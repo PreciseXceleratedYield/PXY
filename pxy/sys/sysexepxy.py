@@ -9,7 +9,7 @@ import pytz
 # ---------------- EXEC SCRIPT ----------------
 def run_execprt():
     """Run execprtpxy.py once at startup"""
-    script_path = "execprtpxy.py"
+    script_path = "syscprtpxy.py"
     if not os.path.exists(script_path):
         print(f"ERR execprt: {script_path} not found")
         return
