@@ -18,8 +18,8 @@ echo
 git reset --hard origin/main
 
 # Copy scripts to proper locations
-sudo cp ~/pxy/sys/pxy ~/pxy/sys/p
-sudo cp ~/pxy/sys/* /usr/local/bin/ &> /dev/null
+sudo cp ~/pxy ~/pxy/sys/p
+sudo cp ~/pxy/* /usr/local/bin/ &> /dev/null
 sudo chmod +x /usr/local/bin/*
 
 echo
