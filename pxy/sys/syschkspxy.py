@@ -6,7 +6,6 @@ import inspect
 import ast
 
 PY_PATH = "./"
-LARGE_FUNC_LINES = 30
 
 exclude_files = {"syschkspxy.py", "exepxy.py", "sysexepxy.py"}
 
@@ -40,18 +39,13 @@ def get_functions_classes(mod):
     for name, obj in inspect.getmembers(mod):
         if inspect.isfunction(obj):
             sig = str(inspect.signature(obj))
-            doc = inspect.getdoc(obj)
-            loc = len(inspect.getsourcelines(obj)[0])
-            funcs.append({'name': name, 'sig': sig, 'doc': doc, 'lines': loc})
+            funcs.append({'name': name, 'sig': sig})
         elif inspect.isclass(obj):
-            doc = inspect.getdoc(obj)
             methods = []
             for mname, mobj in inspect.getmembers(obj, inspect.isfunction):
                 msig = str(inspect.signature(mobj))
-                mdoc = inspect.getdoc(mobj)
-                mloc = len(inspect.getsourcelines(mobj)[0])
-                methods.append({'name': f"{name}.{mname}", 'sig': msig, 'doc': mdoc, 'lines': mloc})
-            classes.append({'name': name, 'doc': doc, 'methods': methods})
+                methods.append({'name': f"{name}.{mname}", 'sig': msig})
+            classes.append({'name': name, 'methods': methods})
     return funcs, classes
 
 def analyze_ast(filepath):
@@ -102,26 +96,15 @@ def option_inspect_functions_classes():
         if funcs:
             print("  Functions:")
             for f in funcs:
-                flags = []
-                if not f['doc']:
-                    flags.append("NO DOC")
-                if f['lines'] > LARGE_FUNC_LINES:
-                    flags.append(f"LARGE")
-                print(f"    {f['name']}{f['sig']} {' '.join(flags)}")
+                print(f"    {f['name']}{f['sig']}")
         else:
             print("  No functions found.")
         if classes:
             print("  Classes:")
             for c in classes:
-                flags = ["NO DOC"] if not c['doc'] else []
-                print(f"    {c['name']} {' '.join(flags)}")
+                print(f"    {c['name']}")
                 for m in c['methods']:
-                    mflags = []
-                    if not m['doc']:
-                        mflags.append("NO DOC")
-                    if m['lines'] > LARGE_FUNC_LINES:
-                        mflags.append("LARGE")
-                    print(f"      {m['name']}{m['sig']} {' '.join(mflags)}")
+                    print(f"      {m['name']}{m['sig']}")
         else:
             print("  No classes found.")
 
@@ -191,7 +174,7 @@ def main():
         print("PYX AUDIT MENU")
         print("#"*40)
         print("1. List all *pxy.py files")
-        print("2. Inspect functions and classes")
+        print("2. Inspect functions and classes (signatures only)")
         print("3. Analyze function calls and imports")
         print("4. Detect orphan functions")
         print("5. Detect orphan classes")
