@@ -1,4 +1,4 @@
-# sysrun_inspect_pxy.py
+# sysrun_showcall.py
 import os
 import glob
 import subprocess
@@ -13,7 +13,7 @@ def collect_py_files():
     return [f for f in py_files if os.path.basename(f) not in exclude_files]
 
 def get_functions(filepath):
-    """Load module and get top-level function names and signatures."""
+    """Return top-level function names and signatures."""
     try:
         module_name = os.path.splitext(os.path.basename(filepath))[0]
         spec = importlib.util.spec_from_file_location(module_name, filepath)
@@ -24,10 +24,10 @@ def get_functions(filepath):
         funcs = []
         for name, obj in inspect.getmembers(mod, inspect.isfunction):
             sig = str(inspect.signature(obj))
-            funcs.append(f"{name}{sig}")
+            funcs.append((name, sig))
         return funcs
     except Exception as e:
-        return [f"ERROR inspecting functions: {e}"]
+        return [("ERROR inspecting functions", str(e))]
 
 def run_files():
     py_files = collect_py_files()
@@ -35,39 +35,26 @@ def run_files():
         print("No *pxy.py files found.")
         return
 
-    success_count = 0
-    fail_count = 0
-
     for file in sorted(py_files):
         print("\n" + "="*60)
         print(f"File: {os.path.relpath(file, PY_PATH)}")
         print("="*60)
 
-        # 1️⃣ Show functions and signatures
+        # 1️⃣ Show functions and “how to call them”
         funcs = get_functions(file)
         if funcs:
-            print("Functions & Signatures:")
-            for f in funcs:
-                print(f"  {f}")
+            print("Functions & How to Call:")
+            for name, sig in funcs:
+                print(f"  {name}{sig}  --> Call: {name}{sig}")
         else:
             print("  No functions found.")
 
         # 2️⃣ Run the file
         try:
             subprocess.run(["python", file], check=True)
-            print(f"✅ Execution successful: {os.path.basename(file)}")
-            success_count += 1
+            print(f"✅ Execution successful")
         except subprocess.CalledProcessError as e:
-            print(f"❌ Execution failed: {os.path.basename(file)} - {e}")
-            fail_count += 1
-
-    # Final summary
-    print("\n" + "#"*60)
-    print("FINAL RUN SUMMARY")
-    print(f"Total files: {len(py_files)}")
-    print(f"Successful: {success_count}")
-    print(f"Failed: {fail_count}")
-    print("#"*60)
+            print(f"❌ Execution failed: {e}")
 
 if __name__ == "__main__":
     run_files()
