@@ -84,8 +84,9 @@ def main():
 
     py_files = glob.glob(os.path.join(PY_PATH, "**", "*pxy.py"), recursive=True)
     
-    # Exclude the audit script itself to prevent self-loop
-    py_files = [f for f in py_files if os.path.basename(f) != "syschkspxy.py"]
+    # Exclude audit runner and main/execution scripts to prevent self-loop
+    exclude_files = {"syschkspxy.py", "exepxy.py", "sysexepxy.py"}
+    py_files = [f for f in py_files if os.path.basename(f) not in exclude_files]
 
     print(f"Found {len(py_files)} *pxy.py files.\n")
 
