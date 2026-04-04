@@ -1,4 +1,4 @@
-# sysaudit_pxy.py
+# sysaudit_full.py
 import os
 import glob
 import importlib.util
@@ -83,6 +83,10 @@ def main():
     global file_function_summary, file_class_summary, file_imports, all_calls, all_module_names
 
     py_files = glob.glob(os.path.join(PY_PATH, "**", "*pxy.py"), recursive=True)
+    
+    # Exclude the audit script itself to prevent self-loop
+    py_files = [f for f in py_files if os.path.basename(f) != "syschkspxy.py"]
+
     print(f"Found {len(py_files)} *pxy.py files.\n")
 
     # Map module names to file paths
