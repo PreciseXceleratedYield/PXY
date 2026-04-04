@@ -63,7 +63,6 @@ def print_candle(o, h, l, c):
 def get_market_snapshot(TICKER):
     result = {}
 
-    # -------- DAILY DATA --------
     df = yf.Ticker(TICKER).history(period="2d")
     if df.empty or len(df) < 2:
         return None
@@ -145,7 +144,7 @@ def get_market_snapshot(TICKER):
     return result
 
 
-# ---------------- MAIN (PRINT ONLY) ----------------
+# ---------------- MAIN ----------------
 def main():
     data = get_market_snapshot(TICKER)
 
@@ -179,7 +178,7 @@ def main():
     spacing = WIDTH - len(f"Bias:{bias}") - len(f"Power:{power}")
     print(left_label + left_value + " " * spacing + right_label + right_value)
 
-    # -------- BREAK + % --------
+    # -------- BREAK + % (FIXED ALIGNMENT) --------
     breakout = data["breakout"]
     o_change = data["o_change"]
     m_change = data["m_change"]
@@ -190,7 +189,41 @@ def main():
     o_color = Fore.GREEN if o_change > 0 else Fore.RED if o_change < 0 else Fore.YELLOW
     m_color = Fore.GREEN if m_change > 0 else Fore.RED if m_change < 0 else Fore.YELLOW
 
-    right_value = o_color + o_str + Fore.WHITE + " | " + m_color + m_str
+    left_part = f"Break:{breakout}"
+    mid_part = o_str
+    right_part = m_str
+
+    left_len = len(left_part)
+    mid_len = len(mid_part)
+    right_len = len(right_part)
+
+    mid_start = (WIDTH // 2) - (mid_len // 2)
+    right_start = WIDTH - right_len
+
+    line = [" "] * WIDTH
+
+    # left
+    for i, ch in enumerate(left_part):
+        if i < WIDTH:
+            line[i] = ch
+
+    # center (O)
+    for i, ch in enumerate(mid_part):
+        pos = mid_start + i
+        if 0 <= pos < WIDTH:
+            line[pos] = ch
+
+    # right (M)
+    for i, ch in enumerate(right_part):
+        pos = right_start + i
+        if 0 <= pos < WIDTH:
+            line[pos] = ch
+
+    final_line = "".join(line)
+
+    # apply colors safely
+    final_line = final_line.replace(o_str, o_color + o_str + Style.RESET_ALL)
+    final_line = final_line.replace(m_str, m_color + m_str + Style.RESET_ALL)
 
     left_label = Fore.YELLOW + "Break:"
     left_value = (
@@ -199,13 +232,12 @@ def main():
         Fore.YELLOW
     ) + breakout
 
-    spacing = WIDTH - len(f"Break:{breakout}") - len(f"{o_str} | {m_str}")
-
-    print(
-        left_label + left_value +
-        " " * max(1, spacing) +
-        right_value
+    final_line = final_line.replace(
+        f"Break:{breakout}",
+        left_label + left_value + Style.RESET_ALL
     )
+
+    print(final_line)
 
 
 # ---------------- RUN ----------------
