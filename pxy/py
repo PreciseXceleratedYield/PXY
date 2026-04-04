@@ -1,0 +1,8 @@
+# Go to the exe directory
+cd ~/pxy/sys/exe || { echo "exe directory not found!"; exit 1; }
+
+# Activate your virtual environment
+source ~/pxy/venv/bin/activate
+
+# Now you are in exe with venv active
+# You can run pxyexe manually here
