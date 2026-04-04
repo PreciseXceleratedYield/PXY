@@ -14,7 +14,7 @@ source ~/env/bin/activate
 
 # ---------------- Function to cleanly kill ----------------
 cleanup() {
-    echo "⏹ Ctrl+C detected → stopping pxymain.py and tmux..."
+    echo -e "\n⏹ Ctrl+C detected → stopping pxymain.py and tmux..."
     tmux kill-session -t $SESSION 2>/dev/null
     exit 0
 }
@@ -25,16 +25,16 @@ trap cleanup SIGINT
 # ---------------- Launch or attach ----------------
 tmux has-session -t $SESSION 2>/dev/null
 if [ $? -eq 0 ]; then
-    # Attach to existing session
+    # Session exists → attach
     tmux attach -t $SESSION
 else
-    # Create session and run pxymain.py
-    tmux new-session -s $SESSION -d "bash -c '
-        echo \"=== Starting pxymain.py: \$(date) ===\";
-        python ~/pxy/sys/exe/run/pxymain.py;
-        echo \"=== pxymain.py exited: \$(date) ===\";
-        exec bash
-    '"
+    # Session doesn't exist → create and run pxymain.py
+    tmux new-session -s $SESSION -d \
+        "bash -c '
+            echo \"=== Starting pxymain.py: \$(date) ===\";
+            exec python ~/pxy/sys/exe/run/pxymain.py;
+        '"
+
     # Attach after starting
     tmux attach -t $SESSION
 fi
