@@ -13,22 +13,19 @@ SESSION="neopxy"
 # ---------------- Avoid nested tmux sessions ----------------
 unset TMUX
 
-# ---------------- Check if tmux session exists ----------------
-tmux has-session -t $SESSION 2>/dev/null
+# ---------------- Activate virtualenv ----------------
+source ~/env/bin/activate
 
-if [ $? -eq 0 ]; then
-    # Session exists → attach
-    tmux attach -t $SESSION
-else
-    # Session doesn't exist → create and run pxymain.py inside tmux
-    tmux new -s $SESSION "bash -c '
+# ---------------- Launch or attach tmux ----------------
+tmux new-session -A -s $SESSION -d \
+    "bash -c '
         echo \"=== Starting neopxy: \$(date) ===\";
         source ~/env/bin/activate;
-
         # Run pxymain.py with colors preserved and log output
-        script -q -f -c \"python pxymain.py\" $LOG_FILE
-
+        script -q -f -c \"python pxymain.py\" $LOG_FILE;
         echo \"=== pxymain.py exited: \$(date) ===\";
         exec bash
     '"
-fi
+
+# ---------------- Attach to tmux ----------------
+tmux attach -t $SESSION
