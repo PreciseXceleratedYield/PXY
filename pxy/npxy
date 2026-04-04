@@ -3,10 +3,6 @@
 # ---------------- Force project directory ----------------
 cd ~/pxy || { echo "Directory ~/pxy not found! Exiting."; exit 1; }
 
-# ---------------- Create logs directory ----------------
-mkdir -p logs
-LOG_FILE="logs/neopxy.log"
-
 # ---------------- TMUX SESSION NAME ----------------
 SESSION="neopxy"
 
@@ -16,16 +12,29 @@ unset TMUX
 # ---------------- Activate virtualenv ----------------
 source ~/env/bin/activate
 
-# ---------------- Launch or attach tmux ----------------
-tmux new-session -A -s $SESSION -d \
-    "bash -c '
-        echo \"=== Starting neopxy: \$(date) ===\";
-        source ~/env/bin/activate;
-        # Run pxymain.py with colors preserved and log output
-        script -q -f -c \"python pxymain.py\" $LOG_FILE;
+# ---------------- Function to cleanly kill ----------------
+cleanup() {
+    echo "⏹ Ctrl+C detected → stopping pxymain.py and tmux..."
+    tmux kill-session -t $SESSION 2>/dev/null
+    exit 0
+}
+
+# Trap Ctrl+C
+trap cleanup SIGINT
+
+# ---------------- Launch or attach ----------------
+tmux has-session -t $SESSION 2>/dev/null
+if [ $? -eq 0 ]; then
+    # Attach to existing session
+    tmux attach -t $SESSION
+else
+    # Create session and run pxymain.py
+    tmux new-session -s $SESSION -d "bash -c '
+        echo \"=== Starting pxymain.py: \$(date) ===\";
+        python ~/pxy/sys/exe/run/pxymain.py;
         echo \"=== pxymain.py exited: \$(date) ===\";
         exec bash
     '"
-
-# ---------------- Attach to tmux ----------------
-tmux attach -t $SESSION
+    # Attach after starting
+    tmux attach -t $SESSION
+fi
