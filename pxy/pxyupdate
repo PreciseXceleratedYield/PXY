@@ -18,7 +18,7 @@ echo
 git reset --hard origin/main
 
 # Copy specific scripts
-sudo cp "$HOME/pxy" "$HOME/pxy/sys/p"
+sudo cp "$HOME/pxy" "$HOME/pxy/sys/p" 2>/dev/null
 
 # Copy only files WITHOUT an extension to /usr/local/bin
 for file in "$HOME/pxy"/*; do
