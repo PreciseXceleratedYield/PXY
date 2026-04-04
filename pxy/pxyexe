@@ -1,47 +1,34 @@
 #!/bin/bash
+
 # ---------------- Base directory ----------------
 BASE_DIR=~/pxy
 
 # ---------------- Activate virtualenv ----------------
 if [ -f ~/env/bin/activate ]; then
     source ~/env/bin/activate
-    echo "✅ Virtual environment activated in $(pwd)"
+    echo "✅ Virtual environment activated in $BASE_DIR"
 else
     echo "❌ Virtual environment ~/env/bin/activate not found!"
     exit 1
 fi
 
-# ---------------- Ask for program ----------------
-echo
-read -p "Enter program to run (pxymain.py or exemainpxy.py): " prog_file
+# ---------------- Set program to run ----------------
+PROG_FILE="exemainpxy.py"
+PROG_DIR="$BASE_DIR/sys/exe"
 
-# ---------------- Determine directory ----------------
-case "$prog_file" in
-    pxymain.py)
-        prog_dir="$BASE_DIR"
-        ;;
-    exemainpxy.py)
-        prog_dir="$BASE_DIR/sys/exe"
-        ;;
-    *)
-        echo "❌ Unknown program '$prog_file'. Exiting."
-        exit 1
-        ;;
-esac
-
-# ---------------- Switch to directory ----------------
-cd "$prog_dir" || { echo "❌ Cannot cd to $prog_dir"; exit 1; }
+# ---------------- Switch to program directory ----------------
+cd "$PROG_DIR" || { echo "❌ Cannot cd to $PROG_DIR"; exit 1; }
 
 # ---------------- Check if file exists ----------------
-if [ ! -f "$prog_file" ]; then
-    echo "❌ File '$prog_file' not found in $prog_dir"
+if [ ! -f "$PROG_FILE" ]; then
+    echo "❌ File '$PROG_FILE' not found in $PROG_DIR"
     exit 1
 fi
 
 # ---------------- Run the program ----------------
-echo "▶ Running $prog_file in $prog_dir ..."
-python "$prog_file"
+echo "▶ Running $PROG_FILE in $PROG_DIR ..."
+python "$PROG_FILE"
 
 # ---------------- Stay in shell ----------------
-echo "✅ Finished running $prog_file. Staying in $(pwd) with virtualenv activated."
+echo "✅ Finished running $PROG_FILE. Staying in $(pwd) with virtualenv activated."
 exec $SHELL
