@@ -11,12 +11,12 @@ def run_execprt():
     """Run execprtpxy.py once at startup"""
     script_path = "syscprtpxy.py"
     if not os.path.exists(script_path):
-        print(f"ERR execprt: {script_path} not found")
+        print("❌ EXECPRT ERR: file not found ⚠️")
         return
     try:
         subprocess.run([sys.executable, script_path], check=True)
     except Exception as e:
-        print(f"ERR execprt: {str(e)[:20]}")
+        print("❌ EXECPRT ERR: run failed ⚠️")
 
 # ---------------- TELEGRAM CONFIG ----------------
 TELEGRAM_BOT_TOKEN = "7141714085:AAHlyEzszCy9N-L6wO1zSAkRwGdl0VTQCFI"
@@ -34,7 +34,7 @@ def send_telegram(msg):
         import requests
         requests.post(url, data=payload)
     except Exception as e:
-        print(f"TG ERR: {str(e)[:25]}")
+        print("📡 TG ERR: message send failed ⚠️")
 
 # ---------------- IST TIMEZONE ----------------
 IST = pytz.timezone("Asia/Kolkata")
@@ -69,13 +69,13 @@ def start_loop():
         # ---- MARKET OPEN ----
         if mkt and not was_open:
             send_telegram("Bot started (market open)")
-            print("MKT OPEN: bot started")
+            print("🚀 MKT OPEN: bot started, ready trade 📡")
             off_done = False
 
         # ---- MARKET CLOSE ----
         if not mkt and was_open:
             send_telegram("Bot stopped (market close)")
-            print("MKT CLOSE: bot stopped")
+            print("🛑 MKT CLOSE: bot stopped, session end 🔒")
             off_done = False
 
         # ---- RUN MAIN SCRIPT ----
@@ -84,11 +84,11 @@ def start_loop():
                 subprocess.run([sys.executable, EXE_FILE])
             else:
                 if not off_done:
-                    print("Off-market run once")
+                    print("🌙 OFF MKT: one run executed, idle now 💤")
                     subprocess.run([sys.executable, EXE_FILE])
                     off_done = True
         else:
-            print(f"ERR exe: {EXE_FILE} not found")
+            print("❌ EXE ERR: exepxy.py file not found ⚠️")
 
         was_open = mkt
         time.sleep(max(0, 1 - (time.time() - t0)))  # ~1s loop
