@@ -75,5 +75,5 @@ def get_random_spiritual_message():
     random.shuffle(adjusted_messages)
     return random.choice(adjusted_messages)
 
-# Example usage: print bold
-print("\033[1m" + get_random_spiritual_message() + "\033[0m")
+# Example usage: print in bold, light blue, and underlined
+print("\033[1;4;94m" + get_random_spiritual_message() + "\033[0m")
