@@ -21,7 +21,7 @@ while true; do
     # Display menu
     echo -e "${YELLOW}   PXY® PreciseXceleratedYield Pvt Ltd™   ${NC}"
     echo "******************************************"
-    echo "          ఓం నమో వాసుదేవాయ           "
+    echo "      ఓం న మో వా సు దే వా య           "
     echo "******************************************"
     echo -e "${YELLOW}   PXY® PreciseXceleratedYield Pvt Ltd™   ${NC}"
 
