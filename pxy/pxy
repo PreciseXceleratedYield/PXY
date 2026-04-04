@@ -8,7 +8,7 @@ NC='\033[0m' # No Color
 
 # Activate virtualenv
 source ~/env/bin/activate
-cd ~/pxy/sys/exe/run
+cd ~/pxy/sys/exe/
 pxylogin >/dev/null 2>&1
 
 while true; do
