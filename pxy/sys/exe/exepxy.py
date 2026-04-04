@@ -63,11 +63,11 @@ loop_counter = 1
 # ---------------- RUN PARENT SCRIPTS ONCE AT START ----------------
 # ---------------- RUN PARENT AND LOCAL EXE SCRIPTS ----------------
 parent_scripts = [
-    str(HERE.parent / "systdaypxy.pyc"),   # parent directory
-    str(HERE.parent / "sysvixpxy.pyc"),
-    str(HERE.parent / "sysdashpxy.pyc"),
-    str(HERE / "exeentrpxy.pyc"),          # current/exe directory
-    str(HERE / "exeexitpxy.pyc")
+    str(HERE.parent / "systdaypxy.py"),   # parent directory
+    str(HERE.parent / "sysvixpxy.py"),
+    str(HERE.parent / "sysdashpxy.py"),
+    str(HERE / "exeentrpxy.py"),          # current/exe directory
+    str(HERE / "exeexitpxy.py")
 ]
 
 for s in parent_scripts:
@@ -87,12 +87,12 @@ while True:
             live_status(f"Loop #{loop_counter} | Subloop #{sub_itr} | CE:{ce_qty} PE:{pe_qty}")
 
             if ce_qty >= 1 and pe_qty >= 1:
-                safe_run("exeexitpxy.pyc")
+                safe_run("exeexitpxy.py")
             elif ce_qty == 0 and pe_qty == 0:
-                safe_run("exeentrpxy.pyc")
+                safe_run("exeentrpxy.py")
             else:
-                safe_run("exeentrpxy.pyc")
-                safe_run("exeexitpxy.pyc")
+                safe_run("exeentrpxy.py")
+                safe_run("exeexitpxy.py")
 
             fancy_pause(3)
 
@@ -100,7 +100,7 @@ while True:
 
     else:
         print("\n💤 Market closed → end-of-day cleanup")
-        safe_run("exeslefpxy.pyc")
+        safe_run("exeslefpxy.py")
         fancy_pause(5)
 
         # Wait until next market open
