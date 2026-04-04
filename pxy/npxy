@@ -4,10 +4,6 @@ SESSION="neopxy"
 unset TMUX
 source ~/env/bin/activate
 
-# Check if session exists
-if tmux has-session -t $SESSION 2>/dev/null; then
-    tmux attach -t $SESSION
-else
-    # Create session and run pxymain.py directly (foreground)
-    tmux new -s $SESSION "exec python ~/pxy/sys/exe/run/pxymain.py"
-fi
+tmux has-session -t $SESSION 2>/dev/null \
+  && tmux attach -t $SESSION \
+  || tmux new -s $SESSION "python ~/pxy/sys/exe/run/pxymain.py"
