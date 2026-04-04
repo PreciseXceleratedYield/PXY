@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# ---------------- Force project directory ----------------
-cd ~/pxy/sys/exe || { echo "Directory ~/pxy/sys/exe not found! Exiting."; exit 1; }
+# ---------------- Force base project directory ----------------
+BASE_DIR=~/pxy
+cd "$BASE_DIR" || { echo "Directory $BASE_DIR not found! Exiting."; exit 1; }
 
 # ---------------- Activate virtual environment ----------------
 if [ -f ~/env/bin/activate ]; then
@@ -12,14 +13,37 @@ else
     exit 1
 fi
 
-# ---------------- Prompt user ----------------
+# ---------------- Ask user for program ----------------
 echo
-read -p "Do you want to run pxymain.py now? (y/n) " run_now
+read -p "Enter the program you want to run (e.g., pxymain.py, exeexitpxy.py): " prog_file
 
-if [[ "$run_now" =~ ^[Yy]$ ]]; then
-    echo "▶ Running pxymain.py..."
-    python pxymain.py
-else
-    echo "ℹ Staying in activated environment. You can run scripts manually."
-    exec $SHELL
+# ---------------- Deduce directory from first 3 letters ----------------
+prefix=${prog_file:0:3}   # first 3 letters
+case "$prefix" in
+    exe|run)
+        prog_dir="$BASE_DIR/sys/exe/run"
+        ;;
+    sys)
+        prog_dir="$BASE_DIR/sys"
+        ;;
+    *)
+        prog_dir="$BASE_DIR"
+        ;;
+esac
+
+# ---------------- Switch to file's directory ----------------
+cd "$prog_dir" || { echo "Cannot cd to $prog_dir"; exit 1; }
+
+# ---------------- Check if file exists ----------------
+if [ ! -f "$prog_file" ]; then
+    echo "❌ File '$prog_file' not found in $prog_dir"
+    exit 1
 fi
+
+# ---------------- Run program ----------------
+echo "▶ Running $prog_file in directory $prog_dir ..."
+python "$prog_file"
+
+# ---------------- Keep shell open ----------------
+echo "✅ Finished running $prog_file. Staying in $(pwd) with virtualenv activated."
+exec $SHELL
