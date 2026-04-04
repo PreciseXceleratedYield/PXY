@@ -9,18 +9,17 @@ import pytz
 
 # ---------------- PATH ----------------
 HERE = Path(__file__).resolve().parent
+EXE_DIR = HERE / "sys" / "exe"   # updated path to exec files
 
 def run_execprt():
+    script_path = EXE_DIR / "execprtpxy.py"
+    if not script_path.exists():
+        print(f"ERR execprt: {script_path} not found")
+        return
     try:
-        script_path = HERE / "execprtpxy.py"
-
-        subprocess.run(
-            [sys.executable, str(script_path)],
-            check=True
-        )
+        subprocess.run([sys.executable, str(script_path)], check=True)
     except Exception as e:
         print(f"ERR execprt: {str(e)[:20]}")
-
 
 # ---------------- TELEGRAM CONFIG ----------------
 TELEGRAM_BOT_TOKEN = "7141714085:AAHlyEzszCy9N-L6wO1zSAkRwGdl0VTQCFI"
@@ -39,7 +38,6 @@ def send_telegram(msg):
     except Exception as e:
         print(f"TG ERR: {str(e)[:25]}")
 
-
 # ---------------- IST TIMEZONE ----------------
 IST = pytz.timezone("Asia/Kolkata")
 MARKET_OPEN  = dt_time(9, 16)
@@ -54,14 +52,13 @@ def is_market_hours():
     wd = now_dt.weekday()
     return 0 <= wd <= 4 and MARKET_OPEN <= t < MARKET_CLOSE
 
-
 # ---------------- SUPERVISOR LOOP ----------------
 def start_loop():
     run_execprt()   # run once
 
     was_open = False
     off_done = False
-    EXE_FILE = HERE / "exepxy.py"
+    EXE_FILE = EXE_DIR / "exepxy.py"
 
     while True:
         t0 = time.time()
@@ -80,17 +77,19 @@ def start_loop():
             off_done = False
 
         # ---- RUN MAIN ----
-        if mkt:
-            subprocess.run([sys.executable, str(EXE_FILE)])
-        else:
-            if not off_done:
-                print("Off-mkt run once")
+        if EXE_FILE.exists():
+            if mkt:
                 subprocess.run([sys.executable, str(EXE_FILE)])
-                off_done = True
+            else:
+                if not off_done:
+                    print("Off-mkt run once")
+                    subprocess.run([sys.executable, str(EXE_FILE)])
+                    off_done = True
+        else:
+            print(f"ERR exe: {EXE_FILE} not found")
 
         was_open = mkt
         time.sleep(max(0, 1 - (time.time() - t0)))
-
 
 # ---------------- ENTRY ----------------
 if __name__ == "__main__":
