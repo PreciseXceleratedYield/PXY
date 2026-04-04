@@ -1,0 +1,25 @@
+#!/bin/bash
+
+# ---------------- Force project directory ----------------
+cd ~/pxy/sys/exe || { echo "Directory ~/pxy/sys/exe not found! Exiting."; exit 1; }
+
+# ---------------- Activate virtual environment ----------------
+if [ -f ~/env/bin/activate ]; then
+    source ~/env/bin/activate
+    echo "✅ Virtual environment activated in $(pwd)"
+else
+    echo "❌ Virtual environment ~/env/bin/activate not found!"
+    exit 1
+fi
+
+# ---------------- Prompt user ----------------
+echo
+read -p "Do you want to run pxymain.py now? (y/n) " run_now
+
+if [[ "$run_now" =~ ^[Yy]$ ]]; then
+    echo "▶ Running pxymain.py..."
+    python pxymain.py
+else
+    echo "ℹ Staying in activated environment. You can run scripts manually."
+    exec $SHELL
+fi
