@@ -96,7 +96,7 @@ def print_market_context_options():
     left = f"VIX:{expand_vix(vix_flag)}"
     right = f"WORLD:{expand_sentiment(sentiment)}"
 
-    print(Fore.CYAN + Style.BRIGHT + f"{left:<21}{right:>21}")
+    print(Fore.LIGHTBLACK_EX + Style.BRIGHT + f"{left:<21}{right:>21}")
 
 
 # ----------------------------
