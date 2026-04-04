@@ -58,7 +58,7 @@ def start_loop():
     run_execprt()   # run execprt once at start
     was_open = False
     off_done = False
-    EXE_FILE = "exemainpxy.py"
+    EXE_FILE = "exepxy.py"
 
     while True:
         t0 = time.time()
