@@ -1,3 +1,13 @@
+#!/bin/bash
+
+# Step 1: Activate your virtual environment
+# Adjust the path to your venv activate script
+source ~/pxy/venv/bin/activate
+
+# Step 2: Navigate to the working directory (if needed)
+cd ~/pxy || { echo "pxy directory not found! Exiting."; exit 1; }
+
+# Step 3: Start or attach tmux session
 tmux has-session -t npxy 2>/dev/null \
   && tmux attach -t npxy \
   || tmux new -s npxy 'pxyexe'
