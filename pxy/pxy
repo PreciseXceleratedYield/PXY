@@ -65,11 +65,7 @@ while true; do
             ;;
         "")
             echo ".........Lets have fun with PXY®  🔥💫🚀🔥"
-            pxypxy
-            ;;
-        en)
-            echo ".........Lets have fun with PXY®  🔥💫🚀🔥"
-            pxypxy
+            pxyexe
             ;;
         *)
             echo "Invalid choice: $choice"
