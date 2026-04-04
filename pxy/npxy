@@ -24,7 +24,10 @@ else
     tmux new -s $SESSION "bash -c '
         echo \"=== Starting neopxy: \$(date) ===\";
         source ~/env/bin/activate;
-        python pxymain.py 2>&1 | tee -a $LOG_FILE;
+
+        # Run pxymain.py with colors preserved and log output
+        script -q -f -c \"python pxymain.py\" $LOG_FILE
+
         echo \"=== pxymain.py exited: \$(date) ===\";
         exec bash
     '"
