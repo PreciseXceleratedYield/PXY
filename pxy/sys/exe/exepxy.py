@@ -99,7 +99,7 @@ while True:
         loop_counter += 1
 
     else:
-        print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
+        print("\n🌙 MKT CLOSED:running cleanup tasks now 💤")
         
         # Correct full path to parent sys folder
         safe_run(str(HERE.parent / "sysslefpxy.py"))
