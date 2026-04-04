@@ -112,17 +112,22 @@ async def main():
         ltp = df['Close'].iloc[-1]
         dprint(f"Current LTP: {ltp}")
 
-        # 4. Side & Strike Logic
-        if "BUY" in entry_signal.upper():
-            side = "BUY" 
-        elif "SELL" in entry_signal.upper():
-            side = "SELL" 
+        # 4. Side & Strike Logic (FIXED)
+        sig = entry_signal.upper().strip()
+        
+        # STRICT side detection
+        if sig.endswith("BUY"):
+            side = "BUY"
+        elif sig.endswith("SELL"):
+            side = "SELL"
         else:
             print(f"{Fore.YELLOW}💤 Neutral Signal: {entry_signal}")
             return
 
-        offset = 200 if entry_signal in ["BUY", "SELL"] else 0
-        
+        # STRICT OTM only for pure BUY/SELL
+        offset = 200 if sig in ["BUY", "SELL"] else 0
+
+        # Strike calculation
         if side == "BUY":
             strike = round_up_50(ltp + offset)
         else:
