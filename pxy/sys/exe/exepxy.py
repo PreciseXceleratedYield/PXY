@@ -102,7 +102,7 @@ while True:
         print("\n💤 Market closed → end-of-day cleanup")
         safe_run(str(HERE / "exeslefpxy.py"))  # full path ensures correct file
         fancy_pause(5)
-
+    
         # Wait until next market open
         while not in_market_hours():
             print("⏳ Waiting for market to open (9:16 IST)", end="\r")
