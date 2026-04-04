@@ -1,34 +1,16 @@
 #!/bin/bash
+# ------------------------------
+# Run exepxy.py from ~/pxy/sys/exe
+# ------------------------------
 
-# ---------------- Base directory ----------------
-BASE_DIR=~/pxy
+# Go to exe folder
+cd "$HOME/pxy/sys/exe" || { echo "Directory ~/pxy/sys/exe not found"; exit 1; }
 
-# ---------------- Activate virtualenv ----------------
-if [ -f ~/env/bin/activate ]; then
-    source ~/env/bin/activate
-    echo "✅ Virtual environment activated in $BASE_DIR"
-else
-    echo "❌ Virtual environment ~/env/bin/activate not found!"
-    exit 1
-fi
+# Optional: activate virtual environment if needed
+# source ~/pxy/env/bin/activate
 
-# ---------------- Set program to run ----------------
-PROG_FILE="exemainpxy.py"
-PROG_DIR="$BASE_DIR/sys/exe"
+# Run the Python script
+python3 exepxy.py
 
-# ---------------- Switch to program directory ----------------
-cd "$PROG_DIR" || { echo "❌ Cannot cd to $PROG_DIR"; exit 1; }
-
-# ---------------- Check if file exists ----------------
-if [ ! -f "$PROG_FILE" ]; then
-    echo "❌ File '$PROG_FILE' not found in $PROG_DIR"
-    exit 1
-fi
-
-# ---------------- Run the program ----------------
-echo "▶ Running $PROG_FILE in $PROG_DIR ..."
-python "$PROG_FILE"
-
-# ---------------- Stay in shell ----------------
-echo "✅ Finished running $PROG_FILE. Staying in $(pwd) with virtualenv activated."
-exec $SHELL
+# Optional: print completion
+echo "exepxy.py execution finished."
