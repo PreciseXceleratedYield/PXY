@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Navigate to pxy directory
+cd "$HOME/pxy" || { echo "pxy directory not found! Exiting."; exit 1; }
+
+echo
+echo "       ******** GET UPDATES *******"
+echo
+
+# Fetch latest updates from git
+git fetch --all
+
+echo
+echo "       ****** RESET SOFTWARE ******"
+echo
+
+# Reset local changes to match remote main branch
+git reset --hard origin/main
+
+# Copy scripts to proper locations
+sudo cp ~/pxy/sys/pxy ~/pxy/sys/p
+sudo cp ~/pxy/sys/* /usr/local/bin/ &> /dev/null
+sudo chmod +x /usr/local/bin/*
+
+echo
+echo "       ***** UPDATE COMPLETED *****"
+echo
+
