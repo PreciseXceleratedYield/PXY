@@ -15,7 +15,7 @@ while true; do
     sudo timedatectl set-timezone UTC > /dev/null 2>&1
 
     # Copy pxy* files from ~/pxy/sys/ to /usr/local/bin/
-    sudo cp ~/pxy/sys/pxy* /usr/local/bin/
+    sudo cp ~/pxy* /usr/local/bin/
     sudo chmod +x /usr/local/bin/pxy*
 
     # Display menu
