@@ -1,23 +1,19 @@
-# sysaudit_menu.py
+# sysaudit_simple.py
 import os
 import glob
 import importlib.util
 import inspect
-import ast
+import py_compile
 
 PY_PATH = "./"
-
 exclude_files = {"syschkspxy.py", "exepxy.py", "sysexepxy.py"}
 
 file_function_summary = {}
-file_class_summary = {}
-file_imports = {}
-all_calls = set()
-all_module_names = {}
+file_syntax_summary = {}
 
-# ------------------------------
+# -----------------------------
 # Utility Functions
-# ------------------------------
+# -----------------------------
 def collect_py_files():
     py_files = glob.glob(os.path.join(PY_PATH, "**", "*pxy.py"), recursive=True)
     return [f for f in py_files if os.path.basename(f) not in exclude_files]
@@ -34,166 +30,92 @@ def load_module(filepath):
     except Exception:
         return None
 
-def get_functions_classes(mod):
-    funcs, classes = [], []
-    for name, obj in inspect.getmembers(mod):
-        if inspect.isfunction(obj):
-            sig = str(inspect.signature(obj))
-            funcs.append({'name': name, 'sig': sig})
-        elif inspect.isclass(obj):
-            methods = []
-            for mname, mobj in inspect.getmembers(obj, inspect.isfunction):
-                msig = str(inspect.signature(mobj))
-                methods.append({'name': f"{name}.{mname}", 'sig': msig})
-            classes.append({'name': name, 'methods': methods})
-    return funcs, classes
+def get_functions(mod):
+    funcs = []
+    for name, obj in inspect.getmembers(mod, inspect.isfunction):
+        sig = str(inspect.signature(obj))
+        funcs.append({'name': name, 'sig': sig})
+    return funcs
 
-def analyze_ast(filepath):
-    calls, imports, global_code = set(), set(), 0
+def check_syntax(filepath):
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
-            tree = ast.parse(f.read(), filename=filepath)
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call):
-                if isinstance(node.func, ast.Name):
-                    calls.add(node.func.id)
-                elif isinstance(node.func, ast.Attribute):
-                    calls.add(node.func.attr)
-            elif isinstance(node, ast.Import):
-                for alias in node.names:
-                    imports.add(alias.name.split('.')[0])
-            elif isinstance(node, ast.ImportFrom):
-                if node.module:
-                    imports.add(node.module.split('.')[0])
-        for stmt in tree.body:
-            if not isinstance(stmt, (ast.FunctionDef, ast.ClassDef, ast.Import, ast.ImportFrom, ast.If)):
-                global_code += 1
-    except Exception:
-        pass
-    return calls, imports, global_code
+        py_compile.compile(filepath, doraise=True)
+        return True, None
+    except py_compile.PyCompileError as e:
+        return False, str(e)
 
-# ------------------------------
+# -----------------------------
 # Menu Options
-# ------------------------------
+# -----------------------------
 def option_list_files():
     py_files = collect_py_files()
     print(f"\nFound {len(py_files)} files:\n")
     for f in py_files:
         print(f"  {os.path.relpath(f, PY_PATH)}")
 
-def option_inspect_functions_classes():
+def option_inspect_functions():
     py_files = collect_py_files()
     for file in sorted(py_files):
         print("\n" + "="*50)
         print(f"File: {os.path.relpath(file, PY_PATH)}")
         mod = load_module(file)
         if not mod:
-            print("  ERROR loading module.")
+            print("  ERROR loading module")
             continue
-        funcs, classes = get_functions_classes(mod)
+        funcs = get_functions(mod)
         file_function_summary[file] = funcs
-        file_class_summary[file] = classes
         if funcs:
-            print("  Functions:")
             for f in funcs:
-                print(f"    {f['name']}{f['sig']}")
+                print(f"  {f['name']}{f['sig']}")
         else:
             print("  No functions found.")
-        if classes:
-            print("  Classes:")
-            for c in classes:
-                print(f"    {c['name']}")
-                for m in c['methods']:
-                    print(f"      {m['name']}{m['sig']}")
-        else:
-            print("  No classes found.")
 
-def option_analyze_calls_imports():
+def option_syntax_check():
     py_files = collect_py_files()
     for file in sorted(py_files):
-        calls, imports, global_code = analyze_ast(file)
-        all_calls.update(calls)
-        file_imports[file] = imports
-        print("\n" + "="*50)
-        print(f"File: {os.path.relpath(file, PY_PATH)}")
-        print(f"  Calls: {', '.join(calls) if calls else 'None'}")
-        print(f"  Imports: {', '.join(imports) if imports else 'None'}")
-        print(f"  Global code lines: {global_code}")
+        ok, msg = check_syntax(file)
+        file_syntax_summary[file] = ok
+        status = "OK" if ok else "ERROR"
+        print(f"{os.path.relpath(file, PY_PATH)} : {status}")
+        if msg:
+            print(f"  {msg}")
 
-def option_orphan_functions():
-    orphan_functions = {}
-    for file, funcs in file_function_summary.items():
-        orphans = [f['name'] for f in funcs if f['name'].split('.')[-1] not in all_calls]
-        if orphans:
-            orphan_functions[file] = orphans
-    for file, funcs in orphan_functions.items():
-        print(f"\n{os.path.relpath(file, PY_PATH)}:")
-        for f in funcs:
-            print(f"  {f}")
-
-def option_orphan_classes():
-    orphan_classes = {}
-    for file, classes in file_class_summary.items():
-        orphans = []
-        for c in classes:
-            method_orphan = all(m['name'].split('.')[-1] not in all_calls for m in c['methods'])
-            if method_orphan:
-                orphans.append(c['name'])
-        if orphans:
-            orphan_classes[file] = orphans
-    for file, classes in orphan_classes.items():
-        print(f"\n{os.path.relpath(file, PY_PATH)}:")
-        for c in classes:
-            print(f"  {c}")
-
-def option_orphan_files():
-    imported_modules = set()
-    for imps in file_imports.values():
-        imported_modules.update(imps)
+def option_summary():
+    print("\n" + "#"*50)
+    print("SUMMARY PER FILE")
+    print("#"*50)
     py_files = collect_py_files()
-    for f in py_files:
-        mod_name = os.path.splitext(os.path.basename(f))[0]
-        all_module_names[mod_name] = f
-    orphan_files = []
-    for mod_name, file in all_module_names.items():
-        with open(file, "r", encoding="utf-8") as f:
-            content = f.read()
-            has_main = '__name__' in content and '__main__' in content
-        if mod_name not in imported_modules and not has_main:
-            orphan_files.append(file)
-    print(f"\nOrphan files ({len(orphan_files)}):")
-    for f in orphan_files:
-        print(f"  {os.path.relpath(f, PY_PATH)}")
+    for file in sorted(py_files):
+        funcs = file_function_summary.get(file, [])
+        syntax_ok = file_syntax_summary.get(file, None)
+        syntax_status = "OK" if syntax_ok else ("Not Checked" if syntax_ok is None else "ERROR")
+        print(f"\nFile: {os.path.relpath(file, PY_PATH)}")
+        print(f"  Functions found: {len(funcs)}")
+        print(f"  Syntax check: {syntax_status}")
 
-# ------------------------------
+# -----------------------------
 # Menu Loop
-# ------------------------------
+# -----------------------------
 def main():
     while True:
         print("\n" + "#"*40)
-        print("PYX AUDIT MENU")
+        print("PYX SIMPLE AUDIT MENU")
         print("#"*40)
         print("1. List all *pxy.py files")
-        print("2. Inspect functions and classes (signatures only)")
-        print("3. Analyze function calls and imports")
-        print("4. Detect orphan functions")
-        print("5. Detect orphan classes")
-        print("6. Detect orphan files")
-        print("7. Exit")
-        choice = input("\nSelect option [1-7]: ").strip()
+        print("2. Inspect functions (signatures only)")
+        print("3. Syntax check each file")
+        print("4. Summary per file")
+        print("5. Exit")
+        choice = input("\nSelect option [1-5]: ").strip()
         if choice == "1":
             option_list_files()
         elif choice == "2":
-            option_inspect_functions_classes()
+            option_inspect_functions()
         elif choice == "3":
-            option_analyze_calls_imports()
+            option_syntax_check()
         elif choice == "4":
-            option_orphan_functions()
+            option_summary()
         elif choice == "5":
-            option_orphan_classes()
-        elif choice == "6":
-            option_orphan_files()
-        elif choice == "7":
             print("Exiting...")
             break
         else:
