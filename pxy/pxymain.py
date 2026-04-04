@@ -12,7 +12,7 @@ HERE = Path(__file__).resolve().parent
 
 def run_execprt():
     try:
-        script_path = HERE / "execprtpxy.pyc"
+        script_path = HERE / "execprtpxy.py"
 
         subprocess.run(
             [sys.executable, str(script_path)],
@@ -61,7 +61,7 @@ def start_loop():
 
     was_open = False
     off_done = False
-    EXE_FILE = HERE / "exepxy.pyc"
+    EXE_FILE = HERE / "exepxy.py"
 
     while True:
         t0 = time.time()
