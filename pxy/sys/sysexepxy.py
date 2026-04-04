@@ -58,7 +58,9 @@ def start_loop():
     run_execprt()   # run execprt once at start
     was_open = False
     off_done = False
-    EXE_FILE = "exepxy.py"
+
+    # Adjusted path to child directory
+    EXE_FILE = os.path.join("exe", "exepxy.py")
 
     while True:
         t0 = time.time()
