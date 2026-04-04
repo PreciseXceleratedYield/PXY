@@ -101,8 +101,8 @@ while True:
     else:
         print("\n💤 Market closed → end-of-day cleanup")
         
-        # Correct full path to sys/sysslefpxy.py
-        safe_run(str(HERE / "sysslefpxy.py"))
+        # Correct full path to parent sys folder
+        safe_run(str(HERE.parent / "sysslefpxy.py"))
         
         fancy_pause(5)
     
