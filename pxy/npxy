@@ -1,40 +1,13 @@
 #!/bin/bash
-
-# ---------------- Force project directory ----------------
 cd ~/pxy || { echo "Directory ~/pxy not found! Exiting."; exit 1; }
-
-# ---------------- TMUX SESSION NAME ----------------
 SESSION="neopxy"
-
-# ---------------- Avoid nested tmux sessions ----------------
 unset TMUX
-
-# ---------------- Activate virtualenv ----------------
 source ~/env/bin/activate
 
-# ---------------- Function to cleanly kill ----------------
-cleanup() {
-    echo -e "\n⏹ Ctrl+C detected → stopping pxymain.py and tmux..."
-    tmux kill-session -t $SESSION 2>/dev/null
-    exit 0
-}
-
-# Trap Ctrl+C
-trap cleanup SIGINT
-
-# ---------------- Launch or attach ----------------
-tmux has-session -t $SESSION 2>/dev/null
-if [ $? -eq 0 ]; then
-    # Session exists → attach
+# Check if session exists
+if tmux has-session -t $SESSION 2>/dev/null; then
     tmux attach -t $SESSION
 else
-    # Session doesn't exist → create and run pxymain.py
-    tmux new-session -s $SESSION -d \
-        "bash -c '
-            echo \"=== Starting pxymain.py: \$(date) ===\";
-            exec python ~/pxy/sys/exe/run/pxymain.py;
-        '"
-
-    # Attach after starting
-    tmux attach -t $SESSION
+    # Create session and run pxymain.py directly (foreground)
+    tmux new -s $SESSION "exec python ~/pxy/sys/exe/run/pxymain.py"
 fi
