@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# ---------------- Go to project directory ----------------
+cd ~/pxy || { echo "Directory ~/pxy not found! Exiting."; exit 1; }
+
+# ---------------- Activate virtual environment ----------------
+if [ -f "env/bin/activate" ]; then
+    source env/bin/activate
+else
+    echo "Virtualenv not found at ~/pxy/env! Exiting."
+    exit 1
+fi
+
+# ---------------- Run pxymain.py ----------------
+if [ -f "pxymain.py" ]; then
+    python pxymain.py
+else
+    echo "pxymain.py not found in ~/pxy! Exiting."
+    exit 1
+fi
