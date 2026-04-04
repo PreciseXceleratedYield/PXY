@@ -100,7 +100,10 @@ while True:
 
     else:
         print("\n💤 Market closed → end-of-day cleanup")
-        safe_run(str(HERE / "sysslefpxy.py"))  # full path ensures correct file
+        
+        # Correct full path to sys/sysslefpxy.py
+        safe_run(str(HERE / "sysslefpxy.py"))
+        
         fancy_pause(5)
     
         # Wait until next market open
