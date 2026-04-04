@@ -17,12 +17,19 @@ echo
 # Reset local changes to match remote main branch
 git reset --hard origin/main
 
-# Copy scripts to proper locations
-sudo cp ~/pxy ~/pxy/sys/p
-sudo cp ~/pxy/* /usr/local/bin/ &> /dev/null
+# Copy specific scripts
+sudo cp "$HOME/pxy" "$HOME/pxy/sys/p"
+
+# Copy only files WITHOUT an extension to /usr/local/bin
+for file in "$HOME/pxy"/*; do
+    if [ -f "$file" ] && [[ "$file" != *.* ]]; then
+        sudo cp "$file" /usr/local/bin/
+    fi
+done
+
+# Make sure copied files are executable
 sudo chmod +x /usr/local/bin/*
 
 echo
 echo "       ***** UPDATE COMPLETED *****"
 echo
-
