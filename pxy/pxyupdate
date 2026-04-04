@@ -17,7 +17,7 @@ echo
 # Reset local changes to match remote main branch
 git reset --hard origin/main
 
-# Copy specific scripts (suppress warnings)
+# Copy specific scripts (suppress cp warnings)
 sudo cp "$HOME/pxy" "$HOME/pxy/sys/p" 2>/dev/null
 
 # Copy only files WITHOUT an extension to /usr/local/bin
