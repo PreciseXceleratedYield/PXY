@@ -3,12 +3,21 @@
 # ---------------- Force project directory ----------------
 cd ~/pxy || { echo "Directory ~/pxy not found! Exiting."; exit 1; }
 
+# ---------------- Ensure pxy is executable ----------------
+if [ ! -x ./pxy ]; then
+    echo "Making ./pxy executable..."
+    chmod +x ./pxy
+fi
+
 # ---------------- Create logs directory ----------------
 mkdir -p logs
 LOG_FILE="logs/neopxy.log"
 
 # ---------------- TMUX SESSION NAME ----------------
 SESSION="neopxy"
+
+# ---------------- Avoid nested tmux sessions ----------------
+unset TMUX
 
 # ---------------- Check if tmux session exists ----------------
 tmux has-session -t $SESSION 2>/dev/null
