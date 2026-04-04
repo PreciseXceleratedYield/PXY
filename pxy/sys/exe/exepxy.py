@@ -3,22 +3,18 @@ import os
 import sys
 import time
 import subprocess
-from pathlib import Path
 from datetime import datetime, time as dt_time
 import pytz
 
-# ---------------- PATH ----------------
-HERE = Path(__file__).resolve().parent
-EXE_DIR = HERE / "sys" / "exe"   # updated path to exec files
-
 # ---------------- EXEC SCRIPT ----------------
 def run_execprt():
-    script_path = EXE_DIR / "execprtpxy.py"
-    if not script_path.exists():
+    """Run execprtpxy.py once at startup"""
+    script_path = "execprtpxy.py"
+    if not os.path.exists(script_path):
         print(f"ERR execprt: {script_path} not found")
         return
     try:
-        subprocess.run([sys.executable, str(script_path)], check=True)
+        subprocess.run([sys.executable, script_path], check=True)
     except Exception as e:
         print(f"ERR execprt: {str(e)[:20]}")
 
@@ -27,6 +23,7 @@ TELEGRAM_BOT_TOKEN = "7141714085:AAHlyEzszCy9N-L6wO1zSAkRwGdl0VTQCFI"
 TELEGRAM_CHAT_ID   = "-4282665161"
 
 def send_telegram(msg):
+    """Send Telegram notification"""
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": TELEGRAM_CHAT_ID,
@@ -45,9 +42,11 @@ MARKET_OPEN  = dt_time(9, 16)
 MARKET_CLOSE = dt_time(15, 25)
 
 def now_ist():
+    """Return current IST datetime"""
     return datetime.now(IST)
 
 def is_market_hours():
+    """Check if current time is within market hours"""
     now_dt = now_ist()
     t = now_dt.time()
     wd = now_dt.weekday()
@@ -55,10 +54,11 @@ def is_market_hours():
 
 # ---------------- SUPERVISOR LOOP ----------------
 def start_loop():
-    run_execprt()   # run once at start
+    """Main loop to supervise execution"""
+    run_execprt()   # run execprt once at start
     was_open = False
     off_done = False
-    EXE_FILE = EXE_DIR / "exemainpxy.py"
+    EXE_FILE = "exemainpxy.py"
 
     while True:
         t0 = time.time()
@@ -77,20 +77,20 @@ def start_loop():
             off_done = False
 
         # ---- RUN MAIN SCRIPT ----
-        if EXE_FILE.exists():
+        if os.path.exists(EXE_FILE):
             if mkt:
-                subprocess.run([sys.executable, str(EXE_FILE)])
+                subprocess.run([sys.executable, EXE_FILE])
             else:
                 if not off_done:
-                    print("Off-mkt run once")
-                    subprocess.run([sys.executable, str(EXE_FILE)])
+                    print("Off-market run once")
+                    subprocess.run([sys.executable, EXE_FILE])
                     off_done = True
         else:
             print(f"ERR exe: {EXE_FILE} not found")
 
         was_open = mkt
-        time.sleep(max(0, 1 - (time.time() - t0)))  # loop ~1s
+        time.sleep(max(0, 1 - (time.time() - t0)))  # ~1s loop
 
-# ---------------- ENTRY ----------------
+# ---------------- ENTRY POINT ----------------
 if __name__ == "__main__":
     start_loop()
