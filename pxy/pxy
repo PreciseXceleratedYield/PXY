@@ -4,10 +4,10 @@
 cd ~/pxy || { echo "Directory ~/pxy not found! Exiting."; exit 1; }
 
 # ---------------- Activate virtual environment ----------------
-if [ -f "env/bin/activate" ]; then
-    source env/bin/activate
+if [ -f "$HOME/env/bin/activate" ]; then
+    source "$HOME/env/bin/activate"
 else
-    echo "Virtualenv not found at ~/pxy/env! Exiting."
+    echo "Virtualenv not found at $HOME/env! Exiting."
     exit 1
 fi
 
