@@ -1,56 +1,78 @@
 #!/bin/bash
+# ANSI color codes
+clear
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-# ---------------- Base directory ----------------
-BASE_DIR=~/pxy
-cd "$BASE_DIR" || { echo "❌ Directory $BASE_DIR not found! Exiting."; exit 1; }
+# Activate virtualenv
+source ~/env/bin/activate
+cd ~/pxy/sys/exe/run
+pxylogin >/dev/null 2>&1
 
-# ---------------- Activate virtualenv ----------------
-if [ -f ~/env/bin/activate ]; then
-    source ~/env/bin/activate
-    echo "✅ Virtual environment activated in $(pwd)"
-else
-    echo "❌ Virtual environment ~/env/bin/activate not found!"
-    exit 1
-fi
+while true; do
+    sudo timedatectl set-timezone UTC > /dev/null 2>&1
 
-# ---------------- Ask for program ----------------
-echo
-read -p "Enter the program you want to run (e.g., pxymain.py, exeexitpxy.py): " prog_file
+    # Copy pxy* files from ~/pxy/sys/ to /usr/local/bin/
+    sudo cp ~/pxy/sys/pxy* /usr/local/bin/
+    sudo chmod +x /usr/local/bin/pxy*
 
-# ---------------- Ensure .py extension ----------------
-[[ "$prog_file" != *.py ]] && prog_file="$prog_file.py"
+    # Display menu
+    echo -e "${YELLOW}   PXY® PreciseXceleratedYield Pvt Ltd™   ${NC}"
+    echo "******************************************"
+    echo "          ఓం నమో వాసుదేవాయ           "
+    echo "******************************************"
+    echo -e "${YELLOW}   PXY® PreciseXceleratedYield Pvt Ltd™   ${NC}"
 
-# ---------------- Determine folder based on prefix ----------------
-prefix=${prog_file:0:3}
-case "$prefix" in
-    exe)
-        prog_dir="$BASE_DIR/sys/exe"
-        ;;
-    run)
-        prog_dir="$BASE_DIR/sys/exe/run"
-        ;;
-    pxy)
-        prog_dir="$BASE_DIR"
-        ;;
-    *)
-        echo "❌ Unknown prefix '$prefix', cannot determine directory."
-        exit 1
-        ;;
-esac
+    # Get user input
+    read -p "Enter your choice:⚙️⚙️⚙️👉👉 " choice
+    pxylogin > /dev/null
 
-# ---------------- Switch to folder ----------------
-cd "$prog_dir" || { echo "❌ Cannot cd to $prog_dir"; exit 1; }
-
-# ---------------- Check if file exists ----------------
-if [ ! -f "$prog_file" ]; then
-    echo "❌ File '$prog_file' not found in $prog_dir"
-    exit 1
-fi
-
-# ---------------- Run the program ----------------
-echo "▶ Running $prog_file in directory $prog_dir ..."
-python "$prog_file"
-
-# ---------------- Stay in shell ----------------
-echo "✅ Finished running $prog_file. Staying in $(pwd) with virtualenv activated."
-exec $SHELL
+    # Perform actions based on user input
+    case $choice in
+        ts)
+            echo "        💊💊💊.Unit Test.💊💊💊"
+            pxyztst
+            ;;   
+        cd)
+            echo "        🔐🔐🔐.Check CDSL.🔐🔐🔐"
+            pxycdsl
+            ;;   
+        vl)
+            echo "        📊📊📊.Check ACV.📊📊📊"
+            pxyacval
+            ;;   
+        by)
+            echo "        🌱🌱🌱..Buy Now.🌱🌱🌱"
+            pxybuy
+            ;;    
+        fl)
+            echo "        ⚡⚡⚡..Flash it .⚡⚡⚡"
+            pxyflash
+            ;;   
+        up)
+            echo "       🧰⚙️🔧🛠️🔐 Update PXY®...🧰⚙️🔧🛠️🔐"
+            pxyupdate
+            ;;
+        ck)
+            echo "        🧪🧪🧪 Test All PXY®...🧪🧪🧪"
+            pxycheck
+            ;;
+        py)
+            echo "        ...................👉exe/run"
+            pxypy
+            ;;
+        "")
+            echo ".........Lets have fun with PXY®  🔥💫🚀🔥"
+            pxypxy
+            ;;
+        en)
+            echo ".........Lets have fun with PXY®  🔥💫🚀🔥"
+            pxypxy
+            ;;
+        *)
+            echo "Invalid choice: $choice"
+            ;;
+    esac
+done
