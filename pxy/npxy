@@ -1,0 +1,21 @@
+#!/bin/bash
+
+# ---------------- Force project directory ----------------
+cd ~/pxy || { echo "Directory ~/pxy not found! Exiting."; exit 1; }
+
+# ---------------- TMUX SESSION NAME ----------------
+SESSION="npxy"
+
+# ---------------- Path to your run script (pxy) ----------------
+RUN_SCRIPT="./pxy"   # pxy is in the same folder
+
+# ---------------- Check if tmux session exists ----------------
+tmux has-session -t $SESSION 2>/dev/null
+
+if [ $? -eq 0 ]; then
+    # Session exists → attach
+    tmux attach -t $SESSION
+else
+    # Session doesn't exist → create and run your pxy script
+    tmux new -s $SESSION "$RUN_SCRIPT"
+fi
