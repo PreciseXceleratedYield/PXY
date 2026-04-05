@@ -1,5 +1,4 @@
-# sysdashpxy.py
-
+# run_pyc.py
 import runpy
 import os
 from colorama import Fore, Style, init
@@ -105,30 +104,6 @@ def get_full_snapshot():
     result["bos_bar"] = bos_bar
     result["bos_val"] = bos_val
 
-    # ================= CHART DATA (CRITICAL) =================
-    try:
-        last_idx = df.index[-1]
-    
-        # Case 1: DatetimeIndex
-        if hasattr(last_idx, "timestamp"):
-            ts = int(last_idx.timestamp())
-    
-        # Case 2: fallback → use current time
-        else:
-            from datetime import datetime
-            import pytz
-            ist = pytz.timezone("Asia/Kolkata")
-            ts = int(datetime.now(ist).timestamp())
-    
-    except Exception:
-        from datetime import datetime
-        import pytz
-        ist = pytz.timezone("Asia/Kolkata")
-        ts = int(datetime.now(ist).timestamp())
-    
-    result["timestamp"] = ts
-    result["close"] = float(df["Close"].iloc[-1])
-
     return result
 
 # ================= PRINT DASHBOARD =================
@@ -196,11 +171,16 @@ def print_dashboard(data):
     space = TOTAL_WIDTH - len(f"Entry:{entry}") - len(f"Rvrsl:{reversal}")
     print(Fore.YELLOW + "Entry:" + color + entry + " " * space + Fore.YELLOW + "Rvrsl:" + color + reversal)
 
+    # ================= DAY CANDLE =================
+    #print(data["day_candle"])
+
     # ================= BOS BAR =================
     print(data["bos_bar"])
+    # Optional: print BOS value text
+    # print("BOS Value:", data["bos_val"])
 
 # ================= MAIN =================
 if __name__ == "__main__":
-    run_pyc_file()
-    data = get_full_snapshot()
-    print_dashboard(data)
+    run_pyc_file()               # run any pyc files
+    data = get_full_snapshot()    # capture all indicators
+    print_dashboard(data)         # display dashboard
