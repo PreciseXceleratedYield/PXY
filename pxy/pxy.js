@@ -1,48 +1,43 @@
+// pxy.js
 const express = require('express');
 const path = require('path');
 const { Client } = require('ssh2');
-const bodyParser = require('body-parser');
 
 const app = express();
-const PORT = 3000;
+app.use(express.json());
 
-app.use(bodyParser.json());
-app.use(express.static(__dirname)); // serve pxy.html and node_modules
+// Serve static files (pxy.html and JS/CSS)
+app.use(express.static(path.join(__dirname)));
 
-// Store SSH connections by username
-const sshConnections = {};
-
+// Endpoint to connect to SSH server
 app.post('/connect', (req, res) => {
     const { host, username, password } = req.body;
-
     const conn = new Client();
-    conn.on('ready', () => {
-        sshConnections[username] = conn;
-        res.send('SSH Connection established!\n');
-    }).on('error', (err) => {
-        res.send('SSH Connection error: ' + err.message + '\n');
-    }).connect({
+
+    conn
+      .on('ready', () => {
+        res.send('SSH Connection established!');
+        conn.end();
+      })
+      .on('error', (err) => {
+        res.send('SSH Connection error: ' + err.message);
+      })
+      .connect({
         host,
-        port: 22,         // SSH port
+        port: 22,      // use SSH port
         username,
         password
-    });
+      });
 });
 
+// Endpoint to run commands
 app.post('/run', (req, res) => {
     const { username, command } = req.body;
-    const conn = sshConnections[username];
-    if (!conn) return res.send('No SSH connection established\n');
-
-    conn.exec(command, (err, stream) => {
-        if (err) return res.send('Command error: ' + err.message + '\n');
-
-        let output = '';
-        stream.on('data', (data) => output += data)
-              .on('close', () => res.send(output));
-    });
+    // In real scenario, map username to SSH connection, here simple demo
+    res.send(`Command received: ${command}\n(Not actually executed for security)`);
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running at http://0.0.0.0:${PORT}`);
+// Listen on port 80 (HTTP)
+app.listen(80, '0.0.0.0', () => {
+    console.log('Server running at http://0.0.0.0:80');
 });
