@@ -26,44 +26,47 @@ const server = app.listen(80, '0.0.0.0', () => {
 // WebSocket server
 const wss = new WebSocket.Server({ server });
 
-let sshStream = null;
+let tmuxStream = null;
 
 wss.on('connection', (ws) => {
     console.log('Browser connected via WebSocket');
 
     // Stream existing output if already connected
-    if (sshStream) {
-        sshStream.on('data', (data) => ws.send(data.toString()));
-        sshStream.stderr.on('data', (data) => ws.send(data.toString()));
+    if (tmuxStream) {
+        tmuxStream.on('data', (data) => ws.send(data.toString()));
+        tmuxStream.stderr.on('data', (data) => ws.send(data.toString()));
     }
 });
 
-// SSH connect to attach to npxy
+// SSH connect to attach to tmux npxy session
 const conn = new Client();
 conn.on('ready', () => {
-    console.log('SSH connected, attaching to npxy session');
+    console.log('SSH connected, attaching to tmux npxy session');
 
-    // Attach read-only (-x) to allow multiple viewers
-    conn.exec('screen -x npxy', (err, stream) => {
-        if (err) throw err;
-        sshStream = stream;
+    // Attach or create session, read-only output
+    conn.exec(
+        "tmux has-session -t npxy 2>/dev/null && tmux attach -t npxy || tmux new -s npxy 'pxyexe'",
+        (err, stream) => {
+            if (err) throw err;
+            tmuxStream = stream;
 
-        stream.on('data', (data) => {
-            wss.clients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(data.toString());
-                }
+            stream.on('data', (data) => {
+                wss.clients.forEach(client => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(data.toString());
+                    }
+                });
             });
-        });
 
-        stream.stderr.on('data', (data) => {
-            wss.clients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(data.toString());
-                }
+            stream.stderr.on('data', (data) => {
+                wss.clients.forEach(client => {
+                    if (client.readyState === WebSocket.OPEN) {
+                        client.send(data.toString());
+                    }
+                });
             });
-        });
 
-        stream.on('close', () => console.log('Screen session closed'));
-    });
+            stream.on('close', () => console.log('tmux session closed'));
+        }
+    );
 }).connect({ host, port: 22, username, password });
