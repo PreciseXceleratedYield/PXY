@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <title>Terminal + NIFTY Chart</title>
 
-<!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
 <style>
@@ -13,57 +12,46 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
+    background: #0f1117;
+    color: #e6edf3;
     font-family: monospace;
-    background: #f0f0f0;
 }
 
 #container {
     display: flex;
-    height: 100vh; /* full viewport height */
-    width: 100%;
+    height: 100vh;
 }
 
+/* TERMINAL */
 #terminal-container {
     width: 55ch;
     max-width: 50%;
     min-width: 300px;
-    display: flex;
-    flex-direction: column;
-    border-right: 2px solid #ccc;
-    height: 100%;
-    background-color: #ffffff;
+    border-right: 1px solid #1f2937;
+    background: #0d1117;
 }
 
 #terminal {
-    flex: 1;
-    overflow-y: auto;
     height: 100%;
-    font-size: 16px;
-    line-height: 1.4;
 }
 
 .xterm {
     height: 100% !important;
-    font-weight: bold;
 }
 
+/* CHART */
 #chart-container {
     flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
     padding: 10px;
-    box-sizing: border-box;
 }
 
-iframe {
-    width: 100%;
-    height: 100%;
-    border: 1px solid #00B4FF;
+canvas {
+    width: 100% !important;
+    height: 100% !important;
 }
 </style>
 </head>
+
 <body>
 
 <div id="container">
@@ -72,49 +60,161 @@ iframe {
     </div>
 
     <div id="chart-container">
-        <iframe 
-            src="https://ssltvc.investing.com/?pair_ID=8985&height=650&width=1200&interval=86400&plotStyle=candles&domain_ID=1&lang_ID=1&timezone_ID=20">
-        </iframe>
+        <canvas id="chart"></canvas>
     </div>
 </div>
 
-<!-- xterm.js and fit addon -->
+<!-- xterm -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
+<!-- chart -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
 <script>
+// ================= TERMINAL =================
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     theme: {
-        background: '#ffffff',
-        foreground: '#222222'
+        background: '#0d1117',
+        foreground: '#00ff9c',
+        cursor: '#00ff9c'
     }
 });
+
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
-
-// Fit terminal to container
 fitAddon.fit();
 
-// Example text to test
-term.writeln('Connected. Displaying npxy tmux session...');
-term.writeln('Terminal ready.');
-
-// WebSocket example
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
-ws.onopen = () => term.writeln('WebSocket connected...');
-ws.onmessage = (event) => { 
-    term.write(event.data); 
-    term.scrollToBottom(); 
+ws.onopen = () => term.writeln('🚀 Connected...');
+ws.onmessage = (event) => {
+    term.write(event.data);
+    term.scrollToBottom();
 };
-ws.onerror = (err) => term.writeln('\nWebSocket error: ' + err);
+ws.onerror = (err) => term.writeln('\n❌ WS error');
 
-// Re-fit on window resize
 window.addEventListener('resize', () => fitAddon.fit());
+
+
+// ================= CHART =================
+const ctx = document.getElementById('chart').getContext('2d');
+
+let chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [
+            {
+                label: 'NIFTY',
+                data: [],
+                borderColor: '#ffffff',
+                borderWidth: 2,
+                tension: 0.25,
+                pointRadius: 0
+            },
+            {
+                label: 'BUY',
+                data: [],
+                pointBackgroundColor: '#00ff00',
+                pointRadius: 6,
+                showLine: false
+            },
+            {
+                label: 'SELL',
+                data: [],
+                pointBackgroundColor: '#ff3b3b',
+                pointRadius: 6,
+                showLine: false
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        animation: false,
+        plugins: {
+            legend: {
+                labels: { color: '#e6edf3' }
+            }
+        },
+        scales: {
+            x: {
+                ticks: { color: '#9ca3af' },
+                grid: { color: '#1a1f2b' }
+            },
+            y: {
+                ticks: { color: '#9ca3af' },
+                grid: { color: '#1a1f2b' }
+            }
+        }
+    }
+});
+
+
+// ================= LIVE UPDATE =================
+async function updateChart() {
+    try {
+        const res = await fetch('/line_data.csv?' + Date.now());
+        const text = await res.text();
+
+        const rows = text.trim().split('\n').slice(1);
+
+        const labels = [];
+        const prices = [];
+        const buyData = [];
+        const sellData = [];
+
+        let lastBuyIndex = -1;
+        let lastSellIndex = -1;
+
+        rows.forEach((row, i) => {
+            const parts = row.split(',');
+
+            const ts = parts[0];
+            const close = parts[1];
+            const entry = parts[2] || "";
+
+            const d = new Date(ts * 1000);
+            const time = d.toLocaleTimeString();
+
+            const price = parseFloat(close);
+
+            labels.push(time);
+            prices.push(price);
+
+            buyData.push(null);
+            sellData.push(null);
+
+            if (entry.includes("BUY")) lastBuyIndex = i;
+            if (entry.includes("SELL")) lastSellIndex = i;
+        });
+
+        // Only latest markers
+        if (lastBuyIndex !== -1) {
+            buyData[lastBuyIndex] = prices[lastBuyIndex];
+        }
+
+        if (lastSellIndex !== -1) {
+            sellData[lastSellIndex] = prices[lastSellIndex];
+        }
+
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = prices;
+        chart.data.datasets[1].data = buyData;
+        chart.data.datasets[2].data = sellData;
+
+        chart.update();
+
+    } catch (e) {
+        console.log("Chart error:", e);
+    }
+}
+
+setInterval(updateChart, 1000);
 </script>
 
 </body>
