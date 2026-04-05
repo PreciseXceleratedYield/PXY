@@ -7,15 +7,18 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const PORT = 80; // use setcap to allow port 80 without sudo
+const PORT = 80; // sudo or setcap needed
 
-// Serve static files
+// Serve static files (xterm CSS/JS)
 app.use(express.static(__dirname));
+
+// Root serves pxy.html
+app.get('/', (req, res) => {
+    res.sendFile(__dirname + '/pxy.html');
+});
 
 // WebSocket: stream tmux npxy session output
 wss.on('connection', (ws) => {
-    const tmuxCmd = 'tmux capture-pane -t npxy -p -J -e && tmux pipe-pane -t npxy -o "cat > /tmp/tmux_pipe"';
-    // Spawn a loop to read tmux pane periodically
     const interval = setInterval(() => {
         exec('tmux capture-pane -t npxy -p -J -e', (err, stdout, stderr) => {
             if (err) {
