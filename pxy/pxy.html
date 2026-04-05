@@ -1,96 +1,23 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Terminal + NIFTY Chart</title>
-
-<!-- xterm.js CSS -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
-
-<style>
-html, body {
-    margin:0;
-    padding:0;
-    height:100%;
-    width:100%;
-    font-family: monospace;
-    background:#1e1e1e;
-    color:#c5c5c5;
-}
-#container {
-    display: flex;
-    height: 100vh; /* full browser height */
-    width: 100%;
-}
-#terminal-container {
-    width:55ch;
-    max-width:50%;
-    min-width:300px;
-    display:flex;
-    flex-direction: column;
-    border-right: 2px solid #444;
-    height:100%;
-}
-#terminal {
-    flex:1;
-    overflow-y:auto;
-}
-#chart-container {
-    flex:1;
-    height:100%;
-    width:100%;
-}
-</style>
-</head>
-<body>
-
-<div id="container">
-    <!-- Left: Terminal -->
-    <div id="terminal-container">
-        <div id="terminal">Connecting to npxy tmux session...</div>
-    </div>
-
-    <!-- Right: TradingView NIFTY Chart Widget -->
-    <div id="chart-container">
-      <div class="tradingview-widget-container" style="height:100%; width:100%;">
-        <div id="tradingview_nifty" style="height:100%; width:100%;"></div>
-        <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
-        <script type="text/javascript">
-          new TradingView.widget({
-            "container_id": "tradingview_nifty",
-            "autosize": true,
-            "symbol": "NSE:NIFTY50",
-            "interval": "60",
-            "timezone": "Asia/Kolkata",
-            "theme": "dark",
-            "style": "1",
-            "locale": "en",
-            "toolbar_bg": "#333",
-            "enable_publishing": false,
-            "allow_symbol_change": false,
-            "studies": ["MACD@tv-basicstudies"]
-          });
-        </script>
-      </div>
-    </div>
+<!-- Right: TradingView NIFTY Chart Widget -->
+<div id="chart-container" style="flex:1; height:100%; width:100%;">
+  <div class="tradingview-widget-container" style="height:100%; width:100%;">
+    <div id="tradingview_nifty" style="height:100%; width:100%;"></div>
+    <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+    <script type="text/javascript">
+      new TradingView.widget({
+        "container_id": "tradingview_nifty",
+        "autosize": true,
+        "symbol": "NSE:NIFTY50",      // NIFTY index
+        "interval": "60",
+        "timezone": "Asia/Kolkata",
+        "theme": "dark",
+        "style": "1",
+        "locale": "en",
+        "toolbar_bg": "#333",
+        "enable_publishing": false,
+        "allow_symbol_change": true,   // true lets users search/switch
+        "studies": ["MACD@tv-basicstudies","RSI@tv-basicstudies"]
+      });
+    </script>
+  </div>
 </div>
-
-<!-- xterm.js JS -->
-<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
-<script>
-const term = new Terminal({ convertEol:true, scrollback:1000 });
-term.open(document.getElementById('terminal'));
-
-const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-const ws = new WebSocket(`${protocol}://${window.location.host}`);
-
-ws.onopen = () => term.writeln('Connected. Displaying npxy tmux session...\n');
-ws.onmessage = (event) => {
-    term.write(event.data);
-    term.scrollToBottom(); // auto-scroll
-};
-ws.onerror = (err) => term.writeln('\nWebSocket error: ' + err);
-</script>
-
-</body>
-</html>
