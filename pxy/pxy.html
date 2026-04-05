@@ -2,9 +2,13 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Terminal + NIFTY Chart</title>
+<title>Terminal + NIFTY Line Chart</title>
 
+<!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 html, body {
@@ -12,37 +16,50 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
-    background: #0f1117;
-    color: #e6edf3;
     font-family: monospace;
+    background-color: #1e1e1e;
+    color: #ffffff;
 }
 
 #container {
     display: flex;
     height: 100vh;
+    width: 100%;
 }
 
-/* TERMINAL */
 #terminal-container {
     width: 55ch;
     max-width: 50%;
     min-width: 300px;
-    border-right: 1px solid #1f2937;
-    background: #0d1117;
+    display: flex;
+    flex-direction: column;
+    border-right: 2px solid #444;
+    height: 100%;
+    background-color: #1e1e1e;
 }
 
 #terminal {
+    flex: 1;
+    overflow-y: auto;
     height: 100%;
+    font-size: 16px;
+    line-height: 1.4;
 }
 
 .xterm {
     height: 100% !important;
+    font-weight: bold;
 }
 
-/* CHART */
 #chart-container {
     flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
     padding: 10px;
+    box-sizing: border-box;
+    background-color: #1e1e1e;
 }
 
 canvas {
@@ -51,7 +68,6 @@ canvas {
 }
 </style>
 </head>
-
 <body>
 
 <div id="container">
@@ -60,161 +76,102 @@ canvas {
     </div>
 
     <div id="chart-container">
-        <canvas id="chart"></canvas>
+        <canvas id="lineChart"></canvas>
     </div>
 </div>
 
-<!-- xterm -->
+<!-- xterm.js and fit addon -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
-<!-- chart -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <script>
-// ================= TERMINAL =================
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     theme: {
-        background: '#0d1117',
-        foreground: '#00ff9c',
-        cursor: '#00ff9c'
+        background: '#1e1e1e',
+        foreground: '#ffffff'
     }
 });
-
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
+term.writeln('Connected. Displaying latest NIFTY signals...');
 
-const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-const ws = new WebSocket(`${protocol}://${window.location.host}`);
-
-ws.onopen = () => term.writeln('🚀 Connected...');
-ws.onmessage = (event) => {
-    term.write(event.data);
-    term.scrollToBottom();
-};
-ws.onerror = (err) => term.writeln('\n❌ WS error');
-
-window.addEventListener('resize', () => fitAddon.fit());
-
-
-// ================= CHART =================
-const ctx = document.getElementById('chart').getContext('2d');
-
-let chart = new Chart(ctx, {
+// ---------------- Chart.js ----------------
+const ctx = document.getElementById('lineChart').getContext('2d');
+let lineChart = new Chart(ctx, {
     type: 'line',
     data: {
         labels: [],
-        datasets: [
-            {
-                label: 'NIFTY',
-                data: [],
-                borderColor: '#ffffff',
-                borderWidth: 2,
-                tension: 0.25,
-                pointRadius: 0
-            },
-            {
-                label: 'BUY',
-                data: [],
-                pointBackgroundColor: '#00ff00',
-                pointRadius: 6,
-                showLine: false
-            },
-            {
-                label: 'SELL',
-                data: [],
-                pointBackgroundColor: '#ff3b3b',
-                pointRadius: 6,
-                showLine: false
-            }
-        ]
+        datasets: [{
+            label: 'Close Price',
+            data: [],
+            borderColor: '#00ffea',
+            backgroundColor: 'rgba(0,255,234,0.2)',
+            fill: false,
+            tension: 0.1,
+            pointRadius: 2,
+            pointHoverRadius: 4
+        }]
     },
     options: {
         responsive: true,
-        animation: false,
-        plugins: {
-            legend: {
-                labels: { color: '#e6edf3' }
-            }
-        },
+        maintainAspectRatio: false,
         scales: {
             x: {
-                ticks: { color: '#9ca3af' },
-                grid: { color: '#1a1f2b' }
+                ticks: { color: '#ffffff' },
+                grid: { color: '#444' }
             },
             y: {
-                ticks: { color: '#9ca3af' },
-                grid: { color: '#1a1f2b' }
+                ticks: { color: '#ffffff' },
+                grid: { color: '#444' }
             }
+        },
+        plugins: {
+            legend: { labels: { color: '#ffffff' } }
         }
     }
 });
 
-
-// ================= LIVE UPDATE =================
-async function updateChart() {
+// ---------------- Load CSV and update ----------------
+async function loadCSV() {
     try {
-        const res = await fetch('/line_data.csv?' + Date.now());
+        const res = await fetch('sys/line_data.csv?_=' + new Date().getTime());
         const text = await res.text();
-
-        const rows = text.trim().split('\n').slice(1);
-
+        const lines = text.trim().split('\n');
         const labels = [];
-        const prices = [];
-        const buyData = [];
-        const sellData = [];
+        const data = [];
 
-        let lastBuyIndex = -1;
-        let lastSellIndex = -1;
-
-        rows.forEach((row, i) => {
-            const parts = row.split(',');
-
-            const ts = parts[0];
-            const close = parts[1];
-            const entry = parts[2] || "";
-
-            const d = new Date(ts * 1000);
-            const time = d.toLocaleTimeString();
-
-            const price = parseFloat(close);
-
-            labels.push(time);
-            prices.push(price);
-
-            buyData.push(null);
-            sellData.push(null);
-
-            if (entry.includes("BUY")) lastBuyIndex = i;
-            if (entry.includes("SELL")) lastSellIndex = i;
-        });
-
-        // Only latest markers
-        if (lastBuyIndex !== -1) {
-            buyData[lastBuyIndex] = prices[lastBuyIndex];
+        // Assuming CSV header: timestamp,close,...
+        for (let i = 1; i < lines.length; i++) {
+            const parts = lines[i].split(',');
+            const ts = parseInt(parts[0]);
+            const close = parseFloat(parts[1]);
+            labels.push(new Date(ts * 1000).toLocaleTimeString());
+            data.push(close);
         }
 
-        if (lastSellIndex !== -1) {
-            sellData[lastSellIndex] = prices[lastSellIndex];
-        }
+        lineChart.data.labels = labels;
+        lineChart.data.datasets[0].data = data;
+        lineChart.update();
 
-        chart.data.labels = labels;
-        chart.data.datasets[0].data = prices;
-        chart.data.datasets[1].data = buyData;
-        chart.data.datasets[2].data = sellData;
+        // Terminal: show latest signal
+        const lastLine = lines[lines.length - 1].split(',');
+        const lastClose = lastLine[1];
+        const lastTimestamp = new Date(parseInt(lastLine[0]) * 1000).toLocaleTimeString();
+        term.writeln(`Latest Close: ${lastClose} @ ${lastTimestamp}`);
 
-        chart.update();
-
-    } catch (e) {
-        console.log("Chart error:", e);
+    } catch (err) {
+        console.error(err);
+        term.writeln('Error loading CSV: ' + err);
     }
 }
 
-setInterval(updateChart, 1000);
+// Initial load + repeat every 10s
+loadCSV();
+setInterval(loadCSV, 10000);
 </script>
 
 </body>
