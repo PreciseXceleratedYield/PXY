@@ -1,7 +1,21 @@
-tmux has-session -t npxy 2>/dev/null \
-  && echo "Session npxy already exists. Checking pxy.js..." \
-  || tmux new-session -d -s npxy
+#!/bin/bash
 
-# Check if pxy.js is already running inside npxy session
-tmux list-panes -t npxy -F "#{pane_pid} #{pane_title}" | grep pxy.js >/dev/null 2>&1 \
-  || tmux send-keys -t npxy "node /full/path/to/pxy.js > /dev/null 2>&1 &" C-m
+# Check if session exists
+tmux has-session -t npxy 2>/dev/null
+
+if [ $? -eq 0 ]; then
+    # Session exists, start pxy.js if not running
+    tmux list-panes -t npxy -F "#{pane_pid} #{pane_title}" | grep pxy.js >/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+        tmux send-keys -t npxy "node /full/path/to/pxy.js > /dev/null 2>&1 &" C-m
+    fi
+    # Attach to existing session
+    tmux attach -t npxy
+else
+    # Session does not exist, create it detached
+    tmux new-session -d -s npxy
+    # Start pxy.js silently
+    tmux send-keys -t npxy "node /full/path/to/pxy.js > /dev/null 2>&1 &" C-m
+    # Attach to session
+    tmux attach -t npxy
+fi
