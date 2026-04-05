@@ -22,11 +22,21 @@ term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-const username = 'sap'; // SSH username
-const sshHost = '20.219.25.209'; // Hardcoded server IP
-const sshPassword = 'YOUR_PASSWORD'; // Replace with your password
+// SSH credentials
+const username = 'sap';
+const sshHost = '20.219.25.209';
+let sshPassword = '';
 
+// Ask for password every time
+sshPassword = prompt("Enter SSH password for " + username + "@" + sshHost);
+
+// Connect to SSH server
 async function connectSSH() {
+  if (!sshPassword) {
+    term.writeln("No password entered. Cannot connect.");
+    return;
+  }
+
   const res = await fetch('/connect', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
@@ -36,6 +46,7 @@ async function connectSSH() {
 }
 connectSSH();
 
+// Send commands to SSH server
 const input = document.getElementById('input');
 input.addEventListener('keydown', async (e) => {
   if(e.key === 'Enter') {
