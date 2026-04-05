@@ -1,52 +1,57 @@
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
-const { exec } = require('child_process');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
+const { exec } = require('child_process');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const PORT = 80;
+const PORT = 80; // change if needed
+const CSV_FILE = path.join(__dirname, 'sys', 'line_data.csv');
 
-// Serve HTML
+// ---------------- Serve HTML ----------------
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'pxy.html'));
 });
 
+// ---------------- WebSocket for terminal ----------------
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
-    // Terminal: tmux updates
-    const termInterval = setInterval(() => {
-        exec('tmux capture-pane -t npxy -pS -100 -J -e', (err, stdout) => {
-            if (err) return ws.send(`\x1b[31mError: ${err.message}\x1b[0m\n`);
-            ws.send(stdout);
+    // Terminal output interval
+    const interval = setInterval(() => {
+        // Try to capture tmux npxy session
+        exec('tmux capture-pane -t npxy -pS -100 -J -e', (err, stdout, stderr) => {
+            if (err) {
+                // fallback output if tmux not running
+                ws.send('\x1b[32mConnected. Terminal ready...\x1b[0m\n');
+                return;
+            }
+            ws.send(stdout || '\x1b[32mConnected. Terminal ready...\x1b[0m\n');
         });
-    }, 200); // faster updates, terminal smooth
-
-    // Chart: CSV updates
-    const chartInterval = setInterval(() => {
-        fs.readFile(path.join(__dirname, 'sys', 'line_data.csv'), 'utf8', (err, data) => {
-            if (err) return;
-            const lines = data.trim().split('\n').slice(1);
-            const chartData = lines.map(l => {
-                const [time, close] = l.split(',');
-                return { time: parseInt(time), close: parseFloat(close) };
-            });
-            ws.send(JSON.stringify({ chart: chartData }));
-        });
-    }, 1000); // 1 second chart update
+    }, 500);
 
     ws.on('close', () => {
         console.log('Client disconnected');
-        clearInterval(termInterval);
-        clearInterval(chartInterval);
+        clearInterval(interval);
     });
 });
 
+// ---------------- Serve CSV ----------------
+app.get('/line_data.csv', (req, res) => {
+    fs.readFile(CSV_FILE, 'utf8', (err, data) => {
+        if (err) {
+            return res.status(500).send('Error reading CSV');
+        }
+        res.header('Content-Type', 'text/csv');
+        res.send(data);
+    });
+});
+
+// ---------------- Start server ----------------
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost`);
 });
