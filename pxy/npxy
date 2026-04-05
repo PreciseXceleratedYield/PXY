@@ -7,7 +7,7 @@ if [ $? -eq 0 ]; then
     # Session exists, start pxy.js if not running
     tmux list-panes -t npxy -F "#{pane_pid} #{pane_title}" | grep pxy.js >/dev/null 2>&1
     if [ $? -ne 0 ]; then
-        tmux send-keys -t npxy "node /full/path/to/pxy.js > /dev/null 2>&1 &" C-m
+        tmux send-keys -t npxy "node node ~/pxy.js > /dev/null 2>&1 &" C-m
     fi
     # Attach to existing session
     tmux attach -t npxy
