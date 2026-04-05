@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <title>Terminal + NIFTY Chart</title>
 
+<!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 html, body {
@@ -14,7 +14,7 @@ html, body {
     height: 100%;
     width: 100%;
     font-family: monospace;
-    background-color: #1e1e1e;
+    background-color: #111; /* dark background */
     color: #fff;
 }
 
@@ -25,25 +25,21 @@ html, body {
 }
 
 #terminal-container {
-    width: 55ch;        /* restore your original width */
-    max-width: 50%;
+    width: 50%;
     min-width: 300px;
     display: flex;
     flex-direction: column;
-    border-right: 2px solid #555;
-    height: 100%;
-    background-color: #1e1e1e;
+    border-right: 2px solid #444;
+    background-color: #111; /* dark */
 }
 
 #terminal {
     flex: 1;
     overflow-y: auto;
-    font-size: 16px;
 }
 
 .xterm {
     height: 100% !important;
-    font-weight: bold;
 }
 
 #chart-container {
@@ -51,13 +47,14 @@ html, body {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 10px;
-    background-color: #1e1e1e;
+    padding: 5px;
+    background-color: #111; /* dark */
 }
 
-canvas {
-    width: 100% !important;
-    height: 100% !important;
+iframe {
+    width: 100%;
+    height: 100%;
+    border: 1px solid #fff; /* white border */
 }
 </style>
 </head>
@@ -69,35 +66,49 @@ canvas {
     </div>
 
     <div id="chart-container">
-        <canvas id="niftyChart"></canvas>
+        <canvas id="chartCanvas"></canvas>
     </div>
 </div>
 
+<!-- xterm.js and fit addon -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-    theme: { background: '#1e1e1e', foreground: '#ffffff' }
+    theme: { background: '#111', foreground: '#fff' }
 });
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
-term.writeln('Connected. Terminal ready...');
 
-// Chart.js setup
-const ctx = document.getElementById('niftyChart').getContext('2d');
-const niftyChart = new Chart(ctx, {
+// ---------------- WebSocket for terminal ----------------
+const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(`${protocol}://${window.location.host}`);
+
+ws.onopen = () => term.writeln('\x1b[32mConnected. Terminal ready...\x1b[0m');
+ws.onmessage = (event) => {
+    term.write(event.data);
+    term.scrollToBottom();
+};
+ws.onerror = (err) => term.writeln('\x1b[31mWebSocket error: ' + err + '\x1b[0m');
+window.addEventListener('resize', () => fitAddon.fit());
+
+// ---------------- Chart.js ----------------
+const ctx = document.getElementById('chartCanvas').getContext('2d');
+const chart = new Chart(ctx, {
     type: 'line',
     data: {
+        labels: [],
         datasets: [{
             label: 'NIFTY Close',
             data: [],
-            borderColor: '#00FF00',
-            backgroundColor: 'rgba(0,255,0,0.2)',
+            borderColor: '#00ffff',
+            backgroundColor: 'rgba(0,255,255,0.1)',
             pointRadius: 0,
             borderWidth: 2,
             tension: 0.2
@@ -106,41 +117,40 @@ const niftyChart = new Chart(ctx, {
     options: {
         responsive: true,
         maintainAspectRatio: false,
-        animation: false,
-        plugins: { legend: { labels: { color: '#ffffff' } } },
+        plugins: { legend: { labels: { color: '#fff' } } },
         scales: {
-            x: { type: 'time', time: { unit: 'minute' }, ticks: { color: '#ffffff' }, grid: { color: '#555' } },
-            y: { ticks: { color: '#ffffff' }, grid: { color: '#555' } }
+            x: { ticks: { color: '#fff' }, grid: { color: '#333' } },
+            y: { ticks: { color: '#fff' }, grid: { color: '#333' } }
         }
     }
 });
 
-// Separate WebSocket streams for terminal and chart
-const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-const ws = new WebSocket(`${protocol}://${window.location.host}`);
-
-ws.onopen = () => term.writeln('WebSocket connected...');
-ws.onmessage = (event) => {
+// ---------------- Fetch CSV and update chart ----------------
+async function updateChart() {
     try {
-        const obj = JSON.parse(event.data);
-        if(obj.chart){
-            // Update chart without blocking terminal
-            const dataset = niftyChart.data.datasets[0];
-            dataset.data = obj.chart.map(p => ({ x: new Date(p.time*1000), y: p.close }));
-            niftyChart.update('none');
-        } else {
-            // Terminal data
-            term.write(event.data);
-            term.scrollToBottom();
-        }
-    } catch(e){
-        // fallback for non-JSON terminal lines
-        term.write(event.data);
-        term.scrollToBottom();
-    }
-};
+        const res = await fetch('/line_data.csv?' + Date.now());
+        const csv = await res.text();
+        const lines = csv.trim().split('\n').slice(1); // skip header
+        const labels = [];
+        const data = [];
+        lines.forEach(line => {
+            const [time, close] = line.split(',');
+            labels.push(new Date(Number(time)*1000).toLocaleTimeString());
+            data.push(Number(close));
+        });
 
-window.addEventListener('resize', () => fitAddon.fit());
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = data;
+        chart.update();
+    } catch(err) {
+        console.error('Chart update error:', err);
+    }
+}
+
+// Initial chart update
+updateChart();
+// Update every 5 seconds
+setInterval(updateChart, 5000);
 </script>
 
 </body>
