@@ -14,8 +14,8 @@ html, body {
     height: 100%;
     width: 100%;
     font-family: monospace;
-    background: #1e1e1e;
-    color: #c5c5c5;
+    background: #f0f0f0; /* light background for terminal */
+    color: #000000; /* default text color */
 }
 #container {
     display: flex;
@@ -28,12 +28,15 @@ html, body {
     min-width: 300px;
     display: flex;
     flex-direction: column;
-    border-right: 2px solid #444;
+    border-right: 2px solid #ccc;
     height: 100%;
+    background-color: #ffffff; /* white terminal panel */
 }
 #terminal {
     flex: 1;
     overflow-y: auto;
+    color: #000000; /* black text in terminal */
+    background-color: #ffffff; /* white terminal background */
 }
 #chart-container {
     flex: 1;
@@ -46,7 +49,7 @@ html, body {
 }
 iframe {
     width: 100%;
-    height: 650px; /* Fixed height */
+    height: 650px; /* fixed height */
     border: 1px solid #00B4FF;
     max-width: 100%;
 }
@@ -60,10 +63,10 @@ iframe {
         <div id="terminal">Connecting to npxy tmux session...</div>
     </div>
 
-    <!-- Right: Investing.com NIFTY Chart -->
+    <!-- Right: Chart (white as-is) -->
     <div id="chart-container">
         <iframe 
-            src="https://ssltvc.investing.com/?pair_ID=8985&height=650&width=1200&interval=86400&plotStyle=candles&domain_ID=1&lang_ID=1&timezone_ID=20&theme=dark">
+            src="https://ssltvc.investing.com/?pair_ID=8985&height=650&width=1200&interval=86400&plotStyle=candles&domain_ID=1&lang_ID=1&timezone_ID=20">
         </iframe>
     </div>
 </div>
@@ -73,7 +76,14 @@ iframe {
 
 <script>
 /* ------------------ TERMINAL ------------------ */
-const term = new Terminal({ convertEol: true, scrollback: 1000 });
+const term = new Terminal({
+    convertEol: true,
+    scrollback: 1000,
+    theme: {
+        background: '#ffffff', // white background
+        foreground: '#000000'  // black text
+    }
+});
 term.open(document.getElementById('terminal'));
 
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
