@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
 <title>Terminal + NIFTY Chart</title>
@@ -15,7 +15,6 @@ html, body {
     width: 100%;
     font-family: monospace;
     background-color: #111; /* dark background */
-    color: #fff;
 }
 
 #container {
@@ -25,21 +24,29 @@ html, body {
 }
 
 #terminal-container {
-    width: 48ch; /* fixed width for terminal */
+    width: 50ch; /* 50 characters wide */
+    max-width: 50%;
     min-width: 300px;
     display: flex;
     flex-direction: column;
     border-right: 1px solid #000; /* thin black separator */
-    background-color: #111; /* dark */
+    height: 100%;
+    background-color: #111; /* dark background */
 }
 
 #terminal {
     flex: 1;
     overflow-y: auto;
+    height: 100%;
+    font-size: 16px;
+    line-height: 1.4;
 }
 
 .xterm {
     height: 100% !important;
+    font-weight: bold;
+    background-color: #111 !important;
+    color: #fff !important;
 }
 
 #chart-container {
@@ -47,13 +54,16 @@ html, body {
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 5px;
-    background-color: #111; /* dark */
+    height: 100%;
+    padding: 10px;
+    box-sizing: border-box;
 }
 
-canvas {
+iframe {
     width: 100%;
     height: 100%;
+    border: 1px solid #00B4FF;
+    background-color: #111;
 }
 </style>
 </head>
@@ -69,6 +79,7 @@ canvas {
     </div>
 </div>
 
+<!-- xterm.js and fit addon -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -77,68 +88,74 @@ canvas {
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-    theme: { background: '#111', foreground: '#fff' },
-    cols: 48
+    theme: {
+        background: '#111',
+        foreground: '#fff'
+    }
 });
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-// ---------------- WebSocket for terminal ----------------
+// ---------------- Terminal WebSocket ----------------
+let lastLines = 0;
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
-ws.onopen = () => term.writeln('\x1b[32mConnected. Terminal ready...\x1b[0m');
+ws.onopen = () => term.writeln('Connected. Terminal ready...');
 ws.onmessage = (event) => {
-    term.write(event.data);
-    term.scrollToBottom();
+    const lines = event.data.split("\n");
+    const newLines = lines.slice(lastLines);
+    newLines.forEach(l => term.writeln(l));
+    lastLines = lines.length;
 };
-ws.onerror = (err) => term.writeln('\x1b[31mWebSocket error: ' + err + '\x1b[0m');
-window.addEventListener('resize', () => fitAddon.fit());
+ws.onerror = (err) => term.writeln('\nWebSocket error: ' + err);
 
-// ---------------- Chart.js ----------------
+// ---------------- Chart ----------------
 const ctx = document.getElementById('chartCanvas').getContext('2d');
 const chart = new Chart(ctx, {
     type: 'line',
     data: {
         labels: [],
         datasets: [{
-            label: 'NIFTY Close',
+            label: 'Close',
             data: [],
-            borderColor: '#00ffff',
-            backgroundColor: 'rgba(0,255,255,0.1)',
-            pointRadius: 0,
-            borderWidth: 2,
-            tension: 0.2
+            borderColor: '#fff',
+            backgroundColor: 'rgba(255,255,255,0.1)',
+            tension: 0.1,
+            pointRadius: 0
         }]
     },
     options: {
         responsive: true,
-        maintainAspectRatio: false,
-        animation: false,  // prevents flickering
         plugins: { legend: { labels: { color: '#fff' } } },
         scales: {
-            x: { ticks: { color: '#fff' }, grid: { color: '#333' } },
-            y: { ticks: { color: '#fff' }, grid: { color: '#333' } }
-        }
+            x: { 
+                ticks: { color: '#fff' }, 
+                grid: { color: '#333' } 
+            },
+            y: { 
+                ticks: { color: '#fff' }, 
+                grid: { color: '#333' } 
+            }
+        },
+        interaction: { intersect: false, mode: 'index' }
     }
 });
 
-// ---------------- Fetch CSV and update chart ----------------
 async function updateChart() {
     try {
-        const res = await fetch('/line_data.csv?' + Date.now());
-        const csv = await res.text();
-        const lines = csv.trim().split('\n').slice(1); // skip header
+        const res = await fetch('/sys/line_data.csv?' + Date.now());
+        const text = await res.text();
+        const rows = text.trim().split("\n").slice(1);
         const labels = [];
         const data = [];
-        lines.forEach(line => {
-            const [time, close] = line.split(',');
+        rows.forEach(r => {
+            const [time, close] = r.split(",");
             labels.push(new Date(Number(time)*1000).toLocaleTimeString());
             data.push(Number(close));
         });
-
         chart.data.labels = labels;
         chart.data.datasets[0].data = data;
         chart.update();
@@ -146,11 +163,11 @@ async function updateChart() {
         console.error('Chart update error:', err);
     }
 }
-
-// Initial chart update
 updateChart();
-// Update every 5 seconds
-setInterval(updateChart, 5000);
+setInterval(updateChart, 3000);
+
+// Re-fit terminal on resize
+window.addEventListener('resize', () => fitAddon.fit());
 </script>
 
 </body>
