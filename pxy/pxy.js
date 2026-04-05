@@ -2,55 +2,66 @@
 const express = require('express');
 const path = require('path');
 const { Client } = require('ssh2');
+const WebSocket = require('ws');
 
 const app = express();
-app.use(express.json());
+
+// Serve static files (xterm.js CSS/JS)
+app.use('/xterm', express.static(path.join(__dirname, 'node_modules/@xterm/xterm')));
 app.use(express.static(path.join(__dirname)));
 
-const sshConnections = {}; // store SSH sessions by username
+const username = 'neo';
+const password = '1';
+const host = 'localhost'; // same VM
 
-// Connect to SSH
-app.post('/connect', (req, res) => {
-    const { host, username, password } = req.body;
-    const conn = new Client();
-
-    conn.on('ready', () => {
-        sshConnections[username] = conn; // save connection
-        res.send('SSH Connection established!');
-    }).on('error', (err) => {
-        res.send('SSH Connection error: ' + err.message);
-    }).connect({
-        host,
-        port: 22,
-        username,
-        password
-    });
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pxy.html'));
 });
 
-// Run commands over SSH
-app.post('/run', (req, res) => {
-    const { username, command } = req.body;
-    const conn = sshConnections[username];
+// HTTP server
+const server = app.listen(80, '0.0.0.0', () => {
+    console.log('Server running on port 80');
+});
 
-    if (!conn) {
-        return res.send('No SSH connection. Connect first.');
+// WebSocket server
+const wss = new WebSocket.Server({ server });
+
+let sshStream = null;
+
+wss.on('connection', (ws) => {
+    console.log('Browser connected via WebSocket');
+
+    if (sshStream) {
+        sshStream.on('data', (data) => ws.send(data.toString()));
+        sshStream.stderr.on('data', (data) => ws.send(data.toString()));
     }
+});
 
-    conn.exec(command, (err, stream) => {
-        if (err) return res.send('Error: ' + err.message);
+// SSH connection to attach npxy
+const conn = new Client();
+conn.on('ready', () => {
+    console.log('SSH connected, attaching to npxy session');
 
-        let output = '';
-        stream.on('close', () => {
-            res.send(output);
-        }).on('data', (data) => {
-            output += data.toString();
-        }).stderr.on('data', (data) => {
-            output += data.toString();
+    conn.exec('screen -r npxy', (err, stream) => {
+        if (err) throw err;
+        sshStream = stream;
+
+        stream.on('data', (data) => {
+            wss.clients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(data.toString());
+                }
+            });
         });
-    });
-});
 
-// Listen on port 80
-app.listen(80, '0.0.0.0', () => {
-    console.log('Server running at http://0.0.0.0:80');
-});
+        stream.stderr.on('data', (data) => {
+            wss.clients.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) {
+                    client.send(data.toString());
+                }
+            });
+        });
+
+        stream.on('close', () => console.log('Screen session closed'));
+    });
+}).connect({ host, port: 22, username, password });
