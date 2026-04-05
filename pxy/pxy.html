@@ -14,7 +14,7 @@ html, body {
     height: 100%;
     width: 100%;
     font-family: monospace;
-    background: #f0f0f0; /* page background */
+    background: #f0f0f0;
 }
 
 #container {
@@ -23,7 +23,6 @@ html, body {
     width: 100%;
 }
 
-/* Left: Terminal panel */
 #terminal-container {
     width: 55ch;
     max-width: 50%;
@@ -32,37 +31,32 @@ html, body {
     flex-direction: column;
     border-right: 2px solid #ccc;
     height: 100%;
-    background-color: #ffffff; /* white terminal panel */
+    background-color: #ffffff;
 }
 
-/* Terminal itself */
 #terminal {
     flex: 1;
     overflow-y: auto;
-    background-color: #ffffff;
     height: 100%;
-    font-size: 16px;       /* larger text */
-    line-height: 1.4;      /* better spacing */
+    font-size: 16px;
+    line-height: 1.4;
 }
 
-/* Ensure xterm canvas fills container */
 .xterm {
     height: 100% !important;
-    font-weight: bold;     /* bolder text */
+    font-weight: bold;
 }
 
-/* Right: Chart panel */
 #chart-container {
     flex: 1;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100%;       /* match terminal height */
+    height: 100%;
     padding: 10px;
     box-sizing: border-box;
 }
 
-/* iframe stretches to fill panel */
 iframe {
     width: 100%;
     height: 100%;
@@ -73,12 +67,10 @@ iframe {
 <body>
 
 <div id="container">
-    <!-- Left: Terminal -->
     <div id="terminal-container">
-        <div id="terminal">Connecting to npxy tmux session...</div>
+        <div id="terminal"></div>
     </div>
 
-    <!-- Right: Investing.com Chart -->
     <div id="chart-container">
         <iframe 
             src="https://ssltvc.investing.com/?pair_ID=8985&height=650&width=1200&interval=86400&plotStyle=candles&domain_ID=1&lang_ID=1&timezone_ID=20">
@@ -86,45 +78,43 @@ iframe {
     </div>
 </div>
 
-<!-- xterm.js -->
+<!-- xterm.js and fit addon -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
 <script>
-/* ------------------ TERMINAL ------------------ */
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     theme: {
-        background: '#ffffff', // white background
-        foreground: '#222222'  // darker text for better visibility
+        background: '#ffffff',
+        foreground: '#222222'
     }
 });
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 
-// WebSocket connection
+// Fit terminal to container
+fitAddon.fit();
+
+// Example text to test
+term.writeln('Connected. Displaying npxy tmux session...');
+term.writeln('Terminal ready.');
+
+// WebSocket example
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
-ws.onopen = () => term.writeln('%cConnected. Displaying npxy tmux session...\n','color:green');
+ws.onopen = () => term.writeln('WebSocket connected...');
 ws.onmessage = (event) => { 
     term.write(event.data); 
     term.scrollToBottom(); 
 };
 ws.onerror = (err) => term.writeln('\nWebSocket error: ' + err);
 
-/* ------------------ RESIZE TERMINAL ------------------ */
-function fitTerminal() {
-    const terminalContainer = document.getElementById('terminal');
-    const containerHeight = terminalContainer.clientHeight;
-    const containerWidth = terminalContainer.clientWidth;
-    const charHeight = term._core?._renderService?.dimensions?.actualCellHeight || 18;
-    const charWidth = term._core?._renderService?.dimensions?.actualCellWidth || 8;
-    const rows = Math.floor(containerHeight / charHeight);
-    const cols = Math.floor(containerWidth / charWidth);
-    term.resize(cols, rows);
-}
-window.addEventListener('resize', fitTerminal);
-setTimeout(fitTerminal, 100); // initial fit
+// Re-fit on window resize
+window.addEventListener('resize', () => fitAddon.fit());
 </script>
 
 </body>
