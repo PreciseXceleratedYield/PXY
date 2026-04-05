@@ -37,10 +37,16 @@ html, body {
 
 /* Terminal itself */
 #terminal {
-    flex: 1;           /* fill full height */
+    flex: 1;
     overflow-y: auto;
     color: #000000;     /* black text */
     background-color: #ffffff; /* white background */
+    height: 100%;       /* fill container */
+}
+
+/* Ensure xterm canvas fills container */
+.xterm {
+    height: 100% !important;
 }
 
 /* Right: Chart panel */
@@ -93,6 +99,7 @@ const term = new Terminal({
 });
 term.open(document.getElementById('terminal'));
 
+// WebSocket connection
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
@@ -102,6 +109,20 @@ ws.onmessage = (event) => {
     term.scrollToBottom(); 
 };
 ws.onerror = (err) => term.writeln('\nWebSocket error: ' + err);
+
+/* ------------------ RESIZE TERMINAL ------------------ */
+function fitTerminal() {
+    const terminalContainer = document.getElementById('terminal');
+    const containerHeight = terminalContainer.clientHeight;
+    const containerWidth = terminalContainer.clientWidth;
+    const charHeight = term._core?._renderService?.dimensions?.actualCellHeight || 18;
+    const charWidth = term._core?._renderService?.dimensions?.actualCellWidth || 8;
+    const rows = Math.floor(containerHeight / charHeight);
+    const cols = Math.floor(containerWidth / charWidth);
+    term.resize(cols, rows);
+}
+window.addEventListener('resize', fitTerminal);
+setTimeout(fitTerminal, 100); // initial fit
 </script>
 
 </body>
