@@ -10,12 +10,12 @@ const wss = new WebSocket.Server({ server });
 
 const PORT = 80; // port 80 requires sudo or setcap
 
-// Serve HTML only
+// Serve HTML
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'pxy.html'));
 });
 
-// WebSocket: stream last 100 lines of tmux npxy session
+// WebSocket: stream tmux npxy session
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
@@ -27,7 +27,7 @@ wss.on('connection', (ws) => {
             }
             ws.send(stdout);
         });
-    }, 500);
+    }, 500); // update every 0.5s
 
     ws.on('close', () => {
         console.log('Client disconnected');
