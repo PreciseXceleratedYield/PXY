@@ -4,10 +4,7 @@
 <meta charset="UTF-8">
 <title>Terminal + NIFTY Chart</title>
 
-<!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
-
-<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
@@ -28,11 +25,12 @@ html, body {
 }
 
 #terminal-container {
-    width: 50%;
+    width: 55ch;        /* restore your original width */
+    max-width: 50%;
     min-width: 300px;
     display: flex;
     flex-direction: column;
-    border-right: 1px solid #555;
+    border-right: 2px solid #555;
     height: 100%;
     background-color: #1e1e1e;
 }
@@ -40,7 +38,7 @@ html, body {
 #terminal {
     flex: 1;
     overflow-y: auto;
-    font-size: 14px;
+    font-size: 16px;
 }
 
 .xterm {
@@ -51,7 +49,6 @@ html, body {
 #chart-container {
     flex: 1;
     display: flex;
-    flex-direction: column;
     justify-content: center;
     align-items: center;
     padding: 10px;
@@ -76,7 +73,6 @@ canvas {
     </div>
 </div>
 
-<!-- xterm.js and FitAddon -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
@@ -111,25 +107,15 @@ const niftyChart = new Chart(ctx, {
         responsive: true,
         maintainAspectRatio: false,
         animation: false,
-        plugins: {
-            legend: { labels: { color: '#ffffff' } }
-        },
+        plugins: { legend: { labels: { color: '#ffffff' } } },
         scales: {
-            x: { 
-                type: 'time',
-                time: { unit: 'minute' },
-                ticks: { color: '#ffffff' },
-                grid: { color: '#555' }
-            },
-            y: {
-                ticks: { color: '#ffffff' },
-                grid: { color: '#555' }
-            }
+            x: { type: 'time', time: { unit: 'minute' }, ticks: { color: '#ffffff' }, grid: { color: '#555' } },
+            y: { ticks: { color: '#ffffff' }, grid: { color: '#555' } }
         }
     }
 });
 
-// WebSocket connection
+// Separate WebSocket streams for terminal and chart
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
@@ -138,9 +124,9 @@ ws.onmessage = (event) => {
     try {
         const obj = JSON.parse(event.data);
         if(obj.chart){
-            // Update chart
+            // Update chart without blocking terminal
             const dataset = niftyChart.data.datasets[0];
-            dataset.data = obj.chart.map(p => ({ x: new Date(p.time * 1000), y: p.close }));
+            dataset.data = obj.chart.map(p => ({ x: new Date(p.time*1000), y: p.close }));
             niftyChart.update('none');
         } else {
             // Terminal data
@@ -148,6 +134,7 @@ ws.onmessage = (event) => {
             term.scrollToBottom();
         }
     } catch(e){
+        // fallback for non-JSON terminal lines
         term.write(event.data);
         term.scrollToBottom();
     }
