@@ -9,40 +9,41 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const PORT = 80; // change if needed
+const PORT = 80;
 
 // Serve HTML
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'pxy.html'));
 });
 
-// WebSocket: stream tmux npxy session + CSV for chart
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
-    const interval = setInterval(() => {
-        // 1️⃣ tmux terminal
+    // Terminal: tmux updates
+    const termInterval = setInterval(() => {
         exec('tmux capture-pane -t npxy -pS -100 -J -e', (err, stdout) => {
             if (err) return ws.send(`\x1b[31mError: ${err.message}\x1b[0m\n`);
             ws.send(stdout);
         });
+    }, 200); // faster updates, terminal smooth
 
-        // 2️⃣ Read CSV for chart
+    // Chart: CSV updates
+    const chartInterval = setInterval(() => {
         fs.readFile(path.join(__dirname, 'sys', 'line_data.csv'), 'utf8', (err, data) => {
             if (err) return;
-            const lines = data.trim().split('\n').slice(1); // skip header
+            const lines = data.trim().split('\n').slice(1);
             const chartData = lines.map(l => {
                 const [time, close] = l.split(',');
                 return { time: parseInt(time), close: parseFloat(close) };
             });
             ws.send(JSON.stringify({ chart: chartData }));
         });
-
-    }, 500);
+    }, 1000); // 1 second chart update
 
     ws.on('close', () => {
         console.log('Client disconnected');
-        clearInterval(interval);
+        clearInterval(termInterval);
+        clearInterval(chartInterval);
     });
 });
 
