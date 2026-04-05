@@ -8,7 +8,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const PORT = 80; // port 80 requires sudo or setcap
+const PORT = 80; // requires sudo or setcap
 
 // Serve HTML
 app.get('/', (req, res) => {
