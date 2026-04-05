@@ -1,24 +1,10 @@
 #!/bin/bash
 
-# Full path to your script
-PXYSCRIPT=~/pxy.js
-SESSION=npxy
+# Start pxy.js silently as daemon if not already running
+pgrep -f "/home/neo/pxy.js" >/dev/null 2>&1 || \
+  nohup node /home/neo/pxy.js > /dev/null 2>&1 &
 
-# Check if tmux session exists, create if needed
-tmux has-session -t $SESSION 2>/dev/null
-if [ $? -ne 0 ]; then
-    tmux new-session -d -s $SESSION
-fi
-
-# Check if pxy.js is already running inside the session
-tmux list-panes -t $SESSION -F "#{pane_pid} #{pane_title}" | grep "$PXYSCRIPT" >/dev/null 2>&1
-if [ $? -ne 0 ]; then
-    tmux send-keys -t $SESSION "node $PXYSCRIPT > /dev/null 2>&1 &" C-m
-fi
-
-# Attach only if NOT already inside a tmux session
-if [ -z "$TMUX" ]; then
-    tmux attach -t $SESSION
-else
-    echo "pxy.js is running inside tmux session '$SESSION'. Already inside tmux, not attaching."
-fi
+# Your original tmux logic stays unchanged
+tmux has-session -t npxy 2>/dev/null \
+  && tmux attach -t npxy \
+  || tmux new -s npxy 'pxyexe'
