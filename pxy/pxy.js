@@ -1,67 +1,64 @@
-// pxy.js
-const express = require('express');
-const path = require('path');
-const { Client } = require('ssh2');
-const WebSocket = require('ws');
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Terminal + TradingView</title>
 
-const app = express();
+<!-- xterm.js CSS -->
+<link rel="stylesheet" href="/xterm/css/xterm.css" />
 
-// Serve static files (xterm.js CSS/JS)
-app.use('/xterm', express.static(path.join(__dirname, 'node_modules/@xterm/xterm')));
-app.use(express.static(path.join(__dirname)));
+<style>
+html, body {
+    margin: 0; padding: 0; height: 100%; width: 100%;
+    font-family: monospace; background: #1e1e1e; color: #c5c5c5;
+}
+#container {
+    display: flex; height: 100%; width: 100%;
+}
+#terminal-container {
+    width: 55ch; /* approx 55 characters wide */
+    max-width: 50%; /* never exceed half screen */
+    min-width: 300px;
+    border-right: 2px solid #444;
+    display: flex; flex-direction: column;
+}
+#terminal {
+    flex: 1;
+}
+#tradingview-container {
+    flex: 1; /* take remaining space */
+    background: #fff;
+}
+iframe {
+    width: 100%; height: 100%; border: none;
+}
+</style>
+</head>
+<body>
+<div id="container">
+    <div id="terminal-container">
+        <div id="terminal">Connecting...</div>
+    </div>
+    <div id="tradingview-container">
+        <!-- TradingView iframe hardcoded for user -->
+        <iframe src="https://www.tradingview.com/embed/?user=kcbppc@gmail.com"></iframe>
+    </div>
+</div>
 
-const username = 'neo';
-const password = '1';
-const host = 'localhost'; // same VM
+<!-- xterm.js -->
+<script src="/xterm/lib/xterm.js"></script>
+<script>
+const term = new Terminal({ convertEol: true, scrollback: 1000 });
+term.open(document.getElementById('terminal'));
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'pxy.html'));
-});
+const ws = new WebSocket(`ws://${window.location.host}`);
+ws.onopen = () => term.writeln('Connected. Displaying npxy session...\n');
 
-// HTTP server
-const server = app.listen(80, '0.0.0.0', () => {
-    console.log('Server running on port 80');
-});
+ws.onmessage = (event) => {
+    term.write(event.data);
+};
 
-// WebSocket server
-const wss = new WebSocket.Server({ server });
-
-let sshStream = null;
-
-wss.on('connection', (ws) => {
-    console.log('Browser connected via WebSocket');
-
-    if (sshStream) {
-        sshStream.on('data', (data) => ws.send(data.toString()));
-        sshStream.stderr.on('data', (data) => ws.send(data.toString()));
-    }
-});
-
-// SSH connection to attach npxy
-const conn = new Client();
-conn.on('ready', () => {
-    console.log('SSH connected, attaching to npxy session');
-
-    conn.exec('screen -r npxy', (err, stream) => {
-        if (err) throw err;
-        sshStream = stream;
-
-        stream.on('data', (data) => {
-            wss.clients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(data.toString());
-                }
-            });
-        });
-
-        stream.stderr.on('data', (data) => {
-            wss.clients.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(data.toString());
-                }
-            });
-        });
-
-        stream.on('close', () => console.log('Screen session closed'));
-    });
-}).connect({ host, port: 22, username, password });
+ws.onerror = (err) => term.writeln('\nWebSocket error: ' + err);
+</script>
+</body>
+</html>
