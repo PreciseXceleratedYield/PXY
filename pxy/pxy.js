@@ -1,38 +1,41 @@
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
-const fs = require('fs');
-const path = require('path');
 const { exec } = require('child_process');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const PORT = 80; // change if needed
-const CSV_FILE = path.join(__dirname, 'sys', 'line_data.csv');
+const PORT = 80; // change port if needed
 
-// ---------------- Serve HTML ----------------
+// Serve HTML
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'pxy.html'));
 });
 
-// ---------------- WebSocket for terminal ----------------
+// Serve sys folder for CSV
+app.use('/sys', express.static(path.join(__dirname, 'sys')));
+
+// WebSocket: stream tmux npxy session (only new lines)
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
-    // Terminal output interval
+    let lastLength = 0;
+
     const interval = setInterval(() => {
-        // Try to capture tmux npxy session
         exec('tmux capture-pane -t npxy -pS -100 -J -e', (err, stdout, stderr) => {
             if (err) {
-                // fallback output if tmux not running
-                ws.send('\x1b[32mConnected. Terminal ready...\x1b[0m\n');
+                ws.send(`\x1b[31mError: ${stderr || err.message}\x1b[0m\n`);
                 return;
             }
-            ws.send(stdout || '\x1b[32mConnected. Terminal ready...\x1b[0m\n');
+            const lines = stdout.split("\n");
+            const newLines = lines.slice(lastLength);
+            if(newLines.length > 0) ws.send(newLines.join("\n"));
+            lastLength = lines.length;
         });
-    }, 500);
+    }, 500); // fetch tmux every 0.5s
 
     ws.on('close', () => {
         console.log('Client disconnected');
@@ -40,18 +43,6 @@ wss.on('connection', (ws) => {
     });
 });
 
-// ---------------- Serve CSV ----------------
-app.get('/line_data.csv', (req, res) => {
-    fs.readFile(CSV_FILE, 'utf8', (err, data) => {
-        if (err) {
-            return res.status(500).send('Error reading CSV');
-        }
-        res.header('Content-Type', 'text/csv');
-        res.send(data);
-    });
-});
-
-// ---------------- Start server ----------------
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost`);
+    console.log(`Server running at http://localhost`);
 });
