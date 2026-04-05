@@ -39,14 +39,16 @@ html, body {
 #terminal {
     flex: 1;
     overflow-y: auto;
-    color: #000000;     /* black text */
-    background-color: #ffffff; /* white background */
-    height: 100%;       /* fill container */
+    background-color: #ffffff;
+    height: 100%;
+    font-size: 16px;       /* larger text */
+    line-height: 1.4;      /* better spacing */
 }
 
 /* Ensure xterm canvas fills container */
 .xterm {
     height: 100% !important;
+    font-weight: bold;     /* bolder text */
 }
 
 /* Right: Chart panel */
@@ -94,7 +96,7 @@ const term = new Terminal({
     scrollback: 1000,
     theme: {
         background: '#ffffff', // white background
-        foreground: '#000000'  // black text
+        foreground: '#222222'  // darker text for better visibility
     }
 });
 term.open(document.getElementById('terminal'));
@@ -103,7 +105,7 @@ term.open(document.getElementById('terminal'));
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
-ws.onopen = () => term.writeln('Connected. Displaying npxy tmux session...\n');
+ws.onopen = () => term.writeln('%cConnected. Displaying npxy tmux session...\n','color:green');
 ws.onmessage = (event) => { 
     term.write(event.data); 
     term.scrollToBottom(); 
