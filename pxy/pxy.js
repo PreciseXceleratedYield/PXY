@@ -5,39 +5,52 @@ const { Client } = require('ssh2');
 
 const app = express();
 app.use(express.json());
-
-// Serve static files (pxy.html and JS/CSS)
 app.use(express.static(path.join(__dirname)));
 
-// Endpoint to connect to SSH server
+const sshConnections = {}; // store SSH sessions by username
+
+// Connect to SSH
 app.post('/connect', (req, res) => {
     const { host, username, password } = req.body;
     const conn = new Client();
 
-    conn
-      .on('ready', () => {
+    conn.on('ready', () => {
+        sshConnections[username] = conn; // save connection
         res.send('SSH Connection established!');
-        conn.end();
-      })
-      .on('error', (err) => {
+    }).on('error', (err) => {
         res.send('SSH Connection error: ' + err.message);
-      })
-      .connect({
+    }).connect({
         host,
-        port: 22,      // use SSH port
+        port: 22,
         username,
         password
-      });
+    });
 });
 
-// Endpoint to run commands
+// Run commands over SSH
 app.post('/run', (req, res) => {
     const { username, command } = req.body;
-    // In real scenario, map username to SSH connection, here simple demo
-    res.send(`Command received: ${command}\n(Not actually executed for security)`);
+    const conn = sshConnections[username];
+
+    if (!conn) {
+        return res.send('No SSH connection. Connect first.');
+    }
+
+    conn.exec(command, (err, stream) => {
+        if (err) return res.send('Error: ' + err.message);
+
+        let output = '';
+        stream.on('close', () => {
+            res.send(output);
+        }).on('data', (data) => {
+            output += data.toString();
+        }).stderr.on('data', (data) => {
+            output += data.toString();
+        });
+    });
 });
 
-// Listen on port 80 (HTTP)
+// Listen on port 80
 app.listen(80, '0.0.0.0', () => {
     console.log('Server running at http://0.0.0.0:80');
 });
