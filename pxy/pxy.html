@@ -15,6 +15,7 @@ body { margin:0; background:#1e1e1e; color:#c5c5c5; font-family:monospace; }
 <body>
 <div id="terminal"></div>
 <input id="input" placeholder="Type command and press Enter">
+
 <script>
 const term = new Terminal();
 const fitAddon = new FitAddon.FitAddon();
@@ -24,43 +25,39 @@ fitAddon.fit();
 
 // SSH credentials
 const username = 'sap';
-const sshHost = '20.219.25.209';
-let sshPassword = '';
+const sshHost = '20.219.25.209'; // your public IP
+let sshPassword = prompt(`Enter SSH password for ${username}@${sshHost}`);
 
-// Ask for password every time
-sshPassword = prompt("Enter SSH password for " + username + "@" + sshHost);
-
-// Connect to SSH server
+// Connect
 async function connectSSH() {
-  if (!sshPassword) {
-    term.writeln("No password entered. Cannot connect.");
-    return;
-  }
+    if (!sshPassword) {
+        term.writeln("No password entered. Cannot connect.");
+        return;
+    }
 
-  const res = await fetch('/connect', {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({host:sshHost, username, password:sshPassword})
-  });
-  term.writeln(await res.text());
+    const res = await fetch('/connect', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ host: sshHost, username, password: sshPassword })
+    });
+    term.writeln(await res.text());
 }
 connectSSH();
 
-// Send commands to SSH server
+// Run commands
 const input = document.getElementById('input');
 input.addEventListener('keydown', async (e) => {
-  if(e.key === 'Enter') {
-    const cmd = input.value;
-    term.writeln('> ' + cmd);
-    input.value = '';
-    const res = await fetch('/run', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({username, command:cmd})
-    });
-    const data = await res.text();
-    term.writeln(data);
-  }
+    if (e.key === 'Enter') {
+        const cmd = input.value;
+        term.writeln('> ' + cmd);
+        input.value = '';
+        const res = await fetch('/run', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ username, command: cmd })
+        });
+        term.writeln(await res.text());
+    }
 });
 </script>
 </body>
