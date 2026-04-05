@@ -1,4 +1,5 @@
-# run_pyc.py
+# sysdashpxy.py
+
 import runpy
 import os
 from colorama import Fore, Style, init
@@ -104,6 +105,10 @@ def get_full_snapshot():
     result["bos_bar"] = bos_bar
     result["bos_val"] = bos_val
 
+    # ================= CHART DATA (CRITICAL) =================
+    result["timestamp"] = int(df.index[-1].timestamp())
+    result["close"] = float(df["Close"].iloc[-1])
+
     return result
 
 # ================= PRINT DASHBOARD =================
@@ -171,16 +176,11 @@ def print_dashboard(data):
     space = TOTAL_WIDTH - len(f"Entry:{entry}") - len(f"Rvrsl:{reversal}")
     print(Fore.YELLOW + "Entry:" + color + entry + " " * space + Fore.YELLOW + "Rvrsl:" + color + reversal)
 
-    # ================= DAY CANDLE =================
-    #print(data["day_candle"])
-
     # ================= BOS BAR =================
     print(data["bos_bar"])
-    # Optional: print BOS value text
-    # print("BOS Value:", data["bos_val"])
 
 # ================= MAIN =================
 if __name__ == "__main__":
-    run_pyc_file()               # run any pyc files
-    data = get_full_snapshot()    # capture all indicators
-    print_dashboard(data)         # display dashboard
+    run_pyc_file()
+    data = get_full_snapshot()
+    print_dashboard(data)
