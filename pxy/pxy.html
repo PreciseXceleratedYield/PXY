@@ -7,9 +7,6 @@
 <!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
-<!-- Chart.js -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
 <style>
 html, body {
     margin: 0;
@@ -44,11 +41,10 @@ html, body {
     padding: 10px;
     box-sizing: border-box;
 }
-canvas {
-    background: #1e1e1e;
+iframe {
+    width: 100%;
+    height: 100%;
     border: 1px solid #00B4FF;
-    height: 100% !important;
-    width: 100% !important;
 }
 </style>
 </head>
@@ -60,9 +56,13 @@ canvas {
         <div id="terminal">Connecting to npxy tmux session...</div>
     </div>
 
-    <!-- Right: NIFTY Chart -->
+    <!-- Right: Investing.com NIFTY Chart -->
     <div id="chart-container">
-        <canvas id="niftyChart"></canvas>
+        <iframe 
+            height="480" 
+            width="650" 
+            src="https://ssltvc.investing.com/?pair_ID=8985&height=480&width=650&interval=86400&plotStyle=candles&domain_ID=1&lang_ID=1&timezone_ID=20">
+        </iframe>
     </div>
 </div>
 
@@ -83,72 +83,6 @@ ws.onmessage = (event) => {
     term.scrollToBottom(); 
 };
 ws.onerror = (err) => term.writeln('\nWebSocket error: ' + err);
-
-/* ------------------ NIFTY CHART ------------------ */
-const ctx = document.getElementById('niftyChart').getContext('2d');
-let niftyChart;
-
-async function fetchNiftyData() {
-    try {
-        // Using Yahoo Finance API (delayed)
-        const response = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/^NSEI?interval=5m&range=1d');
-        const data = await response.json();
-        const timestamps = data.chart.result[0].timestamp.map(ts => new Date(ts*1000).toLocaleTimeString());
-        const prices = data.chart.result[0].indicators.quote[0].close;
-
-        return {timestamps, prices};
-    } catch (err) {
-        console.error('Error fetching NIFTY data:', err);
-        return {timestamps: [], prices: []};
-    }
-}
-
-async function updateChart() {
-    const {timestamps, prices} = await fetchNiftyData();
-    if (!niftyChart) {
-        niftyChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: timestamps,
-                datasets: [{
-                    label: 'NIFTY 50',
-                    data: prices,
-                    borderColor: '#00B4FF',
-                    backgroundColor: 'rgba(0, 180, 255, 0.2)',
-                    fill: true,
-                    pointRadius: 0,
-                    borderWidth: 2,
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    x: { 
-                        ticks: { color: '#c5c5c5' },
-                        grid: { color: '#444' }
-                    },
-                    y: { 
-                        ticks: { color: '#c5c5c5' },
-                        grid: { color: '#444' }
-                    }
-                },
-                plugins: {
-                    legend: { labels: { color: '#c5c5c5' } }
-                }
-            }
-        });
-    } else {
-        niftyChart.data.labels = timestamps;
-        niftyChart.data.datasets[0].data = prices;
-        niftyChart.update();
-    }
-}
-
-// Initial load
-updateChart();
-// Refresh every 60 seconds
-setInterval(updateChart, 60000);
 </script>
 
 </body>
