@@ -36,7 +36,7 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-family:monospace
               "locale": "en",
               "toolbar_bg": "#f1f3f6",
               "enable_publishing": false,
-              "allow_symbol_change": false, // prevents switching to AAPL
+              "allow_symbol_change": false,
               "studies": ["MACD@tv-basicstudies"]
             });
           </script>
@@ -44,7 +44,6 @@ html, body { margin:0; padding:0; height:100%; width:100%; font-family:monospace
     </div>
 </div>
 
-<!-- Terminal JS -->
 <script src="/xterm/lib/xterm.js"></script>
 <script>
 const term = new Terminal({ convertEol:true, scrollback:1000 });
