@@ -8,21 +8,20 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const PORT = 80; // or any port
+const PORT = 80; // requires sudo or setcap
 
-// Serve HTML and static CSV
-app.use('/sys', express.static(path.join(__dirname, 'sys')));
+// Serve HTML
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'pxy.html'));
 });
 
-// WebSocket for terminal
+// WebSocket: stream tmux npxy session
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
     const interval = setInterval(() => {
         exec('tmux capture-pane -t npxy -pS -100 -J -e', (err, stdout, stderr) => {
-            if(err) {
+            if (err) {
                 ws.send(`\x1b[31mError: ${stderr || err.message}\x1b[0m\n`);
                 return;
             }
