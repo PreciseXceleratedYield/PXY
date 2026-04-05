@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # 1️⃣ Start pxy.js silently as daemon if not running
-pgrep -f "/home/pxy/pxy.js" >/dev/null 2>&1 || \
-  nohup node /home/pxy/pxy.js > /dev/null 2>&1 &
+pgrep -f "/home/neo/pxy/pxy.js" >/dev/null 2>&1 || \
+  nohup node /home/neo/pxy/pxy.js > /dev/null 2>&1 &
 
 # 2️⃣ Your existing tmux logic remains unchanged
 tmux has-session -t npxy 2>/dev/null \
