@@ -15,7 +15,7 @@ else
     # Session does not exist, create it detached
     tmux new-session -d -s npxy
     # Start pxy.js silently
-    tmux send-keys -t npxy "node /full/path/to/pxy.js > /dev/null 2>&1 &" C-m
+    tmux send-keys -t npxy "node ~/pxy.js > /dev/null 2>&1 &" C-m
     # Attach to session
     tmux attach -t npxy
 fi
