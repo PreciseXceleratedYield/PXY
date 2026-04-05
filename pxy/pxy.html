@@ -1,11 +1,14 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Terminal + NIFTY Chart</title>
 
 <!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
 html, body {
@@ -14,33 +17,30 @@ html, body {
     height: 100%;
     width: 100%;
     font-family: monospace;
-    background: #000; /* Dark background */
+    background-color: #1e1e1e;
+    color: #fff;
 }
 
 #container {
     display: flex;
-    height: 100vh; /* full viewport height */
+    height: 100vh;
     width: 100%;
 }
 
 #terminal-container {
-    width: 55ch;
-    max-width: 50%;
+    width: 50%;
     min-width: 300px;
     display: flex;
     flex-direction: column;
-    border-right: 2px solid #555;
+    border-right: 1px solid #555;
     height: 100%;
-    background-color: #111; /* dark terminal panel */
+    background-color: #1e1e1e;
 }
 
 #terminal {
     flex: 1;
     overflow-y: auto;
-    height: 100%;
-    font-size: 16px;
-    line-height: 1.4;
-    color: #fff;
+    font-size: 14px;
 }
 
 .xterm {
@@ -51,17 +51,16 @@ html, body {
 #chart-container {
     flex: 1;
     display: flex;
+    flex-direction: column;
     justify-content: center;
     align-items: center;
-    height: 100%;
     padding: 10px;
-    box-sizing: border-box;
-    background-color: #000; /* dark chart background */
+    background-color: #1e1e1e;
 }
 
 canvas {
-    width: 100%;
-    height: 100%;
+    width: 100% !important;
+    height: 100% !important;
 }
 </style>
 </head>
@@ -77,94 +76,84 @@ canvas {
     </div>
 </div>
 
-<!-- xterm.js and fit addon -->
+<!-- xterm.js and FitAddon -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-// ===== TERMINAL =====
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-    theme: {
-        background: '#111',
-        foreground: '#fff'
-    }
+    theme: { background: '#1e1e1e', foreground: '#ffffff' }
 });
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
-
 term.writeln('Connected. Terminal ready...');
 
-// Example WebSocket connection (if used)
+// Chart.js setup
+const ctx = document.getElementById('niftyChart').getContext('2d');
+const niftyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        datasets: [{
+            label: 'NIFTY Close',
+            data: [],
+            borderColor: '#00FF00',
+            backgroundColor: 'rgba(0,255,0,0.2)',
+            pointRadius: 0,
+            borderWidth: 2,
+            tension: 0.2
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+            legend: { labels: { color: '#ffffff' } }
+        },
+        scales: {
+            x: { 
+                type: 'time',
+                time: { unit: 'minute' },
+                ticks: { color: '#ffffff' },
+                grid: { color: '#555' }
+            },
+            y: {
+                ticks: { color: '#ffffff' },
+                grid: { color: '#555' }
+            }
+        }
+    }
+});
+
+// WebSocket connection
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
 ws.onopen = () => term.writeln('WebSocket connected...');
-ws.onmessage = (event) => { 
-    term.write(event.data); 
-    term.scrollToBottom(); 
-};
-ws.onerror = (err) => term.writeln('\nWebSocket error: ' + err);
-
-// Re-fit on window resize
-window.addEventListener('resize', () => fitAddon.fit());
-
-// ===== CHART =====
-async function loadChart() {
+ws.onmessage = (event) => {
     try {
-        const res = await fetch('./sys/line_data.csv?' + Date.now());
-        const csvText = await res.text();
-
-        const rows = csvText.trim().split('\n').slice(1).map(r => {
-            const [time, close] = r.split(',');
-            return { x: new Date(parseInt(time) * 1000), y: parseFloat(close) };
-        });
-
-        const ctx = document.getElementById('niftyChart').getContext('2d');
-
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                datasets: [{
-                    label: 'NIFTY Close',
-                    data: rows,
-                    borderColor: '#00FF00', // green line
-                    backgroundColor: 'rgba(0,0,0,0)', 
-                    tension: 0.2,
-                    pointRadius: 0
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { labels: { color: '#fff' } }
-                },
-                scales: {
-                    x: {
-                        type: 'time',
-                        time: { unit: 'minute' },
-                        ticks: { color: '#fff' },
-                        grid: { color: '#555' }
-                    },
-                    y: {
-                        ticks: { color: '#fff' },
-                        grid: { color: '#555' }
-                    }
-                }
-            }
-        });
-    } catch (err) {
-        console.error('Error loading chart:', err);
+        const obj = JSON.parse(event.data);
+        if(obj.chart){
+            // Update chart
+            const dataset = niftyChart.data.datasets[0];
+            dataset.data = obj.chart.map(p => ({ x: new Date(p.time * 1000), y: p.close }));
+            niftyChart.update('none');
+        } else {
+            // Terminal data
+            term.write(event.data);
+            term.scrollToBottom();
+        }
+    } catch(e){
+        term.write(event.data);
+        term.scrollToBottom();
     }
-}
+};
 
-// Load chart
-loadChart();
+window.addEventListener('resize', () => fitAddon.fit());
 </script>
 
 </body>
