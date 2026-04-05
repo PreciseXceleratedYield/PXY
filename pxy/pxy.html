@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Web SSH Terminal</title>
+<link rel="stylesheet" href="node_modules/@xterm/xterm/css/xterm.css" />
+<script src="node_modules/@xterm/xterm/lib/xterm.js"></script>
+<script src="node_modules/@xterm/addon-fit/lib/xterm-addon-fit.js"></script>
+<style>
+body { margin:0; background:#1e1e1e; color:#c5c5c5; font-family:monospace; }
+#terminal { height:90vh; width:100vw; }
+#input { width:100%; border:none; background:transparent; color:#c5c5c5; font-family:monospace; }
+</style>
+</head>
+<body>
+<div id="terminal"></div>
+<input id="input" placeholder="Type command and press Enter">
+<script>
+const term = new Terminal();
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
+term.open(document.getElementById('terminal'));
+fitAddon.fit();
+
+const username = 'sap'; // SSH username
+const sshHost = '20.219.25.209'; // Hardcoded server IP
+const sshPassword = 'YOUR_PASSWORD'; // Replace with your password
+
+async function connectSSH() {
+  const res = await fetch('/connect', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({host:sshHost, username, password:sshPassword})
+  });
+  term.writeln(await res.text());
+}
+connectSSH();
+
+const input = document.getElementById('input');
+input.addEventListener('keydown', async (e) => {
+  if(e.key === 'Enter') {
+    const cmd = input.value;
+    term.writeln('> ' + cmd);
+    input.value = '';
+    const res = await fetch('/run', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({username, command:cmd})
+    });
+    const data = await res.text();
+    term.writeln(data);
+  }
+});
+</script>
+</body>
+</html>
