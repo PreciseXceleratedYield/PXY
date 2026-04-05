@@ -1,8 +1,46 @@
+# syspxy.py
+
 from sysdashpxy import get_full_snapshot
 from systdaypxy import get_market_snapshot
 from sysvixpxy import get_market_context, expand_vix, expand_sentiment
 from syscnfgpxy import TICKER
 
+import csv
+import os
+
+# ================= GLOBAL =================
+CSV_FILE = "line_data.csv"
+last_candle_time = None
+
+
+# ================= CSV APPENDER =================
+def append_csv(data):
+    global last_candle_time
+
+    ts = data.get("timestamp")
+    close = data.get("close_price")
+
+    if not ts or close is None:
+        return
+
+    # ✅ only new candle
+    if ts == last_candle_time:
+        return
+
+    last_candle_time = ts
+
+    file_exists = os.path.isfile(CSV_FILE)
+
+    with open(CSV_FILE, "a", newline="") as f:
+        writer = csv.writer(f)
+
+        if not file_exists:
+            writer.writerow(["time", "close"])
+
+        writer.writerow([ts, close])
+
+
+# ================= MAIN FUNCTION =================
 def get_all_data():
     # -------- CORE --------
     core = get_full_snapshot() or {}
@@ -44,17 +82,24 @@ def get_all_data():
         "entry": core.get("entry"),
         "reversal": core.get("reversal"),
 
+        # ===== CHART DATA =====
+        "timestamp": core.get("timestamp"),
+        "close_price": core.get("close"),
+
         # ===== VIX =====
-        "vix_flag": vix_flag,                 
-        "vix_mode": vix_text,                 
-        "global_flag": sentiment_flag,        
-        "global_sentiment": sentiment_text    
+        "vix_flag": vix_flag,
+        "vix_mode": vix_text,
+        "global_flag": sentiment_flag,
+        "global_sentiment": sentiment_text
     }
+
+    # 🔥 AUTO WRITE CSV HERE
+    append_csv(data)
 
     return data
 
 
-# ===== OPTIONAL RUN =====
+# ===== OPTIONAL DEBUG =====
 if __name__ == "__main__":
     data = get_all_data()
     for k, v in data.items():
