@@ -106,7 +106,27 @@ def get_full_snapshot():
     result["bos_val"] = bos_val
 
     # ================= CHART DATA (CRITICAL) =================
-    result["timestamp"] = int(df.index[-1].timestamp())
+    try:
+        last_idx = df.index[-1]
+    
+        # Case 1: DatetimeIndex
+        if hasattr(last_idx, "timestamp"):
+            ts = int(last_idx.timestamp())
+    
+        # Case 2: fallback → use current time
+        else:
+            from datetime import datetime
+            import pytz
+            ist = pytz.timezone("Asia/Kolkata")
+            ts = int(datetime.now(ist).timestamp())
+    
+    except Exception:
+        from datetime import datetime
+        import pytz
+        ist = pytz.timezone("Asia/Kolkata")
+        ts = int(datetime.now(ist).timestamp())
+    
+    result["timestamp"] = ts
     result["close"] = float(df["Close"].iloc[-1])
 
     return result
