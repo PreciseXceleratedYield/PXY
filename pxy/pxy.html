@@ -25,11 +25,11 @@ html, body {
 }
 
 #terminal-container {
-    width: 50%;
+    width: 48ch; /* fixed width for terminal */
     min-width: 300px;
     display: flex;
     flex-direction: column;
-    border-right: 2px solid #444;
+    border-right: 1px solid #000; /* thin black separator */
     background-color: #111; /* dark */
 }
 
@@ -51,10 +51,9 @@ html, body {
     background-color: #111; /* dark */
 }
 
-iframe {
+canvas {
     width: 100%;
     height: 100%;
-    border: 1px solid #fff; /* white border */
 }
 </style>
 </head>
@@ -70,7 +69,6 @@ iframe {
     </div>
 </div>
 
-<!-- xterm.js and fit addon -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -79,7 +77,8 @@ iframe {
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-    theme: { background: '#111', foreground: '#fff' }
+    theme: { background: '#111', foreground: '#fff' },
+    cols: 48
 });
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
@@ -117,6 +116,7 @@ const chart = new Chart(ctx, {
     options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: false,  // prevents flickering
         plugins: { legend: { labels: { color: '#fff' } } },
         scales: {
             x: { ticks: { color: '#fff' }, grid: { color: '#333' } },
