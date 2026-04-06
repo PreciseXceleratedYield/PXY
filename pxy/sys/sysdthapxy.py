@@ -14,7 +14,7 @@ def get_ha_data(tickerSymbol=None, df=None):
     Returns:
         ha_close (pd.Series)
         ha_open  (pd.Series)
-        ha_color (pd.Series)
+        ha_color (pd.Series) -> "green" / "red" / "none"
         df       (pd.DataFrame)
     """
 
@@ -29,7 +29,7 @@ def get_ha_data(tickerSymbol=None, df=None):
     elif df.empty:
         return None, None, None, df
     else:
-        pass  # explicit
+        pass
 
     # ---------------- FORMING CANDLE CONTROL ----------------
     if USE_FORMING_CANDLE is True:
@@ -37,7 +37,6 @@ def get_ha_data(tickerSymbol=None, df=None):
     elif USE_FORMING_CANDLE is False:
         df = df.iloc[:-1]
     else:
-        # invalid config
         return None, None, None, df
 
     # ---------------- VALIDATE REQUIRED COLUMNS ----------------
@@ -67,7 +66,7 @@ def get_ha_data(tickerSymbol=None, df=None):
         prev_close = ha_close.iloc[i - 1]
 
         if pd.isna(prev_open) or pd.isna(prev_close):
-            ha_open.iloc[i] = prev_open  # explicit fallback
+            ha_open.iloc[i] = prev_open
         else:
             ha_open.iloc[i] = (prev_open + prev_close) / 2
 
@@ -78,16 +77,77 @@ def get_ha_data(tickerSymbol=None, df=None):
         hc = ha_close.iloc[i]
         ho = ha_open.iloc[i]
 
+        # 🔥 CASE 1: HA invalid → fallback to RAW CLOSE
         if pd.isna(hc) or pd.isna(ho):
-            ha_color.iloc[i] = "neutral"
+
+            if i == 0:
+                ha_color.iloc[i] = "none"
+            else:
+                curr_close = df['Close'].iloc[i]
+                prev_close = df['Close'].iloc[i - 1]
+
+                if pd.isna(curr_close) or pd.isna(prev_close):
+                    ha_color.iloc[i] = "none"
+
+                elif curr_close > prev_close:
+                    ha_color.iloc[i] = "green"
+
+                elif curr_close < prev_close:
+                    ha_color.iloc[i] = "red"
+
+                elif curr_close == prev_close:
+                    prev_color = ha_color.iloc[i - 1]
+
+                    if prev_color == "green":
+                        ha_color.iloc[i] = "green"
+                    elif prev_color == "red":
+                        ha_color.iloc[i] = "red"
+                    else:
+                        ha_color.iloc[i] = "none"
+
+                else:
+                    ha_color.iloc[i] = "none"
+
+        # 🔥 CASE 2: Normal HA logic
         elif hc > ho:
             ha_color.iloc[i] = "green"
+
         elif hc < ho:
             ha_color.iloc[i] = "red"
+
+        # 🔥 CASE 3: DOJI → RAW CLOSE (UPDATED)
         elif hc == ho:
-            ha_color.iloc[i] = "doji"
+
+            if i == 0:
+                ha_color.iloc[i] = "none"
+            else:
+                curr_close = df['Close'].iloc[i]
+                prev_close = df['Close'].iloc[i - 1]
+
+                if pd.isna(curr_close) or pd.isna(prev_close):
+                    ha_color.iloc[i] = "none"
+
+                elif curr_close > prev_close:
+                    ha_color.iloc[i] = "green"
+
+                elif curr_close < prev_close:
+                    ha_color.iloc[i] = "red"
+
+                elif curr_close == prev_close:
+                    prev_color = ha_color.iloc[i - 1]
+
+                    if prev_color == "green":
+                        ha_color.iloc[i] = "green"
+                    elif prev_color == "red":
+                        ha_color.iloc[i] = "red"
+                    else:
+                        ha_color.iloc[i] = "none"
+
+                else:
+                    ha_color.iloc[i] = "none"
+
         else:
-            ha_color.iloc[i] = "unknown"  # absolute fallback
+            ha_color.iloc[i] = "none"
 
     # ---------------- FINAL VALIDATION ----------------
     if ha_close is None:
@@ -107,7 +167,7 @@ if __name__ == "__main__":
     ha_close, ha_open, ha_color, df = get_ha_data()
 
     print("\n" + "="*60)
-    print("STRICT HEIKIN-ASHI DEBUG (NO ASSUMPTIONS)")
+    print("STRICT HEIKIN-ASHI DEBUG (FINAL PRO VERSION)")
     print("="*60)
 
     if ha_close is None:
