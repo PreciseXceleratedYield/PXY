@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Terminal Only</title>
+<title>Eye-Friendly Terminal</title>
 
 <!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
@@ -13,29 +13,39 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
-    font-family: monospace;
-    background: #000000; /* black background for the page */
-    color: #ffffff; /* default text color */
+    font-family: 'Fira Code', monospace; /* smooth monospace font */
+    background: #002b36; /* Solarized Dark background */
+    color: #839496; /* off-white text */
 }
 
 #terminal-container {
     width: 100%;
-    height: 100vh; /* full viewport height */
+    height: 100vh;
     display: flex;
     flex-direction: column;
-    background-color: #000000; /* black terminal container */
+    background-color: #002b36; /* match background */
 }
 
 #terminal {
     flex: 1;
     overflow-y: auto;
     font-size: 16px;
-    line-height: 1.4;
+    line-height: 1.5; /* more spacing for readability */
 }
 
 .xterm {
     height: 100% !important;
-    font-weight: bold;
+    font-weight: normal;
+}
+
+/* cursor and selection customization */
+.xterm .xterm-cursor {
+    border-left: 2px solid #93a1a1 !important; /* soft cursor */
+    animation: none !important; /* disable blinking for less eye strain */
+}
+
+.xterm .xterm-selection {
+    background: rgba(131, 148, 150, 0.2) !important; /* subtle selection */
 }
 </style>
 </head>
@@ -54,9 +64,12 @@ const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     theme: {
-        background: '#000000', // black terminal background
-        foreground: '#00ff00'  // green text like classic terminal
-    }
+        background: '#002b36', // Solarized Dark background
+        foreground: '#839496', // off-white text
+        cursor: '#93a1a1',     // soft gray cursor
+        selection: 'rgba(131, 148, 150, 0.2)' // subtle selection
+    },
+    cursorBlink: false
 });
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
@@ -67,7 +80,7 @@ fitAddon.fit();
 
 // Example text to test
 term.writeln('Connected. Displaying npxy tmux session...');
-term.writeln('Terminal ready.');
+term.writeln('Eye-friendly Solarized Dark terminal ready.');
 
 // WebSocket example
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
