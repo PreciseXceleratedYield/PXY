@@ -1,4 +1,5 @@
 # syshkinpxy.py
+import pandas as pd
 from sysdthapxy import get_ha_data
 from colorama import Fore, Style, init
 
@@ -7,28 +8,34 @@ init(autoreset=True)
 
 # -------------------- HA Flip Detection --------------------
 def detect_ha_flip_signal(df=None):
-    ha_close, ha_open, ha_color, df = get_ha_data(df=df)
-    if ha_color is None or len(ha_color) < 2:
-        return "NONE", 0, 1, 1
+    if df is None or df.empty:
+        return "", "None", "None", pd.Series([0]), pd.Series([0])
 
-    last_closed = ha_color.iloc[-2]
-    current_candle = ha_color.iloc[-1]
+    # Heikin-Ashi calculation
+    ha_close = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
+    ha_open = (df['Open'].shift(1) + df['Close'].shift(1)) / 2
 
-    # ---------------- Detect flips ----------------
-    if last_closed == 'red' and current_candle == 'green':
+    # Generate last 3-4 candle colors using emojis
+    colors = []
+    n = min(4, len(ha_close))
+    for i in range(-n, 0):
+        colors.append('🟩' if ha_close.iloc[i] >= ha_open.iloc[i] else '🟥')
+
+    current_color = 'Bull' if colors[-1] == '🟩' else 'Bear'
+    last_closed_color = 'Bull' if colors[-2] == '🟩' else 'Bear'
+
+    # ---------------- Detect signal ----------------
+    if last_closed_color == 'Bear' and current_color == 'Bull':
         signal = "BUY"
-    elif last_closed == 'green' and current_candle == 'red':
+    elif last_closed_color == 'Bull' and current_color == 'Bear':
         signal = "SELL"
     else:
-        if len(ha_color) >= 3:
-            last_two = ha_color.iloc[-3:-1].tolist()
-            if last_two == ['green', 'green']:
+        # Check last two colors for streak
+        if len(colors) >= 3:
+            last_two = colors[-3:-1]
+            if last_two == ['🟩', '🟩']:
                 signal = "BULL"
-            elif last_two == ['red', 'red']:
-                signal = "BEAR"
-            elif last_two == ['red', 'green']:
-                signal = "BEAR"
-            elif last_two == ['green', 'red']:
+            elif last_two == ['🟥', '🟥']:
                 signal = "BEAR"
             else:
                 signal = "NONE"
@@ -37,32 +44,38 @@ def detect_ha_flip_signal(df=None):
 
     # ---------------- Past depth (previous color streak) ----------------
     past_depth = 1
-    for color in reversed(ha_color.iloc[:-1]):
-        if color == last_closed:
+    prev_color = colors[-2]
+    for c in reversed(colors[:-1]):
+        if c == prev_color:
             past_depth += 1
         else:
             break
 
     # ---------------- Current CE/PE depth (active streak) ----------------
     ce_depth = pe_depth = 1
+    curr_color = colors[-1]
     current_depth = 1
-    for color in reversed(ha_color):
-        if color == current_candle:
+    for c in reversed(colors):
+        if c == curr_color:
             current_depth += 1
         else:
             break
 
-    if current_candle == 'green':
+    if curr_color == '🟩':
         ce_depth = current_depth
     else:
         pe_depth = current_depth
 
-    return signal, past_depth, ce_depth, pe_depth
-
+    return signal, past_depth, ce_depth, pe_depth, colors
 
 # -------------------- Self-runnable test --------------------
 if __name__ == "__main__":
-    signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal()
+    import yfinance as yf
+
+    # Example fetch (replace with your df source)
+    df = yf.download("AAPL", period="5d", interval="1h")
+
+    signal, past_depth, ce_depth, pe_depth, colors = detect_ha_flip_signal(df)
 
     # Color coding
     if signal in ["BUY", "BULL"]:
@@ -83,9 +96,7 @@ if __name__ == "__main__":
     plain_middle = f"Past:{past_depth}"
     plain_right = f"CE:{ce_depth} PE:{pe_depth}"
     space_width = total_width - len(plain_left) - len(plain_middle) - len(plain_right)
-    if space_width < 0:
-        space_width = 1
-    spacing = " " * space_width
+    spacing = " " * max(space_width, 1)
 
     # Print single line
     print(left_text + middle_text + spacing + right_text)
