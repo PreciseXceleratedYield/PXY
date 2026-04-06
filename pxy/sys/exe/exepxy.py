@@ -25,20 +25,25 @@ except Exception as e:
     get_position_summary = lambda: "0CE0PE"
 
 # ---------------- HELPER FUNCTIONS ----------------
-def run_script(script_name):
+def run_script(script_path):
+    """Run a python script safely."""
+    if not Path(script_path).exists():
+        print(f"⚠️ SKIP: script not found -> {script_path}")
+        print("━" * 42)
+        return
     try:
-        subprocess.run(['python3', script_name], check=True)
-    except subprocess.CalledProcessError as e:
-        print("❌ RUN ERR: script execution failed ⚠️")
+        subprocess.run(['python3', script_path], check=True)
+    except subprocess.CalledProcessError:
+        print(f"❌ RUN ERR: script execution failed -> {script_path} ⚠️")
     except Exception as e:
-        print("❌ RUN ERR: unexpected failure occurred ⚠️")
+        print(f"❌ RUN ERR: unexpected failure -> {script_path} ⚠️")
     print("━" * 42)
 
-def safe_run(script_name):
+def safe_run(script_path):
     try:
-        run_script(script_name)
-    except Exception as e:
-        print("⚠️ SAFE RUN: script execution failed ⚠️")
+        run_script(script_path)
+    except Exception:
+        print("⚠️ SAFE RUN: unexpected error occurred ⚠️")
         import traceback
         traceback.print_exc()
 
@@ -61,13 +66,12 @@ print("\n🚀 INIT: main market loop starting now 📡")
 loop_counter = 1
 
 # ---------------- RUN PARENT SCRIPTS ONCE AT START ----------------
-# ---------------- RUN PARENT AND LOCAL EXE SCRIPTS ----------------
 parent_scripts = [
-    str(HERE.parent / "systdaypxy.py"),   # parent directory
-    str(HERE.parent / "sysvixpxy.py"),
-    str(HERE.parent / "sysdashpxy.py"),
-    str(HERE / "exeentrpxy.py"),          # current/exe directory
-    str(HERE / "exeexitpxy.py")
+    HERE.parent / "systdaypxy.py",    # parent directory
+    HERE.parent / "sysvixpxy.py",
+    HERE.parent / "sysdashpxy.py",
+    HERE / "exeentrpxy.py",           # current directory
+    HERE / "exeexitpxy.py"
 ]
 
 for s in parent_scripts:
@@ -81,31 +85,35 @@ while True:
         # 30-iteration subloop
         for sub_itr in range(1, 31):
             pos_summary = get_position_summary()
-            ce_qty = int(pos_summary[0])
-            pe_qty = int(pos_summary[3])
+            try:
+                ce_qty = int(pos_summary[0])
+                pe_qty = int(pos_summary[3])
+            except Exception:
+                ce_qty = 0
+                pe_qty = 0
 
             live_status(f"📊 Loop#{loop_counter} Sub#{sub_itr} CE:{ce_qty} PE:{pe_qty}")
 
             if ce_qty >= 1 and pe_qty >= 1:
-                safe_run("exeexitpxy.py")
+                safe_run(HERE / "exeexitpxy.py")
             elif ce_qty == 0 and pe_qty == 0:
-                safe_run("exeentrpxy.py")
+                safe_run(HERE / "exeentrpxy.py")
             else:
-                safe_run("exeentrpxy.py")
-                safe_run("exeexitpxy.py")
+                safe_run(HERE / "exeentrpxy.py")
+                safe_run(HERE / "exeexitpxy.py")
 
             fancy_pause(3)
 
         loop_counter += 1
 
     else:
-        print("\n🌙 MKT CLOSED:running cleanup tasks now 💤")
+        print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
         
-        # Correct full path to parent sys folder
-        safe_run(str(HERE.parent / "sysslefpxy.py"))
+        # Cleanup script in parent directory
+        safe_run(HERE.parent / "sysslefpxy.py")
         
         fancy_pause(5)
-    
+        
         # Wait until next market open
         while not in_market_hours():
             print("⏳ WAIT: market opens at 09:16 IST 📡", end="\r")
