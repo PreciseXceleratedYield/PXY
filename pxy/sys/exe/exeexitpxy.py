@@ -12,7 +12,7 @@ def place_exit_order(client, row):
         # Standard Kotak Neo V2 Market Sell Parameters for Options
         params = {
             "exchange_segment": "nse_fo",
-            "product": "MIS",
+            "product": "NRML",
             "price": "0",
             "order_type": "MKT",
             "quantity": str(abs(int(row.get('qty', 0)))),
