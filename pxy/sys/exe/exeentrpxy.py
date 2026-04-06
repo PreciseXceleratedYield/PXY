@@ -81,9 +81,17 @@ async def main():
         dprint(f"Current IST Time: {now}")
 
         # Buffer check
-        if time(9,14) <= now < time(9,16):
-            dprint("Inside 9:14-9:16 Buffer. Skipping execution.")
-            return
+        # Define all skip windows
+        skip_windows = [
+            (time(9, 14), time(9, 16)),    # 9:14 AM - 9:16 AM
+            (time(15, 16), time(15, 31))   # 3:16 PM - 3:31 PM
+        ]
+        
+        # Check if current time is inside any skip window
+        for start, end in skip_windows:
+            if start <= now < end:
+                dprint(f"Inside {start.strftime('%H:%M')} - {end.strftime('%H:%M')} buffer. Skipping execution.")
+                return
 
         # 1. Session Initialization
         dprint("Authenticating session...")
