@@ -121,7 +121,7 @@ async def main():
         elif sig in ["ATMSELL", "OTMSELL"]:
             side = "SELL"
         else:
-            print(f"{Fore.YELLOW}💤 Lets Wait as Signal 💤: 💤{entry_signal}💤")
+            print(f"{Fore.YELLOW}💤 Lets Wait as Signal 💤: 💤   {entry_signal}  💤")
             return
 
         # Determine offset: ATM → 0, OTM → 200
