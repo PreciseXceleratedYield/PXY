@@ -3,6 +3,9 @@ import os
 import time
 from colorama import init, Fore, Style
 from exeomspxy import get_combined_data
+import pytz
+import subprocess  # <-- for triggering exesqrpxy.py
+from datetime import datetime, time as dt_time
 
 init(autoreset=True)
 
@@ -52,6 +55,20 @@ def compute_st_fixed(row):
         return "00⚪00", False
 
 def run_snapshot():
+    # --- IST Time Check for Auto Exit ---
+    IST = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(IST).time()
+    exit_start = dt_time(15, 19)  # 3:19 PM
+    exit_end   = dt_time(15, 30)  # 3:30 PM
+
+    if exit_start <= now < exit_end:
+        print(f"{Fore.YELLOW}⚡ Exit Window Active! Triggering exesqrpxy.py ⚡")
+        try:
+            subprocess.run(["python3", "exesqrpxy.py"], check=True)
+        except Exception as e:
+            print(f"{Fore.RED}❌ Failed to run exesqrpxy.py: {e}")
+
+    # --- Original Functionality ---
     data = get_combined_data()
     df = data.get("active_orders", pd.DataFrame())
     
