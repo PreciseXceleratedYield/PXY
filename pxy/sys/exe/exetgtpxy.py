@@ -87,13 +87,3 @@ def target_price(row):
         return round(min(float(row.get("pxy_entry", 0)) + 10, 99), 2)
 
 
-# ===== Example usage =====
-if __name__ == "__main__":
-    sample_data = [
-        {"symbol": "BANKNIFTY_CE", "pxy_entry": 54000, "atr": 80, "ce_power": 1.2, "hkin_ce_depth": 3, "direction": "UP", "signal": "BUY"},
-        {"symbol": "BANKNIFTY_PE", "pxy_entry": 54000, "atr": 80, "pe_power": 1.1, "hkin_pe_depth": 1, "direction": "DOWN", "signal": "SELL"},
-        {"symbol": "BANKNIFTY_CE", "pxy_entry": 54000, "atr": 80, "ce_power": 1.2, "hkin_ce_depth": 0, "direction": "DOWN", "signal": "SELL"},
-    ]
-
-    for row in sample_data:
-        target_price(row)
