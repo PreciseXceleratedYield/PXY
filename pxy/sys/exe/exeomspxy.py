@@ -110,7 +110,7 @@ def get_combined_data(map_active_with_nifty=True, add_calcs=True):
 
 if __name__ == "__main__":
     data = get_combined_data()
-    if not data["active_orders"].empty:
+    if  data["active_orders"].empty:
         cols = ["symbol", "buy_prc", "pxy_entry", "pxy_tgt", "pxy_sl", "sell_prc", "pnl"]
         print("\n" + "="*80)
         print(f"{'OMS LIVE PXY DASHBOARD (V2)':^80}")
