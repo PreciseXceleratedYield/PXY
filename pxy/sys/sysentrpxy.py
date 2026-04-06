@@ -9,27 +9,24 @@ from syshkinpxy import detect_ha_flip_signal
 from sysstrndpxy import calculate_supertrend
 from sysbbospxy import get_bos_bar
 
+# Initialize Colorama
 init(autoreset=True)
 IST = pytz.timezone("Asia/Kolkata")
 
-# ==========================================================
-# --- Reversal logic ---
-# ==========================================================
-def check_reversal(df: pd.DataFrame) -> str:
+# -------------------- Reversal logic --------------------
+def _check_reversal(df: pd.DataFrame) -> str:
     if len(df) < 2:
         return "NONE"
     last = df.iloc[-1]
     prev = df.iloc[-2]
-    if (last['Close'] > last['Open'] and prev['Close'] < prev['Open'] and last['Close'] > prev['High']):
+    if last['Close'] > last['Open'] and prev['Close'] < prev['Open'] and last['Close'] > prev['High']:
         return "ACTIVE"
-    if (last['Close'] < last['Open'] and prev['Close'] > prev['Open'] and last['Close'] < prev['Low']):
+    if last['Close'] < last['Open'] and prev['Close'] > prev['Open'] and last['Close'] < prev['Low']:
         return "ACTIVE"
     return "NONE"
 
-# ==========================================================
-# --- Morning C1 vs C2 ---
-# ==========================================================
-def get_morning_direction(df: pd.DataFrame):
+# -------------------- Morning direction --------------------
+def _get_morning_direction(df: pd.DataFrame):
     if df is None or len(df) < 2:
         return None
     try:
@@ -53,99 +50,102 @@ def get_morning_direction(df: pd.DataFrame):
         return None
     return None
 
-# ==========================================================
-# --- Entry signal calculation ---
-# ==========================================================
-def get_entry_signal(df: pd.DataFrame) -> (str, str):
-    required_cols = ['Open', 'High', 'Low', 'Close']
-    if df is None or not all(col in df.columns for col in required_cols):
-        return "ATMBUY", "DEFAULT"
+# -------------------- Core signal computation --------------------
+def _compute_final_signal(df: pd.DataFrame) -> str:
+    if df is None or not all(col in df.columns for col in ['Open','High','Low','Close']):
+        return "DEFAULT"
 
     now = datetime.now(IST).time()
+    last = df.iloc[-1]
 
-    # 0️⃣ Early 9:14–9:15 → NONE
+    if 'ST' not in df.columns:
+        df = calculate_supertrend(df)
+    st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
+
+    # Phase 0: Early
     if time(9,14) <= now <= time(9,15):
-        return "ATMBUY", "DEFAULT"
+        return "DEFAULT"
 
-    # 1️⃣ Morning 9:16–9:36
+    # Phase 1: Morning
     if time(9,16) <= now <= time(9,36):
-        direction = get_morning_direction(df)
-        if direction == "BUY":
-            return "ATMBUY", "MBUY"
-        elif direction == "SELL":
-            return "ATMSELL", "MSELL"
+        direction = _get_morning_direction(df)
+        if direction == "BUY": return "MBUY"
+        if direction == "SELL": return "MSELL"
 
-    # 2️⃣ Reversal
-    if len(df) >= 2:
-        reversal_status = check_reversal(df)
-        if reversal_status == "ACTIVE":
-            last = df.iloc[-1]
-            entry_signal = "RBUY" if last['Close'] > last['Open'] else "RSELL"
-            close_price = last['Close']
-            st_value = df['ST'].iloc[-1] if 'ST' in df.columns else close_price
-            if entry_signal == "RBUY":
-                atm_signal = "ATMBUY" if close_price > st_value else "OTMBUY"
-            else:
-                atm_signal = "ATMSELL" if close_price < st_value else "OTMSELL"
-            return atm_signal, entry_signal
+    # Phase 2: Reversal
+    if len(df) >= 2 and _check_reversal(df) == "ACTIVE":
+        return "RBUY" if last['Close'] > last['Open'] else "RSELL"
 
-    # 3️⃣ BOS
+    # Phase 3: BOS
     try:
         _, bos_val = get_bos_bar(df)
-        last = df.iloc[-1]
-        st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
-        if bos_val == "BULL":
-            return ("ATMBUY" if last['Close'] > st_value else "OTMBUY", "BBUY")
-        elif bos_val == "BEAR":
-            return ("ATMSELL" if last['Close'] < st_value else "OTMSELL", "BSELL")
+        if bos_val == "BULL": return "BBUY"
+        if bos_val == "BEAR": return "BSELL"
     except Exception:
         pass
 
-    # 4️⃣ ST + HA alignment
+    # Phase 4: ST + HA alignment
     try:
         df = calculate_supertrend(df)
-        if 'ST' in df.columns:
-            last = df.iloc[-1]
-            st_trend = "UP" if last['Close'] > last['ST'] else "DOWN"
-            ha_signal, _, _, _ = detect_ha_flip_signal(df)
-            st_value = last['ST']
-            if st_trend == "UP" and ha_signal in ["BUY", "BULL"]:
-                return ("ATMBUY" if last['Close'] > st_value else "OTMBUY", "SBUY")
-            elif st_trend == "DOWN" and ha_signal in ["SELL", "BEAR"]:
-                return ("ATMSELL" if last['Close'] < st_value else "OTMSELL", "SSELL")
+        last = df.iloc[-1]
+        st_value = last['ST']
+
+        ha_signal, _, _, _ = detect_ha_flip_signal(df)
+
+        if ha_signal in ["BULL", "BEAR"]:
+            return ha_signal
+        elif ha_signal == "BUY":
+            return "SBUY" if last['Close'] > st_value else "SELL"
+        elif ha_signal == "SELL":
+            return "SSELL" if last['Close'] < st_value else "BUY"
+
     except Exception:
         pass
 
-    # 5️⃣ Default fallback → always ATM
+    return None
+
+# -------------------- Public function --------------------
+def get_entry_signal(df: pd.DataFrame):
+    """
+    Returns two signals:
+    1️⃣ entry_signal → ATM style based on ST (ATMBUY/ATMSELL) if price confirms
+    2️⃣ final_signal → raw signal from phase logic (MBUY, RBUY, BBUY, SBUY, etc.)
+    """
+    final_signal = _compute_final_signal(df)
+    if df is None or df.empty:
+        return None, final_signal
+
     last = df.iloc[-1]
     st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
-    if last['Close'] >= st_value:
-        return "ATMBUY", "DEFAULT"
-    else:
-        return "ATMSELL", "DEFAULT"
 
-# ==========================================================
-# --- Self-runnable test ---
-# ==========================================================
+    entry_signal = final_signal
+    if final_signal and "BUY" in str(final_signal) and last['Close'] > st_value:
+        entry_signal = "ATMBUY"
+    elif final_signal and "SELL" in str(final_signal) and last['Close'] < st_value:
+        entry_signal = "ATMSELL"
+
+    return entry_signal, final_signal
+
+# -------------------- Optional: dashboard print --------------------
+def print_dashboard(df):
+    entry_signal, final_signal = get_entry_signal(df)
+    color_map = {
+        "MBUY": Fore.GREEN, "MSELL": Fore.RED,
+        "RBUY": Fore.GREEN, "RSELL": Fore.RED,
+        "BBUY": Fore.GREEN, "BSELL": Fore.RED,
+        "SBUY": Fore.GREEN, "SSELL": Fore.RED,
+        "BUY": Fore.GREEN, "SELL": Fore.RED,
+        "BULL": Fore.GREEN, "BEAR": Fore.RED,
+        "ATMBUY": Fore.GREEN, "ATMSELL": Fore.RED,
+        "DEFAULT": Fore.YELLOW, None: Fore.YELLOW
+    }
+    left_text = f"{color_map.get(final_signal, Fore.YELLOW)}Final: {final_signal}{Style.RESET_ALL}"
+    right_text = f"{color_map.get(entry_signal, Fore.YELLOW)}Entry: {entry_signal}{Style.RESET_ALL}"
+    print(f"{left_text:<25}{right_text:>25}")
+
+# -------------------- Self-test --------------------
 if __name__ == "__main__":
     df = fetch_yf_data()
     if df is not None and not df.empty:
         df = calculate_supertrend(df)
-        final_signal, original_signal = get_entry_signal(df)
-    else:
-        final_signal, original_signal = "ATMBUY", "DEFAULT"
-
-    # --- Print dashboard line ---
-    left_text = f"Entry:{final_signal}"
-    right_text = f"Orig:{original_signal}"
-    dashboard_line = f"{left_text:<21}{right_text:>21}"
-
-    # --- Color coding ---
-    if final_signal in ["ATMBUY","OTMBUY","SBUY","BBUY","RBUY"]:
-        color = Fore.GREEN
-    elif final_signal in ["ATMSELL","OTMSELL","SSELL","BSELL","RSELL"]:
-        color = Fore.RED
-    else:
-        color = Fore.YELLOW
-
-    print(f"{color}{dashboard_line}{Style.RESET_ALL}")
+    print_dashboard(df)
