@@ -11,105 +11,120 @@ from sysstrndpxy import calculate_supertrend
 init(autoreset=True)
 IST = pytz.timezone("Asia/Kolkata")
 
+
 # -------------------- Morning direction --------------------
 def _get_morning_direction(df: pd.DataFrame):
     """Returns exclusive morning signal: OTMBUY or OTMSELL"""
     if df is None or len(df) < 2:
         return None
-    try:
-        df = df.copy()
-        df.index = pd.to_datetime(df.index)
-        if df.index.tz is None:
-            df.index = df.index.tz_localize("UTC").tz_convert(IST)
-        else:
-            df.index = df.index.tz_convert(IST)
-        df['time'] = df.index.time
-        c1_df = df[df['time'] == time(9, 15)]
-        if c1_df.empty:
-            return None
-        c1 = c1_df.iloc[-1]
-        c2 = df.iloc[-1]
 
-        if c2['Close'] > c1['Close']:
+    try:
+        # FORMING vs PREVIOUS CLOSED
+        last = df.iloc[-1]
+        prev = df.iloc[-2]
+
+        if last['Close'] > prev['Close']:
             return "OTMBUY"
-        elif c2['Close'] < c1['Close']:
+        elif last['Close'] < prev['Close']:
             return "OTMSELL"
         else:
-            return None  # exactly equal, no side chosen
-    except Exception:
+            return None
+
+    except Exception as e:
+        print(f"[ERROR] Morning Direction: {e}")
         return None
+
 
 # -------------------- Core signal computation --------------------
 def _compute_final_signal(df: pd.DataFrame) -> str:
     """Compute final signal with mutually exclusive conditions"""
+
+    # ---------- Safety ----------
     if df is None or not all(col in df.columns for col in ['Open','High','Low','Close']):
         return "DEFAULT"
 
     now = datetime.now(IST).time()
-    last = df.iloc[-1]
+    last = df.iloc[-1]  # forming candle
 
-    # Ensure Supertrend column exists
+    # ---------- Ensure Supertrend ----------
     if 'ST' not in df.columns:
         df = calculate_supertrend(df)
-    st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
 
-    # -------------------- Phase 0: Early --------------------
-    if time(9,14) <= now <= time(9,15):
+    st_value = df['ST'].iloc[-1]
+
+    # =========================================================
+    # 🔵 PHASE 0 → 09:00 to 09:16 → STRICT DEFAULT
+    # =========================================================
+    if time(9, 0) <= now <= time(9, 16):
         return "DEFAULT"
 
-    # -------------------- Phase 1: Morning --------------------
-    direction_signal = _get_morning_direction(df)
-    if direction_signal:
-        return direction_signal
+    # =========================================================
+    # 🟡 PHASE 1 → 09:16 to 09:25 → PREVIOUS CLOSE COMPARISON
+    # =========================================================
+    if time(9, 16) < now <= time(9, 25):
+        direction_signal = _get_morning_direction(df)
+        return direction_signal if direction_signal else "DEFAULT"
 
-    # -------------------- Phase 2: HA + ST alignment --------------------
+    # =========================================================
+    # 🟢 PHASE 2 → After 09:25 → HA + ST LOGIC
+    # =========================================================
     try:
         ha_signal, _, _, _ = detect_ha_flip_signal(df)
 
-        # Exclusive conditions: pick only one signal
+        # -------- STRICT EXCLUSIVE TREE --------
         if ha_signal == "BULL":
             return "BULL"
+
         elif ha_signal == "BEAR":
             return "BEAR"
-        elif ha_signal == "BUY":
-            if last['Close'] >= st_value:
-                return "ATMBUY"
-            else:
-                return "OTMBUY"
-        elif ha_signal == "SELL":
-            if last['Close'] <= st_value:
-                return "ATMSELL"
-            else:
-                return "OTMSELL"
-    except Exception:
-        pass
 
-    # -------------------- Default fallback --------------------
-    return "DEFAULT"
+        elif ha_signal == "BUY":
+            return "ATMBUY" if last['Close'] >= st_value else "OTMBUY"
+
+        elif ha_signal == "SELL":
+            return "ATMSELL" if last['Close'] <= st_value else "OTMSELL"
+
+        else:
+            return "DEFAULT"
+
+    except Exception as e:
+        print(f"[ERROR] HA Logic: {e}")
+        return "DEFAULT"
+
 
 # -------------------- Public function --------------------
 def get_entry_signal(df: pd.DataFrame):
     """
     Returns two identical values for backward compatibility
-    Each signal is exclusive
+    (SIGNATURE INTACT)
     """
     final_signal = _compute_final_signal(df)
     return final_signal, final_signal
 
+
 # -------------------- Terminal dashboard print --------------------
 def print_dashboard(df):
     value1, value2 = get_entry_signal(df)
+
     color_map = {
         "OTMBUY": Fore.GREEN, "OTMSELL": Fore.RED,
         "ATMBUY": Fore.GREEN, "ATMSELL": Fore.RED,
         "BULL": Fore.GREEN, "BEAR": Fore.RED,
         "DEFAULT": Fore.YELLOW, None: Fore.YELLOW
     }
+
+    print("\n" + "=" * 50)
+    print(f"{'PXY ENTRY ENGINE':^50}")
+    print("=" * 50)
     print(f"{color_map.get(value1, Fore.YELLOW)}Signal: {value1}{Style.RESET_ALL}")
+    print("=" * 50)
+
 
 # -------------------- Self-test --------------------
 if __name__ == "__main__":
     df = fetch_yf_data()
+
     if df is not None and not df.empty:
         df = calculate_supertrend(df)
+
     print_dashboard(df)
