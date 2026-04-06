@@ -59,13 +59,13 @@ def get_morning_direction(df: pd.DataFrame):
 def get_entry_signal(df: pd.DataFrame) -> (str, str):
     required_cols = ['Open', 'High', 'Low', 'Close']
     if df is None or not all(col in df.columns for col in required_cols):
-        return "NONE", "NONE"
+        return "ATMBUY", "DEFAULT"
 
     now = datetime.now(IST).time()
 
     # 0️⃣ Early 9:14–9:15 → NONE
     if time(9,14) <= now <= time(9,15):
-        return "NONE", "NONE"
+        return "ATMBUY", "DEFAULT"
 
     # 1️⃣ Morning 9:16–9:36
     if time(9,16) <= now <= time(9,36):
@@ -74,8 +74,6 @@ def get_entry_signal(df: pd.DataFrame) -> (str, str):
             return "ATMBUY", "MBUY"
         elif direction == "SELL":
             return "ATMSELL", "MSELL"
-        else:
-            return "NONE", "NONE"
 
     # 2️⃣ Reversal
     if len(df) >= 2:
@@ -94,41 +92,37 @@ def get_entry_signal(df: pd.DataFrame) -> (str, str):
     # 3️⃣ BOS
     try:
         _, bos_val = get_bos_bar(df)
-        close_price = df['Close'].iloc[-1]
-        st_value = df['ST'].iloc[-1] if 'ST' in df.columns else close_price
+        last = df.iloc[-1]
+        st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
         if bos_val == "BULL":
-            entry_signal = "BBUY"
-            atm_signal = "ATMBUY" if close_price > st_value else "OTMBUY"
-            return atm_signal, entry_signal
+            return ("ATMBUY" if last['Close'] > st_value else "OTMBUY", "BBUY")
         elif bos_val == "BEAR":
-            entry_signal = "BSELL"
-            atm_signal = "ATMSELL" if close_price < st_value else "OTMSELL"
-            return atm_signal, entry_signal
+            return ("ATMSELL" if last['Close'] < st_value else "OTMSELL", "BSELL")
     except Exception:
         pass
 
     # 4️⃣ ST + HA alignment
     try:
         df = calculate_supertrend(df)
-        if 'ST' not in df.columns:
-            return "NONE", "NONE"
-        st_trend = "UP" if df['Close'].iloc[-1] > df['ST'].iloc[-1] else "DOWN"
-        ha_signal, _, _, _ = detect_ha_flip_signal(df)
-        close_price = df['Close'].iloc[-1]
-        st_value = df['ST'].iloc[-1]
-        if st_trend == "UP" and ha_signal in ["BUY", "BULL"]:
-            entry_signal = "SBUY"
-            atm_signal = "ATMBUY" if close_price > st_value else "OTMBUY"
-            return atm_signal, entry_signal
-        elif st_trend == "DOWN" and ha_signal in ["SELL", "BEAR"]:
-            entry_signal = "SSELL"
-            atm_signal = "ATMSELL" if close_price < st_value else "OTMSELL"
-            return atm_signal, entry_signal
+        if 'ST' in df.columns:
+            last = df.iloc[-1]
+            st_trend = "UP" if last['Close'] > last['ST'] else "DOWN"
+            ha_signal, _, _, _ = detect_ha_flip_signal(df)
+            st_value = last['ST']
+            if st_trend == "UP" and ha_signal in ["BUY", "BULL"]:
+                return ("ATMBUY" if last['Close'] > st_value else "OTMBUY", "SBUY")
+            elif st_trend == "DOWN" and ha_signal in ["SELL", "BEAR"]:
+                return ("ATMSELL" if last['Close'] < st_value else "OTMSELL", "SSELL")
     except Exception:
         pass
 
-    # Default fallback
-    return "NONE", "NONE"
+    # 5️⃣ Default fallback → always ATM
+    last = df.iloc[-1]
+    st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
+    if last['Close'] >= st_value:
+        return "ATMBUY", "DEFAULT"
+    else:
+        return "ATMSELL", "DEFAULT"
 
 # ==========================================================
 # --- Self-runnable test ---
@@ -136,10 +130,10 @@ def get_entry_signal(df: pd.DataFrame) -> (str, str):
 if __name__ == "__main__":
     df = fetch_yf_data()
     if df is not None and not df.empty:
-        df = calculate_supertrend(df)  # Ensure ST column exists
+        df = calculate_supertrend(df)
         final_signal, original_signal = get_entry_signal(df)
     else:
-        final_signal, original_signal = "NONE", "NONE"
+        final_signal, original_signal = "ATMBUY", "DEFAULT"
 
     # --- Print dashboard line ---
     left_text = f"Entry:{final_signal}"
