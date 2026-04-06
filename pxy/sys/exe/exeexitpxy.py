@@ -79,7 +79,7 @@ def run_snapshot():
         p_col = Fore.GREEN if pnl > 0 else Fore.RED if pnl < 0 else Fore.WHITE
         
         # Print only symbol, ST, PNL
-        print(f"{sym:<21}{st_display:^12}{p_col}{pnl:>10}")
+        print(f"{sym:<21}{st_display:^15}{p_col}{pnl:>10}")
     
     print("-" * 40)
     print(f"{Fore.WHITE}Refreshed: {time.strftime('%H:%M:%S')}")
