@@ -27,17 +27,19 @@ def target_price(row):
         ce_p = float(row.get("ce_power", 1.0))
         pe_p = float(row.get("pe_power", 1.0))
         mullu = str(row.get("direction", "SIDE")).upper()  # UP / DOWN
-        signal = str(row.get("signal", "NONE")).upper()   # Using SIGNAL column
+        entry_type = str(row.get("entry", "NONE")).upper()  # NEW: Use entry instead of signal
 
         # 3️⃣ PHASE & ALIGNMENT LOGIC
         if "CE" in symbol:
             power = ce_p
             depth = int(row.get("hkin_ce_depth", 0))
-            is_aligned = (mullu == "UP") and ("BUY" in signal)
+            # Alignment based on entry type
+            is_aligned = (mullu == "UP") and ("BUY" in entry_type)
         elif "PE" in symbol:
             power = pe_p
             depth = int(row.get("hkin_pe_depth", 0))
-            is_aligned = (mullu == "DOWN") and ("SELL" in signal)
+            # Alignment based on entry type
+            is_aligned = (mullu == "DOWN") and ("SELL" in entry_type)
         else:
             # Non-CE/PE: fallback to baseline price
             return entry_prc
@@ -70,7 +72,7 @@ def target_price(row):
         print(f"{Fore.CYAN}SYMBOL      : {Fore.YELLOW}{symbol}")
         print(f"{Fore.CYAN}Baseline    : {Fore.YELLOW}{entry_prc}")
         print(f"{Fore.CYAN}Direction   : {Fore.YELLOW}{mullu}")
-        print(f"{Fore.CYAN}Signal      : {Fore.YELLOW}{signal}")
+        print(f"{Fore.CYAN}Entry       : {Fore.YELLOW}{entry_type}")
         print(f"{Fore.CYAN}Depth       : {Fore.YELLOW}{depth}")
         print(f"{Fore.CYAN}ATR         : {Fore.YELLOW}{atr}")
         print(f"{Fore.CYAN}Power       : {Fore.YELLOW}{power}")
@@ -85,5 +87,4 @@ def target_price(row):
         print(Fore.RED + f"Error calculating target: {e}")
         # Safety fallback: baseline + 10 points (capped at 99)
         return round(min(float(row.get("pxy_entry", 0)) + 10, 99), 2)
-
 
