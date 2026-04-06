@@ -1,3 +1,4 @@
+# exedynpxy.py
 from datetime import datetime
 
 def dynamic_entry(row):
@@ -5,41 +6,50 @@ def dynamic_entry(row):
     Calculate a dynamic entry price based on elapsed time since buy.
     Increment: 1 point per minute.
     Works for CE/PE options only.
+    Maintains baseline price from OMS and avoids negative increments.
     """
     try:
+        # 1️⃣ Get original buy price
         original_price = float(row.get("buy_prc", 0))
-        entry_time_val = row.get("buy_time")  # match your OMS column
-        symbol = str(row.get("symbol", "")).upper()
+        if original_price == 0:
+            return 0.0
 
-        if not entry_time_val or original_price == 0:
+        # 2️⃣ Read buy_time column from OMS (lowercase after df.columns standardization)
+        entry_time_val = row.get("buy_time")
+        if not entry_time_val:
             return original_price
 
-        now = datetime.now()
+        symbol = str(row.get("symbol", "")).upper()
 
-        # --- Parse full datetime if possible ---
+        # 3️⃣ Parse datetime
+        now = datetime.now()
         if isinstance(entry_time_val, str):
             try:
-                # expected format: "YYYY-MM-DD HH:MM:SS"
+                # Format: "YYYY-MM-DD HH:MM:SS"
                 entry_time = datetime.strptime(entry_time_val, "%Y-%m-%d %H:%M:%S")
             except ValueError:
-                # fallback for only HH:MM:SS
+                # fallback for HH:MM:SS only
                 entry_time = datetime.strptime(entry_time_val, "%H:%M:%S").replace(
                     year=now.year, month=now.month, day=now.day
                 )
         else:
             entry_time = entry_time_val  # already a datetime object
 
-        # --- elapsed seconds ---
+        # 4️⃣ Calculate elapsed seconds
         elapsed_secs = (now - entry_time).total_seconds()
         if elapsed_secs < 0:
             elapsed_secs = 0  # prevent negative increment
 
-        # --- increment 1 point per minute → 1/60 point per second ---
+        # 5️⃣ Increment 1 point per minute
         increment = elapsed_secs / 60.0
 
-        # --- only for CE/PE options ---
-        dynamic_val = original_price + increment if ("CE" in symbol or "PE" in symbol) else original_price
+        # 6️⃣ Apply only for CE/PE options
+        if "CE" in symbol or "PE" in symbol:
+            dynamic_val = original_price + increment
+        else:
+            dynamic_val = original_price
 
+        # 7️⃣ Round to 2 decimals
         return round(dynamic_val, 2)
 
     except Exception as e:
