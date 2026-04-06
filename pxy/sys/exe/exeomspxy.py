@@ -93,7 +93,7 @@ def get_combined_data(map_active_with_nifty=True, add_calcs=True):
 
     # --- 5. THE PXY OMS CALCULATION CHAIN ---
     if add_calcs:
-        dprint("Applying Stateless PXY Calculation Chain...")
+        dprint("Applying Stateless PXY ...")
 
         # STEP A: THE ENTRY MELT (0.20/min decay baseline)
         active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
