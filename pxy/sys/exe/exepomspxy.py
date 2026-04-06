@@ -51,7 +51,7 @@ def print_market_dashboard(market_df):
         ("PE Depth 🔴", "hkin_pe_depth"),
     ]
 
-    row_width = 42
+    row_width = 40
     values = []
     for label, col in metrics:
         val = snapshot.get(col, "NA")
