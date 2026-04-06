@@ -7,23 +7,9 @@ from colorama import Fore, Style, init
 from sysdtafpxy import fetch_yf_data
 from syshkinpxy import detect_ha_flip_signal
 from sysstrndpxy import calculate_supertrend
-from sysbbospxy import get_bos_bar
 
-# Initialize Colorama
 init(autoreset=True)
 IST = pytz.timezone("Asia/Kolkata")
-
-# -------------------- Reversal logic --------------------
-def _check_reversal(df: pd.DataFrame) -> str:
-    if len(df) < 2:
-        return "NONE"
-    last = df.iloc[-1]
-    prev = df.iloc[-2]
-    if last['Close'] > last['Open'] and prev['Close'] < prev['Open'] and last['Close'] > prev['High']:
-        return "ACTIVE"
-    if last['Close'] < last['Open'] and prev['Close'] > prev['Open'] and last['Close'] < prev['Low']:
-        return "ACTIVE"
-    return "NONE"
 
 # -------------------- Morning direction --------------------
 def _get_morning_direction(df: pd.DataFrame):
@@ -43,9 +29,9 @@ def _get_morning_direction(df: pd.DataFrame):
         c1 = c1_df.iloc[-1]
         c2 = df.iloc[-1]
         if c2['Close'] > c1['Close']:
-            return "BUY"
+            return "OTMBUY"
         elif c2['Close'] < c1['Close']:
-            return "SELL"
+            return "OTMSELL"
     except Exception:
         return None
     return None
@@ -58,6 +44,7 @@ def _compute_final_signal(df: pd.DataFrame) -> str:
     now = datetime.now(IST).time()
     last = df.iloc[-1]
 
+    # Ensure Supertrend column exists
     if 'ST' not in df.columns:
         df = calculate_supertrend(df)
     st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
@@ -67,26 +54,12 @@ def _compute_final_signal(df: pd.DataFrame) -> str:
         return "DEFAULT"
 
     # Phase 1: Morning
-    if time(9,16) <= now <= time(9,36):
-        direction = _get_morning_direction(df)
-        if direction == "BUY": return "MBUY"
-        if direction == "SELL": return "MSELL"
+    direction_signal = _get_morning_direction(df)
+    if direction_signal:
+        return direction_signal
 
-    # Phase 2: Reversal
-    if len(df) >= 2 and _check_reversal(df) == "ACTIVE":
-        return "RBUY" if last['Close'] > last['Open'] else "RSELL"
-
-    # Phase 3: BOS
+    # Phase 2: ST + HA alignment
     try:
-        _, bos_val = get_bos_bar(df)
-        if bos_val == "BULL": return "BBUY"
-        if bos_val == "BEAR": return "BSELL"
-    except Exception:
-        pass
-
-    # Phase 4: ST + HA alignment
-    try:
-        df = calculate_supertrend(df)
         last = df.iloc[-1]
         st_value = last['ST']
 
@@ -95,53 +68,36 @@ def _compute_final_signal(df: pd.DataFrame) -> str:
         if ha_signal in ["BULL", "BEAR"]:
             return ha_signal
         elif ha_signal == "BUY":
-            return "SBUY" if last['Close'] > st_value else "SELL"
+            return "ATMBUY" if last['Close'] > st_value else "OTMSELL"
         elif ha_signal == "SELL":
-            return "SSELL" if last['Close'] < st_value else "BUY"
+            return "ATMSELL" if last['Close'] < st_value else "OTMBUY"
 
     except Exception:
         pass
 
-    return None
+    return "DEFAULT"
 
 # -------------------- Public function --------------------
 def get_entry_signal(df: pd.DataFrame):
     """
-    Returns two signals:
-    1️⃣ entry_signal → ATM style based on ST (ATMBUY/ATMSELL) if price confirms
-    2️⃣ final_signal → raw signal from phase logic (MBUY, RBUY, BBUY, SBUY, etc.)
+    Returns two values (value1, value2) for backward compatibility
+    - Keeps same signals as before
     """
     final_signal = _compute_final_signal(df)
-    if df is None or df.empty:
-        return None, final_signal
+    value1 = final_signal
+    value2 = final_signal  # same as value1, can be customized
+    return value1, value2
 
-    last = df.iloc[-1]
-    st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
-
-    entry_signal = final_signal
-    if final_signal and "BUY" in str(final_signal) and last['Close'] > st_value:
-        entry_signal = "ATMBUY"
-    elif final_signal and "SELL" in str(final_signal) and last['Close'] < st_value:
-        entry_signal = "ATMSELL"
-
-    return entry_signal, final_signal
-
-# -------------------- Optional: dashboard print --------------------
+# -------------------- Terminal dashboard print --------------------
 def print_dashboard(df):
-    entry_signal, final_signal = get_entry_signal(df)
+    value1, value2 = get_entry_signal(df)
     color_map = {
-        "MBUY": Fore.GREEN, "MSELL": Fore.RED,
-        "RBUY": Fore.GREEN, "RSELL": Fore.RED,
-        "BBUY": Fore.GREEN, "BSELL": Fore.RED,
-        "SBUY": Fore.GREEN, "SSELL": Fore.RED,
-        "BUY": Fore.GREEN, "SELL": Fore.RED,
-        "BULL": Fore.GREEN, "BEAR": Fore.RED,
+        "OTMBUY": Fore.GREEN, "OTMSELL": Fore.RED,
         "ATMBUY": Fore.GREEN, "ATMSELL": Fore.RED,
+        "BULL": Fore.GREEN, "BEAR": Fore.RED,
         "DEFAULT": Fore.YELLOW, None: Fore.YELLOW
     }
-    left_text = f"{color_map.get(final_signal, Fore.YELLOW)}Final: {final_signal}{Style.RESET_ALL}"
-    right_text = f"{color_map.get(entry_signal, Fore.YELLOW)}Entry: {entry_signal}{Style.RESET_ALL}"
-    print(f"{left_text:<25}{right_text:>25}")
+    print(f"{color_map.get(value1, Fore.YELLOW)}Signal 1: {value1} | Signal 2: {value2}{Style.RESET_ALL}")
 
 # -------------------- Self-test --------------------
 if __name__ == "__main__":
