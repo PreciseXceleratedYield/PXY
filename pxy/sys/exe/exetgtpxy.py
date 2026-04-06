@@ -64,7 +64,7 @@ def target_price(row):
 
         # 6️⃣ CONDITIONAL PRINT
         if PRINT_DASHBOARD:
-            print(f"{'-'*60}")
+            print(f"{'-'*42}")
             print(f"{Fore.CYAN}SYMBOL          : {Fore.YELLOW}{symbol}")
             print(f"{Fore.CYAN}Actual Price    : {Fore.YELLOW}{actual_price}")
             print(f"{Fore.CYAN}Dynamic Entry   : {Fore.YELLOW}{dynamic_entry}")
@@ -76,7 +76,7 @@ def target_price(row):
             print(f"{Fore.CYAN}Phase           : {Fore.YELLOW}{phase}")
             print(f"{Fore.CYAN}Target Pts      : {Fore.YELLOW}{total_points}")
             print(f"{Fore.CYAN}Final Target    : {Fore.GREEN}{round(target, 2)}")
-            print(f"{'-'*60}\n")
+            print(f"{'-'*42}\n")
 
         return round(target, 2)
 
