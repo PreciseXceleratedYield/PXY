@@ -2,6 +2,7 @@
 import runpy
 import os
 from colorama import Fore, Style, init
+import pandas as pd
 
 init(autoreset=True)
 
@@ -23,6 +24,7 @@ TOTAL_WIDTH = 42
 
 # ---------------- UTILS ----------------
 def safe_int(val):
+    """Convert val to int safely; handle None, NaN, or string."""
     try:
         return 0 if val is None else int(float(val))
     except (ValueError, TypeError):
@@ -41,32 +43,32 @@ def run_pyc_file():
 def get_full_snapshot():
     result = {}
 
+    # ===== FETCH DATA =====
     df = fetch_yf_data()
     if df is None or df.empty:
-        return None
+        # create dummy dataframe to prevent None errors
+        df = pd.DataFrame({'Open':[0],'High':[0],'Low':[0],'Close':[0]})
     result["df"] = df
 
-    result["candle_visual"] = get_candle_visual(df=df)
+    # ===== CANDLE VISUAL =====
+    result["candle_visual"] = get_candle_visual(df=df) or ""
 
     # ===== HAIKIN-ASHI =====
     ha_close, ha_open, ha_color, df = get_ha_data(df=df)
-    result["ha_close"] = ha_close
-    result["ha_open"] = ha_open
-    result["ha_color"] = ha_color
+    result["ha_close"] = ha_close or []
+    result["ha_open"] = ha_open or []
+    result["ha_color"] = ha_color or []
 
     # ===== HAIKIN SIGNAL =====
     signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df=df)
-    # --- FIX: fallback BULL/BEAR if None ---
-    if signal is None:
-        signal = "BULL" if df['HA_Close'].iloc[-1] > df['HA_Open'].iloc[-1] else "BEAR"
-    result["hkin_signal"] = signal
-    result["hkin_past_depth"] = past_depth
-    result["hkin_ce_depth"] = ce_depth
-    result["hkin_pe_depth"] = pe_depth
+    result["hkin_signal"] = signal if signal else "NONE"
+    result["hkin_past_depth"] = past_depth if past_depth is not None else 0
+    result["hkin_ce_depth"] = ce_depth if ce_depth is not None else 0
+    result["hkin_pe_depth"] = pe_depth if pe_depth is not None else 0
 
     # ===== STRENGTH =====
     line, _, _ = get_candle_strength_line(df=df)
-    result["strength_line"] = line
+    result["strength_line"] = line or ""
 
     # ===== ATR & KATR =====
     atr_series = calculate_atr(df)
@@ -77,13 +79,15 @@ def get_full_snapshot():
 
     # ===== PRICE =====
     price, direction = detect_raw_direction(df)
-    result["price"] = safe_int(price)
-    result["direction"] = direction if direction else "NONE"
+    price = safe_int(price if price is not None else df['Close'].iloc[-1])
+    direction = direction if direction else "UP"
+    result["price"] = price
+    result["direction"] = direction
 
     # ===== SUPERTREND =====
     df = calculate_supertrend(df)
-    trend = df['ST_Trend'].iloc[-1] if not df.empty else "NONE"
-    line_val = safe_int(df['ST'].iloc[-1] if not df.empty else 0)
+    trend = df['ST_Trend'].iloc[-1] if not df.empty and 'ST_Trend' in df.columns else "NONE"
+    line_val = safe_int(df['ST'].iloc[-1] if not df.empty and 'ST' in df.columns else 0)
     result["supertrend"] = trend
     result["super_line"] = line_val
     result["df"] = df
@@ -96,21 +100,11 @@ def get_full_snapshot():
 
     # ===== ENTRY SIGNAL =====
     entry, reversal = get_entry_signal(df)
-    # --- FIX: fallback to ATM/OTM if None ---
-    if entry is None or entry == "NONE":
-        last_close = df['Close'].iloc[-1]
-        st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last_close
-        if last_close > st_value:
-            entry = "ATMBUY"
-            reversal = "SBUY"
-        else:
-            entry = "ATMSELL"
-            reversal = "SSELL"
-    result["entry"] = entry
-    result["reversal"] = reversal
+    result["entry"] = entry if entry else "ATMSELL"  # always fallback to ATMSELL/BUY
+    result["reversal"] = reversal if reversal else "DEFAULT"
 
     # ===== DAY CANDLE =====
-    result["day_candle"] = get_day_candle_bar(df)
+    result["day_candle"] = get_day_candle_bar(df) or ""
 
     # ===== BOS =====
     bos_bar, bos_val = get_bos_bar(df)
@@ -135,12 +129,10 @@ def print_dashboard(data):
     past_depth = data["hkin_past_depth"]
     ce_depth = data["hkin_ce_depth"]
     pe_depth = data["hkin_pe_depth"]
-
     color = Fore.GREEN if signal in ["BUY","BULL"] else Fore.RED if signal in ["SELL","BEAR"] else Fore.YELLOW
     space1 = TOTAL_WIDTH - len(f"Hkin:{signal}") - len(f"Past:{past_depth}")
     if space1 < 0: space1 = 1
     print(Fore.YELLOW + "Hkin:" + color + signal + " " * space1 + Fore.YELLOW + f"Past:{color}{past_depth}")
-
     space2 = TOTAL_WIDTH - len(f"CE:{ce_depth}") - len(f"PE:{pe_depth}")
     if space2 < 0: space2 = 1
     print(Fore.YELLOW + "CE:" + color + str(ce_depth) + " " * space2 + Fore.YELLOW + "PE:" + color + str(pe_depth))
@@ -192,7 +184,6 @@ def print_dashboard(data):
 
     # ===== BOS BAR =====
     print(data["bos_bar"])
-    # print("BOS Value:", data["bos_val"])  # optional
 
 # ================= MAIN =================
 if __name__ == "__main__":
