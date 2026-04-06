@@ -69,10 +69,11 @@ def detect_ha_flip_signal(df=None):
 
 # -------------------- Self-runnable test --------------------
 if __name__ == "__main__":
-    # Assume you already have your DataFrame `df` from elsewhere
-    # e.g., df = get_ha_data("AAPL") or passed from your main loop
-
+    # Call the function without passing df
     signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal()
+
+    # Print the results directly
+    print(f"Signal: {signal}, Past Depth: {past_depth}, CE Depth: {ce_depth}, PE Depth: {pe_depth}")
 
     # Print results
     print(f"Signal: {signal}, Past Depth: {past_depth}, CE Depth: {ce_depth}, PE Depth: {pe_depth}")
