@@ -36,6 +36,7 @@ def place_exit_order(client, row):
 def compute_st_fixed(row):
     """Calculates XX⚪YY and returns True if LTP >= Target.
     XX → difference of buy price to LTP, colored green if positive, red if negative.
+    ⚪ → same color as XX.
     YY → distance to target, unchanged.
     """
     try:
@@ -57,7 +58,8 @@ def compute_st_fixed(row):
 
         is_hit = ltp >= tgt
 
-        return f"{color}{buy_s}{Fore.RESET}⚪{tg_s}", is_hit
+        # ⚪ takes the same color as XX
+        return f"{color}{buy_s}{color}⚪{Fore.RESET}{tg_s}", is_hit
     except:
         return "00⚪00", False
 
