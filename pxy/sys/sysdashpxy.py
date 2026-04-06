@@ -1,12 +1,5 @@
-# run_pyc.py
-import runpy
-import os
+# sysdashpxy.py
 import math
-from colorama import Fore, Style, init
-
-init(autoreset=True)
-
-# ---- Imports ----
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_ha_data
 from syshkinpxy import detect_ha_flip_signal
@@ -20,18 +13,15 @@ from sysdeptpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
 
-TOTAL_WIDTH = 42
+# ---------------- UTILS ----------------
+def safe_int(val):
+    """Convert val to int safely; handle None, NaN, or string."""
+    try:
+        return 0 if val is None else int(float(val))
+    except (ValueError, TypeError):
+        return 0
 
-# ================= RUN PYC =================
-def run_pyc_file():
-    pyc_files = []
-    for pyc_file in pyc_files:
-        try:
-            runpy.run_path(os.path.join(os.getcwd(), pyc_file), run_name="__main__")
-        except Exception as e:
-            print(f"Error running {pyc_file}: {e}")
-
-# ================= CORE SNAPSHOT FUNCTION =================
+# ---------------- CORE SNAPSHOT ----------------
 def get_full_snapshot():
     result = {}
 
@@ -64,17 +54,17 @@ def get_full_snapshot():
     # ================= ATR =================
     atr_series = calculate_atr(df)
     atr_val_raw = atr_series.iloc[-1] if not atr_series.empty else 0
-    atr_val = 0 if atr_val_raw is None or math.isnan(atr_val_raw) else int(atr_val_raw)
+    atr_val = safe_int(atr_val_raw)
 
     k_val_raw = calculate_dynamic_k(df)
-    k_val = 0 if k_val_raw is None or math.isnan(k_val_raw) else int(k_val_raw)
+    k_val = safe_int(k_val_raw)
 
     result["atr"] = atr_val
     result["katr"] = k_val
 
     # ================= PRICE =================
     price_raw, direction = detect_raw_direction(df)
-    price = 0 if price_raw is None or math.isnan(price_raw) else int(price_raw)
+    price = safe_int(price_raw)
     result["price"] = price
     result["direction"] = direction
 
@@ -82,7 +72,7 @@ def get_full_snapshot():
     df = calculate_supertrend(df)
     trend = df['ST_Trend'].iloc[-1] if not df.empty else "NONE"
     st_raw = df['ST'].iloc[-1] if not df.empty else 0
-    line_val = 0 if st_raw is None or math.isnan(st_raw) else int(st_raw)
+    line_val = safe_int(st_raw)
 
     result["supertrend"] = trend
     result["super_line"] = line_val
@@ -90,9 +80,9 @@ def get_full_snapshot():
 
     # ================= POWER =================
     direction_power, ce, pe = get_ce_pe_power(df=df)
-    result["direction_power"] = 0 if direction_power is None or math.isnan(direction_power) else int(direction_power)
-    result["ce_power"] = 0 if ce is None or math.isnan(ce) else int(ce)
-    result["pe_power"] = 0 if pe is None or math.isnan(pe) else int(pe)
+    result["direction_power"] = safe_int(direction_power)
+    result["ce_power"] = safe_int(ce)
+    result["pe_power"] = safe_int(pe)
 
     # ================= ENTRY =================
     entry, reversal = get_entry_signal(df)
@@ -109,8 +99,8 @@ def get_full_snapshot():
 
     return result
 
-# ================= PRINT DASHBOARD =================
-def print_dashboard(data):
+# ---------------- DASHBOARD PRINT ----------------
+def print_dashboard(data, TOTAL_WIDTH=42):
     if not data:
         print("No data fetched.")
         return
@@ -174,15 +164,14 @@ def print_dashboard(data):
     print(Fore.YELLOW + "Entry:" + color + entry + " " * space + Fore.YELLOW + "Signal:" + color + reversal)
 
     # ================= DAY CANDLE =================
-    #print(data["day_candle"])
+    # print(data["day_candle"])
 
     # ================= BOS BAR =================
     print(data["bos_bar"])
     # Optional: print BOS value text
     # print("BOS Value:", data["bos_val"])
 
-# ================= MAIN =================
+# ---------------- MAIN ----------------
 if __name__ == "__main__":
-    run_pyc_file()               # run any pyc files
-    data = get_full_snapshot()    # capture all indicators
-    print_dashboard(data)         # display dashboard
+    data = get_full_snapshot()
+    print_dashboard(data)
