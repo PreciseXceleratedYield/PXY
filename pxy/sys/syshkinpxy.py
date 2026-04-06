@@ -72,8 +72,6 @@ if __name__ == "__main__":
     # Assume you already have your DataFrame `df` from elsewhere
     # e.g., df = get_ha_data("AAPL") or passed from your main loop
 
-    if __name__ == "__main__":
-    # Call without passing any DataFrame
     signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal()
 
     # Print results
