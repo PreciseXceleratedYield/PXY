@@ -66,7 +66,7 @@ def target_price(row):
         target = entry_prc + total_points
 
         # 7️⃣ DASHBOARD PRINT
-        print(f"{'-'*50}")
+        print(f"{'-'*42}")
         print(f"{Fore.CYAN}SYMBOL      : {Fore.YELLOW}{symbol}")
         print(f"{Fore.CYAN}Baseline    : {Fore.YELLOW}{entry_prc}")
         print(f"{Fore.CYAN}Direction   : {Fore.YELLOW}{mullu}")
@@ -77,7 +77,7 @@ def target_price(row):
         print(f"{Fore.CYAN}Phase       : {Fore.YELLOW}{phase}")
         print(f"{Fore.CYAN}Target Pts  : {Fore.YELLOW}{total_points}")
         print(f"{Fore.CYAN}Final Target: {Fore.GREEN}{round(target, 2)}")
-        print(f"{'-'*50}\n")
+        print(f"{'-'*42}\n")
 
         return round(target, 2)
 
