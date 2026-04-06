@@ -50,7 +50,7 @@ def execute_order(client, symbol, qty, side):
     try:
         params = {
             "exchange_segment": "nse_fo",
-            "product": "MIS",
+            "product": "NRML",
             "price": "0",
             "order_type": "MKT",
             "quantity": str(qty),
