@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 import pandas as pd
 import numpy as np
+from exepomspxy import print_market_dashboard
 
 # --- GLOBAL DEBUG SWITCH ---
 DEBUG = True 
@@ -54,6 +55,7 @@ def get_combined_data(map_active_with_nifty=True, add_calcs=True):
             market_data = syspxy.get_all_data()
             market_df = pd.DataFrame([market_data])
             print("\n[DEBUG] Market Snapshot DataFrame:\n", market_df)
+            print_market_dashboard(market_df)
         except: market_df = pd.DataFrame()
     combined["market_snapshot"] = market_df
 
