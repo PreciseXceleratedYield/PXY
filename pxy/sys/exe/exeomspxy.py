@@ -96,8 +96,9 @@ def get_combined_data(map_active_with_nifty=True, add_calcs=True):
         dprint("Applying Stateless PXY ...")
 
         # STEP A: THE ENTRY MELT (0.20/min decay baseline)
+        # ---- Surgical change: ensure dynamic entry is stored in OMS column
         active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
-        
+
         # STEP B: THE TARGET PUSH (Uses pxy_entry)
         active_df["pxy_tgt"] = active_df.apply(pxy_tgt_calc, axis=1)
         
@@ -116,5 +117,3 @@ if __name__ == "__main__":
         print("="*80)
         print(data["active_orders"][cols])
         print("="*80)
-
-
