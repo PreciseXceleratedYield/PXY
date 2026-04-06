@@ -17,7 +17,6 @@ from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
 from sysstrndpxy import calculate_supertrend
 from syspwerpxy import get_ce_pe_power
-from sysentrpxy import get_entry_signal
 from sysdeptpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
