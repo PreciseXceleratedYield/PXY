@@ -168,8 +168,8 @@ def print_dashboard(data):
     entry = data["entry"]
     reversal = data["reversal"]
     color = Fore.GREEN if entry in ["BUY","BULL"] else Fore.RED if entry in ["SELL","BEAR"] else Fore.YELLOW
-    space = TOTAL_WIDTH - len(f"Entry:{entry}") - len(f"Rvrsl:{reversal}")
-    print(Fore.YELLOW + "Entry:" + color + entry + " " * space + Fore.YELLOW + "Rvrsl:" + color + reversal)
+    space = TOTAL_WIDTH - len(f"Entry:{entry}") - len(f"Signal:{reversal}")
+    print(Fore.YELLOW + "Entry:" + color + entry + " " * space + Fore.YELLOW + "Signal:" + color + reversal)
 
     # ================= DAY CANDLE =================
     #print(data["day_candle"])
