@@ -34,12 +34,12 @@ def target_price(row):
             power = ce_p
             depth = int(row.get("hkin_ce_depth", 0))
             # Alignment based on entry type
-            is_aligned = (mullu == "UP") and ("BUY" in entry_type)
+            is_aligned = (mullu == "UP") and (("BUY" in entry_type) or ("BULL" in entry_type))
         elif "PE" in symbol:
             power = pe_p
             depth = int(row.get("hkin_pe_depth", 0))
             # Alignment based on entry type
-            is_aligned = (mullu == "DOWN") and ("SELL" in entry_type)
+            is_aligned = (mullu == "DOWN") and (("SELL" in entry_type) or ("BEAR" in entry_type))
         else:
             # Non-CE/PE: fallback to baseline price
             return entry_prc
