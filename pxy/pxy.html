@@ -14,7 +14,8 @@ html, body {
     height: 100%;
     width: 100%;
     font-family: monospace;
-    background: #f0f0f0;
+    background: #000000; /* black background for the page */
+    color: #ffffff; /* default text color */
 }
 
 #terminal-container {
@@ -22,7 +23,7 @@ html, body {
     height: 100vh; /* full viewport height */
     display: flex;
     flex-direction: column;
-    background-color: #ffffff;
+    background-color: #000000; /* black terminal container */
 }
 
 #terminal {
@@ -53,8 +54,8 @@ const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     theme: {
-        background: '#ffffff',
-        foreground: '#222222'
+        background: '#000000', // black terminal background
+        foreground: '#00ff00'  // green text like classic terminal
     }
 });
 const fitAddon = new FitAddon.FitAddon();
