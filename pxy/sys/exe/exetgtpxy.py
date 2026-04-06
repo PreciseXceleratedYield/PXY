@@ -17,8 +17,12 @@ def target_price(row):
     """
     try:
         # 1️⃣ BASELINE PRICE
-        entry_prc = float(row.get("pxy_entry", row.get("buy_prc", 0)))
+        dynamic_entry = float(row.get("pxy_entry", 0))  # dynamic from OMS
+        actual_price = float(row.get("buy_prc", 0))     # actual market price
         symbol = str(row.get("symbol", "")).upper()
+        
+        # fallback if dynamic_entry missing
+        entry_prc = dynamic_entry if dynamic_entry > 0 else actual_price
         if entry_prc <= 0: 
             return 0
 
@@ -33,12 +37,10 @@ def target_price(row):
         if "CE" in symbol:
             power = ce_p
             depth = int(row.get("hkin_ce_depth", 0))
-            # Alignment based on entry type
             is_aligned = (mullu == "UP") and (("BUY" in entry_type) or ("BULL" in entry_type))
         elif "PE" in symbol:
             power = pe_p
             depth = int(row.get("hkin_pe_depth", 0))
-            # Alignment based on entry type
             is_aligned = (mullu == "DOWN") and (("SELL" in entry_type) or ("BEAR" in entry_type))
         else:
             # Non-CE/PE: fallback to baseline price
@@ -46,19 +48,16 @@ def target_price(row):
 
         # 4️⃣ TARGET POINTS CALCULATION
         if not is_aligned:
-            # Phase 3: Misalignment → emergency escape
             total_points = 10.0
             phase = "Phase 3 (Misalignment)"
         elif depth >= 2:
-            # Phase 2: Deep trend acceleration (cap depth at 5)
             total_points = atr * power * min(depth, 5)
             phase = "Phase 2 (Deep Trend)"
         elif depth < 2:
-            # Phase 1: Initial / shallow trend
             total_points = max(10.0, atr * power)
             phase = "Phase 1 (Initial Entry)"
         else:
-            total_points = 10.0  # Safety fallback
+            total_points = 10.0
             phase = "Phase 3 (Fallback)"
 
         # 5️⃣ CAP TOTAL POINTS
@@ -68,23 +67,25 @@ def target_price(row):
         target = entry_prc + total_points
 
         # 7️⃣ DASHBOARD PRINT
-        print(f"{'-'*42}")
-        print(f"{Fore.CYAN}SYMBOL      : {Fore.YELLOW}{symbol}")
-        print(f"{Fore.CYAN}Baseline    : {Fore.YELLOW}{entry_prc}")
-        print(f"{Fore.CYAN}Direction   : {Fore.YELLOW}{mullu}")
-        print(f"{Fore.CYAN}Entry       : {Fore.YELLOW}{entry_type}")
-        print(f"{Fore.CYAN}Depth       : {Fore.YELLOW}{depth}")
-        print(f"{Fore.CYAN}ATR         : {Fore.YELLOW}{atr}")
-        print(f"{Fore.CYAN}Power       : {Fore.YELLOW}{power}")
-        print(f"{Fore.CYAN}Phase       : {Fore.YELLOW}{phase}")
-        print(f"{Fore.CYAN}Target Pts  : {Fore.YELLOW}{total_points}")
-        print(f"{Fore.CYAN}Final Target: {Fore.GREEN}{round(target, 2)}")
-        print(f"{'-'*42}\n")
+        print(f"{'-'*60}")
+        print(f"{Fore.CYAN}SYMBOL          : {Fore.YELLOW}{symbol}")
+        print(f"{Fore.CYAN}Actual Price    : {Fore.YELLOW}{actual_price}")
+        print(f"{Fore.CYAN}Dynamic Entry   : {Fore.YELLOW}{dynamic_entry}")
+        print(f"{Fore.CYAN}Used Baseline   : {Fore.YELLOW}{entry_prc}")
+        print(f"{Fore.CYAN}Direction       : {Fore.YELLOW}{mullu}")
+        print(f"{Fore.CYAN}Entry           : {Fore.YELLOW}{entry_type}")
+        print(f"{Fore.CYAN}Depth           : {Fore.YELLOW}{depth}")
+        print(f"{Fore.CYAN}ATR             : {Fore.YELLOW}{atr}")
+        print(f"{Fore.CYAN}Power           : {Fore.YELLOW}{power}")
+        print(f"{Fore.CYAN}Phase           : {Fore.YELLOW}{phase}")
+        print(f"{Fore.CYAN}Target Pts      : {Fore.YELLOW}{total_points}")
+        print(f"{Fore.CYAN}Final Target    : {Fore.GREEN}{round(target, 2)}")
+        print(f"{'-'*60}\n")
 
         return round(target, 2)
 
     except Exception as e:
         print(Fore.RED + f"Error calculating target: {e}")
-        # Safety fallback: baseline + 10 points (capped at 99)
-        return round(min(float(row.get("pxy_entry", 0)) + 10, 99), 2)
+        fallback = round(min(float(row.get("pxy_entry", 0)) + 10, 99), 2)
+        return fallback
 
