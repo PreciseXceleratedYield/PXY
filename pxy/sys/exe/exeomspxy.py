@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import sys
 from pathlib import Path
 import pandas as pd
@@ -54,41 +53,8 @@ def get_combined_data(map_active_with_nifty=True, add_calcs=True):
         try:
             market_data = syspxy.get_all_data()
             market_df = pd.DataFrame([market_data])
-        except: 
-            market_df = pd.DataFrame()
+        except: market_df = pd.DataFrame()
     combined["market_snapshot"] = market_df
-
-    # --- HELPER: PRINT 42-CHAR DASHBOARD ---
-    def print_market_dashboard(df, width=42):
-        if df.empty:
-            return
-        metrics = [
-            ("ATR 📏", "atr"),
-            ("Price 💰", "price"),
-            ("Mullu 🧭", "mullu"),
-            ("Super 🚀", "super"),
-            ("LINE 📊", "line"),
-            ("CE Power 🟢⚡", "ce_power"),
-            ("PE Power 🔴⚡", "pe_power"),
-            ("Entry 🎯", "entry"),
-            ("Signal 📡", "signal"),
-        ]
-        snapshot = df.iloc[0].to_dict()
-        row_items = [f"{label}:{snapshot.get(key,'NA')}" for label,key in metrics]
-
-        print("="*width)
-        print(f"{'MARKET SNAPSHOT':^{width}}")
-        print("="*width)
-        i = 0
-        while i < len(row_items):
-            left = row_items[i]
-            right = row_items[i+1] if i+1 < len(row_items) else ""
-            print(f"{left:<{width//2}}{right:>{width//2}}")
-            i += 2
-        print("="*width)
-
-    # --- PRINT MARKET DASHBOARD AUTOMATICALLY ---
-    print_market_dashboard(market_df, width=42)
 
     # --- 2. ACTIVE ORDERS ---
     active_df = pd.DataFrame()
@@ -102,40 +68,49 @@ def get_combined_data(map_active_with_nifty=True, add_calcs=True):
     if active_df.empty:
         return combined
 
+    # Standardize columns to lowercase for mapping
     active_df.columns = [c.lower() for c in active_df.columns]
 
-    # --- 3. DYNAMIC VALUATION ---
+    # --- 3. DYNAMIC VALUATION (LTP & P&L) ---
     if client and get_mid_price:
         def update_metrics(row):
             token_id = row.get("tok") or row.get("token") or row.get("symbol")
             curr_val = get_mid_price(client, token_id)
+            
             row["sell_prc"] = curr_val if curr_val > 0 else row.get("sell_prc", 0)
             if curr_val > 0:
                 buy_avg = float(row.get("buy_prc", 0))
                 qty = float(row.get("qty", 0))
                 row["pnl"] = round((curr_val - buy_avg) * qty, 2)
             return row
+
         active_df = active_df.apply(update_metrics, axis=1)
 
-    # --- 4. NIFTY SYNC ---
+    # --- 4. NIFTY SYNC (Broadcast Mullu/Power/Depth/ATR to rows) ---
     if map_active_with_nifty and not market_df.empty:
         for col in market_df.columns:
             active_df[col] = market_df[col].iloc[-1]
 
-    # --- 5. PXY OMS CALCS ---
+    # --- 5. THE PXY OMS CALCULATION CHAIN ---
     if add_calcs:
         dprint("Applying Stateless PXY ...")
+
+        # STEP A: THE ENTRY MELT (0.20/min decay baseline)
+        # ---- Surgical change: ensure dynamic entry is stored in OMS column
         active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
+
+        # STEP B: THE TARGET PUSH (Uses pxy_entry)
         active_df["pxy_tgt"] = active_df.apply(pxy_tgt_calc, axis=1)
+        
+        # STEP C: THE STOP LOSS PULL (Uses pxy_entry)
         active_df["pxy_sl"] = active_df.apply(pxy_sl_calc, axis=1)
 
     combined["active_orders"] = active_df
     return combined
 
-# ---------------- MAIN ----------------
 if __name__ == "__main__":
     data = get_combined_data()
-    if not data["active_orders"].empty:
+    if  not data["active_orders"].empty:
         cols = ["symbol", "buy_prc", "pxy_entry", "pxy_tgt", "pxy_sl", "sell_prc", "pnl"]
         print("\n" + "="*80)
         print(f"{'OMS LIVE PXY DASHBOARD (V2)':^80}")
