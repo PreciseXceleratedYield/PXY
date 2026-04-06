@@ -1,10 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Left Terminal Panel",
+  "name": "Open My URL",
   "version": "1.0",
-  "description": "Terminal on left side as full window",
+  "description": "Opens http://20.219.25.209/ in popup",
   "action": {
-    "default_title": "Show Terminal"
+    "default_popup": "popup.html",
+    "default_title": "Open URL"
   },
-  "permissions": ["activeTab", "windows"]
+  "permissions": [
+    "tabs"
+  ]
 }
