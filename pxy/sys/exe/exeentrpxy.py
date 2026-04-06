@@ -112,20 +112,20 @@ async def main():
         ltp = df['Close'].iloc[-1]
         dprint(f"Current LTP: {ltp}")
 
-        # 4. Side & Strike Logic (FIXED)
+        # --- 4. Side & Strike Logic (ADJUSTED FOR ATM/OTM ONLY) ---
         sig = entry_signal.upper().strip()
-        
-        # STRICT side detection
-        if sig.endswith("BUY"):
+
+        # Determine side strictly from ATM/OTM signal
+        if sig in ["ATMBUY", "OTMBUY"]:
             side = "BUY"
-        elif sig.endswith("SELL"):
+        elif sig in ["ATMSELL", "OTMSELL"]:
             side = "SELL"
         else:
             print(f"{Fore.YELLOW}💤 Neutral Signal: {entry_signal}")
             return
 
-        # STRICT OTM only for pure BUY/SELL
-        offset = 200 if sig in ["BUY", "SELL"] else 0
+        # Determine offset: ATM → 0, OTM → 200
+        offset = 200 if sig.startswith("OTM") else 0
 
         # Strike calculation
         if side == "BUY":
@@ -158,17 +158,17 @@ async def main():
         status = f"{Fore.GREEN}Ok" if is_ok else f"{Fore.RED}Failed/Skipped"
 
         print(f"""
-     =================================
-       💰 {Fore.WHITE}Cash   : {funds}
-       ⚡ {Fore.WHITE}Pos    : {pos}
-       🎫 {Fore.WHITE}Symbol : {symbol}
-       📊 {Fore.WHITE}Strike : {strike}
-       🎯 {Fore.WHITE}Signal : {entry_signal}
-       🔁 {Fore.WHITE}Rev    : {reversal}
-       📌 {Fore.WHITE}Status : {status}
-     =================================
-""")
-
+         =================================
+           💰 {Fore.WHITE}Cash   : {int(funds)}
+           ⚡ {Fore.WHITE}Pos    : {pos}
+           🎫 {Fore.WHITE}Symbol : {symbol}
+           📊 {Fore.WHITE}Strike : {strike}
+           🎯 {Fore.WHITE}Action : {entry_signal}
+           🔁 {Fore.WHITE}Signal : {reversal}
+           📌 {Fore.WHITE}Status : {status}
+         =================================
+        """)
+        
     except Exception:
         if DEBUG:
             print(f"{Fore.RED}{traceback.format_exc()}")
