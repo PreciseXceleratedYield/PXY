@@ -1,6 +1,7 @@
 # run_pyc.py
 import runpy
 import os
+import math
 from colorama import Fore, Style, init
 
 init(autoreset=True)
@@ -24,7 +25,6 @@ TOTAL_WIDTH = 42
 # ================= RUN PYC =================
 def run_pyc_file():
     pyc_files = []
-
     for pyc_file in pyc_files:
         try:
             runpy.run_path(os.path.join(os.getcwd(), pyc_file), run_name="__main__")
@@ -39,7 +39,6 @@ def get_full_snapshot():
     df = fetch_yf_data()
     if df is None or df.empty:
         return None
-
     result["df"] = df
 
     # ================= CANDLE VISUAL =================
@@ -64,21 +63,26 @@ def get_full_snapshot():
 
     # ================= ATR =================
     atr_series = calculate_atr(df)
-    atr_val = int(atr_series.iloc[-1]) if not atr_series.empty else 0
-    k_val = calculate_dynamic_k(df)
+    atr_val_raw = atr_series.iloc[-1] if not atr_series.empty else 0
+    atr_val = 0 if atr_val_raw is None or math.isnan(atr_val_raw) else int(atr_val_raw)
+
+    k_val_raw = calculate_dynamic_k(df)
+    k_val = 0 if k_val_raw is None or math.isnan(k_val_raw) else int(k_val_raw)
 
     result["atr"] = atr_val
     result["katr"] = k_val
 
     # ================= PRICE =================
-    price, direction = detect_raw_direction(df)
-    result["price"] = int(price) if price else None
+    price_raw, direction = detect_raw_direction(df)
+    price = 0 if price_raw is None or math.isnan(price_raw) else int(price_raw)
+    result["price"] = price
     result["direction"] = direction
 
     # ================= SUPERTREND =================
     df = calculate_supertrend(df)
-    trend = df['ST_Trend'].iloc[-1]
-    line_val = int(df['ST'].iloc[-1])
+    trend = df['ST_Trend'].iloc[-1] if not df.empty else "NONE"
+    st_raw = df['ST'].iloc[-1] if not df.empty else 0
+    line_val = 0 if st_raw is None or math.isnan(st_raw) else int(st_raw)
 
     result["supertrend"] = trend
     result["super_line"] = line_val
@@ -86,10 +90,9 @@ def get_full_snapshot():
 
     # ================= POWER =================
     direction_power, ce, pe = get_ce_pe_power(df=df)
-
-    result["direction_power"] = direction_power
-    result["ce_power"] = ce
-    result["pe_power"] = pe
+    result["direction_power"] = 0 if direction_power is None or math.isnan(direction_power) else int(direction_power)
+    result["ce_power"] = 0 if ce is None or math.isnan(ce) else int(ce)
+    result["pe_power"] = 0 if pe is None or math.isnan(pe) else int(pe)
 
     # ================= ENTRY =================
     entry, reversal = get_entry_signal(df)
@@ -124,7 +127,6 @@ def print_dashboard(data):
     pe_depth = data["hkin_pe_depth"]
 
     color = Fore.GREEN if signal in ["BUY","BULL"] else Fore.RED if signal in ["SELL","BEAR"] else Fore.YELLOW
-
     space1 = TOTAL_WIDTH - len(f"Hkin:{signal}") - len(f"Past:{past_depth}")
     if space1 < 0: space1 = 1
     print(Fore.YELLOW + "Hkin:" + color + signal + " " * space1 + Fore.YELLOW + f"Past:{color}{past_depth}")
