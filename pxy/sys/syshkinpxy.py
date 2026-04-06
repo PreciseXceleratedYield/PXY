@@ -15,25 +15,25 @@ def detect_ha_flip_signal(df=None):
     current_candle = ha_color.iloc[-1]
 
     # ---------------- Detect flips ----------------
-if last_closed == 'red' and current_candle == 'green':
-    signal = "BUY"
-elif last_closed == 'green' and current_candle == 'red':
-    signal = "SELL"
-else:
-    if len(ha_color) >= 3:
-        last_two = ha_color.iloc[-3:-1].tolist()
-        if last_two == ['green', 'green']:
-            signal = "BULL"
-        elif last_two == ['red', 'red']:
-            signal = "BEAR"
-        elif last_two == ['red', 'green']:
-            signal = "BEAR"
-        elif last_two == ['green', 'red']:
-            signal = "BEAR"
+    if last_closed == 'red' and current_candle == 'green':
+        signal = "BUY"
+    elif last_closed == 'green' and current_candle == 'red':
+        signal = "SELL"
+    else:
+        if len(ha_color) >= 3:
+            last_two = ha_color.iloc[-3:-1].tolist()
+            if last_two == ['green', 'green']:
+                signal = "BULL"
+            elif last_two == ['red', 'red']:
+                signal = "BEAR"
+            elif last_two == ['red', 'green']:
+                signal = "BEAR"
+            elif last_two == ['green', 'red']:
+                signal = "BEAR"
+            else:
+                signal = "NONE"
         else:
             signal = "NONE"
-    else:
-        signal = "NONE"
 
     # ---------------- Past depth (previous color streak) ----------------
     past_depth = 1
