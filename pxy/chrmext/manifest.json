@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Left Terminal Panel",
+  "version": "1.0",
+  "description": "Terminal on left side as side panel",
+  "action": {
+    "default_title": "Show Terminal"
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "permissions": ["activeTab"]
+}
