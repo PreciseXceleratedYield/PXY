@@ -34,24 +34,31 @@ def place_exit_order(client, row):
         return None
 
 def compute_st_fixed(row):
-    """Calculates XX⚪YY and returns True if LTP >= Target."""
+    """Calculates XX⚪YY and returns True if LTP >= Target.
+    XX → difference of buy price to LTP, colored green if positive, red if negative.
+    YY → distance to target, unchanged.
+    """
     try:
         ltp = float(row.get("sell_prc", 0))
         tgt = float(row.get("pxy_tgt", 0))
-        sl  = float(row.get("pxy_sl", 0))
-        
-        if ltp <= 0: return "00⚪00", False
+        buy = float(row.get("buy_prc", 0))  # buy price
 
-        to_sl  = min(99, max(0, int(ltp - sl)))
+        if ltp <= 0: 
+            return "00⚪00", False
+
+        # XX = LTP - Buy Price
+        to_buy = int(ltp - buy)
         to_tgt = min(99, max(0, int(tgt - ltp)))
-        
+
+        # Color based on profit/loss
+        color = Fore.GREEN if to_buy > 0 else Fore.RED if to_buy < 0 else Fore.WHITE
+
+        buy_s, tg_s = f"{abs(to_buy):02d}", f"{to_tgt:02d}"
+
         is_hit = ltp >= tgt
-        
-        sl_s, tg_s = f"{to_sl:02d}", f"{to_tgt:02d}"
-        color = Fore.GREEN if to_tgt < to_sl else Fore.RED if to_sl < to_tgt else Fore.WHITE
-        
-        return f"{sl_s}{color}⚪{Fore.RESET}{tg_s}", is_hit
-    except: 
+
+        return f"{color}{buy_s}{Fore.RESET}⚪{tg_s}", is_hit
+    except:
         return "00⚪00", False
 
 def run_snapshot():
