@@ -82,7 +82,7 @@ def get_entry_signal(df: pd.DataFrame) -> (str, str):
 
     required_cols = ['Open', 'High', 'Low', 'Close']
     if df is None or len(df) < 3 or not all(col in df.columns for col in required_cols):
-        return "NONE", "None"
+        return "NONE", "NONE"
 
     now = datetime.now(IST).time()
 
@@ -90,7 +90,7 @@ def get_entry_signal(df: pd.DataFrame) -> (str, str):
     # 0️⃣ 9:14–9:15 → NONE
     # ======================================================
     if time(9,14) <= now <= time(9,15):
-        return "NONE", "None"
+        return "NONE", "NONE"
 
     # ======================================================
     # 1️⃣ MORNING (9:16–9:36)
@@ -100,31 +100,46 @@ def get_entry_signal(df: pd.DataFrame) -> (str, str):
         direction = get_morning_direction(df)
 
         if direction == "BUY":
-            return "MBUY", "None"
+            return "ATMBUY", "MBUY"
         elif direction == "SELL":
-            return "MSELL", "None"
+            return "ATMSELL", "MSELL"
         else:
-            return "WAIT", "None"
+            return "NONE", "NONE"  # <-- simplified from WAIT to NONE
 
     # ======================================================
-    # 2️⃣ REVERSAL (USES ORIGINAL STRUCTURE)
+    # 2️⃣ REVERSAL (UNCHANGED)
     # ======================================================
     reversal_status = check_reversal(df)
 
     if reversal_status == "ACTIVE":
         last = df.iloc[-1]
         entry_signal = "RBUY" if last['Close'] > last['Open'] else "RSELL"
-        return entry_signal, reversal_status
+        close_price = last['Close']
+        st_value = df['ST'].iloc[-1] if 'ST' in df.columns else close_price
+
+        if entry_signal == "RBUY":
+            atm_signal = "ATMBUY" if close_price > st_value else "OTMBUY"
+        else:
+            atm_signal = "ATMSELL" if close_price < st_value else "OTMSELL"
+
+        return atm_signal, entry_signal
 
     # ======================================================
     # 3️⃣ BOS
     # ======================================================
     try:
         _, bos_val = get_bos_bar(df)
+        close_price = df['Close'].iloc[-1]
+        st_value = df['ST'].iloc[-1] if 'ST' in df.columns else close_price
+
         if bos_val == "BULL":
-            return "BBUY", "None"
+            entry_signal = "BBUY"
+            atm_signal = "ATMBUY" if close_price > st_value else "OTMBUY"
+            return atm_signal, entry_signal
         elif bos_val == "BEAR":
-            return "BSELL", "None"
+            entry_signal = "BSELL"
+            atm_signal = "ATMSELL" if close_price < st_value else "OTMSELL"
+            return atm_signal, entry_signal
     except Exception:
         pass
 
@@ -135,20 +150,26 @@ def get_entry_signal(df: pd.DataFrame) -> (str, str):
         df = calculate_supertrend(df)
 
         if 'ST' not in df.columns:
-            return "NONE", "None"
+            return "NONE", "NONE"
 
         st_trend = "UP" if df['Close'].iloc[-1] > df['ST'].iloc[-1] else "DOWN"
         ha_signal, _, _, _ = detect_ha_flip_signal(df)
+        close_price = df['Close'].iloc[-1]
+        st_value = df['ST'].iloc[-1]
 
         if st_trend == "UP" and ha_signal in ["BUY", "BULL"]:
-            return "SBUY", "None"
+            entry_signal = "SBUY"
+            atm_signal = "ATMBUY" if close_price > st_value else "OTMBUY"
+            return atm_signal, entry_signal
         elif st_trend == "DOWN" and ha_signal in ["SELL", "BEAR"]:
-            return "SSELL", "None"
+            entry_signal = "SSELL"
+            atm_signal = "ATMSELL" if close_price < st_value else "OTMSELL"
+            return atm_signal, entry_signal
 
     except Exception:
         pass
 
-    return "NONE", "None"
+    return "NONE", "NONE"
 
 
 # ==========================================================
@@ -157,15 +178,18 @@ def get_entry_signal(df: pd.DataFrame) -> (str, str):
 if __name__ == "__main__":
 
     df = fetch_yf_data()
-    entry_signal, reversal_status = get_entry_signal(df)
+    df = calculate_supertrend(df)  # Ensure ST column exists
+    final_signal, original_signal = get_entry_signal(df)
 
-    left_text = f"Entry:{entry_signal}"
-    right_text = f"Rvrsl:{reversal_status}"
+    # --- Print dashboard line ---
+    left_text = f"Entry:{final_signal}"
+    right_text = f"Orig:{original_signal}"
     dashboard_line = f"{left_text:<21}{right_text:>21}"
 
-    if entry_signal in ["BUY","BULL","SBUY","BBUY","RBUY","MBUY"]:
+    # --- Color coding ---
+    if final_signal in ["ATMBUY","OTMBUY"]:
         color = Fore.GREEN
-    elif entry_signal in ["SELL","BEAR","SSELL","BSELL","RSELL","MSELL"]:
+    elif final_signal in ["ATMSELL","OTMSELL"]:
         color = Fore.RED
     else:
         color = Fore.YELLOW
