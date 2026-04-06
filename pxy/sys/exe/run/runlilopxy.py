@@ -5,7 +5,8 @@ from runltpspxy import get_mid_price
 
 def process_lilo_orders(client):
     try:
-        if not client: return pd.DataFrame(), pd.DataFrame()
+        if not client: 
+            return pd.DataFrame(), pd.DataFrame()
         
         # Neo V2: Order report returns all orders for the day
         res = client.order_report()
@@ -15,10 +16,10 @@ def process_lilo_orders(client):
         df = pd.DataFrame(res["data"])
         
         # 1. Filter for completed/traded orders only
-        # Neo V2 statuses: 'complete', 'traded'
         df = df[df["ordSt"].isin(["complete", "traded"])].copy()
-        
         if df.empty:
+            # Still print summary with 0
+            print("Running:0  Booked:0".ljust(42))
             return pd.DataFrame(), pd.DataFrame()
 
         # 2. Convert types for calculation
@@ -34,7 +35,6 @@ def process_lilo_orders(client):
 
         # 3. Group by Trading Symbol
         for symbol, group in df.groupby("trdSym"):
-            # Get the numeric token for this symbol from the first order in group
             token_id = group["tok"].iloc[0]
             ex_seg = group["exSeg"].iloc[0]
             
@@ -49,12 +49,12 @@ def process_lilo_orders(client):
                 closed_matches.append({
                     "Symbol": symbol, 
                     "Qty": mqty, 
-                    "tok": token_id, # Keep token for reference
+                    "tok": token_id,
                     "Buy_Time": b["dt"], 
                     "Buy_Prc": b["prc"], 
                     "Exit_Time": s["dt"], 
                     "Sell_Prc": s["prc"], 
-                    "PNL": round((s["prc"] - b["prc"]) * mqty, 2)
+                    "PNL": int((s["prc"] - b["prc"]) * mqty)
                 })
                 
                 s["qty"] -= mqty
@@ -66,25 +66,36 @@ def process_lilo_orders(client):
             # --- Remaining Buys are Open (Unrealized) ---
             for rem in buys:
                 if rem["qty"] > 0:
-                    # Get live valuation via the numeric token
                     live_val = get_mid_price(client, token_id, ex_seg)
                     
                     open_positions.append({
                         "Symbol": symbol, 
                         "Qty": rem["qty"], 
-                        "tok": token_id,  # CRITICAL: Pass token to OMS
+                        "tok": token_id,
                         "Buy_Time": rem["dt"],
                         "Buy_Prc": rem["prc"], 
                         "Exit_Time": "OPEN",
                         "Sell_Prc": live_val, 
-                        "PNL": round((live_val - rem["prc"]) * rem["qty"], 2)
+                        "PNL": int((live_val - rem["prc"]) * rem["qty"])
                     })
 
-        return pd.DataFrame(open_positions), pd.DataFrame(closed_matches)
+        # --- Convert to DataFrames ---
+        open_df = pd.DataFrame(open_positions)
+        closed_df = pd.DataFrame(closed_matches)
+
+        # Ensure totals are integers and print 42-character summary
+        total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0
+        total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0
+        summary_line = f"Running:{total_unrealized}  Booked:{total_realized}"
+        print(summary_line.ljust(42))
+
+        return open_df, closed_df
         
     except Exception as e:
         print(f"[LILO ERROR]: {e}")
+        print("Running:0  Booked:0".ljust(42))
         return pd.DataFrame(), pd.DataFrame()
+
 
 if __name__ == "__main__":
     # Test Block
@@ -97,13 +108,13 @@ if __name__ == "__main__":
     print("\n===== CLOSED TRADES (REALIZED P&L) =====")
     if not closed.empty:
         print(closed[cols])
-        print(f"Total Realized: {closed['PNL'].sum():.2f}")
+        print(f"Total Realized: {int(closed['PNL'].sum())}")
     else:
         print("No closed trades.")
 
     print("\n===== ACTIVE POSITIONS (UNREALIZED P&L) =====")
     if not active.empty:
         print(active[cols])
-        print(f"Total Unrealized: {active['PNL'].sum():.2f}")
+        print(f"Total Unrealized: {int(active['PNL'].sum())}")
     else:
         print("No active positions.")
