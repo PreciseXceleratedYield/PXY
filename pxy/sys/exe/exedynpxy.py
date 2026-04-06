@@ -3,7 +3,6 @@ from datetime import datetime
 def dynamic_entry(row):
     try:
         original_price = float(row.get("buy_prc", 0))
-        current_price = float(row.get("ltp", row.get("sell_prc", 0)))
         entry_time_val = row.get("entry_time")
         symbol = str(row.get("symbol", "")).upper()
 
@@ -11,6 +10,7 @@ def dynamic_entry(row):
             return original_price
 
         now = datetime.now()
+        # Convert entry_time string to datetime if needed
         if isinstance(entry_time_val, str):
             entry_time = datetime.strptime(entry_time_val, "%H:%M:%S").replace(
                 year=now.year, month=now.month, day=now.day
@@ -18,21 +18,16 @@ def dynamic_entry(row):
         else:
             entry_time = entry_time_val
 
-        elapsed_mins = (now - entry_time).total_seconds() / 60
-        decay = round(elapsed_mins * 0.20, 2)
+        # --- elapsed seconds ---
+        elapsed_secs = (now - entry_time).total_seconds()
 
-        # Theta decay
-        dynamic_val = original_price - decay if ("CE" in symbol or "PE" in symbol) else original_price
+        # --- increment 1 point per minute → 1/60 point per second ---
+        increment = elapsed_secs / 60
 
-        # --- ONLY FOR LOSING TRADES (> ₹10 LOSS) ---
-        if current_price > 0 and original_price > current_price:
-            loss = original_price - current_price
+        # --- only for CE/PE options ---
+        dynamic_val = original_price + increment if ("CE" in symbol or "PE" in symbol) else original_price
 
-            if loss > 10:   # 👈 changed from 15 → 10
-                return round(max((dynamic_val * 0.4 + current_price * 0.6), 2.0), 2)
-
-        # --- DEFAULT ---
-        return round(max(dynamic_val, 2.0), 2)
+        return round(dynamic_val, 2)
 
     except Exception:
         return row.get("buy_prc", 0)
