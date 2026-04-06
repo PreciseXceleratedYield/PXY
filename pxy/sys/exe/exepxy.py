@@ -14,19 +14,31 @@ ist = pytz.timezone("Asia/Kolkata")
 # ---------------- PATH SETUP ----------------
 HERE = Path(__file__).resolve().parent
 RUN_DIR = HERE / "run"
-sys.path.insert(0, str(RUN_DIR))  # run subdir for runpchkpxy
-sys.path.insert(0, str(HERE))     # current exe dir
+sys.path.insert(0, str(RUN_DIR))
+sys.path.insert(0, str(HERE))
 
 # ---------------- IMPORT POSITION CHECK ----------------
 try:
     from runpchkpxy import get_position_summary
-except Exception as e:
+except Exception:
     print("⚠️ WARN: position summary import failed ⚠️")
-    get_position_summary = lambda: "0CE0PE"
+    get_position_summary = lambda client=None: "0CE0PE"
+
+# ---------------- CREATE CLIENT ONCE (FIXED) ----------------
+try:
+    from runclntpxy import get_session
+    client = get_session()
+
+    if not client:
+        print("❌ FATAL: Unable to create trading session")
+        sys.exit(1)
+
+except Exception as e:
+    print(f"❌ Client Init Failed: {e}")
+    sys.exit(1)
 
 # ---------------- HELPER FUNCTIONS ----------------
 def run_script(script_path):
-    """Run a python script safely."""
     if not Path(script_path).exists():
         print(f"⚠️ SKIP: script not found -> {script_path}")
         print("━" * 42)
@@ -67,10 +79,10 @@ loop_counter = 1
 
 # ---------------- RUN PARENT SCRIPTS ONCE AT START ----------------
 parent_scripts = [
-    HERE.parent / "systdaypxy.py",    # parent directory
+    HERE.parent / "systdaypxy.py",
     HERE.parent / "sysvixpxy.py",
     HERE.parent / "sysdashpxy.py",
-    HERE / "exeentrpxy.py",           # current directory
+    HERE / "exeentrpxy.py",
     HERE / "exeexitpxy.py"
 ]
 
@@ -82,22 +94,28 @@ while True:
     if in_market_hours():
         live_status("🚀 LOOP ACTIVE: waiting CE/PE trigger 📊")
 
-        # 30-iteration subloop
         for sub_itr in range(1, 31):
-            pos_summary = get_position_summary()
-            try:
-                ce_qty = int(pos_summary[0])
-                pe_qty = int(pos_summary[3])
-            except Exception:
-                ce_qty = 0
-                pe_qty = 0
 
+            # -------- POSITION FETCH --------
+            pos_summary = get_position_summary(client)
+
+            # -------- SAFE PARSING (FINAL FIX) --------
+            try:
+                ce_qty = int(pos_summary.split("CE")[0])
+                pe_qty = int(pos_summary.split("CE")[1].replace("PE", ""))
+            except Exception:
+                ce_qty, pe_qty = 0, 0
+
+            # -------- LIVE STATUS --------
             live_status(f"📊 Loop#{loop_counter} Sub#{sub_itr} CE:{ce_qty} PE:{pe_qty}")
 
+            # -------- CORE LOGIC (UNCHANGED) --------
             if ce_qty >= 1 and pe_qty >= 1:
                 safe_run(HERE / "exeexitpxy.py")
+
             elif ce_qty == 0 and pe_qty == 0:
                 safe_run(HERE / "exeentrpxy.py")
+
             else:
                 safe_run(HERE / "exeentrpxy.py")
                 safe_run(HERE / "exeexitpxy.py")
@@ -108,14 +126,13 @@ while True:
 
     else:
         print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
-        
-        # Cleanup script in parent directory
+
         safe_run(HERE.parent / "sysslefpxy.py")
-        
+
         fancy_pause(5)
-        
-        # Wait until next market open
+
         while not in_market_hours():
             print("⏳ WAIT: market opens at 09:16 IST 📡", end="\r")
             time.sleep(60)
+
         print("\n🚀 MKT OPEN: resuming main loop now 📈")
