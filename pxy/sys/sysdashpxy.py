@@ -23,7 +23,6 @@ TOTAL_WIDTH = 42
 
 # ---------------- UTILS ----------------
 def safe_int(val):
-    """Convert val to int safely; handle None, NaN, or string."""
     try:
         return 0 if val is None else int(float(val))
     except (ValueError, TypeError):
@@ -42,13 +41,11 @@ def run_pyc_file():
 def get_full_snapshot():
     result = {}
 
-    # ===== FETCH DATA =====
     df = fetch_yf_data()
     if df is None or df.empty:
         return None
     result["df"] = df
 
-    # ===== CANDLE VISUAL =====
     result["candle_visual"] = get_candle_visual(df=df)
 
     # ===== HAIKIN-ASHI =====
@@ -59,7 +56,10 @@ def get_full_snapshot():
 
     # ===== HAIKIN SIGNAL =====
     signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df=df)
-    result["hkin_signal"] = signal if signal else "NONE"
+    # --- FIX: fallback BULL/BEAR if None ---
+    if signal is None:
+        signal = "BULL" if df['HA_Close'].iloc[-1] > df['HA_Open'].iloc[-1] else "BEAR"
+    result["hkin_signal"] = signal
     result["hkin_past_depth"] = past_depth
     result["hkin_ce_depth"] = ce_depth
     result["hkin_pe_depth"] = pe_depth
@@ -96,8 +96,18 @@ def get_full_snapshot():
 
     # ===== ENTRY SIGNAL =====
     entry, reversal = get_entry_signal(df)
-    result["entry"] = entry if entry else "NONE"
-    result["reversal"] = reversal if reversal else "NONE"
+    # --- FIX: fallback to ATM/OTM if None ---
+    if entry is None or entry == "NONE":
+        last_close = df['Close'].iloc[-1]
+        st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last_close
+        if last_close > st_value:
+            entry = "ATMBUY"
+            reversal = "SBUY"
+        else:
+            entry = "ATMSELL"
+            reversal = "SSELL"
+    result["entry"] = entry
+    result["reversal"] = reversal
 
     # ===== DAY CANDLE =====
     result["day_candle"] = get_day_candle_bar(df)
