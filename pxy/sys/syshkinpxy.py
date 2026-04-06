@@ -9,7 +9,7 @@ init(autoreset=True)
 # -------------------- HA Flip Detection --------------------
 def detect_ha_flip_signal(df=None):
     if df is None or df.empty:
-        return "", "None", "None", pd.Series([0]), pd.Series([0])
+        return "", "None", "None", pd.Series([0])
 
     # Heikin-Ashi calculation
     ha_close = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
@@ -66,7 +66,9 @@ def detect_ha_flip_signal(df=None):
     else:
         pe_depth = current_depth
 
-    return signal, past_depth, ce_depth, pe_depth, colors
+    # Return exactly 4 values to match your main loop
+    return signal, past_depth, ce_depth, pe_depth
+
 
 # -------------------- Self-runnable test --------------------
 if __name__ == "__main__":
@@ -75,7 +77,7 @@ if __name__ == "__main__":
     # Example fetch (replace with your df source)
     df = yf.download("AAPL", period="5d", interval="1h")
 
-    signal, past_depth, ce_depth, pe_depth, colors = detect_ha_flip_signal(df)
+    signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df)
 
     # Color coding
     if signal in ["BUY", "BULL"]:
