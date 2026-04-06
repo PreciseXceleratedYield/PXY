@@ -1,197 +1,232 @@
-# sysentrpxy.py
-
+# run_pyc.py
+import runpy
+import os
+import math
 import pandas as pd
-from datetime import datetime, time
-import pytz
-
 from colorama import Fore, Style, init
-from sysdtafpxy import fetch_yf_data
-from syshkinpxy import detect_ha_flip_signal
-from sysstrndpxy import calculate_supertrend
-from sysbbospxy import get_bos_bar
 
+# ---------------- INIT ----------------
 init(autoreset=True)
 
-IST = pytz.timezone("Asia/Kolkata")
+# ---- Imports ----
+from sysdtafpxy import fetch_yf_data
+from sysdthapxy import get_ha_data
+from syshkinpxy import detect_ha_flip_signal
+from sysstrhpxy import get_candle_strength_line
+from syskatrpxy import calculate_atr, calculate_dynamic_k
+from sysexitpxy import detect_raw_direction
+from sysstrndpxy import calculate_supertrend
+from syspwerpxy import get_ce_pe_power
+from sysentrpxy import get_entry_signal
+from sysdeptpxy import get_candle_visual
+from syscndlpxy import get_day_candle_bar
+from sysbbospxy import get_bos_bar
 
-# ==========================================================
-# --- Reversal logic (UNCHANGED STRUCTURE) ---
-# ==========================================================
-def check_reversal(df: pd.DataFrame) -> str:
+TOTAL_WIDTH = 42
 
-    if len(df) < 2:
-        return "None"
+# ================= RUN PYC =================
+def run_pyc_file():
+    pyc_files = []  # Add any pyc files to run here
+    for pyc_file in pyc_files:
+        try:
+            runpy.run_path(os.path.join(os.getcwd(), pyc_file), run_name="__main__")
+        except Exception as e:
+            print(f"Error running {pyc_file}: {e}")
+
+# ================= CORE SNAPSHOT FUNCTION =================
+def get_full_snapshot():
+    result = {}
+
+    # ================= FETCH =================
+    df = fetch_yf_data()
+    if df is None or df.empty:
+        # Create empty df to prevent NODAATA
+        df = pd.DataFrame(columns=['Open','High','Low','Close'])
     
-    last = df.iloc[-1]
-    prev = df.iloc[-2]
-    
-    if (last['Close'] > last['Open'] and
-        prev['Close'] < prev['Open'] and
-        last['Close'] > prev['High']):
-        return "ACTIVE"
+    result["df"] = df
 
-    if (last['Close'] < last['Open'] and
-        prev['Close'] > prev['Open'] and
-        last['Close'] < prev['Low']):
-        return "ACTIVE"
-    
-    return "None"
+    # ================= CANDLE VISUAL =================
+    result["candle_visual"] = get_candle_visual(df=df)
 
-
-# ==========================================================
-# --- Morning C1 vs C2 ---
-# ==========================================================
-def get_morning_direction(df: pd.DataFrame):
-
-    if df is None or len(df) < 3:
-        return None
-
+    # ================= HA =================
     try:
-        df = df.copy()
-        df.index = pd.to_datetime(df.index)
-
-        if df.index.tz is None:
-            df.index = df.index.tz_localize("UTC").tz_convert(IST)
-        else:
-            df.index = df.index.tz_convert(IST)
-
-        df['time'] = df.index.time
-
-        c1_df = df[df['time'] == time(9, 15)]
-        if c1_df.empty:
-            return None
-
-        c1 = c1_df.iloc[-1]
-        c2 = df.iloc[-1]
-
-        if c2['Close'] > c1['Close']:
-            return "BUY"
-        elif c2['Close'] < c1['Close']:
-            return "SELL"
-
+        ha_close, ha_open, ha_color, df = get_ha_data(df=df)
+        result["ha_close"] = ha_close
+        result["ha_open"] = ha_open
+        result["ha_color"] = ha_color
     except Exception:
-        return None
+        result["ha_close"] = result["ha_open"] = result["ha_color"] = []
 
-    return None
-
-
-# ==========================================================
-# --- Entry signal calculation ---
-# ==========================================================
-def get_entry_signal(df: pd.DataFrame) -> (str, str):
-
-    required_cols = ['Open', 'High', 'Low', 'Close']
-    if df is None or len(df) < 3 or not all(col in df.columns for col in required_cols):
-        return "NONE", "NONE"
-
-    now = datetime.now(IST).time()
-
-    # ======================================================
-    # 0️⃣ 9:14–9:15 → NONE
-    # ======================================================
-    if time(9,14) <= now <= time(9,15):
-        return "NONE", "NONE"
-
-    # ======================================================
-    # 1️⃣ MORNING (9:16–9:36)
-    # ======================================================
-    if time(9,16) <= now <= time(9,36):
-
-        direction = get_morning_direction(df)
-
-        if direction == "BUY":
-            return "ATMBUY", "MBUY"
-        elif direction == "SELL":
-            return "ATMSELL", "MSELL"
-        else:
-            return "NONE", "NONE"  # <-- simplified from WAIT to NONE
-
-    # ======================================================
-    # 2️⃣ REVERSAL (UNCHANGED)
-    # ======================================================
-    reversal_status = check_reversal(df)
-
-    if reversal_status == "ACTIVE":
-        last = df.iloc[-1]
-        entry_signal = "RBUY" if last['Close'] > last['Open'] else "RSELL"
-        close_price = last['Close']
-        st_value = df['ST'].iloc[-1] if 'ST' in df.columns else close_price
-
-        if entry_signal == "RBUY":
-            atm_signal = "ATMBUY" if close_price > st_value else "OTMBUY"
-        else:
-            atm_signal = "ATMSELL" if close_price < st_value else "OTMSELL"
-
-        return atm_signal, entry_signal
-
-    # ======================================================
-    # 3️⃣ BOS
-    # ======================================================
+    # ================= HAIKIN SIGNAL =================
     try:
-        _, bos_val = get_bos_bar(df)
-        close_price = df['Close'].iloc[-1]
-        st_value = df['ST'].iloc[-1] if 'ST' in df.columns else close_price
-
-        if bos_val == "BULL":
-            entry_signal = "BBUY"
-            atm_signal = "ATMBUY" if close_price > st_value else "OTMBUY"
-            return atm_signal, entry_signal
-        elif bos_val == "BEAR":
-            entry_signal = "BSELL"
-            atm_signal = "ATMSELL" if close_price < st_value else "OTMSELL"
-            return atm_signal, entry_signal
+        signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df=df)
+        result["hkin_signal"] = signal
+        result["hkin_past_depth"] = past_depth
+        result["hkin_ce_depth"] = ce_depth
+        result["hkin_pe_depth"] = pe_depth
     except Exception:
-        pass
+        result["hkin_signal"] = "NONE"
+        result["hkin_past_depth"] = result["hkin_ce_depth"] = result["hkin_pe_depth"] = 0
 
-    # ======================================================
-    # 4️⃣ ST + HA ALIGNMENT
-    # ======================================================
+    # ================= STRENGTH =================
+    try:
+        line, _, _ = get_candle_strength_line(df=df)
+        result["strength_line"] = line
+    except Exception:
+        result["strength_line"] = ""
+
+    # ================= ATR =================
+    try:
+        atr_series = calculate_atr(df)
+        atr_val = 0
+        if not atr_series.empty and pd.notna(atr_series.iloc[-1]):
+            atr_val = int(atr_series.iloc[-1])
+    except Exception:
+        atr_val = 0
+    try:
+        k_val = calculate_dynamic_k(df)
+    except Exception:
+        k_val = 0
+
+    result["atr"] = atr_val
+    result["katr"] = k_val
+
+    # ================= PRICE =================
+    try:
+        price, direction = detect_raw_direction(df)
+        price = int(price) if price and pd.notna(price) else 0
+        if direction not in ["UP","DOWN"]:
+            direction = "NONE"
+    except Exception:
+        price = 0
+        direction = "NONE"
+
+    result["price"] = price
+    result["direction"] = direction
+
+    # ================= SUPERTREND =================
     try:
         df = calculate_supertrend(df)
-
-        if 'ST' not in df.columns:
-            return "NONE", "NONE"
-
-        st_trend = "UP" if df['Close'].iloc[-1] > df['ST'].iloc[-1] else "DOWN"
-        ha_signal, _, _, _ = detect_ha_flip_signal(df)
-        close_price = df['Close'].iloc[-1]
-        st_value = df['ST'].iloc[-1]
-
-        if st_trend == "UP" and ha_signal in ["BUY", "BULL"]:
-            entry_signal = "SBUY"
-            atm_signal = "ATMBUY" if close_price > st_value else "OTMBUY"
-            return atm_signal, entry_signal
-        elif st_trend == "DOWN" and ha_signal in ["SELL", "BEAR"]:
-            entry_signal = "SSELL"
-            atm_signal = "ATMSELL" if close_price < st_value else "OTMSELL"
-            return atm_signal, entry_signal
-
+        trend = df['ST_Trend'].iloc[-1] if 'ST_Trend' in df.columns else "NONE"
+        line_val = int(df['ST'].iloc[-1]) if 'ST' in df.columns and pd.notna(df['ST'].iloc[-1]) else 0
+        result["supertrend"] = trend
+        result["super_line"] = line_val
+        result["df"] = df
     except Exception:
-        pass
+        result["supertrend"] = "NONE"
+        result["super_line"] = 0
 
-    return "NONE", "NONE"
+    # ================= POWER =================
+    try:
+        direction_power, ce, pe = get_ce_pe_power(df=df)
+        if isinstance(direction_power, str) or direction_power is None or math.isnan(direction_power):
+            direction_power = 0
+        result["direction_power"] = int(direction_power)
+        result["ce_power"] = int(ce) if ce and pd.notna(ce) else 0
+        result["pe_power"] = int(pe) if pe and pd.notna(pe) else 0
+    except Exception:
+        result["direction_power"] = result["ce_power"] = result["pe_power"] = 0
 
+    # ================= ENTRY =================
+    try:
+        entry, reversal = get_entry_signal(df)
+    except Exception:
+        entry = "NONE"
+        reversal = "NONE"
 
-# ==========================================================
-# --- Self-runnable test (UNCHANGED STYLE) ---
-# ==========================================================
+    result["entry"] = entry
+    result["reversal"] = reversal
+
+    # ================= DAY CANDLE =================
+    try:
+        result["day_candle"] = get_day_candle_bar(df)
+    except Exception:
+        result["day_candle"] = ""
+
+    # ================= BOS =================
+    try:
+        bos_bar, bos_val = get_bos_bar(df)
+        result["bos_bar"] = bos_bar
+        result["bos_val"] = bos_val
+    except Exception:
+        result["bos_bar"] = ""
+        result["bos_val"] = ""
+
+    return result
+
+# ================= PRINT DASHBOARD =================
+def print_dashboard(data):
+    if not data:
+        return  # skip instead of printing NODAATA
+
+    df = data["df"]
+
+    # ================= CANDLE =================
+    print(data.get("candle_visual",""))
+
+    # ================= HAIKIN =================
+    signal = data.get("hkin_signal","NONE")
+    past_depth = data.get("hkin_past_depth",0)
+    ce_depth = data.get("hkin_ce_depth",0)
+    pe_depth = data.get("hkin_pe_depth",0)
+
+    color = Fore.GREEN if signal in ["BUY","BULL"] else Fore.RED if signal in ["SELL","BEAR"] else Fore.YELLOW
+    space1 = TOTAL_WIDTH - len(f"Hkin:{signal}") - len(f"Past:{past_depth}")
+    if space1 < 0: space1 = 1
+    print(Fore.YELLOW + "Hkin:" + color + signal + " " * space1 + Fore.YELLOW + f"Past:{color}{past_depth}")
+
+    space2 = TOTAL_WIDTH - len(f"CE:{ce_depth}") - len(f"PE:{pe_depth}")
+    if space2 < 0: space2 = 1
+    print(Fore.YELLOW + "CE:" + color + str(ce_depth) + " " * space2 + Fore.YELLOW + "PE:" + color + str(pe_depth))
+
+    # ================= STRENGTH =================
+    print(data.get("strength_line",""))
+
+    # ================= ATR =================
+    atr_val = data.get("atr",0)
+    k_val = data.get("katr",0)
+    space = TOTAL_WIDTH - len(f"ATR:{atr_val}") - len(f"KATR:{k_val}")
+    print(Fore.YELLOW + "ATR:" + Fore.WHITE + str(atr_val) + " " * space + Fore.YELLOW + "KATR:" + Fore.CYAN + str(k_val))
+
+    # ================= PRICE =================
+    price = data.get("price",0)
+    direction = data.get("direction","NONE")
+    color = Fore.GREEN if direction=="UP" else Fore.RED if direction=="DOWN" else Fore.YELLOW
+    space = TOTAL_WIDTH - len(f"Price:{price}") - len(f"Mullu:{direction}")
+    print(Fore.YELLOW + "Price:" + color + str(price) + " " * space + Fore.YELLOW + "Mullu:" + color + direction)
+
+    # ================= SUPERTREND =================
+    trend = data.get("supertrend","NONE")
+    line_val = data.get("super_line",0)
+    color = Fore.GREEN if trend=="UP" else Fore.RED if trend=="DOWN" else Fore.YELLOW
+    space = TOTAL_WIDTH - len(f"Super:{trend}") - len(f"LINE:{line_val}")
+    print(Fore.YELLOW + "Super:" + color + trend + " " * space + Fore.YELLOW + "LINE:" + color + str(line_val))
+
+    # ================= POWER =================
+    ce = data.get("ce_power",0)
+    pe = data.get("pe_power",0)
+    ce_color = Fore.GREEN if ce > pe else Fore.RED if ce < pe else Fore.YELLOW
+    pe_color = Fore.GREEN if pe > ce else Fore.RED if pe < ce else Fore.YELLOW
+    space = TOTAL_WIDTH - len(f"CE Power:{ce}") - len(f"PE Power:{pe}")
+    print(Fore.YELLOW + "CE Power:" + ce_color + str(ce) + " " * space + Fore.YELLOW + "PE Power:" + pe_color + str(pe))
+
+    # ================= ENTRY =================
+    entry = data.get("entry","NONE")
+    reversal = data.get("reversal","NONE")
+    color = Fore.GREEN if entry in ["BUY","BULL","ATMBUY","OTMBUY"] else Fore.RED if entry in ["SELL","BEAR","ATMSELL","OTMSELL"] else Fore.YELLOW
+    space = TOTAL_WIDTH - len(f"Entry:{entry}") - len(f"Signal:{reversal}")
+    print(Fore.YELLOW + "Entry:" + color + entry + " " * space + Fore.YELLOW + "Signal:" + color + reversal)
+
+    # ================= DAY CANDLE =================
+    #print(data.get("day_candle",""))
+
+    # ================= BOS BAR =================
+    print(data.get("bos_bar",""))
+    # Optional: print BOS value text
+    # print("BOS Value:", data.get("bos_val",""))
+
+# ================= MAIN =================
 if __name__ == "__main__":
-
-    df = fetch_yf_data()
-    df = calculate_supertrend(df)  # Ensure ST column exists
-    final_signal, original_signal = get_entry_signal(df)
-
-    # --- Print dashboard line ---
-    left_text = f"Entry:{final_signal}"
-    right_text = f"Orig:{original_signal}"
-    dashboard_line = f"{left_text:<21}{right_text:>21}"
-
-    # --- Color coding ---
-    if final_signal in ["ATMBUY","OTMBUY"]:
-        color = Fore.GREEN
-    elif final_signal in ["ATMSELL","OTMSELL"]:
-        color = Fore.RED
-    else:
-        color = Fore.YELLOW
-
-    print(f"{color}{dashboard_line}{Style.RESET_ALL}")
+    run_pyc_file()               # run any pyc files
+    data = get_full_snapshot()    # capture all indicators
+    print_dashboard(data)         # display dashboard
