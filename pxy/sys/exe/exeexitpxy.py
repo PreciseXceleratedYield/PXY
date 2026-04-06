@@ -63,7 +63,7 @@ def run_snapshot():
         return
 
     # 40-char GRID: SYM(15) ST(12) PNL(10) ~ total 40
-    header = f"{'SYM':<15}{'ST':^12}{'PNL':>10}"
+    header = f"{'SYM':<19}{'ST':^12}{'PNL':>10}"
     print(f"{Fore.CYAN}{Style.BRIGHT}{header}")
     print("-" * 40)
 
@@ -79,7 +79,7 @@ def run_snapshot():
         p_col = Fore.GREEN if pnl > 0 else Fore.RED if pnl < 0 else Fore.WHITE
         
         # Print only symbol, ST, PNL
-        print(f"{sym:<21}{st_display:^15}{p_col}{pnl:>10}")
+        print(f"{sym:<21}{st_display:^12}{p_col}{pnl:>10}")
     
     print("-" * 40)
     print(f"{Fore.WHITE}Refreshed: {time.strftime('%H:%M:%S')}")
