@@ -31,17 +31,29 @@ def target_price(row):
         ce_p = float(row.get("ce_power", 1.0))
         pe_p = float(row.get("pe_power", 1.0))
         mullu = str(row.get("direction", "SIDE")).upper()  # UP / DOWN
-        entry_type = str(row.get("entry", "NONE")).upper()  # NEW: Use entry instead of signal
 
-        # 3️⃣ PHASE & ALIGNMENT LOGIC
+        # ✅ USE EXIT INSTEAD OF ENTRY
+        exit_type = str(row.get("exit", "NONE")).upper()
+
+        # 3️⃣ PHASE & ALIGNMENT LOGIC (EXCLUSIVE)
         if "CE" in symbol:
             power = ce_p
             depth = int(row.get("hkin_ce_depth", 0))
-            is_aligned = (mullu == "UP") and (("BUY" in entry_type) or ("BULL" in entry_type))
+
+            is_aligned = (
+                (mullu == "UP") and 
+                (("BUY" in exit_type) or ("BULL" in exit_type))
+            )
+
         elif "PE" in symbol:
             power = pe_p
             depth = int(row.get("hkin_pe_depth", 0))
-            is_aligned = (mullu == "DOWN") and (("SELL" in entry_type) or ("BEAR" in entry_type))
+
+            is_aligned = (
+                (mullu == "DOWN") and 
+                (("SELL" in exit_type) or ("BEAR" in exit_type))
+            )
+
         else:
             # Non-CE/PE: fallback to baseline price
             return entry_prc
@@ -50,12 +62,15 @@ def target_price(row):
         if not is_aligned:
             total_points = 10.0
             phase = "Phase 3 (Misalignment)"
+
         elif depth >= 2:
             total_points = atr * power * min(depth, 5)
             phase = "Phase 2 (Deep Trend)"
+
         elif depth < 2:
             total_points = max(10.0, atr * power)
             phase = "Phase 1 (Initial Entry)"
+
         else:
             total_points = 10.0
             phase = "Phase 3 (Fallback)"
@@ -73,7 +88,7 @@ def target_price(row):
         print(f"{Fore.CYAN}Dynamic Entry   : {Fore.YELLOW}{dynamic_entry}")
         print(f"{Fore.CYAN}Used Baseline   : {Fore.YELLOW}{entry_prc}")
         print(f"{Fore.CYAN}Direction       : {Fore.YELLOW}{mullu}")
-        print(f"{Fore.CYAN}Entry           : {Fore.YELLOW}{entry_type}")
+        print(f"{Fore.CYAN}Exit            : {Fore.YELLOW}{exit_type}")
         print(f"{Fore.CYAN}Depth           : {Fore.YELLOW}{depth}")
         print(f"{Fore.CYAN}ATR             : {Fore.YELLOW}{atr}")
         print(f"{Fore.CYAN}Power           : {Fore.YELLOW}{power}")
