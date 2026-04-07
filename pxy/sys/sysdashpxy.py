@@ -59,8 +59,22 @@ def get_full_snapshot():
 
     # ===== HAIKIN SIGNAL =====
     signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df=df)
-    if signal is None:
+    
+    # fallback if signal is None
+    if signal is None or past_depth is None:
+        # Determine signal from last HA candle
         signal = "BULL" if ha_close.iloc[-1] > ha_open.iloc[-1] else "BEAR"
+    
+        # Recompute past_depth manually using ha_color
+        if ha_color is not None and not ha_color.empty:
+            last_flip_idx = (ha_color != ha_color.iloc[-1]).to_numpy().nonzero()[0]
+            if len(last_flip_idx) > 0:
+                past_depth = len(ha_color) - last_flip_idx[-1] - 1
+            else:
+                past_depth = len(ha_color)
+        else:
+            past_depth = 1  # minimal fallback
+    
     result["hkin_signal"] = signal
     result["hkin_past_depth"] = past_depth
     result["hkin_ce_depth"] = ce_depth
