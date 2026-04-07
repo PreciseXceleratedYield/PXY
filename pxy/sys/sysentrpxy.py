@@ -89,49 +89,54 @@ def _compute_raw_signal(df: pd.DataFrame) -> str:
 def get_entry_signal(df: pd.DataFrame):
     raw_signal = _compute_raw_signal(df)
     if df is None or df.empty or raw_signal is None:
-        return None, None
+        return None, None, None
 
     last = df.iloc[-1]
     st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
 
-    # Morning MBUY/MSELL always map to ATM
+    # --- Mapping Entry based on raw_signal direction ---
+    # Morning signals → always ATMBUY / ATMSELL
     if raw_signal in ["MBUY", "MSELL"]:
         entry_signal = "ATMBUY" if raw_signal == "MBUY" else "ATMSELL"
         exit_signal = "BUY" if raw_signal == "MBUY" else "SELL"
-        return entry_signal, exit_signal
+        phase = "Morning"
+        return entry_signal, exit_signal, phase
 
-    # BOS signals
+    # BOS signals → convert to BUY/SELL, then ATM/OTM
     if raw_signal in ["BBUY", "BSELL"]:
         exit_signal = "BUY" if raw_signal == "BBUY" else "SELL"
         if exit_signal == "BUY":
             entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
-        else:
+        else:  # SELL
             entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
-        return entry_signal, exit_signal
+        phase = "BOS"
+        return entry_signal, exit_signal, phase
 
-    # Reversal signals
+    # Reversal signals → same logic
     if raw_signal in ["RBUY", "RSELL"]:
         exit_signal = "BUY" if raw_signal == "RBUY" else "SELL"
         if exit_signal == "BUY":
             entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
         else:
             entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
-        return entry_signal, exit_signal
+        phase = "Reversal"
+        return entry_signal, exit_signal, phase
 
-    # HA signals SBUY / SSELL / BUY / SELL
+    # HA signals → SBUY / SSELL / BUY / SELL
     if raw_signal in ["SBUY", "SSELL", "BUY", "SELL"]:
         exit_signal = "BUY" if raw_signal in ["SBUY", "BUY"] else "SELL"
         if exit_signal == "BUY":
             entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
         else:
             entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
-        return entry_signal, exit_signal
+        phase = "HA"
+        return entry_signal, exit_signal, phase
 
-    return None, None
+    return None, None, None
 
 # -------------------- Dashboard --------------------
 def print_dashboard(df):
-    entry_signal, exit_signal = get_entry_signal(df)
+    entry_signal, exit_signal, phase = get_entry_signal(df)
     color_map = {
         "ATMBUY": Fore.GREEN, "ATMSELL": Fore.RED,
         "OTMBUY": Fore.GREEN, "OTMSELL": Fore.RED,
@@ -140,7 +145,8 @@ def print_dashboard(df):
     }
     left_text = f"{color_map.get(entry_signal, Fore.YELLOW)}Entry: {entry_signal}{Style.RESET_ALL}"
     right_text = f"{color_map.get(exit_signal, Fore.YELLOW)}Exit: {exit_signal}{Style.RESET_ALL}"
-    print(f"{left_text:<25}{right_text:>25}")
+    phase_text = f"{Fore.CYAN}Phase: {phase}{Style.RESET_ALL}" if phase else ""
+    print(f"{left_text:<25}{right_text:>25}   {phase_text}")
 
 # -------------------- Self-test --------------------
 if __name__ == "__main__":
