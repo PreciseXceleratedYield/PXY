@@ -35,7 +35,7 @@ html, body {
 
 #terminal {
     flex: 1;
-    overflow: hidden; /* completely hide scroll */
+    overflow: hidden; /* hide scroll */
     font-size: 16px;
     line-height: 1.4;
 }
@@ -90,7 +90,7 @@ const ws = new WebSocket(`${protocol}://${window.location.host}`);
 ws.onmessage = (event) => { term.write(event.data); term.scrollToBottom(); };
 window.addEventListener('resize', () => fitAddon.fit());
 
-// === Chart Setup with missing data fill ===
+// === Chart Setup: Last 120 minutes from latest data ===
 async function loadChartData() {
     const resp = await fetch('/sys/market_data.csv');
     const text = await resp.text();
@@ -102,21 +102,26 @@ async function loadChartData() {
         priceMap[cols[0]] = parseFloat(cols[4]);
     });
 
+    // Find latest timestamp in CSV
+    const timestamps = Object.keys(priceMap).sort();
+    const lastTime = new Date(timestamps[timestamps.length - 1]);
+
     const labels = [];
     const data = [];
 
-    const allTimes = Object.keys(priceMap).sort();
-    const lastTime = new Date(allTimes[allTimes.length - 1]);
-
-    let current = new Date(lastTime.getTime() - 119*60*1000);
-    let lastPrice = priceMap[allTimes[0]] || 0;
+    let current = new Date(lastTime.getTime() - 119*60*1000); // 120 mins back
+    let lastPrice = priceMap[timestamps[0]] || 0;
 
     for (let i = 0; i < 120; i++) {
+        // Format for label: hh:mm
+        labels.push(current.toTimeString().slice(0,5));
+
+        // Match exact key in priceMap
         const key = current.toISOString().slice(0,16).replace('T',' ');
-        labels.push(current.toTimeString().slice(0,5)); // hh:mm
         if (priceMap[key] !== undefined) lastPrice = priceMap[key];
         data.push(lastPrice);
-        current = new Date(current.getTime() + 60*1000);
+
+        current = new Date(current.getTime() + 60*1000); // next minute
     }
 
     const ctx = document.getElementById('chart').getContext('2d');
@@ -136,7 +141,7 @@ async function loadChartData() {
             maintainAspectRatio: false,
             scales: {
                 x: { 
-                    ticks: { color: '#e0d8c0', autoSkip: false, maxRotation: 0 }, 
+                    ticks: { color: '#e0d8c0', autoSkip: false, maxRotation: 0 },
                     grid: { color: '#1e1e1e' }
                 },
                 y: { 
