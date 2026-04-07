@@ -27,8 +27,8 @@ html, body {
 
 /* Terminal panel */
 #terminal-container {
-    width: calc(49ch + 16px); /* 49 chars wide */
-    min-width: 49ch;
+    width: calc(46ch + 16px); /* 46 chars wide */
+    min-width: 46ch;
     background-color: #1e1e1e;
     display: flex;
     flex-direction: column;
@@ -37,32 +37,23 @@ html, body {
 /* Terminal itself */
 #terminal {
     flex: 1;
-    overflow-y: scroll; 
+    overflow-y: scroll; /* allow scrolling */
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE 10+ */
     font-size: 16px;
     line-height: 1.4;
-    padding-left: 7ch; /* shift all lines 7 spaces */
-    scrollbar-width: thin; 
-    scrollbar-color: #1e1e1e #1e1e1e; 
 }
 
-/* Webkit browsers (Chrome/Safari/Edge) */
+/* Hide scrollbars visually in Webkit (Chrome/Safari/Edge) */
 #terminal::-webkit-scrollbar {
-    width: 8px; 
-}
-
-#terminal::-webkit-scrollbar-thumb {
-    background-color: #1e1e1e; 
-    border-radius: 4px;
-}
-
-#terminal::-webkit-scrollbar-track {
-    background-color: #1e1e1e;
+    width: 0px;
+    background: transparent;
 }
 
 /* Chart panel */
 #chart-container {
     flex: 1;
-    background-color: #1e1e1e; /* same as terminal */
+    background-color: #252525;
     display: flex;
     justify-content: center;
     align-items: center;
@@ -108,16 +99,14 @@ term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-// Initial lines
-term.writeln('       Connected. PXy terminal ready.');
-term.writeln('       Width fixed at 49 chars.');
+term.writeln('Connected. PXy terminal ready.');
+term.writeln('Width fixed at 46 chars.');
 
-// WebSocket stream
+// Example WebSocket stream (update with your server)
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 ws.onmessage = (event) => {
-    const lines = event.data.split('\n').map(l => '       ' + l).join('\n');
-    term.write(lines);
+    term.write(event.data);
     term.scrollToBottom();
 };
 
@@ -126,13 +115,14 @@ window.addEventListener('resize', () => fitAddon.fit());
 
 // === Chart Setup ===
 async function loadChartData() {
+    // fetch CSV from sys folder
     const resp = await fetch('/sys/market_data.csv');
     const text = await resp.text();
     const rows = text.split('\n').slice(1).filter(r => r);
-
+    
     const labels = [];
     const data = [];
-
+    
     rows.forEach(row => {
         const cols = row.split(',');
         labels.push(cols[0].slice(11,16)); // hh:mm
@@ -169,8 +159,9 @@ async function loadChartData() {
                     ticks: { color: '#e0d8c0' }
                 }
             },
-            plugins: { legend: { display: false } },
-            layout: { padding: 0 }
+            plugins: {
+                legend: { display: false }
+            }
         }
     });
 }
