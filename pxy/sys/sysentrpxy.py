@@ -5,7 +5,7 @@ import pytz
 from colorama import Fore, Style, init
 
 from sysdtafpxy import fetch_yf_data
-from syshkinpxy import detect_ha_flip_signal
+from sysmktpxy import detect_ha_flip_signal
 from sysstrndpxy import calculate_supertrend
 
 init(autoreset=True)
