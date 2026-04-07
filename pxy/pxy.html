@@ -27,8 +27,8 @@ html, body {
 
 /* Terminal panel */
 #terminal-container {
-    width: calc(46ch + 16px); /* 46 chars wide */
-    min-width: 46ch;
+    width: calc(49ch + 16px); /* 49 chars wide */
+    min-width: 49ch;
     background-color: #1e1e1e;
     display: flex;
     flex-direction: column;
@@ -37,21 +37,21 @@ html, body {
 /* Terminal itself */
 #terminal {
     flex: 1;
-    overflow-y: scroll; /* keep scroll functional */
+    overflow-y: scroll; 
     font-size: 16px;
     line-height: 1.4;
     padding-left: 7ch; /* shift all lines 7 spaces */
-    scrollbar-width: thin; /* Firefox */
-    scrollbar-color: #1e1e1e #1e1e1e; /* thumb/track same color as background */
+    scrollbar-width: thin; 
+    scrollbar-color: #1e1e1e #1e1e1e; 
 }
 
 /* Webkit browsers (Chrome/Safari/Edge) */
 #terminal::-webkit-scrollbar {
-    width: 8px;
+    width: 8px; 
 }
 
 #terminal::-webkit-scrollbar-thumb {
-    background-color: #1e1e1e;
+    background-color: #1e1e1e; 
     border-radius: 4px;
 }
 
@@ -62,7 +62,7 @@ html, body {
 /* Chart panel */
 #chart-container {
     flex: 1;
-    background-color: #252525;
+    background-color: #1e1e1e; /* same as terminal */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -108,15 +108,14 @@ term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-// Shift lines by 7 spaces by default
+// Initial lines
 term.writeln('       Connected. PXy terminal ready.');
-term.writeln('       Width fixed at 46 chars.');
+term.writeln('       Width fixed at 49 chars.');
 
-// WebSocket stream (update with your server)
+// WebSocket stream
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 ws.onmessage = (event) => {
-    // prepend 7 spaces for each line dynamically
     const lines = event.data.split('\n').map(l => '       ' + l).join('\n');
     term.write(lines);
     term.scrollToBottom();
@@ -170,7 +169,8 @@ async function loadChartData() {
                     ticks: { color: '#e0d8c0' }
                 }
             },
-            plugins: { legend: { display: false } }
+            plugins: { legend: { display: false } },
+            layout: { padding: 0 }
         }
     });
 }
