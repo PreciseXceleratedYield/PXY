@@ -91,15 +91,10 @@ def process_lilo_orders(client):
 
 
 def _print_summary(total_unrealized, total_realized):
-    """Print emoji summary on a single line with reserved 6-char numbers."""
-    def format_number(n):
-        if n >= 0:
-            return f"{n:0>6}"
-        else:
-            return f"-{abs(n):0>5}"
-
-    unreal_str = format_number(total_unrealized)
-    real_str = format_number(total_realized)
+    """Print emoji summary on a single line without zero-padding."""
+    # Convert numbers to string directly
+    unreal_str = str(total_unrealized)
+    real_str = str(total_realized)
 
     # Single line
     print(f"     🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️ 🥅🥅{real_str}🥅🥅")
