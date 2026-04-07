@@ -92,7 +92,7 @@ for s in parent_scripts:
 # ---------------- MARKET SUB-LOOP ----------------
 while True:
     if in_market_hours():
-        live_status("🚀 LOOP ACTIVE: waiting CE/PE trigger 📊")
+        live_status("🚀 LOOP: waiting CE/PE trigger 📊")
 
         for sub_itr in range(1, 31):
 
