@@ -1,13 +1,15 @@
 import sys
 import os
 
-# --- Correct path to sibling 'run' directory ---
+# Add the 'run' subfolder of the current script to Python path
 current_dir = os.path.dirname(os.path.abspath(__file__))  # .../pxy/sys/exe
-run_dir = os.path.join(current_dir, "..", "run")           # .../pxy/sys/run
-sys.path.append(os.path.abspath(run_dir))                 # add to Python path
+run_dir = os.path.join(current_dir, "run")               # .../pxy/sys/exe/run
+sys.path.append(run_dir)
+
+# Now Python can find runclntpxy
+from runclntpxy import get_session
 
 import pandas as pd
-from runclntpxy import get_session
 from exeomspxy import get_combined_data
 from colorama import Fore, Style, init
 import pytz
@@ -16,7 +18,6 @@ from datetime import datetime, time as dt_time
 init(autoreset=True)
 
 def place_exit_order(client, symbol, qty):
-    """Exits position via Market Sell."""
     try:
         params = {
             "exchange_segment": "nse_fo",
@@ -26,14 +27,13 @@ def place_exit_order(client, symbol, qty):
             "quantity": str(abs(int(qty))),
             "validity": "DAY",
             "trading_symbol": str(symbol),
-            "transaction_type": "S",  # Sell to exit
+            "transaction_type": "S",
             "amo": "NO",
             "disclosed_quantity": "0",
             "market_protection": "0"
         }
         print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ EXITING POSITION: {symbol} Qty: {qty}")
-        res = client.place_order(**params)
-        return res
+        return client.place_order(**params)
     except Exception as e:
         print(f"{Fore.RED}❌ Exit Order Error for {symbol}: {e}")
         return None
@@ -54,21 +54,15 @@ def exit_all_positions():
         print(f"{Fore.YELLOW}No active positions to exit.{Fore.RESET}")
         return
 
-    # Get the latest market direction
-    direction = None
-    if not market_df.empty and "direction" in market_df.columns:
-        direction = market_df["direction"].iloc[-1]  # 'UP' or 'DOWN'
-
-    # Define the hard exit time threshold
+    direction = market_df["direction"].iloc[-1] if not market_df.empty and "direction" in market_df.columns else None
     exit_all_after = dt_time(15, 25)  # 3:25 PM
 
     for _, row in active_df.iterrows():
         symbol = row.get("symbol")
-        qty    = row.get("qty", 0)
+        qty = row.get("qty", 0)
         if not symbol or qty == 0:
             continue
 
-        # --- Direction-aware exit before 3:25 PM ---
         if now < exit_all_after:
             if direction == "UP" and "PE" in symbol:
                 place_exit_order(client, symbol, qty)
@@ -77,7 +71,6 @@ def exit_all_positions():
             else:
                 print(f"{Fore.CYAN}Holding {symbol} | Direction: {direction}")
         else:
-            # --- After 3:25 PM: exit all positions ---
             place_exit_order(client, symbol, qty)
 
     print(f"{Fore.GREEN}{Style.BRIGHT}✅ Exit attempt completed.")
