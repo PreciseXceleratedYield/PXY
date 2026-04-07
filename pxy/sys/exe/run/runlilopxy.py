@@ -6,24 +6,34 @@ from runltpspxy import get_mid_price
 def process_lilo_orders(client):
     try:
         if not client: 
-            # Replaced Running/Booked print
-            print(f"{f'🏃‍♂️🏃‍♂️0🏃‍♂️🏃‍♂️':^42}")
-            print(f"{f'🥅🥅0🥅🥅':^42}")
+            total_unrealized = 0
+            total_realized = 0
+            # Print summary even if no client
+            unreal_str = f"{total_unrealized:0>6}"
+            real_str = f"{total_realized:0>6}"
+            print(f"{f'🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️':^42}")
+            print(f"{f'🥅🥅{real_str}🥅🥅':^42}")
             return pd.DataFrame(), pd.DataFrame()
         
         res = client.order_report()
         if not res or "data" not in res: 
-            # Replaced Running/Booked print
-            print(f"{f'🏃‍♂️🏃‍♂️0🏃‍♂️🏃‍♂️':^42}")
-            print(f"{f'🥅🥅0🥅🥅':^42}")
+            total_unrealized = 0
+            total_realized = 0
+            unreal_str = f"{total_unrealized:0>6}"
+            real_str = f"{total_realized:0>6}"
+            print(f"{f'🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️':^42}")
+            print(f"{f'🥅🥅{real_str}🥅🥅':^42}")
             return pd.DataFrame(), pd.DataFrame()
 
         df = pd.DataFrame(res["data"])
         df = df[df["ordSt"].isin(["complete", "traded"])].copy()
         if df.empty:
-            # Replaced Running/Booked print
-            print(f"{f'🏃‍♂️🏃‍♂️0🏃‍♂️🏃‍♂️':^42}")
-            print(f"{f'🥅🥅0🥅🥅':^42}")
+            total_unrealized = 0
+            total_realized = 0
+            unreal_str = f"{total_unrealized:0>6}"
+            real_str = f"{total_realized:0>6}"
+            print(f"{f'🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️':^42}")
+            print(f"{f'🥅🥅{real_str}🥅🥅':^42}")
             return pd.DataFrame(), pd.DataFrame()
 
         df["qty"] = pd.to_numeric(df["fldQty"], errors='coerce').fillna(0)
@@ -75,21 +85,28 @@ def process_lilo_orders(client):
         open_df = pd.DataFrame(open_positions)
         closed_df = pd.DataFrame(closed_matches)
 
-        # Totals
-        total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0
+        # --- Emoji summary inside function ---
         total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0
+        total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0
 
-        # Replaced Running/Booked print with emoji summary
-        print(f"{f'🏃‍♂️🏃‍♂️{total_unrealized}🏃‍♂️🏃‍♂️':^42}")
-        print(f"{f'🥅🥅{total_realized}🥅🥅':^42}")
+        # Reserve 6 characters for numbers
+        unreal_str = f"{total_unrealized:0>6}" if total_unrealized >= 0 else f"{total_unrealized}"
+        real_str = f"{total_realized:0>6}" if total_realized >= 0 else f"{total_realized}"
+
+        print(f"{f'🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️':^42}")
+        print(f"{f'🥅🥅{real_str}🥅🥅':^42}")
 
         return open_df, closed_df
 
     except Exception as e:
         print(f"[LILO ERROR]: {e}")
-        # Replaced Running/Booked print with emoji summary
-        print(f"{f'🏃‍♂️🏃‍♂️0🏃‍♂️🏃‍♂️':^42}")
-        print(f"{f'🥅🥅0🥅🥅':^42}")
+        # Even on error, print zeros
+        total_unrealized = 0
+        total_realized = 0
+        unreal_str = f"{total_unrealized:0>6}"
+        real_str = f"{total_realized:0>6}"
+        print(f"{f'🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️':^42}")
+        print(f"{f'🥅🥅{real_str}🥅🥅':^42}")
         return pd.DataFrame(), pd.DataFrame()
 
 
@@ -102,13 +119,11 @@ if __name__ == "__main__":
     print("\n===== CLOSED TRADES =====")
     if not closed.empty:
         print(closed[cols])
-        print(f"Total Realized: {int(closed['PNL'].sum())}")
     else:
         print("No closed trades.")
 
     print("\n===== ACTIVE POSITIONS =====")
     if not active.empty:
         print(active[cols])
-        print(f"Total Unrealized: {int(active['PNL'].sum())}")
     else:
         print("No active positions.")
