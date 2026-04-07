@@ -35,7 +35,7 @@ html, body {
 
 #terminal {
     flex: 1;
-    overflow: hidden;
+    overflow: hidden; /* completely hide scroll */
     font-size: 16px;
     line-height: 1.4;
 }
@@ -85,7 +85,6 @@ fitAddon.fit();
 term.writeln('Connected. PXy terminal ready.');
 term.writeln('Width fixed at 46 chars.');
 
-// WebSocket placeholder
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 ws.onmessage = (event) => { term.write(event.data); term.scrollToBottom(); };
@@ -97,53 +96,53 @@ async function loadChartData() {
     const text = await resp.text();
     const rows = text.split('\n').slice(1).filter(r => r);
 
-    // Map CSV by datetime
     const priceMap = {};
     rows.forEach(row => {
         const cols = row.split(',');
-        priceMap[cols[0]] = parseFloat(cols[4]); // Close price
+        priceMap[cols[0]] = parseFloat(cols[4]);
     });
 
     const labels = [];
     const data = [];
 
-    // Determine last available timestamp
     const allTimes = Object.keys(priceMap).sort();
     const lastTime = new Date(allTimes[allTimes.length - 1]);
 
-    // Build last 120 minutes
-    let current = new Date(lastTime.getTime() - 119*60*1000); // 119 min ago
+    let current = new Date(lastTime.getTime() - 119*60*1000);
     let lastPrice = priceMap[allTimes[0]] || 0;
 
     for (let i = 0; i < 120; i++) {
         const key = current.toISOString().slice(0,16).replace('T',' ');
-        labels.push(current.toTimeString().slice(0,5));
+        labels.push(current.toTimeString().slice(0,5)); // hh:mm
         if (priceMap[key] !== undefined) lastPrice = priceMap[key];
         data.push(lastPrice);
-        current = new Date(current.getTime() + 60*1000); // next minute
+        current = new Date(current.getTime() + 60*1000);
     }
 
     const ctx = document.getElementById('chart').getContext('2d');
     new Chart(ctx, {
         type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Price',
-                data: data,
-                borderColor: '#00ff99',
-                backgroundColor: 'rgba(0,255,153,0.1)',
-                pointRadius: 0,
-                borderWidth: 2,
-                tension: 0.2
-            }]
-        },
+        data: { labels, datasets: [{
+            label: 'Price',
+            data,
+            borderColor: '#00ff99',
+            backgroundColor: 'rgba(0,255,153,0.1)',
+            pointRadius: 0,
+            borderWidth: 2,
+            tension: 0.2
+        }]},
         options: {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: { ticks: { color: '#e0d8c0', maxRotation: 0 }, grid: { color: '#1e1e1e' } },
-                y: { ticks: { color: '#e0d8c0' }, grid: { color: '#1e1e1e' } }
+                x: { 
+                    ticks: { color: '#e0d8c0', autoSkip: false, maxRotation: 0 }, 
+                    grid: { color: '#1e1e1e' }
+                },
+                y: { 
+                    ticks: { color: '#e0d8c0' }, 
+                    grid: { color: '#1e1e1e' }
+                }
             },
             plugins: { legend: { display: false } }
         }
