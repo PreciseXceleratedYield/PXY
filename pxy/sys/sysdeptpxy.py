@@ -1,37 +1,50 @@
 # sysdeptpxy.py
 
-# -------------------- CONFIG SWITCH --------------------
-candle = "ha"  # set to "ha" or "cv"
-candle = candle.lower()
-
-if candle == "ha":
-    from sysdthapxy import get_ha_data
-elif candle == "cv":
-    from sysdtcvpxy import get_ha_data
-else:
-    raise ValueError(f"Invalid candle type: {candle}. Must be 'ha' or 'cv'.")
-
 # -------------------- IMPORTS --------------------
 import pandas as pd
+from sysdtafpxy import fetch_yf_data
 
-# -------------------- CANDLE VISUAL --------------------
+
+# -------------------- CORE FUNCTION --------------------
 def get_candle_visual(df=None, last_n=21):
     """
-    Returns a simple string visual of last_n candles using emoji:
-    🟢 for green, 🔴 for red
-    Works for both HA and CV candles.
+    Returns emoji string based on Heikin Ashi candles:
+    🟢 bullish
+    🔴 bearish
     """
 
-    # ---------------- FETCH DATA ----------------
-    c1_close, c2_close, c_color, df = get_ha_data(df=df)
+    # -------- FETCH DATA --------
+    if df is None:
+        df = fetch_yf_data()
 
-    if c_color is None or df is None or df.empty:
+    if df is None or df.empty:
         return ""
 
-    visual = "".join(["🟢" if c == "green" else "🔴" for c in c_color.iloc[-last_n:]])
-    return visual
+    df.columns = [c.lower() for c in df.columns]
 
-# -------------------- SELF TEST --------------------
+    # -------- HEIKIN ASHI --------
+    ha_close = (df["open"] + df["high"] + df["low"] + df["close"]) / 4
+    ha_open = ha_close.copy()
+
+    for i in range(len(df)):
+        if i == 0:
+            ha_open.iloc[i] = (df["open"].iloc[i] + df["close"].iloc[i]) / 2
+        else:
+            ha_open.iloc[i] = (ha_open.iloc[i-1] + ha_close.iloc[i-1]) / 2
+
+    # -------- COLOR --------
+    colors = [
+        "🟢" if ha_close.iloc[i] >= ha_open.iloc[i] else "🔴"
+        for i in range(len(ha_close))
+    ]
+
+    return "".join(colors[-last_n:])
+
+
+# -------------------- MAIN --------------------
+def main():
+    print(get_candle_visual())
+
+
 if __name__ == "__main__":
-    visual = get_candle_visual()
-    print(visual)
+    main()
