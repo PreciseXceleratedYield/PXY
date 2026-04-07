@@ -100,30 +100,20 @@ def get_entry_signal(df: pd.DataFrame):
         exit_signal = "BUY" if raw_signal == "MBUY" else "SELL"
         return entry_signal, exit_signal
 
-    # BOS signals → BUY/SELL + ATM/OTM
-    if raw_signal in ["BBUY", "BSELL"]:
-        exit_signal = "BUY" if raw_signal == "BBUY" else "SELL"
-        if exit_signal == "BUY":
-            entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
-        else:
-            entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
-        return entry_signal, exit_signal
+    # BOS, Reversal, HA signals
+    mapping = {
+        "BBUY": "BUY", "BSELL": "SELL",
+        "RBUY": "BUY", "RSELL": "SELL",
+        "SBUY": "BUY", "SSELL": "SELL",
+        "BUY": "BUY", "SELL": "SELL"
+    }
 
-    # Reversal signals → BUY/SELL + ATM/OTM
-    if raw_signal in ["RBUY", "RSELL"]:
-        exit_signal = "BUY" if raw_signal == "RBUY" else "SELL"
+    if raw_signal in mapping:
+        exit_signal = mapping[raw_signal]
+        # ATM/OTM mapping strictly respects direction
         if exit_signal == "BUY":
             entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
-        else:
-            entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
-        return entry_signal, exit_signal
-
-    # HA signals → SBUY / SSELL / BUY / SELL
-    if raw_signal in ["SBUY", "SSELL", "BUY", "SELL"]:
-        exit_signal = "BUY" if raw_signal in ["SBUY", "BUY"] else "SELL"
-        if exit_signal == "BUY":
-            entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
-        else:
+        else:  # SELL
             entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
         return entry_signal, exit_signal
 
