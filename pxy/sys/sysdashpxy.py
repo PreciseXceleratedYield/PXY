@@ -8,7 +8,7 @@ init(autoreset=True)
 # ---- Imports ----
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_ha_data
-from syshkinpxy import detect_ha_flip_signal
+from sysmktpxy import detect_ha_flip_signal
 from sysstrhpxy import get_candle_strength_line
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
