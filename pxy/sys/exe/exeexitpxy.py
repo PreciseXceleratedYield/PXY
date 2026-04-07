@@ -90,7 +90,7 @@ def run_snapshot():
     client = get_session()
 
     if df.empty:
-        print(f"{Fore.YELLOW}No active orders. System idling...{Fore.RESET}")
+        print(f"{Fore.YELLOW}    No active orders. System idling...{Fore.RESET}")
         return
     print("━" * 42)
     # 40-char GRID: SYM(15) ST(12) PNL(10) ~ total 40
