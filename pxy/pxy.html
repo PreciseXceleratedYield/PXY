@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Terminal + Live Chart</title>
+
+<!-- Terminal CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+html, body {
+    margin: 0;
+    height: 100%;
+    background: #1e1e1e;
+    color: #e0d8c0;
+    font-family: 'Fira Code', monospace;
+}
+
+#main {
+    display: flex;
+    height: 100vh;
+}
+
+/* TERMINAL LEFT */
+#terminal-container {
+    width: 60%;
+    border-right: 1px solid #333;
+}
+
+/* CHART RIGHT */
+#chart-container {
+    width: 40%;
+    padding: 10px;
+}
+
+canvas {
+    background: #1e1e1e;
+}
+</style>
+</head>
+
+<body>
+
+<div id="main">
+
+    <!-- LEFT TERMINAL -->
+    <div id="terminal-container">
+        <div id="terminal"></div>
+    </div>
+
+    <!-- RIGHT CHART -->
+    <div id="chart-container">
+        <canvas id="chart"></canvas>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+
+<script>
+// ---------- TERMINAL ----------
+const term = new Terminal({ convertEol: true });
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
+term.open(document.getElementById('terminal'));
+fitAddon.fit();
+
+term.writeln('Terminal + Live HA Chart Ready 🚀');
+
+const ws = new WebSocket((location.protocol === 'https:' ? 'wss' : 'ws') + '://' + location.host);
+ws.onmessage = e => term.write(e.data);
+
+// ---------- CHART ----------
+const ctx = document.getElementById('chart').getContext('2d');
+
+let chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: [],
+        datasets: [{
+            label: 'HA Line',
+            data: [],
+            borderWidth: 2,
+            pointRadius: 0
+        }]
+    },
+    options: {
+        animation: false,
+        plugins: { legend: { display: false }},
+        scales: {
+            x: { ticks: { color: '#aaa' }},
+            y: { ticks: { color: '#aaa' }}
+        }
+    }
+});
+
+// ---------- LOAD DATA ----------
+async function loadData() {
+    try {
+        const res = await fetch('/sys/market_data.csv?t=' + Date.now());
+        const text = await res.text();
+
+        const rows = text.trim().split('\n').slice(1); // skip header
+
+        let data = rows.map(r => {
+            const [dt, o, h, l, c] = r.split(',');
+            return {
+                time: dt,
+                open: parseFloat(o),
+                high: parseFloat(h),
+                low: parseFloat(l),
+                close: parseFloat(c)
+            };
+        });
+
+        // last 2 hours (~120 rows assuming 1-min data)
+        data = data.slice(-120);
+
+        let labels = [];
+        let values = [];
+        let colors = [];
+
+        data.forEach(d => {
+            const ha_open = (d.open + d.high + d.low + d.close) / 4;
+            const ha_close = (d.open + d.close) / 2;
+            const ha_line = (ha_open + ha_close) / 2;
+
+            labels.push(d.time.substring(11,16)); // HH:MM
+            values.push(ha_line);
+            colors.push(ha_close >= ha_open ? 'lime' : 'red');
+        });
+
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = values;
+        chart.data.datasets[0].borderColor = colors;
+        chart.update();
+
+    } catch (e) {
+        console.error("Chart load error:", e);
+    }
+}
+
+// auto-refresh every 3s
+setInterval(loadData, 3000);
+loadData();
+
+// Re-fit terminal on resize
+window.addEventListener('resize', () => fitAddon.fit());
+</script>
+
+</body>
+</html>
