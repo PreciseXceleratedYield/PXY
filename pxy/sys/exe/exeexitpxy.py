@@ -35,31 +35,33 @@ def place_exit_order(client, row):
 
 def compute_st_fixed(row):
     """Calculates XX⚪YY and returns True if LTP >= Target.
-    XX → difference of buy price to LTP, colored green if positive, red if negative.
-    ⚪ → same color as XX.
+    XX → difference of pxy_entry to LTP, colored green if positive, red if negative.
+    Dot → 🟢 for profit, 🔴 for loss, ⚪ for neutral
     YY → distance to target, unchanged.
     """
     try:
         ltp = float(row.get("sell_prc", 0))
         tgt = float(row.get("pxy_tgt", 0))
-        buy = float(row.get("buy_prc", 0))  # buy price
+        entry = float(row.get("pxy_entry", 0))  # using pxy_entry now
 
         if ltp <= 0: 
             return "00⚪00", False
 
-        # XX = LTP - Buy Price
-        to_buy = int(ltp - buy)
+        # XX = LTP - pxy_entry
+        to_entry = int(ltp - entry)
         to_tgt = min(99, max(0, int(tgt - ltp)))
 
-        # Color based on profit/loss
-        color = Fore.GREEN if to_buy > 0 else Fore.RED if to_buy < 0 else Fore.WHITE
+        # Color for XX number
+        color = Fore.GREEN if to_entry > 0 else Fore.RED if to_entry < 0 else Fore.WHITE
+        entry_s = f"{abs(to_entry):02d}"
+        tg_s = f"{to_tgt:02d}"
 
-        buy_s, tg_s = f"{abs(to_buy):02d}", f"{to_tgt:02d}"
+        # Hard-coded colored dot
+        dot = "🟢" if to_entry > 0 else "🔴" if to_entry < 0 else "⚪"
 
         is_hit = ltp >= tgt
 
-        # ⚪ takes the same color as XX
-        return f"{color}{buy_s}{color}⚪{Fore.RESET}{tg_s}", is_hit
+        return f"{color}{entry_s}{dot}{Fore.RESET}{tg_s}", is_hit
     except:
         return "00⚪00", False
 
