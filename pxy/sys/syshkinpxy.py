@@ -1,7 +1,7 @@
 # syshkinpxy.py
 
 # -------------------- CONFIG SWITCH --------------------
-candle = "cv"  # set to "ha" or "cv"
+candle = "ha"  # set to "ha" or "cv"
 candle = candle.lower()
 
 if candle == "ha":
@@ -19,7 +19,7 @@ init(autoreset=True)
 
 
 # -------------------- FLIP SIGNAL DETECTION --------------------
-def detect_flip_signal(df=None):
+def detect_ha_flip_signal(df=None):
     """
     Detects live flip signals and trend continuations based on c1/c2 comparison.
     Works for both HA and CV modes.
@@ -96,7 +96,7 @@ def detect_flip_signal(df=None):
 # -------------------- SELF TEST --------------------
 if __name__ == "__main__":
 
-    signal, past_depth, ce_depth, pe_depth = detect_flip_signal()
+    signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal()
 
     print("\n" + "="*60)
     print("FLIP SIGNAL DEBUG (ULTRA STRICT + FORMING CANDLE)")
