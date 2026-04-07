@@ -15,7 +15,7 @@ def get_ha_data(tickerSymbol=None, df=None):
         ha_close (pd.Series)
         ha_open  (pd.Series)
         ha_color (pd.Series) -> "green" / "red" / "none"
-        df       (pd.DataFrame)
+        df       (pd.DataFrame)  # MUST contain HA columns
     """
 
     # ---------------- FETCH DATA ----------------
@@ -24,29 +24,18 @@ def get_ha_data(tickerSymbol=None, df=None):
     else:
         df = df
 
-    if df is None:
+    if df is None or df.empty:
         return None, None, None, df
-    elif df.empty:
-        return None, None, None, df
-    else:
-        pass
 
     # ---------------- FORMING CANDLE CONTROL ----------------
-    if USE_FORMING_CANDLE is True:
-        pass
-    elif USE_FORMING_CANDLE is False:
+    if USE_FORMING_CANDLE is False:
         df = df.iloc[:-1]
-    else:
-        return None, None, None, df
 
     # ---------------- VALIDATE REQUIRED COLUMNS ----------------
     required_cols = ['Open', 'High', 'Low', 'Close']
-
     for col in required_cols:
         if col not in df.columns:
             return None, None, None, df
-        else:
-            pass
 
     # ---------------- HEIKIN-ASHI CLOSE ----------------
     ha_close = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
@@ -56,10 +45,8 @@ def get_ha_data(tickerSymbol=None, df=None):
 
     if len(ha_close) == 0:
         return None, None, None, df
-    elif len(ha_close) > 0:
-        ha_open.iloc[0] = df['Open'].iloc[0]
-    else:
-        return None, None, None, df
+
+    ha_open.iloc[0] = df['Open'].iloc[0]
 
     for i in range(1, len(ha_close)):
         prev_open = ha_open.iloc[i - 1]
@@ -69,6 +56,10 @@ def get_ha_data(tickerSymbol=None, df=None):
             ha_open.iloc[i] = prev_open
         else:
             ha_open.iloc[i] = (prev_open + prev_close) / 2
+
+    # ---------------- HEIKIN-ASHI HIGH/LOW (🔥 ADDED) ----------------
+    ha_high = pd.concat([df['High'], ha_open, ha_close], axis=1).max(axis=1)
+    ha_low  = pd.concat([df['Low'], ha_open, ha_close], axis=1).min(axis=1)
 
     # ---------------- HEIKIN-ASHI COLOR ----------------
     ha_color = pd.Series(index=ha_close.index, dtype='object')
@@ -104,7 +95,6 @@ def get_ha_data(tickerSymbol=None, df=None):
                         ha_color.iloc[i] = "red"
                     else:
                         ha_color.iloc[i] = "none"
-
                 else:
                     ha_color.iloc[i] = "none"
 
@@ -115,7 +105,7 @@ def get_ha_data(tickerSymbol=None, df=None):
         elif hc < ho:
             ha_color.iloc[i] = "red"
 
-        # 🔥 CASE 3: DOJI → RAW CLOSE (UPDATED)
+        # 🔥 CASE 3: DOJI → RAW CLOSE
         elif hc == ho:
 
             if i == 0:
@@ -142,23 +132,19 @@ def get_ha_data(tickerSymbol=None, df=None):
                         ha_color.iloc[i] = "red"
                     else:
                         ha_color.iloc[i] = "none"
-
                 else:
                     ha_color.iloc[i] = "none"
 
         else:
             ha_color.iloc[i] = "none"
 
-    # ---------------- FINAL VALIDATION ----------------
-    if ha_close is None:
-        return None, None, None, df
-    elif ha_open is None:
-        return None, None, None, df
-    elif ha_color is None:
-        return None, None, None, df
-    else:
-        pass
+    # ---------------- 🔥 ATTACH TO DF (CRITICAL FIX) ----------------
+    df['HA_Open'] = ha_open
+    df['HA_Close'] = ha_close
+    df['HA_High'] = ha_high
+    df['HA_Low'] = ha_low
 
+    # ---------------- FINAL RETURN ----------------
     return ha_close, ha_open, ha_color, df
 
 
