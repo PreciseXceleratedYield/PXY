@@ -4,7 +4,7 @@ import pytz
 IST = pytz.timezone("Asia/Kolkata")
 
 # ---- GLOBAL FACTOR ----
-PER_SECOND_INCREMENT = 0.01   # 0.01 increase every second
+PER_SECOND_INCREMENT = 0.005   # 0.01 increase every second
 
 def dynamic_entry(row):
     try:
@@ -36,7 +36,7 @@ def dynamic_entry(row):
         # ---- Apply Increment ONLY for Options ----
         if "CE" in symbol or "PE" in symbol:
             increment = elapsed_secs * PER_SECOND_INCREMENT
-            dynamic_val = original_price + increment
+            dynamic_val = original_price - increment
         else:
             dynamic_val = original_price
 
