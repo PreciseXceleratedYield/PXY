@@ -66,7 +66,8 @@ def execute_order(client, symbol, qty, side):
         res = client.place_order(**params)
         dprint(f"Order Response: {res}", Fore.GREEN)
         
-        return res if res else {"stat": "Not_Ok", "errMsg": "No response from API"}
+        # ✅ Minimal change: set stat explicitly
+        return {"stat": "Ok", "raw": res} if res else {"stat": "Not_Ok", "errMsg": "No response from API"}
 
     except Exception as e:
         if DEBUG: dprint(f"Order Execution Exception: {traceback.format_exc()}", Fore.RED)
@@ -162,8 +163,9 @@ async def main():
 
         # 7. Final Dashboard
         funds = get_available_funds(client)
-        is_ok = any(key in str(res) for key in ["nOrderId", "order_id"])
-        status = f"{Fore.GREEN}Ok" if is_ok else f"{Fore.RED}Failed/Skipped"
+
+        # ✅ Minimal change: determine status from execute_order stat
+        status = f"{Fore.GREEN}Ok" if res.get("stat", "").upper() == "OK" else f"{Fore.RED}Failed/Skipped"
 
         print(f"""
          =================================
