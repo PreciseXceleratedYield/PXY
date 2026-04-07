@@ -1,7 +1,7 @@
 # sysdeptpxy.py
 
 # -------------------- CONFIG SWITCH --------------------
-candle = "cv"  # set to "ha" or "cv"
+candle = "ha"  # set to "ha" or "cv"
 candle = candle.lower()
 
 if candle == "ha":
