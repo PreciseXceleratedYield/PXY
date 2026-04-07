@@ -1,8 +1,10 @@
 import sys
 import os
 
-# --- Add 'run' subdirectory to Python path ---
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "run"))
+# --- Correct path to sibling 'run' directory ---
+current_dir = os.path.dirname(os.path.abspath(__file__))  # .../pxy/sys/exe
+run_dir = os.path.join(current_dir, "..", "run")           # .../pxy/sys/run
+sys.path.append(os.path.abspath(run_dir))                 # add to Python path
 
 import pandas as pd
 from runclntpxy import get_session
