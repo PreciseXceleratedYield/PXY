@@ -1,7 +1,7 @@
 # syshkinpxy.py
 
 # -------------------- CONFIG SWITCH --------------------
-candle = "ha"  # set to "ha" or "cv"
+candle = "cv"  # set to "ha" or "cv"
 candle = candle.lower()
 
 if candle == "ha":
