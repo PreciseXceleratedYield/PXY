@@ -6,18 +6,24 @@ from runltpspxy import get_mid_price
 def process_lilo_orders(client):
     try:
         if not client: 
-            print(f"{'Running:0':<21}{'Booked:0':>21}")
+            # Replaced Running/Booked print
+            print(f"{f'🏃‍♂️🏃‍♂️0🏃‍♂️🏃‍♂️':^42}")
+            print(f"{f'🥅🥅0🥅🥅':^42}")
             return pd.DataFrame(), pd.DataFrame()
         
         res = client.order_report()
         if not res or "data" not in res: 
-            print(f"{'Running:0':<21}{'Booked:0':>21}")
+            # Replaced Running/Booked print
+            print(f"{f'🏃‍♂️🏃‍♂️0🏃‍♂️🏃‍♂️':^42}")
+            print(f"{f'🥅🥅0🥅🥅':^42}")
             return pd.DataFrame(), pd.DataFrame()
 
         df = pd.DataFrame(res["data"])
         df = df[df["ordSt"].isin(["complete", "traded"])].copy()
         if df.empty:
-            print(f"{'Running:0':<21}{'Booked:0':>21}")
+            # Replaced Running/Booked print
+            print(f"{f'🏃‍♂️🏃‍♂️0🏃‍♂️🏃‍♂️':^42}")
+            print(f"{f'🥅🥅0🥅🥅':^42}")
             return pd.DataFrame(), pd.DataFrame()
 
         df["qty"] = pd.to_numeric(df["fldQty"], errors='coerce').fillna(0)
@@ -73,14 +79,17 @@ def process_lilo_orders(client):
         total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0
         total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0
 
-        # Aligned 42-character summary line
-        print(f"{'Running:'+str(total_unrealized):<20}{'Booked:'+str(total_realized):>20}")
+        # Replaced Running/Booked print with emoji summary
+        print(f"{f'🏃‍♂️🏃‍♂️{total_unrealized}🏃‍♂️🏃‍♂️':^42}")
+        print(f"{f'🥅🥅{total_realized}🥅🥅':^42}")
 
         return open_df, closed_df
 
     except Exception as e:
         print(f"[LILO ERROR]: {e}")
-        print(f"{'Running:0':<21}{'Booked:0':>21}")
+        # Replaced Running/Booked print with emoji summary
+        print(f"{f'🏃‍♂️🏃‍♂️0🏃‍♂️🏃‍♂️':^42}")
+        print(f"{f'🥅🥅0🥅🥅':^42}")
         return pd.DataFrame(), pd.DataFrame()
 
 
