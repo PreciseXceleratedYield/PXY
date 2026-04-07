@@ -110,7 +110,7 @@ def get_entry_signal(df: pd.DataFrame):
 
     if raw_signal in mapping:
         exit_signal = mapping[raw_signal]
-        # ATM/OTM mapping strictly respects direction
+        # Strict direction-based ATM/OTM mapping
         if exit_signal == "BUY":
             entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
         else:  # SELL
