@@ -8,21 +8,14 @@ def process_lilo_orders(client):
         if not client: 
             total_unrealized = 0
             total_realized = 0
-            # Print summary even if no client
-            unreal_str = f"{total_unrealized:0>6}"
-            real_str = f"{total_realized:0>6}"
-            print(f"{f'🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️':^42}")
-            print(f"{f'🥅🥅{real_str}🥅🥅':^42}")
+            _print_summary(total_unrealized, total_realized)
             return pd.DataFrame(), pd.DataFrame()
         
         res = client.order_report()
         if not res or "data" not in res: 
             total_unrealized = 0
             total_realized = 0
-            unreal_str = f"{total_unrealized:0>6}"
-            real_str = f"{total_realized:0>6}"
-            print(f"{f'🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️':^42}")
-            print(f"{f'🥅🥅{real_str}🥅🥅':^42}")
+            _print_summary(total_unrealized, total_realized)
             return pd.DataFrame(), pd.DataFrame()
 
         df = pd.DataFrame(res["data"])
@@ -30,10 +23,7 @@ def process_lilo_orders(client):
         if df.empty:
             total_unrealized = 0
             total_realized = 0
-            unreal_str = f"{total_unrealized:0>6}"
-            real_str = f"{total_realized:0>6}"
-            print(f"{f'🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️':^42}")
-            print(f"{f'🥅🥅{real_str}🥅🥅':^42}")
+            _print_summary(total_unrealized, total_realized)
             return pd.DataFrame(), pd.DataFrame()
 
         df["qty"] = pd.to_numeric(df["fldQty"], errors='coerce').fillna(0)
@@ -88,26 +78,32 @@ def process_lilo_orders(client):
         # --- Emoji summary inside function ---
         total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0
         total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0
-
-        # Reserve 6 characters for numbers
-        unreal_str = f"{total_unrealized:0>6}" if total_unrealized >= 0 else f"{total_unrealized}"
-        real_str = f"{total_realized:0>6}" if total_realized >= 0 else f"{total_realized}"
-
-        print(f"{f'🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️':^42}")
-        print(f"{f'🥅🥅{real_str}🥅🥅':^42}")
+        _print_summary(total_unrealized, total_realized)
 
         return open_df, closed_df
 
     except Exception as e:
         print(f"[LILO ERROR]: {e}")
-        # Even on error, print zeros
         total_unrealized = 0
         total_realized = 0
-        unreal_str = f"{total_unrealized:0>6}"
-        real_str = f"{total_realized:0>6}"
-        print(f"{f'🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️':^42}")
-        print(f"{f'🥅🥅{real_str}🥅🥅':^42}")
+        _print_summary(total_unrealized, total_realized)
         return pd.DataFrame(), pd.DataFrame()
+
+
+def _print_summary(total_unrealized, total_realized):
+    """Print the 2-line emoji summary, aligned with 6-char numbers"""
+    def format_number(n):
+        if n >= 0:
+            return f"{n:0>6}"       # Positive → pad with zeros
+        else:
+            return f"-{abs(n):0>5}" # Negative → minus + 5 digits padded
+
+    unreal_str = format_number(total_unrealized)
+    real_str = format_number(total_realized)
+
+    # Center in 42-character width
+    print(f"{f'🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️':^42}")
+    print(f"{f'🥅🥅{real_str}🥅🥅':^42}")
 
 
 if __name__ == "__main__":
