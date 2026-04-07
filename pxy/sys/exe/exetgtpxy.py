@@ -6,7 +6,7 @@ from colorama import init, Fore, Style
 init(autoreset=True)
 
 # ✅ GLOBAL PRINT FLAG (SET THIS TO False TO DISABLE PRINTS)
-PRINT_DASHBOARD = True
+PRINT_DASHBOARD = False
 
 
 def target_price(row):
