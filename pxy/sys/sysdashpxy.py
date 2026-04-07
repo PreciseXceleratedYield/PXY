@@ -8,7 +8,6 @@ init(autoreset=True)
 # ---- Imports ----
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_ha_data
-from sysmktpxy import detect_ha_flip_signal
 from sysstrhpxy import get_candle_strength_line
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
@@ -18,6 +17,7 @@ from sysentrpxy import get_entry_signal
 from sysdeptpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
+from sysmktpxy import detect_ha_flip_signal, CANDLE_MODE  # import mode and function
 
 TOTAL_WIDTH = 42
 
@@ -47,24 +47,24 @@ def get_full_snapshot():
         return None
     result["df"] = df_raw
 
-    # --- Candle visuals and HA
-    df = df_raw.copy()
-    result["candle_visual"] = get_candle_visual(df=df)
+    # --- Candle visual
+    result["candle_visual"] = get_candle_visual(df=df_raw)
 
-    ha_close, ha_open, ha_color, _ = get_ha_data(df=df)
+    # ===== HAIKIN-ASHI =====
+    ha_close, ha_open, ha_color, _ = get_ha_data(df=df_raw)
     result["ha_close"] = ha_close
     result["ha_open"] = ha_open
     result["ha_color"] = ha_color
 
-    # ===== HAIKIN SIGNAL (from mktpxy) =====
-    signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df=df)
+    # ===== HAIKIN SIGNAL (from sysmktpxy.py) =====
+    signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df_raw)
     result["hkin_signal"] = signal
     result["hkin_past_depth"] = past_depth
     result["hkin_ce_depth"] = ce_depth
     result["hkin_pe_depth"] = pe_depth
 
     # ===== STRENGTH =====
-    line, _, _ = get_candle_strength_line(df=df)
+    line, _, _ = get_candle_strength_line(df=df_raw)
     result["strength_line"] = line
 
     # ===== ATR & KATR =====
@@ -123,16 +123,20 @@ def print_dashboard(data):
         print("No data fetched.")
         return
 
+    df = data["df"]
+
     # ===== CANDLE VISUAL =====
     print(data["candle_visual"])
 
     # ===== HAIKIN SIGNAL =====
-    signal = data["hkin_signal"]
-    past_depth = data["hkin_past_depth"]
-    ce_depth = data["hkin_ce_depth"]
-    pe_depth = data["hkin_pe_depth"]
-
-    print(f"Mode: HACV  Signal: {signal}  Past: {past_depth}  CE: {ce_depth}  PE: {pe_depth}")
+    # Display exactly like sysmktpxy.py
+    print(
+        f"Mode: {CANDLE_MODE.upper()}  "
+        f"Signal: {data['hkin_signal']}  "
+        f"Past: {data['hkin_past_depth']}  "
+        f"CE: {data['hkin_ce_depth']}  "
+        f"PE: {data['hkin_pe_depth']}"
+    )
 
     # ===== STRENGTH =====
     print(data["strength_line"])
@@ -155,7 +159,7 @@ def print_dashboard(data):
     line_val = data["super_line"]
     color = Fore.GREEN if trend=="UP" else Fore.RED if trend=="DOWN" else Fore.YELLOW
     space = TOTAL_WIDTH - len(f"Super:{trend}") - len(f"LINE:{line_val}")
-    print(Fore.YELLOW + "Super:" + color + trend + " " * space + Fore.YELLOW + "LINE:" + color + str(line_val))
+    print(Fore.YELLOW + "Super:" + color + str(trend) + " " * space + Fore.YELLOW + "LINE:" + color + str(line_val))
 
     # ===== POWER =====
     ce = data["ce_power"]
@@ -181,6 +185,7 @@ def print_dashboard(data):
 
     # ===== BOS BAR =====
     print(data["bos_bar"])
+    # print("BOS Value:", data["bos_val"])  # optional
 
 # ================= MAIN =================
 if __name__ == "__main__":
