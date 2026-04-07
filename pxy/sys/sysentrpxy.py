@@ -100,7 +100,7 @@ def get_entry_signal(df: pd.DataFrame):
         exit_signal = "BUY" if raw_signal == "MBUY" else "SELL"
         return entry_signal, exit_signal
 
-    # BOS signals → convert to BUY/SELL, then ATM/OTM
+    # BOS signals → BUY/SELL + ATM/OTM
     if raw_signal in ["BBUY", "BSELL"]:
         exit_signal = "BUY" if raw_signal == "BBUY" else "SELL"
         if exit_signal == "BUY":
@@ -109,7 +109,7 @@ def get_entry_signal(df: pd.DataFrame):
             entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
         return entry_signal, exit_signal
 
-    # Reversal signals → same logic
+    # Reversal signals → BUY/SELL + ATM/OTM
     if raw_signal in ["RBUY", "RSELL"]:
         exit_signal = "BUY" if raw_signal == "RBUY" else "SELL"
         if exit_signal == "BUY":
