@@ -25,32 +25,21 @@ html, body {
     width: 100%;
 }
 
-/* Terminal panel */
 #terminal-container {
-    width: calc(46ch + 16px); /* 46 chars wide */
+    width: calc(46ch + 16px);
     min-width: 46ch;
     background-color: #1e1e1e;
     display: flex;
     flex-direction: column;
 }
 
-/* Terminal itself */
 #terminal {
     flex: 1;
-    overflow-y: scroll; /* allow scrolling */
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE 10+ */
+    overflow: hidden;
     font-size: 16px;
     line-height: 1.4;
 }
 
-/* Hide scrollbars visually in Webkit (Chrome/Safari/Edge) */
-#terminal::-webkit-scrollbar {
-    width: 0px;
-    background: transparent;
-}
-
-/* Chart panel */
 #chart-container {
     flex: 1;
     background-color: #252525;
@@ -77,7 +66,6 @@ html, body {
     </div>
 </div>
 
-<!-- JS Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -87,47 +75,53 @@ html, body {
 const term = new Terminal({
     convertEol: true,
     scrollback: 2000,
-    theme: {
-        background: '#1e1e1e',
-        foreground: '#e0d8c0',
-        cursor: '#f0e0b0'
-    },
+    theme: { background: '#1e1e1e', foreground: '#e0d8c0', cursor: '#f0e0b0' },
     cursorBlink: false
 });
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
-
 term.writeln('Connected. PXy terminal ready.');
 term.writeln('Width fixed at 46 chars.');
 
-// Example WebSocket stream (update with your server)
+// WebSocket placeholder
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
-ws.onmessage = (event) => {
-    term.write(event.data);
-    term.scrollToBottom();
-};
-
-// Re-fit terminal on resize
+ws.onmessage = (event) => { term.write(event.data); term.scrollToBottom(); };
 window.addEventListener('resize', () => fitAddon.fit());
 
-// === Chart Setup ===
+// === Chart Setup with missing data fill ===
 async function loadChartData() {
-    // fetch CSV from sys folder
     const resp = await fetch('/sys/market_data.csv');
     const text = await resp.text();
     const rows = text.split('\n').slice(1).filter(r => r);
-    
-    const labels = [];
-    const data = [];
-    
+
+    // Map CSV by datetime
+    const priceMap = {};
     rows.forEach(row => {
         const cols = row.split(',');
-        labels.push(cols[0].slice(11,16)); // hh:mm
-        data.push(parseFloat(cols[4])); // Close price
+        priceMap[cols[0]] = parseFloat(cols[4]); // Close price
     });
+
+    const labels = [];
+    const data = [];
+
+    // Determine last available timestamp
+    const allTimes = Object.keys(priceMap).sort();
+    const lastTime = new Date(allTimes[allTimes.length - 1]);
+
+    // Build last 120 minutes
+    let current = new Date(lastTime.getTime() - 119*60*1000); // 119 min ago
+    let lastPrice = priceMap[allTimes[0]] || 0;
+
+    for (let i = 0; i < 120; i++) {
+        const key = current.toISOString().slice(0,16).replace('T',' ');
+        labels.push(current.toTimeString().slice(0,5));
+        if (priceMap[key] !== undefined) lastPrice = priceMap[key];
+        data.push(lastPrice);
+        current = new Date(current.getTime() + 60*1000); // next minute
+    }
 
     const ctx = document.getElementById('chart').getContext('2d');
     new Chart(ctx, {
@@ -148,20 +142,10 @@ async function loadChartData() {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
-                x: { 
-                    display: true,
-                    title: { display: true, text: 'Time', color: '#e0d8c0' },
-                    ticks: { color: '#e0d8c0' }
-                },
-                y: { 
-                    display: true,
-                    title: { display: true, text: 'Price', color: '#e0d8c0' },
-                    ticks: { color: '#e0d8c0' }
-                }
+                x: { ticks: { color: '#e0d8c0', maxRotation: 0 }, grid: { color: '#1e1e1e' } },
+                y: { ticks: { color: '#e0d8c0' }, grid: { color: '#1e1e1e' } }
             },
-            plugins: {
-                legend: { display: false }
-            }
+            plugins: { legend: { display: false } }
         }
     });
 }
