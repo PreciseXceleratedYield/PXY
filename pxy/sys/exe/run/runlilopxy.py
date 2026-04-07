@@ -75,9 +75,9 @@ def process_lilo_orders(client):
         open_df = pd.DataFrame(open_positions)
         closed_df = pd.DataFrame(closed_matches)
 
-        # --- Emoji summary inside function ---
         total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0
         total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0
+
         _print_summary(total_unrealized, total_realized)
 
         return open_df, closed_df
@@ -91,26 +91,18 @@ def process_lilo_orders(client):
 
 
 def _print_summary(total_unrealized, total_realized):
-    """Print perfectly aligned emoji summary, 6-char numbers, handles double-width emojis"""
+    """Print emoji summary on a single line with reserved 6-char numbers."""
     def format_number(n):
         if n >= 0:
-            return f"{n:0>6}"       # Positive → pad with zeros
+            return f"{n:0>6}"
         else:
-            return f"-{abs(n):0>5}" # Negative → minus + 5 digits padded
+            return f"-{abs(n):0>5}"
 
     unreal_str = format_number(total_unrealized)
     real_str = format_number(total_realized)
 
-    # Emojis are double-width in terminal; manual padding to center
-    line_width = 42
-    line1 = f"🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️"
-    line2 = f"🥅🥅{real_str}🥅🥅"
-
-    pad1 = (line_width - len(line1)) // 2
-    pad2 = (line_width - len(line2)) // 2
-
-    print(" " * pad1 + line1)
-    print(" " * pad2 + line2)
+    # Single line
+    print(f"🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️ 🥅🥅{real_str}🥅🥅")
 
 
 if __name__ == "__main__":
