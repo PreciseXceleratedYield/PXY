@@ -63,13 +63,15 @@ const term = new Terminal({
     scrollback: 1000,
     fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', 'Noto Color Emoji', monospace",
     fontSize: 16,
+    cursorBlink: false,
     theme: {
         background: '#1e1e1e',
         foreground: '#e0d8c0',
         cursor: '#f0e0b0',
         selection: 'rgba(224, 216, 192, 0.2)'
     },
-    cursorBlink: false
+    rendererType: 'dom',             // use DOM renderer for padding support
+    padding: { top: 0, right: 0, bottom: 0, left: 2 } // 2-character left padding
 });
 
 const fitAddon = new FitAddon.FitAddon();
