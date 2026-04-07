@@ -1,0 +1,15 @@
+{
+  "name": "pxy",
+  "version": "1.0.0",
+  "description": "Terminal + 2-hour HA chart viewer",
+  "main": "pxy.js",
+  "scripts": {
+    "start": "sudo node pxy.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "ws": "^8.13.0"
+  },
+  "author": "Your Name",
+  "license": "MIT"
+}
