@@ -2,6 +2,7 @@
 import runpy
 import os
 from colorama import Fore, Style, init
+import pandas as pd
 
 init(autoreset=True)
 
@@ -41,40 +42,43 @@ def run_pyc_file():
 def get_full_snapshot():
     result = {}
 
-    # --- Fetch raw data once
-    df_raw = fetch_yf_data()
-    if df_raw is None or df_raw.empty:
+    df = fetch_yf_data()
+    if df is None or df.empty:
         return None
-    result["df"] = df_raw
+    result["df"] = df
 
-    # --- Use a copy for HA & candle visuals
-    df = df_raw.copy()
     result["candle_visual"] = get_candle_visual(df=df)
 
     # ===== HAIKIN-ASHI =====
-    ha_close, ha_open, ha_color, _ = get_ha_data(df=df)
+    ha_close, ha_open, ha_color, df = get_ha_data(df=df)
     result["ha_close"] = ha_close
     result["ha_open"] = ha_open
     result["ha_color"] = ha_color
 
     # ===== HAIKIN SIGNAL =====
     signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df=df)
-    
-    # fallback if signal is None
-    if signal is None or past_depth is None:
-        # Determine signal from last HA candle
-        signal = "BULL" if ha_close.iloc[-1] > ha_open.iloc[-1] else "BEAR"
-    
-        # Recompute past_depth manually using ha_color
-        if ha_color is not None and not ha_color.empty:
-            last_flip_idx = (ha_color != ha_color.iloc[-1]).to_numpy().nonzero()[0]
-            if len(last_flip_idx) > 0:
-                past_depth = len(ha_color) - last_flip_idx[-1] - 1
-            else:
-                past_depth = len(ha_color)
+
+    # --- fallback / recompute from HA colors ---
+    if ha_color is not None and not ha_color.empty:
+        last_color = ha_color.iloc[-1]
+
+        # Compute past_depth as candles since last flip
+        flip_idx = (ha_color != last_color).to_numpy().nonzero()[0]
+        if len(flip_idx) > 0:
+            past_depth = len(ha_color) - flip_idx[-1] - 1
         else:
-            past_depth = 1  # minimal fallback
-    
+            past_depth = len(ha_color)
+
+        # Compute signal if missing
+        if signal is None:
+            signal = "BULL" if last_color == "green" else "BEAR" if last_color == "red" else "NONE"
+
+    # Ensure minimal fallback
+    if past_depth is None:
+        past_depth = 1
+    if signal is None:
+        signal = "NONE"
+
     result["hkin_signal"] = signal
     result["hkin_past_depth"] = past_depth
     result["hkin_ce_depth"] = ce_depth
@@ -84,37 +88,38 @@ def get_full_snapshot():
     line, _, _ = get_candle_strength_line(df=df)
     result["strength_line"] = line
 
-    # ===== ATR & KATR (use raw df!) =====
-    atr_series = calculate_atr(df_raw)
+    # ===== ATR & KATR =====
+    atr_series = calculate_atr(df)
     atr_val = safe_int(atr_series.iloc[-1] if not atr_series.empty else 0)
-    k_val = safe_int(calculate_dynamic_k(df_raw))
+    k_val = safe_int(calculate_dynamic_k(df))
     result["atr"] = atr_val
     result["katr"] = k_val
 
     # ===== PRICE =====
-    price, direction = detect_raw_direction(df_raw)
+    price, direction = detect_raw_direction(df)
     result["price"] = safe_int(price)
     result["direction"] = direction if direction else "NONE"
 
     # ===== SUPERTREND =====
-    df_st = calculate_supertrend(df_raw)
-    trend = df_st['ST_Trend'].iloc[-1] if not df_st.empty else "NONE"
-    line_val = safe_int(df_st['ST'].iloc[-1] if not df_st.empty else 0)
+    df = calculate_supertrend(df)
+    trend = df['ST_Trend'].iloc[-1] if not df.empty else "NONE"
+    line_val = safe_int(df['ST'].iloc[-1] if not df.empty else 0)
     result["supertrend"] = trend
     result["super_line"] = line_val
-    result["df"] = df_st
+    result["df"] = df
 
     # ===== POWER =====
-    direction_power, ce, pe = get_ce_pe_power(df=df_st)
+    direction_power, ce, pe = get_ce_pe_power(df=df)
     result["direction_power"] = safe_int(direction_power)
     result["ce_power"] = safe_int(ce)
     result["pe_power"] = safe_int(pe)
 
     # ===== ENTRY SIGNAL =====
-    entry, reversal = get_entry_signal(df_st)
+    entry, reversal = get_entry_signal(df)
+    # --- FIX: fallback to ATM/OTM if None ---
     if entry is None or entry == "NONE":
-        last_close = df_st['Close'].iloc[-1]
-        st_value = df_st['ST'].iloc[-1] if 'ST' in df_st.columns else last_close
+        last_close = df['Close'].iloc[-1]
+        st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last_close
         if last_close > st_value:
             entry = "ATMBUY"
             reversal = "SBUY"
@@ -125,10 +130,10 @@ def get_full_snapshot():
     result["reversal"] = reversal
 
     # ===== DAY CANDLE =====
-    result["day_candle"] = get_day_candle_bar(df_st)
+    result["day_candle"] = get_day_candle_bar(df)
 
     # ===== BOS =====
-    bos_bar, bos_val = get_bos_bar(df_st)
+    bos_bar, bos_val = get_bos_bar(df)
     result["bos_bar"] = bos_bar if bos_bar else "NONE"
     result["bos_val"] = bos_val if bos_val else "NONE"
 
@@ -154,7 +159,7 @@ def print_dashboard(data):
     color = Fore.GREEN if signal in ["BUY","BULL"] else Fore.RED if signal in ["SELL","BEAR"] else Fore.YELLOW
     space1 = TOTAL_WIDTH - len(f"Hkin:{signal}") - len(f"Past:{past_depth}")
     if space1 < 0: space1 = 1
-    print(Fore.YELLOW + "Hkin:" + color +signal + " " * space1 + Fore.YELLOW + f"Past:{color}{past_depth}")
+    print(Fore.YELLOW + "Hkin:" + color + signal + " " * space1 + Fore.YELLOW + f"Past:{color}{past_depth}")
 
     space2 = TOTAL_WIDTH - len(f"CE:{ce_depth}") - len(f"PE:{pe_depth}")
     if space2 < 0: space2 = 1
@@ -181,7 +186,7 @@ def print_dashboard(data):
     line_val = data["super_line"]
     color = Fore.GREEN if trend=="UP" else Fore.RED if trend=="DOWN" else Fore.YELLOW
     space = TOTAL_WIDTH - len(f"Super:{trend}") - len(f"LINE:{line_val}")
-    print(Fore.YELLOW + "Super:" + color +trend + " " * space + Fore.YELLOW + "LINE:" + color + str(line_val))
+    print(Fore.YELLOW + "Super:" + color + trend + " " * space + Fore.YELLOW + "LINE:" + color + str(line_val))
 
     # ===== POWER =====
     ce = data["ce_power"]
@@ -195,8 +200,8 @@ def print_dashboard(data):
     entry = data["entry"]
     reversal = data["reversal"]
     color = (
-        Fore.GREEN if entry in ["ATMBUY","OTMBUY","SBUY","BBUY","RBUY"]
-        else Fore.RED if entry in ["ATMSELL","OTMSELL","SSELL","BSELL","RSELL"]
+        Fore.GREEN if entry in ["ATMBUY","OTMBUY","SBUY","BBUY","RBUY"] 
+        else Fore.RED if entry in ["ATMSELL","OTMSELL","SSELL","BSELL","RSELL"] 
         else Fore.YELLOW
     )
     space = TOTAL_WIDTH - len(f"Entry:{entry}") - len(f"Signal:{reversal}")
