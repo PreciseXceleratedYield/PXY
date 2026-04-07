@@ -5,14 +5,14 @@ from runltpspxy import get_mid_price
 
 def process_lilo_orders(client):
     try:
-        if not client: 
+        if not client:
             total_unrealized = 0
             total_realized = 0
             _print_summary(total_unrealized, total_realized)
             return pd.DataFrame(), pd.DataFrame()
-        
+
         res = client.order_report()
-        if not res or "data" not in res: 
+        if not res or "data" not in res:
             total_unrealized = 0
             total_realized = 0
             _print_summary(total_unrealized, total_realized)
@@ -91,7 +91,7 @@ def process_lilo_orders(client):
 
 
 def _print_summary(total_unrealized, total_realized):
-    """Print the 2-line emoji summary, aligned with 6-char numbers"""
+    """Print perfectly aligned emoji summary, 6-char numbers, handles double-width emojis"""
     def format_number(n):
         if n >= 0:
             return f"{n:0>6}"       # Positive → pad with zeros
@@ -101,9 +101,16 @@ def _print_summary(total_unrealized, total_realized):
     unreal_str = format_number(total_unrealized)
     real_str = format_number(total_realized)
 
-    # Center in 42-character width
-    print(f"{f'🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️':^42}")
-    print(f"{f'🥅🥅{real_str}🥅🥅':^42}")
+    # Emojis are double-width in terminal; manual padding to center
+    line_width = 42
+    line1 = f"🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️"
+    line2 = f"🥅🥅{real_str}🥅🥅"
+
+    pad1 = (line_width - len(line1)) // 2
+    pad2 = (line_width - len(line2)) // 2
+
+    print(" " * pad1 + line1)
+    print(" " * pad2 + line2)
 
 
 if __name__ == "__main__":
