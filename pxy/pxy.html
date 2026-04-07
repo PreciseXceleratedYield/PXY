@@ -37,17 +37,26 @@ html, body {
 /* Terminal itself */
 #terminal {
     flex: 1;
-    overflow-y: scroll; /* allow scrolling */
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE 10+ */
+    overflow-y: scroll; /* keep scroll functional */
     font-size: 16px;
     line-height: 1.4;
+    padding-left: 7ch; /* shift all lines 7 spaces */
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #1e1e1e #1e1e1e; /* thumb/track same color as background */
 }
 
-/* Hide scrollbars visually in Webkit (Chrome/Safari/Edge) */
+/* Webkit browsers (Chrome/Safari/Edge) */
 #terminal::-webkit-scrollbar {
-    width: 0px;
-    background: transparent;
+    width: 8px;
+}
+
+#terminal::-webkit-scrollbar-thumb {
+    background-color: #1e1e1e;
+    border-radius: 4px;
+}
+
+#terminal::-webkit-scrollbar-track {
+    background-color: #1e1e1e;
 }
 
 /* Chart panel */
@@ -99,14 +108,17 @@ term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-term.writeln('Connected. PXy terminal ready.');
-term.writeln('Width fixed at 46 chars.');
+// Shift lines by 7 spaces by default
+term.writeln('       Connected. PXy terminal ready.');
+term.writeln('       Width fixed at 46 chars.');
 
-// Example WebSocket stream (update with your server)
+// WebSocket stream (update with your server)
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 ws.onmessage = (event) => {
-    term.write(event.data);
+    // prepend 7 spaces for each line dynamically
+    const lines = event.data.split('\n').map(l => '       ' + l).join('\n');
+    term.write(lines);
     term.scrollToBottom();
 };
 
@@ -115,14 +127,13 @@ window.addEventListener('resize', () => fitAddon.fit());
 
 // === Chart Setup ===
 async function loadChartData() {
-    // fetch CSV from sys folder
     const resp = await fetch('/sys/market_data.csv');
     const text = await resp.text();
     const rows = text.split('\n').slice(1).filter(r => r);
-    
+
     const labels = [];
     const data = [];
-    
+
     rows.forEach(row => {
         const cols = row.split(',');
         labels.push(cols[0].slice(11,16)); // hh:mm
@@ -159,9 +170,7 @@ async function loadChartData() {
                     ticks: { color: '#e0d8c0' }
                 }
             },
-            plugins: {
-                legend: { display: false }
-            }
+            plugins: { legend: { display: false } }
         }
     });
 }
