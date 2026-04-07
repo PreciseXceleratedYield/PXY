@@ -80,12 +80,9 @@ def _compute_raw_signal(df: pd.DataFrame) -> str:
     if ha_signal in ["SELL", "BEAR"]:
         return "SSELL"
 
-    if ha_signal in ["SBUY", "SSELL"]:
-        return ha_signal
-
     return None
 
-# -------------------- Map Raw Signal to Entry (ATM/OTM) --------------------
+# -------------------- Map Raw Signal to Entry/Exit --------------------
 def get_entry_signal(df: pd.DataFrame):
     raw_signal = _compute_raw_signal(df)
     if df is None or df.empty or raw_signal is None:
@@ -94,37 +91,29 @@ def get_entry_signal(df: pd.DataFrame):
     last = df.iloc[-1]
     st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
 
-    # --- Morning signals → always ATMBUY / ATMSELL
-    if raw_signal in ["MBUY", "MSELL"]:
-        entry_signal = "ATMBUY" if raw_signal == "MBUY" else "ATMSELL"
-        exit_signal = "BUY" if raw_signal == "MBUY" else "SELL"
-        return entry_signal, exit_signal
-
-    # BOS, Reversal, HA signals
-    mapping = {
-        "BBUY": "BUY", "BSELL": "SELL",
-        "RBUY": "BUY", "RSELL": "SELL",
-        "SBUY": "BUY", "SSELL": "SELL",
-        "BUY": "BUY", "SELL": "SELL"
+    # --- Hard Direction Mapping ---
+    direction_map = {
+        "MBUY": "BUY", "BBUY": "BUY", "RBUY": "BUY", "SBUY": "BUY", "BUY": "BUY",
+        "MSELL": "SELL", "BSELL": "SELL", "RSELL": "SELL", "SSELL": "SELL", "SELL": "SELL"
     }
+    exit_signal = direction_map.get(raw_signal, None)
+    if exit_signal is None:
+        return None, None
 
-    if raw_signal in mapping:
-        exit_signal = mapping[raw_signal]
-        # Strict direction-based ATM/OTM mapping
-        if exit_signal == "BUY":
-            entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
-        else:  # SELL
-            entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
-        return entry_signal, exit_signal
+    # --- Determine ATM/OTM based on price vs ST ---
+    if exit_signal == "BUY":
+        entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
+    else:  # SELL
+        entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
 
-    return None, None
+    return entry_signal, exit_signal
 
 # -------------------- Dashboard --------------------
 def print_dashboard(df):
     entry_signal, exit_signal = get_entry_signal(df)
     color_map = {
-        "ATMBUY": Fore.GREEN, "ATMSELL": Fore.RED,
-        "OTMBUY": Fore.GREEN, "OTMSELL": Fore.RED,
+        "ATMBUY": Fore.GREEN, "OTMBUY": Fore.GREEN,
+        "ATMSELL": Fore.RED, "OTMSELL": Fore.RED,
         "BUY": Fore.GREEN, "SELL": Fore.RED,
         None: Fore.YELLOW
     }
