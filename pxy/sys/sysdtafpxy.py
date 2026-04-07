@@ -14,7 +14,6 @@ CSV_FILE = "market_data.csv"
 def fetch_yf_data(period="1d", interval=None, min_rows=None, ticker=None):
     """
     Fetch historical data for a ticker using yfinance.
-    Normalizes column names for downstream modules.
     Falls back to 5-day history if insufficient rows.
     """
     interval = interval or DEFAULT_INTERVAL
@@ -32,18 +31,6 @@ def fetch_yf_data(period="1d", interval=None, min_rows=None, ticker=None):
 
     # Reset index to have 'Datetime' as a column
     df.reset_index(inplace=True)
-
-    # 🔹 Fix: normalize column names
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-
-    df.rename(columns={
-        'open': 'Open',
-        'high': 'High',
-        'low': 'Low',
-        'close': 'Close'
-    }, inplace=True)
-
     return df
 
 
@@ -76,7 +63,7 @@ def get_latest_data():
     Returns the latest row of data
     """
     df = fetch_yf_data(period="1d", interval=DEFAULT_INTERVAL)
-    save_to_csv(df)  # persist every call
+    save_to_csv(df)  # <-- persist every call
     return df.tail(1)
 
 
