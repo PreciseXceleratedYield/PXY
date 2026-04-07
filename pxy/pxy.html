@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Terminal + Live HA Chart</title>
+<title>Terminal + 2-Hour HA Chart</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -51,7 +51,7 @@ let chart = new Chart(ctx,{
     }
 });
 
-// ---------- LOAD CSV ----------
+// ---------- LOAD CSV WITH 2-HR GRID ----------
 async function loadData(){
     try{
         const res = await fetch('/sys/market_data.csv?t='+Date.now());
@@ -59,28 +59,38 @@ async function loadData(){
         const text = await res.text();
         const rows = text.trim().split('\n');
 
-        // Skip header row
         const dataRows = rows[0].startsWith('Datetime') ? rows.slice(1) : rows;
 
-        const data = dataRows.slice(-120).map(r=>{
+        // Parse CSV into {time: Date, ha: number}
+        const parsed = dataRows.map(r=>{
             const cols = r.split(',');
-            if(cols.length < 5) return null;  // ignore bad rows
-            const dt = cols[0],
-                  open=parseFloat(cols[1]),
-                  high=parseFloat(cols[2]),
-                  low=parseFloat(cols[3]),
-                  close=parseFloat(cols[4]);
+            if(cols.length < 5) return null;
+            const dt = new Date(cols[0]);
+            const open=parseFloat(cols[1]), high=parseFloat(cols[2]),
+                  low=parseFloat(cols[3]), close=parseFloat(cols[4]);
             if(isNaN(open)||isNaN(high)||isNaN(low)||isNaN(close)) return null;
 
             const ha_open = (open + high + low + close)/4;
             const ha_close = (open + close)/2;
             const ha_line = (ha_open + ha_close)/2;
 
-            return {time:dt, value:ha_line};
+            return {time: dt, value: ha_line};
         }).filter(Boolean);
 
-        chart.data.labels = data.map(d=>d.time.substring(11,16)); // show HH:MM
-        chart.data.datasets[0].data = data.map(d=>d.value);
+        // --- Generate 2-hour 1-min time grid ---
+        const now = new Date();
+        const twoHoursAgo = new Date(now.getTime() - 2*60*60*1000);
+        const timeGrid = [];
+        let lastValue = parsed.length ? parsed[parsed.length-1].value : 0;
+
+        for(let t = new Date(twoHoursAgo); t <= now; t.setMinutes(t.getMinutes()+1)){
+            const found = parsed.find(d=>Math.abs(d.time - t) < 60*1000);
+            if(found) lastValue = found.value;
+            timeGrid.push({time: new Date(t), value: lastValue});
+        }
+
+        chart.data.labels = timeGrid.map(d=>d.time.toTimeString().substring(0,5));
+        chart.data.datasets[0].data = timeGrid.map(d=>d.value);
         chart.update();
 
     }catch(e){ console.error("Chart load error:", e);}
