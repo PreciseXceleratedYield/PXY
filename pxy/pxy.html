@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <title>Night Mode Terminal</title>
@@ -13,9 +13,9 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
-    font-family: 'Fira Code', monospace; /* smooth monospace font */
-    background: #1e1e1e; /* warm dark background */
-    color: #e0d8c0; /* warm off-white text */
+    font-family: 'DejaVu Sans Mono', 'Ubuntu Mono', 'Noto Color Emoji', monospace;
+    background: #1e1e1e;   /* dark terminal background */
+    color: #e0d8c0;         /* warm off-white text */
 }
 
 #terminal-container {
@@ -23,7 +23,6 @@ html, body {
     height: 100vh;
     display: flex;
     flex-direction: column;
-    background-color: #1e1e1e;
 }
 
 #terminal {
@@ -38,14 +37,13 @@ html, body {
     font-weight: normal;
 }
 
-/* cursor and selection customization */
 .xterm .xterm-cursor {
     border-left: 2px solid #f0e0b0 !important; /* warm cursor */
-    animation: none !important; /* disable blinking */
+    animation: none !important;                  /* disable blinking */
 }
 
 .xterm .xterm-selection {
-    background: rgba(224, 216, 192, 0.2) !important; /* subtle selection */
+    background: rgba(224, 216, 192, 0.2) !important; /* subtle warm selection */
 }
 </style>
 </head>
@@ -63,37 +61,40 @@ html, body {
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
+    fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', 'Noto Color Emoji', monospace",
+    fontSize: 16,
     theme: {
-        background: '#1e1e1e', // warm dark background
-        foreground: '#e0d8c0', // warm off-white text
-        cursor: '#f0e0b0',     // warm yellow cursor
-        selection: 'rgba(224, 216, 192, 0.2)' // subtle warm selection
+        background: '#1e1e1e',
+        foreground: '#e0d8c0',
+        cursor: '#f0e0b0',
+        selection: 'rgba(224, 216, 192, 0.2)'
     },
     cursorBlink: false
 });
+
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
-
-// Fit terminal to container
 fitAddon.fit();
 
-// Example text to test
-term.writeln('Connected. Night-mode terminal ready for late-night sessions.');
-term.writeln('Warm tones reduce eye strain and blue light exposure.');
-
-// WebSocket example
+// WebSocket connection to backend Python script
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
-ws.onopen = () => term.writeln('WebSocket connected...');
-ws.onmessage = (event) => { 
-    term.write(event.data); 
-    term.scrollToBottom(); 
+ws.onopen = () => {
+    term.writeln('WebSocket connected. Awaiting terminal output...');
 };
-ws.onerror = (err) => term.writeln('\nWebSocket error: ' + err);
 
-// Re-fit on window resize
+ws.onmessage = (event) => {
+    term.write(event.data);  // append incoming data
+    term.scrollToBottom();
+};
+
+ws.onerror = (err) => {
+    term.writeln(`\nWebSocket error: ${err}`);
+};
+
+// Re-fit terminal on window resize
 window.addEventListener('resize', () => fitAddon.fit());
 </script>
 
