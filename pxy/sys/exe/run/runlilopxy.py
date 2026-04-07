@@ -102,7 +102,7 @@ def _print_summary(total_unrealized, total_realized):
     real_str = format_number(total_realized)
 
     # Single line
-    print(f"🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️ 🥅🥅{real_str}🥅🥅")
+    print(f"     🏃‍♂️🏃‍♂️{unreal_str}🏃‍♂️🏃‍♂️ 🥅🥅{real_str}🥅🥅")
 
 
 if __name__ == "__main__":
