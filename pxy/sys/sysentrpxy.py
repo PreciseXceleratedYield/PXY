@@ -11,6 +11,9 @@ from sysstrndpxy import calculate_supertrend
 init(autoreset=True)
 IST = pytz.timezone("Asia/Kolkata")
 
+# -------------------- STATE MEMORY --------------------
+_last_valid_signal = None
+
 
 # -------------------- Morning direction --------------------
 def _get_morning_direction(df: pd.DataFrame):
@@ -87,12 +90,9 @@ def _compute_final_signal(df: pd.DataFrame) -> str:
 def _validate_with_raw_direction(df: pd.DataFrame, entry_signal: str) -> str:
     """
     Validate signal using last 2 CLOSE direction
-    - UP → allow only BULL / BUY / ATMBUY / OTMBUY
-    - DOWN → allow only BEAR / SELL / ATMSELL / OTMSELL
-    - else → DEFAULT
     """
-    if df is None or len(df) < 2:
-        return "DEFAULT"
+    if df is None or len(df) < 2 or entry_signal is None:
+        return None
 
     try:
         last = df.iloc[-1]
@@ -103,37 +103,40 @@ def _validate_with_raw_direction(df: pd.DataFrame, entry_signal: str) -> str:
         elif last['Close'] < prev['Close']:
             direction = "DOWN"
         else:
-            return "DEFAULT"
+            return None
 
-        # -------- VALIDATION --------
         if direction == "UP":
-            if entry_signal in ["BULL", "BUY", "ATMBUY", "OTMBUY"]:
-                return entry_signal
-            else:
-                return "DEFAULT"
+            return entry_signal if entry_signal in ["BULL", "BUY", "ATMBUY", "OTMBUY"] else None
 
         elif direction == "DOWN":
-            if entry_signal in ["BEAR", "SELL", "ATMSELL", "OTMSELL"]:
-                return entry_signal
-            else:
-                return "DEFAULT"
+            return entry_signal if entry_signal in ["BEAR", "SELL", "ATMSELL", "OTMSELL"] else None
 
-        return "DEFAULT"
+        return None
 
     except Exception as e:
         print(f"[ERROR] Exit Validation: {e}")
-        return "DEFAULT"
+        return None
 
 
-# -------------------- Public function --------------------
+# -------------------- Public function (STATE ENGINE) --------------------
 def get_entry_signal(df: pd.DataFrame):
     """
-    Returns:
-    entry → raw system signal
-    exit  → validated signal (filtered)
+    Pure state engine:
+    - Never returns DEFAULT
+    - Holds last valid signal
     """
-    entry = _compute_final_signal(df)
-    exit_signal = _validate_with_raw_direction(df, entry)
+    global _last_valid_signal
+
+    raw_entry = _compute_final_signal(df)
+
+    # -------- STATE LOGIC --------
+    if raw_entry not in [None, "DEFAULT"]:
+        _last_valid_signal = raw_entry
+
+    entry = _last_valid_signal  # always hold last state
+
+    # -------- EXIT --------
+    exit_signal = _validate_with_raw_direction(df, entry) if entry else None
 
     return entry, exit_signal
 
@@ -146,14 +149,16 @@ def print_dashboard(df):
         "OTMBUY": Fore.GREEN, "OTMSELL": Fore.RED,
         "ATMBUY": Fore.GREEN, "ATMSELL": Fore.RED,
         "BULL": Fore.GREEN, "BEAR": Fore.RED,
-        "DEFAULT": Fore.YELLOW, None: Fore.YELLOW
+        None: Fore.YELLOW
     }
 
     print("\n" + "=" * 60)
     print(f"{'PXY ENTRY / EXIT ENGINE':^60}")
     print("=" * 60)
-    print(f"{color_map.get(entry, Fore.YELLOW)}ENTRY : {entry}{Style.RESET_ALL}")
-    print(f"{color_map.get(exit_signal, Fore.YELLOW)}EXIT  : {exit_signal}{Style.RESET_ALL}")
+
+    print(f"{color_map.get(entry, Fore.YELLOW)}ENTRY : {entry if entry else '—'}{Style.RESET_ALL}")
+    print(f"{color_map.get(exit_signal, Fore.YELLOW)}EXIT  : {exit_signal if exit_signal else '—'}{Style.RESET_ALL}")
+
     print("=" * 60)
 
 
