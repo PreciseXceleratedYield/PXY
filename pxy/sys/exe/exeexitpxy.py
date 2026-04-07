@@ -71,11 +71,14 @@ def run_snapshot():
     now = datetime.now(IST).time()
     exit_start = dt_time(15, 19)  # 3:19 PM
     exit_end   = dt_time(15, 30)  # 3:30 PM
-
+    
     if exit_start <= now < exit_end:
         print(f"{Fore.YELLOW}⚡ Exit Window Active! Triggering exesqrpxy.py ⚡")
         try:
-            subprocess.run(["python3", "exesqrpxy.py"], check=True)
+            # Dynamically get the path of exesqrpxy.py in the same folder as this script
+            SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+            exe_path = os.path.join(SCRIPT_DIR, "exesqrpxy.py")
+            subprocess.run(["python3", exe_path], check=True)
         except Exception as e:
             print(f"{Fore.RED}❌ Failed to run exesqrpxy.py: {e}")
 
