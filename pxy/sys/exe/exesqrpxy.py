@@ -1,4 +1,9 @@
-# exesqrpxy.py
+import sys
+import os
+
+# --- Add 'run' subdirectory to Python path ---
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "run"))
+
 import pandas as pd
 from runclntpxy import get_session
 from exeomspxy import get_combined_data
@@ -36,7 +41,8 @@ def exit_all_positions():
     now = datetime.now(IST).time()
     client = get_session()
     if not client:
-        print(f"{Fore.RED}❌ Session not initialized. Exiting..."); return
+        print(f"{Fore.RED}❌ Session not initialized. Exiting...")
+        return
 
     data = get_combined_data()
     active_df = data.get("active_orders", pd.DataFrame())
