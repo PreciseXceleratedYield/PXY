@@ -2,101 +2,167 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>PXy Terminal + HA Chart</title>
+<title>PXy Dashboard</title>
 
+<!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-html, body { margin:0; height:100%; background:#1e1e1e; color:#e0d8c0; font-family:'Fira Code', monospace;}
-#main { display:flex; height:100vh; }
-#terminal-container { width:60%; border-right:1px solid #333; height:100%; }
-#chart-container { width:40%; height:100%; padding:10px; }
-canvas { width:100%; height:100%; display:block; }
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    width: 100%;
+    font-family: 'Fira Code', monospace;
+    background: #1e1e1e; /* dark background */
+    color: #e0d8c0;
+}
+
+/* Container for terminal + chart */
+#container {
+    display: flex;
+    flex-direction: row;
+    height: 100vh; /* full viewport height */
+    width: 100%;
+}
+
+/* Terminal panel */
+#terminal-container {
+    width: calc(52ch + 16px); /* 52 characters + scrollbar padding */
+    min-width: 52ch;
+    background-color: #1e1e1e;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Terminal itself */
+#terminal {
+    flex: 1;
+    overflow-y: auto;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+/* Chart panel */
+#chart-container {
+    flex: 1; /* fill remaining width */
+    background-color: #252525;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+/* Canvas fills the container */
+#chart {
+    width: 100%;
+    height: 100%;
+}
 </style>
 </head>
 <body>
-<div id="main">
-    <div id="terminal-container"><div id="terminal"></div></div>
-    <div id="chart-container"><canvas id="chart"></canvas></div>
+
+<div id="container">
+    <div id="terminal-container">
+        <div id="terminal"></div>
+    </div>
+    <div id="chart-container">
+        <canvas id="chart"></canvas>
+    </div>
 </div>
 
+<!-- JS Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-// ---------- TERMINAL ----------
-const term = new Terminal({ convertEol:true });
+// === Terminal Setup ===
+const term = new Terminal({
+    convertEol: true,
+    scrollback: 2000,
+    theme: {
+        background: '#1e1e1e',
+        foreground: '#e0d8c0',
+        cursor: '#f0e0b0'
+    },
+    cursorBlink: false
+});
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
-term.writeln("PXy Terminal + Live HA Chart Ready 🚀");
 
-const ws = new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host);
-ws.onmessage = e => term.write(e.data);
+term.writeln('Connected. PXy terminal ready.');
+term.writeln('Width fixed at 52 chars.');
 
-// ---------- CHART ----------
-const ctx = document.getElementById('chart').getContext('2d');
-let chart = new Chart(ctx,{
-    type:'line',
-    data:{ labels:[], datasets:[{ label:'HA Line', data:[], borderColor:'#00ff00', borderWidth:2, pointRadius:0 }]},
-    options:{
-        animation:false,
-        plugins:{legend:{display:false}},
-        scales:{
-            x:{ticks:{color:'#aaa'}, title:{display:true, text:'Time', color:'#ccc'}},
-            y:{ticks:{color:'#aaa'}, title:{display:true, text:'Price', color:'#ccc'}}
+// Example WebSocket stream (update with your server)
+const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(`${protocol}://${window.location.host}`);
+ws.onmessage = (event) => {
+    term.write(event.data);
+    term.scrollToBottom();
+};
+
+// Re-fit terminal on resize
+window.addEventListener('resize', () => fitAddon.fit());
+
+// === Chart Setup ===
+async function loadChartData() {
+    // fetch CSV from sys folder
+    const resp = await fetch('/sys/market_data.csv');
+    const text = await resp.text();
+    const rows = text.split('\n').slice(1).filter(r => r);
+    
+    const labels = [];
+    const data = [];
+    
+    rows.forEach(row => {
+        const cols = row.split(',');
+        labels.push(cols[0].slice(11,16)); // hh:mm
+        data.push(parseFloat(cols[4])); // Close price
+    });
+
+    const ctx = document.getElementById('chart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Price',
+                data: data,
+                borderColor: '#00ff99',
+                backgroundColor: 'rgba(0,255,153,0.1)',
+                pointRadius: 0,
+                borderWidth: 2,
+                tension: 0.2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { 
+                    display: true,
+                    title: { display: true, text: 'Time', color: '#e0d8c0' },
+                    ticks: { color: '#e0d8c0' }
+                },
+                y: { 
+                    display: true,
+                    title: { display: true, text: 'Price', color: '#e0d8c0' },
+                    ticks: { color: '#e0d8c0' }
+                }
+            },
+            plugins: {
+                legend: { display: false }
+            }
         }
-    }
-});
-
-// ---------- LOAD CSV WITH 2-HR GRID ----------
-async function loadData(){
-    try{
-        const res = await fetch('/sys/market_data.csv?t='+Date.now());
-        if(!res.ok){ console.error("CSV fetch failed"); return; }
-        const text = await res.text();
-        const rows = text.trim().split('\n');
-        const dataRows = rows[0].startsWith('Datetime') ? rows.slice(1) : rows;
-
-        const parsed = dataRows.map(r=>{
-            const cols = r.split(',');
-            if(cols.length < 5) return null;
-            const dt = new Date(cols[0]);
-            const open=parseFloat(cols[1]), high=parseFloat(cols[2]),
-                  low=parseFloat(cols[3]), close=parseFloat(cols[4]);
-            if(isNaN(open)||isNaN(high)||isNaN(low)||isNaN(close)) return null;
-
-            const ha_open = (open + high + low + close)/4;
-            const ha_close = (open + close)/2;
-            const ha_line = (ha_open + ha_close)/2;
-
-            return {time: dt, value: ha_line};
-        }).filter(Boolean);
-
-        const now = new Date();
-        const twoHoursAgo = new Date(now.getTime() - 2*60*60*1000);
-        const timeGrid = [];
-        let lastValue = parsed.length ? parsed[parsed.length-1].value : 0;
-
-        for(let t = new Date(twoHoursAgo); t <= now; t.setMinutes(t.getMinutes()+1)){
-            const found = parsed.find(d=>Math.abs(d.time - t) < 60*1000);
-            if(found) lastValue = found.value;
-            timeGrid.push({time: new Date(t), value: lastValue});
-        }
-
-        chart.data.labels = timeGrid.map(d=>d.time.toTimeString().substring(0,5));
-        chart.data.datasets[0].data = timeGrid.map(d=>d.value);
-        chart.update();
-
-    }catch(e){ console.error("Chart load error:", e);}
+    });
 }
 
-// Auto-refresh every 3s
-setInterval(loadData, 3000);
-loadData();
-window.addEventListener('resize',()=>fitAddon.fit());
+loadChartData();
 </script>
+
 </body>
 </html>
