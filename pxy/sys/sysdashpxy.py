@@ -57,6 +57,16 @@ def get_full_snapshot():
 
     # ===== HAIKIN SIGNAL =====
     signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df=df)
+
+    # Fallback if None
+    if signal is None or past_depth is None:
+        signal = "BULL" if ha_close.iloc[-1] > ha_open.iloc[-1] else "BEAR"
+        if ha_color is not None and not ha_color.empty:
+            last_flip_idx = (ha_color != ha_color.iloc[-1]).to_numpy().nonzero()[0]
+            past_depth = len(ha_color) - last_flip_idx[-1] - 1 if len(last_flip_idx) > 0 else len(ha_color)
+        else:
+            past_depth = 1
+
     result["hkin_signal"] = signal
     result["hkin_past_depth"] = past_depth
     result["hkin_ce_depth"] = ce_depth
@@ -125,6 +135,21 @@ def print_dashboard(data):
     # ===== CANDLE VISUAL =====
     print(data["candle_visual"])
 
+    # ===== HAIKIN SIGNAL BLOCK =====
+    signal = data["hkin_signal"]
+    past_depth = data["hkin_past_depth"]
+    ce_depth = data["hkin_ce_depth"]
+    pe_depth = data["hkin_pe_depth"]
+
+    color = Fore.GREEN if signal in ["BUY","BULL"] else Fore.RED if signal in ["SELL","BEAR"] else Fore.YELLOW
+    space1 = TOTAL_WIDTH - len(f"Hkin:{signal}") - len(f"Past:{past_depth}")
+    if space1 < 0: space1 = 1
+    print(Fore.YELLOW + "Hkin:" + color + signal + " " * space1 + Fore.YELLOW + f"Past:{color}{past_depth}")
+
+    space2 = TOTAL_WIDTH - len(f"CE:{ce_depth}") - len(f"PE:{pe_depth}")
+    if space2 < 0: space2 = 1
+    print(Fore.YELLOW + "CE:" + color + str(ce_depth) + " " * space2 + Fore.YELLOW + "PE:" + color + str(pe_depth))
+
     # ===== STRENGTH =====
     print(data["strength_line"])
 
@@ -146,7 +171,7 @@ def print_dashboard(data):
     line_val = data["super_line"]
     color = Fore.GREEN if trend=="UP" else Fore.RED if trend=="DOWN" else Fore.YELLOW
     space = TOTAL_WIDTH - len(f"Super:{trend}") - len(f"LINE:{line_val}")
-    print(Fore.YELLOW + "Super:" + color +trend + " " * space + Fore.YELLOW + "LINE:" + color + str(line_val))
+    print(Fore.YELLOW + "Super:" + color + trend + " " * space + Fore.YELLOW + "LINE:" + color + str(line_val))
 
     # ===== POWER =====
     ce = data["ce_power"]
