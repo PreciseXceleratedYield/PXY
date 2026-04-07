@@ -74,7 +74,7 @@ def process_lilo_orders(client):
         total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0
 
         # Aligned 42-character summary line
-        print(f"{'Running:'+str(total_unrealized):<21}{'Booked:'+str(total_realized):>21}")
+        print(f"{'Running:'+str(total_unrealized):<20}{'Booked:'+str(total_realized):>20}")
 
         return open_df, closed_df
 
