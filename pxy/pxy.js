@@ -8,12 +8,15 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const PORT = 80; // requires sudo or setcap
+const PORT = 80;
 
 // Serve HTML
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'pxy.html'));
 });
+
+// Serve CSV folder
+app.use('/sys', express.static(path.join(__dirname, 'sys')));
 
 // WebSocket: stream tmux npxy session
 wss.on('connection', (ws) => {
@@ -27,7 +30,7 @@ wss.on('connection', (ws) => {
             }
             ws.send(stdout);
         });
-    }, 500); // update every 0.5s
+    }, 500);
 
     ws.on('close', () => {
         console.log('Client disconnected');
