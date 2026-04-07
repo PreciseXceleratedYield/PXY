@@ -1,10 +1,15 @@
 #!/bin/bash
 
-# 1️⃣ Start pxy.js silently as daemon if not running
-pgrep -f "/home/neo/pxy/pxy.js" >/dev/null 2>&1 || \
-  nohup node /home/neo/pxy/pxy.js > /dev/null 2>&1 &
+# Start pxy.js as daemon if not running
+if ! pgrep -f "/home/neo/pxy/pxy.js" >/dev/null 2>&1; then
+    nohup node /home/neo/pxy/pxy.js >> /home/neo/pxy/pxy.log 2>&1 &
+    echo "pxy.js started in background..."
+fi
 
-# 2️⃣ Your existing tmux logic remains unchanged
-tmux has-session -t npxy 2>/dev/null \
-  && tmux attach -t npxy \
-  || tmux new -s npxy 'pxyexe'
+# tmux session logic
+if tmux has-session -t npxy 2>/dev/null; then
+    tmux attach -t npxy
+else
+    tmux new -s npxy -d 'pxyexe'
+    tmux attach -t npxy
+fi
