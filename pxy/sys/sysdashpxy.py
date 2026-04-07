@@ -125,12 +125,14 @@ def print_dashboard(data):
     print(data["candle_visual"])
 
     # ===== FINAL CANDLE ENGINE =====
-    signal = data["hkin_signal"]
-    past_depth = data["hkin_past_depth"]
-    ce_depth = data["hkin_ce_depth"]
-    pe_depth = data["hkin_pe_depth"]
-    color = Fore.GREEN if signal in ["BUY","BULL"] else Fore.RED if signal in ["SELL","BEAR"] else Fore.YELLOW
-    print(Fore.YELLOW + f"Mode: {data['mode']}  Signal: {color}{signal}  Past: {past_depth}  CE: {ce_depth}  PE: {pe_depth}")
+    # ===== FINAL CANDLE ENGINE =====
+    # use raw data as in sysmktpxy
+    signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df_raw)
+    result["mode"] = "HACV"  # match your candle mode
+    result["hkin_signal"] = signal
+    result["hkin_past_depth"] = past_depth
+    result["hkin_ce_depth"] = ce_depth
+    result["hkin_pe_depth"] = pe_depth
 
     # ===== STRENGTH =====
     print(data["strength_line"])
