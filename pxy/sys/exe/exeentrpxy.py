@@ -172,9 +172,9 @@ async def main():
            💰 {Fore.WHITE}Cash   : {int(funds)}
            ⚡ {Fore.WHITE}Pos    : {pos}
            🎫 {Fore.WHITE}Symbol : {symbol}
-           📊 {Fore.WHITE}Strike : {strike}
+           #📊 {Fore.WHITE}Strike : {strike}
            🎯 {Fore.WHITE}Action : {entry_signal}
-           🔁 {Fore.WHITE}Signal : {reversal}
+           #🔁 {Fore.WHITE}Signal : {reversal}
            📌 {Fore.WHITE}Status : {status}
          =================================
         """)
