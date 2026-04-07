@@ -118,12 +118,11 @@ def _validate_with_raw_direction(df: pd.DataFrame, entry_signal: str) -> str:
         return None
 
 
-# -------------------- Public function (STATE ENGINE) --------------------
+# -------------------- Public function (STATE ENGINE + SAFE OUTPUT) --------------------
 def get_entry_signal(df: pd.DataFrame):
     """
-    Pure state engine:
-    - Never returns DEFAULT
-    - Holds last valid signal
+    - Pure state engine internally
+    - Always returns SAFE STRINGS externally
     """
     global _last_valid_signal
 
@@ -133,10 +132,14 @@ def get_entry_signal(df: pd.DataFrame):
     if raw_entry not in [None, "DEFAULT"]:
         _last_valid_signal = raw_entry
 
-    entry = _last_valid_signal  # always hold last state
+    entry = _last_valid_signal  # hold last signal
 
     # -------- EXIT --------
     exit_signal = _validate_with_raw_direction(df, entry) if entry else None
+
+    # -------- SAFE OUTPUT (CRITICAL) --------
+    entry = entry if entry is not None else "DEFAULT"
+    exit_signal = exit_signal if exit_signal is not None else "DEFAULT"
 
     return entry, exit_signal
 
@@ -149,15 +152,15 @@ def print_dashboard(df):
         "OTMBUY": Fore.GREEN, "OTMSELL": Fore.RED,
         "ATMBUY": Fore.GREEN, "ATMSELL": Fore.RED,
         "BULL": Fore.GREEN, "BEAR": Fore.RED,
-        None: Fore.YELLOW
+        "DEFAULT": Fore.YELLOW
     }
 
     print("\n" + "=" * 60)
     print(f"{'PXY ENTRY / EXIT ENGINE':^60}")
     print("=" * 60)
 
-    print(f"{color_map.get(entry, Fore.YELLOW)}ENTRY : {entry if entry else '—'}{Style.RESET_ALL}")
-    print(f"{color_map.get(exit_signal, Fore.YELLOW)}EXIT  : {exit_signal if exit_signal else '—'}{Style.RESET_ALL}")
+    print(f"{color_map.get(entry, Fore.YELLOW)}ENTRY : {entry}{Style.RESET_ALL}")
+    print(f"{color_map.get(exit_signal, Fore.YELLOW)}EXIT  : {exit_signal}{Style.RESET_ALL}")
 
     print("=" * 60)
 
