@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Terminal + 2-Hour HA Chart</title>
+<title>PXy Terminal + HA Chart</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -31,7 +31,7 @@ const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
-term.writeln("Terminal + Live HA Chart Ready 🚀");
+term.writeln("PXy Terminal + Live HA Chart Ready 🚀");
 
 const ws = new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host);
 ws.onmessage = e => term.write(e.data);
@@ -58,10 +58,8 @@ async function loadData(){
         if(!res.ok){ console.error("CSV fetch failed"); return; }
         const text = await res.text();
         const rows = text.trim().split('\n');
-
         const dataRows = rows[0].startsWith('Datetime') ? rows.slice(1) : rows;
 
-        // Parse CSV into {time: Date, ha: number}
         const parsed = dataRows.map(r=>{
             const cols = r.split(',');
             if(cols.length < 5) return null;
@@ -77,7 +75,6 @@ async function loadData(){
             return {time: dt, value: ha_line};
         }).filter(Boolean);
 
-        // --- Generate 2-hour 1-min time grid ---
         const now = new Date();
         const twoHoursAgo = new Date(now.getTime() - 2*60*60*1000);
         const timeGrid = [];
@@ -99,8 +96,6 @@ async function loadData(){
 // Auto-refresh every 3s
 setInterval(loadData, 3000);
 loadData();
-
-// Resize terminal
 window.addEventListener('resize',()=>fitAddon.fit());
 </script>
 </body>
