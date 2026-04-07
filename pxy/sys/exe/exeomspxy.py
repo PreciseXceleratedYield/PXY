@@ -5,7 +5,7 @@ import numpy as np
 from exepomspxy import print_market_dashboard
 
 # --- GLOBAL DEBUG SWITCH ---
-DEBUG = True 
+DEBUG = False 
 
 def dprint(msg):
     if DEBUG: print(f"[DEBUG] {msg}")
