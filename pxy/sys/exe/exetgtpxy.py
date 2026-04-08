@@ -9,14 +9,20 @@ init(autoreset=True)
 PRINT_DASHBOARD = False
 
 # -------------------- CONFIG --------------------
-BASE_TARGET_POINTS = 12  # Default points used in target calculation
-MAX_DEPTH = 5             # Maximum depth multiplier in Phase 2
-MAX_TOTAL_POINTS = 99.0   # Cap for total points
+MAX_TOTAL_POINTS = 99.0  # Cap for total points
+BUFFER = 0               # Can reduce misalignment further if needed
+
+# Configurable points per phase
+PHASE_POINTS = {
+    "MISALIGN": 7,   # Misalignment points
+    "PHASE1": 14,    # Depth <= 2
+    "PHASE2": 14     # Depth > 2, will add depth dynamically
+}
 
 # -------------------- FUNCTION --------------------
 def target_price(row):
     """
-    3-PHASE OPTION TARGET (Premium Based):
+    3-PHASE OPTION TARGET (Simplified Depth-Based):
     """
     try:
         # 1️⃣ BASELINE PRICE
@@ -29,38 +35,32 @@ def target_price(row):
             return 0
 
         # 2️⃣ METRICS
-        atr = float(row.get("atr", 20))
         ce_p = float(row.get("ce_power", 1.0))
         pe_p = float(row.get("pe_power", 1.0))
         exit_type = str(row.get("exit", "NONE")).upper()
 
         # 3️⃣ ALIGNMENT
         if "CE" in symbol:
-            power = ce_p
             depth = int(row.get("hkin_ce_depth", 0))
-            is_aligned = ("BUY" in exit_type) or ("BULL" in exit_type)
-
+            is_aligned = exit_type in {"BUY", "BULL", "NONE"}
         elif "PE" in symbol:
-            power = pe_p
             depth = int(row.get("hkin_pe_depth", 0))
-            is_aligned = ("SELL" in exit_type) or ("BEAR" in exit_type)
-
+            is_aligned = exit_type in {"SELL", "BEAR", "NONE"}
         else:
             return entry_prc
 
-        # 4️⃣ TARGET LOGIC
+        # 4️⃣ TARGET LOGIC (simplified)
         if not is_aligned:
-            total_points = BASE_TARGET_POINTS - MAX_DEPTH
+            total_points = PHASE_POINTS["MISALIGN"]
             phase = "Phase 3 (Misalignment)"
-
-        elif depth >= 2:
-            total_points = max(BASE_TARGET_POINTS, atr * power * min(depth, MAX_DEPTH))
+        elif depth <= 2:
+            total_points = PHASE_POINTS["PHASE1"]
+            phase = "Phase 1 (Shallow Trend)"
+        else:  # depth > 2
+            total_points = PHASE_POINTS["PHASE2"] + depth
             phase = "Phase 2 (Deep Trend)"
 
-        else:
-            total_points = max(BASE_TARGET_POINTS, atr * power)
-            phase = "Phase 1 (Initial Entry)"
-
+        # Cap total points
         total_points = min(total_points, MAX_TOTAL_POINTS)
 
         # 5️⃣ FINAL TARGET
@@ -75,8 +75,6 @@ def target_price(row):
             print(f"{Fore.CYAN}Used Baseline   : {Fore.YELLOW}{entry_prc}")
             print(f"{Fore.CYAN}Exit            : {Fore.YELLOW}{exit_type}")
             print(f"{Fore.CYAN}Depth           : {Fore.YELLOW}{depth}")
-            print(f"{Fore.CYAN}ATR             : {Fore.YELLOW}{atr}")
-            print(f"{Fore.CYAN}Power           : {Fore.YELLOW}{power}")
             print(f"{Fore.CYAN}Phase           : {Fore.YELLOW}{phase}")
             print(f"{Fore.CYAN}Target Pts      : {Fore.YELLOW}{total_points}")
             print(f"{Fore.CYAN}Final Target    : {Fore.GREEN}{round(target, 2)}")
