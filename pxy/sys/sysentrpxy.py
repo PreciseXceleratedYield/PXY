@@ -51,8 +51,10 @@ def get_entry_signal(df: pd.DataFrame):
 
     if raw_signal == "BUY":
         entry_signal = "ATMBUY" if last_close >= last_st else "OTMBUY"
-    else:
+    elif raw_signal == "SELL":
         entry_signal = "ATMSELL" if last_close <= last_st else "OTMSELL"
+    else:
+        entry_signal = "NONE"
 
     return entry_signal, raw_signal
 
