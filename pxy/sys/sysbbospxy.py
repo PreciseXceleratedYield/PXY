@@ -8,23 +8,35 @@ MAX_BAR_LENGTH = 42       # bar width
 
 def get_bos(df):
     """
-    Returns 'BULL' or 'BEAR' based on the last 60 min structure
+    Returns breakout or reversal signal based on the last 60 min structure:
+    - BBUY, BSELL, RBUY, RSELL, or 'NONE'
     df -> must be 1-min OHLC dataframe
     """
     try:
         if df is None or len(df) < STRUCTURE_MINUTES + 2:
-            return "NO DATA"
+            return "NONE"
 
         # Last 60 mins excluding running candle
         recent = df.iloc[-STRUCTURE_MINUTES-1:-1]
 
         structure_high = recent['High'].max()
         structure_low  = recent['Low'].min()
-
         mid = (structure_high + structure_low) / 2
         last_close = df.iloc[-2]['Close']
 
-        return "BULL" if last_close >= mid else "BEAR"
+        # Breakout detection
+        if last_close > structure_high:
+            return "BBUY"
+        elif last_close < structure_low:
+            return "BSELL"
+
+        # Reversal detection
+        if mid < last_close < structure_high:
+            return "RBUY"
+        elif structure_low < last_close < mid:
+            return "RSELL"
+
+        return "NONE"
 
     except Exception:
         return "ERR"
@@ -32,36 +44,32 @@ def get_bos(df):
 
 def get_bos_bar(df):
     """
-    Returns a visual bar for BOS like candle:
-    - GREEN if BULL
-    - RED if BEAR
+    Returns a visual bar for BOS-like signal:
+    - GREEN for BBUY / RBUY
+    - RED for BSELL / RSELL
     - Starts from middle reference
     """
     try:
-        bos = get_bos(df)
-        if bos in ["NO DATA", "ERR"]:
-            return bos, bos  # return both
+        signal = get_bos(df)
+        if signal in ["NONE", "ERR"]:
+            return signal, signal
 
+        # Last 60 mins excluding running candle
         recent = df.iloc[-STRUCTURE_MINUTES-1:-1]
         structure_high = recent['High'].max()
         structure_low  = recent['Low'].min()
-        mid = (structure_high + structure_low) / 2
-        last_close = df.iloc[-2]['Close']
 
-        if bos == "BULL":
-            # BULL → fill right from middle
-            left_len = MAX_BAR_LENGTH // 2
-            right_len = MAX_BAR_LENGTH - left_len
+        left_len = MAX_BAR_LENGTH // 2
+        right_len = MAX_BAR_LENGTH - left_len
+
+        if signal in ["BBUY", "RBUY"]:
             bar = Fore.LIGHTBLACK_EX + '█' * left_len
             bar += Fore.GREEN + '█' * right_len
-        else:
-            # BEAR → fill left from middle
-            right_len = MAX_BAR_LENGTH // 2
-            left_len = MAX_BAR_LENGTH - right_len
+        else:  # BSELL or RSELL
             bar = Fore.RED + '█' * left_len
             bar += Fore.LIGHTBLACK_EX + '█' * right_len
 
-        return bar + Style.RESET_ALL, bos
+        return bar + Style.RESET_ALL, signal
 
     except Exception as e:
         return f"ERR: {e}", "ERR"
