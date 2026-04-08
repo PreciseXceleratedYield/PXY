@@ -13,7 +13,7 @@ from sysbbospxy import get_bos, get_bos_bar
 init(autoreset=True)
 IST = pytz.timezone("Asia/Kolkata")
 
-DEBUG = True  # <-- Enable/disable debugging
+DEBUG = False  # <-- Enable/disable debugging
 
 # -------------------- Morning Direction --------------------
 def _get_morning_direction(df: pd.DataFrame):
