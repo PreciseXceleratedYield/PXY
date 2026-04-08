@@ -1,5 +1,5 @@
 # ==================================================
-# sysmktpxy.py  (SINGLE RUN - NO LOOP + MID PRICE)
+# sysmktpxy.py  (FINAL - NO LOOP + OHLC/4 SYSTEM)
 # ==================================================
 
 import pandas as pd
@@ -35,14 +35,14 @@ def get_signal():
     if df is None or len(df) < 3:
         return "NONE", "NONE"
 
-    # ---------- ENTRY (MID PRICE) ----------
-    df['mid_price'] = (df['Open'] + df['Close']) / 2
+    # ---------- ENTRY (OHLC/4 PRICE) ----------
+    df['price'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
 
-    m1 = df['mid_price'].iloc[-3]
-    m2 = df['mid_price'].iloc[-2]
-    m3 = df['mid_price'].iloc[-1]
+    p1 = df['price'].iloc[-3]
+    p2 = df['price'].iloc[-2]
+    p3 = df['price'].iloc[-1]
 
-    entry_signal = three_candle_signal(m1, m2, m3)
+    entry_signal = three_candle_signal(p1, p2, p3)
 
     # ---------- EXIT (RAW CLOSE) ----------
     c1 = df['Close'].iloc[-3]
@@ -64,15 +64,15 @@ if __name__ == "__main__":
         print("Not enough data")
         exit()
 
-    # ---------- MID PRICE ----------
-    df['mid_price'] = (df['Open'] + df['Close']) / 2
+    # ---------- OHLC/4 PRICE ----------
+    df['price'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
 
     # Debug columns
     df['candle_body'] = df['Close'] - df['Open']
 
     debug_cols = [
         'Open', 'High', 'Low', 'Close',
-        'mid_price', 'candle_body'
+        'price', 'candle_body'
     ]
 
     # 🔥 Print last 10 candles (10 mins)
