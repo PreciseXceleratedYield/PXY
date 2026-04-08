@@ -10,6 +10,8 @@ PRINT_DASHBOARD = False
 
 # -------------------- CONFIG --------------------
 BASE_TARGET_POINTS = 15  # Default points used in target calculation
+MAX_DEPTH = 5             # Maximum depth multiplier in Phase 2
+MAX_TOTAL_POINTS = 99.0   # Cap for total points
 
 # -------------------- FUNCTION --------------------
 def target_price(row):
@@ -48,18 +50,18 @@ def target_price(row):
 
         # 4️⃣ TARGET LOGIC
         if not is_aligned:
-            total_points = BASE_TARGET_POINTS
+            total_points = BASE_TARGET_POINTS - MAX_DEPTH
             phase = "Phase 3 (Misalignment)"
 
         elif depth >= 2:
-            total_points = max(BASE_TARGET_POINTS, atr * power * min(depth, 5))
+            total_points = max(BASE_TARGET_POINTS, atr * power * min(depth, MAX_DEPTH))
             phase = "Phase 2 (Deep Trend)"
 
         else:
             total_points = max(BASE_TARGET_POINTS, atr * power)
             phase = "Phase 1 (Initial Entry)"
 
-        total_points = min(total_points, 99.0)
+        total_points = min(total_points, MAX_TOTAL_POINTS)
 
         # 5️⃣ FINAL TARGET
         target = entry_prc + total_points
