@@ -1,17 +1,17 @@
-# final_full_day_price_action_clean.py
+# sysentrpxy.py
 import pandas as pd
 import pytz
 from colorama import Fore, Style, init
 from sysdtafpxy import fetch_yf_data
 from sysstrndpxy import calculate_supertrend
 
-# -------------------- Initialization --------------------
+# Initialize Colorama
 init(autoreset=True)
 IST = pytz.timezone("Asia/Kolkata")
 DEBUG = False
 
-# -------------------- Price-Action Deterministic Signal --------------------
-def get_price_action_signal(df: pd.DataFrame):
+# -------------------- Deterministic Entry Signal --------------------
+def get_entry_signal(df: pd.DataFrame):
     """
     Deterministic price-action signal for the whole day:
     - C1 = forming candle (last)
@@ -35,7 +35,6 @@ def get_price_action_signal(df: pd.DataFrame):
 
     # -------------------- Deterministic Raw Signal --------------------
     raw_signal = None
-    # Compare last candle backwards until we find direction
     for i in range(len(closes)-1, 0, -1):
         if closes.iloc[i] > closes.iloc[i-1]:
             raw_signal = "BUY"
@@ -57,9 +56,9 @@ def get_price_action_signal(df: pd.DataFrame):
 
     return entry_signal, raw_signal
 
-# -------------------- Dashboard --------------------
+# -------------------- Dashboard (optional) --------------------
 def print_dashboard(df):
-    entry_signal, exit_signal = get_price_action_signal(df)
+    entry_signal, exit_signal = get_entry_signal(df)
     color_map = {
         "ATMBUY": Fore.GREEN, "OTMBUY": Fore.GREEN,
         "ATMSELL": Fore.RED, "OTMSELL": Fore.RED,
@@ -73,5 +72,5 @@ def print_dashboard(df):
 if __name__ == "__main__":
     df = fetch_yf_data()
     if df is not None and not df.empty:
-        df = calculate_supertrend(df)  # required for ATM/OTM mapping
+        df = calculate_supertrend(df)  # needed for ATM/OTM
     print_dashboard(df)
