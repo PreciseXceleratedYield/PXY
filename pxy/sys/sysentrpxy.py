@@ -14,17 +14,14 @@ DEBUG = False
 def get_entry_signal(df: pd.DataFrame):
     """
     Deterministic price-action signal for the whole day:
-    - Morning logic:
-        - 08:55–09:15 IST → no signal (None)
-        - 09:16–09:26 IST → only last 2 candles (C1 vs C2), always ATM
     - C1 = forming candle (last)
     - Fallback chain: C1 vs C2 → C2 vs C3 → C3 vs C4 → ...
     - Entry = ATM/OTM based on SuperTrend
     - Exit = raw BUY/SELL
-    - Signal is never None (except morning no-signal window)
+    - Signal is never None
     """
-    if df is None or len(df) < 2:
-        return None, None  # not enough data
+    if df is None or len(df) < 3:
+        return "ATMBUY", "BUY"  # default fallback
 
     df = df.copy()
     df.index = pd.to_datetime(df.index)
@@ -33,27 +30,10 @@ def get_entry_signal(df: pd.DataFrame):
     else:
         df.index = df.index.tz_convert(IST)
 
-    now = df.index[-1].time()
-
-    # -------------------- Morning Logic --------------------
-    if now < pd.to_datetime("09:15").time():
-        # 08:55–09:15 → no signal
-        return None, None
-    elif pd.to_datetime("09:16").time() <= now <= pd.to_datetime("09:26").time():
-        # 09:16–09:26 → compare only last 2 closes, always ATM
-        last_two = df['Close'].iloc[-2:]
-        if last_two.iloc[-1] > last_two.iloc[-2]:
-            return "ATMBUY", "BUY"
-        elif last_two.iloc[-1] < last_two.iloc[-2]:
-            return "ATMSELL", "SELL"
-        else:
-            return "ATMBUY", "BUY"  # fallback if equal
-
-    # -------------------- After Morning → Normal Logic --------------------
     closes = df['Close']
     st_series = df['ST'] if 'ST' in df.columns else closes
 
-    # Deterministic raw signal
+    # -------------------- Deterministic Raw Signal --------------------
     raw_signal = None
     for i in range(len(closes)-1, 0, -1):
         if closes.iloc[i] > closes.iloc[i-1]:
@@ -86,10 +66,13 @@ def print_dashboard(df):
         "ATMSELL": Fore.RED, "OTMSELL": Fore.RED,
         "BUY": Fore.GREEN, "SELL": Fore.RED
     }
-    if entry_signal is None:
-        left_text = f"{Fore.YELLOW}Entry: NO SIGNAL{Style.RESET_ALL}"
-        right_text = f"{Fore.YELLOW}Exit: NO SIGNAL{Style.RESET_ALL}"
-    else:
-        left_text = f"{color_map.get(entry_signal, Fore.YELLOW)}Entry: {entry_signal}{Style.RESET_ALL}"
-        right_text = f"{color_map.get(exit_signal, Fore.YELLOW)}Exit: {exit_signal}{Style.RESET_ALL}"
+    left_text = f"{color_map.get(entry_signal, Fore.YELLOW)}Entry: {entry_signal}{Style.RESET_ALL}"
+    right_text = f"{color_map.get(exit_signal, Fore.YELLOW)}Exit: {exit_signal}{Style.RESET_ALL}"
     print(f"{left_text:<25}{right_text:>25}")
+
+# -------------------- Self-test --------------------
+if __name__ == "__main__":
+    df = fetch_yf_data()
+    if df is not None and not df.empty:
+        df = calculate_supertrend(df)  # needed for ATM/OTM
+    print_dashboard(df)
