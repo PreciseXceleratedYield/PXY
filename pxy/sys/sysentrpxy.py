@@ -1,128 +1,85 @@
-import warnings
-warnings.filterwarnings("ignore")
-
-import yfinance as yf
+# sysentrpxy.py
 import pandas as pd
-import numpy as np
+import pytz
+from colorama import Fore, Style, init
+from sysdtafpxy import fetch_yf_data
+from sysstrndpxy import calculate_supertrend
 
-# =====================================
-# CONFIG
-# =====================================
-SYMBOL = "^NSEI"
-INTERVAL = "1m"
-PERIOD = "5d"
+# Initialize Colorama
+init(autoreset=True)
+IST = pytz.timezone("Asia/Kolkata")
+DEBUG = False
 
-# =====================================
-# FETCH DATA
-# =====================================
-def fetch_data():
-    ticker = yf.Ticker(SYMBOL)
-    df = ticker.history(period=PERIOD, interval=INTERVAL)
+# -------------------- Deterministic Entry Signal --------------------
+def get_entry_signal(df: pd.DataFrame):
+    """
+    Deterministic price-action signal for the whole day:
+    - C1 = forming candle (last)
+    - Fallback chain: C1 vs C2 → C2 vs C3 → C3 vs C4 → ...
+    - Entry = ATM/OTM based on SuperTrend
+    - Exit = raw BUY/SELL
+    - Signal is never None
+    """
+    if df is None or len(df) < 3:
+        return "ATMBUY", "BUY"  # default fallback
 
-    if df.empty:
-        raise ValueError("No data fetched from Yahoo Finance.")
-
-    for col in ["Open", "High", "Low", "Close"]:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-
-    df = df.dropna(subset=["Open", "High", "Low", "Close"])
-    df.index = df.index.tz_localize(None)
-    return df.copy()
-
-# =====================================
-# ADD INDICATORS
-# =====================================
-def add_indicators(df):
-    df["HA_Close"] = (df["Open"] + df["High"] + df["Low"] + df["Close"]) / 4
-
-    ha_open = [(df.iloc[0]["Open"] + df.iloc[0]["Close"]) / 2]
-    for i in range(1, len(df)):
-        ha_open.append((ha_open[i-1] + df.iloc[i-1]["HA_Close"]) / 2)
-    df["HA_Open"] = ha_open
-
-    df["HA_High"] = df[["High", "HA_Open", "HA_Close"]].max(axis=1)
-    df["HA_Low"] = df[["Low", "HA_Open", "HA_Close"]].min(axis=1)
-
-    df["HA_Status"] = np.where(df["HA_Close"] > df["HA_Open"], "Bull", "Bear")
-
-    return df.dropna()
-
-# =====================================
-# ENTRY + EXIT SIGNAL
-# =====================================
-def get_entry_signal():
-    try:
-        df = fetch_data()
-        df = add_indicators(df)
-    except Exception as e:
-        return f"Error fetching data: {e}"
-
-    if len(df) < 3:
-        return "Not enough data", "Not enough data"
-
-    last = df.iloc[-1]
-    prev = df.iloc[-2]
-    prev2 = df.iloc[-3]
-
-    # ---------- Entry Logic ----------
-    price_last = last["Open"]
-    price_prev = prev["Open"]
-    price_prev2 = prev2["Open"]
-
-    ha_last = last["HA_Status"]
-    ha_prev = prev["HA_Status"]
-
-    if ha_prev == "Bear" and ha_last == "Bull":
-        if price_prev2 > price_prev < price_last:
-            entry_signal = "SBuy"
-        else:
-            entry_signal = "Bull"
-    elif ha_prev == "Bull" and ha_last == "Bear":
-        if price_prev2 < price_prev > price_last:
-            entry_signal = "SSell"
-        else:
-            entry_signal = "Bear"
+    df = df.copy()
+    df.index = pd.to_datetime(df.index)
+    if df.index.tz is None:
+        df.index = df.index.tz_localize("UTC").tz_convert(IST)
     else:
-        if price_last > price_prev > price_prev2:
-            entry_signal = "Bull"
-        elif price_last < price_prev < price_prev2:
-            entry_signal = "Bear"
-        elif price_prev2 > price_prev < price_last:
-            entry_signal = "SBuy"
-        elif price_prev2 < price_prev > price_last:
-            entry_signal = "SSell"
-        else:
-            entry_signal = "Bull" if price_last >= price_prev else "Bear"
+        df.index = df.index.tz_convert(IST)
 
-    # ---------- Exit Logic ----------
-    ha_high_last = last["HA_High"]
-    ha_high_prev = prev["HA_High"]
-    ha_high_prev2 = prev2["HA_High"]
+    closes = df['Close']
+    st_series = df['ST'] if 'ST' in df.columns else closes
 
-    ha_low_last = last["HA_Low"]
-    ha_low_prev = prev["HA_Low"]
-    ha_low_prev2 = prev2["HA_Low"]
+    # -------------------- Deterministic Raw Signal --------------------
+    raw_signal = None
+    for i in range(len(closes)-1, 0, -1):
+        if closes.iloc[i] > closes.iloc[i-1]:
+            raw_signal = "BUY"
+            break
+        elif closes.iloc[i] < closes.iloc[i-1]:
+            raw_signal = "SELL"
+            break
+    if raw_signal is None:
+        raw_signal = "NONE"  # fallback default
 
-    if ha_high_last > ha_high_prev > ha_high_prev2:
-        exit_signal = "Bull"
-    elif ha_high_prev2 > ha_high_prev < ha_high_last:
-        exit_signal = "SBuy"
-    elif ha_low_last < ha_low_prev < ha_low_prev2:
-        exit_signal = "Bear"
-    elif ha_low_prev2 < ha_low_prev > ha_low_last:
-        exit_signal = "SSell"
+    # -------------------- Entry Signal Mapping (ATM/OTM) --------------------
+    last_close = closes.iloc[-1]
+    last_st = st_series.iloc[-1]
+
+    if raw_signal == "BUY":
+        entry_signal = "ATMBUY" if last_close >= last_st else "OTMBUY"
+    elif raw_signal == "SELL":
+        entry_signal = "ATMSELL" if last_close <= last_st else "OTMSELL"
     else:
-        exit_signal = "Bull" if ha_high_last >= ha_high_prev else "Bear"
+        entry_signal = "NONE"
 
-    return entry_signal, exit_signal
+    return entry_signal, raw_signal
 
-# =====================================
-# SELF TEST
-# =====================================
+# -------------------- Dashboard (optional) --------------------
+def print_dashboard(df):
+    entry_signal, exit_signal = get_entry_signal(df)
+    color_map = {
+        "ATMBUY": Fore.GREEN, "OTMBUY": Fore.GREEN,
+        "ATMSELL": Fore.RED, "OTMSELL": Fore.RED,
+        "BUY": Fore.GREEN, "SELL": Fore.RED
+    }
+    left_text = f"{color_map.get(entry_signal, Fore.YELLOW)}Entry: {entry_signal}{Style.RESET_ALL}"
+    right_text = f"{color_map.get(exit_signal, Fore.YELLOW)}Exit: {exit_signal}{Style.RESET_ALL}"
+    print(f"{left_text:<25}{right_text:>25}")
+
+# -------------------- Self-test --------------------
 if __name__ == "__main__":
-    entry_signal, exit_signal = get_entry_signal()
-    print("================================")
-    print(f"Symbol       : {SYMBOL}")
-    print(f"Entry Signal : {entry_signal}")
-    print(f"Exit  Signal : {exit_signal}")
-    print("================================")
+    df = fetch_yf_data()
+    if df is not None and not df.empty:
+        df = calculate_supertrend(df)  # needed for ATM/OTM
+    print_dashboard(df)
+
+# -------------------- Self-test --------------------
+if __name__ == "__main__":
+    df = fetch_yf_data()
+    if df is not None and not df.empty:
+        df = calculate_supertrend(df)  # needed for ATM/OTM
+    print_dashboard(df)
