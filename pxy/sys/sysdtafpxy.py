@@ -6,12 +6,14 @@ from syscnfgpxy import TICKER  # only ticker from config
 
 # Module-level default
 DEFAULT_INTERVAL = "1m"
+DEFAULT_PERIOD = "5d"  # default fetch 5 days
 
-def fetch_yf_data(period="1d", interval=None, ticker=None):
+def fetch_yf_data(period=None, interval=None, ticker=None):
     """
     Fetch historical data for a ticker using yfinance.
-    No minimum row check; returns exactly what yfinance gives.
+    By default, fetches 5 days of 1-minute data.
     """
+    period = period or DEFAULT_PERIOD
     interval = interval or DEFAULT_INTERVAL
     ticker_symbol = ticker or TICKER
 
@@ -27,7 +29,7 @@ def get_latest_data():
     """
     Returns the latest row of data
     """
-    df = fetch_yf_data(period="1d", interval=DEFAULT_INTERVAL)
+    df = fetch_yf_data()
     return df.tail(1)
 
 # -------- Self-runnable test --------
