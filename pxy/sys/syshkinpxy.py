@@ -33,14 +33,15 @@ def detect_ha_flip_signal(df=None, last_n=21):
             break
     current_depth = max(current_depth, 1)
 
-    # Past depth: consecutive same-color bars before current
+    # ---------------- PAST DEPTH (aligned to chart) ----------------
     past_depth = 0
-    for c in reversed(colors[:-1]):
+    for c in reversed(colors[:-1]):   # look at all previous colors except current
         if c == prev_color:
             past_depth += 1
         else:
             break
-    past_depth = max(past_depth, 1)
+    
+    past_depth = max(past_depth, 1)  # ensure at least 1
 
     # Signal detection
     if current_color == "none" or prev_color == "none":
