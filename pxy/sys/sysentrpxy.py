@@ -7,7 +7,7 @@ from colorama import Fore, Style, init
 from sysdtafpxy import fetch_yf_data
 from syshkinpxy import detect_ha_flip_signal
 from sysstrndpxy import calculate_supertrend
-from sysbbospxy import get_bos_bar
+from sysbbospxy import get_bos, get_bos_bar
 
 # Initialize Colorama
 init(autoreset=True)
@@ -44,24 +44,18 @@ def _get_morning_direction(df: pd.DataFrame):
         return None
     return None
 
-# -------------------- Compute Raw Signal --------------------
+# -------------------- Compute Raw Signal (Priority: Morning → BOS → HA) --------------------
 def _compute_raw_signal(df: pd.DataFrame) -> str:
     if df is None or not all(col in df.columns for col in ['Open','High','Low','Close']):
         if DEBUG: print("[DEBUG] _compute_raw_signal: DataFrame missing required columns")
-        return None
+        return "NONE"
 
     now = datetime.now(IST).time()
-    last = df.iloc[-1]
-
-    if 'ST' not in df.columns:
-        if DEBUG: print("[DEBUG] Calculating SuperTrend...")
-        df = calculate_supertrend(df)
-        if DEBUG: print("[DEBUG] SuperTrend calculated")
-
+    
     # --- Morning Phase ---
     if time(9,14) <= now <= time(9,16):
         if DEBUG: print("[DEBUG] Early morning phase, no signal")
-        return None
+        return "NONE"
     if time(9,17) <= now <= time(9,30):
         direction = _get_morning_direction(df)
         if DEBUG: print(f"[DEBUG] Morning direction: {direction}")
@@ -70,73 +64,60 @@ def _compute_raw_signal(df: pd.DataFrame) -> str:
         if direction == "SELL":
             return "MSELL"
 
-    # --- BOS Phase ---
+    # --- BOS Phase (priority) ---
     try:
-        _, bos_val = get_bos_bar(df)
-        if DEBUG: print(f"[DEBUG] BOS value: {bos_val}")
-        if bos_val == "BULL":
-            return "BBUY"
-        if bos_val == "BEAR":
-            return "BSELL"
+        bos_signal = get_bos(df)  # BBUY/BSELL/RBUY/RSELL/NONE
+        if DEBUG: print(f"[DEBUG] BOS signal: {bos_signal}")
+        if bos_signal != "NONE":
+            return bos_signal
     except Exception as e:
-        if DEBUG: print(f"[DEBUG] get_bos_bar exception: {e}")
+        if DEBUG: print(f"[DEBUG] get_bos exception: {e}")
 
-    # --- Reversal Phase ---
+    # --- HA Phase fallback ---
     ha_signal, _, _, _ = detect_ha_flip_signal(df)
     if DEBUG: print(f"[DEBUG] HA flip signal: {ha_signal}")
+
     if ha_signal in ["RBUY", "RSELL"]:
         return ha_signal
-
-    # --- HA Signals Upgrade ---
     if ha_signal in ["BUY", "BULL"]:
         return "SBUY"
     if ha_signal in ["SELL", "BEAR"]:
         return "SSELL"
-
     if ha_signal in ["SBUY", "SSELL"]:
         return ha_signal
+    if ha_signal in ["BULL", "BEAR"]:
+        return ha_signal  # keep as-is
 
-    if DEBUG: print("[DEBUG] No raw signal detected")
-    return None
+    return "NONE"
 
-# -------------------- Map Raw Signal to Entry (ATM/OTM) --------------------
+# -------------------- Map Raw Signal to Entry/Exit --------------------
 def get_entry_signal(df: pd.DataFrame):
     raw_signal = _compute_raw_signal(df)
     if DEBUG: print(f"[DEBUG] Raw signal: {raw_signal}")
 
-    if df is None or df.empty or raw_signal is None:
+    if df is None or df.empty or raw_signal in [None, "NONE"]:
         return None, None
 
     last = df.iloc[-1]
     st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
 
-    # --- Morning signals → always ATMBUY / ATMSELL
-    if raw_signal in ["MBUY", "MSELL"]:
-        entry_signal = "ATMBUY" if raw_signal == "MBUY" else "ATMSELL"
-        exit_signal = "BUY" if raw_signal == "MBUY" else "SELL"
-        if DEBUG: print(f"[DEBUG] Morning signal mapped: {entry_signal}, {exit_signal}")
-        return entry_signal, exit_signal
+    # --- Entry signal conversion ---
+    if raw_signal == "MBUY":
+        entry_signal = "ATMBUY"  # Morning → always ATM
+    elif raw_signal == "MSELL":
+        entry_signal = "ATMSELL"  # Morning → always ATM
+    elif raw_signal in ["BBUY", "RBUY", "SBUY"]:
+        entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
+    elif raw_signal in ["BSELL", "RSELL", "SSELL"]:
+        entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
+    else:
+        entry_signal = None  # e.g., HA BULL / BEAR
 
-    # BOS, Reversal, HA signals
-    mapping = {
-        "BBUY": "BUY", "BSELL": "SELL",
-        "RBUY": "BUY", "RSELL": "SELL",
-        "SBUY": "BUY", "SSELL": "SELL",
-        "BUY": "BUY", "SELL": "SELL"
-    }
+    # --- Exit signal remains raw signal ---
+    exit_signal = raw_signal
 
-    if raw_signal in mapping:
-        exit_signal = mapping[raw_signal]
-        # Strict direction-based ATM/OTM mapping
-        if exit_signal == "BUY":
-            entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
-        else:  # SELL
-            entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
-        if DEBUG: print(f"[DEBUG] Mapped entry/exit: {entry_signal}, {exit_signal}")
-        return entry_signal, exit_signal
-
-    if DEBUG: print("[DEBUG] No entry/exit mapping found")
-    return None, None
+    if DEBUG: print(f"[DEBUG] Mapped entry: {entry_signal}, exit: {exit_signal}")
+    return entry_signal, exit_signal
 
 # -------------------- Dashboard --------------------
 def print_dashboard(df):
@@ -145,6 +126,7 @@ def print_dashboard(df):
         "ATMBUY": Fore.GREEN, "ATMSELL": Fore.RED,
         "OTMBUY": Fore.GREEN, "OTMSELL": Fore.RED,
         "BUY": Fore.GREEN, "SELL": Fore.RED,
+        "BULL": Fore.CYAN, "BEAR": Fore.MAGENTA,
         None: Fore.YELLOW
     }
     left_text = f"{color_map.get(entry_signal, Fore.YELLOW)}Entry: {entry_signal}{Style.RESET_ALL}"
