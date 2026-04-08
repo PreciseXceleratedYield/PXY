@@ -12,14 +12,15 @@ DEBUG = False
 
 def get_entry_signal(df: pd.DataFrame):
     """
-    Returns deterministic entry and exit signals:
+    Returns deterministic entry and exit signals.
     Entry: ATMBUY / ATMSELL / BULL / BEAR / NONE
-    Exit: BUY / SELL / BULL / BEAR / NONE
+    Exit:  BUY / SELL / BULL / BEAR / NONE
 
-    Special time-based rules:
-    - 9:00–9:16 IST: NONE / NONE
-    - 9:16–9:20 IST: raw close comparison (UP->ATMBUY/BUY, DOWN->ATMSELL/SELL)
-    - Rest of day: V/inverted V detection + trend fallback
+    Time-based rules:
+    1. 09:00–09:16 IST -> NONE / NONE
+    2. 09:16–09:20 IST -> raw close comparison only
+    3. After 09:20 -> HA V/inverted V for entry, raw V/inverted V for exit
+    4. Trend fallback if no V detected
     """
     if df is None or len(df) < 2:
         return "NONE", "NONE"
@@ -31,56 +32,57 @@ def get_entry_signal(df: pd.DataFrame):
     else:
         df.index = df.index.tz_convert(IST)
 
-    last_time = df.index[-1].time()
     ha_close = df['Close']  # HA close for entry detection
     raw_close = df['Close']  # Raw close for exit detection
+    last_time = df.index[-1].time()
 
-    # -------------------- 9:00–9:16 IST: No signals --------------------
+    # -------------------- 1. Early market 09:00–09:16 --------------------
     if time(9, 0) <= last_time < time(9, 16):
         return "NONE", "NONE"
 
-    # -------------------- 9:16–9:20 IST: raw close direction --------------------
+    # -------------------- 2. Raw close comparison 09:16–09:20 --------------------
     if time(9, 16) <= last_time <= time(9, 20):
         if raw_close.iloc[-1] >= raw_close.iloc[-2]:
             return "ATMBUY", "BUY"
         else:
             return "ATMSELL", "SELL"
 
-    # -------------------- Normal V/Inverted V detection --------------------
+    # -------------------- 3. Normal detection after 09:20 --------------------
     entry_signal = "NONE"
     exit_signal = "NONE"
 
+    # Loop over candles including running candle
     for i in range(len(df) - 2):
+        # Entry detection using HA close
         c1_h, c2_h, c3_h = ha_close.iloc[i], ha_close.iloc[i+1], ha_close.iloc[i+2]
-        c1_r, c2_r, c3_r = raw_close.iloc[i], raw_close.iloc[i+1], raw_close.iloc[i+2]
-
-        # Entry detection (HA Close)
         if entry_signal == "NONE":
             if c2_h < c1_h and c2_h < c3_h:
                 entry_signal = "ATMBUY"
             elif c2_h > c1_h and c2_h > c3_h:
                 entry_signal = "ATMSELL"
 
-        # Exit detection (Raw Close)
+        # Exit detection using raw close
+        c1_r, c2_r, c3_r = raw_close.iloc[i], raw_close.iloc[i+1], raw_close.iloc[i+2]
         if exit_signal == "NONE":
             if c2_r < c1_r and c2_r < c3_r:
                 exit_signal = "BUY"
             elif c2_r > c1_r and c2_r > c3_r:
                 exit_signal = "SELL"
 
+        # If both detected, stop
         if entry_signal != "NONE" and exit_signal != "NONE":
             break
 
-    # -------------------- Trend fallback --------------------
+    # -------------------- 4. Trend fallback --------------------
     if entry_signal == "NONE":
-        entry_signal = "BULL" if ha_close.iloc[-1] >= ha_close.iloc[-2] else "BEAR"
+        entry_signal = "BULL" if ha_close.iloc[-2] <= ha_close.iloc[-1] else "BEAR"
     if exit_signal == "NONE":
-        exit_signal = "BULL" if raw_close.iloc[-1] >= raw_close.iloc[-2] else "BEAR"
+        exit_signal = "BULL" if raw_close.iloc[-2] <= raw_close.iloc[-1] else "BEAR"
 
     return entry_signal, exit_signal
 
 
-# -------------------- Dashboard --------------------
+# -------------------- Optional Dashboard --------------------
 def print_dashboard(df):
     entry_signal, exit_signal = get_entry_signal(df)
     color_map = {
