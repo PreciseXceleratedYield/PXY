@@ -42,15 +42,32 @@ def get_bos(df):
         return "ERR"
 
 
-def get_bos_bar(df):
+def get_bos_bar(df, c1_col=None, c2_col=None):
     """
     Returns a visual bar for BOS-like signal:
     - GREEN for BBUY / RBUY
     - RED for BSELL / RSELL
     - Starts from middle reference
+    - If C1/C2 comparison fails, signal is treated as NONE
     """
     try:
         signal = get_bos(df)
+
+        # Apply C1/C2 check internally
+        if signal not in ["NONE", "ERR"] and c1_col and c2_col:
+            try:
+                last_c1 = df.iloc[-2][c1_col]
+                last_c2 = df.iloc[-2][c2_col]
+
+                if signal in ["BBUY", "RBUY"]:
+                    if last_c1 < last_c2:
+                        signal = "NONE"
+                elif signal in ["BSELL", "RSELL"]:
+                    if last_c1 > last_c2:
+                        signal = "NONE"
+            except Exception:
+                signal = "ERR"
+
         if signal in ["NONE", "ERR"]:
             return signal, signal
 
