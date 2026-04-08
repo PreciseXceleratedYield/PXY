@@ -9,7 +9,7 @@ init(autoreset=True)
 PRINT_DASHBOARD = False
 
 # -------------------- CONFIG --------------------
-BASE_TARGET_POINTS = 15  # Default points used in target calculation
+BASE_TARGET_POINTS = 12  # Default points used in target calculation
 MAX_DEPTH = 5             # Maximum depth multiplier in Phase 2
 MAX_TOTAL_POINTS = 99.0   # Cap for total points
 
