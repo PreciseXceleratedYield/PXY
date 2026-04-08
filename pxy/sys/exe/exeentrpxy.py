@@ -8,7 +8,7 @@ import math
 import traceback
 
 # --- GLOBAL DEBUG SWITCH ---
-DEBUG = True  # Set to False for production / "no"
+DEBUG = False  # Set to False for production / "no"
 # ---------------------------
 
 init(autoreset=True)
