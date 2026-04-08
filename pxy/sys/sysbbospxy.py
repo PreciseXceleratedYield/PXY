@@ -22,7 +22,7 @@ def get_bos(df):
         structure_high = recent['High'].max()
         structure_low  = recent['Low'].min()
         mid = (structure_high + structure_low) / 2
-        last_close = df.iloc[-2]['Close']
+        last_close = df.iloc[-2]['Close']  # penultimate closed candle
 
         # Breakout detection
         if last_close > structure_high:
@@ -48,6 +48,7 @@ def get_bos_bar(df, c1_col=None, c2_col=None):
     - GREEN for BBUY / RBUY
     - RED for BSELL / RSELL
     - Starts from middle reference
+    - Uses C1 as forming candle, C2 as reference
     - If C1/C2 comparison fails, signal is treated as NONE
     """
     try:
@@ -56,14 +57,14 @@ def get_bos_bar(df, c1_col=None, c2_col=None):
         # Apply C1/C2 check internally
         if signal not in ["NONE", "ERR"] and c1_col and c2_col:
             try:
-                last_c1 = df.iloc[-2][c1_col]
-                last_c2 = df.iloc[-2][c2_col]
+                last_c1 = df.iloc[-1][c1_col]  # forming candle
+                last_c2 = df.iloc[-2][c2_col]  # last closed candle
 
                 if signal in ["BBUY", "RBUY"]:
-                    if last_c1 < last_c2:
+                    if last_c1 < last_c2:  # confirmation fails
                         signal = "NONE"
                 elif signal in ["BSELL", "RSELL"]:
-                    if last_c1 > last_c2:
+                    if last_c1 > last_c2:  # confirmation fails
                         signal = "NONE"
             except Exception:
                 signal = "ERR"
