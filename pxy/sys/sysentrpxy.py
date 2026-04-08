@@ -14,7 +14,7 @@ def _compute_final_signal(df: pd.DataFrame) -> str:
     Entry signal returns ATMBUY/ATMSELL/BULL/BEAR/NONE based on HA flips
     """
     if df is None or not all(col in df.columns for col in ['Open','High','Low','Close']):
-        return None
+        return NONE
 
     try:
         ha_signal, _, _, _ = detect_ha_flip_signal(df)
@@ -28,11 +28,11 @@ def _compute_final_signal(df: pd.DataFrame) -> str:
         elif ha_signal == "BEAR":
             return "BEAR"
         else:
-            return None
+            return NONE
 
     except Exception as e:
         print(f"[ERROR] HA Logic: {e}")
-        return None
+        return NONE
 
 
 # -------------------- EXIT VALIDATION --------------------
@@ -46,7 +46,7 @@ def _validate_with_raw_direction(df: pd.DataFrame, entry_signal: str) -> str:
     - None -> None
     """
     if entry_signal is None:
-        return None
+        return NONE
 
     mapping = {
         "ATMBUY": "BUY",
