@@ -52,3 +52,16 @@ def get_entry_signal(df: pd.DataFrame):
         return "ATMSELL", "SELL"
     else:
         return None, None  # equal → no signal
+
+
+# -------------------- Run if main --------------------
+if __name__ == "__main__":
+    # Fetch example data
+    df = fetch_yf_data("NSE:TCS", period="1d", interval="1m")
+    
+    if df is not None and not df.empty:
+        entry_signal, exit_signal = get_entry_signal(df)
+        if entry_signal is None:
+            print("No signal at this time.")
+        else:
+            print(f"Entry Signal: {entry_signal}, Exit Signal: {exit_signal}")
