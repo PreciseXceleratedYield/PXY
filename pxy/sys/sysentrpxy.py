@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py  (PRODUCTION - FINAL)
+# sysentrpxy.py
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -22,22 +22,14 @@ def _map_entry_signal(entry_signal: str) -> str:
 # ------------------------------
 # MAIN FUNCTION
 # ------------------------------
-def get_entry_signal():
+def get_entry_signal(df=None):
     try:
-        entry_signal, exit_signal = get_signal()
+        entry_signal, exit_signal = get_signal(df)
 
         final_entry = _map_entry_signal(entry_signal)
-        final_exit = exit_signal  # unchanged
+        final_exit = exit_signal
 
         return final_entry, final_exit
 
     except Exception:
         return "NONE", "NONE"
-
-
-# ------------------------------
-# MANUAL RUN
-# ------------------------------
-if __name__ == "__main__":
-    entry, exit = get_entry_signal()
-    print(f"ENTRY: {entry} | EXIT: {exit}")
