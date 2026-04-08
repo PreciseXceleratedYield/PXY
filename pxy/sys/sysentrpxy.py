@@ -2,7 +2,6 @@
 import pandas as pd
 import pytz
 from sysdtafpxy import fetch_yf_data
-from sysstrndpxy import calculate_supertrend
 
 # Timezone
 IST = pytz.timezone("Asia/Kolkata")
@@ -10,10 +9,10 @@ IST = pytz.timezone("Asia/Kolkata")
 # -------------------- Deterministic Entry Signal --------------------
 def get_entry_signal(df: pd.DataFrame):
     """
-    Strict exclusive entry signal with no assumptions:
+    Strict exclusive entry signal with no assumptions, without SuperTrend:
     - 08:55–09:15 IST → no signal
-    - 09:16–09:26 IST → compare only last 2 candles (C1 vs C2), ATM only
-    - After 09:26 → compare last vs previous candle, strict ATM/OTM
+    - 09:16–09:26 IST → compare only last 2 candles (C1 vs C2), strict ATMBUY/ATMSELL
+    - After 09:26 → compare last vs previous candle, strict ATMBUY/ATMSELL
     - Equal candles → no signal
     - No fallbacks anywhere
     """
@@ -43,15 +42,13 @@ def get_entry_signal(df: pd.DataFrame):
 
     # -------------------- After Morning → Normal Logic --------------------
     closes = df['Close']
-    st_series = df['ST'] if 'ST' in df.columns else closes
-
     last_close = closes.iloc[-1]
     prev_close = closes.iloc[-2]
 
-    # Strict exclusive signals with no assumptions
+    # Strict exclusive signals
     if last_close > prev_close:
-        return ("ATMBUY" if last_close >= st_series.iloc[-1] else "OTMBUY", "BUY")
+        return "ATMBUY", "BUY"
     elif last_close < prev_close:
-        return ("ATMSELL" if last_close <= st_series.iloc[-1] else "OTMSELL", "SELL")
+        return "ATMSELL", "SELL"
     else:
         return None, None  # equal → no signal
