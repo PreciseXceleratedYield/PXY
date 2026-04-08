@@ -46,15 +46,15 @@ def target_price(row):
 
         # 4️⃣ TARGET LOGIC
         if not is_aligned:
-            total_points = 10.0
+            total_points = 20
             phase = "Phase 3 (Misalignment)"
 
         elif depth >= 2:
-            total_points = atr * power * min(depth, 5)
+            total_points = max(20, atr * power * min(depth, 5))
             phase = "Phase 2 (Deep Trend)"
 
         else:
-            total_points = max(10.0, atr * power)
+            total_points = max(20.0, atr * power)
             phase = "Phase 1 (Initial Entry)"
 
         total_points = min(total_points, 99.0)
@@ -79,6 +79,11 @@ def target_price(row):
             print(f"{'-'*42}\n")
 
         return round(target, 2)
+
+    except Exception as e:
+        # Optional: print error for debugging
+        print(f"Error calculating target for {row.get('symbol', 'UNKNOWN')}: {e}")
+        return 0
 
     except Exception as e:
         if PRINT_DASHBOARD:
