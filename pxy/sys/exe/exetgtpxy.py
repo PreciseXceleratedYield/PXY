@@ -8,7 +8,10 @@ init(autoreset=True)
 # ✅ GLOBAL PRINT FLAG (SET THIS TO False TO DISABLE PRINTS)
 PRINT_DASHBOARD = False
 
+# -------------------- CONFIG --------------------
+BASE_TARGET_POINTS = 15  # Default points used in target calculation
 
+# -------------------- FUNCTION --------------------
 def target_price(row):
     """
     3-PHASE OPTION TARGET (Premium Based):
@@ -27,7 +30,6 @@ def target_price(row):
         atr = float(row.get("atr", 20))
         ce_p = float(row.get("ce_power", 1.0))
         pe_p = float(row.get("pe_power", 1.0))
-
         exit_type = str(row.get("exit", "NONE")).upper()
 
         # 3️⃣ ALIGNMENT
@@ -46,15 +48,15 @@ def target_price(row):
 
         # 4️⃣ TARGET LOGIC
         if not is_aligned:
-            total_points = 20
+            total_points = BASE_TARGET_POINTS
             phase = "Phase 3 (Misalignment)"
 
         elif depth >= 2:
-            total_points = max(20, atr * power * min(depth, 5))
+            total_points = max(BASE_TARGET_POINTS, atr * power * min(depth, 5))
             phase = "Phase 2 (Deep Trend)"
 
         else:
-            total_points = max(20.0, atr * power)
+            total_points = max(BASE_TARGET_POINTS, atr * power)
             phase = "Phase 1 (Initial Entry)"
 
         total_points = min(total_points, 99.0)
@@ -81,12 +83,5 @@ def target_price(row):
         return round(target, 2)
 
     except Exception as e:
-        # Optional: print error for debugging
         print(f"Error calculating target for {row.get('symbol', 'UNKNOWN')}: {e}")
         return 0
-
-    except Exception as e:
-        if PRINT_DASHBOARD:
-            print(Fore.RED + f"Error calculating target: {e}")
-        fallback = round(min(float(row.get("pxy_entry", 0)) + 10, 99), 2)
-        return fallback
