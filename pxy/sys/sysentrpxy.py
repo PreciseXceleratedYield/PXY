@@ -5,7 +5,7 @@ import pytz
 from colorama import Fore, Style, init
 
 from sysdtafpxy import fetch_yf_data
-from sysmktpxy import detect_ha_flip_signal
+from syshkinpxy import detect_ha_flip_signal
 from sysstrndpxy import calculate_supertrend
 from sysbbospxy import get_bos_bar
 
@@ -40,7 +40,7 @@ def _get_morning_direction(df: pd.DataFrame):
 
 # -------------------- Compute Raw Signal --------------------
 def _compute_raw_signal(df: pd.DataFrame) -> str:
-    if df is None or len(df) < 2 or not all(col in df.columns for col in ['Open','High','Low','Close']):
+    if df is None or not all(col in df.columns for col in ['Open','High','Low','Close']):
         return None
 
     now = datetime.now(IST).time()
@@ -49,7 +49,7 @@ def _compute_raw_signal(df: pd.DataFrame) -> str:
     if 'ST' not in df.columns:
         df = calculate_supertrend(df)
 
-    # --- Morning Phase: highest priority ---
+    # --- Morning Phase ---
     if time(9,14) <= now <= time(9,16):
         return None  # Early morning, no signal
     if time(9,17) <= now <= time(9,30):
@@ -70,7 +70,7 @@ def _compute_raw_signal(df: pd.DataFrame) -> str:
         pass
 
     # --- Reversal Phase ---
-    ha_signal, ha_open, ha_close, ha_color = detect_ha_flip_signal(df)
+    ha_signal, _, _, _ = detect_ha_flip_signal(df)
     if ha_signal in ["RBUY", "RSELL"]:
         return ha_signal
 
@@ -80,53 +80,51 @@ def _compute_raw_signal(df: pd.DataFrame) -> str:
     if ha_signal in ["SELL", "BEAR"]:
         return "SSELL"
 
+    if ha_signal in ["SBUY", "SSELL"]:
+        return ha_signal
+
     return None
 
-# -------------------- Map Raw Signal to Entry/Exit --------------------
+# -------------------- Map Raw Signal to Entry (ATM/OTM) --------------------
 def get_entry_signal(df: pd.DataFrame):
-    if df is None or df.empty:
+    raw_signal = _compute_raw_signal(df)
+    if df is None or df.empty or raw_signal is None:
         return None, None
 
     last = df.iloc[-1]
-    if 'ST' not in df.columns:
-        df = calculate_supertrend(df)
-    st_value = df['ST'].iloc[-1]
+    st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
 
-    raw_signal = _compute_raw_signal(df)
+    # --- Morning signals → always ATMBUY / ATMSELL
+    if raw_signal in ["MBUY", "MSELL"]:
+        entry_signal = "ATMBUY" if raw_signal == "MBUY" else "ATMSELL"
+        exit_signal = "BUY" if raw_signal == "MBUY" else "SELL"
+        return entry_signal, exit_signal
 
-    # --- Determine true HA direction from last candle ---
-    ha_signal, ha_open, ha_close, ha_color = detect_ha_flip_signal(df)
-    if ha_close is not None and ha_open is not None:
-        last_ha_close = ha_close.iloc[-1]
-        last_ha_open = ha_open.iloc[-1]
-        true_direction = "BUY" if last_ha_close > last_ha_open else "SELL"
-    else:
-        # fallback to raw_signal mapping
-        direction_map = {
-            "MBUY": "BUY", "BBUY": "BUY", "RBUY": "BUY", "SBUY": "BUY", "BUY": "BUY",
-            "MSELL": "SELL", "BSELL": "SELL", "RSELL": "SELL", "SSELL": "SELL", "SELL": "SELL"
-        }
-        true_direction = direction_map.get(raw_signal, None)
+    # BOS, Reversal, HA signals
+    mapping = {
+        "BBUY": "BUY", "BSELL": "SELL",
+        "RBUY": "BUY", "RSELL": "SELL",
+        "SBUY": "BUY", "SSELL": "SELL",
+        "BUY": "BUY", "SELL": "SELL"
+    }
 
-    if true_direction is None:
-        return None, None
+    if raw_signal in mapping:
+        exit_signal = mapping[raw_signal]
+        # Strict direction-based ATM/OTM mapping
+        if exit_signal == "BUY":
+            entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
+        else:  # SELL
+            entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
+        return entry_signal, exit_signal
 
-    # --- Map ATM/OTM based on price vs ST ---
-    if true_direction == "BUY":
-        entry_signal = "ATMBUY" if last['Close'] > st_value else "OTMBUY"
-    else:
-        entry_signal = "ATMSELL" if last['Close'] < st_value else "OTMSELL"
-
-    exit_signal = true_direction  # always BUY/SELL
-
-    return entry_signal, exit_signal
+    return None, None
 
 # -------------------- Dashboard --------------------
 def print_dashboard(df):
     entry_signal, exit_signal = get_entry_signal(df)
     color_map = {
-        "ATMBUY": Fore.GREEN, "OTMBUY": Fore.GREEN,
-        "ATMSELL": Fore.RED, "OTMSELL": Fore.RED,
+        "ATMBUY": Fore.GREEN, "ATMSELL": Fore.RED,
+        "OTMBUY": Fore.GREEN, "OTMSELL": Fore.RED,
         "BUY": Fore.GREEN, "SELL": Fore.RED,
         None: Fore.YELLOW
     }
