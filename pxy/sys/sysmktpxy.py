@@ -1,5 +1,5 @@
 # ==================================================
-# sysmktpxy.py  (SINGLE RUN - NO LOOP + DEBUG)
+# sysmktpxy.py  (SINGLE RUN - NO LOOP + MID PRICE)
 # ==================================================
 
 import pandas as pd
@@ -27,31 +27,6 @@ def three_candle_signal(c1, c2, c3):
 
 
 # ------------------------------
-# TradingView HA Calculation
-# ------------------------------
-def apply_heikin_ashi(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.copy()
-
-    # HA Close
-    df['ha_close'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
-
-    # ✅ Correct HA Open initialization (TradingView style)
-    ha_open = [(df['Open'].iloc[0] + df['Close'].iloc[0]) / 2]
-
-    # ✅ Recursive HA Open
-    for i in range(1, len(df)):
-        ha_open.append((ha_open[i - 1] + df['ha_close'].iloc[i - 1]) / 2)
-
-    df['ha_open'] = ha_open
-
-    # HA High / Low
-    df['ha_high'] = df[['High', 'ha_open', 'ha_close']].max(axis=1)
-    df['ha_low'] = df[['Low', 'ha_open', 'ha_close']].min(axis=1)
-
-    return df
-
-
-# ------------------------------
 # Main Function
 # ------------------------------
 def get_signal():
@@ -60,15 +35,14 @@ def get_signal():
     if df is None or len(df) < 3:
         return "NONE", "NONE"
 
-    # Apply HA
-    df = apply_heikin_ashi(df)
+    # ---------- ENTRY (MID PRICE) ----------
+    df['mid_price'] = (df['Open'] + df['Close']) / 2
 
-    # ---------- ENTRY (HA BODY) ----------
-    h1 = df['ha_close'].iloc[-3] - df['ha_open'].iloc[-3]
-    h2 = df['ha_close'].iloc[-2] - df['ha_open'].iloc[-2]
-    h3 = df['ha_close'].iloc[-1] - df['ha_open'].iloc[-1]
+    m1 = df['mid_price'].iloc[-3]
+    m2 = df['mid_price'].iloc[-2]
+    m3 = df['mid_price'].iloc[-1]
 
-    entry_signal = three_candle_signal(h1, h2, h3)
+    entry_signal = three_candle_signal(m1, m2, m3)
 
     # ---------- EXIT (RAW CLOSE) ----------
     c1 = df['Close'].iloc[-3]
@@ -90,17 +64,15 @@ if __name__ == "__main__":
         print("Not enough data")
         exit()
 
-    # Apply HA
-    df = apply_heikin_ashi(df)
+    # ---------- MID PRICE ----------
+    df['mid_price'] = (df['Open'] + df['Close']) / 2
 
     # Debug columns
-    df['ha_body'] = df['ha_close'] - df['ha_open']
     df['candle_body'] = df['Close'] - df['Open']
 
     debug_cols = [
         'Open', 'High', 'Low', 'Close',
-        'ha_open', 'ha_close',
-        'ha_body', 'candle_body'
+        'mid_price', 'candle_body'
     ]
 
     # 🔥 Print last 10 candles (10 mins)
