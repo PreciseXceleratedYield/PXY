@@ -33,15 +33,29 @@ def detect_ha_flip_signal(df=None, last_n=21):
             break
     current_depth = max(current_depth, 1)
 
-    # ---------------- PAST DEPTH (aligned to chart) ----------------
+    # ---------------- PAST DEPTH (consecutive same-color before current streak) ----------------
+    colors = ha_color.tolist()           # full history
+    current_color = colors[-1]           # last forming candle
+    
+    # Find where the current streak of current_color starts
+    current_streak_start = len(colors) - 1
+    for i in reversed(range(len(colors) - 1)):
+        if colors[i] != current_color:
+            current_streak_start = i + 1
+            break
+    
+    # Previous color (immediately before current streak)
+    prev_color = colors[current_streak_start - 1] if current_streak_start > 0 else "none"
+    
+    # Count consecutive candles of prev_color immediately before current streak
     past_depth = 0
-    for c in reversed(colors[:-1]):   # look at all previous colors except current
-        if c == prev_color:
+    for i in reversed(range(current_streak_start)):
+        if colors[i] == prev_color:
             past_depth += 1
         else:
             break
     
-    past_depth = max(past_depth, 1)  # ensure at least 1
+    past_depth = max(past_depth, 1)     # ensure at least 1
 
     # Signal detection
     if current_color == "none" or prev_color == "none":
