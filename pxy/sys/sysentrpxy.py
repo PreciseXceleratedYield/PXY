@@ -43,7 +43,7 @@ def get_entry_signal(df: pd.DataFrame):
             raw_signal = "SELL"
             break
     if raw_signal is None:
-        raw_signal = "BUY"  # fallback default
+        raw_signal = "NONE"  # fallback default
 
     # -------------------- Entry Signal Mapping (ATM/OTM) --------------------
     last_close = closes.iloc[-1]
