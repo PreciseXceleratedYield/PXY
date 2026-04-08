@@ -43,26 +43,17 @@ def get_entry_signal(df: pd.DataFrame):
             raw_signal = "SELL"
             break
     if raw_signal is None:
-        raw_signal = "NONE"  # fallback default
+        raw_signal = "BUY"  # fallback default
 
     # -------------------- Entry Signal Mapping (ATM/OTM) --------------------
     last_close = closes.iloc[-1]
     last_st = st_series.iloc[-1]
 
-    # Strict exclusive mapping
     if raw_signal == "BUY":
-        if last_close > last_st:
-            entry_signal = "ATMBUY"
-        else:
-            entry_signal = None  # no signal if not strictly above
-    elif raw_signal == "SELL":
-        if last_close < last_st:
-            entry_signal = "ATMSELL"
-        else:
-            entry_signal = None  # no signal if not strictly below
+        entry_signal = "ATMBUY" if last_close >= last_st else "OTMBUY"
     else:
-        entry_signal = None  # safety, though raw_signal should be BUY/SELL
-    
+        entry_signal = "ATMSELL" if last_close <= last_st else "OTMSELL"
+
     return entry_signal, raw_signal
 
 # -------------------- Dashboard (optional) --------------------
@@ -76,6 +67,13 @@ def print_dashboard(df):
     left_text = f"{color_map.get(entry_signal, Fore.YELLOW)}Entry: {entry_signal}{Style.RESET_ALL}"
     right_text = f"{color_map.get(exit_signal, Fore.YELLOW)}Exit: {exit_signal}{Style.RESET_ALL}"
     print(f"{left_text:<25}{right_text:>25}")
+
+# -------------------- Self-test --------------------
+if __name__ == "__main__":
+    df = fetch_yf_data()
+    if df is not None and not df.empty:
+        df = calculate_supertrend(df)  # needed for ATM/OTM
+    print_dashboard(df)
 
 # -------------------- Self-test --------------------
 if __name__ == "__main__":
