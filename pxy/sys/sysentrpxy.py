@@ -19,8 +19,7 @@ def get_entry_signal(df: pd.DataFrame):
     Time-based rules:
     1. 09:00–09:16 IST -> NONE / NONE
     2. 09:16–09:20 IST -> raw close comparison only
-    3. After 09:20 -> HA V/inverted V for entry, raw V/inverted V for exit
-    4. Trend fallback if no V detected
+    3. After 09:20 -> V/inverted V detection + trend fallback
     """
     if df is None or len(df) < 2:
         return "NONE", "NONE"
@@ -47,13 +46,11 @@ def get_entry_signal(df: pd.DataFrame):
         else:
             return "ATMSELL", "SELL"
 
-    # -------------------- 3. Normal detection after 09:20 --------------------
+    # -------------------- 3. V / Inverted V detection --------------------
     entry_signal = "NONE"
     exit_signal = "NONE"
-
-    # Loop over candles including running candle
     for i in range(len(df) - 2):
-        # Entry detection using HA close
+        # Entry (HA close)
         c1_h, c2_h, c3_h = ha_close.iloc[i], ha_close.iloc[i+1], ha_close.iloc[i+2]
         if entry_signal == "NONE":
             if c2_h < c1_h and c2_h < c3_h:
@@ -61,7 +58,7 @@ def get_entry_signal(df: pd.DataFrame):
             elif c2_h > c1_h and c2_h > c3_h:
                 entry_signal = "ATMSELL"
 
-        # Exit detection using raw close
+        # Exit (Raw close)
         c1_r, c2_r, c3_r = raw_close.iloc[i], raw_close.iloc[i+1], raw_close.iloc[i+2]
         if exit_signal == "NONE":
             if c2_r < c1_r and c2_r < c3_r:
@@ -69,15 +66,14 @@ def get_entry_signal(df: pd.DataFrame):
             elif c2_r > c1_r and c2_r > c3_r:
                 exit_signal = "SELL"
 
-        # If both detected, stop
         if entry_signal != "NONE" and exit_signal != "NONE":
             break
 
-    # -------------------- 4. Trend fallback --------------------
+    # -------------------- 4. Trend fallback using last 2 candles --------------------
     if entry_signal == "NONE":
-        entry_signal = "BULL" if ha_close.iloc[-2] <= ha_close.iloc[-1] else "BEAR"
+        entry_signal = "BULL" if ha_close.iloc[-2] < ha_close.iloc[-1] else "BEAR"
     if exit_signal == "NONE":
-        exit_signal = "BULL" if raw_close.iloc[-2] <= raw_close.iloc[-1] else "BEAR"
+        exit_signal = "BULL" if raw_close.iloc[-2] < raw_close.iloc[-1] else "BEAR"
 
     return entry_signal, exit_signal
 
