@@ -9,7 +9,8 @@ MAX_BAR_LENGTH = 42
 
 def get_day_candle_bar(df=None):
     """
-    Returns a 42-width colored bar for the LATEST 1-MIN candle
+    Returns a 42-width colored bar for the LATEST 1-MIN candle.
+    Falls back gracefully if df is empty or malformed.
     """
     try:
         if df is None or df.empty:
@@ -18,48 +19,40 @@ def get_day_candle_bar(df=None):
         if df.empty or len(df) < 1:
             return "No candle data"
 
-        # ✅ ONLY last 1-min candle
         row = df.iloc[-1]
+        o, h, l, c = row['Open'], row['High'], row['Low'], row['Close']
 
-        o = row['Open']
-        h = row['High']
-        l = row['Low']
-        c = row['Close']
+        candle_range = h - l
+        if candle_range == 0:
+            candle_range = 1e-5  # prevent division by zero
 
-        candle_length = h - l
-        if candle_length == 0:
-            candle_length = 1e-5
+        # Calculate % of wicks/body relative to range
+        if c >= o:  # bullish
+            lower_pct = (o - l) / candle_range
+            body_pct  = (c - o) / candle_range
+        else:       # bearish
+            lower_pct = (c - l) / candle_range
+            body_pct  = (o - c) / candle_range
 
-        # Body + wicks %
-        if c > o:  # bullish
-            n = round(((o - l) / candle_length) * 100)
-            x = round(((c - o) / candle_length) * 100)
-        else:      # bearish
-            n = round(((c - l) / candle_length) * 100)
-            x = round(((o - c) / candle_length) * 100)
+        upper_pct = 1 - lower_pct - body_pct
 
-        m = 100 - n - x
-
-        # Convert to bar length
-        n_len = round((n / 100) * MAX_BAR_LENGTH)
-        x_len = round((x / 100) * MAX_BAR_LENGTH)
-        m_len = MAX_BAR_LENGTH - n_len - x_len
+        # Convert to lengths for the bar
+        lower_len = round(lower_pct * MAX_BAR_LENGTH)
+        body_len  = max(1, round(body_pct * MAX_BAR_LENGTH))
+        upper_len = MAX_BAR_LENGTH - lower_len - body_len
 
         bar = ""
-
         # Lower wick
-        bar += Fore.LIGHTBLACK_EX + '█' * n_len
-
+        bar += Fore.LIGHTBLACK_EX + '█' * lower_len
         # Body
         if c > o:
-            bar += Fore.GREEN + '█' * x_len
+            bar += Fore.GREEN + '█' * body_len
         elif o > c:
-            bar += Fore.RED + '█' * x_len
+            bar += Fore.RED + '█' * body_len
         else:
-            bar += Fore.YELLOW + '█' * x_len
-
+            bar += Fore.YELLOW + '█' * body_len
         # Upper wick
-        bar += Fore.LIGHTBLACK_EX + '█' * m_len
+        bar += Fore.LIGHTBLACK_EX + '█' * upper_len
 
         return bar + Style.RESET_ALL
 
