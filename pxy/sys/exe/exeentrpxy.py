@@ -22,7 +22,7 @@ ATM_OFFSET = [0, -50, -100, -150, -200][today] if today <= 4 else 0
 OTM_OFFSET = ATM_OFFSET + 200
 SBEULYL_OFFSET = ATM_OFFSET + 300
 
-print(f"Today: {today} | ATM: {ATM_OFFSET} | OTM: {OTM_OFFSET} | SBEULYL: {SBEULYL_OFFSET}")
+print(f"Today:{today}|ATM:{ATM_OFFSET}|OTM:{OTM_OFFSET}|SBEULYL:{SBEULYL_OFFSET}")
 
 # --- DYNAMIC PATH FIX ---
 HERE = Path(__file__).resolve().parent
