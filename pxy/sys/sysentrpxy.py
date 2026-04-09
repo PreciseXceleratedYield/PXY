@@ -59,7 +59,7 @@ def get_entry_signal(df=None):
         # Check for ALLBUY window (entry only)
         # ------------------------
         if BLOCK_ALLBUY_START <= now <= BLOCK_ALLBUY_END:
-            final_entry = "ALLBUY"
+            final_entry = "SBEULYL"
         else:
             final_entry = _map_entry_signal(entry_signal)
 
