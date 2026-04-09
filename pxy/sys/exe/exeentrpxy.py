@@ -8,8 +8,8 @@ from colorama import Fore, init, Style
 import math
 import traceback
 
-# --- GLOBAL DEBUG SWITCH ---
-DEBUG = False
+# --- FULL DEBUG SWITCH ---
+DEBUG = True  # <---- ENABLED
 init(autoreset=True)
 LOT_SIZE = 65  # Maximum qty per symbol
 
@@ -64,7 +64,7 @@ def print_dashboard(funds, pos, symbol, strike, action, signal, status, qty_boug
      =================================
     """)
 
-# --- EXECUTION ---
+# --- EXECUTION WITH DEBUG ---
 def execute_order(client, symbol, qty, side):
     try:
         params = {
@@ -82,33 +82,30 @@ def execute_order(client, symbol, qty, side):
         }
         dprint(f"Executing Order for {symbol} | Params: {params}", Fore.YELLOW)
         res = client.place_order(**params)
-        dprint(f"Order Response: {res}", Fore.GREEN)
+        dprint(f"[API RESPONSE] {res}", Fore.MAGENTA)
         return res if res else {"stat": "Not_Ok", "errMsg": "No response from API"}
     except Exception as e:
-        if DEBUG: dprint(f"Order Execution Exception: {traceback.format_exc()}", Fore.RED)
+        dprint(f"Order Execution Exception: {traceback.format_exc()}", Fore.RED)
         return {"stat": "Not_Ok", "errMsg": str(e)}
 
-# --- STRICT SAFE BUY ---
-orders_placed = set()  # Track symbols already ordered in this run
+# --- STRICT SAFE BUY WITH FULL DEBUG ---
+orders_placed = set()
 
 def safe_buy(client, symbol, max_qty=LOT_SIZE):
-    """
-    Ultra-safe buy:
-    - Checks broker positions
-    - Ensures only one buy per run
-    - Max qty enforcement
-    Returns actual qty bought.
-    """
     try:
         pos = {}
         try:
             pos = get_position_summary(client)
+            dprint(f"Position Summary: {pos}", Fore.BLUE)
             if not isinstance(pos, dict):
                 pos = {}
-        except Exception:
+        except Exception as e:
+            dprint(f"Position fetch exception: {e}", Fore.RED)
             pos = {}
 
         current_qty = pos.get(symbol, 0)
+        dprint(f"Current qty for {symbol}: {current_qty}", Fore.CYAN)
+
         if current_qty >= max_qty:
             print(f"{Fore.YELLOW}⏭ {symbol} already at max {current_qty}, skipping buy")
             return 0
@@ -122,20 +119,20 @@ def safe_buy(client, symbol, max_qty=LOT_SIZE):
             return 0
 
         print(f"{Fore.CYAN}🚀 SAFE BUY: {symbol} | Qty: {buy_qty} | Current: {current_qty}")
-        execute_order(client, symbol, buy_qty, "BUY")
+        res = execute_order(client, symbol, buy_qty, "BUY")
+        dprint(f"Order execution result: {res}", Fore.MAGENTA)
         orders_placed.add(symbol)
         return buy_qty
     except Exception as e:
         print(f"{Fore.RED}❌ Error in safe_buy for {symbol}: {e}")
         return 0
 
-# --- MAIN ASYNC LOGIC ---
+# --- MAIN ASYNC LOGIC WITH FULL DEBUG ---
 async def main():
     try:
         now = datetime.now(IST).time()
         dprint(f"Current IST Time: {now}")
 
-        # Skip buffer windows
         skip_windows = [
             (time(9, 14), time(9, 16)),
             (time(15, 16), time(15, 31))
@@ -145,33 +142,31 @@ async def main():
                 dprint(f"Inside {start.strftime('%H:%M')} - {end.strftime('%H:%M')} buffer. Skipping execution.")
                 return
 
-        # Session
         client = get_session()
         if not client:
             print(f"{Fore.RED}❌ Session failed")
             return
 
-        # Market Data
         df = fetch_yf_data()
         if df is None or df.empty:
             print(f"{Fore.RED}❌ No data from YF")
             return
 
-        # Entry Signal
         entry_signal, reversal = get_entry_signal(df)
         sig = entry_signal.upper().strip()
         ltp = df['Close'].iloc[-1]
-        dprint(f"Raw Signal: {entry_signal} | Reversal: {reversal}")
+        dprint(f"Raw Signal: {entry_signal} | Reversal: {reversal}", Fore.GREEN)
+        dprint(f"LTP: {ltp}", Fore.GREEN)
 
         funds = get_available_funds(client)
         try:
             pos = get_position_summary(client)
+            dprint(f"Fetched Position Summary: {pos}", Fore.BLUE)
             if not isinstance(pos, dict):
                 pos = {}
         except Exception:
             pos = {}
 
-        # --- SIGNAL HANDLING ---
         if sig == "SBEULYL":
             ce_strike = round_up_50(ltp + SBEULYL_OFFSET)
             pe_strike = round_down_50(ltp - SBEULYL_OFFSET)
@@ -201,10 +196,7 @@ async def main():
             return
 
     except Exception:
-        if DEBUG:
-            print(f"{Fore.RED}{traceback.format_exc()}")
-        else:
-            print(f"{Fore.RED}❌ Main execution error occurred. Enable DEBUG for details.")
+        print(f"{Fore.RED}{traceback.format_exc()}")
 
 if __name__ == "__main__":
     asyncio.run(main())
