@@ -18,11 +18,11 @@ LOT_SIZE = 65
 # --- CONFIGURABLE OFFSETS ---
 IST = pytz.timezone("Asia/Kolkata")
 today = datetime.now(IST).weekday()  # Monday=0 ... Friday=4
-ATM_OFFSET = [0, 50, 100, 150, 200][today] if today <= 4 else 0
-OTM_OFFSET = 200
-SBEULYL_OFFSET = 300
+ATM_OFFSET = [0, -50, -100, -150, -200][today] if today <= 4 else 0
+OTM_OFFSET = ATM_OFFSET + 200
+SBEULYL_OFFSET = ATM_OFFSET + 300
 
-print(f"Today: {today} | ATM_OFFSET: {ATM_OFFSET}, OTM_OFFSET: {OTM_OFFSET}, SBEULYL_OFFSET: {SBEULYL_OFFSET}")
+print(f"Today: {today} | ATM: {ATM_OFFSET} | OTM: {OTM_OFFSET} | SBEULYL: {SBEULYL_OFFSET}")
 
 # --- DYNAMIC PATH FIX ---
 HERE = Path(__file__).resolve().parent
