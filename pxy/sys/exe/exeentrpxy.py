@@ -9,7 +9,7 @@ import math
 import traceback
 
 # --- FULL DEBUG SWITCH ---
-DEBUG = True  # <---- ENABLED
+DEBUG = True  # Enable full debug
 init(autoreset=True)
 LOT_SIZE = 65  # Maximum qty per symbol
 
@@ -64,7 +64,7 @@ def print_dashboard(funds, pos, symbol, strike, action, signal, status, qty_boug
      =================================
     """)
 
-# --- EXECUTION WITH DEBUG ---
+# --- EXECUTION WITH FIXED TRANSACTION TYPE ---
 def execute_order(client, symbol, qty, side):
     try:
         params = {
@@ -75,7 +75,7 @@ def execute_order(client, symbol, qty, side):
             "quantity": str(qty),
             "validity": "DAY",
             "trading_symbol": symbol,
-            "transaction_type": side,
+            "transaction_type": "B" if side.upper() == "BUY" else "S",
             "amo": "NO",
             "disclosed_quantity": "0",
             "market_protection": "0"
@@ -89,7 +89,7 @@ def execute_order(client, symbol, qty, side):
         return {"stat": "Not_Ok", "errMsg": str(e)}
 
 # --- STRICT SAFE BUY WITH FULL DEBUG ---
-orders_placed = set()
+orders_placed = set()  # Track symbols ordered this run
 
 def safe_buy(client, symbol, max_qty=LOT_SIZE):
     try:
@@ -133,6 +133,7 @@ async def main():
         now = datetime.now(IST).time()
         dprint(f"Current IST Time: {now}")
 
+        # Skip buffer windows
         skip_windows = [
             (time(9, 14), time(9, 16)),
             (time(15, 16), time(15, 31))
@@ -167,6 +168,7 @@ async def main():
         except Exception:
             pos = {}
 
+        # SBEULYL: buy both CE & PE
         if sig == "SBEULYL":
             ce_strike = round_up_50(ltp + SBEULYL_OFFSET)
             pe_strike = round_down_50(ltp - SBEULYL_OFFSET)
@@ -177,6 +179,7 @@ async def main():
             print_dashboard(funds, pos, ce_symbol, ce_strike, "BUY", sig, Fore.GREEN + "Ok", qty_ce)
             print_dashboard(funds, pos, pe_symbol, pe_strike, "BUY", sig, Fore.GREEN + "Ok", qty_pe)
 
+        # ATMBUY / OTMBUY → buy CE
         elif sig in ["ATMBUY", "OTMBUY"]:
             offset = OTM_OFFSET if sig.startswith("OTM") else ATM_OFFSET
             ce_strike = round_up_50(ltp + offset)
@@ -184,6 +187,7 @@ async def main():
             qty_ce = safe_buy(client, ce_symbol)
             print_dashboard(funds, pos, ce_symbol, ce_strike, "BUY", sig, Fore.GREEN + "Ok", qty_ce)
 
+        # ATMSELL / OTMSSELL → buy PE
         elif sig in ["ATMSELL", "OTMSELL"]:
             offset = OTM_OFFSET if sig.startswith("OTM") else ATM_OFFSET
             pe_strike = round_down_50(ltp - offset)
