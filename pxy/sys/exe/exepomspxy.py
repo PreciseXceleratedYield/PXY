@@ -42,7 +42,7 @@ def print_market_dashboard(market_df):
         ("🟢  CE Power", "ce_power"),
         ("🔴  PE Power", "pe_power"),
         ("🎯  Entry", "entry"),
-        ("🎯  Exit", "exit"),  # renamed here
+        ("🎯  Exits", "exit"),  # renamed here
     ]
     
     # Depth metrics last
