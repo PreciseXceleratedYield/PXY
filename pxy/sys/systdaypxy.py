@@ -1,4 +1,16 @@
 import yfinance as yf
+from syscnfgpxy import TICKER
+from datetime import datetime, timedelta
+
+today = datetime.now().date()
+for i in range(7):
+    day = today - timedelta(days=i)
+    df = yf.Ticker(TICKER).history(start=day, end=day + timedelta(days=1))
+    print(f"Checking {day} => rows:", len(df))
+    print(df)
+
+
+import yfinance as yf
 from colorama import Fore, Style, init, deinit
 from syscnfgpxy import TICKER
 import pytz
