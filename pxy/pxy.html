@@ -14,8 +14,8 @@ html, body {
     height: 100%;
     width: 100%;
     font-family: 'DejaVu Sans Mono', 'Ubuntu Mono', 'Noto Color Emoji', monospace;
-    background: #1e1e1e;   /* dark terminal background */
-    color: #e0d8c0;         /* warm off-white text */
+    background: #1e1e1e;
+    color: #e0d8c0;
 }
 
 #terminal-container {
@@ -28,23 +28,23 @@ html, body {
 #terminal {
     flex: 1;
     overflow-y: auto;
-    font-size: 40px;       /* increased 2.5x from 16px */
+    font-size: 37px;       /* scaled 2.3x */
     line-height: 1.5;
 }
 
 .xterm {
     height: 100% !important;
     font-weight: normal;
-    font-size: 40px !important;  /* ensure xterm respects larger size */
+    font-size: 37px !important;  /* ensure xterm respects larger size */
 }
 
 .xterm .xterm-cursor {
-    border-left: 4px solid #f0e0b0 !important; /* thicker cursor for larger font */
-    animation: none !important;                  /* disable blinking */
+    border-left: 3px solid #f0e0b0 !important; /* adjusted cursor for 37px */
+    animation: none !important;
 }
 
 .xterm .xterm-selection {
-    background: rgba(224, 216, 192, 0.2) !important; /* subtle warm selection */
+    background: rgba(224, 216, 192, 0.2) !important;
 }
 </style>
 </head>
@@ -54,7 +54,6 @@ html, body {
     <div id="terminal"></div>
 </div>
 
-<!-- xterm.js and fit addon -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
@@ -63,7 +62,7 @@ const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', 'Noto Color Emoji', monospace",
-    fontSize: 40,          // increased 2.5x
+    fontSize: 37,          // scaled 2.3x
     cursorBlink: false,
     theme: {
         background: '#1e1e1e',
@@ -72,7 +71,7 @@ const term = new Terminal({
         selection: 'rgba(224, 216, 192, 0.2)'
     },
     rendererType: 'dom',             
-    padding: { top: 0, right: 0, bottom: 0, left: 2 } // 2-character left padding
+    padding: { top: 0, right: 0, bottom: 0, left: 2 }
 });
 
 const fitAddon = new FitAddon.FitAddon();
@@ -80,7 +79,6 @@ term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-// WebSocket connection to backend Python script
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
@@ -97,7 +95,6 @@ ws.onerror = (err) => {
     term.writeln(`\nWebSocket error: ${err}`);
 };
 
-// Re-fit terminal on window resize
 window.addEventListener('resize', () => fitAddon.fit());
 </script>
 
