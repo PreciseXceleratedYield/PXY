@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 import asyncio
 from pathlib import Path
@@ -14,13 +15,18 @@ DEBUG = False
 init(autoreset=True)
 LOT_SIZE = 65
 
+# --- CONFIGURABLE OFFSETS ---
+ATM_OFFSET     = 0      # ATM strike adjustment (negative for ITM)
+OTM_OFFSET     = 200    # OTM strike adjustment
+SBEULYL_OFFSET = 300    # SBEULYL special offset
+# ---------------------------
+
 # --- DYNAMIC PATH FIX ---
 HERE = Path(__file__).resolve().parent
 RUN_DIR = HERE / "run"
-
-if str(HERE) not in sys.path: sys.path.append(str(HERE))
-if str(RUN_DIR) not in sys.path: sys.path.append(str(RUN_DIR))
-if str(HERE.parent) not in sys.path: sys.path.append(str(HERE.parent))
+for p in [HERE, RUN_DIR, HERE.parent]:
+    if str(p) not in sys.path:
+        sys.path.append(str(p))
 
 # --- DEBUG PRINT HELPER ---
 def dprint(msg, color=Fore.CYAN):
@@ -115,9 +121,8 @@ async def main():
         # SPECIAL CASE: SBEULYL
         # ------------------------
         if sig == "SBEULYL":
-            offset = 300
-            ce_strike = round_up_50(ltp + offset)
-            pe_strike = round_down_50(ltp - offset)
+            ce_strike = round_up_50(ltp + SBEULYL_OFFSET)
+            pe_strike = round_down_50(ltp - SBEULYL_OFFSET)
 
             ce_symbol = get_symbol(ce_strike, "BUY")
             pe_symbol = get_symbol(pe_strike, "BUY")
@@ -127,10 +132,14 @@ async def main():
             if not ce_active:
                 print(f"{Fore.CYAN}🚀 Placing CE Buy: {ce_symbol}")
                 execute_order(client, ce_symbol, LOT_SIZE, "BUY")
+            else:
+                print(f"{Fore.YELLOW}⏭ CE {ce_symbol} already active, skipping buy")
 
             if not pe_active:
                 print(f"{Fore.MAGENTA}🚀 Placing PE Buy: {pe_symbol}")
                 execute_order(client, pe_symbol, LOT_SIZE, "BUY")
+            else:
+                print(f"{Fore.YELLOW}⏭ PE {pe_symbol} already active, skipping buy")
 
             return
 
@@ -143,39 +152,55 @@ async def main():
             print(f"{Fore.YELLOW}💤 Lets Wait as Signal 💤: {entry_signal} 💤")
             return
 
-        offset = 200 if sig.startswith("OTM") else 0
-        strike = round_up_50(ltp + offset)
-        symbol = get_symbol(strike, side)
-        dprint(f"Built Symbol: {symbol} for Strike: {strike}")
+        offset = OTM_OFFSET if sig.startswith("OTM") else ATM_OFFSET
+        ce_strike = round_up_50(ltp + offset)
+        pe_strike = round_down_50(ltp - offset)
 
-        if not symbol or symbol == "NA":
-            print(f"{Fore.RED}❌ Could not build symbol for strike {strike}")
-            return
+        ce_symbol = get_symbol(ce_strike, side)
+        pe_symbol = get_symbol(pe_strike, side)
+        dprint(f"Built Symbols → CE: {ce_symbol}, PE: {pe_symbol} for Strike CE: {ce_strike}, PE: {pe_strike}")
 
-        # Execution
-        res = {"stat": "Skipped"}
-        if not ce_active:
-            print(f"{Fore.CYAN}🚀 Placing CE Buy: {symbol}")
-            res = execute_order(client, symbol, LOT_SIZE, "BUY")
+        # Skip if already active
+        if ce_active:
+            print(f"{Fore.YELLOW}⏭ CE {ce_symbol} already active, skipping buy")
         else:
-            dprint("CE already active, skipping buy")
+            print(f"{Fore.CYAN}🚀 Placing CE Buy: {ce_symbol}")
+            res = execute_order(client, ce_symbol, LOT_SIZE, "BUY")
+            # Dashboard prints only if a new order is placed
+            funds = get_available_funds(client)
+            is_ok = any(key in str(res) for key in ["nOrderId", "order_id"])
+            status = f"{Fore.GREEN}Ok" if is_ok else f"{Fore.RED}Failed/Skipped"
+            print(f"""
+             =================================
+               💰 {Fore.WHITE}Cash   : {int(funds)}
+               ⚡ {Fore.WHITE}Pos    : {pos}
+               🎫 {Fore.WHITE}Symbol : {ce_symbol}
+               📊 {Fore.WHITE}Strike : {ce_strike}
+               🎯 {Fore.WHITE}Action : {entry_signal}
+               🔁 {Fore.WHITE}Signal : {reversal}
+               📌 {Fore.WHITE}Status : {status}
+             =================================
+            """)
 
-        # Dashboard
-        funds = get_available_funds(client)
-        is_ok = any(key in str(res) for key in ["nOrderId", "order_id"])
-        status = f"{Fore.GREEN}Ok" if is_ok else f"{Fore.RED}Failed/Skipped"
-
-        print(f"""
-         =================================
-           💰 {Fore.WHITE}Cash   : {int(funds)}
-           ⚡ {Fore.WHITE}Pos    : {pos}
-           🎫 {Fore.WHITE}Symbol : {symbol}
-           📊 {Fore.WHITE}Strike : {strike}
-           🎯 {Fore.WHITE}Action : {entry_signal}
-           🔁 {Fore.WHITE}Signal : {reversal}
-           📌 {Fore.WHITE}Status : {status}
-         =================================
-        """)
+        if pe_active:
+            print(f"{Fore.YELLOW}⏭ PE {pe_symbol} already active, skipping buy")
+        else:
+            print(f"{Fore.MAGENTA}🚀 Placing PE Buy: {pe_symbol}")
+            res = execute_order(client, pe_symbol, LOT_SIZE, "BUY")
+            funds = get_available_funds(client)
+            is_ok = any(key in str(res) for key in ["nOrderId", "order_id"])
+            status = f"{Fore.GREEN}Ok" if is_ok else f"{Fore.RED}Failed/Skipped"
+            print(f"""
+             =================================
+               💰 {Fore.WHITE}Cash   : {int(funds)}
+               ⚡ {Fore.WHITE}Pos    : {pos}
+               🎫 {Fore.WHITE}Symbol : {pe_symbol}
+               📊 {Fore.WHITE}Strike : {pe_strike}
+               🎯 {Fore.WHITE}Action : {entry_signal}
+               🔁 {Fore.WHITE}Signal : {reversal}
+               📌 {Fore.WHITE}Status : {status}
+             =================================
+            """)
 
     except Exception:
         if DEBUG:
