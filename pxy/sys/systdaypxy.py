@@ -1,15 +1,4 @@
-import yfinance as yf
-from syscnfgpxy import TICKER
-from datetime import datetime, timedelta
-
-today = datetime.now().date()
-for i in range(7):
-    day = today - timedelta(days=i)
-    df = yf.Ticker(TICKER).history(start=day, end=day + timedelta(days=1))
-    print(f"Checking {day} => rows:", len(df))
-    print(df)
-
-
+#!/usr/bin/env python3
 import yfinance as yf
 from colorama import Fore, Style, init, deinit
 from syscnfgpxy import TICKER
@@ -62,24 +51,24 @@ def print_candle(o, h, l, c):
 
 
 # ---------------- MARKET SNAPSHOT ----------------
-def get_last_trading_day_data(TICKER, lookback_days=7):
+def get_last_two_trading_days(TICKER, lookback_days=14):
+    """Return the last two trading sessions (latest first)."""
     IST = pytz.timezone("Asia/Kolkata")
     today = datetime.now(IST).date()
-    for i in range(lookback_days):
-        day = today - timedelta(days=i)
-        df = yf.Ticker(TICKER).history(start=day, end=day + timedelta(days=1))
-        if not df.empty:
-            return df
-    return None
+
+    df = yf.Ticker(TICKER).history(
+        start=today - timedelta(days=lookback_days),
+        end=today + timedelta(days=1)
+    )
+    if df.empty or len(df) < 2:
+        return None, None
+    return df.iloc[-1], df.iloc[-2]
 
 
 def get_market_snapshot(TICKER):
-    df = get_last_trading_day_data(TICKER)
-    if df is None or len(df) < 2:
+    today, prev = get_last_two_trading_days(TICKER)
+    if today is None or prev is None:
         return None
-
-    today = df.iloc[-1]
-    prev = df.iloc[-2]
 
     o, h, l, c = today.Open, today.High, today.Low, today.Close
     prev_close = prev.Close
@@ -115,24 +104,29 @@ def get_market_snapshot(TICKER):
     result["o_change"] = round(o_change, 2)
     result["m_change"] = round(m_change, 2)
 
-    # -------- BREAKOUT --------
+    # -------- BREAKOUT (if market open today) --------
     IST = pytz.timezone("Asia/Kolkata")
     now_ist = datetime.now(IST).time()
     breakout = "NA"
-    df_1m = yf.Ticker(TICKER).history(period="1d", interval="1m")
-    if not df_1m.empty:
-        df_1m = df_1m.tz_localize(None)
-        morning_df = df_1m.between_time("09:15", "09:30")
-        if not morning_df.empty:
-            m_high = morning_df["High"].max()
-            m_low = morning_df["Low"].min()
-            if time(9, 15) <= now_ist <= time(9, 30):
-                if c > m_high:
-                    breakout = "ACT-BULL"
-                elif c < m_low:
-                    breakout = "ACT-BEAR"
-                else:
-                    breakout = "WAIT"
+
+    try:
+        df_1m = yf.Ticker(TICKER).history(period="1d", interval="1m")
+        if not df_1m.empty:
+            df_1m = df_1m.tz_localize(None)
+            morning_df = df_1m.between_time("09:15", "09:30")
+            if not morning_df.empty:
+                m_high = morning_df["High"].max()
+                m_low = morning_df["Low"].min()
+                if time(9, 15) <= now_ist <= time(9, 30):
+                    if c > m_high:
+                        breakout = "ACT-BULL"
+                    elif c < m_low:
+                        breakout = "ACT-BEAR"
+                    else:
+                        breakout = "WAIT"
+    except Exception:
+        breakout = "NA"
+
     result["breakout"] = breakout
     return result
 
@@ -173,11 +167,8 @@ def main():
     left_part = f"Break:{breakout}"
     mid_part = o_str
     right_part = m_str
-    left_len = len(left_part)
-    mid_len = len(mid_part)
-    right_len = len(right_part)
-    mid_start = (WIDTH // 2) - (mid_len // 2)
-    right_start = WIDTH - right_len
+    mid_start = (WIDTH // 2) - (len(mid_part) // 2)
+    right_start = WIDTH - len(right_part)
     line = [" "] * WIDTH
     for i, ch in enumerate(left_part):
         if i < WIDTH: line[i] = ch
