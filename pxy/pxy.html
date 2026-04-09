@@ -28,18 +28,18 @@ html, body {
 #terminal {
     flex: 1;
     overflow-y: auto;
-    font-size: 37px;       /* scaled 2.3x */
+    font-size: 38px;       /* scaled 2.35x */
     line-height: 1.5;
 }
 
 .xterm {
     height: 100% !important;
     font-weight: normal;
-    font-size: 37px !important;  /* ensure xterm respects larger size */
+    font-size: 38px !important;  /* ensure xterm respects larger size */
 }
 
 .xterm .xterm-cursor {
-    border-left: 3px solid #f0e0b0 !important; /* adjusted cursor for 37px */
+    border-left: 4px solid #f0e0b0 !important; /* thicker cursor for 38px */
     animation: none !important;
 }
 
@@ -62,7 +62,7 @@ const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', 'Noto Color Emoji', monospace",
-    fontSize: 37,          // scaled 2.3x
+    fontSize: 38,          // scaled 2.35x
     cursorBlink: false,
     theme: {
         background: '#1e1e1e',
