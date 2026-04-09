@@ -16,10 +16,13 @@ init(autoreset=True)
 LOT_SIZE = 65
 
 # --- CONFIGURABLE OFFSETS ---
-ATM_OFFSET     = 0      # ATM strike adjustment (negative for ITM)
-OTM_OFFSET     = 200    # OTM strike adjustment
-SBEULYL_OFFSET = 300    # SBEULYL special offset
-# ---------------------------
+IST = pytz.timezone("Asia/Kolkata")
+today = datetime.now(IST).weekday()  # Monday=0 ... Friday=4
+ATM_OFFSET = [0, 50, 100, 150, 200][today] if today <= 4 else 0
+OTM_OFFSET = 200
+SBEULYL_OFFSET = 300
+
+print(f"Today: {today} | ATM_OFFSET: {ATM_OFFSET}, OTM_OFFSET: {OTM_OFFSET}, SBEULYL_OFFSET: {SBEULYL_OFFSET}")
 
 # --- DYNAMIC PATH FIX ---
 HERE = Path(__file__).resolve().parent
@@ -48,6 +51,20 @@ except ImportError as e:
 # --- ROUNDING HELPERS ---
 def round_up_50(x): return int(math.ceil(x / 50) * 50)
 def round_down_50(x): return int(math.floor(x / 50) * 50)
+
+# --- DASHBOARD PRINT HELPER ---
+def print_dashboard(funds, pos, symbol, strike, action, signal, status):
+    print(f"""
+     =================================
+       💰 {Fore.WHITE}Cash   : {int(funds)}
+       ⚡ {Fore.WHITE}Pos    : {pos}
+       🎫 {Fore.WHITE}Symbol : {symbol}
+       📊 {Fore.WHITE}Strike : {strike}
+       🎯 {Fore.WHITE}Action : {action}
+       🔁 {Fore.WHITE}Signal : {signal}
+       📌 {Fore.WHITE}Status : {status}
+     =================================
+    """)
 
 # --- EXECUTION ---
 def execute_order(client, symbol, qty, side):
@@ -160,28 +177,18 @@ async def main():
         pe_symbol = get_symbol(pe_strike, side)
         dprint(f"Built Symbols → CE: {ce_symbol}, PE: {pe_symbol} for Strike CE: {ce_strike}, PE: {pe_strike}")
 
-        # Skip if already active
+        # --- CE ORDER ---
         if ce_active:
             print(f"{Fore.YELLOW}⏭ CE {ce_symbol} already active, skipping buy")
         else:
             print(f"{Fore.CYAN}🚀 Placing CE Buy: {ce_symbol}")
             res = execute_order(client, ce_symbol, LOT_SIZE, "BUY")
-            # Dashboard prints only if a new order is placed
             funds = get_available_funds(client)
             is_ok = any(key in str(res) for key in ["nOrderId", "order_id"])
             status = f"{Fore.GREEN}Ok" if is_ok else f"{Fore.RED}Failed/Skipped"
-            print(f"""
-             =================================
-               💰 {Fore.WHITE}Cash   : {int(funds)}
-               ⚡ {Fore.WHITE}Pos    : {pos}
-               🎫 {Fore.WHITE}Symbol : {ce_symbol}
-               📊 {Fore.WHITE}Strike : {ce_strike}
-               🎯 {Fore.WHITE}Action : {entry_signal}
-               🔁 {Fore.WHITE}Signal : {reversal}
-               📌 {Fore.WHITE}Status : {status}
-             =================================
-            """)
+            print_dashboard(funds, pos, ce_symbol, ce_strike, entry_signal, reversal, status)
 
+        # --- PE ORDER ---
         if pe_active:
             print(f"{Fore.YELLOW}⏭ PE {pe_symbol} already active, skipping buy")
         else:
@@ -190,17 +197,7 @@ async def main():
             funds = get_available_funds(client)
             is_ok = any(key in str(res) for key in ["nOrderId", "order_id"])
             status = f"{Fore.GREEN}Ok" if is_ok else f"{Fore.RED}Failed/Skipped"
-            print(f"""
-             =================================
-               💰 {Fore.WHITE}Cash   : {int(funds)}
-               ⚡ {Fore.WHITE}Pos    : {pos}
-               🎫 {Fore.WHITE}Symbol : {pe_symbol}
-               📊 {Fore.WHITE}Strike : {pe_strike}
-               🎯 {Fore.WHITE}Action : {entry_signal}
-               🔁 {Fore.WHITE}Signal : {reversal}
-               📌 {Fore.WHITE}Status : {status}
-             =================================
-            """)
+            print_dashboard(funds, pos, pe_symbol, pe_strike, entry_signal, reversal, status)
 
     except Exception:
         if DEBUG:
