@@ -23,17 +23,21 @@ html, body {
     height: 100vh;
     display: flex;
     flex-direction: column;
+
+    /* Scrollbar on the left */
+    direction: rtl;  
 }
 
-/* Default terminal font for desktop */
 #terminal {
     flex: 1;
     overflow-y: auto;
     font-size: 16px;  /* original desktop font */
     line-height: 1.5;
+
+    /* Keep text direction normal inside terminal */
+    direction: ltr;
 }
 
-/* xterm default for desktop */
 .xterm {
     height: 100% !important;
     font-weight: normal;
@@ -116,7 +120,6 @@ ws.onerror = (err) => {
 // Re-fit terminal on window resize
 window.addEventListener('resize', () => {
     fitAddon.fit();
-    // Update font dynamically if resized across mobile breakpoint
     const newFontSize = window.innerWidth <= 768 ? 38 : 16;
     term.setOption('fontSize', newFontSize);
 });
