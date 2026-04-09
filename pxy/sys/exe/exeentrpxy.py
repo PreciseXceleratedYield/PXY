@@ -94,17 +94,19 @@ orders_placed = set()  # Track symbols already ordered in this run
 def safe_buy(client, symbol, max_qty=LOT_SIZE):
     """
     Ultra-safe buy:
-    1. Fetch current broker positions right before order.
-    2. Ensure symbol not already placed in this run.
-    3. Buy only remaining qty to reach max_qty.
+    - Checks broker positions
+    - Ensures only one buy per run
+    - Max qty enforcement
     Returns actual qty bought.
     """
     try:
         pos = {}
         try:
             pos = get_position_summary(client)
+            if not isinstance(pos, dict):
+                pos = {}
         except Exception:
-            pass
+            pos = {}
 
         current_qty = pos.get(symbol, 0)
         if current_qty >= max_qty:
@@ -164,6 +166,8 @@ async def main():
         funds = get_available_funds(client)
         try:
             pos = get_position_summary(client)
+            if not isinstance(pos, dict):
+                pos = {}
         except Exception:
             pos = {}
 
