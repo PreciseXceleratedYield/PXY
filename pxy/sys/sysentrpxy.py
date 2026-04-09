@@ -7,11 +7,17 @@ from datetime import datetime, time
 import pytz  # to handle IST timezone
 
 # ------------------------------
-# CONFIG: Blocked Time Window (IST)
+# CONFIG: Special Time Windows (IST)
 # ------------------------------
-BLOCK_START = time(9, 14)  # Start of block
-BLOCK_END   = time(9, 15)  # End of block
-TIMEZONE    = "Asia/Kolkata"  # IST
+TIMEZONE = "Asia/Kolkata"  # IST
+
+# Blocked period: return NONE
+BLOCK_NONE_START = time(9, 14)
+BLOCK_NONE_END   = time(9, 15, 59)  # inclusive of 9:15
+
+# Special period: ALLBUY for entry only
+BLOCK_ALLBUY_START = time(9, 16)
+BLOCK_ALLBUY_END   = time(9, 17, 59)  # inclusive of 9:17
 
 # ------------------------------
 # ENTRY Mapping
@@ -32,20 +38,30 @@ def _map_entry_signal(entry_signal: str) -> str:
 def get_entry_signal(df=None):
     try:
         # ------------------------
-        # Check for blocked time window
+        # Current time in IST
         # ------------------------
         tz = pytz.timezone(TIMEZONE)
         now = datetime.now(tz).time()
 
-        if BLOCK_START <= now <= BLOCK_END:
+        # ------------------------
+        # Check for NONE window
+        # ------------------------
+        if BLOCK_NONE_START <= now <= BLOCK_NONE_END:
             return "NONE", "NONE"
 
         # ------------------------
         # Normal signal processing
         # ------------------------
         entry_signal, exit_signal = get_signal(df)
-        final_entry = _map_entry_signal(entry_signal)
-        final_exit = exit_signal
+        final_exit = exit_signal  # exit always normal
+
+        # ------------------------
+        # Check for ALLBUY window (entry only)
+        # ------------------------
+        if BLOCK_ALLBUY_START <= now <= BLOCK_ALLBUY_END:
+            final_entry = "ALLBUY"
+        else:
+            final_entry = _map_entry_signal(entry_signal)
 
         return final_entry, final_exit
 
