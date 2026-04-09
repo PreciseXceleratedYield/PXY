@@ -10,7 +10,6 @@ import traceback
 
 # --- GLOBAL DEBUG SWITCH ---
 DEBUG = False
-
 init(autoreset=True)
 LOT_SIZE = 65  # Maximum qty per symbol
 
@@ -52,7 +51,7 @@ def round_up_50(x): return int(math.ceil(x / 50) * 50)
 def round_down_50(x): return int(math.floor(x / 50) * 50)
 
 # --- DASHBOARD PRINT HELPER ---
-def print_dashboard(funds, pos, symbol, strike, action, signal, status):
+def print_dashboard(funds, pos, symbol, strike, action, signal, status, qty_bought):
     print(f"""
      =================================
        💰 {Fore.WHITE}Cash   : {int(funds)}
@@ -61,7 +60,7 @@ def print_dashboard(funds, pos, symbol, strike, action, signal, status):
        📊 {Fore.WHITE}Strike : {strike}
        🎯 {Fore.WHITE}Action : {action}
        🔁 {Fore.WHITE}Signal : {signal}
-       📌 {Fore.WHITE}Status : {status}
+       📌 {Fore.WHITE}Status : {status} | Bought Qty: {qty_bought}
      =================================
     """)
 
@@ -98,48 +97,39 @@ def safe_buy(client, symbol, max_qty=LOT_SIZE):
     1. Fetch current broker positions right before order.
     2. Ensure symbol not already placed in this run.
     3. Buy only remaining qty to reach max_qty.
+    Returns actual qty bought.
     """
     try:
-        # Fetch latest positions
+        pos = {}
         try:
             pos = get_position_summary(client)
         except Exception:
-            pos = {}  # assume empty if error
+            pass
 
         current_qty = pos.get(symbol, 0)
-
-        # First check: qty already at or above max
         if current_qty >= max_qty:
-            print(f"{Fore.YELLOW}⏭ {symbol} already has {current_qty}, skipping buy")
-            return
-
-        # Second check: already ordered in this run
+            print(f"{Fore.YELLOW}⏭ {symbol} already at max {current_qty}, skipping buy")
+            return 0
         if symbol in orders_placed:
-            print(f"{Fore.YELLOW}⏭ Already placed order for {symbol} in this run, skipping")
-            return
+            print(f"{Fore.YELLOW}⏭ Already bought {symbol} in this run, skipping")
+            return 0
 
-        # Qty to buy
         buy_qty = max_qty - current_qty
         if buy_qty <= 0:
             print(f"{Fore.YELLOW}⏭ Nothing to buy for {symbol}, skipping")
-            return
+            return 0
 
-        # Confirmation before execution
-        print(f"{Fore.CYAN}🚀 SAFE BUY FINAL CHECK: Symbol: {symbol} | Qty: {buy_qty} | Current: {current_qty}")
-
-        # Place order
+        print(f"{Fore.CYAN}🚀 SAFE BUY: {symbol} | Qty: {buy_qty} | Current: {current_qty}")
         execute_order(client, symbol, buy_qty, "BUY")
-
-        # Mark as ordered
         orders_placed.add(symbol)
-
+        return buy_qty
     except Exception as e:
         print(f"{Fore.RED}❌ Error in safe_buy for {symbol}: {e}")
+        return 0
 
 # --- MAIN ASYNC LOGIC ---
 async def main():
     try:
-        IST = pytz.timezone("Asia/Kolkata")
         now = datetime.now(IST).time()
         dprint(f"Current IST Time: {now}")
 
@@ -171,41 +161,40 @@ async def main():
         ltp = df['Close'].iloc[-1]
         dprint(f"Raw Signal: {entry_signal} | Reversal: {reversal}")
 
-        # SBEULYL
-        if sig == "SBEULYL":
-            ce_strike = round_up_50(ltp + SBEULYL_OFFSET)
-            pe_strike = round_down_50(ltp - SBEULYL_OFFSET)
-            ce_symbol = get_symbol(ce_strike, "BUY")
-            pe_symbol = get_symbol(pe_strike, "BUY")
-
-            safe_buy(client, ce_symbol, LOT_SIZE)
-            safe_buy(client, pe_symbol, LOT_SIZE)
-            return
-
-        # ATM / OTM signals
-        if sig in ["ATMBUY", "OTMBUY"]:
-            side = "BUY"
-        else:
-            print(f"{Fore.YELLOW}💤 Waiting as Signal: {entry_signal} 💤")
-            return
-
-        offset = OTM_OFFSET if sig.startswith("OTM") else ATM_OFFSET
-        ce_strike = round_up_50(ltp + offset)
-        pe_strike = round_down_50(ltp - offset)
-        ce_symbol = get_symbol(ce_strike, side)
-        pe_symbol = get_symbol(pe_strike, side)
-
-        safe_buy(client, ce_symbol, LOT_SIZE)
-        safe_buy(client, pe_symbol, LOT_SIZE)
-
-        # Update dashboard after buys
         funds = get_available_funds(client)
         try:
             pos = get_position_summary(client)
         except Exception:
             pos = {}
-        print_dashboard(funds, pos, ce_symbol, ce_strike, entry_signal, reversal, Fore.GREEN + "Ok")
-        print_dashboard(funds, pos, pe_symbol, pe_strike, entry_signal, reversal, Fore.GREEN + "Ok")
+
+        # --- SIGNAL HANDLING ---
+        if sig == "SBEULYL":
+            ce_strike = round_up_50(ltp + SBEULYL_OFFSET)
+            pe_strike = round_down_50(ltp - SBEULYL_OFFSET)
+            ce_symbol = get_symbol(ce_strike, "BUY")
+            pe_symbol = get_symbol(pe_strike, "BUY")
+            qty_ce = safe_buy(client, ce_symbol)
+            qty_pe = safe_buy(client, pe_symbol)
+            print_dashboard(funds, pos, ce_symbol, ce_strike, "BUY", sig, Fore.GREEN + "Ok", qty_ce)
+            print_dashboard(funds, pos, pe_symbol, pe_strike, "BUY", sig, Fore.GREEN + "Ok", qty_pe)
+
+        elif sig in ["ATMBUY", "OTMBUY"]:
+            offset = OTM_OFFSET if sig.startswith("OTM") else ATM_OFFSET
+            ce_strike = round_up_50(ltp + offset)
+            ce_symbol = get_symbol(ce_strike, "BUY")
+            qty_ce = safe_buy(client, ce_symbol)
+            print_dashboard(funds, pos, ce_symbol, ce_strike, "BUY", sig, Fore.GREEN + "Ok", qty_ce)
+
+        elif sig in ["ATMSELL", "OTMSELL"]:
+            offset = OTM_OFFSET if sig.startswith("OTM") else ATM_OFFSET
+            pe_strike = round_down_50(ltp - offset)
+            pe_symbol = get_symbol(pe_strike, "BUY")
+            qty_pe = safe_buy(client, pe_symbol)
+            print_dashboard(funds, pos, pe_symbol, pe_strike, "BUY", sig, Fore.GREEN + "Ok", qty_pe)
+
+        else:
+            print(f"{Fore.YELLOW}💤 Waiting as Signal: {entry_signal} 💤")
+            return
 
     except Exception:
         if DEBUG:
