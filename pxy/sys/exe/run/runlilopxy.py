@@ -97,7 +97,7 @@ def _print_summary(total_unrealized, total_realized):
     real_str = str(total_realized)
 
     # Single line
-    print(f"{f'🥅🥅    {real_str}  🏃‍♂️🏃‍♂️  {unreal_str}  🏃‍♂️🏃‍♂️':>32}")
+    print(f"{f'🥅🥅    {real_str}  🏃‍♂️🏃‍♂️  {unreal_str}  🏃‍♂️🏃‍♂️':>42}")
 
 
 if __name__ == "__main__":
