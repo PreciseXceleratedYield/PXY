@@ -14,9 +14,9 @@ BUFFER = 0               # Can reduce misalignment further if needed
 
 # Configurable points per phase
 PHASE_POINTS = {
-    "MISALIGN": 7,   # Misalignment points
-    "PHASE1": 14,    # Depth <= 2
-    "PHASE2": 14     # Depth > 2, will add depth dynamically
+    "MISALIGN": 11,   # Misalignment points
+    "PHASE1": 19,    # Depth <= 2
+    "PHASE2": 19     # Depth > 2, will add depth dynamically
 }
 
 # -------------------- FUNCTION --------------------
