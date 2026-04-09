@@ -25,26 +25,41 @@ html, body {
     flex-direction: column;
 }
 
+/* Default terminal font for desktop */
 #terminal {
     flex: 1;
     overflow-y: auto;
-    font-size: 38px;       /* scaled 2.35x */
+    font-size: 16px;  /* original desktop font */
     line-height: 1.5;
 }
 
+/* xterm default for desktop */
 .xterm {
     height: 100% !important;
     font-weight: normal;
-    font-size: 38px !important;  /* ensure xterm respects larger size */
+    font-size: 16px !important;
 }
 
 .xterm .xterm-cursor {
-    border-left: 4px solid #f0e0b0 !important; /* thicker cursor for 38px */
+    border-left: 2px solid #f0e0b0 !important;
     animation: none !important;
 }
 
 .xterm .xterm-selection {
     background: rgba(224, 216, 192, 0.2) !important;
+}
+
+/* Mobile-specific scaling: screen width <= 768px */
+@media (max-width: 768px) {
+    #terminal {
+        font-size: 38px;       /* scaled 2.35x for mobile */
+    }
+    .xterm {
+        font-size: 38px !important;
+    }
+    .xterm .xterm-cursor {
+        border-left: 4px solid #f0e0b0 !important;
+    }
 }
 </style>
 </head>
@@ -58,11 +73,14 @@ html, body {
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
 <script>
+// Detect mobile for JS Terminal initialization
+const isMobile = window.innerWidth <= 768;
+
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', 'Noto Color Emoji', monospace",
-    fontSize: 38,          // scaled 2.35x
+    fontSize: isMobile ? 38 : 16,   // 38px on mobile, 16px on desktop
     cursorBlink: false,
     theme: {
         background: '#1e1e1e',
@@ -95,7 +113,13 @@ ws.onerror = (err) => {
     term.writeln(`\nWebSocket error: ${err}`);
 };
 
-window.addEventListener('resize', () => fitAddon.fit());
+// Re-fit terminal on window resize
+window.addEventListener('resize', () => {
+    fitAddon.fit();
+    // Update font dynamically if resized across mobile breakpoint
+    const newFontSize = window.innerWidth <= 768 ? 38 : 16;
+    term.setOption('fontSize', newFontSize);
+});
 </script>
 
 </body>
