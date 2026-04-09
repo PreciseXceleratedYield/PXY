@@ -28,17 +28,18 @@ html, body {
 #terminal {
     flex: 1;
     overflow-y: auto;
-    font-size: 16px;
+    font-size: 40px;       /* increased 2.5x from 16px */
     line-height: 1.5;
 }
 
 .xterm {
     height: 100% !important;
     font-weight: normal;
+    font-size: 40px !important;  /* ensure xterm respects larger size */
 }
 
 .xterm .xterm-cursor {
-    border-left: 2px solid #f0e0b0 !important; /* warm cursor */
+    border-left: 4px solid #f0e0b0 !important; /* thicker cursor for larger font */
     animation: none !important;                  /* disable blinking */
 }
 
@@ -62,7 +63,7 @@ const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', 'Noto Color Emoji', monospace",
-    fontSize: 16,
+    fontSize: 40,          // increased 2.5x
     cursorBlink: false,
     theme: {
         background: '#1e1e1e',
@@ -70,7 +71,7 @@ const term = new Terminal({
         cursor: '#f0e0b0',
         selection: 'rgba(224, 216, 192, 0.2)'
     },
-    rendererType: 'dom',             // use DOM renderer for padding support
+    rendererType: 'dom',             
     padding: { top: 0, right: 0, bottom: 0, left: 2 } // 2-character left padding
 });
 
@@ -88,7 +89,7 @@ ws.onopen = () => {
 };
 
 ws.onmessage = (event) => {
-    term.write(event.data);  // append incoming data
+    term.write(event.data);
     term.scrollToBottom();
 };
 
