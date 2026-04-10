@@ -88,16 +88,19 @@ def get_entry_signal(df=None):
     debug_log("[DEBUG] ENTRY SIGNAL:", entry_signal)
     debug_log("[DEBUG] EXIT SIGNAL :", exit_signal)
 
-    # 🔥 FIX NONE PROPAGATION (CRITICAL)
-    if entry_signal == "NONE" and exit_signal != "NONE":
-        entry_signal = exit_signal
+    # ------------------------------
+    # SAFE NORMALIZATION ONLY
+    # ------------------------------
+    if entry_signal is None:
+        entry_signal = "NONE"
+    if exit_signal is None:
+        exit_signal = "NONE"
 
-    if exit_signal == "NONE" and entry_signal != "NONE":
-        exit_signal = entry_signal
-
+    # ------------------------------
+    # ONLY ENTRY FALLBACK (IMPORTANT FIX)
+    # ------------------------------
     if entry_signal == "NONE":
-        entry_signal = "BEAR"
-        exit_signal = "BEAR"
+        entry_signal = "BEAR"   # fallback ONLY for entry
 
     base_entry = map_entry(entry_signal)
     debug_log("[DEBUG] BASE ENTRY:", base_entry)
