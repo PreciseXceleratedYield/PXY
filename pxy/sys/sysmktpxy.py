@@ -40,3 +40,8 @@ def get_signal(df=None):
 
     except Exception:
         return "NONE", "NONE"
+
+# ✅ ONLY PRINT IF MAIN
+if __name__ == "__main__":
+    entry, exit_ = get_signal()
+    print(f"[SIGNAL] ENTRY: {entry} | EXIT: {exit_}")
