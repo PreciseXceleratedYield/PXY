@@ -1,9 +1,10 @@
 # ==================================================
-# sysentrpxy.py  (FULL DEBUG MODE)
+# sysentrpxy.py (FINAL - FORCE + DATA SYNC FIXED)
 # ==================================================
 
 from sysmktpxy import get_signal
 from syslhhlpxy import get_phase_direction
+from sysdtafpxy import fetch_yf_data
 from datetime import datetime, time
 import pytz
 
@@ -18,89 +19,86 @@ FORCE_UP = {"ORBUP", "TRASUP", "NONEUP"}
 FORCE_DOWN = {"ORBDOWN", "TRANSDOWN", "NONEDOWN"}
 
 
-# ==================================================
-def _map_entry_signal(entry_signal: str) -> str:
-
-    if entry_signal == "BUY":
+def _map_entry(signal):
+    if signal == "BUY":
         return "ATMBUY"
-    if entry_signal == "SELL":
+    if signal == "SELL":
         return "ATMSELL"
-    return entry_signal
+    return signal
 
 
-# ==================================================
 def get_entry_signal(df=None):
 
     tz = pytz.timezone(TIMEZONE)
     now = datetime.now(tz).time()
 
     print("\n================ DEBUG START ================")
-
-    # ---------------- TIME ----------------
     print("[DEBUG] TIME:", now)
 
+    # -----------------------------
+    # TIME BLOCK
+    # -----------------------------
     if BLOCK_START <= now <= BLOCK_END:
-        print("[DEBUG] TIME BLOCK ACTIVE → FORCE NONE")
-        print("===========================================\n")
+        print("[DEBUG] TIME BLOCK → NONE")
         return "NONE", "NONE"
 
-    # ---------------- LHHL ----------------
-    _, lhhl = get_phase_direction(df)
+    # -----------------------------
+    # SINGLE SOURCE OF TRUTH (FIX)
+    # -----------------------------
+    if df is None:
+        df = fetch_yf_data()
+
+    # -----------------------------
+    # LHHL ENGINE (SAME DF NOW)
+    # -----------------------------
+    phase, lhhl = get_phase_direction(df)
 
     print("[DEBUG] RAW LHHL:", repr(lhhl))
-
     lhhl_clean = lhhl.strip().upper()
+    print("[DEBUG] CLEAN LHHL:", lhhl_clean)
 
-    print("[DEBUG] CLEAN LHHL:", repr(lhhl_clean))
-
-    # ---------------- FORCE CHECK ----------------
+    # -----------------------------
+    # FORCE LAYER
+    # -----------------------------
     if lhhl_clean in FORCE_UP:
-        print("[DEBUG] FORCE MATCH → UP → ATMBUY")
+        print("[DEBUG] FORCE → ATMBUY")
         print("===========================================\n")
         return "ATMBUY", "NONE"
 
     if lhhl_clean in FORCE_DOWN:
-        print("[DEBUG] FORCE MATCH → DOWN → ATMSELL")
+        print("[DEBUG] FORCE → ATMSELL")
         print("===========================================\n")
         return "ATMSELL", "NONE"
 
-    print("[DEBUG] NO FORCE MATCH → entering SIGNAL ENGINE")
+    print("[DEBUG] NO FORCE → SIGNAL MODE")
 
-    # ---------------- SIGNAL ENGINE ----------------
-    entry_signal, exit_signal = get_signal(df)
+    # -----------------------------
+    # NORMAL MODE
+    # -----------------------------
+    entry, exit_signal = get_signal(df)
 
-    print("[DEBUG] ENTRY SIGNAL:", entry_signal)
-    print("[DEBUG] EXIT SIGNAL :", exit_signal)
+    print("[DEBUG] ENTRY:", entry)
+    print("[DEBUG] EXIT :", exit_signal)
 
-    base_entry = _map_entry_signal(entry_signal)
+    base = _map_entry(entry)
 
-    print("[DEBUG] BASE ENTRY:", base_entry)
+    print("[DEBUG] BASE:", base)
 
     if lhhl_clean == "UP":
-        if base_entry == "BUY":
-            print("[DEBUG] UP CONFIRM → ATMBUY")
-            print("===========================================\n")
+        if base == "BUY":
             return "ATMBUY", exit_signal
-        print("[DEBUG] UP NO CONFIRM")
+        return base, exit_signal
 
     if lhhl_clean == "DOWN":
-        if base_entry == "SELL":
-            print("[DEBUG] DOWN CONFIRM → ATMSELL")
-            print("===========================================\n")
+        if base == "SELL":
             return "ATMSELL", exit_signal
-        print("[DEBUG] DOWN NO CONFIRM")
+        return base, exit_signal
 
-    print("[DEBUG] FALLBACK RETURN")
-    print("===========================================\n")
-
-    return base_entry, exit_signal
+    return base, exit_signal
 
 
-# ==================================================
 if __name__ == "__main__":
-
     entry, exit_signal = get_entry_signal()
-
     print("\nFINAL OUTPUT")
     print("ENTRY:", entry)
     print("EXIT :", exit_signal)
