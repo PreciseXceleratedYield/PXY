@@ -149,15 +149,17 @@ def get_phase_direction(df):
     df = normalize_df(df)
 
     if df is None or df.empty:
-        return "BOS", "UP"
+        return "BOS", "NONE"
 
     df_raw = to_raw_df(df)
     _, raw_dir = detect_raw_direction(df_raw)
 
     if raw_dir == "NONE":
-        raw_dir = prev_direction if prev_direction != "NONE" else "UP"
+        raw_dir = prev_direction if prev_direction != "NONE" else "NONE"
 
+    # ==================================================
     # ORB PHASE
+    # ==================================================
     if not in_bos_phase:
 
         breakout = check_breakout(df)
@@ -173,19 +175,32 @@ def get_phase_direction(df):
             return "BOS", combo
 
         prev_direction = raw_dir
-        return "ORB", raw_dir
 
+        # -----------------------------
+        # ORB OUTPUT MAPPING (NEW)
+        # -----------------------------
+        if raw_dir == "UP":
+            return "ORB", "ORBUP"
+        elif raw_dir == "DOWN":
+            return "ORB", "ORBDOWN"
+        else:
+            return "ORB", "NONE"
+
+    # ==================================================
     # BOOTSTRAP
+    # ==================================================
     if bos_direction == "NONE":
         bos_direction = bootstrap_bos(df)
         prev_direction = bos_direction
         transition_active = False
 
+    # ==================================================
     # BOS STRUCTURE
+    # ==================================================
     new_dir = check_bos_structure(df, bos_direction)
 
     # ==================================================
-    # SAFE TRANSITION (UPDATED OUTPUT FORMAT)
+    # SAFE TRANSITION
     # ==================================================
     if bos_direction in ("UP", "DOWN") and new_dir != bos_direction and not transition_active:
 
