@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (PRODUCTION FINAL FIXED)
+# sysentrpxy.py (PRODUCTION FINAL FIXED + DEBUG SWITCH)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -7,6 +7,16 @@ from syslhhlpxy import get_phase_direction
 from sysdtafpxy import fetch_yf_data
 from datetime import datetime, time
 import pytz
+
+# ------------------------------
+# GLOBAL DEBUG SWITCH
+# ------------------------------
+DEBUG = False   # 🔥 SET False IN PRODUCTION
+
+
+def debug_log(*args):
+    if DEBUG:
+        print(*args)
 
 
 # ------------------------------
@@ -16,7 +26,6 @@ TIMEZONE = "Asia/Kolkata"
 
 BLOCK_NONE_START = time(9, 14)
 BLOCK_NONE_END   = time(9, 15, 59)
-
 
 FORCE_UP = {"ORBUP", "TRASUP", "NONEUP"}
 FORCE_DOWN = {"ORBDOWN", "TRANSDOWN", "NONEDOWN"}
@@ -41,8 +50,8 @@ def get_entry_signal(df=None):
     tz = pytz.timezone(TIMEZONE)
     now = datetime.now(tz).time()
 
-    print("\n================ DEBUG START ================")
-    print("[DEBUG] TIME:", now)
+    debug_log("\n================ DEBUG START ================")
+    debug_log("[DEBUG] TIME:", now)
 
     # ------------------------------
     # TIME BLOCK
@@ -59,10 +68,9 @@ def get_entry_signal(df=None):
     if df is None or len(df) < 3:
         return "NONE", "NONE"
 
-    # 🔥 CRITICAL: isolate dataframe
     df = df.copy()
 
-    print("[DEBUG] DF READY:", df.shape)
+    debug_log("[DEBUG] DF READY:", df.shape)
 
     # ------------------------------
     # LHHL ENGINE
@@ -70,15 +78,15 @@ def get_entry_signal(df=None):
     phase, lhhl = get_phase_direction(df)
 
     lhhl_clean = str(lhhl).strip().upper()
-    print("[DEBUG] RAW LHHL:", lhhl_clean)
+    debug_log("[DEBUG] RAW LHHL:", lhhl_clean)
 
     # ------------------------------
     # MARKET SIGNAL ENGINE
     # ------------------------------
     entry_signal, exit_signal = get_signal(df)
 
-    print("[DEBUG] ENTRY SIGNAL:", entry_signal)
-    print("[DEBUG] EXIT SIGNAL :", exit_signal)
+    debug_log("[DEBUG] ENTRY SIGNAL:", entry_signal)
+    debug_log("[DEBUG] EXIT SIGNAL :", exit_signal)
 
     # 🔥 FIX NONE PROPAGATION (CRITICAL)
     if entry_signal == "NONE" and exit_signal != "NONE":
@@ -92,22 +100,22 @@ def get_entry_signal(df=None):
         exit_signal = "BEAR"
 
     base_entry = map_entry(entry_signal)
-    print("[DEBUG] BASE ENTRY:", base_entry)
+    debug_log("[DEBUG] BASE ENTRY:", base_entry)
 
     # ------------------------------
     # FORCE LAYER (HIGHEST PRIORITY)
     # ------------------------------
     if lhhl_clean in FORCE_UP:
-        print("[DEBUG] FORCE → ATMBUY")
-        print("===========================================\n")
+        debug_log("[DEBUG] FORCE → ATMBUY")
+        debug_log("===========================================\n")
         return "ATMBUY", exit_signal
 
     if lhhl_clean in FORCE_DOWN:
-        print("[DEBUG] FORCE → ATMSELL")
-        print("===========================================\n")
+        debug_log("[DEBUG] FORCE → ATMSELL")
+        debug_log("===========================================\n")
         return "ATMSELL", exit_signal
 
-    print("[DEBUG] NO FORCE → NORMAL MODE")
+    debug_log("[DEBUG] NO FORCE → NORMAL MODE")
 
     # ------------------------------
     # NORMAL MODE
