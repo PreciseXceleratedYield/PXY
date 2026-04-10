@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py  (3-LAYER EXECUTION ENGINE + TIME BLOCK)
+# sysentrpxy.py  (FINAL EXECUTION ENGINE)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -36,7 +36,7 @@ def get_entry_signal(df=None):
     now = datetime.now(tz).time()
 
     # ==================================================
-    # 🥇 LAYER 0 — TIME BLOCK (HIGHEST PRIORITY)
+    # 🥇 LAYER 0 — TIME BLOCK
     # ==================================================
     if BLOCK_START <= now <= BLOCK_END:
         return "NONE", "NONE"
@@ -49,25 +49,25 @@ def get_entry_signal(df=None):
     # ------------------------------
     # SIGNAL ENGINE
     # ------------------------------
-    entry_signal, _ = get_signal(df)
+    entry_signal, exit_signal = get_signal(df)
 
     # ==================================================
     # 🥇 LAYER 1 — ORB OVERRIDE
     # ==================================================
     if lhhl == "ORBUP":
-        return "ATMBUY", "NONE"
+        return "ATMBUY", exit_signal
 
     if lhhl == "ORBDOWN":
-        return "ATMSELL", "NONE"
+        return "ATMSELL", exit_signal
 
     # ==================================================
     # 🥈 LAYER 2 — TRANSITION FORCE MODE
     # ==================================================
     if lhhl in ("TRASUP", "NONEUP"):
-        return "ATMBUY", "NONE"
+        return "ATMBUY", exit_signal
 
     if lhhl in ("TRANSDOWN", "NONEDOWN"):
-        return "ATMSELL", "NONE"
+        return "ATMSELL", exit_signal
 
     # ==================================================
     # 🥉 LAYER 3 — NORMAL MODE
@@ -77,15 +77,26 @@ def get_entry_signal(df=None):
 
     if lhhl == "UP":
         if base_entry == "BUY":
-            return "ATMBUY", "NONE"
-        return base_entry, "NONE"
+            return "ATMBUY", exit_signal
+        return base_entry, exit_signal
 
     if lhhl == "DOWN":
         if base_entry == "SELL":
-            return "ATMSELL", "NONE"
-        return base_entry, "NONE"
+            return "ATMSELL", exit_signal
+        return base_entry, exit_signal
 
     if entry_signal in ("BULL", "BEAR", "NONE"):
-        return entry_signal, "NONE"
+        return entry_signal, exit_signal
 
-    return base_entry, "NONE"
+    return base_entry, exit_signal
+
+
+# ==================================================
+# MAIN RUN
+# ==================================================
+if __name__ == "__main__":
+
+    entry, exit_signal = get_entry_signal()
+
+    print(f"ENTRY  : {entry}")
+    print(f"EXIT   : {exit_signal}")
