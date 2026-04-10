@@ -1,4 +1,4 @@
-# syssma_atrpxy.py
+# sysatsmpxy.py
 
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
@@ -26,16 +26,11 @@ def atr_to_period(atr_value: float) -> int:
     return max(1, min(5, period))
 
 
-# -------------------- MAIN SMA LOGIC --------------------
+# -------------------- SIGNAL ENGINE --------------------
 def get_sma_atr_signal(df: pd.DataFrame) -> dict:
     """
     Returns:
-        {
-            trend: UP/DOWN/FLAT/NA,
-            sma: float,
-            period: int,
-            atr: float
-        }
+        trend, sma, period, atr
     """
 
     if df is None or df.empty:
@@ -47,7 +42,7 @@ def get_sma_atr_signal(df: pd.DataFrame) -> dict:
     if pd.isna(atr):
         return {"trend": "NA", "sma": 0, "period": 0, "atr": 0}
 
-    # -------- PERIOD FROM ATR --------
+    # -------- DYNAMIC PERIOD --------
     period = atr_to_period(atr)
 
     # -------- SMA --------
@@ -74,7 +69,7 @@ def get_sma_atr_signal(df: pd.DataFrame) -> dict:
     }
 
 
-# -------------------- SELF RUN --------------------
+# -------------------- SELF RUN DASHBOARD --------------------
 if __name__ == "__main__":
     df = fetch_yf_data()
     result = get_sma_atr_signal(df)
@@ -94,7 +89,7 @@ if __name__ == "__main__":
     else:
         color = Fore.WHITE
 
-    # ---- FORMAT (42 WIDTH) ----
+    # ---- FORMAT (42 WIDTH DASHBOARD) ----
     left = f"SMA{period}:{trend}"
     right = f"ATR:{atr_val}"
     line = f"{left:<21}{right:>21}"
