@@ -61,7 +61,7 @@ def get_entry_signal(df=None):
     # ------------------------------
     # PURE SIGNALS (NO MODIFICATION)
     # ------------------------------
-    entry_signal, exit_signal = get_signal(df)
+    entry_signal, exit_signal = get_signal()
 
     debug_log("[DEBUG] ENTRY SIGNAL:", entry_signal)
     debug_log("[DEBUG] EXIT SIGNAL :", exit_signal)
