@@ -7,15 +7,13 @@ from colorama import Fore, Style, init
 
 init(autoreset=True)
 
-TOTAL_WIDTH = 42
-
 
 # -------------------- ATR → SMA PERIOD --------------------
 def atr_to_period(atr_value: float) -> int:
     """
     ATR ≤ 8 → SMA = 5
     Every +2 ATR → reduce SMA by 1
-    Final range: 1 to 5
+    Range: 1 to 5
     """
 
     if atr_value <= 8:
@@ -26,72 +24,75 @@ def atr_to_period(atr_value: float) -> int:
     return max(1, min(5, period))
 
 
-# -------------------- SIGNAL ENGINE --------------------
-def get_sma_atr_signal(df: pd.DataFrame) -> dict:
+# -------------------- MAIN SIGNAL --------------------
+def get_atr_sma(df: pd.DataFrame) -> dict:
     """
     Returns:
-        trend, sma, period, atr
+        atrsma : SMA value
+        status : UP / DOWN / FLAT / NA
+        period : dynamic SMA period
+        atr    : latest ATR
     """
 
     if df is None or df.empty:
-        return {"trend": "NA", "sma": 0, "period": 0, "atr": 0}
+        return {"atrsma": 0, "status": "NA", "period": 0, "atr": 0}
 
     atr_series = calculate_atr(df)
     atr = atr_series.iloc[-1]
 
     if pd.isna(atr):
-        return {"trend": "NA", "sma": 0, "period": 0, "atr": 0}
+        return {"atrsma": 0, "status": "NA", "period": 0, "atr": 0}
 
-    # -------- DYNAMIC PERIOD --------
+    # -------- dynamic period --------
     period = atr_to_period(atr)
 
     # -------- SMA --------
-    df['SMA_ATR'] = df['Close'].rolling(period).mean()
-    sma = df['SMA_ATR'].iloc[-1]
+    df['ATR_SMA'] = df['Close'].rolling(period).mean()
+    sma = df['ATR_SMA'].iloc[-1]
     close = df['Close'].iloc[-1]
 
     if pd.isna(sma):
-        return {"trend": "NA", "sma": 0, "period": period, "atr": atr}
+        return {"atrsma": 0, "status": "NA", "period": period, "atr": atr}
 
-    # -------- TREND --------
+    # -------- STATUS --------
     if close > sma:
-        trend = "UP"
+        status = "UP"
     elif close < sma:
-        trend = "DOWN"
+        status = "DOWN"
     else:
-        trend = "FLAT"
+        status = "FLAT"
 
     return {
-        "trend": trend,
-        "sma": sma,
+        "atrsma": sma,
+        "status": status,
         "period": period,
         "atr": atr
     }
 
 
-# -------------------- SELF RUN DASHBOARD --------------------
+# -------------------- SELF TEST --------------------
 if __name__ == "__main__":
     df = fetch_yf_data()
-    result = get_sma_atr_signal(df)
+    result = get_atr_sma(df)
 
-    trend = result["trend"]
-    sma_val = int(result["sma"])
-    period = result["period"]
+    status = result["status"]
+    sma_val = int(result["atrsma"])
     atr_val = round(result["atr"], 2)
+    period = result["period"]
 
     # ---- COLOR ----
-    if trend == "UP":
+    if status == "UP":
         color = Fore.GREEN
-    elif trend == "DOWN":
+    elif status == "DOWN":
         color = Fore.RED
-    elif trend == "FLAT":
+    elif status == "FLAT":
         color = Fore.YELLOW
     else:
         color = Fore.WHITE
 
-    # ---- FORMAT (42 WIDTH DASHBOARD) ----
-    left = f"SMA{period}:{trend}"
-    right = f"ATR:{atr_val}"
+    # ---- OUTPUT ----
+    left = f"ATR_SMA{period}:{status}"
+    right = f"VAL:{sma_val}"
     line = f"{left:<21}{right:>21}"
 
     print(f"{color}{line}{Style.RESET_ALL}")
