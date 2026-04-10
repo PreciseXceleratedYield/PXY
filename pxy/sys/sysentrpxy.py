@@ -1,143 +1,105 @@
-# sysentrpxy.py
+# ==================================================
+# sysentrpxy.py (FINAL CLEAN + TIME + ST LOGIC)
+# ==================================================
 
-import pandas as pd
-from datetime import datetime, time
-import pytz
-from colorama import Fore, Style, init
-
+from sysmktpxy import get_signal
 from sysdtafpxy import fetch_yf_data
-from syshkinpxy import detect_ha_flip_signal
 from sysstrndpxy import calculate_supertrend
 
-init(autoreset=True)
-IST = pytz.timezone("Asia/Kolkata")
+from datetime import datetime, time
+import pytz
 
-# -------------------- Morning direction --------------------
-def _get_morning_direction(df: pd.DataFrame):
-    """Returns exclusive morning signal: OTMBUY or OTMSELL"""
-    if df is None or len(df) < 2:
-        return None
-    try:
-        df = df.copy()
-        df.index = pd.to_datetime(df.index)
+DEBUG = False
 
-        if df.index.tz is None:
-            df.index = df.index.tz_localize("UTC").tz_convert(IST)
-        else:
-            df.index = df.index.tz_convert(IST)
+def debug_log(*args):
+    if DEBUG:
+        print(*args)
 
-        df['time'] = df.index.time
 
-        c1_df = df[df['time'] == time(9, 15)]
-        if c1_df.empty:
-            return None
+TIMEZONE = "Asia/Kolkata"
 
-        c1 = c1_df.iloc[-1]
-        c2 = df.iloc[-1]
+# -------------------- TIME WINDOWS --------------------
+NONE_START = time(9, 14, 0)
+NONE_END   = time(9, 15, 59)
 
-        if c2['Close'] > c1['Close']:
+FORCE_OTM_START = time(9, 16, 0)
+FORCE_OTM_END   = time(9, 25, 0)
+
+
+# -------------------- ENTRY MAPPING --------------------
+def map_entry(sig, close=None, st=None, now=None):
+
+    # -------- PHASE 1: FORCE OTM --------
+    if FORCE_OTM_START <= now <= FORCE_OTM_END:
+        if sig == "BUY":
             return "OTMBUY"
-        elif c2['Close'] < c1['Close']:
+        if sig == "SELL":
             return "OTMSELL"
-        else:
-            return None
+        return sig
 
-    except Exception:
-        return None
+    # -------- PHASE 2: ST FILTER --------
+    if sig == "BUY":
+        signal = "ATMBUY"
+
+        if close is not None and st is not None:
+            if close < st:
+                signal = "OTMBUY"
+
+        return signal
+
+    if sig == "SELL":
+        signal = "ATMSELL"
+
+        if close is not None and st is not None:
+            if close > st:
+                signal = "OTMSELL"
+
+        return signal
+
+    return sig
 
 
-# -------------------- Core signal computation --------------------
-def _compute_final_signal(df: pd.DataFrame) -> str:
-    """Compute final signal with mutually exclusive conditions"""
+# -------------------- CORE --------------------
+def get_entry_signal(df=None):
 
-    if df is None or not all(col in df.columns for col in ['Open','High','Low','Close']):
-        return "DEFAULT"
+    tz = pytz.timezone(TIMEZONE)
+    now = datetime.now(tz).time()
 
-    now = datetime.now(IST).time()
-    last = df.iloc[-1]
+    # -------- PHASE 0: NONE --------
+    if NONE_START <= now <= NONE_END:
+        return "NONE", "NONE"
 
-    # Ensure Supertrend exists
+    if df is None:
+        df = fetch_yf_data(period="5d", interval="1m")
+
+    if df is None or len(df) < 3:
+        return "NONE", "NONE"
+
+    # Ensure ST exists
     if 'ST' not in df.columns:
         df = calculate_supertrend(df)
 
-    st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last['Close']
+    last = df.iloc[-1]
+    close = last['Close']
+    st = last['ST'] if 'ST' in df.columns else close
 
-    # -------------------- Phase 0: Early --------------------
-    if time(9,14) <= now <= time(9,15):
-        return "DEFAULT"
+    entry_signal, exit_signal = get_signal()
 
-    # -------------------- Phase 1: Morning --------------------
-    direction_signal = _get_morning_direction(df)
-    if direction_signal:
-        return direction_signal
+    if entry_signal is None:
+        entry_signal = "NONE"
+        exit_signal = "NONE"
 
-    # -------------------- Phase 2: HA + ST alignment --------------------
-    try:
-        ha_signal, _, _, _ = detect_ha_flip_signal(df)
+    # Apply mapping with time + ST
+    entry = map_entry(entry_signal, close, st, now)
 
-        # ---- PURE HA STATES (UNCHANGED) ----
-        if ha_signal == "BULL":
-            return "BULL"
-
-        elif ha_signal == "BEAR":
-            return "BEAR"
-
-        # ---- BUY LOGIC (UPDATED) ----
-        elif ha_signal == "BUY":
-            signal = "ATMBUY"
-
-            # Downgrade if NOT aligned with SuperTrend
-            if last['Close'] < st_value:
-                signal = "OTMBUY"
-
-            return signal
-
-        # ---- SELL LOGIC (UPDATED) ----
-        elif ha_signal == "SELL":
-            signal = "ATMSELL"
-
-            # Downgrade if NOT aligned with SuperTrend
-            if last['Close'] > st_value:
-                signal = "OTMSELL"
-
-            return signal
-
-    except Exception:
-        pass
-
-    # -------------------- Default fallback --------------------
-    return "DEFAULT"
+    return entry, exit_signal
 
 
-# -------------------- Public function --------------------
-def get_entry_signal(df: pd.DataFrame):
-    """
-    Returns two identical values for backward compatibility
-    Each signal is exclusive
-    """
-    final_signal = _compute_final_signal(df)
-    return final_signal, final_signal
-
-
-# -------------------- Terminal dashboard print --------------------
-def print_dashboard(df):
-    value1, value2 = get_entry_signal(df)
-
-    color_map = {
-        "OTMBUY": Fore.GREEN, "OTMSELL": Fore.RED,
-        "ATMBUY": Fore.GREEN, "ATMSELL": Fore.RED,
-        "BULL": Fore.GREEN, "BEAR": Fore.RED,
-        "DEFAULT": Fore.YELLOW, None: Fore.YELLOW
-    }
-
-    print(f"{color_map.get(value1, Fore.YELLOW)}Signal: {value1}{Style.RESET_ALL}")
-
-
-# -------------------- Self-test --------------------
+# -------------------- TEST --------------------
 if __name__ == "__main__":
-    df = fetch_yf_data()
 
-    if df is not None and not df.empty:
-        df = calculate_supertrend(df)
+    entry, exit_signal = get_entry_signal()
 
-    print_dashboard(df)
+    print("\nFINAL OUTPUT")
+    print("ENTRY:", entry)
+    print("EXIT :", exit_signal)
