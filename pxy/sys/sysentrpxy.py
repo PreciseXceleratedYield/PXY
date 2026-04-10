@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (FINAL - LHHL ENTRY + RAW EXIT ONLY)
+# sysentrpxy.py (FINAL WORKING FIXED VERSION)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -14,11 +14,8 @@ import pytz
 # ------------------------------
 TIMEZONE = "Asia/Kolkata"
 
-BLOCK_START = time(9, 14, 0)
-BLOCK_END   = time(9, 15, 49)
-
-FORCE_UP = {"ORBUP", "TRASUP", "NONEUP"}
-FORCE_DOWN = {"ORBDOWN", "TRANSDOWN", "NONEDOWN"}
+BLOCK_NONE_START = time(9, 14)
+BLOCK_NONE_END   = time(9, 15, 59)
 
 
 # ------------------------------
@@ -32,8 +29,15 @@ def _map_entry(signal):
     return signal
 
 
+# ------------------------------
+# FORCE SETS
+# ------------------------------
+FORCE_UP = {"ORBUP", "TRASUP", "NONEUP"}
+FORCE_DOWN = {"ORBDOWN", "TRANSDOWN", "NONEDOWN"}
+
+
 # ==================================================
-# MAIN ENGINE
+# MAIN FUNCTION
 # ==================================================
 def get_entry_signal(df=None):
 
@@ -46,12 +50,11 @@ def get_entry_signal(df=None):
     # ------------------------------
     # TIME BLOCK
     # ------------------------------
-    if BLOCK_START <= now <= BLOCK_END:
-        print("[DEBUG] TIME BLOCK → NONE")
+    if BLOCK_NONE_START <= now <= BLOCK_NONE_END:
         return "NONE", "NONE"
 
     # ------------------------------
-    # DATA SOURCE (SINGLE)
+    # SINGLE DATA SOURCE (CRITICAL FIX)
     # ------------------------------
     if df is None:
         df = fetch_yf_data()
@@ -67,7 +70,7 @@ def get_entry_signal(df=None):
     print("[DEBUG] CLEAN LHHL:", lhhl_clean)
 
     # ------------------------------
-    # SIGNAL ENGINE (RUN ONCE ONLY)
+    # MARKET SIGNAL (OLD WORKING STYLE)
     # ------------------------------
     entry_signal, exit_signal = get_signal(df)
 
