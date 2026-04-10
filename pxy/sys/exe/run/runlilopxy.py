@@ -100,7 +100,7 @@ def _print_summary(total_unrealized, total_realized):
     from colorama import Fore, Style, init
     init(autoreset=True)
     
-    print(f"{f'                🥅{(Style.BRIGHT + Fore.GREEN if float(real_str.replace('%','').replace('+','')) >= 0 else Fore.RED) + real_str + Style.RESET_ALL}  🏃‍♂️🏃‍♂️  {unreal_str}  🏃‍♂️🏃‍♂️':>42}")
+    print(f"{f'                🥅{(Style.BRIGHT + Fore.GREEN if float(real_str.replace('%','').replace('+','')) >= 0 else Fore.RED) + real_str + Style.RESET_ALL} 🥅  🏃‍♂️🏃‍♂️  {unreal_str}  🏃‍♂️🏃‍♂️':>42}")
 
 
 if __name__ == "__main__":
