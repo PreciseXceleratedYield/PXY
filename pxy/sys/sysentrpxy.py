@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py  (3-LAYER EXECUTION ENGINE - FINAL FORCE FIX)
+# sysentrpxy.py  (STATELESS FORCE-FIRST ENGINE)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -15,6 +15,11 @@ TIMEZONE = "Asia/Kolkata"
 
 BLOCK_START = time(9, 14, 0)
 BLOCK_END   = time(9, 15, 49)
+
+
+# ==================================================
+FORCE_UP = {"ORBUP", "TRASUP", "NONEUP"}
+FORCE_DOWN = {"ORBDOWN", "TRANSDOWN", "NONEDOWN"}
 
 
 # ==================================================
@@ -36,38 +41,28 @@ def get_entry_signal(df=None):
     now = datetime.now(tz).time()
 
     # ==================================================
-    # 🥇 LAYER 0 — TIME BLOCK (HIGHEST PRIORITY)
+    # 🥇 LAYER 0 — TIME BLOCK (HARD STOP)
     # ==================================================
     if BLOCK_START <= now <= BLOCK_END:
         return "NONE", "NONE"
 
-    # ------------------------------
-    # STRUCTURE ENGINE
-    # ------------------------------
-    phase, lhhl = get_phase_direction(df)
+    # ==================================================
+    # 🧠 LHHL STATE (PURE COMPUTATION)
+    # ==================================================
+    _, lhhl = get_phase_direction(df)
 
     # ==================================================
-    # 🥇 LAYER 1 — ORB FORCE (TERMINAL)
+    # 🥇 LAYER 1 — FORCE MODE (NO SIGNAL ENGINE)
     # ==================================================
-    if lhhl == "ORBUP":
+    if lhhl in FORCE_UP:
         return "ATMBUY", "NONE"
 
-    if lhhl == "ORBDOWN":
+    if lhhl in FORCE_DOWN:
         return "ATMSELL", "NONE"
 
     # ==================================================
-    # 🥈 LAYER 2 — TRANSITION FORCE (TERMINAL)
+    # 🥈 LAYER 2 — NORMAL SIGNAL MODE
     # ==================================================
-    if lhhl in ("TRASUP", "NONEUP"):
-        return "ATMBUY", "NONE"
-
-    if lhhl in ("TRANSDOWN", "NONEDOWN"):
-        return "ATMSELL", "NONE"
-
-    # ==================================================
-    # 🥉 LAYER 3 — NORMAL MODE (ONLY SAFE STATES)
-    # ==================================================
-
     entry_signal, exit_signal = get_signal(df)
 
     base_entry = _map_entry_signal(entry_signal)
@@ -82,14 +77,14 @@ def get_entry_signal(df=None):
             return "ATMSELL", exit_signal
         return base_entry, exit_signal
 
-    if entry_signal in ("BULL", "BEAR", "NONE"):
-        return entry_signal, exit_signal
-
+    # ==================================================
+    # 🟡 PASS THROUGH
+    # ==================================================
     return base_entry, exit_signal
 
 
 # ==================================================
-# MAIN RUN
+# MAIN
 # ==================================================
 if __name__ == "__main__":
 
