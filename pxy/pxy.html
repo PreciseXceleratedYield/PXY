@@ -2,20 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Terminal Fix</title>
+<title>Night Mode Terminal</title>
 
+<!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
 <style>
 html, body {
     margin: 0;
+    padding: 0;
     height: 100%;
+    width: 100%;
     background: #1e1e1e;
 }
 
+/* Terminal container */
 #terminal {
     width: 100%;
     height: 100vh;
+}
+
+/* Cursor + selection styling */
+.xterm .xterm-cursor {
+    border-left: 2px solid #f0e0b0 !important;
+    animation: none !important;
+}
+
+.xterm .xterm-selection {
+    background: rgba(224, 216, 192, 0.2) !important;
 }
 </style>
 </head>
@@ -23,51 +37,72 @@ html, body {
 
 <div id="terminal"></div>
 
+<!-- xterm.js -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
 <script>
-const BASE = 16;
+// =====================
+// CONFIG
+// =====================
+const BASE_FONT = 16;
 const SCALE = 2.3;
-const FONT = Math.round(BASE * SCALE); // 37px
+const FONT_SIZE = Math.round(BASE_FONT * SCALE); // 37px
 
+// =====================
+// TERMINAL INIT
+// =====================
 const term = new Terminal({
-    fontSize: FONT,   // ✅ FORCE 2.3x ALWAYS
+    convertEol: true,
+    scrollback: 1000,
+    fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', monospace",
+    fontSize: FONT_SIZE,   // ✅ 2.3x applied here
+    cursorBlink: false,
     theme: {
         background: '#1e1e1e',
-        foreground: '#e0d8c0'
+        foreground: '#e0d8c0',
+        cursor: '#f0e0b0',
+        selection: 'rgba(224, 216, 192, 0.2)'
     },
-    cursorBlink: false
+    rendererType: 'dom',
+    padding: { top: 0, right: 0, bottom: 0, left: 2 }
 });
 
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 
+// =====================
+// START TERMINAL
+// =====================
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-// ✅ TEST OUTPUT (IMPORTANT)
-term.writeln("✅ Terminal Loaded");
-term.writeln("Font size: " + FONT + "px");
-term.writeln("--------------------------------");
+// ✅ TEST OUTPUT (so you SEE it immediately)
+term.writeln("✅ Terminal Ready");
+term.writeln("Font size: " + FONT_SIZE + "px (2.3x)");
+term.writeln("-----------------------------------");
 
-// WebSocket
-const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-const ws = new WebSocket(`${protocol}://${location.host}`);
+// =====================
+// WEBSOCKET
+// =====================
+const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
 ws.onopen = () => {
     term.writeln("✅ WebSocket Connected");
 };
 
-ws.onmessage = (e) => {
-    term.write(e.data);
+ws.onmessage = (event) => {
+    term.write(event.data);
 };
 
 ws.onerror = () => {
     term.writeln("❌ WebSocket Error");
 };
 
-// Resize fix
+// =====================
+// RESIZE HANDLING
+// =====================
 window.addEventListener('resize', () => {
     fitAddon.fit();
 });
