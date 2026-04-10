@@ -15,7 +15,7 @@ def detect_ha_flip_signal(df=None, last_n=21):
 
     # Validation
     if df is None or df.empty or ha_color is None or len(ha_color) < 2:
-        return "NONE", 1, 1, 1
+        return "NA", 1, 1, 1   # 🔥 CHANGED ONLY HERE
 
     # Last N colors (including forming)
     n = min(last_n, len(ha_color))
@@ -33,43 +33,46 @@ def detect_ha_flip_signal(df=None, last_n=21):
             break
     current_depth = max(current_depth, 1)
 
-    # ---------------- PAST DEPTH (consecutive same-color before current streak) ----------------
-    colors = ha_color.tolist()           # full history
-    current_color = colors[-1]           # last forming candle
-    
-    # Find where the current streak of current_color starts
+    # ---------------- PAST DEPTH ----------------
+    colors = ha_color.tolist()
+    current_color = colors[-1]
+
     current_streak_start = len(colors) - 1
     for i in reversed(range(len(colors) - 1)):
         if colors[i] != current_color:
             current_streak_start = i + 1
             break
-    
-    # Previous color (immediately before current streak)
+
     prev_color = colors[current_streak_start - 1] if current_streak_start > 0 else "none"
-    
-    # Count consecutive candles of prev_color immediately before current streak
+
     past_depth = 0
     for i in reversed(range(current_streak_start)):
         if colors[i] == prev_color:
             past_depth += 1
         else:
             break
-    
-    past_depth = max(past_depth, 1)     # ensure at least 1
 
-    # Signal detection
+    past_depth = max(past_depth, 1)
+
+    # ================= SIGNAL FIX (ONLY NONE → NA) =================
+
     if current_color == "none" or prev_color == "none":
-        signal = "NONE"
+        signal = "NA"   # 🔥 CHANGED ONLY HERE
+
     elif prev_color == "red" and current_color == "green":
-        signal = "BUY" if current_depth == 1 else "NONE"
+        signal = "BUY" if current_depth == 1 else "NA"   # 🔥 CHANGED ONLY HERE
+
     elif prev_color == "green" and current_color == "red":
-        signal = "SELL" if current_depth == 1 else "NONE"
+        signal = "SELL" if current_depth == 1 else "NA"  # 🔥 CHANGED ONLY HERE
+
     elif prev_color == "green" and current_color == "green":
-        signal = "BULL" if past_depth >= 2 else "NONE"
+        signal = "BULL" if past_depth >= 2 else "NA"     # 🔥 CHANGED ONLY HERE
+
     elif prev_color == "red" and current_color == "red":
-        signal = "BEAR" if past_depth >= 2 else "NONE"
+        signal = "BEAR" if past_depth >= 2 else "NA"     # 🔥 CHANGED ONLY HERE
+
     else:
-        signal = "NONE"
+        signal = "NA"   # 🔥 CHANGED ONLY HERE
 
     # CE / PE depth
     ce_depth = current_depth if current_color == "green" else 1
@@ -84,13 +87,12 @@ if __name__ == "__main__":
     print("HA FLIP DEBUG (ALIGNED TO DEPTH CHART)")
     print("="*60)
 
-    # Color mapping
     sig_color = {
         "BUY": Fore.GREEN,
         "SELL": Fore.RED,
         "BULL": Fore.CYAN,
         "BEAR": Fore.MAGENTA,
-        "NONE": Fore.WHITE
+        "NA": Fore.WHITE   # 🔥 CHANGED ONLY HERE
     }.get(signal, Fore.WHITE)
 
     print(f"Signal     : {sig_color}{signal}{Style.RESET_ALL}")
