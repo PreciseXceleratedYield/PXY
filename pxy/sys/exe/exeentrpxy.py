@@ -1,9 +1,3 @@
-# ---------------- OFFSET CONFIG ----------------
-ATM_BUFFER = 50   # 🔥 shift ATM (can be 0, 50, 100, etc.)
-OTM_DIFF = 200    # 🔒 always fixed
-# ----------------------------------------------
-
-
 import sys
 import asyncio
 from pathlib import Path
@@ -83,8 +77,12 @@ def execute_order(client, symbol, qty, side):
 async def main():
     try:
         IST = pytz.timezone("Asia/Kolkata")
-        now = datetime.now(IST).time()
-
+        
+        now_dt = datetime.now(IST)
+        now = now_dt.time()
+        
+        ATM_BUFFER = min(now_dt.weekday(), 4) * 50
+        OTM_DIFF = 200
         dprint(f"Current IST Time: {now}")
 
         # Buffer check
