@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (FINAL STABLE ENGINE)
+# sysentrpxy.py (FINAL PRODUCTION STABLE)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -18,14 +18,15 @@ BLOCK_NONE_START = time(9, 14)
 BLOCK_NONE_END   = time(9, 15, 59)
 
 
+# LHHL FORCE RULES
 FORCE_UP = {"ORBUP", "TRASUP", "NONEUP"}
 FORCE_DOWN = {"ORBDOWN", "TRANSDOWN", "NONEDOWN"}
 
 
 # ------------------------------
-# ENTRY MAP
+# ENTRY MAPPING
 # ------------------------------
-def _map_entry(signal):
+def map_entry(signal):
     if signal == "BUY":
         return "ATMBUY"
     if signal == "SELL":
@@ -51,22 +52,27 @@ def get_entry_signal(df=None):
         return "NONE", "NONE"
 
     # ------------------------------
-    # DATA SOURCE
+    # DATA FETCH
     # ------------------------------
     if df is None:
-        df = fetch_yf_data()
+        df = fetch_yf_data(period="5d", interval="1m")
 
-    # 🔥 FIX: NORMALIZE COLUMN FORMAT
-    df.columns = [c.title() for c in df.columns]
+    if df is None or len(df) < 3:
+        return "NONE", "NONE"
+
+    # 🔥 CRITICAL FIX: isolate dataframe
+    df = df.copy()
+
+    print("[DEBUG] DF READY:", df.shape)
 
     # ------------------------------
     # LHHL ENGINE
     # ------------------------------
     phase, lhhl = get_phase_direction(df)
 
-    print("[DEBUG] RAW LHHL:", repr(lhhl))
     lhhl_clean = str(lhhl).strip().upper()
-    print("[DEBUG] CLEAN LHHL:", lhhl_clean)
+
+    print("[DEBUG] RAW LHHL:", lhhl_clean)
 
     # ------------------------------
     # MARKET SIGNAL ENGINE
@@ -76,11 +82,11 @@ def get_entry_signal(df=None):
     print("[DEBUG] ENTRY SIGNAL:", entry_signal)
     print("[DEBUG] EXIT SIGNAL :", exit_signal)
 
-    base_entry = _map_entry(entry_signal)
+    base_entry = map_entry(entry_signal)
     print("[DEBUG] BASE ENTRY:", base_entry)
 
     # ------------------------------
-    # FORCE LAYER
+    # FORCE OVERRIDE (HIGHEST PRIORITY)
     # ------------------------------
     if lhhl_clean in FORCE_UP:
         print("[DEBUG] FORCE → ATMBUY")
@@ -98,18 +104,19 @@ def get_entry_signal(df=None):
     # NORMAL MODE
     # ------------------------------
     if lhhl_clean == "UP":
-        if base_entry == "BUY":
-            return "ATMBUY", exit_signal
-        return base_entry, exit_signal
+        return ("ATMBUY" if base_entry == "BUY" else base_entry), exit_signal
 
     if lhhl_clean == "DOWN":
-        if base_entry == "SELL":
-            return "ATMSELL", exit_signal
-        return base_entry, exit_signal
+        return ("ATMSELL" if base_entry == "SELL" else base_entry), exit_signal
 
+    # ------------------------------
+    # DEFAULT FALLBACK
+    # ------------------------------
     return base_entry, exit_signal
 
 
+# ==================================================
+# RUN
 # ==================================================
 if __name__ == "__main__":
 
