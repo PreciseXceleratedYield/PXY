@@ -1,9 +1,6 @@
 # ==================================================
-# sysmktpxy.py
+# sysmktpxy.py (FINAL - DF CONTROLLED BY CALLER)
 # ==================================================
-
-from sysdtafpxy import fetch_yf_data
-
 
 def three_candle_signal(c1, c2, c3):
     if c2 < c1 and c2 < c3:
@@ -18,12 +15,12 @@ def three_candle_signal(c1, c2, c3):
         return "NONE"
 
 
-def get_signal(df=None):
+# ==================================================
+# MAIN SIGNAL ENGINE (NO INTERNAL FETCH)
+# ==================================================
+def get_signal(df):
     try:
-        # ✅ Use passed df if available
-        if df is None:
-            df = fetch_yf_data(period="5d", interval="1m")
-
+        # ❗ MUST HAVE DATA FROM OUTSIDE
         if df is None or len(df) < 3:
             return "NONE", "NONE"
 
@@ -36,12 +33,9 @@ def get_signal(df=None):
         c1, c2, c3 = df['Close'].iloc[-3], df['Close'].iloc[-2], df['Close'].iloc[-1]
         exit_signal = three_candle_signal(c1, c2, c3)
 
+        print(f"[SIGNAL] ENTRY: {entry_signal} | EXIT: {exit_signal}")
+
         return entry_signal, exit_signal
 
     except Exception:
         return "NONE", "NONE"
-
-# ✅ ONLY PRINT IF MAIN
-if __name__ == "__main__":
-    entry, exit_ = get_signal()
-    print(f"[SIGNAL] ENTRY: {entry} | EXIT: {exit_}")
