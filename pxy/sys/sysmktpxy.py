@@ -1,5 +1,5 @@
 # ==================================================
-# sysmktpxy.py (FINAL - DF CONTROLLED BY CALLER)
+# sysmktpxy.py (FINAL FIXED - PURE DF ENGINE)
 # ==================================================
 
 def three_candle_signal(c1, c2, c3):
@@ -15,16 +15,12 @@ def three_candle_signal(c1, c2, c3):
         return "NONE"
 
 
-# ==================================================
-# MAIN SIGNAL ENGINE (NO INTERNAL FETCH)
-# ==================================================
 def get_signal(df):
     try:
-        # ❗ MUST HAVE DATA FROM OUTSIDE
         if df is None or len(df) < 3:
             return "NONE", "NONE"
 
-        # ENTRY (OHLC/4)
+        # ENTRY (OHLC avg)
         price = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
         p1, p2, p3 = price.iloc[-3], price.iloc[-2], price.iloc[-1]
         entry_signal = three_candle_signal(p1, p2, p3)
