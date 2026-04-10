@@ -18,13 +18,26 @@ def three_candle_signal(c1, c2, c3):
         return "NONE"
 
 
-def get_signal(df=None):
-    try:
-        # ✅ Use passed df if available
-        if df is None:
-            df = fetch_yf_data(period="5d", interval="1m")
+# ==================================================
+# HARD-CODED DATA LOADER (NO ARG NEEDED)
+# ==================================================
+def get_df():
+    df = fetch_yf_data(period="5d", interval="1m")
 
-        if df is None or len(df) < 3:
+    if df is None or len(df) < 3:
+        return None
+
+    return df
+
+
+# ==================================================
+# MAIN SIGNAL ENGINE (NO INPUT REQUIRED)
+# ==================================================
+def get_signal():
+    try:
+        df = get_df()
+
+        if df is None:
             return "NONE", "NONE"
 
         # ENTRY (OHLC/4)
@@ -46,17 +59,13 @@ def get_signal(df=None):
 # MAIN DEBUG RUN
 # ==================================================
 if __name__ == "__main__":
+
     print("\n================ DEBUG RUN ================\n")
 
-    try:
-        df = fetch_yf_data(period="5d", interval="1m")
-        entry, exit_ = get_signal(df)
+    entry, exit_ = get_signal()
 
-        print("[DEBUG] Data fetched OK")
-        print(f"[DEBUG] Entry Signal: {entry}")
-        print(f"[DEBUG] Exit  Signal: {exit_}")
-
-    except Exception as e:
-        print("[ERROR] Failed to run main block:", str(e))
+    print("[DEBUG] Data fetched OK")
+    print(f"[DEBUG] Entry Signal: {entry}")
+    print(f"[DEBUG] Exit  Signal: {exit_}")
 
     print("\n==========================================\n")
