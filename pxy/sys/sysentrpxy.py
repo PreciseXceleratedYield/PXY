@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (FINAL WORKING FIXED VERSION)
+# sysentrpxy.py (FINAL STABLE ENGINE)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -18,8 +18,12 @@ BLOCK_NONE_START = time(9, 14)
 BLOCK_NONE_END   = time(9, 15, 59)
 
 
+FORCE_UP = {"ORBUP", "TRASUP", "NONEUP"}
+FORCE_DOWN = {"ORBDOWN", "TRANSDOWN", "NONEDOWN"}
+
+
 # ------------------------------
-# ENTRY MAPPING
+# ENTRY MAP
 # ------------------------------
 def _map_entry(signal):
     if signal == "BUY":
@@ -29,15 +33,8 @@ def _map_entry(signal):
     return signal
 
 
-# ------------------------------
-# FORCE SETS
-# ------------------------------
-FORCE_UP = {"ORBUP", "TRASUP", "NONEUP"}
-FORCE_DOWN = {"ORBDOWN", "TRANSDOWN", "NONEDOWN"}
-
-
 # ==================================================
-# MAIN FUNCTION
+# MAIN ENGINE
 # ==================================================
 def get_entry_signal(df=None):
 
@@ -54,10 +51,13 @@ def get_entry_signal(df=None):
         return "NONE", "NONE"
 
     # ------------------------------
-    # SINGLE DATA SOURCE (CRITICAL FIX)
+    # DATA SOURCE
     # ------------------------------
     if df is None:
         df = fetch_yf_data()
+
+    # 🔥 FIX: NORMALIZE COLUMN FORMAT
+    df.columns = [c.title() for c in df.columns]
 
     # ------------------------------
     # LHHL ENGINE
@@ -65,12 +65,11 @@ def get_entry_signal(df=None):
     phase, lhhl = get_phase_direction(df)
 
     print("[DEBUG] RAW LHHL:", repr(lhhl))
-
     lhhl_clean = str(lhhl).strip().upper()
     print("[DEBUG] CLEAN LHHL:", lhhl_clean)
 
     # ------------------------------
-    # MARKET SIGNAL (OLD WORKING STYLE)
+    # MARKET SIGNAL ENGINE
     # ------------------------------
     entry_signal, exit_signal = get_signal(df)
 
@@ -81,7 +80,7 @@ def get_entry_signal(df=None):
     print("[DEBUG] BASE ENTRY:", base_entry)
 
     # ------------------------------
-    # FORCE LAYER (ENTRY ONLY)
+    # FORCE LAYER
     # ------------------------------
     if lhhl_clean in FORCE_UP:
         print("[DEBUG] FORCE → ATMBUY")
