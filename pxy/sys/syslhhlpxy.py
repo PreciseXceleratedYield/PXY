@@ -1,5 +1,5 @@
 # ==================================================
-# syslhhlpxy.py  (FINAL BOOTSTRAPPED BOS ENGINE)
+# syslhhlpxy.py  (FINAL FIXED - NO NONE BUG)
 # ==================================================
 
 from sysexitpxy import detect_raw_direction
@@ -16,7 +16,7 @@ transition_active = False
 
 
 # ==================================================
-# NORMALIZATION
+# NORMALIZE DATA
 # ==================================================
 def normalize_df(df):
     if df is None or df.empty:
@@ -32,7 +32,7 @@ def normalize_df(df):
 
 
 # ==================================================
-# ADAPTER FOR RAW ENGINE
+# ADAPTER FOR RAW ENGINE (expects capital cols)
 # ==================================================
 def to_raw_df(df):
     return df.rename(columns={
@@ -60,7 +60,7 @@ def check_breakout(df, lookback=5):
 
 
 # ==================================================
-# SWING DETECTION (LAST 20 CANDLES ONLY)
+# SWING DETECTION (LAST 20 CANDLES)
 # ==================================================
 def detect_swings(df):
     highs = df["high"].values
@@ -90,10 +90,10 @@ def bootstrap_bos(df):
 
     swing_highs, swing_lows = detect_swings(df)
 
-    # structure decision
     if len(swing_highs) > len(swing_lows):
         return "UP"
-    elif len(swing_lows) > len(swing_highs):
+
+    if len(swing_lows) > len(swing_highs):
         return "DOWN"
 
     # fallback momentum
@@ -104,7 +104,7 @@ def bootstrap_bos(df):
 
 
 # ==================================================
-# BOS STRUCTURE CHECK (HH/HL)
+# BOS STRUCTURE CHECK
 # ==================================================
 def check_bos_structure(df, bos_direction, buffer=0):
 
@@ -130,7 +130,7 @@ def check_bos_structure(df, bos_direction, buffer=0):
 
 
 # ==================================================
-# INITIAL FALLBACK (RARE EDGE CASE)
+# INITIAL FALLBACK
 # ==================================================
 def find_initial_direction(df):
     df_raw = to_raw_df(df)
@@ -147,7 +147,7 @@ def get_phase_direction(df):
     global in_bos_phase, transition_active
 
     # ------------------------
-    # CLEAN DATA
+    # SAFE DATA
     # ------------------------
     df = normalize_df(df)
 
@@ -155,7 +155,7 @@ def get_phase_direction(df):
         return "BOS", "UP"
 
     # ------------------------
-    # RAW DIRECTION (ORB FEED)
+    # RAW DIRECTION
     # ------------------------
     df_raw = to_raw_df(df)
     _, raw_dir = detect_raw_direction(df_raw)
@@ -176,7 +176,7 @@ def get_phase_direction(df):
             bos_direction = raw_dir
             in_bos_phase = True
             prev_direction = raw_dir
-            transition_active = True
+            transition_active = False
 
             return "BOS", combo
 
@@ -184,21 +184,22 @@ def get_phase_direction(df):
         return "ORB", raw_dir
 
     # ==================================================
-    # BOOTSTRAP (ONLY ONCE, NO NONE EVER)
+    # 🔥 HARD BOOTSTRAP GUARANTEE (FIX)
     # ==================================================
     if bos_direction == "NONE":
         bos_direction = bootstrap_bos(df)
-        in_bos_phase = True
+        prev_direction = bos_direction
+        transition_active = False
 
     # ==================================================
-    # BOS STRUCTURE ENGINE
+    # BOS STRUCTURE
     # ==================================================
     new_dir = check_bos_structure(df, bos_direction)
 
-    # ------------------------
-    # TRANSITION (1 candle only)
-    # ------------------------
-    if new_dir != bos_direction and not transition_active:
+    # ==================================================
+    # SAFE TRANSITION (NO NONE COMBO EVER)
+    # ==================================================
+    if bos_direction in ("UP", "DOWN") and new_dir != bos_direction and not transition_active:
 
         combo = bos_direction + new_dir
 
@@ -210,14 +211,14 @@ def get_phase_direction(df):
 
     transition_active = False
 
-    # ------------------------
+    # ==================================================
     # HOLD STRUCTURE
-    # ------------------------
+    # ==================================================
     return "BOS", bos_direction
 
 
 # ==================================================
-# SELF RUN
+# RUN
 # ==================================================
 if __name__ == "__main__":
 
