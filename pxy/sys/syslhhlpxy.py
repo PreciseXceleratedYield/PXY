@@ -1,5 +1,5 @@
 # ==================================================
-# syslhhlpxy.py  (FINAL - ROBUST FIXED VERSION)
+# syslhhlpxy.py  (FINAL ROBUST VERSION - FIXED)
 # ==================================================
 
 from sysexitpxy import detect_raw_direction
@@ -16,22 +16,32 @@ transition_active = False
 
 
 # ------------------------
-# SAFE COLUMN NORMALIZATION
+# NORMALIZE DF (lowercase)
 # ------------------------
 def normalize_df(df):
     if df is None or df.empty:
         return df
 
-    # Convert columns to lowercase
     df.columns = [col.lower() for col in df.columns]
 
     required = {"open", "high", "low", "close"}
-
-    # Validate required columns
-    if not required.issubset(set(df.columns)):
+    if not required.issubset(df.columns):
         return None
 
     return df
+
+
+# ------------------------
+# ADAPT FOR RAW DIRECTION
+# (sysexitpxy expects capital names)
+# ------------------------
+def to_raw_df(df):
+    return df.rename(columns={
+        "open": "Open",
+        "high": "High",
+        "low": "Low",
+        "close": "Close"
+    })
 
 
 # ------------------------
@@ -51,7 +61,7 @@ def check_breakout(df, lookback=5):
 
 
 # ------------------------
-# LAST 3 SWINGS
+# LAST 3 SWINGS (HH/HL)
 # ------------------------
 def detect_last_3_swings(df):
     if df is None or len(df) < 5:
@@ -77,7 +87,7 @@ def detect_last_3_swings(df):
 
 
 # ------------------------
-# BOS STRUCTURE
+# BOS STRUCTURE (HH/HL)
 # ------------------------
 def check_bos_structure(df, bos_direction, buffer=0):
 
@@ -91,10 +101,12 @@ def check_bos_structure(df, bos_direction, buffer=0):
     last_high = swing_highs[-1]
     last_low = swing_lows[-1]
 
+    # UP → break HL
     if bos_direction == "UP":
         if close < (last_low - buffer):
             return "DOWN"
 
+    # DOWN → break LH
     elif bos_direction == "DOWN":
         if close > (last_high + buffer):
             return "UP"
@@ -109,7 +121,9 @@ def find_initial_direction(df):
     if df is None or len(df) < 2:
         return "NONE"
 
-    _, d = detect_raw_direction(df)
+    df_raw = to_raw_df(df)
+    _, d = detect_raw_direction(df_raw)
+
     return d if d != "NONE" else "UP"
 
 
@@ -120,19 +134,19 @@ def get_phase_direction(df):
     global prev_direction, bos_direction
     global in_bos_phase, transition_active
 
-    # ------------------------
-    # NORMALIZE DATAFRAME
-    # ------------------------
+    # Normalize input
     df = normalize_df(df)
 
     if df is None or df.empty:
         return "ORB", "NONE"
 
     # ------------------------
-    # RAW DIR
+    # RAW DIRECTION
     # ------------------------
-    _, raw_dir = detect_raw_direction(df)
+    df_raw = to_raw_df(df)
+    _, raw_dir = detect_raw_direction(df_raw)
 
+    # Reduce NONE noise
     if raw_dir == "NONE":
         raw_dir = prev_direction if prev_direction != "NONE" else "UP"
 
@@ -164,7 +178,7 @@ def get_phase_direction(df):
         bos_direction = find_initial_direction(df)
 
     # ------------------------
-    # BOS STRUCTURE CHECK
+    # BOS STRUCTURE
     # ------------------------
     new_dir = check_bos_structure(df, bos_direction)
 
@@ -181,9 +195,10 @@ def get_phase_direction(df):
 
         return "BOS", combo
 
-    # reset transition
+    # Reset transition flag
     transition_active = False
 
+    # Hold structure (sideways)
     return "BOS", bos_direction
 
 
