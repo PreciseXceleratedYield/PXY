@@ -91,7 +91,7 @@ def get_entry_signal(df=None):
 
     # Apply mapping with time + ST
     entry = map_entry(entry_signal, close, st, now)
-
+    print(f"CLOSE: {close:.2f} | ST: {st:.2f}")
     return entry, exit_signal
 
 
@@ -103,3 +103,4 @@ if __name__ == "__main__":
     print("\nFINAL OUTPUT")
     print("ENTRY:", entry)
     print("EXIT :", exit_signal)
+    
