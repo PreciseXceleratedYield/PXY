@@ -1,5 +1,5 @@
 # ==================================================
-# syslhhlpxy.py  (FINAL FIXED - NO NONE BUG)
+# syslhhlpxy.py  (FINAL FIXED - 45 MIN STATE WINDOW)
 # ==================================================
 
 from sysexitpxy import detect_raw_direction
@@ -32,7 +32,7 @@ def normalize_df(df):
 
 
 # ==================================================
-# ADAPTER FOR RAW ENGINE (expects capital cols)
+# ADAPTER FOR RAW ENGINE
 # ==================================================
 def to_raw_df(df):
     return df.rename(columns={
@@ -60,7 +60,7 @@ def check_breakout(df, lookback=5):
 
 
 # ==================================================
-# SWING DETECTION (LAST 20 CANDLES)
+# SWING DETECTION
 # ==================================================
 def detect_swings(df):
     highs = df["high"].values
@@ -83,12 +83,16 @@ def detect_swings(df):
 
 
 # ==================================================
-# BOOTSTRAP BOS (NO NONE EVER)
+# BOOTSTRAP BOS (45 MIN FIX)
 # ==================================================
 def bootstrap_bos(df):
-    df = df.tail(20)
+    df = df.tail(45)
 
     swing_highs, swing_lows = detect_swings(df)
+
+    # safety fallback if no swings
+    if not swing_highs and not swing_lows:
+        return "UP" if df["close"].iloc[-1] > df["close"].iloc[0] else "DOWN"
 
     if len(swing_highs) > len(swing_lows):
         return "UP"
@@ -97,10 +101,7 @@ def bootstrap_bos(df):
         return "DOWN"
 
     # fallback momentum
-    if df["close"].iloc[-1] > df["close"].iloc[0]:
-        return "UP"
-
-    return "DOWN"
+    return "UP" if df["close"].iloc[-1] > df["close"].iloc[0] else "DOWN"
 
 
 # ==================================================
@@ -130,9 +131,10 @@ def check_bos_structure(df, bos_direction, buffer=0):
 
 
 # ==================================================
-# INITIAL FALLBACK
+# INITIAL FALLBACK (45 MIN FIX)
 # ==================================================
 def find_initial_direction(df):
+    df = df.tail(45)
     df_raw = to_raw_df(df)
     _, d = detect_raw_direction(df_raw)
     return d if d != "NONE" else "UP"
@@ -184,7 +186,7 @@ def get_phase_direction(df):
         return "ORB", raw_dir
 
     # ==================================================
-    # 🔥 HARD BOOTSTRAP GUARANTEE (FIX)
+    # BOOTSTRAP (45 MIN STATE)
     # ==================================================
     if bos_direction == "NONE":
         bos_direction = bootstrap_bos(df)
@@ -197,7 +199,7 @@ def get_phase_direction(df):
     new_dir = check_bos_structure(df, bos_direction)
 
     # ==================================================
-    # SAFE TRANSITION (NO NONE COMBO EVER)
+    # SAFE TRANSITION
     # ==================================================
     if bos_direction in ("UP", "DOWN") and new_dir != bos_direction and not transition_active:
 
