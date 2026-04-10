@@ -1,15 +1,17 @@
 # ==================================================
-# sysentrpxy.py (FINAL CLEAN + TIME + ST LOGIC)
+# sysentrpxy.py (FINAL CLEAN + TIME + ST + ATR-SMA FILTER)
 # ==================================================
 
 from sysmktpxy import get_signal
 from sysdtafpxy import fetch_yf_data
 from sysstrndpxy import calculate_supertrend
+from sysatsmpxy import get_atr_sma   # ✅ NEW IMPORT
 
 from datetime import datetime, time
 import pytz
 
 DEBUG = False
+
 
 def debug_log(*args):
     if DEBUG:
@@ -40,23 +42,40 @@ def map_entry(sig, close=None, st=None, now=None):
     # -------- PHASE 2: ST FILTER --------
     if sig == "BUY":
         signal = "ATMBUY"
-
         if close is not None and st is not None:
             if close < st:
                 signal = "OTMBUY"
-
         return signal
 
     if sig == "SELL":
         signal = "ATMSELL"
-
         if close is not None and st is not None:
             if close > st:
                 signal = "OTMSELL"
-
         return signal
 
     return sig
+
+
+# -------------------- ATR SMA VALIDATION --------------------
+def validate_with_sma(signal, close, sma_value):
+
+    if sma_value is None:
+        return "NONE"
+
+    # -------- BUY RULE --------
+    if signal in ["ATMBUY", "OTMBUY"]:
+        if close < sma_value:
+            return signal
+        return "NONE"
+
+    # -------- SELL RULE --------
+    if signal in ["ATMSELL", "OTMSELL"]:
+        if close > sma_value:
+            return signal
+        return "NONE"
+
+    return signal
 
 
 # -------------------- CORE --------------------
@@ -83,15 +102,24 @@ def get_entry_signal(df=None):
     close = last['Close']
     st = last['ST'] if 'ST' in df.columns else close
 
+    # -------- BASE SIGNAL --------
     entry_signal, exit_signal = get_signal()
 
     if entry_signal is None:
         entry_signal = "NONE"
         exit_signal = "NONE"
 
-    # Apply mapping with time + ST
+    # -------- ST MAPPING --------
     entry = map_entry(entry_signal, close, st, now)
-    #print(f"CLOSE: {close:.2f} | ST: {st:.2f}")
+
+    # -------- ATR-SMA FILTER --------
+    sma_data = get_atr_sma(df)
+    sma_value = sma_data["atrsma"]
+
+    debug_log("ENTRY:", entry, "CLOSE:", close, "SMA:", sma_value)
+
+    entry = validate_with_sma(entry, close, sma_value)
+
     return entry, exit_signal
 
 
@@ -103,4 +131,3 @@ if __name__ == "__main__":
     print("\nFINAL OUTPUT")
     print("ENTRY:", entry)
     print("EXIT :", exit_signal)
-    
