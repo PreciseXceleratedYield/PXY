@@ -24,23 +24,20 @@ html, body {
     display: flex;
     flex-direction: column;
 
-    /* Scrollbar on the left */
+    /* Scrollbar on left */
     direction: rtl;  
 }
 
 #terminal {
     flex: 1;
     overflow-y: auto;
-    font-size: 16px;  /* base font */
-    line-height: 1.5;
-
     direction: ltr;
 }
 
+/* xterm visuals only (NO font-size here) */
 .xterm {
     height: 100% !important;
     font-weight: normal;
-    font-size: 16px !important;
 }
 
 .xterm .xterm-cursor {
@@ -50,19 +47,6 @@ html, body {
 
 .xterm .xterm-selection {
     background: rgba(224, 216, 192, 0.2) !important;
-}
-
-/* ✅ 2.3x scaling for mobile */
-@media (max-width: 768px) {
-    #terminal {
-        font-size: 37px;
-    }
-    .xterm {
-        font-size: 37px !important;
-    }
-    .xterm .xterm-cursor {
-        border-left: 4px solid #f0e0b0 !important;
-    }
 }
 </style>
 </head>
@@ -76,19 +60,21 @@ html, body {
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
 <script>
-// Detect mobile
-const isMobile = window.innerWidth <= 768;
-
-// ✅ EXACT 2.3x scaling
+// ===============================
+// CONFIG
+// ===============================
 const BASE_FONT = 16;
 const SCALE = 2.3;
-const MOBILE_FONT = Math.round(BASE_FONT * SCALE); // 37
+const MOBILE_FONT = Math.round(BASE_FONT * SCALE); // 37px
 
+// ===============================
+// INIT TERMINAL
+// ===============================
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', 'Noto Color Emoji', monospace",
-    fontSize: isMobile ? MOBILE_FONT : BASE_FONT,
+    fontSize: BASE_FONT, // initial only
     cursorBlink: false,
     theme: {
         background: '#1e1e1e',
@@ -103,8 +89,27 @@ const term = new Terminal({
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
-fitAddon.fit();
 
+// ===============================
+// FONT APPLY FUNCTION (CRITICAL)
+// ===============================
+function applyFontSize() {
+    const isMobile = window.innerWidth <= 768;
+    const size = isMobile ? MOBILE_FONT : BASE_FONT;
+
+    term.setOption('fontSize', size);
+    fitAddon.fit(); // MUST re-fit after font change
+}
+
+// ===============================
+// INITIAL FIT + APPLY
+// ===============================
+fitAddon.fit();
+applyFontSize();
+
+// ===============================
+// WEBSOCKET
+// ===============================
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
@@ -121,11 +126,11 @@ ws.onerror = (err) => {
     term.writeln(`\nWebSocket error: ${err}`);
 };
 
-// ✅ Maintain scaling on resize
+// ===============================
+// HANDLE RESIZE
+// ===============================
 window.addEventListener('resize', () => {
-    fitAddon.fit();
-    const newFontSize = window.innerWidth <= 768 ? MOBILE_FONT : BASE_FONT;
-    term.setOption('fontSize', newFontSize);
+    applyFontSize();
 });
 </script>
 
