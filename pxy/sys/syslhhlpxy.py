@@ -1,11 +1,10 @@
 # ==================================================
-# syslhhlpxy.py (FINAL FIX - REAL STRUCTURE ENGINE)
+# syslhhlpxy.py (FINAL - STABLE + FORCE READY)
 # ==================================================
 
 from sysdtafpxy import fetch_yf_data
 
 
-# ==================================================
 def normalize_df(df):
     if df is None or df.empty:
         return None
@@ -19,75 +18,59 @@ def normalize_df(df):
     return df
 
 
-# ==================================================
-def detect_price_direction(df):
+def detect_direction(df):
     """
-    PURE PRICE MOMENTUM (NO EXTERNAL DEPENDENCY)
+    PURE momentum-based direction (stable, no NONE leakage)
     """
-    last = df["close"].iloc[-1]
-    prev = df["close"].iloc[-2]
+    if len(df) < 2:
+        return "NONE"
 
-    if last > prev:
+    if df["close"].iloc[-1] > df["close"].iloc[-2]:
         return "UP"
-    elif last < prev:
+    elif df["close"].iloc[-1] < df["close"].iloc[-2]:
         return "DOWN"
     return "NONE"
 
 
-# ==================================================
-def get_phase_direction(df):
+def get_phase_direction(df=None):
+
+    if df is None:
+        df = fetch_yf_data()
 
     df = normalize_df(df)
 
-    if df is None or len(df) < 3:
-        return "BOS", "NONE"
+    if df is None:
+        return "ORB", "NONE"
 
-    # ==================================================
-    # CORE SIGNALS
-    # ==================================================
-    current = detect_price_direction(df)
+    current = detect_direction(df)
 
-    # memory (stateless-safe per runtime call)
     if not hasattr(get_phase_direction, "prev"):
         get_phase_direction.prev = "NONE"
 
     prev = get_phase_direction.prev
     get_phase_direction.prev = current
 
-    # ==================================================
-    # ORB BASE LOGIC
-    # ==================================================
-    if prev == "NONE":
-
-        if current == "UP":
-            return "ORB", "ORBUP"
-
-        if current == "DOWN":
-            return "ORB", "ORBDOWN"
-
-        return "ORB", "NONE"
-
-    # ==================================================
-    # TRANSITION LOGIC (CRITICAL FIX)
-    # ==================================================
+    # -----------------------------
+    # TRANSITIONS (CRITICAL)
+    # -----------------------------
     if prev == "UP" and current == "DOWN":
         return "ORB", "TRANSDOWN"
 
     if prev == "DOWN" and current == "UP":
         return "ORB", "TRASUP"
 
-    # ==================================================
-    # CONTINUATION LOGIC
-    # ==================================================
+    # -----------------------------
+    # CONTINUATION
+    # -----------------------------
     if current == "UP":
         return "ORB", "ORBUP"
 
     if current == "DOWN":
         return "ORB", "ORBDOWN"
 
-    # ==================================================
-    # FALLBACK (MINIMIZED NONE)
-    # ==================================================
+    # -----------------------------
+    # FALLBACK
+    # -----------------------------
     if prev == "UP":
         return "ORB", "NONEUP"
 
@@ -95,13 +78,3 @@ def get_phase_direction(df):
         return "ORB", "NONEDOWN"
 
     return "ORB", "NONE"
-
-
-# ==================================================
-if __name__ == "__main__":
-
-    df = fetch_yf_data()
-
-    phase, direction = get_phase_direction(df)
-
-    print(f"{phase} | {direction}")
