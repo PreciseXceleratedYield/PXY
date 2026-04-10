@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (PRODUCTION FINAL FIXED)
+# sysentrpxy.py (CLEAN PRODUCTION VERSION)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -8,20 +8,13 @@ from sysdtafpxy import fetch_yf_data
 from datetime import datetime, time
 import pytz
 
-# ------------------------------
-# GLOBAL DEBUG SWITCH
-# ------------------------------
 DEBUG = False
-
 
 def debug_log(*args):
     if DEBUG:
         print(*args)
 
 
-# ------------------------------
-# CONFIG
-# ------------------------------
 TIMEZONE = "Asia/Kolkata"
 
 BLOCK_NONE_START = time(9, 14)
@@ -31,9 +24,6 @@ FORCE_UP = {"ORBUP", "TRASUP", "NONEUP"}
 FORCE_DOWN = {"ORBDOWN", "TRANSDOWN", "NONEDOWN"}
 
 
-# ------------------------------
-# ENTRY MAPPING
-# ------------------------------
 def map_entry(sig):
     if sig == "BUY":
         return "ATMBUY"
@@ -42,9 +32,6 @@ def map_entry(sig):
     return sig
 
 
-# ==================================================
-# MAIN ENGINE
-# ==================================================
 def get_entry_signal(df=None):
 
     tz = pytz.timezone(TIMEZONE)
@@ -53,15 +40,9 @@ def get_entry_signal(df=None):
     debug_log("\n================ DEBUG START ================")
     debug_log("[DEBUG] TIME:", now)
 
-    # ------------------------------
-    # TIME BLOCK
-    # ------------------------------
     if BLOCK_NONE_START <= now <= BLOCK_NONE_END:
         return "NONE", "NONE"
 
-    # ------------------------------
-    # FETCH DATA
-    # ------------------------------
     if df is None:
         df = fetch_yf_data(period="5d", interval="1m")
 
@@ -72,34 +53,25 @@ def get_entry_signal(df=None):
 
     debug_log("[DEBUG] DF READY:", df.shape)
 
-    # ------------------------------
-    # LHHL ENGINE
-    # ------------------------------
     phase, lhhl = get_phase_direction(df)
 
     lhhl_clean = str(lhhl).strip().upper()
-    debug_log("[DEBUG] RAW LHHL:", lhhl_clean)
+    debug_log("[DEBUG] LHHL:", lhhl_clean)
 
     # ------------------------------
-    # MARKET SIGNAL ENGINE
+    # PURE SIGNALS (NO MODIFICATION)
     # ------------------------------
     entry_signal, exit_signal = get_signal(df)
 
-    debug_log("[DEBUG] RAW ENTRY SIGNAL:", entry_signal)
-    debug_log("[DEBUG] RAW EXIT SIGNAL :", exit_signal)
-
-    # 🔥 STORE ORIGINAL ENTRY FOR EXIT (IMPORTANT FIX)
-    raw_entry_signal = entry_signal
+    debug_log("[DEBUG] ENTRY SIGNAL:", entry_signal)
+    debug_log("[DEBUG] EXIT SIGNAL :", exit_signal)
 
     # ------------------------------
-    # SAFE NORMALIZATION ONLY FOR ENTRY
+    # ENTRY PROCESS ONLY
     # ------------------------------
     if entry_signal is None:
         entry_signal = "NONE"
 
-    # ------------------------------
-    # ENTRY FALLBACK ONLY
-    # ------------------------------
     if entry_signal == "NONE":
         entry_signal = "BEAR"
 
@@ -108,38 +80,26 @@ def get_entry_signal(df=None):
     debug_log("[DEBUG] BASE ENTRY:", base_entry)
 
     # ------------------------------
-    # FORCE LAYER (HIGHEST PRIORITY)
+    # FORCE LAYER (ENTRY ONLY)
     # ------------------------------
     if lhhl_clean in FORCE_UP:
-        debug_log("[DEBUG] FORCE → ATMBUY")
-        debug_log("===========================================\n")
-        return "ATMBUY", raw_entry_signal
+        return "ATMBUY", exit_signal
 
     if lhhl_clean in FORCE_DOWN:
-        debug_log("[DEBUG] FORCE → ATMSELL")
-        debug_log("===========================================\n")
-        return "ATMSELL", raw_entry_signal
-
-    debug_log("[DEBUG] NO FORCE → NORMAL MODE")
+        return "ATMSELL", exit_signal
 
     # ------------------------------
     # NORMAL MODE
     # ------------------------------
     if lhhl_clean == "UP":
-        return ("ATMBUY" if base_entry == "BUY" else base_entry), raw_entry_signal
+        return ("ATMBUY" if base_entry == "BUY" else base_entry), exit_signal
 
     if lhhl_clean == "DOWN":
-        return ("ATMSELL" if base_entry == "SELL" else base_entry), raw_entry_signal
+        return ("ATMSELL" if base_entry == "SELL" else base_entry), exit_signal
 
-    # ------------------------------
-    # FALLBACK SAFE MODE
-    # ------------------------------
-    return base_entry, raw_entry_signal
+    return base_entry, exit_signal
 
 
-# ==================================================
-# RUN
-# ==================================================
 if __name__ == "__main__":
 
     entry, exit_signal = get_entry_signal()
