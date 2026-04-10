@@ -61,7 +61,7 @@ def compute_st_fixed(row):
 
         is_hit = ltp >= tgt
 
-        return f"{color}{entry_s}{dot}{Fore.RESET}{tg_s}", is_hit
+        return f"{color}{entry_s}{dot} {Fore.RESET}{tg_s}", is_hit
     except:
         return "00⚪00", False
 
