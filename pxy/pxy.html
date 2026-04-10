@@ -31,10 +31,9 @@ html, body {
 #terminal {
     flex: 1;
     overflow-y: auto;
-    font-size: 16px;  /* original desktop font */
+    font-size: 16px;  /* base font */
     line-height: 1.5;
 
-    /* Keep text direction normal inside terminal */
     direction: ltr;
 }
 
@@ -53,13 +52,13 @@ html, body {
     background: rgba(224, 216, 192, 0.2) !important;
 }
 
-/* Mobile-specific scaling: screen width <= 768px */
+/* ✅ 2.3x scaling for mobile */
 @media (max-width: 768px) {
     #terminal {
-        font-size: 38px;       /* scaled 2.35x for mobile */
+        font-size: 37px;
     }
     .xterm {
-        font-size: 38px !important;
+        font-size: 37px !important;
     }
     .xterm .xterm-cursor {
         border-left: 4px solid #f0e0b0 !important;
@@ -77,14 +76,19 @@ html, body {
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
 <script>
-// Detect mobile for JS Terminal initialization
+// Detect mobile
 const isMobile = window.innerWidth <= 768;
+
+// ✅ EXACT 2.3x scaling
+const BASE_FONT = 16;
+const SCALE = 2.3;
+const MOBILE_FONT = Math.round(BASE_FONT * SCALE); // 37
 
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', 'Noto Color Emoji', monospace",
-    fontSize: isMobile ? 38 : 16,   // 38px on mobile, 16px on desktop
+    fontSize: isMobile ? MOBILE_FONT : BASE_FONT,
     cursorBlink: false,
     theme: {
         background: '#1e1e1e',
@@ -92,7 +96,7 @@ const term = new Terminal({
         cursor: '#f0e0b0',
         selection: 'rgba(224, 216, 192, 0.2)'
     },
-    rendererType: 'dom',             
+    rendererType: 'dom',
     padding: { top: 0, right: 0, bottom: 0, left: 2 }
 });
 
@@ -117,10 +121,10 @@ ws.onerror = (err) => {
     term.writeln(`\nWebSocket error: ${err}`);
 };
 
-// Re-fit terminal on window resize
+// ✅ Maintain scaling on resize
 window.addEventListener('resize', () => {
     fitAddon.fit();
-    const newFontSize = window.innerWidth <= 768 ? 38 : 16;
+    const newFontSize = window.innerWidth <= 768 ? MOBILE_FONT : BASE_FONT;
     term.setOption('fontSize', newFontSize);
 });
 </script>
