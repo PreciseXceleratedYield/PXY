@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py  (FINAL EXECUTION ENGINE)
+# sysentrpxy.py  (3-LAYER EXECUTION ENGINE - FINAL FORCE FIX)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -36,7 +36,7 @@ def get_entry_signal(df=None):
     now = datetime.now(tz).time()
 
     # ==================================================
-    # 🥇 LAYER 0 — TIME BLOCK
+    # 🥇 LAYER 0 — TIME BLOCK (HIGHEST PRIORITY)
     # ==================================================
     if BLOCK_START <= now <= BLOCK_END:
         return "NONE", "NONE"
@@ -46,32 +46,29 @@ def get_entry_signal(df=None):
     # ------------------------------
     phase, lhhl = get_phase_direction(df)
 
-    # ------------------------------
-    # SIGNAL ENGINE
-    # ------------------------------
-    entry_signal, exit_signal = get_signal(df)
-
     # ==================================================
-    # 🥇 LAYER 1 — ORB OVERRIDE
+    # 🥇 LAYER 1 — ORB FORCE (TERMINAL)
     # ==================================================
     if lhhl == "ORBUP":
-        return "ATMBUY", exit_signal
+        return "ATMBUY", "NONE"
 
     if lhhl == "ORBDOWN":
-        return "ATMSELL", exit_signal
+        return "ATMSELL", "NONE"
 
     # ==================================================
-    # 🥈 LAYER 2 — TRANSITION FORCE MODE
+    # 🥈 LAYER 2 — TRANSITION FORCE (TERMINAL)
     # ==================================================
     if lhhl in ("TRASUP", "NONEUP"):
-        return "ATMBUY", exit_signal
+        return "ATMBUY", "NONE"
 
     if lhhl in ("TRANSDOWN", "NONEDOWN"):
-        return "ATMSELL", exit_signal
+        return "ATMSELL", "NONE"
 
     # ==================================================
-    # 🥉 LAYER 3 — NORMAL MODE
+    # 🥉 LAYER 3 — NORMAL MODE (ONLY SAFE STATES)
     # ==================================================
+
+    entry_signal, exit_signal = get_signal(df)
 
     base_entry = _map_entry_signal(entry_signal)
 
