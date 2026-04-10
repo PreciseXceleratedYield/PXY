@@ -2,135 +2,74 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Night Mode Terminal</title>
+<title>Terminal Fix</title>
 
-<!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
 <style>
 html, body {
     margin: 0;
-    padding: 0;
     height: 100%;
-    width: 100%;
-    font-family: 'DejaVu Sans Mono', 'Ubuntu Mono', 'Noto Color Emoji', monospace;
     background: #1e1e1e;
-    color: #e0d8c0;
-}
-
-#terminal-container {
-    width: 100%;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-
-    /* Scrollbar on left */
-    direction: rtl;  
 }
 
 #terminal {
-    flex: 1;
-    overflow-y: auto;
-    direction: ltr;
-}
-
-/* xterm visuals only (NO font-size here) */
-.xterm {
-    height: 100% !important;
-    font-weight: normal;
-}
-
-.xterm .xterm-cursor {
-    border-left: 2px solid #f0e0b0 !important;
-    animation: none !important;
-}
-
-.xterm .xterm-selection {
-    background: rgba(224, 216, 192, 0.2) !important;
+    width: 100%;
+    height: 100vh;
 }
 </style>
 </head>
 <body>
 
-<div id="terminal-container">
-    <div id="terminal"></div>
-</div>
+<div id="terminal"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
 <script>
-// ===============================
-// CONFIG
-// ===============================
-const BASE_FONT = 16;
+const BASE = 16;
 const SCALE = 2.3;
-const MOBILE_FONT = Math.round(BASE_FONT * SCALE); // 37px
+const FONT = Math.round(BASE * SCALE); // 37px
 
-// ===============================
-// INIT TERMINAL
-// ===============================
 const term = new Terminal({
-    convertEol: true,
-    scrollback: 1000,
-    fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', 'Noto Color Emoji', monospace",
-    fontSize: BASE_FONT, // initial only
-    cursorBlink: false,
+    fontSize: FONT,   // ✅ FORCE 2.3x ALWAYS
     theme: {
         background: '#1e1e1e',
-        foreground: '#e0d8c0',
-        cursor: '#f0e0b0',
-        selection: 'rgba(224, 216, 192, 0.2)'
+        foreground: '#e0d8c0'
     },
-    rendererType: 'dom',
-    padding: { top: 0, right: 0, bottom: 0, left: 2 }
+    cursorBlink: false
 });
 
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
+
 term.open(document.getElementById('terminal'));
-
-// ===============================
-// FONT APPLY FUNCTION (CRITICAL)
-// ===============================
-function applyFontSize() {
-    const isMobile = window.innerWidth <= 768;
-    const size = isMobile ? MOBILE_FONT : BASE_FONT;
-
-    term.setOption('fontSize', size);
-    fitAddon.fit(); // MUST re-fit after font change
-}
-
-// ===============================
-// INITIAL FIT + APPLY
-// ===============================
 fitAddon.fit();
-applyFontSize();
 
-// ===============================
-// WEBSOCKET
-// ===============================
-const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-const ws = new WebSocket(`${protocol}://${window.location.host}`);
+// ✅ TEST OUTPUT (IMPORTANT)
+term.writeln("✅ Terminal Loaded");
+term.writeln("Font size: " + FONT + "px");
+term.writeln("--------------------------------");
+
+// WebSocket
+const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(`${protocol}://${location.host}`);
 
 ws.onopen = () => {
-    term.writeln('WebSocket connected. Awaiting terminal output...');
+    term.writeln("✅ WebSocket Connected");
 };
 
-ws.onmessage = (event) => {
-    term.write(event.data);
-    term.scrollToBottom();
+ws.onmessage = (e) => {
+    term.write(e.data);
 };
 
-ws.onerror = (err) => {
-    term.writeln(`\nWebSocket error: ${err}`);
+ws.onerror = () => {
+    term.writeln("❌ WebSocket Error");
 };
 
-// ===============================
-// HANDLE RESIZE
-// ===============================
+// Resize fix
 window.addEventListener('resize', () => {
-    applyFontSize();
+    fitAddon.fit();
 });
 </script>
 
