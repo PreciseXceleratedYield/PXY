@@ -1,34 +1,64 @@
-# syssma5pxy.py
+# syssma_atrpxy.py
 
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
+from syskatrpxy import calculate_atr
+from colorama import Fore, Style, init
+
+init(autoreset=True)
+
+TOTAL_WIDTH = 42
 
 
-# --------------------------------------------------
-# FUNCTION
-# --------------------------------------------------
-def get_sma5_signal(df: pd.DataFrame) -> dict:
+# -------------------- ATR → SMA PERIOD --------------------
+def atr_to_period(atr_value: float) -> int:
     """
-    Returns SMA5 signal + value
-    Output:
+    ATR ≤ 8 → SMA = 5
+    Every +2 ATR → reduce SMA by 1
+    Final range: 1 to 5
+    """
+
+    if atr_value <= 8:
+        period = 5
+    else:
+        period = 5 - int((atr_value - 8) // 2)
+
+    return max(1, min(5, period))
+
+
+# -------------------- MAIN SMA LOGIC --------------------
+def get_sma_atr_signal(df: pd.DataFrame) -> dict:
+    """
+    Returns:
         {
-            "trend": "UP/DOWN/FLAT/NA",
-            "value": float
+            trend: UP/DOWN/FLAT/NA,
+            sma: float,
+            period: int,
+            atr: float
         }
     """
 
-    if df is None or df.empty or len(df) < 5:
-        return {"trend": "NA", "value": 0}
+    if df is None or df.empty:
+        return {"trend": "NA", "sma": 0, "period": 0, "atr": 0}
 
-    df['SMA_5'] = df['Close'].rolling(window=5).mean()
+    atr_series = calculate_atr(df)
+    atr = atr_series.iloc[-1]
 
-    last = df.iloc[-1]
-    sma = last['SMA_5']
-    close = last['Close']
+    if pd.isna(atr):
+        return {"trend": "NA", "sma": 0, "period": 0, "atr": 0}
+
+    # -------- PERIOD FROM ATR --------
+    period = atr_to_period(atr)
+
+    # -------- SMA --------
+    df['SMA_ATR'] = df['Close'].rolling(period).mean()
+    sma = df['SMA_ATR'].iloc[-1]
+    close = df['Close'].iloc[-1]
 
     if pd.isna(sma):
-        return {"trend": "NA", "value": 0}
+        return {"trend": "NA", "sma": 0, "period": period, "atr": atr}
 
+    # -------- TREND --------
     if close > sma:
         trend = "UP"
     elif close < sma:
@@ -36,21 +66,23 @@ def get_sma5_signal(df: pd.DataFrame) -> dict:
     else:
         trend = "FLAT"
 
-    return {"trend": trend, "value": sma}
+    return {
+        "trend": trend,
+        "sma": sma,
+        "period": period,
+        "atr": atr
+    }
 
 
-# --------------------------------------------------
-# SELF RUN (DASHBOARD STYLE)
-# --------------------------------------------------
+# -------------------- SELF RUN --------------------
 if __name__ == "__main__":
-    from colorama import Fore, Style, init
-    init(autoreset=True)
-
     df = fetch_yf_data()
-    result = get_sma5_signal(df)
+    result = get_sma_atr_signal(df)
 
     trend = result["trend"]
-    value = int(result["value"])
+    sma_val = int(result["sma"])
+    period = result["period"]
+    atr_val = round(result["atr"], 2)
 
     # ---- COLOR ----
     if trend == "UP":
@@ -62,9 +94,9 @@ if __name__ == "__main__":
     else:
         color = Fore.WHITE
 
-    # ---- FORMAT (42 WIDTH SAME AS YOUR SYSTEM) ----
-    left = f"SMA5:{trend}"
-    right = f"VAL:{value}"
+    # ---- FORMAT (42 WIDTH) ----
+    left = f"SMA{period}:{trend}"
+    right = f"ATR:{atr_val}"
     line = f"{left:<21}{right:>21}"
 
     print(f"{color}{line}{Style.RESET_ALL}")
