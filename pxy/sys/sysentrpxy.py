@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (FINAL PRODUCTION STABLE)
+# sysentrpxy.py (PRODUCTION FINAL FIXED)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -18,7 +18,6 @@ BLOCK_NONE_START = time(9, 14)
 BLOCK_NONE_END   = time(9, 15, 59)
 
 
-# LHHL FORCE RULES
 FORCE_UP = {"ORBUP", "TRASUP", "NONEUP"}
 FORCE_DOWN = {"ORBDOWN", "TRANSDOWN", "NONEDOWN"}
 
@@ -26,12 +25,12 @@ FORCE_DOWN = {"ORBDOWN", "TRANSDOWN", "NONEDOWN"}
 # ------------------------------
 # ENTRY MAPPING
 # ------------------------------
-def map_entry(signal):
-    if signal == "BUY":
+def map_entry(sig):
+    if sig == "BUY":
         return "ATMBUY"
-    if signal == "SELL":
+    if sig == "SELL":
         return "ATMSELL"
-    return signal
+    return sig
 
 
 # ==================================================
@@ -52,7 +51,7 @@ def get_entry_signal(df=None):
         return "NONE", "NONE"
 
     # ------------------------------
-    # DATA FETCH
+    # FETCH DATA
     # ------------------------------
     if df is None:
         df = fetch_yf_data(period="5d", interval="1m")
@@ -60,7 +59,7 @@ def get_entry_signal(df=None):
     if df is None or len(df) < 3:
         return "NONE", "NONE"
 
-    # 🔥 CRITICAL FIX: isolate dataframe
+    # 🔥 CRITICAL: isolate dataframe
     df = df.copy()
 
     print("[DEBUG] DF READY:", df.shape)
@@ -71,7 +70,6 @@ def get_entry_signal(df=None):
     phase, lhhl = get_phase_direction(df)
 
     lhhl_clean = str(lhhl).strip().upper()
-
     print("[DEBUG] RAW LHHL:", lhhl_clean)
 
     # ------------------------------
@@ -82,11 +80,22 @@ def get_entry_signal(df=None):
     print("[DEBUG] ENTRY SIGNAL:", entry_signal)
     print("[DEBUG] EXIT SIGNAL :", exit_signal)
 
+    # 🔥 FIX NONE PROPAGATION (CRITICAL)
+    if entry_signal == "NONE" and exit_signal != "NONE":
+        entry_signal = exit_signal
+
+    if exit_signal == "NONE" and entry_signal != "NONE":
+        exit_signal = entry_signal
+
+    if entry_signal == "NONE":
+        entry_signal = "BEAR"
+        exit_signal = "BEAR"
+
     base_entry = map_entry(entry_signal)
     print("[DEBUG] BASE ENTRY:", base_entry)
 
     # ------------------------------
-    # FORCE OVERRIDE (HIGHEST PRIORITY)
+    # FORCE LAYER (HIGHEST PRIORITY)
     # ------------------------------
     if lhhl_clean in FORCE_UP:
         print("[DEBUG] FORCE → ATMBUY")
@@ -110,7 +119,7 @@ def get_entry_signal(df=None):
         return ("ATMSELL" if base_entry == "SELL" else base_entry), exit_signal
 
     # ------------------------------
-    # DEFAULT FALLBACK
+    # FALLBACK SAFE MODE
     # ------------------------------
     return base_entry, exit_signal
 
