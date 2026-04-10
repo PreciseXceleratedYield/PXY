@@ -1,5 +1,5 @@
 # ==================================================
-# syslhhlpxy.py  (FINAL - PHASE + DIRECTION)
+# syslhhlpxy.py  (FINAL - ROBUST FIXED VERSION)
 # ==================================================
 
 from sysexitpxy import detect_raw_direction
@@ -16,6 +16,25 @@ transition_active = False
 
 
 # ------------------------
+# SAFE COLUMN NORMALIZATION
+# ------------------------
+def normalize_df(df):
+    if df is None or df.empty:
+        return df
+
+    # Convert columns to lowercase
+    df.columns = [col.lower() for col in df.columns]
+
+    required = {"open", "high", "low", "close"}
+
+    # Validate required columns
+    if not required.issubset(set(df.columns)):
+        return None
+
+    return df
+
+
+# ------------------------
 # BREAKOUT (ORB → BOS)
 # ------------------------
 def check_breakout(df, lookback=5):
@@ -26,7 +45,7 @@ def check_breakout(df, lookback=5):
 
     high = recent["high"].max()
     low = recent["low"].min()
-    close = df["Close"].iloc[-1]
+    close = df["close"].iloc[-1]
 
     return close > high or close < low
 
@@ -62,7 +81,7 @@ def detect_last_3_swings(df):
 # ------------------------
 def check_bos_structure(df, bos_direction, buffer=0):
 
-    close = df["Close"].iloc[-1]
+    close = df["close"].iloc[-1]
 
     swing_highs, swing_lows = detect_last_3_swings(df)
 
@@ -101,6 +120,11 @@ def get_phase_direction(df):
     global prev_direction, bos_direction
     global in_bos_phase, transition_active
 
+    # ------------------------
+    # NORMALIZE DATAFRAME
+    # ------------------------
+    df = normalize_df(df)
+
     if df is None or df.empty:
         return "ORB", "NONE"
 
@@ -128,7 +152,7 @@ def get_phase_direction(df):
             prev_direction = raw_dir
             transition_active = True
 
-            return "BOS", combo  # transition happens at BOS start
+            return "BOS", combo
 
         prev_direction = raw_dir
         return "ORB", raw_dir
@@ -140,7 +164,7 @@ def get_phase_direction(df):
         bos_direction = find_initial_direction(df)
 
     # ------------------------
-    # BOS STRUCTURE
+    # BOS STRUCTURE CHECK
     # ------------------------
     new_dir = check_bos_structure(df, bos_direction)
 
