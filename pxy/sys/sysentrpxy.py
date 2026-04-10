@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (FINAL SIGNAL ROUTER)
+# sysentrpxy.py (FINAL CLEAN VERSION)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -16,8 +16,9 @@ def debug_log(*args):
 
 TIMEZONE = "Asia/Kolkata"
 
+# ✅ ONLY FIRST 2 MIN BLOCK
 NONE_START = time(9, 14, 0)
-NONE_END   = time(19, 15, 59)
+NONE_END   = time(9, 15, 59)
 
 
 def map_entry(sig):
@@ -25,7 +26,7 @@ def map_entry(sig):
         return "ATMBUY"
     if sig == "SELL":
         return "ATMSELL"
-    return sig  # BULL / BEAR / NONE / etc.
+    return sig
 
 
 def get_entry_signal(df=None):
@@ -33,7 +34,7 @@ def get_entry_signal(df=None):
     tz = pytz.timezone(TIMEZONE)
     now = datetime.now(tz).time()
 
-    # TIME BLOCK OVERRIDE
+    # TIME BLOCK ONLY HERE
     if NONE_START <= now <= NONE_END:
         return "NONE", "NONE"
 
@@ -51,7 +52,7 @@ def get_entry_signal(df=None):
 
     entry = map_entry(entry_signal)
 
-    # EXIT IS RAW ENTRY SIGNAL (UNCHANGED)
+    # EXIT = RAW ENTRY SIGNAL
     return entry, exit_signal
 
 
