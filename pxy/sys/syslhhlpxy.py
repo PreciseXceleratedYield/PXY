@@ -90,7 +90,6 @@ def bootstrap_bos(df):
 
     swing_highs, swing_lows = detect_swings(df)
 
-    # safety fallback if no swings
     if not swing_highs and not swing_lows:
         return "UP" if df["close"].iloc[-1] > df["close"].iloc[0] else "DOWN"
 
@@ -100,7 +99,6 @@ def bootstrap_bos(df):
     if len(swing_lows) > len(swing_highs):
         return "DOWN"
 
-    # fallback momentum
     return "UP" if df["close"].iloc[-1] > df["close"].iloc[0] else "DOWN"
 
 
@@ -148,26 +146,18 @@ def get_phase_direction(df):
     global prev_direction, bos_direction
     global in_bos_phase, transition_active
 
-    # ------------------------
-    # SAFE DATA
-    # ------------------------
     df = normalize_df(df)
 
     if df is None or df.empty:
         return "BOS", "UP"
 
-    # ------------------------
-    # RAW DIRECTION
-    # ------------------------
     df_raw = to_raw_df(df)
     _, raw_dir = detect_raw_direction(df_raw)
 
     if raw_dir == "NONE":
         raw_dir = prev_direction if prev_direction != "NONE" else "UP"
 
-    # ==================================================
     # ORB PHASE
-    # ==================================================
     if not in_bos_phase:
 
         breakout = check_breakout(df)
@@ -185,25 +175,26 @@ def get_phase_direction(df):
         prev_direction = raw_dir
         return "ORB", raw_dir
 
-    # ==================================================
-    # BOOTSTRAP (45 MIN STATE)
-    # ==================================================
+    # BOOTSTRAP
     if bos_direction == "NONE":
         bos_direction = bootstrap_bos(df)
         prev_direction = bos_direction
         transition_active = False
 
-    # ==================================================
     # BOS STRUCTURE
-    # ==================================================
     new_dir = check_bos_structure(df, bos_direction)
 
     # ==================================================
-    # SAFE TRANSITION
+    # SAFE TRANSITION (UPDATED OUTPUT FORMAT)
     # ==================================================
     if bos_direction in ("UP", "DOWN") and new_dir != bos_direction and not transition_active:
 
-        combo = bos_direction + new_dir
+        if bos_direction == "UP" and new_dir == "DOWN":
+            combo = "TRANSDOWN"
+        elif bos_direction == "DOWN" and new_dir == "UP":
+            combo = "TRASUP"
+        else:
+            combo = bos_direction + new_dir
 
         bos_direction = new_dir
         prev_direction = new_dir
@@ -213,9 +204,6 @@ def get_phase_direction(df):
 
     transition_active = False
 
-    # ==================================================
-    # HOLD STRUCTURE
-    # ==================================================
     return "BOS", bos_direction
 
 
