@@ -1,3 +1,9 @@
+# ---------------- OFFSET CONFIG ----------------
+ATM_BUFFER = 50   # 🔥 shift ATM (can be 0, 50, 100, etc.)
+OTM_DIFF = 200    # 🔒 always fixed
+# ----------------------------------------------
+
+
 import sys
 import asyncio
 from pathlib import Path
@@ -123,7 +129,7 @@ async def main():
 
         # --- 4. Side & Strike Logic (ADJUSTED FOR ATM/OTM ONLY) ---
         sig = entry_signal.upper().strip()
-
+        
         # Determine side strictly from ATM/OTM signal
         if sig in ["ATMBUY", "OTMBUY"]:
             side = "BUY"
@@ -132,15 +138,21 @@ async def main():
         else:
             print(f"{Fore.YELLOW}💤 Lets Wait as Signal 💤: 💤   {entry_signal}  💤")
             return
-
-        # Determine offset: ATM → 0, OTM → 200
-        offset = 200 if sig.startswith("OTM") else 0
-
-        # Strike calculation
+    
+        # -------- STEP 1: SHIFTED ATM --------
         if side == "BUY":
-            strike = round_up_50(ltp + offset)
+            atm_strike = round_up_50(ltp + ATM_BUFFER)
         else:
-            strike = round_down_50(ltp - offset)
+            atm_strike = round_down_50(ltp - ATM_BUFFER)
+       
+        # -------- STEP 2: OTM FROM ATM --------
+        if sig.startswith("OTM"):
+            if side == "BUY":
+                strike = round_up_50(atm_strike + OTM_DIFF)
+            else:
+                strike = round_down_50(atm_strike - OTM_DIFF)
+        else:
+            strike = atm_strike
 
         # 5. Symbol Building
         symbol = get_symbol(strike, side)
