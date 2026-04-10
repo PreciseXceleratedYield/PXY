@@ -94,7 +94,7 @@ def run_snapshot():
         return
     print("━" * 42)
     # 40-char GRID: SYM(15) ST(12) PNL(10) ~ total 40
-    header = f"{'SYM':<18}{'ST':^12}{'PNL':>7}"
+    header = f"{'SYM':<19}{'ST':^12}{'PNL':>7}"
     print(f"  {Fore.CYAN}{Style.BRIGHT}{header}")
     print("-" * 42)
 
