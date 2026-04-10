@@ -78,3 +78,15 @@ def get_phase_direction(df=None):
         return "ORB", "NONEDOWN"
 
     return "ORB", "NONE"
+
+# ================= MAIN DEBUG =================
+if __name__ == "__main__":
+    df = fetch_yf_data()
+
+    phase, state = get_phase_direction(df)
+
+    print("\n" + "=" * 50)
+    print("PHASE DEBUG OUTPUT")
+    print("=" * 50)
+    print("Phase :", phase)
+    print("State :", state)
