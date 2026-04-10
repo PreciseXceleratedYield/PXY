@@ -4,7 +4,7 @@ import pytz
 IST = pytz.timezone("Asia/Kolkata")
 
 # ---- GLOBAL FACTOR ----
-PER_SECOND_INCREMENT = 0.001   # 0.01 increase every second
+PER_SECOND_INCREMENT = 0.01   # 0.01 increase every second
 
 def dynamic_entry(row):
     try:
