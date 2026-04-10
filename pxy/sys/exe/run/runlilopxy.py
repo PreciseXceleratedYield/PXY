@@ -97,7 +97,10 @@ def _print_summary(total_unrealized, total_realized):
     real_str = str(total_realized)
 
     # Single line
-    print(f"{f' 🥅  {real_str}  🥅  🏃‍♂️🏃‍♂️  {unreal_str}  🏃‍♂️🏃‍♂️':>42}")
+    from colorama import Fore, Style, init
+    init(autoreset=True)
+    
+    print(f"{f' 🥅    {(Style.BRIGHT + Fore.GREEN if float(real_str.replace('%','').replace('+','')) >= 0 else Fore.RED) + real_str + Style.RESET_ALL}  🏃‍♂️🏃‍♂️  {unreal_str}  🏃‍♂️🏃‍♂️':>42}")
 
 
 if __name__ == "__main__":
