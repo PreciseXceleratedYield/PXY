@@ -1,8 +1,7 @@
 # ==================================================
-# syslhhlpxy.py  (FINAL LHHL ENGINE - FORCE READY)
+# syslhhlpxy.py (FINAL FIX - REAL STRUCTURE ENGINE)
 # ==================================================
 
-from sysexitpxy import detect_raw_direction
 from sysdtafpxy import fetch_yf_data
 
 
@@ -12,8 +11,8 @@ def normalize_df(df):
         return None
 
     df.columns = [c.lower() for c in df.columns]
-
     required = {"open", "high", "low", "close"}
+
     if not required.issubset(df.columns):
         return None
 
@@ -21,20 +20,18 @@ def normalize_df(df):
 
 
 # ==================================================
-def to_raw_df(df):
-    return df.rename(columns={
-        "open": "Open",
-        "high": "High",
-        "low": "Low",
-        "close": "Close"
-    })
+def detect_price_direction(df):
+    """
+    PURE PRICE MOMENTUM (NO EXTERNAL DEPENDENCY)
+    """
+    last = df["close"].iloc[-1]
+    prev = df["close"].iloc[-2]
 
-
-# ==================================================
-def detect_direction(df):
-    df_raw = to_raw_df(df)
-    _, d = detect_raw_direction(df_raw)
-    return d if d in ("UP", "DOWN") else "NONE"
+    if last > prev:
+        return "UP"
+    elif last < prev:
+        return "DOWN"
+    return "NONE"
 
 
 # ==================================================
@@ -42,54 +39,61 @@ def get_phase_direction(df):
 
     df = normalize_df(df)
 
-    if df is None:
+    if df is None or len(df) < 3:
         return "BOS", "NONE"
 
-    current_dir = detect_direction(df)
+    # ==================================================
+    # CORE SIGNALS
+    # ==================================================
+    current = detect_price_direction(df)
 
-    # ==================================================
-    # STATIC MEMORY (local snapshot only per call context)
-    # ==================================================
+    # memory (stateless-safe per runtime call)
     if not hasattr(get_phase_direction, "prev"):
         get_phase_direction.prev = "NONE"
 
     prev = get_phase_direction.prev
-
-    # update memory AFTER evaluation
-    get_phase_direction.prev = current_dir
+    get_phase_direction.prev = current
 
     # ==================================================
-    # ORB PHASE LOGIC
+    # ORB BASE LOGIC
     # ==================================================
-    # FIRST VALID STATE
     if prev == "NONE":
-        if current_dir == "UP":
+
+        if current == "UP":
             return "ORB", "ORBUP"
-        if current_dir == "DOWN":
+
+        if current == "DOWN":
             return "ORB", "ORBDOWN"
+
         return "ORB", "NONE"
 
     # ==================================================
     # TRANSITION LOGIC (CRITICAL FIX)
     # ==================================================
-    if prev == "UP" and current_dir == "DOWN":
+    if prev == "UP" and current == "DOWN":
         return "ORB", "TRANSDOWN"
 
-    if prev == "DOWN" and current_dir == "UP":
+    if prev == "DOWN" and current == "UP":
         return "ORB", "TRASUP"
 
     # ==================================================
     # CONTINUATION LOGIC
     # ==================================================
-    if current_dir == "UP":
+    if current == "UP":
         return "ORB", "ORBUP"
 
-    if current_dir == "DOWN":
+    if current == "DOWN":
         return "ORB", "ORBDOWN"
 
     # ==================================================
-    # FALLBACK
+    # FALLBACK (MINIMIZED NONE)
     # ==================================================
+    if prev == "UP":
+        return "ORB", "NONEUP"
+
+    if prev == "DOWN":
+        return "ORB", "NONEDOWN"
+
     return "ORB", "NONE"
 
 
