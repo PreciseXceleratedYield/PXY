@@ -9,17 +9,21 @@ except:
     get_bank_symbol = None
 
 
-def resolve_index(ticker):
-    t = str(ticker).upper()
+# ---------------- INDEX RESOLVER ----------------
 
-    if t in ["^NSEI", "NIFTY", "NIFTY50"]:
+def resolve_index(ticker):
+    t = str(ticker).upper().strip()
+
+    if t == "^NSEI":
         return "NIFTY"
 
-    if t in ["^NSEBANK", "BANKNIFTY"]:
+    if t == "^NSEBANK":
         return "BANKNIFTY"
 
-    raise ValueError(f"❌ Unsupported TICKER: {ticker}")
+    raise ValueError(f"❌ Unsupported TICKER in config: {ticker}")
 
+
+# ---------------- MAIN ENTRY ----------------
 
 def get_symbol(price, side):
     index = resolve_index(TICKER)
@@ -29,7 +33,7 @@ def get_symbol(price, side):
 
     if index == "BANKNIFTY":
         if not get_bank_symbol:
-            raise ImportError("❌ runbankpxy.py not found")
+            raise ImportError("❌ runbankpxy.py missing")
         return get_bank_symbol(price, side)
 
-    raise RuntimeError("❌ Invalid index resolution")
+    raise RuntimeError("❌ Invalid index mapping")
