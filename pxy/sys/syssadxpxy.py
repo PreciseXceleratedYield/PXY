@@ -44,7 +44,7 @@ def calculate_adx(df: pd.DataFrame, period=14) -> float:
 # -------------------- Self-runnable test --------------------
 if __name__ == "__main__":
     print("=== ADX Module Test ===")
-    df = fetch_yf_data(period="5d", interval="1m")  # 1-min Nifty data
+    df = fetch_yf_data(period="5d", interval="1m")  
     if df is None or df.empty:
         print("No data available for ADX calculation")
     else:
