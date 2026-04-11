@@ -16,7 +16,7 @@ def get_ce_pe_power(df=None):
     if df is None:
         df = fetch_yf_data(period="2d", interval="1m")
     """
-    Calculate CE/PE power based on last move and ATR using 1-min Nifty data.
+    Calculate CE/PE power based on last move and ATR using 1-min data.
     Returns:
         direction (str): 'Up', 'Down', 'Flat'
         CEPower (int): 1-10
