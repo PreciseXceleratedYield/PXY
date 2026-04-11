@@ -89,8 +89,8 @@ def get_combined_data(map_active_with_nifty=True, add_calcs=True):
 
         active_df = active_df.apply(update_metrics, axis=1)
 
-    # --- 4. NIFTY SYNC (Broadcast Mullu/Power/Depth/ATR to rows) ---
-    if map_active_with_nifty and not market_df.empty:
+    # --- 4. MKT SYNC (Broadcast Mullu/Power/Depth/ATR to rows) ---
+    if map_active_with_market and not market_df.empty:
         for col in market_df.columns:
             active_df[col] = market_df[col].iloc[-1]
 
