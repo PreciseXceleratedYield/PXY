@@ -1,4 +1,5 @@
-# sysdeptpxy.py
+# sysdeptpxy.py 🟩 🟥
+# sysdeptpxy.py 
 
 from sysdthapxy import get_ha_data
 
@@ -8,7 +9,7 @@ def get_candle_visual(df=None, last_n=21):
     if ha_color is None:
         return ""
 
-    visual = "".join(["🟢" if c=="green" else "🔴" for c in ha_color.iloc[-last_n:]])
+    visual = "".join(["🟩" if c=="green" else "🟥" for c in ha_color.iloc[-last_n:]])
     return visual
 
 
