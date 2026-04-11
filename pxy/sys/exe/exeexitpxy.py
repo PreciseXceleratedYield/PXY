@@ -100,7 +100,8 @@ def run_snapshot():
 
     for _, r in df.iterrows():
         raw_sym = str(r.get('symbol',''))
-        sym = raw_sym.replace("NIFTY26", "")[:15]
+        import re 
+        sym = re.sub(r'^[A-Z]+\d*', '', raw_sym)[:15]
         
         st_display, is_target_hit = compute_st_fixed(r)
         if is_target_hit:
