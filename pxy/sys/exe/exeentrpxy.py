@@ -40,9 +40,6 @@ except ImportError as e:
     print(f"{Fore.RED}❌ Critical Import Error: {e}")
     sys.exit(1)
 
-# --- ROUNDING HELPERS ---
-def round_up_50(x): return int(math.ceil(x / 50) * 50)
-def round_down_50(x): return int(math.floor(x / 50) * 50)
 
 # --- EXECUTION (DEBUGGED) ---
 def execute_order(client, symbol, qty, side):
@@ -80,9 +77,7 @@ async def main():
         
         now_dt = datetime.now(IST)
         now = now_dt.time()
-        
-        ATM_BUFFER = min(now_dt.weekday(), 4) * 50
-        OTM_DIFF = 200
+
         dprint(f"Current IST Time: {now}")
 
         # Buffer check
@@ -136,28 +131,12 @@ async def main():
         else:
             print(f"{Fore.YELLOW}💤 Lets Wait as Signal 💤: 💤   {entry_signal}  💤")
             return
-    
-        # -------- STEP 1: SHIFTED ATM --------
-        if side == "BUY":
-            atm_strike = round_up_50(ltp + ATM_BUFFER)
-        else:
-            atm_strike = round_down_50(ltp - ATM_BUFFER)
-       
-        # -------- STEP 2: OTM FROM ATM --------
-        if sig.startswith("OTM"):
-            if side == "BUY":
-                strike = round_up_50(atm_strike + OTM_DIFF)
-            else:
-                strike = round_down_50(atm_strike - OTM_DIFF)
-        else:
-            strike = atm_strike
 
-        # 5. Symbol Building
-        symbol = get_symbol(strike, side)
-        dprint(f"Built Symbol: {symbol} for Strike: {strike}")
-
+        # --- NEW CLEAN FLOW ---
+        symbol = get_symbol(ltp, side, sig)
+        dprint(f"Built Symbol: {symbol} from LTP: {ltp}")
         if not symbol or symbol == "NA":
-            print(f"{Fore.RED}❌ Could not build symbol for strike {strike}")
+            print(f"{Fore.RED}❌ Could not build symbol from LTP {ltp}")
             return
 
         # 6. Execution Block
