@@ -1,10 +1,31 @@
 from datetime import datetime
 import pytz
+import math
 
 IST = pytz.timezone("Asia/Kolkata")
 
-# ---- GLOBAL FACTOR ----
-PER_SECOND_INCREMENT = 0.007   # 0.01 increase every second
+# ---------------- CONFIG ----------------
+MAX_SECONDS = 4 * 60 * 60   # 4 hours window
+MIN_INC = 0.0001
+MAX_INC = 0.01
+K = 5  # exponential curvature (higher = sharper late decay)
+# ----------------------------------------
+
+
+def get_dynamic_increment(elapsed_secs):
+    """
+    Exponential acceleration from MIN_INC → MAX_INC over 4 hours.
+    """
+    t = min(elapsed_secs / MAX_SECONDS, 1.0)
+
+    # exponential easing
+    exp_val = math.exp(K * t) - 1
+    exp_max = math.exp(K) - 1
+
+    factor = exp_val / exp_max  # normalize 0 → 1
+
+    return MIN_INC + (MAX_INC - MIN_INC) * factor
+
 
 def dynamic_entry(row):
     try:
@@ -33,10 +54,13 @@ def dynamic_entry(row):
         # ---- Time Difference ----
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
 
-        # ---- Apply Increment ONLY for Options ----
+        # ---- Apply decay ONLY for options ----
         if "CE" in symbol or "PE" in symbol:
-            increment = elapsed_secs * PER_SECOND_INCREMENT
-            dynamic_val = original_price - increment
+
+            per_sec_inc = get_dynamic_increment(elapsed_secs)
+            decrement = elapsed_secs * per_sec_inc
+
+            dynamic_val = original_price - decrement
         else:
             dynamic_val = original_price
 
