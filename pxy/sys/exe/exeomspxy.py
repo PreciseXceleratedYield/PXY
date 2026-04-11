@@ -48,7 +48,7 @@ except: pxy_sl_calc = lambda row: 0
 def get_combined_data(map_active_with_market=True, add_calcs=True):
     combined = {"market_snapshot": pd.DataFrame(), "active_orders": pd.DataFrame()}
 
-    # --- 1. NIFTY SNAPSHOT ---
+    # --- 1. MKT SNAPSHOT ---
     market_df = pd.DataFrame()
     if syspxy:
         try:
