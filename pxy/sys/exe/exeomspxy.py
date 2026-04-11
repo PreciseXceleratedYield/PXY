@@ -45,7 +45,7 @@ try: from exeslpxy import stop_loss as pxy_sl_calc
 except: pxy_sl_calc = lambda row: 0
 
 # ---------------- MAIN FUNCTION ----------------
-def get_combined_data(map_active_with_nifty=True, add_calcs=True):
+def get_combined_data(map_active_with_market=True, add_calcs=True):
     combined = {"market_snapshot": pd.DataFrame(), "active_orders": pd.DataFrame()}
 
     # --- 1. NIFTY SNAPSHOT ---
