@@ -1,133 +1,109 @@
 # sys/exe/exetgtpxy_dashboard.py
-import math
-from colorama import init, Fore, Style
 
-# Initialize Colorama
+import math
+from colorama import init, Fore
+
 init(autoreset=True)
 
 PRINT_DASHBOARD = False
 
 # -------------------- CONFIG --------------------
-MAX_TOTAL_POINTS = 99.0
-BUFFER = 0
-
-PHASE_POINTS = {
-    "MISALIGN": "ATR",
-    "PHASE1": "ATR + 3",
-    "PHASE2": "ATR + DEPTH"
-}
-
-# -------------------- SAFE EVALUATOR --------------------
-def resolve_points(expr, atr, depth):
-    """
-    SAFE parser (NO eval)
-    Supports:
-    - ATR
-    - DEPTH
-    - + constant math only
-    """
-
-    if isinstance(expr, (int, float)):
-        return float(expr)
-
-    if not isinstance(expr, str):
-        return 0
-
-    expr = expr.upper().replace(" ", "")
-
-    # base values
-    base = 0.0
-
-    # case: ATR only
-    if expr == "ATR":
-        return atr
-
-    # case: ATR + DEPTH
-    if expr == "ATR+DEPTH":
-        return atr + depth
-
-    # case: ATR + number
-    if expr.startswith("ATR+"):
-        try:
-            val = float(expr.replace("ATR+", ""))
-            return atr + val
-        except:
-            return atr
-
-    # fallback
-    return atr
+MIN_POINTS = 3
+BASE_POINTS = 5
+MAX_POINTS = 20
 
 
-# -------------------- FUNCTION --------------------
-def target_price(row):
-    """
-    3-PHASE OPTION TARGET (Simplified Depth-Based):
-    """
+# -------------------- SAFE HELPERS --------------------
+def safe_float(x, default=0.0):
     try:
-        # 1️⃣ BASELINE PRICE
-        dynamic_entry = float(row.get("pxy_entry", 0))
-        actual_price = float(row.get("buy_prc", 0))
-        symbol = str(row.get("symbol", "")).upper()
+        return float(x)
+    except:
+        return default
 
-        entry_prc = dynamic_entry if dynamic_entry > 0 else actual_price
-        if entry_prc <= 0:
+
+def safe_int(x, default=0):
+    try:
+        return int(float(x))
+    except:
+        return default
+
+
+# -------------------- MAIN ENGINE --------------------
+def target_price(row):
+    try:
+        # 1️⃣ ENTRY
+        entry = safe_float(row.get("pxy_entry") or row.get("buy_prc"))
+        if entry <= 0:
             return 0
 
-        # 2️⃣ METRICS
-        ce_p = float(row.get("ce_power", 1.0))
-        pe_p = float(row.get("pe_power", 1.0))
-        exit_type = str(row.get("exit", "NONE")).upper()
+        symbol = str(row.get("symbol", "")).upper()
 
-        # ATR (SAFE)
-        atr = float(row.get("atr", 0))
-        if atr <= 0:
-            atr = entry_prc * 0.01  # fallback 1%
+        # 2️⃣ SIGNALS
+        ce_p = safe_float(row.get("ce_power", 1))
+        pe_p = safe_float(row.get("pe_power", 1))
 
-        # 3️⃣ ALIGNMENT
-        if "CE" in symbol:
-            depth = int(row.get("hkin_ce_depth", 0))
-            is_aligned = exit_type in {"BUY", "BULL", "NONE"}
-        elif "PE" in symbol:
-            depth = int(row.get("hkin_pe_depth", 0))
-            is_aligned = exit_type in {"SELL", "BEAR", "NONE"}
+        ce_d = safe_int(row.get("hkin_ce_depth", 0))
+        pe_d = safe_int(row.get("hkin_pe_depth", 0))
+
+        atr = safe_float(row.get("atr", 0))
+        katr = max(safe_float(row.get("katr", 1)), 0.001)
+
+        # 3️⃣ RELATIVE CORE SIGNALS
+
+        # Power imbalance (direction strength)
+        power_gap = abs(ce_p - pe_p)
+
+        # Dominance (who is stronger)
+        dominant_power = max(ce_p, pe_p)
+
+        # Depth maturity
+        depth_strength = max(ce_d, pe_d)
+
+        # Depth imbalance (trend clarity)
+        depth_gap = abs(ce_d - pe_d)
+
+        # Volatility expansion (ATR vs KATR)
+        vol_ratio = atr / katr
+
+        # normalize into stable ranges
+        power_score = min(power_gap / 5, 1) * 6
+        depth_score = min(depth_strength / 10, 1) * 5
+        imbalance_score = min(depth_gap / 5, 1) * 3
+        vol_score = min(vol_ratio / 3, 1) * 6
+
+        # 4️⃣ ALIGNMENT (MISALIGN FILTER)
+        aligned = (power_gap < 0.5) and (depth_gap <= 1)
+
+        # 5️⃣ FINAL SCORE BUILD
+        if not aligned:
+            score = MIN_POINTS
         else:
-            return entry_prc
+            score = BASE_POINTS + power_score + depth_score + imbalance_score + vol_score
 
-        # 4️⃣ TARGET LOGIC
-        if not is_aligned:
-            total_points = resolve_points(PHASE_POINTS["MISALIGN"], atr, depth)
-            phase = "Phase 3 (Misalignment)"
-        elif depth <= 2:
-            total_points = resolve_points(PHASE_POINTS["PHASE1"], atr, depth)
-            phase = "Phase 1 (Shallow Trend)"
-        else:
-            total_points = resolve_points(PHASE_POINTS["PHASE2"], atr, depth)
-            phase = "Phase 2 (Deep Trend)"
+        # 6️⃣ SOFT LIMITS (NO JUMPING)
+        score = max(MIN_POINTS, min(score, MAX_POINTS))
 
-        # optional depth add (your original behavior preserved)
-        if depth > 2:
-            total_points += depth
+        # 7️⃣ FINAL TARGET (smooth % move)
+        target = entry * (1 + score / 100)
 
-        # Cap
-        total_points = min(total_points, MAX_TOTAL_POINTS)
-
-        # 5️⃣ FINAL TARGET
-        target = entry_prc + total_points
-
-        # 6️⃣ DEBUG
+        # 8️⃣ DEBUG
         if PRINT_DASHBOARD:
-            print(f"{'-'*42}")
-            print(f"{Fore.CYAN}SYMBOL          : {Fore.YELLOW}{symbol}")
-            print(f"{Fore.CYAN}ENTRY           : {Fore.YELLOW}{entry_prc}")
-            print(f"{Fore.CYAN}ATR             : {Fore.YELLOW}{atr}")
-            print(f"{Fore.CYAN}DEPTH           : {Fore.YELLOW}{depth}")
-            print(f"{Fore.CYAN}PHASE           : {Fore.YELLOW}{phase}")
-            print(f"{Fore.CYAN}TARGET POINTS   : {Fore.YELLOW}{total_points}")
-            print(f"{Fore.CYAN}FINAL TARGET    : {Fore.GREEN}{round(target, 2)}")
-            print(f"{'-'*42}\n")
+            print(f"{'-'*45}")
+            print(f"{Fore.CYAN}SYMBOL   : {symbol}")
+            print(f"{Fore.CYAN}ENTRY    : {entry}")
+            print(f"{Fore.CYAN}CE/PE    : {ce_p} / {pe_p}")
+            print(f"{Fore.CYAN}CE_D/PE_D: {ce_d} / {pe_d}")
+            print(f"{Fore.CYAN}ATR/KATR : {atr} / {katr}")
+            print(f"{Fore.YELLOW}POWER    : {power_score:.2f}")
+            print(f"{Fore.YELLOW}DEPTH    : {depth_score:.2f}")
+            print(f"{Fore.YELLOW}IMBAL    : {imbalance_score:.2f}")
+            print(f"{Fore.YELLOW}VOL      : {vol_score:.2f}")
+            print(f"{Fore.GREEN}SCORE %  : {score:.2f}")
+            print(f"{Fore.GREEN}TARGET   : {round(target, 2)}")
+            print(f"{'-'*45}\n")
 
         return round(target, 2)
 
     except Exception as e:
-        print(f"Error calculating target for {row.get('symbol', 'UNKNOWN')}: {e}")
+        print(f"Error target_price: {e}")
         return 0
