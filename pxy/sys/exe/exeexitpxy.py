@@ -6,7 +6,7 @@ from exeomspxy import get_combined_data
 import pytz
 import subprocess  # <-- for triggering exesqrpxy.py
 from datetime import datetime, time as dt_time
-
+import re 
 init(autoreset=True)
 
 def place_exit_order(client, row):
@@ -100,7 +100,7 @@ def run_snapshot():
 
     for _, r in df.iterrows():
         raw_sym = str(r.get('symbol',''))
-        import re 
+
         sym = re.sub(r'^[A-Z]+\d*', '', raw_sym)[:15]
         
         st_display, is_target_hit = compute_st_fixed(r)
