@@ -98,7 +98,7 @@ def get_entry_signal(df=None):
     if 'ST' not in df.columns:
         df = calculate_supertrend(df)
 
-    last = df.iloc[-1]
+    last = df.iloc[-2]
     close = last['Close']
     st = last['ST'] if 'ST' in df.columns else close
 
