@@ -98,27 +98,32 @@ def get_entry_signal(df=None):
     if 'ST' not in df.columns:
         df = calculate_supertrend(df)
 
-    last = df.iloc[-2]
-    close = last['Close']
-    st = last['ST'] if 'ST' in df.columns else close
+    # -------------------- ST (uses -1) --------------------
+    last_st = df.iloc[-1]
+    close = last_st['Close']
+    st = last_st['ST'] if 'ST' in df.columns else close
 
-    # -------- BASE SIGNAL --------
+    # -------------------- BASE SIGNAL --------------------
     entry_signal, exit_signal = get_signal()
 
     if entry_signal is None:
         entry_signal = "NONE"
         exit_signal = "NONE"
 
-    # -------- ST MAPPING --------
+    # -------------------- ST MAPPING --------------------
     entry = map_entry(entry_signal, close, st, now)
 
-    # -------- ATR-SMA FILTER --------
+    # -------------------- ATR-SMA FILTER --------------------
     sma_data = get_atr_sma(df)
     sma_value = sma_data["atrsma"]
 
+    # -------------------- SMA (uses -2) --------------------
+    last_sma = df.iloc[-2]
+    close_sma = last_sma["Close"]
+
     debug_log("ENTRY:", entry, "CLOSE:", close, "SMA:", sma_value)
 
-    entry = validate_with_sma(entry, close, sma_value)
+    entry = validate_with_sma(entry, close_sma, sma_value)
 
     return entry, exit_signal
 
