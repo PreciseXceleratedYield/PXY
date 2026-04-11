@@ -18,8 +18,8 @@ TIMEZONE = pytz.timezone("Asia/Kolkata")
 # Minimal config for all scripts
 PARAMS = {
     "ticker": "^NSEI",              # default ticker
-    "supertrend_period": 3,         # required by syssuperpxy.py
-    "supertrend_multiplier": 3      # required by syssuperpxy.py
+    "supertrend_period": 2,         # required by syssuperpxy.py
+    "supertrend_multiplier": 2      # required by syssuperpxy.py
 }
 
 # Optional: a TICKER constant for scripts importing TICKER directly
