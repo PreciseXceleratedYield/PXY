@@ -4,27 +4,24 @@ from pathlib import Path
 from datetime import datetime, time
 import pytz
 from colorama import Fore, init, Style
-import math
 import traceback
 
 # --- GLOBAL DEBUG SWITCH ---
-DEBUG = False  # Set to False for production / "no"
-# ---------------------------
-
+DEBUG = False
 init(autoreset=True)
+
 LOT_SIZE = 65
 
-# --- DYNAMIC PATH FIX ---
+# --- PATH FIX ---
 HERE = Path(__file__).resolve().parent
 RUN_DIR = HERE / "run"
 
-if str(HERE) not in sys.path: sys.path.append(str(HERE))
-if str(RUN_DIR) not in sys.path: sys.path.append(str(RUN_DIR))
-if str(HERE.parent) not in sys.path: sys.path.append(str(HERE.parent))
+for p in [HERE, RUN_DIR, HERE.parent]:
+    if str(p) not in sys.path:
+        sys.path.append(str(p))
 
-# --- DEBUG PRINT HELPER ---
+# --- DEBUG PRINT ---
 def dprint(msg, color=Fore.CYAN):
-    """Prints debug messages only if DEBUG is enabled."""
     if DEBUG:
         print(f"{Style.BRIGHT}{color}[DEBUG] {msg}{Style.RESET_ALL}")
 
@@ -35,15 +32,14 @@ try:
     from runclntpxy import get_session
     from runfundpxy import get_available_funds
     from runpchkpxy import get_position_summary
-    from runsymbpxy import get_symbol 
-except ImportError as e:
-    print(f"{Fore.RED}❌ Critical Import Error: {e}")
+    from runsymbpxy import get_symbol
+except Exception as e:
+    print(f"{Fore.RED}IMPORT ERROR: {e}")
     sys.exit(1)
 
 
-# --- EXECUTION (DEBUGGED) ---
-def execute_order(client, symbol, qty, side):
-    """Executes Market Buy with parameter logging."""
+# --- ORDER EXECUTION ---
+def execute_order(client, symbol, qty):
     try:
         params = {
             "exchange_segment": "nse_fo",
@@ -53,128 +49,111 @@ def execute_order(client, symbol, qty, side):
             "quantity": str(qty),
             "validity": "DAY",
             "trading_symbol": symbol,
-            "transaction_type": "B", 
+            "transaction_type": "B",
             "amo": "NO",
             "disclosed_quantity": "0",
             "market_protection": "0"
         }
-        
-        dprint(f"Executing Order for {symbol} | Params: {params}", Fore.YELLOW)
+
+        dprint(f"ORDER: {symbol} QTY={qty}", Fore.YELLOW)
         res = client.place_order(**params)
-        dprint(f"Order Response: {res}", Fore.GREEN)
-        
-        # ✅ Minimal change: set stat explicitly
-        return {"stat": "Ok", "raw": res} if res else {"stat": "Not_Ok", "errMsg": "No response from API"}
+        return {"stat": "OK" if res else "FAIL", "raw": res}
 
     except Exception as e:
-        if DEBUG: dprint(f"Order Execution Exception: {traceback.format_exc()}", Fore.RED)
-        return {"stat": "Not_Ok", "errMsg": str(e)}
+        return {"stat": "FAIL", "err": str(e)}
 
-# --- MAIN ASYNC LOGIC ---
+
+# --- MAIN ---
 async def main():
     try:
         IST = pytz.timezone("Asia/Kolkata")
-        
-        now_dt = datetime.now(IST)
-        now = now_dt.time()
+        now = datetime.now(IST).time()
 
-        dprint(f"Current IST Time: {now}")
+        # --- MARKET SAFETY WINDOW ---
+        if (time(9, 14) <= now < time(9, 16)) or (time(15, 16) <= now < time(15, 31)):
+            print("⏳ Market buffer time - skipped")
+            return
 
-        # Buffer check
-        # Define all skip windows
-        skip_windows = [
-            (time(9, 14), time(9, 16)),    # 9:14 AM - 9:16 AM
-            (time(15, 16), time(15, 31))   # 3:16 PM - 3:31 PM
-        ]
-        
-        # Check if current time is inside any skip window
-        for start, end in skip_windows:
-            if start <= now < end:
-                dprint(f"Inside {start.strftime('%H:%M')} - {end.strftime('%H:%M')} buffer. Skipping execution.")
-                return
-
-        # 1. Session Initialization
-        dprint("Authenticating session...")
+        # --- SESSION ---
         client = get_session()
         if not client:
-            print(f"{Fore.RED}❌ Session failed")
+            print("❌ Session failed")
             return
 
-        # 2. Market Data Retrieval
-        dprint("Fetching Yahoo Finance data...")
+        # --- DATA ---
         df = fetch_yf_data()
         if df is None or df.empty:
-            print(f"{Fore.RED}❌ No data from YF")
+            print("❌ No market data")
             return
 
-        # 3. Signal & Position Analysis
         entry_signal, reversal = get_entry_signal(df)
-        dprint(f"Raw Signal: {entry_signal} | Reversal: {reversal}")
-        
-        pos = get_position_summary(client)
-        dprint(f"Current Positions: {pos}")
-        
-        ce_active = "1CE" in pos
-        pe_active = "1PE" in pos
-
-        ltp = df['Close'].iloc[-1]
-        dprint(f"Current LTP: {ltp}")
-
-        # --- 4. TRADE DIRECTION (FROM SIGNAL ONLY) ---
         sig = (entry_signal or "").upper().strip()
-        
-        VALID_SIGS = ["ATMBUY", "OTMBUY", "ATMSELL", "OTMSELL"]
-        
-        if sig not in VALID_SIGS:
-            print(f"{Fore.YELLOW}💤 Lets Wait as Signal 💤: 💤   {entry_signal}  💤")
+
+        valid = ["ATMBUY", "OTMBUY", "ATMSELL", "OTMSELL"]
+        if sig not in valid:
+            print(f"WAIT SIGNAL: {entry_signal}")
             return
-        # --- NEW CLEAN FLOW ---
+
+        ltp = df["Close"].iloc[-1]
+
+        # --- SYMBOL BUILD (ONLY ONCE) ---
         symbol = get_symbol(ltp, sig)
-
-        
-        dprint(f"Built Symbol: {symbol} from LTP: {ltp}")
         if not symbol or symbol == "NA":
-            print(f"{Fore.RED}❌ Could not build symbol from LTP {ltp}")
+            print("❌ Symbol build failed")
             return
 
-        # 6. Execution Block
+        # --- POSITION SAFETY ---
+        try:
+            pos = get_position_summary(client)
+            ce_active = "1CE" in pos
+            pe_active = "1PE" in pos
+        except Exception:
+            # SAFE MODE: assume positions exist if check fails
+            ce_active = True
+            pe_active = True
+            pos = "UNKNOWN (SAFE MODE)"
+
         BUY_SIGS = ["ATMBUY", "OTMBUY"]
         SELL_SIGS = ["ATMSELL", "OTMSELL"]
-        
-        res = {"stat": "Skipped"}
-        
-        if sig in BUY_SIGS and not ce_active:
-            print(f"{Fore.CYAN}🚀 Placing CE Buy: {symbol}")
-            res = execute_order(client, symbol, LOT_SIZE, "BUY")
-        
-        elif sig in SELL_SIGS and not pe_active:
-            print(f"{Fore.MAGENTA}🚀 Placing PE Buy: {symbol}")
-            res = execute_order(client, symbol, LOT_SIZE, "SELL")
-        
-        else:
-            dprint("Execution skipped. CE/PE already active or invalid state")
 
-        # 7. Final Dashboard
+        res = {"stat": "SKIPPED"}
+
+        # --- TRADE DECISION (SIGNAL ONLY DRIVES IT) ---
+        if sig in BUY_SIGS:
+            if not ce_active:
+                print(f"🚀 BUY CE: {symbol}")
+                res = execute_order(client, symbol, LOT_SIZE)
+            else:
+                print("CE already active → SKIP SAFE")
+
+        elif sig in SELL_SIGS:
+            if not pe_active:
+                print(f"🚀 BUY PE: {symbol}")
+                res = execute_order(client, symbol, LOT_SIZE)
+            else:
+                print("PE already active → SKIP SAFE")
+
+        # --- FUNDS ---
         funds = get_available_funds(client)
 
-        # ✅ Minimal change: determine status from execute_order stat
-        status = f"{Fore.GREEN}Ok" if res.get("stat", "").upper() == "OK" else f"{Fore.RED}Failed/Skipped"
+        status = res.get("stat", "FAIL")
 
         print(f"""
-         =================================
-           💰 {Fore.WHITE}Cash   : {int(funds)}
-           ⚡ {Fore.WHITE}Pos    : {pos}
-           🎫 {Fore.WHITE}Symbol : {symbol}
-           🎯 {Fore.WHITE}Action : {entry_signal}
-           📌 {Fore.WHITE}Status : {status}
-         =================================
-        """)
-        
+=================================
+💰 Cash   : {int(funds)}
+📦 Pos    : {pos}
+🎫 Symbol : {symbol}
+🎯 Signal : {entry_signal}
+📌 Status : {status}
+=================================
+""")
+
     except Exception:
         if DEBUG:
-            print(f"{Fore.RED}{traceback.format_exc()}")
+            print(traceback.format_exc())
         else:
-            print(f"{Fore.RED}❌ Main execution error occurred. Enable DEBUG for details.")
+            print("❌ Main error (enable DEBUG)")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
