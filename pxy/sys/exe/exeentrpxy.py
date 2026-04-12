@@ -166,13 +166,13 @@ async def main():
         status = res.get("stat", "FAIL")
 
         print(f"""
-=================================
+  =====================================
     💰 Cash   : {int(funds)}
     📦 Pos    : {pos}
     🎫 Symbol : {symbol}
     🎯 Signal : {entry_signal}
     📌 Status : {status}
-=================================
+  =====================================
 """)
 
     except Exception:
