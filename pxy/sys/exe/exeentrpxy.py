@@ -121,34 +121,38 @@ async def main():
         dprint(f"Current LTP: {ltp}")
 
         # --- 4. TRADE DIRECTION (FROM SIGNAL ONLY) ---
-        sig = entry_signal.upper().strip()
+        sig = (entry_signal or "").upper().strip()
         
-        # Determine side strictly from ATM/OTM signal
-        if sig in ["ATMBUY", "OTMBUY"]:
-            side = "BUY"
-        elif sig in ["ATMSELL", "OTMSELL"]:
-            side = "SELL"
-        else:
+        VALID_SIGS = ["ATMBUY", "OTMBUY", "ATMSELL", "OTMSELL"]
+        
+        if sig not in VALID_SIGS:
             print(f"{Fore.YELLOW}💤 Lets Wait as Signal 💤: 💤   {entry_signal}  💤")
             return
-
         # --- NEW CLEAN FLOW ---
-        symbol = get_symbol(ltp, side, sig)
+        symbol = get_symbol(ltp, sig)
+
+        
         dprint(f"Built Symbol: {symbol} from LTP: {ltp}")
         if not symbol or symbol == "NA":
             print(f"{Fore.RED}❌ Could not build symbol from LTP {ltp}")
             return
 
         # 6. Execution Block
+        BUY_SIGS = ["ATMBUY", "OTMBUY"]
+        SELL_SIGS = ["ATMSELL", "OTMSELL"]
+        
         res = {"stat": "Skipped"}
-        if side == "BUY" and not ce_active:
+        
+        if sig in BUY_SIGS and not ce_active:
             print(f"{Fore.CYAN}🚀 Placing CE Buy: {symbol}")
             res = execute_order(client, symbol, LOT_SIZE, "BUY")
-        elif side == "SELL" and not pe_active:
+        
+        elif sig in SELL_SIGS and not pe_active:
             print(f"{Fore.MAGENTA}🚀 Placing PE Buy: {symbol}")
             res = execute_order(client, symbol, LOT_SIZE, "SELL")
+        
         else:
-            dprint(f"Execution skipped. Condition: {side} Active? {ce_active if side == 'BUY' else pe_active}")
+            dprint("Execution skipped. CE/PE already active or invalid state")
 
         # 7. Final Dashboard
         funds = get_available_funds(client)
