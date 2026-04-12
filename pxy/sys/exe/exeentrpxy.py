@@ -66,7 +66,7 @@ def execute_order(client, symbol, qty):
             "exchange_segment": "nse_fo",
             "product": "NRML",
             "price": "0",
-            "order_type": "LMT",
+            "order_type": "L",
             "quantity": str(qty),
             "validity": "DAY",
             "trading_symbol": symbol,
