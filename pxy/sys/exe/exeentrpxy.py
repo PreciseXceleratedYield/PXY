@@ -58,7 +58,10 @@ def execute_order(client, symbol, qty):
         dprint(f"ORDER -> {symbol} | QTY={qty}", Fore.YELLOW)
         res = client.place_order(**params)
 
-        return {"stat": "OK" if res else "FAIL", "raw": res}
+        return {
+            "stat": "OK" if res and str(res).strip() else "FAIL",
+            "raw": res
+        }
 
     except Exception as e:
         return {"stat": "FAIL", "err": str(e)}
@@ -70,7 +73,7 @@ async def main():
         IST = pytz.timezone("Asia/Kolkata")
         now = datetime.now(IST).time()
 
-        # --- MARKET SAFETY WINDOW ---
+        # --- MARKET BUFFER ---
         if (time(9, 14) <= now < time(9, 16)) or (time(15, 16) <= now < time(15, 31)):
             print("⏳ Market buffer time - skipped")
             return
@@ -88,7 +91,13 @@ async def main():
             return
 
         entry_signal, reversal = get_entry_signal(df)
-        sig = (entry_signal or "").upper().strip()
+
+        # --- SAFETY FIX 1: entry_signal guard ---
+        if not entry_signal:
+            print("WAIT SIGNAL: None")
+            return
+
+        sig = entry_signal.upper().strip()
 
         VALID = ["ATMBUY", "OTMBUY", "ATMSELL", "OTMSELL"]
 
@@ -98,47 +107,54 @@ async def main():
 
         ltp = df["Close"].iloc[-1]
 
-        # --- POSITION CHECK (SAFE MODE) ---
+        # --- SAFETY FIX 2: position parsing ---
         try:
             pos = get_position_summary(client)
-            ce_active = "1CE" in pos
-            pe_active = "1PE" in pos
+
+            if isinstance(pos, (list, tuple, set)):
+                ce_active = "1CE" in pos
+                pe_active = "1PE" in pos
+
+            elif isinstance(pos, dict):
+                ce_active = pos.get("1CE", False)
+                pe_active = pos.get("1PE", False)
+
+            else:
+                ce_active = "1CE" in str(pos)
+                pe_active = "1PE" in str(pos)
+
         except Exception:
-            ce_active = True   # SAFE MODE
+            ce_active = True
             pe_active = True
             pos = "UNKNOWN (SAFE MODE)"
 
         BUY_SIGS = ["ATMBUY", "OTMBUY"]
         SELL_SIGS = ["ATMSELL", "OTMSELL"]
 
-        res = {"stat": "SKIPPED"}
         symbol = None
+        res = {"stat": "SKIPPED"}
 
-        # =========================
-        # BUY FLOW (CE)
-        # =========================
+        # --- BUY CE ---
         if sig in BUY_SIGS:
             if ce_active:
-                print("CE already active → SKIP (no symbol build)")
+                print("CE already active → SKIP")
             else:
                 symbol = get_symbol(ltp, sig)
                 if not symbol or symbol == "NA":
-                    print("❌ CE symbol build failed")
+                    print("❌ CE symbol failed")
                     return
 
                 print(f"🚀 BUY CE: {symbol}")
                 res = execute_order(client, symbol, LOT_SIZE)
 
-        # =========================
-        # SELL FLOW (PE)
-        # =========================
+        # --- BUY PE ---
         elif sig in SELL_SIGS:
             if pe_active:
-                print("PE already active → SKIP (no symbol build)")
+                print("PE already active → SKIP")
             else:
                 symbol = get_symbol(ltp, sig)
                 if not symbol or symbol == "NA":
-                    print("❌ PE symbol build failed")
+                    print("❌ PE symbol failed")
                     return
 
                 print(f"🚀 BUY PE: {symbol}")
@@ -163,7 +179,7 @@ async def main():
         if DEBUG:
             print(traceback.format_exc())
         else:
-            print("❌ Main error (enable DEBUG)")
+            print("❌ Main error")
 
 
 if __name__ == "__main__":
