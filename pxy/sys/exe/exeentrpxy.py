@@ -26,6 +26,7 @@ def dprint(msg, color=Fore.CYAN):
         print(f"{Style.BRIGHT}{color}[DEBUG] {msg}{Style.RESET_ALL}")
 
 # --- IMPORTS ---
+dprint("IMPORTING MODULES...")
 try:
     from sysdtafpxy import fetch_yf_data
     from sysentrpxy import get_entry_signal
@@ -33,6 +34,7 @@ try:
     from runfundpxy import get_available_funds
     from runpchkpxy import get_position_summary
     from runsymbpxy import get_symbol
+    dprint("IMPORTS SUCCESS")
 except Exception as e:
     print(f"{Fore.RED}IMPORT ERROR: {e}")
     sys.exit(1)
@@ -40,6 +42,7 @@ except Exception as e:
 
 # --- ORDER EXECUTION ---
 def execute_order(client, symbol, qty):
+    dprint("ENTER execute_order")
     try:
         params = {
             "exchange_segment": "nse_fo",
@@ -55,8 +58,11 @@ def execute_order(client, symbol, qty):
             "market_protection": "0"
         }
 
-        dprint(f"ORDER -> {symbol} | QTY={qty}", Fore.YELLOW)
+        dprint(f"ORDER PARAMS: {params}", Fore.YELLOW)
+
         res = client.place_order(**params)
+
+        dprint(f"ORDER RESPONSE: {res}", Fore.GREEN)
 
         return {
             "stat": "OK" if res and str(res).strip() else "FAIL",
@@ -64,40 +70,57 @@ def execute_order(client, symbol, qty):
         }
 
     except Exception as e:
+        dprint(f"ORDER ERROR: {e}", Fore.RED)
         return {"stat": "FAIL", "err": str(e)}
 
 
 # --- MAIN ---
 async def main():
+    dprint("===== MAIN START =====", Fore.GREEN)
+
     try:
         IST = pytz.timezone("Asia/Kolkata")
         now = datetime.now(IST).time()
 
+        dprint(f"TIME CHECK: {now}")
+
         # --- MARKET BUFFER ---
         if (time(9, 14) <= now < time(9, 16)) or (time(15, 16) <= now < time(15, 31)):
+            dprint("MARKET BUFFER ACTIVE - SKIPPING", Fore.YELLOW)
             print("⏳ Market buffer time - skipped")
             return
 
         # --- SESSION ---
+        dprint("CREATING SESSION...")
         client = get_session()
+        dprint(f"SESSION RESULT: {client}")
+
         if not client:
             print("❌ Session failed")
             return
 
         # --- DATA ---
+        dprint("FETCHING DATA...")
         df = fetch_yf_data()
+        dprint(f"DATA RECEIVED: {type(df)}")
+
         if df is None or df.empty:
             print("❌ No data")
             return
 
-        entry_signal, reversal = get_entry_signal(df)
+        dprint(f"DATA ROWS: {len(df)}")
 
-        # --- SAFETY FIX 1: entry_signal guard ---
+        # --- SIGNAL ---
+        dprint("GETTING ENTRY SIGNAL...")
+        entry_signal, reversal = get_entry_signal(df)
+        dprint(f"SIGNAL RAW: {entry_signal} | REVERSAL: {reversal}")
+
         if not entry_signal:
             print("WAIT SIGNAL: None")
             return
 
         sig = entry_signal.upper().strip()
+        dprint(f"FORMATTED SIGNAL: {sig}")
 
         VALID = ["ATMBUY", "OTMBUY", "ATMSELL", "OTMSELL"]
 
@@ -106,10 +129,13 @@ async def main():
             return
 
         ltp = df["Close"].iloc[-1]
+        dprint(f"LTP: {ltp}")
 
-        # --- SAFETY FIX 2: position parsing ---
+        # --- POSITION CHECK ---
+        dprint("CHECKING POSITIONS...")
         try:
             pos = get_position_summary(client)
+            dprint(f"POSITION RAW: {pos}")
 
             if isinstance(pos, (list, tuple, set)):
                 ce_active = "1CE" in pos
@@ -123,7 +149,10 @@ async def main():
                 ce_active = "1CE" in str(pos)
                 pe_active = "1PE" in str(pos)
 
-        except Exception:
+            dprint(f"CE_ACTIVE={ce_active}, PE_ACTIVE={pe_active}")
+
+        except Exception as e:
+            dprint(f"POSITION ERROR: {e}", Fore.RED)
             ce_active = True
             pe_active = True
             pos = "UNKNOWN (SAFE MODE)"
@@ -136,34 +165,52 @@ async def main():
 
         # --- BUY CE ---
         if sig in BUY_SIGS:
+            dprint("BRANCH: BUY CE")
+
             if ce_active:
+                dprint("CE ALREADY ACTIVE - SKIP", Fore.YELLOW)
                 print("CE already active → SKIP")
             else:
+                dprint("GETTING SYMBOL FOR CE...")
                 symbol = get_symbol(ltp, sig)
+                dprint(f"SYMBOL: {symbol}")
+
                 if not symbol or symbol == "NA":
                     print("❌ CE symbol failed")
                     return
 
                 print(f"🚀 BUY CE: {symbol}")
+                dprint("EXECUTING ORDER CE...")
                 res = execute_order(client, symbol, LOT_SIZE)
 
         # --- BUY PE ---
         elif sig in SELL_SIGS:
+            dprint("BRANCH: BUY PE")
+
             if pe_active:
+                dprint("PE ALREADY ACTIVE - SKIP", Fore.YELLOW)
                 print("PE already active → SKIP")
             else:
+                dprint("GETTING SYMBOL FOR PE...")
                 symbol = get_symbol(ltp, sig)
+                dprint(f"SYMBOL: {symbol}")
+
                 if not symbol or symbol == "NA":
                     print("❌ PE symbol failed")
                     return
 
                 print(f"🚀 BUY PE: {symbol}")
+                dprint("EXECUTING ORDER PE...")
                 res = execute_order(client, symbol, LOT_SIZE)
 
         # --- FUNDS ---
+        dprint("FETCHING FUNDS...")
         funds = get_available_funds(client)
+        dprint(f"FUNDS: {funds}")
 
         status = res.get("stat", "FAIL")
+
+        dprint("FINAL SUMMARY PRINT")
 
         print(f"""
   =====================================
@@ -175,6 +222,8 @@ async def main():
   =====================================
 """)
 
+        dprint("===== MAIN END =====", Fore.GREEN)
+
     except Exception:
         if DEBUG:
             print(traceback.format_exc())
@@ -183,4 +232,5 @@ async def main():
 
 
 if __name__ == "__main__":
+    dprint("SCRIPT START")
     asyncio.run(main())
