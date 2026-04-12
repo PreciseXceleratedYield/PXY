@@ -120,7 +120,7 @@ async def main():
         ltp = df['Close'].iloc[-1]
         dprint(f"Current LTP: {ltp}")
 
-        # --- 4. Side & Strike Logic (ADJUSTED FOR ATM/OTM ONLY) ---
+        # --- 4. TRADE DIRECTION (FROM SIGNAL ONLY) ---
         sig = entry_signal.upper().strip()
         
         # Determine side strictly from ATM/OTM signal
