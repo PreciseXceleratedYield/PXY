@@ -4,7 +4,7 @@ import pytz
 
 # Minimal config for all imports to work
 PARAMS = {
-    "ticker": "^NSEI"  # NIFTY 50  # old scripts using PARAMS["ticker"]
+    "ticker": "^NSEBANK" #"^NSEI"  # NIFTY 50  # old scripts using PARAMS["ticker"]
 }
 
 # TICKER constant for scripts that import TICKER directly
