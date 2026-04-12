@@ -10,7 +10,28 @@ import traceback
 DEBUG = True
 init(autoreset=True)
 
-LOT_SIZE = 65
+import sys
+from pathlib import Path
+
+# --- ADD PARENT DIR TO PATH ---
+HERE = Path(__file__).resolve().parent
+PARENT = HERE.parent
+
+if str(PARENT) not in sys.path:
+    sys.path.append(str(PARENT))
+
+# --- IMPORT CONFIG FROM PARENT DIR ---
+from syscnfgpxy import TICKER
+
+# --- LOT SIZE (EXACT MATCH LOGIC) ---
+t = TICKER.upper().strip()
+
+if t == "^NSEBANK":
+    LOT_SIZE = 30
+elif t == "^NSEI":
+    LOT_SIZE = 65
+else:
+    LOT_SIZE = None
 
 # --- PATH FIX ---
 HERE = Path(__file__).resolve().parent
