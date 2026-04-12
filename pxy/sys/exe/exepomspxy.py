@@ -13,14 +13,21 @@ def color_value(label, val):
     val_str = str(val)
     val_upper = val_str.upper()
     
-    if val_upper in ["UP", "BULL", "BUY"]:
+    if "BUY" in val_upper:
         return Fore.GREEN + val_str + Style.RESET_ALL
-    elif val_upper in ["DOWN", "BEAR", "SELL"]:
+    elif "SELL" in val_upper:
         return Fore.RED + val_str + Style.RESET_ALL
+    
+    elif val_upper in ["UP", "BULL"]:
+        return Fore.GREEN + val_str + Style.RESET_ALL
+    elif val_upper in ["DOWN", "BEAR"]:
+        return Fore.RED + val_str + Style.RESET_ALL
+    
     elif label in ["CE Power 🟢", "PE Power 🔴"] and float(val) > 1:
         return Fore.YELLOW + val_str + Style.RESET_ALL
     elif label in ["CE Depth 🟢", "PE Depth 🔴"] and float(val) > 1:
         return Fore.MAGENTA + val_str + Style.RESET_ALL
+    
     elif isinstance(val, (int, float)):
         return Fore.CYAN + val_str + Style.RESET_ALL
     else:
