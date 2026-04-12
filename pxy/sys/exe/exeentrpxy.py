@@ -6,7 +6,7 @@ import pytz
 from colorama import Fore, init, Style
 import traceback
 
-# --- GLOBAL DEBUG SWITCH ---
+# --- GLOBAL CONFIG ---
 DEBUG = False
 init(autoreset=True)
 
@@ -55,8 +55,9 @@ def execute_order(client, symbol, qty):
             "market_protection": "0"
         }
 
-        dprint(f"ORDER: {symbol} QTY={qty}", Fore.YELLOW)
+        dprint(f"ORDER -> {symbol} | QTY={qty}", Fore.YELLOW)
         res = client.place_order(**params)
+
         return {"stat": "OK" if res else "FAIL", "raw": res}
 
     except Exception as e:
@@ -83,33 +84,27 @@ async def main():
         # --- DATA ---
         df = fetch_yf_data()
         if df is None or df.empty:
-            print("❌ No market data")
+            print("❌ No data")
             return
 
         entry_signal, reversal = get_entry_signal(df)
         sig = (entry_signal or "").upper().strip()
 
-        valid = ["ATMBUY", "OTMBUY", "ATMSELL", "OTMSELL"]
-        if sig not in valid:
+        VALID = ["ATMBUY", "OTMBUY", "ATMSELL", "OTMSELL"]
+
+        if sig not in VALID:
             print(f"WAIT SIGNAL: {entry_signal}")
             return
 
         ltp = df["Close"].iloc[-1]
 
-        # --- SYMBOL BUILD (ONLY ONCE) ---
-        symbol = get_symbol(ltp, sig)
-        if not symbol or symbol == "NA":
-            print("❌ Symbol build failed")
-            return
-
-        # --- POSITION SAFETY ---
+        # --- POSITION CHECK (SAFE MODE) ---
         try:
             pos = get_position_summary(client)
             ce_active = "1CE" in pos
             pe_active = "1PE" in pos
         except Exception:
-            # SAFE MODE: assume positions exist if check fails
-            ce_active = True
+            ce_active = True   # SAFE MODE
             pe_active = True
             pos = "UNKNOWN (SAFE MODE)"
 
@@ -117,21 +112,37 @@ async def main():
         SELL_SIGS = ["ATMSELL", "OTMSELL"]
 
         res = {"stat": "SKIPPED"}
+        symbol = None
 
-        # --- TRADE DECISION (SIGNAL ONLY DRIVES IT) ---
+        # =========================
+        # BUY FLOW (CE)
+        # =========================
         if sig in BUY_SIGS:
-            if not ce_active:
+            if ce_active:
+                print("CE already active → SKIP (no symbol build)")
+            else:
+                symbol = get_symbol(ltp, sig)
+                if not symbol or symbol == "NA":
+                    print("❌ CE symbol build failed")
+                    return
+
                 print(f"🚀 BUY CE: {symbol}")
                 res = execute_order(client, symbol, LOT_SIZE)
-            else:
-                print("CE already active → SKIP SAFE")
 
+        # =========================
+        # SELL FLOW (PE)
+        # =========================
         elif sig in SELL_SIGS:
-            if not pe_active:
+            if pe_active:
+                print("PE already active → SKIP (no symbol build)")
+            else:
+                symbol = get_symbol(ltp, sig)
+                if not symbol or symbol == "NA":
+                    print("❌ PE symbol build failed")
+                    return
+
                 print(f"🚀 BUY PE: {symbol}")
                 res = execute_order(client, symbol, LOT_SIZE)
-            else:
-                print("PE already active → SKIP SAFE")
 
         # --- FUNDS ---
         funds = get_available_funds(client)
