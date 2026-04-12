@@ -63,7 +63,7 @@ def print_market_dashboard(market_df):
     for label, col in metrics:
         val = snapshot.get(col, "NA")
         val_colored = color_value(label, val)
-        values.append(f"{label}:{val_colored}")
+        values.append(f"{label} : {val_colored}")
 
     for i in range(0, len(values), 2):
         left = values[i]
