@@ -77,7 +77,7 @@ def print_market_dashboard(market_df):
     for label, col in depth_metrics:
         val = snapshot.get(col, "NA")
         val_colored = color_value(label, val)
-        depth_values.append(f"{label}:{val_colored}")
+        depth_values.append(f"{label} : {val_colored}")
 
     if depth_values:
         left = depth_values[0]
