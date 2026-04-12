@@ -10,9 +10,6 @@ import traceback
 DEBUG = True
 init(autoreset=True)
 
-import sys
-from pathlib import Path
-
 # --- ADD PARENT DIR TO PATH ---
 HERE = Path(__file__).resolve().parent
 PARENT = HERE.parent
