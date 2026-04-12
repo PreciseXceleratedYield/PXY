@@ -7,7 +7,7 @@ from colorama import Fore, init, Style
 import traceback
 
 # --- GLOBAL CONFIG ---
-DEBUG = False
+DEBUG = True
 init(autoreset=True)
 
 LOT_SIZE = 65
