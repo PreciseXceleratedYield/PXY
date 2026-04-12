@@ -65,7 +65,7 @@ def execute_order(client, symbol, qty):
         params = {
             "exchange_segment": "nse_fo",
             "product": "NRML",
-            "price": "500",
+            "price": "0",
             "order_type": "L",
             "quantity": str(qty),
             "validity": "DAY",
@@ -75,6 +75,7 @@ def execute_order(client, symbol, qty):
             "disclosed_quantity": "0",
             "market_protection": "0"
         }
+
 
         dprint(f"ORDER PARAMS: {params}", Fore.YELLOW)
 
