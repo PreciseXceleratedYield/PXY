@@ -1,30 +1,28 @@
-# exe/run/runsymbpxy.py
+# sys/exe/runsymbpxy.py
 
-import sys
+from syscnfgpxy import TICKER
 from pathlib import Path
+import sys
 
-# ---------------- PATH FIX (IMPORTANT) ----------------
+# --- PATH FIX (sys is parent of exe) ---
 HERE = Path(__file__).resolve().parent
-PARENT = HERE.parent.parent   # exe/run -> exe -> sys parent
+SYS_DIR = HERE.parent  # sys folder
 
-if str(PARENT) not in sys.path:
-    sys.path.append(str(PARENT))
+if str(SYS_DIR) not in sys.path:
+    sys.path.append(str(SYS_DIR))
 
-# ---------------- IMPORT FROM SYS ----------------
-from sys.syscnfgpxy import TICKER   # 👈 correct now
-
-from runniftypxy import get_symbol as get_nifty_symbol
+# --- IMPORT SYMBOL BUILDERS ---
+from runniftypxy import get_symbol as nifty_symbol_builder
 
 try:
-    from runbankpxy import get_symbol as get_bank_symbol
-except ImportError:
-    get_bank_symbol = None
+    from runbankpxy import get_symbol as bank_symbol_builder
+except:
+    bank_symbol_builder = None
 
 
 # ---------------- INDEX RESOLVER ----------------
-
-def resolve_index(ticker):
-    t = ticker.strip().upper()
+def resolve_index():
+    t = str(TICKER).upper().strip()
 
     if t == "^NSEI":
         return "NIFTY"
@@ -32,20 +30,25 @@ def resolve_index(ticker):
     if t == "^NSEBANK":
         return "BANKNIFTY"
 
-    raise ValueError(f"Unsupported TICKER: {ticker}")
+    raise ValueError(f"Unsupported TICKER: {TICKER}")
 
 
 # ---------------- DISPATCHER ----------------
-
 def get_symbol(price, side):
-    index = resolve_index(TICKER)
+    """
+    ONLY responsibility:
+    - pick correct builder
+    - forward (price, side)
+    """
+
+    index = resolve_index()
 
     if index == "NIFTY":
-        return get_nifty_symbol(price, side)
+        return nifty_symbol_builder(price, side)
 
     if index == "BANKNIFTY":
-        if not get_bank_symbol:
-            raise ImportError("runbankpxy.py missing")
-        return get_bank_symbol(price, side)
+        if not bank_symbol_builder:
+            raise ImportError("runbankpxy missing")
+        return bank_symbol_builder(price, side)
 
     raise RuntimeError("Invalid index mapping")
