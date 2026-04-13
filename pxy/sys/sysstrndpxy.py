@@ -57,7 +57,8 @@ def calculate_supertrend(df: pd.DataFrame, period=None, multiplier=None) -> pd.D
         prev_trend = trend[i - 1]
         close = df['Close'].iloc[i]
 
-        # -------- TREND (MATCH PINE) --------
+        # -------- FINAL TREND LOGIC (PRICE vs LINE ONLY) --------
+        # Trend decided ONLY by: close vs previous SuperTrend line
         if close > prev_st:
             curr_trend = "UP"
         elif close < prev_st:
