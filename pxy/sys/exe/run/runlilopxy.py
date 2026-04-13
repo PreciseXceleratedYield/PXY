@@ -100,8 +100,14 @@ def _print_summary(total_unrealized, total_realized):
     from colorama import Fore, Style, init
     init(autoreset=True)
     
-    print(f"{f'                🥅  {(Style.BRIGHT + Fore.GREEN if float(real_str.replace('%','').replace('+','')) >= 0 else Fore.RED) + real_str + Style.RESET_ALL} 🥅  🏃‍♂️🏃‍♂️  {unreal_str} 🏃‍♂️🏃‍♂️':>42}")
-
+    val = float(real_str.replace('%', '').strip())
+    color = Style.BRIGHT + Fore.GREEN if val >= 0 else Fore.RED
+    
+    line1 = f"🥅  {color + real_str + Style.RESET_ALL} 🥅"
+    line2 = f"🏃‍♂️🏃‍♂️  {unreal_str} 🏃‍♂️🏃‍♂️"
+    
+    print(line1.center(38))
+    print(line2.center(38))
 
 if __name__ == "__main__":
     client = get_session()
