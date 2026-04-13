@@ -48,7 +48,7 @@ def target_price(row):
         katr = max(f(row.get("katr", 1)), 0.001)
 
         # 5️⃣ POINT SYSTEM
-        MIN_POINTS = max(int(atr / 5), 1)
+        MIN_POINTS = max(int(atr), 1)
         BASE_POINTS = max(int(atr), 1)
         MAX_POINTS = max(int(atr * 3), BASE_POINTS)
 
