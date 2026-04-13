@@ -44,7 +44,7 @@ def target_price(row):
         # 2.5️⃣ DYNAMIC POINT SYSTEM (ATR BASED)
         MIN_POINTS = max(int(atr / 8), 1)
         BASE_POINTS = max(int(atr), 1)
-        MAX_POINTS = max(int(atr * 3), BASE_POINTS)
+        MAX_POINTS = max(int(atr * 8), BASE_POINTS)
 
         # 3️⃣ CORE SIGNALS
         power_gap = abs(ce_p - pe_p)
