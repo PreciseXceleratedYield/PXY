@@ -42,7 +42,7 @@ def target_price(row):
         katr = max(f(row.get("katr", 1)), 0.001)  # prevent divide-by-zero
 
         # 2.5️⃣ DYNAMIC POINT SYSTEM (ATR BASED)
-        MIN_POINTS = max(int(atr / 8), 1)
+        MIN_POINTS = max(int(atr / 10), 1)
         BASE_POINTS = max(int(atr), 1)
         MAX_POINTS = max(int(atr * 8), BASE_POINTS)
 
