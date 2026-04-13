@@ -1,109 +1,78 @@
-# sys/exe/exetgtpxy_dashboard.py
-
+# sys/exe/exetgtpxy.py
 import math
-from colorama import init, Fore
 
-init(autoreset=True)
-
-# -------------------- SAFE HELPERS --------------------
-def f(x, d=0.0):
-    try:
-        return float(x)
-    except:
-        return d
-
-
-def i(x, d=0):
-    try:
-        return int(float(x))
-    except:
-        return d
-
-
-# -------------------- MAIN ENGINE --------------------
 def target_price(row):
+    """
+    3-PHASE AIRTIGHT OPTION TARGET (Premium Based):
+    PHASE 1: Initial Entry (Depth <= 2) -> max(10, ATR * Power)
+    PHASE 2: Deep Trend (Depth > 2 + Aligned) -> ATR * Power * Depth
+    PHASE 3: Reversal (Mullu/Signal Flip) -> Fixed 10 Points
+    
+    NOTE: Both CE and PE ADD points because Option Price must go UP for profit.
+    Baseline: pxy_entry (Recalculated every minute with 0.20 decay).
+    """
     try:
-        # 1️⃣ ENTRY
-        entry = i(row.get("pxy_entry") or row.get("buy_prc"))
-        if entry <= 0:
-            print("INVALID_ENTRY|SKIP")
+        # 1. BASELINE: Use the decaying dynamic pxy_entry from OMS
+        entry_prc = float(row.get("pxy_entry", row.get("buy_prc", 0)))
+        symbol = str(row.get("symbol", "")).upper()
+        
+        if entry_prc <= 0: 
             return 0
 
-        symbol = str(row.get("symbol", "UNKNOWN")).upper()
-
-        # 2️⃣ EXIT FIELD (IMPORTANT)
-        exit_signal = str(row.get("exit", "NONE")).upper()
-
-        # 3️⃣ INPUTS
-        ce_p = f(row.get("ce_power", 1))
-        pe_p = f(row.get("pe_power", 1))
-
-        ce_d = i(row.get("hkin_ce_depth", 0))
-        pe_d = i(row.get("hkin_pe_depth", 0))
-
-        atr = f(row.get("atr", 0))
-        katr = max(f(row.get("katr", 1)), 0.001)
-
-        # 4️⃣ POINT SYSTEM
-        MIN_POINTS = max(int(atr / 5), 1)
-        BASE_POINTS = max(int(atr), 1)
-        MAX_POINTS = max(int(atr * 3), BASE_POINTS)
-
-        # 5️⃣ STRENGTH
-        power_gap = abs(ce_p - pe_p)
-        depth_gap = abs(ce_d - pe_d)
-        depth_strength = max(ce_d, pe_d)
-        vol_ratio = atr / katr
-
-        # 6️⃣ SCORES
-        power_score = min(power_gap / 5, 1) * 6
-        depth_score = min(depth_strength / 10, 1) * 5
-        imbalance_score = min(depth_gap / 5, 1) * 3
-        vol_score = min(vol_ratio / 3, 1) * 6
-
-        # 7️⃣ EXIT ↔ CE/PE ALIGNMENT
-        if any(x in exit_signal for x in ["BUY", "BULL"]):
-            aligned = ce_p >= pe_p
-            direction = "UP"
-
-        elif any(x in exit_signal for x in ["SELL", "BEAR"]):
-            aligned = pe_p >= ce_p
-            direction = "DOWN"
-
+        # 2. EXTRACT DATA FROM THE OMS ROW (Synced from market_snapshot)
+        atr = float(row.get("atr", 20))
+        ce_p = float(row.get("ce_power", 1.0))
+        pe_p = float(row.get("pe_power", 1.0))
+        mullu = str(row.get("direction", "SIDE")).upper() # UP or DOWN
+        signal = str(row.get("entry", "NONE")).upper()
+        
+        # 3. ALIGNMENT & PHASE SELECTION
+        if "CE" in symbol:
+            power = ce_p
+            depth = int(row.get("hkin_ce_depth", 0))
+            # Aligned if Mullu is UP and Signal is BUY
+            is_aligned = (mullu == "UP") and ("BUY" in signal)
+        elif "PE" in symbol:
+            power = pe_p
+            depth = int(row.get("hkin_pe_depth", 0))
+            # Aligned if Mullu is DOWN and Signal is SELL
+            is_aligned = (mullu == "DOWN") and ("SELL" in signal)
         else:
-            aligned = True
-            direction = "NONE"
+            return entry_prc
 
-        # 8️⃣ SCORE + TARGET
-        if not aligned:
-            score = MIN_POINTS
-            state = Fore.RED + "MIS" + Fore.RESET
-            target = entry
+        # 4. CALCULATE THE TARGET "PUSH" (POINTS)
+        # --- PHASE 3: EMERGENCY / REVERSAL ---
+        if not is_aligned:
+            # Mullu has flipped against the position. 
+            # Ask for only 10 points to escape the trade fast.
+            total_points = 10.0
 
+        # --- PHASE 2: DEEP TREND ACCELERATION ---
+        elif depth > 2:
+            # Strong conviction trend (HKIN Depth 3, 4, 5).
+            # Target = ATR * Power * Depth (Capped at 5 depth)
+            total_points = atr * power * min(depth, 5)
+
+        # --- PHASE 1: INITIAL TARGET ---
         else:
-            score = BASE_POINTS + power_score + depth_score + imbalance_score + vol_score
-            score = int(max(MIN_POINTS, min(score, MAX_POINTS)))
+            # Early entry or normal trend. 
+            # Target = max(10.0, ATR * Power)
+            total_points = max(10.0, atr * power)
 
-            if direction == "UP":
-                target = int(entry * (1 + score / 100))
-                state = Fore.GREEN + "CE" + Fore.RESET
+        # 5. FINAL CALCULATION
+        # Both CE/PE: Current Decaying Price + Target Points
+        # As pxy_entry drops 0.20/min, this Target also "melts" toward the market.
+        target = entry_prc + total_points
 
-            elif direction == "DOWN":
-                target = int(entry * (1 - score / 100))
-                state = Fore.GREEN + "PE" + Fore.RESET
+        return round(target, 2)
 
-            else:
-                target = entry
-                state = Fore.YELLOW + "NONE" + Fore.RESET
+    except Exception:
+        # Final safety fallback: 10 points above current dynamic price
+        return round(float(row.get("pxy_entry", 0)) + 10, 2)
 
-        # 9️⃣ CLEAN SYMBOL
-        clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
 
-        # 🔟 OUTPUT
-        print(f"{clean_symbol} | {exit_signal} | E:{entry} | S:{score}% | {state} | T:{target}")
+        return round(target, 2)
 
-        return target
-
-    except Exception as e:
-        print(f"ERROR|{str(e)}")
-        return 0
+    except Exception:
+        # Final safety fallback: 10 points above current dynamic price
+        return round(float(row.get("pxy_dynamic_buy", 0)) + 10, 2)
