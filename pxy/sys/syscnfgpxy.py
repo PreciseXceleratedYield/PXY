@@ -2,7 +2,7 @@ import pytz
 
 # ---------------- SINGLE CONFIG ----------------
 PARAMS = {
-    "ticker": "^FTSE",          # or "^NSEI""^NSEBANK"
+    "ticker": "BTC-USD",          # or "^NSEI""^NSEBANK"
     "supertrend_period": 3,
     "supertrend_multiplier": 3
 }
