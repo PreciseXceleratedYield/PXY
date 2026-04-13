@@ -6,8 +6,8 @@ from colorama import init, Fore
 init(autoreset=True)
 
 # -------------------- CONFIG --------------------
-MIN_POINTS = 3
-BASE_POINTS = 5
+MIN_POINTS = 5
+BASE_POINTS = 7
 MAX_POINTS = 20
 
 
