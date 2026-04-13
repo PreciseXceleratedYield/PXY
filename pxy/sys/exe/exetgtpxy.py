@@ -31,8 +31,8 @@ def target_price(row):
 
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
 
-        # 2️⃣ SIGNAL
-        signal = str(row.get("signal", "NONE")).upper()
+        # 2️⃣ EXIT FIELD (IMPORTANT)
+        exit_signal = str(row.get("exit", "NONE")).upper()
 
         # 3️⃣ INPUTS
         ce_p = f(row.get("ce_power", 1))
@@ -61,12 +61,12 @@ def target_price(row):
         imbalance_score = min(depth_gap / 5, 1) * 3
         vol_score = min(vol_ratio / 3, 1) * 6
 
-        # 7️⃣ SIGNAL ↔ CE/PE ALIGNMENT
-        if any(x in signal for x in ["BUY", "BULL"]):
+        # 7️⃣ EXIT ↔ CE/PE ALIGNMENT
+        if any(x in exit_signal for x in ["BUY", "BULL"]):
             aligned = ce_p >= pe_p
             direction = "UP"
 
-        elif any(x in signal for x in ["SELL", "BEAR"]):
+        elif any(x in exit_signal for x in ["SELL", "BEAR"]):
             aligned = pe_p >= ce_p
             direction = "DOWN"
 
@@ -100,7 +100,7 @@ def target_price(row):
         clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
 
         # 🔟 OUTPUT
-        print(f"{clean_symbol} | {signal} | E:{entry} | S:{score}% | {state} | T:{target}")
+        print(f"{clean_symbol} | {exit_signal} | E:{entry} | S:{score}% | {state} | T:{target}")
 
         return target
 
