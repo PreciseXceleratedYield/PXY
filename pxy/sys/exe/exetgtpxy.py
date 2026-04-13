@@ -76,7 +76,7 @@ def target_price(row):
         target = int(entry * (1 + score / 100))
 
         # 8️⃣ SAFE OUTPUT (NO CRASH POSSIBILITY)
-        print(f"{symbol}|E:{entry}|S:{score}%|{state}|T:{target}")
+        print(f"{symbol.split('26',1)[-1] if '26' in symbol else symbol}|E:{entry}|S:{score}%|{state}|T:{target}")
 
         return target
 
