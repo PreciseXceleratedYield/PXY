@@ -71,7 +71,7 @@ def execute_order(client, symbol, qty):
             "validity": "DAY",
             "trading_symbol": symbol,
             "transaction_type": "B",
-            "amo": "YES",
+            "amo": "NO",
             "disclosed_quantity": "0",
             "market_protection": "0"
         }
