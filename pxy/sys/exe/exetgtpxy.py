@@ -31,7 +31,10 @@ def target_price(row):
 
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
 
-        # 2️⃣ INPUTS (SAFE)
+        # 2️⃣ SIGNAL (EXTERNAL)
+        signal = str(row.get("signal", "NONE")).upper()
+
+        # 3️⃣ INPUTS (SAFE)
         ce_p = f(row.get("ce_power", 1))
         pe_p = f(row.get("pe_power", 1))
 
@@ -41,44 +44,77 @@ def target_price(row):
         atr = f(row.get("atr", 0))
         katr = max(f(row.get("katr", 1)), 0.001)  # prevent divide-by-zero
 
-        # 2.5️⃣ DYNAMIC POINT SYSTEM (ATR BASED)
+        # 4️⃣ DYNAMIC POINT SYSTEM (ATR BASED)
         MIN_POINTS = max(int(atr / 5), 1)
         BASE_POINTS = max(int(atr), 1)
         MAX_POINTS = max(int(atr * 3), BASE_POINTS)
 
-        # 3️⃣ CORE SIGNALS
-        power_gap = abs(ce_p - pe_p)
-        depth_gap = abs(ce_d - pe_d)
+        # 5️⃣ CORE DIFFERENCES (DIRECTIONAL)
+        power_diff = ce_p - pe_p
+        depth_diff = ce_d - pe_d
+
+        power_gap = abs(power_diff)
+        depth_gap = abs(depth_diff)
         depth_strength = max(ce_d, pe_d)
+
         vol_ratio = atr / katr
 
-        # 4️⃣ NORMALIZATION (SAFE BOUNDS)
+        # 6️⃣ NORMALIZATION (SAFE BOUNDS)
         power_score = min(power_gap / 5, 1) * 6
         depth_score = min(depth_strength / 10, 1) * 5
         imbalance_score = min(depth_gap / 5, 1) * 3
         vol_score = min(vol_ratio / 3, 1) * 6
 
-        # 5️⃣ ALIGNMENT LOGIC
-        aligned = (power_gap < 0.5 and depth_gap <= 1)
+        # 7️⃣ MARKET BIAS (CE / PE)
+        if power_diff > 0:
+            bias = "CE"
+        elif power_diff < 0:
+            bias = "PE"
+        else:
+            bias = "NONE"
 
+        # 8️⃣ SIGNAL SIDE
+        if any(x in signal for x in ["BUY", "BULL"]):
+            signal_side = "CE"
+        elif any(x in signal for x in ["SELL", "BEAR"]):
+            signal_side = "PE"
+        else:
+            signal_side = "NONE"
+
+        # 9️⃣ ALIGNMENT LOGIC
+        aligned = (
+            (bias == signal_side) or
+            (signal_side == "NONE") or
+            (bias == "NONE")
+        )
+
+        # 🔟 SCORE + TARGET
         if not aligned:
             score = MIN_POINTS
             state = Fore.RED + "MIS" + Fore.RESET
+            target = entry  # no move
+
         else:
             score = BASE_POINTS + power_score + depth_score + imbalance_score + vol_score
-            state = Fore.GREEN + "ALN" + Fore.RESET
+            score = int(max(MIN_POINTS, min(score, MAX_POINTS)))
 
-        # 6️⃣ FINAL CLAMP (INTEGER ONLY)
-        score = int(max(MIN_POINTS, min(score, MAX_POINTS)))
+            if bias == "CE":
+                target = int(entry * (1 + score / 100))   # 📈 UP
+                state = Fore.GREEN + "CE" + Fore.RESET
 
-        # 7️⃣ TARGET (INTEGER ONLY)
-        target = int(entry * (1 + score / 100))
+            elif bias == "PE":
+                target = int(entry * (1 - score / 100))   # 📉 DOWN
+                state = Fore.GREEN + "PE" + Fore.RESET
 
-        # 8️⃣ CLEAN SYMBOL (REMOVE YEAR PREFIX LIKE 26)
+            else:
+                target = entry
+                state = Fore.YELLOW + "NONE" + Fore.RESET
+
+        # 1️⃣1️⃣ CLEAN SYMBOL (REMOVE YEAR PREFIX LIKE 26)
         clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
 
-        # 9️⃣ OUTPUT
-        print(f"{clean_symbol} | E:{entry} | S:{score}% | {state} | T:{target}")
+        # 1️⃣2️⃣ OUTPUT
+        print(f"{clean_symbol} | {signal} | {bias} | E:{entry} | S:{score}% | {state} | T:{target}")
 
         return target
 
