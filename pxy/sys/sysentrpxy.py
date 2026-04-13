@@ -44,14 +44,14 @@ def map_entry(sig, close=None, st=None, now=None):
         signal = "ATMBUY"
         if close is not None and st is not None:
             if close < st:
-                signal = "OTMBUY"
+                signal = "NONE"
         return signal
 
     if sig == "SELL":
         signal = "ATMSELL"
         if close is not None and st is not None:
             if close > st:
-                signal = "OTMSELL"
+                signal = "NONE"
         return signal
 
     return sig
