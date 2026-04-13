@@ -59,7 +59,7 @@ def target_price(row):
         vol_score = min(vol_ratio / 3, 1) * 6
 
         # 5️⃣ ALIGNMENT LOGIC (UPDATED)
-        exit_signal = str(row.get("exit", "NONE")).upper()
+        exit_signal = str(row.get("entry", "NONE")).upper()
 
         if "CE" in symbol:
             aligned = (
