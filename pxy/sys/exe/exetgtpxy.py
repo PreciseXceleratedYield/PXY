@@ -5,12 +5,6 @@ from colorama import init, Fore
 
 init(autoreset=True)
 
-# -------------------- CONFIG --------------------
-MIN_POINTS = 5
-BASE_POINTS = 7
-MAX_POINTS = 20
-
-
 # -------------------- SAFE HELPERS --------------------
 def f(x, d=0.0):
     try:
@@ -47,6 +41,11 @@ def target_price(row):
         atr = f(row.get("atr", 0))
         katr = max(f(row.get("katr", 1)), 0.001)  # prevent divide-by-zero
 
+        # 2.5️⃣ DYNAMIC POINT SYSTEM (ATR BASED)
+        MIN_POINTS = max(int(atr / 3), 1)
+        BASE_POINTS = max(int(atr), 1)
+        MAX_POINTS = max(int(atr * 3), BASE_POINTS)
+
         # 3️⃣ CORE SIGNALS
         power_gap = abs(ce_p - pe_p)
         depth_gap = abs(ce_d - pe_d)
@@ -75,8 +74,11 @@ def target_price(row):
         # 7️⃣ TARGET (INTEGER ONLY)
         target = int(entry * (1 + score / 100))
 
-        # 8️⃣ SAFE OUTPUT (NO CRASH POSSIBILITY)
-        print(f"{symbol.split('26',1)[-1] if '26' in symbol else symbol} | E:{entry} | S:{score}% | {state} | T:{target}")
+        # 8️⃣ CLEAN SYMBOL (REMOVE YEAR PREFIX LIKE 26)
+        clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
+
+        # 9️⃣ OUTPUT
+        print(f"{clean_symbol}|E:{entry}|S:{score}%|{state}|T:{target}")
 
         return target
 
