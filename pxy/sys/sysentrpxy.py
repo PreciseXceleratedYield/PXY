@@ -9,7 +9,7 @@ from sysatsmpxy import get_atr_sma   # ✅ NEW IMPORT
 from sysbbospxy import get_bos
 df = fetch_yf_data()
 signalbox = get_bos(df)
-print(signalbos)
+print(signalbox)
 
 from datetime import datetime, time
 import pytz
