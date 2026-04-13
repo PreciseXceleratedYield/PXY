@@ -6,6 +6,9 @@ from sysmktpxy import get_signal
 from sysdtafpxy import fetch_yf_data
 from sysstrndpxy import calculate_supertrend
 from sysatsmpxy import get_atr_sma   # ✅ NEW IMPORT
+from exebbospxy import get_bos
+signal = get_bos(df)
+print(signal)
 
 from datetime import datetime, time
 import pytz
