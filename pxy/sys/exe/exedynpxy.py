@@ -1,31 +1,7 @@
 from datetime import datetime
 import pytz
-import math
 
 IST = pytz.timezone("Asia/Kolkata")
-
-# ---------------- CONFIG ----------------
-MAX_SECONDS = 4 * 60 * 60   # 4 hours window
-MIN_INC = 0.0001
-MAX_INC = 0.01
-K = 5  # exponential curvature (higher = sharper late decay)
-# ----------------------------------------
-
-
-def get_dynamic_increment(elapsed_secs):
-    """
-    Exponential acceleration from MIN_INC → MAX_INC over 4 hours.
-    """
-    t = min(elapsed_secs / MAX_SECONDS, 1.0)
-
-    # exponential easing
-    exp_val = math.exp(K * t) - 1
-    exp_max = math.exp(K) - 1
-
-    factor = exp_val / exp_max  # normalize 0 → 1
-
-    return MIN_INC + (MAX_INC - MIN_INC) * factor
-
 
 def dynamic_entry(row):
     try:
@@ -37,6 +13,12 @@ def dynamic_entry(row):
             return original_price
 
         now = datetime.now(IST)
+
+        # ---- Dynamic Increment Based on Symbol ----
+        if "BANK" in symbol:
+            per_second_increment = 0.02
+        else:
+            per_second_increment = 0.007
 
         # ---- Parse Entry Time ----
         if isinstance(entry_time_val, str):
@@ -54,13 +36,10 @@ def dynamic_entry(row):
         # ---- Time Difference ----
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
 
-        # ---- Apply decay ONLY for options ----
+        # ---- Apply Increment ONLY for Options ----
         if "CE" in symbol or "PE" in symbol:
-
-            per_sec_inc = get_dynamic_increment(elapsed_secs)
-            decrement = elapsed_secs * per_sec_inc
-
-            dynamic_val = original_price - decrement
+            increment = elapsed_secs * per_second_increment
+            dynamic_val = original_price - increment
         else:
             dynamic_val = original_price
 
