@@ -7,6 +7,7 @@ from sysdtafpxy import fetch_yf_data
 from sysstrndpxy import calculate_supertrend
 from sysatsmpxy import get_atr_sma   # ✅ NEW IMPORT
 from sysbbospxy import get_bos
+
 df = fetch_yf_data()
 signalbox = get_bos(df)
 print(signalbox)
@@ -128,6 +129,31 @@ def get_entry_signal(df=None):
     debug_log("ENTRY:", entry, "CLOSE:", close, "SMA:", sma_value)
 
     entry = validate_with_sma(entry, close_sma, sma_value)
+
+    # ==================================================
+    # 🧠 BOS FINAL 5-CASE ENGINE (ADDED ONLY HERE)
+    # ==================================================
+    bos_signal = get_bos(df)
+
+    # CASE 1: BULL + RBUY → OTMBUY
+    if entry == "BULL" and bos_signal == "RBUY":
+        entry = "OTMBUY"
+
+    # CASE 2: BEAR + RSELL → OTMSELL
+    elif entry == "BEAR" and bos_signal == "RSELL":
+        entry = "OTMSELL"
+
+    # CASE 3: NONE + RBUY → OTMBUY
+    elif entry == "NONE" and bos_signal == "RBUY":
+        entry = "OTMBUY"
+
+    # CASE 4: NONE + RSELL → OTMSELL
+    elif entry == "NONE" and bos_signal == "RSELL":
+        entry = "OTMSELL"
+
+    # CASE 5: BOS = NONE → DO NOTHING (PASS THROUGH)
+    elif bos_signal == "NONE":
+        pass
 
     return entry, exit_signal
 
