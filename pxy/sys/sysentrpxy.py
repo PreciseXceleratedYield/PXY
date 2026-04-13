@@ -67,13 +67,13 @@ def validate_with_sma(signal, close, sma_value):
     if signal in ["ATMBUY", "OTMBUY"]:
         if close < sma_value:
             return signal
-        return "NONE"
+        return signal
 
     # -------- SELL RULE --------
     if signal in ["ATMSELL", "OTMSELL"]:
         if close > sma_value:
             return signal
-        return "NONE"
+        return signal
 
     return signal
 
