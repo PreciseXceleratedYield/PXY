@@ -3,7 +3,7 @@
 from colorama import Fore, Style, init
 init(autoreset=True)
 
-STRUCTURE_WINDOW = 20    # 🔥 CHANGED: rolling swing instead of 60 mins
+STRUCTURE_WINDOW = 14    # 🔥 CHANGED: rolling swing instead of 60 mins
 MAX_BAR_LENGTH = 42       # bar width
 
 def get_bos(df):
