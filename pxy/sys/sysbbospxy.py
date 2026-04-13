@@ -3,21 +3,21 @@
 from colorama import Fore, Style, init
 init(autoreset=True)
 
-STRUCTURE_MINUTES = 60    # last 60 mins for structure
+STRUCTURE_WINDOW = 20    # 🔥 CHANGED: rolling swing instead of 60 mins
 MAX_BAR_LENGTH = 42       # bar width
 
 def get_bos(df):
     """
-    Returns breakout or reversal signal based on the last 60 min structure:
+    Returns breakout or reversal signal based on rolling 20-candle structure:
     - BBUY, BSELL, RBUY, RSELL, or 'NONE'
     df -> must be 1-min OHLC dataframe
     """
     try:
-        if df is None or len(df) < STRUCTURE_MINUTES + 2:
+        if df is None or len(df) < STRUCTURE_WINDOW + 2:
             return "NONE"
 
-        # Last 60 mins excluding running candle
-        recent = df.iloc[-STRUCTURE_MINUTES-1:-1]
+        # 🔥 Last 20 candles excluding running candle
+        recent = df.iloc[-STRUCTURE_WINDOW-1:-1]
 
         structure_high = recent['High'].max()
         structure_low  = recent['Low'].min()
@@ -72,8 +72,8 @@ def get_bos_bar(df, c1_col=None, c2_col=None):
         if signal in ["NONE", "ERR"]:
             return signal, signal
 
-        # Last 60 mins excluding running candle
-        recent = df.iloc[-STRUCTURE_MINUTES-1:-1]
+        # 🔥 NOTE: kept original visualization logic unchanged
+        recent = df.iloc[-STRUCTURE_WINDOW-1:-1]
         structure_high = recent['High'].max()
         structure_low  = recent['Low'].min()
 
