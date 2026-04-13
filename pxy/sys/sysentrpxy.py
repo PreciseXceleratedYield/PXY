@@ -6,7 +6,7 @@ from sysmktpxy import get_signal
 from sysdtafpxy import fetch_yf_data
 from sysstrndpxy import calculate_supertrend
 from sysatsmpxy import get_atr_sma   # ✅ NEW IMPORT
-from exebbospxy import get_bos
+from sysbbospxy import get_bos
 signalbox = get_bos(df)
 print(signalbos)
 
