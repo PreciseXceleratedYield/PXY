@@ -103,8 +103,13 @@ def _print_summary(total_unrealized, total_realized):
     val = float(real_str.replace('%', '').strip())
     color = Style.BRIGHT + Fore.GREEN if val >= 0 else Fore.RED
     
-    line1 = f"{f'         🥅⚽  {color + real_str + Style.RESET_ALL} ⚽🥅':^41}"
-    line2 = f"{f'        🏃‍♂️🏃‍♂️  {unreal_str} 🏃‍♂️🏃‍♂️':^41}"
+    val_real = float(real_str.replace('%',''))
+    val_unreal = float(unreal_str.replace('%',''))
+    
+    color = Style.BRIGHT + Fore.GREEN if val_real >= 0 else Fore.RED
+    
+    line1 = f"{f'🥅⚽  {color}{val_real:+.2f}%{Style.RESET_ALL}  ⚽🥅':^41}"
+    line2 = f"{f'🏃‍♂️🏃‍♂️  {val_unreal:+.2f}%  🏃‍♂️🏃‍♂️':^41}"
     
     print(line1.center(38))
     print(line2.center(38))
