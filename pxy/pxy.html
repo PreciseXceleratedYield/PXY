@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>Night Mode Terminal</title>
+<title>Terminal + NIFTY Chart</title>
 
 <!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
@@ -13,99 +13,108 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
-    background: #1e1e1e;
+    font-family: monospace;
+    background: #f0f0f0;
 }
 
-/* Terminal container */
-#terminal {
+#container {
+    display: flex;
+    height: 100vh; /* full viewport height */
     width: 100%;
-    height: 100vh;
 }
 
-/* Cursor + selection styling */
-.xterm .xterm-cursor {
-    border-left: 2px solid #f0e0b0 !important;
-    animation: none !important;
+#terminal-container {
+    width: 55ch;
+    max-width: 50%;
+    min-width: 300px;
+    display: flex;
+    flex-direction: column;
+    border-right: 2px solid #ccc;
+    height: 100%;
+    background-color: #ffffff;
 }
 
-.xterm .xterm-selection {
-    background: rgba(224, 216, 192, 0.2) !important;
+#terminal {
+    flex: 1;
+    overflow-y: auto;
+    height: 100%;
+    font-size: 16px;
+    line-height: 1.4;
+}
+
+.xterm {
+    height: 100% !important;
+    font-weight: bold;
+}
+
+#chart-container {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+iframe {
+    width: 100%;
+    height: 100%;
+    border: 1px solid #00B4FF;
 }
 </style>
 </head>
 <body>
 
-<div id="terminal"></div>
+<div id="container">
+    <div id="terminal-container">
+        <div id="terminal"></div>
+    </div>
 
-<!-- xterm.js -->
+    <div id="chart-container">
+        <iframe 
+            src="https://ssltvc.investing.com/?pair_ID=8985&height=650&width=1200&interval=86400&plotStyle=candles&domain_ID=1&lang_ID=1&timezone_ID=20">
+        </iframe>
+    </div>
+</div>
+
+<!-- xterm.js and fit addon -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
 <script>
-// =====================
-// CONFIG
-// =====================
-const BASE_FONT = 16;
-const SCALE = 2.3;
-const FONT_SIZE = Math.round(BASE_FONT * SCALE); // 37px
-
-// =====================
-// TERMINAL INIT
-// =====================
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-    fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', monospace",
-    fontSize: FONT_SIZE,   // ✅ 2.3x applied here
-    cursorBlink: false,
     theme: {
-        background: '#1e1e1e',
-        foreground: '#e0d8c0',
-        cursor: '#f0e0b0',
-        selection: 'rgba(224, 216, 192, 0.2)'
-    },
-    rendererType: 'dom',
-    padding: { top: 0, right: 0, bottom: 0, left: 2 }
+        background: '#ffffff',
+        foreground: '#222222'
+    }
 });
-
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
-
-// =====================
-// START TERMINAL
-// =====================
 term.open(document.getElementById('terminal'));
+
+// Fit terminal to container
 fitAddon.fit();
 
-// ✅ TEST OUTPUT (so you SEE it immediately)
-term.writeln("✅ Terminal Ready");
-term.writeln("Font size: " + FONT_SIZE + "px (2.3x)");
-term.writeln("-----------------------------------");
+// Example text to test
+term.writeln('Connected. Displaying npxy tmux session...');
+term.writeln('Terminal ready.');
 
-// =====================
-// WEBSOCKET
-// =====================
+// WebSocket example
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
-ws.onopen = () => {
-    term.writeln("✅ WebSocket Connected");
+ws.onopen = () => term.writeln('WebSocket connected...');
+ws.onmessage = (event) => { 
+    term.write(event.data); 
+    term.scrollToBottom(); 
 };
+ws.onerror = (err) => term.writeln('\nWebSocket error: ' + err);
 
-ws.onmessage = (event) => {
-    term.write(event.data);
-};
-
-ws.onerror = () => {
-    term.writeln("❌ WebSocket Error");
-};
-
-// =====================
-// RESIZE HANDLING
-// =====================
-window.addEventListener('resize', () => {
-    fitAddon.fit();
-});
+// Re-fit on window resize
+window.addEventListener('resize', () => fitAddon.fit());
 </script>
 
 </body>
