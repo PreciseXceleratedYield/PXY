@@ -1,4 +1,3 @@
-# exepomspxy.py
 from colorama import Fore, Style, init
 import re
 
@@ -11,7 +10,7 @@ def visible_len(s):
     return len(ansi_escape.sub('', s))
 
 
-# ---------------- VALUE ONLY COLOR ----------------
+# ---------------- VALUE COLOR ONLY ----------------
 def color_value(val):
     val_str = str(val)
     val_upper = val_str.upper()
@@ -30,7 +29,7 @@ def color_value(val):
 
 def print_market_dashboard(market_df):
     if market_df.empty:
-        print("No market snapshot available")
+        print("No data")
         return
 
     snapshot = market_df.iloc[0].to_dict()
@@ -46,11 +45,6 @@ def print_market_dashboard(market_df):
         ("Exit", "exit"),
     ]
 
-    depth_metrics = [
-        ("CE Depth", "hkin_ce_depth"),
-        ("PE Depth", "hkin_pe_depth"),
-    ]
-
     row_width = 40
     values = []
 
@@ -58,48 +52,20 @@ def print_market_dashboard(market_df):
     for label, col in metrics:
         val = snapshot.get(col, "NA")
         val_colored = color_value(val)
-        values.append((label, col, val_colored))
+
+        values.append((label, col, val_colored, val))
 
     # ---------------- PRINT ----------------
     for i in range(0, len(values), 2):
 
-        # LEFT SIDE
-        l_label, l_col, l_val = values[i]
-        left = f"{l_label}: {l_val}"
+        # LEFT: VALUE → LABEL
+        l_label, l_col, l_val_col, l_val_raw = values[i]
+        left = f"{l_val_raw}: {l_label}"
 
-        # RIGHT SIDE (NO EMOJIS, SIMPLE)
+        # RIGHT: VALUE → LABEL
         if i + 1 < len(values):
-            r_label, r_col, _ = values[i + 1]
-            raw_val = snapshot.get(r_col, "NA")
-            raw_val_colored = color_value(raw_val)
-
-            right = f"{r_label}: {raw_val_colored}"
-        else:
-            right = ""
-
-        spaces = row_width - visible_len(left) - visible_len(right)
-        spaces = spaces if spaces > 0 else 2
-
-        print(f"{left}{' ' * spaces}{right}")
-
-    # ---------------- DEPTH ----------------
-    depth_values = []
-
-    for label, col in depth_metrics:
-        val = snapshot.get(col, "NA")
-        val_colored = color_value(val)
-        depth_values.append((label, col, val_colored))
-
-    if depth_values:
-        l_label, l_col, l_val = depth_values[0]
-        left = f"{l_label}: {l_val}"
-
-        if len(depth_values) > 1:
-            r_label, r_col, _ = depth_values[1]
-            raw_val = snapshot.get(r_col, "NA")
-            raw_val_colored = color_value(raw_val)
-
-            right = f"{r_label}: {raw_val_colored}"
+            r_label, r_col, r_val_col, r_val_raw = values[i + 1]
+            right = f"{r_val_raw}: {r_label}"
         else:
             right = ""
 
