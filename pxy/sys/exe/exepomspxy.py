@@ -11,7 +11,8 @@ def visible_len(s):
     return len(ansi_escape.sub('', s))
 
 
-def color_value(label, val):
+# ---------------- VALUE ONLY COLOR SCAN ----------------
+def color_value(val):
     val_str = str(val)
     val_upper = val_str.upper()
 
@@ -19,24 +20,12 @@ def color_value(label, val):
         return Fore.GREEN + val_str + Style.RESET_ALL
     elif "SELL" in val_upper:
         return Fore.RED + val_str + Style.RESET_ALL
-
-    elif val_upper in ["UP", "BULL"]:
+    elif "UP" in val_upper or "BULL" in val_upper:
         return Fore.GREEN + val_str + Style.RESET_ALL
-    elif val_upper in ["DOWN", "BEAR"]:
+    elif "DOWN" in val_upper or "BEAR" in val_upper:
         return Fore.RED + val_str + Style.RESET_ALL
 
-    try:
-        if label in ["🟢 CE Power", "🔴 PE Power"] and float(val) > 1:
-            return Fore.YELLOW + val_str + Style.RESET_ALL
-        elif label in ["🟢 CE Depth", "🔴 PE Depth"] and float(val) > 1:
-            return Fore.MAGENTA + val_str + Style.RESET_ALL
-    except:
-        pass
-
-    if isinstance(val, (int, float)):
-        return Fore.CYAN + val_str + Style.RESET_ALL
-
-    return val_str
+    return Fore.CYAN + val_str + Style.RESET_ALL
 
 
 def print_market_dashboard(market_df):
@@ -65,20 +54,20 @@ def print_market_dashboard(market_df):
     row_width = 40
     values = []
 
-    # ---------------- LEFT SIDE ----------------
+    # ---------------- BUILD DATA ----------------
     for label, col in metrics:
         val = snapshot.get(col, "NA")
-        val_colored = color_value(label, val)
+        val_colored = color_value(val)
         values.append((label, col, val_colored))
 
-    # ---------------- PRINT ----------------
+    # ---------------- PRINT MAIN ----------------
     for i in range(0, len(values), 2):
 
         # LEFT (UNCHANGED)
         l_label, l_col, l_val = values[i]
         left = f"{l_label}: {l_val}"
 
-        # RIGHT (NEW FORMAT: value → label → emoji)
+        # RIGHT (value → label → emoji)
         if i + 1 < len(values):
             r_label, r_col, _ = values[i + 1]
 
@@ -106,7 +95,7 @@ def print_market_dashboard(market_df):
 
     for label, col in depth_metrics:
         val = snapshot.get(col, "NA")
-        val_colored = color_value(label, val)
+        val_colored = color_value(val)
         depth_values.append((label, col, val_colored))
 
     if depth_values:
