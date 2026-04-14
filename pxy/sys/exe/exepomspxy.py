@@ -54,24 +54,25 @@ def print_market_dashboard(market_df):
     row_width = 40
     values = []
 
-    # ---------------- BUILD DATA ----------------
+    # ---------------- BUILD METRICS ----------------
     for label, col in metrics:
         val = snapshot.get(col, "NA")
         val_colored = color_value(val)
         values.append((label, col, val_colored))
 
-    # ---------------- PRINT MAIN ----------------
+    # ---------------- PRINT MAIN DASHBOARD ----------------
     for i in range(0, len(values), 2):
 
-        # LEFT (UNCHANGED)
+        # LEFT SIDE
         l_label, l_col, l_val = values[i]
         left = f"{l_label}: {l_val}"
 
-        # RIGHT (value → label → emoji)
+        # RIGHT SIDE (FIXED: VALUE ALSO COLORED)
         if i + 1 < len(values):
             r_label, r_col, _ = values[i + 1]
 
             raw_val = snapshot.get(r_col, "NA")
+            raw_val_colored = color_value(raw_val)
 
             parts = r_label.split()
             if len(parts) >= 2:
@@ -81,7 +82,7 @@ def print_market_dashboard(market_df):
                 emoji = ""
                 label_text = r_label
 
-            right = f"{raw_val}: {label_text} {emoji}"
+            right = f"{raw_val_colored}: {label_text} {emoji}"
         else:
             right = ""
 
@@ -90,7 +91,7 @@ def print_market_dashboard(market_df):
 
         print(f"{left}{' ' * spaces}{right}")
 
-    # ---------------- DEPTH ----------------
+    # ---------------- DEPTH SECTION ----------------
     depth_values = []
 
     for label, col in depth_metrics:
@@ -106,6 +107,7 @@ def print_market_dashboard(market_df):
             r_label, r_col, _ = depth_values[1]
 
             raw_val = snapshot.get(r_col, "NA")
+            raw_val_colored = color_value(raw_val)
 
             parts = r_label.split()
             if len(parts) >= 2:
@@ -115,7 +117,7 @@ def print_market_dashboard(market_df):
                 emoji = ""
                 label_text = r_label
 
-            right = f"{raw_val}: {label_text} {emoji}"
+            right = f"{raw_val_colored}: {label_text} {emoji}"
         else:
             right = ""
 
