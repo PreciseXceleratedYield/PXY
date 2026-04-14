@@ -43,7 +43,7 @@ def print_market_dashboard(market_df):
     # Regular metrics
     metrics = [
         ("📏  ATR", "atr"),
-        ("Mullu", "direction  🧭"),
+        ("Mullu", "direction" , "🧭"),
         ("🚀  Super", "supertrend"),
         ("LINE", "super_line  📊"),
         ("🟢  CE Power", "ce_power"),
