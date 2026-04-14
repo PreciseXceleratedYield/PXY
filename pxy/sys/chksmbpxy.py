@@ -1,7 +1,7 @@
-# run_loop.py
+# chksmbpxy.py
 import time
 import yfinance as yf
-from sysdashpxy import get_full_snapshot, print_dashboard  # ✅ your original functions
+import sysdashpxy   # ✅ import full module
 
 # ================= FETCH =================
 def fetch_yf_data(symbol):
@@ -38,9 +38,13 @@ if __name__ == "__main__":
         df = fetch_yf_data(symbol)
 
         if df is not None:
-            # ✅ pass df EXACTLY like your original system expects
-            data = get_full_snapshot(df=df)
-            print_dashboard(data)
+            # 🔥 MONKEY PATCH (override internal fetch)
+            sysdashpxy.fetch_yf_data = lambda: df
+
+            # ✅ call original EXACT function
+            data = sysdashpxy.get_full_snapshot()
+            sysdashpxy.print_dashboard(data)
+
         else:
             print("No data fetched.")
 
