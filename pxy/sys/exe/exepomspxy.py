@@ -43,19 +43,19 @@ def print_market_dashboard(market_df):
     # Regular metrics
     metrics = [
         ("📏  ATR", "atr"),
-        ("🧭  Mullu", "direction"),
+        ("Mullu", "direction  🧭"),
         ("🚀  Super", "supertrend"),
-        ("📊  LINE", "super_line"),
+        ("LINE", "super_line  📊"),
         ("🟢  CE Power", "ce_power"),
-        ("🔴  PE Power", "pe_power"),
+        ("PE Power", "pe_power  🔴"),
         ("🎯  Entry", "entry"),
-        ("🎯  Exits", "exit"),  # renamed here
+        ("Exits", "exit 🎯"),  # renamed here
     ]
     
     # Depth metrics last
     depth_metrics = [
         ("🟢  CE Depth", "hkin_ce_depth"),
-        ("🔴  PE Depth", "hkin_pe_depth"),
+        ("PE Depth", "hkin_pe_depth  🔴"),
     ]
 
     row_width = 40
