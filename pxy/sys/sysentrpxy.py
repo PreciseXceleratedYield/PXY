@@ -13,7 +13,7 @@ df = fetch_yf_data()
 from datetime import datetime, time
 import pytz
 
-DEBUG = False   # ENABLED
+DEBUG = True   # ENABLED
 
 def debug_log(*args):
     if DEBUG:
