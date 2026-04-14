@@ -44,11 +44,16 @@ def get_all_data():
         "entry": core.get("entry"),
         "exit": core.get("exit"),
 
+        # ✅ NEWLY INCLUDED
+        "candle_visual": core.get("candle_visual", ""),
+        "bos_bar": core.get("bos_bar", "NONE"),
+        "day_candle": core.get("day_candle", ""),
+
         # ===== VIX =====
-        "vix_flag": vix_flag,                 
-        "vix_mode": vix_text,                 
-        "global_flag": sentiment_flag,        
-        "global_sentiment": sentiment_text    
+        "vix_flag": vix_flag,
+        "vix_mode": vix_text,
+        "global_flag": sentiment_flag,
+        "global_sentiment": sentiment_text
     }
 
     return data
