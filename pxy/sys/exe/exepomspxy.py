@@ -11,7 +11,7 @@ def visible_len(s):
     return len(ansi_escape.sub('', s))
 
 
-# ---------------- VALUE ONLY COLOR SCAN ----------------
+# ---------------- VALUE ONLY COLOR ----------------
 def color_value(val):
     val_str = str(val)
     val_upper = val_str.upper()
@@ -36,53 +36,44 @@ def print_market_dashboard(market_df):
     snapshot = market_df.iloc[0].to_dict()
 
     metrics = [
-        ("📏 ATR", "atr"),
-        ("🧭 Mullu", "direction"),
-        ("🚀 Super", "supertrend"),
-        ("📊 LINE", "super_line"),
-        ("🟢 CE Power", "ce_power"),
-        ("🔴 PE Power", "pe_power"),
-        ("🎯 Entry", "entry"),
-        ("🎯 Exit", "exit"),
+        ("ATR", "atr"),
+        ("Mullu", "direction"),
+        ("Super", "supertrend"),
+        ("LINE", "super_line"),
+        ("CE Power", "ce_power"),
+        ("PE Power", "pe_power"),
+        ("Entry", "entry"),
+        ("Exit", "exit"),
     ]
 
     depth_metrics = [
-        ("🟢 CE Depth", "hkin_ce_depth"),
-        ("🔴 PE Depth", "hkin_pe_depth"),
+        ("CE Depth", "hkin_ce_depth"),
+        ("PE Depth", "hkin_pe_depth"),
     ]
 
     row_width = 40
     values = []
 
-    # ---------------- BUILD METRICS ----------------
+    # ---------------- BUILD ----------------
     for label, col in metrics:
         val = snapshot.get(col, "NA")
         val_colored = color_value(val)
         values.append((label, col, val_colored))
 
-    # ---------------- PRINT MAIN DASHBOARD ----------------
+    # ---------------- PRINT ----------------
     for i in range(0, len(values), 2):
 
         # LEFT SIDE
         l_label, l_col, l_val = values[i]
         left = f"{l_label}: {l_val}"
 
-        # RIGHT SIDE (FIXED: VALUE ALSO COLORED)
+        # RIGHT SIDE (NO EMOJIS, SIMPLE)
         if i + 1 < len(values):
             r_label, r_col, _ = values[i + 1]
-
             raw_val = snapshot.get(r_col, "NA")
             raw_val_colored = color_value(raw_val)
 
-            parts = r_label.split()
-            if len(parts) >= 2:
-                emoji = parts[0]
-                label_text = " ".join(parts[1:])
-            else:
-                emoji = ""
-                label_text = r_label
-
-            right = f"{raw_val_colored}: {label_text} {emoji}"
+            right = f"{r_label}: {raw_val_colored}"
         else:
             right = ""
 
@@ -91,7 +82,7 @@ def print_market_dashboard(market_df):
 
         print(f"{left}{' ' * spaces}{right}")
 
-    # ---------------- DEPTH SECTION ----------------
+    # ---------------- DEPTH ----------------
     depth_values = []
 
     for label, col in depth_metrics:
@@ -105,19 +96,10 @@ def print_market_dashboard(market_df):
 
         if len(depth_values) > 1:
             r_label, r_col, _ = depth_values[1]
-
             raw_val = snapshot.get(r_col, "NA")
             raw_val_colored = color_value(raw_val)
 
-            parts = r_label.split()
-            if len(parts) >= 2:
-                emoji = parts[0]
-                label_text = " ".join(parts[1:])
-            else:
-                emoji = ""
-                label_text = r_label
-
-            right = f"{raw_val_colored}: {label_text} {emoji}"
+            right = f"{r_label}: {raw_val_colored}"
         else:
             right = ""
 
