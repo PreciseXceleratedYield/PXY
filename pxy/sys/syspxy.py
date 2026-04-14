@@ -42,7 +42,7 @@ def get_all_data():
         "ce_power": core.get("ce_power"),
         "pe_power": core.get("pe_power"),
         "entry": core.get("entry"),
-        "exit": core.get("reversal"),
+        "exit": core.get("exit"),
 
         # ===== VIX =====
         "vix_flag": vix_flag,                 
