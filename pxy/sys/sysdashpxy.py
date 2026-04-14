@@ -169,14 +169,14 @@ def print_dashboard(data):
 
     # ===== ENTRY =====
     entry = data["entry"]
-    reversal = data["reversal"]
+    exit = data["exit"]
     color = (
         Fore.GREEN if entry in ["ATMBUY","OTMBUY","SBUY","BBUY","RBUY"] 
         else Fore.RED if entry in ["ATMSELL","OTMSELL","SSELL","BSELL","RSELL"] 
         else Fore.YELLOW
     )
-    space = TOTAL_WIDTH - len(f"Entry:{entry}") - len(f"Signal:{reversal}")
-    print(Fore.YELLOW + "Entry:" + color + entry + " " * space + Fore.YELLOW + "Signal:" + color + reversal)
+    space = TOTAL_WIDTH - len(f"Entry:{entry}") - len(f"Signal:{exit}")
+    print(Fore.YELLOW + "Entry:" + color + entry + " " * space + Fore.YELLOW + "Signal:" + color + exit)
 
     # ===== DAY CANDLE =====
     # print(data["day_candle"])  # optional
