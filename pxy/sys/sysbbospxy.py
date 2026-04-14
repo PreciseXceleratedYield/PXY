@@ -100,9 +100,12 @@ def get_bos_bar(df, c1_col=None, c2_col=None):
             except Exception:
                 signal = "ERR"
 
+        # ✅ ONLY CHANGE: return empty bar instead of "NONE"
         if signal in ["NONE", "ERR"]:
-            return signal, signal
+            bar = Fore.LIGHTBLACK_EX + "░" * MAX_BAR_LENGTH
+            return bar + Style.RESET_ALL, signal
 
+        # ----- ORIGINAL BAR LOGIC (UNCHANGED) -----
         left_len = MAX_BAR_LENGTH // 2
         right_len = MAX_BAR_LENGTH - left_len
 
