@@ -1,13 +1,13 @@
 # run_pyc.py
 import runpy
 import os
-import time   # ✅ added
+import time
+import yfinance as yf   # ✅ self-fetch
 from colorama import Fore, Style, init
 
 init(autoreset=True)
 
 # ---- Imports ----
-from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_ha_data
 from syshkinpxy import detect_ha_flip_signal
 from sysstrhpxy import get_candle_strength_line
@@ -21,6 +21,32 @@ from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
 
 TOTAL_WIDTH = 42
+
+# ================= FETCH (SELF DEPENDENT) =================
+def fetch_yf_data(symbol):
+    try:
+        ticker = yf.Ticker(symbol)
+
+        # ✅ Try 1: 1 day / 1 min
+        df = ticker.history(interval="1m", period="1d")
+
+        # 🔁 fallback: 5 day / 1 min
+        if df is None or df.empty:
+            df = ticker.history(interval="1m", period="5d")
+
+        # 🔁 final fallback (optional safety)
+        if df is None or df.empty:
+            df = ticker.history(interval="5m", period="5d")
+
+        if df is None or df.empty:
+            print(f"❌ No data for {symbol}")
+            return None
+
+        return df
+
+    except Exception as e:
+        print(f"YF Error ({symbol}):", e)
+        return None
 
 # ---------------- UTILS ----------------
 def safe_int(val):
@@ -39,10 +65,10 @@ def run_pyc_file():
             print(f"Error running {pyc_file}: {e}")
 
 # ================= CORE SNAPSHOT FUNCTION =================
-def get_full_snapshot(symbol):   # ✅ added symbol
+def get_full_snapshot(symbol):
     result = {}
 
-    df = fetch_yf_data(symbol)   # ✅ pass symbol
+    df = fetch_yf_data(symbol)
     if df is None or df.empty:
         return None
     result["df"] = df
@@ -124,8 +150,6 @@ def print_dashboard(data):
         print("No data fetched.")
         return
 
-    df = data["df"]
-
     print(data["candle_visual"])
 
     signal = data["hkin_signal"]
@@ -188,4 +212,4 @@ if __name__ == "__main__":
         run_pyc_file()
         data = get_full_snapshot(symbol)
         print_dashboard(data)
-        time.sleep(6)   # ✅ 6 sec loop
+        time.sleep(6)
