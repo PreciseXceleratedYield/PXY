@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Terminal + NIFTY Chart</title>
+<title>Night Mode Terminal</title>
 
+<!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
 <style>
@@ -12,121 +13,99 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
-    font-family: monospace;
-    background: #000000; /* 🖤 AMOLED */
-    color: #ffffff;
+    background: #1e1e1e;
 }
 
-#container {
-    display: flex;
-    height: 100vh;
-    width: 100%;
-}
-
-/* LEFT TERMINAL */
-#terminal-container {
-    width: 55ch;
-    max-width: 50%;
-    min-width: 300px;
-    display: flex;
-    flex-direction: column;
-    border-right: 1px solid #111; /* ultra subtle */
-    height: 100%;
-    background-color: #000000;
-}
-
+/* Terminal container */
 #terminal {
-    flex: 1;
-    overflow-y: auto;
-    height: 100%;
-    font-size: 16px;
-    line-height: 1.4;
-}
-
-.xterm {
-    height: 100% !important;
-    font-weight: bold;
-}
-
-/* RIGHT CHART */
-#chart-container {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
-    padding: 6px; /* tighter for AMOLED */
-    box-sizing: border-box;
-    background: #000000;
-}
-
-iframe {
     width: 100%;
-    height: 100%;
-    border: 1px solid #111;
-    background: #000000;
+    height: 100vh;
+}
+
+/* Cursor + selection styling */
+.xterm .xterm-cursor {
+    border-left: 2px solid #f0e0b0 !important;
+    animation: none !important;
+}
+
+.xterm .xterm-selection {
+    background: rgba(224, 216, 192, 0.2) !important;
 }
 </style>
 </head>
 <body>
 
-<div id="container">
-    <div id="terminal-container">
-        <div id="terminal"></div>
-    </div>
+<div id="terminal"></div>
 
-    <div id="chart-container">
-        <iframe
-            src="https://s.tradingview.com/widgetembed/?symbol=NSE:BANKNIFTY&interval=5&theme=dark&style=1&locale=en&hide_top_toolbar=1&hide_legend=0&save_image=0&toolbarbg=000000&studies=[]"
-            style="width:100%; height:100%; border:0;">
-        </iframe>
-    </div>
-</div>
-
+<!-- xterm.js -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
 <script>
+// =====================
+// CONFIG
+// =====================
+const BASE_FONT = 16;
+const SCALE = 2.3;
+const FONT_SIZE = Math.round(BASE_FONT * SCALE); // 37px
+
+// =====================
+// TERMINAL INIT
+// =====================
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
+    fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', monospace",
+    fontSize: FONT_SIZE,   // ✅ 2.3x applied here
+    cursorBlink: false,
     theme: {
-        background: '#000000',   // 🖤 AMOLED
-        foreground: '#ffffff',
-        cursor: '#00ffcc',       // neon cursor
-        selection: '#222222',
-
-        black: '#000000',
-        red: '#ff4d4d',
-        green: '#00ff88',
-        yellow: '#ffff66',
-        blue: '#4da6ff',
-        magenta: '#ff66ff',
-        cyan: '#00ffff',
-        white: '#ffffff'
-    }
+        background: '#1e1e1e',
+        foreground: '#e0d8c0',
+        cursor: '#f0e0b0',
+        selection: 'rgba(224, 216, 192, 0.2)'
+    },
+    rendererType: 'dom',
+    padding: { top: 0, right: 0, bottom: 0, left: 2 }
 });
 
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
-term.open(document.getElementById('terminal'));
 
+// =====================
+// START TERMINAL
+// =====================
+term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-term.writeln('Connected. AMOLED mode active...');
-term.writeln('Terminal ready.');
+// ✅ TEST OUTPUT (so you SEE it immediately)
+term.writeln("✅ Terminal Ready");
+term.writeln("Font size: " + FONT_SIZE + "px (2.3x)");
+term.writeln("-----------------------------------");
 
+// =====================
+// WEBSOCKET
+// =====================
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
-ws.onopen = () => term.writeln('WebSocket connected...');
-ws.onmessage = (event) => { 
-    term.write(event.data); 
-    term.scrollToBottom(); 
+ws.onopen = () => {
+    term.writeln("✅ WebSocket Connected");
 };
-ws.onerror = (err) => term.writeln('\nWebSocket error: ' + err);
 
-window.addEventListener('resize', () => fitAddon.fit());
+ws.onmessage = (event) => {
+    term.write(event.data);
+};
+
+ws.onerror = () => {
+    term.writeln("❌ WebSocket Error");
+};
+
+// =====================
+// RESIZE HANDLING
+// =====================
+window.addEventListener('resize', () => {
+    fitAddon.fit();
+});
 </script>
 
 </body>
