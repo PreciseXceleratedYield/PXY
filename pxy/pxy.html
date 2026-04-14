@@ -33,6 +33,7 @@ html, body {
 }
 </style>
 </head>
+
 <body>
 
 <div id="terminal"></div>
@@ -46,8 +47,8 @@ html, body {
 // CONFIG
 // =====================
 const BASE_FONT = 16;
-const SCALE = 2.3;
-const FONT_SIZE = Math.round(BASE_FONT * SCALE); // 37px
+const SCALE = 1; // ✅ UPDATED TO 2.7x
+const FONT_SIZE = Math.round(BASE_FONT * SCALE); // ≈ 43px
 
 // =====================
 // TERMINAL INIT
@@ -56,7 +57,7 @@ const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', monospace",
-    fontSize: FONT_SIZE,   // ✅ 2.3x applied here
+    fontSize: FONT_SIZE,
     cursorBlink: false,
     theme: {
         background: '#1e1e1e',
@@ -64,8 +65,7 @@ const term = new Terminal({
         cursor: '#f0e0b0',
         selection: 'rgba(224, 216, 192, 0.2)'
     },
-    rendererType: 'dom',
-    padding: { top: 0, right: 0, bottom: 0, left: 2 }
+    rendererType: 'dom'
 });
 
 const fitAddon = new FitAddon.FitAddon();
@@ -77,9 +77,9 @@ term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-// ✅ TEST OUTPUT (so you SEE it immediately)
+// TEST OUTPUT
 term.writeln("✅ Terminal Ready");
-term.writeln("Font size: " + FONT_SIZE + "px (2.3x)");
+term.writeln("Font size: " + FONT_SIZE + "px (2.7x)");
 term.writeln("-----------------------------------");
 
 // =====================
