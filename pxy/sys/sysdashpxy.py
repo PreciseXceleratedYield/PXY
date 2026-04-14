@@ -95,19 +95,10 @@ def get_full_snapshot():
     result["pe_power"] = safe_int(pe)
 
     # ===== ENTRY SIGNAL =====
-    entry, reversal = get_entry_signal(df)
+    entry, exit = get_entry_signal(df)
     # --- FIX: fallback to ATM/OTM if None ---
-    if entry is None or entry == "NONE":
-        last_close = df['Close'].iloc[-1]
-        st_value = df['ST'].iloc[-1] if 'ST' in df.columns else last_close
-        if last_close > st_value:
-            entry = "ATMBUY"
-            reversal = "SBUY"
-        else:
-            entry = "ATMSELL"
-            reversal = "SSELL"
     result["entry"] = entry
-    result["reversal"] = reversal
+    result["exit"] = exit
 
     # ===== DAY CANDLE =====
     result["day_candle"] = get_day_candle_bar(df)
