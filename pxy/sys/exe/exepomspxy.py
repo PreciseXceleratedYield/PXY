@@ -1,13 +1,6 @@
 from colorama import Fore, Style, init
-import re
 
 init(autoreset=True)
-
-ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
-
-
-def visible_len(s):
-    return len(ansi_escape.sub('', s))
 
 
 # ---------------- VALUE COLOR ONLY ----------------
@@ -45,31 +38,21 @@ def print_market_dashboard(market_df):
         ("Exit", "exit"),
     ]
 
-    row_width = 40
-    values = []
+    # ---------------- SPLIT INTO LEFT / RIGHT ----------------
+    mid = len(metrics) // 2
+    left_metrics = metrics[:mid]
+    right_metrics = metrics[mid:]
 
-    # ---------------- BUILD DATA ----------------
-    for label, col in metrics:
-        val_raw = snapshot.get(col, "NA")
-        val_colored = color_value(val_raw)
+    # ---------------- LEFT SIDE ----------------
+    for label, col in left_metrics:
+        val = snapshot.get(col, "NA")
+        val_colored = color_value(val)
+        print(f"{label}: {val_colored}")
 
-        values.append((label, col, val_raw, val_colored))
+    print()  # separator
 
-    # ---------------- PRINT ----------------
-    for i in range(0, len(values), 2):
-
-        # LEFT SIDE (VALUE → LABEL, COLORED VALUE)
-        l_label, l_col, l_raw, l_colored = values[i]
-        left = f"{l_colored}: {l_label}"
-
-        # RIGHT SIDE (VALUE → LABEL, COLORED VALUE)
-        if i + 1 < len(values):
-            r_label, r_col, r_raw, r_colored = values[i + 1]
-            right = f"{r_colored}: {r_label}"
-        else:
-            right = ""
-
-        spaces = row_width - visible_len(left) - visible_len(right)
-        spaces = spaces if spaces > 0 else 2
-
-        print(f"{left}{' ' * spaces}{right}")
+    # ---------------- RIGHT SIDE ----------------
+    for label, col in right_metrics:
+        val = snapshot.get(col, "NA")
+        val_colored = color_value(val)
+        print(f"{val_colored}: {label}")
