@@ -47,7 +47,7 @@ def print_market_dashboard(market_df):
     ]
 
     depth_metrics = [
-        ("🟢 CE Depth", "hkin_ce_depth"),
+        ("🟢  CE Depth", "hkin_ce_depth"),
         ("🔴 PE Depth", "hkin_pe_depth"),
     ]
 
