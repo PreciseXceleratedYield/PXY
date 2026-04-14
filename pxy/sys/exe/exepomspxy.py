@@ -48,8 +48,8 @@ def print_market_dashboard(market_df):
 
     metrics = [
         ("📏 ATR", "atr"),
-        ("🚀 Super", "supertrend"),
         ("🧭 Mullu", "direction"),
+        ("🚀 Super", "supertrend"),
         ("📊 LINE", "super_line"),
         ("🟢 CE Power", "ce_power"),
         ("🔴 PE Power", "pe_power"),
@@ -65,20 +65,20 @@ def print_market_dashboard(market_df):
     row_width = 40
     values = []
 
-    # ---------------- BUILD LEFT SIDE ----------------
+    # ---------------- LEFT SIDE ----------------
     for label, col in metrics:
         val = snapshot.get(col, "NA")
         val_colored = color_value(label, val)
         values.append((label, col, val_colored))
 
-    # ---------------- PRINT DASHBOARD ----------------
+    # ---------------- PRINT ----------------
     for i in range(0, len(values), 2):
 
-        # LEFT SIDE (UNCHANGED)
+        # LEFT (UNCHANGED)
         l_label, l_col, l_val = values[i]
         left = f"{l_label}: {l_val}"
 
-        # RIGHT SIDE (YOUR REQUIRED FORMAT)
+        # RIGHT (NEW FORMAT: value → label → emoji)
         if i + 1 < len(values):
             r_label, r_col, _ = values[i + 1]
 
@@ -92,7 +92,7 @@ def print_market_dashboard(market_df):
                 emoji = ""
                 label_text = r_label
 
-            right = f"{label_text}: {raw_val}{emoji}"
+            right = f"{raw_val}: {label_text} {emoji}"
         else:
             right = ""
 
@@ -101,7 +101,7 @@ def print_market_dashboard(market_df):
 
         print(f"{left}{' ' * spaces}{right}")
 
-    # ---------------- DEPTH SECTION ----------------
+    # ---------------- DEPTH ----------------
     depth_values = []
 
     for label, col in depth_metrics:
@@ -126,7 +126,7 @@ def print_market_dashboard(market_df):
                 emoji = ""
                 label_text = r_label
 
-            right = f"{label_text}: {raw_val}{emoji}"
+            right = f"{raw_val}: {label_text} {emoji}"
         else:
             right = ""
 
