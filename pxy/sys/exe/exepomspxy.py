@@ -36,13 +36,13 @@ def print_market_dashboard(market_df):
     snapshot = market_df.iloc[0].to_dict()
 
     metrics = [
-        ("📏 ATR", "atr"),
+        ("📏  ATR", "atr"),
         ("🧭 Mullu", "direction"),
-        ("🚀 Super", "supertrend"),
+        ("🚀  Super", "supertrend"),
         ("📊 LINE", "super_line"),
-        ("🟢 CE Power", "ce_power"),
+        ("🟢  CE Power", "ce_power"),
         ("🔴 PE Power", "pe_power"),
-        ("🎯 Entry", "entry"),
+        ("🎯  Entry", "entry"),
         ("🎯 Exit", "exit"),
     ]
 
