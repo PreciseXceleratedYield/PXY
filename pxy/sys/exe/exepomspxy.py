@@ -46,7 +46,6 @@ def print_market_dashboard(market_df):
 
     snapshot = market_df.iloc[0].to_dict()
 
-    # ---------------- METRICS ----------------
     metrics = [
         ("📏 ATR", "atr"),
         ("🧭 Mullu", "direction"),
@@ -66,26 +65,24 @@ def print_market_dashboard(market_df):
     row_width = 40
     values = []
 
-    # ---------------- BUILD LEFT SIDE ----------------
+    # ---------------- BUILD VALUES ----------------
     for label, col in metrics:
         val = snapshot.get(col, "NA")
         val_colored = color_value(label, val)
-        values.append((label, val_colored))
+        values.append((label, col, val_colored, val))
 
-    # ---------------- PRINT DASHBOARD ----------------
+    # ---------------- PRINT MAIN ----------------
     for i in range(0, len(values), 2):
 
         # LEFT SIDE (UNCHANGED)
-        l_label, l_val = values[i]
+        l_label, l_col, l_val, _ = values[i]
         left = f"{l_label}: {l_val}"
 
-        # RIGHT SIDE (FIXED FORMAT)
+        # RIGHT SIDE (SAFE FIX)
         if i + 1 < len(values):
-            r_label, _ = values[i + 1]
+            r_label, r_col, _, _ = values[i + 1]
 
-            col_key = metrics[i + 1][1]
-            raw_val = snapshot.get(col_key, "NA")
-
+            raw_val = snapshot.get(r_col, "NA")
             right = f"{raw_val}: {r_label}"
         else:
             right = ""
@@ -101,16 +98,15 @@ def print_market_dashboard(market_df):
     for label, col in depth_metrics:
         val = snapshot.get(col, "NA")
         val_colored = color_value(label, val)
-        depth_values.append((label, val_colored))
+        depth_values.append((label, col, val_colored))
 
     if depth_values:
-        l_label, l_val = depth_values[0]
+        l_label, l_col, l_val = depth_values[0]
         left = f"{l_label}: {l_val}"
 
         if len(depth_values) > 1:
-            r_label, _ = depth_values[1]
-            col_key = depth_metrics[1][1]
-            raw_val = snapshot.get(col_key, "NA")
+            r_label, r_col, _ = depth_values[1]
+            raw_val = snapshot.get(r_col, "NA")
             right = f"{raw_val}: {r_label}"
         else:
             right = ""
