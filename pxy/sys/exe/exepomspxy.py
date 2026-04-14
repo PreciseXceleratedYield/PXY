@@ -46,7 +46,7 @@ def print_market_dashboard(market_df):
 
     snapshot = market_df.iloc[0].to_dict()
 
-    # ---------------- METRICS (UNCHANGED) ----------------
+    # ---------------- METRICS ----------------
     metrics = [
         ("📏 ATR", "atr"),
         ("🧭 Mullu", "direction"),
@@ -66,24 +66,26 @@ def print_market_dashboard(market_df):
     row_width = 40
     values = []
 
+    # ---------------- BUILD LEFT SIDE ----------------
     for label, col in metrics:
         val = snapshot.get(col, "NA")
         val_colored = color_value(label, val)
         values.append((label, val_colored))
 
-    # ---------------- PRINT ----------------
+    # ---------------- PRINT DASHBOARD ----------------
     for i in range(0, len(values), 2):
 
-        # LEFT (UNCHANGED)
+        # LEFT SIDE (UNCHANGED)
         l_label, l_val = values[i]
         left = f"{l_label}: {l_val}"
 
-        # RIGHT (MODIFIED ONLY HERE)
+        # RIGHT SIDE (FIXED FORMAT)
         if i + 1 < len(values):
-            r_label, r_val = values[i + 1]
+            r_label, _ = values[i + 1]
 
-            # extract raw value for display order
-            raw_val = snapshot.get(metrics[i + 1][1], "NA")
+            col_key = metrics[i + 1][1]
+            raw_val = snapshot.get(col_key, "NA")
+
             right = f"{raw_val}: {r_label}"
         else:
             right = ""
@@ -106,8 +108,9 @@ def print_market_dashboard(market_df):
         left = f"{l_label}: {l_val}"
 
         if len(depth_values) > 1:
-            r_label, r_val = depth_values[1]
-            raw_val = snapshot.get(depth_metrics[1][1], "NA")
+            r_label, _ = depth_values[1]
+            col_key = depth_metrics[1][1]
+            raw_val = snapshot.get(col_key, "NA")
             right = f"{raw_val}: {r_label}"
         else:
             right = ""
