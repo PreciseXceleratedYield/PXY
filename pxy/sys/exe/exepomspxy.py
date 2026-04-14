@@ -48,24 +48,24 @@ def print_market_dashboard(market_df):
     row_width = 40
     values = []
 
-    # ---------------- BUILD ----------------
+    # ---------------- BUILD DATA ----------------
     for label, col in metrics:
-        val = snapshot.get(col, "NA")
-        val_colored = color_value(val)
+        val_raw = snapshot.get(col, "NA")
+        val_colored = color_value(val_raw)
 
-        values.append((label, col, val_colored, val))
+        values.append((label, col, val_raw, val_colored))
 
     # ---------------- PRINT ----------------
     for i in range(0, len(values), 2):
 
-        # LEFT: VALUE → LABEL
-        l_label, l_col, l_val_col, l_val_raw = values[i]
-        left = f"{l_val_raw}: {l_label}"
+        # LEFT SIDE (VALUE → LABEL, COLORED VALUE)
+        l_label, l_col, l_raw, l_colored = values[i]
+        left = f"{l_colored}: {l_label}"
 
-        # RIGHT: VALUE → LABEL
+        # RIGHT SIDE (VALUE → LABEL, COLORED VALUE)
         if i + 1 < len(values):
-            r_label, r_col, r_val_col, r_val_raw = values[i + 1]
-            right = f"{r_val_raw}: {r_label}"
+            r_label, r_col, r_raw, r_colored = values[i + 1]
+            right = f"{r_colored}: {r_label}"
         else:
             right = ""
 
