@@ -63,13 +63,13 @@ def target_price(row):
 
         if "CE" in symbol:
             aligned = (
-                any(x in exit_signal for x in ["BUY", "BULL"]) or
+                any(x in exit_signal for x in ["BUY", "BULL", "NONE"]) or
                 "NONE" in exit_signal
             )
 
         elif "PE" in symbol:
             aligned = (
-                any(x in exit_signal for x in ["SELL", "BEAR"]) or
+                any(x in exit_signal for x in ["SELL", "BEAR", "NONE"]) or
                 "NONE" in exit_signal
             )
 
