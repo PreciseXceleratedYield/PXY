@@ -58,23 +58,20 @@ def target_price(row):
         imbalance_score = min(depth_gap / 5, 1) * 3
         vol_score = min(vol_ratio / 3, 1) * 6
 
-        # 5️⃣ ALIGNMENT LOGIC (UPDATED)
+        # 5️⃣ ALIGNMENT LOGIC (WITH NONE INCLUDED)
         exit_signal = str(row.get("exit", "NONE")).upper()
 
-        if "CE" in symbol:
-            aligned = (
-                any(x in exit_signal for x in ["BUY", "BULL", "NONE"]) or
-                "NONE" in exit_signal
-            )
+        is_ce = "CE" in symbol
+        is_pe = "PE" in symbol
 
-        elif "PE" in symbol:
-            aligned = (
-                any(x in exit_signal for x in ["SELL", "BEAR", "NONE"]) or
-                "NONE" in exit_signal
-            )
+        bullish = any(x in exit_signal for x in ["BUY", "BULL"])
+        bearish = any(x in exit_signal for x in ["SELL", "BEAR"])
+        is_none = "NONE" in exit_signal
 
-        else:
-            aligned = False
+        aligned = (
+            (is_ce and (bullish or is_none)) or
+            (is_pe and (bearish or is_none))
+        )
 
         # 6️⃣ SCORE
         if not aligned:
