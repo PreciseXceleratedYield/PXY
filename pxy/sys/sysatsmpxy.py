@@ -8,14 +8,16 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 
+# ==================================================
+# 🔥 SINGLE SWITCH (SMART MODE)
+# ==================================================
+# "ATR" → ATR dynamic SMA logic
+# number (e.g. 7, 9, 21) → SMA of that period
+SMA_MODE = "ATR"
+
+
 # -------------------- ATR → SMA PERIOD --------------------
 def atr_to_period(atr_value: float) -> int:
-    """
-    ATR ≤ 8 → SMA = 5
-    Every +2 ATR → reduce SMA by 1
-    Range: 1 to 5
-    """
-
     if atr_value <= 8:
         period = 5
     else:
@@ -26,13 +28,6 @@ def atr_to_period(atr_value: float) -> int:
 
 # -------------------- MAIN SIGNAL --------------------
 def get_atr_sma(df: pd.DataFrame) -> dict:
-    """
-    Returns:
-        atrsma : SMA value
-        status : UP / DOWN / FLAT / NA
-        period : dynamic SMA period
-        atr    : latest ATR
-    """
 
     if df is None or df.empty:
         return {"atrsma": 0, "status": "NA", "period": 0, "atr": 0}
@@ -43,13 +38,18 @@ def get_atr_sma(df: pd.DataFrame) -> dict:
     if pd.isna(atr):
         return {"atrsma": 0, "status": "NA", "period": 0, "atr": 0}
 
-    # -------- dynamic period --------
-    period = atr_to_period(atr)
-
-    # -------- SMA --------
-    df['ATR_SMA'] = df['Close'].rolling(period).mean()
-    sma = df['ATR_SMA'].iloc[-1]
     close = df['Close'].iloc[-1]
+
+    # ==================================================
+    # 🔥 MODE HANDLING
+    # ==================================================
+    if SMA_MODE == "ATR":
+        period = atr_to_period(atr)
+    else:
+        period = int(SMA_MODE)
+
+    df['SMA'] = df['Close'].rolling(period).mean()
+    sma = df['SMA'].iloc[-1]
 
     if pd.isna(sma):
         return {"atrsma": 0, "status": "NA", "period": period, "atr": atr}
@@ -80,19 +80,7 @@ if __name__ == "__main__":
     atr_val = round(result["atr"], 2)
     period = result["period"]
 
-    # ---- COLOR ----
-    if status == "UP":
-        color = Fore.GREEN
-    elif status == "DOWN":
-        color = Fore.RED
-    elif status == "FLAT":
-        color = Fore.YELLOW
-    else:
-        color = Fore.WHITE
+    color = Fore.GREEN if status == "UP" else Fore.RED if status == "DOWN" else Fore.YELLOW
 
-    # ---- OUTPUT ----
-    left = f"ATR_SMA{period}:{status}"
-    right = f"VAL:{sma_val}"
-    line = f"{left:<21}{right:>21}"
-
+    line = f"ATR_SMA{period}:{status}   VAL:{sma_val}   ATR:{atr_val}"
     print(f"{color}{line}{Style.RESET_ALL}")
