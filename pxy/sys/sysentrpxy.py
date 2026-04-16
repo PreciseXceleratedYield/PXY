@@ -86,7 +86,7 @@ def get_entry_signal(df=None):
         if close < st:
             entry = "ATMSELL"
         else:
-            entry = "ATMBUY"
+            entry = "ATMSELL"
 
     else:
         entry = "NONE"
