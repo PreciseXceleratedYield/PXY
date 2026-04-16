@@ -7,73 +7,50 @@ MAX_BAR_LENGTH = 42
 
 def get_bos(df):
     """
-    BOS Hybrid (FIXED):
+    BOS Hybrid (CLEAN + STATELSS):
 
-    - First structure shift → BUY / SELL (ONE candle only)
-    - Then continuous → UP / DOWN
-    - Stable, no repeat triggers, no noise
+    - BUY / SELL → only on fresh breakout candle
+    - UP / DOWN → trend inside structure
+    - no memory, no repeats, no noise loops
     """
 
     try:
-        if df is None or len(df) < STRUCTURE_WINDOW + 5:
+        if df is None or len(df) < STRUCTURE_WINDOW + 2:
             return "NONE"
 
-        # ✅ FIX 1: do NOT drop last candle
         data = df.copy()
 
-        # ✅ FIX 2: use actual last candle
         last_close = df['Close'].iloc[-1]
         prev_close = df['Close'].iloc[-2]
 
-        # ----------------------------
-        # STEP 1: find last swing anchor
-        # ----------------------------
-        last_event_index = None
+        # ==================================================
+        # CLEAN STRUCTURE ZONE (FIXED, NO DRIFT)
+        # ==================================================
+        base = data.iloc[-STRUCTURE_WINDOW:]
 
-        for i in range(STRUCTURE_WINDOW, len(data)):
-            # ✅ FIX 3: exclude current candle (important)
-            window = data.iloc[i - STRUCTURE_WINDOW:i]
+        structure_high = base['High'].max()
+        structure_low = base['Low'].min()
 
-            high = window['High'].max()
-            low  = window['Low'].min()
-            close = data['Close'].iloc[i]
-
-            # stronger breakout logic (fix strict miss issue)
-            if close > high or close < low:
-                last_event_index = i
-
-        # fallback (stable anchor)
-        if last_event_index is None:
-            last_event_index = max(0, len(data) - STRUCTURE_WINDOW * 2)
-
-        # ----------------------------
-        # STEP 2: structure zone
-        # ----------------------------
-        monitor = data.iloc[last_event_index:]
-
-        if len(monitor) < 5:
-            return "NONE"
-
-        structure_high = monitor['High'].max()
-        structure_low  = monitor['Low'].min()
         mid = (structure_high + structure_low) / 2
 
-        # ----------------------------
-        # STEP 3: FIRST SHIFT (STRICT)
-        # ----------------------------
+        # small buffer to avoid fake wicks
+        buffer = (structure_high - structure_low) * 0.01
 
-        # 🟢 Fresh breakout UP
-        if prev_close < structure_high and last_close >= structure_high:
+        # ==================================================
+        # STEP 1: STRICT FIRST BREAKOUT (ONLY ONCE PER EVENT)
+        # ==================================================
+
+        # 🟢 BUY breakout
+        if prev_close <= structure_high and last_close > structure_high + buffer:
             return "BUY"
 
-        # 🔴 Fresh breakout DOWN
-        if prev_close > structure_low and last_close <= structure_low:
+        # 🔴 SELL breakout
+        if prev_close >= structure_low and last_close < structure_low - buffer:
             return "SELL"
 
-        # ----------------------------
-        # STEP 4: CONTINUOUS TREND
-        # ----------------------------
-
+        # ==================================================
+        # STEP 2: CONTINUATION TREND
+        # ==================================================
         if last_close > structure_high:
             return "UP"
 
@@ -86,10 +63,10 @@ def get_bos(df):
         return "NONE"
 
 
+# ==================================================
+# VISUAL BAR (UNCHANGED)
+# ==================================================
 def get_bos_bar(df):
-    """
-    Visual BOS Bar (FIXED)
-    """
 
     try:
         signal = get_bos(df)
