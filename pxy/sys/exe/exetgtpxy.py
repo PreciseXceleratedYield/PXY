@@ -54,7 +54,7 @@ def target_price(row):
 
         # 6️⃣ SCORE (SIMPLE)
         if aligned:
-            score = 200   # 🔥 fixed strong target
+            score = 100   # 🔥 fixed strong target
             state = "✅"
         else:
             score = MIN_POINTS
