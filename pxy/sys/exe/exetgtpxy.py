@@ -43,8 +43,8 @@ def target_price(row):
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
 
-        bullish = any(x in exit_signal for x in ["BUY", "BULL"])
-        bearish = any(x in exit_signal for x in ["SELL", "BEAR"])
+        bullish = any(x in exit_signal for x in ["BUY", "BULL", "NONE"])
+        bearish = any(x in exit_signal for x in ["SELL", "BEAR", "NONE"])
 
         # 5️⃣ STRICT ALIGNMENT (NO NONE)
         aligned = (
