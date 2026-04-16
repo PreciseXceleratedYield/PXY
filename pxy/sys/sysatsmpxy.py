@@ -13,7 +13,7 @@ init(autoreset=True)
 # ==================================================
 # "ATR" → ATR dynamic SMA logic
 # number (e.g. 7, 9, 21) → SMA of that period
-SMA_MODE = x
+SMA_MODE = 9
 
 
 # -------------------- ATR → SMA PERIOD --------------------
