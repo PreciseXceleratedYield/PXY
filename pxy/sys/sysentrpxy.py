@@ -103,6 +103,10 @@ def get_entry_signal(df=None):
     
     sma_result = get_sma(df, period=9)
     sma_status = sma_result["status"]
+    sma_value = sma_result["value"]
+    
+    dprint("SMA9 STATUS", sma_status)
+    dprint("SMA9 VALUE", sma_value)
     
     if signal == "BUY" and st_trend == "DOWN" and sma_status == "UP":
         dprint("MODE", "COUNTER BUY")
