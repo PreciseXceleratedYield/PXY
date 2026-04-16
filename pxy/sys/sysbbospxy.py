@@ -7,7 +7,7 @@ MAX_BAR_LENGTH = 42
 
 def get_bos(df):
     """
-    BOS Hybrid (FINAL):
+    BOS Hybrid (FIXED):
 
     - First structure shift → BUY / SELL (ONE candle only)
     - Then continuous → UP / DOWN
@@ -18,10 +18,12 @@ def get_bos(df):
         if df is None or len(df) < STRUCTURE_WINDOW + 5:
             return "NONE"
 
-        data = df.iloc[:-1].copy()
+        # ✅ FIX 1: do NOT drop last candle
+        data = df.copy()
 
-        last_close = data['Close'].iloc[-1]
-        prev_close = data['Close'].iloc[-2]
+        # ✅ FIX 2: use actual last candle
+        last_close = df['Close'].iloc[-1]
+        prev_close = df['Close'].iloc[-2]
 
         # ----------------------------
         # STEP 1: find last swing anchor
@@ -29,13 +31,15 @@ def get_bos(df):
         last_event_index = None
 
         for i in range(STRUCTURE_WINDOW, len(data)):
+            # ✅ FIX 3: exclude current candle (important)
             window = data.iloc[i - STRUCTURE_WINDOW:i]
 
             high = window['High'].max()
             low  = window['Low'].min()
             close = data['Close'].iloc[i]
 
-            if close >= high or close <= low:
+            # stronger breakout logic (fix strict miss issue)
+            if close > high or close < low:
                 last_event_index = i
 
         # fallback (stable anchor)
@@ -58,11 +62,11 @@ def get_bos(df):
         # STEP 3: FIRST SHIFT (STRICT)
         # ----------------------------
 
-        # 🟢 Fresh breakout UP (strict cross)
+        # 🟢 Fresh breakout UP
         if prev_close < structure_high and last_close >= structure_high:
             return "BUY"
 
-        # 🔴 Fresh breakout DOWN (strict cross)
+        # 🔴 Fresh breakout DOWN
         if prev_close > structure_low and last_close <= structure_low:
             return "SELL"
 
@@ -70,14 +74,12 @@ def get_bos(df):
         # STEP 4: CONTINUOUS TREND
         # ----------------------------
 
-        # Strong zones
         if last_close > structure_high:
             return "UP"
 
         if last_close < structure_low:
             return "DOWN"
 
-        # Range bias (stable)
         return "UP" if last_close >= mid else "DOWN"
 
     except Exception:
@@ -86,7 +88,7 @@ def get_bos(df):
 
 def get_bos_bar(df):
     """
-    Visual BOS Bar (FINAL)
+    Visual BOS Bar (FIXED)
     """
 
     try:
@@ -99,14 +101,12 @@ def get_bos_bar(df):
         left_len = MAX_BAR_LENGTH // 2
         right_len = MAX_BAR_LENGTH - left_len
 
-        # 🔥 Shift events (full color)
         if signal == "BUY":
             bar = Fore.GREEN + "█" * MAX_BAR_LENGTH
 
         elif signal == "SELL":
             bar = Fore.RED + "█" * MAX_BAR_LENGTH
 
-        # 🧠 Trend state
         elif signal == "UP":
             bar = Fore.LIGHTBLACK_EX + "█" * left_len
             bar += Fore.GREEN + "█" * right_len
