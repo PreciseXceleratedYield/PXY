@@ -2,69 +2,103 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 STRUCTURE_WINDOW = 14
-MAX_BAR_LENGTH = 42
+SWEEP_BUFFER = 0.0015  # liquidity sweep sensitivity
 
 
+# ==================================================
+# STRUCTURE ENGINE (NON-REPAINT)
+# ==================================================
+def get_structure(df):
+    base = df.iloc[-(STRUCTURE_WINDOW + 1):-1]
+
+    high = base['High'].max()
+    low = base['Low'].min()
+    mid = (high + low) / 2
+
+    return high, low, mid
+
+
+# ==================================================
+# LIQUIDITY SWEEP DETECTOR
+# ==================================================
+def detect_sweep(df, structure_high, structure_low):
+    last = df.iloc[-1]
+    prev = df.iloc[-2]
+
+    # sweep high (fake breakout above resistance)
+    sweep_high = (
+        last['High'] > structure_high and
+        last['Close'] < structure_high
+    )
+
+    # sweep low (fake breakdown below support)
+    sweep_low = (
+        last['Low'] < structure_low and
+        last['Close'] > structure_low
+    )
+
+    if sweep_high:
+        return "SWEEP_SELL"
+    if sweep_low:
+        return "SWEEP_BUY"
+
+    return None
+
+
+# ==================================================
+# BOS + CHOCH ENGINE (INSTITUTIONAL LOGIC)
+# ==================================================
 def get_bos(df):
-    """
-    BOS Hybrid (CLEAN + STATELSS):
-
-    - BUY / SELL → only on fresh breakout candle
-    - UP / DOWN → trend inside structure
-    - no memory, no repeats, no noise loops
-    """
 
     try:
         if df is None or len(df) < STRUCTURE_WINDOW + 2:
             return "NONE"
 
-        data = df.copy()
+        last = df.iloc[-1]
+        prev = df.iloc[-2]
 
-        last_close = df['Close'].iloc[-1]
-        prev_close = df['Close'].iloc[-2]
-
-        # ==================================================
-        # CLEAN STRUCTURE ZONE (FIXED, NO DRIFT)
-        # ==================================================
-        base = data.iloc[-STRUCTURE_WINDOW:]
-
-        structure_high = base['High'].max()
-        structure_low = base['Low'].min()
-
-        mid = (structure_high + structure_low) / 2
-
-        # small buffer to avoid fake wicks
-        buffer = (structure_high - structure_low) * 0.01
+        structure_high, structure_low, mid = get_structure(df)
 
         # ==================================================
-        # STEP 1: STRICT FIRST BREAKOUT (ONLY ONCE PER EVENT)
+        # STEP 1: LIQUIDITY SWEEP (HIGHEST PRIORITY)
         # ==================================================
+        sweep_signal = detect_sweep(df, structure_high, structure_low)
 
-        # 🟢 BUY breakout
-        if prev_close <= structure_high and last_close > structure_high + buffer:
+        if sweep_signal == "SWEEP_BUY":
             return "BUY"
 
-        # 🔴 SELL breakout
-        if prev_close >= structure_low and last_close < structure_low - buffer:
+        if sweep_signal == "SWEEP_SELL":
             return "SELL"
 
         # ==================================================
-        # STEP 2: CONTINUATION TREND
+        # STEP 2: TRUE BREAK OF STRUCTURE (BOS)
         # ==================================================
-        if last_close > structure_high:
+        if prev['Close'] <= structure_high and last['Close'] > structure_high:
+            return "BUY"
+
+        if prev['Close'] >= structure_low and last['Close'] < structure_low:
+            return "SELL"
+
+        # ==================================================
+        # STEP 3: CHOCH (TREND REVERSAL CONFIRMATION)
+        # ==================================================
+        if last['Close'] > structure_high:
             return "UP"
 
-        if last_close < structure_low:
+        if last['Close'] < structure_low:
             return "DOWN"
 
-        return "UP" if last_close >= mid else "DOWN"
+        # ==================================================
+        # STEP 4: RANGE MODE (NO TRADE ZONE FEEL)
+        # ==================================================
+        return "UP" if last['Close'] >= mid else "DOWN"
 
     except Exception:
         return "NONE"
 
 
 # ==================================================
-# VISUAL BAR (UNCHANGED)
+# VISUAL BAR (IMPROVED SIGNAL MAPPING)
 # ==================================================
 def get_bos_bar(df):
 
@@ -72,27 +106,23 @@ def get_bos_bar(df):
         signal = get_bos(df)
 
         if signal == "NONE":
-            bar = Fore.LIGHTBLACK_EX + "░" * MAX_BAR_LENGTH
-            return bar + Style.RESET_ALL, signal
-
-        left_len = MAX_BAR_LENGTH // 2
-        right_len = MAX_BAR_LENGTH - left_len
+            return Fore.LIGHTBLACK_EX + "░" * 42 + Style.RESET_ALL, signal
 
         if signal == "BUY":
-            bar = Fore.GREEN + "█" * MAX_BAR_LENGTH
+            return Fore.GREEN + "█" * 42 + Style.RESET_ALL, signal
 
-        elif signal == "SELL":
-            bar = Fore.RED + "█" * MAX_BAR_LENGTH
+        if signal == "SELL":
+            return Fore.RED + "█" * 42 + Style.RESET_ALL, signal
 
-        elif signal == "UP":
-            bar = Fore.LIGHTBLACK_EX + "█" * left_len
-            bar += Fore.GREEN + "█" * right_len
+        if signal == "UP":
+            bar = Fore.LIGHTBLACK_EX + "█" * 21
+            bar += Fore.GREEN + "█" * 21
+            return bar + Style.RESET_ALL, signal
 
-        else:  # DOWN
-            bar = Fore.RED + "█" * left_len
-            bar += Fore.LIGHTBLACK_EX + "█" * right_len
-
-        return bar + Style.RESET_ALL, signal
+        if signal == "DOWN":
+            bar = Fore.RED + "█" * 21
+            bar += Fore.LIGHTBLACK_EX + "█" * 21
+            return bar + Style.RESET_ALL, signal
 
     except Exception as e:
         return f"ERR: {e}", "ERR"
