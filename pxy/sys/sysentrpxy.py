@@ -98,18 +98,20 @@ def get_entry_signal(df=None):
         return "OTMSELL", exit_signal
 
     # ==================================================
-    # 🔁 3. COUNTER MODE
+    # 🔁 3. COUNTER MODE (FIXED SMA LOGIC)
     # ==================================================
-    sma = get_sma(df, period=9)
-    print(sma)
-    if signal == "BUY" and st_trend == "DOWN" and bos == "BUY":
+    
+    sma_result = get_sma(df, period=9)
+    sma_status = sma_result["status"]
+    
+    if signal == "BUY" and st_trend == "DOWN" and sma_status == "UP":
         dprint("MODE", "COUNTER BUY")
         return "OTMBUY", exit_signal
-
-    if signal == "SELL" and st_trend == "UP" and bos == "SELL":
+    
+    if signal == "SELL" and st_trend == "UP" and sma_status == "DOWN":
         dprint("MODE", "COUNTER SELL")
         return "OTMSELL", exit_signal
-
+        
     # ==================================================
     # 🟢 4. TREND MODE
     # ==================================================
