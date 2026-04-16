@@ -6,6 +6,7 @@ from sysmktpxy import get_signal
 from sysdtafpxy import fetch_yf_data
 from sysstrndpxy import calculate_supertrend
 from sysbbospxy import get_bos
+from syssmapxy import get_sma
 
 from datetime import datetime, time
 import pytz
@@ -99,6 +100,8 @@ def get_entry_signal(df=None):
     # ==================================================
     # 🔁 3. COUNTER MODE
     # ==================================================
+    sma = get_sma(df, period=9)
+    print(sma)
     if signal == "BUY" and st_trend == "DOWN" and bos == "BUY":
         dprint("MODE", "COUNTER BUY")
         return "OTMBUY", exit_signal
