@@ -80,13 +80,13 @@ def get_entry_signal(df=None):
         if close > st:
             entry = "ATMBUY"
         else:
-            entry = "ATMBUY"
+            entry = "OTMBUY"
 
     elif direction == "DOWN":
         if close < st:
             entry = "ATMSELL"
         else:
-            entry = "ATMSELL"
+            entry = "OTMSELL"
 
     else:
         entry = "NONE"
