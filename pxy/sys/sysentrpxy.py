@@ -27,7 +27,7 @@ USE_MORNING_OVERRIDE = True
 USE_FORCE_OTM        = True
 USE_ST_FILTER        = True
 USE_ATR_SMA          = False
-USE_BOS              = False
+USE_BOS              = True
 
 # -------------------- TIME WINDOWS --------------------
 NONE_START = time(9, 14, 0)
