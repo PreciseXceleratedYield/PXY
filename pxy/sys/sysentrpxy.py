@@ -13,8 +13,11 @@ import pytz
 
 TIMEZONE = "Asia/Kolkata"
 
-# -------------------- DEBUG SWITCH --------------------
-DEBUG = False   # 🔴 GLOBAL SWITCH
+# -------------------- GLOBAL MODE SWITCH --------------------
+MODE = "RAW"   # "TREND" | "RAW"
+
+DEBUG = False   # 🔴 GLOBAL DEBUG SWITCH
+
 
 def dprint(label, value=""):
     if DEBUG:
@@ -36,7 +39,26 @@ def get_entry_signal(df=None):
     dprint("CURRENT TIME", now)
 
     # ==================================================
-    # 🕒 1. MORNING OVERRIDE (RAW MODE)
+    # 🧪 RAW MODE (NO INDICATORS, NO MORNING LOGIC)
+    # ==================================================
+    if MODE == "RAW":
+
+        signal, exit_signal = get_signal()
+        dprint("RAW SIGNAL", signal)
+        dprint("RAW EXIT", exit_signal)
+
+        if signal == "BUY":
+            return "ATMBUY", exit_signal
+
+        if signal == "SELL":
+            return "ATMSELL", exit_signal
+
+        # strict pass-through
+        return signal, exit_signal
+
+
+    # ==================================================
+    # 🕒 1. MORNING OVERRIDE (TREND MODE ONLY)
     # ==================================================
     if MORNING_START <= now <= MORNING_END:
 
@@ -45,15 +67,13 @@ def get_entry_signal(df=None):
         dprint("EXIT SIGNAL", exit_signal)
 
         if signal in ["BUY", "BULL"]:
-            dprint("RETURN", "OTMBUY")
             return "OTMBUY", exit_signal
 
         if signal in ["SELL", "BEAR"]:
-            dprint("RETURN", "OTMSELL")
             return "OTMSELL", exit_signal
 
-        dprint("RETURN", "NONE")
         return "NONE", exit_signal
+
 
     # ==================================================
     # 🧠 DATA PREPARATION
@@ -63,7 +83,6 @@ def get_entry_signal(df=None):
         dprint("FETCH DATA", "5d 1m")
 
     if df is None or len(df) < 3:
-        dprint("DATA STATUS", "INSUFFICIENT")
         return "NONE", "NONE"
 
     if 'ST' not in df.columns:
@@ -73,64 +92,46 @@ def get_entry_signal(df=None):
     last = df.iloc[-1]
     st_trend = last['ST_Trend']
 
-    dprint("ST TREND", st_trend)
-
     signal, exit_signal = get_signal()
-    dprint("SIGNAL", signal)
-    dprint("EXIT", exit_signal)
 
     if signal is None:
-        dprint("RETURN", "NONE")
         return "NONE", "NONE"
 
     bos = get_bos(df)
-    dprint("BOS", bos)
 
     # ==================================================
-    # ⚡ 2. BOS BREAKOUT MODE (HIGHEST AFTER MORNING)
+    # ⚡ BOS BREAKOUT MODE
     # ==================================================
     if bos == "BUY" and st_trend == "DOWN":
-        dprint("MODE", "BOS BUY REVERSAL")
         return "OTMBUY", exit_signal
 
     if bos == "SELL" and st_trend == "UP":
-        dprint("MODE", "BOS SELL REVERSAL")
         return "OTMSELL", exit_signal
 
     # ==================================================
-    # 🔁 3. COUNTER MODE (FIXED SMA LOGIC)
+    # 🔁 COUNTER MODE
     # ==================================================
-    
     sma_result = get_sma(df, period=9)
     sma_status = sma_result["status"]
-    sma_value = sma_result["value"]
-    
-    dprint("SMA9 STATUS", sma_status)
-    dprint("SMA9 VALUE", sma_value)
-    
+
     if signal == "BUY" and st_trend == "DOWN" and sma_status == "UP":
-        dprint("MODE", "COUNTER BUY")
         return "OTMBUY", exit_signal
-    
+
     if signal == "SELL" and st_trend == "UP" and sma_status == "DOWN":
-        dprint("MODE", "COUNTER SELL")
         return "OTMSELL", exit_signal
-        
+
     # ==================================================
-    # 🟢 4. TREND MODE
+    # 🟢 TREND MODE
     # ==================================================
     if signal == "BUY" and st_trend == "UP":
-        dprint("MODE", "TREND BUY")
         return "ATMBUY", exit_signal
 
     if signal == "SELL" and st_trend == "DOWN":
-        dprint("MODE", "TREND SELL")
         return "ATMSELL", exit_signal
 
     # ==================================================
-    # ❌ 5. NO TRADE
+    # ❌ NO TRADE
     # ==================================================
-    dprint("FINAL", signal)
     return signal, exit_signal
 
 
