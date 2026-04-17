@@ -46,17 +46,17 @@ def target_price(row):
         bullish = any(x in exit_signal for x in ["BUY", "BULL", "NONE"])
         bearish = any(x in exit_signal for x in ["SELL", "BEAR", "NONE"])
 
-        # 5️⃣ STRICT ALIGNMENT (NO NONE)
+        # 5️⃣ STRICT ALIGNMENT
         aligned = (
             (is_ce and bullish) or
             (is_pe and bearish)
         )
 
-        # 6️⃣ SCORE (SIMPLE)
+        # 6️⃣ SCORE (FIXED WITH CORRECT DEPTH KEYS)
         if aligned:
-            ce_depth = f(row.get("ce_depth", 0))
-            pe_depth = f(row.get("pe_depth", 0))
-            score = atr - abs(ce_depth - pe_depth)
+            ce_depth = f(row.get("hkin_ce_depth", 0))
+            pe_depth = f(row.get("hkin_pe_depth", 0))
+            score = max(atr - abs(ce_depth - pe_depth), 1)
             state = "✅"
         else:
             score = MIN_POINTS
@@ -69,7 +69,7 @@ def target_price(row):
         clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
 
         # 9️⃣ OUTPUT
-        print(f"{clean_symbol}|E:{entry}|S:{score}%|{state} |T:{target}")
+        print(f"{clean_symbol}|E:{entry}|S:{int(score)}%|{state} |T:{target}")
 
         return target
 
