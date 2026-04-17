@@ -2,7 +2,7 @@ import pytz
 
 # ---------------- SINGLE CONFIG ----------------
 PARAMS = {
-    "ticker": "^NSEBANK",          # or "^NSEI""^NSEBANK" BTC-USD COMEX:GC1!
+    "ticker": "AAPL",          # or "^NSEI""^NSEBANK" BTC-USD COMEX:GC1!
     "supertrend_period": 3,
     "supertrend_multiplier": 3
 }
