@@ -14,7 +14,7 @@ import pytz
 TIMEZONE = "Asia/Kolkata"
 
 # -------------------- DEBUG SWITCH --------------------
-DEBUG = True   # 🔴 GLOBAL SWITCH
+DEBUG = False   # 🔴 GLOBAL SWITCH
 
 def dprint(label, value=""):
     if DEBUG:
