@@ -37,47 +37,42 @@ def target_price(row):
         # 3️⃣ MIN POINTS (ATR BASED)
         MIN_POINTS = max(int(atr / 15), 1)
 
-        # 4️⃣ SIGNAL
+        # 4️⃣ SIGNAL (FIXED: removed NONE)
         exit_signal = str(row.get("entry", "NONE")).upper()
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
 
-        bullish = any(x in exit_signal for x in ["BUY", "BULL", "NONE"])
-        bearish = any(x in exit_signal for x in ["SELL", "BEAR", "NONE"])
+        bullish = any(x in exit_signal for x in ["BUY", "BULL"])
+        bearish = any(x in exit_signal for x in ["SELL", "BEAR"])
 
-        # 5️⃣ STRICT ALIGNMENT (NO NONE)
-        aligned = (
-            (is_ce and bullish) or
-            (is_pe and bearish)
-        )
-
-        # 6️⃣ SCORE (EXCLUSIVE LOGIC)
+        # 5️⃣ DEPTH INPUTS
         ce_depth = f(row.get("ce_depth", 0))
         pe_depth = f(row.get("pe_depth", 0))
-        
+
+        # 6️⃣ SCORE (STRICT & EFFECTIVE)
         if is_ce and bullish:
             score = atr - ce_depth
             state = "CE✅"
-        
+
         elif is_pe and bearish:
             score = atr - pe_depth
             state = "PE✅"
-        
+
         else:
             score = MIN_POINTS
             state = "❌"
-        
-        # safety floor
+
+        # 7️⃣ SAFETY FLOOR
         score = max(score, 1.0)
 
-        # 7️⃣ TARGET
+        # 8️⃣ TARGET
         target = int(entry * (1 + score / 100))
 
-        # 8️⃣ CLEAN SYMBOL
+        # 9️⃣ CLEAN SYMBOL
         clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
 
-        # 9️⃣ OUTPUT
+        # 🔟 OUTPUT
         print(f"{clean_symbol}|E:{entry}|S:{score}%|{state} |T:{target}")
 
         return target
