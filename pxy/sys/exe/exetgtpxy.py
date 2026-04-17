@@ -67,7 +67,7 @@ def target_price(row):
         clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
 
         # 9️⃣ OUTPUT
-        print(f"{clean_symbol}|E:{int(entry):04d}|S:{score}%|{state}|T:{int(target):04d}")
+        print(f"{clean_symbol}|E:{entry:04d}|S:{score:02d}%|{state}|T:{target:04d}")
 
         return target
 
