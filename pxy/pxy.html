@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Transparent Terminal</title>
+<title>Light Mode Terminal</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
@@ -12,25 +12,22 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
-
-    background: transparent;   /* 🔥 KEY */
-    overflow: hidden;
+    background: #ffffff; /* LIGHT BACKGROUND */
+    color: #111;
 }
 
 /* Terminal container */
 #terminal {
     width: 100%;
     height: 100vh;
-    background: transparent;   /* 🔥 KEY */
 }
 
-/* Cursor */
+/* Cursor + selection styling */
 .xterm .xterm-cursor {
     border-left: 2px solid #111 !important;
     animation: none !important;
 }
 
-/* Selection */
 .xterm .xterm-selection {
     background: rgba(0, 0, 0, 0.15) !important;
 }
@@ -46,18 +43,27 @@ html, body {
 
 <script>
 
+// =====================
+// CONFIG
+// =====================
+const BASE_FONT = 15.3;
+const SCALE = 1;
+const FONT_SIZE = Math.round(BASE_FONT * SCALE);
+
+// =====================
+// TERMINAL INIT (LIGHT THEME)
+// =====================
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-    fontFamily: "'DejaVu Sans Mono', monospace",
-    fontSize: 15,
+    fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', monospace",
+    fontSize: FONT_SIZE,
     cursorBlink: false,
 
     theme: {
-        background: 'rgba(0,0,0,0)',   // 🔥 TRUE TRANSPARENT
-        foreground: '#111111',
+        background: '#ffffff',   // LIGHT BACKGROUND
+        foreground: '#111111',   // DARK TEXT
         cursor: '#111111',
-
         selection: 'rgba(0, 0, 0, 0.15)',
 
         black: '#111111',
@@ -67,24 +73,52 @@ const term = new Terminal({
         blue: '#1565c0',
         magenta: '#6a1b9a',
         cyan: '#00838f',
-        white: '#333333'
-    }
+        white: '#333333',
+        brightBlack: '#555555',
+        brightWhite: '#000000'
+    },
+
+    rendererType: 'dom'
 });
 
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 
+// =====================
+// START TERMINAL
+// =====================
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-term.writeln("Transparent Terminal Ready ✨");
+// TEST OUTPUT
+term.writeln("✅ Terminal Ready (Light Theme)");
+term.writeln("Font size: " + FONT_SIZE + "px");
+term.writeln("-----------------------------------");
 
+// =====================
+// WEBSOCKET
+// =====================
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
-ws.onmessage = (event) => term.write(event.data);
+ws.onopen = () => {
+    term.writeln("✅ WebSocket Connected");
+};
 
-window.addEventListener('resize', () => fitAddon.fit());
+ws.onmessage = (event) => {
+    term.write(event.data);
+};
+
+ws.onerror = () => {
+    term.writeln("❌ WebSocket Error");
+};
+
+// =====================
+// RESIZE
+// =====================
+window.addEventListener('resize', () => {
+    fitAddon.fit();
+});
 
 </script>
 
