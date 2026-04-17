@@ -34,11 +34,11 @@ def dynamic_entry(row):
             if entry_time.tzinfo is None:
                 entry_time = IST.localize(entry_time)
 
-        # ---- Time Difference ----
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
 
-        # ---- APPLY ADJUSTMENT ONLY IF PnL < 1000 (ABS SAFE) ----
-        if abs(pnl) < 1000 and ("CE" in symbol or "PE" in symbol):
+        # ---- FINAL RULE ----
+        # NO adjustment until pnl crosses -1000 loss
+        if pnl <= -1000 and ("CE" in symbol or "PE" in symbol):
             increment = elapsed_secs * per_second_increment
             dynamic_val = original_price - increment
         else:
