@@ -65,7 +65,7 @@ def target_price(row):
             state = "PE✅"
         
         else:
-            score = atr
+            score = MIN_POINTS
             state = "❌"
         
         # safety floor
