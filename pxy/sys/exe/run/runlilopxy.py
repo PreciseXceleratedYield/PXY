@@ -3,6 +3,10 @@ import pandas as pd
 from runclntpxy import get_session
 from runltpspxy import get_mid_price
 
+# 🔥 GLOBAL SWITCH
+MATCH_MODE = "LIFO"   # "FIFO" or "LIFO"
+
+
 def process_lilo_orders(client):
     try:
         if not client:
@@ -41,8 +45,11 @@ def process_lilo_orders(client):
             sells = group[group["trnsTp"].str.upper() == "S"].to_dict('records')
 
             while sells and buys:
-                s, b = sells[0], buys[0]
+                s = sells[0]
+                b = buys[-1] if MATCH_MODE == "LIFO" else buys[0]
+
                 mqty = min(s["qty"], b["qty"])
+
                 closed_matches.append({
                     "Symbol": symbol,
                     "Qty": mqty,
@@ -53,10 +60,18 @@ def process_lilo_orders(client):
                     "Sell_Prc": s["prc"],
                     "PNL": int((s["prc"] - b["prc"]) * mqty)
                 })
+
                 s["qty"] -= mqty
                 b["qty"] -= mqty
-                if s["qty"] <= 0: sells.pop(0)
-                if b["qty"] <= 0: buys.pop(0)
+
+                if s["qty"] <= 0:
+                    sells.pop(0)
+
+                if b["qty"] <= 0:
+                    if MATCH_MODE == "LIFO":
+                        buys.pop(-1)
+                    else:
+                        buys.pop(0)
 
             for rem in buys:
                 if rem["qty"] > 0:
@@ -92,28 +107,23 @@ def process_lilo_orders(client):
 
 def _print_summary(total_unrealized, total_realized):
     """Print emoji summary on a single line without zero-padding."""
-    # Convert numbers to string directly
     unreal_str = str(total_unrealized)
     real_str = str(total_realized)
 
-    # Single line
     from colorama import Fore, Style, init
     init(autoreset=True)
-    
-    val = float(real_str.replace('%', '').strip())
-    color = Style.BRIGHT + Fore.GREEN if val >= 0 else Fore.RED
-    
+
     val_real = float(real_str.replace('%',''))
-    val_unreal = float(unreal_str.replace('%',''))
-    
     color = Style.BRIGHT + Fore.GREEN if val_real >= 0 else Fore.RED
-    
+
     line1 = f"{f'          🥅 ⚽  {color}{int(float(real_str)):+d}{Style.RESET_ALL}  ⚽ 🥅':^41}"
     line2 = f"{f'         🏃‍♂️🏃‍♂️  {int(float(unreal_str)):+d}  🏃‍♂️🏃‍♂️':^41}"
+
     print(" " * 42)
     print(line1.center(38))
     print(line2.center(38))
     print(" " * 42)
+
 
 if __name__ == "__main__":
     client = get_session()
