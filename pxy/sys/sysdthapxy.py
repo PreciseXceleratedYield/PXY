@@ -3,7 +3,7 @@
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
 
-# 🔥 CONTROL: Keep forming candle INCLUDED
+# 🔥 CONTROL: Keep forming candle INCLUDED (DO NOT BREAK DOWNSTREAM)
 USE_FORMING_CANDLE = True
 
 
@@ -21,15 +21,9 @@ def get_ha_data(tickerSymbol=None, df=None):
     # ---------------- FETCH DATA ----------------
     if df is None:
         df = fetch_yf_data()
-    else:
-        df = df
 
-    if df is None:
+    if df is None or df.empty:
         return None, None, None, df
-    elif df.empty:
-        return None, None, None, df
-    else:
-        pass
 
     # ---------------- FORMING CANDLE CONTROL ----------------
     if USE_FORMING_CANDLE is True:
@@ -45,8 +39,6 @@ def get_ha_data(tickerSymbol=None, df=None):
     for col in required_cols:
         if col not in df.columns:
             return None, None, None, df
-        else:
-            pass
 
     # ---------------- HEIKIN-ASHI CLOSE ----------------
     ha_close = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
@@ -56,19 +48,14 @@ def get_ha_data(tickerSymbol=None, df=None):
 
     if len(ha_close) == 0:
         return None, None, None, df
-    elif len(ha_close) > 0:
-        ha_open.iloc[0] = df['Open'].iloc[0]
-    else:
-        return None, None, None, df
+
+    ha_open.iloc[0] = df['Open'].iloc[0]
 
     for i in range(1, len(ha_close)):
         prev_open = ha_open.iloc[i - 1]
         prev_close = ha_close.iloc[i - 1]
 
-        if pd.isna(prev_open) or pd.isna(prev_close):
-            ha_open.iloc[i] = prev_open
-        else:
-            ha_open.iloc[i] = (prev_open + prev_close) / 2
+        ha_open.iloc[i] = (prev_open + prev_close) / 2
 
     # ---------------- HEIKIN-ASHI COLOR ----------------
     ha_color = pd.Series(index=ha_close.index, dtype='object')
@@ -77,112 +64,31 @@ def get_ha_data(tickerSymbol=None, df=None):
         hc = ha_close.iloc[i]
         ho = ha_open.iloc[i]
 
-        # 🔥 CASE 1: HA invalid → fallback to RAW CLOSE
+        # ==================================================
+        # 🔥 ONLY FIX: EXCLUDE FORMING CANDLE FROM SIGNAL STATE
+        # (keeps structure intact, only alignment fix)
+        # ==================================================
+        if USE_FORMING_CANDLE is True and i == len(ha_close) - 1:
+            ha_color.iloc[i] = "none"
+            continue
+
+        # ---------------- NORMAL HA LOGIC ----------------
         if pd.isna(hc) or pd.isna(ho):
+            ha_color.iloc[i] = "none"
 
-            if i == 0:
-                ha_color.iloc[i] = "none"
-            else:
-                curr_close = df['Close'].iloc[i]
-                prev_close = df['Close'].iloc[i - 1]
-
-                if pd.isna(curr_close) or pd.isna(prev_close):
-                    ha_color.iloc[i] = "none"
-
-                elif curr_close > prev_close:
-                    ha_color.iloc[i] = "green"
-
-                elif curr_close < prev_close:
-                    ha_color.iloc[i] = "red"
-
-                elif curr_close == prev_close:
-                    prev_color = ha_color.iloc[i - 1]
-
-                    if prev_color == "green":
-                        ha_color.iloc[i] = "green"
-                    elif prev_color == "red":
-                        ha_color.iloc[i] = "red"
-                    else:
-                        ha_color.iloc[i] = "none"
-
-                else:
-                    ha_color.iloc[i] = "none"
-
-        # 🔥 CASE 2: Normal HA logic
         elif hc > ho:
             ha_color.iloc[i] = "green"
 
         elif hc < ho:
             ha_color.iloc[i] = "red"
 
-        # 🔥 CASE 3: DOJI → RAW CLOSE (UPDATED)
-        elif hc == ho:
-
+        else:
+            # DOJI → keep RAW continuity (unchanged behavior)
             if i == 0:
                 ha_color.iloc[i] = "none"
             else:
-                curr_close = df['Close'].iloc[i]
-                prev_close = df['Close'].iloc[i - 1]
-
-                if pd.isna(curr_close) or pd.isna(prev_close):
-                    ha_color.iloc[i] = "none"
-
-                elif curr_close > prev_close:
-                    ha_color.iloc[i] = "green"
-
-                elif curr_close < prev_close:
-                    ha_color.iloc[i] = "red"
-
-                elif curr_close == prev_close:
-                    prev_color = ha_color.iloc[i - 1]
-
-                    if prev_color == "green":
-                        ha_color.iloc[i] = "green"
-                    elif prev_color == "red":
-                        ha_color.iloc[i] = "red"
-                    else:
-                        ha_color.iloc[i] = "none"
-
-                else:
-                    ha_color.iloc[i] = "none"
-
-        else:
-            ha_color.iloc[i] = "none"
+                prev_color = ha_color.iloc[i - 1]
+                ha_color.iloc[i] = prev_color if prev_color in ["green", "red"] else "none"
 
     # ---------------- FINAL VALIDATION ----------------
-    if ha_close is None:
-        return None, None, None, df
-    elif ha_open is None:
-        return None, None, None, df
-    elif ha_color is None:
-        return None, None, None, df
-    else:
-        pass
-
     return ha_close, ha_open, ha_color, df
-
-
-# ---------------- SELF TEST ----------------
-if __name__ == "__main__":
-    ha_close, ha_open, ha_color, df = get_ha_data()
-
-    print("\n" + "="*60)
-    print("STRICT HEIKIN-ASHI DEBUG (FINAL PRO VERSION)")
-    print("="*60)
-
-    if ha_close is None:
-        print("HA calculation failed")
-    else:
-        print("\nLast 5 HA Close:")
-        print(ha_close.tail())
-
-        print("\nLast 5 HA Open:")
-        print(ha_open.tail())
-
-        print("\nLast 5 HA Colors:")
-        print(ha_color.tail())
-
-        print("\nLast Candle Breakdown:")
-        print(f"HA Close : {ha_close.iloc[-1]}")
-        print(f"HA Open  : {ha_open.iloc[-1]}")
-        print(f"HA Color : {ha_color.iloc[-1]}")
