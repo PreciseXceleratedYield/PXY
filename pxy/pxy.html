@@ -2,9 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Night Mode Terminal</title>
+<title>Light Mode Terminal</title>
 
-<!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
 <style>
@@ -13,7 +12,8 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
-    background: #1e1e1e;
+    background: #ffffff; /* LIGHT BACKGROUND */
+    color: #111;
 }
 
 /* Terminal container */
@@ -24,12 +24,12 @@ html, body {
 
 /* Cursor + selection styling */
 .xterm .xterm-cursor {
-    border-left: 2px solid #f0e0b0 !important;
+    border-left: 2px solid #111 !important;
     animation: none !important;
 }
 
 .xterm .xterm-selection {
-    background: rgba(224, 216, 192, 0.2) !important;
+    background: rgba(0, 0, 0, 0.15) !important;
 }
 </style>
 </head>
@@ -38,20 +38,20 @@ html, body {
 
 <div id="terminal"></div>
 
-<!-- xterm.js -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
 <script>
+
 // =====================
 // CONFIG
 // =====================
 const BASE_FONT = 15.3;
-const SCALE = 1 // ✅ UPDATED TO 2.7x
-const FONT_SIZE = Math.round(BASE_FONT * SCALE); // ≈ 43px
+const SCALE = 1;
+const FONT_SIZE = Math.round(BASE_FONT * SCALE);
 
 // =====================
-// TERMINAL INIT
+// TERMINAL INIT (LIGHT THEME)
 // =====================
 const term = new Terminal({
     convertEol: true,
@@ -59,12 +59,25 @@ const term = new Terminal({
     fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', monospace",
     fontSize: FONT_SIZE,
     cursorBlink: false,
+
     theme: {
-        background: '#1e1e1e',
-        foreground: '#e0d8c0',
-        cursor: '#f0e0b0',
-        selection: 'rgba(224, 216, 192, 0.2)'
+        background: '#ffffff',   // LIGHT BACKGROUND
+        foreground: '#111111',   // DARK TEXT
+        cursor: '#111111',
+        selection: 'rgba(0, 0, 0, 0.15)',
+
+        black: '#111111',
+        red: '#d32f2f',
+        green: '#2e7d32',
+        yellow: '#f9a825',
+        blue: '#1565c0',
+        magenta: '#6a1b9a',
+        cyan: '#00838f',
+        white: '#333333',
+        brightBlack: '#555555',
+        brightWhite: '#000000'
     },
+
     rendererType: 'dom'
 });
 
@@ -78,8 +91,8 @@ term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
 // TEST OUTPUT
-term.writeln("✅ Terminal Ready");
-term.writeln("Font size: " + FONT_SIZE + "px (2.7x)");
+term.writeln("✅ Terminal Ready (Light Theme)");
+term.writeln("Font size: " + FONT_SIZE + "px");
 term.writeln("-----------------------------------");
 
 // =====================
@@ -101,11 +114,12 @@ ws.onerror = () => {
 };
 
 // =====================
-// RESIZE HANDLING
+// RESIZE
 // =====================
 window.addEventListener('resize', () => {
     fitAddon.fit();
 });
+
 </script>
 
 </body>
