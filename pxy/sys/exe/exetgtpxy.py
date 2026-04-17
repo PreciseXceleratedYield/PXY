@@ -40,19 +40,20 @@ def target_price(row):
         # 4️⃣ SIGNAL
         entry_signal = str(row.get("entry", "NONE")).upper()
         exit_signal = str(row.get("exit", "NONE")).upper()
+        direction_signal = str(row.get("direction", "NONE")).upper()
         
         counter = str(row.get("counter", "Y")).upper()
         
         if counter == "Y":
             _signal = entry_signal
         else:
-            _signal = exit_signal
+            _signal = direction_signal
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
 
-        bullish = any(x in _signal for x in ["BUY", "BULL", "NONE"])
-        bearish = any(x in _signal for x in ["SELL", "BEAR", "NONE"])
+        bullish = any(x in _signal for x in ["BUY", "BULL", "UP"])
+        bearish = any(x in _signal for x in ["SELL", "BEAR", 'DOWN'])
 
         # 5️⃣ STRICT ALIGNMENT
         aligned = (
