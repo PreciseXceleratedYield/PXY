@@ -52,13 +52,24 @@ def target_price(row):
             (is_pe and bearish)
         )
 
-        # 6️⃣ SCORE (SIMPLE)
-        if aligned:
-            score = atr   # 🔥 fixed strong target
-            state = "✅"
+        # 6️⃣ SCORE (EXCLUSIVE LOGIC)
+        ce_depth = f(row.get("ce_depth", 0))
+        pe_depth = f(row.get("pe_depth", 0))
+        
+        if is_ce and bullish:
+            score = atr - ce_depth
+            state = "CE✅"
+        
+        elif is_pe and bearish:
+            score = atr - pe_depth
+            state = "PE✅"
+        
         else:
-            score = MIN_POINTS
+            score = atr
             state = "❌"
+        
+        # safety floor
+        score = max(score, 1.0)
 
         # 7️⃣ TARGET
         target = int(entry * (1 + score / 100))
