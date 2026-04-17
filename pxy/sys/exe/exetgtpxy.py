@@ -73,7 +73,7 @@ def target_price(row):
         clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
 
         # 🔟 OUTPUT (AFTER ADJUSTMENT)
-        print(f"{clean_symbol}|E:{entry:03d}|S:{int(score):02d}%|{state} |T:{target:03d}")
+        print(f"{clean_symbol}|E:{entry:03d}|S:{int(score):02d}%|{'🟢' if (is_ce and bullish) else '🔴' if (is_pe and bearish) else '⚪'}|T:{target:03d}")
 
         return target
 
