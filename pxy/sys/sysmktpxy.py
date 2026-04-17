@@ -8,7 +8,7 @@ import pandas as pd
 # ==================================================
 # GLOBAL SWITCHES
 # ==================================================
-MODE = "SMART"   # "SMART" or "HKIN"
+MODE = "HKIN"   # "SMART" or "HKIN"
 DEBUG = True     # DEBUG SWITCH
 
 
