@@ -2,9 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Night Mode Terminal</title>
+<title>Terminal Light/Dark Toggle</title>
 
-<!-- xterm.js CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
 <style>
@@ -13,32 +12,57 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
+    transition: background 0.3s ease;
+}
+
+/* THEME: DARK */
+body.dark {
     background: #1e1e1e;
 }
 
-/* Terminal container */
+/* THEME: LIGHT */
+body.light {
+    background: #ffffff;
+}
+
+/* terminal */
 #terminal {
     width: 100%;
     height: 100vh;
 }
 
-/* Cursor + selection styling */
-.xterm .xterm-cursor {
-    border-left: 2px solid #f0e0b0 !important;
-    animation: none !important;
+/* toggle button */
+#toggleBtn {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 999;
+    padding: 8px 12px;
+    border: none;
+    cursor: pointer;
+    border-radius: 6px;
+    font-weight: bold;
 }
 
-.xterm .xterm-selection {
-    background: rgba(224, 216, 192, 0.2) !important;
+/* button themes */
+body.dark #toggleBtn {
+    background: #333;
+    color: #fff;
+}
+
+body.light #toggleBtn {
+    background: #eee;
+    color: #111;
 }
 </style>
 </head>
 
-<body>
+<body class="dark">
+
+<button id="toggleBtn">Light Mode</button>
 
 <div id="terminal"></div>
 
-<!-- xterm.js -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
@@ -47,8 +71,13 @@ html, body {
 // CONFIG
 // =====================
 const BASE_FONT = 15.3;
-const SCALE = 1 // ✅ UPDATED TO 2.7x
-const FONT_SIZE = Math.round(BASE_FONT * SCALE); // ≈ 43px
+const SCALE = 1;
+const FONT_SIZE = Math.round(BASE_FONT * SCALE);
+
+// =====================
+// THEME STATE
+// =====================
+let isDark = true;
 
 // =====================
 // TERMINAL INIT
@@ -59,17 +88,42 @@ const term = new Terminal({
     fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', monospace",
     fontSize: FONT_SIZE,
     cursorBlink: false,
-    theme: {
-        background: '#1e1e1e',
-        foreground: '#e0d8c0',
-        cursor: '#f0e0b0',
-        selection: 'rgba(224, 216, 192, 0.2)'
-    },
-    rendererType: 'dom'
+    theme: getTheme()
 });
 
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
+
+// =====================
+// THEME FUNCTION
+// =====================
+function getTheme() {
+    return isDark
+        ? {
+            background: '#1e1e1e',
+            foreground: '#e0d8c0',
+            cursor: '#f0e0b0',
+            selection: 'rgba(224, 216, 192, 0.2)'
+        }
+        : {
+            background: '#ffffff',
+            foreground: '#111111',
+            cursor: '#000000',
+            selection: 'rgba(0, 0, 0, 0.15)'
+        };
+}
+
+// =====================
+// APPLY UI THEME
+// =====================
+function applyUITheme() {
+    document.body.className = isDark ? "dark" : "light";
+
+    const btn = document.getElementById("toggleBtn");
+    btn.textContent = isDark ? "Light Mode" : "Dark Mode";
+
+    term.setOption("theme", getTheme());
+}
 
 // =====================
 // START TERMINAL
@@ -77,10 +131,20 @@ term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
+applyUITheme();
+
 // TEST OUTPUT
-term.writeln("✅ Terminal Ready");
-term.writeln("Font size: " + FONT_SIZE + "px (2.7x)");
+term.writeln("Terminal Ready");
+term.writeln("Toggle theme using top-right button");
 term.writeln("-----------------------------------");
+
+// =====================
+// TOGGLE HANDLER
+// =====================
+document.getElementById("toggleBtn").addEventListener("click", () => {
+    isDark = !isDark;
+    applyUITheme();
+});
 
 // =====================
 // WEBSOCKET
@@ -88,24 +152,17 @@ term.writeln("-----------------------------------");
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
-ws.onopen = () => {
-    term.writeln("✅ WebSocket Connected");
-};
+ws.onopen = () => term.writeln("WebSocket Connected");
 
-ws.onmessage = (event) => {
-    term.write(event.data);
-};
+ws.onmessage = (event) => term.write(event.data);
 
-ws.onerror = () => {
-    term.writeln("❌ WebSocket Error");
-};
+ws.onerror = () => term.writeln("WebSocket Error");
 
 // =====================
-// RESIZE HANDLING
+// RESIZE
 // =====================
-window.addEventListener('resize', () => {
-    fitAddon.fit();
-});
+window.addEventListener('resize', () => fitAddon.fit());
+
 </script>
 
 </body>
