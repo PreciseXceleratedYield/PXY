@@ -54,9 +54,9 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
         try:
             market_data = syspxy.get_all_data()
             market_df = pd.DataFrame([market_data])
-            #print("\n[DEBUG] Market Snapshot DataFrame:\n", market_df)
             print_market_dashboard(market_df)
-        except: market_df = pd.DataFrame()
+        except:
+            market_df = pd.DataFrame()
     combined["market_snapshot"] = market_df
 
     # --- 2. ACTIVE ORDERS ---
@@ -65,8 +65,10 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     if process_lilo_orders and get_session:
         try:
             client = get_session()
-            if client: active_df, _ = process_lilo_orders(client)
-        except: active_df = pd.DataFrame()
+            if client:
+                active_df, _ = process_lilo_orders(client)
+        except:
+            active_df = pd.DataFrame()
 
     if active_df.empty:
         return combined
@@ -74,17 +76,38 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     # Standardize columns to lowercase for mapping
     active_df.columns = [c.lower() for c in active_df.columns]
 
+    # ==============================
+    # CE / PE COUNTER LOGIC (ACTIVE ONLY)
+    # ==============================
+    active_df["opt_type"] = active_df["symbol"].str[-2:]
+
+    ce_count = (active_df["opt_type"] == "CE").sum()
+    pe_count = (active_df["opt_type"] == "PE").sum()
+
+    def mark_counter(row):
+        if ce_count == pe_count:
+            return "Y"
+
+        if ce_count > pe_count:
+            return "N" if row["opt_type"] == "CE" else "Y"
+        else:
+            return "N" if row["opt_type"] == "PE" else "Y"
+
+    active_df["counter"] = active_df.apply(mark_counter, axis=1)
+
     # --- 3. DYNAMIC VALUATION (LTP & P&L) ---
     if client and get_mid_price:
         def update_metrics(row):
             token_id = row.get("tok") or row.get("token") or row.get("symbol")
             curr_val = get_mid_price(client, token_id)
-            
+
             row["sell_prc"] = curr_val if curr_val > 0 else row.get("sell_prc", 0)
+
             if curr_val > 0:
                 buy_avg = float(row.get("buy_prc", 0))
                 qty = float(row.get("qty", 0))
                 row["pnl"] = round((curr_val - buy_avg) * qty, 2)
+
             return row
 
         active_df = active_df.apply(update_metrics, axis=1)
@@ -98,14 +121,8 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     if add_calcs:
         dprint("Applying Stateless PXY ...")
 
-        # STEP A: THE ENTRY MELT (0.20/min decay baseline)
-        # ---- Surgical change: ensure dynamic entry is stored in OMS column
         active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
-
-        # STEP B: THE TARGET PUSH (Uses pxy_entry)
         active_df["pxy_tgt"] = active_df.apply(pxy_tgt_calc, axis=1)
-        
-        # STEP C: THE STOP LOSS PULL (Uses pxy_entry)
         active_df["pxy_sl"] = active_df.apply(pxy_sl_calc, axis=1)
 
     combined["active_orders"] = active_df
@@ -113,7 +130,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
 
 if __name__ == "__main__":
     data = get_combined_data()
-    if  not data["active_orders"].empty:
+    if not data["active_orders"].empty:
         cols = ["symbol", "buy_prc", "pxy_entry", "pxy_tgt", "pxy_sl", "sell_prc", "pnl"]
         print("\n" + "="*80)
         print(f"{'OMS LIVE PXY DASHBOARD (V2)':^80}")
