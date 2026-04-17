@@ -38,7 +38,7 @@ def target_price(row):
         MIN_POINTS = max(int(atr / 15), 1)
 
         # 4️⃣ SIGNAL
-        exit_signal = str(row.get("exit", "NONE")).upper()
+        exit_signal = str(row.get("entry", "NONE")).upper()
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
@@ -67,7 +67,7 @@ def target_price(row):
         clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
 
         # 9️⃣ OUTPUT
-        print(f"{clean_symbol}|E:{entry:04d}|S:{score:02d}%|{state} |T:{target:04d}")
+        print(f"{clean_symbol}|E:{entry}|S:{score}%|{state} |T:{target}")
 
         return target
 
