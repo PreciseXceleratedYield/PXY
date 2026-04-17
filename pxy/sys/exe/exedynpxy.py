@@ -17,7 +17,7 @@ def dynamic_entry(row):
 
         # ---- Dynamic Increment Based on Symbol ----
         if "BANK" in symbol:
-            per_second_increment = 0.02
+            per_second_increment = 0.01
         else:
             per_second_increment = 0
 
