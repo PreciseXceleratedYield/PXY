@@ -37,8 +37,8 @@ def dynamic_entry(row):
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
 
         # ---- FINAL RULE ----
-        # NO adjustment until pnl crosses -1000 loss
-        if pnl <= -1000 and ("CE" in symbol or "PE" in symbol):
+        # NO adjustment until pnl crosses -500 loss
+        if pnl <= -500 and ("CE" in symbol or "PE" in symbol):
             increment = elapsed_secs * per_second_increment
             dynamic_val = original_price - increment
         else:
