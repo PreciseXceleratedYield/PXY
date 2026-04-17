@@ -8,6 +8,7 @@ def dynamic_entry(row):
         original_price = float(row.get("buy_prc", 0))
         entry_time_val = row.get("buy_time")
         symbol = str(row.get("symbol", "")).upper()
+        pnl = float(row.get("pnl", 0))
 
         if not entry_time_val or original_price == 0:
             return original_price
@@ -36,8 +37,8 @@ def dynamic_entry(row):
         # ---- Time Difference ----
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
 
-        # ---- Apply Increment ONLY for Options ----
-        if "CE" in symbol or "PE" in symbol:
+        # ---- APPLY ADJUSTMENT ONLY IF PnL < 1000 (ABS SAFE) ----
+        if abs(pnl) < 1000 and ("CE" in symbol or "PE" in symbol):
             increment = elapsed_secs * per_second_increment
             dynamic_val = original_price - increment
         else:
