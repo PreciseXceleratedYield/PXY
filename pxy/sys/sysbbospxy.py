@@ -168,14 +168,9 @@ def get_bos_bar(df):
     log("SIGNAL", signal)
 
     # ==================================================
-    # LABEL FIX ONLY (BOS → BOST)
+    # EXACT BANNER FORMAT (NO CHANGES)
     # ==================================================
-    label = "BOST" if MODE == "BOS" else MODE
-
-    left = "ﮩ٨ﮩ٨ـﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ"
-    right = "٨٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ٨ـﮩﮩ٨ﮩ"
-
-    banner = (left + label + right)[:42].ljust(42)
+    banner = "٨٨ﮩ٨ﮩ٨ـﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ" + MODE + "ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ٨ـﮩﮩ٨ﮩﮩ٨ﮩ"
 
     # ==================================================
     # COLOR ONLY
