@@ -45,7 +45,7 @@ def target_price(row):
         counter = str(row.get("counter", "Y")).upper()
         
         if counter == "Y":
-            _signal = entry_signal
+            _signal = exit_signal
         else:
             _signal = direction_signal
 
