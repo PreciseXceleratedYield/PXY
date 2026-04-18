@@ -110,59 +110,86 @@ def get_entry_signal(df=None):
 
 
     # ==================================================
-    # 🧠 TREND MODE (UNCHANGED)
+    # 🧠 TREND MODE (UPDATED - MORNING SYNCED WITH RAW STYLE)
     # ==================================================
     if df is None:
         df = fetch_yf_data(period="5d", interval="1m")
         dprint("FETCH DATA", "5d 1m")
-
+    
     if df is None or len(df) < 3:
         return "NONE", "NONE"
-
+    
+    # -------------------- INDICATORS --------------------
     if 'ST' not in df.columns:
         df = calculate_supertrend(df)
         dprint("SUPERTREND", "CALCULATED")
-
+    
     last = df.iloc[-1]
     st_trend = last['ST_Trend']
-
+    
     signal, exit_signal = get_signal()
-
+    
     if signal is None:
         return "NONE", "NONE"
-
+    
     bos = get_bos(df)
-
+    
+    sma_result = get_sma(df, period=9)
+    sma_status = sma_result["status"]
+    
+    # ==================================================
+    # 🕒 MORNING WINDOW (TREND MODE FIXED)
+    # ==================================================
+    now = datetime.now(pytz.timezone(TIMEZONE)).time()
+    
+    if MORNING_START <= now <= MORNING_END:
+    
+        # normalize raw signals
+        if signal == "BULL":
+            signal = "BUY"
+        elif signal == "BEAR":
+            signal = "SELL"
+    
+        dprint("TREND MORNING", signal)
+    
+        if signal == "BUY":
+            return "OTMBUY", exit_signal
+    
+        if signal == "SELL":
+            return "OTMSELL", exit_signal
+    
+        return signal, exit_signal
+    
+    
     # ==================================================
     # ⚡ BOS BREAKOUT MODE
     # ==================================================
     if bos == "BUY" and st_trend == "DOWN":
         return "OTMBUY", exit_signal
-
+    
     if bos == "SELL" and st_trend == "UP":
         return "OTMSELL", exit_signal
-
+    
+    
     # ==================================================
     # 🔁 COUNTER MODE
     # ==================================================
-    sma_result = get_sma(df, period=9)
-    sma_status = sma_result["status"]
-
     if signal == "BUY" and st_trend == "DOWN" and sma_status == "UP":
         return "OTMBUY", exit_signal
-
+    
     if signal == "SELL" and st_trend == "UP" and sma_status == "DOWN":
         return "OTMSELL", exit_signal
-
+    
+    
     # ==================================================
     # 🟢 TREND MODE
     # ==================================================
     if signal == "BUY" and st_trend == "UP":
         return "ATMBUY", exit_signal
-
+    
     if signal == "SELL" and st_trend == "DOWN":
         return "ATMSELL", exit_signal
-
+    
     return signal, exit_signal
 
 
