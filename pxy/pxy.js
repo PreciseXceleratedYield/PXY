@@ -8,30 +8,31 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const PORT = 80; // requires sudo or setcap
+const PORT = 80;
 
-// Serve HTML
+// Serve frontend
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'pxy.html'));
 });
 
-// WebSocket: stream tmux npxy session
+// WebSocket stream from tmux
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
     const interval = setInterval(() => {
-        exec('tmux capture-pane -t npxy -pS -100 -J -e', (err, stdout, stderr) => {
+        exec('tmux capture-pane -t npxy -pS -200 -J -e', (err, stdout, stderr) => {
             if (err) {
-                ws.send(`\x1b[31mError: ${stderr || err.message}\x1b[0m\n`);
+                ws.send(`ERROR: ${stderr || err.message}\n`);
                 return;
             }
+
             ws.send(stdout);
         });
-    }, 500); // update every 0.5s
+    }, 500);
 
     ws.on('close', () => {
-        console.log('Client disconnected');
         clearInterval(interval);
+        console.log('Client disconnected');
     });
 });
 
