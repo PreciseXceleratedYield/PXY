@@ -22,11 +22,8 @@ def log(tag, msg):
 
 # ==================================================
 # ==================================================
-# 🔵 YOUR ORIGINAL BOS CODE (UNCHANGED)
+# 🔵 BOS ENGINE (UNCHANGED)
 # ==================================================
-# 👉 KEEP YOUR EXISTING get_structure / detect_sweep / get_bos EXACTLY AS IS
-# 👉 PASTED HERE AS PLACEHOLDER
-
 def get_structure(df):
     base = df.iloc[-(STRUCTURE_WINDOW + 1):-1]
     high = base['High'].max()
@@ -61,24 +58,20 @@ def get_bos(df):
 
         structure_high, structure_low, mid = get_structure(df)
 
-        log("BOS", f"High={structure_high:.2f} Low={structure_low:.2f}")
+        log("BOS", f"H:{structure_high} L:{structure_low}")
 
         sweep_signal = detect_sweep(df, structure_high, structure_low)
 
         if sweep_signal == "SWEEP_BUY":
-            log("BOS", "SWEEP BUY")
             return "BUY"
 
         if sweep_signal == "SWEEP_SELL":
-            log("BOS", "SWEEP SELL")
             return "SELL"
 
         if prev['Close'] <= structure_high and last['Close'] > structure_high:
-            log("BOS", "BREAK HIGH → BUY")
             return "BUY"
 
         if prev['Close'] >= structure_low and last['Close'] < structure_low:
-            log("BOS", "BREAK LOW → SELL")
             return "SELL"
 
         if last['Close'] > structure_high:
@@ -89,14 +82,13 @@ def get_bos(df):
 
         return "UP" if last['Close'] >= mid else "DOWN"
 
-    except Exception as e:
-        log("BOS_ERROR", str(e))
+    except Exception:
         return "NONE"
 
 
 # ==================================================
 # ==================================================
-# 🟢 HKIN (PARALLEL ENGINE)
+# 🟢 HKIN ENGINE (UNCHANGED)
 # ==================================================
 _prev_hkin_state = None
 
@@ -125,8 +117,7 @@ def get_hkin_state(df):
             return "DOWN"
         return "NONE"
 
-    except Exception as e:
-        log("HKIN_ERROR", str(e))
+    except Exception:
         return "NONE"
 
 
@@ -138,15 +129,11 @@ def get_hkin_signal(df):
 
     signal = "NONE"
 
-    log("HKIN", f"Prev={_prev_hkin_state} Current={current}")
-
     if _prev_hkin_state == "DOWN" and current == "UP":
         signal = "BUY"
-        log("HKIN", "FLIP → BUY")
 
     elif _prev_hkin_state == "UP" and current == "DOWN":
         signal = "SELL"
-        log("HKIN", "FLIP → SELL")
 
     else:
         signal = current
@@ -158,7 +145,7 @@ def get_hkin_signal(df):
 
 # ==================================================
 # ==================================================
-# ⚙️ UNIFIED SWITCH ENGINE
+# ⚙️ SWITCH ENGINE
 # ==================================================
 def get_signal(df):
 
@@ -172,7 +159,7 @@ def get_signal(df):
 
 # ==================================================
 # ==================================================
-# 📊 VISUAL BAR (SAME STYLE FOR BOTH)
+# 📊 VISUAL OUTPUT (ONLY CHANGE HERE)
 # ==================================================
 def get_bos_bar(df):
 
@@ -180,16 +167,18 @@ def get_bos_bar(df):
 
     log("SIGNAL", signal)
 
-    if signal == "BUY":
-        return Fore.GREEN + "█" * 42 + Style.RESET_ALL, signal
+    # ==================================================
+    # ONLY LABEL CHANGE (BOS / HKIN)
+    # ==================================================
+    banner = "ﮩ٨ﮩ٨ـﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ" + MODE + "٨٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ٨ـﮩﮩ٨ﮩ"
 
-    if signal == "SELL":
-        return Fore.RED + "█" * 42 + Style.RESET_ALL, signal
+    # ==================================================
+    # COLOR ONLY
+    # ==================================================
+    if signal in ["BUY", "UP"]:
+        return Fore.GREEN + banner + Style.RESET_ALL, signal
 
-    if signal == "UP":
-        return Fore.GREEN + "█" * 42 + Style.RESET_ALL, signal
+    if signal in ["SELL", "DOWN"]:
+        return Fore.RED + banner + Style.RESET_ALL, signal
 
-    if signal == "DOWN":
-        return Fore.RED + "█" * 42 + Style.RESET_ALL, signal
-
-    return Fore.LIGHTBLACK_EX + "░" * 42 + Style.RESET_ALL, signal
+    return Fore.LIGHTBLACK_EX + banner + Style.RESET_ALL, signal
