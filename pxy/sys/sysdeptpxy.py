@@ -14,10 +14,10 @@ def get_candle_visual(df=None, last_n=42):
         return ""
 
     # ==================================================
-    # ARROW-BASED VISUAL (REPLACED CANDLES)
+    # SIMPLE + / - MOMENTUM STREAM
     # ==================================================
     visual = "".join([
-        f"{GREEN}→{RESET}" if c == "green" else f"{RED}←{RESET}"
+        f"{GREEN}+{RESET}" if c == "green" else f"{RED}-{RESET}"
         for c in ha_color.iloc[-last_n:]
     ])
 
@@ -26,5 +26,4 @@ def get_candle_visual(df=None, last_n=42):
 
 # -------- Self-test --------
 if __name__ == "__main__":
-    visual = get_candle_visual()
-    print(visual)
+    print(get_candle_visual())
