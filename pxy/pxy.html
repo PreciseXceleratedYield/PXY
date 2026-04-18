@@ -12,7 +12,7 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
-    background: #ffffff; /* LIGHT BACKGROUND */
+    background: #ffffff;
     color: #111;
 }
 
@@ -22,12 +22,13 @@ html, body {
     height: 100vh;
 }
 
-/* Cursor + selection styling */
+/* Cursor */
 .xterm .xterm-cursor {
     border-left: 2px solid #111 !important;
     animation: none !important;
 }
 
+/* Selection */
 .xterm .xterm-selection {
     background: rgba(0, 0, 0, 0.15) !important;
 }
@@ -38,8 +39,12 @@ html, body {
 
 <div id="terminal"></div>
 
+<!-- xterm -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+
+<!-- ✅ IMPORTANT: Unicode fix addon -->
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-unicode11/lib/xterm-addon-unicode11.js"></script>
 
 <script>
 
@@ -51,18 +56,21 @@ const SCALE = 1;
 const FONT_SIZE = Math.round(BASE_FONT * SCALE);
 
 // =====================
-// TERMINAL INIT (LIGHT THEME)
+// TERMINAL INIT
 // =====================
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-    fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', monospace",
+
+    // ✅ IMPORTANT: emoji-safe font stack
+    fontFamily: "'Cascadia Mono', 'Segoe UI Emoji', 'Noto Color Emoji', monospace",
     fontSize: FONT_SIZE,
+
     cursorBlink: false,
 
     theme: {
-        background: '#ffffff',   // LIGHT BACKGROUND
-        foreground: '#111111',   // DARK TEXT
+        background: '#ffffff',
+        foreground: '#111111',
         cursor: '#111111',
         selection: 'rgba(0, 0, 0, 0.15)',
 
@@ -81,18 +89,26 @@ const term = new Terminal({
     rendererType: 'dom'
 });
 
+// =====================
+// ADDONS
+// =====================
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 
+// ✅ FIX: Unicode width engine (CRITICAL)
+const unicode11Addon = new Unicode11Addon.Unicode11Addon();
+term.loadAddon(unicode11Addon);
+term.unicode.activeVersion = '11';
+
 // =====================
-// START TERMINAL
+// START
 // =====================
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-// TEST OUTPUT
-term.writeln("✅ Terminal Ready (Light Theme)");
-term.writeln("Font size: " + FONT_SIZE + "px");
+// TEST
+term.writeln("✅ Terminal Ready (Emoji Fix Enabled)");
+term.writeln("Testing: 🚀 📈 ⚠️ 🔥 ✔ alignment OK");
 term.writeln("-----------------------------------");
 
 // =====================
