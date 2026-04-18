@@ -38,7 +38,7 @@ def get_entry_signal(df=None):
     dprint("CURRENT TIME", now)
 
     # ==================================================
-    # 🧪 RAW MODE (NO INDICATORS, NO TREND LOGIC)
+    # 🧪 RAW MODE (NO INDICATORS, ONLY CONFIRMATION LOGIC)
     # ==================================================
     if MODE == "RAW":
 
@@ -46,21 +46,22 @@ def get_entry_signal(df=None):
         dprint("RAW SIGNAL", signal)
         dprint("RAW EXIT", exit_signal)
 
-        # SAFE DF fallback (for BOS + ST)
+        # SAFE DF fallback
         if df is None:
             df = fetch_yf_data(period="5d", interval="1m")
 
         if df is None or len(df) < 3:
-            return "NONE", exit_signal
+            return signal, exit_signal   # fallback RAW
 
         last = df.iloc[-1]
         bos = get_bos(df)
         st_trend = last.get('ST_Trend', "NONE")
 
         dprint("RAW BOS", bos)
+        dprint("RAW ST", st_trend)
 
         # ==================================================
-        # 🕒 MORNING (RAW SIGNAL ONLY)
+        # 🕒 MORNING (PURE RAW ENTRY)
         # ==================================================
         if MORNING_START <= now <= MORNING_END:
 
@@ -70,31 +71,43 @@ def get_entry_signal(df=None):
             if signal == "SELL":
                 return "ATMSELL", exit_signal
 
-            return "NONE", exit_signal
+            return signal, exit_signal
+
 
         # ==================================================
-        # 🧠 AFTER MORNING (RAW + BOS + ST CONFIRMATION)
+        # 🧠 AFTER MORNING (RAW + ST + BOS LOGIC)
         # ==================================================
 
         if signal == "BUY":
 
+            # STRONG CONFIRMATION → ATM
             if st_trend == "UP" and bos in ["BUY", "UP"]:
                 return "ATMBUY", exit_signal
 
+            # WEAK CONFIRMATION → OTM
             if st_trend == "UP" or bos in ["BUY", "UP"]:
                 return "OTMBUY", exit_signal
 
-            return "NONE", exit_signal
+            # NO CONFIRMATION → RAW CONTINUES
+            return signal, exit_signal
+
 
         if signal == "SELL":
 
+            # STRONG CONFIRMATION → ATM
             if st_trend == "DOWN" and bos in ["SELL", "DOWN"]:
                 return "ATMSELL", exit_signal
 
+            # WEAK CONFIRMATION → OTM
             if st_trend == "DOWN" or bos in ["SELL", "DOWN"]:
                 return "OTMSELL", exit_signal
 
-            return "NONE", exit_signal
+            # NO CONFIRMATION → RAW CONTINUES
+            return signal, exit_signal
+
+
+        return signal, exit_signal
+
 
     # ==================================================
     # 🧠 TREND MODE (UNCHANGED)
@@ -150,7 +163,7 @@ def get_entry_signal(df=None):
     if signal == "SELL" and st_trend == "DOWN":
         return "ATMSELL", exit_signal
 
-    return "NONE", exit_signal
+    return signal, exit_signal
 
 
 # ==================================================
