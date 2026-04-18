@@ -158,36 +158,36 @@ def get_signal(df):
 
 
 # ==================================================
-# ==================================================
 # 📊 VISUAL OUTPUT (ONLY CHANGE HERE)
+# ==================================================
+from colorama import Fore, Style, init
+init(autoreset=True)
+
+# ==================================================
+# VISUAL OUTPUT
 # ==================================================
 def get_bos_bar(df):
 
     signal = get_signal(df)
     log("SIGNAL", signal)
 
-    core = MODE
-
-    # ==============================
-    # 42 CHAR LAYOUT
-    # ==============================
+    # ==================================================
+    # EXACT SAME LEFT / RIGHT (YOUR REQUEST)
+    # ==================================================
     left  = "٨٨ﮩﮩ٨ـﮩﮩ٨ﮩ"
-    right = "ﮩﮩ٨ﮩ٨ـﮩﮩ٨"
-    
-    center = f"{core:^6}"
+    right = "٨٨ﮩﮩ٨ـﮩﮩ٨ﮩ"   # SAME AS LEFT
 
-    banner = f"{left}{center}{right}"
+    core = f"{MODE:^6}"
 
-    # FORCE EXACT WIDTH = 42
-    banner = banner[:42].ljust(42)
+    banner = f"{left}{core}{right}"
 
-    # ==============================
-    # OUTPUT
-    # ==============================
+    # ==================================================
+    # COLOR OUTPUT (REAL ANSI)
+    # ==================================================
     if signal in ["BUY", "UP"]:
-        return f"[GREEN] {banner}", signal
+        return Fore.GREEN + banner + Style.RESET_ALL, signal
 
     if signal in ["SELL", "DOWN"]:
-        return f"[RED]   {banner}", signal
+        return Fore.RED + banner + Style.RESET_ALL, signal
 
-    return f"[GRAY]  {banner}", signal
+    return Fore.LIGHTBLACK_EX + banner + Style.RESET_ALL, signal
