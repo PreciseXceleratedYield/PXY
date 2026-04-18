@@ -1,5 +1,6 @@
 from datetime import datetime
 import pytz
+import math
 
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -30,11 +31,11 @@ def dynamic_entry(row):
         ce_depth = float(row.get("hkin_ce_depth", 1))
         pe_depth = float(row.get("hkin_pe_depth", 1))
 
-        # ---------------- DEPTH FACTOR ----------------
+        # ---------------- DEPTH FACTOR (SMOOTHED) ----------------
         if is_ce:
-            depth_factor = max(ce_depth - 1, 0)
+            depth_factor = math.sqrt(max(ce_depth - 1, 0))
         elif is_pe:
-            depth_factor = max(pe_depth - 1, 0)
+            depth_factor = math.sqrt(max(pe_depth - 1, 0))
         else:
             depth_factor = 0
 
@@ -46,7 +47,10 @@ def dynamic_entry(row):
                 entry_time = datetime.strptime(entry_time_val, "%Y-%m-%d %H:%M:%S")
                 entry_time = IST.localize(entry_time)
             except ValueError:
-                h, m, s = map(int, entry_time_val.split(":"))
+                parts = list(map(int, entry_time_val.split(":")))
+                while len(parts) < 3:
+                    parts.append(0)
+                h, m, s = parts[:3]
                 entry_time = now.replace(hour=h, minute=m, second=s, microsecond=0)
         else:
             entry_time = entry_time_val
