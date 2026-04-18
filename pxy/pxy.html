@@ -16,19 +16,16 @@ html, body {
     color: #111;
 }
 
-/* Terminal container */
 #terminal {
     width: 100%;
     height: 100vh;
 }
 
-/* Cursor */
 .xterm .xterm-cursor {
     border-left: 2px solid #111 !important;
     animation: none !important;
 }
 
-/* Selection */
 .xterm .xterm-selection {
     background: rgba(0, 0, 0, 0.15) !important;
 }
@@ -39,21 +36,34 @@ html, body {
 
 <div id="terminal"></div>
 
-<!-- xterm -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
-
-<!-- ✅ IMPORTANT: Unicode fix addon -->
-<script src="https://cdn.jsdelivr.net/npm/xterm-addon-unicode11/lib/xterm-addon-unicode11.js"></script>
 
 <script>
 
 // =====================
-// CONFIG
+// FONT SIZE
 // =====================
 const BASE_FONT = 15.3;
-const SCALE = 1;
-const FONT_SIZE = Math.round(BASE_FONT * SCALE);
+const FONT_SIZE = Math.round(BASE_FONT);
+
+// =====================
+// 🔥 EMOJI WIDTH FIX (CRITICAL)
+// =====================
+window.wcwidth = function (char) {
+    const code = char.codePointAt(0);
+
+    // emojis + symbols → width 2
+    if (
+        (code >= 0x1F300 && code <= 0x1FAFF) ||
+        (code >= 0x2600 && code <= 0x26FF) ||
+        (code >= 0x2700 && code <= 0x27BF)
+    ) {
+        return 2;
+    }
+
+    return 1;
+};
 
 // =====================
 // TERMINAL INIT
@@ -62,8 +72,7 @@ const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
 
-    // ✅ IMPORTANT: emoji-safe font stack
-    fontFamily: "'Cascadia Mono', 'Segoe UI Emoji', 'Noto Color Emoji', monospace",
+    fontFamily: "'Cascadia Mono', 'Noto Color Emoji', monospace",
     fontSize: FONT_SIZE,
 
     cursorBlink: false,
@@ -81,24 +90,12 @@ const term = new Terminal({
         blue: '#1565c0',
         magenta: '#6a1b9a',
         cyan: '#00838f',
-        white: '#333333',
-        brightBlack: '#555555',
-        brightWhite: '#000000'
-    },
-
-    rendererType: 'dom'
+        white: '#333333'
+    }
 });
 
-// =====================
-// ADDONS
-// =====================
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
-
-// ✅ FIX: Unicode width engine (CRITICAL)
-const unicode11Addon = new Unicode11Addon.Unicode11Addon();
-term.loadAddon(unicode11Addon);
-term.unicode.activeVersion = '11';
 
 // =====================
 // START
@@ -107,8 +104,8 @@ term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
 // TEST
-term.writeln("✅ Terminal Ready (Emoji Fix Enabled)");
-term.writeln("Testing: 🚀 📈 ⚠️ 🔥 ✔ alignment OK");
+term.writeln("✅ Terminal Ready");
+term.writeln("Emoji fix enabled 🚀 📈 ⚠️");
 term.writeln("-----------------------------------");
 
 // =====================
@@ -129,9 +126,6 @@ ws.onerror = () => {
     term.writeln("❌ WebSocket Error");
 };
 
-// =====================
-// RESIZE
-// =====================
 window.addEventListener('resize', () => {
     fitAddon.fit();
 });
