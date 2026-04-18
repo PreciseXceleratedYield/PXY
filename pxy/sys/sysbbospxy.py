@@ -5,7 +5,7 @@ init(autoreset=True)
 # GLOBAL SETTINGS
 # ==================================================
 MODE = "HKA"      # "BOS" or "HKA"
-DEBUG = True
+DEBUG = False
 
 HA_WINDOW = 15
 STRUCTURE_WINDOW = 14
