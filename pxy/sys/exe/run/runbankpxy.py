@@ -3,7 +3,7 @@ from datetime import datetime, date, timedelta
 
 # ---------------- CONFIG ----------------
 STRIKE_STEP = 100
-OTM_DISTANCE = 600
+OTM_DISTANCE = 1000
 ATM_BUFFER = 0
 
 HOLIDAYS = [
