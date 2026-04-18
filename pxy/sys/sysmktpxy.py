@@ -8,8 +8,9 @@ import pandas as pd
 # ==================================================
 # GLOBAL SWITCHES
 # ==================================================
-MODE = "HKIN"   # "SMART" or "HKIN"
+MODE = "HKIN"   # "OC2" or "HKIN"
 DEBUG = False     # DEBUG SWITCH
+EXIT_MODE = "OHLC"   # "C" or "OHLC"   🔥 PATCH ADDED
 
 
 # ==================================================
@@ -172,14 +173,14 @@ def get_signal():
         dbg("MODE:", MODE)
 
         # ==============================
-        # SMART MODE
+        # OC2 MODE
         # ==============================
-        if MODE == "SMART":
+        if MODE == "OC2":
 
-            price = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
+            price = (df['Open'] +  df['Close']) / 2
             p0, p1, p2, p3 = price.iloc[-4], price.iloc[-3], price.iloc[-2], price.iloc[-1]
 
-            dbg("SMART PRICE:", p0, p1, p2, p3)
+            dbg("OC2 PRICE:", p0, p1, p2, p3)
 
             entry_signal = three_candle_signal(p1, p2, p3)
 
@@ -207,19 +208,45 @@ def get_signal():
             entry_signal = hkin_entry_signal(ha_o2, ha_c2, ha_o3, ha_c3)
 
         # ==============================
-        # EXIT (UNCHANGED)
+        # EXIT (UNCHANGED LOGIC + FIXED OHLC)
         # ==============================
-        c0, c1, c2, c3 = df['Close'].iloc[-4], df['Close'].iloc[-3], df['Close'].iloc[-2], df['Close'].iloc[-1]
 
-        dbg("EXIT CLOSE:", c0, c1, c2, c3)
+        if EXIT_MODE == "C":
 
-        exit_signal = three_candle_signal(c1, c2, c3)
+            c0, c1, c2, c3 = df['Close'].iloc[-4], df['Close'].iloc[-3], df['Close'].iloc[-2], df['Close'].iloc[-1]
 
-        if exit_signal == "NONE":
-            exit_signal = four_candle_signal(c0, c1, c2, c3)
+            dbg("EXIT CLOSE:", c0, c1, c2, c3)
 
-        if exit_signal == "NONE":
-            exit_signal = momentum_signal(c2, c3)
+            exit_signal = three_candle_signal(c1, c2, c3)
+
+            if exit_signal == "NONE":
+                exit_signal = four_candle_signal(c0, c1, c2, c3)
+
+            if exit_signal == "NONE":
+                exit_signal = momentum_signal(c2, c3)
+
+        else:
+
+            h0, h1, h2, h3 = df['High'].iloc[-4], df['High'].iloc[-3], df['High'].iloc[-2], df['High'].iloc[-1]
+            l0, l1, l2, l3 = df['Low'].iloc[-4], df['Low'].iloc[-3], df['Low'].iloc[-2], df['Low'].iloc[-1]
+
+            dbg("EXIT OHLC:", h0, h1, h2, h3, l0, l1, l2, l3)
+
+            # 🔥 FIXED LOGIC ONLY
+            if l2 < l1 and l2 < l3 and h3 > h2:
+                exit_signal = "BUY"
+
+            elif h2 > h1 and h2 > h3 and l3 < l2:
+                exit_signal = "SELL"
+
+            elif h0 < h1 < h2 < h3 and l0 < l1 < l2 < l3:
+                exit_signal = "BULL"
+
+            elif h0 > h1 > h2 > h3 and l0 > l1 > l2 > l3:
+                exit_signal = "BEAR"
+
+            else:
+                exit_signal = "NONE"
 
         dbg("FINAL ENTRY:", entry_signal, "EXIT:", exit_signal)
 
