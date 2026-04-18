@@ -104,7 +104,7 @@ async def main():
         dprint(f"TIME CHECK: {now}")
 
         # --- MARKET BUFFER ---
-        if (time(9, 14) <= now < time(9, 16)) or (time(15, 16) <= now < time(15, 31)):
+        if (time(9, 14) <= now < time(9, 16)) or (time(15, 19) <= now < time(15, 31)):
             dprint("MARKET BUFFER ACTIVE - SKIPPING", Fore.YELLOW)
             print("⏳ Market buffer time - skipped")
             return
