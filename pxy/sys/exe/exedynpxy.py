@@ -8,7 +8,7 @@ IST = pytz.timezone("Asia/Kolkata")
 # 🔧 CONFIG (TUNE FROM HERE ONLY)
 # ==================================================
 BASE_INCREMENT = 0.016   # base decay per second
-PNL_THRESHOLD = -500     # activate dynamic adjustment
+PNL_THRESHOLD = -300     # activate dynamic adjustment (updated)
 
 
 def dynamic_entry(row):
