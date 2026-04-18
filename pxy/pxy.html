@@ -12,7 +12,7 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
-    background: #ffffff;
+    background: #ffffff; /* LIGHT BACKGROUND */
     color: #111;
 }
 
@@ -22,13 +22,12 @@ html, body {
     height: 100vh;
 }
 
-/* Cursor styling */
+/* Cursor + selection styling */
 .xterm .xterm-cursor {
     border-left: 2px solid #111 !important;
     animation: none !important;
 }
 
-/* Selection styling */
 .xterm .xterm-selection {
     background: rgba(0, 0, 0, 0.15) !important;
 }
@@ -47,7 +46,9 @@ html, body {
 // =====================
 // CONFIG
 // =====================
-const FONT_SIZE = 12;
+const BASE_FONT = 15.3;
+const SCALE = 1;
+const FONT_SIZE = Math.round(BASE_FONT * SCALE);
 
 // =====================
 // TERMINAL INIT (LIGHT THEME)
@@ -55,17 +56,13 @@ const FONT_SIZE = 12;
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-
-    fontFamily: "'Cascadia Mono', monospace",
+    fontFamily: "'DejaVu Sans Mono', 'Ubuntu Mono', monospace",
     fontSize: FONT_SIZE,
-    lineHeight: 1.2,
-    letterSpacing: 0.6,   // closest to "cell width .6"
-
     cursorBlink: false,
 
     theme: {
-        background: '#ffffff',
-        foreground: '#111111',
+        background: '#ffffff',   // LIGHT BACKGROUND
+        foreground: '#111111',   // DARK TEXT
         cursor: '#111111',
         selection: 'rgba(0, 0, 0, 0.15)',
 
@@ -95,7 +92,7 @@ fitAddon.fit();
 
 // TEST OUTPUT
 term.writeln("✅ Terminal Ready (Light Theme)");
-term.writeln("Font: Cascadia Mono 12px | LineHeight 1.2");
+term.writeln("Font size: " + FONT_SIZE + "px");
 term.writeln("-----------------------------------");
 
 // =====================
