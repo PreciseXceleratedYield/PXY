@@ -47,7 +47,7 @@ def get_entry_signal(df=None):
         dprint("RAW SIGNAL", signal)
         dprint("RAW EXIT", exit_signal)
 
-        # SAFE DF fallback for BOS
+        # SAFE DF fallback ONCE (used for BOS only)
         if df is None:
             df = fetch_yf_data(period="5d", interval="1m")
 
@@ -78,8 +78,9 @@ def get_entry_signal(df=None):
 
         return "NONE", exit_signal
 
+
     # ==================================================
-    # 🕒 1. MORNING OVERRIDE (TREND MODE ONLY)
+    # 🕒 TREND MODE (UNCHANGED)
     # ==================================================
     if MORNING_START <= now <= MORNING_END:
 
