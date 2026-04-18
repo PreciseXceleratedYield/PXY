@@ -65,12 +65,12 @@ def get_entry_signal(df=None):
         # ==================================================
         if MORNING_START <= now <= MORNING_END:
 
-            if signal == "BUY":
-                return "ATMBUY", exit_signal
-
-            if signal == "SELL":
-                return "ATMSELL", exit_signal
-
+            if signal in ["BUY", "BULL"]:
+                return "OTMBUY", exit_signal
+            
+            if signal in ["SELL", "BEAR"]:
+                return "OTMSELL", exit_signal
+            
             return signal, exit_signal
 
 
