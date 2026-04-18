@@ -208,7 +208,7 @@ def get_signal():
             entry_signal = hkin_entry_signal(ha_o2, ha_c2, ha_o3, ha_c3)
 
         # ==============================
-        # EXIT (UNCHANGED LOGIC + FIXED OHLC)
+        # EXIT (FIXED OHLC PATCH ONLY)
         # ==============================
 
         if EXIT_MODE == "C":
@@ -232,7 +232,7 @@ def get_signal():
 
             dbg("EXIT OHLC:", h0, h1, h2, h3, l0, l1, l2, l3)
 
-            # 🔥 FIXED LOGIC ONLY
+            # 🔥 FIXED + NO NONE BLOCK
             if l2 < l1 and l2 < l3 and h3 > h2:
                 exit_signal = "BUY"
 
@@ -246,7 +246,18 @@ def get_signal():
                 exit_signal = "BEAR"
 
             else:
-                exit_signal = "NONE"
+                # 🔥 IMPORTANT: fallback to CLOSE instead of NONE
+                c0, c1, c2, c3 = df['Close'].iloc[-4], df['Close'].iloc[-3], df['Close'].iloc[-2], df['Close'].iloc[-1]
+
+                dbg("EXIT FALLBACK CLOSE:", c0, c1, c2, c3)
+
+                exit_signal = three_candle_signal(c1, c2, c3)
+
+                if exit_signal == "NONE":
+                    exit_signal = four_candle_signal(c0, c1, c2, c3)
+
+                if exit_signal == "NONE":
+                    exit_signal = momentum_signal(c2, c3)
 
         dbg("FINAL ENTRY:", entry_signal, "EXIT:", exit_signal)
 
