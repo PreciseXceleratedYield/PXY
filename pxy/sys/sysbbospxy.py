@@ -164,31 +164,30 @@ def get_signal(df):
 def get_bos_bar(df):
 
     signal = get_signal(df)
-
     log("SIGNAL", signal)
 
-    # ==================================================
-    # EXACT BANNER FORMAT (NO CHANGES)
-    # ==================================================
-    banner = "٨٨ﮩ٨ﮩ٨ـ  ﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ"   + MODE +   "ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ٨ـﮩﮩﮩ٨  ﮩﮩ٨ﮩ"
+    core = MODE
 
-    # ==================================================
-    # COLOR ONLY
-    # ==================================================
+    # ==============================
+    # 42 CHAR LAYOUT
+    # ==============================
+    left  = "٨٨ﮩﮩ٨ـﮩﮩ٨ﮩ"
+    right = "ﮩﮩ٨ﮩ٨ـﮩﮩ٨"
+    
+    center = f"{core:^6}"
+
+    banner = f"{left}{center}{right}"
+
+    # FORCE EXACT WIDTH = 42
+    banner = banner[:42].ljust(42)
+
+    # ==============================
+    # OUTPUT
+    # ==============================
     if signal in ["BUY", "UP"]:
-        return Fore.GREEN + banner + Style.RESET_ALL, signal
+        return f"[GREEN] {banner}", signal
 
     if signal in ["SELL", "DOWN"]:
-        return Fore.RED + banner + Style.RESET_ALL, signal
+        return f"[RED]   {banner}", signal
 
-    return Fore.LIGHTBLACK_EX + banner + Style.RESET_ALL, signal
-    # ==================================================
-    # COLOR ONLY
-    # ==================================================
-    if signal in ["BUY", "UP"]:
-        return Fore.GREEN + banner + Style.RESET_ALL, signal
-
-    if signal in ["SELL", "DOWN"]:
-        return Fore.RED + banner + Style.RESET_ALL, signal
-
-    return Fore.LIGHTBLACK_EX + banner + Style.RESET_ALL, signal
+    return f"[GRAY]  {banner}", signal
