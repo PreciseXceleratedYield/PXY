@@ -27,7 +27,7 @@ def get_candle_visual(df=None, last_n=42):
     # - = bearish candle
     # ==================================================
     visual = "".join([
-        f"{GREEN}+{RESET}" if is_bull else f"{RED}-{RESET}"
+        f"{GREEN}/{RESET}" if is_bull else f"{RED}\{RESET}"
         for is_bull in direction.iloc[-last_n:]
     ])
 
