@@ -4,7 +4,7 @@ init(autoreset=True)
 # ==================================================
 # GLOBAL SETTINGS
 # ==================================================
-MODE = "HKIN"      # "BOS" or "HKIN"
+MODE = "BOS"      # "BOS" or "HKIN"
 DEBUG = True
 
 HA_WINDOW = 15
