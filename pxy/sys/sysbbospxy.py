@@ -4,7 +4,7 @@ init(autoreset=True)
 # ==================================================
 # GLOBAL SETTINGS
 # ==================================================
-MODE = "TBOS"      # "TBOS" or "HKIN"
+MODE = "BOS"      # "BOS" or "HKA"
 DEBUG = True
 
 HA_WINDOW = 15
@@ -22,7 +22,7 @@ def log(tag, msg):
 
 # ==================================================
 # ==================================================
-# 🔵 TBOS ENGINE (UNCHANGED)
+# 🔵 BOS ENGINE (UNCHANGED)
 # ==================================================
 def get_structure(df):
     base = df.iloc[-(STRUCTURE_WINDOW + 1):-1]
@@ -47,7 +47,7 @@ def detect_sweep(df, structure_high, structure_low):
     return None
 
 
-def get_TBOS(df):
+def get_bos(df):
 
     try:
         if df is None or len(df) < STRUCTURE_WINDOW + 2:
@@ -58,7 +58,7 @@ def get_TBOS(df):
 
         structure_high, structure_low, mid = get_structure(df)
 
-        log("TBOS", f"H:{structure_high} L:{structure_low}")
+        log("BOS", f"H:{structure_high} L:{structure_low}")
 
         sweep_signal = detect_sweep(df, structure_high, structure_low)
 
@@ -88,12 +88,12 @@ def get_TBOS(df):
 
 # ==================================================
 # ==================================================
-# 🟢 HKIN ENGINE (UNCHANGED)
+# 🟢 HKA ENGINE (UNCHANGED)
 # ==================================================
-_prev_hkin_state = None
+_prev_HKA_state = None
 
 
-def get_hkin_state(df):
+def get_HKA_state(df):
 
     try:
         if df is None or len(df) < HA_WINDOW:
@@ -121,24 +121,24 @@ def get_hkin_state(df):
         return "NONE"
 
 
-def get_hkin_signal(df):
+def get_HKA_signal(df):
 
-    global _prev_hkin_state
+    global _prev_HKA_state
 
-    current = get_hkin_state(df)
+    current = get_HKA_state(df)
 
     signal = "NONE"
 
-    if _prev_hkin_state == "DOWN" and current == "UP":
+    if _prev_HKA_state == "DOWN" and current == "UP":
         signal = "BUY"
 
-    elif _prev_hkin_state == "UP" and current == "DOWN":
+    elif _prev_HKA_state == "UP" and current == "DOWN":
         signal = "SELL"
 
     else:
         signal = current
 
-    _prev_hkin_state = current
+    _prev_HKA_state = current
 
     return signal
 
@@ -151,17 +151,17 @@ def get_signal(df):
 
     log("MODE", MODE)
 
-    if MODE == "HKIN":
-        return get_hkin_signal(df)
+    if MODE == "HKA":
+        return get_HKA_signal(df)
 
-    return get_TBOS(df)
+    return get_bos(df)
 
 
 # ==================================================
 # ==================================================
 # 📊 VISUAL OUTPUT (ONLY CHANGE HERE)
 # ==================================================
-def get_TBOS_bar(df):
+def get_bos_bar(df):
 
     signal = get_signal(df)
 
