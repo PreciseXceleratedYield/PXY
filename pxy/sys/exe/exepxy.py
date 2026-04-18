@@ -70,7 +70,7 @@ def live_status(msg):
 
 def in_market_hours():
     now = datetime.now(ist)
-    return (0 <= now.weekday() <= 4 and dt_time(9, 16) <= now.time() <= dt_time(15, 25))
+    return (0 <= now.weekday() <= 4 and dt_time(9, 16) <= now.time() <= dt_time(15, 29))
 
 # ---------------- MAIN LOOP ----------------
 print("\n🚀 INIT: main market loop starting now 📡")
