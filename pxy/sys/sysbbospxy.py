@@ -168,10 +168,25 @@ def get_bos_bar(df):
     log("SIGNAL", signal)
 
     # ==================================================
-    # ONLY LABEL CHANGE (BOS / HKIN)
+    # LABEL FIX ONLY (BOS → BOST)
     # ==================================================
-    banner = "ﮩ٨ﮩ٨ـﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ" + MODE + "٨٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ٨ـﮩﮩ٨ﮩ"
+    label = "BOST" if MODE == "BOS" else MODE
 
+    left = "ﮩ٨ﮩ٨ـﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ"
+    right = "٨٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ٨ـﮩﮩ٨ﮩ"
+
+    banner = (left + label + right)[:42].ljust(42)
+
+    # ==================================================
+    # COLOR ONLY
+    # ==================================================
+    if signal in ["BUY", "UP"]:
+        return Fore.GREEN + banner + Style.RESET_ALL, signal
+
+    if signal in ["SELL", "DOWN"]:
+        return Fore.RED + banner + Style.RESET_ALL, signal
+
+    return Fore.LIGHTBLACK_EX + banner + Style.RESET_ALL, signal
     # ==================================================
     # COLOR ONLY
     # ==================================================
