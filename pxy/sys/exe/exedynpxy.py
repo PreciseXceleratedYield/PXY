@@ -3,6 +3,13 @@ import pytz
 
 IST = pytz.timezone("Asia/Kolkata")
 
+# ==================================================
+# 🔧 CONFIG (TUNE FROM HERE ONLY)
+# ==================================================
+BASE_INCREMENT = 0.016   # base decay per second
+PNL_THRESHOLD = -500     # activate dynamic adjustment
+
+
 def dynamic_entry(row):
     try:
         original_price = float(row.get("buy_prc", 0))
@@ -15,13 +22,25 @@ def dynamic_entry(row):
 
         now = datetime.now(IST)
 
-        # ---- Dynamic Increment Based on Symbol ----
-        if "BANK" in symbol:
-            per_second_increment = 0.016
-        else:
-            per_second_increment = 0
+        # ---------------- SYMBOL TYPE ----------------
+        is_ce = "CE" in symbol
+        is_pe = "PE" in symbol
 
-        # ---- Parse Entry Time ----
+        # ---------------- DEPTH ----------------
+        ce_depth = float(row.get("hkin_ce_depth", 1))
+        pe_depth = float(row.get("hkin_pe_depth", 1))
+
+        # ---------------- DEPTH FACTOR ----------------
+        if is_ce:
+            depth_factor = max(ce_depth - 1, 0)
+        elif is_pe:
+            depth_factor = max(pe_depth - 1, 0)
+        else:
+            depth_factor = 0
+
+        per_second_increment = BASE_INCREMENT * depth_factor
+
+        # ---------------- PARSE ENTRY TIME ----------------
         if isinstance(entry_time_val, str):
             try:
                 entry_time = datetime.strptime(entry_time_val, "%Y-%m-%d %H:%M:%S")
@@ -36,9 +55,8 @@ def dynamic_entry(row):
 
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
 
-        # ---- FINAL RULE ----
-        # NO adjustment until pnl crosses -500 loss
-        if pnl <= -500 and ("CE" in symbol or "PE" in symbol):
+        # ---------------- FINAL RULE ----------------
+        if pnl <= PNL_THRESHOLD and (is_ce or is_pe):
             increment = elapsed_secs * per_second_increment
             dynamic_val = original_price - increment
         else:
