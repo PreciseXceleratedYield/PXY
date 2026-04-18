@@ -35,7 +35,7 @@ def target_price(row):
         atr = f(row.get("atr", 0))
 
         # 3️⃣ MIN POINTS (ATR BASED)
-        MIN_POINTS = 2
+        MIN_POINTS = 0.5
 
         # 4️⃣ SIGNAL
         entry_signal = str(row.get("entry", "NONE")).upper()
