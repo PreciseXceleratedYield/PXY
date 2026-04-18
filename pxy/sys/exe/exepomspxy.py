@@ -34,8 +34,7 @@ def print_market_dashboard(market_df):
         return
 
     snapshot = market_df.iloc[0].to_dict()
-    # ===== VISUAL =====
-    print(snapshot.get("candle_visual", ""))
+
     
     # ===== DAY CONTEXT =====
     print(snapshot.get("day_candle", ""))
@@ -132,3 +131,5 @@ def print_market_dashboard(market_df):
         print(f"{left}{' ' * spaces}{right}")
     # ===== BOS =====
     print(snapshot.get("bos_bar", "NONE"))
+    # ===== VISUAL =====
+    print(snapshot.get("candle_visual", ""))
