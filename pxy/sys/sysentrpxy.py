@@ -47,15 +47,36 @@ def get_entry_signal(df=None):
         dprint("RAW SIGNAL", signal)
         dprint("RAW EXIT", exit_signal)
 
-        if signal == "BUY":
+        # SAFE DF fallback for BOS
+        if df is None:
+            df = fetch_yf_data(period="5d", interval="1m")
+
+        bos = get_bos(df) if df is not None else "NONE"
+        dprint("RAW BOS", bos)
+
+        # ==================================================
+        # 🕒 MORNING (RAW SIGNAL ONLY)
+        # ==================================================
+        if MORNING_START <= now <= MORNING_END:
+
+            if signal == "BUY":
+                return "ATMBUY", exit_signal
+
+            if signal == "SELL":
+                return "ATMSELL", exit_signal
+
+            return "NONE", exit_signal
+
+        # ==================================================
+        # 🧠 AFTER MORNING (RAW + BOS CONFIRMATION)
+        # ==================================================
+        if signal == "BUY" and bos in ["BUY", "UP"]:
             return "ATMBUY", exit_signal
 
-        if signal == "SELL":
+        if signal == "SELL" and bos in ["SELL", "DOWN"]:
             return "ATMSELL", exit_signal
 
-        # strict pass-through
-        return signal, exit_signal
-
+        return "NONE", exit_signal
 
     # ==================================================
     # 🕒 1. MORNING OVERRIDE (TREND MODE ONLY)
