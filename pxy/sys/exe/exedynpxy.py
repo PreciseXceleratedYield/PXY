@@ -1,14 +1,15 @@
 from datetime import datetime
 import pytz
 import math
+import re
 
 IST = pytz.timezone("Asia/Kolkata")
 
 # ==================================================
 # 🔧 CONFIG (TUNE FROM HERE ONLY)
 # ==================================================
-BASE_INCREMENT = 0.016   # base decay per second
-PNL_THRESHOLD = -300     # activate dynamic adjustment (updated)
+BASE_INCREMENT = 0.016
+PNL_THRESHOLD = -300
 
 
 def dynamic_entry(row):
@@ -31,7 +32,7 @@ def dynamic_entry(row):
         ce_depth = float(row.get("hkin_ce_depth", 1))
         pe_depth = float(row.get("hkin_pe_depth", 1))
 
-        # ---------------- DEPTH FACTOR (SMOOTHED) ----------------
+        # ---------------- DEPTH FACTOR ----------------
         if is_ce:
             depth_factor = math.sqrt(max(ce_depth - 1, 0))
         elif is_pe:
@@ -59,10 +60,17 @@ def dynamic_entry(row):
 
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
 
+        # ---------------- CLEAN SYMBOL ----------------
+        clean_symbol = re.sub(r'^(NIFTY|BANKNIFTY)26', '', symbol)
+
         # ---------------- FINAL RULE ----------------
         if pnl <= PNL_THRESHOLD and (is_ce or is_pe):
             increment = elapsed_secs * per_second_increment
             dynamic_val = original_price - increment
+
+            points = int(increment)
+            print(f"{clean_symbol} | READY TO GIVEAWAY {points} POINTS")
+
         else:
             dynamic_val = original_price
 
