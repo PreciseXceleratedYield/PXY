@@ -4,7 +4,7 @@ init(autoreset=True)
 # ==================================================
 # GLOBAL SETTINGS
 # ==================================================
-MODE = "BOS"      # "BOS" or "HKIN"
+MODE = "TBOS"      # "TBOS" or "HKIN"
 DEBUG = True
 
 HA_WINDOW = 15
@@ -22,7 +22,7 @@ def log(tag, msg):
 
 # ==================================================
 # ==================================================
-# 🔵 BOS ENGINE (UNCHANGED)
+# 🔵 TBOS ENGINE (UNCHANGED)
 # ==================================================
 def get_structure(df):
     base = df.iloc[-(STRUCTURE_WINDOW + 1):-1]
@@ -47,7 +47,7 @@ def detect_sweep(df, structure_high, structure_low):
     return None
 
 
-def get_bos(df):
+def get_TBOS(df):
 
     try:
         if df is None or len(df) < STRUCTURE_WINDOW + 2:
@@ -58,7 +58,7 @@ def get_bos(df):
 
         structure_high, structure_low, mid = get_structure(df)
 
-        log("BOS", f"H:{structure_high} L:{structure_low}")
+        log("TBOS", f"H:{structure_high} L:{structure_low}")
 
         sweep_signal = detect_sweep(df, structure_high, structure_low)
 
@@ -154,14 +154,14 @@ def get_signal(df):
     if MODE == "HKIN":
         return get_hkin_signal(df)
 
-    return get_bos(df)
+    return get_TBOS(df)
 
 
 # ==================================================
 # ==================================================
 # 📊 VISUAL OUTPUT (ONLY CHANGE HERE)
 # ==================================================
-def get_bos_bar(df):
+def get_TBOS_bar(df):
 
     signal = get_signal(df)
 
