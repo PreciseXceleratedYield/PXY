@@ -34,36 +34,45 @@ def place_exit_order(client, row):
         return None
 
 def compute_st_fixed(row):
-    """Calculates XX⚪YY and returns True if LTP >= Target.
-    XX → difference of pxy_entry to LTP, colored green if positive, red if negative.
-    Dot → 🟢 for profit, 🔴 for loss, ⚪ for neutral
-    YY → distance to target, unchanged.
-    """
     try:
         ltp = float(row.get("sell_prc", 0))
         tgt = float(row.get("pxy_tgt", 0))
-        entry = float(row.get("pxy_entry", 0))  # using pxy_entry now
+        entry = float(row.get("pxy_entry", 0))
 
-        if ltp <= 0: 
-            return "00⚪00", False
+        if ltp <= 0 or entry <= 0:
+            return "%00⚪ 00%", False
 
-        # XX = LTP - pxy_entry
-        to_entry = int(ltp - entry)
-        to_tgt = min(99, max(0, int(tgt - ltp)))
+        # --- % calculations ---
+        entry_pct = int(((ltp - entry) / entry) * 100)
+        tgt_pct   = int(((tgt - ltp) / entry) * 100)
 
-        # Color for XX number
-        color = Fore.GREEN if to_entry > 0 else Fore.RED if to_entry < 0 else Fore.WHITE
-        entry_s = f"{abs(to_entry):02d}"
-        tg_s = f"{to_tgt:02d}"
+        # --- clamp ---
+        entry_pct = max(-99, min(99, entry_pct))
+        tgt_pct   = max(0, min(99, tgt_pct))
 
-        # Hard-coded colored dot
-        dot = "🟢" if to_entry > 0 else "🔴" if to_entry < 0 else "⚪"
+        # --- LEFT SIDE COLOR ONLY ---
+        if entry_pct > 0:
+            color = Fore.GREEN
+            dot = "🟢"
+        elif entry_pct < 0:
+            color = Fore.RED
+            dot = "🔴"
+        else:
+            color = Fore.WHITE
+            dot = "⚪"
 
+        entry_s = f"{abs(entry_pct):02d}"
+        tgt_s   = f"{tgt_pct:02d}"
+
+        # --- target hit ---
         is_hit = ltp >= tgt
 
-        return f"{color}{entry_s}{dot} {Fore.RESET}{tg_s}", is_hit
+        # --- FINAL FORMAT ---
+        # LEFT = colored, RIGHT = plain white (no color carry)
+        return f"{color}%{entry_s}{dot}{Fore.RESET} {tgt_s}%", is_hit
+
     except:
-        return "00⚪00", False
+        return "%00⚪ 00%", False
 
 def run_snapshot():
     # --- IST Time Check for Auto Exit ---
@@ -111,7 +120,7 @@ def run_snapshot():
         p_col = Fore.GREEN if pnl > 0 else Fore.RED if pnl < 0 else Fore.WHITE
         
         # Print only symbol, ST, PNL
-        print(f"  {sym:<21}{st_display:^12}{p_col}{pnl:>10}")
+        print(f"  {sym:<21}{st_display:<12}{p_col}{pnl:>10}")
     
     print("-" * 42)
     print(f"  {Fore.WHITE}Refreshed: {time.strftime('%H:%M:%S')}")
