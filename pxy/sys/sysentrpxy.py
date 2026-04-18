@@ -15,8 +15,7 @@ TIMEZONE = "Asia/Kolkata"
 
 # -------------------- GLOBAL MODE SWITCH --------------------
 MODE = "RAW"   # "TREND" | "RAW"
-
-DEBUG = False   # 🔴 GLOBAL DEBUG SWITCH
+DEBUG = False
 
 
 def dprint(label, value=""):
@@ -39,7 +38,7 @@ def get_entry_signal(df=None):
     dprint("CURRENT TIME", now)
 
     # ==================================================
-    # 🧪 RAW MODE (NO INDICATORS, NO MORNING LOGIC)
+    # 🧪 RAW MODE (NO INDICATORS, NO TREND LOGIC)
     # ==================================================
     if MODE == "RAW":
 
@@ -47,11 +46,17 @@ def get_entry_signal(df=None):
         dprint("RAW SIGNAL", signal)
         dprint("RAW EXIT", exit_signal)
 
-        # SAFE DF fallback ONCE (used for BOS only)
+        # SAFE DF fallback (for BOS + ST)
         if df is None:
             df = fetch_yf_data(period="5d", interval="1m")
 
-        bos = get_bos(df) if df is not None else "NONE"
+        if df is None or len(df) < 3:
+            return "NONE", exit_signal
+
+        last = df.iloc[-1]
+        bos = get_bos(df)
+        st_trend = last.get('ST_Trend', "NONE")
+
         dprint("RAW BOS", bos)
 
         # ==================================================
@@ -68,37 +73,31 @@ def get_entry_signal(df=None):
             return "NONE", exit_signal
 
         # ==================================================
-        # 🧠 AFTER MORNING (RAW + BOS CONFIRMATION)
+        # 🧠 AFTER MORNING (RAW + BOS + ST CONFIRMATION)
         # ==================================================
-        if signal == "BUY" and bos in ["BUY", "UP"]:
-            return "ATMBUY", exit_signal
 
-        if signal == "SELL" and bos in ["SELL", "DOWN"]:
-            return "ATMSELL", exit_signal
+        if signal == "BUY":
 
-        return signal, exit_signal
+            if st_trend == "UP" and bos in ["BUY", "UP"]:
+                return "ATMBUY", exit_signal
 
+            if st_trend == "UP" or bos in ["BUY", "UP"]:
+                return "OTMBUY", exit_signal
 
-    # ==================================================
-    # 🕒 TREND MODE (UNCHANGED)
-    # ==================================================
-    if MORNING_START <= now <= MORNING_END:
+            return "NONE", exit_signal
 
-        signal, exit_signal = get_signal()
-        dprint("MORNING SIGNAL", signal)
-        dprint("EXIT SIGNAL", exit_signal)
+        if signal == "SELL":
 
-        if signal in ["BUY", "BULL"]:
-            return "OTMBUY", exit_signal
+            if st_trend == "DOWN" and bos in ["SELL", "DOWN"]:
+                return "ATMSELL", exit_signal
 
-        if signal in ["SELL", "BEAR"]:
-            return "OTMSELL", exit_signal
+            if st_trend == "DOWN" or bos in ["SELL", "DOWN"]:
+                return "OTMSELL", exit_signal
 
-        return "NONE", exit_signal
-
+            return "NONE", exit_signal
 
     # ==================================================
-    # 🧠 DATA PREPARATION
+    # 🧠 TREND MODE (UNCHANGED)
     # ==================================================
     if df is None:
         df = fetch_yf_data(period="5d", interval="1m")
@@ -151,10 +150,7 @@ def get_entry_signal(df=None):
     if signal == "SELL" and st_trend == "DOWN":
         return "ATMSELL", exit_signal
 
-    # ==================================================
-    # ❌ NO TRADE
-    # ==================================================
-    return signal, exit_signal
+    return "NONE", exit_signal
 
 
 # ==================================================
