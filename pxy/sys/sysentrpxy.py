@@ -65,10 +65,10 @@ def get_entry_signal(df=None):
         # ==================================================
         if MORNING_START <= now <= MORNING_END:
 
-            if signal in ["BUY", "BULL"]:
+            if exit_signal in ["BUY", "BULL"]:
                 return "OTMBUY", exit_signal
             
-            if signal in ["SELL", "BEAR"]:
+            if exit_signal in ["SELL", "BEAR"]:
                 return "OTMSELL", exit_signal
             
             return signal, exit_signal
@@ -142,23 +142,17 @@ def get_entry_signal(df=None):
     # ==================================================
     now = datetime.now(pytz.timezone(TIMEZONE)).time()
     
+    # ==================================================
     if MORNING_START <= now <= MORNING_END:
-    
-        # normalize raw signals
-        if signal == "BULL":
-            signal = "BUY"
-        elif signal == "BEAR":
-            signal = "SELL"
-    
-        dprint("TREND MORNING", signal)
-    
-        if signal == "BUY":
+
+        if exit_signal in ["BUY", "BULL"]:
             return "OTMBUY", exit_signal
-    
-        if signal == "SELL":
+            
+        if exit_signal in ["SELL", "BEAR"]:
             return "OTMSELL", exit_signal
-    
+            
         return signal, exit_signal
+
     
     
     # ==================================================
