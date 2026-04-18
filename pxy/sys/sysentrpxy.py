@@ -76,7 +76,7 @@ def get_entry_signal(df=None):
         if signal == "SELL" and bos in ["SELL", "DOWN"]:
             return "ATMSELL", exit_signal
 
-        return "NONE", exit_signal
+        return signal, exit_signal
 
 
     # ==================================================
