@@ -17,7 +17,7 @@ html, body {
 }
 
 /* =========================
-   MAIN CONTAINER
+   MAIN LAYOUT
 ========================= */
 #container {
     display: flex;
@@ -73,7 +73,7 @@ canvas {
 }
 
 /* =========================
-   FULLSCREEN (DESKTOP)
+   DESKTOP FULLSCREEN MODES
 ========================= */
 .fullscreen-terminal #terminal { width: 100% !important; }
 .fullscreen-terminal #right { display: none; }
@@ -82,7 +82,7 @@ canvas {
 .fullscreen-chart #right { width: 100% !important; }
 
 /* =========================
-   📱 MOBILE FIX (REAL FIX)
+   📱 MOBILE (VISUAL SAFETY)
 ========================= */
 @media (max-width: 768px) {
 
@@ -112,7 +112,6 @@ canvas {
 <div id="container">
 
     <div id="terminal"></div>
-
     <div id="divider"></div>
 
     <div id="right">
@@ -139,9 +138,9 @@ canvas {
 <script>
 
 /* =========================
-   MOBILE DETECTION (IMPORTANT FIX)
+   MOBILE CHECK (REAL FIX)
 ========================= */
-const isMobile = window.innerWidth <= 768;
+const isMobile = () => window.innerWidth <= 768;
 
 /* =========================
    TERMINAL
@@ -176,7 +175,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG SPLIT (DESKTOP ONLY)
+   DRAG (DESKTOP ONLY)
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -193,7 +192,7 @@ window.addEventListener("mouseup", () => {
 
 window.addEventListener("mousemove", (e) => {
     if (!dragging) return;
-    if (isMobile) return;
+    if (isMobile()) return;
 
     const p = (e.clientX / window.innerWidth) * 100;
     if (p < 10 || p > 80) return;
@@ -213,8 +212,7 @@ function saveLayout() {
 
 function loadLayout() {
     const saved = localStorage.getItem("split");
-
-    if (saved && !isMobile) {
+    if (saved && !isMobile()) {
         terminal.style.width = saved;
         right.style.width = (100 - parseFloat(saved)) + "%";
     }
@@ -238,14 +236,28 @@ function resetLayout() {
 }
 
 /* =========================
-   CHART (BLOCK ON MOBILE FIX)
+   CHART CONTROL (IMPORTANT FIX)
 ========================= */
-let chart;
+let chart = null;
 
+/* =========================
+   LOAD DATA
+========================= */
 async function load() {
 
-    // 🚫 MOBILE: STOP EVERYTHING
-    if (isMobile) return;
+    // 🚫 HARD STOP MOBILE
+    if (isMobile()) {
+        if (chart) {
+            chart.destroy();
+            chart = null;
+        }
+
+        const canvas = document.getElementById("priceChart");
+        const ctx = canvas.getContext("2d");
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        return;
+    }
 
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
@@ -257,7 +269,12 @@ async function load() {
     draw(closes, stVals, stTrend);
 }
 
+/* =========================
+   DRAW CHART
+========================= */
 function draw(closes, stVals, stTrend) {
+
+    if (isMobile()) return;
 
     const ctx = document.getElementById("priceChart");
 
@@ -339,8 +356,10 @@ loadLayout();
 load();
 setInterval(load, 3000);
 
+/* re-check on resize */
 window.addEventListener("resize", () => {
-    if (window.innerWidth <= 768) {
+
+    if (isMobile()) {
         if (chart) {
             chart.destroy();
             chart = null;
