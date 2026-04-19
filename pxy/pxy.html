@@ -18,18 +18,14 @@ html, body {
     font-family: monospace;
 }
 
-/* ===================== */
-/* LEFT - TERMINAL */
-/* ===================== */
+/* LEFT TERMINAL */
 #terminal {
     width: 50%;
     height: 100vh;
     border-right: 1px solid #ddd;
 }
 
-/* ===================== */
-/* RIGHT - CHART */
-/* ===================== */
+/* RIGHT CHART */
 #chart {
     width: 50%;
     height: 100vh;
@@ -52,22 +48,16 @@ canvas {
 
 <body>
 
-<!-- ===================== -->
-<!-- LEFT TERMINAL -->
-<!-- ===================== -->
+<!-- LEFT -->
 <div id="terminal"></div>
 
-<!-- ===================== -->
-<!-- RIGHT CHART -->
-<!-- ===================== -->
+<!-- RIGHT -->
 <div id="chart">
     <h3>📊 Close Price (Last 42)</h3>
     <canvas id="priceChart"></canvas>
 </div>
 
-<!-- ===================== -->
-<!-- LIBRARIES -->
-<!-- ===================== -->
+<!-- LIBS -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -75,7 +65,7 @@ canvas {
 <script>
 
 // =====================
-// TERMINAL INIT
+// TERMINAL
 // =====================
 const term = new Terminal({
     convertEol: true,
@@ -109,26 +99,37 @@ ws.onmessage = (event) => {
 };
 
 // =====================
-// CHART LOGIC
+// CHART
 // =====================
 let chartInstance = null;
 
 async function loadChart() {
     try {
         const res = await fetch("./sys/syschrtpxy.json");
+
+        if (!res.ok) {
+            console.log("JSON not found");
+            return;
+        }
+
         const data = await res.json();
 
-        const labels = data.map(d => d.time.split(" ")[1] || d.time);
-        const closes = data.map(d => d.close);
+        if (!Array.isArray(data) || data.length === 0) {
+            console.log("Empty JSON");
+            return;
+        }
 
-        drawChart(labels, closes);
+        const labels = data.map((_, i) => i + 1);
+        const closes = data.map(d => Number(d.close));
+
+        renderChart(labels, closes);
 
     } catch (err) {
-        console.error("Chart load error:", err);
+        console.error("Chart error:", err);
     }
 }
 
-function drawChart(labels, data) {
+function renderChart(labels, data) {
     const ctx = document.getElementById("priceChart").getContext("2d");
 
     if (chartInstance) chartInstance.destroy();
@@ -161,10 +162,10 @@ function drawChart(labels, data) {
 }
 
 // =====================
-// AUTO REFRESH JSON
+// AUTO REFRESH
 // =====================
 loadChart();
-setInterval(loadChart, 5000);
+setInterval(loadChart, 3000);
 
 // =====================
 // RESIZE FIX
