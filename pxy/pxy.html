@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Terminal + Chart Dashboard</title>
+<title>Terminal + Chart</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
@@ -14,8 +14,8 @@ html, body {
     width: 100%;
     display: flex;
     background: #ffffff;
-    overflow: hidden;
     font-family: monospace;
+    overflow: hidden;
 }
 
 /* LEFT TERMINAL */
@@ -48,10 +48,10 @@ canvas {
 
 <body>
 
-<!-- LEFT: TERMINAL -->
+<!-- LEFT -->
 <div id="terminal"></div>
 
-<!-- RIGHT: CHART -->
+<!-- RIGHT -->
 <div id="chart">
     <h3>📊 Close Price (Last 42)</h3>
     <canvas id="priceChart"></canvas>
@@ -64,9 +64,9 @@ canvas {
 
 <script>
 
-/* =========================
-   TERMINAL SETUP
-   ========================= */
+// =====================
+// TERMINAL
+// =====================
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
@@ -88,9 +88,9 @@ fitAddon.fit();
 term.writeln("✅ Terminal Ready");
 term.writeln("-----------------------------------");
 
-/* =========================
-   WEBSOCKET (pxy.js)
-   ========================= */
+// =====================
+// WEBSOCKET
+// =====================
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
@@ -98,35 +98,38 @@ ws.onmessage = (event) => {
     term.write(event.data);
 };
 
-/* =========================
-   CHART LOGIC
-   ========================= */
+// =====================
+// CHART
+// =====================
 let chartInstance = null;
 
 async function loadChart() {
     try {
-        const res = await fetch("/sys/syschrtpxy.json");
+        const res = await fetch("/sys/syschrtpxy.json");  // IMPORTANT FIX
 
         if (!res.ok) {
-            console.log("JSON not reachable");
+            console.log("❌ JSON not reachable");
             return;
         }
 
         const data = await res.json();
 
-        if (!Array.isArray(data) || data.length === 0) return;
+        if (!Array.isArray(data) || data.length === 0) {
+            console.log("Empty data");
+            return;
+        }
 
         const labels = data.map((_, i) => i + 1);
         const closes = data.map(d => Number(d.close));
 
-        renderChart(labels, closes);
+        drawChart(labels, closes);
 
     } catch (err) {
         console.error("Chart error:", err);
     }
 }
 
-function renderChart(labels, data) {
+function drawChart(labels, data) {
     const ctx = document.getElementById("priceChart").getContext("2d");
 
     if (chartInstance) chartInstance.destroy();
@@ -158,15 +161,15 @@ function renderChart(labels, data) {
     });
 }
 
-/* =========================
-   AUTO REFRESH
-   ========================= */
+// =====================
+// AUTO REFRESH
+// =====================
 loadChart();
 setInterval(loadChart, 3000);
 
-/* =========================
-   RESIZE FIX
-   ========================= */
+// =====================
+// RESIZE
+// =====================
 window.addEventListener('resize', () => fitAddon.fit());
 
 </script>
