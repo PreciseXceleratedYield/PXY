@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PXY DEBUG DASHBOARD</title>
+<title>PX Terminal + Chart DEBUG</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
@@ -11,7 +11,9 @@ html, body {
     margin: 0;
     padding: 0;
     height: 100%;
+    width: 100%;
     display: flex;
+    overflow: hidden;
     font-family: monospace;
 }
 
@@ -31,22 +33,17 @@ html, body {
 #title {
     padding: 10px;
     font-weight: bold;
-    background: #f3f3f3;
 }
 
-#status {
-    padding: 5px 10px;
-    font-size: 12px;
-    color: blue;
-}
-
-#chartWrap {
+#chartBox {
     flex: 1;
+    position: relative;
 }
 
 canvas {
     width: 100% !important;
     height: 100% !important;
+    background: #f8f8f8;
 }
 </style>
 </head>
@@ -59,8 +56,7 @@ canvas {
 <!-- RIGHT -->
 <div id="right">
     <div id="title">📊 Close Price (Last 42)</div>
-    <div id="status">INIT...</div>
-    <div id="chartWrap">
+    <div id="chartBox">
         <canvas id="priceChart"></canvas>
     </div>
 </div>
@@ -71,9 +67,7 @@ canvas {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-
-console.log("JS LOADED OK");
-document.getElementById("status").innerText = "JS LOADED OK";
+console.log("SCRIPT STARTED");
 
 // =====================
 // TERMINAL
@@ -81,6 +75,7 @@ document.getElementById("status").innerText = "JS LOADED OK";
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
+    fontFamily: "monospace",
     fontSize: 14
 });
 
@@ -93,48 +88,47 @@ fitAddon.fit();
 term.writeln("TERMINAL OK");
 
 // =====================
-// WS
+// WEBSOCKET
 // =====================
 const ws = new WebSocket(`ws://${location.host}`);
+
 ws.onmessage = (e) => term.write(e.data);
 
 // =====================
-// CHART
+// CHART DEBUG
 // =====================
 let chart;
 
 async function load() {
     try {
-        console.log("FETCH START");
+        console.log("FETCHING JSON...");
 
-        const res = await fetch("./pxy.json");
+        const res = await fetch("/sys/syschrtpxy.json");
 
-        if (!res.ok) {
-            throw new Error("HTTP " + res.status);
-        }
+        console.log("STATUS:", res.status);
 
         const data = await res.json();
 
-        console.log("DATA OK:", data.length);
-
-        document.getElementById("status").innerText =
-            "DATA LOADED: " + data.length;
+        console.log("DATA LEN:", data.length);
 
         const closes = data.map(d => Number(d.close));
 
         draw(closes);
 
     } catch (err) {
-        console.error(err);
-        document.getElementById("status").innerText =
-            "ERROR: " + err.message;
+        console.error("CHART ERROR:", err);
     }
 }
 
 function draw(data) {
-    console.log("DRAW");
+    console.log("DRAWING CHART...");
 
     const ctx = document.getElementById("priceChart");
+
+    if (!ctx) {
+        console.error("NO CANVAS FOUND");
+        return;
+    }
 
     if (chart) chart.destroy();
 
@@ -155,11 +149,8 @@ function draw(data) {
             maintainAspectRatio: false
         }
     });
-
-    document.getElementById("status").innerText = "CHART RENDERED";
 }
 
-// =====================
 load();
 setInterval(load, 3000);
 
