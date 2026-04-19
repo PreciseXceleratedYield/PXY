@@ -46,8 +46,7 @@ def dprint(msg, color=Fore.CYAN):
 # --- IMPORTS ---
 dprint("IMPORTING MODULES...")
 try:
-    from sysdtafpxy import fetch_yf_data
-    from sysentrpxy import get_entry_signal
+    from syspxy import get_all_data
     from runclntpxy import get_session
     from runfundpxy import get_available_funds
     from runpchkpxy import get_position_summary
@@ -119,25 +118,24 @@ async def main():
             return
 
         # --- DATA ---
-        dprint("FETCHING DATA...")
-        df = fetch_yf_data()
-        dprint(f"DATA RECEIVED: {type(df)}")
-
-        if df is None or df.empty:
-            print("❌ No data")
+        # --- SIGNAL (FROM SYSPXY) ---
+        dprint("GETTING SIGNAL FROM SYSPXY...")
+        
+        data = get_all_data()
+        
+        entry_signal = data.get("entry")
+        reversal     = data.get("exit")
+        ltp          = data.get("price")   # 🔥 replaces df["Close"]
+        if ltp is None:
+            print("❌ No price from syspxy")
             return
-
-        dprint(f"DATA ROWS: {len(df)}")
-
-        # --- SIGNAL ---
-        dprint("GETTING ENTRY SIGNAL...")
-        entry_signal, reversal = get_entry_signal(df)
-        dprint(f"SIGNAL RAW: {entry_signal} | REVERSAL: {reversal}")
-
+        
+        dprint(f"SIGNAL: {entry_signal} | {reversal}")
+        
         if not entry_signal:
             print("WAIT SIGNAL: None")
             return
-
+        
         sig = entry_signal.upper().strip()
         dprint(f"FORMATTED SIGNAL: {sig}")
 
@@ -147,8 +145,6 @@ async def main():
             print(f"WAIT SIGNAL: {entry_signal}")
             return
 
-        ltp = df["Close"].iloc[-1]
-        dprint(f"LTP: {ltp}")
 
         # --- POSITION CHECK ---
         dprint("CHECKING POSITIONS...")
@@ -169,7 +165,14 @@ async def main():
                 pe_active = "1PE" in str(pos)
 
             dprint(f"CE_ACTIVE={ce_active}, PE_ACTIVE={pe_active}")
-
+            # --- DUPLICATE SIGNAL PROTECTION ---
+            if sig in ["ATMBUY", "OTMBUY"] and ce_active:
+                print("⚠️ BUY signal but CE already active → SKIP")
+                return
+            
+            if sig in ["ATMSELL", "OTMSELL"] and pe_active:
+                print("⚠️ SELL signal but PE already active → SKIP")
+                return
         except Exception as e:
             dprint(f"POSITION ERROR: {e}", Fore.RED)
             ce_active = True
