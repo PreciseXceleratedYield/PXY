@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PXY DASHBOARD</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+
+<style>
+html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: monospace;
+    background: #ffffff;
+    color: #111;
+}
+
+/* =========================
+   MAIN CONTAINER
+========================= */
+#container {
+    display: flex;
+    width: 100%;
+    height: 100vh;
+}
+
+/* =========================
+   TERMINAL
+========================= */
+#terminal {
+    width: 35%;
+    min-width: 200px;
+    height: 100vh;
+    background: #ffffff;
+    border-right: 1px solid #e5e5e5;
+}
+
+/* =========================
+   DIVIDER
+========================= */
+#divider {
+    width: 5px;
+    cursor: col-resize;
+    background: #ddd;
+}
+
+/* =========================
+   RIGHT PANEL
+========================= */
+#right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+}
+
+#toolbar {
+    padding: 5px;
+    background: #f3f3f3;
+    display: flex;
+    gap: 10px;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+#chartWrap {
+    flex: 1;
+}
+
+canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* =========================
+   FULLSCREEN MODES (DESKTOP)
+========================= */
+.fullscreen-terminal #terminal {
+    width: 100% !important;
+}
+
+.fullscreen-terminal #right {
+    display: none;
+}
+
+.fullscreen-chart #terminal {
+    display: none;
+}
+
+.fullscreen-chart #right {
+    width: 100% !important;
+}
+
+/* =========================
+   📱 MOBILE MODE
+========================= */
+@media (max-width: 768px) {
+
+    #right {
+        display: none !important;
+    }
+
+    #divider {
+        display: none !important;
+    }
+
+    #terminal {
+        width: 100% !important;
+        height: 100vh !important;
+        border-right: none;
+    }
+
+    #container {
+        flex-direction: column;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div id="container">
+
+    <div id="terminal"></div>
+
+    <div id="divider"></div>
+
+    <div id="right">
+
+        <div id="toolbar">
+            <button onclick="toggleTerminal()">🖥 Terminal</button>
+            <button onclick="toggleChart()">📊 Chart</button>
+            <button onclick="resetLayout()">🔄 Reset</button>
+        </div>
+
+        <div id="chartWrap">
+            <canvas id="priceChart"></canvas>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- LIBS -->
+<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+
+/* =========================
+   TERMINAL
+========================= */
+const term = new Terminal({
+    convertEol: true,
+    scrollback: 1000,
+    fontFamily: "monospace",
+    fontSize: 14,
+    cursorBlink: false,
+    theme: {
+        background: "#ffffff",
+        foreground: "#111111",
+        cursor: "#111111",
+        selection: "rgba(0,0,0,0.08)"
+    }
+});
+
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
+term.open(document.getElementById('terminal'));
+
+setTimeout(() => fitAddon.fit(), 50);
+window.addEventListener("resize", () => fitAddon.fit());
+
+term.writeln("TERMINAL OK");
+
+/* =========================
+   WEBSOCKET
+========================= */
+const ws = new WebSocket(`ws://${location.host}`);
+ws.onmessage = (e) => term.write(e.data);
+
+/* =========================
+   DRAG SPLIT (DESKTOP ONLY)
+========================= */
+const divider = document.getElementById("divider");
+const terminal = document.getElementById("terminal");
+const right = document.getElementById("right");
+
+let isDragging = false;
+
+divider.addEventListener("mousedown", () => isDragging = true);
+
+window.addEventListener("mouseup", () => {
+    isDragging = false;
+    saveLayout();
+});
+
+window.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+    if (window.innerWidth <= 768) return; // disable on mobile
+
+    const percent = (e.clientX / window.innerWidth) * 100;
+    if (percent < 10 || percent > 80) return;
+
+    terminal.style.width = percent + "%";
+    right.style.width = (100 - percent) + "%";
+
+    fitAddon.fit();
+});
+
+/* =========================
+   LAYOUT
+========================= */
+function saveLayout() {
+    localStorage.setItem("split", terminal.style.width);
+}
+
+function loadLayout() {
+    const saved = localStorage.getItem("split");
+    if (saved && window.innerWidth > 768) {
+        terminal.style.width = saved;
+        right.style.width = (100 - parseFloat(saved)) + "%";
+    }
+}
+
+/* =========================
+   FULLSCREEN
+========================= */
+function toggleTerminal() {
+    document.body.classList.toggle("fullscreen-terminal");
+}
+
+function toggleChart() {
+    document.body.classList.toggle("fullscreen-chart");
+}
+
+function resetLayout() {
+    terminal.style.width = "35%";
+    right.style.width = "65%";
+    localStorage.removeItem("split");
+}
+
+/* =========================
+   CHART
+========================= */
+let chart;
+
+async function load() {
+    const res = await fetch("./syschrtpxy.json");
+    const data = await res.json();
+
+    const closes = data.map(d => d.close);
+    const stVals = data.map(d => d.st);
+    const stTrend = data.map(d => d.st_trend);
+
+    draw(closes, stVals, stTrend);
+}
+
+function draw(closes, stVals, stTrend) {
+
+    const ctx = document.getElementById("priceChart");
+
+    if (chart) chart.destroy();
+
+    /* =========================
+       3 CANDLE RIGHT PADDING
+    ========================= */
+    const pad = 3;
+
+    const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
+    const closePad = [...closes, ...Array(pad).fill(null)];
+    const stPad = [...stVals, ...Array(pad).fill(null)];
+    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
+
+    chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels,
+
+            datasets: [
+
+                // CLOSE
+                {
+                    label: "Close",
+                    data: closePad,
+                    borderColor: "#1f77b4",
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.25
+                },
+
+                // SUPER TREND
+                {
+                    label: "ST",
+                    data: stPad,
+                    showLine: false,
+
+                    pointRadius: 2,
+                    pointBorderWidth: 2,
+
+                    pointBackgroundColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    ),
+
+                    pointBorderColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    )
+                }
+            ]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            plugins: {
+                legend: { display: false }
+            },
+
+            scales: {
+                x: {
+                    ticks: { color: "#333" },
+                    grid: { color: "#eee" },
+                    offset: true
+                },
+                y: {
+                    position: "right",
+                    ticks: { color: "#333" },
+                    grid: { color: "#eee" }
+                }
+            }
+        }
+    });
+}
+
+/* =========================
+   INIT
+========================= */
+loadLayout();
+load();
+setInterval(load, 3000);
+
+</script>
+
+</body>
+</html>
