@@ -10,22 +10,22 @@ const wss = new WebSocket.Server({ server });
 
 const PORT = 80;
 
-/* =========================
-   STATIC FILE FIX (IMPORTANT)
-   ========================= */
+// =====================
+// STATIC FILE ACCESS (IMPORTANT)
+// =====================
+app.use(express.static(__dirname));
 app.use('/sys', express.static(path.join(__dirname, 'sys')));
-app.use(express.static(__dirname)); // serve html + assets
 
-/* =========================
-   FRONTEND
-   ========================= */
+// =====================
+// FRONTEND
+// =====================
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'pxy.html'));
 });
 
-/* =========================
-   WEBSOCKET (TERMINAL STREAM)
-   ========================= */
+// =====================
+// TERMINAL STREAM (tmux)
+// =====================
 wss.on('connection', (ws) => {
     console.log('Client connected');
 
@@ -37,15 +37,10 @@ wss.on('connection', (ws) => {
         });
     }, 500);
 
-    ws.on('close', () => {
-        clearInterval(interval);
-        console.log('Client disconnected');
-    });
+    ws.on('close', () => clearInterval(interval));
 });
 
-/* =========================
-   START SERVER
-   ========================= */
+// =====================
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://localhost`);
 });
