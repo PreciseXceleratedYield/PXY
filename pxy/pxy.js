@@ -10,21 +10,28 @@ const wss = new WebSocket.Server({ server });
 
 const PORT = 80;
 
-// =====================
-// STATIC FILES
-// =====================
+/* =========================
+   STATIC ROOT (IMPORTANT)
+   ========================= */
 app.use(express.static(__dirname));
 
-// =====================
-// MAIN PAGE
-// =====================
+/* =========================
+   EXPLICIT JSON ROUTE (FOR DEBUG)
+   ========================= */
+app.get('/pxy.json', (req, res) => {
+    res.sendFile(path.join(__dirname, 'pxy.json'));
+});
+
+/* =========================
+   MAIN PAGE
+   ========================= */
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'pxy.html'));
 });
 
-// =====================
-// WS (TERMINAL)
-// =====================
+/* =========================
+   WEBSOCKET
+   ========================= */
 wss.on('connection', (ws) => {
     const interval = setInterval(() => {
         exec('tmux capture-pane -t npxy -pS -200 -J -e', (err, stdout) => {
@@ -35,7 +42,9 @@ wss.on('connection', (ws) => {
     ws.on('close', () => clearInterval(interval));
 });
 
-// =====================
+/* =========================
+   START
+   ========================= */
 server.listen(PORT, '0.0.0.0', () => {
-    console.log("Server running on port", PORT);
+    console.log("Server running on http://localhost");
 });
