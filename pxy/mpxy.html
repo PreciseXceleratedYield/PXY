@@ -7,47 +7,64 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
 <style>
+
+/* =========================
+   GLOBAL FIX (REMOVES DOUBLE FRAME BUG)
+========================= */
 html, body {
     margin: 0;
+    padding: 0;
+    width: 100%;
     height: 100%;
     overflow: hidden;
+    position: fixed;
     font-family: monospace;
     background: #ffffff;
 }
 
 /* =========================
-   LAYOUT
+   MAIN CONTAINER
 ========================= */
 #container {
     display: flex;
     width: 100%;
-    height: 100vh;
+    height: 100%;
+    overflow: hidden;
 }
 
-/* TERMINAL */
+/* =========================
+   TERMINAL PANEL
+========================= */
 #terminal {
     width: 35%;
-    min-width: 200px;
-    height: 100vh;
-    background: #fff;
+    min-width: 0;
+    height: 100%;
+    background: #ffffff;
     border-right: 1px solid #e5e5e5;
 }
 
-/* DIVIDER */
+/* =========================
+   DIVIDER
+========================= */
 #divider {
     width: 5px;
     cursor: col-resize;
     background: #ddd;
 }
 
-/* RIGHT PANEL */
+/* =========================
+   RIGHT PANEL
+========================= */
 #right {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #fff;
+    background: #ffffff;
+    min-width: 0;
+    min-height: 0;
 }
 
+/* toolbar */
 #toolbar {
     padding: 5px;
     background: #f3f3f3;
@@ -56,8 +73,10 @@ html, body {
     border-bottom: 1px solid #e5e5e5;
 }
 
+/* chart area */
 #chartWrap {
     flex: 1;
+    min-height: 0;
 }
 
 canvas {
@@ -69,16 +88,19 @@ canvas {
    FULLSCREEN MODES (DESKTOP)
 ========================= */
 .fullscreen-terminal #terminal { width: 100% !important; }
-.fullscreen-terminal #right { display: none; }
+.fullscreen-terminal #right { display: none !important; }
 
-.fullscreen-chart #terminal { display: none; }
+.fullscreen-chart #terminal { display: none !important; }
 .fullscreen-chart #right { width: 100% !important; }
 
 /* =========================
-   📱 MOBILE MODE (SAME FILE)
+   📱 MOBILE MODE (NO DOUBLE FRAME FIX)
 ========================= */
 .mobile-mode #right {
     display: none !important;
+    width: 0 !important;
+    flex: 0 !important;
+    position: absolute !important;
 }
 
 .mobile-mode #divider {
@@ -87,7 +109,15 @@ canvas {
 
 .mobile-mode #terminal {
     width: 100% !important;
+    height: 100% !important;
 }
+
+/* safety */
+#terminal, #right {
+    min-width: 0;
+    min-height: 0;
+}
+
 </style>
 </head>
 
@@ -122,13 +152,10 @@ canvas {
 <script>
 
 /* =========================
-   MOBILE DETECTION (ONE TIME)
+   MOBILE DETECTION
 ========================= */
 const isMobile = window.innerWidth <= 768;
 
-/* =========================
-   APPLY MODE
-========================= */
 if (isMobile) {
     document.body.classList.add("mobile-mode");
 }
@@ -139,7 +166,6 @@ if (isMobile) {
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-    fontFamily: "monospace",
     fontSize: 14,
     cursorBlink: false,
     theme: {
@@ -164,7 +190,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   SPLIT DRAG (DESKTOP ONLY)
+   SPLIT RESIZE (DESKTOP ONLY)
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -208,14 +234,13 @@ function resetLayout() {
 }
 
 /* =========================
-   CHART
+   CHART (SAFE)
 ========================= */
 let chart = null;
 
 async function load() {
 
-    // 🚫 MOBILE = NO CHART
-    if (isMobile) return;
+    if (isMobile) return; // 🚫 no chart on mobile
 
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
