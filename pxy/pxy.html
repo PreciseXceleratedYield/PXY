@@ -37,7 +37,7 @@ html, body {
 }
 
 /* =========================
-   RESIZE DIVIDER
+   RESIZER
 ========================= */
 #divider {
     width: 5px;
@@ -46,7 +46,7 @@ html, body {
 }
 
 /* =========================
-   RIGHT PANEL (CHART)
+   RIGHT PANEL
 ========================= */
 #right {
     flex: 1;
@@ -55,7 +55,6 @@ html, body {
     background: #ffffff;
 }
 
-/* toolbar */
 #toolbar {
     padding: 5px;
     background: #f3f3f3;
@@ -98,13 +97,10 @@ canvas {
 
 <div id="container">
 
-    <!-- TERMINAL -->
     <div id="terminal"></div>
 
-    <!-- RESIZER -->
     <div id="divider"></div>
 
-    <!-- CHART -->
     <div id="right">
 
         <div id="toolbar">
@@ -129,7 +125,7 @@ canvas {
 <script>
 
 /* =========================
-   TERMINAL (LIGHT THEME FIXED)
+   TERMINAL
 ========================= */
 const term = new Terminal({
     convertEol: true,
@@ -137,7 +133,6 @@ const term = new Terminal({
     fontFamily: "monospace",
     fontSize: 14,
     cursorBlink: false,
-
     theme: {
         background: "#ffffff",
         foreground: "#111111",
@@ -148,14 +143,9 @@ const term = new Terminal({
 
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
-
 term.open(document.getElementById('terminal'));
 
-setTimeout(() => {
-    fitAddon.fit();
-    document.getElementById("terminal").style.background = "#ffffff";
-}, 50);
-
+setTimeout(() => fitAddon.fit(), 50);
 window.addEventListener("resize", () => fitAddon.fit());
 
 term.writeln("TERMINAL OK");
@@ -167,7 +157,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAGGABLE SPLIT
+   DRAG SPLIT
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -186,7 +176,6 @@ window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
 
     const percent = (e.clientX / window.innerWidth) * 100;
-
     if (percent < 10 || percent > 80) return;
 
     terminal.style.width = percent + "%";
@@ -196,7 +185,7 @@ window.addEventListener("mousemove", (e) => {
 });
 
 /* =========================
-   SAVE / LOAD LAYOUT
+   LAYOUT SAVE
 ========================= */
 function saveLayout() {
     localStorage.setItem("split", terminal.style.width);
@@ -211,7 +200,7 @@ function loadLayout() {
 }
 
 /* =========================
-   FULLSCREEN MODES
+   FULLSCREEN
 ========================= */
 function toggleTerminal() {
     document.body.classList.toggle("fullscreen-terminal");
@@ -222,8 +211,8 @@ function toggleChart() {
 }
 
 function resetLayout() {
-    terminal.style.width = "31%";
-    right.style.width = "69%";
+    terminal.style.width = "35%";
+    right.style.width = "65%";
     localStorage.removeItem("split");
 }
 
@@ -237,15 +226,18 @@ async function load() {
         const res = await fetch("./syschrtpxy.json");
         const data = await res.json();
 
-        const closes = data.map(d => Number(d.close));
-        draw(closes);
+        const closes = data.map(d => d.close);
+        const stVals = data.map(d => d.st);
+        const stTrend = data.map(d => d.st_trend);
+
+        draw(closes, stVals, stTrend);
 
     } catch (err) {
         console.error(err);
     }
 }
 
-function draw(data) {
+function draw(closes, stVals, stTrend) {
     const ctx = document.getElementById("priceChart");
 
     if (chart) chart.destroy();
@@ -253,15 +245,42 @@ function draw(data) {
     chart = new Chart(ctx, {
         type: "line",
         data: {
-            labels: data.map((_, i) => i),
-            datasets: [{
-                data: data,
-                borderColor: "#1f77b4",
-                borderWidth: 2,
-                pointRadius: 0,
-                tension: 0.25
-            }]
+            labels: closes.map((_, i) => i),
+
+            datasets: [
+
+                // CLOSE PRICE
+                {
+                    label: "Close",
+                    data: closes,
+                    borderColor: "#1f77b4",
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.25
+                },
+
+                // SUPER TREND POINTS
+                {
+                    label: "SuperTrend",
+                    data: stVals,
+                    showLine: false,
+
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+
+                    pointBackgroundColor: stTrend.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    ),
+
+                    pointBorderColor: stTrend.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    ),
+
+                    pointBorderWidth: 2
+                }
+            ]
         },
+
         options: {
             responsive: true,
             maintainAspectRatio: false,
