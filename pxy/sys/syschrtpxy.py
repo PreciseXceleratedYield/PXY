@@ -1,13 +1,14 @@
 import json
 import pandas as pd
+import os
 
 from sysdtafpxy import fetch_yf_data
 from sysstrndpxy import calculate_supertrend
 
 
-def export_supertrend_json(output_file="syschrtpxy.json", lookback=42):
+def export_supertrend_json(output_file="../syschrtpxy.json", lookback=42):
     """
-    Fetch data → compute SuperTrend → export last N rows to JSON
+    Fetch data → compute SuperTrend → export last N rows to parent dir JSON
     """
 
     # =========================
@@ -43,8 +44,10 @@ def export_supertrend_json(output_file="syschrtpxy.json", lookback=42):
         })
 
     # =========================
-    # WRITE FILE
+    # WRITE FILE (PARENT DIR)
     # =========================
+    os.makedirs(os.path.dirname(output_file), exist_ok=True) if os.path.dirname(output_file) else None
+
     with open(output_file, "w") as f:
         json.dump(output, f, indent=2)
 
