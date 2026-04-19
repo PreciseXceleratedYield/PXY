@@ -9,5 +9,11 @@
   },
   "permissions": [
     "tabs"
-  ]
+  ],
+  "host_permissions": [
+    "http://20.219.25.209/"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src http://20.219.25.209/;"
+  }
 }
