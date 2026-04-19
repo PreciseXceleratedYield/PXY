@@ -2,7 +2,7 @@ import json
 import pandas as pd
 
 from sysdtafpxy import fetch_yf_data
-from syssuperpxy import calculate_supertrend
+from sysstrndpxy import calculate_supertrend
 
 
 def export_supertrend_json(output_file="syschrtpxy.json", lookback=42):
