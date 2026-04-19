@@ -17,41 +17,27 @@ html, body {
 }
 
 /* =========================
-   TOP BANNER (NEW)
+   MAIN CONTAINER
 ========================= */
-#banner {
-    height: 64px; /* ~4 lines */
-    width: 100%;
-    background: #f7f7f7;
-    border-bottom: 1px solid #ddd;
-    padding: 6px 10px;
-    box-sizing: border-box;
-    font-size: 12px;
-    line-height: 16px;
-}
-
-/* =========================
-   MAIN WRAP
-========================= */
-#main {
+#container {
     display: flex;
     width: 100%;
-    height: calc(100vh - 64px);
+    height: 100vh;
 }
 
 /* =========================
-   TERMINAL
+   TERMINAL PANEL
 ========================= */
 #terminal {
     width: 35%;
     min-width: 200px;
-    height: 100%;
+    height: 100vh;
     background: #ffffff;
     border-right: 1px solid #e5e5e5;
 }
 
 /* =========================
-   DIVIDER
+   RESIZER
 ========================= */
 #divider {
     width: 5px;
@@ -60,12 +46,13 @@ html, body {
 }
 
 /* =========================
-   RIGHT
+   RIGHT PANEL
 ========================= */
 #right {
     flex: 1;
     display: flex;
     flex-direction: column;
+    background: #ffffff;
 }
 
 #toolbar {
@@ -85,28 +72,33 @@ canvas {
     height: 100% !important;
 }
 
-/* FULLSCREEN */
-.fullscreen-terminal #terminal { width: 100% !important; }
-.fullscreen-terminal #right { display: none; }
-.fullscreen-chart #terminal { display: none; }
-.fullscreen-chart #right { width: 100% !important; }
+/* =========================
+   FULLSCREEN MODES
+========================= */
+.fullscreen-terminal #terminal {
+    width: 100% !important;
+}
+
+.fullscreen-terminal #right {
+    display: none;
+}
+
+.fullscreen-chart #terminal {
+    display: none;
+}
+
+.fullscreen-chart #right {
+    width: 100% !important;
+}
 </style>
 </head>
 
 <body>
 
-<!-- ================= BANNER (NEW) ================= -->
-<div id="banner">
-    <div id="b1">PXY DASHBOARD ACTIVE</div>
-    <div id="b2">ST: -- | TREND: --</div>
-    <div id="b3">WAITING DATA...</div>
-    <div id="b4">━━━━━━━━━━━━━━━━━━━━━━━━━━━━</div>
-</div>
-
-<!-- ================= MAIN ================= -->
-<div id="main">
+<div id="container">
 
     <div id="terminal"></div>
+
     <div id="divider"></div>
 
     <div id="right">
@@ -122,6 +114,7 @@ canvas {
         </div>
 
     </div>
+
 </div>
 
 <!-- LIBS -->
@@ -131,15 +124,20 @@ canvas {
 
 <script>
 
-/* ================= TERMINAL ================= */
+/* =========================
+   TERMINAL
+========================= */
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     fontFamily: "monospace",
     fontSize: 14,
+    cursorBlink: false,
     theme: {
         background: "#ffffff",
-        foreground: "#111"
+        foreground: "#111111",
+        cursor: "#111111",
+        selection: "rgba(0,0,0,0.08)"
     }
 });
 
@@ -150,49 +148,60 @@ term.open(document.getElementById('terminal'));
 setTimeout(() => fitAddon.fit(), 50);
 window.addEventListener("resize", () => fitAddon.fit());
 
-term.writeln("TERMINAL READY");
+term.writeln("TERMINAL OK");
 
-/* ================= WS ================= */
+/* =========================
+   WEBSOCKET
+========================= */
 const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
-/* ================= DRAG ================= */
+/* =========================
+   DRAG SPLIT
+========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
 const right = document.getElementById("right");
 
-let dragging = false;
+let isDragging = false;
 
-divider.addEventListener("mousedown", () => dragging = true);
+divider.addEventListener("mousedown", () => isDragging = true);
 
-window.addEventListener("mouseup", () => dragging = false);
+window.addEventListener("mouseup", () => {
+    isDragging = false;
+    saveLayout();
+});
 
 window.addEventListener("mousemove", (e) => {
-    if (!dragging) return;
+    if (!isDragging) return;
 
-    const p = (e.clientX / window.innerWidth) * 100;
-    if (p < 10 || p > 80) return;
+    const percent = (e.clientX / window.innerWidth) * 100;
+    if (percent < 10 || percent > 80) return;
 
-    terminal.style.width = p + "%";
-    right.style.width = (100 - p) + "%";
+    terminal.style.width = percent + "%";
+    right.style.width = (100 - percent) + "%";
 
     fitAddon.fit();
 });
 
-/* ================= LAYOUT ================= */
+/* =========================
+   LAYOUT SAVE
+========================= */
 function saveLayout() {
     localStorage.setItem("split", terminal.style.width);
 }
 
 function loadLayout() {
-    const s = localStorage.getItem("split");
-    if (s) {
-        terminal.style.width = s;
-        right.style.width = (100 - parseFloat(s)) + "%";
+    const saved = localStorage.getItem("split");
+    if (saved) {
+        terminal.style.width = saved;
+        right.style.width = (100 - parseFloat(saved)) + "%";
     }
 }
 
-/* ================= FULLSCREEN ================= */
+/* =========================
+   FULLSCREEN
+========================= */
 function toggleTerminal() {
     document.body.classList.toggle("fullscreen-terminal");
 }
@@ -207,28 +216,25 @@ function resetLayout() {
     localStorage.removeItem("split");
 }
 
-/* ================= CHART ================= */
+/* =========================
+   CHART
+========================= */
 let chart;
 
-function updateBanner(lastST, trend) {
-    document.getElementById("b2").innerText =
-        `ST: ${lastST} | TREND: ${trend}`;
-
-    document.getElementById("b3").innerText =
-        trend === "UP" ? "MARKET BULLISH" : "MARKET BEARISH";
-}
-
 async function load() {
-    const res = await fetch("./syschrtpxy.json");
-    const data = await res.json();
+    try {
+        const res = await fetch("./syschrtpxy.json");
+        const data = await res.json();
 
-    const closes = data.map(d => d.close);
-    const stVals = data.map(d => d.st);
-    const stTrend = data.map(d => d.st_trend);
+        const closes = data.map(d => d.close);
+        const stVals = data.map(d => d.st);
+        const stTrend = data.map(d => d.st_trend);
 
-    updateBanner(stVals.at(-1), stTrend.at(-1));
+        draw(closes, stVals, stTrend);
 
-    draw(closes, stVals, stTrend);
+    } catch (err) {
+        console.error(err);
+    }
 }
 
 function draw(closes, stVals, stTrend) {
@@ -243,6 +249,7 @@ function draw(closes, stVals, stTrend) {
 
             datasets: [
 
+                // CLOSE PRICE
                 {
                     label: "Close",
                     data: closes,
@@ -252,16 +259,14 @@ function draw(closes, stVals, stTrend) {
                     tension: 0.25
                 },
 
-                /* ================= SUPER TREND ASCII STYLE ================= */
+                // SUPER TREND POINTS
                 {
-                    label: "ST",
+                    label: "SuperTrend",
                     data: stVals,
                     showLine: false,
 
-                    pointRadius: 0,   // hide circles
-
-                    /* THIS IS THE KEY CHANGE */
-                    pointStyle: stTrend.map(t => "line"),
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
 
                     pointBackgroundColor: stTrend.map(t =>
                         t === "UP" ? "#00c853" : "#ff1744"
@@ -271,10 +276,7 @@ function draw(closes, stVals, stTrend) {
                         t === "UP" ? "#00c853" : "#ff1744"
                     ),
 
-                    pointBorderWidth: 3,
-
-                    /* use unicode line marker instead of emoji */
-                    beforeDraw: (chart) => {}
+                    pointBorderWidth: 2
                 }
             ]
         },
@@ -282,18 +284,29 @@ function draw(closes, stVals, stTrend) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+
             plugins: {
                 legend: { display: false }
             },
+
             scales: {
-                x: { ticks: { color: "#333" }, grid: { color: "#eee" } },
-                y: { position: "right", ticks: { color: "#333" }, grid: { color: "#eee" } }
+                x: {
+                    ticks: { color: "#333" },
+                    grid: { color: "#eee" }
+                },
+                y: {
+                    position: "right",
+                    ticks: { color: "#333" },
+                    grid: { color: "#eee" }
+                }
             }
         }
     });
 }
 
-/* ================= INIT ================= */
+/* =========================
+   INIT
+========================= */
 loadLayout();
 load();
 setInterval(load, 3000);
