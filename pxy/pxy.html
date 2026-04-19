@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Light Mode Terminal</title>
+<title>Terminal + Chart Dashboard</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
@@ -12,58 +12,67 @@ html, body {
     padding: 0;
     height: 100%;
     width: 100%;
+    display: flex;
     background: #ffffff;
-    color: #111;
+    overflow: hidden;
+    font-family: monospace;
 }
 
+/* ===================== */
+/* LEFT - TERMINAL */
+/* ===================== */
 #terminal {
-    width: 100%;
+    width: 50%;
     height: 100vh;
+    border-right: 1px solid #ddd;
 }
 
+/* ===================== */
+/* RIGHT - CHART */
+/* ===================== */
+#chart {
+    width: 50%;
+    height: 100vh;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+canvas {
+    width: 100% !important;
+    height: 95vh !important;
+}
+
+/* terminal cursor fix */
 .xterm .xterm-cursor {
     border-left: 2px solid #111 !important;
     animation: none !important;
-}
-
-.xterm .xterm-selection {
-    background: rgba(0, 0, 0, 0.15) !important;
 }
 </style>
 </head>
 
 <body>
 
+<!-- ===================== -->
+<!-- LEFT TERMINAL -->
+<!-- ===================== -->
 <div id="terminal"></div>
 
+<!-- ===================== -->
+<!-- RIGHT CHART -->
+<!-- ===================== -->
+<div id="chart">
+    <h3>📊 Close Price (Last 42)</h3>
+    <canvas id="priceChart"></canvas>
+</div>
+
+<!-- ===================== -->
+<!-- LIBRARIES -->
+<!-- ===================== -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-
-// =====================
-// FONT SIZE
-// =====================
-const BASE_FONT = 14.2;
-const FONT_SIZE = Math.round(BASE_FONT);
-
-// =====================
-// 🔥 EMOJI WIDTH FIX (CRITICAL)
-// =====================
-window.wcwidth = function (char) {
-    const code = char.codePointAt(0);
-
-    // emojis + symbols → width 2
-    if (
-        (code >= 0x1F300 && code <= 0x1FAFF) ||
-        (code >= 0x2600 && code <= 0x26FF) ||
-        (code >= 0x2700 && code <= 0x27BF)
-    ) {
-        return 2;
-    }
-
-    return 1;
-};
 
 // =====================
 // TERMINAL INIT
@@ -71,64 +80,96 @@ window.wcwidth = function (char) {
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-
-    fontFamily: "'Cascadia Mono', 'Noto Color Emoji', monospace",
-    fontSize: FONT_SIZE,
-
+    fontFamily: "'Cascadia Mono', monospace",
+    fontSize: 14,
     cursorBlink: false,
-
     theme: {
         background: '#ffffff',
-        foreground: '#111111',
-        cursor: '#111111',
-        selection: 'rgba(0, 0, 0, 0.15)',
-
-        black: '#111111',
-        red: '#d32f2f',
-        green: '#2e7d32',
-        yellow: '#f9a825',
-        blue: '#1565c0',
-        magenta: '#6a1b9a',
-        cyan: '#00838f',
-        white: '#333333'
+        foreground: '#111'
     }
 });
 
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 
-// =====================
-// START
-// =====================
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-// TEST
 term.writeln("✅ Terminal Ready");
-term.writeln("Emoji fix enabled 🚀 📈 ⚠️");
 term.writeln("-----------------------------------");
 
 // =====================
-// WEBSOCKET
+// WEBSOCKET (pxy.js)
 // =====================
 const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
-
-ws.onopen = () => {
-    term.writeln("✅ WebSocket Connected");
-};
 
 ws.onmessage = (event) => {
     term.write(event.data);
 };
 
-ws.onerror = () => {
-    term.writeln("❌ WebSocket Error");
-};
+// =====================
+// CHART LOGIC
+// =====================
+let chartInstance = null;
 
-window.addEventListener('resize', () => {
-    fitAddon.fit();
-});
+async function loadChart() {
+    try {
+        const res = await fetch("./sys/syschrtpxy.json");
+        const data = await res.json();
+
+        const labels = data.map(d => d.time.split(" ")[1] || d.time);
+        const closes = data.map(d => d.close);
+
+        drawChart(labels, closes);
+
+    } catch (err) {
+        console.error("Chart load error:", err);
+    }
+}
+
+function drawChart(labels, data) {
+    const ctx = document.getElementById("priceChart").getContext("2d");
+
+    if (chartInstance) chartInstance.destroy();
+
+    chartInstance = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Close",
+                data: data,
+                borderColor: "#1565c0",
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.25
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: { display: false },
+                y: { display: true }
+            }
+        }
+    });
+}
+
+// =====================
+// AUTO REFRESH JSON
+// =====================
+loadChart();
+setInterval(loadChart, 5000);
+
+// =====================
+// RESIZE FIX
+// =====================
+window.addEventListener('resize', () => fitAddon.fit());
 
 </script>
 
