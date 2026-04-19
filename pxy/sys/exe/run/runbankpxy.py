@@ -24,7 +24,7 @@ def get_monthly_expiry():
     today = date.today()
 
     # Decide target month
-    if today.day <= 20:
+    if today.day <= 24:
         target_month = today.month
         target_year = today.year
     else:
