@@ -1,74 +1,102 @@
-import matplotlib
-matplotlib.use("Agg")  # 🔴 MUST for server
-
 import pandas as pd
-import matplotlib.pyplot as plt
-import os
+import numpy as np
+from asciichartpy import plot
+from clorpxy import BRIGHT_RED, BRIGHT_GREEN, BRIGHT_YELLOW, RESET
 
-CSV_FILE = "market_data.csv"
-OUTPUT_FILE = "ha_chart.png"
+from syscnfgpxy import PARAMS
+from sysdtafpxy import fetch_yf_data
+from syssuperpxy import calculate_supertrend
 
-def plot_last_2_hours_ha():
-    # Check file exists
-    if not os.path.exists(CSV_FILE):
-        print("❌ CSV not found:", CSV_FILE)
-        return
+# === PARAMETERS ===
+TICKER_SYMBOL = PARAMS["ticker"]
+LAST_POINTS = 42
+CHART_HEIGHT = 12
+TOTAL_WIDTH = 42
 
-    # Load data
-    try:
-        df = pd.read_csv(CSV_FILE, parse_dates=["Datetime"])
-    except Exception as e:
-        print("❌ Error reading CSV:", e)
-        return
+# === FETCH DATA (YOUR ENGINE) ===
+df = fetch_yf_data()
 
-    # Sort
-    df.sort_values("Datetime", inplace=True)
+if df is None or df.empty:
+    print("No data fetched from data source.")
+    exit()
 
-    if df.empty:
-        print("❌ CSV is empty")
-        return
+# === SUPER TREND CALCULATION ===
+df = calculate_supertrend(df)
 
-    # Filter last 2 hours
-    last_time = df["Datetime"].iloc[-1]
-    df = df[df["Datetime"] >= last_time - pd.Timedelta(hours=2)]
+# === EXTRACT ST SERIES ===
+st_series = df["ST"].dropna().tolist()
+close_series = df["Close"].tolist()
 
-    print("✅ Rows in last 2 hours:", len(df))
+if len(st_series) == 0:
+    print("No SuperTrend data available.")
+    exit()
 
-    if df.empty:
-        print("❌ No data in last 2 hours")
-        return
+# === SELECT LAST POINTS (ST LINE INSTEAD OF SMA/CLOSE) ===
+data_points = st_series[-LAST_POINTS:] if len(st_series) >= LAST_POINTS else st_series
+data_points_int = [int(round(p)) for p in data_points]
 
-    # --- YOUR HA STYLE ---
-    df["HA_Open"] = (df["Open"] + df["High"] + df["Low"] + df["Close"]) / 4
-    df["HA_Close"] = (df["Open"] + df["Close"]) / 2
-    df["HA_Line"] = (df["HA_Open"] + df["HA_Close"]) / 2
+# === CURRENT VALUES ===
+latest_st = int(round(st_series[-1]))
+latest_close = int(round(close_series[-1]))
 
-    # Color logic
-    df["Color"] = df.apply(
-        lambda row: "green" if row["HA_Close"] >= row["HA_Open"] else "red",
-        axis=1
-    )
+st_trend = df["ST_Trend"].iloc[-1]
 
-    # Plot
-    plt.figure()
+# === ADJUST PLOT WIDTH ===
+min_value = min(data_points_int)
+max_value = max(data_points_int)
 
-    for i in range(1, len(df)):
-        plt.plot(
-            df["Datetime"].iloc[i-1:i+1],
-            df["HA_Line"].iloc[i-1:i+1],
-            color=df["Color"].iloc[i]
-        )
+y_axis_width = len(str(max_value)) + 1
+plot_width = TOTAL_WIDTH - y_axis_width - 1
+plot_width = max(plot_width, 10)
 
-    plt.title("Last 2 Hours HA Trend")
-    plt.xlabel("Time")
-    plt.ylabel("Price")
-    plt.xticks(rotation=45)
+# === SCALE DATA ===
+if len(data_points_int) != plot_width:
+    x_old = np.linspace(0, 1, len(data_points_int))
+    x_new = np.linspace(0, 1, plot_width)
+    data_points_scaled = np.interp(x_new, x_old, data_points_int).tolist()
+    data_points_scaled = [int(round(p)) for p in data_points_scaled]
+else:
+    data_points_scaled = data_points_int
 
-    plt.tight_layout()
-    plt.savefig(OUTPUT_FILE)
+# === ASCII CHART ===
+chart = plot(
+    data_points_scaled,
+    {'height': CHART_HEIGHT, 'format': "{:.0f}", 'width': plot_width}
+)
 
-    print("✅ Chart saved as:", OUTPUT_FILE)
+chart_lines = chart.split('\n')
 
+# === COLOR MAPPING BASED ON SUPER TREND ===
+scale_step = (max_value - min_value) / (len(chart_lines) - 1) if len(chart_lines) > 1 else 1
 
-if __name__ == "__main__":
-    plot_last_2_hours_ha()
+for i, line in enumerate(chart_lines):
+    line_value = max_value - i * scale_step
+    line_parts = line.split(' ')
+
+    for j, part in enumerate(line_parts):
+        part_clean = part.strip().replace('-', '')
+
+        if part_clean.isdigit():
+
+            # === SUPER TREND BASED COLORING ===
+            if st_trend == "UP":
+                color = BRIGHT_GREEN
+            else:
+                color = BRIGHT_RED
+
+            # highlight near ST level
+            if abs(line_value - latest_st) < scale_step:
+                color = BRIGHT_YELLOW
+
+            line_parts[j] = f"{color}{part}{RESET}"
+            break
+
+    chart_lines[i] = ' '.join(line_parts)
+
+highlighted_chart = "\n".join(chart_lines)
+
+# === OUTPUT ===
+print(highlighted_chart)
+
+print(f"\nST Trend: {st_trend} | ST Line: {latest_st} | Close: {latest_close}")
+print(RESET)
