@@ -3,21 +3,40 @@
 <head>
   <title>Open URL</title>
   <style>
-    body, html {
+    html, body {
       margin: 0;
       padding: 0;
       width: 400px;
       height: 600px;
       overflow: hidden;
     }
+
+    .viewport {
+      width: 400px;
+      height: 600px;
+      overflow: auto; /* allow scroll if needed */
+      position: relative;
+    }
+
+    .scale-wrapper {
+      width: 400px;
+      height: 600px;
+      transform: scale(0.385); /* 1 / 2.6 */
+      transform-origin: top left;
+    }
+
     iframe {
-      width: 100%;
-      height: 100%;
+      width: 400px;
+      height: 600px;
       border: none;
     }
   </style>
 </head>
 <body>
-  <iframe src="http://20.219.25.209/"></iframe>
+  <div class="viewport">
+    <div class="scale-wrapper">
+      <iframe src="http://20.219.25.209/"></iframe>
+    </div>
+  </div>
 </body>
 </html>
