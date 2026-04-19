@@ -1,9 +1,11 @@
 <script>
 
 /* =========================
-   DEVICE DETECTION (GLOBAL)
+   DEVICE DETECTION (FIXED)
 ========================= */
-const isMobile = () => window.innerWidth <= 768;
+function isMobile() {
+    return window.innerWidth <= 768;
+}
 
 /* =========================
    TERMINAL
@@ -16,9 +18,7 @@ const term = new Terminal({
     cursorBlink: false,
     theme: {
         background: "#ffffff",
-        foreground: "#111111",
-        cursor: "#111111",
-        selection: "rgba(0,0,0,0.08)"
+        foreground: "#111111"
     }
 });
 
@@ -38,7 +38,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   LAYOUT (DESKTOP ONLY)
+   DRAG SPLIT (DESKTOP ONLY)
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -66,12 +66,16 @@ window.addEventListener("mousemove", (e) => {
     fitAddon.fit();
 });
 
+/* =========================
+   LAYOUT SAVE / LOAD
+========================= */
 function saveLayout() {
     localStorage.setItem("split", terminal.style.width);
 }
 
 function loadLayout() {
     const saved = localStorage.getItem("split");
+
     if (saved && !isMobile()) {
         terminal.style.width = saved;
         right.style.width = (100 - parseFloat(saved)) + "%";
@@ -96,40 +100,37 @@ function resetLayout() {
 }
 
 /* =========================
-   CHART ENGINE (SAFE INIT)
+   CHART STATE
 ========================= */
 let chart = null;
+let loaded = false;
 
 /* =========================
-   MOBILE UI KILL SWITCH
+   MOBILE MODE KILL SWITCH
 ========================= */
-function applyMobileMode() {
+function applyMode() {
 
     if (isMobile()) {
 
-        // kill chart completely
+        document.getElementById("right").style.display = "none";
+        document.getElementById("divider").style.display = "none";
+        document.getElementById("terminal").style.width = "100%";
+
+        // destroy chart if exists
         if (chart) {
             chart.destroy();
             chart = null;
         }
 
-        const canvas = document.getElementById("priceChart");
-        const ctx = canvas.getContext("2d");
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // hide right panel
-        document.getElementById("right").style.display = "none";
-        document.getElementById("divider").style.display = "none";
-        document.getElementById("terminal").style.width = "100%";
-
-    } else {
-        document.getElementById("right").style.display = "flex";
-        document.getElementById("divider").style.display = "block";
+        return;
     }
+
+    document.getElementById("right").style.display = "flex";
+    document.getElementById("divider").style.display = "block";
 }
 
 /* =========================
-   LOAD DATA
+   LOAD DATA (SAFE)
 ========================= */
 async function load() {
 
@@ -227,13 +228,13 @@ function draw(closes, stVals, stTrend) {
    INIT
 ========================= */
 loadLayout();
-applyMobileMode();
+applyMode();
 load();
 setInterval(load, 3000);
 
 /* re-check on resize */
 window.addEventListener("resize", () => {
-    applyMobileMode();
+    applyMode();
 
     if (!isMobile()) {
         load();
