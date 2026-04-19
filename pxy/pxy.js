@@ -10,6 +10,9 @@ const wss = new WebSocket.Server({ server });
 
 const PORT = 80;
 
+// ⭐ IMPORTANT FIX (THIS IS WHAT YOU'RE MISSING)
+app.use(express.static(__dirname));
+
 // Serve frontend
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'pxy.html'));
@@ -25,7 +28,6 @@ wss.on('connection', (ws) => {
                 ws.send(`ERROR: ${stderr || err.message}\n`);
                 return;
             }
-
             ws.send(stdout);
         });
     }, 500);
