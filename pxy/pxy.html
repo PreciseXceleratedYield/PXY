@@ -26,7 +26,7 @@ html, body {
 }
 
 /* =========================
-   TERMINAL PANEL
+   TERMINAL
 ========================= */
 #terminal {
     width: 35%;
@@ -37,7 +37,7 @@ html, body {
 }
 
 /* =========================
-   RESIZER
+   DIVIDER
 ========================= */
 #divider {
     width: 5px;
@@ -73,7 +73,7 @@ canvas {
 }
 
 /* =========================
-   FULLSCREEN MODES
+   FULLSCREEN MODES (DESKTOP)
 ========================= */
 .fullscreen-terminal #terminal {
     width: 100% !important;
@@ -89,6 +89,30 @@ canvas {
 
 .fullscreen-chart #right {
     width: 100% !important;
+}
+
+/* =========================
+   📱 MOBILE MODE
+========================= */
+@media (max-width: 768px) {
+
+    #right {
+        display: none !important;
+    }
+
+    #divider {
+        display: none !important;
+    }
+
+    #terminal {
+        width: 100% !important;
+        height: 100vh !important;
+        border-right: none;
+    }
+
+    #container {
+        flex-direction: column;
+    }
 }
 </style>
 </head>
@@ -157,7 +181,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG SPLIT
+   DRAG SPLIT (DESKTOP ONLY)
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -174,6 +198,7 @@ window.addEventListener("mouseup", () => {
 
 window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
+    if (window.innerWidth <= 768) return; // disable on mobile
 
     const percent = (e.clientX / window.innerWidth) * 100;
     if (percent < 10 || percent > 80) return;
@@ -185,7 +210,7 @@ window.addEventListener("mousemove", (e) => {
 });
 
 /* =========================
-   LAYOUT SAVE
+   LAYOUT
 ========================= */
 function saveLayout() {
     localStorage.setItem("split", terminal.style.width);
@@ -193,7 +218,7 @@ function saveLayout() {
 
 function loadLayout() {
     const saved = localStorage.getItem("split");
-    if (saved) {
+    if (saved && window.innerWidth > 768) {
         terminal.style.width = saved;
         right.style.width = (100 - parseFloat(saved)) + "%";
     }
@@ -211,8 +236,8 @@ function toggleChart() {
 }
 
 function resetLayout() {
-    terminal.style.width = "40%";
-    right.style.width = "60%";
+    terminal.style.width = "35%";
+    right.style.width = "65%";
     localStorage.removeItem("split");
 }
 
@@ -222,61 +247,65 @@ function resetLayout() {
 let chart;
 
 async function load() {
-    try {
-        const res = await fetch("./syschrtpxy.json");
-        const data = await res.json();
+    const res = await fetch("./syschrtpxy.json");
+    const data = await res.json();
 
-        const closes = data.map(d => d.close);
-        const stVals = data.map(d => d.st);
-        const stTrend = data.map(d => d.st_trend);
+    const closes = data.map(d => d.close);
+    const stVals = data.map(d => d.st);
+    const stTrend = data.map(d => d.st_trend);
 
-        draw(closes, stVals, stTrend);
-
-    } catch (err) {
-        console.error(err);
-    }
+    draw(closes, stVals, stTrend);
 }
 
 function draw(closes, stVals, stTrend) {
+
     const ctx = document.getElementById("priceChart");
 
     if (chart) chart.destroy();
 
+    /* =========================
+       3 CANDLE RIGHT PADDING
+    ========================= */
+    const pad = 3;
+
+    const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
+    const closePad = [...closes, ...Array(pad).fill(null)];
+    const stPad = [...stVals, ...Array(pad).fill(null)];
+    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
+
     chart = new Chart(ctx, {
         type: "line",
         data: {
-            labels: closes.map((_, i) => i),
+            labels,
 
             datasets: [
 
-                // CLOSE PRICE
+                // CLOSE
                 {
                     label: "Close",
-                    data: closes,
+                    data: closePad,
                     borderColor: "#1f77b4",
                     borderWidth: 2,
                     pointRadius: 0,
                     tension: 0.25
                 },
 
-                // SUPER TREND POINTS
+                // SUPER TREND
                 {
-                    label: "SuperTrend",
-                    data: stVals,
+                    label: "ST",
+                    data: stPad,
                     showLine: false,
 
                     pointRadius: 2,
-                    pointHoverRadius: 3,
+                    pointBorderWidth: 2,
 
-                    pointBackgroundColor: stTrend.map(t =>
+                    pointBackgroundColor: trendPad.map(t =>
                         t === "UP" ? "#00c853" : "#ff1744"
                     ),
 
-                    pointBorderColor: stTrend.map(t =>
+                    pointBorderColor: trendPad.map(t =>
                         t === "UP" ? "#00c853" : "#ff1744"
-                    ),
-
-                    pointBorderWidth: 2
+                    )
                 }
             ]
         },
@@ -292,7 +321,8 @@ function draw(closes, stVals, stTrend) {
             scales: {
                 x: {
                     ticks: { color: "#333" },
-                    grid: { color: "#eee" }
+                    grid: { color: "#eee" },
+                    offset: true
                 },
                 y: {
                     position: "right",
