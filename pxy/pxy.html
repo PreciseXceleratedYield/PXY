@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PX Dashboard</title>
+<title>PXY DEBUG DASHBOARD</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
@@ -11,30 +11,42 @@ html, body {
     margin: 0;
     padding: 0;
     height: 100%;
-    width: 100%;
     display: flex;
     font-family: monospace;
-    overflow: hidden;
 }
 
-/* LEFT TERMINAL */
 #terminal {
     width: 50%;
     height: 100vh;
     border-right: 1px solid #ddd;
 }
 
-/* RIGHT CHART */
 #right {
     width: 50%;
     height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#title {
     padding: 10px;
-    box-sizing: border-box;
+    font-weight: bold;
+    background: #f3f3f3;
+}
+
+#status {
+    padding: 5px 10px;
+    font-size: 12px;
+    color: blue;
+}
+
+#chartWrap {
+    flex: 1;
 }
 
 canvas {
     width: 100% !important;
-    height: 95vh !important;
+    height: 100% !important;
 }
 </style>
 </head>
@@ -46,8 +58,11 @@ canvas {
 
 <!-- RIGHT -->
 <div id="right">
-    <h3>📊 Close Price (Last 42)</h3>
-    <canvas id="priceChart"></canvas>
+    <div id="title">📊 Close Price (Last 42)</div>
+    <div id="status">INIT...</div>
+    <div id="chartWrap">
+        <canvas id="priceChart"></canvas>
+    </div>
 </div>
 
 <!-- LIBS -->
@@ -57,13 +72,15 @@ canvas {
 
 <script>
 
+console.log("JS LOADED OK");
+document.getElementById("status").innerText = "JS LOADED OK";
+
 // =====================
 // TERMINAL
 // =====================
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-    fontFamily: "monospace",
     fontSize: 14
 });
 
@@ -76,78 +93,75 @@ fitAddon.fit();
 term.writeln("TERMINAL OK");
 
 // =====================
-// WEBSOCKET
+// WS
 // =====================
 const ws = new WebSocket(`ws://${location.host}`);
-
 ws.onmessage = (e) => term.write(e.data);
 
 // =====================
 // CHART
 // =====================
-let chartInstance = null;
+let chart;
 
-async function loadChart() {
+async function load() {
     try {
+        console.log("FETCH START");
+
         const res = await fetch("./pxy.json");
 
         if (!res.ok) {
-            console.log("FETCH FAIL:", res.status);
-            return;
+            throw new Error("HTTP " + res.status);
         }
 
         const data = await res.json();
 
+        console.log("DATA OK:", data.length);
+
+        document.getElementById("status").innerText =
+            "DATA LOADED: " + data.length;
+
         const closes = data.map(d => Number(d.close));
 
-        drawChart(closes);
+        draw(closes);
 
     } catch (err) {
-        console.error("FETCH ERROR:", err);
+        console.error(err);
+        document.getElementById("status").innerText =
+            "ERROR: " + err.message;
     }
 }
 
-function drawChart(data) {
+function draw(data) {
+    console.log("DRAW");
+
     const ctx = document.getElementById("priceChart");
 
-    if (!ctx) return;
+    if (chart) chart.destroy();
 
-    const c = ctx.getContext("2d");
-
-    if (chartInstance) chartInstance.destroy();
-
-    chartInstance = new Chart(c, {
+    chart = new Chart(ctx, {
         type: "line",
         data: {
-            labels: data.map((_, i) => i + 1),
+            labels: data.map((_, i) => i),
             datasets: [{
                 label: "Close",
                 data: data,
-                borderColor: "#1565c0",
+                borderColor: "blue",
                 borderWidth: 2,
-                pointRadius: 0,
-                tension: 0.25
+                pointRadius: 0
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                x: { display: false },
-                y: { display: true }
-            }
+            maintainAspectRatio: false
         }
     });
+
+    document.getElementById("status").innerText = "CHART RENDERED";
 }
 
 // =====================
-loadChart();
-setInterval(loadChart, 3000);
-
-window.addEventListener('resize', () => fitAddon.fit());
+load();
+setInterval(load, 3000);
 
 </script>
 
