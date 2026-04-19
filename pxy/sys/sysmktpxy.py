@@ -10,7 +10,7 @@ import pandas as pd
 # ==================================================
 MODE = "HKIN"   # "OC2" or "HKIN"
 DEBUG = False     # DEBUG SWITCH
-EXIT_MODE = "C"   # "C" or "OHLC"   🔥 PATCH ADDED
+EXIT_MODE = "OHLC"   # "C" or "OHLC"   🔥 PATCH ADDED
 
 
 # ==================================================
