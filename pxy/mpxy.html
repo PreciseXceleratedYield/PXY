@@ -2,332 +2,133 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PXY DASHBOARD</title>
+<title>Light Mode Terminal</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
 <style>
-
-/* =========================
-   GLOBAL FIX (REMOVES DOUBLE FRAME BUG)
-========================= */
 html, body {
     margin: 0;
     padding: 0;
-    width: 100%;
     height: 100%;
-    overflow: hidden;
-    position: fixed;
-    font-family: monospace;
+    width: 100%;
     background: #ffffff;
+    color: #111;
 }
 
-/* =========================
-   MAIN CONTAINER
-========================= */
-#container {
-    display: flex;
-    width: 100%;
-    height: 100%;
-    overflow: hidden;
-}
-
-/* =========================
-   TERMINAL PANEL
-========================= */
 #terminal {
-    width: 35%;
-    min-width: 0;
-    height: 100%;
-    background: #ffffff;
-    border-right: 1px solid #e5e5e5;
+    width: 100%;
+    height: 100vh;
 }
 
-/* =========================
-   DIVIDER
-========================= */
-#divider {
-    width: 5px;
-    cursor: col-resize;
-    background: #ddd;
+.xterm .xterm-cursor {
+    border-left: 2px solid #111 !important;
+    animation: none !important;
 }
 
-/* =========================
-   RIGHT PANEL
-========================= */
-#right {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: #ffffff;
-    min-width: 0;
-    min-height: 0;
+.xterm .xterm-selection {
+    background: rgba(0, 0, 0, 0.15) !important;
 }
-
-/* toolbar */
-#toolbar {
-    padding: 5px;
-    background: #f3f3f3;
-    display: flex;
-    gap: 10px;
-    border-bottom: 1px solid #e5e5e5;
-}
-
-/* chart area */
-#chartWrap {
-    flex: 1;
-    min-height: 0;
-}
-
-canvas {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-/* =========================
-   FULLSCREEN MODES (DESKTOP)
-========================= */
-.fullscreen-terminal #terminal { width: 100% !important; }
-.fullscreen-terminal #right { display: none !important; }
-
-.fullscreen-chart #terminal { display: none !important; }
-.fullscreen-chart #right { width: 100% !important; }
-
-/* =========================
-   📱 MOBILE MODE (NO DOUBLE FRAME FIX)
-========================= */
-.mobile-mode #right {
-    display: none !important;
-    width: 0 !important;
-    flex: 0 !important;
-    position: absolute !important;
-}
-
-.mobile-mode #divider {
-    display: none !important;
-}
-
-.mobile-mode #terminal {
-    width: 100% !important;
-    height: 100% !important;
-}
-
-/* safety */
-#terminal, #right {
-    min-width: 0;
-    min-height: 0;
-}
-
 </style>
 </head>
 
 <body>
 
-<div id="container">
+<div id="terminal"></div>
 
-    <div id="terminal"></div>
-    <div id="divider"></div>
-
-    <div id="right">
-
-        <div id="toolbar">
-            <button onclick="toggleTerminal()">🖥 Terminal</button>
-            <button onclick="toggleChart()">📊 Chart</button>
-            <button onclick="resetLayout()">🔄 Reset</button>
-        </div>
-
-        <div id="chartWrap">
-            <canvas id="priceChart"></canvas>
-        </div>
-
-    </div>
-
-</div>
-
-<!-- LIBS -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 
-/* =========================
-   MOBILE DETECTION
-========================= */
-const isMobile = window.innerWidth <= 768;
+// =====================
+// FONT SIZE
+// =====================
+const BASE_FONT = 14.2;
+const FONT_SIZE = Math.round(BASE_FONT);
 
-if (isMobile) {
-    document.body.classList.add("mobile-mode");
-}
+// =====================
+// 🔥 EMOJI WIDTH FIX (CRITICAL)
+// =====================
+window.wcwidth = function (char) {
+    const code = char.codePointAt(0);
 
-/* =========================
-   TERMINAL
-========================= */
+    // emojis + symbols → width 2
+    if (
+        (code >= 0x1F300 && code <= 0x1FAFF) ||
+        (code >= 0x2600 && code <= 0x26FF) ||
+        (code >= 0x2700 && code <= 0x27BF)
+    ) {
+        return 2;
+    }
+
+    return 1;
+};
+
+// =====================
+// TERMINAL INIT
+// =====================
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-    fontSize: 14,
+
+    fontFamily: "'Cascadia Mono', 'Noto Color Emoji', monospace",
+    fontSize: FONT_SIZE,
+
     cursorBlink: false,
+
     theme: {
-        background: "#ffffff",
-        foreground: "#111"
+        background: '#ffffff',
+        foreground: '#111111',
+        cursor: '#111111',
+        selection: 'rgba(0, 0, 0, 0.15)',
+
+        black: '#111111',
+        red: '#d32f2f',
+        green: '#2e7d32',
+        yellow: '#f9a825',
+        blue: '#1565c0',
+        magenta: '#6a1b9a',
+        cyan: '#00838f',
+        white: '#333333'
     }
 });
 
-const fit = new FitAddon.FitAddon();
-term.loadAddon(fit);
-term.open(document.getElementById("terminal"));
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
 
-setTimeout(() => fit.fit(), 50);
-window.addEventListener("resize", () => fit.fit());
+// =====================
+// START
+// =====================
+term.open(document.getElementById('terminal'));
+fitAddon.fit();
 
-term.writeln("TERMINAL READY");
+// TEST
+term.writeln("✅ Terminal Ready");
+term.writeln("Emoji fix enabled 🚀 📈 ⚠️");
+term.writeln("-----------------------------------");
 
-/* =========================
-   WEBSOCKET
-========================= */
-const ws = new WebSocket(`ws://${location.host}`);
-ws.onmessage = (e) => term.write(e.data);
+// =====================
+// WEBSOCKET
+// =====================
+const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
-/* =========================
-   SPLIT RESIZE (DESKTOP ONLY)
-========================= */
-const divider = document.getElementById("divider");
-const terminal = document.getElementById("terminal");
-const right = document.getElementById("right");
+ws.onopen = () => {
+    term.writeln("✅ WebSocket Connected");
+};
 
-let dragging = false;
+ws.onmessage = (event) => {
+    term.write(event.data);
+};
 
-divider.addEventListener("mousedown", () => {
-    if (isMobile) return;
-    dragging = true;
+ws.onerror = () => {
+    term.writeln("❌ WebSocket Error");
+};
+
+window.addEventListener('resize', () => {
+    fitAddon.fit();
 });
-
-window.addEventListener("mouseup", () => dragging = false);
-
-window.addEventListener("mousemove", (e) => {
-    if (!dragging || isMobile) return;
-
-    const p = (e.clientX / window.innerWidth) * 100;
-    if (p < 10 || p > 80) return;
-
-    terminal.style.width = p + "%";
-    right.style.width = (100 - p) + "%";
-
-    fit.fit();
-});
-
-/* =========================
-   LAYOUT
-========================= */
-function toggleTerminal() {
-    document.body.classList.toggle("fullscreen-terminal");
-}
-
-function toggleChart() {
-    document.body.classList.toggle("fullscreen-chart");
-}
-
-function resetLayout() {
-    terminal.style.width = "35%";
-    right.style.width = "65%";
-}
-
-/* =========================
-   CHART (SAFE)
-========================= */
-let chart = null;
-
-async function load() {
-
-    if (isMobile) return; // 🚫 no chart on mobile
-
-    const res = await fetch("./syschrtpxy.json");
-    const data = await res.json();
-
-    const closes = data.map(d => d.close);
-    const stVals = data.map(d => d.st);
-    const stTrend = data.map(d => d.st_trend);
-
-    draw(closes, stVals, stTrend);
-}
-
-function draw(closes, stVals, stTrend) {
-
-    const ctx = document.getElementById("priceChart");
-
-    if (chart) chart.destroy();
-
-    const pad = 3;
-
-    const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
-    const closePad = [...closes, ...Array(pad).fill(null)];
-    const stPad = [...stVals, ...Array(pad).fill(null)];
-    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
-
-    chart = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels,
-            datasets: [
-
-                {
-                    label: "Close",
-                    data: closePad,
-                    borderColor: "#1f77b4",
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    tension: 0.25
-                },
-
-                {
-                    label: "SuperTrend",
-                    data: stPad,
-                    showLine: false,
-
-                    pointRadius: 2,
-                    pointBorderWidth: 2,
-
-                    pointBackgroundColor: trendPad.map(t =>
-                        t === "UP" ? "#00c853" : "#ff1744"
-                    ),
-
-                    pointBorderColor: trendPad.map(t =>
-                        t === "UP" ? "#00c853" : "#ff1744"
-                    )
-                }
-            ]
-        },
-
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-
-            plugins: {
-                legend: { display: false }
-            },
-
-            scales: {
-                x: {
-                    ticks: { color: "#333" },
-                    grid: { color: "#eee" },
-                    offset: true
-                },
-                y: {
-                    position: "right",
-                    ticks: { color: "#333" },
-                    grid: { color: "#eee" }
-                }
-            }
-        }
-    });
-}
-
-/* =========================
-   INIT
-========================= */
-load();
-setInterval(load, 3000);
 
 </script>
 
