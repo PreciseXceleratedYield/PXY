@@ -37,7 +37,16 @@ def print_market_dashboard(market_df):
 
     
     # ===== DAY CONTEXT =====
-    print(snapshot.get("day_candle", ""))
+    import subprocess
+    import sys
+    
+    result = subprocess.run(
+        [sys.executable, "systdaypxy.py"],
+        capture_output=True,
+        text=True
+    )
+    
+    print(result.stdout.strip())
     
     metrics = [
         ("📏  ATR", "atr"),
