@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Terminal + Chart Dashboard</title>
+<title>PX Terminal + Chart DEBUG</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
@@ -13,35 +13,37 @@ html, body {
     height: 100%;
     width: 100%;
     display: flex;
-    background: #ffffff;
-    font-family: monospace;
     overflow: hidden;
+    font-family: monospace;
 }
 
-/* LEFT TERMINAL */
 #terminal {
     width: 50%;
     height: 100vh;
     border-right: 1px solid #ddd;
 }
 
-/* RIGHT CHART */
-#chart {
+#right {
     width: 50%;
     height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#title {
     padding: 10px;
-    box-sizing: border-box;
+    font-weight: bold;
+}
+
+#chartBox {
+    flex: 1;
+    position: relative;
 }
 
 canvas {
     width: 100% !important;
-    height: 95vh !important;
-}
-
-/* cursor fix */
-.xterm .xterm-cursor {
-    border-left: 2px solid #111 !important;
-    animation: none !important;
+    height: 100% !important;
+    background: #f8f8f8;
 }
 </style>
 </head>
@@ -52,9 +54,11 @@ canvas {
 <div id="terminal"></div>
 
 <!-- RIGHT -->
-<div id="chart">
-    <h3>📊 Close Price (Last 42)</h3>
-    <canvas id="priceChart"></canvas>
+<div id="right">
+    <div id="title">📊 Close Price (Last 42)</div>
+    <div id="chartBox">
+        <canvas id="priceChart"></canvas>
+    </div>
 </div>
 
 <!-- LIBS -->
@@ -63,6 +67,7 @@ canvas {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
+console.log("SCRIPT STARTED");
 
 // =====================
 // TERMINAL
@@ -70,13 +75,8 @@ canvas {
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
-    fontFamily: "'Cascadia Mono', monospace",
-    fontSize: 14,
-    cursorBlink: false,
-    theme: {
-        background: '#ffffff',
-        foreground: '#111'
-    }
+    fontFamily: "monospace",
+    fontSize: 14
 });
 
 const fitAddon = new FitAddon.FitAddon();
@@ -85,86 +85,74 @@ term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
 fitAddon.fit();
 
-term.writeln("✅ Terminal Ready");
-term.writeln("-----------------------------------");
+term.writeln("TERMINAL OK");
 
 // =====================
 // WEBSOCKET
 // =====================
-const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
-const ws = new WebSocket(`${protocol}://${window.location.host}`);
+const ws = new WebSocket(`ws://${location.host}`);
 
-ws.onmessage = (event) => {
-    term.write(event.data);
-};
+ws.onmessage = (e) => term.write(e.data);
 
 // =====================
-// CHART LOGIC
+// CHART DEBUG
 // =====================
-let chartInstance = null;
+let chart;
 
-async function loadChart() {
+async function load() {
     try {
+        console.log("FETCHING JSON...");
+
         const res = await fetch("/sys/syschrtpxy.json");
+
+        console.log("STATUS:", res.status);
 
         const data = await res.json();
 
+        console.log("DATA LEN:", data.length);
+
         const closes = data.map(d => Number(d.close));
 
-        drawChart(closes);
+        draw(closes);
 
     } catch (err) {
-        console.error("Chart error:", err);
+        console.error("CHART ERROR:", err);
     }
 }
 
-function drawChart(data) {
-    const canvas = document.getElementById("priceChart");
+function draw(data) {
+    console.log("DRAWING CHART...");
 
-    // FORCE HEIGHT (fix invisible chart issue)
-    canvas.height = window.innerHeight * 0.9;
+    const ctx = document.getElementById("priceChart");
 
-    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+        console.error("NO CANVAS FOUND");
+        return;
+    }
 
-    if (chartInstance) chartInstance.destroy();
+    if (chart) chart.destroy();
 
-    chartInstance = new Chart(ctx, {
+    chart = new Chart(ctx, {
         type: "line",
         data: {
-            labels: data.map((_, i) => i + 1),
+            labels: data.map((_, i) => i),
             datasets: [{
                 label: "Close",
                 data: data,
-                borderColor: "#1565c0",
+                borderColor: "blue",
                 borderWidth: 2,
-                pointRadius: 0,
-                tension: 0.25
+                pointRadius: 0
             }]
         },
         options: {
             responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                x: { display: false },
-                y: { display: true }
-            }
+            maintainAspectRatio: false
         }
     });
 }
 
-// =====================
-// INIT
-// =====================
-loadChart();
-setInterval(loadChart, 3000);
-
-// =====================
-// RESIZE FIX
-// =====================
-window.addEventListener('resize', () => fitAddon.fit());
+load();
+setInterval(load, 3000);
 
 </script>
 
