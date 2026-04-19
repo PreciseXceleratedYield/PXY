@@ -11,14 +11,9 @@ const wss = new WebSocket.Server({ server });
 const PORT = 80;
 
 /* =========================
-   IMPORTANT: STATIC ROUTES
+   STATIC FILES
    ========================= */
-
-// serve frontend files (pxy.html, js, etc.)
 app.use(express.static(__dirname));
-
-// serve /sys folder correctly (THIS FIXES YOUR ISSUE)
-app.use('/sys', express.static(path.join(__dirname, 'sys')));
 
 /* =========================
    MAIN PAGE
@@ -28,7 +23,7 @@ app.get('/', (req, res) => {
 });
 
 /* =========================
-   WEBSOCKET STREAM (tmux)
+   WEBSOCKET (tmux stream)
    ========================= */
 wss.on('connection', (ws) => {
     console.log('Client connected');
