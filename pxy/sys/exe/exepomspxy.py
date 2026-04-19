@@ -40,13 +40,7 @@ def print_market_dashboard(market_df):
     import subprocess
     import sys
     
-    result = subprocess.run(
-        [sys.executable, "systdaypxy.py"],
-        capture_output=True,
-        text=True
-    )
-    
-    print(result.stdout.strip())
+    subprocess.run([sys.executable, "systdaypxy.py"])
     
     metrics = [
         ("📏  ATR", "atr"),
