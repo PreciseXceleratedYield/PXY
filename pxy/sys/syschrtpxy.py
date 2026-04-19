@@ -5,7 +5,7 @@ from colorama import Fore, Style, init
 
 from syscnfgpxy import PARAMS
 from sysdtafpxy import fetch_yf_data
-from syssuperpxy import calculate_supertrend
+from sysstrndpxy import calculate_supertrend
 
 # === INIT COLORAMA ===
 init(autoreset=True)
