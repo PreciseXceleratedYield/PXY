@@ -2,106 +2,81 @@ import pandas as pd
 import numpy as np
 from asciichartpy import plot
 from colorama import Fore, Style, init
+import yfinance as yf
 
-from syscnfgpxy import PARAMS
 from sysdtafpxy import fetch_yf_data
 from sysstrndpxy import calculate_supertrend
+from syscnfgpxy import PARAMS
 
 # === INIT COLORAMA ===
 init(autoreset=True)
 
-# === PARAMETERS ===
-TICKER_SYMBOL = PARAMS["ticker"]
-LAST_POINTS = 42
-CHART_HEIGHT = 12
-TOTAL_WIDTH = 42
+# Define ticker
+ticker_symbol = PARAMS["ticker"]
 
 # === FETCH DATA ===
-df = fetch_yf_data()
+nifty_data = yf.Ticker(ticker_symbol)
+nifty_hist = nifty_data.history(period="5d", interval="1m")
 
-if df is None or df.empty:
-    print("No data fetched from data source.")
+if nifty_hist.empty:
+    print("No data fetched.")
     exit()
 
-# === SUPER TREND ===
+# === SUPER TREND CALCULATION ===
+df = nifty_hist.copy()
 df = calculate_supertrend(df)
 
-st_series = df["ST"].dropna().tolist()
-close_series = df["Close"].tolist()
+# Extract data
+close_1min = df["Close"].tolist()
+st_line = df["ST"].tolist()
 
-if len(st_series) == 0:
-    print("No SuperTrend data available.")
-    exit()
+# === DATA SELECTION (same structure as your original) ===
+last_1min_close = close_1min[-15:]
 
-# === DATA ===
-data_points = st_series[-LAST_POINTS:] if len(st_series) >= LAST_POINTS else st_series
-data_points_int = [int(round(p)) for p in data_points]
+# fallback safety
+st_clean = [x for x in st_line if not pd.isna(x)]
 
-latest_st = int(round(st_series[-1]))
-latest_close = int(round(close_series[-1]))
+last_st = st_clean[-20:] if len(st_clean) >= 20 else st_clean
+
+data_points = last_st + last_1min_close
+
+# === LATEST VALUES ===
+latest_close = close_1min[-1] if close_1min else None
+latest_st = st_clean[-1] if st_clean else None
 st_trend = df["ST_Trend"].iloc[-1]
 
-# ==================================================
-# 🔥 ONLY CHANGE: FORCE ST TO BE CENTER REFERENCE
-# ==================================================
-center = latest_st
-
-data_points_centered = [p - center for p in data_points_int]
-
-min_dev = min(data_points_centered)
-max_dev = max(data_points_centered)
-
-pad = max(abs(min_dev), abs(max_dev))
-
-min_dev = -pad
-max_dev = pad
-
-# === WIDTH SETUP ===
-y_axis_width = len(str(max(data_points_int))) + 1
-plot_width = TOTAL_WIDTH - y_axis_width - 1
-plot_width = max(plot_width, 10)
-
-# === SCALE DATA ===
-if len(data_points_centered) != plot_width:
-    x_old = np.linspace(0, 1, len(data_points_centered))
-    x_new = np.linspace(0, 1, plot_width)
-
-    scaled = np.interp(x_new, x_old, data_points_centered).tolist()
-    scaled = [int(round(p)) for p in scaled]
-else:
-    scaled = data_points_centered
-
-# shift back to real values for plotting
-data_points_scaled = [p + center for p in scaled]
-
 # === ASCII CHART ===
-chart = plot(
-    data_points_scaled,
-    {'height': CHART_HEIGHT, 'format': "{:.0f}", 'width': plot_width}
-)
+chart = plot(data_points, {'height': 12, 'format': "{:.0f}"})
 
 chart_lines = chart.split('\n')
 
-scale_step = (max(data_points_scaled) - min(data_points_scaled)) / (len(chart_lines) - 1) if len(chart_lines) > 1 else 1
+min_value = min(data_points)
+max_value = max(data_points)
+scale_step = (max_value - min_value) / (len(chart_lines) - 1)
 
-# === NO CHART COLORING (kept clean as per earlier request) ===
+# === ONLY SIMPLE ST MARKING (NO COLOR PXY, NO SMA LOGIC) ===
 for i, line in enumerate(chart_lines):
-    line_parts = line.split(' ')
-    chart_lines[i] = ' '.join(line_parts)
+    line_value = max_value - i * scale_step
 
-highlighted_chart = "\n".join(chart_lines)
+    if latest_st is not None and abs(line_value - latest_st) < scale_step / 2:
+        line_parts = line.split(' ')
+
+        if st_trend == "UP":
+            line_parts[0] = f"{Fore.GREEN}{line_parts[0]}{Style.RESET_ALL}"
+        else:
+            line_parts[0] = f"{Fore.RED}{line_parts[0]}{Style.RESET_ALL}"
+
+        chart_lines[i] = ' '.join(line_parts)
 
 # === OUTPUT ===
+highlighted_chart = "\n".join(chart_lines)
 print(highlighted_chart)
 
-# === ONLY ST VALUE COLOR ===
-if st_trend == "UP":
-    st_color = Fore.GREEN
-else:
-    st_color = Fore.RED
-
+# === ONLY ST INFO LINE ===
 print(
     f"\nST Trend: {st_trend} | "
-    f"ST Line: {st_color}{latest_st}{Style.RESET_ALL} | "
+    f"ST Line: {latest_st} | "
     f"Close: {latest_close}"
 )
+
+print(Style.RESET_ALL)
