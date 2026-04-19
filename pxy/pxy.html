@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PXY DEBUG DASHBOARD</title>
+<title>PXY DASHBOARD</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
@@ -13,44 +13,46 @@ html, body {
     height: 100%;
     display: flex;
     font-family: monospace;
-    overflow: hidden;
+    background: #ffffff;
+    color: #111;
 }
 
 /* ===================== */
-/* LEFT TERMINAL PANEL   */
+/* LEFT TERMINAL (54% approx) */
 /* ===================== */
 #terminal {
-    width: 50%;
+    width: 54%;
     height: 100vh;
-    border-right: 1px solid #ddd;
+    border-right: 1px solid #e5e5e5;
+    background: #ffffff;
 }
 
 /* ===================== */
-/* RIGHT CHART PANEL     */
+/* RIGHT CHART */
 /* ===================== */
 #right {
-    width: 50%;
+    width: 46%;
     height: 100vh;
     display: flex;
     flex-direction: column;
+    background: #ffffff;
 }
 
+/* remove header look */
 #title {
-    padding: 10px;
-    font-weight: bold;
-    background: #f3f3f3;
+    display: none;
 }
 
 #status {
-    padding: 5px 10px;
-    font-size: 12px;
-    color: blue;
+    display: none;
 }
 
 #chartWrap {
     flex: 1;
+    padding: 10px;
 }
 
+/* chart clean theme */
 canvas {
     width: 100% !important;
     height: 100% !important;
@@ -60,32 +62,27 @@ canvas {
 
 <body>
 
-<!-- LEFT: TERMINAL -->
+<!-- LEFT TERMINAL -->
 <div id="terminal"></div>
 
-<!-- RIGHT: CHART -->
+<!-- RIGHT CHART -->
 <div id="right">
-    <div id="title">📊 Close Price (Last 42)</div>
-    <div id="status">INIT...</div>
     <div id="chartWrap">
         <canvas id="priceChart"></canvas>
     </div>
 </div>
 
-<!-- ===================== -->
-<!-- LIBRARIES -->
-<!-- ===================== -->
+<!-- LIBS -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 
-console.log("JS LOADED OK");
-document.getElementById("status").innerText = "JS LOADED OK";
+console.log("JS OK");
 
 /* =====================
-   TERMINAL SETUP (UNCHANGED + STABLE)
+   TERMINAL
 ===================== */
 const term = new Terminal({
     convertEol: true,
@@ -104,48 +101,30 @@ fitAddon.fit();
 term.writeln("TERMINAL OK");
 
 /* =====================
-   WEBSOCKET STREAM
+   WEBSOCKET
 ===================== */
 const ws = new WebSocket(`ws://${location.host}`);
-
 ws.onmessage = (e) => term.write(e.data);
 
 /* =====================
-   CHART ENGINE
+   CHART
 ===================== */
 let chart;
 
 async function load() {
     try {
-        console.log("FETCH START");
-
         const res = await fetch("./syschrtpxy.json");
-
-        if (!res.ok) {
-            throw new Error("HTTP " + res.status);
-        }
-
         const data = await res.json();
 
-        console.log("DATA OK:", data.length);
-
-        document.getElementById("status").innerText =
-            "DATA LOADED: " + data.length;
-
         const closes = data.map(d => Number(d.close));
-
         draw(closes);
 
     } catch (err) {
         console.error(err);
-        document.getElementById("status").innerText =
-            "ERROR: " + err.message;
     }
 }
 
 function draw(data) {
-    console.log("DRAW");
-
     const ctx = document.getElementById("priceChart");
 
     if (chart) chart.destroy();
@@ -155,9 +134,8 @@ function draw(data) {
         data: {
             labels: data.map((_, i) => i),
             datasets: [{
-                label: "Close",
                 data: data,
-                borderColor: "blue",
+                borderColor: "#1f77b4",
                 borderWidth: 2,
                 pointRadius: 0,
                 tension: 0.25
@@ -166,13 +144,32 @@ function draw(data) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+
             plugins: {
                 legend: { display: false }
+            },
+
+            scales: {
+                x: {
+                    ticks: {
+                        color: "#333"
+                    },
+                    grid: {
+                        color: "#eee"
+                    }
+                },
+                y: {
+                    position: "right",   // ✅ MOVE Y AXIS RIGHT
+                    ticks: {
+                        color: "#333"
+                    },
+                    grid: {
+                        color: "#eee"
+                    }
+                }
             }
         }
     });
-
-    document.getElementById("status").innerText = "CHART RENDERED";
 }
 
 /* ===================== */
