@@ -1,11 +1,14 @@
 import pandas as pd
 import numpy as np
 from asciichartpy import plot
-from clorpxy import BRIGHT_RED, BRIGHT_GREEN, BRIGHT_YELLOW, RESET
+from colorama import Fore, Style, init
 
 from syscnfgpxy import PARAMS
 from sysdtafpxy import fetch_yf_data
 from syssuperpxy import calculate_supertrend
+
+# === INIT COLORAMA ===
+init(autoreset=True)
 
 # === PARAMETERS ===
 TICKER_SYMBOL = PARAMS["ticker"]
@@ -13,17 +16,16 @@ LAST_POINTS = 42
 CHART_HEIGHT = 12
 TOTAL_WIDTH = 42
 
-# === FETCH DATA (YOUR ENGINE) ===
+# === FETCH DATA ===
 df = fetch_yf_data()
 
 if df is None or df.empty:
     print("No data fetched from data source.")
     exit()
 
-# === SUPER TREND CALCULATION ===
+# === SUPER TREND ===
 df = calculate_supertrend(df)
 
-# === EXTRACT ST SERIES ===
 st_series = df["ST"].dropna().tolist()
 close_series = df["Close"].tolist()
 
@@ -31,17 +33,15 @@ if len(st_series) == 0:
     print("No SuperTrend data available.")
     exit()
 
-# === SELECT LAST POINTS (ST LINE INSTEAD OF SMA/CLOSE) ===
+# === DATA WINDOW ===
 data_points = st_series[-LAST_POINTS:] if len(st_series) >= LAST_POINTS else st_series
 data_points_int = [int(round(p)) for p in data_points]
 
-# === CURRENT VALUES ===
 latest_st = int(round(st_series[-1]))
 latest_close = int(round(close_series[-1]))
-
 st_trend = df["ST_Trend"].iloc[-1]
 
-# === ADJUST PLOT WIDTH ===
+# === WIDTH SETUP ===
 min_value = min(data_points_int)
 max_value = max(data_points_int)
 
@@ -66,9 +66,9 @@ chart = plot(
 
 chart_lines = chart.split('\n')
 
-# === COLOR MAPPING BASED ON SUPER TREND ===
 scale_step = (max_value - min_value) / (len(chart_lines) - 1) if len(chart_lines) > 1 else 1
 
+# === COLOR LOGIC ===
 for i, line in enumerate(chart_lines):
     line_value = max_value - i * scale_step
     line_parts = line.split(' ')
@@ -78,17 +78,17 @@ for i, line in enumerate(chart_lines):
 
         if part_clean.isdigit():
 
-            # === SUPER TREND BASED COLORING ===
+            # Trend color
             if st_trend == "UP":
-                color = BRIGHT_GREEN
+                color = Fore.GREEN
             else:
-                color = BRIGHT_RED
+                color = Fore.RED
 
-            # highlight near ST level
+            # highlight ST level
             if abs(line_value - latest_st) < scale_step:
-                color = BRIGHT_YELLOW
+                color = Fore.YELLOW
 
-            line_parts[j] = f"{color}{part}{RESET}"
+            line_parts[j] = f"{color}{part}{Style.RESET_ALL}"
             break
 
     chart_lines[i] = ' '.join(line_parts)
@@ -99,4 +99,4 @@ highlighted_chart = "\n".join(chart_lines)
 print(highlighted_chart)
 
 print(f"\nST Trend: {st_trend} | ST Line: {latest_st} | Close: {latest_close}")
-print(RESET)
+print(Style.RESET_ALL)
