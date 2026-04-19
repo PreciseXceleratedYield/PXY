@@ -188,10 +188,28 @@ def get_entry_signal(df=None):
 
 
 # ==================================================
-# TEST
+# TEST (FIXED - MATCHES DASHBOARD PIPELINE)
 # ==================================================
 if __name__ == "__main__":
-    entry, exit_signal = get_entry_signal()
-    print("\nFINAL OUTPUT")
+
+    print("\nRUNNING CONSISTENT TEST...\n")
+
+    # ✅ SAME AS DASHBOARD
+    df = fetch_yf_data()
+    
+    if df is None or df.empty:
+        print("No data fetched")
+        exit()
+
+    # ✅ Apply same indicators as dashboard
+    df = calculate_supertrend(df)
+
+    # (optional but safer if dashboard uses BOS heavily)
+    # no need to call get_bos separately — function will use df
+
+    # ✅ Call with SAME DF
+    entry, exit_signal = get_entry_signal(df)
+
+    print("FINAL OUTPUT")
     print("ENTRY:", entry)
     print("EXIT :", exit_signal)
