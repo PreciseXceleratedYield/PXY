@@ -1,11 +1,152 @@
-<script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PXY DASHBOARD</title>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+
+<style>
+html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    font-family: monospace;
+    background: #ffffff;
+    color: #111;
+}
 
 /* =========================
-   DEVICE DETECTION (FIXED)
+   MAIN CONTAINER
 ========================= */
-function isMobile() {
-    return window.innerWidth <= 768;
+#container {
+    display: flex;
+    width: 100%;
+    height: 100vh;
 }
+
+/* =========================
+   TERMINAL
+========================= */
+#terminal {
+    width: 35%;
+    min-width: 200px;
+    height: 100vh;
+    background: #ffffff;
+    border-right: 1px solid #e5e5e5;
+}
+
+/* =========================
+   DIVIDER
+========================= */
+#divider {
+    width: 5px;
+    cursor: col-resize;
+    background: #ddd;
+}
+
+/* =========================
+   RIGHT PANEL
+========================= */
+#right {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #ffffff;
+}
+
+#toolbar {
+    padding: 5px;
+    background: #f3f3f3;
+    display: flex;
+    gap: 10px;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+#chartWrap {
+    flex: 1;
+}
+
+canvas {
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* =========================
+   FULLSCREEN MODES (DESKTOP)
+========================= */
+.fullscreen-terminal #terminal {
+    width: 100% !important;
+}
+
+.fullscreen-terminal #right {
+    display: none;
+}
+
+.fullscreen-chart #terminal {
+    display: none;
+}
+
+.fullscreen-chart #right {
+    width: 100% !important;
+}
+
+/* =========================
+   📱 MOBILE MODE
+========================= */
+@media (max-width: 768px) {
+
+    #right {
+        display: none !important;
+    }
+
+    #divider {
+        display: none !important;
+    }
+
+    #terminal {
+        width: 100% !important;
+        height: 100vh !important;
+        border-right: none;
+    }
+
+    #container {
+        flex-direction: column;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div id="container">
+
+    <div id="terminal"></div>
+
+    <div id="divider"></div>
+
+    <div id="right">
+
+        <div id="toolbar">
+            <button onclick="toggleTerminal()">🖥 Terminal</button>
+            <button onclick="toggleChart()">📊 Chart</button>
+            <button onclick="resetLayout()">🔄 Reset</button>
+        </div>
+
+        <div id="chartWrap">
+            <canvas id="priceChart"></canvas>
+        </div>
+
+    </div>
+
+</div>
+
+<!-- LIBS -->
+<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
 
 /* =========================
    TERMINAL
@@ -18,7 +159,9 @@ const term = new Terminal({
     cursorBlink: false,
     theme: {
         background: "#ffffff",
-        foreground: "#111111"
+        foreground: "#111111",
+        cursor: "#111111",
+        selection: "rgba(0,0,0,0.08)"
     }
 });
 
@@ -44,30 +187,30 @@ const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
 const right = document.getElementById("right");
 
-let dragging = false;
+let isDragging = false;
 
-divider.addEventListener("mousedown", () => dragging = true);
+divider.addEventListener("mousedown", () => isDragging = true);
 
 window.addEventListener("mouseup", () => {
-    dragging = false;
+    isDragging = false;
     saveLayout();
 });
 
 window.addEventListener("mousemove", (e) => {
-    if (!dragging) return;
-    if (isMobile()) return;
+    if (!isDragging) return;
+    if (window.innerWidth <= 768) return; // disable on mobile
 
-    const p = (e.clientX / window.innerWidth) * 100;
-    if (p < 10 || p > 80) return;
+    const percent = (e.clientX / window.innerWidth) * 100;
+    if (percent < 10 || percent > 80) return;
 
-    terminal.style.width = p + "%";
-    right.style.width = (100 - p) + "%";
+    terminal.style.width = percent + "%";
+    right.style.width = (100 - percent) + "%";
 
     fitAddon.fit();
 });
 
 /* =========================
-   LAYOUT SAVE / LOAD
+   LAYOUT
 ========================= */
 function saveLayout() {
     localStorage.setItem("split", terminal.style.width);
@@ -75,8 +218,7 @@ function saveLayout() {
 
 function loadLayout() {
     const saved = localStorage.getItem("split");
-
-    if (saved && !isMobile()) {
+    if (saved && window.innerWidth > 768) {
         terminal.style.width = saved;
         right.style.width = (100 - parseFloat(saved)) + "%";
     }
@@ -100,43 +242,11 @@ function resetLayout() {
 }
 
 /* =========================
-   CHART STATE
+   CHART
 ========================= */
-let chart = null;
-let loaded = false;
+let chart;
 
-/* =========================
-   MOBILE MODE KILL SWITCH
-========================= */
-function applyMode() {
-
-    if (isMobile()) {
-
-        document.getElementById("right").style.display = "none";
-        document.getElementById("divider").style.display = "none";
-        document.getElementById("terminal").style.width = "100%";
-
-        // destroy chart if exists
-        if (chart) {
-            chart.destroy();
-            chart = null;
-        }
-
-        return;
-    }
-
-    document.getElementById("right").style.display = "flex";
-    document.getElementById("divider").style.display = "block";
-}
-
-/* =========================
-   LOAD DATA (SAFE)
-========================= */
 async function load() {
-
-    // 🚫 HARD BLOCK MOBILE
-    if (isMobile()) return;
-
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
@@ -147,17 +257,15 @@ async function load() {
     draw(closes, stVals, stTrend);
 }
 
-/* =========================
-   DRAW CHART
-========================= */
 function draw(closes, stVals, stTrend) {
-
-    if (isMobile()) return;
 
     const ctx = document.getElementById("priceChart");
 
     if (chart) chart.destroy();
 
+    /* =========================
+       3 CANDLE RIGHT PADDING
+    ========================= */
     const pad = 3;
 
     const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
@@ -172,6 +280,7 @@ function draw(closes, stVals, stTrend) {
 
             datasets: [
 
+                // CLOSE
                 {
                     label: "Close",
                     data: closePad,
@@ -181,8 +290,9 @@ function draw(closes, stVals, stTrend) {
                     tension: 0.25
                 },
 
+                // SUPER TREND
                 {
-                    label: "SuperTrend",
+                    label: "ST",
                     data: stPad,
                     showLine: false,
 
@@ -228,17 +338,10 @@ function draw(closes, stVals, stTrend) {
    INIT
 ========================= */
 loadLayout();
-applyMode();
 load();
 setInterval(load, 3000);
 
-/* re-check on resize */
-window.addEventListener("resize", () => {
-    applyMode();
-
-    if (!isMobile()) {
-        load();
-    }
-});
-
 </script>
+
+</body>
+</html>
