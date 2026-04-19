@@ -9,67 +9,116 @@
 <style>
 html, body {
     margin: 0;
-    padding: 0;
     height: 100%;
-    display: flex;
+    overflow: hidden;
     font-family: monospace;
     background: #ffffff;
     color: #111;
 }
 
-/* ===================== */
-/* LEFT TERMINAL (54% approx) */
-/* ===================== */
-#terminal {
-    width: 54%;
+/* =========================
+   MAIN CONTAINER
+========================= */
+#container {
+    display: flex;
+    width: 100%;
     height: 100vh;
-    border-right: 1px solid #e5e5e5;
-    background: #ffffff;
 }
 
-/* ===================== */
-/* RIGHT CHART */
-/* ===================== */
-#right {
-    width: 46%;
+/* =========================
+   TERMINAL PANEL
+========================= */
+#terminal {
+    width: 35%;
+    min-width: 200px;
     height: 100vh;
+    background: #ffffff;
+    border-right: 1px solid #e5e5e5;
+}
+
+/* =========================
+   RESIZE DIVIDER
+========================= */
+#divider {
+    width: 5px;
+    cursor: col-resize;
+    background: #ddd;
+}
+
+/* =========================
+   RIGHT PANEL (CHART)
+========================= */
+#right {
+    flex: 1;
     display: flex;
     flex-direction: column;
     background: #ffffff;
 }
 
-/* remove header look */
-#title {
-    display: none;
-}
-
-#status {
-    display: none;
+/* toolbar */
+#toolbar {
+    padding: 5px;
+    background: #f3f3f3;
+    display: flex;
+    gap: 10px;
+    border-bottom: 1px solid #e5e5e5;
 }
 
 #chartWrap {
     flex: 1;
-    padding: 10px;
 }
 
-/* chart clean theme */
 canvas {
     width: 100% !important;
     height: 100% !important;
+}
+
+/* =========================
+   FULLSCREEN MODES
+========================= */
+.fullscreen-terminal #terminal {
+    width: 100% !important;
+}
+
+.fullscreen-terminal #right {
+    display: none;
+}
+
+.fullscreen-chart #terminal {
+    display: none;
+}
+
+.fullscreen-chart #right {
+    width: 100% !important;
 }
 </style>
 </head>
 
 <body>
 
-<!-- LEFT TERMINAL -->
-<div id="terminal"></div>
+<div id="container">
 
-<!-- RIGHT CHART -->
-<div id="right">
-    <div id="chartWrap">
-        <canvas id="priceChart"></canvas>
+    <!-- TERMINAL -->
+    <div id="terminal"></div>
+
+    <!-- RESIZER -->
+    <div id="divider"></div>
+
+    <!-- CHART -->
+    <div id="right">
+
+        <div id="toolbar">
+            <button onclick="toggleTerminal()">🖥 Terminal</button>
+            <button onclick="toggleChart()">📊 Chart</button>
+            <button onclick="resetLayout()">🔄 Reset</button>
+        </div>
+
+        <div id="chartWrap">
+            <canvas id="priceChart"></canvas>
+        </div>
+
     </div>
+
 </div>
 
 <!-- LIBS -->
@@ -79,36 +128,108 @@ canvas {
 
 <script>
 
-console.log("JS OK");
-
-/* =====================
-   TERMINAL
-===================== */
+/* =========================
+   TERMINAL (LIGHT THEME FIXED)
+========================= */
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     fontFamily: "monospace",
     fontSize: 14,
-    cursorBlink: false
+    cursorBlink: false,
+
+    theme: {
+        background: "#ffffff",
+        foreground: "#111111",
+        cursor: "#111111",
+        selection: "rgba(0,0,0,0.08)"
+    }
 });
 
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 
 term.open(document.getElementById('terminal'));
-fitAddon.fit();
+
+setTimeout(() => {
+    fitAddon.fit();
+    document.getElementById("terminal").style.background = "#ffffff";
+}, 50);
+
+window.addEventListener("resize", () => fitAddon.fit());
 
 term.writeln("TERMINAL OK");
 
-/* =====================
+/* =========================
    WEBSOCKET
-===================== */
+========================= */
 const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
-/* =====================
+/* =========================
+   DRAGGABLE SPLIT
+========================= */
+const divider = document.getElementById("divider");
+const terminal = document.getElementById("terminal");
+const right = document.getElementById("right");
+
+let isDragging = false;
+
+divider.addEventListener("mousedown", () => isDragging = true);
+
+window.addEventListener("mouseup", () => {
+    isDragging = false;
+    saveLayout();
+});
+
+window.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+
+    const percent = (e.clientX / window.innerWidth) * 100;
+
+    if (percent < 10 || percent > 80) return;
+
+    terminal.style.width = percent + "%";
+    right.style.width = (100 - percent) + "%";
+
+    fitAddon.fit();
+});
+
+/* =========================
+   SAVE / LOAD LAYOUT
+========================= */
+function saveLayout() {
+    localStorage.setItem("split", terminal.style.width);
+}
+
+function loadLayout() {
+    const saved = localStorage.getItem("split");
+    if (saved) {
+        terminal.style.width = saved;
+        right.style.width = (100 - parseFloat(saved)) + "%";
+    }
+}
+
+/* =========================
+   FULLSCREEN MODES
+========================= */
+function toggleTerminal() {
+    document.body.classList.toggle("fullscreen-terminal");
+}
+
+function toggleChart() {
+    document.body.classList.toggle("fullscreen-chart");
+}
+
+function resetLayout() {
+    terminal.style.width = "35%";
+    right.style.width = "65%";
+    localStorage.removeItem("split");
+}
+
+/* =========================
    CHART
-===================== */
+========================= */
 let chart;
 
 async function load() {
@@ -151,28 +272,23 @@ function draw(data) {
 
             scales: {
                 x: {
-                    ticks: {
-                        color: "#333"
-                    },
-                    grid: {
-                        color: "#eee"
-                    }
+                    ticks: { color: "#333" },
+                    grid: { color: "#eee" }
                 },
                 y: {
-                    position: "right",   // ✅ MOVE Y AXIS RIGHT
-                    ticks: {
-                        color: "#333"
-                    },
-                    grid: {
-                        color: "#eee"
-                    }
+                    position: "right",
+                    ticks: { color: "#333" },
+                    grid: { color: "#eee" }
                 }
             }
         }
     });
 }
 
-/* ===================== */
+/* =========================
+   INIT
+========================= */
+loadLayout();
 load();
 setInterval(load, 3000);
 
