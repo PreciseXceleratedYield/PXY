@@ -73,26 +73,16 @@ canvas {
 }
 
 /* =========================
-   FULLSCREEN MODES (DESKTOP)
+   FULLSCREEN (DESKTOP)
 ========================= */
-.fullscreen-terminal #terminal {
-    width: 100% !important;
-}
+.fullscreen-terminal #terminal { width: 100% !important; }
+.fullscreen-terminal #right { display: none; }
 
-.fullscreen-terminal #right {
-    display: none;
-}
-
-.fullscreen-chart #terminal {
-    display: none;
-}
-
-.fullscreen-chart #right {
-    width: 100% !important;
-}
+.fullscreen-chart #terminal { display: none; }
+.fullscreen-chart #right { width: 100% !important; }
 
 /* =========================
-   📱 MOBILE MODE
+   📱 MOBILE FIX (REAL FIX)
 ========================= */
 @media (max-width: 768px) {
 
@@ -149,6 +139,11 @@ canvas {
 <script>
 
 /* =========================
+   MOBILE DETECTION (IMPORTANT FIX)
+========================= */
+const isMobile = window.innerWidth <= 768;
+
+/* =========================
    TERMINAL
 ========================= */
 const term = new Terminal({
@@ -187,24 +182,24 @@ const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
 const right = document.getElementById("right");
 
-let isDragging = false;
+let dragging = false;
 
-divider.addEventListener("mousedown", () => isDragging = true);
+divider.addEventListener("mousedown", () => dragging = true);
 
 window.addEventListener("mouseup", () => {
-    isDragging = false;
+    dragging = false;
     saveLayout();
 });
 
 window.addEventListener("mousemove", (e) => {
-    if (!isDragging) return;
-    if (window.innerWidth <= 768) return; // disable on mobile
+    if (!dragging) return;
+    if (isMobile) return;
 
-    const percent = (e.clientX / window.innerWidth) * 100;
-    if (percent < 10 || percent > 80) return;
+    const p = (e.clientX / window.innerWidth) * 100;
+    if (p < 10 || p > 80) return;
 
-    terminal.style.width = percent + "%";
-    right.style.width = (100 - percent) + "%";
+    terminal.style.width = p + "%";
+    right.style.width = (100 - p) + "%";
 
     fitAddon.fit();
 });
@@ -218,7 +213,8 @@ function saveLayout() {
 
 function loadLayout() {
     const saved = localStorage.getItem("split");
-    if (saved && window.innerWidth > 768) {
+
+    if (saved && !isMobile) {
         terminal.style.width = saved;
         right.style.width = (100 - parseFloat(saved)) + "%";
     }
@@ -242,11 +238,15 @@ function resetLayout() {
 }
 
 /* =========================
-   CHART
+   CHART (BLOCK ON MOBILE FIX)
 ========================= */
 let chart;
 
 async function load() {
+
+    // 🚫 MOBILE: STOP EVERYTHING
+    if (isMobile) return;
+
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
@@ -280,7 +280,6 @@ function draw(closes, stVals, stTrend) {
 
             datasets: [
 
-                // CLOSE
                 {
                     label: "Close",
                     data: closePad,
@@ -290,9 +289,8 @@ function draw(closes, stVals, stTrend) {
                     tension: 0.25
                 },
 
-                // SUPER TREND
                 {
-                    label: "ST",
+                    label: "SuperTrend",
                     data: stPad,
                     showLine: false,
 
@@ -340,6 +338,17 @@ function draw(closes, stVals, stTrend) {
 loadLayout();
 load();
 setInterval(load, 3000);
+
+window.addEventListener("resize", () => {
+    if (window.innerWidth <= 768) {
+        if (chart) {
+            chart.destroy();
+            chart = null;
+        }
+    } else {
+        load();
+    }
+});
 
 </script>
 
