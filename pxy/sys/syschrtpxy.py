@@ -51,7 +51,7 @@ def export_supertrend_json(output_file="../syschrtpxy.json", lookback=42):
     with open(output_file, "w") as f:
         json.dump(output, f, indent=2)
 
-    print(f"JSON updated: {output_file} ({len(output)} rows)")
+    #print(f"JSON updated: {output_file} ({len(output)} rows)")
     return output
 
 
