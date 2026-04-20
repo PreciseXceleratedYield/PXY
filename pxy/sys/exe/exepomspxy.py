@@ -133,6 +133,6 @@ def print_market_dashboard(market_df):
 
         print(f"{left}{' ' * spaces}{right}")
     # ===== BOS =====
-    print(snapshot.get("bos_bar", "-----------------------------------------------"))
+    print(snapshot.get("bos_bar", "------------------------------------------"))
     # ===== VISUAL =====
     #print(snapshot.get("candle_visual", ""))
