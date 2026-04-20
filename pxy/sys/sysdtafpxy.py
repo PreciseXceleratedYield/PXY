@@ -1,7 +1,7 @@
 # sysdtafpxy.py
 import sys, os
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # --- PATH MANAGEMENT ---
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__)) 
@@ -12,47 +12,52 @@ from syscnfgpxy import TICKER
 from runclntpxy import get_session
 
 def fetch_yf_data(ticker=None):
+    """
+    KOTAK NEO V2 - QUOTES FALLBACK
+    Uses 'quotes' method to fetch OHLC because 'history' is often restricted.
+    """
     ticker_symbol = ticker or TICKER
+
     try:
         client = get_session()
 
-        # --- DEBUG: Print available methods to see what your version supports ---
-        # print("Available methods:", [m for m in dir(client) if not m.startswith('_')])
+        # FETCH CURRENT QUOTE (Hard-coded for OHLC)
+        # Standard method name in V2 is client.quotes()
+        instr_tokens = [{"instrument_token": ticker_symbol, "exchange_segment": "nse_cm"}]
+        response = client.quotes(instrument_tokens=instr_tokens, quote_type="ohlc", isIndex=True)
 
-        # Dates for backfill
-        to_date = datetime.now().strftime("%d-%m-%Y")
-        from_date = (datetime.now() - timedelta(days=1)).strftime("%d-%m-%Y")
-
-        # Official V2 call (requires latest GitHub version)
-        # Note: If this still fails, try 'get_history' or 'historical_data'
-        response = client.history(
-            instrument_token=ticker_symbol,
-            exchange_segment="nse_cm",
-            interval="1minute",
-            from_date=from_date,
-            to_date=to_date,
-            isIndex=True
-        )
-
-        if response and "data" in response:
-            df = pd.DataFrame(response["data"])
-            rename_map = {"time": "Datetime", "open": "Open", "high": "High",
-                          "low": "Low", "close": "Close", "volume": "Volume"}
-            df.rename(columns=rename_map, inplace=True)
-            if "Datetime" in df.columns:
-                df["Datetime"] = pd.to_datetime(df["Datetime"])
-            return df.dropna().reset_index(drop=True)
+        if response and "data" in response and len(response["data"]) > 0:
+            raw_data = response["data"][0]
             
-        print(f"EMPTY_OR_UNAUTHORIZED|{ticker_symbol}")
+            # Format into a DataFrame compatible with your strategy
+            df = pd.DataFrame([{
+                "Datetime": datetime.now().replace(second=0, microsecond=0),
+                "Open": float(raw_data.get("open", 0)),
+                "High": float(raw_data.get("high", 0)),
+                "Low": float(raw_data.get("low", 0)),
+                "Close": float(raw_data.get("ltp", raw_data.get("close", 0))),
+                "Volume": float(raw_data.get("v", 0))
+            }])
+            
+            return df
+            
+        print(f"NEO_QUOTE_EMPTY|{ticker_symbol}")
         return pd.DataFrame()
 
     except Exception as e:
-        print(f"FETCH_CRITICAL_ERR|{ticker_symbol}|{str(e)}")
+        print(f"NEO_CRITICAL_ERR|{ticker_symbol}|{str(e)}")
         return pd.DataFrame()
 
+def get_latest_data():
+    """Returns the current 1-minute OHLC bar."""
+    return fetch_yf_data()
+
 if __name__ == "__main__":
-    print(f"Ticker: {TICKER} | Exchange: nse_cm | Interval: 1minute")
+    print(f"Ticker: {TICKER} | Exchange: nse_cm | Mode: Live Quote OHLC")
     data = fetch_yf_data()
-    if not data.empty: print(data.tail(5))
+    if not data.empty:
+        print("CURRENT BAR DATA:")
+        print(data)
+
 
 
