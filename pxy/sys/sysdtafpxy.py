@@ -1,48 +1,45 @@
 # sysdtafpxy.py
+
 import sys
 import os
 import pandas as pd
 from datetime import datetime, timedelta
 
-# ---------------- FIXED PATH MANAGEMENT ----------------
-# Based on your 'ls' output: /home/neo/pxy/sys/exe/run/
+# ---------------- PATH MANAGEMENT ----------------
+# Matches: /home/neo/pxy/sys/exe/run/
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__)) 
 RUN_DIR = os.path.join(CURRENT_DIR, "exe", "run")
 
 if RUN_DIR not in sys.path:
     sys.path.append(RUN_DIR)
 
-# Safety Check
-if not os.path.exists(os.path.join(RUN_DIR, "runclntpxy.py")):
-    print(f"CRITICAL: runclntpxy.py STILL NOT FOUND IN: {RUN_DIR}")
-
-# Now safe to import
+# Import dependencies
 from syscnfgpxy import TICKER
 from runclntpxy import get_session
 
-# ---------------- FETCH DATA FUNCTION (HARD-CODED) ----------------
 def fetch_yf_data(ticker=None):
     """
-    KOTAK NEO V2 - FULL HARD-CODED FETCH
-    Enforces: Exchange="nse_cm", Interval="1minute", isIndex=True
+    KOTAK NEO - HARD-CODED FETCH
+    Updated to use 'historical_data' method.
     """
     ticker_symbol = ticker or TICKER
 
     try:
         client = get_session()
 
-        # Hard-coded backfill range: Last 1 day
+        # Date range: Today and Yesterday
         to_date = datetime.now().strftime("%d-%m-%Y")
         from_date = (datetime.now() - timedelta(days=1)).strftime("%d-%m-%Y")
 
-        # EVERYTHING HARD-CODED EXCEPT ticker_symbol
-        response = client.history(
+        # API CALL - Switched 'history' to 'historical_data'
+        # Hard-coded: nse_cm, 1minute, isIndex=True
+        response = client.historical_data(
             instrument_token=ticker_symbol,
-            exchange_segment="nse_cm",  # Hard-coded
-            interval="1minute",         # Hard-coded
+            exchange_segment="nse_cm",
+            interval="1minute",
             from_date=from_date,
             to_date=to_date,
-            isIndex=True                # Hard-coded for Nifty index
+            isIndex=True
         )
 
         if response and "data" in response:
@@ -64,11 +61,11 @@ def fetch_yf_data(ticker=None):
             
             return df.dropna().reset_index(drop=True)
             
-        print(f"NEO_EMPTY_RESPONSE|{ticker_symbol}")
+        print(f"NEO_EMPTY_OR_UNAUTHORIZED|{ticker_symbol}")
         return pd.DataFrame()
 
     except Exception as e:
-        print(f"NEO_CRITICAL_ERR|{ticker_symbol}|{str(e)}")
+        print(f"NEO_FETCH_ERROR|{ticker_symbol}|{str(e)}")
         return pd.DataFrame()
 
 def get_latest_data():
@@ -76,9 +73,10 @@ def get_latest_data():
     return df.tail(1) if not df.empty else pd.DataFrame()
 
 if __name__ == "__main__":
-    print(f"Ticker: {TICKER} | Exchange: nse_cm | Interval: 1minute")
+    print(f"Ticker: {TICKER} | Segment: nse_cm | Interval: 1minute")
     data = fetch_yf_data()
     if not data.empty:
-        print("SUCCESS! LAST 5 CANDLES:")
+        print("SUCCESS! DATA RECEIVED:")
         print(data.tail(5))
-
+    else:
+        print("Check if your account has 'Historical Data' enabled in Neo portal.")
