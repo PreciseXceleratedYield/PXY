@@ -1,3 +1,4 @@
+# sysdtafpxy.py
 import sys
 import os
 import pandas as pd
@@ -18,22 +19,36 @@ DEFAULT_MIN_ROWS = 50
 
 def fetch_yf_data(period="1d", interval=None, min_rows=None, ticker=None):
     """
-    KOTAK NEO implementation of your yfinance fetcher.
-    Hard-coded to nse_cm and 1minute for Kotak compatibility.
+    KOTAK NEO implementation of yfinance fetcher.
+    Maintains exact 50-row structure and Datetime column for downstream.
     """
-    ticker_symbol = ticker or TICKER
-    
+    t = ticker or TICKER
+    target_rows = min_rows or DEFAULT_MIN_ROWS
+
+    # --- LOT SIZE LOGIC ---
+    # Current 2025 Market Lot sizes
+    if t == "Nifty Bank":
+        LOT_SIZE = 30
+    elif t == "Nifty 50":
+        LOT_SIZE = 65
+    else:
+        LOT_SIZE = None
+
     try:
         client = get_session()
-        instr_tokens = [{"instrument_token": ticker_symbol, "exchange_segment": "nse_cm"}]
+        # Nifty 50 and Nifty Bank require exact string names in Kotak Neo V2
+        instr_tokens = [{"instrument_token": t, "exchange_segment": "nse_cm"}]
         
-        # Kotak API Call
+        # Kotak API Call - Returns a list of dictionaries
         response = client.quotes(instrument_tokens=instr_tokens, quote_type="ohlc")
 
         if isinstance(response, list) and len(response) > 0:
             raw = response[0]
             ohlc_data = raw.get("ohlc", {})
-            close_val = float(ohlc_data.get("close", 0))
+            
+            # Extract current data
+            ltp = float(raw.get("last_traded_price", 0))
+            close_val = float(ohlc_data.get("close", ltp))
 
             # Construct the row matching your exact expected format
             data_row = {
@@ -42,21 +57,14 @@ def fetch_yf_data(period="1d", interval=None, min_rows=None, ticker=None):
                 "High": float(ohlc_data.get("high", close_val)),
                 "Low": float(ohlc_data.get("low", close_val)),
                 "Close": close_val,
-                "Volume": 0
+                "Volume": 0,
+                "LotSize": LOT_SIZE
             }
 
-            # Create DataFrame
-            df = pd.DataFrame([data_row])
-
-            # Downstream fix: If min_rows is required, duplicate the current row 
-            # to prevent strategy crashes (since Quotes only gives 1 row)
-            target_rows = min_rows or DEFAULT_MIN_ROWS
-            if len(df) < target_rows:
-                df = pd.concat([df] * target_rows, ignore_index=True)
-
-            # Ensure 'Datetime' exists as a column (simulating your reset_index)
-            # In your yf code, reset_index moved 'Datetime' from Index to Column.
-            # Here we already have it as a column, so we just ensure index is clean.
+            # Create synthetic history (50 rows) to prevent downstream index crashes
+            df = pd.DataFrame([data_row] * target_rows)
+            
+            # Ensure 'Datetime' exists as a column (mimics reset_index behavior)
             df.reset_index(drop=True, inplace=True)
             
             return df
@@ -64,7 +72,7 @@ def fetch_yf_data(period="1d", interval=None, min_rows=None, ticker=None):
         return pd.DataFrame()
 
     except Exception as e:
-        print(f"NEO_ERROR|{ticker_symbol}|{str(e)}")
+        print(f"NEO_ERROR|{t}|{str(e)}")
         return pd.DataFrame()
 
 def get_latest_data():
@@ -74,11 +82,11 @@ def get_latest_data():
 
 # -------- Self-runnable test --------
 if __name__ == "__main__":
-    print("=== Testing Kotak-Neo Data Fetch Module ===")
+    print(f"=== Testing Kotak-Neo Data Fetch Module for {TICKER} ===")
     df = fetch_yf_data()
     if not df.empty:
-        print(f"Rows returned: {len(df)}")
+        print(f"Lot Size: {df['LotSize'].iloc[-1]} | Rows: {len(df)}")
         print(df.tail(50))
     else:
-        print("Data fetch failed.")
+        print("Data fetch failed. Ensure TICKER is 'Nifty 50' or 'Nifty Bank'.")
 
