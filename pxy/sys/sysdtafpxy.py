@@ -14,7 +14,7 @@ from runclntpxy import get_session
 
 # Module-level defaults to match your downstream
 DEFAULT_INTERVAL = "1m"
-DEFAULT_MIN_ROWS = 5
+DEFAULT_MIN_ROWS = 100
 
 def fetch_yf_data(period="1d", interval=None, min_rows=None, ticker=None):
     """
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     df = fetch_yf_data()
     if not df.empty:
         print(f"Rows returned: {len(df)}")
-        print(df.tail(5))
+        print(df.tail(100))
     else:
         print("Data fetch failed.")
 
