@@ -13,7 +13,7 @@ from runclntpxy import get_session
 
 def fetch_yf_data(ticker=None):
     """
-    KOTAK NEO V2 - QUOTES FALLBACK
+    KOTAK NEO V2 - QUOTES OHLC FETCH
     Hard-coded: nse_cm, quote_type="ohlc"
     """
     ticker_symbol = ticker or TICKER
@@ -22,26 +22,32 @@ def fetch_yf_data(ticker=None):
         client = get_session()
 
         # FETCH CURRENT QUOTE
-        # Note: isIndex is NOT a parameter for quotes()
+        # For Nifty 50, use the exact string name as the token
         instr_tokens = [{"instrument_token": ticker_symbol, "exchange_segment": "nse_cm"}]
+        
+        # Note: 'isIndex' is removed here as your previous version failed with it
         response = client.quotes(instrument_tokens=instr_tokens, quote_type="ohlc")
 
-        if response and "data" in response:
-            # Neo response data is usually a list of dicts
+        # LOGIC FIX: The SDK returns a dictionary where "data" contains a LIST of scripts
+        if response and "data" in response and isinstance(response["data"], list):
             data_list = response["data"]
             if not data_list:
                 return pd.DataFrame()
             
-            raw = data_list[0] # Get first scrip result
+            # The actual OHLC data is nested inside the 'ohlc' key of the first item
+            raw = data_list[0]
+            ohlc = raw.get("ohlc", {})
             
-            # Create DataFrame matching your strategy columns
+            # Use ltp (Last Traded Price) if close is not yet finalized
+            ltp = float(raw.get("last_traded_price", 0))
+            
             df = pd.DataFrame([{
                 "Datetime": datetime.now().replace(second=0, microsecond=0),
-                "Open": float(raw.get("open", 0)),
-                "High": float(raw.get("high", 0)),
-                "Low": float(raw.get("low", 0)),
-                "Close": float(raw.get("ltp", raw.get("close", 0))),
-                "Volume": float(raw.get("v", 0))
+                "Open": float(ohlc.get("open", ltp)),
+                "High": float(ohlc.get("high", ltp)),
+                "Low": float(ohlc.get("low", ltp)),
+                "Close": ltp,
+                "Volume": float(raw.get("volume", 0))
             }])
             
             return df
@@ -62,6 +68,8 @@ if __name__ == "__main__":
         print("CURRENT BAR DATA:")
         print(data)
     else:
-        print("No data received. Check if Market is Open or Ticker is correct.")
+        # Debugging step: print the full response if empty to see why
+        print("No data received. Try adding 'isIndex=True' back if this still fails.")
+
 
 
