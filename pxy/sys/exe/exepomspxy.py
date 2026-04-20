@@ -40,7 +40,7 @@ def print_market_dashboard(market_df):
     import subprocess
     import sys
     
-    #subprocess.run([sys.executable, "systdaypxy.py"])
+    subprocess.run([sys.executable, "systdaypxy.py"])
     
     metrics = [
         ("📏  ATR", "atr"),
@@ -133,6 +133,6 @@ def print_market_dashboard(market_df):
 
         print(f"{left}{' ' * spaces}{right}")
     # ===== BOS =====
-    print(snapshot.get("bos_bar", "------------------------------------------"))
+    print(snapshot.get("bos_bar", "NONE"))
     # ===== VISUAL =====
-    #print(snapshot.get("candle_visual", ""))
+    print(snapshot.get("candle_visual", ""))
