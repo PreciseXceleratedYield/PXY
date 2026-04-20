@@ -1,7 +1,10 @@
-import sys, os
+import sys, os, warnings
 import pandas as pd
 from datetime import datetime
 from syscnfgpxy import TICKER
+
+# Silence the concat FutureWarning
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # ---------------- PATH MANAGEMENT ----------------
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__)) 
@@ -22,40 +25,35 @@ def fetch_yf_data(ticker=None, min_rows=DEFAULT_MIN_ROWS):
     
     try:
         client = get_session()
-        # Nifty 50 requires exact string name as token
         instr_tokens = [{"instrument_token": t, "exchange_segment": "nse_cm"}]
         response = client.quotes(instrument_tokens=instr_tokens, quote_type="ohlc")
         
-        # 1. PARSE LIST RESPONSE
         if not isinstance(response, list) or len(response) == 0:
             return pd.DataFrame()
 
-        # Your SDK returns a list; grab the first dict
         raw = response[0] 
         
-        # 2. EXTRACT INDEX PRICE
-        # Check all possible keys for the latest index price
-        ltp = float(raw.get("last_traded_price", 
-                    raw.get("ltp", 0)))
-        
-        # Fallback to OHLC close if LTP is missing
+        # Extract Index Price
+        ltp = float(raw.get("last_traded_price", raw.get("ltp", 0)))
         if ltp == 0 and "ohlc" in raw:
             ltp = float(raw["ohlc"].get("close", 0))
 
         if ltp == 0:
-            print(f"WAITING_FOR_LTP|{t}")
             return pd.DataFrame()
         
-        # 3. LOAD & CLEAN HISTORY (Isolate Today)
+        # LOAD & CLEAN HISTORY
         if os.path.exists(CSV_FILE):
             df_hist = pd.read_csv(CSV_FILE)
-            if 'LotSize' in df_hist.columns: df_hist.drop(columns=['LotSize'], inplace=True)
+            # Remove any unwanted columns if they exist
+            for col in ['LotSize', 'Lots']:
+                if col in df_hist.columns: df_hist.drop(columns=[col], inplace=True)
+            
             df_hist['Datetime'] = pd.to_datetime(df_hist['Datetime'])
             df_hist = df_hist[df_hist['Datetime'].dt.strftime('%Y-%m-%d') == today_str]
         else:
             df_hist = pd.DataFrame(columns=["Datetime", "Open", "High", "Low", "Close", "Volume"])
 
-        # 4. DYNAMIC OHLC UPDATE (Real-time within the minute)
+        # DYNAMIC UPDATE
         live_dt = pd.to_datetime(current_min)
         if not df_hist.empty and df_hist['Datetime'].iloc[-1] == live_dt:
             idx = df_hist.index[-1]
@@ -68,15 +66,13 @@ def fetch_yf_data(ticker=None, min_rows=DEFAULT_MIN_ROWS):
         
         df_hist.to_csv(CSV_FILE, index=False)
 
-        # 5. BACKFILL (Always return 50 rows for strategy stability)
+        # BACKFILL TO 50 ROWS
         if len(df_hist) < min_rows:
             last_val = df_hist.iloc[-1].to_dict()
             padding = pd.DataFrame([last_val] * (min_rows - len(df_hist)))
             df_hist = pd.concat([padding, df_hist], ignore_index=True)
         
-        final_df = df_hist.tail(min_rows).reset_index(drop=True)
-        final_df['Datetime'] = pd.to_datetime(final_df['Datetime'])
-        return final_df
+        return df_hist.tail(min_rows).reset_index(drop=True)
 
     except Exception as e:
         print(f"SYNC_ERROR: {e}")
