@@ -7,7 +7,7 @@ from colorama import Fore, init, Style
 import traceback
 
 # --- GLOBAL CONFIG ---
-DEBUG = True
+DEBUG = False
 init(autoreset=True)
 
 # --- ADD PARENT DIR TO PATH ---
@@ -25,7 +25,7 @@ t = TICKER.upper().strip()
 
 if t == "^NSEBANK":
     LOT_SIZE = 30
-elif t in ["^NSEI", "Nifty 50"]:
+elif t == "^NSEI":
     LOT_SIZE = 65
 else:
     LOT_SIZE = None
