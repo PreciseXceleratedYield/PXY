@@ -8,7 +8,7 @@ IST = pytz.timezone("Asia/Kolkata")
 # ==================================================
 # 🔧 CONFIG (TUNE FROM HERE ONLY)
 # ==================================================
-BASE_INCREMENT = 0.016
+BASE_INCREMENT = 0
 PNL_THRESHOLD = -300
 
 
