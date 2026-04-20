@@ -25,7 +25,7 @@ t = TICKER.upper().strip()
 
 if t == "^NSEBANK":
     LOT_SIZE = 30
-elif t == "^NSEI":
+elif t in ["^NSEI", "Nifty 50"]:
     LOT_SIZE = 65
 else:
     LOT_SIZE = None
