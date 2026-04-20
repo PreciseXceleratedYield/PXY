@@ -1,6 +1,4 @@
-# sysdtafpxy.py
-import sys
-import os
+import sys, os
 import pandas as pd
 from datetime import datetime
 from syscnfgpxy import TICKER
@@ -8,8 +6,7 @@ from syscnfgpxy import TICKER
 # ---------------- PATH MANAGEMENT ----------------
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__)) 
 RUN_DIR = os.path.join(CURRENT_DIR, "exe", "run")
-if RUN_DIR not in sys.path:
-    sys.path.append(RUN_DIR)
+if RUN_DIR not in sys.path: sys.path.append(RUN_DIR)
 
 from runclntpxy import get_session
 
@@ -18,12 +15,6 @@ CSV_FILE = f"{TICKER.lower().replace(' ', '_')}_history.csv"
 DEFAULT_MIN_ROWS = 50
 
 def fetch_yf_data(ticker=None, min_rows=DEFAULT_MIN_ROWS):
-    """
-    1. Fetch Live LTP from Kotak Neo.
-    2. Dynamic minute-level High/Low tracking.
-    3. Update/Overwrite CSV row for current minute.
-    4. Backfill to 50 rows (Removed LotSize).
-    """
     t = ticker or TICKER
     now = datetime.now()
     today_str = now.strftime("%Y-%m-%d")
@@ -41,14 +32,22 @@ def fetch_yf_data(ticker=None, min_rows=DEFAULT_MIN_ROWS):
         raw = response[0]
         ltp = float(raw.get("last_traded_price", 0))
         
+        # STOP if price is zero (Market closed or API error)
+        if ltp == 0:
+            print(f"WAITING_FOR_LTP|{t}")
+            return pd.DataFrame()
+        
         # --- 2. LOAD & CLEAN HISTORY ---
         if os.path.exists(CSV_FILE):
             df_hist = pd.read_csv(CSV_FILE)
+            # FORCE REMOVE LOTSIZE IF IT STILL EXISTS IN OLD FILE
+            if 'LotSize' in df_hist.columns:
+                df_hist = df_hist.drop(columns=['LotSize'])
+            
             df_hist['Datetime'] = pd.to_datetime(df_hist['Datetime'])
-            # Filter today's data only
             df_hist = df_hist[df_hist['Datetime'].dt.strftime('%Y-%m-%d') == today_str]
         else:
-            df_hist = pd.DataFrame()
+            df_hist = pd.DataFrame(columns=["Datetime", "Open", "High", "Low", "Close", "Volume"])
 
         # --- 3. DYNAMIC OHLC UPDATE ---
         live_dt = pd.to_datetime(current_min)
@@ -71,10 +70,10 @@ def fetch_yf_data(ticker=None, min_rows=DEFAULT_MIN_ROWS):
             }
             df_hist = pd.concat([df_hist, pd.DataFrame([new_row])], ignore_index=True)
         
-        # Save CSV
+        # --- 4. SAVE CLEAN CSV ---
         df_hist.to_csv(CSV_FILE, index=False)
 
-        # --- 4. BACKFILL TO 50 ROWS ---
+        # --- 5. BACKFILL FOR DOWNSTREAM ---
         if len(df_hist) < min_rows:
             last_val = df_hist.iloc[-1].to_dict()
             padding = pd.DataFrame([last_val] * (min_rows - len(df_hist)))
@@ -91,9 +90,8 @@ def fetch_yf_data(ticker=None, min_rows=DEFAULT_MIN_ROWS):
 def get_latest_data():
     return fetch_yf_data().tail(1)
 
-# -------- TEST BLOCK (5 ROWS) --------
 if __name__ == "__main__":
-    print(f"=== Kotak Neo CSV Sync: {TICKER} (No Lots) ===")
+    print(f"=== Kotak Neo CSV Sync: {TICKER} (CLEAN) ===")
     df = fetch_yf_data()
     if not df.empty:
         print(df.tail(5))
