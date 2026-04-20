@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 from syscnfgpxy import TICKER
 
-# Silence the concat FutureWarning
+# Silence warnings to keep downstream logs clean
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # ---------------- PATH MANAGEMENT ----------------
@@ -13,79 +13,83 @@ if RUN_DIR not in sys.path: sys.path.append(RUN_DIR)
 
 from runclntpxy import get_session
 
-# --- CONFIGURATION ---
+# --- CONFIGURATION (Matches Downstream) ---
 CSV_FILE = f"{TICKER.lower().replace(' ', '_')}_history.csv"
-DEFAULT_MIN_ROWS = 50
+DEFAULT_MIN_ROWS = 50 
 
-def get_lot_size(t):
-    """Current 2026 NSE lot sizes."""
-    if t == "Nifty Bank": return 30
-    if t == "Nifty 50": return 75
-    return None
-
-def fetch_yf_data(ticker=None, min_rows=DEFAULT_MIN_ROWS):
+def fetch_yf_data(period="1d", interval="1m", min_rows=None, ticker=None):
+    """
+    KOTAK NEO REPLACEMENT:
+    1. Updates CSV with true 1-minute OHLC constructed from live LTP.
+    2. Filters for today's data only.
+    3. Returns exactly 50 rows (Datetime, Open, High, Low, Close, Volume=0).
+    """
     t = ticker or TICKER
+    target_rows = min_rows or DEFAULT_MIN_ROWS
     now = datetime.now()
     today_str = now.strftime("%Y-%m-%d")
     current_min = now.strftime("%Y-%m-%d %H:%M:00")
     
     try:
+        # --- 1. RUN: FETCH LIVE LTP ---
         client = get_session()
-        # Nifty 50 and Nifty Bank require exact string names in Kotak Neo V2
         instr_tokens = [{"instrument_token": t, "exchange_segment": "nse_cm"}]
-        
-        # Kotak API Call
+        # Using quote_type='ltp' for faster real-time price tracking
         response = client.quotes(instrument_tokens=instr_tokens, quote_type="ltp")
         
-        # --- FIX: Access first item in list ---
-        if not isinstance(response, list) or len(response) == 0:
-            return pd.DataFrame()
-        
-        # Access the first dictionary in the response list
-        raw = response[0] 
-        
-        # Extract live price (Index Value or Last Traded Price)
+        # Access the dictionary inside the Neo list response
+        raw = response if isinstance(response, list) and len(response) > 0 else {}
+        # Kotak Neo Indices use 'iv' or 'last_traded_price'
         ltp = float(raw.get("last_traded_price", raw.get("ltp", raw.get("iv", 0))))
-        if ltp == 0: return pd.DataFrame()
-        
-        # Load and clean history for today only
-        if os.path.exists(CSV_FILE):
-            df_hist = pd.read_csv(CSV_FILE)
-            if 'LotSize' in df_hist.columns: df_hist.drop(columns=['LotSize'], inplace=True)
-            df_hist['Datetime'] = pd.to_datetime(df_hist['Datetime'])
-            df_hist = df_hist[df_hist['Datetime'].dt.strftime('%Y-%m-%d') == today_str]
-        else:
-            df_hist = pd.DataFrame(columns=["Datetime", "Open", "High", "Low", "Close", "Volume"])
 
-        # --- REAL-TIME 1-MINUTE OHLC LOGIC ---
-        live_dt = pd.to_datetime(current_min)
-        if not df_hist.empty and df_hist['Datetime'].iloc[-1] == live_dt:
-            # SAME MINUTE: Update High, Low, and Close
-            idx = df_hist.index[-1]
-            df_hist.at[idx, 'High'] = max(float(df_hist.at[idx, 'High']), ltp)
-            df_hist.at[idx, 'Low'] = min(float(df_hist.at[idx, 'Low']), ltp)
-            df_hist.at[idx, 'Close'] = ltp
-        else:
-            # NEW MINUTE: Start a fresh candle
-            new_row = {"Datetime": current_min, "Open": ltp, "High": ltp, "Low": ltp, "Close": ltp, "Volume": 0}
-            df_hist = pd.concat([df_hist, pd.DataFrame([new_row])], ignore_index=True)
-        
-        # Save CSV
-        df_hist.to_csv(CSV_FILE, index=False)
+        if ltp > 0:
+            # --- 2. UPDATE: MANAGE CSV HISTORY (Today Only) ---
+            if os.path.exists(CSV_FILE):
+                df_hist = pd.read_csv(CSV_FILE)
+                df_hist['Datetime'] = pd.to_datetime(df_hist['Datetime'])
+                # Keep only Today's data
+                df_hist = df_hist[df_hist['Datetime'].dt.strftime('%Y-%m-%d') == today_str]
+            else:
+                df_hist = pd.DataFrame(columns=["Datetime", "Open", "High", "Low", "Close", "Volume"])
 
-        # Backfill for strategy stability
-        if len(df_hist) < min_rows:
-            padding = pd.DataFrame([df_hist.iloc[-1].to_dict()] * (min_rows - len(df_hist)))
-            df_hist = pd.concat([padding, df_hist], ignore_index=True)
+            live_dt = pd.to_datetime(current_min)
+            if not df_hist.empty and df_hist['Datetime'].iloc[-1] == live_dt:
+                # SAME MINUTE: Build OHLC dynamically from LTP
+                idx = df_hist.index[-1]
+                df_hist.at[idx, 'High'] = max(float(df_hist.at[idx, 'High']), ltp)
+                df_hist.at[idx, 'Low'] = min(float(df_hist.at[idx, 'Low']), ltp)
+                df_hist.at[idx, 'Close'] = ltp
+            else:
+                # NEW MINUTE: Start fresh candle with LTP
+                new_row = {"Datetime": current_min, "Open": ltp, "High": ltp, "Low": ltp, "Close": ltp, "Volume": 0}
+                df_hist = pd.concat([df_hist, pd.DataFrame([new_row])], ignore_index=True)
+            
+            df_hist.to_csv(CSV_FILE, index=False)
         
-        return df_hist.tail(min_rows).reset_index(drop=True)
+        # --- 3. READ: RETURN DATA FOR STRATEGY ---
+        df = pd.read_csv(CSV_FILE)
+        df['Datetime'] = pd.to_datetime(df['Datetime'])
+        
+        # Backfill padding to 50 rows if history is short (Market Opening)
+        if len(df) < target_rows:
+            last_valid = df.iloc[-1].to_dict() if not df.empty else {"Datetime": current_min, "Open": ltp, "High": ltp, "Low": ltp, "Close": ltp, "Volume": 0}
+            padding = pd.DataFrame([last_valid] * (target_rows - len(df)))
+            df = pd.concat([padding, df], ignore_index=True)
+
+        return df.tail(target_rows).reset_index(drop=True)
 
     except Exception as e:
-        print(f"SYNC_ERROR: {e}")
+        print(f"NEO_DATA_ERROR|{e}")
         return pd.DataFrame()
 
+def get_latest_data():
+    """ Returns the single latest row of data """
+    return fetch_yf_data().tail(1)
+
 if __name__ == "__main__":
+    print(f"=== Kotak Neo Sync: {TICKER} (Real-time OHLC) ===")
     df = fetch_yf_data()
     if not df.empty:
-        print(f"LIVE UPDATE | Price: {df['Close'].iloc[-1]} | Time: {df['Datetime'].iloc[-1]}")
+        print(df.tail(5))
+
 
