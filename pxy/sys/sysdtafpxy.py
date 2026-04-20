@@ -16,35 +16,28 @@ def fetch_yf_data(ticker=None):
 
     try:
         client = get_session()
-
-        # Build token list
         instr_tokens = [{"instrument_token": ticker_symbol, "exchange_segment": "nse_cm"}]
         
-        # Fetching Quotes
+        # API Call
         response = client.quotes(instrument_tokens=instr_tokens, quote_type="ohlc")
 
-        # --- CRITICAL: LOOK AT THIS OUTPUT IN YOUR TERMINAL ---
-        print(f"\n--- DEBUG RAW RESPONSE ---\n{response}\n--------------------------\n")
-
-        if response and "data" in response:
-            data_list = response["data"]
+        # PARSING LOGIC: Your version returns a list of dicts directly
+        if isinstance(response, list) and len(response) > 0:
+            raw = response[0]  # Get the first dictionary in the list
+            ohlc_data = raw.get("ohlc", {})
             
-            # Neo SDK usually returns a list of dictionaries
-            if isinstance(data_list, list) and len(data_list) > 0:
-                raw = data_list[0] # Take first scrip result
-                
-                ohlc = raw.get("ohlc", {})
-                ltp = float(raw.get("last_traded_price", 0))
-                
-                df = pd.DataFrame([{
-                    "Datetime": datetime.now().replace(second=0, microsecond=0),
-                    "Open": float(ohlc.get("open", ltp)),
-                    "High": float(ohlc.get("high", ltp)),
-                    "Low": float(ohlc.get("low", ltp)),
-                    "Close": ltp,
-                    "Volume": float(raw.get("volume", 0))
-                }])
-                return df
+            # Use 'close' as LTP since the API is providing it in the ohlc block
+            close_val = float(ohlc_data.get("close", 0))
+
+            df = pd.DataFrame([{
+                "Datetime": datetime.now().replace(second=0, microsecond=0),
+                "Open": float(ohlc_data.get("open", close_val)),
+                "High": float(ohlc_data.get("high", close_val)),
+                "Low": float(ohlc_data.get("low", close_val)),
+                "Close": close_val,
+                "Volume": 0.0  # Indices usually don't return volume in this block
+            }])
+            return df
             
         return pd.DataFrame()
 
@@ -52,12 +45,14 @@ def fetch_yf_data(ticker=None):
         print(f"NEO_CRITICAL_ERR|{ticker_symbol}|{str(e)}")
         return pd.DataFrame()
 
+def get_latest_data():
+    return fetch_yf_data()
+
 if __name__ == "__main__":
-    print(f"Ticker: {TICKER} | Starting Fetch...")
     data = fetch_yf_data()
-    if data is not None and not data.empty:
-        print("SUCCESS! DATA RECEIVED.")
+    if not data.empty:
+        print("SUCCESS! NIFTY DATA PARSED:")
         print(data)
     else:
-        print("STILL EMPTY. Please check the RAW_RESPONSE printed above.")
+        print("Parsing failed. Check response structure.")
 
