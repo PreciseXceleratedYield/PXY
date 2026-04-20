@@ -14,31 +14,31 @@ from runclntpxy import get_session
 def fetch_yf_data(ticker=None):
     """
     KOTAK NEO V2 - QUOTES OHLC FETCH
-    Hard-coded: nse_cm, quote_type="ohlc"
+    Hard-coded: nse_cm, quote_type="ohlc", isIndex=True
     """
+    # Use config TICKER if none provided (Ensure it is "Nifty 50")
     ticker_symbol = ticker or TICKER
 
     try:
         client = get_session()
 
-        # FETCH CURRENT QUOTE
-        # For Nifty 50, use the exact string name as the token
+        # Token list - Nifty 50 requires exact string name
         instr_tokens = [{"instrument_token": ticker_symbol, "exchange_segment": "nse_cm"}]
         
-        # Note: 'isIndex' is removed here as your previous version failed with it
-        response = client.quotes(instrument_tokens=instr_tokens, quote_type="ohlc")
+        # Calling quotes with isIndex=True (Required for string-based index tokens)
+        response = client.quotes(instrument_tokens=instr_tokens, quote_type="ohlc", isIndex=True)
 
-        # LOGIC FIX: The SDK returns a dictionary where "data" contains a LIST of scripts
-        if response and "data" in response and isinstance(response["data"], list):
+        # DEBUG: Uncomment the line below to see the raw API output if data is still missing
+        # print(f"DEBUG RESPONSE: {response}")
+
+        if response and "data" in response:
             data_list = response["data"]
-            if not data_list:
+            if not data_list or len(data_list) == 0:
                 return pd.DataFrame()
             
-            # The actual OHLC data is nested inside the 'ohlc' key of the first item
-            raw = data_list[0]
+            # The structure often puts the scrip data in the first list item
+            raw = data_list[0] 
             ohlc = raw.get("ohlc", {})
-            
-            # Use ltp (Last Traded Price) if close is not yet finalized
             ltp = float(raw.get("last_traded_price", 0))
             
             df = pd.DataFrame([{
@@ -58,18 +58,11 @@ def fetch_yf_data(ticker=None):
         print(f"NEO_CRITICAL_ERR|{ticker_symbol}|{str(e)}")
         return pd.DataFrame()
 
-def get_latest_data():
-    return fetch_yf_data()
-
 if __name__ == "__main__":
-    print(f"Ticker: {TICKER} | Segment: nse_cm | Mode: Live Quote OHLC")
+    print(f"Ticker: {TICKER} | Segment: nse_cm | Mode: Quotes OHLC")
     data = fetch_yf_data()
     if not data.empty:
-        print("CURRENT BAR DATA:")
+        print("SUCCESS! CURRENT CANDLE:")
         print(data)
     else:
-        # Debugging step: print the full response if empty to see why
-        print("No data received. Try adding 'isIndex=True' back if this still fails.")
-
-
-
+        print("Still no data. Ensure Market is open (9:15 AM - 3:30 PM) and 'Nifty 50' is correctly spelled in syscnfgpxy.py.")
