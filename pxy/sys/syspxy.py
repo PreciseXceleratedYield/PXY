@@ -3,14 +3,7 @@ from systdaypxy import get_market_snapshot
 from sysvixpxy import get_market_context, expand_vix, expand_sentiment
 from syscnfgpxy import TICKER
 
-# 🔥 ADD THIS
-from syschrtpxy import export_supertrend_json
-
-
 def get_all_data():
-    # -------- RUN CHART GENERATION FIRST --------
-    export_supertrend_json()
-
     # -------- CORE --------
     core = get_full_snapshot() or {}
 
@@ -51,7 +44,7 @@ def get_all_data():
         "entry": core.get("entry"),
         "exit": core.get("exit"),
 
-        # ===== NEW =====
+        # ✅ NEWLY INCLUDED
         "candle_visual": core.get("candle_visual", ""),
         "bos_bar": core.get("bos_bar", "NONE"),
         "day_candle": core.get("day_candle", ""),
@@ -66,7 +59,7 @@ def get_all_data():
     return data
 
 
-# ===== SELF TEST =====
+# ===== OPTIONAL RUN =====
 if __name__ == "__main__":
     data = get_all_data()
     for k, v in data.items():
