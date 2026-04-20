@@ -14,34 +14,38 @@ from runclntpxy import get_session
 def fetch_yf_data(ticker=None):
     """
     KOTAK NEO V2 - QUOTES FALLBACK
-    Uses 'quotes' method to fetch OHLC because 'history' is often restricted.
+    Hard-coded: nse_cm, quote_type="ohlc"
     """
     ticker_symbol = ticker or TICKER
 
     try:
         client = get_session()
 
-        # FETCH CURRENT QUOTE (Hard-coded for OHLC)
-        # Standard method name in V2 is client.quotes()
+        # FETCH CURRENT QUOTE
+        # Note: isIndex is NOT a parameter for quotes()
         instr_tokens = [{"instrument_token": ticker_symbol, "exchange_segment": "nse_cm"}]
-        response = client.quotes(instrument_tokens=instr_tokens, quote_type="ohlc", isIndex=True)
+        response = client.quotes(instrument_tokens=instr_tokens, quote_type="ohlc")
 
-        if response and "data" in response and len(response["data"]) > 0:
-            raw_data = response["data"][0]
+        if response and "data" in response:
+            # Neo response data is usually a list of dicts
+            data_list = response["data"]
+            if not data_list:
+                return pd.DataFrame()
             
-            # Format into a DataFrame compatible with your strategy
+            raw = data_list[0] # Get first scrip result
+            
+            # Create DataFrame matching your strategy columns
             df = pd.DataFrame([{
                 "Datetime": datetime.now().replace(second=0, microsecond=0),
-                "Open": float(raw_data.get("open", 0)),
-                "High": float(raw_data.get("high", 0)),
-                "Low": float(raw_data.get("low", 0)),
-                "Close": float(raw_data.get("ltp", raw_data.get("close", 0))),
-                "Volume": float(raw_data.get("v", 0))
+                "Open": float(raw.get("open", 0)),
+                "High": float(raw.get("high", 0)),
+                "Low": float(raw.get("low", 0)),
+                "Close": float(raw.get("ltp", raw.get("close", 0))),
+                "Volume": float(raw.get("v", 0))
             }])
             
             return df
             
-        print(f"NEO_QUOTE_EMPTY|{ticker_symbol}")
         return pd.DataFrame()
 
     except Exception as e:
@@ -49,15 +53,15 @@ def fetch_yf_data(ticker=None):
         return pd.DataFrame()
 
 def get_latest_data():
-    """Returns the current 1-minute OHLC bar."""
     return fetch_yf_data()
 
 if __name__ == "__main__":
-    print(f"Ticker: {TICKER} | Exchange: nse_cm | Mode: Live Quote OHLC")
+    print(f"Ticker: {TICKER} | Segment: nse_cm | Mode: Live Quote OHLC")
     data = fetch_yf_data()
     if not data.empty:
         print("CURRENT BAR DATA:")
         print(data)
-
+    else:
+        print("No data received. Check if Market is Open or Ticker is correct.")
 
 
