@@ -24,10 +24,10 @@ except:
 def resolve_index():
     t = str(TICKER).upper().strip()
 
-    if t == "^NSEI":
+    if t in ["^NSEI", "NIFTY", "NIFTY 50", "NIFTY50"]:
         return "NIFTY"
 
-    if t == "^NSEBANK":
+    if t in ["^NSEBANK", "BANKNIFTY", "NIFTY BANK", "BANK NIFTY"]:
         return "BANKNIFTY"
 
     raise ValueError(f"Unsupported TICKER: {TICKER}")
