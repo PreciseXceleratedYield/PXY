@@ -20,9 +20,9 @@ DEFAULT_MIN_ROWS = 50
 def fetch_yf_data(period="1d", interval="1m", min_rows=None, ticker=None):
     """
     KOTAK NEO REPLACEMENT:
-    1. Updates CSV with true 1-minute OHLC constructed from live LTP.
+    1. Updates CSV with true 1-minute OHLC.
     2. Filters for today's data only.
-    3. Returns exactly 50 rows (Datetime, Open, High, Low, Close, Volume=0).
+    3. Returns exactly 50 rows from the CSV.
     """
     t = ticker or TICKER
     target_rows = min_rows or DEFAULT_MIN_ROWS
@@ -34,12 +34,15 @@ def fetch_yf_data(period="1d", interval="1m", min_rows=None, ticker=None):
         # --- 1. RUN: FETCH LIVE LTP ---
         client = get_session()
         instr_tokens = [{"instrument_token": t, "exchange_segment": "nse_cm"}]
-        # Using quote_type='ltp' for faster real-time price tracking
         response = client.quotes(instrument_tokens=instr_tokens, quote_type="ltp")
         
-        # Access the dictionary inside the Neo list response
-        raw = response if isinstance(response, list) and len(response) > 0 else {}
-        # Kotak Neo Indices use 'iv' or 'last_traded_price'
+        # FIX: Access the dictionary inside the Neo list response
+        if isinstance(response, list) and len(response) > 0:
+            raw = response[0] # Grab the first item in the list
+        else:
+            raw = {}
+
+        # Capture Index Value or Last Traded Price
         ltp = float(raw.get("last_traded_price", raw.get("ltp", raw.get("iv", 0))))
 
         if ltp > 0:
@@ -64,19 +67,24 @@ def fetch_yf_data(period="1d", interval="1m", min_rows=None, ticker=None):
                 new_row = {"Datetime": current_min, "Open": ltp, "High": ltp, "Low": ltp, "Close": ltp, "Volume": 0}
                 df_hist = pd.concat([df_hist, pd.DataFrame([new_row])], ignore_index=True)
             
+            # Save CSV (Update File)
             df_hist.to_csv(CSV_FILE, index=False)
         
-        # --- 3. READ: RETURN DATA FOR STRATEGY ---
-        df = pd.read_csv(CSV_FILE)
-        df['Datetime'] = pd.to_datetime(df['Datetime'])
-        
-        # Backfill padding to 50 rows if history is short (Market Opening)
-        if len(df) < target_rows:
-            last_valid = df.iloc[-1].to_dict() if not df.empty else {"Datetime": current_min, "Open": ltp, "High": ltp, "Low": ltp, "Close": ltp, "Volume": 0}
-            padding = pd.DataFrame([last_valid] * (target_rows - len(df)))
-            df = pd.concat([padding, df], ignore_index=True)
+        # --- 3. READ: RETURN DATA FROM FILE ---
+        if os.path.exists(CSV_FILE):
+            df = pd.read_csv(CSV_FILE)
+            df['Datetime'] = pd.to_datetime(df['Datetime'])
+            
+            # Backfill padding to 50 rows if history is short (Early morning)
+            if len(df) < target_rows:
+                # Use current data for padding
+                last_row = df.iloc[-1].to_dict() if not df.empty else {"Datetime": current_min, "Open": ltp, "High": ltp, "Low": ltp, "Close": ltp, "Volume": 0}
+                padding = pd.DataFrame([last_row] * (target_rows - len(df)))
+                df = pd.concat([padding, df], ignore_index=True)
 
-        return df.tail(target_rows).reset_index(drop=True)
+            return df.tail(target_rows).reset_index(drop=True)
+        
+        return pd.DataFrame()
 
     except Exception as e:
         print(f"NEO_DATA_ERROR|{e}")
@@ -91,5 +99,6 @@ if __name__ == "__main__":
     df = fetch_yf_data()
     if not df.empty:
         print(df.tail(5))
+
 
 
