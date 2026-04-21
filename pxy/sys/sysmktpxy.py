@@ -197,11 +197,11 @@ def get_signal():
 
             ha = compute_heikin_ashi(df)
 
-            ha_o2 = ha['HA_Open'].iloc[-3]
-            ha_c2 = ha['HA_Close'].iloc[-3]
+            ha_o2 = ha['HA_Open'].iloc[-2]
+            ha_c2 = ha['HA_Close'].iloc[-2]
 
-            ha_o3 = ha['HA_Open'].iloc[-2]
-            ha_c3 = ha['HA_Close'].iloc[-2]
+            ha_o3 = ha['HA_Open'].iloc[-1]   # 🔥 running candle
+            ha_c3 = ha['HA_Close'].iloc[-1]  # 🔥 running candle
 
             dbg("HKIN CLOSED:", ha_o2, ha_c2, ha_o3, ha_c3)
 
