@@ -34,11 +34,11 @@ def get_entry_signal(df=None):
     # ------------------------------
     # ONLY CONDITION (YOUR RULE)
     # ------------------------------
-    if signal == "BUY" and side == "PE" and depth > 6:
-        return "BUY", exit_signal
+    if signal == "BUY" and side == "PE" and depth > 5:
+        return "ATMBUY", exit_signal
 
-    if signal == "SELL" and side == "CE" and depth > 6:
-        return "SELL", exit_signal
+    if signal == "SELL" and side == "CE" and depth > 5:
+        return "ATMSELL", exit_signal
 
     # ------------------------------
     # EVERYTHING ELSE BLOCKED
