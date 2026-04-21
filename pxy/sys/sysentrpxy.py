@@ -1,20 +1,24 @@
 # ==================================================
-# sysentrpxy.py (PURE DEPTH FILTER VERSION)
+# sysentrpxy.py (DEPTH ENTRY + ORIGINAL ENTRY AS EXIT)
 # ==================================================
 
 from sysmktpxy import get_signal
-from syshkinpxy import detect_ha_flip_signal
+from syshkinpxy_aligned import detect_ha_flip_signal
 
 
 # ==================================================
-# CORE ENGINE (MINIMAL)
+# CORE ENGINE
 # ==================================================
 def get_entry_signal(df=None):
 
     # ------------------------------
-    # BASE SIGNAL (UNCHANGED)
+    # ORIGINAL ENGINE SIGNALS
     # ------------------------------
-    signal, exit_signal = get_signal()
+    entry_signal, exit_signal = get_signal()
+
+    # 🔥 IMPORTANT:
+    # We will use ORIGINAL ENTRY as EXIT
+    original_entry = entry_signal
 
     # ------------------------------
     # DEPTH CHECK
@@ -23,27 +27,32 @@ def get_entry_signal(df=None):
         _, past_depth, _, _ = detect_ha_flip_signal()
 
         if past_depth == "NA":
-            return "NONE", exit_signal
+            return "NONE", original_entry
 
         side = past_depth[:2]   # CE / PE
         depth = int(past_depth[2:])
 
     except:
-        return "NONE", exit_signal
+        return "NONE", original_entry
 
     # ------------------------------
-    # ONLY CONDITION (YOUR RULE)
+    # ENTRY FILTER (ONLY YOUR RULE)
     # ------------------------------
-    if signal == "BUY" and side == "PE" and depth > 5:
-        return "ATMBUY", exit_signal
+    if entry_signal == "BUY" and side == "PE" and depth > 6:
+        final_entry = "BUY"
 
-    if signal == "SELL" and side == "CE" and depth > 5:
-        return "ATMSELL", exit_signal
+    elif entry_signal == "SELL" and side == "CE" and depth > 6:
+        final_entry = "SELL"
+
+    else:
+        final_entry = "NONE"
 
     # ------------------------------
-    # EVERYTHING ELSE BLOCKED
+    # 🔁 FINAL RETURN
+    # ENTRY = FILTERED
+    # EXIT  = ORIGINAL ENTRY
     # ------------------------------
-    return "NONE", exit_signal
+    return final_entry, original_entry
 
 
 # ==================================================
