@@ -92,6 +92,12 @@ def detect_ha_flip_signal(df=None, last_n=21):
     ce_depth = current_depth if current_color == "green" else 1
     pe_depth = current_depth if current_color == "red" else 1
 
+    if current_streak_start > 0:
+        streak_color = colors[current_streak_start - 1]
+        past_depth = f"CE{past_depth}" if streak_color == "green" else f"PE{past_depth}" if streak_color == "red" else "NA"
+    else:
+        past_depth = "NA"
+    
     return signal, past_depth, ce_depth, pe_depth
 
 
