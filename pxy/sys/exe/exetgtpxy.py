@@ -46,7 +46,7 @@ def target_price(row):
         direction_signal = str(row.get("direction", "NONE")).upper()
         counter = str(row.get("counter", "Y")).upper()
 
-        _signal = entry_signal if counter == "Y" else direction_signal
+        _signal = exit_signal if counter == "Y" else exit_signal
 
         bullish = any(x in _signal for x in ["BUY", "BULL", "UP"])
         bearish = any(x in _signal for x in ["SELL", "BEAR", "DOWN"])
