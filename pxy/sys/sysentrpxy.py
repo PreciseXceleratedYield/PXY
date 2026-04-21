@@ -12,7 +12,7 @@ from sysdtafpxy import fetch_yf_data
 # ==================================================
 # MODE SWITCH
 # ==================================================
-MODE = "ADAPTIVE"   # "SIMPLE" or "ADAPTIVE"
+MODE = "SIMPLE"   # "SIMPLE" or "ADAPTIVE"
 
 
 # ==================================================
