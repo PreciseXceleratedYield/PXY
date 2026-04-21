@@ -6,6 +6,11 @@ from sysdtafpxy import fetch_yf_data
 # 🔥 CONTROL: Keep forming candle INCLUDED (DO NOT BREAK DOWNSTREAM)
 USE_FORMING_CANDLE = True
 
+# 🔥 CLEAN SWITCH
+# "HA"  → Heikin Ashi
+# "OC2" → (Open + Close)/2 vs previous
+CANDLE_STYLE = "HA"
+
 
 def get_ha_data(tickerSymbol=None, df=None):
     """
@@ -54,41 +59,63 @@ def get_ha_data(tickerSymbol=None, df=None):
     for i in range(1, len(ha_close)):
         prev_open = ha_open.iloc[i - 1]
         prev_close = ha_close.iloc[i - 1]
-
         ha_open.iloc[i] = (prev_open + prev_close) / 2
 
-    # ---------------- HEIKIN-ASHI COLOR ----------------
+    # ---------------- OC2 (Open+Close)/2 ----------------
+    oc2 = (df['Open'] + df['Close']) / 2
+    oc2_prev = oc2.shift(1)
+
+    # ---------------- COLOR ----------------
     ha_color = pd.Series(index=ha_close.index, dtype='object')
 
     for i in range(len(ha_close)):
         hc = ha_close.iloc[i]
         ho = ha_open.iloc[i]
 
+        oc = oc2.iloc[i]
+        oc_prev_val = oc2_prev.iloc[i]
+
         # ==================================================
-        # 🔥 ONLY FIX: EXCLUDE FORMING CANDLE FROM SIGNAL STATE
-        # (keeps structure intact, only alignment fix)
+        # 🔥 EXCLUDE FORMING CANDLE FROM SIGNAL STATE
         # ==================================================
         if USE_FORMING_CANDLE is True and i == len(ha_close) - 1:
             ha_color.iloc[i] = "none"
             continue
 
-        # ---------------- NORMAL HA LOGIC ----------------
+        # ---------------- NA SAFETY ----------------
         if pd.isna(hc) or pd.isna(ho):
             ha_color.iloc[i] = "none"
+            continue
 
-        elif hc > ho:
-            ha_color.iloc[i] = "green"
+        # ==================================================
+        # 🔥 CLEAN SWITCH LOGIC (ONLY 2 MODES)
+        # ==================================================
 
-        elif hc < ho:
-            ha_color.iloc[i] = "red"
+        if CANDLE_STYLE == "OC2":
+            # 🔥 OC2 → current vs previous
+            if oc > oc_prev_val:
+                ha_color.iloc[i] = "green"
+            elif oc < oc_prev_val:
+                ha_color.iloc[i] = "red"
+            else:
+                if i == 0:
+                    ha_color.iloc[i] = "none"
+                else:
+                    prev_color = ha_color.iloc[i - 1]
+                    ha_color.iloc[i] = prev_color if prev_color in ["green", "red"] else "none"
 
         else:
-            # DOJI → keep RAW continuity (unchanged behavior)
-            if i == 0:
-                ha_color.iloc[i] = "none"
+            # 🔥 HA → original logic
+            if hc > ho:
+                ha_color.iloc[i] = "green"
+            elif hc < ho:
+                ha_color.iloc[i] = "red"
             else:
-                prev_color = ha_color.iloc[i - 1]
-                ha_color.iloc[i] = prev_color if prev_color in ["green", "red"] else "none"
+                if i == 0:
+                    ha_color.iloc[i] = "none"
+                else:
+                    prev_color = ha_color.iloc[i - 1]
+                    ha_color.iloc[i] = prev_color if prev_color in ["green", "red"] else "none"
 
-    # ---------------- FINAL VALIDATION ----------------
+    # ---------------- FINAL ----------------
     return ha_close, ha_open, ha_color, df
