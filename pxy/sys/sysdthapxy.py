@@ -9,7 +9,7 @@ USE_FORMING_CANDLE = True
 # 🔥 CLEAN SWITCH
 # "HA"  → Heikin Ashi
 # "OC2" → (Open + Close)/2 vs previous
-CANDLE_STYLE = "HA"
+CANDLE_STYLE = "OC2"
 
 
 def get_ha_data(tickerSymbol=None, df=None):
