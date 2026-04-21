@@ -1,5 +1,5 @@
 # ==================================================
-# SMA50 SLOPE ENGINE (5 vs 1 + STRENGTH)
+# SMA50 SLOPE ENGINE (STABLE VERSION)
 # ==================================================
 
 import pandas as pd
@@ -13,30 +13,26 @@ init(autoreset=True)
 # CORE FUNCTION
 # ==================================================
 def get_sma50_slope(source_col="close", colored=False, return_strength=False):
-    """
-    Logic:
-    - Compute SMA(50)
-    - Take last 6 SMA values
-    - Compare avg(first 5) vs last (6th)
 
-    Returns:
-        Direction: "UP" / "DOWN" / "FLAT"
-        Strength: slope_pct (optional)
-    """
-
-    # 1️⃣ Fetch data
     df = fetch_yf_data()
 
-    if df is None or source_col not in df.columns:
+    if df is None:
+        return (None, None) if return_strength else None
+
+    # 🔥 normalize columns (CRITICAL FIX)
+    df.columns = [c.lower() for c in df.columns]
+    source_col = source_col.lower()
+
+    if source_col not in df.columns:
         return (None, None) if return_strength else None
 
     # 2️⃣ Compute SMA(50)
     sma50 = df[source_col].rolling(50).mean()
 
-    # 3️⃣ Take last 6 values
-    last6 = sma50.iloc[-6:]
+    # take last valid window only
+    last6 = sma50.dropna().iloc[-6:]
 
-    if last6.isna().any():
+    if len(last6) < 6:
         return (None, None) if return_strength else None
 
     # 4️⃣ Compute comparison
@@ -51,10 +47,10 @@ def get_sma50_slope(source_col="close", colored=False, return_strength=False):
     else:
         direction = "FLAT"
 
-    # 6️⃣ 🔥 Strength (normalized slope %)
+    # 6️⃣ Strength
     slope_pct = (last - avg_5) / avg_5 if avg_5 != 0 else 0
 
-    # 7️⃣ Colored output (only for direction)
+    # 7️⃣ Color output
     if colored:
         if direction == "UP":
             direction_col = Fore.GREEN + direction + Style.RESET_ALL
@@ -73,7 +69,7 @@ def get_sma50_slope(source_col="close", colored=False, return_strength=False):
 
 
 # ==================================================
-# DIRECT RUN (OPTIONAL)
+# TEST
 # ==================================================
 if __name__ == "__main__":
     direction, strength = get_sma50_slope(return_strength=True, colored=True)
