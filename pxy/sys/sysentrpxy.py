@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (SIMPLE + ADAPTIVE FINAL STABLE)
+# sysentrpxy.py (SIMPLE + ADAPTIVE FINAL FIXED)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -26,7 +26,7 @@ def get_entry_signal(df=None):
     signal, exit_signal = get_signal()
 
     # ==================================================
-    # SIMPLE MODE (UNCHANGED LOGIC)
+    # SIMPLE MODE (UNCHANGED)
     # ==================================================
     if MODE == "SIMPLE":
 
@@ -52,7 +52,7 @@ def get_entry_signal(df=None):
 
 
     # ==================================================
-    # ADAPTIVE MODE (FIXED LOGIC ONLY)
+    # ADAPTIVE MODE (FIXED SLOPE HANDLING)
     # ==================================================
     df = fetch_yf_data()
 
@@ -69,28 +69,43 @@ def get_entry_signal(df=None):
         return "NONE", exit_signal
 
     # ------------------------------
-    # SLOPE + STRENGTH
+    # SLOPE + STRENGTH (FIXED)
     # ------------------------------
     slope, slope_pct = get_sma50_slope(return_strength=True)
 
-    if slope not in ["UP", "DOWN"]:
-        print("[DEBUG] SLOPE INVALID → NO TRADE")
+    if slope is None:
+        print("[DEBUG] SLOPE = None → NO TRADE")
         return "NONE", exit_signal
 
+    # 🔥 normalize properly
+    slope = str(slope).strip().upper()
+
+    if "UP" in slope:
+        slope = "UP"
+    elif "DOWN" in slope:
+        slope = "DOWN"
+
+    if slope not in ["UP", "DOWN"]:
+        print("[DEBUG] SLOPE INVALID →", slope)
+        return "NONE", exit_signal
+
+    # ------------------------------
+    # SLOPE STRENGTH
+    # ------------------------------
     slope_strength = 0
     if slope_pct is not None:
         slope_strength = min(abs(slope_pct) / 0.005, 1)
 
-    slope_depth_factor = 1 - slope_strength   # 🔥 inversion applied
+    slope_depth_factor = 1 - slope_strength
 
     # ------------------------------
-    # VOLATILITY
+    # VOLATILITY (K)
     # ------------------------------
     k = calculate_dynamic_k(df)
     k_norm = (k - 1) / 2
 
     # ------------------------------
-    # PRESSURE (FINAL STABLE MODEL)
+    # PRESSURE
     # ------------------------------
     pressure = (0.5 * k_norm) + (0.5 * slope_depth_factor)
 
