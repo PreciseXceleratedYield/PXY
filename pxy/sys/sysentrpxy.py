@@ -3,7 +3,7 @@
 # ==================================================
 
 from sysmktpxy import get_signal
-from syshkinpxy_aligned import detect_ha_flip_signal
+from syshkinpxy import detect_ha_flip_signal
 
 
 # ==================================================
