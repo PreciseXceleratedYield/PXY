@@ -12,7 +12,7 @@ def calculate_supertrend(df: pd.DataFrame, period=None, multiplier=None) -> pd.D
     - Smooth trailing
     - Exact match with Pine version
     """
-
+    df = df.copy()   # ✅ FIX
     period = period or PARAMS["supertrend_period"]   # 3
     multiplier = multiplier or PARAMS["supertrend_multiplier"]  # 3
 
