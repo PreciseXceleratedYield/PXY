@@ -1,4 +1,6 @@
-# syshkinpxy_aligned.py
+# ==================================================
+# syshkinpxy_aligned.py (LIVE MODE - RUNNING CANDLE INCLUDED)
+# ==================================================
 
 import pandas as pd
 from sysdthapxy import get_ha_data
@@ -9,6 +11,7 @@ init(autoreset=True)
 def detect_ha_flip_signal(df=None, last_n=21):
     """
     Detect HA flip signals aligned exactly with depth chart.
+    LIVE MODE: Includes running candle in all calculations.
     Returns: signal, past_depth, ce_depth, pe_depth
     """
 
@@ -19,16 +22,16 @@ def detect_ha_flip_signal(df=None, last_n=21):
         return "NA", 1, 1, 1
 
     # ==================================================
-    # 🔥 ALIGNMENT FIX: ENSURE CLOSED-CANDLE CONSISTENCY
-    # (does NOT change structure or logic)
+    # 🔥 LIVE MODE: INCLUDE RUNNING CANDLE
+    # (only remove invalid values like "none")
     # ==================================================
     colors_full = ha_color.tolist()
 
-    # If upstream includes forming candle, neutralize last bar usage
-    if len(colors_full) > 1:
-        colors = colors_full[:-1] if colors_full[-1] == "none" else colors_full
-    else:
-        colors = colors_full
+    # Keep ONLY valid HA colors (do NOT remove last candle)
+    colors = [c for c in colors_full if c in ("green", "red")]
+
+    if len(colors) < 2:
+        return "NA", 1, 1, 1
 
     # Last N colors
     n = min(last_n, len(colors))
@@ -37,18 +40,21 @@ def detect_ha_flip_signal(df=None, last_n=21):
     current_color = colors_n[-1]
     prev_color = colors_n[-2]
 
-    # Current depth: consecutive same-color bars
+    # ==================================================
+    # CURRENT DEPTH (LIVE)
+    # ==================================================
     current_depth = 0
     for c in reversed(colors_n):
         if c == current_color:
             current_depth += 1
         else:
             break
+
     current_depth = max(current_depth, 1)
 
-    # ---------------- PAST DEPTH ----------------
-    colors = colors  # already aligned safe list
-
+    # ==================================================
+    # PAST DEPTH (LIVE)
+    # ==================================================
     current_color = colors[-1]
 
     current_streak_start = len(colors) - 1
@@ -68,8 +74,9 @@ def detect_ha_flip_signal(df=None, last_n=21):
 
     past_depth = max(past_depth, 1)
 
-    # ================= SIGNAL FIX =================
-
+    # ==================================================
+    # SIGNAL LOGIC (UNCHANGED)
+    # ==================================================
     if current_color == "none" or prev_color == "none":
         signal = "NA"
 
@@ -88,16 +95,19 @@ def detect_ha_flip_signal(df=None, last_n=21):
     else:
         signal = "NA"
 
-    # CE / PE depth
+    # ==================================================
+    # CE / PE DEPTH (LIVE)
+    # ==================================================
     ce_depth = current_depth if current_color == "green" else 1
     pe_depth = current_depth if current_color == "red" else 1
 
+    # Format past depth label
     if current_streak_start > 0:
         streak_color = colors[current_streak_start - 1]
         past_depth = f"CE{past_depth}" if streak_color == "green" else f"PE{past_depth}" if streak_color == "red" else "NA"
     else:
         past_depth = "NA"
-    
+
     return signal, past_depth, ce_depth, pe_depth
 
 
@@ -106,7 +116,7 @@ if __name__ == "__main__":
     signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal()
 
     print("\n" + "="*60)
-    print("HA FLIP DEBUG (ALIGNED TO DEPTH CHART)")
+    print("HA FLIP DEBUG (LIVE MODE - RUNNING CANDLE)")
     print("="*60)
 
     sig_color = {
