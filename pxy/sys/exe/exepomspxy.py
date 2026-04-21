@@ -58,7 +58,7 @@ def print_market_dashboard(market_df):
         ("🔴 PE Depth", "hkin_pe_depth"),
     ]
 
-    row_width = 40
+    row_width = 41
     values = []
 
     # ---------------- BUILD METRICS ----------------
