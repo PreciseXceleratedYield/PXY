@@ -40,7 +40,7 @@ def target_price(row):
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
 
-        # 4️⃣ SIGNAL (keep your existing structure)
+        # 4️⃣ SIGNAL
         entry_signal = str(row.get("entry", "NONE")).upper()
         exit_signal = str(row.get("exit", "NONE")).upper()
         direction_signal = str(row.get("direction", "NONE")).upper()
@@ -57,11 +57,16 @@ def target_price(row):
             (is_pe and bearish)
         )
 
-        # 6️⃣ SCORE → ATR × RELEVANT POWER
+        # 6️⃣ SCORE → ATR × POWER + RELEVANT DEPTH
         if aligned:
             power = ce_power if is_ce else pe_power if is_pe else 0
 
-            score = atr * power
+            ce_depth = f(row.get("hkin_ce_depth", 0))
+            pe_depth = f(row.get("hkin_pe_depth", 0))
+
+            depth = ce_depth if is_ce else pe_depth if is_pe else 0
+
+            score = (atr * power) + depth
 
             # safety controls
             score = max(score, 1)
