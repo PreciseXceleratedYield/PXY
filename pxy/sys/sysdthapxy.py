@@ -4,7 +4,7 @@ import pandas as pd
 from sysdtafpxy import fetch_yf_data
 
 # 🔥 CONTROL: Keep forming candle INCLUDED (DO NOT BREAK DOWNSTREAM)
-USE_FORMING_CANDLE = True
+USE_FORMING_CANDLE = False
 
 # 🔥 CLEAN SWITCH
 # "HA"  → Heikin Ashi
