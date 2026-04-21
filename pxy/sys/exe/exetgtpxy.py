@@ -65,7 +65,7 @@ def target_price(row):
         if aligned:
             ce_depth = f(row.get("hkin_ce_depth", 0))
             pe_depth = f(row.get("hkin_pe_depth", 0))
-            score = max(atr - abs(ce_depth - pe_depth), 1)
+            score = 20 #max(atr - abs(ce_depth - pe_depth), 1)
             state = "✅"
         else:
             score = MIN_POINTS
