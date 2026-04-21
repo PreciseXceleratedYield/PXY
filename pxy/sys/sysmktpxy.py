@@ -8,7 +8,7 @@ import pandas as pd
 # ==================================================
 # GLOBAL SWITCHES
 # ==================================================
-MODE = "OC2"   # "OC2" or "HKIN"
+MODE = "HKIN"   # "OC2" or "HKIN"
 DEBUG = False     # DEBUG SWITCH
 EXIT_MODE = "C"   # "C" or "OHLC"   🔥 PATCH ADDED
 
