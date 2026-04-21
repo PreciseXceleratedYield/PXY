@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (SIMPLE + ADAPTIVE FINAL FIXED)
+# sysentrpxy.py (SIMPLE + ADAPTIVE WITH DASHBOARD)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -26,7 +26,7 @@ def get_entry_signal(df=None):
     signal, exit_signal = get_signal()
 
     # ==================================================
-    # SIMPLE MODE (UNCHANGED)
+    # SIMPLE MODE
     # ==================================================
     if MODE == "SIMPLE":
 
@@ -42,6 +42,23 @@ def get_entry_signal(df=None):
         except:
             return "NONE", exit_signal
 
+        # ------------------------------
+        # SIMPLE DASHBOARD
+        # ------------------------------
+        print(f"""
+ﮩ٨ﮩ٨ـﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ SIMPLE ENGINE ﮩﮩﮩ٨ﮩ
+--------------------------------------------------
+SIGNAL      : {signal}
+EXIT        : {exit_signal}
+
+LAST DEPTH  : {side}{depth}
+REQUIRED    : > 5
+
+STATUS      : {"PASS" if depth > 5 else "BLOCKED"}
+MODE        : SIMPLE RULE FILTER
+--------------------------------------------------
+""")
+
         if signal == "BUY" and side == "PE" and depth > 5:
             return "ATMBUY", exit_signal
 
@@ -52,7 +69,7 @@ def get_entry_signal(df=None):
 
 
     # ==================================================
-    # ADAPTIVE MODE (FIXED SLOPE HANDLING)
+    # ADAPTIVE MODE
     # ==================================================
     df = fetch_yf_data()
 
@@ -69,7 +86,7 @@ def get_entry_signal(df=None):
         return "NONE", exit_signal
 
     # ------------------------------
-    # SLOPE + STRENGTH (FIXED)
+    # SLOPE + STRENGTH
     # ------------------------------
     slope, slope_pct = get_sma50_slope(return_strength=True)
 
@@ -77,9 +94,7 @@ def get_entry_signal(df=None):
         print("[DEBUG] SLOPE = None → NO TRADE")
         return "NONE", exit_signal
 
-    # 🔥 normalize properly
     slope = str(slope).strip().upper()
-
     if "UP" in slope:
         slope = "UP"
     elif "DOWN" in slope:
@@ -89,9 +104,6 @@ def get_entry_signal(df=None):
         print("[DEBUG] SLOPE INVALID →", slope)
         return "NONE", exit_signal
 
-    # ------------------------------
-    # SLOPE STRENGTH
-    # ------------------------------
     slope_strength = 0
     if slope_pct is not None:
         slope_strength = min(abs(slope_pct) / 0.005, 1)
@@ -99,7 +111,7 @@ def get_entry_signal(df=None):
     slope_depth_factor = 1 - slope_strength
 
     # ------------------------------
-    # VOLATILITY (K)
+    # VOLATILITY
     # ------------------------------
     k = calculate_dynamic_k(df)
     k_norm = (k - 1) / 2
@@ -112,12 +124,33 @@ def get_entry_signal(df=None):
     # ------------------------------
     # DEPTH MODEL
     # ------------------------------
-
-    trend_depth = int(round(1 + (1 - pressure) * 2))   # 1 → 3
-    counter_depth = int(round(4 + pressure * 3))        # 4 → 7
+    trend_depth = int(round(1 + (1 - pressure) * 2))
+    counter_depth = int(round(4 + pressure * 3))
 
     trend_depth = min(max(trend_depth, 1), 3)
     counter_depth = min(max(counter_depth, 4), 7)
+
+    # ------------------------------
+    # ADAPTIVE DASHBOARD
+    # ------------------------------
+    print(f"""
+ﮩ٨ﮩ٨ـﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ ADAPTIVE ENGINE ﮩﮩﮩ٨ﮩ
+--------------------------------------------------
+SMA DIR      : {slope}
+SLOPE STR    : {round(slope_strength,4)}
+FORCE        : {round(pressure,4)}
+
+LAST DEPTH   : {side}{depth}
+TREND DEPTH  : {trend_depth}
+COUNTER DEPTH: {counter_depth}
+
+SIGNAL       : {signal}
+EXIT         : {exit_signal}
+
+STATUS       : {"TREND READY" if depth >= trend_depth else "WAIT"}
+MODE         : ADAPTIVE
+--------------------------------------------------
+""")
 
     # ------------------------------
     # ENTRY LOGIC
