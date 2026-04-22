@@ -82,7 +82,7 @@ def run_snapshot():
     exit_end   = dt_time(15, 30)  # 3:30 PM
     
     if exit_start <= now < exit_end:
-        print(f"{Fore.YELLOW}⚡ Exit Window Active! Triggering exesqrpxy.py ⚡")
+        print(f"{Fore.YELLOW}⚡ Exit Window Active! Triggering ⚡")
         try:
             # Dynamically get the path of exesqrpxy.py in the same folder as this script
             SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
