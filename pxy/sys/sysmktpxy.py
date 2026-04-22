@@ -48,13 +48,13 @@ def entry_signal(colors):
         return "SELL"
 
     # 🔥 continuation based on live pressure
-    if curr == "green":
+    if prev == "green" and curr == "green":
         return "BULL"
 
-    if curr == "red":
+    if prev == "red" and curr == "red":
         return "BEAR"
 
-    return "BEAR"
+    return "NONE"
 
 
 # ==================================================
