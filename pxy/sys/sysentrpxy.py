@@ -31,7 +31,8 @@ def get_entry_signal(df=None):
     # 🔥 RAW PASS-THROUGH MODE (NO FILTERS)
     # ==================================================
     if signal in ["BULL", "BEAR", "NONE"]:
-        print(f"⛔ 🚧  NO ENTRY 🚧 ⛔ 🚧 {signal} 🚧 ⛔")
+        line = f"⛔ 🚧 NO ENTRY 🚧 ⛔ 🚧 {signal} 🚧 ⛔"
+        print(line.center(36))
         return signal, exit_signal
 
     # ------------------------------
@@ -117,7 +118,8 @@ def get_entry_signal(df=None):
         else:
             action = "NONE"
 
-        print(f"✅ {action} ✅ | SELL@CE{ce_req} | BUY@PE{pe_req} ✅ ✅") 
+        line = f"✅ {action} ✅ | SELL@CE{ce_req} | BUY@PE{pe_req} ✅ ✅"
+        print(line.center(36))
         return action, exit_signal
 
     # ------------------------------
@@ -155,7 +157,8 @@ def get_entry_signal(df=None):
     else:
         action = signal
 
-    print(f"🔓{signal}🔓 | {action} | REQ 🟢={ce_req} 🔴={pe_req} | 🔐 {side}{depth}")
+    line = f"🔓{signal}🔓 | {action} | REQ 🟢={ce_req} 🔴={pe_req} | 🔐 {side}{depth}"
+    print(line.center(36))
     return final_signal, exit_signal
 
 
