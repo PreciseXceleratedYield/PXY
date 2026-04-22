@@ -99,7 +99,7 @@ def get_bos_bar(df):
 
     state = "BREAK OUT" if signal in ["BUY", "SELL"] else "NO TRADE"
 
-    banner = "     ﮩ٨ﮩ٨ـﮩـﮩ٨ـﮩﮩ٨ﮩ" + state + "٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩﮩ"
+    banner = "     ﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ_" + state + "_٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩﮩ"
 
     if signal == "BUY":
         return Fore.GREEN + banner + Style.RESET_ALL, signal
