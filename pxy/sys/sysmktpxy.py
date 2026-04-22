@@ -1,14 +1,13 @@
 # ==================================================
-# PRO SIGNAL ENGINE (WITH DEBUG MODE)
+# PRO SIGNAL ENGINE (HA STATE-ALIGNED - NO NONE VERSION)
 # ==================================================
 
 from sysdtafpxy import fetch_yf_data
-import pandas as pd
 
 # ==================================================
-# GLOBAL SWITCHES
+# SWITCHES
 # ==================================================
-MODE = "HKIN"   # "OC2" or "HKIN"
+MODE = "HKIN"
 DEBUG = False
 EXIT_MODE = "C"
 
@@ -28,77 +27,73 @@ def get_df():
     df = fetch_yf_data(period="5d", interval="1m")
 
     if df is None or len(df) < 4:
-        dbg("Data insufficient")
         return None
 
     return df
 
 
 # ==================================================
-# SIGNAL ENGINE FUNCTIONS
+# CANDLE STATE (CORE IDEA)
 # ==================================================
-def three_candle_signal(c1, c2, c3):
-
-    if c2 < c1 and c2 < c3:
-        return "BUY"
-    if c2 > c1 and c2 > c3:
-        return "SELL"
-    if c1 < c2 < c3:
-        return "BULL"
-    if c1 > c2 > c3:
-        return "BEAR"
-
-    return "NONE"
-
-
-def four_candle_signal(c0, c1, c2, c3):
-
-    if c1 == min([c0, c1, c2, c3]):
-        return "BUY"
-
-    if c1 == max([c0, c1, c2, c3]):
-        return "SELL"
-
-    if c3 > c2 > c1 > c0:
-        return "BULL"
-
-    if c3 < c2 < c1 < c0:
-        return "BEAR"
-
-    return "NONE"
-
-
-def momentum_signal(c2, c3):
-
-    if c3 > c2:
-        return "BULL"
-    if c3 < c2:
-        return "BEAR"
-
-    return "NONE"
+def candle_state(o, c):
+    if c > o:
+        return 1      # GREEN
+    elif c < o:
+        return -1     # RED
+    return 0          # DOJI
 
 
 # ==================================================
-# HKIN ENTRY ENGINE
+# HKIN STATE ENGINE (NO NONE LOGIC)
 # ==================================================
-def hkin_entry_signal(prev_o, prev_c, curr_o, curr_c):
+def hkin_state_signal(prev_o, prev_c, curr_o, curr_c):
 
-    prev_green = prev_c > prev_o
-    curr_green = curr_c > curr_o
+    prev_state = candle_state(prev_o, prev_c)
+    curr_state = candle_state(curr_o, curr_c)
 
-    if (not prev_green) and curr_green:
+    dbg("STATE:", prev_state, curr_state)
+
+    # 🔥 transition logic (main driver)
+    if curr_state > prev_state:
         return "BUY"
 
-    if prev_green and (not curr_green):
+    if curr_state < prev_state:
         return "SELL"
 
-    if curr_green and prev_green:
+    # 🔥 continuation logic
+    if curr_state == 1:
         return "BULL"
 
-    if (not curr_green) and (not prev_green):
+    if curr_state == -1:
         return "BEAR"
 
-    return "NONE"
+    # 🔥 fallback (NEVER NONE)
+    return "BULL" if prev_state >= 0 else "BEAR"
+
+
+# ==================================================
+# EXIT STATE ENGINE (STABLE TREND SCORE)
+# ==================================================
+def exit_state_signal(df):
+
+    closes = df['Close'].iloc[-4:].values
+
+    score = 0
+
+    for i in range(1, len(closes)):
+        if closes[i] > closes[i - 1]:
+            score += 1
+        else:
+            score -= 1
+
+    if score >= 2:
+        return "BUY"
+    elif score <= -2:
+        return "SELL"
+    elif score == 1:
+        return "BULL"
+    else:
+        return "BEAR"
 
 
 # ==================================================
@@ -110,112 +105,34 @@ def get_signal():
         df = get_df()
 
         if df is None:
-            return "NONE", "NONE"
+            return "BEAR", "BEAR"
 
         # ==============================
-        # OC2 MODE
+        # HKIN MODE (STATE-BASED ENGINE)
         # ==============================
-        if MODE == "OC2":
+        from sysdthapxy import get_ha_data
 
-            price = (df['Open'] + df['Close']) / 2
-            p0, p1, p2, p3 = price.iloc[-4], price.iloc[-3], price.iloc[-2], price.iloc[-1]
+        _, _, _, df = get_ha_data(df=df)
 
-            entry_signal = three_candle_signal(p1, p2, p3)
+        if df is None:
+            return "BEAR", "BEAR"
 
-            if entry_signal == "NONE":
-                entry_signal = four_candle_signal(p0, p1, p2, p3)
+        # 🔥 USE CLOSED CANDLES ONLY (-3, -2)
+        prev_o = df["HA_Open"].iloc[-3]
+        prev_c = df["HA_Close"].iloc[-3]
 
-            if entry_signal == "NONE":
-                entry_signal = momentum_signal(p2, p3)
+        curr_o = df["HA_Open"].iloc[-2]
+        curr_c = df["HA_Close"].iloc[-2]
 
-        # ==============================
-        # HKIN MODE (CLEAN + NO REPAINT)
-        # ==============================
-        else:
-
-            from sysdthapxy import get_ha_data
-
-            _, _, _, df = get_ha_data(df=df)
-
-            if df is None or "HA_Open" not in df.columns:
-                return "NONE", "NONE"
-
-            # 🔥 USE ONLY CLOSED CANDLES (-3, -2)
-            ha_o2 = df["HA_Open"].iloc[-3]
-            ha_c2 = df["HA_Close"].iloc[-3]
-
-            ha_o3 = df["HA_Open"].iloc[-2]
-            ha_c3 = df["HA_Close"].iloc[-2]
-
-            entry_signal = hkin_entry_signal(ha_o2, ha_c2, ha_o3, ha_c3)
+        entry_signal = hkin_state_signal(prev_o, prev_c, curr_o, curr_c)
 
         # ==============================
-        # EXIT LOGIC
+        # EXIT ENGINE
         # ==============================
-        if EXIT_MODE == "C":
-
-            c0, c1, c2, c3 = (
-                df['Close'].iloc[-4],
-                df['Close'].iloc[-3],
-                df['Close'].iloc[-2],
-                df['Close'].iloc[-1]
-            )
-
-            exit_signal = three_candle_signal(c1, c2, c3)
-
-            if exit_signal == "NONE":
-                exit_signal = four_candle_signal(c0, c1, c2, c3)
-
-            if exit_signal == "NONE":
-                exit_signal = momentum_signal(c2, c3)
-
-        else:
-
-            h0, h1, h2, h3 = (
-                df['High'].iloc[-4],
-                df['High'].iloc[-3],
-                df['High'].iloc[-2],
-                df['High'].iloc[-1]
-            )
-
-            l0, l1, l2, l3 = (
-                df['Low'].iloc[-4],
-                df['Low'].iloc[-3],
-                df['Low'].iloc[-2],
-                df['Low'].iloc[-1]
-            )
-
-            if l2 < l1 and l2 < l3 and h3 > h2:
-                exit_signal = "BUY"
-
-            elif h2 > h1 and h2 > h3 and l3 < l2:
-                exit_signal = "SELL"
-
-            elif h0 < h1 < h2 < h3 and l0 < l1 < l2 < l3:
-                exit_signal = "BULL"
-
-            elif h0 > h1 > h2 > h3 and l0 > l1 > l2 > l3:
-                exit_signal = "BEAR"
-
-            else:
-
-                c0, c1, c2, c3 = (
-                    df['Close'].iloc[-4],
-                    df['Close'].iloc[-3],
-                    df['Close'].iloc[-2],
-                    df['Close'].iloc[-1]
-                )
-
-                exit_signal = three_candle_signal(c1, c2, c3)
-
-                if exit_signal == "NONE":
-                    exit_signal = four_candle_signal(c0, c1, c2, c3)
-
-                if exit_signal == "NONE":
-                    exit_signal = momentum_signal(c2, c3)
+        exit_signal = exit_state_signal(df)
 
         # ==============================
-        # ALIGNMENT RULE
+        # ALIGNMENT RULE (SAFE OVERRIDE)
         # ==============================
         if entry_signal == "BULL" and exit_signal == "BUY":
             entry_signal = "BUY"
@@ -227,12 +144,12 @@ def get_signal():
 
     except Exception as e:
         print("[ERROR]", e)
-        return "NONE", "NONE"
+        return "BEAR", "BEAR"
 
 
 # ==================================================
 # RUN
 # ==================================================
 if __name__ == "__main__":
-    entry, exit_ = get_signal()
-    print(entry, exit_)
+    e, x = get_signal()
+    print(e, x)
