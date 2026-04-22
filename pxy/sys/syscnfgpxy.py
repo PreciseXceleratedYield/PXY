@@ -3,8 +3,8 @@ import pytz
 # ---------------- SINGLE CONFIG ----------------
 PARAMS = {
     "ticker": "^NSEBANK",          # or "^NSEI""^NSEBANK" BTC-USD COMEX:GC1! GBP/USD Yahoo: GBPUSD=X TradingView: FX:GBPUSD
-    "supertrend_period": 7,
-    "supertrend_multiplier": 7
+    "supertrend_period": 3,
+    "supertrend_multiplier": 3
 }
 
 # ---------------- CONSTANTS ----------------
