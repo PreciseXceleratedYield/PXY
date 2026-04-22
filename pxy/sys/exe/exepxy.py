@@ -117,8 +117,8 @@ while True:
                 safe_run(HERE / "exeentrpxy.py")
 
             else:
-                safe_run(HERE / "exeentrpxy.py")
                 safe_run(HERE / "exeexitpxy.py")
+                safe_run(HERE / "exeentrpxy.py")
 
             fancy_pause(3)
 
