@@ -24,9 +24,7 @@ def get_entry_signal(df=None):
     # ------------------------------
     # BASE SIGNAL
     # ------------------------------
-    signal, _ = get_signal()
-    exit_signal = signal
-
+    signal, exit_signal  = get_signal()
     # ------------------------------
     # TIME BLOCK (IST)  ✅ PRIORITY
     # ------------------------------
@@ -47,7 +45,8 @@ def get_entry_signal(df=None):
             return "OTMSELL", exit_signal
 
         return "NONE", exit_signal
-
+        
+    exit_signal = signal
     # ==================================================
     # 🔥 RAW PASS-THROUGH MODE (NO FILTERS)
     # ==================================================
