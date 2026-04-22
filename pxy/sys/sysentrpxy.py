@@ -1,8 +1,9 @@
 # ==================================================
-# sysentrpxy.py (FINAL: INTEGRATED WITH sysmktpxy)
+# sysentrpxy.py (FINAL: WITH MORNING BLOCK OVERRIDE + IST FIX)
 # ==================================================
 
 from sysmktpxy import get_signal
+from syshkinpxy import detect_ha_flip_signal
 from sysstrndpxy import calculate_supertrend
 from syssadxpxy import calculate_adx
 from sysdtafpxy import fetch_yf_data
@@ -11,62 +12,79 @@ from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 
-# ==================================================
-# ENTRY ENGINE
-# ==================================================
 def get_entry_signal(df=None):
 
     # ------------------------------
-    # BASE SIGNAL FROM sysmktpxy
+    # BASE SIGNAL
     # ------------------------------
-    entry_signal, exit_signal, ce, pe, last_opp, df, ha = get_signal()
+    signal, _ = get_signal()
 
-    # ==============================
-    # TIME BLOCK (IST)
-    # ==============================
+    # EXIT = ALWAYS ORIGINAL SIGNAL
+    exit_signal = signal
+
+    # ------------------------------
+    # TIME BLOCK (MORNING OVERRIDE - IST FORCED)
+    # ------------------------------
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
     current_time = now.time()
 
+    # 09:14 → 09:16 → NO TRADE
     if time(9, 14) <= current_time < time(9, 16):
-        print("[TIME BLOCK] NO TRADE")
+        print("[TIME BLOCK] 09:14–09:16 → NO TRADE")
         return "NONE", exit_signal
 
+    # 09:16 → 09:30 → DIRECT OTM (NO FILTERS)
     if time(9, 16) <= current_time < time(9, 30):
+        print("[TIME BLOCK] 09:16–09:30 → DIRECT OTM (NO FILTER)")
 
-        print("[MORNING BLOCK] DIRECT OTM MODE")
-
-        if entry_signal == "BUY":
+        if signal == "BUY":
             return "OTMBUY", exit_signal
 
-        if entry_signal == "SELL":
+        if signal == "SELL":
             return "OTMSELL", exit_signal
 
         return "NONE", exit_signal
 
-    # ==============================
-    # AFTER 09:30 FILTER ENGINE
-    # ==============================
+    # ------------------------------
+    # AFTER 09:30 → NORMAL ENGINE
+    # ------------------------------
 
+    # ------------------------------
+    # DATA FETCH (single source)
+    # ------------------------------
     df = fetch_yf_data()
 
+    # ------------------------------
+    # SUPERTREND
+    # ------------------------------
     df = calculate_supertrend(df)
     last = df.iloc[-1]
 
-    trend = last["ST_Trend"]
+    trend = last["ST_Trend"]      # UP / DOWN
     st_line = int(last["ST"])
 
+    # ------------------------------
+    # ADX
+    # ------------------------------
     adx = calculate_adx(df)
 
     if adx is None:
+        print("[DEBUG] ADX = None → NO TRADE")
         return "NONE", exit_signal
 
     adx_factor = min(max(adx / 50, 0), 1)
 
+    # ------------------------------
+    # DEPTH MODEL
+    # ------------------------------
     trend_depth = int(round(6 - (adx_factor * 5)))
     trend_depth = min(max(trend_depth, 1), 6)
 
     counter_depth = 7
 
+    # ------------------------------
+    # REQUIREMENTS (CE / PE view)
+    # ------------------------------
     if trend == "UP":
         pe_req = trend_depth
         ce_req = counter_depth
@@ -74,67 +92,72 @@ def get_entry_signal(df=None):
         pe_req = counter_depth
         ce_req = trend_depth
 
-    # ==============================
-    # DEPTH FROM sysmktpxy
-    # ==============================
-    if entry_signal in ["BUY", "BULL"]:
-        side = "CE"
-        depth = ce
-    elif entry_signal in ["SELL", "BEAR"]:
-        side = "PE"
-        depth = pe
-    else:
-        side = None
+    # ------------------------------
+    # DEPTH (safe read)
+    # ------------------------------
+    try:
+        _, past_depth, _, _ = detect_ha_flip_signal()
+
+        if past_depth != "NA":
+            side = past_depth[:2]
+            depth = int(past_depth[2:])
+        else:
+            side = "NA"
+            depth = 0
+
+    except:
+        side = "NA"
         depth = 0
 
-    # ==============================
-    # DEBUG PRINT
-    # ==============================
+    # ------------------------------
+    # CLEAN PRINT
+    # ------------------------------
     print(f"""
-------------- ENGINE STATUS -------------
-Signal      : {entry_signal}
-Exit        : {exit_signal}
+------------- SIMPLE (ST + ADX) -------------
+Signal (RAW) : {signal}
+Exit (RAW)   : {exit_signal}
 
-Trend       : {trend}
-ST Line     : {st_line}
-ADX         : {round(adx, 2)}
+Trend        : {trend}
+ST Line      : {st_line}
+ADX          : {round(adx, 2)}
 
-Depth Side  : {side}
-Depth Value : {depth}
-Last Opp    : {last_opp}
+Depth        : {side}{depth}
 
-PE Req      : {pe_req}
-CE Req      : {ce_req}
-----------------------------------------
+PE Req (BUY) : >= {pe_req}
+CE Req (SELL): >= {ce_req}
+---------------------------------------------
 """)
 
-    # ==============================
-    # FILTER LOGIC
-    # ==============================
-    if entry_signal not in ["BUY", "SELL"]:
-        return entry_signal, exit_signal
+    # ------------------------------
+    # FILTER ONLY BUY / SELL
+    # ------------------------------
+    if signal not in ["BUY", "SELL"]:
+        return signal, exit_signal
 
+    # ------------------------------
+    # ENTRY LOGIC
+    # ------------------------------
     if trend == "UP":
 
-        if entry_signal == "BUY" and side == "CE" and depth >= ce_req:
+        if signal == "BUY" and side == "PE" and depth >= pe_req:
             return "ATMBUY", exit_signal
 
-        if entry_signal == "SELL" and side == "PE" and depth >= pe_req:
+        if signal == "SELL" and side == "CE" and depth >= ce_req:
             return "OTMSELL", exit_signal
 
     elif trend == "DOWN":
 
-        if entry_signal == "SELL" and side == "CE" and depth >= ce_req:
+        if signal == "SELL" and side == "CE" and depth >= ce_req:
             return "ATMSELL", exit_signal
 
-        if entry_signal == "BUY" and side == "PE" and depth >= pe_req:
+        if signal == "BUY" and side == "PE" and depth >= pe_req:
             return "OTMBUY", exit_signal
 
     return "NONE", exit_signal
 
 
 # ==================================================
-# RUN
+# TEST
 # ==================================================
 if __name__ == "__main__":
     entry, exit_signal = get_entry_signal()
