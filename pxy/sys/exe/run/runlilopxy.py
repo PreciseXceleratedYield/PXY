@@ -3,10 +3,11 @@ import pandas as pd
 from runclntpxy import get_session
 from runltpspxy import get_mid_price
 
+
 # =========================
 # 🔁 SWITCH: FIFO / LIFO
 # =========================
-MATCH_MODE = "LIFO"   # change to "LIFO" when needed
+MATCH_MODE = "LIFO"   # "FIFO" or "LIFO"
 
 
 def process_lilo_orders(client):
@@ -47,17 +48,12 @@ def process_lilo_orders(client):
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records')
             sells = group[group["trnsTp"].str.upper() == "S"].to_dict('records')
 
-            # =========================
-            # 🔁 MATCH ENGINE (LIFO/FIFO)
-            # =========================
             while sells and buys:
 
-                if MATCH_MODE == "LIFO":
-                    s = sells[-1]
-                    b = buys[-1]
-                else:
-                    s = sells[0]
-                    b = buys[0]
+                # =========================
+                # 🔁 FIFO / LIFO SELECT
+                # =========================
+                s, b = (sells[-1], buys[-1]) if MATCH_MODE == "LIFO" else (sells[0], buys[0])
 
                 mqty = min(s["qty"], b["qty"])
 
@@ -76,23 +72,14 @@ def process_lilo_orders(client):
                 b["qty"] -= mqty
 
                 # =========================
-                # REMOVE EXHAUSTED ORDERS
+                # 🔁 REMOVE EXHAUSTED
                 # =========================
                 if s["qty"] <= 0:
-                    if MATCH_MODE == "LIFO":
-                        sells.pop()
-                    else:
-                        sells.pop(0)
+                    sells.pop() if MATCH_MODE == "LIFO" else sells.pop(0)
 
                 if b["qty"] <= 0:
-                    if MATCH_MODE == "LIFO":
-                        buys.pop()
-                    else:
-                        buys.pop(0)
+                    buys.pop() if MATCH_MODE == "LIFO" else buys.pop(0)
 
-            # =========================
-            # OPEN POSITIONS
-            # =========================
             for rem in buys:
                 if rem["qty"] > 0:
                     live_val = get_mid_price(client, token_id, ex_seg)
@@ -121,3 +108,44 @@ def process_lilo_orders(client):
         print(f"[LILO ERROR]: {e}")
         _print_summary(0, 0)
         return pd.DataFrame(), pd.DataFrame()
+
+
+def _print_summary(total_unrealized, total_realized):
+    """Print emoji summary on a single line without zero-padding."""
+    unreal_str = str(total_unrealized)
+    real_str = str(total_realized)
+
+    from colorama import Fore, Style, init
+    init(autoreset=True)
+
+    val_real = float(real_str.replace('%',''))
+    val_unreal = float(unreal_str.replace('%',''))
+
+    color = Style.BRIGHT + Fore.GREEN if val_real >= 0 else Fore.RED
+
+    line1 = f"{f'          🥅 ⚽  {color}{int(float(real_str)):+d}{Style.RESET_ALL}  ⚽ 🥅':^41}"
+    line2 = f"{f'         🏃‍♂️🏃‍♂️  {int(float(unreal_str)):+d}  🏃‍♂️🏃‍♂️':^41}"
+
+    print(" " * 42)
+    print(line1.center(38))
+    print(line2.center(38))
+    print(" " * 42)
+
+
+if __name__ == "__main__":
+    client = get_session()
+    active, closed = process_lilo_orders(client)
+
+    cols = ["Symbol", "Qty", "Buy_Time", "Buy_Prc", "Exit_Time", "Sell_Prc", "PNL"]
+
+    print("\n===== CLOSED TRADES =====")
+    if not closed.empty:
+        print(closed[cols])
+    else:
+        print("No closed trades.")
+
+    print("\n===== ACTIVE POSITIONS =====")
+    if not active.empty:
+        print(active[cols])
+    else:
+        print("No active positions.")
