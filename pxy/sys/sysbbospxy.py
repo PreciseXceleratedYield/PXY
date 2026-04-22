@@ -4,16 +4,12 @@ init(autoreset=True)
 # ==================================================
 # GLOBAL SETTINGS
 # ==================================================
-MODE = "BOS"      # "BOS" or "HKA"
-DEBUG = False
-
-HA_WINDOW = 15
 STRUCTURE_WINDOW = 14
-SWEEP_BUFFER = 0.0015
+DEBUG = False
 
 
 # ==================================================
-# DEBUG LOGGER
+# LOGGER
 # ==================================================
 def log(tag, msg):
     if DEBUG:
@@ -21,32 +17,33 @@ def log(tag, msg):
 
 
 # ==================================================
-# ==================================================
-# 🔵 BOS ENGINE (UNCHANGED)
+# STRUCTURE
 # ==================================================
 def get_structure(df):
     base = df.iloc[-(STRUCTURE_WINDOW + 1):-1]
     high = base['High'].max()
     low = base['Low'].min()
-    mid = (high + low) / 2
-    return high, low, mid
+    return high, low
 
 
+# ==================================================
+# SWEEP DETECTION
+# ==================================================
 def detect_sweep(df, structure_high, structure_low):
     last = df.iloc[-1]
-    prev = df.iloc[-2]
 
-    sweep_high = (last['High'] > structure_high and last['Close'] < structure_high)
-    sweep_low = (last['Low'] < structure_low and last['Close'] > structure_low)
+    if last['High'] > structure_high and last['Close'] < structure_high:
+        return "SELL"
 
-    if sweep_high:
-        return "SWEEP_SELL"
-    if sweep_low:
-        return "SWEEP_BUY"
+    if last['Low'] < structure_low and last['Close'] > structure_low:
+        return "BUY"
 
     return None
 
 
+# ==================================================
+# 🔵 BOS ENGINE (EVENT ONLY)
+# ==================================================
 def get_bos(df):
 
     try:
@@ -56,16 +53,19 @@ def get_bos(df):
         last = df.iloc[-1]
         prev = df.iloc[-2]
 
-        structure_high, structure_low, mid = get_structure(df)
+        structure_high, structure_low = get_structure(df)
 
         log("BOS", f"H:{structure_high} L:{structure_low}")
 
-        sweep_signal = detect_sweep(df, structure_high, structure_low)
+        # ==================================================
+        # 🚀 EVENT SIGNALS ONLY
+        # ==================================================
+        sweep = detect_sweep(df, structure_high, structure_low)
 
-        if sweep_signal == "SWEEP_BUY":
+        if sweep == "BUY":
             return "BUY"
 
-        if sweep_signal == "SWEEP_SELL":
+        if sweep == "SELL":
             return "SELL"
 
         if prev['Close'] <= structure_high and last['Close'] > structure_high:
@@ -74,121 +74,37 @@ def get_bos(df):
         if prev['Close'] >= structure_low and last['Close'] < structure_low:
             return "SELL"
 
-        if last['Close'] > structure_high:
-            return "UP"
-
-        if last['Close'] < structure_low:
-            return "DOWN"
-
-        return "UP" if last['Close'] >= mid else "DOWN"
-
-    except Exception:
-        return "NONE"
-
-
-# ==================================================
-# ==================================================
-# 🟢 HKA ENGINE (UNCHANGED)
-# ==================================================
-_prev_HKA_state = None
-
-
-def get_HKA_state(df):
-
-    try:
-        if df is None or len(df) < HA_WINDOW:
-            return "NONE"
-
-        base = df.iloc[-HA_WINDOW:]
-
-        ha_close = (base['Open'] + base['High'] + base['Low'] + base['Close']) / 4
-
-        ha_open = [(base['Open'].iloc[0] + base['Close'].iloc[0]) / 2]
-
-        for i in range(1, len(base)):
-            ha_open.append((ha_open[i-1] + ha_close.iloc[i-1]) / 2)
-
-        o = ha_open[-1]
-        c = ha_close.iloc[-1]
-
-        if c > o:
-            return "UP"
-        if c < o:
-            return "DOWN"
+        # ==================================================
+        # ❌ NO TRADE OTHERWISE
+        # ==================================================
         return "NONE"
 
     except Exception:
         return "NONE"
 
 
-def get_HKA_signal(df):
-
-    global _prev_HKA_state
-
-    current = get_HKA_state(df)
-
-    signal = "NONE"
-
-    if _prev_HKA_state == "DOWN" and current == "UP":
-        signal = "BUY"
-
-    elif _prev_HKA_state == "UP" and current == "DOWN":
-        signal = "SELL"
-
-    else:
-        signal = current
-
-    _prev_HKA_state = current
-
-    return signal
-
-
 # ==================================================
-# ==================================================
-# ⚙️ SWITCH ENGINE
+# ⚙️ SIGNAL ENGINE
 # ==================================================
 def get_signal(df):
-
-    log("MODE", MODE)
-
-    if MODE == "HKA":
-        return get_HKA_signal(df)
-
     return get_bos(df)
 
 
 # ==================================================
-# ==================================================
-# 📊 VISUAL OUTPUT (ONLY CHANGE HERE)
+# 📊 VISUAL OUTPUT
 # ==================================================
 def get_bos_bar(df):
 
     signal = get_signal(df)
 
-    log("SIGNAL", signal)
+    state = "BREAK OUT" if signal in ["BUY", "SELL"] else "NO TRADE"
 
-    # ==================================================
-    # EXACT BANNER FORMAT (NO CHANGES)
-    # ==================================================
-    banner = "     ﮩ٨ﮩ٨ـﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ" + MODE + "٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩ٨ﮩﮩ٨ﮩ"
+    banner = "     ﮩ٨ﮩ٨ـﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ" + state + "٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩ٨ﮩﮩ٨ﮩ"
 
-    # ==================================================
-    # COLOR ONLY
-    # ==================================================
-    if signal in ["BUY", "UP"]:
+    if signal == "BUY":
         return Fore.GREEN + banner + Style.RESET_ALL, signal
 
-    if signal in ["SELL", "DOWN"]:
-        return Fore.RED + banner + Style.RESET_ALL, signal
-
-    return Fore.LIGHTBLACK_EX + banner + Style.RESET_ALL, signal
-    # ==================================================
-    # COLOR ONLY
-    # ==================================================
-    if signal in ["BUY", "UP"]:
-        return Fore.GREEN + banner + Style.RESET_ALL, signal
-
-    if signal in ["SELL", "DOWN"]:
+    if signal == "SELL":
         return Fore.RED + banner + Style.RESET_ALL, signal
 
     return Fore.LIGHTBLACK_EX + banner + Style.RESET_ALL, signal
