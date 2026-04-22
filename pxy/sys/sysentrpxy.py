@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (FINAL: ST + ADX + ATM/OTM LOGIC)
+# sysentrpxy.py (FINAL: CLEAN PRINT + CE/PE REQ)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -9,9 +9,6 @@ from syssadxpxy import calculate_adx
 from sysdtafpxy import fetch_yf_data
 
 
-# ==================================================
-# CORE ENGINE
-# ==================================================
 def get_entry_signal(df=None):
 
     # ------------------------------
@@ -23,30 +20,7 @@ def get_entry_signal(df=None):
     exit_signal = signal
 
     # ------------------------------
-    # PASS-THROUGH (NON TRADE SIGNALS)
-    # ------------------------------
-    if signal not in ["BUY", "SELL"]:
-        print(f"[PASS] Signal (no filter): {signal}")
-        return signal, exit_signal
-
-    # ------------------------------
-    # DEPTH
-    # ------------------------------
-    try:
-        _, past_depth, _, _ = detect_ha_flip_signal()
-
-        if past_depth == "NA":
-            print("Depth: NA → NO TRADE")
-            return "NONE", exit_signal
-
-        side = past_depth[:2]   # CE / PE
-        depth = int(past_depth[2:])
-
-    except:
-        return "NONE", exit_signal
-
-    # ------------------------------
-    # DATA FETCH
+    # DATA FETCH (single source)
     # ------------------------------
     df = fetch_yf_data()
 
@@ -68,31 +42,46 @@ def get_entry_signal(df=None):
         print("[DEBUG] ADX = None → NO TRADE")
         return "NONE", exit_signal
 
-    # Normalize ADX → 0 to 1
     adx_factor = min(max(adx / 50, 0), 1)
 
     # ------------------------------
     # DEPTH MODEL
     # ------------------------------
-    # Trend-following → dynamic (1 to 6)
     trend_depth = int(round(6 - (adx_factor * 5)))
     trend_depth = min(max(trend_depth, 1), 6)
 
-    # Counter → always strict
     counter_depth = 7
 
     # ------------------------------
-    # REQUIREMENTS
+    # REQUIREMENTS (CE / PE view)
+    # CE → SELL side, PE → BUY side
     # ------------------------------
     if trend == "UP":
-        buy_req = trend_depth      # trend-following BUY
-        sell_req = counter_depth   # counter SELL
+        pe_req = trend_depth      # BUY (trend)
+        ce_req = counter_depth    # SELL (counter)
     else:
-        buy_req = counter_depth
-        sell_req = trend_depth
+        pe_req = counter_depth
+        ce_req = trend_depth
 
     # ------------------------------
-    # PRINT
+    # DEPTH (safe read)
+    # ------------------------------
+    try:
+        _, past_depth, _, _ = detect_ha_flip_signal()
+
+        if past_depth != "NA":
+            side = past_depth[:2]
+            depth = int(past_depth[2:])
+        else:
+            side = "NA"
+            depth = 0
+
+    except:
+        side = "NA"
+        depth = 0
+
+    # ------------------------------
+    # CLEAN PRINT (ALWAYS)
     # ------------------------------
     print(f"""
 ------------- SIMPLE (ST + ADX) -------------
@@ -105,32 +94,34 @@ ADX          : {round(adx, 2)}
 
 Depth        : {side}{depth}
 
-BUY Req      : >= {buy_req}
-SELL Req     : >= {sell_req}
+PE Req (BUY) : >= {pe_req}
+CE Req (SELL): >= {ce_req}
 ---------------------------------------------
 """)
+
+    # ------------------------------
+    # FILTER ONLY BUY / SELL
+    # ------------------------------
+    if signal not in ["BUY", "SELL"]:
+        return signal, exit_signal
 
     # ------------------------------
     # ENTRY LOGIC (ATM / OTM)
     # ------------------------------
     if trend == "UP":
 
-        # Trend-following BUY → ATM
-        if signal == "BUY" and side == "PE" and depth >= buy_req:
+        if signal == "BUY" and side == "PE" and depth >= pe_req:
             return "ATMBUY", exit_signal
 
-        # Counter SELL → OTM
-        if signal == "SELL" and side == "CE" and depth >= sell_req:
+        if signal == "SELL" and side == "CE" and depth >= ce_req:
             return "OTMSELL", exit_signal
 
     elif trend == "DOWN":
 
-        # Trend-following SELL → ATM
-        if signal == "SELL" and side == "CE" and depth >= sell_req:
+        if signal == "SELL" and side == "CE" and depth >= ce_req:
             return "ATMSELL", exit_signal
 
-        # Counter BUY → OTM
-        if signal == "BUY" and side == "PE" and depth >= buy_req:
+        if signal == "BUY" and side == "PE" and depth >= pe_req:
             return "OTMBUY", exit_signal
 
     return "NONE", exit_signal
