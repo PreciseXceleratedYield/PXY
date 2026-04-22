@@ -157,7 +157,7 @@ def get_entry_signal(df=None):
     else:
         action = signal
 
-    line = f"{signal}  | {action} | REQ 🟢 ={ce_req} 🔴 ={pe_req} | 🔐 {side}{depth}"
+    line = f"{action} | REQ 🟢 ={ce_req} 🔴 ={pe_req} | 🔐 {side}{depth}"
     print(line.center(36))
     return final_signal, exit_signal
 
