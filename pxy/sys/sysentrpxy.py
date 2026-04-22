@@ -31,7 +31,7 @@ def get_entry_signal(df=None):
     # 🔥 RAW PASS-THROUGH MODE (NO FILTERS)
     # ==================================================
     if signal in ["BULL", "BEAR", "NONE"]:
-        print(f"🚧🚧 NO ENTRY 🚧🚧 AS IT IS 🚧🚧 {signal} 🚧🚧")
+        print(f"🚧 🚧  NO ENTRY 🚧 🚧  AS 🚧 🚧  {signal} 🚧 🚧")
         return signal, exit_signal
 
     # ------------------------------
@@ -41,11 +41,11 @@ def get_entry_signal(df=None):
     current_time = now.time()
 
     if time(9, 14) <= current_time < time(9, 16):
-        print("[TIME BLOCK] 09:14–09:16 → NO TRADE")
+        print("[⏱️ ⌛] 09:14–09:16 → NO TRADE")
         return "NONE", exit_signal
 
     if time(9, 16) <= current_time < time(9, 30):
-        print("[TIME BLOCK] 09:16–09:30 → DIRECT OTM (NO FILTER)")
+        print("[⏱️ ⌛] 09:16–09:30 → DIRECT OTM (NO FILTER)")
 
         if signal == "BUY":
             return "OTMBUY", exit_signal
