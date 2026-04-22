@@ -16,12 +16,18 @@ html, body {
     color: #111;
 }
 
+/* =========================
+   MAIN CONTAINER
+========================= */
 #container {
     display: flex;
     width: 100%;
     height: 100vh;
 }
 
+/* =========================
+   TERMINAL
+========================= */
 #terminal {
     width: 35%;
     min-width: 200px;
@@ -30,12 +36,18 @@ html, body {
     border-right: 1px solid #e5e5e5;
 }
 
+/* =========================
+   DIVIDER
+========================= */
 #divider {
     width: 5px;
     cursor: col-resize;
     background: #ddd;
 }
 
+/* =========================
+   RIGHT PANEL
+========================= */
 #right {
     flex: 1;
     display: flex;
@@ -60,6 +72,9 @@ canvas {
     height: 100% !important;
 }
 
+/* =========================
+   FULLSCREEN MODES (DESKTOP)
+========================= */
 .fullscreen-terminal #terminal {
     width: 100% !important;
 }
@@ -76,6 +91,9 @@ canvas {
     width: 100% !important;
 }
 
+/* =========================
+   📱 MOBILE MODE
+========================= */
 @media (max-width: 768px) {
 
     #right {
@@ -126,10 +144,7 @@ canvas {
 <!-- LIBS -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
-
-<!-- Chart.js + Financial Plugin -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
 
 <script>
 
@@ -166,7 +181,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG SPLIT
+   DRAG SPLIT (DESKTOP ONLY)
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -183,7 +198,7 @@ window.addEventListener("mouseup", () => {
 
 window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
-    if (window.innerWidth <= 768) return;
+    if (window.innerWidth <= 768) return; // disable on mobile
 
     const percent = (e.clientX / window.innerWidth) * 100;
     if (percent < 10 || percent > 80) return;
@@ -227,86 +242,68 @@ function resetLayout() {
 }
 
 /* =========================
-   HEIKIN ASHI CONVERSION
-========================= */
-function toHA(data) {
-    let ha = [];
-
-    for (let i = 0; i < data.length; i++) {
-
-        const d = data[i];
-
-        const close = (d.open + d.high + d.low + d.close) / 4;
-
-        let open;
-        if (i === 0) {
-            open = (d.open + d.close) / 2;
-        } else {
-            open = (ha[i - 1].o + ha[i - 1].c) / 2;
-        }
-
-        const high = Math.max(d.high, open, close);
-        const low = Math.min(d.low, open, close);
-
-        ha.push({ x: i, o: open, h: high, l: low, c: close });
-    }
-
-    return ha;
-}
-
-/* =========================
    CHART
 ========================= */
 let chart;
 
 async function load() {
     const res = await fetch("./syschrtpxy.json");
-    const raw = await res.json();
+    const data = await res.json();
 
-    const haData = toHA(raw);
+    const closes = data.map(d => d.close);
+    const stVals = data.map(d => d.st);
+    const stTrend = data.map(d => d.st_trend);
 
-    const stVals = raw.map(d => d.st);
-    const stTrend = raw.map(d => d.st_trend);
-
-    draw(haData, stVals, stTrend);
+    draw(closes, stVals, stTrend);
 }
 
-function draw(haData, stVals, stTrend) {
+function draw(closes, stVals, stTrend) {
 
     const ctx = document.getElementById("priceChart");
 
     if (chart) chart.destroy();
 
-    chart = new Chart(ctx, {
-        type: "candlestick",
+    /* =========================
+       3 CANDLE RIGHT PADDING
+    ========================= */
+    const pad = 3;
 
+    const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
+    const closePad = [...closes, ...Array(pad).fill(null)];
+    const stPad = [...stVals, ...Array(pad).fill(null)];
+    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
+
+    chart = new Chart(ctx, {
+        type: "line",
         data: {
+            labels,
+
             datasets: [
 
-                // HEIKIN ASHI
+                // CLOSE
                 {
-                    label: "HA",
-                    data: haData,
-
-                    borderColor: ctx => {
-                        const d = ctx.raw;
-                        return d.c >= d.o ? "#00c853" : "#ff1744";
-                    },
-
-                    backgroundColor: ctx => {
-                        const d = ctx.raw;
-                        return d.c >= d.o ? "#00c853" : "#ff1744";
-                    }
+                    label: "Close",
+                    data: closePad,
+                    borderColor: "#000000",
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.25
                 },
 
-                // SUPER TREND DOTS
+                // SUPER TREND
                 {
-                    type: "scatter",
                     label: "ST",
-                    data: stVals.map((v, i) => ({ x: i, y: v })),
+                    data: stPad,
+                    showLine: false,
 
                     pointRadius: 2,
-                    pointBackgroundColor: stTrend.map(t =>
+                    pointBorderWidth: 2,
+
+                    pointBackgroundColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    ),
+
+                    pointBorderColor: trendPad.map(t =>
                         t === "UP" ? "#00c853" : "#ff1744"
                     )
                 }
@@ -324,7 +321,8 @@ function draw(haData, stVals, stTrend) {
             scales: {
                 x: {
                     ticks: { color: "#333" },
-                    grid: { color: "#eee" }
+                    grid: { color: "#eee" },
+                    offset: true
                 },
                 y: {
                     position: "right",
