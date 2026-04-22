@@ -92,7 +92,6 @@ def get_ha_data(tickerSymbol=None, df=None):
         # ==================================================
 
         if CANDLE_STYLE == "OC2":
-            # 🔥 OC2 → current vs previous
             if oc > oc_prev_val:
                 ha_color.iloc[i] = "green"
             elif oc < oc_prev_val:
@@ -105,7 +104,6 @@ def get_ha_data(tickerSymbol=None, df=None):
                     ha_color.iloc[i] = prev_color if prev_color in ["green", "red"] else "none"
 
         else:
-            # 🔥 HA → original logic
             if hc > ho:
                 ha_color.iloc[i] = "green"
             elif hc < ho:
@@ -117,5 +115,47 @@ def get_ha_data(tickerSymbol=None, df=None):
                     prev_color = ha_color.iloc[i - 1]
                     ha_color.iloc[i] = prev_color if prev_color in ["green", "red"] else "none"
 
-    # ---------------- FINAL ----------------
     return ha_close, ha_open, ha_color, df
+
+
+# ==================================================
+# 🔥 NEW: SIGNAL ENGINE (BUILT ON TOP OF HA COLOR)
+# ==================================================
+def get_bull_bear_signal(ha_color: pd.Series):
+    """
+    Converts HA colors into trading signals:
+    BUY / SELL / BULL / BEAR / NONE
+    """
+
+    if ha_color is None or len(ha_color) == 0:
+        return None
+
+    signal = pd.Series(index=ha_color.index, dtype='object')
+
+    for i in range(len(ha_color)):
+        curr = ha_color.iloc[i]
+
+        if pd.isna(curr) or curr == "none":
+            signal.iloc[i] = "NONE"
+            continue
+
+        prev = ha_color.iloc[i - 1] if i > 0 else None
+
+        # ---------------- ENTRY SIGNALS ----------------
+        if prev == "red" and curr == "green":
+            signal.iloc[i] = "BUY"
+
+        elif prev == "green" and curr == "red":
+            signal.iloc[i] = "SELL"
+
+        # ---------------- TREND STATE ----------------
+        elif curr == "green":
+            signal.iloc[i] = "BULL"
+
+        elif curr == "red":
+            signal.iloc[i] = "BEAR"
+
+        else:
+            signal.iloc[i] = "NONE"
+
+    return signal
