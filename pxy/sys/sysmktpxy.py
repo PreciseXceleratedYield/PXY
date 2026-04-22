@@ -1,5 +1,5 @@
 # ==================================================
-# SIMPLE PRO SIGNAL ENGINE (PURE HEIKIN-ASHI STATE)
+# PRO SIGNAL ENGINE (HA + RUNNING CANDLE VERSION)
 # ==================================================
 
 from sysdtafpxy import fetch_yf_data
@@ -16,11 +16,11 @@ def get_df():
 
 
 # ==================================================
-# TREND STATE (BULL / BEAR)
+# TREND STATE
 # ==================================================
 def trend_state(colors):
 
-    recent = colors.dropna().iloc[-5:]
+    recent = colors.dropna().iloc[-6:]  # include running influence
 
     green = sum(recent == "green")
     red = sum(recent == "red")
@@ -33,19 +33,21 @@ def trend_state(colors):
 
 
 # ==================================================
-# ENTRY SIGNAL (BUY / SELL)
+# ENTRY SIGNAL (USES RUNNING CANDLE)
 # ==================================================
 def entry_signal(colors):
 
-    prev = colors.iloc[-3]   # closed candle
-    curr = colors.iloc[-2]   # last closed candle
+    prev = colors.iloc[-2]   # last closed
+    curr = colors.iloc[-1]   # 🔥 RUNNING CANDLE
 
+    # 🔥 fast reaction logic
     if prev == "red" and curr == "green":
         return "BUY"
 
     if prev == "green" and curr == "red":
         return "SELL"
 
+    # 🔥 continuation based on live pressure
     if curr == "green":
         return "BULL"
 
@@ -65,7 +67,6 @@ def get_signal():
         if df is None:
             return "BEAR", "BEAR"
 
-        # 🔥 IMPORT HA ENGINE
         from sysdthapxy import get_ha_data
 
         _, _, ha_color, df = get_ha_data(df=df)
@@ -74,13 +75,13 @@ def get_signal():
             return "BEAR", "BEAR"
 
         # ==============================
-        # SIGNALS FROM COLOR ONLY
+        # SIGNALS (RUNNING INCLUDED)
         # ==============================
         entry = entry_signal(ha_color)
         trend = trend_state(ha_color)
 
         # ==============================
-        # ALIGNMENT RULE (SIMPLE)
+        # ALIGNMENT RULE
         # ==============================
         if trend == "BULL" and entry == "BUY":
             entry = "BUY"
