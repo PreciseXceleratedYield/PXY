@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (SIMPLE + ST + ADX DYNAMIC DEPTH)
+# sysentrpxy.py (ENTRY FILTER ONLY | EXIT RAW SIGNAL)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -9,15 +9,22 @@ from syssadxpxy import calculate_adx
 from sysdtafpxy import fetch_yf_data
 
 
-# ==================================================
-# CORE ENGINE
-# ==================================================
 def get_entry_signal(df=None):
 
     # ------------------------------
     # BASE SIGNAL
     # ------------------------------
-    signal, exit_signal = get_signal()
+    signal, _ = get_signal()
+
+    # 🔥 EXIT = ALWAYS ORIGINAL SIGNAL
+    exit_signal = signal
+
+    # ------------------------------
+    # PASS-THROUGH (NON-TRADE SIGNALS)
+    # ------------------------------
+    if signal not in ["BUY", "SELL"]:
+        print(f"[PASS] Signal (no filter): {signal}")
+        return signal, exit_signal
 
     # ------------------------------
     # DEPTH
@@ -29,28 +36,28 @@ def get_entry_signal(df=None):
             print("Depth: NA → NO TRADE")
             return "NONE", exit_signal
 
-        side = past_depth[:2]   # CE / PE
+        side = past_depth[:2]
         depth = int(past_depth[2:])
 
     except:
         return "NONE", exit_signal
 
     # ------------------------------
-    # DATA FETCH (single source)
+    # DATA FETCH
     # ------------------------------
     df = fetch_yf_data()
 
     # ------------------------------
-    # SUPERTREND (DIRECTION)
+    # SUPERTREND
     # ------------------------------
     df = calculate_supertrend(df)
     last = df.iloc[-1]
 
-    trend = last["ST_Trend"]      # UP / DOWN
+    trend = last["ST_Trend"]
     st_line = int(last["ST"])
 
     # ------------------------------
-    # ADX (STRENGTH FACTOR)
+    # ADX
     # ------------------------------
     adx = calculate_adx(df)
 
@@ -58,37 +65,33 @@ def get_entry_signal(df=None):
         print("[DEBUG] ADX = None → NO TRADE")
         return "NONE", exit_signal
 
-    # Normalize (0 → 1)
     adx_factor = min(max(adx / 50, 0), 1)
 
     # ------------------------------
     # DEPTH MODEL
     # ------------------------------
-    # Trend-following → dynamic (1 to 6)
     trend_depth = int(round(6 - (adx_factor * 5)))
     trend_depth = min(max(trend_depth, 1), 6)
 
-    # Counter → fixed strict
     counter_depth = 7
 
     # ------------------------------
-    # REQUIREMENTS BASED ON TREND
+    # REQUIREMENTS
     # ------------------------------
     if trend == "UP":
-        buy_req = trend_depth      # follow trend
-        sell_req = counter_depth   # counter
-
-    else:  # DOWN
+        buy_req = trend_depth
+        sell_req = counter_depth
+    else:
         buy_req = counter_depth
         sell_req = trend_depth
 
     # ------------------------------
-    # CLEAN PRINT
+    # PRINT
     # ------------------------------
     print(f"""
 ------------- SIMPLE (ST + ADX) -------------
-Signal       : {signal}
-Exit         : {exit_signal}
+Signal (RAW) : {signal}
+Exit (RAW)   : {exit_signal}
 
 Trend        : {trend}
 ST Line      : {st_line}
@@ -102,7 +105,7 @@ SELL Req     : >= {sell_req}
 """)
 
     # ------------------------------
-    # ENTRY LOGIC
+    # ENTRY FILTER
     # ------------------------------
     if signal == "BUY" and side == "PE" and depth >= buy_req:
         return "ATMBUY", exit_signal
