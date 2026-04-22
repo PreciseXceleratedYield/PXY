@@ -27,16 +27,8 @@ def get_entry_signal(df=None):
     signal, _ = get_signal()
     exit_signal = signal
 
-    # ==================================================
-    # 🔥 RAW PASS-THROUGH MODE (NO FILTERS)
-    # ==================================================
-    if signal in ["BULL", "BEAR", "NONE"]:
-        line = f"⛔ 🚧 NO ENTRY 🚧 ⛔ 🚧 {signal} 🚧 ⛔"
-        print(line.center(36))
-        return signal, exit_signal
-
     # ------------------------------
-    # TIME BLOCK (IST)
+    # TIME BLOCK (IST)  ✅ PRIORITY
     # ------------------------------
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
     current_time = now.time()
@@ -48,12 +40,21 @@ def get_entry_signal(df=None):
     if time(9, 16) <= current_time < time(9, 30):
         print("[⏱️ ⌛] 09:16–09:30 → DIRECT OTM (NO FILTER)")
 
-        if signal == "BUY":
+        if exit_signal in ["BUY", "BULL"]:
             return "OTMBUY", exit_signal
-        if signal == "SELL":
+        
+        if exit_signal in ["SELL", "BEAR"]:
             return "OTMSELL", exit_signal
 
         return "NONE", exit_signal
+
+    # ==================================================
+    # 🔥 RAW PASS-THROUGH MODE (NO FILTERS)
+    # ==================================================
+    if signal in ["BULL", "BEAR", "NONE"]:
+        line = f"⛔ 🚧 NO ENTRY 🚧 ⛔ 🚧 {signal} 🚧 ⛔"
+        print(line.center(36))
+        return signal, exit_signal
 
     # ------------------------------
     # DATA FETCH
@@ -167,9 +168,9 @@ def get_entry_signal(df=None):
     elif signal == "SELL":
         action = "SELL"
     elif signal == "OTMBUY":
-        action = "ATMBUY"
+        action = "OTMBUY"   # ✅ FIXED
     elif signal == "OTMSELL":
-        action = "ATMSELL"
+        action = "OTMSELL"  # ✅ FIXED
     else:
         action = signal
 
