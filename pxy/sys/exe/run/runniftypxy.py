@@ -5,7 +5,7 @@ from datetime import datetime, date, timedelta
 STRIKE_STEP = 50
 
 # FIXED OTM DISTANCE (your requirement)
-OTM_DISTANCE = 200  
+OTM_DISTANCE = 100
 
 # DAILY ATM BUFFER (you can change daily without touching logic)
 ATM_BUFFER = 0  
