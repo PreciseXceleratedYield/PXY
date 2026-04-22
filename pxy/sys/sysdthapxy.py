@@ -3,19 +3,17 @@
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
 
-# 🔥 CONTROL: Keep forming candle INCLUDED (DO NOT BREAK DOWNSTREAM)
+# ==================================================
+# CONFIG
+# ==================================================
 USE_FORMING_CANDLE = True
-
-# 🔥 CLEAN SWITCH
-# "HA"  → Heikin Ashi
-# "OC2" → (Open + Close)/2 vs previous
 CANDLE_STYLE = "HA"
 
 
+# ==================================================
+# DATA ENGINE (HEIKIN ASHI)
+# ==================================================
 def get_ha_data(tickerSymbol=None, df=None):
-    """
-    Compute Heikin-Ashi OHLC and colors from data.
-    """
 
     if df is None:
         df = fetch_yf_data()
@@ -23,6 +21,7 @@ def get_ha_data(tickerSymbol=None, df=None):
     if df is None or df.empty:
         return None, None, None, df
 
+    # forming candle control
     if USE_FORMING_CANDLE is False:
         df = df.iloc[:-1]
 
@@ -31,10 +30,10 @@ def get_ha_data(tickerSymbol=None, df=None):
         if col not in df.columns:
             return None, None, None, df
 
-    # ---------------- HEIKIN-ASHI CLOSE ----------------
+    # ---------------- HA CLOSE ----------------
     ha_close = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
 
-    # ---------------- HEIKIN-ASHI OPEN ----------------
+    # ---------------- HA OPEN ----------------
     ha_open = pd.Series(index=ha_close.index, dtype='float64')
 
     if len(ha_close) == 0:
@@ -53,6 +52,7 @@ def get_ha_data(tickerSymbol=None, df=None):
     ha_color = pd.Series(index=ha_close.index, dtype='object')
 
     for i in range(len(ha_close)):
+
         hc = ha_close.iloc[i]
         ho = ha_open.iloc[i]
 
@@ -87,15 +87,17 @@ def get_ha_data(tickerSymbol=None, df=None):
 
 
 # ==================================================
-# 🔥 SIGNAL ENGINE
+# SIGNAL ENGINE
 # ==================================================
-def get_bull_bear_signal(ha_color: pd.Series):
+def get_bull_bear_signal(ha_color):
+
     if ha_color is None:
         return None
 
     signal = pd.Series(index=ha_color.index, dtype='object')
 
     for i in range(len(ha_color)):
+
         curr = ha_color.iloc[i]
 
         if curr == "none" or pd.isna(curr):
@@ -123,19 +125,68 @@ def get_bull_bear_signal(ha_color: pd.Series):
 
 
 # ==================================================
-# 🔥 MAIN RUN BLOCK
+# LIVE CANDLE CHECK (LAST ROW)
+# ==================================================
+def get_live_last_candle_signal(ha_close, ha_open):
+
+    if ha_close is None or ha_open is None:
+        return "NONE"
+
+    i = len(ha_close) - 1
+
+    hc = ha_close.iloc[i]
+    ho = ha_open.iloc[i]
+
+    if pd.isna(hc) or pd.isna(ho):
+        return "NONE"
+
+    if hc > ho:
+        return "BUY"
+    elif hc < ho:
+        return "SELL"
+    else:
+        return "HOLD"
+
+
+# ==================================================
+# 🔥 ROLLING 1-MIN WINDOW
+# ==================================================
+def get_last_1min_window(df):
+
+    if df is None or df.empty:
+        return None
+
+    if not isinstance(df.index, pd.DatetimeIndex):
+        return None
+
+    last_time = df.index[-1]
+    start_time = last_time - pd.Timedelta(minutes=1)
+
+    return df[df.index >= start_time].copy()
+
+
+# ==================================================
+# MAIN
 # ==================================================
 if __name__ == "__main__":
 
     ha_close, ha_open, ha_color, df = get_ha_data()
+
     signal = get_bull_bear_signal(ha_color)
 
+    live_signal = get_live_last_candle_signal(ha_close, ha_open)
+
+    last_1min_df = get_last_1min_window(df)
+
+    # ---------------- OUTPUT ----------------
     print("\n================ LAST 15 SIGNALS ================\n")
-    if signal is not None:
-        print(signal.tail(15))
-    else:
-        print("No signal generated")
+    print(signal.tail(15))
 
     print("\n================ LAST COLOR STATE ================\n")
-    if ha_color is not None:
-        print(ha_color.tail(15))
+    print(ha_color.tail(15))
+
+    print("\n================ LIVE CANDLE SIGNAL ================\n")
+    print(live_signal)
+
+    print("\n================ LAST 1-MIN WINDOW ================\n")
+    print(last_1min_df)
