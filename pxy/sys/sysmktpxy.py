@@ -9,8 +9,8 @@ import pandas as pd
 # GLOBAL SWITCHES
 # ==================================================
 MODE = "HKIN"   # "OC2" or "HKIN"
-DEBUG = False     # DEBUG SWITCH
-EXIT_MODE = "C"   # "C" or "OHLC"
+DEBUG = False
+EXIT_MODE = "C"
 
 
 # ==================================================
@@ -31,80 +31,51 @@ def get_df():
         dbg("Data insufficient")
         return None
 
-    dbg("Data loaded:", len(df))
     return df
 
 
 # ==================================================
-# 3-CANDLE CORE SIGNAL
+# SIGNAL ENGINE FUNCTIONS
 # ==================================================
 def three_candle_signal(c1, c2, c3):
 
-    dbg("3C:", c1, c2, c3)
-
     if c2 < c1 and c2 < c3:
-        dbg("3C BUY")
         return "BUY"
-
     if c2 > c1 and c2 > c3:
-        dbg("3C SELL")
         return "SELL"
-
     if c1 < c2 < c3:
-        dbg("3C BULL")
         return "BULL"
-
     if c1 > c2 > c3:
-        dbg("3C BEAR")
         return "BEAR"
 
-    dbg("3C NONE")
     return "NONE"
 
 
-# ==================================================
-# 4-CANDLE STRUCTURE ENGINE
-# ==================================================
 def four_candle_signal(c0, c1, c2, c3):
 
-    dbg("4C:", c0, c1, c2, c3)
-
     if c1 == min([c0, c1, c2, c3]):
-        dbg("4C BUY")
         return "BUY"
 
     if c1 == max([c0, c1, c2, c3]):
-        dbg("4C SELL")
         return "SELL"
 
     if c3 > c2 > c1 > c0:
-        dbg("4C BULL")
         return "BULL"
 
     if c3 < c2 < c1 < c0:
-        dbg("4C BEAR")
         return "BEAR"
 
-    dbg("4C NONE")
     return "NONE"
 
 
-# ==================================================
-# MOMENTUM ENGINE
-# ==================================================
 def momentum_signal(c2, c3):
 
-    dbg("MOM:", c2, c3)
-
     if c3 > c2:
-        dbg("MOM BULL")
         return "BULL"
-    elif c3 < c2:
-        dbg("MOM BEAR")
+    if c3 < c2:
         return "BEAR"
-    else:
-        dbg("MOM NONE")
-        return "NONE"
+
+    return "NONE"
 
 
 # ==================================================
@@ -112,28 +83,21 @@ def momentum_signal(c2, c3):
 # ==================================================
 def hkin_entry_signal(prev_o, prev_c, curr_o, curr_c):
 
-    dbg("HKIN:", prev_o, prev_c, curr_o, curr_c)
-
     prev_green = prev_c > prev_o
     curr_green = curr_c > curr_o
 
     if (not prev_green) and curr_green:
-        dbg("HKIN BUY")
         return "BUY"
 
     if prev_green and (not curr_green):
-        dbg("HKIN SELL")
         return "SELL"
 
     if curr_green and prev_green:
-        dbg("HKIN BULL")
         return "BULL"
 
     if (not curr_green) and (not prev_green):
-        dbg("HKIN BEAR")
         return "BEAR"
 
-    dbg("HKIN NONE")
     return "NONE"
 
 
@@ -141,13 +105,12 @@ def hkin_entry_signal(prev_o, prev_c, curr_o, curr_c):
 # MASTER ENGINE
 # ==================================================
 def get_signal():
+
     try:
         df = get_df()
 
         if df is None:
             return "NONE", "NONE"
-
-        dbg("MODE:", MODE)
 
         # ==============================
         # OC2 MODE
@@ -156,8 +119,6 @@ def get_signal():
 
             price = (df['Open'] + df['Close']) / 2
             p0, p1, p2, p3 = price.iloc[-4], price.iloc[-3], price.iloc[-2], price.iloc[-1]
-
-            dbg("OC2 PRICE:", p0, p1, p2, p3)
 
             entry_signal = three_candle_signal(p1, p2, p3)
 
@@ -168,24 +129,23 @@ def get_signal():
                 entry_signal = momentum_signal(p2, p3)
 
         # ==============================
-        # HKIN MODE (IMPORT FROM sysdthapxy)
+        # HKIN MODE (CLEAN + NO REPAINT)
         # ==============================
         else:
 
             from sysdthapxy import get_ha_data
 
-            _, _, _, ha = get_ha_data(df=df)
+            _, _, _, df = get_ha_data(df=df)
 
-            if ha is None or len(ha) < 3:
+            if df is None or "HA_Open" not in df.columns:
                 return "NONE", "NONE"
 
-            ha_o2 = ha['HA_Open'].iloc[-2]
-            ha_c2 = ha['HA_Close'].iloc[-2]
+            # 🔥 USE ONLY CLOSED CANDLES (-3, -2)
+            ha_o2 = df["HA_Open"].iloc[-3]
+            ha_c2 = df["HA_Close"].iloc[-3]
 
-            ha_o3 = ha['HA_Open'].iloc[-1]   # running candle
-            ha_c3 = ha['HA_Close'].iloc[-1]  # running candle
-
-            dbg("HKIN CLOSED:", ha_o2, ha_c2, ha_o3, ha_c3)
+            ha_o3 = df["HA_Open"].iloc[-2]
+            ha_c3 = df["HA_Close"].iloc[-2]
 
             entry_signal = hkin_entry_signal(ha_o2, ha_c2, ha_o3, ha_c3)
 
@@ -200,8 +160,6 @@ def get_signal():
                 df['Close'].iloc[-2],
                 df['Close'].iloc[-1]
             )
-
-            dbg("EXIT CLOSE:", c0, c1, c2, c3)
 
             exit_signal = three_candle_signal(c1, c2, c3)
 
@@ -227,8 +185,6 @@ def get_signal():
                 df['Low'].iloc[-1]
             )
 
-            dbg("EXIT OHLC:", h0, h1, h2, h3, l0, l1, l2, l3)
-
             if l2 < l1 and l2 < l3 and h3 > h2:
                 exit_signal = "BUY"
 
@@ -242,14 +198,13 @@ def get_signal():
                 exit_signal = "BEAR"
 
             else:
+
                 c0, c1, c2, c3 = (
                     df['Close'].iloc[-4],
                     df['Close'].iloc[-3],
                     df['Close'].iloc[-2],
                     df['Close'].iloc[-1]
                 )
-
-                dbg("EXIT FALLBACK CLOSE:", c0, c1, c2, c3)
 
                 exit_signal = three_candle_signal(c1, c2, c3)
 
@@ -259,18 +214,14 @@ def get_signal():
                 if exit_signal == "NONE":
                     exit_signal = momentum_signal(c2, c3)
 
-        dbg("FINAL ENTRY:", entry_signal, "EXIT:", exit_signal)
-
         # ==============================
-        # ALIGNMENT
+        # ALIGNMENT RULE
         # ==============================
         if entry_signal == "BULL" and exit_signal == "BUY":
             entry_signal = "BUY"
 
         elif entry_signal == "BEAR" and exit_signal == "SELL":
             entry_signal = "SELL"
-
-        dbg("FINAL OUTPUT:", entry_signal, exit_signal)
 
         return entry_signal, exit_signal
 
@@ -280,7 +231,7 @@ def get_signal():
 
 
 # ==================================================
-# DEBUG RUN
+# RUN
 # ==================================================
 if __name__ == "__main__":
     entry, exit_ = get_signal()
