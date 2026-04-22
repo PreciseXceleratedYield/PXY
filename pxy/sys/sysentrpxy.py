@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (FINAL: WITH MORNING BLOCK OVERRIDE + IST FIX)
+# sysentrpxy.py (FINAL: WITH MORNING BLOCK + DEPTH SWITCH)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -12,18 +12,23 @@ from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 
+# ==================================================
+# DEPTH CONTROL SWITCH
+# ==================================================
+DEPTH_RELAXATION = 1   # 0 = strict, 1 = -1 relaxation, 2 = -2, etc.
+MIN_DEPTH = 1
+
+
 def get_entry_signal(df=None):
 
     # ------------------------------
     # BASE SIGNAL
     # ------------------------------
     signal, _ = get_signal()
-
-    # EXIT = ALWAYS ORIGINAL SIGNAL
     exit_signal = signal
 
     # ------------------------------
-    # TIME BLOCK (MORNING OVERRIDE - IST FORCED)
+    # TIME BLOCK (IST)
     # ------------------------------
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
     current_time = now.time()
@@ -37,14 +42,13 @@ def get_entry_signal(df=None):
 
         if signal == "BUY":
             return "OTMBUY", exit_signal
-
         if signal == "SELL":
             return "OTMSELL", exit_signal
 
         return "NONE", exit_signal
 
     # ------------------------------
-    # AFTER 09:30 → NORMAL ENGINE
+    # DATA FETCH
     # ------------------------------
     df = fetch_yf_data()
 
@@ -68,14 +72,14 @@ def get_entry_signal(df=None):
     counter_depth = 7
 
     # ------------------------------
-    # REQUIREMENTS
+    # REQUIREMENTS (WITH SWITCH)
     # ------------------------------
     if trend == "UP":
-        pe_req = max(1, trend_depth)
-        ce_req = max(1, counter_depth)
+        pe_req = max(MIN_DEPTH, trend_depth - DEPTH_RELAXATION)
+        ce_req = max(MIN_DEPTH, counter_depth - DEPTH_RELAXATION)
     else:
-        pe_req = max(1, counter_depth)
-        ce_req = max(1, trend_depth)
+        pe_req = max(MIN_DEPTH, counter_depth - DEPTH_RELAXATION)
+        ce_req = max(MIN_DEPTH, trend_depth - DEPTH_RELAXATION)
 
     # ------------------------------
     # DEPTH FETCH
@@ -110,7 +114,7 @@ def get_entry_signal(df=None):
         return action, exit_signal
 
     # ------------------------------
-    # NORMAL LOGIC
+    # ENTRY LOGIC
     # ------------------------------
     final_signal = "NONE"
 
@@ -130,11 +134,8 @@ def get_entry_signal(df=None):
         if signal == "BUY" and side == "PE" and depth >= pe_req:
             final_signal = "OTMBUY"
 
-    else:
-        final_signal = "NONE"
-
     # ------------------------------
-    # FINAL PRINT (ONLY ONCE)
+    # FINAL ONE-LINE PRINT
     # ------------------------------
     if signal == "BUY":
         action = "BUY"
