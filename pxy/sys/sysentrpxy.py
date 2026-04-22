@@ -28,12 +28,10 @@ def get_entry_signal(df=None):
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
     current_time = now.time()
 
-    # 09:14 → 09:16 → NO TRADE
     if time(9, 14) <= current_time < time(9, 16):
         print("[TIME BLOCK] 09:14–09:16 → NO TRADE")
         return "NONE", exit_signal
 
-    # 09:16 → 09:30 → DIRECT OTM (NO FILTERS)
     if time(9, 16) <= current_time < time(9, 30):
         print("[TIME BLOCK] 09:16–09:30 → DIRECT OTM (NO FILTER)")
 
@@ -48,24 +46,14 @@ def get_entry_signal(df=None):
     # ------------------------------
     # AFTER 09:30 → NORMAL ENGINE
     # ------------------------------
-
-    # ------------------------------
-    # DATA FETCH (single source)
-    # ------------------------------
     df = fetch_yf_data()
 
-    # ------------------------------
-    # SUPERTREND
-    # ------------------------------
     df = calculate_supertrend(df)
     last = df.iloc[-1]
 
-    trend = last["ST_Trend"]      # UP / DOWN
+    trend = last["ST_Trend"]
     st_line = int(last["ST"])
 
-    # ------------------------------
-    # ADX
-    # ------------------------------
     adx = calculate_adx(df)
 
     if adx is None:
@@ -74,17 +62,11 @@ def get_entry_signal(df=None):
 
     adx_factor = min(max(adx / 50, 0), 1)
 
-    # ------------------------------
-    # DEPTH MODEL
-    # ------------------------------
     trend_depth = int(round(6 - (adx_factor * 5)))
     trend_depth = min(max(trend_depth, 1), 6)
 
     counter_depth = 7
 
-    # ------------------------------
-    # REQUIREMENTS (CE / PE view)
-    # ------------------------------
     if trend == "UP":
         pe_req = trend_depth
         ce_req = counter_depth
@@ -93,7 +75,7 @@ def get_entry_signal(df=None):
         ce_req = trend_depth
 
     # ------------------------------
-    # DEPTH (safe read)
+    # DEPTH FETCH
     # ------------------------------
     try:
         _, past_depth, _, _ = detect_ha_flip_signal()
@@ -134,9 +116,24 @@ CE Req (SELL): >= {ce_req}
     if signal not in ["BUY", "SELL"]:
         return signal, exit_signal
 
-    # ------------------------------
-    # ENTRY LOGIC
-    # ------------------------------
+    # ==================================================
+    # 🔥 MOMENTUM MODE (DEPTH > 7 → IGNORE TREND COMPLETELY)
+    # ==================================================
+    if depth > 7:
+
+        print("[MOMENTUM MODE] Depth > 7 → Ignore trend & CE/PE logic")
+
+        if signal == "BUY":
+            return "ATMBUY", exit_signal
+
+        if signal == "SELL":
+            return "ATMSELL", exit_signal
+
+        return "NONE", exit_signal
+
+    # ==================================================
+    # COUNTER MODE (DEPTH ≤ 7 → FULL LOGIC)
+    # ==================================================
     if trend == "UP":
 
         if signal == "BUY" and side == "PE" and depth >= pe_req:
