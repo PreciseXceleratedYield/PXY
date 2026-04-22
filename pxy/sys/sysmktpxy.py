@@ -1,6 +1,8 @@
 # ==================================================
-# SIMPLE SIGNAL ENGINE (WITH STATE UPGRADE LOGIC)
-# HA + OC/2 FEEDBACK SYSTEM
+# 5-STATE DUAL ENGINE (STRICT MODE)
+# HA + OC/2
+# OUTPUT: BUY / SELL / BULL / BEAR / NONE
+# ONLY 2 UPGRADE CONDITIONS
 # ==================================================
 
 from sysdtafpxy import fetch_yf_data
@@ -13,13 +15,13 @@ import pandas as pd
 # ==================================================
 def get_df():
     df = fetch_yf_data(period="5d", interval="1m")
-    if df is None or len(df) < 4:
+    if df is None or len(df) < 10:
         return None
     return df
 
 
 # ==================================================
-# CLEAN COLORS
+# CLEAN INPUT
 # ==================================================
 def clean_colors(colors):
     colors = colors.astype(str).str.lower().str.strip()
@@ -32,7 +34,7 @@ def clean_colors(colors):
 
 
 # ==================================================
-# ENTRY (HA STATE)
+# HA STATE (5 STATES ONLY)
 # ==================================================
 def entry_signal(colors):
 
@@ -60,11 +62,11 @@ def entry_signal(colors):
 
 
 # ==================================================
-# EXIT (RUNNING OC/2)
+# OC/2 STATE (5 STATES ONLY - NO INTERPRETATION)
 # ==================================================
 def exit_signal(df):
 
-    if df is None or len(df) < 2:
+    if df is None or len(df) < 3:
         return "NONE"
 
     oc2 = (df["Open"] + df["Close"]) / 2
@@ -72,26 +74,27 @@ def exit_signal(df):
     prev = oc2.iloc[-2]
     curr = oc2.iloc[-1]
 
+    if abs(curr - prev) < 0.0005:
+        return "NONE"
+
     if curr > prev:
-        return "BUY"
+        return "BULL"
 
     if curr < prev:
-        return "SELL"
+        return "BEAR"
 
     return "NONE"
 
 
 # ==================================================
-# STATE UPGRADE ENGINE (CORE LOGIC)
+# UPGRADE ENGINE (ONLY 2 RULES)
 # ==================================================
-def apply_upgrade(ha_state, exit_state):
+def apply_upgrade(ha_state, oc_state):
 
-    # ONLY TWO UPGRADE CONDITIONS
-
-    if ha_state == "BULL" and exit_state == "BUY":
+    if ha_state == "BULL" and oc_state == "BUY":
         return "BUY"
 
-    if ha_state == "BEAR" and exit_state == "SELL":
+    if ha_state == "BEAR" and oc_state == "SELL":
         return "SELL"
 
     return ha_state
@@ -115,12 +118,11 @@ def get_signal():
         ha_color = pd.Series(ha_color)
 
         ha_state = entry_signal(ha_color)
-        exit_state = exit_signal(df)
+        oc_state = exit_signal(df)
 
-        # 🔥 APPLY UPGRADE RULE
-        final_state = apply_upgrade(ha_state, exit_state)
+        final_state = apply_upgrade(ha_state, oc_state)
 
-        return final_state, exit_state
+        return final_state, oc_state
 
     except Exception as e:
         print("[ERROR]", e)
@@ -132,5 +134,5 @@ def get_signal():
 # ==================================================
 if __name__ == "__main__":
     entry, exit_ = get_signal()
-    print("FINAL HA STATE:", entry)
-    print("OC2 STATE      :", exit_)
+    print("FINAL STATE:", entry)
+    print("OC/2 STATE  :", exit_)
