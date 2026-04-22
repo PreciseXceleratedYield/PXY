@@ -6,12 +6,11 @@ from sysdtafpxy import fetch_yf_data
 # ==================================================
 # CONFIG
 # ==================================================
-USE_FORMING_CANDLE = True
-CANDLE_STYLE = "HA"
+CANDLE_STYLE = "HA"   # HA / OC2
 
 
 # ==================================================
-# DATA ENGINE (HEIKIN ASHI)
+# HEIKIN ASHI ENGINE
 # ==================================================
 def get_ha_data(tickerSymbol=None, df=None):
 
@@ -20,10 +19,6 @@ def get_ha_data(tickerSymbol=None, df=None):
 
     if df is None or df.empty:
         return None, None, None, df
-
-    # forming candle control
-    if USE_FORMING_CANDLE is False:
-        df = df.iloc[:-1]
 
     required_cols = ['Open', 'High', 'Low', 'Close']
     for col in required_cols:
@@ -35,9 +30,6 @@ def get_ha_data(tickerSymbol=None, df=None):
 
     # ---------------- HA OPEN ----------------
     ha_open = pd.Series(index=ha_close.index, dtype='float64')
-
-    if len(ha_close) == 0:
-        return None, None, None, df
 
     ha_open.iloc[0] = df['Open'].iloc[0]
 
@@ -56,13 +48,13 @@ def get_ha_data(tickerSymbol=None, df=None):
         hc = ha_close.iloc[i]
         ho = ha_open.iloc[i]
 
-        if USE_FORMING_CANDLE and i == len(ha_close) - 1:
-            ha_color.iloc[i] = "none"
-            continue
-
         if pd.isna(hc) or pd.isna(ho):
             ha_color.iloc[i] = "none"
             continue
+
+        # ==================================================
+        # 🔥 MAIN LOGIC (NO LAST ROW EXCLUSION)
+        # ==================================================
 
         if CANDLE_STYLE == "OC2":
             oc = oc2.iloc[i]
@@ -82,6 +74,21 @@ def get_ha_data(tickerSymbol=None, df=None):
                 ha_color.iloc[i] = "red"
             else:
                 ha_color.iloc[i] = ha_color.iloc[i - 1] if i > 0 else "none"
+
+    # ==================================================
+    # 🔥 LIVE OVERRIDE FOR LAST CANDLE (IMPORTANT FIX)
+    # ==================================================
+    i = len(ha_close) - 1
+
+    hc = ha_close.iloc[i]
+    ho = ha_open.iloc[i]
+
+    if not pd.isna(hc) and not pd.isna(ho):
+
+        if hc > ho:
+            ha_color.iloc[i] = "green"
+        elif hc < ho:
+            ha_color.iloc[i] = "red"
 
     return ha_close, ha_open, ha_color, df
 
@@ -125,12 +132,9 @@ def get_bull_bear_signal(ha_color):
 
 
 # ==================================================
-# LIVE CANDLE CHECK (LAST ROW)
+# LIVE LAST CANDLE CHECK
 # ==================================================
 def get_live_last_candle_signal(ha_close, ha_open):
-
-    if ha_close is None or ha_open is None:
-        return "NONE"
 
     i = len(ha_close) - 1
 
@@ -149,7 +153,7 @@ def get_live_last_candle_signal(ha_close, ha_open):
 
 
 # ==================================================
-# 🔥 ROLLING 1-MIN WINDOW
+# ROLLING 1 MIN WINDOW
 # ==================================================
 def get_last_1min_window(df):
 
@@ -178,11 +182,10 @@ if __name__ == "__main__":
 
     last_1min_df = get_last_1min_window(df)
 
-    # ---------------- OUTPUT ----------------
     print("\n================ LAST 15 SIGNALS ================\n")
     print(signal.tail(15))
 
-    print("\n================ LAST COLOR STATE ================\n")
+    print("\n================ COLOR STATE ================\n")
     print(ha_color.tail(15))
 
     print("\n================ LIVE CANDLE SIGNAL ================\n")
