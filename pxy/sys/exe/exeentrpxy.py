@@ -75,7 +75,6 @@ def execute_order(client, symbol, qty):
             "market_protection": "0"
         }
 
-
         dprint(f"ORDER PARAMS: {params}", Fore.YELLOW)
 
         res = client.place_order(**params)
@@ -118,24 +117,27 @@ async def main():
             return
 
         # --- DATA ---
-        # --- SIGNAL (FROM SYSPXY) ---
         dprint("GETTING SIGNAL FROM SYSPXY...")
-        
         data = get_all_data()
-        
+
         entry_signal = data.get("entry")
         reversal     = data.get("exit")
-        ltp          = data.get("price")   # 🔥 replaces df["Close"]
+        ltp          = data.get("price")
+
         if ltp is None:
             print("❌ No price from syspxy")
             return
-        
+
+        # 🔥 SURGICAL ADDITION: EXIT NORMALIZATION
+        exit_sig = str(reversal).upper().strip() if reversal else "NONE"
+        dprint(f"EXIT REGIME: {exit_sig}")
+
         dprint(f"SIGNAL: {entry_signal} | {reversal}")
-        
+
         if not entry_signal:
             print("WAIT SIGNAL: None")
             return
-        
+
         sig = entry_signal.upper().strip()
         dprint(f"FORMATTED SIGNAL: {sig}")
 
@@ -144,7 +146,6 @@ async def main():
         if sig not in VALID:
             print(f"WAIT SIGNAL: {entry_signal}")
             return
-
 
         # --- POSITION CHECK ---
         dprint("CHECKING POSITIONS...")
@@ -165,14 +166,24 @@ async def main():
                 pe_active = "1PE" in str(pos)
 
             dprint(f"CE_ACTIVE={ce_active}, PE_ACTIVE={pe_active}")
-            # --- DUPLICATE SIGNAL PROTECTION ---
-            if sig in ["ATMBUY", "OTMBUY"] and ce_active:
-                print("⚠️ BUY signal but CE already active → SKIP")
-                return
-            
-            if sig in ["ATMSELL", "OTMSELL"] and pe_active:
-                print("⚠️ SELL signal but PE already active → SKIP")
-                return
+
+            # ==================================================
+            # 🔥 SURGICAL EXIT-BASED SIGNAL CORRECTION
+            # ==================================================
+
+            if ce_active and pe_active:
+                print("⚠️ CE + PE both active → NO ACTION")
+                sig = "NONE"
+
+            else:
+                if exit_sig in ["BUY", "BULL"]:
+                    if pe_active:
+                        sig = "ATMBUY"
+
+                elif exit_sig in ["SELL", "BEAR"]:
+                    if ce_active:
+                        sig = "ATMSELL"
+
         except Exception as e:
             dprint(f"POSITION ERROR: {e}", Fore.RED)
             ce_active = True
