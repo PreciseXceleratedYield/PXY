@@ -4,7 +4,7 @@
 
 from sysmktpxy import get_signal
 from syshkinpxy import detect_ha_flip_signal
-from systrndpxy import calculate_supertrend
+from sysstrndpxy import calculate_supertrend
 from syssadxpxy import calculate_adx
 from sysdtafpxy import fetch_yf_data
 
