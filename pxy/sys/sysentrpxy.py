@@ -67,12 +67,17 @@ def get_entry_signal(df=None):
 
     counter_depth = 7
 
+    # ==================================================
+    # 🔥 REDUCED DEPTH REQUIREMENT (BOTH CE & PE RELAXED)
+    # ==================================================
+    DEPTH_RELAX = 1.3  # tune: 1.2 = tight, 1.5 = looser
+
     if trend == "UP":
-        pe_req = trend_depth
-        ce_req = counter_depth
+        pe_req = max(1, int(trend_depth / DEPTH_RELAX))
+        ce_req = max(2, int(counter_depth / DEPTH_RELAX))
     else:
-        pe_req = counter_depth
-        ce_req = trend_depth
+        pe_req = max(2, int(counter_depth / DEPTH_RELAX))
+        ce_req = max(1, int(trend_depth / DEPTH_RELAX))
 
     # ------------------------------
     # DEPTH FETCH
