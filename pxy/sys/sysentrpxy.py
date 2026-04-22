@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (FINAL: WITH MORNING BLOCK OVERRIDE)
+# sysentrpxy.py (FINAL: WITH MORNING BLOCK OVERRIDE + IST FIX)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -8,7 +8,8 @@ from sysstrndpxy import calculate_supertrend
 from syssadxpxy import calculate_adx
 from sysdtafpxy import fetch_yf_data
 
-from datetime import datetime
+from datetime import datetime, time
+from zoneinfo import ZoneInfo
 
 
 def get_entry_signal(df=None):
@@ -22,18 +23,18 @@ def get_entry_signal(df=None):
     exit_signal = signal
 
     # ------------------------------
-    # TIME BLOCK (MORNING OVERRIDE)
+    # TIME BLOCK (MORNING OVERRIDE - IST FORCED)
     # ------------------------------
-    now = datetime.now()
-    current_time = now.strftime("%H:%M")
+    now = datetime.now(ZoneInfo("Asia/Kolkata"))
+    current_time = now.time()
 
     # 09:14 → 09:16 → NO TRADE
-    if "09:14" <= current_time < "09:16":
+    if time(9, 14) <= current_time < time(9, 16):
         print("[TIME BLOCK] 09:14–09:16 → NO TRADE")
         return "NONE", exit_signal
 
     # 09:16 → 09:30 → DIRECT OTM (NO FILTERS)
-    if "09:16" <= current_time < "09:30":
+    if time(9, 16) <= current_time < time(9, 30):
         print("[TIME BLOCK] 09:16–09:30 → DIRECT OTM (NO FILTER)")
 
         if signal == "BUY":
