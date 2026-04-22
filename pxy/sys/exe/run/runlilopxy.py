@@ -6,7 +6,7 @@ from runltpspxy import get_mid_price
 # =========================
 # 🔁 SWITCH: FIFO / LIFO
 # =========================
-MATCH_MODE = "FIFO"   # change to "LIFO" when needed
+MATCH_MODE = "LIFO"   # change to "LIFO" when needed
 
 
 def process_lilo_orders(client):
