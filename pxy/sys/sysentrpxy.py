@@ -31,7 +31,7 @@ def get_entry_signal(df=None):
     # 🔥 RAW PASS-THROUGH MODE (NO FILTERS)
     # ==================================================
     if signal in ["BULL", "BEAR", "NONE"]:
-        print(f"[🚧🚧 NO ENTRY 🚧🚧] AS IT IS {signal}")
+        print(f"[🚧🚧 NO ENTRY 🚧🚧 AS IT IS 🚧🚧 {signal} 🚧🚧]")
         return signal, exit_signal
 
     # ------------------------------
