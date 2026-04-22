@@ -117,7 +117,7 @@ def get_entry_signal(df=None):
         else:
             action = "NONE"
 
-        print(f"✅ {action} ✅ | SELL@CE{ce_req} | BUY@PE{pe_req}") ✅ ✅
+        print(f"✅ {action} ✅ | SELL@CE{ce_req} | BUY@PE{pe_req} ✅ ✅") 
         return action, exit_signal
 
     # ------------------------------
