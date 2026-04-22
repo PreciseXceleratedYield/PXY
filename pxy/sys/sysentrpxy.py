@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (FINAL: CLEAN PRINT + CE/PE REQ)
+# sysentrpxy.py (FINAL: WITH MORNING BLOCK OVERRIDE)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -7,6 +7,8 @@ from syshkinpxy import detect_ha_flip_signal
 from sysstrndpxy import calculate_supertrend
 from syssadxpxy import calculate_adx
 from sysdtafpxy import fetch_yf_data
+
+from datetime import datetime
 
 
 def get_entry_signal(df=None):
@@ -18,6 +20,33 @@ def get_entry_signal(df=None):
 
     # EXIT = ALWAYS ORIGINAL SIGNAL
     exit_signal = signal
+
+    # ------------------------------
+    # TIME BLOCK (MORNING OVERRIDE)
+    # ------------------------------
+    now = datetime.now()
+    current_time = now.strftime("%H:%M")
+
+    # 09:14 → 09:16 → NO TRADE
+    if "09:14" <= current_time < "09:16":
+        print("[TIME BLOCK] 09:14–09:16 → NO TRADE")
+        return "NONE", exit_signal
+
+    # 09:16 → 09:30 → DIRECT OTM (NO FILTERS)
+    if "09:16" <= current_time < "09:30":
+        print("[TIME BLOCK] 09:16–09:30 → DIRECT OTM (NO FILTER)")
+
+        if signal == "BUY":
+            return "OTMBUY", exit_signal
+
+        if signal == "SELL":
+            return "OTMSELL", exit_signal
+
+        return "NONE", exit_signal
+
+    # ------------------------------
+    # AFTER 09:30 → NORMAL ENGINE
+    # ------------------------------
 
     # ------------------------------
     # DATA FETCH (single source)
@@ -54,11 +83,10 @@ def get_entry_signal(df=None):
 
     # ------------------------------
     # REQUIREMENTS (CE / PE view)
-    # CE → SELL side, PE → BUY side
     # ------------------------------
     if trend == "UP":
-        pe_req = trend_depth      # BUY (trend)
-        ce_req = counter_depth    # SELL (counter)
+        pe_req = trend_depth
+        ce_req = counter_depth
     else:
         pe_req = counter_depth
         ce_req = trend_depth
@@ -81,7 +109,7 @@ def get_entry_signal(df=None):
         depth = 0
 
     # ------------------------------
-    # CLEAN PRINT (ALWAYS)
+    # CLEAN PRINT
     # ------------------------------
     print(f"""
 ------------- SIMPLE (ST + ADX) -------------
@@ -106,7 +134,7 @@ CE Req (SELL): >= {ce_req}
         return signal, exit_signal
 
     # ------------------------------
-    # ENTRY LOGIC (ATM / OTM)
+    # ENTRY LOGIC
     # ------------------------------
     if trend == "UP":
 
