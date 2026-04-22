@@ -1,9 +1,10 @@
 # ==================================================
-# SIMPLE SIGNAL ENGINE (ENTRY = EXIT SAME SIGNAL)
+# SIMPLE SIGNAL ENGINE (FIXED + STABLE)
 # ==================================================
 
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_ha_data
+import pandas as pd
 
 
 # ==================================================
@@ -17,12 +18,35 @@ def get_df():
 
 
 # ==================================================
-# CORE SIGNAL (NO FILTERS)
+# CLEAN COLOR NORMALIZER (🔥 FIX)
+# ==================================================
+def clean_colors(colors):
+
+    colors = colors.astype(str).str.lower().str.strip()
+
+    # fix common junk values
+    colors = colors.replace({
+        "nan": None,
+        "none": None,
+        "": None
+    })
+
+    return colors
+
+
+# ==================================================
+# CORE SIGNAL
 # ==================================================
 def entry_exit_signal(colors):
 
-    prev = colors.iloc[-2]   # last closed candle
-    curr = colors.iloc[-1]   # running candle
+    colors = clean_colors(colors)
+
+    # ensure we have valid last 2 candles
+    if len(colors.dropna()) < 2:
+        return "NONE"
+
+    prev = colors.iloc[-2]
+    curr = colors.iloc[-1]
 
     if prev == "red" and curr == "green":
         return "BUY"
@@ -54,9 +78,10 @@ def get_signal():
         if ha_color is None:
             return "NONE", "NONE"
 
+        ha_color = pd.Series(ha_color)
+
         signal = entry_exit_signal(ha_color)
 
-        # ENTRY = EXIT SAME VALUE
         return signal, signal
 
     except Exception as e:
