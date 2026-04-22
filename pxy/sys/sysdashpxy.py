@@ -14,12 +14,13 @@ from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
 from sysstrndpxy import calculate_supertrend
 from syspwerpxy import get_ce_pe_power
-from sysentrpxy import get_entry_signal
+from sysmktpxy import get_signal   # 🔥 IMPORTANT FIX
 from sysdeptpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
 
 TOTAL_WIDTH = 42
+
 
 # ---------------- UTILS ----------------
 def safe_int(val):
@@ -27,6 +28,7 @@ def safe_int(val):
         return 0 if val is None else int(float(val))
     except (ValueError, TypeError):
         return 0
+
 
 # ================= RUN PYC FILES =================
 def run_pyc_file():
@@ -37,6 +39,7 @@ def run_pyc_file():
         except Exception as e:
             print(f"Error running {pyc_file}: {e}")
 
+
 # ================= CORE SNAPSHOT FUNCTION =================
 def get_full_snapshot():
     result = {}
@@ -44,8 +47,10 @@ def get_full_snapshot():
     df = fetch_yf_data()
     if df is None or df.empty:
         return None
+
     result["df"] = df
 
+    # ===== CANDLE VISUAL =====
     result["candle_visual"] = get_candle_visual(df=df)
 
     # ===== HAIKIN-ASHI =====
@@ -56,9 +61,10 @@ def get_full_snapshot():
 
     # ===== HAIKIN SIGNAL =====
     signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df=df)
-    # --- FIX: fallback BULL/BEAR if None ---
+
     if signal is None:
         signal = "BULL" if df['HA_Close'].iloc[-1] > df['HA_Open'].iloc[-1] else "BEAR"
+
     result["hkin_signal"] = signal
     result["hkin_past_depth"] = past_depth
     result["hkin_ce_depth"] = ce_depth
@@ -72,6 +78,7 @@ def get_full_snapshot():
     atr_series = calculate_atr(df)
     atr_val = safe_int(atr_series.iloc[-1] if not atr_series.empty else 0)
     k_val = safe_int(calculate_dynamic_k(df))
+
     result["atr"] = atr_val
     result["katr"] = k_val
 
@@ -84,6 +91,7 @@ def get_full_snapshot():
     df = calculate_supertrend(df)
     trend = df['ST_Trend'].iloc[-1] if not df.empty else "NONE"
     line_val = safe_int(df['ST'].iloc[-1] if not df.empty else 0)
+
     result["supertrend"] = trend
     result["super_line"] = line_val
     result["df"] = df
@@ -94,11 +102,16 @@ def get_full_snapshot():
     result["ce_power"] = safe_int(ce)
     result["pe_power"] = safe_int(pe)
 
-    # ===== ENTRY SIGNAL =====
-    entry, exit = get_entry_signal(df)
-    # --- FIX: fallback to ATM/OTM if None ---
+    # ==================================================
+    # 🔥 MASTER SIGNAL ENGINE (NEW FIXED FLOW)
+    # ==================================================
+    entry, exit_signal, ce_d, pe_d, last_opp, df, ha = get_signal()
+
     result["entry"] = entry
-    result["exit"] = exit
+    result["exit"] = exit_signal
+    result["ce_depth"] = ce_d
+    result["pe_depth"] = pe_d
+    result["last_opp"] = last_opp
 
     # ===== DAY CANDLE =====
     result["day_candle"] = get_day_candle_bar(df)
@@ -110,13 +123,12 @@ def get_full_snapshot():
 
     return result
 
+
 # ================= PRINT DASHBOARD =================
 def print_dashboard(data):
     if not data:
         print("No data fetched.")
         return
-
-    df = data["df"]
 
     # ===== CANDLE VISUAL =====
     print(data["candle_visual"])
@@ -128,12 +140,15 @@ def print_dashboard(data):
     pe_depth = data["hkin_pe_depth"]
 
     color = Fore.GREEN if signal in ["BUY","BULL"] else Fore.RED if signal in ["SELL","BEAR"] else Fore.YELLOW
+
     space1 = TOTAL_WIDTH - len(f"Hkin:{signal}") - len(f"Past:{past_depth}")
     if space1 < 0: space1 = 1
+
     print(Fore.YELLOW + "Hkin:" + color + signal + " " * space1 + Fore.YELLOW + f"Past:{color}{past_depth}")
 
     space2 = TOTAL_WIDTH - len(f"CE:{ce_depth}") - len(f"PE:{pe_depth}")
     if space2 < 0: space2 = 1
+
     print(Fore.YELLOW + "CE:" + color + str(ce_depth) + " " * space2 + Fore.YELLOW + "PE:" + color + str(pe_depth))
 
     # ===== STRENGTH =====
@@ -142,48 +157,50 @@ def print_dashboard(data):
     # ===== ATR =====
     atr_val = data["atr"]
     k_val = data["katr"]
+
     space = TOTAL_WIDTH - len(f"ATR:{atr_val}") - len(f"KATR:{k_val}")
-    print(Fore.YELLOW + "ATR:" + Fore.WHITE + str(atr_val) + " " * space + Fore.YELLOW + "KATR:" + Fore.CYAN + str(k_val))
+    print(Fore.YELLOW + "ATR:" + str(atr_val) + " " * space + Fore.CYAN + "KATR:" + str(k_val))
 
     # ===== PRICE =====
     price = data["price"]
     direction = data["direction"]
-    color = Fore.GREEN if direction=="UP" else Fore.RED if direction=="DOWN" else Fore.YELLOW
-    space = TOTAL_WIDTH - len(f"Price:{price}") - len(f"Mullu:{direction}")
-    print(Fore.YELLOW + "Price:" + color + str(price) + " " * space + Fore.YELLOW + "Mullu:" + color + direction)
+
+    color = Fore.GREEN if direction == "UP" else Fore.RED if direction == "DOWN" else Fore.YELLOW
+
+    space = TOTAL_WIDTH - len(f"Price:{price}") - len(f"Dir:{direction}")
+    print(Fore.YELLOW + "Price:" + color + str(price) + " " * space + Fore.YELLOW + "Dir:" + color + direction)
 
     # ===== SUPERTREND =====
     trend = data["supertrend"]
     line_val = data["super_line"]
-    color = Fore.GREEN if trend=="UP" else Fore.RED if trend=="DOWN" else Fore.YELLOW
-    space = TOTAL_WIDTH - len(f"Super:{trend}") - len(f"LINE:{line_val}")
-    print(Fore.YELLOW + "Super:" + color + trend + " " * space + Fore.YELLOW + "LINE:" + color + str(line_val))
+
+    color = Fore.GREEN if trend == "UP" else Fore.RED if trend == "DOWN" else Fore.YELLOW
+
+    space = TOTAL_WIDTH - len(f"Super:{trend}") - len(f"Line:{line_val}")
+    print(Fore.YELLOW + "Super:" + color + trend + " " * space + Fore.YELLOW + "Line:" + color + str(line_val))
 
     # ===== POWER =====
     ce = data["ce_power"]
     pe = data["pe_power"]
-    ce_color = Fore.GREEN if ce > pe else Fore.RED if ce < pe else Fore.YELLOW
-    pe_color = Fore.GREEN if pe > ce else Fore.RED if pe < ce else Fore.YELLOW
-    space = TOTAL_WIDTH - len(f"CE Power:{ce}") - len(f"PE Power:{pe}")
-    print(Fore.YELLOW + "CE Power:" + ce_color + str(ce) + " " * space + Fore.YELLOW + "PE Power:" + pe_color + str(pe))
+
+    ce_color = Fore.GREEN if ce > pe else Fore.RED if pe > ce else Fore.YELLOW
+    pe_color = Fore.GREEN if pe > ce else Fore.RED if ce > pe else Fore.YELLOW
+
+    space = TOTAL_WIDTH - len(f"CE:{ce}") - len(f"PE:{pe}")
+    print(Fore.YELLOW + "CE:" + ce_color + str(ce) + " " * space + Fore.YELLOW + "PE:" + pe_color + str(pe))
 
     # ===== ENTRY =====
     entry = data["entry"]
-    exit = data["exit"]
-    color = (
-        Fore.GREEN if entry in ["ATMBUY","OTMBUY","SBUY","BBUY","RBUY"] 
-        else Fore.RED if entry in ["ATMSELL","OTMSELL","SSELL","BSELL","RSELL"] 
-        else Fore.YELLOW
-    )
-    space = TOTAL_WIDTH - len(f"Entry:{entry}") - len(f"Signal:{exit}")
-    print(Fore.YELLOW + "Entry:" + color + entry + " " * space + Fore.YELLOW + "Signal:" + color + exit)
+    exit_signal = data["exit"]
 
-    # ===== DAY CANDLE =====
-    # print(data["day_candle"])  # optional
+    color = Fore.GREEN if "BUY" in entry else Fore.RED if "SELL" in entry else Fore.YELLOW
 
-    # ===== BOS BAR =====
+    space = TOTAL_WIDTH - len(f"Entry:{entry}") - len(f"Exit:{exit_signal}")
+    print(Fore.YELLOW + "Entry:" + color + entry + " " * space + Fore.YELLOW + "Exit:" + color + exit_signal)
+
+    # ===== BOS =====
     print(data["bos_bar"])
-    # print("BOS Value:", data["bos_val"])  # optional
+
 
 # ================= MAIN =================
 if __name__ == "__main__":
