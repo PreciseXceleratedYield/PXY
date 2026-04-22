@@ -155,8 +155,7 @@ def get_entry_signal(df=None):
     else:
         action = signal
 
-    print(f"🔎 Checking entry possibility...")
-    print(f"{signal} | {action} | REQ CE={ce_req} PE={pe_req} | ACTUAL {side}{depth}")
+    print(f"🔓{signal}🔓 | {action} | REQ 🟢={ce_req} 🔴={pe_req} | 🔐 {side}{depth}")
     return final_signal, exit_signal
 
 
