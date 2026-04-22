@@ -77,8 +77,8 @@ def get_entry_signal(df=None):
     # ------------------------------
     # DEPTH MODEL
     # ------------------------------
-    trend_depth = int(round(6 - (adx_factor * 4)))
-    trend_depth = min(max(trend_depth, 1), 5)
+    trend_depth = int(round(6 - (adx_factor * 5)))
+    trend_depth = min(max(trend_depth, 1), 6)
 
     counter_depth = 7
 
