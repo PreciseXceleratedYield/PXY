@@ -78,12 +78,12 @@ def get_candle_strength_line(df=None):
         # ------------------------------
         # DEBUG (REMOVE LATER)
         # ------------------------------
-        print("\n====== STRENGTH DEBUG ======")
-        print("DF LEN:", len(df))
-        print("ATR:", atr)
-        print("ADX:", adx)
-        print("CANDLE RANGE:", candle_range)
-        print("============================\n")
+        #print("\n====== STRENGTH DEBUG ======")
+        #print("DF LEN:", len(df))
+        #print("ATR:", atr)
+        #print("ADX:", adx)
+        #print("CANDLE RANGE:", candle_range)
+        #print("============================\n")
 
         # ------------------------------
         # SAFE SCORE CALCULATION
