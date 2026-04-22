@@ -14,7 +14,10 @@ from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
 from sysstrndpxy import calculate_supertrend
 from syspwerpxy import get_ce_pe_power
-from sysmktpxy import get_signal   # 🔥 IMPORTANT FIX
+
+from sysmktpxy import get_signal           # RAW ENGINE (CE/PE + HA)
+from sysentrpxy import get_entry_signal    # FINAL ENGINE (ENTRY/EXIT)
+
 from sysdeptpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
@@ -40,7 +43,7 @@ def run_pyc_file():
             print(f"Error running {pyc_file}: {e}")
 
 
-# ================= CORE SNAPSHOT FUNCTION =================
+# ================= SNAPSHOT =================
 def get_full_snapshot():
     result = {}
 
@@ -50,31 +53,38 @@ def get_full_snapshot():
 
     result["df"] = df
 
-    # ===== CANDLE VISUAL =====
+    # ===== VISUAL =====
     result["candle_visual"] = get_candle_visual(df=df)
 
-    # ===== HAIKIN-ASHI =====
+    # ===== HA DATA =====
     ha_close, ha_open, ha_color, df = get_ha_data(df=df)
+
     result["ha_close"] = ha_close
     result["ha_open"] = ha_open
     result["ha_color"] = ha_color
 
-    # ===== HAIKIN SIGNAL =====
-    signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df=df)
+    # ==================================================
+    # 🔥 RAW MARKET ENGINE (sysmktpxy)
+    # ==================================================
+    entry_raw, exit_raw, ce, pe, last_opp, df, ha = get_signal()
 
-    if signal is None:
-        signal = "BULL" if df['HA_Close'].iloc[-1] > df['HA_Open'].iloc[-1] else "BEAR"
+    result["hkin_ce_depth"] = ce
+    result["hkin_pe_depth"] = pe
+    result["hkin_past_depth"] = last_opp
 
-    result["hkin_signal"] = signal
-    result["hkin_past_depth"] = past_depth
-    result["hkin_ce_depth"] = ce_depth
-    result["hkin_pe_depth"] = pe_depth
+    # ==================================================
+    # 🔥 FINAL ENTRY ENGINE (sysentrpxy)
+    # ==================================================
+    entry, exit_signal = get_entry_signal(df=df)
+
+    result["entry"] = entry
+    result["exit"] = exit_signal
 
     # ===== STRENGTH =====
     line, _, _ = get_candle_strength_line(df=df)
     result["strength_line"] = line
 
-    # ===== ATR & KATR =====
+    # ===== ATR =====
     atr_series = calculate_atr(df)
     atr_val = safe_int(atr_series.iloc[-1] if not atr_series.empty else 0)
     k_val = safe_int(calculate_dynamic_k(df))
@@ -94,24 +104,12 @@ def get_full_snapshot():
 
     result["supertrend"] = trend
     result["super_line"] = line_val
-    result["df"] = df
 
     # ===== POWER =====
-    direction_power, ce, pe = get_ce_pe_power(df=df)
-    result["direction_power"] = safe_int(direction_power)
-    result["ce_power"] = safe_int(ce)
-    result["pe_power"] = safe_int(pe)
+    direction_power, ce_p, pe_p = get_ce_pe_power(df=df)
 
-    # ==================================================
-    # 🔥 MASTER SIGNAL ENGINE (NEW FIXED FLOW)
-    # ==================================================
-    entry, exit_signal, ce_d, pe_d, last_opp, df, ha = get_signal()
-
-    result["entry"] = entry
-    result["exit"] = exit_signal
-    result["ce_depth"] = ce_d
-    result["pe_depth"] = pe_d
-    result["last_opp"] = last_opp
+    result["ce_power"] = safe_int(ce_p)
+    result["pe_power"] = safe_int(pe_p)
 
     # ===== DAY CANDLE =====
     result["day_candle"] = get_day_candle_bar(df)
@@ -124,32 +122,30 @@ def get_full_snapshot():
     return result
 
 
-# ================= PRINT DASHBOARD =================
+# ================= DASHBOARD =================
 def print_dashboard(data):
     if not data:
         print("No data fetched.")
         return
 
-    # ===== CANDLE VISUAL =====
     print(data["candle_visual"])
 
-    # ===== HAIKIN SIGNAL =====
-    signal = data["hkin_signal"]
-    past_depth = data["hkin_past_depth"]
+    # ===== CE / PE DEPTH (ONLY FROM sysmktpxy) =====
     ce_depth = data["hkin_ce_depth"]
     pe_depth = data["hkin_pe_depth"]
+    past_depth = data["hkin_past_depth"]
 
-    color = Fore.GREEN if signal in ["BUY","BULL"] else Fore.RED if signal in ["SELL","BEAR"] else Fore.YELLOW
+    color = Fore.GREEN if ce_depth > pe_depth else Fore.RED if pe_depth > ce_depth else Fore.YELLOW
 
-    space1 = TOTAL_WIDTH - len(f"Hkin:{signal}") - len(f"Past:{past_depth}")
-    if space1 < 0: space1 = 1
+    space = TOTAL_WIDTH - len(f"CE:{ce_depth}") - len(f"PE:{pe_depth}")
+    if space < 0:
+        space = 1
 
-    print(Fore.YELLOW + "Hkin:" + color + signal + " " * space1 + Fore.YELLOW + f"Past:{color}{past_depth}")
-
-    space2 = TOTAL_WIDTH - len(f"CE:{ce_depth}") - len(f"PE:{pe_depth}")
-    if space2 < 0: space2 = 1
-
-    print(Fore.YELLOW + "CE:" + color + str(ce_depth) + " " * space2 + Fore.YELLOW + "PE:" + color + str(pe_depth))
+    print(
+        Fore.YELLOW + "CE:" + color + str(ce_depth)
+        + " " * space +
+        Fore.YELLOW + "PE:" + color + str(pe_depth)
+    )
 
     # ===== STRENGTH =====
     print(data["strength_line"])
@@ -179,17 +175,7 @@ def print_dashboard(data):
     space = TOTAL_WIDTH - len(f"Super:{trend}") - len(f"Line:{line_val}")
     print(Fore.YELLOW + "Super:" + color + trend + " " * space + Fore.YELLOW + "Line:" + color + str(line_val))
 
-    # ===== POWER =====
-    ce = data["ce_power"]
-    pe = data["pe_power"]
-
-    ce_color = Fore.GREEN if ce > pe else Fore.RED if pe > ce else Fore.YELLOW
-    pe_color = Fore.GREEN if pe > ce else Fore.RED if ce > pe else Fore.YELLOW
-
-    space = TOTAL_WIDTH - len(f"CE:{ce}") - len(f"PE:{pe}")
-    print(Fore.YELLOW + "CE:" + ce_color + str(ce) + " " * space + Fore.YELLOW + "PE:" + pe_color + str(pe))
-
-    # ===== ENTRY =====
+    # ===== ENTRY / EXIT (FROM sysentrpxy ONLY) =====
     entry = data["entry"]
     exit_signal = data["exit"]
 
