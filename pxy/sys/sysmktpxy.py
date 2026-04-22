@@ -10,7 +10,7 @@ import pandas as pd
 # ==================================================
 MODE = "HKIN"   # "OC2" or "HKIN"
 DEBUG = False     # DEBUG SWITCH
-EXIT_MODE = "C"   # "C" or "OHLC"   🔥 PATCH ADDED
+EXIT_MODE = "C"   # "C" or "OHLC"
 
 
 # ==================================================
@@ -33,29 +33,6 @@ def get_df():
 
     dbg("Data loaded:", len(df))
     return df
-
-
-# ==================================================
-# HEIKIN ASHI CALCULATOR (HKIN ONLY)
-# ==================================================
-def compute_heikin_ashi(df):
-    ha = df.copy()
-
-    ha_close = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
-
-    ha_open = [0] * len(df)
-    ha_open[0] = (df['Open'].iloc[0] + df['Close'].iloc[0]) / 2
-
-    for i in range(1, len(df)):
-        ha_open[i] = (ha_open[i - 1] + ha_close.iloc[i - 1]) / 2
-
-    ha_open = pd.Series(ha_open, index=df.index)
-
-    ha['HA_Open'] = ha_open
-    ha['HA_Close'] = ha_close
-
-    dbg("Heikin Ashi computed")
-    return ha
 
 
 # ==================================================
@@ -131,7 +108,7 @@ def momentum_signal(c2, c3):
 
 
 # ==================================================
-# HKIN ENTRY ENGINE (CLOSED CANDLES ONLY)
+# HKIN ENTRY ENGINE
 # ==================================================
 def hkin_entry_signal(prev_o, prev_c, curr_o, curr_c):
 
@@ -177,7 +154,7 @@ def get_signal():
         # ==============================
         if MODE == "OC2":
 
-            price = (df['Open'] +  df['Close']) / 2
+            price = (df['Open'] + df['Close']) / 2
             p0, p1, p2, p3 = price.iloc[-4], price.iloc[-3], price.iloc[-2], price.iloc[-1]
 
             dbg("OC2 PRICE:", p0, p1, p2, p3)
@@ -191,29 +168,38 @@ def get_signal():
                 entry_signal = momentum_signal(p2, p3)
 
         # ==============================
-        # HKIN MODE
+        # HKIN MODE (IMPORT FROM sysdthapxy)
         # ==============================
         else:
 
-            ha = compute_heikin_ashi(df)
+            from sysdthapxy import get_ha_data
+
+            _, _, _, ha = get_ha_data(df=df)
+
+            if ha is None or len(ha) < 3:
+                return "NONE", "NONE"
 
             ha_o2 = ha['HA_Open'].iloc[-2]
             ha_c2 = ha['HA_Close'].iloc[-2]
 
-            ha_o3 = ha['HA_Open'].iloc[-1]   # 🔥 running candle
-            ha_c3 = ha['HA_Close'].iloc[-1]  # 🔥 running candle
+            ha_o3 = ha['HA_Open'].iloc[-1]   # running candle
+            ha_c3 = ha['HA_Close'].iloc[-1]  # running candle
 
             dbg("HKIN CLOSED:", ha_o2, ha_c2, ha_o3, ha_c3)
 
             entry_signal = hkin_entry_signal(ha_o2, ha_c2, ha_o3, ha_c3)
 
         # ==============================
-        # EXIT (FIXED OHLC PATCH ONLY)
+        # EXIT LOGIC
         # ==============================
-
         if EXIT_MODE == "C":
 
-            c0, c1, c2, c3 = df['Close'].iloc[-4], df['Close'].iloc[-3], df['Close'].iloc[-2], df['Close'].iloc[-1]
+            c0, c1, c2, c3 = (
+                df['Close'].iloc[-4],
+                df['Close'].iloc[-3],
+                df['Close'].iloc[-2],
+                df['Close'].iloc[-1]
+            )
 
             dbg("EXIT CLOSE:", c0, c1, c2, c3)
 
@@ -227,12 +213,22 @@ def get_signal():
 
         else:
 
-            h0, h1, h2, h3 = df['High'].iloc[-4], df['High'].iloc[-3], df['High'].iloc[-2], df['High'].iloc[-1]
-            l0, l1, l2, l3 = df['Low'].iloc[-4], df['Low'].iloc[-3], df['Low'].iloc[-2], df['Low'].iloc[-1]
+            h0, h1, h2, h3 = (
+                df['High'].iloc[-4],
+                df['High'].iloc[-3],
+                df['High'].iloc[-2],
+                df['High'].iloc[-1]
+            )
+
+            l0, l1, l2, l3 = (
+                df['Low'].iloc[-4],
+                df['Low'].iloc[-3],
+                df['Low'].iloc[-2],
+                df['Low'].iloc[-1]
+            )
 
             dbg("EXIT OHLC:", h0, h1, h2, h3, l0, l1, l2, l3)
 
-            # 🔥 FIXED + NO NONE BLOCK
             if l2 < l1 and l2 < l3 and h3 > h2:
                 exit_signal = "BUY"
 
@@ -246,8 +242,12 @@ def get_signal():
                 exit_signal = "BEAR"
 
             else:
-                # 🔥 IMPORTANT: fallback to CLOSE instead of NONE
-                c0, c1, c2, c3 = df['Close'].iloc[-4], df['Close'].iloc[-3], df['Close'].iloc[-2], df['Close'].iloc[-1]
+                c0, c1, c2, c3 = (
+                    df['Close'].iloc[-4],
+                    df['Close'].iloc[-3],
+                    df['Close'].iloc[-2],
+                    df['Close'].iloc[-1]
+                )
 
                 dbg("EXIT FALLBACK CLOSE:", c0, c1, c2, c3)
 
@@ -275,7 +275,7 @@ def get_signal():
         return entry_signal, exit_signal
 
     except Exception as e:
-        print(f"[ERROR]", e)
+        print("[ERROR]", e)
         return "NONE", "NONE"
 
 
