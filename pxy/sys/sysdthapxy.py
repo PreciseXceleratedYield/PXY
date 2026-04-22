@@ -1,7 +1,7 @@
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
 
-USE_FORMING_CANDLE = True
+USE_FORMING_CANDLE = False
 CANDLE_STYLE = "HA"
 
 
