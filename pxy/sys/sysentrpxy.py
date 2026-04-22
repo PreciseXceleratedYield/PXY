@@ -1,5 +1,5 @@
 # ==================================================
-# sysentrpxy.py (FINAL: WITH MORNING BLOCK + DEPTH SWITCH)
+# sysentrpxy.py (FINAL: RAW PASS + FULL FILTER PIPELINE)
 # ==================================================
 
 from sysmktpxy import get_signal
@@ -26,6 +26,13 @@ def get_entry_signal(df=None):
     # ------------------------------
     signal, _ = get_signal()
     exit_signal = signal
+
+    # ==================================================
+    # 🔥 RAW PASS-THROUGH MODE (NO FILTERS)
+    # ==================================================
+    if signal in ["BULL", "BEAR", "NONE"]:
+        print(f"[RAW PASS] {signal} → bypass all filters")
+        return signal, exit_signal
 
     # ------------------------------
     # TIME BLOCK (IST)
@@ -135,7 +142,7 @@ def get_entry_signal(df=None):
             final_signal = "OTMBUY"
 
     # ------------------------------
-    # FINAL ONE-LINE PRINT
+    # FINAL PRINT
     # ------------------------------
     if signal == "BUY":
         action = "BUY"
