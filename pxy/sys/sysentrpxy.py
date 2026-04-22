@@ -67,17 +67,15 @@ def get_entry_signal(df=None):
 
     counter_depth = 7
 
-    # ==================================================
-    # 🔥 REDUCED DEPTH REQUIREMENT (BOTH CE & PE RELAXED)
-    # ==================================================
-    DEPTH_RELAX = 1.3  # tune: 1.2 = tight, 1.5 = looser
-
+    # ------------------------------
+    # REQUIREMENTS
+    # ------------------------------
     if trend == "UP":
-        pe_req = max(1, int(trend_depth / DEPTH_RELAX))
-        ce_req = max(2, int(counter_depth / DEPTH_RELAX))
+        pe_req = max(1, trend_depth)
+        ce_req = max(1, counter_depth)
     else:
-        pe_req = max(2, int(counter_depth / DEPTH_RELAX))
-        ce_req = max(1, int(trend_depth / DEPTH_RELAX))
+        pe_req = max(1, counter_depth)
+        ce_req = max(1, trend_depth)
 
     # ------------------------------
     # DEPTH FETCH
@@ -97,65 +95,61 @@ def get_entry_signal(df=None):
         depth = 0
 
     # ------------------------------
-    # CLEAN PRINT
+    # MOMENTUM MODE
     # ------------------------------
-    print(f"""
-------------- SIMPLE (ST + ADX) -------------
-Signal (RAW) : {signal}
-Exit (RAW)   : {exit_signal}
-
-Trend        : {trend}
-ST Line      : {st_line}
-ADX          : {round(adx, 2)}
-
-Depth        : {side}{depth}
-
-PE Req (BUY) : >= {pe_req}
-CE Req (SELL): >= {ce_req}
----------------------------------------------
-""")
-
-    # ------------------------------
-    # FILTER ONLY BUY / SELL
-    # ------------------------------
-    if signal not in ["BUY", "SELL"]:
-        return signal, exit_signal
-
-    # ==================================================
-    # 🔥 MOMENTUM MODE (DEPTH > 7 → IGNORE TREND COMPLETELY)
-    # ==================================================
     if depth > 7:
 
-        print("[MOMENTUM MODE] Depth > 7 → Ignore trend & CE/PE logic")
-
         if signal == "BUY":
-            return "ATMBUY", exit_signal
+            action = "ATMBUY"
+        elif signal == "SELL":
+            action = "ATMSELL"
+        else:
+            action = "NONE"
 
-        if signal == "SELL":
-            return "ATMSELL", exit_signal
+        print(f"{action} | SELL@CE{ce_req} | BUY@PE{pe_req}")
+        return action, exit_signal
 
-        return "NONE", exit_signal
+    # ------------------------------
+    # NORMAL LOGIC
+    # ------------------------------
+    final_signal = "NONE"
 
-    # ==================================================
-    # COUNTER MODE (DEPTH ≤ 7 → FULL LOGIC)
-    # ==================================================
     if trend == "UP":
 
         if signal == "BUY" and side == "PE" and depth >= pe_req:
-            return "ATMBUY", exit_signal
+            final_signal = "ATMBUY"
 
         if signal == "SELL" and side == "CE" and depth >= ce_req:
-            return "OTMSELL", exit_signal
+            final_signal = "OTMSELL"
 
     elif trend == "DOWN":
 
         if signal == "SELL" and side == "CE" and depth >= ce_req:
-            return "ATMSELL", exit_signal
+            final_signal = "ATMSELL"
 
         if signal == "BUY" and side == "PE" and depth >= pe_req:
-            return "OTMBUY", exit_signal
+            final_signal = "OTMBUY"
 
-    return "NONE", exit_signal
+    else:
+        final_signal = "NONE"
+
+    # ------------------------------
+    # FINAL PRINT (ONLY ONCE)
+    # ------------------------------
+    if signal == "BUY":
+        action = "BUY"
+    elif signal == "SELL":
+        action = "SELL"
+    elif signal == "OTMBUY":
+        action = "ATMBUY"
+    elif signal == "OTMSELL":
+        action = "ATMSELL"
+    else:
+        action = signal
+
+    print(f"{action} | SELL@CE{ce_req} | BUY@PE{pe_req}")
+
+    return final_signal, exit_signal
 
 
 # ==================================================
