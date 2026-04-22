@@ -7,7 +7,7 @@ from syshkinpxy import detect_ha_flip_signal
 from sysstrndpxy import calculate_supertrend
 from syssadxpxy import calculate_adx
 from sysdtafpxy import fetch_yf_data
-
+from sysbbospxy import get_signal as get_bos_signal
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
@@ -61,6 +61,22 @@ def get_entry_signal(df=None):
     df = fetch_yf_data()
 
     df = calculate_supertrend(df)
+
+    # ==================================================
+    # 🔵 BOS SECOND PRIORITY OVERRIDE (FIXED POSITION)
+    # ==================================================
+    try:
+        bos_signal = get_bos_signal(df)
+
+        if bos_signal == "BUY":
+            return "ATMBUY", exit_signal
+
+        if bos_signal == "SELL":
+            return "ATMSELL", exit_signal
+
+    except:
+        pass
+
     last = df.iloc[-1]
 
     trend = last["ST_Trend"]
@@ -118,7 +134,7 @@ def get_entry_signal(df=None):
         else:
             action = "NONE"
 
-        line = f"✅ {action} ✅ | SELL@CE{ce_req} | BUY@PE{pe_req} ✅ ✅"
+        line = f"✅ {action} | SELL@CE{ce_req} | BUY@PE{pe_req}"
         print(line.center(36))
         return action, exit_signal
 
@@ -159,6 +175,7 @@ def get_entry_signal(df=None):
 
     line = f"{action} | REQ 🟢 ={ce_req} 🔴 ={pe_req} | 🔐 {side}{depth}"
     print(line.center(36))
+
     return final_signal, exit_signal
 
 
