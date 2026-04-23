@@ -46,8 +46,21 @@ def target_price(row):
         direction_signal = str(row.get("direction", "NONE")).upper()
         counter = str(row.get("counter", "Y")).upper()
 
-        _signal = exit_signal if counter == "Y" else exit_signal
+        # ✅ FIXED SIGNAL SELECTION (surgical)
+        _signal = exit_signal if counter == "Y" else entry_signal
 
+        # -------------------- HLD MODE (NONE CASE) --------------------
+        if _signal == "NONE":
+            score = 20
+            target = int(entry * (1 + score / 100))
+            state = "🟡HLD"
+
+            clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
+            print(f"{clean_symbol}|| E:{entry:03d}|| S:{score:02d}%|| {state} || T:{target:03d}")
+
+            return target
+
+        # ✅ REMOVED "NONE" FROM LOGIC (surgical)
         bullish = any(x in _signal for x in ["BUY", "BULL", "UP"])
         bearish = any(x in _signal for x in ["SELL", "BEAR", "DOWN"])
 
