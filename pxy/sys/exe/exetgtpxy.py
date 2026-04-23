@@ -47,7 +47,7 @@ def target_price(row):
         counter = str(row.get("counter", "Y")).upper()
 
         # ✅ FIXED SIGNAL SELECTION (surgical)
-        _signal = exit_signal if counter == "Y" else exit_signal
+        _signal = entry_signal if counter == "Y" else exit_signal
 
         # -------------------- HLD MODE (NONE CASE) --------------------
         if _signal == "NONE":
@@ -79,7 +79,7 @@ def target_price(row):
 
             depth = ce_depth if is_ce else pe_depth if is_pe else 0
 
-            score = (atr * power) + depth
+            score = (atr * power) 
 
             # safety controls
             score = max(score, 1)
