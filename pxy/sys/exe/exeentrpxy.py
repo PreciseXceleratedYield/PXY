@@ -7,7 +7,7 @@ from colorama import Fore, init, Style
 import traceback
 
 # --- GLOBAL CONFIG ---
-DEBUG = True
+DEBUG = False
 init(autoreset=True)
 
 # --- ADD PARENT DIR TO PATH ---
