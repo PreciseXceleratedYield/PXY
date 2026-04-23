@@ -69,7 +69,7 @@ def exit_signal(df):
     if df is None or len(df) < 4:
         return "NONE"
 
-    oc2 = (df["Open"] + df["Close"]) / 2
+    oc2 = df["Close"]
 
     prev2 = oc2.iloc[-3]   # older
     prev1 = oc2.iloc[-2]   # previous
