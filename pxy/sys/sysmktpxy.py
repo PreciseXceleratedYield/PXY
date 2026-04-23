@@ -66,21 +66,31 @@ def entry_signal(colors):
 # ==================================================
 def exit_signal(df):
 
-    if df is None or len(df) < 3:
+    if df is None or len(df) < 4:
         return "NONE"
 
     oc2 = (df["Open"] + df["Close"]) / 2
 
-    prev = oc2.iloc[-2]
-    curr = oc2.iloc[-1]
+    prev2 = oc2.iloc[-3]   # older
+    prev1 = oc2.iloc[-2]   # previous
+    curr  = oc2.iloc[-1]   # current
 
-    if abs(curr - prev) < 0.0005:
+    # noise filter
+    if abs(curr - prev1) < 0.0005:
         return "NONE"
 
-    if curr > prev:
+    # --- FLIP LOGIC (gives BUY / SELL) ---
+    if prev1 <= prev2 and curr > prev1:
+        return "BUY"   # down → up flip
+
+    if prev1 >= prev2 and curr < prev1:
+        return "SELL"  # up → down flip
+
+    # --- CONTINUATION ---
+    if curr > prev1:
         return "BULL"
 
-    if curr < prev:
+    if curr < prev1:
         return "BEAR"
 
     return "NONE"
