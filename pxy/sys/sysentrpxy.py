@@ -25,6 +25,7 @@ def get_entry_signal(df=None):
     # BASE SIGNAL
     # ------------------------------
     signal, exit_signal  = get_signal()
+    orig_signal = signal
     # ------------------------------
     # TIME BLOCK (IST)  ✅ PRIORITY
     # ------------------------------
@@ -174,7 +175,7 @@ def get_entry_signal(df=None):
 
     line = f"{action} | REQ 🟢 ={ce_req} 🔴 ={pe_req} | 🔐 {side}{depth}"
     print(line.center(36))
-
+    exit_signal = orig_signal
     return final_signal, exit_signal
 
 
