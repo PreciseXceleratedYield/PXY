@@ -15,7 +15,7 @@ from zoneinfo import ZoneInfo
 # ==================================================
 # DEPTH CONTROL SWITCH
 # ==================================================
-DEPTH_RELAXATION = 1   # 0 = strict, 1 = -1 relaxation, 2 = -2, etc.
+DEPTH_RELAXATION = 3   # 0 = strict, 1 = -1 relaxation, 2 = -2, etc.
 MIN_DEPTH = 1
 
 
