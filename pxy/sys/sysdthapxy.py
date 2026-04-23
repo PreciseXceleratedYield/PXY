@@ -34,20 +34,27 @@ def get_ha_data(tickerSymbol=None, df=None):
         ha_open.iloc[i] = (ha_open.iloc[i - 1] + ha_close.iloc[i - 1]) / 2
 
     # ==================================================
-    # 🔥 COLOR LOGIC (SIMPLE + STABLE)
+    # 🔥 COLOR LOGIC (OC/2 MOMENTUM REPLACEMENT)
     # ==================================================
+
+    oc2 = (df['Open'] + df['Close']) / 2   # 🔥 NEW BASE LINE
 
     ha_color = pd.Series(index=df.index, dtype='object')
 
     for i in range(len(df)):
 
-        if pd.isna(ha_open.iloc[i]) or pd.isna(ha_close.iloc[i]):
+        if pd.isna(oc2.iloc[i]):
             ha_color.iloc[i] = "none"
             continue
 
-        if ha_close.iloc[i] > ha_open.iloc[i]:
+        if i == 0:
+            ha_color.iloc[i] = "none"
+            continue
+
+        # 🔥 OC/2 TREND DIRECTION
+        if oc2.iloc[i] > oc2.iloc[i - 1]:
             ha_color.iloc[i] = "green"
-        elif ha_close.iloc[i] < ha_open.iloc[i]:
+        elif oc2.iloc[i] < oc2.iloc[i - 1]:
             ha_color.iloc[i] = "red"
         else:
             ha_color.iloc[i] = ha_color.iloc[i - 1] if i > 0 else "none"
