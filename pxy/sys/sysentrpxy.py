@@ -46,7 +46,6 @@ def get_entry_signal(df=None):
 
         return "NONE", exit_signal
         
-    exit_signal = signal
     # ==================================================
     # 🔥 RAW PASS-THROUGH MODE (NO FILTERS)
     # ==================================================
