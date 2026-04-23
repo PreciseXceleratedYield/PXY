@@ -143,9 +143,10 @@ async def main():
 
         VALID = ["ATMBUY", "OTMBUY", "ATMSELL", "OTMSELL"]
 
-        if sig not in VALID:
-            print(f"WAIT SIGNAL: {entry_signal}")
-            return
+        is_valid_entry = sig in VALID
+        
+        if not is_valid_entry:
+            dprint(f"NON-TRADE ENTRY SIGNAL: {sig}", Fore.YELLOW)
 
         # --- POSITION CHECK ---
         dprint("CHECKING POSITIONS...")
@@ -209,7 +210,11 @@ async def main():
                 dprint(f"➡️ SIGNAL UNCHANGED: {sig}", Fore.YELLOW)
             
             dprint("----- REGIME CHECK END -----", Fore.MAGENTA)
-
+            # --- FORCE FINAL SIGNAL NORMALIZATION ---
+            sig = sig.upper().strip()
+            # --- FINAL ENTRY VALIDATION AFTER REGIME CORRECTION ---
+            if not is_valid_entry:
+                dprint(f"ENTRY INVALID BUT REGIME OVERRIDE ALLOWED: {sig}", Fore.YELLOW)
         except Exception as e:
             dprint(f"POSITION ERROR: {e}", Fore.RED)
             ce_active = True
