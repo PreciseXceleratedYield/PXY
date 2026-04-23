@@ -82,12 +82,12 @@ def target_price(row):
             score = (atr * power) + depth
 
             # safety controls
-            score = max(score, 0.0)
+            score = max(score, 1)
             score = min(score, 50)
 
             state = "✅"
         else:
-            score = 1
+            score = 0
             state = "❌"
 
         # 7️⃣ TARGET
