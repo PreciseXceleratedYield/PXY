@@ -73,7 +73,7 @@ canvas {
 }
 
 /* =========================
-   FULLSCREEN MODES (DESKTOP)
+   FULLSCREEN MODES
 ========================= */
 .fullscreen-terminal #terminal {
     width: 100% !important;
@@ -92,27 +92,17 @@ canvas {
 }
 
 /* =========================
-   📱 MOBILE MODE
+   MOBILE
 ========================= */
 @media (max-width: 768px) {
-
-    #right {
-        display: none !important;
-    }
-
-    #divider {
-        display: none !important;
-    }
-
+    #right { display: none !important; }
+    #divider { display: none !important; }
     #terminal {
         width: 100% !important;
         height: 100vh !important;
         border-right: none;
     }
-
-    #container {
-        flex-direction: column;
-    }
+    #container { flex-direction: column; }
 }
 </style>
 </head>
@@ -144,7 +134,10 @@ canvas {
 <!-- LIBS -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+
+<!-- ✅ ADD FINANCIAL CHART PLUGIN -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
 
 <script>
 
@@ -181,7 +174,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG SPLIT (DESKTOP ONLY)
+   DRAG SPLIT
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -198,7 +191,7 @@ window.addEventListener("mouseup", () => {
 
 window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
-    if (window.innerWidth <= 768) return; // disable on mobile
+    if (window.innerWidth <= 768) return;
 
     const percent = (e.clientX / window.innerWidth) * 100;
     if (percent < 10 || percent > 80) return;
@@ -242,87 +235,49 @@ function resetLayout() {
 }
 
 /* =========================
-   CHART
+   CANDLE CHART (FIXED)
 ========================= */
+
 let chart;
 
 async function load() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
-    const closes = data.map(d => d.close);
-    const stVals = data.map(d => d.st);
-    const stTrend = data.map(d => d.st_trend);
+    const candles = data.map(d => ({
+        x: Number(d.time),
+        o: d.open,
+        h: d.high,
+        l: d.low,
+        c: d.close
+    }));
 
-    draw(closes, stVals, stTrend);
+    draw(candles);
 }
 
-function draw(closes, stVals, stTrend) {
+function draw(candles) {
 
     const ctx = document.getElementById("priceChart");
 
     if (chart) chart.destroy();
 
-    /* =========================
-       3 CANDLE RIGHT PADDING
-    ========================= */
-    const pad = 3;
-
-    const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
-    const closePad = [...closes, ...Array(pad).fill(null)];
-    const stPad = [...stVals, ...Array(pad).fill(null)];
-    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
-
     chart = new Chart(ctx, {
-        type: "line",
+        type: "candlestick",
         data: {
-            labels,
-
-            datasets: [
-
-                // CLOSE
-                {
-                    label: "Close",
-                    data: closePad,
-                    borderColor: "#000000",
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    tension: 0.25
-                },
-
-                // SUPER TREND
-                {
-                    label: "ST",
-                    data: stPad,
-                    showLine: false,
-
-                    pointRadius: 2,
-                    pointBorderWidth: 2,
-
-                    pointBackgroundColor: trendPad.map(t =>
-                        t === "UP" ? "#00c853" : "#ff1744"
-                    ),
-
-                    pointBorderColor: trendPad.map(t =>
-                        t === "UP" ? "#00c853" : "#ff1744"
-                    )
-                }
-            ]
+            datasets: [{
+                data: candles
+            }]
         },
-
         options: {
             responsive: true,
             maintainAspectRatio: false,
-
             plugins: {
                 legend: { display: false }
             },
-
             scales: {
                 x: {
                     ticks: { color: "#333" },
-                    grid: { color: "#eee" },
-                    offset: true
+                    grid: { color: "#eee" }
                 },
                 y: {
                     position: "right",
