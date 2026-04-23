@@ -95,7 +95,6 @@ html, body {
    MOBILE
 ========================= */
 @media (max-width: 768px) {
-
     #right { display: none !important; }
     #divider { display: none !important; }
 
@@ -140,7 +139,7 @@ html, body {
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
-<!-- ✅ LIGHTWEIGHT CANDLE CHART -->
+<!-- CANDLE CHART ENGINE -->
 <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 
 <script>
@@ -268,8 +267,9 @@ async function load() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
-    const candles = data.map(d => ({
-        time: Number(d.time),
+    // ✅ FIX: use index as time (333,334,335 → 0,1,2)
+    const candles = data.map((d, i) => ({
+        time: i,
         open: Number(d.open),
         high: Number(d.high),
         low: Number(d.low),
