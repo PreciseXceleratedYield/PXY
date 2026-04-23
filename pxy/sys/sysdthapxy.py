@@ -11,7 +11,7 @@ def get_ha_data(tickerSymbol=None, df=None):
         df = fetch_yf_data()
 
     if df is None or df.empty:
-        return None, None, None, None, df
+        return None, None, None, df
 
     if not USE_FORMING_CANDLE:
         df = df.iloc[:-1]
@@ -19,7 +19,7 @@ def get_ha_data(tickerSymbol=None, df=None):
     required_cols = ['Open', 'High', 'Low', 'Close']
     for col in required_cols:
         if col not in df.columns:
-            return None, None, None, None, df
+            return None, None, None, df
 
     # ==================================================
     # 🔥 HEIKIN ASHI CORE (CLEAN + CORRECT)
@@ -106,4 +106,7 @@ def get_ha_data(tickerSymbol=None, df=None):
         else:
             signal.iloc[i] = "none"
 
-    return ha_close, ha_open, ha_color, signal, df
+    # 👇 inject into df (NO signature change)
+    df["ha_signal"] = signal
+
+    return ha_close, ha_open, ha_color, df
