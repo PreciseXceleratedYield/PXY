@@ -170,19 +170,45 @@ async def main():
             # ==================================================
             # 🔥 SURGICAL EXIT-BASED SIGNAL CORRECTION
             # ==================================================
-
+            
+            dprint("----- REGIME CHECK START -----", Fore.MAGENTA)
+            
+            dprint(f"ENTRY SIGNAL: {entry_signal}", Fore.CYAN)
+            dprint(f"EXIT REGIME : {exit_sig}", Fore.CYAN)
+            dprint(f"POSITION    : CE={ce_active}, PE={pe_active}", Fore.CYAN)
+            
+            original_sig = sig  # preserve before modification
+            
             if ce_active and pe_active:
+                dprint("⚠️ BOTH CE & PE ACTIVE → FORCING NONE", Fore.RED)
                 print("⚠️ CE + PE both active → NO ACTION")
                 sig = "NONE"
-
+            
             else:
                 if exit_sig in ["BUY", "BULL"]:
                     if pe_active:
+                        dprint("🔁 MISMATCH: PE active but regime BULL → switching to CE", Fore.RED)
                         sig = "ATMBUY"
-
+                    else:
+                        dprint("✅ MATCH: BULL regime with no PE conflict", Fore.GREEN)
+            
                 elif exit_sig in ["SELL", "BEAR"]:
                     if ce_active:
+                        dprint("🔁 MISMATCH: CE active but regime BEAR → switching to PE", Fore.RED)
                         sig = "ATMSELL"
+                    else:
+                        dprint("✅ MATCH: BEAR regime with no CE conflict", Fore.GREEN)
+            
+                else:
+                    dprint("ℹ️ NO CLEAR EXIT REGIME → NO OVERRIDE", Fore.YELLOW)
+            
+            # --- FINAL STATE ---
+            if original_sig != sig:
+                dprint(f"⚡ SIGNAL CHANGED: {original_sig} → {sig}", Fore.GREEN)
+            else:
+                dprint(f"➡️ SIGNAL UNCHANGED: {sig}", Fore.YELLOW)
+            
+            dprint("----- REGIME CHECK END -----", Fore.MAGENTA)
 
         except Exception as e:
             dprint(f"POSITION ERROR: {e}", Fore.RED)
