@@ -25,6 +25,7 @@ def get_entry_signal(df=None):
     # BASE SIGNAL
     # ------------------------------
     signal, exit_signal  = get_signal()
+
     # ------------------------------
     # TIME BLOCK (IST)  ✅ PRIORITY
     # ------------------------------
@@ -47,13 +48,12 @@ def get_entry_signal(df=None):
         return "NONE", exit_signal
         
     exit_signal = signal
+
     # ==================================================
-    # 🔥 RAW PASS-THROUGH MODE (NO FILTERS)
+    # 🔥 RAW PASS-THROUGH MODE (REMOVED EARLY RETURN)
     # ==================================================
     if signal in ["BULL", "BEAR", "NONE"]:
-        line = f"⛔ 🚧 NO ENTRY 🚧 ⛔ 🚧 {signal} 🚧 ⛔"
-        print(line.center(36))
-        return signal, exit_signal
+        print(f"[INFO] Non-actionable signal → {signal} (pipeline continues)")
 
     # ------------------------------
     # DATA FETCH
@@ -167,9 +167,9 @@ def get_entry_signal(df=None):
     elif signal == "SELL":
         action = "SELL"
     elif signal == "OTMBUY":
-        action = "OTMBUY"   # ✅ FIXED
+        action = "OTMBUY"
     elif signal == "OTMSELL":
-        action = "OTMSELL"  # ✅ FIXED
+        action = "OTMSELL"
     else:
         action = signal
 
