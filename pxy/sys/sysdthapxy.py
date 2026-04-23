@@ -25,7 +25,7 @@ def get_ha_data(tickerSymbol=None, df=None):
     # 🔥 HEIKIN ASHI CORE (CLEAN + CORRECT)
     # ==================================================
 
-    ha_close = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
+    ha_close = (df['Open'] + df['Close']) / 2
 
     ha_open = pd.Series(index=df.index, dtype='float64')
     ha_open.iloc[0] = df['Open'].iloc[0]
