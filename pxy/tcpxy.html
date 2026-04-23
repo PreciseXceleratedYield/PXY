@@ -67,9 +67,9 @@ html, body {
     flex: 1;
 }
 
-canvas {
-    width: 100% !important;
-    height: 100% !important;
+#priceChart {
+    width: 100%;
+    height: 100%;
 }
 
 /* =========================
@@ -95,14 +95,19 @@ canvas {
    MOBILE
 ========================= */
 @media (max-width: 768px) {
+
     #right { display: none !important; }
     #divider { display: none !important; }
+
     #terminal {
         width: 100% !important;
         height: 100vh !important;
         border-right: none;
     }
-    #container { flex-direction: column; }
+
+    #container {
+        flex-direction: column;
+    }
 }
 </style>
 </head>
@@ -124,7 +129,7 @@ canvas {
         </div>
 
         <div id="chartWrap">
-            <canvas id="priceChart"></canvas>
+            <div id="priceChart"></div>
         </div>
 
     </div>
@@ -135,9 +140,8 @@ canvas {
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
-<!-- ✅ ADD FINANCIAL CHART PLUGIN -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-financial"></script>
+<!-- ✅ LIGHTWEIGHT CANDLE CHART -->
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 
 <script>
 
@@ -160,6 +164,7 @@ const term = new Terminal({
 
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
+
 term.open(document.getElementById('terminal'));
 
 setTimeout(() => fitAddon.fit(), 50);
@@ -239,62 +244,57 @@ function resetLayout() {
 ========================= */
 
 let chart;
+let candleSeries;
+
+function initChart() {
+
+    chart = LightweightCharts.createChart(document.getElementById("priceChart"), {
+        layout: {
+            background: { color: "#ffffff" },
+            textColor: "#111"
+        },
+        grid: {
+            vertLines: { color: "#eee" },
+            horzLines: { color: "#eee" }
+        },
+        width: document.getElementById("priceChart").clientWidth,
+        height: document.getElementById("priceChart").clientHeight
+    });
+
+    candleSeries = chart.addCandlestickSeries();
+}
 
 async function load() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
     const candles = data.map(d => ({
-        x: Number(d.time),
-        o: d.open,
-        h: d.high,
-        l: d.low,
-        c: d.close
+        time: Number(d.time),
+        open: Number(d.open),
+        high: Number(d.high),
+        low: Number(d.low),
+        close: Number(d.close)
     }));
 
-    draw(candles);
-}
-
-function draw(candles) {
-
-    const ctx = document.getElementById("priceChart");
-
-    if (chart) chart.destroy();
-
-    chart = new Chart(ctx, {
-        type: "candlestick",
-        data: {
-            datasets: [{
-                data: candles
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                x: {
-                    ticks: { color: "#333" },
-                    grid: { color: "#eee" }
-                },
-                y: {
-                    position: "right",
-                    ticks: { color: "#333" },
-                    grid: { color: "#eee" }
-                }
-            }
-        }
-    });
+    candleSeries.setData(candles);
 }
 
 /* =========================
    INIT
 ========================= */
 loadLayout();
+initChart();
 load();
 setInterval(load, 3000);
+
+window.addEventListener("resize", () => {
+    if (chart) {
+        chart.applyOptions({
+            width: document.getElementById("priceChart").clientWidth,
+            height: document.getElementById("priceChart").clientHeight
+        });
+    }
+});
 
 </script>
 
