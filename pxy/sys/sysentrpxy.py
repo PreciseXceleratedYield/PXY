@@ -114,7 +114,7 @@ def get_entry_signal(df=None):
         if past_depth != "NA":
             side = past_depth[:2]
             depth = int(past_depth[2:])
-            depth = 0
+            depth = 10
         else:
             side = "NA"
             depth = 0
