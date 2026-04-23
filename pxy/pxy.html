@@ -2,9 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Light Mode Terminal</title>
-
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+<title>Light Mode Chart</title>
 
 <style>
 html, body {
@@ -13,102 +11,47 @@ html, body {
     height: 100%;
     width: 100%;
     background: #ffffff;
-    color: #111;
+    overflow: hidden;
 }
 
 #terminal {
     width: 100%;
     height: 100vh;
 }
-
-.xterm .xterm-cursor {
-    border-left: 2px solid #111 !important;
-    animation: none !important;
-}
-
-.xterm .xterm-selection {
-    background: rgba(0, 0, 0, 0.15) !important;
-}
 </style>
+
+<!-- TradingView Lightweight Charts -->
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 
 <body>
 
 <div id="terminal"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
-
 <script>
 
 // =====================
-// FONT SIZE (2.3x SCALE)
+// INIT CHART
 // =====================
-const BASE_FONT = 14.2;
-const SCALE = 2.7;
-const FONT_SIZE = Math.round(BASE_FONT * SCALE);
-
-// =====================
-// 🔥 EMOJI WIDTH FIX
-// =====================
-window.wcwidth = function (char) {
-    const code = char.codePointAt(0);
-
-    if (
-        (code >= 0x1F300 && code <= 0x1FAFF) ||
-        (code >= 0x2600 && code <= 0x26FF) ||
-        (code >= 0x2700 && code <= 0x27BF)
-    ) {
-        return 2;
-    }
-
-    return 1;
-};
-
-// =====================
-// TERMINAL INIT
-// =====================
-const term = new Terminal({
-    convertEol: true,
-    scrollback: 1000,
-
-    fontFamily: "'Cascadia Mono', 'Noto Color Emoji', monospace",
-    fontSize: FONT_SIZE,
-    lineHeight: 1.2,
-
-    cursorBlink: false,
-
-    theme: {
-        background: '#ffffff',
-        foreground: '#111111',
-        cursor: '#111111',
-        selection: 'rgba(0, 0, 0, 0.15)',
-
-        black: '#111111',
-        red: '#d32f2f',
-        green: '#2e7d32',
-        yellow: '#f9a825',
-        blue: '#1565c0',
-        magenta: '#6a1b9a',
-        cyan: '#00838f',
-        white: '#333333'
-    }
+const chart = LightweightCharts.createChart(document.getElementById('terminal'), {
+    layout: {
+        background: { color: '#ffffff' },
+        textColor: '#111111'
+    },
+    grid: {
+        vertLines: { color: '#eee' },
+        horzLines: { color: '#eee' }
+    },
+    width: window.innerWidth,
+    height: window.innerHeight
 });
 
-const fitAddon = new FitAddon.FitAddon();
-term.loadAddon(fitAddon);
+const candleSeries = chart.addCandlestickSeries();
 
 // =====================
-// START
+// STORE CANDLES
 // =====================
-term.open(document.getElementById('terminal'));
-fitAddon.fit();
-
-// TEST
-term.writeln("✅ Terminal Ready");
-term.writeln("Font scaled 2.3x 🔍");
-term.writeln("Emoji fix enabled 🚀 📈 ⚠️");
-term.writeln("-----------------------------------");
+let candles = [];
 
 // =====================
 // WEBSOCKET
@@ -117,19 +60,47 @@ const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const ws = new WebSocket(`${protocol}://${window.location.host}`);
 
 ws.onopen = () => {
-    term.writeln("✅ WebSocket Connected");
+    console.log("WebSocket Connected");
 };
 
+// =====================
+// HANDLE DATA
+// EXPECTS:
+// {
+//   time, open, high, low, close
+// }
+// =====================
 ws.onmessage = (event) => {
-    term.write(event.data);
+
+    try {
+        const d = JSON.parse(event.data);
+
+        const candle = {
+            time: Number(d.time),
+            open: Number(d.open),
+            high: Number(d.high),
+            low: Number(d.low),
+            close: Number(d.close)
+        };
+
+        candles.push(candle);
+
+        // update chart
+        candleSeries.setData(candles);
+
+    } catch (err) {
+        console.log("Invalid data:", event.data);
+    }
 };
 
-ws.onerror = () => {
-    term.writeln("❌ WebSocket Error");
-};
-
+// =====================
+// RESIZE HANDLING
+// =====================
 window.addEventListener('resize', () => {
-    fitAddon.fit();
+    chart.applyOptions({
+        width: window.innerWidth,
+        height: window.innerHeight
+    });
 });
 
 </script>
