@@ -8,7 +8,7 @@ from sysstrndpxy import calculate_supertrend
 
 def export_supertrend_json(output_file="../syschrtpxy.json", lookback=42):
     """
-    Fetch data → compute SuperTrend → export last N rows with OHLC to JSON
+    Fetch data → compute SuperTrend → export last N rows to parent dir JSON
     """
 
     # =========================
@@ -38,18 +38,7 @@ def export_supertrend_json(output_file="../syschrtpxy.json", lookback=42):
     for idx, row in df.iterrows():
         output.append({
             "time": str(idx),
-
-            # -------------------------
-            # OHLC DATA (ADDED)
-            # -------------------------
-            "open": float(row["Open"]),
-            "high": float(row["High"]),
-            "low": float(row["Low"]),
             "close": float(row["Close"]),
-
-            # -------------------------
-            # SUPER TREND DATA
-            # -------------------------
             "st": float(row["ST"]),
             "st_trend": str(row["ST_Trend"])
         })
@@ -57,12 +46,12 @@ def export_supertrend_json(output_file="../syschrtpxy.json", lookback=42):
     # =========================
     # WRITE FILE (PARENT DIR)
     # =========================
-    if os.path.dirname(output_file):
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    os.makedirs(os.path.dirname(output_file), exist_ok=True) if os.path.dirname(output_file) else None
 
     with open(output_file, "w") as f:
         json.dump(output, f, indent=2)
 
+    #print(f"JSON updated: {output_file} ({len(output)} rows)")
     return output
 
 
