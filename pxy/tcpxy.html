@@ -67,13 +67,13 @@ html, body {
     flex: 1;
 }
 
-#priceChart {
-    width: 100%;
-    height: 100%;
+canvas {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 /* =========================
-   FULLSCREEN MODES
+   FULLSCREEN MODES (DESKTOP)
 ========================= */
 .fullscreen-terminal #terminal {
     width: 100% !important;
@@ -92,11 +92,17 @@ html, body {
 }
 
 /* =========================
-   MOBILE
+   📱 MOBILE MODE
 ========================= */
 @media (max-width: 768px) {
-    #right { display: none !important; }
-    #divider { display: none !important; }
+
+    #right {
+        display: none !important;
+    }
+
+    #divider {
+        display: none !important;
+    }
 
     #terminal {
         width: 100% !important;
@@ -128,7 +134,7 @@ html, body {
         </div>
 
         <div id="chartWrap">
-            <div id="priceChart"></div>
+            <canvas id="priceChart"></canvas>
         </div>
 
     </div>
@@ -138,9 +144,7 @@ html, body {
 <!-- LIBS -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
-
-<!-- CANDLE CHART ENGINE -->
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 
@@ -163,7 +167,6 @@ const term = new Terminal({
 
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
-
 term.open(document.getElementById('terminal'));
 
 setTimeout(() => fitAddon.fit(), 50);
@@ -178,7 +181,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG SPLIT
+   DRAG SPLIT (DESKTOP ONLY)
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -195,7 +198,7 @@ window.addEventListener("mouseup", () => {
 
 window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
-    if (window.innerWidth <= 768) return;
+    if (window.innerWidth <= 768) return; // disable on mobile
 
     const percent = (e.clientX / window.innerWidth) * 100;
     if (percent < 10 || percent > 80) return;
@@ -239,62 +242,104 @@ function resetLayout() {
 }
 
 /* =========================
-   CANDLE CHART (FIXED)
+   CHART
 ========================= */
-
 let chart;
-let candleSeries;
-
-function initChart() {
-
-    chart = LightweightCharts.createChart(document.getElementById("priceChart"), {
-        layout: {
-            background: { color: "#ffffff" },
-            textColor: "#111"
-        },
-        grid: {
-            vertLines: { color: "#eee" },
-            horzLines: { color: "#eee" }
-        },
-        width: document.getElementById("priceChart").clientWidth,
-        height: document.getElementById("priceChart").clientHeight
-    });
-
-    candleSeries = chart.addCandlestickSeries();
-}
 
 async function load() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
-    // ✅ FIX: use index as time (333,334,335 → 0,1,2)
-    const candles = data.map((d, i) => ({
-        time: i,
-        open: Number(d.open),
-        high: Number(d.high),
-        low: Number(d.low),
-        close: Number(d.close)
-    }));
+    const closes = data.map(d => d.close);
+    const stVals = data.map(d => d.st);
+    const stTrend = data.map(d => d.st_trend);
 
-    candleSeries.setData(candles);
+    draw(closes, stVals, stTrend);
+}
+
+function draw(closes, stVals, stTrend) {
+
+    const ctx = document.getElementById("priceChart");
+
+    if (chart) chart.destroy();
+
+    /* =========================
+       3 CANDLE RIGHT PADDING
+    ========================= */
+    const pad = 3;
+
+    const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
+    const closePad = [...closes, ...Array(pad).fill(null)];
+    const stPad = [...stVals, ...Array(pad).fill(null)];
+    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
+
+    chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels,
+
+            datasets: [
+
+                // CLOSE
+                {
+                    label: "Close",
+                    data: closePad,
+                    borderColor: "#000000",
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.25
+                },
+
+                // SUPER TREND
+                {
+                    label: "ST",
+                    data: stPad,
+                    showLine: false,
+
+                    pointRadius: 2,
+                    pointBorderWidth: 2,
+
+                    pointBackgroundColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    ),
+
+                    pointBorderColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    )
+                }
+            ]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            plugins: {
+                legend: { display: false }
+            },
+
+            scales: {
+                x: {
+                    ticks: { color: "#333" },
+                    grid: { color: "#eee" },
+                    offset: true
+                },
+                y: {
+                    position: "right",
+                    ticks: { color: "#333" },
+                    grid: { color: "#eee" }
+                }
+            }
+        }
+    });
 }
 
 /* =========================
    INIT
 ========================= */
 loadLayout();
-initChart();
 load();
 setInterval(load, 3000);
-
-window.addEventListener("resize", () => {
-    if (chart) {
-        chart.applyOptions({
-            width: document.getElementById("priceChart").clientWidth,
-            height: document.getElementById("priceChart").clientHeight
-        });
-    }
-});
 
 </script>
 
