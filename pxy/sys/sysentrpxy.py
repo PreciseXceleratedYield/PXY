@@ -36,13 +36,13 @@ def get_entry_signal(df=None):
         return "NONE", exit_signal
 
     if time(9, 16) <= current_time < time(9, 30):
-        print("[⏱️ ⌛] 09:16–09:30 → DIRECT OTM (NO FILTER)")
+        print("[⏱️ ⌛] 09:16–09:30 → DIRECT ATM (NO FILTER)")
 
         if exit_signal in ["BUY", "BULL"]:
-            return "OTMBUY", exit_signal
+            return "ATMBUY", exit_signal
         
         if exit_signal in ["SELL", "BEAR"]:
-            return "OTMSELL", exit_signal
+            return "ATMSELL", exit_signal
 
         return "NONE", exit_signal
         
@@ -148,7 +148,7 @@ def get_entry_signal(df=None):
             final_signal = "ATMBUY"
 
         if signal == "SELL" and side == "CE" and depth >= ce_req:
-            final_signal = "OTMSELL"
+            final_signal = "ATMSELL"
 
     elif trend == "DOWN":
 
@@ -156,7 +156,7 @@ def get_entry_signal(df=None):
             final_signal = "ATMSELL"
 
         if signal == "BUY" and side == "PE" and depth >= pe_req:
-            final_signal = "OTMBUY"
+            final_signal = "ATMBUY"
 
     # ------------------------------
     # FINAL PRINT
@@ -165,10 +165,10 @@ def get_entry_signal(df=None):
         action = "BUY"
     elif signal == "SELL":
         action = "SELL"
-    elif signal == "OTMBUY":
-        action = "OTMBUY"   # ✅ FIXED
-    elif signal == "OTMSELL":
-        action = "OTMSELL"  # ✅ FIXED
+    elif signal == "ATMBUY":
+        action = "ATMBUY"   # ✅ FIXED
+    elif signal == "ATMSELL":
+        action = "ATMSELL"  # ✅ FIXED
     else:
         action = signal
 
