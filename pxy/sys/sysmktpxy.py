@@ -229,7 +229,7 @@ def get_signal():
         final_state, final_tag = apply_upgrade(entry_state, entry_tag, oc_state)
 
         print(f"🔥 ENTRY MODE: {final_tag} 🚀 ✔️")
-
+        final_state = BUY
         return final_state, final_state
 
     except Exception as e:
