@@ -57,8 +57,6 @@ except Exception as e:
     print(f"{Fore.RED}IMPORT ERROR: {e}")
     sys.exit(1)
 
-OTM_DISTANCE = 100
-
 # --- ORDER EXECUTION ---
 def execute_order(client, symbol, qty):
     dprint("ENTER execute_order")
@@ -125,10 +123,20 @@ async def main():
         entry_signal = data.get("entry")
         reversal     = data.get("exit")
         ltp          = data.get("price")
-
-        if ltp is None:
-            print("❌ No price from syspxy")
-            return
+        # --- DYNAMIC OTM DISTANCE ---
+        try:
+            TO_raw = data.get("TO")
+            YC_raw = data.get("YC")
+        
+            TO = int(float(TO_raw))
+            YC = int(float(YC_raw))
+        
+            OTM_DISTANCE = abs(TO - YC)
+            dprint(f"OTM_DYNAMIC: |{TO}-{YC}| = {OTM_DISTANCE}", Fore.CYAN)
+        
+        except Exception as e:
+            dprint(f"OTM fallback used: {e}", Fore.YELLOW)
+            OTM_DISTANCE = 100
 
         # 🔥 SURGICAL ADDITION: EXIT NORMALIZATION
         exit_sig = str(reversal).upper().strip() if reversal else "NONE"
