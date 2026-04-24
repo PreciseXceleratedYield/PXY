@@ -228,7 +228,7 @@ async def main():
 
         symbol = None
         res = {"stat": "SKIPPED"}
-        sig = ATMBUY
+
         # --- BUY CE ---
         if sig in BUY_SIGS:
             dprint("BRANCH: BUY CE")
