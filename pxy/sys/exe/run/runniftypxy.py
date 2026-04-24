@@ -4,9 +4,6 @@ from datetime import datetime, date, timedelta
 # ---------------- CONFIG ----------------
 STRIKE_STEP = 50
 
-# FIXED OTM DISTANCE (your requirement)
-OTM_DISTANCE = 100
-
 # DAILY ATM BUFFER (you can change daily without touching logic)
 ATM_BUFFER = 0  
 
@@ -45,7 +42,7 @@ def round_to_strike(price):
 
 # ---------------- MAIN ----------------
 
-def get_symbol(price, side):
+def get_symbol(price, side, otm_distance):
     """
     Signal-driven symbol builder:
     - ATM = base strike + buffer
@@ -79,9 +76,9 @@ def get_symbol(price, side):
         # ---------------- OTM SHIFT ----------------
         if "OTM" in side:
             if opt_type == "CE":
-                strike = atm_adjusted + OTM_DISTANCE
+                strike = atm_adjusted + otm_distance
             else:
-                strike = atm_adjusted - OTM_DISTANCE
+                strike = atm_adjusted - otm_distance
         else:
             strike = atm_adjusted
 
