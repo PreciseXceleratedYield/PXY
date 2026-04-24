@@ -166,10 +166,10 @@ def exit_signal(df):
     curr  = oc2.iloc[-1]
 
     if prev1 <= prev2 and curr > prev1:
-        return "BUY"
+        return "BULL"
 
     if prev1 >= prev2 and curr < prev1:
-        return "SELL"
+        return "BEAR"
 
     if curr > prev1:
         return "BULL"
