@@ -1,13 +1,14 @@
 # ==================================================
-# 5-STATE DUAL ENGINE (FINAL CLEAN VERSION)
-# PRICE ACTION + OC/2 FLOW
+# FINAL DUAL ENGINE (LOCKED VERSION)
+# PRICE ACTION + OC/2 FLOW + SAFETY LAYERS
 # OUTPUT:
-# ENTRY → BUY / SELL / BULL / BEAR
-# EXIT  → BUY / SELL / BULL / BEAR
+# ENTRY → BUY / SELL / BULL / BEAR / NONE
+# EXIT  → BUY / SELL / BULL / BEAR / NONE
 # ==================================================
 
 from sysdtafpxy import fetch_yf_data
 import pandas as pd
+from datetime import time
 
 
 # ==================================================
@@ -15,9 +16,70 @@ import pandas as pd
 # ==================================================
 def get_df():
     df = fetch_yf_data(period="1d", interval="1m")
+
     if df is None or len(df) < 20:
         return None
-    return df
+
+    df['Datetime'] = pd.to_datetime(df['Datetime'])
+
+    # Keep only today
+    today = df['Datetime'].dt.date.iloc[-1]
+    df = df[df['Datetime'].dt.date == today]
+
+    # Start from 9:16
+    df = df[df['Datetime'].dt.time >= time(9, 16)]
+
+    if len(df) < 5:
+        return None
+
+    return df.reset_index(drop=True)
+
+
+# ==================================================
+# SAFETY: OPEN BLOCK
+# ==================================================
+def is_open_block(current_time):
+    try:
+        return time(9,14) <= current_time <= time(9,16)
+    except:
+        return False
+
+
+# ==================================================
+# SAFETY: DATA VALIDATION
+# ==================================================
+def is_data_valid(df):
+
+    try:
+        if df is None or len(df) < 5:
+            return False
+
+        required = ["Open", "High", "Low", "Close"]
+        for col in required:
+            if col not in df.columns:
+                return False
+
+        last = df.iloc[-1]
+
+        if last[required].isnull().any():
+            return False
+
+        if last["High"] < last["Low"]:
+            return False
+
+        if not (last["Low"] <= last["Open"] <= last["High"]):
+            return False
+
+        if not (last["Low"] <= last["Close"] <= last["High"]):
+            return False
+
+        if last[required].min() <= 0:
+            return False
+
+        return True
+
+    except:
+        return False
 
 
 # ==================================================
@@ -37,11 +99,6 @@ def is_bullish(c):
 def is_bearish(c):
     return c['Close'] < c['Open']
 
-def is_strong(c):
-    rng = c['High'] - c['Low']
-    body = abs(c['Close'] - c['Open'])
-    return rng > 0 and body > rng * 0.6
-
 
 # ==================================================
 # ENTRY SIGNAL (PRICE ACTION)
@@ -52,18 +109,7 @@ def entry_signal(df):
     prev_high = get_prev_high(df)
     prev_low = get_prev_low(df)
 
-    # 1. MORNING BREAKOUT
-    if len(df) >= 6:
-        orb_high = df['High'].iloc[:5].max()
-        orb_low = df['Low'].iloc[:5].min()
-
-        if is_strong(last):
-            if last['Close'] > orb_high:
-                return "BUY", "MORNING_BREAKOUT_BUY"
-            if last['Close'] < orb_low:
-                return "SELL", "MORNING_BREAKOUT_SELL"
-
-    # 2. LIQUIDITY SWEEP
+    # 1. LIQUIDITY SWEEP
     rng = last['High'] - last['Low']
     if rng > 0:
         if last['Low'] < prev_low and (last['Close'] - last['Low']) > rng * 0.5:
@@ -72,21 +118,21 @@ def entry_signal(df):
         if last['High'] > prev_high and (last['High'] - last['Close']) > rng * 0.5:
             return "SELL", "LIQUIDITY_SWEEP_SELL"
 
-    # 3. REVERSAL
+    # 2. REVERSAL
     if last['Close'] > prev_high and is_bullish(last):
         return "BUY", "REVERSAL_BUY"
 
     if last['Close'] < prev_low and is_bearish(last):
         return "SELL", "REVERSAL_SELL"
 
-    # 4. CONTINUATION
+    # 3. CONTINUATION
     if last['High'] > prev_high and is_bullish(last):
         return "BUY", "CONTINUATION_BUY"
 
     if last['Low'] < prev_low and is_bearish(last):
         return "SELL", "CONTINUATION_SELL"
 
-    # 5. IMBALANCE
+    # 4. IMBALANCE
     if len(df) >= 3:
         c1 = df.iloc[-3]
         c2 = df.iloc[-2]
@@ -115,14 +161,12 @@ def exit_signal(df):
     prev1 = oc2.iloc[-2]
     curr  = oc2.iloc[-1]
 
-    # FLIP
     if prev1 <= prev2 and curr > prev1:
         return "BUY"
 
     if prev1 >= prev2 and curr < prev1:
         return "SELL"
 
-    # CONTINUATION
     if curr > prev1:
         return "BULL"
 
@@ -137,14 +181,12 @@ def exit_signal(df):
 # ==================================================
 def apply_upgrade(entry_state, entry_tag, oc_state):
 
-    # Strong signal → use it
     if entry_state == "BUY":
         return "BUY", entry_tag
 
     if entry_state == "SELL":
         return "SELL", entry_tag
 
-    # No signal → pass OC2 as-is
     return oc_state, f"OC2_{oc_state}"
 
 
@@ -156,22 +198,34 @@ def get_signal():
     try:
         df = get_df()
         if df is None:
-            print("ENTRY MODE: DEFAULT")
-            return "BULL", "BULL"
+            print("ENTRY MODE: NO_DATA")
+            return "NONE", "NONE"
 
+        current_time = df.iloc[-1]['Datetime'].time()
+
+        # Opening safety block
+        if is_open_block(current_time):
+            print("ENTRY MODE: OPENING_BLOCK")
+            return "NONE", "NONE"
+
+        # Data validation
+        if not is_data_valid(df):
+            print("ENTRY MODE: BAD_DATA")
+            return "NONE", "NONE"
+
+        # Core logic
         entry_state, entry_tag = entry_signal(df)
         oc_state = exit_signal(df)
 
         final_state, final_tag = apply_upgrade(entry_state, entry_tag, oc_state)
 
-        # 🔥 PRINT ENTRY MODE
         print(f"ENTRY MODE: {final_tag}")
 
         return final_state, oc_state
 
     except Exception as e:
         print("[ERROR]", e)
-        return "BULL", "BULL"
+        return "NONE", "NONE"
 
 
 # ==================================================
