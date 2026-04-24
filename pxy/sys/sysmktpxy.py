@@ -225,7 +225,7 @@ def get_signal():
 
         print(f"🔥 ENTRY MODE: {final_tag} ✔️🚀")
 
-        return final_state, oc_state
+        return final_state, final_state
 
     except Exception as e:
         print("[ERROR]", e)
