@@ -26,14 +26,14 @@ def get_all_data():
     data = {
         # ===== DASH =====
         "bias": dash.get("bias"),
-        "power": dash.get("power"),
-        "breakout": dash.get("breakout"),
         "o_change": dash.get("o_change"),
         "m_change": dash.get("m_change"),
-        "open": dash.get("open"),
+
+        # 🔥 RENAMED FIELDS
+        "TO": dash.get("open"),
         "high": dash.get("high"),
         "low": dash.get("low"),
-        "close": dash.get("close"),
+        "YK": dash.get("close"),
 
         # ===== CORE =====
         "hkin_signal": core.get("hkin_signal", "NONE"),
