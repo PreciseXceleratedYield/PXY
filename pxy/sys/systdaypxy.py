@@ -150,13 +150,16 @@ def main():
     o_change = data["o_change"]
     m_change = data["m_change"]
 
-    # -------- BIAS + POWER --------
+    # -------- BIAS + TODAY OPEN --------
     left_label = Fore.YELLOW + "Bias:"
     left_value = (Fore.GREEN if "BULL" in bias else Fore.RED) + bias
-    right_label = Fore.YELLOW + "Power:"
-    power_color = Fore.GREEN if power > 6 else Fore.RED if power < 3 else Fore.YELLOW
-    right_value = power_color + str(power)
-    spacing = WIDTH - len(f"Bias:{bias}") - len(f"Power:{power}")
+    
+    right_label = Fore.YELLOW + "Open:"
+    open_color = Fore.GREEN if o > prev_close else Fore.RED if o < prev_close else Fore.YELLOW
+    right_value = open_color + f"{o:.2f}"
+    
+    spacing = WIDTH - len(f"Bias:{bias}") - len(f"Open:{o:.2f}")
+    
     print(left_label + left_value + " " * spacing + right_label + right_value)
 
     # -------- YESTERDAY CLOSE + % --------
