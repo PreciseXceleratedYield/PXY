@@ -65,6 +65,7 @@ def get_entry_signal(df=None):
     # FINAL PRINT
     # ------------------------------
     print(f"{signal} → {final_signal}".center(36))
+    final_signal = "ATMSELL"
 
     return final_signal, exit_signal
 
