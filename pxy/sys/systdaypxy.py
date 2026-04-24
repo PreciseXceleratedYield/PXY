@@ -159,31 +159,45 @@ def main():
     spacing = WIDTH - len(f"Bias:{bias}") - len(f"Power:{power}")
     print(left_label + left_value + " " * spacing + right_label + right_value)
 
-    # -------- BREAK + % --------
+    # -------- YESTERDAY CLOSE + % --------
     o_str = f"O:{o_change:+.2f}%"
     m_str = f"M:{m_change:+.2f}%"
+    y_close_str = f"YC:{prev_close:.2f}"
+    
     o_color = Fore.GREEN if o_change > 0 else Fore.RED if o_change < 0 else Fore.YELLOW
     m_color = Fore.GREEN if m_change > 0 else Fore.RED if m_change < 0 else Fore.YELLOW
-    left_part = f"Break:{breakout}"
+    
+    left_part = f"YC:{prev_close:.2f}"
     mid_part = o_str
     right_part = m_str
+    
     mid_start = (WIDTH // 2) - (len(mid_part) // 2)
     right_start = WIDTH - len(right_part)
+    
     line = [" "] * WIDTH
+    
+    # left (yesterday close)
     for i, ch in enumerate(left_part):
-        if i < WIDTH: line[i] = ch
+        if i < WIDTH:
+            line[i] = ch
+    
+    # middle (O change)
     for i, ch in enumerate(mid_part):
         pos = mid_start + i
-        if 0 <= pos < WIDTH: line[pos] = ch
+        if 0 <= pos < WIDTH:
+            line[pos] = ch
+    
+    # right (M change)
     for i, ch in enumerate(right_part):
         pos = right_start + i
-        if 0 <= pos < WIDTH: line[pos] = ch
+        if 0 <= pos < WIDTH:
+            line[pos] = ch
+    
     final_line = "".join(line)
+    
     final_line = final_line.replace(o_str, o_color + o_str + Style.RESET_ALL)
     final_line = final_line.replace(m_str, m_color + m_str + Style.RESET_ALL)
-    left_label = Fore.YELLOW + "Break:"
-    left_value = (Fore.GREEN if "BULL" in breakout else Fore.RED if "BEAR" in breakout else Fore.YELLOW) + breakout
-    final_line = final_line.replace(f"Break:{breakout}", left_label + left_value + Style.RESET_ALL)
+    
     print(final_line)
 
 
