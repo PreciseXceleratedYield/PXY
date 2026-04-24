@@ -228,7 +228,7 @@ def get_signal():
 
         final_state, final_tag = apply_upgrade(entry_state, entry_tag, oc_state)
 
-        print(f"🔥 ENTRY MODE: {final_tag} ✔️🚀")
+        print(f"🔥 ENTRY MODE: {final_tag} 🚀 ✔️")
 
         return final_state, final_state
 
