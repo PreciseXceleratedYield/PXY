@@ -131,7 +131,7 @@ async def main():
             TO = int(float(TO_raw))
             YC = int(float(YC_raw))
         
-            OTM_DISTANCE = abs(TO - YC)
+            OTM_DISTANCE = round(abs(TO - YC) / 100) * 100
             dprint(f"OTM_DYNAMIC: |{TO}-{YC}| = {OTM_DISTANCE}", Fore.CYAN)
         
         except Exception as e:
