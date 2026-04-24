@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PXY DASHBOARD</title>
+<title>PXY TRADING DASHBOARD</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
@@ -46,7 +46,7 @@ html, body {
 }
 
 /* =========================
-   RIGHT PANEL (BROWSER)
+   RIGHT PANEL (CHART)
 ========================= */
 #right {
     flex: 1;
@@ -57,27 +57,18 @@ html, body {
 
 /* TOOLBAR */
 #toolbar {
-    padding: 5px;
+    padding: 6px;
     background: #f3f3f3;
     display: flex;
     gap: 10px;
     border-bottom: 1px solid #e5e5e5;
 }
 
-#urlBar {
-    flex: 1;
-    padding: 6px;
-    font-family: monospace;
-    border: 1px solid #ccc;
-    outline: none;
-}
-
-/* BROWSER */
-#browser {
+/* CHART CONTAINER */
+#chart {
     flex: 1;
     width: 100%;
-    border: none;
-    background: white;
+    height: 100%;
 }
 
 /* =========================
@@ -91,11 +82,11 @@ html, body {
     display: none;
 }
 
-.fullscreen-browser #terminal {
+.fullscreen-chart #terminal {
     display: none;
 }
 
-.fullscreen-browser #right {
+.fullscreen-chart #right {
     width: 100% !important;
 }
 
@@ -103,7 +94,6 @@ html, body {
    MOBILE
 ========================= */
 @media (max-width: 768px) {
-
     #right {
         display: none !important;
     }
@@ -129,24 +119,23 @@ html, body {
 
 <div id="container">
 
-    <!-- LEFT: TERMINAL -->
+    <!-- LEFT TERMINAL -->
     <div id="terminal"></div>
 
-    <!-- RESIZE BAR -->
+    <!-- RESIZER -->
     <div id="divider"></div>
 
-    <!-- RIGHT: BROWSER -->
+    <!-- RIGHT CHART -->
     <div id="right">
 
         <div id="toolbar">
-            <input id="urlBar" placeholder="Enter URL like google.com">
-            <button onclick="loadURL()">Go</button>
             <button onclick="toggleTerminal()">🖥 Terminal</button>
-            <button onclick="toggleBrowser()">🌐 Browser</button>
+            <button onclick="toggleChart()">📊 Chart</button>
             <button onclick="resetLayout()">🔄 Reset</button>
         </div>
 
-        <iframe id="browser"></iframe>
+        <!-- TradingView Chart -->
+        <div id="chart"></div>
 
     </div>
 
@@ -156,27 +145,29 @@ html, body {
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 
+<!-- TRADINGVIEW -->
+<script src="https://s3.tradingview.com/tv.js"></script>
+
 <script>
 
 /* =========================
-   TERMINAL SETUP
+   TERMINAL
 ========================= */
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
     fontFamily: "monospace",
     fontSize: 14,
-    cursorBlink: false,
     theme: {
         background: "#ffffff",
-        foreground: "#111111"
+        foreground: "#111"
     }
 });
 
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 
-term.open(document.getElementById('terminal'));
+term.open(document.getElementById("terminal"));
 
 setTimeout(() => fitAddon.fit(), 50);
 window.addEventListener("resize", () => fitAddon.fit());
@@ -190,31 +181,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   BROWSER LOGIC
-========================= */
-const urlBar = document.getElementById("urlBar");
-const browser = document.getElementById("browser");
-
-function loadURL() {
-    let url = urlBar.value.trim();
-    if (!url) return;
-
-    if (!url.startsWith("http")) {
-        url = "https://" + url;
-    }
-
-    browser.src = url;
-}
-
-urlBar.addEventListener("keypress", (e) => {
-    if (e.key === "Enter") loadURL();
-});
-
-// default page
-browser.src = "https://example.com";
-
-/* =========================
-   RESIZE LEFT / RIGHT
+   RESIZE
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -244,7 +211,7 @@ window.addEventListener("mousemove", (e) => {
 });
 
 /* =========================
-   SAVE / LOAD LAYOUT
+   LAYOUT SAVE/LOAD
 ========================= */
 function loadLayout() {
     const saved = localStorage.getItem("split");
@@ -255,14 +222,14 @@ function loadLayout() {
 }
 
 /* =========================
-   FULLSCREEN TOGGLES
+   FULLSCREEN
 ========================= */
 function toggleTerminal() {
     document.body.classList.toggle("fullscreen-terminal");
 }
 
-function toggleBrowser() {
-    document.body.classList.toggle("fullscreen-browser");
+function toggleChart() {
+    document.body.classList.toggle("fullscreen-chart");
 }
 
 function resetLayout() {
@@ -270,6 +237,21 @@ function resetLayout() {
     right.style.width = "65%";
     localStorage.removeItem("split");
 }
+
+/* =========================
+   TRADINGVIEW CHART
+========================= */
+new TradingView.widget({
+    container_id: "chart",
+    symbol: "NSE:NIFTY",
+    interval: "5",
+    theme: "light",
+    style: "1",
+    locale: "en",
+    allow_symbol_change: true,
+    hide_top_toolbar: false,
+    autosize: true
+});
 
 /* =========================
    INIT
