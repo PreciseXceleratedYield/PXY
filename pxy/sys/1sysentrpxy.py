@@ -1,5 +1,5 @@
 # ==================================================
-# FINAL DUAL ENGINE (LOCKED VERSION)
+# FINAL DUAL ENGINE (LOCKED VERSION - PRODUCTION SAFE)
 # PRICE ACTION + OC/2 FLOW + SAFETY LAYERS
 # OUTPUT:
 # ENTRY → BUY / SELL / BULL / BEAR / NONE
@@ -40,7 +40,7 @@ def get_df():
 # ==================================================
 def is_open_block(current_time):
     try:
-        return time(9,14) <= current_time <= time(9,16)
+        return time(9, 14) <= current_time <= time(9, 16)
     except:
         return False
 
@@ -55,6 +55,7 @@ def is_data_valid(df):
             return False
 
         required = ["Open", "High", "Low", "Close"]
+
         for col in required:
             if col not in df.columns:
                 return False
@@ -83,15 +84,17 @@ def is_data_valid(df):
 
 
 # ==================================================
-# HELPERS
+# HELPERS (FIXED - NA SAFE)
 # ==================================================
 LOOKBACK = 5
 
 def get_prev_high(df):
-    return df['High'].shift(1).rolling(LOOKBACK).max().iloc[-1]
+    val = df['High'].shift(1).rolling(LOOKBACK).max().iloc[-1]
+    return val if pd.notna(val) else df['High'].iloc[-1]
 
 def get_prev_low(df):
-    return df['Low'].shift(1).rolling(LOOKBACK).min().iloc[-1]
+    val = df['Low'].shift(1).rolling(LOOKBACK).min().iloc[-1]
+    return val if pd.notna(val) else df['Low'].iloc[-1]
 
 def is_bullish(c):
     return c['Close'] > c['Open']
@@ -109,8 +112,9 @@ def entry_signal(df):
     prev_high = get_prev_high(df)
     prev_low = get_prev_low(df)
 
-    # 1. LIQUIDITY SWEEP
     rng = last['High'] - last['Low']
+
+    # LIQUIDITY SWEEP
     if rng > 0:
         if last['Low'] < prev_low and (last['Close'] - last['Low']) > rng * 0.5:
             return "BUY", "LIQUIDITY_SWEEP_BUY"
@@ -118,21 +122,21 @@ def entry_signal(df):
         if last['High'] > prev_high and (last['High'] - last['Close']) > rng * 0.5:
             return "SELL", "LIQUIDITY_SWEEP_SELL"
 
-    # 2. REVERSAL
+    # REVERSAL
     if last['Close'] > prev_high and is_bullish(last):
         return "BUY", "REVERSAL_BUY"
 
     if last['Close'] < prev_low and is_bearish(last):
         return "SELL", "REVERSAL_SELL"
 
-    # 3. CONTINUATION
+    # CONTINUATION
     if last['High'] > prev_high and is_bullish(last):
         return "BUY", "CONTINUATION_BUY"
 
     if last['Low'] < prev_low and is_bearish(last):
         return "SELL", "CONTINUATION_SELL"
 
-    # 4. IMBALANCE
+    # IMBALANCE
     if len(df) >= 3:
         c1 = df.iloc[-3]
         c2 = df.iloc[-2]
@@ -153,7 +157,7 @@ def entry_signal(df):
 def exit_signal(df):
 
     if df is None or len(df) < 3:
-        return "BULL"
+        return "NONE"
 
     oc2 = (df['Open'] + df['Close']) / 2
 
@@ -173,11 +177,11 @@ def exit_signal(df):
     if curr < prev1:
         return "BEAR"
 
-    return "BULL"
+    return "NONE"
 
 
 # ==================================================
-# UPGRADE ENGINE (NO FORCING)
+# UPGRADE ENGINE
 # ==================================================
 def apply_upgrade(entry_state, entry_tag, oc_state):
 
@@ -187,7 +191,7 @@ def apply_upgrade(entry_state, entry_tag, oc_state):
     if entry_state == "SELL":
         return "SELL", entry_tag
 
-    return oc_state, f"OC2_{oc_state}"
+    return oc_state, oc_state
 
 
 # ==================================================
