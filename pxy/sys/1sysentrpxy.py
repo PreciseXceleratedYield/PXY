@@ -198,19 +198,19 @@ def get_signal():
     try:
         df = get_df()
         if df is None:
-            print("ENTRY MODE: NO_DATA")
+            print("🚫 ENTRY MODE: NO_DATA 📉")
             return "NONE", "NONE"
 
         current_time = df.iloc[-1]['Datetime'].time()
 
         # Opening safety block
         if is_open_block(current_time):
-            print("ENTRY MODE: OPENING_BLOCK")
+            print("⏳ ENTRY MODE: OPENING_BLOCK 🛑")
             return "NONE", "NONE"
 
         # Data validation
         if not is_data_valid(df):
-            print("ENTRY MODE: BAD_DATA")
+            print("⚠️ ENTRY MODE: BAD_DATA 🚫")
             return "NONE", "NONE"
 
         # Core logic
@@ -219,7 +219,7 @@ def get_signal():
 
         final_state, final_tag = apply_upgrade(entry_state, entry_tag, oc_state)
 
-        print(f"ENTRY MODE: {final_tag}")
+        print(f"🔥 ENTRY MODE: {final_tag} ✔️🚀")
 
         return final_state, oc_state
 
