@@ -34,21 +34,21 @@ def resolve_index():
 
 
 # ---------------- DISPATCHER ----------------
-def get_symbol(price, side):
+def get_symbol(price, side, otm_distance):
     """
     ONLY responsibility:
     - pick correct builder
-    - forward (price, side)
+    - forward (price, side, otm_distance)
     """
 
     index = resolve_index()
 
     if index == "NIFTY":
-        return nifty_symbol_builder(price, side)
+        return nifty_symbol_builder(price, side, otm_distance)
 
     if index == "BANKNIFTY":
         if not bank_symbol_builder:
             raise ImportError("runbankpxy missing")
-        return bank_symbol_builder(price, side)
+        return bank_symbol_builder(price, side, otm_distance)
 
     raise RuntimeError("Invalid index mapping")
