@@ -3,6 +3,8 @@
 # ==================================================
 
 from sysmktpxy import get_signal
+from syscnfgpxy import TICKER
+from your_snapshot_file import get_market_snapshot  # adjust if needed
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
@@ -16,7 +18,17 @@ def get_entry_signal(df=None):
     # BASE SIGNAL
     # ------------------------------
     signal, exit_signal = get_signal()
-    orig_signal = signal
+
+    # ------------------------------
+    # BIAS FETCH
+    # ------------------------------
+    data = get_market_snapshot(TICKER)
+    bias = data["bias"] if data else "NEUTRAL"
+
+    # simple normalization
+    bias_u = bias.upper()
+    is_bear = "BEAR" in bias_u
+    is_bull = "BULL" in bias_u
 
     # ------------------------------
     # TIME BLOCK (IST)
@@ -40,31 +52,30 @@ def get_entry_signal(df=None):
         return "NONE", exit_signal
 
     # ==================================================
-    # RAW PASS-THROUGH MODE (NO FILTERS)
+    # RAW PASS-THROUGH MODE
     # ==================================================
     if signal in ["BULL", "BEAR", "NONE"]:
-        line = f"⛔ 🚧 NO ENTRY 🚧 ⛔ 🚧 {signal} 🚧 ⛔"
-        print(line.center(36))
+        print(f"⛔ 🚧 NO ENTRY 🚧 ⛔ 🚧 {signal} 🚧 ⛔".center(36))
         return signal, exit_signal
 
     # ==================================================
-    # SIMPLE ATM MAPPING (CORE LOGIC ONLY)
+    # BIAS MAPPING ONLY (CORE LOGIC)
     # ==================================================
     final_signal = "NONE"
 
-    if signal in ["BUY"]:
-        final_signal = "ATMBUY"
+    if signal == "BUY":
+        final_signal = "OTMBUY" if is_bear else "ATMBUY"
 
-    elif signal in ["SELL"]:
-        final_signal = "ATMSELL"
+    elif signal == "SELL":
+        final_signal = "OTMSELL" if is_bull else "ATMSELL"
 
     elif signal in ["ATMBUY", "ATMSELL"]:
         final_signal = signal
 
     # ------------------------------
-    # FINAL PRINT
+    # OUTPUT
     # ------------------------------
-    print(f"{signal} → {final_signal}".center(36))
+    print(f"{signal} → {final_signal} ({bias})".center(36))
 
     return final_signal, exit_signal
 
