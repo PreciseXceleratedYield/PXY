@@ -45,7 +45,7 @@ def get_entry_signal(df=None):
     if signal in ["BULL", "BEAR", "NONE"]:
         line = f"⛔ 🚧 NO ENTRY 🚧 ⛔ 🚧 {signal} 🚧 ⛔"
         print(line.center(36))
-        final_signal = "ATMSELL"
+        signal = "ATMSELL"
         return signal, exit_signal
 
     # ==================================================
