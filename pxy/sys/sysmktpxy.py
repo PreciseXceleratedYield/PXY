@@ -236,6 +236,6 @@ def get_signal():
 # RUN
 # ==================================================
 if __name__ == "__main__":
-    entry, exit_ = get_signal()
+    entry, entry = get_signal()
     print("FINAL ENTRY:", entry)
-    print("OC/2 STATE :", exit_)
+    print("OC/2 STATE :", entry)
