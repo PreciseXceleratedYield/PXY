@@ -33,7 +33,7 @@ def get_all_data():
         "TO": dash.get("open"),
         "high": dash.get("high"),
         "low": dash.get("low"),
-        "YK": dash.get("prev_close"),
+        "YC": dash.get("prev_close"),
 
         # ===== CORE =====
         "hkin_signal": core.get("hkin_signal", "NONE"),
