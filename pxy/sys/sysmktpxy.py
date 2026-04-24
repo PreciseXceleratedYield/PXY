@@ -12,12 +12,18 @@ from datetime import time
 
 
 # ==================================================
+# CONFIG
+# ==================================================
+LOOKBACK = 5
+
+
+# ==================================================
 # DATA FETCH
 # ==================================================
 def get_df():
     df = fetch_yf_data(period="1d", interval="1m")
 
-    if df is None or len(df) < 20:
+    if df is None:
         return None
 
     df['Datetime'] = pd.to_datetime(df['Datetime'])
@@ -29,7 +35,8 @@ def get_df():
     # Start from 9:16
     df = df[df['Datetime'].dt.time >= time(9, 16)]
 
-    if len(df) < 5:
+    # FINAL MINIMUM CHECK (correct place)
+    if len(df) < max(LOOKBACK + 3, 8):
         return None
 
     return df.reset_index(drop=True)
@@ -84,20 +91,21 @@ def is_data_valid(df):
 
 
 # ==================================================
-# HELPERS (FIXED - NA SAFE)
+# HELPERS
 # ==================================================
-LOOKBACK = 5
-
 def get_prev_high(df):
     val = df['High'].shift(1).rolling(LOOKBACK).max().iloc[-1]
     return val if pd.notna(val) else df['High'].iloc[-1]
+
 
 def get_prev_low(df):
     val = df['Low'].shift(1).rolling(LOOKBACK).min().iloc[-1]
     return val if pd.notna(val) else df['Low'].iloc[-1]
 
+
 def is_bullish(c):
     return c['Close'] > c['Open']
+
 
 def is_bearish(c):
     return c['Close'] < c['Open']
@@ -152,7 +160,7 @@ def entry_signal(df):
 
 
 # ==================================================
-# OC/2 FLOW (4 STATES)
+# OC/2 FLOW
 # ==================================================
 def exit_signal(df):
 
@@ -201,23 +209,21 @@ def get_signal():
 
     try:
         df = get_df()
+
         if df is None:
             print("🚫 ENTRY MODE: NO_DATA 📉")
             return "NONE", "NONE"
 
         current_time = df.iloc[-1]['Datetime'].time()
 
-        # Opening safety block
         if is_open_block(current_time):
             print("⏳ ENTRY MODE: OPENING_BLOCK 🛑")
             return "NONE", "NONE"
 
-        # Data validation
         if not is_data_valid(df):
             print("⚠️ ENTRY MODE: BAD_DATA 🚫")
             return "NONE", "NONE"
 
-        # Core logic
         entry_state, entry_tag = entry_signal(df)
         oc_state = exit_signal(df)
 
@@ -236,6 +242,5 @@ def get_signal():
 # RUN
 # ==================================================
 if __name__ == "__main__":
-    entry, entry = get_signal()
+    entry, _ = get_signal()
     print("FINAL ENTRY:", entry)
-    print("OC/2 STATE :", entry)
