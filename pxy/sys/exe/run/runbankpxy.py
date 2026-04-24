@@ -1,9 +1,7 @@
-# run/runbankpxy.py
 from datetime import datetime, date, timedelta
 
 # ---------------- CONFIG ----------------
 STRIKE_STEP = 100
-OTM_DISTANCE = 200
 ATM_BUFFER = 0
 
 HOLIDAYS = [
@@ -14,16 +12,11 @@ HOLIDAYS = [
 
 HOLIDAYS = [datetime.strptime(h, "%d-%b-%Y").date() for h in HOLIDAYS]
 
-# ---------------- HELPERS ----------------
 
+# ---------------- EXPIRY ----------------
 def get_monthly_expiry():
-    """BANKNIFTY monthly expiry:
-       Days 1–20  -> current month expiry
-       Days 21+   -> next month expiry
-    """
     today = date.today()
 
-    # Decide target month
     if today.day <= 24:
         target_month = today.month
         target_year = today.year
@@ -35,7 +28,6 @@ def get_monthly_expiry():
             target_month = today.month + 1
             target_year = today.year
 
-    # Find last day of target month
     if target_month == 12:
         next_month = date(target_year + 1, 1, 1)
     else:
@@ -43,11 +35,9 @@ def get_monthly_expiry():
 
     last_day = next_month - timedelta(days=1)
 
-    # Move back to last Thursday
     offset = (last_day.weekday() - 3) % 7
     expiry = last_day - timedelta(days=offset)
 
-    # Holiday adjustment
     while expiry in HOLIDAYS:
         expiry -= timedelta(days=1)
 
@@ -55,16 +45,15 @@ def get_monthly_expiry():
 
 
 def is_monthly_expiry(expiry_date):
-    return True  # BANKNIFTY = always monthly rule
+    return True
 
 
 def round_to_strike(price):
     return int(round(float(price) / STRIKE_STEP) * STRIKE_STEP)
 
 
-# ---------------- MAIN ----------------
-
-def get_symbol(price, side):
+# ---------------- MAIN SYMBOL BUILDER ----------------
+def get_symbol(price, side, otm_distance):
     try:
         if not price or price == 0:
             return "NA"
@@ -79,13 +68,16 @@ def get_symbol(price, side):
         else:
             return "NA"
 
-        # ---------------- ATM BASE ----------------
+        # ---------------- ATM ----------------
         atm = round_to_strike(price)
         atm = atm + ATM_BUFFER
 
         # ---------------- OTM SHIFT ----------------
         if "OTM" in side:
-            strike = atm + OTM_DISTANCE if opt_type == "CE" else atm - OTM_DISTANCE
+            if opt_type == "CE":
+                strike = atm + otm_distance
+            else:
+                strike = atm - otm_distance
         else:
             strike = atm
 
