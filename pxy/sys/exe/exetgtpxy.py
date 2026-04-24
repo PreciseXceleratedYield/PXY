@@ -87,7 +87,7 @@ def target_price(row):
 
             state = "✅"
         else:
-            score = 1
+            score = 3
             state = "❌"
 
         # 7️⃣ TARGET
