@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PXY TRADING DASHBOARD</title>
+<title>PXY DASHBOARD</title>
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
@@ -26,7 +26,7 @@ html, body {
 }
 
 /* =========================
-   TERMINAL (LEFT)
+   TERMINAL
 ========================= */
 #terminal {
     width: 35%;
@@ -46,7 +46,7 @@ html, body {
 }
 
 /* =========================
-   RIGHT PANEL (CHART)
+   RIGHT PANEL
 ========================= */
 #right {
     flex: 1;
@@ -55,24 +55,25 @@ html, body {
     background: #ffffff;
 }
 
-/* TOOLBAR */
 #toolbar {
-    padding: 6px;
+    padding: 5px;
     background: #f3f3f3;
     display: flex;
     gap: 10px;
     border-bottom: 1px solid #e5e5e5;
 }
 
-/* CHART CONTAINER */
-#chart {
+#chartWrap {
     flex: 1;
-    width: 100%;
-    height: 100%;
+}
+
+canvas {
+    width: 100% !important;
+    height: 100% !important;
 }
 
 /* =========================
-   FULLSCREEN MODES
+   FULLSCREEN MODES (DESKTOP)
 ========================= */
 .fullscreen-terminal #terminal {
     width: 100% !important;
@@ -91,9 +92,10 @@ html, body {
 }
 
 /* =========================
-   MOBILE
+   📱 MOBILE MODE
 ========================= */
 @media (max-width: 768px) {
+
     #right {
         display: none !important;
     }
@@ -119,13 +121,10 @@ html, body {
 
 <div id="container">
 
-    <!-- LEFT TERMINAL -->
     <div id="terminal"></div>
 
-    <!-- RESIZER -->
     <div id="divider"></div>
 
-    <!-- RIGHT CHART -->
     <div id="right">
 
         <div id="toolbar">
@@ -134,8 +133,9 @@ html, body {
             <button onclick="resetLayout()">🔄 Reset</button>
         </div>
 
-        <!-- TradingView Chart -->
-        <div id="chart"></div>
+        <div id="chartWrap">
+            <canvas id="priceChart"></canvas>
+        </div>
 
     </div>
 
@@ -144,9 +144,7 @@ html, body {
 <!-- LIBS -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
-
-<!-- TRADINGVIEW -->
-<script src="https://s3.tradingview.com/tv.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 
@@ -158,50 +156,51 @@ const term = new Terminal({
     scrollback: 1000,
     fontFamily: "monospace",
     fontSize: 14,
+    cursorBlink: false,
     theme: {
         background: "#ffffff",
-        foreground: "#111"
+        foreground: "#111111",
+        cursor: "#111111",
+        selection: "rgba(0,0,0,0.08)"
     }
 });
 
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
-
-term.open(document.getElementById("terminal"));
+term.open(document.getElementById('terminal'));
 
 setTimeout(() => fitAddon.fit(), 50);
 window.addEventListener("resize", () => fitAddon.fit());
 
-term.writeln("TERMINAL READY");
+term.writeln("TERMINAL OK");
 
 /* =========================
-   WEBSOCKET (optional)
+   WEBSOCKET
 ========================= */
 const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   RESIZE
+   DRAG SPLIT (DESKTOP ONLY)
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
 const right = document.getElementById("right");
 
-let dragging = false;
+let isDragging = false;
 
-divider.addEventListener("mousedown", () => dragging = true);
+divider.addEventListener("mousedown", () => isDragging = true);
 
 window.addEventListener("mouseup", () => {
-    dragging = false;
-    localStorage.setItem("split", terminal.style.width);
+    isDragging = false;
+    saveLayout();
 });
 
 window.addEventListener("mousemove", (e) => {
-    if (!dragging) return;
-    if (window.innerWidth <= 768) return;
+    if (!isDragging) return;
+    if (window.innerWidth <= 768) return; // disable on mobile
 
     const percent = (e.clientX / window.innerWidth) * 100;
-
     if (percent < 10 || percent > 80) return;
 
     terminal.style.width = percent + "%";
@@ -211,8 +210,12 @@ window.addEventListener("mousemove", (e) => {
 });
 
 /* =========================
-   LAYOUT SAVE/LOAD
+   LAYOUT
 ========================= */
+function saveLayout() {
+    localStorage.setItem("split", terminal.style.width);
+}
+
 function loadLayout() {
     const saved = localStorage.getItem("split");
     if (saved && window.innerWidth > 768) {
@@ -239,24 +242,104 @@ function resetLayout() {
 }
 
 /* =========================
-   TRADINGVIEW CHART
+   CHART
 ========================= */
-new TradingView.widget({
-    container_id: "chart",
-    symbol: "NSE:NIFTY",
-    interval: "5",
-    theme: "light",
-    style: "1",
-    locale: "en",
-    allow_symbol_change: true,
-    hide_top_toolbar: false,
-    autosize: true
-});
+let chart;
+
+async function load() {
+    const res = await fetch("./syschrtpxy.json");
+    const data = await res.json();
+
+    const closes = data.map(d => d.close);
+    const stVals = data.map(d => d.st);
+    const stTrend = data.map(d => d.st_trend);
+
+    draw(closes, stVals, stTrend);
+}
+
+function draw(closes, stVals, stTrend) {
+
+    const ctx = document.getElementById("priceChart");
+
+    if (chart) chart.destroy();
+
+    /* =========================
+       3 CANDLE RIGHT PADDING
+    ========================= */
+    const pad = 3;
+
+    const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
+    const closePad = [...closes, ...Array(pad).fill(null)];
+    const stPad = [...stVals, ...Array(pad).fill(null)];
+    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
+
+    chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels,
+
+            datasets: [
+
+                // CLOSE
+                {
+                    label: "Close",
+                    data: closePad,
+                    borderColor: "#000000",
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.25
+                },
+
+                // SUPER TREND
+                {
+                    label: "ST",
+                    data: stPad,
+                    showLine: false,
+
+                    pointRadius: 2,
+                    pointBorderWidth: 2,
+
+                    pointBackgroundColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    ),
+
+                    pointBorderColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    )
+                }
+            ]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+
+            plugins: {
+                legend: { display: false }
+            },
+
+            scales: {
+                x: {
+                    ticks: { color: "#333" },
+                    grid: { color: "#eee" },
+                    offset: true
+                },
+                y: {
+                    position: "right",
+                    ticks: { color: "#333" },
+                    grid: { color: "#eee" }
+                }
+            }
+        }
+    });
+}
 
 /* =========================
    INIT
 ========================= */
 loadLayout();
+load();
+setInterval(load, 3000);
 
 </script>
 
