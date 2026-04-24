@@ -79,7 +79,7 @@ def target_price(row):
 
             depth = ce_depth if is_ce else pe_depth if is_pe else 0
 
-            score = ((atr) * power)
+            score = atr
 
             # safety controls
             score = max(score, 3)
