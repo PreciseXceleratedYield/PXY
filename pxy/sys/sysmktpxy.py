@@ -160,18 +160,18 @@ def entry_signal(df):
 
 
 # ==================================================
-# OC/2 FLOW
+# HA FLOW
 # ==================================================
 def exit_signal(df):
 
     if df is None or len(df) < 3:
         return "NONE"
 
-    oc2 = (df['Open'] + df['Close']) / 2
+    ha_close = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
 
-    prev2 = oc2.iloc[-3]
-    prev1 = oc2.iloc[-2]
-    curr  = oc2.iloc[-1]
+    prev2 = ha_close.iloc[-3]
+    prev1 = ha_close.iloc[-2]
+    curr  = ha_close.iloc[-1]
 
     if prev1 <= prev2 and curr > prev1:
         return "BULL"
@@ -186,7 +186,6 @@ def exit_signal(df):
         return "BEAR"
 
     return "NONE"
-
 
 # ==================================================
 # UPGRADE ENGINE
