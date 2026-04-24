@@ -4,7 +4,7 @@
 
 from sysmktpxy import get_signal
 from syscnfgpxy import TICKER
-from your_snapshot_file import get_market_snapshot  # adjust if needed
+from systdaypxy import get_market_snapshot  # adjust if needed
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
