@@ -39,20 +39,22 @@ def print_candle(o, h, l, c):
     lower_len = int(round(lower * WIDTH))
     body_len  = max(1, int(round(body * WIDTH)))
     upper_len = WIDTH - lower_len - body_len
+
     print(
         Fore.LIGHTBLACK_EX + "█" * lower_len +
         color + "█" * body_len + Style.RESET_ALL +
         Fore.LIGHTBLACK_EX + "█" * upper_len
     )
+
     low_str   = str(int(round(l)))
     close_str = str(int(round(c)))
     high_str  = str(int(round(h)))
+
     print(f"{low_str:<10}{close_str:^22}{high_str:>10}")
 
 
 # ---------------- MARKET SNAPSHOT ----------------
 def get_last_two_trading_days(TICKER, lookback_days=14):
-    """Return the last two trading sessions (latest first)."""
     IST = pytz.timezone("Asia/Kolkata")
     today = datetime.now(IST).date()
 
@@ -62,6 +64,7 @@ def get_last_two_trading_days(TICKER, lookback_days=14):
     )
     if df.empty or len(df) < 2:
         return None, None
+
     return df.iloc[-1], df.iloc[-2]
 
 
@@ -70,9 +73,20 @@ def get_market_snapshot(TICKER):
     if today is None or prev is None:
         return None
 
-    o, h, l, c = today.Open, today.High, today.Low, today.Close
-    prev_close = prev.Close
-    result = {"open": o, "high": h, "low": l, "close": c, "prev_close": prev_close}
+    # ---------------- INTEGER CONVERSION ONLY ----------------
+    o = int(round(today.Open))
+    h = int(round(today.High))
+    l = int(round(today.Low))
+    c = int(round(today.Close))
+    prev_close = int(round(prev.Close))
+
+    result = {
+        "open": o,
+        "high": h,
+        "low": l,
+        "close": c,
+        "prev_close": prev_close
+    }
 
     # -------- BIAS --------
     midpoint = (h + l) / 2
@@ -86,9 +100,10 @@ def get_market_snapshot(TICKER):
         bias = "W-BEAR"
     else:
         bias = "NEUTRAL"
+
     result["bias"] = bias
 
-    # -------- POWER --------
+    # -------- POWER (UNCHANGED LOGIC, but safe integers already) --------
     rng = h - l
     if rng == 0:
         power = 1
@@ -96,15 +111,17 @@ def get_market_snapshot(TICKER):
         body_position = abs(c - midpoint)
         power = int((body_position / rng) * 10)
         power = max(1, min(power, 10))
+
     result["power"] = power
 
     # -------- % CALCULATIONS --------
     o_change = ((c - o) / o) * 100 if o != 0 else 0
     m_change = ((c - midpoint) / midpoint) * 100 if midpoint != 0 else 0
+
     result["o_change"] = round(o_change, 2)
     result["m_change"] = round(m_change, 2)
 
-    # -------- BREAKOUT (if market open today) --------
+    # -------- BREAKOUT --------
     IST = pytz.timezone("Asia/Kolkata")
     now_ist = datetime.now(IST).time()
     breakout = "NA"
@@ -114,9 +131,11 @@ def get_market_snapshot(TICKER):
         if not df_1m.empty:
             df_1m = df_1m.tz_localize(None)
             morning_df = df_1m.between_time("09:15", "09:30")
+
             if not morning_df.empty:
                 m_high = morning_df["High"].max()
                 m_low = morning_df["Low"].min()
+
                 if time(9, 15) <= now_ist <= time(9, 30):
                     if c > m_high:
                         breakout = "ACT-BULL"
@@ -153,54 +172,50 @@ def main():
     # -------- BIAS + TODAY OPEN --------
     left_label = Fore.YELLOW + "Bias:"
     left_value = (Fore.GREEN if "BULL" in bias else Fore.RED) + bias
-    
+
     right_label = Fore.YELLOW + "Open:"
     open_color = Fore.GREEN if o > prev_close else Fore.RED if o < prev_close else Fore.YELLOW
-    right_value = open_color + f"{o:.2f}"
-    
-    spacing = WIDTH - len(f"Bias:{bias}") - len(f"Open:{o:.2f}")
-    
+    right_value = open_color + f"{o}"
+
+    spacing = WIDTH - len(f"Bias:{bias}") - len(f"Open:{o}")
+
     print(left_label + left_value + " " * spacing + right_label + right_value)
 
     # -------- YESTERDAY CLOSE + % --------
     o_str = f"O:{o_change:+.2f}%"
     m_str = f"M:{m_change:+.2f}%"
-    y_close_str = f"YC:{prev_close:.2f}"
-    
-    o_color = Fore.GREEN if o_change > 0 else Fore.RED if o_change < 0 else Fore.YELLOW
-    m_color = Fore.GREEN if m_change > 0 else Fore.RED if m_change < 0 else Fore.YELLOW
-    
-    left_part = f"YC:{prev_close:.2f}"
+
+    left_part = f"YC:{prev_close}"
     mid_part = o_str
     right_part = m_str
-    
+
     mid_start = (WIDTH // 2) - (len(mid_part) // 2)
     right_start = WIDTH - len(right_part)
-    
+
     line = [" "] * WIDTH
-    
-    # left (yesterday close)
+
     for i, ch in enumerate(left_part):
         if i < WIDTH:
             line[i] = ch
-    
-    # middle (O change)
+
     for i, ch in enumerate(mid_part):
         pos = mid_start + i
         if 0 <= pos < WIDTH:
             line[pos] = ch
-    
-    # right (M change)
+
     for i, ch in enumerate(right_part):
         pos = right_start + i
         if 0 <= pos < WIDTH:
             line[pos] = ch
-    
+
     final_line = "".join(line)
-    
+
+    o_color = Fore.GREEN if o_change > 0 else Fore.RED if o_change < 0 else Fore.YELLOW
+    m_color = Fore.GREEN if m_change > 0 else Fore.RED if m_change < 0 else Fore.YELLOW
+
     final_line = final_line.replace(o_str, o_color + o_str + Style.RESET_ALL)
     final_line = final_line.replace(m_str, m_color + m_str + Style.RESET_ALL)
-    
+
     print(final_line)
 
 
