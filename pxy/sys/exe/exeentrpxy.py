@@ -6,7 +6,6 @@ import pytz
 from colorama import Fore, init, Style
 import traceback
 
-OTM_DISTANCE = 100
 
 # --- GLOBAL CONFIG ---
 DEBUG = False
@@ -58,6 +57,7 @@ except Exception as e:
     print(f"{Fore.RED}IMPORT ERROR: {e}")
     sys.exit(1)
 
+OTM_DISTANCE = 100
 
 # --- ORDER EXECUTION ---
 def execute_order(client, symbol, qty):
