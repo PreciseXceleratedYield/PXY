@@ -6,6 +6,8 @@ import pytz
 from colorama import Fore, init, Style
 import traceback
 
+OTM_DISTANCE = 100
+
 # --- GLOBAL CONFIG ---
 DEBUG = False
 init(autoreset=True)
@@ -236,7 +238,7 @@ async def main():
                 print("CE already active → SKIP")
             else:
                 dprint("GETTING SYMBOL FOR CE...")
-                symbol = get_symbol(ltp, sig)
+                symbol = get_symbol(ltp, sig, OTM_DISTANCE)
                 dprint(f"SYMBOL: {symbol}")
 
                 if not symbol or symbol == "NA":
@@ -256,7 +258,7 @@ async def main():
                 print("PE already active → SKIP")
             else:
                 dprint("GETTING SYMBOL FOR PE...")
-                symbol = get_symbol(ltp, sig)
+                symbol = get_symbol(ltp, sig, OTM_DISTANCE)
                 dprint(f"SYMBOL: {symbol}")
 
                 if not symbol or symbol == "NA":
