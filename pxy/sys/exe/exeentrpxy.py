@@ -127,16 +127,21 @@ async def main():
         try:
             TO_raw = data.get("TO")
             YC_raw = data.get("YC")
-        
+            
             TO = int(float(TO_raw))
             YC = int(float(YC_raw))
-        
             OTM_DISTANCE = round(abs(TO - YC) / 100) * 100
             dprint(f"OTM_DYNAMIC: |{TO}-{YC}| = {OTM_DISTANCE}", Fore.CYAN)
-        
+            bias = str(data.get("bias", "")).upper().strip()
+    
+            is_bull = any(word in bias for word in ["BULL"])
+            is_bear = any(word in bias for word in ["BEAR"])
         except Exception as e:
             dprint(f"OTM fallback used: {e}", Fore.YELLOW)
             OTM_DISTANCE = 100
+            bias = ""
+            is_bull = False
+            is_bear = False
 
         # 🔥 SURGICAL ADDITION: EXIT NORMALIZATION
         exit_sig = str(reversal).upper().strip() if reversal else "NONE"
@@ -199,14 +204,24 @@ async def main():
                 if exit_sig in ["BUY", "BULL"]:
                     if pe_active:
                         dprint("🔁 MISMATCH: PE active but regime BULL → switching to CE", Fore.RED)
-                        sig = "ATMBUY"
+            
+                        if is_bull:
+                            sig = "ATMBUY"
+                        else:
+                            sig = "OTMBUY"
+            
                     else:
                         dprint("✅ MATCH: BULL regime with no PE conflict", Fore.GREEN)
             
                 elif exit_sig in ["SELL", "BEAR"]:
                     if ce_active:
                         dprint("🔁 MISMATCH: CE active but regime BEAR → switching to PE", Fore.RED)
-                        sig = "ATMSELL"
+            
+                        if is_bear:
+                            sig = "ATMSELL"
+                        else:
+                            sig = "OTMSELL"
+            
                     else:
                         dprint("✅ MATCH: BEAR regime with no CE conflict", Fore.GREEN)
             
@@ -222,6 +237,7 @@ async def main():
             dprint("----- REGIME CHECK END -----", Fore.MAGENTA)
             # --- FORCE FINAL SIGNAL NORMALIZATION ---
             sig = sig.upper().strip()
+            is_valid_entry = sig in VALID
             # --- FINAL ENTRY VALIDATION AFTER REGIME CORRECTION ---
             if not is_valid_entry:
                 dprint(f"ENTRY INVALID BUT REGIME OVERRIDE ALLOWED: {sig}", Fore.YELLOW)
