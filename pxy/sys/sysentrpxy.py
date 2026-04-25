@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 def get_entry_signal(df=None):
 
     signal, exit_signal = get_signal()
+    orig_signal = signal
 
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
     current_time = now.time()
@@ -71,6 +72,7 @@ def get_entry_signal(df=None):
 
     print(f"{signal} → {final_signal} (ST:{st})".center(36))
 
+    exit_signal = orig_signal
     return final_signal, exit_signal
 
 
