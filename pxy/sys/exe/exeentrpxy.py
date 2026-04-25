@@ -132,14 +132,14 @@ async def main():
             YC = int(float(YC_raw))
             OTM_DISTANCE = round(abs(TO - YC) / 100) * 100
             dprint(f"OTM_DYNAMIC: |{TO}-{YC}| = {OTM_DISTANCE}", Fore.CYAN)
-            bias = str(data.get("bias", "")).upper().strip()
+            supertrend = str(data.get("supertrend", "")).upper().strip()
     
-            is_bull = any(word in bias for word in ["BULL"])
-            is_bear = any(word in bias for word in ["BEAR"])
+            is_bull = supertrend == "UP"
+            is_bear = supertrend == "DOWN"
         except Exception as e:
             dprint(f"OTM fallback used: {e}", Fore.YELLOW)
             OTM_DISTANCE = 100
-            bias = ""
+            supertrend = ""
             is_bull = False
             is_bear = False
 
