@@ -27,7 +27,7 @@ def get_structure(df):
 
 
 # ==================================================
-# SWEEP DETECTION
+# SWEEP DETECTION (UNCHANGED BUT NOT USED FOR DIRECTION NOW)
 # ==================================================
 def detect_sweep(df, structure_high, structure_low):
     last = df.iloc[-1]
@@ -42,45 +42,35 @@ def detect_sweep(df, structure_high, structure_low):
 
 
 # ==================================================
-# 🔵 BOS ENGINE (EVENT ONLY)
+# 🔵 BOS ENGINE (ONLY STRUCTURE DIRECTION)
 # ==================================================
 def get_bos(df):
 
     try:
         if df is None or len(df) < STRUCTURE_WINDOW + 2:
-            return "NONE"
+            return "SIDE"
 
-        last = df.iloc[-1]
-        prev = df.iloc[-2]
-
-        structure_high, structure_low = get_structure(df)
-
-        log("BOS", f"H:{structure_high} L:{structure_low}")
+        log("BOS", "calculating structure direction")
 
         # ==================================================
-        # 🚀 EVENT SIGNALS ONLY
+        # 🔥 STRUCTURE DIRECTION ONLY
         # ==================================================
-        sweep = detect_sweep(df, structure_high, structure_low)
+        prev_high = df['High'].iloc[-15:-1].max()
+        prev_low  = df['Low'].iloc[-15:-1].min()
 
-        if sweep == "BUY":
-            return "BUY"
+        curr_high = df['High'].iloc[-14:].max()
+        curr_low  = df['Low'].iloc[-14:].min()
 
-        if sweep == "SELL":
-            return "SELL"
+        if curr_high > prev_high and curr_low >= prev_low:
+            return "BULL"
 
-        if prev['Close'] <= structure_high and last['Close'] > structure_high:
-            return "BUY"
+        if curr_high <= prev_high and curr_low < prev_low:
+            return "BEAR"
 
-        if prev['Close'] >= structure_low and last['Close'] < structure_low:
-            return "SELL"
-
-        # ==================================================
-        # ❌ NO TRADE OTHERWISE
-        # ==================================================
-        return "NONE"
+        return "SIDE"
 
     except Exception:
-        return "NONE"
+        return "SIDE"
 
 
 # ==================================================
@@ -97,14 +87,14 @@ def get_bos_bar(df):
 
     signal = get_signal(df)
 
-    state = "BREAK OUT" if signal in ["BUY", "SELL"] else "NO TRADE"
+    state = signal  # BULL / BEAR / SIDE
 
     banner = "     ﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ_" + state + "_٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩﮩ"
 
-    if signal == "BUY":
+    if signal == "BULL":
         return Fore.GREEN + banner + Style.RESET_ALL, signal
 
-    if signal == "SELL":
+    if signal == "BEAR":
         return Fore.RED + banner + Style.RESET_ALL, signal
 
     return Fore.LIGHTBLACK_EX + banner + Style.RESET_ALL, signal
