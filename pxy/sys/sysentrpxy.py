@@ -39,9 +39,6 @@ def get_entry_signal(df=None):
     # 🔵 AFTER 9:30 → FULL SYSTEM
     # ==================================================
 
-    # BASE SIGNAL
-    signal, exit_signal = get_signal()
-
     # ST FETCH
     df = calculate_supertrend(df)
     last = df.iloc[-1]
