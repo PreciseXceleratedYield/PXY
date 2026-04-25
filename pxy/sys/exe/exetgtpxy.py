@@ -64,7 +64,7 @@ def target_price(row):
         bearish = any(x in _signal for x in ["SELL", "BEAR", "DOWN"])
 
         # 5️⃣ SUPER TREND DIRECTION (FIXED)
-        st = str(supertrend).upper()
+        st = str(supertrend).strip().upper()
 
         is_up = st == "UP"
         is_down = st == "DOWN"
