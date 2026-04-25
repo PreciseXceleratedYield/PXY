@@ -4,7 +4,7 @@ init(autoreset=True)
 # ==================================================
 # GLOBAL SETTINGS
 # ==================================================
-STRUCTURE_WINDOW = 14
+STRUCTURE_WINDOW = 30
 DEBUG = False
 
 
@@ -27,7 +27,7 @@ def get_structure(df):
 
 
 # ==================================================
-# SWEEP DETECTION (UNCHANGED BUT NOT USED FOR DIRECTION NOW)
+# SWEEP DETECTION (NOT USED FOR DIRECTION)
 # ==================================================
 def detect_sweep(df, structure_high, structure_low):
     last = df.iloc[-1]
@@ -42,7 +42,7 @@ def detect_sweep(df, structure_high, structure_low):
 
 
 # ==================================================
-# 🔵 BOS ENGINE (ONLY STRUCTURE DIRECTION)
+# 🔵 STRUCTURE DIRECTION ENGINE (30 WINDOW)
 # ==================================================
 def get_bos(df):
 
@@ -53,13 +53,13 @@ def get_bos(df):
         log("BOS", "calculating structure direction")
 
         # ==================================================
-        # 🔥 STRUCTURE DIRECTION ONLY
+        # 🔥 STRUCTURE LOGIC (30 WINDOW)
         # ==================================================
-        prev_high = df['High'].iloc[-15:-1].max()
-        prev_low  = df['Low'].iloc[-15:-1].min()
+        prev_high = df['High'].iloc[-(STRUCTURE_WINDOW + 1):-1].max()
+        prev_low  = df['Low'].iloc[-(STRUCTURE_WINDOW + 1):-1].min()
 
-        curr_high = df['High'].iloc[-14:].max()
-        curr_low  = df['Low'].iloc[-14:].min()
+        curr_high = df['High'].iloc[-STRUCTURE_WINDOW:].max()
+        curr_low  = df['Low'].iloc[-STRUCTURE_WINDOW:].min()
 
         if curr_high > prev_high and curr_low >= prev_low:
             return "BULL"
@@ -74,20 +74,20 @@ def get_bos(df):
 
 
 # ==================================================
-# ⚙️ SIGNAL ENGINE
+# SIGNAL ENGINE
 # ==================================================
 def get_signal(df):
     return get_bos(df)
 
 
 # ==================================================
-# 📊 VISUAL OUTPUT
+# VISUAL OUTPUT
 # ==================================================
 def get_bos_bar(df):
 
     signal = get_signal(df)
 
-    state = signal  # BULL / BEAR / SIDE
+    state = signal
 
     banner = "     ﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ_" + state + "_٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩﮩ"
 
