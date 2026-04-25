@@ -12,15 +12,21 @@ def dynamic_entry(row):
         original_price = float(row.get("buy_prc", 0))
         entry_time_val = row.get("buy_time")
         symbol = str(row.get("symbol", "")).upper()
+
         supertrend = str(row.get("supertrend", "")).upper().strip()
 
         if not entry_time_val or original_price == 0:
             return original_price
 
+        # ---------------- SAFE SUPERTREND CHECK ----------------
+        if supertrend not in ["UP", "DOWN"]:
+            return original_price
+
         now = datetime.now(IST)
 
-        is_ce = "CE" in symbol
-        is_pe = "PE" in symbol
+        # ---------------- STRICT SYMBOL CHECK ----------------
+        is_ce = symbol.endswith("CE")
+        is_pe = symbol.endswith("PE")
 
         # ==================================================
         # 🧠 TREND ALIGNMENT CHECK
@@ -67,7 +73,7 @@ def dynamic_entry(row):
                 increment = elapsed_secs * BASE_INCREMENT
                 dynamic_val = original_price - increment
 
-                print(f"{symbol} | AGAINST TREND DECAY: {int(increment)} pts")
+                print(f"{symbol} | COUNTER DECAY: {int(increment)} pts")
 
                 return round(dynamic_val, 2)
 
