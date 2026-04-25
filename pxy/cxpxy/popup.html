@@ -1,42 +1,62 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Open URL</title>
+  <title>CXPXY</title>
   <style>
-    html, body {
+    body {
       margin: 0;
-      padding: 0;
-      width: 400px;
+      width: 1000px;
       height: 600px;
-      overflow: hidden;
-    }
-
-    .viewport {
-      width: 400px;
-      height: 600px;
-      overflow: auto; /* allow scroll if needed */
-      position: relative;
-    }
-
-    .scale-wrapper {
-      width: 400px;
-      height: 600px;
-      transform: scale(0.385); /* 1 / 2.6 */
-      transform-origin: top left;
+      font-family: Arial;
     }
 
     iframe {
-      width: 400px;
-      height: 600px;
+      width: 100%;
+      height: 100%;
       border: none;
+    }
+
+    #fallback {
+      display: none;
+      text-align: center;
+      padding-top: 200px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
     }
   </style>
 </head>
+
 <body>
-  <div class="viewport">
-    <div class="scale-wrapper">
-      <iframe src="http://20.219.25.209/"></iframe>
-    </div>
-  </div>
+
+<iframe id="frame" src="http://20.219.25.209/cxpxy.html"></iframe>
+
+<div id="fallback">
+  <p>Popup blocked by site security</p>
+  <button onclick="openTab()">Open Dashboard</button>
+</div>
+
+<script>
+  const iframe = document.getElementById("frame");
+
+  setTimeout(() => {
+    try {
+      iframe.contentWindow.location.href;
+    } catch (e) {
+      iframe.style.display = "none";
+      document.getElementById("fallback").style.display = "block";
+    }
+  }, 1500);
+
+  function openTab() {
+    chrome.tabs.create({
+      url: "http://20.219.25.209/cxpxy.html"
+    });
+  }
+</script>
+
 </body>
 </html>
