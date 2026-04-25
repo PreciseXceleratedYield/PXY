@@ -79,7 +79,7 @@ def target_price(row):
                 score = atr * ce_power
                 state = "UP_CE"
             elif is_pe:
-                score = atr / 2
+                score = atr / 3
                 state = "UP_PE"
 
         elif is_down:
@@ -88,7 +88,7 @@ def target_price(row):
                 score = atr * pe_power
                 state = "DOWN_PE"
             elif is_ce:
-                score = atr / 2
+                score = atr / 3
                 state = "DOWN_CE"
 
         # 7️⃣ TARGET
