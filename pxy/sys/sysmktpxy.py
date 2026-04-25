@@ -32,11 +32,11 @@ def get_df():
     today = df['Datetime'].dt.date.iloc[-1]
     df = df[df['Datetime'].dt.date == today]
 
-    # Start from 9:16
-    df = df[df['Datetime'].dt.time >= time(9, 16)]
+    # Start from 9:15
+    df = df[df['Datetime'].dt.time >= time(9, 15)]
 
-    # FINAL MINIMUM CHECK (correct place)
-    if len(df) < max(LOOKBACK + 3, 8):
+    # FINAL MINIMUM CHECK
+    if len(df) < 13:
         return None
 
     return df.reset_index(drop=True)
@@ -187,6 +187,7 @@ def exit_signal(df):
 
     return "NONE"
 
+
 # ==================================================
 # UPGRADE ENGINE
 # ==================================================
@@ -215,7 +216,7 @@ def get_signal():
 
         current_time = df.iloc[-1]['Datetime'].time()
 
-        if is_open_block(current_time):
+        if is_open_block(current_time) and len(df) < 15:
             print("⏳ ENTRY MODE: OPENING_BLOCK 🛑")
             return "NONE", "NONE"
 
@@ -229,7 +230,9 @@ def get_signal():
         final_state, final_tag = apply_upgrade(entry_state, entry_tag, oc_state)
 
         print(f"🔥 ENTRY MODE: {final_tag} 🚀 ✔️")
-        return final_state, final_state
+
+        # FIXED: preserve exit signal properly
+        return final_state, oc_state
 
     except Exception as e:
         print("[ERROR]", e)
