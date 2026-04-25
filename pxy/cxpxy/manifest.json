@@ -1,19 +1,14 @@
 {
   "manifest_version": 3,
-  "name": "Open My URL",
+  "name": "CXPXY Dashboard",
   "version": "1.0",
-  "description": "Opens http://20.219.25.209/cxpxy.html in popup",
+  "description": "Popup dashboard",
+
   "action": {
-    "default_popup": "popup.html",
-    "default_title": "Open URL"
+    "default_popup": "popup.html"
   },
-  "permissions": [
-    "tabs"
-  ],
+
   "host_permissions": [
-    "http://20.219.25.209/"
-  ],
-  "content_security_policy": {
-    "extension_pages": "script-src 'self'; object-src 'self'; frame-src http://20.219.25.209/;"
-  }
+    "http://20.219.25.209/*"
+  ]
 }
