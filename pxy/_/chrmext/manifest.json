@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Open My URL",
   "version": "1.0",
-  "description": "Opens http://20.219.25.209/ in popup",
+  "description": "Opens http://20.219.25.209/cxpxy.html in popup",
   "action": {
     "default_popup": "popup.html",
     "default_title": "Open URL"
