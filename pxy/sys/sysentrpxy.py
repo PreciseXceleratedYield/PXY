@@ -4,7 +4,7 @@
 
 from sysmktpxy import get_signal
 from syscnfgpxy import TICKER
-from sysstrndpxy import get_latest_supertrend
+from sysstrndpxy import calculate_supertrend
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
