@@ -35,23 +35,23 @@ def target_price(row):
         atr = f(row.get("atr", 0))
         ce_power = f(row.get("ce_power", 0))
         pe_power = f(row.get("pe_power", 0))
+        supertrend = row.get("supertrend", 0)
 
         # 3️⃣ OPTION TYPE
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
 
-        # 4️⃣ SIGNAL
+        # 4️⃣ SIGNALS
         entry_signal = str(row.get("entry", "NONE")).upper()
         exit_signal = str(row.get("exit", "NONE")).upper()
-        direction_signal = str(row.get("direction", "NONE")).upper()
         counter = str(row.get("counter", "Y")).upper()
 
-        # ✅ FIXED SIGNAL SELECTION (surgical)
-        _signal = exit_signal if counter == "Y" else exit_signal
+        # FIXED (minimal correction)
+        _signal = exit_signal if counter == "Y" else entry_signal
 
-        # -------------------- HLD MODE (NONE CASE) --------------------
+        # -------------------- HLD MODE --------------------
         if _signal == "NONE":
-            score = 20
+            score = 6
             target = int(entry * (1 + score / 100))
             state = "🟡HLD"
 
@@ -60,27 +60,36 @@ def target_price(row):
 
             return target
 
-        # ✅ REMOVED "NONE" FROM LOGIC (surgical)
         bullish = any(x in _signal for x in ["BUY", "BULL", "UP"])
         bearish = any(x in _signal for x in ["SELL", "BEAR", "DOWN"])
 
-        # 5️⃣ ALIGNMENT
-        aligned = (
-            (is_ce and bullish) or
-            (is_pe and bearish)
-        )
+        # 5️⃣ SUPER TREND DIRECTION (FIXED)
+        st = str(supertrend).upper()
 
-        # 6️⃣ SCORE → ATR × POWER + RELEVANT DEPTH
-        if aligned:
-            power = ce_power if is_ce else pe_power if is_pe else 0
+        is_up = st == "UP"
+        is_down = st == "DOWN"
 
-            ce_depth = f(row.get("hkin_ce_depth", 0))
-            pe_depth = f(row.get("hkin_pe_depth", 0))
+        # -------------------- CORE LOGIC --------------------
+        score = 0
+        state = "❌"
 
-            depth = ce_depth if is_ce else pe_depth if is_pe else 0
+        if is_up:
+            # UP TREND
+            if is_ce:
+                score = atr * ce_power
+                state = "UP_CE"
+            elif is_pe:
+                score = atr / 2
+                state = "UP_PE"
 
-            score = atr * power
-            state = "❌"
+        elif is_down:
+            # DOWN TREND
+            if is_pe:
+                score = atr * pe_power
+                state = "DOWN_PE"
+            elif is_ce:
+                score = atr / 2
+                state = "DOWN_CE"
 
         # 7️⃣ TARGET
         target = int(entry * (1 + score / 100))
