@@ -42,10 +42,12 @@ def get_entry_signal(df=None):
     # BASE SIGNAL
     signal, exit_signal = get_signal()
 
-    # ST FETCH (if needed later in your pipeline)
-    data = get_latest_supertrend()
-    st = data.get("supertrend", "NEUTRAL").upper()
-
+    # ST FETCH
+    df = calculate_supertrend(df)
+    last = df.iloc[-1]
+    
+    st = str(last["ST_Trend"]).upper()
+    
     is_up = st == "UP"
     is_down = st == "DOWN"
 
