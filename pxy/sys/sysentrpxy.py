@@ -5,6 +5,7 @@
 from sysmktpxy import get_signal
 from syscnfgpxy import TICKER
 from systdaypxy import get_market_snapshot  # adjust if needed
+from sysstrndpxy import get_latest_supertrend
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
@@ -20,15 +21,14 @@ def get_entry_signal(df=None):
     signal, exit_signal = get_signal()
 
     # ------------------------------
-    # BIAS FETCH
+    # ST FETCH (REPLACES BIAS)
     # ------------------------------
-    data = get_market_snapshot(TICKER)
-    bias = data["bias"] if data else "NEUTRAL"
+    data = get_latest_supertrend()
 
-    # simple normalization
-    bias_u = bias.upper()
-    is_bear = "BEAR" in bias_u
-    is_bull = "BULL" in bias_u
+    st = data.get("supertrend", "NEUTRAL").upper()
+
+    is_up = st == "UP"
+    is_down = st == "DOWN"
 
     # ------------------------------
     # TIME BLOCK (IST)
@@ -59,15 +59,15 @@ def get_entry_signal(df=None):
         return signal, exit_signal
 
     # ==================================================
-    # BIAS MAPPING ONLY (CORE LOGIC)
+    # ST MAPPING ONLY (REPLACES BIAS LOGIC)
     # ==================================================
     final_signal = "NONE"
 
     if signal == "BUY":
-        final_signal = "OTMBUY" if is_bear else "ATMBUY"
+        final_signal = "OTMBUY" if is_down else "ATMBUY"
 
     elif signal == "SELL":
-        final_signal = "OTMSELL" if is_bull else "ATMSELL"
+        final_signal = "OTMSELL" if is_up else "ATMSELL"
 
     elif signal in ["ATMBUY", "ATMSELL"]:
         final_signal = signal
@@ -75,7 +75,7 @@ def get_entry_signal(df=None):
     # ------------------------------
     # OUTPUT
     # ------------------------------
-    print(f"{signal} → {final_signal} ({bias})".center(36))
+    print(f"{signal} → {final_signal} (ST:{st})".center(36))
 
     return final_signal, exit_signal
 
