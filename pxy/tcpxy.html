@@ -33,28 +33,12 @@ body::-webkit-scrollbar {
 }
 
 /* =========================
-   TOP CANDLE (NEW FIX)
-========================= */
-#topCandleWrap {
-    width: 100%;
-    height: 60px;
-    background: #3b3b3b;
-    border-bottom: 1px solid #4a4a4a;
-}
-
-#topCandle {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-/* =========================
    MAIN LAYOUT
 ========================= */
 #container {
     display: flex;
     width: 100%;
-    height: calc(100vh - 60px);
+    height: 100vh;
 }
 
 /* =========================
@@ -63,7 +47,7 @@ body::-webkit-scrollbar {
 #terminal {
     width: 35%;
     min-width: 200px;
-    height: 100%;
+    height: 100vh;
     background: #3b3b3b;
     border-right: 1px solid #4a4a4a;
 }
@@ -172,11 +156,6 @@ canvas {
 
 <body>
 
-<!-- 🔥 TOP CANDLE FRAME (ADDED) -->
-<div id="topCandleWrap">
-    <canvas id="topCandle"></canvas>
-</div>
-
 <div id="container">
 
     <div id="terminal"></div>
@@ -229,7 +208,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG
+   DRAG FIXED DIVIDER
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -252,6 +231,7 @@ window.addEventListener("mousemove", (e) => {
     if (window.innerWidth <= 768) return;
 
     const percent = (e.clientX / window.innerWidth) * 100;
+
     if (percent < 10 || percent > 80) return;
 
     terminal.style.width = percent + "%";
@@ -276,7 +256,7 @@ function loadLayout() {
 }
 
 /* =========================
-   CHART
+   CHART (UNCHANGED)
 ========================= */
 let chart;
 
@@ -289,65 +269,8 @@ async function load() {
     const stTrend = data.map(d => d.st_trend);
 
     draw(closes, stVals, stTrend);
-    drawTopCandle(stVals, closes);   // 🔥 ADDED
 }
 
-/* =========================
-   TOP CANDLE LOGIC (NEW)
-========================= */
-function drawTopCandle(stVals, closes) {
-
-    const canvas = document.getElementById("topCandle");
-    const ctx = canvas.getContext("2d");
-
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (!stVals.length || !closes.length) return;
-
-    const open = stVals[0];
-    const close = closes[closes.length - 1];
-    const high = Math.max(...stVals);
-    const low = Math.min(...stVals);
-
-    const midY = canvas.height / 2;
-
-    const pad = 20;
-    const width = canvas.width - pad * 2;
-
-    const scale = v =>
-        pad + ((v - low) / (high - low || 1)) * width;
-
-    const xOpen = scale(open);
-    const xClose = scale(close);
-    const xHigh = scale(high);
-    const xLow = scale(low);
-
-    const color = close >= open ? "#00c853" : "#ff1744";
-
-    // wick
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(xLow, midY);
-    ctx.lineTo(xHigh, midY);
-    ctx.stroke();
-
-    // body
-    ctx.fillStyle = color;
-    ctx.fillRect(
-        Math.min(xOpen, xClose),
-        midY - 1.5,
-        Math.abs(xClose - xOpen),
-        3
-    );
-}
-
-/* =========================
-   ORIGINAL CHART (UNCHANGED)
-========================= */
 function draw(closes, stVals, stTrend) {
 
     const ctx = document.getElementById("priceChart");
@@ -374,6 +297,7 @@ function draw(closes, stVals, stTrend) {
         data: {
             labels,
             datasets: [
+
                 {
                     label: "Close",
                     data: closePad,
@@ -382,6 +306,7 @@ function draw(closes, stVals, stTrend) {
                     pointRadius: 0,
                     tension: 0.25
                 },
+
                 {
                     label: "ST",
                     data: stPad,
@@ -408,6 +333,58 @@ function draw(closes, stVals, stTrend) {
             }
         }
     });
+}
+
+/* =========================
+   🔥 TOP FRAME FIX (ONLY CHANGE)
+========================= */
+function drawTopCandle(stVals, closes) {
+
+    const canvas = document.getElementById("topCandle");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!stVals.length || !closes.length) return;
+
+    const open = stVals[0];
+    const close = closes[closes.length - 1];
+
+    const high = Math.max(...stVals, ...closes);
+    const low = Math.min(...stVals, ...closes);
+
+    const range = high - low || 1;
+    const midY = canvas.height / 2;
+
+    // 🔥 NO PADDING (EDGE TO EDGE)
+    const scale = (v) =>
+        ((v - low) / range) * canvas.width;
+
+    const xOpen = scale(open);
+    const xClose = scale(close);
+    const xHigh = scale(high);
+    const xLow = scale(low);
+
+    const color = close >= open ? "#00c853" : "#ff1744";
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(xLow, midY);
+    ctx.lineTo(xHigh, midY);
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.fillRect(
+        Math.min(xOpen, xClose),
+        midY - 1.5,
+        Math.max(Math.abs(xClose - xOpen), 2),
+        3
+    );
 }
 
 /* =========================
