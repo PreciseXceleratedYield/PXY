@@ -8,6 +8,9 @@
 
 <style>
 
+/* =========================
+   GLOBAL
+========================= */
 :root {
     --divider-width: 6px;
 }
@@ -19,10 +22,18 @@ html, body {
     font-family: monospace;
     background: #3b3b3b;
     color: #eaeaea;
+
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none;
 }
 
 /* =========================
-   TOP CANDLE
+   TOP CANDLE (NEW FIX)
 ========================= */
 #topCandleWrap {
     width: 100%;
@@ -57,6 +68,17 @@ html, body {
     border-right: 1px solid #4a4a4a;
 }
 
+/* hide xterm scrollbar */
+.xterm .xterm-viewport {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar {
+    width: 0px !important;
+    height: 0px !important;
+}
+
 /* =========================
    DIVIDER
 ========================= */
@@ -65,6 +87,7 @@ html, body {
     min-width: 10px;
     cursor: col-resize;
     background: #4a4a4a;
+    z-index: 10;
 }
 
 /* =========================
@@ -77,21 +100,71 @@ html, body {
     background: #3b3b3b;
 }
 
+/* =========================
+   CHART FIX
+========================= */
 #chartWrap {
     flex: 1;
     position: relative;
+    height: 100%;
     overflow: hidden;
 }
 
 canvas {
+    display: block;
     width: 100% !important;
     height: 100% !important;
-    display: block;
     background: #3b3b3b;
 }
 
+/* =========================
+   REMOVE TOOLBAR
+========================= */
 #toolbar {
     display: none;
+}
+
+/* =========================
+   FULLSCREEN
+========================= */
+.fullscreen-terminal #terminal {
+    width: 100% !important;
+}
+
+.fullscreen-terminal #right {
+    display: none;
+}
+
+.fullscreen-chart #terminal {
+    display: none;
+}
+
+.fullscreen-chart #right {
+    width: 100% !important;
+}
+
+/* =========================
+   MOBILE
+========================= */
+@media (max-width: 768px) {
+
+    #right {
+        display: none !important;
+    }
+
+    #divider {
+        display: none !important;
+    }
+
+    #terminal {
+        width: 100% !important;
+        height: 100vh !important;
+        border-right: none;
+    }
+
+    #container {
+        flex-direction: column;
+    }
 }
 
 </style>
@@ -99,7 +172,7 @@ canvas {
 
 <body>
 
-<!-- 🔥 TOP CANDLE -->
+<!-- 🔥 TOP CANDLE FRAME (ADDED) -->
 <div id="topCandleWrap">
     <canvas id="topCandle"></canvas>
 </div>
@@ -124,7 +197,7 @@ canvas {
 <script>
 
 /* =========================
-   TERMINAL (DIM FIXED)
+   TERMINAL
 ========================= */
 const term = new Terminal({
     convertEol: true,
@@ -132,30 +205,11 @@ const term = new Terminal({
     fontFamily: "monospace",
     fontSize: 14,
     cursorBlink: false,
-
     theme: {
         background: "#3b3b3b",
-        foreground: "#cfcfcf",
-        cursor: "#cfcfcf",
-        selection: "rgba(255,255,255,0.08)",
-
-        black:   "#2b2b2b",
-        red:     "#c75c5c",
-        green:   "#5fbf7f",
-        yellow:  "#c7b15c",
-        blue:    "#6b8fd6",
-        magenta: "#a277c7",
-        cyan:    "#5fbfc7",
-        white:   "#bdbdbd",
-
-        brightBlack:   "#3a3a3a",
-        brightRed:     "#d97a7a",
-        brightGreen:   "#78d39a",
-        brightYellow:  "#d9c47a",
-        brightBlue:    "#8aa6e6",
-        brightMagenta: "#b48ad9",
-        brightCyan:    "#78d9e6",
-        brightWhite:   "#e0e0e0"
+        foreground: "#eaeaea",
+        cursor: "#eaeaea",
+        selection: "rgba(255,255,255,0.1)"
     }
 });
 
@@ -169,40 +223,77 @@ window.addEventListener("resize", () => fitAddon.fit());
 term.writeln("TERMINAL OK");
 
 /* =========================
-   OPTIONAL WS SAFE
+   WEBSOCKET
 ========================= */
-try {
-    const ws = new WebSocket(`ws://${location.host}`);
-    ws.onmessage = (e) => term.write(e.data);
-} catch (e) {
-    console.log("WS not available");
-}
+const ws = new WebSocket(`ws://${location.host}`);
+ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DATA
+   DRAG
 ========================= */
-let chart;
+const divider = document.getElementById("divider");
+const terminal = document.getElementById("terminal");
+const right = document.getElementById("right");
 
-async function load() {
-    try {
-        const res = await fetch("./syschrtpxy.json");
-        const data = await res.json();
+let isDragging = false;
 
-        if (!data || data.length === 0) return;
+divider.addEventListener("mousedown", (e) => {
+    isDragging = true;
+    e.preventDefault();
+});
 
-        const closes = data.map(d => d.close);
-        const stVals = data.map(d => d.st);
+window.addEventListener("mouseup", () => {
+    isDragging = false;
+    saveLayout();
+});
 
-        drawChart(closes, stVals);
-        drawTopCandle(stVals, closes);
+window.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+    if (window.innerWidth <= 768) return;
 
-    } catch (e) {
-        console.log("DATA LOAD ERROR", e);
+    const percent = (e.clientX / window.innerWidth) * 100;
+    if (percent < 10 || percent > 80) return;
+
+    terminal.style.width = percent + "%";
+    right.style.width = (100 - percent) + "%";
+
+    fitAddon.fit();
+});
+
+/* =========================
+   LAYOUT
+========================= */
+function saveLayout() {
+    localStorage.setItem("split", terminal.style.width);
+}
+
+function loadLayout() {
+    const saved = localStorage.getItem("split");
+    if (saved && window.innerWidth > 768) {
+        terminal.style.width = saved;
+        right.style.width = (100 - parseFloat(saved)) + "%";
     }
 }
 
 /* =========================
-   TOP CANDLE (STABLE)
+   CHART
+========================= */
+let chart;
+
+async function load() {
+    const res = await fetch("./syschrtpxy.json");
+    const data = await res.json();
+
+    const closes = data.map(d => d.close);
+    const stVals = data.map(d => d.st);
+    const stTrend = data.map(d => d.st_trend);
+
+    draw(closes, stVals, stTrend);
+    drawTopCandle(stVals, closes);   // 🔥 ADDED
+}
+
+/* =========================
+   TOP CANDLE LOGIC (NEW)
 ========================= */
 function drawTopCandle(stVals, closes) {
 
@@ -236,6 +327,7 @@ function drawTopCandle(stVals, closes) {
 
     const color = close >= open ? "#00c853" : "#ff1744";
 
+    // wick
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -243,6 +335,7 @@ function drawTopCandle(stVals, closes) {
     ctx.lineTo(xHigh, midY);
     ctx.stroke();
 
+    // body
     ctx.fillStyle = color;
     ctx.fillRect(
         Math.min(xOpen, xClose),
@@ -253,9 +346,9 @@ function drawTopCandle(stVals, closes) {
 }
 
 /* =========================
-   CHART
+   ORIGINAL CHART (UNCHANGED)
 ========================= */
-function drawChart(closes, stVals) {
+function draw(closes, stVals, stTrend) {
 
     const ctx = document.getElementById("priceChart");
 
@@ -264,11 +357,14 @@ function drawChart(closes, stVals) {
     const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
     const closePad = [...closes, ...Array(pad).fill(null)];
     const stPad = [...stVals, ...Array(pad).fill(null)];
+    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
 
     if (chart) {
+
         chart.data.labels = labels;
         chart.data.datasets[0].data = closePad;
         chart.data.datasets[1].data = stPad;
+
         chart.update("none");
         return;
     }
@@ -281,7 +377,7 @@ function drawChart(closes, stVals) {
                 {
                     label: "Close",
                     data: closePad,
-                    borderColor: "#000",
+                    borderColor: "#000000",
                     borderWidth: 2,
                     pointRadius: 0,
                     tension: 0.25
@@ -291,17 +387,24 @@ function drawChart(closes, stVals) {
                     data: stPad,
                     showLine: false,
                     pointRadius: 2,
-                    pointBackgroundColor: "#00c853"
+                    pointBorderWidth: 2,
+                    pointBackgroundColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    ),
+                    pointBorderColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    )
                 }
             ]
         },
+
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-                x: { grid: { display: false } },
-                y: { grid: { display: false }, position: "right" }
+                x: { grid: { display: false }, ticks: { color: "#eaeaea" } },
+                y: { grid: { display: false }, ticks: { color: "#eaeaea" }, position: "right" }
             }
         }
     });
@@ -310,10 +413,9 @@ function drawChart(closes, stVals) {
 /* =========================
    INIT
 ========================= */
-window.onload = () => {
-    load();
-    setInterval(load, 3000);
-};
+loadLayout();
+load();
+setInterval(load, 3000);
 
 </script>
 
