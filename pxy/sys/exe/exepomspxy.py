@@ -53,12 +53,12 @@ def print_market_dashboard(market_df):
         ("🎯 Exit", "exit"),
         ("🟩  CE Force", "ce_force"),
         ("🟥 PE Force", "pe_force"),        
-        
+        ("🟢  CE Depth", "hkin_ce_depth"),
+        ("🔴 PE Depth", "hkin_pe_depth"),        
     ]
 
     depth_metrics = [
-        ("🟢  CE Depth", "hkin_ce_depth"),
-        ("🔴 PE Depth", "hkin_pe_depth"),
+
     ]
 
     row_width = 41
