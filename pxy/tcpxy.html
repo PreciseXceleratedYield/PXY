@@ -12,18 +12,18 @@ html, body {
     height: 100%;
     overflow: hidden;
     font-family: monospace;
-    background: #d0d0d0; /* ✅ MEDIUM GREY BACKGROUND */
+    background: #bdbdbd; /* base medium grey */
 }
 
 /* =========================
-   TOP SINGLE CANDLE FRAME
+   TOP FRAME (WHITE)
 ========================= */
 #bannerWrap {
     width: 100%;
     height: 42px;
     position: relative;
-    background: #d0d0d0; /* match tone */
-    border-bottom: 1px solid #b5b5b5;
+    background: #ffffff; /* ✅ WHITE */
+    border-bottom: 1px solid #cfcfcf;
     overflow: hidden;
 }
 
@@ -34,7 +34,7 @@ html, body {
     top: 0;
     left: 0;
     z-index: 0;
-    opacity: 0.4;
+    opacity: 0.35;
 }
 
 #banner {
@@ -56,25 +56,39 @@ html, body {
     height: calc(100vh - 42px);
 }
 
+/* =========================
+   TERMINAL (MEDIUM GREY)
+========================= */
 #terminal {
     width: 35%;
     min-width: 200px;
     height: 100%;
-    background: #e6e6e6;
-    border-right: 1px solid #bdbdbd;
+    background: #bdbdbd;  /* ✅ SAME MEDIUM GREY */
+    border-right: 1px solid #9e9e9e;
 }
 
+/* XTERM INTERNAL THEME MATCH */
+.xterm {
+    background-color: #bdbdbd !important;
+}
+
+/* =========================
+   DIVIDER
+========================= */
 #divider {
     width: 5px;
     cursor: col-resize;
-    background: #bdbdbd;
+    background: #9e9e9e;
 }
 
+/* =========================
+   RIGHT PANEL (CHART AREA)
+========================= */
 #right {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #d0d0d0; /* match */
+    background: #bdbdbd; /* ✅ SAME MEDIUM GREY */
 }
 
 #chartWrap {
@@ -87,12 +101,36 @@ canvas {
 }
 
 /* =========================
+   SCROLLBAR THEME (MEDIUM GREY)
+========================= */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #9e9e9e #bdbdbd;
+}
+
+/* Chrome / Edge */
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+    background: #bdbdbd;
+}
+
+*::-webkit-scrollbar-thumb {
+    background-color: #9e9e9e;
+    border-radius: 10px;
+    border: 2px solid #bdbdbd;
+}
+
+/* =========================
    MOBILE
 ========================= */
 @media (max-width: 768px) {
     #right { display: none !important; }
     #divider { display: none !important; }
-    #terminal { width: 100% !important; height: 100vh !important; border-right: none; }
+    #terminal { width: 100% !important; height: 100vh !important; }
     #container { flex-direction: column; }
 }
 </style>
@@ -136,7 +174,7 @@ const term = new Terminal({
     fontSize: 14,
     cursorBlink: false,
     theme: {
-        background: "#e6e6e6",
+        background: "#bdbdbd",
         foreground: "#111"
     }
 });
@@ -180,7 +218,7 @@ window.addEventListener("mousemove", (e) => {
 });
 
 /* =========================
-   MAIN CHART (FIXED GRID + ST RESTORED)
+   MAIN CHART (GRID STILL OFF FROM PREVIOUS)
 ========================= */
 let chart;
 
@@ -203,7 +241,6 @@ function draw(data) {
             labels: data.map((_, i) => i),
             datasets: [
 
-                // CLOSE
                 {
                     data: data.map(d => d.close),
                     borderColor: "#b8860b",
@@ -212,10 +249,9 @@ function draw(data) {
                     tension: 0.25
                 },
 
-                // ST LINE (RESTORED)
                 {
                     data: data.map(d => d.st),
-                    borderColor: "#00c853",
+                    borderColor: "#00e676",
                     borderWidth: 1.5,
                     pointRadius: 0,
                     tension: 0.25
@@ -226,25 +262,18 @@ function draw(data) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-
-            plugins: {
-                legend: { display: false }
-            },
+            plugins: { legend: { display: false } },
 
             scales: {
-                x: {
-                    grid: { display: false }   // ✅ NO GRID
-                },
-                y: {
-                    grid: { display: false }   // ✅ NO GRID
-                }
+                x: { grid: { display: false } },
+                y: { grid: { display: false } }
             }
         }
     });
 }
 
 /* =========================
-   BANNER CANDLE FIX (BRIGHT COLORS)
+   BANNER CANDLE (UNCHANGED)
 ========================= */
 let bgChart;
 
@@ -256,11 +285,6 @@ async function loadBannerCandle() {
     const close = data[data.length - 1].close;
     const high = Math.max(...data.map(d => d.high));
     const low = Math.min(...data.map(d => d.low));
-
-    drawBannerCandle(open, high, low, close);
-}
-
-function drawBannerCandle(open, high, low, close) {
 
     const ctx = document.getElementById("bgChart");
 
@@ -274,13 +298,13 @@ function drawBannerCandle(open, high, low, close) {
 
                 {
                     data: [high - low],
-                    backgroundColor: "#888",
+                    backgroundColor: "#999",
                     barThickness: 2
                 },
 
                 {
                     data: [Math.abs(close - open)],
-                    backgroundColor: close >= open ? "#00e676" : "#ff1744",  // ✅ BRIGHT GREEN / RED
+                    backgroundColor: close >= open ? "#00e676" : "#ff1744",
                     barThickness: 18
                 }
             ]
