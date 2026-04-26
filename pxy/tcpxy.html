@@ -8,9 +8,6 @@
 
 <style>
 
-/* =========================
-   GLOBAL
-========================= */
 :root {
     --divider-width: 6px;
 }
@@ -32,34 +29,12 @@ body::-webkit-scrollbar {
     display: none;
 }
 
-/* =========================
-   TOP CANDLE STRIP
-========================= */
-#topCandleWrap {
-    width: 100%;
-    height: 18px;
-    background: #3b3b3b;
-    border-bottom: 1px solid #4a4a4a;
-}
-
-#topCandle {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-/* =========================
-   MAIN LAYOUT
-========================= */
 #container {
     display: flex;
     width: 100%;
     height: calc(100vh - 18px);
 }
 
-/* =========================
-   TERMINAL
-========================= */
 #terminal {
     width: 35%;
     min-width: 200px;
@@ -68,7 +43,6 @@ body::-webkit-scrollbar {
     border-right: 1px solid #4a4a4a;
 }
 
-/* hide xterm scrollbar */
 .xterm .xterm-viewport {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -79,9 +53,6 @@ body::-webkit-scrollbar {
     height: 0px !important;
 }
 
-/* =========================
-   DIVIDER
-========================= */
 #divider {
     width: var(--divider-width);
     min-width: 10px;
@@ -90,9 +61,6 @@ body::-webkit-scrollbar {
     z-index: 10;
 }
 
-/* =========================
-   RIGHT PANEL
-========================= */
 #right {
     flex: 1;
     display: flex;
@@ -100,9 +68,6 @@ body::-webkit-scrollbar {
     background: #3b3b3b;
 }
 
-/* =========================
-   CHART
-========================= */
 #chartWrap {
     flex: 1;
     position: relative;
@@ -117,44 +82,10 @@ canvas {
     background: #3b3b3b;
 }
 
-/* =========================
-   MOBILE
-========================= */
-@media (max-width: 768px) {
-
-    #right {
-        display: none !important;
-    }
-
-    #divider {
-        display: none !important;
-    }
-
-    #terminal {
-        width: 100% !important;
-        height: 100vh !important;
-        border-right: none;
-    }
-
-    #container {
-        flex-direction: column;
-        height: 100vh;
-    }
-
-    #topCandleWrap {
-        display: none;
-    }
-}
-
 </style>
 </head>
 
 <body>
-
-<!-- 🔥 TOP CANDLE STRIP -->
-<div id="topCandleWrap">
-    <canvas id="topCandle"></canvas>
-</div>
 
 <div id="container">
 
@@ -269,7 +200,6 @@ async function load() {
     const stTrend = data.map(d => d.st_trend);
 
     draw(closes, stVals, stTrend);
-    drawTopCandle(stVals, closes);
 }
 
 function draw(closes, stVals, stTrend) {
@@ -296,7 +226,6 @@ function draw(closes, stVals, stTrend) {
         data: {
             labels,
             datasets: [
-
                 {
                     label: "Close",
                     data: closePad,
@@ -305,7 +234,6 @@ function draw(closes, stVals, stTrend) {
                     pointRadius: 0,
                     tension: 0.25
                 },
-
                 {
                     label: "ST",
                     data: stPad,
@@ -321,7 +249,6 @@ function draw(closes, stVals, stTrend) {
                 }
             ]
         },
-
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -335,7 +262,7 @@ function draw(closes, stVals, stTrend) {
 }
 
 /* =========================
-   🔥 TOP HORIZONTAL CANDLE
+   TOP CANDLE (ONLY WICK FIX)
 ========================= */
 function drawTopCandle(stVals, closes) {
 
@@ -366,10 +293,12 @@ function drawTopCandle(stVals, closes) {
     const xOpen = scale(open);
     const xClose = scale(close);
 
-    const color = "#ffffff";
+    // 🔥 FIX ONLY HERE
+    const bodyColor = close >= open ? "#00c853" : "#ff1744";
+    const wickColor = "#ffffff";
 
-    // wick (full horizontal range)
-    ctx.strokeStyle = color;
+    // wick (white)
+    ctx.strokeStyle = wickColor;
     ctx.lineWidth = 2;
 
     ctx.beginPath();
@@ -377,8 +306,8 @@ function drawTopCandle(stVals, closes) {
     ctx.lineTo(xHigh, midY);
     ctx.stroke();
 
-    // body
-    ctx.fillStyle = color;
+    // body (green/red)
+    ctx.fillStyle = bodyColor;
 
     ctx.fillRect(
         Math.min(xOpen, xClose),
