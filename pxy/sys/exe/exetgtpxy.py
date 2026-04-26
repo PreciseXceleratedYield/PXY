@@ -1,7 +1,7 @@
 # sys/exe/exetgtpxy_dashboard.py
 
 import math
-from colorama import init
+from colorama import init, Fore, Style
 
 init(autoreset=True)
 
@@ -33,8 +33,8 @@ def target_price(row):
 
         # 2️⃣ INPUTS
         atr = f(row.get("atr", 0))
-        ce_power = f(row.get("ce_power", 0))
-        pe_power = f(row.get("pe_power", 0))
+        ce_power = f(row.get("ce_power", 1))
+        pe_power = f(row.get("pe_power", 1))
         supertrend = row.get("supertrend", 0)
 
         # 3️⃣ OPTION TYPE
@@ -46,62 +46,60 @@ def target_price(row):
         exit_signal = str(row.get("exit", "NONE")).upper()
         counter = str(row.get("counter", "Y")).upper()
 
-        # FIXED (minimal correction)
         _signal = exit_signal if counter == "Y" else entry_signal
 
         # -------------------- HLD MODE --------------------
         if _signal == "NONE":
             score = 6
             target = int(entry * (1 + score / 100))
-            state = "🟡HLD"
+            state = "HLD"
+            color = Style.NORMAL
 
             clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
-            print(f"{clean_symbol}|| E:{entry:03d}|| S:{score:02d}%|| {state} || T:{target:03d}")
-
+            print(f"{color}{clean_symbol}|| E:{entry:03d}|| S:{score:02d}%|| {state} || T:{target:03d}")
             return target
 
+        # -------------------- SIGNAL TYPE --------------------
         bullish = any(x in _signal for x in ["BUY", "BULL", "UP"])
         bearish = any(x in _signal for x in ["SELL", "BEAR", "DOWN"])
 
-        # 5️⃣ SUPER TREND DIRECTION (FIXED)
+        # -------------------- SUPER TREND --------------------
         st = str(supertrend).strip().upper()
-
         is_up = st == "UP"
         is_down = st == "DOWN"
 
-        # -------------------- CORE LOGIC --------------------
-        score = 0
-        state = "❌"
+        # -------------------- ALIGNMENT --------------------
+        all_aligned = (
+            (bullish and is_up and is_ce) or
+            (bearish and is_down and is_pe)
+        )
 
-        if is_up:
-            # UP TREND
+        # -------------------- SCORE --------------------
+        if all_aligned:
             if is_ce:
                 score = atr * ce_power
-                state = "UP_CE"
             elif is_pe:
-                score = atr / 3
-                state = "UP_PE"
-
-        elif is_down:
-            # DOWN TREND
-            if is_pe:
                 score = atr * pe_power
-                state = "DOWN_PE"
-            elif is_ce:
-                score = atr / 3
-                state = "DOWN_CE"
+            else:
+                score = atr
+            state = "ALN"
+            color = Style.BRIGHT + Fore.GREEN
 
-        # 7️⃣ TARGET
+        else:
+            score = 1.7
+            state = "NLN"
+            color = Style.BRIGHT + Fore.RED
+
+        # -------------------- TARGET --------------------
         target = int(entry * (1 + score / 100))
 
-        # 8️⃣ CLEAN SYMBOL
         clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
 
-        # 9️⃣ OUTPUT
-        print(f"{clean_symbol}|| E:{entry:03d}|| S:{int(score):02d}%|| {state} || T:{target:03d}")
+        # -------------------- OUTPUT --------------------
+        print(f"{color}{clean_symbol}|| E:{entry:03d}|| S:{int(score):02d}%|| {state} || T:{target:03d}")
 
         return target
 
     except Exception as e:
-        print(f"ERROR|{str(e)}")
+        print(f"{Style.BRIGHT + Fore.RED}ERROR|{str(e)}")
         return 0
