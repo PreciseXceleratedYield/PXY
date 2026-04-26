@@ -4,8 +4,6 @@
 <meta charset="UTF-8">
 <title>PXY DASHBOARD</title>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
-
 <style>
 html, body {
     margin: 0;
@@ -16,26 +14,25 @@ html, body {
 }
 
 /* =========================
-   TOP SINGLE CANDLE FRAME
+   TOP FULL WIDTH CANDLE FRAME
 ========================= */
 #bannerWrap {
+    position: relative;
     width: 100%;
     height: 42px;
-    position: relative;
     background: #ffffff;
     border-bottom: 1px solid #e5e5e5;
     overflow: hidden;
 }
 
-/* candle canvas fills entire banner */
-#bgChart {
+/* canvas fills entire banner */
+#bgCanvas {
     position: absolute;
     width: 100%;
     height: 42px;
     top: 0;
     left: 0;
     z-index: 0;
-    opacity: 0.35;
 }
 
 /* text overlay */
@@ -62,41 +59,28 @@ html, body {
 #terminal {
     width: 35%;
     min-width: 200px;
-    height: 100%;
     background: #f7f7f7;
     border-right: 1px solid #e0e0e0;
+}
+
+/* RIGHT */
+#right {
+    flex: 1;
+    background: #fafafa;
 }
 
 /* DIVIDER */
 #divider {
     width: 5px;
-    cursor: col-resize;
     background: #e6e6e6;
-}
-
-/* RIGHT PANEL */
-#right {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: #fafafa;
-}
-
-#chartWrap {
-    flex: 1;
-}
-
-canvas {
-    width: 100% !important;
-    height: 100% !important;
+    cursor: col-resize;
 }
 
 /* MOBILE */
 @media (max-width: 768px) {
-    #right { display: none !important; }
-    #divider { display: none !important; }
-    #terminal { width: 100% !important; height: 100vh !important; border-right: none; }
-    #container { flex-direction: column; }
+    #right { display: none; }
+    #divider { display: none; }
+    #terminal { width: 100%; height: 100vh; }
 }
 </style>
 </head>
@@ -104,189 +88,84 @@ canvas {
 <body>
 
 <!-- =========================
-     TOP SINGLE CANDLE
+     FULL WIDTH CANDLE BANNER
 ========================= -->
 <div id="bannerWrap">
-    <canvas id="bgChart"></canvas>
+    <canvas id="bgCanvas"></canvas>
     <div id="banner">🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦</div>
 </div>
 
 <div id="container">
-
     <div id="terminal"></div>
     <div id="divider"></div>
-
-    <div id="right">
-        <div id="chartWrap">
-            <canvas id="priceChart"></canvas>
-        </div>
-    </div>
-
+    <div id="right"></div>
 </div>
-
-<!-- LIBS -->
-<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 
 /* =========================
-   TERMINAL
+   FULL WIDTH CANDLE RENDERER
 ========================= */
-const term = new Terminal({
-    convertEol: true,
-    scrollback: 1000,
-    fontFamily: "monospace",
-    fontSize: 14,
-    cursorBlink: false,
-    theme: {
-        background: "#f7f7f7",
-        foreground: "#111"
+async function drawBanner() {
+
+    const res = await fetch("./syschrtpxy.json");
+    const data = await res.json();
+
+    const canvas = document.getElementById("bgCanvas");
+    const ctx = canvas.getContext("2d");
+
+    const w = canvas.width = canvas.offsetWidth;
+    const h = canvas.height = canvas.offsetHeight;
+
+    const prices = data.map(d => ({
+        open: d.st,
+        high: d.high,
+        low: d.low,
+        close: d.close
+    }));
+
+    const min = Math.min(...prices.map(p => p.low));
+    const max = Math.max(...prices.map(p => p.high));
+
+    const scaleY = (p) => h - ((p - min) / (max - min)) * h;
+
+    const step = w / prices.length;
+
+    ctx.clearRect(0, 0, w, h);
+
+    for (let i = 0; i < prices.length; i++) {
+
+        const x = i * step;
+
+        const p = prices[i];
+
+        const yHigh = scaleY(p.high);
+        const yLow = scaleY(p.low);
+        const yOpen = scaleY(p.open);
+        const yClose = scaleY(p.close);
+
+        // WICK
+        ctx.strokeStyle = "#999";
+        ctx.beginPath();
+        ctx.moveTo(x, yHigh);
+        ctx.lineTo(x, yLow);
+        ctx.stroke();
+
+        // BODY
+        ctx.fillStyle = p.close >= p.open ? "#4DB6AC" : "#FF8A65";
+
+        const bodyTop = Math.min(yOpen, yClose);
+        const bodyH = Math.abs(yOpen - yClose);
+
+        ctx.fillRect(x - 1, bodyTop, 2, bodyH || 1);
     }
-});
-
-const fitAddon = new FitAddon.FitAddon();
-term.loadAddon(fitAddon);
-term.open(document.getElementById('terminal'));
-
-setTimeout(() => fitAddon.fit(), 50);
-window.addEventListener("resize", () => fitAddon.fit());
-
-term.writeln("TERMINAL OK");
-
-/* =========================
-   WEBSOCKET
-========================= */
-const ws = new WebSocket(`ws://${location.host}`);
-ws.onmessage = (e) => term.write(e.data);
-
-/* =========================
-   DRAG
-========================= */
-const divider = document.getElementById("divider");
-const terminal = document.getElementById("terminal");
-const right = document.getElementById("right");
-
-let isDragging = false;
-
-divider.addEventListener("mousedown", () => isDragging = true);
-
-window.addEventListener("mouseup", () => isDragging = false);
-
-window.addEventListener("mousemove", (e) => {
-    if (!isDragging) return;
-
-    const percent = (e.clientX / window.innerWidth) * 100;
-    terminal.style.width = percent + "%";
-    right.style.width = (100 - percent) + "%";
-
-    fitAddon.fit();
-});
-
-/* =========================
-   MAIN CHART (UNCHANGED SIMPLIFIED)
-========================= */
-let chart;
-
-async function load() {
-    const res = await fetch("./syschrtpxy.json");
-    const data = await res.json();
-
-    draw(data);
-}
-
-function draw(data) {
-
-    const ctx = document.getElementById("priceChart");
-
-    if (chart) chart.destroy();
-
-    chart = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels: data.map((_, i) => i),
-            datasets: [{
-                data: data.map(d => d.close),
-                borderColor: "#b8860b",
-                borderWidth: 1,
-                pointRadius: 0,
-                tension: 0.25
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } }
-        }
-    });
-}
-
-/* =========================
-   SINGLE HORIZONTAL CANDLE (KEY PART)
-========================= */
-let bgChart;
-
-async function loadBannerCandle() {
-    const res = await fetch("./syschrtpxy.json");
-    const data = await res.json();
-
-    const open = data[0].st;              // ST = OPEN
-    const close = data[data.length - 1].close;
-    const high = Math.max(...data.map(d => d.high));
-    const low = Math.min(...data.map(d => d.low));
-
-    drawBannerCandle(open, high, low, close);
-}
-
-function drawBannerCandle(open, high, low, close) {
-
-    const ctx = document.getElementById("bgChart");
-
-    if (bgChart) bgChart.destroy();
-
-    bgChart = new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels: ["PXY"],
-            datasets: [
-
-                // WICK (HIGH-LOW)
-                {
-                    data: [high - low],
-                    backgroundColor: "#999",
-                    barThickness: 2
-                },
-
-                // BODY (OPEN-CLOSE)
-                {
-                    data: [Math.abs(close - open)],
-                    backgroundColor: close >= open ? "#4DB6AC" : "#FF8A65",
-                    barThickness: 18
-                }
-            ]
-        },
-
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { display: false },
-                y: { display: false }
-            }
-        }
-    });
 }
 
 /* =========================
    INIT
 ========================= */
-load();
-loadBannerCandle();
-
-setInterval(load, 3000);
-setInterval(loadBannerCandle, 3000);
+drawBanner();
+setInterval(drawBanner, 3000);
 
 </script>
 
