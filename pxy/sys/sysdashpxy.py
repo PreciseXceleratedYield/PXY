@@ -18,6 +18,7 @@ from sysentrpxy import get_entry_signal
 from sysdeptpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
+from sysadxpxy import calculate_adx   # ✅ ADD THIS
 
 TOTAL_WIDTH = 42
 
@@ -56,7 +57,6 @@ def get_full_snapshot():
 
     # ===== HAIKIN SIGNAL =====
     signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df=df)
-    # --- FIX: fallback BULL/BEAR if None ---
     if signal is None:
         signal = "BULL" if df['HA_Close'].iloc[-1] > df['HA_Open'].iloc[-1] else "BEAR"
     result["hkin_signal"] = signal
@@ -64,9 +64,18 @@ def get_full_snapshot():
     result["hkin_ce_depth"] = ce_depth
     result["hkin_pe_depth"] = pe_depth
 
-    # ===== STRENGTH =====
+    # ===== STRENGTH (UNCHANGED) =====
     line, _, _ = get_candle_strength_line(df=df)
     result["strength_line"] = line
+
+    # ===== FORCE (NEW ADD) =====
+    force_result = calculate_adx(df)
+    if force_result:
+        ce_force, pe_force = force_result
+    else:
+        ce_force, pe_force = 1.0, 1.0
+    result["ce_force"] = ce_force
+    result["pe_force"] = pe_force
 
     # ===== ATR & KATR =====
     atr_series = calculate_atr(df)
@@ -96,7 +105,6 @@ def get_full_snapshot():
 
     # ===== ENTRY SIGNAL =====
     entry, exit = get_entry_signal(df)
-    # --- FIX: fallback to ATM/OTM if None ---
     result["entry"] = entry
     result["exit"] = exit
 
@@ -136,8 +144,21 @@ def print_dashboard(data):
     if space2 < 0: space2 = 1
     print(Fore.YELLOW + "CE:" + color + str(ce_depth) + " " * space2 + Fore.YELLOW + "PE:" + color + str(pe_depth))
 
-    # ===== STRENGTH =====
-    print(data["strength_line"])
+    # ===== FORCE (REPLACES STRENGTH PRINT ONLY) =====
+    ce_force = data.get("ce_force", 1.0)
+    pe_force = data.get("pe_force", 1.0)
+
+    ce_color = Fore.GREEN if ce_force > 1 else Fore.YELLOW
+    pe_color = Fore.GREEN if pe_force > 1 else Fore.YELLOW
+
+    space = TOTAL_WIDTH - len(f"CE Force:{ce_force:.2f}") - len(f"PE Force:{pe_force:.2f}")
+    if space < 0: space = 1
+
+    print(
+        Fore.YELLOW + "CE Force:" + ce_color + f"{ce_force:.2f}"
+        + " " * space +
+        Fore.YELLOW + "PE Force:" + pe_color + f"{pe_force:.2f}"
+    )
 
     # ===== ATR =====
     atr_val = data["atr"]
@@ -178,12 +199,8 @@ def print_dashboard(data):
     space = TOTAL_WIDTH - len(f"Entry:{entry}") - len(f"Signal:{exit}")
     print(Fore.YELLOW + "Entry:" + color + entry + " " * space + Fore.YELLOW + "Signal:" + color + exit)
 
-    # ===== DAY CANDLE =====
-    # print(data["day_candle"])  # optional
-
     # ===== BOS BAR =====
     print(data["bos_bar"])
-    # print("BOS Value:", data["bos_val"])  # optional
 
 # ================= MAIN =================
 if __name__ == "__main__":
