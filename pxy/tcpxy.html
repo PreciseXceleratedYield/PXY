@@ -29,25 +29,18 @@ body::-webkit-scrollbar {
     display: none;
 }
 
-#topCandleWrap {
-    width: 100%;
-    height: 18px;
-    background: #3b3b3b;
-    border-bottom: 1px solid #4a4a4a;
-}
-
-#topCandle {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
+/* =========================
+   MAIN LAYOUT
+========================= */
 #container {
     display: flex;
     width: 100%;
     height: calc(100vh - 18px);
 }
 
+/* =========================
+   TERMINAL
+========================= */
 #terminal {
     width: 35%;
     min-width: 200px;
@@ -66,6 +59,9 @@ body::-webkit-scrollbar {
     height: 0px !important;
 }
 
+/* =========================
+   DIVIDER
+========================= */
 #divider {
     width: var(--divider-width);
     min-width: 10px;
@@ -74,6 +70,9 @@ body::-webkit-scrollbar {
     z-index: 10;
 }
 
+/* =========================
+   RIGHT PANEL
+========================= */
 #right {
     flex: 1;
     display: flex;
@@ -95,14 +94,59 @@ canvas {
     background: #3b3b3b;
 }
 
+/* =========================
+   🔥 BOTTOM CANDLE STRIP (MOVED)
+========================= */
+#topCandleWrap {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 18px;
+    background: #3b3b3b;
+    border-top: 1px solid #4a4a4a;
+    z-index: 999;
+}
+
+#topCandle {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* =========================
+   MOBILE
+========================= */
+@media (max-width: 768px) {
+
+    #right {
+        display: none !important;
+    }
+
+    #divider {
+        display: none !important;
+    }
+
+    #terminal {
+        width: 100% !important;
+        height: 100vh !important;
+        border-right: none;
+    }
+
+    #container {
+        flex-direction: column;
+        height: 100vh;
+    }
+
+    #topCandleWrap {
+        display: none;
+    }
+}
+
 </style>
 </head>
 
 <body>
-
-<div id="topCandleWrap">
-    <canvas id="topCandle"></canvas>
-</div>
 
 <div id="container">
 
@@ -115,6 +159,11 @@ canvas {
         </div>
     </div>
 
+</div>
+
+<!-- 🔥 MOVED TO BOTTOM -->
+<div id="topCandleWrap">
+    <canvas id="topCandle"></canvas>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
@@ -280,7 +329,7 @@ function draw(closes, stVals, stTrend) {
 }
 
 /* =========================
-   🔥 TOP CANDLE (4× THICKNESS)
+   TOP CANDLE (UNCHANGED LOGIC)
 ========================= */
 function drawTopCandle(stVals, closes) {
 
@@ -323,7 +372,7 @@ function drawTopCandle(stVals, closes) {
     ctx.lineTo(xHigh, midY);
     ctx.stroke();
 
-    // 🔥 4× THICK BODY
+    // body (4x thickness = 12px)
     const thickness = 12;
 
     ctx.fillStyle = bodyColor;
