@@ -22,7 +22,7 @@ html, body {
 }
 
 /* =========================
-   TOP CANDLE FRAME
+   TOP BANNER
 ========================= */
 #topCandleWrap {
     width: 100%;
@@ -80,6 +80,7 @@ html, body {
 #chartWrap {
     flex: 1;
     position: relative;
+    overflow: hidden;
 }
 
 canvas {
@@ -98,7 +99,7 @@ canvas {
 
 <body>
 
-<!-- 🔥 TOP CANDLE -->
+<!-- 🔥 TOP CANDLE BANNER -->
 <div id="topCandleWrap">
     <canvas id="topCandle"></canvas>
 </div>
@@ -147,24 +148,40 @@ window.addEventListener("resize", () => fitAddon.fit());
 term.writeln("TERMINAL OK");
 
 /* =========================
-   DATA
+   OPTIONAL WEBSOCKET
+========================= */
+const ws = new WebSocket(`ws://${location.host}`);
+ws.onmessage = (e) => term.write(e.data);
+
+/* =========================
+   DATA LOAD
 ========================= */
 let chart;
 
 async function load() {
     try {
         const res = await fetch("./syschrtpxy.json");
+
+        if (!res.ok) {
+            console.log("JSON not found");
+            return;
+        }
+
         const data = await res.json();
+
+        if (!data || data.length === 0) {
+            console.log("EMPTY DATA");
+            return;
+        }
 
         const closes = data.map(d => d.close);
         const stVals = data.map(d => d.st);
-        const stTrend = data.map(d => d.st_trend);
 
-        drawChart(closes, stVals, stTrend);
+        drawChart(closes, stVals);
         drawTopCandle(stVals, closes);
 
     } catch (e) {
-        console.log("data load waiting...");
+        console.log("LOAD ERROR:", e);
     }
 }
 
@@ -222,9 +239,9 @@ function drawTopCandle(stVals, closes) {
 }
 
 /* =========================
-   CHART (FIXED SAFE)
+   CHART
 ========================= */
-function drawChart(closes, stVals, stTrend) {
+function drawChart(closes, stVals) {
 
     const ctx = document.getElementById("priceChart");
 
@@ -277,10 +294,12 @@ function drawChart(closes, stVals, stTrend) {
 }
 
 /* =========================
-   INIT
+   INIT (IMPORTANT FIX)
 ========================= */
-load();
-setInterval(load, 3000);
+window.onload = () => {
+    load();
+    setInterval(load, 3000);
+};
 
 </script>
 
