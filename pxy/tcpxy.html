@@ -16,37 +16,38 @@ html, body {
 }
 
 /* =========================
-   TOP CANDLE STRIP (NEW)
+   BLOCK CANDLE BANNER
 ========================= */
 #bannerWrap {
-    position: relative;
     width: 100%;
     height: 42px;
-    overflow: hidden;
-    border-bottom: 1px solid #e5e5e5;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background: #ffffff;
+    border-bottom: 1px solid #e5e5e5;
+    position: relative;
+    overflow: hidden;
 }
 
-/* candle canvas ONLY inside banner */
-#bgChart {
+/* ASCII candle strip */
+#candleStrip {
     position: absolute;
-    top: 0;
-    left: 0;
     width: 100%;
-    height: 42px;
-    opacity: 0.25;
-    z-index: 0;
-    pointer-events: none;
+    text-align: center;
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: #888;
+    opacity: 0.9;
+    white-space: nowrap;
 }
 
-/* banner text on top */
+/* banner text above strip */
 #banner {
     position: relative;
     z-index: 2;
-    text-align: center;
     font-size: 15px;
     font-weight: bold;
-    line-height: 42px;
     color: #111;
 }
 
@@ -113,13 +114,11 @@ canvas {
 <body>
 
 <!-- =========================
-     TOP BANNER + CANDLE STRIP
+     BLOCK CANDLE BANNER
 ========================= -->
 <div id="bannerWrap">
-    <canvas id="bgChart"></canvas>
-    <div id="banner">
-        🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
-    </div>
+    <div id="candleStrip"></div>
+    <div id="banner">🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦</div>
 </div>
 
 <div id="container">
@@ -185,7 +184,6 @@ divider.addEventListener("mousedown", () => isDragging = true);
 
 window.addEventListener("mouseup", () => {
     isDragging = false;
-    localStorage.setItem("split", terminal.style.width);
 });
 
 window.addEventListener("mousemove", (e) => {
@@ -220,128 +218,65 @@ function draw(closes, stVals, stTrend) {
 
     if (chart) chart.destroy();
 
-    const pad = 3;
-
-    const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
-    const closePad = [...closes, ...Array(pad).fill(null)];
-    const stPad = [...stVals, ...Array(pad).fill(null)];
-    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
-
     chart = new Chart(ctx, {
         type: "line",
         data: {
-            labels,
+            labels: closes.map((_, i) => i),
             datasets: [
-
                 {
                     label: "Close",
-                    data: closePad,
+                    data: closes,
                     borderColor: "#b8860b",
                     borderWidth: 1,
                     pointRadius: 0,
                     tension: 0.25
-                },
-
-                {
-                    label: "ST",
-                    data: stPad,
-                    showLine: false,
-                    pointRadius: 6,
-                    pointStyle: 'rectRot',
-                    pointRotation: 90,
-
-                    pointBackgroundColor: trendPad.map(t =>
-                        t === "UP" ? "#4DB6AC" : "#FF8A65"
-                    ),
-
-                    pointBorderColor: trendPad.map(t =>
-                        t === "UP" ? "#4DB6AC" : "#FF8A65"
-                    ),
-
-                    pointBorderWidth: 1
                 }
             ]
         },
-
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { ticks: { color: "#333" }, grid: { display: false } },
-                y: { position: "right", ticks: { color: "#333" }, grid: { display: false } }
-            }
-        }
-    });
-}
-
-/* =========================
-   CANDLE STRIP FOR BANNER
-========================= */
-let bgChart;
-
-async function loadBG() {
-    const res = await fetch("./syschrtpxy.json");
-    const data = await res.json();
-
-    const labels = data.map((_, i) => i);
-    const lows = data.map(d => d.low);
-    const highs = data.map(d => d.high);
-    const opens = data.map(d => d.st);
-    const closes = data.map(d => d.close);
-
-    drawBG(labels, lows, highs, opens, closes);
-}
-
-function drawBG(labels, lows, highs, opens, closes) {
-
-    const ctx = document.getElementById("bgChart");
-
-    if (bgChart) bgChart.destroy();
-
-    bgChart = new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels,
-            datasets: [
-
-                {
-                    data: highs.map((h, i) => h - lows[i]),
-                    backgroundColor: "#999",
-                    barThickness: 1,
-                    grouped: false
-                },
-
-                {
-                    data: closes.map((c, i) => Math.abs(c - opens[i])),
-                    backgroundColor: closes.map((c, i) =>
-                        c >= opens[i] ? "#4DB6AC" : "#FF8A65"
-                    ),
-                    barThickness: 3,
-                    grouped: false
-                }
-            ]
-        },
-
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
                 x: { display: false },
-                y: { display: false }
+                y: { position: "right" }
             }
         }
     });
 }
 
 /* =========================
+   BLOCK CANDLE RENDERER
+========================= */
+async function loadBannerCandles() {
+    const res = await fetch("./syschrtpxy.json");
+    const data = await res.json();
+
+    const strip = data.slice(-80).map(d => {
+        const range = d.high - d.low;
+        const body = Math.abs(d.close - d.st);
+
+        // normalize into blocks
+        const strength = Math.min(8, Math.max(1, Math.floor(range / 10)));
+
+        let char = "█";
+        if (d.close < d.st) char = "▓";
+        if (d.close < d.low + range * 0.3) char = "░";
+
+        return char.repeat(strength);
+    }).join("");
+
+    document.getElementById("candleStrip").innerText = strip;
+}
+
+/* =========================
    INIT
 ========================= */
 load();
-loadBG();
+loadBannerCandles();
+
 setInterval(load, 3000);
-setInterval(loadBG, 5000);
+setInterval(loadBannerCandles, 2000);
 
 </script>
 
