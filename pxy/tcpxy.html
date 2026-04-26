@@ -16,43 +16,41 @@ html, body {
 }
 
 /* =========================
-   BLOCK CANDLE BANNER
+   TOP SINGLE CANDLE FRAME
 ========================= */
 #bannerWrap {
     width: 100%;
     height: 42px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    position: relative;
     background: #ffffff;
     border-bottom: 1px solid #e5e5e5;
-    position: relative;
     overflow: hidden;
 }
 
-/* ASCII candle strip */
-#candleStrip {
+/* candle canvas fills entire banner */
+#bgChart {
     position: absolute;
     width: 100%;
-    text-align: center;
-    font-size: 12px;
-    letter-spacing: 1px;
-    color: #888;
-    opacity: 0.9;
-    white-space: nowrap;
+    height: 42px;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    opacity: 0.35;
 }
 
-/* banner text above strip */
+/* text overlay */
 #banner {
     position: relative;
     z-index: 2;
-    font-size: 15px;
+    text-align: center;
     font-weight: bold;
+    font-size: 15px;
+    line-height: 42px;
     color: #111;
 }
 
 /* =========================
-   MAIN CONTAINER
+   MAIN LAYOUT
 ========================= */
 #container {
     display: flex;
@@ -60,9 +58,7 @@ html, body {
     height: calc(100vh - 42px);
 }
 
-/* =========================
-   TERMINAL
-========================= */
+/* TERMINAL */
 #terminal {
     width: 35%;
     min-width: 200px;
@@ -71,18 +67,14 @@ html, body {
     border-right: 1px solid #e0e0e0;
 }
 
-/* =========================
-   DIVIDER
-========================= */
+/* DIVIDER */
 #divider {
     width: 5px;
     cursor: col-resize;
     background: #e6e6e6;
 }
 
-/* =========================
-   RIGHT PANEL
-========================= */
+/* RIGHT PANEL */
 #right {
     flex: 1;
     display: flex;
@@ -99,9 +91,7 @@ canvas {
     height: 100% !important;
 }
 
-/* =========================
-   MOBILE
-========================= */
+/* MOBILE */
 @media (max-width: 768px) {
     #right { display: none !important; }
     #divider { display: none !important; }
@@ -114,10 +104,10 @@ canvas {
 <body>
 
 <!-- =========================
-     BLOCK CANDLE BANNER
+     TOP SINGLE CANDLE
 ========================= -->
 <div id="bannerWrap">
-    <div id="candleStrip"></div>
+    <canvas id="bgChart"></canvas>
     <div id="banner">🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦</div>
 </div>
 
@@ -152,7 +142,7 @@ const term = new Terminal({
     cursorBlink: false,
     theme: {
         background: "#f7f7f7",
-        foreground: "#111111"
+        foreground: "#111"
     }
 });
 
@@ -182,9 +172,7 @@ let isDragging = false;
 
 divider.addEventListener("mousedown", () => isDragging = true);
 
-window.addEventListener("mouseup", () => {
-    isDragging = false;
-});
+window.addEventListener("mouseup", () => isDragging = false);
 
 window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
@@ -197,7 +185,7 @@ window.addEventListener("mousemove", (e) => {
 });
 
 /* =========================
-   PRICE CHART (UNCHANGED)
+   MAIN CHART (UNCHANGED SIMPLIFIED)
 ========================= */
 let chart;
 
@@ -205,14 +193,10 @@ async function load() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
-    const closes = data.map(d => d.close);
-    const stVals = data.map(d => d.st);
-    const stTrend = data.map(d => d.st_trend);
-
-    draw(closes, stVals, stTrend);
+    draw(data);
 }
 
-function draw(closes, stVals, stTrend) {
+function draw(data) {
 
     const ctx = document.getElementById("priceChart");
 
@@ -221,62 +205,88 @@ function draw(closes, stVals, stTrend) {
     chart = new Chart(ctx, {
         type: "line",
         data: {
-            labels: closes.map((_, i) => i),
+            labels: data.map((_, i) => i),
+            datasets: [{
+                data: data.map(d => d.close),
+                borderColor: "#b8860b",
+                borderWidth: 1,
+                pointRadius: 0,
+                tension: 0.25
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } }
+        }
+    });
+}
+
+/* =========================
+   SINGLE HORIZONTAL CANDLE (KEY PART)
+========================= */
+let bgChart;
+
+async function loadBannerCandle() {
+    const res = await fetch("./syschrtpxy.json");
+    const data = await res.json();
+
+    const open = data[0].st;              // ST = OPEN
+    const close = data[data.length - 1].close;
+    const high = Math.max(...data.map(d => d.high));
+    const low = Math.min(...data.map(d => d.low));
+
+    drawBannerCandle(open, high, low, close);
+}
+
+function drawBannerCandle(open, high, low, close) {
+
+    const ctx = document.getElementById("bgChart");
+
+    if (bgChart) bgChart.destroy();
+
+    bgChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: ["PXY"],
             datasets: [
+
+                // WICK (HIGH-LOW)
                 {
-                    label: "Close",
-                    data: closes,
-                    borderColor: "#b8860b",
-                    borderWidth: 1,
-                    pointRadius: 0,
-                    tension: 0.25
+                    data: [high - low],
+                    backgroundColor: "#999",
+                    barThickness: 2
+                },
+
+                // BODY (OPEN-CLOSE)
+                {
+                    data: [Math.abs(close - open)],
+                    backgroundColor: close >= open ? "#4DB6AC" : "#FF8A65",
+                    barThickness: 18
                 }
             ]
         },
+
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
                 x: { display: false },
-                y: { position: "right" }
+                y: { display: false }
             }
         }
     });
 }
 
 /* =========================
-   BLOCK CANDLE RENDERER
-========================= */
-async function loadBannerCandles() {
-    const res = await fetch("./syschrtpxy.json");
-    const data = await res.json();
-
-    const strip = data.slice(-80).map(d => {
-        const range = d.high - d.low;
-        const body = Math.abs(d.close - d.st);
-
-        // normalize into blocks
-        const strength = Math.min(8, Math.max(1, Math.floor(range / 10)));
-
-        let char = "█";
-        if (d.close < d.st) char = "▓";
-        if (d.close < d.low + range * 0.3) char = "░";
-
-        return char.repeat(strength);
-    }).join("");
-
-    document.getElementById("candleStrip").innerText = strip;
-}
-
-/* =========================
    INIT
 ========================= */
 load();
-loadBannerCandles();
+loadBannerCandle();
 
 setInterval(load, 3000);
-setInterval(loadBannerCandles, 2000);
+setInterval(loadBannerCandle, 3000);
 
 </script>
 
