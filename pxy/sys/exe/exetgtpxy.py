@@ -50,7 +50,7 @@ def target_price(row):
         exit_signal = str(row.get("exit", "NONE")).upper()
         counter = str(row.get("counter", "Y")).upper()
 
-        _signal = exit_signal if counter == "Y" else exit_signal
+        _signal = entry_signal if counter == "Y" else entry_signal
 
         # -------------------- HLD MODE --------------------
         if _signal == "NONE":
@@ -108,16 +108,16 @@ def target_price(row):
 
         if all_aligned:
             if is_ce:
-                score = atr * ce_power
+                score = (atr / 4) * ce_power
             elif is_pe:
-                score = atr * pe_power
+                score = (atr / 4) * pe_power
             else:
                 score = atr
             state = "ALN"
             color = Style.BRIGHT + Fore.GREEN
 
         else:
-            score = 1.7
+            score = (atr / 4)
             state = "NLN"
             color = Style.BRIGHT + Fore.RED
 
