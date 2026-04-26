@@ -8,6 +8,9 @@
 
 <style>
 
+/* =========================
+   GLOBAL
+========================= */
 :root {
     --divider-width: 6px;
 }
@@ -19,22 +22,14 @@ html, body {
     font-family: monospace;
     background: #3b3b3b;
     color: #eaeaea;
+
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 }
 
-/* =========================
-   TOP BANNER
-========================= */
-#topCandleWrap {
-    width: 100%;
-    height: 60px;
-    background: #3b3b3b;
-    border-bottom: 1px solid #4a4a4a;
-}
-
-#topCandle {
-    width: 100%;
-    height: 100%;
-    display: block;
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+    display: none;
 }
 
 /* =========================
@@ -43,7 +38,7 @@ html, body {
 #container {
     display: flex;
     width: 100%;
-    height: calc(100vh - 60px);
+    height: 100vh;
 }
 
 /* =========================
@@ -52,9 +47,20 @@ html, body {
 #terminal {
     width: 35%;
     min-width: 200px;
-    height: 100%;
+    height: 100vh;
     background: #3b3b3b;
     border-right: 1px solid #4a4a4a;
+}
+
+/* hide xterm scrollbar */
+.xterm .xterm-viewport {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar {
+    width: 0px !important;
+    height: 0px !important;
 }
 
 /* =========================
@@ -65,6 +71,7 @@ html, body {
     min-width: 10px;
     cursor: col-resize;
     background: #4a4a4a;
+    z-index: 10;
 }
 
 /* =========================
@@ -77,32 +84,77 @@ html, body {
     background: #3b3b3b;
 }
 
+/* =========================
+   CHART FIX (IMPORTANT)
+========================= */
 #chartWrap {
     flex: 1;
-    position: relative;
-    overflow: hidden;
+    position: relative;   /* 🔴 FIX */
+    height: 100%;         /* 🔴 FIX */
+    overflow: hidden;     /* 🔴 FIX */
 }
 
 canvas {
+    display: block;       /* 🔴 FIX */
     width: 100% !important;
     height: 100% !important;
-    display: block;
     background: #3b3b3b;
 }
 
+/* =========================
+   REMOVE TOOLBAR
+========================= */
 #toolbar {
     display: none;
+}
+
+/* =========================
+   FULLSCREEN
+========================= */
+.fullscreen-terminal #terminal {
+    width: 100% !important;
+}
+
+.fullscreen-terminal #right {
+    display: none;
+}
+
+.fullscreen-chart #terminal {
+    display: none;
+}
+
+.fullscreen-chart #right {
+    width: 100% !important;
+}
+
+/* =========================
+   MOBILE
+========================= */
+@media (max-width: 768px) {
+
+    #right {
+        display: none !important;
+    }
+
+    #divider {
+        display: none !important;
+    }
+
+    #terminal {
+        width: 100% !important;
+        height: 100vh !important;
+        border-right: none;
+    }
+
+    #container {
+        flex-direction: column;
+    }
 }
 
 </style>
 </head>
 
 <body>
-
-<!-- 🔥 TOP CANDLE BANNER -->
-<div id="topCandleWrap">
-    <canvas id="topCandle"></canvas>
-</div>
 
 <div id="container">
 
@@ -134,7 +186,9 @@ const term = new Terminal({
     cursorBlink: false,
     theme: {
         background: "#3b3b3b",
-        foreground: "#eaeaea"
+        foreground: "#eaeaea",
+        cursor: "#eaeaea",
+        selection: "rgba(255,255,255,0.1)"
     }
 });
 
@@ -148,100 +202,76 @@ window.addEventListener("resize", () => fitAddon.fit());
 term.writeln("TERMINAL OK");
 
 /* =========================
-   OPTIONAL WEBSOCKET
+   WEBSOCKET
 ========================= */
 const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DATA LOAD
+   DRAG FIXED DIVIDER
 ========================= */
-let chart;
+const divider = document.getElementById("divider");
+const terminal = document.getElementById("terminal");
+const right = document.getElementById("right");
 
-async function load() {
-    try {
-        const res = await fetch("./syschrtpxy.json");
+let isDragging = false;
 
-        if (!res.ok) {
-            console.log("JSON not found");
-            return;
-        }
+divider.addEventListener("mousedown", (e) => {
+    isDragging = true;
+    e.preventDefault();
+});
 
-        const data = await res.json();
+window.addEventListener("mouseup", () => {
+    isDragging = false;
+    saveLayout();
+});
 
-        if (!data || data.length === 0) {
-            console.log("EMPTY DATA");
-            return;
-        }
+window.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+    if (window.innerWidth <= 768) return;
 
-        const closes = data.map(d => d.close);
-        const stVals = data.map(d => d.st);
+    const percent = (e.clientX / window.innerWidth) * 100;
 
-        drawChart(closes, stVals);
-        drawTopCandle(stVals, closes);
+    if (percent < 10 || percent > 80) return;
 
-    } catch (e) {
-        console.log("LOAD ERROR:", e);
+    terminal.style.width = percent + "%";
+    right.style.width = (100 - percent) + "%";
+
+    fitAddon.fit();
+});
+
+/* =========================
+   LAYOUT
+========================= */
+function saveLayout() {
+    localStorage.setItem("split", terminal.style.width);
+}
+
+function loadLayout() {
+    const saved = localStorage.getItem("split");
+    if (saved && window.innerWidth > 768) {
+        terminal.style.width = saved;
+        right.style.width = (100 - parseFloat(saved)) + "%";
     }
 }
 
 /* =========================
-   TOP HORIZONTAL CANDLE
+   CHART (FIXED - NO DESTROY)
 ========================= */
-function drawTopCandle(stVals, closes) {
+let chart;
 
-    const canvas = document.getElementById("topCandle");
-    const ctx = canvas.getContext("2d");
+async function load() {
+    const res = await fetch("./syschrtpxy.json");
+    const data = await res.json();
 
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
+    const closes = data.map(d => d.close);
+    const stVals = data.map(d => d.st);
+    const stTrend = data.map(d => d.st_trend);
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (!stVals.length || !closes.length) return;
-
-    const open = stVals[0];
-    const close = closes[closes.length - 1];
-    const high = Math.max(...stVals);
-    const low = Math.min(...stVals);
-
-    const midY = canvas.height / 2;
-
-    const pad = 20;
-    const width = canvas.width - pad * 2;
-
-    const scale = v =>
-        pad + ((v - low) / (high - low || 1)) * width;
-
-    const xOpen = scale(open);
-    const xClose = scale(close);
-    const xHigh = scale(high);
-    const xLow = scale(low);
-
-    const color = close >= open ? "#00c853" : "#ff1744";
-
-    // wick
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(xLow, midY);
-    ctx.lineTo(xHigh, midY);
-    ctx.stroke();
-
-    // body (3px thickness)
-    ctx.fillStyle = color;
-    ctx.fillRect(
-        Math.min(xOpen, xClose),
-        midY - 1.5,
-        Math.abs(xClose - xOpen),
-        3
-    );
+    draw(closes, stVals, stTrend);
 }
 
-/* =========================
-   CHART
-========================= */
-function drawChart(closes, stVals) {
+function draw(closes, stVals, stTrend) {
 
     const ctx = document.getElementById("priceChart");
 
@@ -250,12 +280,26 @@ function drawChart(closes, stVals) {
     const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
     const closePad = [...closes, ...Array(pad).fill(null)];
     const stPad = [...stVals, ...Array(pad).fill(null)];
+    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
 
+    /* =========================
+       IN-PLACE UPDATE (NO FLICKER)
+    ========================= */
     if (chart) {
+
         chart.data.labels = labels;
         chart.data.datasets[0].data = closePad;
         chart.data.datasets[1].data = stPad;
-        chart.update("none");
+
+        chart.data.datasets[1].pointBackgroundColor = trendPad.map(t =>
+            t === "UP" ? "#00c853" : "#ff1744"
+        );
+
+        chart.data.datasets[1].pointBorderColor = trendPad.map(t =>
+            t === "UP" ? "#00c853" : "#ff1744"
+        );
+
+        chart.update("none"); // 🔴 no animation jump
         return;
     }
 
@@ -264,42 +308,50 @@ function drawChart(closes, stVals) {
         data: {
             labels,
             datasets: [
+
                 {
                     label: "Close",
                     data: closePad,
-                    borderColor: "#000",
+                    borderColor: "#000000",
                     borderWidth: 2,
                     pointRadius: 0,
                     tension: 0.25
                 },
+
                 {
                     label: "ST",
                     data: stPad,
                     showLine: false,
                     pointRadius: 2,
-                    pointBackgroundColor: "#00c853"
+                    pointBorderWidth: 2,
+                    pointBackgroundColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    ),
+                    pointBorderColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    )
                 }
             ]
         },
+
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-                x: { grid: { display: false } },
-                y: { grid: { display: false }, position: "right" }
+                x: { grid: { display: false }, ticks: { color: "#eaeaea" } },
+                y: { grid: { display: false }, ticks: { color: "#eaeaea" }, position: "right" }
             }
         }
     });
 }
 
 /* =========================
-   INIT (IMPORTANT FIX)
+   INIT
 ========================= */
-window.onload = () => {
-    load();
-    setInterval(load, 3000);
-};
+loadLayout();
+load();
+setInterval(load, 3000);
 
 </script>
 
