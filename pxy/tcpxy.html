@@ -33,12 +33,28 @@ body::-webkit-scrollbar {
 }
 
 /* =========================
+   TOP CANDLE STRIP
+========================= */
+#topCandleWrap {
+    width: 100%;
+    height: 18px;
+    background: #3b3b3b;
+    border-bottom: 1px solid #4a4a4a;
+}
+
+#topCandle {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* =========================
    MAIN LAYOUT
 ========================= */
 #container {
     display: flex;
     width: 100%;
-    height: 100vh;
+    height: calc(100vh - 18px);
 }
 
 /* =========================
@@ -47,7 +63,7 @@ body::-webkit-scrollbar {
 #terminal {
     width: 35%;
     min-width: 200px;
-    height: 100vh;
+    height: 100%;
     background: #3b3b3b;
     border-right: 1px solid #4a4a4a;
 }
@@ -85,7 +101,7 @@ body::-webkit-scrollbar {
 }
 
 /* =========================
-   CHART FIX
+   CHART
 ========================= */
 #chartWrap {
     flex: 1;
@@ -99,32 +115,6 @@ canvas {
     width: 100% !important;
     height: 100% !important;
     background: #3b3b3b;
-}
-
-/* =========================
-   REMOVE TOOLBAR
-========================= */
-#toolbar {
-    display: none;
-}
-
-/* =========================
-   FULLSCREEN
-========================= */
-.fullscreen-terminal #terminal {
-    width: 100% !important;
-}
-
-.fullscreen-terminal #right {
-    display: none;
-}
-
-.fullscreen-chart #terminal {
-    display: none;
-}
-
-.fullscreen-chart #right {
-    width: 100% !important;
 }
 
 /* =========================
@@ -148,6 +138,11 @@ canvas {
 
     #container {
         flex-direction: column;
+        height: 100vh;
+    }
+
+    #topCandleWrap {
+        display: none;
     }
 }
 
@@ -155,6 +150,11 @@ canvas {
 </head>
 
 <body>
+
+<!-- 🔥 TOP CANDLE STRIP -->
+<div id="topCandleWrap">
+    <canvas id="topCandle"></canvas>
+</div>
 
 <div id="container">
 
@@ -208,7 +208,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG FIXED DIVIDER
+   DRAG DIVIDER
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -256,7 +256,7 @@ function loadLayout() {
 }
 
 /* =========================
-   CHART (UNCHANGED)
+   CHART
 ========================= */
 let chart;
 
@@ -269,6 +269,7 @@ async function load() {
     const stTrend = data.map(d => d.st_trend);
 
     draw(closes, stVals, stTrend);
+    drawTopCandle(stVals, closes);
 }
 
 function draw(closes, stVals, stTrend) {
@@ -283,11 +284,9 @@ function draw(closes, stVals, stTrend) {
     const trendPad = [...stTrend, ...Array(pad).fill("UP")];
 
     if (chart) {
-
         chart.data.labels = labels;
         chart.data.datasets[0].data = closePad;
         chart.data.datasets[1].data = stPad;
-
         chart.update("none");
         return;
     }
@@ -336,7 +335,7 @@ function draw(closes, stVals, stTrend) {
 }
 
 /* =========================
-   🔥 TOP FRAME FIX (ONLY CHANGE)
+   🔥 TOP HORIZONTAL CANDLE
 ========================= */
 function drawTopCandle(stVals, closes) {
 
@@ -359,17 +358,17 @@ function drawTopCandle(stVals, closes) {
     const range = high - low || 1;
     const midY = canvas.height / 2;
 
-    // 🔥 NO PADDING (EDGE TO EDGE)
-    const scale = (v) =>
+    const scale = v =>
         ((v - low) / range) * canvas.width;
 
+    const xLow = scale(low);
+    const xHigh = scale(high);
     const xOpen = scale(open);
     const xClose = scale(close);
-    const xHigh = scale(high);
-    const xLow = scale(low);
 
     const color = close >= open ? "#00c853" : "#ff1744";
 
+    // wick (full horizontal range)
     ctx.strokeStyle = color;
     ctx.lineWidth = 2;
 
@@ -378,7 +377,9 @@ function drawTopCandle(stVals, closes) {
     ctx.lineTo(xHigh, midY);
     ctx.stroke();
 
+    // body
     ctx.fillStyle = color;
+
     ctx.fillRect(
         Math.min(xOpen, xClose),
         midY - 1.5,
