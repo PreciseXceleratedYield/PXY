@@ -16,14 +16,14 @@ html, body {
 }
 
 /* =========================
-   TOP FRAME
+   TOP FRAME (BRICK YELLOW)
 ========================= */
 #bannerWrap {
     width: 100%;
     height: 42px;
     position: relative;
-    background: #bdbdbd;
-    border-bottom: 1px solid #9e9e9e;
+    background: #C2A14A; /* ✅ BRICK YELLOW */
+    border-bottom: 1px solid #a8893a;
     overflow: hidden;
 }
 
@@ -48,7 +48,7 @@ html, body {
 }
 
 /* =========================
-   MAIN LAYOUT (33 / 66)
+   MAIN LAYOUT
 ========================= */
 #container {
     display: flex;
@@ -57,7 +57,7 @@ html, body {
 }
 
 #terminal {
-    width: 28%;
+    width: 35%;
     min-width: 200px;
     height: 100%;
     background: #bdbdbd;
@@ -71,7 +71,7 @@ html, body {
 }
 
 #right {
-    width: 66%;
+    flex: 1;
     display: flex;
     flex-direction: column;
     background: #bdbdbd;
@@ -180,7 +180,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG (still works but default 33/66)
+   DRAG
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -189,13 +189,13 @@ const right = document.getElementById("right");
 let isDragging = false;
 
 divider.addEventListener("mousedown", () => isDragging = true);
+
 window.addEventListener("mouseup", () => isDragging = false);
 
 window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
 
     const percent = (e.clientX / window.innerWidth) * 100;
-
     terminal.style.width = percent + "%";
     right.style.width = (100 - percent) + "%";
 
@@ -210,6 +210,7 @@ let chart;
 async function load() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
+
     draw(data);
 }
 
@@ -256,7 +257,7 @@ function draw(data) {
 }
 
 /* =========================
-   BANNER CANDLE (FIXED LOGIC)
+   BANNER CANDLE
 ========================= */
 let bgChart;
 
@@ -264,11 +265,8 @@ async function loadBannerCandle() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
-    const latest = data[data.length - 1];
-
-    const close = latest.close;
-    const st = latest.st;
-
+    const open = data[0].st;
+    const close = data[data.length - 1].close;
     const high = Math.max(...data.map(d => d.high));
     const low = Math.min(...data.map(d => d.low));
 
@@ -283,15 +281,15 @@ async function loadBannerCandle() {
             datasets: [
 
                 {
-                    // FULL RANGE WICK
                     data: [high - low],
-                    backgroundColor: "#8a6f2a"
+                    backgroundColor: "#8a6f2a",
+                    barThickness: 2
                 },
 
                 {
-                    // LATEST BODY (ST → CLOSE)
-                    data: [Math.abs(close - st)],
-                    backgroundColor: close >= st ? "#00e676" : "#ff1744"
+                    data: [Math.abs(close - open)],
+                    backgroundColor: close >= open ? "#00e676" : "#ff1744",
+                    barThickness: 18
                 }
             ]
         },
@@ -300,18 +298,9 @@ async function loadBannerCandle() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-
             scales: {
-                x: {
-                    display: false,
-                    grid: { display: false }
-                },
-                y: {
-                    display: false,
-                    grid: { display: false },
-                    min: low,
-                    max: high
-                }
+                x: { display: false },
+                y: { display: false }
             }
         }
     });
