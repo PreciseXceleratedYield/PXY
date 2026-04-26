@@ -43,11 +43,10 @@ html, body {
     font-weight: bold;
     font-size: 15px;
     line-height: 42px;
-    color: #111;
 }
 
 /* =========================
-   LAYOUT (28 / 70)
+   LAYOUT 28 / 72
 ========================= */
 #container {
     display: flex;
@@ -57,19 +56,18 @@ html, body {
 
 #terminal {
     width: 28%;
-    min-width: 200px;
     background: #bdbdbd;
     border-right: 1px solid #9e9e9e;
 }
 
 #divider {
     width: 5px;
-    cursor: col-resize;
     background: #9e9e9e;
+    cursor: col-resize;
 }
 
 #right {
-    width: 70%;
+    width: 72%;
     display: flex;
     flex-direction: column;
     background: #bdbdbd;
@@ -88,7 +86,6 @@ canvas {
 
 <body>
 
-<!-- TOP -->
 <div id="bannerWrap">
     <canvas id="bgChart"></canvas>
     <div id="banner">🏦 PXY DASHBOARD</div>
@@ -105,44 +102,86 @@ canvas {
     </div>
 </div>
 
+<!-- LIBS -->
+<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
 
+/* =========================
+   TERMINAL (RESTORED)
+========================= */
+const term = new Terminal({
+    convertEol: true,
+    scrollback: 1000,
+    fontFamily: "monospace",
+    fontSize: 14,
+    cursorBlink: false,
+    theme: {
+        background: "#bdbdbd",
+        foreground: "#111"
+    }
+});
+
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
+term.open(document.getElementById('terminal'));
+
+setTimeout(() => fitAddon.fit(), 50);
+window.addEventListener("resize", () => fitAddon.fit());
+
+term.writeln("TERMINAL OK");
+
+/* WebSocket */
+const ws = new WebSocket(`ws://${location.host}`);
+ws.onmessage = (e) => term.write(e.data);
+
+/* =========================
+   DRAG
+========================= */
+const divider = document.getElementById("divider");
+const terminal = document.getElementById("terminal");
+const right = document.getElementById("right");
+
+let drag = false;
+
+divider.addEventListener("mousedown", () => drag = true);
+window.addEventListener("mouseup", () => drag = false);
+
+window.addEventListener("mousemove", (e) => {
+    if (!drag) return;
+
+    const p = (e.clientX / window.innerWidth) * 100;
+    terminal.style.width = p + "%";
+    right.style.width = (100 - p) + "%";
+    fitAddon.fit();
+});
+
+/* =========================
+   CHART ENGINE (NO FLICKER)
+========================= */
 let chart;
-let bgChart;
+let minPrice = null;
+let maxPrice = null;
 
-/* =========================
-   LOAD DATA
-========================= */
-async function load() {
-    const res = await fetch("./syschrtpxy.json");
-    const data = await res.json();
-
-    drawMain(data);
-    drawBanner(data);
-}
-
-/* =========================
-   ST DOTTED + COLOR SEGMENT
-========================= */
+/* ST COLOR SEGMENT */
 function stColor(ctx) {
-    const curr = ctx.p1.raw;
-    const prev = ctx.p0.raw;
-    return curr >= prev ? "#006400" : "#8B0000";
+    const c = ctx.p1.raw;
+    const p = ctx.p0.raw;
+    return c >= p ? "#006400" : "#8B0000";
 }
 
-/* =========================
-   MAIN CHART
-========================= */
-function drawMain(data) {
+/* INIT CHART */
+function initChart(data) {
 
     const ctx = document.getElementById("priceChart");
 
-    if (chart) chart.destroy();
-
     const highs = data.map(d => d.high);
     const lows = data.map(d => d.low);
+
+    minPrice = Math.min(...lows);
+    maxPrice = Math.max(...highs);
 
     chart = new Chart(ctx, {
         type: "line",
@@ -151,25 +190,20 @@ function drawMain(data) {
             datasets: [
 
                 {
-                    label: "Close",
                     data: data.map(d => d.close),
                     borderColor: "#b8860b",
                     borderWidth: 1,
-                    pointRadius: 0,
-                    tension: 0.25
+                    pointRadius: 0
                 },
 
                 {
-                    label: "ST",
                     data: data.map(d => d.st),
-
+                    borderColor: "#006400",
                     borderWidth: 2,
                     pointRadius: 0,
-                    tension: 0.25,
-
+                    borderDash: [4,3],
                     segment: {
-                        borderColor: stColor,
-                        borderDash: [4, 3]   // dotted effect
+                        borderColor: stColor
                     }
                 }
             ]
@@ -179,64 +213,7 @@ function drawMain(data) {
             responsive: true,
             maintainAspectRatio: false,
 
-            plugins: {
-                legend: { display: false }
-            },
-
-            scales: {
-                x: {
-                    grid: { display: false }
-                },
-
-                y: {
-                    min: Math.min(...lows),
-                    max: Math.max(...highs),
-                    beginAtZero: false,
-                    grid: { display: false }
-                }
-            }
-        }
-    });
-}
-
-/* =========================
-   BANNER CANDLE (FIXED SCALE)
-========================= */
-function drawBanner(data) {
-
-    const latest = data[data.length - 1];
-
-    const close = latest.close;
-    const st = latest.st;
-
-    const high = Math.max(...data.map(d => d.high));
-    const low = Math.min(...data.map(d => d.low));
-
-    const ctx = document.getElementById("bgChart");
-
-    if (bgChart) bgChart.destroy();
-
-    bgChart = new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels: ["PXY"],
-            datasets: [
-
-                {
-                    data: [high - low],
-                    backgroundColor: "#8a6f2a"
-                },
-
-                {
-                    data: [Math.abs(close - st)],
-                    backgroundColor: close >= st ? "#006400" : "#8B0000"
-                }
-            ]
-        },
-
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
+            animation: false,   // 🔥 NO FLICKER
 
             plugins: {
                 legend: { display: false }
@@ -245,18 +222,40 @@ function drawBanner(data) {
             scales: {
                 x: { display: false },
                 y: {
-                    display: false,
-                    min: low,
-                    max: high
+                    min: minPrice,
+                    max: maxPrice,
+                    grid: { display: false },
+                    beginAtZero: false
                 }
             }
         }
     });
 }
 
+/* UPDATE ONLY DATA */
+function updateChart(data) {
+
+    if (!chart) {
+        initChart(data);
+        return;
+    }
+
+    chart.data.labels = data.map((_, i) => i);
+    chart.data.datasets[0].data = data.map(d => d.close);
+    chart.data.datasets[1].data = data.map(d => d.st);
+
+    chart.update('none'); // 🔥 no animation = stable
+}
+
 /* =========================
-   INIT
+   LOAD LOOP
 ========================= */
+async function load() {
+    const res = await fetch("./syschrtpxy.json");
+    const data = await res.json();
+    updateChart(data);
+}
+
 load();
 setInterval(load, 3000);
 
