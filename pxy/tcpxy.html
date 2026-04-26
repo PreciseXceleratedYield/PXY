@@ -12,8 +12,10 @@ html, body {
     height: 100%;
     overflow: hidden;
     font-family: monospace;
-    background: #ffffff;
-    color: #111;
+
+    /* 🔴 GLOBAL THEME (MEDIUM DARK GRAY) */
+    background: #3b3b3b;
+    color: #eaeaea;
 }
 
 /* =========================
@@ -32,8 +34,9 @@ html, body {
     width: 35%;
     min-width: 200px;
     height: 100vh;
-    background: #ffffff;
-    border-right: 1px solid #e5e5e5;
+
+    background: #3b3b3b;   /* SAME */
+    border-right: 1px solid #4a4a4a;
 }
 
 /* =========================
@@ -42,7 +45,8 @@ html, body {
 #divider {
     width: 5px;
     cursor: col-resize;
-    background: #ddd;
+
+    background: #4a4a4a;   /* slightly lighter */
 }
 
 /* =========================
@@ -52,21 +56,24 @@ html, body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #ffffff;
+
+    background: #3b3b3b;   /* SAME */
 }
 
-/* 🔴 HIDE TOOLBAR (FIX) */
+/* toolbar hidden already */
 #toolbar {
     display: none;
 }
 
 #chartWrap {
     flex: 1;
+    background: #3b3b3b;   /* ensure chart bg match */
 }
 
 canvas {
     width: 100% !important;
     height: 100% !important;
+    background: #3b3b3b;   /* FIX chart base */
 }
 
 /* =========================
@@ -124,8 +131,6 @@ canvas {
 
     <div id="right">
 
-        <!-- toolbar removed visually via CSS -->
-
         <div id="chartWrap">
             <canvas id="priceChart"></canvas>
         </div>
@@ -150,10 +155,10 @@ const term = new Terminal({
     fontSize: 14,
     cursorBlink: false,
     theme: {
-        background: "#ffffff",
-        foreground: "#111111",
-        cursor: "#111111",
-        selection: "rgba(0,0,0,0.08)"
+        background: "#3b3b3b",
+        foreground: "#eaeaea",
+        cursor: "#eaeaea",
+        selection: "rgba(255,255,255,0.1)"
     }
 });
 
@@ -242,22 +247,19 @@ function draw(closes, stVals, stTrend) {
 
             scales: {
                 x: {
-                    ticks: { color: "#333" },
-                    grid: { display: false }   // 🔴 FIX
+                    ticks: { color: "#eaeaea" },
+                    grid: { display: false }
                 },
                 y: {
                     position: "right",
-                    ticks: { color: "#333" },
-                    grid: { display: false }   // 🔴 FIX
+                    ticks: { color: "#eaeaea" },
+                    grid: { display: false }
                 }
             }
         }
     });
 }
 
-/* =========================
-   INIT
-========================= */
 load();
 setInterval(load, 3000);
 
