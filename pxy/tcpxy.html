@@ -12,69 +12,55 @@ html, body {
     height: 100%;
     overflow: hidden;
     font-family: monospace;
-    background: #bdbdbd;
-}
-
-/* =========================
-   TOP FRAME (BRICK YELLOW)
-========================= */
-#bannerWrap {
-    width: 100%;
-    height: 42px;
-    position: relative;
-    background: #C2A14A; /* ✅ BRICK YELLOW */
-    border-bottom: 1px solid #a8893a;
-    overflow: hidden;
-}
-
-#bgChart {
-    position: absolute;
-    width: 100%;
-    height: 42px;
-    top: 0;
-    left: 0;
-    z-index: 0;
-    opacity: 0.35;
-}
-
-#banner {
-    position: relative;
-    z-index: 2;
-    text-align: center;
-    font-weight: bold;
-    font-size: 15px;
-    line-height: 42px;
+    background: #ffffff;
     color: #111;
 }
 
 /* =========================
-   MAIN LAYOUT
+   MAIN CONTAINER
 ========================= */
 #container {
     display: flex;
     width: 100%;
-    height: calc(100vh - 42px);
+    height: 100vh;
 }
 
+/* =========================
+   TERMINAL
+========================= */
 #terminal {
     width: 35%;
     min-width: 200px;
-    height: 100%;
-    background: #bdbdbd;
-    border-right: 1px solid #9e9e9e;
+    height: 100vh;
+    background: #ffffff;
+    border-right: 1px solid #e5e5e5;
 }
 
+/* =========================
+   DIVIDER
+========================= */
 #divider {
     width: 5px;
     cursor: col-resize;
-    background: #9e9e9e;
+    background: #ddd;
 }
 
+/* =========================
+   RIGHT PANEL
+========================= */
 #right {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #bdbdbd;
+    background: #ffffff;
+}
+
+#toolbar {
+    padding: 5px;
+    background: #f3f3f3;
+    display: flex;
+    gap: 10px;
+    border-bottom: 1px solid #e5e5e5;
 }
 
 #chartWrap {
@@ -87,57 +73,70 @@ canvas {
 }
 
 /* =========================
-   SCROLLBAR
+   FULLSCREEN MODES (DESKTOP)
 ========================= */
-* {
-    scrollbar-width: thin;
-    scrollbar-color: #9e9e9e #bdbdbd;
+.fullscreen-terminal #terminal {
+    width: 100% !important;
 }
 
-*::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+.fullscreen-terminal #right {
+    display: none;
 }
 
-*::-webkit-scrollbar-track {
-    background: #bdbdbd;
+.fullscreen-chart #terminal {
+    display: none;
 }
 
-*::-webkit-scrollbar-thumb {
-    background-color: #9e9e9e;
-    border-radius: 10px;
-    border: 2px solid #bdbdbd;
+.fullscreen-chart #right {
+    width: 100% !important;
 }
 
 /* =========================
-   MOBILE
+   📱 MOBILE MODE
 ========================= */
 @media (max-width: 768px) {
-    #right { display: none !important; }
-    #divider { display: none !important; }
-    #terminal { width: 100% !important; height: 100vh !important; }
-    #container { flex-direction: column; }
+
+    #right {
+        display: none !important;
+    }
+
+    #divider {
+        display: none !important;
+    }
+
+    #terminal {
+        width: 100% !important;
+        height: 100vh !important;
+        border-right: none;
+    }
+
+    #container {
+        flex-direction: column;
+    }
 }
 </style>
 </head>
 
 <body>
 
-<!-- TOP -->
-<div id="bannerWrap">
-    <canvas id="bgChart"></canvas>
-    <div id="banner">🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦</div>
-</div>
-
 <div id="container">
 
     <div id="terminal"></div>
+
     <div id="divider"></div>
 
     <div id="right">
+
+        <div id="toolbar">
+            <button onclick="toggleTerminal()">🖥 Terminal</button>
+            <button onclick="toggleChart()">📊 Chart</button>
+            <button onclick="resetLayout()">🔄 Reset</button>
+        </div>
+
         <div id="chartWrap">
             <canvas id="priceChart"></canvas>
         </div>
+
     </div>
 
 </div>
@@ -159,8 +158,10 @@ const term = new Terminal({
     fontSize: 14,
     cursorBlink: false,
     theme: {
-        background: "#bdbdbd",
-        foreground: "#111"
+        background: "#ffffff",
+        foreground: "#111111",
+        cursor: "#111111",
+        selection: "rgba(0,0,0,0.08)"
     }
 });
 
@@ -180,7 +181,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG
+   DRAG SPLIT (DESKTOP ONLY)
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -190,12 +191,18 @@ let isDragging = false;
 
 divider.addEventListener("mousedown", () => isDragging = true);
 
-window.addEventListener("mouseup", () => isDragging = false);
+window.addEventListener("mouseup", () => {
+    isDragging = false;
+    saveLayout();
+});
 
 window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
+    if (window.innerWidth <= 768) return; // disable on mobile
 
     const percent = (e.clientX / window.innerWidth) * 100;
+    if (percent < 10 || percent > 80) return;
+
     terminal.style.width = percent + "%";
     right.style.width = (100 - percent) + "%";
 
@@ -203,7 +210,39 @@ window.addEventListener("mousemove", (e) => {
 });
 
 /* =========================
-   MAIN CHART
+   LAYOUT
+========================= */
+function saveLayout() {
+    localStorage.setItem("split", terminal.style.width);
+}
+
+function loadLayout() {
+    const saved = localStorage.getItem("split");
+    if (saved && window.innerWidth > 768) {
+        terminal.style.width = saved;
+        right.style.width = (100 - parseFloat(saved)) + "%";
+    }
+}
+
+/* =========================
+   FULLSCREEN
+========================= */
+function toggleTerminal() {
+    document.body.classList.toggle("fullscreen-terminal");
+}
+
+function toggleChart() {
+    document.body.classList.toggle("fullscreen-chart");
+}
+
+function resetLayout() {
+    terminal.style.width = "35%";
+    right.style.width = "65%";
+    localStorage.removeItem("split");
+}
+
+/* =========================
+   CHART
 ========================= */
 let chart;
 
@@ -211,35 +250,62 @@ async function load() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
-    draw(data);
+    const closes = data.map(d => d.close);
+    const stVals = data.map(d => d.st);
+    const stTrend = data.map(d => d.st_trend);
+
+    draw(closes, stVals, stTrend);
 }
 
-function draw(data) {
+function draw(closes, stVals, stTrend) {
 
     const ctx = document.getElementById("priceChart");
 
     if (chart) chart.destroy();
 
+    /* =========================
+       3 CANDLE RIGHT PADDING
+    ========================= */
+    const pad = 3;
+
+    const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
+    const closePad = [...closes, ...Array(pad).fill(null)];
+    const stPad = [...stVals, ...Array(pad).fill(null)];
+    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
+
     chart = new Chart(ctx, {
         type: "line",
         data: {
-            labels: data.map((_, i) => i),
+            labels,
+
             datasets: [
 
+                // CLOSE
                 {
-                    data: data.map(d => d.close),
-                    borderColor: "#b8860b",
-                    borderWidth: 1,
+                    label: "Close",
+                    data: closePad,
+                    borderColor: "#000000",
+                    borderWidth: 2,
                     pointRadius: 0,
                     tension: 0.25
                 },
 
+                // SUPER TREND
                 {
-                    data: data.map(d => d.st),
-                    borderColor: "#00e676",
-                    borderWidth: 1.5,
-                    pointRadius: 0,
-                    tension: 0.25
+                    label: "ST",
+                    data: stPad,
+                    showLine: false,
+
+                    pointRadius: 2,
+                    pointBorderWidth: 2,
+
+                    pointBackgroundColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    ),
+
+                    pointBorderColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    )
                 }
             ]
         },
@@ -247,60 +313,22 @@ function draw(data) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
+
+            plugins: {
+                legend: { display: false }
+            },
+
             scales: {
-                x: { grid: { display: false } },
-                y: { grid: { display: false } }
-            }
-        }
-    });
-}
-
-/* =========================
-   BANNER CANDLE
-========================= */
-let bgChart;
-
-async function loadBannerCandle() {
-    const res = await fetch("./syschrtpxy.json");
-    const data = await res.json();
-
-    const open = data[0].st;
-    const close = data[data.length - 1].close;
-    const high = Math.max(...data.map(d => d.high));
-    const low = Math.min(...data.map(d => d.low));
-
-    const ctx = document.getElementById("bgChart");
-
-    if (bgChart) bgChart.destroy();
-
-    bgChart = new Chart(ctx, {
-        type: "bar",
-        data: {
-            labels: ["PXY"],
-            datasets: [
-
-                {
-                    data: [high - low],
-                    backgroundColor: "#8a6f2a",
-                    barThickness: 2
+                x: {
+                    ticks: { color: "#333" },
+                    grid: { color: "#eee" },
+                    offset: true
                 },
-
-                {
-                    data: [Math.abs(close - open)],
-                    backgroundColor: close >= open ? "#00e676" : "#ff1744",
-                    barThickness: 18
+                y: {
+                    position: "right",
+                    ticks: { color: "#333" },
+                    grid: { color: "#eee" }
                 }
-            ]
-        },
-
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { display: false },
-                y: { display: false }
             }
         }
     });
@@ -309,11 +337,9 @@ async function loadBannerCandle() {
 /* =========================
    INIT
 ========================= */
+loadLayout();
 load();
-loadBannerCandle();
-
 setInterval(load, 3000);
-setInterval(loadBannerCandle, 3000);
 
 </script>
 
