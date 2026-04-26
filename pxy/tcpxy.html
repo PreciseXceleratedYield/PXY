@@ -12,7 +12,7 @@
    GLOBAL SETTINGS
 ========================= */
 :root {
-    --divider-width: 6px;   /* 👈 CHANGE THIS (controls split bar width) */
+    --divider-width: 6px;
 }
 
 html, body {
@@ -33,7 +33,7 @@ body::-webkit-scrollbar {
 }
 
 /* =========================
-   MAIN LAYOUT
+   LAYOUT
 ========================= */
 #container {
     display: flex;
@@ -52,7 +52,7 @@ body::-webkit-scrollbar {
     border-right: 1px solid #4a4a4a;
 }
 
-/* HIDE XTERM SCROLLBAR */
+/* HIDE TERMINAL SCROLLBAR */
 .xterm .xterm-viewport {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -64,12 +64,15 @@ body::-webkit-scrollbar {
 }
 
 /* =========================
-   DIVIDER (ADJUSTABLE)
+   DIVIDER (FIXED DRAG AREA)
 ========================= */
 #divider {
     width: var(--divider-width);
+    min-width: 10px;          /* 👈 IMPORTANT: makes drag easy */
     cursor: col-resize;
     background: #4a4a4a;
+    z-index: 10;
+    pointer-events: auto;
 }
 
 /* =========================
@@ -203,6 +206,54 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
+   DRAG FIXED DIVIDER
+========================= */
+const divider = document.getElementById("divider");
+const terminal = document.getElementById("terminal");
+const right = document.getElementById("right");
+
+let isDragging = false;
+
+divider.addEventListener("mousedown", (e) => {
+    isDragging = true;
+    e.preventDefault(); // prevents selection freeze
+});
+
+window.addEventListener("mouseup", () => {
+    isDragging = false;
+    saveLayout();
+});
+
+window.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+    if (window.innerWidth <= 768) return;
+
+    const percent = (e.clientX / window.innerWidth) * 100;
+
+    if (percent < 10 || percent > 80) return;
+
+    terminal.style.width = percent + "%";
+    right.style.width = (100 - percent) + "%";
+
+    fitAddon.fit();
+});
+
+/* =========================
+   LAYOUT SAVE
+========================= */
+function saveLayout() {
+    localStorage.setItem("split", terminal.style.width);
+}
+
+function loadLayout() {
+    const saved = localStorage.getItem("split");
+    if (saved && window.innerWidth > 768) {
+        terminal.style.width = saved;
+        right.style.width = (100 - parseFloat(saved)) + "%";
+    }
+}
+
+/* =========================
    CHART
 ========================= */
 let chart;
@@ -265,21 +316,10 @@ function draw(closes, stVals, stTrend) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-
-            plugins: {
-                legend: { display: false }
-            },
-
+            plugins: { legend: { display: false } },
             scales: {
-                x: {
-                    ticks: { color: "#eaeaea" },
-                    grid: { display: false }
-                },
-                y: {
-                    position: "right",
-                    ticks: { color: "#eaeaea" },
-                    grid: { display: false }
-                }
+                x: { grid: { display: false }, ticks: { color: "#eaeaea" } },
+                y: { grid: { display: false }, ticks: { color: "#eaeaea" }, position: "right" }
             }
         }
     });
@@ -288,6 +328,7 @@ function draw(closes, stVals, stTrend) {
 /* =========================
    INIT
 ========================= */
+loadLayout();
 load();
 setInterval(load, 3000);
 
