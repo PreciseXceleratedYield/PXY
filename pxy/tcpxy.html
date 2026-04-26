@@ -9,7 +9,7 @@
 <style>
 
 /* =========================
-   GLOBAL SETTINGS
+   GLOBAL
 ========================= */
 :root {
     --divider-width: 6px;
@@ -33,7 +33,7 @@ body::-webkit-scrollbar {
 }
 
 /* =========================
-   LAYOUT
+   MAIN LAYOUT
 ========================= */
 #container {
     display: flex;
@@ -52,7 +52,7 @@ body::-webkit-scrollbar {
     border-right: 1px solid #4a4a4a;
 }
 
-/* HIDE TERMINAL SCROLLBAR */
+/* hide xterm scrollbar */
 .xterm .xterm-viewport {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -64,15 +64,14 @@ body::-webkit-scrollbar {
 }
 
 /* =========================
-   DIVIDER (FIXED DRAG AREA)
+   DIVIDER
 ========================= */
 #divider {
     width: var(--divider-width);
-    min-width: 10px;          /* 👈 IMPORTANT: makes drag easy */
+    min-width: 10px;
     cursor: col-resize;
     background: #4a4a4a;
     z-index: 10;
-    pointer-events: auto;
 }
 
 /* =========================
@@ -85,29 +84,32 @@ body::-webkit-scrollbar {
     background: #3b3b3b;
 }
 
-#toolbar {
-    display: none;
-}
-
+/* =========================
+   CHART FIX (IMPORTANT)
+========================= */
 #chartWrap {
     flex: 1;
-    background: #3b3b3b;
+    position: relative;   /* 🔴 FIX */
+    height: 100%;         /* 🔴 FIX */
+    overflow: hidden;     /* 🔴 FIX */
 }
 
 canvas {
+    display: block;       /* 🔴 FIX */
     width: 100% !important;
     height: 100% !important;
     background: #3b3b3b;
 }
 
-/* REMOVE VISUAL BORDERS */
-#terminal, #right {
-    box-shadow: none;
-    border: none;
+/* =========================
+   REMOVE TOOLBAR
+========================= */
+#toolbar {
+    display: none;
 }
 
 /* =========================
-   FULLSCREEN MODES
+   FULLSCREEN
 ========================= */
 .fullscreen-terminal #terminal {
     width: 100% !important;
@@ -216,7 +218,7 @@ let isDragging = false;
 
 divider.addEventListener("mousedown", (e) => {
     isDragging = true;
-    e.preventDefault(); // prevents selection freeze
+    e.preventDefault();
 });
 
 window.addEventListener("mouseup", () => {
@@ -239,7 +241,7 @@ window.addEventListener("mousemove", (e) => {
 });
 
 /* =========================
-   LAYOUT SAVE
+   LAYOUT
 ========================= */
 function saveLayout() {
     localStorage.setItem("split", terminal.style.width);
@@ -254,7 +256,7 @@ function loadLayout() {
 }
 
 /* =========================
-   CHART
+   CHART (FIXED - NO DESTROY)
 ========================= */
 let chart;
 
@@ -273,14 +275,33 @@ function draw(closes, stVals, stTrend) {
 
     const ctx = document.getElementById("priceChart");
 
-    if (chart) chart.destroy();
-
     const pad = 3;
 
     const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
     const closePad = [...closes, ...Array(pad).fill(null)];
     const stPad = [...stVals, ...Array(pad).fill(null)];
     const trendPad = [...stTrend, ...Array(pad).fill("UP")];
+
+    /* =========================
+       IN-PLACE UPDATE (NO FLICKER)
+    ========================= */
+    if (chart) {
+
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = closePad;
+        chart.data.datasets[1].data = stPad;
+
+        chart.data.datasets[1].pointBackgroundColor = trendPad.map(t =>
+            t === "UP" ? "#00c853" : "#ff1744"
+        );
+
+        chart.data.datasets[1].pointBorderColor = trendPad.map(t =>
+            t === "UP" ? "#00c853" : "#ff1744"
+        );
+
+        chart.update("none"); // 🔴 no animation jump
+        return;
+    }
 
     chart = new Chart(ctx, {
         type: "line",
