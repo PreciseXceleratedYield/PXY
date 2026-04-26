@@ -40,14 +40,22 @@ def get_all_data():
         "hkin_past_depth": core.get("hkin_past_depth", 0),
         "hkin_ce_depth": core.get("hkin_ce_depth", 1),
         "hkin_pe_depth": core.get("hkin_pe_depth", 1),
+
         "atr": core.get("atr"),
         "katr": core.get("katr"),
         "price": core.get("price"),
         "direction": core.get("direction"),
+
         "supertrend": core.get("supertrend"),
         "super_line": core.get("super_line"),
+
         "ce_power": core.get("ce_power"),
         "pe_power": core.get("pe_power"),
+
+        # 🔥 FORCE FIX (SINGLE ADDITION)
+        "ce_force": core.get("ce_force", 1.0),
+        "pe_force": core.get("pe_force", 1.0),
+
         "entry": core.get("entry"),
         "exit": core.get("exit"),
 
