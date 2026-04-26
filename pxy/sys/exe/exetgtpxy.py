@@ -46,7 +46,7 @@ def target_price(row):
         exit_signal = str(row.get("exit", "NONE")).upper()
         counter = str(row.get("counter", "Y")).upper()
 
-        _signal = exit_signal if counter == "Y" else entry_signal
+        _signal = exit_signal if counter == "Y" else exit_signal
 
         # -------------------- HLD MODE --------------------
         if _signal == "NONE":
