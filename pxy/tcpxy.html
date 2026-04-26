@@ -55,12 +55,9 @@ html, body {
     background: #ffffff;
 }
 
+/* toolbar removed spacing kept clean */
 #toolbar {
-    padding: 5px;
-    background: #f3f3f3;
-    display: flex;
-    gap: 10px;
-    border-bottom: 1px solid #e5e5e5;
+    display: none;
 }
 
 #chartWrap {
@@ -127,11 +124,7 @@ canvas {
 
     <div id="right">
 
-        <div id="toolbar">
-            <button onclick="toggleTerminal()">🖥 Terminal</button>
-            <button onclick="toggleChart()">📊 Chart</button>
-            <button onclick="resetLayout()">🔄 Reset</button>
-        </div>
+        <!-- TOOLBAR REMOVED -->
 
         <div id="chartWrap">
             <canvas id="priceChart"></canvas>
