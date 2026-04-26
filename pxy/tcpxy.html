@@ -22,7 +22,7 @@ html, body {
 #container {
     display: flex;
     width: 100%;
-    height: 100vh;
+    height: calc(100vh - 38px);
 }
 
 /* =========================
@@ -31,7 +31,7 @@ html, body {
 #terminal {
     width: 35%;
     min-width: 200px;
-    height: 100vh;
+    height: 100%;
     background: #ffffff;
     border-right: 1px solid #e5e5e5;
 }
@@ -90,6 +90,24 @@ canvas {
 
 <body>
 
+<!-- =========================
+     TOP BANNER
+========================= -->
+<div style="
+    width: 100%;
+    text-align: center;
+    font-family: monospace;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 8px 0;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e5e5;
+    color: #111;
+    letter-spacing: 0.5px;
+">
+    🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
+</div>
+
 <div id="container">
 
     <div id="terminal"></div>
@@ -111,7 +129,7 @@ canvas {
 <script>
 
 /* =========================
-   TERMINAL (UNCHANGED)
+   TERMINAL
 ========================= */
 const term = new Terminal({
     convertEol: true,
@@ -137,13 +155,13 @@ window.addEventListener("resize", () => fitAddon.fit());
 term.writeln("TERMINAL OK");
 
 /* =========================
-   WEBSOCKET (UNCHANGED)
+   WEBSOCKET
 ========================= */
 const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG SPLIT (UNCHANGED)
+   DRAG SPLIT
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -203,7 +221,7 @@ function draw(closes, stVals, stTrend) {
             labels,
             datasets: [
 
-                // PRICE LINE (UNCHANGED)
+                // PRICE LINE
                 {
                     label: "Close",
                     data: closePad,
@@ -213,7 +231,7 @@ function draw(closes, stVals, stTrend) {
                     tension: 0.25
                 },
 
-                // ST → DASH MARKERS (FIXED STYLE ONLY)
+                // ST DASH MARKERS (EYE FRIENDLY)
                 {
                     label: "ST",
                     data: stPad,
