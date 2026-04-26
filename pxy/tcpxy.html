@@ -8,9 +8,6 @@
 
 <style>
 
-/* =========================
-   GLOBAL
-========================= */
 :root {
     --divider-width: 6px;
 }
@@ -22,14 +19,22 @@ html, body {
     font-family: monospace;
     background: #3b3b3b;
     color: #eaeaea;
-
-    scrollbar-width: none;
-    -ms-overflow-style: none;
 }
 
-html::-webkit-scrollbar,
-body::-webkit-scrollbar {
-    display: none;
+/* =========================
+   TOP CANDLE
+========================= */
+#topCandleWrap {
+    width: 100%;
+    height: 60px;
+    background: #3b3b3b;
+    border-bottom: 1px solid #4a4a4a;
+}
+
+#topCandle {
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 /* =========================
@@ -38,7 +43,7 @@ body::-webkit-scrollbar {
 #container {
     display: flex;
     width: 100%;
-    height: 100vh;
+    height: calc(100vh - 60px);
 }
 
 /* =========================
@@ -47,20 +52,9 @@ body::-webkit-scrollbar {
 #terminal {
     width: 35%;
     min-width: 200px;
-    height: 100vh;
+    height: 100%;
     background: #3b3b3b;
     border-right: 1px solid #4a4a4a;
-}
-
-/* hide xterm scrollbar */
-.xterm .xterm-viewport {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-
-.xterm .xterm-viewport::-webkit-scrollbar {
-    width: 0px !important;
-    height: 0px !important;
 }
 
 /* =========================
@@ -71,7 +65,6 @@ body::-webkit-scrollbar {
     min-width: 10px;
     cursor: col-resize;
     background: #4a4a4a;
-    z-index: 10;
 }
 
 /* =========================
@@ -84,77 +77,32 @@ body::-webkit-scrollbar {
     background: #3b3b3b;
 }
 
-/* =========================
-   CHART FIX (IMPORTANT)
-========================= */
 #chartWrap {
     flex: 1;
-    position: relative;   /* 🔴 FIX */
-    height: 100%;         /* 🔴 FIX */
-    overflow: hidden;     /* 🔴 FIX */
+    position: relative;
+    overflow: hidden;
 }
 
 canvas {
-    display: block;       /* 🔴 FIX */
     width: 100% !important;
     height: 100% !important;
+    display: block;
     background: #3b3b3b;
 }
 
-/* =========================
-   REMOVE TOOLBAR
-========================= */
 #toolbar {
     display: none;
-}
-
-/* =========================
-   FULLSCREEN
-========================= */
-.fullscreen-terminal #terminal {
-    width: 100% !important;
-}
-
-.fullscreen-terminal #right {
-    display: none;
-}
-
-.fullscreen-chart #terminal {
-    display: none;
-}
-
-.fullscreen-chart #right {
-    width: 100% !important;
-}
-
-/* =========================
-   MOBILE
-========================= */
-@media (max-width: 768px) {
-
-    #right {
-        display: none !important;
-    }
-
-    #divider {
-        display: none !important;
-    }
-
-    #terminal {
-        width: 100% !important;
-        height: 100vh !important;
-        border-right: none;
-    }
-
-    #container {
-        flex-direction: column;
-    }
 }
 
 </style>
 </head>
 
 <body>
+
+<!-- 🔥 TOP CANDLE -->
+<div id="topCandleWrap">
+    <canvas id="topCandle"></canvas>
+</div>
 
 <div id="container">
 
@@ -176,7 +124,7 @@ canvas {
 <script>
 
 /* =========================
-   TERMINAL
+   TERMINAL (DIM FIXED)
 ========================= */
 const term = new Terminal({
     convertEol: true,
@@ -184,11 +132,30 @@ const term = new Terminal({
     fontFamily: "monospace",
     fontSize: 14,
     cursorBlink: false,
+
     theme: {
         background: "#3b3b3b",
-        foreground: "#eaeaea",
-        cursor: "#eaeaea",
-        selection: "rgba(255,255,255,0.1)"
+        foreground: "#cfcfcf",
+        cursor: "#cfcfcf",
+        selection: "rgba(255,255,255,0.08)",
+
+        black:   "#2b2b2b",
+        red:     "#c75c5c",
+        green:   "#5fbf7f",
+        yellow:  "#c7b15c",
+        blue:    "#6b8fd6",
+        magenta: "#a277c7",
+        cyan:    "#5fbfc7",
+        white:   "#bdbdbd",
+
+        brightBlack:   "#3a3a3a",
+        brightRed:     "#d97a7a",
+        brightGreen:   "#78d39a",
+        brightYellow:  "#d9c47a",
+        brightBlue:    "#8aa6e6",
+        brightMagenta: "#b48ad9",
+        brightCyan:    "#78d9e6",
+        brightWhite:   "#e0e0e0"
     }
 });
 
@@ -202,76 +169,93 @@ window.addEventListener("resize", () => fitAddon.fit());
 term.writeln("TERMINAL OK");
 
 /* =========================
-   WEBSOCKET
+   OPTIONAL WS SAFE
 ========================= */
-const ws = new WebSocket(`ws://${location.host}`);
-ws.onmessage = (e) => term.write(e.data);
-
-/* =========================
-   DRAG FIXED DIVIDER
-========================= */
-const divider = document.getElementById("divider");
-const terminal = document.getElementById("terminal");
-const right = document.getElementById("right");
-
-let isDragging = false;
-
-divider.addEventListener("mousedown", (e) => {
-    isDragging = true;
-    e.preventDefault();
-});
-
-window.addEventListener("mouseup", () => {
-    isDragging = false;
-    saveLayout();
-});
-
-window.addEventListener("mousemove", (e) => {
-    if (!isDragging) return;
-    if (window.innerWidth <= 768) return;
-
-    const percent = (e.clientX / window.innerWidth) * 100;
-
-    if (percent < 10 || percent > 80) return;
-
-    terminal.style.width = percent + "%";
-    right.style.width = (100 - percent) + "%";
-
-    fitAddon.fit();
-});
-
-/* =========================
-   LAYOUT
-========================= */
-function saveLayout() {
-    localStorage.setItem("split", terminal.style.width);
-}
-
-function loadLayout() {
-    const saved = localStorage.getItem("split");
-    if (saved && window.innerWidth > 768) {
-        terminal.style.width = saved;
-        right.style.width = (100 - parseFloat(saved)) + "%";
-    }
+try {
+    const ws = new WebSocket(`ws://${location.host}`);
+    ws.onmessage = (e) => term.write(e.data);
+} catch (e) {
+    console.log("WS not available");
 }
 
 /* =========================
-   CHART (FIXED - NO DESTROY)
+   DATA
 ========================= */
 let chart;
 
 async function load() {
-    const res = await fetch("./syschrtpxy.json");
-    const data = await res.json();
+    try {
+        const res = await fetch("./syschrtpxy.json");
+        const data = await res.json();
 
-    const closes = data.map(d => d.close);
-    const stVals = data.map(d => d.st);
-    const stTrend = data.map(d => d.st_trend);
+        if (!data || data.length === 0) return;
 
-    draw(closes, stVals, stTrend);
+        const closes = data.map(d => d.close);
+        const stVals = data.map(d => d.st);
+
+        drawChart(closes, stVals);
+        drawTopCandle(stVals, closes);
+
+    } catch (e) {
+        console.log("DATA LOAD ERROR", e);
+    }
 }
 
-function draw(closes, stVals, stTrend) {
+/* =========================
+   TOP CANDLE (STABLE)
+========================= */
+function drawTopCandle(stVals, closes) {
+
+    const canvas = document.getElementById("topCandle");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!stVals.length || !closes.length) return;
+
+    const open = stVals[0];
+    const close = closes[closes.length - 1];
+    const high = Math.max(...stVals);
+    const low = Math.min(...stVals);
+
+    const midY = canvas.height / 2;
+
+    const pad = 20;
+    const width = canvas.width - pad * 2;
+
+    const scale = v =>
+        pad + ((v - low) / (high - low || 1)) * width;
+
+    const xOpen = scale(open);
+    const xClose = scale(close);
+    const xHigh = scale(high);
+    const xLow = scale(low);
+
+    const color = close >= open ? "#00c853" : "#ff1744";
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(xLow, midY);
+    ctx.lineTo(xHigh, midY);
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.fillRect(
+        Math.min(xOpen, xClose),
+        midY - 1.5,
+        Math.abs(xClose - xOpen),
+        3
+    );
+}
+
+/* =========================
+   CHART
+========================= */
+function drawChart(closes, stVals) {
 
     const ctx = document.getElementById("priceChart");
 
@@ -280,26 +264,12 @@ function draw(closes, stVals, stTrend) {
     const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
     const closePad = [...closes, ...Array(pad).fill(null)];
     const stPad = [...stVals, ...Array(pad).fill(null)];
-    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
 
-    /* =========================
-       IN-PLACE UPDATE (NO FLICKER)
-    ========================= */
     if (chart) {
-
         chart.data.labels = labels;
         chart.data.datasets[0].data = closePad;
         chart.data.datasets[1].data = stPad;
-
-        chart.data.datasets[1].pointBackgroundColor = trendPad.map(t =>
-            t === "UP" ? "#00c853" : "#ff1744"
-        );
-
-        chart.data.datasets[1].pointBorderColor = trendPad.map(t =>
-            t === "UP" ? "#00c853" : "#ff1744"
-        );
-
-        chart.update("none"); // 🔴 no animation jump
+        chart.update("none");
         return;
     }
 
@@ -308,39 +278,30 @@ function draw(closes, stVals, stTrend) {
         data: {
             labels,
             datasets: [
-
                 {
                     label: "Close",
                     data: closePad,
-                    borderColor: "#000000",
+                    borderColor: "#000",
                     borderWidth: 2,
                     pointRadius: 0,
                     tension: 0.25
                 },
-
                 {
                     label: "ST",
                     data: stPad,
                     showLine: false,
                     pointRadius: 2,
-                    pointBorderWidth: 2,
-                    pointBackgroundColor: trendPad.map(t =>
-                        t === "UP" ? "#00c853" : "#ff1744"
-                    ),
-                    pointBorderColor: trendPad.map(t =>
-                        t === "UP" ? "#00c853" : "#ff1744"
-                    )
+                    pointBackgroundColor: "#00c853"
                 }
             ]
         },
-
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
             scales: {
-                x: { grid: { display: false }, ticks: { color: "#eaeaea" } },
-                y: { grid: { display: false }, ticks: { color: "#eaeaea" }, position: "right" }
+                x: { grid: { display: false } },
+                y: { grid: { display: false }, position: "right" }
             }
         }
     });
@@ -349,9 +310,10 @@ function draw(closes, stVals, stTrend) {
 /* =========================
    INIT
 ========================= */
-loadLayout();
-load();
-setInterval(load, 3000);
+window.onload = () => {
+    load();
+    setInterval(load, 3000);
+};
 
 </script>
 
