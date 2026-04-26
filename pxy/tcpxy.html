@@ -198,7 +198,7 @@ window.addEventListener("mouseup", () => {
 
 window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
-    if (window.innerWidth <= 768) return; // disable on mobile
+    if (window.innerWidth <= 768) return;
 
     const percent = (e.clientX / window.innerWidth) * 100;
     if (percent < 10 || percent > 80) return;
@@ -263,9 +263,6 @@ function draw(closes, stVals, stTrend) {
 
     if (chart) chart.destroy();
 
-    /* =========================
-       3 CANDLE RIGHT PADDING
-    ========================= */
     const pad = 3;
 
     const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
@@ -277,15 +274,14 @@ function draw(closes, stVals, stTrend) {
         type: "line",
         data: {
             labels,
-
             datasets: [
 
-                // CLOSE
+                // CLOSE (PRICE LINE)
                 {
                     label: "Close",
                     data: closePad,
-                    borderColor: "#000000",
-                    borderWidth: 2,
+                    borderColor: "#b8860b",
+                    borderWidth: 4,
                     pointRadius: 0,
                     tension: 0.25
                 },
@@ -295,14 +291,11 @@ function draw(closes, stVals, stTrend) {
                     label: "ST",
                     data: stPad,
                     showLine: false,
-
                     pointRadius: 2,
                     pointBorderWidth: 2,
-
                     pointBackgroundColor: trendPad.map(t =>
                         t === "UP" ? "#00c853" : "#ff1744"
                     ),
-
                     pointBorderColor: trendPad.map(t =>
                         t === "UP" ? "#00c853" : "#ff1744"
                     )
@@ -321,13 +314,13 @@ function draw(closes, stVals, stTrend) {
             scales: {
                 x: {
                     ticks: { color: "#333" },
-                    grid: { color: "#eee" },
+                    grid: { display: false },
                     offset: true
                 },
                 y: {
                     position: "right",
                     ticks: { color: "#333" },
-                    grid: { color: "#eee" }
+                    grid: { display: false }
                 }
             }
         }
