@@ -9,7 +9,6 @@ init(autoreset=True)
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_ha_data
 from syshkinpxy import detect_ha_flip_signal
-from sysstrhpxy import get_candle_strength_line
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
 from sysstrndpxy import calculate_supertrend
@@ -18,7 +17,7 @@ from sysentrpxy import get_entry_signal
 from sysdeptpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
-from syssadxpxy import calculate_adx   # ✅ ADD THIS
+from syssadxpxy import calculate_adx   # ✅ KEEP
 
 TOTAL_WIDTH = 42
 
@@ -64,16 +63,15 @@ def get_full_snapshot():
     result["hkin_ce_depth"] = ce_depth
     result["hkin_pe_depth"] = pe_depth
 
-    # ===== STRENGTH (UNCHANGED) =====
-    line, _, _ = get_candle_strength_line(df=df)
-    result["strength_line"] = line
+    # ❌ ===== STRENGTH REMOVED COMPLETELY =====
 
-    # ===== FORCE (NEW ADD) =====
+    # ===== FORCE =====
     force_result = calculate_adx(df)
     if force_result:
         ce_force, pe_force = force_result
     else:
         ce_force, pe_force = 1.0, 1.0
+
     result["ce_force"] = ce_force
     result["pe_force"] = pe_force
 
@@ -144,7 +142,7 @@ def print_dashboard(data):
     if space2 < 0: space2 = 1
     print(Fore.YELLOW + "CE:" + color + str(ce_depth) + " " * space2 + Fore.YELLOW + "PE:" + color + str(pe_depth))
 
-    # ===== FORCE (REPLACES STRENGTH PRINT ONLY) =====
+    # ===== FORCE =====
     ce_force = data.get("ce_force", 1.0)
     pe_force = data.get("pe_force", 1.0)
 
