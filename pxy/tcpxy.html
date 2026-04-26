@@ -16,7 +16,7 @@ html, body {
 }
 
 /* =========================
-   TOP FRAME (MEDIUM GREY)
+   TOP FRAME
 ========================= */
 #bannerWrap {
     width: 100%;
@@ -48,7 +48,7 @@ html, body {
 }
 
 /* =========================
-   MAIN LAYOUT
+   MAIN LAYOUT (33 / 66)
 ========================= */
 #container {
     display: flex;
@@ -57,7 +57,7 @@ html, body {
 }
 
 #terminal {
-    width: 35%;
+    width: 33%;
     min-width: 200px;
     height: 100%;
     background: #bdbdbd;
@@ -71,7 +71,7 @@ html, body {
 }
 
 #right {
-    flex: 1;
+    width: 66%;
     display: flex;
     flex-direction: column;
     background: #bdbdbd;
@@ -180,7 +180,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG
+   DRAG (still works but default 33/66)
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -195,6 +195,7 @@ window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
 
     const percent = (e.clientX / window.innerWidth) * 100;
+
     terminal.style.width = percent + "%";
     right.style.width = (100 - percent) + "%";
 
@@ -245,9 +246,6 @@ function draw(data) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            layout: {
-                padding: 0
-            },
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { display: false } },
@@ -258,7 +256,7 @@ function draw(data) {
 }
 
 /* =========================
-   BANNER CANDLE (FULL HEIGHT FIXED)
+   BANNER CANDLE (FIXED LOGIC)
 ========================= */
 let bgChart;
 
@@ -266,8 +264,11 @@ async function loadBannerCandle() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
-    const open = data[0].st;
-    const close = data[data.length - 1].close;
+    const latest = data[data.length - 1];
+
+    const close = latest.close;
+    const st = latest.st;
+
     const high = Math.max(...data.map(d => d.high));
     const low = Math.min(...data.map(d => d.low));
 
@@ -282,13 +283,15 @@ async function loadBannerCandle() {
             datasets: [
 
                 {
+                    // FULL RANGE WICK
                     data: [high - low],
                     backgroundColor: "#8a6f2a"
                 },
 
                 {
-                    data: [Math.abs(close - open)],
-                    backgroundColor: close >= open ? "#00e676" : "#ff1744"
+                    // LATEST BODY (ST → CLOSE)
+                    data: [Math.abs(close - st)],
+                    backgroundColor: close >= st ? "#00e676" : "#ff1744"
                 }
             ]
         },
@@ -296,9 +299,6 @@ async function loadBannerCandle() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            layout: {
-                padding: 0
-            },
             plugins: { legend: { display: false } },
 
             scales: {
