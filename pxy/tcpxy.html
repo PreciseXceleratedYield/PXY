@@ -55,7 +55,6 @@ html, body {
     background: #ffffff;
 }
 
-/* toolbar removed spacing kept clean */
 #toolbar {
     display: none;
 }
@@ -70,7 +69,7 @@ canvas {
 }
 
 /* =========================
-   FULLSCREEN MODES (DESKTOP)
+   FULLSCREEN MODES
 ========================= */
 .fullscreen-terminal #terminal {
     width: 100% !important;
@@ -89,7 +88,7 @@ canvas {
 }
 
 /* =========================
-   📱 MOBILE MODE
+   MOBILE
 ========================= */
 @media (max-width: 768px) {
 
@@ -123,8 +122,6 @@ canvas {
     <div id="divider"></div>
 
     <div id="right">
-
-        <!-- TOOLBAR REMOVED -->
 
         <div id="chartWrap">
             <canvas id="priceChart"></canvas>
@@ -174,7 +171,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG SPLIT (DESKTOP ONLY)
+   DRAG SPLIT
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -269,29 +266,29 @@ function draw(closes, stVals, stTrend) {
             labels,
             datasets: [
 
-                // CLOSE (PRICE LINE)
+                // PRICE LINE (thin)
                 {
                     label: "Close",
                     data: closePad,
                     borderColor: "#b8860b",
-                    borderWidth: 4,
+                    borderWidth: 1,
                     pointRadius: 0,
                     tension: 0.25
                 },
 
-                // SUPER TREND
+                // SUPER TREND (continuous line)
                 {
                     label: "ST",
                     data: stPad,
-                    showLine: false,
-                    pointRadius: 2,
-                    pointBorderWidth: 2,
-                    pointBackgroundColor: trendPad.map(t =>
-                        t === "UP" ? "#00c853" : "#ff1744"
-                    ),
-                    pointBorderColor: trendPad.map(t =>
-                        t === "UP" ? "#00c853" : "#ff1744"
-                    )
+                    showLine: true,
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.25,
+
+                    borderColor: (ctx) => {
+                        const i = ctx.dataIndex;
+                        return trendPad[i] === "UP" ? "#00c853" : "#ff1744";
+                    }
                 }
             ]
         },
