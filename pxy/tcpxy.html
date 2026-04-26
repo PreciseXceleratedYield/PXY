@@ -16,7 +16,7 @@ html, body {
 }
 
 /* =========================
-   TOP BAR
+   TOP FRAME
 ========================= */
 #bannerWrap {
     width: 100%;
@@ -33,6 +33,7 @@ html, body {
     height: 42px;
     top: 0;
     left: 0;
+    z-index: 0;
     opacity: 0.35;
 }
 
@@ -43,10 +44,11 @@ html, body {
     font-weight: bold;
     font-size: 15px;
     line-height: 42px;
+    color: #111;
 }
 
 /* =========================
-   LAYOUT 28 / 72
+   MAIN LAYOUT (33 / 66)
 ========================= */
 #container {
     display: flex;
@@ -56,18 +58,20 @@ html, body {
 
 #terminal {
     width: 28%;
+    min-width: 200px;
+    height: 100%;
     background: #bdbdbd;
     border-right: 1px solid #9e9e9e;
 }
 
 #divider {
     width: 5px;
-    background: #9e9e9e;
     cursor: col-resize;
+    background: #9e9e9e;
 }
 
 #right {
-    width: 72%;
+    width: 70%;
     display: flex;
     flex-direction: column;
     background: #bdbdbd;
@@ -81,17 +85,52 @@ canvas {
     width: 100% !important;
     height: 100% !important;
 }
+
+/* =========================
+   SCROLLBAR
+========================= */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #9e9e9e #bdbdbd;
+}
+
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+    background: #bdbdbd;
+}
+
+*::-webkit-scrollbar-thumb {
+    background-color: #9e9e9e;
+    border-radius: 10px;
+    border: 2px solid #bdbdbd;
+}
+
+/* =========================
+   MOBILE
+========================= */
+@media (max-width: 768px) {
+    #right { display: none !important; }
+    #divider { display: none !important; }
+    #terminal { width: 100% !important; height: 100vh !important; }
+    #container { flex-direction: column; }
+}
 </style>
 </head>
 
 <body>
 
+<!-- TOP -->
 <div id="bannerWrap">
     <canvas id="bgChart"></canvas>
-    <div id="banner">🏦 PXY DASHBOARD</div>
+    <div id="banner">🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦</div>
 </div>
 
 <div id="container">
+
     <div id="terminal"></div>
     <div id="divider"></div>
 
@@ -100,6 +139,7 @@ canvas {
             <canvas id="priceChart"></canvas>
         </div>
     </div>
+
 </div>
 
 <!-- LIBS -->
@@ -110,7 +150,7 @@ canvas {
 <script>
 
 /* =========================
-   TERMINAL (RESTORED)
+   TERMINAL
 ========================= */
 const term = new Terminal({
     convertEol: true,
@@ -133,55 +173,51 @@ window.addEventListener("resize", () => fitAddon.fit());
 
 term.writeln("TERMINAL OK");
 
-/* WebSocket */
+/* =========================
+   WEBSOCKET
+========================= */
 const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG
+   DRAG (still works but default 33/66)
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
 const right = document.getElementById("right");
 
-let drag = false;
+let isDragging = false;
 
-divider.addEventListener("mousedown", () => drag = true);
-window.addEventListener("mouseup", () => drag = false);
+divider.addEventListener("mousedown", () => isDragging = true);
+window.addEventListener("mouseup", () => isDragging = false);
 
 window.addEventListener("mousemove", (e) => {
-    if (!drag) return;
+    if (!isDragging) return;
 
-    const p = (e.clientX / window.innerWidth) * 100;
-    terminal.style.width = p + "%";
-    right.style.width = (100 - p) + "%";
+    const percent = (e.clientX / window.innerWidth) * 100;
+
+    terminal.style.width = percent + "%";
+    right.style.width = (100 - percent) + "%";
+
     fitAddon.fit();
 });
 
 /* =========================
-   CHART ENGINE (NO FLICKER)
+   MAIN CHART
 ========================= */
 let chart;
-let minPrice = null;
-let maxPrice = null;
 
-/* ST COLOR SEGMENT */
-function stColor(ctx) {
-    const c = ctx.p1.raw;
-    const p = ctx.p0.raw;
-    return c >= p ? "#006400" : "#8B0000";
+async function load() {
+    const res = await fetch("./syschrtpxy.json");
+    const data = await res.json();
+    draw(data);
 }
 
-/* INIT CHART */
-function initChart(data) {
+function draw(data) {
 
     const ctx = document.getElementById("priceChart");
 
-    const highs = data.map(d => d.high);
-    const lows = data.map(d => d.low);
-
-    minPrice = Math.min(...lows);
-    maxPrice = Math.max(...highs);
+    if (chart) chart.destroy();
 
     chart = new Chart(ctx, {
         type: "line",
@@ -193,18 +229,16 @@ function initChart(data) {
                     data: data.map(d => d.close),
                     borderColor: "#b8860b",
                     borderWidth: 1,
-                    pointRadius: 0
+                    pointRadius: 0,
+                    tension: 0.25
                 },
 
                 {
                     data: data.map(d => d.st),
-                    borderColor: "#006400",
-                    borderWidth: 2,
+                    borderColor: "#00e676",
+                    borderWidth: 1.5,
                     pointRadius: 0,
-                    borderDash: [4,3],
-                    segment: {
-                        borderColor: stColor
-                    }
+                    tension: 0.25
                 }
             ]
         },
@@ -212,52 +246,85 @@ function initChart(data) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { display: false } }
+            }
+        }
+    });
+}
 
-            animation: false,   // 🔥 NO FLICKER
+/* =========================
+   BANNER CANDLE (FIXED LOGIC)
+========================= */
+let bgChart;
 
-            plugins: {
-                legend: { display: false }
-            },
+async function loadBannerCandle() {
+    const res = await fetch("./syschrtpxy.json");
+    const data = await res.json();
+
+    const latest = data[data.length - 1];
+
+    const close = latest.close;
+    const st = latest.st;
+
+    const high = Math.max(...data.map(d => d.high));
+    const low = Math.min(...data.map(d => d.low));
+
+    const ctx = document.getElementById("bgChart");
+
+    if (bgChart) bgChart.destroy();
+
+    bgChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: ["PXY"],
+            datasets: [
+
+                {
+                    // FULL RANGE WICK
+                    data: [high - low],
+                    backgroundColor: "#8a6f2a"
+                },
+
+                {
+                    // LATEST BODY (ST → CLOSE)
+                    data: [Math.abs(close - st)],
+                    backgroundColor: close >= st ? "#00e676" : "#ff1744"
+                }
+            ]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
 
             scales: {
-                x: { display: false },
+                x: {
+                    display: false,
+                    grid: { display: false }
+                },
                 y: {
-                    min: minPrice,
-                    max: maxPrice,
+                    display: false,
                     grid: { display: false },
-                    beginAtZero: false
+                    min: low,
+                    max: high
                 }
             }
         }
     });
 }
 
-/* UPDATE ONLY DATA */
-function updateChart(data) {
-
-    if (!chart) {
-        initChart(data);
-        return;
-    }
-
-    chart.data.labels = data.map((_, i) => i);
-    chart.data.datasets[0].data = data.map(d => d.close);
-    chart.data.datasets[1].data = data.map(d => d.st);
-
-    chart.update('none'); // 🔥 no animation = stable
-}
-
 /* =========================
-   LOAD LOOP
+   INIT
 ========================= */
-async function load() {
-    const res = await fetch("./syschrtpxy.json");
-    const data = await res.json();
-    updateChart(data);
-}
-
 load();
+loadBannerCandle();
+
 setInterval(load, 3000);
+setInterval(loadBannerCandle, 3000);
 
 </script>
 
