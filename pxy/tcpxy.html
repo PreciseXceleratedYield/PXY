@@ -22,7 +22,7 @@ html, body {
 }
 
 /* =========================
-   🔥 TOP CANDLE FRAME (ONLY ADDITION)
+   TOP CANDLE FRAME
 ========================= */
 #topCandleWrap {
     width: 100%;
@@ -38,7 +38,7 @@ html, body {
 }
 
 /* =========================
-   MAIN LAYOUT (UNCHANGED except height adjust)
+   MAIN LAYOUT
 ========================= */
 #container {
     display: flex;
@@ -80,7 +80,6 @@ html, body {
 #chartWrap {
     flex: 1;
     position: relative;
-    overflow: hidden;
 }
 
 canvas {
@@ -124,7 +123,7 @@ canvas {
 <script>
 
 /* =========================
-   TERMINAL (UNCHANGED)
+   TERMINAL
 ========================= */
 const term = new Terminal({
     convertEol: true,
@@ -141,31 +140,38 @@ const term = new Terminal({
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
+
 setTimeout(() => fitAddon.fit(), 50);
 window.addEventListener("resize", () => fitAddon.fit());
 
 term.writeln("TERMINAL OK");
 
 /* =========================
-   CHART (UNCHANGED)
+   DATA
 ========================= */
 let chart;
 
 async function load() {
-    const res = await fetch("./syschrtpxy.json");
-    const data = await res.json();
+    try {
+        const res = await fetch("./syschrtpxy.json");
+        const data = await res.json();
 
-    const closes = data.map(d => d.close);
-    const stVals = data.map(d => d.st);
-    const stTrend = data.map(d => d.st_trend);
+        const closes = data.map(d => d.close);
+        const stVals = data.map(d => d.st);
+        const stTrend = data.map(d => d.st_trend);
 
-    draw(closes, stVals, stTrend);
+        drawChart(closes, stVals, stTrend);
+        drawTopCandle(stVals, closes);
+
+    } catch (e) {
+        console.log("data load waiting...");
+    }
 }
 
 /* =========================
-   🔥 TOP HORIZONTAL CANDLE (ONLY ADDITION)
+   TOP HORIZONTAL CANDLE
 ========================= */
-function draw(closes, stVals) {
+function drawTopCandle(stVals, closes) {
 
     const canvas = document.getElementById("topCandle");
     const ctx = canvas.getContext("2d");
@@ -174,6 +180,8 @@ function draw(closes, stVals) {
     canvas.height = canvas.clientHeight;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (!stVals.length || !closes.length) return;
 
     const open = stVals[0];
     const close = closes[closes.length - 1];
@@ -203,7 +211,7 @@ function draw(closes, stVals) {
     ctx.lineTo(xHigh, midY);
     ctx.stroke();
 
-    // body (3-line thickness)
+    // body (3px thickness)
     ctx.fillStyle = color;
     ctx.fillRect(
         Math.min(xOpen, xClose),
@@ -211,6 +219,61 @@ function draw(closes, stVals) {
         Math.abs(xClose - xOpen),
         3
     );
+}
+
+/* =========================
+   CHART (FIXED SAFE)
+========================= */
+function drawChart(closes, stVals, stTrend) {
+
+    const ctx = document.getElementById("priceChart");
+
+    const pad = 3;
+
+    const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
+    const closePad = [...closes, ...Array(pad).fill(null)];
+    const stPad = [...stVals, ...Array(pad).fill(null)];
+
+    if (chart) {
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = closePad;
+        chart.data.datasets[1].data = stPad;
+        chart.update("none");
+        return;
+    }
+
+    chart = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: "Close",
+                    data: closePad,
+                    borderColor: "#000",
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    tension: 0.25
+                },
+                {
+                    label: "ST",
+                    data: stPad,
+                    showLine: false,
+                    pointRadius: 2,
+                    pointBackgroundColor: "#00c853"
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { grid: { display: false } },
+                y: { grid: { display: false }, position: "right" }
+            }
+        }
+    });
 }
 
 /* =========================
