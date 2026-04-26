@@ -13,6 +13,40 @@ html, body {
     overflow: hidden;
     font-family: monospace;
     background: #ffffff;
+}
+
+/* =========================
+   TOP CANDLE STRIP (NEW)
+========================= */
+#bannerWrap {
+    position: relative;
+    width: 100%;
+    height: 42px;
+    overflow: hidden;
+    border-bottom: 1px solid #e5e5e5;
+    background: #ffffff;
+}
+
+/* candle canvas ONLY inside banner */
+#bgChart {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 42px;
+    opacity: 0.25;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* banner text on top */
+#banner {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+    font-size: 15px;
+    font-weight: bold;
+    line-height: 42px;
     color: #111;
 }
 
@@ -22,7 +56,7 @@ html, body {
 #container {
     display: flex;
     width: 100%;
-    height: calc(100vh - 38px);
+    height: calc(100vh - 42px);
 }
 
 /* =========================
@@ -32,8 +66,8 @@ html, body {
     width: 35%;
     min-width: 200px;
     height: 100%;
-    background: #f7f7f7;              /* 👈 softer gray */
-    border-right: 1px solid #e0e0e0; /* 👈 softer border */
+    background: #f7f7f7;
+    border-right: 1px solid #e0e0e0;
 }
 
 /* =========================
@@ -42,7 +76,7 @@ html, body {
 #divider {
     width: 5px;
     cursor: col-resize;
-    background: #e6e6e6;              /* 👈 softer divider */
+    background: #e6e6e6;
 }
 
 /* =========================
@@ -52,11 +86,7 @@ html, body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #fafafa;              /* 👈 softer gray */
-}
-
-#toolbar {
-    display: none;
+    background: #fafafa;
 }
 
 #chartWrap {
@@ -69,14 +99,6 @@ canvas {
 }
 
 /* =========================
-   FULLSCREEN MODES
-========================= */
-.fullscreen-terminal #terminal { width: 100% !important; }
-.fullscreen-terminal #right { display: none; }
-.fullscreen-chart #terminal { display: none; }
-.fullscreen-chart #right { width: 100% !important; }
-
-/* =========================
    MOBILE
 ========================= */
 @media (max-width: 768px) {
@@ -85,27 +107,20 @@ canvas {
     #terminal { width: 100% !important; height: 100vh !important; border-right: none; }
     #container { flex-direction: column; }
 }
-
-/* =========================
-   BOTTOM BANNER
-========================= */
-#banner {
-    width: 100%;
-    text-align: center;
-    font-family: monospace;
-    font-size: 16px;
-    font-weight: bold;
-    padding: 8px 0;
-    background: #ffffff;
-    border-top: 1px solid #e5e5e5;
-    color: #111;
-    letter-spacing: 0.5px;
-    height: 38px;
-}
 </style>
 </head>
 
 <body>
+
+<!-- =========================
+     TOP BANNER + CANDLE STRIP
+========================= -->
+<div id="bannerWrap">
+    <canvas id="bgChart"></canvas>
+    <div id="banner">
+        🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
+    </div>
+</div>
 
 <div id="container">
 
@@ -118,11 +133,6 @@ canvas {
         </div>
     </div>
 
-</div>
-
-<!-- BOTTOM BANNER -->
-<div id="banner">
-    🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
 </div>
 
 <!-- LIBS -->
@@ -143,9 +153,7 @@ const term = new Terminal({
     cursorBlink: false,
     theme: {
         background: "#f7f7f7",
-        foreground: "#111111",
-        cursor: "#111111",
-        selection: "rgba(0,0,0,0.08)"
+        foreground: "#111111"
     }
 });
 
@@ -165,7 +173,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG SPLIT
+   DRAG
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -191,7 +199,7 @@ window.addEventListener("mousemove", (e) => {
 });
 
 /* =========================
-   CHART
+   PRICE CHART (UNCHANGED)
 ========================= */
 let chart;
 
@@ -225,7 +233,6 @@ function draw(closes, stVals, stTrend) {
             labels,
             datasets: [
 
-                // PRICE LINE
                 {
                     label: "Close",
                     data: closePad,
@@ -235,12 +242,10 @@ function draw(closes, stVals, stTrend) {
                     tension: 0.25
                 },
 
-                // ST DASH MARKERS (EYE FRIENDLY)
                 {
                     label: "ST",
                     data: stPad,
                     showLine: false,
-
                     pointRadius: 6,
                     pointStyle: 'rectRot',
                     pointRotation: 90,
@@ -261,21 +266,70 @@ function draw(closes, stVals, stTrend) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
-
-            plugins: {
-                legend: { display: false }
-            },
-
+            plugins: { legend: { display: false } },
             scales: {
-                x: {
-                    ticks: { color: "#333" },
-                    grid: { display: false }
+                x: { ticks: { color: "#333" }, grid: { display: false } },
+                y: { position: "right", ticks: { color: "#333" }, grid: { display: false } }
+            }
+        }
+    });
+}
+
+/* =========================
+   CANDLE STRIP FOR BANNER
+========================= */
+let bgChart;
+
+async function loadBG() {
+    const res = await fetch("./syschrtpxy.json");
+    const data = await res.json();
+
+    const labels = data.map((_, i) => i);
+    const lows = data.map(d => d.low);
+    const highs = data.map(d => d.high);
+    const opens = data.map(d => d.st);
+    const closes = data.map(d => d.close);
+
+    drawBG(labels, lows, highs, opens, closes);
+}
+
+function drawBG(labels, lows, highs, opens, closes) {
+
+    const ctx = document.getElementById("bgChart");
+
+    if (bgChart) bgChart.destroy();
+
+    bgChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels,
+            datasets: [
+
+                {
+                    data: highs.map((h, i) => h - lows[i]),
+                    backgroundColor: "#999",
+                    barThickness: 1,
+                    grouped: false
                 },
-                y: {
-                    position: "right",
-                    ticks: { color: "#333" },
-                    grid: { display: false }
+
+                {
+                    data: closes.map((c, i) => Math.abs(c - opens[i])),
+                    backgroundColor: closes.map((c, i) =>
+                        c >= opens[i] ? "#4DB6AC" : "#FF8A65"
+                    ),
+                    barThickness: 3,
+                    grouped: false
                 }
+            ]
+        },
+
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { display: false },
+                y: { display: false }
             }
         }
     });
@@ -285,7 +339,9 @@ function draw(closes, stVals, stTrend) {
    INIT
 ========================= */
 load();
+loadBG();
 setInterval(load, 3000);
+setInterval(loadBG, 5000);
 
 </script>
 
