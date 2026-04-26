@@ -92,62 +92,6 @@ canvas {
 <script>
 
 /* =========================
-   TERMINAL
-========================= */
-const term = new Terminal({
-    convertEol: true,
-    scrollback: 1000,
-    fontFamily: "monospace",
-    fontSize: 14,
-    cursorBlink: false,
-    theme: {
-        background: "#ffffff",
-        foreground: "#111111"
-    }
-});
-
-const fitAddon = new FitAddon.FitAddon();
-term.loadAddon(fitAddon);
-term.open(document.getElementById('terminal'));
-
-setTimeout(() => fitAddon.fit(), 50);
-window.addEventListener("resize", () => fitAddon.fit());
-
-term.writeln("TERMINAL OK");
-
-/* =========================
-   WEBSOCKET
-========================= */
-const ws = new WebSocket(`ws://${location.host}`);
-ws.onmessage = (e) => term.write(e.data);
-
-/* =========================
-   DRAG
-========================= */
-const divider = document.getElementById("divider");
-const terminal = document.getElementById("terminal");
-const right = document.getElementById("right");
-
-let isDragging = false;
-
-divider.addEventListener("mousedown", () => isDragging = true);
-
-window.addEventListener("mouseup", () => {
-    isDragging = false;
-    localStorage.setItem("split", terminal.style.width);
-});
-
-window.addEventListener("mousemove", (e) => {
-    if (!isDragging) return;
-
-    const percent = (e.clientX / window.innerWidth) * 100;
-    terminal.style.width = percent + "%";
-    right.style.width = (100 - percent) + "%";
-
-    fitAddon.fit();
-});
-
-/* =========================
    CHART
 ========================= */
 let chart;
@@ -192,23 +136,24 @@ function draw(closes, stVals, stTrend) {
                     tension: 0.25
                 },
 
-                // ST → DASH MARKERS (━ EFFECT)
+                // ST → DASH MARKERS (EYE-FRIENDLY COLORS)
                 {
                     label: "ST",
                     data: stPad,
                     showLine: false,
 
                     pointRadius: 6,
-                    pointStyle: 'rectRot',   // diamond-like
-                    pointRotation: 90,       // makes it horizontal (━ feel)
-                    pointHoverRadius: 6,
+                    pointStyle: 'rectRot',
+                    pointRotation: 90,
 
                     pointBackgroundColor: trendPad.map(t =>
-                        t === "UP" ? "#00c853" : "#ff1744"
+                        t === "UP" ? "#4DB6AC" : "#FF8A65"   // 👈 soft teal / soft coral
                     ),
+
                     pointBorderColor: trendPad.map(t =>
-                        t === "UP" ? "#00c853" : "#ff1744"
+                        t === "UP" ? "#4DB6AC" : "#FF8A65"
                     ),
+
                     pointBorderWidth: 1
                 }
             ]
