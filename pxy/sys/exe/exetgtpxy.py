@@ -58,7 +58,7 @@ def target_price(row):
         exit_signal = str(row.get("exit", "NONE")).upper()
         counter = str(row.get("counter", "Y")).upper()
 
-        _signal = entry_signal if counter == "Y" else exit_signal
+        _signal = exit_signal if counter == "Y" else exit_signal
 
         # -------------------- HLD MODE --------------------
         if _signal == "NONE":
@@ -119,9 +119,9 @@ def target_price(row):
 
         if all_aligned:
             if is_ce:
-                score = base * ce_power * ce_force
+                score = (base * ce_power * ce_force) * atr
             elif is_pe:
-                score = base * pe_power * pe_force
+                score = (base * pe_power * pe_force) * atr
             else:
                 score = base
 
