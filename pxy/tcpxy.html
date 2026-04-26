@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <title>PXY DASHBOARD</title>
 
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+
 <style>
 html, body {
     margin: 0;
@@ -14,25 +16,29 @@ html, body {
 }
 
 /* =========================
-   TOP FULL WIDTH CANDLE BANNER
+   TOP SINGLE CANDLE FRAME
 ========================= */
 #bannerWrap {
-    position: relative;
     width: 100%;
     height: 42px;
-    border-bottom: 1px solid #e5e5e5;
+    position: relative;
     background: #ffffff;
+    border-bottom: 1px solid #e5e5e5;
     overflow: hidden;
 }
 
-#bgCanvas {
+/* candle canvas fills entire banner */
+#bgChart {
     position: absolute;
     width: 100%;
     height: 42px;
     top: 0;
     left: 0;
+    z-index: 0;
+    opacity: 0.35;
 }
 
+/* text overlay */
 #banner {
     position: relative;
     z-index: 2;
@@ -56,6 +62,7 @@ html, body {
 #terminal {
     width: 35%;
     min-width: 200px;
+    height: 100%;
     background: #f7f7f7;
     border-right: 1px solid #e0e0e0;
 }
@@ -67,14 +74,16 @@ html, body {
     background: #e6e6e6;
 }
 
-/* RIGHT */
+/* RIGHT PANEL */
 #right {
     flex: 1;
+    display: flex;
+    flex-direction: column;
     background: #fafafa;
 }
 
 #chartWrap {
-    height: 100%;
+    flex: 1;
 }
 
 canvas {
@@ -84,9 +93,10 @@ canvas {
 
 /* MOBILE */
 @media (max-width: 768px) {
-    #right { display: none; }
-    #divider { display: none; }
-    #terminal { width: 100%; height: 100vh; }
+    #right { display: none !important; }
+    #divider { display: none !important; }
+    #terminal { width: 100% !important; height: 100vh !important; border-right: none; }
+    #container { flex-direction: column; }
 }
 </style>
 </head>
@@ -94,10 +104,10 @@ canvas {
 <body>
 
 <!-- =========================
-     TOP BANNER CANDLE
+     TOP SINGLE CANDLE
 ========================= -->
 <div id="bannerWrap">
-    <canvas id="bgCanvas"></canvas>
+    <canvas id="bgChart"></canvas>
     <div id="banner">🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦</div>
 </div>
 
@@ -152,30 +162,30 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG SPLIT
+   DRAG
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
 const right = document.getElementById("right");
 
-let dragging = false;
+let isDragging = false;
 
-divider.addEventListener("mousedown", () => dragging = true);
+divider.addEventListener("mousedown", () => isDragging = true);
 
-window.addEventListener("mouseup", () => dragging = false);
+window.addEventListener("mouseup", () => isDragging = false);
 
 window.addEventListener("mousemove", (e) => {
-    if (!dragging) return;
+    if (!isDragging) return;
 
-    const pct = (e.clientX / window.innerWidth) * 100;
-    terminal.style.width = pct + "%";
-    right.style.width = (100 - pct) + "%";
+    const percent = (e.clientX / window.innerWidth) * 100;
+    terminal.style.width = percent + "%";
+    right.style.width = (100 - percent) + "%";
 
     fitAddon.fit();
 });
 
 /* =========================
-   MAIN CHART (UNCHANGED)
+   MAIN CHART (UNCHANGED SIMPLIFIED)
 ========================= */
 let chart;
 
@@ -183,10 +193,10 @@ async function load() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
-    drawMain(data);
+    draw(data);
 }
 
-function drawMain(data) {
+function draw(data) {
 
     const ctx = document.getElementById("priceChart");
 
@@ -213,51 +223,59 @@ function drawMain(data) {
 }
 
 /* =========================
-   FULL WIDTH BANNER CANDLE
+   SINGLE HORIZONTAL CANDLE (KEY PART)
 ========================= */
-async function drawBannerCandle() {
+let bgChart;
 
+async function loadBannerCandle() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
-    const canvas = document.getElementById("bgCanvas");
-    const ctx = canvas.getContext("2d");
+    const open = data[0].st;              // ST = OPEN
+    const close = data[data.length - 1].close;
+    const high = Math.max(...data.map(d => d.high));
+    const low = Math.min(...data.map(d => d.low));
 
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
+    drawBannerCandle(open, high, low, close);
+}
 
-    const min = Math.min(...data.map(d => d.low));
-    const max = Math.max(...data.map(d => d.high));
+function drawBannerCandle(open, high, low, close) {
 
-    const scaleY = p => canvas.height - ((p - min) / (max - min)) * canvas.height;
+    const ctx = document.getElementById("bgChart");
 
-    const step = canvas.width / data.length;
+    if (bgChart) bgChart.destroy();
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    bgChart = new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: ["PXY"],
+            datasets: [
 
-    data.forEach((d, i) => {
+                // WICK (HIGH-LOW)
+                {
+                    data: [high - low],
+                    backgroundColor: "#999",
+                    barThickness: 2
+                },
 
-        const x = i * step;
+                // BODY (OPEN-CLOSE)
+                {
+                    data: [Math.abs(close - open)],
+                    backgroundColor: close >= open ? "#4DB6AC" : "#FF8A65",
+                    barThickness: 18
+                }
+            ]
+        },
 
-        const open = d.st;
-        const high = d.high;
-        const low = d.low;
-        const close = d.close;
-
-        // wick
-        ctx.strokeStyle = "#999";
-        ctx.beginPath();
-        ctx.moveTo(x, scaleY(high));
-        ctx.lineTo(x, scaleY(low));
-        ctx.stroke();
-
-        // body
-        ctx.fillStyle = close >= open ? "#4DB6AC" : "#FF8A65";
-
-        const top = Math.min(scaleY(open), scaleY(close));
-        const height = Math.abs(scaleY(open) - scaleY(close));
-
-        ctx.fillRect(x - 1, top, 2, height || 1);
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { display: false },
+                y: { display: false }
+            }
+        }
     });
 }
 
@@ -265,10 +283,10 @@ async function drawBannerCandle() {
    INIT
 ========================= */
 load();
-drawBannerCandle();
+loadBannerCandle();
 
 setInterval(load, 3000);
-setInterval(drawBannerCandle, 3000);
+setInterval(loadBannerCandle, 3000);
 
 </script>
 
