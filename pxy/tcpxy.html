@@ -48,7 +48,7 @@ html, body {
 }
 
 /* =========================
-   MAIN LAYOUT (33 / 66)
+   MAIN LAYOUT
 ========================= */
 #container {
     display: flex;
@@ -180,7 +180,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG (still works but default 33/66)
+   DRAG
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -235,7 +235,7 @@ function draw(data) {
 
                 {
                     data: data.map(d => d.st),
-                    borderColor: "#00e676",
+                    borderColor: "#006400",   // DARK GREEN ST LINE
                     borderWidth: 1.5,
                     pointRadius: 0,
                     tension: 0.25
@@ -256,7 +256,7 @@ function draw(data) {
 }
 
 /* =========================
-   BANNER CANDLE (FIXED LOGIC)
+   BANNER CANDLE
 ========================= */
 let bgChart;
 
@@ -283,15 +283,13 @@ async function loadBannerCandle() {
             datasets: [
 
                 {
-                    // FULL RANGE WICK
                     data: [high - low],
                     backgroundColor: "#8a6f2a"
                 },
 
                 {
-                    // LATEST BODY (ST → CLOSE)
                     data: [Math.abs(close - st)],
-                    backgroundColor: close >= st ? "#00e676" : "#ff1744"
+                    backgroundColor: close >= st ? "#006400" : "#8B0000"   // DARK GREEN / DARK RED
                 }
             ]
         },
@@ -300,7 +298,6 @@ async function loadBannerCandle() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-
             scales: {
                 x: {
                     display: false,
