@@ -18,7 +18,7 @@ from sysentrpxy import get_entry_signal
 from sysdeptpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
-from sysadxpxy import calculate_adx   # ✅ ADD THIS
+from syssadxpxy import calculate_adx   # ✅ ADD THIS
 
 TOTAL_WIDTH = 42
 
