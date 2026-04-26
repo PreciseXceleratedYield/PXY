@@ -16,12 +16,18 @@ html, body {
     color: #111;
 }
 
+/* =========================
+   MAIN CONTAINER
+========================= */
 #container {
     display: flex;
     width: 100%;
     height: 100vh;
 }
 
+/* =========================
+   TERMINAL
+========================= */
 #terminal {
     width: 35%;
     min-width: 200px;
@@ -30,12 +36,18 @@ html, body {
     border-right: 1px solid #e5e5e5;
 }
 
+/* =========================
+   DIVIDER
+========================= */
 #divider {
     width: 5px;
     cursor: col-resize;
     background: #ddd;
 }
 
+/* =========================
+   RIGHT PANEL
+========================= */
 #right {
     flex: 1;
     display: flex;
@@ -56,11 +68,17 @@ canvas {
     height: 100% !important;
 }
 
+/* =========================
+   FULLSCREEN MODES
+========================= */
 .fullscreen-terminal #terminal { width: 100% !important; }
 .fullscreen-terminal #right { display: none; }
 .fullscreen-chart #terminal { display: none; }
 .fullscreen-chart #right { width: 100% !important; }
 
+/* =========================
+   MOBILE
+========================= */
 @media (max-width: 768px) {
     #right { display: none !important; }
     #divider { display: none !important; }
@@ -85,11 +103,70 @@ canvas {
 
 </div>
 
+<!-- LIBS -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
+
+/* =========================
+   TERMINAL (UNCHANGED)
+========================= */
+const term = new Terminal({
+    convertEol: true,
+    scrollback: 1000,
+    fontFamily: "monospace",
+    fontSize: 14,
+    cursorBlink: false,
+    theme: {
+        background: "#ffffff",
+        foreground: "#111111",
+        cursor: "#111111",
+        selection: "rgba(0,0,0,0.08)"
+    }
+});
+
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
+term.open(document.getElementById('terminal'));
+
+setTimeout(() => fitAddon.fit(), 50);
+window.addEventListener("resize", () => fitAddon.fit());
+
+term.writeln("TERMINAL OK");
+
+/* =========================
+   WEBSOCKET (UNCHANGED)
+========================= */
+const ws = new WebSocket(`ws://${location.host}`);
+ws.onmessage = (e) => term.write(e.data);
+
+/* =========================
+   DRAG SPLIT (UNCHANGED)
+========================= */
+const divider = document.getElementById("divider");
+const terminal = document.getElementById("terminal");
+const right = document.getElementById("right");
+
+let isDragging = false;
+
+divider.addEventListener("mousedown", () => isDragging = true);
+
+window.addEventListener("mouseup", () => {
+    isDragging = false;
+    localStorage.setItem("split", terminal.style.width);
+});
+
+window.addEventListener("mousemove", (e) => {
+    if (!isDragging) return;
+
+    const percent = (e.clientX / window.innerWidth) * 100;
+    terminal.style.width = percent + "%";
+    right.style.width = (100 - percent) + "%";
+
+    fitAddon.fit();
+});
 
 /* =========================
    CHART
@@ -126,7 +203,7 @@ function draw(closes, stVals, stTrend) {
             labels,
             datasets: [
 
-                // PRICE LINE
+                // PRICE LINE (UNCHANGED)
                 {
                     label: "Close",
                     data: closePad,
@@ -136,7 +213,7 @@ function draw(closes, stVals, stTrend) {
                     tension: 0.25
                 },
 
-                // ST → DASH MARKERS (EYE-FRIENDLY COLORS)
+                // ST → DASH MARKERS (FIXED STYLE ONLY)
                 {
                     label: "ST",
                     data: stPad,
@@ -147,7 +224,7 @@ function draw(closes, stVals, stTrend) {
                     pointRotation: 90,
 
                     pointBackgroundColor: trendPad.map(t =>
-                        t === "UP" ? "#4DB6AC" : "#FF8A65"   // 👈 soft teal / soft coral
+                        t === "UP" ? "#4DB6AC" : "#FF8A65"
                     ),
 
                     pointBorderColor: trendPad.map(t =>
