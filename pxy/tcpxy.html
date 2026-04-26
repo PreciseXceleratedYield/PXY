@@ -16,18 +16,12 @@ html, body {
     color: #111;
 }
 
-/* =========================
-   MAIN CONTAINER
-========================= */
 #container {
     display: flex;
     width: 100%;
     height: 100vh;
 }
 
-/* =========================
-   TERMINAL
-========================= */
 #terminal {
     width: 35%;
     min-width: 200px;
@@ -36,18 +30,12 @@ html, body {
     border-right: 1px solid #e5e5e5;
 }
 
-/* =========================
-   DIVIDER
-========================= */
 #divider {
     width: 5px;
     cursor: col-resize;
     background: #ddd;
 }
 
-/* =========================
-   RIGHT PANEL
-========================= */
 #right {
     flex: 1;
     display: flex;
@@ -68,47 +56,16 @@ canvas {
     height: 100% !important;
 }
 
-/* =========================
-   FULLSCREEN MODES
-========================= */
-.fullscreen-terminal #terminal {
-    width: 100% !important;
-}
+.fullscreen-terminal #terminal { width: 100% !important; }
+.fullscreen-terminal #right { display: none; }
+.fullscreen-chart #terminal { display: none; }
+.fullscreen-chart #right { width: 100% !important; }
 
-.fullscreen-terminal #right {
-    display: none;
-}
-
-.fullscreen-chart #terminal {
-    display: none;
-}
-
-.fullscreen-chart #right {
-    width: 100% !important;
-}
-
-/* =========================
-   MOBILE
-========================= */
 @media (max-width: 768px) {
-
-    #right {
-        display: none !important;
-    }
-
-    #divider {
-        display: none !important;
-    }
-
-    #terminal {
-        width: 100% !important;
-        height: 100vh !important;
-        border-right: none;
-    }
-
-    #container {
-        flex-direction: column;
-    }
+    #right { display: none !important; }
+    #divider { display: none !important; }
+    #terminal { width: 100% !important; height: 100vh !important; border-right: none; }
+    #container { flex-direction: column; }
 }
 </style>
 </head>
@@ -118,20 +75,16 @@ canvas {
 <div id="container">
 
     <div id="terminal"></div>
-
     <div id="divider"></div>
 
     <div id="right">
-
         <div id="chartWrap">
             <canvas id="priceChart"></canvas>
         </div>
-
     </div>
 
 </div>
 
-<!-- LIBS -->
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -149,9 +102,7 @@ const term = new Terminal({
     cursorBlink: false,
     theme: {
         background: "#ffffff",
-        foreground: "#111111",
-        cursor: "#111111",
-        selection: "rgba(0,0,0,0.08)"
+        foreground: "#111111"
     }
 });
 
@@ -171,7 +122,7 @@ const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
 /* =========================
-   DRAG SPLIT
+   DRAG
 ========================= */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
@@ -183,53 +134,18 @@ divider.addEventListener("mousedown", () => isDragging = true);
 
 window.addEventListener("mouseup", () => {
     isDragging = false;
-    saveLayout();
+    localStorage.setItem("split", terminal.style.width);
 });
 
 window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
-    if (window.innerWidth <= 768) return;
 
     const percent = (e.clientX / window.innerWidth) * 100;
-    if (percent < 10 || percent > 80) return;
-
     terminal.style.width = percent + "%";
     right.style.width = (100 - percent) + "%";
 
     fitAddon.fit();
 });
-
-/* =========================
-   LAYOUT
-========================= */
-function saveLayout() {
-    localStorage.setItem("split", terminal.style.width);
-}
-
-function loadLayout() {
-    const saved = localStorage.getItem("split");
-    if (saved && window.innerWidth > 768) {
-        terminal.style.width = saved;
-        right.style.width = (100 - parseFloat(saved)) + "%";
-    }
-}
-
-/* =========================
-   FULLSCREEN
-========================= */
-function toggleTerminal() {
-    document.body.classList.toggle("fullscreen-terminal");
-}
-
-function toggleChart() {
-    document.body.classList.toggle("fullscreen-chart");
-}
-
-function resetLayout() {
-    terminal.style.width = "35%";
-    right.style.width = "65%";
-    localStorage.removeItem("split");
-}
 
 /* =========================
    CHART
@@ -266,7 +182,7 @@ function draw(closes, stVals, stTrend) {
             labels,
             datasets: [
 
-                // PRICE LINE (thin)
+                // PRICE LINE
                 {
                     label: "Close",
                     data: closePad,
@@ -276,19 +192,24 @@ function draw(closes, stVals, stTrend) {
                     tension: 0.25
                 },
 
-                // SUPER TREND (continuous line)
+                // ST → DASH MARKERS (━ EFFECT)
                 {
                     label: "ST",
                     data: stPad,
-                    showLine: true,
-                    borderWidth: 2,
-                    pointRadius: 0,
-                    tension: 0.25,
+                    showLine: false,
 
-                    borderColor: (ctx) => {
-                        const i = ctx.dataIndex;
-                        return trendPad[i] === "UP" ? "#00c853" : "#ff1744";
-                    }
+                    pointRadius: 6,
+                    pointStyle: 'rectRot',   // diamond-like
+                    pointRotation: 90,       // makes it horizontal (━ feel)
+                    pointHoverRadius: 6,
+
+                    pointBackgroundColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    ),
+                    pointBorderColor: trendPad.map(t =>
+                        t === "UP" ? "#00c853" : "#ff1744"
+                    ),
+                    pointBorderWidth: 1
                 }
             ]
         },
@@ -304,8 +225,7 @@ function draw(closes, stVals, stTrend) {
             scales: {
                 x: {
                     ticks: { color: "#333" },
-                    grid: { display: false },
-                    offset: true
+                    grid: { display: false }
                 },
                 y: {
                     position: "right",
@@ -320,7 +240,6 @@ function draw(closes, stVals, stTrend) {
 /* =========================
    INIT
 ========================= */
-loadLayout();
 load();
 setInterval(load, 3000);
 
