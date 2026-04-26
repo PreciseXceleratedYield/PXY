@@ -49,12 +49,12 @@ def print_market_dashboard(market_df):
         ("📊 LINE", "super_line"),
         ("🟢  CE Power", "ce_power"),
         ("🔴 PE Power", "pe_power"),
-        ("🎯  Entry", "entry"),
-        ("🎯 Exit", "exit"),
         ("🟩  CE Force", "ce_force"),
         ("🟥 PE Force", "pe_force"),        
         ("🟢  CE Depth", "hkin_ce_depth"),
-        ("🔴 PE Depth", "hkin_pe_depth"),        
+        ("🔴 PE Depth", "hkin_pe_depth"),   
+        ("🎯  Entry", "entry"),
+        ("🎯 Exit", "exit"),
     ]
 
     depth_metrics = [
