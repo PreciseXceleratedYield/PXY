@@ -16,13 +16,13 @@ html, body {
 }
 
 /* =========================
-   TOP FRAME (NOW MEDIUM GREY)
+   TOP FRAME (MEDIUM GREY)
 ========================= */
 #bannerWrap {
     width: 100%;
     height: 42px;
     position: relative;
-    background: #bdbdbd;   /* FIXED */
+    background: #bdbdbd;
     border-bottom: 1px solid #9e9e9e;
     overflow: hidden;
 }
@@ -245,6 +245,9 @@ function draw(data) {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: {
+                padding: 0
+            },
             plugins: { legend: { display: false } },
             scales: {
                 x: { grid: { display: false } },
@@ -255,7 +258,7 @@ function draw(data) {
 }
 
 /* =========================
-   BANNER CANDLE
+   BANNER CANDLE (FULL HEIGHT FIXED)
 ========================= */
 let bgChart;
 
@@ -280,14 +283,12 @@ async function loadBannerCandle() {
 
                 {
                     data: [high - low],
-                    backgroundColor: "#8a6f2a",
-                    barThickness: 2
+                    backgroundColor: "#8a6f2a"
                 },
 
                 {
                     data: [Math.abs(close - open)],
-                    backgroundColor: close >= open ? "#00e676" : "#ff1744",
-                    barThickness: 18
+                    backgroundColor: close >= open ? "#00e676" : "#ff1744"
                 }
             ]
         },
@@ -295,10 +296,22 @@ async function loadBannerCandle() {
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            layout: {
+                padding: 0
+            },
             plugins: { legend: { display: false } },
+
             scales: {
-                x: { display: false },
-                y: { display: false }
+                x: {
+                    display: false,
+                    grid: { display: false }
+                },
+                y: {
+                    display: false,
+                    grid: { display: false },
+                    min: low,
+                    max: high
+                }
             }
         }
     });
