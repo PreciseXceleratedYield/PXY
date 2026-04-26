@@ -12,6 +12,9 @@
     --divider-width: 6px;
 }
 
+/* =========================
+   GLOBAL
+========================= */
 html, body {
     margin: 0;
     height: 100%;
@@ -30,12 +33,34 @@ body::-webkit-scrollbar {
 }
 
 /* =========================
+   TOP HEADER (NEW)
+========================= */
+#topHeader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 26px;
+    background: #3b3b3b;
+    color: #eaeaea;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid #4a4a4a;
+    z-index: 1000;
+}
+
+/* =========================
    MAIN LAYOUT
 ========================= */
 #container {
     display: flex;
     width: 100%;
     height: calc(100vh - 18px);
+    padding-top: 26px; /* space for header */
 }
 
 /* =========================
@@ -95,7 +120,7 @@ canvas {
 }
 
 /* =========================
-   🔥 BOTTOM CANDLE STRIP (MOVED)
+   BOTTOM CANDLE STRIP
 ========================= */
 #topCandleWrap {
     position: fixed;
@@ -148,6 +173,11 @@ canvas {
 
 <body>
 
+<!-- 🔥 TOP HEADER -->
+<div id="topHeader">
+    🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
+</div>
+
 <div id="container">
 
     <div id="terminal"></div>
@@ -161,7 +191,7 @@ canvas {
 
 </div>
 
-<!-- 🔥 MOVED TO BOTTOM -->
+<!-- 🔥 BOTTOM CANDLE -->
 <div id="topCandleWrap">
     <canvas id="topCandle"></canvas>
 </div>
@@ -233,8 +263,6 @@ window.addEventListener("mousemove", (e) => {
 
     terminal.style.width = percent + "%";
     right.style.width = (100 - percent) + "%";
-
-    fitAddon.fit();
 });
 
 /* =========================
@@ -253,7 +281,7 @@ function loadLayout() {
 }
 
 /* =========================
-   CHART
+   CHART (UNCHANGED)
 ========================= */
 let chart;
 
@@ -329,7 +357,7 @@ function draw(closes, stVals, stTrend) {
 }
 
 /* =========================
-   TOP CANDLE (UNCHANGED LOGIC)
+   BOTTOM CANDLE (UNCHANGED)
 ========================= */
 function drawTopCandle(stVals, closes) {
 
@@ -363,7 +391,6 @@ function drawTopCandle(stVals, closes) {
     const bodyColor = close >= open ? "#00c853" : "#ff1744";
     const wickColor = "#ffffff";
 
-    // wick
     ctx.strokeStyle = wickColor;
     ctx.lineWidth = 3;
 
@@ -372,7 +399,6 @@ function drawTopCandle(stVals, closes) {
     ctx.lineTo(xHigh, midY);
     ctx.stroke();
 
-    // body (4x thickness = 12px)
     const thickness = 12;
 
     ctx.fillStyle = bodyColor;
