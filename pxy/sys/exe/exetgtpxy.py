@@ -39,7 +39,15 @@ def target_price(row):
         atr = f(row.get("atr", 0))
         ce_power = f(row.get("ce_power", 1))
         pe_power = f(row.get("pe_power", 1))
+
+        # 🔥 FORCE FACTOR
+        ce_force = f(row.get("ce_force", 1.0))
+        pe_force = f(row.get("pe_force", 1.0))
+
         supertrend = row.get("supertrend", 0)
+
+        # 🔥 BASE ENGINE (NEW STANDARD)
+        base = atr / 4
 
         # 3️⃣ OPTION TYPE
         is_ce = "CE" in symbol
@@ -73,7 +81,7 @@ def target_price(row):
         is_down = st == "DOWN"
 
         # ==================================================
-        # 🔥 MORNING WINDOW OVERRIDE (ONLY CHANGE ADDED)
+        # 🔥 MORNING WINDOW OVERRIDE
         # ==================================================
         now = datetime.now(IST)
         in_open_window = (now.hour == 9 and 15 <= now.minute <= 30)
@@ -94,13 +102,16 @@ def target_price(row):
                 state = "NLN"
                 color = Style.BRIGHT + Fore.RED
 
+            # 🔥 FORCE APPLIED IN MORNING
+            score *= ce_force if is_ce else pe_force
+
             target = int(entry * (1 + score / 100))
             clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
 
             print(f"{color}{clean_symbol}|| E:{entry:03d}|| S:{score:02d}%|| {state} || T:{target:03d}")
             return target
 
-        # -------------------- ORIGINAL LOGIC (UNCHANGED) --------------------
+        # -------------------- ORIGINAL LOGIC --------------------
         all_aligned = (
             (bullish and is_up and is_ce) or
             (bearish and is_down and is_pe)
@@ -108,16 +119,23 @@ def target_price(row):
 
         if all_aligned:
             if is_ce:
-                score = (atr / 4) * ce_power
+                score = base * ce_power * ce_force
             elif is_pe:
-                score = (atr / 4) * pe_power
+                score = base * pe_power * pe_force
             else:
-                score = atr
+                score = base
+
             state = "ALN"
             color = Style.BRIGHT + Fore.GREEN
 
         else:
-            score = (atr / 4)
+            score = base
+
+            if is_ce:
+                score *= ce_force
+            elif is_pe:
+                score *= pe_force
+
             state = "NLN"
             color = Style.BRIGHT + Fore.RED
 
