@@ -12,7 +12,7 @@ html, body {
     height: 100%;
     overflow: hidden;
     font-family: monospace;
-    background: #ffffff;
+    background: #d0d0d0; /* ✅ MEDIUM GREY BACKGROUND */
 }
 
 /* =========================
@@ -22,12 +22,11 @@ html, body {
     width: 100%;
     height: 42px;
     position: relative;
-    background: #ffffff;
-    border-bottom: 1px solid #e5e5e5;
+    background: #d0d0d0; /* match tone */
+    border-bottom: 1px solid #b5b5b5;
     overflow: hidden;
 }
 
-/* candle canvas fills entire banner */
 #bgChart {
     position: absolute;
     width: 100%;
@@ -35,10 +34,9 @@ html, body {
     top: 0;
     left: 0;
     z-index: 0;
-    opacity: 0.35;
+    opacity: 0.4;
 }
 
-/* text overlay */
 #banner {
     position: relative;
     z-index: 2;
@@ -58,28 +56,25 @@ html, body {
     height: calc(100vh - 42px);
 }
 
-/* TERMINAL */
 #terminal {
     width: 35%;
     min-width: 200px;
     height: 100%;
-    background: #f7f7f7;
-    border-right: 1px solid #e0e0e0;
+    background: #e6e6e6;
+    border-right: 1px solid #bdbdbd;
 }
 
-/* DIVIDER */
 #divider {
     width: 5px;
     cursor: col-resize;
-    background: #e6e6e6;
+    background: #bdbdbd;
 }
 
-/* RIGHT PANEL */
 #right {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #fafafa;
+    background: #d0d0d0; /* match */
 }
 
 #chartWrap {
@@ -91,7 +86,9 @@ canvas {
     height: 100% !important;
 }
 
-/* MOBILE */
+/* =========================
+   MOBILE
+========================= */
 @media (max-width: 768px) {
     #right { display: none !important; }
     #divider { display: none !important; }
@@ -103,9 +100,7 @@ canvas {
 
 <body>
 
-<!-- =========================
-     TOP SINGLE CANDLE
-========================= -->
+<!-- TOP BANNER -->
 <div id="bannerWrap">
     <canvas id="bgChart"></canvas>
     <div id="banner">🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦</div>
@@ -141,7 +136,7 @@ const term = new Terminal({
     fontSize: 14,
     cursorBlink: false,
     theme: {
-        background: "#f7f7f7",
+        background: "#e6e6e6",
         foreground: "#111"
     }
 });
@@ -185,7 +180,7 @@ window.addEventListener("mousemove", (e) => {
 });
 
 /* =========================
-   MAIN CHART (UNCHANGED SIMPLIFIED)
+   MAIN CHART (FIXED GRID + ST RESTORED)
 ========================= */
 let chart;
 
@@ -206,24 +201,50 @@ function draw(data) {
         type: "line",
         data: {
             labels: data.map((_, i) => i),
-            datasets: [{
-                data: data.map(d => d.close),
-                borderColor: "#b8860b",
-                borderWidth: 1,
-                pointRadius: 0,
-                tension: 0.25
-            }]
+            datasets: [
+
+                // CLOSE
+                {
+                    data: data.map(d => d.close),
+                    borderColor: "#b8860b",
+                    borderWidth: 1,
+                    pointRadius: 0,
+                    tension: 0.25
+                },
+
+                // ST LINE (RESTORED)
+                {
+                    data: data.map(d => d.st),
+                    borderColor: "#00c853",
+                    borderWidth: 1.5,
+                    pointRadius: 0,
+                    tension: 0.25
+                }
+            ]
         },
+
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            plugins: { legend: { display: false } }
+
+            plugins: {
+                legend: { display: false }
+            },
+
+            scales: {
+                x: {
+                    grid: { display: false }   // ✅ NO GRID
+                },
+                y: {
+                    grid: { display: false }   // ✅ NO GRID
+                }
+            }
         }
     });
 }
 
 /* =========================
-   SINGLE HORIZONTAL CANDLE (KEY PART)
+   BANNER CANDLE FIX (BRIGHT COLORS)
 ========================= */
 let bgChart;
 
@@ -231,7 +252,7 @@ async function loadBannerCandle() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
-    const open = data[0].st;              // ST = OPEN
+    const open = data[0].st;
     const close = data[data.length - 1].close;
     const high = Math.max(...data.map(d => d.high));
     const low = Math.min(...data.map(d => d.low));
@@ -251,17 +272,15 @@ function drawBannerCandle(open, high, low, close) {
             labels: ["PXY"],
             datasets: [
 
-                // WICK (HIGH-LOW)
                 {
                     data: [high - low],
-                    backgroundColor: "#999",
+                    backgroundColor: "#888",
                     barThickness: 2
                 },
 
-                // BODY (OPEN-CLOSE)
                 {
                     data: [Math.abs(close - open)],
-                    backgroundColor: close >= open ? "#4DB6AC" : "#FF8A65",
+                    backgroundColor: close >= open ? "#00e676" : "#ff1744",  // ✅ BRIGHT GREEN / RED
                     barThickness: 18
                 }
             ]
