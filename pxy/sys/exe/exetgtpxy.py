@@ -47,7 +47,7 @@ def target_price(row):
         supertrend = row.get("supertrend", 0)
 
         # 🔥 BASE ENGINE (NEW STANDARD)
-        base = atr / 4
+        base = 1.7
 
         # 3️⃣ OPTION TYPE
         is_ce = "CE" in symbol
@@ -119,9 +119,9 @@ def target_price(row):
 
         if all_aligned:
             if is_ce:
-                score = (base * ce_power * ce_force) * atr
+                score = (base * ce_power * ce_force) + atr
             elif is_pe:
-                score = (base * pe_power * pe_force) * atr
+                score = (base * pe_power * pe_force) + atr
             else:
                 score = base
 
