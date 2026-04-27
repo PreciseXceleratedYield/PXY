@@ -1,16 +1,16 @@
+# sys/exe/dynentrypxy.py
 from datetime import datetime
 import pytz
-import math
 import re
 
 IST = pytz.timezone("Asia/Kolkata")
 
 # ==================================================
-# 🔧 CONFIG (TUNE FROM HERE ONLY)
+# 🔧 TIGHTENED CONFIG: PURE TIME DECAY
 # ==================================================
-BASE_INCREMENT = 0.0005
-PNL_THRESHOLD = -0
-
+# 0.005 per second = 0.3 points per minute = 18 points per hour
+BASE_DECAY_RATE = 0.005 
+PNL_THRESHOLD = 0.0
 
 def dynamic_entry(row):
     try:
@@ -19,38 +19,21 @@ def dynamic_entry(row):
         symbol = str(row.get("symbol", "")).upper()
         pnl = float(row.get("pnl", 0))
 
-        if not entry_time_val or original_price == 0:
+        if not entry_time_val or original_price <= 0:
             return original_price
 
         now = datetime.now(IST)
 
-        # ---------------- SYMBOL TYPE ----------------
-        is_ce = "CE" in symbol
-        is_pe = "PE" in symbol
-
-        # ---------------- DEPTH ----------------
-        ce_depth = float(row.get("hkin_ce_depth", 1))
-        pe_depth = float(row.get("hkin_pe_depth", 1))
-
-        # ---------------- DEPTH FACTOR ----------------
-        if is_ce:
-            depth_factor = math.sqrt(max(ce_depth - 1, 0))
-        elif is_pe:
-            depth_factor = math.sqrt(max(pe_depth - 1, 0))
-        else:
-            depth_factor = 0
-
-        per_second_increment = BASE_INCREMENT * depth_factor
-
         # ---------------- PARSE ENTRY TIME ----------------
         if isinstance(entry_time_val, str):
             try:
+                # Expecting "YYYY-MM-DD HH:MM:SS"
                 entry_time = datetime.strptime(entry_time_val, "%Y-%m-%d %H:%M:%S")
                 entry_time = IST.localize(entry_time)
             except ValueError:
+                # Fallback for "HH:MM:S" format
                 parts = list(map(int, entry_time_val.split(":")))
-                while len(parts) < 3:
-                    parts.append(0)
+                while len(parts) < 3: parts.append(0)
                 h, m, s = parts[:3]
                 entry_time = now.replace(hour=h, minute=m, second=s, microsecond=0)
         else:
@@ -58,20 +41,21 @@ def dynamic_entry(row):
             if entry_time.tzinfo is None:
                 entry_time = IST.localize(entry_time)
 
+        # ---------------- CALC ELAPSED ----------------
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
 
-        # ---------------- CLEAN SYMBOL ----------------
-        clean_symbol = re.sub(r'^(NIFTY|BANKNIFTY)26', '', symbol)
-
-        # ---------------- FINAL RULE ----------------
-        if pnl <= PNL_THRESHOLD and (is_ce or is_pe):
-            increment = elapsed_secs * per_second_increment
-            dynamic_val = original_price - increment
-
-            points = int(increment)
-            print(f"{clean_symbol} | READY TO GIVEAWAY {points} POINTS")
-
+        # ---------------- PURE DECAY RULE ----------------
+        # If PNL is 0 or negative, start the linear decay
+        if pnl <= PNL_THRESHOLD:
+            decay_amount = elapsed_secs * BASE_DECAY_RATE
+            dynamic_val = original_price - decay_amount
+            
+            # Clean symbol for logging
+            clean_symbol = re.sub(r'^(NIFTY|BANKNIFTY)26', '', symbol)
+            if decay_amount > 0.5: # Only print if meaningful decay
+                print(f"{clean_symbol} | TIME DECAY: -{decay_amount:.2f} PTS")
         else:
+            # If in profit, keep original buy price (don't decay)
             dynamic_val = original_price
 
         return round(dynamic_val, 2)
@@ -79,3 +63,4 @@ def dynamic_entry(row):
     except Exception as e:
         print(f"[ERROR] dynamic_entry: {e}")
         return original_price
+
