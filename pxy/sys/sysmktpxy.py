@@ -35,8 +35,8 @@ def get_df():
     # Start from 9:15
     df = df[df['Datetime'].dt.time >= time(9, 15)]
 
-    # FINAL MINIMUM CHECK (ENTRY SIDE - UNCHANGED)
-    if len(df) < 13:
+    # ✅ FIX: allow early data (for exit)
+    if len(df) < 3:
         return None
 
     return df.reset_index(drop=True)
@@ -160,11 +160,10 @@ def entry_signal(df):
 
 
 # ==================================================
-# EXIT SIGNAL (UNCHANGED LOGIC, 3-CANDLE MIN CONFIRMED)
+# EXIT SIGNAL (3 CANDLES)
 # ==================================================
 def exit_signal(df):
 
-    # ✅ ONLY REQUIREMENT: 3 candles minimum
     if df is None or len(df) < 3:
         return "NONE"
 
