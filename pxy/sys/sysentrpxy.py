@@ -19,8 +19,8 @@ def get_entry_signal(df=None):
 
     # --- MORNING OVERRIDE (9:16–9:30) ---
     if time(9, 16) <= current_time < time(9, 30):
-        if exit_l2 in ["BUY", "BULL"]: return "OTMBUY", exit_l2
-        if exit_l2 in ["SELL", "BEAR"]: return "OTMSELL", exit_l2
+        if exit_l2 in ["BUY", "BULL"]: return "MORNING", exit_l2
+        if exit_l2 in ["SELL", "BEAR"]: return "MORNING", exit_l2
         return "NONE", exit_l2
 
     # --- ATR BLOCK ---
