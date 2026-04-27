@@ -47,7 +47,7 @@ def target_price(row):
         supertrend = row.get("supertrend", 0)
 
         # 🔥 BASE ENGINE
-        base = 1.7
+        base = 0.5
 
         # 3️⃣ OPTION TYPE
         is_ce = "CE" in symbol
