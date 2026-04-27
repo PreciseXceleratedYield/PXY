@@ -116,9 +116,9 @@ def target_price(row):
 
         if all_aligned:
             if is_ce:
-                score = (base * ce_power * ce_force) + atr
+                score = (base * ce_power * ce_force) + (atr/3)
             elif is_pe:
-                score = (base * pe_power * pe_force) + atr
+                score = (base * pe_power * pe_force) + (atr/3)
             else:
                 score = base
 
