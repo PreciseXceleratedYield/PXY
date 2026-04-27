@@ -11,6 +11,7 @@ def calculate_supertrend(df: pd.DataFrame, period=3, multiplier=3) -> pd.DataFra
                         abs(row['High'] - row['previous_close']), 
                         abs(row['Low'] - row['previous_close'])), axis=1)
     
+    # RMA matching Pine Script
     df['ATR'] = df['TR'].ewm(alpha=1/period, adjust=False).mean()
     df['HL2'] = (df['High'] + df['Low']) / 2
     
@@ -25,23 +26,20 @@ def calculate_supertrend(df: pd.DataFrame, period=3, multiplier=3) -> pd.DataFra
             st[i], trend[i] = hl2, "UP"
             continue
         
-        prev_st, prev_trend = st[i-1], trend[i-1]
+        prev_st = st[i-1]
         close = df['Close'].iloc[i]
         
+        # Explicit Trend Conditions
         if close > prev_st: curr_trend = "UP"
         elif close < prev_st: curr_trend = "DOWN"
-        else: curr_trend = prev_trend
+        else: curr_trend = trend[i-1]
             
+        # Continuous Trailing Logic
         if curr_trend == "UP": st[i] = max(lower, prev_st)
-        else: st[i] = min(upper, prev_st)
+        if curr_trend == "DOWN": st[i] = min(upper, prev_st)
         trend[i] = curr_trend
         
     df['ST'], df['ST_Trend'] = st, trend
     df.drop(columns=['previous_close'], inplace=True)
     return df
-
-if __name__ == "__main__":
-    df = fetch_yf_data()
-    df = calculate_supertrend(df, period=3, multiplier=3)
-    print(df.tail(1))
 
