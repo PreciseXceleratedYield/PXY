@@ -1,10 +1,15 @@
 from datetime import datetime
 import pytz
+import math
 import re
 
 IST = pytz.timezone("Asia/Kolkata")
 
+# ==================================================
+# 🔧 CONFIG (TUNE FROM HERE ONLY)
+# ==================================================
 BASE_INCREMENT = 0.001
+PNL_THRESHOLD = -0
 
 
 def dynamic_entry(row):
@@ -12,36 +17,32 @@ def dynamic_entry(row):
         original_price = float(row.get("buy_prc", 0))
         entry_time_val = row.get("buy_time")
         symbol = str(row.get("symbol", "")).upper()
-
-        supertrend = str(row.get("supertrend", "")).upper().strip()
+        pnl = float(row.get("pnl", 0))
 
         if not entry_time_val or original_price == 0:
             return original_price
 
-        # ---------------- SAFE SUPERTREND CHECK ----------------
-        if supertrend not in ["UP", "DOWN"]:
-            return original_price
-
         now = datetime.now(IST)
 
-        # ---------------- STRICT SYMBOL CHECK ----------------
-        is_ce = symbol.endswith("CE")
-        is_pe = symbol.endswith("PE")
+        # ---------------- SYMBOL TYPE ----------------
+        is_ce = "CE" in symbol
+        is_pe = "PE" in symbol
 
-        # ==================================================
-        # 🧠 TREND ALIGNMENT CHECK
-        # ==================================================
-        aligned = False
+        # ---------------- DEPTH ----------------
+        ce_depth = float(row.get("hkin_ce_depth", 1))
+        pe_depth = float(row.get("hkin_pe_depth", 1))
 
-        if is_ce and supertrend == "UP":
-            aligned = True
+        # ---------------- DEPTH FACTOR ----------------
+        if is_ce:
+            depth_factor = math.sqrt(max(ce_depth - 1, 0))
+        elif is_pe:
+            depth_factor = math.sqrt(max(pe_depth - 1, 0))
+        else:
+            depth_factor = 0
 
-        if is_pe and supertrend == "DOWN":
-            aligned = True
+        per_second_increment = BASE_INCREMENT * depth_factor
 
-        # ==================================================
-        # PARSE TIME
-        # ==================================================
+        # ---------------- PARSE ENTRY TIME ----------------
         if isinstance(entry_time_val, str):
             try:
                 entry_time = datetime.strptime(entry_time_val, "%Y-%m-%d %H:%M:%S")
@@ -59,25 +60,21 @@ def dynamic_entry(row):
 
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
 
-        # ==================================================
-        # FINAL DECISION
-        # ==================================================
-        if is_ce or is_pe:
+        # ---------------- CLEAN SYMBOL ----------------
+        clean_symbol = re.sub(r'^(NIFTY|BANKNIFTY)26', '', symbol)
 
-            if aligned:
-                # 🟢 NO DECAY IN TREND DIRECTION
-                return round(original_price, 2)
+        # ---------------- FINAL RULE ----------------
+        if pnl <= PNL_THRESHOLD and (is_ce or is_pe):
+            increment = elapsed_secs * per_second_increment
+            dynamic_val = original_price - increment
 
-            else:
-                # 🔴 DECAY ONLY WHEN AGAINST TREND
-                increment = elapsed_secs * BASE_INCREMENT
-                dynamic_val = original_price - increment
+            points = int(increment)
+            print(f"{clean_symbol} | READY TO GIVEAWAY {points} POINTS")
 
-                print(f"{symbol} | COUNTER DECAY: {int(increment)} pts")
+        else:
+            dynamic_val = original_price
 
-                return round(dynamic_val, 2)
-
-        return original_price
+        return round(dynamic_val, 2)
 
     except Exception as e:
         print(f"[ERROR] dynamic_entry: {e}")
