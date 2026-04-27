@@ -9,7 +9,7 @@ import traceback
 
 # --- GLOBAL CONFIG ---
 DEBUG = False
-COUNTERBUY = "YES"
+COUNTERBUY = "NO"
 init(autoreset=True)
 
 # --- ADD PARENT DIR TO PATH ---
@@ -196,7 +196,7 @@ async def main():
          
             original_sig = sig  # preserve before modification
             
-            if COUNTERBUY == "YES":
+            if COUNTERBUY.upper() == "YES":
             
                 if ce_active and pe_active:
                     dprint("⚠️ BOTH CE & PE ACTIVE → FORCING NONE", Fore.RED)
@@ -239,9 +239,7 @@ async def main():
                 dprint(f"⚡ SIGNAL CHANGED: {original_sig} → {sig}", Fore.GREEN)
             else:
                 dprint(f"➡️ SIGNAL UNCHANGED: {sig}", Fore.YELLOW)
-            
-            else:
-                dprint("⏭️ COUNTERBUY SWITCH OFF → SKIPPING BLOCK", Fore.YELLOW)
+
             # --- FORCE FINAL SIGNAL NORMALIZATION ---
             sig = sig.upper().strip()
             is_valid_entry = sig in VALID
