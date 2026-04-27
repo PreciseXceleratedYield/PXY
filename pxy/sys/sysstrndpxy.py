@@ -5,7 +5,7 @@ from sysdtafpxy import fetch_yf_data
 # ==================================================
 # DEBUG CONFIG
 # ==================================================
-DEBUG_MODE = False 
+DEBUG_MODE = True 
 
 def calculate_supertrend(df: pd.DataFrame, period=3, multiplier=3) -> pd.DataFrame:
     """ Continuous SuperTrend (Pine-matching logic) """
@@ -31,10 +31,12 @@ def calculate_supertrend(df: pd.DataFrame, period=3, multiplier=3) -> pd.DataFra
             continue
         
         prev_st = st[i-1]
-        close = df['Close'].iloc[i]
         
-        if close > prev_st: curr_trend = "UP"
-        elif close < prev_st: curr_trend = "DOWN"
+        # Use HA Close for Trend Direction Decision
+        ha_close = (df['Open'].iloc[i] + df['High'].iloc[i] + df['Low'].iloc[i] + df['Close'].iloc[i]) / 4
+        
+        if ha_close > prev_st: curr_trend = "UP"
+        elif ha_close < prev_st: curr_trend = "DOWN"
         else: curr_trend = trend[i-1]
             
         if curr_trend == "UP": st[i] = max(lower, prev_st)
@@ -48,35 +50,35 @@ def get_signal(df=None):
     if df is None: df = fetch_yf_data()
     if df is None or df.empty: return "NONE", "NONE"
 
-    # Single Continuous Major Line (3:3)
-    df_slow = calculate_supertrend(df, period=3, multiplier=3)
+    # Calculate Continuous Major Line (3:3)
+    df_st = calculate_supertrend(df, period=3, multiplier=3)
 
-    # Current Price and Line Values
-    curr_close = df_slow['Close'].iloc[-1]
-    prev_close = df_slow['Close'].iloc[-2]
-    curr_st = df_slow['ST'].iloc[-1]
-    prev_st = df_slow['ST'].iloc[-2]
+    # HA Price Calculation
+    # ha_close = (O + H + L + C) / 4
+    ha_curr = (df_st['Open'].iloc[-1] + df_st['High'].iloc[-1] + df_st['Low'].iloc[-1] + df_st['Close'].iloc[-1]) / 4
+    ha_prev = (df_st['Open'].iloc[-2] + df_st['High'].iloc[-2] + df_st['Low'].iloc[-2] + df_st['Close'].iloc[-2]) / 4
     
-    slow_trend_status = df_slow['ST_Trend'].iloc[-1]
+    curr_st = df_st['ST'].iloc[-1]
+    prev_st = df_st['ST'].iloc[-2]
+    
+    slow_trend_status = df_st['ST_Trend'].iloc[-1]
 
-    # --- PRICE CROSSOVER LOGIC (ABSOLUTE PRIORITY) ---
-    # BUY: Price was below ST line and now closed above it
-    if prev_close <= prev_st and curr_close > curr_st:
+    # --- HA CROSSOVER LOGIC (ABSOLUTE PRIORITY) ---
+    if ha_prev <= prev_st and ha_curr > curr_st:
         st_signal = "BUY"
-    # SELL: Price was above ST line and now closed below it
-    elif prev_close >= prev_st and curr_close < curr_st:
+    elif ha_prev >= prev_st and ha_curr < curr_st:
         st_signal = "SELL"
     # --- DIRECTIONAL POSITION ---
-    elif curr_close > curr_st:
+    elif ha_curr > curr_st:
         st_signal = "UP"
-    elif curr_close < curr_st:
+    elif ha_curr < curr_st:
         st_signal = "DOWN"
     else:
         st_signal = "NONE"
 
     if DEBUG_MODE:
-        diff = curr_close - curr_st
-        print(f"[DEBUG] PRICE:{curr_close:.2f} | MAJOR_ST:{curr_st:.2f} | DIFF:{diff:.2f}")
+        diff = ha_curr - curr_st
+        print(f"[DEBUG] HA_PRICE:{ha_curr:.2f} | MAJOR_ST:{curr_st:.2f} | DIFF:{diff:.2f}")
 
     return st_signal, slow_trend_status
 
@@ -85,6 +87,6 @@ if __name__ == "__main__":
     init(autoreset=True)
     res, major = get_signal()
     color = Fore.GREEN if res in ["BUY", "UP"] else Fore.RED if res in ["SELL", "DOWN"] else Fore.WHITE
-    print(f"{color}ST_SIG: {res:<15} MAJOR_TREND: {major}{Style.RESET_ALL}")
+    print(f"{color}ST_SIG(HA): {res:<13} MAJOR_TREND: {major}{Style.RESET_ALL}")
 
 
