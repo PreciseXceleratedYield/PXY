@@ -29,15 +29,15 @@ def calculate_supertrend(df: pd.DataFrame, period=3, multiplier=3) -> pd.DataFra
             st[i], trend[i] = hl2, "UP"
             continue
         
-        prev_st = st[i-1]
+        prev_st_val = st[i-1]
         ha_close = (df['Open'].iloc[i] + df['High'].iloc[i] + df['Low'].iloc[i] + df['Close'].iloc[i]) / 4
         
-        if ha_close > prev_st: curr_trend = "UP"
-        elif ha_close < prev_st: curr_trend = "DOWN"
+        if ha_close > prev_st_val: curr_trend = "UP"
+        elif ha_close < prev_st_val: curr_trend = "DOWN"
         else: curr_trend = trend[i-1]
             
-        if curr_trend == "UP": st[i] = max(lower, prev_st)
-        else: st[i] = min(upper, prev_st)
+        if curr_trend == "UP": st[i] = max(lower, prev_st_val)
+        else: st[i] = min(upper, prev_st_val)
         trend[i] = curr_trend
         
     df['ST'], df['ST_Trend'] = st, trend
@@ -54,27 +54,26 @@ def get_signal(df=None):
     c_open, c_high, c_low, c_close = df_st['Open'].iloc[-1], df_st['High'].iloc[-1], df_st['Low'].iloc[-1], df_st['Close'].iloc[-1]
     p_open, p_high, p_low, p_close = df_st['Open'].iloc[-2], df_st['High'].iloc[-2], df_st['Low'].iloc[-2], df_st['Close'].iloc[-2]
     
-    # HA Price for Early Detection (Body Midpoint vs Close)
+    # HA Close Logic
     ha_c_curr = (c_open + c_high + c_low + c_close) / 4
     ha_c_prev = (p_open + p_high + p_low + p_close) / 4
     
-    # Current ST Line
+    # ST Line Values
     st_curr = df_st['ST'].iloc[-1]
     st_prev = df_st['ST'].iloc[-2]
     
     st_signal = "NONE"
 
-    # --- 1-MINUTE STICKY TRIGGER LOGIC ---
-    # Detected EARLY: The moment HA Close flips the ST line
-    # BUY: Prev was below/equal, Curr is above
+    # --- 1-MINUTE STICKY TRIGGER LOGIC (HA CLOSE BASED) ---
+    # BUY: Cross Above
     if ha_c_prev <= st_prev and ha_c_curr > st_curr:
         st_signal = "BUY"
     
-    # SELL: Prev was above/equal, Curr is below
-    elif ha_c_prev >= prev_st and ha_c_curr < st_curr:
+    # SELL: Cross Below (FIXED: changed prev_st to st_prev)
+    elif ha_c_prev >= st_prev and ha_c_curr < st_curr:
         st_signal = "SELL"
         
-    # --- CONTINUOUS FLOW (AFTER THE TRIGGER MINUTE) ---
+    # --- CONTINUOUS FLOW ---
     elif ha_c_curr > st_curr:
         st_signal = "UP"
     elif ha_c_curr < st_curr:
@@ -83,11 +82,8 @@ def get_signal(df=None):
     return st_signal, df_st['ST_Trend'].iloc[-1]
 
 if __name__ == "__main__":
-    from colorama import Fore, Style, init
-    init(autoreset=True)
     res, major = get_signal()
-    color = Fore.GREEN if res in ["BUY", "UP"] else Fore.RED if res in ["SELL", "DOWN"] else Fore.WHITE
-    print(f"{color}ST_SIG: {res:<15} MAJOR: {major}{Style.RESET_ALL}")
+    print(f"ST_SIG: {res} | MAJOR: {major}")
 
 
 
