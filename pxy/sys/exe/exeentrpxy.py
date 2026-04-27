@@ -155,6 +155,15 @@ async def main():
             return
 
         sig = entry_signal.upper().strip()
+        if sig == "STBUY":
+            dprint("⚡ REVERSAL DETECTED: STBUY → ATMBUY", Fore.GREEN)
+            sig = "ATMBUY"
+        elif sig == "STSELL":
+            dprint("⚡ REVERSAL DETECTED: STSELL → ATMSELL", Fore.GREEN)
+            sig = "ATMSELL"
+        
+        dprint(f"FINAL NORMALIZED SIGNAL: {sig}")
+       
         dprint(f"FORMATTED SIGNAL: {sig}")
 
         VALID = ["ATMBUY", "OTMBUY", "ATMSELL", "OTMSELL"]
