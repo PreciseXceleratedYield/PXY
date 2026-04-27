@@ -16,16 +16,19 @@ def color_value(val):
     val_str = str(val)
     val_upper = val_str.upper()
 
-    if "BUY" in val_upper:
-        return Fore.GREEN + val_str + Style.RESET_ALL
-    elif "SELL" in val_upper:
-        return Fore.RED + val_str + Style.RESET_ALL
-    elif "UP" in val_upper or "BULL" in val_upper:
-        return Fore.GREEN + val_str + Style.RESET_ALL
-    elif "DOWN" in val_upper or "BEAR" in val_upper:
-        return Fore.RED + val_str + Style.RESET_ALL
+    dark_green = Style.DIM + Fore.GREEN
+    dark_red = Style.DIM + Fore.RED
 
-    return Fore.CYAN + val_str + Style.RESET_ALL
+    if "BUY" in val_upper:
+        return dark_green + val_str + Style.RESET_ALL
+    elif "SELL" in val_upper:
+        return dark_red + val_str + Style.RESET_ALL
+    elif "UP" in val_upper or "BULL" in val_upper:
+        return dark_green + val_str + Style.RESET_ALL
+    elif "DOWN" in val_upper or "BEAR" in val_upper:
+        return dark_red + val_str + Style.RESET_ALL
+
+    return Style.DIM + Fore.CYAN + val_str + Style.RESET_ALL
 
 
 def print_market_dashboard(market_df):
