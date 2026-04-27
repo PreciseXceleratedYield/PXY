@@ -68,7 +68,7 @@ def target_price(row):
             color = Style.NORMAL
 
             clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
-            print(f"{color}{clean_symbol}|| E:{entry:03d}|| S:{score:02d}%|| {state} || T:{target:03d}")
+            print(f"{color}{clean_symbol}|| E:{entry:03d}|| S:{int(score):02d}%|| {state} || T:{target:03d}")
             return target
 
         # -------------------- SIGNAL TYPE --------------------
@@ -108,7 +108,7 @@ def target_price(row):
             target = int(entry * (1 + score / 100))
             clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
 
-            print(f"{color}{clean_symbol}|| E:{entry:03d}|| S:{score:02d}%|| {state} || T:{target:03d}")
+            print(f"{color}{clean_symbol}|| E:{entry:03d}|| S:{int(score):02d}%|| {state} || T:{target:03d}")
             return target
 
         # -------------------- ORIGINAL LOGIC --------------------
