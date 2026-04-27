@@ -35,7 +35,7 @@ def get_df():
     # Start from 9:15
     df = df[df['Datetime'].dt.time >= time(9, 15)]
 
-    # FINAL MINIMUM CHECK
+    # FINAL MINIMUM CHECK (ENTRY SIDE - UNCHANGED)
     if len(df) < 13:
         return None
 
@@ -160,11 +160,15 @@ def entry_signal(df):
 
 
 # ==================================================
-# HA FLOW
+# EXIT SIGNAL (UNCHANGED LOGIC, 3-CANDLE MIN CONFIRMED)
 # ==================================================
 def exit_signal(df):
 
+    # ✅ ONLY REQUIREMENT: 3 candles minimum
     if df is None or len(df) < 3:
+        return "NONE"
+
+    if not is_data_valid(df):
         return "NONE"
 
     ha_close = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
@@ -231,7 +235,6 @@ def get_signal():
 
         print(f"🔥 ENTRY MODE: {final_tag} 🚀 ✔️")
 
-        # FIXED: preserve exit signal properly
         return final_state, oc_state
 
     except Exception as e:
