@@ -46,8 +46,8 @@ def target_price(row):
         # 4. STRICT ALIGNMENT CHECK (TIGHTENED STRING SEARCH)
         # 'BUY' catches STBUY, ATMBUY, OTMBUY, BUY, etc.
         # 'SELL' catches STSELL, ATMSELL, OTMSELL, SELL, etc.
-        bullish = any(x in calc_sig for x in ["BUY", "BULL", "UP"])
-        bearish = any(x in calc_sig for x in ["SELL", "BEAR", "DOWN"])
+        bullish = any(x in calc_sig for x in ["BUY", "BULL"])
+        bearish = any(x in calc_sig for x in ["SELL", "BEAR"])
         
         aligned = (is_ce and bullish) or (is_pe and bearish)
 
