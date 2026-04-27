@@ -62,10 +62,10 @@ def get_entry_signal(df=None):
     final_signal = "NONE"
 
     if signal == "BUY":
-        final_signal = "BUY" if is_down else "ATMBUY"
+        final_signal = "BUY" if is_up else "ATMBUY"
 
     elif signal == "SELL":
-        final_signal = "SELL" if is_up else "ATMSELL"
+        final_signal = "SELL" if is_down else "ATMSELL"
 
     print(f"{signal} → {final_signal} (ST:{st})".center(36))
 
