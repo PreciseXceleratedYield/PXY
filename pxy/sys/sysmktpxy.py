@@ -1,8 +1,5 @@
-# ==================================================
-# FINAL ENGINE: get_signal() 
-# ENTRY: L4 (Cascade) | EXIT: L2 (OC/2)
-# ==================================================
-from sysdtafpxy import fetch_yf_data 
+# sysmktpxy.py
+from sysdtafpxy import fetch_yf_data
 import pandas as pd
 
 # --- LAYER 1: PURE CLOSE ---
@@ -38,7 +35,6 @@ def get_l3_ha(df):
 
 # --- LAYER 4: CASCADE ENTRY ---
 def get_l4_entry(l1, l2, l3):
-    """STRICT CASCADE GATING"""
     if l3 == "BUY": return "BUY"
     if l3 == "SELL": return "SELL"
     if l3 == "BULL":
@@ -60,16 +56,19 @@ def get_l4_entry(l1, l2, l3):
     return "NONE"
 
 # ==================================================
-# MASTER INTERFACE
+# MASTER INTERFACE (SURGICAL FIX: ADDED df=None)
 # ==================================================
-def get_signal():
+def get_signal(df=None): 
     """
     Returns (Entry_Signal, Exit_Signal)
     Entry: L4 (HA-Lead Cascade)
-    Exit:  L2 (OC/2 Flow)
+    Exit: L2 (OC/2 Flow)
     """
     try:
-        df = fetch_yf_data()
+        # Use passed df or fetch fresh
+        if df is None:
+            df = fetch_yf_data()
+            
         if df is None or df.empty:
             return "NONE", "NONE"
 
@@ -82,17 +81,14 @@ def get_signal():
         entry_sig = get_l4_entry(l1, l2, l3)
         exit_sig = l2 # Exit is strictly based on OC/2 state
 
-        print(f"[LOG] ENTRY(L4): {entry_sig} | EXIT(L2): {exit_sig}")
         return entry_sig, exit_sig
 
     except Exception as e:
         print(f"Signal Error: {e}")
         return "NONE", "NONE"
 
-# ==================================================
-# EXECUTION
-# ==================================================
 if __name__ == "__main__":
     entry, exit_state = get_signal()
     print(f"FINAL RESULT -> ENTRY: {entry}, EXIT: {exit_state}")
+
 
