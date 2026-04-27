@@ -6,6 +6,11 @@ import pytz
 from datetime import datetime, timedelta, time
 
 init(autoreset=True)
+
+# ---- ADDED: DARK COLORS ----
+dark_green = Style.DIM + Fore.GREEN
+dark_red = Style.DIM + Fore.RED
+
 WIDTH = 42
 
 # ---------------- HEADER ----------------
@@ -14,9 +19,9 @@ def print_header(today_close, prev_close):
     if prev_close is None:
         color = Fore.YELLOW
     elif today_close > prev_close:
-        color = Fore.GREEN
+        color = dark_green
     elif today_close < prev_close:
-        color = Fore.RED
+        color = dark_red
     else:
         color = Fore.YELLOW
     print(color + Style.BRIGHT + f"{text:^{WIDTH}}")
@@ -30,11 +35,11 @@ def print_candle(o, h, l, c):
     if c >= o:
         lower = (o - l) / rng
         body  = (c - o) / rng
-        color = Fore.GREEN
+        color = dark_green
     else:
         lower = (c - l) / rng
         body  = (o - c) / rng
-        color = Fore.RED
+        color = dark_red
     upper = 1 - lower - body
     lower_len = int(round(lower * WIDTH))
     body_len  = max(1, int(round(body * WIDTH)))
@@ -103,7 +108,7 @@ def get_market_snapshot(TICKER):
 
     result["bias"] = bias
 
-    # -------- POWER (UNCHANGED LOGIC, but safe integers already) --------
+    # -------- POWER --------
     rng = h - l
     if rng == 0:
         power = 1
@@ -171,10 +176,10 @@ def main():
 
     # -------- BIAS + TODAY OPEN --------
     left_label = Fore.YELLOW + "Bias:"
-    left_value = (Fore.GREEN if "BULL" in bias else Fore.RED) + bias
+    left_value = (dark_green if "BULL" in bias else dark_red) + bias
 
     right_label = Fore.YELLOW + "Open:"
-    open_color = Fore.GREEN if o > prev_close else Fore.RED if o < prev_close else Fore.YELLOW
+    open_color = dark_green if o > prev_close else dark_red if o < prev_close else Fore.YELLOW
     right_value = open_color + f"{o}"
 
     spacing = WIDTH - len(f"Bias:{bias}") - len(f"Open:{o}")
@@ -210,8 +215,8 @@ def main():
 
     final_line = "".join(line)
 
-    o_color = Fore.GREEN if o_change > 0 else Fore.RED if o_change < 0 else Fore.YELLOW
-    m_color = Fore.GREEN if m_change > 0 else Fore.RED if m_change < 0 else Fore.YELLOW
+    o_color = dark_green if o_change > 0 else dark_red if o_change < 0 else Fore.YELLOW
+    m_color = dark_green if m_change > 0 else dark_red if m_change < 0 else Fore.YELLOW
 
     final_line = final_line.replace(o_str, o_color + o_str + Style.RESET_ALL)
     final_line = final_line.replace(m_str, m_color + m_str + Style.RESET_ALL)
