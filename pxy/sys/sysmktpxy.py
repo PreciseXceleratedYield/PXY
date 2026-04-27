@@ -1,249 +1,98 @@
 # ==================================================
-# FINAL DUAL ENGINE (LOCKED VERSION - PRODUCTION SAFE)
-# PRICE ACTION + OC/2 FLOW + SAFETY LAYERS
-# OUTPUT:
-# ENTRY → BUY / SELL / BULL / BEAR / NONE
-# EXIT  → BUY / SELL / BULL / BEAR / NONE
+# FINAL ENGINE: get_signal() 
+# ENTRY: L4 (Cascade) | EXIT: L2 (OC/2)
 # ==================================================
-
-from sysdtafpxy import fetch_yf_data
+from sysdtafpxy import fetch_yf_data 
 import pandas as pd
-from datetime import time
 
-
-# ==================================================
-# CONFIG
-# ==================================================
-LOOKBACK = 5
-
-
-# ==================================================
-# DATA FETCH
-# ==================================================
-def get_df():
-    df = fetch_yf_data(period="1d", interval="1m")
-
-    if df is None:
-        return None
-
-    df['Datetime'] = pd.to_datetime(df['Datetime'])
-
-    # Keep only today
-    today = df['Datetime'].dt.date.iloc[-1]
-    df = df[df['Datetime'].dt.date == today]
-
-    # Start from 9:15
-    df = df[df['Datetime'].dt.time >= time(9, 15)]
-
-    # ✅ FIX: allow early data (for exit)
-    if len(df) < 3:
-        return None
-
-    return df.reset_index(drop=True)
-
-
-# ==================================================
-# SAFETY: OPEN BLOCK
-# ==================================================
-def is_open_block(current_time):
-    try:
-        return time(9, 14) <= current_time <= time(9, 16)
-    except:
-        return False
-
-
-# ==================================================
-# SAFETY: DATA VALIDATION
-# ==================================================
-def is_data_valid(df):
-
-    try:
-        if df is None or len(df) < 5:
-            return False
-
-        required = ["Open", "High", "Low", "Close"]
-
-        for col in required:
-            if col not in df.columns:
-                return False
-
-        last = df.iloc[-1]
-
-        if last[required].isnull().any():
-            return False
-
-        if last["High"] < last["Low"]:
-            return False
-
-        if not (last["Low"] <= last["Open"] <= last["High"]):
-            return False
-
-        if not (last["Low"] <= last["Close"] <= last["High"]):
-            return False
-
-        if last[required].min() <= 0:
-            return False
-
-        return True
-
-    except:
-        return False
-
-
-# ==================================================
-# HELPERS
-# ==================================================
-def get_prev_high(df):
-    val = df['High'].shift(1).rolling(LOOKBACK).max().iloc[-1]
-    return val if pd.notna(val) else df['High'].iloc[-1]
-
-
-def get_prev_low(df):
-    val = df['Low'].shift(1).rolling(LOOKBACK).min().iloc[-1]
-    return val if pd.notna(val) else df['Low'].iloc[-1]
-
-
-def is_bullish(c):
-    return c['Close'] > c['Open']
-
-
-def is_bearish(c):
-    return c['Close'] < c['Open']
-
-
-# ==================================================
-# ENTRY SIGNAL (PRICE ACTION)
-# ==================================================
-def entry_signal(df):
-
-    last = df.iloc[-1]
-    prev_high = get_prev_high(df)
-    prev_low = get_prev_low(df)
-
-    rng = last['High'] - last['Low']
-
-    # LIQUIDITY SWEEP
-    if rng > 0:
-        if last['Low'] < prev_low and (last['Close'] - last['Low']) > rng * 0.5:
-            return "BUY", "LIQUIDITY_SWEEP_BUY"
-
-        if last['High'] > prev_high and (last['High'] - last['Close']) > rng * 0.5:
-            return "SELL", "LIQUIDITY_SWEEP_SELL"
-
-    # REVERSAL
-    if last['Close'] > prev_high and is_bullish(last):
-        return "BUY", "REVERSAL_BUY"
-
-    if last['Close'] < prev_low and is_bearish(last):
-        return "SELL", "REVERSAL_SELL"
-
-    # CONTINUATION
-    if last['High'] > prev_high and is_bullish(last):
-        return "BUY", "CONTINUATION_BUY"
-
-    if last['Low'] < prev_low and is_bearish(last):
-        return "SELL", "CONTINUATION_SELL"
-
-    # IMBALANCE
-    if len(df) >= 3:
-        c1 = df.iloc[-3]
-        c2 = df.iloc[-2]
-        c3 = df.iloc[-1]
-
-        if c1['High'] < c3['Low'] and is_bullish(c2):
-            return "BUY", "IMBALANCE_BUY"
-
-        if c1['Low'] > c3['High'] and is_bearish(c2):
-            return "SELL", "IMBALANCE_SELL"
-
-    return "NONE", None
-
-
-# ==================================================
-# EXIT SIGNAL (3 CANDLES)
-# ==================================================
-def exit_signal(df):
-
-    if df is None or len(df) < 3:
-        return "NONE"
-
-    if not is_data_valid(df):
-        return "NONE"
-
-    ha_close = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
-
-    prev2 = ha_close.iloc[-3]
-    prev1 = ha_close.iloc[-2]
-    curr  = ha_close.iloc[-1]
-
-    if prev1 <= prev2 and curr > prev1:
-        return "BULL"
-
-    if prev1 >= prev2 and curr < prev1:
-        return "BEAR"
-
-    if curr > prev1:
-        return "BULL"
-
-    if curr < prev1:
-        return "BEAR"
-
+# --- LAYER 1: PURE CLOSE ---
+def get_l1_close(df):
+    c2, c1, curr = df['Close'].iloc[-3], df['Close'].iloc[-2], df['Close'].iloc[-1]
+    if c1 < c2 and curr > c1: return "BUY"
+    if c1 > c2 and curr < c1: return "SELL"
+    if curr > c1: return "BULL"
+    if curr < c1: return "BEAR"
     return "NONE"
 
+# --- LAYER 2: OC/2 ---
+def get_l2_oc2(df):
+    mid = (df['Open'] + df['Close']) / 2
+    m2, m1, curr = mid.iloc[-3], mid.iloc[-2], mid.iloc[-1]
+    if m1 < m2 and curr > m1: return "BUY"
+    if m1 > m2 and curr < m1: return "SELL"
+    if curr > m1: return "BULL"
+    if curr < m1: return "BEAR"
+    return "NONE"
+
+# --- LAYER 3: HA ---
+def get_l3_ha(df):
+    ha_c = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
+    ha_o = (df['Open'].shift(1) + df['Close'].shift(1)) / 2
+    curr_o, curr_c = ha_o.iloc[-1], ha_c.iloc[-1]
+    prev_o, prev_c = ha_o.iloc[-2], ha_c.iloc[-2]
+    if prev_c < prev_o and curr_c > curr_o: return "BUY"
+    if prev_c > prev_o and curr_c < curr_o: return "SELL"
+    if curr_c > curr_o: return "BULL"
+    if curr_c < curr_o: return "BEAR"
+    return "NONE"
+
+# --- LAYER 4: CASCADE ENTRY ---
+def get_l4_entry(l1, l2, l3):
+    """STRICT CASCADE GATING"""
+    if l3 == "BUY": return "BUY"
+    if l3 == "SELL": return "SELL"
+    if l3 == "BULL":
+        if l1 == "BUY" or l2 == "BUY": return "BUY"
+        return "BULL"
+    if l3 == "BEAR":
+        if l1 == "SELL" or l2 == "SELL": return "SELL"
+        return "BEAR"
+    if l3 == "NONE":
+        if l2 == "BUY": return "BUY"
+        if l2 == "SELL": return "SELL"
+        if l2 == "BULL": return "BULL"
+        if l2 == "BEAR": return "BEAR"
+    if l3 == "NONE" and l2 == "NONE":
+        if l1 == "BUY": return "BUY"
+        if l1 == "SELL": return "SELL"
+        if l1 == "BULL": return "BULL"
+        if l1 == "BEAR": return "BEAR"
+    return "NONE"
 
 # ==================================================
-# UPGRADE ENGINE
-# ==================================================
-def apply_upgrade(entry_state, entry_tag, oc_state):
-
-    if entry_state == "BUY":
-        return "BUY", entry_tag
-
-    if entry_state == "SELL":
-        return "SELL", entry_tag
-
-    return oc_state, oc_state
-
-
-# ==================================================
-# MASTER ENGINE
+# MASTER INTERFACE
 # ==================================================
 def get_signal():
-
+    """
+    Returns (Entry_Signal, Exit_Signal)
+    Entry: L4 (HA-Lead Cascade)
+    Exit:  L2 (OC/2 Flow)
+    """
     try:
-        df = get_df()
-
-        if df is None:
-            print("🚫 ENTRY MODE: NO_DATA 📉")
+        df = fetch_yf_data()
+        if df is None or df.empty:
             return "NONE", "NONE"
 
-        current_time = df.iloc[-1]['Datetime'].time()
+        # 1. Generate independent signals
+        l1 = get_l1_close(df)
+        l2 = get_l2_oc2(df)
+        l3 = get_l3_ha(df)
 
-        if is_open_block(current_time) and len(df) < 15:
-            print("⏳ ENTRY MODE: OPENING_BLOCK 🛑")
-            return "NONE", "NONE"
+        # 2. Assign Role Logic
+        entry_sig = get_l4_entry(l1, l2, l3)
+        exit_sig = l2 # Exit is strictly based on OC/2 state
 
-        if not is_data_valid(df):
-            print("⚠️ ENTRY MODE: BAD_DATA 🚫")
-            return "NONE", "NONE"
-
-        entry_state, entry_tag = entry_signal(df)
-        oc_state = exit_signal(df)
-
-        final_state, final_tag = apply_upgrade(entry_state, entry_tag, oc_state)
-
-        print(f"🔥 ENTRY MODE: {final_tag} 🚀 ✔️")
-
-        return final_state, oc_state
+        print(f"[LOG] ENTRY(L4): {entry_sig} | EXIT(L2): {exit_sig}")
+        return entry_sig, exit_sig
 
     except Exception as e:
-        print("[ERROR]", e)
+        print(f"Signal Error: {e}")
         return "NONE", "NONE"
 
-
 # ==================================================
-# RUN
+# EXECUTION
 # ==================================================
 if __name__ == "__main__":
-    entry, _ = get_signal()
-    print("FINAL ENTRY:", entry)
+    entry, exit_state = get_signal()
+    print(f"FINAL RESULT -> ENTRY: {entry}, EXIT: {exit_state}")
+
