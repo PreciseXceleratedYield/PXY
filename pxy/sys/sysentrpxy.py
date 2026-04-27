@@ -8,10 +8,10 @@ from zoneinfo import ZoneInfo
 
 def get_entry_signal(df=None):
     # 1. Fetch Cascade Signals (L4 Entry, L2 Exit)
-    entry_l4, exit_l2 = get_signal()
+    # ✅ FIX: Passing df here to prevent Data Desync
+    entry_l4, exit_l2 = get_signal(df) 
     
     # 2. ST Priority & Directional Flow (Body Crossover Logic)
-    # st_entry returns: BUY, SELL, UP, or DOWN
     st_entry, st_exit = get_st_signal(df)
     
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
@@ -32,25 +32,24 @@ def get_entry_signal(df=None):
     final_signal = "NONE"
 
     # A. ST REVERSAL PRIORITY (One-Candle Crossover)
-    # If ST just flipped, this is the Master Priority Signal
     if st_entry == "BUY":
         final_signal = "STBUY"
     elif st_entry == "SELL":
         final_signal = "STSELL"
         
     # B. BULLISH ZONE GATING (ST is BUY or UP)
-    # We use 'if' instead of 'elif' here to allow L4 signals to be 
-    # evaluated even on the ST crossover candle if needed.
+    # ✅ TREND FOLLOWING UPGRADE: BUY becomes ATMBUY
     if final_signal == "NONE" and st_entry in ["BUY", "UP"]:
         if entry_l4 == "BUY": 
-            final_signal = "BUY"
+            final_signal = "ATMBUY" 
         elif entry_l4 == "BULL": 
             final_signal = "BULL"
 
     # C. BEARISH ZONE GATING (ST is SELL or DOWN)
+    # ✅ TREND FOLLOWING UPGRADE: SELL becomes ATMSELL
     if final_signal == "NONE" and st_entry in ["SELL", "DOWN"]:
         if entry_l4 == "SELL": 
-            final_signal = "SELL"
+            final_signal = "ATMSELL"
         elif entry_l4 == "BEAR": 
             final_signal = "BEAR"
 
@@ -58,7 +57,6 @@ def get_entry_signal(df=None):
     if final_signal in ["BULL", "BEAR", "NONE"]:
         print(f"⛔ 🚧 NO ENTRY 🚧 {final_signal} 🚧 ⛔".center(36))
     else:
-        # Logs the Priority Signal (STBUY/STSELL) or the Secondary (BUY/SELL)
         print(f"🔥 {entry_l4} → {final_signal} (ST_STATE:{st_entry})".center(36))
 
     return final_signal, exit_l2
