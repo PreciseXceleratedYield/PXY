@@ -48,31 +48,35 @@ def get_signal(df=None):
     if df is None: df = fetch_yf_data()
     if df is None or df.empty: return "NONE", "NONE"
 
-    # Hardcoded Continuous Lines
-    df_fast = calculate_supertrend(df, period=1, multiplier=1) # MINOR
-    df_slow = calculate_supertrend(df, period=3, multiplier=3) # MAJOR
+    # Single Continuous Major Line (3:3)
+    df_slow = calculate_supertrend(df, period=3, multiplier=3)
 
-    f_curr, f_prev = df_fast['ST'].iloc[-1], df_fast['ST'].iloc[-2]
-    s_curr, s_prev = df_slow['ST'].iloc[-1], df_slow['ST'].iloc[-2]
+    # Current Price and Line Values
+    curr_close = df_slow['Close'].iloc[-1]
+    prev_close = df_slow['Close'].iloc[-2]
+    curr_st = df_slow['ST'].iloc[-1]
+    prev_st = df_slow['ST'].iloc[-2]
     
     slow_trend_status = df_slow['ST_Trend'].iloc[-1]
 
-    # --- CROSSOVER TRIGGER ---
-    if f_prev <= s_prev and f_curr > s_curr:
+    # --- PRICE CROSSOVER LOGIC (ABSOLUTE PRIORITY) ---
+    # BUY: Price was below ST line and now closed above it
+    if prev_close <= prev_st and curr_close > curr_st:
         st_signal = "BUY"
-    elif f_prev >= s_prev and f_curr < s_curr:
+    # SELL: Price was above ST line and now closed below it
+    elif prev_close >= prev_st and curr_close < curr_st:
         st_signal = "SELL"
     # --- DIRECTIONAL POSITION ---
-    elif f_curr > s_curr:
+    elif curr_close > curr_st:
         st_signal = "UP"
-    elif f_curr < s_curr:
+    elif curr_close < curr_st:
         st_signal = "DOWN"
     else:
         st_signal = "NONE"
 
     if DEBUG_MODE:
-        diff = f_curr - s_curr
-        print(f"[DEBUG] MINOR:{f_curr:.2f} | MAJOR:{s_curr:.2f} | DIFF:{diff:.2f}")
+        diff = curr_close - curr_st
+        print(f"[DEBUG] PRICE:{curr_close:.2f} | MAJOR_ST:{curr_st:.2f} | DIFF:{diff:.2f}")
 
     return st_signal, slow_trend_status
 
@@ -81,5 +85,6 @@ if __name__ == "__main__":
     init(autoreset=True)
     res, major = get_signal()
     color = Fore.GREEN if res in ["BUY", "UP"] else Fore.RED if res in ["SELL", "DOWN"] else Fore.WHITE
-    print(f"{color}ST_SIG: {res:<15} MAJOR: {major}{Style.RESET_ALL}")
+    print(f"{color}ST_SIG: {res:<15} MAJOR_TREND: {major}{Style.RESET_ALL}")
+
 
