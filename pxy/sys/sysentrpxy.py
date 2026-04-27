@@ -3,7 +3,7 @@
 # ==================================================
 from sysmktpxy import get_signal  # L1-L4 Cascade Engine
 from syscnfgpxy import TICKER
-from sysstrndpxy import get_signal as get_st_signal # ST 1:1 vs 3:3 Absolute Priority
+from sysstrndpxy import calculate_supertrend as get_st_signal
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
