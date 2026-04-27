@@ -46,19 +46,16 @@ def target_price(row):
 
         supertrend = row.get("supertrend", 0)
 
-        # 🔥 BASE ENGINE (NEW STANDARD)
+        # 🔥 BASE ENGINE
         base = 1.7
 
         # 3️⃣ OPTION TYPE
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
 
-        # 4️⃣ SIGNALS
-        entry_signal = str(row.get("entry", "NONE")).upper()
-        exit_signal = str(row.get("exit", "NONE")).upper()
-        counter = str(row.get("counter", "Y")).upper()
-
-        _signal = exit_signal if counter == "Y" else exit_signal
+        # 4️⃣ SIGNALS (EXIT ONLY — AS REQUESTED)
+        exit_signal = str(row.get("exit", "NONE")).strip().upper()
+        _signal = exit_signal   # 🔥 BOTH USE EXIT
 
         # -------------------- HLD MODE --------------------
         if _signal == "NONE":
@@ -73,7 +70,7 @@ def target_price(row):
 
         # -------------------- SIGNAL TYPE --------------------
         bullish = any(x in _signal for x in ["BUY", "BULL", "UP"])
-        bearish = any(x in _signal for x in ["SELL", "BEAR", "DOWN"])
+        bearish = any(x in _signal for x in ["SELL", "BEAR", "DOWN", "SHORT"])
 
         # -------------------- SUPER TREND --------------------
         st = str(supertrend).strip().upper()
@@ -102,7 +99,7 @@ def target_price(row):
                 state = "NLN"
                 color = Style.BRIGHT + Fore.RED
 
-            # 🔥 FORCE APPLIED IN MORNING
+            # 🔥 FORCE APPLIED
             score *= ce_force if is_ce else pe_force
 
             target = int(entry * (1 + score / 100))
