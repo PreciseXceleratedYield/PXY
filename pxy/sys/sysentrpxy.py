@@ -19,7 +19,7 @@ def get_entry_signal(df=None):
     
     # 2. Fetch Absolute Priority from Supertrend 1:1 vs 3:3
     # st_entry: BUY/SELL/UP/DOWN
-    st_entry, st_exit = get_st_signal()
+    st_entry, st_exit = calculate_supertrend()
     
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
     current_time = now.time()
