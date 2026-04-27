@@ -30,28 +30,28 @@ def target_price(row):
         is_morning = time(9, 15) <= now < time(9, 30)
 
         # 2. 🚨 THE MASTER KILL-SWITCH (POST 9:30 ONLY)
-        # Kill Target immediately if direction clashes with Option Type
+        # Kill Target ONLY if the Supertrend Major Trend flips against the position
         if not is_morning:
-            if is_ce and any(x in sig for x in ["STSELL", "DOWN", "SELL", "BEAR"]):
+            if is_ce and any(x in sig for x in ["STSELL", "DOWN"]):
                 print(f"{symbol}|| 🛑 ST_OPPOSITE_EXIT || T:0")
                 return 0
-            if is_pe and any(x in sig for x in ["STBUY", "UP", "BUY", "BULL"]):
+            if is_pe and any(x in sig for x in ["STBUY", "UP"]):
                 print(f"{symbol}|| 🛑 ST_OPPOSITE_EXIT || T:0")
                 return 0
 
         # 3. SIGNAL SOURCE
-        # Use Exit Signal for morning speed, Entry Signal for day stability
+        # Morning: OC/2 Flow | After 9:30: L4 Entry
         calc_sig = exit_sig if is_morning else sig
 
-        # 4. STRICT ALIGNMENT CHECK
-        # All signals must point the same way as the Option Type
-        bullish = any(x in calc_sig for x in ["BUY", "BULL", "UP", "STBUY"])
-        bearish = any(x in calc_sig for x in ["SELL", "BEAR", "DOWN", "STSELL"])
+        # 4. STRICT ALIGNMENT CHECK (TIGHTENED STRING SEARCH)
+        # 'BUY' catches STBUY, ATMBUY, OTMBUY, BUY, etc.
+        # 'SELL' catches STSELL, ATMSELL, OTMSELL, SELL, etc.
+        bullish = any(x in calc_sig for x in ["BUY", "BULL", "UP"])
+        bearish = any(x in calc_sig for x in ["SELL", "BEAR", "DOWN"])
         
         aligned = (is_ce and bullish) or (is_pe and bearish)
 
         # 5. FIXED SCORE LOGIC (20% vs 1.4%)
-        # If aligned: 20% Target | If not aligned: 1.4% Target
         score = 20.0 if aligned else 1.4
         state = "✅ALIGNED" if aligned else "❌MISMATCH"
         
@@ -66,6 +66,7 @@ def target_price(row):
     except Exception as e:
         print(f"ERROR|{str(e)}")
         return 0
+
 
 
 
