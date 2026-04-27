@@ -9,6 +9,7 @@ import traceback
 
 # --- GLOBAL CONFIG ---
 DEBUG = False
+COUNTERBUY = "YES"
 init(autoreset=True)
 
 # --- ADD PARENT DIR TO PATH ---
@@ -192,49 +193,55 @@ async def main():
             dprint(f"ENTRY SIGNAL: {entry_signal}", Fore.CYAN)
             dprint(f"EXIT REGIME : {exit_sig}", Fore.CYAN)
             dprint(f"POSITION    : CE={ce_active}, PE={pe_active}", Fore.CYAN)
-            
+         
             original_sig = sig  # preserve before modification
             
-            if ce_active and pe_active:
-                dprint("⚠️ BOTH CE & PE ACTIVE → FORCING NONE", Fore.RED)
-                print("⚠️ CE + PE both active → NO ACTION")
-                sig = "NONE"
+            if COUNTERBUY == "YES":
+            
+                if ce_active and pe_active:
+                    dprint("⚠️ BOTH CE & PE ACTIVE → FORCING NONE", Fore.RED)
+                    print("⚠️ CE + PE both active → NO ACTION")
+                    sig = "NONE"
+                
+                else:
+                    if exit_sig in ["BUY", "BULL"]:
+                        if pe_active:
+                            dprint("🔁 MISMATCH: PE active but regime BULL → switching to CE", Fore.RED)
+            
+                            if is_bull:
+                                sig = "ATMBUY"
+                            else:
+                                sig = "OTMBUY"
+            
+                        else:
+                            dprint("✅ MATCH: BULL regime with no PE conflict", Fore.GREEN)
+            
+                    elif exit_sig in ["SELL", "BEAR"]:
+                        if ce_active:
+                            dprint("🔁 MISMATCH: CE active but regime BEAR → switching to PE", Fore.RED)
+            
+                            if is_bear:
+                                sig = "ATMSELL"
+                            else:
+                                sig = "OTMSELL"
+            
+                        else:
+                            dprint("✅ MATCH: BEAR regime with no CE conflict", Fore.GREEN)
+            
+                    else:
+                        dprint("ℹ️ NO CLEAR EXIT REGIME → NO OVERRIDE", Fore.YELLOW)
             
             else:
-                if exit_sig in ["BUY", "BULL"]:
-                    if pe_active:
-                        dprint("🔁 MISMATCH: PE active but regime BULL → switching to CE", Fore.RED)
+                dprint("⏭️ COUNTERBUY SWITCH OFF → SKIPPING BLOCK", Fore.YELLOW)
             
-                        if is_bull:
-                            sig = "ATMBUY"
-                        else:
-                            sig = "OTMBUY"
-            
-                    else:
-                        dprint("✅ MATCH: BULL regime with no PE conflict", Fore.GREEN)
-            
-                elif exit_sig in ["SELL", "BEAR"]:
-                    if ce_active:
-                        dprint("🔁 MISMATCH: CE active but regime BEAR → switching to PE", Fore.RED)
-            
-                        if is_bear:
-                            sig = "ATMSELL"
-                        else:
-                            sig = "OTMSELL"
-            
-                    else:
-                        dprint("✅ MATCH: BEAR regime with no CE conflict", Fore.GREEN)
-            
-                else:
-                    dprint("ℹ️ NO CLEAR EXIT REGIME → NO OVERRIDE", Fore.YELLOW)
-            
-            # --- FINAL STATE ---
+            # --- FINAL STATE (ALWAYS PRINT) ---
             if original_sig != sig:
                 dprint(f"⚡ SIGNAL CHANGED: {original_sig} → {sig}", Fore.GREEN)
             else:
                 dprint(f"➡️ SIGNAL UNCHANGED: {sig}", Fore.YELLOW)
             
-            dprint("----- REGIME CHECK END -----", Fore.MAGENTA)
+            else:
+                dprint("⏭️ COUNTERBUY SWITCH OFF → SKIPPING BLOCK", Fore.YELLOW)
             # --- FORCE FINAL SIGNAL NORMALIZATION ---
             sig = sig.upper().strip()
             is_valid_entry = sig in VALID
