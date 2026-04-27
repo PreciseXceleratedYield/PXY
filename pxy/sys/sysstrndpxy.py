@@ -32,7 +32,7 @@ def calculate_supertrend(df: pd.DataFrame, period=3, multiplier=3) -> pd.DataFra
         
         prev_st = st[i-1]
         
-        # Use HA Close for Trend Direction Decision
+        # Trend decided by HA Close vs previous line
         ha_close = (df['Open'].iloc[i] + df['High'].iloc[i] + df['Low'].iloc[i] + df['Close'].iloc[i]) / 4
         
         if ha_close > prev_st: curr_trend = "UP"
@@ -50,43 +50,52 @@ def get_signal(df=None):
     if df is None: df = fetch_yf_data()
     if df is None or df.empty: return "NONE", "NONE"
 
-    # Calculate Continuous Major Line (3:3)
     df_st = calculate_supertrend(df, period=3, multiplier=3)
 
-    # HA Price Calculation
-    # ha_close = (O + H + L + C) / 4
-    ha_curr = (df_st['Open'].iloc[-1] + df_st['High'].iloc[-1] + df_st['Low'].iloc[-1] + df_st['Close'].iloc[-1]) / 4
-    ha_prev = (df_st['Open'].iloc[-2] + df_st['High'].iloc[-2] + df_st['Low'].iloc[-2] + df_st['Close'].iloc[-2]) / 4
+    # --- CURRENT HA BODY CALCULATION ---
+    c_open, c_high, c_low, c_close = df_st['Open'].iloc[-1], df_st['High'].iloc[-1], df_st['Low'].iloc[-1], df_st['Close'].iloc[-1]
+    p_open, p_high, p_low, p_close = df_st['Open'].iloc[-2], df_st['High'].iloc[-2], df_st['Low'].iloc[-2], df_st['Close'].iloc[-2]
+    
+    # HA Close (Current & Previous)
+    ha_close_curr = (c_open + c_high + c_low + c_close) / 4
+    ha_close_prev = (p_open + p_high + p_low + p_close) / 4
+    
+    # HA Open (Current) = (Prev_Open + Prev_Close) / 2
+    ha_open_curr = (p_open + p_close) / 2
     
     curr_st = df_st['ST'].iloc[-1]
     prev_st = df_st['ST'].iloc[-2]
     
-    slow_trend_status = df_st['ST_Trend'].iloc[-1]
+    st_signal = "NONE"
 
-    # --- HA CROSSOVER LOGIC (ABSOLUTE PRIORITY) ---
-    if ha_prev <= prev_st and ha_curr > curr_st:
+    # --- STRICT HA BODY CROSSOVER LOGIC ---
+    
+    # CROSSING ABOVE (BUY): HA Body (Open & Close) must both be above ST
+    # AND the previous HA Close was below/on the line
+    if ha_close_prev <= prev_st and (ha_close_curr > curr_st and ha_open_curr > curr_st):
         st_signal = "BUY"
-    elif ha_prev >= prev_st and ha_curr < curr_st:
+        
+    # CROSSING BELOW (SELL): HA Body (Open & Close) must both be below ST
+    # AND the previous HA Close was above/on the line
+    elif ha_close_prev >= prev_st and (ha_close_curr < curr_st and ha_open_curr < curr_st):
         st_signal = "SELL"
-    # --- DIRECTIONAL POSITION ---
-    elif ha_curr > curr_st:
+        
+    # --- DIRECTIONAL POSITION (FLOW) ---
+    elif ha_close_curr > curr_st:
         st_signal = "UP"
-    elif ha_curr < curr_st:
+    elif ha_close_curr < curr_st:
         st_signal = "DOWN"
-    else:
-        st_signal = "NONE"
 
     if DEBUG_MODE:
-        diff = ha_curr - curr_st
-        print(f"[DEBUG] HA_PRICE:{ha_curr:.2f} | MAJOR_ST:{curr_st:.2f} | DIFF:{diff:.2f}")
+        print(f"[DEBUG] HA_O:{ha_open_curr:.2f} | HA_C:{ha_close_curr:.2f} | ST:{curr_st:.2f} | SIG:{st_signal}")
 
-    return st_signal, slow_trend_status
+    return st_signal, df_st['ST_Trend'].iloc[-1]
 
 if __name__ == "__main__":
     from colorama import Fore, Style, init
     init(autoreset=True)
     res, major = get_signal()
     color = Fore.GREEN if res in ["BUY", "UP"] else Fore.RED if res in ["SELL", "DOWN"] else Fore.WHITE
-    print(f"{color}ST_SIG(HA): {res:<13} MAJOR_TREND: {major}{Style.RESET_ALL}")
+    print(f"{color}ST_SIG: {res:<15} MAJOR: {major}{Style.RESET_ALL}")
 
 
