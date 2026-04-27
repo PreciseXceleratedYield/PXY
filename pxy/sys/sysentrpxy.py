@@ -33,9 +33,9 @@ def get_entry_signal(df=None):
 
     # A. ST MINER CROSSOVER (Highest Priority Trigger)
     if st_entry == "BUY":
-        final_signal = "ATMBUY"
+        final_signal = "STBUY"
     elif st_entry == "SELL":
-        final_signal = "ATMSELL"
+        final_signal = "STSELL"
         
     # B. ST MINER BULLISH ZONE (Only if 1:1 is UP relative to 3:3)
     elif st_entry == "UP":
