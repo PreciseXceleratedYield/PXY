@@ -377,7 +377,7 @@ function drawTopCandle(stVals, closes) {
 
     if (!stVals.length || !closes.length) return;
 
-    const open = stVals[0];
+    const open = stVals[stVals.length - 1]; 
     const close = closes[closes.length - 1];
 
     const high = Math.max(...stVals, ...closes);
