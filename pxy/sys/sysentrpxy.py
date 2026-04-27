@@ -1,7 +1,7 @@
 # sysentrpxy.py
 from sysmktpxy import get_signal  # L1-L4 Cascade Engine
 from syscnfgpxy import TICKER
-from sysstrndpxy import calculate_supertrend, get_signal as get_st_signal
+from sysstrndpxy import get_signal as get_st_signal
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
@@ -10,7 +10,7 @@ def get_entry_signal(df=None):
     # 1. Fetch Cascade Signals (L4 Entry, L2 Exit)
     entry_l4, exit_l2 = get_signal()
     
-    # 2. ST Absolute Priority & Directional Flow (1:1 vs 3:3)
+    # 2. ST Priority & Directional Flow (Body Crossover Logic)
     # st_entry returns: BUY, SELL, UP, or DOWN
     st_entry, st_exit = get_st_signal(df)
     
@@ -31,35 +31,31 @@ def get_entry_signal(df=None):
     # --- FINAL ENTRY MAPPING (STRICT TRIPLE ALIGNMENT) ---
     final_signal = "NONE"
 
-    # A. ST MINER CROSSOVER (Highest Priority Trigger)
+    # A. ST CROSSOVER (Absolute Priority Reversal)
     if st_entry == "BUY":
         final_signal = "STBUY"
     elif st_entry == "SELL":
         final_signal = "STSELL"
         
-    # B. ST MINER BULLISH ZONE (Only if 1:1 is UP relative to 3:3)
+    # B. BULLISH ZONE (ST is UP - Body Above Line)
     elif st_entry == "UP":
-        # Only allow Bullish L4 signals
         if entry_l4 == "BUY": 
             final_signal = "BUY"
         elif entry_l4 == "BULL": 
             final_signal = "BULL"
-        # If L4 is BEAR/SELL, it conflicts with ST Minor UP -> Result: NONE
 
-    # C. ST MINER BEARISH ZONE (Only if 1:1 is DOWN relative to 3:3)
+    # C. BEARISH ZONE (ST is DOWN - Body Below Line)
     elif st_entry == "DOWN":
-        # Only allow Bearish L4 signals
         if entry_l4 == "SELL": 
             final_signal = "SELL"
         elif entry_l4 == "BEAR": 
             final_signal = "BEAR"
-        # If L4 is BULL/BUY, it conflicts with ST Minor DOWN -> Result: NONE
 
-    # D. Final Strict Logic Check
+    # D. Final Strict Logic Check (Log Formatting)
     if final_signal in ["BULL", "BEAR", "NONE"]:
         print(f"⛔ 🚧 NO ENTRY 🚧 {final_signal} 🚧 ⛔".center(36))
     else:
-        print(f"🔥 {entry_l4} → {final_signal} (ST_MINER:{st_entry})".center(36))
+        print(f"🔥 {entry_l4} → {final_signal} (ST_ZONE:{st_entry})".center(36))
 
     return final_signal, exit_l2
 
