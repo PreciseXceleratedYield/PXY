@@ -1,10 +1,11 @@
 # ==================================================
-# sysentrpxy.py (CLEAN: RAW SIGNAL ONLY → ATM MAPPER)
+# sysentrpxy.py (CLEAN: RAW SIGNAL ONLY → ATM MAPPER + ATR REGIME)
 # ==================================================
 
 from sysmktpxy import get_signal
 from syscnfgpxy import TICKER
 from sysstrndpxy import calculate_supertrend
+from syskatrpxy import calculate_atr, calculate_dynamic_k
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
@@ -40,14 +41,22 @@ def get_entry_signal(df=None):
     # 🔵 AFTER 9:30 → FULL SYSTEM
     # ==================================================
 
-    # ST FETCH
+    # Supertrend
     df = calculate_supertrend(df)
     last = df.iloc[-1]
-    
+
     st = str(last["ST_Trend"]).upper()
-    
     is_up = st == "UP"
     is_down = st == "DOWN"
+
+    # ==================================================
+    # 📊 ATR BLOCK
+    # ==================================================
+    atr_series = calculate_atr(df)
+    atr = atr_series.iloc[-1] if not atr_series.empty else 0
+    k_value = calculate_dynamic_k(df)
+
+    print(f"ATR:{atr:.2f} | K:{k_value}".center(36))
 
     # ==================================================
     # RAW PASS-THROUGH MODE
@@ -57,17 +66,28 @@ def get_entry_signal(df=None):
         return signal, exit_signal
 
     # ==================================================
-    # NORMAL MAPPING (UNCHANGED LOGIC FLOW)
+    # ATR-BASED REGIME LOGIC
     # ==================================================
     final_signal = "NONE"
 
-    if signal == "BUY":
-        final_signal = "BUY" if is_down else "ATMBUY"
+    if atr > 7:
+        # ---- TREND MODE (ORIGINAL LOGIC) ----
+        if signal == "BUY":
+            final_signal = "BUY" if is_down else "ATMBUY"
 
-    elif signal == "SELL":
-        final_signal = "SELL" if is_up else "ATMSELL"
+        elif signal == "SELL":
+            final_signal = "SELL" if is_up else "ATMSELL"
 
-    print(f"{signal} → {final_signal} (ST:{st})".center(36))
+    else:
+        # ---- MEAN REVERSION MODE ----
+        # SELL above ST, BUY below ST
+        if signal == "BUY":
+            final_signal = "ATMBUY" if is_down else "BUY"
+
+        elif signal == "SELL":
+            final_signal = "ATMSELL" if is_up else "SELL"
+
+    print(f"{signal} → {final_signal} (ST:{st} | ATR:{atr:.2f})".center(36))
 
     exit_signal = orig_signal
     return final_signal, exit_signal
