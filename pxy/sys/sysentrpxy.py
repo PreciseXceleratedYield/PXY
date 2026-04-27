@@ -31,31 +31,35 @@ def get_entry_signal(df=None):
     # --- FINAL ENTRY MAPPING (STRICT TRIPLE ALIGNMENT) ---
     final_signal = "NONE"
 
-    # A. ST CROSSOVER (Absolute Priority Reversal)
+    # A. ST REVERSAL PRIORITY (One-Candle Crossover)
+    # If ST just flipped, this is the Master Priority Signal
     if st_entry == "BUY":
         final_signal = "STBUY"
     elif st_entry == "SELL":
         final_signal = "STSELL"
         
-    # B. BULLISH ZONE (ST is UP - Body Above Line)
-    elif st_entry == "UP":
+    # B. BULLISH ZONE GATING (ST is BUY or UP)
+    # We use 'if' instead of 'elif' here to allow L4 signals to be 
+    # evaluated even on the ST crossover candle if needed.
+    if final_signal == "NONE" and st_entry in ["BUY", "UP"]:
         if entry_l4 == "BUY": 
             final_signal = "BUY"
         elif entry_l4 == "BULL": 
             final_signal = "BULL"
 
-    # C. BEARISH ZONE (ST is DOWN - Body Below Line)
-    elif st_entry == "DOWN":
+    # C. BEARISH ZONE GATING (ST is SELL or DOWN)
+    if final_signal == "NONE" and st_entry in ["SELL", "DOWN"]:
         if entry_l4 == "SELL": 
             final_signal = "SELL"
         elif entry_l4 == "BEAR": 
             final_signal = "BEAR"
 
-    # D. Final Strict Logic Check (Log Formatting)
+    # D. Final Strict Logic Check & Reporting
     if final_signal in ["BULL", "BEAR", "NONE"]:
         print(f"⛔ 🚧 NO ENTRY 🚧 {final_signal} 🚧 ⛔".center(36))
     else:
-        print(f"🔥 {entry_l4} → {final_signal} (ST_ZONE:{st_entry})".center(36))
+        # Logs the Priority Signal (STBUY/STSELL) or the Secondary (BUY/SELL)
+        print(f"🔥 {entry_l4} → {final_signal} (ST_STATE:{st_entry})".center(36))
 
     return final_signal, exit_l2
 
@@ -65,5 +69,6 @@ if __name__ == "__main__":
     entry, ex = get_entry_signal(df)
     print("-" * 36)
     print(f"ENTRY: {entry} | EXIT: {ex}")
+
 
 
