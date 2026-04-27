@@ -5,7 +5,7 @@ from sysdtafpxy import fetch_yf_data
 # ==================================================
 # DEBUG CONFIG
 # ==================================================
-DEBUG_MODE = True 
+DEBUG_MODE = False 
 
 def calculate_supertrend(df: pd.DataFrame, period=3, multiplier=3) -> pd.DataFrame:
     """ Continuous SuperTrend (Pine-matching logic) """
