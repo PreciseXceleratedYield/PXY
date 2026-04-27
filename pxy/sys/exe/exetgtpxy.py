@@ -30,7 +30,7 @@ def target_price(row):
         is_morning = time(9, 15) <= now < time(9, 30)
 
         # 2. 🚨 THE MASTER KILL-SWITCH (POST 9:30 ONLY)
-        # Kill Target ONLY if the Supertrend Major Trend flips against the position
+        # Surgical: Exit if SuperTrend direction contradicts the position
         if not is_morning:
             if is_ce and any(x in sig for x in ["STSELL", "DOWN"]):
                 print(f"{symbol}|| 🛑 ST_OPPOSITE_EXIT || T:0")
@@ -40,12 +40,12 @@ def target_price(row):
                 return 0
 
         # 3. SIGNAL SOURCE
-        # Morning: OC/2 Flow | After 9:30: L4 Entry
+        # Morning: OC/2 Flow (Exit Signal) | After 9:30: L4 Entry
         calc_sig = exit_sig if is_morning else sig
 
-        # 4. STRICT ALIGNMENT CHECK (TIGHTENED STRING SEARCH)
-        # 'BUY' catches STBUY, ATMBUY, OTMBUY, BUY, etc.
-        # 'SELL' catches STSELL, ATMSELL, OTMSELL, SELL, etc.
+        # 4. STRICT ALIGNMENT CHECK
+        # 'BUY' catches STBUY, ATMBUY, BUY, etc.
+        # 'UP'/'DOWN' removed as they are handled by the Kill-Switch above
         bullish = any(x in calc_sig for x in ["BUY", "BULL"])
         bearish = any(x in calc_sig for x in ["SELL", "BEAR"])
         
@@ -66,7 +66,5 @@ def target_price(row):
     except Exception as e:
         print(f"ERROR|{str(e)}")
         return 0
-
-
 
 
