@@ -1,89 +1,96 @@
-# sysstrndpxy.py
-import pandas as pd
+# sysmktpxy.py
 from sysdtafpxy import fetch_yf_data
+import pandas as pd
+
+# --- LAYER 1: PURE CLOSE ---
+def get_l1_close(df):
+    c2, c1, curr = df['Close'].iloc[-3], df['Close'].iloc[-2], df['Close'].iloc[-1]
+    if c1 < c2 and curr > c1: return "BUY"
+    if c1 > c2 and curr < c1: return "SELL"
+    if curr > c1: return "BULL"
+    if curr < c1: return "BEAR"
+    return "NONE"
+
+# --- LAYER 2: OC/2 ---
+def get_l2_oc2(df):
+    mid = (df['Open'] + df['Close']) / 2
+    m2, m1, curr = mid.iloc[-3], mid.iloc[-2], mid.iloc[-1]
+    if m1 < m2 and curr > m1: return "BUY"
+    if m1 > m2 and curr < m1: return "SELL"
+    if curr > m1: return "BULL"
+    if curr < m1: return "BEAR"
+    return "NONE"
+
+# --- LAYER 3: HA ---
+def get_l3_ha(df):
+    ha_c = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
+    ha_o = (df['Open'].shift(1) + df['Close'].shift(1)) / 2
+    curr_o, curr_c = ha_o.iloc[-1], ha_c.iloc[-1]
+    prev_o, prev_c = ha_o.iloc[-2], ha_c.iloc[-2]
+    if prev_c < prev_o and curr_c > curr_o: return "BUY"
+    if prev_c > prev_o and curr_c < curr_o: return "SELL"
+    if curr_c > curr_o: return "BULL"
+    if curr_c < curr_o: return "BEAR"
+    return "NONE"
+
+# --- LAYER 4: CASCADE ENTRY ---
+def get_l4_entry(l1, l2, l3):
+    if l3 == "BUY": return "BUY"
+    if l3 == "SELL": return "SELL"
+    if l3 == "BULL":
+        if l1 == "BUY" or l2 == "BUY": return "BUY"
+        return "BULL"
+    if l3 == "BEAR":
+        if l1 == "SELL" or l2 == "SELL": return "SELL"
+        return "BEAR"
+    if l3 == "NONE":
+        if l2 == "BUY": return "BUY"
+        if l2 == "SELL": return "SELL"
+        if l2 == "BULL": return "BULL"
+        if l2 == "BEAR": return "BEAR"
+    if l3 == "NONE" and l2 == "NONE":
+        if l1 == "BUY": return "BUY"
+        if l1 == "SELL": return "SELL"
+        if l1 == "BULL": return "BULL"
+        if l1 == "BEAR": return "BEAR"
+    return "NONE"
 
 # ==================================================
-# DEBUG CONFIG
+# MASTER INTERFACE (SURGICAL FIX: ADDED df=None)
 # ==================================================
-DEBUG_MODE = False
-
-def calculate_supertrend(df: pd.DataFrame, period=3, multiplier=3) -> pd.DataFrame:
-    """ Continuous SuperTrend (Pine-matching logic) """
-    df = df.copy()
-    df['previous_close'] = df['Close'].shift(1)
-    df['TR'] = df[['High', 'Low', 'Close', 'previous_close']].apply(
-        lambda row: max(row['High'] - row['Low'], 
-                        abs(row['High'] - row['previous_close']), 
-                        abs(row['Low'] - row['previous_close'])), axis=1)
-    
-    df['ATR'] = df['TR'].ewm(alpha=1/period, adjust=False).mean()
-    df['HL2'] = (df['High'] + df['Low']) / 2
-    
-    st = [0.0] * len(df)
-    trend = [""] * len(df)
-    
-    for i in range(len(df)):
-        hl2, atr = df['HL2'].iloc[i], df['ATR'].iloc[i]
-        upper, lower = hl2 + multiplier * atr, hl2 - multiplier * atr
-        if i == 0 or pd.isna(atr):
-            st[i], trend[i] = hl2, "UP"
-            continue
-        
-        prev_st_val = st[i-1]
-        ha_close = (df['Open'].iloc[i] + df['High'].iloc[i] + df['Low'].iloc[i] + df['Close'].iloc[i]) / 4
-        
-        if ha_close > prev_st_val: curr_trend = "UP"
-        elif ha_close < prev_st_val: curr_trend = "DOWN"
-        else: curr_trend = trend[i-1]
+def get_signal(df=None): 
+    """
+    Returns (Entry_Signal, Exit_Signal)
+    Entry: L4 (HA-Lead Cascade)
+    Exit: L2 (OC/2 Flow)
+    """
+    try:
+        # Use passed df or fetch fresh
+        if df is None:
+            df = fetch_yf_data()
             
-        if curr_trend == "UP": st[i] = max(lower, prev_st_val)
-        else: st[i] = min(upper, prev_st_val)
-        trend[i] = curr_trend
-        
-    df['ST'], df['ST_Trend'] = st, trend
-    return df
+        if df is None or df.empty:
+            return "NONE", "NONE"
 
-def get_signal(df=None):
-    if df is None: df = fetch_yf_data()
-    if df is None or df.empty: return "NONE", "NONE"
+        # 1. Generate independent signals
+        l1 = get_l1_close(df)
+        l2 = get_l2_oc2(df)
+        l3 = get_l3_ha(df)
 
-    # Calculate 3:3 Continuous ST
-    df_st = calculate_supertrend(df, period=3, multiplier=3)
+        # 2. Assign Role Logic
+        entry_sig = get_l4_entry(l1, l2, l3)
+        exit_sig = l2 # Exit is strictly based on OC/2 state
 
-    # --- CURRENT CANDLE (C) & PREVIOUS CANDLE (P) ---
-    c_open, c_high, c_low, c_close = df_st['Open'].iloc[-1], df_st['High'].iloc[-1], df_st['Low'].iloc[-1], df_st['Close'].iloc[-1]
-    p_open, p_high, p_low, p_close = df_st['Open'].iloc[-2], df_st['High'].iloc[-2], df_st['Low'].iloc[-2], df_st['Close'].iloc[-2]
-    
-    # HA Close Logic
-    ha_c_curr = (c_open + c_high + c_low + c_close) / 4
-    ha_c_prev = (p_open + p_high + p_low + p_close) / 4
-    
-    # ST Line Values
-    st_curr = df_st['ST'].iloc[-1]
-    st_prev = df_st['ST'].iloc[-2]
-    
-    st_signal = "NONE"
+        return entry_sig, exit_sig
 
-    # --- 1-MINUTE STICKY TRIGGER LOGIC (HA CLOSE BASED) ---
-    # BUY: Cross Above
-    if ha_c_prev <= st_prev and ha_c_curr > st_curr:
-        st_signal = "BUY"
-    
-    # SELL: Cross Below (FIXED: changed prev_st to st_prev)
-    elif ha_c_prev >= st_prev and ha_c_curr < st_curr:
-        st_signal = "SELL"
-        
-    # --- CONTINUOUS FLOW ---
-    elif ha_c_curr > st_curr:
-        st_signal = "UP"
-    elif ha_c_curr < st_curr:
-        st_signal = "DOWN"
-
-    return st_signal, df_st['ST_Trend'].iloc[-1]
+    except Exception as e:
+        print(f"Signal Error: {e}")
+        return "NONE", "NONE"
 
 if __name__ == "__main__":
-    res, major = get_signal()
-    print(f"ST_SIG: {res} | MAJOR: {major}")
+    entry, exit_state = get_signal()
+    print(f"FINAL RESULT -> ENTRY: {entry}, EXIT: {exit_state}")
+
 
 
 
