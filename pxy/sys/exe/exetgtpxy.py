@@ -30,6 +30,7 @@ def target_price(row):
         is_morning = time(9, 15) <= now < time(9, 30)
 
         # 2. 🚨 THE MASTER KILL-SWITCH (POST 9:30 ONLY)
+        # Kill Target immediately if direction clashes with Option Type
         if not is_morning:
             if is_ce and any(x in sig for x in ["STSELL", "DOWN", "SELL", "BEAR"]):
                 print(f"{symbol}|| 🛑 ST_OPPOSITE_EXIT || T:0")
@@ -39,6 +40,7 @@ def target_price(row):
                 return 0
 
         # 3. SIGNAL SOURCE
+        # Use Exit Signal for morning speed, Entry Signal for day stability
         calc_sig = exit_sig if is_morning else sig
 
         # 4. STRICT ALIGNMENT CHECK
@@ -55,7 +57,7 @@ def target_price(row):
         
         target = int(entry * (1 + score / 100))
         
-        # 6. OUTPUT
+        # 6. OUTPUT (CLEAN SYMBOL + DASHBOARD)
         clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
         print(f"{clean_symbol}|| E:{entry:03d}|| S:{score:.1f}%|| {state} || T:{target:03d}")
         
@@ -64,5 +66,6 @@ def target_price(row):
     except Exception as e:
         print(f"ERROR|{str(e)}")
         return 0
+
 
 
