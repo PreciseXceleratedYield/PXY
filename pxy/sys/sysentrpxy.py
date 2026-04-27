@@ -3,7 +3,7 @@
 # ==================================================
 from sysmktpxy import get_signal  # This is the get_signal() we built with L4 Cascade
 from syscnfgpxy import TICKER
-from syssuperpxy import get_signal as get_st_signal # The 1:1 vs 3:3 Priority Logic
+from sysstrndpxy import get_signal as get_st_signal # The 1:1 vs 3:3 Priority Logic
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
