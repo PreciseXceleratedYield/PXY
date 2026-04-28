@@ -41,18 +41,11 @@ html, body {
 
     font-size: 12px;
     font-weight: 900;
-    letter-spacing: 0.5px;
-
     color: #000;
 
     background: linear-gradient(270deg,#ff1744,#00c853,#ff1744);
     background-size: 300% 300%;
     animation: flow 10s ease infinite;
-
-    box-shadow:
-        inset 0 -1px 0 rgba(0,0,0,0.5),
-        inset 0 1px 0 rgba(255,255,255,0.2),
-        0 2px 6px rgba(0,0,0,0.5);
 
     z-index: 1000;
 }
@@ -63,12 +56,23 @@ html, body {
     100% { background-position: 0% }
 }
 
-/* CENTER TEXT */
+/* HEADER TEXT */
 #headerCenter {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    white-space: nowrap;
+    display: flex;
+    gap: 6px;
+}
+
+.brandMain {
+    font-size: 14px;
+    letter-spacing: 1px;
+}
+
+.brandSub {
+    font-size: 10px;
+    opacity: 0.7;
 }
 
 /* RIGHT SIDE */
@@ -76,16 +80,10 @@ html, body {
     position: absolute;
     right: 10px;
     display: flex;
-    align-items: center;
     gap: 12px;
 }
 
-/* LIVE */
-.liveBox {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
+.liveBox { display: flex; gap: 4px; }
 
 #statusDot {
     width: 6px;
@@ -97,16 +95,12 @@ html, body {
 }
 
 @keyframes blink {
-    0%,100% { opacity: 1; }
-    50% { opacity: 0.3; }
+    0%,100% { opacity: 1 }
+    50% { opacity: 0.3 }
 }
 
 /* MENU */
-#menu {
-    position: relative;
-    cursor: pointer;
-    font-size: 14px;
-}
+#menu { position: relative; cursor: pointer; }
 
 #dropdown {
     position: absolute;
@@ -115,22 +109,12 @@ html, body {
     background: #2b2b2b;
     border: 1px solid #444;
     display: none;
-    min-width: 100px;
-    z-index: 2000;
 }
 
-#dropdown div {
-    padding: 6px 10px;
-    cursor: pointer;
-}
+#dropdown div { padding: 6px 10px; cursor: pointer; }
+#dropdown div:hover { background: #3b3b3b; }
 
-#dropdown div:hover {
-    background: #3b3b3b;
-}
-
-#menu.active #dropdown {
-    display: block;
-}
+#menu.active #dropdown { display: block; }
 
 /* LAYOUT */
 #container {
@@ -149,9 +133,7 @@ html, body {
     width: var(--divider-width);
     cursor: col-resize;
     background: #3b3b3b;
-    opacity: 0;
 }
-#divider:hover { opacity: 0.15; }
 
 #right { flex: 1; display: flex; flex-direction: column; }
 #chartWrap { flex: 1; }
@@ -179,7 +161,8 @@ canvas {
 <div id="topHeader">
 
     <div id="headerCenter">
-        🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
+        <span class="brandMain">PXY®</span>
+        <span class="brandSub">PreciseXceleratedYield Pvt Ltd</span>
     </div>
 
     <div id="headerRight">
@@ -229,8 +212,7 @@ const term = new Terminal({
     theme: {
         background: "#3b3b3b",
         foreground: "#eaeaea",
-        cursor: "#eaeaea",
-        selection: "rgba(255,255,255,0.1)"
+        cursor: "#eaeaea"
     }
 });
 
@@ -245,11 +227,31 @@ ws.onmessage = e => term.write(e.data);
 
 /* MENU */
 const menu = document.getElementById("menu");
-menu.onclick = (e) => {
+menu.onclick = e => {
     e.stopPropagation();
     menu.classList.toggle("active");
 };
 window.onclick = () => menu.classList.remove("active");
+
+/* DIVIDER DRAG */
+const divider = document.getElementById("divider");
+const terminal = document.getElementById("terminal");
+const right = document.getElementById("right");
+
+let isDragging = false;
+
+divider.addEventListener("mousedown", () => isDragging = true);
+window.addEventListener("mouseup", () => isDragging = false);
+
+window.addEventListener("mousemove", e => {
+    if (!isDragging) return;
+
+    const percent = (e.clientX / window.innerWidth) * 100;
+    if (percent < 10 || percent > 80) return;
+
+    terminal.style.width = percent + "%";
+    right.style.width = (100 - percent) + "%";
+});
 
 /* CHART */
 let chart;
@@ -263,6 +265,7 @@ async function load(){
     const trend=data.map(d=>d.st_trend);
 
     draw(closes,st,trend);
+    drawTopCandle(st,closes);
 }
 
 function draw(closes,st,trend){
@@ -273,10 +276,16 @@ function draw(closes,st,trend){
     const s=st.slice(-MAX);
     const t=trend.slice(-MAX);
 
+    const pad=5;
+
+    const labels=[...c.map((_,i)=>i),...Array(pad).fill("")];
+    const closePad=[...c,...Array(pad).fill(null)];
+    const stPad=[...s,...Array(pad).fill(null)];
+
     const dir=t.at(-1)==="UP"?1:-1;
 
-    const header=document.getElementById("topHeader");
-    header.style.background = dir===1
+    document.getElementById("topHeader").style.background =
+        dir===1
         ? "linear-gradient(270deg,#00c853,#00e676,#00c853)"
         : "linear-gradient(270deg,#ff1744,#ff5252,#ff1744)";
 
@@ -284,16 +293,16 @@ function draw(closes,st,trend){
         chart=new Chart(document.getElementById("priceChart"),{
             type:"line",
             data:{
-                labels:c.map((_,i)=>i),
+                labels,
                 datasets:[
                     {
-                        data:c,
+                        data:closePad,
                         borderColor:"rgba(255,255,255,0.25)",
                         borderWidth:2,
                         pointRadius:0
                     },
                     {
-                        data:s,
+                        data:stPad,
                         borderWidth:3,
                         pointRadius:0,
                         segment:{
@@ -313,11 +322,53 @@ function draw(closes,st,trend){
             }
         });
     } else {
-        chart.data.labels=c.map((_,i)=>i);
-        chart.data.datasets[0].data=c;
-        chart.data.datasets[1].data=s;
+        chart.data.labels=labels;
+        chart.data.datasets[0].data=closePad;
+        chart.data.datasets[1].data=stPad;
         chart.update("none");
     }
+}
+
+/* BOTTOM STRIP */
+function drawTopCandle(stVals, closes){
+
+    const canvas=document.getElementById("topCandle");
+    const ctx=canvas.getContext("2d");
+
+    canvas.width=canvas.clientWidth;
+    canvas.height=canvas.clientHeight;
+
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    const open=stVals.at(-1);
+    const close=closes.at(-1);
+
+    const high=Math.max(...stVals,...closes);
+    const low=Math.min(...stVals,...closes);
+
+    const scale=v=>((v-low)/(high-low||1))*canvas.width;
+
+    const xLow=scale(low);
+    const xHigh=scale(high);
+    const xOpen=scale(open);
+    const xClose=scale(close);
+
+    const midY=canvas.height/2;
+
+    ctx.strokeStyle="#fff";
+    ctx.beginPath();
+    ctx.moveTo(xLow,midY);
+    ctx.lineTo(xHigh,midY);
+    ctx.stroke();
+
+    ctx.fillStyle=close>=open?"#00c853":"#ff1744";
+
+    ctx.fillRect(
+        Math.min(xOpen,xClose),
+        midY-6,
+        Math.max(Math.abs(xClose-xOpen),2),
+        12
+    );
 }
 
 load();
