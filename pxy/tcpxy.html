@@ -19,47 +19,22 @@ html, body {
     color: #eaeaea;
 }
 
-/* 🔥 SCROLLBAR FIX */
+/* SCROLLBAR */
 * {
     scrollbar-width: thin;
     scrollbar-color: #3b3b3b #3b3b3b;
 }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: #3b3b3b; }
+::-webkit-scrollbar-thumb { background: #3b3b3b; }
 
-::-webkit-scrollbar {
-    width: 4px;
-    height: 4px;
-}
-
-::-webkit-scrollbar-track {
-    background: #3b3b3b;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #3b3b3b;
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: #4a4a4a;
-}
-
-/* XTERM SCROLLBAR */
+/* XTERM SCROLL */
 .xterm .xterm-viewport {
     scrollbar-width: thin;
     scrollbar-color: #3b3b3b #3b3b3b;
 }
-
-.xterm .xterm-viewport::-webkit-scrollbar {
-    width: 4px;
-}
-
-.xterm .xterm-viewport::-webkit-scrollbar-thumb {
-    background: #3b3b3b;
-}
-
-.xterm .xterm-viewport::-webkit-scrollbar-track {
-    background: #3b3b3b;
-}
+.xterm .xterm-viewport::-webkit-scrollbar { width: 4px; }
+.xterm .xterm-viewport::-webkit-scrollbar-thumb { background: #3b3b3b; }
 
 /* HEADER */
 #topHeader {
@@ -84,11 +59,7 @@ html, body {
     height: 20px;
     z-index: 2000;
     cursor: pointer;
-    opacity: 0.95;
-    filter: drop-shadow(0 0 4px rgba(0,0,0,0.6));
-    transition: all 0.2s ease;
 }
-#logo:hover { transform: scale(1.08); }
 
 /* LAYOUT */
 #container {
@@ -103,22 +74,15 @@ html, body {
     border-right: 1px solid #4a4a4a;
 }
 
-/* INVISIBLE DIVIDER */
 #divider {
     width: var(--divider-width);
-    min-width: 10px;
     cursor: col-resize;
     background: #3b3b3b;
     opacity: 0;
 }
 #divider:hover { opacity: 0.15; }
 
-#right {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-}
-
+#right { flex: 1; display: flex; flex-direction: column; }
 #chartWrap { flex: 1; }
 
 canvas {
@@ -141,7 +105,7 @@ canvas {
 <body>
 
 <div id="topHeader">
-    🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
+🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
 </div>
 
 <img id="logo" src="./logo.png">
@@ -165,225 +129,194 @@ canvas {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-/* TERMINAL */
-const term = new Terminal({
-    convertEol: true,
-    scrollback: 1000,
-    fontFamily: "monospace",
-    fontSize: 14,
-    cursorBlink: false,
-    theme: {
-        background: "#3b3b3b",
-        foreground: "#eaeaea",
-        cursor: "#eaeaea"
-    }
-});
-
+const term = new Terminal();
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
-setTimeout(() => fitAddon.fit(), 50);
-window.addEventListener("resize", () => fitAddon.fit());
+setTimeout(()=>fitAddon.fit(),50);
 
 const ws = new WebSocket(`ws://${location.host}`);
-ws.onmessage = (e) => term.write(e.data);
+ws.onmessage = e => term.write(e.data);
 
-/* DIVIDER DRAG */
+/* DIVIDER */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
 const right = document.getElementById("right");
 
-let isDragging = false;
+let drag=false;
+divider.onmousedown=()=>drag=true;
+window.onmouseup=()=>drag=false;
+window.onmousemove=e=>{
+    if(!drag) return;
+    let p=(e.clientX/window.innerWidth)*100;
+    if(p<10||p>80)return;
+    terminal.style.width=p+"%";
+    right.style.width=(100-p)+"%";
+};
 
-divider.addEventListener("mousedown", e => {
-    isDragging = true;
-    e.preventDefault();
-});
-
-window.addEventListener("mouseup", () => isDragging = false);
-
-window.addEventListener("mousemove", e => {
-    if (!isDragging) return;
-    const percent = (e.clientX / window.innerWidth) * 100;
-    if (percent < 10 || percent > 80) return;
-
-    terminal.style.width = percent + "%";
-    right.style.width = (100 - percent) + "%";
-});
-
-/* LOGO CLICK */
-document.getElementById("logo").onclick = () => location.reload();
+/* LOGO */
+document.getElementById("logo").onclick=()=>location.reload();
 
 /* CORE */
-let chart, pulse = 0;
-let trades = [];
-let currentTrade = null;
+let chart,pulse=0,trades=[],currentTrade=null;
 
-/* LOAD */
-async function load() {
-    const res = await fetch("./syschrtpxy.json");
-    const data = await res.json();
+async function load(){
+    const res=await fetch("./syschrtpxy.json");
+    const data=await res.json();
 
-    const closes = data.map(d => d.close);
-    const st = data.map(d => d.st);
-    const trend = data.map(d => d.st_trend);
+    const closes=data.map(d=>d.close);
+    const st=data.map(d=>d.st);
+    const trend=data.map(d=>d.st_trend);
 
-    draw(closes, st, trend);
-    drawTopCandle(st, closes);
+    draw(closes,st,trend);
+    drawTopCandle(st,closes);
 }
 
-/* DRAW */
-function draw(closes, st, trend) {
+function draw(closes,st,trend){
 
-    const MAX_POINTS = 40;
+    const MAX=40;
 
-    const c = closes.slice(-MAX_POINTS);
-    const s = st.slice(-MAX_POINTS);
-    const t = trend.slice(-MAX_POINTS);
+    const c=closes.slice(-MAX);
+    const s=st.slice(-MAX);
+    const t=trend.slice(-MAX);
 
-    const closePad = [...c, null, null, null];
-    const stPad = [...s, null, null, null];
-    const trendPad = [...t, "UP","UP","UP"];
+    const closePad=[...c,null,null,null];
+    const stPad=[...s,null,null,null];
+    const trendPad=[...t,"UP","UP","UP"];
 
-    const last = closePad.at(-4);
-    const dir = trendPad.at(-4) === "UP" ? 1 : -1;
+    const last=closePad.at(-4);
+    const dir=trendPad.at(-4)==="UP"?1:-1;
 
-    let signal = false;
-    if (closePad.at(-5)) {
-        const p = closePad.at(-5) - stPad.at(-5);
-        const c2 = closePad.at(-4) - stPad.at(-4);
-        signal = p*c2 < 0;
+    let signal=false;
+    if(closePad.at(-5)){
+        const p=closePad.at(-5)-stPad.at(-5);
+        const c2=closePad.at(-4)-stPad.at(-4);
+        signal=p*c2<0;
     }
 
-    if (signal) {
-        if (!currentTrade) currentTrade = { entry:last, dir };
-        else {
-            const pnl = dir===1 ? last-currentTrade.entry : currentTrade.entry-last;
+    if(signal){
+        if(!currentTrade) currentTrade={entry:last,dir};
+        else{
+            const pnl=dir===1?last-currentTrade.entry:currentTrade.entry-last;
             trades.push(pnl);
-            currentTrade = null;
+            currentTrade=null;
         }
     }
 
-    const winRate = trades.length
-        ? trades.filter(t=>t>0).length / trades.length * 100
-        : 0;
+    const logo=document.getElementById("logo");
+    logo.style.filter=dir===1
+        ?"drop-shadow(0 0 6px #00c853)"
+        :"drop-shadow(0 0 6px #ff1744)";
 
-    const logo = document.getElementById("logo");
-    logo.style.filter = dir===1
-        ? "drop-shadow(0 0 6px #00c853)"
-        : "drop-shadow(0 0 6px #ff1744)";
-
-    if (signal) {
+    if(signal){
         logo.style.transform="scale(1.2)";
         setTimeout(()=>logo.style.transform="scale(1)",150);
     }
 
-    if (chart) {
-        chart.data.labels = closePad.map((_,i)=>i);
-        chart.data.datasets[0].data = closePad;
-        chart.data.datasets[1].data = stPad;
+    if(chart){
+        chart.data.labels=closePad.map((_,i)=>i);
+        chart.data.datasets[0].data=closePad;
+        chart.data.datasets[1].data=stPad;
         chart.update("none");
         return;
     }
 
-    chart = new Chart(document.getElementById("priceChart"), {
-        type: "line",
-        data: {
-            labels: closePad.map((_,i)=>i),
-            datasets: [
+    chart=new Chart(document.getElementById("priceChart"),{
+        type:"line",
+        data:{
+            labels:closePad.map((_,i)=>i),
+            datasets:[
                 {
-                    data: closePad,
-                    borderColor: "rgba(255,255,255,0.25)",
-                    borderWidth: 2,
-                    pointRadius: 0
+                    data:closePad,
+                    borderColor:"rgba(255,255,255,0.25)",
+                    borderWidth:2,
+                    pointRadius:0
                 },
                 {
-                    data: stPad,
-                    borderWidth: 3,
-                    pointRadius: 0,
+                    data:stPad,
+                    borderWidth:3,
+                    pointRadius:0,
                     segment:{
-                        borderColor: c =>
-                            trendPad[c.p0DataIndex]==="UP"
-                                ? "#00c853" : "#ff1744"
+                        borderColor:c=>trendPad[c.p0DataIndex]==="UP"
+                            ?"#00c853":"#ff1744"
                     }
                 },
                 {
-                    data: closePad.map((v,i)=>{
-                        if(i<1) return null;
-                        const p = closePad[i-1]-stPad[i-1];
-                        const c2 = v-stPad[i];
-                        return (p*c2<0)?v:null;
+                    data:closePad.map((v,i)=>{
+                        if(i<1)return null;
+                        const p=closePad[i-1]-stPad[i-1];
+                        const c2=v-stPad[i];
+                        return(p*c2<0)?v:null;
                     }),
                     showLine:false,
-                    pointRadius: ctx =>
-                        ctx.raw ? 3.5 + Math.sin(pulse)*1.2 : 0,
-                    pointBackgroundColor:"#fff",
-                    pointBorderWidth:1
+                    pointRadius:ctx=>ctx.raw?3.5+Math.sin(pulse)*1.2:0,
+                    pointBackgroundColor:"#fff"
                 }
             ]
         },
         options:{
             animation:false,
-            plugins:{legend:{display:false}}
+            plugins:{legend:{display:false}},
+            scales:{
+                x:{grid:{display:false},ticks:{display:false}},
+                y:{grid:{display:false},ticks:{display:false},position:"right"}
+            }
         }
     });
 }
 
 /* BOTTOM STRIP */
-function drawTopCandle(stVals, closes) {
+function drawTopCandle(stVals,closes){
 
-    const canvas = document.getElementById("topCandle");
-    const ctx = canvas.getContext("2d");
+    const canvas=document.getElementById("topCandle");
+    const ctx=canvas.getContext("2d");
 
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
+    canvas.width=canvas.clientWidth;
+    canvas.height=canvas.clientHeight;
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    const open = stVals.at(-1);
-    const close = closes.at(-1);
+    const open=stVals.at(-1);
+    const close=closes.at(-1);
 
-    const high = Math.max(...stVals, ...closes);
-    const low = Math.min(...stVals, ...closes);
+    const high=Math.max(...stVals,...closes);
+    const low=Math.min(...stVals,...closes);
 
-    const range = high - low || 1;
-    const scale = v => ((v - low) / range) * canvas.width;
+    const scale=v=>((v-low)/(high-low||1))*canvas.width;
 
-    const xLow = scale(low);
-    const xHigh = scale(high);
-    const xOpen = scale(open);
-    const xClose = scale(close);
+    const xLow=scale(low);
+    const xHigh=scale(high);
+    const xOpen=scale(open);
+    const xClose=scale(close);
 
-    const midY = canvas.height / 2;
+    const midY=canvas.height/2;
 
-    ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle="#fff";
     ctx.beginPath();
-    ctx.moveTo(xLow, midY);
-    ctx.lineTo(xHigh, midY);
+    ctx.moveTo(xLow,midY);
+    ctx.lineTo(xHigh,midY);
     ctx.stroke();
 
-    ctx.fillStyle = close >= open ? "#00c853" : "#ff1744";
+    ctx.fillStyle=close>=open?"#00c853":"#ff1744";
 
     ctx.fillRect(
-        Math.min(xOpen, xClose),
-        midY - 6,
-        Math.max(Math.abs(xClose - xOpen), 2),
+        Math.min(xOpen,xClose),
+        midY-6,
+        Math.max(Math.abs(xClose-xOpen),2),
         12
     );
 }
 
 /* PULSE */
 function animate(){
-    pulse += 0.1;
+    pulse+=0.1;
     if(chart) chart.update('none');
     requestAnimationFrame(animate);
 }
 animate();
 
-/* INIT */
 load();
-setInterval(load, 3000);
+setInterval(load,3000);
 </script>
 
 </body>
