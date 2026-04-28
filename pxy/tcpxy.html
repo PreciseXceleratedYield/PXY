@@ -7,14 +7,8 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
 <style>
+:root { --divider-width: 6px; }
 
-:root {
-    --divider-width: 6px;
-}
-
-/* =========================
-   GLOBAL
-========================= */
 html, body {
     margin: 0;
     height: 100%;
@@ -22,300 +16,190 @@ html, body {
     font-family: monospace;
     background: #3b3b3b;
     color: #eaeaea;
-
-    scrollbar-width: none;
-    -ms-overflow-style: none;
 }
 
-html::-webkit-scrollbar,
-body::-webkit-scrollbar {
-    display: none;
-}
-
-/* =========================
-   TOP HEADER (NEW)
-========================= */
+/* HEADER */
 #topHeader {
     position: fixed;
     top: 0;
-    left: 0;
     width: 100%;
     height: 26px;
-
-    /* red → green */
     background: linear-gradient(90deg, #ff1744, #00c853);
-
-    color: #000000;
+    color: #000;
     font-weight: 900;
-
     display: flex;
     align-items: center;
     justify-content: center;
-
-    font-size: 13px;
-    letter-spacing: 0.5px;
-
-    border-bottom: 1px solid #4a4a4a;
     z-index: 1000;
 }
 
-/* =========================
-   MAIN LAYOUT
-========================= */
-#container {
-    display: flex;
-    width: 100%;
-    height: calc(100vh - 18px);
-    padding-top: 26px; /* space for header */
+/* LOGO */
+#logo {
+    position: fixed;
+    top: 2px;
+    right: 8px;
+    height: 22px;
+    cursor: pointer;
+    z-index: 2000;
+    transition: 0.2s;
 }
 
-/* =========================
-   TERMINAL
-========================= */
+/* LAYOUT */
+#container {
+    display: flex;
+    height: calc(100vh - 18px);
+    padding-top: 26px;
+}
+
 #terminal {
     width: 35%;
-    min-width: 200px;
-    height: 100%;
     background: #3b3b3b;
     border-right: 1px solid #4a4a4a;
 }
 
-.xterm .xterm-viewport {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-
-.xterm .xterm-viewport::-webkit-scrollbar {
-    width: 0px !important;
-    height: 0px !important;
-}
-
-/* =========================
-   DIVIDER
-========================= */
 #divider {
     width: var(--divider-width);
-    min-width: 10px;
     cursor: col-resize;
-    background: #3b3b3b;
-    z-index: 10;
 }
 
-/* =========================
-   RIGHT PANEL
-========================= */
 #right {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: #3b3b3b;
 }
 
 #chartWrap {
     flex: 1;
-    position: relative;
-    height: 100%;
-    overflow: hidden;
 }
 
 canvas {
-    display: block;
     width: 100% !important;
     height: 100% !important;
-    background: #3b3b3b;
 }
-
-/* =========================
-   BOTTOM CANDLE STRIP
-========================= */
-#topCandleWrap {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    height: 18px;
-    background: #3b3b3b;
-    border-top: 1px solid #4a4a4a;
-    z-index: 999;
-}
-
-#topCandle {
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-/* =========================
-   MOBILE
-========================= */
-@media (max-width: 768px) {
-
-    #right {
-        display: none !important;
-    }
-
-    #divider {
-        display: none !important;
-    }
-
-    #terminal {
-        width: 100% !important;
-        height: 100vh !important;
-        border-right: none;
-    }
-
-    #container {
-        flex-direction: column;
-        height: 100vh;
-    }
-
-    #topCandleWrap {
-        display: none;
-    }
-}
-
 </style>
 </head>
 
 <body>
 
-<!-- 🔥 TOP HEADER -->
 <div id="topHeader">
     🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
 </div>
 
-<div id="container">
+<img id="logo" src="logo.png">
 
+<div id="container">
     <div id="terminal"></div>
     <div id="divider"></div>
-
     <div id="right">
         <div id="chartWrap">
             <canvas id="priceChart"></canvas>
         </div>
     </div>
-
-</div>
-
-<!-- 🔥 BOTTOM CANDLE -->
-<div id="topCandleWrap">
-    <canvas id="topCandle"></canvas>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
+/* =========================
+   CORE CONFIG
+========================= */
+const COLORS = {
+    bull: "#00c853",
+    bear: "#ff1744",
+    dim: "rgba(255,255,255,0.25)"
+};
+
+let chart, pulse = 0;
+let trades = [];
+let currentTrade = null;
+let WEIGHTS = { trend:0.4, volatility:0.3, slope:0.3 };
 
 /* =========================
    TERMINAL
 ========================= */
-const term = new Terminal({
-    convertEol: true,
-    scrollback: 1000,
-    fontFamily: "monospace",
-    fontSize: 14,
-    cursorBlink: false,
-    theme: {
-        background: "#3b3b3b",
-        foreground: "#eaeaea",
-        cursor: "#eaeaea",
-        selection: "rgba(255,255,255,0.1)"
-    }
-});
-
-const fitAddon = new FitAddon.FitAddon();
-term.loadAddon(fitAddon);
+const term = new Terminal();
 term.open(document.getElementById('terminal'));
 
-setTimeout(() => fitAddon.fit(), 50);
-window.addEventListener("resize", () => fitAddon.fit());
-
-term.writeln("TERMINAL OK");
+/* =========================
+   LOGO CLICK
+========================= */
+document.getElementById("logo").onclick = () => location.reload();
 
 /* =========================
-   WEBSOCKET
+   DATA LOAD
 ========================= */
-const ws = new WebSocket(`ws://${location.host}`);
-ws.onmessage = (e) => term.write(e.data);
-
-/* =========================
-   DRAG DIVIDER
-========================= */
-const divider = document.getElementById("divider");
-const terminal = document.getElementById("terminal");
-const right = document.getElementById("right");
-
-let isDragging = false;
-
-divider.addEventListener("mousedown", (e) => {
-    isDragging = true;
-    e.preventDefault();
-});
-
-window.addEventListener("mouseup", () => {
-    isDragging = false;
-    saveLayout();
-});
-
-window.addEventListener("mousemove", (e) => {
-    if (!isDragging) return;
-    if (window.innerWidth <= 768) return;
-
-    const percent = (e.clientX / window.innerWidth) * 100;
-
-    if (percent < 10 || percent > 80) return;
-
-    terminal.style.width = percent + "%";
-    right.style.width = (100 - percent) + "%";
-});
-
-/* =========================
-   LAYOUT
-========================= */
-function saveLayout() {
-    localStorage.setItem("split", terminal.style.width);
-}
-
-function loadLayout() {
-    const saved = localStorage.getItem("split");
-    if (saved && window.innerWidth > 768) {
-        terminal.style.width = saved;
-        right.style.width = (100 - parseFloat(saved)) + "%";
-    }
-}
-
-/* =========================
-   CHART (UNCHANGED)
-========================= */
-let chart;
-
 async function load() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
 
     const closes = data.map(d => d.close);
-    const stVals = data.map(d => d.st);
-    const stTrend = data.map(d => d.st_trend);
+    const st = data.map(d => d.st);
+    const trend = data.map(d => d.st_trend);
 
-    draw(closes, stVals, stTrend);
-    drawTopCandle(stVals, closes);
+    draw(closes, st, trend);
 }
 
-function draw(closes, stVals, stTrend) {
+/* =========================
+   DRAW
+========================= */
+function draw(closes, st, trend) {
 
     const ctx = document.getElementById("priceChart");
 
     const pad = 3;
-
-    const labels = [...closes.map((_, i) => i), ...Array(pad).fill("")];
     const closePad = [...closes, ...Array(pad).fill(null)];
-    const stPad = [...stVals, ...Array(pad).fill(null)];
-    const trendPad = [...stTrend, ...Array(pad).fill("UP")];
+    const stPad = [...st, ...Array(pad).fill(null)];
+    const trendPad = [...trend, ...Array(pad).fill("UP")];
 
+    /* ===== FEATURES ===== */
+    const last = closePad.at(-4);
+    const prev = closePad.at(-8) || last;
+
+    const volatility = Math.abs(last - prev);
+    const slope = last - prev;
+    const dir = trendPad.at(-4) === "UP" ? 1 : -1;
+
+    const score = Math.round(
+        (dir*WEIGHTS.trend + volatility*WEIGHTS.volatility + slope*WEIGHTS.slope)*50 + 50
+    );
+
+    /* ===== SIGNAL ===== */
+    let signal = false;
+    if (closePad.at(-5) && stPad.at(-5)) {
+        const prevDiff = closePad.at(-5) - stPad.at(-5);
+        const currDiff = closePad.at(-4) - stPad.at(-4);
+        signal = prevDiff * currDiff < 0;
+    }
+
+    /* ===== TRADE ENGINE ===== */
+    if (signal) {
+        if (!currentTrade) {
+            currentTrade = { entry:last, dir };
+        } else {
+            const pnl = dir === 1 ? last-currentTrade.entry : currentTrade.entry-last;
+            trades.push(pnl);
+            currentTrade = null;
+        }
+    }
+
+    const winRate = trades.length
+        ? trades.filter(t=>t>0).length / trades.length * 100
+        : 0;
+
+    /* ===== LOGO ===== */
+    const logo = document.getElementById("logo");
+    logo.style.filter = dir === 1
+        ? "drop-shadow(0 0 6px #00c853)"
+        : "drop-shadow(0 0 6px #ff1744)";
+
+    if (signal) {
+        logo.style.transform = "scale(1.2)";
+        setTimeout(()=>logo.style.transform="scale(1)",150);
+    }
+
+    /* ===== CHART ===== */
     if (chart) {
-        chart.data.labels = labels;
         chart.data.datasets[0].data = closePad;
         chart.data.datasets[1].data = stPad;
         chart.update("none");
@@ -325,106 +209,81 @@ function draw(closes, stVals, stTrend) {
     chart = new Chart(ctx, {
         type: "line",
         data: {
-            labels,
+            labels: closePad.map((_,i)=>i),
             datasets: [
+
+                // PRICE (DIM)
                 {
-                    label: "Close",
                     data: closePad,
-                    borderColor: "rgba(0, 0, 0, 0.25)", // 👈 dim line
+                    borderColor: COLORS.dim,
                     borderWidth: 2,
-                    pointRadius: 0,
-                    tension: 0.25
+                    pointRadius: 0
                 },
+
+                // ST (MAIN)
                 {
-                    label: "ST",
                     data: stPad,
-                    showLine: false,
-                    pointRadius: 2,
-                    pointBorderWidth: 2,
-                    pointBackgroundColor: trendPad.map(t =>
-                        t === "UP" ? "#00c853" : "#ff1744"
-                    ),
-                    pointBorderColor: trendPad.map(t =>
-                        t === "UP" ? "#00c853" : "#ff1744"
-                    )
+                    borderWidth: 3,
+                    pointRadius: 0,
+                    segment: {
+                        borderColor: c =>
+                            trendPad[c.p0DataIndex]==="UP"
+                                ? COLORS.bull : COLORS.bear
+                    }
+                },
+
+                // CROSS PULSE
+                {
+                    data: closePad.map((v,i)=>{
+                        if(i<1) return null;
+                        const p = closePad[i-1]-stPad[i-1];
+                        const c = v-stPad[i];
+                        return (p*c<0)?v:null;
+                    }),
+                    showLine:false,
+                    pointRadius: ctx =>
+                        ctx.raw ? 5 + Math.sin(pulse)*2 : 0,
+                    pointBackgroundColor:"#fff"
                 }
             ]
         },
         options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: {
-                x: { grid: { display: false }, ticks: { color: "#eaeaea" } },
-                y: { grid: { display: false }, ticks: { color: "#eaeaea" }, position: "right" }
+            animation:false,
+            plugins:{
+                legend:{display:false}
             }
-        }
+        },
+        plugins:[{
+            id:"overlay",
+            afterDraw(chart){
+                const {ctx, chartArea:{left,top}} = chart;
+
+                ctx.fillStyle="#fff";
+                ctx.font="12px monospace";
+
+                ctx.fillText(`SCORE: ${score}`, left+10, top+20);
+                ctx.fillText(`WR: ${winRate.toFixed(1)}%`, left+10, top+40);
+            }
+        }]
     });
 }
 
 /* =========================
-   BOTTOM CANDLE (UNCHANGED)
+   PULSE LOOP
 ========================= */
-function drawTopCandle(stVals, closes) {
-
-    const canvas = document.getElementById("topCandle");
-    const ctx = canvas.getContext("2d");
-
-    canvas.width = canvas.clientWidth;
-    canvas.height = canvas.clientHeight;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (!stVals.length || !closes.length) return;
-
-    const open = stVals[stVals.length - 1]; 
-    const close = closes[closes.length - 1];
-
-    const high = Math.max(...stVals, ...closes);
-    const low = Math.min(...stVals, ...closes);
-
-    const range = high - low || 1;
-    const midY = canvas.height / 2;
-
-    const scale = v =>
-        ((v - low) / range) * canvas.width;
-
-    const xLow = scale(low);
-    const xHigh = scale(high);
-    const xOpen = scale(open);
-    const xClose = scale(close);
-
-    const bodyColor = close >= open ? "#00c853" : "#ff1744";
-    const wickColor = "#ffffff";
-
-    ctx.strokeStyle = wickColor;
-    ctx.lineWidth = 3;
-
-    ctx.beginPath();
-    ctx.moveTo(xLow, midY);
-    ctx.lineTo(xHigh, midY);
-    ctx.stroke();
-
-    const thickness = 12;
-
-    ctx.fillStyle = bodyColor;
-
-    ctx.fillRect(
-        Math.min(xOpen, xClose),
-        midY - thickness / 2,
-        Math.max(Math.abs(xClose - xOpen), 2),
-        thickness
-    );
+function animate(){
+    pulse += 0.1;
+    if(chart) chart.update('none');
+    requestAnimationFrame(animate);
 }
+animate();
 
 /* =========================
    INIT
 ========================= */
-loadLayout();
 load();
 setInterval(load, 3000);
 
 </script>
-
 </body>
 </html>
