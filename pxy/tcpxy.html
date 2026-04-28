@@ -32,7 +32,7 @@ html, body {
 .xterm .xterm-viewport::-webkit-scrollbar { width: 4px; }
 .xterm .xterm-viewport::-webkit-scrollbar-thumb { background: #3b3b3b; }
 
-/* ================= HEADER PRO ================= */
+/* HEADER */
 #topHeader {
     position: fixed;
     top: 0;
@@ -41,9 +41,8 @@ html, body {
 
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: center;
 
-    padding: 0 12px;
     font-size: 12px;
     font-weight: 900;
 
@@ -61,19 +60,34 @@ html, body {
     z-index: 1000;
 }
 
-#headerLeft, #headerRight {
+@keyframes flow {
+    0% { background-position: 0% }
+    50% { background-position: 100% }
+    100% { background-position: 0% }
+}
+
+/* HEADER POSITIONS */
+#headerCenter {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+#headerRight {
+    position: absolute;
+    right: 10px;
     display: flex;
     align-items: center;
-    gap: 6px;
-    min-width: 120px;
+    gap: 12px;
 }
 
-#headerCenter {
-    flex: 1;
-    text-align: center;
+/* LIVE */
+.liveBox {
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
-/* STATUS DOT */
 #statusDot {
     width: 6px;
     height: 6px;
@@ -88,10 +102,34 @@ html, body {
     50% { opacity: 0.3; }
 }
 
-@keyframes flow {
-    0% { background-position: 0% }
-    50% { background-position: 100% }
-    100% { background-position: 0% }
+/* MENU */
+#menu {
+    position: relative;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+#dropdown {
+    position: absolute;
+    top: 22px;
+    right: 0;
+    background: #2b2b2b;
+    border: 1px solid #444;
+    display: none;
+    min-width: 100px;
+}
+
+#dropdown div {
+    padding: 6px 10px;
+    cursor: pointer;
+}
+
+#dropdown div:hover {
+    background: #3b3b3b;
+}
+
+#menu.active #dropdown {
+    display: block;
 }
 
 /* LOGO */
@@ -147,19 +185,26 @@ canvas {
 
 <body>
 
-<!-- 🔥 HEADER -->
+<!-- HEADER -->
 <div id="topHeader">
-    <div id="headerLeft">
-        <span id="statusDot"></span>
-        <span>LIVE</span>
-    </div>
-
     <div id="headerCenter">
         🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
     </div>
 
     <div id="headerRight">
-        <span id="metric">WR: --%</span>
+        <span class="liveBox">
+            <span id="statusDot"></span>
+            <span>LIVE</span>
+        </span>
+
+        <div id="menu">
+            ☰
+            <div id="dropdown">
+                <div>CSV 1</div>
+                <div>CSV 2</div>
+                <div>CSV 3</div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -208,11 +253,19 @@ window.addEventListener("resize",()=>fitAddon.fit());
 const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = e => term.write(e.data);
 
+/* MENU */
+const menu = document.getElementById("menu");
+menu.onclick = (e) => {
+    e.stopPropagation();
+    menu.classList.toggle("active");
+};
+window.onclick = () => menu.classList.remove("active");
+
 /* LOGO */
 document.getElementById("logo").onclick=()=>location.reload();
 
-/* CORE */
-let chart,pulse=0,trades=[],currentTrade=null;
+/* CHART + DATA */
+let chart,pulse=0;
 
 async function load(){
     const res=await fetch("./syschrtpxy.json");
@@ -229,6 +282,7 @@ async function load(){
 function draw(closes,st,trend){
 
     const MAX=40;
+
     const c=closes.slice(-MAX);
     const s=st.slice(-MAX);
     const t=trend.slice(-MAX);
@@ -237,37 +291,13 @@ function draw(closes,st,trend){
     const stPad=[...s,null,null,null];
     const trendPad=[...t,"UP","UP","UP"];
 
-    const last=closePad.at(-4);
     const dir=trendPad.at(-4)==="UP"?1:-1;
 
-    /* HEADER METRIC */
-    const metric=document.getElementById("metric");
-
-    if(trades.length){
-        const wr = trades.filter(t=>t>0).length / trades.length * 100;
-        metric.textContent = `WR: ${wr.toFixed(1)}%`;
-    }
-
-    /* HEADER COLOR */
     const header=document.getElementById("topHeader");
     header.style.background = dir===1
         ? "linear-gradient(270deg,#00c853,#00e676,#00c853)"
         : "linear-gradient(270deg,#ff1744,#ff5252,#ff1744)";
 
-    /* SIGNAL DETECT */
-    let signal=false;
-    if(closePad.at(-5)){
-        const p=closePad.at(-5)-stPad.at(-5);
-        const c2=closePad.at(-4)-stPad.at(-4);
-        signal=p*c2<0;
-    }
-
-    if(signal){
-        header.style.transform="scale(1.01)";
-        setTimeout(()=>header.style.transform="scale(1)",120);
-    }
-
-    /* LOGO COLOR */
     const logo=document.getElementById("logo");
     logo.style.filter=dir===1
         ?"drop-shadow(0 0 6px #00c853)"
@@ -300,17 +330,6 @@ function draw(closes,st,trend){
                         borderColor:c=>trendPad[c.p0DataIndex]==="UP"
                             ?"#00c853":"#ff1744"
                     }
-                },
-                {
-                    data:closePad.map((v,i)=>{
-                        if(i<1)return null;
-                        const p=closePad[i-1]-stPad[i-1];
-                        const c2=v-stPad[i];
-                        return(p*c2<0)?v:null;
-                    }),
-                    showLine:false,
-                    pointRadius:ctx=>ctx.raw?3.5+Math.sin(pulse)*1.2:0,
-                    pointBackgroundColor:"#fff"
                 }
             ]
         },
@@ -319,7 +338,7 @@ function draw(closes,st,trend){
             plugins:{legend:{display:false}},
             scales:{
                 x:{grid:{display:false},ticks:{display:false}},
-                y:{grid:{display:false},ticks:{display:false},position:"right"}
+                y:{grid:{display:false},ticks:{display:false}}
             }
         }
     });
@@ -365,14 +384,6 @@ function drawTopCandle(stVals,closes){
         12
     );
 }
-
-/* PULSE */
-function animate(){
-    pulse+=0.1;
-    if(chart) chart.update('none');
-    requestAnimationFrame(animate);
-}
-animate();
 
 load();
 setInterval(load,3000);
