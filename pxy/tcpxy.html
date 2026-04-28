@@ -19,6 +19,34 @@ html, body {
     color: #eaeaea;
 }
 
+/* ===== ULTRA THIN INVISIBLE SCROLLBAR ===== */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #3b3b3b #3b3b3b;
+}
+
+::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+}
+
+::-webkit-scrollbar-track {
+    background: #3b3b3b;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #3b3b3b;
+    border-radius: 2px;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar {
+    width: 2px;
+}
+
+.xterm .xterm-viewport::-webkit-scrollbar-thumb {
+    background: #3b3b3b;
+}
+
 /* HEADER */
 #topHeader {
     position: fixed;
@@ -111,7 +139,7 @@ html, body {
     padding-top: 26px;
 }
 
-/* 👇 DEFAULT SHIFT LEFT (was 35%) */
+/* DEFAULT SHIFT LEFT */
 #terminal {
     width: 33%;
     min-width: 200px;
