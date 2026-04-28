@@ -9,6 +9,7 @@
 <style>
 :root { --divider-width: 6px; }
 
+/* GLOBAL */
 html, body {
     margin: 0;
     height: 100%;
@@ -36,12 +37,17 @@ html, body {
 /* LOGO */
 #logo {
     position: fixed;
-    top: 2px;
-    right: 8px;
-    height: 22px;
-    cursor: pointer;
+    top: 3px;
+    right: 10px;
+    height: 20px;
     z-index: 2000;
-    transition: 0.2s;
+    cursor: pointer;
+    opacity: 0.95;
+    filter: drop-shadow(0 0 4px rgba(0,0,0,0.6));
+    transition: all 0.2s ease;
+}
+#logo:hover {
+    transform: scale(1.08);
 }
 
 /* LAYOUT */
@@ -57,9 +63,17 @@ html, body {
     border-right: 1px solid #4a4a4a;
 }
 
+/* INVISIBLE DIVIDER */
 #divider {
     width: var(--divider-width);
+    min-width: 10px;
     cursor: col-resize;
+    background: #3b3b3b;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+#divider:hover {
+    opacity: 0.15;
 }
 
 #right {
@@ -77,7 +91,7 @@ canvas {
     height: 100% !important;
 }
 
-/* BOTTOM STRIP (RESTORED) */
+/* BOTTOM STRIP */
 #topCandleWrap {
     position: fixed;
     bottom: 0;
@@ -86,7 +100,6 @@ canvas {
     background: #3b3b3b;
     border-top: 1px solid #4a4a4a;
 }
-
 </style>
 </head>
 
@@ -96,7 +109,7 @@ canvas {
     🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
 </div>
 
-<img id="logo" src="logo.png">
+<img id="logo" src="./logo.png">
 
 <div id="container">
     <div id="terminal"></div>
@@ -117,7 +130,7 @@ canvas {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-/* ================= TERMINAL (UNCHANGED) ================= */
+/* TERMINAL (UNCHANGED) */
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
@@ -140,21 +153,38 @@ window.addEventListener("resize", () => fitAddon.fit());
 const ws = new WebSocket(`ws://${location.host}`);
 ws.onmessage = (e) => term.write(e.data);
 
-/* ================= CORE ================= */
-const COLORS = {
-    bull: "#00c853",
-    bear: "#ff1744",
-    dim: "rgba(255,255,255,0.25)"
-};
+/* DIVIDER DRAG */
+const divider = document.getElementById("divider");
+const terminal = document.getElementById("terminal");
+const right = document.getElementById("right");
 
+let isDragging = false;
+
+divider.addEventListener("mousedown", e => {
+    isDragging = true;
+    e.preventDefault();
+});
+
+window.addEventListener("mouseup", () => isDragging = false);
+
+window.addEventListener("mousemove", e => {
+    if (!isDragging) return;
+    const percent = (e.clientX / window.innerWidth) * 100;
+    if (percent < 10 || percent > 80) return;
+
+    terminal.style.width = percent + "%";
+    right.style.width = (100 - percent) + "%";
+});
+
+/* LOGO CLICK */
+document.getElementById("logo").onclick = () => location.reload();
+
+/* CORE */
 let chart, pulse = 0;
 let trades = [];
 let currentTrade = null;
 
-/* ================= LOGO ================= */
-document.getElementById("logo").onclick = () => location.reload();
-
-/* ================= LOAD ================= */
+/* LOAD */
 async function load() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
@@ -167,7 +197,7 @@ async function load() {
     drawTopCandle(st, closes);
 }
 
-/* ================= DRAW ================= */
+/* DRAW */
 function draw(closes, st, trend) {
 
     const ctx = document.getElementById("priceChart");
@@ -179,7 +209,6 @@ function draw(closes, st, trend) {
     const last = closePad.at(-4);
     const dir = trendPad.at(-4) === "UP" ? 1 : -1;
 
-    /* SIGNAL */
     let signal = false;
     if (closePad.at(-5)) {
         const p = closePad.at(-5) - stPad.at(-5);
@@ -187,7 +216,6 @@ function draw(closes, st, trend) {
         signal = p*c < 0;
     }
 
-    /* TRADE */
     if (signal) {
         if (!currentTrade) currentTrade = { entry:last, dir };
         else {
@@ -201,7 +229,7 @@ function draw(closes, st, trend) {
         ? trades.filter(t=>t>0).length / trades.length * 100
         : 0;
 
-    /* LOGO REACT */
+    /* LOGO COLOR */
     const logo = document.getElementById("logo");
     logo.style.filter = dir===1
         ? "drop-shadow(0 0 6px #00c853)"
@@ -225,8 +253,15 @@ function draw(closes, st, trend) {
             labels: closePad.map((_,i)=>i),
             datasets: [
 
-                { data: closePad, borderColor: COLORS.dim, borderWidth: 2, pointRadius:0 },
+                /* PRICE (DIM) */
+                {
+                    data: closePad,
+                    borderColor: "rgba(255,255,255,0.25)",
+                    borderWidth: 2,
+                    pointRadius: 0
+                },
 
+                /* ST (BOLD) */
                 {
                     data: stPad,
                     borderWidth: 3,
@@ -234,10 +269,11 @@ function draw(closes, st, trend) {
                     segment:{
                         borderColor: c =>
                             trendPad[c.p0DataIndex]==="UP"
-                                ? COLORS.bull : COLORS.bear
+                                ? "#00c853" : "#ff1744"
                     }
                 },
 
+                /* CROSS GLOW (SMALL) */
                 {
                     data: closePad.map((v,i)=>{
                         if(i<1) return null;
@@ -247,8 +283,9 @@ function draw(closes, st, trend) {
                     }),
                     showLine:false,
                     pointRadius: ctx =>
-                        ctx.raw ? 5 + Math.sin(pulse)*2 : 0,
-                    pointBackgroundColor:"#fff"
+                        ctx.raw ? 3.5 + Math.sin(pulse)*1.2 : 0,
+                    pointBackgroundColor:"#fff",
+                    pointBorderWidth:1
                 }
             ]
         },
@@ -268,7 +305,7 @@ function draw(closes, st, trend) {
     });
 }
 
-/* ================= BOTTOM STRIP (RESTORED) ================= */
+/* BOTTOM STRIP */
 function drawTopCandle(stVals, closes) {
 
     const canvas = document.getElementById("topCandle");
@@ -285,22 +322,36 @@ function drawTopCandle(stVals, closes) {
     const high = Math.max(...stVals, ...closes);
     const low = Math.min(...stVals, ...closes);
 
-    const scale = v => ((v - low) / (high - low || 1)) * canvas.width;
+    const range = high - low || 1;
+    const scale = v => ((v - low) / range) * canvas.width;
 
+    const xLow = scale(low);
+    const xHigh = scale(high);
     const xOpen = scale(open);
     const xClose = scale(close);
 
+    const midY = canvas.height / 2;
+
+    /* WHITE WICK */
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(xLow, midY);
+    ctx.lineTo(xHigh, midY);
+    ctx.stroke();
+
+    /* BODY */
     ctx.fillStyle = close >= open ? "#00c853" : "#ff1744";
 
     ctx.fillRect(
         Math.min(xOpen, xClose),
-        canvas.height/2 - 6,
-        Math.max(Math.abs(xClose-xOpen),2),
+        midY - 6,
+        Math.max(Math.abs(xClose - xOpen), 2),
         12
     );
 }
 
-/* ================= PULSE ================= */
+/* PULSE */
 function animate(){
     pulse += 0.1;
     if(chart) chart.update('none');
@@ -308,10 +359,10 @@ function animate(){
 }
 animate();
 
-/* ================= INIT ================= */
+/* INIT */
 load();
 setInterval(load, 3000);
-
 </script>
+
 </body>
 </html>
