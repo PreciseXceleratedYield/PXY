@@ -15,36 +15,24 @@ html, body {
     height: 100%;
     overflow: hidden;
     font-family: monospace;
-    background: #3b3b3b;
-    color: #eaeaea;
+    background: #f5f5f5;
+    color: #111;
 }
 
-/* ===== ULTRA THIN INVISIBLE SCROLLBAR ===== */
+/* SCROLLBAR */
 * {
     scrollbar-width: thin;
-    scrollbar-color: #3b3b3b #3b3b3b;
+    scrollbar-color: #f5f5f5 #f5f5f5;
 }
-
 ::-webkit-scrollbar {
     width: 2px;
     height: 2px;
 }
-
 ::-webkit-scrollbar-track {
-    background: #3b3b3b;
+    background: #f5f5f5;
 }
-
 ::-webkit-scrollbar-thumb {
-    background: #3b3b3b;
-    border-radius: 2px;
-}
-
-.xterm .xterm-viewport::-webkit-scrollbar {
-    width: 2px;
-}
-
-.xterm .xterm-viewport::-webkit-scrollbar-thumb {
-    background: #3b3b3b;
+    background: #f5f5f5;
 }
 
 /* HEADER */
@@ -75,20 +63,19 @@ html, body {
     100% { background-position: 0% }
 }
 
-/* LEFT BRAND */
+/* LEFT */
 #headerLeft {
     position: absolute;
     left: 10px;
     font-size: 14px;
 }
 
-/* CENTER TEXT */
+/* CENTER */
 #headerCenter {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
     font-size: 14px;
-    letter-spacing: 1px;
 }
 
 /* RIGHT */
@@ -105,8 +92,7 @@ html, body {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #00ff88;
-    box-shadow: 0 0 6px #00ff88;
+    background: #00c853;
     animation: blink 1.2s infinite;
 }
 
@@ -122,13 +108,19 @@ html, body {
     position: absolute;
     top: 22px;
     right: 0;
-    background: #2b2b2b;
-    border: 1px solid #444;
+    background: #f5f5f5;
+    border: 1px solid #ddd;
     display: none;
 }
 
-#dropdown div { padding: 6px 10px; cursor: pointer; }
-#dropdown div:hover { background: #3b3b3b; }
+#dropdown div {
+    padding: 6px 10px;
+    cursor: pointer;
+}
+
+#dropdown div:hover {
+    background: #eee;
+}
 
 #menu.active #dropdown { display: block; }
 
@@ -139,17 +131,16 @@ html, body {
     padding-top: 26px;
 }
 
-/* DEFAULT SHIFT LEFT */
 #terminal {
     width: 33%;
     min-width: 200px;
-    border-right: 1px solid #4a4a4a;
+    border-right: 1px solid #ddd;
 }
 
 #divider {
     width: var(--divider-width);
     cursor: col-resize;
-    background: #3b3b3b;
+    background: #f5f5f5;
 }
 
 #right { flex: 1; display: flex; flex-direction: column; }
@@ -158,6 +149,7 @@ html, body {
 canvas {
     width: 100% !important;
     height: 100% !important;
+    background: #f5f5f5;
 }
 
 /* BOTTOM STRIP */
@@ -166,8 +158,8 @@ canvas {
     bottom: 0;
     width: 100%;
     height: 18px;
-    background: #3b3b3b;
-    border-top: 1px solid #4a4a4a;
+    background: #f5f5f5;
+    border-top: 1px solid #ddd;
 }
 </style>
 </head>
@@ -176,12 +168,8 @@ canvas {
 
 <!-- HEADER -->
 <div id="topHeader">
-
     <div id="headerLeft">PXY®</div>
-
-    <div id="headerCenter">
-        PreciseXceleratedYield Pvt Ltd
-    </div>
+    <div id="headerCenter">PreciseXceleratedYield Pvt Ltd</div>
 
     <div id="headerRight">
         <span class="liveBox">
@@ -198,7 +186,6 @@ canvas {
             </div>
         </div>
     </div>
-
 </div>
 
 <div id="container">
@@ -220,7 +207,7 @@ canvas {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-/* TERMINAL (UNCHANGED) */
+/* TERMINAL */
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
@@ -228,9 +215,9 @@ const term = new Terminal({
     fontSize: 14,
     cursorBlink: false,
     theme: {
-        background: "#3b3b3b",
-        foreground: "#eaeaea",
-        cursor: "#eaeaea"
+        background: "#f5f5f5",
+        foreground: "#111",
+        cursor: "#111"
     }
 });
 
@@ -251,7 +238,7 @@ menu.onclick = e => {
 };
 window.onclick = () => menu.classList.remove("active");
 
-/* DIVIDER DRAG */
+/* DIVIDER */
 const divider = document.getElementById("divider");
 const terminal = document.getElementById("terminal");
 const right = document.getElementById("right");
@@ -263,10 +250,8 @@ window.addEventListener("mouseup", () => isDragging = false);
 
 window.addEventListener("mousemove", e => {
     if (!isDragging) return;
-
     const percent = (e.clientX / window.innerWidth) * 100;
     if (percent < 10 || percent > 80) return;
-
     terminal.style.width = percent + "%";
     right.style.width = (100 - percent) + "%";
 });
@@ -287,7 +272,6 @@ async function load(){
 }
 
 function draw(closes,st,trend){
-
     const MAX=40;
 
     const c=closes.slice(-MAX);
@@ -300,13 +284,6 @@ function draw(closes,st,trend){
     const closePad=[...c,...Array(pad).fill(null)];
     const stPad=[...s,...Array(pad).fill(null)];
 
-    const dir=t.at(-1)==="UP"?1:-1;
-
-    document.getElementById("topHeader").style.background =
-        dir===1
-        ? "linear-gradient(270deg,#00c853,#00e676,#00c853)"
-        : "linear-gradient(270deg,#ff1744,#ff5252,#ff1744)";
-
     if(!chart){
         chart=new Chart(document.getElementById("priceChart"),{
             type:"line",
@@ -315,7 +292,7 @@ function draw(closes,st,trend){
                 datasets:[
                     {
                         data:closePad,
-                        borderColor:"rgba(255,255,255,0.25)",
+                        borderColor:"rgba(0,0,0,0.25)",
                         borderWidth:2,
                         pointRadius:0
                     },
@@ -344,9 +321,8 @@ function draw(closes,st,trend){
     }
 }
 
-/* BOTTOM STRIP */
+/* BOTTOM */
 function drawTopCandle(stVals, closes){
-
     const canvas=document.getElementById("topCandle");
     const ctx=canvas.getContext("2d");
 
@@ -363,25 +339,20 @@ function drawTopCandle(stVals, closes){
 
     const scale=v=>((v-low)/(high-low||1))*canvas.width;
 
-    const xLow=scale(low);
-    const xHigh=scale(high);
-    const xOpen=scale(open);
-    const xClose=scale(close);
-
     const midY=canvas.height/2;
 
-    ctx.strokeStyle="#fff";
+    ctx.strokeStyle="#000";
     ctx.beginPath();
-    ctx.moveTo(xLow,midY);
-    ctx.lineTo(xHigh,midY);
+    ctx.moveTo(scale(low),midY);
+    ctx.lineTo(scale(high),midY);
     ctx.stroke();
 
     ctx.fillStyle=close>=open?"#00c853":"#ff1744";
 
     ctx.fillRect(
-        Math.min(xOpen,xClose),
+        Math.min(scale(open),scale(close)),
         midY-6,
-        Math.max(Math.abs(xClose-xOpen),2),
+        Math.max(Math.abs(scale(close)-scale(open)),2),
         12
     );
 }
