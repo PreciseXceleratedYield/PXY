@@ -53,7 +53,7 @@ def target_price(row):
 
         # 5. FIXED SCORE LOGIC (20% vs 1.4%)
         score = 20.0 if aligned else 1.4
-        state = "✅ALIGNED" if aligned else "❌MISMATCH"
+        state = "✅" if aligned else "❌"
         
         target = int(entry * (1 + score / 100))
         
