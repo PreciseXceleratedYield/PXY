@@ -53,7 +53,7 @@ html, body {
 
 #terminal {
     width: 35%;
-    background: #3b3b3b;
+    min-width: 200px;
     border-right: 1px solid #4a4a4a;
 }
 
@@ -76,6 +76,17 @@ canvas {
     width: 100% !important;
     height: 100% !important;
 }
+
+/* BOTTOM STRIP (RESTORED) */
+#topCandleWrap {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    height: 18px;
+    background: #3b3b3b;
+    border-top: 1px solid #4a4a4a;
+}
+
 </style>
 </head>
 
@@ -97,13 +108,39 @@ canvas {
     </div>
 </div>
 
+<div id="topCandleWrap">
+    <canvas id="topCandle"></canvas>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-/* =========================
-   CORE CONFIG
-========================= */
+/* ================= TERMINAL (UNCHANGED) ================= */
+const term = new Terminal({
+    convertEol: true,
+    scrollback: 1000,
+    fontFamily: "monospace",
+    fontSize: 14,
+    cursorBlink: false,
+    theme: {
+        background: "#3b3b3b",
+        foreground: "#eaeaea",
+        cursor: "#eaeaea"
+    }
+});
+
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
+term.open(document.getElementById('terminal'));
+setTimeout(() => fitAddon.fit(), 50);
+window.addEventListener("resize", () => fitAddon.fit());
+
+const ws = new WebSocket(`ws://${location.host}`);
+ws.onmessage = (e) => term.write(e.data);
+
+/* ================= CORE ================= */
 const COLORS = {
     bull: "#00c853",
     bear: "#ff1744",
@@ -113,22 +150,11 @@ const COLORS = {
 let chart, pulse = 0;
 let trades = [];
 let currentTrade = null;
-let WEIGHTS = { trend:0.4, volatility:0.3, slope:0.3 };
 
-/* =========================
-   TERMINAL
-========================= */
-const term = new Terminal();
-term.open(document.getElementById('terminal'));
-
-/* =========================
-   LOGO CLICK
-========================= */
+/* ================= LOGO ================= */
 document.getElementById("logo").onclick = () => location.reload();
 
-/* =========================
-   DATA LOAD
-========================= */
+/* ================= LOAD ================= */
 async function load() {
     const res = await fetch("./syschrtpxy.json");
     const data = await res.json();
@@ -138,46 +164,34 @@ async function load() {
     const trend = data.map(d => d.st_trend);
 
     draw(closes, st, trend);
+    drawTopCandle(st, closes);
 }
 
-/* =========================
-   DRAW
-========================= */
+/* ================= DRAW ================= */
 function draw(closes, st, trend) {
 
     const ctx = document.getElementById("priceChart");
 
-    const pad = 3;
-    const closePad = [...closes, ...Array(pad).fill(null)];
-    const stPad = [...st, ...Array(pad).fill(null)];
-    const trendPad = [...trend, ...Array(pad).fill("UP")];
+    const closePad = [...closes, null,null,null];
+    const stPad = [...st, null,null,null];
+    const trendPad = [...trend, "UP","UP","UP"];
 
-    /* ===== FEATURES ===== */
     const last = closePad.at(-4);
-    const prev = closePad.at(-8) || last;
-
-    const volatility = Math.abs(last - prev);
-    const slope = last - prev;
     const dir = trendPad.at(-4) === "UP" ? 1 : -1;
 
-    const score = Math.round(
-        (dir*WEIGHTS.trend + volatility*WEIGHTS.volatility + slope*WEIGHTS.slope)*50 + 50
-    );
-
-    /* ===== SIGNAL ===== */
+    /* SIGNAL */
     let signal = false;
-    if (closePad.at(-5) && stPad.at(-5)) {
-        const prevDiff = closePad.at(-5) - stPad.at(-5);
-        const currDiff = closePad.at(-4) - stPad.at(-4);
-        signal = prevDiff * currDiff < 0;
+    if (closePad.at(-5)) {
+        const p = closePad.at(-5) - stPad.at(-5);
+        const c = closePad.at(-4) - stPad.at(-4);
+        signal = p*c < 0;
     }
 
-    /* ===== TRADE ENGINE ===== */
+    /* TRADE */
     if (signal) {
-        if (!currentTrade) {
-            currentTrade = { entry:last, dir };
-        } else {
-            const pnl = dir === 1 ? last-currentTrade.entry : currentTrade.entry-last;
+        if (!currentTrade) currentTrade = { entry:last, dir };
+        else {
+            const pnl = dir===1 ? last-currentTrade.entry : currentTrade.entry-last;
             trades.push(pnl);
             currentTrade = null;
         }
@@ -187,18 +201,17 @@ function draw(closes, st, trend) {
         ? trades.filter(t=>t>0).length / trades.length * 100
         : 0;
 
-    /* ===== LOGO ===== */
+    /* LOGO REACT */
     const logo = document.getElementById("logo");
-    logo.style.filter = dir === 1
+    logo.style.filter = dir===1
         ? "drop-shadow(0 0 6px #00c853)"
         : "drop-shadow(0 0 6px #ff1744)";
 
     if (signal) {
-        logo.style.transform = "scale(1.2)";
+        logo.style.transform="scale(1.2)";
         setTimeout(()=>logo.style.transform="scale(1)",150);
     }
 
-    /* ===== CHART ===== */
     if (chart) {
         chart.data.datasets[0].data = closePad;
         chart.data.datasets[1].data = stPad;
@@ -212,27 +225,19 @@ function draw(closes, st, trend) {
             labels: closePad.map((_,i)=>i),
             datasets: [
 
-                // PRICE (DIM)
-                {
-                    data: closePad,
-                    borderColor: COLORS.dim,
-                    borderWidth: 2,
-                    pointRadius: 0
-                },
+                { data: closePad, borderColor: COLORS.dim, borderWidth: 2, pointRadius:0 },
 
-                // ST (MAIN)
                 {
                     data: stPad,
                     borderWidth: 3,
                     pointRadius: 0,
-                    segment: {
+                    segment:{
                         borderColor: c =>
                             trendPad[c.p0DataIndex]==="UP"
                                 ? COLORS.bull : COLORS.bear
                     }
                 },
 
-                // CROSS PULSE
                 {
                     data: closePad.map((v,i)=>{
                         if(i<1) return null;
@@ -247,30 +252,55 @@ function draw(closes, st, trend) {
                 }
             ]
         },
-        options: {
+        options:{
             animation:false,
-            plugins:{
-                legend:{display:false}
-            }
+            plugins:{legend:{display:false}}
         },
         plugins:[{
             id:"overlay",
             afterDraw(chart){
                 const {ctx, chartArea:{left,top}} = chart;
-
                 ctx.fillStyle="#fff";
                 ctx.font="12px monospace";
-
-                ctx.fillText(`SCORE: ${score}`, left+10, top+20);
-                ctx.fillText(`WR: ${winRate.toFixed(1)}%`, left+10, top+40);
+                ctx.fillText(`WR: ${winRate.toFixed(1)}%`, left+10, top+20);
             }
         }]
     });
 }
 
-/* =========================
-   PULSE LOOP
-========================= */
+/* ================= BOTTOM STRIP (RESTORED) ================= */
+function drawTopCandle(stVals, closes) {
+
+    const canvas = document.getElementById("topCandle");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = canvas.clientWidth;
+    canvas.height = canvas.clientHeight;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const open = stVals.at(-1);
+    const close = closes.at(-1);
+
+    const high = Math.max(...stVals, ...closes);
+    const low = Math.min(...stVals, ...closes);
+
+    const scale = v => ((v - low) / (high - low || 1)) * canvas.width;
+
+    const xOpen = scale(open);
+    const xClose = scale(close);
+
+    ctx.fillStyle = close >= open ? "#00c853" : "#ff1744";
+
+    ctx.fillRect(
+        Math.min(xOpen, xClose),
+        canvas.height/2 - 6,
+        Math.max(Math.abs(xClose-xOpen),2),
+        12
+    );
+}
+
+/* ================= PULSE ================= */
 function animate(){
     pulse += 0.1;
     if(chart) chart.update('none');
@@ -278,9 +308,7 @@ function animate(){
 }
 animate();
 
-/* =========================
-   INIT
-========================= */
+/* ================= INIT ================= */
 load();
 setInterval(load, 3000);
 
