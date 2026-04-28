@@ -19,15 +19,6 @@ html, body {
     color: #eaeaea;
 }
 
-/* SCROLLBAR */
-* {
-    scrollbar-width: thin;
-    scrollbar-color: #3b3b3b #3b3b3b;
-}
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: #3b3b3b; }
-::-webkit-scrollbar-thumb { background: #3b3b3b; }
-
 /* HEADER */
 #topHeader {
     position: fixed;
@@ -56,26 +47,23 @@ html, body {
     100% { background-position: 0% }
 }
 
-/* HEADER TEXT */
+/* LEFT BRAND */
+#headerLeft {
+    position: absolute;
+    left: 10px;
+    font-size: 14px;
+}
+
+/* CENTER TEXT */
 #headerCenter {
     position: absolute;
     left: 50%;
     transform: translateX(-50%);
-    display: flex;
-    gap: 6px;
-}
-
-.brandMain {
     font-size: 14px;
     letter-spacing: 1px;
 }
 
-.brandSub {
-    font-size: 10px;
-    opacity: 0.7;
-}
-
-/* RIGHT SIDE */
+/* RIGHT */
 #headerRight {
     position: absolute;
     right: 10px;
@@ -123,8 +111,9 @@ html, body {
     padding-top: 26px;
 }
 
+/* 👇 DEFAULT SHIFT LEFT (was 35%) */
 #terminal {
-    width: 35%;
+    width: 33%;
     min-width: 200px;
     border-right: 1px solid #4a4a4a;
 }
@@ -160,9 +149,10 @@ canvas {
 <!-- HEADER -->
 <div id="topHeader">
 
+    <div id="headerLeft">PXY®</div>
+
     <div id="headerCenter">
-        <span class="brandMain">PXY®</span>
-        <span class="brandSub">PreciseXceleratedYield Pvt Ltd</span>
+        PreciseXceleratedYield Pvt Ltd
     </div>
 
     <div id="headerRight">
@@ -315,10 +305,7 @@ function draw(closes,st,trend){
             options:{
                 animation:false,
                 plugins:{legend:{display:false}},
-                scales:{
-                    x:{display:false},
-                    y:{display:false}
-                }
+                scales:{ x:{display:false}, y:{display:false} }
             }
         });
     } else {
