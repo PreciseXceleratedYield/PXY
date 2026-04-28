@@ -59,6 +59,8 @@ html, body {
     height: 20px;
     z-index: 2000;
     cursor: pointer;
+    opacity: 0.95;
+    transition: 0.2s;
 }
 
 /* LAYOUT */
@@ -74,6 +76,7 @@ html, body {
     border-right: 1px solid #4a4a4a;
 }
 
+/* INVISIBLE DIVIDER */
 #divider {
     width: var(--divider-width);
     cursor: col-resize;
@@ -129,14 +132,35 @@ canvas {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-const term = new Terminal();
+/* =========================
+   TERMINAL (YOUR ORIGINAL)
+========================= */
+const term = new Terminal({
+    convertEol: true,
+    scrollback: 1000,
+    fontFamily: "monospace",
+    fontSize: 14,
+    cursorBlink: false,
+    theme: {
+        background: "#3b3b3b",
+        foreground: "#eaeaea",
+        cursor: "#eaeaea",
+        selection: "rgba(255,255,255,0.1)"
+    }
+});
+
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
-setTimeout(()=>fitAddon.fit(),50);
 
+setTimeout(() => fitAddon.fit(), 50);
+window.addEventListener("resize", () => fitAddon.fit());
+
+term.writeln("TERMINAL OK");
+
+/* WEBSOCKET */
 const ws = new WebSocket(`ws://${location.host}`);
-ws.onmessage = e => term.write(e.data);
+ws.onmessage = (e) => term.write(e.data);
 
 /* DIVIDER */
 const divider = document.getElementById("divider");
@@ -158,7 +182,7 @@ window.onmousemove=e=>{
 document.getElementById("logo").onclick=()=>location.reload();
 
 /* CORE */
-let chart,pulse=0,trades=[],currentTrade=null;
+let chart,pulse=0;
 
 async function load(){
     const res=await fetch("./syschrtpxy.json");
@@ -184,34 +208,12 @@ function draw(closes,st,trend){
     const stPad=[...s,null,null,null];
     const trendPad=[...t,"UP","UP","UP"];
 
-    const last=closePad.at(-4);
     const dir=trendPad.at(-4)==="UP"?1:-1;
-
-    let signal=false;
-    if(closePad.at(-5)){
-        const p=closePad.at(-5)-stPad.at(-5);
-        const c2=closePad.at(-4)-stPad.at(-4);
-        signal=p*c2<0;
-    }
-
-    if(signal){
-        if(!currentTrade) currentTrade={entry:last,dir};
-        else{
-            const pnl=dir===1?last-currentTrade.entry:currentTrade.entry-last;
-            trades.push(pnl);
-            currentTrade=null;
-        }
-    }
 
     const logo=document.getElementById("logo");
     logo.style.filter=dir===1
         ?"drop-shadow(0 0 6px #00c853)"
         :"drop-shadow(0 0 6px #ff1744)";
-
-    if(signal){
-        logo.style.transform="scale(1.2)";
-        setTimeout(()=>logo.style.transform="scale(1)",150);
-    }
 
     if(chart){
         chart.data.labels=closePad.map((_,i)=>i);
