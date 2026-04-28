@@ -28,27 +28,70 @@ html, body {
 ::-webkit-scrollbar-track { background: #3b3b3b; }
 ::-webkit-scrollbar-thumb { background: #3b3b3b; }
 
-/* XTERM SCROLL */
-.xterm .xterm-viewport {
-    scrollbar-width: thin;
-    scrollbar-color: #3b3b3b #3b3b3b;
-}
+/* XTERM */
 .xterm .xterm-viewport::-webkit-scrollbar { width: 4px; }
 .xterm .xterm-viewport::-webkit-scrollbar-thumb { background: #3b3b3b; }
 
-/* HEADER */
+/* ================= HEADER PRO ================= */
 #topHeader {
     position: fixed;
     top: 0;
     width: 100%;
     height: 26px;
-    background: linear-gradient(90deg, #ff1744, #00c853);
-    color: #000;
-    font-weight: 900;
+
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+
+    padding: 0 12px;
+    font-size: 12px;
+    font-weight: 900;
+
+    color: #000;
+
+    background: linear-gradient(270deg,#ff1744,#00c853,#ff1744);
+    background-size: 300% 300%;
+    animation: flow 10s ease infinite;
+
+    box-shadow:
+        inset 0 -1px 0 rgba(0,0,0,0.5),
+        inset 0 1px 0 rgba(255,255,255,0.2),
+        0 2px 6px rgba(0,0,0,0.5);
+
     z-index: 1000;
+}
+
+#headerLeft, #headerRight {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 120px;
+}
+
+#headerCenter {
+    flex: 1;
+    text-align: center;
+}
+
+/* STATUS DOT */
+#statusDot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #00ff88;
+    box-shadow: 0 0 6px #00ff88;
+    animation: blink 1.2s infinite;
+}
+
+@keyframes blink {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.3; }
+}
+
+@keyframes flow {
+    0% { background-position: 0% }
+    50% { background-position: 100% }
+    100% { background-position: 0% }
 }
 
 /* LOGO */
@@ -59,8 +102,6 @@ html, body {
     height: 20px;
     z-index: 2000;
     cursor: pointer;
-    opacity: 0.95;
-    transition: 0.2s;
 }
 
 /* LAYOUT */
@@ -76,7 +117,6 @@ html, body {
     border-right: 1px solid #4a4a4a;
 }
 
-/* INVISIBLE DIVIDER */
 #divider {
     width: var(--divider-width);
     cursor: col-resize;
@@ -107,8 +147,20 @@ canvas {
 
 <body>
 
+<!-- 🔥 HEADER -->
 <div id="topHeader">
-🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
+    <div id="headerLeft">
+        <span id="statusDot"></span>
+        <span>LIVE</span>
+    </div>
+
+    <div id="headerCenter">
+        🏦 PXY® PreciseXceleratedYield Pvt Ltd 🏦
+    </div>
+
+    <div id="headerRight">
+        <span id="metric">WR: --%</span>
+    </div>
 </div>
 
 <img id="logo" src="./logo.png">
@@ -132,9 +184,7 @@ canvas {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-/* =========================
-   TERMINAL (YOUR ORIGINAL)
-========================= */
+/* TERMINAL (UNCHANGED) */
 const term = new Terminal({
     convertEol: true,
     scrollback: 1000,
@@ -152,37 +202,17 @@ const term = new Terminal({
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
+setTimeout(()=>fitAddon.fit(),50);
+window.addEventListener("resize",()=>fitAddon.fit());
 
-setTimeout(() => fitAddon.fit(), 50);
-window.addEventListener("resize", () => fitAddon.fit());
-
-term.writeln("TERMINAL OK");
-
-/* WEBSOCKET */
 const ws = new WebSocket(`ws://${location.host}`);
-ws.onmessage = (e) => term.write(e.data);
-
-/* DIVIDER */
-const divider = document.getElementById("divider");
-const terminal = document.getElementById("terminal");
-const right = document.getElementById("right");
-
-let drag=false;
-divider.onmousedown=()=>drag=true;
-window.onmouseup=()=>drag=false;
-window.onmousemove=e=>{
-    if(!drag) return;
-    let p=(e.clientX/window.innerWidth)*100;
-    if(p<10||p>80)return;
-    terminal.style.width=p+"%";
-    right.style.width=(100-p)+"%";
-};
+ws.onmessage = e => term.write(e.data);
 
 /* LOGO */
 document.getElementById("logo").onclick=()=>location.reload();
 
 /* CORE */
-let chart,pulse=0;
+let chart,pulse=0,trades=[],currentTrade=null;
 
 async function load(){
     const res=await fetch("./syschrtpxy.json");
@@ -199,7 +229,6 @@ async function load(){
 function draw(closes,st,trend){
 
     const MAX=40;
-
     const c=closes.slice(-MAX);
     const s=st.slice(-MAX);
     const t=trend.slice(-MAX);
@@ -208,8 +237,37 @@ function draw(closes,st,trend){
     const stPad=[...s,null,null,null];
     const trendPad=[...t,"UP","UP","UP"];
 
+    const last=closePad.at(-4);
     const dir=trendPad.at(-4)==="UP"?1:-1;
 
+    /* HEADER METRIC */
+    const metric=document.getElementById("metric");
+
+    if(trades.length){
+        const wr = trades.filter(t=>t>0).length / trades.length * 100;
+        metric.textContent = `WR: ${wr.toFixed(1)}%`;
+    }
+
+    /* HEADER COLOR */
+    const header=document.getElementById("topHeader");
+    header.style.background = dir===1
+        ? "linear-gradient(270deg,#00c853,#00e676,#00c853)"
+        : "linear-gradient(270deg,#ff1744,#ff5252,#ff1744)";
+
+    /* SIGNAL DETECT */
+    let signal=false;
+    if(closePad.at(-5)){
+        const p=closePad.at(-5)-stPad.at(-5);
+        const c2=closePad.at(-4)-stPad.at(-4);
+        signal=p*c2<0;
+    }
+
+    if(signal){
+        header.style.transform="scale(1.01)";
+        setTimeout(()=>header.style.transform="scale(1)",120);
+    }
+
+    /* LOGO COLOR */
     const logo=document.getElementById("logo");
     logo.style.filter=dir===1
         ?"drop-shadow(0 0 6px #00c853)"
@@ -269,7 +327,6 @@ function draw(closes,st,trend){
 
 /* BOTTOM STRIP */
 function drawTopCandle(stVals,closes){
-
     const canvas=document.getElementById("topCandle");
     const ctx=canvas.getContext("2d");
 
