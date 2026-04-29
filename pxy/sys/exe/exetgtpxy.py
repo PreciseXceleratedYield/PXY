@@ -29,7 +29,7 @@ def target_price(row):
         pe_p, pe_f = f(row.get("pe_power"), 0.0), f(row.get("pe_force"), 0.0)
 
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
-        sig = str(row.get("exit", "NONE")).upper()
+        sig = str(row.get("entry", "NONE")).upper()
         is_ce, is_pe = "CE" in symbol, "PE" in symbol
 
         # --- TIME CALCULATIONS ---
