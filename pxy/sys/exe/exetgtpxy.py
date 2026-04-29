@@ -27,9 +27,11 @@ def target_price(row):
         atr = f(row.get("atr"), 0.0)
         ce_p, ce_f = f(row.get("ce_power"), 0.0), f(row.get("ce_force"), 0.0)
         pe_p, pe_f = f(row.get("pe_power"), 0.0), f(row.get("pe_force"), 0.0)
-        ce_depth = f(row.get("ce_depth"), 0.0)
-        pe_depth = f(row.get("pe_depth"), 0.0)
         
+        # FIXED: Mapped to your log field names
+        ce_depth = f(row.get("hkin_ce_depth"), 0.0)
+        pe_depth = f(row.get("hkin_pe_depth"), 0.0)
+
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
         is_ce, is_pe = "CE" in symbol, "PE" in symbol
 
@@ -95,7 +97,7 @@ def target_price(row):
             else:
                 score, state = 1.4, "⏳" if is_fresh else "❌"
 
-        # 4. FINAL CALCULATION (Score + Depth)
+        # 4. FINAL CALCULATION (Exact Request: ATR*P*F + DEPTH)
         if state == "🔥" and active_depth > 0:
             target = int(score + active_depth)
         else:
@@ -111,4 +113,5 @@ def target_price(row):
     except Exception as e:
         print(f"ERROR|{str(e)}")
         return 0
+
 
