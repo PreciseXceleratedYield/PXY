@@ -24,8 +24,6 @@ def target_price(row):
         atr = f(row.get("atr"), 0.0)
         ce_p, ce_f = f(row.get("ce_power"), 0.0), f(row.get("ce_force"), 0.0)
         pe_p, pe_f = f(row.get("pe_power"), 0.0), f(row.get("pe_force"), 0.0)
-        
-        # DEPTH (ACTIVE LINE PRICE / MIDPOINT)
         ce_depth = f(row.get("ce_depth"), 0.0)
         pe_depth = f(row.get("pe_depth"), 0.0)
         
@@ -33,9 +31,7 @@ def target_price(row):
         is_ce, is_pe = "CE" in symbol, "PE" in symbol
 
         # SIGNALS
-        # Exit: BUY, SELL, BEAR, BULL (Multiplier Driver)
         exit_sig = str(row.get("exit_sig", "NONE")).upper() 
-        # ST: UP, DOWN, BUY, SELL (Kill-Switch Driver)
         st_sig = str(row.get("st_sig", "NONE")).upper()     
 
         # --- TIME CALCULATIONS ---
@@ -59,52 +55,43 @@ def target_price(row):
                 e_time = entry_time_val if entry_time_val.tzinfo else IST.localize(entry_time_val)
             elapsed_secs = (now - e_time).total_seconds()
 
-        # 2. 🚨 THE MASTER KILL-SWITCH (ST SIGNAL ONLY: UP/DOWN/BUY/SELL)
+        # 2. 🚨 THE MASTER KILL-SWITCH (ST SIGNAL ONLY)
         is_fresh = elapsed_secs <= 180 and not is_morning
         
+        # Kill-Switch only triggers for OLD trades
         if not is_fresh and not is_morning:
-            # CE EXIT: Immediate 0 if ST turns Bearish
             if is_ce and any(x in st_sig for x in ["DOWN", "SELL"]):
-                print(f"{symbol}|| 🛑 ST_KILL (CE) || ST:{st_sig} || T:0")
+                print(f"{symbol}|| 🛑 ST_KILL_CE (OLD) || T:0")
                 return 0
-            
-            # PE EXIT: Immediate 0 if ST turns Bullish
             if is_pe and any(x in st_sig for x in ["UP", "BUY"]):
-                print(f"{symbol}|| 🛑 ST_KILL (PE) || ST:{st_sig} || T:0")
+                print(f"{symbol}|| 🛑 ST_KILL_PE (OLD) || T:0")
                 return 0
 
-        # 3. 🎯 DYNAMIC TARGET LOGIC
-        score = 1.4 # Default Fallback
+        # 3. 🎯 DYNAMIC TARGET LOGIC (ALL TRADES FOLLOW SIGNALS)
+        score = 1.4 
         state = "✅"
         active_depth = 0.0
 
         if is_ce:
             active_depth = ce_depth
-            # Surgical Math (🔥) if Sentiment is Bullish
-            if any(x in exit_sig for x in ["BUY", "BULL"]) and "SELL" not in exit_sig and "BEAR" not in exit_sig:
+            if any(x in exit_sig for x in ["BUY", "BULL"]) and "SELL" not in exit_sig:
                 score = atr * ce_p * ce_f
                 state = "🔥" if score > 0 else "⚠️"
             else:
-                # Standard Target if Sentiment is Bearish/None
                 score, state = 1.4, "⏳" if is_fresh else "❌"
         
         elif is_pe:
             active_depth = pe_depth
-            # Surgical Math (🔥) if Sentiment is Bearish
-            if any(x in exit_sig for x in ["SELL", "BEAR"]) and "BUY" not in exit_sig and "BULL" not in exit_sig:
+            if any(x in exit_sig for x in ["SELL", "BEAR"]) and "BUY" not in exit_sig:
                 score = atr * pe_p * pe_f
                 state = "🔥" if score > 0 else "⚠️"
             else:
                 score, state = 1.4, "⏳" if is_fresh else "❌"
-        else:
-            state = "⚪"
 
         # 4. FINAL CALCULATION (Exact Request: ATR*P*F + DEPTH)
         if state == "🔥" and active_depth > 0:
-            # Surgical Target = (ATR * Power * Force) + Depth
             target = int(score + active_depth)
         else:
-            # Safety Target = Entry + 1.4%
             target = int(entry_prc * (1 + score / 100))
 
         # CLEAN OUTPUT
