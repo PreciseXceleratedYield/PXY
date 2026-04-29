@@ -70,7 +70,7 @@ def target_price(row):
 
         if is_ce:
             # Surgical Multiplier if Exit Signal aligns
-            if any(x in exit_sig for x in ["BUY", "BULL"]):
+            if any(x in exit_sig for x in ["BUY", "BULL", "NONE"]):
                 calc = atr * ce_p * ce_f
                 score = calc if calc > 0 else 1.4
                 state = "🔥" if calc > 0 else "⚠️"
@@ -80,7 +80,7 @@ def target_price(row):
         
         elif is_pe:
             # Surgical Multiplier if Exit Signal aligns
-            if any(x in exit_sig for x in ["SELL", "BEAR"]):
+            if any(x in exit_sig for x in ["SELL", "BEAR", "NONE"]):
                 calc = atr * pe_p * pe_f
                 score = calc if calc > 0 else 1.4
                 state = "🔥" if calc > 0 else "⚠️"
