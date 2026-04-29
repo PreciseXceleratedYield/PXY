@@ -1,9 +1,12 @@
 from datetime import time, datetime
 import pytz
-from colorama import init
+from colorama import init, Fore
 
 init(autoreset=True)
 IST = pytz.timezone("Asia/Kolkata")
+
+# --- DEBUG CONFIG ---
+DEBUG_MODE = True 
 
 def f(x, d=0.0):
     try:
@@ -31,8 +34,12 @@ def target_price(row):
         is_ce, is_pe = "CE" in symbol, "PE" in symbol
 
         # SIGNALS
-        exit_sig = str(row.get("exit", "NONE")).upper() 
-        st_sig = str(row.get("supertrend", "NONE")).upper()     
+        exit_sig = str(row.get("exit", "NONE")).upper()
+        st_sig = str(row.get("supertrend", "NONE")).upper()
+
+        # --- DEBUG PRINT ---
+        if DEBUG_MODE:
+            print(f"{Fore.CYAN}DEBUG DATA | {symbol} | E:{entry_prc} | ATR:{atr} | CP:{ce_p} | CF:{ce_f} | CD:{ce_depth} | ST:{st_sig} | EX:{exit_sig}")
 
         # --- TIME CALCULATIONS ---
         now = datetime.now(IST)
@@ -48,8 +55,7 @@ def target_price(row):
                 except:
                     try:
                         parts = list(map(int, entry_time_val.split(":")))
-                        e_time = now.replace(hour=parts[0], minute=parts[1], 
-                                             second=parts[2] if len(parts)>2 else 0, microsecond=0)
+                        e_time = now.replace(hour=parts[0], minute=parts[1], second=parts[2] if len(parts)>2 else 0, microsecond=0)
                     except: e_time = now
             else:
                 e_time = entry_time_val if entry_time_val.tzinfo else IST.localize(entry_time_val)
@@ -58,7 +64,6 @@ def target_price(row):
         # 2. 🚨 THE MASTER KILL-SWITCH (ST SIGNAL ONLY)
         is_fresh = elapsed_secs <= 180 and not is_morning
         
-        # Kill-Switch only triggers for OLD trades
         if not is_fresh and not is_morning:
             if is_ce and any(x in st_sig for x in ["DOWN", "SELL"]):
                 print(f"{symbol}|| 🛑 ST_KILL_CE (OLD) || T:0")
@@ -67,7 +72,7 @@ def target_price(row):
                 print(f"{symbol}|| 🛑 ST_KILL_PE (OLD) || T:0")
                 return 0
 
-        # 3. 🎯 DYNAMIC TARGET LOGIC (ALL TRADES FOLLOW SIGNALS)
+        # 3. 🎯 DYNAMIC TARGET LOGIC
         score = 1.4 
         state = "✅"
         active_depth = 0.0
@@ -75,7 +80,8 @@ def target_price(row):
         if is_ce:
             active_depth = ce_depth
             if any(x in exit_sig for x in ["BUY", "BULL"]) and "SELL" not in exit_sig:
-                score = atr * ce_p * ce_f
+                # SURGICAL SCORE = 1.4 * Power * Force
+                score = 1.4 * ce_p * ce_f
                 state = "🔥" if score > 0 else "⚠️"
             else:
                 score, state = 1.4, "⏳" if is_fresh else "❌"
@@ -83,12 +89,13 @@ def target_price(row):
         elif is_pe:
             active_depth = pe_depth
             if any(x in exit_sig for x in ["SELL", "BEAR"]) and "BUY" not in exit_sig:
-                score = atr * pe_p * pe_f
+                # SURGICAL SCORE = 1.4 * Power * Force
+                score = 1.4 * pe_p * pe_f
                 state = "🔥" if score > 0 else "⚠️"
             else:
                 score, state = 1.4, "⏳" if is_fresh else "❌"
 
-        # 4. FINAL CALCULATION (Exact Request: ATR*P*F + DEPTH)
+        # 4. FINAL CALCULATION (Score + Depth)
         if state == "🔥" and active_depth > 0:
             target = int(score + active_depth)
         else:
@@ -104,3 +111,4 @@ def target_price(row):
     except Exception as e:
         print(f"ERROR|{str(e)}")
         return 0
+
