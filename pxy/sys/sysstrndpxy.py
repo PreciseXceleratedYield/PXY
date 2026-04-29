@@ -6,14 +6,16 @@ from sysdtafpxy import fetch_yf_data
 # GLOBAL CONFIG
 # ==================================================
 DEBUG_MODE = False
-JUMP_MODE = True  # True: Line jumps to Upper/Lower | False: Continuous line
+JUMP_MODE = False  # Continuous line like Pine
 
 def calculate_supertrend(df: pd.DataFrame, period=3, multiplier=3) -> pd.DataFrame:
-    """ SuperTrend Engine with Jump/Continuous Switch """
+    """ SuperTrend Engine - UPDATED TO ATR-SQUARED CONTINUOUS """
     df = df.copy()
     df['previous_close'] = df['Close'].shift(1)
     df['TR'] = df[['High', 'Low', 'Close', 'previous_close']].apply(
         lambda row: max(row['High'] - row['Low'], abs(row['High'] - row['previous_close']), abs(row['Low'] - row['previous_close'])), axis=1)
+    
+    # Pine-matching RMA logic
     df['ATR'] = df['TR'].ewm(alpha=1/period, adjust=False).mean()
     df['HL2'] = (df['High'] + df['Low']) / 2
     
@@ -22,7 +24,9 @@ def calculate_supertrend(df: pd.DataFrame, period=3, multiplier=3) -> pd.DataFra
     
     for i in range(len(df)):
         hl2, atr = df['HL2'].iloc[i], df['ATR'].iloc[i]
-        upper, lower = hl2 + multiplier * atr, hl2 - multiplier * atr
+        
+        # --- ATR-SQUARED LOGIC (multiplier = atr) ---
+        upper, lower = hl2 + (atr * atr), hl2 - (atr * atr)
         
         if i == 0 or pd.isna(atr):
             st[i], trend[i] = hl2, "UP"
@@ -35,17 +39,14 @@ def calculate_supertrend(df: pd.DataFrame, period=3, multiplier=3) -> pd.DataFra
         # 1. Determine Trend
         curr_trend = "UP" if ha_close > prev_st_val else "DOWN" if ha_close < prev_st_val else prev_trend
         
-        # 2. THE JUMP SWITCH LOGIC
-        if JUMP_MODE:
-            # JUMPING: Line resets to actual upper/lower bound on flip
-            if curr_trend == "UP":
-                st[i] = lower if prev_trend == "DOWN" else max(lower, prev_st_val)
-            else:
-                st[i] = upper if prev_trend == "UP" else min(upper, prev_st_val)
+        # 2. CONTINUOUS LOGIC (JUMP_MODE False)
+        if curr_trend == "UP":
+            st[i] = max(lower, prev_st_val)
         else:
-            # CONTINUOUS (Original): Line sticks to prev_st until cross
-            st[i] = max(lower, prev_st_val) if curr_trend == "UP" else min(upper, prev_st_val)
+            st[i] = min(upper, prev_st_val)
             
+        # ROUND TO ONE DECIMAL AS IN PINE
+        st[i] = round(st[i], 1)
         trend[i] = curr_trend
         
     df['ST'], df['ST_Trend'] = st, trend
@@ -56,8 +57,9 @@ def get_signal(df=None):
         df = fetch_yf_data()
     if df is None or df.empty:
         return "NONE", "NONE"
-
-    df_st = calculate_supertrend(df, period=3, multiplier=3)
+        
+    # Keep period=3, multiplier is ignored in the new logic
+    df_st = calculate_supertrend(df, period=3, multiplier=3) 
     
     # --- CURRENT CANDLE (C) & PREVIOUS CANDLE (P) ---
     last_row = df_st.iloc[-1]
@@ -78,13 +80,13 @@ def get_signal(df=None):
         st_signal = "UP"
     else:
         st_signal = "DOWN"
-
+        
     return st_signal, last_row['ST_Trend']
 
 if __name__ == "__main__":
     res, major = get_signal()
-    mode_label = "JUMPING" if JUMP_MODE else "CONTINUOUS"
-    print(f"MODE: {mode_label} | ST_SIG: {res} | MAJOR: {major}")
+    print(f"ST_SIG: {res} | MAJOR: {major}")
+
 
 
 
