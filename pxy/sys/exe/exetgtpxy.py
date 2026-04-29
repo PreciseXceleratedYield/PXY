@@ -31,8 +31,8 @@ def target_price(row):
         is_ce, is_pe = "CE" in symbol, "PE" in symbol
 
         # SIGNALS
-        exit_sig = str(row.get("exit_sig", "NONE")).upper() 
-        st_sig = str(row.get("st_sig", "NONE")).upper()     
+        exit_sig = str(row.get("exit", "NONE")).upper() 
+        st_sig = str(row.get("supertrend", "NONE")).upper()     
 
         # --- TIME CALCULATIONS ---
         now = datetime.now(IST)
