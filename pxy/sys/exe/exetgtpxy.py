@@ -64,7 +64,7 @@ def target_price(row):
         score = 1.4 # Default Fallback
 
         if is_ce:
-            if any(x in sig for x in ["BUY", "UP"]):
+            if any(x in sig for x in ["BUY","BULL", "UP"]):
                 if "BUY" in sig:
                     # SURGICAL CALC WITH FALLBACK
                     calc = atr * ce_p * ce_f
@@ -76,7 +76,7 @@ def target_price(row):
                 score, state = 1.4, "⏳" if is_fresh else "❌"
         
         elif is_pe:
-            if any(x in sig for x in ["SELL", "DOWN"]):
+            if any(x in sig for x in ["SELL","BEAR", "DOWN"]):
                 if "SELL" in sig:
                     # SURGICAL CALC WITH FALLBACK
                     calc = atr * pe_p * pe_f
