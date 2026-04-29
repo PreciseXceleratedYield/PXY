@@ -1,4 +1,3 @@
-# sys/exe/exetgtpxy_dashboard.py
 from datetime import time, datetime
 import pytz
 from colorama import init
@@ -14,44 +13,58 @@ def f(x, d=0.0):
         return d
 
 def i(x, d=0):
-    try: return int(float(x))
-    except: return d
+    try:
+        return int(float(x))
+    except:
+        return d
 
 def target_price(row):
     try:
         # 1. DATA FETCH
         entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
-        if entry_prc <= 0: return 0
+        if entry_prc <= 0:
+            return 0
 
-        # FETCH METRICS WITH 0.0 FALLBACK TO DETECT ERRORS
+        # FETCH METRICS WITH 0.0 FALLBACK
         atr = f(row.get("atr"), 0.0)
         ce_p, ce_f = f(row.get("ce_power"), 0.0), f(row.get("ce_force"), 0.0)
         pe_p, pe_f = f(row.get("pe_power"), 0.0), f(row.get("pe_force"), 0.0)
-
+        
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
         sig = str(row.get("entry", "NONE")).upper()
         is_ce, is_pe = "CE" in symbol, "PE" in symbol
 
-        # --- TIME CALCULATIONS ---
+        # --- FIXED TIME CALCULATIONS (3 MIN THRESHOLD) ---
         now = datetime.now(IST)
         is_morning = time(9, 15) <= now.time() < time(9, 30)
         entry_time_val = row.get("buy_time")
         elapsed_secs = 0
-        
+
         if entry_time_val:
             if isinstance(entry_time_val, str):
                 try:
+                    # Try Full Date Format
                     e_time = datetime.strptime(entry_time_val, "%Y-%m-%d %H:%M:%S")
                     e_time = IST.localize(e_time)
                 except:
-                    parts = list(map(int, entry_time_val.split(":")))
-                    e_time = now.replace(hour=parts[0], minute=parts[1], second=parts[2] if len(parts)>2 else 0)
+                    try:
+                        # Try HH:MM:SS format
+                        parts = list(map(int, entry_time_val.split(":")))
+                        e_time = now.replace(hour=parts[0], minute=parts[1], 
+                                             second=parts[2] if len(parts)>2 else 0, microsecond=0)
+                    except:
+                        e_time = now
             else:
-                e_time = entry_time_val if entry_time_val.tzinfo else IST.localize(entry_time_val)
+                # Handle Datetime object safely
+                if entry_time_val.tzinfo is None:
+                    e_time = IST.localize(entry_time_val)
+                else:
+                    e_time = entry_time_val.astimezone(IST)
+            
             elapsed_secs = (now - e_time).total_seconds()
 
-        # 2. 🚨 THE MASTER KILL-SWITCH
-        if not is_morning and elapsed_secs > 120:
+        # 2. 🚨 THE MASTER KILL-SWITCH (3 MINUTE LIMIT)
+        if not is_morning and elapsed_secs > 180:
             if is_ce and any(x in sig for x in ["SELL", "DOWN"]):
                 print(f"{symbol}|| 🛑 EXIT_SIG_BEARISH || T:0")
                 return 0
@@ -60,13 +73,12 @@ def target_price(row):
                 return 0
 
         # 3. 🎯 DYNAMIC TARGET LOGIC
-        is_fresh = elapsed_secs <= 120 and not is_morning
+        is_fresh = elapsed_secs <= 180 and not is_morning
         score = 1.4 # Default Fallback
-
+        
         if is_ce:
             if any(x in sig for x in ["BUY","BULL", "UP"]):
                 if "BUY" in sig:
-                    # SURGICAL CALC WITH FALLBACK
                     calc = atr * ce_p * ce_f
                     score = calc if calc > 0 else 1.4
                     state = "🔥" if calc > 0 else "⚠️"
@@ -78,7 +90,6 @@ def target_price(row):
         elif is_pe:
             if any(x in sig for x in ["SELL","BEAR", "DOWN"]):
                 if "SELL" in sig:
-                    # SURGICAL CALC WITH FALLBACK
                     calc = atr * pe_p * pe_f
                     score = calc if calc > 0 else 1.4
                     state = "🔥" if calc > 0 else "⚠️"
