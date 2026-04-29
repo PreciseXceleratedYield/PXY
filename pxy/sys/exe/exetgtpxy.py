@@ -29,8 +29,10 @@ def target_price(row):
         is_ce, is_pe = "CE" in symbol, "PE" in symbol
 
         # SIGNALS
-        exit_sig = str(row.get("exit_sig", "NONE")).upper() # Multiplier Switch
-        st_sig = str(row.get("st_sig", "NONE")).upper()     # Kill-Switch
+        # Exit: BUY, SELL, BEAR, BULL
+        exit_sig = str(row.get("exit_sig", "NONE")).upper() 
+        # ST: UP, DOWN, BUY, SELL
+        st_sig = str(row.get("st_sig", "NONE")).upper()     
 
         # --- TIME CALCULATIONS ---
         now = datetime.now(IST)
@@ -46,45 +48,49 @@ def target_price(row):
                 except:
                     try:
                         parts = list(map(int, entry_time_val.split(":")))
-                        e_time = now.replace(hour=parts[0], minute=parts[1], second=parts[2] if len(parts)>2 else 0, microsecond=0)
+                        e_time = now.replace(hour=parts[0], minute=parts[1], 
+                                             second=parts[2] if len(parts)>2 else 0, microsecond=0)
                     except: e_time = now
             else:
                 e_time = entry_time_val if entry_time_val.tzinfo else IST.localize(entry_time_val)
             elapsed_secs = (now - e_time).total_seconds()
 
-        # 2. 🚨 THE MASTER KILL-SWITCH (IMMEDIATE FOR OLD ENTRIES)
+        # 2. 🚨 THE MASTER KILL-SWITCH (ST SIGNAL ONLY: UP/DOWN/BUY/SELL)
         is_fresh = elapsed_secs <= 180 and not is_morning
         
-        # IF OLD (>3 mins): ST Signal reversal triggers immediate T:0
         if not is_fresh and not is_morning:
-            if is_ce and ("DOWN" in st_sig or "SELL" in st_sig):
-                print(f"{symbol}|| 🛑 IMMEDIATE_ST_EXIT (OLD) || T:0")
+            # CE EXIT: Immediate 0 if ST turns Bearish
+            if is_ce and any(x in st_sig for x in ["DOWN", "SELL"]):
+                print(f"{symbol}|| 🛑 ST_KILL (CE) || ST:{st_sig} || T:0")
                 return 0
-            if is_pe and ("UP" in st_sig or "BUY" in st_sig):
-                print(f"{symbol}|| 🛑 IMMEDIATE_ST_EXIT (OLD) || T:0")
+            
+            # PE EXIT: Immediate 0 if ST turns Bullish
+            if is_pe and any(x in st_sig for x in ["UP", "BUY"]):
+                print(f"{symbol}|| 🛑 ST_KILL (PE) || ST:{st_sig} || T:0")
                 return 0
 
         # 3. 🎯 DYNAMIC TARGET LOGIC (EXIT_SIG DETERMINES SCORE)
-        score = 1.4 # Default Fallback
+        score = 1.4 
         state = "✅"
 
         if is_ce:
-            # Surgical Multiplier if Exit Signal aligns
-            if any(x in exit_sig for x in ["BUY", "BULL", "NONE"]):
+            # Surgical Math (🔥) if Exit sentiment is Bullish
+            if any(x in exit_sig for x in ["BUY", "BULL"]) and "SELL" not in exit_sig and "BEAR" not in exit_sig:
                 calc = atr * ce_p * ce_f
                 score = calc if calc > 0 else 1.4
                 state = "🔥" if calc > 0 else "⚠️"
             else:
-                # If Trend is UP but Sentiment (Exit) is not, stay at 1.4%
+                # Default 1.4 if sentiment is BEAR, SELL, or NONE
                 score, state = 1.4, "⏳" if is_fresh else "❌"
         
         elif is_pe:
-            # Surgical Multiplier if Exit Signal aligns
-            if any(x in exit_sig for x in ["SELL", "BEAR", "NONE"]):
+            # Surgical Math (🔥) if Exit sentiment is Bearish
+            if any(x in exit_sig for x in ["SELL", "BEAR"]) and "BUY" not in exit_sig and "BULL" not in exit_sig:
                 calc = atr * pe_p * pe_f
                 score = calc if calc > 0 else 1.4
                 state = "🔥" if calc > 0 else "⚠️"
             else:
+                # Default 1.4 if sentiment is BULL, BUY, or NONE
                 score, state = 1.4, "⏳" if is_fresh else "❌"
         else:
             state = "⚪"
@@ -102,5 +108,3 @@ def target_price(row):
     except Exception as e:
         print(f"ERROR|{str(e)}")
         return 0
-
-
