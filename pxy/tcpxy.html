@@ -1,3 +1,6 @@
+It sounds like the script crashed because it was trying to update chart properties incorrectly or the WebSocket couldn't connect. I have fixed the Chart.js update logic and added try/catch blocks to ensure the terminal doesn't "hang" if the WebSocket or JSON data is missing.
+Here is the full, debugged code:
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,19 +8,8 @@
     <title>PXY DASHBOARD</title>
     <link rel="stylesheet" href="https://jsdelivr.net" />
     <style>
-        :root { 
-            --divider-width: 6px; 
-            --bg: #f5f5f5; 
-            --fg: #111; 
-            --border: #ddd; 
-            --menu-hover: #eee;
-        }
-        body.dark-mode {
-            --bg: #121212;
-            --fg: #e0e0e0;
-            --border: #333;
-            --menu-hover: #222;
-        }
+        :root { --divider-width: 6px; --bg: #f5f5f5; --fg: #111; --border: #ddd; --menu-hover: #eee; }
+        body.dark-mode { --bg: #121212; --fg: #e0e0e0; --border: #333; --menu-hover: #222; }
         html, body { margin: 0; height: 100%; overflow: hidden; font-family: monospace; background: var(--bg); color: var(--fg); }
         #topHeader { position: fixed; top: 0; width: 100%; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; color: #fff; z-index: 1000; }
         #headerLeft { position: absolute; left: 10px; font-size: 14px; }
@@ -58,9 +50,7 @@
     <div id="container">
         <div id="terminal"></div>
         <div id="divider"></div>
-        <div id="right">
-            <div id="chartWrap"><canvas id="priceChart"></canvas></div>
-        </div>
+        <div id="right"><div id="chartWrap"><canvas id="priceChart"></canvas></div></div>
     </div>
     <div id="topCandleWrap"><canvas id="topCandle"></canvas></div>
 
@@ -68,6 +58,7 @@
     <script src="https://jsdelivr.net"></script>
     <script src="https://jsdelivr.net"></script>
     <script>
+        // TERMINAL INITIALIZATION
         const term = new Terminal({
             convertEol: true,
             fontFamily: "monospace",
@@ -77,29 +68,36 @@
         const fitAddon = new FitAddon.FitAddon();
         term.loadAddon(fitAddon);
         term.open(document.getElementById('terminal'));
-        setTimeout(() => fitAddon.fit(), 50);
+        setTimeout(() => fitAddon.fit(), 100);
 
-        const ws = new WebSocket(`ws://${location.host}`);
-        ws.onmessage = e => term.write(e.data);
+        // WEBSOCKET
+        try {
+            const ws = new WebSocket(`ws://${location.host}`);
+            ws.onmessage = e => term.write(e.data);
+            ws.onerror = () => term.write("\r\n[WS Error: Check connection]\r\n");
+        } catch(e) { console.error("WS connection failed"); }
 
+        // THEME TOGGLE
         document.getElementById("themeToggle").onclick = (e) => {
             e.stopPropagation();
-            document.body.classList.toggle("dark-mode");
-            const isDark = document.body.classList.contains("dark-mode");
-            term.setOption('theme', isDark 
+            const isDark = document.body.classList.toggle("dark-mode");
+            term.options.theme = isDark 
                 ? { background: "#121212", foreground: "#e0e0e0", cursor: "#e0e0e0" }
-                : { background: "#f5f5f5", foreground: "#111", cursor: "#111" }
-            );
-            load(); 
+                : { background: "#f5f5f5", foreground: "#111", cursor: "#111" };
+            if(chart) {
+                chart.options.scales.y.grid.color = isDark ? "#333" : "#ddd";
+                load();
+            }
         };
 
+        // UI INTERACTION
         const menu = document.getElementById("menu");
         menu.onclick = e => { e.stopPropagation(); menu.classList.toggle("active"); };
         window.onclick = () => menu.classList.remove("active");
 
         const divider = document.getElementById("divider");
-        const terminal = document.getElementById("terminal");
-        const right = document.getElementById("right");
+        const terminalDiv = document.getElementById("terminal");
+        const rightDiv = document.getElementById("right");
         let isDragging = false;
         divider.addEventListener("mousedown", () => isDragging = true);
         window.addEventListener("mouseup", () => isDragging = false);
@@ -107,21 +105,23 @@
             if (!isDragging) return;
             const percent = (e.clientX / window.innerWidth) * 100;
             if (percent < 10 || percent > 80) return;
-            terminal.style.width = percent + "%";
-            right.style.width = (100 - percent) + "%";
+            terminalDiv.style.width = percent + "%";
+            rightDiv.style.width = (100 - percent) + "%";
             fitAddon.fit();
         });
 
+        // DATA AND CHARTS
         let chart;
         async function load(){
             try {
                 const res = await fetch("./syschrtpxy.json");
+                if(!res.ok) return;
                 const data = await res.json();
                 const closes = data.map(d=>d.close);
                 const st = data.map(d=>d.st);
                 draw(closes, st);
                 drawTopCandle(st, closes);
-            } catch(e) {}
+            } catch(e) { console.log("Fetch failed, retrying..."); }
         }
 
         function draw(closes, st){
@@ -138,20 +138,25 @@
             else if (last < prev) header.style.background = "linear-gradient(270deg,#7f0000,#b71c1c,#7f0000)";
             else header.style.background = "#616161";
 
+            const chartData = {
+                labels: [...c.map((_,i)=>i),...Array(5).fill("")],
+                datasets: [
+                    { data: [...c,...Array(5).fill(null)], borderColor: lineCol, borderWidth: 2, pointRadius: 0 },
+                    { data: [...s,...Array(5).fill(null)], borderColor: stCol, borderWidth: 1, pointRadius: 0 }
+                ]
+            };
+
             if(!chart){
                 chart = new Chart(document.getElementById("priceChart"), {
                     type:"line",
-                    data:{ labels:[...c.map((_,i)=>i),...Array(5).fill("")], datasets:[
-                        { data:[...c,...Array(5).fill(null)], borderColor:lineCol, borderWidth:2, pointRadius:0 },
-                        { data:[...s,...Array(5).fill(null)], borderColor:stCol, borderWidth:1, pointRadius:0 }
-                    ]},
+                    data: chartData,
                     options:{ animation:false, plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{display:false}}}
                 });
             } else {
                 chart.data.datasets[0].borderColor = lineCol;
                 chart.data.datasets[1].borderColor = stCol;
-                chart.data.datasets[0].data = [...c,...Array(5).fill(null)];
-                chart.data.datasets[1].data = [...s,...Array(5).fill(null)];
+                chart.data.datasets[0].data = chartData.datasets[0].data;
+                chart.data.datasets[1].data = chartData.datasets[1].data;
                 chart.update("none");
             }
         }
@@ -173,5 +178,7 @@
     </script>
 </body>
 </html>
+
+Are you seeing the "Toggle" option in the menu and is the Terminal window responding now?
 
 
