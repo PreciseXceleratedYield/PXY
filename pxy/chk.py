@@ -4,7 +4,7 @@ import sys
 
 def run_all_sub_scripts():
     # Added your requested exclusions
-    exclude_list = [os.path.basename(__file__), "exepxy.py", "sysmonpxy.py", "syspxy.py"]
+    exclude_list = [os.path.basename(__file__), "sysexepxy.py","exepxy.py", "sysmonpxy.py", "syspxy.py"]
     failed_scripts = []
 
     for root, dirs, files in os.walk('.'):
