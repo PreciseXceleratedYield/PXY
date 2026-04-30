@@ -1,248 +1,220 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>PXY DASHBOARD</title>
-
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
-
-<style>
-:root { --divider-width: 6px; }
-
-html, body {
-    margin: 0;
-    height: 100%;
-    overflow: hidden;
-    font-family: monospace;
-    background: #f5f5f5;
-    color: #111;
-}
-
-* {
-    scrollbar-width: thin;
-    scrollbar-color: #f5f5f5 #f5f5f5;
-}
-::-webkit-scrollbar { width: 2px; height: 2px; }
-::-webkit-scrollbar-track { background: #f5f5f5; }
-::-webkit-scrollbar-thumb { background: #f5f5f5; }
-
-#topHeader {
-    position: fixed;
-    top: 0;
-    width: 100%;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    font-weight: 900;
-    color: #fff;
-    z-index: 1000;
-}
-
-#headerLeft { position: absolute; left: 10px; font-size: 14px; }
-#headerCenter { position: absolute; left: 50%; transform: translateX(-50%); font-size: 14px; }
-#headerRight { position: absolute; right: 10px; display: flex; gap: 12px; }
-
-.liveBox { display: flex; gap: 4px; }
-
-#statusDot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #00c853;
-    animation: blink 1.2s infinite;
-}
-
-@keyframes blink {
-    0%,100% { opacity: 1 }
-    50% { opacity: 0.3 }
-}
-
-#menu { position: relative; cursor: pointer; }
-#dropdown {
-    position: absolute;
-    top: 22px;
-    right: 0;
-    background: #f5f5f5;
-    border: 1px solid #ddd;
-    display: none;
-}
-#dropdown div { padding: 6px 10px; cursor: pointer; }
-#dropdown div:hover { background: #eee; }
-#menu.active #dropdown { display: block; }
-
-#container {
-    display: flex;
-    height: calc(100vh - 18px);
-    padding-top: 26px;
-}
-
-#terminal {
-    width: 33%;
-    min-width: 200px;
-    border-right: 1px solid #ddd;
-}
-
-#divider {
-    width: var(--divider-width);
-    cursor: col-resize;
-    background: #f5f5f5;
-}
-
-#right { flex: 1; display: flex; flex-direction: column; }
-#chartWrap { flex: 1; }
-
-canvas {
-    width: 100% !important;
-    height: 100% !important;
-    background: #f5f5f5;
-}
-
-#topCandleWrap {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    height: 18px;
-    background: #f5f5f5;
-    border-top: 1px solid #ddd;
-}
-</style>
+    <meta charset="UTF-8">
+    <title>PXY DASHBOARD</title>
+    <link rel="stylesheet" href="https://jsdelivr.net" />
+    <style>
+        :root { --divider-width: 6px; }
+        /* GLOBAL */
+        html, body { margin: 0; height: 100%; overflow: hidden; font-family: monospace; background: #f5f5f5; color: #111; }
+        /* SCROLLBAR */
+        * { scrollbar-width: thin; scrollbar-color: #f5f5f5 #f5f5f5; }
+        ::-webkit-scrollbar { width: 2px; height: 2px; }
+        ::-webkit-scrollbar-track { background: #f5f5f5; }
+        ::-webkit-scrollbar-thumb { background: #f5f5f5; }
+        /* HEADER */
+        #topHeader { position: fixed; top: 0; width: 100%; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; color: #fff; z-index: 1000; }
+        #headerLeft { position: absolute; left: 10px; font-size: 14px; }
+        #headerCenter { position: absolute; left: 50%; transform: translateX(-50%); font-size: 14px; }
+        #headerRight { position: absolute; right: 10px; display: flex; gap: 12px; }
+        .liveBox { display: flex; gap: 4px; }
+        #statusDot { width: 6px; height: 6px; border-radius: 50%; background: #00c853; animation: blink 1.2s infinite; }
+        @keyframes blink { 0%,100% { opacity: 1 } 50% { opacity: 0.3 } }
+        /* MENU */
+        #menu { position: relative; cursor: pointer; }
+        #dropdown { position: absolute; top: 22px; right: 0; background: #f5f5f5; border: 1px solid #ddd; display: none; }
+        #dropdown div { padding: 6px 10px; cursor: pointer; }
+        #dropdown div:hover { background: #eee; }
+        #menu.active #dropdown { display: block; }
+        /* LAYOUT */
+        #container { display: flex; height: calc(100vh - 44px); padding-top: 26px; }
+        #terminal { width: 33%; min-width: 200px; border-right: 1px solid #ddd; }
+        #divider { width: var(--divider-width); cursor: col-resize; background: #f5f5f5; }
+        #right { flex: 1; display: flex; flex-direction: column; }
+        #chartWrap { flex: 1; }
+        canvas { width: 100% !important; height: 100% !important; background: #f5f5f5; }
+        /* BOTTOM HORIZONTAL CANDLE */
+        #topCandleWrap { position: fixed; bottom: 0; width: 100%; height: 18px; background: #f5f5f5; border-top: 1px solid #ddd; display: flex; align-items: center; }
+        #topCandle { width: 100%; height: 100%; }
+    </style>
 </head>
-
 <body>
-
-<div id="topHeader">
-    <div id="headerLeft">PXY®</div>
-    <div id="headerCenter">PreciseXceleratedYield Pvt Ltd</div>
-
-    <div id="headerRight">
-        <span class="liveBox">
-            <span id="statusDot"></span>
-            <span>LIVE</span>
-        </span>
-
-        <div id="menu">
-            ☰
-            <div id="dropdown">
-                <div>CSV 1</div>
-                <div>CSV 2</div>
-                <div>CSV 3</div>
+    <div id="topHeader">
+        <div id="headerLeft">PXY®</div>
+        <div id="headerCenter">PreciseXceleratedYield Pvt Ltd</div>
+        <div id="headerRight">
+            <span class="liveBox">
+                <span id="statusDot"></span>
+                <span>LIVE</span>
+            </span>
+            <div id="menu"> ☰ 
+                <div id="dropdown">
+                    <div>CSV 1</div>
+                    <div>CSV 2</div>
+                    <div>CSV 3</div>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<div id="container">
-    <div id="terminal"></div>
-    <div id="divider"></div>
-    <div id="right">
-        <div id="chartWrap">
-            <canvas id="priceChart"></canvas>
+    <div id="container">
+        <div id="terminal"></div>
+        <div id="divider"></div>
+        <div id="right">
+            <div id="chartWrap">
+                <canvas id="priceChart"></canvas>
+            </div>
         </div>
     </div>
-</div>
 
-<div id="topCandleWrap">
-    <canvas id="topCandle"></canvas>
-</div>
+    <div id="topCandleWrap">
+        <canvas id="topCandle"></canvas>
+    </div>
 
-<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://jsdelivr.net"></script>
+    <script src="https://jsdelivr.net"></script>
+    <script src="https://jsdelivr.net"></script>
+    <script>
+        const term = new Terminal({ convertEol: true, scrollback: 1000, fontFamily: "monospace", fontSize: 14, cursorBlink: false, theme: { background: "#f5f5f5", foreground: "#111", cursor: "#111" } });
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal'));
+        setTimeout(()=>fitAddon.fit(),50);
+        window.addEventListener("resize",()=>fitAddon.fit());
 
-<script>
-const term = new Terminal({ convertEol:true, scrollback:1000, fontFamily:"monospace", fontSize:14 });
+        const ws = new WebSocket(`ws://${location.host}`);
+        ws.onmessage = e => term.write(e.data);
 
-const fitAddon = new FitAddon.FitAddon();
-term.loadAddon(fitAddon);
-term.open(document.getElementById('terminal'));
-setTimeout(()=>fitAddon.fit(),50);
-window.addEventListener("resize",()=>fitAddon.fit());
+        /* MENU */
+        const menu = document.getElementById("menu");
+        menu.onclick = e => { e.stopPropagation(); menu.classList.toggle("active"); };
+        window.onclick = () => menu.classList.remove("active");
 
-const ws = new WebSocket(`ws://${location.host}`);
-ws.onmessage = e => term.write(e.data);
-
-let chart;
-
-async function load(){
-    const res=await fetch("./syschrtpxy.json");
-    const data=await res.json();
-
-    const closes=data.map(d=>d.close);
-    const st=data.map(d=>d.st);
-    const highs=data.map(d=>d.high);
-    const lows=data.map(d=>d.low);
-
-    draw(closes,st);
-    drawTopCandle(st,closes,highs,lows);
-}
-
-function draw(closes,st){
-    const c=closes.slice(-40);
-    const s=st.slice(-40);
-
-    if(!chart){
-        chart=new Chart(document.getElementById("priceChart"),{
-            type:"line",
-            data:{
-                labels:c.map((_,i)=>i),
-                datasets:[
-                    { data:c, borderColor:"rgba(0,0,0,0.25)", borderWidth:2, pointRadius:0 },
-                    { data:s, borderColor:"#000", borderWidth:1, pointRadius:0 }
-                ]
-            },
-            options:{ animation:false, plugins:{legend:{display:false}}, scales:{x:{display:false},y:{display:false}} }
+        /* DIVIDER */
+        const divider = document.getElementById("divider");
+        const terminal = document.getElementById("terminal");
+        const right = document.getElementById("right");
+        let isDragging = false;
+        divider.addEventListener("mousedown", () => isDragging = true);
+        window.addEventListener("mouseup", () => isDragging = false);
+        window.addEventListener("mousemove", e => {
+            if (!isDragging) return;
+            const percent = (e.clientX / window.innerWidth) * 100;
+            if (percent < 10 || percent > 80) return;
+            terminal.style.width = percent + "%";
+            right.style.width = (100 - percent) + "%";
         });
-    } else {
-        chart.data.datasets[0].data=c;
-        chart.data.datasets[1].data=s;
-        chart.update("none");
-    }
-}
 
-function drawTopCandle(stVals, closes, highs, lows){
-    const canvas=document.getElementById("topCandle");
-    const ctx=canvas.getContext("2d");
+        /* CHART */
+        let chart;
+        async function load(){
+            try {
+                const res = await fetch("./syschrtpxy.json");
+                const data = await res.json();
+                const closes = data.map(d => d.close);
+                const st = data.map(d => d.st);
+                draw(closes, st);
+                drawTopCandle(st, closes);
+            } catch(e) { console.error("Data load error", e); }
+        }
 
-    canvas.width=canvas.clientWidth;
-    canvas.height=canvas.clientHeight;
+        function draw(closes, st){
+            const MAX = 40;
+            const c = closes.slice(-MAX);
+            const s = st.slice(-MAX);
+            const pad = 5;
+            const labels = [...c.map((_,i)=>i), ...Array(pad).fill("")];
+            const closePad = [...c, ...Array(pad).fill(null)];
+            const stPad = [...s, ...Array(pad).fill(null)];
 
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+            const last = c.at(-1);
+            const prev = c.at(-2);
+            const header = document.getElementById("topHeader");
+            if (last > prev) {
+                header.style.background = "linear-gradient(270deg,#1b5e20,#2e7d32,#1b5e20)";
+            } else if (last < prev) {
+                header.style.background = "linear-gradient(270deg,#7f0000,#b71c1c,#7f0000)";
+            } else {
+                header.style.background = "#616161";
+            }
 
-    const st = stVals.at(-1);
-    const close = closes.at(-1);
+            if(!chart){
+                chart = new Chart(document.getElementById("priceChart"),{
+                    type: "line",
+                    data: {
+                        labels,
+                        datasets: [
+                            { data: closePad, borderColor: "rgba(0,0,0,0.25)", borderWidth: 2, pointRadius: 0 },
+                            { data: stPad, borderWidth: 1, pointRadius: 0, borderColor: "#000" }
+                        ]
+                    },
+                    options: { animation: false, plugins: {legend: {display: false}}, scales: { x: {display: false}, y: {display: false} } }
+                });
+            } else {
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = closePad;
+                chart.data.datasets[1].data = stPad;
+                chart.update("none");
+            }
+        }
 
-    const HH = Math.max(...highs.slice(-40));
-    const LL = Math.min(...lows.slice(-40));
+        /* BOTTOM HORIZONTAL CANDLE LOGIC */
+        function drawTopCandle(stVals, closes){
+            const canvas = document.getElementById("topCandle");
+            const ctx = canvas.getContext("2d");
+            canvas.width = canvas.clientWidth;
+            canvas.height = canvas.clientHeight;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const high = close>=st ? HH : st;
-    const low  = close>=st ? st : LL;
+            const curPrice = closes.at(-1);
+            const curST = stVals.at(-1);
+            const last40 = closes.slice(-40);
+            const hh40 = Math.max(...last40);
+            const ll40 = Math.min(...last40);
 
-    const scale=v=>((v-low)/(high-low||1))*canvas.width;
-    const midY=canvas.height/2;
+            let open, high, low, close, color;
 
-    ctx.strokeStyle="#000";
-    ctx.beginPath();
-    ctx.moveTo(scale(low),midY);
-    ctx.lineTo(scale(high),midY);
-    ctx.stroke();
+            if (curPrice >= curST) {
+                // ABOVE ST: ST is support
+                open = curST;
+                low = curST;
+                close = curPrice;
+                high = hh40;
+                color = "#1b5e20"; // Green
+            } else {
+                // BELOW ST: ST is resistance
+                open = curST;
+                high = curST;
+                close = curPrice;
+                low = ll40;
+                color = "#b71c1c"; // Red
+            }
 
-    // ✅ COLOR FIX ONLY
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = close >= st ? "#1b5e20" : "#7f0000";
+            // Determine global range for the horizontal scale
+            const minScale = Math.min(low, curST, curPrice);
+            const maxScale = Math.max(high, curST, curPrice);
+            const scale = v => ((v - minScale) / (maxScale - minScale || 1)) * canvas.width;
+            const midY = canvas.height / 2;
 
-    ctx.fillRect(
-        Math.min(scale(st),scale(close)),
-        midY-6,
-        Math.max(Math.abs(scale(close)-scale(st)),2),
-        12
-    );
-}
+            // Draw Wick (Real market range)
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(scale(low), midY);
+            ctx.lineTo(scale(high), midY);
+            ctx.stroke();
 
-load();
-setInterval(load,3000);
-</script>
+            // Draw Candle Body (ST to Current Price)
+            ctx.fillStyle = color;
+            const bodyX = Math.min(scale(open), scale(close));
+            const bodyW = Math.max(Math.abs(scale(close) - scale(open)), 2);
+            ctx.fillRect(bodyX, midY - 6, bodyW, 12);
+        }
 
+        load();
+        setInterval(load, 3000);
+    </script>
 </body>
 </html>
+
