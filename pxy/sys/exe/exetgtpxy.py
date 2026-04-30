@@ -100,7 +100,7 @@ def target_price(row):
         if DEBUG_MODE:
             clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
             status_msg = " [NEW]" if elapsed_secs <= 180 else f" [{int(elapsed_secs/60)}m]"
-            print(f"{clean_symbol}|| E:{entry_prc}|| D:{active_depth:.1f}|| S:{score:.2f}|| {state} || T:{target}{status_msg}")
+            print(f"{clean_symbol}|| S:{score:.2f}|| {state} || T:{target}{status_msg}")
 
         return target
 
