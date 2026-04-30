@@ -3,41 +3,45 @@ import subprocess
 import sys
 
 def run_all_sub_scripts():
+    # Added your requested exclusions
     exclude_list = [os.path.basename(__file__), "exepxy.py", "sysmonpxy.py", "syspxy.py"]
-    results = {"success": [], "errors": []}
+    failed_scripts = []
 
     for root, dirs, files in os.walk('.'):
         for file in files:
             if file.endswith('.py') and file not in exclude_list:
-                file_path = os.path.join(root, file)
+                file_path = os.path.abspath(os.path.join(root, file))
+                # Get the folder where the script lives
+                script_dir = os.path.dirname(file_path)
                 
-                print(f"🚀 RUNNING: {file_path}...")
+                print(f"\n" + "🚀" * 20)
+                print(f"RUNNING: {file_path}")
+                print("🚀" * 20)
                 
                 try:
-                    # check=True will raise the exception if the script fails
-                    subprocess.run([sys.executable, file_path], check=True, capture_output=True, text=True)
-                    results["success"].append(file_path)
+                    # 'cwd' switches the execution directory to the script's own folder
+                    subprocess.run([sys.executable, file_path], check=True, cwd=script_dir)
+                    print(f"\n✅ [DONE]: {file}")
                 except subprocess.CalledProcessError as e:
-                    # Capture error and move to next script without asking
-                    error_msg = e.stderr.strip() if e.stderr else "Unknown error"
-                    results["errors"].append((file_path, e.returncode, error_msg))
-                    print(f"⚠️  FAILED: {file_path}")
+                    print(f"\n⚠️ [CRASHED]: {file_path}")
+                    failed_scripts.append(f"{file_path} (Exit Code: {e.returncode})")
+                    
+                    # Manual intervention: wait and ask before moving to next
+                    choice = input("\nError detected. Continue to next script? (y/n): ").strip().lower()
+                    if choice != 'y':
+                        print("🛑 Stopping runner.")
+                        sys.exit()
 
-    # Final Summary Output
-    print("\n" + "="*30)
-    print("       FINAL REPORT")
-    print("="*30)
-    print(f"✅ Completed: {len(results['success'])}")
-    print(f"❌ Failed:    {len(results['errors'])}")
-    
-    if results["errors"]:
-        print("\n--- ERROR DETAILS ---")
-        for path, code, msg in results["errors"]:
-            print(f"\n[!] {path} (Code: {code})")
-            # Print last line of error for brevity
-            print(f"    Trace: {msg.splitlines()[-1] if msg else 'No stderr'}")
-    
-    print("\n" + "="*30)
+    # Final Summary Report
+    print("\n" + "="*40)
+    print("🏁 PROCESS COMPLETE")
+    if failed_scripts:
+        print("\n❌ SCRIPTS WITH ERRORS:")
+        for fail in failed_scripts:
+            print(f"  - {fail}")
+    else:
+        print("\n✨ All scripts ran successfully!")
+    print("="*40)
 
 if __name__ == "__main__":
     run_all_sub_scripts()
