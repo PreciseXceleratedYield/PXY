@@ -37,15 +37,12 @@ html, body {
     top: 0;
     width: 100%;
     height: 26px;
-
     display: flex;
     align-items: center;
     justify-content: center;
-
     font-size: 12px;
     font-weight: 900;
     color: #fff;
-
     z-index: 1000;
 }
 
@@ -243,12 +240,12 @@ async function load(){
 
     const closes=data.map(d=>d.close);
     const st=data.map(d=>d.st);
-    const highs=data.map(d=>d.high);   // ✅ added
-    const lows=data.map(d=>d.low);     // ✅ added
+    const highs=data.map(d=>d.high);
+    const lows=data.map(d=>d.low);
     const trend=data.map(d=>d.st_trend);
 
     draw(closes,st,trend);
-    drawTopCandle(st,closes,highs,lows); // ✅ updated
+    drawTopCandle(st,closes,highs,lows);
 }
 
 function draw(closes,st,trend){
@@ -350,12 +347,9 @@ function drawTopCandle(stVals, closes, highs, lows){
 
     ctx.fillStyle=close>=st?"#1b5e20":"#7f0000";
 
-    ctx.fillRect(
-        Math.min(scale(st),scale(close)),
-        midY-6,
-        Math.max(Math.abs(scale(close)-scale(st)),2),
-        12
-    );
+    // ✅ FIX: draw marker instead of full body
+    const x = scale(close);
+    ctx.fillRect(x - 1, midY - 6, 2, 12);
 }
 
 load();
