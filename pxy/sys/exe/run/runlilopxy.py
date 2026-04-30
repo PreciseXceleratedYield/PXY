@@ -131,7 +131,7 @@ def _print_summary(total_unrealized, total_realized):
     combined = f"{part1}   {part2}"
     
     # Print right-aligned within 35 spaces
-    print(f"{combined:>35}")
+    print(f"{combined:>40}")
 
 if __name__ == "__main__":
     client = get_session()
