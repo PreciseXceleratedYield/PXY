@@ -3,33 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <title>PXY DASHBOARD</title>
-    <link rel="stylesheet" href="https://jsdelivr.net" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
     <style>
         :root { --divider-width: 6px; }
         html, body { margin: 0; height: 100%; overflow: hidden; font-family: monospace; background: #f5f5f5; color: #111; }
-        * { scrollbar-width: thin; scrollbar-color: #f5f5f5 #f5f5f5; }
-        ::-webkit-scrollbar { width: 2px; height: 2px; }
-        ::-webkit-scrollbar-track { background: #f5f5f5; }
-        ::-webkit-scrollbar-thumb { background: #f5f5f5; }
-        #topHeader { position: fixed; top: 0; width: 100%; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; color: #fff; z-index: 1000; }
+        #topHeader { position: fixed; top: 0; width: 100%; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; color: #fff; z-index: 1000; background: #616161; }
         #headerLeft { position: absolute; left: 10px; font-size: 14px; }
         #headerCenter { position: absolute; left: 50%; transform: translateX(-50%); font-size: 14px; }
         #headerRight { position: absolute; right: 10px; display: flex; gap: 12px; }
-        .liveBox { display: flex; gap: 4px; }
-        #statusDot { width: 6px; height: 6px; border-radius: 50%; background: #00c853; animation: blink 1.2s infinite; }
-        @keyframes blink { 0%,100% { opacity: 1 } 50% { opacity: 0.3 } }
-        #menu { position: relative; cursor: pointer; }
-        #dropdown { position: absolute; top: 22px; right: 0; background: #f5f5f5; border: 1px solid #ddd; display: none; }
-        #dropdown div { padding: 6px 10px; cursor: pointer; }
-        #dropdown div:hover { background: #eee; }
-        #menu.active #dropdown { display: block; }
         #container { display: flex; height: calc(100vh - 44px); padding-top: 26px; }
         #terminal { width: 33%; min-width: 200px; border-right: 1px solid #ddd; }
         #divider { width: var(--divider-width); cursor: col-resize; background: #f5f5f5; }
         #right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         #chartWrap { flex: 1; position: relative; }
         canvas { width: 100% !important; height: 100% !important; display: block; }
-        #topCandleWrap { position: fixed; bottom: 0; width: 100%; height: 18px; background: #f5f5f5; border-top: 1px solid #ddd; display: flex; align-items: center; }
+        #topCandleWrap { position: fixed; bottom: 0; width: 100%; height: 18px; background: #f5f5f5; border-top: 1px solid #ddd; }
         #topCandle { width: 100%; height: 100%; }
     </style>
 </head>
@@ -37,14 +25,8 @@
     <div id="topHeader">
         <div id="headerLeft">PXY®</div>
         <div id="headerCenter">PreciseXceleratedYield Pvt Ltd</div>
-        <div id="headerRight">
-            <span class="liveBox"><span id="statusDot"></span><span>LIVE</span></span>
-            <div id="menu"> ☰ 
-                <div id="dropdown"><div>CSV 1</div><div>CSV 2</div><div>CSV 3</div></div>
-            </div>
-        </div>
+        <div id="headerRight">LIVE</div>
     </div>
-
     <div id="container">
         <div id="terminal"></div>
         <div id="divider"></div>
@@ -52,40 +34,17 @@
             <div id="chartWrap"><canvas id="priceChart"></canvas></div>
         </div>
     </div>
-
     <div id="topCandleWrap"><canvas id="topCandle"></canvas></div>
 
-    <script src="https://jsdelivr.net"></script>
-    <script src="https://jsdelivr.net"></script>
-    <script src="https://jsdelivr.net"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         const term = new Terminal({ convertEol: true, scrollback: 1000, fontFamily: "monospace", fontSize: 14, theme: { background: "#f5f5f5", foreground: "#111" } });
         const fitAddon = new FitAddon.FitAddon();
         term.loadAddon(fitAddon);
         term.open(document.getElementById('terminal'));
         setTimeout(() => fitAddon.fit(), 100);
-        window.addEventListener("resize", () => fitAddon.fit());
-
-        // WebSocket setup (optional error handling)
-        const ws = new WebSocket(`ws://${location.host}`);
-        ws.onmessage = e => term.write(e.data);
-
-        // Menu
-        const menu = document.getElementById("menu");
-        menu.onclick = e => { e.stopPropagation(); menu.classList.toggle("active"); };
-        window.onclick = () => menu.classList.remove("active");
-
-        // Divider
-        const divider = document.getElementById("divider");
-        const terminal = document.getElementById("terminal");
-        let isDragging = false;
-        divider.addEventListener("mousedown", () => isDragging = true);
-        window.addEventListener("mouseup", () => isDragging = false);
-        window.addEventListener("mousemove", e => {
-            if (!isDragging) return;
-            const percent = (e.clientX / window.innerWidth) * 100;
-            if (percent > 10 && percent < 80) terminal.style.width = percent + "%";
-        });
 
         let chart;
         async function load() {
@@ -93,25 +52,25 @@
                 const res = await fetch("./syschrtpxy.json");
                 if (!res.ok) return;
                 const data = await res.json();
+                
                 const closes = data.map(d => d.close);
                 const st = data.map(d => d.st);
                 
                 updateMainChart(closes, st);
                 drawHorizontalCandle(st, closes);
-            } catch (err) { console.error("Update failed", err); }
+            } catch (err) { 
+                console.error("Fetch error:", err); 
+            }
         }
 
         function updateMainChart(closes, st) {
             const MAX = 40;
             const c = closes.slice(-MAX);
             const s = st.slice(-MAX);
-            const pad = 5;
-            const labels = [...c.map((_, i) => i), ...Array(pad).fill("")];
-            const closePad = [...c, ...Array(pad).fill(null)];
-            const stPad = [...s, ...Array(pad).fill(null)];
+            const labels = c.map((_, i) => i);
 
-            // Header Color
-            const last = c.at(-1), prev = c.at(-2);
+            // Header color logic
+            const last = c[c.length-1], prev = c[c.length-2];
             const header = document.getElementById("topHeader");
             header.style.background = last > prev ? "linear-gradient(270deg,#1b5e20,#2e7d32,#1b5e20)" : 
                                      last < prev ? "linear-gradient(270deg,#7f0000,#b71c1c,#7f0000)" : "#616161";
@@ -120,18 +79,18 @@
                 chart = new Chart(document.getElementById("priceChart"), {
                     type: "line",
                     data: {
-                        labels,
+                        labels: labels,
                         datasets: [
-                            { data: closePad, borderColor: "rgba(0,0,0,0.3)", borderWidth: 2, pointRadius: 0 },
-                            { data: stPad, borderColor: "#000", borderWidth: 1, pointRadius: 0 }
+                            { data: c, borderColor: "rgba(0,0,0,0.3)", borderWidth: 2, pointRadius: 0 },
+                            { data: s, borderColor: "#000", borderWidth: 1, pointRadius: 0 }
                         ]
                     },
                     options: { animation: false, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } } }
                 });
             } else {
                 chart.data.labels = labels;
-                chart.data.datasets[0].data = closePad;
-                chart.data.datasets[1].data = stPad;
+                chart.data.datasets[0].data = c; // Fixed indexing
+                chart.data.datasets[1].data = s; // Fixed indexing
                 chart.update('none');
             }
         }
@@ -142,8 +101,8 @@
             canvas.width = canvas.clientWidth;
             canvas.height = canvas.clientHeight;
 
-            const curPrice = closes.at(-1);
-            const curST = stVals.at(-1);
+            const curPrice = closes[closes.length - 1];
+            const curST = stVals[stVals.length - 1];
             const last40 = closes.slice(-40);
             const hh40 = Math.max(...last40);
             const ll40 = Math.min(...last40);
@@ -151,27 +110,47 @@
             let open, high, low, close, color;
 
             if (curPrice >= curST) {
+                // ✅ Price ABOVE ST: ST is support, Upside is real high
                 open = curST; low = curST; close = curPrice; high = hh40; color = "#1b5e20";
             } else {
+                // ✅ Price BELOW ST: ST is resistance, Downside is real low
                 open = curST; high = curST; close = curPrice; low = ll40; color = "#b71c1c";
             }
 
-            const min = Math.min(low, curST, curPrice), max = Math.max(high, curST, curPrice);
-            const scale = v => ((v - min) / (max - min || 1)) * canvas.width;
+            const min = Math.min(low, curST, curPrice);
+            const max = Math.max(high, curST, curPrice);
+            const range = max - min || 1;
+            const scale = v => ((v - min) / range) * canvas.width;
             const midY = canvas.height / 2;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            // Wick
+            
+            // Draw Wick
             ctx.strokeStyle = "#000";
+            ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.moveTo(scale(low), midY); ctx.lineTo(scale(high), midY);
+            ctx.moveTo(scale(low), midY); 
+            ctx.lineTo(scale(high), midY);
             ctx.stroke();
-            // Body
+
+            // Draw Body
             ctx.fillStyle = color;
             const x = Math.min(scale(open), scale(close));
             const w = Math.max(Math.abs(scale(close) - scale(open)), 2);
             ctx.fillRect(x, midY - 6, w, 12);
         }
+
+        // Divider logic
+        const divider = document.getElementById("divider");
+        const terminal = document.getElementById("terminal");
+        let isDragging = false;
+        divider.onmousedown = () => isDragging = true;
+        window.onmouseup = () => isDragging = false;
+        window.onmousemove = e => {
+            if (!isDragging) return;
+            const p = (e.clientX / window.innerWidth) * 100;
+            if (p > 10 && p < 80) terminal.style.width = p + "%";
+        };
 
         load();
         setInterval(load, 3000);
