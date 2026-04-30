@@ -243,10 +243,12 @@ async function load(){
 
     const closes=data.map(d=>d.close);
     const st=data.map(d=>d.st);
+    const highs=data.map(d=>d.high);   // ✅ added
+    const lows=data.map(d=>d.low);     // ✅ added
     const trend=data.map(d=>d.st_trend);
 
     draw(closes,st,trend);
-    drawTopCandle(st,closes);
+    drawTopCandle(st,closes,highs,lows); // ✅ updated
 }
 
 function draw(closes,st,trend){
@@ -261,7 +263,6 @@ function draw(closes,st,trend){
     const closePad=[...c,...Array(pad).fill(null)];
     const stPad=[...s,...Array(pad).fill(null)];
 
-    /* 🔥 HEADER COLOR FIX */
     const last = c.at(-1);
     const prev = c.at(-2);
 
@@ -310,7 +311,7 @@ function draw(closes,st,trend){
 }
 
 /* BOTTOM */
-function drawTopCandle(stVals, closes){
+function drawTopCandle(stVals, closes, highs, lows){
     const canvas=document.getElementById("topCandle");
     const ctx=canvas.getContext("2d");
 
@@ -319,11 +320,24 @@ function drawTopCandle(stVals, closes){
 
     ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    const open=stVals.at(-1);
-    const close=closes.at(-1);
+    const st = stVals.at(-1);
+    const close = closes.at(-1);
 
-    const high=Math.max(...stVals,...closes);
-    const low=Math.min(...stVals,...closes);
+    const highs40 = highs.slice(-40);
+    const lows40  = lows.slice(-40);
+
+    const HH = Math.max(...highs40);
+    const LL = Math.min(...lows40);
+
+    let high, low;
+
+    if (close >= st) {
+        high = HH;
+        low  = st;
+    } else {
+        high = st;
+        low  = LL;
+    }
 
     const scale=v=>((v-low)/(high-low||1))*canvas.width;
     const midY=canvas.height/2;
@@ -334,12 +348,12 @@ function drawTopCandle(stVals, closes){
     ctx.lineTo(scale(high),midY);
     ctx.stroke();
 
-    ctx.fillStyle=close>=open?"#1b5e20":"#7f0000";
+    ctx.fillStyle=close>=st?"#1b5e20":"#7f0000";
 
     ctx.fillRect(
-        Math.min(scale(open),scale(close)),
+        Math.min(scale(st),scale(close)),
         midY-6,
-        Math.max(Math.abs(scale(close)-scale(open)),2),
+        Math.max(Math.abs(scale(close)-scale(st)),2),
         12
     );
 }
@@ -350,5 +364,3 @@ setInterval(load,3000);
 
 </body>
 </html>
-
-
