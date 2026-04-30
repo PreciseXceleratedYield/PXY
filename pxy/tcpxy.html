@@ -40,15 +40,11 @@
     <script src="https://jsdelivr.net"></script>
     <script src="https://jsdelivr.net"></script>
     <script>
-        // Terminal Setup
         const term = new Terminal({ convertEol: true, scrollback: 1000, fontFamily: "monospace", fontSize: 14, theme: { background: "#f5f5f5", foreground: "#111" } });
         const fitAddon = new FitAddon.FitAddon();
         term.loadAddon(fitAddon);
         term.open(document.getElementById('terminal'));
-        
-        // Initial Terminal Message
-        term.writeln("PXY Terminal Initialized...");
-        term.writeln("Waiting for market data connection...");
+        term.writeln("PXY System Online...");
 
         setTimeout(() => fitAddon.fit(), 200);
 
@@ -58,6 +54,7 @@
                 const res = await fetch("./syschrtpxy.json");
                 if (!res.ok) return;
                 const data = await res.json();
+                if (!data.length) return;
                 
                 const closes = data.map(d => d.close);
                 const st = data.map(d => d.st);
@@ -65,8 +62,7 @@
                 updateMainChart(closes, st);
                 drawHorizontalCandle(st, closes);
             } catch (err) { 
-                console.error("Fetch error:", err); 
-                term.writeln("Data Load Error: Check console");
+                console.error("Update Error:", err); 
             }
         }
 
@@ -95,8 +91,8 @@
                 });
             } else {
                 chart.data.labels = labels;
-                chart.data.datasets[0].data = c; // Fixed indexing
-                chart.data.datasets[1].data = s; // Fixed indexing
+                chart.data.datasets[0].data = c; // FIXED INDEXING
+                chart.data.datasets[1].data = s; // FIXED INDEXING
                 chart.update('none');
             }
         }
@@ -141,11 +137,6 @@
             ctx.fillRect(x, midY - 6, w, 12);
         }
 
-        // WebSocket connection to terminal
-        const ws = new WebSocket(`ws://${location.host}`);
-        ws.onmessage = e => term.write(e.data);
-
-        // Divider
         const divider = document.getElementById("divider");
         const terminal = document.getElementById("terminal");
         let isDragging = false;
@@ -159,6 +150,9 @@
                 fitAddon.fit();
             }
         };
+
+        const ws = new WebSocket(`ws://${location.host}`);
+        ws.onmessage = e => term.write(e.data);
 
         load();
         setInterval(load, 3000);
