@@ -70,22 +70,22 @@ def target_price(row):
             active_depth = ce_depth
             # CE Surgical: ST UP/BUY and Exit BUY/BULL
             if any(x in st_sig for x in ["UP", "BUY"]) and any(x in exit_sig for x in ["BUY", "BULL"]):
-                # SURGICAL FIX: score = ATR * Power(min 1) * Force(min 1)
-                score = atr * max(1.0, ce_p) * max(1.0, ce_f / 10)
+                # SURGICAL FIX: Includes ATR logic + Depth
+                score = (atr * max(1.0, ce_p) * max(1.0, ce_f / 10)) + ce_depth
                 state = "🔥"
 
         elif is_pe:
             active_depth = pe_depth
             # PE Surgical: ST DOWN/SELL and Exit SELL/BEAR
             if any(x in st_sig for x in ["DOWN", "SELL"]) and any(x in exit_sig for x in ["SELL", "BEAR"]):
-                # SURGICAL FIX: score = ATR * Power(min 1) * Force(min 1)
-                score = atr * max(1.0, pe_p) * max(1.0, pe_f / 10)
+                # SURGICAL FIX: Includes ATR logic + Depth
+                score = (atr * max(1.0, pe_p) * max(1.0, pe_f / 10)) + pe_depth
                 state = "🔥"
 
         # 4. FINAL CALCULATION
         if state == "🔥":
-            # ATR surgical target: Entry + Score Points + Depth
-            target = int(entry_prc + score + active_depth)
+            # ATR surgical target: Score already includes depth now
+            target = int(entry_prc + score)
         else:
             # Status Quo target: Entry + 1.4%
             target = int(entry_prc * (1 + 1.4 / 100))
@@ -94,7 +94,6 @@ def target_price(row):
         if DEBUG_MODE:
             clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
             status_msg = " [NEW]" if elapsed_secs <= 180 else f" [{int(elapsed_secs/60)}m]"
-            # In Status Quo, we print 1.4 as the score; in Surgical, we print the ATR-based points
             print(f"{clean_symbol}|| E:{entry_prc}|| S:{score:.1f}|| {state} || T:{target}{status_msg}")
 
         return target
@@ -102,5 +101,6 @@ def target_price(row):
     except Exception as e:
         print(f"ERROR|{str(e)}")
         return 0
+
 
 
