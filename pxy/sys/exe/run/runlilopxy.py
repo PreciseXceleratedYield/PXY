@@ -127,12 +127,12 @@ def _print_summary(total_unrealized, total_realized):
     real_val = int(float(real_str))
     unreal_val = int(float(unreal_str))
     
-    part1 = f"🥅 {color}{real_val:+06d}{Style.RESET_ALL} 🥅"
-    part2 = f"{unreal_val:+06d} 🔸 🏃‍♂️🔸 🏃‍♂️"
+    part1 = f"🥅  {color}{real_val:+06d}{Style.RESET_ALL} 🥅"
+    part2 = f"{unreal_val:+06d} 🔸 🏃‍♂️ 🔸 🏃‍♂️"
     
     # Combine and right-align
     combined = f"{part1}   {part2}"
-    print(f"{combined:>40}")
+    print(f"{combined:<40}")
 
 
 if __name__ == "__main__":
