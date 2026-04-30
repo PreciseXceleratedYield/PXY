@@ -132,7 +132,7 @@ def _print_summary(total_unrealized, total_realized):
     
     # Combine and right-align
     combined = f"{part1}   {part2}"
-    print(f"{combined:<40}")
+    print(f"{combined:^38}")
 
 
 if __name__ == "__main__":
