@@ -81,7 +81,7 @@ def target_price(row):
 
         if is_ce:
             active_depth = ce_depth
-            if any(x in exit_sig for x in ["BUY", "BULL"]) and "SELL" not in exit_sig:
+            if any(x in exit_sig for x in ["BUY", "BULL"]):
                 # SURGICAL SCORE = 1.4 * Power * Force
                 score = atr * ce_p 
                 state = "🔥" if score > 0 else "⚠️"
@@ -90,7 +90,7 @@ def target_price(row):
         
         elif is_pe:
             active_depth = pe_depth
-            if any(x in exit_sig for x in ["SELL", "BEAR"]) and "BUY" not in exit_sig:
+            if any(x in exit_sig for x in ["SELL", "BEAR"]):
                 # SURGICAL SCORE = 1.4 * Power * Force
                 score = atr * pe_p 
                 state = "🔥" if score > 0 else "⚠️"
