@@ -44,7 +44,6 @@ def target_price(row):
 
         # --- TIME CALCULATIONS ---
         now = datetime.now(IST)
-        is_morning = time(9, 15) <= now.time() < time(9, 30)
         entry_time_val = row.get("buy_time")
         elapsed_secs = 0
 
@@ -57,50 +56,46 @@ def target_price(row):
                     try:
                         parts = list(map(int, entry_time_val.split(":")))
                         e_time = now.replace(hour=parts[0], minute=parts[1], second=parts[2] if len(parts)>2 else 0, microsecond=0)
-                    except:
-                        e_time = now
+                    except: e_time = now
             else:
                 e_time = entry_time_val if entry_time_val.tzinfo else IST.localize(entry_time_val)
             elapsed_secs = (now - e_time).total_seconds()
 
-        # 2. 🎯 DYNAMIC TARGET LOGIC (Status Quo is 1.4%)
-        score = 1.4
-        state = "⏳" # Default state is Status Quo
+        # 2. 🎯 DYNAMIC TARGET LOGIC
+        score = 1.4  # Default percentage for Status Quo
+        state = "⏳" # Status Quo
         active_depth = 0.0
 
         if is_ce:
             active_depth = ce_depth
-            # CE Target: Upgrade to ATR if ST is UP/BUY AND Exit is BUY/BULL
-            st_up = any(x in st_sig for x in ["UP", "BUY"])
-            ex_up = any(x in exit_sig for x in ["BUY", "BULL"])
-            
-            if st_up and ex_up:
-                score = atr * ce_p * max(1, ce_f / 10)
+            # CE Surgical: ST UP/BUY and Exit BUY/BULL
+            if any(x in st_sig for x in ["UP", "BUY"]) and any(x in exit_sig for x in ["BUY", "BULL"]):
+                # SURGICAL FIX: score = ATR * Power(min 1) * Force(min 1)
+                score = atr * max(1.0, ce_p) * max(1.0, ce_f / 10)
                 state = "🔥"
 
         elif is_pe:
             active_depth = pe_depth
-            # PE Target: Upgrade to ATR if ST is DOWN/SELL AND Exit is SELL/BEAR
-            st_down = any(x in st_sig for x in ["DOWN", "SELL"])
-            ex_down = any(x in exit_sig for x in ["SELL", "BEAR"])
-            
-            if st_down and ex_down:
-                score = atr * pe_p * max(1, pe_f / 10)
+            # PE Surgical: ST DOWN/SELL and Exit SELL/BEAR
+            if any(x in st_sig for x in ["DOWN", "SELL"]) and any(x in exit_sig for x in ["SELL", "BEAR"]):
+                # SURGICAL FIX: score = ATR * Power(min 1) * Force(min 1)
+                score = atr * max(1.0, pe_p) * max(1.0, pe_f / 10)
                 state = "🔥"
 
         # 4. FINAL CALCULATION
         if state == "🔥":
-            # ATR/Surgical Target
+            # ATR surgical target: Entry + Score Points + Depth
             target = int(entry_prc + score + active_depth)
         else:
-            # Status Quo Target (1.4%)
-            target = int(entry_prc * (1 + score / 100))
+            # Status Quo target: Entry + 1.4%
+            target = int(entry_prc * (1 + 1.4 / 100))
 
         # CLEAN OUTPUT
         if DEBUG_MODE:
             clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
             status_msg = " [NEW]" if elapsed_secs <= 180 else f" [{int(elapsed_secs/60)}m]"
-            print(f"{clean_symbol}|| S:{score:.2f}|| {state} || T:{target}{status_msg}")
+            # In Status Quo, we print 1.4 as the score; in Surgical, we print the ATR-based points
+            print(f"{clean_symbol}|| E:{entry_prc}|| S:{score:.1f}|| {state} || T:{target}{status_msg}")
 
         return target
 
