@@ -71,7 +71,7 @@ def target_price(row):
             # CE Surgical: ST UP/BUY and Exit BUY/BULL
             if any(x in st_sig for x in ["UP", "BUY"]) and any(x in exit_sig for x in ["BUY", "BULL"]):
                 # SURGICAL FIX: Includes ATR logic + Depth
-                score = (atr * max(1.0, ce_p) * max(1.0, ce_f / 10)) + ce_depth
+                score = (atr * max(1.0, ce_p) * max(1.0, ce_f / 10)) 
                 state = "🔥"
 
         elif is_pe:
@@ -79,7 +79,7 @@ def target_price(row):
             # PE Surgical: ST DOWN/SELL and Exit SELL/BEAR
             if any(x in st_sig for x in ["DOWN", "SELL"]) and any(x in exit_sig for x in ["SELL", "BEAR"]):
                 # SURGICAL FIX: Includes ATR logic + Depth
-                score = (atr * max(1.0, pe_p) * max(1.0, pe_f / 10)) + pe_depth
+                score = (atr * max(1.0, pe_p) * max(1.0, pe_f / 10)) 
                 state = "🔥"
 
         # 4. FINAL CALCULATION
