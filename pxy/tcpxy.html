@@ -1,6 +1,3 @@
-It sounds like the script crashed because it was trying to update chart properties incorrectly or the WebSocket couldn't connect. I have fixed the Chart.js update logic and added try/catch blocks to ensure the terminal doesn't "hang" if the WebSocket or JSON data is missing.
-Here is the full, debugged code:
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -19,8 +16,8 @@ Here is the full, debugged code:
         #statusDot { width: 6px; height: 6px; border-radius: 50%; background: #00c853; animation: blink 1.2s infinite; }
         @keyframes blink { 0%,100% { opacity: 1 } 50% { opacity: 0.3 } }
         #menu { position: relative; cursor: pointer; }
-        #dropdown { position: absolute; top: 22px; right: 0; background: var(--bg); border: 1px solid var(--border); display: none; color: var(--fg); min-width: 80px; }
-        #dropdown div { padding: 6px 10px; cursor: pointer; }
+        #dropdown { position: absolute; top: 22px; right: 0; background: var(--bg); border: 1px solid var(--border); display: none; color: var(--fg); min-width: 80px; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        #dropdown div { padding: 8px 12px; cursor: pointer; }
         #dropdown div:hover { background: var(--menu-hover); }
         #menu.active #dropdown { display: block; }
         #container { display: flex; height: calc(100vh - 18px); padding-top: 26px; }
@@ -40,9 +37,6 @@ Here is the full, debugged code:
             <div id="menu"> ☰ 
                 <div id="dropdown">
                     <div id="themeToggle">Toggle</div>
-                    <div>CSV 1</div>
-                    <div>CSV 2</div>
-                    <div>CSV 3</div>
                 </div>
             </div>
         </div>
@@ -58,7 +52,7 @@ Here is the full, debugged code:
     <script src="https://jsdelivr.net"></script>
     <script src="https://jsdelivr.net"></script>
     <script>
-        // TERMINAL INITIALIZATION
+        // 1. TERMINAL SETUP
         const term = new Terminal({
             convertEol: true,
             fontFamily: "monospace",
@@ -70,27 +64,24 @@ Here is the full, debugged code:
         term.open(document.getElementById('terminal'));
         setTimeout(() => fitAddon.fit(), 100);
 
-        // WEBSOCKET
+        // 2. WEBSOCKET
         try {
             const ws = new WebSocket(`ws://${location.host}`);
             ws.onmessage = e => term.write(e.data);
-            ws.onerror = () => term.write("\r\n[WS Error: Check connection]\r\n");
         } catch(e) { console.error("WS connection failed"); }
 
-        // THEME TOGGLE
+        // 3. THEME TOGGLE (Fixed Terminal Update)
         document.getElementById("themeToggle").onclick = (e) => {
             e.stopPropagation();
             const isDark = document.body.classList.toggle("dark-mode");
-            term.options.theme = isDark 
+            term.setOption('theme', isDark 
                 ? { background: "#121212", foreground: "#e0e0e0", cursor: "#e0e0e0" }
-                : { background: "#f5f5f5", foreground: "#111", cursor: "#111" };
-            if(chart) {
-                chart.options.scales.y.grid.color = isDark ? "#333" : "#ddd";
-                load();
-            }
+                : { background: "#f5f5f5", foreground: "#111", cursor: "#111" }
+            );
+            load(); 
         };
 
-        // UI INTERACTION
+        // 4. UI MENU & RESIZING
         const menu = document.getElementById("menu");
         menu.onclick = e => { e.stopPropagation(); menu.classList.toggle("active"); };
         window.onclick = () => menu.classList.remove("active");
@@ -110,7 +101,7 @@ Here is the full, debugged code:
             fitAddon.fit();
         });
 
-        // DATA AND CHARTS
+        // 5. CHARTING & DATA (Fixed Update Logic)
         let chart;
         async function load(){
             try {
@@ -121,7 +112,7 @@ Here is the full, debugged code:
                 const st = data.map(d=>d.st);
                 draw(closes, st);
                 drawTopCandle(st, closes);
-            } catch(e) { console.log("Fetch failed, retrying..."); }
+            } catch(e) {}
         }
 
         function draw(closes, st){
@@ -138,25 +129,25 @@ Here is the full, debugged code:
             else if (last < prev) header.style.background = "linear-gradient(270deg,#7f0000,#b71c1c,#7f0000)";
             else header.style.background = "#616161";
 
-            const chartData = {
-                labels: [...c.map((_,i)=>i),...Array(5).fill("")],
-                datasets: [
-                    { data: [...c,...Array(5).fill(null)], borderColor: lineCol, borderWidth: 2, pointRadius: 0 },
-                    { data: [...s,...Array(5).fill(null)], borderColor: stCol, borderWidth: 1, pointRadius: 0 }
-                ]
-            };
+            const labels = [...c.map((_,i)=>i),...Array(5).fill("")];
+            const dataset1 = [...c,...Array(5).fill(null)];
+            const dataset2 = [...s,...Array(5).fill(null)];
 
             if(!chart){
                 chart = new Chart(document.getElementById("priceChart"), {
                     type:"line",
-                    data: chartData,
+                    data:{ labels, datasets:[
+                        { data: dataset1, borderColor:lineCol, borderWidth:2, pointRadius:0 },
+                        { data: dataset2, borderColor:stCol, borderWidth:1, pointRadius:0 }
+                    ]},
                     options:{ animation:false, plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{display:false}}}
                 });
             } else {
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = dataset1;
                 chart.data.datasets[0].borderColor = lineCol;
+                chart.data.datasets[1].data = dataset2;
                 chart.data.datasets[1].borderColor = stCol;
-                chart.data.datasets[0].data = chartData.datasets[0].data;
-                chart.data.datasets[1].data = chartData.datasets[1].data;
                 chart.update("none");
             }
         }
@@ -179,6 +170,5 @@ Here is the full, debugged code:
 </body>
 </html>
 
-Are you seeing the "Toggle" option in the menu and is the Terminal window responding now?
 
 
