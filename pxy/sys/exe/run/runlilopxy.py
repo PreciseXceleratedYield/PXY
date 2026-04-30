@@ -123,15 +123,17 @@ def _print_summary(total_unrealized, total_realized):
 
     color = Style.BRIGHT + Fore.GREEN if val_real >= 0 else Fore.RED
 
-    # Create the segments
-    part1 = f"🥅 {color}{int(float(real_str)):+d}{Style.RESET_ALL} 🥅"
-    part2 = f"🔸 🏃‍♂️🔸 🏃‍♂️ {int(float(unreal_str)):+d} 🏃‍♂️🏃‍♂️"
+    # :0+6 ensures sign (+/-) followed by 5 digits
+    real_val = int(float(real_str))
+    unreal_val = int(float(unreal_str))
     
-    # Combine them
+    part1 = f"🥅 {color}{real_val:+06d}{Style.RESET_ALL} 🥅"
+    part2 = f"{unreal_val:+06d} 🔸 🏃‍♂️🔸 🏃‍♂️"
+    
+    # Combine and right-align
     combined = f"{part1}   {part2}"
-    
-    # Print right-aligned within 35 spaces
     print(f"{combined:>40}")
+
 
 if __name__ == "__main__":
     client = get_session()
