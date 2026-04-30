@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>PXY DASHBOARD</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+    <link rel="stylesheet" href="https://jsdelivr.net" />
     <style>
         :root { --divider-width: 6px; }
         html, body { margin: 0; height: 100%; overflow: hidden; font-family: monospace; background: #f5f5f5; color: #111; }
@@ -12,7 +12,7 @@
         #headerCenter { position: absolute; left: 50%; transform: translateX(-50%); font-size: 14px; }
         #headerRight { position: absolute; right: 10px; display: flex; gap: 12px; }
         #container { display: flex; height: calc(100vh - 44px); padding-top: 26px; }
-        #terminal { width: 33%; min-width: 200px; border-right: 1px solid #ddd; }
+        #terminal { width: 33%; min-width: 200px; border-right: 1px solid #ddd; background: #f5f5f5; }
         #divider { width: var(--divider-width); cursor: col-resize; background: #f5f5f5; }
         #right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         #chartWrap { flex: 1; position: relative; }
@@ -36,15 +36,21 @@
     </div>
     <div id="topCandleWrap"><canvas id="topCandle"></canvas></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://jsdelivr.net"></script>
+    <script src="https://jsdelivr.net"></script>
+    <script src="https://jsdelivr.net"></script>
     <script>
+        // Terminal Setup
         const term = new Terminal({ convertEol: true, scrollback: 1000, fontFamily: "monospace", fontSize: 14, theme: { background: "#f5f5f5", foreground: "#111" } });
         const fitAddon = new FitAddon.FitAddon();
         term.loadAddon(fitAddon);
         term.open(document.getElementById('terminal'));
-        setTimeout(() => fitAddon.fit(), 100);
+        
+        // Initial Terminal Message
+        term.writeln("PXY Terminal Initialized...");
+        term.writeln("Waiting for market data connection...");
+
+        setTimeout(() => fitAddon.fit(), 200);
 
         let chart;
         async function load() {
@@ -60,6 +66,7 @@
                 drawHorizontalCandle(st, closes);
             } catch (err) { 
                 console.error("Fetch error:", err); 
+                term.writeln("Data Load Error: Check console");
             }
         }
 
@@ -69,7 +76,6 @@
             const s = st.slice(-MAX);
             const labels = c.map((_, i) => i);
 
-            // Header color logic
             const last = c[c.length-1], prev = c[c.length-2];
             const header = document.getElementById("topHeader");
             header.style.background = last > prev ? "linear-gradient(270deg,#1b5e20,#2e7d32,#1b5e20)" : 
@@ -110,10 +116,8 @@
             let open, high, low, close, color;
 
             if (curPrice >= curST) {
-                // ✅ Price ABOVE ST: ST is support, Upside is real high
                 open = curST; low = curST; close = curPrice; high = hh40; color = "#1b5e20";
             } else {
-                // ✅ Price BELOW ST: ST is resistance, Downside is real low
                 open = curST; high = curST; close = curPrice; low = ll40; color = "#b71c1c";
             }
 
@@ -124,8 +128,6 @@
             const midY = canvas.height / 2;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            // Draw Wick
             ctx.strokeStyle = "#000";
             ctx.lineWidth = 1;
             ctx.beginPath();
@@ -133,14 +135,17 @@
             ctx.lineTo(scale(high), midY);
             ctx.stroke();
 
-            // Draw Body
             ctx.fillStyle = color;
             const x = Math.min(scale(open), scale(close));
             const w = Math.max(Math.abs(scale(close) - scale(open)), 2);
             ctx.fillRect(x, midY - 6, w, 12);
         }
 
-        // Divider logic
+        // WebSocket connection to terminal
+        const ws = new WebSocket(`ws://${location.host}`);
+        ws.onmessage = e => term.write(e.data);
+
+        // Divider
         const divider = document.getElementById("divider");
         const terminal = document.getElementById("terminal");
         let isDragging = false;
@@ -149,7 +154,10 @@
         window.onmousemove = e => {
             if (!isDragging) return;
             const p = (e.clientX / window.innerWidth) * 100;
-            if (p > 10 && p < 80) terminal.style.width = p + "%";
+            if (p > 10 && p < 80) {
+                terminal.style.width = p + "%";
+                fitAddon.fit();
+            }
         };
 
         load();
