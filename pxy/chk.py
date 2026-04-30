@@ -3,9 +3,14 @@ import subprocess
 import sys
 
 def run_all_sub_scripts():
-    # Files to ignore (this script itself and exepxy.py)
-    exclude_list = [os.path.basename(__file__), "exepxy.py"]
-    
+    # Added sysmonpxy.py and syspxy.py to the skip list
+    exclude_list = [
+        os.path.basename(__file__), 
+        "exepxy.py", 
+        "sysmonpxy.py", 
+        "syspxy.py"
+    ]
+
     # Walk through current directory and all subdirectories
     for root, dirs, files in os.walk('.'):
         for file in files:
@@ -21,7 +26,6 @@ def run_all_sub_scripts():
                     # Execute the script
                     subprocess.run([sys.executable, file_path], check=True)
                     print(f"\n✅ [DONE]: {file}")
-                
                 except subprocess.CalledProcessError as e:
                     print(f"\n⚠️ [CRASHED]: {file_path}")
                     print(f"Error Code: {e.returncode}")
@@ -34,4 +38,5 @@ def run_all_sub_scripts():
 
 if __name__ == "__main__":
     run_all_sub_scripts()
+
 
