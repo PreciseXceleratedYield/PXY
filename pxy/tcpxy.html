@@ -1,352 +1,209 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>PXY DASHBOARD</title>
+    <meta charset="UTF-8">
+    <title>PXY DASHBOARD</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+    <style>
+        :root { 
+            --divider-width: 6px; 
+            --bg: #f5f5f5; 
+            --fg: #111; 
+            --border: #ddd; 
+            --menu-hover: #eee;
+        }
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+        /* DARK MODE OVERRIDES */
+        body.dark-mode {
+            --bg: #121212;
+            --fg: #e0e0e0;
+            --border: #333;
+            --menu-hover: #222;
+        }
 
-<style>
-:root { --divider-width: 6px; }
+        html, body { margin: 0; height: 100%; overflow: hidden; font-family: monospace; background: var(--bg); color: var(--fg); transition: background 0.2s; }
+        
+        * { scrollbar-width: thin; scrollbar-color: var(--bg) var(--bg); }
+        ::-webkit-scrollbar { width: 2px; height: 2px; }
+        ::-webkit-scrollbar-track { background: var(--bg); }
+        ::-webkit-scrollbar-thumb { background: var(--bg); }
 
-/* GLOBAL */
-html, body {
-    margin: 0;
-    height: 100%;
-    overflow: hidden;
-    font-family: monospace;
-    background: #f5f5f5;
-    color: #111;
-}
+        #topHeader { position: fixed; top: 0; width: 100%; height: 26px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 900; color: #fff; z-index: 1000; }
+        #headerLeft { position: absolute; left: 10px; font-size: 14px; }
+        #headerCenter { position: absolute; left: 50%; transform: translateX(-50%); font-size: 14px; }
+        #headerRight { position: absolute; right: 10px; display: flex; gap: 12px; }
 
-/* SCROLLBAR */
-* {
-    scrollbar-width: thin;
-    scrollbar-color: #f5f5f5 #f5f5f5;
-}
-::-webkit-scrollbar {
-    width: 2px;
-    height: 2px;
-}
-::-webkit-scrollbar-track { background: #f5f5f5; }
-::-webkit-scrollbar-thumb { background: #f5f5f5; }
+        .liveBox { display: flex; gap: 4px; }
+        #statusDot { width: 6px; height: 6px; border-radius: 50%; background: #00c853; animation: blink 1.2s infinite; }
+        @keyframes blink { 0%,100% { opacity: 1 } 50% { opacity: 0.3 } }
 
-/* HEADER */
-#topHeader {
-    position: fixed;
-    top: 0;
-    width: 100%;
-    height: 26px;
+        #menu { position: relative; cursor: pointer; }
+        #dropdown { position: absolute; top: 22px; right: 0; background: var(--bg); border: 1px solid var(--border); display: none; color: var(--fg); min-width: 100px; }
+        #dropdown div { padding: 6px 10px; cursor: pointer; border-bottom: 1px solid var(--border); }
+        #dropdown div:hover { background: var(--menu-hover); }
+        #menu.active #dropdown { display: block; }
 
-    display: flex;
-    align-items: center;
-    justify-content: center;
+        #container { display: flex; height: calc(100vh - 18px); padding-top: 26px; }
+        #terminal { width: 33%; min-width: 200px; border-right: 1px solid var(--border); }
+        #divider { width: var(--divider-width); cursor: col-resize; background: var(--bg); }
+        #right { flex: 1; display: flex; flex-direction: column; }
+        canvas { width: 100% !important; height: 100% !important; background: var(--bg); }
 
-    font-size: 12px;
-    font-weight: 900;
-    color: #fff;
-
-    z-index: 1000;
-}
-
-/* LEFT */
-#headerLeft {
-    position: absolute;
-    left: 10px;
-    font-size: 14px;
-}
-
-/* CENTER */
-#headerCenter {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 14px;
-}
-
-/* RIGHT */
-#headerRight {
-    position: absolute;
-    right: 10px;
-    display: flex;
-    gap: 12px;
-}
-
-.liveBox { display: flex; gap: 4px; }
-
-#statusDot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: #00c853;
-    animation: blink 1.2s infinite;
-}
-
-@keyframes blink {
-    0%,100% { opacity: 1 }
-    50% { opacity: 0.3 }
-}
-
-/* MENU */
-#menu { position: relative; cursor: pointer; }
-
-#dropdown {
-    position: absolute;
-    top: 22px;
-    right: 0;
-    background: #f5f5f5;
-    border: 1px solid #ddd;
-    display: none;
-}
-
-#dropdown div { padding: 6px 10px; cursor: pointer; }
-#dropdown div:hover { background: #eee; }
-
-#menu.active #dropdown { display: block; }
-
-/* LAYOUT */
-#container {
-    display: flex;
-    height: calc(100vh - 18px);
-    padding-top: 26px;
-}
-
-#terminal {
-    width: 33%;
-    min-width: 200px;
-    border-right: 1px solid #ddd;
-}
-
-#divider {
-    width: var(--divider-width);
-    cursor: col-resize;
-    background: #f5f5f5;
-}
-
-#right { flex: 1; display: flex; flex-direction: column; }
-#chartWrap { flex: 1; }
-
-canvas {
-    width: 100% !important;
-    height: 100% !important;
-    background: #f5f5f5;
-}
-
-/* BOTTOM */
-#topCandleWrap {
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-    height: 18px;
-    background: #f5f5f5;
-    border-top: 1px solid #ddd;
-}
-</style>
+        #topCandleWrap { position: fixed; bottom: 0; width: 100%; height: 18px; background: var(--bg); border-top: 1px solid var(--border); }
+    </style>
 </head>
+<body class=""> <!-- Default Light -->
 
-<body>
-
-<div id="topHeader">
-    <div id="headerLeft">PXY®</div>
-    <div id="headerCenter">PreciseXceleratedYield Pvt Ltd</div>
-
-    <div id="headerRight">
-        <span class="liveBox">
-            <span id="statusDot"></span>
-            <span>LIVE</span>
-        </span>
-
-        <div id="menu">
-            ☰
-            <div id="dropdown">
-                <div>CSV 1</div>
-                <div>CSV 2</div>
-                <div>CSV 3</div>
+    <div id="topHeader">
+        <div id="headerLeft">PXY®</div>
+        <div id="headerCenter">PreciseXceleratedYield Pvt Ltd</div>
+        <div id="headerRight">
+            <span class="liveBox">
+                <span id="statusDot"></span> <span>LIVE</span>
+            </span>
+            <div id="menu"> 
+                ☰ 
+                <div id="dropdown">
+                    <div id="themeToggle">🌓 Toggle Theme</div>
+                    <div>CSV 1</div>
+                    <div>CSV 2</div>
+                    <div>CSV 3</div>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<div id="container">
-    <div id="terminal"></div>
-    <div id="divider"></div>
-    <div id="right">
-        <div id="chartWrap">
-            <canvas id="priceChart"></canvas>
+    <div id="container">
+        <div id="terminal"></div>
+        <div id="divider"></div>
+        <div id="right">
+            <div id="chartWrap"><canvas id="priceChart"></canvas></div>
         </div>
     </div>
-</div>
 
-<div id="topCandleWrap">
-    <canvas id="topCandle"></canvas>
-</div>
+    <div id="topCandleWrap">
+        <canvas id="topCandle"></canvas>
+    </div>
 
-<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<script>
-const term = new Terminal({
-    convertEol: true,
-    scrollback: 1000,
-    fontFamily: "monospace",
-    fontSize: 14,
-    cursorBlink: false,
-    theme: {
-        background: "#f5f5f5",
-        foreground: "#111",
-        cursor: "#111"
-    }
-});
-
-const fitAddon = new FitAddon.FitAddon();
-term.loadAddon(fitAddon);
-term.open(document.getElementById('terminal'));
-setTimeout(()=>fitAddon.fit(),50);
-window.addEventListener("resize",()=>fitAddon.fit());
-
-const ws = new WebSocket(`ws://${location.host}`);
-ws.onmessage = e => term.write(e.data);
-
-/* MENU */
-const menu = document.getElementById("menu");
-menu.onclick = e => {
-    e.stopPropagation();
-    menu.classList.toggle("active");
-};
-window.onclick = () => menu.classList.remove("active");
-
-/* DIVIDER */
-const divider = document.getElementById("divider");
-const terminal = document.getElementById("terminal");
-const right = document.getElementById("right");
-
-let isDragging = false;
-
-divider.addEventListener("mousedown", () => isDragging = true);
-window.addEventListener("mouseup", () => isDragging = false);
-
-window.addEventListener("mousemove", e => {
-    if (!isDragging) return;
-    const percent = (e.clientX / window.innerWidth) * 100;
-    if (percent < 10 || percent > 80) return;
-    terminal.style.width = percent + "%";
-    right.style.width = (100 - percent) + "%";
-});
-
-/* CHART */
-let chart;
-
-async function load(){
-    const res=await fetch("./syschrtpxy.json");
-    const data=await res.json();
-
-    const closes=data.map(d=>d.close);
-    const st=data.map(d=>d.st);
-    const trend=data.map(d=>d.st_trend);
-
-    draw(closes,st,trend);
-    drawTopCandle(st,closes);
-}
-
-function draw(closes,st,trend){
-
-    const MAX=40;
-    const c=closes.slice(-MAX);
-    const s=st.slice(-MAX);
-
-    const pad=5;
-
-    const labels=[...c.map((_,i)=>i),...Array(pad).fill("")];
-    const closePad=[...c,...Array(pad).fill(null)];
-    const stPad=[...s,...Array(pad).fill(null)];
-
-    /* 🔥 HEADER COLOR FIX */
-    const last = c.at(-1);
-    const prev = c.at(-2);
-
-    const header = document.getElementById("topHeader");
-
-    if (last > prev) {
-        header.style.background = "linear-gradient(270deg,#1b5e20,#2e7d32,#1b5e20)";
-    } else if (last < prev) {
-        header.style.background = "linear-gradient(270deg,#7f0000,#b71c1c,#7f0000)";
-    } else {
-        header.style.background = "#616161";
-    }
-
-    if(!chart){
-        chart=new Chart(document.getElementById("priceChart"),{
-            type:"line",
-            data:{
-                labels,
-                datasets:[
-                    {
-                        data:closePad,
-                        borderColor:"rgba(0,0,0,0.25)",
-                        borderWidth:2,
-                        pointRadius:0
-                    },
-                    {
-                        data:stPad,
-                        borderWidth:1,
-                        pointRadius:0,
-                        borderColor:"#000"
-                    }
-                ]
-            },
-            options:{
-                animation:false,
-                plugins:{legend:{display:false}},
-                scales:{ x:{display:false}, y:{display:false} }
-            }
+    <script>
+        /* TERMINAL SETUP */
+        const term = new Terminal({
+            convertEol: true,
+            scrollback: 1000,
+            fontFamily: "monospace",
+            fontSize: 14,
+            theme: { background: "#f5f5f5", foreground: "#111", cursor: "#111" }
         });
-    } else {
-        chart.data.labels=labels;
-        chart.data.datasets[0].data=closePad;
-        chart.data.datasets[1].data=stPad;
-        chart.update("none");
-    }
-}
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal'));
+        setTimeout(()=>fitAddon.fit(),50);
 
-/* BOTTOM */
-function drawTopCandle(stVals, closes){
-    const canvas=document.getElementById("topCandle");
-    const ctx=canvas.getContext("2d");
+        /* THEME TOGGLE LOGIC */
+        const themeBtn = document.getElementById("themeToggle");
+        themeBtn.onclick = (e) => {
+            e.stopPropagation();
+            document.body.classList.toggle("dark-mode");
+            const isDark = document.body.classList.contains("dark-mode");
+            
+            // Update Terminal Colors
+            term.options.theme = isDark 
+                ? { background: "#121212", foreground: "#e0e0e0", cursor: "#e0e0e0" }
+                : { background: "#f5f5f5", foreground: "#111", cursor: "#111" };
+            
+            // Reload chart to update colors
+            load(); 
+        };
 
-    canvas.width=canvas.clientWidth;
-    canvas.height=canvas.clientHeight;
+        /* MENU */
+        const menu = document.getElementById("menu");
+        menu.onclick = e => { e.stopPropagation(); menu.classList.toggle("active"); };
+        window.onclick = () => menu.classList.remove("active");
 
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+        /* DIVIDER (RESIZE) */
+        const divider = document.getElementById("divider");
+        const terminal = document.getElementById("terminal");
+        const right = document.getElementById("right");
+        let isDragging = false;
+        divider.addEventListener("mousedown", () => isDragging = true);
+        window.addEventListener("mouseup", () => isDragging = false);
+        window.addEventListener("mousemove", e => {
+            if (!isDragging) return;
+            const percent = (e.clientX / window.innerWidth) * 100;
+            if (percent < 10 || percent > 80) return;
+            terminal.style.width = percent + "%";
+            right.style.width = (100 - percent) + "%";
+            fitAddon.fit();
+        });
 
-    const open=stVals.at(-1);
-    const close=closes.at(-1);
+        /* DATA & CHARTING */
+        let chart;
+        async function load(){
+            try {
+                const res = await fetch("./syschrtpxy.json");
+                const data = await res.json();
+                draw(data.map(d=>d.close), data.map(d=>d.st));
+                drawTopCandle(data.map(d=>d.st), data.map(d=>d.close));
+            } catch(e) { console.log("Waiting for data..."); }
+        }
 
-    const high=Math.max(...stVals,...closes);
-    const low=Math.min(...stVals,...closes);
+        function draw(closes, st){
+            const isDark = document.body.classList.contains("dark-mode");
+            const lineCol = isDark ? "rgba(255,255,255,0.2)" : "rgba(0,0,0,0.25)";
+            const stCol = isDark ? "#fff" : "#000";
 
-    const scale=v=>((v-low)/(high-low||1))*canvas.width;
-    const midY=canvas.height/2;
+            const MAX=40;
+            const c = closes.slice(-MAX);
+            const s = st.slice(-MAX);
+            const labels = [...c.map((_,i)=>i), ...Array(5).fill("")];
 
-    ctx.strokeStyle="#000";
-    ctx.beginPath();
-    ctx.moveTo(scale(low),midY);
-    ctx.lineTo(scale(high),midY);
-    ctx.stroke();
+            // Header Color Logic
+            const last = c.at(-1); const prev = c.at(-2);
+            const header = document.getElementById("topHeader");
+            if (last > prev) header.style.background = "linear-gradient(270deg,#1b5e20,#2e7d32,#1b5e20)";
+            else if (last < prev) header.style.background = "linear-gradient(270deg,#7f0000,#b71c1c,#7f0000)";
+            else header.style.background = "#616161";
 
-    ctx.fillStyle=close>=open?"#1b5e20":"#7f0000";
+            if(!chart){
+                chart = new Chart(document.getElementById("priceChart"), {
+                    type:"line",
+                    data:{ labels, datasets:[
+                        { data:[...c, ...Array(5).fill(null)], borderColor:lineCol, borderWidth:2, pointRadius:0 },
+                        { data:[...s, ...Array(5).fill(null)], borderColor:stCol, borderWidth:1, pointRadius:0 }
+                    ]},
+                    options:{ animation:false, plugins:{legend:{display:false}}, scales:{x:{display:false}, y:{display:false}}}
+                });
+            } else {
+                chart.data.datasets[0].borderColor = lineCol;
+                chart.data.datasets[1].borderColor = stCol;
+                chart.data.datasets[0].data = [...c, ...Array(5).fill(null)];
+                chart.data.datasets[1].data = [...s, ...Array(5).fill(null)];
+                chart.update("none");
+            }
+        }
 
-    ctx.fillRect(
-        Math.min(scale(open),scale(close)),
-        midY-6,
-        Math.max(Math.abs(scale(close)-scale(open)),2),
-        12
-    );
-}
+        function drawTopCandle(stVals, closes){
+            const canvas=document.getElementById("topCandle");
+            const ctx=canvas.getContext("2d");
+            canvas.width=canvas.clientWidth; canvas.height=canvas.clientHeight;
+            const isDark = document.body.classList.contains("dark-mode");
 
-load();
-setInterval(load,3000);
-</script>
+            const open=stVals.at(-1); const close=closes.at(-1);
+            const high=Math.max(...stVals,...closes); const low=Math.min(...stVals,...closes);
+            const scale=v=>((v-low)/(high-low||1))*canvas.width;
+            
+            ctx.strokeStyle = isDark ? "#555" : "#000";
+            ctx.beginPath(); ctx.moveTo(scale(low), canvas.height/2); ctx.lineTo(scale(high), canvas.height/2); ctx.stroke();
+            ctx.fillStyle = close >= open ? "#1b5e20" : "#7f0000";
+            ctx.fillRect(Math.min(scale(open),scale(close)), 3, Math.max(Math.abs(scale(close)-scale(open)),2), 12);
+        }
 
+        load(); setInterval(load, 3000);
+    </script>
 </body>
 </html>
+
