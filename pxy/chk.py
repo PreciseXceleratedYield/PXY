@@ -8,6 +8,7 @@ def run_all_sub_scripts():
         os.path.basename(__file__), 
         "exepxy.py", 
         "sysmonpxy.py", 
+        "sysexepxy.py", 
         "syspxy.py"
     ]
 
