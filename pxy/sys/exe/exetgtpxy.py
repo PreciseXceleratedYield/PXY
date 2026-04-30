@@ -1,52 +1,45 @@
-from datetime import time, datetime
 import pytz
-from colorama import init, Fore
+from datetime import datetime
+from colorama import init, Fore, Style
 
 init(autoreset=True)
 IST = pytz.timezone("Asia/Kolkata")
 
-# --- DEBUG CONFIG ---
+# --- CONFIG ---
 DEBUG_MODE = True
+VERBOSE_DEBUG = True 
 
 def f(x, d=0.0):
     try:
         val = float(x)
         return val if val > 0 else d
-    except:
-        return d
+    except: return d
 
 def i(x, d=0):
-    try:
-        return int(float(x))
-    except:
-        return d
+    try: return int(float(x))
+    except: return d
 
 def target_price(row):
     try:
         # 1. DATA FETCH
         entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
-        if entry_prc <= 0:
-            return 0
-
+        if entry_prc <= 0: return 0
+        
         atr = f(row.get("atr"), 0.0)
-        ce_p, ce_f = f(row.get("ce_power"), 0.0), f(row.get("ce_force"), 0.0)
-        pe_p, pe_f = f(row.get("pe_power"), 0.0), f(row.get("pe_force"), 0.0)
-        
-        ce_depth = f(row.get("hkin_ce_depth"), 0.0)
-        pe_depth = f(row.get("hkin_pe_depth"), 0.0)
-        
+        ce_p = f(row.get("ce_power"), 0.0)
+        pe_p = f(row.get("pe_power"), 0.0)
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
         is_ce, is_pe = "CE" in symbol, "PE" in symbol
-
-        # SIGNALS
-        exit_sig = str(row.get("exit", "NONE")).upper()
+        
+        # Signal values: SELL/BUY/UP/DOWN/BULL/BEAR/NONE
         st_sig = str(row.get("supertrend", "NONE")).upper()
+        exit_sig = str(row.get("exit", "NONE")).upper()
 
         # --- TIME CALCULATIONS ---
         now = datetime.now(IST)
         entry_time_val = row.get("buy_time")
         elapsed_secs = 0
-
+        
         if entry_time_val:
             if isinstance(entry_time_val, str):
                 try:
@@ -55,46 +48,79 @@ def target_price(row):
                 except:
                     try:
                         parts = list(map(int, entry_time_val.split(":")))
-                        e_time = now.replace(hour=parts[0], minute=parts[1], second=parts[2] if len(parts)>2 else 0, microsecond=0)
+                        e_time = now.replace(hour=parts[0], minute=parts[1], second=parts[2] if len(parts)>2 else 0)
                     except: e_time = now
             else:
                 e_time = entry_time_val if entry_time_val.tzinfo else IST.localize(entry_time_val)
             elapsed_secs = (now - e_time).total_seconds()
 
-        # 2. 🎯 DYNAMIC TARGET LOGIC
-        score = 1.4  # Default percentage for Status Quo
-        state = "⏳" # Status Quo
-        active_depth = 0.0
+        # 2. 🎯 LOGIC CONSTANTS
+        is_new = elapsed_secs <= 120 # 2 min grace
+        min_profit_pct = 1.4
+        fallback_score = int(entry_prc * (min_profit_pct / 100))
+        
+        score = fallback_score
+        state = "⏳"
 
+        # Signal Mapping
+        st_is_up = any(x in st_sig for x in ["UP", "BUY"])
+        st_is_down = any(x in st_sig for x in ["DOWN", "SELL"])
+        exit_is_bull = any(x in exit_sig for x in ["BUY", "BULL"])
+        exit_is_bear = any(x in exit_sig for x in ["SELL", "BEAR"])
+
+        # 3. 🛡️ CE / PE LOGIC
         if is_ce:
-            active_depth = ce_depth
-            # CE Surgical: ST UP/BUY and Exit BUY/BULL
-            if any(x in st_sig for x in ["UP", "BUY"]) and any(x in exit_sig for x in ["BUY", "BULL"]):
-                # SURGICAL FIX: Includes ATR logic + Depth
-                score = (atr * max(1.0, ce_p)) 
-                state = "🔥"
+            if is_new:
+                # Rule 2: New entries purely on matching exit signal
+                if exit_is_bull:
+                    score = max(fallback_score, (atr * max(1.0, ce_p)))
+                    state = "🔥"
+            else:
+                # Rule 1: Old entries
+                if st_is_down and exit_is_bear: 
+                    state = "💀" # BOTH OPPOSITE -> KILL (-1)
+                elif st_is_down and not exit_is_bull:
+                    state = "⏳" # TREND OPPOSITE -> SURVIVE 1.4%
+                elif (st_is_up or "NONE" in st_sig) and exit_is_bull:
+                    score = max(fallback_score, (atr * max(1.0, ce_p)))
+                    state = "🔥"
+                else: 
+                    state = "⏳" # Rule 3: Fallback 1.4%
 
         elif is_pe:
-            active_depth = pe_depth
-            # PE Surgical: ST DOWN/SELL and Exit SELL/BEAR
-            if any(x in st_sig for x in ["DOWN", "SELL"]) and any(x in exit_sig for x in ["SELL", "BEAR"]):
-                # SURGICAL FIX: Includes ATR logic + Depth
-                score = (atr * max(1.0, pe_p)) 
-                state = "🔥"
+            if is_new:
+                # Rule 2: New entries purely on matching exit signal
+                if exit_is_bear:
+                    score = max(fallback_score, (atr * max(1.0, pe_p)))
+                    state = "🔥"
+            else:
+                # Rule 1: Old entries
+                if st_is_up and exit_is_bull: 
+                    state = "💀" # BOTH OPPOSITE -> KILL (-1)
+                elif st_is_up and not exit_is_bear:
+                    state = "⏳" # TREND OPPOSITE -> SURVIVE 1.4%
+                elif (st_is_down or "NONE" in st_sig) and exit_is_bear:
+                    score = max(fallback_score, (atr * max(1.0, pe_p)))
+                    state = "🔥"
+                else: 
+                    state = "⏳" # Rule 3: Fallback 1.4%
 
         # 4. FINAL CALCULATION
         if state == "🔥":
-            # ATR surgical target: Score already includes depth now
             target = int(entry_prc + score)
+        elif state == "💀":
+            target = -1 # Immediate market exit trigger
         else:
-            # Status Quo target: Entry + 1.4%
-            target = int(entry_prc * (1 + 1.4 / 100))
+            target = int(entry_prc + fallback_score)
 
         # CLEAN OUTPUT
         if DEBUG_MODE:
             clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
-            status_msg = " [NEW]" if elapsed_secs <= 180 else f" [{int(elapsed_secs/60)}m]"
-            print(f"{clean_symbol}|| S:{score:.1f}|| {state} || {status_msg}")
+            color = Fore.RED if state == "💀" else (Fore.GREEN if state == "🔥" else Fore.YELLOW)
+            msg = f" [NEW:{int(elapsed_secs)}s]" if is_new else f" [OLD:{int(elapsed_secs/60)}m]"
+            print(f"{color}{clean_symbol}|| S:{score:.1f}|| {state} || TGT:{int(target)}{msg}{Style.RESET_ALL}")
+            if VERBOSE_DEBUG:
+                print(f"   [DEBUG] ST:{st_sig} | EXIT:{exit_sig} | Entry:{entry_prc}")
 
         return target
 
