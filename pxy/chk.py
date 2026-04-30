@@ -3,41 +3,44 @@ import subprocess
 import sys
 
 def run_all_sub_scripts():
-    # Added sysmonpxy.py and syspxy.py to the skip list
-    exclude_list = [
-        os.path.basename(__file__), 
-        "exepxy.py", 
-        "sysmonpxy.py", 
-        "sysexepxy.py", 
-        "syspxy.py"
-    ]
+    exclude_list = [os.path.basename(__file__), "exepxy.py", "sysmonpxy.py", "syspxy.py"]
+    results = {"success": [], "errors": []}
 
-    # Walk through current directory and all subdirectories
     for root, dirs, files in os.walk('.'):
         for file in files:
-            # Only target .py files not in the exclude list
             if file.endswith('.py') and file not in exclude_list:
                 file_path = os.path.join(root, file)
                 
-                print(f"\n" + "🚀" * 20)
-                print(f"RUNNING: {file_path}")
-                print("🚀" * 20)
+                print(f"🚀 RUNNING: {file_path}...")
                 
                 try:
-                    # Execute the script
-                    subprocess.run([sys.executable, file_path], check=True)
-                    print(f"\n✅ [DONE]: {file}")
+                    # check=True will raise the exception if the script fails
+                    subprocess.run([sys.executable, file_path], check=True, capture_output=True, text=True)
+                    results["success"].append(file_path)
                 except subprocess.CalledProcessError as e:
-                    print(f"\n⚠️ [CRASHED]: {file_path}")
-                    print(f"Error Code: {e.returncode}")
-                    
-                    # Manual intervention required
-                    choice = input("\nError detected. Continue to next script? (y/n): ").strip().lower()
-                    if choice != 'y':
-                        print("🛑 Stopping runner.")
-                        sys.exit()
+                    # Capture error and move to next script without asking
+                    error_msg = e.stderr.strip() if e.stderr else "Unknown error"
+                    results["errors"].append((file_path, e.returncode, error_msg))
+                    print(f"⚠️  FAILED: {file_path}")
+
+    # Final Summary Output
+    print("\n" + "="*30)
+    print("       FINAL REPORT")
+    print("="*30)
+    print(f"✅ Completed: {len(results['success'])}")
+    print(f"❌ Failed:    {len(results['errors'])}")
+    
+    if results["errors"]:
+        print("\n--- ERROR DETAILS ---")
+        for path, code, msg in results["errors"]:
+            print(f"\n[!] {path} (Code: {code})")
+            # Print last line of error for brevity
+            print(f"    Trace: {msg.splitlines()[-1] if msg else 'No stderr'}")
+    
+    print("\n" + "="*30)
 
 if __name__ == "__main__":
     run_all_sub_scripts()
+
 
 
