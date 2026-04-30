@@ -131,7 +131,7 @@ def _print_summary(total_unrealized, total_realized):
     part2 = f"     {unreal_val:+06d} 🔸 🏃‍♂️ 🔸 🏃‍♂️"
     
     # Combine and right-align
-    combined = f"{part1}   {part2}"
+    combined = f"{part2}   {part2}"
     print()
     print(f"{combined:^38}")
     print()
