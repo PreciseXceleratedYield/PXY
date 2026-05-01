@@ -8,10 +8,14 @@ from sysdtafpxy import fetch_yf_data
 # ==================================================
 DEBUG_MODE = False
 JUMP_MODE = False
-MIN_BODY_CONFIRM = 1.0  # Body length required for BUY/SELL
+MIN_BODY_CONFIRM = 1.0  # Surgical body length for BUY/SELL
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """ PXY® Engine: Major (ATR^2) and Minor (Major/6) """
+    """ 
+    PXY® Engine:
+    Major ST (Factor: ATR^2)
+    Minor ST (Factor: Major Factor / 6)
+    """
     df = df.copy()
     df['previous_close'] = df['Close'].shift(1)
     df['TR'] = df[['High', 'Low', 'Close', 'previous_close']].apply(
@@ -24,21 +28,23 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     st_maj = [0.0] * len(df)
     st_min = [0.0] * len(df)
     trend_maj = [""] * len(df)
+    trend_min = [""] * len(df)
     dyn_atr = [0.0] * len(df)
     
     seed_atr = df['TR'].rolling(window=3, min_periods=1).mean()
 
     for i in range(len(df)):
         tr, hl2 = df['TR'].iloc[i], df['HL2'].iloc[i]
-        ha_close = (df['Open'].iloc[i] + df['High'].iloc[i] + df['Low'].iloc[i] + df['Close'].iloc[i]) / 4
+        # haClose logic: (O+H+L+C)/4
+        ha_c = (df['Open'].iloc[i] + df['High'].iloc[i] + df['Low'].iloc[i] + df['Close'].iloc[i]) / 4
 
         if i == 0:
             dyn_atr[i] = seed_atr.iloc[0] if not pd.isna(seed_atr.iloc[0]) else 1.0
             st_maj[i], st_min[i] = hl2, hl2
-            trend_maj[i] = "UP"
+            trend_maj[i], trend_min[i] = "UP", "UP"
             continue
         
-        # 1. DYNAMIC ATR
+        # 1. DYNAMIC ATR (Recursive Alpha)
         prev_atr = dyn_atr[i-1]
         alpha = 1 / max(1, round(prev_atr))
         dyn_atr[i] = (alpha * tr) + (1 - alpha) * prev_atr
@@ -47,18 +53,20 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         maj_f = dyn_atr[i] * dyn_atr[i]
         min_f = maj_f / 6
         
-        # 3. MAJOR ST LOGIC (Matches original return structure)
-        curr_trend = "UP" if ha_close > st_maj[i-1] else "DOWN" if ha_close < st_maj[i-1] else trend_maj[i-1]
-        st_maj[i] = max(hl2 - maj_f, st_maj[i-1]) if curr_trend == "UP" else min(hl2 + maj_f, st_maj[i-1])
-        trend_maj[i] = curr_trend
+        # 3. MAJOR ST LOGIC
+        curr_t_maj = "UP" if ha_c > st_maj[i-1] else "DOWN" if ha_c < st_maj[i-1] else trend_maj[i-1]
+        st_maj[i] = max(hl2 - maj_f, st_maj[i-1]) if curr_t_maj == "UP" else min(hl2 + maj_f, st_maj[i-1])
+        trend_maj[i] = curr_t_maj
 
         # 4. MINOR ST LOGIC
-        prev_min = st_min[i-1]
-        min_trend = "UP" if ha_close > prev_min else "DOWN" if ha_close < prev_min else "UP"
-        st_min[i] = max(hl2 - min_f, prev_min) if min_trend == "UP" else min(hl2 + min_f, prev_min)
+        curr_t_min = "UP" if ha_c > st_min[i-1] else "DOWN" if ha_c < st_min[i-1] else trend_min[i-1]
+        st_min[i] = max(hl2 - min_f, st_min[i-1]) if curr_t_min == "UP" else min(hl2 + min_f, st_min[i-1])
+        trend_min[i] = curr_t_min
 
-    df['ST'], df['ST_Trend'] = st_maj, trend_maj # Maintain original column names
-    df['ST_Min'] = st_min
+    # ASSIGNING MINOR AS THE PRIMARY DOWNSTREAM DATA
+    df['ST'] = st_min         # The price value is now Minor
+    df['ST_Trend'] = trend_min # The trend state (UP/DOWN) is now Minor
+    df['ST_Maj'] = st_maj      # Major kept for internal logic
     return df
 
 def get_signal(df=None):
@@ -71,29 +79,31 @@ def get_signal(df=None):
     last = df_st.iloc[-1]
     prev = df_st.iloc[-2]
     
-    # Body Confirmation Logic
+    # Surgical Logic Check
     body_len = abs(last['Close'] - last['Open'])
     ha_c = (last['Open'] + last['High'] + last['Low'] + last['Close']) / 4
     
-    st_curr, st_prev = last['ST'], prev['ST']
-    min_curr, min_prev = last['ST_Min'], prev['ST_Min']
+    min_curr, min_prev = last['ST'], prev['ST'] # ST is now Minor
+    maj_curr = last['ST_Maj']
     c_curr, c_prev = last['Close'], prev['Close']
 
-    # 1. ACTION TRIGGERS (Crossovers + Body Confirm)
+    # 1. ACTION TRIGGERS (Crossing Minor ST with Body Confirm)
     if c_curr > min_curr and c_prev <= min_prev and body_len >= MIN_BODY_CONFIRM:
         res = "BUY"
     elif c_curr < min_curr and c_prev >= min_prev and body_len >= MIN_BODY_CONFIRM:
         res = "SELL"
-    # 2. TREND STATES
-    elif ha_c > min_curr and min_curr > st_curr:
+    # 2. TREND STATES (PXY® Logic)
+    elif ha_c > min_curr and min_curr > maj_curr:
         res = "UP"
-    elif ha_c < min_curr and min_curr < st_curr:
+    elif ha_c < min_curr and min_curr < maj_curr:
         res = "DOWN"
     else:
         res = "SIDE"
 
+    # Return result and the MINOR trend state
     return res, last['ST_Trend']
 
 if __name__ == "__main__":
-    res, major_trend = get_signal()
-    print(f"ST_SIG: {res} | MAJOR_TREND: {major_trend}")
+    signal, minor_trend = get_signal()
+    print(f"PXY® SIGNAL: {signal} | MINOR_TREND: {minor_trend}")
+
