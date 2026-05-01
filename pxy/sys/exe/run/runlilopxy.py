@@ -142,7 +142,7 @@ def _print_summary(total_unrealized, total_realized):
     color = Style.BRIGHT + Fore.GREEN if val_real >= 0 else Fore.RED
     real_val = int(float(real_str))
     unreal_val = int(float(unreal_str))
-    part1 = f"🥅 {color}{real_val:+06d}{Style.RESET_ALL} 🥅"
+    part1 = f"🥅  {color}{real_val:+06d}{Style.RESET_ALL} 🥅"
     part2 = f" {unreal_val:+06d} 🔸 🏃‍♂️ 🔸 🏃‍♂️"
     combined = f"{part2} {part1}"
     print()
