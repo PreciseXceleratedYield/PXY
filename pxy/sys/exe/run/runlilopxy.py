@@ -12,16 +12,12 @@ from runltpspxy import get_mid_price
 MATCH_MODE = "FIFO" # "FIFO" or "LIFO"
 
 def dump_to_json_sync(closed_df):
-    """Saves closed trades to pnl.json with full debugging."""
+    """Saves closed trades to pnl.json in ~/pxy/ (3 levels up)."""
     try:
+        # Path: ~/pxy/sys/exe/run/ -> ~/pxy/
         current_file = os.path.abspath(__file__)
-        current_dir = os.path.dirname(current_file)
-        
-        # Creating in SAME folder first to verify
-        file_path = os.path.join(current_dir, "pnl.json")
-        
-        print(f"\n--- DEBUGGING JSON DUMP ---")
-        print(f"Attempting to write to: {file_path}")
+        target_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(current_file))))
+        file_path = os.path.join(target_dir, "pnl.json")
 
         if closed_df.empty:
             data = []
@@ -34,14 +30,9 @@ def dump_to_json_sync(closed_df):
         
         with open(file_path, "w") as f:
             json.dump(data, f, indent=4)
-            
-        print(f"SUCCESS: File created at {file_path}")
-        print(f"---------------------------\n")
-            
+        print(f"[DEBUG]: JSON updated at {file_path} (Records: {len(data)})")
     except Exception as e:
-        print(f"\n!!! JSON DUMP ERROR !!!")
-        traceback.print_exc()
-        print(f"---------------------------\n")
+        print(f"[JSON ERROR]: {e}")
 
 def process_lilo_orders(client):
     try:
@@ -50,13 +41,16 @@ def process_lilo_orders(client):
             return pd.DataFrame(), pd.DataFrame()
 
         res = client.order_report()
+        # Ensure we dump even if no data exists in response
         if not res or "data" not in res:
             _print_summary(0, 0)
+            dump_to_json_sync(pd.DataFrame())
             return pd.DataFrame(), pd.DataFrame()
 
         df = pd.DataFrame(res["data"])
         df = df[df["ordSt"].isin(["complete", "traded"])].copy()
 
+        # Ensure we dump even if no completed orders found
         if df.empty:
             _print_summary(0, 0)
             dump_to_json_sync(pd.DataFrame())
@@ -71,27 +65,22 @@ def process_lilo_orders(client):
         open_positions = []
 
         for symbol, group in df.groupby("trdSym"):
-            # FIXED: Added [0] to iloc to prevent crash
             token_id = group["tok"].iloc[0]
             ex_seg = group["exSeg"].iloc[0]
-            
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records')
             sells = group[group["trnsTp"].str.upper() == "S"].to_dict('records')
 
             while sells and buys:
                 s, b = (sells[-1], buys[-1]) if MATCH_MODE == "LIFO" else (sells[0], buys[0])
                 mqty = min(s["qty"], b["qty"])
-
                 closed_matches.append({
                     "Symbol": symbol, "Qty": mqty, "tok": token_id,
                     "Buy_Time": b["dt"], "Buy_Prc": b["prc"],
                     "Exit_Time": s["dt"], "Sell_Prc": s["prc"],
                     "PNL": int((s["prc"] - b["prc"]) * mqty)
                 })
-
                 s["qty"] -= mqty
                 b["qty"] -= mqty
-
                 if s["qty"] <= 0:
                     sells.pop() if MATCH_MODE == "LIFO" else sells.pop(0)
                 if b["qty"] <= 0:
@@ -114,13 +103,13 @@ def process_lilo_orders(client):
         total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0
         _print_summary(total_unrealized, total_realized)
 
+        # Successful path dump
         dump_to_json_sync(closed_df)
 
         return open_df, closed_df
 
     except Exception as e:
         print(f"[LILO ERROR]: {e}")
-        traceback.print_exc() # Debugging logic
         _print_summary(0, 0)
         return pd.DataFrame(), pd.DataFrame()
 
