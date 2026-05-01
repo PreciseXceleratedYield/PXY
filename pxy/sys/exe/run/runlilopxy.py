@@ -14,8 +14,8 @@ MATCH_MODE = "FIFO" # "FIFO" or "LIFO"
 def dump_to_json_bg(closed_df):
     """Saves closed trades to pnl.json in the pxy/ directory (4 levels up)."""
     try:
-        # Script is at: pxy/sys/exe/run/runlilopxy.py
-        # 1: run/ -> 2: exe/ -> 3: sys/ -> 4: pxy/
+        # Script path: pxy/sys/exe/run/runlilopxy.py
+        # Target path: pxy/pnl.json
         current_file = os.path.abspath(__file__)
         target_dir = current_file
         for _ in range(4):
@@ -23,13 +23,14 @@ def dump_to_json_bg(closed_df):
             
         file_path = os.path.join(target_dir, "pnl.json")
 
-        # Prepare records and handle Timestamps for JSON compatibility
-        records = closed_df.copy()
-        for col in records.columns:
-            if pd.api.types.is_datetime64_any_dtype(records[col]):
-                records[col] = records[col].dt.strftime('%Y-%m-%d %H:%M:%S')
-        
-        data = records.to_dict(orient='records')
+        if closed_df.empty:
+            data = []
+        else:
+            records = closed_df.copy()
+            for col in records.columns:
+                if pd.api.types.is_datetime64_any_dtype(records[col]):
+                    records[col] = records[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+            data = records.to_dict(orient='records')
         
         with open(file_path, "w") as f:
             json.dump(data, f, indent=4)
@@ -58,6 +59,8 @@ def process_lilo_orders(client):
             total_unrealized = 0
             total_realized = 0
             _print_summary(total_unrealized, total_realized)
+            # Create/update file even if empty
+            threading.Thread(target=dump_to_json_bg, args=(pd.DataFrame(),), daemon=True).start()
             return pd.DataFrame(), pd.DataFrame()
 
         df["qty"] = pd.to_numeric(df["fldQty"], errors='coerce').fillna(0)
@@ -69,15 +72,15 @@ def process_lilo_orders(client):
         open_positions = []
 
         for symbol, group in df.groupby("trdSym"):
+            # RESTORED: .iloc[0] exactly as per original
             token_id = group["tok"].iloc[0]
             ex_seg = group["exSeg"].iloc[0]
+            
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records')
             sells = group[group["trnsTp"].str.upper() == "S"].to_dict('records')
 
             while sells and buys:
-                # =========================
-                # 🔁 FIFO / LIFO SELECT
-                # =========================
+                # RESTORED: (sells[0], buys[0]) for FIFO exactly as per original
                 s, b = (sells[-1], buys[-1]) if MATCH_MODE == "LIFO" else (sells[0], buys[0])
                 mqty = min(s["qty"], b["qty"])
 
@@ -95,9 +98,6 @@ def process_lilo_orders(client):
                 s["qty"] -= mqty
                 b["qty"] -= mqty
 
-                # =========================
-                # 🔁 REMOVE EXHAUSTED
-                # =========================
                 if s["qty"] <= 0:
                     sells.pop() if MATCH_MODE == "LIFO" else sells.pop(0)
                 if b["qty"] <= 0:
@@ -125,7 +125,7 @@ def process_lilo_orders(client):
 
         _print_summary(total_unrealized, total_realized)
 
-        # TRIGGER JSON UPDATE in background to not block return
+        # Background JSON dump
         threading.Thread(target=dump_to_json_bg, args=(closed_df,), daemon=True).start()
 
         return open_df, closed_df
@@ -159,5 +159,6 @@ if __name__ == "__main__":
     print("\n===== ACTIVE POSITIONS =====")
     if not active.empty: print(active[cols])
     else: print("No active positions.")
+
 
 
