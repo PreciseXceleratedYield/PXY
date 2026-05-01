@@ -2,7 +2,6 @@
 import pandas as pd
 import json
 import os
-import threading
 from runclntpxy import get_session
 from runltpspxy import get_mid_price
 
@@ -11,10 +10,10 @@ from runltpspxy import get_mid_price
 # =========================
 MATCH_MODE = "FIFO" # "FIFO" or "LIFO"
 
-def dump_to_json_task(closed_df):
+def dump_to_json_sync(closed_df):
     """Saves closed trades to pnl.json in pxy/ (3 levels up)."""
     try:
-        # Script path: ~/pxy/sys/exe/run/runlilopxy.py
+        # Script is at: ~/pxy/sys/exe/run/runlilopxy.py
         # 1: run/ -> 2: exe/ -> 3: sys/ -> Result: ~/pxy/
         current_file = os.path.abspath(__file__)
         target_dir = current_file
@@ -34,7 +33,6 @@ def dump_to_json_task(closed_df):
         
         with open(file_path, "w") as f:
             json.dump(data, f, indent=4)
-        print(f"[SUCCESS]: Saved to {file_path}")
     except Exception as e:
         print(f"[JSON ERROR]: {e}")
 
@@ -57,9 +55,7 @@ def process_lilo_orders(client):
         if df.empty:
             total_unrealized, total_realized = 0, 0
             _print_summary(total_unrealized, total_realized)
-            t = threading.Thread(target=dump_to_json_task, args=(pd.DataFrame(),))
-            t.start()
-            t.join()
+            dump_to_json_sync(pd.DataFrame())
             return pd.DataFrame(), pd.DataFrame()
 
         df["qty"] = pd.to_numeric(df["fldQty"], errors='coerce').fillna(0)
@@ -109,9 +105,8 @@ def process_lilo_orders(client):
         total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0
         _print_summary(total_unrealized, total_realized)
 
-        t = threading.Thread(target=dump_to_json_task, args=(closed_df,))
-        t.start()
-        t.join() 
+        # Save to JSON before returning
+        dump_to_json_sync(closed_df)
 
         return open_df, closed_df
 
