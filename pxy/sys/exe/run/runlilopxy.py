@@ -15,10 +15,7 @@ def dump_to_json_bg(closed_df):
     """Saves closed trades to pnl.json in the pxy/ directory (4 levels up)."""
     try:
         # Script is at: pxy/sys/exe/run/runlilopxy.py
-        # Level 1: pxy/sys/exe/run/
-        # Level 2: pxy/sys/exe/
-        # Level 3: pxy/sys/
-        # Level 4: pxy/
+        # 1: run/ -> 2: exe/ -> 3: sys/ -> 4: pxy/
         current_file = os.path.abspath(__file__)
         target_dir = current_file
         for _ in range(4):
@@ -26,6 +23,7 @@ def dump_to_json_bg(closed_df):
             
         file_path = os.path.join(target_dir, "pnl.json")
 
+        # Prepare records and handle Timestamps for JSON compatibility
         records = closed_df.copy()
         for col in records.columns:
             if pd.api.types.is_datetime64_any_dtype(records[col]):
@@ -127,7 +125,7 @@ def process_lilo_orders(client):
 
         _print_summary(total_unrealized, total_realized)
 
-        # TRIGGER JSON UPDATE in background
+        # TRIGGER JSON UPDATE in background to not block return
         threading.Thread(target=dump_to_json_bg, args=(closed_df,), daemon=True).start()
 
         return open_df, closed_df
@@ -161,4 +159,5 @@ if __name__ == "__main__":
     print("\n===== ACTIVE POSITIONS =====")
     if not active.empty: print(active[cols])
     else: print("No active positions.")
+
 
