@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <title>PXY DASHBOARD</title>
@@ -9,22 +9,57 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
 <style>
-:root {
-    --bg:       #06080d;
-    --bg2:      #0c101a;
-    --bg3:      #111827;
-    --border:   rgba(255,255,255,0.06);
-    --border2:  rgba(255,255,255,0.12);
-    --text:     #e8ecf4;
-    --muted:    #5b6478;
-    --accent:   #3b82f6;
-    --bull:     #22c55e;
-    --bear:     #ef4444;
-    --bull-dim: rgba(34,197,94,0.12);
-    --bear-dim: rgba(239,68,68,0.12);
-    --gold:     #f59e0b;
-    --glow-bull: 0 0 20px rgba(34,197,94,0.25);
-    --glow-bear: 0 0 20px rgba(239,68,68,0.25);
+/* ─── DARK THEME (default) ─── */
+:root,
+[data-theme="dark"] {
+    --bg:         #06080d;
+    --bg2:        #0c101a;
+    --bg3:        #111827;
+    --border:     rgba(255,255,255,0.06);
+    --border2:    rgba(255,255,255,0.12);
+    --text:       #e8ecf4;
+    --muted:      #5b6478;
+    --accent:     #3b82f6;
+    --bull:       #22c55e;
+    --bear:       #ef4444;
+    --bull-dim:   rgba(34,197,94,0.12);
+    --bear-dim:   rgba(239,68,68,0.12);
+    --gold:       #f59e0b;
+    --grid:       rgba(255,255,255,0.035);
+    --shadow:     rgba(0,0,0,0.5);
+    --scanline:   rgba(255,255,255,0.012);
+    --chart-grid: rgba(255,255,255,0.04);
+    --chart-tick: #374151;
+    --toggle-bg:  #1e293b;
+    --track-mid:  rgba(255,255,255,0.08);
+    --tick-line:  rgba(255,255,255,0.15);
+    --lbl-color:  rgba(91,100,120,0.9);
+}
+
+/* ─── LIGHT THEME ─── */
+[data-theme="light"] {
+    --bg:         #f4f6fb;
+    --bg2:        #ffffff;
+    --bg3:        #eef1f8;
+    --border:     rgba(0,0,0,0.07);
+    --border2:    rgba(0,0,0,0.13);
+    --text:       #0f172a;
+    --muted:      #94a3b8;
+    --accent:     #2563eb;
+    --bull:       #16a34a;
+    --bear:       #dc2626;
+    --bull-dim:   rgba(22,163,74,0.10);
+    --bear-dim:   rgba(220,38,38,0.10);
+    --gold:       #d97706;
+    --grid:       rgba(0,0,0,0.04);
+    --shadow:     rgba(0,0,0,0.12);
+    --scanline:   rgba(0,0,0,0.006);
+    --chart-grid: rgba(0,0,0,0.05);
+    --chart-tick: #94a3b8;
+    --toggle-bg:  #e2e8f0;
+    --track-mid:  rgba(0,0,0,0.07);
+    --tick-line:  rgba(0,0,0,0.15);
+    --lbl-color:  rgba(100,116,139,0.9);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -35,6 +70,7 @@ html, body {
     font-family: 'DM Mono', monospace;
     background: var(--bg);
     color: var(--text);
+    transition: background 0.35s ease, color 0.35s ease;
 }
 
 /* ─── SCROLLBAR ─── */
@@ -51,17 +87,55 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 20px;
+    padding: 0 16px;
     background: var(--bg2);
     border-bottom: 1px solid var(--border);
     z-index: 1000;
-    transition: background 0.6s ease, box-shadow 0.6s ease;
+    transition: background 0.35s, box-shadow 0.5s, border-color 0.35s;
 }
 
+/* LEFT: menu + live + trend */
 #headerLeft {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+}
+
+/* CENTER: price */
+#headerCenter {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.price-display {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    transition: color 0.35s;
+}
+
+.price-change {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.05em;
+    transition: all 0.4s;
+}
+.price-change.bull { background: var(--bull-dim); color: var(--bull); }
+.price-change.bear { background: var(--bear-dim); color: var(--bear); }
+
+/* RIGHT: toggle + logo */
+#headerRight {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
 .logo {
@@ -70,6 +144,7 @@ html, body {
     font-size: 18px;
     letter-spacing: -0.5px;
     color: var(--text);
+    transition: color 0.35s;
 }
 
 .logo-dot {
@@ -84,53 +159,19 @@ html, body {
 .divider-v {
     width: 1px; height: 20px;
     background: var(--border2);
+    transition: background 0.35s;
 }
 
 .company-name {
-    font-family: 'DM Mono', monospace;
     font-size: 10px;
     font-weight: 300;
     color: var(--muted);
     letter-spacing: 0.15em;
     text-transform: uppercase;
+    transition: color 0.35s;
 }
 
-#headerCenter {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    align-items: center;
-    gap: 20px;
-}
-
-.price-display {
-    font-family: 'Syne', sans-serif;
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    transition: color 0.4s;
-}
-
-.price-change {
-    font-size: 11px;
-    font-weight: 400;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-family: 'DM Mono', monospace;
-    letter-spacing: 0.05em;
-    transition: all 0.4s;
-}
-
-.price-change.bull { background: var(--bull-dim); color: var(--bull); }
-.price-change.bear { background: var(--bear-dim); color: var(--bear); }
-
-#headerRight {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
+/* LIVE */
 .live-indicator {
     display: flex;
     align-items: center;
@@ -149,27 +190,70 @@ html, body {
     animation: blink 1.4s ease-in-out infinite;
 }
 
-@keyframes blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.25; }
+/* TREND BADGE */
+.trend-badge {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 500;
+    transition: all 0.4s;
+}
+.trend-badge.bull { background: var(--bull-dim); color: var(--bull); border: 1px solid rgba(34,197,94,0.2); }
+.trend-badge.bear { background: var(--bear-dim); color: var(--bear); border: 1px solid rgba(239,68,68,0.2); }
+
+/* ─── THEME TOGGLE ─── */
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    background: var(--toggle-bg);
+    transition: background 0.35s, border-color 0.35s;
+}
+.theme-toggle:hover { border-color: var(--accent); }
+
+.toggle-emoji { font-size: 12px; line-height: 1; transition: transform 0.5s ease; }
+
+.toggle-track {
+    width: 32px; height: 18px;
+    border-radius: 9px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    position: relative;
+    transition: background 0.35s;
+    flex-shrink: 0;
 }
 
-@keyframes pulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50%       { transform: scale(1.4); opacity: 0.7; }
+.toggle-thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), background 0.35s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.35);
 }
+[data-theme="light"] .toggle-thumb {
+    transform: translateX(14px);
+    background: var(--gold);
+}
+[data-theme="light"] .toggle-emoji-moon  { transform: rotate(-30deg) scale(0.8); opacity: 0.4; }
+[data-theme="dark"]  .toggle-emoji-sun   { transform: rotate(30deg) scale(0.8); opacity: 0.4; }
 
 /* ─── MENU ─── */
-#menu {
-    position: relative;
-    cursor: pointer;
-}
+#menu { position: relative; cursor: pointer; }
 
 .menu-btn {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
+    padding: 5px 11px;
     border: 1px solid var(--border2);
     border-radius: 6px;
     font-size: 11px;
@@ -179,29 +263,23 @@ html, body {
     background: transparent;
     font-family: 'DM Mono', monospace;
 }
+.menu-btn:hover { color: var(--text); background: var(--bg3); }
 
-.menu-btn:hover { border-color: var(--border2); color: var(--text); background: var(--bg3); }
-
-.menu-icon {
-    display: flex; flex-direction: column; gap: 3px;
-}
-.menu-icon span {
-    display: block; width: 14px; height: 1px;
-    background: currentColor;
-    transition: all 0.2s;
-}
+.menu-icon { display: flex; flex-direction: column; gap: 3px; }
+.menu-icon span { display: block; width: 14px; height: 1px; background: currentColor; transition: all 0.2s; }
 
 #dropdown {
     position: absolute;
     top: calc(100% + 8px);
-    right: 0;
+    left: 0;
     background: var(--bg2);
     border: 1px solid var(--border2);
     border-radius: 8px;
     overflow: hidden;
     display: none;
-    min-width: 140px;
-    box-shadow: 0 12px 32px rgba(0,0,0,0.5);
+    min-width: 150px;
+    box-shadow: 0 12px 32px var(--shadow);
+    transition: background 0.35s;
 }
 
 #dropdown div {
@@ -214,10 +292,8 @@ html, body {
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 8px;
 }
-
 #dropdown div:last-child { border-bottom: none; }
 #dropdown div:hover { background: var(--bg3); color: var(--text); }
-
 #dropdown div::before {
     content: '';
     width: 4px; height: 4px;
@@ -235,13 +311,14 @@ html, body {
     margin-top: 44px;
 }
 
-/* ─── TERMINAL PANEL ─── */
+/* TERMINAL PANEL */
 #terminalPanel {
     width: 32%;
     min-width: 220px;
     display: flex;
     flex-direction: column;
     border-right: 1px solid var(--border);
+    transition: border-color 0.35s;
 }
 
 .panel-header {
@@ -253,6 +330,7 @@ html, body {
     border-bottom: 1px solid var(--border);
     background: var(--bg2);
     flex-shrink: 0;
+    transition: background 0.35s, border-color 0.35s;
 }
 
 .panel-label {
@@ -262,11 +340,7 @@ html, body {
     color: var(--muted);
 }
 
-.panel-dot {
-    width: 5px; height: 5px;
-    border-radius: 50%;
-}
-
+.panel-dot { width: 5px; height: 5px; border-radius: 50%; }
 .panel-dot.cyan  { background: #22d3ee; box-shadow: 0 0 5px #22d3ee; }
 .panel-dot.amber { background: var(--gold); box-shadow: 0 0 5px var(--gold); }
 .panel-dot.green { background: var(--bull); box-shadow: 0 0 5px var(--bull); }
@@ -276,50 +350,43 @@ html, body {
     overflow: hidden;
     padding: 6px;
     background: var(--bg);
+    transition: background 0.35s;
 }
 
-/* ─── DIVIDER ─── */
+/* DIVIDER */
 #divider {
     width: 5px;
     cursor: col-resize;
     background: var(--bg);
     border-right: 1px solid var(--border);
     flex-shrink: 0;
-    transition: background 0.2s;
     position: relative;
+    transition: background 0.2s, border-color 0.35s;
 }
-
 #divider:hover { background: var(--bg3); }
-
 #divider::after {
     content: '';
     position: absolute;
     top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%,-50%);
     width: 1px; height: 40px;
     background: var(--border2);
     border-radius: 2px;
 }
 
-/* ─── RIGHT PANEL ─── */
-#right {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
+/* RIGHT */
+#right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-/* ─── STATS BAR ─── */
+/* STATS BAR */
 #statsBar {
     height: 36px;
     display: flex;
     align-items: center;
-    gap: 0;
     border-bottom: 1px solid var(--border);
     background: var(--bg2);
     padding: 0 16px;
     flex-shrink: 0;
-    overflow: hidden;
+    transition: background 0.35s, border-color 0.35s;
 }
 
 .stat-item {
@@ -328,8 +395,8 @@ html, body {
     gap: 8px;
     padding: 0 16px;
     border-right: 1px solid var(--border);
+    transition: border-color 0.35s;
 }
-
 .stat-item:first-child { padding-left: 0; }
 
 .stat-key {
@@ -338,19 +405,20 @@ html, body {
     letter-spacing: 0.14em;
     color: var(--muted);
 }
-
 .stat-val {
     font-size: 12px;
     font-weight: 500;
     color: var(--text);
+    transition: color 0.35s;
 }
 
-/* ─── CHART ─── */
+/* CHART */
 #chartWrap {
     flex: 1;
     position: relative;
     overflow: hidden;
     background: var(--bg);
+    transition: background 0.35s;
 }
 
 #chartWrap::before {
@@ -358,34 +426,30 @@ html, body {
     position: absolute;
     inset: 0;
     background:
-        linear-gradient(to right, transparent 0%, transparent 94%, var(--bg) 100%),
-        linear-gradient(to bottom, transparent 0%, transparent 90%, var(--bg) 100%);
+        linear-gradient(to right,  transparent 94%, var(--bg) 100%),
+        linear-gradient(to bottom, transparent 90%, var(--bg) 100%);
     pointer-events: none;
     z-index: 2;
+    transition: background 0.35s;
 }
 
-/* Chart grid lines */
 .grid-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
+    position: absolute; inset: 0;
+    z-index: 0; pointer-events: none;
     background-image:
-        linear-gradient(var(--border) 1px, transparent 1px),
-        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
     background-size: 60px 60px;
     background-position: -0.5px -0.5px;
 }
 
 canvas#priceChart {
-    position: absolute;
-    inset: 0;
-    width: 100% !important;
-    height: 100% !important;
+    position: absolute; inset: 0;
+    width: 100% !important; height: 100% !important;
     z-index: 1;
 }
 
-/* ─── BOTTOM CANDLE BAR ─── */
+/* BOTTOM BAR */
 #bottomBar {
     position: fixed;
     bottom: 0; left: 0; right: 0;
@@ -396,14 +460,10 @@ canvas#priceChart {
     align-items: center;
     padding: 0 16px;
     gap: 16px;
+    transition: background 0.35s, border-color 0.35s;
 }
 
-#bottomLeft {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 120px;
-}
+#bottomLeft { display: flex; align-items: center; gap: 10px; min-width: 120px; }
 
 .bottom-label {
     font-size: 9px;
@@ -413,64 +473,47 @@ canvas#priceChart {
 }
 
 #topCandleWrap {
-    flex: 1;
-    height: 16px;
-    position: relative;
+    flex: 1; height: 16px; position: relative;
 }
 
 canvas#topCandle {
-    position: absolute;
-    inset: 0;
-    width: 100% !important;
-    height: 100% !important;
+    position: absolute; inset: 0;
+    width: 100% !important; height: 100% !important;
 }
 
-#bottomRight {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-width: 120px;
-    justify-content: flex-end;
-}
+#bottomRight { display: flex; align-items: center; gap: 12px; min-width: 120px; justify-content: flex-end; }
 
 .time-display {
     font-size: 10px;
     color: var(--muted);
     font-variant-numeric: tabular-nums;
+    transition: color 0.35s;
 }
 
-/* ─── TREND BADGE ─── */
-.trend-badge {
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    padding: 2px 7px;
-    border-radius: 3px;
-    font-weight: 500;
-}
-.trend-badge.bull { background: var(--bull-dim); color: var(--bull); border: 1px solid rgba(34,197,94,0.2); }
-.trend-badge.bear { background: var(--bear-dim); color: var(--bear); border: 1px solid rgba(239,68,68,0.2); }
-
-/* ─── SCAN LINE effect ─── */
+/* SCANLINE */
 @keyframes scanline {
     from { transform: translateY(-100%); }
     to   { transform: translateY(100vh); }
 }
-
 .scanline {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    height: 60px;
-    background: linear-gradient(to bottom, transparent, rgba(255,255,255,0.012), transparent);
-    pointer-events: none;
-    z-index: 9999;
+    position: fixed; top: 0; left: 0; right: 0; height: 60px;
+    background: linear-gradient(to bottom, transparent, var(--scanline), transparent);
+    pointer-events: none; z-index: 9999;
     animation: scanline 8s linear infinite;
 }
 
-/* ─── xterm overrides ─── */
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.25; }
+}
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%       { transform: scale(1.4); opacity: 0.7; }
+}
+
 .xterm { height: 100% !important; }
 .xterm-viewport { background: transparent !important; }
-.xterm-screen { background: transparent !important; }
+.xterm-screen   { background: transparent !important; }
 </style>
 </head>
 
@@ -478,23 +521,9 @@ canvas#topCandle {
 <div class="scanline"></div>
 
 <div id="topHeader">
+
+    <!-- ── LEFT: menu + live + trend ── -->
     <div id="headerLeft">
-        <span class="logo">PXY<span class="logo-dot"></span></span>
-        <div class="divider-v"></div>
-        <span class="company-name">PreciseXceleratedYield</span>
-    </div>
-
-    <div id="headerCenter">
-        <span class="price-display" id="priceDisplay">—</span>
-        <span class="price-change bull" id="priceChange">+0.00%</span>
-    </div>
-
-    <div id="headerRight">
-        <div class="live-indicator">
-            <span id="statusDot"></span>
-            <span>Live</span>
-        </div>
-        <span class="trend-badge bull" id="trendBadge">Bullish</span>
         <div id="menu">
             <div class="menu-btn">
                 <div class="menu-icon">
@@ -508,7 +537,41 @@ canvas#topCandle {
                 <div>CSV Stream 3</div>
             </div>
         </div>
+
+        <div class="divider-v"></div>
+
+        <div class="live-indicator">
+            <span id="statusDot"></span>
+            <span>Live</span>
+        </div>
+
+        <span class="trend-badge bull" id="trendBadge">Bullish</span>
     </div>
+
+    <!-- ── CENTER: price ── -->
+    <div id="headerCenter">
+        <span class="price-display" id="priceDisplay">—</span>
+        <span class="price-change bull" id="priceChange">+0.00%</span>
+    </div>
+
+    <!-- ── RIGHT: theme toggle + PXY ── -->
+    <div id="headerRight">
+
+        <!-- Theme Toggle -->
+        <div class="theme-toggle" id="themeToggle" title="Toggle dark / light">
+            <span class="toggle-emoji toggle-emoji-moon">🌙</span>
+            <div class="toggle-track">
+                <div class="toggle-thumb"></div>
+            </div>
+            <span class="toggle-emoji toggle-emoji-sun">☀️</span>
+        </div>
+
+        <div class="divider-v"></div>
+        <span class="company-name">PreciseXceleratedYield</span>
+        <div class="divider-v"></div>
+        <span class="logo">PXY<span class="logo-dot"></span></span>
+    </div>
+
 </div>
 
 <div id="container">
@@ -572,28 +635,50 @@ canvas#topCandle {
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
-/* ─── TERMINAL ─── */
-const term = new Terminal({
-    convertEol: true,
-    scrollback: 1000,
-    fontFamily: "'DM Mono', monospace",
-    fontSize: 12,
-    lineHeight: 1.5,
-    cursorBlink: false,
-    theme: {
-        background: "#06080d",
-        foreground: "#8899bb",
-        cursor: "#3b82f6",
-        green: "#22c55e",
-        red: "#ef4444",
-        yellow: "#f59e0b",
-        cyan: "#22d3ee",
-        blue: "#3b82f6",
-        brightBlack: "#374151",
-        brightWhite: "#e8ecf4"
+/* ─── THEME ─── */
+const html        = document.documentElement;
+const themeToggle = document.getElementById("themeToggle");
+let isDark = true;
+
+const darkTermTheme = {
+    background: "#06080d", foreground: "#8899bb", cursor: "#3b82f6",
+    green: "#22c55e", red: "#ef4444", yellow: "#f59e0b",
+    cyan: "#22d3ee", blue: "#3b82f6",
+    brightBlack: "#374151", brightWhite: "#e8ecf4"
+};
+const lightTermTheme = {
+    background: "#f8fafc", foreground: "#334155", cursor: "#2563eb",
+    green: "#16a34a", red: "#dc2626", yellow: "#d97706",
+    cyan: "#0891b2", blue: "#2563eb",
+    brightBlack: "#cbd5e1", brightWhite: "#0f172a"
+};
+
+themeToggle.addEventListener("click", e => {
+    e.stopPropagation();
+    isDark = !isDark;
+    html.setAttribute("data-theme", isDark ? "dark" : "light");
+    if (term) term.options.theme = isDark ? darkTermTheme : lightTermTheme;
+    if (lastSt && lastCloses) drawMomentumBar(lastSt, lastCloses);
+    if (chart) {
+        chart.options.plugins.tooltip.backgroundColor = cssVar("--bg2");
+        chart.options.plugins.tooltip.bodyColor       = cssVar("--text");
+        chart.options.scales.y.grid.color             = cssVar("--chart-grid");
+        chart.options.scales.y.ticks.color            = cssVar("--chart-tick");
+        chart.update("none");
     }
 });
 
+function cssVar(name) {
+    return getComputedStyle(html).getPropertyValue(name).trim();
+}
+
+/* ─── TERMINAL ─── */
+const term = new Terminal({
+    convertEol: true, scrollback: 1000,
+    fontFamily: "'DM Mono', monospace",
+    fontSize: 12, lineHeight: 1.5, cursorBlink: false,
+    theme: darkTermTheme
+});
 const fitAddon = new FitAddon.FitAddon();
 term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal'));
@@ -608,11 +693,10 @@ const menu = document.getElementById("menu");
 menu.onclick = e => { e.stopPropagation(); menu.classList.toggle("active"); };
 window.onclick = () => menu.classList.remove("active");
 
-/* ─── DIVIDER DRAG ─── */
-const divider    = document.getElementById("divider");
-const termPanel  = document.getElementById("terminalPanel");
-let isDragging   = false;
-
+/* ─── DIVIDER ─── */
+const divider   = document.getElementById("divider");
+const termPanel = document.getElementById("terminalPanel");
+let isDragging  = false;
 divider.addEventListener("mousedown", () => isDragging = true);
 window.addEventListener("mouseup",   () => isDragging = false);
 window.addEventListener("mousemove", e => {
@@ -625,30 +709,26 @@ window.addEventListener("mousemove", e => {
 
 /* ─── CLOCK ─── */
 function tick() {
-    const now = new Date();
     document.getElementById("clockDisplay").textContent =
-        now.toLocaleTimeString('en-IN', { hour12: false });
+        new Date().toLocaleTimeString('en-IN', { hour12: false });
 }
-tick();
-setInterval(tick, 1000);
+tick(); setInterval(tick, 1000);
 
-/* ─── CHART ─── */
-let chart;
-let prevClose = null;
+/* ─── DATA ─── */
+let chart, lastSt = null, lastCloses = null;
 
 async function load() {
     let data;
     try {
-        const res  = await fetch("./syschrtpxy.json");
+        const res = await fetch("./syschrtpxy.json");
         data = await res.json();
     } catch {
         data = generateDemoData();
     }
-
     const closes = data.map(d => d.close);
     const st     = data.map(d => d.st);
     const trend  = data.map(d => d.st_trend);
-
+    lastSt = st; lastCloses = closes;
     updateHeader(closes, st, trend);
     updateStats(closes, st);
     draw(closes, st, trend);
@@ -656,8 +736,7 @@ async function load() {
 }
 
 function generateDemoData() {
-    let price = 2450;
-    let st    = 2430;
+    let price = 2450, st = 2430;
     const out = [];
     for (let i = 0; i < 80; i++) {
         price += (Math.random() - 0.48) * 12;
@@ -668,44 +747,30 @@ function generateDemoData() {
 }
 
 function updateHeader(closes, st, trend) {
-    const last = closes.at(-1);
-    const prev = closes.at(-2) || last;
-
+    const last = closes.at(-1), prev = closes.at(-2) || closes.at(-1);
     document.getElementById("priceDisplay").textContent =
         last.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-    const pct = ((last - prev) / prev * 100);
+    const pct = (last - prev) / prev * 100;
     const el  = document.getElementById("priceChange");
-    el.textContent  = (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
-    el.className    = "price-change " + (pct >= 0 ? "bull" : "bear");
-
-    const header     = document.getElementById("topHeader");
-    const trendBadge = document.getElementById("trendBadge");
-    const isBull     = last >= prev;
-
-    if (isBull) {
-        header.style.boxShadow = "0 1px 0 rgba(34,197,94,0.25)";
-        trendBadge.className   = "trend-badge bull";
-        trendBadge.textContent = "Bullish";
-    } else {
-        header.style.boxShadow = "0 1px 0 rgba(239,68,68,0.25)";
-        trendBadge.className   = "trend-badge bear";
-        trendBadge.textContent = "Bearish";
-    }
-    prevClose = last;
+    el.textContent = (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
+    el.className   = "price-change " + (pct >= 0 ? "bull" : "bear");
+    const header = document.getElementById("topHeader");
+    const badge  = document.getElementById("trendBadge");
+    const isBull = last >= prev;
+    header.style.boxShadow = isBull
+        ? "0 1px 0 rgba(34,197,94,0.25)"
+        : "0 1px 0 rgba(239,68,68,0.25)";
+    badge.className   = "trend-badge " + (isBull ? "bull" : "bear");
+    badge.textContent = isBull ? "Bullish" : "Bearish";
 }
 
 function updateStats(closes, st) {
-    const slice  = closes.slice(-40);
-    const stSlice = st.slice(-40);
-    const last   = closes.at(-1);
-    const prev   = closes.at(-2) || last;
-
-    document.getElementById("statOpen").textContent  = closes.at(-40)?.toFixed(2) ?? "—";
-    document.getElementById("statHigh").textContent  = Math.max(...slice).toFixed(2);
-    document.getElementById("statLow").textContent   = Math.min(...slice).toFixed(2);
-    document.getElementById("statST").textContent    = stSlice.at(-1)?.toFixed(2) ?? "—";
-
+    const slice = closes.slice(-40), stSlice = st.slice(-40);
+    const last  = closes.at(-1), prev = closes.at(-2) || closes.at(-1);
+    document.getElementById("statOpen").textContent = closes.at(-40)?.toFixed(2) ?? "—";
+    document.getElementById("statHigh").textContent = Math.max(...slice).toFixed(2);
+    document.getElementById("statLow").textContent  = Math.min(...slice).toFixed(2);
+    document.getElementById("statST").textContent   = stSlice.at(-1)?.toFixed(2) ?? "—";
     const delta = last - prev;
     const dEl   = document.getElementById("statDelta");
     dEl.textContent = (delta >= 0 ? "+" : "") + delta.toFixed(2);
@@ -713,26 +778,14 @@ function updateStats(closes, st) {
 }
 
 function draw(closes, st, trend) {
-    const MAX = 60;
-    const c   = closes.slice(-MAX);
-    const s   = st.slice(-MAX);
-    const t   = trend.slice(-MAX);
-    const pad = 8;
-
-    const labels    = [...c.map((_, i) => i), ...Array(pad).fill("")];
-    const closePad  = [...c, ...Array(pad).fill(null)];
-    const stPad     = [...s, ...Array(pad).fill(null)];
-
-    const isBull = c.at(-1) >= c.at(-2);
-
-    const lineColor  = isBull ? "#22c55e" : "#ef4444";
-    const lineGlow   = isBull
-        ? "rgba(34,197,94,0.6)"
-        : "rgba(239,68,68,0.6)";
-    const fillTop    = isBull
-        ? "rgba(34,197,94,0.12)"
-        : "rgba(239,68,68,0.12)";
-    const fillBot    = "rgba(0,0,0,0)";
+    const MAX = 60, pad = 8;
+    const c = closes.slice(-MAX), s = st.slice(-MAX);
+    const labels   = [...c.map((_,i) => i), ...Array(pad).fill("")];
+    const closePad = [...c, ...Array(pad).fill(null)];
+    const stPad    = [...s, ...Array(pad).fill(null)];
+    const isBull   = c.at(-1) >= c.at(-2);
+    const lineColor = isBull ? cssVar("--bull") : cssVar("--bear");
+    const fillTop   = isBull ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)";
 
     if (!chart) {
         chart = new Chart(document.getElementById("priceChart"), {
@@ -749,12 +802,10 @@ function draw(closes, st, trend) {
                         backgroundColor: ctx => {
                             const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
                             g.addColorStop(0, fillTop);
-                            g.addColorStop(1, fillBot);
+                            g.addColorStop(1, "rgba(0,0,0,0)");
                             return g;
                         },
-                        tension: 0.35,
-                        shadowColor: lineGlow,
-                        shadowBlur: 12
+                        tension: 0.35
                     },
                     {
                         data: stPad,
@@ -775,11 +826,11 @@ function draw(closes, st, trend) {
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: "#0c101a",
-                        borderColor: "rgba(255,255,255,0.1)",
+                        backgroundColor: cssVar("--bg2"),
+                        borderColor:     cssVar("--border2"),
                         borderWidth: 1,
-                        titleColor: "#5b6478",
-                        bodyColor: "#e8ecf4",
+                        titleColor: cssVar("--muted"),
+                        bodyColor:  cssVar("--text"),
                         padding: 10,
                         titleFont: { family: "'DM Mono', monospace", size: 10 },
                         bodyFont:  { family: "'DM Mono', monospace", size: 12 },
@@ -796,9 +847,9 @@ function draw(closes, st, trend) {
                     y: {
                         display: true,
                         position: "right",
-                        grid: { color: "rgba(255,255,255,0.04)", drawBorder: false },
+                        grid: { color: cssVar("--chart-grid"), drawBorder: false },
                         ticks: {
-                            color: "#374151",
+                            color: cssVar("--chart-tick"),
                             font: { family: "'DM Mono', monospace", size: 10 },
                             maxTicksLimit: 6
                         }
@@ -819,72 +870,52 @@ function draw(closes, st, trend) {
 function drawMomentumBar(stVals, closes) {
     const canvas = document.getElementById("topCandle");
     const ctx    = canvas.getContext("2d");
-
     canvas.width  = canvas.clientWidth;
     canvas.height = canvas.clientHeight;
-
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const w = canvas.width;
-    const h = canvas.height;
-    const midY = h / 2;
-
-    const allVals  = [...stVals, ...closes];
-    const high     = Math.max(...allVals);
-    const low      = Math.min(...allVals);
-    const range    = high - low || 1;
-
+    const w = canvas.width, h = canvas.height, midY = h / 2;
+    const allVals = [...stVals, ...closes];
+    const high = Math.max(...allVals), low = Math.min(...allVals);
+    const range = high - low || 1;
     const toX = v => ((v - low) / range) * (w - 40) + 20;
 
-    const open  = stVals.at(-1);
-    const close = closes.at(-1);
+    const open  = stVals.at(-1), close = closes.at(-1);
     const isBull = close >= open;
 
-    /* track line */
-    const trackGrad = ctx.createLinearGradient(0, 0, w, 0);
-    trackGrad.addColorStop(0, "rgba(255,255,255,0)");
-    trackGrad.addColorStop(0.3, "rgba(255,255,255,0.08)");
-    trackGrad.addColorStop(0.7, "rgba(255,255,255,0.08)");
-    trackGrad.addColorStop(1, "rgba(255,255,255,0)");
+    // track
+    const tm = cssVar("--track-mid");
+    const tg = ctx.createLinearGradient(0, 0, w, 0);
+    tg.addColorStop(0,   "rgba(0,0,0,0)");
+    tg.addColorStop(0.2, tm);
+    tg.addColorStop(0.8, tm);
+    tg.addColorStop(1,   "rgba(0,0,0,0)");
+    ctx.strokeStyle = tg; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(20, midY); ctx.lineTo(w - 20, midY); ctx.stroke();
 
-    ctx.strokeStyle = trackGrad;
-    ctx.lineWidth   = 1;
-    ctx.beginPath();
-    ctx.moveTo(20, midY);
-    ctx.lineTo(w - 20, midY);
-    ctx.stroke();
-
-    /* high/low ticks */
-    ctx.strokeStyle = "rgba(255,255,255,0.15)";
-    ctx.lineWidth   = 1;
+    // ticks
+    ctx.strokeStyle = cssVar("--tick-line");
     [20, w - 20].forEach(x => {
-        ctx.beginPath();
-        ctx.moveTo(x, midY - 5);
-        ctx.lineTo(x, midY + 5);
-        ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, midY - 5); ctx.lineTo(x, midY + 5); ctx.stroke();
     });
 
-    /* candle body */
-    const x1     = toX(Math.min(open, close));
-    const x2     = toX(Math.max(open, close));
-    const bodyW  = Math.max(x2 - x1, 3);
-    const bodyH  = 10;
-
-    const bodyColor = isBull ? "#22c55e" : "#ef4444";
+    // body
+    const x1 = toX(Math.min(open, close)), x2 = toX(Math.max(open, close));
+    const bodyW = Math.max(x2 - x1, 3);
+    const bodyColor = isBull ? cssVar("--bull") : cssVar("--bear");
     const glowColor = isBull ? "rgba(34,197,94,0.4)" : "rgba(239,68,68,0.4)";
 
-    ctx.shadowColor = glowColor;
-    ctx.shadowBlur  = 8;
+    ctx.shadowColor = glowColor; ctx.shadowBlur = 8;
     ctx.fillStyle   = bodyColor;
     ctx.beginPath();
-    ctx.roundRect(x1, midY - bodyH / 2, bodyW, bodyH, 2);
+    ctx.roundRect(x1, midY - 5, bodyW, 10, 2);
     ctx.fill();
-    ctx.shadowBlur  = 0;
+    ctx.shadowBlur = 0;
 
-    /* current price label */
-    ctx.fillStyle   = "rgba(91,100,120,0.9)";
-    ctx.font        = "10px 'DM Mono', monospace";
-    ctx.textAlign   = "right";
+    // label
+    ctx.fillStyle = cssVar("--lbl-color");
+    ctx.font      = "10px 'DM Mono', monospace";
+    ctx.textAlign = "right";
     ctx.fillText(close.toFixed(2), w - 4, midY + 4);
 }
 
