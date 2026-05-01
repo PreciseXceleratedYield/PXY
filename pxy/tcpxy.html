@@ -3,174 +3,600 @@
 <head>
 <meta charset="UTF-8">
 <title>PXY DASHBOARD</title>
-
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
 
 <style>
-
-/* ───────── ROOT ───────── */
-:root {
-    --bg:#06080d; --bg2:#0c101a; --bg3:#111827;
-    --border:rgba(255,255,255,0.06);
-    --border2:rgba(255,255,255,0.12);
-    --text:#e8ecf4; --muted:#5b6478;
-    --bull:#22c55e; --bear:#ef4444;
-    --accent:#3b82f6;
+/* ─── DARK THEME (default) ─── */
+:root,
+[data-theme="dark"] {
+    --bg:         #06080d;
+    --bg2:        #0c101a;
+    --bg3:        #111827;
+    --border:     rgba(255,255,255,0.06);
+    --border2:    rgba(255,255,255,0.12);
+    --text:       #e8ecf4;
+    --muted:      #5b6478;
+    --accent:     #3b82f6;
+    --bull:       #22c55e;
+    --bear:       #ef4444;
+    --bull-dim:   rgba(34,197,94,0.12);
+    --bear-dim:   rgba(239,68,68,0.12);
+    --gold:       #f59e0b;
+    --grid:       rgba(255,255,255,0.035);
+    --shadow:     rgba(0,0,0,0.5);
+    --scanline:   rgba(255,255,255,0.012);
+    --chart-grid: rgba(255,255,255,0.04);
+    --chart-tick: #374151;
+    --toggle-bg:  #1e293b;
+    --track-mid:  rgba(255,255,255,0.08);
+    --tick-line:  rgba(255,255,255,0.15);
+    --lbl-color:  rgba(91,100,120,0.9);
 }
 
-/* ───────── BASE ───────── */
-*{box-sizing:border-box;margin:0;padding:0}
-
-html,body{
-    height:100%;
-    overflow:auto;
-    font-family:'DM Mono',monospace;
-    background:var(--bg);
-    color:var(--text);
+/* ─── LIGHT THEME ─── */
+[data-theme="light"] {
+    --bg:         #f4f6fb;
+    --bg2:        #ffffff;
+    --bg3:        #eef1f8;
+    --border:     rgba(0,0,0,0.07);
+    --border2:    rgba(0,0,0,0.13);
+    --text:       #0f172a;
+    --muted:      #94a3b8;
+    --accent:     #2563eb;
+    --bull:       #16a34a;
+    --bear:       #dc2626;
+    --bull-dim:   rgba(22,163,74,0.10);
+    --bear-dim:   rgba(220,38,38,0.10);
+    --gold:       #d97706;
+    --grid:       rgba(0,0,0,0.04);
+    --shadow:     rgba(0,0,0,0.12);
+    --scanline:   rgba(0,0,0,0.006);
+    --chart-grid: rgba(0,0,0,0.05);
+    --chart-tick: #94a3b8;
+    --toggle-bg:  #e2e8f0;
+    --track-mid:  rgba(0,0,0,0.07);
+    --tick-line:  rgba(0,0,0,0.15);
+    --lbl-color:  rgba(100,116,139,0.9);
 }
 
-/* ───────── HEADER ───────── */
-#topHeader{
-    position:fixed; top:0; left:0; right:0;
-    height:44px;
-    display:flex; align-items:center; justify-content:space-between;
-    padding:0 12px;
-    background:var(--bg2);
-    border-bottom:1px solid var(--border);
-    z-index:1000;
-    flex-wrap:wrap;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    height: 100%;
+    overflow: hidden;
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    transition: background 0.35s ease, color 0.35s ease;
 }
 
-.price-display{
-    font-family:'Syne';
-    font-weight:800;
-    font-size:clamp(16px,2vw,28px);
+/* ─── SCROLLBAR ─── */
+* { scrollbar-width: thin; scrollbar-color: var(--border2) transparent; }
+::-webkit-scrollbar { width: 3px; height: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ─── HEADER ─── */
+#topHeader {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    z-index: 1000;
+    transition: background 0.35s, box-shadow 0.5s, border-color 0.35s;
 }
 
-/* ───────── LAYOUT ───────── */
-#container{
-    display:flex;
-    width:100%;
-    height:calc(100dvh - 44px - 44px);
-    margin-top:44px;
+/* LEFT: menu + live + trend */
+#headerLeft {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
-/* ───────── TERMINAL ───────── */
-#terminalPanel{
-    width:30%;
-    min-width:200px;
-    max-width:420px;
-    display:flex;
-    flex-direction:column;
-    border-right:1px solid var(--border);
+/* CENTER: price */
+#headerCenter {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
-#terminal{
-    flex:1;
-    overflow:hidden;
+.price-display {
+    font-family: 'Syne', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    transition: color 0.35s;
 }
 
-/* ───────── DIVIDER ───────── */
-#divider{
-    width:5px;
-    cursor:col-resize;
+.price-change {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    letter-spacing: 0.05em;
+    transition: all 0.4s;
+}
+.price-change.bull { background: var(--bull-dim); color: var(--bull); }
+.price-change.bear { background: var(--bear-dim); color: var(--bear); }
+
+/* RIGHT: toggle + logo */
+#headerRight {
+    display: flex;
+    align-items: center;
+    gap: 12px;
 }
 
-/* ───────── RIGHT ───────── */
-#right{
-    flex:1;
-    display:flex;
-    flex-direction:column;
+.logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    transition: color 0.35s;
+    white-space: nowrap;
 }
 
-/* ───────── STATS ───────── */
-#statsBar{
-    display:flex;
-    flex-wrap:wrap;
-    padding:6px;
-    border-bottom:1px solid var(--border);
+.logo sup {
+    font-size: 10px;
+    font-weight: 600;
+    vertical-align: super;
+    color: var(--accent);
+    letter-spacing: 0;
 }
 
-.stat-item{
-    padding:4px 10px;
-    font-size:12px;
+.company-name {
+    font-size: 10px;
+    font-weight: 300;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    transition: color 0.35s;
+    white-space: nowrap;
 }
 
-/* ───────── CHART ───────── */
-#chartWrap{
-    flex:1;
-    position:relative;
+.company-name sup {
+    font-size: 8px;
+    vertical-align: super;
+    color: var(--accent);
+    letter-spacing: 0;
 }
 
-canvas{
-    width:100%!important;
-    height:100%!important;
+.divider-v {
+    width: 1px; height: 20px;
+    background: var(--border2);
+    transition: background 0.35s;
+    flex-shrink: 0;
 }
 
-/* ───────── BOTTOM ───────── */
-#bottomBar{
-    position:fixed;
-    bottom:0;
-    left:0; right:0;
-    height:44px;
-    background:var(--bg2);
-    border-top:1px solid var(--border);
+/* LIVE */
+.live-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
 }
 
-/* ───────── RESPONSIVE ───────── */
-
-/* Tablet */
-@media(max-width:1024px){
-    #terminalPanel{width:35%}
+#statusDot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--bull);
+    box-shadow: 0 0 6px var(--bull);
+    animation: blink 1.4s ease-in-out infinite;
 }
 
-/* Mobile */
-@media(max-width:768px){
+/* TREND BADGE */
+.trend-badge {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    font-weight: 500;
+    transition: all 0.4s;
+}
+.trend-badge.bull { background: var(--bull-dim); color: var(--bull); border: 1px solid rgba(34,197,94,0.2); }
+.trend-badge.bear { background: var(--bear-dim); color: var(--bear); border: 1px solid rgba(239,68,68,0.2); }
 
-    #container{
-        flex-direction:column;
-        height:auto;
-    }
+/* ─── THEME TOGGLE ─── */
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    padding: 4px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    background: var(--toggle-bg);
+    transition: background 0.35s, border-color 0.35s;
+}
+.theme-toggle:hover { border-color: var(--accent); }
 
-    #terminalPanel{
-        width:100%;
-        height:180px;
-        border-right:none;
-        border-bottom:1px solid var(--border);
-    }
+.toggle-emoji { font-size: 12px; line-height: 1; transition: transform 0.5s ease; }
 
-    #divider{display:none}
-
-    #right{
-        height:calc(100dvh - 44px - 44px - 180px);
-    }
-
-    #topHeader{
-        height:auto;
-        padding:6px;
-    }
+.toggle-track {
+    width: 32px; height: 18px;
+    border-radius: 9px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    position: relative;
+    transition: background 0.35s;
+    flex-shrink: 0;
 }
 
-/* TV */
-@media(min-width:1600px){
-    .price-display{font-size:32px}
-    .stat-item{font-size:14px}
+.toggle-thumb {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--accent);
+    transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), background 0.35s;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+}
+[data-theme="light"] .toggle-thumb {
+    transform: translateX(14px);
+    background: var(--gold);
+}
+[data-theme="light"] .toggle-emoji-moon  { transform: rotate(-30deg) scale(0.8); opacity: 0.4; }
+[data-theme="dark"]  .toggle-emoji-sun   { transform: rotate(30deg) scale(0.8); opacity: 0.4; }
+
+/* ─── MENU ─── */
+#menu { position: relative; cursor: pointer; }
+
+.menu-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 11px;
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    transition: all 0.2s;
+    background: transparent;
+    font-family: 'DM Mono', monospace;
+}
+.menu-btn:hover { color: var(--text); background: var(--bg3); }
+
+.menu-icon { display: flex; flex-direction: column; gap: 3px; }
+.menu-icon span { display: block; width: 14px; height: 1px; background: currentColor; transition: all 0.2s; }
+
+#dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    overflow: hidden;
+    display: none;
+    min-width: 150px;
+    box-shadow: 0 12px 32px var(--shadow);
+    transition: background 0.35s;
 }
 
+#dropdown div {
+    padding: 10px 16px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    transition: all 0.15s;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+}
+#dropdown div:last-child { border-bottom: none; }
+#dropdown div:hover { background: var(--bg3); color: var(--text); }
+#dropdown div::before {
+    content: '';
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+    flex-shrink: 0;
+}
+
+#menu.active #dropdown { display: block; }
+
+/* ─── LAYOUT ─── */
+#container {
+    display: flex;
+    height: calc(100vh - 44px - 44px);
+    margin-top: 44px;
+}
+
+/* TERMINAL PANEL */
+#terminalPanel {
+    width: 32%;
+    min-width: 220px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--border);
+    transition: border-color 0.35s;
+}
+
+.panel-header {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    flex-shrink: 0;
+    transition: background 0.35s, border-color 0.35s;
+}
+
+.panel-label {
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.panel-dot { width: 5px; height: 5px; border-radius: 50%; }
+.panel-dot.cyan  { background: #22d3ee; box-shadow: 0 0 5px #22d3ee; }
+.panel-dot.amber { background: var(--gold); box-shadow: 0 0 5px var(--gold); }
+.panel-dot.green { background: var(--bull); box-shadow: 0 0 5px var(--bull); }
+
+#terminal {
+    flex: 1;
+    overflow: hidden;
+    padding: 6px;
+    background: var(--bg);
+    transition: background 0.35s;
+}
+
+/* DIVIDER */
+#divider {
+    width: 5px;
+    cursor: col-resize;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    flex-shrink: 0;
+    position: relative;
+    transition: background 0.2s, border-color 0.35s;
+}
+#divider:hover { background: var(--bg3); }
+#divider::after {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%,-50%);
+    width: 1px; height: 40px;
+    background: var(--border2);
+    border-radius: 2px;
+}
+
+/* RIGHT */
+#right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* STATS BAR */
+#statsBar {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+    padding: 0 16px;
+    flex-shrink: 0;
+    transition: background 0.35s, border-color 0.35s;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 16px;
+    border-right: 1px solid var(--border);
+    transition: border-color 0.35s;
+}
+.stat-item:first-child { padding-left: 0; }
+
+.stat-key {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+}
+.stat-val {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    transition: color 0.35s;
+}
+
+/* CHART */
+#chartWrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    transition: background 0.35s;
+}
+
+#chartWrap::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(to right,  transparent 94%, var(--bg) 100%),
+        linear-gradient(to bottom, transparent 90%, var(--bg) 100%);
+    pointer-events: none;
+    z-index: 2;
+    transition: background 0.35s;
+}
+
+.grid-overlay {
+    position: absolute; inset: 0;
+    z-index: 0; pointer-events: none;
+    background-image:
+        linear-gradient(var(--grid) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 60px 60px;
+    background-position: -0.5px -0.5px;
+}
+
+canvas#priceChart {
+    position: absolute; inset: 0;
+    width: 100% !important; height: 100% !important;
+    z-index: 1;
+}
+
+/* BOTTOM BAR */
+#bottomBar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 44px;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 16px;
+    transition: background 0.35s, border-color 0.35s;
+}
+
+#bottomLeft { display: flex; align-items: center; gap: 10px; min-width: 130px; }
+
+.bottom-label {
+    font-size: 9px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+#topCandleWrap {
+    flex: 1;
+    height: 32px;
+    position: relative;
+    background: var(--bg3);
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    overflow: visible;
+}
+
+canvas#topCandle {
+    position: absolute; inset: 0;
+    width: 100% !important; height: 100% !important;
+}
+
+#bottomRight { display: flex; align-items: center; gap: 12px; min-width: 130px; justify-content: flex-end; }
+
+.time-display {
+    font-size: 10px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    transition: color 0.35s;
+}
+
+/* SCANLINE */
+@keyframes scanline {
+    from { transform: translateY(-100%); }
+    to   { transform: translateY(100vh); }
+}
+.scanline {
+    position: fixed; top: 0; left: 0; right: 0; height: 60px;
+    background: linear-gradient(to bottom, transparent, var(--scanline), transparent);
+    pointer-events: none; z-index: 9999;
+    animation: scanline 8s linear infinite;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.25; }
+}
+@keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%       { transform: scale(1.4); opacity: 0.7; }
+}
+
+.xterm { height: 100% !important; }
+.xterm-viewport { background: transparent !important; }
+.xterm-screen   { background: transparent !important; }
 </style>
 </head>
 
 <body>
+<div class="scanline"></div>
 
 <div id="topHeader">
-    <div>PXY</div>
-    <div class="price-display" id="priceDisplay">—</div>
+
+    <!-- ── LEFT: menu + live + trend ── -->
+    <div id="headerLeft">
+        <div id="menu">
+            <div class="menu-btn">
+                <div class="menu-icon">
+                    <span></span><span></span><span></span>
+                </div>
+                <span>Feed</span>
+            </div>
+            <div id="dropdown">
+                <div>CSV Stream 1</div>
+                <div>CSV Stream 2</div>
+                <div>CSV Stream 3</div>
+            </div>
+        </div>
+
+        <div class="divider-v"></div>
+
+        <div class="live-indicator">
+            <span id="statusDot"></span>
+            <span>Live</span>
+        </div>
+
+        <span class="trend-badge bull" id="trendBadge">Bullish</span>
+    </div>
+
+    <!-- ── CENTER: price ── -->
+    <div id="headerCenter">
+        <span class="price-display" id="priceDisplay">—</span>
+        <span class="price-change bull" id="priceChange">+0.00%</span>
+    </div>
+
+    <!-- ── RIGHT: theme toggle + PXY ── -->
+    <div id="headerRight">
+
+        <!-- Theme Toggle -->
+        <div class="theme-toggle" id="themeToggle" title="Toggle dark / light">
+            <span class="toggle-emoji toggle-emoji-moon">🌙</span>
+            <div class="toggle-track">
+                <div class="toggle-thumb"></div>
+            </div>
+            <span class="toggle-emoji toggle-emoji-sun">☀️</span>
+        </div>
+
+        <div class="divider-v"></div>
+        <span class="company-name">PreciseXceleratedYield Pvt Ltd<sup>™</sup></span>
+        <div class="divider-v"></div>
+        <span class="logo">PXY<sup>®</sup></span>
+    </div>
+
 </div>
 
 <div id="container">
-
     <div id="terminalPanel">
+        <div class="panel-header">
+            <div class="panel-dot green"></div>
+            <div class="panel-dot amber"></div>
+            <div class="panel-dot cyan"></div>
+            <span class="panel-label" style="margin-left:4px;">System Log</span>
+        </div>
         <div id="terminal"></div>
     </div>
 
@@ -178,88 +604,399 @@ canvas{
 
     <div id="right">
         <div id="statsBar">
-            <div class="stat-item">Open: <span id="statOpen">—</span></div>
-            <div class="stat-item">High: <span id="statHigh">—</span></div>
-            <div class="stat-item">Low: <span id="statLow">—</span></div>
+            <div class="stat-item">
+                <span class="stat-key">Open</span>
+                <span class="stat-val" id="statOpen">—</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-key">High</span>
+                <span class="stat-val" style="color:var(--bull)" id="statHigh">—</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-key">Low</span>
+                <span class="stat-val" style="color:var(--bear)" id="statLow">—</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-key">ST</span>
+                <span class="stat-val" id="statST">—</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-key">Δ Close</span>
+                <span class="stat-val" id="statDelta">—</span>
+            </div>
         </div>
 
         <div id="chartWrap">
+            <div class="grid-overlay"></div>
             <canvas id="priceChart"></canvas>
         </div>
     </div>
-
 </div>
 
-<div id="bottomBar"></div>
+<div id="bottomBar">
+    <div id="bottomLeft">
+        <span class="bottom-label">Momentum</span>
+    </div>
+    <div id="topCandleWrap">
+        <canvas id="topCandle"></canvas>
+    </div>
+    <div id="bottomRight">
+        <span class="time-display" id="clockDisplay">—</span>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <script>
+/* ─── THEME ─── */
+const html        = document.documentElement;
+const themeToggle = document.getElementById("themeToggle");
+let isDark = true;
 
-/* DPI FIX */
-Chart.defaults.devicePixelRatio = window.devicePixelRatio || 1;
-
-/* TERMINAL */
-const term = new Terminal({fontSize:12});
-const fitAddon = new FitAddon.FitAddon();
-term.loadAddon(fitAddon);
-term.open(document.getElementById("terminal"));
-setTimeout(()=>fitAddon.fit(),100);
-window.addEventListener("resize",()=>fitAddon.fit());
-
-/* DIVIDER RESIZE */
-const divider=document.getElementById("divider");
-const panel=document.getElementById("terminalPanel");
-
-let drag=false;
-
-divider.onmousedown=()=>drag=true;
-window.onmouseup=()=>drag=false;
-
-window.onmousemove=e=>{
-    if(!drag) return;
-    const pct=(e.clientX/window.innerWidth)*100;
-    if(pct<15||pct>70) return;
-    panel.style.width=pct+"%";
-    fitAddon.fit();
+const darkTermTheme = {
+    background: "#06080d", foreground: "#8899bb", cursor: "#3b82f6",
+    green: "#22c55e", red: "#ef4444", yellow: "#f59e0b",
+    cyan: "#22d3ee", blue: "#3b82f6",
+    brightBlack: "#374151", brightWhite: "#e8ecf4"
+};
+const lightTermTheme = {
+    background: "#f8fafc", foreground: "#334155", cursor: "#2563eb",
+    green: "#16a34a", red: "#dc2626", yellow: "#d97706",
+    cyan: "#0891b2", blue: "#2563eb",
+    brightBlack: "#cbd5e1", brightWhite: "#0f172a"
 };
 
-/* DEMO CHART */
-const ctx=document.getElementById("priceChart");
-
-let data=[...Array(60)].map((_,i)=>i+Math.random()*10);
-
-new Chart(ctx,{
-    type:"line",
-    data:{
-        labels:data.map((_,i)=>i),
-        datasets:[{
-            data:data,
-            borderColor:"#22c55e",
-            tension:.3,
-            pointRadius:0
-        }]
-    },
-    options:{
-        responsive:true,
-        maintainAspectRatio:false,
-        plugins:{legend:{display:false}}
+themeToggle.addEventListener("click", e => {
+    e.stopPropagation();
+    isDark = !isDark;
+    html.setAttribute("data-theme", isDark ? "dark" : "light");
+    if (term) term.options.theme = isDark ? darkTermTheme : lightTermTheme;
+    if (lastSt && lastCloses) drawMomentumBar(lastSt, lastCloses);
+    if (chart) {
+        chart.options.plugins.tooltip.backgroundColor = cssVar("--bg2");
+        chart.options.plugins.tooltip.bodyColor       = cssVar("--text");
+        chart.options.scales.y.grid.color             = cssVar("--chart-grid");
+        chart.options.scales.y.ticks.color            = cssVar("--chart-tick");
+        chart.update("none");
     }
 });
 
-/* MOCK DATA */
-function updateStats(){
-    document.getElementById("statOpen").textContent=(Math.random()*100).toFixed(2);
-    document.getElementById("statHigh").textContent=(Math.random()*120).toFixed(2);
-    document.getElementById("statLow").textContent=(Math.random()*80).toFixed(2);
-    document.getElementById("priceDisplay").textContent=(Math.random()*2500).toFixed(2);
+function cssVar(name) {
+    return getComputedStyle(html).getPropertyValue(name).trim();
 }
 
-setInterval(updateStats,2000);
+/* ─── TERMINAL ─── */
+const term = new Terminal({
+    convertEol: true, scrollback: 1000,
+    fontFamily: "'DM Mono', monospace",
+    fontSize: 12, lineHeight: 1.5, cursorBlink: false,
+    theme: darkTermTheme
+});
+const fitAddon = new FitAddon.FitAddon();
+term.loadAddon(fitAddon);
+term.open(document.getElementById('terminal'));
+setTimeout(() => fitAddon.fit(), 50);
+window.addEventListener("resize", () => fitAddon.fit());
 
+const ws = new WebSocket(`ws://${location.host}`);
+ws.onmessage = e => term.write(e.data);
+
+/* ─── MENU ─── */
+const menu = document.getElementById("menu");
+menu.onclick = e => { e.stopPropagation(); menu.classList.toggle("active"); };
+window.onclick = () => menu.classList.remove("active");
+
+/* ─── DIVIDER ─── */
+const divider   = document.getElementById("divider");
+const termPanel = document.getElementById("terminalPanel");
+let isDragging  = false;
+divider.addEventListener("mousedown", () => isDragging = true);
+window.addEventListener("mouseup",   () => isDragging = false);
+window.addEventListener("mousemove", e => {
+    if (!isDragging) return;
+    const pct = (e.clientX / window.innerWidth) * 100;
+    if (pct < 12 || pct > 72) return;
+    termPanel.style.width = pct + "%";
+    setTimeout(() => fitAddon.fit(), 10);
+});
+
+/* ─── CLOCK ─── */
+function tick() {
+    document.getElementById("clockDisplay").textContent =
+        new Date().toLocaleTimeString('en-IN', { hour12: false });
+}
+tick(); setInterval(tick, 1000);
+
+/* ─── DATA ─── */
+let chart, lastSt = null, lastCloses = null;
+
+async function load() {
+    let data;
+    try {
+        const res = await fetch("./syschrtpxy.json");
+        data = await res.json();
+    } catch {
+        data = generateDemoData();
+    }
+    const closes = data.map(d => d.close);
+    const st     = data.map(d => d.st);
+    const trend  = data.map(d => d.st_trend);
+    lastSt = st; lastCloses = closes;
+    updateHeader(closes, st, trend);
+    updateStats(closes, st);
+    draw(closes, st, trend);
+    drawMomentumBar(st, closes);
+}
+
+function generateDemoData() {
+    let price = 2450, st = 2430;
+    const out = [];
+    for (let i = 0; i < 80; i++) {
+        price += (Math.random() - 0.48) * 12;
+        st    += (Math.random() - 0.49) * 6;
+        out.push({ close: price, st, st_trend: price > st ? 1 : -1 });
+    }
+    return out;
+}
+
+function updateHeader(closes, st, trend) {
+    const last = closes.at(-1), prev = closes.at(-2) || closes.at(-1);
+    document.getElementById("priceDisplay").textContent =
+        last.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const pct = (last - prev) / prev * 100;
+    const el  = document.getElementById("priceChange");
+    el.textContent = (pct >= 0 ? "+" : "") + pct.toFixed(2) + "%";
+    el.className   = "price-change " + (pct >= 0 ? "bull" : "bear");
+    const header = document.getElementById("topHeader");
+    const badge  = document.getElementById("trendBadge");
+    const isBull = last >= prev;
+    header.style.boxShadow = isBull
+        ? "0 1px 0 rgba(34,197,94,0.25)"
+        : "0 1px 0 rgba(239,68,68,0.25)";
+    badge.className   = "trend-badge " + (isBull ? "bull" : "bear");
+    badge.textContent = isBull ? "Bullish" : "Bearish";
+}
+
+function updateStats(closes, st) {
+    const slice = closes.slice(-40), stSlice = st.slice(-40);
+    const last  = closes.at(-1), prev = closes.at(-2) || closes.at(-1);
+    document.getElementById("statOpen").textContent = closes.at(-40)?.toFixed(2) ?? "—";
+    document.getElementById("statHigh").textContent = Math.max(...slice).toFixed(2);
+    document.getElementById("statLow").textContent  = Math.min(...slice).toFixed(2);
+    document.getElementById("statST").textContent   = stSlice.at(-1)?.toFixed(2) ?? "—";
+    const delta = last - prev;
+    const dEl   = document.getElementById("statDelta");
+    dEl.textContent = (delta >= 0 ? "+" : "") + delta.toFixed(2);
+    dEl.style.color = delta >= 0 ? "var(--bull)" : "var(--bear)";
+}
+
+function draw(closes, st, trend) {
+    const MAX = 60, pad = 8;
+    const c = closes.slice(-MAX), s = st.slice(-MAX);
+    const labels   = [...c.map((_,i) => i), ...Array(pad).fill("")];
+    const closePad = [...c, ...Array(pad).fill(null)];
+    const stPad    = [...s, ...Array(pad).fill(null)];
+    const isBull   = c.at(-1) >= c.at(-2);
+    const lineColor = isBull ? cssVar("--bull") : cssVar("--bear");
+    const fillTop   = isBull ? "rgba(34,197,94,0.12)" : "rgba(239,68,68,0.12)";
+
+    if (!chart) {
+        chart = new Chart(document.getElementById("priceChart"), {
+            type: "line",
+            data: {
+                labels,
+                datasets: [
+                    {
+                        data: closePad,
+                        borderColor: lineColor,
+                        borderWidth: 2,
+                        pointRadius: 0,
+                        fill: true,
+                        backgroundColor: ctx => {
+                            const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
+                            g.addColorStop(0, fillTop);
+                            g.addColorStop(1, "rgba(0,0,0,0)");
+                            return g;
+                        },
+                        tension: 0.35
+                    },
+                    {
+                        data: stPad,
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        borderColor: "rgba(59,130,246,0.6)",
+                        borderDash: [4, 4],
+                        fill: false,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                animation: false,
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: cssVar("--bg2"),
+                        borderColor:     cssVar("--border2"),
+                        borderWidth: 1,
+                        titleColor: cssVar("--muted"),
+                        bodyColor:  cssVar("--text"),
+                        padding: 10,
+                        titleFont: { family: "'DM Mono', monospace", size: 10 },
+                        bodyFont:  { family: "'DM Mono', monospace", size: 12 },
+                        callbacks: {
+                            label: ctx => {
+                                const name = ctx.datasetIndex === 0 ? "Close" : "ST";
+                                return `  ${name}: ${ctx.parsed.y?.toFixed(2) ?? "—"}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { display: false },
+                    y: {
+                        display: true,
+                        position: "right",
+                        grid: { color: cssVar("--chart-grid"), drawBorder: false },
+                        ticks: {
+                            color: cssVar("--chart-tick"),
+                            font: { family: "'DM Mono', monospace", size: 10 },
+                            maxTicksLimit: 6
+                        }
+                    }
+                }
+            }
+        });
+    } else {
+        chart.data.labels = labels;
+        chart.data.datasets[0].data        = closePad;
+        chart.data.datasets[0].borderColor = lineColor;
+        chart.data.datasets[1].data        = stPad;
+        chart.update("none");
+    }
+}
+
+/* ─── MOMENTUM BAR ─── */
+function drawMomentumBar(stVals, closes) {
+    const canvas = document.getElementById("topCandle");
+    const ctx    = canvas.getContext("2d");
+
+    // high-DPI
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.parentElement.getBoundingClientRect();
+    canvas.width  = rect.width  * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width  = rect.width  + "px";
+    canvas.style.height = rect.height + "px";
+    ctx.scale(dpr, dpr);
+
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+
+    const PADX = 60; // horizontal padding for labels
+    const midY = H / 2;
+
+    // compute range from recent data
+    const recentCloses = closes.slice(-60);
+    const recentSt     = stVals.slice(-60);
+    const allVals = [...recentCloses, ...recentSt];
+    const high = Math.max(...allVals);
+    const low  = Math.min(...allVals);
+    const range = high - low || 1;
+
+    const toX = v => ((v - low) / range) * (W - PADX * 2) + PADX;
+
+    // candle OHLC values
+    const open  = stVals.at(-1);
+    const close = closes.at(-1);
+    const wick_high = Math.max(...recentCloses.slice(-5), ...recentSt.slice(-5));
+    const wick_low  = Math.min(...recentCloses.slice(-5), ...recentSt.slice(-5));
+    const isBull = close >= open;
+
+    const bodyColor = isBull ? cssVar("--bull") : cssVar("--bear");
+    const glowColor = isBull ? "rgba(34,197,94,0.5)" : "rgba(239,68,68,0.5)";
+    const mutedColor = cssVar("--muted");
+    const borderColor = cssVar("--border2");
+
+    // ── track line (full width) ──
+    const tg = ctx.createLinearGradient(0, 0, W, 0);
+    tg.addColorStop(0,   "rgba(0,0,0,0)");
+    tg.addColorStop(0.1, cssVar("--track-mid"));
+    tg.addColorStop(0.9, cssVar("--track-mid"));
+    tg.addColorStop(1,   "rgba(0,0,0,0)");
+    ctx.strokeStyle = tg;
+    ctx.lineWidth   = 1;
+    ctx.beginPath();
+    ctx.moveTo(PADX, midY);
+    ctx.lineTo(W - PADX, midY);
+    ctx.stroke();
+
+    // ── wick line (high to low) ──
+    const wickX1 = toX(wick_low);
+    const wickX2 = toX(wick_high);
+
+    ctx.strokeStyle = bodyColor;
+    ctx.lineWidth   = 1.5;
+    ctx.globalAlpha = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(wickX1, midY);
+    ctx.lineTo(wickX2, midY);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // wick end ticks
+    ctx.strokeStyle = bodyColor;
+    ctx.lineWidth   = 1.5;
+    [wickX1, wickX2].forEach(x => {
+        ctx.beginPath();
+        ctx.moveTo(x, midY - 6);
+        ctx.lineTo(x, midY + 6);
+        ctx.stroke();
+    });
+
+    // ── candle body ──
+    const bx1  = toX(Math.min(open, close));
+    const bx2  = toX(Math.max(open, close));
+    const bodyW = Math.max(bx2 - bx1, 4);
+    const bodyH = 14;
+
+    ctx.shadowColor = glowColor;
+    ctx.shadowBlur  = 10;
+    ctx.fillStyle   = bodyColor;
+    ctx.beginPath();
+    ctx.roundRect(bx1, midY - bodyH / 2, bodyW, bodyH, 3);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+
+    // inner shine
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.beginPath();
+    ctx.roundRect(bx1 + 2, midY - bodyH / 2 + 2, bodyW - 4, 4, 2);
+    ctx.fill();
+
+    // ── labels ──
+    ctx.font      = "10px 'DM Mono', monospace";
+    ctx.textAlign = "left";
+    ctx.fillStyle = mutedColor;
+    ctx.fillText("L " + wick_low.toFixed(1), 4, midY + 4);
+
+    ctx.textAlign = "right";
+    ctx.fillStyle = mutedColor;
+    ctx.fillText("H " + wick_high.toFixed(1), W - 4, midY - 6);
+
+    ctx.fillStyle = bodyColor;
+    ctx.textAlign = "right";
+    ctx.font      = "bold 10px 'DM Mono', monospace";
+    ctx.fillText(close.toFixed(2), W - 4, midY + 6);
+}
+
+load();
+setInterval(load, 3000);
 </script>
-
 </body>
 </html>
