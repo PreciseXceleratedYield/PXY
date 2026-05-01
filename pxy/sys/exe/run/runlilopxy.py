@@ -1,4 +1,4 @@
-# run/runlilopxy.py
+# pxy/sys/exe/run/runlilopxy.py
 import pandas as pd
 import json
 import os
@@ -12,14 +12,20 @@ from runltpspxy import get_mid_price
 MATCH_MODE = "FIFO" # "FIFO" or "LIFO"
 
 def dump_to_json_bg(closed_df):
-    """Saves closed trades to pnl.json in the grandparent directory."""
+    """Saves closed trades to pnl.json in the pxy/ directory (4 levels up)."""
     try:
-        # Grandparent directory logic
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        gp_dir = os.path.dirname(os.path.dirname(current_dir))
-        file_path = os.path.join(gp_dir, "pnl.json")
+        # Script is at: pxy/sys/exe/run/runlilopxy.py
+        # Level 1: pxy/sys/exe/run/
+        # Level 2: pxy/sys/exe/
+        # Level 3: pxy/sys/
+        # Level 4: pxy/
+        current_file = os.path.abspath(__file__)
+        target_dir = current_file
+        for _ in range(4):
+            target_dir = os.path.dirname(target_dir)
+            
+        file_path = os.path.join(target_dir, "pnl.json")
 
-        # Convert DF to list of dicts; handle Timestamps for JSON compatibility
         records = closed_df.copy()
         for col in records.columns:
             if pd.api.types.is_datetime64_any_dtype(records[col]):
@@ -121,7 +127,7 @@ def process_lilo_orders(client):
 
         _print_summary(total_unrealized, total_realized)
 
-        # TRIGGER JSON UPDATE (Background thread to avoid delay)
+        # TRIGGER JSON UPDATE in background
         threading.Thread(target=dump_to_json_bg, args=(closed_df,), daemon=True).start()
 
         return open_df, closed_df
@@ -143,9 +149,7 @@ def _print_summary(total_unrealized, total_realized):
     part1 = f"🥅 {color}{real_val:+06d}{Style.RESET_ALL} 🥅"
     part2 = f" {unreal_val:+06d} 🔸 🏃‍♂️ 🔸 🏃‍♂️"
     combined = f"{part2} {part1}"
-    print()
-    print(f"{combined:^38}")
-    print()
+    print(f"\n{combined:^38}\n")
 
 if __name__ == "__main__":
     client = get_session()
@@ -157,3 +161,4 @@ if __name__ == "__main__":
     print("\n===== ACTIVE POSITIONS =====")
     if not active.empty: print(active[cols])
     else: print("No active positions.")
+
