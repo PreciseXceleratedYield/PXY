@@ -2,6 +2,7 @@
 import pandas as pd
 import json
 import os
+import traceback
 from runclntpxy import get_session
 from runltpspxy import get_mid_price
 
@@ -11,16 +12,19 @@ from runltpspxy import get_mid_price
 MATCH_MODE = "FIFO" # "FIFO" or "LIFO"
 
 def dump_to_json_sync(closed_df):
-    """Saves closed trades to pnl.json in pxy/ (3 levels up)."""
+    """Saves closed trades to pnl.json with full debugging."""
     try:
-        # Script is at: ~/pxy/sys/exe/run/runlilopxy.py
-        # 1: run/ -> 2: exe/ -> 3: sys/ -> Result: ~/pxy/
+        # FULL DEBUGGING: Print current location
         current_file = os.path.abspath(__file__)
-        target_dir = current_file
-        for _ in range(3):
-            target_dir = os.path.dirname(target_dir)
-            
-        file_path = os.path.join(target_dir, "pnl.json")
+        current_dir = os.path.dirname(current_file)
+        
+        # Creating in SAME folder first to verify write permissions
+        file_path = os.path.join(current_dir, "pnl.json")
+        
+        print(f"--- DEBUGGING JSON DUMP ---")
+        print(f"Script Location: {current_file}")
+        print(f"Attempting to write to: {file_path}")
+        print(f"Records to write: {len(closed_df)}")
 
         if closed_df.empty:
             data = []
@@ -33,8 +37,14 @@ def dump_to_json_sync(closed_df):
         
         with open(file_path, "w") as f:
             json.dump(data, f, indent=4)
+            
+        print(f"SUCCESS: File created at {file_path}")
+        print(f"---------------------------")
+            
     except Exception as e:
-        print(f"[JSON ERROR]: {e}")
+        print(f"!!! JSON DUMP ERROR !!!")
+        traceback.print_exc() # This gives the exact line and reason for failure
+        print(f"---------------------------")
 
 def process_lilo_orders(client):
     try:
@@ -67,22 +77,26 @@ def process_lilo_orders(client):
         open_positions = []
 
         for symbol, group in df.groupby("trdSym"):
-            token_id = group["tok"].iloc[0]
-            ex_seg = group["exSeg"].iloc[0]
+            token_id = group["tok"].iloc[0] # Original Logic
+            ex_seg = group["exSeg"].iloc[0] # Original Logic
+            
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records')
             sells = group[group["trnsTp"].str.upper() == "S"].to_dict('records')
 
             while sells and buys:
                 s, b = (sells[-1], buys[-1]) if MATCH_MODE == "LIFO" else (sells[0], buys[0])
                 mqty = min(s["qty"], b["qty"])
+
                 closed_matches.append({
                     "Symbol": symbol, "Qty": mqty, "tok": token_id,
                     "Buy_Time": b["dt"], "Buy_Prc": b["prc"],
                     "Exit_Time": s["dt"], "Sell_Prc": s["prc"],
                     "PNL": int((s["prc"] - b["prc"]) * mqty)
                 })
+
                 s["qty"] -= mqty
                 b["qty"] -= mqty
+
                 if s["qty"] <= 0:
                     sells.pop() if MATCH_MODE == "LIFO" else sells.pop(0)
                 if b["qty"] <= 0:
@@ -105,7 +119,7 @@ def process_lilo_orders(client):
         total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0
         _print_summary(total_unrealized, total_realized)
 
-        # Save to JSON before returning
+        # Always dump for debugging
         dump_to_json_sync(closed_df)
 
         return open_df, closed_df
