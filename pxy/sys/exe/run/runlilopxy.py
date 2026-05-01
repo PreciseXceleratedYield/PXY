@@ -1,14 +1,36 @@
 # run/runlilopxy.py
 import pandas as pd
+import json
+import os
+import threading
 from runclntpxy import get_session
 from runltpspxy import get_mid_price
-
 
 # =========================
 # 🔁 SWITCH: FIFO / LIFO
 # =========================
-MATCH_MODE = "FIFO"   # "FIFO" or "LIFO"
+MATCH_MODE = "FIFO" # "FIFO" or "LIFO"
 
+def dump_to_json_bg(closed_df):
+    """Saves closed trades to pnl.json in the grandparent directory."""
+    try:
+        # Grandparent directory logic
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        gp_dir = os.path.dirname(os.path.dirname(current_dir))
+        file_path = os.path.join(gp_dir, "pnl.json")
+
+        # Convert DF to list of dicts; handle Timestamps for JSON compatibility
+        records = closed_df.copy()
+        for col in records.columns:
+            if pd.api.types.is_datetime64_any_dtype(records[col]):
+                records[col] = records[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        data = records.to_dict(orient='records')
+        
+        with open(file_path, "w") as f:
+            json.dump(data, f, indent=4)
+    except Exception as e:
+        print(f"[JSON ERROR]: {e}")
 
 def process_lilo_orders(client):
     try:
@@ -27,6 +49,7 @@ def process_lilo_orders(client):
 
         df = pd.DataFrame(res["data"])
         df = df[df["ordSt"].isin(["complete", "traded"])].copy()
+
         if df.empty:
             total_unrealized = 0
             total_realized = 0
@@ -44,17 +67,14 @@ def process_lilo_orders(client):
         for symbol, group in df.groupby("trdSym"):
             token_id = group["tok"].iloc[0]
             ex_seg = group["exSeg"].iloc[0]
-
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records')
             sells = group[group["trnsTp"].str.upper() == "S"].to_dict('records')
 
             while sells and buys:
-
                 # =========================
                 # 🔁 FIFO / LIFO SELECT
                 # =========================
                 s, b = (sells[-1], buys[-1]) if MATCH_MODE == "LIFO" else (sells[0], buys[0])
-
                 mqty = min(s["qty"], b["qty"])
 
                 closed_matches.append({
@@ -76,7 +96,6 @@ def process_lilo_orders(client):
                 # =========================
                 if s["qty"] <= 0:
                     sells.pop() if MATCH_MODE == "LIFO" else sells.pop(0)
-
                 if b["qty"] <= 0:
                     buys.pop() if MATCH_MODE == "LIFO" else buys.pop(0)
 
@@ -102,6 +121,9 @@ def process_lilo_orders(client):
 
         _print_summary(total_unrealized, total_realized)
 
+        # TRIGGER JSON UPDATE (Background thread to avoid delay)
+        threading.Thread(target=dump_to_json_bg, args=(closed_df,), daemon=True).start()
+
         return open_df, closed_df
 
     except Exception as e:
@@ -109,48 +131,29 @@ def process_lilo_orders(client):
         _print_summary(0, 0)
         return pd.DataFrame(), pd.DataFrame()
 
-
 def _print_summary(total_unrealized, total_realized):
-    """Print emoji summary on a single line without zero-padding."""
     unreal_str = str(total_unrealized)
     real_str = str(total_realized)
-
     from colorama import Fore, Style, init
     init(autoreset=True)
-
     val_real = float(real_str.replace('%',''))
-    val_unreal = float(unreal_str.replace('%',''))
-
     color = Style.BRIGHT + Fore.GREEN if val_real >= 0 else Fore.RED
-
-    # :0+6 ensures sign (+/-) followed by 5 digits
     real_val = int(float(real_str))
     unreal_val = int(float(unreal_str))
-    
-    part1 = f"🥅  {color}{real_val:+06d}{Style.RESET_ALL} 🥅"
-    part2 = f"     {unreal_val:+06d} 🔸 🏃‍♂️ 🔸 🏃‍♂️"
-    
-    # Combine and right-align
-    combined = f"{part2}   {part1}"
+    part1 = f"🥅 {color}{real_val:+06d}{Style.RESET_ALL} 🥅"
+    part2 = f" {unreal_val:+06d} 🔸 🏃‍♂️ 🔸 🏃‍♂️"
+    combined = f"{part2} {part1}"
     print()
     print(f"{combined:^38}")
     print()
 
-
 if __name__ == "__main__":
     client = get_session()
     active, closed = process_lilo_orders(client)
-
     cols = ["Symbol", "Qty", "Buy_Time", "Buy_Prc", "Exit_Time", "Sell_Prc", "PNL"]
-
     print("\n===== CLOSED TRADES =====")
-    if not closed.empty:
-        print(closed[cols])
-    else:
-        print("No closed trades.")
-
+    if not closed.empty: print(closed[cols])
+    else: print("No closed trades.")
     print("\n===== ACTIVE POSITIONS =====")
-    if not active.empty:
-        print(active[cols])
-    else:
-        print("No active positions.")
+    if not active.empty: print(active[cols])
+    else: print("No active positions.")
