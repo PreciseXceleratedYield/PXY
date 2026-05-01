@@ -1,0 +1,75 @@
+//@version=5
+indicator("PXY®", overlay=true)
+
+// --- Shared Data ---
+float trVal = ta.tr(true)
+float priceHl2 = (high + low) / 2
+
+// 1. Standard Midpoint: (Open + Close) / 2
+float ocMid = (open + close) / 2
+
+// 2. Heikin-Ashi Midpoint: (haOpen + haClose) / 2
+float haClose = (open + high + low + close) / 4
+var float haOpen = na
+haOpen := na(haOpen) ? (open + close) / 2 : (haOpen + haClose) / 2
+float haMid = (haOpen + haClose) / 2
+
+// ==========================================
+// 1. MAJOR SUPERTREND (Dynamic Recursive)
+// ==========================================
+var float dynAtrMaj = na
+var float stMaj = na
+var int trendMaj = 1
+
+if bar_index == 0
+    dynAtrMaj := trVal
+else
+    float prevAtr = nz(dynAtrMaj)
+    float alpha = 1 / math.max(1, math.round(prevAtr))
+    dynAtrMaj := (alpha * trVal) + (1 - alpha) * prevAtr
+
+float majFactor = dynAtrMaj * dynAtrMaj
+float upperMaj = priceHl2 + majFactor
+float lowerMaj = priceHl2 - majFactor
+
+if bar_index > 0
+    float prevStMaj = nz(stMaj, priceHl2)
+    trendMaj := haClose > prevStMaj ? 1 : haClose < prevStMaj ? -1 : trendMaj
+    stMaj := trendMaj == 1 ? math.max(lowerMaj, prevStMaj) : math.min(upperMaj, prevStMaj)
+else
+    stMaj := priceHl2
+
+// ==========================================
+// 2. MINOR SUPERTREND (Major / 6)
+// ==========================================
+var float stMin = na
+var int trendMin = 1
+
+// Factor is 1/6th of the Major's factor
+float minFactor = majFactor / 6
+float upperMin = priceHl2 + minFactor
+float lowerMin = priceHl2 - minFactor
+
+if bar_index > 0
+    float prevStMin = nz(stMin, priceHl2)
+    trendMin := haClose > prevStMin ? 1 : haClose < prevStMin ? -1 : trendMin
+    stMin := trendMin == 1 ? math.max(lowerMin, prevStMin) : math.min(upperMin, prevStMin)
+else
+    stMin := priceHl2
+
+// ==========================================
+// PLOTTING
+// ==========================================
+// PXY® Major ST
+plot(stMaj, color=trendMaj == 1 ? color.green : color.red, linewidth=3, title="PXY Major ST")
+
+// PXY® Minor ST
+plot(stMin, color=trendMin == 1 ? color.lime : color.orange, linewidth=1, title="PXY Minor ST")
+
+// Standard Price Midpoint
+color ocColor = ocMid >= nz(ocMid) ? color.green : color.red
+plot(ocMid, color=ocColor, linewidth=2, title="Standard Midpoint")
+
+// Heikin-Ashi Midpoint
+color haColor = haMid >= nz(haMid) ? color.teal : color.purple
+plot(haMid, color=haColor, linewidth=1, title="HA Midpoint")
