@@ -46,17 +46,17 @@ def print_market_dashboard(market_df):
     subprocess.run([sys.executable, "systdaypxy.py"])
 
     metrics = [
-        ("📏 ATR", "atr"),
+        ("📏  ATR", "atr"),
         ("🧭 Mullu", "direction"),
-        ("🚀 Super", "supertrend"),
+        ("🚀  Super", "supertrend"),
         ("📊 LINE", "super_line"),
-        ("🟢 CE Power", "ce_power"),
+        ("🟢  CE Power", "ce_power"),
         ("🔴 PE Power", "pe_power"),
-        ("🟩 CE Force", "ce_force"),
+        ("🟩  CE Force", "ce_force"),
         ("🟥 PE Force", "pe_force"),
-        ("🟢 CE Depth", "hkin_ce_depth"),
+        ("🟢  CE Depth", "hkin_ce_depth"),
         ("🔴 PE Depth", "hkin_pe_depth"),
-        ("🎯 Entry", "entry"),
+        ("🎯  Entry", "entry"),
         ("🎯 Exit", "exit"),
     ]
 
