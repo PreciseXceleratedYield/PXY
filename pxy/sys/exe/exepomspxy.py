@@ -10,15 +10,14 @@ ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
 def visible_len(s):
     return len(ansi_escape.sub('', s))
 
-# ---------------- VALUE ONLY COLOR SCAN (HIGH CONTRAST) ----------------
+# ---------------- VALUE ONLY COLOR SCAN ----------------
 def color_value(val):
     val_str = str(val)
     val_upper = val_str.upper()
     
-    # Surgical High-Contrast Palette
+    # High Contrast for signals only
     br_green = Fore.LIGHTGREEN_EX + Style.BRIGHT
     br_red = Fore.LIGHTRED_EX + Style.BRIGHT
-    br_cyan = Fore.LIGHTCYAN_EX + Style.BRIGHT
     br_yellow = Fore.LIGHTYELLOW_EX + Style.BRIGHT
 
     if "BUY" in val_upper:
@@ -32,8 +31,8 @@ def color_value(val):
     elif "SIDE" in val_upper or "NONE" in val_upper:
         return br_yellow + val_str + Style.RESET_ALL
         
-    # Numbers and non-signals get clean High-Contrast Cyan
-    return br_cyan + val_str + Style.RESET_ALL
+    # Numbers and non-signals get clean, non-bright Cyan
+    return Fore.CYAN + val_str + Style.RESET_ALL
 
 def print_market_dashboard(market_df):
     if market_df.empty:
@@ -60,11 +59,10 @@ def print_market_dashboard(market_df):
         ("🎯 Exit", "exit"),
     ]
 
-    depth_metrics = []
     row_width = 41
     values = []
 
-    # ---------------- BUILD METRICS (Surgical Decimal Fix) ----------------
+    # ---------------- BUILD METRICS ----------------
     for label, col in metrics:
         val = snapshot.get(col, "NA")
         if "Power" in label or "Force" in label:
@@ -97,36 +95,10 @@ def print_market_dashboard(market_df):
             emoji = parts[0] if len(parts) >= 2 else ""
             label_text = " ".join(parts[1:]) if len(parts) >= 2 else r_label
             
-            # Label text in White, Value in Contextual Color
             right = f"{raw_val_colored}: {Fore.WHITE}{label_text} {emoji}"
         else:
             right = ""
 
-        # Dynamic Spacing Logic
-        spaces = row_width - visible_len(left) - visible_len(right)
-        spaces = max(2, spaces)
-        print(f"{left}{' ' * spaces}{right}")
-
-    # ---------------- DEPTH SECTION (Optional) ----------------
-    depth_values = []
-    for label, col in depth_metrics:
-        val = snapshot.get(col, "NA")
-        val_colored = color_value(val)
-        depth_values.append((label, col, val_colored))
-
-    if depth_values:
-        l_label, l_col, l_val = depth_values[0]
-        left = f"{Fore.WHITE}{l_label}: {l_val}"
-        if len(depth_values) > 1:
-            r_label, r_col, _ = depth_values[1]
-            raw_val = snapshot.get(r_col, "NA")
-            raw_val_colored = color_value(raw_val)
-            parts = r_label.split()
-            emoji = parts[0] if len(parts) >= 2 else ""
-            label_text = " ".join(parts[1:]) if len(parts) >= 2 else r_label
-            right = f"{raw_val_colored}: {Fore.WHITE}{label_text} {emoji}"
-        else:
-            right = ""
         spaces = row_width - visible_len(left) - visible_len(right)
         spaces = max(2, spaces)
         print(f"{left}{' ' * spaces}{right}")
@@ -134,4 +106,5 @@ def print_market_dashboard(market_df):
     # ===== BOS & VISUAL =====
     print(snapshot.get("bos_bar", "NONE"))
     print(snapshot.get("candle_visual", ""))
+
 
