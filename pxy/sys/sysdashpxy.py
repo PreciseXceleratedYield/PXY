@@ -2,7 +2,6 @@
 import runpy
 import os
 from colorama import Fore, Style, init
-
 init(autoreset=True)
 
 # ---- Imports ----
@@ -17,8 +16,9 @@ from sysentrpxy import get_entry_signal
 from sysdeptpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
-from syssadxpxy import calculate_adx   # ✅ KEEP
+from syssadxpxy import calculate_adx
 
+# ✅ KEEP
 TOTAL_WIDTH = 42
 
 # ---------------- UTILS ----------------
@@ -40,12 +40,11 @@ def run_pyc_file():
 # ================= CORE SNAPSHOT FUNCTION =================
 def get_full_snapshot():
     result = {}
-
     df = fetch_yf_data()
     if df is None or df.empty:
         return None
+    
     result["df"] = df
-
     result["candle_visual"] = get_candle_visual(df=df)
 
     # ===== HAIKIN-ASHI =====
@@ -63,15 +62,12 @@ def get_full_snapshot():
     result["hkin_ce_depth"] = ce_depth
     result["hkin_pe_depth"] = pe_depth
 
-    # ❌ ===== STRENGTH REMOVED COMPLETELY =====
-
     # ===== FORCE =====
     force_result = calculate_adx(df)
     if force_result:
         ce_force, pe_force = force_result
     else:
         ce_force, pe_force = 1.0, 1.0
-
     result["ce_force"] = ce_force
     result["pe_force"] = pe_force
 
@@ -87,10 +83,11 @@ def get_full_snapshot():
     result["price"] = safe_int(price)
     result["direction"] = direction if direction else "NONE"
 
-    # ===== SUPERTREND =====
+    # ===== SUPERTREND (MINER ONLY) =====
     df = calculate_supertrend(df)
     trend = df['ST_Trend'].iloc[-1] if not df.empty else "NONE"
     line_val = safe_int(df['ST'].iloc[-1] if not df.empty else 0)
+    
     result["supertrend"] = trend
     result["super_line"] = line_val
     result["df"] = df
@@ -122,86 +119,58 @@ def print_dashboard(data):
         print("No data fetched.")
         return
 
-    df = data["df"]
+    # Header Separator
+    print(Fore.CYAN + "═" * TOTAL_WIDTH)
 
     # ===== CANDLE VISUAL =====
     print(data["candle_visual"])
 
-    # ===== HAIKIN SIGNAL =====
+    # ===== HAIKIN & PRICE BLOCK =====
     signal = data["hkin_signal"]
-    past_depth = data["hkin_past_depth"]
-    ce_depth = data["hkin_ce_depth"]
-    pe_depth = data["hkin_pe_depth"]
-
-    color = Fore.GREEN if signal in ["BUY","BULL"] else Fore.RED if signal in ["SELL","BEAR"] else Fore.YELLOW
-    space1 = TOTAL_WIDTH - len(f"Hkin:{signal}") - len(f"Past:{past_depth}")
-    if space1 < 0: space1 = 1
-    print(Fore.YELLOW + "Hkin:" + color + signal + " " * space1 + Fore.YELLOW + f"Past:{color}{past_depth}")
-
-    space2 = TOTAL_WIDTH - len(f"CE:{ce_depth}") - len(f"PE:{pe_depth}")
-    if space2 < 0: space2 = 1
-    print(Fore.YELLOW + "CE:" + color + str(ce_depth) + " " * space2 + Fore.YELLOW + "PE:" + color + str(pe_depth))
-
-    # ===== FORCE =====
-    ce_force = data.get("ce_force", 1.0)
-    pe_force = data.get("pe_force", 1.0)
-
-    ce_color = Fore.GREEN if ce_force > 1 else Fore.YELLOW
-    pe_color = Fore.GREEN if pe_force > 1 else Fore.YELLOW
-
-    space = TOTAL_WIDTH - len(f"CE Force:{ce_force:.2f}") - len(f"PE Force:{pe_force:.2f}")
-    if space < 0: space = 1
-
-    print(
-        Fore.YELLOW + "CE Force:" + ce_color + f"{ce_force:.2f}"
-        + " " * space +
-        Fore.YELLOW + "PE Force:" + pe_color + f"{pe_force:.2f}"
-    )
-
-    # ===== ATR =====
-    atr_val = data["atr"]
-    k_val = data["katr"]
-    space = TOTAL_WIDTH - len(f"ATR:{atr_val}") - len(f"KATR:{k_val}")
-    print(Fore.YELLOW + "ATR:" + Fore.WHITE + str(atr_val) + " " * space + Fore.YELLOW + "KATR:" + Fore.CYAN + str(k_val))
-
-    # ===== PRICE =====
+    past = data["hkin_past_depth"]
+    h_col = Fore.GREEN if signal in ["BUY","BULL"] else Fore.RED if signal in ["SELL","BEAR"] else Fore.YELLOW
+    
     price = data["price"]
     direction = data["direction"]
-    color = Fore.GREEN if direction=="UP" else Fore.RED if direction=="DOWN" else Fore.YELLOW
-    space = TOTAL_WIDTH - len(f"Price:{price}") - len(f"Mullu:{direction}")
-    print(Fore.YELLOW + "Price:" + color + str(price) + " " * space + Fore.YELLOW + "Mullu:" + color + direction)
+    p_col = Fore.GREEN if direction=="UP" else Fore.RED if direction=="DOWN" else Fore.YELLOW
+    
+    # Surgical Layout 1
+    print(f"{Fore.YELLOW}HKIN: {h_col}{signal:<8} {Fore.YELLOW}PST: {h_col}{past:>2} {Fore.CYAN}│ {Fore.YELLOW}PRC: {p_col}{price}")
 
-    # ===== SUPERTREND =====
+    # ===== FORCE & ATR BLOCK =====
+    ce_f, pe_f = data.get("ce_force", 1.0), data.get("pe_force", 1.0)
+    atr, katr = data["atr"], data["katr"]
+    print(f"{Fore.YELLOW}FORC: {Fore.GREEN}{ce_f:.1f}{Fore.WHITE}/{Fore.RED}{pe_f:.1f}  {Fore.CYAN}│ {Fore.YELLOW}ATR: {Fore.WHITE}{atr:<4} {Fore.YELLOW}K: {Fore.CYAN}{katr}")
+
+    # ===== SUPERTREND (MINER FOCUS) =====
     trend = data["supertrend"]
-    line_val = data["super_line"]
-    color = Fore.GREEN if trend=="UP" else Fore.RED if trend=="DOWN" else Fore.YELLOW
-    space = TOTAL_WIDTH - len(f"Super:{trend}") - len(f"LINE:{line_val}")
-    print(Fore.YELLOW + "Super:" + color + trend + " " * space + Fore.YELLOW + "LINE:" + color + str(line_val))
+    line = data["super_line"]
+    st_col = Fore.GREEN if trend in ["UP", "BUY"] else Fore.RED if trend in ["DOWN", "SELL"] else Fore.YELLOW
+    
+    # "LINE" gets white for visibility, "Super" gets surgical color
+    print(f"{Fore.YELLOW}SUPER: {st_col}{trend:<7} {Fore.CYAN}│ {Fore.YELLOW}LINE: {Fore.WHITE}{line}")
 
-    # ===== POWER =====
-    ce = data["ce_power"]
-    pe = data["pe_power"]
-    ce_color = Fore.GREEN if ce > pe else Fore.RED if ce < pe else Fore.YELLOW
-    pe_color = Fore.GREEN if pe > ce else Fore.RED if pe < ce else Fore.YELLOW
-    space = TOTAL_WIDTH - len(f"CE Power:{ce}") - len(f"PE Power:{pe}")
-    print(Fore.YELLOW + "CE Power:" + ce_color + str(ce) + " " * space + Fore.YELLOW + "PE Power:" + pe_color + str(pe))
+    # ===== POWER BLOCK =====
+    ce, pe = data["ce_power"], data["pe_power"]
+    ce_p_col = Fore.GREEN if ce > pe else Fore.RED if ce < pe else Fore.YELLOW
+    pe_p_col = Fore.GREEN if pe > ce else Fore.RED if pe < ce else Fore.YELLOW
+    print(f"{Fore.YELLOW}PWR-CE: {ce_p_col}{ce:<4} {Fore.YELLOW}PWR-PE: {pe_p_col}{pe:>4}")
 
-    # ===== ENTRY =====
+    # ===== ENTRY & SIGNAL BLOCK =====
     entry = data["entry"]
     exit = data["exit"]
-    color = (
-        Fore.GREEN if entry in ["ATMBUY","OTMBUY","SBUY","BBUY","RBUY"] 
-        else Fore.RED if entry in ["ATMSELL","OTMSELL","SSELL","BSELL","RSELL"] 
-        else Fore.YELLOW
-    )
-    space = TOTAL_WIDTH - len(f"Entry:{entry}") - len(f"Signal:{exit}")
-    print(Fore.YELLOW + "Entry:" + color + entry + " " * space + Fore.YELLOW + "Signal:" + color + exit)
+    e_col = (Fore.GREEN if entry in ["ATMBUY","OTMBUY","SBUY","BBUY","RBUY"] else Fore.RED if entry in ["ATMSELL","OTMSELL","SSELL","BSELL","RSELL"] else Fore.YELLOW)
+    
+    print(f"{Fore.CYAN}─" * TOTAL_WIDTH)
+    print(f"{Fore.YELLOW}ENTRY: {e_col}{entry:<12} {Fore.YELLOW}SIG: {e_col}{exit}")
 
-    # ===== BOS BAR =====
+    # ===== BOS & DAY CANDLE =====
     print(data["bos_bar"])
+    print(Fore.CYAN + "═" * TOTAL_WIDTH)
 
 # ================= MAIN =================
 if __name__ == "__main__":
     run_pyc_file()
     data = get_full_snapshot()
     print_dashboard(data)
+
