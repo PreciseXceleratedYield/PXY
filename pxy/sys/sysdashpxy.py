@@ -116,65 +116,64 @@ def print_dashboard(data):
         print("No data fetched.")
         return
 
+    # Labels: Fore.WHITE
+    # Values: Contextual (Green/Red/Yellow/Cyan)
+
     # 1. CANDLE VISUAL
     print(data["candle_visual"])
 
     # 2. HAIKIN SIGNAL
-    sig = data["hkin_signal"]
-    pst = data["hkin_past_depth"]
+    sig, pst = data["hkin_signal"], data["hkin_past_depth"]
     ce_d, pe_d = data["hkin_ce_depth"], data["hkin_pe_depth"]
-    
-    # Surgical Color for Haikin
-    h_color = Fore.LIGHTGREEN_EX if sig in ["BUY","BULL"] else Fore.LIGHTRED_EX if sig in ["SELL","BEAR"] else Fore.YELLOW
+    h_col = Fore.LIGHTGREEN_EX if sig in ["BUY","BULL"] else Fore.LIGHTRED_EX if sig in ["SELL","BEAR"] else Fore.YELLOW
     
     s1 = TOTAL_WIDTH - len(f"Hkin:{sig}") - len(f"Past:{pst}")
-    print(Fore.YELLOW + "Hkin:" + h_color + sig + " " * max(1, s1) + Fore.YELLOW + f"Past:{h_color}{pst}")
+    print(Fore.WHITE + "Hkin:" + h_col + sig + " " * max(1, s1) + Fore.WHITE + "Past:" + h_col + str(pst))
     
     s2 = TOTAL_WIDTH - len(f"CE:{ce_d}") - len(f"PE:{pe_d}")
-    print(Fore.YELLOW + "CE:" + Fore.LIGHTGREEN_EX + str(ce_d) + " " * max(1, s2) + Fore.YELLOW + "PE:" + Fore.LIGHTRED_EX + str(pe_d))
+    print(Fore.WHITE + "CE:" + Fore.LIGHTGREEN_EX + str(ce_d) + " " * max(1, s2) + Fore.WHITE + "PE:" + Fore.LIGHTRED_EX + str(pe_d))
 
     # 3. FORCE
     cef, pef = data.get("ce_force", 1.0), data.get("pe_force", 1.0)
-    cef_c = Fore.LIGHTGREEN_EX if cef > 1 else Fore.WHITE
-    pef_c = Fore.LIGHTRED_EX if pef > 1 else Fore.WHITE
+    cef_c = Fore.LIGHTGREEN_EX if cef > 1 else Fore.CYAN
+    pef_c = Fore.LIGHTRED_EX if pef > 1 else Fore.CYAN
     s_f = TOTAL_WIDTH - len(f"CE Force:{cef:.2f}") - len(f"PE Force:{pef:.2f}")
-    print(Fore.YELLOW + "CE Force:" + cef_c + f"{cef:.2f}" + " " * max(1, s_f) + Fore.YELLOW + "PE Force:" + pef_c + f"{pef:.2f}")
+    print(Fore.WHITE + "CE Force:" + cef_c + f"{cef:.2f}" + " " * max(1, s_f) + Fore.WHITE + "PE Force:" + pef_c + f"{pef:.2f}")
 
     # 4. ATR
     atr, katr = data["atr"], data["katr"]
     s_a = TOTAL_WIDTH - len(f"ATR:{atr}") - len(f"KATR:{katr}")
-    print(Fore.YELLOW + "ATR:" + Fore.WHITE + str(atr) + " " * max(1, s_a) + Fore.YELLOW + "KATR:" + Fore.CYAN + str(katr))
+    print(Fore.WHITE + "ATR:" + Fore.CYAN + str(atr) + " " * max(1, s_a) + Fore.WHITE + "KATR:" + Fore.CYAN + str(katr))
 
     # 5. PRICE
     prc, drct = data["price"], data["direction"]
     p_color = Fore.LIGHTGREEN_EX if drct=="UP" else Fore.LIGHTRED_EX if drct=="DOWN" else Fore.YELLOW
     s_p = TOTAL_WIDTH - len(f"Price:{prc}") - len(f"Mullu:{drct}")
-    print(Fore.YELLOW + "Price:" + Fore.WHITE + str(prc) + " " * max(1, s_p) + Fore.YELLOW + "Mullu:" + p_color + drct)
+    print(Fore.WHITE + "Price:" + Fore.CYAN + str(prc) + " " * max(1, s_p) + Fore.WHITE + "Mullu:" + p_color + drct)
 
-    # 6. SUPERTREND (SURGICAL COLORS)
+    # 6. SUPERTREND
     trnd, line = data["supertrend"], data["super_line"]
-    # Action colors (BUY/SELL) are brighter than State colors (UP/DOWN)
     if trnd == "BUY": st_c = Fore.GREEN + Style.BRIGHT
     elif trnd == "SELL": st_c = Fore.RED + Style.BRIGHT
-    elif trnd == "UP": st_c = Fore.GREEN
-    elif trnd == "DOWN": st_c = Fore.RED
+    elif trnd == "UP": st_c = Fore.LIGHTGREEN_EX
+    elif trnd == "DOWN": st_c = Fore.LIGHTRED_EX
     else: st_c = Fore.YELLOW
 
     s_st = TOTAL_WIDTH - len(f"Super:{trnd}") - len(f"LINE:{line}")
-    print(Fore.YELLOW + "Super:" + st_c + trnd + " " * max(1, s_st) + Fore.YELLOW + "LINE:" + Fore.WHITE + str(line))
+    print(Fore.WHITE + "Super:" + st_c + trnd + " " * max(1, s_st) + Fore.WHITE + "LINE:" + Fore.CYAN + str(line))
 
     # 7. POWER
     ce, pe = data["ce_power"], data["pe_power"]
-    ce_c = Fore.LIGHTGREEN_EX if ce > pe else Fore.WHITE
-    pe_c = Fore.LIGHTRED_EX if pe > ce else Fore.WHITE
+    ce_c = Fore.LIGHTGREEN_EX if ce > pe else Fore.CYAN
+    pe_c = Fore.LIGHTRED_EX if pe > ce else Fore.CYAN
     s_pw = TOTAL_WIDTH - len(f"CE Power:{ce}") - len(f"PE Power:{pe}")
-    print(Fore.YELLOW + "CE Power:" + ce_c + str(ce) + " " * max(1, s_pw) + Fore.YELLOW + "PE Power:" + pe_c + str(pe))
+    print(Fore.WHITE + "CE Power:" + ce_c + str(ce) + " " * max(1, s_pw) + Fore.WHITE + "PE Power:" + pe_c + str(pe))
 
     # 8. ENTRY & EXIT
     ent, ext = data["entry"], data["exit"]
-    e_color = Fore.LIGHTGREEN_EX if "BUY" in ent else Fore.LIGHTRED_EX if "SELL" in ent else Fore.YELLOW
+    e_color = Fore.LIGHTGREEN_EX if "BUY" in ent or "UP" in ent else Fore.LIGHTRED_EX if "SELL" in ent or "DOWN" in ent else Fore.YELLOW
     s_e = TOTAL_WIDTH - len(f"Entry:{ent}") - len(f"Signal:{ext}")
-    print(Fore.YELLOW + "Entry:" + e_color + ent + " " * max(1, s_e) + Fore.YELLOW + "Signal:" + e_color + ext)
+    print(Fore.WHITE + "Entry:" + e_color + ent + " " * max(1, s_e) + Fore.WHITE + "Signal:" + e_color + ext)
 
     # 9. BOS
     print(data["bos_bar"])
