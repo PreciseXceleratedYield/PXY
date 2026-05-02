@@ -318,11 +318,11 @@ async def main():
 
         print(f"""
   =====================================
-    💰 Cash   : {int(funds)}
-    📦 Pos    : {pos}
-    🎫 Symbol : {symbol}
-    🎯 Signal : {entry_signal}
-    📌 Status : {status}
+    💰  Cash   : {int(funds)}
+    📦  Pos    : {pos}
+    🎫  Symbol : {symbol}
+    🎯  Signal : {entry_signal}
+    📌  Status : {status}
   =====================================
 """)
 
