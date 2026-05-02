@@ -492,14 +492,21 @@ html[data-device="tv"] #pnlOverlay{left:10ch;}
   width:auto;
   object-fit:contain;
   display:block;
-  filter:drop-shadow(0 0 8px rgba(100,210,60,.30));
+  /* screen blend: black background of PNG becomes invisible,
+     coloured parts (green glow, silver letters) shine through */
+  mix-blend-mode:screen;
+  filter:drop-shadow(0 0 6px rgba(100,210,60,.22)) brightness(1.08);
   transition:height .2s,filter .35s;
 }
 html[data-device="mobile"]  #pxyLogo{ height:26px; }
 html[data-device="tablet"]  #pxyLogo{ height:30px; }
 html[data-device="desktop"] #pxyLogo{ height:34px; }
 html[data-device="tv"]      #pxyLogo{ height:46px; }
-[data-theme="light"] #pxyLogo{ filter:drop-shadow(0 0 6px rgba(60,180,60,.25)) brightness(.92); }
+/* light theme: multiply keeps colours, drops the black box */
+[data-theme="light"] #pxyLogo{
+  mix-blend-mode:multiply;
+  filter:drop-shadow(0 0 5px rgba(60,180,60,.20)) brightness(.88);
+}
 
 </style>
 </head>
@@ -852,15 +859,29 @@ function updateStats(closes,st){
   el.style.color=d>=0?'var(--bull)':'var(--bear)';
 }
 
+/* ═══════════════════════════════════════
+   CHART DATA
+   — diff before update so unchanged data
+     never triggers a canvas repaint
+   ═══════════════════════════════════════ */
+let _prevCloseKey='', _prevStKey='';
+
 function drawChart(closes,st){
   const MAX=60,PAD=8;
   const c=closes.slice(-MAX),s=st.slice(-MAX);
+
+  // cheap diff: compare last value + length — skip full redraw if identical
+  const closeKey = c.at(-1)?.toFixed(4)+'|'+c.length;
+  const stKey    = s.at(-1)?.toFixed(4)+'|'+s.length;
+  const same     = closeKey===_prevCloseKey && stKey===_prevStKey;
+
   const labels=[...c.map((_,i)=>i),...Array(PAD).fill('')];
   const cPad=[...c,...Array(PAD).fill(null)];
   const sPad=[...s,...Array(PAD).fill(null)];
   const bull=c.at(-1)>=(c.at(-2)||c.at(-1));
   const lClr=bull?cv('--bull'):cv('--bear');
   const fTop=bull?'rgba(34,197,94,.10)':'rgba(239,68,68,.10)';
+
   if(!chart){
     chart=new Chart(document.getElementById('priceChart'),{
       type:'line',
@@ -870,7 +891,10 @@ function drawChart(closes,st){
         {data:sPad,borderWidth:1.5,pointRadius:0,borderColor:'rgba(59,130,246,.55)',borderDash:[4,4],fill:false,tension:.3}
       ]},
       options:{
-        animation:false,responsive:true,maintainAspectRatio:false,
+        animation:false,
+        responsive:true,maintainAspectRatio:false,
+        // disable ALL built-in resize animation — key for TV
+        resizeDelay:0,
         interaction:{mode:'index',intersect:false},
         plugins:{
           legend:{display:false},
@@ -885,64 +909,104 @@ function drawChart(closes,st){
           ticks:{color:cv('--ctick'),font:{family:"'DM Mono',monospace",size:9},maxTicksLimit:6}}}
       }
     });
-  } else {
+  } else if(!same){
+    // only push new data + repaint when something actually changed
     chart.data.labels=labels;
     chart.data.datasets[0].data=cPad;
     chart.data.datasets[0].borderColor=lClr;
     chart.data.datasets[1].data=sPad;
-    chart.update('none');
+    // 'none' skips animation but still does a full clear+draw;
+    // schedule it via rAF so it never lands mid-composite on TV
+    requestAnimationFrame(()=>chart.update('none'));
   }
+
+  _prevCloseKey=closeKey;
+  _prevStKey=stKey;
 }
 
 /* ═══════════════════════════════════════
    MOMENTUM BAR
+   — cache canvas pixel size; only call
+     canvas.width= when dims truly change
+     (that reset is what causes the flash)
+   — schedule paint via rAF
    ═══════════════════════════════════════ */
+let _momW=0, _momH=0, _momCtx=null;
+
 function drawMom(stVals,closes){
   const canvas=document.getElementById('momBar');
-  const ctx=canvas.getContext('2d');
   const dpr=window.devicePixelRatio||1;
   const rect=canvas.parentElement.getBoundingClientRect();
-  canvas.width=rect.width*dpr; canvas.height=rect.height*dpr;
-  canvas.style.width=rect.width+'px'; canvas.style.height=rect.height+'px';
-  ctx.scale(dpr,dpr);
-  const W=rect.width,H=rect.height,PADX=58,midY=H/2;
-  const rC=closes.slice(-60),rS=stVals.slice(-60);
-  const all=[...rC,...rS],hi=Math.max(...all),lo=Math.min(...all),rng=hi-lo||1;
-  const toX=v=>((v-lo)/rng)*(W-PADX*2)+PADX;
-  const open=stVals.at(-1),close=closes.at(-1);
-  const wHi=Math.max(...rC.slice(-5),...rS.slice(-5));
-  const wLo=Math.min(...rC.slice(-5),...rS.slice(-5));
-  const bull=close>=open;
-  const bClr=bull?cv('--bull'):cv('--bear');
-  const gClr=bull?'rgba(34,197,94,.5)':'rgba(239,68,68,.5)';
-  ctx.clearRect(0,0,W,H);
-  const tg=ctx.createLinearGradient(0,0,W,0);
-  tg.addColorStop(0,'rgba(0,0,0,0)'); tg.addColorStop(.1,cv('--trmid')); tg.addColorStop(.9,cv('--trmid')); tg.addColorStop(1,'rgba(0,0,0,0)');
-  ctx.strokeStyle=tg; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(PADX,midY); ctx.lineTo(W-PADX,midY); ctx.stroke();
-  ctx.strokeStyle=bClr; ctx.lineWidth=1.5; ctx.globalAlpha=.45;
-  ctx.beginPath(); ctx.moveTo(toX(wLo),midY); ctx.lineTo(toX(wHi),midY); ctx.stroke();
-  ctx.globalAlpha=1;
-  [toX(wLo),toX(wHi)].forEach(x=>{ ctx.beginPath(); ctx.moveTo(x,midY-5); ctx.lineTo(x,midY+5); ctx.stroke(); });
-  const bx1=toX(Math.min(open,close)),bx2=toX(Math.max(open,close));
-  const bW=Math.max(bx2-bx1,4),bH=13;
-  ctx.shadowColor=gClr; ctx.shadowBlur=10;
-  ctx.fillStyle=bClr; ctx.beginPath(); ctx.roundRect(bx1,midY-bH/2,bW,bH,3); ctx.fill();
-  ctx.shadowBlur=0;
-  ctx.fillStyle='rgba(255,255,255,.11)'; ctx.beginPath(); ctx.roundRect(bx1+2,midY-bH/2+2,bW-4,4,2); ctx.fill();
-  ctx.fillStyle=cv('--muted'); ctx.font="9.5px 'DM Mono',monospace";
-  ctx.textAlign='left';  ctx.fillText('L '+wLo.toFixed(1),4,midY+4);
-  ctx.textAlign='right'; ctx.fillText('H '+wHi.toFixed(1),W-4,midY-5);
-  ctx.fillStyle=bClr; ctx.font="bold 9.5px 'DM Mono',monospace";
-  ctx.fillText(close.toFixed(2),W-4,midY+5);
+  const needW=Math.round(rect.width*dpr);
+  const needH=Math.round(rect.height*dpr);
+
+  // only resize canvas backing store when dimensions actually change
+  if(needW!==_momW || needH!==_momH || !_momCtx){
+    canvas.width=needW; canvas.height=needH;
+    canvas.style.width=rect.width+'px'; canvas.style.height=rect.height+'px';
+    _momW=needW; _momH=needH;
+    _momCtx=canvas.getContext('2d');
+  }
+
+  // capture values; paint on next animation frame so it never tears
+  const ctx=_momCtx;
+  const W=rect.width,H=rect.height;
+  requestAnimationFrame(()=>{
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    const PADX=58,midY=H/2;
+    const rC=closes.slice(-60),rS=stVals.slice(-60);
+    const all=[...rC,...rS],hi=Math.max(...all),lo=Math.min(...all),rng=hi-lo||1;
+    const toX=v=>((v-lo)/rng)*(W-PADX*2)+PADX;
+    const open=stVals.at(-1),close=closes.at(-1);
+    const wHi=Math.max(...rC.slice(-5),...rS.slice(-5));
+    const wLo=Math.min(...rC.slice(-5),...rS.slice(-5));
+    const bull=close>=open;
+    const bClr=bull?cv('--bull'):cv('--bear');
+    const gClr=bull?'rgba(34,197,94,.5)':'rgba(239,68,68,.5)';
+
+    ctx.clearRect(0,0,W,H);
+
+    // track
+    const tg=ctx.createLinearGradient(0,0,W,0);
+    tg.addColorStop(0,'rgba(0,0,0,0)'); tg.addColorStop(.1,cv('--trmid'));
+    tg.addColorStop(.9,cv('--trmid')); tg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.strokeStyle=tg; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(PADX,midY); ctx.lineTo(W-PADX,midY); ctx.stroke();
+
+    // wick
+    ctx.strokeStyle=bClr; ctx.lineWidth=1.5; ctx.globalAlpha=.45;
+    ctx.beginPath(); ctx.moveTo(toX(wLo),midY); ctx.lineTo(toX(wHi),midY); ctx.stroke();
+    ctx.globalAlpha=1;
+    [toX(wLo),toX(wHi)].forEach(x=>{ ctx.beginPath(); ctx.moveTo(x,midY-5); ctx.lineTo(x,midY+5); ctx.stroke(); });
+
+    // body
+    const bx1=toX(Math.min(open,close)),bx2=toX(Math.max(open,close));
+    const bW=Math.max(bx2-bx1,4),bH=13;
+    ctx.shadowColor=gClr; ctx.shadowBlur=10;
+    ctx.fillStyle=bClr; ctx.beginPath(); ctx.roundRect(bx1,midY-bH/2,bW,bH,3); ctx.fill();
+    ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,255,255,.11)';
+    ctx.beginPath(); ctx.roundRect(bx1+2,midY-bH/2+2,bW-4,4,2); ctx.fill();
+
+    // labels
+    ctx.fillStyle=cv('--muted'); ctx.font="9.5px 'DM Mono',monospace";
+    ctx.textAlign='left';  ctx.fillText('L '+wLo.toFixed(1),4,midY+4);
+    ctx.textAlign='right'; ctx.fillText('H '+wHi.toFixed(1),W-4,midY-5);
+    ctx.fillStyle=bClr; ctx.font="bold 9.5px 'DM Mono',monospace";
+    ctx.fillText(close.toFixed(2),W-4,midY+5);
+  });
 }
 
 /* ═══════════════════════════════════════
-   INIT
+   INIT — stagger PNL and chart polls so
+   they never fire at the exact same ms
+   (two simultaneous repaints = flicker)
    ═══════════════════════════════════════ */
 async function refresh(){ await Promise.all([loadChart(),loadPNL()]); }
 refresh();
-setInterval(refresh,3000);
+// chart refreshes every 3 s, PNL every 5 s independently — no simultaneous repaints
+setInterval(loadChart, 3000);
+setInterval(loadPNL,   5000);
 </script>
 </body>
 </html>
