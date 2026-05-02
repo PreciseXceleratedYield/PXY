@@ -43,7 +43,6 @@ def get_full_snapshot():
     df = fetch_yf_data()
     if df is None or df.empty:
         return None
-    
     result["df"] = df
     result["candle_visual"] = get_candle_visual(df=df)
 
@@ -83,11 +82,10 @@ def get_full_snapshot():
     result["price"] = safe_int(price)
     result["direction"] = direction if direction else "NONE"
 
-    # ===== SUPERTREND (MINER ONLY) =====
+    # ===== SUPERTREND (MINER) =====
     df = calculate_supertrend(df)
     trend = df['ST_Trend'].iloc[-1] if not df.empty else "NONE"
     line_val = safe_int(df['ST'].iloc[-1] if not df.empty else 0)
-    
     result["supertrend"] = trend
     result["super_line"] = line_val
     result["df"] = df
@@ -110,7 +108,6 @@ def get_full_snapshot():
     bos_bar, bos_val = get_bos_bar(df)
     result["bos_bar"] = bos_bar if bos_bar else "NONE"
     result["bos_val"] = bos_val if bos_val else "NONE"
-
     return result
 
 # ================= PRINT DASHBOARD =================
@@ -119,54 +116,68 @@ def print_dashboard(data):
         print("No data fetched.")
         return
 
-    # Header Separator
-    print(Fore.CYAN + "═" * TOTAL_WIDTH)
-
-    # ===== CANDLE VISUAL =====
+    # 1. CANDLE VISUAL
     print(data["candle_visual"])
 
-    # ===== HAIKIN & PRICE BLOCK =====
-    signal = data["hkin_signal"]
-    past = data["hkin_past_depth"]
-    h_col = Fore.GREEN if signal in ["BUY","BULL"] else Fore.RED if signal in ["SELL","BEAR"] else Fore.YELLOW
+    # 2. HAIKIN SIGNAL
+    sig = data["hkin_signal"]
+    pst = data["hkin_past_depth"]
+    ce_d, pe_d = data["hkin_ce_depth"], data["hkin_pe_depth"]
     
-    price = data["price"]
-    direction = data["direction"]
-    p_col = Fore.GREEN if direction=="UP" else Fore.RED if direction=="DOWN" else Fore.YELLOW
+    # Surgical Color for Haikin
+    h_color = Fore.LIGHTGREEN_EX if sig in ["BUY","BULL"] else Fore.LIGHTRED_EX if sig in ["SELL","BEAR"] else Fore.YELLOW
     
-    # Surgical Layout 1
-    print(f"{Fore.YELLOW}HKIN: {h_col}{signal:<8} {Fore.YELLOW}PST: {h_col}{past:>2} {Fore.CYAN}│ {Fore.YELLOW}PRC: {p_col}{price}")
+    s1 = TOTAL_WIDTH - len(f"Hkin:{sig}") - len(f"Past:{pst}")
+    print(Fore.YELLOW + "Hkin:" + h_color + sig + " " * max(1, s1) + Fore.YELLOW + f"Past:{h_color}{pst}")
+    
+    s2 = TOTAL_WIDTH - len(f"CE:{ce_d}") - len(f"PE:{pe_d}")
+    print(Fore.YELLOW + "CE:" + Fore.LIGHTGREEN_EX + str(ce_d) + " " * max(1, s2) + Fore.YELLOW + "PE:" + Fore.LIGHTRED_EX + str(pe_d))
 
-    # ===== FORCE & ATR BLOCK =====
-    ce_f, pe_f = data.get("ce_force", 1.0), data.get("pe_force", 1.0)
+    # 3. FORCE
+    cef, pef = data.get("ce_force", 1.0), data.get("pe_force", 1.0)
+    cef_c = Fore.LIGHTGREEN_EX if cef > 1 else Fore.WHITE
+    pef_c = Fore.LIGHTRED_EX if pef > 1 else Fore.WHITE
+    s_f = TOTAL_WIDTH - len(f"CE Force:{cef:.2f}") - len(f"PE Force:{pef:.2f}")
+    print(Fore.YELLOW + "CE Force:" + cef_c + f"{cef:.2f}" + " " * max(1, s_f) + Fore.YELLOW + "PE Force:" + pef_c + f"{pef:.2f}")
+
+    # 4. ATR
     atr, katr = data["atr"], data["katr"]
-    print(f"{Fore.YELLOW}FORC: {Fore.GREEN}{ce_f:.1f}{Fore.WHITE}/{Fore.RED}{pe_f:.1f}  {Fore.CYAN}│ {Fore.YELLOW}ATR: {Fore.WHITE}{atr:<4} {Fore.YELLOW}K: {Fore.CYAN}{katr}")
+    s_a = TOTAL_WIDTH - len(f"ATR:{atr}") - len(f"KATR:{katr}")
+    print(Fore.YELLOW + "ATR:" + Fore.WHITE + str(atr) + " " * max(1, s_a) + Fore.YELLOW + "KATR:" + Fore.CYAN + str(katr))
 
-    # ===== SUPERTREND (MINER FOCUS) =====
-    trend = data["supertrend"]
-    line = data["super_line"]
-    st_col = Fore.GREEN if trend in ["UP", "BUY"] else Fore.RED if trend in ["DOWN", "SELL"] else Fore.YELLOW
-    
-    # "LINE" gets white for visibility, "Super" gets surgical color
-    print(f"{Fore.YELLOW}SUPER: {st_col}{trend:<7} {Fore.CYAN}│ {Fore.YELLOW}LINE: {Fore.WHITE}{line}")
+    # 5. PRICE
+    prc, drct = data["price"], data["direction"]
+    p_color = Fore.LIGHTGREEN_EX if drct=="UP" else Fore.LIGHTRED_EX if drct=="DOWN" else Fore.YELLOW
+    s_p = TOTAL_WIDTH - len(f"Price:{prc}") - len(f"Mullu:{drct}")
+    print(Fore.YELLOW + "Price:" + Fore.WHITE + str(prc) + " " * max(1, s_p) + Fore.YELLOW + "Mullu:" + p_color + drct)
 
-    # ===== POWER BLOCK =====
+    # 6. SUPERTREND (SURGICAL COLORS)
+    trnd, line = data["supertrend"], data["super_line"]
+    # Action colors (BUY/SELL) are brighter than State colors (UP/DOWN)
+    if trnd == "BUY": st_c = Fore.GREEN + Style.BRIGHT
+    elif trnd == "SELL": st_c = Fore.RED + Style.BRIGHT
+    elif trnd == "UP": st_c = Fore.GREEN
+    elif trnd == "DOWN": st_c = Fore.RED
+    else: st_c = Fore.YELLOW
+
+    s_st = TOTAL_WIDTH - len(f"Super:{trnd}") - len(f"LINE:{line}")
+    print(Fore.YELLOW + "Super:" + st_c + trnd + " " * max(1, s_st) + Fore.YELLOW + "LINE:" + Fore.WHITE + str(line))
+
+    # 7. POWER
     ce, pe = data["ce_power"], data["pe_power"]
-    ce_p_col = Fore.GREEN if ce > pe else Fore.RED if ce < pe else Fore.YELLOW
-    pe_p_col = Fore.GREEN if pe > ce else Fore.RED if pe < ce else Fore.YELLOW
-    print(f"{Fore.YELLOW}PWR-CE: {ce_p_col}{ce:<4} {Fore.YELLOW}PWR-PE: {pe_p_col}{pe:>4}")
+    ce_c = Fore.LIGHTGREEN_EX if ce > pe else Fore.WHITE
+    pe_c = Fore.LIGHTRED_EX if pe > ce else Fore.WHITE
+    s_pw = TOTAL_WIDTH - len(f"CE Power:{ce}") - len(f"PE Power:{pe}")
+    print(Fore.YELLOW + "CE Power:" + ce_c + str(ce) + " " * max(1, s_pw) + Fore.YELLOW + "PE Power:" + pe_c + str(pe))
 
-    # ===== ENTRY & SIGNAL BLOCK =====
-    entry = data["entry"]
-    exit = data["exit"]
-    e_col = (Fore.GREEN if entry in ["ATMBUY","OTMBUY","SBUY","BBUY","RBUY"] else Fore.RED if entry in ["ATMSELL","OTMSELL","SSELL","BSELL","RSELL"] else Fore.YELLOW)
-    
-    print(f"{Fore.CYAN}─" * TOTAL_WIDTH)
-    print(f"{Fore.YELLOW}ENTRY: {e_col}{entry:<12} {Fore.YELLOW}SIG: {e_col}{exit}")
+    # 8. ENTRY & EXIT
+    ent, ext = data["entry"], data["exit"]
+    e_color = Fore.LIGHTGREEN_EX if "BUY" in ent else Fore.LIGHTRED_EX if "SELL" in ent else Fore.YELLOW
+    s_e = TOTAL_WIDTH - len(f"Entry:{ent}") - len(f"Signal:{ext}")
+    print(Fore.YELLOW + "Entry:" + e_color + ent + " " * max(1, s_e) + Fore.YELLOW + "Signal:" + e_color + ext)
 
-    # ===== BOS & DAY CANDLE =====
+    # 9. BOS
     print(data["bos_bar"])
-    print(Fore.CYAN + "═" * TOTAL_WIDTH)
 
 # ================= MAIN =================
 if __name__ == "__main__":
