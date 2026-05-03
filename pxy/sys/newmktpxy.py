@@ -1,43 +1,86 @@
 # sysmktpxy.py
 from sysdtafpxy import fetch_yf_data
+import json
+import os
+
+# Dynamic naming based on script file name
+BASE_NAME = os.path.splitext(os.path.basename(__file__))[0]
+JSON_FILE = f"{BASE_NAME}.json"
+
+def read_last_signal():
+    if not os.path.exists(JSON_FILE):
+        return "NONE"
+    try:
+        with open(JSON_FILE, "r") as f:
+            data = json.load(f)
+            return data.get("signal", "NONE")
+    except:
+        return "NONE"
+
+def write_last_signal(signal):
+    try:
+        with open(JSON_FILE, "w") as f:
+            json.dump({"signal": signal}, f)
+    except:
+        pass
 
 def get_signal(df=None):
-    if df is None: df = fetch_yf_data()
-    # Need at least 4 bars to look back at c1 safely
-    if df is None or len(df) < 4: return "NONE", "NONE"
+    # --- DATA FETCH WITH ERROR HANDLING ---
+    try:
+        if df is None: 
+            df = fetch_yf_data()
+    except Exception:
+        return "NONE", "NONE"
+    
+    if df is None or len(df) < 4: 
+        return "NONE", "NONE"
 
-    def get_master_price(i):
-        o = df['Open'].iloc[i]
-        h = df['High'].iloc[i]
-        l = df['Low'].iloc[i]
-        c = df['Close'].iloc[i]
-        c1 = df['Close'].iloc[i-1] # Previous Close
-        
-        e1 = c                    # Pure C
-        e2 = (c1 + c) / 2         # C1 + C / 2
-        e3 = (c + o) / 2          # C + O / 2
-        e4 = (o + h + l + c) / 4  # OHLC / 4
-        
-        # Average the 4 engines and round to 4 decimals
+    # 1. Master Price (4 Engines)
+    def get_p(i):
+        o, h, l, c = df['Open'].iloc[i], df['High'].iloc[i], df['Low'].iloc[i], df['Close'].iloc[i]
+        c1 = df['Close'].iloc[i-1]
+        e1, e2 = c, (c1 + c) / 2
+        e3, e4 = (c + o) / 2, (o + h + l + c) / 4
         return round((e1 + e2 + e3 + e4) / 4, 4)
 
-    p_now  = get_master_price(-1)
-    p_prev = get_master_price(-2)
-    p_old  = get_master_price(-3)
+    try:
+        p1, p2, p3 = get_p(-1), get_p(-2), get_p(-3)
+    except:
+        return "NONE", "NONE"
 
-    # --- SIMPLE LOGIC ---
-    if p_now > p_prev:
-        # Flip detected: was falling/flat, now rising
-        final = "BUY" if p_prev <= p_old else "BULL"
-    elif p_now < p_prev:
-        # Flip detected: was rising/flat, now falling
-        final = "SELL" if p_prev >= p_old else "BEAR"
-    else:
-        # Price is identical to 4 decimals
-        final = "NONE"
+    # 2. Read Last Record from JSON
+    last_json = read_last_signal()
 
+    # 3. Pattern Logic + Upgrade Logic
+    final = "NONE"
+
+    # --- V-Pattern / BUY Section ---
+    if p1 > p2 and p3 > p2:
+        final = "BUY"
+    
+    # --- Inverted V / SELL Section ---
+    elif p1 < p2 and p3 < p2:
+        final = "SELL"
+        
+    # --- BULL Section (Upgrade Check) ---
+    elif p1 > p2:
+        if last_json == "SELL":
+            final = "BUY"
+        else:
+            final = "BULL"
+            
+    # --- BEAR Section (Upgrade Check) ---
+    elif p1 < p2:
+        if last_json == "BUY":
+            final = "SELL"
+        else:
+            final = "BEAR"
+
+    # 4. Save and Overwrite
+    write_last_signal(final)
     return final, final
 
 if __name__ == "__main__":
     sig, _ = get_signal()
     print(f"SIGNAL: {sig}")
+
