@@ -40,7 +40,7 @@ def get_entry_signal(df=None):
     elif st_entry == "SELL":
         final_signal = "STSELL"
 
-    # B. BULLISH ZONE GATING (ST is BUY, UP, or SIDE)
+    # B. BULLISH ZONE GATING (ST is BUY, UP)
     # ✅ SIDE enabled: Allows entry while price is between Major and Minor lines
     if final_signal == "NONE" and st_entry in ["BUY", "UP", "SIDE"]:
         if entry_l4 == "BUY":
@@ -48,7 +48,7 @@ def get_entry_signal(df=None):
         elif entry_l4 == "BULL":
             final_signal = "BULL"
 
-    # C. BEARISH ZONE GATING (ST is SELL, DOWN, or SIDE)
+    # C. BEARISH ZONE GATING (ST is SELL, DOWN)
     # ✅ SIDE enabled: Allows entry while price is between Major and Minor lines
     if final_signal == "NONE" and st_entry in ["SELL", "DOWN", "SIDE"]:
         if entry_l4 == "SELL":
