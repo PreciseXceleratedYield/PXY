@@ -20,8 +20,8 @@ def rma(series, length):
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
-    PXY® Tiered Engine:
-    Logic: Tiered Volatility (1.0, 2.0, 3.0) based on 3-period ATR
+    PXY® Linear Engine:
+    Logic: Linear Oscillating Volatility (1.0 to 3.0) based on 3-period ATR ratio
     Style: Continuous 'No-Jump'
     """
     df = df.copy()
@@ -34,7 +34,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['HL2'] = (df['High'] + df['Low']) / 2
     df['HA_Close'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
     
-    # Baseline: 3-period RMA (Sync with Pine ta.atr(3))
+    # Baseline: 3-period RMA
     df['ATR_3'] = rma(df['TR'].fillna(0).values, 3)
 
     size = len(df)
@@ -50,18 +50,16 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
         if i == 0:
             st_line[i] = hl2
-            dyn_atr_val[i] = tr_curr
+            dyn_atr_val[i] = tr_curr if tr_curr > 0 else 0.01
             continue
 
-        # 2. TIERED VOLATILITY ENGINE (3-Period Base)
-        if tr_curr > (avg_atr * 1.5):
-            dynamic_val = 1.0  # Fast
-        elif tr_curr > (avg_atr * 0.8):
-            dynamic_val = 2.0  # Medium
-        else:
-            dynamic_val = 3.0  # Slow
+        # 2. LINEAR OSCILLATION LOGIC
+        # ratio = avg / current. If current is huge, ratio is small (approaches 1.0)
+        ratio = (avg_atr / tr_curr) if tr_curr > 0 else 1.0
+        # Sync with Pine: math.max(1.0, math.min(3.0, ratio * 1.5))
+        dynamic_val = max(1.0, min(3.0, ratio * 1.5))
 
-        # 3. DYNAMIC SMOOTHING (Alpha synced to Tier)
+        # 3. DYNAMIC SMOOTHING (Alpha synced to Linear Factor)
         alpha = 1 / dynamic_val
         dyn_atr_val[i] = (alpha * tr_curr) + (1 - alpha) * dyn_atr_val[i-1]
         
@@ -95,7 +93,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     df['ST'] = st_line
     df['ST_Trend'] = signals
-    df['ST_Maj_Price'] = st_line
     return df
 
 def get_signal(df=None):
@@ -111,10 +108,9 @@ def get_signal(df=None):
 if __name__ == "__main__":
     signal_res, st_price = get_signal()
     print("-" * 35)
-    print(f"PXY® TIERED SIGNAL: {signal_res}")
-    print(f"ST LINE PRICE: {st_price:.2f}")
+    print(f"PXY® LINEAR SIGNAL: {signal_res}")
+    print(f"ST LINE PRICE:  {st_price:.2f}")
     print("-" * 35)
-
 
 
 
