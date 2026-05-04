@@ -36,9 +36,9 @@ def get_entry_signal(df=None):
     
     # B. ST REVERSAL PRIORITY
     elif st_entry == "BUY":
-        final_signal = "STBUY"
+        final_signal = "STUP"
     elif st_entry == "SELL":
-        final_signal = "STSELL"
+        final_signal = "STDOWN"
 
     # C. BULLISH ZONE GATING
     elif st_entry == "UP":
