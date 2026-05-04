@@ -1,5 +1,5 @@
 # sysentrpxy.py
-from sysmktpxyv1 import get_signal  # L1-L4 Cascade Engine
+from sysmktpxyv1 import get_signal # L1-L4 Cascade Engine
 from syscnfgpxy import TICKER
 from sysstrndpxy import get_signal as get_st_signal
 from syskatrpxy import calculate_atr, calculate_dynamic_k
@@ -7,18 +7,22 @@ from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 def get_entry_signal(df=None):
-    # 1. Fetch Cascade Signals
+    # 1. Fetch Cascade Signals (L4 Entry, L2 Exit)
+    # ✅ FIX: Passing df here to prevent Data Desync
     entry_l4, exit_l2 = get_signal(df)
 
-    # 2. Fetch ST Signals (Dynamic SMA Minor / 2*ATR Major)
+    # 2. ST Priority & Directional Flow (Body Crossover Logic)
+    # st_entry is the Signal (BUY/SELL/UP/DOWN/SIDE), st_price is the Minor ST Value
     st_entry, st_price = get_st_signal(df)
-
+    
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
     current_time = now.time()
 
-    # --- MORNING OVERRIDE ---
+    # --- MORNING OVERRIDE (9:16–9:30) ---
     if time(9, 16) <= current_time < time(9, 30):
-        if exit_l2 in ["BUY", "BULL", "SELL", "BEAR"]:
+        if exit_l2 in ["BUY", "BULL"]:
+            return "MORNING", exit_l2
+        if exit_l2 in ["SELL", "BEAR"]:
             return "MORNING", exit_l2
         return "NONE", exit_l2
 
@@ -27,34 +31,32 @@ def get_entry_signal(df=None):
     atr = atr_series.iloc[-1] if not atr_series.empty else 0
     print(f"ATR:{atr:.2f}".center(36))
 
-    # --- FINAL ENTRY MAPPING ---
+    # --- FINAL ENTRY MAPPING (STRICT TRIPLE ALIGNMENT) ---
     final_signal = "NONE"
 
-    # A. FORCE SIDE SIGNAL
-    if st_entry == "SIDE":
-        final_signal = "SIDE"
-    
-    # B. ST REVERSAL PRIORITY
-    elif st_entry == "BUY":
-        final_signal = "STUP"
+    # A. ST REVERSAL PRIORITY (One-Candle Crossover)
+    if st_entry == "BUY":
+        final_signal = "STBUY"
     elif st_entry == "SELL":
-        final_signal = "STDOWN"
+        final_signal = "STSELL"
 
-    # C. BULLISH ZONE GATING
-    elif st_entry == "UP":
+    # B. BULLISH ZONE GATING (ST is BUY, UP, or SIDE)
+    # ✅ SIDE enabled: Allows entry while price is between Major and Minor lines
+    if final_signal == "NONE" and st_entry in ["BUY", "UP", "SIDE"]:
         if entry_l4 == "BUY":
             final_signal = "ATMBUY"
         elif entry_l4 == "BULL":
             final_signal = "BULL"
 
-    # D. BEARISH ZONE GATING
-    elif st_entry == "DOWN":
+    # C. BEARISH ZONE GATING (ST is SELL, DOWN, or SIDE)
+    # ✅ SIDE enabled: Allows entry while price is between Major and Minor lines
+    if final_signal == "NONE" and st_entry in ["SELL", "DOWN", "SIDE"]:
         if entry_l4 == "SELL":
             final_signal = "ATMSELL"
         elif entry_l4 == "BEAR":
             final_signal = "BEAR"
 
-    # E. Final Reporting
+    # D. Final Strict Logic Check & Reporting
     if final_signal in ["BULL", "BEAR", "NONE"]:
         print(f"⛔ 🚧 NO ENTRY 🚧 {final_signal} 🚧 ⛔".center(36))
     else:
