@@ -36,14 +36,14 @@ def get_entry_signal(df=None):
     # A. BUY LOGIC (Trigger on BEAR or BUY signals)
     # Gated by Bullish VWAP Zone
     if st_entry in ["BUY", "UP", "SIDE"]:
-        if entry_l4 in ["BEAR", "BUY"]:
+        if entry_l4 in ["BEAR"]:
             # Above VWAP = ATM, Below = OTM
             final_signal = "ATMBUY" if last_price > st_price else "OTMBUY"
 
     # B. SELL LOGIC (Trigger on BULL or SELL signals)
     # Gated by Bearish VWAP Zone
     if final_signal == "NONE" and st_entry in ["SELL", "DOWN", "SIDE"]:
-        if entry_l4 in ["BULL", "SELL"]:
+        if entry_l4 in ["BULL"]:
             # Below VWAP = ATM, Above = OTM
             final_signal = "ATMSELL" if last_price < st_price else "OTMSELL"
 
