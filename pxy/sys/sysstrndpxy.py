@@ -7,7 +7,7 @@ from sysdtafpxy import fetch_yf_data
 # ==================================================
 DEBUG_MODE = False
 
-def calculate_supertrend_1_1(df: pd.DataFrame) -> pd.DataFrame:
+def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
     PXY® Sync Engine:
     Logic: Fixed 1:1 SuperTrend (ATR 1, Multiplier 1.0)
@@ -24,13 +24,13 @@ def calculate_supertrend_1_1(df: pd.DataFrame) -> pd.DataFrame:
                np.maximum(abs(df['High'] - df['previous_close']), 
                           abs(df['Low'] - df['previous_close'])))
     
-    # ATR(1) is simply the TR of the current candle
+    # ATR(1) is the TR of the current candle
     df['ATR_1'] = df['TR'] 
     df['HL2'] = (df['High'] + df['Low']) / 2
     
     size = len(df)
     st_line = [0.0] * size
-    trend_state = [1] * size # 1 for UP, -1 for DOWN
+    trend_state = [1] * size 
 
     # 3. 1:1 Calculation Loop
     for i in range(size):
@@ -62,7 +62,6 @@ def calculate_supertrend_1_1(df: pd.DataFrame) -> pd.DataFrame:
             st_line[i] = min(upper_band, prev_st)
 
     # 4. Signal Mapping (Using HA Line vs ST Line)
-    # This matches your chart where HA is a reference line
     signals = ["SIDE"] * size
     for i in range(1, size):
         ha_curr = df['HA_Close'].iloc[i]
@@ -88,7 +87,7 @@ def get_signal(df=None):
     if df is None or df.empty:
         return "NONE", 0.0
         
-    df_st = calculate_supertrend_1_1(df)
+    df_st = calculate_supertrend(df)
     last = df_st.iloc[-1]
     return last['ST_Trend'], last['ST']
 
@@ -98,7 +97,6 @@ if __name__ == "__main__":
     print(f"PXY® 1:1 SYNC SIGNAL: {signal_res}")
     print(f"ST LINE PRICE: {st_price:.2f}")
     print("-" * 35)
-
 
 
 
