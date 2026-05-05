@@ -65,7 +65,7 @@ def target_price(row):
         # 3. SURGICAL LOGIC
         if is_ce:
             if is_new:
-                if exit_is_bull: state, score = "🔥", max(fallback_score, (atr * max(1.0, ce_p)))
+                if exit_is_bull: state, score = "🔥", max(fallback_score, (1.4 * max(1.0, ce_p)))
                 else: state = "⏳"
             else:
                 if st_is_down and exit_is_bear: state = "💀" 
@@ -73,7 +73,7 @@ def target_price(row):
                 else: state = "⏳"
         elif is_pe:
             if is_new:
-                if exit_is_bear: state, score = "🔥", max(fallback_score, (atr * max(1.0, pe_p)))
+                if exit_is_bear: state, score = "🔥", max(fallback_score, (1.4 * max(1.0, pe_p)))
                 else: state = "⏳"
             else:
                 if st_is_up and exit_is_bull: state = "💀"
