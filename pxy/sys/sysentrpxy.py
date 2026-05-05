@@ -1,66 +1,61 @@
 # sysentrpxy.py
-from sysmktpxy import get_signal # L1-L4 Cascade Engine
-from syscnfgpxy import TICKER
-from sysstrndpxy import get_signal as get_st_signal
-from syskatrpxy import calculate_atr, calculate_dynamic_k
-from datetime import datetime, time
-from zoneinfo import ZoneInfo
+from sysmktpxy import get_signal 
+from syscnfgpxy import TICKER 
+from sysstrndpxy import get_signal as get_st_signal 
+from syskatrpxy import calculate_atr, calculate_dynamic_k 
+from datetime import datetime, time 
+from zoneinfo import ZoneInfo 
 
 def get_entry_signal(df=None):
-    # 1. Fetch Cascade Signals (L4 Entry, L2 Exit)
-    # ✅ FIX: Passing df here to prevent Data Desync
-    entry_l4, exit_l2 = get_signal(df)
+    # 1. Fetch Cascade Signals (Confirmed Entry, Trend Exit)
+    entry_l4, exit_l2 = get_signal(df) 
 
-    # 2. ST Priority & Directional Flow (Body Crossover Logic)
-    # st_entry is the Signal (BUY/SELL/UP/DOWN/SIDE), st_price is the Minor ST Value
-    st_entry, st_price = get_st_signal(df)
-    
+    # 2. ST Priority (ATR:ATR Logic)
+    st_entry, st_price = get_st_signal(df) 
+
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
     current_time = now.time()
 
-    # --- MORNING OVERRIDE (9:16–9:30) ---
-    if time(9, 16) <= current_time < time(9, 30):
-        if exit_l2 in ["BUY", "BULL"]:
-            return "MORNING", exit_l2
-        if exit_l2 in ["SELL", "BEAR"]:
+    # --- MORNING OVERRIDE (Ends exactly at 9:17) ---
+    if time(9, 15) <= current_time < time(9, 17):
+        if exit_l2 in ["BUY", "BULL", "SELL", "BEAR"]:
             return "MORNING", exit_l2
         return "NONE", exit_l2
 
     # --- ATR BLOCK ---
     atr_series = calculate_atr(df)
     atr = atr_series.iloc[-1] if not atr_series.empty else 0
-    print(f"ATR:{atr:.2f}".center(36))
 
-    # --- FINAL ENTRY MAPPING (STRICT TRIPLE ALIGNMENT) ---
+    # --- FINAL ENTRY MAPPING ---
     final_signal = "NONE"
 
-    # A. ST REVERSAL PRIORITY (One-Candle Crossover)
-    if st_entry == "BUY":
-        final_signal = "STBUY"
-    elif st_entry == "SELL":
-        final_signal = "STSELL"
-
-    # B. BULLISH ZONE GATING (ST is BUY, UP, or SIDE)
-    # ✅ SIDE enabled: Allows entry while price is between Major and Minor lines
-    if final_signal == "NONE" and st_entry in ["BUY", "UP", "SIDE"]:
+    # IF ST IS BUY/UP
+    if st_entry in ["BUY", "UP"]:
         if entry_l4 == "BUY":
             final_signal = "ATMBUY"
-        elif entry_l4 == "BULL":
-            final_signal = "BULL"
+        elif entry_l4 == "SELL":
+            final_signal = "OTMSELL"
+        else:
+            final_signal = entry_l4 # BULL/BEAR/NONE
 
-    # C. BEARISH ZONE GATING (ST is SELL, DOWN, or SIDE)
-    # ✅ SIDE enabled: Allows entry while price is between Major and Minor lines
-    if final_signal == "NONE" and st_entry in ["SELL", "DOWN", "SIDE"]:
+    # IF ST IS SELL/DOWN
+    elif st_entry in ["SELL", "DOWN"]:
         if entry_l4 == "SELL":
             final_signal = "ATMSELL"
-        elif entry_l4 == "BEAR":
-            final_signal = "BEAR"
+        elif entry_l4 == "BUY":
+            final_signal = "OTMBUY"
+        else:
+            final_signal = entry_l4 # BULL/BEAR/NONE
+            
+    # IF ST IS SIDE
+    else:
+        final_signal = entry_l4
 
-    # D. Final Strict Logic Check & Reporting
+    # Reporting
     if final_signal in ["BULL", "BEAR", "NONE"]:
         print(f"⛔ 🚧 NO ENTRY 🚧 {final_signal} 🚧 ⛔".center(36))
     else:
-        print(f"🔥 {entry_l4} → {final_signal} (ST_STATE:{st_entry})".center(36))
+        print(f"🔥 {entry_l4} → {final_signal} (ST:{st_entry})".center(36))
 
     return final_signal, exit_l2
 
@@ -70,5 +65,6 @@ if __name__ == "__main__":
     entry, ex = get_entry_signal(df)
     print("-" * 36)
     print(f"ENTRY: {entry} | EXIT: {ex}")
+
 
 
