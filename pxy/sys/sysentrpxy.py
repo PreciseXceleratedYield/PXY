@@ -1,5 +1,5 @@
 # sysentrpxy.py
-from sysmktpxyv1 import get_signal # L1-L4 Cascade Engine
+from sysmktpxy import get_signal # L1-L4 Cascade Engine
 from syscnfgpxy import TICKER
 from sysstrndpxy import get_signal as get_st_signal
 from syskatrpxy import calculate_atr, calculate_dynamic_k
