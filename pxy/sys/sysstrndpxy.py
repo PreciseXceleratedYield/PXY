@@ -7,72 +7,51 @@ from sysdtafpxy import fetch_yf_data
 # ==================================================
 DEBUG_MODE = False
 
-def rma(series, length):
-    """TradingView Running Moving Average (RMA) logic for ATR sync"""
-    alpha = 1 / length
-    result = np.zeros_like(series)
-    for i in range(len(series)):
-        if i == 0:
-            result[i] = series[i]
-        else:
-            result[i] = alpha * series[i] + (1 - alpha) * result[i-1]
-    return result
-
-def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
+def calculate_supertrend_1_1(df: pd.DataFrame) -> pd.DataFrame:
     """
-    PXY® Linear Engine:
-    Logic: Linear Oscillating Volatility (1.0 to 3.0) based on 3-period ATR ratio
-    Style: Continuous 'No-Jump'
+    PXY® Sync Engine:
+    Logic: Fixed 1:1 SuperTrend (ATR 1, Multiplier 1.0)
+    Reference: Independent Heikin-Ashi Line
     """
     df = df.copy()
     
-    # 1. Vectorized Pre-calculations
+    # 1. Independent Heikin-Ashi Line (Reference Only)
+    df['HA_Close'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
+    
+    # 2. SuperTrend 1:1 Pre-calculations (Based on Close)
     df['previous_close'] = df['Close'].shift(1)
     df['TR'] = np.maximum(df['High'] - df['Low'], 
                np.maximum(abs(df['High'] - df['previous_close']), 
                           abs(df['Low'] - df['previous_close'])))
-    df['HL2'] = (df['High'] + df['Low']) / 2
-    df['HA_Close'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
     
-    # Baseline: 3-period RMA
-    df['ATR_3'] = rma(df['TR'].fillna(0).values, 3)
-
+    # ATR(1) is simply the TR of the current candle
+    df['ATR_1'] = df['TR'] 
+    df['HL2'] = (df['High'] + df['Low']) / 2
+    
     size = len(df)
     st_line = [0.0] * size
-    trend_state = [1] * size 
-    dyn_atr_val = [0.0] * size
+    trend_state = [1] * size # 1 for UP, -1 for DOWN
 
+    # 3. 1:1 Calculation Loop
     for i in range(size):
+        curr_close = df['Close'].iloc[i]
         hl2 = df['HL2'].iloc[i]
-        ha_c = df['HA_Close'].iloc[i]
-        tr_curr = df['TR'].iloc[i]
-        avg_atr = df['ATR_3'].iloc[i]
-
+        atr1 = df['ATR_1'].iloc[i]
+        
         if i == 0:
             st_line[i] = hl2
-            dyn_atr_val[i] = tr_curr if tr_curr > 0 else 0.01
             continue
 
-        # 2. LINEAR OSCILLATION LOGIC
-        # ratio = avg / current. If current is huge, ratio is small (approaches 1.0)
-        ratio = (avg_atr / tr_curr) if tr_curr > 0 else 1.0
-        # Sync with Pine: math.max(1.0, math.min(3.0, ratio * 1.5))
-        dynamic_val = max(1.0, min(3.0, ratio * 1.5))
-
-        # 3. DYNAMIC SMOOTHING (Alpha synced to Linear Factor)
-        alpha = 1 / dynamic_val
-        dyn_atr_val[i] = (alpha * tr_curr) + (1 - alpha) * dyn_atr_val[i-1]
+        # Band Calculation (Multiplier 1.0)
+        upper_band = hl2 + (1.0 * atr1)
+        lower_band = hl2 - (1.0 * atr1)
         
-        # 4. BAND CALCULATION
-        factor = dyn_atr_val[i] * dynamic_val
-        upper_band = hl2 + factor
-        lower_band = hl2 - factor
-
-        # 5. CONTINUOUS TRAILING LOGIC
+        # Continuous Trailing Logic (Price vs Previous ST)
         prev_st = st_line[i-1]
-        if ha_c > prev_st:
+        
+        if curr_close > prev_st:
             trend_state[i] = 1
-        elif ha_c < prev_st:
+        elif curr_close < prev_st:
             trend_state[i] = -1
         else:
             trend_state[i] = trend_state[i-1]
@@ -82,14 +61,22 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else:
             st_line[i] = min(upper_band, prev_st)
 
-    # --- DASHBOARD MAPPING ---
+    # 4. Signal Mapping (Using HA Line vs ST Line)
+    # This matches your chart where HA is a reference line
     signals = ["SIDE"] * size
     for i in range(1, size):
-        ha_c_curr = df['HA_Close'].iloc[i]
-        if trend_state[i] == 1:
-            signals[i] = "UP" if ha_c_curr > st_line[i] else "BUY"
+        ha_curr = df['HA_Close'].iloc[i]
+        ha_prev = df['HA_Close'].iloc[i-1]
+        st_curr = st_line[i]
+        st_prev = st_line[i-1]
+
+        # Crossing Logic (HA Crosses ST)
+        if ha_curr > st_curr and ha_prev <= st_prev:
+            signals[i] = "BUY"
+        elif ha_curr < st_curr and ha_prev >= st_prev:
+            signals[i] = "SELL"
         else:
-            signals[i] = "DOWN" if ha_c_curr < st_line[i] else "SELL"
+            signals[i] = "UP" if ha_curr > st_curr else "DOWN"
 
     df['ST'] = st_line
     df['ST_Trend'] = signals
@@ -100,16 +87,16 @@ def get_signal(df=None):
         df = fetch_yf_data()
     if df is None or df.empty:
         return "NONE", 0.0
-    
-    df_st = calculate_supertrend(df)
+        
+    df_st = calculate_supertrend_1_1(df)
     last = df_st.iloc[-1]
     return last['ST_Trend'], last['ST']
 
 if __name__ == "__main__":
     signal_res, st_price = get_signal()
     print("-" * 35)
-    print(f"PXY® LINEAR SIGNAL: {signal_res}")
-    print(f"ST LINE PRICE:  {st_price:.2f}")
+    print(f"PXY® 1:1 SYNC SIGNAL: {signal_res}")
+    print(f"ST LINE PRICE: {st_price:.2f}")
     print("-" * 35)
 
 
