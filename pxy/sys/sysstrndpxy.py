@@ -15,6 +15,16 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
 
+    # --- FIX: Ensure Index is Datetime for .date grouping ---
+    if not isinstance(df.index, pd.DatetimeIndex):
+        # Look for typical date column names if index isn't already datetime
+        for col in ['Date', 'Datetime', 'timestamp', 'time']:
+            if col in df.columns:
+                df[col] = pd.to_datetime(df[col])
+                df.set_index(col, inplace=True)
+                break
+    # -------------------------------------------------------
+
     # 1. Master Price Engine (Synchronized)
     def get_p_series(df_slice):
         o, h, l, c = df_slice['Open'], df_slice['High'], df_slice['Low'], df_slice['Close']
@@ -25,11 +35,15 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['P_Master'] = get_p_series(df)
 
     # 2. VWAP Calculation (Session Reset)
-    # Uses daily grouping to reset VWAP each session
+    # Now safe to call .date because index is forced to DatetimeIndex
     tp = (df['High'] + df['Low'] + df['Close']) / 3
     tpv = tp * df['Volume']
     group = df.index.date
-    df['VWAP'] = tpv.groupby(group).cumsum() / df['Volume'].groupby(group).cumsum()
+    
+    # Calculate Cumulative Sums with daily reset
+    cum_tpv = tpv.groupby(group).cumsum()
+    cum_vol = df['Volume'].groupby(group).cumsum()
+    df['VWAP'] = cum_tpv / cum_vol
 
     # 3. Signal Mapping (P vs VWAP)
     size = len(df)
@@ -39,7 +53,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         p_curr, p_prev = df['P_Master'].iloc[i], df['P_Master'].iloc[i-1]
         v_curr, v_prev = df['VWAP'].iloc[i], df['VWAP'].iloc[i-1]
 
-        if pd.isna(v_curr) or pd.isna(v_prev): continue
+        if pd.isna(v_curr) or pd.isna(v_prev): 
+            continue
 
         # Crossing Logic
         if p_curr > v_curr and p_prev <= v_prev:
@@ -49,16 +64,20 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else:
             signals[i] = "UP" if p_curr > v_curr else "DOWN"
 
-    df['ST'] = df['VWAP'] # VWAP replaces the ST line
+    df['ST'] = df['VWAP']  # VWAP replaces the ST line
     df['ST_Trend'] = signals
     return df
 
 def get_signal(df=None):
-    if df is None: df = fetch_yf_data()
-    if df is None or df.empty: return "NONE", 0.0
+    if df is None: 
+        df = fetch_yf_data()
+    if df is None or df.empty: 
+        return "NONE", 0.0
+        
     df_st = calculate_supertrend(df)
     last = df_st.iloc[-1]
     return last['ST_Trend'], last['ST']
+
 
 
 
