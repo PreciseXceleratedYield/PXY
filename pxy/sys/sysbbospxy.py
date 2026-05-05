@@ -1,100 +1,49 @@
 from colorama import Fore, Style, init
+import pandas as pd
+
 init(autoreset=True)
 
-# ==================================================
-# GLOBAL SETTINGS
-# ==================================================
-STRUCTURE_WINDOW = 30
-DEBUG = False
+# ANSI for the visual stream
+GREEN_C = "\033[92m"
+RED_C   = "\033[91m"
+RESET   = "\033[0m"
 
+def get_p_series(df):
+    c, o, h, l = df['Close'], df['Open'], df['High'], df['Low']
+    c1 = c.shift(1)
+    e1, e2 = c, (c1 + c) / 2
+    e3, e4 = (c + o) / 2, (o + h + l + c) / 4
+    return ((e1 + e2 + e3 + e4) / 4).round(4)
 
-# ==================================================
-# LOGGER
-# ==================================================
-def log(tag, msg):
-    if DEBUG:
-        print(f"{Fore.CYAN}[{tag}] {msg}{Style.RESET_ALL}")
+def get_candle_visual_and_counts(df, last_n=42):
+    p_vals = get_p_series(df)
+    is_up = p_vals > p_vals.shift(1)
+    subset = is_up.iloc[-last_n:]
+    
+    # 1. Build the visual string
+    visual = "".join([f"{GREEN_C}/{RESET}" if val else f"{RED_C}\{RESET}" for val in subset])
+    
+    # 2. Extract counts for BOS
+    g_count = subset.sum() # True = 1
+    r_count = len(subset) - g_count
+    
+    return visual, g_count, r_count
 
-
-# ==================================================
-# STRUCTURE
-# ==================================================
-def get_structure(df):
-    base = df.iloc[-(STRUCTURE_WINDOW + 1):-1]
-    high = base['High'].max()
-    low = base['Low'].min()
-    return high, low
-
-
-# ==================================================
-# SWEEP DETECTION (NOT USED FOR DIRECTION)
-# ==================================================
-def detect_sweep(df, structure_high, structure_low):
-    last = df.iloc[-1]
-
-    if last['High'] > structure_high and last['Close'] < structure_high:
-        return "SELL"
-
-    if last['Low'] < structure_low and last['Close'] > structure_low:
-        return "BUY"
-
-    return None
-
-
-# ==================================================
-# 🔵 STRUCTURE DIRECTION ENGINE (30 WINDOW)
-# ==================================================
-def get_bos(df):
-
-    try:
-        if df is None or len(df) < STRUCTURE_WINDOW + 2:
-            return "SIDE"
-
-        log("BOS", "calculating structure direction")
-
-        # ==================================================
-        # 🔥 STRUCTURE LOGIC (30 WINDOW)
-        # ==================================================
-        prev_high = df['High'].iloc[-(STRUCTURE_WINDOW + 1):-1].max()
-        prev_low  = df['Low'].iloc[-(STRUCTURE_WINDOW + 1):-1].min()
-
-        curr_high = df['High'].iloc[-STRUCTURE_WINDOW:].max()
-        curr_low  = df['Low'].iloc[-STRUCTURE_WINDOW:].min()
-
-        if curr_high > prev_high and curr_low >= prev_low:
-            return "BULL"
-
-        if curr_high <= prev_high and curr_low < prev_low:
-            return "BEAR"
-
-        return "SIDE"
-
-    except Exception:
-        return "SIDE"
-
-
-# ==================================================
-# SIGNAL ENGINE
-# ==================================================
-def get_signal(df):
-    return get_bos(df)
-
-
-# ==================================================
-# VISUAL OUTPUT
-# ==================================================
 def get_bos_bar(df):
+    visual, g, r = get_candle_visual_and_counts(df, 42)
+    
+    # Decide BOS
+    if g > r:
+        signal, color = "BULL", Fore.GREEN
+    elif r > g:
+        signal, color = "BEAR", Fore.RED
+    else:
+        signal, color = "SIDE", Fore.LIGHTBLACK_EX
+        
+    banner = f" ﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ_{signal}_٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩﮩ"
+    return color + banner + Style.RESET_ALL, signal, visual
 
-    signal = get_signal(df)
-
-    state = signal
-
-    banner = "     ﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ_" + state + "_٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩﮩ"
-
-    if signal == "BULL":
-        return Fore.GREEN + banner + Style.RESET_ALL, signal
-
-    if signal == "BEAR":
-        return Fore.RED + banner + Style.RESET_ALL, signal
-
-    return Fore.LIGHTBLACK_EX + banner + Style.RESET_ALL, signal
+if __name__ == "__main__":
+    # Test
+    # banner, sig, vis = get_bos_bar(df)
+    pass
