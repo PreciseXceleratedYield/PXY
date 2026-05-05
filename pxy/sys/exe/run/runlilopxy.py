@@ -8,7 +8,7 @@ from runltpspxy import get_mid_price
 # =========================
 # 🔁 SWITCH: FIFO / LIFO
 # =========================
-MATCH_MODE = "FIFO" # "FIFO" or "LIFO"
+MATCH_MODE = "LIFO" # "FIFO" or "LIFO"
 
 def dump_to_json(closed_df):
     """Saves closed trades to pnl.json in ~/pxy/."""
