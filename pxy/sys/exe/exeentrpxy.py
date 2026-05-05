@@ -131,7 +131,7 @@ async def main():
             
             TO = int(float(TO_raw))
             YC = int(float(YC_raw))
-            OTM_DISTANCE = round(abs(TO - YC) / 100) * 100
+            OTM_DISTANCE = (round(abs(TO - YC) / 100) * 100) * 2
             dprint(f"OTM_DYNAMIC: |{TO}-{YC}| = {OTM_DISTANCE}", Fore.CYAN)
             supertrend = str(data.get("supertrend", "")).upper().strip()
     
