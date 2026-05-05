@@ -49,7 +49,7 @@ def target_price(row):
             elapsed_secs = (now - e_time).total_seconds()
 
         is_new = elapsed_secs < 60
-        min_profit_pct = 1.4
+        min_profit_pct = 0.4
         fallback_score = int(entry_prc * (min_profit_pct / 100))
         
         state = "⏳"
