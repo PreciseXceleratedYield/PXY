@@ -15,48 +15,71 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.copy()
 
-    # --- FIX: Ensure Index is Datetime for .date grouping ---
+    # 1. ROBUST DATETIME INDEX FIX
+    # Ensures .index.date works correctly for session resets
     if not isinstance(df.index, pd.DatetimeIndex):
-        # Look for typical date column names if index isn't already datetime
-        for col in ['Date', 'Datetime', 'timestamp', 'time']:
+        date_col = None
+        for col in ['Date', 'Datetime', 'timestamp', 'time', 'date']:
             if col in df.columns:
-                df[col] = pd.to_datetime(df[col])
-                df.set_index(col, inplace=True)
+                date_col = col
                 break
-    # -------------------------------------------------------
+        
+        if date_col:
+            df[date_col] = pd.to_datetime(df[date_col])
+            df.set_index(date_col, inplace=True)
+        else:
+            # Fallback: force index to datetime if it's strings/objects
+            try:
+                df.index = pd.to_datetime(df.index)
+            except:
+                pass 
 
-    # 1. Master Price Engine (Synchronized)
+    # 2. Master Price Engine (Synchronized)
     def get_p_series(df_slice):
-        o, h, l, c = df_slice['Open'], df_slice['High'], df_slice['Low'], df_slice['Close']
-        c1 = df_slice['Close'].shift(1)
-        e1, e2, e3, e4 = c, (c1 + c) / 2, (c + o) / 2, (o + h + l + c) / 4
+        o = df_slice['Open']
+        h = df_slice['High']
+        l = df_slice['Low']
+        c = df_slice['Close']
+        c1 = c.shift(1)
+        
+        e1 = c
+        e2 = (c1 + c) / 2
+        e3 = (c + o) / 2
+        e4 = (o + h + l + c) / 4
         return (e1 + e2 + e3 + e4) / 4
 
     df['P_Master'] = get_p_series(df)
 
-    # 2. VWAP Calculation (Session Reset)
-    # Now safe to call .date because index is forced to DatetimeIndex
+    # 3. VWAP Calculation (Session Reset)
     tp = (df['High'] + df['Low'] + df['Close']) / 3
     tpv = tp * df['Volume']
-    group = df.index.date
     
-    # Calculate Cumulative Sums with daily reset
+    # Group by calendar date to reset daily
+    group = df.index.date
     cum_tpv = tpv.groupby(group).cumsum()
     cum_vol = df['Volume'].groupby(group).cumsum()
-    df['VWAP'] = cum_tpv / cum_vol
+    
+    # Avoid division by zero if volume is 0
+    df['VWAP'] = cum_tpv / cum_vol.replace(0, np.nan)
+    df['VWAP'] = df['VWAP'].ffill() # Forward fill initial NaNs
 
-    # 3. Signal Mapping (P vs VWAP)
+    # 4. Signal Mapping (P vs VWAP)
     size = len(df)
     signals = ["SIDE"] * size
     
+    # Optimized loop using numpy values to prevent indexing errors
+    p_vals = df['P_Master'].values
+    v_vals = df['VWAP'].values
+    
     for i in range(1, size):
-        p_curr, p_prev = df['P_Master'].iloc[i], df['P_Master'].iloc[i-1]
-        v_curr, v_prev = df['VWAP'].iloc[i], df['VWAP'].iloc[i-1]
+        p_curr, p_prev = p_vals[i], p_vals[i-1]
+        v_curr, v_prev = v_vals[i], v_vals[i-1]
 
-        if pd.isna(v_curr) or pd.isna(v_prev): 
+        # Skip if VWAP calculation hasn't started yet
+        if np.isnan(v_curr) or np.isnan(v_prev):
             continue
 
-        # Crossing Logic
+        # Crossing Logic (Master Price P Crosses VWAP)
         if p_curr > v_curr and p_prev <= v_prev:
             signals[i] = "BUY"
         elif p_curr < v_curr and p_prev >= v_prev:
@@ -64,19 +87,63 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else:
             signals[i] = "UP" if p_curr > v_curr else "DOWN"
 
-    df['ST'] = df['VWAP']  # VWAP replaces the ST line
+    df['ST'] = df['VWAP']
     df['ST_Trend'] = signals
     return df
 
 def get_signal(df=None):
-    if df is None: 
+    """
+    Standard interface for sysentrpxy and sysdashpxy
+    """
+    if df is None:
         df = fetch_yf_data()
-    if df is None or df.empty: 
+    
+    if df is None or df.empty:
         return "NONE", 0.0
         
-    df_st = calculate_supertrend(df)
-    last = df_st.iloc[-1]
-    return last['ST_Trend'], last['ST']
+    try:
+        df_st = calculate_supertrend(df)
+        if df_st.empty:
+            return "NONE", 0.0
+            
+        last = df_st.iloc[-1]
+        
+        # Ensure we return valid types
+        res_trend = str(last['ST_Trend']) if pd.notna(last['ST_Trend']) else "SIDE"
+        res_price = float(last['ST']) if pd.notna(last['ST']) else 0.0
+        
+        return res_trend, res_price
+        
+    except Exception as e:
+        if DEBUG_MODE:
+            print(f"Error in sysstrndpxy calculation: {e}")
+        return "NONE", 0.0
+
+# ==================================================
+# TESTER BLOCK
+# ==================================================
+if __name__ == "__main__":
+    print(" TESTING SYSSTRNDPXY (VWAP ENGINE) ".center(50, "="))
+    
+    # Simulate or Fetch Data
+    test_df = fetch_yf_data()
+    
+    if test_df is not None and not test_df.empty:
+        trend, price = get_signal(test_df)
+        
+        print(f"Index Type: {type(test_df.index)}")
+        print(f"Latest Time: {test_df.index[-1]}")
+        print("-" * 50)
+        print(f"RESULT TREND: {trend}")
+        print(f"RESULT VWAP : {price:.2f}")
+        print("-" * 50)
+        
+        # Show table of last 5 bars
+        df_full = calculate_supertrend(test_df)
+        print("\nLast 5 bars calculation:")
+        print(df_full[['P_Master', 'VWAP', 'ST_Trend']].tail(5))
+    else:
+        print("ERROR: No data received from fetch_yf_data()")
 
 
 
