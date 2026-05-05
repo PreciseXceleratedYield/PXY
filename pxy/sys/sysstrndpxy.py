@@ -20,52 +20,69 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     df['P_Master'] = get_p_series(df)
 
-    # 3. VWAP Calculation with NaN Fallback
-    tp = (df['High'] + df['Low'] + df['Close']) / 3
-    tpv = tp * df['Volume']
-    group = df.index.date
-    
-    cum_tpv = tpv.groupby(group).cumsum()
-    cum_vol = df['Volume'].groupby(group).cumsum()
-    
-    # Calculation: If volume is 0, use Typical Price (tp) as fallback
-    vwap_calc = cum_tpv / cum_vol.replace(0, np.nan)
-    df['VWAP'] = vwap_calc.fillna(tp) # <--- THIS FIXES THE NaN ISSUE
+    # 3. Dynamic SMA Calculation (Period = Current ATR)
+    # Calculate ATR (14) first
+    high_low = df['High'] - df['Low']
+    high_cp = np.abs(df['High'] - df['Close'].shift())
+    low_cp = np.abs(df['Low'] - df['Close'].shift())
+    tr = pd.concat([high_low, high_cp, low_cp], axis=1).max(axis=1)
+    df['ATR'] = tr.rolling(window=14).mean().fillna(5) # Default to 5 if NaN
 
-    # 4. Signal Mapping
+    # Calculate SMA with Dynamic Period
+    # Since rolling() requires a fixed integer, we use a loop-based approach for variable window
+    p_master_vals = df['P_Master'].values
+    atr_vals = df['ATR'].values
     size = len(df)
+    sma_values = np.zeros(size)
+
+    for i in range(size):
+        # Current ATR defines the period (minimum 1)
+        period = max(1, int(round(atr_vals[i])))
+        start_idx = max(0, i - period + 1)
+        # Average of P_Master over the dynamic window
+        sma_values[i] = np.mean(p_master_vals[start_idx : i + 1])
+
+    df['DYNAMIC_SMA'] = sma_values
+
+    # 4. Signal Mapping (P vs Dynamic SMA)
     signals = ["SIDE"] * size
-    p_vals, v_vals = df['P_Master'].values, df['VWAP'].values
+    s_vals = df['DYNAMIC_SMA'].values
     
     for i in range(1, size):
-        if np.isnan(v_vals[i]) or np.isnan(p_vals[i]): continue
-        
-        if p_vals[i] > v_vals[i] and p_vals[i-1] <= v_vals[i-1]:
+        if np.isnan(s_vals[i]) or np.isnan(p_master_vals[i]):
+            continue
+            
+        if p_master_vals[i] > s_vals[i] and p_master_vals[i-1] <= s_vals[i-1]:
             signals[i] = "BUY"
-        elif p_vals[i] < v_vals[i] and p_vals[i-1] >= v_vals[i-1]:
+        elif p_master_vals[i] < s_vals[i] and p_master_vals[i-1] >= s_vals[i-1]:
             signals[i] = "SELL"
         else:
-            signals[i] = "UP" if p_vals[i] > v_vals[i] else "DOWN"
+            signals[i] = "UP" if p_master_vals[i] > s_vals[i] else "DOWN"
 
-    df['ST'], df['ST_Trend'] = df['VWAP'], signals
+    # Maintain compatibility with existing ST/ST_Trend keys
+    df['ST'] = df['DYNAMIC_SMA']
+    df['ST_Trend'] = signals
     return df
 
 def get_signal(df=None):
-    if df is None: df = fetch_yf_data()
-    if df is None or df.empty: return "NONE", 0.0
+    if df is None:
+        df = fetch_yf_data()
+    if df is None or df.empty:
+        return "NONE", 0.0
     try:
         df_st = calculate_supertrend(df)
         last = df_st.iloc[-1]
         return str(last['ST_Trend']), float(last['ST'])
-    except:
+    except Exception as e:
+        print(f"Error: {e}")
         return "NONE", 0.0
 
 if __name__ == "__main__":
     test_df = fetch_yf_data()
     if test_df is not None:
         df_full = calculate_supertrend(test_df)
-        print("\nFix Verified - Last 5 bars:")
-        print(df_full[['P_Master', 'VWAP', 'ST_Trend']].tail(5))
+        print("\nDynamic SMA (Period = ATR) - Last 5 bars:")
+        print(df_full[['P_Master', 'ST', 'ST_Trend', 'ATR']].tail(5))
 
 
 
