@@ -18,7 +18,7 @@ def get_entry_signal(df=None):
     now = datetime.now(ZoneInfo("Asia/Kolkata"))
     current_time = now.time()
 
-    # --- MORNING OVERRIDE (9:16–9:30) ---
+    # --- MORNING OVERRIDE (9:15–9:18) ---
     if time(9, 16) <= current_time < time(9, 30):
         if exit_l2 in ["BUY", "BULL"]:
             return "RISE", exit_l2
