@@ -9,9 +9,9 @@ DEBUG_MODE = False
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
-    PXY® Master Engine Sync:
-    Logic: Time Series Moving Average (TSMA) 9-Period
-    Reference: Endpoint of 9-bar Linear Regression Line
+    PXY® SuperTrend Engine (ATR:ATR Logic):
+    - Factor = Current ATR
+    - Period = Current ATR (Rounded)
     """
     df = df.copy()
 
@@ -22,69 +22,70 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             df[date_col] = pd.to_datetime(df[date_col])
             df.set_index(date_col, inplace=True)
 
-    # 2. Master Price Engine (Synchronized)
-    def get_p_series(df_slice):
-        o, h, l, c = df_slice['Open'], df_slice['High'], df_slice['Low'], df_slice['Close']
-        c1 = c.shift(1)
-        # Master Engine Price Logic
-        return (c + (c1 + c) / 2 + (c + o) / 2 + (o + h + l + c) / 4) / 4
-
-    df['P_Master'] = get_p_series(df)
-
-    # 3. Pure NumPy Time Series Moving Average (9-Period)
-    # Using the Least Squares Linear Regression Endpoint formula
-    # TSMA Endpoint = Intercept + Slope * (Period - 1)
-    p_vals = df['P_Master'].values
-    size = len(df)
-    tsma_vals = np.full(size, np.nan)
-    period = 9
-
-    # Pre-calculate x-axis constants for Linear Regression
-    # x = [0, 1, 2, ..., 8]
-    x = np.arange(period)
-    sum_x = np.sum(x)
-    sum_x2 = np.sum(x**2)
-    denominator = (period * sum_x2) - (sum_x**2)
-
-    for i in range(period - 1, size):
-        y = p_vals[i - period + 1 : i + 1]
-        if np.isnan(y).any():
-            continue
-        
-        # Calculate Slope (m) and Intercept (b) using Least Squares
-        sum_y = np.sum(y)
-        sum_xy = np.sum(x * y)
-        
-        slope = (period * sum_xy - sum_x * sum_y) / denominator
-        intercept = (sum_y - slope * sum_x) / period
-        
-        # TSMA value is the predicted Y at the latest point (x = period-1)
-        tsma_vals[i] = intercept + slope * (period - 1)
-
-    df['TSMA_9'] = tsma_vals
-
-    # 4. Signal Mapping (P_Master vs TSMA_9)
-    signals = ["SIDE"] * size
-    t_vals = df['TSMA_9'].values
+    # 2. ATR Calculation (Standard 14-period to derive the dynamic Factor/Period)
+    high = df['High']
+    low = df['Low']
+    close = df['Close']
     
-    for i in range(1, size):
-        p_curr, p_prev = p_vals[i], p_vals[i-1]
-        t_curr, t_prev = t_vals[i], t_vals[i-1]
+    tr = pd.concat([high - low, 
+                    (high - close.shift(1)).abs(), 
+                    (low - close.shift(1)).abs()], axis=1).max(axis=1)
+    
+    # We use a base 14-period ATR to determine the "ATR:ATR" values
+    base_atr = tr.rolling(window=14).mean()
+    
+    # 3. SuperTrend with ATR:ATR Logic
+    # We loop to apply the dynamic nature of the Factor/Period
+    size = len(df)
+    st_line = np.zeros(size)
+    st_trend = ["SIDE"] * size
+    upper_band = np.zeros(size)
+    lower_band = np.zeros(size)
+    trend = 1 # 1 for Up, -1 for Down
 
-        if np.isnan(t_curr) or np.isnan(t_prev):
+    for i in range(1, size):
+        # ATR:ATR values
+        current_atr = base_atr.iloc[i]
+        if np.isnan(current_atr):
             continue
             
-        # Crossing Logic
-        if p_curr > t_curr and p_prev <= t_prev:
-            signals[i] = "BUY"
-        elif p_curr < t_curr and p_prev >= t_prev:
-            signals[i] = "SELL"
+        factor = current_atr
+        # Use current ATR as period (minimum 2 to avoid errors)
+        dynamic_period = max(int(round(current_atr)), 2)
+        
+        # Calculate hl2
+        hl2 = (high.iloc[i] + low.iloc[i]) / 2
+        
+        # Basic Bands
+        basic_ub = hl2 + (factor * current_atr)
+        basic_lb = hl2 - (factor * current_atr)
+        
+        # Final Bands
+        upper_band[i] = basic_ub if (basic_ub < upper_band[i-1] or close.iloc[i-1] > upper_band[i-1]) else upper_band[i-1]
+        lower_band[i] = basic_lb if (basic_lb > lower_band[i-1] or close.iloc[i-1] < lower_band[i-1]) else lower_band[i-1]
+        
+        # Strategy Logic
+        if trend == 1:
+            if close.iloc[i] <= lower_band[i]:
+                trend = -1
+                st_line[i] = upper_band[i]
+            else:
+                st_line[i] = lower_band[i]
         else:
-            signals[i] = "UP" if p_curr > t_curr else "DOWN"
+            if close.iloc[i] >= upper_band[i]:
+                trend = 1
+                st_line[i] = lower_band[i]
+            else:
+                st_line[i] = upper_band[i]
+                
+        # Trend Mapping
+        if trend == 1:
+            st_trend[i] = "BUY" if (st_trend[i-1] == "DOWN" or st_trend[i-1] == "SIDE") else "UP"
+        else:
+            st_trend[i] = "SELL" if (st_trend[i-1] == "UP" or st_trend[i-1] == "SIDE") else "DOWN"
 
-    # Maintain compatibility with existing dashboard and entry script keys
-    df['ST'] = df['TSMA_9']
-    df['ST_Trend'] = signals
+    df['ST'] = st_line
+    df['ST_Trend'] = st_trend
     return df
 
 def get_signal(df=None):
@@ -97,19 +98,21 @@ def get_signal(df=None):
         last = df_st.iloc[-1]
         return str(last['ST_Trend']), float(last['ST'])
     except Exception as e:
-        if DEBUG_MODE: print(f"TSMA Error: {e}")
+        if DEBUG_MODE:
+            print(f"SuperTrend Error: {e}")
         return "NONE", 0.0
 
 if __name__ == "__main__":
-    print(" TESTING TSMA 9 ENGINE ".center(50, "="))
+    print(" TESTING SUPERTREND ATR:ATR ENGINE ".center(50, "="))
     test_df = fetch_yf_data()
     if test_df is not None:
         df_full = calculate_supertrend(test_df)
         print(f"Latest Price: {test_df['Close'].iloc[-1]:.2f}")
-        print(f"TSMA Line   : {df_full['ST'].iloc[-1]:.2f}")
+        print(f"ST Line     : {df_full['ST'].iloc[-1]:.2f}")
         print(f"Trend State : {df_full['ST_Trend'].iloc[-1]}")
         print("-" * 50)
-        print(df_full[['P_Master', 'ST', 'ST_Trend']].tail(5))
+        print(df_full[['ST', 'ST_Trend']].tail(5))
+
 
 
 
