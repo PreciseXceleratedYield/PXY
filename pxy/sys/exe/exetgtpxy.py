@@ -65,14 +65,14 @@ def target_price(row):
         # CE Entry: BEAR/BUY -> EXIT CE: ONLY ON SELL
         if is_ce:
             if "SELL" in exit_sig:
-                state, score = "🔥", max(fallback_score, ((atr) * max(1.0, ce_p)))
+                state, score = "🔥", max(fallback_score, ((atr*atr) * max(1.0, ce_p)))
             else:
                 state = "⏳"
                 
         # PE Entry: BULL/SELL -> EXIT PE: ONLY ON BUY
         elif is_pe:
             if "BUY" in exit_sig:
-                state, score = "🔥", max(fallback_score, ((atr) * max(1.0, pe_p)))
+                state, score = "🔥", max(fallback_score, ((atr*atr) * max(1.0, pe_p)))
             else:
                 state = "⏳"
 
