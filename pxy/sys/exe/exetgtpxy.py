@@ -85,7 +85,7 @@ def target_price(row):
             color = Fore.CYAN if state == "🔥" else Fore.YELLOW
             status = "NEW" if is_new else f"OLD:{int(elapsed_secs/60)}m"
             exit_trigger = "SELL" if is_ce else "BUY"
-            print(f"{color}{clean_symbol}|| WAIT_FOR:{exit_trigger} | CURRENT:{exit_sig} || STATE:{state} || TGT:{target}{Style.RESET_ALL}")
+            print(f"{color}{clean_symbol}|| NOW:{exit_sig} || STATE:{state}")
             
         return target
 
