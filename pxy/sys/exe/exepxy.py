@@ -58,24 +58,16 @@ def run_script(script_path):
         print("━" * 42)
         return
     try:
-        # ✅ FIX 1: timeout + capture_output
-        result = subprocess.run(
+        # ✅ FIX 1: timeout only (no capture_output → colors preserved)
+        subprocess.run(
             ['python3', str(script_path)],
             check=True,
-            timeout=30,
-            capture_output=True,
-            text=True
+            timeout=30
         )
-
-        if result.stdout:
-            print(result.stdout.strip())
-
     except subprocess.TimeoutExpired:
         print(f"⏱ TIMEOUT: script stuck -> {script_path} ⚠️")
-    except subprocess.CalledProcessError as e:
+    except subprocess.CalledProcessError:
         print(f"❌ RUN ERR: script execution failed -> {script_path} ⚠️")
-        if e.stderr:
-            print("ERR:", e.stderr.strip())
     except Exception as e:
         print(f"❌ RUN ERR: unexpected failure -> {script_path} ⚠️")
 
