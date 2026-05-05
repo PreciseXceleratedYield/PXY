@@ -33,7 +33,7 @@ def get_bos_bar(df):
             
         # 3. Final Banner Format: Only shows the relevant %
         # Example: ﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ_ 76% BULL _٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩﮩ
-        banner = f"{color}ﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ_{strength_pct}% {signal}_٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩﮩ{Style.RESET_ALL}"
+        banner = f"          {color}ﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ_{strength_pct}% {signal}_٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩﮩ{Style.RESET_ALL}"
         
         return banner, signal
 
