@@ -6,6 +6,7 @@ import pytz
 from colorama import init, Fore, Style
 import sys
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, TimeoutError  # ✅ FIX 2
 
 # ---------------- INIT ----------------
 init(autoreset=True)
@@ -37,6 +38,19 @@ except Exception as e:
     print(f"❌ Client Init Failed: {e}")
     sys.exit(1)
 
+# ---------------- FIX 2: API TIMEOUT WRAPPER ----------------
+def call_with_timeout(func, timeout=5, *args, **kwargs):
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(func, *args, **kwargs)
+        try:
+            return future.result(timeout=timeout)
+        except TimeoutError:
+            print("⏱ API TIMEOUT: position fetch took too long ⚠️")
+            return None
+        except Exception as e:
+            print(f"❌ API ERROR: {e}")
+            return None
+
 # ---------------- HELPER FUNCTIONS ----------------
 def run_script(script_path):
     if not Path(script_path).exists():
@@ -44,11 +58,27 @@ def run_script(script_path):
         print("━" * 42)
         return
     try:
-        subprocess.run(['python3', script_path], check=True)
-    except subprocess.CalledProcessError:
+        # ✅ FIX 1: timeout + capture_output
+        result = subprocess.run(
+            ['python3', str(script_path)],
+            check=True,
+            timeout=30,
+            capture_output=True,
+            text=True
+        )
+
+        if result.stdout:
+            print(result.stdout.strip())
+
+    except subprocess.TimeoutExpired:
+        print(f"⏱ TIMEOUT: script stuck -> {script_path} ⚠️")
+    except subprocess.CalledProcessError as e:
         print(f"❌ RUN ERR: script execution failed -> {script_path} ⚠️")
+        if e.stderr:
+            print("ERR:", e.stderr.strip())
     except Exception as e:
         print(f"❌ RUN ERR: unexpected failure -> {script_path} ⚠️")
+
     print("━" * 42)
 
 def safe_run(script_path):
@@ -96,10 +126,13 @@ while True:
 
         for sub_itr in range(1, 31):
 
-            # -------- POSITION FETCH --------
-            pos_summary = get_position_summary(client)
+            # -------- POSITION FETCH (FIXED) --------
+            pos_summary = call_with_timeout(get_position_summary, 5, client)
 
-            # -------- SAFE PARSING (FINAL FIX) --------
+            if not pos_summary:
+                pos_summary = "0CE0PE"
+
+            # -------- SAFE PARSING --------
             try:
                 ce_qty = int(pos_summary.split("CE")[0])
                 pe_qty = int(pos_summary.split("CE")[1].replace("PE", ""))
