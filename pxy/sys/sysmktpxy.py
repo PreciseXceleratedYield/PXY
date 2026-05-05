@@ -1,42 +1,20 @@
 # sysmktpxy.py
 from sysdtafpxy import fetch_yf_data
-import json
-import os
-
-# Dynamic naming based on script file name
-BASE_NAME = os.path.splitext(os.path.basename(__file__))[0]
-JSON_FILE = f"{BASE_NAME}.json"
-
-def read_last_signal():
-    if not os.path.exists(JSON_FILE):
-        return "NONE"
-    try:
-        with open(JSON_FILE, "r") as f:
-            data = json.load(f)
-            return data.get("signal", "NONE")
-    except:
-        return "NONE"
-
-def write_last_signal(signal):
-    try:
-        with open(JSON_FILE, "w") as f:
-            json.dump({"signal": signal}, f)
-    except:
-        pass
 
 def get_signal(df=None):
-    # --- DATA FETCH WITH ERROR HANDLING ---
+    # --- DATA FETCH ---
     try:
-        if df is None: 
+        if df is None:
             df = fetch_yf_data()
     except Exception:
         return "NONE", "NONE"
-    
-    if df is None or len(df) < 4: 
+
+    if df is None or len(df) < 5:
         return "NONE", "NONE"
 
-    # 1. Master Price (4 Engines)
+    # 1. Master Price Calculation
     def get_p(i):
+        # i=-1 is the latest candle (running if live)
         o, h, l, c = df['Open'].iloc[i], df['High'].iloc[i], df['Low'].iloc[i], df['Close'].iloc[i]
         c1 = df['Close'].iloc[i-1]
         e1, e2 = c, (c1 + c) / 2
@@ -44,43 +22,44 @@ def get_signal(df=None):
         return round((e1 + e2 + e3 + e4) / 4, 4)
 
     try:
-        p1, p2, p3 = get_p(-1), get_p(-2), get_p(-3)
+        # p0 = Running (Live)
+        # p1 = Last Closed
+        # p2 = Previous Closed
+        # p3 = Oldest Closed
+        p0, p1, p2, p3 = get_p(-1), get_p(-2), get_p(-3), get_p(-4)
     except:
         return "NONE", "NONE"
 
-    # 2. Read Last Record from JSON
-    last_json = read_last_signal()
-
-    # 3. Pattern Logic + Upgrade Logic
-    final = "NONE"
-
-    # --- V-Pattern / BUY Section ---
+    # --- 2. ENTRY LOGIC (Confirmed - Closed Candles Only) ---
+    # Using p1, p2, p3 ensures signal won't disappear
+    entry = "NONE"
     if p1 > p2 and p3 > p2:
-        final = "BUY"
-    
-    # --- Inverted V / SELL Section ---
+        entry = "BUY"
     elif p1 < p2 and p3 < p2:
-        final = "SELL"
-        
-    # --- BULL Section (Upgrade Check) ---
+        entry = "SELL"
     elif p1 > p2:
-        if last_json == "SELL":
-            final = "BUY"
-        else:
-            final = "BULL"
-            
-    # --- BEAR Section (Upgrade Check) ---
+        entry = "BULL"
     elif p1 < p2:
-        if last_json == "BUY":
-            final = "SELL"
-        else:
-            final = "BEAR"
+        entry = "BEAR"
 
-    # 4. Save and Overwrite
-    write_last_signal(final)
-    return final, final
+    # --- 3. EXIT LOGIC (Running - Includes Live Candle p0) ---
+    # Immediate reaction based on live price
+    exit_sig = "NONE"
+    if p0 > p1 and p2 > p1:
+        exit_sig = "BUY"
+    elif p0 < p1 and p2 < p1:
+        exit_sig = "SELL"
+    elif p0 > p1:
+        exit_sig = "BULL"
+    elif p0 < p1:
+        exit_sig = "BEAR"
+
+    return entry, exit_sig
 
 if __name__ == "__main__":
-    sig, _ = get_signal()
-    print(f"SIGNAL: {sig}")
+    # entry uses closed data; exit_sig uses running data
+    entry, exit_sig = get_signal()
+    print(f"ENTRY (Confirmed): {entry}")
+    print(f"EXIT (Running):   {exit_sig}")
+
 
