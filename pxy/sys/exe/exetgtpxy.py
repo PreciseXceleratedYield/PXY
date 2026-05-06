@@ -53,13 +53,13 @@ def target_price(row):
         if is_ce:
             # CE goes UP on BULLISH signals
             if any(t in active_signal for t in bullish_triggers):
-                calc_score = BASE * hce_d * ce_f * ce_p
+                calc_score = (BASE * ce_f * ce_p) + hce_d
                 state, score = "🔥", max(floor_points, int(calc_score))
                 
         elif is_pe:
             # PE goes UP on BEARISH signals
             if any(t in active_signal for t in bearish_triggers):
-                calc_score = BASE * hpe_d * pe_f * pe_p
+                calc_score = (BASE * pe_f * pe_p) + hpe_d 
                 state, score = "🔥", max(floor_points, int(calc_score))
 
         # 6. FINAL OUTPUT
