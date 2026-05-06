@@ -107,13 +107,35 @@ def get_signal(df=None):
         return "NONE", 0.0
 
 if __name__ == "__main__":
-    print(" TESTING ANCHORED PXY ENGINE (IST SYNC) ".center(50, "="))
+    print(" TESTING ANCHORED PXY ENGINE (IST SYNC) ".center(60, "="))
     test_df = fetch_yf_data()
+    
     if test_df is not None:
         df_full = calculate_supertrend(test_df)
-        print(f"Latest Price : {test_df['Close'].iloc[-1]:.2f}")
-        print(f"ST Line Val  : {df_full['ST'].iloc[-1]:.2f}")
-        print(f"Trend State  : {df_full['ST_Trend'].iloc[-1]}")
+        
+        # 1. Add bar_count back temporarily for printing if you dropped it in cleanup
+        # If already dropped, we re-calculate it locally for the print
+        df_full['bar_count'] = df_full.groupby(df_full.index.date).cumcount() + 1
+        
+        # 2. Define our cross-check milestones
+        milestones = ["09:15", "09:31", "10:01"]
+        
+        print(f"{'Time (IST)':<15} | {'Bar':<5} | {'ST Value':<12} | {'Trend'}")
         print("-" * 50)
-        print(df_full[['ST', 'ST_Trend']].tail(5))
+        
+        # 3. Filter and Print
+        for ts in df_full.index:
+            time_str = ts.strftime('%H:%M')
+            if time_str in milestones:
+                row = df_full.loc[ts]
+                # If ST is a Series (multiple days), we take the last one
+                st_val = row['ST'] if isinstance(row['ST'], (float, np.float64)) else row['ST'].iloc[-1]
+                trend = row['ST_Trend'] if isinstance(row['ST_Trend'], str) else row['ST_Trend'].iloc[-1]
+                bc = row['bar_count'] if isinstance(row['bar_count'], (int, np.int64)) else row['bar_count'].iloc[-1]
+                
+                print(f"{ts.strftime('%Y-%m-%d %H:%M'):<15} | {int(bc):<5} | {st_val:<12.2f} | {trend}")
+
+        print("-" * 50)
+        print(f"Latest Live Price: {test_df['Close'].iloc[-1]:.2f}")
+
 
