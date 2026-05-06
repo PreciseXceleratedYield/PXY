@@ -9,9 +9,13 @@ from sysdtafpxy import fetch_yf_data
 DEBUG_MODE = False
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    PXY® Engine: Fixed Anchor + Smooth IST Merge Logic
+    Corrected for Pandas alignment and IST session synchronization.
+    """
     df = df.copy()
 
-    # 1. Robust Datetime Index Fix & IST Conversion
+    # 1. Robust Datetime Index & IST Conversion
     if not isinstance(df.index, pd.DatetimeIndex):
         date_col = next((c for c in ['Date', 'Datetime', 'timestamp', 'time'] if c in df.columns), None)
         if date_col:
@@ -28,85 +32,68 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['bar_count'] = df.groupby('date_only').cumcount() + 1
 
     # 3. Components: Session Price Mean & Dynamic 50 SMA
-    # FIXED: Using transform to ensure index alignment
-    session_mean = df.groupby('date_only')['Close'].transform(lambda x: x.expanding().mean())
-    
-    # Logic: Expanding if bars < 50, otherwise Rolling 50
-    sma_50 = df.groupby('date_only')['Close'].transform(
+    # Using groupby transform to maintain index alignment
+    df['session_mean'] = df.groupby('date_only')['Close'].transform(lambda x: x.expanding().mean())
+    df['sma_50'] = df.groupby('date_only')['Close'].transform(
         lambda x: x.expanding().mean() if len(x) <= 50 else x.rolling(window=50).mean()
     )
-    
-    python_hybrid = (session_mean + sma_50) / 2
+    df['python_hybrid'] = (df['session_mean'] + df['sma_50']) / 2
 
     # 4. Anchor Logic (9:15 IST Candle)
-    daily_groups = df.groupby('date_only')
-    first_bars = daily_groups.first()
+    first_bars = df.groupby('date_only').first()
     anchors = np.where(first_bars['Close'] > first_bars['Open'], first_bars['High'], first_bars['Low'])
     anchor_map = pd.Series(anchors, index=first_bars.index)
     df['anchor'] = df['date_only'].map(anchor_map)
 
     # 5. The No-Jump Black Line Logic (ST)
-    blend_factor = (df['bar_count'] - 15) / 30.0
+    df['blend_factor'] = (df['bar_count'] - 15) / 30.0
     
-    df['ST'] = np.select(
-        [
-            df['bar_count'] <= 15,
-            (df['bar_count'] > 15) & (df['bar_count'] <= 45)
-        ],
-        [
-            df['anchor'],
-            (df['anchor'] * (1 - blend_factor)) + (python_hybrid * blend_factor)
-        ],
-        default=python_hybrid
+    # Calculate Phase transitions
+    df['ST'] = np.where(
+        df['bar_count'] <= 15, 
+        df['anchor'], 
+        np.where(
+            df['bar_count'] <= 45, 
+            (df['anchor'] * (1 - df['blend_factor'])) + (df['python_hybrid'] * df['blend_factor']), 
+            df['python_hybrid']
+        )
     )
 
-    # 6. Signal Mapping
-    st_trend = []
-    prev_trend = "SIDE"
-    for i in range(len(df)):
-        curr_close = df['Close'].iloc[i]
-        curr_line = df['ST'].iloc[i]
-        
-        if pd.isna(curr_line):
-            st_trend.append("SIDE")
-            continue
-            
-        if curr_close > curr_line:
-            new_trend = "UP" if prev_trend in ["UP", "BUY"] else "BUY"
-        elif curr_close < curr_line:
-            new_trend = "DOWN" if prev_trend in ["DOWN", "SELL"] else "SELL"
-        else:
-            new_trend = "SIDE"
-        
-        st_trend.append(new_trend)
-        prev_trend = new_trend
+    # 6. Signal Mapping (Trend)
+    df['p_price'] = ((df['Close'] + (df['Close'] + df['Close'].shift(1))/2 + (df['Close'] + df['Open'])/2 + 
+                     (df['Open'] + df['High'] + df['Low'] + df['Close'])/4) / 4).round(4)
     
-    df['ST_Trend'] = st_trend
+    df['p_diff'] = df.groupby('date_only')['p_price'].diff()
+    
+    # Simple state logic based on price relative to ST
+    df['ST_Trend'] = np.where(df['Close'] > df['ST'], "UP", "DOWN")
+    
     return df
 
 if __name__ == "__main__":
-    print(" TESTING ANCHORED PXY ENGINE (IST SYNC) ".center(60, "="))
+    print(" TESTING ANCHORED PXY ENGINE (IST SYNC) ".center(65, "="))
     test_df = fetch_yf_data()
     
     if test_df is not None:
         df_full = calculate_supertrend(test_df)
-        df_full['bar_count'] = df_full.groupby(df_full.index.date).cumcount() + 1
         
         milestones = ["09:15", "09:31", "10:01"]
         print(f"{'Time (IST)':<15} | {'Bar':<5} | {'ST Value':<12} | {'Trend'}")
-        print("-" * 60)
+        print("-" * 65)
         
-        for ts in df_full.index:
+        # Cross-check for the most recent session
+        latest_date = df_full.index.date[-1]
+        session_df = df_full[df_full.index.date == latest_date]
+        
+        for ts in session_df.index:
             time_str = ts.strftime('%H:%M')
             if time_str in milestones:
-                row = df_full.loc[ts]
-                st_val = row['ST']
-                trend = row['ST_Trend']
-                bc = row['bar_count']
-                print(f"{ts.strftime('%Y-%m-%d %H:%M'):<15} | {int(bc):<5} | {st_val:<12.2f} | {trend}")
+                row = session_df.loc[ts]
+                print(f"{ts.strftime('%Y-%m-%d %H:%M'):<15} | {int(row['bar_count']):<5} | {row['ST']:<12.2f} | {row['ST_Trend']}")
 
-        print("-" * 60)
+        print("-" * 65)
         print(f"Latest Live Price: {test_df['Close'].iloc[-1]:.2f}")
+
 
 
 
