@@ -1,16 +1,7 @@
-import pandas as pd
-import numpy as np
-import pytz
-from sysdtafpxy import fetch_yf_data
-
-# ==================================================
-# GLOBAL CONFIG
-# ==================================================
-DEBUG_MODE = False
-
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
     PXY® Engine: Fixed Anchor + Smooth IST Merge Logic
+    Fixed for Pandas 2.0+ and Python 3.12 compatibility.
     """
     df = df.copy()
 
@@ -40,17 +31,18 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     python_hybrid = (session_mean + sma_50) / 2
 
-    # 4. Anchor Logic (9:15 IST Candle)
-    def compute_anchor(group):
-        first_row = group.iloc[0]
+    # 4. FIXED ANCHOR LOGIC (Using transform to avoid ValueError)
+    def get_first_bar_val(group):
         # Bullish 9:15 -> High, Bearish -> Low
-        anchor_val = first_row['High'] if first_row['Close'] > first_row['Open'] else first_row['Low']
-        return pd.Series([anchor_val] * len(group), index=group.index)
+        return group.iloc[0]['High'] if group.iloc[0]['Close'] > group.iloc[0]['Open'] else group.iloc[0]['Low']
 
-    df['anchor'] = df.groupby('date_only', group_keys=False).apply(compute_anchor)
+    # transform broadcasts the single value to all rows in the group
+    df['anchor'] = df.groupby('date_only', group_keys=False).apply(
+        lambda x: pd.Series([get_first_bar_val(x)] * len(x), index=x.index),
+        include_groups=False
+    ).reset_index(level=0, drop=True)
 
-    # 5. The No-Jump Black Line Logic (ST) using IST milestones
-    # Phase 1: 9:15-9:30 | Phase 2: 9:30-10:00 (Merge) | Phase 3: Post 10:00
+    # 5. The No-Jump Black Line Logic (ST)
     blend_factor = (df['bar_count'] - 15) / 30.0
     
     df['ST'] = np.select(
@@ -88,28 +80,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     
     df['ST_Trend'] = st_trend
 
+    # Cleanup temporary columns to keep it clean
+    df.drop(columns=['date_only', 'bar_count', 'anchor'], inplace=True)
     return df
-
-def get_signal(df=None):
-    if df is None:
-        df = fetch_yf_data()
-    if df is None or df.empty:
-        return "NONE", 0.0
-    try:
-        df_st = calculate_supertrend(df)
-        last = df_st.iloc[-1]
-        return str(last['ST_Trend']), float(last['ST'])
-    except Exception as e:
-        if DEBUG_MODE: print(f"White Line Error: {e}")
-        return "NONE", 0.0
-
-if __name__ == "__main__":
-    test_df = fetch_yf_data()
-    if test_df is not None:
-        df_full = calculate_supertrend(test_df)
-        print(f"IST Sync Check - Latest ST: {df_full['ST'].iloc[-1]:.2f}")
-
-
-
-
 
