@@ -9,7 +9,7 @@ IST = pytz.timezone("Asia/Kolkata")
 # ==========================================
 # ⚙️ GLOBAL PARAMETER
 # ==========================================
-BASE = 1.4      # Single parameter for Multiplier, Floor %, and Default Value
+BASE = 3      # Single parameter for Multiplier, Floor %, and Default Value
 
 def f(x, d=0.0):
     try:
