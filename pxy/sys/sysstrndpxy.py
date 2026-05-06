@@ -22,7 +22,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             df[date_col] = pd.to_datetime(df[date_col])
             df.set_index(date_col, inplace=True)
     
-    # Ensure index is in IST for safety
     if df.index.tz is None:
         df.index = df.index.tz_localize('UTC').tz_convert('Asia/Kolkata')
     else:
@@ -33,28 +32,25 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['bar_count'] = df.groupby('date_only').cumcount() + 1
 
     # 3. Components: Session Price Mean & Dynamic 50 SMA
-    session_mean = df.groupby('date_only', group_keys=False)['Close'].apply(
-        lambda x: x.expanding().mean()
-    )
-    
+    session_mean = df.groupby('date_only', group_keys=False)['Close'].apply(lambda x: x.expanding().mean())
     sma_50 = df.groupby('date_only', group_keys=False)['Close'].apply(
         lambda x: x.expanding().mean() if len(x) <= 50 else x.rolling(window=50).mean()
     )
-
     python_hybrid = (session_mean + sma_50) / 2
 
-    # 4. Anchor Logic (9:15 IST Candle) - Fixed for Pandas 2.0+
-    def get_anchor_val(group):
-        # Bullish 9:15 -> High, Bearish -> Low
-        val = group['High'].iloc[0] if group['Close'].iloc[0] > group['Open'].iloc[0] else group['Low'].iloc[0]
-        return pd.Series([val] * len(group), index=group.index)
-
-    df['anchor'] = df.groupby('date_only', group_keys=False).apply(
-        get_anchor_val, include_groups=False
-    )
+    # 4. FIXED ANCHOR LOGIC (Avoids ValueError in Pandas 2.0+)
+    # Determine the anchor value (High or Low) for the first bar of each day
+    daily_groups = df.groupby('date_only')
+    first_bars = daily_groups.first()
+    
+    # Logic: Bullish 9:15 -> High, Bearish -> Low
+    anchors = np.where(first_bars['Close'] > first_bars['Open'], first_bars['High'], first_bars['Low'])
+    anchor_map = pd.Series(anchors, index=first_bars.index)
+    
+    # Map the anchor back to every bar in the session
+    df['anchor'] = df['date_only'].map(anchor_map)
 
     # 5. The No-Jump Black Line Logic (ST)
-    # Phase 1: 1-15 (Anchor) | Phase 2: 16-45 (30min Merge) | Phase 3: 46+ (Hybrid)
     blend_factor = (df['bar_count'] - 15) / 30.0
     
     df['ST'] = np.select(
@@ -98,7 +94,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def get_signal(df=None):
-    """Main entry point for downstream modules."""
     if df is None:
         df = fetch_yf_data()
     if df is None or df.empty:
@@ -106,11 +101,9 @@ def get_signal(df=None):
     try:
         df_st = calculate_supertrend(df)
         last = df_st.iloc[-1]
-        # Return Signal string and Line value float
         return str(last['ST_Trend']), float(last['ST'])
     except Exception as e:
-        if DEBUG_MODE:
-            print(f"White Line Error: {e}")
+        if DEBUG_MODE: print(f"White Line Error: {e}")
         return "NONE", 0.0
 
 if __name__ == "__main__":
