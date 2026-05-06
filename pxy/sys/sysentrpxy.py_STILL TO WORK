@@ -25,7 +25,7 @@ def get_entry_signal(df=None):
     # --- FINAL ENTRY MAPPING (Unified for Morning & Day) ---
     final_signal = "NONE"
 
-    if entry_l4 == "BULL":
+    if entry_l4 == "BULL" OR :
         # SELL on BULL signal if green depth is high (Contrarian)
         if ce_d > (atr / 3):
             final_signal = "OTMSELL"
