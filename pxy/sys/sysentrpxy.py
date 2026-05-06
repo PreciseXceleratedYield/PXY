@@ -41,7 +41,7 @@ def get_entry_signal(df=None):
     # IF ST IS BUY/UP
     if st_entry in ["BUY", "UP"]:
         if entry_l4 == "BUY":
-            final_signal = "ATMBUY"
+            final_signal = "OTMBUY"
         elif entry_l4 == "SELL":
             final_signal = "OTMSELL"
         else:
@@ -50,7 +50,7 @@ def get_entry_signal(df=None):
     # IF ST IS SELL/DOWN
     elif st_entry in ["SELL", "DOWN"]:
         if entry_l4 == "SELL":
-            final_signal = "ATMSELL"
+            final_signal = "OTMSELL"
         elif entry_l4 == "BUY":
             final_signal = "OTMBUY"
         else:
