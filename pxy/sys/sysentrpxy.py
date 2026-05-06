@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 def get_entry_signal(df=None):
     # 1. Fetch Basic Signals (L4 Entry, L2 Trend Exit)
     entry_l4, exit_l2 = get_signal(df)
+    entry_l4 = exit_l2
     
     # 2. Fetch ST Signal (IST Anchored White Line Engine)
     st_trend, st_price = get_st_signal(df)
