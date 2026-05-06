@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import pytz
 from sysdtafpxy import fetch_yf_data
 
 # ==================================================
@@ -9,13 +8,9 @@ from sysdtafpxy import fetch_yf_data
 DEBUG_MODE = False
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    PXY® Engine: Fixed Anchor + Smooth IST Merge Logic
-    Corrected for Pandas alignment and IST session synchronization.
-    """
     df = df.copy()
 
-    # 1. Robust Datetime Index & IST Conversion
+    # 1. Datetime & IST Setup
     if not isinstance(df.index, pd.DatetimeIndex):
         date_col = next((c for c in ['Date', 'Datetime', 'timestamp', 'time'] if c in df.columns), None)
         if date_col:
@@ -32,23 +27,25 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['bar_count'] = df.groupby('date_only').cumcount() + 1
 
     # 3. Components: Session Price Mean & Dynamic 50 SMA
-    # Using groupby transform to maintain index alignment
-    df['session_mean'] = df.groupby('date_only')['Close'].transform(lambda x: x.expanding().mean())
-    df['sma_50'] = df.groupby('date_only')['Close'].transform(
-        lambda x: x.expanding().mean() if len(x) <= 50 else x.rolling(window=50).mean()
-    )
+    # min_periods=1 ensures we get values from bar 1 onwards (no NaNs)
+    df['session_mean'] = df.groupby('date_only')['Close'].transform(lambda x: x.expanding(min_periods=1).mean())
+    df['sma_50'] = df.groupby('date_only')['Close'].transform(lambda x: x.rolling(window=50, min_periods=1).mean())
+    
     df['python_hybrid'] = (df['session_mean'] + df['sma_50']) / 2
 
     # 4. Anchor Logic (9:15 IST Candle)
     first_bars = df.groupby('date_only').first()
+    # Bullish -> High, Bearish -> Low
     anchors = np.where(first_bars['Close'] > first_bars['Open'], first_bars['High'], first_bars['Low'])
     anchor_map = pd.Series(anchors, index=first_bars.index)
     df['anchor'] = df['date_only'].map(anchor_map)
 
     # 5. The No-Jump Black Line Logic (ST)
     df['blend_factor'] = (df['bar_count'] - 15) / 30.0
+    # Clip blend factor between 0 and 1 for safety
+    df['blend_factor'] = df['blend_factor'].clip(0, 1)
     
-    # Calculate Phase transitions
+    # Phase Logic
     df['ST'] = np.where(
         df['bar_count'] <= 15, 
         df['anchor'], 
@@ -59,19 +56,13 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         )
     )
 
-    # 6. Signal Mapping (Trend)
-    df['p_price'] = ((df['Close'] + (df['Close'] + df['Close'].shift(1))/2 + (df['Close'] + df['Open'])/2 + 
-                     (df['Open'] + df['High'] + df['Low'] + df['Close'])/4) / 4).round(4)
-    
-    df['p_diff'] = df.groupby('date_only')['p_price'].diff()
-    
-    # Simple state logic based on price relative to ST
+    # 6. Trend Logic
     df['ST_Trend'] = np.where(df['Close'] > df['ST'], "UP", "DOWN")
     
     return df
 
 if __name__ == "__main__":
-    print(" TESTING ANCHORED PXY ENGINE (IST SYNC) ".center(65, "="))
+    print(" TESTING ANCHORED PXY ENGINE (FIXED NaNs) ".center(65, "="))
     test_df = fetch_yf_data()
     
     if test_df is not None:
@@ -81,9 +72,9 @@ if __name__ == "__main__":
         print(f"{'Time (IST)':<15} | {'Bar':<5} | {'ST Value':<12} | {'Trend'}")
         print("-" * 65)
         
-        # Cross-check for the most recent session
-        latest_date = df_full.index.date[-1]
-        session_df = df_full[df_full.index.date == latest_date]
+        # Get the latest day in the data
+        latest_day = df_full.index.date[-1]
+        session_df = df_full[df_full.index.date == latest_day]
         
         for ts in session_df.index:
             time_str = ts.strftime('%H:%M')
@@ -92,7 +83,7 @@ if __name__ == "__main__":
                 print(f"{ts.strftime('%Y-%m-%d %H:%M'):<15} | {int(row['bar_count']):<5} | {row['ST']:<12.2f} | {row['ST_Trend']}")
 
         print("-" * 65)
-        print(f"Latest Live Price: {test_df['Close'].iloc[-1]:.2f}")
+        print(f"Latest Price: {test_df['Close'].iloc[-1]:.2f}")
 
 
 
