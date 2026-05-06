@@ -21,17 +21,17 @@ def i(x, d=0):
 
 def target_price(row):
     try:
-        # 1. DYNAMIC BASE (atr/3)
+        # 1. DYNAMIC BASE (atr)
         atr_val = f(row.get("atr"), 9.0)
         BASE = atr_val
 
         # 2. FIELD DEFINITIONS
-        hce_d = f(row.get("hkin_ce_depth"), BASE)
-        hpe_d = f(row.get("hkin_pe_depth"), BASE)
-        ce_p = f(row.get("ce_power"), BASE)
-        pe_p = f(row.get("pe_power"), BASE)
-        ce_f = f(row.get("ce_force"), BASE)
-        pe_f = f(row.get("pe_force"), BASE)
+        hce_d = f(row.get("hkin_ce_depth"), 1.0) # Default to 1.0 to avoid small scores
+        hpe_d = f(row.get("hkin_pe_depth"), 1.0)
+        ce_p = f(row.get("ce_power"), 1.0)
+        pe_p = f(row.get("pe_power"), 1.0)
+        ce_f = f(row.get("ce_force"), 1.0)
+        pe_f = f(row.get("pe_force"), 1.0)
 
         # 3. ENTRY DATA
         entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
@@ -41,32 +41,30 @@ def target_price(row):
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
         is_ce, is_pe = "CE" in symbol, "PE" in symbol
 
-        # 4. SIGNAL LOGIC (Always Exit Signal)
+        # 4. SIGNAL LOGIC
         active_signal = str(row.get("exit", "NONE")).upper()
         is_counter = str(row.get("counter", "N")).upper() == "Y"
 
-        # 5. CALCULATION LOGIC (REFINED DIRECTION)
-        floor_points = int(entry_prc * (BASE / 100))
+        # 5. CALCULATION LOGIC
+        # If NOT aligned, target is just the BASE (ATR value)
         state = "⏳"
-        score = floor_points
+        score = int(BASE) 
 
-        # Define keyword groups
         bullish_triggers = ["BUY", "BULL", "OTMBUY", "ATMBUY"]
         bearish_triggers = ["SELL", "BEAR", "OTMSELL", "ATMSELL"]
 
         if is_ce:
-            # CE goes UP on BULLISH signals
+            # If Aligned: Use inverse depth formula
             if any(t in active_signal for t in bullish_triggers):
-                # Fixed missing parenthesis here
-                calc_score = max(BASE / 2, (BASE + ce_f + ce_p) / hce_d)
-                state, score = "🔥", max(floor_points, int(calc_score))
+                calc_score = (BASE + ce_f + ce_p) / hce_d
+                # Minimum floor is still the BASE
+                state, score = "🔥", max(int(BASE), int(calc_score))
         
         elif is_pe:
-            # PE goes UP on BEARISH signals
+            # If Aligned: Use inverse depth formula
             if any(t in active_signal for t in bearish_triggers):
-                # Fixed syntax consistency here
-                calc_score = max(BASE / 2, (BASE + pe_f + pe_p) / hpe_d)
-                state, score = "🔥", max(floor_points, int(calc_score))
+                calc_score = (BASE + pe_f + pe_p) / hpe_d
+                state, score = "🔥", max(int(BASE), int(calc_score))
 
         # 6. FINAL OUTPUT
         target = int(entry_prc + score)
