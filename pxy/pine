@@ -1,21 +1,21 @@
-//@version=5
-indicator("PXY", overlay=true)
+/@version=5
+indicator("White Line + P-Master Dots + Session 50 SMA", overlay=true)
 
 // ==========================================
-// 1. SESSION WHITE LINE LOGIC
+// 1. SESSION LOGIC & 50 SMA
 // ==========================================
 isNewDay = ta.change(time("D")) != 0
 var int barsToday = 0
 barsToday := isNewDay ? 1 : barsToday + 1
 
-// Session VWAP
-sessionVWAP = ta.vwap(hlc3, isNewDay)
-
-// Dynamic 50 SMA (Grows from 1 to 50)
+// Dynamic 50 SMA (Grows from 1 to 50 every morning)
 dynamicLength = math.min(barsToday, 50)
 sessionSMA = ta.sma(close, dynamicLength)
 
-// White Line (The Average)
+// Session VWAP
+sessionVWAP = ta.vwap(hlc3, isNewDay)
+
+// White Line (Mean of VWAP and Dynamic SMA)
 avgLine = (sessionVWAP + sessionSMA) / 2
 
 // ==========================================
@@ -27,20 +27,22 @@ float e3 = (close + open) / 2
 float e4 = ohlc4
 float p_price = math.round((e1 + e2 + e3 + e4) / 4, 4)
 
-// P-Dot Color: Green if P-Price is rising, Red if falling
+// P-Dot Color: Green if rising, Red if falling
 color pDotColor = p_price > nz(p_price[1], p_price) ? #00FF00 : p_price < nz(p_price[1], p_price) ? #FF0000 : color.gray
 
 // ==========================================
 // 3. PLOTTING
 // ==========================================
 
-// --- White Line Group ---
-// Main White Line (Thick)
-plot(barsToday > 1 ? avgLine : na, color=color.white, linewidth=2, title="White Line (VWAP-SMA Avg)")
+// --- Individual Indicators ---
+// Session 50 SMA (Orange)
+plot(barsToday > 1 ? sessionSMA : na, color=#FF9800, linewidth=2, title="Session 50 SMA")
 
-// Individual Components (Transparent/Thin for reference)
-plot(barsToday > 1 ? sessionVWAP : na, color=color.new(#9C27B0, 60), linewidth=1, title="Ref VWAP")
-plot(barsToday > 1 ? sessionSMA : na, color=color.new(#FF9800, 60), linewidth=1, title="Ref 50 SMA")
+// Session VWAP (Purple)
+plot(barsToday > 1 ? sessionVWAP : na, color=#9C27B0, linewidth=1, title="Session VWAP")
+
+// --- White Line (The Average) ---
+plot(barsToday > 1 ? avgLine : na, color=color.white, linewidth=2, title="White Line (Avg)")
 
 // --- P-Master Group ---
 // P-Line (Thin Black)
@@ -51,5 +53,6 @@ plot(p_price, title="P-Dots", color=pDotColor, style=plot.style_circles, linewid
 
 // Visual Session Break
 bgcolor(isNewDay ? color.new(color.white, 90) : na)
+
 
 
