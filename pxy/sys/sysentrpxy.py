@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 def get_entry_signal(df=None):
     # 1. Fetch Cascade Signals (Confirmed Entry, Trend Exit)
     entry_l4, exit_l2 = get_signal(df)
+    entry_l4 = exit_l2
     
     # 2. ST Priority (SuperTrend Logic)
     st_entry, st_price = get_st_signal(df)
