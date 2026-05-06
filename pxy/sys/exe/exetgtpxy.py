@@ -24,14 +24,11 @@ def target_price(row):
         entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
         if entry_prc <= 0:
             return 0
-            
-        # 2. SCORE CALCULATION (1.4% of Entry Price)
-        # We use 1.4% as the base "score" to add
-        pct_score = entry_prc * 0.014
-        
-        # Ensure a minimum score of 6 points (or ATR if higher)
+
+        # 2. BASE CALCULATION (ATR/3)
+        # ATR floor of 6 ensures BASE_SCORE is always at least 2.0%
         atr_val = f(row.get("atr"), 6.0)
-        BASE_SCORE = max(pct_score, atr_val, 6.0)
+        BASE_SCORE = atr_val / 3
         
         # 3. SIGNAL & CONTEXT LOGIC
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
@@ -48,30 +45,35 @@ def target_price(row):
         ce_f = f(row.get("ce_force"), 1.0)
         pe_f = f(row.get("pe_force"), 1.0)
 
-        # 5. FINAL SCORE CALCULATION
+        # 5. FINAL PERCENTAGE SCORE CALCULATION
         state = "⏳"
-        final_score = int(BASE_SCORE) 
+        final_pct_score = BASE_SCORE # Default fallback (ATR/3)
         
         bullish_triggers = ["BUY", "BULL", "OTMBUY", "ATMBUY"]
         bearish_triggers = ["SELL", "BEAR", "OTMSELL", "ATMSELL"]
 
-        # Calculate Fire (🔥) Score if signal matches
+        # Calculate Fire (🔥) Percentage if aligned
         if is_ce:
             if any(t in active_signal for t in bullish_triggers):
-                calc = (BASE_SCORE + ce_f + ce_p) / hce_d
-                state, final_score = "🔥", max(int(BASE_SCORE), int(calc))
+                calc = (atr_val / hce_d * ce_f * ce_p)
+                state, final_pct_score = "🔥", max(BASE_SCORE, calc)
         elif is_pe:
             if any(t in active_signal for t in bearish_triggers):
-                calc = (BASE_SCORE + pe_f + pe_p) / hpe_d
-                state, final_score = "🔥", max(int(BASE_SCORE), int(calc))
+                calc = (atr_val / hpe_d * pe_f * pe_p)
+                state, final_pct_score = "🔥", max(BASE_SCORE, calc)
 
-        # 6. FINAL OUTPUT
-        # Target = Entry + 1.4% (or calculated fire score)
-        target = int(entry_prc + final_score)
+        # 8. MAX CAP LOGIC (99%)
+        # Ensure the percentage added never exceeds 99%
+        if final_pct_score > 99.0:
+            final_pct_score = 99.0
+
+        # 6. FINAL OUTPUT (Score as Percentage Add)
+        add_value = entry_prc * (final_pct_score / 100.0)
+        target = int(entry_prc + add_value)
 
         # 7. DEBUG PRINT
         color = Fore.CYAN if state == "🔥" else (Fore.MAGENTA if is_counter else Fore.YELLOW)
-        print(f"{color}{clean_symbol} | SIG:{active_signal} | ST:{state} | TGT:{target} (+{final_score})")
+        print(f"{color}{clean_symbol} | SIG:{active_signal} | ST:{state} | TGT:{target} (+{final_pct_score:.2f}%)")
 
         return target
     except Exception:
