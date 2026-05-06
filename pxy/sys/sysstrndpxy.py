@@ -1,18 +1,28 @@
+import pandas as pd
+import numpy as np
+import pytz
+from sysdtafpxy import fetch_yf_data
+
+# ==================================================
+# GLOBAL CONFIG
+# ==================================================
+DEBUG_MODE = False
+
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
     PXY® Engine: Fixed Anchor + Smooth IST Merge Logic
-    Fixed for Pandas 2.0+ and Python 3.12 compatibility.
+    Synchronized with Pine Script V5.
     """
     df = df.copy()
 
-    # 1. IST DATETIME FIX
+    # 1. Robust Datetime Index Fix & IST Conversion
     if not isinstance(df.index, pd.DatetimeIndex):
         date_col = next((c for c in ['Date', 'Datetime', 'timestamp', 'time'] if c in df.columns), None)
         if date_col:
             df[date_col] = pd.to_datetime(df[date_col])
             df.set_index(date_col, inplace=True)
     
-    # Ensure index is in IST
+    # Ensure index is in IST for safety
     if df.index.tz is None:
         df.index = df.index.tz_localize('UTC').tz_convert('Asia/Kolkata')
     else:
@@ -23,26 +33,28 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['bar_count'] = df.groupby('date_only').cumcount() + 1
 
     # 3. Components: Session Price Mean & Dynamic 50 SMA
-    session_mean = df.groupby('date_only')['Close'].expanding().mean().reset_index(level=0, drop=True)
+    session_mean = df.groupby('date_only', group_keys=False)['Close'].apply(
+        lambda x: x.expanding().mean()
+    )
     
-    sma_50 = df.groupby('date_only')['Close'].apply(
+    sma_50 = df.groupby('date_only', group_keys=False)['Close'].apply(
         lambda x: x.expanding().mean() if len(x) <= 50 else x.rolling(window=50).mean()
-    ).reset_index(level=0, drop=True)
+    )
 
     python_hybrid = (session_mean + sma_50) / 2
 
-    # 4. FIXED ANCHOR LOGIC (Using transform to avoid ValueError)
-    def get_first_bar_val(group):
+    # 4. Anchor Logic (9:15 IST Candle) - Fixed for Pandas 2.0+
+    def get_anchor_val(group):
         # Bullish 9:15 -> High, Bearish -> Low
-        return group.iloc[0]['High'] if group.iloc[0]['Close'] > group.iloc[0]['Open'] else group.iloc[0]['Low']
+        val = group['High'].iloc[0] if group['Close'].iloc[0] > group['Open'].iloc[0] else group['Low'].iloc[0]
+        return pd.Series([val] * len(group), index=group.index)
 
-    # transform broadcasts the single value to all rows in the group
     df['anchor'] = df.groupby('date_only', group_keys=False).apply(
-        lambda x: pd.Series([get_first_bar_val(x)] * len(x), index=x.index),
-        include_groups=False
-    ).reset_index(level=0, drop=True)
+        get_anchor_val, include_groups=False
+    )
 
     # 5. The No-Jump Black Line Logic (ST)
+    # Phase 1: 1-15 (Anchor) | Phase 2: 16-45 (30min Merge) | Phase 3: 46+ (Hybrid)
     blend_factor = (df['bar_count'] - 15) / 30.0
     
     df['ST'] = np.select(
@@ -80,7 +92,35 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     
     df['ST_Trend'] = st_trend
 
-    # Cleanup temporary columns to keep it clean
-    df.drop(columns=['date_only', 'bar_count', 'anchor'], inplace=True)
+    # Cleanup temporary columns
+    cols_to_drop = ['date_only', 'bar_count', 'anchor']
+    df.drop(columns=[c for c in cols_to_drop if c in df.columns], inplace=True)
     return df
+
+def get_signal(df=None):
+    """Main entry point for downstream modules."""
+    if df is None:
+        df = fetch_yf_data()
+    if df is None or df.empty:
+        return "NONE", 0.0
+    try:
+        df_st = calculate_supertrend(df)
+        last = df_st.iloc[-1]
+        # Return Signal string and Line value float
+        return str(last['ST_Trend']), float(last['ST'])
+    except Exception as e:
+        if DEBUG_MODE:
+            print(f"White Line Error: {e}")
+        return "NONE", 0.0
+
+if __name__ == "__main__":
+    print(" TESTING ANCHORED PXY ENGINE (IST SYNC) ".center(50, "="))
+    test_df = fetch_yf_data()
+    if test_df is not None:
+        df_full = calculate_supertrend(test_df)
+        print(f"Latest Price : {test_df['Close'].iloc[-1]:.2f}")
+        print(f"ST Line Val  : {df_full['ST'].iloc[-1]:.2f}")
+        print(f"Trend State  : {df_full['ST_Trend'].iloc[-1]}")
+        print("-" * 50)
+        print(df_full[['ST', 'ST_Trend']].tail(5))
 
