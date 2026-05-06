@@ -1,58 +1,76 @@
-/@version=5
-indicator("White Line + P-Master Dots + Session 50 SMA", overlay=true)
+//@version=5
+indicator("PXY®", overlay=true)
 
 // ==========================================
-// 1. SESSION LOGIC & 50 SMA
+// 1. SESSION & BAR TRACKING
 // ==========================================
 isNewDay = ta.change(time("D")) != 0
-var int barsToday = 0
-barsToday := isNewDay ? 1 : barsToday + 1
+var int barCount = 0
+barCount := isNewDay ? 1 : barCount + 1
 
-// Dynamic 50 SMA (Grows from 1 to 50 every morning)
-dynamicLength = math.min(barsToday, 50)
-sessionSMA = ta.sma(close, dynamicLength)
-
-// Session VWAP
-sessionVWAP = ta.vwap(hlc3, isNewDay)
-
-// White Line (Mean of VWAP and Dynamic SMA)
-avgLine = (sessionVWAP + sessionSMA) / 2
+// Time Milestones
+isPost930 = barCount > 15
+isPost1000 = barCount > 45
 
 // ==========================================
-// 2. P-MASTER LINE & DOT LOGIC
+// 2. COMPONENTS (Python-Style No-Volume)
 // ==========================================
-float e1 = close
-float e2 = (close + nz(close[1], close)) / 2
-float e3 = (close + open) / 2
-float e4 = ohlc4
-float p_price = math.round((e1 + e2 + e3 + e4) / 4, 4)
+var float firstBarAnchor = na
+if isNewDay
+    firstBarAnchor := close > open ? high : low
 
-// P-Dot Color: Green if rising, Red if falling
-color pDotColor = p_price > nz(p_price[1], p_price) ? #00FF00 : p_price < nz(p_price[1], p_price) ? #FF0000 : color.gray
+// Session Price Mean
+var float runningSum = 0.0
+runningSum := isNewDay ? close : runningSum + close
+sessionPriceMean = runningSum / barCount
+
+// Dynamic 50 SMA
+dynamicSMALen = math.min(barCount, 50)
+sessionSMA = ta.sma(close, dynamicSMALen)
+
+// Final Target Average
+pythonHybrid = (sessionSMA + sessionPriceMean) / 2
 
 // ==========================================
-// 3. PLOTTING
+// 3. THE NO-JUMP BLACK LINE LOGIC
 // ==========================================
+float blackLine = na
+if barCount <= 15
+    blackLine := firstBarAnchor
+else if barCount > 15 and barCount <= 45
+    float blendFactor = (barCount - 15) / 30.0
+    blackLine := (firstBarAnchor * (1 - blendFactor)) + (pythonHybrid * blendFactor)
+else
+    blackLine := pythonHybrid
 
-// --- Individual Indicators ---
-// Session 50 SMA (Orange)
-plot(barsToday > 1 ? sessionSMA : na, color=#FF9800, linewidth=2, title="Session 50 SMA")
+// ==========================================
+// 4. P-MASTER DOTS (FIXED COLOR LOGIC)
+// ==========================================
+p_price = math.round((close + (close + nz(close[1], close))/2 + (close + open)/2 + ohlc4)/4, 4)
 
-// Session VWAP (Purple)
-plot(barsToday > 1 ? sessionVWAP : na, color=#9C27B0, linewidth=1, title="Session VWAP")
+// Check change vs previous bar
+p_change = p_price - nz(p_price[1], p_price)
 
-// --- White Line (The Average) ---
-plot(barsToday > 1 ? avgLine : na, color=color.white, linewidth=2, title="White Line (Avg)")
+color pDotColor = color.gray
+if isNewDay
+    // Force first dot color based on 9:15 candle
+    pDotColor := close > open ? #00FF00 : #FF0000
+else
+    // Green if rising, Red if falling
+    pDotColor := p_change > 0 ? #00FF00 : p_change < 0 ? #FF0000 : #808080
 
-// --- P-Master Group ---
-// P-Line (Thin Black)
-plot(p_price, title="P-Master Line", color=color.new(color.black, 40), linewidth=1)
+// ==========================================
+// 5. PLOTTING
+// ==========================================
+// Main Black Line
+plot(blackLine, "Black Line", color.black, 3)
 
-// P-Dots (Thick Colored)
-plot(p_price, title="P-Dots", color=pDotColor, style=plot.style_circles, linewidth=3)
+// The Bull/Bear Dots (Force visible colors)
+plot(p_price, "P-Dots", pDotColor, 3, plot.style_circles)
 
-// Visual Session Break
-bgcolor(isNewDay ? color.new(color.white, 90) : na)
+// Visual Zones
+bgcolor(barCount <= 15 ? color.new(color.gray, 92) : (barCount <= 45 ? color.new(color.blue, 96) : na))
+
 
 
 
