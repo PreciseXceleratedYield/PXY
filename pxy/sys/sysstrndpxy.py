@@ -9,8 +9,9 @@ DEBUG_MODE = False
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
-    PXY® Engine: White Line Logic (VWAP + Dynamic 50 SMA) / 2
-    Fixed: Capitalization for 'Volume' column to prevent KeyError.
+    PXY® Engine: White Line Logic (No-Volume Version)
+    - Line = (Session Mean + Dynamic 50 SMA) / 2
+    - Logic handles the YF 'Zero Volume' issue by using session price mean as proxy.
     """
     df = df.copy()
 
@@ -21,34 +22,26 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             df[date_col] = pd.to_datetime(df[date_col])
             df.set_index(date_col, inplace=True)
 
-    # 2. VWAP Calculation (Session-based)
-    # Identify Volume column (handle 'Volume' or 'volume')
-    vol_col = 'Volume' if 'Volume' in df.columns else 'volume'
-    
-    if vol_col not in df.columns:
-        # Fallback if Volume is missing: use SMA only
-        df['date_only'] = df.index.date
-        vwap = df['Close'].rolling(window=1).mean() # Dummy vwap
-    else:
-        df['date_only'] = df.index.date
-        hlc3 = (df['High'] + df['Low'] + df['Close']) / 3
-        df['pv'] = hlc3 * df[vol_col]
-        df['cum_pv'] = df.groupby('date_only')['pv'].transform(pd.Series.cumsum)
-        df['cum_vol'] = df.groupby('date_only')[vol_col].transform(pd.Series.cumsum)
-        vwap = df['cum_pv'] / df['cum_vol']
-
-    # 3. Dynamic 50 SMA Calculation (Session-based)
+    # 2. Session Tracking
+    df['date_only'] = df.index.date
     df['bar_count'] = df.groupby('date_only').cumcount() + 1
-    
-    # Efficient expanding-to-50 SMA
+
+    # 3. Session Price Mean (Proxy for VWAP when volume is 0)
+    # This is the cumulative average of price since the 9:15 open
+    session_mean = df.groupby('date_only', group_keys=False)['Close'].apply(
+        lambda x: x.expanding(min_periods=1).mean()
+    )
+
+    # 4. Dynamic 50 SMA Calculation (Session-based)
+    # Window grows from 1 to 50 as bars accumulate today
     sma_50 = df.groupby('date_only', group_keys=False)['Close'].apply(
         lambda x: x.expanding(min_periods=1).mean() if len(x) <= 50 else x.rolling(window=50).mean()
     )
 
-    # 4. White Line Average
-    df['ST'] = (vwap + sma_50) / 2
+    # 5. White Line Average (Mean of the two session averages)
+    df['ST'] = (session_mean + sma_50) / 2
 
-    # 5. Signal Mapping
+    # 6. Signal Mapping (Retaining BUY/UP/SELL/DOWN for downstream)
     st_trend = []
     prev_trend = "SIDE"
     
@@ -56,6 +49,11 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         curr_close = df['Close'].iloc[i]
         curr_line = df['ST'].iloc[i]
         
+        # Handle initial NaNs
+        if np.isnan(curr_line):
+            st_trend.append("SIDE")
+            continue
+            
         if curr_close > curr_line:
             new_trend = "UP" if prev_trend in ["UP", "BUY"] else "BUY"
         elif curr_close < curr_line:
@@ -68,13 +66,14 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     df['ST_Trend'] = st_trend
     
-    # Cleanup
-    cols_to_drop = ['date_only', 'pv', 'cum_pv', 'cum_vol', 'bar_count']
+    # Cleanup temporary columns
+    cols_to_drop = ['date_only', 'bar_count']
     df.drop(columns=[c for c in cols_to_drop if c in df.columns], inplace=True)
     
     return df
 
 def get_signal(df=None):
+    """Main entry point for downstream modules."""
     if df is None:
         df = fetch_yf_data()
     if df is None or df.empty:
@@ -82,6 +81,7 @@ def get_signal(df=None):
     try:
         df_st = calculate_supertrend(df)
         last = df_st.iloc[-1]
+        # Return Signal string and Line value float
         return str(last['ST_Trend']), float(last['ST'])
     except Exception as e:
         if DEBUG_MODE:
@@ -89,10 +89,16 @@ def get_signal(df=None):
         return "NONE", 0.0
 
 if __name__ == "__main__":
+    print(" TESTING NO-VOLUME WHITE LINE ENGINE ".center(50, "="))
     test_df = fetch_yf_data()
     if test_df is not None:
         df_full = calculate_supertrend(test_df)
-        print(f"Latest Signal: {df_full['ST_Trend'].iloc[-1]} | Value: {df_full['ST'].iloc[-1]:.2f}")
+        print(f"Latest Price : {test_df['Close'].iloc[-1]:.2f}")
+        print(f"White Line   : {df_full['ST'].iloc[-1]:.2f}")
+        print(f"Signal State : {df_full['ST_Trend'].iloc[-1]}")
+        print("-" * 50)
+        print(df_full[['ST', 'ST_Trend']].tail(5))
+
 
 
 
