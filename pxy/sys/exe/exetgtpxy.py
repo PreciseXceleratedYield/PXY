@@ -73,7 +73,7 @@ def target_price(row):
 
         # 7. DEBUG PRINT
         color = Fore.CYAN if state == "🔥" else (Fore.MAGENTA if is_counter else Fore.YELLOW)
-        print(f"{color}{clean_symbol} | SIG:{active_signal} | ST:{state}")
+        print(f"        {color}{clean_symbol} | SIG:{active_signal} | ST:{state}")
 
         return target
     except Exception:
