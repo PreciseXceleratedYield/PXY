@@ -213,11 +213,11 @@ async def main():
         # --- DASHBOARD OUTPUT ---
         print(f"""
  =====================================
- 💰 Cash   : {int(funds)}
- 📦 Pos    : {pos}
- 🎫 Symbol : {symbol}
- 🎯 Signal : {entry_signal}
- 📌 Status : {res.get('stat')}
+     💰 Cash   : {int(funds)}
+     📦 Pos    : {pos}
+     🎫 Symbol : {symbol}
+     🎯 Signal : {entry_signal}
+     📌 Status : {res.get('stat')}
  =====================================
         """)
         dprint("===== MAIN END =====", Fore.GREEN)
