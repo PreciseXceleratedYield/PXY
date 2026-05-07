@@ -6,9 +6,8 @@ import pytz
 from colorama import init, Fore, Style
 import sys
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor, TimeoutError  # ✅ FIX 2
 
-# ✅ FIX 2
 # ---------------- INIT ----------------
 init(autoreset=True)
 ist = pytz.timezone("Asia/Kolkata")
@@ -30,9 +29,11 @@ except Exception:
 try:
     from runclntpxy import get_session
     client = get_session()
+
     if not client:
         print("❌ FATAL: Unable to create trading session")
         sys.exit(1)
+
 except Exception as e:
     print(f"❌ Client Init Failed: {e}")
     sys.exit(1)
@@ -69,6 +70,7 @@ def run_script(script_path):
         print(f"❌ RUN ERR: script execution failed -> {script_path} ⚠️")
     except Exception as e:
         print(f"❌ RUN ERR: unexpected failure -> {script_path} ⚠️")
+
     print("━" * 42)
 
 def safe_run(script_path):
@@ -83,7 +85,7 @@ def fancy_pause(seconds=3):
     for i in range(seconds, 0, -1):
         print(f"⏳ Pause active... {Fore.YELLOW}{i}{Style.RESET_ALL}s", end="\r", flush=True)
         time.sleep(1)
-    print("✅ Resume execution now ")
+    print("✅ Resume execution now        ")
 
 def live_status(msg):
     print(f"{datetime.now(ist).strftime('%H:%M:%S')} {msg}", end="\r", flush=True)
@@ -94,6 +96,7 @@ def in_market_hours():
 
 # ---------------- MAIN LOOP ----------------
 print("\n🚀 INIT: main market loop starting now 📡")
+
 loop_counter = 1
 
 # ---------------- RUN PARENT SCRIPTS ONCE AT START ----------------
@@ -112,9 +115,12 @@ for s in parent_scripts:
 while True:
     if in_market_hours():
         live_status("🚀 LOOP: waiting CE/PE trigger 📊")
+
         for sub_itr in range(1, 31):
+
             # -------- POSITION FETCH (FIXED) --------
             pos_summary = call_with_timeout(get_position_summary, 5, client)
+
             if not pos_summary:
                 pos_summary = "0CE0PE"
 
@@ -128,29 +134,30 @@ while True:
             # -------- LIVE STATUS --------
             live_status(f"📊 Loop#{loop_counter} Sub#{sub_itr} CE:{ce_qty} PE:{pe_qty}")
 
-            # -------- CORE LOGIC (SURGICAL CHANGE) --------
-            
-            # 1. Balanced/Hedged (e.g., 1CE and 1PE) -> ONLY EXIT
-            if ce_qty > 0 and ce_qty == pe_qty:
+            # -------- CORE LOGIC (UNCHANGED) --------
+            if ce_qty >= 1 and pe_qty >= 1:
                 safe_run(HERE / "exeexitpxy.py")
-            
-            # 2. Zero Positions (0CE and 0PE) -> ONLY ENTRY (Skip Exit)
+
             elif ce_qty == 0 and pe_qty == 0:
                 safe_run(HERE / "exeentrpxy.py")
-            
-            # 3. Imbalance (e.g., 1CE and 0PE) -> RUN BOTH
+
             else:
                 safe_run(HERE / "exeexitpxy.py")
                 safe_run(HERE / "exeentrpxy.py")
 
             fancy_pause(3)
-            loop_counter += 1
+
+        loop_counter += 1
+
     else:
         print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
+
         safe_run(HERE.parent / "sysslefpxy.py")
+
         fancy_pause(5)
+
         while not in_market_hours():
             print("⏳ WAIT: market opens at 09:16 IST 📡", end="\r")
             time.sleep(60)
-        print("\n🚀 MKT OPEN: resuming main loop now 📈")
 
+        print("\n🚀 MKT OPEN: resuming main loop now 📈")
