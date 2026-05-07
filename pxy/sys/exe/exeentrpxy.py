@@ -173,25 +173,57 @@ async def main():
         if not is_valid_entry:
             dprint(f"NON-TRADE ENTRY SIGNAL: {sig}", Fore.YELLOW)
 
-        # --- POSITION CHECK ---
-        dprint("CHECKING POSITIONS...")
+        # --- POSITION AWARENESS (STRICT 1:1 RATIO) ---
         try:
-            pos = get_position_summary(client)
-            dprint(f"POSITION RAW: {pos}")
+            pos_summary = get_position_summary(client)  # Expected: "XCEYPE"
+            
+            # Robust split logic to handle potential formatting variations
+            parts = pos_summary.split("CE")
+            ce_qty = int(parts[0])
+            pe_qty = int(parts[1].replace("PE", ""))
+            
+            dprint(f"📊 MONITORING RATIO -> CE:{ce_qty} | PE:{pe_qty}", Fore.CYAN)
+        except Exception as e:
+            # Critical safety: if we can't determine positions, we MUST NOT trade
+            print(f"{Fore.RED}❌ CRITICAL POSITION ERROR: {e}. Aborting entry to prevent over-trading.")
+            return
 
-            if isinstance(pos, (list, tuple, set)):
-                ce_active = "1CE" in pos
-                pe_active = "1PE" in pos
+        BUY_SIGS = ["ATMBUY", "OTMBUY"]
+        SELL_SIGS = ["ATMSELL", "OTMSELL"]
+        symbol = None
+        res = {"stat": "SKIPPED"}
+        
+        # Ensure signal is clean for comparison
+        current_sig = sig.upper().strip() if sig else ""
 
-            elif isinstance(pos, dict):
-                ce_active = pos.get("1CE", False)
-                pe_active = pos.get("1PE", False)
-
+        # ==================================================
+        # 🔥 RE-BALANCING LOGIC (REQUIRES FRESH SIGNAL)
+        # ==================================================
+        
+        # --- CASE 1: BUY CE (Allowed if empty OR to balance PE) ---
+        if current_sig in BUY_SIGS:
+            if (ce_qty == 0 and pe_qty == 0) or (ce_qty < pe_qty):
+                dprint(f"⚖️ SIGNAL MATCH: Buying CE to balance {pe_qty} PE lots", Fore.GREEN)
+                symbol = get_symbol(ltp, current_sig, OTM_DISTANCE)
+                if symbol and symbol != "NA":
+                    res = execute_order(client, symbol, LOT_SIZE)
+                else:
+                    print("❌ CE symbol failed")
             else:
-                ce_active = "1CE" in str(pos)
-                pe_active = "1PE" in str(pos)
+                print(f"✋ SIGNAL IGNORED: Ratio {ce_qty}:{pe_qty}. Already balanced or CE-heavy.")
 
-            dprint(f"CE_ACTIVE={ce_active}, PE_ACTIVE={pe_active}")
+        # --- CASE 2: BUY PE (Allowed if empty OR to balance CE) ---
+        elif current_sig in SELL_SIGS:
+            if (ce_qty == 0 and pe_qty == 0) or (pe_qty < ce_qty):
+                dprint(f"⚖️ SIGNAL MATCH: Buying PE to balance {ce_qty} CE lots", Fore.GREEN)
+                symbol = get_symbol(ltp, current_sig, OTM_DISTANCE)
+                if symbol and symbol != "NA":
+                    res = execute_order(client, symbol, LOT_SIZE)
+                else:
+                    print("❌ PE symbol failed")
+            else:
+                print(f"✋ SIGNAL IGNORED: Ratio {ce_qty}:{pe_qty}. Already balanced or PE-heavy.")
+
 
             # ==================================================
             # 🔥 SURGICAL EXIT-BASED SIGNAL CORRECTION
