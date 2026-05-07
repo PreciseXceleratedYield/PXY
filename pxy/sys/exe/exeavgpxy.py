@@ -5,7 +5,7 @@ from datetime import datetime, time as dt_time
 from colorama import Fore, Style
 
 # --- CONFIG ---
-REBUY_ENABLED = True 
+REBUY_ENABLED = False 
 COOL_DOWN_SECONDS = 300  # 5 Minutes
 
 def get_cooling_file(side):
