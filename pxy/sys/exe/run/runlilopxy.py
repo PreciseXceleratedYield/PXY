@@ -10,49 +10,76 @@ from runltpspxy import get_mid_price
 # ⚙️ CONFIGURATION
 # =========================
 MATCH_MODE = "PFO" 
-MEMORY_FILE = os.path.expanduser("~/pxy/pnl.json")
+PNL_FILE = os.path.expanduser("~/pxy/pnl.json")
+META_FILE = os.path.expanduser("~/pxy/pnl_meta.json")
 
-def dump_to_json(closed_df):
-    """Saves closed trades to pnl.json exactly like the original script."""
+def rotate_daily_file():
+    """Archives pnl files at market open to start fresh daily."""
     try:
-        if closed_df.empty:
-            data = []
-        else:
+        if not os.path.exists(PNL_FILE): return
+        now = datetime.now()
+        market_open = now.replace(hour=9, minute=15, second=0, microsecond=0)
+        mtime = datetime.fromtimestamp(os.path.getmtime(PNL_FILE))
+        if now >= market_open and mtime < market_open:
+            date_str = mtime.strftime("%Y-%m-%d")
+            for f in [PNL_FILE, META_FILE]:
+                if os.path.exists(f):
+                    os.rename(f, f.replace(".json", f"_{date_str}.json"))
+    except: pass
+
+def dump_data(closed_df, banked_pnl, processed_ids):
+    """Maintains original pnl.json format and saves internal state to meta."""
+    try:
+        # 1. Save pnl.json exactly as original (List of records)
+        trade_data = []
+        if not closed_df.empty:
             records = closed_df.copy()
-            # Convert Timestamps to strings for JSON compatibility
             for col in records.columns:
                 if pd.api.types.is_datetime64_any_dtype(records[col]):
                     records[col] = records[col].dt.strftime('%Y-%m-%d %H:%M:%S')
-            data = records.to_dict(orient='records')
-            
-        with open(MEMORY_FILE, "w") as f:
-            json.dump(data, f, indent=4)
-    except Exception as e:
-        print(f"[DUMP ERROR]: {e}")
+            trade_data = records.to_dict(orient='records')
+        
+        with open(PNL_FILE, "w") as f:
+            json.dump(trade_data, f, indent=4)
+
+        # 2. Save internal logic state to meta file
+        meta_data = {
+            "banked_pnl": int(banked_pnl),
+            "processed_ids": list(processed_ids)
+        }
+        with open(META_FILE, "w") as f:
+            json.dump(meta_data, f, indent=4)
+    except: pass
 
 def process_lilo_orders(client):
     try:
-        if not client:
-            _print_summary(0, 0)
-            return pd.DataFrame(), pd.DataFrame()
+        rotate_daily_file()
+        
+        # Load memory from meta file
+        banked_pnl, processed_ids = 0, set()
+        if os.path.exists(META_FILE):
+            with open(META_FILE, "r") as f:
+                meta = json.load(f)
+                banked_pnl = meta.get("banked_pnl", 0)
+                processed_ids = set(meta.get("processed_ids", []))
 
         res = client.order_report()
-        if not res or "data" not in res:
-            _print_summary(0, 0)
-            return pd.DataFrame(), pd.DataFrame()
+        if not res or "data" not in res: return pd.DataFrame(), pd.DataFrame()
 
         df = pd.DataFrame(res["data"])
         df = df[df["ordSt"].isin(["complete", "traded"])].copy()
         
+        # Filter out orders we have already processed in previous runs
+        df = df[~df["nOrdNo"].isin(processed_ids)].copy()
+        
         if df.empty:
-            _print_summary(0, 0)
+            _print_summary(0, banked_pnl)
             return pd.DataFrame(), pd.DataFrame()
 
-        # Data Cleaning
-        df["qty"] = pd.to_numeric(df["fldQty"], errors='coerce').fillna(0)
-        df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0)
+        df["qty"] = pd.to_numeric(df["fldQty"]).fillna(0)
+        df["prc"] = pd.to_numeric(df["avgPrc"]).fillna(0)
         df["dt"] = pd.to_datetime(df["ordDtTm"])
-        df = df.sort_values(by="dt", ascending=True)
+        df = df.sort_values(by="dt")
 
         closed_matches = []
         open_positions = []
@@ -65,41 +92,35 @@ def process_lilo_orders(client):
 
             for s in sells:
                 while s["qty"] > 0 and buys:
-                    # 🔁 PROFIT FIRST OUT SORTING
+                    # 🔁 PFO: Sort buys to pick the one that gives maximum profit vs current sell
                     if MATCH_MODE == "PFO":
                         buys.sort(key=lambda x: (s["prc"] - x["prc"]), reverse=True)
                     
                     b = buys[0]
                     mqty = min(s["qty"], b["qty"])
+                    pnl_val = int((s["prc"] - b["prc"]) * mqty)
+                    
+                    if pnl_val > 0: banked_pnl += pnl_val
+                    processed_ids.add(s["nOrdNo"])
+                    processed_ids.add(b["nOrdNo"])
                     
                     closed_matches.append({
-                        "Symbol": symbol,
-                        "Qty": mqty,
-                        "tok": token_id,
-                        "Buy_Time": b["dt"],
-                        "Buy_Prc": b["prc"],
-                        "Exit_Time": s["dt"],
-                        "Sell_Prc": s["prc"],
-                        "PNL": int((s["prc"] - b["prc"]) * mqty)
+                        "Symbol": symbol, "Qty": mqty, "tok": token_id,
+                        "Buy_Time": b["dt"], "Buy_Prc": b["prc"],
+                        "Exit_Time": s["dt"], "Sell_Prc": s["prc"], "PNL": pnl_val
                     })
                     
                     s["qty"] -= mqty
                     b["qty"] -= mqty
-                    if b["qty"] <= 0:
-                        buys.pop(0)
+                    if b["qty"] <= 0: buys.pop(0)
 
-            # Active Positions
             for rem in buys:
                 if rem["qty"] > 0:
                     live_val = get_mid_price(client, token_id, ex_seg)
                     open_positions.append({
-                        "Symbol": symbol,
-                        "Qty": rem["qty"],
-                        "tok": token_id,
-                        "Buy_Time": rem["dt"],
-                        "Buy_Prc": rem["prc"],
-                        "Exit_Time": "OPEN",
-                        "Sell_Prc": live_val,
+                        "Symbol": symbol, "Qty": rem["qty"], "tok": token_id,
+                        "Buy_Time": rem["dt"], "Buy_Prc": rem["prc"],
+                        "Exit_Time": "OPEN", "Sell_Prc": live_val,
                         "PNL": int((live_val - rem["prc"]) * rem["qty"])
                     })
 
@@ -107,15 +128,11 @@ def process_lilo_orders(client):
         closed_df = pd.DataFrame(closed_matches)
         
         total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0
-        total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0
+        _print_summary(total_unrealized, banked_pnl)
         
-        _print_summary(total_unrealized, total_realized)
-        
-        # 💾 DUMP EXACTLY AS ORIGINAL
-        dump_to_json(closed_df)
-        
+        dump_data(closed_df, banked_pnl, processed_ids)
         return open_df, closed_df
-
+        
     except Exception as e:
         print(f"[LILO ERROR]: {e}")
         return pd.DataFrame(), pd.DataFrame()
