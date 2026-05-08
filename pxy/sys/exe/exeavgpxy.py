@@ -5,8 +5,10 @@ from datetime import datetime, time as dt_time
 from colorama import Fore, Style
 
 # --- CONFIG ---
-REBUY_ENABLED = True 
+REBUY_ENABLED = True
 COOL_DOWN_SECONDS = 300  # 5 Minutes
+SIDE_SWITCH = 2          # 2 = Both sides must hit -7%, 1 = Single side hit -7%
+LOSS_THRESHOLD = -7      # Threshold for triggering averaging
 
 def get_cooling_file(side):
     """Returns the filename for side-specific cooling."""
@@ -17,20 +19,18 @@ def is_cooling(side):
     file_path = get_cooling_file(side)
     if not os.path.exists(file_path):
         return False
-    
     try:
         with open(file_path, "r") as f:
             content = f.read().strip()
             if not content: return False
             last_ts = float(content)
-        
-        elapsed = time.time() - last_ts
-        if elapsed < COOL_DOWN_SECONDS:
-            return True
-        else:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            return False
+            elapsed = time.time() - last_ts
+            if elapsed < COOL_DOWN_SECONDS:
+                return True
+            else:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                return False
     except:
         return False
 
@@ -43,9 +43,10 @@ def set_cooling(side):
         print(f"{Fore.RED}Error writing cooling file: {e}")
 
 def handle_side_averaging(client, df):
-    """Main logic for layering buys."""
-    if df.empty: return
-    
+    """Main logic for layering buys with Dual-Side or Single-Side switch."""
+    if df.empty:
+        return
+
     ist = pytz.timezone("Asia/Kolkata")
     now = datetime.now(ist).time()
     
@@ -56,41 +57,68 @@ def handle_side_averaging(client, df):
     # Create Side Column
     df['side'] = df['symbol'].str[-2:].upper()
 
-    for side in ['CE', 'PE']:
-        side_df = df[df['side'] == side]
-        count = len(side_df)
+    def get_loss(row):
+        entry = float(row.get("pxy_entry", 0))
+        ltp = float(row.get("sell_prc", 0))
+        return ((ltp - entry) / entry) * 100 if entry > 0 else 0
 
-        # PASS if count is 0 or already 3 (Strict production limit)
-        if count == 0 or count >= 3:
+    # Separate Side Data
+    ce_df = df[df['side'] == 'CE']
+    pe_df = df[df['side'] == 'PE']
+
+    # Calculate status of latest positions
+    ce_hit = not ce_df.empty and get_loss(ce_df.iloc[-1]) <= LOSS_THRESHOLD
+    pe_hit = not pe_df.empty and get_loss(pe_df.iloc[-1]) <= LOSS_THRESHOLD
+
+    # Determine if trigger condition is met based on SIDE_SWITCH
+    trigger_allowed = False
+    if SIDE_SWITCH == 2:
+        trigger_allowed = ce_hit and pe_hit
+    else:
+        trigger_allowed = ce_hit or pe_hit
+
+    if not trigger_allowed:
+        return
+
+    # Execution Loop
+    for side, side_df in [('CE', ce_df), ('PE', pe_df)]:
+        if side_df.empty:
             continue
-
-        if is_cooling(side):
-            continue
-
-        def get_loss(row):
-            entry = float(row.get("pxy_entry", 0))
-            ltp = float(row.get("sell_prc", 0))
-            return ((ltp - entry) / entry) * 100 if entry > 0 else 0
-
-        # Condition: All existing layers on this side must be at <= -10%
-        if side_df.apply(get_loss, axis=1).le(-10).all():
-            last_order = side_df.iloc[-1]
-            symbol = last_order['symbol']
-            qty = abs(int(last_order['qty']))
-
-            print(f"{Fore.YELLOW}📉 {side} Side (Count {count}) hit -10% loss threshold.")
             
-            try:
-                params = {
-                    "exchange_segment": "nse_fo", "product": "NRML",
-                    "price": "0", "order_type": "MKT", "quantity": str(qty),
-                    "trading_symbol": str(symbol), "transaction_type": "B",
-                    "validity": "DAY", "amo": "NO"
-                }
-                client.place_order(**params)
-                set_cooling(side)
-                print(f"{Fore.GREEN}{Style.BRIGHT}✅ SUCCESS: Layer {count+1} Added for {symbol}.")
-            except Exception as e:
-                print(f"{Fore.RED}❌ Rebuy Execution Failed: {e}")
+        count = len(side_df)
+        
+        # Check if the specific side meets the individual loss criteria
+        # (Needed when SIDE_SWITCH is 1, or to ensure we don't average a profitable side in Switch 2)
+        if get_loss(side_df.iloc[-1]) > LOSS_THRESHOLD:
+            continue
+
+        # PASS if already 3 (Strict production limit) or cooling
+        if count >= 3 or is_cooling(side):
+            continue
+
+        last_order = side_df.iloc[-1]
+        symbol = last_order['symbol']
+        qty = abs(int(last_order['qty']))
+
+        print(f"{Fore.YELLOW}📉 {side} Side Triggered (Switch {SIDE_SWITCH}). Latest loss <= {LOSS_THRESHOLD}%.")
+        
+        try:
+            params = {
+                "exchange_segment": "nse_fo",
+                "product": "NRML",
+                "price": "0",
+                "order_type": "MKT",
+                "quantity": str(qty),
+                "trading_symbol": str(symbol),
+                "transaction_type": "B",
+                "validity": "DAY",
+                "amo": "NO"
+            }
+            client.place_order(**params)
+            set_cooling(side)
+            print(f"{Fore.GREEN}{Style.BRIGHT}✅ SUCCESS: Layer {count+1} Added for {symbol}.")
+        except Exception as e:
+            print(f"{Fore.RED}❌ Rebuy Execution Failed: {e}")
+
 
 
