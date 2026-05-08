@@ -136,7 +136,7 @@ async def main():
         try:
             TO, YC = int(float(data.get("TO"))), int(float(data.get("YC")))
             OTM_DISTANCE = (round(abs(TO - YC) / 100) * 100) * 2
-            OTM_DISTANCE = 500
+            OTM_DISTANCE = 200
             supertrend = str(data.get("supertrend", "")).upper().strip()
             is_bull, is_bear = (supertrend == "UP"), (supertrend == "DOWN")
             dprint(f"OTM DIST: {OTM_DISTANCE} | SUPERTREND: {supertrend}")
