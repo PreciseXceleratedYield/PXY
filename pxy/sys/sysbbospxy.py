@@ -4,7 +4,7 @@ import pandas as pd
 init(autoreset=True)
 WIDTH = 42
 
-# ---------------- DETERMINISTIC VISUAL ENGINE (UNMODIFIED) ----------------
+# ---------------- DETERMINISTIC VISUAL ENGINE (MODIFIED FOR WICK CHAR) ----------------
 def build_candle_bar(o, h, l, c, width=WIDTH):
     o, h, l, c = map(float, (o, h, l, c))
     rng = h - l
@@ -24,17 +24,19 @@ def build_candle_bar(o, h, l, c, width=WIDTH):
     upper_len = width - lower_len - body_len
 
     bar = ""
-    # lower wick
-    bar += Fore.LIGHTBLACK_EX + "█" * lower_len
-    # body
+    # lower wick (Using ━ as requested)
+    bar += Fore.LIGHTBLACK_EX + "━" * lower_len
+    
+    # body (Using █)
     if c > o:
         bar += Fore.GREEN + "█" * body_len
     elif o > c:
         bar += Fore.RED + "█" * body_len
     else:
         bar += Fore.YELLOW + "█" * body_len
-    # upper wick
-    bar += Fore.LIGHTBLACK_EX + "█" * upper_len
+        
+    # upper wick (Using ━ as requested)
+    bar += Fore.LIGHTBLACK_EX + "━" * upper_len
     
     return bar + Style.RESET_ALL
 
@@ -42,19 +44,19 @@ def build_candle_bar(o, h, l, c, width=WIDTH):
 def get_bos_bar(df):
     try:
         if df is None or len(df) < 42:
-            return Fore.LIGHTBLACK_EX + "█" * WIDTH + Style.RESET_ALL, "0%"
+            return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "0%"
 
         # 1. Capture Cumulative 42-minute OHLC
         window = df.iloc[-42:]
-        o_42 = float(window.iloc[0]['Open'])    # Open of the 42nd minute ago
-        h_42 = float(window['High'].max())      # Highest High of the 42-min window
-        l_42 = float(window['Low'].min())       # Lowest Low of the 42-min window
-        c_42 = float(window.iloc[-1]['Close'])  # Current Price
+        o_42 = float(window.iloc[0]['Open'])    # First candle's open
+        h_42 = float(window['High'].max())      # Window High
+        l_42 = float(window['Low'].min())       # Window Low
+        c_42 = float(window.iloc[-1]['Close'])  # Current Close
 
-        # 2. Build the visual bar using your exact logic
+        # 2. Build the visual bar (Body: █, Wick: ━)
         visual_bar = build_candle_bar(o_42, h_42, l_42, c_42)
 
-        # 3. Calculate 1-99% Strength (Low-to-Close position)
+        # 3. Low to Close % Comparison (1 to 99)
         rng = h_42 - l_42
         if rng != 0:
             raw_val = round(((c_42 - l_42) / rng) * 100)
@@ -66,7 +68,7 @@ def get_bos_bar(df):
         return visual_bar, strength_pct
 
     except Exception:
-        return Fore.LIGHTBLACK_EX + "█" * WIDTH + Style.RESET_ALL, "ERR%"
+        return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "ERR%"
 
 
 
