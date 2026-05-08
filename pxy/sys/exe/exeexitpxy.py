@@ -15,7 +15,7 @@ from exeavgpxy import handle_side_averaging
 init(autoreset=True)
 
 # --- DEBUG CONFIG ---
-DEBUG_MODE = True 
+DEBUG_MODE = False 
 
 def debug_log(msg, color=Fore.BLUE):
     if DEBUG_MODE:
