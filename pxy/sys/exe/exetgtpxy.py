@@ -5,6 +5,9 @@ from colorama import init, Fore, Style
 init(autoreset=True)
 IST = pytz.timezone("Asia/Kolkata")
 
+# Global set to track printed sides for the current refresh cycle
+PRINTED_SIDES = set()
+
 def f(x, d=0.0):
     try:
         val = float(x)
@@ -19,6 +22,7 @@ def i(x, d=0):
         return d
 
 def target_price(row):
+    global PRINTED_SIDES
     try:
         # 1. ENTRY DATA
         entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
@@ -31,10 +35,11 @@ def target_price(row):
 
         # 3. SIGNAL & CONTEXT LOGIC
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
-        is_ce, is_pe = "CE" in symbol, "PE" in symbol
+        side = "CE" if "CE" in symbol else "PE" if "PE" in symbol else "NA"
+        
+        is_ce, is_pe = (side == "CE"), (side == "PE")
         active_signal = str(row.get("exit", "NONE")).upper()
         is_counter = str(row.get("counter", "N")).upper() == "Y"
-        clean_symbol = symbol.split('26', 1)[-1] if '26' in symbol else symbol
 
         # 4. FIELD DEFINITIONS
         hce_d = f(row.get("hkin_ce_depth"), 1.0)
@@ -54,10 +59,19 @@ def target_price(row):
             if any(t in active_signal for t in bullish_triggers):
                 calc = (atr_val * ce_f * ce_p) + hce_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
+            elif any(t in active_signal for t in bearish_triggers):
+                # Opposing Signal: Half the score
+                final_pct_score = BASE_SCORE / 2
+                state = "❄️"
+        
         elif is_pe:
             if any(t in active_signal for t in bearish_triggers):
                 calc = (atr_val * pe_f * pe_p) + hpe_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
+            elif any(t in active_signal for t in bullish_triggers):
+                # Opposing Signal: Half the score
+                final_pct_score = BASE_SCORE / 2
+                state = "❄️"
 
         # 8. MAX CAP LOGIC
         if final_pct_score > 99.0:
@@ -67,13 +81,15 @@ def target_price(row):
         add_value = entry_prc * (final_pct_score / 100.0)
         target = int(entry_prc + add_value)
 
-        # 7. UPDATED DEBUG PRINT
-        # Replaced SIG:{active_signal} with the calculated % score
-        color = Fore.CYAN if state == "🔥" else (Fore.MAGENTA if is_counter else Fore.YELLOW)
-        print(f" {color}{clean_symbol} | {final_pct_score:.1f}% | ST:{state}")
+        # 7. SUPPRESSED DEBUG PRINT (Once per side)
+        if side not in PRINTED_SIDES and side != "NA":
+            color = Fore.CYAN if state == "🔥" else (Fore.BLUE if state == "❄️" else (Fore.MAGENTA if is_counter else Fore.YELLOW))
+            print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state}")
+            PRINTED_SIDES.add(side)
 
         return target
     except Exception:
         return 0
+
 
 
