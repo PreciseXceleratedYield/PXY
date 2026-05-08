@@ -9,33 +9,31 @@ def get_p_series(df):
 
 def get_bos_bar(df):
     try:
-        # Check for minimum data
+        # Check if we have at least 42 periods for the rolling window
         if df is None or len(df) < 43:
             return "━" * 42, "0%"
 
-        # 1. P-Master Rolling Logic (42 candles)
+        # 1. 42-Minute Rolling Window (Each char is 1 candle)
         p_vals = get_p_series(df)
         is_up = p_vals > p_vals.shift(1)
-        subset = is_up.iloc[-42:]
+        subset = is_up.iloc[-42:] # Last 42 candles
         
-        # 2. Visual Bar Construction (42 characters)
-        # Body (Up) = █, Wick (Otherwise) = ━
+        # █ for bodies (up), ━ for wicks (down)
         visual_bar = "".join(["█" if up else "━" for up in subset])
 
-        # 3. Strength Percentage (Low to Close Comparison)
+        # 2. Low to Close Comparison (Present Candle)
         latest = df.iloc[-1]
-        c, h, l = latest['Close'], latest['High'], latest['Low']
+        cur_c, hh, ll = latest['Close'], latest['High'], latest['Low']
         
-        if h != l:
-            # Position of Close relative to Low-High range
-            strength_val = round(((c - l) / (h - l)) * 100)
+        if hh != ll:
+            # How close is the present price to the bottom (LL)?
+            raw_val = round(((cur_c - ll) / (hh - ll)) * 100)
         else:
-            strength_val = 50
+            raw_val = 50 # Neutral if no movement
             
-        # Clamp strictly between 1 and 99
-        strength_pct = f"{max(1, min(99, strength_val))}%"
+        # Strictly clamp 1 to 99
+        strength_pct = f"{max(1, min(99, raw_val))}%"
 
-        # Returns only the visual bar and the percentage
         return visual_bar, strength_pct
 
     except Exception:
