@@ -62,6 +62,7 @@ def get_all_data():
         # ===== NEW =====
         "candle_visual": core.get("candle_visual", ""),
         "bos_bar": core.get("bos_bar", "NONE"),
+        "bos_val": core.get("bos_val", "0%"),  # <--- ADD THIS LINE
         "day_candle": core.get("day_candle", ""),
 
         # ===== VIX =====
