@@ -116,87 +116,65 @@ async def main():
             print("⏳ Market buffer time - skipped")
             return
 
-        dprint("CREATING SESSION...")
         client = get_session()
-        if not client:
-            dprint("SESSION FAILED", Fore.RED)
-            return
+        if not client: return
 
-        dprint("GETTING DATA FROM SYSPXY...")
         data = get_all_data()
         entry_signal = data.get("entry")
         reversal = data.get("exit")
         ltp = data.get("price")
 
-        # --- DYNAMIC OTM & SUPERTREND ---
         try:
             supertrend = str(data.get("supertrend", "")).upper().strip()
-            is_bull, is_bear = (supertrend == "UP"), (supertrend == "DOWN")
             OTM_DISTANCE = 200
-            dprint(f"OTM DIST: {OTM_DISTANCE} | SUPERTREND: {supertrend}")
-        except Exception as e:
-            dprint(f"OTM fallback: {e}", Fore.YELLOW)
-            OTM_DISTANCE, is_bull, is_bear = 100, False, False
+        except: OTM_DISTANCE = 100
 
         exit_sig = str(reversal).upper().strip() if reversal else "NONE"
-        dprint(f"EXIT REGIME: {exit_sig}")
-
-        if not entry_signal:
-            print("WAIT SIGNAL: None")
-            return
+        if not entry_signal: return
 
         sig = entry_signal.upper().strip()
         if sig == "STBUY": sig = "ATMBUY"
         elif sig == "STSELL": sig = "ATMSELL"
-        dprint(f"NORMALIZED SIGNAL: {sig}")
+        dprint(f"SIGNAL: {sig}")
 
-        # --- FIXED POSITION CHECK ---
-        dprint("CHECKING POSITIONS...")
+        # --- UPDATED POSITION BALANCING LOGIC ---
+        dprint("CHECKING POSITIONS FOR BALANCE...")
         pos_raw = str(get_position_summary(client))
-        dprint(f"POS RAW: {pos_raw}")
         
-        # Regex extracts the number before CE and PE to check if qty > 0
         ce_match = re.search(r'(\d+)CE', pos_raw)
         pe_match = re.search(r'(\d+)PE', pos_raw)
         
-        ce_active = int(ce_match.group(1)) > 0 if ce_match else False
-        pe_active = int(pe_match.group(1)) > 0 if pe_match else False
+        ce_qty = int(ce_match.group(1)) if ce_match else 0
+        pe_qty = int(pe_match.group(1)) if pe_match else 0
         
-        dprint(f"CE_ACTIVE: {ce_active} | PE_ACTIVE: {pe_active}")
+        dprint(f"CURRENT -> CE: {ce_qty} | PE: {pe_qty}")
 
-        # --- REGIME CORRECTION ---
-        if COUNTERBUY.upper() == "YES":
-            dprint("REGIME OVERRIDE START...", Fore.MAGENTA)
-            if ce_active and pe_active:
-                sig = "NONE"
-            elif exit_sig in ["BUY", "BULL"]:
-                if pe_active: sig = "ATMBUY" if is_bull else "OTMBUY"
-            elif exit_sig in ["SELL", "BEAR"]:
-                if ce_active: sig = "ATMSELL" if is_bear else "OTMSELL"
-
-        # --- EXECUTION BRANCHES ---
         symbol, res = None, {"stat": "SKIPPED"}
+        
         if sig in ["ATMBUY", "OTMBUY"]:
-            dprint("BRANCH: BUY CE")
-            if ce_active:
-                print("CE already active → SKIP")
-            elif not is_side_cooling("CE"):
-                symbol = get_symbol(ltp, sig, OTM_DISTANCE)
-                if symbol and symbol != "NA":
-                    res = execute_order(client, symbol, LOT_SIZE)
-                    if res["stat"] == "OK": set_side_cooling("CE")
+            dprint("BRANCH: BALANCE CE")
+            # ONLY BUY if CE is lower than PE, or both are zero
+            if ce_qty < pe_qty or (ce_qty == 0 and pe_qty == 0):
+                if not is_side_cooling("CE"):
+                    symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+                    if symbol and symbol != "NA":
+                        res = execute_order(client, symbol, LOT_SIZE)
+                        if res["stat"] == "OK": set_side_cooling("CE")
+            else:
+                dprint(f"SKIP: CE({ce_qty}) is already balanced with or > PE({pe_qty})", Fore.YELLOW)
 
         elif sig in ["ATMSELL", "OTMSELL"]:
-            dprint("BRANCH: BUY PE")
-            if pe_active:
-                print("PE already active → SKIP")
-            elif not is_side_cooling("PE"):
-                symbol = get_symbol(ltp, sig, OTM_DISTANCE)
-                if symbol and symbol != "NA":
-                    res = execute_order(client, symbol, LOT_SIZE)
-                    if res["stat"] == "OK": set_side_cooling("PE")
+            dprint("BRANCH: BALANCE PE")
+            # ONLY BUY if PE is lower than CE, or both are zero
+            if pe_qty < ce_qty or (ce_qty == 0 and pe_qty == 0):
+                if not is_side_cooling("PE"):
+                    symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+                    if symbol and symbol != "NA":
+                        res = execute_order(client, symbol, LOT_SIZE)
+                        if res["stat"] == "OK": set_side_cooling("PE")
+            else:
+                dprint(f"SKIP: PE({pe_qty}) is already balanced with or > CE({ce_qty})", Fore.YELLOW)
 
-        dprint("FETCHING FUNDS FOR SUMMARY...")
         funds = get_available_funds(client)
 
         print(f"""
