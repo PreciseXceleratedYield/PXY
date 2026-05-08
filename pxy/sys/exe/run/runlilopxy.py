@@ -6,9 +6,6 @@ from datetime import datetime
 from runclntpxy import get_session
 from runltpspxy import get_mid_price
 
-# =========================
-# ⚙️ CONFIGURATION
-# =========================
 MATCH_MODE = "PFO" 
 MEMORY_FILE = os.path.expanduser("~/pxy/pnl.json")
 
@@ -85,20 +82,23 @@ def process_lilo_orders(client):
                     b["qty"] -= mqty
                     if b["qty"] <= 0: buys.pop(0)
 
-            # --- CRITICAL FIX: Keeping original naming for downstream ---
+            # RESTORED ORIGINAL KEYS FOR DOWNSTREAM COMPATIBILITY
             for rem in buys:
                 if rem["qty"] > 0:
                     live_val = get_mid_price(client, token_id, ex_seg)
                     open_positions.append({
-                        "symbol": symbol,           # Dashboard needs 'symbol'
-                        "qty": rem["qty"],
-                        "pxy_entry": rem["prc"],    # Changed from 'prc' to 'pxy_entry'
-                        "sell_prc": live_val,      # Changed from 'live_val' to 'sell_prc'
-                        "pnl": int((live_val - rem["prc"]) * rem["qty"])
+                        "Symbol": symbol,
+                        "Qty": rem["qty"],
+                        "tok": token_id,
+                        "Buy_Time": rem["dt"],
+                        "Buy_Prc": rem["prc"],
+                        "Exit_Time": "OPEN",
+                        "Sell_Prc": live_val,
+                        "PNL": int((live_val - rem["prc"]) * rem["qty"])
                     })
 
         open_df = pd.DataFrame(open_positions)
-        total_unrealized = int(open_df["pnl"].sum()) if not open_df.empty else 0
+        total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0
         
         _print_summary(total_unrealized, banked_pnl)
         dump_to_json(banked_pnl, processed_ids)
@@ -112,5 +112,3 @@ def _print_summary(total_unrealized, total_realized):
     from colorama import Fore, Style
     color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED
     print(f"\n 🏃 {int(total_unrealized):+06d} 🔸 🥅 {color}{int(total_realized):+06d}{Style.RESET_ALL} 🥅\n")
-
-
