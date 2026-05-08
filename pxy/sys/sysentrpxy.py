@@ -7,10 +7,13 @@ from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 def get_entry_signal(df=None):
+    # --- CONFIG SWITCH ---
+    ALWAYSOTM = True  # Set to False to retain original ATM/OTM logic
+    
     # 1. Fetch Basic Signals (L4 Entry, L2 Trend Exit)
     entry_l4, exit_l2 = get_signal(df)
     entry_l4 = exit_l2
-    
+
     # 2. Fetch ST Signal (IST Anchored White Line Engine)
     st_trend, st_price = get_st_signal(df)
 
@@ -26,30 +29,33 @@ def get_entry_signal(df=None):
     # --- PHASE A: BULLISH MOMENTUM (ST is UP or BUY) ---
     if st_trend in ["BUY", "UP"]:
         if entry_l4 == "BUY":
-            final_signal = "ATMBUY"   # Upgrade to ATM in Trend
+            final_signal = "ATMBUY"  # Upgrade to ATM in Trend
         elif entry_l4 == "SELL":
-            final_signal = "OTMSELL"  # Stay OTM for Counter-trend
+            final_signal = "OTMSELL" # Stay OTM for Counter-trend
         else:
             final_signal = entry_l4   # Pass through BULL/BEAR etc.
 
     # --- PHASE B: BEARISH MOMENTUM (ST is SELL or DOWN) ---
     elif st_trend in ["SELL", "DOWN"]:
         if entry_l4 == "SELL":
-            final_signal = "ATMSELL"  # Upgrade to ATM in Trend
+            final_signal = "ATMSELL" # Upgrade to ATM in Trend
         elif entry_l4 == "BUY":
-            final_signal = "OTMBUY"   # Stay OTM for Counter-trend
+            final_signal = "OTMBUY"  # Stay OTM for Counter-trend
         else:
             final_signal = entry_l4   # Pass through BULL/BEAR etc.
 
     # --- PHASE C: NEUTRAL / SIDE ---
     else:
-        final_signal = entry_l4       # Pass through original signal if ST is neutral
+        final_signal = entry_l4 # Pass through original signal if ST is neutral
 
     # ==========================================
-    # 4. MORNING OVERRIDE (9:15 to 10:00)
+    # 4. OVERRIDE LOGIC (MORNING & ALWAYSOTM)
     # ==========================================
-    # Force OTM for Option Triggers, but leave BULL/BEAR as is
-    if time(9, 15) <= current_time < time(10, 00):
+    
+    # Check for Morning Window OR Global Switch
+    is_morning = time(9, 15) <= current_time < time(10, 00)
+    
+    if is_morning or ALWAYSOTM:
         if final_signal == "ATMBUY":
             final_signal = "OTMBUY"
         elif final_signal == "ATMSELL":
@@ -70,6 +76,7 @@ if __name__ == "__main__":
         entry, ex = get_entry_signal(df)
         print("-" * 36)
         print(f"FINAL RESULT >> ENTRY: {entry} | EXIT: {ex}")
+
 
 
 
