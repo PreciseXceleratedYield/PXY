@@ -1,4 +1,8 @@
 import pandas as pd
+from colorama import Fore, Style, init
+
+# Initialize colorama
+init(autoreset=True)
 
 def get_p_series(df):
     c, o, h, l = df['Close'], df['Open'], df['High'], df['Low']
@@ -9,30 +13,30 @@ def get_p_series(df):
 
 def get_bos_bar(df):
     try:
-        # Require 42 periods for the cumulative window
         if df is None or len(df) < 42:
-            return "▬" * 42, "0%"
+            return Fore.LIGHTBLACK_EX + "▬" * 42 + Style.RESET_ALL, "0%"
 
-        # 1. 42-Minute Cumulative Data
+        # 1. 42-Minute Cumulative High/Low
         window = df.iloc[-42:]
         hh = window['High'].max()
         ll = window['Low'].min()
+        curr_c = df.iloc[-1]['Close']
         
-        # 2. Determine "Body" vs "Wick" for the 42-min Candle
-        # We use the P-series to check if the current momentum is UP
+        # 2. Body vs Wick Logic (P-Master check)
         p_vals = get_p_series(df)
         is_up = p_vals.iloc[-1] > p_vals.iloc[-2]
         
-        # If UP (Green Body): █
-        # Otherwise (Wick/Straight Line): ▬
-        char = "█" if is_up else "▬"
-        visual_bar = char * 42
+        # 3. Create the Visual Bar with Colors
+        if is_up:
+            # Solid White Body
+            visual_bar = Style.BRIGHT + "█" * 42 + Style.RESET_ALL
+        else:
+            # Dim Grey Wick (The "Straight Line")
+            visual_bar = Style.DIM + Fore.WHITE + "▬" * 42 + Style.RESET_ALL
 
-        # 3. 1 to 99% Strength (Low to Close comparison over the 42-min range)
-        current_close = df.iloc[-1]['Close']
+        # 4. Strength % (Position of current Close within the 42-min HH/LL range)
         if hh != ll:
-            # Position of price within the 42-min total range
-            raw_val = round(((current_close - ll) / (hh - ll)) * 100)
+            raw_val = round(((curr_c - ll) / (hh - ll)) * 100)
         else:
             raw_val = 50
             
@@ -41,8 +45,7 @@ def get_bos_bar(df):
         return visual_bar, strength_pct
 
     except Exception:
-        return "▬" * 42, "ERR%"
-
+        return Style.DIM + "▬" * 42, "ERR%"
 
 
 
