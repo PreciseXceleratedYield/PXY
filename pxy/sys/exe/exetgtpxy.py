@@ -84,7 +84,7 @@ def target_price(row):
         # 7. SUPPRESSED DEBUG PRINT (Once per side)
         if side not in PRINTED_SIDES and side != "NA":
             color = Fore.CYAN if state == "🔥" else (Fore.BLUE if state == "❄️" else (Fore.MAGENTA if is_counter else Fore.YELLOW))
-            print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state}")
+            print(f"        {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state}")
             PRINTED_SIDES.add(side)
 
         return target
