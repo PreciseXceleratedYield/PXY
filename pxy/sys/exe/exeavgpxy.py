@@ -7,7 +7,7 @@ from colorama import Fore, Style
 # --- CONFIG ---
 REBUY_ENABLED = True
 COOL_DOWN_SECONDS = 300  # 5 Minutes
-SIDE_SWITCH = 2          # 2 = Both sides must hit -7%, 1 = Single side hit -7%
+SIDE_SWITCH = 1          # 2 = Both sides must hit -7%, 1 = Single side hit -7%
 LOSS_THRESHOLD = -7      # Threshold for triggering averaging
 
 def get_cooling_file(side):
