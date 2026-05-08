@@ -31,7 +31,7 @@ def target_price(row):
 
         # 2. BASE CALCULATION
         atr_val = f(row.get("atr"), 6.0)
-        BASE_SCORE = atr_val
+        BASE_SCORE = atr_val * 2
 
         # 3. SIGNAL & CONTEXT LOGIC
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
