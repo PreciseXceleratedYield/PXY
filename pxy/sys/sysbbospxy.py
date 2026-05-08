@@ -1,7 +1,4 @@
-from colorama import Fore, Style, init
 import pandas as pd
-
-init(autoreset=True)
 
 def get_p_series(df):
     c, o, h, l = df['Close'], df['Open'], df['High'], df['Low']
@@ -12,33 +9,37 @@ def get_p_series(df):
 
 def get_bos_bar(df):
     try:
+        # Check for minimum data
         if df is None or len(df) < 43:
-            return Fore.LIGHTBLACK_EX + " ﮩ٨ﮩ_WAIT_ﮩ٨ﮩ" + Style.RESET_ALL, "SIDE"
+            return "━" * 42, "0%"
 
-        # 1. P-Master Logic (42 candles)
+        # 1. P-Master Rolling Logic (42 candles)
         p_vals = get_p_series(df)
         is_up = p_vals > p_vals.shift(1)
         subset = is_up.iloc[-42:]
         
-        g_count = int(subset.sum())
-        r_count = int(len(subset) - g_count)
+        # 2. Visual Bar Construction (42 characters)
+        # Body (Up) = █, Wick (Otherwise) = ━
+        visual_bar = "".join(["█" if up else "━" for up in subset])
+
+        # 3. Strength Percentage (Low to Close Comparison)
+        latest = df.iloc[-1]
+        c, h, l = latest['Close'], latest['High'], latest['Low']
         
-        # 2. Dominant Percentage Calculation
-        if g_count >= r_count:
-            signal, color = "BULL", Fore.GREEN
-            strength_pct = round((g_count / 42) * 100)
+        if h != l:
+            # Position of Close relative to Low-High range
+            strength_val = round(((c - l) / (h - l)) * 100)
         else:
-            signal, color = "BEAR", Fore.RED
-            strength_pct = round((r_count / 42) * 100)
+            strength_val = 50
             
-        # 3. Final Banner Format: Only shows the relevant %
-        # Example: ﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ_ 76% BULL _٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩﮩ
-        banner = f"       {color}ﮩ٨ﮩ٨ـﮩ٨ـﮩﮩ٨ﮩ_{strength_pct}% {signal}_٨ـﮩ٨ـ٨ﮩ٨ـﮩﮩﮩﮩ{Style.RESET_ALL}"
-        
-        return banner, signal
+        # Clamp strictly between 1 and 99
+        strength_pct = f"{max(1, min(99, strength_val))}%"
+
+        # Returns only the visual bar and the percentage
+        return visual_bar, strength_pct
 
     except Exception:
-        return Fore.LIGHTBLACK_EX + " ﮩ٨ﮩ_ERR_ﮩ٨ﮩ" + Style.RESET_ALL, "SIDE"
+        return "━" * 42, "ERR%"
 
 
 
