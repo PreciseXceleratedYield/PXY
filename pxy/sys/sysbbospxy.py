@@ -9,35 +9,34 @@ def get_p_series(df):
 
 def get_bos_bar(df):
     try:
-        # Check if we have at least 42 periods for the rolling window
         if df is None or len(df) < 43:
-            return "━" * 42, "0%"
+            return "▬" * 42, "0%" # Using ▬ (Heavy Bar) to prevent gaps
 
-        # 1. 42-Minute Rolling Window (Each char is 1 candle)
+        # 1. Rolling 42-min window logic
         p_vals = get_p_series(df)
         is_up = p_vals > p_vals.shift(1)
-        subset = is_up.iloc[-42:] # Last 42 candles
+        subset = is_up.iloc[-42:]
         
-        # █ for bodies (up), ━ for wicks (down)
-        visual_bar = "".join(["█" if up else "━" for up in subset])
+        # 2. Character Mapping (No gaps)
+        # Body (Up) = █ (Full Block)
+        # Wick (Otherwise) = ▬ (Heavy Box Horizontal Bar)
+        visual_bar = "".join(["█" if up else "▬" for up in subset])
 
-        # 2. Low to Close Comparison (Present Candle)
+        # 3. Present Candle: Low to Close comparison (HH is high, LL is low)
         latest = df.iloc[-1]
         cur_c, hh, ll = latest['Close'], latest['High'], latest['Low']
         
         if hh != ll:
-            # How close is the present price to the bottom (LL)?
             raw_val = round(((cur_c - ll) / (hh - ll)) * 100)
         else:
-            raw_val = 50 # Neutral if no movement
+            raw_val = 50
             
-        # Strictly clamp 1 to 99
         strength_pct = f"{max(1, min(99, raw_val))}%"
 
         return visual_bar, strength_pct
 
     except Exception:
-        return "━" * 42, "ERR%"
+        return "▬" * 42, "ERR%"
 
 
 
