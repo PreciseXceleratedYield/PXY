@@ -6,9 +6,10 @@ from colorama import Fore, Style
 
 # --- CONFIG ---
 REBUY_ENABLED = True
-COOL_DOWN_SECONDS = 300 # 5 Minutes
-SIDE_SWITCH = 1 # 2 = Both sides must hit -7%, 1 = Single side hit -7%
-LOSS_THRESHOLD = -11 # Threshold for triggering averaging
+MAX_LAYERS = 3         # <--- NEW SWITCH: Set to 2, 3, 4 etc.
+COOL_DOWN_SECONDS = 300 
+SIDE_SWITCH = 1 
+LOSS_THRESHOLD = -11 
 
 def get_cooling_file(side):
     """Returns the filename for side-specific cooling."""
@@ -50,29 +51,22 @@ def handle_side_averaging(client, df):
     ist = pytz.timezone("Asia/Kolkata")
     now = datetime.now(ist).time()
 
-    # 9:30 AM to 3:00 PM IST Check
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,0)):
         return
 
-    # --- FIXED LINE BELOW ---
-    # We use .str twice: once to slice and once to uppercase
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper()
-    # -----------------------
 
     def get_loss(row):
         entry = float(row.get("pxy_entry", 0))
         ltp = float(row.get("sell_prc", 0))
         return ((ltp - entry) / entry) * 100 if entry > 0 else 0
 
-    # Separate Side Data
     ce_df = df[df['side'] == 'CE']
     pe_df = df[df['side'] == 'PE']
 
-    # Calculate status of latest positions
     ce_hit = not ce_df.empty and get_loss(ce_df.iloc[-1]) <= LOSS_THRESHOLD
     pe_hit = not pe_df.empty and get_loss(pe_df.iloc[-1]) <= LOSS_THRESHOLD
 
-    # Determine if trigger condition is met based on SIDE_SWITCH
     if SIDE_SWITCH == 2:
         trigger_allowed = ce_hit and pe_hit
     else:
@@ -81,24 +75,24 @@ def handle_side_averaging(client, df):
     if not trigger_allowed:
         return
 
-    # Execution Loop
     for side, side_df in [('CE', ce_df), ('PE', pe_df)]:
         if side_df.empty:
             continue
             
         count = len(side_df)
 
-        # Skip if side is profitable or already reached 3-layer limit or cooling
         if get_loss(side_df.iloc[-1]) > LOSS_THRESHOLD:
             continue
-        if count >= 3 or is_cooling(side):
+            
+        # UPDATED: Now uses the MAX_LAYERS switch
+        if count >= MAX_LAYERS or is_cooling(side):
             continue
 
         last_order = side_df.iloc[-1]
         symbol = last_order['symbol']
         qty = abs(int(last_order['qty']))
 
-        print(f"{Fore.YELLOW}📉 {side} Side Triggered (Switch {SIDE_SWITCH}). Latest loss <= {LOSS_THRESHOLD}%.")
+        print(f"{Fore.YELLOW}📉 {side} Side Triggered. Latest loss <= {LOSS_THRESHOLD}%.")
 
         try:
             params = {
@@ -117,7 +111,5 @@ def handle_side_averaging(client, df):
             print(f"{Fore.GREEN}{Style.BRIGHT}✅ SUCCESS: Layer {count+1} Added for {symbol}.")
         except Exception as e:
             print(f"{Fore.RED}❌ Rebuy Execution Failed: {e}")
-
-
 
 
