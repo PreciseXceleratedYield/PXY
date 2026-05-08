@@ -2,7 +2,7 @@
 from datetime import datetime, date, timedelta
 
 # ---------------- CONFIG ----------------
-STRIKE_STEP = 50
+STRIKE_STEP = 100
 
 # DAILY ATM BUFFER (you can change daily without touching logic)
 ATM_BUFFER = 0  
