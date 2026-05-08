@@ -1,8 +1,4 @@
 import pandas as pd
-from colorama import Fore, Style, init
-
-# Initialize colorama
-init(autoreset=True)
 
 def get_p_series(df):
     c, o, h, l = df['Close'], df['Open'], df['High'], df['Low']
@@ -14,38 +10,37 @@ def get_p_series(df):
 def get_bos_bar(df):
     try:
         if df is None or len(df) < 42:
-            return Fore.LIGHTBLACK_EX + "▬" * 42 + Style.RESET_ALL, "0%"
+            return "▬" * 42, "0%"
 
-        # 1. 42-Minute Cumulative High/Low
+        # 1. 42-Minute Cumulative Range
         window = df.iloc[-42:]
-        hh = window['High'].max()
-        ll = window['Low'].min()
+        hh, ll = window['High'].max(), window['Low'].min()
         curr_c = df.iloc[-1]['Close']
         
-        # 2. Body vs Wick Logic (P-Master check)
+        # 2. Momentum Check
         p_vals = get_p_series(df)
         is_up = p_vals.iloc[-1] > p_vals.iloc[-2]
         
-        # 3. Create the Visual Bar with Colors
+        # 3. ANSI Escape Codes for real color depth
+        # \033[38;5;255m = Pure White
+        # \033[38;5;242m = Distinct Medium-Dark Grey
+        # \033[0m = Reset
         if is_up:
-            # Solid White Body
-            visual_bar = Style.BRIGHT + "█" * 42 + Style.RESET_ALL
+            visual_bar = "\033[38;5;255m" + "█" * 42 + "\033[0m"
         else:
-            # Dim Grey Wick (The "Straight Line")
-            visual_bar = Style.DIM + Fore.WHITE + "▬" * 42 + Style.RESET_ALL
+            visual_bar = "\033[38;5;242m" + "▬" * 42 + "\033[0m"
 
-        # 4. Strength % (Position of current Close within the 42-min HH/LL range)
+        # 4. Strength % (1-99%)
         if hh != ll:
             raw_val = round(((curr_c - ll) / (hh - ll)) * 100)
+            strength_pct = f"{max(1, min(99, raw_val))}%"
         else:
-            raw_val = 50
-            
-        strength_pct = f"{max(1, min(99, raw_val))}%"
+            strength_pct = "50%"
 
         return visual_bar, strength_pct
 
     except Exception:
-        return Style.DIM + "▬" * 42, "ERR%"
+        return "\033[38;5;242m" + "▬" * 42 + "\033[0m", "ERR%"
 
 
 
