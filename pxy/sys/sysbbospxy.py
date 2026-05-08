@@ -9,29 +9,30 @@ def get_p_series(df):
 
 def get_bos_bar(df):
     try:
+        # Require 42 periods for the cumulative window
         if df is None or len(df) < 42:
             return "▬" * 42, "0%"
 
-        # 1. Cumulative OHLC for the 42-minute window
+        # 1. 42-Minute Cumulative Data
         window = df.iloc[-42:]
-        cumulative_open = window.iloc[0]['Open']
-        cumulative_close = window.iloc[-1]['Close']
         hh = window['High'].max()
         ll = window['Low'].min()
-
-        # 2. Body vs Wick Logic (Cumulative)
-        # If Current Close > 42-min Open = Green Body (█)
-        # If Current Close < 42-min Open = Red Wick (▬)
-        is_green = cumulative_close >= cumulative_open
-        char = "█" if is_green else "▬"
         
-        # Returns a solid 42-character block of that state
+        # 2. Determine "Body" vs "Wick" for the 42-min Candle
+        # We use the P-series to check if the current momentum is UP
+        p_vals = get_p_series(df)
+        is_up = p_vals.iloc[-1] > p_vals.iloc[-2]
+        
+        # If UP (Green Body): █
+        # Otherwise (Wick/Straight Line): ▬
+        char = "█" if is_up else "▬"
         visual_bar = char * 42
 
         # 3. 1 to 99% Strength (Low to Close comparison over the 42-min range)
+        current_close = df.iloc[-1]['Close']
         if hh != ll:
-            # Where is the current price relative to the 42-min Low and High?
-            raw_val = round(((cumulative_close - ll) / (hh - ll)) * 100)
+            # Position of price within the 42-min total range
+            raw_val = round(((current_close - ll) / (hh - ll)) * 100)
         else:
             raw_val = 50
             
@@ -41,6 +42,7 @@ def get_bos_bar(df):
 
     except Exception:
         return "▬" * 42, "ERR%"
+
 
 
 
