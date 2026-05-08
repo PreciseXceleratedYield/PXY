@@ -25,11 +25,10 @@ def target_price(row):
         if entry_prc <= 0:
             return 0
 
-        # 2. BASE CALCULATION (ATR/3)
-        # ATR floor of 6 ensures BASE_SCORE is always at least 2.0%
+        # 2. BASE CALCULATION
         atr_val = f(row.get("atr"), 6.0)
-        BASE_SCORE = atr_val 
-        
+        BASE_SCORE = atr_val
+
         # 3. SIGNAL & CONTEXT LOGIC
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
         is_ce, is_pe = "CE" in symbol, "PE" in symbol
@@ -47,37 +46,34 @@ def target_price(row):
 
         # 5. FINAL PERCENTAGE SCORE CALCULATION
         state = "⏳"
-        final_pct_score = BASE_SCORE # Default fallback (ATR/3)
-        
+        final_pct_score = BASE_SCORE
         bullish_triggers = ["BUY", "BULL", "OTMBUY", "ATMBUY"]
         bearish_triggers = ["SELL", "BEAR", "OTMSELL", "ATMSELL"]
 
-        # Calculate Fire (🔥) Percentage if aligned
         if is_ce:
             if any(t in active_signal for t in bullish_triggers):
-                calc = (atr_val  * ce_f * ce_p) + hce_d
+                calc = (atr_val * ce_f * ce_p) + hce_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
         elif is_pe:
             if any(t in active_signal for t in bearish_triggers):
-                calc = (atr_val * pe_f * pe_p)  + hpe_d
+                calc = (atr_val * pe_f * pe_p) + hpe_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
 
-        # 8. MAX CAP LOGIC (99%)
-        # Ensure the percentage added never exceeds 99%
+        # 8. MAX CAP LOGIC
         if final_pct_score > 99.0:
             final_pct_score = 99.0
 
-        # 6. FINAL OUTPUT (Score as Percentage Add)
+        # 6. FINAL OUTPUT
         add_value = entry_prc * (final_pct_score / 100.0)
         target = int(entry_prc + add_value)
 
-        # 7. DEBUG PRINT
+        # 7. UPDATED DEBUG PRINT
+        # Replaced SIG:{active_signal} with the calculated % score
         color = Fore.CYAN if state == "🔥" else (Fore.MAGENTA if is_counter else Fore.YELLOW)
-        print(f"        {color}{clean_symbol} | SIG:{active_signal} | ST:{state}")
+        print(f" {color}{clean_symbol} | {final_pct_score:.1f}% | ST:{state}")
 
         return target
     except Exception:
         return 0
-
 
 
