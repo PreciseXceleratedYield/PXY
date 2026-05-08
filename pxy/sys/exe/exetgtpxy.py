@@ -57,7 +57,7 @@ def target_price(row):
 
         if is_ce:
             if any(t in active_signal for t in bullish_triggers):
-                calc = (atr_val * ce_f * ce_p) + hce_d
+                calc = ((atr_val * ce_f * ce_p) + hce_d) / hce_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
             elif any(t in active_signal for t in bearish_triggers):
                 # Opposing Signal: Half the score
@@ -66,7 +66,7 @@ def target_price(row):
         
         elif is_pe:
             if any(t in active_signal for t in bearish_triggers):
-                calc = (atr_val * pe_f * pe_p) + hpe_d
+                calc = ((atr_val * pe_f * pe_p) + hpe_d) / hpe_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
             elif any(t in active_signal for t in bullish_triggers):
                 # Opposing Signal: Half the score
