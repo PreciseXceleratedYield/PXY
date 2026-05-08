@@ -11,10 +11,9 @@ from runltpspxy import get_mid_price
 # =========================
 MATCH_MODE = "PFO" 
 PNL_FILE = os.path.expanduser("~/pxy/pnl.json")
-META_FILE = os.path.expanduser("~/pxy/pnl_meta.json")
 
 def rotate_daily_file():
-    """Archives files at market open to start fresh daily."""
+    """Archives pnl.json at market open to start fresh daily."""
     try:
         if not os.path.exists(PNL_FILE): return
         now = datetime.now()
@@ -22,56 +21,47 @@ def rotate_daily_file():
         mtime = datetime.fromtimestamp(os.path.getmtime(PNL_FILE))
         if now >= market_open and mtime < market_open:
             date_str = mtime.strftime("%Y-%m-%d")
-            for f in [PNL_FILE, META_FILE]:
-                if os.path.exists(f):
-                    os.rename(f, f.replace(".json", f"_{date_str}.json"))
+            os.rename(PNL_FILE, PNL_FILE.replace(".json", f"_{date_str}.json"))
     except: pass
 
-def dump_data(closed_df, banked_pnl, processed_ids):
-    """Cumulative dump to pnl.json to keep dashboard data intact."""
+def dump_to_pnl_json(new_matches):
+    """Strictly places all coded/matched trades into pnl.json."""
     try:
-        # 1. Load History
-        all_trades = []
+        history = []
         if os.path.exists(PNL_FILE):
-            try:
-                with open(PNL_FILE, "r") as f:
-                    all_trades = json.load(f)
-                    if not isinstance(all_trades, list): all_trades = []
-            except: all_trades = []
+            with open(PNL_FILE, "r") as f:
+                try:
+                    history = json.load(f)
+                except: history = []
 
-        # 2. Append New Matches
-        if not closed_df.empty:
-            records = closed_df.copy()
+        if not new_matches.empty:
+            records = new_matches.copy()
+            # Formatting for JSON compatibility
             for col in records.columns:
                 if pd.api.types.is_datetime64_any_dtype(records[col]):
                     records[col] = records[col].dt.strftime('%Y-%m-%d %H:%M:%S')
-            new_trades = records.to_dict(orient='records')
-            all_trades.extend(new_trades)
-        
-        # 3. Save History
-        with open(PNL_FILE, "w") as f:
-            json.dump(all_trades, f, indent=4)
+            
+            new_list = records.to_dict(orient='records')
+            history.extend(new_list)
 
-        # 4. Save Internal Logic State
-        meta_data = {
-            "banked_pnl": int(banked_pnl),
-            "processed_ids": list(processed_ids)
-        }
-        with open(META_FILE, "w") as f:
-            json.dump(meta_data, f, indent=4)
-    except: pass
+        with open(PNL_FILE, "w") as f:
+            json.dump(history, f, indent=4)
+    except Exception as e:
+        print(f"[JSON ERR]: {e}")
 
 def process_lilo_orders(client):
     try:
         rotate_daily_file()
         
-        # Load internal state
-        banked_pnl, processed_ids = 0, set()
-        if os.path.exists(META_FILE):
-            with open(META_FILE, "r") as f:
-                meta = json.load(f)
-                banked_pnl = meta.get("banked_pnl", 0)
-                processed_ids = set(meta.get("processed_ids", []))
+        # Load processed IDs from existing PNL file to avoid double-entry
+        processed_ids = set()
+        if os.path.exists(PNL_FILE):
+            with open(PNL_FILE, "r") as f:
+                try:
+                    for trade in json.load(f):
+                        if "buy_id" in trade: processed_ids.add(trade["buy_id"])
+                        if "sell_id" in trade: processed_ids.add(trade["sell_id"])
+                except: pass
 
         res = client.order_report()
         if not res or "data" not in res: return pd.DataFrame(), pd.DataFrame()
@@ -81,7 +71,6 @@ def process_lilo_orders(client):
         df = df[~df["nOrdNo"].isin(processed_ids)].copy()
         
         if df.empty:
-            _print_summary(0, banked_pnl)
             return pd.DataFrame(), pd.DataFrame()
 
         df["qty"] = pd.to_numeric(df["fldQty"]).fillna(0)
@@ -100,21 +89,21 @@ def process_lilo_orders(client):
 
             for s in sells:
                 while s["qty"] > 0 and buys:
-                    # ENGINE: Profit First Out
-                    buys.sort(key=lambda x: (s["prc"] - x["prc"]), reverse=True)
+                    if MATCH_MODE == "PFO":
+                        buys.sort(key=lambda x: (s["prc"] - x["prc"]), reverse=True)
                     
                     b = buys[0]
                     mqty = min(s["qty"], b["qty"])
-                    pnl_val = int((s["prc"] - b["prc"]) * mqty)
-                    
-                    if pnl_val > 0: banked_pnl += pnl_val
-                    processed_ids.add(s["nOrdNo"])
-                    processed_ids.add(b["nOrdNo"])
                     
                     closed_matches.append({
-                        "Symbol": symbol, "Qty": mqty, "tok": token_id,
-                        "Buy_Prc": b["prc"], "Sell_Prc": s["prc"], 
-                        "Exit_Time": s["dt"], "PNL": pnl_val
+                        "Symbol": symbol,
+                        "Qty": mqty,
+                        "Buy_Prc": b["prc"],
+                        "Sell_Prc": s["prc"],
+                        "PNL": int((s["prc"] - b["prc"]) * mqty),
+                        "Exit_Time": s["dt"],
+                        "buy_id": b["nOrdNo"], # Stored to prevent re-processing
+                        "sell_id": s["nOrdNo"]
                     })
                     
                     s["qty"] -= mqty
@@ -125,32 +114,25 @@ def process_lilo_orders(client):
                 if rem["qty"] > 0:
                     live_val = get_mid_price(client, token_id, ex_seg)
                     open_positions.append({
-                        "Symbol": symbol, "Qty": rem["qty"], "tok": token_id,
-                        "Buy_Prc": rem["prc"], "Sell_Prc": live_val,
-                        "Exit_Time": "OPEN", "PNL": int((live_val - rem["prc"]) * rem["qty"])
+                        "Symbol": symbol, "Qty": rem["qty"], "Buy_Prc": rem["prc"],
+                        "Sell_Prc": live_val, "PNL": int((live_val - rem["prc"]) * rem["qty"])
                     })
 
-        open_df = pd.DataFrame(open_positions)
         closed_df = pd.DataFrame(closed_matches)
+        open_df = pd.DataFrame(open_positions)
+
+        # 💾 SAVE ALL CODED TRADES
+        dump_to_pnl_json(closed_df)
         
-        total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0
-        _print_summary(total_unrealized, banked_pnl)
-        
-        dump_data(closed_df, banked_pnl, processed_ids)
         return open_df, closed_df
         
     except Exception as e:
         print(f"[LILO ERROR]: {e}")
         return pd.DataFrame(), pd.DataFrame()
 
-def _print_summary(total_unrealized, total_realized):
-    from colorama import Fore, Style, init
-    init(autoreset=True)
-    color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED
-    print(f"\n 🏃 {int(total_unrealized):+06d} 🔸 🥅 {color}{int(total_realized):+06d}{Style.RESET_ALL} 🥅\n")
-
 if __name__ == "__main__":
     client = get_session()
     process_lilo_orders(client)
+
 
 
