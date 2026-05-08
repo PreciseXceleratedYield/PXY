@@ -179,11 +179,11 @@ async def main():
 
         print(f"""
  =====================================
- 💰 Cash   : {int(funds)}
- 📦 Pos    : {pos_raw}
- 🎫 Symbol : {symbol}
- 🎯 Signal : {entry_signal}
- 📌 Status : {res.get('stat')}
+     💰 Cash   : {int(funds)}
+     📦 Pos    : {pos_raw}
+     🎫 Symbol : {symbol}
+     🎯 Signal : {entry_signal}
+     📌 Status : {res.get('stat')}
  =====================================
  """)
         dprint("===== MAIN END =====", Fore.GREEN)
