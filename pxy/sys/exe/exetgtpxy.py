@@ -28,7 +28,7 @@ def target_price(row):
         # 2. BASE CALCULATION (ATR/3)
         # ATR floor of 6 ensures BASE_SCORE is always at least 2.0%
         atr_val = f(row.get("atr"), 6.0)
-        BASE_SCORE = atr_val / 3
+        BASE_SCORE = atr_val 
         
         # 3. SIGNAL & CONTEXT LOGIC
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
@@ -55,11 +55,11 @@ def target_price(row):
         # Calculate Fire (🔥) Percentage if aligned
         if is_ce:
             if any(t in active_signal for t in bullish_triggers):
-                calc = (atr_val / hce_d * ce_f * ce_p)
+                calc = (atr_val  * ce_f * ce_p) + hce_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
         elif is_pe:
             if any(t in active_signal for t in bearish_triggers):
-                calc = (atr_val / hpe_d * pe_f * pe_p)
+                calc = (atr_val * pe_f * pe_p)  + hpe_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
 
         # 8. MAX CAP LOGIC (99%)
