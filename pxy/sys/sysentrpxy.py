@@ -2,17 +2,19 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 
-def get_entry_signal():
+def get_entry_signal(df=None):
     """
-    Fetches NIFTY 50 data and returns the current Entry and Exit status.
-    V5 logic with V2 Taxation + Dynamic ATR-based 3/7 targets.
+    V5 Logic with V2 Taxation. 
+    Accepts df from dashboard or fetches ^NSEI if df is None.
     """
-    ticker_symbol = "^NSEI"
-    
     try:
-        df = yf.download(ticker_symbol, period='5d', interval='1m', progress=False)
-        if df.empty or len(df) < 210:
+        if df is None:
+            df = yf.download("^NSEI", period='5d', interval='1m', progress=False)
+        
+        if df is None or df.empty or len(df) < 210:
             return "NONE", "NONE"
+            
+        # Standardise yfinance columns
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
             
@@ -24,7 +26,7 @@ def get_entry_signal():
         return "NONE", "NONE"
 
     # ==========================================
-    # 1. TREND & DYNAMIC TARGET CALCULATIONS
+    # 1. TREND & DYNAMIC TARGETS
     # ==========================================
     df['sma200'] = close_ser.rolling(window=200).mean()
     
@@ -37,12 +39,11 @@ def get_entry_signal():
     df['atr'] = tr.rolling(window=14).mean()
     df['smoothed_atr'] = df['atr'].rolling(window=14).mean()
 
-    # Dynamic Requirements (ATR/3 and Full ATR)
-    # Target counts scale with volatility, minimum 3 and 7
-    df['trend_target'] = (df['smoothed_atr'] / 3).fillna(3).round().clip(lower=3).astype(int)
-    df['counter_target'] = df['smoothed_atr'].fillna(7).round().clip(lower=7).astype(int)
+    # Dynamic Targets (Min 3 and 7)
+    df['t_req'] = (df['smoothed_atr'] / 3).fillna(3).round().clip(lower=3).astype(int)
+    df['c_req'] = df['smoothed_atr'].fillna(7).round().clip(lower=7).astype(int)
 
-    # P-Master Dots System
+    # P-Master Dots
     df['ohlc4'] = (open_ser + high_ser + low_ser + close_ser) / 4
     df['p_price'] = ((close_ser + (close_ser + close_ser.shift(1))/2 + (close_ser + open_ser)/2 + df['ohlc4']) / 4).round(4)
     df['p_change'] = df['p_price'].diff()
@@ -68,7 +69,14 @@ def get_entry_signal():
         green_counts[i], red_counts[i] = g, r
 
     # ==========================================
-    # 3. ENTRY LOGIC (Closed Bar: -2)
+    # 3. EXIT LOGIC (Live Bar: -1)
+    # ==========================================
+    p0 = df['p_price'].iloc[-1]
+    p1 = df['p_price'].iloc[-2]
+    exit_sig = "BULL" if p0 > p1 else "BEAR"
+
+    # ==========================================
+    # 4. ENTRY LOGIC (Closed Bar: -2)
     # ==========================================
     idx = -2
     dyn_len = int(max(10, round(df['smoothed_atr'].iloc[idx])))
@@ -80,32 +88,20 @@ def get_entry_signal():
     flippedG = (p_change_vals[idx] >= 0) and (p_change_vals[idx-1] < 0)
     flippedR = (p_change_vals[idx] < 0) and (p_change_vals[idx-1] >= 0)
     
-    # Check counts from previous bar against Dynamic Targets
     pR, pG = red_counts[idx-1], green_counts[idx-1]
-    t_req = df['trend_target'].iloc[idx]
-    c_req = df['counter_target'].iloc[idx]
+    t_target, c_target = df['t_req'].iloc[idx], df['c_req'].iloc[idx]
 
     entry = "NONE"
-    if isBull and t_req <= pR < c_req and flippedG:
+    if isBull and t_target <= pR < c_target and flippedG:
         entry = "OTMBUY"
-    elif isBear and t_req <= pG < c_req and flippedR:
+    elif isBear and t_target <= pG < c_target and flippedR:
         entry = "OTMSELL"
-    elif isBear and pR >= c_req and flippedG:
+    elif isBear and pR >= c_target and flippedG:
         entry = "ATMBUY"
-    elif isBull and pG >= c_req and flippedR:
+    elif isBull and pG >= c_target and flippedR:
         entry = "ATMSELL"
-
-    # ==========================================
-    # 4. EXIT LOGIC (Live Bar: -1)
-    # ==========================================
-    p0 = round(((close_ser.iloc[-1] + (close_ser.iloc[-2] + close_ser.iloc[-1])/2 + (close_ser.iloc[-1] + open_ser.iloc[-1])/2 + df['ohlc4'].iloc[-1]) / 4), 4)
-    p1 = df['p_price'].iloc[-2]
-    
-    exit_sig = "BULL" if p0 > p1 else "BEAR"
-    
-    # Sync Entry to Exit if no specific V5 signal
-    if entry == "NONE":
-        entry = exit_sig
+    else:
+        entry = exit_sig # Fallback to trend
 
     return entry, exit_sig
 
