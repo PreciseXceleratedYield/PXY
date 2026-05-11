@@ -57,9 +57,9 @@ def get_entry_signal(df=None):
         if now_ist < dt_time(9, 17):
             entry = "MORNING"
         elif c1 <= tsma1 and c0 > tsma0:
-            entry = "BUY"  # Bullish Crossover
+            entry = "ATMBUY"  # Bullish Crossover
         elif c1 >= tsma1 and c0 < tsma0:
-            entry = "SELL" # Bearish Crossover
+            entry = "ATMSELL" # Bearish Crossover
         else:
             # If no crossover, copy the P-Master Exit Signal
             entry = exit_sig
