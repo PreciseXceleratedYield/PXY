@@ -62,7 +62,7 @@ def get_signal(df=None):
     elif p0 < p1: exit_sig = "SELL" if r_l_pivot else "BEAR"
 
     # The print statement you requested
-    print(f"[SIGNAL] Entry(TSMA): {entry} | Exit(PM): {exit_sig} | C:{c0:.2f}")
+    #print(f"[SIGNAL] Entry(TSMA): {entry} | Exit(PM): {exit_sig} | C:{c0:.2f}")
 
     return entry, exit_sig
 
