@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
-from sysentrpxy import calculate_supertrend 
+from sysstrndpxy import calculate_supertrend 
 
 def calc_tsma_np(series, window=7):
     """Pure NumPy Linear Regression (TSMA)"""
