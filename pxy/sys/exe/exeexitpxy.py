@@ -68,7 +68,7 @@ def run_snapshot():
     IST = pytz.timezone("Asia/Kolkata")
     now = datetime.now(IST).time()
 
-    if dt_time(15, 19) <= now < dt_time(15, 30):
+    if dt_time(15, 23) <= now < dt_time(15, 30):
         try:
             exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exesqrpxy.py")
             if os.path.exists(exe_path):
