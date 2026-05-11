@@ -126,7 +126,7 @@ async def main():
 
         try:
             supertrend = str(data.get("supertrend", "")).upper().strip()
-            OTM_DISTANCE = 200
+            OTM_DISTANCE = 100
         except: OTM_DISTANCE = 100
 
         exit_sig = str(reversal).upper().strip() if reversal else "NONE"
