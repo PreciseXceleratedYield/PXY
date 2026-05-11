@@ -12,7 +12,6 @@ def get_entry_signal(df=None):
     
     # 1. Fetch Basic Signals (L4 Entry, L2 Trend Exit)
     entry_l4, exit_l2 = get_signal(df)
-    entry_l4 = exit_l2
 
     # 2. Fetch ST Signal (IST Anchored White Line Engine)
     st_trend, st_price = get_st_signal(df)
@@ -48,18 +47,6 @@ def get_entry_signal(df=None):
     else:
         final_signal = entry_l4 # Pass through original signal if ST is neutral
 
-    # ==========================================
-    # 4. OVERRIDE LOGIC (MORNING & ALWAYSOTM)
-    # ==========================================
-    
-    # Check for Morning Window OR Global Switch
-    is_morning = time(9, 15) <= current_time < time(10, 00)
-    
-    if is_morning or ALWAYSOTM:
-        if final_signal == "ATMBUY":
-            final_signal = "OTMBUY"
-        elif final_signal == "ATMSELL":
-            final_signal = "OTMSELL"
 
     # Reporting
     if final_signal in ["BULL", "BEAR", "NONE"]:
