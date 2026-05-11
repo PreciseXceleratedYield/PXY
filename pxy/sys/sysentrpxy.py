@@ -8,22 +8,24 @@ VERBOSE = True
 
 def get_entry_signal(df=None):
     try:
-        # 1. FETCH DATA - Using Ticker.history for better reliability
+        ist = pytz.timezone("Asia/Kolkata")
+        now_ist = datetime.now(ist).time()
+
+        # 1. FETCH DATA - 7d period is required on Mondays to bridge the weekend
         if df is None:
-            ticker = yf.Ticker("^NSEI")
-            # 1m data is limited to last 7 days. This ensures we pull Friday's data on Monday.
-            df = ticker.history(period="7d", interval="1m")
+            # interval='1m' is limited to the last 7 days of history
+            df = yf.download("^NSEI", period='7d', interval='1m', progress=False)
         
-        # Reduced stable threshold to 15 to allow early morning trading
-        if df is None or df.empty or len(df) < 15:
-            if VERBOSE: print(f"[DEBUG] Found {len(df)} bars. Market just opened or data delay.")
+        # Threshold: We need at least 2 bars for exit_sig (p0 vs p1). 
+        # Session trend is more stable with 15+ bars.
+        if df is None or df.empty or len(df) < 2:
+            if VERBOSE: print(f"[DEBUG] Critical Data Failure. Bars: {len(df) if df is not None else 0}")
             return "NONE", "NONE"
 
-        # Standardise columns (history() returns different format than download())
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
         df = df.copy()
-        if 'Close' not in df.columns and 'close' in df.columns:
-            df.rename(columns={'open':'Open','high':'High','low':'Low','close':'Close'}, inplace=True)
-            
+
         # ==========================================
         # 2. SESSION DATA (Zero Lag Trend)
         # ==========================================
@@ -46,7 +48,7 @@ def get_entry_signal(df=None):
         is_bull_trend = line2 > line1
 
         # ==========================================
-        # 3. P-MASTER & V2 TAXATION
+        # 3. P-MASTER DOTS & V2 TAXATION
         # ==========================================
         df['ohlc4'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
         df['p_price'] = ((df['Close'] + (df['Close'] + df['Close'].shift(1).fillna(df['Close']))/2 + 
@@ -68,14 +70,11 @@ def get_entry_signal(df=None):
             g_counts[i], r_counts[i] = g, r
 
         # ==========================================
-        # 4. ENTRY/EXIT SIGNAL
+        # 4. EXIT & ENTRY LOGIC
         # ==========================================
         p0, p1 = df['p_price'].iloc[-1], df['p_price'].iloc[-2]
         exit_sig = "BULL" if p0 > p1 else "BEAR"
 
-        ist = pytz.timezone("Asia/Kolkata")
-        now_ist = datetime.now(ist).time()
-        
         idx = -1
         fG = (p_change[idx] >= 0) and (p_change[idx-1] < 0)
         fR = (p_change[idx] < 0) and (p_change[idx-1] >= 0)
@@ -83,8 +82,9 @@ def get_entry_signal(df=None):
         
         if VERBOSE:
             bias = "S-B" if is_bull_trend[idx] else "S-S"
-            print(f"[{datetime.now(ist).strftime('%H:%M')}] Bars: {len(df)} | Bias: {bias} | R:{int(pR)} G:{int(pG)}")
+            print(f"[{datetime.now(ist).strftime('%H:%M:%S')}] Bars: {len(df)} | Bias: {bias} | R:{int(pR)} G:{int(pG)} | P0:{p0:.2f}")
 
+        # Morning Rule: Force MORNING for Entry but keep Exit valid
         if now_ist < dt_time(9, 17):
             entry = "MORNING"
         else:
@@ -97,7 +97,6 @@ def get_entry_signal(df=None):
         return entry, exit_sig
 
     except Exception as e:
-        if VERBOSE: print(f"[ERR] {e}")
+        if VERBOSE: print(f"[CRITICAL] {e}")
         return "NONE", "NONE"
-
 
