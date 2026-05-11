@@ -38,8 +38,8 @@ def get_entry_signal(df=None):
         curr_close = df['Close'].iloc[-1]
 
         # LIVE DYNAMIC LINES (Pine Logic)
-        line_g = (curr_close + (roll_h + rounded_atr)) / 2
-        line_r = (curr_close + (roll_l - rounded_atr)) / 2
+        line_g = (curr_close + (roll_h + (rounded_atr/2))) / 2
+        line_r = (curr_close + (roll_l - (rounded_atr/2))) / 2
 
         # 3. P-MASTER (Exit Logic)
         df['ohlc4'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
