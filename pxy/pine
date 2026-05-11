@@ -1,75 +1,63 @@
-//@version=5
-indicator("PXY®", overlay=true)
+//@version=6
+indicator("PXY® - TSMA + Anchored Black Line", overlay=true)
 
 // ==========================================
-// 1. SESSION & BAR TRACKING
+// 1. BLACK LINE LOGIC (SuperTrend)
 // ==========================================
-isNewDay = ta.change(time("D")) != 0
-var int barCount = 0
-barCount := isNewDay ? 1 : barCount + 1
+is_new_day = ta.change(time("D")) != 0
+var float anchor = na
+var int bar_cnt = 0
+var float session_sum = 0.0
 
-// Time Milestones
-isPost930 = barCount > 15
-isPost1000 = barCount > 45
-
-// ==========================================
-// 2. COMPONENTS (Python-Style No-Volume)
-// ==========================================
-var float firstBarAnchor = na
-if isNewDay
-    firstBarAnchor := close > open ? high : low
-
-// Session Price Mean
-var float runningSum = 0.0
-runningSum := isNewDay ? close : runningSum + close
-sessionPriceMean = runningSum / barCount
-
-// Dynamic 50 SMA
-dynamicSMALen = math.min(barCount, 50)
-sessionSMA = ta.sma(close, dynamicSMALen)
-
-// Final Target Average
-pythonHybrid = (sessionSMA + sessionPriceMean) / 2
-
-// ==========================================
-// 3. THE NO-JUMP BLACK LINE LOGIC
-// ==========================================
-float blackLine = na
-if barCount <= 15
-    blackLine := firstBarAnchor
-else if barCount > 15 and barCount <= 45
-    float blendFactor = (barCount - 15) / 30.0
-    blackLine := (firstBarAnchor * (1 - blendFactor)) + (pythonHybrid * blendFactor)
+// Reset bar count and set anchor at 09:15
+if is_new_day
+    bar_cnt := 1
+    session_sum := close
+    anchor := close > open ? high : low
 else
-    blackLine := pythonHybrid
+    bar_cnt += 1
+    session_sum += close
 
-// ==========================================
-// 4. P-MASTER DOTS (FIXED COLOR LOGIC)
-// ==========================================
-p_price = math.round((close + (close + nz(close[1], close))/2 + (close + open)/2 + ohlc4)/4, 4)
+// Calculate Hybrid Components
+session_mean = session_sum / bar_cnt
+sma_50 = ta.sma(close, 50)
+python_hybrid = (session_mean + sma_50) / 2
 
-// Check change vs previous bar
-p_change = p_price - nz(p_price[1], p_price)
+// Blend Factor (Bar 15 to 45)
+blend = math.max(0, math.min(1, (bar_cnt - 15) / 30.0))
 
-color pDotColor = color.gray
-if isNewDay
-    // Force first dot color based on 9:15 candle
-    pDotColor := close > open ? #00FF00 : #FF0000
+// The Black Line (ST)
+float black_line = na
+if bar_cnt <= 15
+    black_line := anchor
+else if bar_cnt <= 45
+    black_line := (anchor * (1 - blend)) + (python_hybrid * blend)
 else
-    // Green if rising, Red if falling
-    pDotColor := p_change > 0 ? #00FF00 : p_change < 0 ? #FF0000 : #808080
+    black_line := python_hybrid
+
+plot(black_line, "Black Line (ST)", color=color.black, linewidth=2)
 
 // ==========================================
-// 5. PLOTTING
+// 2. TSMA LOGIC (7-Period)
 // ==========================================
-// Main Black Line
-plot(blackLine, "Black Line", color.black, 3)
+tsma_price = ta.linreg(close, 10, 0)
+plot(tsma_price, "7-TSMA", color=color.gray, linewidth=2)
 
-// The Bull/Bear Dots (Force visible colors)
-plot(p_price, "P-Dots", pDotColor, 3, plot.style_circles)
+// ==========================================
+// 3. SIGNALS & COLORS
+// ==========================================
+isBuy  = ta.crossover(close, tsma_price)
+isSell = ta.crossunder(close, tsma_price)
+isBull = close > tsma_price
+isBear = close < tsma_price
 
-// Visual Zones
-bgcolor(barCount <= 15 ? color.new(color.gray, 92) : (barCount <= 45 ? color.new(color.blue, 96) : na))
+// Shapes for B/S
+plotshape(isBuy, "B", shape.labelup, location.belowbar, color.green, text="B", textcolor=color.white, size=size.small)
+plotshape(isSell, "S", shape.labeldown, location.abovebar, color.maroon, text="S", textcolor=color.white, size=size.small)
+
+// Bar Coloring
+barcolor(isBuy ? color.green : isSell ? color.maroon : isBull ? color.new(color.green, 50) : isBear ? color.new(color.maroon, 50) : na)
+
 
 
 
