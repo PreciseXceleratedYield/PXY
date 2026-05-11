@@ -9,7 +9,7 @@ REBUY_ENABLED = True
 MAX_LAYERS = 2         # <--- NEW SWITCH: Set to 2, 3, 4 etc.
 COOL_DOWN_SECONDS = 300 
 SIDE_SWITCH = 1 
-LOSS_THRESHOLD = -7
+LOSS_THRESHOLD = -14
 
 def get_cooling_file(side):
     """Returns the filename for side-specific cooling."""
