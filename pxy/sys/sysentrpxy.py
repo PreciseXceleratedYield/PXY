@@ -1,15 +1,24 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import pytz
+from datetime import datetime, time as dt_time
 
 def get_entry_signal(df=None):
     """
     V5 Logic with V2 Taxation. 
-    Synced for RUNNING BARS to match Pine Script real-time actions.
+    Synced for RUNNING BARS with 9:17 AM Morning Rule.
     """
     try:
+        # 1. TIME CHECK (Morning Rule)
+        ist = pytz.timezone("Asia/Kolkata")
+        now_ist = datetime.now(ist).time()
+        
+        if now_ist < dt_time(9, 17):
+            return "MORNING", "NONE"
+
+        # 2. FETCH DATA
         if df is None:
-            # Using 2m interval or 1m; '2d' period is enough for session data
             df = yf.download("^NSEI", period='2d', interval='1m', progress=False)
         
         if df is None or df.empty or len(df) < 20:
@@ -21,7 +30,7 @@ def get_entry_signal(df=None):
         df = df.copy()
 
         # ==========================================
-        # 1. SESSION DATA (Zero Lag Trend)
+        # 3. SESSION DATA (Zero Lag Trend)
         # ==========================================
         df.index = pd.to_datetime(df.index)
         is_new_day = df.index.date != np.roll(df.index.date, 1)
@@ -43,15 +52,13 @@ def get_entry_signal(df=None):
         is_bear_trend = line2 < line1
 
         # ==========================================
-        # 2. P-MASTER & V2 TAXATION
+        # 4. P-MASTER & V2 TAXATION
         # ==========================================
         df['ohlc4'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
-        # Calculate p_price including the running live close
         df['p_price'] = ((df['Close'] + (df['Close'] + df['Close'].shift(1).fillna(df['Close']))/2 + 
                          (df['Close'] + df['Open'])/2 + df['ohlc4']) / 4).round(4)
         
         p_change_vals = df['p_price'].diff().fillna(0).values
-        
         green_counts = np.zeros(len(df))
         red_counts = np.zeros(len(df))
         
@@ -69,35 +76,31 @@ def get_entry_signal(df=None):
             green_counts[i], red_counts[i] = g, r
 
         # ==========================================
-        # 3. EXIT LOGIC (Original Code)
+        # 5. EXIT LOGIC (Original Code)
         # ==========================================
         p0 = df['p_price'].iloc[-1]
         p1 = df['p_price'].iloc[-2]
         exit_sig = "BULL" if p0 > p1 else "BEAR"
 
         # ==========================================
-        # 4. ENTRY LOGIC (Running Action Sync)
+        # 6. ENTRY LOGIC (Synced Action)
         # ==========================================
-        # In Pine: isTB = isBullTrend and prevRedCount >= 3 ... and flippedGreen
-        # 'prev' in a running bar loop means the value from the previous index
         idx = -1
         flippedGreen = (p_change_vals[idx] >= 0) and (p_change_vals[idx-1] < 0)
         flippedRed = (p_change_vals[idx] < 0) and (p_change_vals[idx-1] >= 0)
         
-        # Accessing counts from the previous bar (idx-1) to match 'prevRedCount'
         pR = red_counts[idx-1]
         pG = green_counts[idx-1]
         
         entry = "NONE"
-        
         if is_bull_trend[idx] and 3 <= pR < 7 and flippedGreen:
-            entry = "OTMBUY"   # Matches Pine TB
+            entry = "OTMBUY"
         elif is_bear_trend[idx] and 3 <= pG < 7 and flippedRed:
-            entry = "OTMSELL"  # Matches Pine TS
+            entry = "OTMSELL"
         elif is_bear_trend[idx] and pR >= 7 and flippedGreen:
-            entry = "ATMBUY"   # Matches Pine CB
+            entry = "ATMBUY"
         elif is_bull_trend[idx] and pG >= 7 and flippedRed:
-            entry = "ATMSELL"  # Matches Pine CS
+            entry = "ATMSELL"
         else:
             entry = exit_sig
 
@@ -105,4 +108,5 @@ def get_entry_signal(df=None):
 
     except Exception:
         return "NONE", "NONE"
+
 
