@@ -8,19 +8,22 @@ VERBOSE = True
 
 def get_entry_signal(df=None):
     try:
-        # 1. FETCH DATA - Use 7d to ensure enough bars on Monday/Holidays
+        # 1. FETCH DATA - Using Ticker.history for better reliability
         if df is None:
-            df = yf.download("^NSEI", period='7d', interval='1m', progress=False)
+            ticker = yf.Ticker("^NSEI")
+            # 1m data is limited to last 7 days. This ensures we pull Friday's data on Monday.
+            df = ticker.history(period="7d", interval="1m")
         
-        # We check for 30 bars to ensure the trend and counters are stable
-        if df is None or df.empty or len(df) < 30:
-            if VERBOSE: print(f"[DEBUG] Only found {len(df)} bars. Need 30 for stable logic.")
+        # Reduced stable threshold to 15 to allow early morning trading
+        if df is None or df.empty or len(df) < 15:
+            if VERBOSE: print(f"[DEBUG] Found {len(df)} bars. Market just opened or data delay.")
             return "NONE", "NONE"
 
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
+        # Standardise columns (history() returns different format than download())
         df = df.copy()
-
+        if 'Close' not in df.columns and 'close' in df.columns:
+            df.rename(columns={'open':'Open','high':'High','low':'Low','close':'Close'}, inplace=True)
+            
         # ==========================================
         # 2. SESSION DATA (Zero Lag Trend)
         # ==========================================
@@ -41,22 +44,20 @@ def get_entry_signal(df=None):
         line1 = (s_open + s_high + s_low) / 3
         line2 = (s_open + s_high + s_low + df['Close'].values) / 4
         is_bull_trend = line2 > line1
-        is_bear_trend = line2 < line1
 
         # ==========================================
-        # 3. P-MASTER DOTS & V2 TAXATION
+        # 3. P-MASTER & V2 TAXATION
         # ==========================================
         df['ohlc4'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
         df['p_price'] = ((df['Close'] + (df['Close'] + df['Close'].shift(1).fillna(df['Close']))/2 + 
                          (df['Close'] + df['Open'])/2 + df['ohlc4']) / 4).round(4)
         
-        p_change_vals = df['p_price'].diff().fillna(0).values
-        green_counts, red_counts = np.zeros(len(df)), np.zeros(len(df))
+        p_change = df['p_price'].diff().fillna(0).values
+        g_counts, r_counts = np.zeros(len(df)), np.zeros(len(df))
         
         g, r = 0, 0
         for i in range(len(df)):
-            change = p_change_vals[i]
-            if change >= 0:
+            if p_change[i] >= 0:
                 g += 1
                 if r == 1: r, g = 0, max(0, g - 2)
                 elif r > 1: r = 0
@@ -64,10 +65,10 @@ def get_entry_signal(df=None):
                 r += 1
                 if g == 1: g, r = 0, max(0, r - 2)
                 elif g > 1: g = 0
-            green_counts[i], red_counts[i] = g, r
+            g_counts[i], r_counts[i] = g, r
 
         # ==========================================
-        # 4. EXIT & ENTRY LOGIC
+        # 4. ENTRY/EXIT SIGNAL
         # ==========================================
         p0, p1 = df['p_price'].iloc[-1], df['p_price'].iloc[-2]
         exit_sig = "BULL" if p0 > p1 else "BEAR"
@@ -76,30 +77,27 @@ def get_entry_signal(df=None):
         now_ist = datetime.now(ist).time()
         
         idx = -1
-        fG = (p_change_vals[idx] >= 0) and (p_change_vals[idx-1] < 0)
-        fR = (p_change_vals[idx] < 0) and (p_change_vals[idx-1] >= 0)
-        pR, pG = red_counts[idx-1], green_counts[idx-1]
+        fG = (p_change[idx] >= 0) and (p_change[idx-1] < 0)
+        fR = (p_change[idx] < 0) and (p_change[idx-1] >= 0)
+        pR, pG = r_counts[idx-1], g_counts[idx-1]
         
         if VERBOSE:
-            print(f"--- DEBUG {datetime.now(ist).strftime('%H:%M:%S')} ---")
-            print(f"Bars used : {len(df)} | Trend: {'BULL' if is_bull_trend[idx] else 'BEAR'}")
-            print(f"Taxation  : R:{int(pR)} G:{int(pG)} | Flips: G:{fG} R:{fR}")
+            bias = "S-B" if is_bull_trend[idx] else "S-S"
+            print(f"[{datetime.now(ist).strftime('%H:%M')}] Bars: {len(df)} | Bias: {bias} | R:{int(pR)} G:{int(pG)}")
 
         if now_ist < dt_time(9, 17):
             entry = "MORNING"
         else:
             if is_bull_trend[idx] and 3 <= pR < 7 and fG: entry = "OTMBUY"
-            elif is_bear_trend[idx] and 3 <= pG < 7 and fR: entry = "OTMSELL"
-            elif is_bear_trend[idx] and pR >= 7 and fG: entry = "ATMBUY"
+            elif not is_bull_trend[idx] and 3 <= pG < 7 and fR: entry = "OTMSELL"
+            elif not is_bull_trend[idx] and pR >= 7 and fG: entry = "ATMBUY"
             elif is_bull_trend[idx] and pG >= 7 and fR: entry = "ATMSELL"
             else: entry = exit_sig
 
         return entry, exit_sig
 
     except Exception as e:
-        if VERBOSE: print(f"[CRITICAL] {e}")
+        if VERBOSE: print(f"[ERR] {e}")
         return "NONE", "NONE"
-
-
 
 
