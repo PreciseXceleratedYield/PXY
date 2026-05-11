@@ -38,7 +38,7 @@ def target_price(row):
         side = "CE" if "CE" in symbol else "PE" if "PE" in symbol else "NA"
         
         is_ce, is_pe = (side == "CE"), (side == "PE")
-        active_signal = str(row.get("exit", "NONE")).upper()
+        active_signal = str(row.get("entry", "NONE")).upper()
         is_counter = str(row.get("counter", "N")).upper() == "Y"
 
         # 4. FIELD DEFINITIONS
