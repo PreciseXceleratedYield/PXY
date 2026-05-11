@@ -1,59 +1,33 @@
 # sysentrpxy.py
 from sysmktpxy import get_signal
 from syscnfgpxy import TICKER
-from sysstrndpxy import get_signal as get_st_signal
-from syskatrpxy import calculate_atr
-from datetime import datetime, time
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 def get_entry_signal(df=None):
-    # --- CONFIG SWITCH ---
-    ALWAYSOTM = True  # Set to False to retain original ATM/OTM logic
-    
-    # 1. Fetch Basic Signals (L4 Entry, L2 Trend Exit)
+    # 1. Fetch Synced Signals from sysmktpxy
+    # entry_l4: Contains "BUY", "SELL", "BULL", "BEAR", or "NONE"
+    # exit_l2: Contains the P-Master exit signals
     entry_l4, exit_l2 = get_signal(df)
 
-    # 2. Fetch ST Signal (IST Anchored White Line Engine)
-    st_trend, st_price = get_st_signal(df)
-
-    # Time Management
-    now = datetime.now(ZoneInfo("Asia/Kolkata"))
-    current_time = now.time()
-
-    # ==========================================
-    # 3. ENTRY MAPPING LOGIC (ST SYNCED)
-    # ==========================================
+    # 2. ACTION MAPPING LOGIC
+    # We only create ATM actions for the specific crossing/touch events.
+    # Everything else passes through as the raw string.
+    
     final_signal = "NONE"
 
-    # --- PHASE A: BULLISH MOMENTUM (ST is UP or BUY) ---
-    if st_trend in ["BUY", "UP"]:
-        if entry_l4 == "BUY":
-            final_signal = "ATMBUY"  # Upgrade to ATM in Trend
-        elif entry_l4 == "SELL":
-            final_signal = "OTMSELL" # Stay OTM for Counter-trend
-        else:
-            final_signal = entry_l4   # Pass through BULL/BEAR etc.
-
-    # --- PHASE B: BEARISH MOMENTUM (ST is SELL or DOWN) ---
-    elif st_trend in ["SELL", "DOWN"]:
-        if entry_l4 == "SELL":
-            final_signal = "ATMSELL" # Upgrade to ATM in Trend
-        elif entry_l4 == "BUY":
-            final_signal = "OTMBUY"  # Stay OTM for Counter-trend
-        else:
-            final_signal = entry_l4   # Pass through BULL/BEAR etc.
-
-    # --- PHASE C: NEUTRAL / SIDE ---
+    if entry_l4 == "BUY":
+        final_signal = "ATMBUY"
+    elif entry_l4 == "SELL":
+        final_signal = "ATMSELL"
     else:
-        final_signal = entry_l4 # Pass through original signal if ST is neutral
+        # Pass BULL, BEAR, or NONE exactly as they are
+        final_signal = entry_l4
 
-
-    # Reporting
-    if final_signal in ["BULL", "BEAR", "NONE"]:
-        print(f"⛔ 🚧 NO ENTRY (ST:{st_trend}) 🚧 {final_signal} 🚧 ⛔".center(36))
-    else:
-        print(f"🔥 {entry_l4} → {final_signal} (ST:{st_trend})".center(36))
-
+    # Reporting only on Action Signals
+    if final_signal in ["ATMBUY", "ATMSELL"]:
+        print(f"🔥 ACTION TRIGGERED: {final_signal} 🔥".center(36))
+    
     return final_signal, exit_l2
 
 if __name__ == "__main__":
