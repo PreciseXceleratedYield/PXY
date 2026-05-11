@@ -5,11 +5,11 @@ from datetime import datetime, time as dt_time
 from colorama import Fore, Style
 
 # --- CONFIG ---
-REBUY_ENABLED = False
-MAX_LAYERS = 1        # <--- NEW SWITCH: Set to 2, 3, 4 etc.
+REBUY_ENABLED = True
+MAX_LAYERS = 2        # <--- NEW SWITCH: Set to 2, 3, 4 etc.
 COOL_DOWN_SECONDS = 300 
-SIDE_SWITCH = 1 
-LOSS_THRESHOLD = -14
+SIDE_SWITCH = 2 
+LOSS_THRESHOLD = -10
 
 def get_cooling_file(side):
     """Returns the filename for side-specific cooling."""
