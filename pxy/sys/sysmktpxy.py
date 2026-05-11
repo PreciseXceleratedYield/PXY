@@ -10,23 +10,21 @@ def calc_tsma_np(series, window=7):
         window = len(series)
     y = series.tail(window).values
     x = np.arange(len(y))
-    coeffs = np.polyfit(x, y, 1)
-    # Predicted value at the current bar
-    return coeffs[0] * (len(y) - 1) + coeffs[1]
+    coeffs = np.polyfit(x, y, 1) 
+    # FIX: coeffs[0] is slope, coeffs[1] is intercept
+    return coeffs[0] * (len(y) - 1) + coeffs[1] 
 
 def get_signal(df=None):
     try:
         if df is None:
             df = fetch_yf_data()
         
-        # --- FIX: Ensure Datetime Index for GroupBy ---
         if not isinstance(df.index, pd.DatetimeIndex):
             date_col = next((c for c in ['Datetime', 'Date', 'timestamp', 'time'] if c in df.columns), None)
             if date_col:
                 df[date_col] = pd.to_datetime(df[date_col])
                 df.set_index(date_col, inplace=True)
             else:
-                # If no date column found, we cannot calculate day high/low
                 return "NONE", "NONE"
     except Exception:
         return "NONE", "NONE"
@@ -39,19 +37,16 @@ def get_signal(df=None):
     st0 = df_st['ST'].iloc[-1]
     st1 = df_st['ST'].iloc[-2]
     
-    # ATR(14) Calculation
     h_s, l_s, c_s = df['High'], df['Low'], df['Close']
     tr = pd.concat([h_s - l_s, (h_s - c_s.shift()).abs(), (l_s - c_s.shift()).abs()], axis=1).max(axis=1)
     atr = tr.rolling(14).mean().iloc[-1]
     
-    # Calculate Day High/Low safely
     day_high = df.groupby(df.index.date)['High'].transform('max').iloc[-1]
     day_low = df.groupby(df.index.date)['Low'].transform('min').iloc[-1]
     
     c0, c1 = c_s.iloc[-1], c_s.iloc[-2]
     h0, l0 = h_s.iloc[-1], l_s.iloc[-1]
     
-    # Dynamic Boundaries (Price Mid-point + 0.25 ATR)
     upper_b = ((day_high + c0) / 2) + (0.25 * atr)
     lower_b = ((day_low + c0) / 2) - (0.25 * atr)
 
@@ -72,25 +67,18 @@ def get_signal(df=None):
     p1, e1_1, e2_1, e3_1, e4_1 = get_layers(-2)
     p2, e1_2, e2_2, e3_2, e4_2 = get_layers(-3)
 
-    # --- 4. ENTRY LOGIC (PRICE CROSSING LINES) ---
+    # --- 4. ENTRY LOGIC ---
     entry = "NONE"
-    
-    # Cross Logic: Price crossing TSMA
     p_cross_tsma_up = (c1 <= tsma1 and c0 > tsma0)
     p_cross_tsma_dn = (c1 >= tsma1 and c0 < tsma0)
-    
-    # Cross Logic: Price crossing Black Line (ST)
     p_cross_black_up = (c1 <= st1 and c0 > st0)
     p_cross_black_dn = (c1 >= st1 and c0 < st0)
     
-    # Filters
     above_black = c0 > st0
     below_black = c0 < st0
 
-    # BUY: (TSMA Cross UP while Above Black) OR (Wick touches Floor) OR (Black Line Cross UP)
     if (p_cross_tsma_up and above_black) or (l0 <= lower_b) or p_cross_black_up:
         entry = "BUY"
-    # SELL: (TSMA Cross DN while Below Black) OR (Wick touches Ceiling) OR (Black Line Cross DN)
     elif (p_cross_tsma_dn and below_black) or (h0 >= upper_b) or p_cross_black_dn:
         entry = "SELL"
     elif c0 > tsma0:
@@ -118,4 +106,5 @@ def get_signal(df=None):
 if __name__ == "__main__":
     e, x = get_signal()
     print(f"Final Return -> Entry: {e}, Exit: {x}")
+
 
