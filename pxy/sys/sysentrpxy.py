@@ -4,95 +4,63 @@ import numpy as np
 import pytz
 from datetime import datetime, time as dt_time
 
-VERBOSE = True 
+VERBOSE = True
 
 def get_entry_signal(df=None):
     try:
         ist = pytz.timezone("Asia/Kolkata")
         now_ist = datetime.now(ist).time()
 
-        # 1. FETCH DATA - 7d period is required on Mondays to bridge the weekend
+        # 1. FETCH DATA
         if df is None:
-            # interval='1m' is limited to the last 7 days of history
+            # interval='1m' requires a short period (max 7 days)
             df = yf.download("^NSEI", period='7d', interval='1m', progress=False)
-        
-        # Threshold: We need at least 2 bars for exit_sig (p0 vs p1). 
-        # Session trend is more stable with 15+ bars.
-        if df is None or df.empty or len(df) < 2:
-            if VERBOSE: print(f"[DEBUG] Critical Data Failure. Bars: {len(df) if df is not None else 0}")
+
+        # We need at least 15 bars (14 for rolling window + 1 for signal comparison)
+        if df is None or df.empty or len(df) < 15:
+            if VERBOSE: print(f"[DEBUG] Data Failure. Bars: {len(df) if df is not None else 0}")
             return "NONE", "NONE"
 
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
         df = df.copy()
 
-        # ==========================================
-        # 2. SESSION DATA (Zero Lag Trend)
-        # ==========================================
-        df.index = pd.to_datetime(df.index)
-        is_new_day = df.index.date != np.roll(df.index.date, 1)
-        
-        s_high, s_low, s_open = np.zeros(len(df)), np.zeros(len(df)), np.zeros(len(df))
-        curr_h, curr_l, curr_o = 0.0, 0.0, 0.0
-        
-        for i in range(len(df)):
-            if is_new_day[i]:
-                curr_h, curr_l, curr_o = df['High'].iloc[i], df['Low'].iloc[i], df['Open'].iloc[i]
-            else:
-                curr_h = max(df['High'].iloc[i], curr_h)
-                curr_l = min(df['Low'].iloc[i], curr_l)
-            s_high[i], s_low[i], s_open[i] = curr_h, curr_l, curr_o
-
-        line1 = (s_open + s_high + s_low) / 3
-        line2 = (s_open + s_high + s_low + df['Close'].values) / 4
-        is_bull_trend = line2 > line1
-
-        # ==========================================
-        # 3. P-MASTER DOTS & V2 TAXATION
-        # ==========================================
+        # 2. P-MASTER CALCULATION (For Exit Logic)
         df['ohlc4'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
         df['p_price'] = ((df['Close'] + (df['Close'] + df['Close'].shift(1).fillna(df['Close']))/2 + 
-                         (df['Close'] + df['Open'])/2 + df['ohlc4']) / 4).round(4)
+                          (df['Close'] + df['Open'])/2 + df['ohlc4']) / 4).round(4)
         
-        p_change = df['p_price'].diff().fillna(0).values
-        g_counts, r_counts = np.zeros(len(df)), np.zeros(len(df))
-        
-        g, r = 0, 0
-        for i in range(len(df)):
-            if p_change[i] >= 0:
-                g += 1
-                if r == 1: r, g = 0, max(0, g - 2)
-                elif r > 1: r = 0
-            else:
-                r += 1
-                if g == 1: g, r = 0, max(0, r - 2)
-                elif g > 1: g = 0
-            g_counts[i], r_counts[i] = g, r
-
-        # ==========================================
-        # 4. EXIT & ENTRY LOGIC
-        # ==========================================
         p0, p1 = df['p_price'].iloc[-1], df['p_price'].iloc[-2]
+        
+        # EXIT SIMPLE: Simple directional bias based on p_price
         exit_sig = "BULL" if p0 > p1 else "BEAR"
 
-        idx = -1
-        fG = (p_change[idx] >= 0) and (p_change[idx-1] < 0)
-        fR = (p_change[idx] < 0) and (p_change[idx-1] >= 0)
-        pR, pG = r_counts[idx-1], g_counts[idx-1]
-        
-        if VERBOSE:
-            bias = "S-B" if is_bull_trend[idx] else "S-S"
-            print(f"[{datetime.now(ist).strftime('%H:%M:%S')}] Bars: {len(df)} | Bias: {bias} | R:{int(pR)} G:{int(pG)} | P0:{p0:.2f}")
+        # 3. ROLLING 14m GRID LOGIC (PINE SIMPLE)
+        # Replicating roll_h = ta.highest(high, 14) and roll_l = ta.lowest(low, 14)
+        roll_h = df['High'].rolling(window=14).max().iloc[-1]
+        roll_l = df['Low'].rolling(window=14).min().iloc[-1]
 
-        # Morning Rule: Force MORNING for Entry but keep Exit valid
+        # LIVE DYNAMIC LINES: line_g = (roll_h + close) / 2 | line_r = (roll_l + close) / 2
+        line_g = (roll_h + df['Close'].iloc[-1]) / 2
+        line_r = (roll_l + df['Close'].iloc[-1]) / 2
+
+        # SIGNAL LOGIC: isBuy = low < line_r | isSell = high > line_g
+        isBuy = df['Low'].iloc[-1] < line_r
+        isSell = df['High'].iloc[-1] > line_g
+
+        # 4. FINAL ENTRY/EXIT ASSIGNMENT
         if now_ist < dt_time(9, 17):
             entry = "MORNING"
+        elif isBuy:
+            entry = "OTMBUY"
+        elif isSell:
+            entry = "OTMSELL"
         else:
-            if is_bull_trend[idx] and 3 <= pR < 7 and fG: entry = "OTMBUY"
-            elif not is_bull_trend[idx] and 3 <= pG < 7 and fR: entry = "OTMSELL"
-            elif not is_bull_trend[idx] and pR >= 7 and fG: entry = "ATMBUY"
-            elif is_bull_trend[idx] and pG >= 7 and fR: entry = "ATMSELL"
-            else: entry = exit_sig
+            # Fallback: if Pine logic is NONE, copy the exit signal
+            entry = exit_sig
+
+        if VERBOSE:
+            print(f"[{datetime.now(ist).strftime('%H:%M:%S')}] Entry: {entry} | Exit: {exit_sig} | L_R: {line_r:.1f} L_G: {line_g:.1f}")
 
         return entry, exit_sig
 
@@ -100,3 +68,6 @@ def get_entry_signal(df=None):
         if VERBOSE: print(f"[CRITICAL] {e}")
         return "NONE", "NONE"
 
+# Example Usage:
+# signal, exit = get_entry_signal()
+# print(f"Final Signal: {signal}, Exit Bias: {exit}")
