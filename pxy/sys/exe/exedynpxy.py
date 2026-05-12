@@ -2,14 +2,14 @@
 from datetime import datetime
 import pytz
 import re
+import pandas as pd # Added pandas for robust time conversion
 
 IST = pytz.timezone("Asia/Kolkata")
 
 # ==================================================
 # 🔧 TIGHTENED CONFIG: PURE TIME DECAY
 # ==================================================
-# 0.005 per second = 0.3 points per minute = 18 points per hour
-BASE_DECAY_RATE = 0.001
+BASE_DECAY_RATE = 0.001 
 PNL_THRESHOLD = 0.0
 
 def dynamic_entry(row):
@@ -31,31 +31,32 @@ def dynamic_entry(row):
                 entry_time = datetime.strptime(entry_time_val, "%Y-%m-%d %H:%M:%S")
                 entry_time = IST.localize(entry_time)
             except ValueError:
-                # Fallback for "HH:MM:S" format
+                # Fallback for "HH:MM:SS" format
                 parts = list(map(int, entry_time_val.split(":")))
                 while len(parts) < 3: parts.append(0)
                 h, m, s = parts[:3]
                 entry_time = now.replace(hour=h, minute=m, second=s, microsecond=0)
         else:
-            entry_time = entry_time_val
+            # FIX: Convert numpy/pandas datetime64 or float64 to a standard Timestamp
+            entry_time = pd.to_datetime(entry_time_val)
+            # Ensure it is localized to IST
             if entry_time.tzinfo is None:
                 entry_time = IST.localize(entry_time)
+            else:
+                entry_time = entry_time.astimezone(IST)
 
         # ---------------- CALC ELAPSED ----------------
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
 
         # ---------------- PURE DECAY RULE ----------------
-        # If PNL is 0 or negative, start the linear decay
         if pnl <= PNL_THRESHOLD:
             decay_amount = elapsed_secs * BASE_DECAY_RATE
             dynamic_val = original_price - decay_amount
             
-            # Clean symbol for logging
             clean_symbol = re.sub(r'^(NIFTY|BANKNIFTY)26', '', symbol)
-            if decay_amount > 0.5: # Only print if meaningful decay
+            if decay_amount > 0.5:
                 print(f"{clean_symbol} | TIME DECAY: -{decay_amount:.2f} PTS")
         else:
-            # If in profit, keep original buy price (don't decay)
             dynamic_val = original_price
 
         return round(dynamic_val, 2)
