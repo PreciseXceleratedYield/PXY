@@ -9,7 +9,7 @@ IST = pytz.timezone("Asia/Kolkata")
 # 🔧 TIGHTENED CONFIG: PURE TIME DECAY
 # ==================================================
 # 0.005 per second = 0.3 points per minute = 18 points per hour
-BASE_DECAY_RATE = 0.000
+BASE_DECAY_RATE = 0.0001
 PNL_THRESHOLD = 0.0
 
 def dynamic_entry(row):
