@@ -161,33 +161,39 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     return combined
 
 if __name__ == "__main__":
+    # 1. Fetch data through your existing combined function
     data = get_combined_data()
     
-    # 1. SHOW ACTIVE TRADES (Live PnL)
+    # 2. PRINT ACTIVE POSITIONS
     print("\n" + "="*80)
     print(f"{'OMS LIVE PXY DASHBOARD (ACTIVE)':^80}")
     print("="*80)
-    if not data["active_orders"].empty:
+    
+    active_df = data.get("active_orders", pd.DataFrame())
+    if not active_df.empty:
         cols = ["symbol", "tag", "qty", "buy_prc", "sell_prc", "pnl", "pxy_tgt", "pxy_sl"]
-        available_cols = [c for c in cols if c in data["active_orders"].columns]
-        print(data["active_orders"][available_cols].to_string(index=False))
+        available_cols = [c for c in cols if c in active_df.columns]
+        print(active_df[available_cols].to_string(index=False))
     else:
         print(f"{'No Active Positions':^80}")
     print("="*80)
 
-    # 2. SHOW COMPLETED TRADES (Realized PnL)
-    # We fetch the closed trades directly from the LILO engine
+    # 3. PRINT CLOSED POSITIONS (Today's Realized History)
     client = get_session()
     if client:
-        from runlilopxy import process_lilo_orders
+        # We call process_lilo_orders again or modify get_combined_data to return both.
+        # Calling it here ensures we get the most recent 'closed_df'.
         _, closed_df = process_lilo_orders(client)
         
         if not closed_df.empty:
-            print(f"\n{'COMPLETED TRADES TODAY (INACTIVE)':^80}")
-            print("-"*80)
-            # Adjust columns to match closed_df structure
+            print(f"\n{'TODAY\'S CLOSED POSITIONS (INACTIVE)':^80}")
+            print("-" * 80)
+            # Match the column names returned by runlilopxy.py
             c_cols = ["Symbol", "Tag", "Qty", "Buy_Prc", "Sell_Prc", "PNL"]
             print(closed_df[c_cols].to_string(index=False))
-            print("-"*80)
-            print(f"TOTAL REALIZED PNL: {closed_df['PNL'].sum():+d}")
-            print("="*80 + "\n")
+            print("-" * 80)
+            total_pnl = closed_df['PNL'].sum()
+            color = Fore.GREEN if total_pnl >= 0 else Fore.RED
+            print(f"{'TOTAL REALIZED PNL:':<60} {color}{int(total_pnl):+d}{Style.RESET_ALL}")
+            print("=" * 80 + "\n")
+
