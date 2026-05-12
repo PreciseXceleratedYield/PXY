@@ -5,7 +5,7 @@ from sysdtafpxy import fetch_yf_data
 from sysstrndpxy import calculate_supertrend
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 
-DEBUG = True 
+DEBUG = False 
 
 def calc_tsma_np(series, window=7):
     """Pure NumPy Linear Regression (TSMA) - Returns single float prediction"""
