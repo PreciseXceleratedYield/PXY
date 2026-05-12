@@ -84,27 +84,29 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
                 # A. Get unmatched orders from stateless LILO engine
                 active_df, _ = process_lilo_orders(client)
                 
-                # B. SAFETY SYNC: Get Real-time Broker Positions
-                pos_res = client.positions()
-                if pos_res and "data" in pos_res and not active_df.empty:
-                    pos_df = pd.DataFrame(pos_res["data"])
-                    
-                    # Identify symbols with a real positive net quantity (Buy > Sell)
-                    # flBuyQty - flSellQty = Real holdings at Kotak
-                    real_holdings = pos_df[
-                        (pos_df['flBuyQty'].astype(float) - pos_df['flSellQty'].astype(float)) > 0
-                    ]['trdSym'].tolist()
-
-                    # C. FINAL FILTER: Only keep strategy-tracked rows that exist at the broker
-                    active_df = active_df[active_df['symbol'].isin(real_holdings)].copy()
-
                 if not active_df.empty:
-                    # Standardize column names to lowercase for the rest of the script
+                    # B. CRITICAL FIX: Standardize casing BEFORE filtering or accessing 'symbol'
                     active_df.columns = [c.lower() for c in active_df.columns]
                     
-                    # Clean the tag (HHMMSS or UUID) for the dashboard and exit scripts
-                    active_df['tag'] = active_df['tag'].astype(str).str.split('.').str[0].replace('nan', '').str.strip()
+                    # C. SAFETY SYNC: Filter by Real Broker Positions
+                    pos_res = client.positions()
+                    if pos_res and "data" in pos_res:
+                        pos_df = pd.DataFrame(pos_res["data"])
+                        
+                        if not pos_df.empty:
+                            # Calculate net holdings (Buy - Sell)
+                            # Only symbols with a positive net balance should be on the dashboard
+                            real_holdings = pos_df[
+                                (pos_df['flBuyQty'].astype(float) - pos_df['flSellQty'].astype(float)) > 0
+                            ]['trdSym'].tolist()
+
+                            # Filter strategy orders to match actual broker holdings
+                            active_df = active_df[active_df['symbol'].isin(real_holdings)].copy()
                     
+                    # D. Final Column Cleaning (Tag cleanup)
+                    if not active_df.empty:
+                        active_df['tag'] = active_df['tag'].astype(str).str.split('.').str[0].replace('nan', '').str.strip()
+                        
         except Exception as e:
             print(f"OMS DATA ERROR: {e}")
             active_df = pd.DataFrame()
@@ -131,7 +133,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     # --- 3. DYNAMIC VALUATION UPDATE ---
     if client and get_mid_price:
         def update_metrics(row):
-            # Only refresh LTP if the LILO engine didn't already provide it
+            # Refresh LTP only if necessary
             if float(row.get("sell_prc", 0)) <= 0:
                 token_id = row.get("tok") or row.get("token")
                 curr_val = get_mid_price(client, token_id)
@@ -165,8 +167,8 @@ if __name__ == "__main__":
         print("\n" + "="*80)
         print(f"{'OMS LIVE PXY DASHBOARD (SYNCED)':^80}")
         print("="*80)
+        # Only print columns that actually exist to prevent display errors
         available_cols = [c for c in cols if c in data["active_orders"].columns]
         print(data["active_orders"][available_cols].to_string(index=False))
         print("="*80)
-
 
