@@ -1,3 +1,4 @@
+# exeavgpxy.py
 import os
 import time
 import pytz
@@ -6,51 +7,25 @@ from colorama import Fore, Style
 
 # --- CONFIG ---
 REBUY_ENABLED = True
-MAX_LAYERS = 1        # <--- NEW SWITCH: Set to 2, 3, 4 etc.
-COOL_DOWN_SECONDS = 300 
-SIDE_SWITCH = 2 
+MAX_LAYERS = 1 
+COOL_DOWN_SECONDS = 300
+SIDE_SWITCH = 2
 LOSS_THRESHOLD = -10
 
-def get_cooling_file(side):
-    """Returns the filename for side-specific cooling."""
-    return f"exeavgpxy_{side.lower()}.txt"
-
-def is_cooling(side):
-    """Checks cooling and self-deletes if 5 mins passed."""
-    file_path = get_cooling_file(side)
-    if not os.path.exists(file_path):
-        return False
-    try:
-        with open(file_path, "r") as f:
-            content = f.read().strip()
-            if not content: return False
-            last_ts = float(content)
-            elapsed = time.time() - last_ts
-            if elapsed < COOL_DOWN_SECONDS:
-                return True
-            else:
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                return False
-    except:
-        return False
-
-def set_cooling(side):
-    """Saves current timestamp to a side-specific file."""
-    try:
-        with open(get_cooling_file(side), "w") as f:
-            f.write(str(time.time()))
-    except Exception as e:
-        print(f"{Fore.RED}Error writing cooling file: {e}")
+def generate_pxy_tag():
+    """Generates a pure timestamp tag: HHMMSS for 1:1 matching"""
+    IST = pytz.timezone("Asia/Kolkata")
+    return datetime.now(IST).strftime('%H%M%S')
 
 def handle_side_averaging(client, df):
-    """Main logic for layering buys with Dual-Side or Single-Side switch."""
+    """Main logic for layering buys with Tag-Based Tracking."""
     if df is None or df.empty:
         return
 
     ist = pytz.timezone("Asia/Kolkata")
     now = datetime.now(ist).time()
 
+    # Time Guard: Only average during active market hours
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,0)):
         return
 
@@ -67,6 +42,7 @@ def handle_side_averaging(client, df):
     ce_hit = not ce_df.empty and get_loss(ce_df.iloc[-1]) <= LOSS_THRESHOLD
     pe_hit = not pe_df.empty and get_loss(pe_df.iloc[-1]) <= LOSS_THRESHOLD
 
+    # Decision Matrix
     if SIDE_SWITCH == 2:
         trigger_allowed = ce_hit and pe_hit
     else:
@@ -78,22 +54,24 @@ def handle_side_averaging(client, df):
     for side, side_df in [('CE', ce_df), ('PE', pe_df)]:
         if side_df.empty:
             continue
-            
+        
         count = len(side_df)
-
         if get_loss(side_df.iloc[-1]) > LOSS_THRESHOLD:
             continue
-            
-        # UPDATED: Now uses the MAX_LAYERS switch
+
+        # Check Max Layers and Cooling
         if count >= MAX_LAYERS or is_cooling(side):
             continue
 
         last_order = side_df.iloc[-1]
         symbol = last_order['symbol']
         qty = abs(int(last_order['qty']))
+        
+        # GENERATE NEW TAG: Even for averaging, every order must have a unique ID
+        new_tag = generate_pxy_tag()
 
-        print(f"{Fore.YELLOW}📉 {side} Side Triggered. Latest loss <= {LOSS_THRESHOLD}%.")
-
+        print(f"{Fore.YELLOW}📉 {side} Averaging Triggered. Loss: {get_loss(side_df.iloc[-1]):.2f}%")
+        
         try:
             params = {
                 "exchange_segment": "nse_fo",
@@ -104,11 +82,12 @@ def handle_side_averaging(client, df):
                 "trading_symbol": str(symbol),
                 "transaction_type": "B",
                 "validity": "DAY",
-                "amo": "NO"
+                "amo": "NO",
+                "tag": new_tag  # <--- CRITICAL: Tagging the Rebuy
             }
             client.place_order(**params)
             set_cooling(side)
-            print(f"{Fore.GREEN}{Style.BRIGHT}✅ SUCCESS: Layer {count+1} Added for {symbol}.")
+            print(f"{Fore.GREEN}{Style.BRIGHT}✅ SUCCESS: Layer {count+1} Added for {symbol} | TAG: {new_tag}")
         except Exception as e:
             print(f"{Fore.RED}❌ Rebuy Execution Failed: {e}")
 
