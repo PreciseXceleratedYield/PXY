@@ -120,20 +120,25 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     # --- 5. THE PXY OMS CALCULATION CHAIN ---
     if add_calcs:
         dprint("Applying Stateless PXY ...")
-
         active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
         active_df["pxy_tgt"] = active_df.apply(pxy_tgt_calc, axis=1)
         active_df["pxy_sl"] = active_df.apply(pxy_sl_calc, axis=1)
-
-    combined["active_orders"] = active_df
+        # Ensure 'tag' column exists and is string type for downstream consistency
+        if 'tag' in active_df.columns:
+            active_df['tag'] = active_df['tag'].astype(str)
+    
+        combined["active_orders"] = active_df
     return combined
-
-if __name__ == "__main__":
-    data = get_combined_data()
-    if not data["active_orders"].empty:
-        cols = ["symbol", "buy_prc", "pxy_entry", "pxy_tgt", "pxy_sl", "sell_prc", "pnl"]
-        print("\n" + "="*80)
-        print(f"{'OMS LIVE PXY DASHBOARD (V2)':^80}")
-        print("="*80)
-        print(data["active_orders"][cols])
-        print("="*80)
+    
+    if __name__ == "__main__":
+        data = get_combined_data()
+        if not data["active_orders"].empty:
+            # ADDED 'tag' to the list below
+            cols = ["symbol", "tag", "buy_prc", "pxy_entry", "pxy_tgt", "pxy_sl", "sell_prc", "pnl"] 
+            print("\n" + "="*80)
+            print(f"{'OMS LIVE PXY DASHBOARD (V2)':^80}")
+            print("="*80)
+            # Verify columns exist before printing to prevent crashes
+            available_cols = [c for c in cols if c in data["active_orders"].columns]
+            print(data["active_orders"][available_cols])
+            print("="*80)
