@@ -14,6 +14,7 @@ SIMPLE_MODE = True  # Set to True to remove CE/PE check and run both scripts eve
 # ---------------- INIT ----------------
 init(autoreset=True)
 ist = pytz.timezone("Asia/Kolkata")
+
 # ---------------- PATH SETUP ----------------
 HERE = Path(__file__).resolve().parent
 RUN_DIR = HERE / "run"
@@ -39,7 +40,8 @@ except Exception as e:
     sys.exit(1)
 
 # ---------------- FIX 2: API TIMEOUT WRAPPER ----------------
-def call_with_timeout(func, timeout=5, *args, **kwargs):
+# UPDATED: Set to 7 seconds
+def call_with_timeout(func, timeout=7, *args, **kwargs):
     with ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(func, *args, **kwargs)
         try:
@@ -58,7 +60,8 @@ def run_script(script_path):
         print("━" * 42)
         return
     try:
-        subprocess.run(['python3', str(script_path)], check=True, timeout=30)
+        # UPDATED: Sub-script timeout set to 7 seconds
+        subprocess.run(['python3', str(script_path)], check=True, timeout=7)
     except subprocess.TimeoutExpired:
         print(f"⏱ TIMEOUT: script stuck -> {script_path} ⚠️")
     except subprocess.CalledProcessError:
@@ -73,7 +76,8 @@ def safe_run(script_path):
     except Exception:
         print("⚠️ SAFE RUN: unexpected error occurred ⚠️")
 
-def fancy_pause(seconds=3):
+# UPDATED: Default pause set to 7 seconds
+def fancy_pause(seconds=7):
     for i in range(seconds, 0, -1):
         print(f"⏳ Pause active... {Fore.YELLOW}{i}{Style.RESET_ALL}s", end="\r", flush=True)
         time.sleep(1)
@@ -90,6 +94,7 @@ def in_market_hours():
 print("\n🚀 INIT: main market loop starting now 📡")
 loop_counter = 1
 
+# Initial system check scripts
 parent_scripts = [
     HERE.parent / "systdaypxy.py",
     HERE.parent / "sysvixpxy.py",
@@ -97,22 +102,27 @@ parent_scripts = [
     HERE / "exeentrpxy.py",
     HERE / "exeexitpxy.py"
 ]
+
 for s in parent_scripts:
     safe_run(s)
 
 while True:
     if in_market_hours():
         live_status("🚀 LOOP: waiting trigger 📊")
+        
         for sub_itr in range(1, 31):
-            pos_summary = call_with_timeout(get_position_summary, 5, client)
-            if not pos_summary: pos_summary = "0CE0PE"
-
+            # API call with 7s timeout
+            pos_summary = call_with_timeout(get_position_summary, 7, client)
+            
+            if not pos_summary:
+                pos_summary = "0CE0PE"
+                
             try:
                 ce_qty = int(pos_summary.split("CE")[0])
                 pe_qty = int(pos_summary.split("CE")[1].replace("PE", ""))
             except Exception:
                 ce_qty, pe_qty = 0, 0
-
+                
             live_status(f"📊 Loop#{loop_counter} Sub#{sub_itr} CE:{ce_qty} PE:{pe_qty}")
 
             # -------- CORE LOGIC WITH SWITCH --------
@@ -120,7 +130,6 @@ while True:
                 safe_run(HERE / "exeexitpxy.py")
                 safe_run(HERE / "exeentrpxy.py")
             else:
-                # Original logic preserved
                 if ce_qty > 0 and ce_qty == pe_qty:
                     safe_run(HERE / "exeexitpxy.py")
                 elif ce_qty == 0 and pe_qty == 0:
@@ -129,15 +138,15 @@ while True:
                     safe_run(HERE / "exeexitpxy.py")
                     safe_run(HERE / "exeentrpxy.py")
 
-            fancy_pause(3)
-        loop_counter += 1
+            fancy_pause(7) # 7-second pause between sub-iterations
+            loop_counter += 1
+            
     else:
         print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
         safe_run(HERE.parent / "sysslefpxy.py")
-        fancy_pause(5)
+        fancy_pause(7)
         while not in_market_hours():
             print("⏳ WAIT: market opens at 09:16 IST 📡", end="\r")
             time.sleep(60)
         print("\n🚀 MKT OPEN: resuming main loop now 📈")
-
 
