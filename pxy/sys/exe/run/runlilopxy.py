@@ -53,11 +53,13 @@ def process_lilo_orders(client):
         df["dt"] = pd.to_datetime(df["ordDtTm"])
 
         # SAFE TAG EXTRACTION: Handles missing guiOrdId for old orders
+        # Replace your existing get_safe_tag with this:
         def get_safe_tag(row):
+            # Get value and force to string, remove '.0' if it's a float
             t = row.get("guiOrdId") or row.get("tag") or ""
-            t_str = str(t).strip()
-            # Return empty string if tag is 'nan', 'None', or truly empty
+            t_str = str(t).split('.')[0].strip() # Clean float .0
             return t_str if t_str.lower() not in ["nan", "none", ""] else ""
+
 
         df["tag"] = df.apply(get_safe_tag, axis=1)
 
