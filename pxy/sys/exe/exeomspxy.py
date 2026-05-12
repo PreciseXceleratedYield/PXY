@@ -24,6 +24,7 @@ for parent in HERE.parents:
     if (parent / 'syspxy.py').exists() or (parent / 'syspxy.pyc').exists():
         syspxy_path = parent
         break
+
 if syspxy_path:
     sys.path.insert(0, str(syspxy_path))
 
@@ -45,16 +46,19 @@ try:
     from exedynpxy import dynamic_entry as pxy_dyn
 except:
     pxy_dyn = lambda row: row.get("buy_prc", 0)
+
 try:
     from exetgtpxy import target_price as pxy_tgt_calc
 except:
     pxy_tgt_calc = lambda row: 0
+
 try:
     from exeslpxy import stop_loss as pxy_sl_calc
 except:
     pxy_sl_calc = lambda row: 0
 
 # ---------------- MAIN FUNCTION ----------------
+
 def get_combined_data(map_active_with_market=True, add_calcs=True):
     combined = {"market_snapshot": pd.DataFrame(), "active_orders": pd.DataFrame()}
 
@@ -69,29 +73,27 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
             market_df = pd.DataFrame()
     combined["market_snapshot"] = market_df
 
-    # --- 2. ACTIVE ORDERS ---
+    # --- 2. ACTIVE ORDERS (LILO FETCH) ---
     active_df = pd.DataFrame()
     client = None
+
     if process_lilo_orders and get_session:
         try:
             client = get_session()
             if client:
-                # Fetch all orders (Tagged and Untagged) from LILO matching
+                # Fetch all orders (Tagged and Untagged) from fixed LILO script
+                # active_df already contains 'tag', 'sell_prc' (LTP), and 'pnl'
                 active_df, _ = process_lilo_orders(client)
                 
                 if not active_df.empty:
-                    # 1. Force columns to lowercase
+                    # 1. Standardize column names to lowercase
                     active_df.columns = [c.lower() for c in active_df.columns]
                     
-                    # 2. Force TAG to be a clean string (Strip .0 and spaces)
+                    # 2. CLEAN TAG: Critical for exit scripts to match HHMMSS
                     active_df['tag'] = active_df['tag'].astype(str).str.split('.').str[0].replace('nan', '').str.strip()
                     
-                    # 3. Filter only tagged orders
-                    active_df = active_df[active_df['tag'] != ""].copy()
-                    
-                    if active_df.empty:
-                        dprint("DEBUG: All orders filtered out (No tags found).")
-                        return combined
+                    # NOTE: We NO LONGER filter out empty tags here. 
+                    # This ensures all positions (even UUID tagged ones) are visible.
         except Exception as e:
             print(f"OMS DATA ERROR: {e}")
             active_df = pd.DataFrame()
@@ -100,7 +102,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
         return combined
 
     # ==============================
-    # CE / PE COUNTER LOGIC (ACTIVE ONLY)
+    # CE / PE COUNTER LOGIC
     # ==============================
     active_df["opt_type"] = active_df["symbol"].str[-2:].str.upper()
     ce_count = (active_df["opt_type"] == "CE").sum()
@@ -108,24 +110,28 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
 
     def mark_counter(row):
         if ce_count == pe_count: return "Y"
-        if ce_count > pe_count: 
+        if ce_count > pe_count:
             return "N" if row["opt_type"] == "CE" else "Y"
-        else: 
+        else:
             return "N" if row["opt_type"] == "PE" else "Y"
 
     active_df["counter"] = active_df.apply(mark_counter, axis=1)
 
-    # --- 3. DYNAMIC VALUATION (LTP & P&L) ---
+    # --- 3. DYNAMIC VALUATION UPDATE ---
+    # We update LTP and PNL again here ONLY if runlilopxy values are missing or zero
     if client and get_mid_price:
         def update_metrics(row):
-            token_id = row.get("tok") or row.get("token") or row.get("symbol")
-            curr_val = get_mid_price(client, token_id)
-            row["sell_prc"] = curr_val if curr_val > 0 else row.get("sell_prc", 0)
-            if curr_val > 0:
-                buy_avg = float(row.get("buy_prc", 0))
-                qty = float(row.get("qty", 0))
-                row["pnl"] = round((curr_val - buy_avg) * qty, 2)
+            # Try to get fresh LTP if sell_prc is missing
+            if float(row.get("sell_prc", 0)) <= 0:
+                token_id = row.get("tok") or row.get("token")
+                curr_val = get_mid_price(client, token_id)
+                if curr_val > 0:
+                    row["sell_prc"] = curr_val
+                    buy_avg = float(row.get("buy_prc", 0))
+                    qty = float(row.get("qty", 0))
+                    row["pnl"] = round((curr_val - buy_avg) * qty, 2)
             return row
+        
         active_df = active_df.apply(update_metrics, axis=1)
 
     # --- 4. MKT SYNC ---
@@ -138,17 +144,19 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
         active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
         active_df["pxy_tgt"] = active_df.apply(pxy_tgt_calc, axis=1)
         active_df["pxy_sl"] = active_df.apply(pxy_sl_calc, axis=1)
-        
+
     combined["active_orders"] = active_df
     return combined
 
 if __name__ == "__main__":
     data = get_combined_data()
     if not data["active_orders"].empty:
-        cols = ["symbol", "tag", "buy_prc", "pxy_entry", "pxy_tgt", "pxy_sl", "sell_prc", "pnl"]
+        # Displaying 'tag' in the dashboard so you can verify it matches your HHMMSS
+        cols = ["symbol", "tag", "qty", "buy_prc", "sell_prc", "pnl", "pxy_tgt", "pxy_sl"]
         print("\n" + "="*80)
-        print(f"{'OMS LIVE PXY DASHBOARD (V2)':^80}")
+        print(f"{'OMS LIVE PXY DASHBOARD (TAG-SYNCED)':^80}")
         print("="*80)
         available_cols = [c for c in cols if c in data["active_orders"].columns]
-        print(data["active_orders"][available_cols])
+        print(data["active_orders"][available_cols].to_string(index=False))
         print("="*80)
+
