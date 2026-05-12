@@ -6,7 +6,7 @@ from datetime import datetime, time as dt_time
 from colorama import Fore, Style
 
 # --- CONFIG ---
-REBUY_ENABLED = True
+REBUY_ENABLED = False
 MAX_LAYERS = 1 
 COOL_DOWN_SECONDS = 300
 SIDE_SWITCH = 2
