@@ -40,6 +40,7 @@ def get_signal(df=None):
     h_s, l_s, c_s = df['High'], df['Low'], df['Close']
     tr = pd.concat([h_s - l_s, (h_s - c_s.shift()).abs(), (l_s - c_s.shift()).abs()], axis=1).max(axis=1)
     atr = tr.rolling(14).mean().iloc[-1]
+    atr = 10 if (atr == 0 or np.isnan(atr)) else atr
     
     day_high = df.groupby(df.index.date)['High'].transform('max').iloc[-1]
     day_low = df.groupby(df.index.date)['Low'].transform('min').iloc[-1]
