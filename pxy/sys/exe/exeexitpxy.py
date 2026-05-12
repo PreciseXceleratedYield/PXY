@@ -21,9 +21,19 @@ def debug_log(msg, color=Fore.BLUE):
     if DEBUG_MODE:
         # Removed \n from debug logs to prevent extra spacing
         print(f"{color}[DEBUG] {msg}{Style.RESET_ALL}")
+# Updated Tag Generator for Day Trading
+def generate_pxy_tag():
+    """Generates a pure timestamp tag: HHMMSS"""
+    IST = pytz.timezone("Asia/Kolkata")
+    return datetime.now(IST).strftime('%H%M%S')
 
 def place_exit_order(client, row):
     try:
+        # 1. Retrieve the tag from the existing BUY order
+        # 2. Fallback to current HHMMSS if no tag is found
+        existing_tag = row.get('tag') or row.get('guiordid')
+        final_tag = existing_tag if (existing_tag and str(existing_tag).lower() != 'nan') else generate_pxy_tag()
+
         params = {
             "exchange_segment": "nse_fo",
             "product": "NRML",
@@ -33,9 +43,11 @@ def place_exit_order(client, row):
             "validity": "DAY",
             "trading_symbol": str(row.get('symbol', '')),
             "transaction_type": "S",
-            "amo": "NO"
+            "amo": "NO",
+            "tag": str(final_tag) # Pure HHMMSS link
         }
-        print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ TGT HIT! EXITING: {params['trading_symbol']}")
+        
+        print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ TGT HIT! EXITING: {params['trading_symbol']} | TAG: {final_tag}")
         return client.place_order(**params)
     except Exception as e:
         print(f"{Fore.RED}❌ Exit Order Error: {e}")
