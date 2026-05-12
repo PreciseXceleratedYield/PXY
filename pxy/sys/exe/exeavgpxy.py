@@ -6,7 +6,7 @@ from colorama import Fore, Style
 
 # --- CONFIG ---
 REBUY_ENABLED = True
-MAX_LAYERS = 2        # <--- NEW SWITCH: Set to 2, 3, 4 etc.
+MAX_LAYERS = 1        # <--- NEW SWITCH: Set to 2, 3, 4 etc.
 COOL_DOWN_SECONDS = 300 
 SIDE_SWITCH = 2 
 LOSS_THRESHOLD = -10
