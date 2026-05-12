@@ -73,7 +73,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
             market_df = pd.DataFrame()
     combined["market_snapshot"] = market_df
 
-    # --- 2. ACTIVE ORDERS (LILO FETCH) ---
+    # --- 2. ACTIVE ORDERS (LILO + BROKER SYNC) ---
     active_df = pd.DataFrame()
     client = None
 
@@ -81,19 +81,30 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
         try:
             client = get_session()
             if client:
-                # Fetch all orders (Tagged and Untagged) from fixed LILO script
-                # active_df already contains 'tag', 'sell_prc' (LTP), and 'pnl'
+                # A. Get unmatched orders from stateless LILO engine
                 active_df, _ = process_lilo_orders(client)
                 
+                # B. SAFETY SYNC: Get Real-time Broker Positions
+                pos_res = client.positions()
+                if pos_res and "data" in pos_res and not active_df.empty:
+                    pos_df = pd.DataFrame(pos_res["data"])
+                    
+                    # Identify symbols with a real positive net quantity (Buy > Sell)
+                    # flBuyQty - flSellQty = Real holdings at Kotak
+                    real_holdings = pos_df[
+                        (pos_df['flBuyQty'].astype(float) - pos_df['flSellQty'].astype(float)) > 0
+                    ]['trdSym'].tolist()
+
+                    # C. FINAL FILTER: Only keep strategy-tracked rows that exist at the broker
+                    active_df = active_df[active_df['symbol'].isin(real_holdings)].copy()
+
                 if not active_df.empty:
-                    # 1. Standardize column names to lowercase
+                    # Standardize column names to lowercase for the rest of the script
                     active_df.columns = [c.lower() for c in active_df.columns]
                     
-                    # 2. CLEAN TAG: Critical for exit scripts to match HHMMSS
+                    # Clean the tag (HHMMSS or UUID) for the dashboard and exit scripts
                     active_df['tag'] = active_df['tag'].astype(str).str.split('.').str[0].replace('nan', '').str.strip()
                     
-                    # NOTE: We NO LONGER filter out empty tags here. 
-                    # This ensures all positions (even UUID tagged ones) are visible.
         except Exception as e:
             print(f"OMS DATA ERROR: {e}")
             active_df = pd.DataFrame()
@@ -118,10 +129,9 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     active_df["counter"] = active_df.apply(mark_counter, axis=1)
 
     # --- 3. DYNAMIC VALUATION UPDATE ---
-    # We update LTP and PNL again here ONLY if runlilopxy values are missing or zero
     if client and get_mid_price:
         def update_metrics(row):
-            # Try to get fresh LTP if sell_prc is missing
+            # Only refresh LTP if the LILO engine didn't already provide it
             if float(row.get("sell_prc", 0)) <= 0:
                 token_id = row.get("tok") or row.get("token")
                 curr_val = get_mid_price(client, token_id)
@@ -151,12 +161,12 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
 if __name__ == "__main__":
     data = get_combined_data()
     if not data["active_orders"].empty:
-        # Displaying 'tag' in the dashboard so you can verify it matches your HHMMSS
         cols = ["symbol", "tag", "qty", "buy_prc", "sell_prc", "pnl", "pxy_tgt", "pxy_sl"]
         print("\n" + "="*80)
-        print(f"{'OMS LIVE PXY DASHBOARD (TAG-SYNCED)':^80}")
+        print(f"{'OMS LIVE PXY DASHBOARD (SYNCED)':^80}")
         print("="*80)
         available_cols = [c for c in cols if c in data["active_orders"].columns]
         print(data["active_orders"][available_cols].to_string(index=False))
         print("="*80)
+
 
