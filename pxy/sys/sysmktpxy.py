@@ -57,8 +57,17 @@ def get_signal(df=None):
     c0, c1 = float(c_s.iloc[-1]), float(c_s.iloc[-2])
     h0, l0 = float(h_s.iloc[-1]), float(l_s.iloc[-1])
 
-    upper_b = ((day_high + c0) / 2) + (0.25 * atr)
-    lower_b = ((day_low + c0) / 2) - (0.25 * atr)
+    # Get Day High/Low excluding the current live candle
+    prev_day_df = today_df.iloc[:-1]
+    if not prev_day_df.empty:
+        p_high, p_low = prev_day_df['High'].max(), prev_day_df['Low'].min()
+    else:
+        p_high, p_low = h_s.iloc[-2], l_s.iloc[-2]
+
+    # Calculate boundaries using previous candle data (c1)
+    upper_b = ((p_high + c1) / 2) + (0.25 * atr)
+    lower_b = ((p_low + c1) / 2) - (0.25 * atr)
+
 
     # --- 2. TSMA ---
     tsma0 = calc_tsma_np(c_s, 7)
