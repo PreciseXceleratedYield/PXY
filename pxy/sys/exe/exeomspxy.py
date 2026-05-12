@@ -162,13 +162,32 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
 
 if __name__ == "__main__":
     data = get_combined_data()
+    
+    # 1. SHOW ACTIVE TRADES (Live PnL)
+    print("\n" + "="*80)
+    print(f"{'OMS LIVE PXY DASHBOARD (ACTIVE)':^80}")
+    print("="*80)
     if not data["active_orders"].empty:
         cols = ["symbol", "tag", "qty", "buy_prc", "sell_prc", "pnl", "pxy_tgt", "pxy_sl"]
-        print("\n" + "="*80)
-        print(f"{'OMS LIVE PXY DASHBOARD (SYNCED)':^80}")
-        print("="*80)
-        # Only print columns that actually exist to prevent display errors
         available_cols = [c for c in cols if c in data["active_orders"].columns]
         print(data["active_orders"][available_cols].to_string(index=False))
-        print("="*80)
+    else:
+        print(f"{'No Active Positions':^80}")
+    print("="*80)
 
+    # 2. SHOW COMPLETED TRADES (Realized PnL)
+    # We fetch the closed trades directly from the LILO engine
+    client = get_session()
+    if client:
+        from runlilopxy import process_lilo_orders
+        _, closed_df = process_lilo_orders(client)
+        
+        if not closed_df.empty:
+            print(f"\n{'COMPLETED TRADES TODAY (INACTIVE)':^80}")
+            print("-"*80)
+            # Adjust columns to match closed_df structure
+            c_cols = ["Symbol", "Tag", "Qty", "Buy_Prc", "Sell_Prc", "PNL"]
+            print(closed_df[c_cols].to_string(index=False))
+            print("-"*80)
+            print(f"TOTAL REALIZED PNL: {closed_df['PNL'].sum():+d}")
+            print("="*80 + "\n")
