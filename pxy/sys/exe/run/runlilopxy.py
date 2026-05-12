@@ -8,7 +8,7 @@ from runltpspxy import get_mid_price
 # =========================
 # ⚙️ CONFIGURATION
 # =========================
-MATCH_MODE = "TAG" # Switched from PFO to Tag-Based (HHMMSS)
+MATCH_MODE = "TAG" # Tag-Based Matching (HHMMSS)
 
 def dump_to_json(closed_df):
     """Saves closed trades to pnl.json in ~/pxy/."""
@@ -40,7 +40,7 @@ def process_lilo_orders(client):
             return pd.DataFrame(), pd.DataFrame()
             
         df = pd.DataFrame(res["data"])
-        # Filtering for completed orders
+        # Filtering for completed orders only
         df = df[df["ordSt"].isin(["complete", "traded"])].copy()
         
         if df.empty:
@@ -52,20 +52,21 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0)
         df["dt"] = pd.to_datetime(df["ordDtTm"])
 
-        # SAFE TAG EXTRACTION: Handles missing guiOrdId for old orders
-        # Replace your existing get_safe_tag with this:
+        # SAFE TAG EXTRACTION: Handles guiOrdId, memo, or tag and cleans float decimals
         def get_safe_tag(row):
-            # Get value and force to string, remove '.0' if it's a float
-            t = row.get("guiOrdId") or row.get("tag") or ""
-            t_str = str(t).split('.')[0].strip() # Clean float .0
-            return t_str if t_str.lower() not in ["nan", "none", ""] else ""
-
+            # Try all possible fields where Kotak Neo might store the tag
+            t = row.get("guiOrdId") or row.get("memo") or row.get("tag") or ""
+            # Convert to string and remove '.0' if it's a float-string
+            t_str = str(t).split('.')[0].strip()
+            # Return empty string if value is null-like
+            return t_str if t_str.lower() not in ["nan", "none", "null", ""] else ""
 
         df["tag"] = df.apply(get_safe_tag, axis=1)
 
         closed_matches = []
         open_positions = []
 
+        # Process per Symbol
         for symbol, group in df.groupby("trdSym"):
             token_id = group["tok"].iloc[0]
             ex_seg = group["exSeg"].iloc[0]
@@ -74,16 +75,16 @@ def process_lilo_orders(client):
             sells = group[group["trnsTp"].str.upper() == "S"].to_dict('records')
 
             # =========================
-            # 🔁 TAG-MATCHING ENGINE (HHMMSS)
+            # 🔁 TAG-MATCHING ENGINE
             # =========================
             matched_sell_indices = []
             
             for b in buys:
-                # RULE: If Buy has NO TAG (Old Bag), it cannot be matched by this logic
+                # If Buy has no tag (Old Order), skip and keep it in open list
                 if b["tag"] == "":
                     continue
 
-                # Look for a sell with the EXACT same tag (HHMMSS)
+                # Find a Sell with the exact same tag
                 match_idx = next((i for i, s in enumerate(sells) 
                                  if s["tag"] == b["tag"] 
                                  and i not in matched_sell_indices), None)
@@ -104,9 +105,9 @@ def process_lilo_orders(client):
                         "Sell_Prc": s["prc"],
                         "PNL": int((s["prc"] - b["prc"]) * mqty)
                     })
-                    b["qty"] -= mqty # Mark as matched
+                    b["qty"] -= mqty # Mark qty as matched
                 
-            # Remaining Buys (Untagged OLD bags OR unmatched new scalps) go to Open
+            # Remaining Quantity (Old Bags or Unmatched Scalps) move to Open
             for b in buys:
                 if b["qty"] > 0:
                     live_val = get_mid_price(client, token_id, ex_seg)
