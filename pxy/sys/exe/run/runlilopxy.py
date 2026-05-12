@@ -40,6 +40,7 @@ def process_lilo_orders(client):
             return pd.DataFrame(), pd.DataFrame()
             
         df = pd.DataFrame(res["data"])
+        # Filtering for completed orders
         df = df[df["ordSt"].isin(["complete", "traded"])].copy()
         
         if df.empty:
@@ -50,8 +51,15 @@ def process_lilo_orders(client):
         df["qty"] = pd.to_numeric(df["fldQty"], errors='coerce').fillna(0)
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0)
         df["dt"] = pd.to_datetime(df["ordDtTm"])
-        # Extract Tag from guiOrdId (HHMMSS)
-        df["tag"] = df["guiOrdId"].astype(str)
+
+        # SAFE TAG EXTRACTION: Handles missing guiOrdId for old orders
+        def get_safe_tag(row):
+            t = row.get("guiOrdId") or row.get("tag") or ""
+            t_str = str(t).strip()
+            # Return empty string if tag is 'nan', 'None', or truly empty
+            return t_str if t_str.lower() not in ["nan", "none", ""] else ""
+
+        df["tag"] = df.apply(get_safe_tag, axis=1)
 
         closed_matches = []
         open_positions = []
@@ -69,10 +77,13 @@ def process_lilo_orders(client):
             matched_sell_indices = []
             
             for b in buys:
+                # RULE: If Buy has NO TAG (Old Bag), it cannot be matched by this logic
+                if b["tag"] == "":
+                    continue
+
                 # Look for a sell with the EXACT same tag (HHMMSS)
-                # Ensure tag is not empty/nan
-                match_idx = next((i for i, s in enumerate(sells) if s["tag"] == b["tag"] 
-                                 and b["tag"] not in ["nan", "None", ""] 
+                match_idx = next((i for i, s in enumerate(sells) 
+                                 if s["tag"] == b["tag"] 
                                  and i not in matched_sell_indices), None)
                 
                 if match_idx is not None:
@@ -91,14 +102,17 @@ def process_lilo_orders(client):
                         "Sell_Prc": s["prc"],
                         "PNL": int((s["prc"] - b["prc"]) * mqty)
                     })
-                else:
-                    # If no tag match, it stays as an OPEN position
+                    b["qty"] -= mqty # Mark as matched
+                
+            # Remaining Buys (Untagged OLD bags OR unmatched new scalps) go to Open
+            for b in buys:
+                if b["qty"] > 0:
                     live_val = get_mid_price(client, token_id, ex_seg)
                     open_positions.append({
                         "Symbol": symbol,
                         "Qty": b["qty"],
                         "tok": token_id,
-                        "tag": b["tag"], # Passed to Exit Script via combined_data
+                        "tag": b["tag"], 
                         "Buy_Time": b["dt"],
                         "Buy_Prc": b["prc"],
                         "Exit_Time": "OPEN",
@@ -133,6 +147,5 @@ def _print_summary(total_unrealized, total_realized):
 if __name__ == "__main__":
     client = get_session()
     process_lilo_orders(client)
-
 
 
