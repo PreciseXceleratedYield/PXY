@@ -82,9 +82,18 @@ try:
 except Exception as e:
     print(f"{Fore.RED}IMPORT ERROR: {e}"); sys.exit(1)
 
+# --- Updated Tag Generator for Day Trading ---
+def generate_pxy_tag():
+    """Generates a pure timestamp tag: HHMMSS"""
+    ist = pytz.timezone("Asia/Kolkata")
+    return datetime.now(ist).strftime('%H%M%S')
+
 def execute_order(client, symbol, qty):
     dprint(f"ENTER execute_order for {symbol}")
     try:
+        # Generate the unique ID for this specific scalp
+        order_tag = generate_pxy_tag()
+        
         params = {
             "exchange_segment": "nse_fo",
             "product": "NRML",
@@ -94,15 +103,21 @@ def execute_order(client, symbol, qty):
             "validity": "DAY",
             "trading_symbol": symbol,
             "transaction_type": "B",
-            "amo": "NO"
+            "amo": "NO",
+            "tag": order_tag  # <--- NEW: Attaching the HHMMSS tag
         }
+        
         dprint(f"ORDER PARAMS: {params}", Fore.YELLOW)
         res = client.place_order(**params)
-        dprint(f"ORDER RESPONSE: {res}", Fore.GREEN)
+        
+        # Log the tag with the response for verification
+        print(f"{Fore.CYAN}🚀 ORDER PLACED | SYMBOL: {symbol} | TAG: {order_tag}")
+        
         return {"stat": "OK" if res and str(res).strip() else "FAIL", "raw": res}
     except Exception as e:
         dprint(f"ORDER ERROR: {e}", Fore.RED)
         return {"stat": "FAIL", "err": str(e)}
+
 
 async def main():
     dprint("===== MAIN START =====", Fore.GREEN)
