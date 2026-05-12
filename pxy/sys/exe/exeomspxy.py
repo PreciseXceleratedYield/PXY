@@ -66,17 +66,23 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
         try:
             client = get_session()
             if client:
-                # Fetch all orders (Tagged and Untagged)
                 active_df, _ = process_lilo_orders(client)
                 
                 if not active_df.empty:
-                    # Standardize columns to lowercase
+                    # 1. Force columns to lowercase
                     active_df.columns = [c.lower() for c in active_df.columns]
                     
-                    # 🛡️ THE FIX: Only pass TAGGED orders to the Exit Logic
-                    # This hides old untagged bags from the SL/TP script
-                    active_df['tag'] = active_df['tag'].fillna("").astype(str).str.strip()
+                    # 2. Force TAG to be a clean string
+                    active_df['tag'] = active_df['tag'].astype(str).str.split('.').str[0].str.strip()
+                    
+                    # 3. DEBUG: Check if we actually have tagged orders before filtering
+                    tagged_count = (active_df['tag'] != "").sum()
+                    if tagged_count == 0:
+                        print(f"DEBUG: Found {len(active_df)} orders but ZERO have tags.")
+                    
+                    # 4. Filter only tagged orders
                     active_df = active_df[active_df['tag'] != ""].copy()
+
         except Exception as e:
             active_df = pd.DataFrame()
 
