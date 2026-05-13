@@ -1,55 +1,48 @@
+# sysdtafpxy.py
 import warnings 
 import pandas as pd 
 import yfinance as yf
 from syscnfgpxy import TICKER 
 
+# Silence future warning constraints completely
 warnings.simplefilter(action='ignore', category=FutureWarning) 
 
-# --- CONFIGURATION --- 
-DEFAULT_INTERVAL = "1m" 
-TARGET_TOTAL_ROWS = 42 
-
-def fetch_yf_data(period="5d", interval=None, min_rows=None, ticker=None): 
+def fetch_yf_data(period="5d", interval="1m", min_rows=None, ticker=None): 
     """ 
-    YFINANCE PADDED OHLC ENGINE
-    Guarantees exactly 42 rows by pooling today and yesterday's data.
+    UNSLICED CONTINUOUS YFINANCE ENGINE
+    Downloads multi-day context vectors to give SMA and ATR full mature lookback.
+    Matches your TradingView Pine Script chart dataset availability.
     """ 
-    target_interval = interval or DEFAULT_INTERVAL 
-    target_rows = min_rows or TARGET_TOTAL_ROWS 
     ticker_symbol = ticker or TICKER 
-    
     try:
         ticker_obj = yf.Ticker(ticker_symbol) 
         
-        # Always download 5 days to ensure we have a robust historical backlog for padding
-        df = ticker_obj.history(period="5d", interval=target_interval) 
+        # Pull 5 days of history to provide deep lookup capabilities
+        df = ticker_obj.history(period=period, interval=interval) 
         
         if df.empty:
-            print("WARNING: Data engine returned an empty DataFrame.")
+            print("WARNING: Yahoo Finance data engine returned an empty frame.")
             return pd.DataFrame()
             
         df.dropna(inplace=True) 
         
-        # DatetimeIndex alignment fix to prevent conversion parsing crashes downstream
+        # Ensure index is an explicit DatetimeIndex for safe timezone calculations
         if not isinstance(df.index, pd.DatetimeIndex):
             df.index = pd.to_datetime(df.index)
             
-        # Select the absolute last 42 bars from the 5-day dataset pool
-        # This naturally merges today's morning bars with yesterday's market close
-        return df.tail(target_rows) 
+        return df 
         
     except Exception as e:
         print(f"YFINANCE_DATA_ERROR | {e}")
         return pd.DataFrame()
 
 def get_latest_data(): 
-    """Returns the most recent single row from the engine"""
+    """Returns the most recent live completed bar matrix row"""
     return fetch_yf_data().tail(1) 
 
 if __name__ == "__main__": 
-    print(f"=== Pure YFinance Data Sync Engine | {TICKER} ===") 
+    print(f"=== Continuous YFinance Engine | Active Ticker: {TICKER} ===") 
     df = fetch_yf_data() 
     if not df.empty: 
-        print(f"Total Rows Retrieved: {len(df)} (Target: {TARGET_TOTAL_ROWS})")
-        print(df.tail(5))
+        print(f"SUCCESS: Total Continuous Vector Rows Loaded: {len(df)}")
 
