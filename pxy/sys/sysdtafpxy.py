@@ -1,48 +1,157 @@
-# sysdtafpxy.py
-import warnings 
-import pandas as pd 
+import os
+import warnings
+import numpy as np
+import pandas as pd
 import yfinance as yf
-from syscnfgpxy import TICKER 
+from syscnfgpxy import TICKER, OHLC_MODE, TIMEZONE
 
 # Silence future warning constraints completely
-warnings.simplefilter(action='ignore', category=FutureWarning) 
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
-def fetch_yf_data(period="5d", interval="1m", min_rows=None, ticker=None): 
-    """ 
-    UNSLICED CONTINUOUS YFINANCE ENGINE
-    Downloads multi-day context vectors to give SMA and ATR full mature lookback.
-    Matches your TradingView Pine Script chart dataset availability.
-    """ 
-    ticker_symbol = ticker or TICKER 
-    try:
-        ticker_obj = yf.Ticker(ticker_symbol) 
+
+def get_heikin_ashi_ohlc(o, h, l, c):
+    """Generates pure Heikin-Ashi smooth trend OHLC matrices"""
+    ha_c = (o + h + l + c) / 4
+    ha_o = np.zeros_like(o)
+    ha_o = (o + c) / 2
+    for i in range(1, len(o)):
+        ha_o[i] = (ha_o[i-1] + ha_c[i-1]) / 2
+    ha_h = np.maximum(h, np.maximum(ha_o, ha_c))
+    ha_l = np.minimum(l, np.minimum(ha_o, ha_c))
+    return ha_o, ha_h, ha_l, ha_c
+
+
+def get_open_close_median_ohlc(o, c):
+    """Generates flat candle Open-Close Midpoint OHLC matrices (oc/2)"""
+    oc2 = (o + c) / 2
+    return oc2, oc2, oc2, oc2
+
+
+def get_momentum_ohlc(c):
+    """Generates shift momentum OHLC matrices using prior close boundaries (c1 c0)"""
+    c1 = np.empty_like(c)
+    c1 = c
+    c1[1:] = c[:-1]
+    return c1, c, c1, c
+
+
+def apply_ohlc_transformation(df, mode=1):
+    """Transforms raw arrays into distinct, complete structural OHLC formats"""
+    if df.empty:
+        return df
         
-        # Pull 5 days of history to provide deep lookup capabilities
-        df = ticker_obj.history(period=period, interval=interval) 
+    o = df['Open'].to_numpy()
+    h = df['High'].to_numpy()
+    l = df['Low'].to_numpy()
+    c = df['Close'].to_numpy()
+    
+    if mode == 1:
+        return df
+        
+    elif mode == 2:
+        df['Open'], df['High'], df['Low'], df['Close'] = get_heikin_ashi_ohlc(o, h, l, c)
+        
+    elif mode == 3:
+        df['Open'], df['High'], df['Low'], df['Close'] = get_open_close_median_ohlc(o, c)
+        
+    elif mode == 4:
+        df['Open'], df['High'], df['Low'], df['Close'] = get_momentum_ohlc(c)
+        
+    elif mode == 5:
+        ha_o, ha_h, ha_l, ha_c = get_heikin_ashi_ohlc(o, h, l, c)
+        oc2_o, oc2_h, oc2_l, oc2_c = get_open_close_median_ohlc(o, c)
+        c1c0_o, c1c0_h, c1c0_l, c1c0_c = get_momentum_ohlc(c)
+        
+        df['Open'] = (o + ha_o + oc2_o + c1c0_o) / 4
+        df['High'] = (h + ha_h + oc2_h + c1c0_h) / 4
+        df['Low'] = (l + ha_l + oc2_l + c1c0_l) / 4
+        df['Close'] = (c + ha_c + oc2_c + c1c0_c) / 4
+    else:
+        print(f"SYSTEM_WARNING | Mode {mode} unrecognized. Defaulting to Raw OHLC.")
+        
+    return df
+
+
+def write_matrix_to_parent_csv(df):
+    """Saves data into the parent directory using the script filename string"""
+    try:
+        script_directory = os.path.dirname(os.path.abspath(__file__))
+        parent_directory = os.path.dirname(script_directory)
+        base_filename = os.path.splitext(os.path.basename(__file__)) + ".csv"
+        target_export_path = os.path.join(parent_directory, base_filename)
+        
+        df.to_csv(target_export_path, index=True)
+        print(f"CSV_EXPORT_SUCCESS | Matrix dumped cleanly to: {target_export_path}")
+    except Exception as e:
+        print(f"CSV_EXPORT_ERROR | Write operation failure: {e}")
+
+
+def fetch_yf_data(period="1d", interval="1m", target_rows=52):
+    """
+    PERMANENT 52-ROW STRUCTURE PROCESSING ENGINE
+    - Extracts 1-day, 1-minute live sequential vector ticks.
+    - Forces timeline padding to build a 52-candle data frame block at market open.
+    - Locks values down to the active imported config file mode.
+    - Auto-exports final data matrices into your destination folder pathway.
+    """
+    try:
+        ticker_obj = yf.Ticker(TICKER)
+        df = ticker_obj.history(period=period, interval=interval)
         
         if df.empty:
             print("WARNING: Yahoo Finance data engine returned an empty frame.")
             return pd.DataFrame()
-            
-        df.dropna(inplace=True) 
         
-        # Ensure index is an explicit DatetimeIndex for safe timezone calculations
+        df.dropna(inplace=True)
+        
         if not isinstance(df.index, pd.DatetimeIndex):
             df.index = pd.to_datetime(df.index)
             
-        return df 
+        # Adjust time metrics to match localized timezone profile parameters
+        if df.index.tz is None:
+            df = df.tz_localize('UTC').tz_convert(TIMEZONE)
+        else:
+            df = df.tz_convert(TIMEZONE)
+            
+        live_rows = len(df)
+        
+        # Phase A: Market Open Backfill Phase
+        if live_rows < target_rows:
+            needed_rows = target_rows - live_rows
+            first_bar = df.iloc[0]
+            base_time = df.index[0]
+            
+            padded_timestamps = [base_time - pd.Timedelta(minutes=i) for i in range(needed_rows, 0, -1)]
+            padding_df = pd.concat([first_bar.to_frame().T] * needed_rows, ignore_index=True)
+            padding_df.index = padded_timestamps
+            df = pd.concat([padding_df, df])
+        # Phase B: Market Core Mature Phase
+        else:
+            df = df.tail(target_rows)
+            
+        df = df.copy()
+        processed_df = apply_ohlc_transformation(df, mode=OHLC_MODE)
+        
+        # Fire automatic export sequence to disk space
+        write_matrix_to_parent_csv(processed_df)
+        return processed_df
         
     except Exception as e:
-        print(f"YFINANCE_DATA_ERROR | {e}")
+        print(f"YFINANCE_ENGINE_FAILURE | {e}")
         return pd.DataFrame()
 
-def get_latest_data(): 
-    """Returns the most recent live completed bar matrix row"""
-    return fetch_yf_data().tail(1) 
 
-if __name__ == "__main__": 
-    print(f"=== Continuous YFinance Engine | Active Ticker: {TICKER} ===") 
-    df = fetch_yf_data() 
-    if not df.empty: 
-        print(f"SUCCESS: Total Continuous Vector Rows Loaded: {len(df)}")
+def get_latest_data():
+    """Returns the most recent live completed row using active config files parameters"""
+    return fetch_yf_data().tail(1)
+
+
+# ---------------- SYSTEM SELF TEST ----------------
+if __name__ == "__main__":
+    print(f"=== PROCESSING RUNNING | ENGINE TARGET TICKER: {TICKER} ===")
+    print(f"=== CURRENTLY ENFORCED DATA TRANSFORMATION MODE: {OHLC_MODE} ===")
+    output_df = fetch_yf_data()
+    if not output_df.empty:
+        print(f"ENGINE_RUN_SUCCESS | Total Data Frame Sizing Bounds: {output_df.shape}")
+
 
