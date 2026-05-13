@@ -16,7 +16,7 @@ def calc_tsma_np(series, window=7):
     y = series.tail(window).values 
     x = np.arange(len(y)) 
     coeffs = np.polyfit(x, y, 1) 
-    return float(coeffs * (len(y) - 1) + coeffs) 
+    return float(coeffs[0] * (len(y) - 1) + coeffs[1]) 
 
 def log_sync_state(timestamp, entry, exit_sig, price, tsma, st, upper, lower, ceiling_touch, floor_touch): 
     try: 
@@ -63,12 +63,11 @@ def get_signal(df=None):
     # --- 1. DATA ENTRY & ATR SNAPSHOT --- 
     h_s, l_s, c_s, o_s = df_calc['High'], df_calc['Low'], df_calc['Close'], df_calc['Open'] 
     
-    # Pine Script: atr_sma = ta.sma(ta.tr, 14)
     prev_close = c_s.shift(1)
     tr = pd.concat([h_s - l_s, (h_s - prev_close).abs(), (l_s - prev_close).abs()], axis=1).max(axis=1)
     atr_series = tr.rolling(14).mean().fillna(20.0)
 
-    # --- 2. Pine Script INTRADAY SESSION COUNTER & ANCHOR BLACK LINE MATH --- 
+    # --- 2. INTRADAY SESSION COUNTER & ANCHOR BLACK LINE MATH --- 
     df_calc['date_only'] = df_calc.index.date
     df_calc['bar_cnt'] = df_calc.groupby('date_only').cumcount() + 1 
     df_calc['session_sum'] = df_calc.groupby('date_only')['Close'].cumsum()
@@ -76,7 +75,6 @@ def get_signal(df=None):
     df_calc['sma_50'] = df_calc.groupby('date_only')['Close'].transform(lambda x: x.rolling(window=50, min_periods=1).mean())
     df_calc['python_hybrid'] = (df_calc['session_mean'] + df_calc['sma_50']) / 2 
     
-    # Anchor definition logic at 9:15 AM open bar
     first_bars = df_calc.groupby('date_only').first()
     anchor_values = np.where(first_bars['Close'] > first_bars['Open'], first_bars['High'], first_bars['Low'])
     anchor_map = pd.Series(anchor_values, index=first_bars.index)
@@ -96,7 +94,6 @@ def get_signal(df=None):
     df_calc['day_high_running'] = df_calc.groupby('date_only')['High'].cummax()
     df_calc['day_low_running'] = df_calc.groupby('date_only')['Low'].cummin()
     
-    # Pine Script Shifted variables: day_high, close, atr_offset
     df_calc['day_high_shifted'] = df_calc['day_high_running'].shift(1)
     df_calc['day_low_shifted'] = df_calc['day_low_running'].shift(1)
     df_calc['close_shifted'] = df_calc['Close'].shift(1)
@@ -105,11 +102,11 @@ def get_signal(df=None):
     df_calc['upper_boundary_series'] = ((df_calc['day_high_shifted'] + df_calc['close_shifted']) / 2) + df_calc['atr_offset_shifted']
     df_calc['lower_boundary_series'] = ((df_calc['day_low_shifted'] + df_calc['close_shifted']) / 2) - df_calc['atr_offset_shifted']
     
-    # --- 4. CONTINUOUS TSMA SERIES & STRATEGY SIGNAL EVALUATION --- 
-    tsma_list = [calc_tsma_np(c_s.iloc[:i+1], 7) for i in range(len(df_calc))]
+    # --- 4. CONTINUOUS TSMA SERIES VECTOR (WITH ZERO SVD GUARD FIXED) --- 
+    tsma_list = [calc_tsma_np(c_s.iloc[:i+1], 7) if (i >= 1) else float(c_s.iloc[i]) for i in range(len(df_calc))]
     df_calc['tsma_7'] = tsma_list
     
-    # 5. ISOLATE TODAY'S SIGNALS CANVAS (Removes older data frames safely)
+    # 5. ISOLATE TODAY'S SIGNALS CANVAS
     today_date = df_calc.index[-1].date()
     df_today = df_calc[df_calc['date_only'] == today_date].copy()
     
@@ -128,13 +125,11 @@ def get_signal(df=None):
     df_today['aboveBlack'] = df_today['Close'] > df_today['ST']
     df_today['belowBlack'] = df_today['Close'] < df_today['ST']
     
-    # Loop Memory Matrix Emulation matching ta.highest / ta.lowest across 7 bars
     df_today['highest_high_7'] = df_today['High'].rolling(7, min_periods=1).max()
     df_today['lowest_low_7'] = df_today['Low'].rolling(7, min_periods=1).min()
     df_today['hadRecentCeilingTouch'] = df_today['highest_high_7'] >= df_today['upper_boundary_series']
     df_today['hadRecentFloorTouch'] = df_today['lowest_low_7'] <= df_today['lower_boundary_series']
     
-    # Pine Script: isSafe = bar_cnt >= 14
     df_today['isSafe'] = df_today['bar_cnt'] >= 14
     
     df_today['isBuy'] = df_today['isSafe'] & (
@@ -181,6 +176,3 @@ def get_signal(df=None):
 if __name__ == "__main__": 
     e, x = get_signal() 
     print(f"Final Synchronized Outputs -> Entry Status: {e} | Exit Trend: {x}")
-
-
-
