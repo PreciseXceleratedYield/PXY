@@ -49,7 +49,6 @@ def get_signal(df=None):
         df_calc['c1'] = df_calc['Close'].shift(1)
         df_calc['c2'] = df_calc['Close'].shift(2)
         df_calc['st1'] = df_calc['ST'].shift(1)
-        
         df_calc['aboveBlack'] = df_calc['Close'] > df_calc['ST']
         df_calc['belowBlack'] = df_calc['Close'] < df_calc['ST']
         
@@ -67,7 +66,6 @@ def get_signal(df=None):
         # Core Geometric Formations (C0, C1, C2 Only)
         v_pattern_up = (c1 < c2) and (c0 > c1)
         inverted_v_down = (c1 > c2) and (c0 < c1)
-        
         three_candles_up = (c0 > c1) and (c1 > c2)
         three_candles_down = (c0  Entry Status: {e} | Exit Trend: {x}")
 
