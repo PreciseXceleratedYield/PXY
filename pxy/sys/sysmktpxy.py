@@ -5,7 +5,7 @@ import json
 import os
 from datetime import datetime
 from sysdtafpxy import fetch_yf_data
-from sysstrndpxy import calculate_supertrend  # Uses your upgraded TSMA(50) architecture
+from sysstrndpxy import calculate_supertrend  # Uses your upgraded TSMA(42) + Price Midpoint architecture
 
 DEBUG = True
 
@@ -18,7 +18,7 @@ def calc_tsma_np(series, window=7):
     coeffs = np.polyfit(x, y, 1)
     return float(coeffs[0] * (len(y) - 1) + coeffs[1])
 
-def log_sync_state(timestamp, entry, exit_sig, price, tsma, st, upper, lower, ceiling_touch, floor_touch):
+def log_sync_state(timestamp, entry, exit_sig, price, tsma, st):
     try:
         dir_path = os.path.expanduser("~/pxy")
         os.makedirs(dir_path, exist_ok=True)
@@ -28,10 +28,6 @@ def log_sync_state(timestamp, entry, exit_sig, price, tsma, st, upper, lower, ce
             "Price": float(price),
             "TSMA": round(float(tsma), 2),
             "ST_Line": round(float(st), 2),
-            "Ceiling_Boundary": round(float(upper), 2),
-            "Floor_Boundary": round(float(lower), 2),
-            "Ceiling_Touch": bool(ceiling_touch),
-            "Floor_Touch": bool(floor_touch),
             "Signal_Entry": str(entry),
             "Signal_Exit": str(exit_sig),
             "Logged_At": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -52,99 +48,78 @@ def log_sync_state(timestamp, entry, exit_sig, price, tsma, st, upper, lower, ce
 def get_signal(df=None):
     if df is None:
         df = fetch_yf_data()
-        
     if df is None or df.empty:
         return "NONE", "NONE"
         
     try:
         # --- 1. RUN STRUCTURAL SUPERTREND BACKBONE ---
-        df_calc = calculate_supertrend(df)  # Slices to a strict 50-row matrix internally
+        df_calc = calculate_supertrend(df) # Slices to a strict 50-row matrix internally
         
-        # --- 2. CALCULATE ATR OVER MATURED DATA VECTOR ---
-        h_s, l_s, c_s = df_calc['High'], df_calc['Low'], df_calc['Close']
-        prev_close = c_s.shift(1)
-        tr = pd.concat([h_s - l_s, (h_s - prev_close).abs(), (l_s - prev_close).abs()], axis=1).max(axis=1)
-        atr_series = tr.rolling(14, min_periods=1).mean().fillna(20.0)
+        # --- 2. EXTRACT MATURED PRICE SERIE COMPONENTS ---
+        c_s = df_calc['Close']
         
-        # --- 3. DYNAMIC INTRA-MATRIX CHANNELS ---
-        df_calc['day_high_running'] = h_s.cummax()
-        df_calc['day_low_running'] = l_s.cummin()
-        
-        df_calc['day_high_shifted'] = df_calc['day_high_running'].shift(1)
-        df_calc['day_low_shifted'] = df_calc['day_low_running'].shift(1)
-        df_calc['close_shifted'] = c_s.shift(1)
-        df_calc['atr_offset_shifted'] = (0.25 * atr_series).shift(1)
-        
-        df_calc['upper_boundary_series'] = ((df_calc['day_high_shifted'] + df_calc['close_shifted']) / 2) + df_calc['atr_offset_shifted']
-        df_calc['lower_boundary_series'] = ((df_calc['day_low_shifted'] + df_calc['close_shifted']) / 2) - df_calc['atr_offset_shifted']
-        
-        # --- 4. CALC FAST TSMA_7 TRACKER VECTORS ---
+        # --- 3. CALC FAST TSMA_7 TRACKER VECTORS ---
         tsma_list = [calc_tsma_np(c_s.iloc[:i+1], 7) if (i >= 1) else float(c_s.iloc[i]) for i in range(len(df_calc))]
         df_calc['tsma_7'] = tsma_list
         
-        # --- 5. SIGNAL MATRIX CROSSES (UPGRADED TO DYNAMIC PROGRESSIVE LOOKBACK) ---
+        # --- 4. SIGNAL MATRIX LOOKBACK SHIFTS (STRICT C0, C1, C2 ONLY) ---
         df_calc['c1'] = df_calc['Close'].shift(1)
+        df_calc['c2'] = df_calc['Close'].shift(2)
         df_calc['tsma1'] = df_calc['tsma_7'].shift(1)
         df_calc['st1'] = df_calc['ST'].shift(1)
-        
-        df_calc['priceCrossUp'] = (df_calc['c1'] <= df_calc['tsma1']) & (df_calc['Close'] > df_calc['tsma_7'])
-        df_calc['priceCrossDn'] = (df_calc['c1'] >= df_calc['tsma1']) & (df_calc['Close'] < df_calc['tsma_7'])
-        df_calc['crossAboveBlack'] = (df_calc['c1'] <= df_calc['st1']) & (df_calc['Close'] > df_calc['ST'])
-        df_calc['crossBelowBlack'] = (df_calc['c1'] >= df_calc['st1']) & (df_calc['Close'] < df_calc['ST'])
         
         df_calc['aboveBlack'] = df_calc['Close'] > df_calc['ST']
         df_calc['belowBlack'] = df_calc['Close'] < df_calc['ST']
         
-        # Pull the absolute final bar's accumulated count to dynamically scale the lookback size
-        last_row_pre = df_calc.iloc[-1]
-        current_bar_count = int(last_row_pre['bar_count'])
-        dynamic_lookback = min(current_bar_count, 42)
+        df_calc['crossAboveBlack'] = (df_calc['c1'] <= df_calc['st1']) & (df_calc['Close'] > df_calc['ST'])
+        df_calc['crossBelowBlack'] = (df_calc['c1'] >= df_calc['st1']) & (df_calc['Close'] < df_calc['ST'])
         
-        # Rolling tracking parameters use the progressive window sizing
-        df_calc['highest_high_42'] = df_calc['High'].rolling(dynamic_lookback, min_periods=1).max()
-        df_calc['lowest_low_42'] = df_calc['Low'].rolling(dynamic_lookback, min_periods=1).min()
-        
-        df_calc['hadRecentCeilingTouch'] = df_calc['highest_high_42'] >= df_calc['upper_boundary_series']
-        df_calc['hadRecentFloorTouch'] = df_calc['lowest_low_42'] <= df_calc['lower_boundary_series']
-        
-        # --- 6. ISOLATE ENTRY EXECUTIONS FROM LAST ROW ---
+        # --- 5. ISOLATE VECTOR STATES FROM LAST ROW ---
         last_row = df_calc.iloc[-1].copy()
         c0, tsma0, st0 = float(last_row['Close']), float(last_row['tsma_7']), float(last_row['ST'])
-        upper_b, lower_b = float(last_row['upper_boundary_series']), float(last_row['lower_boundary_series'])
-        had_recent_ceiling, had_recent_floor = bool(last_row['hadRecentCeilingTouch']), bool(last_row['hadRecentFloorTouch'])
+        c1, c2 = float(last_row['c1']), float(last_row['c2'])
+        cross_up_black = bool(last_row['crossAboveBlack'])
+        cross_dn_black = bool(last_row['crossBelowBlack'])
+        
+        # Core Geometric Formations (C0, C1, C2 Only)
+        v_pattern_up = (c1 < c2) and (c0 > c1)
+        inverted_v_down = (c1 > c2) and (c0 < c1)
+        
+        three_candles_up = (c0 > c1) and (c1 > c2)
+        three_candles_down = (c0 < c1) and (c1 < c2)
+        
+        st_signal = str(last_row['ST_Trend']) 
+        above_black = bool(last_row['aboveBlack'])
+        below_black = bool(last_row['belowBlack'])
         
         if DEBUG:
-            print(f"\n--- PXY DEBUG (PROGRESSIVE 1-42 MATCH) --- Price: {c0} | TSMA: {tsma0:.2f} | ST: {st0:.2f}")
-            print(f"Locked Boundaries: UP {upper_b:.2f} | LO {lower_b:.2f}")
-            print(f"Dynamic Lookback Bounds: {dynamic_lookback} bars | Ceiling_Touch: {had_recent_ceiling} | Floor_Touch: {had_recent_floor}")
-            
+            print(f"\n--- PXY DEBUG (GEOMETRIC ENGINE) --- Price: {c0} | TSMA: {tsma0:.2f} | ST: {st0:.2f}")
+            print(f"Candle Context : C0: {c0} | C1: {c1} | C2: {c2}")
+
+        # --- 6. ENTRY SIGNAL EXECUTION ENGINE ---
         entry = "NONE"
-        # REMOVED: Execution safety restrictions; system is completely active from bar 1
-        is_buy = bool((last_row['priceCrossUp'] & had_recent_floor) | (last_row['priceCrossUp'] & last_row['aboveBlack']) | last_row['crossAboveBlack'])
-        is_sell = bool((last_row['priceCrossDn'] & had_recent_ceiling) | (last_row['priceCrossDn'] & last_row['belowBlack']) | last_row['crossBelowBlack'])
-        
-        if is_buy:
+        if st_signal == "BUY" or cross_up_black:
             entry = "BUY"
-        elif is_sell:
+        elif st_signal == "SELL" or cross_dn_black:
             entry = "SELL"
-        elif last_row['aboveBlack'] and c0 > tsma0:
+        elif v_pattern_up and above_black:
+            entry = "BUY"
+        elif inverted_v_down and below_black:
+            entry = "SELL"
+        elif three_candles_up and above_black and (c0 > tsma0):
             entry = "BULL"
-        elif last_row['belowBlack'] and c0 < tsma0:
+        elif three_candles_down and below_black and (c0 < tsma0):
             entry = "BEAR"
+
+        # --- 7. EXIT SIGNAL ENGINE (FIXED - NO EXTERNAL LAYER CONDITIONS) ---
+        # Evaluates trend exhaustion strictly using the structural patterns
+        exit_sig = "SIDE"
+        if inverted_v_down or three_candles_down:
+            exit_sig = "SELL"  # Signal exit to flatten long setups
+        elif v_pattern_up or three_candles_up:
+            exit_sig = "BUY"   # Signal exit to flatten short setups
             
-        # --- 7. EXIT LOGIC LAYER ARRAYS ---
-        c_arr, o_arr, h_arr, l_arr = df_calc['Close'].values, df_calc['Open'].values, df_calc['High'].values, df_calc['Low'].values
-        
-        def get_layers_array(idx):
-            c, o, h, l = c_arr[idx], o_arr[idx], h_arr[idx], l_arr[idx]
-            c_prev = c_arr[idx-1] if abs(idx-1) <= len(c_arr) else c
-            return round((c + (c_prev+c)/2 + (c+o)/2 + (o+h+l+c)/4) / 4, 4)
-            
-        p0 = get_layers_array(-1)
-        p1 = get_layers_array(-2) if len(df_calc) > 1 else p0
-        exit_sig = "BUY" if p0 > p1 else "SELL"
-        
-        log_sync_state(df_calc.index[-1], entry, exit_sig, c0, tsma0, st0, upper_b, lower_b, had_recent_ceiling, had_recent_floor)
+        log_sync_state(df_calc.index[-1], entry, exit_sig, c0, tsma0, st0)
         return entry, exit_sig
         
     except Exception as e:
@@ -155,5 +130,6 @@ def get_signal(df=None):
 if __name__ == "__main__":
     e, x = get_signal()
     print(f"Final Synchronized Outputs -> Entry Status: {e} | Exit Trend: {x}")
+
 
 
