@@ -1,92 +1,109 @@
-# sysstrndpxy.py 
-import pandas as pd 
-import numpy as np 
-import pytz 
-from sysdtafpxy import fetch_yf_data 
+# sysstrndpxy.py
+import pandas as pd
+import numpy as np
+import pytz
+from sysdtafpxy import fetch_yf_data
 
-DEBUG_MODE = True 
+DEBUG_MODE = True
 
-def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
-    """ 
-    PXY® Engine: Fixed Anchor + Smooth IST Merge Logic 
-    Fully optimized to run on an unsliced continuous data stream.
-    """ 
-    df = df.copy() 
-    if not isinstance(df.index, pd.DatetimeIndex): 
-        date_col = next((c for c in ['Date', 'Datetime', 'timestamp', 'time'] if c in df.columns), None) 
-        if date_col: 
-            df[date_col] = pd.to_datetime(df[date_col]) 
-            df.set_index(date_col, inplace=True) 
+def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    PXY® Engine: Fixed Anchor + Smooth IST Merge Logic
+    Slices and processes a strict 50-row rolling frame window.
+    """
+    # Force a strict trailing 50-row window from the upstream feed
+    df = df.tail(50).copy()
+    
+    # 1. Enforce Datetime Index Alignment
+    if not isinstance(df.index, pd.DatetimeIndex):
+        date_col = next((c for c in ['Date', 'Datetime', 'timestamp', 'time'] if c in df.columns), None)
+        if date_col:
+            df[date_col] = pd.to_datetime(df[date_col])
+            df.set_index(date_col, inplace=True)
             
-    # Timezone conversion check to prevent re-localization index crashes
-    if df.index.tz is None: 
-        df.index = df.index.tz_localize('UTC').tz_convert('Asia/Kolkata') 
-    elif str(df.index.tz) != 'Asia/Kolkata': 
-        df.index = df.index.tz_convert('Asia/Kolkata') 
-
-    df['date_only'] = df.index.date 
-    df['bar_count'] = df.groupby('date_only').cumcount() + 1 
+    # 2. Timezone synchronization check
+    if df.index.tz is None:
+        df.index = df.index.tz_localize('UTC').tz_convert('Asia/Kolkata')
+    elif str(df.index.tz) != 'Asia/Kolkata':
+        df.index = df.index.tz_convert('Asia/Kolkata')
+        
+    # 3. Position-based Matrix Metrics for exactly 50 rows
+    df['bar_count'] = np.arange(1, 51)
     
-    # Expanding session mean calculation matching Pine Script's cumulative sum loop
-    df['session_mean'] = df.groupby('date_only')['Close'].transform(lambda x: x.expanding(min_periods=1).mean()) 
+    # Cumulative session mean over the 50-row space
+    df['session_mean'] = df['Close'].expanding(min_periods=1).mean()
     
-    # 50 SMA calculation - min_periods=1 keeps it from returning NaN during morning warm-up
-    df['sma_50'] = df.groupby('date_only')['Close'].transform(lambda x: x.rolling(window=50, min_periods=1).mean()) 
-    df['python_hybrid'] = (df['session_mean'] + df['sma_50']) / 2 
-
-    # Grab the 9:15 AM opening candle of each daily session to define anchor levels
-    first_bars = df.groupby('date_only').first() 
-    anchors = np.where(first_bars['Close'] > first_bars['Open'], first_bars['High'], first_bars['Low']) 
-    anchor_map = pd.Series(anchors, index=first_bars.index) 
-    df['anchor'] = df['date_only'].map(anchor_map) 
+    # 50 SMA rolling window matches exactly 50 rows matrix sizing
+    df['sma_50'] = df['Close'].rolling(window=50, min_periods=1).mean()
+    df['python_hybrid'] = (df['session_mean'] + df['sma_50']) / 2
     
-    # Smooth merge phase factor: 0.0 at bar 15 -> 1.0 at bar 45
-    df['blend_factor'] = ((df['bar_count'] - 15) / 30.0).clip(0, 1) 
+    # 4. Stabilized Anchor Logic
+    # Pulls strictly from index 0 of the current 50-row matrix
+    first_bar_open = df['Open'].iloc[0]
+    first_bar_close = df['Close'].iloc[0]
+    first_bar_high = df['High'].iloc[0]
+    first_bar_low = df['Low'].iloc[0]
     
-    df['ST'] = np.where( 
+    anchor_value = first_bar_high if first_bar_close > first_bar_open else first_bar_low
+    df['anchor'] = anchor_value
+    
+    # 5. Blend factor calculations (15 to 45 scaling bounds)
+    df['blend_factor'] = ((df['bar_count'] - 15) / 30.0).clip(0, 1)
+    
+    df['ST'] = np.where(
         df['bar_count'] <= 15, 
         df['anchor'], 
-        np.where( 
+        np.where(
             df['bar_count'] <= 45, 
             (df['anchor'] * (1 - df['blend_factor'])) + (df['python_hybrid'] * df['blend_factor']), 
-            df['python_hybrid'] 
-        ) 
-    ) 
+            df['python_hybrid']
+        )
+    )
+    
+    # 6. Optimized Trend Matrix Generation
+    st_trend = []
+    prev_trend = "SIDE"
+    
+    for i in range(len(df)):
+        curr_close = df['Close'].iloc[i]
+        curr_line = df['ST'].iloc[i]
+        
+        if pd.isna(curr_line):
+            st_trend.append("SIDE")
+            continue
+            
+        if curr_close > curr_line:
+            new_trend = "UP" if prev_trend in ["UP", "BUY"] else "BUY"
+        elif curr_close < curr_line:
+            new_trend = "DOWN" if prev_trend in ["DOWN", "SELL"] else "SELL"
+        else:
+            new_trend = "SIDE"
+            
+        st_trend.append(new_trend)
+        prev_trend = new_trend
+        
+    df['ST_Trend'] = st_trend
+    return df
 
-    st_trend = [] 
-    prev_trend = "SIDE" 
-    for i in range(len(df)): 
-        curr_close = df['Close'].iloc[i] 
-        curr_line = df['ST'].iloc[i] 
-        if pd.isna(curr_line): 
-            st_trend.append("SIDE") 
-            continue 
-        if curr_close > curr_line: 
-            new_trend = "UP" if prev_trend in ["UP", "BUY"] else "BUY" 
-        elif curr_close < curr_line: 
-            new_trend = "DOWN" if prev_trend in ["DOWN", "SELL"] else "SELL" 
-        else: 
-            new_trend = "SIDE" 
-        st_trend.append(new_trend) 
-        prev_trend = new_trend 
-    df['ST_Trend'] = st_trend 
-
-    # DATA FIX: Keep internal columns intact so downstream modules can reuse them
-    # instead of recalculating heavy windows over the continuous data stream
-    return df 
-
-def get_signal(df=None): 
-    if df is None: 
-        df = fetch_yf_data() 
-    if df is None or df.empty: 
-        return "NONE", 0.0 
-    try: 
-        df_st = calculate_supertrend(df) 
-        last = df_st.iloc[-1] 
-        return str(last['ST_Trend']), float(last['ST']) 
-    except Exception as e: 
-        if DEBUG_MODE: 
-            print(f"PXY Error: {e}") 
+def get_signal(df=None):
+    """Downstream communication port processing execution metrics"""
+    if df is None:
+        df = fetch_yf_data()
+        
+    if df is None or df.empty:
+        return "NONE", 0.0
+        
+    try:
+        df_st = calculate_supertrend(df)
+        last = df_st.iloc[-1]
+        return str(last['ST_Trend']), float(last['ST'])
+    except Exception as e:
+        if DEBUG_MODE:
+            print(f"PXY Error: {e}")
         return "NONE", 0.0
 
+if __name__ == "__main__":
+    print("=== Supertrend Signal Engine Self-Test ===")
+    trend_signal, st_line_value = get_signal()
+    print(f"CURRENT SYSTEM SIGNAL: {trend_signal} | LINE METRIC: {st_line_value}")
 
