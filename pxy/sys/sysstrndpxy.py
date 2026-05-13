@@ -37,6 +37,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['anchor'] = df['date_only'].map(anchor_map) 
 
     df['blend_factor'] = ((df['bar_count'] - 15) / 30.0).clip(0, 1) 
+    
+    # FIXED LINE 43: Removed the syntax corruption inside the np.where parameters
     df['ST'] = np.where( 
         df['bar_count'] <= 15, 
         df['anchor'], 
@@ -44,7 +46,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             df['bar_count'] <= 45, 
             (df['anchor'] * (1 - df['blend_factor'])) + (df['python_hybrid'] * df['blend_factor']), 
             df['python_hybrid'] 
-        ) distribute updates
+        ) 
     ) 
 
     st_trend = [] 
@@ -101,5 +103,4 @@ if __name__ == "__main__":
         print("-" * 65) 
         print(f"Latest Price: {test_df['Close'].iloc[-1]:.2f}") 
         print(f"Final Signal: {get_signal(test_df)}")
-
 
