@@ -3,7 +3,6 @@ import pandas as pd
 from datetime import datetime 
 from syscnfgpxy import TICKER 
 
-# Silence warnings 
 warnings.simplefilter(action='ignore', category=FutureWarning) 
 
 # ---------------- GLOBAL SWITCH ---------------- 
@@ -16,13 +15,9 @@ if RUN_DIR not in sys.path:
     sys.path.append(RUN_DIR) 
 from runclntpxy import get_session 
 
-# --- CONFIGURATION --- 
 CSV_FILE = f"{TICKER.lower().replace(' ', '_')}_history.csv" 
 DEFAULT_MIN_ROWS = 50 
 
-# ============================================================ 
-# ====================== NEO DATA SOURCE ====================== 
-# ============================================================ 
 def _fetch_neo_data(period="1d", interval="1m", min_rows=None, ticker=None): 
     """ KOTAK NEO REAL-TIME OHLC ENGINE """ 
     t = ticker or TICKER 
@@ -54,12 +49,7 @@ def _fetch_neo_data(period="1d", interval="1m", min_rows=None, ticker=None):
                 df_hist.at[idx, 'Close'] = ltp 
             else: 
                 new_row = { 
-                    "Datetime": current_min, 
-                    "Open": ltp, 
-                    "High": ltp, 
-                    "Low": ltp, 
-                    "Close": ltp, 
-                    "Volume": 0 
+                    "Datetime": current_min, "Open": ltp, "High": ltp, "Low": ltp, "Close": ltp, "Volume": 0 
                 } 
                 df_hist = pd.concat([df_hist, pd.DataFrame([new_row])], ignore_index=True) 
             df_hist.to_csv(CSV_FILE, index=False) 
@@ -78,9 +68,6 @@ def _fetch_neo_data(period="1d", interval="1m", min_rows=None, ticker=None):
         print(f"NEO_DATA_ERROR|{e}") 
         return pd.DataFrame() 
 
-# ============================================================ 
-# ====================== YFINANCE SOURCE ===================== 
-# ============================================================ 
 import yfinance as yf 
 DEFAULT_INTERVAL = "1m" 
 DEFAULT_MIN_ROWS_YF = 5 
@@ -91,17 +78,10 @@ def _fetch_yf_data(period="5d", interval=None, min_rows=None, ticker=None):
     min_rows = min_rows or DEFAULT_MIN_ROWS_YF 
     ticker_symbol = ticker or TICKER 
     ticker_obj = yf.Ticker(ticker_symbol) 
-    
-    # Changed period to "5d" so yesterday's boundary lines work on ultra-short loops
     df = ticker_obj.history(period="5d", interval=interval) 
     df.dropna(inplace=True) 
-    
-    # DATA FIX: Do not run reset_index() here. Keep DatetimeIndex intact.
     return df.tail(min_rows) 
 
-# ============================================================ 
-# ====================== UNIFIED API ========================== 
-# ============================================================ 
 def fetch_yf_data(period="1d", interval="1m", min_rows=None, ticker=None): 
     """ UNIFIED DATA INTERFACE """ 
     if SOURCE.upper() == "NEO": 
@@ -110,7 +90,6 @@ def fetch_yf_data(period="1d", interval="1m", min_rows=None, ticker=None):
         return _fetch_yf_data(period=period, interval=interval, min_rows=min_rows, ticker=ticker) 
 
 def get_latest_data(): 
-    """Returns latest row from selected source""" 
     return fetch_yf_data().tail(1) 
 
 if __name__ == "__main__": 
