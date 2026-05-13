@@ -13,7 +13,7 @@ def get_heikin_ashi_ohlc(o, h, l, c):
     """Generates pure Heikin-Ashi smooth trend OHLC matrices"""
     ha_c = (o + h + l + c) / 4
     ha_o = np.zeros_like(o)
-    ha_o = (o + c) / 2
+    ha_o[0] = (o[0] + c[0]) / 2
     for i in range(1, len(o)):
         ha_o[i] = (ha_o[i-1] + ha_c[i-1]) / 2
     ha_h = np.maximum(h, np.maximum(ha_o, ha_c))
@@ -30,7 +30,7 @@ def get_open_close_median_ohlc(o, c):
 def get_momentum_ohlc(c):
     """Generates shift momentum OHLC matrices using prior close boundaries (c1 c0)"""
     c1 = np.empty_like(c)
-    c1 = c
+    c1[0] = c[0]
     c1[1:] = c[:-1]
     return c1, c, c1, c
 
@@ -77,7 +77,11 @@ def write_matrix_to_parent_csv(df):
     try:
         script_directory = os.path.dirname(os.path.abspath(__file__))
         parent_directory = os.path.dirname(script_directory)
-        base_filename = os.path.splitext(os.path.basename(__file__)) + ".csv"
+        
+        # FIXED: Extracted string element from os.path.splitext tuple result safely
+        base_name = os.path.splitext(os.path.basename(__file__))[0]
+        base_filename = base_name + ".csv"
+        
         target_export_path = os.path.join(parent_directory, base_filename)
         
         df.to_csv(target_export_path, index=True)
@@ -153,5 +157,4 @@ if __name__ == "__main__":
     output_df = fetch_yf_data()
     if not output_df.empty:
         print(f"ENGINE_RUN_SUCCESS | Total Data Frame Sizing Bounds: {output_df.shape}")
-
 
