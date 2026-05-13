@@ -69,51 +69,8 @@ def get_signal(df=None):
         inverted_v_down = (c1 > c2) and (c0 < c1)
         
         three_candles_up = (c0 > c1) and (c1 > c2)
-        three_candles_down = (c0 < c1) and (c1 < c2)
-        
-        st_signal = str(last_row['ST_Trend']) 
-        above_black = bool(last_row['aboveBlack'])
-        below_black = bool(last_row['belowBlack'])
-        
-        if DEBUG:
-            print(f"\n--- PXY DEBUG (ISOLATED EXECUTION SYSTEM) --- Price: {c0} | ST: {st0:.2f}")
-            print(f"Candle Context : C0: {c0} | C1: {c1} | C2: {c2}")
-            print(f"Cross Checks   : CrossUpST: {cross_up_black} | CrossDnST: {cross_dn_black}")
+        three_candles_down = (c0  Entry Status: {e} | Exit Trend: {x}")
 
-        # --- 4. ENTRY SIGNAL ENGINE (RESTRICTED BY ST BLACK LINE) ---
-        entry = "NONE"
-        if st_signal == "BUY" or cross_up_black:
-            entry = "BUY"
-        elif st_signal == "SELL" or cross_dn_black:
-            entry = "SELL"
-        elif v_pattern_up and above_black:
-            entry = "BUY"
-        elif inverted_v_down and below_black:
-            entry = "SELL"
-        elif three_candles_up and above_black:
-            entry = "BULL"
-        elif three_candles_down and below_black:
-            entry = "BEAR"
-
-        # --- 5. EXIT SIGNAL ENGINE (PURE GEOMETRICS - NO ST COMPARISON) ---
-        # Exits are triggered strictly by raw candlestick reversals to maximize exit speed
-        exit_sig = "SIDE"
-        if inverted_v_down or three_candles_down:
-            exit_sig = "SELL"  # Immediate structural trend exhaustion -> flatten long setups
-        elif v_pattern_up or three_candles_up:
-            exit_sig = "BUY"   # Immediate structural trend exhaustion -> flatten short setups
-            
-        log_sync_state(df_calc.index[-1], entry, exit_sig, c0, st0)
-        return entry, exit_sig
-        
-    except Exception as e:
-        if DEBUG:
-            print(f"PXY Master Core Error: {e}")
-        return "NONE", "NONE"
-
-if __name__ == "__main__":
-    e, x = get_signal()
-    print(f"Final Synchronized Outputs -> Entry Status: {e} | Exit Trend: {x}")
 
 
 
