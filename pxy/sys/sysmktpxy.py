@@ -14,7 +14,7 @@ def calc_tsma_np(series, window=7):
     y = series.tail(window).values 
     x = np.arange(len(y)) 
     coeffs = np.polyfit(x, y, 1) 
-    return float(coeffs[0] * (len(y) - 1) + coeffs[1]) 
+    return float(coeffs * (len(y) - 1) + coeffs) 
 
 def get_signal(df=None): 
     try: 
@@ -31,7 +31,7 @@ def get_signal(df=None):
         if DEBUG: print(f"DEBUG: Fetch Error: {e}") 
         return "NONE", "NONE" 
 
-    # DATA FIX: Lowered gate length check from 50 to 3 bars
+    # Guard gate lowered to 3 to accept your rolling accumulation window
     if df is None or len(df) < 3: 
         return "NONE", "NONE" 
 
@@ -58,7 +58,7 @@ def get_signal(df=None):
     tsma0 = calc_tsma_np(c_s, 7) 
     tsma1 = calc_tsma_np(c_s.iloc[:-1], 7) 
 
-    # DATA FIX: Guarded lookback scaling for when history is < 7
+    # Guarded lookback scaling for when history is < 7
     current_lookback = min(7, len(df))
     had_recent_ceiling = (h_s.tail(current_lookback) >= upper_b).any() 
     had_recent_floor = (l_s.tail(current_lookback) <= lower_b).any() 
@@ -85,10 +85,8 @@ def get_signal(df=None):
     elif below_black and c0 < tsma0: 
         entry = "BEAR" 
 
-    # Morning Safety Filter 
-    if entry in ["BUY", "SELL"] and len(df) < 14: 
-        if DEBUG: print("DEBUG: Signal blocked - Morning warm-up (<14 bars)") 
-        entry = "NONE" 
+    # FIX: Morning Safety Filter has been completely removed to prevent blocking signals.
+    # Entry conditions pass directly through to execution at all times.
 
     # --- 5. EXIT LOGIC --- 
     def get_layers(idx): 
@@ -103,6 +101,7 @@ def get_signal(df=None):
 if __name__ == "__main__": 
     e, x = get_signal() 
     print(f"Final Execution -> Entry: {e}, Exit: {x}")
+
 
 
 
