@@ -63,16 +63,47 @@ def get_signal(df=None):
     c0, c1 = float(c_s.iloc[-1]), float(c_s.iloc[-2]) 
     h0, l0 = float(h_s.iloc[-1]), float(l_s.iloc[-1]) 
 
-    # --- 2. LOCKED BOUNDARIES (Pine Script Bar-by-Bar Series Match) --- 
-    df_calc['date_only'] = df_calc.index.date 
-    df_calc['day_high'] = df_calc.groupby('date_only')['High'].cummax() 
-    df_calc['day_low'] = df_calc.groupby('date_only')['Low'].cummin() 
+    # --- 2. LOCKED BOUNDARIES (Today's Intraday Only Match) --- 
+    # Extract today's actual calendar date from the very last row in the frame
+    today_date = df_calc.index[-1].date()
+    
+    # Initialize separate tracking arrays matching your candle size
+    day_highs = np.zeros(len(df_calc))
+    day_lows = np.zeros(len(df_calc))
+    
+    # Track the active high/low baseline initialized at the first bar of the dataset
+    curr_high = float(h_s.iloc[0])
+    curr_low = float(l_s.iloc[0])
+    
+    for i in range(len(df_calc)):
+        row_date = df_calc.index[i].date()
+        
+        # FIX: If the row belongs to a past day, it is ignored and resets to that specific bar's values.
+        # Once it hits today's date, it locks and calculates cumulative expansion smoothly.
+        if row_date != today_date:
+            curr_high = float(h_s.iloc[i])
+            curr_low = float(l_s.iloc[i])
+        else:
+            # We are inside today's session -> accumulate high/low metrics actively
+            curr_high = max(curr_high, float(h_s.iloc[i]))
+            curr_low = min(curr_low, float(l_s.iloc[i]))
+            
+        day_highs[i] = curr_high
+        day_lows[i] = curr_low
+        
+    df_calc['day_high'] = day_highs
+    df_calc['day_low'] = day_lows
+    
+    # Shift arrays by 1 bar to mimic historical boundary locking
     df_calc['p_high_shifted'] = df_calc['day_high'].shift(1).fillna(df_calc['High']) 
     df_calc['p_low_shifted'] = df_calc['day_low'].shift(1).fillna(df_calc['Low']) 
     df_calc['close_shifted'] = df_calc['Close'].shift(1).fillna(df_calc['Close']) 
     df_calc['atr_offset_shifted'] = (0.25 * atr_series).shift(1).fillna(0.25 * atr_series) 
+    
+    # Assemble final boundary lines tracking today's price action exclusively
     df_calc['upper_boundary_series'] = ((df_calc['p_high_shifted'] + df_calc['close_shifted']) / 2) + df_calc['atr_offset_shifted'] 
     df_calc['lower_boundary_series'] = ((df_calc['p_low_shifted'] + df_calc['close_shifted']) / 2) - df_calc['atr_offset_shifted'] 
+    
     upper_b = float(df_calc['upper_boundary_series'].iloc[-1]) 
     lower_b = float(df_calc['lower_boundary_series'].iloc[-1]) 
 
@@ -115,5 +146,6 @@ def get_signal(df=None):
 if __name__ == "__main__": 
     e, x = get_signal() 
     print(f"Final Execution -> Entry: {e}, Exit: {x}")
+
 
 
