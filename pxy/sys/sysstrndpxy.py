@@ -5,9 +5,9 @@ from sysdtafpxy import fetch_yf_data
 
 DEBUG_MODE = True
 
-def calculate_tsma(series: pd.Series) -> np.ndarray:
+def calculate_tsma_42(series: pd.Series) -> np.ndarray:
     """
-    Calculates a strict 50-row Time Series Moving Average (Linear Regression).
+    Calculates a strict 42-row Time Series Moving Average (Linear Regression).
     Uses a fast linear algebra slope projection over the pre-padded matrix rows.
     """
     y = series.to_numpy()
@@ -19,8 +19,8 @@ def calculate_tsma(series: pd.Series) -> np.ndarray:
     
     # Linear algebra loop over the index rows
     for i in range(1, n):
-        # Window size matches row count, capped at 50 lookback rows
-        current_window = min(i + 1, 50)
+        # Window size matches row count, capped at 42 lookback rows
+        current_window = min(i + 1, 42)
         y_slice = y[i - current_window + 1 : i + 1]
         
         # Build independent time grid index vector x: [0, 1, 2... window_len - 1]
@@ -39,8 +39,10 @@ def calculate_tsma(series: pd.Series) -> np.ndarray:
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
-    PXY® Engine: Fixed Anchor + Smooth IST Merge Logic
-    Processes the strict 50-row tail vector generated from the upstream feed.
+    PXY® Engine: Pure TSMA 42 Price Midpoint Engine
+    - Slices down to a strict 50-row tail matrix vector.
+    - Runs completely on upstream pre-transformed Mode 5 datasets.
+    - Forces the ST baseline to track the 50/50 blend of TSMA 42 and Live Close.
     """
     # Slice the clean matrix down to exactly 50 rows
     df = df.tail(50).copy()
@@ -48,32 +50,13 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     # Create sequential bar tracker integers from 1 to 50
     df['bar_count'] = np.arange(1, 51)
     
-    # Calculate tracking baseline profiles
-    df['session_mean'] = df['Close'].expanding(min_periods=1).mean()
-    df['tsma_50'] = calculate_tsma(df['Close'])
-    df['python_hybrid'] = (df['session_mean'] + df['tsma_50']) / 2
+    # Process Pure TSMA 42 Baseline Wave over Mode 5 Closings
+    tsma_42_line = calculate_tsma_42(df['Close'])
     
-    # Extract Anchor Levels cleanly from Row 1 using positional index selectors
-    first_bar_open = df['Open'].iloc[0]
-    first_bar_close = df['Close'].iloc[0]
+    # NEW ST LINE MATH: Pure 1:1 price weight fusion blending TSMA 42 with Live Close
+    df['ST'] = (tsma_42_line + df['Close'].to_numpy()) / 2.0
     
-    anchor_value = df['High'].iloc[0] if first_bar_close > first_bar_open else df['Low'].iloc[0]
-    df['anchor'] = anchor_value
-    
-    # Apply three-phase structural blending configurations
-    df['blend_factor'] = ((df['bar_count'] - 15) / 30.0).clip(0, 1)
-    
-    df['ST'] = np.where(
-        df['bar_count'] <= 15, 
-        df['anchor'], 
-        np.where(
-            df['bar_count'] <= 45, 
-            (df['anchor'] * (1 - df['blend_factor'])) + (df['python_hybrid'] * df['blend_factor']), 
-            df['python_hybrid']
-        )
-    )
-    
-    # State-machine trend tracking loop
+    # State-machine trend tracking loop matching the Pine engine
     st_trend = []
     prev_trend = "SIDE"
     
@@ -116,8 +99,9 @@ def get_signal(df=None):
         return "NONE", 0.0
 
 if __name__ == "__main__":
-    print("=== Cleaned TSMA(50) Supertrend Signal Engine Self-Test ===")
+    print("=== Upgraded Mode 5 TSMA 42 Midpoint Engine Self-Test ===")
     trend_signal, st_line_value = get_signal()
-    print(f"CURRENT SYSTEM SIGNAL: {trend_signal} | LINE METRIC: {st_line_value}")
+    print(f"CURRENT SYSTEM SIGNAL: {trend_signal} | LINE METRIC: {st_line_value:.2f}")
+
 
 
