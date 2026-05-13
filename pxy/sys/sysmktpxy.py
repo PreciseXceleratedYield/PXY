@@ -14,7 +14,8 @@ def calc_tsma_np(series, window=7):
     y = series.tail(window).values 
     x = np.arange(len(y)) 
     coeffs = np.polyfit(x, y, 1) 
-    return float(coeffs * (len(y) - 1) + coeffs) 
+    # FIXED LINE 17: Restored [0] for slope and [1] for intercept to produce a true scalar float
+    return float(coeffs[0] * (len(y) - 1) + coeffs[1]) 
 
 def get_signal(df=None): 
     try: 
@@ -85,9 +86,6 @@ def get_signal(df=None):
     elif below_black and c0 < tsma0: 
         entry = "BEAR" 
 
-    # FIX: Morning Safety Filter has been completely removed to prevent blocking signals.
-    # Entry conditions pass directly through to execution at all times.
-
     # --- 5. EXIT LOGIC --- 
     def get_layers(idx): 
         c, o, h, l = df['Close'].iloc[idx], df['Open'].iloc[idx], df['High'].iloc[idx], df['Low'].iloc[idx] 
@@ -101,8 +99,5 @@ def get_signal(df=None):
 if __name__ == "__main__": 
     e, x = get_signal() 
     print(f"Final Execution -> Entry: {e}, Exit: {x}")
-
-
-
 
 
