@@ -1,18 +1,20 @@
 import pytz
 
-# ---------------- SINGLE CONFIG ----------------
+# ---------------- LOCAL SYSTEM CONFIGURATION ----------------
 PARAMS = {
-    "ticker": "^NSEI",  # options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X"
-    "supertrend_period": 2,
-    "supertrend_multiplier": 1
+    "ticker": "^NSEI",          # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X"
+    "ohlc_mode": 5              # Change Mode Here: 1=Raw, 2=HA, 3=oc/2, 4=c1c0, 5=Composite Average
 }
 
-# ---------------- CONSTANTS ----------------
+# ---------------- CONSTANTS DERIVED FROM CONFIG ----------------
 TICKER = PARAMS["ticker"]
-
+OHLC_MODE = PARAMS["ohlc_mode"]
 TIMEZONE = pytz.timezone("Asia/Kolkata")
 
-# ---------------- SELF TEST ----------------
+# ---------------- SYSTEM SELF TEST ----------------
 if __name__ == "__main__":
-    print("PARAMS:", PARAMS)
-    print("TICKER:", TICKER)
+    print("=== CONFIGURATION FILE VERIFICATION ===")
+    print(f"TARGET TICKER  : {TICKER}")
+    print(f"ACTIVE MODE    : {OHLC_MODE}")
+    print(f"SYSTEM TIMEZONE: {TIMEZONE}")
+
