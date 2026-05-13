@@ -23,7 +23,6 @@ def log_sync_state(timestamp, entry, exit_sig, price, tsma, st, upper, lower, ce
         dir_path = os.path.expanduser("~/pxy")
         os.makedirs(dir_path, exist_ok=True)
         file_path = os.path.join(dir_path, "tv_sync_log.json")
-        
         log_entry = {
             "Timestamp": str(timestamp),
             "Price": float(price),
@@ -37,7 +36,6 @@ def log_sync_state(timestamp, entry, exit_sig, price, tsma, st, upper, lower, ce
             "Signal_Exit": str(exit_sig),
             "Logged_At": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
-        
         logs = []
         if os.path.exists(file_path):
             with open(file_path, "r") as f:
@@ -59,8 +57,8 @@ def get_signal(df=None):
         return "NONE", "NONE"
         
     try:
-        # --- 1. RUN STRUCTURAL SUPERTREND BACKBONE (REPLACES DUPLICATE LOOPS) ---
-        df_calc = calculate_supertrend(df) # Slices to a strict 50-row matrix internally
+        # --- 1. RUN STRUCTURAL SUPERTREND BACKBONE ---
+        df_calc = calculate_supertrend(df)  # Slices to a strict 50-row matrix internally
         
         # --- 2. CALCULATE ATR OVER MATURED DATA VECTOR ---
         h_s, l_s, c_s = df_calc['High'], df_calc['Low'], df_calc['Close']
@@ -68,7 +66,7 @@ def get_signal(df=None):
         tr = pd.concat([h_s - l_s, (h_s - prev_close).abs(), (l_s - prev_close).abs()], axis=1).max(axis=1)
         atr_series = tr.rolling(14, min_periods=1).mean().fillna(20.0)
         
-        # --- 3. DYNAMIC INTRA-MATRIX CHANNELS (REPLACES BROKEN GROUPBY HIGH/LOWS) ---
+        # --- 3. DYNAMIC INTRA-MATRIX CHANNELS ---
         df_calc['day_high_running'] = h_s.cummax()
         df_calc['day_low_running'] = l_s.cummin()
         
@@ -84,7 +82,7 @@ def get_signal(df=None):
         tsma_list = [calc_tsma_np(c_s.iloc[:i+1], 7) if (i >= 1) else float(c_s.iloc[i]) for i in range(len(df_calc))]
         df_calc['tsma_7'] = tsma_list
         
-        # --- 5. SIGNAL MATRIX CROSSES ---
+        # --- 5. SIGNAL MATRIX CROSSES (UPGRADED TO DYNAMIC PROGRESSIVE LOOKBACK) ---
         df_calc['c1'] = df_calc['Close'].shift(1)
         df_calc['tsma1'] = df_calc['tsma_7'].shift(1)
         df_calc['st1'] = df_calc['ST'].shift(1)
@@ -97,11 +95,17 @@ def get_signal(df=None):
         df_calc['aboveBlack'] = df_calc['Close'] > df_calc['ST']
         df_calc['belowBlack'] = df_calc['Close'] < df_calc['ST']
         
-        df_calc['highest_high_7'] = df_calc['High'].rolling(7, min_periods=1).max()
-        df_calc['lowest_low_7'] = df_calc['Low'].rolling(7, min_periods=1).min()
+        # Pull the absolute final bar's accumulated count to dynamically scale the lookback size
+        last_row_pre = df_calc.iloc[-1]
+        current_bar_count = int(last_row_pre['bar_count'])
+        dynamic_lookback = min(current_bar_count, 42)
         
-        df_calc['hadRecentCeilingTouch'] = df_calc['highest_high_7'] >= df_calc['upper_boundary_series']
-        df_calc['hadRecentFloorTouch'] = df_calc['lowest_low_7'] <= df_calc['lower_boundary_series']
+        # Rolling tracking parameters use the progressive window sizing
+        df_calc['highest_high_42'] = df_calc['High'].rolling(dynamic_lookback, min_periods=1).max()
+        df_calc['lowest_low_42'] = df_calc['Low'].rolling(dynamic_lookback, min_periods=1).min()
+        
+        df_calc['hadRecentCeilingTouch'] = df_calc['highest_high_42'] >= df_calc['upper_boundary_series']
+        df_calc['hadRecentFloorTouch'] = df_calc['lowest_low_42'] <= df_calc['lower_boundary_series']
         
         # --- 6. ISOLATE ENTRY EXECUTIONS FROM LAST ROW ---
         last_row = df_calc.iloc[-1].copy()
@@ -110,25 +114,24 @@ def get_signal(df=None):
         had_recent_ceiling, had_recent_floor = bool(last_row['hadRecentCeilingTouch']), bool(last_row['hadRecentFloorTouch'])
         
         if DEBUG:
-            print(f"\n--- PXY DEBUG (MATRIC ALIGNED PRO) --- Price: {c0} | TSMA: {tsma0:.2f} | ST: {st0:.2f}")
+            print(f"\n--- PXY DEBUG (PROGRESSIVE 1-42 MATCH) --- Price: {c0} | TSMA: {tsma0:.2f} | ST: {st0:.2f}")
             print(f"Locked Boundaries: UP {upper_b:.2f} | LO {lower_b:.2f}")
-            print(f"Memory Matrix (7-bar): Ceiling_Touch: {had_recent_ceiling} | Floor_Touch: {had_recent_floor}")
+            print(f"Dynamic Lookback Bounds: {dynamic_lookback} bars | Ceiling_Touch: {had_recent_ceiling} | Floor_Touch: {had_recent_floor}")
             
         entry = "NONE"
-        if last_row['bar_count'] >= 14:  # Enforces safe buffer check based on the matrix index
-            # FIXED: Evaluated conditional boolean using standard variables instead of a subscripted walrus operator
-            is_buy = bool((last_row['priceCrossUp'] & had_recent_floor) | (last_row['priceCrossUp'] & last_row['aboveBlack']) | last_row['crossAboveBlack'])
-            is_sell = bool((last_row['priceCrossDn'] & had_recent_ceiling) | (last_row['priceCrossDn'] & last_row['belowBlack']) | last_row['crossBelowBlack'])
+        # REMOVED: Execution safety restrictions; system is completely active from bar 1
+        is_buy = bool((last_row['priceCrossUp'] & had_recent_floor) | (last_row['priceCrossUp'] & last_row['aboveBlack']) | last_row['crossAboveBlack'])
+        is_sell = bool((last_row['priceCrossDn'] & had_recent_ceiling) | (last_row['priceCrossDn'] & last_row['belowBlack']) | last_row['crossBelowBlack'])
+        
+        if is_buy:
+            entry = "BUY"
+        elif is_sell:
+            entry = "SELL"
+        elif last_row['aboveBlack'] and c0 > tsma0:
+            entry = "BULL"
+        elif last_row['belowBlack'] and c0 < tsma0:
+            entry = "BEAR"
             
-            if is_buy:
-                entry = "BUY"
-            elif is_sell:
-                entry = "SELL"
-            elif last_row['aboveBlack'] and c0 > tsma0:
-                entry = "BULL"
-            elif last_row['belowBlack'] and c0 < tsma0:
-                entry = "BEAR"
-                
         # --- 7. EXIT LOGIC LAYER ARRAYS ---
         c_arr, o_arr, h_arr, l_arr = df_calc['Close'].values, df_calc['Open'].values, df_calc['High'].values, df_calc['Low'].values
         
@@ -152,4 +155,5 @@ def get_signal(df=None):
 if __name__ == "__main__":
     e, x = get_signal()
     print(f"Final Synchronized Outputs -> Entry Status: {e} | Exit Trend: {x}")
+
 
