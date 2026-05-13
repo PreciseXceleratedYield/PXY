@@ -70,7 +70,7 @@ def get_signal(df=None):
         
         # --- 3. DYNAMIC INTRA-MATRIX CHANNELS (REPLACES BROKEN GROUPBY HIGH/LOWS) ---
         df_calc['day_high_running'] = h_s.cummax()
-        df_calc['day_low_running'] = l_s.cummax()
+        df_calc['day_low_running'] = l_s.cummin()
         
         df_calc['day_high_shifted'] = df_calc['day_high_running'].shift(1)
         df_calc['day_low_shifted'] = df_calc['day_low_running'].shift(1)
@@ -104,7 +104,7 @@ def get_signal(df=None):
         df_calc['hadRecentFloorTouch'] = df_calc['lowest_low_7'] <= df_calc['lower_boundary_series']
         
         # --- 6. ISOLATE ENTRY EXECUTIONS FROM LAST ROW ---
-        last_row = df_calc.iloc[-1]
+        last_row = df_calc.iloc[-1].copy()
         c0, tsma0, st0 = float(last_row['Close']), float(last_row['tsma_7']), float(last_row['ST'])
         upper_b, lower_b = float(last_row['upper_boundary_series']), float(last_row['lower_boundary_series'])
         had_recent_ceiling, had_recent_floor = bool(last_row['hadRecentCeilingTouch']), bool(last_row['hadRecentFloorTouch'])
@@ -115,10 +115,14 @@ def get_signal(df=None):
             print(f"Memory Matrix (7-bar): Ceiling_Touch: {had_recent_ceiling} | Floor_Touch: {had_recent_floor}")
             
         entry = "NONE"
-        if last_row['bar_cnt'] >= 14:  # Enforces safe buffer check based on the matrix index
-            if last_row['isBuy'] := ((last_row['priceCrossUp'] & had_recent_floor) | (last_row['priceCrossUp'] & last_row['aboveBlack']) | last_row['crossAboveBlack']):
+        if last_row['bar_count'] >= 14:  # Enforces safe buffer check based on the matrix index
+            # FIXED: Evaluated conditional boolean using standard variables instead of a subscripted walrus operator
+            is_buy = bool((last_row['priceCrossUp'] & had_recent_floor) | (last_row['priceCrossUp'] & last_row['aboveBlack']) | last_row['crossAboveBlack'])
+            is_sell = bool((last_row['priceCrossDn'] & had_recent_ceiling) | (last_row['priceCrossDn'] & last_row['belowBlack']) | last_row['crossBelowBlack'])
+            
+            if is_buy:
                 entry = "BUY"
-            elif last_row['isSell'] := ((last_row['priceCrossDn'] & had_recent_ceiling) | (last_row['priceCrossDn'] & last_row['belowBlack']) | last_row['crossBelowBlack']):
+            elif is_sell:
                 entry = "SELL"
             elif last_row['aboveBlack'] and c0 > tsma0:
                 entry = "BULL"
