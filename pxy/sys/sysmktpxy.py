@@ -34,13 +34,13 @@ def _print_console_bar(st, c2, c1, c0, price, cross_up, cross_dn):
     diff_val = price - st
 
     print(f"\n{YLW}=== GEOMETRIC ENGINE CONSOLE MONITOR ==={RST}")
-    print(f"{RED}ST    {st:.2f}{RST} : {GRAY}[{RED}{get_clean_bar(st, '-')}{GRAY}]{RST}")
-    print(f"{GRN}C2    {c2:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c2)}{GRAY}]{RST}")
-    print(f"{GRN}C1    {c1:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c1)}{GRAY}]{RST}")
-    print(f"{GRN}C0    {c0:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c0)}{GRAY}]{RST}")
-    print(f"{CYN}PRICE {price:.2f}{RST} : {GRAY}[{CYN}{get_clean_bar(price, '═')}{GRAY}]{RST}")
+    print(f"{RED}ST-{st:.2f}{RST} : {GRAY}[{RED}{get_clean_bar(st, '-')}{GRAY}]{RST}")
+    print(f"{GRN}C2-{c2:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c2)}{GRAY}]{RST}")
+    print(f"{GRN}C1-{c1:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c1)}{GRAY}]{RST}")
+    print(f"{GRN}C0-{c0:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c0)}{GRAY}]{RST}")
+    print(f"{CYN}LP-{price:.2f}{RST} : {GRAY}[{CYN}{get_clean_bar(price, '═')}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
-    print(f"CrossUp: {YLW}{cross_up}{RST} | CrossDn: {YLW}{cross_dn}{RST} | Trend: {trend_color}{trend_str}{RST} ({diff_val:+.2f})")
+    print(f"UP: {YLW}{cross_up}{RST} | DDOWN: {YLW}{cross_dn}{RST} | Trend: {trend_color}{trend_str}{RST} ({diff_val:+.2f})")
 
 def log_sync_state(timestamp, entry, exit_sig, price, st):
     """Logs the system state variables cleanly into the target JSON template file."""
