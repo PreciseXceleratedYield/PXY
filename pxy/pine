@@ -1,64 +1,97 @@
-//@version=6
-indicator("PXY® - TSMA + Anchored Black Line", overlay=true)
+//@version=5
+indicator("PXY® Mode 5 Pure TSMA 42 Price Midpoint Engine (100% Synced)", overlay=true, max_bars_back=500)
 
 // ==========================================
-// 1. BLACK LINE LOGIC (SuperTrend)
+// 1. DATA PROCESSING - COMPOSITE MODE 5 MATRIX
+// ==========================================
+var float ha_o = na
+ha_c = (open + high + low + close) / 4.0
+ha_o := na(ha_o) ? (open + close) / 2.0 : (ha_o + ha_c) / 2.0
+ha_h = math.max(high, math.max(ha_o, ha_c))
+ha_l = math.min(low, math.min(ha_o, ha_c))
+oc2 = (open + close) / 2.0
+c1_raw = nz(close, close)
+
+// Pure Mode 5 Candle Array Overrides
+o = (open + ha_o + oc2 + c1_raw) / 4.0
+h = (high + ha_h + oc2 + close) / 4.0
+l = (low + ha_l + oc2 + c1_raw) / 4.0
+c = (close + ha_c + oc2 + close) / 4.0
+
+// Determine Mode 5 Candle Color States
+is_green_c0 = c > o
+is_red_c0   = c < o
+
+// Fetch previous candle states strictly using historical lookback bracket
+is_green_c1 = is_green_c0[1]
+is_red_c1   = is_red_c0[1]
+
+// Plot the clean Mode 5 candles directly on your chart canvas
+plotcandle(o, h, l, c, title="Mode 5 Candles", color = is_green_c0 ? color.new(color.teal, 30) : color.new(color.maroon, 30), wickcolor = is_green_c0 ? color.teal : color.maroon, bordercolor = is_green_c0 ? color.teal : color.maroon)
+
+// ==========================================
+// 2. INTERNAL ROW ENGINE LOOKUP
 // ==========================================
 is_new_day = ta.change(time("D")) != 0
-var float anchor = na
-var int bar_cnt = 0
-var float session_sum = 0.0
-
-// Reset bar count and set anchor at 09:15
-if is_new_day
-    bar_cnt := 1
-    session_sum := close
-    anchor := close > open ? high : low
-else
-    bar_cnt += 1
-    session_sum += close
-
-// Calculate Hybrid Components
-session_mean = session_sum / bar_cnt
-sma_50 = ta.sma(close, 50)
-python_hybrid = (session_mean + sma_50) / 2
-
-// Blend Factor (Bar 15 to 45)
-blend = math.max(0, math.min(1, (bar_cnt - 15) / 30.0))
-
-// The Black Line (ST)
-float black_line = na
-if bar_cnt <= 15
-    black_line := anchor
-else if bar_cnt <= 45
-    black_line := (anchor * (1 - blend)) + (python_hybrid * blend)
-else
-    black_line := python_hybrid
-
-plot(black_line, "Black Line (ST)", color=color.black, linewidth=2)
+var int bar_count = 0
+bar_count := is_new_day ? 1 : bar_count + 1
 
 // ==========================================
-// 2. TSMA LOGIC (7-Period)
+// 3. PURE TSMA 42 PRICE MIDPOINT TRACKER
 // ==========================================
-tsma_price = ta.linreg(close, 10, 0)
-plot(tsma_price, "7-TSMA", color=color.gray, linewidth=2)
+tsma_window = math.min(bar_count, 42)
+tsma_line = ta.linreg(c, tsma_window, 0)
+ST = (tsma_line + c) / 2.0
+
+plot(ST, title="TSMA 42 Price Midpoint", color=color.black, linewidth=3, style=plot.style_line)
 
 // ==========================================
-// 3. SIGNALS & COLORS
+// 4. STEP 1: CALCULATE RAW INDEPENDENT EXITS
 // ==========================================
-isBuy  = ta.crossover(close, tsma_price)
-isSell = ta.crossunder(close, tsma_price)
-isBull = close > tsma_price
-isBear = close < tsma_price
+pure_color_buy  = is_red_c1 and is_green_c0   // Rule 6: Red -> Green
+pure_color_bull = is_green_c1 and is_green_c0 // Rule 7: Green -> Green
+pure_color_sell = is_green_c1 and is_red_c0   // Rule 8: Green -> Red
+pure_color_bear = is_red_c1 and is_red_c0     // Rule 9: Red -> Red
 
-// Shapes for B/S
-plotshape(isBuy, "B", shape.labelup, location.belowbar, color.green, text="B", textcolor=color.white, size=size.small)
-plotshape(isSell, "S", shape.labeldown, location.abovebar, color.maroon, text="S", textcolor=color.white, size=size.small)
+// ==========================================
+// 5. STEP 2: APPLY STRUCTURAL ENTRY FILTERS
+// ==========================================
+above_black = c > ST
+below_black = c < ST
 
-// Bar Coloring
-barcolor(isBuy ? color.green : isSell ? color.maroon : isBull ? color.new(color.green, 50) : isBear ? color.new(color.maroon, 50) : na)
+// Check for exact cross intersections matching Python 1:1
+cross_up_black = ta.crossover(c, ST)
+cross_dn_black = ta.crossunder(c, ST)
 
+// Evaluate priorities cascade exactly matching your python conditional block
+string entry = "NONE"
+if cross_up_black
+    entry := "BUY"
+else if pure_color_buy and above_black
+    entry := "BUY"
+else if pure_color_bull and above_black
+    entry := "BULL"
+else if cross_dn_black
+    entry := "SELL"
+else if pure_color_sell and below_black
+    entry := "SELL"
+else if pure_color_bear and below_black
+    entry := "BEAR"
 
+// ==========================================
+// 6. MAP TRIGGERS & SHAPE PLOTS
+// ==========================================
+// Trigger tracking parameters (Triggers shapes cleanly on changes)
+trigger_buy  = (entry == "BUY")  and (entry[1] != "BUY")
+trigger_bull = (entry == "BULL") and (entry[1] != "BULL")
+trigger_sell = (entry == "SELL") and (entry[1] != "SELL")
+trigger_bear = (entry == "BEAR") and (entry[1] != "BEAR")
+
+// Unified structural mapping outputs
+plotshape(trigger_buy,  title="BUY Entry",  style=shape.triangleup,   location=location.belowbar, color=color.green,  size=size.normal, text="BUY")
+plotshape(trigger_bull, title="BULL Entry", style=shape.arrowup,      location=location.belowbar, color=color.teal,   size=size.small,  text="BULL")
+plotshape(trigger_sell, title="SELL Entry", style=shape.triangledown, location=location.abovebar, color=color.red,    size=size.normal, text="SELL")
+plotshape(trigger_bear, title="BEAR Entry", style=shape.arrowdown,    location=location.abovebar, color=color.maroon, size=size.small,  text="BEAR")
 
 
 
