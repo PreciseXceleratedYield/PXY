@@ -9,7 +9,7 @@ from colorama import Fore, Style
 REBUY_ENABLED = True 
 MAX_LAYERS = 1 
 COOL_DOWN_SECONDS = 300 
-LOSS_THRESHOLD = -10 # Trigger if loss is -10% or worse 
+LOSS_THRESHOLD = -14 # Trigger if loss is -10% or worse 
 
 def generate_pxy_tag(): 
     IST = pytz.timezone("Asia/Kolkata") 
@@ -71,8 +71,8 @@ def handle_side_averaging(client, df):
         loss_hit = (current_loss <= LOSS_THRESHOLD) 
 
         # 2. SIGNAL must match the side (Accepts BOTH original and clean fallback strings) 
-        signal_matches = (side == 'CE' and current_signal in ["ATMBUY", "BUY"]) or \
-                         (side == 'PE' and current_signal in ["ATMSELL", "SELL"]) 
+        signal_matches = (side == 'CE' and current_signal in ["ATMBUY"]) or \
+                         (side == 'PE' and current_signal in ["ATMSELL"]) 
 
         # Only proceed if BOTH are true 
         if loss_hit and signal_matches: 
