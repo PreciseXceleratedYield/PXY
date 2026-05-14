@@ -7,11 +7,11 @@ Timezone Configuration: Aligned strictly to Indian Standard Time (IST) Zone.
 
 Operational Rules Matrix (Indian Markets):
 1. Window [09:15 IST - 09:30 IST]: Bypasses entry core. Routes raw exit_l2.
-   - exit_l2 == "BUY"  -> OTMBUY
-   - exit_l2 == "SELL" -> OTMSELL
+   - exit_l2 == "BUY"  -> ATMBUY
+   - exit_l2 == "SELL" -> ATMSELL
 2. Window [After 09:30 IST]: Kick-starts standard entry_l4 structural filters.
-   - CROSSBUY / CROSSSELL -> ATMBUY / ATMSELL
-   - TRENDBUY / TRENDSELL -> OTMBUY / OTMSELL
+   - CROSSBUY / CROSSSELL -> OTMBUY / OTMSELL
+   - TRENDBUY / TRENDSELL -> ATMBUY / ATMSELL
 3. Fallback Route: If final_signal resolves to "NONE", it extracts the clean
    raw exit_l2 state to pass straight down to the downstream process.
 ===============================================================================
@@ -53,23 +53,23 @@ def get_entry_signal(df=None):
 
     # 3. IST TIME-BASED OPTIONS ROUTING ENGINE
     if market_open <= current_time_ist < time_boundary:
-        # --- EARLY MORNING OPENING WINDOW: PURE RAW REVERSAL TO OTM ---
+        # --- EARLY MORNING OPENING WINDOW: PURE RAW REVERSAL TO ATM ---
         if exit_l2 == "BUY":
-            final_signal = "OTMBUY"
+            final_signal = "ATMBUY"
         elif exit_l2 == "SELL":
-            final_signal = "OTMSELL"
+            final_signal = "ATMSELL"
         else:
             final_signal = "NONE"
     else:
         # --- STANDARD CONTINUOUS WINDOW: ACTIVE ENTRY FILTER CORE ---
         if entry_l4 == "CROSSBUY":
-            final_signal = "ATMBUY"
-        elif entry_l4 == "CROSSSELL":
-            final_signal = "ATMSELL"
-        elif entry_l4 == "TRENDBUY":
             final_signal = "OTMBUY"
-        elif entry_l4 == "TRENDSELL":
+        elif entry_l4 == "CROSSSELL":
             final_signal = "OTMSELL"
+        elif entry_l4 == "TRENDBUY":
+            final_signal = "ATMBUY"
+        elif entry_l4 == "TRENDSELL":
+            final_signal = "ATMSELL"
         else:
             # Pass BULL, BEAR, or NONE exactly as they are down the line
             final_signal = entry_l4
@@ -84,7 +84,7 @@ def get_entry_signal(df=None):
             final_signal = exit_l2  # Safely passes BULL, BEAR, or NONE downstream
 
     # Reporting on active Indian Market signals
-    if final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL", "BUY", "SELL"]:
+    if final_signal in ["OTMBUY", "OTMSELL", "ATMBUY", "ATMSELL", "BUY", "SELL"]:
         print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION TRIGGERED: {final_signal} 🔥".center(50))
 
     return final_signal, exit_l2
