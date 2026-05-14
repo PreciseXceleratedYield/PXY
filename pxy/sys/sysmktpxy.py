@@ -22,14 +22,16 @@ def _print_console_bar(st, c2, c1, c0, price, cross_up, cross_dn):
 
     min_val = min(c2, c1, c0, st) - 2
     max_val = max(c2, c1, c0, st) + 2
-    scale_width = 45
+    
+    # Scale width reduced by >50% to fit exactly into 42-width terminal lines
+    scale_width = 20
 
     def get_clean_bar(val, marker="█"):
         pos = int(((val - min_val) / (max_val - min_val)) * scale_width)
         pos = max(1, pos)
         return (marker * pos).ljust(scale_width)
 
-    trend_str = "BULLISH" if price >= st else "BEARISH"
+    trend_str = "BULL" if price >= st else "BEAR"
     trend_color = GRN if price >= st else RED
     diff_val = price - st
 
@@ -40,7 +42,7 @@ def _print_console_bar(st, c2, c1, c0, price, cross_up, cross_dn):
     print(f"{GRN}C0-{c0:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c0)}{GRAY}]{RST}")
     print(f"{CYN}LP-{price:.2f}{RST} : {GRAY}[{CYN}{get_clean_bar(price, '═')}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
-    print(f"UP: {YLW}{cross_up}{RST} | DDOWN: {YLW}{cross_dn}{RST} | Trend: {trend_color}{trend_str}{RST} ({diff_val:+.2f})")
+    print(f"UP:{YLW}{str(cross_up)[0]}{RST} | DDN:{YLW}{str(cross_dn)[0]}{RST} | Trnd:{trend_color}{trend_str}{RST} ({diff_val:+.2f})")
 
 def log_sync_state(timestamp, entry, exit_sig, price, st):
     """Logs the system state variables cleanly into the target JSON template file."""
