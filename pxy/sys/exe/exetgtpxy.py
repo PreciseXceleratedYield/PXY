@@ -1,7 +1,7 @@
-import pytz
 from datetime import datetime
-from colorama import init, Fore, Style
 import re
+from colorama import Fore, Style, init
+import pytz
 
 init(autoreset=True)
 IST = pytz.timezone("Asia/Kolkata")
@@ -9,18 +9,21 @@ IST = pytz.timezone("Asia/Kolkata")
 # Global set to track printed sides for the current refresh cycle
 PRINTED_SIDES = set()
 
+
 def f(x, d=0.0):
     try:
         val = float(x)
         return val if val > 0 else d
-    except:
+    except Exception:
         return d
+
 
 def i(x, d=0):
     try:
         return int(float(x))
-    except:
+    except Exception:
         return d
+
 
 def target_price(row):
     global PRINTED_SIDES
@@ -37,9 +40,11 @@ def target_price(row):
         # 3. SIGNAL & CONTEXT LOGIC
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
         side = "CE" if "CE" in symbol else "PE" if "PE" in symbol else "NA"
-        
         is_ce, is_pe = (side == "CE"), (side == "PE")
+
         active_signal = str(row.get("exit", "NONE")).upper()
+        clean_signal = active_signal.strip()  # FIX: Defined string variable
+
         is_counter = str(row.get("counter", "N")).upper() == "Y"
 
         # 4. FIELD DEFINITIONS
@@ -53,26 +58,26 @@ def target_price(row):
         # 5. FINAL PERCENTAGE SCORE CALCULATION
         state = "⏳"
         final_pct_score = BASE_SCORE
-        is_bullish_signal = bool(re.search(r'(BUY|BULL)', clean_signal))
-        is_bearish_signal = bool(re.search(r'(SELL|BEAR)', clean_signal))
+
+        # FIX: Check using regex evaluations
+        is_bullish_signal = bool(re.search(r"(BUY|BULL)", clean_signal))
+        is_bearish_signal = bool(re.search(r"(SELL|BEAR)", clean_signal))
 
         if is_ce:
-            if any(t in active_signal for t in bullish_triggers):
+            if is_bullish_signal:
                 calc = ((atr_val * ce_f * ce_p) + hce_d) / hce_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
-            elif any(t in active_signal for t in bearish_triggers):
-                # Opposing Signal: Half the score
+            elif is_bearish_signal:
                 final_pct_score = BASE_SCORE / 2
-                state = "❄️"
-        
+                state = "❄️"  # FIX: Fixed URL encoding break
+
         elif is_pe:
-            if any(t in active_signal for t in bearish_triggers):
+            if is_bearish_signal:
                 calc = ((atr_val * pe_f * pe_p) + hpe_d) / hpe_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
-            elif any(t in active_signal for t in bullish_triggers):
-                # Opposing Signal: Half the score
+            elif is_bullish_signal:
                 final_pct_score = BASE_SCORE / 2
-                state = "❄️"
+                state = "❄️"  # FIX: Fixed URL encoding break
 
         # 8. MAX CAP LOGIC
         if final_pct_score > 99.0:
@@ -84,13 +89,22 @@ def target_price(row):
 
         # 7. SUPPRESSED DEBUG PRINT (Once per side)
         if side not in PRINTED_SIDES and side != "NA":
-            color = Fore.CYAN if state == "🔥" else (Fore.BLUE if state == "❄️" else (Fore.MAGENTA if is_counter else Fore.YELLOW))
-            print(f"        {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state}")
+            color = (
+                Fore.CYAN
+                if state == "🔥"
+                else (
+                    Fore.BLUE
+                    if state == "❄️"
+                    else (Fore.MAGENTA if is_counter else Fore.YELLOW)
+                )
+            )
+            print(
+                f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state}"
+            )
             PRINTED_SIDES.add(side)
 
         return target
     except Exception:
         return 0
-
 
 
