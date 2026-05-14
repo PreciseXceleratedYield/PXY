@@ -3,51 +3,12 @@
 ===============================================================================
 PXY GEOMETRIC ENGINE CORE SYSTEM DOCUMENTATION MASTER INDEX
 ===============================================================================
-
 PART 1: RAW CANDLESTICK BASE STATES (UNFILTERED)
-1. Bullish Reversal Rebound State (BUY)
-   - Formula: (C1 < O1) AND (C0 > O0)
-   - Meaning: Bearish drop hitting structural exhaustion and flipping up.
-2. Bullish Trend Continuation State (BULL)
-   - Formula: (C1 > O1) AND (C0 > O0)
-   - Meaning: Persistent buyers retaining control, extending the upward leg.
-3. Bearish Reversal Breakdown State (SELL)
-   - Formula: (C1 > O1) AND (C0 < O0)
-   - Meaning: Bullish ascent hitting resistance, forcing a downward rotation.
-4. Bearish Trend Continuation State (BEAR)
-   - Formula: (C1 < O1) AND (C0 < O0)
-   - Meaning: Persistent distribution remaining active, cascading price lower.
-5. Equilibrium Flat Market State (NONE)
-   - Formula: (C0 == O0)
-   - Meaning: Total doji matrix compression; no measurable directional delta.
-
-PART 2: EXIT SIGNAL MAPPING ENGINE (exit_sig)
-6. Primary Exit Rebound Trigger (exit_sig = "BUY")
-   - Met: Validates State #1 (BUY). Evaluated independently of the ST line.
-7. Secondary Exit Extension Trigger (exit_sig = "BULL")
-   - Met: Validates State #2 (BULL). Marks active bullish continuation.
-8. Primary Exit Breakdown Trigger (exit_sig = "SELL")
-   - Met: Validates State #3 (SELL). Forces immediate long exit protection.
-9. Secondary Exit Extension Trigger (exit_sig = "BEAR")
-   - Met: Validates State #4 (BEAR). Marks active bearish continuation.
-10. Neutral Exit Quiet Trigger (exit_sig = "NONE")
-    - Met: Validates State #5 (NONE). System remains in holding pattern.
-
-PART 3: ENTRY SIGNAL EXECUTION ENGINE (entry)
-11. Bullish Breakout Crossover Entry (entry = "BUY")
-    - Formula: (C1 <= ST1) AND (C0 > ST0) [Highest System Priority Override]
-12. Bullish Reversal Filtered Entry (entry = "BUY")
-    - Formula: (exit_sig == "BUY") AND (C0 > ST0)
-13. Bullish Follow-Through Entry (entry = "BULL")
-    - Formula: (exit_sig == "BULL") AND (C0 > ST0)
-14. Bearish Breakdown Crossunder Entry (entry = "SELL")
-    - Formula: (C1 >= ST1) AND (C0 < ST0) [Highest System Priority Override]
-15. Bearish Reversal Filtered Entry (entry = "SELL")
-    - Formula: (exit_sig == "SELL") AND (C0 < ST0)
-16. Bearish Follow-Through Entry (entry = "BEAR")
-    - Formula: (exit_sig == "BEAR") AND (C0 < ST0)
-17. Blocked Entry Protection Safe State (entry = "NONE")
-    - Formula: Patterns triggering on the wrong side of market structure.
+1. Bullish Reversal Rebound State (BUY)  - Formula: (C1 < O1) AND (C0 > O0)
+2. Bullish Trend Continuation State (BULL) - Formula: (C1 > O1) AND (C0 > O0)
+3. Bearish Reversal Breakdown State (SELL) - Formula: (C1 > O1) AND (C0 < O0)
+4. Bearish Trend Continuation State (BEAR) - Formula: (C1 < O1) AND (C0 < O0)
+5. Equilibrium Flat Market State (NONE)    - Formula: (C0 == O0)
 ===============================================================================
 """
 
@@ -62,12 +23,12 @@ from sysstrndpxy import calculate_supertrend
 # Global Config
 DEBUG = True
 
-def _print_console_bar(st, c2, c1, c0, cross_up, cross_dn, entry, exit_sig):
+def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, exit_sig):
     """Helper engine function to render the graphical sorted ascii layout matrix inside the console."""
     # ANSI escape code constants
     RST = "\033[0m"       # Reset Color
-    RED = "\033[91m"      # Red for ST
-    GRN = "\033[92m"      # Green for Candle Closes
+    RED = "\033[91m"      # Red for Bearish/ST
+    GRN = "\033[92m"      # Green for Bullish
     YLW = "\033[1;93m"    # Bold Yellow for Highlight/Trend
     GRAY = "\033[90m"     # Dim Gray for layout lines
 
@@ -85,14 +46,19 @@ def _print_console_bar(st, c2, c1, c0, cross_up, cross_dn, entry, exit_sig):
     trend_color = GRN if c0 >= st else RED
     diff_val = c0 - st
 
-    # Build row items for descending sort logic (highest price on top)
+    # Contextual candle coloring evaluation logic based on Open arrays
+    c2_color = GRN if c2 >= o2 else RED
+    c1_color = GRN if c1 >= o1 else RED
+    c0_color = GRN if c0 >= o0 else RED
+
+    # Build row items for descending sort logic (highest price on top) with adaptive colors
     rows = [
         (st, f"ST-{st:.2f}", "-", RED),
-        (c2, f"C2-{c2:.2f}", "█", GRN),
-        (c1, f"C1-{c1:.2f}", "█", GRN),
-        (c0, f"C0-{c0:.2f}", "█", GRN)
+        (c2, f"C2-{c2:.2f}", "█", c2_color),
+        (c1, f"C1-{c1:.2f}", "█", c1_color),
+        (c0, f"C0-{c0:.2f}", "█", c0_color)
     ]
-    rows.sort(key=lambda item: item, reverse=True)
+    rows.sort(key=lambda item: item[0], reverse=True)
 
     print(f"\n{YLW}=== GEOMETRIC ENGINE CONSOLE MONITOR ==={RST}")
     for val, label, marker, color in rows:
@@ -132,10 +98,7 @@ def log_sync_state(timestamp, entry, exit_sig, price, st):
         pass
 
 def get_signal(df=None):
-    """
-    Main signal generation function.
-    Executes raw state evaluation first, then filters findings into active entries.
-    """
+    """Main signal generation function."""
     if df is None:
         df = fetch_yf_data()
     if df is None or df.empty:
@@ -149,6 +112,7 @@ def get_signal(df=None):
         df_calc['c1'] = df_calc['Close'].shift(1)
         df_calc['c2'] = df_calc['Close'].shift(2)
         df_calc['o1'] = df_calc['Open'].shift(1)
+        df_calc['o2'] = df_calc['Open'].shift(2) # Added for C2 color check synchronization
         df_calc['st1'] = df_calc['ST'].shift(1)
         
         df_calc['aboveBlack'] = df_calc['Close'] > df_calc['ST']
@@ -162,51 +126,50 @@ def get_signal(df=None):
         c0, st0 = float(last_row['Close']), float(last_row['ST'])
         o0 = float(last_row['Open'])
         c1, c2 = float(last_row['c1']), float(last_row['c2'])
-        o1 = float(last_row['o1'])
+        o1, o2 = float(last_row['o1']), float(last_row['o2'])
         
         cross_up_black = bool(last_row['crossAboveBlack'])
         cross_dn_black = bool(last_row['crossBelowBlack'])
         above_black = bool(last_row['aboveBlack'])
         below_black = bool(last_row['belowBlack'])
         
-        # PART 1 MATRIX: Check Candlestick Base Colors
         is_green_c0 = c0 > o0
         is_red_c0   = c0 < o0
         is_green_c1 = c1 > o1
         is_red_c1   = c1 < o1
         
         # --- 4. STEP 1: CALCULATE RAW INDEPENDENT EXIT TREND STATE FIRST ---
-        exit_sig = "NONE" # Rule 10 Implementation fallback
+        exit_sig = "NONE"
         if is_red_c1 and is_green_c0:
-            exit_sig = "BUY"  # Rule 6 Execution path
+            exit_sig = "BUY"
         elif is_green_c1 and is_green_c0:
-            exit_sig = "BULL" # Rule 7 Execution path
+            exit_sig = "BULL"
         elif is_green_c1 and is_red_c0:
-            exit_sig = "SELL" # Rule 8 Execution path
+            exit_sig = "SELL"
         elif is_red_c1 and is_red_c0:
-            exit_sig = "BEAR" # Rule 9 Execution path
+            exit_sig = "BEAR"
             
         # --- 5. STEP 2: APPLY FILTERS DIRECTLY ON PRE-COMPUTED EXITS FOR ENTRY ---
-        entry = "NONE" # Rule 17 Implementation fallback
+        entry = "NONE"
         
         # Bullish Entry Rules Cascade Filter
         if cross_up_black:
-            entry = "BUY"  # Rule 11 Override
+            entry = "BUY"
         elif exit_sig == "BUY" and above_black:
-            entry = "BUY"  # Rule 12 Confirmation pass
+            entry = "BUY"
         elif exit_sig == "BULL" and above_black:
-            entry = "BULL" # Rule 13 Confirmation pass
+            entry = "BULL"
             
         # Bearish Entry Rules Cascade Filter
         elif cross_dn_black:
-            entry = "SELL" # Rule 14 Override
+            entry = "SELL"
         elif exit_sig == "SELL" and below_black:
-            entry = "SELL" # Rule 15 Confirmation pass
+            entry = "SELL"
         elif exit_sig == "BEAR" and below_black:
-            entry = "BEAR" # Rule 16 Confirmation pass
+            entry = "BEAR"
             
         if DEBUG:
-            _print_console_bar(st0, c2, c1, c0, cross_up_black, cross_dn_black, entry, exit_sig)
+            _print_console_bar(st0, c2, c1, c0, o2, o1, o0, cross_up_black, cross_dn_black, entry, exit_sig)
             
         log_sync_state(df_calc.index[-1], entry, exit_sig, c0, st0)
         return entry, exit_sig
@@ -216,9 +179,9 @@ def get_signal(df=None):
             print(f"PXY Master Core Error: {e}")
         return "NONE", "NONE"
 
-# ==================== MAIN EXECUTION INTERFACE INTERSECT ====================
 if __name__ == "__main__":
     e, x = get_signal()
     print(f"\nFinal Synchronized Outputs -> Entry Status: {e} | Exit Trend: {x}")
+
 
 
