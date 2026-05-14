@@ -33,7 +33,7 @@ def _print_console_bar(st, c2, c1, c0, cross_up, cross_dn):
     trend_color = GRN if c0 >= st else RED
     diff_val = c0 - st
 
-    # Build row items for ascending sort logic
+    # Build row items for descending sort logic
     # Structure: (numerical_value, formatted_label_prefix, bar_marker, label_color)
     rows = [
         (st, f"ST-{st:.2f}", "-", RED),
@@ -42,8 +42,8 @@ def _print_console_bar(st, c2, c1, c0, cross_up, cross_dn):
         (c0, f"C0-{c0:.2f}", "█", GRN)
     ]
     
-    # Strictly sort rows by the numerical key value (ascending order)
-    rows.sort(key=lambda item: item[0])
+    # Strictly sort rows by the numerical value in descending order (highest price on top)
+    rows.sort(key=lambda item: item[0], reverse=True)
 
     print(f"\n{YLW}=== GEOMETRIC ENGINE CONSOLE MONITOR ==={RST}")
     for val, label, marker, color in rows:
