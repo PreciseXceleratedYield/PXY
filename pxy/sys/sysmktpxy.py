@@ -11,34 +11,36 @@ from sysstrndpxy import calculate_supertrend
 DEBUG = True
 
 def _print_console_bar(st, c2, c1, c0, price, cross_up, cross_dn):
-    """Helper engine function to render the graphical ascii layout matrix inside the console."""
+    """Helper engine function to render the graphical colored ascii layout matrix inside the console."""
+    # ANSI escape code constants
+    RST = "\033[0m"       # Reset Color
+    RED = "\033[91m"      # Red for ST
+    GRN = "\033[92m"      # Green for Candle Closes
+    CYN = "\033[96m"      # Cyan for Live Price
+    YLW = "\033[1;93m"    # Bold Yellow for Highlight/Trend
+    GRAY = "\033[90m"     # Dim Gray for layout lines
+
     min_val = min(c2, c1, c0, st) - 2
     max_val = max(c2, c1, c0, st) + 2
     scale_width = 45
 
-    def get_embedded_bar(val, label_text, marker="█"):
+    def get_clean_bar(val, marker="█"):
         pos = int(((val - min_val) / (max_val - min_val)) * scale_width)
-        display_str = f" {label_text:.2f} "
-        
-        bar_part = marker * pos
-        if len(bar_part) > len(display_str) + 2:
-            merged = bar_part[:2] + display_str + bar_part[2 + len(display_str):]
-        else:
-            merged = bar_part + display_str
-            
-        return merged.ljust(scale_width)
+        pos = max(1, pos)
+        return (marker * pos).ljust(scale_width)
 
     trend_str = "BULLISH" if price >= st else "BEARISH"
+    trend_color = GRN if price >= st else RED
     diff_val = price - st
 
-    print("\n=== GEOMETRIC ENGINE CONSOLE MONITOR ===")
-    print(f"ST    {st:.2f} : [{get_embedded_bar(st, st, '-')}]")
-    print(f"C2    {c2:.2f} : [{get_embedded_bar(c2, c2)}]")
-    print(f"C1    {c1:.2f} : [{get_embedded_bar(c1, c1)}]")
-    print(f"C0    {c0:.2f} : [{get_embedded_bar(c0, c0)}]")
-    print(f"PRICE {price:.2f} : [{get_embedded_bar(price, price, '═')}]")
-    print("========================================")
-    print(f"CrossUp: {cross_up} | CrossDn: {cross_dn} | Trend: {trend_str} ({diff_val:+.2f})")
+    print(f"\n{YLW}=== GEOMETRIC ENGINE CONSOLE MONITOR ==={RST}")
+    print(f"{RED}ST    {st:.2f}{RST} : {GRAY}[{RED}{get_clean_bar(st, '-')}{GRAY}]{RST}")
+    print(f"{GRN}C2    {c2:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c2)}{GRAY}]{RST}")
+    print(f"{GRN}C1    {c1:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c1)}{GRAY}]{RST}")
+    print(f"{GRN}C0    {c0:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c0)}{GRAY}]{RST}")
+    print(f"{CYN}PRICE {price:.2f}{RST} : {GRAY}[{CYN}{get_clean_bar(price, '═')}{GRAY}]{RST}")
+    print(f"{YLW}========================================{RST}")
+    print(f"CrossUp: {YLW}{cross_up}{RST} | CrossDn: {YLW}{cross_dn}{RST} | Trend: {trend_color}{trend_str}{RST} ({diff_val:+.2f})")
 
 def log_sync_state(timestamp, entry, exit_sig, price, st):
     """Logs the system state variables cleanly into the target JSON template file."""
@@ -82,7 +84,7 @@ def get_signal(df=None):
         
     try:
         # --- 1. RUN STRUCTURAL SUPERTREND BACKBONE ---
-        df_calc = calculate_supertrend(df) # Slices to a strict 50-row matrix internally
+        df_calc = calculate_supertrend(df)
         
         # --- 2. SIGNAL MATRIX LOOKBACK SHIFTS (STRICT C0, C1, C2 AND ST ONLY) ---
         df_calc['c1'] = df_calc['Close'].shift(1)
@@ -92,7 +94,6 @@ def get_signal(df=None):
         df_calc['aboveBlack'] = df_calc['Close'] > df_calc['ST']
         df_calc['belowBlack'] = df_calc['Close'] < df_calc['ST']
         
-        # Cross conditions directly matching your Pine Script history lookup operators
         df_calc['crossAboveBlack'] = (df_calc['c1'] <= df_calc['st1']) & (df_calc['Close'] > df_calc['ST'])
         df_calc['crossBelowBlack'] = (df_calc['c1'] >= df_calc['st1']) & (df_calc['Close'] < df_calc['ST'])
         
@@ -104,7 +105,6 @@ def get_signal(df=None):
         cross_up_black = bool(last_row['crossAboveBlack'])
         cross_dn_black = bool(last_row['crossBelowBlack'])
         
-        # Core Geometric Formations (C0, C1, C2 Only)
         v_pattern_up = (c1 < c2) and (c0 > c1)
         inverted_v_down = (c1 > c2) and (c0 < c1)
         three_candles_up = (c0 > c1) and (c1 > c2)
@@ -117,7 +117,7 @@ def get_signal(df=None):
         if DEBUG:
             _print_console_bar(st0, c2, c1, c0, c0, cross_up_black, cross_dn_black)
             
-        # --- 4. ENTRY SIGNAL EXECUTION ENGINE (RESTRICTED BY ST BLACK LINE) ---
+        # --- 4. ENTRY SIGNAL EXECUTION ENGINE ---
         entry = "NONE"
         if st_signal == "BUY" or cross_up_black:
             entry = "BUY"
@@ -132,7 +132,7 @@ def get_signal(df=None):
         elif three_candles_down and below_black:
             entry = "BEAR"
             
-        # --- 5. EXIT SIGNAL ENGINE (PURE GEOMETRICS + FULL STATUS EXPANSION) ---
+        # --- 5. EXIT SIGNAL ENGINE ---
         exit_sig = "SIDE"
         if st_signal == "BUY" or cross_up_black:
             exit_sig = "BUY"
@@ -147,7 +147,6 @@ def get_signal(df=None):
         elif three_candles_down:
             exit_sig = "BEAR"
         else:
-            # FIXED LINE 105: Applied strict structural indentation block formatting rules
             exit_sig = "NONE"
             
         log_sync_state(df_calc.index[-1], entry, exit_sig, c0, st0)
@@ -162,5 +161,4 @@ def get_signal(df=None):
 if __name__ == "__main__":
     e, x = get_signal()
     print(f"\nFinal Synchronized Outputs -> Entry Status: {e} | Exit Trend: {x}")
-
 
