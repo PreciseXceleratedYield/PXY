@@ -1,6 +1,7 @@
 import pytz
 from datetime import datetime
 from colorama import init, Fore, Style
+import re
 
 init(autoreset=True)
 IST = pytz.timezone("Asia/Kolkata")
@@ -38,7 +39,7 @@ def target_price(row):
         side = "CE" if "CE" in symbol else "PE" if "PE" in symbol else "NA"
         
         is_ce, is_pe = (side == "CE"), (side == "PE")
-        active_signal = str(row.get("entry", "NONE")).upper()
+        active_signal = str(row.get("exit", "NONE")).upper()
         is_counter = str(row.get("counter", "N")).upper() == "Y"
 
         # 4. FIELD DEFINITIONS
@@ -52,8 +53,8 @@ def target_price(row):
         # 5. FINAL PERCENTAGE SCORE CALCULATION
         state = "⏳"
         final_pct_score = BASE_SCORE
-        bullish_triggers = ["BUY", "BULL", "OTMBUY", "ATMBUY"]
-        bearish_triggers = ["SELL", "BEAR", "OTMSELL", "ATMSELL"]
+        is_bullish_signal = bool(re.search(r'(BUY|BULL)', clean_signal))
+        is_bearish_signal = bool(re.search(r'(SELL|BEAR)', clean_signal))
 
         if is_ce:
             if any(t in active_signal for t in bullish_triggers):
