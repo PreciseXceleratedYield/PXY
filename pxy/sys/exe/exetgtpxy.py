@@ -64,14 +64,14 @@ def target_price(row):
                 calc = ((atr_val * ce_f * ce_p) + hce_d) / hce_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
             elif is_bearish_signal:
-                final_pct_score = (1.4 * ce_f * ce_p)
+                final_pct_score = (1.4)
                 state = "❄️"
         elif is_pe:
             if is_bearish_signal:
                 calc = ((atr_val * pe_f * pe_p) + hpe_d) / hpe_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
             elif is_bullish_signal:
-                final_pct_score = (1.4 * pe_f * pe_p)
+                final_pct_score = (1.4)
                 state = "❄️"
                 
         # 8. MAX CAP LOGIC
