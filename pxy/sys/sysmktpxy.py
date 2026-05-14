@@ -5,9 +5,40 @@ import json
 import os
 from datetime import datetime
 from sysdtafpxy import fetch_yf_data
-from sysstrndpxy import calculate_supertrend  # Uses your upgraded TSMA(42) + Price Midpoint architecture
+from sysstrndpxy import calculate_supertrend
 
+# Uses your upgraded TSMA(42) + Price Midpoint architecture
 DEBUG = True
+
+def _print_console_bar(st, c2, c1, c0, price, cross_up, cross_dn):
+    """Helper engine function to render the graphical ascii layout matrix inside the console."""
+    min_val = min(c2, c1, c0, st) - 2
+    max_val = max(c2, c1, c0, st) + 2
+    scale_width = 45
+
+    def get_embedded_bar(val, label_text, marker="█"):
+        pos = int(((val - min_val) / (max_val - min_val)) * scale_width)
+        display_str = f" {label_text:.2f} "
+        
+        bar_part = marker * pos
+        if len(bar_part) > len(display_str) + 2:
+            merged = bar_part[:2] + display_str + bar_part[2 + len(display_str):]
+        else:
+            merged = bar_part + display_str
+            
+        return merged.ljust(scale_width)
+
+    trend_str = "BULLISH" if price >= st else "BEARISH"
+    diff_val = price - st
+
+    print("\n=== GEOMETRIC ENGINE CONSOLE MONITOR ===")
+    print(f"ST    {st:.2f} : [{get_embedded_bar(st, st, '-')}]")
+    print(f"C2    {c2:.2f} : [{get_embedded_bar(c2, c2)}]")
+    print(f"C1    {c1:.2f} : [{get_embedded_bar(c1, c1)}]")
+    print(f"C0    {c0:.2f} : [{get_embedded_bar(c0, c0)}]")
+    print(f"PRICE {price:.2f} : [{get_embedded_bar(price, price, '═')}]")
+    print("========================================")
+    print(f"CrossUp: {cross_up} | CrossDn: {cross_dn} | Trend: {trend_str} ({diff_val:+.2f})")
 
 def log_sync_state(timestamp, entry, exit_sig, price, st):
     """Logs the system state variables cleanly into the target JSON template file."""
@@ -15,6 +46,7 @@ def log_sync_state(timestamp, entry, exit_sig, price, st):
         dir_path = os.path.expanduser("~/pxy")
         os.makedirs(dir_path, exist_ok=True)
         file_path = os.path.join(dir_path, "tv_sync_log.json")
+        
         log_entry = {
             "Timestamp": str(timestamp),
             "Price": float(price),
@@ -23,6 +55,7 @@ def log_sync_state(timestamp, entry, exit_sig, price, st):
             "Signal_Exit": str(exit_sig),
             "Logged_At": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
+        
         logs = []
         if os.path.exists(file_path):
             with open(file_path, "r") as f:
@@ -30,6 +63,7 @@ def log_sync_state(timestamp, entry, exit_sig, price, st):
                     logs = json.load(f)
                 except:
                     logs = []
+                    
         logs.append(log_entry)
         with open(file_path, "w") as f:
             json.dump(logs[-100:], f, indent=4)
@@ -38,8 +72,8 @@ def log_sync_state(timestamp, entry, exit_sig, price, st):
 
 def get_signal(df=None):
     """
-    Main signal generation function. Evaluates V-patterns, 3-candle lines,
-    and black line crossovers to output entry status and exit trend.
+    Main signal generation function.
+    Evaluates V-patterns, 3-candle lines, and black line crossovers to output entry status and exit trend.
     """
     if df is None:
         df = fetch_yf_data()
@@ -66,6 +100,7 @@ def get_signal(df=None):
         last_row = df_calc.iloc[-1].copy()
         c0, st0 = float(last_row['Close']), float(last_row['ST'])
         c1, c2 = float(last_row['c1']), float(last_row['c2'])
+        
         cross_up_black = bool(last_row['crossAboveBlack'])
         cross_dn_black = bool(last_row['crossBelowBlack'])
         
@@ -75,15 +110,13 @@ def get_signal(df=None):
         three_candles_up = (c0 > c1) and (c1 > c2)
         three_candles_down = (c0 < c1) and (c1 < c2)
         
-        st_signal = str(last_row['ST_Trend']) 
+        st_signal = str(last_row['ST_Trend'])
         above_black = bool(last_row['aboveBlack'])
         below_black = bool(last_row['belowBlack'])
         
         if DEBUG:
-            print(f"\n--- PXY DEBUG (GEOMETRIC ENGINE) --- Price: {c0} | ST: {st0:.2f}")
-            print(f"Candle Context : C0: {c0} | C1: {c1} | C2: {c2}")
-            print(f"Cross Checks   : CrossUpST: {cross_up_black} | CrossDnST: {cross_dn_black}")
-
+            _print_console_bar(st0, c2, c1, c0, c0, cross_up_black, cross_dn_black)
+            
         # --- 4. ENTRY SIGNAL EXECUTION ENGINE (RESTRICTED BY ST BLACK LINE) ---
         entry = "NONE"
         if st_signal == "BUY" or cross_up_black:
@@ -98,7 +131,7 @@ def get_signal(df=None):
             entry = "BULL"
         elif three_candles_down and below_black:
             entry = "BEAR"
-
+            
         # --- 5. EXIT SIGNAL ENGINE (PURE GEOMETRICS + FULL STATUS EXPANSION) ---
         exit_sig = "SIDE"
         if st_signal == "BUY" or cross_up_black:
@@ -113,7 +146,8 @@ def get_signal(df=None):
             exit_sig = "BULL"
         elif three_candles_down:
             exit_sig = "BEAR"
-        else: # FIXED LINE 105: Applied strict structural indentation block formatting rules
+        else:
+            # FIXED LINE 105: Applied strict structural indentation block formatting rules
             exit_sig = "NONE"
             
         log_sync_state(df_calc.index[-1], entry, exit_sig, c0, st0)
@@ -127,6 +161,6 @@ def get_signal(df=None):
 # ==================== MAIN EXECUTION INTERFACE INTERSECT ====================
 if __name__ == "__main__":
     e, x = get_signal()
-    print(f"Final Synchronized Outputs -> Entry Status: {e} | Exit Trend: {x}")
+    print(f"\nFinal Synchronized Outputs -> Entry Status: {e} | Exit Trend: {x}")
 
 
