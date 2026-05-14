@@ -10,20 +10,17 @@ from sysstrndpxy import calculate_supertrend
 # Uses your upgraded TSMA(42) + Price Midpoint architecture
 DEBUG = True
 
-def _print_console_bar(st, c2, c1, c0, price, cross_up, cross_dn):
-    """Helper engine function to render the graphical colored ascii layout matrix inside the console."""
+def _print_console_bar(st, c2, c1, c0, cross_up, cross_dn):
+    """Helper engine function to render the graphical sorted ascii layout matrix inside the console."""
     # ANSI escape code constants
     RST = "\033[0m"       # Reset Color
     RED = "\033[91m"      # Red for ST
     GRN = "\033[92m"      # Green for Candle Closes
-    CYN = "\033[96m"      # Cyan for Live Price
     YLW = "\033[1;93m"    # Bold Yellow for Highlight/Trend
     GRAY = "\033[90m"     # Dim Gray for layout lines
 
     min_val = min(c2, c1, c0, st) - 2
     max_val = max(c2, c1, c0, st) + 2
-    
-    # Scale width reduced by >50% to fit exactly into 42-width terminal lines
     scale_width = 20
 
     def get_clean_bar(val, marker="█"):
@@ -31,18 +28,28 @@ def _print_console_bar(st, c2, c1, c0, price, cross_up, cross_dn):
         pos = max(1, pos)
         return (marker * pos).ljust(scale_width)
 
-    trend_str = "BULL" if price >= st else "BEAR"
-    trend_color = GRN if price >= st else RED
-    diff_val = price - st
+    # Contextual settings
+    trend_str = "BULL" if c0 >= st else "BEAR"
+    trend_color = GRN if c0 >= st else RED
+    diff_val = c0 - st
+
+    # Build row items for ascending sort logic
+    # Structure: (numerical_value, formatted_label_prefix, bar_marker, label_color)
+    rows = [
+        (st, f"ST-{st:.2f}", "-", RED),
+        (c2, f"C2-{c2:.2f}", "█", GRN),
+        (c1, f"C1-{c1:.2f}", "█", GRN),
+        (c0, f"C0-{c0:.2f}", "█", GRN)
+    ]
+    
+    # Strictly sort rows by the numerical key value (ascending order)
+    rows.sort(key=lambda item: item[0])
 
     print(f"\n{YLW}=== GEOMETRIC ENGINE CONSOLE MONITOR ==={RST}")
-    print(f"{RED}ST-{st:.2f}{RST} : {GRAY}[{RED}{get_clean_bar(st, '-')}{GRAY}]{RST}")
-    print(f"{GRN}C2-{c2:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c2)}{GRAY}]{RST}")
-    print(f"{GRN}C1-{c1:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c1)}{GRAY}]{RST}")
-    print(f"{GRN}C0-{c0:.2f}{RST} : {GRAY}[{GRN}{get_clean_bar(c0)}{GRAY}]{RST}")
-    print(f"{CYN}LP-{price:.2f}{RST} : {GRAY}[{CYN}{get_clean_bar(price, '═')}{GRAY}]{RST}")
+    for val, label, marker, color in rows:
+        print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
-    print(f"UP:{YLW}{str(cross_up)[0]}{RST} | DDN:{YLW}{str(cross_dn)[0]}{RST} | Trnd:{trend_color}{trend_str}{RST} ({diff_val:+.2f})")
+    print(f"UP:{YLW}{str(cross_up)}{RST} | DDN:{YLW}{str(cross_dn)}{RST} | Trnd:{trend_color}{trend_str}{RST} ({diff_val:+.2f})")
 
 def log_sync_state(timestamp, entry, exit_sig, price, st):
     """Logs the system state variables cleanly into the target JSON template file."""
@@ -117,7 +124,7 @@ def get_signal(df=None):
         below_black = bool(last_row['belowBlack'])
         
         if DEBUG:
-            _print_console_bar(st0, c2, c1, c0, c0, cross_up_black, cross_dn_black)
+            _print_console_bar(st0, c2, c1, c0, cross_up_black, cross_dn_black)
             
         # --- 4. ENTRY SIGNAL EXECUTION ENGINE ---
         entry = "NONE"
