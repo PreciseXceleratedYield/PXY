@@ -68,7 +68,7 @@ def target_price(row):
                 calc = ((atr_val * ce_f * ce_p) + hce_d) / hce_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
             elif is_bearish_signal:
-                final_pct_score = BASE_SCORE / 2
+                final_pct_score = (1.4 * ce_f * ce_p)
                 state = "❄️"  # FIX: Fixed URL encoding break
 
         elif is_pe:
@@ -76,7 +76,7 @@ def target_price(row):
                 calc = ((atr_val * pe_f * pe_p) + hpe_d) / hpe_d
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
             elif is_bullish_signal:
-                final_pct_score = BASE_SCORE / 2
+                final_pct_score = (1.4 * pe_f * pe_p)
                 state = "❄️"  # FIX: Fixed URL encoding break
 
         # 8. MAX CAP LOGIC
