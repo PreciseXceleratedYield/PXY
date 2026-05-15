@@ -126,17 +126,26 @@ async def main():
         IST = pytz.timezone("Asia/Kolkata")
         now = datetime.now(IST).time()
         dprint(f"TIME CHECK: {now}")
-        
+
+        # 1. Check Market Timing First
         if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 19) <= now < dt_time(15, 31)):
-            print("⏳ Market buffer time - skipped")
+            print(f"{Fore.YELLOW}⏳ Market buffer time - skipped")
             return
 
-        client = get_session()
-        if not client: return
-
+        # 2. Fetch Data and Check Signal Status
         data = get_all_data()
-        entry_signal = data.get("entry")
+        entry_signal = str(data.get("entry", "")).upper().strip()
         reversal = data.get("exit")
+
+        if entry_signal in ["BULL", "BEAR", "NONE", "WAIT", ""]:
+            print(f"{Fore.MAGENTA}🛑 Inactive signal ({entry_signal if entry_signal else 'BLANK'}) - skipped execution")
+            return
+
+        # --- SESSION INITIALIZATION (Only runs for actionable signals) ---
+        client = get_session()
+        if not client:
+            return
+
         ltp = data.get("price")
 
         try:
