@@ -280,28 +280,41 @@ body {
     border-radius: 10px;
     overflow: hidden;
     display: none;
-    min-width: 160px;
+    min-width: 180px;
     box-shadow: 0 16px 40px var(--shadow);
     z-index: 200;
     transition: background 0.35s;
 }
-#dropdown div {
-    padding: 11px 16px;
-    font-size: 12px;
-    cursor: pointer;
-    color: var(--muted);
-    letter-spacing: 0.06em;
-    transition: all 0.15s;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 8px;
-}
-#dropdown div:last-child { border-bottom: none; }
-#dropdown div:hover, #dropdown div:active { background: var(--bg3); color: var(--text); }
-#dropdown div::before {
-    content: ''; width: 4px; height: 4px;
-    border-radius: 50%; background: var(--accent); flex-shrink: 0;
-}
 #menu.open #dropdown { display: block; }
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 16px;
+    text-decoration: none;
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s, color 0.15s;
+    cursor: pointer;
+}
+.nav-item:last-child { border-bottom: none; }
+.nav-item:hover, .nav-item:active { background: var(--bg3); }
+
+.nav-icon  { font-size: 14px; flex-shrink: 0; }
+.nav-label {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    flex: 1;
+}
+.nav-arrow {
+    font-size: 12px;
+    color: var(--muted);
+    transition: transform 0.2s;
+}
+.nav-item:hover .nav-arrow { transform: translateX(3px); color: var(--accent); }
 
 /* ══════════════════════════════════════════
    MAIN BODY  (terminal | chart)
@@ -505,7 +518,7 @@ canvas#topCandle {
 
     #terminalPanel {
         width: 100% !important;
-        height: 38%;
+        height: 50%;
         border-right: none;
         border-bottom: 1px solid var(--border);
     }
@@ -584,271 +597,6 @@ canvas#topCandle {
 .xterm-viewport { background: transparent !important; }
 .xterm-screen   { background: transparent !important; }
 
-/* ══════════════════════════════════════════
-   PNL STYLES
-══════════════════════════════════════════ */
-.pnl-label {
-    font-size: clamp(8px, 0.8vw, 10px);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: var(--muted);
-    font-weight: 300;
-}
-
-/* dropdown overrides for PnL */
-#dropdown {
-    min-width: 300px;
-    max-height: 420px;
-    overflow-y: auto;
-}
-
-.pnl-dropdown-header {
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    padding: 10px 16px !important;
-    background: var(--bg3) !important;
-    border-bottom: 1px solid var(--border2) !important;
-    cursor: default !important;
-    pointer-events: none;
-}
-.pnl-dropdown-header::before { display: none !important; }
-
-.pnl-dd-label {
-    font-size: 9px;
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--muted);
-}
-
-.pnl-dd-total {
-    font-family: 'Syne', sans-serif;
-    font-size: 15px;
-    font-weight: 700;
-}
-
-.pnl-trade-row {
-    display: flex !important;
-    justify-content: space-between !important;
-    align-items: center !important;
-    padding: 9px 16px !important;
-    border-bottom: 1px solid var(--border) !important;
-    cursor: default !important;
-    gap: 12px !important;
-}
-.pnl-trade-row::before { display: none !important; }
-.pnl-trade-row:last-child { border-bottom: none !important; }
-.pnl-trade-row:hover { background: var(--bg3) !important; }
-
-.pnl-trade-left {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-}
-
-.pnl-trade-sym {
-    font-size: 11px;
-    font-weight: 500;
-    color: var(--text);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 160px;
-}
-
-.pnl-trade-meta {
-    font-size: 9px;
-    color: var(--muted);
-    letter-spacing: 0.05em;
-    white-space: nowrap;
-}
-
-.pnl-trade-right {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-    flex-shrink: 0;
-}
-
-.pnl-trade-pnl {
-    font-family: 'Syne', sans-serif;
-    font-size: 13px;
-    font-weight: 700;
-}
-
-.pnl-trade-pnl.bull { color: var(--bull); }
-.pnl-trade-pnl.bear { color: var(--bear); }
-
-.pnl-trade-qty {
-    font-size: 9px;
-    color: var(--muted);
-}
-
-.pnl-menu-link {
-    display: flex !important;
-    align-items: center !important;
-    gap: 8px !important;
-    padding: 11px 16px !important;
-    cursor: pointer !important;
-    color: var(--accent) !important;
-    font-size: 12px !important;
-    letter-spacing: 0.05em !important;
-    border-bottom: 1px solid var(--border2) !important;
-    transition: background 0.15s !important;
-}
-.pnl-menu-link::before { display: none !important; }
-.pnl-menu-link:hover { background: var(--bg3) !important; }
-.pnl-link-icon { font-size: 13px; }
-.pnl-link-arrow { margin-left: auto; opacity: 0.5; font-size: 13px; }
-
-/* ── PNL MODAL ── */
-#pnlModal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 2000;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    padding: clamp(10px, 3vw, 40px);
-    align-items: center;
-    justify-content: center;
-}
-#pnlModal.open { display: flex; }
-
-#pnlModalBox {
-    background: var(--bg2);
-    border: 1px solid var(--border2);
-    border-radius: 14px;
-    width: 100%;
-    max-width: 900px;
-    max-height: 90dvh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
-    overflow: hidden;
-    transition: background 0.35s;
-}
-
-#pnlModalHeader {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg3);
-    flex-shrink: 0;
-    transition: background 0.35s, border-color 0.35s;
-}
-
-#pnlModalTitleGroup {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-}
-
-#pnlModalTitle {
-    font-family: 'Syne', sans-serif;
-    font-size: clamp(13px, 1.5vw, 16px);
-    font-weight: 700;
-    color: var(--text);
-    letter-spacing: 0.02em;
-}
-
-#pnlModalTotal {
-    font-family: 'Syne', sans-serif;
-    font-size: clamp(16px, 2vw, 22px);
-    font-weight: 800;
-    letter-spacing: -0.5px;
-}
-
-#pnlModalClose {
-    background: transparent;
-    border: 1px solid var(--border2);
-    color: var(--muted);
-    width: 30px; height: 30px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 13px;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s;
-    font-family: 'DM Mono', monospace;
-    flex-shrink: 0;
-}
-#pnlModalClose:hover { background: var(--bear-dim); color: var(--bear); border-color: var(--bear); }
-
-#pnlModalBody {
-    flex: 1;
-    overflow-y: auto;
-    overflow-x: auto;
-    padding: 0;
-}
-
-#pnlTable {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: clamp(10px, 1vw, 12px);
-}
-
-#pnlTable thead tr {
-    background: var(--bg3);
-    position: sticky;
-    top: 0;
-    z-index: 1;
-}
-
-#pnlTable th {
-    padding: 10px 16px;
-    text-align: left;
-    font-size: clamp(8px, 0.8vw, 10px);
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: var(--muted);
-    font-weight: 400;
-    border-bottom: 1px solid var(--border2);
-    white-space: nowrap;
-}
-
-#pnlTable td {
-    padding: 11px 16px;
-    border-bottom: 1px solid var(--border);
-    color: var(--text);
-    white-space: nowrap;
-    transition: color 0.35s;
-}
-
-#pnlTable tbody tr:hover td { background: var(--bg3); }
-#pnlTable tbody tr:last-child td { border-bottom: none; }
-
-.td-sym  { font-weight: 500; }
-.td-tag  { color: var(--muted) !important; font-size: 0.9em; }
-.td-pnl  { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.1em; }
-.td-pnl.bull { color: var(--bull) !important; }
-.td-pnl.bear { color: var(--bear) !important; }
-.td-time { color: var(--muted) !important; font-size: 0.9em; }
-
-#pnlTable tfoot tr td {
-    padding: 12px 16px;
-    border-top: 1px solid var(--border2);
-    font-weight: 600;
-    background: var(--bg3);
-    position: sticky;
-    bottom: 0;
-}
-.td-foot-label { color: var(--muted); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
-.td-foot-total { font-family: 'Syne', sans-serif; font-size: 1.2em; font-weight: 800; }
-.td-foot-total.bull { color: var(--bull); }
-.td-foot-total.bear { color: var(--bear); }
-
-.pnl-empty {
-    padding: 32px 16px;
-    text-align: center;
-    color: var(--muted);
-    font-size: 11px;
-    letter-spacing: 0.08em;
-}
 </style>
 </head>
 
@@ -870,16 +618,21 @@ canvas#topCandle {
                     <span>PXY</span>
                 </div>
                 <div id="dropdown">
-                    <div id="pnlDropdownHeader" class="pnl-dropdown-header">
-                        <span class="pnl-dd-label">P&amp;L Summary</span>
-                        <span class="pnl-dd-total" id="pnlDdTotal">—</span>
-                    </div>
-                    <div class="pnl-menu-link" id="openPnlTable">
-                        <span class="pnl-link-icon">📊</span>
-                        <span>View Full P&amp;L Table</span>
-                        <span class="pnl-link-arrow">→</span>
-                    </div>
-                    <div id="pnlTradeList"></div>
+                    <a class="nav-item" href="#" id="navGame">
+                        <span class="nav-icon">🎮</span>
+                        <span class="nav-label">GAME</span>
+                        <span class="nav-arrow">→</span>
+                    </a>
+                    <a class="nav-item" href="#" id="navTrades">
+                        <span class="nav-icon">📊</span>
+                        <span class="nav-label">TRADES</span>
+                        <span class="nav-arrow">→</span>
+                    </a>
+                    <a class="nav-item" href="#" id="navBacktest">
+                        <span class="nav-icon">🔬</span>
+                        <span class="nav-label">BACKTEST</span>
+                        <span class="nav-arrow">→</span>
+                    </a>
                 </div>
             </div>
         </div>
@@ -934,37 +687,6 @@ canvas#topCandle {
         </div>
         <span class="time-display" id="clockDisplay">—</span>
     </footer>
-
-<!-- ══ PNL MODAL ══ -->
-<div id="pnlModal">
-    <div id="pnlModalBox">
-        <div id="pnlModalHeader">
-            <div id="pnlModalTitleGroup">
-                <span id="pnlModalTitle">P&amp;L Summary</span>
-                <span id="pnlModalTotal">—</span>
-            </div>
-            <button id="pnlModalClose">✕</button>
-        </div>
-        <div id="pnlModalBody">
-            <table id="pnlTable">
-                <thead>
-                    <tr>
-                        <th>Symbol</th>
-                        <th>Tag</th>
-                        <th>Qty</th>
-                        <th>Buy</th>
-                        <th>Sell</th>
-                        <th>Buy Time</th>
-                        <th>Exit Time</th>
-                        <th>PnL</th>
-                    </tr>
-                </thead>
-                <tbody id="pnlTableBody"></tbody>
-                <tfoot id="pnlTableFoot"></tfoot>
-            </table>
-        </div>
-    </div>
-</div>
 
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
@@ -1321,7 +1043,7 @@ function drawMomentumBar(stVals, closes) {
 }
 
 /* ══════════════════════════════════════
-   PNL
+   PNL — updates header only
 ══════════════════════════════════════ */
 async function loadPnl() {
     let trades = [];
@@ -1330,68 +1052,23 @@ async function loadPnl() {
         trades = await res.json();
     } catch { trades = []; }
 
-    const total = trades.reduce((s, t) => s + (t.PNL || 0), 0);
+    const total  = trades.reduce((s, t) => s + (t.PNL || 0), 0);
     const isBull = total >= 0;
 
-    // ── header center: show total PnL ──
-    $('priceDisplay').textContent =
-        (isBull ? '+' : '') + total.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    $('priceDisplay').textContent = (isBull ? '+' : '') + total.toLocaleString('en-IN');
     $('priceDisplay').style.color = isBull ? cssVar('--bull') : cssVar('--bear');
-
-    // hide % change badge — not relevant for PnL
     $('priceChange').style.display = 'none';
-
-    // header glow
     $('topHeader').style.boxShadow = isBull
         ? '0 1px 0 rgba(34,197,94,0.28)'
         : '0 1px 0 rgba(239,68,68,0.28)';
-
-    // ── dropdown total ──
-    const ddTotal = $('pnlDdTotal');
-    ddTotal.textContent = (isBull ? '+' : '') + total.toLocaleString('en-IN');
-    ddTotal.style.color = isBull ? cssVar('--bull') : cssVar('--bear');
-
-    // ── trade rows ──
-    const list = $('pnlTradeList');
-    list.innerHTML = '';
-
-    if (!trades.length) {
-        const empty = document.createElement('div');
-        empty.className = 'pnl-empty';
-        empty.textContent = 'No closed trades yet';
-        list.appendChild(empty);
-        return;
-    }
-
-    // sort: biggest loss first, then profits
-    const sorted = [...trades].sort((a, b) => (a.PNL || 0) - (b.PNL || 0));
-
-    sorted.forEach(t => {
-        const pnl    = t.PNL || 0;
-        const bull   = pnl >= 0;
-        const sym    = t.Symbol || '—';
-        const qty    = t.Qty ?? '—';
-        const buyP   = t.Buy_Prc != null ? (+t.Buy_Prc).toFixed(1) : '—';
-        const sellP  = t.Sell_Prc != null ? (+t.Sell_Prc).toFixed(1) : '—';
-        const tag    = t.Tag ? `[${t.Tag}]` : '';
-        const time   = t.Exit_Time && t.Exit_Time !== 'OPEN'
-            ? t.Exit_Time.slice(11, 16)   // HH:MM
-            : 'OPEN';
-
-        const row = document.createElement('div');
-        row.className = 'pnl-trade-row';
-        row.innerHTML = `
-            <div class="pnl-trade-left">
-                <span class="pnl-trade-sym">${sym} ${tag}</span>
-                <span class="pnl-trade-meta">${buyP} → ${sellP} &nbsp;·&nbsp; ${time}</span>
-            </div>
-            <div class="pnl-trade-right">
-                <span class="pnl-trade-pnl ${bull ? 'bull' : 'bear'}">${bull ? '+' : ''}${pnl.toLocaleString('en-IN')}</span>
-                <span class="pnl-trade-qty">Qty ${qty}</span>
-            </div>`;
-        list.appendChild(row);
-    });
 }
+
+/* ══════════════════════════════════════
+   NAV LINKS  (urls to be filled later)
+══════════════════════════════════════ */
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') menu.classList.remove('open');
+});
 
 /* ══════════════════════════════════════
    START
