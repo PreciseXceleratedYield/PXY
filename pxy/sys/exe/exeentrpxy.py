@@ -138,7 +138,7 @@ async def main():
         reversal = data.get("exit")
 
         if entry_signal in ["BULL", "BEAR", "NONE", "WAIT", ""]:
-            print(f"{Fore.MAGENTA}🛑  NO-ACTION signal ({entry_signal if entry_signal else 'BLANK'}) - skipped")
+            print(f"{Fore.MAGENTA}🛑  NO-ACTION signal({entry_signal if entry_signal else 'BLANK'})- BUY skipped")
             return
 
         # --- SESSION INITIALIZATION (Only runs for actionable signals) ---
