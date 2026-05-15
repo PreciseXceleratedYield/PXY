@@ -70,6 +70,10 @@ def get_entry_signal(df=None):
             final_signal = "ATMBUY"
         elif entry_l4 == "TRENDSELL":
             final_signal = "ATMSELL"
+         elif entry_l4 == "SELL":
+            final_signal = "OTMSELL"
+         elif entry_l4 == "BUY":
+            final_signal = "OTMBUY"
         else:
             # Pass BULL, BEAR, or NONE exactly as they are down the line
             final_signal = entry_l4
