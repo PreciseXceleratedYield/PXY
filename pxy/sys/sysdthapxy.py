@@ -2,9 +2,9 @@ import pandas as pd
 from sysdtafpxy import fetch_yf_data 
 
 USE_FORMING_CANDLE = True 
-CANDLE_STYLE = "CLOSE" 
+CANDLE_STYLE = "HA" # Kept exactly the same to match configurations
 
-def get_close_data(tickerSymbol=None, df=None): 
+def get_ha_data(tickerSymbol=None, df=None): 
     if df is None: 
         df = fetch_yf_data() 
     if df is None or df.empty: 
@@ -21,29 +21,29 @@ def get_close_data(tickerSymbol=None, df=None):
     # ================================================== # 
     # 🔥 VALUE ASSIGNMENT (STRICTLY CLOSE PRICE)        # 
     # ================================================== # 
-    close_output = df['Close'] 
-    close_mirror = df['Close'] 
+    ha_close = df['Close'] 
+    ha_open = df['Close'] 
     
     # ================================================== # 
     # 🔥 COLOR LOGIC (CLOSE PRICE MOMENTUM)              # 
     # ================================================== # 
-    trend_color = pd.Series(index=df.index, dtype='object') 
+    ha_color = pd.Series(index=df.index, dtype='object') 
     
     for i in range(len(df)): 
         if pd.isna(df['Close'].iloc[i]): 
-            trend_color.iloc[i] = "none" 
+            ha_color.iloc[i] = "none" 
             continue 
         if i == 0: 
-            trend_color.iloc[i] = "none" 
+            ha_color.iloc[i] = "none" 
             continue 
             
         # 🔥 TREND DIRECTION DETERMINED STRICTLY BY CLOSE PRICE 
         if df['Close'].iloc[i] > df['Close'].iloc[i - 1]: 
-            trend_color.iloc[i] = "green" 
+            ha_color.iloc[i] = "green" 
         elif df['Close'].iloc[i] < df['Close'].iloc[i - 1]: 
-            trend_color.iloc[i] = "red" 
+            ha_color.iloc[i] = "red" 
         else: 
-            trend_color.iloc[i] = trend_color.iloc[i - 1] 
+            ha_color.iloc[i] = ha_color.iloc[i - 1] 
 
     # ================================================== # 
     # 🔥 SIGNAL ENGINE (2 CANDLE HOLD + PATTERN LOGIC)   # 
@@ -57,9 +57,9 @@ def get_close_data(tickerSymbol=None, df=None):
             signal.iloc[i] = "none" 
             continue 
             
-        c0 = trend_color.iloc[i] 
-        c1 = trend_color.iloc[i - 1] 
-        c2 = trend_color.iloc[i - 2] if i >= 2 else None 
+        c0 = ha_color.iloc[i] 
+        c1 = ha_color.iloc[i - 1] 
+        c2 = ha_color.iloc[i - 2] if i >= 2 else None 
         new_signal = None 
         
         # ---------------- BUY LOGIC ---------------- 
@@ -89,10 +89,8 @@ def get_close_data(tickerSymbol=None, df=None):
         else: 
             signal.iloc[i] = "none" 
 
-    # 👇 inject into df using a clean signal column name
-    df["close_signal"] = signal 
+    # 👇 Injected column name matches what sysdashpxy.py looks for
+    df["ha_signal"] = signal 
     
-    # Returns values in the exact original order positions
-    return close_output, close_mirror, trend_color, df
-
+    return ha_close, ha_open, ha_color, df
 
