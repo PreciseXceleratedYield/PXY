@@ -75,8 +75,8 @@ def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, ex
     for val, label, marker, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
-    print(f"UP:{YLW}{str(cross_up)}{RST} | DDN:{YLW}{str(cross_dn)}{RST} | Trnd:{trend_color}{trend_str}{RST} ({diff_val:+.2f})")
-    print(f"ENTRY: {YLW}{entry}{RST} | EXIT: {YLW}{exit_sig}{RST}")
+    print(f"UP:{YLW}{str(cross_up)}{RST} | DDN:{YLW}{str(cross_dn)}{RST} | Trnd:{trend_color}{trend_str}{RST}")
+    print(f"       ENTRY: {YLW}{entry}{RST} | EXIT: {YLW}{exit_sig}{RST}")
 
 def log_sync_state(timestamp, entry, exit_sig, price, st):
     """
