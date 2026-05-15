@@ -131,7 +131,7 @@ def run_snapshot():
 
     handle_side_averaging(client, df) 
     print("━" * 42) 
-    print(f" {Fore.CYAN}{Style.BRIGHT}{'SYMBOL':<21}{'ST':^10}{'PNL':>8}") 
+    print(f" {Fore.CYAN}{Style.BRIGHT}{'SYMBOL':<20}{'ST':^10}{'PL':>8}") 
     print("-" * 42) 
     for idx, r in df.iterrows(): 
         sym = str(r.get('symbol',''))[:21] 
@@ -140,7 +140,7 @@ def run_snapshot():
             verify_and_exit(client, r) 
         pnl_val = int(r.get('pnl', 0)) 
         p_col = Fore.GREEN if pnl_val > 0 else Fore.RED if pnl_val < 0 else Fore.WHITE 
-        print(f" {sym:<21}{st_display:<12}{p_col}{pnl_val:>8}") 
+        print(f" {sym:<20}{st_display:<12}{p_col}{pnl_val:>8}") 
     print("-" * 42) 
     print(f"{Fore.WHITE}Refreshed: {datetime.now(IST).strftime('%H:%M:%S')}") 
 
