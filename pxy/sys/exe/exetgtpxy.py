@@ -61,14 +61,14 @@ def target_price(row):
         
         if is_ce:
             if is_bullish_signal:
-                calc = (((atr_val * ce_f * ce_p) + hce_d) / hce_d) + hce_d
+                calc = max(((((atr_val * ce_f * ce_p) + hce_d) / hce_d) + hce_d), 1.4 * hce_d)
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
             elif is_bearish_signal:
                 final_pct_score = (1.4)
                 state = "❄️"
         elif is_pe:
             if is_bearish_signal:
-                calc = (((atr_val * pe_f * pe_p) + hpe_d) / hpe_d) + hpe_d
+                calc =max(((((atr_val * pe_f * pe_p) + hpe_d) / hpe_d) + hpe_d), 1.4 * hpe_d)
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
             elif is_bullish_signal:
                 final_pct_score = (1.4)
