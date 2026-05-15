@@ -85,7 +85,7 @@ def get_entry_signal(df=None):
 
     # Reporting on active Indian Market signals
     if final_signal in ["OTMBUY", "OTMSELL", "ATMBUY", "ATMSELL", "BUY", "SELL"]:
-        print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION{final_signal} 🔥 ".center(50))
+        print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION-{final_signal} 🔥 ".center(40))
 
     return final_signal, exit_l2
 
