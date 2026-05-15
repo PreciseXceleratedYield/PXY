@@ -175,6 +175,8 @@ def get_signal(df=None):
             entry = "CROSSBUY"
         elif exit_sig == "BUY" and above_black:
             entry = "TRENDBUY"
+        elif exit_sig == "BUY" and below_black:  # <--- FIXES THE MASKING FOR BUY
+            entry = "FLIPBUY"
         elif exit_sig == "BULL" and above_black:
             entry = "BULL"
 
@@ -183,6 +185,8 @@ def get_signal(df=None):
             entry = "CROSSSELL"
         elif exit_sig == "SELL" and below_black:
             entry = "TRENDSELL"
+        elif exit_sig == "SELL" and above_black:  # <--- FIXES THE MASKING FOR SELL
+            entry = "FLIPSELL"
         elif exit_sig == "BEAR" and below_black:
             entry = "BEAR"
 
