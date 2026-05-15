@@ -583,6 +583,118 @@ canvas#topCandle {
 .xterm { height: 100% !important; }
 .xterm-viewport { background: transparent !important; }
 .xterm-screen   { background: transparent !important; }
+
+/* ══════════════════════════════════════════
+   PNL STYLES
+══════════════════════════════════════════ */
+.pnl-label {
+    font-size: clamp(8px, 0.8vw, 10px);
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 300;
+}
+
+/* dropdown overrides for PnL */
+#dropdown {
+    min-width: 300px;
+    max-height: 420px;
+    overflow-y: auto;
+}
+
+.pnl-dropdown-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 10px 16px !important;
+    background: var(--bg3) !important;
+    border-bottom: 1px solid var(--border2) !important;
+    cursor: default !important;
+    pointer-events: none;
+}
+.pnl-dropdown-header::before { display: none !important; }
+
+.pnl-dd-label {
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.pnl-dd-total {
+    font-family: 'Syne', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.pnl-trade-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    padding: 9px 16px !important;
+    border-bottom: 1px solid var(--border) !important;
+    cursor: default !important;
+    gap: 12px !important;
+}
+.pnl-trade-row::before { display: none !important; }
+.pnl-trade-row:last-child { border-bottom: none !important; }
+.pnl-trade-row:hover { background: var(--bg3) !important; }
+
+.pnl-trade-left {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.pnl-trade-sym {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 160px;
+}
+
+.pnl-trade-meta {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.pnl-trade-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+    flex-shrink: 0;
+}
+
+.pnl-trade-pnl {
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.pnl-trade-pnl.bull { color: var(--bull); }
+.pnl-trade-pnl.bear { color: var(--bear); }
+
+.pnl-trade-qty {
+    font-size: 9px;
+    color: var(--muted);
+}
+
+.pnl-empty {
+    padding: 18px 16px;
+    text-align: center;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    cursor: default;
+}
+.pnl-empty::before { display: none !important; }
 </style>
 </head>
 
@@ -604,15 +716,18 @@ canvas#topCandle {
                     <span>Feed</span>
                 </div>
                 <div id="dropdown">
-                    <div>CSV Stream 1</div>
-                    <div>CSV Stream 2</div>
-                    <div>CSV Stream 3</div>
+                    <div id="pnlDropdownHeader" class="pnl-dropdown-header">
+                        <span class="pnl-dd-label">P&amp;L Summary</span>
+                        <span class="pnl-dd-total" id="pnlDdTotal">—</span>
+                    </div>
+                    <div id="pnlTradeList"></div>
                 </div>
             </div>
         </div>
 
-        <!-- CENTER: price -->
+        <!-- CENTER: PnL -->
         <div id="headerCenter">
+            <span class="pnl-label">PnL</span>
             <span class="price-display" id="priceDisplay">—</span>
             <span class="price-change bull" id="priceChange">+0.00%</span>
         </div>
@@ -814,7 +929,6 @@ async function load() {
     const st     = data.map(d => d.st);
     const trend  = data.map(d => d.st_trend);
     lastSt = st; lastCloses = closes;
-    updateHeader(closes, st, trend);
     draw(closes, st, trend);
     drawMomentumBar(st, closes);
 }
@@ -1019,10 +1133,85 @@ function drawMomentumBar(stVals, closes) {
 }
 
 /* ══════════════════════════════════════
+   PNL
+══════════════════════════════════════ */
+async function loadPnl() {
+    let trades = [];
+    try {
+        const res = await fetch('./pnl.json?_=' + Date.now());
+        trades = await res.json();
+    } catch { trades = []; }
+
+    const total = trades.reduce((s, t) => s + (t.PNL || 0), 0);
+    const isBull = total >= 0;
+
+    // ── header center: show total PnL ──
+    $('priceDisplay').textContent =
+        (isBull ? '+' : '') + total.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    $('priceDisplay').style.color = isBull ? cssVar('--bull') : cssVar('--bear');
+
+    // hide % change badge — not relevant for PnL
+    $('priceChange').style.display = 'none';
+
+    // header glow
+    $('topHeader').style.boxShadow = isBull
+        ? '0 1px 0 rgba(34,197,94,0.28)'
+        : '0 1px 0 rgba(239,68,68,0.28)';
+
+    // ── dropdown total ──
+    const ddTotal = $('pnlDdTotal');
+    ddTotal.textContent = (isBull ? '+' : '') + total.toLocaleString('en-IN');
+    ddTotal.style.color = isBull ? cssVar('--bull') : cssVar('--bear');
+
+    // ── trade rows ──
+    const list = $('pnlTradeList');
+    list.innerHTML = '';
+
+    if (!trades.length) {
+        const empty = document.createElement('div');
+        empty.className = 'pnl-empty';
+        empty.textContent = 'No closed trades yet';
+        list.appendChild(empty);
+        return;
+    }
+
+    // sort: biggest loss first, then profits
+    const sorted = [...trades].sort((a, b) => (a.PNL || 0) - (b.PNL || 0));
+
+    sorted.forEach(t => {
+        const pnl    = t.PNL || 0;
+        const bull   = pnl >= 0;
+        const sym    = t.Symbol || '—';
+        const qty    = t.Qty ?? '—';
+        const buyP   = t.Buy_Prc != null ? (+t.Buy_Prc).toFixed(1) : '—';
+        const sellP  = t.Sell_Prc != null ? (+t.Sell_Prc).toFixed(1) : '—';
+        const tag    = t.Tag ? `[${t.Tag}]` : '';
+        const time   = t.Exit_Time && t.Exit_Time !== 'OPEN'
+            ? t.Exit_Time.slice(11, 16)   // HH:MM
+            : 'OPEN';
+
+        const row = document.createElement('div');
+        row.className = 'pnl-trade-row';
+        row.innerHTML = `
+            <div class="pnl-trade-left">
+                <span class="pnl-trade-sym">${sym} ${tag}</span>
+                <span class="pnl-trade-meta">${buyP} → ${sellP} &nbsp;·&nbsp; ${time}</span>
+            </div>
+            <div class="pnl-trade-right">
+                <span class="pnl-trade-pnl ${bull ? 'bull' : 'bear'}">${bull ? '+' : ''}${pnl.toLocaleString('en-IN')}</span>
+                <span class="pnl-trade-qty">Qty ${qty}</span>
+            </div>`;
+        list.appendChild(row);
+    });
+}
+
+/* ══════════════════════════════════════
    START
 ══════════════════════════════════════ */
 load();
-setInterval(load, 3000);
+loadPnl();
+setInterval(load,    3000);
+setInterval(loadPnl, 5000);
 </script>
 </body>
 </html>
