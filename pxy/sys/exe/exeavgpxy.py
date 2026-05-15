@@ -70,9 +70,11 @@ def handle_side_averaging(client, df):
         # 1. Must be in LOSS 
         loss_hit = (current_loss <= LOSS_THRESHOLD) 
 
-        # 2. SIGNAL must match the side (Accepts BOTH original and clean fallback strings) 
-        signal_matches = (side == 'CE' and current_signal in ["ATMBUY"]) or \
-                         (side == 'PE' and current_signal in ["ATMSELL"]) 
+        # 2. SIGNAL must match the side (ATM + OTM support)
+        signal_matches = (
+            (side == 'CE' and current_signal in ["ATMBUY", "OTMBUY"]) or
+            (side == 'PE' and current_signal in ["ATMSELL", "OTMSELL"])
+        )
 
         # Only proceed if BOTH are true 
         if loss_hit and signal_matches: 
