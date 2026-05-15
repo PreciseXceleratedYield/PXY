@@ -686,15 +686,169 @@ canvas#topCandle {
     color: var(--muted);
 }
 
+.pnl-menu-link {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 11px 16px !important;
+    cursor: pointer !important;
+    color: var(--accent) !important;
+    font-size: 12px !important;
+    letter-spacing: 0.05em !important;
+    border-bottom: 1px solid var(--border2) !important;
+    transition: background 0.15s !important;
+}
+.pnl-menu-link::before { display: none !important; }
+.pnl-menu-link:hover { background: var(--bg3) !important; }
+.pnl-link-icon { font-size: 13px; }
+.pnl-link-arrow { margin-left: auto; opacity: 0.5; font-size: 13px; }
+
+/* ── PNL MODAL ── */
+#pnlModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    padding: clamp(10px, 3vw, 40px);
+    align-items: center;
+    justify-content: center;
+}
+#pnlModal.open { display: flex; }
+
+#pnlModalBox {
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 900px;
+    max-height: 90dvh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6);
+    overflow: hidden;
+    transition: background 0.35s;
+}
+
+#pnlModalHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg3);
+    flex-shrink: 0;
+    transition: background 0.35s, border-color 0.35s;
+}
+
+#pnlModalTitleGroup {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+#pnlModalTitle {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(13px, 1.5vw, 16px);
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.02em;
+}
+
+#pnlModalTotal {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(16px, 2vw, 22px);
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+#pnlModalClose {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    width: 30px; height: 30px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+    font-family: 'DM Mono', monospace;
+    flex-shrink: 0;
+}
+#pnlModalClose:hover { background: var(--bear-dim); color: var(--bear); border-color: var(--bear); }
+
+#pnlModalBody {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: auto;
+    padding: 0;
+}
+
+#pnlTable {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: clamp(10px, 1vw, 12px);
+}
+
+#pnlTable thead tr {
+    background: var(--bg3);
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+#pnlTable th {
+    padding: 10px 16px;
+    text-align: left;
+    font-size: clamp(8px, 0.8vw, 10px);
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+    border-bottom: 1px solid var(--border2);
+    white-space: nowrap;
+}
+
+#pnlTable td {
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    white-space: nowrap;
+    transition: color 0.35s;
+}
+
+#pnlTable tbody tr:hover td { background: var(--bg3); }
+#pnlTable tbody tr:last-child td { border-bottom: none; }
+
+.td-sym  { font-weight: 500; }
+.td-tag  { color: var(--muted) !important; font-size: 0.9em; }
+.td-pnl  { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 1.1em; }
+.td-pnl.bull { color: var(--bull) !important; }
+.td-pnl.bear { color: var(--bear) !important; }
+.td-time { color: var(--muted) !important; font-size: 0.9em; }
+
+#pnlTable tfoot tr td {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border2);
+    font-weight: 600;
+    background: var(--bg3);
+    position: sticky;
+    bottom: 0;
+}
+.td-foot-label { color: var(--muted); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; }
+.td-foot-total { font-family: 'Syne', sans-serif; font-size: 1.2em; font-weight: 800; }
+.td-foot-total.bull { color: var(--bull); }
+.td-foot-total.bear { color: var(--bear); }
+
 .pnl-empty {
-    padding: 18px 16px;
+    padding: 32px 16px;
     text-align: center;
     color: var(--muted);
     font-size: 11px;
     letter-spacing: 0.08em;
-    cursor: default;
 }
-.pnl-empty::before { display: none !important; }
 </style>
 </head>
 
@@ -713,12 +867,17 @@ canvas#topCandle {
                     <div class="menu-icon">
                         <span></span><span></span><span></span>
                     </div>
-                    <span>Feed</span>
+                    <span>PXY</span>
                 </div>
                 <div id="dropdown">
                     <div id="pnlDropdownHeader" class="pnl-dropdown-header">
                         <span class="pnl-dd-label">P&amp;L Summary</span>
                         <span class="pnl-dd-total" id="pnlDdTotal">—</span>
+                    </div>
+                    <div class="pnl-menu-link" id="openPnlTable">
+                        <span class="pnl-link-icon">📊</span>
+                        <span>View Full P&amp;L Table</span>
+                        <span class="pnl-link-arrow">→</span>
                     </div>
                     <div id="pnlTradeList"></div>
                 </div>
@@ -776,7 +935,36 @@ canvas#topCandle {
         <span class="time-display" id="clockDisplay">—</span>
     </footer>
 
-</div><!-- #app -->
+<!-- ══ PNL MODAL ══ -->
+<div id="pnlModal">
+    <div id="pnlModalBox">
+        <div id="pnlModalHeader">
+            <div id="pnlModalTitleGroup">
+                <span id="pnlModalTitle">P&amp;L Summary</span>
+                <span id="pnlModalTotal">—</span>
+            </div>
+            <button id="pnlModalClose">✕</button>
+        </div>
+        <div id="pnlModalBody">
+            <table id="pnlTable">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Tag</th>
+                        <th>Qty</th>
+                        <th>Buy</th>
+                        <th>Sell</th>
+                        <th>Buy Time</th>
+                        <th>Exit Time</th>
+                        <th>PnL</th>
+                    </tr>
+                </thead>
+                <tbody id="pnlTableBody"></tbody>
+                <tfoot id="pnlTableFoot"></tfoot>
+            </table>
+        </div>
+    </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
