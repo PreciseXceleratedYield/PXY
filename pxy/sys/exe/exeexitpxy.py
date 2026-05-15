@@ -131,7 +131,7 @@ def run_snapshot():
 
     handle_side_averaging(client, df) 
     print("━" * 42) 
-    print(f" {Fore.CYAN}{Style.BRIGHT}{'SYMBOL':<20}{'ST':^10}{'PL':>8}") 
+    print(f" {Fore.CYAN}{Style.BRIGHT}{'SYMBOL':<20}{'ST':^8}{'PL':>8}") 
     print("-" * 42) 
     for idx, r in df.iterrows(): 
         sym = str(r.get('symbol',''))[:21] 
