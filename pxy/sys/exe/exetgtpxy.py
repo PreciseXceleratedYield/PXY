@@ -26,7 +26,6 @@ def get_line_direction(row):
     """Compares super_line and bos_val metrics directly including equality."""
     super_line = float(row.get("super_line", 0.0))
     bos_val = float(row.get("bos_val", 0.0))
-    
     if super_line > bos_val:
         return "UP"
     elif super_line < bos_val:
@@ -75,25 +74,20 @@ def target_price(row):
 
         if is_ce:
             if is_bullish_signal:
-                calc = max(((((atr_val * ce_f * ce_p) + hce_d) / hce_d) + hce_d), 1.4 * hce_d)
-                
+                calc = max(((((atr_val * ce_f * ce_p) + hce_d) / (1.0 if hce_d > 3.0 else hce_d)) + hce_d), 1.4 * hce_d)
                 # If direction is not UP (i.e., DOWN or FLAT), cut calculation in half
                 if line_dir != "UP":
                     calc = calc / 2.0
-                    
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
             elif is_bearish_signal:
                 final_pct_score = 1.4
                 state = "❄️"
-                
         elif is_pe:
             if is_bearish_signal:
-                calc = max(((((atr_val * pe_f * pe_p) + hpe_d) / hpe_d) + hpe_d), 1.4 * hpe_d)
-                
+                calc = max(((((atr_val * pe_f * pe_p) + hpe_d) / (1.0 if hpe_d > 3.0 else hpe_d)) + hpe_d), 1.4 * hpe_d)
                 # If direction is not DOWN (i.e., UP or FLAT), cut calculation in half
                 if line_dir != "DOWN":
                     calc = calc / 2.0
-                    
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
             elif is_bullish_signal:
                 final_pct_score = 1.4
@@ -120,6 +114,4 @@ def target_price(row):
         return target
     except Exception:
         return 0
-
-
 
