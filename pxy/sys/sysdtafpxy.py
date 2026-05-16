@@ -14,7 +14,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 _RAW_DUMP_DONE = False
 
 def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
-    """Dumps raw JSON to parent directory if within the overnight time window on first fetch."""
+    """Dumps raw JSON converted to IST to parent directory if within the overnight time window."""
     global _RAW_DUMP_DONE
     if _RAW_DUMP_DONE:
         return
@@ -25,22 +25,33 @@ def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
     start_time = time(15, 45)
     end_time = time(9, 14)
 
-    # Condition logic modified to correctly handle cross-midnight time tracking windows
+    # Condition logic handles cross-midnight time tracking windows
     if now_ist >= start_time or now_ist <= end_time:
         try:
-            # Fetch absolute raw fast info/history JSON
+            # Fetch absolute raw fast info/history
             raw_data = ticker_obj.history(period=period, interval=interval)
             
-            # Setup paths safely by targeting the string index 0 from splitext tuple
-            script_directory = os.path.dirname(os.path.abspath(__file__))
-            parent_directory = os.path.dirname(script_directory)
-            base_name = os.path.splitext(os.path.basename(__file__))[0]
-            target_export_path = os.path.join(parent_directory, f"{base_name}.json")
-            
-            # Dump to JSON
-            raw_data.to_json(target_export_path, date_format='iso', orient='split')
-            print(f"📦 RAW JSON DUMP SUCCESS | Saved raw data directly to: {target_export_path}")
-            _RAW_DUMP_DONE = True
+            if not raw_data.empty:
+                # Force timestamp index conversion to IST before dumping
+                if not isinstance(raw_data.index, pd.DatetimeIndex):
+                    raw_data.index = pd.to_datetime(raw_data.index)
+                if raw_data.index.tz is None:
+                    raw_data = raw_data.tz_localize('UTC').tz_convert(TIMEZONE)
+                else:
+                    raw_data = raw_data.tz_convert(TIMEZONE)
+
+                # Setup paths safely by targeting the string index 0 from splitext tuple
+                script_directory = os.path.dirname(os.path.abspath(__file__))
+                parent_directory = os.path.dirname(script_directory)
+                base_name = os.path.splitext(os.path.basename(__file__))[0]
+                target_export_path = os.path.join(parent_directory, f"{base_name}.json")
+                
+                # Dump whole data block to JSON with IST timestamps
+                raw_data.to_json(target_export_path, date_format='iso', orient='split')
+                print(f"📦 RAW JSON DUMP SUCCESS (IST) | Saved raw data directly to: {target_export_path}")
+                _RAW_DUMP_DONE = True
+            else:
+                print("WARNING: Raw data fetch returned empty frame. Skipping JSON dump.")
         except Exception as e:
             print(f"RAW_JSON_DUMP_ERROR | {e}")
     else:
@@ -51,7 +62,7 @@ def get_heikin_ashi_ohlc(o, h, l, c):
     ha_c = (o + h + l + c) / 4
     ha_o = np.zeros_like(o)
     if len(o) > 0:
-        ha_o[0] = (o[0] + c[0]) / 2
+        ha_o = (o + c) / 2
     for i in range(1, len(o)):
         ha_o[i] = (ha_o[i-1] + ha_c[i-1]) / 2
     ha_h = np.maximum(h, np.maximum(ha_o, ha_c))
@@ -67,7 +78,7 @@ def get_momentum_ohlc(c):
     """Generates shift momentum OHLC matrices using prior close boundaries (c1 c0)"""
     c1 = np.empty_like(c)
     if len(c) > 0:
-        c1[0] = c[0]
+        c1 = c
         c1[1:] = c[:-1]
     return c1, c, c1, c
 
