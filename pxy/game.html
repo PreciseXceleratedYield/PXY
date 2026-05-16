@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>PXY® CRICKET</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
+<style>
+:root {
+    --pitch:    #1a2a0a;
+    --grass:    #0d1f05;
+    --sky:      #060c1a;
+    --bg2:      #0a1520;
+    --bg3:      #111f30;
+    --border:   rgba(255,255,255,0.07);
+    --border2:  rgba(255,255,255,0.14);
+    --text:     #e8f0e0;
+    --muted:    #4a6040;
+    --accent:   #c8ff00;       /* electric lime */
+    --bull:     #22c55e;
+    --bear:     #ef4444;
+    --gold:     #fbbf24;
+    --cream:    #f5e6c8;
+    --header-h: 52px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+
+body {
+    min-height: 100dvh;
+    font-family: 'DM Mono', monospace;
+    background: var(--sky);
+    color: var(--text);
+    overflow-x: hidden;
+    overscroll-behavior: none;
+}
+
+/* ── STADIUM BG ── */
+body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+        radial-gradient(ellipse 90% 60% at 50% 110%, rgba(30,80,10,0.35) 0%, transparent 70%),
+        radial-gradient(ellipse 120% 50% at 50% 120%, rgba(10,40,5,0.6) 0%, transparent 60%),
+        linear-gradient(to bottom, #060c1a 0%, #0a1a08 60%, #0d2008 100%);
+    pointer-events: none; z-index: 0;
+}
+
+/* noise grain */
+body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.4; pointer-events: none; z-index: 0;
+}
+
+* { position: relative; z-index: 1; }
+
+/* scrollbar */
+* { scrollbar-width: thin; scrollbar-color: rgba(200,255,0,0.2) transparent; }
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-thumb { background: rgba(200,255,0,0.2); border-radius: 2px; }
+
+/* ══ HEADER ══ */
+#topHeader {
+    height: var(--header-h);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 clamp(12px, 2.5vw, 24px);
+    background: rgba(6,12,26,0.9);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 100;
+    gap: 10px;
+}
+
+.hdr-left, .hdr-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+.back-btn {
+    display: flex; align-items: center; gap: 5px;
+    padding: 4px 11px; border: 1px solid var(--border2); border-radius: 5px;
+    color: var(--muted); font-size: 11px; letter-spacing: 0.06em;
+    text-decoration: none; font-family: 'DM Mono', monospace;
+    transition: all 0.2s;
+}
+.back-btn:hover { color: var(--text); border-color: var(--accent); }
+
+.divider-v { width: 1px; height: 18px; background: var(--border2); flex-shrink: 0; }
+
+.game-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(20px, 3vw, 28px);
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(200,255,0,0.4);
+}
+
+.logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 16px; color: var(--text); }
+.logo sup { font-size: 0.55em; vertical-align: super; color: var(--accent); }
+
+/* session timer */
+#sessionTimer {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(18px, 2.5vw, 24px);
+    letter-spacing: 0.1em;
+    color: var(--cream);
+    min-width: 60px; text-align: center;
+}
+#sessionTimer.danger { color: var(--bear); text-shadow: 0 0 10px rgba(239,68,68,0.5); animation: timerPulse 0.5s infinite; }
+@keyframes timerPulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+
+/* ══ SCOREBOARD ══ */
+#scoreboard {
+    background: linear-gradient(135deg, rgba(10,21,32,0.95), rgba(6,20,8,0.95));
+    border: 1px solid rgba(200,255,0,0.15);
+    border-radius: 16px;
+    margin: clamp(12px,2vw,24px) clamp(12px,3vw,32px) 0;
+    padding: clamp(14px,2vw,24px) clamp(16px,3vw,32px);
+    box-shadow: 0 0 60px rgba(200,255,0,0.06), inset 0 1px 0 rgba(255,255,255,0.05);
+    overflow: hidden;
+}
+
+.score-top {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 16px; flex-wrap: wrap;
+}
+
+.team-block { display: flex; flex-direction: column; gap: 4px; }
+
+.team-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(11px, 1.2vw, 13px);
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    text-transform: uppercase;
+}
+
+.runs-display {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(52px, 9vw, 96px);
+    line-height: 0.9;
+    letter-spacing: -2px;
+}
+.runs-display.your   { color: var(--accent); text-shadow: 0 0 30px rgba(200,255,0,0.3); }
+.runs-display.market { color: var(--bear);   text-shadow: 0 0 30px rgba(239,68,68,0.25); }
+
+.wickets-overs {
+    font-family: 'DM Mono', monospace;
+    font-size: clamp(12px,1.3vw,15px);
+    color: var(--muted);
+    margin-top: 4px;
+}
+.wickets-overs span { color: var(--text); }
+
+/* vs badge */
+.vs-badge {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(22px, 4vw, 40px);
+    color: rgba(255,255,255,0.12);
+    letter-spacing: 0.05em;
+    align-self: center;
+    padding: 0 8px;
+}
+
+/* current over dots */
+#overDots {
+    display: flex; gap: 8px; align-items: center;
+    margin-top: clamp(10px,1.5vw,18px);
+    flex-wrap: wrap;
+}
+
+.over-label {
+    font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--muted); margin-right: 4px; flex-shrink: 0;
+}
+
+.ball-dot {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', sans-serif; font-size: 13px;
+    font-weight: 400; border: 1px solid var(--border2);
+    transition: all 0.3s; flex-shrink: 0;
+}
+.ball-dot.empty   { background: rgba(255,255,255,0.04); color: var(--muted); }
+.ball-dot.run     { background: rgba(200,255,0,0.15);  color: var(--accent); border-color: rgba(200,255,0,0.3); }
+.ball-dot.four    { background: rgba(34,197,94,0.2);   color: var(--bull);   border-color: rgba(34,197,94,0.4); }
+.ball-dot.six     { background: rgba(251,191,36,0.2);  color: var(--gold);   border-color: rgba(251,191,36,0.4); }
+.ball-dot.wicket  { background: rgba(239,68,68,0.2);   color: var(--bear);   border-color: rgba(239,68,68,0.4); animation: wicketFlash 0.6s ease; }
+.ball-dot.dot-ball{ background: rgba(255,255,255,0.06); color: var(--muted); }
+@keyframes wicketFlash { 0%,100%{transform:scale(1)} 50%{transform:scale(1.35)} }
+
+/* ══ PITCH STRIP — current batsmen ══ */
+#pitchStrip {
+    display: flex; gap: clamp(8px,1.5vw,16px); align-items: stretch;
+    margin: clamp(10px,1.5vw,16px) clamp(12px,3vw,32px) 0;
+    flex-wrap: wrap;
+}
+
+.batsman-card {
+    flex: 1; min-width: 200px;
+    background: rgba(10,21,32,0.8);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    display: flex; flex-direction: column; gap: 6px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+.batsman-card.batting {
+    border-color: rgba(200,255,0,0.35);
+    box-shadow: 0 0 20px rgba(200,255,0,0.08);
+}
+.batsman-card.out {
+    border-color: rgba(239,68,68,0.25);
+    opacity: 0.6;
+}
+
+.bat-header { display: flex; justify-content: space-between; align-items: center; }
+.bat-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(16px,2vw,20px); letter-spacing: 0.1em;
+}
+.bat-name.ce { color: var(--bull); }
+.bat-name.pe { color: var(--bear); }
+
+.bat-status {
+    font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+    padding: 2px 7px; border-radius: 3px;
+}
+.bat-status.batting { background: rgba(200,255,0,0.12); color: var(--accent); }
+.bat-status.out     { background: rgba(239,68,68,0.12); color: var(--bear); }
+.bat-status.waiting { background: rgba(255,255,255,0.05); color: var(--muted); }
+
+.bat-runs {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(28px,4vw,42px); line-height: 1;
+    color: var(--cream); letter-spacing: -1px;
+}
+
+.bat-detail { font-size: 10px; color: var(--muted); }
+
+/* market card */
+.market-card {
+    flex: 1; min-width: 200px;
+    background: linear-gradient(135deg, rgba(30,5,5,0.7), rgba(10,21,32,0.8));
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 12px;
+    padding: 14px 18px;
+    display: flex; flex-direction: column; gap: 6px;
+}
+.mkt-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(16px,2vw,20px); letter-spacing: 0.1em;
+    color: var(--bear);
+}
+.mkt-wickets {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(28px,4vw,42px); line-height: 1;
+    color: var(--bear); letter-spacing: -1px;
+}
+.mkt-label { font-size: 10px; color: var(--muted); }
+
+/* ══ COMMENTARY BOX ══ */
+#commentaryWrap {
+    margin: clamp(10px,1.5vw,16px) clamp(12px,3vw,32px);
+    background: rgba(6,12,26,0.7);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.commentary-header {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--muted); display: flex; align-items: center; gap: 8px;
+}
+.live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 6px var(--accent);
+    animation: blink 1.2s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+#commentaryFeed {
+    height: 180px; overflow-y: auto;
+    padding: 8px 0;
+    display: flex; flex-direction: column-reverse;
+}
+
+.commentary-item {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 7px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    animation: slideIn 0.35s ease;
+}
+@keyframes slideIn { from{opacity:0;transform:translateY(-8px)} to{opacity:1;transform:none} }
+
+.comm-ball {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', sans-serif; font-size: 11px;
+    flex-shrink: 0; margin-top: 1px;
+}
+
+.comm-text { font-size: 11px; line-height: 1.5; color: var(--text); flex: 1; }
+.comm-text .highlight { color: var(--accent); font-weight: 500; }
+.comm-text .wicket    { color: var(--bear); }
+.comm-text .boundary  { color: var(--gold); }
+.comm-time { font-size: 9px; color: var(--muted); flex-shrink: 0; margin-top: 2px; }
+
+/* ══ SCORECARD TABLE ══ */
+#scorecardWrap {
+    margin: 0 clamp(12px,3vw,32px) clamp(16px,2vw,24px);
+    background: rgba(6,12,26,0.7);
+    border: 1px solid var(--border);
+    border-radius: 12px; overflow: hidden;
+}
+
+.sc-header {
+    padding: 8px 16px; border-bottom: 1px solid var(--border);
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--muted);
+}
+
+#scorecardTable {
+    width: 100%; border-collapse: collapse;
+    font-size: clamp(9px,0.9vw,11px);
+}
+#scorecardTable th {
+    padding: 7px 14px; text-align: left;
+    font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--muted); font-weight: 400;
+    border-bottom: 1px solid var(--border);
+}
+#scorecardTable th.r { text-align: right; }
+#scorecardTable td {
+    padding: 8px 14px; border-bottom: 1px solid rgba(255,255,255,0.03);
+    color: var(--text);
+}
+#scorecardTable td.r { text-align: right; }
+#scorecardTable tbody tr:hover td { background: rgba(255,255,255,0.02); }
+.sc-sym   { font-weight: 500; max-width: 160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.sc-tag   { color: var(--accent); font-size: 10px; }
+.sc-runs  { font-family: 'Bebas Neue', sans-serif; font-size: 14px; }
+.sc-runs.pos { color: var(--bull); }
+.sc-runs.neg { color: var(--bear); }
+.sc-out   { color: var(--bear); font-size: 10px; }
+.sc-not   { color: var(--accent); font-size: 10px; }
+
+/* ══ MATCH RESULT OVERLAY ══ */
+#resultOverlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(12px);
+    z-index: 500;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 20px;
+    text-align: center; padding: 24px;
+}
+#resultOverlay.show { display: flex; }
+
+.result-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(36px,8vw,80px);
+    letter-spacing: 0.08em;
+    line-height: 1;
+    animation: resultPop 0.5s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes resultPop { from{transform:scale(0.6);opacity:0} to{transform:scale(1);opacity:1} }
+.result-title.win  { color: var(--accent); text-shadow: 0 0 60px rgba(200,255,0,0.5); }
+.result-title.loss { color: var(--bear);   text-shadow: 0 0 60px rgba(239,68,68,0.5); }
+
+.result-sub {
+    font-family: 'DM Mono', monospace;
+    font-size: clamp(12px,1.5vw,16px);
+    color: var(--muted); max-width: 400px;
+}
+
+.result-score {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(28px,5vw,52px);
+    color: var(--cream); letter-spacing: 0.05em;
+}
+
+.result-btn {
+    padding: 10px 28px; border-radius: 8px;
+    border: 1px solid var(--accent); color: var(--accent);
+    background: rgba(200,255,0,0.08);
+    font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 0.12em;
+    cursor: pointer; transition: all 0.2s;
+}
+.result-btn:hover { background: rgba(200,255,0,0.18); }
+
+/* confetti */
+.confetti-piece {
+    position: fixed; width: 8px; height: 8px; border-radius: 2px;
+    animation: confettiFall linear forwards;
+    pointer-events: none; z-index: 600;
+}
+@keyframes confettiFall {
+    0%  { transform: translateY(-20px) rotate(0deg);   opacity: 1; }
+    100%{ transform: translateY(100vh)  rotate(720deg); opacity: 0; }
+}
+
+/* responsive */
+@media (max-width: 640px) {
+    .score-top { flex-direction: column; align-items: center; text-align: center; }
+    .vs-badge  { display: none; }
+    #pitchStrip { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="topHeader">
+    <div class="hdr-left">
+        <a class="back-btn" href="pxy.html">← DASHBOARD</a>
+        <div class="divider-v"></div>
+        <span class="game-title">🏏 PXY CRICKET</span>
+    </div>
+    <div class="hdr-right">
+        <div id="sessionTimer">15:00</div>
+        <div class="divider-v"></div>
+        <span class="logo">PXY<sup>®</sup></span>
+    </div>
+</header>
+
+<!-- SCOREBOARD -->
+<div id="scoreboard">
+    <div class="score-top">
+        <!-- YOUR TEAM -->
+        <div class="team-block">
+            <span class="team-name">YOUR XI</span>
+            <div class="runs-display your" id="yourRuns">0</div>
+            <div class="wickets-overs">
+                <span id="yourWickets">0</span> wkts &nbsp;·&nbsp;
+                <span id="yourOvers">0.0</span> overs &nbsp;·&nbsp;
+                RR <span id="yourRR">0.00</span>
+            </div>
+        </div>
+        <div class="vs-badge">VS</div>
+        <!-- MARKET -->
+        <div class="team-block" style="text-align:right">
+            <span class="team-name" style="text-align:right">MARKET</span>
+            <div class="runs-display market" id="mktRuns">0</div>
+            <div class="wickets-overs">
+                Wickets taken: <span id="mktWickets">0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- OVER DOTS -->
+    <div id="overDots">
+        <span class="over-label">Current Over</span>
+        <div class="ball-dot empty" id="b0">·</div>
+        <div class="ball-dot empty" id="b1">·</div>
+        <div class="ball-dot empty" id="b2">·</div>
+        <div class="ball-dot empty" id="b3">·</div>
+        <div class="ball-dot empty" id="b4">·</div>
+        <div class="ball-dot empty" id="b5">·</div>
+    </div>
+</div>
+
+<!-- PITCH STRIP -->
+<div id="pitchStrip">
+    <!-- CE BATSMAN -->
+    <div class="batsman-card batting" id="ceCard">
+        <div class="bat-header">
+            <span class="bat-name ce">CE</span>
+            <span class="bat-status batting" id="ceStatus">BATTING</span>
+        </div>
+        <div class="bat-runs" id="ceRuns">0</div>
+        <div class="bat-detail">
+            <span id="ceBalls">0</span> balls &nbsp;·&nbsp;
+            <span id="ce4s">0</span> fours &nbsp;·&nbsp;
+            <span id="ce6s">0</span> sixes
+        </div>
+    </div>
+
+    <!-- PE BATSMAN -->
+    <div class="batsman-card waiting" id="peCard">
+        <div class="bat-header">
+            <span class="bat-name pe">PE</span>
+            <span class="bat-status waiting" id="peStatus">WAITING</span>
+        </div>
+        <div class="bat-runs" id="peRuns">0</div>
+        <div class="bat-detail">
+            <span id="peBalls">0</span> balls &nbsp;·&nbsp;
+            <span id="pe4s">0</span> fours &nbsp;·&nbsp;
+            <span id="pe6s">0</span> sixes
+        </div>
+    </div>
+
+    <!-- MARKET BOWLING -->
+    <div class="market-card">
+        <div class="mkt-name">🏴 MARKET</div>
+        <div class="mkt-wickets" id="mktWicketsBig">0</div>
+        <div class="mkt-label">wickets taken</div>
+        <div style="margin-top:8px;font-size:10px;color:var(--muted)">
+            Economy: <span style="color:var(--text)" id="mktEcon">0.00</span>
+        </div>
+    </div>
+</div>
+
+<!-- COMMENTARY -->
+<div id="commentaryWrap">
+    <div class="commentary-header">
+        <div class="live-dot"></div>
+        LIVE COMMENTARY
+    </div>
+    <div id="commentaryFeed"></div>
+</div>
+
+<!-- SCORECARD -->
+<div id="scorecardWrap">
+    <div class="sc-header">SCORECARD</div>
+    <table id="scorecardTable">
+        <thead>
+            <tr>
+                <th>Batsman</th>
+                <th>Tag</th>
+                <th>Type</th>
+                <th class="r">Runs</th>
+                <th class="r">Balls</th>
+                <th class="r">SR</th>
+                <th>Dismissal</th>
+            </tr>
+        </thead>
+        <tbody id="scorecardBody"></tbody>
+    </table>
+</div>
+
+<!-- RESULT OVERLAY -->
+<div id="resultOverlay">
+    <div class="result-title win" id="resultTitle">VICTORY!</div>
+    <div class="result-score" id="resultScore">—</div>
+    <div class="result-sub" id="resultSub">—</div>
+    <button class="result-btn" onclick="restartGame()">PLAY AGAIN</button>
+    <a class="back-btn" href="pxy.html" style="margin-top:8px">← DASHBOARD</a>
+</div>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════
+   GAME STATE
+══════════════════════════════════════ */
+const GAME_DURATION  = 15 * 60; // 15 minutes in seconds
+const RUNS_DIVISOR   = 100;     // PnL ÷ 100 = runs
+const SIX_THRESHOLD  = 500;     // PnL ≥ 500 = SIX
+const FOUR_THRESHOLD = 200;     // PnL ≥ 200 = FOUR
+
+let state = {
+    yourRuns:    0,
+    mktWickets:  0,
+    totalBalls:  0,
+    overBalls:   0,  // balls in current over (0-5)
+    overs:       0,
+
+    ce: { runs:0, balls:0, fours:0, sixes:0, out:false },
+    pe: { runs:0, balls:0, fours:0, sixes:0, out:false },
+
+    currentBatsman: 'CE', // who is on strike
+    processed:      new Set(), // trade tags already processed
+    overHistory:    [], // array of ball results for current over
+    allBalls:       [], // scorecard rows
+
+    sessionStart:   Date.now(),
+    sessionSeconds: GAME_DURATION,
+    ended:          false,
+
+    lastPnl:        0,
+    knockCount:     0, // for market wickets
+};
+
+/* ══════════════════════════════════════
+   COMMENTARY LINES
+══════════════════════════════════════ */
+const LINES = {
+    six: [
+        "MASSIVE HIT! That's gone into the stands!",
+        "SIX! The market bowler is shell-shocked!",
+        "MAXIMUM! Crowd goes absolutely WILD!",
+        "What a stroke! Right over long-on!",
+        "SIX AND A HALF! If that were possible!",
+    ],
+    four: [
+        "FOUR! Beautifully timed through the covers!",
+        "Racing to the boundary! Four runs!",
+        "Lovely shot! Bisects the field perfectly!",
+        "FOUR! The market couldn't stop that one!",
+        "Elegant! Rolled away to the fence!",
+    ],
+    run: [
+        "Good running between the wickets!",
+        "They've turned it around for {r} runs.",
+        "Pushed into the gap, {r} more added.",
+        "Smart cricket — {r} runs off that.",
+        "{r} runs! Keeping the scoreboard ticking.",
+    ],
+    dot: [
+        "Dot ball. Market bowler in control.",
+        "Defended. No run scored.",
+        "Tight line, no room to play a shot.",
+        "The market beats the bat! Dot ball.",
+        "Good delivery, played watchfully.",
+    ],
+    wicket: [
+        "WICKET! Market strikes! The loss takes its toll!",
+        "OUT! Market celebrates! {bat} loses ground!",
+        "Gone! The market bowler pumps his fist!",
+        "DISMISSED! {bat} walks back to the pavilion.",
+        "Market draws blood! Trade loss = wicket!",
+    ],
+    over: [
+        "End of over {o}. {r} runs from this over.",
+        "Over {o} complete. Market taken {w} wicket(s) so far.",
+        "Good over from the Market! {r} scored.",
+        "YOUR XI needed more from that over — {r} runs.",
+    ],
+};
+
+function rnd(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function fill(s, obj) {
+    return s.replace(/\{(\w+)\}/g, (_, k) => obj[k] ?? '?');
+}
+
+/* ══════════════════════════════════════
+   SESSION TIMER
+══════════════════════════════════════ */
+let timerInterval;
+
+function startTimer() {
+    timerInterval = setInterval(() => {
+        state.sessionSeconds--;
+        updateTimerDisplay();
+        if (state.sessionSeconds <= 0) endGame();
+    }, 1000);
+}
+
+function updateTimerDisplay() {
+    const m = Math.floor(state.sessionSeconds / 60);
+    const s = state.sessionSeconds % 60;
+    const el = document.getElementById('sessionTimer');
+    el.textContent = `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    el.classList.toggle('danger', state.sessionSeconds <= 60);
+}
+
+/* ══════════════════════════════════════
+   PROCESS A TRADE INTO CRICKET
+══════════════════════════════════════ */
+function processTrade(trade) {
+    const tag = String(trade.Tag || '');
+    if (state.processed.has(tag) || state.ended) return;
+    state.processed.add(tag);
+
+    const pnl  = trade.PNL || 0;
+    const isCE = (trade.Symbol || '').toUpperCase().endsWith('CE');
+    const bat   = isCE ? 'CE' : 'PE';
+    state.currentBatsman = bat;
+
+    const runs    = Math.abs(Math.round(pnl / RUNS_DIVISOR));
+    const isWicket= pnl < 0;
+
+    let ballType, commentary, runsThisBall = 0;
+
+    if (isWicket) {
+        // wicket
+        ballType = 'wicket';
+        state.mktWickets++;
+        state[bat.toLowerCase()].out = true;
+        const line = fill(rnd(LINES.wicket), { bat });
+        commentary = `<span class="wicket">${line} (₹${Math.abs(pnl).toLocaleString('en-IN')} lost)</span>`;
+    } else if (pnl >= SIX_THRESHOLD) {
+        ballType = 'six'; runsThisBall = 6;
+        state.yourRuns += 6;
+        state[bat.toLowerCase()].runs  += 6;
+        state[bat.toLowerCase()].sixes += 1;
+        commentary = `<span class="boundary">${rnd(LINES.six)} +₹${pnl.toLocaleString('en-IN')}</span>`;
+    } else if (pnl >= FOUR_THRESHOLD) {
+        ballType = 'four'; runsThisBall = 4;
+        state.yourRuns += 4;
+        state[bat.toLowerCase()].runs  += 4;
+        state[bat.toLowerCase()].fours += 1;
+        commentary = `<span class="boundary">${rnd(LINES.four)} +₹${pnl.toLocaleString('en-IN')}</span>`;
+    } else if (runs > 0) {
+        ballType = 'run'; runsThisBall = runs;
+        state.yourRuns += runs;
+        state[bat.toLowerCase()].runs += runs;
+        const line = fill(rnd(LINES.run), { r: runs });
+        commentary = `${line} <span class="highlight">+₹${pnl.toLocaleString('en-IN')}</span>`;
+    } else {
+        ballType = 'dot-ball';
+        commentary = rnd(LINES.dot);
+    }
+
+    state[bat.toLowerCase()].balls++;
+    state.totalBalls++;
+    state.overBalls++;
+    state.overHistory.push({ type: ballType, val: runsThisBall, bat });
+
+    // add commentary
+    addCommentary(ballType, commentary, bat, runsThisBall);
+
+    // add to scorecard
+    state.allBalls.push({
+        trade, bat, ballType, runsThisBall,
+        pnl, balls: state[bat.toLowerCase()].balls
+    });
+
+    // over complete?
+    if (state.overBalls >= 6) {
+        const overRuns = state.overHistory.reduce((s,b)=>s+b.val,0);
+        const overLine = fill(rnd(LINES.over), { o: state.overs+1, r: overRuns, w: state.mktWickets });
+        addCommentary('over', overLine, '', 0);
+        state.overs++;
+        state.overBalls = 0;
+        state.overHistory = [];
+    }
+
+    // update all UI
+    renderScoreboard();
+    renderBatsmen();
+    renderOverDots();
+    renderScorecard();
+}
+
+/* ══════════════════════════════════════
+   COMMENTARY
+══════════════════════════════════════ */
+function addCommentary(type, text, bat, runs) {
+    const feed = document.getElementById('commentaryFeed');
+    const item = document.createElement('div');
+    item.className = 'commentary-item';
+
+    // ball indicator
+    const ballColors = {
+        six:      { bg:'rgba(251,191,36,0.2)',  color:'#fbbf24', txt:'6' },
+        four:     { bg:'rgba(34,197,94,0.2)',   color:'#22c55e', txt:'4' },
+        run:      { bg:'rgba(200,255,0,0.1)',   color:'#c8ff00', txt: String(runs) },
+        wicket:   { bg:'rgba(239,68,68,0.2)',   color:'#ef4444', txt:'W' },
+        'dot-ball':{ bg:'rgba(255,255,255,0.05)', color:'#4a6040', txt:'·' },
+        over:     { bg:'rgba(255,255,255,0.05)', color:'#4a6040', txt:'OV' },
+    };
+    const bc = ballColors[type] || ballColors['dot-ball'];
+
+    const now = new Date();
+    const time = now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false});
+
+    item.innerHTML = `
+        <div class="comm-ball" style="background:${bc.bg};color:${bc.color}">${bc.txt}</div>
+        <div class="comm-text">${bat ? `<span class="highlight">${bat}</span>: ` : ''}${text}</div>
+        <div class="comm-time">${time}</div>`;
+
+    feed.prepend(item);
+
+    // keep last 40 items
+    while (feed.children.length > 40) feed.removeChild(feed.lastChild);
+}
+
+/* ══════════════════════════════════════
+   RENDER SCOREBOARD
+══════════════════════════════════════ */
+function renderScoreboard() {
+    document.getElementById('yourRuns').textContent    = state.yourRuns;
+    document.getElementById('mktRuns').textContent     = state.mktWickets * 10; // market score = wickets × 10
+    document.getElementById('yourWickets').textContent = state.mktWickets;
+    document.getElementById('mktWickets').textContent  = state.mktWickets;
+    document.getElementById('mktWicketsBig').textContent = state.mktWickets;
+
+    const overs = state.overs + (state.overBalls / 10);
+    document.getElementById('yourOvers').textContent = overs.toFixed(1);
+
+    const rr = state.totalBalls > 0 ? ((state.yourRuns / state.totalBalls) * 6).toFixed(2) : '0.00';
+    document.getElementById('yourRR').textContent = rr;
+
+    const econ = state.mktWickets > 0 ? (state.yourRuns / Math.max(state.totalBalls/6,1)).toFixed(2) : '0.00';
+    document.getElementById('mktEcon').textContent = econ;
+}
+
+/* ══════════════════════════════════════
+   RENDER BATSMEN
+══════════════════════════════════════ */
+function renderBatsmen() {
+    ['ce','pe'].forEach(b => {
+        const s   = state[b];
+        const cap = b.toUpperCase();
+        document.getElementById(`${b}Runs`).textContent  = s.runs;
+        document.getElementById(`${b}Balls`).textContent = s.balls;
+        document.getElementById(`${b}4s`).textContent    = s.fours;
+        document.getElementById(`${b}6s`).textContent    = s.sixes;
+
+        const card   = document.getElementById(`${b}Card`);
+        const status = document.getElementById(`${b}Status`);
+
+        if (s.out) {
+            card.className = 'batsman-card out';
+            status.className = 'bat-status out';
+            status.textContent = 'OUT';
+        } else if (state.currentBatsman === cap) {
+            card.className = 'batsman-card batting';
+            status.className = 'bat-status batting';
+            status.textContent = 'BATTING ●';
+        } else {
+            card.className = 'batsman-card waiting';
+            status.className = 'bat-status waiting';
+            status.textContent = 'WAITING';
+        }
+    });
+}
+
+/* ══════════════════════════════════════
+   RENDER OVER DOTS
+══════════════════════════════════════ */
+function renderOverDots() {
+    for (let i = 0; i < 6; i++) {
+        const el = document.getElementById(`b${i}`);
+        const ball = state.overHistory[i];
+        if (!ball) {
+            el.className = 'ball-dot empty';
+            el.textContent = '·';
+        } else {
+            el.className = `ball-dot ${ball.type}`;
+            el.textContent = ball.type === 'wicket' ? 'W'
+                           : ball.type === 'dot-ball' ? '·'
+                           : ball.val || '·';
+        }
+    }
+}
+
+/* ══════════════════════════════════════
+   RENDER SCORECARD
+══════════════════════════════════════ */
+function renderScorecard() {
+    const tbody = document.getElementById('scorecardBody');
+    tbody.innerHTML = '';
+
+    state.allBalls.forEach(b => {
+        const isBat  = b.bat;
+        const isCE   = isBat === 'CE';
+        const sr     = b.balls > 0 ? ((b.runsThisBall / 1) * 100).toFixed(0) : '0';
+        const dismissed = b.ballType === 'wicket';
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="sc-sym">${shortSym(b.trade.Symbol)}</td>
+            <td class="sc-tag">#${b.trade.Tag||'—'}</td>
+            <td><span class="tr-type ${isCE?'ce':'pe'}" style="font-size:9px;padding:1px 5px;border-radius:3px;background:${isCE?'rgba(34,197,94,0.15)':'rgba(239,68,68,0.15)'};color:${isCE?'var(--bull)':'var(--bear)'}">${isBat}</span></td>
+            <td class="r sc-runs ${b.pnl>=0?'pos':'neg'}">${b.pnl>=0?'+':''}${b.runsThisBall}</td>
+            <td class="r" style="color:var(--muted)">1</td>
+            <td class="r" style="color:var(--muted)">${b.runsThisBall * 100}</td>
+            <td class="${dismissed?'sc-out':'sc-not'}">${dismissed ? 'b. Market' : 'not out'}</td>`;
+        tbody.appendChild(tr);
+    });
+}
+
+function shortSym(s) {
+    if (!s) return '—';
+    const m = s.match(/NIFTY\d{2}(\d{2})(\d{2})(\d+)(CE|PE)/i);
+    if (m) return `N${m[2]}${m[3]}${m[4]}`;
+    return s.length > 18 ? s.slice(0,16)+'…' : s;
+}
+
+/* ══════════════════════════════════════
+   END GAME
+══════════════════════════════════════ */
+function endGame() {
+    if (state.ended) return;
+    state.ended = true;
+    clearInterval(timerInterval);
+    clearInterval(pollInterval);
+
+    const win  = state.yourRuns > state.mktWickets * 10;
+    const over = document.getElementById('resultOverlay');
+    const title= document.getElementById('resultTitle');
+    const score= document.getElementById('resultScore');
+    const sub  = document.getElementById('resultSub');
+
+    over.classList.add('show');
+    title.textContent = win ? '🏆 VICTORY!' : '💀 DEFEATED';
+    title.className   = `result-title ${win ? 'win' : 'loss'}`;
+    score.textContent = `${state.yourRuns} / ${state.mktWickets}  vs  MKT ${state.mktWickets * 10}`;
+    sub.textContent   = win
+        ? `YOUR XI wins! ${state.yourRuns} runs in ${state.overs}.${state.overBalls} overs. Market took ${state.mktWickets} wickets.`
+        : `Market wins! You scored ${state.yourRuns} but lost ${state.mktWickets} wickets. Better luck next session!`;
+
+    if (win) launchConfetti();
+}
+
+function launchConfetti() {
+    const colors = ['#c8ff00','#22c55e','#fbbf24','#3b82f6','#e8f0e0'];
+    for (let i = 0; i < 80; i++) {
+        setTimeout(() => {
+            const el = document.createElement('div');
+            el.className = 'confetti-piece';
+            el.style.cssText = `
+                left: ${Math.random()*100}vw;
+                top: -10px;
+                background: ${colors[Math.floor(Math.random()*colors.length)]};
+                animation-duration: ${1.5 + Math.random()*2}s;
+                animation-delay: ${Math.random()*0.5}s;
+                transform: rotate(${Math.random()*360}deg);
+                width: ${6+Math.random()*8}px;
+                height: ${6+Math.random()*8}px;`;
+            document.body.appendChild(el);
+            setTimeout(() => el.remove(), 3500);
+        }, i * 40);
+    }
+}
+
+function restartGame() {
+    document.getElementById('resultOverlay').classList.remove('show');
+    state = {
+        yourRuns:0, mktWickets:0, totalBalls:0, overBalls:0, overs:0,
+        ce:{runs:0,balls:0,fours:0,sixes:0,out:false},
+        pe:{runs:0,balls:0,fours:0,sixes:0,out:false},
+        currentBatsman:'CE', processed: new Set(),
+        overHistory:[], allBalls:[],
+        sessionStart: Date.now(), sessionSeconds: GAME_DURATION, ended:false,
+        lastPnl:0, knockCount:0,
+    };
+    document.getElementById('commentaryFeed').innerHTML = '';
+    document.getElementById('scorecardBody').innerHTML  = '';
+    renderScoreboard(); renderBatsmen(); renderOverDots();
+    startTimer();
+    startPolling();
+
+    addCommentary('over', '🏏 New innings! YOUR XI are at the crease. MARKET opens the bowling.', '', 0);
+}
+
+/* ══════════════════════════════════════
+   POLL pnl.json
+══════════════════════════════════════ */
+let lastTradeCount = 0;
+let pollInterval;
+
+async function poll() {
+    if (state.ended) return;
+    try {
+        const res    = await fetch('./pnl.json?_=' + Date.now());
+        const trades = await res.json();
+
+        // process only new trades (not yet seen by Tag)
+        trades.forEach(t => {
+            if (!state.processed.has(String(t.Tag||''))) {
+                processTrade(t);
+            }
+        });
+    } catch {}
+}
+
+function startPolling() {
+    poll();
+    pollInterval = setInterval(poll, 5000);
+}
+
+/* ══════════════════════════════════════
+   BOOT
+══════════════════════════════════════ */
+addCommentary('over', '🏏 Welcome to PXY CRICKET! YOUR XI (CE & PE) face the MARKET. 15-min session begins!', '', 0);
+updateTimerDisplay();
+startTimer();
+startPolling();
+</script>
+</body>
+</html>
