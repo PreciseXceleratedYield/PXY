@@ -23,7 +23,7 @@ def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
     ist_tz = pytz.timezone('Asia/Kolkata')
     now_ist = datetime.now(ist_tz).time()
     start_time = time(15, 45)
-    end_time = time(15, 14)
+    end_time = time(9, 14)
 
     # Condition logic handles cross-midnight time tracking windows
     if now_ist >= start_time or now_ist <= end_time:
