@@ -48,14 +48,14 @@ def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
                 
                 # Dump whole data block to JSON with IST timestamps
                 raw_data.to_json(target_export_path, date_format='iso', orient='split')
-                #print(f"📦 RAW JSON DUMP SUCCESS (IST))
+                print(f"📦 RAW JSON DUMP SUCCESS (IST) | Saved raw data directly to: {target_export_path}")
                 _RAW_DUMP_DONE = True
             else:
                 print("WARNING: Raw data fetch returned empty frame. Skipping JSON dump.")
         except Exception as e:
             print(f"RAW_JSON_DUMP_ERROR | {e}")
     else:
-        print("⚠️ MARKET HOURS DETECTED | Skipping dump ")
+        print("⚠️ MARKET HOURS DETECTED | Skipping raw JSON dump execution phase safely.")
 
 def get_heikin_ashi_ohlc(o, h, l, c):
     """Generates pure Heikin-Ashi smooth trend OHLC matrices"""
@@ -118,7 +118,7 @@ def write_matrix_to_parent_csv(df):
         base_filename = base_name + ".csv"
         target_export_path = os.path.join(parent_directory, base_filename)
         df.to_csv(target_export_path, index=True)
-        #print(f"📦 PROCESSED CSV SUCCESS | Saved matrix file directly to: {target_export_path}")
+        print(f"📦 PROCESSED CSV SUCCESS | Saved matrix file directly to: {target_export_path}")
     except Exception as e:
         print(f"CSV_EXPORT_ERROR | Write operation failure: {e}")
 
@@ -170,4 +170,3 @@ if __name__ == "__main__":
     output_df = fetch_yf_data()
     if not output_df.empty:
         print(f"ENGINE_RUN_SUCCESS | Total Data Frame Sizing Bounds: {output_df.shape}")
-
