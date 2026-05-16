@@ -14,7 +14,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 _RAW_DUMP_DONE = False
 
 def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
-    """Dumps raw JSON to parent directory if within the time window on first fetch."""
+    """Dumps raw JSON to parent directory if within the overnight time window on first fetch."""
     global _RAW_DUMP_DONE
     if _RAW_DUMP_DONE:
         return
@@ -25,13 +25,13 @@ def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
     start_time = time(15, 45)
     end_time = time(9, 14)
 
-    # Strictly execute only inside this specific window
-    if start_time <= now_ist <= end_time:
+    # Condition logic modified to correctly handle cross-midnight time tracking windows
+    if now_ist >= start_time or now_ist <= end_time:
         try:
             # Fetch absolute raw fast info/history JSON
             raw_data = ticker_obj.history(period=period, interval=interval)
             
-            # Setup paths
+            # Setup paths safely by targeting the string index 0 from splitext tuple
             script_directory = os.path.dirname(os.path.abspath(__file__))
             parent_directory = os.path.dirname(script_directory)
             base_name = os.path.splitext(os.path.basename(__file__))[0]
@@ -39,15 +39,19 @@ def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
             
             # Dump to JSON
             raw_data.to_json(target_export_path, date_format='iso', orient='split')
+            print(f"📦 RAW JSON DUMP SUCCESS | Saved raw data directly to: {target_export_path}")
             _RAW_DUMP_DONE = True
         except Exception as e:
             print(f"RAW_JSON_DUMP_ERROR | {e}")
+    else:
+        print("⚠️ MARKET HOURS DETECTED | Skipping raw JSON dump execution phase safely.")
 
 def get_heikin_ashi_ohlc(o, h, l, c):
     """Generates pure Heikin-Ashi smooth trend OHLC matrices"""
     ha_c = (o + h + l + c) / 4
     ha_o = np.zeros_like(o)
-    ha_o[0] = (o[0] + c[0]) / 2
+    if len(o) > 0:
+        ha_o[0] = (o[0] + c[0]) / 2
     for i in range(1, len(o)):
         ha_o[i] = (ha_o[i-1] + ha_c[i-1]) / 2
     ha_h = np.maximum(h, np.maximum(ha_o, ha_c))
@@ -62,8 +66,9 @@ def get_open_close_median_ohlc(o, c):
 def get_momentum_ohlc(c):
     """Generates shift momentum OHLC matrices using prior close boundaries (c1 c0)"""
     c1 = np.empty_like(c)
-    c1[0] = c[0]
-    c1[1:] = c[:-1]
+    if len(c) > 0:
+        c1[0] = c[0]
+        c1[1:] = c[:-1]
     return c1, c, c1, c
 
 def apply_ohlc_transformation(df, mode=1):
@@ -102,13 +107,12 @@ def write_matrix_to_parent_csv(df):
         base_filename = base_name + ".csv"
         target_export_path = os.path.join(parent_directory, base_filename)
         df.to_csv(target_export_path, index=True)
+        print(f"📦 PROCESSED CSV SUCCESS | Saved matrix file directly to: {target_export_path}")
     except Exception as e:
         print(f"CSV_EXPORT_ERROR | Write operation failure: {e}")
 
 def fetch_yf_data(period="1d", interval="1m", target_rows=52):
-    """
-    PERMANENT 52-ROW STRUCTURE PROCESSING ENGINE
-    """
+    """PERMANENT 52-ROW STRUCTURE PROCESSING ENGINE"""
     try:
         ticker_obj = yf.Ticker(TICKER)
         
@@ -155,5 +159,4 @@ if __name__ == "__main__":
     output_df = fetch_yf_data()
     if not output_df.empty:
         print(f"ENGINE_RUN_SUCCESS | Total Data Frame Sizing Bounds: {output_df.shape}")
-
 
