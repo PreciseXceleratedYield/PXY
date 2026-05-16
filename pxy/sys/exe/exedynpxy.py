@@ -7,10 +7,11 @@ import pandas as pd
 IST = pytz.timezone("Asia/Kolkata")
 
 # ==================================================
-# 🔧 TIGHTENED CONFIG: PURE TIME DECAY
+# 🔧 CONFIG: ROOM EARLY -> DEPTH ACCELERATION LATER
 # ==================================================
-BASE_DECAY_RATE = 0.001 
+BASE_DECAY_RATE = 0.001
 PNL_THRESHOLD = 0.0
+GRACE_WINDOW_SECS = 1800        # 30 minutes grace window in seconds
 
 def dynamic_entry(row):
     try:
@@ -18,10 +19,10 @@ def dynamic_entry(row):
         entry_time_val = row.get("buy_time")
         symbol = str(row.get("symbol", "")).upper()
         pnl = float(row.get("pnl", 0))
-
+        
         if not entry_time_val or original_price <= 0:
             return original_price
-
+            
         now = datetime.now(IST)
 
         # ---------------- PARSE ENTRY TIME ----------------
@@ -45,23 +46,44 @@ def dynamic_entry(row):
                 entry_time = entry_time.astimezone(IST)
 
         # ---------------- CALC ELAPSED ----------------
-        # Both 'now' and 'entry_time' are now IST aware
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
+
+        # ---------------- DUAL-PHASE DECAY SYSTEM ----------------
+        if elapsed_secs <= GRACE_WINDOW_SECS:
+            # Phase 1: Give new entries breathing room. Pure flat baseline decay only.
+            active_decay_rate = BASE_DECAY_RATE
+            phase_tag = "EARLY ROOM (1.0x)"
+        else:
+            # Phase 2: After 30 minutes, inject the heavy depth acceleration multiplier.
+            if "CE" in symbol:
+                depth = float(row.get("hkin_ce_depth", 1.0))
+            elif "PE" in symbol:
+                depth = float(row.get("hkin_pe_depth", 1.0))
+            else:
+                depth = 1.0
+
+            # Protect against negative depth adjustments or zero values safely
+            if depth <= 0:
+                depth = 1.0
+
+            active_decay_rate = BASE_DECAY_RATE * depth
+            phase_tag = f"DEPTH ACCEL ({depth:.1f}x)"
 
         # ---------------- PURE DECAY RULE ----------------
         if pnl <= PNL_THRESHOLD:
-            decay_amount = elapsed_secs * BASE_DECAY_RATE
+            decay_amount = elapsed_secs * active_decay_rate
             dynamic_val = original_price - decay_amount
-            
             clean_symbol = re.sub(r'^(NIFTY|BANKNIFTY)26', '', symbol)
+            
             if decay_amount > 0.5:
-                print(f"{clean_symbol} | TIME DECAY: -{decay_amount:.2f} PTS")
+                print(f"{clean_symbol} | {phase_tag} DECAY: -{decay_amount:.2f} PTS")
         else:
             dynamic_val = original_price
-
+            
         return round(dynamic_val, 2)
-
+        
     except Exception as e:
         # If error occurs, return original price to avoid breaking the trade
         return original_price
+
 
