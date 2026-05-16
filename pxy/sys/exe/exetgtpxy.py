@@ -22,6 +22,18 @@ def i(x, d=0):
     except Exception:
         return d
 
+def get_line_direction(row):
+    """Compares super_line and bos_val metrics directly including equality."""
+    super_line = float(row.get("super_line", 0.0))
+    bos_val = float(row.get("bos_val", 0.0))
+    
+    if super_line > bos_val:
+        return "UP"
+    elif super_line < bos_val:
+        return "DOWN"
+    else:
+        return "FLAT"  # Triggers when super_line == bos_val
+
 def target_price(row):
     global PRINTED_SIDES
     try:
@@ -29,20 +41,19 @@ def target_price(row):
         entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
         if entry_prc <= 0:
             return 0
-            
+
         # 2. BASE CALCULATION
         atr_val = f(row.get("atr"), 6.0)
         BASE_SCORE = atr_val / 2
-        
+
         # 3. SIGNAL & CONTEXT LOGIC
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
         side = "CE" if "CE" in symbol else "PE" if "PE" in symbol else "NA"
         is_ce, is_pe = (side == "CE"), (side == "PE")
-        
         active_signal = str(row.get("exit", "NONE")).upper()
         clean_signal = active_signal.strip()
         is_counter = str(row.get("counter", "N")).upper() == "Y"
-        
+
         # 4. FIELD DEFINITIONS
         hce_d = f(row.get("hkin_ce_depth"), 1.0)
         hpe_d = f(row.get("hkin_pe_depth"), 1.0)
@@ -50,54 +61,65 @@ def target_price(row):
         pe_p = f(row.get("pe_power"), 1.0)
         ce_f = f(row.get("ce_force"), 1.0)
         pe_f = f(row.get("pe_force"), 1.0)
-        
+
+        # Get line matrix direction once per call
+        line_dir = get_line_direction(row)
+
         # 5. FINAL PERCENTAGE SCORE CALCULATION
         state = "⏳"
         final_pct_score = BASE_SCORE
-        
+
         # Check using regex evaluations
         is_bullish_signal = bool(re.search(r"(BUY|BULL)", clean_signal))
         is_bearish_signal = bool(re.search(r"(SELL|BEAR)", clean_signal))
-        
+
         if is_ce:
             if is_bullish_signal:
                 calc = max(((((atr_val * ce_f * ce_p) + hce_d) / hce_d) + hce_d), 1.4 * hce_d)
+                
+                # If direction is not UP (i.e., DOWN or FLAT), cut calculation in half
+                if line_dir != "UP":
+                    calc = calc / 2.0
+                    
                 state, final_pct_score = "🔥", max(BASE_SCORE, calc)
             elif is_bearish_signal:
-                final_pct_score = (1.4)
-                state = "❄️"
-        elif is_pe:
-            if is_bearish_signal:
-                calc =max(((((atr_val * pe_f * pe_p) + hpe_d) / hpe_d) + hpe_d), 1.4 * hpe_d)
-                state, final_pct_score = "🔥", max(BASE_SCORE, calc)
-            elif is_bullish_signal:
-                final_pct_score = (1.4)
+                final_pct_score = 1.4
                 state = "❄️"
                 
+        elif is_pe:
+            if is_bearish_signal:
+                calc = max(((((atr_val * pe_f * pe_p) + hpe_d) / hpe_d) + hpe_d), 1.4 * hpe_d)
+                
+                # If direction is not DOWN (i.e., UP or FLAT), cut calculation in half
+                if line_dir != "DOWN":
+                    calc = calc / 2.0
+                    
+                state, final_pct_score = "🔥", max(BASE_SCORE, calc)
+            elif is_bullish_signal:
+                final_pct_score = 1.4
+                state = "❄️"
+
         # 8. MAX CAP LOGIC
         if final_pct_score > 99.0:
             final_pct_score = 99.0
-            
+
         # 6. FINAL OUTPUT
         add_value = entry_prc * (final_pct_score / 100.0)
         target = int(entry_prc + add_value)
-        
+
         # 7. SUPPRESSED DEBUG PRINT (Once per side)
         if side not in PRINTED_SIDES and side != "NA":
             color = (
-                Fore.CYAN
-                if state == "🔥"
-                else (
-                    Fore.BLUE
-                    if state == "❄️"
-                    else (Fore.MAGENTA if is_counter else Fore.YELLOW)
+                Fore.CYAN if state == "🔥" else (
+                    Fore.BLUE if state == "❄️" else (Fore.MAGENTA if is_counter else Fore.YELLOW)
                 )
             )
             print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state}")
             PRINTED_SIDES.add(side)
-            
+
         return target
     except Exception:
         return 0
+
 
 
