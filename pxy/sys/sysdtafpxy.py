@@ -55,7 +55,7 @@ def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
         except Exception as e:
             print(f"RAW_JSON_DUMP_ERROR | {e}")
     else:
-        #print("⚠️ MARKET HOURS DETECTED | Skipping dump ")
+        print("⚠️ MARKET HOURS DETECTED | Skipping dump ")
 
 def get_heikin_ashi_ohlc(o, h, l, c):
     """Generates pure Heikin-Ashi smooth trend OHLC matrices"""
