@@ -48,14 +48,15 @@ def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
                 
                 # Dump whole data block to JSON with IST timestamps
                 raw_data.to_json(target_export_path, date_format='iso', orient='split')
-                print(f"📦 RAW JSON DUMP SUCCESS (IST) | Saved raw data directly to: {target_export_path}")
+                print(f"📦 RAW JSON DUMP SUCCESS (IST)")
                 _RAW_DUMP_DONE = True
             else:
                 print("WARNING: Raw data fetch returned empty frame. Skipping JSON dump.")
         except Exception as e:
             print(f"RAW_JSON_DUMP_ERROR | {e}")
     else:
-        print("⚠️ MARKET HOURS DETECTED | Skipping raw JSON dump execution phase safely.")
+        pass
+        #print("⚠️ MARKET HOURS DETECTED | Skipping raw JSON dump execution phase safely.")
 
 def get_heikin_ashi_ohlc(o, h, l, c):
     """Generates pure Heikin-Ashi smooth trend OHLC matrices"""
