@@ -663,12 +663,16 @@ function redrawMarkers() {
         line.setAttribute('opacity', '0.5');
         svg.appendChild(line);
 
-        // BUY marker — triangle up
-        const buyMark = makeMark(buyPt.x, buyPt.y, 'B', bull, ti, t, true);
+        const isCE = (t.Symbol || '').toUpperCase().endsWith('CE');
+        const entryLabel = isCE ? 'CE' : 'PE';
+        const exitLabel  = isCE ? 'PE' : 'CE';
+
+        // BUY marker
+        const buyMark = makeMark(buyPt.x, buyPt.y, entryLabel, bull, ti, t, true);
         svg.appendChild(buyMark);
 
-        // SELL marker — triangle down
-        const sellMark = makeMark(sellPt.x, sellPt.y, 'S', isBull ? bull : bear, ti, t, false);
+        // SELL marker
+        const sellMark = makeMark(sellPt.x, sellPt.y, exitLabel, isBull ? bull : bear, ti, t, false);
         svg.appendChild(sellMark);
     });
 }
