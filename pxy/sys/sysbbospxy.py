@@ -22,7 +22,7 @@ def build_candle_bar(o, h, l, c, width=WIDTH):
         lower_len = width - body_len
     upper_len = width - lower_len - body_len
     bar = ""
-    # lower wick (Using ━ as requested)
+    # lower wick (Using ━)
     bar += Fore.LIGHTBLACK_EX + "━" * lower_len
     # body (Using █)
     if c > o:
@@ -31,24 +31,26 @@ def build_candle_bar(o, h, l, c, width=WIDTH):
         bar += Fore.RED + "█" * body_len
     else:
         bar += Fore.YELLOW + "█" * body_len
-    # upper wick (Using ━ as requested)
+    # upper wick (Using ━)
     bar += Fore.LIGHTBLACK_EX + "━" * upper_len
     return bar + Style.RESET_ALL
 
-# ---------------- 42-MIN ROLLING API (WEIGHTED BOS MODIFIED) ----------------
+# ---------------- 42-MIN ROLLING API (MIDPOINT OPEN MODIFIED) ----------------
 def get_bos_bar(df):
     try:
         if df is None or len(df) < 42:
             return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "0.00"
 
-        # 1. Capture Cumulative 42-minute OHLC for the visual bar engine
+        # 1. Capture Cumulative 42-minute boundaries
         window = df.iloc[-42:]
-        o_42 = float(window.iloc[0]['Open'])
         h_42 = float(window['High'].max())
         l_42 = float(window['Low'].min())
-        c_42 = float(window.iloc[-1]['Close']) # Live current price
+        c_42 = float(window.iloc[-1]['Close']) # Live current close price
 
-        # 2. Build the visual bar using cumulative metrics
+        # MODIFIED: Override the first open with the true High-Low window midpoint
+        o_42 = (h_42 + l_42) / 2.0
+
+        # 2. Build the visual bar using modified midpoint open parameters
         visual_bar = build_candle_bar(o_42, h_42, l_42, c_42)
 
         # 3. Calculate 42-Period Simple Moving Average on Close Prices
