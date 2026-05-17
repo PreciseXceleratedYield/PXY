@@ -27,10 +27,7 @@ is_green_c1 = is_green_c0[1]
 is_red_c1 = is_red_c0[1]
 
 // Plot the clean Mode 5 candles directly on your chart canvas
-plotcandle(o, h, l, c, title="Mode 5 Candles", 
-           color = is_green_c0 ? color.new(color.teal, 30) : color.new(color.maroon, 30), 
-           wickcolor = is_green_c0 ? color.teal : color.maroon, 
-           bordercolor = is_green_c0 ? color.teal : color.maroon)
+plotcandle(o, h, l, c, title="Mode 5 Candles", color = is_green_c0 ? color.new(color.teal, 30) : color.new(color.maroon, 30), wickcolor = is_green_c0 ? color.teal : color.maroon, bordercolor = is_green_c0 ? color.teal : color.maroon)
 
 // ==========================================
 // 2. INTERNAL ROW ENGINE LOOKUP
@@ -48,12 +45,19 @@ ST = (tsma_line + c) / 2.0
 plot(ST, title="TSMA 42 Price Midpoint", color=color.black, linewidth=3, style=plot.style_line)
 
 // ==========================================
+// 3b. PURE BOS ENGINE (PURE 42 SMA - NO WEIGHTS)
+// ==========================================
+sma_window = math.min(bar_count, 42)
+bos_line = ta.sma(c, sma_window)
+plot(bos_line, title="BOS Line (Pure SMA)", color=color.blue, linewidth=2, style=plot.style_line)
+
+// ==========================================
 // 4. STEP 1: CALCULATE RAW INDEPENDENT EXITS
 // ==========================================
-pure_color_buy  = is_red_c1 and is_green_c0   // Rule 6: Red -> Green (BUY Reversal)
-pure_color_bull = is_green_c1 and is_green_c0 // Rule 7: Green -> Green (BULL Continuation)
-pure_color_sell = is_green_c1 and is_red_c0   // Rule 8: Green -> Red (SELL Reversal)
-pure_color_bear = is_red_c1 and is_red_c0     // Rule 9: Red -> Red (BEAR Continuation)
+pure_color_buy = is_red_c1 and is_green_c0        // Rule 6: Red -> Green (BUY Reversal)
+pure_color_bull = is_green_c1 and is_green_c0      // Rule 7: Green -> Green (BULL Continuation)
+pure_color_sell = is_green_c1 and is_red_c0        // Rule 8: Green -> Red (SELL Reversal)
+pure_color_bear = is_red_c1 and is_red_c0         // Rule 9: Red -> Red (BEAR Continuation)
 
 // ==========================================
 // 5. STEP 2: APPLY STRUCTURAL ENTRY FILTERS
@@ -73,6 +77,8 @@ if cross_up_black
     entry := "CROSSBUY"
 else if pure_color_buy and above_black
     entry := "TRENDBUY"
+else if pure_color_buy and below_black            // <--- MATCHES PYTHON FLIPBUY
+    entry := "FLIPBUY"
 else if pure_color_bull and above_black
     entry := "BULL"
 
@@ -81,6 +87,8 @@ if cross_dn_black
     entry := "CROSSSELL"
 else if pure_color_sell and below_black
     entry := "TRENDSELL"
+else if pure_color_sell and above_black           // <--- MATCHES PYTHON FLIPSELL
+    entry := "FLIPSELL"
 else if pure_color_bear and below_black
     entry := "BEAR"
 
@@ -88,16 +96,22 @@ else if pure_color_bear and below_black
 // 6. MAP TRIGGERS & SHAPE PLOTS
 // ==========================================
 // Trigger tracking parameters (Triggers shapes cleanly on changes using lookback historical bracket [1])
-trigger_crossbuy  = (entry == "CROSSBUY")  and (entry[1] != "CROSSBUY")
-trigger_trendbuy  = (entry == "TRENDBUY")  and (entry[1] != "TRENDBUY")
+trigger_crossbuy = (entry == "CROSSBUY") and (entry[1] != "CROSSBUY")
+trigger_trendbuy = (entry == "TRENDBUY") and (entry[1] != "TRENDBUY")
+trigger_flipbuy = (entry == "FLIPBUY") and (entry[1] != "FLIPBUY")   // New FLIPBUY trigger tracker
+
 trigger_crosssell = (entry == "CROSSSELL") and (entry[1] != "CROSSSELL")
 trigger_trendsell = (entry == "TRENDSELL") and (entry[1] != "TRENDSELL")
+trigger_flipsell = (entry == "FLIPSELL") and (entry[1] != "FLIPSELL") // New FLIPSELL trigger tracker
 
 // Unified structural mapping outputs with distinct geometric rules
-plotshape(trigger_crossbuy,  title="CROSSBUY Trigger",  style=shape.arrowup,    location=location.belowbar, color=color.green,  size=size.normal)
-plotshape(trigger_trendbuy,  title="TRENDBUY Trigger",  style=shape.circle,     location=location.belowbar, color=color.lime,   size=size.small)
+plotshape(trigger_crossbuy, title="CROSSBUY Trigger", style=shape.arrowup, location=location.belowbar, color=color.green, size=size.normal)
+plotshape(trigger_trendbuy, title="TRENDBUY Trigger", style=shape.circle, location=location.belowbar, color=color.lime, size=size.small)
+plotshape(trigger_flipbuy, title="FLIPBUY Trigger", style=shape.diamond, location=location.belowbar, color=color.blue, size=size.small)
 
-plotshape(trigger_crosssell, title="CROSSSELL Trigger", style=shape.arrowdown,  location=location.abovebar, color=color.red,    size=size.normal)
-plotshape(trigger_trendsell, title="TRENDSELL Trigger", style=shape.circle,     location=location.abovebar, color=color.orange, size=size.small)
+plotshape(trigger_crosssell, title="CROSSSELL Trigger", style=shape.arrowdown, location=location.abovebar, color=color.red, size=size.normal)
+plotshape(trigger_trendsell, title="TRENDSELL Trigger", style=shape.circle, location=location.abovebar, color=color.orange, size=size.small)
+plotshape(trigger_flipsell, title="FLIPSELL Trigger", style=shape.diamond, location=location.abovebar, color=color.purple, size=size.small)
+
 
 
