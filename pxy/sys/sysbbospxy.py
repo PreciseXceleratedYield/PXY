@@ -40,29 +40,32 @@ def get_bos_bar(df):
     try:
         if df is None or len(df) < 42:
             return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "0.00"
-
+            
         # 1. Capture Cumulative 42-minute boundaries
         window = df.iloc[-42:]
         h_42 = float(window['High'].max())
         l_42 = float(window['Low'].min())
-        c_42 = float(window.iloc[-1]['Close']) # Live current close price
-
-        # MODIFIED: Override the first open with the true High-Low window midpoint
+        c_42 = float(window.iloc[-1]['Close'])  # Live current close price
+        
+        # Override the first open with the true High-Low window midpoint
         o_42 = (h_42 + l_42) / 2.0
-
+        
         # 2. Build the visual bar using modified midpoint open parameters
         visual_bar = build_candle_bar(o_42, h_42, l_42, c_42)
-
+        
         # 3. Calculate 42-Period Simple Moving Average on Close Prices
         sma_42 = float(window['Close'].mean())
         
-        # 4. Apply Custom Weights: 2 for SMA, 1 for Live Close
-        bos_value = ((sma_42 * 2) + (c_42 * 1)) / 3
+        # 4. EXACT PINE SCRIPT MATCH: (SMA42 + LIVE) / 2
+        # No more weights (*2). Now uses a pure 50/50 split midpoint engine.
+        bos_value = (sma_42 + c_42) / 2.0
+        
         bos_str = f"{bos_value:.2f}"
-
         return visual_bar, bos_str
+        
     except Exception:
         return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "ERR"
+
 
 
 
