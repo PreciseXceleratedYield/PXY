@@ -116,13 +116,23 @@ def process_lilo_orders(client):
         _print_summary(0, 0) 
         return pd.DataFrame(), pd.DataFrame() 
 
-def _print_summary(total_unrealized, total_realized): 
-    from colorama import Fore, Style, init 
-    init(autoreset=True) 
-    color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
-    unreal_str = f"{int(total_unrealized):+06d}" 
-    real_str = f"{int(total_realized):+06d}" 
-    print(f"\n {unreal_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅 {color}{real_str}{Style.RESET_ALL} 🥅\n") 
+def _print_summary(total_unrealized, total_realized):
+    from colorama import Fore, Style, init
+    init(autoreset=True)
+    
+    # 1. Set the color based on realized value
+    color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Style.BRIGHT + Fore.RED
+    
+    # 2. Format the integer values with explicit signs and padding
+    run_str = f"{int(total_unrealized):+06d}"
+    book_str = f"{int(total_realized):+06d}"
+    
+    # 3. Correctly combine the strings
+    real_str = run_str + book_str
+    
+    # 4. Clean print statement with corrected math length inside the nets
+    print(f"\n{run_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅 {color}{len(real_str) + len(run_str)}{Style.RESET_ALL} 🥅\n")
+
 
 if __name__ == "__main__": 
     client = get_session() 
