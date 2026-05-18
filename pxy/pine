@@ -1,117 +1,58 @@
-//@version=5
-indicator("PXY® Mode 5 Pure TSMA 42 Price Midpoint Engine (100% Synced)", overlay=true, max_bars_back=500)
+//@version=6 
+indicator("PXY® Pure OC/2 Chart - Pure Python SMA 42 Master", overlay=true, max_bars_back=500) 
 
-// ==========================================
-// 1. DATA PROCESSING - COMPOSITE MODE 5 MATRIX
-// ==========================================
-var float ha_o = na
-ha_c = (open + high + low + close) / 4.0
-ha_o := na(ha_o) ? (open + close) / 2.0 : (ha_o + ha_c) / 2.0
-ha_h = math.max(high, math.max(ha_o, ha_c))
-ha_l = math.min(low, math.min(ha_o, ha_c))
-oc2 = (open + close) / 2.0
-c1_raw = nz(close, close)
+// =============================================================================== 
+// 1. PURE OC/2 PRICE CALCULATIONS 
+// =============================================================================== 
+c0 = (open + close) / 2.0 
+c1 = c0[1] // Samples prior bar's value to maintain correct candle body height 
 
-// Pure Mode 5 Candle Array Overrides
-o = (open + ha_o + oc2 + c1_raw) / 4.0
-h = (high + ha_h + oc2 + close) / 4.0
-l = (low + ha_l + oc2 + c1_raw) / 4.0
-c = (close + ha_c + oc2 + close) / 4.0
+// =============================================================================== 
+// 2. PURE OC/2 VISUAL CHART LAYOUT 
+// =============================================================================== 
+candle_color = (c0 >= c1) ? color.teal : color.maroon 
+plotcandle(open=c1, high=math.max(c0, c1), low=math.min(c0, c1), close=c0, title="PXY Pure OC/2 Custom Candles", color=color.new(candle_color, 20), wickcolor=candle_color, bordercolor=candle_color) 
 
-// Determine Mode 5 Candle Color States
-is_green_c0 = c > o
-is_red_c0 = c < o
+// =============================================================================== 
+// 3. THE 1:1 PURE SMA BASELINE (WITH LIVE INFLUENCE FILTER) 
+// =============================================================================== 
+sma_window = 42 
+// Calculated as the raw moving average of your custom c0 prices 
+sma_raw = ta.sma(c0, sma_window) 
+// Live price influence smoothing step 
+ST = (sma_raw + c0) / 2.0 
+// Plot the clean, live-influenced 42 SMA on your chart in orange 
+plot(ST, title="PXY ST Line (Pure SMA 42)", color=color.orange, linewidth=2) 
 
-// Fetch previous candle states strictly using historical lookback bracket
-is_green_c1 = is_green_c0[1]
-is_red_c1 = is_red_c0[1]
+// =============================================================================== 
+// 4. SIGNAL LAYER 1: TREND LINE FLIPS (TRIGGERS ONLY ON THE CROSSOVER BAR) 
+// =============================================================================== 
+// TB (Trend BUY): Triggers STRICTLY on the first crossover bar moving above the line 
+trigger_tb = ta.crossover(c0, ST) 
+// TS (Trend SELL): Triggers STRICTLY on the first crossunder bar moving below the line 
+trigger_ts = ta.crossunder(c0, ST) 
 
-// Plot the clean Mode 5 candles directly on your chart canvas
-plotcandle(o, h, l, c, title="Mode 5 Candles", color = is_green_c0 ? color.new(color.teal, 30) : color.new(color.maroon, 30), wickcolor = is_green_c0 ? color.teal : color.maroon, bordercolor = is_green_c0 ? color.teal : color.maroon)
+// =============================================================================== 
+// 5. SIGNAL LAYER 2: MOMENTUM FLIPS (TRIGGERS STRICTLY ON THE COLOR TRANSITION BAR) 
+// =============================================================================== 
+// Direct array lookbacks ensure transition triggers fire ONLY on the color flip bar 
+color_change_to_green = (c0 > c0[1]) and (c0[1] < c0[2]) 
+color_change_to_red = (c0 < c0[1]) and (c0[1] > c0[2]) 
 
-// ==========================================
-// 2. INTERNAL ROW ENGINE LOOKUP
-// ==========================================
-is_new_day = ta.change(time("D")) != 0
-var int bar_count = 0
-bar_count := is_new_day ? 1 : bar_count + 1
+// Route Action signals only on the precise bar where the price direction flips while holding its trend position 
+// CB (Action BUY): Price flips Red -> Green while holding above the line (excluding the TB crossover bar) 
+trigger_cb = color_change_to_green and (c0 > ST) and not trigger_tb 
+// CS (Action SELL): Price flips Green -> Red while holding below the line (excluding the TS crossunder bar) 
+trigger_cs = color_change_to_red and (c0 < ST) and not trigger_ts 
 
-// ==========================================
-// 3. PURE TSMA 42 PRICE MIDPOINT TRACKER
-// ==========================================
-tsma_window = math.min(bar_count, 42)
-tsma_line = ta.linreg(c, tsma_window, 0)
-ST = (tsma_line + c) / 2.0
-plot(ST, title="TSMA 42 Price Midpoint", color=color.black, linewidth=3, style=plot.style_line)
+// =============================================================================== 
+// 6. VISUAL SIGNAL PLOTTING PIPELINE - ANCHOR ALIGNMENT FIXED 
+// =============================================================================== 
+// LAYER 1: Line Crossing Flips (TB / TS mapped to Square Shapes) 
+plotchar(trigger_tb, title="TB Cross", char="🟩", location=location.belowbar, size=size.tiny) 
+plotchar(trigger_ts, title="TS Cross", char="🟥", location=location.abovebar, size=size.tiny) 
 
-// ==========================================
-// 3b. PURE BOS ENGINE (PURE 42 SMA - NO WEIGHTS)
-// ==========================================
-sma_window = math.min(bar_count, 42)
-bos_line = ta.sma(c, sma_window)
-plot(bos_line, title="BOS Line (Pure SMA)", color=color.blue, linewidth=2, style=plot.style_line)
-
-// ==========================================
-// 4. STEP 1: CALCULATE RAW INDEPENDENT EXITS
-// ==========================================
-pure_color_buy = is_red_c1 and is_green_c0        // Rule 6: Red -> Green (BUY Reversal)
-pure_color_bull = is_green_c1 and is_green_c0      // Rule 7: Green -> Green (BULL Continuation)
-pure_color_sell = is_green_c1 and is_red_c0        // Rule 8: Green -> Red (SELL Reversal)
-pure_color_bear = is_red_c1 and is_red_c0         // Rule 9: Red -> Red (BEAR Continuation)
-
-// ==========================================
-// 5. STEP 2: APPLY STRUCTURAL ENTRY FILTERS
-// ==========================================
-above_black = c > ST
-below_black = c < ST
-
-// Check for exact cross intersections matching Python 1:1
-cross_up_black = ta.crossover(c, ST)
-cross_dn_black = ta.crossunder(c, ST)
-
-// Evaluate priorities cascade exactly matching your python conditional block string
-string entry = "NONE"
-
-// Bullish Entry Rules Cascade Filter
-if cross_up_black
-    entry := "CROSSBUY"
-else if pure_color_buy and above_black
-    entry := "TRENDBUY"
-else if pure_color_buy and below_black            // <--- MATCHES PYTHON FLIPBUY
-    entry := "FLIPBUY"
-else if pure_color_bull and above_black
-    entry := "BULL"
-
-// Bearish Entry Rules Cascade Filter (Decoupled 'if' block ensures 1:1 sync with Python layout)
-if cross_dn_black
-    entry := "CROSSSELL"
-else if pure_color_sell and below_black
-    entry := "TRENDSELL"
-else if pure_color_sell and above_black           // <--- MATCHES PYTHON FLIPSELL
-    entry := "FLIPSELL"
-else if pure_color_bear and below_black
-    entry := "BEAR"
-
-// ==========================================
-// 6. MAP TRIGGERS & SHAPE PLOTS
-// ==========================================
-// Trigger tracking parameters (Triggers shapes cleanly on changes using lookback historical bracket [1])
-trigger_crossbuy = (entry == "CROSSBUY") and (entry[1] != "CROSSBUY")
-trigger_trendbuy = (entry == "TRENDBUY") and (entry[1] != "TRENDBUY")
-trigger_flipbuy = (entry == "FLIPBUY") and (entry[1] != "FLIPBUY")   // New FLIPBUY trigger tracker
-
-trigger_crosssell = (entry == "CROSSSELL") and (entry[1] != "CROSSSELL")
-trigger_trendsell = (entry == "TRENDSELL") and (entry[1] != "TRENDSELL")
-trigger_flipsell = (entry == "FLIPSELL") and (entry[1] != "FLIPSELL") // New FLIPSELL trigger tracker
-
-// Unified structural mapping outputs with distinct geometric rules
-plotshape(trigger_crossbuy, title="CROSSBUY Trigger", style=shape.arrowup, location=location.belowbar, color=color.green, size=size.normal)
-plotshape(trigger_trendbuy, title="TRENDBUY Trigger", style=shape.circle, location=location.belowbar, color=color.lime, size=size.small)
-plotshape(trigger_flipbuy, title="FLIPBUY Trigger", style=shape.diamond, location=location.belowbar, color=color.blue, size=size.small)
-
-plotshape(trigger_crosssell, title="CROSSSELL Trigger", style=shape.arrowdown, location=location.abovebar, color=color.red, size=size.normal)
-plotshape(trigger_trendsell, title="TRENDSELL Trigger", style=shape.circle, location=location.abovebar, color=color.orange, size=size.small)
-plotshape(trigger_flipsell, title="FLIPSELL Trigger", style=shape.diamond, location=location.abovebar, color=color.purple, size=size.small)
-
-
+// LAYER 2: Internal Price Momentum Flips (CB / CS mapped to Circle Shapes) 
+plotchar(trigger_cb, title="CB Trend", char="🟢", location=location.belowbar, size=size.tiny) 
+plotchar(trigger_cs, title="CS Trend", char="🔴", location=location.abovebar, size=size.tiny)
 
