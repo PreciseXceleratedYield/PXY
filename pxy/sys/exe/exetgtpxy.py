@@ -74,7 +74,7 @@ def target_price(row):
 
         if is_ce:
             if is_bullish_signal:
-                calc = 33.0 if is_counter else max(((((atr_val * ce_f * ce_p) + hce_d) / (1.0 if hce_d > 3.0 else hce_d)) + hce_d), 1.4 * hce_d)
+                calc = max(((((atr_val * ce_f * ce_p) + hce_d) / (1.0 if hce_d > 3.0 else hce_d)) + hce_d), 1.4 * hce_d)
                 # If direction is not UP (i.e., DOWN or FLAT), cut calculation in half
                 if line_dir != "UP":
                     calc = calc / 2.0
@@ -84,7 +84,7 @@ def target_price(row):
                 state = "❄️"
         elif is_pe:
             if is_bearish_signal:
-                calc = 33.0 if is_counter else max(((((atr_val * pe_f * pe_p) + hpe_d) / (1.0 if hpe_d > 3.0 else hpe_d)) + hpe_d), 1.4 * hpe_d)
+                calc = max(((((atr_val * pe_f * pe_p) + hpe_d) / (1.0 if hpe_d > 3.0 else hpe_d)) + hpe_d), 1.4 * hpe_d)
                 # If direction is not DOWN (i.e., UP or FLAT), cut calculation in half
                 if line_dir != "DOWN":
                     calc = calc / 2.0
