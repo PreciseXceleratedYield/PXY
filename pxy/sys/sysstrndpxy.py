@@ -5,7 +5,7 @@ from sysdtafpxy import fetch_yf_data
 
 # Global Config
 DEBUG_MODE = True
-MA_TYPE = "SMA"  # <--- SWITCH SWITCH: Set to "TSMA" or "SMA"
+MA_TYPE = "TSMA"  # <--- SWITCH SWITCH: Set to "TSMA" or "SMA"
 
 def calculate_sma_42(series: pd.Series) -> np.ndarray:
     """
@@ -124,6 +124,7 @@ if __name__ == "__main__":
     print(f"=== Upgraded Mode 5 {MA_TYPE} 42 Midpoint Engine Self-Test ===")
     trend_signal, st_line_value = get_signal()
     print(f"CURRENT SYSTEM SIGNAL: {trend_signal} | LINE METRIC: {st_line_value:.2f}")
+
 
 
 
