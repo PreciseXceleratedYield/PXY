@@ -92,13 +92,13 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         
         # Layer C: Routing Evaluation Matrix
         if cross_above:
-            new_trend = "CROSSBUY"
+            new_trend = "BUY"
         elif cross_below:
-            new_trend = "CROSSSELL"
+            new_trend = "SELL"
         elif color_flip_green and (c0 > st_curr):
-            new_trend = "TRENDBUY"
+            new_trend = "BUY"
         elif color_flip_red and (c0 < st_curr):
-            new_trend = "TRENDSELL"
+            new_trend = "SELL"
         else:
             new_trend = "BULL" if (c0 > st_curr) else "BEAR"
             
