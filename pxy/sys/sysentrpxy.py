@@ -74,6 +74,10 @@ def get_entry_signal(df=None):
             final_signal = "OTMSELL"
         elif entry_l4 == "FLIPBUY":
             final_signal = "OTMBUY"
+        elif entry_l4 == "FLOWSELL":
+            final_signal = "OTMSELL"
+        elif entry_l4 == "FLOWBUY":
+            final_signal = "OTMBUY"           
         else:
             # Pass BULL, BEAR, or NONE exactly as they are down the line
             final_signal = entry_l4
