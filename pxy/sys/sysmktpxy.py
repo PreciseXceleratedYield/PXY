@@ -1,22 +1,22 @@
+# sysmktpxy.py
 """
 ===============================================================================
-PXY GEOMETRIC ENGINE CORE SYSTEM DOCUMENTATION
-MASTER INDEX
+PXY GEOMETRIC ENGINE CORE SYSTEM DOCUMENTATION MASTER INDEX
 ===============================================================================
 PART 1: RAW CANDLESTICK BASE STATES (UNFILTERED)
-1. Bullish Reversal Rebound State (BUY) - Formula: (C1 < O1) AND (C0 > O0)
-2. Bullish Trend Continuation State (BULL) - Formula: (C1 > O1) AND (C0 > O0)
-3. Bearish Reversal Breakdown State (SELL) - Formula: (C1 > O1) AND (C0 < O0)
-4. Bearish Trend Continuation State (BEAR) - Formula: (C1 < O1) AND (C0 < O0)
-5. Equilibrium Flat Market State (NONE) - Formula: (C0 == O0)
+1. Bullish Reversal Rebound State (BUY)       - Formula: (C1 < O1) AND (C0 > O0)
+2. Bullish Trend Continuation State (BULL)    - Formula: (C1 > O1) AND (C0 > O0)
+3. Bearish Reversal Breakdown State (SELL)    - Formula: (C1 > O1) AND (C0 < O0)
+4. Bearish Trend Continuation State (BEAR)    - Formula: (C1 < O1) AND (C0 < O0)
+5. Equilibrium Flat Market State (NONE)       - Formula: (C0 == O0)
 
 PART 2: FILTERED SYSTEM EXECUTION ENGINE LABELS
-1. CROSSBUY - Fired on the exact candle that closes ABOVE the SuperTrend line.
+1. CROSSBUY  - Fired on the exact candle that closes ABOVE the SuperTrend line.
 2. CROSSSELL - Fired on the exact candle that closes BELOW the SuperTrend line.
-3. TRENDBUY - Pullback Reversal entry formed while price is already ABOVE SuperTrend.
+3. TRENDBUY  - Pullback Reversal entry formed while price is already ABOVE SuperTrend.
 4. TRENDSELL - Pullback Reversal entry formed while price is already BELOW SuperTrend.
-5. BULL - Neutral Bullish tracking state; no new entry execution allowed.
-6. BEAR - Neutral Bearish tracking state; no new entry execution allowed.
+5. BULL      - Neutral Bullish tracking state; no new entry execution allowed.
+6. BEAR      - Neutral Bearish tracking state; no new entry execution allowed.
 ===============================================================================
 """
 
@@ -37,11 +37,11 @@ def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, ex
     Dynamically tracks the relative positions of structural prices against the SuperTrend line.
     """
     # ANSI escape code constants
-    RST = "\033[0m"       # Reset Color
-    RED = "\033[91m"       # Red for Bearish/ST
-    GRN = "\033[92m"       # Green for Bullish
-    YLW = "\033[1;93m"     # Bold Yellow for Highlight/Trend
-    GRAY = "\033[90m"      # Dim Gray for layout lines
+    RST = "\033[0m"          # Reset Color
+    RED = "\033[91m"          # Red for Bearish/ST
+    GRN = "\033[92m"          # Green for Bullish
+    YLW = "\033[1;93m"        # Bold Yellow for Highlight/Trend
+    GRAY = "\033[90m"         # Dim Gray for layout lines
 
     min_val = min(c2, c1, c0, st) - 2
     max_val = max(c2, c1, c0, st) + 2
@@ -76,7 +76,7 @@ def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, ex
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
     print(f"UP:{YLW}{str(cross_up)}{RST} | DDN:{YLW}{str(cross_dn)}{RST} | Trnd:{trend_color}{trend_str}{RST}")
-    print(f" ENTRY: {YLW}{entry}{RST} | EXIT: {YLW}{exit_sig}{RST}")
+    print(f"       ENTRY: {YLW}{entry}{RST} | EXIT: {YLW}{exit_sig}{RST}")
 
 def log_sync_state(timestamp, entry, exit_sig, price, st):
     """
@@ -108,18 +108,18 @@ def log_sync_state(timestamp, entry, exit_sig, price, st):
         logs.append(log_entry)
         with open(file_path, "w") as f:
             json.dump(logs[-100:], f, indent=4)
-
     except Exception as e:
         if DEBUG:
             print(f"Logger Engine Exception Encountered: {e}")
 
 def get_signal(df=None):
     """
-    Main signal generation function. Handles raw matrix ingestion, extracts positional vectors,
+    Main signal generation function. Handles raw matrix ingestion, extracts positional vectors, 
     processes candlestick patterns, and routes them through decoupled trend filters.
     """
     if df is None:
         df = fetch_yf_data()
+        
     if df is None or df.empty:
         return "NONE", "NONE"
 
@@ -134,10 +134,6 @@ def get_signal(df=None):
         df_calc['o2'] = df_calc['Open'].shift(2)
         df_calc['st1'] = df_calc['ST'].shift(1)
         
-        # FIXED: Geometric calculations moved here so they are ready before last_row is extracted
-        df_calc['V_PAT_BUY'] = (df_calc['Close'].shift(2) > df_calc['Close'].shift(1)) & (df_calc['Close'] > df_calc['Close'].shift(1))
-        df_calc['INV_V_PAT_SELL'] = (df_calc['Close'].shift(2) < df_calc['Close'].shift(1)) & (df_calc['Close'] < df_calc['Close'].shift(1))
-
         df_calc['aboveBlack'] = df_calc['Close'] > df_calc['ST']
         df_calc['belowBlack'] = df_calc['Close'] < df_calc['ST']
         df_calc['crossAboveBlack'] = (df_calc['c1'] <= df_calc['st1']) & (df_calc['Close'] > df_calc['ST'])
@@ -149,7 +145,7 @@ def get_signal(df=None):
         o0 = float(last_row['Open'])
         c1, c2 = float(last_row['c1']), float(last_row['c2'])
         o1, o2 = float(last_row['o1']), float(last_row['o2'])
-
+        
         cross_up_black = bool(last_row['crossAboveBlack'])
         cross_dn_black = bool(last_row['crossBelowBlack'])
         above_black = bool(last_row['aboveBlack'])
@@ -184,8 +180,8 @@ def get_signal(df=None):
         elif exit_sig == "BULL" and above_black:
             entry = "BULL"
 
-        # Bearish Entry Rules Cascade Filter - FIXED: 'if' turned to 'elif' to protect 'BULL' state
-        elif cross_dn_black:
+        # Bearish Entry Rules Cascade Filter (Decoupled to protect crossover detection)
+        if cross_dn_black:
             entry = "CROSSSELL"
         elif exit_sig == "SELL" and below_black:
             entry = "TRENDSELL"
@@ -194,21 +190,10 @@ def get_signal(df=None):
         elif exit_sig == "BEAR" and below_black:
             entry = "BEAR"
 
-        # --- 6. STEP 3: PATTERN UPGRADE RECONCILIATION ENGINE ---
-        is_v_buy = bool(last_row['V_PAT_BUY'])
-        is_inv_sell = bool(last_row['INV_V_PAT_SELL'])
-
-        if entry == "BULL" and is_v_buy:
-            entry = "FLOWBUY"
-
-        # FIXED: Added missing closing quote to "FLOWSELL"
-        if entry == "BEAR" and is_inv_sell:
-            entry = "FLOWSELL"
-
         if DEBUG:
             _print_console_bar(st0, c2, c1, c0, o2, o1, o0, cross_up_black, cross_dn_black, entry, exit_sig)
+            
         log_sync_state(df_calc.index[-1], entry, exit_sig, c0, st0)
-
         return entry, exit_sig
 
     except Exception as e:
@@ -219,7 +204,5 @@ def get_signal(df=None):
 if __name__ == "__main__":
     e, x = get_signal()
     print(f"\nFinal Synchronized Outputs -> Entry Status: {e} | Exit Trend: {x}")
-
-
 
 
