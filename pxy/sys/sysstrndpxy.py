@@ -5,7 +5,7 @@ from sysdtafpxy import fetch_yf_data
 
 # Global Config
 DEBUG_MODE = True
-MA_TYPE = "TSMA"  # <--- SWITCH SWITCH: Set to "TSMA" or "SMA"
+MA_TYPE = "SMA"  # <--- SWITCH SWITCH: Set to "TSMA" or "SMA"
 
 def calculate_sma_42(series: pd.Series) -> np.ndarray:
     """
