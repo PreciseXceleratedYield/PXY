@@ -55,9 +55,9 @@ def get_entry_signal(df=None):
     if market_open <= current_time_ist < time_boundary:
         # --- EARLY MORNING OPENING WINDOW: PURE RAW REVERSAL TO ATM ---
         if exit_l2 == "BUY":
-            final_signal = "ATMBUY"
+            final_signal = "OTMBUY"
         elif exit_l2 == "SELL":
-            final_signal = "ATMSELL"
+            final_signal = "OTMSELL"
         else:
             final_signal = "NONE"
     else:
