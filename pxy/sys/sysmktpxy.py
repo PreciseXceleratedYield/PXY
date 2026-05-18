@@ -1,23 +1,22 @@
 """# sysmktpxy.py """
-===============================================================================
-PXY GEOMETRIC ENGINE CORE SYSTEM DOCUMENTATION MASTER INDEX
-===============================================================================
-PART 1: RAW CLOSE-PRICE BASE STATES (UNFILTERED)
-1. V-Pattern / Flat Matrix Rebound State (BUY)    - Formula: ((C1 < C2 OR C1 == C2) AND C0 > C1) OR (C1 == C0 AND C0 > C2)
-2. Upward Trend Continuation State (BULL)         - Formula: ((C1 > C2) AND C0 > C1) OR (C1 == C0 AND C0 > C2) *if handling macro
-3. Inverted V / Flat Matrix Breakdown State (SELL) - Formula: ((C1 > C2 OR C1 == C2) AND C0 < C1) OR (C1 == C0 AND C0 < C2)
-4. Downward Trend Continuation State (BEAR)       - Formula: ((C1 < C2) AND C0 < C1)
-5. Equilibrium Flat Market State (NONE)           - Formula: (C0 == C1 AND C0 == C2)
-
-PART 2: FILTERED SYSTEM EXECUTION ENGINE LABELS
-1. CROSSBUY  - Fired on the exact candle that closes ABOVE the SuperTrend line.
-2. CROSSSELL - Fired on the exact candle that closes BELOW the SuperTrend line.
-3. TRENDBUY  - Pullback Reversal entry formed while price is already ABOVE SuperTrend.
-4. TRENDSELL - Pullback Reversal entry formed while price is already BELOW SuperTrend.
-5. BULL      - Neutral Bullish tracking state; no new entry execution allowed.
-6. BEAR      - Neutral Bearish tracking state; no new entry execution allowed.
-===============================================================================
-"""
+# ===============================================================================
+# PXY GEOMETRIC ENGINE CORE SYSTEM DOCUMENTATION MASTER INDEX
+# ===============================================================================
+# PART 1: RAW CLOSE-PRICE BASE STATES (UNFILTERED)
+# 1. V-Pattern / Flat Matrix Rebound State (BUY)    - Formula: ((C1 < C2 OR C1 == C2) AND C0 > C1) OR (C1 == C0 AND C0 > C2)
+# 2. Upward Trend Continuation State (BULL)         - Formula: ((C1 > C2) AND C0 > C1)
+# 3. Inverted V / Flat Matrix Breakdown State (SELL) - Formula: ((C1 > C2 OR C1 == C2) AND C0 < C1) OR (C1 == C0 AND C0 < C2)
+# 4. Downward Trend Continuation State (BEAR)       - Formula: ((C1 < C2) AND C0 < C1)
+# 5. Equilibrium Flat Market State (NONE)           - Formula: (C0 == C1 AND C0 == C2)
+#
+# PART 2: FILTERED SYSTEM EXECUTION ENGINE LABELS
+# 1. CROSSBUY  - Fired on the exact candle that closes ABOVE the SuperTrend line.
+# 2. CROSSSELL - Fired on the exact candle that closes BELOW the SuperTrend line.
+# 3. TRENDBUY  - Pullback Reversal entry formed while price is already ABOVE SuperTrend.
+# 4. TRENDSELL - Pullback Reversal entry formed while price is already BELOW SuperTrend.
+# 5. BULL      - Neutral Bullish tracking state; no new entry execution allowed.
+# 6. BEAR      - Neutral Bearish tracking state; no new entry execution allowed.
+# ===============================================================================
 
 import numpy as np
 import pandas as pd
