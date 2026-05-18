@@ -7,7 +7,7 @@ from colorama import Fore, Style
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 1 
+MAX_LAYERS = 2
 COOL_DOWN_SECONDS = 100
 LOSS_THRESHOLD = -14 # Trigger if loss is -10% or worse 
 
