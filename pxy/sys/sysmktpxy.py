@@ -1,14 +1,13 @@
-# sysmktpxy.py
-"""
+"""# sysmktpxy.py """
 ===============================================================================
 PXY GEOMETRIC ENGINE CORE SYSTEM DOCUMENTATION MASTER INDEX
 ===============================================================================
-PART 1: RAW CANDLESTICK BASE STATES (UNFILTERED)
-1. Bullish Reversal Rebound State (BUY)       - Formula: (C1 < O1) AND (C0 > O0)
-2. Bullish Trend Continuation State (BULL)    - Formula: (C1 > O1) AND (C0 > O0)
-3. Bearish Reversal Breakdown State (SELL)    - Formula: (C1 > O1) AND (C0 < O0)
-4. Bearish Trend Continuation State (BEAR)    - Formula: (C1 < O1) AND (C0 < O0)
-5. Equilibrium Flat Market State (NONE)       - Formula: (C0 == O0)
+PART 1: RAW CLOSE-PRICE BASE STATES (UNFILTERED)
+1. V-Pattern / Flat Matrix Rebound State (BUY)    - Formula: ((C1 < C2 OR C1 == C2) AND C0 > C1) OR (C1 == C0 AND C0 > C2)
+2. Upward Trend Continuation State (BULL)         - Formula: ((C1 > C2) AND C0 > C1) OR (C1 == C0 AND C0 > C2) *if handling macro
+3. Inverted V / Flat Matrix Breakdown State (SELL) - Formula: ((C1 > C2 OR C1 == C2) AND C0 < C1) OR (C1 == C0 AND C0 < C2)
+4. Downward Trend Continuation State (BEAR)       - Formula: ((C1 < C2) AND C0 < C1)
+5. Equilibrium Flat Market State (NONE)           - Formula: (C0 == C1 AND C0 == C2)
 
 PART 2: FILTERED SYSTEM EXECUTION ENGINE LABELS
 1. CROSSBUY  - Fired on the exact candle that closes ABOVE the SuperTrend line.
@@ -37,11 +36,11 @@ def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, ex
     Dynamically tracks the relative positions of structural prices against the SuperTrend line.
     """
     # ANSI escape code constants
-    RST = "\033[0m"          # Reset Color
-    RED = "\033[91m"          # Red for Bearish/ST
-    GRN = "\033[92m"          # Green for Bullish
-    YLW = "\033[1;93m"        # Bold Yellow for Highlight/Trend
-    GRAY = "\033[90m"         # Dim Gray for layout lines
+    RST = "\033[0m"       # Reset Color
+    RED = "\033[91m"       # Red for Bearish/ST
+    GRN = "\033[92m"       # Green for Bullish
+    YLW = "\033[1;93m"     # Bold Yellow for Highlight/Trend
+    GRAY = "\033[90m"      # Dim Gray for layout lines
 
     min_val = min(c2, c1, c0, st) - 2
     max_val = max(c2, c1, c0, st) + 2
@@ -76,7 +75,8 @@ def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, ex
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
     print(f"UP:{YLW}{str(cross_up)}{RST} | DDN:{YLW}{str(cross_dn)}{RST} | Trnd:{trend_color}{trend_str}{RST}")
-    print(f"       ENTRY: {YLW}{entry}{RST} | EXIT: {YLW}{exit_sig}{RST}")
+    print(f" ENTRY: {YLW}{entry}{RST} | EXIT: {YLW}{exit_sig}{RST}")
+
 
 def log_sync_state(timestamp, entry, exit_sig, price, st):
     """
@@ -106,20 +106,23 @@ def log_sync_state(timestamp, entry, exit_sig, price, st):
                     logs = []
 
         logs.append(log_entry)
+
         with open(file_path, "w") as f:
             json.dump(logs[-100:], f, indent=4)
+
     except Exception as e:
         if DEBUG:
             print(f"Logger Engine Exception Encountered: {e}")
 
+
 def get_signal(df=None):
     """
-    Main signal generation function. Handles raw matrix ingestion, extracts positional vectors, 
-    processes candlestick patterns, and routes them through decoupled trend filters.
+    Main signal generation function. Handles raw matrix ingestion, extracts positional vectors,
+    processes close price structural variations, and routes them through decoupled trend filters.
     """
     if df is None:
         df = fetch_yf_data()
-        
+
     if df is None or df.empty:
         return "NONE", "NONE"
 
@@ -133,19 +136,21 @@ def get_signal(df=None):
         df_calc['o1'] = df_calc['Open'].shift(1)
         df_calc['o2'] = df_calc['Open'].shift(2)
         df_calc['st1'] = df_calc['ST'].shift(1)
-        
+
         df_calc['aboveBlack'] = df_calc['Close'] > df_calc['ST']
         df_calc['belowBlack'] = df_calc['Close'] < df_calc['ST']
+
         df_calc['crossAboveBlack'] = (df_calc['c1'] <= df_calc['st1']) & (df_calc['Close'] > df_calc['ST'])
         df_calc['crossBelowBlack'] = (df_calc['c1'] >= df_calc['st1']) & (df_calc['Close'] < df_calc['ST'])
 
         # --- 3. ISOLATE VECTOR STATES FROM LAST ROW ---
         last_row = df_calc.iloc[-1].copy()
+
         c0, st0 = float(last_row['Close']), float(last_row['ST'])
         o0 = float(last_row['Open'])
         c1, c2 = float(last_row['c1']), float(last_row['c2'])
         o1, o2 = float(last_row['o1']), float(last_row['o2'])
-        
+
         cross_up_black = bool(last_row['crossAboveBlack'])
         cross_dn_black = bool(last_row['crossBelowBlack'])
         above_black = bool(last_row['aboveBlack'])
@@ -158,14 +163,29 @@ def get_signal(df=None):
 
         # --- 4. STEP 1: CALCULATE RAW INDEPENDENT EXIT TREND STATE FIRST ---
         exit_sig = "NONE"
-        if is_red_c1 and is_green_c0:
-            exit_sig = "BUY"
-        elif is_green_c1 and is_green_c0:
-            exit_sig = "BULL"
-        elif is_green_c1 and is_red_c0:
-            exit_sig = "SELL"
-        elif is_red_c1 and is_red_c0:
-            exit_sig = "BEAR"
+
+        # Rule Trigger A: Current candle matches previous candle exactly (Flat Flat)
+        if c1 == c0:
+            if c0 > c2:
+                exit_sig = "BUY"    # Macro upward breakout over C2
+            elif c0 < c2:
+                exit_sig = "SELL"   # Macro downward breakdown under C2
+            else:
+                exit_sig = "NONE"   # Complete stagnation (C0 == C1 == C2)
+        
+        # Rule Trigger B: Standard directional movement sequence
+        else:
+            if (c1 > c2) and (c0 > c1):
+                exit_sig = "BULL"       # Upward Continuation (Up -> Up)
+                
+            elif (c1 < c2) and (c0 < c1):
+                exit_sig = "BEAR"       # Downward Continuation (Down -> Down)
+                
+            elif (c1 < c2 or c1 == c2) and (c0 > c1):
+                exit_sig = "BUY"        # V Pattern OR Flat Breakout Higher
+                
+            elif (c1 > c2 or c1 == c2) and (c0 < c1):
+                exit_sig = "SELL"       # Inverted V Pattern OR Flat Breakdown Lower
 
         # --- 5. STEP 2: APPLY FILTERS DIRECTLY ON PRE-COMPUTED EXITS FOR ENTRY ---
         entry = "NONE"
@@ -192,7 +212,7 @@ def get_signal(df=None):
 
         if DEBUG:
             _print_console_bar(st0, c2, c1, c0, o2, o1, o0, cross_up_black, cross_dn_black, entry, exit_sig)
-            
+        
         log_sync_state(df_calc.index[-1], entry, exit_sig, c0, st0)
         return entry, exit_sig
 
@@ -200,6 +220,7 @@ def get_signal(df=None):
         if DEBUG:
             print(f"PXY Master Core Error: {e}")
         return "NONE", "NONE"
+
 
 if __name__ == "__main__":
     e, x = get_signal()
