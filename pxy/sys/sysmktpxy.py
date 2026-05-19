@@ -42,7 +42,7 @@ def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, ex
         (c0, f"C0-{c0:.2f}", "█", c0_color)
     ]
     
-    rows.sort(key=lambda item: item[0], reverse=True)
+    rows.sort(key=lambda item: item, reverse=True)
 
     print(f"\n{YLW}=== GEOMETRIC ENGINE CONSOLE MONITOR ==={RST}")
     for val, label, marker, color in rows:
@@ -97,7 +97,6 @@ def get_signal(df=None):
         df_calc['o2'] = df_calc['Open'].shift(2)
         df_calc['st1'] = df_calc['ST'].shift(1)
 
-        # Crossover Tracking Logic
         df_calc['crossAboveBlack'] = (df_calc['c1'] <= df_calc['st1']) & (df_calc['Close'] > df_calc['ST'])
         df_calc['crossBelowBlack'] = (df_calc['c1'] >= df_calc['st1']) & (df_calc['Close'] < df_calc['ST'])
 
@@ -118,7 +117,7 @@ def get_signal(df=None):
         # Clean string to safely process alternative formats
         streak_signal = str(raw_streak).replace("⚡", "").strip().upper()
 
-        # PRIORITY 1: Only catch explicit trading actions from Streak Module
+        # PRIORITY 1: Continuous or immediate explicit trading actions take top priority
         if streak_signal == "BUY":
             entry = "BUY"
             exit_sig = "BUY"
@@ -126,18 +125,20 @@ def get_signal(df=None):
             entry = "SELL"
             exit_sig = "SELL"
         
-        # PRIORITY 2: Drop into Fallback only on explicit SuperTrend crossovers
+        # PRIORITY 2: If NEUTRAL, fall back and let the continuous SuperTrend determine state
         else:
-            if cross_up_black:
+            # Re-verify trend by matching explicit data columns or the pricing layout fallback
+            imported_signal = str(last_row.get('ST_Trend', '')).strip().upper()
+            
+            if imported_signal in ["BUY", "BULL", "UP", "1", "1.0"] or (c0 >= st0):
                 entry = "BUY"
                 exit_sig = "BUY"
-            elif cross_dn_black:
+            elif imported_signal in ["SELL", "BEAR", "DOWN", "-1", "-1.0"] or (c0 < st0):
                 entry = "SELL"
                 exit_sig = "SELL"
             else:
-                # If no streak flip occurs and no SuperTrend line breakout occurs, stay neutral
-                entry = "NEUTRAL"
-                exit_sig = "NEUTRAL"
+                entry = "NONE"
+                exit_sig = "NONE"
 
         if DEBUG:
             _print_console_bar(st0, c2, c1, c0, o2, o1, o0, cross_up_black, cross_dn_black, entry, exit_sig)
@@ -153,6 +154,7 @@ def get_signal(df=None):
 if __name__ == "__main__":
     e, x = get_signal()
     print(f"\n=== [TIER 2] Synchronized Outputs -> Entry: {e} | Exit: {x} ===")
+
 
 
 
