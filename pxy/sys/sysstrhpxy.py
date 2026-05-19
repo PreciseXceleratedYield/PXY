@@ -14,7 +14,7 @@ def get_candle_strength_line(df=None):
     """
     Evaluates market structure and filters via 1-Cancel-1-Demand criteria.
     Returns:
-        str: Only the final signal status ("⚡ BUY", "⚡ SELL", or "Neutral")
+        str: Only the final signal status ("BUY", "SELL", or "NEUTRAL")
     """
     # ------------------------------
     # GET HA DATA (SINGLE CALL ONLY)
@@ -25,7 +25,7 @@ def get_candle_strength_line(df=None):
     # SAFETY CHECK
     # ------------------------------
     if df is None or len(df) == 0:
-        return "Neutral"
+        return "NEUTRAL"
         
     # ------------------------------
     # STATE MACHINE: STREAK & MISS TRACKING
@@ -125,7 +125,7 @@ def get_candle_strength_line(df=None):
     elif bear_flip:
         final_signal = "SELL"
     else:
-        final_signal = "Neutral"
+        final_signal = "NEUTRAL"
 
     return final_signal
 
