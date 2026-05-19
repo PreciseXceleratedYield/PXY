@@ -35,11 +35,11 @@ def get_entry_signal(df=None):
     # 3. IST TIME-BASED OPTIONS ROUTING ENGINE (ALL ATM EXECUTION CHANNELS)
     if market_open <= current_time_ist < time_boundary:
         if exit_l2 == "BUY":
-            final_signal = "ATMBUY"
+            final_signal = "⏰ BUY ⏳"
         elif exit_l2 == "SELL":
-            final_signal = "ATMSELL"
+            final_signal = "⏰ SELL ⏳"
         else:
-            final_signal = "NONE"
+            final_signal = "⏰ NAN ⏳"
     else:
         if entry_l4 == "BUY":
             final_signal = "ATMBUY"
