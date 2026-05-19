@@ -34,7 +34,7 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
         (c1, f"C1-{c1:.2f}", "█", c1_color),
         (c0, f"C0-{c0:.2f}", "█", c0_color)
     ]
-    rows.sort(key=lambda item: item[0], reverse=True)
+    rows.sort(key=lambda item: item, reverse=True)
 
     print(f"\n{YLW}=== GEOMETRIC V-ENGINE MONITOR ==={RST}")
     for val, label, marker, color in rows:
@@ -93,8 +93,9 @@ def get_signal(df):
             red_col = [c for c in df.columns if 'red' in str(c).lower()]
             df['is_red'] = df[red_col[0]] if red_col else df['Close'] < df['Open']
 
-        df['is_green'] = df['is_green'].astype(str).str.lower().isin(['true', '1', '1.0', 'green', 'yes'])
-        df['is_red']   = df['is_red'].astype(str).str.lower().isin(['true', '1', '1.0', 'red', 'yes'])
+        # FIXED: Expanded lookup array to safely parse integers (like '2') or custom upstream signals
+        df['is_green'] = df['is_green'].astype(str).str.lower().strip().isin(['true', '1', '1.0', '2', '2.0', 'green', 'yes'])
+        df['is_red']   = df['is_red'].astype(str).str.lower().strip().isin(['true', '1', '1.0', 'red', 'yes'])
 
         # --------------------------------------------------
         # EXTRACT CANDLES: LIVE (0), PREVIOUS (1), PREV-2 (2)
@@ -157,17 +158,13 @@ def get_signal(df):
         return "NONE", "NONE"
 
 if __name__ == "__main__":
-    # Unit test module simulating a pure V-Pattern flip entry
     dates = pd.date_range(start="2026-01-01", periods=3, freq="min")
     test_df = pd.DataFrame({
-        'Open': [100, 102, 101],
-        'Close': [102, 101, 103],
-        'is_green': [True, False, True], # Green -> Red -> Green (V Pattern)
-        'is_red': [False, True, False]
+        'Open': [100, 101, 102],
+        'Close': [101, 102, 103],
+        'is_green': ['2', '2', '2'], # Simulates continuous bull state matching upstream string formats
+        'is_red': [False, False, False]
     }, index=dates)
     
     e, x = get_signal(test_df)
     print(f"\n=== Verification Output -> Entry: {e} | Exit: {x} ===")
-
-
-
