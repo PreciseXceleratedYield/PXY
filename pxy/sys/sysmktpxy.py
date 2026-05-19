@@ -93,9 +93,9 @@ def get_signal(df):
             red_col = [c for c in df.columns if 'red' in str(c).lower()]
             df['is_red'] = df[red_col[0]] if red_col else df['Close'] < df['Open']
 
-        # FIXED: Expanded lookup array to safely parse integers (like '2') or custom upstream signals
-        df['is_green'] = df['is_green'].astype(str).str.lower().strip().isin(['true', '1', '1.0', '2', '2.0', 'green', 'yes'])
-        df['is_red']   = df['is_red'].astype(str).str.lower().strip().isin(['true', '1', '1.0', 'red', 'yes'])
+        # FIXED: Added the proper '.str' accessor before calling '.strip()' on Pandas series objects
+        df['is_green'] = df['is_green'].astype(str).str.lower().str.strip().isin(['true', '1', '1.0', '2', '2.0', 'green', 'yes'])
+        df['is_red']   = df['is_red'].astype(str).str.lower().str.strip().isin(['true', '1', '1.0', 'red', 'yes'])
 
         # --------------------------------------------------
         # EXTRACT CANDLES: LIVE (0), PREVIOUS (1), PREV-2 (2)
@@ -162,9 +162,10 @@ if __name__ == "__main__":
     test_df = pd.DataFrame({
         'Open': [100, 101, 102],
         'Close': [101, 102, 103],
-        'is_green': ['2', '2', '2'], # Simulates continuous bull state matching upstream string formats
+        'is_green': ['2', '2', '2'],
         'is_red': [False, False, False]
     }, index=dates)
     
     e, x = get_signal(test_df)
     print(f"\n=== Verification Output -> Entry: {e} | Exit: {x} ===")
+
