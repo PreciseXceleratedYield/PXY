@@ -147,20 +147,36 @@ def get_candle_strength_line(df=None):
             color = Fore.YELLOW
 
         # ------------------------------
-        # ATR + ADX
+        # ATR + ADX UNPACKING
         # ------------------------------
         atr_series = calculate_atr(df)
         atr = atr_series.iloc[-1] if not pd.isna(atr_series.iloc[-1]) else 0.0
-        adx = calculate_adx(df)
+        
+        # Safe extraction of ADX (extracts value if returned as tuple/series/dataframe)
+        adx_raw = calculate_adx(df)
+        adx_value = 0.0
+        
+        if adx_raw is not None:
+            if isinstance(adx_raw, tuple):
+                adx_value = adx_raw[0] # Take first element from tuple
+            elif isinstance(adx_raw, (pd.Series, pd.DataFrame)):
+                adx_value = adx_raw.iloc[-1] if not adx_raw.empty else 0.0
+            else:
+                adx_value = float(adx_raw)
+                
+        # If extracted ADX is still inside a Series array element
+        if isinstance(adx_value, pd.Series):
+            adx_value = adx_value.iloc[-1] if not adx_value.empty else 0.0
+
         candle_range = df['High'].iloc[-1] - df['Low'].iloc[-1]
 
         # ------------------------------
         # SAFE SCORE CALCULATION
         # ------------------------------
-        if adx is None or atr == 0 or pd.isna(atr):
+        if adx_value is None or pd.isna(adx_value) or atr == 0 or pd.isna(atr):
             score_value = 0.0
         else:
-            score_value = (candle_range / atr) * (adx / 100)
+            score_value = (candle_range / atr) * (float(adx_value) / 100)
 
     # ------------------------------
     # FORMAT OUTPUT
