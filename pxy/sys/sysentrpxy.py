@@ -29,7 +29,7 @@ def get_entry_signal(df=None):
             pass
 
     market_open = datetime.strptime("09:15", "%H:%M").time()
-    time_boundary = datetime.strptime("09:30", "%H:%M").time()
+    time_boundary = datetime.strptime("09:28", "%H:%M").time()
     final_signal = "NONE"
 
     # 3. IST TIME-BASED OPTIONS ROUTING ENGINE (ALL ATM EXECUTION CHANNELS)
