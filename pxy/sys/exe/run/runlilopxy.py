@@ -122,6 +122,7 @@ def process_lilo_orders(client):
                         "Sell_Prc": live_val, 
                         "PNL": int((live_val - b["prc"]) * b["qty"]) 
                     }) 
+                    b["qty"] = 0  # ✅ FIXED: Zeroing balance breaks the tracking freeze instantly
 
         print(f"[DEBUG] [process_lilo_orders] Finished loops. Open items total: {len(open_positions)} | Closed items total: {len(closed_matches)}")
         open_df = pd.DataFrame(open_positions) 
