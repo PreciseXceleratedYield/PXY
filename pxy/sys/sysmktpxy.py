@@ -75,8 +75,9 @@ def log_sync_state(timestamp, entry, exit_sig, price):
 def get_signal(df):
     """ 
     3-Bar Vector Engine evaluating V-Flips, Inverted V-Flips, and Continuations.
+    Falls back to SMA structural tracking if close arrays display mixed chop.
     """
-    if df is None or len(df) < 3:
+    if df is None or len(df) < 5:
         return "NONE", "NONE"
 
     try:
@@ -87,37 +88,37 @@ def get_signal(df):
         # --------------------------------------------------
         if 'is_green' not in df.columns:
             green_col = [c for c in df.columns if 'green' in str(c).lower()]
-            df['is_green'] = df[green_col[0]] if green_col else df['Close'] > df['Open']
+            df['is_green'] = df[green_col] if green_col else df['Close'] > df['Open']
 
         if 'is_red' not in df.columns:
             red_col = [c for c in df.columns if 'red' in str(c).lower()]
-            df['is_red'] = df[red_col[0]] if red_col else df['Close'] < df['Open']
+            df['is_red'] = df[red_col] if red_col else df['Close'] < df['Open']
 
-        # FIXED: Added the proper '.str' accessor before calling '.strip()' on Pandas series objects
         df['is_green'] = df['is_green'].astype(str).str.lower().str.strip().isin(['true', '1', '1.0', '2', '2.0', 'green', 'yes'])
         df['is_red']   = df['is_red'].astype(str).str.lower().str.strip().isin(['true', '1', '1.0', 'red', 'yes'])
+
+        # Calculate a baseline rolling 5-period trend helper to resolve close price chop
+        df['sma_trend'] = df['Close'].rolling(window=5, min_periods=1).mean()
 
         # --------------------------------------------------
         # EXTRACT CANDLES: LIVE (0), PREVIOUS (1), PREV-2 (2)
         # --------------------------------------------------
         last_idx = df.index[-1]
         
-        # Candle 0 (Current Live Bar)
         is_live_green = bool(df.at[last_idx, 'is_green'])
         is_live_red   = bool(df.at[last_idx, 'is_red'])
         
-        # Candle -1 (Previous Bar)
         is_prev1_green = bool(df['is_green'].iloc[-2])
         is_prev1_red   = bool(df['is_red'].iloc[-2])
         
-        # Candle -2 (Two Bars Ago)
         is_prev2_green = bool(df['is_green'].iloc[-3])
         is_prev2_red   = bool(df['is_red'].iloc[-3])
         
-        # Console visual layout variables
         c0, o0 = float(df.at[last_idx, 'Close']), float(df.at[last_idx, 'Open'])
         c1, o1 = float(df.iloc[-2]['Close']), float(df.iloc[-2]['Open'])
         c2, o2 = float(df.iloc[-3]['Close']), float(df.iloc[-3]['Open'])
+        
+        live_sma = float(df.at[last_idx, 'sma_trend'])
 
         # --------------------------------------------------
         # EXCLUSIVE MATRIX FILTER GATES
@@ -133,7 +134,7 @@ def get_signal(df):
         continuation_bear = is_prev2_red and is_prev1_red and is_live_red
 
         # --------------------------------------------------
-        # SIGNAL ROUTING LOGIC
+        # SIGNAL ROUTING LOGIC WITH MACRO FALLBACKS
         # --------------------------------------------------
         if v_buy:
             entry, exit_sig = "BUY", "BUY"
@@ -144,7 +145,12 @@ def get_signal(df):
         elif continuation_bear:
             entry, exit_sig = "BEAR", "BEAR"
         else:
-            entry, exit_sig = "NONE", "NONE"
+            # FIXED fallback: If candle color values are mixed but current price
+            # remains safely capped beneath our trend baseline, force BEAR/BULL 
+            if c0 < live_sma:
+                entry, exit_sig = "BEAR", "BEAR"
+            else:
+                entry, exit_sig = "BULL", "BULL"
 
         if DEBUG:
             _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig)
@@ -158,12 +164,12 @@ def get_signal(df):
         return "NONE", "NONE"
 
 if __name__ == "__main__":
-    dates = pd.date_range(start="2026-01-01", periods=3, freq="min")
+    dates = pd.date_range(start="2026-01-01", periods=5, freq="min")
     test_df = pd.DataFrame({
-        'Open': [100, 101, 102],
-        'Close': [101, 102, 103],
-        'is_green': ['2', '2', '2'],
-        'is_red': [False, False, False]
+        'Open': [23729, 23729, 23729.92, 23729.35, 23729.90],
+        'Close': [23729, 23729, 23729.92, 23729.35, 23729.90],
+        'is_green': [False, False, True, False, True],
+        'is_red': [True, True, False, True, False]
     }, index=dates)
     
     e, x = get_signal(test_df)
