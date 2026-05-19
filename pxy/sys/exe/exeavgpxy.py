@@ -9,7 +9,7 @@ REBUY_ENABLED = True
 SIGNAL_CHECK_ENABLED = False # 🔄 Set to False to ignore dashboard signals completely
 MAX_LAYERS = 3
 COOL_DOWN_SECONDS = 100
-LOSS_THRESHOLD = -6 # Trigger if loss is -14% or worse 
+LOSS_THRESHOLD = -14 # Trigger if loss is -14% or worse 
 
 def generate_pxy_tag(): 
     IST = pytz.timezone("Asia/Kolkata") 
