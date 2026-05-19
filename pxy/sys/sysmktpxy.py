@@ -112,15 +112,14 @@ def get_signal(df):
         # --------------------------------------------------
         # TOP-PRIORITY ROUTING MATRIX
         # --------------------------------------------------
-        # Active setup flips evaluate first to guarantee immediate executions
         if v_buy:
             entry, exit_sig = "BUY", "BUY"
         elif inverted_v_sell:
             entry, exit_sig = "SELL", "SELL"
             
-        # Long term continuations execute only when pattern setup is quiet
+        # FIXED FALLBACK: Aligned tightly with pure price trend direction
         else:
-            entry = "BULL" if color0_green else "BEAR"
+            entry = "BULL" if c0 >= c1 else "BEAR"
             exit_sig = entry
 
         if DEBUG:
