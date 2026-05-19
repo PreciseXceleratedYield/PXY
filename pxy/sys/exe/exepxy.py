@@ -60,8 +60,8 @@ def run_script(script_path):
         print("━" * 42)
         return
     try:
-        # UPDATED: Sub-script timeout set to 7 seconds
-        subprocess.run(['python3', str(script_path)], check=True, timeout=7)
+        # ✅ SUCCESS: Sub-script execution safety threshold extended to 1 minute (60 seconds)
+        subprocess.run(['python3', str(script_path)], check=True, timeout=60)
     except subprocess.TimeoutExpired:
         print(f"⏱ TIMEOUT: script stuck -> {script_path} ⚠️")
     except subprocess.CalledProcessError:
@@ -149,4 +149,5 @@ while True:
             print("⏳ WAIT: market opens at 09:16 IST 📡", end="\r")
             time.sleep(60)
         print("\n🚀 MKT OPEN: resuming main loop now 📈")
+
 
