@@ -131,7 +131,7 @@ def _print_summary(total_unrealized, total_realized):
     real_str = run_str + book_str
     
     # 4. Clean print statement with corrected math length inside the nets
-    print(f"\n{run_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅 {color}{len(real_str) + len(run_str)}{Style.RESET_ALL} 🥅\n")
+    print(f"\n{run_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅 {color}{len(book_str) }{Style.RESET_ALL} 🥅\n")
 
 
 if __name__ == "__main__": 
