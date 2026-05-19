@@ -106,11 +106,18 @@ def process_lilo_orders(client):
                     }) 
                     b["qty"] -= mqty 
 
+            # ⚡ OPTIMIZATION: Fetch the price EXACTLY ONCE per token group before processing open rows
+            cached_live_val = None
+            has_open_qty = any(b["qty"] > 0 for b in buys)
+            
+            if has_open_qty:
+                print(f"[DEBUG] [Group: {symbol}] Detected open layers. Requesting market price once for token: {token_id}...")
+                cached_live_val = get_mid_price(client, token_id, ex_seg)
+                print(f"[DEBUG] [Group: {symbol}] get_mid_price network response cached: {cached_live_val}")
+
             for b in buys: 
                 if b["qty"] > 0: 
-                    print(f"[DEBUG] [Group: {symbol}] Found open position balance qty: {b['qty']}. Requesting market price for token: {token_id}...")
-                    live_val = get_mid_price(client, token_id, ex_seg) 
-                    print(f"[DEBUG] [Group: {symbol}] get_mid_price returned: {live_val}")
+                    print(f"[DEBUG] [Group: {symbol}] Processing open layer row balance qty: {b['qty']} using cached price.")
                     open_positions.append({ 
                         "Symbol": symbol, 
                         "Qty": b["qty"], 
@@ -119,10 +126,10 @@ def process_lilo_orders(client):
                         "Buy_Time": b["dt"], 
                         "Buy_Prc": b["prc"], 
                         "Exit_Time": "OPEN", 
-                        "Sell_Prc": live_val, 
-                        "PNL": int((live_val - b["prc"]) * b["qty"]) 
+                        "Sell_Prc": cached_live_val, 
+                        "PNL": int((cached_live_val - b["prc"]) * b["qty"]) 
                     }) 
-                    b["qty"] = 0  # ✅ FIXED: Zeroing balance breaks the tracking freeze instantly
+                    b["qty"] = 0 
 
         print(f"[DEBUG] [process_lilo_orders] Finished loops. Open items total: {len(open_positions)} | Closed items total: {len(closed_matches)}")
         open_df = pd.DataFrame(open_positions) 
