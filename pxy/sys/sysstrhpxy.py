@@ -1,138 +1,132 @@
 # ==================================================
-# sysstrhpxy.py (FINAL: STREAMLINED SIGNAL RETURN)
+# sysstrhpxy.py (STREAMLINED CORE PROXIMITY ENGINE)
 # ==================================================
 import pandas as pd
-from colorama import Fore, Style, init
-from sysdthapxy import get_ha_data
-from syskatrpxy import calculate_atr
-from syssadxpxy import calculate_adx
+import numpy as np
 
-init(autoreset=True)
-TOTAL_WIDTH = 42
-
-def get_candle_strength_line(df=None):
+def get_candle_strength_line(df):
     """
-    Evaluates market structure and filters via 1-Cancel-1-Demand criteria.
+    Evaluates pattern rules using clean upstream OC/2 signals.
+    Expects df columns: 'is_green' and 'is_red' pre-calculated by your upstream engine.
     Returns:
-        str: Only the final signal status ("BUY", "SELL", or "NEUTRAL")
+        str: "BUY", "SELL", or "NEUTRAL"
     """
-    # ------------------------------
-    # GET HA DATA (SINGLE CALL ONLY)
-    # ------------------------------
-    ha_close, ha_open, ha_color, df = get_ha_data(df=df)
-    
-    # ------------------------------
-    # SAFETY CHECK
-    # ------------------------------
-    if df is None or len(df) == 0:
+    # Safety Check: Guarantee a minimum baseline history profile size
+    if df is None or len(df) < 20:
         return "NEUTRAL"
         
-    # ------------------------------
-    # STATE MACHINE: STREAK & MISS TRACKING
-    # ------------------------------
-    target_count = 6
-    min_count = 4  # Threshold required before interruption recovery allows
+    # Isolate last row index mapping shorthand handles
+    last_idx = df.index[-1]
+    is_live_green = bool(df.at[last_idx, 'is_green'])
+    is_live_red   = bool(df.at[last_idx, 'is_red'])
+
+    # --------------------------------------------------
+    # PRIORITY 1: STRICT 7-BAR LOOKBACK (NO MISSES)
+    # --------------------------------------------------
+    # Evaluates past candles -2 down to -8 relative to your final row position
+    past_7_bars_red = df['is_red'].iloc[-8:-1].all()
+    past_7_bars_grn = df['is_green'].iloc[-8:-1].all()
     
-    red_total = 0
-    green_total = 0
-    red_misses = 0
-    green_misses = 0
+    strict_buy  = is_live_green and past_7_bars_red
+    strict_sell = is_live_red and past_7_bars_grn
     
-    bull_flip = False
-    bear_flip = False
+    # Priority Fast Path Exit Trigger
+    if strict_buy:
+        return "BUY"
+    if strict_sell:
+        return "SELL"
+
+    # --------------------------------------------------
+    # IMMEDIATE PAST 3 CONSECUTIVE VERIFICATION
+    # --------------------------------------------------
+    # Verifies that candles directly preceding your flip are completely clear
+    immediate_3_red = df['is_red'].iloc[-4:-1].all()
+    immediate_3_grn = df['is_green'].iloc[-4:-1].all()
+
+    # --------------------------------------------------
+    # PRIORITY 2: ROLLBACK SEARCH (1-CANCEL-1-DEMAND)
+    # --------------------------------------------------
+    target_count = 8
     
-    # Process historical bars chronologically
-    for i in range(len(ha_color)):
-        current_color = ha_color.iloc[i]
-        is_green = (current_color == "green")
-        is_red = (current_color == "red")
+    red_total, green_total = 0, 0
+    red_misses, green_misses = 0, 0
+    
+    # Pre-allocate clean target flag history trackers
+    rollback_buy_history  = np.zeros(len(df), dtype=bool)
+    rollback_sell_history = np.zeros(len(df), dtype=bool)
+
+    # Walk chronologically through historical vectors to calculate state conditions
+    for i in range(len(df)):
+        is_g = bool(df['is_green'].iloc[i])
+        is_r = bool(df['is_red'].iloc[i])
         
-        # Reset triggers inside loop to isolate the final candle step precisely
-        bull_flip = False
-        bear_flip = False
-        
-        # --- BULLISH (RED) STREAK TRACKING ---
-        if is_red:
+        # --- BULLISH RED STREAK PROCESSING ---
+        if is_r:
             if red_total == 0:
                 red_total = 1
                 red_misses = 0
-            elif red_misses == 1 and red_total >= min_count:
+            elif red_misses == 1:
                 red_total += 1
-                red_misses = 0
-            elif red_misses == 1 and red_total < min_count:
-                red_total = 1
                 red_misses = 0
             else:
                 red_total += 1
-        elif is_green:
-            if red_total > 0:
+        elif is_g:
+            if red_total >= 3:
                 if red_total >= target_count:
-                    bull_flip = True
-                    red_total = 0
-                    red_misses = 0
-                elif red_total >= min_count:
+                    rollback_buy_history[i] = True
+                    red_total, red_misses = 0, 0
+                else:
                     red_misses += 1
                     if red_misses > 1:
-                        red_total = 0
-                        red_misses = 0
-                else:
-                    red_total = 0
-                    red_misses = 0
+                        red_total, red_misses = 0, 0
+            else:
+                red_total, red_misses = 0, 0
+                
+        if is_g and red_total >= target_count:
+            rollback_buy_history[i] = True
+            red_total, red_misses = 0, 0
 
-        if is_green and red_total >= target_count:
-            bull_flip = True
-            red_total = 0
-            red_misses = 0
-
-        # --- BEARISH (GREEN) STREAK TRACKING ---
-        if is_green:
+        # --- BEARISH GREEN STREAK PROCESSING ---
+        if is_g:
             if green_total == 0:
                 green_total = 1
                 green_misses = 0
-            elif green_misses == 1 and green_total >= min_count:
+            elif green_misses == 1:
                 green_total += 1
-                green_misses = 0
-            elif green_misses == 1 and green_total < min_count:
-                green_total = 1
                 green_misses = 0
             else:
                 green_total += 1
-        elif is_red:
-            if green_total > 0:
+        elif is_r:
+            if green_total >= 3:
                 if green_total >= target_count:
-                    bear_flip = True
-                    green_total = 0
-                    green_misses = 0
-                elif green_total >= min_count:
+                    rollback_sell_history[i] = True
+                    green_total, green_misses = 0, 0
+                else:
                     green_misses += 1
                     if green_misses > 1:
-                        green_total = 0
-                        green_misses = 0
-                else:
-                    green_total = 0
-                    green_misses = 0
-                    
-        if is_red and green_total >= target_count:
-            bear_flip = True
-            green_total = 0
-            green_misses = 0
+                        green_total, green_misses = 0, 0
+            else:
+                green_total, green_misses = 0, 0
+                
+        if is_r and green_total >= target_count:
+            rollback_sell_history[i] = True
+            green_total, green_misses = 0, 0
 
-    # ------------------------------
-    # ASSIGN AND RETURN ONLY SIGNAL
-    # ------------------------------
-    if bull_flip:
-        final_signal = "BUY"
-    elif bear_flip:
-        final_signal = "SELL"
-    else:
-        final_signal = "NEUTRAL"
+    # --------------------------------------------------
+    # EVALUATE 14-CANDLE ROLLING WINDOW FLAGS
+    # --------------------------------------------------
+    rollback_buy_in_window  = any(rollback_buy_history[-14:])
+    rollback_sell_in_window = any(rollback_sell_history[-14:])
 
-    return final_signal
+    # Combined matching conditional paths
+    valid_rollback_buy  = is_live_green and immediate_3_red and rollback_buy_in_window
+    valid_rollback_sell = is_live_red and immediate_3_grn and rollback_sell_in_window
 
-# ==================================================
-# TEST
-# ==================================================
-if __name__ == "__main__":
-    signal = get_candle_strength_line()
-    print(f"Output Signal: {signal}")
+    if valid_rollback_buy:
+        return "BUY"
+    elif valid_rollback_sell:
+        return "SELL"
+    
+    return "NEUTRAL"
+
 
