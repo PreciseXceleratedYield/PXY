@@ -54,7 +54,7 @@ def target_price(row):
         state = "⏳"
         final_pct_score = BASE_SCORE
 
-        # DIVIDED SIGNALS: Clean split for safety
+        # DIVIDED SIGNALS: Clean keyword identification
         is_buy_signal = "BUY" in clean_signal
         is_sell_signal = "SELL" in clean_signal
         is_bull_signal = "BULL" in clean_signal
@@ -68,24 +68,20 @@ def target_price(row):
                 state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
             elif is_sell_signal or is_bear_signal:
                 state = "🚨"
-                # If it's strictly a hard SELL signal, force the 1.4 exit rule.
-                # Otherwise (if it's BEAR), use your original divided score.
                 if is_sell_signal:
-                    final_pct_score = 1.4 * hce_d
+                    final_pct_score = 1.4  # Applies exactly 1.4% profit target on hard SELL signal
                 else:
-                    final_pct_score = ce_calc / 2
+                    final_pct_score = ce_calc / 2  # Falls back to original trend division
                 
         elif is_pe:
             if is_sell_signal or is_bear_signal:
                 state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
             elif is_buy_signal or is_bull_signal:
                 state = "🚨"
-                # If it's strictly a hard BUY signal, force the 1.4 exit rule.
-                # Otherwise (if it's BULL), use your original divided score.
                 if is_buy_signal:
-                    final_pct_score = 1.4 * hpe_d
+                    final_pct_score = 1.4  # Applies exactly 1.4% profit target on hard BUY signal
                 else:
-                    final_pct_score = pe_calc / 2
+                    final_pct_score = pe_calc / 2  # Falls back to original trend division
 
         # 8. MAX CAP LOGIC
         if final_pct_score > 99.0:
