@@ -41,6 +41,8 @@ def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, ex
         (c1, f"C1-{c1:.2f}", "█", c1_color),
         (c0, f"C0-{c0:.2f}", "█", c0_color)
     ]
+    
+    # FIXED: Elements sort correctly by price value now
     rows.sort(key=lambda item: item[0], reverse=True)
 
     print(f"\n{YLW}=== GEOMETRIC ENGINE CONSOLE MONITOR ==={RST}")
@@ -111,19 +113,33 @@ def get_signal(df=None):
         # STREAK LOGIC & SUPERTREND OVERRIDE INTEGRATION
         # --------------------------------------------------
         # Fetch the standalone streak signal from your system module
-        streak_signal = get_candle_strength_line(df=df_calc)
+        raw_streak = get_candle_strength_line(df=df_calc)
+        
+        # Clean string to safely process alternative formats
+        streak_signal = str(raw_streak).replace("⚡", "").strip().upper()
 
-        if streak_signal == "⚡ BUY":
+        # PRIORITY 1: Only catch explicit trading actions
+        if streak_signal == "BUY":
             entry = "BUY"
             exit_sig = "BUY"
-        elif streak_signal == "⚡ SELL":
+        elif streak_signal == "SELL":
             entry = "SELL"
             exit_sig = "SELL"
+        
+        # PRIORITY 2: Drop into Fallback if NEUTRAL or anything else
         else:
-            # If no strict streak exists, override with standard Supertrend indicators
-            imported_signal = str(last_row['ST_Trend'])
-            entry = imported_signal
-            exit_sig = imported_signal
+            imported_signal = str(last_row['ST_Trend']).strip().upper()
+            
+            # Standardize common SuperTrend outputs into system states
+            if imported_signal in ["BUY", "BULL", "UP", "1", "1.0"]:
+                entry = "BUY"
+                exit_sig = "BUY"
+            elif imported_signal in ["SELL", "BEAR", "DOWN", "-1", "-1.0"]:
+                entry = "SELL"
+                exit_sig = "SELL"
+            else:
+                entry = imported_signal
+                exit_sig = imported_signal
 
         if DEBUG:
             _print_console_bar(st0, c2, c1, c0, o2, o1, o0, cross_up_black, cross_dn_black, entry, exit_sig)
