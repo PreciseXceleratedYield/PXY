@@ -75,7 +75,6 @@ def log_sync_state(timestamp, entry, exit_sig, price):
 def get_signal(df):
     """ 
     3-Bar Vector Engine evaluating V-Flips, Inverted V-Flips, and Continuations.
-    Falls back to SMA structural tracking if close arrays display mixed chop.
     """
     if df is None or len(df) < 5:
         return "NONE", "NONE"
@@ -105,20 +104,30 @@ def get_signal(df):
         # --------------------------------------------------
         last_idx = df.index[-1]
         
-        is_live_green = bool(df.at[last_idx, 'is_green'])
-        is_live_red   = bool(df.at[last_idx, 'is_red'])
-        
-        is_prev1_green = bool(df['is_green'].iloc[-2])
-        is_prev1_red   = bool(df['is_red'].iloc[-2])
-        
-        is_prev2_green = bool(df['is_green'].iloc[-3])
-        is_prev2_red   = bool(df['is_red'].iloc[-3])
-        
         c0, o0 = float(df.at[last_idx, 'Close']), float(df.at[last_idx, 'Open'])
         c1, o1 = float(df.iloc[-2]['Close']), float(df.iloc[-2]['Open'])
         c2, o2 = float(df.iloc[-3]['Close']), float(df.iloc[-3]['Open'])
         
         live_sma = float(df.at[last_idx, 'sma_trend'])
+
+        # --------------------------------------------------
+        # SELF-HEALING CORRECTION FOR UPSTREAM CLASHES
+        # --------------------------------------------------
+        # If upstream flags overlap (both true), calculate clean directional filters directly
+        if bool(df.at[last_idx, 'is_green']) and bool(df.at[last_idx, 'is_red']):
+            is_live_green  = c0 >= c1
+            is_live_red    = c0 < c1
+            is_prev1_green = c1 >= c2
+            is_prev1_red   = c1 < c2
+            is_prev2_green = c2 >= float(df.iloc[-4]['Close'])
+            is_prev2_red   = c2 < float(df.iloc[-4]['Close'])
+        else:
+            is_live_green  = bool(df.at[last_idx, 'is_green'])
+            is_live_red    = bool(df.at[last_idx, 'is_red'])
+            is_prev1_green = bool(df['is_green'].iloc[-2])
+            is_prev1_red   = bool(df['is_red'].iloc[-2])
+            is_prev2_green = bool(df['is_green'].iloc[-3])
+            is_prev2_red   = bool(df['is_red'].iloc[-3])
 
         # --------------------------------------------------
         # EXCLUSIVE MATRIX FILTER GATES
@@ -134,7 +143,7 @@ def get_signal(df):
         continuation_bear = is_prev2_red and is_prev1_red and is_live_red
 
         # --------------------------------------------------
-        # SIGNAL ROUTING LOGIC WITH MACRO FALLBACKS
+        # SIGNAL ROUTING LOGIC
         # --------------------------------------------------
         if v_buy:
             entry, exit_sig = "BUY", "BUY"
@@ -145,8 +154,6 @@ def get_signal(df):
         elif continuation_bear:
             entry, exit_sig = "BEAR", "BEAR"
         else:
-            # FIXED fallback: If candle color values are mixed but current price
-            # remains safely capped beneath our trend baseline, force BEAR/BULL 
             if c0 < live_sma:
                 entry, exit_sig = "BEAR", "BEAR"
             else:
@@ -162,16 +169,4 @@ def get_signal(df):
         if DEBUG:
             print(f"PXY Vector Engine Exception: {e}")
         return "NONE", "NONE"
-
-if __name__ == "__main__":
-    dates = pd.date_range(start="2026-01-01", periods=5, freq="min")
-    test_df = pd.DataFrame({
-        'Open': [23729, 23729, 23729.92, 23729.35, 23729.90],
-        'Close': [23729, 23729, 23729.92, 23729.35, 23729.90],
-        'is_green': [False, False, True, False, True],
-        'is_red': [True, True, False, True, False]
-    }, index=dates)
-    
-    e, x = get_signal(test_df)
-    print(f"\n=== Verification Output -> Entry: {e} | Exit: {x} ===")
 
