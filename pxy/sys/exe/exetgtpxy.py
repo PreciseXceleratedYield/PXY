@@ -60,8 +60,8 @@ def target_price(row):
         is_bull_signal = "BULL" in clean_signal
         is_bear_signal = "BEAR" in clean_signal
 
-        ce_calc = max(((((atr_val * ce_f * ce_p) + hce_d) / (hce_d)) + hce_d), 1.4 * hce_d)
-        pe_calc = max(((((atr_val * pe_f * pe_p) + hpe_d) / (hpe_d)) + hpe_d), 1.4 * hpe_d)
+        ce_calc = max(((((atr_val * 1 * 1) + hce_d) / (hce_d)) + hce_d), 1.4 * hce_d)
+        pe_calc = max(((((atr_val * 1 * 1) + hpe_d) / (hpe_d)) + hpe_d), 1.4 * hpe_d)
 
         if is_ce:
             if is_buy_signal or is_bull_signal:
