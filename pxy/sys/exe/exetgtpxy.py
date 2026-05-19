@@ -3,6 +3,7 @@ import re
 from colorama import Fore, Style, init
 import pytz
 
+# Initialize colorama for colored console logs
 init(autoreset=True)
 IST = pytz.timezone("Asia/Kolkata")
 
@@ -25,10 +26,27 @@ def i(x, d=0):
 def target_price(row):
     global PRINTED_SIDES
     try:
-        # 1. ENTRY DATA
+        # 1. ENTRY DATA & FRESHNESS CHECK
         entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
         if entry_prc <= 0:
             return 0
+
+        # Check if trade is fresh (within 2 minutes)
+        is_fresh = False
+        entry_time_raw = row.get("entry_time") # Expects string "YYYY-MM-DD HH:MM:SS" or datetime object
+        
+        if entry_time_raw:
+            if isinstance(entry_time_raw, str):
+                entry_time = datetime.strptime(entry_time_raw, "%Y-%m-%d %H:%M:%S")
+                entry_time = IST.localize(entry_time)
+            else:
+                entry_time = entry_time_raw
+                
+            current_time = datetime.now(IST)
+            time_diff = (current_time - entry_time).total_seconds() / 60.0
+            
+            if time_diff <= 2.0:
+                is_fresh = True
 
         # 2. BASE CALCULATION
         atr_val = f(row.get("atr"), 6.0)
@@ -45,57 +63,57 @@ def target_price(row):
         # 4. FIELD DEFINITIONS
         hce_d = f(row.get("hkin_ce_depth"), 1.0)
         hpe_d = f(row.get("hkin_pe_depth"), 1.0)
-        ce_p = f(row.get("ce_power"), 1.0)
-        pe_p = f(row.get("pe_power"), 1.0)
-        ce_f = f(row.get("ce_force"), 1.0)
-        pe_f = f(row.get("pe_force"), 1.0)
 
         # 5. FINAL PERCENTAGE SCORE CALCULATION
         state = "⏳"
-        final_pct_score = BASE_SCORE
+        
+        # Rule A: Fresh entry rule overrides everything for the first 2 minutes
+        if is_fresh:
+            state = "🆕"
+            final_pct_score = 3.0
+        else:
+            final_pct_score = BASE_SCORE
+            is_buy_signal = "BUY" in clean_signal
+            is_sell_signal = "SELL" in clean_signal
+            is_bull_signal = "BULL" in clean_signal
+            is_bear_signal = "BEAR" in clean_signal
 
-        # DIVIDED SIGNALS: Clean keyword identification
-        is_buy_signal = "BUY" in clean_signal
-        is_sell_signal = "SELL" in clean_signal
-        is_bull_signal = "BULL" in clean_signal
-        is_bear_signal = "BEAR" in clean_signal
+            ce_calc = 1.4 * hce_d
+            pe_calc = 1.4 * hpe_d 
 
-        ce_calc = 1.4 * hce_d
-        pe_calc = hpe_d * 1.4 
+            if is_ce:
+                # Trending alignment signals (Same direction)
+                if is_buy_signal or is_bull_signal:
+                    state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
+                # Counter / Opposite Exit Signals
+                elif is_sell_signal or is_bear_signal:
+                    state = "🚨"
+                    final_pct_score = 1.4  
+                    
+            elif is_pe:
+                # Trending alignment signals (Same direction)
+                if is_sell_signal or is_bear_signal:
+                    state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
+                # Counter / Opposite Exit Signals
+                elif is_buy_signal or is_bull_signal:
+                    state = "🚨"
+                    final_pct_score = 1.4  
 
-        if is_ce:
-            if is_buy_signal or is_bull_signal:
-                state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
-            elif is_sell_signal or is_bear_signal:
-                state = "🚨"
-                if is_sell_signal:
-                    final_pct_score = 1.4  # Applies exactly 1.4% profit target on hard SELL signal
-                else:
-                    final_pct_score = ce_calc / 2  # Falls back to original trend division
-                
-        elif is_pe:
-            if is_sell_signal or is_bear_signal:
-                state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
-            elif is_buy_signal or is_bull_signal:
-                state = "🚨"
-                if is_buy_signal:
-                    final_pct_score = 1.4  # Applies exactly 1.4% profit target on hard BUY signal
-                else:
-                    final_pct_score = pe_calc / 2  # Falls back to original trend division
+        # 6. MAX CAP LOGIC (Hard capped at 25%)
+        if final_pct_score > 25.0:
+            final_pct_score = 25.0
 
-        # 8. MAX CAP LOGIC
-        if final_pct_score > 99.0:
-            final_pct_score = 99.0
-
-        # 6. FINAL OUTPUT
+        # 7. FINAL TARGET CONVERSION
         add_value = entry_prc * (final_pct_score / 100.0)
         target = int(entry_prc + add_value)
 
-        # 7. SUPPRESSED DEBUG PRINT (Once per side)
+        # 8. SUPPRESSED DEBUG PRINT (Once per side per refresh cycle)
         if side not in PRINTED_SIDES and side != "NA":
             color = (
-                Fore.CYAN if state == "🔥" else (
-                    Fore.RED if state == "🚨" else (Fore.MAGENTA if is_counter else Fore.YELLOW)
+                Fore.GREEN if state == "🆕" else (
+                    Fore.CYAN if state == "🔥" else (
+                        Fore.RED if state == "🚨" else (Fore.MAGENTA if is_counter else Fore.YELLOW)
+                    )
                 )
             )
             print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state}")
