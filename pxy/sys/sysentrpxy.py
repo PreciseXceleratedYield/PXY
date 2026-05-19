@@ -29,17 +29,17 @@ def get_entry_signal(df=None):
             pass
 
     market_open = datetime.strptime("09:15", "%H:%M").time()
-    time_boundary = datetime.strptime("09:28", "%H:%M").time()
+    time_boundary = datetime.strptime("09:30", "%H:%M").time()
     final_signal = "NONE"
 
     # 3. IST TIME-BASED OPTIONS ROUTING ENGINE (ALL ATM EXECUTION CHANNELS)
     if market_open <= current_time_ist < time_boundary:
         if exit_l2 == "BUY":
-            final_signal = "⏰ BUY ⏳"
+            final_signal = "ATMBUY"
         elif exit_l2 == "SELL":
-            final_signal = "⏰ SELL ⏳"
+            final_signal = "ATMSELL"
         else:
-            final_signal = "⏰ NAN ⏳"
+            final_signal = "NONE"
     else:
         if entry_l4 == "BUY":
             final_signal = "ATMBUY"
