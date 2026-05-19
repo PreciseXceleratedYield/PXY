@@ -5,6 +5,9 @@ import json
 import os
 from datetime import datetime
 
+# 🔥 FIXED: Imported from your exact file module name
+from sysdthapxy import get_ha_data
+
 # Global Config
 DEBUG = True
 
@@ -74,62 +77,46 @@ def log_sync_state(timestamp, entry, exit_sig, price):
 
 def get_signal(df):
     """ 
-    3-Bar Vector Engine with absolute priority routing on pattern breakouts over trends.
+    3-Bar Vector Engine wrapped around imported functional core data streams.
     """
     if df is None or len(df) < 5:
         return "NONE", "NONE"
 
     try:
-        df = df.copy()
-
-        # --------------------------------------------------
-        # EXTRACT COORDINATES FOR LAST 3 CANDLES
-        # --------------------------------------------------
-        last_idx = df.index[-1]
+        # 1. RUN DATAFRAME THROUGH THE ENGINE TRUTH MATRIX
+        _, _, _, calculated_df = get_ha_data(df=df)
         
-        c0, o0 = float(df.at[last_idx, 'Close']), float(df.at[last_idx, 'Open'])
-        c1, o1 = float(df.iloc[-2]['Close']), float(df.iloc[-2]['Open'])
-        c2, o2 = float(df.iloc[-3]['Close']), float(df.iloc[-3]['Open'])
+        if calculated_df is None or "ha_signal" not in calculated_df.columns:
+            return "NONE", "NONE"
 
-        # Geometric Shapes (Close Prices)
-        geo_v_shape    = (c2 > c1) and (c0 > c1)      # Valley floor
-        geo_inverted_v = (c2 < c1) and (c0 < c1)      # Peak ceiling
+        # 2. EXTRACT TRUTH DATA FROM LAST INDEX
+        last_idx = calculated_df.index[-1]
+        raw_signal = str(calculated_df.at[last_idx, "ha_signal"]).upper()
+        
+        # 3. COORDINATE MAPPING FOR VISUALIZER BAR (STAYS STANDARD PRICE)
+        c0, o0 = float(calculated_df.at[last_idx, 'Close']), float(calculated_df.at[last_idx, 'Open'])
+        c1, o1 = float(calculated_df.iloc[-2]['Close']), float(calculated_df.iloc[-2]['Open'])
+        c2, o2 = float(calculated_df.iloc[-3]['Close']), float(calculated_df.iloc[-3]['Open'])
 
-        # Candle Color Orientations (Close vs Open)
-        color0_green = c0 > o0
-        color1_green = c1 > o1
-        color2_green = c2 > o2
-
-        color_v_sequence   = (color2_green and not color1_green and color0_green)         # Green -> Red -> Green
-        color_inv_sequence = (not color2_green and color1_green and not color0_green)     # Red -> Green -> Red
-
-        # --------------------------------------------------
-        # EITHER/OR SIGNAL GENERATION GATES
-        # --------------------------------------------------
-        v_buy           = geo_v_shape or color_v_sequence
-        inverted_v_sell = geo_inverted_v or color_inv_sequence
-
-        # --------------------------------------------------
-        # TOP-PRIORITY ROUTING MATRIX
-        # --------------------------------------------------
-        if v_buy:
-            entry, exit_sig = "BUY", "BUY"
-        elif inverted_v_sell:
-            entry, exit_sig = "SELL", "SELL"
-            
-        # FIXED FALLBACK: Aligned tightly with pure price trend direction
+        # 4. RESOLVE SIGNALS
+        if raw_signal in ["BUY", "SELL", "BULL", "BEAR"]:
+            entry = raw_signal
+            exit_sig = raw_signal
         else:
+            # Fallback tracking if engine registers a "none" string value
             entry = "BULL" if c0 >= c1 else "BEAR"
             exit_sig = entry
 
+        # 5. DIAGNOSTICS & STREAM LOGGING
         if DEBUG:
             _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig)
 
-        log_sync_state(df.index[-1], entry, exit_sig, c0)
+        log_sync_state(calculated_df.index[-1], entry, exit_sig, c0)
         return entry, exit_sig
 
     except Exception as e:
         if DEBUG:
             print(f"PXY High-Priority Vector Engine Exception: {e}")
         return "NONE", "NONE"
+
 
