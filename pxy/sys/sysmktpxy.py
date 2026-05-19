@@ -5,18 +5,19 @@ import json
 import os
 from datetime import datetime
 from sysdtafpxy import fetch_yf_data
-from sysstrndpxy import calculate_supertrend  # <-- Import from Tier 1 Core
+from sysstrndpxy import calculate_supertrend # <-- Import from Tier 1 Core
+from sysstrhpxy import get_candle_strength_line # <-- Import your 6-bar streak module
 
 # Global Config
 DEBUG = True
 
 def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, exit_sig):
     """ Renders the graphical sorted ASCII price matrix layout inside the console terminal. """
-    RST = "\033[0m"       
-    RED = "\033[91m"      
-    GRN = "\033[92m"      
-    YLW = "\033[1;93m"    
-    GRAY = "\033[90m"     
+    RST = "\033[0m"
+    RED = "\033[91m"
+    GRN = "\033[92m"
+    YLW = "\033[1;93m"
+    GRAY = "\033[90m"
 
     min_val = min(c2, c1, c0, st) - 2
     max_val = max(c2, c1, c0, st) + 2
@@ -49,7 +50,6 @@ def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, ex
     print(f"UP:{YLW}{str(cross_up)}{RST} | DDN:{YLW}{str(cross_dn)}{RST} | Trnd:{trend_color}{trend_str}{RST}")
     print(f" ENTRY: {YLW}{entry}{RST} | EXIT: {YLW}{exit_sig}{RST}")
 
-
 def log_sync_state(timestamp, entry, exit_sig, price, st):
     """ Logs the synchronized system state variables into a local rolling JSON buffer. """
     try:
@@ -81,7 +81,6 @@ def log_sync_state(timestamp, entry, exit_sig, price, st):
         if DEBUG:
             print(f"Logger Engine Exception Encountered: {e}")
 
-
 def get_signal(df=None):
     """ Processes positional vectors, extracts upstream states, and tracks metrics. """
     if df is None:
@@ -91,12 +90,12 @@ def get_signal(df=None):
 
     try:
         df_calc = calculate_supertrend(df)
-
         df_calc['c1'] = df_calc['Close'].shift(1)
         df_calc['c2'] = df_calc['Close'].shift(2)
         df_calc['o1'] = df_calc['Open'].shift(1)
         df_calc['o2'] = df_calc['Open'].shift(2)
         df_calc['st1'] = df_calc['ST'].shift(1)
+
         df_calc['crossAboveBlack'] = (df_calc['c1'] <= df_calc['st1']) & (df_calc['Close'] > df_calc['ST'])
         df_calc['crossBelowBlack'] = (df_calc['c1'] >= df_calc['st1']) & (df_calc['Close'] < df_calc['ST'])
 
@@ -108,14 +107,27 @@ def get_signal(df=None):
         cross_up_black = bool(last_row['crossAboveBlack'])
         cross_dn_black = bool(last_row['crossBelowBlack'])
 
-        # Capture signal from upstream import without mutation or modification
-        imported_signal = str(last_row['ST_Trend'])
-        entry = imported_signal
-        exit_sig = imported_signal
+        # --------------------------------------------------
+        # STREAK LOGIC & SUPERTREND OVERRIDE INTEGRATION
+        # --------------------------------------------------
+        # Fetch the standalone streak signal from your system module
+        streak_signal = get_candle_strength_line(df=df_calc)
+
+        if streak_signal == "⚡ BUY":
+            entry = "BUY"
+            exit_sig = "BUY"
+        elif streak_signal == "⚡ SELL":
+            entry = "SELL"
+            exit_sig = "SELL"
+        else:
+            # If no strict streak exists, override with standard Supertrend indicators
+            imported_signal = str(last_row['ST_Trend'])
+            entry = imported_signal
+            exit_sig = imported_signal
 
         if DEBUG:
             _print_console_bar(st0, c2, c1, c0, o2, o1, o0, cross_up_black, cross_dn_black, entry, exit_sig)
-        
+
         log_sync_state(df_calc.index[-1], entry, exit_sig, c0, st0)
         return entry, exit_sig
 
@@ -123,7 +135,6 @@ def get_signal(df=None):
         if DEBUG:
             print(f"PXY Master Core Error: {e}")
         return "NONE", "NONE"
-
 
 if __name__ == "__main__":
     e, x = get_signal()
