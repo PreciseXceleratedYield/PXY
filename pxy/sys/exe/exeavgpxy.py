@@ -1,3 +1,4 @@
+# exeavgpxy.py 
 import os 
 import time 
 import pytz 
@@ -6,10 +7,9 @@ from colorama import Fore, Style
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-SIGNAL_CHECK_ENABLED = False # 🔄 Set to False to ignore dashboard signals completely
 MAX_LAYERS = 3
 COOL_DOWN_SECONDS = 100
-LOSS_THRESHOLD = -14 # Trigger if loss is -14% or worse 
+LOSS_THRESHOLD = -14 # Trigger if loss is -10% or worse 
 
 def generate_pxy_tag(): 
     IST = pytz.timezone("Asia/Kolkata") 
@@ -35,7 +35,7 @@ def is_cooling(side):
         return False 
 
 def handle_side_averaging(client, df): 
-    """Averages based on position loss. Dashboard signal check is optional via switch.""" 
+    """Averages ONLY if Loss Threshold is hit AND Signal matches.""" 
     if df is None or df.empty: 
         return 
         
@@ -44,10 +44,8 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
-    # 1. Extract current Signal if switch is turned ON
-    current_signal = ""
-    if SIGNAL_CHECK_ENABLED:
-        current_signal = str(df.iloc[0].get("entry", "")).upper().strip() 
+    # 1. Identify current Signal (Synced from your Market Dashboard) 
+    current_signal = str(df.iloc[0].get("entry", "")).upper().strip() 
 
     # 2. Add side helper column 
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
@@ -67,21 +65,18 @@ def handle_side_averaging(client, df):
         current_loss = get_loss(last_order) 
 
         # ======================================================== 
-        # 🛡️ THE CONDITION LOCK (CONTROLLED BY THE SWITCH)
+        # 🛡️ THE "DOUBLE LOCK" CONDITION (UPDATED FOR FALLBACKS)
         # ======================================================== 
-        # 1. Pure % Loss Check (Always active)
+        # 1. Must be in LOSS 
         loss_hit = (current_loss <= LOSS_THRESHOLD) 
 
-        # 2. Signal Check (Defaults to True if switch is disabled)
-        if SIGNAL_CHECK_ENABLED:
-            signal_matches = (
-                (side == 'CE' and current_signal in ["ATMBUY", "OTMBUY"]) or
-                (side == 'PE' and current_signal in ["ATMSELL", "OTMSELL"])
-            )
-        else:
-            signal_matches = True # Bypasses the filter completely
+        # 2. SIGNAL must match the side (ATM + OTM support)
+        signal_matches = (
+            (side == 'CE' and current_signal in ["ATMBUY", "OTMBUY"]) or
+            (side == 'PE' and current_signal in ["ATMSELL", "OTMSELL"])
+        )
 
-        # Only proceed if conditions clear
+        # Only proceed if BOTH are true 
         if loss_hit and signal_matches: 
             # Check Layer count and Cooling file 
             if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
@@ -89,8 +84,7 @@ def handle_side_averaging(client, df):
                 qty = abs(int(last_order['qty'])) 
                 new_tag = generate_pxy_tag() 
                 
-                log_msg = f"Signal: {current_signal}" if SIGNAL_CHECK_ENABLED else "Pure % Threshold Trigger"
-                print(f"{Fore.YELLOW}📉 AVG TRIGGERED: {side} | Loss: {current_loss:.2f}% | {log_msg}") 
+                print(f"{Fore.YELLOW}📉 AVG TRIGGERED: {side} | Loss: {current_loss:.2f}% | Signal: {current_signal}") 
                 try: 
                     params = { 
                         "exchange_segment": "nse_fo", 
@@ -110,5 +104,3 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Averaged {symbol} | TAG: {new_tag}") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
-
-
