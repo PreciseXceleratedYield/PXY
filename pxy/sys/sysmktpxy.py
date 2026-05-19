@@ -36,10 +36,10 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
     ]
     rows.sort(key=lambda item: item, reverse=True)
 
-    print(f"\n{YLW}=== GEOMETRIC V-ENGINE MONITOR ==={RST}")
+    print(f"\n{YLW}=== GEOMETRIC HIGH-PRIORITY ENTRY ENGINE ==={RST}")
     for val, label, marker, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
-    print(f"{YLW}==================================={RST}")
+    print(f"{YLW}============================================{RST}")
     print(f" ENTRY SIGNAL: {YLW}{entry}{RST} | EXIT SIGNAL: {YLW}{exit_sig}{RST}")
 
 def log_sync_state(timestamp, entry, exit_sig, price):
@@ -74,90 +74,54 @@ def log_sync_state(timestamp, entry, exit_sig, price):
 
 def get_signal(df):
     """ 
-    3-Bar Vector Engine evaluating V-Flips, Inverted V-Flips, and Continuations.
+    3-Bar Vector Engine with absolute priority routing on pattern breakouts over trends.
     """
     if df is None or len(df) < 5:
         return "NONE", "NONE"
 
     try:
         df = df.copy()
-        
-        # --------------------------------------------------
-        # CRASH PROTECTION: DYNAMIC UPSTREAM COLUMN MAPPING
-        # --------------------------------------------------
-        if 'is_green' not in df.columns:
-            green_col = [c for c in df.columns if 'green' in str(c).lower()]
-            df['is_green'] = df[green_col] if green_col else df['Close'] > df['Open']
-
-        if 'is_red' not in df.columns:
-            red_col = [c for c in df.columns if 'red' in str(c).lower()]
-            df['is_red'] = df[red_col] if red_col else df['Close'] < df['Open']
-
-        df['is_green'] = df['is_green'].astype(str).str.lower().str.strip().isin(['true', '1', '1.0', '2', '2.0', 'green', 'yes'])
-        df['is_red']   = df['is_red'].astype(str).str.lower().str.strip().isin(['true', '1', '1.0', 'red', 'yes'])
-
-        # Calculate a baseline rolling 5-period trend helper to resolve close price chop
-        df['sma_trend'] = df['Close'].rolling(window=5, min_periods=1).mean()
 
         # --------------------------------------------------
-        # EXTRACT CANDLES: LIVE (0), PREVIOUS (1), PREV-2 (2)
+        # EXTRACT COORDINATES FOR LAST 3 CANDLES
         # --------------------------------------------------
         last_idx = df.index[-1]
         
         c0, o0 = float(df.at[last_idx, 'Close']), float(df.at[last_idx, 'Open'])
         c1, o1 = float(df.iloc[-2]['Close']), float(df.iloc[-2]['Open'])
         c2, o2 = float(df.iloc[-3]['Close']), float(df.iloc[-3]['Open'])
-        
-        live_sma = float(df.at[last_idx, 'sma_trend'])
+
+        # Geometric Shapes (Close Prices)
+        geo_v_shape    = (c2 > c1) and (c0 > c1)      # Valley floor
+        geo_inverted_v = (c2 < c1) and (c0 < c1)      # Peak ceiling
+
+        # Candle Color Orientations (Close vs Open)
+        color0_green = c0 > o0
+        color1_green = c1 > o1
+        color2_green = c2 > o2
+
+        color_v_sequence   = (color2_green and not color1_green and color0_green)         # Green -> Red -> Green
+        color_inv_sequence = (not color2_green and color1_green and not color0_green)     # Red -> Green -> Red
 
         # --------------------------------------------------
-        # SELF-HEALING CORRECTION FOR UPSTREAM CLASHES
+        # EITHER/OR SIGNAL GENERATION GATES
         # --------------------------------------------------
-        # If upstream flags overlap (both true), calculate clean directional filters directly
-        if bool(df.at[last_idx, 'is_green']) and bool(df.at[last_idx, 'is_red']):
-            is_live_green  = c0 >= c1
-            is_live_red    = c0 < c1
-            is_prev1_green = c1 >= c2
-            is_prev1_red   = c1 < c2
-            is_prev2_green = c2 >= float(df.iloc[-4]['Close'])
-            is_prev2_red   = c2 < float(df.iloc[-4]['Close'])
-        else:
-            is_live_green  = bool(df.at[last_idx, 'is_green'])
-            is_live_red    = bool(df.at[last_idx, 'is_red'])
-            is_prev1_green = bool(df['is_green'].iloc[-2])
-            is_prev1_red   = bool(df['is_red'].iloc[-2])
-            is_prev2_green = bool(df['is_green'].iloc[-3])
-            is_prev2_red   = bool(df['is_red'].iloc[-3])
+        v_buy           = geo_v_shape or color_v_sequence
+        inverted_v_sell = geo_inverted_v or color_inv_sequence
 
         # --------------------------------------------------
-        # EXCLUSIVE MATRIX FILTER GATES
+        # TOP-PRIORITY ROUTING MATRIX
         # --------------------------------------------------
-        # V-Pattern: Green -> Red -> Green
-        v_buy = is_prev2_green and is_prev1_red and is_live_green
-        
-        # Inverted V-Pattern: Red -> Green -> Red
-        inverted_v_sell = is_prev2_red and is_prev1_green and is_live_red
-        
-        # Continuation Trends (All 3 match in a row)
-        continuation_bull = is_prev2_green and is_prev1_green and is_live_green
-        continuation_bear = is_prev2_red and is_prev1_red and is_live_red
-
-        # --------------------------------------------------
-        # SIGNAL ROUTING LOGIC
-        # --------------------------------------------------
+        # Active setup flips evaluate first to guarantee immediate executions
         if v_buy:
             entry, exit_sig = "BUY", "BUY"
         elif inverted_v_sell:
             entry, exit_sig = "SELL", "SELL"
-        elif continuation_bull:
-            entry, exit_sig = "BULL", "BULL"
-        elif continuation_bear:
-            entry, exit_sig = "BEAR", "BEAR"
+            
+        # Long term continuations execute only when pattern setup is quiet
         else:
-            if c0 < live_sma:
-                entry, exit_sig = "BEAR", "BEAR"
-            else:
-                entry, exit_sig = "BULL", "BULL"
+            entry = "BULL" if color0_green else "BEAR"
+            exit_sig = entry
 
         if DEBUG:
             _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig)
@@ -167,6 +131,6 @@ def get_signal(df):
 
     except Exception as e:
         if DEBUG:
-            print(f"PXY Vector Engine Exception: {e}")
+            print(f"PXY High-Priority Vector Engine Exception: {e}")
         return "NONE", "NONE"
 
