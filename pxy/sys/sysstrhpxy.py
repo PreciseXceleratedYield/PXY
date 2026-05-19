@@ -121,9 +121,9 @@ def get_candle_strength_line(df=None):
     # ASSIGN AND RETURN ONLY SIGNAL
     # ------------------------------
     if bull_flip:
-        final_signal = "⚡ BUY"
+        final_signal = "BUY"
     elif bear_flip:
-        final_signal = "⚡ SELL"
+        final_signal = "SELL"
     else:
         final_signal = "Neutral"
 
