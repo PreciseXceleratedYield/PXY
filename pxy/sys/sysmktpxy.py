@@ -4,14 +4,11 @@ import pandas as pd
 import json
 import os
 from datetime import datetime
-from sysdtafpxy import fetch_yf_data
-from sysstrndpxy import calculate_supertrend # <-- Import from Tier 1 Core
-from sysstrhpxy import get_candle_strength_line # <-- Import your streak module
 
 # Global Config
 DEBUG = True
 
-def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, exit_sig):
+def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
     """ Renders the graphical sorted ASCII price matrix layout inside the console terminal. """
     RST = "\033[0m"
     RED = "\033[91m"
@@ -19,8 +16,8 @@ def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, ex
     YLW = "\033[1;93m"
     GRAY = "\033[90m"
 
-    min_val = min(c2, c1, c0, st) - 2
-    max_val = max(c2, c1, c0, st) + 2
+    min_val = min(c2, c1, c0) - 2
+    max_val = max(c2, c1, c0) + 2
     scale_width = 20
 
     def get_clean_bar(val, marker="█"):
@@ -28,30 +25,24 @@ def _print_console_bar(st, c2, c1, c0, o2, o1, o0, cross_up, cross_dn, entry, ex
         pos = max(1, pos)
         return (marker * pos).ljust(scale_width)
 
-    trend_str = "BULL" if c0 >= st else "BEAR"
-    trend_color = GRN if c0 >= st else RED
-
     c2_color = GRN if c2 >= o2 else RED
     c1_color = GRN if c1 >= o1 else RED
     c0_color = GRN if c0 >= o0 else RED
 
     rows = [
-        (st, f"ST-{st:.2f}", "-", RED),
         (c2, f"C2-{c2:.2f}", "█", c2_color),
         (c1, f"C1-{c1:.2f}", "█", c1_color),
         (c0, f"C0-{c0:.2f}", "█", c0_color)
     ]
-    
-    rows.sort(key=lambda item: item, reverse=True)
+    rows.sort(key=lambda item: item[0], reverse=True)
 
-    print(f"\n{YLW}=== GEOMETRIC ENGINE CONSOLE MONITOR ==={RST}")
+    print(f"\n{YLW}=== GEOMETRIC V-ENGINE MONITOR ==={RST}")
     for val, label, marker, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
-    print(f"{YLW}========================================{RST}")
-    print(f"UP:{YLW}{str(cross_up)}{RST} | DDN:{YLW}{str(cross_dn)}{RST} | Trnd:{trend_color}{trend_str}{RST}")
-    print(f" ENTRY: {YLW}{entry}{RST} | EXIT: {YLW}{exit_sig}{RST}")
+    print(f"{YLW}==================================={RST}")
+    print(f" ENTRY SIGNAL: {YLW}{entry}{RST} | EXIT SIGNAL: {YLW}{exit_sig}{RST}")
 
-def log_sync_state(timestamp, entry, exit_sig, price, st):
+def log_sync_state(timestamp, entry, exit_sig, price):
     """ Logs the synchronized system state variables into a local rolling JSON buffer. """
     try:
         dir_path = os.path.expanduser("~/pxy")
@@ -61,7 +52,6 @@ def log_sync_state(timestamp, entry, exit_sig, price, st):
         log_entry = {
             "Timestamp": str(timestamp),
             "Price": float(price),
-            "ST_Line": round(float(st), 2),
             "Signal_Entry": str(entry),
             "Signal_Exit": str(exit_sig),
             "Logged_At": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -82,79 +72,102 @@ def log_sync_state(timestamp, entry, exit_sig, price, st):
         if DEBUG:
             print(f"Logger Engine Exception Encountered: {e}")
 
-def get_signal(df=None):
-    """ Processes positional vectors, extracts upstream states, and tracks metrics. """
-    if df is None:
-        df = fetch_yf_data()
-    if df is None or df.empty:
+def get_signal(df):
+    """ 
+    3-Bar Vector Engine evaluating V-Flips, Inverted V-Flips, and Continuations.
+    """
+    if df is None or len(df) < 3:
         return "NONE", "NONE"
 
     try:
-        df_calc = calculate_supertrend(df)
-        df_calc['c1'] = df_calc['Close'].shift(1)
-        df_calc['c2'] = df_calc['Close'].shift(2)
-        df_calc['o1'] = df_calc['Open'].shift(1)
-        df_calc['o2'] = df_calc['Open'].shift(2)
-        df_calc['st1'] = df_calc['ST'].shift(1)
+        df = df.copy()
+        
+        # --------------------------------------------------
+        # CRASH PROTECTION: DYNAMIC UPSTREAM COLUMN MAPPING
+        # --------------------------------------------------
+        if 'is_green' not in df.columns:
+            green_col = [c for c in df.columns if 'green' in str(c).lower()]
+            df['is_green'] = df[green_col[0]] if green_col else df['Close'] > df['Open']
 
-        df_calc['crossAboveBlack'] = (df_calc['c1'] <= df_calc['st1']) & (df_calc['Close'] > df_calc['ST'])
-        df_calc['crossBelowBlack'] = (df_calc['c1'] >= df_calc['st1']) & (df_calc['Close'] < df_calc['ST'])
+        if 'is_red' not in df.columns:
+            red_col = [c for c in df.columns if 'red' in str(c).lower()]
+            df['is_red'] = df[red_col[0]] if red_col else df['Close'] < df['Open']
 
-        last_row = df_calc.iloc[-1].copy()
-        c0, st0 = float(last_row['Close']), float(last_row['ST'])
-        o0 = float(last_row['Open'])
-        c1, c2 = float(last_row['c1']), float(last_row['c2'])
-        o1, o2 = float(last_row['o1']), float(last_row['o2'])
-        cross_up_black = bool(last_row['crossAboveBlack'])
-        cross_dn_black = bool(last_row['crossBelowBlack'])
+        df['is_green'] = df['is_green'].astype(str).str.lower().isin(['true', '1', '1.0', 'green', 'yes'])
+        df['is_red']   = df['is_red'].astype(str).str.lower().isin(['true', '1', '1.0', 'red', 'yes'])
 
         # --------------------------------------------------
-        # STREAK LOGIC & SUPERTREND OVERRIDE INTEGRATION
+        # EXTRACT CANDLES: LIVE (0), PREVIOUS (1), PREV-2 (2)
         # --------------------------------------------------
-        # Fetch the standalone streak signal from your system module
-        raw_streak = get_candle_strength_line(df=df_calc)
+        last_idx = df.index[-1]
         
-        # Clean string to safely process alternative formats
-        streak_signal = str(raw_streak).replace("⚡", "").strip().upper()
+        # Candle 0 (Current Live Bar)
+        is_live_green = bool(df.at[last_idx, 'is_green'])
+        is_live_red   = bool(df.at[last_idx, 'is_red'])
+        
+        # Candle -1 (Previous Bar)
+        is_prev1_green = bool(df['is_green'].iloc[-2])
+        is_prev1_red   = bool(df['is_red'].iloc[-2])
+        
+        # Candle -2 (Two Bars Ago)
+        is_prev2_green = bool(df['is_green'].iloc[-3])
+        is_prev2_red   = bool(df['is_red'].iloc[-3])
+        
+        # Console visual layout variables
+        c0, o0 = float(df.at[last_idx, 'Close']), float(df.at[last_idx, 'Open'])
+        c1, o1 = float(df.iloc[-2]['Close']), float(df.iloc[-2]['Open'])
+        c2, o2 = float(df.iloc[-3]['Close']), float(df.iloc[-3]['Open'])
 
-        # PRIORITY 1: Continuous or immediate explicit trading actions take top priority
-        if streak_signal == "BUY":
-            entry = "BUY"
-            exit_sig = "BUY"
-        elif streak_signal == "SELL":
-            entry = "SELL"
-            exit_sig = "SELL"
+        # --------------------------------------------------
+        # EXCLUSIVE MATRIX FILTER GATES
+        # --------------------------------------------------
+        # V-Pattern: Green -> Red -> Green
+        v_buy = is_prev2_green and is_prev1_red and is_live_green
         
-        # PRIORITY 2: If NEUTRAL, fall back and let the continuous SuperTrend determine state
+        # Inverted V-Pattern: Red -> Green -> Red
+        inverted_v_sell = is_prev2_red and is_prev1_green and is_live_red
+        
+        # Continuation Trends (All 3 match in a row)
+        continuation_bull = is_prev2_green and is_prev1_green and is_live_green
+        continuation_bear = is_prev2_red and is_prev1_red and is_live_red
+
+        # --------------------------------------------------
+        # SIGNAL ROUTING LOGIC
+        # --------------------------------------------------
+        if v_buy:
+            entry, exit_sig = "BUY", "BUY"
+        elif inverted_v_sell:
+            entry, exit_sig = "SELL", "SELL"
+        elif continuation_bull:
+            entry, exit_sig = "BULL", "BULL"
+        elif continuation_bear:
+            entry, exit_sig = "BEAR", "BEAR"
         else:
-            # Re-verify trend by matching explicit data columns or the pricing layout fallback
-            imported_signal = str(last_row.get('ST_Trend', '')).strip().upper()
-            
-            if imported_signal in ["BUY", "BULL", "UP", "1", "1.0"] or (c0 >= st0):
-                entry = "BUY"
-                exit_sig = "BUY"
-            elif imported_signal in ["SELL", "BEAR", "DOWN", "-1", "-1.0"] or (c0 < st0):
-                entry = "SELL"
-                exit_sig = "SELL"
-            else:
-                entry = "NONE"
-                exit_sig = "NONE"
+            entry, exit_sig = "NONE", "NONE"
 
         if DEBUG:
-            _print_console_bar(st0, c2, c1, c0, o2, o1, o0, cross_up_black, cross_dn_black, entry, exit_sig)
+            _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig)
 
-        log_sync_state(df_calc.index[-1], entry, exit_sig, c0, st0)
+        log_sync_state(df.index[-1], entry, exit_sig, c0)
         return entry, exit_sig
 
     except Exception as e:
         if DEBUG:
-            print(f"PXY Master Core Error: {e}")
+            print(f"PXY Vector Engine Exception: {e}")
         return "NONE", "NONE"
 
 if __name__ == "__main__":
-    e, x = get_signal()
-    print(f"\n=== [TIER 2] Synchronized Outputs -> Entry: {e} | Exit: {x} ===")
-
+    # Unit test module simulating a pure V-Pattern flip entry
+    dates = pd.date_range(start="2026-01-01", periods=3, freq="min")
+    test_df = pd.DataFrame({
+        'Open': [100, 102, 101],
+        'Close': [102, 101, 103],
+        'is_green': [True, False, True], # Green -> Red -> Green (V Pattern)
+        'is_red': [False, True, False]
+    }, index=dates)
+    
+    e, x = get_signal(test_df)
+    print(f"\n=== Verification Output -> Entry: {e} | Exit: {x} ===")
 
 
 
