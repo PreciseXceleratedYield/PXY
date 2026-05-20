@@ -54,7 +54,7 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, si
     print(border + "\n")
 
 def handle_side_averaging(client, df): 
-    """Averages ONLY if dynamic ATR % Loss Threshold is hit AND Signal matches.""" 
+    """Averages only if EVERY active position on that side has crossed the ATR threshold.""" 
     if df is None or df.empty: 
         return 
         
@@ -86,38 +86,54 @@ def handle_side_averaging(client, df):
         if side_df.empty: 
             continue 
 
-        # Get the latest entry layer for this specific side 
-        last_order = side_df.iloc[-1] 
-        current_loss = get_loss(last_order) 
-
         # ======================================================== 
-        # 📊 EXTRACT RAW ATR % AND SET THE CEILING
+        # 🔄 SIMPLE ALL-OR-NOTHING CONDITION ENGINE
         # ======================================================== 
-        raw_atr_pct = float(last_order.get("atr", 0))
+        all_positions_crossed_threshold = True
         
-        if raw_atr_pct > 0:
-            dynamic_loss_threshold = -(raw_atr_pct * ATR_MULTIPLIER)
-        else:
-            dynamic_loss_threshold = -14.0  # System fallback if ATR track is missing
+        # Scan every single open contract on this specific side
+        for index, row in side_df.iterrows():
+            pos_loss = get_loss(row)
+            
+            # Extract dynamic ATR ceiling for this specific contract row
+            raw_atr_pct = float(row.get("atr", 0))
+            if raw_atr_pct > 0:
+                row_threshold = -(raw_atr_pct * ATR_MULTIPLIER)
+            else:
+                row_threshold = -14.0
+            
+            # If even ONE position has NOT crossed the threshold yet, flip the flag to False
+            if pos_loss > row_threshold:
+                all_positions_crossed_threshold = False
+                break  # Stop checking this side immediately, it's not ready to average
 
         # ======================================================== 
-        # 🛡️ THE "DOUBLE LOCK" CONDITION (UPDATED FOR DYNAMIC ATR)
+        # 🛡️ THE "DOUBLE LOCK" TRIGGER VALUATION
         # ======================================================== 
-        loss_hit = (current_loss <= dynamic_loss_threshold) 
+        # 1. Lock 1 passes only if EVERY position on this side is crossed deep into loss
+        loss_hit = all_positions_crossed_threshold
+
+        # 2. Lock 2 verifies trend direction matching
         signal_matches = (
             (side == 'CE' and current_signal in ["ATMBUY", "OTMBUY"]) or
             (side == 'PE' and current_signal in ["ATMSELL", "OTMSELL"])
         )
 
-        # Only proceed and display dashboard if BOTH locks pass, cooling clears, and layer limit allows
+        # Only execute if both locks are green, cooling clears, and total side rows are within limits
         if loss_hit and signal_matches: 
             if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
+                # Pick the latest contract entry of this side to deploy the average order on
+                last_order = side_df.iloc[-1]
                 symbol = last_order['symbol'] 
                 qty = abs(int(last_order['qty'])) 
                 new_tag = generate_pxy_tag() 
                 
-                # Render the execution dashboard instantly prior to placing order
-                print_pxy_trigger_dashboard(side, symbol, current_loss, dynamic_loss_threshold, current_signal, new_tag)
+                # Fetch final metrics for terminal report visualization
+                final_loss = get_loss(last_order)
+                raw_atr_pct = float(last_order.get("atr", 0))
+                final_threshold = -(raw_atr_pct * ATR_MULTIPLIER) if raw_atr_pct > 0 else -14.0
+                
+                print_pxy_trigger_dashboard(side, symbol, final_loss, final_threshold, current_signal, new_tag)
                 
                 try: 
                     params = { 
@@ -135,6 +151,7 @@ def handle_side_averaging(client, df):
                     res = client.place_order(**params) 
                     if res: 
                         set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: Order confirmation complete.") 
+                        print(f"{Fore.GREEN}✅ SUCCESS: Order confirmation complete for side {side}.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+
