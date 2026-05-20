@@ -71,7 +71,7 @@ def get_entry_signal(df=None):
     if is_live_action:
         print(f"🔥 LIVE ENTRY ACTION TRIPPED: {final_signal} | TREND STATE: {st_trend} 🔥")
     elif final_signal in ["BUY", "SELL", "BULL", "BEAR"]:
-        print(f"ℹ️ INFO ONLY (State/Fallback): {final_signal} | TREND STATE: {st_trend}")
+        print(f"ℹ️ INFO ONLY : {final_signal} | TREND STATE: {st_trend}")
 
     return final_signal, exit_signal
 
