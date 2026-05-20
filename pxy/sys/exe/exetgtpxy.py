@@ -78,8 +78,8 @@ def target_price(row):
             is_bull_signal = "BULL" in clean_signal
             is_bear_signal = "BEAR" in clean_signal
 
-            ce_calc = 2 * hce_d
-            pe_calc = 2 * hpe_d 
+            ce_calc = 1.4 * hce_d
+            pe_calc = 1.4 * hpe_d 
 
             if is_ce:
                 # Trending alignment signals (Same direction)
@@ -88,7 +88,7 @@ def target_price(row):
                 # Counter / Opposite Exit Signals
                 elif is_sell_signal or is_bear_signal:
                     state = "🚨"
-                    final_pct_score = 1.4  
+                    final_pct_score = 2  
                     
             elif is_pe:
                 # Trending alignment signals (Same direction)
@@ -97,7 +97,7 @@ def target_price(row):
                 # Counter / Opposite Exit Signals
                 elif is_buy_signal or is_bull_signal:
                     state = "🚨"
-                    final_pct_score = 1.4  
+                    final_pct_score = 2
 
         # 6. MAX CAP LOGIC (Hard capped at 25%)
         if final_pct_score > 25.0:
