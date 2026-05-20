@@ -45,7 +45,7 @@ def handle_side_averaging(client, df):
         return 
 
     # 1. Identify current Signal (Synced from your Market Dashboard) 
-    current_signal = str(df.iloc[0].get("entry", "")).upper().strip() 
+    current_signal = str(df.iloc[0].get("exit", "")).upper().strip() 
 
     # 2. Add side helper column 
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
