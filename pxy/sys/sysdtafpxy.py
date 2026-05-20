@@ -1,3 +1,4 @@
+# sysstrndpxy.py
 import os
 import warnings
 from datetime import datetime, time
@@ -83,6 +84,31 @@ def get_momentum_ohlc(c):
         c1[1:] = c[:-1]
     return c1, c, c1, c
 
+def get_3sma_oc2_ohlc(df):
+    """Generates 3 min OC/2 Pine chart calculation candles (Mode 6)"""
+    # Calculate 3-period SMA for Open and Close prices
+    sma_o = df['Open'].rolling(window=3, min_periods=1).mean().to_numpy()
+    sma_c = df['Close'].rolling(window=3, min_periods=1).mean().to_numpy()
+    
+    n = len(df)
+    ha_o = np.zeros(n)
+    ha_c = np.zeros(n)
+    
+    # Replicate the var float running accumulator logic from Pine Script
+    for i in range(n):
+        current_ha_c = (sma_o[i] + sma_c[i]) / 2.0
+        ha_c[i] = current_ha_c
+        
+        if i == 0:
+            ha_o[i] = current_ha_c
+        else:
+            ha_o[i] = (ha_o[i-1] + ha_c[i-1]) / 2.0
+            
+    # Define boundaries strictly using the OC Midpoint data (no wicks)
+    ha_h = np.maximum(ha_o, ha_c)
+    ha_l = np.minimum(ha_o, ha_c)
+    return ha_o, ha_h, ha_l, ha_c
+
 def apply_ohlc_transformation(df, mode=1):
     """Transforms raw arrays into distinct, complete structural OHLC formats"""
     if df.empty: return df
@@ -106,6 +132,8 @@ def apply_ohlc_transformation(df, mode=1):
         df['High'] = (h + ha_h + oc2_h + c1c0_h) / 4
         df['Low'] = (l + ha_l + oc2_l + c1c0_l) / 4
         df['Close'] = (c + ha_c + oc2_c + c1c0_c) / 4
+    elif mode == 6:
+        df['Open'], df['High'], df['Low'], df['Close'] = get_3sma_oc2_ohlc(df)
     else:
         print(f"SYSTEM_WARNING | Mode {mode} unrecognized. Defaulting to Raw OHLC.")
     return df
@@ -171,3 +199,4 @@ if __name__ == "__main__":
     output_df = fetch_yf_data()
     if not output_df.empty:
         print(f"ENGINE_RUN_SUCCESS | Total Data Frame Sizing Bounds: {output_df.shape}")
+
