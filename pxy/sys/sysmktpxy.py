@@ -42,7 +42,7 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
     print(f"\n{YLW}=== GEOMETRIC HIGH-PRIORITY ENTRY ENGINE ==={RST}")
     for val, label, marker, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
-    print(f"{YLW}============================================{RST}")
+    print(f"{YLW}=========================================={RST}")
     print(f" ENTRY SIGNAL: {YLW}{entry}{RST} | EXIT SIGNAL: {YLW}{exit_sig}{RST}")
 
 def log_sync_state(timestamp, entry, exit_sig, price):
