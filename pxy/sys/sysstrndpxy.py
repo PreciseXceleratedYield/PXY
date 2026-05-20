@@ -43,16 +43,14 @@ def calculate_tsma_42(series: pd.Series) -> np.ndarray:
     return tsma_output 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
-    """ PXY® Engine: Multi-Layer Cross and Flip State Matrix. """ 
+    """ Reconfigured Engine: Very simple 42 SMA state mapping alone. """ 
     if MA_TYPE.upper() == "SMA": 
         base_ma_line = calculate_sma_42(df['Close']) 
     else: 
         base_ma_line = calculate_tsma_42(df['Close']) 
         
-    df['ST'] = (base_ma_line + df['Close'].to_numpy()) / 2.0 
-    df['c1'] = df['Close'].shift(1) 
-    df['c2'] = df['Close'].shift(2) 
-    df['st_prev'] = df['ST'].shift(1) 
+    # Strictly use the base 42 Moving Average line alone as our boundary
+    df['ST'] = base_ma_line 
     
     tail_size = min(50, len(df)) 
     df = df.tail(tail_size).copy() 
@@ -60,31 +58,18 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     
     st_trend = [] 
     for i in range(len(df)): 
-        if i == 0: 
-            st_trend.append("SIDE") 
-            continue 
         c0 = df['Close'].iloc[i] 
-        c1 = df['c1'].iloc[i] 
-        c2 = df['c2'].iloc[i] 
         st_curr = df['ST'].iloc[i] 
-        st_prev = df['st_prev'].iloc[i] 
         
-        if pd.isna(st_curr) or pd.isna(st_prev) or pd.isna(c1): 
+        if pd.isna(st_curr): 
             st_trend.append("SIDE") 
             continue 
             
-        cross_above = (c0 > st_curr) and (c1 <= st_prev) 
-        cross_below = (c0 < st_curr) and (c1 >= st_prev) 
-        
-        color_flip_green = (c0 > c1) and not (not pd.isna(c2) and c1 > c2) 
-        color_flip_red = (c0 < c1) and not (not pd.isna(c2) and c1 < c2) 
-        
-        if cross_above or (color_flip_green and c0 > st_curr): 
-            new_trend = "BUY" 
-        elif cross_below or (color_flip_red and c0 < st_curr): 
-            new_trend = "SELL" 
+        # Clean structural mapping: Simple 42 Moving Average boundary comparison
+        if c0 >= st_curr: 
+            new_trend = "BULL" 
         else: 
-            new_trend = "BULL" if (c0 > st_curr) else "BEAR" 
+            new_trend = "BEAR" 
             
         st_trend.append(new_trend) 
         
@@ -95,6 +80,7 @@ if __name__ == "__main__":
     print(f"=== [TIER 1] {MA_TYPE} 42 Engine Local Math Test ===") 
     df_st = calculate_supertrend(fetch_yf_data())
     print(f"TERMINAL STATE STRUCTURAL METRIC: {df_st['ST_Trend'].iloc[-1]}")
+
 
 
 
