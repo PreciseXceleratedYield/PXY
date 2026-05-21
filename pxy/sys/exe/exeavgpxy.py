@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 0
+MAX_LAYERS = 1
 COOL_DOWN_SECONDS = 100
 ATR_MULTIPLIER = 1.0  
 
