@@ -73,7 +73,7 @@ def dynamic_entry(row):
             else:
                 # MODIFIED FALLBACK: No standard depth penalty allowed. Defaults strictly to pure time decay.
                 depth = 1.0
-                phase_tag = "STANDARD TIME DECAY (1.0x)"
+                phase_tag = "(1.0x)"
 
             # Protect against negative depth adjustments or zero values safely
             if depth <= 0:
