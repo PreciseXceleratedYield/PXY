@@ -68,46 +68,44 @@ def target_price(row):
         hpe_d = f(row.get("hkin_pe_depth"), 1.0)
         ce_p = f(row.get("ce_power"), 1.0)
         pe_p = f(row.get("pe_power"), 1.0)
-        ce_f = f(row.get("ce_force"), 1.0)  # Kept in case your math needs it later
-        pe_f = f(row.get("pe_force"), 1.0)  # Kept in case your math needs it later
+        ce_f = f(row.get("ce_force"), 1.0)  
+        pe_f = f(row.get("pe_force"), 1.0)  
 
-        # 5. FINAL PERCENTAGE SCORE CALCULATION
+        # 5. FINAL PERCENTAGE SCORE CALCULATION (✅ FIXED: Counter-Trend takes priority over Freshness)
         state = "⏳"
         
-        if is_fresh:
+        if is_counter:
+            final_pct_score = 44.0
+        elif is_fresh:
             state = "🆕"
             final_pct_score = 3.0
         else:
             final_pct_score = BASE_SCORE
-            
+
             # Fast membership lookups
             is_bullish_signal = clean_signal in ("BUY", "BULL")
             is_bearish_signal = clean_signal in ("SELL", "BEAR")
 
             # Applied your updated scaling math multipliers
-            if is_counter:
-                final_pct_score = 44.0
-            else:
-                ce_calc = (1.4 * hce_d) ** min(ce_p, 2)
-                pe_calc = (1.4 * hpe_d) ** min(pe_p, 2)
-                if is_ce:
-                    if is_bullish_signal:
-                        state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
-                    elif is_bearish_signal:
-                        state = "🚨"
-                        final_pct_score = 1.4 
-                        
-                elif is_pe:
-                    if is_bearish_signal:
-                        state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
-                    elif is_bullish_signal:
-                        state = "🚨"
-                        final_pct_score = 1.4 
-
+            ce_calc = (1.4 * hce_d) ** min(ce_p, 2)
+            pe_calc = (1.4 * hpe_d) ** min(pe_p, 2)
+            if is_ce:
+                if is_bullish_signal:
+                    state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
+                elif is_bearish_signal:
+                    state = "🚨"
+                    final_pct_score = 1.4 
+                    
+            elif is_pe:
+                if is_bearish_signal:
+                    state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
+                elif is_bullish_signal:
+                    state = "🚨"
+                    final_pct_score = 1.4 
 
         # 6. MAX CAP LOGIC (Hard capped at 25%)
-        if final_pct_score > 55.0:
-            final_pct_score = 55.0
+        if final_pct_score > 99.0:
+            final_pct_score = 99.0
 
         # 7. FINAL TARGET CONVERSION
         add_value = entry_prc * (final_pct_score / 100.0)
@@ -129,6 +127,7 @@ def target_price(row):
 
     except Exception:
         return 0
+
 # =====================================================================
 # 🚀 AUTOMATED RISK MATRIX UNIT TESTING SUITE
 # =====================================================================
