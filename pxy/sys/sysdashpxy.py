@@ -6,7 +6,7 @@ init(autoreset=True)
 
 # ---- Imports ----
 from sysdtafpxy import fetch_yf_data
-from sysdthapxy import get_ha_data
+from sysdthapxy import get_pxy_data
 from syshkinpxy import detect_ha_flip_signal
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
