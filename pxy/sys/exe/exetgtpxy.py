@@ -79,7 +79,7 @@ def target_price(row):
             is_bear_signal = "BEAR" in clean_signal
 
             ce_calc = 1.4 * hce_d
-            pe_calc = 1.7 * hpe_d 
+            pe_calc = 1.6 * hpe_d 
 
             if is_ce:
                 # Trending alignment signals (Same direction)
