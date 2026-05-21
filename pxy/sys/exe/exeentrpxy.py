@@ -12,7 +12,7 @@ from colorama import Fore, init, Style
 # --- GLOBAL CONFIG ---
 DEBUG = False 
 COUNTERBUY = "NO" 
-COOL_DOWN_SECONDS = 100 
+COOL_DOWN_SECONDS = 10
 
 init(autoreset=True)
 
