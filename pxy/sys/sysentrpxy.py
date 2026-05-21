@@ -69,7 +69,7 @@ def get_entry_signal(df=None):
 
     # 6. SEPARATED ACTION VS. INFORMATIONAL LOGGER
     if is_live_action:
-        print(f"🔥 LIVE ENTRY ACTION TRIPPED: {final_signal} | TREND STATE: {st_trend} 🔥")
+        print(f"🔥 ACTION : {final_signal} | TREND STATE: {st_trend} 🔥")
     elif final_signal in ["BUY", "SELL", "BULL", "BEAR"]:
         print(f"ℹ️ INFO ONLY : {final_signal} | TREND STATE: {st_trend}")
 
