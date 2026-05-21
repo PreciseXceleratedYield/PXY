@@ -85,22 +85,21 @@ def target_price(row):
             is_bearish_signal = clean_signal in ("SELL", "BEAR")
 
             # Applied your updated scaling math multipliers
-            ce_calc = 1.4 * hce_d * ce_p
-            pe_calc = 1.6 * hpe_d * pe_p
-
+            ce_calc = (1.4 * hce_d) ** min(ce_p, 2)
+            pe_calc = (1.4 * hpe_d) ** min(pe_p, 2)
             if is_ce:
                 if is_bullish_signal:
                     state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
                 elif is_bearish_signal:
                     state = "🚨"
-                    final_pct_score = 2.0  
+                    final_pct_score = 1.4 ** min(ce_p, 2)
                     
             elif is_pe:
                 if is_bearish_signal:
                     state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
                 elif is_bullish_signal:
                     state = "🚨"
-                    final_pct_score = 2.0
+                    final_pct_score = 1.4 ** min(pe_p, 2)
 
         # 6. MAX CAP LOGIC (Hard capped at 25%)
         if final_pct_score > 25.0:
