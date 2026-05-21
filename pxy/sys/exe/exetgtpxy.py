@@ -92,14 +92,14 @@ def target_price(row):
                     state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
                 elif is_bearish_signal:
                     state = "🚨"
-                    final_pct_score = 1.4 ** min(ce_p, 2)
+                    final_pct_score = 1.4 
                     
             elif is_pe:
                 if is_bearish_signal:
                     state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
                 elif is_bullish_signal:
                     state = "🚨"
-                    final_pct_score = 1.4 ** min(pe_p, 2)
+                    final_pct_score = 1.4 
 
         # 6. MAX CAP LOGIC (Hard capped at 25%)
         if final_pct_score > 25.0:
