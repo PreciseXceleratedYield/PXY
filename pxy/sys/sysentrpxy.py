@@ -40,13 +40,13 @@ def get_entry_signal(df=None):
     # Priority 3: Ongoing Trend State Filters (Strict Explicit Inverse Rules)
     elif st_trend == "BULL":
         if entry_signal == "SELL":
-            final_signal = "NONE"  # SELL DOES NOT pass through
+            final_signal = "OTMSELL"  # FIXED: Counter-trend short changed from NONE to OTMSELL
         else:
             final_signal = entry_signal  # Every other signal passes as is (BUY -> BUY, NONE -> NONE)
             
     elif st_trend == "BEAR":
         if entry_signal == "BUY":
-            final_signal = "NONE"  # BUY DOES NOT pass through
+            final_signal = "OTMBUY"   # FIXED: Counter-trend long changed from NONE to OTMBUY
         else:
             final_signal = entry_signal  # Every other signal passes as is (SELL -> SELL, NONE -> NONE)
             
@@ -54,15 +54,15 @@ def get_entry_signal(df=None):
         # Fallback safety block for early data rows ("SIDE")
         final_signal = "NONE"
 
-    # 4. FORCE ALL CONFIRMED ENTRY ACTION CHANNELS TO ATM STRIKE SIGNALS
-    # Pure status values (BULL/BEAR/NONE) bypass the ATM strike formatting
+    # 4. FORCE ALL CONFIRMED ENTRY ACTION CHANNELS TO STRIKE SIGNALS
+    # Kept ATM completely as is. Standardized filtered triggers.
     if final_signal == "BUY":
         final_signal = "ATMBUY"
     elif final_signal == "SELL":
         final_signal = "ATMSELL"
 
     # 5. ABSOLUTE END CATCH-ALL: Informational Fallback
-    is_live_action = final_signal in ["ATMBUY", "ATMSELL"]
+    is_live_action = final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]
     
     if final_signal == "NONE":
         final_signal = exit_signal
