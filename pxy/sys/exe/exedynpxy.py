@@ -9,7 +9,7 @@ IST = pytz.timezone("Asia/Kolkata")
 # ==================================================
 # 🔧 REVISED CONFIG: COMPRESSION DETECTOR TIME DECAY
 # ==================================================
-BASE_DECAY_RATE = 0.001
+BASE_DECAY_RATE = 0.0005
 PNL_THRESHOLD = 0.0
 GRACE_WINDOW_SECS = 1800  # 30 minutes grace window in seconds
 
