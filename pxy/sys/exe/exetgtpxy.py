@@ -85,25 +85,29 @@ def target_price(row):
             is_bearish_signal = clean_signal in ("SELL", "BEAR")
 
             # Applied your updated scaling math multipliers
-            ce_calc = (1.4 * hce_d) ** min(ce_p, 2)
-            pe_calc = (1.4 * hpe_d) ** min(pe_p, 2)
-            if is_ce:
-                if is_bullish_signal:
-                    state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
-                elif is_bearish_signal:
-                    state = "🚨"
-                    final_pct_score = 1.4 
-                    
-            elif is_pe:
-                if is_bearish_signal:
-                    state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
-                elif is_bullish_signal:
-                    state = "🚨"
-                    final_pct_score = 1.4 
+            if is_counter:
+                final_pct_score = 44.0
+            else:
+                ce_calc = (1.4 * hce_d) ** min(ce_p, 2)
+                pe_calc = (1.4 * hpe_d) ** min(pe_p, 2)
+                if is_ce:
+                    if is_bullish_signal:
+                        state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
+                    elif is_bearish_signal:
+                        state = "🚨"
+                        final_pct_score = 1.4 
+                        
+                elif is_pe:
+                    if is_bearish_signal:
+                        state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
+                    elif is_bullish_signal:
+                        state = "🚨"
+                        final_pct_score = 1.4 
+
 
         # 6. MAX CAP LOGIC (Hard capped at 25%)
-        if final_pct_score > 25.0:
-            final_pct_score = 25.0
+        if final_pct_score > 55.0:
+            final_pct_score = 55.0
 
         # 7. FINAL TARGET CONVERSION
         add_value = entry_prc * (final_pct_score / 100.0)
@@ -125,4 +129,54 @@ def target_price(row):
 
     except Exception:
         return 0
+# =====================================================================
+# 🚀 AUTOMATED RISK MATRIX UNIT TESTING SUITE
+# =====================================================================
+if __name__ == "__main__":
+    print(f"\n{Fore.YELLOW}==================================================")
+    print(f"{Fore.YELLOW}   PXY® RISK MATRIX COMPILER - LIVE UNIT TESTS     ")
+    print(f"{Fore.YELLOW}==================================================\n")
+    
+    # Base configuration template simulating an active option premium price
+    base_mock_row = {
+        "buy_prc": 200,
+        "atr": 4.0,
+        "hkin_ce_depth": 2.0,
+        "hkin_pe_depth": 1.0,
+        "ce_power": 1.0,
+        "pe_power": 1.0,
+        "counter": "N"
+    }
 
+    # ------------------ TEST 1: FRESH TRADE OVERRIDE ------------------
+    print(f"{Fore.WHITE}[TEST 1] Testing New Execution (< 2 mins old)...")
+    PRINTED_SIDES.clear()
+    test_row_1 = base_mock_row.copy()
+    test_row_1["symbol"] = "NIFTY_CE_STRIKE"
+    test_row_1["entry_time"] = datetime.now(IST).strftime("%Y-%m-%d %H:%M:%S")
+    t1_res = target_price(test_row_1)
+    print(f"Resulting target price: {t1_res} (Expected 206 due to a flat 3% target score)\n")
+
+    # ------------------ TEST 2: STANDARD BULLISH SIGNAL ------------------
+    print(f"{Fore.WHITE}[TEST 2] Testing Standard Trend Follower (Call Option + BULL Matrix)...")
+    PRINTED_SIDES.clear()
+    test_row_2 = base_mock_row.copy()
+    test_row_2["symbol"] = "NIFTY_CE_STRIKE"
+    test_row_2["exit"] = "BULL"
+    test_row_2["entry_time"] = (datetime.now(IST) - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
+    t2_res = target_price(test_row_2)
+    print(f"Resulting target price: {t2_res}\n")
+
+    # ------------------ TEST 3: COUNTER-TREND SCORING ------------------
+    print(f"{Fore.WHITE}[TEST 3] Testing Counter-Trend Rule Override (is_counter = Y)...")
+    PRINTED_SIDES.clear()
+    test_row_3 = base_mock_row.copy()
+    test_row_3["symbol"] = "NIFTY_PE_STRIKE"
+    test_row_3["counter"] = "Y"
+    test_row_3["entry_time"] = (datetime.now(IST) - timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
+    t3_res = target_price(test_row_3)
+    print(f"Resulting target price: {t3_res} (Expected 288 due to a strict 44% target multiplier score)\n")
+
+    print(f"{Fore.GREEN}==================================================")
+    print(f"{Fore.GREEN}   ALL COMPILER UNIT TEST ITERATIONS COMPLETE     ")
+    print(f"{Fore.GREEN}==================================================")
