@@ -1,5 +1,4 @@
 from datetime import datetime
-import re
 from colorama import Fore, Style, init
 import pytz
 
@@ -40,7 +39,11 @@ def target_price(row):
                 entry_time = datetime.strptime(entry_time_raw, "%Y-%m-%d %H:%M:%S")
                 entry_time = IST.localize(entry_time)
             else:
-                entry_time = entry_time_raw
+                # FIX: Ensure existing datetime objects are accurately localized or converted to IST
+                if entry_time_raw.tzinfo is None:
+                    entry_time = IST.localize(entry_time_raw)
+                else:
+                    entry_time = entry_time_raw.astimezone(IST)
                 
             current_time = datetime.now(IST)
             time_diff = (current_time - entry_time).total_seconds() / 60.0
@@ -60,44 +63,44 @@ def target_price(row):
         clean_signal = active_signal.strip()
         is_counter = str(row.get("counter", "N")).upper() == "Y"
 
-        # 4. FIELD DEFINITIONS
+        # 4. FIELD DEFINITIONS (Removed duplicate extractions)
         hce_d = f(row.get("hkin_ce_depth"), 1.0)
         hpe_d = f(row.get("hkin_pe_depth"), 1.0)
+        ce_p = f(row.get("ce_power"), 1.0)
+        pe_p = f(row.get("pe_power"), 1.0)
+        ce_f = f(row.get("ce_force"), 1.0)  # Kept in case your math needs it later
+        pe_f = f(row.get("pe_force"), 1.0)  # Kept in case your math needs it later
 
         # 5. FINAL PERCENTAGE SCORE CALCULATION
         state = "⏳"
         
-        # Rule A: Fresh entry rule overrides everything for the first 2 minutes
         if is_fresh:
             state = "🆕"
             final_pct_score = 3.0
         else:
             final_pct_score = BASE_SCORE
-            is_buy_signal = "BUY" in clean_signal
-            is_sell_signal = "SELL" in clean_signal
-            is_bull_signal = "BULL" in clean_signal
-            is_bear_signal = "BEAR" in clean_signal
+            
+            # Fast membership lookups
+            is_bullish_signal = clean_signal in ("BUY", "BULL")
+            is_bearish_signal = clean_signal in ("SELL", "BEAR")
 
-            ce_calc = 1.4 * hce_d
-            pe_calc = 1.6 * hpe_d 
+            # Applied your updated scaling math multipliers
+            ce_calc = 1.4 * hce_d * ce_p
+            pe_calc = 1.6 * hpe_d * pe_p
 
             if is_ce:
-                # Trending alignment signals (Same direction)
-                if is_buy_signal or is_bull_signal:
+                if is_bullish_signal:
                     state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
-                # Counter / Opposite Exit Signals
-                elif is_sell_signal or is_bear_signal:
+                elif is_bearish_signal:
                     state = "🚨"
-                    final_pct_score = 2  
+                    final_pct_score = 2.0  
                     
             elif is_pe:
-                # Trending alignment signals (Same direction)
-                if is_sell_signal or is_bear_signal:
+                if is_bearish_signal:
                     state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
-                # Counter / Opposite Exit Signals
-                elif is_buy_signal or is_bull_signal:
+                elif is_bullish_signal:
                     state = "🚨"
-                    final_pct_score = 2
+                    final_pct_score = 2.0
 
         # 6. MAX CAP LOGIC (Hard capped at 25%)
         if final_pct_score > 25.0:
@@ -123,3 +126,4 @@ def target_price(row):
 
     except Exception:
         return 0
+
