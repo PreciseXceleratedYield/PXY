@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 from colorama import Fore, Style, init
 import pytz
 
@@ -55,18 +56,13 @@ def target_price(row):
         symbol = str(row.get("symbol", "UNKNOWN")).upper()
         side = "CE" if "CE" in symbol else "PE" if "PE" in symbol else "NA"
         is_ce, is_pe = (side == "CE"), (side == "PE")
-        
-        # Clean clean match mapping for strict signal words
-        clean_signal = str(row.get("exit", "NONE")).strip().upper()
+        active_signal = str(row.get("exit", "NONE")).upper()
+        clean_signal = active_signal.strip()
         is_counter = str(row.get("counter", "N")).upper() == "Y"
 
         # 4. FIELD DEFINITIONS
         hce_d = f(row.get("hkin_ce_depth"), 1.0)
         hpe_d = f(row.get("hkin_pe_depth"), 1.0)
-        ce_p = f(row.get("ce_power"), 1.0)
-        pe_p = f(row.get("pe_power"), 1.0)
-        ce_f = f(row.get("ce_force"), 1.0)
-        pe_f = f(row.get("pe_force"), 1.0)
 
         # 5. FINAL PERCENTAGE SCORE CALCULATION
         state = "⏳"
@@ -77,33 +73,35 @@ def target_price(row):
             final_pct_score = 3.0
         else:
             final_pct_score = BASE_SCORE
-            
-            # Direct word matching flags
-            is_bullish_signal = clean_signal in ("BUY", "BULL")
-            is_bearish_signal = clean_signal in ("SELL", "BEAR")
-            is_none_signal = (clean_signal == "NONE")
+            is_buy_signal = "BUY" in clean_signal
+            is_sell_signal = "SELL" in clean_signal
+            is_bull_signal = "BULL" in clean_signal
+            is_bear_signal = "BEAR" in clean_signal
+
+            ce_calc = 1.7 * hce_d
+            pe_calc = 1.7 * hpe_d 
 
             if is_ce:
-                # NONE is favored: triggers aggressive calculations alongside BUY and BULL
-                if is_bullish_signal or is_none_signal:
-                    calc = (((atr_val * ce_f * ce_p) + hce_d) / hce_d) + hce_d
-                    state, final_pct_score = "🔥", max(BASE_SCORE, calc)
-                elif is_bearish_signal:
-                    final_pct_score = 1.4
-                    state = "❄️"
+                # Trending alignment signals (Same direction)
+                if is_buy_signal or is_bull_signal:
+                    state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
+                # Counter / Opposite Exit Signals
+                elif is_sell_signal or is_bear_signal:
+                    state = "🚨"
+                    final_pct_score = 2  
                     
             elif is_pe:
-                # NONE is favored: triggers aggressive calculations alongside SELL and BEAR
-                if is_bearish_signal or is_none_signal:
-                    calc = (((atr_val * pe_f * pe_p) + hpe_d) / hpe_d) + hpe_d
-                    state, final_pct_score = "🔥", max(BASE_SCORE, calc)
-                elif is_bullish_signal:
-                    final_pct_score = 1.4
-                    state = "❄️"
+                # Trending alignment signals (Same direction)
+                if is_sell_signal or is_bear_signal:
+                    state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
+                # Counter / Opposite Exit Signals
+                elif is_buy_signal or is_bull_signal:
+                    state = "🚨"
+                    final_pct_score = 2
 
-        # 6. MAX CAP LOGIC
-        if final_pct_score > 99.0:
-            final_pct_score = 99.0
+        # 6. MAX CAP LOGIC (Hard capped at 25%)
+        if final_pct_score > 25.0:
+            final_pct_score = 25.0
 
         # 7. FINAL TARGET CONVERSION
         add_value = entry_prc * (final_pct_score / 100.0)
@@ -114,7 +112,7 @@ def target_price(row):
             color = (
                 Fore.GREEN if state == "🆕" else (
                     Fore.CYAN if state == "🔥" else (
-                        Fore.BLUE if state == "❄️" else (Fore.MAGENTA if is_counter else Fore.YELLOW)
+                        Fore.RED if state == "🚨" else (Fore.MAGENTA if is_counter else Fore.YELLOW)
                     )
                 )
             )
@@ -125,4 +123,3 @@ def target_price(row):
 
     except Exception:
         return 0
-
