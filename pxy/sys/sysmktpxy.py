@@ -6,7 +6,7 @@ import os
 from datetime import datetime
 
 # 🔥 FIXED: Imported from your exact file module name
-from sysdthapxy import get_pxy_data
+from pxy_engine import get_pxy_data
 
 # Global Config
 DEBUG = True
@@ -37,13 +37,12 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
         (c1, f"C1-{c1:.2f}", "█", c1_color),
         (c0, f"C0-{c0:.2f}", "█", c0_color)
     ]
-    rows.sort(key=lambda item: item, reverse=True)
+    rows.sort(key=lambda item: item[0], reverse=True)
 
     print(f"\n{YLW}= GEOMETRIC HIGH-PRIORITY ENTRY ENGINE ={RST}")
     for val, label, marker, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
-    #print(f" ENTRY SIGNAL: {YLW}{entry}{RST} | EXIT SIGNAL: {YLW}{exit_sig}{RST}")
 
 def log_sync_state(timestamp, entry, exit_sig, price):
     """ Logs the synchronized system state variables into a local rolling JSON buffer. """
@@ -83,15 +82,16 @@ def get_signal(df):
         return "NONE", "NONE"
 
     try:
-        # 1. RUN DATAFRAME THROUGH THE ENGINE TRUTH MATRIX
-        _, _, _, calculated_df = get_ha_data(df=df)
+        # 1. RUN DATAFRAME THROUGH THE ENGINE TRUTH MATRIX (✅ FIXED)
+        _, _, _, calculated_df = get_pxy_data(df=df)
         
-        if calculated_df is None or "ha_signal" not in calculated_df.columns:
+        # 🛡️ FIXED: Column validations updated to read 'pxy_signal' instead of 'ha_signal'
+        if calculated_df is None or "pxy_signal" not in calculated_df.columns:
             return "NONE", "NONE"
 
         # 2. EXTRACT TRUTH DATA FROM LAST INDEX
         last_idx = calculated_df.index[-1]
-        raw_signal = str(calculated_df.at[last_idx, "ha_signal"]).upper()
+        raw_signal = str(calculated_df.at[last_idx, "pxy_signal"]).upper()  # ✅ FIXED
         
         # 3. COORDINATE MAPPING FOR VISUALIZER BAR (STAYS STANDARD PRICE)
         c0, o0 = float(calculated_df.at[last_idx, 'Close']), float(calculated_df.at[last_idx, 'Open'])
