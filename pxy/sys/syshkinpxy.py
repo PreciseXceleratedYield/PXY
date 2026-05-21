@@ -1,53 +1,36 @@
-# syshkinpxy.py
+# syspxyflip.py
 import pandas as pd
-from colorama import Fore, Style, init
+from colorama import init
+from pxy_engine import get_pxy_data
 
 init(autoreset=True)
 
-def get_p_series(df):
-    """Calculates the P (Master Price) for the entire dataframe."""
-    c = df['Close']
-    o = df['Open']
-    h = df['High']
-    l = df['Low']
-    c1 = df['Close'].shift(1)
+def detect_pxy_flip_signal(df=None, last_n=21):
+    """Detects signal depth boundaries using the true outputs processed by Script 1."""
+    output = get_pxy_data(df=df)
     
-    e1 = c
-    e2 = (c1 + c) / 2
-    e3 = (c + o) / 2
-    e4 = (o + h + l + c) / 4
-    
-    p_series = (e1 + e2 + e3 + e4) / 4
-    return p_series.round(4)
+    if output is None or output[3].empty:
+        return "NA", 1, 1, 1
+        
+    # Read the frozen matrix series out of Script 1
+    _, _, pxy_color_series, final_df = output
 
-def detect_ha_flip_signal(df=None, last_n=21):
-    """
-    Detects depth using Master Price (P) logic.
-    Function name KEPT as detect_ha_flip_signal to prevent ImportErrors in Dashboard/Entry.
-    """
-    if df is None or len(df) < 5:
+    if len(final_df) < 5:
         return "NA", 1, 1, 1
 
-    # 1. Calculate P-based trends (Green if P goes up, Red if P goes down)
-    p_vals = get_p_series(df)
-    
-    colors = []
-    for i in range(1, len(p_vals)):
-        if p_vals.iloc[i] > p_vals.iloc[i-1]:
-            colors.append("green")
-        elif p_vals.iloc[i] < p_vals.iloc[i-1]:
-            colors.append("red")
-        else:
-            colors.append(colors[-1] if colors else "green")
+    # Safe conversion to python list array formats for lookback scanning
+    colors = pxy_color_series.tolist()
 
     if len(colors) < 2:
         return "NA", 1, 1, 1
 
-    # 2. DEPTH LOGIC
+    # ==================================================
+    # ⚡ PRODUCTION DEPTH ANALYSIS STREAKS
+    # ==================================================
     colors_n = colors[-last_n:]
     current_color = colors_n[-1]
     
-    # Current Streak
+    # Current Streak Depth Tracking
     current_depth = 0
     for c in reversed(colors_n):
         if c == current_color:
@@ -56,7 +39,7 @@ def detect_ha_flip_signal(df=None, last_n=21):
             break
     current_depth = max(current_depth, 1)
 
-    # Past Streak
+    # Historical Prior Streak Depth Tracking
     current_streak_start = len(colors) - current_depth
     prev_color = colors[current_streak_start - 1] if current_streak_start > 0 else "none"
     
@@ -69,7 +52,9 @@ def detect_ha_flip_signal(df=None, last_n=21):
                 break
     past_depth_val = max(past_depth_val, 1)
 
-    # 3. SIGNAL LOGIC
+    # ==================================================
+    # 🔥 CORE SIGNAL ROUTER PROCESSOR
+    # ==================================================
     if prev_color == "red" and current_color == "green":
         signal = "BUY" if current_depth == 1 else "NA"
     elif prev_color == "green" and current_color == "red":
@@ -81,7 +66,9 @@ def detect_ha_flip_signal(df=None, last_n=21):
     else:
         signal = "NA"
 
-    # 4. CE / PE DEPTH
+    # ==================================================
+    # 🎯 DERIVED MATRIX OPTION DEPTH BOUNDARIES
+    # ==================================================
     ce_depth = current_depth if current_color == "green" else 1
     pe_depth = current_depth if current_color == "red" else 1
     past_depth_str = f"CE{past_depth_val}" if prev_color == "green" else f"PE{past_depth_val}" if prev_color == "red" else "NA"
