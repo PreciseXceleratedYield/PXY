@@ -7,7 +7,7 @@ init(autoreset=True)
 # ---- Imports ----
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_pxy_data
-from syshkinpxy import detect_ha_flip_signal
+from syshkinpxy import detect_pxy_flip_signal
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
 from sysstrndpxy import calculate_supertrend
@@ -47,13 +47,13 @@ def get_full_snapshot():
     result["candle_visual"] = get_candle_visual(df=df)
 
     # ===== HAIKIN-ASHI =====
-    ha_close, ha_open, ha_color, df = get_ha_data(df=df)
+    ha_close, ha_open, ha_color, df = get_pxy_data(df=df)
     result["ha_close"] = ha_close
     result["ha_open"] = ha_open
     result["ha_color"] = ha_color
 
     # ===== HAIKIN SIGNAL =====
-    signal, past_depth, ce_depth, pe_depth = detect_ha_flip_signal(df=df)
+    signal, past_depth, ce_depth, pe_depth = detect_pxy_flip_signal(df=df)
     if signal is None:
         signal = "BULL" if df['HA_Close'].iloc[-1] > df['HA_Open'].iloc[-1] else "BEAR"
     result["hkin_signal"] = signal
