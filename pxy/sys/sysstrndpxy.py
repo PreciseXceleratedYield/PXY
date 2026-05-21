@@ -13,22 +13,22 @@ except ImportError:
 DEBUG_MODE = True 
 MA_TYPE = "SMA"  # Set to "TSMA" or "SMA" 
 
-def calculate_sma_42(series: pd.Series) -> np.ndarray: 
+def calculate_sma_30(series: pd.Series) -> np.ndarray: 
     y = series.to_numpy() 
     n = len(y) 
     sma_output = np.empty(n) 
     for i in range(n): 
-        current_window = min(i + 1, 42) 
+        current_window = min(i + 1, 30) 
         y_slice = y[i - current_window + 1 : i + 1] 
         sma_output[i] = y_slice.mean() 
     return sma_output 
 
-def calculate_tsma_42(series: pd.Series) -> np.ndarray: 
+def calculate_tsma_30(series: pd.Series) -> np.ndarray: 
     y = series.to_numpy() 
     n = len(y) 
     tsma_output = y.copy() 
     for i in range(1, n): 
-        current_window = min(i + 1, 42) 
+        current_window = min(i + 1, 30) 
         y_slice = y[i - current_window + 1 : i + 1] 
         x = np.arange(current_window) 
         x_mean = x.mean() 
@@ -43,13 +43,13 @@ def calculate_tsma_42(series: pd.Series) -> np.ndarray:
     return tsma_output 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
-    """ PXY® Engine: Clean 42 MA Matrix with Crossover Signals & Ongoing States. """ 
+    """ PXY® Engine: Clean 30 MA Matrix with Crossover Signals & Ongoing States. """ 
     if MA_TYPE.upper() == "SMA": 
-        base_ma_line = calculate_sma_42(df['Close']) 
+        base_ma_line = calculate_sma_30(df['Close']) 
     else: 
-        base_ma_line = calculate_tsma_42(df['Close']) 
+        base_ma_line = calculate_tsma_30(df['Close']) 
         
-    # Boundary tracking set strictly to the 42 Moving Average line alone
+    # Boundary tracking set strictly to the 30 Moving Average line alone
     df['ST'] = base_ma_line 
     df['c1'] = df['Close'].shift(1) 
     df['st_prev'] = df['ST'].shift(1) 
@@ -72,7 +72,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             st_trend.append("SIDE") 
             continue 
             
-        # Clean 42 MA Crossover Logic
+        # Clean 30 MA Crossover Logic
         cross_above = (c0 > st_curr) and (c1 <= st_prev) 
         cross_below = (c0 < st_curr) and (c1 >= st_prev) 
         
@@ -90,7 +90,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     return df 
 
 if __name__ == "__main__": 
-    print(f"=== [TIER 1] {MA_TYPE} 42 Engine Local Math Test ===") 
+    print(f"=== [TIER 1] {MA_TYPE} 30 Engine Local Math Test ===") 
     df_st = calculate_supertrend(fetch_yf_data())
     print(f"TERMINAL STATE STRUCTURAL METRIC: {df_st['ST_Trend'].iloc[-1]}")
 
