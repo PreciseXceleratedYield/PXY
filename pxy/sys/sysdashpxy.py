@@ -4,7 +4,7 @@ import os
 from colorama import Fore, Style, init
 init(autoreset=True)
 
-# ---- Imports ----
+# ---- Pure Production Naming Alignment Imports ----
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_pxy_data
 from syshkinpxy import detect_pxy_flip_signal
@@ -18,10 +18,10 @@ from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
 from syssadxpxy import calculate_adx
 
-# ✅ KEEP
+# ✅ KEEP CONSOLE ALIGNMENT
 TOTAL_WIDTH = 42
 
-# ---------------- UTILS ----------------
+# ---------------- STRUCTURAL UTILS ----------------
 def safe_int(val):
     try:
         return 0 if val is None else int(float(val))
@@ -40,29 +40,37 @@ def run_pyc_file():
 # ================= CORE SNAPSHOT FUNCTION =================
 def get_full_snapshot():
     result = {}
-    df = fetch_yf_data()
-    if df is None or df.empty:
+    master_df = fetch_yf_data()
+    if master_df is None or master_df.empty:
         return None
-    result["df"] = df
-    result["candle_visual"] = get_candle_visual(df=df)
+        
+    # Enforce strict single source of truth across downstream layout components
+    result["candle_visual"] = get_candle_visual(df=master_df)
 
-    # ===== HAIKIN-ASHI =====
-    ha_close, ha_open, ha_color, df = get_pxy_data(df=df)
-    result["ha_close"] = ha_close
-    result["ha_open"] = ha_open
-    result["ha_color"] = ha_color
+    # ===== CLOSE MOMENTUM DATA ENGINE =====
+    # Pulls 100% frozen, non-fluctuating historical candle arrays (iloc[:-1])
+    pxy_close, pxy_open, pxy_color, history_df = get_pxy_data(df=master_df)
+    result["ha_close"] = pxy_close
+    result["ha_open"] = pxy_open
+    result["ha_color"] = pxy_color
 
-    # ===== HAIKIN SIGNAL =====
-    signal, past_depth, ce_depth, pe_depth = detect_pxy_flip_signal(df=df)
-    if signal is None:
-        signal = "BULL" if df['HA_Close'].iloc[-1] > df['HA_Open'].iloc[-1] else "BEAR"
+    # ===== FLIP & TREND STREAK SIGNAL =====
+    signal, past_depth, ce_depth, pe_depth = detect_pxy_flip_signal(df=master_df)
+    
+    # Secure fallback loop checks using true Close and Open columns 
+    if signal is None or signal == "NA":
+        if not history_df.empty:
+            signal = "BULL" if history_df['Close'].iloc[-1] > history_df['Open'].iloc[-1] else "BEAR"
+        else:
+            signal = "NONE"
+        
     result["hkin_signal"] = signal
     result["hkin_past_depth"] = past_depth
     result["hkin_ce_depth"] = ce_depth
     result["hkin_pe_depth"] = pe_depth
 
-    # ===== FORCE =====
-    force_result = calculate_adx(df)
+    # ===== FORCE (ADX MATRIX) =====
+    force_result = calculate_adx(master_df)
     if force_result:
         ce_force, pe_force = force_result
     else:
@@ -70,42 +78,43 @@ def get_full_snapshot():
     result["ce_force"] = ce_force
     result["pe_force"] = pe_force
 
-    # ===== ATR & KATR =====
-    atr_series = calculate_atr(df)
+    # ===== ATR & KATR MATRIX VOLATILITY =====
+    atr_series = calculate_atr(master_df)
     atr_val = safe_int(atr_series.iloc[-1] if not atr_series.empty else 0)
-    k_val = safe_int(calculate_dynamic_k(df))
+    k_val = safe_int(calculate_dynamic_k(master_df))
     result["atr"] = atr_val
     result["katr"] = k_val
 
-    # ===== PRICE =====
-    price, direction = detect_raw_direction(df)
+    # ===== PRICE & DIRECTION VECTORS =====
+    price, direction = detect_raw_direction(master_df)
     result["price"] = safe_int(price)
     result["direction"] = direction if direction else "NONE"
 
-    # ===== SUPERTREND (MINER) =====
-    df = calculate_supertrend(df)
-    trend = df['ST_Trend'].iloc[-1] if not df.empty else "NONE"
-    line_val = safe_int(df['ST'].iloc[-1] if not df.empty else 0)
+    # ===== SUPERTREND PROFILES =====
+    processed_st_df = calculate_supertrend(master_df.copy())
+    # Fixed alignment gap: iloc[-1] targets the exact same closed window bar 
+    trend = processed_st_df['ST_Trend'].iloc[-1] if not processed_st_df.empty else "NONE"
+    line_val = safe_int(processed_st_df['ST'].iloc[-1] if not processed_st_df.empty else 0)
     result["supertrend"] = trend
     result["super_line"] = line_val
-    result["df"] = df
+    result["df"] = processed_st_df
 
-    # ===== POWER =====
-    direction_power, ce, pe = get_ce_pe_power(df=df)
+    # ===== DIRECTIONAL POWER MATRIX =====
+    direction_power, ce, pe = get_ce_pe_power(df=master_df)
     result["direction_power"] = safe_int(direction_power)
     result["ce_power"] = safe_int(ce)
     result["pe_power"] = safe_int(pe)
 
-    # ===== ENTRY SIGNAL =====
-    entry, exit = get_entry_signal(df)
+    # ===== ENTRY ENGINE ROUTING =====
+    entry, exit = get_entry_signal(master_df)
     result["entry"] = entry
     result["exit"] = exit
 
-    # ===== DAY CANDLE =====
-    result["day_candle"] = get_day_candle_bar(df)
+    # ===== DAY CANDLE DATA INTERFACE =====
+    result["day_candle"] = get_day_candle_bar(master_df)
 
-    # ===== BOS =====
-    bos_bar, bos_val = get_bos_bar(df)
+    # ===== BREAKOUT STRUCTURE (BOS) MATRIX =====
+    bos_bar, bos_val = get_bos_bar(master_df)
     result["bos_bar"] = bos_bar if bos_bar else "NONE"
     result["bos_val"] = bos_val if bos_val else "NONE"
     return result
@@ -113,16 +122,13 @@ def get_full_snapshot():
 # ================= PRINT DASHBOARD =================
 def print_dashboard(data):
     if not data:
-        print("No data fetched.")
+        print("No metrics fetched from data pipeline.")
         return
 
-    # Labels: Fore.WHITE
-    # Values: Contextual (Green/Red/Yellow/Cyan)
-
-    # 1. CANDLE VISUAL
+    # 1. CANDLE VISUAL STREAM
     print(data["candle_visual"])
 
-    # 2. HAIKIN SIGNAL
+    # 2. FLIP/TREND DATA LINE
     sig, pst = data["hkin_signal"], data["hkin_past_depth"]
     ce_d, pe_d = data["hkin_ce_depth"], data["hkin_pe_depth"]
     h_col = Fore.LIGHTGREEN_EX if sig in ["BUY","BULL"] else Fore.LIGHTRED_EX if sig in ["SELL","BEAR"] else Fore.YELLOW
@@ -133,25 +139,25 @@ def print_dashboard(data):
     s2 = TOTAL_WIDTH - len(f"CE:{ce_d}") - len(f"PE:{pe_d}")
     print(Fore.WHITE + "CE:" + Fore.LIGHTGREEN_EX + str(ce_d) + " " * max(1, s2) + Fore.WHITE + "PE:" + Fore.LIGHTRED_EX + str(pe_d))
 
-    # 3. FORCE
+    # 3. FORCE PROFILES
     cef, pef = data.get("ce_force", 1.0), data.get("pe_force", 1.0)
     cef_c = Fore.LIGHTGREEN_EX if cef > 1 else Fore.CYAN
     pef_c = Fore.LIGHTRED_EX if pef > 1 else Fore.CYAN
     s_f = TOTAL_WIDTH - len(f"CE Force:{cef:.2f}") - len(f"PE Force:{pef:.2f}")
     print(Fore.WHITE + "CE Force:" + cef_c + f"{cef:.2f}" + " " * max(1, s_f) + Fore.WHITE + "PE Force:" + pef_c + f"{pef:.2f}")
 
-    # 4. ATR
+    # 4. ATR SCALING BOUNDARIES
     atr, katr = data["atr"], data["katr"]
     s_a = TOTAL_WIDTH - len(f"ATR:{atr}") - len(f"KATR:{katr}")
     print(Fore.WHITE + "ATR:" + Fore.CYAN + str(atr) + " " * max(1, s_a) + Fore.WHITE + "KATR:" + Fore.CYAN + str(katr))
 
-    # 5. PRICE
+    # 5. MARKET PRICE INDEX
     prc, drct = data["price"], data["direction"]
     p_color = Fore.LIGHTGREEN_EX if drct=="UP" else Fore.LIGHTRED_EX if drct=="DOWN" else Fore.YELLOW
     s_p = TOTAL_WIDTH - len(f"Price:{prc}") - len(f"Mullu:{drct}")
     print(Fore.WHITE + "Price:" + Fore.CYAN + str(prc) + " " * max(1, s_p) + Fore.WHITE + "Mullu:" + p_color + drct)
 
-    # 6. SUPERTREND
+    # 6. SUPERTREND ROUTING LINE
     trnd, line = data["supertrend"], data["super_line"]
     if trnd == "BUY": st_c = Fore.GREEN + Style.BRIGHT
     elif trnd == "SELL": st_c = Fore.RED + Style.BRIGHT
@@ -162,25 +168,25 @@ def print_dashboard(data):
     s_st = TOTAL_WIDTH - len(f"Super:{trnd}") - len(f"LINE:{line}")
     print(Fore.WHITE + "Super:" + st_c + trnd + " " * max(1, s_st) + Fore.WHITE + "LINE:" + Fore.CYAN + str(line))
 
-    # 7. POWER
+    # 7. RISK METRIC DIRECTION POWER
     ce, pe = data["ce_power"], data["pe_power"]
     ce_c = Fore.LIGHTGREEN_EX if ce > pe else Fore.CYAN
     pe_c = Fore.LIGHTRED_EX if pe > ce else Fore.CYAN
     s_pw = TOTAL_WIDTH - len(f"CE Power:{ce}") - len(f"PE Power:{pe}")
     print(Fore.WHITE + "CE Power:" + ce_c + str(ce) + " " * max(1, s_pw) + Fore.WHITE + "PE Power:" + pe_c + str(pe))
 
-    # 8. ENTRY & EXIT
+    # 8. LIVE ORDER SIGNALS
     ent, ext = data["entry"], data["exit"]
     e_color = Fore.LIGHTGREEN_EX if "BUY" in ent or "UP" in ent else Fore.LIGHTRED_EX if "SELL" in ent or "DOWN" in ent else Fore.YELLOW
     s_e = TOTAL_WIDTH - len(f"Entry:{ent}") - len(f"Signal:{ext}")
     print(Fore.WHITE + "Entry:" + e_color + ent + " " * max(1, s_e) + Fore.WHITE + "Signal:" + e_color + ext)
 
-    # 9. BOS
+    # 9. BOS BOUNDARY PRINT MATRIX
     print(data["bos_bar"])
 
-# ================= MAIN =================
+# ================= MAIN RUNNER ENGINE =================
 if __name__ == "__main__":
     run_pyc_file()
-    data = get_full_snapshot()
-    print_dashboard(data)
+    snapshot_data = get_full_snapshot()
+    print_dashboard(snapshot_data)
 
