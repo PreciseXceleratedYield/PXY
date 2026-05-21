@@ -1,58 +1,145 @@
-//@version=6 
-indicator("PXY® Pure OC/2 Chart - Pure Python SMA 42 Master", overlay=true, max_bars_back=500) 
+//@version=6
+indicator("PXY® Engine", overlay=true, shorttitle="PXY® Engine")
 
-// =============================================================================== 
-// 1. PURE OC/2 PRICE CALCULATIONS 
-// =============================================================================== 
-c0 = (open + close) / 2.0 
-c1 = c0[1] // Samples prior bar's value to maintain correct candle body height 
+// ==========================================
+// 1. CONFIGURATION INTERFACE & SESSION LOGIC
+// ==========================================
+ma_type   = input.string("SMA", title="42 MA Engine Type", options=["SMA", "TSMA (Linear Regression)"])
+sess_spec = input.string("0915-1530:23456", title="Active Trading Session")
 
-// =============================================================================== 
-// 2. PURE OC/2 VISUAL CHART LAYOUT 
-// =============================================================================== 
-candle_color = (c0 >= c1) ? color.teal : color.maroon 
-plotcandle(open=c1, high=math.max(c0, c1), low=math.min(c0, c1), close=c0, title="PXY Pure OC/2 Custom Candles", color=color.new(candle_color, 20), wickcolor=candle_color, bordercolor=candle_color) 
+// Trace exact minutes elapsed since market open to handle the 50-minute backfill window
+in_session = not na(time(timeframe.period, sess_spec))
+var int bar_count_since_open = 0
+if in_session and not in_session[1]
+    bar_count_since_open := 1
+else if in_session
+    bar_count_since_open += 1
+else
+    bar_count_since_open := 0
 
-// =============================================================================== 
-// 3. THE 1:1 PURE SMA BASELINE (WITH LIVE INFLUENCE FILTER) 
-// =============================================================================== 
-sma_window = 42 
-// Calculated as the raw moving average of your custom c0 prices 
-sma_raw = ta.sma(c0, sma_window) 
-// Live price influence smoothing step 
-ST = (sma_raw + c0) / 2.0 
-// Plot the clean, live-influenced 42 SMA on your chart in orange 
-plot(ST, title="PXY ST Line (Pure SMA 42)", color=color.orange, linewidth=2) 
+// ==========================================
+// 1B. PYTHON-REPLICA BACKFILL PATCH
+// ==========================================
+// This patch completely stops yesterday's data from polluting today's open.
+// It forces Pine Script to assume the first bar was duplicated into the past.
+float custom_open  = open
+float custom_close = close
 
-// =============================================================================== 
-// 4. SIGNAL LAYER 1: TREND LINE FLIPS (TRIGGERS ONLY ON THE CROSSOVER BAR) 
-// =============================================================================== 
-// TB (Trend BUY): Triggers STRICTLY on the first crossover bar moving above the line 
-trigger_tb = ta.crossover(c0, ST) 
-// TS (Trend SELL): Triggers STRICTLY on the first crossunder bar moving below the line 
-trigger_ts = ta.crossunder(c0, ST) 
+if in_session and bar_count_since_open <= 50
+    custom_open  := ta.valuewhen(bar_count_since_open == 1, open, 0)
+    custom_close := ta.valuewhen(bar_count_since_open == 1, close, 0)
 
-// =============================================================================== 
-// 5. SIGNAL LAYER 2: MOMENTUM FLIPS (TRIGGERS STRICTLY ON THE COLOR TRANSITION BAR) 
-// =============================================================================== 
-// Direct array lookbacks ensure transition triggers fire ONLY on the color flip bar 
-color_change_to_green = (c0 > c0[1]) and (c0[1] < c0[2]) 
-color_change_to_red = (c0 < c0[1]) and (c0[1] > c0[2]) 
+// ==========================================
+// 2. TIER 1 - MODE 6 CANDLE PROCESSING 
+// ==========================================
+// Changed ONLY the input series to use the patched backfill variables
+sma_o = ta.sma(custom_open, 3)
+sma_c = ta.sma(custom_close, 3)
 
-// Route Action signals only on the precise bar where the price direction flips while holding its trend position 
-// CB (Action BUY): Price flips Red -> Green while holding above the line (excluding the TB crossover bar) 
-trigger_cb = color_change_to_green and (c0 > ST) and not trigger_tb 
-// CS (Action SELL): Price flips Green -> Red while holding below the line (excluding the TS crossunder bar) 
-trigger_cs = color_change_to_red and (c0 < ST) and not trigger_ts 
+var float ha_o = na
+ha_c = (sma_o + sma_c) / 2.0
+ha_o := na(ha_o) ? (sma_o + sma_c) / 2.0 : (ha_o + ha_c) / 2.0
 
-// =============================================================================== 
-// 6. VISUAL SIGNAL PLOTTING PIPELINE - ANCHOR ALIGNMENT FIXED 
-// =============================================================================== 
-// LAYER 1: Line Crossing Flips (TB / TS mapped to Square Shapes) 
-plotchar(trigger_tb, title="TB Cross", char="🟩", location=location.belowbar, size=size.tiny) 
-plotchar(trigger_ts, title="TS Cross", char="🟥", location=location.abovebar, size=size.tiny) 
+ha_h = math.max(ha_o, ha_c)
+ha_l = math.min(ha_o, ha_c)
 
-// LAYER 2: Internal Price Momentum Flips (CB / CS mapped to Circle Shapes) 
-plotchar(trigger_cb, title="CB Trend", char="🟢", location=location.belowbar, size=size.tiny) 
-plotchar(trigger_cs, title="CS Trend", char="🔴", location=location.abovebar, size=size.tiny)
+m6_bullish = ha_c >= ha_o
+m6_color   = m6_bullish ? color.lime : color.red
+plotcandle(ha_o, ha_h, ha_l, ha_c, title="Mode 6 Core Blocks", color=m6_color, bordercolor=m6_color, wickcolor=color.new(color.white, 100))
+
+// ==========================================
+// 3. AUTOMATED LAYER 2 SIMULATION (sysmktpxy)
+// ==========================================
+m6_bull_prev = ta.valuewhen(true, m6_bullish, 1)
+
+// Generate Dynamic Market Entry Signals
+string entry_signal = "NONE"
+if m6_bullish and not m6_bull_prev
+    entry_signal := "BUY"
+else if not m6_bullish and m6_bull_prev
+    entry_signal := "SELL"
+else
+    entry_signal := m6_bullish ? "BULL" : "BEAR"
+
+// Generate Independent Market Exit Signals (Noise Filters)
+string exit_signal = "NONE"
+if not m6_bullish and m6_bull_prev
+    exit_signal := "BUY"   // Exit Long trades if trend flips red
+else if m6_bullish and not m6_bull_prev
+    exit_signal := "SELL"  // Exit Short trades if trend flips green
+
+// ==========================================
+// 4. TIER 2 - DERIVED TRENDLINE BOUNDARY (42 MA)
+// ==========================================
+var float st_line = na
+if ma_type == "SMA"
+    st_line := ta.sma(ha_c, 30)
+else
+    st_line := ta.linreg(ha_c, 30, 0)
+
+c0      = ha_c
+st_curr = st_line
+c1      = ta.valuewhen(true, ha_c, 1)
+st_prev = ta.valuewhen(true, st_line, 1)
+
+cross_above = (c0 > st_curr) and (c1 <= st_prev)
+cross_below = (c0 < st_curr) and (c1 >= st_prev)
+
+// Resolve structural st_trend states
+var string st_trend = "SIDE"
+if cross_above
+    st_trend := "BUY"
+else if cross_below
+    st_trend := "SELL"
+else if c0 > st_curr
+    st_trend := "BULL"
+else
+    st_trend := "BEAR"
+
+// ==========================================
+// 5. TIER 3 - CORE ROUTER ENGINE (sysentrpxy)
+// ==========================================
+var string final_signal = "NONE"
+
+if st_trend == "BUY"
+    final_signal := "BUY"
+else if st_trend == "SELL"
+    final_signal := "SELL"
+else if entry_signal == "BULL" or entry_signal == "BEAR"
+    final_signal := entry_signal
+else if st_trend == "BULL"
+    final_signal := (entry_signal == "SELL") ? "NONE" : entry_signal
+else if st_trend == "BEAR"
+    final_signal := (entry_signal == "BUY") ? "NONE" : entry_signal
+else
+    final_signal := "NONE"
+
+// Convert confirmed routes to execution variables
+is_atmbuy  = (final_signal == "BUY")
+is_atmsell = (final_signal == "SELL")
+
+// Extract independent exit execution triggers
+is_exit_long  = (exit_signal == "BUY")
+is_exit_short = (exit_signal == "SELL")
+
+// ==========================================
+// 6. VISUAL RENDERING ENGINE & ALERTS
+// ==========================================
+trend_color = (st_trend == "BUY" or st_trend == "BULL") ? color.lime : (st_trend == "SELL" or st_trend == "BEAR") ? color.red : color.gray
+plot(st_line, title="42 MA Structural Line", color=trend_color, linewidth=3)
+
+// A. ENTRY SIGNALS: Plotted cleanly as Triangles
+plotshape(is_atmbuy,  title="ATMBUY Action Entry",  style=shape.triangleup,   location=location.belowbar, color=color.lime, size=size.tiny)
+plotshape(is_atmsell, title="ATMSELL Action Entry", style=shape.triangledown, location=location.abovebar, color=color.red,  size=size.tiny)
+
+// B. EXIT SIGNALS: Plotted unconditionally as Circles/Dots
+plotshape(is_exit_long,  title="Exit Long Dot",  style=shape.circle, location=location.abovebar, color=color.new(color.orange, 20), size=size.tiny)
+plotshape(is_exit_short, title="Exit Short Dot", style=shape.circle, location=location.belowbar, color=color.new(color.orange, 20), size=size.tiny)
+
+// Webhook payload routing connectors
+alertcondition(is_atmbuy,     title="Entry ATMBUY Alert", message="Order Engine: [ATMBUY]")
+alertcondition(is_atmsell,    title="Entry ATMSELL Alert", message="Order Engine: [ATMSELL]")
+alertcondition(is_exit_long,  title="Exit Long Alert",     message="Order Engine: [EXIT_LONG]")
+alertcondition(is_exit_short, title="Exit Short Alert",    message="Order Engine: [EXIT_SHORT]")
+
 
