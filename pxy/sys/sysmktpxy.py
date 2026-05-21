@@ -33,9 +33,9 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
     c0_color = GRN if c0 >= o0 else RED
 
     rows = [
-        (c2, f"② C2-{c2:.2f}", "█", c2_color),
-        (c1, f"① C1-{c1:.2f}", "█", c1_color),
-        (c0, f"⓪ C0-{c0:.2f}", "█", c0_color)
+        (c2, f"    ② C2-{c2:.2f}", "█", c2_color),
+        (c1, f"    ① C1-{c1:.2f}", "█", c1_color),
+        (c0, f"    ⓪ C0-{c0:.2f}", "█", c0_color)
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
