@@ -83,8 +83,8 @@ def target_price(row):
             final_pct_score = BASE_SCORE
 
             # Fast membership lookups
-            is_bullish_signal = clean_signal in ("BUY", "BULL")
-            is_bearish_signal = clean_signal in ("SELL", "BEAR")
+            is_bullish_signal = clean_signal in ("BUY", "BULL","AVGB")
+            is_bearish_signal = clean_signal in ("SELL", "BEAR", "AVGS")
 
             # Applied your updated scaling math multipliers
             ce_calc = (1.4 * hce_d) ** min(ce_p, 2)
