@@ -78,9 +78,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         
         # State Matrix Assignment
         if cross_above: 
-            new_trend = "BUY" 
+            new_trend = "AVGB" 
         elif cross_below: 
-            new_trend = "SELL" 
+            new_trend = "AVGS" 
         else: 
             new_trend = "BULL" if (c0 > st_curr) else "BEAR" 
             
