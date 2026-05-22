@@ -8,8 +8,8 @@ RESET = "\033[0m"
 
 def get_candle_visual(df=None, last_n=42):
     """
-    Constructs a clean 1-character-per-bar timeline stream.
-    Sanitizes raw string inputs to prevent broken streak resets.
+    Constructs a 1-character-per-bar timeline stream.
+    Maps BULL/GREEN to Green and BEAR/RED to Red with proper streak tracking.
     """
     try:
         output = get_pxy_data(df=df)
@@ -30,36 +30,36 @@ def get_candle_visual(df=None, last_n=42):
         return ""
         
     # Take the exact last 42 bars to fill your window
-    raw_colors = pxy_color_series.iloc[-last_n:]
+    raw_states = pxy_color_series.iloc[-last_n:]
     
     visual_elements = []
     current_streak = 0
-    last_color = None
+    last_state = None
     
-    for raw_string in raw_colors:
-        # CRITICAL FIX: Strip invisible spaces/newlines and convert text to lowercase
-        if not isinstance(raw_string, str):
-            color_string = str(raw_string).strip().lower()
-        else:
-            color_string = raw_string.strip().lower()
+    for raw_string in raw_states:
+        # Clean the string from hidden spaces and force lowercase
+        state_string = str(raw_string).strip().lower()
             
-        # Compute the cleaned streak progression safely
-        if color_string == last_color:
+        # Track streak based on matching the current state to the last state
+        if state_string == last_state:
             current_streak += 1
         else:
             current_streak = 1
-            last_color = color_string
+            last_state = state_string
             
-        # If the streak goes beyond 9, cap it and repeat 9
+        # Cap the streak display at 9
         display_num = 9 if current_streak > 9 else current_streak
         
-        # Match against our sanitized string keys
-        color_code = GREEN if "green" in color_string else RED
+        # Green for bull trends, Red for bear trends
+        if "bull" in state_string or "green" in state_string:
+            color_code = GREEN
+        else:
+            color_code = RED
+            
         visual_elements.append(f"{color_code}{display_num}{RESET}")
 
     return "".join(visual_elements)
 
 if __name__ == "__main__":
-    print("\nCLOSE-MOMENTUM CONFIRMED VISUAL STREAM (Sanitized 42 Columns):")
+    print("\nCLOSE-MOMENTUM CONFIRMED VISUAL STREAM (Exact 42 Column Width):")
     print(get_candle_visual(last_n=42))
-
