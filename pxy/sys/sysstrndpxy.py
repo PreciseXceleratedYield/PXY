@@ -9,7 +9,7 @@ except ImportError:
         # Deterministic default mock data for baseline isolation testing
         return pd.DataFrame({'Close': np.linspace(10, 20, 100) + np.random.randn(100) * 0.5}) 
 
-# 🎯 INTEGRATED PIPELINE CONNECTIONS
+# INTEGRATED PIPELINE CONNECTIONS
 try:
     from syskatrpxy import calculate_atr, calculate_dynamic_k
 except ImportError:
@@ -24,29 +24,35 @@ except ImportError:
 DEBUG_MODE = True 
 MA_TYPE = "SMA"  # Set to "TSMA" or "SMA" 
 
-# 🔄 SURGICALLY UPDATED FROM STATIC 42 TO DYNAMIC WINDOW ARRAYS
+# 🔄 FIXED INDICES TYPE CASTING FOR SLICING
 def calculate_sma_42(series: pd.Series, dynamic_lengths: np.ndarray) -> np.ndarray: 
     y = series.to_numpy() 
     n = len(y) 
     sma_output = np.empty(n) 
     sma_output[:] = np.nan
     for i in range(n): 
-        L = dynamic_lengths[i]
-        if np.isnan(L) or i < L - 1:
+        raw_L = dynamic_lengths[i]
+        if np.isnan(raw_L):
+            continue
+        L = int(raw_L) # 🎯 CRITICAL FIX: Explicitly cast to pure integer type for slicing
+        if i < L - 1:
             continue
         y_slice = y[i - L + 1 : i + 1] 
         sma_output[i] = y_slice.mean() 
     return sma_output 
 
-# 🔄 SURGICALLY UPDATED FROM STATIC 42 TO DYNAMIC WINDOW ARRAYS
+# 🔄 FIXED INDICES TYPE CASTING FOR SLICING
 def calculate_tsma_42(series: pd.Series, dynamic_lengths: np.ndarray) -> np.ndarray: 
     y = series.to_numpy() 
     n = len(y) 
     tsma_output = np.empty(n)
     tsma_output[:] = np.nan
     for i in range(n): 
-        L = dynamic_lengths[i]
-        if np.isnan(L) or i < L - 1:
+        raw_L = dynamic_lengths[i]
+        if np.isnan(raw_L):
+            continue
+        L = int(raw_L) # 🎯 CRITICAL FIX: Explicitly cast to pure integer type for slicing
+        if i < L - 1:
             continue
         y_slice = y[i - L + 1 : i + 1] 
         x = np.arange(L) 
@@ -72,8 +78,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     dynamic_lengths[:] = np.nan
     for i in range(n):
         if not np.isnan(atr_series[i]):
-            L = int(np.round(atr_series[i] * k_factor))
-            dynamic_lengths[i] = max(3, min(100, L))
+            # 🎯 SAFETY FIX: Force rounding conversions to standard float/int before bounds checking
+            L = round(float(atr_series[i] * k_factor))
+            dynamic_lengths[i] = float(max(3, min(100, L)))
 
     # B. Generate the base line passing the dynamic lengths through
     if MA_TYPE.upper() == "SMA": 
