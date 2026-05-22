@@ -28,9 +28,9 @@ def get_entry_signal(df=None):
     # 3. CORE TREND PRIORITY ROUTER (ENTRY ONLY)
     
     # Priority 1: Fresh 42 SMA Crossover signals take absolute priority over everything
-    if st_trend == "BUY":
+    if st_trend == "AVGB":
         final_signal = "BUY"
-    elif st_trend == "SELL":
+    elif st_trend == "AVGS":
         final_signal = "SELL"
         
     # Priority 2: Direct Ongoing State Pass-Through (If market layer sends BULL or BEAR)
@@ -72,6 +72,13 @@ def get_entry_signal(df=None):
         print(f"🔥 ACTION : {final_signal} | TREND STATE: {st_trend} 🔥")
     elif final_signal in ["BUY", "SELL", "BULL", "BEAR"]:
         print(f"ℹ️ INFO ONLY : {final_signal} | TREND STATE: {st_trend}")
+    
+    # Normalization matching your exact instruction
+    if st_trend == "AVGB":
+        exit_signal = "AVGB"
+    elif st_trend == "AVGS":
+        exit_signal = "AVGS"
+    # No 'else' block needed. If neither matches, exit_signal passes through as-is.
 
     return final_signal, exit_signal
 
@@ -83,5 +90,6 @@ if __name__ == "__main__":
         entry, ex = get_entry_signal(df)
         print("-" * 50)
         print(f"FINAL ENTRY SIGNAL: {entry} | EXIT SIGNAL: {ex}")
+
 
 
