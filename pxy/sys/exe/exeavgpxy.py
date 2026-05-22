@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 0
+MAX_LAYERS = 1
 COOL_DOWN_SECONDS = 20  # ⏱️ UPDATED: Cooling interval set to exactly 20 seconds
 ATR_MULTIPLIER = 1.0  
 
@@ -63,8 +63,10 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
-    # 1. Extract raw string from your exit tracker column safely
-    raw_exit_signal = str(df.iloc.get("exit", "")).upper().strip() 
+    # 1. ✅ FIXED: Extract string from the last row of the 'exit' column safely
+    if "exit" not in df.columns:
+        return
+    raw_exit_signal = str(df["exit"].iloc[-1]).upper().strip() 
 
     # 2. Exclusively evaluate the explicit matrix states
     current_signal = "NONE"
