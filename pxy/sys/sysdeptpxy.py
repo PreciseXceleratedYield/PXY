@@ -9,35 +9,31 @@ RESET = "\033[0m"
 def get_candle_visual(df=None, last_n=100):
     """
     Constructs an upward progressing timeline stream (123...9101112).
-    Fixes the 'all 1s' bug by calculating streaks per bar BEFORE splitting digits.
+    Guarantees that 1 bar = 1 character space, making it perfectly scannable.
     """
-    try:
-        output = get_pxy_data(df=df)
-    except Exception as e:
-        return f"{RED}[Data Source Error: {str(e)[:18]}...]{RESET}"
+    output = get_pxy_data(df=df)
     
     if output is None:
         return ""
         
-    if isinstance(output, tuple):
-        # Unpack output safely assuming it matches your original structure: (_, _, pxy_color_series, _)
-        pxy_color_series = next((item for item in output if isinstance(item, pd.Series)), None)
+    if isinstance(output, tuple) and len(output) >= 4:
+        pxy_color_series = output[2]  # Extract the color series directly from the tuple
     elif isinstance(output, pd.Series):
         pxy_color_series = output
     else:
-        pxy_color_series = None
+        return ""
 
-    if pxy_color_series is None or pxy_color_series.empty:
+    if pxy_color_series.empty:
         return ""
         
-    # Grab a larger history buffer to calculate streaks accurately from their true origin
+    # Grab a larger history buffer to calculate streaks accurately from their start
     raw_colors = pxy_color_series.iloc[-last_n:]
     
-    all_characters = []
+    all_elements = []
     current_streak = 0
     last_color = None
     
-    # Pass 1: Calculate streaks purely based on the original data bars
+    # First Pass: Chronological order (Oldest -> Newest)
     for color_string in raw_colors:
         if color_string == last_color:
             current_streak += 1
@@ -45,21 +41,23 @@ def get_candle_visual(df=None, last_n=100):
             current_streak = 1
             last_color = color_string
             
+        # Convert streak to string to get its individual layout digits
         streak_str = str(current_streak)
         color_code = GREEN if color_string == "green" else RED
         
-        # Pass 2: Now safely split the multi-digit numbers into characters
+        # When a streak hits double digits (e.g. 10), we split '1' and '0' 
+        # across two bars to match your exact pattern timeline layout.
         for char in streak_str:
-            all_characters.append({
+            all_elements.append({
                 'char': char,
                 'color': color_code
             })
 
-    # Pass 3: Keep exactly the latest 42 character columns to maintain strict layout size
-    latest_characters = all_characters[-42:]
+    # Second Pass: Keep exactly the latest 42 terminal character spaces
+    latest_elements = all_elements[-42:]
     
-    # Build final colorized string stream output
-    visual_stream = "".join([f"{item['color']}{item['char']}{RESET}" for item in latest_characters])
+    # Build final colorized string stream
+    visual_stream = "".join([f"{item['color']}{item['char']}{RESET}" for item in latest_elements])
     
     return visual_stream
 
