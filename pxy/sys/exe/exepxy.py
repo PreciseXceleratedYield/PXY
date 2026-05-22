@@ -61,7 +61,7 @@ def run_script(script_path):
         return
     try:
         # ✅ SUCCESS: Sub-script execution safety threshold extended to 1 minute (60 seconds)
-        subprocess.run(['python3', str(script_path)], check=True, timeout=60)
+        subprocess.run(['python3', str(script_path)], check=True, timeout=20)
     except subprocess.TimeoutExpired:
         print(f"⏱ TIMEOUT: script stuck -> {script_path} ⚠️")
     except subprocess.CalledProcessError:
