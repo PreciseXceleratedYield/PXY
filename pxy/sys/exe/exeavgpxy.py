@@ -10,7 +10,7 @@ init(autoreset=True)
 # --- CONFIG --- 
 REBUY_ENABLED = True 
 MAX_LAYERS = 0
-COOL_DOWN_SECONDS = 100
+COOL_DOWN_SECONDS = 20  # ⏱️ UPDATED: Cooling interval set to exactly 20 seconds
 ATR_MULTIPLIER = 1.0  
 
 def generate_pxy_tag(): 
@@ -64,14 +64,14 @@ def handle_side_averaging(client, df):
         return 
 
     # 1. Extract raw string from your exit tracker column safely
-    raw_exit_signal = str(df.iloc[0].get("exit", "")).upper().strip() 
+    raw_exit_signal = str(df.iloc.get("exit", "")).upper().strip() 
 
-    # 2. Convert simple track signals into structured execution tracking variables
+    # 2. Exclusively evaluate the explicit matrix states
     current_signal = "NONE"
-    if raw_exit_signal == "BUY":
-        current_signal = "ATMBUY"
-    elif raw_exit_signal == "SELL":
-        current_signal = "ATMSELL"
+    if raw_exit_signal == "AVGB":
+        current_signal = "AVGB"
+    elif raw_exit_signal == "AVGS":
+        current_signal = "AVGS"
 
     # 3. Add side helper column derived from symbol layout
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
@@ -110,13 +110,13 @@ def handle_side_averaging(client, df):
         # ======================================================== 
         # 🛡️ THE "DOUBLE LOCK" TRIGGER VALUATION
         # ======================================================== 
-        # 1. Lock 1 passes only if EVERY position on this side is crossed deep into loss
+        # Lock 1: All open side contracts must be past their individual ATR loss floors
         loss_hit = all_positions_crossed_threshold
 
-        # 2. Lock 2 verifies trend direction matching
+        # Lock 2: Match strictly on your dedicated state matrix values
         signal_matches = (
-            (side == 'CE' and current_signal in ["ATMBUY", "OTMBUY"]) or
-            (side == 'PE' and current_signal in ["ATMSELL", "OTMSELL"])
+            (side == 'CE' and current_signal == "AVGB") or
+            (side == 'PE' and current_signal == "AVGS")
         )
 
         # Only execute if both locks are green, cooling clears, and total side rows are within limits
@@ -154,4 +154,5 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Order confirmation complete for side {side}.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+
 
