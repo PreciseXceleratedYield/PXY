@@ -11,7 +11,7 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 1
 COOL_DOWN_SECONDS = 20  # ⏱️ UPDATED: Cooling interval set to exactly 20 seconds
-ATR_MULTIPLIER = 1.0  
+ATR_MULTIPLIER = 2 
 
 def generate_pxy_tag(): 
     IST = pytz.timezone("Asia/Kolkata") 
