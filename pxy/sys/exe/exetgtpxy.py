@@ -32,14 +32,13 @@ def target_price(row):
 
         # Check if trade is fresh (within 2 minutes)
         is_fresh = False
-        entry_time_raw = row.get("entry_time") # Expects string "YYYY-MM-DD HH:MM:SS" or datetime object
+        entry_time_raw = row.get("entry_time")
         
         if entry_time_raw:
             if isinstance(entry_time_raw, str):
                 entry_time = datetime.strptime(entry_time_raw, "%Y-%m-%d %H:%M:%S")
                 entry_time = IST.localize(entry_time)
             else:
-                # FIX: Ensure existing datetime objects are accurately localized or converted to IST
                 if entry_time_raw.tzinfo is None:
                     entry_time = IST.localize(entry_time_raw)
                 else:
@@ -63,47 +62,57 @@ def target_price(row):
         clean_signal = active_signal.strip()
         is_counter = str(row.get("counter", "N")).upper() == "Y"
 
-        # 4. FIELD DEFINITIONS (Removed duplicate extractions)
+        # 4. FIELD DEFINITIONS
         hce_d = f(row.get("hkin_ce_depth"), 1.0)
         hpe_d = f(row.get("hkin_pe_depth"), 1.0)
         ce_p = f(row.get("ce_power"), 1.0)
         pe_p = f(row.get("pe_power"), 1.0)
-        ce_f = f(row.get("ce_force"), 1.0)  
-        pe_f = f(row.get("pe_force"), 1.0)  
 
-        # 5. FINAL PERCENTAGE SCORE CALCULATION (✅ FIXED: Counter-Trend takes priority over Freshness)
+        # Fast membership trend lookups
+        is_bullish_signal = clean_signal in ("BUY", "BULL", "AVGB")
+        is_bearish_signal = clean_signal in ("SELL", "BEAR", "AVGS")
+
+        # Core scaling math multipliers
+        ce_calc = (1.4 * hce_d) ** min(ce_p, 2)
+        pe_calc = (1.4 * hpe_d) ** min(pe_p, 2)
+
+        # 5. FINAL PERCENTAGE SCORE CALCULATION
         state = "⏳"
-        
-        if is_counter:
-            final_pct_score = 44.0
-        elif is_fresh:
-            state = "🆕"
-            final_pct_score = 3.0
-        else:
-            final_pct_score = BASE_SCORE
+        final_pct_score = BASE_SCORE
 
-            # Fast membership lookups
-            is_bullish_signal = clean_signal in ("BUY", "BULL","AVGB")
-            is_bearish_signal = clean_signal in ("SELL", "BEAR", "AVGS")
+        if is_ce:
+            if is_counter and is_bullish_signal:
+                state = "🎯"  # Target state label for active counter-trend match
+                final_pct_score = 44.0
+            elif is_counter and is_bearish_signal:
+                state = "🚨"  # Safely fall back to trailing state even on counter
+                final_pct_score = 1.4
+            elif is_fresh:
+                state = "🆕"
+                final_pct_score = 3.0
+            elif is_bullish_signal:
+                state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
+            elif is_bearish_signal:
+                state = "🚨"
+                final_pct_score = 1.4
+                
+        elif is_pe:
+            if is_counter and is_bearish_signal:
+                state = "🎯"  # Target state label for active counter-trend match
+                final_pct_score = 44.0
+            elif is_counter and is_bullish_signal:
+                state = "🚨"  # Safely fall back to trailing state even on counter
+                final_pct_score = 1.4
+            elif is_fresh:
+                state = "🆕"
+                final_pct_score = 3.0
+            elif is_bearish_signal:
+                state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
+            elif is_bullish_signal:
+                state = "🚨"
+                final_pct_score = 1.4
 
-            # Applied your updated scaling math multipliers
-            ce_calc = (1.4 * hce_d) ** min(ce_p, 2)
-            pe_calc = (1.4 * hpe_d) ** min(pe_p, 2)
-            if is_ce:
-                if is_bullish_signal:
-                    state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
-                elif is_bearish_signal:
-                    state = "🚨"
-                    final_pct_score = 1.4 
-                    
-            elif is_pe:
-                if is_bearish_signal:
-                    state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
-                elif is_bullish_signal:
-                    state = "🚨"
-                    final_pct_score = 1.4 
-
-        # 6. MAX CAP LOGIC (Hard capped at 25%)
+        # 6. MAX CAP LOGIC (Hard capped at 99%)
         if final_pct_score > 99.0:
             final_pct_score = 99.0
 
@@ -111,12 +120,12 @@ def target_price(row):
         add_value = entry_prc * (final_pct_score / 100.0)
         target = int(entry_prc + add_value)
 
-        # 8. SUPPRESSED DEBUG PRINT (Once per side per refresh cycle)
+        # 8. SUPPRESSED DEBUG PRINT
         if side not in PRINTED_SIDES and side != "NA":
             color = (
                 Fore.GREEN if state == "🆕" else (
                     Fore.CYAN if state == "🔥" else (
-                        Fore.RED if state == "🚨" else (Fore.MAGENTA if is_counter else Fore.YELLOW)
+                        Fore.RED if state == "🚨" else (Fore.MAGENTA if state == "🎯" else Fore.YELLOW)
                     )
                 )
             )
