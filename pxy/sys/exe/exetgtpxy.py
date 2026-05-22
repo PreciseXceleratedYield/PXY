@@ -82,10 +82,11 @@ def target_price(row):
 
         if is_ce:
             if is_counter and is_bullish_signal:
-                state = "🎯"  # Target state label for active counter-trend match
-                final_pct_score = 44.0
+                state = "🎯"  
+                # ✅ FIXED: Replaced 'atr' with 'atr_val' to prevent NameError crash
+                final_pct_score = atr_val * ce_p
             elif is_counter and is_bearish_signal:
-                state = "🚨"  # Safely fall back to trailing state even on counter
+                state = "🚨"  
                 final_pct_score = 1.4
             elif is_fresh:
                 state = "🆕"
@@ -98,10 +99,11 @@ def target_price(row):
                 
         elif is_pe:
             if is_counter and is_bearish_signal:
-                state = "🎯"  # Target state label for active counter-trend match
-                final_pct_score = 44.0
+                state = "🎯"  
+                # ✅ FIXED: Replaced 'atr' with 'atr_val' to prevent NameError crash
+                final_pct_score = atr_val * pe_p
             elif is_counter and is_bullish_signal:
-                state = "🚨"  # Safely fall back to trailing state even on counter
+                state = "🚨"  
                 final_pct_score = 1.4
             elif is_fresh:
                 state = "🆕"
