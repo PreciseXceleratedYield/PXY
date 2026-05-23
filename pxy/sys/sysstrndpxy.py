@@ -11,7 +11,7 @@ except ImportError:
 
 # Global Config 
 DEBUG_MODE = True 
-MA_TYPE = "SMA"  # Set to "TSMA" or "SMA" 
+MA_TYPE = "TSMA"  # Set to "TSMA" or "SMA" 
 
 def calculate_sma_42(series: pd.Series) -> np.ndarray: 
     y = series.to_numpy() 
