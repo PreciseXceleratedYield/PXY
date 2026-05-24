@@ -74,8 +74,8 @@ def get_momentum_ohlc(c):
 
 def get_3sma_oc2_ohlc(df):
     """Generates 3 min OC/2 Pine chart calculation candles (Mode 6)"""
-    sma_o = df['Open'].rolling(window=3, min_periods=1).mean().to_numpy()
-    sma_c = df['Close'].rolling(window=3, min_periods=1).mean().to_numpy()
+    sma_o = df['Open'].rolling(window=4, min_periods=1).mean().to_numpy()
+    sma_c = df['Close'].rolling(window=4, min_periods=1).mean().to_numpy()
     
     n = len(df)
     ha_o = np.zeros(n)
