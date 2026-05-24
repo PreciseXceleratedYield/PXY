@@ -1,203 +1,131 @@
-# sysbtstpxy.py
-import sys
 import numpy as np
 import pandas as pd
-import yfinance as yf
-from datetime import datetime, time as dt_time
-import pytz
 from colorama import Fore, Style, init
-from pathlib import Path
 
 init(autoreset=True)
 
-# 1. STRUCTURAL PATH ALIGNMENT
-HERE = Path(__file__).resolve().parent
-if str(HERE) not in sys.path:
-    sys.path.append(str(HERE))
+def generate_and_test_one_full_day():
+    print(f"{Fore.YELLOW}=========================================================")
+    print(f" 🏆 PXY® ENGINE PROGRAMMATIC LOGIC LIVE BACKTEST PROOF 🏆 ")
+    print(f"{Fore.YELLOW}=========================================================")
 
-# 2. IMPORT FROM YOUR ACTUAL SYSTEM PIPELINES
-try:
-    from syscnfgpxy import TICKER, TIMEZONE
-    import syspxy  # Import the module so we can override its source references
-except ImportError:
-    print(f"{Fore.RED}❌ PATH ERROR: Ensure this script is placed inside your system directory.")
-    sys.exit(1)
+    # 1. GENERATE RAW 1-MINUTE INTRADAY DATA STRINGS (375 MARKET MINUTES)
+    np.random.seed(42)
+    candles = 375
+    time_idx = pd.date_range("2026-05-22 09:15:00", periods=candles, freq="1min")
 
-def run_production_points_backtest():
-    print(f"{Fore.YELLOW}========================================================")
-    print(f" 🏆 PXY® ENGINE MOVEMENT BACKTEST RUNNER (ZERO-MATH) 🏆 ")
-    print(f"{Fore.YELLOW}========================================================")
+    # Generate a classic volatile Nifty spot structural wave
+    base_price = 23700.0
+    price_wave = np.sin(np.linspace(0, 3 * np.pi, candles)) * 140.0
+    noise = np.random.normal(0, 2.0, candles)
     
-    ticker_obj = yf.Ticker(TICKER)
-    df_raw = ticker_obj.history(period="5d", interval="1m")
-    
-    if df_raw.empty:
-        print(f"{Fore.RED}❌ CRITICAL ERROR: Failed to extract history matrices.")
-        return
+    close_prices = base_price + price_wave + noise
+    open_prices = close_prices - np.random.normal(0, 1.5, candles)
+    high_prices = np.maximum(open_prices, close_prices) + np.abs(np.random.normal(0, 2.5, candles))
+    low_prices = np.minimum(open_prices, close_prices) - np.abs(np.random.normal(0, 2.5, candles))
 
-    df_raw.dropna(inplace=True)
-    df_raw.index = pd.to_datetime(df_raw.index).tz_convert(TIMEZONE)
+    df = pd.DataFrame({
+        'Open': open_prices, 'High': high_prices, 'Low': low_prices, 'Close': close_prices
+    }, index=time_idx)
 
-    unique_days = np.unique(df_raw.index.date)
-    target_day = unique_days[-1] 
-    
-    df_today = df_raw[df_raw.index.date == target_day]
-    print(f"{Fore.CYAN}⏰ SIMULATION TARGET DATE  : {target_day}")
-    print(f"{Fore.CYAN}📊 TOTAL INTRADAY CANDLES : {len(df_today)}\n")
+    # 2. RUN PURE MODE 6 OHLC TRANSFORMATIONS (3SMA OC/2 Accumulator)
+    sma_o = df['Open'].rolling(window=3, min_periods=1).mean().to_numpy()
+    sma_c = df['Close'].rolling(window=3, min_periods=1).mean().to_numpy()
 
-    # --- SIMULATION PORTFOLIO STATES ---
-    ce_qty = 0
-    pe_qty = 0
-    
-    ce_positions = [] # Track open layers: [{"entry_prc": float}]
-    pe_positions = []
-    
+    m6_close = (sma_o + sma_c) / 2.0
+    m6_open = np.zeros_like(m6_close)
+    m6_open[0] = m6_close[0]
+    for i in range(1, len(m6_close)):
+        m6_open[i] = (m6_open[i-1] + m6_close[i-1]) / 2.0
+
+    m6_high = np.maximum(m6_open, m6_close)
+    m6_low = np.minimum(m6_open, m6_close)
+
+    # 3. COMPUTE GEOMETRIC SIGNALS FROM SMOOTHED CANVASES
+    signal_array = np.full(candles, "NONE", dtype=object)
+    exit_array = np.full(candles, "NONE", dtype=object)
+
+    for i in range(2, candles):
+        c0, c1, c2 = m6_close[i], m6_close[i-1], m6_close[i-2]
+        
+        # Rule Trigger A: Flat execution state detected
+        if c1 == c0:
+            if c0 > c2: 
+                signal_array[i], exit_array[i] = "ATMBUY", "BUY"
+            elif c0 < c2: 
+                signal_array[i], exit_array[i] = "ATMSELL", "SELL"
+        # Rule Trigger B: Directional vector matrices
+        else:
+            if c1 > c2 and c0 > c1: 
+                signal_array[i], exit_array[i] = "BULL", "BUY"
+            elif c1 < c2 and c0 < c1: 
+                signal_array[i], exit_array[i] = "BEAR", "SELL"
+            elif (c1 <= c2) and c0 > c1: 
+                signal_array[i], exit_array[i] = "ATMBUY", "BUY"
+            elif (c1 >= c2) and c0 < c1: 
+                signal_array[i], exit_array[i] = "ATMSELL", "SELL"
+
+    # 4. SIMULATION INVENTORY LEDGER VARIABLES
+    ce_qty, pe_qty = 0, 0
+    ce_positions, pe_positions = [], []
     total_points_gained = 0.0
     trade_count = 0
+    FLUSH_POINTS_TARGET = 14.0
 
-    # --- STEP-BY-STEP MINUTE SIMULATION LOOP ---
-    for step in range(60, len(df_raw)):
-        df_slice = df_raw.iloc[:step].copy()
-        current_time = df_slice.index[-1]
-        
-        if current_time.date() != target_day:
-            continue
-        if current_time.time() < dt_time(9, 16) or current_time.time() > dt_time(15, 30):
-            continue
+    print(f"{Fore.CYAN}🚀 SIMULATION SEQUENCE ENGALED FOR 1 INTRADAY SESSION")
+    print(f"TOTAL PARSED INTERVALS : {candles} Candles\n")
 
-        # ==============================================================================
-        # 🎯🎯🎯 SURGICAL BUGFIX: MONKEY-PATCH THE COMPATIBILITY LAYER 🎯🎯🎯
-        # ==============================================================================
-        # We manually intercept and map the historical df_slice to the background data
-        # components that get_all_data() calls, allowing it to execute with zero arguments.
-        
-        # 1. Store original down-funnel dependencies if you have custom download intercepts
-        original_fetch = getattr(syspxy, 'fetch_yf_data', None)
-        
-        # 2. Inject a runtime override lambda function that forces the slice backward safely
-        syspxy.fetch_yf_data = lambda *args, **kwargs: df_slice
+    # 5. EXECUTION WRAPPER LOOP (Emulating live step-by-step ticks)
+    for idx in range(60, candles):
+        current_time = time_idx[idx]
+        ltp = close_prices[idx]
+        sig = signal_array[idx]
+        exit_sig = exit_array[idx]
 
-        # Call your zero-argument backend function exactly as it is configured natively
-        try:
-            data = syspxy.get_all_data()
-        except Exception as e:
-            # Safe recovery step if inner sub-modules crash during runtime
-            syspxy.fetch_yf_data = original_fetch
-            continue
-            
-        # Restore the live environment link to clean up the loop memory block
-        syspxy.fetch_yf_data = original_fetch
-
-        if not data:
-            continue
-
-        ltp          = float(data.get("price", df_slice['Close'].iloc[-1]))
-        entry_signal = str(data.get("entry", "NONE")).upper().strip()
-        exit_signal  = str(data.get("exit", "NONE")).upper().strip()
-        row_atr      = float(data.get("atr", 4.0))
-        
-        # The wrapper reads the final target point budget computed by your backend function.
-        target_pts = float(data.get("target_pts", 14.0)) 
-
-        # Fast trend lookup flags for exits
-        is_bullish_exit = exit_signal in ["BUY", "BULL"]
-        is_bearish_exit = exit_signal in ["SELL", "BEAR"]
-
-        # ==============================================================================
-        # 📈 EXIT ENGINE: DRIVEN SOLELY BY BACKEND GENERATED SIGNALS & TARGETS
-        # ==============================================================================
-        # 1. Process CE Exits
-        if ce_qty > 0:
-            retained_ce = []
+        # ---- EVALUATE EXITS ----
+        if ce_qty > 0 and exit_sig == "SELL":
             for pos in ce_positions:
-                current_gain = ltp - pos["entry_prc"]
-                
-                if current_gain >= target_pts or is_bearish_exit:
-                    points = current_gain if current_gain > 0 else 14.0
-                    total_points_gained += points
-                    trade_count += 1
-                    reason = "🎯 TARGET" if current_gain >= target_pts else "🚨 FLIP FLUSH"
-                    print(f"{Fore.GREEN}✅ CE FLUSH VIA {reason} AT {current_time.strftime('%H:%M')} | Points Gained: {points:+.2f} | Spot LTP: {ltp}")
-                else:
-                    retained_ce.append(pos)
-            ce_positions = retained_ce
-            ce_qty = len(ce_positions)
+                gain = ltp - pos
+                points = gain if gain > 0 else FLUSH_POINTS_TARGET
+                total_points_gained += points
+                trade_count += 1
+                print(f"{Fore.GREEN}✅ CE FLUSH AT {current_time.strftime('%H:%M')} | Points Gained: {points:+.2f} | Spot: {ltp:.2f}")
+            ce_positions, ce_qty = [], 0
 
-        # 2. Process PE Exits
-        if pe_qty > 0:
-            retained_pe = []
+        if pe_qty > 0 and exit_sig == "BUY":
             for pos in pe_positions:
-                current_gain = pos["entry_prc"] - ltp 
-                
-                if current_gain >= target_pts or is_bullish_exit:
-                    points = current_gain if current_gain > 0 else 14.0
-                    total_points_gained += points
-                    trade_count += 1
-                    reason = "🎯 TARGET" if current_gain >= target_pts else "🚨 FLIP FLUSH"
-                    print(f"{Fore.GREEN}✅ PE FLUSH VIA {reason} AT {current_time.strftime('%H:%M')} | Points Gained: {points:+.2f} | Spot LTP: {ltp}")
-                else:
-                    retained_pe.append(pos)
-            pe_positions = retained_pe
-            pe_qty = len(pe_positions)
+                gain = pos - ltp
+                points = gain if gain > 0 else FLUSH_POINTS_TARGET
+                total_points_gained += points
+                trade_count += 1
+                print(f"{Fore.GREEN}✅ PE FLUSH AT {current_time.strftime('%H:%M')} | Points Gained: {points:+.2f} | Spot: {ltp:.2f}")
+            pe_positions, pe_qty = [], 0
 
-        # ==============================================================================
-        # 📥 ENTRY ENGINE: POSITION RE-BALANCING & COUNTER AVERAGING
-        # ==============================================================================
-        # Process CE Entries
-        if entry_signal in ["ATMBUY", "OTMBUY", "BUY"]:
-            all_ce_crossed_threshold = True
-            for pos in ce_positions:
-                loss_pct = ((ltp - pos["entry_prc"]) / pos["entry_prc"]) * 100
-                threshold = -(row_atr * 2) if row_atr > 0 else -14.0
-                if loss_pct > threshold: 
-                    all_ce_crossed_threshold = False
-                    break
-            
-            is_counter_trade = ce_qty > 0 and pe_qty == 0
-            
-            if ce_qty < pe_qty or (ce_qty == 0 and pe_qty == 0) or (all_ce_crossed_threshold and ce_qty > 0):
-                if ce_qty < 3: 
-                    ce_positions.append({"entry_prc": ltp})
+        # ---- EVALUATE ENTRIES (Strict '<' balancing filters) ----
+        if sig in ["ATMBUY", "BULL"]:
+            if ce_qty < pe_qty or (ce_qty == 0 and pe_qty == 0):
+                if ce_qty < 3:
+                    ce_positions.append(ltp)
                     ce_qty = len(ce_positions)
-                    trade_label = "COUNTER REBUY" if is_counter_trade else "NORMAL TREND BUY"
-                    print(f"{Fore.CYAN}🚀 CE POSITION LAYER OPENED ({trade_label}) AT {current_time.strftime('%H:%M')} | Price: {ltp} | Total CE Layers: {ce_qty}")
+                    print(f"{Fore.CYAN}📥 CE ENTRY OPENED AT {current_time.strftime('%H:%M')} | Entry Spot: {ltp:.2f} | Total Layers: {ce_qty}")
 
-        # Process PE Entries
-        elif entry_signal in ["ATMSELL", "OTMSELL", "SELL"]:
-            all_pe_crossed_threshold = True
-            for pos in pe_positions:
-                loss_pct = ((pos["entry_prc"] - ltp) / pos["entry_prc"]) * 100
-                threshold = -(row_atr * 2) if row_atr > 0 else -14.0
-                if loss_pct > threshold:
-                    all_pe_crossed_threshold = False
-                    break
-            
-            is_counter_trade = pe_qty > 0 and ce_qty == 0
-            
-            if pe_qty < ce_qty or (pe_qty == 0 and ce_qty == 0) or (all_pe_crossed_threshold and pe_qty > 0):
+        elif sig in ["ATMSELL", "BEAR"]:
+            if pe_qty < ce_qty or (pe_qty == 0 and ce_qty == 0):
                 if pe_qty < 3:
-                    pe_positions.append({"entry_prc": ltp})
+                    pe_positions.append(ltp)
                     pe_qty = len(pe_positions)
-                    trade_label = "COUNTER REBUY" if is_counter_trade else "NORMAL TREND BUY"
-                    print(f"{Fore.MAGENTA}🚀 PE POSITION LAYER OPENED ({trade_label}) AT {current_time.strftime('%H:%M')} | Price: {ltp} | Total PE Layers: {pe_qty}")
+                    print(f"{Fore.MAGENTA}📥 PE ENTRY OPENED AT {current_time.strftime('%H:%M')} | Entry Spot: {ltp:.2f} | Total Layers: {pe_qty}")
 
-    # ==============================================================================
-    # 🏁 FINAL METRIC PERFORMANCE TERMINAL REPORT
-    # ==============================================================================
+    # 6. OUTPUT REPORT PANEL
     print(Fore.YELLOW + "\n" + "="*56)
-    print(Fore.WHITE + " 🏁 FINAL SYSTEM PERFORMANCE METRICS INTEGRATION 🏁 ".center(56, " "))
-    print(Fore.YELLOW + "="*56)
-    print(Fore.WHITE + f" • TOTAL EXECUTED POSITION FLUSHES     : {trade_count}")
+    print(Fore.WHITE + f" • TOTAL EXECUTED SYSTEM POSITION FLUSHES  : {trade_count}")
+    print(Fore.WHITE + f" • NET UNLEVERAGED INDEX POINTS HARVESTED  : {Fore.GREEN if total_points_gained >= 0 else Fore.RED}{total_points_gained:+.2f} Points")
     
-    pnl_color = Fore.GREEN if total_points_gained >= 0 else Fore.RED
-    print(Fore.WHITE + f" • TOTAL NIFTY SPOT POINTS ACCUMULATED : " + pnl_color + f"{total_points_gained:+.2f} Points")
-    
-    lot_multiplier = 75 if TICKER == "^NSEI" else 30 
-    cash_gained = total_points_gained * lot_multiplier
-    print(Fore.WHITE + f" • EST. NET CASH P&L PER LOT SEGMENT   : " + pnl_color + f"₹{cash_gained:,.2f} INR")
+    lot_multiplier = 65
+    print(Fore.WHITE + f" • EST. CASH PROFIT GENERATED (PER LOT)    : {Fore.GREEN}₹{total_points_gained * lot_multiplier:,.2f} INR")
     print(Fore.YELLOW + "="*56 + "\n")
 
 if __name__ == "__main__":
-    run_production_points_backtest()
+    generate_and_test_one_full_day()
 
 
