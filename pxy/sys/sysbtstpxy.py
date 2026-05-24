@@ -177,10 +177,11 @@ def run_production_points_backtest():
     pnl_color = Fore.GREEN if total_points_gained >= 0 else Fore.RED
     print(Fore.WHITE + f" • TOTAL NIFTY SPOT POINTS ACCUMULATED : " + pnl_color + f"{total_points_gained:+.2f} Points")
     
-    lot_multiplier = 65 
+    lot_multiplier = 75 if TICKER == "^NSEI" else 30 # Dynamic lot size selector based on config ticker parameters
     cash_gained = total_points_gained * lot_multiplier
     print(Fore.WHITE + f" • EST. NET CASH P&L PER LOT SEGMENT   : " + pnl_color + f"₹{cash_gained:,.2f} INR")
     print(Fore.YELLOW + "="*56 + "\n")
 
 if __name__ == "__main__":
     run_production_points_backtest()
+
