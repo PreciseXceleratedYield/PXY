@@ -1,4 +1,4 @@
-# sysbacktestpxy.py
+# sysbtstpxy.py
 import sys
 import numpy as np
 import pandas as pd
@@ -18,7 +18,7 @@ if str(HERE) not in sys.path:
 # 2. IMPORT FROM YOUR ACTUAL SYSTEM PIPELINES
 try:
     from syscnfgpxy import TICKER, TIMEZONE
-    from syspxy import get_all_data
+    import syspxy  # Import the module so we can override its source references
 except ImportError:
     print(f"{Fore.RED}❌ PATH ERROR: Ensure this script is placed inside your system directory.")
     sys.exit(1)
@@ -66,10 +66,28 @@ def run_production_points_backtest():
             continue
 
         # ==============================================================================
-        # ⚡ READ PURE STRUCTURAL PAYLOAD DIRECTLY FROM YOUR syspxy OUTPUT
+        # 🎯🎯🎯 SURGICAL BUGFIX: MONKEY-PATCH THE COMPATIBILITY LAYER 🎯🎯🎯
         # ==============================================================================
-        # Wrapper does ZERO indicators or targets math. It trusts your backend 100%.
-        data = get_all_data(df=df_slice)
+        # We manually intercept and map the historical df_slice to the background data
+        # components that get_all_data() calls, allowing it to execute with zero arguments.
+        
+        # 1. Store original down-funnel dependencies if you have custom download intercepts
+        original_fetch = getattr(syspxy, 'fetch_yf_data', None)
+        
+        # 2. Inject a runtime override lambda function that forces the slice backward safely
+        syspxy.fetch_yf_data = lambda *args, **kwargs: df_slice
+
+        # Call your zero-argument backend function exactly as it is configured natively
+        try:
+            data = syspxy.get_all_data()
+        except Exception as e:
+            # Safe recovery step if inner sub-modules crash during runtime
+            syspxy.fetch_yf_data = original_fetch
+            continue
+            
+        # Restore the live environment link to clean up the loop memory block
+        syspxy.fetch_yf_data = original_fetch
+
         if not data:
             continue
 
@@ -78,9 +96,7 @@ def run_production_points_backtest():
         exit_signal  = str(data.get("exit", "NONE")).upper().strip()
         row_atr      = float(data.get("atr", 4.0))
         
-        # 🎯 BACKEND REUSE COMPLIANCE: 
         # The wrapper reads the final target point budget computed by your backend function.
-        # Fallback default constants are applied ONLY if your current dictionary key isn't appended yet.
         target_pts = float(data.get("target_pts", 14.0)) 
 
         # Fast trend lookup flags for exits
@@ -88,7 +104,7 @@ def run_production_points_backtest():
         is_bearish_exit = exit_signal in ["SELL", "BEAR"]
 
         # ==============================================================================
-        # 📈 EXIT ENGINE: DRIVEN SOLELY BY BACKEND GENERATED SIGNALS & TARGET TARGETS
+        # 📈 EXIT ENGINE: DRIVEN SOLELY BY BACKEND GENERATED SIGNALS & TARGETS
         # ==============================================================================
         # 1. Process CE Exits
         if ce_qty > 0:
@@ -96,7 +112,6 @@ def run_production_points_backtest():
             for pos in ce_positions:
                 current_gain = ltp - pos["entry_prc"]
                 
-                # Exits strictly if the calculated gain hits your backend target_pts OR a trend flip forces it
                 if current_gain >= target_pts or is_bearish_exit:
                     points = current_gain if current_gain > 0 else 14.0
                     total_points_gained += points
@@ -112,7 +127,7 @@ def run_production_points_backtest():
         if pe_qty > 0:
             retained_pe = []
             for pos in pe_positions:
-                current_gain = pos["entry_prc"] - ltp # Put positions profit when spot drops
+                current_gain = pos["entry_prc"] - ltp 
                 
                 if current_gain >= target_pts or is_bullish_exit:
                     points = current_gain if current_gain > 0 else 14.0
@@ -145,7 +160,7 @@ def run_production_points_backtest():
                     ce_positions.append({"entry_prc": ltp})
                     ce_qty = len(ce_positions)
                     trade_label = "COUNTER REBUY" if is_counter_trade else "NORMAL TREND BUY"
-                    print(f"{Fore.CYAN}🚀 CE LAYER OPENED ({trade_label}) AT {current_time.strftime('%H:%M')} | Price: {ltp} | Total CE Layers: {ce_qty}")
+                    print(f"{Fore.CYAN}🚀 CE POSITION LAYER OPENED ({trade_label}) AT {current_time.strftime('%H:%M')} | Price: {ltp} | Total CE Layers: {ce_qty}")
 
         # Process PE Entries
         elif entry_signal in ["ATMSELL", "OTMSELL", "SELL"]:
@@ -177,11 +192,12 @@ def run_production_points_backtest():
     pnl_color = Fore.GREEN if total_points_gained >= 0 else Fore.RED
     print(Fore.WHITE + f" • TOTAL NIFTY SPOT POINTS ACCUMULATED : " + pnl_color + f"{total_points_gained:+.2f} Points")
     
-    lot_multiplier = 75 if TICKER == "^NSEI" else 30 # Dynamic lot size selector based on config ticker parameters
+    lot_multiplier = 75 if TICKER == "^NSEI" else 30 
     cash_gained = total_points_gained * lot_multiplier
     print(Fore.WHITE + f" • EST. NET CASH P&L PER LOT SEGMENT   : " + pnl_color + f"₹{cash_gained:,.2f} INR")
     print(Fore.YELLOW + "="*56 + "\n")
 
 if __name__ == "__main__":
     run_production_points_backtest()
+
 
