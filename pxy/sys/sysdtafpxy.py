@@ -135,21 +135,30 @@ def write_matrix_to_parent_csv(df):
     except Exception as e:
         print(f"CSV_EXPORT_ERROR | Write operation failure: {e}")
 
-def fetch_yf_data(target_rows=60):
-    """DYNAMIC HISTORICAL SLICE AND FALLBACK RETRIEVAL ENGINE"""
+# 🎯 FIXED SIGNATURE: Restored 'period' and 'interval' keywords to preserve master system dependencies
+def fetch_yf_data(period=None, interval="1m", target_rows=60):
+    """DYNAMIC HISTORICAL SLICE RETRIEVAL ENGINE WITH SIGNATURE BACKWARD-COMPATIBILITY"""
     ticker_obj = yf.Ticker(TICKER)
     df = pd.DataFrame()
     
-    # Cascade lookup logic to safely find at least 60 active data points
-    for search_period in ["5d", "7d", "max"]:
+    # If a specific period is passed by an external script, use it directly
+    if period is not None:
         try:
-            df = ticker_obj.history(period=search_period, interval="1m")
-            if not df.empty:
-                df.dropna(inplace=True)
-                if len(df) >= target_rows:
-                    break
-        except Exception:
-            pass
+            df = ticker_obj.history(period=period, interval=interval)
+        except Exception as e:
+            print(f"ERROR: Explicit download failed for period={period} | {e}")
+            
+    # If no period is specified, execute your automatic 60-candle lookup cascade loop
+    if df.empty:
+        for search_period in ["5d", "7d", "max"]:
+            try:
+                df = ticker_obj.history(period=search_period, interval=interval)
+                if not df.empty:
+                    df.dropna(inplace=True)
+                    if len(df) >= target_rows:
+                        break
+            except Exception:
+                pass
 
     if df.empty or len(df) < target_rows:
         print(f"CRITICAL: Failed to collect minimum {target_rows} candles from history profiles.")
@@ -163,8 +172,8 @@ def fetch_yf_data(target_rows=60):
     else:
         df = df.tz_convert(TIMEZONE)
         
-    # JSON backup operation remains bound to 5d structure rules safely
-    dump_raw_json_in_window(ticker_obj, period="5d", interval="1m")
+    # JSON backup operation remains bound to active structure safely
+    dump_raw_json_in_window(ticker_obj, period="5d", interval=interval)
         
     # Isolate exactly the final 60 rows for execution calculations
     df = df.tail(target_rows).copy()
