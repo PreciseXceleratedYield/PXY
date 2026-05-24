@@ -5,8 +5,8 @@ import json
 import os
 from datetime import datetime
 
-# 🔥 SURGICAL UPDATE: Import both the confirmed and live variants from your core engine
-from sysdthapxy import get_pxy_data, get_pxy_live_data
+# 🔥 FIXED: Imported from your exact file module name
+from sysdthapxy import get_pxy_data
 
 # Global Config
 DEBUG = True
@@ -82,43 +82,36 @@ def get_signal(df):
         return "NONE", "NONE"
 
     try:
-        # ==============================================================================
-        # SURGICAL UPDATE: INDEPENDENT DATA PROCESSING LINES
-        # ==============================================================================
-        # 1A. Fetch CONFIRMED Dataframe strictly for Entries
-        _, _, _, confirmed_df = get_pxy_data(df=df)
+        # 1. RUN DATAFRAME THROUGH THE ENGINE TRUTH MATRIX (✅ FIXED)
+        _, _, _, calculated_df = get_pxy_data(df=df)
         
-        # 1B. Fetch LIVE RUNNING Dataframe strictly for Exits
-        _, _, _, live_df = get_pxy_live_data(df=df)
-        
-        # Column validation on both generated frames
-        if confirmed_df is None or "pxy_signal" not in confirmed_df.columns:
-            return "NONE", "NONE"
-        if live_df is None or "pxy_signal" not in live_df.columns:
+        # 🛡️ FIXED: Column validations updated to read 'pxy_signal' instead of 'ha_signal'
+        if calculated_df is None or "pxy_signal" not in calculated_df.columns:
             return "NONE", "NONE"
 
-        # 2. EXTRACT TRACKING DATA TARGETS
-        idx_confirmed = confirmed_df.index[-1]
-        idx_live      = live_df.index[-1]
+        # 2. EXTRACT TRUTH DATA FROM LAST INDEX
+        last_idx = calculated_df.index[-1]
+        raw_signal = str(calculated_df.at[last_idx, "pxy_signal"]).upper()  # ✅ FIXED
         
-        # Entry reads from confirmed (closed) frame, Exit reads from live (ticking) frame
-        raw_entry_signal = str(confirmed_df.at[idx_confirmed, "pxy_signal"]).upper()
-        raw_exit_signal  = str(live_df.at[idx_live, "pxy_signal"]).upper()
-        
-        # 3. COORDINATE MAPPING FOR VISUALIZER BAR (Pulls from Confirmed Frame for standard stability)
-        c0, o0 = float(confirmed_df.at[idx_confirmed, 'Close']), float(confirmed_df.at[idx_confirmed, 'Open'])
-        c1, o1 = float(confirmed_df.iloc[-2]['Close']), float(confirmed_df.iloc[-2]['Open'])
-        c2, o2 = float(confirmed_df.iloc[-3]['Close']), float(confirmed_df.iloc[-3]['Open'])
+        # 3. COORDINATE MAPPING FOR VISUALIZER BAR (STAYS STANDARD PRICE)
+        c0, o0 = float(calculated_df.at[last_idx, 'Close']), float(calculated_df.at[last_idx, 'Open'])
+        c1, o1 = float(calculated_df.iloc[-2]['Close']), float(calculated_df.iloc[-2]['Open'])
+        c2, o2 = float(calculated_df.iloc[-3]['Close']), float(calculated_df.iloc[-3]['Open'])
 
-        # 4. RESOLVE FINAL ASYMMETRICAL DATA STATE 
-        entry    = raw_entry_signal if raw_entry_signal in ["BUY", "SELL", "BULL", "BEAR"] else ("BULL" if c0 >= c1 else "BEAR")
-        exit_sig = raw_exit_signal if raw_exit_signal in ["BUY", "SELL", "BULL", "BEAR"] else entry
+        # 4. RESOLVE SIGNALS
+        if raw_signal in ["BUY", "SELL", "BULL", "BEAR"]:
+            entry = raw_signal
+            exit_sig = raw_signal
+        else:
+            # Fallback tracking if engine registers a "none" string value
+            entry = "BULL" if c0 >= c1 else "BEAR"
+            exit_sig = entry
 
         # 5. DIAGNOSTICS & STREAM LOGGING
         if DEBUG:
             _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig)
 
-        log_sync_state(confirmed_df.index[-1], entry, exit_sig, c0)
+        log_sync_state(calculated_df.index[-1], entry, exit_sig, c0)
         return entry, exit_sig
 
     except Exception as e:
