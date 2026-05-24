@@ -72,10 +72,11 @@ def get_momentum_ohlc(c):
         c1[1:] = c[:-1]
     return c1, c, c1, c
 
-def get_3sma_oc2_ohlc(df):
-    """Generates 3 min OC/2 Pine chart calculation candles (Mode 6)"""
-    sma_o = df['Open'].rolling(window=3, min_periods=1).mean().to_numpy()
-    sma_c = df['Close'].rolling(window=3, min_periods=1).mean().to_numpy()
+def get_3sma_oc2_ohlc(df, window=4):
+    """Generates dynamic SMA OC/2 Pine chart calculation candles (Mode 6)"""
+    # 🎯 UPDATED: Using the dynamic window parameter instead of a hardcoded 3
+    sma_o = df['Open'].rolling(window=window, min_periods=1).mean().to_numpy()
+    sma_c = df['Close'].rolling(window=window, min_periods=1).mean().to_numpy()
     
     n = len(df)
     ha_o = np.zeros(n)
@@ -93,6 +94,7 @@ def get_3sma_oc2_ohlc(df):
     ha_h = np.maximum(ha_o, ha_c)
     ha_l = np.minimum(ha_o, ha_c)
     return ha_o, ha_h, ha_l, ha_c
+
 
 def apply_ohlc_transformation(df, mode=1):
     """Transforms raw arrays into distinct, complete structural OHLC formats"""
