@@ -14,7 +14,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # Track if raw dump has run for this session
 _RAW_DUMP_DONE = False
 
-def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
+def dump_raw_json_in_window(ticker_obj, period="5d", interval="1m"):
     """Dumps raw JSON converted to IST to parent directory if within the overnight time window."""
     global _RAW_DUMP_DONE
     if _RAW_DUMP_DONE:
@@ -26,14 +26,10 @@ def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
     start_time = time(15, 45)
     end_time = time(9, 14)
 
-    # Condition logic handles cross-midnight time tracking windows
     if now_ist >= start_time or now_ist <= end_time:
         try:
-            # Fetch absolute raw fast info/history
             raw_data = ticker_obj.history(period=period, interval=interval)
-            
             if not raw_data.empty:
-                # Force timestamp index conversion to IST before dumping
                 if not isinstance(raw_data.index, pd.DatetimeIndex):
                     raw_data.index = pd.to_datetime(raw_data.index)
                 if raw_data.index.tz is None:
@@ -41,23 +37,15 @@ def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
                 else:
                     raw_data = raw_data.tz_convert(TIMEZONE)
 
-                # Setup paths safely by targeting the string index 0 from splitext tuple
                 script_directory = os.path.dirname(os.path.abspath(__file__))
                 parent_directory = os.path.dirname(script_directory)
                 base_name = os.path.splitext(os.path.basename(__file__))[0]
                 target_export_path = os.path.join(parent_directory, f"{base_name}.json")
                 
-                # Dump whole data block to JSON with IST timestamps
                 raw_data.to_json(target_export_path, date_format='iso', orient='split')
-                #print(f"📦 RAW JSON DUMP SUCCESS (IST)")
                 _RAW_DUMP_DONE = True
-            else:
-                print("WARNING: Raw data fetch returned empty frame. Skipping JSON dump.")
         except Exception as e:
             print(f"RAW_JSON_DUMP_ERROR | {e}")
-    else:
-        pass
-        #print("⚠️ MARKET HOURS DETECTED | Skipping raw JSON dump execution phase safely.")
 
 def get_heikin_ashi_ohlc(o, h, l, c):
     """Generates pure Heikin-Ashi smooth trend OHLC matrices"""
@@ -86,7 +74,6 @@ def get_momentum_ohlc(c):
 
 def get_3sma_oc2_ohlc(df):
     """Generates 3 min OC/2 Pine chart calculation candles (Mode 6)"""
-    # Calculate 3-period SMA for Open and Close prices
     sma_o = df['Open'].rolling(window=3, min_periods=1).mean().to_numpy()
     sma_c = df['Close'].rolling(window=3, min_periods=1).mean().to_numpy()
     
@@ -94,7 +81,6 @@ def get_3sma_oc2_ohlc(df):
     ha_o = np.zeros(n)
     ha_c = np.zeros(n)
     
-    # Replicate the var float running accumulator logic from Pine Script
     for i in range(n):
         current_ha_c = (sma_o[i] + sma_c[i]) / 2.0
         ha_c[i] = current_ha_c
@@ -104,7 +90,6 @@ def get_3sma_oc2_ohlc(df):
         else:
             ha_o[i] = (ha_o[i-1] + ha_c[i-1]) / 2.0
             
-    # Define boundaries strictly using the OC Midpoint data (no wicks)
     ha_h = np.maximum(ha_o, ha_c)
     ha_l = np.minimum(ha_o, ha_c)
     return ha_o, ha_h, ha_l, ha_c
@@ -147,47 +132,46 @@ def write_matrix_to_parent_csv(df):
         base_filename = base_name + ".csv"
         target_export_path = os.path.join(parent_directory, base_filename)
         df.to_csv(target_export_path, index=True)
-        #print(f"📦 PROCESSED CSV SUCCESS | Saved matrix file directly to: {target_export_path}")
     except Exception as e:
         print(f"CSV_EXPORT_ERROR | Write operation failure: {e}")
 
-def fetch_yf_data(period="1d", interval="1m", target_rows=52):
-    """PERMANENT 52-ROW STRUCTURE PROCESSING ENGINE"""
-    try:
-        ticker_obj = yf.Ticker(TICKER)
-        
-        # Intercept here for pure raw dump on first fetch
-        dump_raw_json_in_window(ticker_obj, period, interval)
-        
-        df = ticker_obj.history(period=period, interval=interval)
-        if df.empty:
-            print("WARNING: Yahoo Finance data engine returned an empty frame.")
-            return pd.DataFrame()
-        df.dropna(inplace=True)
-        if not isinstance(df.index, pd.DatetimeIndex):
-            df.index = pd.to_datetime(df.index)
-        if df.index.tz is None:
-            df = df.tz_localize('UTC').tz_convert(TIMEZONE)
-        else:
-            df = df.tz_convert(TIMEZONE)
-        live_rows = len(df)
-        if live_rows < target_rows:
-            needed_rows = target_rows - live_rows
-            first_bar = df.iloc[0]
-            base_time = df.index[0]
-            padded_timestamps = [base_time - pd.Timedelta(minutes=i) for i in range(needed_rows, 0, -1)]
-            padding_df = pd.concat([first_bar.to_frame().T] * needed_rows, ignore_index=True)
-            padding_df.index = padded_timestamps
-            df = pd.concat([padding_df, df])
-        else:
-            df = df.tail(target_rows)
-        df = df.copy()
-        processed_df = apply_ohlc_transformation(df, mode=OHLC_MODE)
-        write_matrix_to_parent_csv(processed_df)
-        return processed_df
-    except Exception as e:
-        print(f"YFINANCE_ENGINE_FAILURE | {e}")
+def fetch_yf_data(target_rows=60):
+    """DYNAMIC HISTORICAL SLICE AND FALLBACK RETRIEVAL ENGINE"""
+    ticker_obj = yf.Ticker(TICKER)
+    df = pd.DataFrame()
+    
+    # Cascade lookup logic to safely find at least 60 active data points
+    for search_period in ["5d", "7d", "max"]:
+        try:
+            df = ticker_obj.history(period=search_period, interval="1m")
+            if not df.empty:
+                df.dropna(inplace=True)
+                if len(df) >= target_rows:
+                    break
+        except Exception:
+            pass
+
+    if df.empty or len(df) < target_rows:
+        print(f"CRITICAL: Failed to collect minimum {target_rows} candles from history profiles.")
         return pd.DataFrame()
+        
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
+        
+    if df.index.tz is None:
+        df = df.tz_localize('UTC').tz_convert(TIMEZONE)
+    else:
+        df = df.tz_convert(TIMEZONE)
+        
+    # JSON backup operation remains bound to 5d structure rules safely
+    dump_raw_json_in_window(ticker_obj, period="5d", interval="1m")
+        
+    # Isolate exactly the final 60 rows for execution calculations
+    df = df.tail(target_rows).copy()
+    
+    processed_df = apply_ohlc_transformation(df, mode=OHLC_MODE)
+    write_matrix_to_parent_csv(processed_df)
+    return processed_df
 
 def get_latest_data():
     """Returns the most recent live completed row using active config files parameters"""
@@ -198,5 +182,5 @@ if __name__ == "__main__":
     print(f"=== CURRENTLY ENFORCED DATA TRANSFORMATION MODE: {OHLC_MODE} ===")
     output_df = fetch_yf_data()
     if not output_df.empty:
-        print(f"ENGINE_RUN_SUCCESS | Total Data Frame Sizing Bounds: {output_df.shape}")
-
+        print(f"ENGINE_RUN_SUCCESS | Collected Rows Count: {len(output_df)}")
+        print(f"Processed Matrix Head:\n{output_df.head(2)}")
