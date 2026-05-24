@@ -10,7 +10,7 @@ init(autoreset=True)
 # --- CONFIG --- 
 REBUY_ENABLED = True 
 MAX_LAYERS = 2
-COOL_DOWN_SECONDS = 20  # ⏱️ UPDATED: Cooling interval set to exactly 20 seconds
+COOL_DOWN_SECONDS = 20  
 ATR_MULTIPLIER = 2 
 
 def generate_pxy_tag(): 
@@ -28,7 +28,10 @@ def is_cooling(side):
         return False 
     try: 
         with open(file_path, "r") as f: 
-            last_ts = float(f.read().strip()) 
+            content = f.read().strip()
+            if not content:
+                return False
+            last_ts = float(content) 
             if (time.time() - last_ts) < COOL_DOWN_SECONDS: 
                 return True 
         os.remove(file_path) 
@@ -63,17 +66,21 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
-    # 1. ✅ FIXED: Extract string from the last row of the 'exit' column safely
     if "exit" not in df.columns:
         return
     raw_exit_signal = str(df["exit"].iloc[-1]).upper().strip() 
 
-    # 2. Exclusively evaluate the explicit matrix states
+    # ========================================================
+    # 🎯 SURGICAL UPDATE: SUPPORT BOTH ATM AND OTM MATRIX SIGNALS
+    # ========================================================
     current_signal = "NONE"
-    if raw_exit_signal == "AVGB":
+    if raw_exit_signal.startswith("ATMBUY") or raw_exit_signal.startswith("OTMBUY"):
         current_signal = "AVGB"
-    elif raw_exit_signal == "AVGS":
+    elif raw_exit_signal.startswith("ATMSELL") or raw_exit_signal.startswith("OTMSELL"):
         current_signal = "AVGS"
+
+    # Safeguard copy to eliminate slice view modification warning
+    df = df.copy()
 
     # 3. Add side helper column derived from symbol layout
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
@@ -93,44 +100,36 @@ def handle_side_averaging(client, df):
         # ======================================================== 
         all_positions_crossed_threshold = True
         
-        # Scan every single open contract on this specific side
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
-            # Extract dynamic ATR ceiling for this specific contract row
             raw_atr_pct = float(row.get("atr", 0))
             if raw_atr_pct > 0:
                 row_threshold = -(raw_atr_pct * ATR_MULTIPLIER)
             else:
                 row_threshold = -14.0
             
-            # If even ONE position has NOT crossed the threshold yet, flip the flag to False
             if pos_loss > row_threshold:
                 all_positions_crossed_threshold = False
-                break  # Stop checking this side immediately, it's not ready to average
+                break  
 
         # ======================================================== 
         # 🛡️ THE "DOUBLE LOCK" TRIGGER VALUATION
         # ======================================================== 
-        # Lock 1: All open side contracts must be past their individual ATR loss floors
         loss_hit = all_positions_crossed_threshold
 
-        # Lock 2: Match strictly on your dedicated state matrix values
         signal_matches = (
             (side == 'CE' and current_signal == "AVGB") or
             (side == 'PE' and current_signal == "AVGS")
         )
 
-        # Only execute if both locks are green, cooling clears, and total side rows are within limits
         if loss_hit and signal_matches: 
             if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
-                # Pick the latest contract entry of this side to deploy the average order on
                 last_order = side_df.iloc[-1]
                 symbol = last_order['symbol'] 
                 qty = abs(int(last_order['qty'])) 
                 new_tag = generate_pxy_tag() 
                 
-                # Fetch final metrics for terminal report visualization
                 final_loss = get_loss(last_order)
                 raw_atr_pct = float(last_order.get("atr", 0))
                 final_threshold = -(raw_atr_pct * ATR_MULTIPLIER) if raw_atr_pct > 0 else -14.0
