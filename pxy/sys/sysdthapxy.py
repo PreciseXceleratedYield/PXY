@@ -3,24 +3,12 @@ import pandas as pd
 import numpy as np
 from sysdtafpxy import fetch_yf_data
 
-USE_FORMING_CANDLE = False  # Hard-locked to completed candles for absolute production confirmation
 CANDLE_STYLE = "CLOSE_MOMENTUM"
 
-def get_pxy_data(tickerSymbol=None, df=None):
-    if df is None:
-        df = fetch_yf_data()
-        
-    if df is None or df.empty:
-        return None, None, None, pd.DataFrame()
-        
-    # Safeguard: Separate processing safely from global reference memory
+def _compute_pxy_matrices(df):
+    """Internal core engine to process signals and colors uniformly across both variants."""
     df = df.copy()
-        
-    required_cols = ['Open', 'High', 'Low', 'Close']
-    for col in required_cols:
-        if col not in df.columns:
-            return None, None, None, pd.DataFrame()
-
+    
     # ==================================================
     # ⚡ DATA MATRIX PRE-COMPUTATION
     # ==================================================
@@ -29,7 +17,7 @@ def get_pxy_data(tickerSymbol=None, df=None):
     df['c2_close'] = df['Close'].shift(2) 
 
     # ==================================================
-    # 🔥 SIGNAL ENGINE (PURE CLOSED STRUCTURE CONFIRMATIONS)
+    # 🔥 SIGNAL ENGINE (PURE DIRECTIONAL CONFIRMATIONS)
     # ==================================================
     signal_array = np.full(len(df), "none", dtype=object)
     
@@ -71,18 +59,71 @@ def get_pxy_data(tickerSymbol=None, df=None):
     choices = ["green", "red"]
     
     df["pxy_color"] = np.select(conditions, choices, default="gray")
+    return df
 
-    # ==================================================
-    # 🛡️ PRODUCTION OUTPUT FILTER (GAP EXCLUSION CODES)
-    # ==================================================
-    # Slicing is executed safely here to drop the live running candle from the pipeline
-    final_df = df.iloc[:-1].copy()
+
+# ==============================================================================
+# VARIANT 1: CONFIRMED HISTORICAL VARIANT (Excludes Live Running Candle)
+# ==============================================================================
+def get_pxy_data(tickerSymbol=None, df=None):
+    """
+    Returns only frozen, fully completed candles.
+    Drops the last row (live running candle) to prevent repainting.
+    """
+    if df is None:
+        df = fetch_yf_data()
+        
+    if df is None or df.empty:
+        return None, None, None, pd.DataFrame()
+        
+    required_cols = ['Open', 'High', 'Low', 'Close']
+    for col in required_cols:
+        if col not in df.columns:
+            return None, None, None, pd.DataFrame()
+
+    # Compute core math matrices
+    processed_df = _compute_pxy_matrices(df)
+
+    # Truncate to exclude the ticking candle
+    final_df = processed_df.iloc[:-1].copy()
     
     pxy_close = final_df['Close'].copy()
     pxy_open = final_df['Open'].copy()
     pxy_color_series = final_df['pxy_color'].copy()
 
     return pxy_close, pxy_open, pxy_color_series, final_df
+
+
+# ==============================================================================
+# VARIANT 2: LIVE RUNNING VARIANT (🎯 MATCHING SIGNATURE UNIFICATION)
+# ==============================================================================
+def get_pxy_live_data(tickerSymbol=None, df=None):
+    """
+    Returns the entire dataset up to the current moment.
+    Includes the live, actively flashing forming candle at index [-1].
+    """
+    if df is None:
+        df = fetch_yf_data()
+        
+    if df is None or df.empty:
+        return None, None, None, pd.DataFrame()
+        
+    required_cols = ['Open', 'High', 'Low', 'Close']
+    for col in required_cols:
+        if col not in df.columns:
+            return None, None, None, pd.DataFrame()
+
+    # Compute core math matrices
+    live_df = _compute_pxy_matrices(df)
+    
+    # Extract matrices including the live running bar
+    pxy_close = live_df['Close'].copy()
+    pxy_open = live_df['Open'].copy()
+    pxy_color_series = live_df['pxy_color'].copy()
+
+    # 🎯 Unification: Signature remains exactly 4 parameters.
+    # To check the live signal state, an external script simply queries: df['pxy_signal'].iloc[-1]
+    return pxy_close, pxy_open, pxy_color_series, live_df
 
 
 
