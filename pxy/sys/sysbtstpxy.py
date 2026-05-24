@@ -1,4 +1,4 @@
-# sysbtstpxy.py
+# sysbacktestpxy.py
 import sys
 import numpy as np
 import pandas as pd
@@ -28,7 +28,7 @@ def run_production_points_backtest():
     print(f" 🏆 PXY® ENGINE MOVEMENT BACKTEST RUNNER (RATE-LIMIT SAFE) 🏆 ")
     print(f"{Fore.YELLOW}========================================================")
     
-    # 🎯 FIX 1: DOWNLOAD ALL HISTORICAL DATA ONCE HERE (ONLY 1 SINGLE API CALL)
+    # Download 7 days of data once into memory to bypass rate limits entirely
     ticker_obj = yf.Ticker(TICKER)
     df_raw = ticker_obj.history(period="7d", interval="1m")
     
@@ -56,12 +56,14 @@ def run_production_points_backtest():
     total_points_gained = 0.0
     trade_count = 0
 
-    # Find the starting index where today's session actually begins in df_raw
-    today_start_indices = np.where(df_raw.index.date == target_day)[0]
-    if len(today_start_indices) == 0:
+    # 🎯🎯🎯 FIXED: SURGICAL INDEX EXTRACTION 🎯🎯🎯
+    # np.where returns a tuple of arrays. [0][0] safely isolates the exact 
+    # first integer index integer where today's session opens in df_raw.
+    today_start_indices = np.where(df_raw.index.date == target_day)
+    if len(today_start_indices[0]) == 0:
         print(f"{Fore.RED}❌ CRITICAL ERROR: No intraday bars found for today.")
         return
-    start_idx = today_start_indices[0]
+    start_idx = int(today_start_indices[0][0])
 
     # --- STEP-BY-STEP MINUTE SIMULATION LOOP ---
     for idx in range(start_idx, len(df_raw)):
@@ -73,15 +75,13 @@ def run_production_points_backtest():
         # Get current spot price of Nifty at this exact simulation minute
         ltp = float(df_raw['Close'].iloc[idx])
 
-        # 🎯 FIX 2: SLICE EXTRACT DIRECTLY FROM LOCAL DATA (ZERO NETWORK CALLS INSIDE LOOP)
+        # Slice extract directly from local cache data (Zero network calls inside loop)
         df_slice = df_raw.iloc[:idx+1].copy()
 
         # ==============================================================================
         # ⚡ MONKEY-PATCH OVERRIDE LINK
         # ==============================================================================
         original_fetch = getattr(syspxy, 'fetch_yf_data', None)
-        
-        # Force the loop lambda to pull our local historical df_slice copy natively
         syspxy.fetch_yf_data = lambda *args, **kwargs: df_slice
 
         try:
@@ -215,7 +215,4 @@ def run_production_points_backtest():
     lot_multiplier = 75 if TICKER == "^NSEI" else 30 
     cash_gained = total_points_gained * lot_multiplier
     print(Fore.WHITE + f" • EST. NET CASH P&L PER LOT SEGMENT   : " + pnl_color + f"₹{cash_gained:,.2f} INR")
-    print(Fore.YELLOW + "="*56 + "\n")
-
-
 
