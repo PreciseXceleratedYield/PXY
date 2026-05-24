@@ -25,11 +25,12 @@ except ImportError:
 
 def run_production_points_backtest():
     print(f"{Fore.YELLOW}========================================================")
-    print(f" 🏆 PXY® ENGINE MOVEMENT BACKTEST RUNNER (ZERO-MATH) 🏆 ")
+    print(f" 🏆 PXY® ENGINE MOVEMENT BACKTEST RUNNER (RATE-LIMIT SAFE) 🏆 ")
     print(f"{Fore.YELLOW}========================================================")
     
+    # 🎯 FIX 1: DOWNLOAD ALL HISTORICAL DATA ONCE HERE (ONLY 1 SINGLE API CALL)
     ticker_obj = yf.Ticker(TICKER)
-    df_raw = ticker_obj.history(period="5d", interval="1m")
+    df_raw = ticker_obj.history(period="7d", interval="1m")
     
     if df_raw.empty:
         print(f"{Fore.RED}❌ CRITICAL ERROR: Failed to extract history matrices.")
@@ -72,13 +73,15 @@ def run_production_points_backtest():
         # Get current spot price of Nifty at this exact simulation minute
         ltp = float(df_raw['Close'].iloc[idx])
 
-        # Send a larger data block up to the current minute (idx + 1)
+        # 🎯 FIX 2: SLICE EXTRACT DIRECTLY FROM LOCAL DATA (ZERO NETWORK CALLS INSIDE LOOP)
         df_slice = df_raw.iloc[:idx+1].copy()
 
         # ==============================================================================
         # ⚡ MONKEY-PATCH OVERRIDE LINK
         # ==============================================================================
         original_fetch = getattr(syspxy, 'fetch_yf_data', None)
+        
+        # Force the loop lambda to pull our local historical df_slice copy natively
         syspxy.fetch_yf_data = lambda *args, **kwargs: df_slice
 
         try:
@@ -160,7 +163,6 @@ def run_production_points_backtest():
         # ==============================================================================
         # 📥 ENTRY ENGINE: POSITION RE-BALANCING & COUNTER AVERAGING
         # ==============================================================================
-        # Process CE Entries
         if entry_signal in ["ATMBUY", "OTMBUY", "BUY"]:
             all_ce_crossed_threshold = True
             for pos in ce_positions:
@@ -180,7 +182,6 @@ def run_production_points_backtest():
                     trade_label = "COUNTER REBUY" if is_counter_trade else "NORMAL TREND BUY"
                     print(f"{Fore.CYAN}🚀 CE POSITION LAYER OPENED ({trade_label}) AT {current_time.strftime('%H:%M')} | Price: {ltp} | Total CE Layers: {ce_qty}")
 
-        # Process PE Entries
         elif entry_signal in ["ATMSELL", "OTMSELL", "SELL"]:
             all_pe_crossed_threshold = True
             for pos in pe_positions:
@@ -215,9 +216,6 @@ def run_production_points_backtest():
     cash_gained = total_points_gained * lot_multiplier
     print(Fore.WHITE + f" • EST. NET CASH P&L PER LOT SEGMENT   : " + pnl_color + f"₹{cash_gained:,.2f} INR")
     print(Fore.YELLOW + "="*56 + "\n")
-
-if __name__ == "__main__":
-    run_production_points_backtest()
 
 
 
