@@ -1,10 +1,7 @@
-from datetime import datetime, timedelta
 from colorama import Fore, Style, init
-import pytz
 
 # Initialize colorama for colored console logs
 init(autoreset=True)
-IST = pytz.timezone("Asia/Kolkata")
 
 # Global set to track printed sides for the current refresh cycle
 PRINTED_SIDES = set()
@@ -25,30 +22,10 @@ def i(x, d=0):
 def target_price(row):
     global PRINTED_SIDES
     try:
-        # 1. ENTRY DATA & FRESHNESS CHECK
+        # 1. ENTRY DATA CHECK
         entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
         if entry_prc <= 0:
             return 0
-
-        # Check if trade is fresh (within 2 minutes)
-        is_fresh = False
-        entry_time_raw = row.get("entry_time")
-        
-        if entry_time_raw:
-            if isinstance(entry_time_raw, str):
-                entry_time = datetime.strptime(entry_time_raw, "%Y-%m-%d %H:%M:%S")
-                entry_time = IST.localize(entry_time)
-            else:
-                if entry_time_raw.tzinfo is None:
-                    entry_time = IST.localize(entry_time_raw)
-                else:
-                    entry_time = entry_time_raw.astimezone(IST)
-                
-            current_time = datetime.now(IST)
-            time_diff = (current_time - entry_time).total_seconds() / 60.0
-            
-            if time_diff <= 2.0:
-                is_fresh = True
 
         # 2. BASE CALCULATION
         atr_val = f(row.get("atr"), 6.0)
@@ -69,8 +46,8 @@ def target_price(row):
         pe_p = f(row.get("pe_power"), 1.0)
 
         # Fast membership trend lookups
-        is_bullish_signal = clean_signal in ("BUY", "BULL", "AVGB")
-        is_bearish_signal = clean_signal in ("SELL", "BEAR", "AVGS")
+        is_bullish_signal = clean_signal in ("BUY", "BULL")
+        is_bearish_signal = clean_signal in ("SELL", "BEAR")
 
         # Core scaling math multipliers
         ce_calc = (1.4 * hce_d) ** min(ce_p, 2)
@@ -80,17 +57,16 @@ def target_price(row):
         state = "⏳"
         final_pct_score = BASE_SCORE
 
+        # ==============================================================================
+        # 🎯 DIRECT SIGNAL & COUNTER ENGINE (FRESH OVERRIDES REMOVED)
+        # ==============================================================================
         if is_ce:
             if is_counter and is_bullish_signal:
                 state = "🎯"  
-                # ✅ FIXED: Replaced 'atr' with 'atr_val' to prevent NameError crash
-                final_pct_score = atr_val * ce_p
+                final_pct_score = 99.0  
             elif is_counter and is_bearish_signal:
                 state = "🚨"  
-                final_pct_score = 1.4
-            elif is_fresh:
-                state = "🆕"
-                final_pct_score = 3.0
+                final_pct_score = 1.4   
             elif is_bullish_signal:
                 state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
             elif is_bearish_signal:
@@ -100,14 +76,10 @@ def target_price(row):
         elif is_pe:
             if is_counter and is_bearish_signal:
                 state = "🎯"  
-                # ✅ FIXED: Replaced 'atr' with 'atr_val' to prevent NameError crash
-                final_pct_score = atr_val * pe_p
+                final_pct_score = 99.0  
             elif is_counter and is_bullish_signal:
                 state = "🚨"  
-                final_pct_score = 1.4
-            elif is_fresh:
-                state = "🆕"
-                final_pct_score = 3.0
+                final_pct_score = 1.4   
             elif is_bearish_signal:
                 state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
             elif is_bullish_signal:
@@ -125,10 +97,8 @@ def target_price(row):
         # 8. SUPPRESSED DEBUG PRINT
         if side not in PRINTED_SIDES and side != "NA":
             color = (
-                Fore.GREEN if state == "🆕" else (
-                    Fore.CYAN if state == "🔥" else (
-                        Fore.RED if state == "🚨" else (Fore.MAGENTA if state == "🎯" else Fore.YELLOW)
-                    )
+                Fore.CYAN if state == "🔥" else (
+                    Fore.RED if state == "🚨" else (Fore.MAGENTA if state == "🎯" else Fore.YELLOW)
                 )
             )
             print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state}")
@@ -138,4 +108,5 @@ def target_price(row):
 
     except Exception:
         return 0
+
 
