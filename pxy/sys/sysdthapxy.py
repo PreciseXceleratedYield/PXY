@@ -3,8 +3,7 @@ import pandas as pd
 import numpy as np
 from sysdtafpxy import fetch_yf_data
 
-# ⚡ LIVE ENFORCEMENT ACTIVATED: Set to True to stream active forming bars dynamically
-USE_FORMING_CANDLE = True  
+USE_FORMING_CANDLE = False  # Hard-locked to completed candles for absolute production confirmation
 CANDLE_STYLE = "CLOSE_MOMENTUM"
 
 def get_pxy_data(tickerSymbol=None, df=None):
@@ -30,22 +29,17 @@ def get_pxy_data(tickerSymbol=None, df=None):
     df['c2_close'] = df['Close'].shift(2) 
 
     # ==================================================
-    # 🔥 SIGNAL ENGINE (REAL-TIME STREAM EVALUATION)
+    # 🔥 SIGNAL ENGINE (PURE CLOSED STRUCTURE CONFIRMATIONS)
     # ==================================================
     signal_array = np.full(len(df), "none", dtype=object)
-    
-    # Pre-extract numpy vectors for fast processing loops
-    c0_v = df['c0_close'].to_numpy()
-    c1_v = df['c1_close'].to_numpy()
-    c2_v = df['c2_close'].to_numpy()
     
     for i in range(len(df)):
         if i < 2:
             continue
             
-        c0 = float(c0_v[i])
-        c1 = float(c1_v[i])
-        c2 = float(c2_v[i])
+        c0 = float(df['c0_close'].iloc[i])
+        c1 = float(df['c1_close'].iloc[i])
+        c2 = float(df['c2_close'].iloc[i])
         
         # Rule Trigger A: Flat execution state detected (C1 == C0)
         if c1 == c0:
@@ -68,7 +62,7 @@ def get_pxy_data(tickerSymbol=None, df=None):
     df["pxy_signal"] = signal_array
 
     # ==================================================
-    # 🎨 COLOR PROCESSING (STRICT PRICE RULES)
+    # 🎨 COLOR PROCESSING (STRICT CLOSED PRICE RULES)
     # ==================================================
     is_green = (df['c0_close'] > df['c1_close']) | ((df['c0_close'] == df['c1_close']) & (df['c0_close'] > df['c2_close']))
     is_red   = (df['c0_close'] < df['c1_close']) | ((df['c0_close'] == df['c1_close']) & (df['c0_close'] < df['c2_close']))
@@ -79,14 +73,10 @@ def get_pxy_data(tickerSymbol=None, df=None):
     df["pxy_color"] = np.select(conditions, choices, default="gray")
 
     # ==================================================
-    # 🛡️ PRODUCTION OUTPUT FILTER (CONNECTED SWITCH)
+    # 🛡️ PRODUCTION OUTPUT FILTER (GAP EXCLUSION CODES)
     # ==================================================
-    # If USE_FORMING_CANDLE is True, process the absolute latest live ticking bar.
-    # If False, drop the incomplete bar to stick to closed historical bars only.
-    if USE_FORMING_CANDLE:
-        final_df = df.copy()
-    else:
-        final_df = df.iloc[:-1].copy()
+    # Slicing is executed safely here to drop the live running candle from the pipeline
+    final_df = df.iloc[:-1].copy()
     
     pxy_close = final_df['Close'].copy()
     pxy_open = final_df['Open'].copy()
