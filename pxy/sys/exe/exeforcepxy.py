@@ -69,37 +69,28 @@ def execute_order(client, symbol, qty):
         return {"stat": "FAIL", "err": str(e)}
 
 async def main():
-    if len(sys.argv) < 2:
-        print(f"{Fore.RED}Usage: python exeforcepxy.py [BUY/SELL]")
-        return
-
-    action = sys.argv.upper().strip()
-    if action == "BUY":
-        sig = "ATMBUY"
-        side_label = "CE"
-    elif action == "SELL":
-        sig = "ATMSELL"
-        side_label = "PE"
-    else:
-        print(f"{Fore.RED}Invalid parameter! Use 'BUY' or 'SELL'.")
-        return
-
-    # --- INTERACTIVE CONFIRMATION PROMPT ---
-    print(f"\n{Fore.YELLOW}⚠️  ATTENTION: You are about to FORCE execute a {Fore.RED}{action}{Fore.YELLOW} order ({side_label}).")
-    print(f"{Fore.WHITE} [1] Confirm and Send Order")
-    print(f"{Fore.WHITE} [2] Cancel Execution")
+    print(f"\n{Fore.YELLOW}⚡ === EXECUTOR FORCED ENGINE ===")
+    print(f"{Fore.WHITE} [1] FORCE BUY (CE)")
+    print(f"{Fore.WHITE} [2] FORCE SELL (PE)")
+    print(f"{Fore.WHITE} [3] CANCEL / EXIT")
     
-    # Use loop to enforce a valid 1 or 2 choice
+    # Force the user to pick an accurate route via menu numeric interface
     while True:
         try:
-            choice = input(f"{Fore.CYAN}Select option (1 or 2): {Style.RESET_ALL}").strip()
+            choice = input(f"{Fore.CYAN}Select action (1, 2, or 3): {Style.RESET_ALL}").strip()
             if choice == "1":
+                sig = "ATMBUY"
+                side_label = "CE"
                 break
             elif choice == "2":
-                print(f"{Fore.YELLOW}❌ Execution aborted by user.")
+                sig = "ATMSELL"
+                side_label = "PE"
+                break
+            elif choice in ["3", ""]:
+                print(f"{Fore.YELLOW}❌ Execution aborted.")
                 return
             else:
-                print(f"{Fore.RED}Invalid input. Please enter exactly 1 or 2.")
+                print(f"{Fore.RED}Invalid selection. Enter 1 for BUY, 2 for SELL, or 3 to exit.")
         except (KeyboardInterrupt, SystemExit):
             print(f"\n{Fore.YELLOW}❌ Execution aborted.")
             return
@@ -145,3 +136,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
