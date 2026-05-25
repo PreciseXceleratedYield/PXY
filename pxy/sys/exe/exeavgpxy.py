@@ -11,8 +11,8 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 1
 COOL_DOWN_SECONDS = 20  
-ATR_MULTIPLIER = 2 
-DEBUG_MODE = True  # 🔍 SET TO TRUE FOR FORCEFUL TERMINAL MONITORING
+ATR_MULTIPLIER = 3 
+DEBUG_MODE = True  # 🔍 Keep enabled to trace threshold breaks cleanly
 
 def generate_pxy_tag(): 
     IST = pytz.timezone("Asia/Kolkata") 
@@ -49,7 +49,7 @@ def is_cooling(side):
             print(f"{Fore.RED}[DEBUG] ⚠️ Error reading cooling file: {e}")
         return False 
 
-def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, signal, tag):
+def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag):
     """Renders a strict 42-character width dashboard ONLY upon an order trigger event."""
     width = 42
     border = Fore.YELLOW + "=" * width
@@ -60,17 +60,16 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, si
     print(divider)
     print(Fore.WHITE + f" • SYMBOL       : {symbol}")
     print(Fore.WHITE + f" • SIDE OPTION   : {side}")
-    print(Fore.WHITE + f" • ACTIVE SIGNAL : {signal}")
     print(Fore.WHITE + f" • TRIGGER LOSS  : " + Fore.RED + f"{current_loss:.2f}%")
     print(Fore.WHITE + f" • ATR TARGET (%): " + Fore.YELLOW + f"{target_threshold:.2f}%")
     print(Fore.WHITE + f" • ORDER TAG     : {tag}")
     print(border + "\n")
 
 def handle_side_averaging(client, df): 
-    """Averages only if EVERY active position on that side has crossed the ATR threshold.""" 
+    """Averages side positions (CE or PE) strictly based on individual ATR threshold drops.""" 
     if DEBUG_MODE:
         print(f"\n{Fore.BLUE}[DEBUG] ========================================")
-        print(f"{Fore.BLUE}[DEBUG] 🚀 STARTING AVERAGING ENGINE EVALUATION")
+        print(f"{Fore.BLUE}[DEBUG] 🚀 STARTING MATHEMATICAL THRESHOLD ENGINE")
         print(f"{Fore.BLUE}[DEBUG] ========================================")
 
     if df is None or df.empty: 
@@ -94,18 +93,6 @@ def handle_side_averaging(client, df):
         if DEBUG_MODE:
             print(f"{Fore.RED}[DEBUG] ❌ Execution Aborted: Time window restricted (9:30 AM - 3:10 PM only).")
         return 
-
-    if "exit" not in df.columns:
-        if DEBUG_MODE:
-            print(f"{Fore.RED}[DEBUG] ❌ Execution Aborted: Missing required column 'exit' inside input DataFrame.")
-        return
-        
-    # Extract string from the last row of the 'exit' column safely
-    raw_exit_signal = str(df["exit"].iloc[-1]).upper().strip() 
-    current_signal = raw_exit_signal
-
-    if DEBUG_MODE:
-        print(f"{Fore.WHITE}[DEBUG] • Raw Active Matrix Signal Extracted: '{current_signal}'")
 
     # Safeguard copy to eliminate slice warnings
     df = df.copy()
@@ -131,18 +118,18 @@ def handle_side_averaging(client, df):
             continue 
 
         # ======================================================== 
-        # 🔄 ALL-OR-NOTHING CONDITION ENGINE
+        # 🔄 ALL-OR-NOTHING CONDITION ENGINE (STRICTLY ON DRAWDOWN)
         # ======================================================== 
         all_positions_crossed_threshold = True
         
         for index, row in side_df.iterrows():
-            pos_loss = get_loss(row)  # Clean positive float drop (e.g. 25.0)
+            pos_loss = get_loss(row)  # Clean positive float drop percentage (e.g. 8.67)
             
             raw_atr_pct = float(row.get("atr", 0))
             if raw_atr_pct > 0:
                 row_threshold = raw_atr_pct * ATR_MULTIPLIER
             else:
-                row_threshold = 14.0  # 14% target floor drop
+                row_threshold = 14.0  # Default 14% target floor drop fallback
             
             if DEBUG_MODE:
                 print(f"{Fore.WHITE}[DEBUG]   ↳ Contract: {row['symbol']} | Current Drop: {pos_loss:.2f}% | Target Floor: {row_threshold:.2f}%")
@@ -150,32 +137,25 @@ def handle_side_averaging(client, df):
             # Trigger check: If loss drop is LESS than target drop floor, it hasn't dropped enough
             if pos_loss < row_threshold:
                 if DEBUG_MODE:
-                    print(f"{Fore.RED}[DEBUG]   ❌ Blocker: Position hasn't fallen enough to hit threshold floor.")
+                    print(f"{Fore.RED}[DEBUG]   ❌ Blocker: Position has not hit drawdown threshold floor yet.")
                 all_positions_crossed_threshold = False
                 break  
 
         # ======================================================== 
-        # 🛡️ THE "DOUBLE LOCK" TRIGGER VALUATION
+        # 🛡️ THE PURE DRAWDOWN EXECUTION ROUTER
         # ======================================================== 
         loss_hit = all_positions_crossed_threshold
 
-        # Lock 2: Match cleanly using fixed 'in' syntax over valid raw signals
-        signal_matches = (
-            (side == 'CE' and current_signal in ["ATMBUY", "OTMBUY"]) or
-            (side == 'PE' and current_signal in ["ATMSELL", "OTMSELL"])
-        )
-
         if DEBUG_MODE:
-            print(f"{Fore.WHITE}[DEBUG] • Lock 1 [Drawdown Threshold Passed] : {loss_hit}")
-            print(f"{Fore.WHITE}[DEBUG] • Lock 2 [Signal Route Direction Match]: {signal_matches}")
+            print(f"{Fore.WHITE}[DEBUG] • Drawdown Threshold Passed Flag : {loss_hit}")
 
-        if loss_hit and signal_matches: 
-            # Layer cap verification
+        if loss_hit: 
+            # Verification of layer cap constraints and safety timeouts
             layer_check = len(side_df) < (MAX_LAYERS + 1)
             cooling_check = not is_cooling(side)
             
             if DEBUG_MODE:
-                print(f"{Fore.WHITE}[DEBUG] • Layer Count Check Passed : {layer_check} (Active: {len(side_df)} / Max Allowed Layers: {MAX_LAYERS + 1})")
+                print(f"{Fore.WHITE}[DEBUG] • Layer Count Check Passed : {layer_check} (Active: {len(side_df)} / Max Allowed: {MAX_LAYERS + 1})")
                 print(f"{Fore.WHITE}[DEBUG] • Cooling Off Period Clear: {cooling_check}")
 
             if layer_check and cooling_check: 
@@ -188,7 +168,8 @@ def handle_side_averaging(client, df):
                 raw_atr_pct = float(last_order.get("atr", 0))
                 final_threshold = (raw_atr_pct * ATR_MULTIPLIER) if raw_atr_pct > 0 else 14.0
                 
-                print_pxy_trigger_dashboard(side, symbol, -final_loss, -final_threshold, current_signal, new_tag)
+                # Prints clean negative dashboard layout values to preserve standard terminal metrics style
+                print_pxy_trigger_dashboard(side, symbol, -final_loss, -final_threshold, new_tag)
                 
                 try: 
                     params = { 
@@ -214,13 +195,13 @@ def handle_side_averaging(client, df):
                     print(f"{Fore.RED}❌ Rebuy Execution Failed: {e}")
             else:
                 if DEBUG_MODE:
-                    print(f"{Fore.RED}[DEBUG] ❌ Order Aborted: Layer limits hit or cooling active.")
+                    print(f"{Fore.RED}[DEBUG] ❌ Order Aborted: Layer limits hit or cooling active for side {side}.")
         else:
             if DEBUG_MODE:
-                print(f"{Fore.RED}[DEBUG] ❌ Order Aborted: Direct matching validation locks failed for side {side}.")
+                print(f"{Fore.RED}[DEBUG] ❌ Order Aborted: Threshold verification failed for side {side}.")
 
     if DEBUG_MODE:
         print(f"{Fore.BLUE}[DEBUG] ========================================")
-        print(f"{Fore.BLUE}[DEBUG] 🏁 FINISHED AVERAGING ENGINE EVALUATION")
+        print(f"{Fore.BLUE}[DEBUG] 🏁 FINISHED MATHEMATICAL THRESHOLD EVALUATION")
         print(f"{Fore.BLUE}[DEBUG] ========================================\n")
 
