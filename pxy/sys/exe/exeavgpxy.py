@@ -10,7 +10,7 @@ init(autoreset=True)
 # --- CONFIG --- 
 REBUY_ENABLED = True 
 MAX_LAYERS = 1
-COOL_DOWN_SECONDS = 20  # ⏱️ UPDATED: Cooling interval set to exactly 20 seconds
+COOL_DOWN_SECONDS = 20  
 ATR_MULTIPLIER = 2 
 
 def generate_pxy_tag(): 
@@ -28,7 +28,10 @@ def is_cooling(side):
         return False 
     try: 
         with open(file_path, "r") as f: 
-            last_ts = float(f.read().strip()) 
+            content = f.read().strip()
+            if not content:
+                return False
+            last_ts = float(content) 
             if (time.time() - last_ts) < COOL_DOWN_SECONDS: 
                 return True 
         os.remove(file_path) 
@@ -63,25 +66,26 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
-    # 1. ✅ FIXED: Extract string from the last row of the 'exit' column safely
     if "exit" not in df.columns:
         return
+        
+    # Extract string from the last row of the 'exit' column safely
     raw_exit_signal = str(df["exit"].iloc[-1]).upper().strip() 
 
-    # 2. Exclusively evaluate the explicit matrix states
-    current_signal = "NONE"
-    if raw_exit_signal == "AVGB":
-        current_signal = "AVGB"
-    elif raw_exit_signal == "AVGS":
-        current_signal = "AVGS"
+    # Assign raw exit signal to current_signal variable to support the matrix evaluation below
+    current_signal = raw_exit_signal
 
-    # 3. Add side helper column derived from symbol layout
+    # Safeguard copy to eliminate slice warnings
+    df = df.copy()
+
+    # Add side helper column derived from symbol layout
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
 
     def get_loss(row): 
         entry = float(row.get("buy_prc", 0)) 
         ltp = float(row.get("sell_prc", 0)) 
-        return ((ltp - entry) / entry) * 100 if entry > 0 else 0 
+        # Returns clean positive drawdown value for safe, inverted numeric comparisons
+        return ((entry - ltp) / entry) * 100 if entry > 0 else 0 
 
     for side in ['CE', 'PE']: 
         side_df = df[df['side'] == side] 
@@ -93,48 +97,44 @@ def handle_side_averaging(client, df):
         # ======================================================== 
         all_positions_crossed_threshold = True
         
-        # Scan every single open contract on this specific side
         for index, row in side_df.iterrows():
-            pos_loss = get_loss(row)
+            pos_loss = get_loss(row)  # Loss value is now a positive float drop (e.g. 25.0)
             
-            # Extract dynamic ATR ceiling for this specific contract row
             raw_atr_pct = float(row.get("atr", 0))
             if raw_atr_pct > 0:
-                row_threshold = -(raw_atr_pct * ATR_MULTIPLIER)
+                row_threshold = raw_atr_pct * ATR_MULTIPLIER
             else:
-                row_threshold = -14.0
+                row_threshold = 14.0  # 14% target floor drop
             
-            # If even ONE position has NOT crossed the threshold yet, flip the flag to False
-            if pos_loss > row_threshold:
+            # Trigger check: If loss drop is LESS than target drop floor, it hasn't dropped enough
+            if pos_loss < row_threshold:
                 all_positions_crossed_threshold = False
-                break  # Stop checking this side immediately, it's not ready to average
+                break  
 
         # ======================================================== 
         # 🛡️ THE "DOUBLE LOCK" TRIGGER VALUATION
         # ======================================================== 
-        # Lock 1: All open side contracts must be past their individual ATR loss floors
         loss_hit = all_positions_crossed_threshold
 
-        # Lock 2: Match strictly on your dedicated state matrix values
+        # Lock 2: Match cleanly using fixed 'in' syntax over valid raw signals
         signal_matches = (
             (side == 'CE' and current_signal in ["ATMBUY", "OTMBUY"]) or
             (side == 'PE' and current_signal in ["ATMSELL", "OTMSELL"])
         )
-        # Only execute if both locks are green, cooling clears, and total side rows are within limits
+
         if loss_hit and signal_matches: 
             if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
-                # Pick the latest contract entry of this side to deploy the average order on
                 last_order = side_df.iloc[-1]
                 symbol = last_order['symbol'] 
                 qty = abs(int(last_order['qty'])) 
                 new_tag = generate_pxy_tag() 
                 
-                # Fetch final metrics for terminal report visualization
                 final_loss = get_loss(last_order)
                 raw_atr_pct = float(last_order.get("atr", 0))
-                final_threshold = -(raw_atr_pct * ATR_MULTIPLIER) if raw_atr_pct > 0 else -14.0
+                final_threshold = (raw_atr_pct * ATR_MULTIPLIER) if raw_atr_pct > 0 else 14.0
                 
-                print_pxy_trigger_dashboard(side, symbol, final_loss, final_threshold, current_signal, new_tag)
+                # Prints as negative percentage values on the terminal console UI 
+                print_pxy_trigger_dashboard(side, symbol, -final_loss, -final_threshold, current_signal, new_tag)
                 
                 try: 
                     params = { 
@@ -155,4 +155,5 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Order confirmation complete for side {side}.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+
 
