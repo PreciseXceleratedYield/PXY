@@ -27,14 +27,14 @@ def get_entry_signal(df=None):
     # Condition: BULL and CE Power < 2 (Triggers only when CE Power is exactly 1)
     elif entry_signal == "BULL":
         if ce_power < 2:
-            final_signal = "CROSSSELL"
+            final_signal = "STSELL"
         else:
             final_signal = "BULL"
             
     # Condition: BEAR and PE Power < 2 (Triggers only when PE Power is exactly 1)
     elif entry_signal == "BEAR":
         if pe_power < 2:
-            final_signal = "CROSSBUY"
+            final_signal = "STBUY"
         else:
             final_signal = "BEAR"
     else:
