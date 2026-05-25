@@ -11,7 +11,7 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 1
 COOL_DOWN_SECONDS = 20  
-ATR_MULTIPLIER = 3 
+ATR_MULTIPLIER = 2.5
 
 def generate_pxy_tag(): 
     IST = pytz.timezone("Asia/Kolkata") 
