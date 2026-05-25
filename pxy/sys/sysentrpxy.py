@@ -44,8 +44,8 @@ def get_entry_signal(df=None):
     if final_signal == "NONE" and exit_signal:
         final_signal = exit_signal.upper().strip()
 
-    # 5. ACTION LOGGER
-    if final_signal in ["ATMBUY", "ATMSELL", "CROSSSELL", "CROSSBUY"]:
+    # 5. ACTION LOGGER (Fixed array values to match your new ST tags)
+    if final_signal in ["ATMBUY", "ATMSELL", "STBUY", "STSELL"]:
         print(f"🔥 ACTION LAYER ROUTER DEPLOYED : {final_signal} (CE:{ce_power} | PE:{pe_power}) 🔥")
 
     return final_signal, exit_signal
