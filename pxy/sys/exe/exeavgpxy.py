@@ -117,10 +117,9 @@ def handle_side_averaging(client, df):
 
         # Lock 2: Match strictly on your dedicated state matrix values
         signal_matches = (
-            (side == 'CE' and current_signal == "AVGB") or
-            (side == 'PE' and current_signal == "AVGS")
+            (side == 'CE' and current_signal in ["ATMBUY", "OTMBUY"]) or
+            (side == 'PE' and current_signal in ["ATMSELL", "OTMSELL"])
         )
-
         # Only execute if both locks are green, cooling clears, and total side rows are within limits
         if loss_hit and signal_matches: 
             if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
