@@ -1,5 +1,6 @@
 # sysentrpxy.py
 from sysmktpxy import get_signal  # <-- Import from Tier 2 Network Layer
+from syspowrpxy import get_ce_pe_power  # <-- IMPORTED Tier 3 Power Engine Layer
 
 try:
     from syscnfgpxy import TICKER
@@ -14,23 +15,38 @@ def get_entry_signal(df=None):
 
     final_signal = "NONE"
 
-    # 2. DIRECT PASSTHROUGH TO ATM STRIKE CONVERGENCE
+    # 2. Fetch Intraday CE/PE Momentum Power Arrays (Outputs integers 1 to 10)
+    direction, ce_power, pe_power = get_ce_pe_power(df)
+
+    # 3. DIRECT PASSTHROUGH & EXCLUSIVE POWER FLOOR TRIGGERING
     if entry_signal == "BUY":
         final_signal = "ATMBUY"
     elif entry_signal == "SELL":
         final_signal = "ATMSELL"
-    elif entry_signal in ["BULL", "BEAR"]:
-        final_signal = entry_signal
+        
+    # Condition: BULL and CE Power < 2 (Triggers only when CE Power is exactly 1)
+    elif entry_signal == "BULL":
+        if ce_power < 2:
+            final_signal = "CROSSSELL"
+        else:
+            final_signal = "BULL"
+            
+    # Condition: BEAR and PE Power < 2 (Triggers only when PE Power is exactly 1)
+    elif entry_signal == "BEAR":
+        if pe_power < 2:
+            final_signal = "CROSSBUY"
+        else:
+            final_signal = "BEAR"
     else:
         final_signal = "NONE"
 
-    # 3. ABSOLUTE END CATCH-ALL
+    # 4. ABSOLUTE END CATCH-ALL
     if final_signal == "NONE" and exit_signal:
         final_signal = exit_signal.upper().strip()
 
-    # 4. ACTION LOGGER
-    if final_signal in ["ATMBUY", "ATMSELL"]:
-        print(f"🔥 ACTION LAYER ROUTER DEPLOYED : {final_signal} 🔥")
+    # 5. ACTION LOGGER
+    if final_signal in ["ATMBUY", "ATMSELL", "CROSSSELL", "CROSSBUY"]:
+        print(f"🔥 ACTION LAYER ROUTER DEPLOYED : {final_signal} (CE:{ce_power} | PE:{pe_power}) 🔥")
 
     return final_signal, exit_signal
 
