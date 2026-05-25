@@ -70,10 +70,10 @@ def handle_side_averaging(client, df):
 
     # 2. Exclusively evaluate the explicit matrix states
     current_signal = "NONE"
-    if raw_exit_signal == "AVGB":
-        current_signal = "AVGB"
-    elif raw_exit_signal == "AVGS":
-        current_signal = "AVGS"
+    if raw_exit_signal == "BUY":
+        current_signal = "BUY"
+    elif raw_exit_signal == "SELL":
+        current_signal = "SELL"
 
     # 3. Add side helper column derived from symbol layout
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
@@ -117,8 +117,8 @@ def handle_side_averaging(client, df):
 
         # Lock 2: Match strictly on your dedicated state matrix values
         signal_matches = (
-            (side == 'CE' and current_signal == "AVGB") or
-            (side == 'PE' and current_signal == "AVGS")
+            (side == 'CE' and current_signal == "BUY") or
+            (side == 'PE' and current_signal == "SELL")
         )
 
         # Only execute if both locks are green, cooling clears, and total side rows are within limits
