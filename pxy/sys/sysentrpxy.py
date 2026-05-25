@@ -1,6 +1,6 @@
 # sysentrpxy.py
 from sysmktpxy import get_signal  # <-- Import from Tier 2 Network Layer
-from syspowrpxy import get_ce_pe_power  # <-- IMPORTED Tier 3 Power Engine Layer
+from syspwerpxy import get_ce_pe_power  # <-- IMPORTED Tier 3 Power Engine Layer
 
 try:
     from syscnfgpxy import TICKER
