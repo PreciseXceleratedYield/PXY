@@ -73,7 +73,7 @@ async def main():
         print(f"{Fore.RED}Usage: python exeforcepxy.py [BUY/SELL]")
         return
 
-    action = sys.argv[1].upper().strip()
+    action = sys.argv.upper().strip()
     if action == "BUY":
         sig = "ATMBUY"
         side_label = "CE"
@@ -83,6 +83,26 @@ async def main():
     else:
         print(f"{Fore.RED}Invalid parameter! Use 'BUY' or 'SELL'.")
         return
+
+    # --- INTERACTIVE CONFIRMATION PROMPT ---
+    print(f"\n{Fore.YELLOW}⚠️  ATTENTION: You are about to FORCE execute a {Fore.RED}{action}{Fore.YELLOW} order ({side_label}).")
+    print(f"{Fore.WHITE} [1] Confirm and Send Order")
+    print(f"{Fore.WHITE} [2] Cancel Execution")
+    
+    # Use loop to enforce a valid 1 or 2 choice
+    while True:
+        try:
+            choice = input(f"{Fore.CYAN}Select option (1 or 2): {Style.RESET_ALL}").strip()
+            if choice == "1":
+                break
+            elif choice == "2":
+                print(f"{Fore.YELLOW}❌ Execution aborted by user.")
+                return
+            else:
+                print(f"{Fore.RED}Invalid input. Please enter exactly 1 or 2.")
+        except (KeyboardInterrupt, SystemExit):
+            print(f"\n{Fore.YELLOW}❌ Execution aborted.")
+            return
 
     print(f"{Fore.MAGENTA}⚡ FORCED BYPASS TRIGGERED: Generating immediate {sig} ({side_label}) order...")
 
