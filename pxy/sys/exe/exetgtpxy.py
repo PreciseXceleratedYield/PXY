@@ -50,8 +50,8 @@ def target_price(row):
         is_bearish_signal = clean_signal in ("SELL", "BEAR")
 
         # Core scaling math multipliers
-        ce_calc = (1.4 * hce_d) ** min(ce_p, 2)
-        pe_calc = (1.4 * hpe_d) ** min(pe_p, 2)
+        ce_calc = atr_val * ce_p
+        pe_calc = atr_val * pe_p
 
         # 5. FINAL PERCENTAGE SCORE CALCULATION
         state = "⏳"
