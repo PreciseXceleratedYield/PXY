@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 1
+MAX_LAYERS = 2
 COOL_DOWN_SECONDS = 20  
 ATR_MULTIPLIER = 2
 DEBUG_MODE = False  # 🔍 Switch to True to see full 42-char loop traces
