@@ -11,8 +11,8 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 1
 COOL_DOWN_SECONDS = 20  
-ATR_MULTIPLIER = 1.4
-DEBUG_MODE = True  # 🔍 Keep enabled to trace threshold breaks cleanly
+ATR_MULTIPLIER = 2
+DEBUG_MODE = False  # 🔍 Keep enabled to trace threshold breaks cleanly
 
 def generate_pxy_tag(): 
     IST = pytz.timezone("Asia/Kolkata") 
