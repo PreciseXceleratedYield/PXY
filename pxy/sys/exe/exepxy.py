@@ -41,7 +41,7 @@ except Exception as e:
 
 # ---------------- FIX 2: API TIMEOUT WRAPPER ----------------
 # UPDATED: Set to 7 seconds
-def call_with_timeout(func, timeout=30, *args, **kwargs):
+def call_with_timeout(func, timeout=10, *args, **kwargs):
     with ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(func, *args, **kwargs)
         try:
