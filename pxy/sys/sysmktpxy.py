@@ -5,7 +5,7 @@ import json
 import os
 from datetime import datetime
 
-# 🔥 FIXED: Imported from your exact file module name
+# Imported from your exact file module name
 from sysdthapxy import get_pxy_data
 
 # Global Config
@@ -76,34 +76,37 @@ def log_sync_state(timestamp, entry, exit_sig, price):
 
 def get_signal(df):
     """ 
-    3-Bar Vector Engine wrapped around imported functional core data streams.
+    3-Bar Vector Engine mapped purely to BULL and BEAR output constraints.
     """
     if df is None or len(df) < 5:
         return "NONE", "NONE"
 
     try:
-        # 1. RUN DATAFRAME THROUGH THE ENGINE TRUTH MATRIX (✅ FIXED)
+        # 1. RUN DATAFRAME THROUGH THE ENGINE TRUTH MATRIX
         _, _, _, calculated_df = get_pxy_data(df=df)
         
-        # 🛡️ FIXED: Column validations updated to read 'pxy_signal' instead of 'ha_signal'
         if calculated_df is None or "pxy_signal" not in calculated_df.columns:
             return "NONE", "NONE"
 
         # 2. EXTRACT TRUTH DATA FROM LAST INDEX
         last_idx = calculated_df.index[-1]
-        raw_signal = str(calculated_df.at[last_idx, "pxy_signal"]).upper()  # ✅ FIXED
+        raw_signal = str(calculated_df.at[last_idx, "pxy_signal"]).upper().strip()
         
-        # 3. COORDINATE MAPPING FOR VISUALIZER BAR (STAYS STANDARD PRICE)
+        # 3. COORDINATE MAPPING FOR VISUALIZER BAR
         c0, o0 = float(calculated_df.at[last_idx, 'Close']), float(calculated_df.at[last_idx, 'Open'])
         c1, o1 = float(calculated_df.iloc[-2]['Close']), float(calculated_df.iloc[-2]['Open'])
         c2, o2 = float(calculated_df.iloc[-3]['Close']), float(calculated_df.iloc[-3]['Open'])
 
-        # 4. RESOLVE SIGNALS
-        if raw_signal in ["BUY", "SELL", "BULL", "BEAR"]:
-            entry = raw_signal
-            exit_sig = raw_signal
+        # 4. RESOLVE SIGNALS (Pure BULL / BEAR Routing Matrix)
+        # ✅ FIXED: Force conversions from raw BUY/SELL down into BULL/BEAR states
+        if raw_signal in ["BUY", "BULL"]:
+            entry = "BULL"
+            exit_sig = "BULL"
+        elif raw_signal in ["SELL", "BEAR"]:
+            entry = "BEAR"
+            exit_sig = "BEAR"
         else:
-            # Fallback tracking if engine registers a "none" string value
+            # Fallback tracking if engine registers a "none" or blank string value
             entry = "BULL" if c0 >= c1 else "BEAR"
             exit_sig = entry
 
