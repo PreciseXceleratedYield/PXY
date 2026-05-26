@@ -1,5 +1,6 @@
 # sysentrpxy.py
 from sysstrndpxy import calculate_supertrend  # <-- Import Tier 1 42 TSMA Engine
+from sysmktpxy import get_signal  # <-- Import Tier 2 Network Layer (BULL/BEAR Pure Layer)
 try:
     from syscnfgpxy import TICKER
 except ImportError:
@@ -16,11 +17,20 @@ def get_entry_signal(df=None):
         except Exception:
             st_trend = "SIDE"
 
-    # Initialize output signals to clean baseline neutral states
-    final_signal = "NONE"
-    exit_signal = "NONE"
+    # --- INDEPENDENT MARKET EXIT LAYER EXTRACTION ---
+    # Fetch background context directly from sysmktpxy module independently
+    mkt_entry, mkt_exit = "NONE", "NONE"
+    if df is not None and not df.empty:
+        try:
+            mkt_entry, mkt_exit = get_signal(df)
+            mkt_exit = str(mkt_exit).upper().strip()
+        except Exception:
+            mkt_exit = "NONE"
 
-    # --- CORE TREND PRIORITY ROUTER (DEPENDS ON STRND ONLY) ---
+    # Initialize entry signal to clean baseline neutral state
+    final_signal = "NONE"
+
+    # --- CORE TREND PRIORITY ROUTER (ENTRY DEPENDS ON STRND ONLY) ---
     
     # 1. ATMBUY Channel Configurations (Crossovers & Trajectory Channel Swings)
     if st_trend in ["CROSSBUY", "TRENDBUY"]:
@@ -46,14 +56,10 @@ def get_entry_signal(df=None):
     else:
         final_signal = "NONE"
 
-    # --- SYNC EXIT LAYER WITH REFINED STRUCTURAL EXPECTATIONS ---
-    # Strictly maps your structural trend states to BULL, BEAR, SELL, BUY, or NONE
-    if st_trend in ["CROSSBUY", "FORCEBUY", "TRENDBUY"]:
-        exit_signal = "BUY"
-    elif st_trend in ["CROSSSELL", "FORCESELL", "TRENDSELL"]:
-        exit_signal = "SELL"
-    elif st_trend in ["BULL", "BEAR"]:
-        exit_signal = st_trend
+    # --- SYNC EXIT LAYER INDEPENDENTLY FROM SYSMKTPXY ---
+    # Overridden completely to rely strictly on the flattened market signals: BULL, BEAR, or NONE
+    if mkt_exit in ["BULL", "BEAR", "NONE"]:
+        exit_signal = mkt_exit
     else:
         exit_signal = "NONE"
 
@@ -61,20 +67,21 @@ def get_entry_signal(df=None):
     is_live_action = final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]
     
     if is_live_action:
-        print(f"🔥 ACTION : {final_signal} | EXIT MAP: {exit_signal} | TREND STATE: {st_trend} 🔥")
+        print(f"🔥 ACTION : {final_signal} | INDEPENDENT EXIT MAP: {exit_signal} | TREND STATE: {st_trend} 🔥")
     elif final_signal in ["BULL", "BEAR"]:
-        print(f"ℹ️ INFO ONLY : {final_signal} | EXIT MAP: {exit_signal} | TREND STATE: {st_trend}")
+        print(f"ℹ️ INFO ONLY : {final_signal} | INDEPENDENT EXIT MAP: {exit_signal} | TREND STATE: {st_trend}")
     else:
-        print(f"💤 NEUTRAL STATE : {final_signal} | EXIT MAP: {exit_signal} | TREND STATE: {st_trend}")
+        print(f"💤 NEUTRAL STATE : {final_signal} | INDEPENDENT EXIT MAP: {exit_signal} | TREND STATE: {st_trend}")
 
     return final_signal, exit_signal
 
 if __name__ == "__main__":
     from sysdtafpxy import fetch_yf_data
-    print("\n=== [TIER 3] Unified STRND Pass-Through Pipeline Self-Test ===")
+    print("\n=== [TIER 3] Unified STRND Entry + Independent MKT Exit Pipeline Self-Test ===")
     df = fetch_yf_data()
     if df is not None:
         entry, ex = get_entry_signal(df)
         print("-" * 50)
         print(f"FINAL ENTRY SIGNAL: {entry} | EXIT SIGNAL: {ex}")
+
 
