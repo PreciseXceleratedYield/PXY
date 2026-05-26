@@ -70,20 +70,19 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['c1'] = df['Close'].shift(1) 
     df['st_prev'] = df['ST'].shift(1) 
     
-    # Extract shift arrays for clean validation indexing matches
+    # ✅ FIXED: Extract all numpy arrays at full length BEFORE the tail slice
     m5_c  = df['Close'].to_numpy()
     st    = df['pxy_st_line'].to_numpy()
     no_ll = df['pxy_st_no_ll'].to_numpy()
     no_hh = df['pxy_st_no_hh'].to_numpy()
     
-    tail_size = min(50, len(df)) 
-    df = df.tail(tail_size).copy() 
-    df['bar_count'] = np.arange(1, tail_size + 1) 
+    st_trend_full = [] 
+    n = len(df)
     
-    st_trend = [] 
-    for i in range(len(df)): 
+    # ✅ FIXED: Loop runs through full series length to maintain absolute index safety
+    for i in range(n): 
         if i < 3: 
-            st_trend.append("SIDE") 
+            st_trend_full.append("SIDE") 
             continue 
             
         c0 = m5_c[i]
@@ -131,13 +130,20 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else: 
             new_trend = "BULL" if (c0 > st[i]) else "BEAR" 
             
-        st_trend.append(new_trend) 
+        st_trend_full.append(new_trend) 
         
-    df['ST_Trend'] = st_trend 
+    df['ST_Trend'] = st_trend_full 
+    
+    # ✅ FIXED: Slice down to the 50-row window safely here at the very end 
+    tail_size = min(50, len(df)) 
+    df = df.tail(tail_size).copy() 
+    df['bar_count'] = np.arange(1, tail_size + 1) 
+    
     return df 
 
 if __name__ == "__main__": 
     print(f"=== [TIER 1] {MA_TYPE} 42 Engine Local Math Test ===") 
     df_st = calculate_supertrend(fetch_yf_data())
     print(f"TERMINAL STATE STRUCTURAL METRIC: {df_st['ST_Trend'].iloc[-1]}")
+
 
