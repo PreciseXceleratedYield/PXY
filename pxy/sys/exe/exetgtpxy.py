@@ -42,6 +42,23 @@ def target_price(row):
         # Supertrend field capture and sanitization
         supertrend_val = str(row.get("supertrend", "NONE")).upper().strip()
 
+        # ==============================================================================
+        # 🚨 HARD TRIGGER EXITS (CORRIDOR OVERRIDES)
+        # ==============================================================================
+        # Rule 1: Kill all PE trades immediately if trend does NOT contain BEAR, SELL, or STSELL
+        if is_pe and not any(term in supertrend_val for term in ["BEAR", "SELL", "STSELL"]):
+            if side not in PRINTED_SIDES:
+                print(f" {Fore.RED}💥 PE FORCE KILL {side:<2} | TREND IS NOT BEARISH ({supertrend_val}) -> EMERGENCY EXIT")
+                PRINTED_SIDES.add(side)
+            return 1  # Bypasses all math. Forces immediate exit execution loop downstream.
+
+        # Rule 2: Flip for CE trades. Kill if trend does NOT contain BULL, BUY, or STBUY
+        if is_ce and not any(term in supertrend_val for term in ["BULL", "BUY", "STBUY"]):
+            if side not in PRINTED_SIDES:
+                print(f" {Fore.RED}💥 CE FORCE KILL {side:<2} | TREND IS NOT BULLISH ({supertrend_val}) -> EMERGENCY EXIT")
+                PRINTED_SIDES.add(side)
+            return 1  # Bypasses all math. Forces immediate exit execution loop downstream.
+
         # 4. FIELD DEFINITIONS
         hce_d = f(row.get("hkin_ce_depth"), 1.0)
         hpe_d = f(row.get("hkin_pe_depth"), 1.0)
@@ -56,7 +73,7 @@ def target_price(row):
         st_is_bearish_counter = supertrend_val in ("BEAR", "SELL", "STSELL")
         st_is_bullish_counter = supertrend_val in ("BULL", "BUY", "STBUY")
 
-        # Core scaling math multipliers
+        # Core scaling math multipliers (Enforced universally now)
         ce_calc = atr_val * ce_p
         pe_calc = atr_val * pe_p
 
@@ -75,7 +92,8 @@ def target_price(row):
                     final_pct_score = 1.4 * ce_p
                 else:
                     state = "🎯"  
-                    final_pct_score = max(BASE_SCORE, ce_calc) 
+                    # ACCELERATED: Uses full scaling math multiplier instead of max cap rules
+                    final_pct_score = ce_calc
             elif is_counter and is_bearish_signal:
                 # Flat Opposite Signal Block
                 state = "🚨"  
@@ -86,7 +104,7 @@ def target_price(row):
                     state = "🚨"
                     final_pct_score = 1.4 * ce_p
                 else:
-                    state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
+                    state, final_pct_score = "🔥", ce_calc
             elif is_bearish_signal:
                 # Flat Opposite Signal Block
                 state = "🚨"
@@ -100,7 +118,8 @@ def target_price(row):
                     final_pct_score = 1.4 * pe_p
                 else:
                     state = "🎯"  
-                    final_pct_score = max(BASE_SCORE, pe_calc)  
+                    # ACCELERATED: Uses full scaling math multiplier instead of max cap rules
+                    final_pct_score = pe_calc  
             elif is_counter and is_bullish_signal:
                 # Flat Opposite Signal Block
                 state = "🚨"  
@@ -111,7 +130,7 @@ def target_price(row):
                     state = "🚨"
                     final_pct_score = 1.4 * pe_p
                 else:
-                    state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
+                    state, final_pct_score = "🔥", pe_calc
             elif is_bullish_signal:
                 # Flat Opposite Signal Block
                 state = "🚨"
@@ -139,4 +158,5 @@ def target_price(row):
 
     except Exception:
         return 0
+
 
