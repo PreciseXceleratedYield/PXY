@@ -53,8 +53,8 @@ def target_price(row):
         is_bearish_signal = clean_signal in ("SELL", "BEAR")
         
         # Supertrend Directional Counter Classifications
-        st_is_bearish_counter = supertrend_val in ("BEAR", "STSELL")
-        st_is_bullish_counter = supertrend_val in ("BULL", "STBUY")
+        st_is_bearish_counter = supertrend_val in ("BEAR", "SELL")
+        st_is_bullish_counter = supertrend_val in ("BULL", "BUY")
 
         # Core scaling math multipliers
         ce_calc = atr_val * ce_p
