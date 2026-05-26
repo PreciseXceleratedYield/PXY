@@ -7,7 +7,14 @@ try:
 except ImportError: 
     def fetch_yf_data(): 
         # Deterministic default mock data for baseline isolation testing
-        return pd.DataFrame({'Close': np.linspace(10, 20, 100) + np.random.randn(100) * 0.5}) 
+        np.random.seed(42)
+        n = 150
+        return pd.DataFrame({
+            'Open': np.linspace(10, 20, n) + np.random.randn(n) * 0.5,
+            'High': np.linspace(10, 20, n) + np.random.randn(n) * 0.5 + 0.5,
+            'Low': np.linspace(10, 20, n) + np.random.randn(n) * 0.5 - 0.5,
+            'Close': np.linspace(10, 20, n) + np.random.randn(n) * 0.5
+        })
 
 # Global Config 
 DEBUG_MODE = True 
@@ -49,10 +56,25 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     else: 
         base_ma_line = calculate_tsma_42(df['Close']) 
         
-    # Boundary tracking set strictly to the 42 Moving Average line alone
-    df['ST'] = base_ma_line 
+    # 1. Formulate Highest High and Lowest Low channels over pre-transformed inputs
+    hh_42 = df['High'].rolling(window=42, min_periods=1).max().to_numpy()
+    ll_42 = df['Low'].rolling(window=42, min_periods=1).min().to_numpy()
+    
+    # 2. Calculate Three Reference Lines based on your 4-part / 3-part formulas
+    df['pxy_st_line']  = (base_ma_line + hh_42 + ll_42 + df['Close']) / 4.0
+    df['pxy_st_no_ll'] = (base_ma_line + hh_42 + df['Close']) / 3.0
+    df['pxy_st_no_hh'] = (base_ma_line + ll_42 + df['Close']) / 3.0
+    
+    # 3. Structural Boundary tracking keys for state comparisons
+    df['ST'] = df['pxy_st_line'] 
     df['c1'] = df['Close'].shift(1) 
     df['st_prev'] = df['ST'].shift(1) 
+    
+    # Extract shift arrays for clean validation indexing matches
+    m5_c  = df['Close'].to_numpy()
+    st    = df['pxy_st_line'].to_numpy()
+    no_ll = df['pxy_st_no_ll'].to_numpy()
+    no_hh = df['pxy_st_no_hh'].to_numpy()
     
     tail_size = min(50, len(df)) 
     df = df.tail(tail_size).copy() 
@@ -60,29 +82,54 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     
     st_trend = [] 
     for i in range(len(df)): 
-        if i == 0: 
-            st_trend.append("SIDE") 
-            continue 
-        c0 = df['Close'].iloc[i] 
-        c1 = df['c1'].iloc[i] 
-        st_curr = df['ST'].iloc[i] 
-        st_prev = df['st_prev'].iloc[i] 
-        
-        if pd.isna(st_curr) or pd.isna(st_prev) or pd.isna(c1): 
+        if i < 3: 
             st_trend.append("SIDE") 
             continue 
             
-        # Clean 42 MA Crossover Logic
-        cross_above = (c0 > st_curr) and (c1 <= st_prev) 
-        cross_below = (c0 < st_curr) and (c1 >= st_prev) 
+        c0 = m5_c[i]
+        c1 = m5_c[i-1]
+        c2 = m5_c[i-2]
+        c3 = m5_c[i-3]
         
-        # State Matrix Assignment
-        if cross_above: 
-            new_trend = "AVGB" 
-        elif cross_below: 
-            new_trend = "AVGS" 
+        # Check Main Crossover Signals matching your requested labels
+        cross_buy  = (c0 > st[i]) and (c1 <= st[i-1])
+        cross_sell = (c0 < st[i]) and (c1 >= st[i-1])
+        
+        # Check Force Boundary Breakout Signals
+        force_buy  = (c0 > no_ll[i]) and (c1 <= no_ll[i-1])
+        force_sell = (c0 < no_hh[i]) and (c1 >= no_hh[i-1])
+        
+        # Check Pocket Positions for Trajectory Patterns (c1, c2, c3 windows)
+        in_upper_pocket = (c1 < no_ll[i-1] and c1 > st[i-1]) and \
+                          (c2 < no_ll[i-2] and c2 > st[i-2]) and \
+                          (c3 < no_ll[i-3] and c3 > st[i-3])
+                          
+        in_lower_pocket = (c1 < st[i-1] and c1 > no_hh[i-1]) and \
+                          (c2 < st[i-2] and c2 > no_hh[i-2]) and \
+                          (c3 < st[i-3] and c3 > no_hh[i-3])
+        
+        # Shape Inflexion Formations
+        v_shape_bottom  = (c1 < c2) and (c0 > c1)
+        v_shape_top     = (c1 > c2) and (c0 < c1)
+        
+        trend_buy  = in_upper_pocket and v_shape_bottom
+        trend_sell = in_lower_pocket and v_shape_top
+        
+        # State Matrix Assignment Hierarchy (Replaces old AVGB / AVGS)
+        if force_buy:
+            new_trend = "FORCEBUY"
+        elif force_sell:
+            new_trend = "FORCESELL"
+        elif cross_buy: 
+            new_trend = "CROSSBUY" 
+        elif cross_sell: 
+            new_trend = "CROSSSELL" 
+        elif trend_buy:
+            new_trend = "TRENDBUY"
+        elif trend_sell:
+            new_trend = "TRENDSELL"
         else: 
-            new_trend = "BULL" if (c0 > st_curr) else "BEAR" 
+            new_trend = "BULL" if (c0 > st[i]) else "BEAR" 
             
         st_trend.append(new_trend) 
         
