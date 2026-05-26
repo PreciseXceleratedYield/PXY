@@ -75,7 +75,7 @@ def target_price(row):
                     final_pct_score = 1.4 * ce_p
                 else:
                     state = "🎯"  
-                    final_pct_score = 99.0  
+                    final_pct_score = max(BASE_SCORE, ce_calc) 
             elif is_counter and is_bearish_signal:
                 # Flat Opposite Signal Block
                 state = "🚨"  
@@ -100,7 +100,7 @@ def target_price(row):
                     final_pct_score = 1.4 * pe_p
                 else:
                     state = "🎯"  
-                    final_pct_score = 99.0  
+                    final_pct_score = max(BASE_SCORE, pe_calc)  
             elif is_counter and is_bullish_signal:
                 # Flat Opposite Signal Block
                 state = "🚨"  
