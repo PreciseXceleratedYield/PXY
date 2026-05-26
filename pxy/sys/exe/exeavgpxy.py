@@ -8,7 +8,7 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # --- CONFIG --- 
-REBUY_ENABLED = True 
+REBUY_ENABLED = False 
 MAX_LAYERS = 2
 COOL_DOWN_SECONDS = 20  # ⏱️ UPDATED: Cooling interval set to exactly 20 seconds
 ATR_MULTIPLIER = 2 
