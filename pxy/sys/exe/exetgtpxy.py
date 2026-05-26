@@ -38,6 +38,9 @@ def target_price(row):
         active_signal = str(row.get("exit", "NONE")).upper()
         clean_signal = active_signal.strip()
         is_counter = str(row.get("counter", "N")).upper() == "Y"
+        
+        # Supertrend field capture and sanitization
+        supertrend_val = str(row.get("supertrend", "NONE")).upper().strip()
 
         # 4. FIELD DEFINITIONS
         hce_d = f(row.get("hkin_ce_depth"), 1.0)
@@ -45,9 +48,13 @@ def target_price(row):
         ce_p = f(row.get("ce_power"), 1.0)
         pe_p = f(row.get("pe_power"), 1.0)
 
-        # Fast membership trend lookups
+        # Main Exit Signal Classifications
         is_bullish_signal = clean_signal in ("BUY", "BULL")
         is_bearish_signal = clean_signal in ("SELL", "BEAR")
+        
+        # Supertrend Directional Counter Classifications
+        st_is_bearish_counter = supertrend_val in ("BEAR", "STSELL")
+        st_is_bullish_counter = supertrend_val in ("BULL", "STBUY")
 
         # Core scaling math multipliers
         ce_calc = atr_val * ce_p
@@ -58,7 +65,7 @@ def target_price(row):
         final_pct_score = BASE_SCORE
 
         # ==============================================================================
-        # 🎯 DIRECT SIGNAL & COUNTER ENGINE (FRESH OVERRIDES REMOVED)
+        # 🎯 DIRECT SIGNAL & COUNTER ENGINE (SUPERTREND ACCELERATION FILTER ONLY)
         # ==============================================================================
         if is_ce:
             if is_counter and is_bullish_signal:
@@ -68,7 +75,12 @@ def target_price(row):
                 state = "🚨"  
                 final_pct_score = 1.4   
             elif is_bullish_signal:
-                state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
+                # 🛑 Acceleration Block Filtered by Supertrend
+                if st_is_bearish_counter:
+                    state = "🚨"
+                    final_pct_score = 1.4
+                else:
+                    state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
             elif is_bearish_signal:
                 state = "🚨"
                 final_pct_score = 1.4
@@ -81,7 +93,12 @@ def target_price(row):
                 state = "🚨"  
                 final_pct_score = 1.4   
             elif is_bearish_signal:
-                state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
+                # 🛑 Acceleration Block Filtered by Supertrend
+                if st_is_bullish_counter:
+                    state = "🚨"
+                    final_pct_score = 1.4
+                else:
+                    state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
             elif is_bullish_signal:
                 state = "🚨"
                 final_pct_score = 1.4
@@ -101,7 +118,7 @@ def target_price(row):
                     Fore.RED if state == "🚨" else (Fore.MAGENTA if state == "🎯" else Fore.YELLOW)
                 )
             )
-            print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state}")
+            print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state} | Supertrend:{supertrend_val}")
             PRINTED_SIDES.add(side)
 
         return target
