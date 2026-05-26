@@ -67,11 +67,11 @@ def get_entry_signal(df=None):
     is_live_action = final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]
     
     if is_live_action:
-        print(f"🔥 ACTION : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend} 🔥")
+        print(f"🔥 ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend} 🔥")
     elif final_signal in ["BULL", "BEAR"]:
-        print(f"ℹ️ INFO : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend}")
+        print(f"ℹ️ ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend}")
     else:
-        print(f"💤 NEUTRAL : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend}")
+        print(f"💤 ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend}")
 
     return final_signal, exit_signal
 
