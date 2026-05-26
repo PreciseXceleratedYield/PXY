@@ -53,8 +53,8 @@ def target_price(row):
         is_bearish_signal = clean_signal in ("SELL", "BEAR")
         
         # Supertrend Directional Counter Classifications
-        st_is_bearish_counter = supertrend_val in ("BEAR", "SELL")
-        st_is_bullish_counter = supertrend_val in ("BULL", "BUY")
+        st_is_bearish_counter = supertrend_val in ("BEAR", "SELL", "STSELL")
+        st_is_bullish_counter = supertrend_val in ("BULL", "BUY", "STBUY")
 
         # Core scaling math multipliers
         ce_calc = atr_val * ce_p
@@ -65,51 +65,55 @@ def target_price(row):
         final_pct_score = BASE_SCORE
 
         # ==============================================================================
-        # 🎯 DIRECT SIGNAL & COUNTER ENGINE (SUPERTREND ACCELERATION & COUNTER FILTER)
+        # 🎯 DIRECT SIGNAL & ENGINE (RESTORED EXACT STRUCTURAL MATRIX)
         # ==============================================================================
         if is_ce:
             if is_counter and is_bullish_signal:
-                # 🛑 Counter Block Filtered by Supertrend
+                # Opposite ST Block during Counter Setup
                 if st_is_bearish_counter:
                     state = "🚨"
-                    final_pct_score = 1.4
+                    final_pct_score = 1.4 * ce_p
                 else:
                     state = "🎯"  
                     final_pct_score = 99.0  
             elif is_counter and is_bearish_signal:
+                # Flat Opposite Signal Block
                 state = "🚨"  
                 final_pct_score = 1.4   
             elif is_bullish_signal:
-                # 🛑 Acceleration Block Filtered by Supertrend
+                # No counter scenario -> Check Supertrend, then ACCELERATE
                 if st_is_bearish_counter:
                     state = "🚨"
-                    final_pct_score = 1.4
+                    final_pct_score = 1.4 * ce_p
                 else:
                     state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
             elif is_bearish_signal:
+                # Flat Opposite Signal Block
                 state = "🚨"
                 final_pct_score = 1.4
                 
         elif is_pe:
             if is_counter and is_bearish_signal:
-                # 🛑 Counter Block Filtered by Supertrend
+                # Opposite ST Block during Counter Setup
                 if st_is_bullish_counter:
                     state = "🚨"
-                    final_pct_score = 1.4
+                    final_pct_score = 1.4 * pe_p
                 else:
                     state = "🎯"  
                     final_pct_score = 99.0  
             elif is_counter and is_bullish_signal:
+                # Flat Opposite Signal Block
                 state = "🚨"  
                 final_pct_score = 1.4   
             elif is_bearish_signal:
-                # 🛑 Acceleration Block Filtered by Supertrend
+                # No counter scenario -> Check Supertrend, then ACCELERATE
                 if st_is_bullish_counter:
                     state = "🚨"
-                    final_pct_score = 1.4
+                    final_pct_score = 1.4 * pe_p
                 else:
                     state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
             elif is_bullish_signal:
+                # Flat Opposite Signal Block
                 state = "🚨"
                 final_pct_score = 1.4
 
