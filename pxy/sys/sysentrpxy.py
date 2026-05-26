@@ -28,9 +28,9 @@ def get_entry_signal(df=None):
     # 3. CORE TREND PRIORITY ROUTER (ENTRY ONLY)
     
     # Priority 1: Fresh 42 SMA Crossover signals take absolute priority over everything
-    if st_trend == "BUY":
+    if st_trend == "AVGB":
         final_signal = "STBUY"
-    elif st_trend == "SELL":
+    elif st_trend == "AVGS":
         final_signal = "STSELL"
         
     # Priority 2: Direct Ongoing State Pass-Through (If market layer sends BULL or BEAR)
