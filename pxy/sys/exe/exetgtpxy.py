@@ -65,12 +65,17 @@ def target_price(row):
         final_pct_score = BASE_SCORE
 
         # ==============================================================================
-        # 🎯 DIRECT SIGNAL & COUNTER ENGINE (SUPERTREND ACCELERATION FILTER ONLY)
+        # 🎯 DIRECT SIGNAL & COUNTER ENGINE (SUPERTREND ACCELERATION & COUNTER FILTER)
         # ==============================================================================
         if is_ce:
             if is_counter and is_bullish_signal:
-                state = "🎯"  
-                final_pct_score = 99.0  
+                # 🛑 Counter Block Filtered by Supertrend
+                if st_is_bearish_counter:
+                    state = "🚨"
+                    final_pct_score = 1.4
+                else:
+                    state = "🎯"  
+                    final_pct_score = 99.0  
             elif is_counter and is_bearish_signal:
                 state = "🚨"  
                 final_pct_score = 1.4   
@@ -87,8 +92,13 @@ def target_price(row):
                 
         elif is_pe:
             if is_counter and is_bearish_signal:
-                state = "🎯"  
-                final_pct_score = 99.0  
+                # 🛑 Counter Block Filtered by Supertrend
+                if st_is_bullish_counter:
+                    state = "🚨"
+                    final_pct_score = 1.4
+                else:
+                    state = "🎯"  
+                    final_pct_score = 99.0  
             elif is_counter and is_bullish_signal:
                 state = "🚨"  
                 final_pct_score = 1.4   
@@ -125,5 +135,4 @@ def target_price(row):
 
     except Exception:
         return 0
-
 
