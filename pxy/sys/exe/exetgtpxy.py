@@ -132,7 +132,7 @@ def target_price(row):
                     Fore.RED if state == "🚨" else (Fore.MAGENTA if state == "🎯" else Fore.YELLOW)
                 )
             )
-            print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state} | Supertrend:{supertrend_val}")
+            print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state} | trend:{supertrend_val}")
             PRINTED_SIDES.add(side)
 
         return target
