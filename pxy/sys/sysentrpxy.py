@@ -29,9 +29,9 @@ def get_entry_signal(df=None):
     
     # Priority 1: Fresh 42 SMA Crossover signals take absolute priority over everything
     if st_trend == "BUY":
-        final_signal = "BUY"
+        final_signal = "STBUY"
     elif st_trend == "SELL":
-        final_signal = "SELL"
+        final_signal = "STSELL"
         
     # Priority 2: Direct Ongoing State Pass-Through (If market layer sends BULL or BEAR)
     elif entry_signal in ["BULL", "BEAR"]:
