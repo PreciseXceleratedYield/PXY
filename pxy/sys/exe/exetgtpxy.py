@@ -57,8 +57,8 @@ def target_price(row):
         st_is_bullish_counter = supertrend_val in ("BULL", "BUY", "STBUY")
 
         # Core scaling math multipliers
-        ce_calc = atr_val * ce_p
-        pe_calc = atr_val * pe_p
+        ce_calc = (atr_val * ce_p) + hce_d
+        pe_calc = (atr_val * pe_p) + hpe_d
 
         # 5. FINAL PERCENTAGE SCORE CALCULATION
         state = "⏳"
