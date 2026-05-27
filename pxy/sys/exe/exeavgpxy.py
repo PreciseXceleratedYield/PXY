@@ -8,10 +8,10 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # --- CONFIG --- 
-REBUY_ENABLED = False 
+REBUY_ENABLED = True 
 MAX_LAYERS = 2
 COOL_DOWN_SECONDS = 20  # ⏱️ UPDATED: Cooling interval set to exactly 20 seconds
-ATR_MULTIPLIER = 2 
+ATR_MULTIPLIER = 1 
 
 def generate_pxy_tag(): 
     IST = pytz.timezone("Asia/Kolkata") 
