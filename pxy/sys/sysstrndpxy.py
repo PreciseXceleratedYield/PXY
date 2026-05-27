@@ -36,7 +36,7 @@ def calculate_tsma_42(series: pd.Series) -> np.ndarray:
     return tsma_output 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
-    """ PXY® Engine: Processed data driver with force priority dual-crossing signals. """ 
+    """ PXY® Engine: Processed data driver with force priority & baseline trend tracking. """ 
     if df is None or df.empty:
         return pd.DataFrame()
 
@@ -73,7 +73,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     
     for i in range(n): 
         if i < 1: 
-            st_trend_full.append("NONE") 
+            st_trend_full.append("BULL" if m5_c[i] >= st[i] else "BEAR") 
             continue 
             
         c0 = m5_c[i]
@@ -92,7 +92,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         force_sell_above = (c0 > no_hh[i]) and (c1 <= no_hh[i-1])
         force_sell       = force_sell_below or force_sell_above
         
-        # EXCLUSIVE PRIORITY MATRIX: FORCE IS STRATEGICALLY AT THE TOP
+        # EXCLUSIVE PRIORITY MATRIX WITH ONGOING BASELINE FALLBACK
         if force_buy:
             new_trend = "FORCESELL"   # Upper boundary line crossing -> FORCE PRIORITY FLIP
         elif force_sell:
@@ -102,7 +102,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         elif cross_sell: 
             new_trend = "CROSSSELL" 
         else: 
-            new_trend = "NONE"        # Exclusive output. Pure neutral fallback state.
+            # 🎯 REPLACED NONE: Sits back as BULL or BEAR based on position relative to center line
+            new_trend = "BULL" if (c0 >= st[i]) else "BEAR" 
             
         st_trend_full.append(new_trend) 
         
@@ -112,5 +113,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     return df.tail(tail_size).copy() 
 
 if __name__ == "__main__": 
-    print(f"=== [TIER 1] Force-Priority Dual-Crossing 42 Engine Configured ===")
+    print(f"=== [TIER 1] Force-Priority Engine with Baseline Trend Fallback Ready ===")
+
 
