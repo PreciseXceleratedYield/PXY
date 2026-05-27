@@ -66,7 +66,7 @@ def handle_side_averaging(client, df):
     # 1. ✅ FIXED: Extract string from the last row of the 'exit' column safely
     if "exit" not in df.columns:
         return
-    raw_exit_signal = str(df["exit"].iloc[-1]).upper().strip() 
+    raw_exit_signal = str(df["entry"].iloc[-1]).upper().strip() 
 
     # 2. Exclusively evaluate the explicit matrix states
     current_signal = "NONE"
