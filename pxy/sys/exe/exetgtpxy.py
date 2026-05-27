@@ -72,50 +72,50 @@ def target_price(row):
                 # Opposite ST Block during Counter Setup
                 if st_is_bearish_counter:
                     state = "🚨"
-                    final_pct_score = 2.4 * ce_p
+                    final_pct_score = 2 * ce_p
                 else:
                     state = "🎯"  
                     final_pct_score = max(BASE_SCORE, ce_calc) 
             elif is_counter and is_bearish_signal:
                 # Flat Opposite Signal Block
                 state = "🚨"  
-                final_pct_score = 2.4   
+                final_pct_score = 2   
             elif is_bullish_signal:
                 # No counter scenario -> Check Supertrend, then ACCELERATE
                 if st_is_bearish_counter:
                     state = "🚨"
-                    final_pct_score = 2.4 * ce_p
+                    final_pct_score = 2 * ce_p
                 else:
                     state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
             elif is_bearish_signal:
                 # Flat Opposite Signal Block
                 state = "🚨"
-                final_pct_score = 2.4
+                final_pct_score = 2
                 
         elif is_pe:
             if is_counter and is_bearish_signal:
                 # Opposite ST Block during Counter Setup
                 if st_is_bullish_counter:
                     state = "🚨"
-                    final_pct_score = 2.4 * pe_p
+                    final_pct_score = 2 * pe_p
                 else:
                     state = "🎯"  
                     final_pct_score = max(BASE_SCORE, pe_calc)  
             elif is_counter and is_bullish_signal:
                 # Flat Opposite Signal Block
                 state = "🚨"  
-                final_pct_score = 2.4   
+                final_pct_score = 2   
             elif is_bearish_signal:
                 # No counter scenario -> Check Supertrend, then ACCELERATE
                 if st_is_bullish_counter:
                     state = "🚨"
-                    final_pct_score = 2.4 * pe_p
+                    final_pct_score = 2 * pe_p
                 else:
                     state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
             elif is_bullish_signal:
                 # Flat Opposite Signal Block
                 state = "🚨"
-                final_pct_score = 2.4
+                final_pct_score = 2
 
         # 6. MAX CAP LOGIC (Hard capped at 99%)
         if final_pct_score > 99.0:
