@@ -64,7 +64,7 @@ def target_price(row):
                 # CRITICAL SERVER OVERRIDE: Fetch UTC live clock and project directly to IST
                 current_time = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).time()
             
-            if datetime.time(9, 15) <= current_time <= datetime.time(10, 15):
+            if datetime.time(9, 15) <= current_time <= datetime.time(9, 15):
                 is_morning_window = True
         except Exception:
             is_morning_window = False
