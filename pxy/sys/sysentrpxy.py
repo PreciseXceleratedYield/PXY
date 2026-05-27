@@ -78,21 +78,21 @@ def get_entry_signal(df=None):
             
     # --- NORMAL MODE ROUTER (BEFORE 9:15 OR AFTER 10:15 IST) ---
     else:
-        # 1. ATMBUY Channel Configurations (Crossovers & Trajectory Channel Swings)
+        # 1. OTMBUY Channel Configurations (Crossovers & Trajectory Channel Swings)
         if st_trend in ["CROSSBUY", "TRENDBUY"]:
-            final_signal = "ATMBUY"
+            final_signal = "OTMBUY"
             
         # 2. OTMBUY Channel Configurations (Extreme Force Boundary Breakouts)
         elif st_trend == "FORCEBUY":
-            final_signal = "OTMBUY"
+            final_signal = "ATMBUY"
             
-        # 3. ATMSELL Channel Configurations (Crossovers & Trajectory Channel Swings)
+        # 3. OTMSELL Channel Configurations (Crossovers & Trajectory Channel Swings)
         elif st_trend in ["CROSSSELL", "TRENDSELL"]:
-            final_signal = "ATMSELL"
+            final_signal = "OTMSELL"
             
         # 4. OTMSELL Channel Configurations (Extreme Force Boundary Breakouts)
         elif st_trend == "FORCESELL":
-            final_signal = "OTMSELL"
+            final_signal = "ATMSELL"
             
         # 5. Unfiltered Trend States Pass-Through
         elif st_trend in ["BULL", "BEAR"]:
@@ -103,7 +103,7 @@ def get_entry_signal(df=None):
             final_signal = "NONE"
 
     # --- SEPARATED ACTION VS. INFORMATIONAL LOGGER ---
-    is_live_action = final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]
+    is_live_action = final_signal in ["OTMBUY", "OTMSELL", "OTMBUY", "OTMSELL"]
     window_tag = "[⏱️ IST MORNING]" if is_morning_window else "[⚙️ NORMAL MODE]"
     
     if is_live_action:
