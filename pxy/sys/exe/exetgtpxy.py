@@ -1,7 +1,4 @@
 from colorama import Fore, Style, init
-import datetime
-import pandas as pd
-from zoneinfo import ZoneInfo  # Robust built-in timezone library
 
 # Initialize colorama for colored console logs
 init(autoreset=True)
@@ -45,49 +42,6 @@ def target_price(row):
         # Supertrend field capture and sanitization
         supertrend_val = str(row.get("supertrend", "NONE")).upper().strip()
 
-        # --- TIME-BASED TREND OVERRIDE DECK (09:15 - 10:15 IST Locked) ---
-        is_morning_window = False
-        try:
-            row_time = row.get("time") or row.get("timestamp") or row.get("datetime")
-            if row_time is not None:
-                if isinstance(row_time, (datetime.time, datetime.datetime)):
-                    if isinstance(row_time, datetime.time):
-                        current_time = row_time
-                    else:
-                        # Map to IST if datetime object is provided
-                        ts = pd.Timestamp(row_time)
-                        current_time = ts.replace(tzinfo=ZoneInfo("Asia/Kolkata")).time() if ts.tzinfo is None else ts.tz_convert("Asia/Kolkata").time()
-                else:
-                    ts = pd.to_datetime(row_time)
-                    current_time = ts.replace(tzinfo=ZoneInfo("Asia/Kolkata")).time() if ts.tzinfo is None else ts.tz_convert("Asia/Kolkata").time()
-            else:
-                # CRITICAL SERVER OVERRIDE: Fetch UTC live clock and project directly to IST
-                current_time = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).time()
-            
-            if datetime.time(9, 15) <= current_time <= datetime.time(9, 15):
-                is_morning_window = True
-        except Exception:
-            is_morning_window = False
-
-        # Assign routing track: swap Supertrend for raw exit signal during morning opening window
-        eval_trend = clean_signal if is_morning_window else supertrend_val
-        window_tag = "[⏱️ IST MORNING]" if is_morning_window else "[⚙️ NORMAL]"
-
-        # ==============================================================================
-        # 🚨 HARD TRIGGER EXITS (CORRIDOR OVERRIDES)
-        # ==============================================================================
-        if is_pe and not any(term in eval_trend for term in ["BEAR", "SELL", "STSELL"]):
-            if side not in PRINTED_SIDES:
-                print(f" {Fore.RED}💥 PE FORCE KILL {side:<2} | {window_tag} METRIC IS NOT BEARISH ({eval_trend}) -> EMERGENCY EXIT")
-                PRINTED_SIDES.add(side)
-            return 1  
-
-        if is_ce and not any(term in eval_trend for term in ["BULL", "BUY", "STBUY"]):
-            if side not in PRINTED_SIDES:
-                print(f" {Fore.RED}💥 CE FORCE KILL {side:<2} | {window_tag} METRIC IS NOT BULLISH ({eval_trend}) -> EMERGENCY EXIT")
-                PRINTED_SIDES.add(side)
-            return 1  
-
         # 4. FIELD DEFINITIONS
         hce_d = f(row.get("hkin_ce_depth"), 1.0)
         hpe_d = f(row.get("hkin_pe_depth"), 1.0)
@@ -98,13 +52,13 @@ def target_price(row):
         is_bullish_signal = clean_signal in ("BUY", "BULL")
         is_bearish_signal = clean_signal in ("SELL", "BEAR")
         
-        # Supertrend/Override Directional Counter Classifications
-        st_is_bearish_counter = eval_trend in ("BEAR", "SELL", "STSELL")
-        st_is_bullish_counter = eval_trend in ("BULL", "BUY", "STBUY")
+        # Supertrend Directional Counter Classifications
+        st_is_bearish_counter = supertrend_val in ("BEAR", "SELL", "STSELL")
+        st_is_bullish_counter = supertrend_val in ("BULL", "BUY", "STBUY")
 
         # Core scaling math multipliers
-        ce_calc = 1.4 * ce_p
-        pe_calc = 1.4 * pe_p
+        ce_calc = atr_val * ce_p
+        pe_calc = atr_val * pe_p
 
         # 5. FINAL PERCENTAGE SCORE CALCULATION
         state = "⏳"
@@ -115,43 +69,51 @@ def target_price(row):
         # ==============================================================================
         if is_ce:
             if is_counter and is_bullish_signal:
+                # Opposite ST Block during Counter Setup
                 if st_is_bearish_counter:
                     state = "🚨"
                     final_pct_score = 1.4 * ce_p
                 else:
                     state = "🎯"  
-                    final_pct_score = ce_calc
+                    final_pct_score = max(BASE_SCORE, ce_calc) 
             elif is_counter and is_bearish_signal:
+                # Flat Opposite Signal Block
                 state = "🚨"  
                 final_pct_score = 1.4   
             elif is_bullish_signal:
+                # No counter scenario -> Check Supertrend, then ACCELERATE
                 if st_is_bearish_counter:
                     state = "🚨"
                     final_pct_score = 1.4 * ce_p
                 else:
-                    state, final_pct_score = "🔥", ce_calc
+                    state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
             elif is_bearish_signal:
+                # Flat Opposite Signal Block
                 state = "🚨"
                 final_pct_score = 1.4
                 
         elif is_pe:
             if is_counter and is_bearish_signal:
+                # Opposite ST Block during Counter Setup
                 if st_is_bullish_counter:
                     state = "🚨"
                     final_pct_score = 1.4 * pe_p
                 else:
                     state = "🎯"  
-                    final_pct_score = pe_calc  
+                    final_pct_score = max(BASE_SCORE, pe_calc)  
             elif is_counter and is_bullish_signal:
+                # Flat Opposite Signal Block
                 state = "🚨"  
                 final_pct_score = 1.4   
             elif is_bearish_signal:
+                # No counter scenario -> Check Supertrend, then ACCELERATE
                 if st_is_bullish_counter:
                     state = "🚨"
                     final_pct_score = 1.4 * pe_p
                 else:
-                    state, final_pct_score = "🔥", pe_calc
+                    state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
             elif is_bullish_signal:
+                # Flat Opposite Signal Block
                 state = "🚨"
                 final_pct_score = 1.4
 
@@ -170,7 +132,7 @@ def target_price(row):
                     Fore.RED if state == "🚨" else (Fore.MAGENTA if state == "🎯" else Fore.YELLOW)
                 )
             )
-            print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state} | tracking:{eval_trend}")
+            print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state} | trend:{supertrend_val}")
             PRINTED_SIDES.add(side)
 
         return target
