@@ -1,184 +1,99 @@
-//@version=6
-indicator("PXY® Engine - Mode 5 (Adaptive ATR * k Period)", overlay=true, shorttitle="PXY® Engine", max_bars_back=300)
+//@version=5
+indicator("PXY Mode 5 Dots", overlay=true)
 
-// ==========================================
-// 1. CONFIGURATION INTERFACE & SESSION LOGIC
-// ==========================================
-ma_type   = input.string("SMA", title="42 MA Engine Type", options=["SMA", "TSMA (Linear Regression)"])
-sess_spec = input.string("0915-1530:23456", title="Active Trading Session")
-k         = input.float(3.0, title="ATR Multiplier Factor (k)") // 🎯 ADDED: Custom multiplier variable input
+// --- 1. Fetch 1-Minute OHLC Data via Security Function ---
+o_1m = request.security(syminfo.tickerid, "1", open)
+h_1m = request.security(syminfo.tickerid, "1", high)
+l_1m = request.security(syminfo.tickerid, "1", low)
+c_1m = request.security(syminfo.tickerid, "1", close)
 
-// Trace exact minutes elapsed since market open to handle the 50-minute backfill window
-in_session = not na(time(timeframe.period, sess_spec))
-var int bar_count_since_open = 0
-if in_session and not in_session[1]
-    bar_count_since_open := 1
-else if in_session
-    bar_count_since_open += 1
-else
-    bar_count_since_open := 0
+// --- 2. Mode 5 Base Components Calculation (Using 1m Data) ---
+o_raw = o_1m
+h_raw = h_1m
+l_raw = l_1m
+c_raw = c_1m
 
-// ==========================================
-// 1B. PYTHON-REPLICA BACKFILL PATCH
-// ==========================================
-float custom_open  = open
-float custom_high  = high
-float custom_low   = low
-float custom_close = close
+// Component B: Pure Heikin-Ashi Prices
+var float ha_o = na
+ha_c = (o_raw + h_raw + l_raw + c_raw) / 4.0
+ha_o := na(ha_o) ? (o_raw + c_raw) / 2.0 : (ha_o + ha_c) / 2.0
+ha_h = math.max(h_raw, math.max(ha_o, ha_c))
+ha_l = math.min(l_raw, math.min(ha_o, ha_c))
 
-if in_session and bar_count_since_open <= 50
-    custom_open  := ta.valuewhen(bar_count_since_open == 1, open, 0)
-    custom_high  := ta.valuewhen(bar_count_since_open == 1, high, 0)
-    custom_low   := ta.valuewhen(bar_count_since_open == 1, low, 0)
-    custom_close := ta.valuewhen(bar_count_since_open == 1, close, 0)
+// Component C: Open-Close Median Prices
+oc2 = (o_raw + c_raw) / 2.0
+oc2_o = oc2
+oc2_h = oc2
+oc2_l = oc2
+oc2_c = oc2
 
-// ==========================================
-// 2. TIER 1 - MODE 5 HYBRID TRANSFORMATION
-// ==========================================
-float raw_o = custom_open
-float raw_h = custom_high
-float raw_l = custom_low
-float raw_c = custom_close
+// Component D: Shift Momentum Prices
+c1_shift = nz(c_raw, c_raw)
+c1c0_o = c1_shift
+c1c0_h = c_raw
+c1c0_l = c1_shift
+c1c0_c = c_raw
 
-// Vector 1: Pure Heikin-Ashi Structural Matrix
-float ha_c_vec = (raw_o + raw_h + raw_l + raw_c) / 4.0
-var float ha_o_vec = na
-ha_o_vec := na(ha_o_vec) ? (raw_o + raw_c) / 2.0 : (ha_o_vec + ha_c_vec) / 2.0
-float ha_h_vec = math.max(raw_h, math.max(ha_o_vec, ha_c_vec))
-float ha_l_vec = math.min(raw_l, math.min(ha_o_vec, ha_c_vec))
+// Combine Matrices (Mode 5 Unified Price Matrix)
+m5_open  = (o_raw + ha_o + oc2_o + c1c0_o) / 4.0
+m5_high  = (h_raw + ha_h + oc2_h + c1c0_h) / 4.0
+m5_low   = (l_raw + ha_l + oc2_l + c1c0_l) / 4.0
+m5_close = (c_raw + ha_c + oc2_c + c1c0_c) / 4.0
 
-// Vector 2: Open-Close Median Matrix (oc2)
-float oc2_o = (raw_o + raw_c) / 2.0
-float oc2_h = oc2_o
-float oc2_l = oc2_o
-float oc2_c = oc2_o
+// --- 3. Calculate the 3 Distinct Reference Lines ---
+tsma_42 = ta.linreg(m5_close, 42, 0)
+hh_42   = ta.highest(m5_high, 42)
+ll_42   = ta.lowest(m5_low, 42)
 
-// Vector 3: Shift Momentum Matrix (c1c0)
-float c1c0_o = nz(raw_c, raw_c)
-float c1c0_h = raw_c
-float c1c0_l = nz(raw_c, raw_c)
-float c1c0_c = raw_c
+pxy_st_line  = (tsma_42 + hh_42 + ll_42 + m5_close ) / 4.0 // Main Reference ST Line
+pxy_st_no_ll = (tsma_42 + hh_42 + m5_close) / 3.0         // Upper Line (No Low of Low)
+pxy_st_no_hh = (tsma_42 + ll_42 + m5_close) / 3.0         // Lower Line (No High of High)
 
-// 🔄 MODE 5 EQUAL-WEIGHT COMPOSITE CONVERGENCE BLEND
-float mode5_open  = (raw_o + ha_o_vec + oc2_o + c1c0_o) / 4.0
-float mode5_high  = (raw_h + ha_h_vec + oc2_h + c1c0_h) / 4.0
-float mode5_low   = (raw_l + ha_l_vec + oc2_l + c1c0_l) / 4.0
-float mode5_close = (raw_c + ha_c_vec + oc2_c + c1c0_c) / 4.0
+// --- 4. Signal and Pattern Tracking Framework ---
 
-m6_bullish = mode5_close >= mode5_open
-m6_color   = m6_bullish ? color.lime : color.red
-plotcandle(mode5_open, mode5_high, mode5_low, mode5_close, title="Mode 5 Hybrid Composite Blocks", color=m6_color, bordercolor=m6_color, wickcolor=color.new(color.white, 100))
+// A. Standard Crossovers (Main Reference ST Line)
+cross_buy  = ta.crossover(m5_close, pxy_st_line)
+cross_sell = ta.crossunder(m5_close, pxy_st_line)
 
-// ==========================================
-// 3. AUTOMATED LAYER 2 SIMULATION (sysmktpxy)
-// ==========================================
-m6_bull_prev = ta.valuewhen(true, m6_bullish, 1)
+// B. Force Threshold Boundaries (Upper and Lower Lines)
+force_buy  = ta.crossover(m5_close, pxy_st_no_ll)
+force_sell = ta.crossunder(m5_close, pxy_st_no_hh)
 
-string entry_signal = "NONE"
-if m6_bullish and not m6_bull_prev
-    entry_signal := "BUY"
-else if not m6_bullish and m6_bull_prev
-    entry_signal := "SELL"
-else
-    entry_signal := m6_bullish ? "BULL" : "BEAR"
+// C. Dynamic Multi-Bar Channel V-Patterns (c[1], c[2], c[3] historical windows)
+in_upper_pocket = (m5_close[1] < pxy_st_no_ll[1] and m5_close[1] > pxy_st_line[1]) and 
+                  (m5_close[2] < pxy_st_no_ll[2] and m5_close[2] > pxy_st_line[2]) and 
+                  (m5_close[3] < pxy_st_no_ll[3] and m5_close[3] > pxy_st_line[3])
 
-string exit_signal = "NONE"
-if not m6_bullish and m6_bull_prev
-    exit_signal := "BUY"   
-else if m6_bullish and not m6_bull_prev
-    exit_signal := "SELL"  
+v_shape_bottom  = (m5_close[1] < m5_close[2]) and (m5_close > m5_close[1])
+trend_buy       = in_upper_pocket and v_shape_bottom
 
-// ==========================================
-// 4. TIER 2 - DYNAMIC VOLATILITY PERIOD ENGINE (ATR * k)
-// ==========================================
-// A. Calculate true range on Mode 5 candles exclusively
-float m5_tr = math.max(mode5_high - mode5_low, math.max(math.abs(mode5_high - mode5_close), math.abs(mode5_low - mode5_close)))
-float base_atr = ta.rma(m5_tr, 14)
+in_lower_pocket = (m5_close[1] < pxy_st_line[1] and m5_close[1] > pxy_st_no_hh[1]) and 
+                  (m5_close[2] < pxy_st_line[2] and m5_close[2] > pxy_st_no_hh[2]) and 
+                  (m5_close[3] < pxy_st_line[3] and m5_close[3] > pxy_st_no_hh[3])
 
-// B. 🎯 Transform ATR * k into an integer lookback length (Clamped between 3 and 100 for loop safety)
-int dynamic_len = math.max(3, math.min(100, int(math.round(base_atr * k))))
+v_shape_top     = (m5_close[1] > m5_close[2]) and (m5_close < m5_close[1])
+trend_sell      = in_lower_pocket and v_shape_top
 
-// C. Custom dynamic engines to bypass Pine Script's static series restrictions
-f_dynamic_sma(src, len) =>
-    float sum = 0.0
-    for i = 0 to len - 1
-        sum += src[i]
-    sum / len
+// --- 5. Independent Dot Color & Plot Logic ---
+dot_color = (m5_close > m5_open) ? color.green : color.red
 
-f_dynamic_linreg(src, len) =>
-    float sum_x = 0.0, float sum_y = 0.0, float sum_xx = 0.0, float sum_xy = 0.0
-    for i = 0 to len - 1
-        float x = i
-        float y = src[i]
-        sum_x += x
-        sum_y += y
-        sum_xx += x * x
-        sum_xy += x * y
-    float slope = (len * sum_xy - sum_x * sum_y) / (len * sum_xx - sum_x * sum_x)
-    float intercept = (sum_y - slope * sum_x) / len
-    intercept
+// Plotting elements with shortened titles
+plot(m5_close, title="M5 Dots", color=dot_color, style=plot.style_circles, linewidth=3)
+plot(pxy_st_no_ll, title="Upper Boundary", color=color.teal, linewidth=1)
+plot(pxy_st_line, title="Main Ref", color=color.orange, linewidth=2)
+plot(pxy_st_no_hh, title="Lower Boundary", color=color.purple, linewidth=1)
 
-// D. Resolve line positions dynamically
-float st_line = (ma_type == "SMA") ? f_dynamic_sma(mode5_close, dynamic_len) : f_dynamic_linreg(mode5_close, dynamic_len)
+// --- 6. UI Text Signal Overlays (Shortened Label Text) ---
+// Standard Crossovers
+plotchar(cross_buy, title="CBUY", char="", text="CBUY", location=location.belowbar, textcolor=color.green, size=size.small)
+plotchar(cross_sell, title="CSELL", char="", text="CSELL", location=location.abovebar, textcolor=color.red, size=size.small)
 
-c0      = mode5_close
-st_curr = st_line
-c1      = ta.valuewhen(true, mode5_close, 1)
-st_prev = ta.valuewhen(true, st_line, 1)
+// Force Boundary Breakouts
+plotchar(force_buy, title="FBUY", char="", text="FBUY", location=location.belowbar, textcolor=color.green, size=size.small)
+plotchar(force_sell, title="FSELL", char="", text="FSELL", location=location.abovebar, textcolor=color.red, size=size.small)
 
-cross_above = (c0 > st_curr) and (c1 <= st_prev)
-cross_below = (c0 < st_curr) and (c1 >= st_prev)
+// Channel Patterns
+plotchar(trend_buy, title="TBUY", char="", text="TBUY", location=location.belowbar, textcolor=color.lime, size=size.small)
+plotchar(trend_sell, title="TSELL", char="", text="TSELL", location=location.abovebar, textcolor=color.maroon, size=size.small)
 
-var string st_trend = "SIDE"
-if cross_above
-    st_trend := "BUY"
-else if cross_below
-    st_trend := "SELL"
-else if c0 > st_curr
-    st_trend := "BULL"
-else
-    st_trend := "BEAR"
-
-// ==========================================
-// 5. TIER 3 - CORE ROUTER ENGINE (sysentrpxy)
-// ==========================================
-var string final_signal = "NONE"
-
-if st_trend == "BUY"
-    final_signal := "BUY"
-else if st_trend == "SELL"
-    final_signal := "SELL"
-else if entry_signal == "BULL" or entry_signal == "BEAR"
-    final_signal := entry_signal
-else if st_trend == "BULL"
-    final_signal := (entry_signal == "SELL") ? "NONE" : entry_signal
-else if st_trend == "BEAR"
-    final_signal := (entry_signal == "BUY") ? "NONE" : entry_signal
-else
-    final_signal := "NONE"
-
-is_atmbuy  = (final_signal == "BUY")
-is_atmsell = (final_signal == "SELL")
-is_exit_long  = (exit_signal == "BUY")
-is_exit_short = (exit_signal == "SELL")
-
-// ==========================================
-// 6. VISUAL RENDERING ENGINE & ALERTS
-// ==========================================
-trend_color = (st_trend == "BUY" or st_trend == "BULL") ? color.lime : (st_trend == "SELL" or st_trend == "BEAR") ? color.red : color.gray
-plot(st_line, title="Adaptive Baseline Line", color=trend_color, linewidth=3)
-
-// Render volatility bands using the active dynamic lookback distance scaled by factor k
-plot(st_line + (base_atr * k), title="Dynamic Upper Boundary", color=color.new(color.gray, 50), style=plot.style_line, linestyle=plot.linestyle_dashed)
-plot(st_line - (base_atr * k), title="Dynamic Lower Boundary", color=color.new(color.gray, 50), style=plot.style_line, linestyle=plot.linestyle_dashed)
-
-plotshape(is_atmbuy,  title="ATMBUY Action Entry",  style=shape.triangleup,   location=location.belowbar, color=color.lime, size=size.tiny)
-plotshape(is_atmsell, title="ATMSELL Action Entry", style=shape.triangledown, location=location.abovebar, color=color.red,  size=size.tiny)
-plotshape(is_exit_long,  title="Exit Long Dot",  style=shape.circle, location=location.abovebar, color=color.new(color.orange, 20), size=size.tiny)
-plotshape(is_exit_short, title="Exit Short Dot", style=shape.circle, location=location.belowbar, color=color.new(color.orange, 20), size=size.tiny)
-
-alertcondition(is_atmbuy,     title="Entry ATMBUY Alert", message="Order Engine: [ATMBUY]")
-alertcondition(is_atmsell,    title="Entry ATMSELL Alert", message="Order Engine: [ATMSELL]")
-alertcondition(is_exit_long,  title="Exit Long Alert",     message="Order Engine: [EXIT_LONG]")
-alertcondition(is_exit_short, title="Exit Short Alert",    message="Order Engine: [EXIT_SHORT]")
 
