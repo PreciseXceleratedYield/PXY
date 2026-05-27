@@ -70,9 +70,9 @@ def handle_side_averaging(client, df):
 
     # 2. Exclusively evaluate the explicit matrix states
     current_signal = "NONE"
-    if raw_exit_signal == "FORCEBUY":
+    if raw_exit_signal == "ATMBUY":
         current_signal = "BUY"
-    elif raw_exit_signal == "FORCESELL":
+    elif raw_exit_signal == "ATMSELL":
         current_signal = "SELL"
 
     # 3. Add side helper column derived from symbol layout
