@@ -7,6 +7,7 @@ except ImportError:
     TICKER = "NSE_INDEX"
 import pandas as pd
 import datetime
+from zoneinfo import ZoneInfo  # Robust built-in timezone library
 
 def get_entry_signal(df=None):
     # Extract Tier 1 Underlying 42 TSMA Trend States
@@ -29,7 +30,6 @@ def get_entry_signal(df=None):
             mkt_exit = "NONE"
 
     # --- SYNC EXIT LAYER INDEPENDENTLY FROM SYSMKTPXY ---
-    # Overridden completely to rely strictly on the flattened market signals: BULL, BEAR, or NONE
     if mkt_exit in ["BULL", "BEAR", "NONE"]:
         exit_signal = mkt_exit
     else:
@@ -38,17 +38,26 @@ def get_entry_signal(df=None):
     # Initialize entry signal to clean baseline neutral state
     final_signal = "NONE"
 
-    # --- TIME-BASED PRIORITY ROUTER OVERRIDE (09:15 - 10:15) ---
+    # --- TIME-BASED PRIORITY ROUTER OVERRIDE (09:15 - 10:15 IST Locked) ---
     is_morning_window = False
     if df is not None and not df.empty:
         try:
-            # Extract time from the latest dataframe index row
             latest_time = df.index[-1]
-            if isinstance(latest_time, pd.Timestamp):
-                current_time = latest_time.time()
+            # Convert string index to timestamp object if necessary
+            if not isinstance(latest_time, pd.Timestamp):
+                ts = pd.to_datetime(latest_time)
             else:
-                # Fallback parser if index is string format
-                current_time = pd.to_datetime(latest_time).time()
+                ts = latest_time
+            
+            # Strict Timezone Conversion to Indian Standard Time (IST)
+            if ts.tzinfo is None:
+                # If naive, assume it's already IST from your Indian broker data feed
+                ts_ist = ts.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
+            else:
+                # If localized (e.g. UTC from Yahoo Finance), cleanly shift it to IST
+                ts_ist = ts.tz_convert("Asia/Kolkata")
+                
+            current_time = ts_ist.time()
             
             start_window = datetime.time(9, 15)
             end_window = datetime.time(10, 15)
@@ -67,7 +76,7 @@ def get_entry_signal(df=None):
         else:
             final_signal = "NONE"
             
-    # --- NORMAL MODE ROUTER (BEFORE 9:15 OR AFTER 10:15) ---
+    # --- NORMAL MODE ROUTER (BEFORE 9:15 OR AFTER 10:15 IST) ---
     else:
         # 1. ATMBUY Channel Configurations (Crossovers & Trajectory Channel Swings)
         if st_trend in ["CROSSBUY", "TRENDBUY"]:
@@ -95,7 +104,7 @@ def get_entry_signal(df=None):
 
     # --- SEPARATED ACTION VS. INFORMATIONAL LOGGER ---
     is_live_action = final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]
-    window_tag = "[⏱️ MORNING WINDOW]" if is_morning_window else "[⚙️ NORMAL MODE]"
+    window_tag = "[⏱️ IST MORNING]" if is_morning_window else "[⚙️ NORMAL MODE]"
     
     if is_live_action:
         print(f"🔥 {window_tag} ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend} 🔥")
