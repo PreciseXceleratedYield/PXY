@@ -1,6 +1,7 @@
 from colorama import Fore, Style, init
 import datetime
 import pandas as pd
+from zoneinfo import ZoneInfo  # Robust built-in timezone library
 
 # Initialize colorama for colored console logs
 init(autoreset=True)
@@ -44,19 +45,24 @@ def target_price(row):
         # Supertrend field capture and sanitization
         supertrend_val = str(row.get("supertrend", "NONE")).upper().strip()
 
-        # --- TIME-BASED TREND OVERRIDE DECK (09:15 - 10:15) ---
+        # --- TIME-BASED TREND OVERRIDE DECK (09:15 - 10:15 IST Locked) ---
         is_morning_window = False
         try:
-            # Look for explicit timestamp fields in the row structure
             row_time = row.get("time") or row.get("timestamp") or row.get("datetime")
             if row_time is not None:
                 if isinstance(row_time, (datetime.time, datetime.datetime)):
-                    current_time = row_time if isinstance(row_time, datetime.time) else row_time.time()
+                    if isinstance(row_time, datetime.time):
+                        current_time = row_time
+                    else:
+                        # Map to IST if datetime object is provided
+                        ts = pd.Timestamp(row_time)
+                        current_time = ts.replace(tzinfo=ZoneInfo("Asia/Kolkata")).time() if ts.tzinfo is None else ts.tz_convert("Asia/Kolkata").time()
                 else:
-                    current_time = pd.to_datetime(row_time).time()
+                    ts = pd.to_datetime(row_time)
+                    current_time = ts.replace(tzinfo=ZoneInfo("Asia/Kolkata")).time() if ts.tzinfo is None else ts.tz_convert("Asia/Kolkata").time()
             else:
-                # Fallback to system execution time if row payload lacks timestamps
-                current_time = datetime.datetime.now().time()
+                # CRITICAL SERVER OVERRIDE: Fetch UTC live clock and project directly to IST
+                current_time = datetime.datetime.now(ZoneInfo("Asia/Kolkata")).time()
             
             if datetime.time(9, 15) <= current_time <= datetime.time(10, 15):
                 is_morning_window = True
@@ -65,24 +71,22 @@ def target_price(row):
 
         # Assign routing track: swap Supertrend for raw exit signal during morning opening window
         eval_trend = clean_signal if is_morning_window else supertrend_val
-        window_tag = "[⏱️ MORNING]" if is_morning_window else "[⚙️ NORMAL]"
+        window_tag = "[⏱️ IST MORNING]" if is_morning_window else "[⚙️ NORMAL]"
 
         # ==============================================================================
         # 🚨 HARD TRIGGER EXITS (CORRIDOR OVERRIDES)
         # ==============================================================================
-        # Rule 1: Kill all PE trades immediately if trend/signal does NOT contain BEAR, SELL, or STSELL
         if is_pe and not any(term in eval_trend for term in ["BEAR", "SELL", "STSELL"]):
             if side not in PRINTED_SIDES:
                 print(f" {Fore.RED}💥 PE FORCE KILL {side:<2} | {window_tag} METRIC IS NOT BEARISH ({eval_trend}) -> EMERGENCY EXIT")
                 PRINTED_SIDES.add(side)
-            return 1  # Bypasses all math. Forces immediate exit execution loop downstream.
+            return 1  
 
-        # Rule 2: Flip for CE trades. Kill if trend/signal does NOT contain BULL, BUY, or STBUY
         if is_ce and not any(term in eval_trend for term in ["BULL", "BUY", "STBUY"]):
             if side not in PRINTED_SIDES:
                 print(f" {Fore.RED}💥 CE FORCE KILL {side:<2} | {window_tag} METRIC IS NOT BULLISH ({eval_trend}) -> EMERGENCY EXIT")
                 PRINTED_SIDES.add(side)
-            return 1  # Bypasses all math. Forces immediate exit execution loop downstream.
+            return 1  
 
         # 4. FIELD DEFINITIONS
         hce_d = f(row.get("hkin_ce_depth"), 1.0)
@@ -98,7 +102,7 @@ def target_price(row):
         st_is_bearish_counter = eval_trend in ("BEAR", "SELL", "STSELL")
         st_is_bullish_counter = eval_trend in ("BULL", "BUY", "STBUY")
 
-        # Core scaling math multipliers (Enforced universally now)
+        # Core scaling math multipliers
         ce_calc = 1.4 * ce_p
         pe_calc = 1.4 * pe_p
 
@@ -111,53 +115,43 @@ def target_price(row):
         # ==============================================================================
         if is_ce:
             if is_counter and is_bullish_signal:
-                # Opposite ST Block during Counter Setup
                 if st_is_bearish_counter:
                     state = "🚨"
                     final_pct_score = 1.4 * ce_p
                 else:
                     state = "🎯"  
-                    # ACCELERATED: Uses full scaling math multiplier instead of max cap rules
                     final_pct_score = ce_calc
             elif is_counter and is_bearish_signal:
-                # Flat Opposite Signal Block
                 state = "🚨"  
                 final_pct_score = 1.4   
             elif is_bullish_signal:
-                # No counter scenario -> Check Supertrend, then ACCELERATE
                 if st_is_bearish_counter:
                     state = "🚨"
                     final_pct_score = 1.4 * ce_p
                 else:
                     state, final_pct_score = "🔥", ce_calc
             elif is_bearish_signal:
-                # Flat Opposite Signal Block
                 state = "🚨"
                 final_pct_score = 1.4
                 
         elif is_pe:
             if is_counter and is_bearish_signal:
-                # Opposite ST Block during Counter Setup
                 if st_is_bullish_counter:
                     state = "🚨"
                     final_pct_score = 1.4 * pe_p
                 else:
                     state = "🎯"  
-                    # ACCELERATED: Uses full scaling math multiplier instead of max cap rules
                     final_pct_score = pe_calc  
             elif is_counter and is_bullish_signal:
-                # Flat Opposite Signal Block
                 state = "🚨"  
                 final_pct_score = 1.4   
             elif is_bearish_signal:
-                # No counter scenario -> Check Supertrend, then ACCELERATE
                 if st_is_bullish_counter:
                     state = "🚨"
                     final_pct_score = 1.4 * pe_p
                 else:
                     state, final_pct_score = "🔥", pe_calc
             elif is_bullish_signal:
-                # Flat Opposite Signal Block
                 state = "🚨"
                 final_pct_score = 1.4
 
@@ -183,4 +177,3 @@ def target_price(row):
 
     except Exception:
         return 0
-
