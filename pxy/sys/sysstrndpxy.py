@@ -70,7 +70,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['c1'] = df['Close'].shift(1) 
     df['st_prev'] = df['ST'].shift(1) 
     
-    # ✅ FIXED: Extract all numpy arrays at full length BEFORE the tail slice
+    # Extract all numpy arrays at full length BEFORE the tail slice
     m5_c  = df['Close'].to_numpy()
     st    = df['pxy_st_line'].to_numpy()
     no_ll = df['pxy_st_no_ll'].to_numpy()
@@ -79,7 +79,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     st_trend_full = [] 
     n = len(df)
     
-    # ✅ FIXED: Loop runs through full series length to maintain absolute index safety
+    # Loop runs through full series length to maintain absolute index safety
     for i in range(n): 
         if i < 3: 
             st_trend_full.append("SIDE") 
@@ -114,11 +114,11 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         trend_buy  = in_upper_pocket and v_shape_bottom
         trend_sell = in_lower_pocket and v_shape_top
         
-        # State Matrix Assignment Hierarchy (Replaces old AVGB / AVGS)
+        # State Matrix Assignment Hierarchy (INTENDED MATRIX INVERSION PRESERVED)
         if force_buy:
-            new_trend = "FORCESELL"
+            new_trend = "FORCESELL"   # Upper boundary break out -> INTENDED FORCESELL
         elif force_sell:
-            new_trend = "FORCEBUY"
+            new_trend = "FORCEBUY"    # Lower boundary break down -> INTENDED FORCEBUY
         elif cross_buy: 
             new_trend = "CROSSBUY" 
         elif cross_sell: 
@@ -134,7 +134,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         
     df['ST_Trend'] = st_trend_full 
     
-    # ✅ FIXED: Slice down to the 50-row window safely here at the very end 
+    # Slice down to the 50-row window safely here at the very end 
     tail_size = min(50, len(df)) 
     df = df.tail(tail_size).copy() 
     df['bar_count'] = np.arange(1, tail_size + 1) 
@@ -144,6 +144,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 if __name__ == "__main__": 
     print(f"=== [TIER 1] {MA_TYPE} 42 Engine Local Math Test ===") 
     df_st = calculate_supertrend(fetch_yf_data())
-    print(f"TERMINAL STATE STRUCTURAL METRIC: {df_st['ST_Trend'].iloc[-1]}")
+    print(f"LIVE TERMINAL CANDLE STATE METRIC: {df_st['ST_Trend'].iloc[-1]}")
 
 
