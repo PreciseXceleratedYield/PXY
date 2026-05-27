@@ -60,7 +60,7 @@ def get_entry_signal(df=None):
             current_time = ts_ist.time()
             
             start_window = datetime.time(9, 15)
-            end_window = datetime.time(10, 15)
+            end_window = datetime.time(9, 15)
             
             if start_window <= current_time <= end_window:
                 is_morning_window = True
