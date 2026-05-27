@@ -116,9 +116,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         
         # State Matrix Assignment Hierarchy (Replaces old AVGB / AVGS)
         if force_buy:
-            new_trend = "FORCEBUY"
-        elif force_sell:
             new_trend = "FORCESELL"
+        elif force_sell:
+            new_trend = "FORCEBUY"
         elif cross_buy: 
             new_trend = "CROSSBUY" 
         elif cross_sell: 
