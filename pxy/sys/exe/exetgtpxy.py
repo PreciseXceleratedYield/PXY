@@ -117,6 +117,13 @@ def target_price(row):
                 state = "🚨"
                 final_pct_score = 2
 
+        # ==============================================================================
+        # 🛡️ GLOBAL CRITICAL FLOORS & CEILINGS ENGINE
+        # ==============================================================================
+        # CRITICAL REQ: Enforce an absolute minimum floor limit of 1.4% everywhere
+        if final_pct_score < 1.4:
+            final_pct_score = 1.4
+
         # 6. MAX CAP LOGIC (Hard capped at 99%)
         if final_pct_score > 99.0:
             final_pct_score = 99.0
@@ -139,3 +146,4 @@ def target_price(row):
 
     except Exception:
         return 0
+
