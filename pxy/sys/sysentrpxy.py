@@ -107,11 +107,11 @@ def get_entry_signal(df=None):
     window_tag = "[⏱️ IST MORNING]" if is_morning_window else "[⚙️ NORMAL MODE]"
     
     if is_live_action:
-        print(f"🔥 {window_tag} ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend} 🔥")
+        print(f"🔥 {window_tag} En:{final_signal} | Ex:{exit_signal} | ST:{st_trend} 🔥")
     elif final_signal in ["BULL", "BEAR"]:
-        print(f"ℹ️ {window_tag} ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend}")
+        print(f"ℹ️ {window_tag} En:{final_signal} | Ex:{exit_signal} | ST:{st_trend}")
     else:
-        print(f"💤 {window_tag} ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend}")
+        print(f"💤 {window_tag} En:{final_signal} | Ex:{exit_signal} | ST:{st_trend}")
 
     return final_signal, exit_signal
 
