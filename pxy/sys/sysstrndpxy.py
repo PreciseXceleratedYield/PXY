@@ -2,19 +2,6 @@
 import pandas as pd 
 import numpy as np 
 
-try: 
-    from sysdtafpxy import fetch_yf_data 
-except ImportError: 
-    def fetch_yf_data(): 
-        np.random.seed(42)
-        n = 150
-        return pd.DataFrame({
-            'Open': np.linspace(10, 20, n) + np.random.randn(n) * 0.5,
-            'High': np.linspace(10, 20, n) + np.random.randn(n) * 0.5 + 0.5,
-            'Low': np.linspace(10, 20, n) + np.random.randn(n) * 0.5 - 0.5,
-            'Close': np.linspace(10, 20, n) + np.random.randn(n) * 0.5
-        })
-
 # Global Config 
 DEBUG_MODE = True 
 MA_TYPE = "TSMA"  
@@ -49,7 +36,13 @@ def calculate_tsma_42(series: pd.Series) -> np.ndarray:
     return tsma_output 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
-    """ PXY® Engine: Simplified 42 MA Matrix with Clean Crossovers & Flip Breakouts. """ 
+    """ PXY® Engine: Processed data driver with force priority dual-crossing signals. """ 
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    # Safe working copy to keep memory context isolated
+    df = df.copy()
+
     if MA_TYPE.upper() == "SMA": 
         base_ma_line = calculate_sma_42(df['Close']) 
     else: 
@@ -64,12 +57,12 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['pxy_st_no_ll'] = (base_ma_line + hh_42 + df['Close']) / 3.0
     df['pxy_st_no_hh'] = (base_ma_line + ll_42 + df['Close']) / 3.0
     
-    # 🚨 DASHBOARD COMPATIBILITY FIX: Bind required schema keys cleanly 
+    # Dashboard Compatibility Reference Keys
     df['ST'] = df['pxy_st_line'] 
     df['c1'] = df['Close'].shift(1) 
     df['st_prev'] = df['ST'].shift(1) 
 
-    # Extract arrays
+    # Extract NumPy arrays for ultra-fast loop routing
     m5_c  = df['Close'].to_numpy()
     st    = df['pxy_st_line'].to_numpy()
     no_ll = df['pxy_st_no_ll'].to_numpy()
@@ -80,41 +73,44 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     
     for i in range(n): 
         if i < 1: 
-            st_trend_full.append("SIDE") 
+            st_trend_full.append("NONE") 
             continue 
             
         c0 = m5_c[i]
         c1 = m5_c[i-1]
         
-        # Pure Line Crossovers
+        # Pure Center Line Crossovers
         cross_buy  = (c0 > st[i]) and (c1 <= st[i-1])
         cross_sell = (c0 < st[i]) and (c1 >= st[i-1])
         
-        # Pure Boundary Breakout Signals (Your Intended Inversion Setup)
-        force_buy  = (c0 > no_ll[i]) and (c1 <= no_ll[i-1])
-        force_sell = (c0 < no_hh[i]) and (c1 >= no_hh[i-1])
+        # Dual-Directional Boundary Crossing Logic (Catches Above & Below)
+        force_buy_above  = (c0 > no_ll[i]) and (c1 <= no_ll[i-1])
+        force_buy_below  = (c0 < no_ll[i]) and (c1 >= no_ll[i-1])
+        force_buy        = force_buy_above or force_buy_below
+
+        force_sell_below = (c0 < no_hh[i]) and (c1 >= no_hh[i-1])
+        force_sell_above = (c0 > no_hh[i]) and (c1 <= no_hh[i-1])
+        force_sell       = force_sell_below or force_sell_above
         
-        # Simplified State Assignment Hierarchy
+        # EXCLUSIVE PRIORITY MATRIX: FORCE IS STRATEGICALLY AT THE TOP
         if force_buy:
-            new_trend = "FORCESELL"   # Upper break out -> Intended flip to FORCESELL
+            new_trend = "FORCESELL"   # Upper boundary line crossing -> FORCE PRIORITY FLIP
         elif force_sell:
-            new_trend = "FORCEBUY"    # Lower break down -> Intended flip to FORCEBUY
+            new_trend = "FORCEBUY"    # Lower boundary line crossing -> FORCE PRIORITY FLIP
         elif cross_buy: 
             new_trend = "CROSSBUY" 
         elif cross_sell: 
             new_trend = "CROSSSELL" 
         else: 
-            new_trend = "BULL" if (c0 > st[i]) else "BEAR" 
+            new_trend = "NONE"        # Exclusive output. Pure neutral fallback state.
             
         st_trend_full.append(new_trend) 
         
     df['ST_Trend'] = st_trend_full 
     
     tail_size = min(50, len(df)) 
-    df = df.tail(tail_size).copy() 
-    return df 
+    return df.tail(tail_size).copy() 
 
 if __name__ == "__main__": 
-    print(f"=== [TIER 1] Simplified {MA_TYPE} 42 Engine Local Test ===") 
-    df_st = calculate_supertrend(fetch_yf_data())
-    print(f"LIVE CANDLE STATE METRIC: {df_st['ST_Trend'].iloc[-1]}")
+    print(f"=== [TIER 1] Force-Priority Dual-Crossing 42 Engine Configured ===")
+
