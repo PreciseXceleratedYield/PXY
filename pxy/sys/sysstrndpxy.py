@@ -64,6 +64,11 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['pxy_st_no_ll'] = (base_ma_line + hh_42 + df['Close']) / 3.0
     df['pxy_st_no_hh'] = (base_ma_line + ll_42 + df['Close']) / 3.0
     
+    # 🚨 DASHBOARD COMPATIBILITY FIX: Bind required schema keys cleanly 
+    df['ST'] = df['pxy_st_line'] 
+    df['c1'] = df['Close'].shift(1) 
+    df['st_prev'] = df['ST'].shift(1) 
+
     # Extract arrays
     m5_c  = df['Close'].to_numpy()
     st    = df['pxy_st_line'].to_numpy()
