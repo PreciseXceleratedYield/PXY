@@ -6,6 +6,7 @@ try:
 except ImportError:
     TICKER = "NSE_INDEX"
 import pandas as pd
+import datetime
 
 def get_entry_signal(df=None):
     # Extract Tier 1 Underlying 42 TSMA Trend States
@@ -27,35 +28,6 @@ def get_entry_signal(df=None):
         except Exception:
             mkt_exit = "NONE"
 
-    # Initialize entry signal to clean baseline neutral state
-    final_signal = "NONE"
-
-    # --- CORE TREND PRIORITY ROUTER (ENTRY DEPENDS ON STRND ONLY) ---
-    
-    # 1. ATMBUY Channel Configurations (Crossovers & Trajectory Channel Swings)
-    if st_trend in ["CROSSBUY", "TRENDBUY"]:
-        final_signal = "ATMBUY"
-        
-    # 2. OTMBUY Channel Configurations (Extreme Force Boundary Breakouts)
-    elif st_trend == "FORCEBUY":
-        final_signal = "OTMBUY"
-        
-    # 3. ATMSELL Channel Configurations (Crossovers & Trajectory Channel Swings)
-    elif st_trend in ["CROSSSELL", "TRENDSELL"]:
-        final_signal = "ATMSELL"
-        
-    # 4. OTMSELL Channel Configurations (Extreme Force Boundary Breakouts)
-    elif st_trend == "FORCESELL":
-        final_signal = "OTMSELL"
-        
-    # 5. Unfiltered Trend States Pass-Through
-    elif st_trend in ["BULL", "BEAR"]:
-        final_signal = st_trend
-        
-    # Fallback handling for early initialization rows ("SIDE")
-    else:
-        final_signal = "NONE"
-
     # --- SYNC EXIT LAYER INDEPENDENTLY FROM SYSMKTPXY ---
     # Overridden completely to rely strictly on the flattened market signals: BULL, BEAR, or NONE
     if mkt_exit in ["BULL", "BEAR", "NONE"]:
@@ -63,15 +35,74 @@ def get_entry_signal(df=None):
     else:
         exit_signal = "NONE"
 
+    # Initialize entry signal to clean baseline neutral state
+    final_signal = "NONE"
+
+    # --- TIME-BASED PRIORITY ROUTER OVERRIDE (09:15 - 10:15) ---
+    is_morning_window = False
+    if df is not None and not df.empty:
+        try:
+            # Extract time from the latest dataframe index row
+            latest_time = df.index[-1]
+            if isinstance(latest_time, pd.Timestamp):
+                current_time = latest_time.time()
+            else:
+                # Fallback parser if index is string format
+                current_time = pd.to_datetime(latest_time).time()
+            
+            start_window = datetime.time(9, 15)
+            end_window = datetime.time(10, 15)
+            
+            if start_window <= current_time <= end_window:
+                is_morning_window = True
+        except Exception:
+            is_morning_window = False
+
+    # Route based on time priority window
+    if is_morning_window:
+        if exit_signal == "BULL":
+            final_signal = "OTMBUY"
+        elif exit_signal == "BEAR":
+            final_signal = "OTMSELL"
+        else:
+            final_signal = "NONE"
+            
+    # --- NORMAL MODE ROUTER (BEFORE 9:15 OR AFTER 10:15) ---
+    else:
+        # 1. ATMBUY Channel Configurations (Crossovers & Trajectory Channel Swings)
+        if st_trend in ["CROSSBUY", "TRENDBUY"]:
+            final_signal = "ATMBUY"
+            
+        # 2. OTMBUY Channel Configurations (Extreme Force Boundary Breakouts)
+        elif st_trend == "FORCEBUY":
+            final_signal = "OTMBUY"
+            
+        # 3. ATMSELL Channel Configurations (Crossovers & Trajectory Channel Swings)
+        elif st_trend in ["CROSSSELL", "TRENDSELL"]:
+            final_signal = "ATMSELL"
+            
+        # 4. OTMSELL Channel Configurations (Extreme Force Boundary Breakouts)
+        elif st_trend == "FORCESELL":
+            final_signal = "OTMSELL"
+            
+        # 5. Unfiltered Trend States Pass-Through
+        elif st_trend in ["BULL", "BEAR"]:
+            final_signal = st_trend
+            
+        # Fallback handling for early initialization rows ("SIDE")
+        else:
+            final_signal = "NONE"
+
     # --- SEPARATED ACTION VS. INFORMATIONAL LOGGER ---
     is_live_action = final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]
+    window_tag = "[⏱️ MORNING WINDOW]" if is_morning_window else "[⚙️ NORMAL MODE]"
     
     if is_live_action:
-        print(f"🔥 ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend} 🔥")
+        print(f"🔥 {window_tag} ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend} 🔥")
     elif final_signal in ["BULL", "BEAR"]:
-        print(f"ℹ️ ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend}")
+        print(f"ℹ️ {window_tag} ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend}")
     else:
-        print(f"💤 ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend}")
+        print(f"💤 {window_tag} ENTRY : {final_signal} | EXIT: {exit_signal} | TREND: {st_trend}")
 
     return final_signal, exit_signal
 
