@@ -1,30 +1,29 @@
 //@version=5
-indicator("PXY Engine with (O+C)/2 Candlesticks", overlay=true)
+indicator("PXY Engine - Synced (OC/2 Input Data)", overlay=true)
 
 // Global Config
 MA_TYPE = input.string("TSMA", title="MA Type", options=["SMA", "TSMA"])
 show_custom_candles = input.bool(true, title="Show (O+C)/2 Candlesticks")
 
-// --- Python Mirror Source: (O+C)/2 ---
+// --- Python Mirror Source Configuration ---
+// Since your Python df['Close'] contains processed (O+C)/2, 
+// we map our core source directly to this calculation.
 oc2 = (open + close) / 2.0
 
-// --- Custom Candlestick Components ---
-// To simulate a candle using (O+C)/2 as the core value:
-oc2_open  = oc2[1] // The "open" of the new value is yesterday's "close" value
+// --- Custom Candlestick Components (Visual Representation) ---
+oc2_open  = oc2[1]
 oc2_close = oc2
 oc2_high  = math.max(high, math.max(oc2_open, oc2_close))
 oc2_low   = math.min(low, math.min(oc2_open, oc2_close))
-
-// Candle Coloring Logic
 candle_color = oc2_close >= oc2_open ? color.green : color.red
 
-// Plot Custom Candles (Will overlay on the chart)
+// Plot Custom Candles (Overlaying the chart)
 plotcandle(oc2_open, oc2_high, oc2_low, oc2_close, title="(O+C)/2 Candles", 
            color=show_custom_candles ? candle_color : color.new(color.white, 100), 
            wickcolor=show_custom_candles ? candle_color : color.new(color.white, 100), 
            bordercolor=show_custom_candles ? candle_color : color.new(color.white, 100))
 
-// --- 100% Synced Custom Functions (NumPy Loop Replications using oc2) ---
+// --- Custom Functions (NumPy Loop Replications using oc2) ---
 
 // Replicates Python: calculate_sma_42
 calculate_sma_42(float src) =>
@@ -85,7 +84,7 @@ calculate_ll_42() =>
         min_val := math.min(min_val, low[j])
     min_val
 
-// --- Core Calculations ---
+// --- Core Calculations Driven by Processed Data ---
 sma_line  = calculate_sma_42(oc2)
 tsma_line = calculate_tsma_42(oc2)
 
@@ -94,22 +93,23 @@ hh_42        = calculate_hh_42()
 ll_42        = calculate_ll_42()
 
 // --- REFERENCE LINES MATCHING PYTHON MATHEMATICS ---
+// These now use 'oc2' where Python uses df['Close']
 pxy_st_line  = (base_ma_line + hh_42 + ll_42 + oc2) / 4.0
 pxy_st_no_ll = (base_ma_line + hh_42 + oc2) / 3.0 // Upper Boundary Line
 pxy_st_no_hh = (base_ma_line + ll_42 + oc2) / 3.0 // Lower Boundary Line
 
 // --- Array Logic Routing Map Sticking Directly to Historical Price Steps ---
 c0 = oc2
-c1 = oc2[1] // Previous bar index [i-1]
+c1 = oc2[1] // Current and previous state tracking for crossover calculation
 
 st0 = pxy_st_line
-st1 = pxy_st_line[1] // Previous bar index [i-1]
+st1 = pxy_st_line[1]
 
 no_ll0 = pxy_st_no_ll
-no_ll1 = pxy_st_no_ll[1] // Previous bar index [i-1]
+no_ll1 = pxy_st_no_ll[1]
 
 no_hh0 = pxy_st_no_hh
-no_hh1 = pxy_st_no_hh[1] // Previous bar index [i-1]
+no_hh1 = pxy_st_no_hh[1]
 
 // Priority Boolean Conditions Evaluated Dynamically Per Bar
 bool is_buy_signal  = false
@@ -147,3 +147,4 @@ plot(pxy_st_no_hh, title="PXY ST Lower Boundary (No HH)", color=color.purple, li
 // Sharp price-locked independent execution signals
 plotshape(is_buy_signal, title="Buy Signal", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small)
 plotshape(is_sell_signal, title="Sell Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small)
+
