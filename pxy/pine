@@ -1,11 +1,28 @@
 //@version=5
-indicator("PXY Engine", overlay=true)
+indicator("PXY Engine with (O+C)/2 Candlesticks", overlay=true)
 
 // Global Config
 MA_TYPE = input.string("TSMA", title="MA Type", options=["SMA", "TSMA"])
+show_custom_candles = input.bool(true, title="Show (O+C)/2 Candlesticks")
 
 // --- Python Mirror Source: (O+C)/2 ---
 oc2 = (open + close) / 2.0
+
+// --- Custom Candlestick Components ---
+// To simulate a candle using (O+C)/2 as the core value:
+oc2_open  = oc2[1] // The "open" of the new value is yesterday's "close" value
+oc2_close = oc2
+oc2_high  = math.max(high, math.max(oc2_open, oc2_close))
+oc2_low   = math.min(low, math.min(oc2_open, oc2_close))
+
+// Candle Coloring Logic
+candle_color = oc2_close >= oc2_open ? color.green : color.red
+
+// Plot Custom Candles (Will overlay on the chart)
+plotcandle(oc2_open, oc2_high, oc2_low, oc2_close, title="(O+C)/2 Candles", 
+           color=show_custom_candles ? candle_color : color.new(color.white, 100), 
+           wickcolor=show_custom_candles ? candle_color : color.new(color.white, 100), 
+           bordercolor=show_custom_candles ? candle_color : color.new(color.white, 100))
 
 // --- 100% Synced Custom Functions (NumPy Loop Replications using oc2) ---
 
@@ -130,4 +147,3 @@ plot(pxy_st_no_hh, title="PXY ST Lower Boundary (No HH)", color=color.purple, li
 // Sharp price-locked independent execution signals
 plotshape(is_buy_signal, title="Buy Signal", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small)
 plotshape(is_sell_signal, title="Sell Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small)
-
