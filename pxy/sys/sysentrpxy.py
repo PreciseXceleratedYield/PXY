@@ -1,16 +1,14 @@
 # sysentrpxy.py
-from sysstrndpxy import calculate_supertrend  # <-- Import Tier 1 42 TSMA Engine
+from sysstrndpxy import calculate_supertrend  # <-- Sourced from your upstream module
 from sysmktpxy import get_signal  # <-- Import Tier 2 Network Layer (BULL/BEAR Pure Layer)
 try:
     from syscnfgpxy import TICKER
 except ImportError:
     TICKER = "NSE_INDEX"
 import pandas as pd
-import datetime
-from zoneinfo import ZoneInfo  # Robust built-in timezone library
 
 def get_entry_signal(df=None):
-    # Extract Tier 1 Underlying 42 TSMA Trend States
+    # Extract Tier 1 Underlying Upstream Trend States (FORCEBUY, FORCESELL, CROSSBUY, CROSSSELL, BULL, BEAR)
     st_trend = "SIDE"
     if df is not None and not df.empty:
         try:
@@ -20,7 +18,6 @@ def get_entry_signal(df=None):
             st_trend = "SIDE"
 
     # --- INDEPENDENT MARKET EXIT LAYER EXTRACTION ---
-    # Fetch background context directly from sysmktpxy module independently
     mkt_entry, mkt_exit = "NONE", "NONE"
     if df is not None and not df.empty:
         try:
@@ -38,73 +35,33 @@ def get_entry_signal(df=None):
     # Initialize entry signal to clean baseline neutral state
     final_signal = "NONE"
 
-    # --- TIME-BASED PRIORITY ROUTER OVERRIDE (09:15 - 10:15 IST Locked) ---
-    is_morning_window = False
-    if df is not None and not df.empty:
-        try:
-            latest_time = df.index[-1]
-            # Convert string index to timestamp object if necessary
-            if not isinstance(latest_time, pd.Timestamp):
-                ts = pd.to_datetime(latest_time)
-            else:
-                ts = latest_time
-            
-            # Strict Timezone Conversion to Indian Standard Time (IST)
-            if ts.tzinfo is None:
-                # If naive, assume it's already IST from your Indian broker data feed
-                ts_ist = ts.replace(tzinfo=ZoneInfo("Asia/Kolkata"))
-            else:
-                # If localized (e.g. UTC from Yahoo Finance), cleanly shift it to IST
-                ts_ist = ts.tz_convert("Asia/Kolkata")
-                
-            current_time = ts_ist.time()
-            
-            start_window = datetime.time(9, 15)
-            end_window = datetime.time(9, 15)
-            
-            if start_window <= current_time <= end_window:
-                is_morning_window = True
-        except Exception:
-            is_morning_window = False
-
-    # Route based on time priority window
-    if is_morning_window:
-        if exit_signal == "BULL":
-            final_signal = "OTMBUY"
-        elif exit_signal == "BEAR":
-            final_signal = "OTMSELL"
-        else:
-            final_signal = "NONE"
-            
-    # --- NORMAL MODE ROUTER (BEFORE 9:15 OR AFTER 10:15 IST) ---
+    # --- DIRECT ROUTER ENGINE (NOW SEGREGATING ATM VS OTM CHANNELS) ---
+    # 1. Standard Center Axis Crossover Up -> OTMBUY Execution
+    if st_trend == "CROSSBUY":
+        final_signal = "OTMBUY"
+        
+    # 2. Extreme Lower Band Channel Violation -> ATMBUY Execution
+    elif st_trend == "FORCEBUY":
+        final_signal = "ATMBUY"
+        
+    # 3. Standard Center Axis Crossover Down -> OTMSELL Execution
+    elif st_trend == "CROSSSELL":
+        final_signal = "OTMSELL"
+        
+    # 4. Extreme Upper Band Channel Violation -> ATMSELL Execution
+    elif st_trend == "FORCESELL":
+        final_signal = "ATMSELL"
+        
+    # 5. Unfiltered Pure Baseline Trend States Pass-Through
+    elif st_trend in ["BULL", "BEAR"]:
+        final_signal = st_trend
+        
+    # Fallback handling for early initialization rows ("SIDE")
     else:
-        # 1. OTMBUY Channel Configurations (Crossovers & Trajectory Channel Swings)
-        if st_trend in ["CROSSBUY", "TRENDBUY"]:
-            final_signal = "OTMBUY"
-            
-        # 2. OTMBUY Channel Configurations (Extreme Force Boundary Breakouts)
-        elif st_trend == "FORCEBUY":
-            final_signal = "ATMBUY"
-            
-        # 3. OTMSELL Channel Configurations (Crossovers & Trajectory Channel Swings)
-        elif st_trend in ["CROSSSELL", "TRENDSELL"]:
-            final_signal = "OTMSELL"
-            
-        # 4. OTMSELL Channel Configurations (Extreme Force Boundary Breakouts)
-        elif st_trend == "FORCESELL":
-            final_signal = "ATMSELL"
-            
-        # 5. Unfiltered Trend States Pass-Through
-        elif st_trend in ["BULL", "BEAR"]:
-            final_signal = st_trend
-            
-        # Fallback handling for early initialization rows ("SIDE")
-        else:
-            final_signal = "NONE"
+        final_signal = "NONE"
 
     # --- SEPARATED ACTION VS. INFORMATIONAL LOGGER ---
-    is_live_action = final_signal in ["OTMBUY", "OTMSELL", "OTMBUY", "OTMSELL"]
-    window_tag = "[⏱️ IST MORNING]" if is_morning_window else "[⚙️ NORMAL MODE]"
+    is_live_action = final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]
     
     if is_live_action:
         print(f"🔥 En:{final_signal} | Ex:{exit_signal} | St:{st_trend} 🔥")
@@ -123,5 +80,6 @@ if __name__ == "__main__":
         entry, ex = get_entry_signal(df)
         print("-" * 50)
         print(f"FINAL ENTRY SIGNAL: {entry} | EXIT SIGNAL: {ex}")
+
 
 
