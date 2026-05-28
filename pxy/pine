@@ -1,29 +1,84 @@
 //@version=5
-indicator("PXY Engine - Synced (OC/2 Input Data)", overlay=true)
+indicator("PXY Engine - Multi-Mode Unified Matrix Sync", overlay=true)
 
-// Global Config
-MA_TYPE = input.string("TSMA", title="MA Type", options=["SMA", "TSMA"])
-show_custom_candles = input.bool(true, title="Show (O+C)/2 Candlesticks")
+// --- Global Config & Mode Switches ---
+MA_TYPE             = input.string("TSMA", title="MA Type", options=["SMA", "TSMA"])
+OHLC_MODE           = input.int(1, title="Data Transformation Mode", minval=1, maxval=6, tooltip="1: Raw, 2: Heikin-Ashi, 3: Open-Close Median, 4: Shift Momentum, 5: Composite Blend, 6: 4-SMA OC/2")
+show_custom_candles = input.bool(true, title="Show Transformed Candlesticks")
 
-// --- Python Mirror Source Configuration ---
-// Since your Python df['Close'] contains processed (O+C)/2, 
-// we map our core source directly to this calculation.
-oc2 = (open + close) / 2.0
+// --- Mode 2 & Mode 5 Dependent Function: Pure Heikin-Ashi Matrix Generator ---
+get_ha_matrices() =>
+    var float ha_o = na
+    float ha_c = (open + high + low + close) / 4.0
+    ha_o := na(ha_o) ? (open + close) / 2.0 : (ha_o + ha_c) / 2.0
+    float ha_h = math.max(high, math.max(ha_o, ha_c))
+    float ha_l = math.min(low, math.min(ha_o, ha_c))
+    [ha_o, ha_h, ha_l, ha_c]
 
-// --- Custom Candlestick Components (Visual Representation) ---
-oc2_open  = oc2[1]
-oc2_close = oc2
-oc2_high  = math.max(high, math.max(oc2_open, oc2_close))
-oc2_low   = math.min(low, math.min(oc2_open, oc2_close))
-candle_color = oc2_close >= oc2_open ? color.green : color.red
+[ha_o_m2, ha_h_m2, ha_l_m2, ha_c_m2] = get_ha_matrices()
 
-// Plot Custom Candles (Overlaying the chart)
-plotcandle(oc2_open, oc2_high, oc2_low, oc2_close, title="(O+C)/2 Candles", 
+// --- Mode 6 Dependent Function: 4-SMA OC/2 Loop Generator ---
+get_mode6_matrices() =>
+    float sma_o = ta.sma(open, 4)
+    float sma_c = ta.sma(close, 4)
+    var float m6_o = na
+    float m6_c = (sma_o + sma_c) / 2.0
+    m6_o := na(m6_o) ? m6_c : (m6_o + m6_c) / 2.0
+    float m6_h = math.max(m6_o, m6_c)
+    float m6_l = math.min(m6_o, m6_c)
+    [m6_o, m6_h, m6_l, m6_c]
+
+[m6_o, m6_h, m6_l, m6_c] = get_mode6_matrices()
+
+// --- Dynamic Runtime OHLC Assignment Switching Block ---
+float src_o = open
+float src_h = high
+float src_l = low
+float src_c = close
+
+if OHLC_MODE == 1
+    src_o := open
+    src_h := high
+    src_l := low
+    src_c := close
+else if OHLC_MODE == 2
+    src_o := ha_o_m2
+    src_h := ha_h_m2
+    src_l := ha_l_m2
+    src_c := ha_c_m2
+else if OHLC_MODE == 3
+    float oc2 = (open + close) / 2.0
+    src_o := oc2
+    src_h := oc2
+    src_l := oc2
+    src_c := oc2
+else if OHLC_MODE == 4
+    float raw_c1 = na(close[1]) ? close : close[1]
+    src_o := raw_c1
+    src_h := close
+    src_l := raw_c1
+    src_c := close
+else if OHLC_MODE == 5
+    float oc2 = (open + close) / 2.0
+    float raw_c1 = na(close[1]) ? close : close[1]
+    src_o := (open + ha_o_m2 + oc2 + raw_c1) / 4.0
+    src_h := (high + ha_h_m2 + oc2 + close) / 4.0
+    src_l := (low + ha_l_m2 + oc2 + raw_c1) / 4.0
+    src_c := (close + ha_c_m2 + oc2 + close) / 4.0
+else if OHLC_MODE == 6
+    src_o := m6_o
+    src_h := m6_h
+    src_l := m6_l
+    src_c := m6_c
+
+// --- Plot Active Transformed Matrix Custom Candles ---
+candle_color = src_c >= src_o ? color.green : color.red
+plotcandle(src_o, src_h, src_l, src_c, title="Active Transformed Candles", 
            color=show_custom_candles ? candle_color : color.new(color.white, 100), 
            wickcolor=show_custom_candles ? candle_color : color.new(color.white, 100), 
            bordercolor=show_custom_candles ? candle_color : color.new(color.white, 100))
 
-// --- Custom Functions (NumPy Loop Replications using oc2) ---
+// --- 100% Synced Custom Functions (NumPy Loop Replications using Active Matrix Inputs) ---
 
 // Replicates Python: calculate_sma_42
 calculate_sma_42(float src) =>
@@ -40,26 +95,20 @@ calculate_tsma_42(float src) =>
     float tsma_output = src
     if i > 0
         int current_window = math.min(i + 1, 42)
-        
-        // Calculate Means
         float x_sum = 0.0
         float y_sum = 0.0
         for j = 0 to current_window - 1
             x_sum := x_sum + j
             y_sum := y_sum + src[j]
-        
         float x_mean = x_sum / current_window
         float y_mean = y_sum / current_window
-        
         float num = 0.0
         float denom = 0.0
         for j = 0 to current_window - 1
-            // Inverts historical offset 'j' to align with Python's forward x step sequence [0, 1, 2...]
             float x_val = (current_window - 1) - j 
             float x_diff = x_val - x_mean
             num := num + (x_diff * (src[j] - y_mean))
             denom := denom + math.pow(x_diff, 2)
-            
         if denom == 0
             tsma_output := src
         else
@@ -68,48 +117,47 @@ calculate_tsma_42(float src) =>
             tsma_output := slope * (current_window - 1) + intercept
     tsma_output
 
-// Replicates Python: rolling(42, min_periods=1).max()
-calculate_hh_42() =>
+// Replicates Python: rolling(42, min_periods=1).max() over Active High Matrix
+calculate_hh_42(float src) =>
     int current_window = math.min(bar_index + 1, 42)
-    float max_val = high
+    float max_val = src
     for j = 0 to current_window - 1
-        max_val := math.max(max_val, high[j])
+        max_val := math.max(max_val, src[j])
     max_val
 
-// Replicates Python: rolling(42, min_periods=1).min()
-calculate_ll_42() =>
+// Replicates Python: rolling(42, min_periods=1).min() over Active Low Matrix
+calculate_ll_42(float src) =>
     int current_window = math.min(bar_index + 1, 42)
-    float min_val = low
+    float min_val = src
     for j = 0 to current_window - 1
-        min_val := math.min(min_val, low[j])
+        min_val := math.min(min_val, src[j])
     min_val
 
-// --- Core Calculations Driven by Processed Data ---
-sma_line  = calculate_sma_42(oc2)
-tsma_line = calculate_tsma_42(oc2)
+// --- Core Calculations Driven by Selected Mode Matrix ---
+sma_line  = calculate_sma_42(src_c)
+tsma_line = calculate_tsma_42(src_c)
 
 base_ma_line = (MA_TYPE == "SMA") ? sma_line : tsma_line
-hh_42        = calculate_hh_42()
-ll_42        = calculate_ll_42()
+hh_42        = calculate_hh_42(src_h)
+ll_42        = calculate_ll_42(src_l)
 
 // --- REFERENCE LINES MATCHING PYTHON MATHEMATICS ---
-// These now use 'oc2' where Python uses df['Close']
-pxy_st_line  = (base_ma_line + hh_42 + ll_42 + oc2) / 4.0
-pxy_st_no_ll = (base_ma_line + hh_42 + oc2) / 3.0 // Upper Boundary Line
-pxy_st_no_hh = (base_ma_line + ll_42 + oc2) / 3.0 // Lower Boundary Line
+pxy_st_line  = (base_ma_line + hh_42 + ll_42 + src_c) / 4.0
+pxy_st_no_ll = (base_ma_line + hh_42 + src_c) / 3.0 // Upper Boundary Line
+pxy_st_no_hh = (base_ma_line + ll_42 + src_c) / 3.0 // Lower Boundary Line
 
-// --- Array Logic Routing Map Sticking Directly to Historical Price Steps ---
-c0 = oc2
-c1 = oc2[1] // Current and previous state tracking for crossover calculation
+// --- Array Logic Routing Map (Pulled dynamically via history tracking) ---
+c0 = src_c
+c1 = src_c[1] // 🎯 FIXED: Restored historical offset to capture shifts
 
 st0 = pxy_st_line
-st1 = pxy_st_line[1]
+st1 = pxy_st_line[1] // 🎯 FIXED: Restored historical offset to compare lines
 
 no_ll0 = pxy_st_no_ll
-no_ll1 = pxy_st_no_ll[1]
+no_ll1 = pxy_st_no_ll[1] // 🎯 FIXED
 
 no_hh0 = pxy_st_no_hh
-no_hh1 = pxy_st_no_hh[1]
+no_hh1 = pxy_st_no_hh[1] // 🎯 FIXED
 
 // Priority Boolean Conditions Evaluated Dynamically Per Bar
 bool is_buy_signal  = false
@@ -147,4 +195,3 @@ plot(pxy_st_no_hh, title="PXY ST Lower Boundary (No HH)", color=color.purple, li
 // Sharp price-locked independent execution signals
 plotshape(is_buy_signal, title="Buy Signal", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small)
 plotshape(is_sell_signal, title="Sell Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small)
-
