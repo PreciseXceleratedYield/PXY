@@ -1,99 +1,133 @@
 //@version=5
-indicator("PXY Mode 5 Dots", overlay=true)
+indicator("PXY Engine", overlay=true)
 
-// --- 1. Fetch 1-Minute OHLC Data via Security Function ---
-o_1m = request.security(syminfo.tickerid, "1", open)
-h_1m = request.security(syminfo.tickerid, "1", high)
-l_1m = request.security(syminfo.tickerid, "1", low)
-c_1m = request.security(syminfo.tickerid, "1", close)
+// Global Config
+MA_TYPE = input.string("TSMA", title="MA Type", options=["SMA", "TSMA"])
 
-// --- 2. Mode 5 Base Components Calculation (Using 1m Data) ---
-o_raw = o_1m
-h_raw = h_1m
-l_raw = l_1m
-c_raw = c_1m
+// --- Python Mirror Source: (O+C)/2 ---
+oc2 = (open + close) / 2.0
 
-// Component B: Pure Heikin-Ashi Prices
-var float ha_o = na
-ha_c = (o_raw + h_raw + l_raw + c_raw) / 4.0
-ha_o := na(ha_o) ? (o_raw + c_raw) / 2.0 : (ha_o + ha_c) / 2.0
-ha_h = math.max(h_raw, math.max(ha_o, ha_c))
-ha_l = math.min(l_raw, math.min(ha_o, ha_c))
+// --- 100% Synced Custom Functions (NumPy Loop Replications using oc2) ---
 
-// Component C: Open-Close Median Prices
-oc2 = (o_raw + c_raw) / 2.0
-oc2_o = oc2
-oc2_h = oc2
-oc2_l = oc2
-oc2_c = oc2
+// Replicates Python: calculate_sma_42
+calculate_sma_42(float src) =>
+    int i = bar_index
+    int current_window = math.min(i + 1, 42)
+    float sum = 0.0
+    for j = 0 to current_window - 1
+        sum := sum + src[j]
+    sum / current_window
 
-// Component D: Shift Momentum Prices
-c1_shift = nz(c_raw, c_raw)
-c1c0_o = c1_shift
-c1c0_h = c_raw
-c1c0_l = c1_shift
-c1c0_c = c_raw
+// Replicates Python: calculate_tsma_42
+calculate_tsma_42(float src) =>
+    int i = bar_index
+    float tsma_output = src
+    if i > 0
+        int current_window = math.min(i + 1, 42)
+        
+        // Calculate Means
+        float x_sum = 0.0
+        float y_sum = 0.0
+        for j = 0 to current_window - 1
+            x_sum := x_sum + j
+            y_sum := y_sum + src[j]
+        
+        float x_mean = x_sum / current_window
+        float y_mean = y_sum / current_window
+        
+        float num = 0.0
+        float denom = 0.0
+        for j = 0 to current_window - 1
+            // Inverts historical offset 'j' to align with Python's forward x step sequence [0, 1, 2...]
+            float x_val = (current_window - 1) - j 
+            float x_diff = x_val - x_mean
+            num := num + (x_diff * (src[j] - y_mean))
+            denom := denom + math.pow(x_diff, 2)
+            
+        if denom == 0
+            tsma_output := src
+        else
+            float slope = num / denom
+            float intercept = y_mean - slope * x_mean
+            tsma_output := slope * (current_window - 1) + intercept
+    tsma_output
 
-// Combine Matrices (Mode 5 Unified Price Matrix)
-m5_open  = (o_raw + ha_o + oc2_o + c1c0_o) / 4.0
-m5_high  = (h_raw + ha_h + oc2_h + c1c0_h) / 4.0
-m5_low   = (l_raw + ha_l + oc2_l + c1c0_l) / 4.0
-m5_close = (c_raw + ha_c + oc2_c + c1c0_c) / 4.0
+// Replicates Python: rolling(42, min_periods=1).max()
+calculate_hh_42() =>
+    int current_window = math.min(bar_index + 1, 42)
+    float max_val = high
+    for j = 0 to current_window - 1
+        max_val := math.max(max_val, high[j])
+    max_val
 
-// --- 3. Calculate the 3 Distinct Reference Lines ---
-tsma_42 = ta.linreg(m5_close, 42, 0)
-hh_42   = ta.highest(m5_high, 42)
-ll_42   = ta.lowest(m5_low, 42)
+// Replicates Python: rolling(42, min_periods=1).min()
+calculate_ll_42() =>
+    int current_window = math.min(bar_index + 1, 42)
+    float min_val = low
+    for j = 0 to current_window - 1
+        min_val := math.min(min_val, low[j])
+    min_val
 
-pxy_st_line  = (tsma_42 + hh_42 + ll_42 + m5_close ) / 4.0 // Main Reference ST Line
-pxy_st_no_ll = (tsma_42 + hh_42 + m5_close) / 3.0         // Upper Line (No Low of Low)
-pxy_st_no_hh = (tsma_42 + ll_42 + m5_close) / 3.0         // Lower Line (No High of High)
+// --- Core Calculations ---
+sma_line  = calculate_sma_42(oc2)
+tsma_line = calculate_tsma_42(oc2)
 
-// --- 4. Signal and Pattern Tracking Framework ---
+base_ma_line = (MA_TYPE == "SMA") ? sma_line : tsma_line
+hh_42        = calculate_hh_42()
+ll_42        = calculate_ll_42()
 
-// A. Standard Crossovers (Main Reference ST Line)
-cross_buy  = ta.crossover(m5_close, pxy_st_line)
-cross_sell = ta.crossunder(m5_close, pxy_st_line)
+// --- REFERENCE LINES MATCHING PYTHON MATHEMATICS ---
+pxy_st_line  = (base_ma_line + hh_42 + ll_42 + oc2) / 4.0
+pxy_st_no_ll = (base_ma_line + hh_42 + oc2) / 3.0 // Upper Boundary Line
+pxy_st_no_hh = (base_ma_line + ll_42 + oc2) / 3.0 // Lower Boundary Line
 
-// B. Force Threshold Boundaries (Upper and Lower Lines)
-force_buy  = ta.crossover(m5_close, pxy_st_no_ll)
-force_sell = ta.crossunder(m5_close, pxy_st_no_hh)
+// --- Array Logic Routing Map Sticking Directly to Historical Price Steps ---
+c0 = oc2
+c1 = oc2[1] // Previous bar index [i-1]
 
-// C. Dynamic Multi-Bar Channel V-Patterns (c[1], c[2], c[3] historical windows)
-in_upper_pocket = (m5_close[1] < pxy_st_no_ll[1] and m5_close[1] > pxy_st_line[1]) and 
-                  (m5_close[2] < pxy_st_no_ll[2] and m5_close[2] > pxy_st_line[2]) and 
-                  (m5_close[3] < pxy_st_no_ll[3] and m5_close[3] > pxy_st_line[3])
+st0 = pxy_st_line
+st1 = pxy_st_line[1] // Previous bar index [i-1]
 
-v_shape_bottom  = (m5_close[1] < m5_close[2]) and (m5_close > m5_close[1])
-trend_buy       = in_upper_pocket and v_shape_bottom
+no_ll0 = pxy_st_no_ll
+no_ll1 = pxy_st_no_ll[1] // Previous bar index [i-1]
 
-in_lower_pocket = (m5_close[1] < pxy_st_line[1] and m5_close[1] > pxy_st_no_hh[1]) and 
-                  (m5_close[2] < pxy_st_line[2] and m5_close[2] > pxy_st_no_hh[2]) and 
-                  (m5_close[3] < pxy_st_line[3] and m5_close[3] > pxy_st_no_hh[3])
+no_hh0 = pxy_st_no_hh
+no_hh1 = pxy_st_no_hh[1] // Previous bar index [i-1]
 
-v_shape_top     = (m5_close[1] > m5_close[2]) and (m5_close < m5_close[1])
-trend_sell      = in_lower_pocket and v_shape_top
+// Priority Boolean Conditions Evaluated Dynamically Per Bar
+bool is_buy_signal  = false
+bool is_sell_signal = false
 
-// --- 5. Independent Dot Color & Plot Logic ---
-dot_color = (m5_close > m5_open) ? color.green : color.red
+if bar_index >= 1
+    // Pure Center Line Crossovers
+    cross_buy  = (c0 > st0) and (c1 <= st1)
+    cross_sell = (c0 < st0) and (c1 >= st1)
+    
+    // Dual-Directional Boundary Crossing Logic (Catches Above & Below)
+    force_buy_above  = (c0 > no_ll0) and (c1 <= no_ll1)
+    force_buy_below  = (c0 < no_ll0) and (c1 >= no_ll1)
+    force_buy        = force_buy_above or force_buy_below
 
-// Plotting elements with shortened titles
-plot(m5_close, title="M5 Dots", color=dot_color, style=plot.style_circles, linewidth=3)
-plot(pxy_st_no_ll, title="Upper Boundary", color=color.teal, linewidth=1)
-plot(pxy_st_line, title="Main Ref", color=color.orange, linewidth=2)
-plot(pxy_st_no_hh, title="Lower Boundary", color=color.purple, linewidth=1)
+    force_sell_below = (c0 < no_hh0) and (c1 >= no_hh1)
+    force_sell_above = (c0 > no_hh0) and (c1 <= no_hh1)
+    force_sell       = force_sell_below or force_sell_above
+    
+    // EXCLUSIVE PRIORITY MATRIX SYNCED DIRECTLY WITH SWAPPED PYTHON LOGIC
+    if force_buy
+        is_sell_signal := true   // Upper Boundary Line Interaction -> FORCESELL
+    else if force_sell
+        is_buy_signal  := true   // Lower Boundary Line Interaction -> FORCEBUY
+    else if cross_buy
+        is_buy_signal  := true   // CROSSBUY
+    else if cross_sell
+        is_sell_signal := true   // CROSSSELL
 
-// --- 6. UI Text Signal Overlays (Shortened Label Text) ---
-// Standard Crossovers
-plotchar(cross_buy, title="CBUY", char="", text="CBUY", location=location.belowbar, textcolor=color.green, size=size.small)
-plotchar(cross_sell, title="CSELL", char="", text="CSELL", location=location.abovebar, textcolor=color.red, size=size.small)
+// --- Chart Element Plots ---
+plot(pxy_st_line, title="PXY ST Line Center", color=color.blue, linewidth=2)
+plot(pxy_st_no_ll, title="PXY ST Upper Boundary (No LL)", color=color.orange, linewidth=1, style=plot.style_linebr)
+plot(pxy_st_no_hh, title="PXY ST Lower Boundary (No HH)", color=color.purple, linewidth=1, style=plot.style_linebr)
 
-// Force Boundary Breakouts
-plotchar(force_buy, title="FBUY", char="", text="FBUY", location=location.belowbar, textcolor=color.green, size=size.small)
-plotchar(force_sell, title="FSELL", char="", text="FSELL", location=location.abovebar, textcolor=color.red, size=size.small)
-
-// Channel Patterns
-plotchar(trend_buy, title="TBUY", char="", text="TBUY", location=location.belowbar, textcolor=color.lime, size=size.small)
-plotchar(trend_sell, title="TSELL", char="", text="TSELL", location=location.abovebar, textcolor=color.maroon, size=size.small)
-
+// Sharp price-locked independent execution signals
+plotshape(is_buy_signal, title="Buy Signal", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small)
+plotshape(is_sell_signal, title="Sell Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small)
 
