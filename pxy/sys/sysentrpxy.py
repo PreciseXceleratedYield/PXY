@@ -35,18 +35,18 @@ def get_entry_signal(df=None):
     # Initialize entry signal to clean baseline neutral state
     final_signal = "NONE"
 
-    # --- DIRECT ROUTER ENGINE (NOW SEGREGATING ATM VS OTM CHANNELS) ---
-    # 1. Standard Center Axis Crossover Up -> OTMBUY Execution
+    # --- DIRECT ROUTER ENGINE (NOW SEGREGATING ATM VS ATM CHANNELS) ---
+    # 1. Standard Center Axis Crossover Up -> ATMBUY Execution
     if st_trend == "CROSSBUY":
-        final_signal = "OTMBUY"
+        final_signal = "ATMBUY"
         
     # 2. Extreme Lower Band Channel Violation -> ATMBUY Execution
     elif st_trend == "FORCEBUY":
         final_signal = "ATMBUY"
         
-    # 3. Standard Center Axis Crossover Down -> OTMSELL Execution
+    # 3. Standard Center Axis Crossover Down -> ATMSELL Execution
     elif st_trend == "CROSSSELL":
-        final_signal = "OTMSELL"
+        final_signal = "ATMSELL"
         
     # 4. Extreme Upper Band Channel Violation -> ATMSELL Execution
     elif st_trend == "FORCESELL":
@@ -61,7 +61,7 @@ def get_entry_signal(df=None):
         final_signal = "NONE"
 
     # --- SEPARATED ACTION VS. INFORMATIONAL LOGGER ---
-    is_live_action = final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]
+    is_live_action = final_signal in ["ATMBUY", "ATMSELL", "ATMBUY", "ATMSELL"]
     
     if is_live_action:
         print(f"🔥 En:{final_signal} | Ex:{exit_signal} | St:{st_trend} 🔥")
