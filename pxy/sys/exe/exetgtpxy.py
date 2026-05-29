@@ -42,7 +42,7 @@ def target_price(row):
             final_pct_score = max(2.0, atr_val + depth_val)
         else:
             # Normal depth rule: subtract for depth 1-3, add for depth 4+
-            final_pct_score = max(2.0, atr_val - depth_val if depth_val <= 3 else atr_val + depth_val)
+            final_pct_score = max(2.0, atr_val - depth_val if depth_val <= 4 else atr_val + depth_val)
 
         # 4. FINAL PERCENTAGE TARGET MATH CONVERSION
         add_value = entry_prc * (final_pct_score / 100.0)
