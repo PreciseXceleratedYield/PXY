@@ -49,14 +49,13 @@ def target_price(row):
         target = round(entry_prc + add_value, 2)
 
         # 5. STREAMLINED ACTION OUTPUT CONSOLE LOGGER
-        print_key = f"{symbol}_{side}"
-        if print_key not in PRINTED_SIDES and side != "NA":
+        # FIX: Track by side only instead of combining with symbol
+        if side not in PRINTED_SIDES and side != "NA":
             print(f" {Fore.CYAN}{side:<2} SCORE | Target: {final_pct_score:>4.1f}%")
-            PRINTED_SIDES.add(print_key)
+            PRINTED_SIDES.add(side)
 
         return target
 
     except Exception:
         return 0
-
 
