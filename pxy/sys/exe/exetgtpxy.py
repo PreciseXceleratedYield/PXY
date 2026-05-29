@@ -51,7 +51,7 @@ def target_price(row):
         # 5. STREAMLINED ACTION OUTPUT CONSOLE LOGGER
         print_key = f"{symbol}_{side}"
         if print_key not in PRINTED_SIDES and side != "NA":
-            print(f" {Fore.CYAN}{side:<2} SCORE | Calculated Target Percentage: {final_pct_score:>4.1f}%")
+            print(f" {Fore.CYAN}{side:<2} SCORE | Target: {final_pct_score:>4.1f}%")
             PRINTED_SIDES.add(print_key)
 
         return target
