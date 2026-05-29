@@ -44,12 +44,17 @@ def target_price(row):
             # Normal depth rule: subtract for depth 1-3, add for depth 4+
             final_pct_score = max(2.0, atr_val - depth_val if depth_val <= 4 else atr_val + depth_val)
 
+        # 🔄 OPPOSITE TREND RULE (Using 'exit' Column)
+        # Cut target percentage score in half for CE during BEAR, or PE during BULL
+        exit_trend = str(row.get("exit", "NONE")).upper()
+        if (side == "CE" and "BEAR" in exit_trend) or (side == "PE" and "BULL" in exit_trend):
+            final_pct_score = final_pct_score / 2.0
+
         # 4. FINAL PERCENTAGE TARGET MATH CONVERSION
         add_value = entry_prc * (final_pct_score / 100.0)
         target = round(entry_prc + add_value, 2)
 
         # 5. STREAMLINED ACTION OUTPUT CONSOLE LOGGER
-        # FIX: Track by side only instead of combining with symbol
         if side not in PRINTED_SIDES and side != "NA":
             print(f" {Fore.CYAN}{side:<2} SCORE | Target: {final_pct_score:>4.1f}%")
             PRINTED_SIDES.add(side)
