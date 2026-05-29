@@ -33,8 +33,16 @@ def target_price(row):
         elif side == "PE":
             depth_val = sanitize_float(row.get("hkin_pe_depth"), 1.0)
 
-        # 3. DIRECT target = atr - depth (ALWAYS Clamped with Floor of 2.0)
-        final_pct_score = max(2.0, atr_val - depth_val)
+        # 3. DYNAMIC PERCENTAGE SCORE MATH
+        # Extract counter flag directly from row data
+        is_counter = str(row.get("counter", "N")).upper() == "Y"
+
+        if is_counter:
+            # If counter is active, only add
+            final_pct_score = max(2.0, atr_val + depth_val)
+        else:
+            # Normal depth rule: subtract for depth 1-3, add for depth 4+
+            final_pct_score = max(2.0, atr_val - depth_val if depth_val <= 3 else atr_val + depth_val)
 
         # 4. FINAL PERCENTAGE TARGET MATH CONVERSION
         add_value = entry_prc * (final_pct_score / 100.0)
