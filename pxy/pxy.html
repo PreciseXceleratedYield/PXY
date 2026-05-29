@@ -554,7 +554,7 @@ canvas#topCandle {
         --header-h: 48px;
         --bottom-h: 50px;
     }
-    #terminalPanel { width: 26%; }
+    #terminalPanel { width: 38%; }
     .company-name { display: none; }
 }
 
@@ -567,7 +567,7 @@ canvas#topCandle {
         --stats-h:  36px;
         --bottom-h: 52px;
     }
-    #terminalPanel { width: 32%; }
+    #terminalPanel { width: 28.5%; }
 }
 
 /* ══════════════════════════════════════════
@@ -589,9 +589,29 @@ canvas#topCandle {
     .bottom-label { font-size: 12px; }
     .time-display { font-size: 14px; }
     #topCandleWrap { height: 46px; border-radius: 8px; }
-    #terminalPanel { width: 28%; }
+    #terminalPanel { width: 30%; }
     .menu-btn  { font-size: 13px; padding: 7px 14px; }
     .menu-icon span { width: 16px; }
+
+    /* ── TV ARTIFACT FIXES ──
+       Dropping shade on TV is caused by:
+       1. Scanline animation — disabled
+       2. Chart edge fade gradients using ::after — causes repaint on scroll/update
+       3. CSS transitions triggering layer compositing at high refresh rates
+    */
+    .scanline { display: none; }
+
+    /* remove the chart edge fade overlays — they repaint on every chart update on TV */
+    #chartWrap::after { display: none; }
+
+    /* disable all CSS transitions on TV to prevent ghost frames */
+    * { transition: none !important; animation: none !important; }
+
+    /* re-enable only the status dot blink — needed for live indicator */
+    #statusDot { animation: blink 1.4s ease-in-out infinite !important; }
+
+    /* force GPU compositing on canvas to isolate repaints */
+    canvas { will-change: auto; transform: translateZ(0); }
 }
 
 /* ══════════════════════════════════════════
@@ -750,12 +770,30 @@ themeToggle.addEventListener('click', e => {
 ══════════════════════════════════════ */
 const menu    = $('menu');
 const menuBtn = $('menuBtn');
-menuBtn.addEventListener('click', e => {
-    e.stopPropagation();
-    menu.classList.toggle('open');
+
+menuBtn.addEventListener('click',      e => { e.stopPropagation(); menu.classList.toggle('open'); });
+menuBtn.addEventListener('touchend',   e => { e.preventDefault(); e.stopPropagation(); menu.classList.toggle('open'); });
+
+// close when clicking outside — but NOT when tapping a nav item
+document.addEventListener('click', e => {
+    if (!menu.contains(e.target)) menu.classList.remove('open');
 });
-document.addEventListener('click',       () => menu.classList.remove('open'));
-document.addEventListener('touchstart',  () => menu.classList.remove('open'), { passive: true });
+
+// nav items — use touchend so link fires before anything closes it
+document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('touchend', e => {
+        e.stopPropagation();
+        const href = item.getAttribute('href');
+        if (href && href !== '#') {
+            menu.classList.remove('open');
+            window.location.href = href;
+        }
+    });
+    item.addEventListener('click', e => {
+        e.stopPropagation();
+        menu.classList.remove('open');
+    });
+});
 
 /* ══════════════════════════════════════
    TERMINAL
