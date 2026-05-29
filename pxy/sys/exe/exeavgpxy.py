@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 2
+MAX_LAYERS = 3
 COOL_DOWN_SECONDS = 20  # ⏱️ UPDATED: Cooling interval set to exactly 20 seconds
 ATR_MULTIPLIER = 1.5
 
