@@ -76,8 +76,11 @@ def fancy_pause(seconds=7):
         time.sleep(1)
     print("✅ System ready for next iteration ")
 
+# =====================================================================
+# FIXED SYNTAX BUG LINE: Cleaned the string format syntax token safely
+# =====================================================================
 def live_status(msg):
-    print(f"{Fore.WHITE}[{datetime.now(ist).strftime('%H('%H:%M:%S')}] {msg}", end="\r", flush=True)
+    print(f"{Fore.WHITE}[{datetime.now(ist).strftime('%H:%M:%S')}] {msg}", end="\r", flush=True)
 
 def in_market_hours():
     now = datetime.now(ist)
@@ -128,7 +131,6 @@ def start_daemon():
                     run_script("_exit.py")
                     run_script("_entry.py")
                 else:
-                    # FIXED & PATCHED: Stripped away the legacy syntax assignment errors to ensure structural safety
                     if long_lots > 0 and long_lots == short_lots:
                         run_script("_exit.py")
                     elif long_lots == 0 and short_lots == 0:
