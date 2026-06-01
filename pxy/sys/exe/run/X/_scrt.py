@@ -1,3 +1,4 @@
+#_scrt.py
 # Kotak Neo API Credentials - 2026 Architecture
 # Keep this file private and never share it.
 
