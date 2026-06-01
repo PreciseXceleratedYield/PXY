@@ -59,11 +59,11 @@ def process_lilo_orders(client):
         # Standardized parser that accurately extracts base tags from _S markers
         def get_safe_tag(row): 
             t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
-            t_str = str(t).split('.').strip() 
+            t_str = str(t).split('.')[0].strip() 
             if "_S" in t_str:
-                t_str = t_str.split('_S').strip()
+                t_str = t_str.split('_S')[0].strip()
             elif "_" in t_str:
-                t_str = t_str.split('_').strip()
+                t_str = t_str.split('_')[0].strip()
             return t_str if t_str.lower() not in ["nan", "none", "null", ""] else "" 
             
         df["tag"] = df.apply(get_safe_tag, axis=1) 
@@ -71,14 +71,19 @@ def process_lilo_orders(client):
         open_positions = [] 
 
         for symbol, group in df.groupby("trdSym"): 
-            # FIXED: Added [0] brackets to correctly extract the first string element instead of referencing the Pandas module object
+            # FIX: Safely parse token out of the sequence list without strip/split collision failures
             try:
-                token_id = str(int(float(str(group["tok"].iloc[0]).split('.').strip())))
-            except:
+                raw_tok = str(group["tok"].iloc[0]).strip()
+                token_id = str(int(float(raw_tok.split('.')[0])))
+            except Exception as tok_err:
                 token_id = str(group["tok"].iloc[0]).strip()
 
-            raw_seg = group["exSeg"].iloc[0] 
-            ex_seg = "nse_fo" if str(raw_seg).lower() in ["nse_fo", "nfo"] else str(raw_seg).lower()
+            try:
+                raw_seg = str(group["exSeg"].iloc[0]).strip()
+            except:
+                raw_seg = "nse_fo"
+                
+            ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
             
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records') 
             sells = group[group["trnsTp"].str.upper() == "S"].to_dict('records') 
@@ -106,7 +111,7 @@ def process_lilo_orders(client):
                     b["qty"] -= mqty 
 
             # ==============================================================================
-            # 🛡️ VERBOSE LIVE VALUATION FETCH ENGINE (KOTAK NEO V2 PRODUCTION CONFIGURATION)
+            # 🛡️ VERBOSE LIVE VALUATION FETCH ENGINE (KOTAK NEO V2 STABLE DEPLOYMENT)
             # ==============================================================================
             for b in buys: 
                 if b["qty"] > 0: 
@@ -116,14 +121,11 @@ def process_lilo_orders(client):
                     live_val = get_mid_price(client, token_id, ex_seg) 
                     debug_log(f"  -> API Response (get_mid_price): {live_val}", Fore.MAGENTA)
                     
-                    # 2. Kotak Neo V2 Native Market Depth Fallback Lookup (Fires if mid-price outputs 0.0)
+                    # 2. Kotak Neo V2 Native Market Depth Fallback Lookup
                     if live_val <= 0:
                         try:
-                            # Kotak Neo V2 uses get_market_depth to parse instrument quotes snapshots
                             depth_data = client.get_market_depth(exchangeSegment=ex_seg, instrumentToken=token_id)
-                            
                             if depth_data and isinstance(depth_data, dict):
-                                # Extract trading values using Kotak's data object layout properties
                                 data_payload = depth_data.get("data") or depth_data
                                 live_val = float(data_payload.get("ltp") or data_payload.get("lastTradedPrice") or 0)
                                 if live_val > 0:
