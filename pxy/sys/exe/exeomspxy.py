@@ -109,6 +109,9 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
                         for col in list(active_df.columns):
                             active_df[col.lower()] = active_df[col]
                         
+                        # FIX: Wipe out any cached stale values copied from 'Sell_Prc' so section 3 always fetches live pricing
+                        active_df['sell_prc'] = 0.0
+                        
                         active_df['tag'] = active_df['tag'].astype(str).str.split('.').str.get(0).str.replace('nan', '').str.strip()
                         
         except Exception as e:
@@ -137,7 +140,6 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     # --- 3. DYNAMIC VALUATION UPDATE WITH FIXED KEY RESOLUTION ---
     if client and get_mid_price:
         def update_metrics(row):
-            # FIXED: Checks both lowercase and uppercase keys to prevent LILO token extraction failures
             token_id = row.get("tok") or row.get("token") or row.get("tok") or row.get("TOKEN")
             ex_seg = row.get("exseg") or row.get("exSeg") or row.get("exseg") or "nse_fo"
             
@@ -148,7 +150,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
             
             # LTP Fallback Tracker (Only defaults to buy price if live data network feed is dead)
             if curr_val <= 0:
-                curr_val = float(row.get("sell_prc") or row.get("ltp") or row.get("LTP") or row.get("buy_prc") or 0)
+                curr_val = float(row.get("ltp") or row.get("LTP") or row.get("buy_prc") or 0)
                 if DEBUG and curr_val > 0:
                     print(f"{Fore.YELLOW}[OMS FALLBACK] Mid price lookup failed for Token {token_id}. Defaulting to LTP: {curr_val}")
 
@@ -172,10 +174,10 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     if add_calcs:
         active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
         
-        # Extract only the integer target price out of the math engine's output tuple
+        # FIX: Extract element [0] out of the calculation engine tuple package
         def safe_tgt_call(row):
             res = pxy_tgt_calc(row)
-            return res if isinstance(res, tuple) else res
+            return res[0] if isinstance(res, tuple) else res
 
         active_df["pxy_tgt"] = active_df.apply(safe_tgt_call, axis=1)
         active_df["pxy_sl"] = active_df.apply(pxy_sl_calc, axis=1)
