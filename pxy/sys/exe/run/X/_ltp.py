@@ -1,5 +1,32 @@
 # _ltp.py
-from runltpspxy import get_mid_price
+
+def get_mid_price(client, token: str, segment: str = "nse_fo") -> float:
+    """
+    Surgically drills into the broker's depth arrays to calculate mid-price.
+    """
+    try:
+        instr = [{"instrument_token": str(token), "exchange_segment": segment}]
+        res = client.quotes(instrument_tokens=instr, quote_type="depth")
+
+        if not res or not isinstance(res, list) or len(res) == 0:
+            return 0.0
+        
+        data = res[0] 
+        
+        depth = data.get("depth", {})
+        buy_list = depth.get("buy", [])
+        sell_list = depth.get("sell", [])
+
+        bid = float(buy_list[0].get("price", 0)) if buy_list else 0.0
+        ask = float(sell_list[0].get("price", 0)) if sell_list else 0.0
+        
+        if bid > 0 and ask > 0:
+            return round((bid + ask) / 2, 2)
+        
+        return float(data.get("last_price", 0))
+    except Exception:
+        return 0.0
+
 
 def get_option_live_ltp(client, token_id, ex_seg, fallback_price=0.0):
     """
@@ -10,6 +37,7 @@ def get_option_live_ltp(client, token_id, ex_seg, fallback_price=0.0):
 
     # Layer 1: Local Mid Price module algorithm
     try:
+        # FIXED: Directly references the isolated function above
         option_live_ltp = get_mid_price(client, token_id, ex_seg)
         if option_live_ltp > 0: return option_live_ltp
     except:
@@ -66,3 +94,4 @@ def get_option_live_ltp(client, token_id, ex_seg, fallback_price=0.0):
 
     # Layer 5: Fallback absolute security shield -> Entry Cost Baseline
     return fallback_price if fallback_price > 0 else 0.0
+
