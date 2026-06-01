@@ -62,7 +62,7 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # Clean tag parser safely extracting base token strings without list split bugs
+        # Standardized tag parser without slice attribute crashes
         def get_safe_tag(row): 
             try:
                 t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
@@ -98,7 +98,6 @@ def process_lilo_orders(client):
             except Exception:
                 raw_seg = "nse_fo"
                 
-            # Kotak Neo V2 strictly mandates lowercase "nse_fo" for derivatives
             ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
             
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records') 
@@ -144,7 +143,7 @@ def process_lilo_orders(client):
                             tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
                             
                             # V2 Method: Call client.quotes with lowercase array payload
-                            v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="all")
+                            v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
                             
                             # V2 Response Parsing Matrix
                             if isinstance(v2_quotes, dict):
@@ -198,3 +197,5 @@ def process_lilo_orders(client):
 
         open_df = pd.DataFrame(open_positions) 
         closed_df = pd.DataFrame(closed_matches) 
+        total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0 
+        total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0 
