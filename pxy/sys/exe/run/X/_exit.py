@@ -162,7 +162,7 @@ async def exit_cycle():
         
         if open_trade['txn_type'] == "B":
             trade_pnl = (ltp - open_trade['entry_ltp']) * LOT_SIZE
-            side_str = "LONG"
+            side_emoji = "➕"  # Heavy Plus Emoji
             if entry_signal in ["SELL", "BEAR"] and trade_pnl > MIN_EXIT_PROFIT and not exit_executed:
                 if execute_exit(client, open_trade['symbol'], open_trade['qty'], "S"):
                     exit_executed = True
@@ -170,7 +170,7 @@ async def exit_cycle():
 
         elif open_trade['txn_type'] == "S":
             trade_pnl = (open_trade['entry_ltp'] - ltp) * LOT_SIZE
-            side_str = "SHORT"
+            side_emoji = "➖"  # Heavy Minus Emoji
             if entry_signal in ["BUY", "BULL"] and trade_pnl > MIN_EXIT_PROFIT and not exit_executed:
                 if execute_exit(client, open_trade['symbol'], open_trade['qty'], "B"):
                     exit_executed = True
@@ -180,11 +180,14 @@ async def exit_cycle():
         pnl_icon = "🍏" if trade_pnl >= 0 else "🍎"
         side_icon = "🟢" if open_trade['txn_type'] == "B" else "🔴"
         
-        # FIXED DISPLAY: Pulls the short strike profile from the symbol safely
         clean_sym = open_trade['symbol'][-7:] if len(open_trade['symbol']) > 7 else open_trade['symbol']
         
-        # Combined active trade matrix formatted to exactly 42 characters wide
-        trade_line = f" {side_icon} [{index}] {clean_sym} {side_str}: {pnl_icon} ₹{int(trade_pnl)}"
+        # Forces + or - inside the PNL field dynamically
+        pnl_val_int = int(trade_pnl)
+        pnl_str = f"+{pnl_val_int}" if pnl_val_int >= 0 else f"{pnl_val_int}"
+        
+        # Combined active trade matrix formatted to exactly 42 characters wide with equal-length emojis
+        trade_line = f" {side_icon} [{index}] {clean_sym} {side_emoji} : {pnl_icon} ₹{pnl_str}"
         print(_pad_line_to_42(trade_line, pnl_color, Style.RESET_ALL))
 
     print(_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL))
