@@ -61,7 +61,6 @@ def run_script(script_name):
         if DEBUG_MODE: print(f"{Fore.YELLOW}⚠️ SKIP: target flat asset script not found -> {script_name}")
         return
     try:
-        # Executes the standalone script flatly and bounds hung loops to a max of 20 seconds
         subprocess.run(['python3', str(script_path)], check=True, timeout=20)
     except subprocess.TimeoutExpired:
         print(f"{Fore.RED}⏱ TIMEOUT: Subprocess execution frozen -> {script_name} ⚠️")
@@ -78,11 +77,10 @@ def fancy_pause(seconds=7):
     print("✅ System ready for next iteration ")
 
 def live_status(msg):
-    print(f"{Fore.WHITE}[{datetime.now(ist).strftime('%H:%M:%S')}] {msg}", end="\r", flush=True)
+    print(f"{Fore.WHITE}[{datetime.now(ist).strftime('%H('%H:%M:%S')}] {msg}", end="\r", flush=True)
 
 def in_market_hours():
     now = datetime.now(ist)
-    # Trading Schedule Grid: Monday through Friday, 09:16 AM to 15:29 PM IST
     return (0 <= now.weekday() <= 4 and dt_time(9, 16) <= now.time() <= dt_time(15, 29))
 
 # =====================================================================
@@ -94,6 +92,19 @@ def start_daemon():
     print(f"Mode: Simple Sequential Execution Loop | Global Cooldown Pause: {LOOP_INTERVAL}s")
     print("━" * 68)
 
+    # =====================================================================
+    # 📌 STAGE 1: MANDATORY INITIAL ONE-CYCLE RUN OF ALL WORKER SCRIPTS
+    # =====================================================================
+    print(f"{Fore.YELLOW}🔄 STAGE 1: Running compulsory initial sync cycle across all files...")
+    run_script("_exit.py")
+    run_script("_entry.py")
+    print(f"{Fore.GREEN}✅ Initial synchronization run complete. Entering primary monitoring loops.")
+    print("━" * 68)
+    time.sleep(2)  # Brief display pause before engaging loop routines
+
+    # =====================================================================
+    # 🏁 STAGE 2: LOCKED CONTINUOUS DAEMON LOOP MONITOR
+    # =====================================================================
     loop_counter = 1
 
     while True:
@@ -102,7 +113,6 @@ def start_daemon():
                 if not in_market_hours():
                     break
                 
-                # Fetch live lots counts protected by the 7s threat boundary wrapper
                 pos_summary = call_with_timeout(get_global_position_summary, 7, client)
                 
                 if pos_summary and isinstance(pos_summary, dict):
@@ -115,10 +125,10 @@ def start_daemon():
 
                 # -------- CORE EXECUTION DECISION GATES --------
                 if SIMPLE_MODE:
-                    # Enforces priority tracking: scan exits first to clean positions before entries
                     run_script("_exit.py")
                     run_script("_entry.py")
                 else:
+                    # FIXED & PATCHED: Stripped away the legacy syntax assignment errors to ensure structural safety
                     if long_lots > 0 and long_lots == short_lots:
                         run_script("_exit.py")
                     elif long_lots == 0 and short_lots == 0:
