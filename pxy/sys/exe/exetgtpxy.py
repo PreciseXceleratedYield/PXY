@@ -20,18 +20,12 @@ def i(x, d=0):
         return d
 
 def target_price(row):
-    """
-    Calculates the target price and the final percentage score.
-    Returns:
-        tuple: (target_price, final_pct_score)
-    """
     global PRINTED_SIDES
     try:
         # 1. ENTRY DATA CHECK
-        entry_prc = i(row.get("pxy_entry") or row.get("buy_prc") or row.get("entry_prc"))
+        entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
         if entry_prc <= 0:
-            print(f"{Fore.RED}[DEBUG SKIP] Skipping row due to missing or invalid entry price: {entry_prc}")
-            return 0, 0.0
+            return 0
 
         # 2. BASE CALCULATION
         atr_val = f(row.get("atr"), 6.0)
@@ -75,6 +69,7 @@ def target_price(row):
         # ==============================================================================
         if is_ce:
             if is_counter and is_bullish_signal:
+                # Opposite ST Block during Counter Setup
                 if st_is_bearish_counter:
                     state = "🚨"
                     final_pct_score = 2 * ce_p
@@ -82,20 +77,24 @@ def target_price(row):
                     state = "🎯"  
                     final_pct_score = max(BASE_SCORE, ce_calc) 
             elif is_counter and is_bearish_signal:
+                # Flat Opposite Signal Block
                 state = "🚨"  
                 final_pct_score = 2   
             elif is_bullish_signal:
+                # No counter scenario -> Check Supertrend, then ACCELERATE
                 if st_is_bearish_counter:
                     state = "🚨"
                     final_pct_score = 2 * ce_p
                 else:
                     state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
             elif is_bearish_signal:
+                # Flat Opposite Signal Block
                 state = "🚨"
                 final_pct_score = 2
                 
         elif is_pe:
             if is_counter and is_bearish_signal:
+                # Opposite ST Block during Counter Setup
                 if st_is_bullish_counter:
                     state = "🚨"
                     final_pct_score = 2 * pe_p
@@ -103,69 +102,47 @@ def target_price(row):
                     state = "🎯"  
                     final_pct_score = max(BASE_SCORE, pe_calc)  
             elif is_counter and is_bullish_signal:
+                # Flat Opposite Signal Block
                 state = "🚨"  
                 final_pct_score = 2   
             elif is_bearish_signal:
+                # No counter scenario -> Check Supertrend, then ACCELERATE
                 if st_is_bullish_counter:
                     state = "🚨"
                     final_pct_score = 2 * pe_p
                 else:
                     state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
             elif is_bullish_signal:
+                # Flat Opposite Signal Block
                 state = "🚨"
                 final_pct_score = 2
-
-        # Cache evaluating raw metric prior to modifying variables
-        raw_pct_score = final_pct_score
 
         # ==============================================================================
         # 🛡️ GLOBAL CRITICAL FLOORS & CEILINGS ENGINE
         # ==============================================================================
-        floor_applied = False
-        if final_pct_score <= 2.0:
+        # CRITICAL REQ: Enforce an absolute minimum floor limit of 1.4% everywhere
+        if final_pct_score < 2.0:
             final_pct_score = 3.0
-            floor_applied = True
 
-        cap_applied = False
+        # 6. MAX CAP LOGIC (Hard capped at 99%)
         if final_pct_score > 99.0:
             final_pct_score = 99.0
-            cap_applied = True
 
         # 7. FINAL TARGET CONVERSION
         add_value = entry_prc * (final_pct_score / 100.0)
         target = int(entry_prc + add_value)
 
-        # ==============================================================================
-        # 🔍 FULL VERBOSE DEBUG PRINT ENGINE (EXECUTES EVERY ROW)
-        # ==============================================================================
-        color = (
-            Fore.CYAN if state == "🔥" else (
-                Fore.RED if state == "🚨" else (Fore.MAGENTA if state == "🎯" else Fore.YELLOW)
+        # 8. SUPPRESSED DEBUG PRINT
+        if side not in PRINTED_SIDES and side != "NA":
+            color = (
+                Fore.CYAN if state == "🔥" else (
+                    Fore.RED if state == "🚨" else (Fore.MAGENTA if state == "🎯" else Fore.YELLOW)
+                )
             )
-        )
-        
-        print(f"\n{Fore.WHITE}{'='*60}")
-        print(f"{Fore.GREEN}[DEBUG MATCH] Symbol: {symbol} | Side: {side}")
-        print(f"{Fore.WHITE}{'-'*60}")
-        print(f"  > Inputs      | Entry: {entry_prc} | ATR: {atr_val} | Exit Sig: {clean_signal} | Counter: {is_counter} | ST: {supertrend_val}")
-        print(f"  > Power/Depth | CE_Pow: {ce_p} | PE_Pow: {pe_p} | CE_Depth: {hce_d} | PE_Depth: {hpe_d}")
-        print(f"  > Math Calcs  | BASE_SCORE: {BASE_SCORE:.2f} | ce_calc: {ce_calc:.2f} | pe_calc: {pe_calc:.2f}")
-        print(f"  > Matrix Out  | State: {state} | Raw Score: {raw_pct_score:.2f}%")
-        
-        if floor_applied:
-            print(f"  > Engine Mod  | {Fore.YELLOW}Floor Applied! Boosted <= 2.0% up to 3.0%")
-        if cap_applied:
-            print(f"  > Engine Mod  | {Fore.RED}Cap Applied! Restricted > 99.0% down to 99.0%")
-            
-        print(f"  > Final Execution Result:")
-        print(f"    {color}{side:<2} SCORE: {final_pct_score:>4.1f}% | Added Val: +{add_value:.2f} | Final Target Prc: {target}")
-        print(f"{Fore.WHITE}{'='*60}\n")
+            print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state} | trend:{supertrend_val}")
+            PRINTED_SIDES.add(side)
 
-        # Standard non-verbose console print fallback matching old pattern if needed elsewhere
-        PRINTED_SIDES.add(side)
+        return target
 
-        return target, final_pct_score
-
-    except Exception as e:
-        print(f"{Fore.RED}[DEBUG CRITICAL EXCEPTION]: {str(e)}")
-        return 0, 0.0
+    except Exception:
+        return 0
