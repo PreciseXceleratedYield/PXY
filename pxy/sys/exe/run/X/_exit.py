@@ -1,204 +1,246 @@
 # _exit.py
-import sys
 import asyncio
 import os
 from datetime import datetime, time as dt_time
 import pytz
-import yfinance as yf
-import pandas as pd
-from colorama import Fore, init, Style
-from _sgnl import _pad_line_to_42  # Shared 42-character width constraint engine
 
-LOT_SIZE = 65     
-MIN_EXIT_PROFIT = 200         
+from colorama import Fore, init, Style
+from _sgnl import _pad_line_to_42
+from _ltp import get_option_live_ltp  # Uses your 5-tier fallback script
+from _clnt import get_session
+
+LOT_SIZE = 65
+MIN_EXIT_PROFIT = 200
 
 init(autoreset=True)
 
+
+# ---------------- SCREEN ----------------
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def get_historical_index_price_by_tag(df_history, tag_string):
+
+# ---------------- ORDER LEDGER ----------------
+def reconstruct_fifo_ledger_from_orders(client):
+    """
+    Builds an independent position ledger grouped strictly by unique Entry Tags.
+    Pairs TRD_HHMMSS_B with TRD_HHMMSS_B_X to calculate true open net quantity per tag.
+    """
     try:
-        if not tag_string or len(str(tag_string)) < 4: return 0.0
-        tag_str = str(tag_string).strip()
-        hh = int(tag_str[:2])
-        mm = int(tag_str[2:4])
-        for idx_time, row in df_history.iterrows():
-            if idx_time.hour == hh and idx_time.minute == mm:
-                return float(row['Close'])
-    except: pass
-    return 0.0
+        order_res = client.order_report()  
+        orders = order_res.get("data", []) if isinstance(order_res, dict) else order_res
+        if not isinstance(orders, list):
+            return []
 
-def reconstruct_fifo_ledger_from_tags(client, df_history):
-    ledger_reconstructed = []
-    try:
-        pos_res = client.positions()
-        positions = pos_res.get("data", [])
-        if not positions or not isinstance(positions, list): return []
+        raw_entries = {}
+        closed_tags = set()
 
-        raw_nodes = []
-        for pos in positions:
-            net_qty = float(pos.get("net_qty", 0))
-            if net_qty == 0: net_qty = float(pos.get("flBuyQty", 0)) - float(pos.get("flSellQty", 0))
-            
-            if abs(net_qty) > 0:
-                sym = str(pos.get("trdSym", "")).upper()
-                if sym.endswith("CE") and "NIFTY" in sym and "BANKNIFTY" not in sym:
-                    tag = pos.get("tag", pos.get("orderTag", pos.get("text", "")))
-                    entry_idx_price = get_historical_index_price_by_tag(df_history, tag)
-                    if entry_idx_price == 0.0: 
-                        entry_idx_price = float(pos.get("actPrc", pos.get("buyPrc", 0)))
-                    
-                    txn_type = "B" if net_qty > 0 else "S"
-                    raw_nodes.append({
-                        "symbol": sym, "txn_type": txn_type, "entry_ltp": entry_idx_price, 
-                        "qty": int(abs(net_qty)), "tag": str(tag)
-                    })
+        # Step 1: Categorize all orders by their operational tags
+        for o in orders:
+            if str(o.get("stat", "")).lower() != "complete":
+                continue
 
-        raw_nodes.sort(key=lambda x: x['tag'])
-        for node in raw_nodes:
-            lots_count = int(node['qty'] / LOT_SIZE)
-            for _ in range(lots_count):
-                ledger_reconstructed.append({
-                    "symbol": node['symbol'], "txn_type": node['txn_type'], 
-                    "entry_ltp": node['entry_ltp'], "qty": LOT_SIZE
-                })
+            tag = str(o.get("tag") or o.get("ordModNo") or "").strip().upper()
+            if not tag:
+                continue
+
+            # If it's a recorded exit tag, mark the parent entry tag as closed
+            if tag.endswith("_X"):
+                parent_tag = tag[:-2]  # Strips "_X" to find the original entry tag
+                closed_tags.add(parent_tag)
+                continue
+
+            # Only track valid strategy entry frameworks
+            if not tag.startswith("TRD_") or not (tag.endswith("_B") or tag.endswith("_S")):
+                continue
+
+            qty = int(float(o.get("fldQty", 0)))
+            if qty <= 0:
+                continue
+
+            # Store the entry baseline details using the tag as the unique key
+            raw_entries[tag] = {
+                "symbol": o.get("trdSym", ""),
+                "txn_type": str(o.get("trnsTp", "")).upper().strip(),
+                "entry_price": float(o.get("avgPrc", 0)),
+                "qty": qty,
+                "tag": tag,
+                "token": o.get("tok")  
+            }
+
+        # Step 2: Filter out any entries that have a matching exit tag
+        ledger = [details for tag, details in raw_entries.items() if tag not in closed_tags]
+        return ledger
+
     except Exception as e:
-        err_msg = f"❌ Tag Error: {str(e)[:24]}"
-        print(_pad_line_to_42(err_msg, Fore.RED, Style.RESET_ALL))
-    return ledger_reconstructed
+        print(_pad_line_to_42(f"❌ Ledger Error {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
+        return []
 
-def execute_exit(client, symbol, qty, txn_type):
+
+# ---------------- EXIT ORDER ----------------
+def execute_exit(client, symbol, qty, txn_type, entry_tag):
     try:
-        order_tag = f"{datetime.now().strftime('%H%M%S')}_EX"
+        exit_tag = f"{entry_tag}_X"
         params = {
-            "exchange_segment": "nse_fo", "product": "NRML", "price": "0",
-            "order_type": "MKT", "quantity": str(qty), "validity": "DAY",
-            "trading_symbol": symbol, "transaction_type": txn_type, "amo": "NO", "tag": order_tag  
+            "exchange_segment": "nse_fo",
+            "product": "NRML",
+            "price": "0",
+            "order_type": "MKT",
+            "quantity": str(qty),
+            "validity": "DAY",
+            "trading_symbol": symbol,
+            "transaction_type": txn_type,
+            "amo": "NO",
+            "tag": exit_tag
         }
+
         res = client.place_order(**params)
+
         if res and str(res).strip():
-            out_str = f"🏁 EXIT OK | {symbol[:15]} | {txn_type}"
-            print(_pad_line_to_42(out_str, Fore.MAGENTA + Style.BRIGHT, Style.RESET_ALL))
+            print(
+                _pad_line_to_42(
+                    f"🏁 EXIT | {symbol[:15]} | {exit_tag}",
+                    Fore.MAGENTA + Style.BRIGHT,
+                    Style.RESET_ALL
+                )
+            )
             return True
+
     except Exception as e:
-        err_msg = f"❌ Exit Error: {str(e)[:24]}"
-        print(_pad_line_to_42(err_msg, Fore.RED, Style.RESET_ALL))
+        print(_pad_line_to_42(f"❌ Exit Error {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
+
     return False
 
+
+# ---------------- FORCE FLATTEN ----------------
 def force_global_account_flatten(client):
     try:
         pos_res = client.positions()
         positions = pos_res.get("data", [])
-        if not positions or not isinstance(positions, list): return
 
-        for pos in positions:
-            net_qty = float(pos.get("net_qty", 0))
-            if net_qty == 0: net_qty = float(pos.get("flBuyQty", 0)) - float(pos.get("flSellQty", 0))
-            
-            if abs(net_qty) > 0:
-                sym = str(pos.get("trdSym", "")).upper()
-                if sym.endswith("CE") and "NIFTY" in sym and "BANKNIFTY" not in sym:
-                    exit_txn = "S" if net_qty > 0 else "B"
-                    out_str = f"🚨 EOD AUTO-COLLAPSE: {sym[:17]}"
-                    print(_pad_line_to_42(out_str, Fore.RED + Style.BRIGHT, Style.RESET_ALL))
-                    execute_exit(client, sym, int(abs(net_qty)), exit_txn)
+        if not isinstance(positions, list):
+            return
+
+        for p in positions:
+            net_qty = float(p.get("net_qty", 0))
+            if net_qty == 0:
+                net_qty = float(p.get("flBuyQty", 0)) - float(p.get("flSellQty", 0))
+
+            if abs(net_qty) <= 0:
+                continue
+
+            sym = str(p.get("trdSym", "")).upper()
+            if "NIFTY" not in sym or "BANKNIFTY" in sym:
+                continue
+
+            txn = "S" if net_qty > 0 else "B"
+
+            print(_pad_line_to_42(
+                f"🚨 EOD EXIT {sym[:15]}",
+                Fore.RED + Style.BRIGHT,
+                Style.RESET_ALL
+            ))
+
+            params = {
+                "exchange_segment": "nse_fo",
+                "product": "NRML",
+                "price": "0",
+                "order_type": "MKT",
+                "quantity": str(int(abs(net_qty))),
+                "validity": "DAY",
+                "trading_symbol": sym,
+                "transaction_type": txn,
+                "amo": "NO",
+                "tag": f"EOD_{datetime.now().strftime('%H%M%S')}"
+            }
+            client.place_order(**params)
+
     except Exception as e:
-        err_msg = f"❌ Critical EOD Fail: {str(e)[:20]}"
-        print(_pad_line_to_42(err_msg, Fore.RED, Style.RESET_ALL))
+        print(_pad_line_to_42(f"❌ EOD FAIL {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
 
+
+# ---------------- EXIT ENGINE ----------------
 async def exit_cycle():
     IST = pytz.timezone("Asia/Kolkata")
     now = datetime.now(IST).time()
 
-    from _sgnl import get_all_data, apply_mode_5_transformation, TIMEZONE
-    from _clnt import get_session
-
     client = get_session()
-    if not client: return
+    if not client:
+        return
 
     if dt_time(15, 20) <= now < dt_time(15, 26):
         clear_screen()
-        print(_pad_line_to_42("⏳ EOD LIMIT: 3:20 PM IST FORCED FLATTEN", Fore.RED + Style.BRIGHT, Style.RESET_ALL))
+        print(_pad_line_to_42("⏳ EOD FORCE FLATTEN", Fore.RED + Style.BRIGHT, Style.RESET_ALL))
         force_global_account_flatten(client)
         return
 
-    if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 25) <= now < dt_time(15, 31)): 
+    if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 25) <= now < dt_time(15, 31)):
         clear_screen()
-        print(_pad_line_to_42("⏳ SYSTEM IDLE: BUFFER TIMING BLOCK", Fore.YELLOW, Style.RESET_ALL))
+        print(_pad_line_to_42("⏳ SYSTEM BUFFER", Fore.YELLOW, Style.RESET_ALL))
         return
+
+    from _sgnl import get_all_data
 
     data = get_all_data()
     entry_signal = str(data.get("entry", "")).upper().strip()
-    ltp = float(data.get("price", 0))
-    if ltp == 0 or not entry_signal: return
+    index_ltp = float(data.get("price", 0))
 
-    ticker_obj = yf.Ticker("^NSEI")
-    df_raw = ticker_obj.history(period="1d", interval="1m")
-    if df_raw.empty: return
-    df_raw.dropna(inplace=True)
-    df_raw.index = pd.to_datetime(df_raw.index).tz_convert(TIMEZONE)
-    df_history = apply_mode_5_transformation(df_raw)
-
-    ledger = reconstruct_fifo_ledger_from_tags(client, df_history)
-
-    clear_screen()
-    border = "==========================================" # 42 chars
-    print(_pad_line_to_42("📋 STATELESS FIFO MONITOR DASHBOARD", Fore.YELLOW + Style.BRIGHT, Style.RESET_ALL))
-    print(_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL))
-    print(_pad_line_to_42(f"🎯 INDEX LTP : {ltp:<23}", Fore.CYAN, Style.RESET_ALL))
-    print(_pad_line_to_42(f"🚦 SIGNAL    : {entry_signal:<23}", Fore.MAGENTA, Style.RESET_ALL))
-    print(_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL))
-
-    if not ledger:
-        print(_pad_line_to_42("⚪ NO ACTIVE TRACKED POSITIONS FOUND", Fore.WHITE + Style.DIM, Style.RESET_ALL))
-        print(_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL))
+    if index_ltp == 0 or not entry_signal:
         return
 
-    exit_executed = False
+    ledger = reconstruct_fifo_ledger_from_orders(client)
 
-    for index, open_trade in enumerate(ledger):
-        trade_pnl = 0.0
+    clear_screen()
+    print(_pad_line_to_42("📋 EXIT DASHBOARD", Fore.YELLOW + Style.BRIGHT, Style.RESET_ALL))
+    print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
+    print(_pad_line_to_42(f"INDEX LTP : {index_ltp}", Fore.CYAN, Style.RESET_ALL))
+    print(_pad_line_to_42(f"SIGNAL    : {entry_signal}", Fore.MAGENTA, Style.RESET_ALL))
+    print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
+
+    if not ledger:
+        print(_pad_line_to_42("NO POSITIONS", Fore.WHITE, Style.RESET_ALL))
+        return
+
+    for i, t in enumerate(ledger):
+        # Dynamically pulls your 5-Layer Options LTP Hierarchy
+        option_ltp = get_option_live_ltp(
+            client=client,
+            token_id=t["token"],
+            ex_seg="nse_fo",
+            fallback_price=t["entry_price"]
+        )
+
+        pnl = 0.0 
         
-        if open_trade['txn_type'] == "B":
-            trade_pnl = (ltp - open_trade['entry_ltp']) * LOT_SIZE
-            side_emoji = "➕"  # Heavy Plus Emoji
-            if entry_signal in ["SELL", "BEAR"] and trade_pnl > MIN_EXIT_PROFIT and not exit_executed:
-                if execute_exit(client, open_trade['symbol'], open_trade['qty'], "S"):
-                    exit_executed = True
-                    break
+        # Calculate PnL based on the entry parameters tied directly to this position's tag
+        if t["txn_type"] == "B":
+            pnl = (option_ltp - t["entry_price"]) * t["qty"]
+            if entry_signal in ["SELL", "BEAR"] and pnl > MIN_EXIT_PROFIT:
+                if execute_exit(client, t["symbol"], t["qty"], "S", t["tag"]):
+                    continue  
 
-        elif open_trade['txn_type'] == "S":
-            trade_pnl = (open_trade['entry_ltp'] - ltp) * LOT_SIZE
-            side_emoji = "➖"  # Heavy Minus Emoji
-            if entry_signal in ["BUY", "BULL"] and trade_pnl > MIN_EXIT_PROFIT and not exit_executed:
-                if execute_exit(client, open_trade['symbol'], open_trade['qty'], "B"):
-                    exit_executed = True
-                    break
+        elif t["txn_type"] == "S":
+            pnl = (t["entry_price"] - option_ltp) * t["qty"]
+            if entry_signal in ["BUY", "BULL"] and pnl > MIN_EXIT_PROFIT:
+                if execute_exit(client, t["symbol"], t["qty"], "B", t["tag"]):
+                    continue  
 
-        pnl_color = Fore.GREEN if trade_pnl >= 0 else Fore.RED
-        pnl_icon = "🍏" if trade_pnl >= 0 else "🍎"
-        side_icon = "🟢" if open_trade['txn_type'] == "B" else "🔴"
-        
-        clean_sym = open_trade['symbol'][-7:] if len(open_trade['symbol']) > 7 else open_trade['symbol']
-        
-        # Forces + or - inside the PNL field dynamically
-        pnl_val_int = int(trade_pnl)
-        pnl_str = f"+{pnl_val_int}" if pnl_val_int >= 0 else f"{pnl_val_int}"
-        
-        # Combined active trade matrix formatted to exactly 42 characters wide with equal-length emojis
-        trade_line = f" {side_icon} [{index}] {clean_sym} {side_emoji} : {pnl_icon} ₹{pnl_str}"
-        print(_pad_line_to_42(trade_line, pnl_color, Style.RESET_ALL))
+        color = Fore.GREEN if pnl >= 0 else Fore.RED
+        # Displaying granular metrics directly tracked via the unique order tag
+        print(_pad_line_to_42(
+            f"[{i}] {t['tag']} PnL:{int(pnl)}",
+            color,
+            Style.RESET_ALL
+        ))
 
-    print(_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL))
 
-# STRICTLY SINGLE-CYCLE RESTRUCTURING: Runs exactly once and exits cleanly
+# ---------------- MAIN ----------------
 async def main():
     try:
         await exit_cycle()
     except Exception as e:
-        err_msg = f"⚠️ Exit Failure: {str(e)[:22]}"
-        print(_pad_line_to_42(err_msg, Fore.RED, Style.RESET_ALL))
+        print(_pad_line_to_42(f"⚠️ EXIT FAIL {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
+
 
 if __name__ == "__main__":
     asyncio.run(main())
