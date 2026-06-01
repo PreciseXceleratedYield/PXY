@@ -110,8 +110,9 @@ def force_global_account_flatten(client):
 
 def dump_to_json(closed_df): 
     try: 
-        file_path = os.path.expanduser("~/pxy/pnl.json") 
-        os.makedirs(os.path.dirname(file_path), exist_ok=True) 
+        # Resolves path directly to the directory housing this script file
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        file_path = os.path.join(current_dir, "pnl.json")
         
         IST = pytz.timezone("Asia/Kolkata")
         if os.path.exists(file_path):
@@ -233,5 +234,5 @@ async def exit_cycle():
         })
 
     dump_to_json(pd.DataFrame(closed_matches))
-    print(_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL))
+
 
