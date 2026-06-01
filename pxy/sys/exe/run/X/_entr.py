@@ -59,7 +59,8 @@ def get_global_position_summary(client):
 
 def execute_order(client, symbol, qty, txn_type):
     try:
-        order_tag = datetime.now(pytz.timezone("Asia/Kolkata")).strftime('%H%M%S')
+        base_tag = datetime.now(pytz.timezone("Asia/Kolkata")).strftime('%H%M%S')
+        order_tag = f"{base_tag}_{txn_type}"
         params = {
             "exchange_segment": "nse_fo", "product": "NRML", "price": "0",
             "order_type": "MKT", "quantity": str(qty), "validity": "DAY",
