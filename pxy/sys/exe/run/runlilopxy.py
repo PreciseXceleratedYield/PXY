@@ -69,7 +69,7 @@ def process_lilo_orders(client):
                     t_str = t_str.split('_')[0].strip()
                 return t_str if t_str.lower() not in ["nan", "none", "null", ""] else "" 
             except Exception:
-                return ""
+                return "" 
             
         df["tag"] = df.apply(get_safe_tag, axis=1) 
         closed_matches = [] 
@@ -121,7 +121,7 @@ def process_lilo_orders(client):
                     b["qty"] -= mqty 
 
             # ==============================================================================
-            # 🎯 MULTI-LAYERED PRIORITY RESCUE PRICE MATRIX (KOTAK NEO V2 NATIVE)
+            # 🎯 ROBUST MULTI-LAYERED PRIORITY RESCUE PRICE MATRIX (KOTAK NEO V2)
             # ==============================================================================
             for b in buys: 
                 if b["qty"] > 0: 
@@ -131,20 +131,31 @@ def process_lilo_orders(client):
                     live_val = get_mid_price(client, token_id, ex_seg) 
                     debug_log(f"  -> Layer 1 (get_mid_price): {live_val}", Fore.MAGENTA)
                     
-                    # LAYER 2: Try active live broker quotes method
+                    # LAYER 2: Try active live broker quotes method (Polished parser matching V2 specs)
                     if live_val <= 0 and token_id:
                         try:
+                            # Kotak Neo V2 official array dictionary request parameters structure
                             tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
                             v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
                             
-                            if v2_quotes and isinstance(v2_quotes, dict) and "message" in v2_quotes:
-                                msg_data = v2_quotes["message"]
-                                if isinstance(msg_data, list) and len(msg_data) > 0:
-                                    live_val = float(msg_data[0].get("ltp", 0))
-                                    if live_val > 0:
-                                        debug_log(f"  {Fore.GREEN}✅ [Layer 2 Success] Fetched active exchange LTP: {live_val}")
+                            # FIX: Multi-type response unwrap engine to prevent layout crashes
+                            if isinstance(v2_quotes, list) and len(v2_quotes) > 0:
+                                item = v2_quotes[0]
+                                live_val = float(item.get("ltp") or item.get("lastTradedPrice") or 0)
+                            elif isinstance(v2_quotes, dict):
+                                if "message" in v2_quotes:
+                                    msg_block = v2_quotes["message"]
+                                    if isinstance(msg_block, list) and len(msg_block) > 0:
+                                        live_val = float(msg_block[0].get("ltp", 0))
+                                    elif isinstance(msg_block, dict):
+                                        live_val = float(msg_block.get("ltp", 0))
+                                else:
+                                    live_val = float(v2_quotes.get("ltp") or v2_quotes.get("lastTradedPrice") or 0)
+                                    
+                            if live_val > 0:
+                                debug_log(f"  {Fore.GREEN}✅ [Layer 2 Success] Extracted exchange LTP price: {live_val}")
                         except Exception as v2_err:
-                            debug_log(f"  Layer 2 API rescue failure: {v2_err}", Fore.RED)
+                            debug_log(f"  Layer 2 API rescue error trace: {v2_err}", Fore.RED)
                     
                     # LAYER 3: Try last known row cache LTP
                     if live_val <= 0:
@@ -193,4 +204,4 @@ def _print_summary(total_unrealized, total_realized):
 
 if __name__ == "__main__": 
     client = get_session() 
-    process_lilo_orders(client)
+
