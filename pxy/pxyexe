@@ -4,7 +4,7 @@
 # ------------------------------
 
 # Go to exe folder
-cd "$HOME/pxy/sys" || { echo "Directory ~/pxy/sys/exe/run/X not found"; exit 1; }
+cd "$HOME/pxy/sys/exe/run/X" || { echo "Directory ~/pxy/sys/exe/run/X not found"; exit 1; }
 
 # Optional: activate virtual environment if needed
 # source ~/pxy/env/bin/activate
