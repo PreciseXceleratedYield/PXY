@@ -16,6 +16,12 @@ def debug_log(msg, color=Fore.BLUE):
     if DEBUG_MODE: 
         print(f"{color}[DEBUG LILO] {msg}{Style.RESET_ALL}") 
 
+def _print_summary(total_unrealized, total_realized): 
+    color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
+    unreal_str = f"{int(total_unrealized):+06d}" 
+    real_str = f"{int(total_realized):+06d}" 
+    print(f"\n {unreal_str} 🔸 跑 🔸 跑 🥅  {color}{real_str}{Style.RESET_ALL} 🥅\n") 
+
 def dump_to_json(closed_df): 
     try: 
         file_path = os.path.expanduser("~/pxy/pnl.json") 
@@ -54,7 +60,7 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # FIXED: Rebuilt text tag parser to strictly eliminate split list string errors
+        # FIX: Rebuilt tag text extractor to cleanly avoid split array strip crashes
         def get_safe_tag(row): 
             try:
                 t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
@@ -80,14 +86,16 @@ def process_lilo_orders(client):
                     raw_tok = raw_tok.split('.')[0].strip()
                 token_id = str(int(float(raw_tok)))
             except Exception:
-                token_id = str(group["tok"].iloc[0]).strip()
+                try:
+                    token_id = str(group["tok"].iloc[0]).strip()
+                except Exception:
+                    token_id = ""
 
             try:
                 raw_seg = str(group["exSeg"].iloc[0]).strip()
             except Exception:
                 raw_seg = "nse_fo"
                 
-            # Kotak Neo V2 strictly demands lower-case 'nse_fo' for options routing
             ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
             
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records') 
@@ -124,13 +132,12 @@ def process_lilo_orders(client):
                     debug_log(f"Pricing Request -> Symbol: {symbol} | Token: {token_id} | Segment: {ex_seg}", Fore.WHITE)
                     
                     # ---------------- LAYER 1: Custom Mid Price Logic ----------------
-                    if live_val <= 0:
-                        try:
-                            live_val = get_mid_price(client, token_id, ex_seg)
-                            if live_val > 0:
-                                debug_log(f"  -> Layer 1 [MID CALCULATE SUCCESS] Live Price: {live_val}", Fore.GREEN)
-                        except Exception as e1:
-                            debug_log(f"  Layer 1 Error: {e1}", Fore.RED)
+                    try:
+                        live_val = get_mid_price(client, token_id, ex_seg)
+                        if live_val > 0:
+                            debug_log(f"  -> Layer 1 [MID CALCULATE SUCCESS] Live Price: {live_val}", Fore.GREEN)
+                    except Exception as e1:
+                        debug_log(f"  Layer 1 Error: {e1}", Fore.RED)
                     
                     # ---------------- LAYER 2: Native Official V2 Quotes List ----------------
                     if live_val <= 0 and token_id:
@@ -139,13 +146,17 @@ def process_lilo_orders(client):
                             v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
                             
                             if isinstance(v2_quotes, dict):
-                                data_chunk = v2_quotes.get("data") or v2_quotes.get("message")
+                                data_chunk = v2_quotes.get("data") or v2_quotes.get("message") or v2_quotes
                                 if isinstance(data_chunk, list) and len(data_chunk) > 0:
-                                    live_val = float(data_chunk[0].get("ltp") or data_chunk[0].get("lastTradedPrice") or 0)
+                                    first_item = data_chunk[0]
+                                    if isinstance(first_item, dict):
+                                        live_val = float(first_item.get("ltp") or first_item.get("lastTradedPrice") or 0)
                                 elif isinstance(data_chunk, dict):
                                     live_val = float(data_chunk.get("ltp") or data_chunk.get("lastTradedPrice") or 0)
                             elif isinstance(v2_quotes, list) and len(v2_quotes) > 0:
-                                live_val = float(v2_quotes[0].get("ltp") or v2_quotes[0].get("lastTradedPrice") or 0)
+                                first_item = v2_quotes[0]
+                                if isinstance(first_item, dict):
+                                    live_val = float(first_item.get("ltp") or first_item.get("lastTradedPrice") or 0)
                                 
                             if live_val > 0:
                                 debug_log(f"  -> Layer 2 [V2 QUOTES NATIVE SUCCESS] Live Price: {live_val}", Fore.GREEN)
@@ -157,7 +168,9 @@ def process_lilo_orders(client):
                         try:
                             scrip_res = client.search_scrip(exchangeSegment=ex_seg, instrumentToken=str(token_id))
                             if isinstance(scrip_res, list) and len(scrip_res) > 0:
-                                live_val = float(scrip_res[0].get("ltp") or scrip_res[0].get("lastPrice") or 0)
+                                first_item = scrip_res[0]
+                                if isinstance(first_item, dict):
+                                    live_val = float(first_item.get("ltp") or first_item.get("lastPrice") or 0)
                             elif isinstance(scrip_res, dict):
                                 live_val = float(scrip_res.get("ltp") or scrip_res.get("lastPrice") or 0)
                                 
@@ -184,11 +197,3 @@ def process_lilo_orders(client):
                             if resp and hasattr(resp, 'json'):
                                 json_out = resp.json()
                                 if isinstance(json_out, dict) and "data" in json_out:
-                                    items = json_out["data"]
-                                    if isinstance(items, list) and len(items) > 0:
-                                        live_val = float(items[0].get("ltp") or items[0].get("lastTradedPrice") or 0)
-                                    elif isinstance(items, dict):
-                                        live_val = float(items.get("ltp") or items.get("lastTradedPrice") or 0)
-                                        
-                            if live_val > 0:
-                                debug_log(f"  -> Layer 4 [REST BACKDOOR SUCCESS] Live Price: {live_val}", Fore.GREEN)
