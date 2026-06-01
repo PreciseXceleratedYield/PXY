@@ -36,7 +36,7 @@ def calculate_tsma_42(series: pd.Series) -> np.ndarray:
     return tsma_output 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
-    """ PXY® Engine: Processed data driver with force priority & baseline trend tracking. """ 
+    """ PXY® Engine: Cleaned single ST line processing driver matrix. """ 
     if df is None or df.empty:
         return pd.DataFrame()
 
@@ -48,14 +48,12 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     else: 
         base_ma_line = calculate_tsma_42(df['Close']) 
         
-    # 1. Formulate Highest High and Lowest Low channels
+    # Formulate Highest High and Lowest Low channels
     hh_42 = df['High'].rolling(window=42, min_periods=1).max().to_numpy()
     ll_42 = df['Low'].rolling(window=42, min_periods=1).min().to_numpy()
     
-    # 2. Reference Lines 
-    df['pxy_st_line']  = (base_ma_line + hh_42 + ll_42 + df['Close']) / 4.0
-    df['pxy_st_no_ll'] = (base_ma_line + hh_42 + df['Close']) / 3.0
-    df['pxy_st_no_hh'] = (base_ma_line + ll_42 + df['Close']) / 3.0
+    # 🎯 ONLY KEEP ST LINE - REMOVED ALL OTHER CHANNELS
+    df['pxy_st_line'] = (base_ma_line + hh_42 + ll_42 + df['Close']) / 4.0
     
     # Dashboard Compatibility Reference Keys
     df['ST'] = df['pxy_st_line'] 
@@ -64,9 +62,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     # Extract NumPy arrays for ultra-fast loop routing
     m5_c  = df['Close'].to_numpy()
+    m5_o  = df['Open'].to_numpy()
     st    = df['pxy_st_line'].to_numpy()
-    no_ll = df['pxy_st_no_ll'].to_numpy()
-    no_hh = df['pxy_st_no_hh'].to_numpy()
     
     st_trend_full = [] 
     n = len(df)
@@ -78,31 +75,34 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             
         c0 = m5_c[i]
         c1 = m5_c[i-1]
+        o0 = m5_o[i]
+        o1 = m5_o[i-1]
         
-        # Pure Center Line Crossovers
+        # 1. Pure Center Line Crossovers
         cross_buy  = (c0 > st[i]) and (c1 <= st[i-1])
         cross_sell = (c0 < st[i]) and (c1 >= st[i-1])
         
-        # Dual-Directional Boundary Crossing Logic (Catches Above & Below)
-        force_buy_above  = (c0 > no_ll[i]) and (c1 <= no_ll[i-1])
-        force_buy_below  = (c0 < no_ll[i]) and (c1 >= no_ll[i-1])
-        force_buy        = force_buy_above or force_buy_below
-
-        force_sell_below = (c0 < no_hh[i]) and (c1 >= no_hh[i-1])
-        force_sell_above = (c0 > no_hh[i]) and (c1 <= no_hh[i-1])
-        force_sell       = force_sell_below or force_sell_above
+        # 2. Candle Color Flip Metrics (Red <-> Green Body Changes)
+        is_curr_green = (c0 > o0)
+        is_prev_green = (c1 > o1)
         
-        # EXCLUSIVE PRIORITY MATRIX WITH ONGOING BASELINE FALLBACK
-        if force_buy:
-            new_trend = "FORCESELL"   # Upper boundary line crossing -> FORCE PRIORITY FLIP
-        elif force_sell:
-            new_trend = "FORCEBUY"    # Lower boundary line crossing -> FORCE PRIORITY FLIP
-        elif cross_buy: 
+        # Detect shifts in candle direction
+        red_to_green = is_curr_green and not is_prev_green
+        green_to_red = not is_curr_green and is_prev_green
+        
+        # ==============================================================================
+        # 🎯 EXCLUSIVE PRIORITY SIGNAL EXECUTION MATRIX
+        # ==============================================================================
+        if cross_buy: 
             new_trend = "CROSSBUY" 
         elif cross_sell: 
             new_trend = "CROSSSELL" 
+        elif red_to_green:
+            new_trend = "FORCEBUY"     # Context-based signal: Candle flipped green
+        elif green_to_red:
+            new_trend = "FORCESELL"    # Context-based signal: Candle flipped red
         else: 
-            # 🎯 REPLACED NONE: Sits back as BULL or BEAR based on position relative to center line
+            # Baseline Ongoing Trend Fallback
             new_trend = "BULL" if (c0 >= st[i]) else "BEAR" 
             
         st_trend_full.append(new_trend) 
@@ -113,5 +113,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     return df.tail(tail_size).copy() 
 
 if __name__ == "__main__": 
-    print(f"=== [TIER 1] Force-Priority Engine with Baseline Trend Fallback Ready ===")
+    print(f"=== [TIER 1] Single ST Line Matrix with Context Candle Flip Engine Ready ===")
+
+
 
