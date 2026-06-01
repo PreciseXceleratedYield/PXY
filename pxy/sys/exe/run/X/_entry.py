@@ -67,7 +67,6 @@ def execute_order(client, symbol, qty, txn_type):
         }
         res = client.place_order(**params)
         if res and str(res).strip():
-            # Meaningful emoji inserted and formatted to exactly 42 chars
             out_str = f"🚀 ROUTED|{symbol}|{txn_type}|TAG:{order_tag}"
             print(_pad_line_to_42(out_str, "\033[96m", "\033[0m"))
         return {"stat": "OK" if res and str(res).strip() else "FAIL"}
@@ -93,28 +92,39 @@ async def trade_cycle():
     summary = get_global_position_summary(client)
     global_longs, global_shorts = summary["long"], summary["short"]
 
-    if global_longs >= 1 and global_shorts >= 1: return
+    # Maximum safety locking mechanism
+    if global_longs >= 1 and global_shorts >= 1: 
+        print(_pad_line_to_42("🔒 HOLD | POS EXIST | NO TRADE ADDED", "\033[93m", "\033[0m"))
+        return
 
-    if entry_signal == "BUY" and (global_longs < global_shorts or (global_longs == 0 and global_shorts == 0)):
-        target_strike = round(ltp / 100) * 100
-        symbol = get_nifty_symbol(target_strike)
-        execute_order(client, symbol, LOT_SIZE, "B")
+    # --- BUY SIGNAL EXECUTION PIPELINE ---
+    if entry_signal == "BUY":
+        if global_longs < global_shorts or (global_longs == 0 and global_shorts == 0):
+            target_strike = round(ltp / 100) * 100
+            symbol = get_nifty_symbol(target_strike)
+            execute_order(client, symbol, LOT_SIZE, "B")
+        else:
+            print(_pad_line_to_42("🔒 HOLD | POS EXIST | NO TRADE ADDED", "\033[93m", "\033[0m"))
 
-    elif entry_signal == "SELL" and (global_shorts < global_longs or (global_longs == 0 and global_shorts == 0)):
-        base_100 = round(ltp / 100) * 100
-        target_strike = base_100 - 50 if abs(ltp - (base_100 - 50)) < abs(ltp - (base_100 + 50)) else base_100 + 50
-        symbol = get_nifty_symbol(target_strike)
-        execute_order(client, symbol, LOT_SIZE, "S")
+    # --- SELL SIGNAL EXECUTION PIPELINE ---
+    elif entry_signal == "SELL":
+        if global_shorts < global_longs or (global_longs == 0 and global_shorts == 0):
+            base_100 = round(ltp / 100) * 100
+            target_strike = base_100 - 50 if abs(ltp - (base_100 - 50)) < abs(ltp - (base_100 + 50)) else base_100 + 50
+            symbol = get_nifty_symbol(target_strike)
+            execute_order(client, symbol, LOT_SIZE, "S")
+        else:
+            print(_pad_line_to_42("🔒 HOLD | POS EXIST | NO TRADE ADDED", "\033[93m", "\033[0m"))
 
 # STRICTLY SINGLE-CYCLE RESTRUCTURING: Runs exactly once and exits cleanly
 async def main():
     try:
         await trade_cycle()
     except Exception as e:
-        # Adjusted error print layout to fit exactly 42 characters width with emoji
         err_msg = f"⚠️ Entry Failure: {str(e)[:22]}"
         print(_pad_line_to_42(err_msg, "\033[91m", "\033[0m"))
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
