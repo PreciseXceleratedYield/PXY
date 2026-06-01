@@ -16,6 +16,13 @@ def debug_log(msg, color=Fore.BLUE):
     if DEBUG_MODE: 
         print(f"{color}[DEBUG LILO] {msg}{Style.RESET_ALL}") 
 
+def _print_summary(total_unrealized, total_realized): 
+    """Restored Summary print tracker engine"""
+    color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
+    unreal_str = f"{int(total_unrealized):+06d}" 
+    real_str = f"{int(total_realized):+06d}" 
+    print(f"\n {unreal_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅  {color}{real_str}{Style.RESET_ALL} 🥅\n") 
+
 def dump_to_json(closed_df): 
     try: 
         file_path = os.path.expanduser("~/pxy/pnl.json") 
@@ -56,7 +63,6 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # Standardized tag parser
         def get_safe_tag(row): 
             try:
                 t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
@@ -120,60 +126,41 @@ def process_lilo_orders(client):
                     b["qty"] -= mqty 
 
             # ==============================================================================
-            # 🎯 KOTAK NEO V2 REST BACKDOOR DIRECT PRICE LOOKUP
+            # 🎯 MULTI-LAYERED PRIORITY RESCUE PRICE MATRIX
             # ==============================================================================
             for b in buys: 
                 if b["qty"] > 0: 
                     debug_log(f"Fetching Price -> Ticker: {symbol} | Token: {token_id} | Segment: {ex_seg}", Fore.CYAN)
                     
-                    # LAYER 1: Local mid price algorithm
+                    # LAYER 1: Try local mid price algorithm
                     live_val = get_mid_price(client, token_id, ex_seg) 
                     debug_log(f"  -> Layer 1 (get_mid_price): {live_val}", Fore.MAGENTA)
                     
-                    # LAYER 2: Direct REST Client URL request (Extracted from internal SDK structures)
-                    if live_val <= 0 and token_id and hasattr(client, 'rest_client'):
+                    # LAYER 2: Official Kotak V2 quotes configuration 
+                    if live_val <= 0 and token_id:
                         try:
-                            # Build header verification params using current live session data
-                            header_params = {
-                                "Sid": client.configuration.edit_sid,
-                                "Auth": client.configuration.edit_token,
-                                "Content-Type": "application/x-www-form-urlencoded"
-                            }
+                            tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
+                            v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
                             
-                            # Format exactly how Kotak Neo's quote server parameters expect them
-                            # Layout mirrors standard Kotak instrument list structure: "nse_fo|42304"
-                            body_params = {
-                                "tokens": f"{ex_seg}|{token_id}",
-                                "quoteType": "ltp"
-                            }
-                            
-                            # Fetch REST URL routing map details
-                            URL = client.configuration.get_url_details("view_quotes")
-                            
-                            # Send direct POST request straight to Kotak server via rest_client
-                            resp = client.rest_client.request(
-                                url=URL, method='POST',
-                                headers=header_params,
-                                body=body_params
-                            )
-                            
-                            # Parse response payload dictionary structures cleanly
-                            if resp and hasattr(resp, 'json'):
-                                resp_data = resp.json()
-                                if isinstance(resp_data, dict) and "data" in resp_data:
-                                    items = resp_data["data"]
-                                    if isinstance(items, list) and len(items) > 0:
-                                        live_val = float(items[0].get("ltp") or items[0].get("lastTradedPrice") or 0)
-                                        if live_val > 0:
-                                            debug_log(f"  {Fore.GREEN}✅ [KOTAK BACKDOOR SUCCESS] Direct REST LTP fetched: {live_val}")
-                        except Exception as rest_err:
-                            debug_log(f"  Direct REST backdoor lookup failed: {rest_err}", Fore.RED)
+                            if isinstance(v2_quotes, list) and len(v2_quotes) > 0:
+                                live_val = float(v2_quotes[0].get("ltp") or v2_quotes[0].get("lastTradedPrice") or 0)
+                            elif isinstance(v2_quotes, dict):
+                                msg_data = v2_quotes.get("message") or v2_quotes.get("data") or v2_quotes
+                                if isinstance(msg_data, list) and len(msg_data) > 0:
+                                    live_val = float(msg_data[0].get("ltp") or msg_data[0].get("lastTradedPrice") or 0)
+                                elif isinstance(msg_data, dict):
+                                    live_val = float(msg_data.get("ltp") or msg_data.get("lastTradedPrice") or 0)
+                                    
+                            if live_val > 0:
+                                debug_log(f"  {Fore.GREEN}✅ [Layer 2 Success] Fetched live exchange LTP: {live_val}")
+                        except Exception as v2_err:
+                            debug_log(f"  Layer 2 API rescue failure: {v2_err}", Fore.RED)
                     
-                    # LAYER 3: Last known row memory cache LTP fallback
+                    # LAYER 3: Try last known row cache LTP
                     if live_val <= 0:
                         row_cache_ltp = float(b.get("sell_prc") or b.get("ltp") or b.get("LTP") or 0)
                         if row_cache_ltp > 0:
-                            debug_log(f"  {Fore.YELLOW}⚠️ [Layer 3 Success] API down. Recovered cached row LTP: {row_cache_ltp}")
+                            debug_log(f"  {Fore.YELLOW}⚠️ [Layer 3 Success] Recovered cached row LTP: {row_cache_ltp}")
                             live_val = row_cache_ltp
                     
                     # LAYER 4: Absolute final safety net -> Fall back to Buy Entry Price
@@ -205,4 +192,12 @@ def process_lilo_orders(client):
         return open_df, closed_df 
     except Exception as e: 
         print(f"{Fore.RED}[TAG MATCH ERROR CRITICAL CRASH]: {e}") 
+        _print_summary(0, 0) 
+        # FIX: Ensure it always returns valid empty DataFrames instead of falling back to implicit None
+        return pd.DataFrame(), pd.DataFrame() 
+
+if __name__ == "__main__": 
+    client = get_session() 
+    process_lilo_orders(client)
+
 
