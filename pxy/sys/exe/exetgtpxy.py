@@ -20,12 +20,17 @@ def i(x, d=0):
         return d
 
 def target_price(row):
+    """
+    Calculates the target price and the final percentage score.
+    Returns:
+        tuple: (target_price, final_pct_score)
+    """
     global PRINTED_SIDES
     try:
         # 1. ENTRY DATA CHECK
         entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
         if entry_prc <= 0:
-            return 0
+            return 0, 0.0
 
         # 2. BASE CALCULATION
         atr_val = f(row.get("atr"), 6.0)
@@ -120,8 +125,8 @@ def target_price(row):
         # ==============================================================================
         # 🛡️ GLOBAL CRITICAL FLOORS & CEILINGS ENGINE
         # ==============================================================================
-        # CRITICAL REQ: Enforce an absolute minimum floor limit of 1.4% everywhere
-        if final_pct_score < 2.0:
+        # FIX: Changed operator to '<=' to catch flat opposite blocks sitting precisely at 2.0%
+        if final_pct_score <= 2.0:
             final_pct_score = 3.0
 
         # 6. MAX CAP LOGIC (Hard capped at 99%)
@@ -142,7 +147,8 @@ def target_price(row):
             print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state} | trend:{supertrend_val}")
             PRINTED_SIDES.add(side)
 
-        return target
+        # FIX: Return both values so the display script does not print 150+ numbers into a percentage slot
+        return target, final_pct_score
 
     except Exception:
-        return 0
+        return 0, 0.0
