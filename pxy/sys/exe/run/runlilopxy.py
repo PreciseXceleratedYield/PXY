@@ -56,17 +56,20 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # Clean tag parser safely extracting base token strings
+        # Protected tag parsing format structure
         def get_safe_tag(row): 
-            t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
-            t_str = str(t).strip()
-            if '.' in t_str:
-                t_str = t_str.split('.')[0].strip()
-            if "_S" in t_str:
-                t_str = t_str.split('_S')[0].strip()
-            elif "_" in t_str:
-                t_str = t_str.split('_')[0].strip()
-            return t_str if t_str.lower() not in ["nan", "none", "null", ""] else "" 
+            try:
+                t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
+                t_str = str(t).strip()
+                if '.' in t_str:
+                    t_str = t_str.split('.')[0].strip()
+                if "_S" in t_str:
+                    t_str = t_str.split('_S')[0].strip()
+                elif "_" in t_str:
+                    t_str = t_str.split('_')[0].strip()
+                return t_str if t_str.lower() not in ["nan", "none", "null", ""] else "" 
+            except Exception:
+                return ""
             
         df["tag"] = df.apply(get_safe_tag, axis=1) 
         closed_matches = [] 
@@ -75,15 +78,21 @@ def process_lilo_orders(client):
         for symbol, group in df.groupby("trdSym"): 
             try:
                 raw_tok = str(group["tok"].iloc[0]).strip()
+                if '.' in raw_tok:
+                    raw_tok = raw_tok.split('.')[0].strip()
                 token_id = str(int(float(raw_tok)))
             except Exception:
-                token_id = str(group["tok"].iloc[0]).strip()
+                try:
+                    token_id = str(group["tok"].iloc[0]).strip()
+                except Exception:
+                    token_id = ""
 
             try:
                 raw_seg = str(group["exSeg"].iloc[0]).strip()
             except Exception:
                 raw_seg = "nse_fo"
                 
+            # FIX: Force strict Kotak Neo V2 lowercase segment strings ("nse_fo")
             ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
             
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records') 
@@ -112,32 +121,41 @@ def process_lilo_orders(client):
                     b["qty"] -= mqty 
 
             # ==============================================================================
-            # 🎯 SIMPLE KOTAK NEO V2 LTP SNAPSHOT ENGINE
+            # 🎯 KOTAK NEO V2 NATIVE QUOTES SPECIFICATION ENGINE
             # ==============================================================================
             for b in buys: 
                 if b["qty"] > 0: 
                     debug_log(f"Fetching Price -> Ticker: {symbol} | Token: {token_id} | Segment: {ex_seg}", Fore.CYAN)
                     
-                    # 1. Primary Attempt: Use your local mid price logic
+                    # 1. Primary Attempt: Use your local mid price algorithm
                     live_val = get_mid_price(client, token_id, ex_seg) 
                     debug_log(f"  -> API Response (get_mid_price): {live_val}", Fore.MAGENTA)
                     
-                    # 2. FIX: Native Simple V2 LTP Request (Triggers cleanly on 0.0)
-                    if live_val <= 0:
+                    # 2. Kotak Neo V2 Official Quotes Fallback (Triggers on 0.0 response)
+                    if live_val <= 0 and token_id:
                         try:
-                            # Invoke Kotak Neo V2 native simplified LTP request method
-                            ltp_res = client.get_ltp(exchangeSegment=ex_seg, instrumentToken=token_id)
+                            # FIX: Match the exact documentation list-of-dicts layout parameters
+                            tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
                             
-                            if ltp_res and isinstance(ltp_res, dict):
-                                # Neo API V2 returns dynamic dictionaries containing 'ltp' field references
-                                data_payload = ltp_res.get("data") or ltp_res
-                                live_val = float(data_payload.get("ltp") or data_payload.get("lastTradedPrice") or 0)
+                            # Fire documentation-mapped quote method call
+                            v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
+                            
+                            # Parse according to Kotak V2 response array layouts
+                            if isinstance(v2_quotes, list) and len(v2_quotes) > 0:
+                                target_block = v2_quotes[0]
+                                live_val = float(target_block.get("ltp") or target_block.get("lastTradedPrice") or 0)
                                 if live_val > 0:
-                                    debug_log(f"  {Fore.GREEN}✅ [KOTAK V2 LTP SUCCESS] Live value fetched via get_ltp: {live_val}")
+                                    debug_log(f"  {Fore.GREEN}✅ [KOTAK V2 SUCCESS] Live value fetched via quotes(): {live_val}")
+                            elif isinstance(v2_quotes, dict) and "message" in v2_quotes:
+                                msg_data = v2_quotes["message"]
+                                if isinstance(msg_data, list) and len(msg_data) > 0:
+                                    live_val = float(msg_data[0].get("ltp", 0))
+                                    if live_val > 0:
+                                        debug_log(f"  {Fore.GREEN}✅ [KOTAK V2 SUCCESS] Extracted from message array: {live_val}")
                         except Exception as v2_err:
-                            debug_log(f"  Simple get_ltp API lookup error: {v2_err}", Fore.RED)
+                            debug_log(f"  Native V2 quotes engine fallback lookup error: {v2_err}", Fore.RED)
                     
-                    # 3. Final structural fallback constraint
+                    # 3. Last Resort Safety net (Only defaults to entry if the entire network drops)
                     if live_val <= 0:
                         print(f"  {Fore.RED}🚨 [FEED DEAD] Fallback network dropout. Defaulting to entry price: {b['prc']}")
                         live_val = b["prc"]
@@ -173,7 +191,7 @@ def _print_summary(total_unrealized, total_realized):
     color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
     unreal_str = f"{int(total_unrealized):+06d}" 
     real_str = f"{int(total_realized):+06d}" 
-    print(f"\n {unreal_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅  {color}{real_str}{Style.RESET_ALL} 🥅\n") 
+    print(f"\n {unreal_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅  {color}{real_str}{Style.RESET_ALL} 0🥅\n") 
 
 if __name__ == "__main__": 
     client = get_session() 
