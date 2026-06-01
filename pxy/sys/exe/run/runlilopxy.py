@@ -2,10 +2,19 @@
 import pandas as pd 
 import json 
 import os 
+from colorama import init, Fore, Style 
 from runclntpxy import get_session 
 from runltpspxy import get_mid_price 
 
+# Initialize colorama for colored console logs
+init(autoreset=True) 
+
 MATCH_MODE = "TAG" 
+DEBUG_MODE = True 
+
+def debug_log(msg, color=Fore.BLUE): 
+    if DEBUG_MODE: 
+        print(f"{color}[DEBUG LILO] {msg}{Style.RESET_ALL}") 
 
 def dump_to_json(closed_df): 
     try: 
@@ -22,16 +31,18 @@ def dump_to_json(closed_df):
         with open(file_path, "w") as f: 
             json.dump(data, f, indent=4) 
     except Exception as e: 
-        print(f"Error dumping to JSON: {e}") 
+        print(f"{Fore.RED}Error dumping to JSON: {e}") 
 
 def process_lilo_orders(client): 
     try: 
         if not client: 
+            debug_log("Execution rejected: Client session instance is missing or invalid.", Fore.RED)
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
             
         res = client.order_report() 
         if not res or "data" not in res: 
+            debug_log("Broker connection returned an empty orderbook or invalid response format.", Fore.RED)
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
             
@@ -48,9 +59,7 @@ def process_lilo_orders(client):
         # FIX: Standardized parser that accurately extracts base tags from _S markers
         def get_safe_tag(row): 
             t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
-            # First clean potential decimal points from floats
             t_str = str(t).split('.')[0].strip() 
-            # Split off the explicit _S identifier flag to isolate the raw base token
             if "_S" in t_str:
                 t_str = t_str.split('_S')[0].strip()
             elif "_" in t_str:
@@ -89,9 +98,26 @@ def process_lilo_orders(client):
                     }) 
                     b["qty"] -= mqty 
 
+            # ==============================================================================
+            # 🔍 VERBOSE PRICE FETCH DEBUG ENGINE
+            # ==============================================================================
             for b in buys: 
                 if b["qty"] > 0: 
+                    # 1. Trace the incoming parameter signatures
+                    debug_log(f"Fetching Price -> Ticker: {symbol} | Token: {token_id} | Segment: {ex_seg}", Fore.CYAN)
+                    
+                    # 2. Fire the core mid-price api calculation request
                     live_val = get_mid_price(client, token_id, ex_seg) 
+                    debug_log(f"  -> API Response (get_mid_price): {live_val}", Fore.MAGENTA)
+                    
+                    # 3. INTERCEPT BUG AND ENFORCE LTP RESCUE FALLBACK
+                    if live_val <= 0:
+                        print(f"  {Fore.YELLOW}⚠️ [FALLBACK CRITICAL] Mid-price failed or returned 0.0. Rescuing via historical execution LTP: {b['prc']}")
+                        live_val = b["prc"]
+                    
+                    unrealized_pnl = int((live_val - b["prc"]) * b["qty"])
+                    debug_log(f"  -> Final Assigned Valuation Price: {live_val} | Calculated PNL: {unrealized_pnl:+d}", Fore.GREEN)
+                    
                     open_positions.append({ 
                         "Symbol": symbol, 
                         "Qty": b["qty"], 
@@ -101,7 +127,7 @@ def process_lilo_orders(client):
                         "Buy_Prc": b["prc"], 
                         "Exit_Time": "OPEN", 
                         "Sell_Prc": live_val, 
-                        "PNL": int((live_val - b["prc"]) * b["qty"]) 
+                        "PNL": unrealized_pnl 
                     }) 
 
         open_df = pd.DataFrame(open_positions) 
@@ -112,13 +138,11 @@ def process_lilo_orders(client):
         dump_to_json(closed_df) 
         return open_df, closed_df 
     except Exception as e: 
-        print(f"[TAG MATCH ERROR]: {e}") 
+        print(f"{Fore.RED}[TAG MATCH ERROR CRITICAL CRASH]: {e}") 
         _print_summary(0, 0) 
         return pd.DataFrame(), pd.DataFrame() 
 
 def _print_summary(total_unrealized, total_realized): 
-    from colorama import Fore, Style, init 
-    init(autoreset=True) 
     color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
     unreal_str = f"{int(total_unrealized):+06d}" 
     real_str = f"{int(total_realized):+06d}" 
@@ -127,3 +151,4 @@ def _print_summary(total_unrealized, total_realized):
 if __name__ == "__main__": 
     client = get_session() 
     process_lilo_orders(client)
+
