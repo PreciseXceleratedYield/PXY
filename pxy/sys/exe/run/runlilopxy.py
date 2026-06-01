@@ -56,7 +56,7 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # Protected tag parsing format structure
+        # Clean tag parser safely extracting base token strings without list split bugs
         def get_safe_tag(row): 
             try:
                 t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
@@ -92,7 +92,7 @@ def process_lilo_orders(client):
             except Exception:
                 raw_seg = "nse_fo"
                 
-            # FIX: Force strict Kotak Neo V2 lowercase segment strings ("nse_fo")
+            # Kotak Neo V2 native quotes endpoint strictly requires lowercase "nse_fo" parameter tokens
             ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
             
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records') 
@@ -121,43 +121,41 @@ def process_lilo_orders(client):
                     b["qty"] -= mqty 
 
             # ==============================================================================
-            # 🎯 KOTAK NEO V2 NATIVE QUOTES SPECIFICATION ENGINE
+            # 🎯 MULTI-LAYERED PRIORITY RESCUE PRICE MATRIX (KOTAK NEO V2 NATIVE)
             # ==============================================================================
             for b in buys: 
                 if b["qty"] > 0: 
                     debug_log(f"Fetching Price -> Ticker: {symbol} | Token: {token_id} | Segment: {ex_seg}", Fore.CYAN)
                     
-                    # 1. Primary Attempt: Use your local mid price algorithm
+                    # LAYER 1: Try local mid price algorithm
                     live_val = get_mid_price(client, token_id, ex_seg) 
-                    debug_log(f"  -> API Response (get_mid_price): {live_val}", Fore.MAGENTA)
+                    debug_log(f"  -> Layer 1 (get_mid_price): {live_val}", Fore.MAGENTA)
                     
-                    # 2. Kotak Neo V2 Official Quotes Fallback (Triggers on 0.0 response)
+                    # LAYER 2: Try active live broker quotes method
                     if live_val <= 0 and token_id:
                         try:
-                            # FIX: Match the exact documentation list-of-dicts layout parameters
                             tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
-                            
-                            # Fire documentation-mapped quote method call
                             v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
                             
-                            # Parse according to Kotak V2 response array layouts
-                            if isinstance(v2_quotes, list) and len(v2_quotes) > 0:
-                                target_block = v2_quotes[0]
-                                live_val = float(target_block.get("ltp") or target_block.get("lastTradedPrice") or 0)
-                                if live_val > 0:
-                                    debug_log(f"  {Fore.GREEN}✅ [KOTAK V2 SUCCESS] Live value fetched via quotes(): {live_val}")
-                            elif isinstance(v2_quotes, dict) and "message" in v2_quotes:
+                            if v2_quotes and isinstance(v2_quotes, dict) and "message" in v2_quotes:
                                 msg_data = v2_quotes["message"]
                                 if isinstance(msg_data, list) and len(msg_data) > 0:
                                     live_val = float(msg_data[0].get("ltp", 0))
                                     if live_val > 0:
-                                        debug_log(f"  {Fore.GREEN}✅ [KOTAK V2 SUCCESS] Extracted from message array: {live_val}")
+                                        debug_log(f"  {Fore.GREEN}✅ [Layer 2 Success] Fetched active exchange LTP: {live_val}")
                         except Exception as v2_err:
-                            debug_log(f"  Native V2 quotes engine fallback lookup error: {v2_err}", Fore.RED)
+                            debug_log(f"  Layer 2 API rescue failure: {v2_err}", Fore.RED)
                     
-                    # 3. Last Resort Safety net (Only defaults to entry if the entire network drops)
+                    # LAYER 3: Try last known row cache LTP
                     if live_val <= 0:
-                        print(f"  {Fore.RED}🚨 [FEED DEAD] Fallback network dropout. Defaulting to entry price: {b['prc']}")
+                        row_cache_ltp = float(b.get("sell_prc") or b.get("ltp") or b.get("LTP") or 0)
+                        if row_cache_ltp > 0:
+                            debug_log(f"  {Fore.YELLOW}⚠️ [Layer 3 Success] API down. Recovered cached row LTP: {row_cache_ltp}")
+                            live_val = row_cache_ltp
+                    
+                    # LAYER 4: Absolute final safety net -> Fall back to Buy Entry Price
+                    if live_val <= 0:
+                        print(f"  {Fore.RED}🚨 [LAYER 4 SAFETY] No market data resolved. Falling back to buy entry anchor: {b['prc']}")
                         live_val = b["prc"]
                     
                     unrealized_pnl = int((live_val - b["prc"]) * b["qty"])
@@ -191,9 +189,8 @@ def _print_summary(total_unrealized, total_realized):
     color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
     unreal_str = f"{int(total_unrealized):+06d}" 
     real_str = f"{int(total_realized):+06d}" 
-    print(f"\n {unreal_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅  {color}{real_str}{Style.RESET_ALL} 0🥅\n") 
+    print(f"\n {unreal_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅  {color}{real_str}{Style.RESET_ALL} 🥅\n") 
 
 if __name__ == "__main__": 
     client = get_session() 
     process_lilo_orders(client)
-
