@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 # _exe.py
 import os
@@ -8,6 +7,7 @@ import subprocess
 from datetime import datetime, time as dt_time
 import pytz
 from colorama import init, Fore, Style
+from _sgnl import _pad_line_to_42  # Shared 42-character width constraint engine
 
 init(autoreset=True)
 
@@ -29,7 +29,8 @@ def send_telegram(msg):
         import requests
         requests.post(url, data=payload, timeout=5)
     except Exception:
-        print("📡 TG ERR: Notification transmission failure ⚠️")
+        err_msg = "📡 TG ERR: Notification fail ⚠️"
+        print(_pad_line_to_42(err_msg, Fore.YELLOW, Style.RESET_ALL))
 
 # =====================================================================
 # 2. IST TIMEZONE AND HOURS PROFILE MONITOR
@@ -54,26 +55,28 @@ def is_market_hours():
 def start_loop():
     """Monitors trading states and acts as a shield wrapper for _sys.py."""
     EXE_FILE = "_sys.py"
+    border = "==========================================" # 42 chars
 
-    print("━" * 68)
-    print(f"{Fore.GREEN}{Style.BRIGHT}📌 STAGE 1: Executing Mandatory Initial Startup Cycle...")
-    print("━" * 68)
+    print(f"\n{_pad_line_to_42(border, Fore.GREEN, Style.RESET_ALL)}")
+    print(_pad_line_to_42("📌 STAGE 1: Mandatory Initial Startup Run", Fore.GREEN + Style.BRIGHT, Style.RESET_ALL))
+    print(_pad_line_to_42(border, Fore.GREEN, Style.RESET_ALL))
     
     # ---- MANDATORY FIRST RUN AT STARTUP ----
     if os.path.exists(EXE_FILE):
-        print(f"🔄 Running initial synchronization scan via -> {EXE_FILE}")
+        sync_msg = f"🔄 Initial sync scan: {EXE_FILE}"
+        print(_pad_line_to_42(sync_msg, Fore.WHITE, Style.RESET_ALL))
         subprocess.run([sys.executable, EXE_FILE])
-        print(f"{Fore.GREEN}✅ Initial startup sync cycle complete successfully.")
+        print(_pad_line_to_42("✅ Startup sync cycle complete", Fore.GREEN, Style.RESET_ALL))
     else:
-        print(f"❌ EXE ERR: Core pipeline orchestrator '{EXE_FILE}' missing from directory ⚠️")
+        err_msg = f"❌ EXE ERR: Missing target script {EXE_FILE}"
+        print(_pad_line_to_42(err_msg, Fore.RED, Style.RESET_ALL))
         sys.exit(1)
 
-    print("\n" + "━" * 68)
-    print(f"{Fore.YELLOW}{Style.BRIGHT}🏁 STAGE 2: Supervisor Active. Locking Into Guard Loop Matrix...")
-    print("━" * 68)
+    print(f"\n{_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL)}")
+    print(_pad_line_to_42("🏁 STAGE 2: Supervisor Loop Matrix Active", Fore.YELLOW + Style.BRIGHT, Style.RESET_ALL))
+    print(_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL))
 
     was_open = is_market_hours()
-    # If we started outside market hours, the initial startup run already served as our "off-market run"
     off_done = not was_open 
 
     while True:
@@ -83,27 +86,25 @@ def start_loop():
         # ---- BOUNDARY TRANSITION: MARKET OPEN ----
         if mkt and not was_open:
             send_telegram("<b>Bot started (market open)</b>")
-            print("🚀 MKT OPEN: Supervisor starting trading daemon arrays 📡")
+            print(_pad_line_to_42("🚀 MKT OPEN: Starting trading daemon 📡", Fore.GREEN, Style.RESET_ALL))
             off_done = False
 
         # ---- BOUNDARY TRANSITION: MARKET CLOSE ----
         if not mkt and was_open:
             send_telegram("<b>Bot stopped (market close)</b>")
-            print("🛑 MKT CLOSE: Supervisor throttling trading channels 🔒")
+            print(_pad_line_to_42("🛑 MKT CLOSE: Throttling trading core 🔒", Fore.RED, Style.RESET_ALL))
             off_done = False
 
         # ---- TARGET SUBPROCESS MANAGEMENT GATE ----
         if mkt:
-            # If within active live trading parameters, run your loop master script continuously
             subprocess.run([sys.executable, EXE_FILE])
         else:
             if not off_done:
-                print("🌙 OFF MKT: Executing single maintenance session scan, idling now 💤")
+                print(_pad_line_to_42("🌙 OFF MKT: Maintenance session run 💤", Fore.BLUE, Style.RESET_ALL))
                 subprocess.run([sys.executable, EXE_FILE])
                 off_done = True
 
         was_open = mkt
-        # Holds a flat, balanced 1-second ticks evaluation pacing frequency loop
         time.sleep(max(0, 1 - (time.time() - t0)))
 
 # =====================================================================
@@ -113,6 +114,5 @@ if __name__ == "__main__":
     try:
         start_loop()
     except KeyboardInterrupt:
-        print("\n🛑 Supervisor process halted via system interrupt command. Exiting.")
+        print(f"\n{_pad_line_to_42('🛑 Supervisor halted via exit command', Fore.YELLOW, Style.RESET_ALL)}")
         sys.exit(0)
-
