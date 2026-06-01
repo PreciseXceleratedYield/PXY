@@ -56,7 +56,7 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # Standardized tag extraction without string list collision crashes
+        # Standardized tag parser
         def get_safe_tag(row): 
             try:
                 t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
@@ -120,7 +120,7 @@ def process_lilo_orders(client):
                     b["qty"] -= mqty 
 
             # ==============================================================================
-            # 🎯 MULTI-LAYERED PRIORITY RESCUE PRICE MATRIX (KOTAK V2 OFFICIAL SCHEMA)
+            # 🎯 KOTAK NEO V2 REST BACKDOOR DIRECT PRICE LOOKUP
             # ==============================================================================
             for b in buys: 
                 if b["qty"] > 0: 
@@ -130,31 +130,44 @@ def process_lilo_orders(client):
                     live_val = get_mid_price(client, token_id, ex_seg) 
                     debug_log(f"  -> Layer 1 (get_mid_price): {live_val}", Fore.MAGENTA)
                     
-                    # LAYER 2: Native Kotak Neo V2 quotes endpoint
-                    if live_val <= 0 and token_id:
+                    # LAYER 2: Direct REST Client URL request (Extracted from internal SDK structures)
+                    if live_val <= 0 and token_id and hasattr(client, 'rest_client'):
                         try:
-                            # Strict list of dict format required by V2 SDK
-                            tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
-                            v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="all")
+                            # Build header verification params using current live session data
+                            header_params = {
+                                "Sid": client.configuration.edit_sid,
+                                "Auth": client.configuration.edit_token,
+                                "Content-Type": "application/x-www-form-urlencoded"
+                            }
                             
-                            # CRITICAL WORKAROUND: Handle raw list returns safely to prevent object attribute crashes
-                            if isinstance(v2_quotes, list) and len(v2_quotes) > 0:
-                                first_entry = v2_quotes[0]
-                                live_val = float(first_entry.get("ltp") or first_entry.get("lastTradedPrice") or 0)
-                            elif isinstance(v2_quotes, dict):
-                                if "message" in v2_quotes:
-                                    msg_data = v2_quotes["message"]
-                                    if isinstance(msg_data, list) and len(msg_data) > 0:
-                                        live_val = float(msg_data[0].get("ltp") or msg_data[0].get("lastTradedPrice") or 0)
-                                    elif isinstance(msg_data, dict):
-                                        live_val = float(msg_data.get("ltp") or msg_data.get("lastTradedPrice") or 0)
-                                else:
-                                    live_val = float(v2_quotes.get("ltp") or v2_quotes.get("lastTradedPrice") or 0)
-                                
-                            if live_val > 0:
-                                debug_log(f"  {Fore.GREEN}✅ [Layer 2 Success] Fetched live exchange LTP: {live_val}")
-                        except Exception as v2_err:
-                            debug_log(f"  Layer 2 API rescue failure message: {v2_err}", Fore.RED)
+                            # Format exactly how Kotak Neo's quote server parameters expect them
+                            # Layout mirrors standard Kotak instrument list structure: "nse_fo|42304"
+                            body_params = {
+                                "tokens": f"{ex_seg}|{token_id}",
+                                "quoteType": "ltp"
+                            }
+                            
+                            # Fetch REST URL routing map details
+                            URL = client.configuration.get_url_details("view_quotes")
+                            
+                            # Send direct POST request straight to Kotak server via rest_client
+                            resp = client.rest_client.request(
+                                url=URL, method='POST',
+                                headers=header_params,
+                                body=body_params
+                            )
+                            
+                            # Parse response payload dictionary structures cleanly
+                            if resp and hasattr(resp, 'json'):
+                                resp_data = resp.json()
+                                if isinstance(resp_data, dict) and "data" in resp_data:
+                                    items = resp_data["data"]
+                                    if isinstance(items, list) and len(items) > 0:
+                                        live_val = float(items[0].get("ltp") or items[0].get("lastTradedPrice") or 0)
+                                        if live_val > 0:
+                                            debug_log(f"  {Fore.GREEN}✅ [KOTAK BACKDOOR SUCCESS] Direct REST LTP fetched: {live_val}")
+                        except Exception as rest_err:
+                            debug_log(f"  Direct REST backdoor lookup failed: {rest_err}", Fore.RED)
                     
                     # LAYER 3: Last known row memory cache LTP fallback
                     if live_val <= 0:
@@ -192,14 +205,4 @@ def process_lilo_orders(client):
         return open_df, closed_df 
     except Exception as e: 
         print(f"{Fore.RED}[TAG MATCH ERROR CRITICAL CRASH]: {e}") 
-        _print_summary(0, 0) 
-        return pd.DataFrame(), pd.DataFrame() 
 
-def _print_summary(total_unrealized, total_realized): 
-    color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
-    unreal_str = f"{int(total_unrealized):+06d}" 
-    real_str = f"{int(total_realized):+06d}" 
-    print(f"\n {unreal_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅  {color}{real_str}{Style.RESET_ALL} 🥅\n") 
-
-if __name__ == "__main__": 
-    client = get_session() 
