@@ -2,7 +2,7 @@
 import sys
 import asyncio
 import os
-from datetime import datetime, time as dt_time, timedelta
+from datetime import datetime, time as dt_time
 import pytz
 import yfinance as yf
 import pandas as pd
@@ -10,7 +10,6 @@ from colorama import Fore, init, Style
 
 LOT_SIZE = 65     
 MIN_EXIT_PROFIT = 200         
-LOOP_INTERVAL_SECONDS = 5     
 
 init(autoreset=True)
 
@@ -83,11 +82,7 @@ def execute_exit(client, symbol, qty, txn_type):
         print(f"Exit failure: {e}")
     return False
 
-# =====================================================================
-# HARD AUTO-SQUAREOFF FUNCTION FOR OPEN POSITIONS
-# =====================================================================
 def force_global_account_flatten(client):
-    """Fetches real broker metrics and flattens all open Nifty CE positions."""
     try:
         pos_res = client.positions()
         positions = pos_res.get("data", [])
@@ -100,7 +95,6 @@ def force_global_account_flatten(client):
             if abs(net_qty) > 0:
                 sym = str(pos.get("trdSym", "")).upper()
                 if sym.endswith("CE") and "NIFTY" in sym and "BANKNIFTY" not in sym:
-                    # Symmetrical Exit Logic: Sell Longs ("S"), Buy to Cover Shorts ("B")
                     exit_txn = "S" if net_qty > 0 else "B"
                     print(Fore.RED + Style.BRIGHT + f"🚨 EOD AUTO-SQUAREOFF: Collapsing {sym} | QTY: {int(abs(net_qty))}")
                     execute_exit(client, sym, int(abs(net_qty)), exit_txn)
@@ -117,16 +111,12 @@ async def exit_cycle():
     client = get_session()
     if not client: return
 
-    # =====================================================================
-    # CRITICAL TRIGGER: AUTO-SQUAREOFF TIME WINDOW CHECK (3:20 PM - 3:25 PM)
-    # =====================================================================
     if dt_time(15, 20) <= now < dt_time(15, 26):
         clear_screen()
         print(Fore.RED + Style.BRIGHT + "⏳ EOD TIME BOUNDARY REACHED (3:20 PM IST). FORCING COMPLETE PORTFOLIO FLATTENING...")
         force_global_account_flatten(client)
         return
 
-    # Standard Market Buffer Check
     if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 25) <= now < dt_time(15, 31)): 
         clear_screen()
         print(Fore.YELLOW + "⏳ System idling: Market buffer timing block active.")
@@ -186,11 +176,12 @@ async def exit_cycle():
 
     print("━" * 68)
 
+# STRICTLY SINGLE-CYCLE RESTRUCTURING: Runs exactly once and exits cleanly
 async def main():
-    while True:
-        try: await exit_cycle()
-        except: pass
-        await asyncio.sleep(LOOP_INTERVAL_SECONDS)
+    try:
+        await exit_cycle()
+    except Exception as e:
+        print(f"⚠️ Exit Check Failure: {e}")
 
 if __name__ == "__main__":
     asyncio.run(main())
