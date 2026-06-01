@@ -154,7 +154,7 @@ async def main():
 
         # 2. Safe Flat Imports
         from syspxy import get_all_data
-        from runclntpxy import get_session
+        from _clnt import get_session
         
         # 3. Pull Data Stream Metrics
         data = get_all_data()
