@@ -59,7 +59,7 @@ def process_lilo_orders(client):
         # Standardized parser that accurately extracts base tags from _S markers
         def get_safe_tag(row): 
             t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
-            t_str = str(t).split('.')[0].strip() 
+            t_str = str(t).split('.').strip() 
             if "_S" in t_str:
                 t_str = t_str.split('_S').strip()
             elif "_" in t_str:
@@ -71,14 +71,13 @@ def process_lilo_orders(client):
         open_positions = [] 
 
         for symbol, group in df.groupby("trdSym"): 
-            # Fix token variations safely to maintain clean numeric strings
+            # FIXED: Added [0] brackets to correctly extract the first string element instead of referencing the Pandas module object
             try:
-                token_id = str(int(float(str(group["tok"].iloc).split('.').strip())))
+                token_id = str(int(float(str(group["tok"].iloc[0]).split('.').strip())))
             except:
-                token_id = str(group["tok"].iloc).strip()
+                token_id = str(group["tok"].iloc[0]).strip()
 
-            raw_seg = group["exSeg"].iloc 
-            # Kotak Neo V2 internal API requests strictly expect lower-case "nse_fo" parameter wrappers
+            raw_seg = group["exSeg"].iloc[0] 
             ex_seg = "nse_fo" if str(raw_seg).lower() in ["nse_fo", "nfo"] else str(raw_seg).lower()
             
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records') 
@@ -107,7 +106,7 @@ def process_lilo_orders(client):
                     b["qty"] -= mqty 
 
             # ==============================================================================
-            # 🛡️ VERBOSE LIVE VALUATION FETCH ENGINE (KOTAK NEO V2 NATIVE SPECIFICATION)
+            # 🛡️ VERBOSE LIVE VALUATION FETCH ENGINE (KOTAK NEO V2 PRODUCTION CONFIGURATION)
             # ==============================================================================
             for b in buys: 
                 if b["qty"] > 0: 
@@ -117,24 +116,18 @@ def process_lilo_orders(client):
                     live_val = get_mid_price(client, token_id, ex_seg) 
                     debug_log(f"  -> API Response (get_mid_price): {live_val}", Fore.MAGENTA)
                     
-                    # 2. Kotak Neo V2 Native Scrip Info Fallback Lookup (Fires if mid-price outputs 0.0)
+                    # 2. Kotak Neo V2 Native Market Depth Fallback Lookup (Fires if mid-price outputs 0.0)
                     if live_val <= 0:
                         try:
-                            # Kotak Neo V2 SDK natively looks up single contracts using client.get_scrip_info
-                            scrip_data = client.get_scrip_info(exchangeSegment=ex_seg, instrumentToken=token_id)
+                            # Kotak Neo V2 uses get_market_depth to parse instrument quotes snapshots
+                            depth_data = client.get_market_depth(exchangeSegment=ex_seg, instrumentToken=token_id)
                             
-                            if scrip_data and isinstance(scrip_data, dict):
-                                # Extract real-time last traded price from V2 payload dictionary structure
-                                live_val = float(scrip_data.get("ltp") or scrip_data.get("lastTradedPrice") or 0)
+                            if depth_data and isinstance(depth_data, dict):
+                                # Extract trading values using Kotak's data object layout properties
+                                data_payload = depth_data.get("data") or depth_data
+                                live_val = float(data_payload.get("ltp") or data_payload.get("lastTradedPrice") or 0)
                                 if live_val > 0:
-                                    debug_log(f"  {Fore.GREEN}✅ [KOTAK V2 SUCCESS] Recovered live price using get_scrip_info: {live_val}")
-                                    
-                            # Alternate list layout safety parsing
-                            elif scrip_data and isinstance(scrip_data, list) and len(scrip_data) > 0:
-                                inner_block = scrip_data[0]
-                                live_val = float(inner_block.get("ltp") or inner_block.get("lastTradedPrice") or 0)
-                                if live_val > 0:
-                                    debug_log(f"  {Fore.GREEN}✅ [KOTAK V2 SUCCESS] Recovered live price from list packet array: {live_val}")
+                                    debug_log(f"  {Fore.GREEN}✅ [KOTAK V2 SUCCESS] Recovered live price using get_market_depth: {live_val}")
                         except Exception as v2_err:
                             debug_log(f"  Direct Kotak Neo V2 API dynamic recovery error: {v2_err}", Fore.RED)
                     
@@ -179,5 +172,4 @@ def _print_summary(total_unrealized, total_realized):
 if __name__ == "__main__": 
     client = get_session() 
     process_lilo_orders(client)
-
 
