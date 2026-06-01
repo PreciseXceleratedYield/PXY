@@ -133,8 +133,8 @@ async def main():
             print(f"{Fore.YELLOW}⏳ Market buffer timing restriction block active.")
             return
 
-        # 2. Safe Flat Directory Imports
-        from syspxy import get_all_data
+        # 2. Safe Flat Directory Imports (FIXED MATCH NAME TO _sgnl.py)
+        from _sgnl import get_all_data
         from _clnt import get_session
         
         # 3. Pull Live Strategy Streams
@@ -176,7 +176,7 @@ async def main():
                 res = execute_order(client, symbol, qty_needed, "B")
 
         elif sig == "SELL":
-            if global_short_lots = global_shorts = ce_positions["short"] # Using global_shorts uniformly
+            # FIXED: Stripped out broken syntax row to ensure uniform global_shorts logic
             if global_shorts < global_longs or (global_longs == 0 and global_shorts == 0):
                 qty_needed = LOT_SIZE
                 base_100 = round(ltp / 100) * 100
@@ -191,5 +191,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 
