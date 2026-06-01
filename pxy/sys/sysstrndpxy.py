@@ -94,9 +94,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         
         # EXCLUSIVE PRIORITY MATRIX WITH ONGOING BASELINE FALLBACK
         if force_buy:
-            new_trend = "FORCESELL"   # Upper boundary line crossing -> FORCE PRIORITY FLIP
+            new_trend = "FORCEBUY"  
         elif force_sell:
-            new_trend = "FORCEBUY"    # Lower boundary line crossing -> FORCE PRIORITY FLIP
+            new_trend = "FORCESELL"   
         elif cross_buy: 
             new_trend = "CROSSBUY" 
         elif cross_sell: 
