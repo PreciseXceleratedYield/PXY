@@ -2,25 +2,10 @@
 import pandas as pd 
 import json 
 import os 
-from colorama import init, Fore, Style 
 from runclntpxy import get_session 
 from runltpspxy import get_mid_price 
 
-# Initialize colorama for colored console logs
-init(autoreset=True) 
-
 MATCH_MODE = "TAG" 
-DEBUG_MODE = True 
-
-def debug_log(msg, color=Fore.BLUE): 
-    if DEBUG_MODE: 
-        print(f"{color}[DEBUG LILO] {msg}{Style.RESET_ALL}") 
-
-def _print_summary(total_unrealized, total_realized): 
-    color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
-    unreal_str = f"{int(total_unrealized):+06d}" 
-    real_str = f"{int(total_realized):+06d}" 
-    print(f"\n {unreal_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅  {color}{real_str}{Style.RESET_ALL} 🥅\n") 
 
 def dump_to_json(closed_df): 
     try: 
@@ -37,18 +22,16 @@ def dump_to_json(closed_df):
         with open(file_path, "w") as f: 
             json.dump(data, f, indent=4) 
     except Exception as e: 
-        print(f"{Fore.RED}Error dumping to JSON: {e}") 
+        print(f"Error dumping to JSON: {e}") 
 
 def process_lilo_orders(client): 
     try: 
         if not client: 
-            debug_log("Execution rejected: Client session instance is missing or invalid.", Fore.RED)
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
             
         res = client.order_report() 
         if not res or "data" not in res: 
-            debug_log("Broker connection returned an empty orderbook or invalid response format.", Fore.RED)
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
             
@@ -62,44 +45,25 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # Standardized tag parser without slice attribute crashes
+        # FIX: Standardized parser that accurately extracts base tags from _S markers
         def get_safe_tag(row): 
-            try:
-                t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
-                t_str = str(t).strip()
-                if '.' in t_str:
-                    t_str = t_str.split('.')[0].strip()
-                if "_S" in t_str:
-                    t_str = t_str.split('_S')[0].strip()
-                elif "_" in t_str:
-                    t_str = t_str.split('_')[0].strip()
-                return t_str if t_str.lower() not in ["nan", "none", "null", ""] else "" 
-            except Exception:
-                return ""
+            t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
+            # First clean potential decimal points from floats
+            t_str = str(t).split('.')[0].strip() 
+            # Split off the explicit _S identifier flag to isolate the raw base token
+            if "_S" in t_str:
+                t_str = t_str.split('_S')[0].strip()
+            elif "_" in t_str:
+                t_str = t_str.split('_')[0].strip()
+            return t_str if t_str.lower() not in ["nan", "none", "null", ""] else "" 
             
         df["tag"] = df.apply(get_safe_tag, axis=1) 
         closed_matches = [] 
         open_positions = [] 
 
         for symbol, group in df.groupby("trdSym"): 
-            try:
-                raw_tok = str(group["tok"].iloc[0]).strip()
-                if '.' in raw_tok:
-                    raw_tok = raw_tok.split('.')[0].strip()
-                token_id = str(int(float(raw_tok)))
-            except Exception:
-                try:
-                    token_id = str(group["tok"].iloc[0]).strip()
-                except Exception:
-                    token_id = ""
-
-            try:
-                raw_seg = str(group["exSeg"].iloc[0]).strip()
-            except Exception:
-                raw_seg = "nse_fo"
-                
-            ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
-            
+            token_id = group["tok"].iloc[0] 
+            ex_seg = group["exSeg"].iloc[0] 
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records') 
             sells = group[group["trnsTp"].str.upper() == "S"].to_dict('records') 
             matched_sell_indices = set() 
@@ -125,64 +89,9 @@ def process_lilo_orders(client):
                     }) 
                     b["qty"] -= mqty 
 
-            # ==============================================================================
-            # 🎯 MULTI-LAYERED PRIORITY RESCUE PRICE MATRIX (KOTAK V2 AUTHORITATIVE SCHEMA)
-            # ==============================================================================
             for b in buys: 
                 if b["qty"] > 0: 
-                    debug_log(f"Fetching Price -> Ticker: {symbol} | Token: {token_id} | Segment: {ex_seg}", Fore.CYAN)
-                    
-                    # LAYER 1: Primary Attempt via your local mid-price algorithm module
                     live_val = get_mid_price(client, token_id, ex_seg) 
-                    debug_log(f"  -> Layer 1 (get_mid_price): {live_val}", Fore.MAGENTA)
-                    
-                    # LAYER 2: Correct Native Kotak Neo V2 quotes() Implementation
-                    if live_val <= 0 and token_id:
-                        try:
-                            # V2 Constraint: Plural instrument_tokens key mapping passing a list of dicts
-                            tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
-                            
-                            # V2 Method: Call client.quotes with lowercase array payload
-                            v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
-                            
-                            # V2 Response Parsing Matrix
-                            if isinstance(v2_quotes, dict):
-                                data_chunk = v2_quotes.get("data") or v2_quotes.get("message")
-                                
-                                if isinstance(data_chunk, list) and len(data_chunk) > 0:
-                                    first_item = data_chunk[0]
-                                    if isinstance(first_item, dict):
-                                        live_val = float(first_item.get("ltp") or first_item.get("lastTradedPrice") or 0)
-                                elif isinstance(data_chunk, dict):
-                                    live_val = float(data_chunk.get("ltp") or data_chunk.get("lastTradedPrice") or 0)
-                                else:
-                                    live_val = float(v2_quotes.get("ltp") or v2_quotes.get("lastTradedPrice") or 0)
-                                    
-                            elif isinstance(v2_quotes, list) and len(v2_quotes) > 0:
-                                first_item = v2_quotes[0]
-                                if isinstance(first_item, dict):
-                                    live_val = float(first_item.get("ltp") or first_item.get("lastTradedPrice") or 0)
-                                
-                            if live_val > 0:
-                                debug_log(f"  {Fore.GREEN}✅ [Layer 2 Success] Extracted real-time exchange LTP: {live_val}")
-                        except Exception as v2_err:
-                            debug_log(f"  Layer 2 API rescue error payload trace: {v2_err}", Fore.RED)
-                    
-                    # LAYER 3: Fall back to last known cached row LTP inside dataframe fields
-                    if live_val <= 0:
-                        row_cache_ltp = float(b.get("sell_prc") or b.get("ltp") or b.get("LTP") or 0)
-                        if row_cache_ltp > 0:
-                            debug_log(f"  {Fore.YELLOW}⚠️ [Layer 3 Success] API down. Recovered cached row LTP: {row_cache_ltp}")
-                            live_val = row_cache_ltp
-                    
-                    # LAYER 4: Final safety net fallback -> Default to execution buy entry price
-                    if live_val <= 0:
-                        print(f"  {Fore.RED}🚨 [LAYER 4 SAFETY] No market data resolved. Falling back to buy entry anchor: {b['prc']}")
-                        live_val = b["prc"]
-                    
-                    unrealized_pnl = int((live_val - b["prc"]) * b["qty"])
-                    debug_log(f"  -> Final Assigned Valuation Price: {live_val} | Calculated PNL: {unrealized_pnl:+d}", Fore.GREEN)
-                    
                     open_positions.append({ 
                         "Symbol": symbol, 
                         "Qty": b["qty"], 
@@ -192,10 +101,29 @@ def process_lilo_orders(client):
                         "Buy_Prc": b["prc"], 
                         "Exit_Time": "OPEN", 
                         "Sell_Prc": live_val, 
-                        "PNL": unrealized_pnl 
+                        "PNL": int((live_val - b["prc"]) * b["qty"]) 
                     }) 
 
         open_df = pd.DataFrame(open_positions) 
         closed_df = pd.DataFrame(closed_matches) 
         total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0 
         total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0 
+        _print_summary(total_unrealized, total_realized) 
+        dump_to_json(closed_df) 
+        return open_df, closed_df 
+    except Exception as e: 
+        print(f"[TAG MATCH ERROR]: {e}") 
+        _print_summary(0, 0) 
+        return pd.DataFrame(), pd.DataFrame() 
+
+def _print_summary(total_unrealized, total_realized): 
+    from colorama import Fore, Style, init 
+    init(autoreset=True) 
+    color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
+    unreal_str = f"{int(total_unrealized):+06d}" 
+    real_str = f"{int(total_realized):+06d}" 
+    print(f"\n {unreal_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅  {color}{real_str}{Style.RESET_ALL} 🥅\n") 
+
+if __name__ == "__main__": 
+    client = get_session() 
+    process_lilo_orders(client)
