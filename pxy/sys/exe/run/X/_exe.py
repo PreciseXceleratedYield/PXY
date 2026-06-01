@@ -6,6 +6,9 @@ import time
 import subprocess
 from datetime import datetime, time as dt_time
 import pytz
+from colorama import init, Fore, Style
+
+init(autoreset=True)
 
 # =====================================================================
 # 1. INTEGRATED TELEGRAM ALERT INTERFACE
@@ -49,14 +52,28 @@ def is_market_hours():
 # =====================================================================
 def start_loop():
     """Monitors trading states and acts as a shield wrapper for _sys.py."""
-    was_open = False
-    off_done = False
-
-    # TARGET EXECUTABLE FILE PATH: Points directly flat to your automated loop orchestrator
     EXE_FILE = "_sys.py"
 
-    print(f"🛡️ SUPERVISOR ACTIVE: Guarding flat file target node -> {EXE_FILE}")
     print("━" * 68)
+    print(f"{Fore.GREEN}{Style.BRIGHT}📌 STAGE 1: Executing Mandatory Initial Startup Cycle...")
+    print("━" * 68)
+    
+    # ---- MANDATORY FIRST RUN AT STARTUP ----
+    if os.path.exists(EXE_FILE):
+        print(f"🔄 Running initial synchronization scan via -> {EXE_FILE}")
+        subprocess.run([sys.executable, EXE_FILE])
+        print(f"{Fore.GREEN}✅ Initial startup sync cycle complete successfully.")
+    else:
+        print(f"❌ EXE ERR: Core pipeline orchestrator '{EXE_FILE}' missing from directory ⚠️")
+        sys.exit(1)
+
+    print("\n" + "━" * 68)
+    print(f"{Fore.YELLOW}{Style.BRIGHT}🏁 STAGE 2: Supervisor Active. Locking Into Guard Loop Matrix...")
+    print("━" * 68)
+
+    was_open = is_market_hours()
+    # If we started outside market hours, the initial startup run already served as our "off-market run"
+    off_done = not was_open 
 
     while True:
         t0 = time.time()
@@ -75,18 +92,14 @@ def start_loop():
             off_done = False
 
         # ---- TARGET SUBPROCESS MANAGEMENT GATE ----
-        if os.path.exists(EXE_FILE):
-            if mkt:
-                # If within active live trading parameters, run your loop master script
-                subprocess.run([sys.executable, EXE_FILE])
-            else:
-                if not off_done:
-                    print("🌙 OFF MKT: Executing single maintenance session scan, idling now 💤")
-                    subprocess.run([sys.executable, EXE_FILE])
-                    off_done = True
+        if mkt:
+            # If within active live trading parameters, run your loop master script continuously
+            subprocess.run([sys.executable, EXE_FILE])
         else:
-            print(f"❌ EXE ERR: Core pipeline orchestrator '{EXE_FILE}' missing from directory ⚠️")
-            time.sleep(5)  # Throttle terminal alert logging spam
+            if not off_done:
+                print("🌙 OFF MKT: Executing single maintenance session scan, idling now 💤")
+                subprocess.run([sys.executable, EXE_FILE])
+                off_done = True
 
         was_open = mkt
         # Holds a flat, balanced 1-second ticks evaluation pacing frequency loop
@@ -101,3 +114,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n🛑 Supervisor process halted via system interrupt command. Exiting.")
         sys.exit(0)
+
