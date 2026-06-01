@@ -134,20 +134,23 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
 
     active_df["counter"] = active_df.apply(mark_counter, axis=1)
 
-    # --- 3. DYNAMIC VALUATION UPDATE WITH LTP FALLBACK ---
+    # --- 3. DYNAMIC VALUATION UPDATE WITH FIXED KEY RESOLUTION ---
     if client and get_mid_price:
         def update_metrics(row):
-            token_id = row.get("tok") or row.get("token")
-            ex_seg = row.get("exseg") or row.get("exSeg") or "nse_fo"
+            # FIXED: Checks both lowercase and uppercase keys to prevent LILO token extraction failures
+            token_id = row.get("tok") or row.get("token") or row.get("tok") or row.get("TOKEN")
+            ex_seg = row.get("exseg") or row.get("exSeg") or row.get("exseg") or "nse_fo"
             
-            # Query mid price
-            curr_val = get_mid_price(client, token_id, ex_seg)
+            curr_val = 0.0
+            if token_id:
+                # Query mid price using the confirmed token mapping ID
+                curr_val = get_mid_price(client, token_id, ex_seg)
             
-            # LTP Fallback Tracker
+            # LTP Fallback Tracker (Only defaults to buy price if live data network feed is dead)
             if curr_val <= 0:
                 curr_val = float(row.get("sell_prc") or row.get("ltp") or row.get("LTP") or row.get("buy_prc") or 0)
                 if DEBUG and curr_val > 0:
-                    print(f"{Fore.YELLOW}[OMS FALLBACK] Mid price dropped. Rescued with fallback LTP price: {curr_val}")
+                    print(f"{Fore.YELLOW}[OMS FALLBACK] Mid price lookup failed for Token {token_id}. Defaulting to LTP: {curr_val}")
 
             if curr_val > 0:
                 row["sell_prc"] = curr_val
@@ -169,10 +172,10 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     if add_calcs:
         active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
         
-        # FIX: Extract only the integer target price out of the math engine's output tuple
+        # Extract only the integer target price out of the math engine's output tuple
         def safe_tgt_call(row):
             res = pxy_tgt_calc(row)
-            return res[0] if isinstance(res, tuple) else res
+            return res if isinstance(res, tuple) else res
 
         active_df["pxy_tgt"] = active_df.apply(safe_tgt_call, axis=1)
         active_df["pxy_sl"] = active_df.apply(pxy_sl_calc, axis=1)
@@ -195,4 +198,20 @@ if __name__ == "__main__":
     else:
         print(f"{'No Active Positions':^80}")
     print("="*80)
+
+    client = get_session()
+    if client and process_lilo_orders:
+        _, closed_df = process_lilo_orders(client)
+        
+        if not closed_df.empty:
+            print(f"\n{'TODAY\'S CLOSED POSITIONS (INACTIVE)':^80}")
+            print("-" * 80)
+            c_cols = ["Symbol", "Tag", "Qty", "Buy_Prc", "Sell_Prc", "PNL"]
+            print(closed_df[c_cols].to_string(index=False))
+            print("-" * 80)
+            total_pnl = closed_df['PNL'].sum()
+            color = Fore.GREEN if total_pnl >= 0 else Fore.RED
+            print(f"{'TOTAL REALIZED PNL:':<60} {color}{int(total_pnl):+d}{Style.RESET_ALL}")
+            print("=" * 80 + "\n")
+
 
