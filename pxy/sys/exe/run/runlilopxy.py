@@ -59,11 +59,11 @@ def process_lilo_orders(client):
         # Standardized parser that accurately extracts base tags from _S markers
         def get_safe_tag(row): 
             t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
-            t_str = str(t).split('.')[0].strip() 
+            t_str = str(t).split('.').strip() 
             if "_S" in t_str:
-                t_str = t_str.split('_S')[0].strip()
+                t_str = t_str.split('_S').strip()
             elif "_" in t_str:
-                t_str = t_str.split('_')[0].strip()
+                t_str = t_str.split('_').strip()
             return t_str if t_str.lower() not in ["nan", "none", "null", ""] else "" 
             
         df["tag"] = df.apply(get_safe_tag, axis=1) 
@@ -71,19 +71,14 @@ def process_lilo_orders(client):
         open_positions = [] 
 
         for symbol, group in df.groupby("trdSym"): 
-            # FIX: Safely parse token out of the sequence list without strip/split collision failures
             try:
-                raw_tok = str(group["tok"].iloc[0]).strip()
-                token_id = str(int(float(raw_tok.split('.')[0])))
-            except Exception as tok_err:
-                token_id = str(group["tok"].iloc[0]).strip()
-
-            try:
-                raw_seg = str(group["exSeg"].iloc[0]).strip()
+                token_id = str(int(float(str(group["tok"].iloc).split('.').strip())))
             except:
-                raw_seg = "nse_fo"
-                
-            ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
+                token_id = str(group["tok"].iloc).strip()
+
+            raw_seg = group["exSeg"].iloc 
+            # Kotak Neo V2 strictly requires lowercase "nse_fo" for derivatives segment lookups
+            ex_seg = "nse_fo" if str(raw_seg).lower() in ["nse_fo", "nfo"] else str(raw_seg).lower()
             
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records') 
             sells = group[group["trnsTp"].str.upper() == "S"].to_dict('records') 
@@ -111,29 +106,36 @@ def process_lilo_orders(client):
                     b["qty"] -= mqty 
 
             # ==============================================================================
-            # 🛡️ VERBOSE LIVE VALUATION FETCH ENGINE (KOTAK NEO V2 STABLE DEPLOYMENT)
+            # 🛡️ VERBOSE LIVE VALUATION FETCH ENGINE (KOTAK NEO V2 NATIVE QUOTES)
             # ==============================================================================
             for b in buys: 
                 if b["qty"] > 0: 
                     debug_log(f"Fetching Price -> Ticker: {symbol} | Token: {token_id} | Segment: {ex_seg}", Fore.CYAN)
                     
-                    # 1. Primary Attempt: Use your local mid price algorithm module mapping
+                    # 1. Primary Attempt: Use your local mid price algorithm
                     live_val = get_mid_price(client, token_id, ex_seg) 
                     debug_log(f"  -> API Response (get_mid_price): {live_val}", Fore.MAGENTA)
                     
-                    # 2. Kotak Neo V2 Native Market Depth Fallback Lookup
+                    # 2. Kotak Neo V2 Native Quotes Fallback (Triggers if mid-price output is 0.0)
                     if live_val <= 0:
                         try:
-                            depth_data = client.get_market_depth(exchangeSegment=ex_seg, instrumentToken=token_id)
-                            if depth_data and isinstance(depth_data, dict):
-                                data_payload = depth_data.get("data") or depth_data
-                                live_val = float(data_payload.get("ltp") or data_payload.get("lastTradedPrice") or 0)
-                                if live_val > 0:
-                                    debug_log(f"  {Fore.GREEN}✅ [KOTAK V2 SUCCESS] Recovered live price using get_market_depth: {live_val}")
+                            # FIX: Build exact dictionary matrix structure expected by Kotak V2 client.quotes()
+                            tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
+                            
+                            # Fire native V2 quotes request method
+                            quote_res = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
+                            
+                            if quote_res and 'message' in quote_res:
+                                # Parse out native 'ltp' floating value out of the response arrays safely
+                                msg_data = quote_res['message']
+                                if isinstance(msg_data, list) and len(msg_data) > 0:
+                                    live_val = float(msg_data[0].get('ltp', 0))
+                                    if live_val > 0:
+                                        debug_log(f"  {Fore.GREEN}✅ [KOTAK V2 SUCCESS] Recovered live price using client.quotes(): {live_val}")
                         except Exception as v2_err:
                             debug_log(f"  Direct Kotak Neo V2 API dynamic recovery error: {v2_err}", Fore.RED)
                     
-                    # 3. Last Resort Safety net (Only defaults to entry if the entire network connection drops)
+                    # 3. Last Resort Safety net (Only defaults to entry if the entire network drops)
                     if live_val <= 0:
                         print(f"  {Fore.RED}🚨 [FEED DEAD] Complete fallback network dropout. Defaulting to buy anchor price: {b['prc']}")
                         live_val = b["prc"]
