@@ -1,6 +1,9 @@
 # _sgnl.py
 import os
 import warnings
+import json
+from datetime import datetime
+import pytz
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -13,6 +16,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # =====================================================================
 TICKER = "^NSEI"               # Tracking NIFTY 50 Index
 TIMEZONE = "Asia/Kolkata"       # Local execution context (IST)
+JSON_OUTPUT = "_sgnl.json"      # Keeping file in the same folder
 
 def _pad_line_to_42(visible_text, ansi_prefix="", ansi_suffix=""):
     """
@@ -70,7 +74,7 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
         (c1, c1_emoji, f" C1-{c1:.2f}", "█", c1_color),
         (c0, c0_emoji, f" C0-{c0:.2f}", "█", c0_color)
     ]
-    rows.sort(key=lambda item: item[0], reverse=True)
+    rows.sort(key=lambda item: item, reverse=True)
 
     # Print 42-width Header
     print(f"\n{_pad_line_to_42(header_text, YLW, RST)}")
@@ -163,10 +167,72 @@ def calculate_no_repaint_signals(df):
 
     return live_ltp, signal
 
+def export_chart_json(df, lookback=42):
+    """ Cleans old files from prior days immediately and writes fresh padded processed Mode 5 data. """
+    try:
+        if df.empty: return
+        
+        # --- CRITICAL STALE FILE CLEANUP INTERFACE ---
+        if os.path.exists(JSON_OUTPUT):
+            tz_context = pytz.timezone(TIMEZONE)
+            current_date_ist = datetime.now(tz_context).date()
+            
+            # Extract file modification timestamp date window
+            file_mtime = os.path.getmtime(JSON_OUTPUT)
+            file_date_ist = datetime.fromtimestamp(file_mtime, tz_context).date()
+            
+            # If the local JSON belongs to a different day, completely wipe it out
+            if file_date_ist < current_date_ist:
+                os.remove(JSON_OUTPUT)
+
+        df_target = df.copy()
+        o = df_target['Open']
+        h = df_target['High']
+        l = df_target['Low']
+        c = df_target['Close']
+        c1 = df_target['Close'].shift(1)
+
+        e1 = c
+        e2 = (c1 + c) / 2
+        e3 = (c + o) / 2
+        e4 = (o + h + l + c) / 4
+        
+        df_target['P_Master'] = (e1 + e2 + e3 + e4) / 4
+        
+        output = []
+        for idx, row in df_target.iterrows():
+            p_val = float(row["P_Master"]) if not np.isnan(row["P_Master"]) else float(row["Close"])
+            output.append({
+                "time": str(idx),
+                "close": float(row["Close"]),
+                "p_master": p_val,
+                "st": float(row["Close"]),  
+                "st_trend": "BULL" if row["Close"] >= row["Open"] else "BEAR"
+            })
+            
+        # --- TODAY-ONLY BACKFILL LOGIC ---
+        current_len = len(output)
+        if current_len < lookback:
+            padding_needed = lookback - current_len
+            first_candle = output[0]  # Grab the very first 09:15 AM candle node
+            
+            # Create duplicates to pad the top of the array
+            padding_list = [first_candle.copy() for _ in range(padding_needed)]
+            output = padding_list + output
+        else:
+            # If we already have 42+ bars, just take the last 42 as normal
+            output = output[-lookback:]
+            
+        with open(JSON_OUTPUT, "w") as f:
+            json.dump(output, f, indent=2)
+            
+    except Exception:
+        pass 
+
 def get_all_data():
     """
     Downloads strictly 1 day of 1-minute bars straight from yfinance.
-    Applies Mode 5 and maps out the verified no-repaint trend flips.
+    Applies Mode 5, maps out verified trend flips, and outputs matrix JSON updates.
     """
     try:
         # Fetching strictly today's 1-minute tracking profile
@@ -184,6 +250,9 @@ def get_all_data():
         # Process historical completed rows via Mode 5 transformation matrix
         transformed_df = apply_mode_5_transformation(df.copy())
         ltp, signal = calculate_no_repaint_signals(transformed_df)
+        
+        # ---- JSON EXPORTER TARGETING SAME FOLDER WITH BACKFILL ----
+        export_chart_json(transformed_df, lookback=42)
         
         return {"entry": signal, "price": ltp}
 
