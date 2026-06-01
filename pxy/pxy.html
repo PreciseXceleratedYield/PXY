@@ -847,7 +847,7 @@ let chart, lastSt = null, lastCloses = null;
 async function load() {
     let data;
     try {
-        const res = await fetch('./syschrtpxy.json');
+        const res = await fetch('/sys/exe/run/X/_sgnl.json');
         data = await res.json();
     } catch {
         data = generateDemoData();
