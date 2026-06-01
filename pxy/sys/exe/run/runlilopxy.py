@@ -61,7 +61,7 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # FIX: Standardized parser that accurately extracts base tags from _S markers
+        # Standardized parser that accurately extracts base tags from _S markers
         def get_safe_tag(row): 
             t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
             t_str = str(t).split('.')[0].strip() 
@@ -125,13 +125,20 @@ def process_lilo_orders(client):
                 else:
                     debug_log(f"  {Fore.YELLOW}⏳ No immediate closing trade counterpart found for tag: {b['tag']}")
 
-            # Isolate lingering open risks
+            # FIX: Isolate lingering open risks with an explicit LTP safety fallback limit
             for b in buys: 
                 if b["qty"] > 0: 
+                    # Attempt to fetch dynamic dynamic mid price execution data
                     live_val = get_mid_price(client, token_id, ex_seg) 
+                    
+                    # LTP Fallback Activation Check
+                    if live_val <= 0:
+                        debug_log(f"  ⚠️ Mid-price feed failed (0.0) for token {token_id}. Falling back to buy price LTP reference.", Fore.YELLOW)
+                        live_val = b["prc"]
+                    
                     unrealized_pnl = int((live_val - b["prc"]) * b["qty"])
                     
-                    debug_log(f"  {Fore.CYAN}🏃 Open tracking detected | Tag: {b['tag']} | Unfilled volume: {b['qty']} | Live LTP: {live_val}")
+                    debug_log(f"  🏃 Open tracking detected | Tag: {b['tag']} | Unfilled volume: {b['qty']} | Live LTP: {live_val}")
                     
                     open_positions.append({ 
                         "Symbol": symbol, 
@@ -171,3 +178,4 @@ def _print_summary(total_unrealized, total_realized):
 if __name__ == "__main__": 
     client = get_session() 
     process_lilo_orders(client)
+
