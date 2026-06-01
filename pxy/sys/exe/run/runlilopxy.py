@@ -144,11 +144,10 @@ def process_lilo_orders(client):
                             tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
                             
                             # V2 Method: Call client.quotes with lowercase array payload
-                            v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
+                            v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="all")
                             
                             # V2 Response Parsing Matrix
                             if isinstance(v2_quotes, dict):
-                                # Extract data wrapper container array matching V2 response specification
                                 data_chunk = v2_quotes.get("data") or v2_quotes.get("message")
                                 
                                 if isinstance(data_chunk, list) and len(data_chunk) > 0:
@@ -198,5 +197,4 @@ def process_lilo_orders(client):
                     }) 
 
         open_df = pd.DataFrame(open_positions) 
-
-
+        closed_df = pd.DataFrame(closed_matches) 
