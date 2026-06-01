@@ -4,14 +4,13 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 from exepomspxy import print_market_dashboard
-from colorama import Fore, Style
 
 # --- GLOBAL DEBUG SWITCH ---
-DEBUG = True
+DEBUG = False
 
 def dprint(msg):
     if DEBUG:
-        print(f"[DEBUG OMS] {msg}")
+        print(f"[DEBUG] {msg}")
 
 # ---------------- PATH SETUP ----------------
 HERE = Path(__file__).resolve().parent
@@ -48,14 +47,10 @@ try:
 except:
     pxy_dyn = lambda row: row.get("buy_prc", 0)
 
-# Point this directly to your updated standalone calculation script
 try:
-    from target_script import target_price as pxy_tgt_calc
-except ImportError:
-    try:
-        from exetgtpxy import target_price as pxy_tgt_calc
-    except:
-        pxy_tgt_calc = lambda row: (0, 0.0)
+    from exetgtpxy import target_price as pxy_tgt_calc
+except:
+    pxy_tgt_calc = lambda row: 0
 
 try:
     from exeslpxy import stop_loss as pxy_sl_calc
@@ -90,29 +85,27 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
                 active_df, _ = process_lilo_orders(client)
                 
                 if not active_df.empty:
-                    # B. SAFETY SYNC: Filter by Real Broker Positions
+                    # B. CRITICAL FIX: Standardize casing BEFORE filtering or accessing 'symbol'
+                    active_df.columns = [c.lower() for c in active_df.columns]
+                    
+                    # C. SAFETY SYNC: Filter by Real Broker Positions
                     pos_res = client.positions()
                     if pos_res and "data" in pos_res:
                         pos_df = pd.DataFrame(pos_res["data"])
                         
                         if not pos_df.empty:
+                            # Calculate net holdings (Buy - Sell)
+                            # Only symbols with a positive net balance should be on the dashboard
                             real_holdings = pos_df[
                                 (pos_df['flBuyQty'].astype(float) - pos_df['flSellQty'].astype(float)) > 0
                             ]['trdSym'].tolist()
 
-                            # Match strategy orders dynamically (handling loose casing issues cleanly)
-                            active_df = active_df[active_df.apply(lambda r: str(r.get('Symbol') or r.get('symbol')).strip() in real_holdings, axis=1)].copy()
+                            # Filter strategy orders to match actual broker holdings
+                            active_df = active_df[active_df['symbol'].isin(real_holdings)].copy()
                     
-                    # C. Standardize keys to lowercase but maintain compatibility copies
+                    # D. Final Column Cleaning (Tag cleanup)
                     if not active_df.empty:
-                        # Fix up naming collisions while preserving upper cases needed by target scripts
-                        for col in list(active_df.columns):
-                            active_df[col.lower()] = active_df[col]
-                        
-                        # FIX: Wipe out any cached stale values copied from 'Sell_Prc' so section 3 always fetches live pricing
-                        active_df['sell_prc'] = 0.0
-                        
-                        active_df['tag'] = active_df['tag'].astype(str).str.split('.').str.get(0).str.replace('nan', '').str.strip()
+                        active_df['tag'] = active_df['tag'].astype(str).str.split('.').str[0].replace('nan', '').str.strip()
                         
         except Exception as e:
             print(f"OMS DATA ERROR: {e}")
@@ -124,7 +117,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     # ==============================
     # CE / PE COUNTER LOGIC
     # ==============================
-    active_df["opt_type"] = active_df["symbol"].astype(str).str[-2:].str.upper()
+    active_df["opt_type"] = active_df["symbol"].str[-2:].str.upper()
     ce_count = (active_df["opt_type"] == "CE").sum()
     pe_count = (active_df["opt_type"] == "PE").sum()
 
@@ -137,29 +130,18 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
 
     active_df["counter"] = active_df.apply(mark_counter, axis=1)
 
-    # --- 3. DYNAMIC VALUATION UPDATE WITH FIXED KEY RESOLUTION ---
+    # --- 3. DYNAMIC VALUATION UPDATE ---
     if client and get_mid_price:
         def update_metrics(row):
-            token_id = row.get("tok") or row.get("token") or row.get("tok") or row.get("TOKEN")
-            ex_seg = row.get("exseg") or row.get("exSeg") or row.get("exseg") or "nse_fo"
-            
-            curr_val = 0.0
-            if token_id:
-                # Query mid price using the confirmed token mapping ID
-                curr_val = get_mid_price(client, token_id, ex_seg)
-            
-            # LTP Fallback Tracker (Only defaults to buy price if live data network feed is dead)
-            if curr_val <= 0:
-                curr_val = float(row.get("ltp") or row.get("LTP") or row.get("buy_prc") or 0)
-                if DEBUG and curr_val > 0:
-                    print(f"{Fore.YELLOW}[OMS FALLBACK] Mid price lookup failed for Token {token_id}. Defaulting to LTP: {curr_val}")
-
-            if curr_val > 0:
-                row["sell_prc"] = curr_val
-                buy_avg = float(row.get("buy_prc", 0))
-                qty = float(row.get("qty", 0))
-                row["pnl"] = round((curr_val - buy_avg) * qty, 2)
-                
+            # Refresh LTP only if necessary
+            if float(row.get("sell_prc", 0)) <= 0:
+                token_id = row.get("tok") or row.get("token")
+                curr_val = get_mid_price(client, token_id)
+                if curr_val > 0:
+                    row["sell_prc"] = curr_val
+                    buy_avg = float(row.get("buy_prc", 0))
+                    qty = float(row.get("qty", 0))
+                    row["pnl"] = round((curr_val - buy_avg) * qty, 2)
             return row
         
         active_df = active_df.apply(update_metrics, axis=1)
@@ -168,26 +150,21 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     if map_active_with_market and not market_df.empty:
         for col in market_df.columns:
             active_df[col] = market_df[col].iloc[-1]
-            active_df[col.upper()] = market_df[col].iloc[-1]
 
     # --- 5. THE PXY OMS CALCULATION CHAIN ---
     if add_calcs:
         active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
-        
-        # FIX: Extract element [0] out of the calculation engine tuple package
-        def safe_tgt_call(row):
-            res = pxy_tgt_calc(row)
-            return res[0] if isinstance(res, tuple) else res
-
-        active_df["pxy_tgt"] = active_df.apply(safe_tgt_call, axis=1)
+        active_df["pxy_tgt"] = active_df.apply(pxy_tgt_calc, axis=1)
         active_df["pxy_sl"] = active_df.apply(pxy_sl_calc, axis=1)
 
     combined["active_orders"] = active_df
     return combined
 
 if __name__ == "__main__":
+    # 1. Fetch data through your existing combined function
     data = get_combined_data()
     
+    # 2. PRINT ACTIVE POSITIONS
     print("\n" + "="*80)
     print(f"{'OMS LIVE PXY DASHBOARD (ACTIVE)':^80}")
     print("="*80)
@@ -201,13 +178,17 @@ if __name__ == "__main__":
         print(f"{'No Active Positions':^80}")
     print("="*80)
 
+    # 3. PRINT CLOSED POSITIONS (Today's Realized History)
     client = get_session()
-    if client and process_lilo_orders:
+    if client:
+        # We call process_lilo_orders again or modify get_combined_data to return both.
+        # Calling it here ensures we get the most recent 'closed_df'.
         _, closed_df = process_lilo_orders(client)
         
         if not closed_df.empty:
             print(f"\n{'TODAY\'S CLOSED POSITIONS (INACTIVE)':^80}")
             print("-" * 80)
+            # Match the column names returned by runlilopxy.py
             c_cols = ["Symbol", "Tag", "Qty", "Buy_Prc", "Sell_Prc", "PNL"]
             print(closed_df[c_cols].to_string(index=False))
             print("-" * 80)
@@ -215,5 +196,4 @@ if __name__ == "__main__":
             color = Fore.GREEN if total_pnl >= 0 else Fore.RED
             print(f"{'TOTAL REALIZED PNL:':<60} {color}{int(total_pnl):+d}{Style.RESET_ALL}")
             print("=" * 80 + "\n")
-
 
