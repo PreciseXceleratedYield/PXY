@@ -22,7 +22,7 @@ ist = pytz.timezone("Asia/Kolkata")
 HERE = Path(__file__).resolve().parent
 
 # --- INTEGRATED POSITION SUMMARY READ ENGINE (FLAT IMPORT) ---
-from _entry import get_global_position_summary
+from _entr import get_global_position_summary
 
 # --- INITIALIZE SHARED BROKER CLIENT ONCE AT BOOT ---
 try:
@@ -114,7 +114,7 @@ def start_daemon():
     # =====================================================================
     print(_pad_line_to_42("🔄 STAGE 1: Compulsory Sync Run...", Fore.YELLOW, Style.RESET_ALL))
     run_script("_exit.py")
-    run_script("_entry.py")
+    run_script("_entr.py")
     print(_pad_line_to_42("✅ Initial synchronization complete", Fore.GREEN, Style.RESET_ALL))
     print(_pad_line_to_42(border, Fore.GREEN, Style.RESET_ALL))
     time.sleep(2)
@@ -144,15 +144,15 @@ def start_daemon():
                 # -------- CORE EXECUTION DECISION GATES --------
                 if SIMPLE_MODE:
                     run_script("_exit.py")
-                    run_script("_entry.py")
+                    run_script("_entr.py")
                 else:
                     if long_lots > 0 and long_lots == short_lots:
                         run_script("_exit.py")
                     elif long_lots == 0 and short_lots == 0:
-                        run_script("_entry.py")
+                        run_script("_entr.py")
                     else:
                         run_script("_exit.py")
-                        run_script("_entry.py")
+                        run_script("_entr.py")
 
                 fancy_pause(LOOP_INTERVAL)
                 loop_counter += 1
