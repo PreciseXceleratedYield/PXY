@@ -1,4 +1,4 @@
-from colorama import Fore, Style, init
+from colorama import Fore, init
 
 # Initialize colorama for colored console logs
 init(autoreset=True)
@@ -28,7 +28,7 @@ def target_price(row):
     global PRINTED_SIDES
     try:
         # 1. ENTRY DATA CHECK
-        entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
+        entry_prc = i(row.get("pxy_entry") or row.get("buy_prc") or row.get("entry_prc"))
         if entry_prc <= 0:
             return 0, 0.0
 
@@ -74,7 +74,6 @@ def target_price(row):
         # ==============================================================================
         if is_ce:
             if is_counter and is_bullish_signal:
-                # Opposite ST Block during Counter Setup
                 if st_is_bearish_counter:
                     state = "🚨"
                     final_pct_score = 2 * ce_p
@@ -82,24 +81,20 @@ def target_price(row):
                     state = "🎯"  
                     final_pct_score = max(BASE_SCORE, ce_calc) 
             elif is_counter and is_bearish_signal:
-                # Flat Opposite Signal Block
                 state = "🚨"  
                 final_pct_score = 2   
             elif is_bullish_signal:
-                # No counter scenario -> Check Supertrend, then ACCELERATE
                 if st_is_bearish_counter:
                     state = "🚨"
                     final_pct_score = 2 * ce_p
                 else:
                     state, final_pct_score = "🔥", max(BASE_SCORE, ce_calc)
             elif is_bearish_signal:
-                # Flat Opposite Signal Block
                 state = "🚨"
                 final_pct_score = 2
                 
         elif is_pe:
             if is_counter and is_bearish_signal:
-                # Opposite ST Block during Counter Setup
                 if st_is_bullish_counter:
                     state = "🚨"
                     final_pct_score = 2 * pe_p
@@ -107,29 +102,26 @@ def target_price(row):
                     state = "🎯"  
                     final_pct_score = max(BASE_SCORE, pe_calc)  
             elif is_counter and is_bullish_signal:
-                # Flat Opposite Signal Block
                 state = "🚨"  
                 final_pct_score = 2   
             elif is_bearish_signal:
-                # No counter scenario -> Check Supertrend, then ACCELERATE
                 if st_is_bullish_counter:
                     state = "🚨"
                     final_pct_score = 2 * pe_p
                 else:
                     state, final_pct_score = "🔥", max(BASE_SCORE, pe_calc)
             elif is_bullish_signal:
-                # Flat Opposite Signal Block
                 state = "🚨"
                 final_pct_score = 2
 
         # ==============================================================================
         # 🛡️ GLOBAL CRITICAL FLOORS & CEILINGS ENGINE
         # ==============================================================================
-        # FIX: Changed operator to '<=' to catch flat opposite blocks sitting precisely at 2.0%
+        # FIX: Operator corrected to '<=' to catch flat opposite blocks sitting at exactly 2.0%
         if final_pct_score <= 2.0:
             final_pct_score = 3.0
 
-        # 6. MAX CAP LOGIC (Hard capped at 99%)
+        # Hard cap limits at 99.0%
         if final_pct_score > 99.0:
             final_pct_score = 99.0
 
@@ -139,16 +131,12 @@ def target_price(row):
 
         # 8. SUPPRESSED DEBUG PRINT
         if side not in PRINTED_SIDES and side != "NA":
-            color = (
-                Fore.CYAN if state == "🔥" else (
-                    Fore.RED if state == "🚨" else (Fore.MAGENTA if state == "🎯" else Fore.YELLOW)
-                )
-            )
-            print(f" {color}{side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state} | trend:{supertrend_val}")
+            state_emoji = "🔥" if state == "🔥" else ("🚨" if state == "🚨" else ("🎯" if state == "🎯" else "⏳"))
+            print(f" {side:<2} SCORE | {final_pct_score:>4.1f}% | ST:{state_emoji} | trend:{supertrend_val}")
             PRINTED_SIDES.add(side)
 
-        # FIX: Return both values so the display script does not print 150+ numbers into a percentage slot
         return target, final_pct_score
 
     except Exception:
         return 0, 0.0
+
