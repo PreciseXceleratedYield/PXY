@@ -1,5 +1,5 @@
 import pyotp
-import scrt
+import _scrt
 from neo_api_client import NeoAPI
 
 def get_session():
