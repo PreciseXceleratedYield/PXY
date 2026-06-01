@@ -56,7 +56,7 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # Clean tag parser safely extracting base token strings without list split bugs
+        # Standardized tag extraction without string list collision crashes
         def get_safe_tag(row): 
             try:
                 t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
@@ -92,7 +92,6 @@ def process_lilo_orders(client):
             except Exception:
                 raw_seg = "nse_fo"
                 
-            # Kotak Neo V2 native quotes endpoint strictly requires lowercase "nse_fo" parameter tokens
             ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
             
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records') 
@@ -121,50 +120,52 @@ def process_lilo_orders(client):
                     b["qty"] -= mqty 
 
             # ==============================================================================
-            # 🎯 MULTI-LAYERED PRIORITY RESCUE PRICE MATRIX (CORRECT KOTAK V2 STRUCT)
+            # 🎯 MULTI-LAYERED PRIORITY RESCUE PRICE MATRIX (KOTAK V2 OFFICIAL SCHEMA)
             # ==============================================================================
             for b in buys: 
                 if b["qty"] > 0: 
                     debug_log(f"Fetching Price -> Ticker: {symbol} | Token: {token_id} | Segment: {ex_seg}", Fore.CYAN)
                     
-                    # LAYER 1: Try local mid price algorithm
+                    # LAYER 1: Local mid price algorithm
                     live_val = get_mid_price(client, token_id, ex_seg) 
                     debug_log(f"  -> Layer 1 (get_mid_price): {live_val}", Fore.MAGENTA)
                     
-                    # LAYER 2: Try active live broker quotes method (FIXED SCHEMA)
+                    # LAYER 2: Native Kotak Neo V2 quotes endpoint
                     if live_val <= 0 and token_id:
                         try:
-                            # FIX: Quotes API expects a list containing dictionaries with specific keys
+                            # Strict list of dict format required by V2 SDK
                             tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
+                            v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="all")
                             
-                            # Fire correct V2 documentation endpoint signature
-                            v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
-                            
-                            # Parse out native 'ltp' key directly from Kotak's response packet
+                            # CRITICAL WORKAROUND: Handle raw list returns safely to prevent object attribute crashes
                             if isinstance(v2_quotes, list) and len(v2_quotes) > 0:
-                                live_val = float(v2_quotes[0].get("ltp") or v2_quotes[0].get("lastTradedPrice") or 0)
-                            elif isinstance(v2_quotes, dict) and "message" in v2_quotes:
-                                msg_data = v2_quotes["message"]
-                                if isinstance(msg_data, list) and len(msg_data) > 0:
-                                    live_val = float(msg_data[0].get("ltp") or msg_data[0].get("lastTradedPrice") or 0)
+                                first_entry = v2_quotes[0]
+                                live_val = float(first_entry.get("ltp") or first_entry.get("lastTradedPrice") or 0)
                             elif isinstance(v2_quotes, dict):
-                                live_val = float(v2_quotes.get("ltp") or v2_quotes.get("lastTradedPrice") or 0)
+                                if "message" in v2_quotes:
+                                    msg_data = v2_quotes["message"]
+                                    if isinstance(msg_data, list) and len(msg_data) > 0:
+                                        live_val = float(msg_data[0].get("ltp") or msg_data[0].get("lastTradedPrice") or 0)
+                                    elif isinstance(msg_data, dict):
+                                        live_val = float(msg_data.get("ltp") or msg_data.get("lastTradedPrice") or 0)
+                                else:
+                                    live_val = float(v2_quotes.get("ltp") or v2_quotes.get("lastTradedPrice") or 0)
                                 
                             if live_val > 0:
-                                debug_log(f"  {Fore.GREEN}✅ [Layer 2 Success] Fetched live V2 exchange LTP: {live_val}")
+                                debug_log(f"  {Fore.GREEN}✅ [Layer 2 Success] Fetched live exchange LTP: {live_val}")
                         except Exception as v2_err:
-                            debug_log(f"  Layer 2 API rescue error: {v2_err}", Fore.RED)
+                            debug_log(f"  Layer 2 API rescue failure message: {v2_err}", Fore.RED)
                     
-                    # LAYER 3: Try last known row cache LTP
+                    # LAYER 3: Last known row memory cache LTP fallback
                     if live_val <= 0:
-                        row_cache_ltp = float(b.get("sell_prc") or b.get("ltp") or b.get("Lvalues") or 0)
+                        row_cache_ltp = float(b.get("sell_prc") or b.get("ltp") or b.get("LTP") or 0)
                         if row_cache_ltp > 0:
                             debug_log(f"  {Fore.YELLOW}⚠️ [Layer 3 Success] API down. Recovered cached row LTP: {row_cache_ltp}")
                             live_val = row_cache_ltp
                     
                     # LAYER 4: Absolute final safety net -> Fall back to Buy Entry Price
                     if live_val <= 0:
-                        print(f"  {Fore.RED}🚨 [LAYER 4 SAFETY] No market data resolved. Falling back to buy entry anchor: {b['prc']}")
+                        print(f"  {Fore.RED}🚨 [LAYER 4 SAFETY] Complete dropout. Falling back to buy entry anchor: {b['prc']}")
                         live_val = b["prc"]
                     
                     unrealized_pnl = int((live_val - b["prc"]) * b["qty"])
@@ -202,5 +203,3 @@ def _print_summary(total_unrealized, total_realized):
 
 if __name__ == "__main__": 
     client = get_session() 
-    process_lilo_orders(client)
-
