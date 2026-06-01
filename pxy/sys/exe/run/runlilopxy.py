@@ -56,14 +56,18 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # Standardized parser that accurately extracts base tags from _S markers
+        # FIX: Rebuilt text parser to strictly avoid running string methods on list arrays
         def get_safe_tag(row): 
             t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
-            t_str = str(t).split('.').strip() 
+            # First handle formatting string safely
+            t_str = str(t).strip()
+            if '.' in t_str:
+                t_str = t_str.split('.')[0].strip()
+            # Unpack suffix configurations
             if "_S" in t_str:
-                t_str = t_str.split('_S').strip()
+                t_str = t_str.split('_S')[0].strip()
             elif "_" in t_str:
-                t_str = t_str.split('_').strip()
+                t_str = t_str.split('_')[0].strip()
             return t_str if t_str.lower() not in ["nan", "none", "null", ""] else "" 
             
         df["tag"] = df.apply(get_safe_tag, axis=1) 
@@ -71,14 +75,21 @@ def process_lilo_orders(client):
         open_positions = [] 
 
         for symbol, group in df.groupby("trdSym"): 
+            # Safely handle sequence extraction tokens
             try:
-                token_id = str(int(float(str(group["tok"].iloc).split('.').strip())))
-            except:
-                token_id = str(group["tok"].iloc).strip()
+                raw_tok = str(group["tok"].iloc[0]).strip()
+                if '.' in raw_tok:
+                    raw_tok = raw_tok.split('.')[0]
+                token_id = str(int(float(raw_tok)))
+            except Exception:
+                token_id = str(group["tok"].iloc[0]).strip()
 
-            raw_seg = group["exSeg"].iloc 
-            # Kotak Neo V2 strictly requires lowercase "nse_fo" for derivatives segment lookups
-            ex_seg = "nse_fo" if str(raw_seg).lower() in ["nse_fo", "nfo"] else str(raw_seg).lower()
+            try:
+                raw_seg = str(group["exSeg"].iloc[0]).strip()
+            except Exception:
+                raw_seg = "nse_fo"
+                
+            ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
             
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records') 
             sells = group[group["trnsTp"].str.upper() == "S"].to_dict('records') 
@@ -119,14 +130,13 @@ def process_lilo_orders(client):
                     # 2. Kotak Neo V2 Native Quotes Fallback (Triggers if mid-price output is 0.0)
                     if live_val <= 0:
                         try:
-                            # FIX: Build exact dictionary matrix structure expected by Kotak V2 client.quotes()
+                            # Build exact dictionary matrix structure expected by Kotak V2 client.quotes()
                             tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
                             
                             # Fire native V2 quotes request method
                             quote_res = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
                             
                             if quote_res and 'message' in quote_res:
-                                # Parse out native 'ltp' floating value out of the response arrays safely
                                 msg_data = quote_res['message']
                                 if isinstance(msg_data, list) and len(msg_data) > 0:
                                     live_val = float(msg_data[0].get('ltp', 0))
@@ -176,4 +186,5 @@ def _print_summary(total_unrealized, total_realized):
 if __name__ == "__main__": 
     client = get_session() 
     process_lilo_orders(client)
+
 
