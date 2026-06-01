@@ -10,7 +10,7 @@ from runltpspxy import get_mid_price
 init(autoreset=True) 
 
 MATCH_MODE = "TAG" 
-DEBUG_MODE = True 
+DEBUG_MODE = False 
 
 def debug_log(msg, color=Fore.BLUE): 
     if DEBUG_MODE: 
