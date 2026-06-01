@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime, date, timedelta, time as dt_time
 import pytz
 from colorama import Fore, init, Style
+from _sgnl import _pad_line_to_42  # Shared 42-character width constraint engine
 
 TICKER = "^NSEI"  
 LOT_SIZE = 65     
@@ -66,7 +67,9 @@ def execute_order(client, symbol, qty, txn_type):
         }
         res = client.place_order(**params)
         if res and str(res).strip():
-            print(Fore.CYAN + f"🚀 ORDER ROUTED | {symbol} | TYPE: {txn_type} | FIXED TAG: {order_tag}")
+            # Meaningful emoji inserted and formatted to exactly 42 chars
+            out_str = f"🚀 ROUTED|{symbol}|{txn_type}|TAG:{order_tag}"
+            print(_pad_line_to_42(out_str, "\033[96m", "\033[0m"))
         return {"stat": "OK" if res and str(res).strip() else "FAIL"}
     except Exception as e:
         return {"stat": "FAIL", "err": str(e)}
@@ -108,7 +111,9 @@ async def main():
     try:
         await trade_cycle()
     except Exception as e:
-        print(f"⚠️ Entry Check Failure: {e}")
+        # Adjusted error print layout to fit exactly 42 characters width with emoji
+        err_msg = f"⚠️ Entry Failure: {str(e)[:22]}"
+        print(_pad_line_to_42(err_msg, "\033[91m", "\033[0m"))
 
 if __name__ == "__main__":
     asyncio.run(main())
