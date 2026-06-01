@@ -1,3 +1,4 @@
+# exit_script.py 
 import pandas as pd 
 import os 
 import time 
@@ -9,9 +10,6 @@ from colorama import init, Fore, Style
 from exeomspxy import get_combined_data 
 from runclntpxy import get_session 
 from exeavgpxy import handle_side_averaging 
-
-# FIX: Dynamic import link referencing your standalone math logic module
-from exetgtpxy import target_price, PRINTED_SIDES
 
 init(autoreset=True) 
 
@@ -25,18 +23,22 @@ def get_sell_suffix():
     """Generates an explicit sell suffix code with millisecond resolution"""
     IST = pytz.timezone("Asia/Kolkata")
     ms = datetime.now(IST).strftime('%f')[:-3]
-    return f"_S{ms}" 
+    return f"_S{ms}" # Returns pattern like _S412
 
 def place_exit_order(client, row): 
     """Triggers Sell order by appending an explicit _S{ms} suffix to the entry tag.""" 
     try: 
         existing_tag = row.get('tag') 
+        
+        # Clean and extract the original entry tag baseline
         if existing_tag and str(existing_tag).lower() not in ['nan', 'none', '']: 
+            # Strip away any existing suffix tokens if present
             base_tag = str(existing_tag).split('_')[0].strip()
         else: 
             IST = pytz.timezone("Asia/Kolkata")
             base_tag = datetime.now(IST).strftime('%H%M%S')
             
+        # FIX: Structure final tag with explicit sell suffix code
         final_tag = f"{base_tag}{get_sell_suffix()}"
             
         params = { 
@@ -80,9 +82,6 @@ def verify_and_exit(client, row):
             return 
             
         pos_df = pd.DataFrame(pos_res["data"]) 
-        if pos_df.empty or 'trdSym' not in pos_df.columns:
-            return
-
         match = pos_df[pos_df['trdSym'] == symbol] 
         if not match.empty: 
             net_qty = int(match['flBuyQty'].sum()) - int(match['flSellQty'].sum()) 
@@ -96,42 +95,23 @@ def verify_and_exit(client, row):
         print(f"{Fore.RED}❌ Safety Check Crash: {e}") 
 
 def compute_st_fixed(row): 
-    """
-    Computes dashboard display metrics with normalized keys and automated math module links.
-    """
     try: 
-        # Normalize naming variations for incoming data keys from broker feeds
-        ltp = float(row.get("sell_prc") or row.get("ltp") or 0) 
-        entry = float(row.get("pxy_entry") or row.get("buy_prc") or row.get("entry_prc") or 0) 
-        
-        tgt = float(row.get("pxy_tgt") or 0)
-        if tgt <= 0:
-            # FIX: Unpack the target price integer safely from the calculation module's returned tuple
-            tgt, _ = target_price(row)
-            tgt = float(tgt)
-
-        # Catch data validation drop errors cleanly
-        if ltp <= 0 or entry <= 0 or tgt <= 0: 
-            return f"{Fore.YELLOW}%--⚪ --%{Fore.RESET}", False 
-
-        # Calculate tracking percentage deviations
+        ltp = float(row.get("sell_prc", 0)) 
+        tgt = float(row.get("pxy_tgt", 0)) 
+        entry = float(row.get("pxy_entry", 0)) 
+        if ltp <= 0 or entry <= 0: 
+            return "%00⚪ 00%", False 
         entry_pct = int(((ltp - entry) / entry) * 100) 
         tgt_pct = int(((tgt - ltp) / entry) * 100) 
-        
         entry_pct = max(-99, min(99, entry_pct)) 
         tgt_pct = max(0, min(99, tgt_pct)) 
-        
         color, dot = (Fore.GREEN, "🟢") if entry_pct > 0 else (Fore.RED, "🔴") if entry_pct < 0 else (Fore.WHITE, "⚪") 
         st_str = f"{color}%{abs(entry_pct):02d}{dot}{Fore.RESET} {tgt_pct:02d}%" 
-        
         return st_str, (ltp >= tgt) 
-    except Exception: 
-        return f"{Fore.RED}%ERR⚪ ER%{Fore.RESET}", False 
+    except: 
+        return "%00⚪ 00%", False 
 
 def run_snapshot(): 
-    # Clear the shared engine's side logging cache on each update loop
-    PRINTED_SIDES.clear()
-    
     IST = pytz.timezone("Asia/Kolkata") 
     now = datetime.now(IST).time() 
     if dt_time(15, 23) <= now < dt_time(15, 30): 
@@ -166,5 +146,3 @@ def run_snapshot():
 
 if __name__ == "__main__": 
     run_snapshot()
-
-
