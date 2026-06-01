@@ -56,14 +56,12 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # FIX: Rebuilt text parser to strictly avoid running string methods on list arrays
+        # Clean tag parser safely extracting base token strings
         def get_safe_tag(row): 
             t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
-            # First handle formatting string safely
             t_str = str(t).strip()
             if '.' in t_str:
                 t_str = t_str.split('.')[0].strip()
-            # Unpack suffix configurations
             if "_S" in t_str:
                 t_str = t_str.split('_S')[0].strip()
             elif "_" in t_str:
@@ -75,11 +73,8 @@ def process_lilo_orders(client):
         open_positions = [] 
 
         for symbol, group in df.groupby("trdSym"): 
-            # Safely handle sequence extraction tokens
             try:
                 raw_tok = str(group["tok"].iloc[0]).strip()
-                if '.' in raw_tok:
-                    raw_tok = raw_tok.split('.')[0]
                 token_id = str(int(float(raw_tok)))
             except Exception:
                 token_id = str(group["tok"].iloc[0]).strip()
@@ -117,37 +112,34 @@ def process_lilo_orders(client):
                     b["qty"] -= mqty 
 
             # ==============================================================================
-            # 🛡️ VERBOSE LIVE VALUATION FETCH ENGINE (KOTAK NEO V2 NATIVE QUOTES)
+            # 🎯 SIMPLE KOTAK NEO V2 LTP SNAPSHOT ENGINE
             # ==============================================================================
             for b in buys: 
                 if b["qty"] > 0: 
                     debug_log(f"Fetching Price -> Ticker: {symbol} | Token: {token_id} | Segment: {ex_seg}", Fore.CYAN)
                     
-                    # 1. Primary Attempt: Use your local mid price algorithm
+                    # 1. Primary Attempt: Use your local mid price logic
                     live_val = get_mid_price(client, token_id, ex_seg) 
                     debug_log(f"  -> API Response (get_mid_price): {live_val}", Fore.MAGENTA)
                     
-                    # 2. Kotak Neo V2 Native Quotes Fallback (Triggers if mid-price output is 0.0)
+                    # 2. FIX: Native Simple V2 LTP Request (Triggers cleanly on 0.0)
                     if live_val <= 0:
                         try:
-                            # Build exact dictionary matrix structure expected by Kotak V2 client.quotes()
-                            tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
+                            # Invoke Kotak Neo V2 native simplified LTP request method
+                            ltp_res = client.get_ltp(exchangeSegment=ex_seg, instrumentToken=token_id)
                             
-                            # Fire native V2 quotes request method
-                            quote_res = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
-                            
-                            if quote_res and 'message' in quote_res:
-                                msg_data = quote_res['message']
-                                if isinstance(msg_data, list) and len(msg_data) > 0:
-                                    live_val = float(msg_data[0].get('ltp', 0))
-                                    if live_val > 0:
-                                        debug_log(f"  {Fore.GREEN}✅ [KOTAK V2 SUCCESS] Recovered live price using client.quotes(): {live_val}")
+                            if ltp_res and isinstance(ltp_res, dict):
+                                # Neo API V2 returns dynamic dictionaries containing 'ltp' field references
+                                data_payload = ltp_res.get("data") or ltp_res
+                                live_val = float(data_payload.get("ltp") or data_payload.get("lastTradedPrice") or 0)
+                                if live_val > 0:
+                                    debug_log(f"  {Fore.GREEN}✅ [KOTAK V2 LTP SUCCESS] Live value fetched via get_ltp: {live_val}")
                         except Exception as v2_err:
-                            debug_log(f"  Direct Kotak Neo V2 API dynamic recovery error: {v2_err}", Fore.RED)
+                            debug_log(f"  Simple get_ltp API lookup error: {v2_err}", Fore.RED)
                     
-                    # 3. Last Resort Safety net (Only defaults to entry if the entire network drops)
+                    # 3. Final structural fallback constraint
                     if live_val <= 0:
-                        print(f"  {Fore.RED}🚨 [FEED DEAD] Complete fallback network dropout. Defaulting to buy anchor price: {b['prc']}")
+                        print(f"  {Fore.RED}🚨 [FEED DEAD] Fallback network dropout. Defaulting to entry price: {b['prc']}")
                         live_val = b["prc"]
                     
                     unrealized_pnl = int((live_val - b["prc"]) * b["qty"])
@@ -186,5 +178,4 @@ def _print_summary(total_unrealized, total_realized):
 if __name__ == "__main__": 
     client = get_session() 
     process_lilo_orders(client)
-
 
