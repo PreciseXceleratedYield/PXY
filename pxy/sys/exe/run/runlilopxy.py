@@ -60,7 +60,6 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # FIX: Rebuilt tag text extractor to cleanly avoid split array strip crashes
         def get_safe_tag(row): 
             try:
                 t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
@@ -197,3 +196,5 @@ def process_lilo_orders(client):
                             if resp and hasattr(resp, 'json'):
                                 json_out = resp.json()
                                 if isinstance(json_out, dict) and "data" in json_out:
+                                    items = json_out["data"]
+
