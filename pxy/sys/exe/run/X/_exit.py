@@ -117,14 +117,12 @@ async def exit_cycle():
     client = get_session()
     if not client: return
 
-    # 3:20 PM Boundary Checks
     if dt_time(15, 20) <= now < dt_time(15, 26):
         clear_screen()
         print(_pad_line_to_42("⏳ EOD LIMIT: 3:20 PM IST FORCED FLATTEN", Fore.RED + Style.BRIGHT, Style.RESET_ALL))
         force_global_account_flatten(client)
         return
 
-    # Buffer block checks
     if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 25) <= now < dt_time(15, 31)): 
         clear_screen()
         print(_pad_line_to_42("⏳ SYSTEM IDLE: BUFFER TIMING BLOCK", Fore.YELLOW, Style.RESET_ALL))
@@ -144,7 +142,6 @@ async def exit_cycle():
 
     ledger = reconstruct_fifo_ledger_from_tags(client, df_history)
 
-    # Output dashboard rendering scaled down to exact 42 characters layout width
     clear_screen()
     border = "==========================================" # 42 chars
     print(_pad_line_to_42("📋 STATELESS FIFO MONITOR DASHBOARD", Fore.YELLOW + Style.BRIGHT, Style.RESET_ALL))
@@ -181,9 +178,13 @@ async def exit_cycle():
 
         pnl_color = Fore.GREEN if trade_pnl >= 0 else Fore.RED
         pnl_icon = "🍏" if trade_pnl >= 0 else "🍎"
+        side_icon = "🟢" if open_trade['txn_type'] == "B" else "🔴"
         
-        # Combined trade matrix formatted precisely to fit 42 character boundaries
-        trade_line = f"[{index}] {side_str} MTM: {pnl_icon} ₹{int(trade_pnl)}"
+        # FIXED DISPLAY: Pulls the short strike profile from the symbol safely
+        clean_sym = open_trade['symbol'][-7:] if len(open_trade['symbol']) > 7 else open_trade['symbol']
+        
+        # Combined active trade matrix formatted to exactly 42 characters wide
+        trade_line = f" {side_icon} [{index}] {clean_sym} {side_str}: {pnl_icon} ₹{int(trade_pnl)}"
         print(_pad_line_to_42(trade_line, pnl_color, Style.RESET_ALL))
 
     print(_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL))
