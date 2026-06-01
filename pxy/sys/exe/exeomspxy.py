@@ -109,7 +109,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
                         for col in list(active_df.columns):
                             active_df[col.lower()] = active_df[col]
                         
-                        active_df['tag'] = active_df['tag'].astype(str).str.split('.').str[0].replace('nan', '').str.strip()
+                        active_df['tag'] = active_df['tag'].astype(str).str.split('.').str.get(0).str.replace('nan', '').str.strip()
                         
         except Exception as e:
             print(f"OMS DATA ERROR: {e}")
@@ -137,20 +137,18 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     # --- 3. DYNAMIC VALUATION UPDATE WITH LTP FALLBACK ---
     if client and get_mid_price:
         def update_metrics(row):
-            # Attempt to pull or refresh valuation metrics
             token_id = row.get("tok") or row.get("token")
             ex_seg = row.get("exseg") or row.get("exSeg") or "nse_fo"
             
-            # Query the mid price engine
+            # Query mid price
             curr_val = get_mid_price(client, token_id, ex_seg)
             
-            # FIX: If we can't get mid price, fall back to historical row LTP
+            # LTP Fallback Tracker
             if curr_val <= 0:
                 curr_val = float(row.get("sell_prc") or row.get("ltp") or row.get("LTP") or row.get("buy_prc") or 0)
                 if DEBUG and curr_val > 0:
                     print(f"{Fore.YELLOW}[OMS FALLBACK] Mid price dropped. Rescued with fallback LTP price: {curr_val}")
 
-            # Assign valid validated calculations
             if curr_val > 0:
                 row["sell_prc"] = curr_val
                 buy_avg = float(row.get("buy_prc", 0))
@@ -171,10 +169,10 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     if add_calcs:
         active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
         
-        # Unpack tuple format values safely so raw scores don't contaminate price metrics
+        # FIX: Extract only the integer target price out of the math engine's output tuple
         def safe_tgt_call(row):
             res = pxy_tgt_calc(row)
-            return res if isinstance(res, tuple) else res
+            return res[0] if isinstance(res, tuple) else res
 
         active_df["pxy_tgt"] = active_df.apply(safe_tgt_call, axis=1)
         active_df["pxy_sl"] = active_df.apply(pxy_sl_calc, axis=1)
@@ -198,17 +196,3 @@ if __name__ == "__main__":
         print(f"{'No Active Positions':^80}")
     print("="*80)
 
-    client = get_session()
-    if client and process_lilo_orders:
-        _, closed_df = process_lilo_orders(client)
-        
-        if not closed_df.empty:
-            print(f"\n{'TODAY\'S CLOSED POSITIONS (INACTIVE)':^80}")
-            print("-" * 80)
-            c_cols = ["Symbol", "Tag", "Qty", "Buy_Prc", "Sell_Prc", "PNL"]
-            print(closed_df[c_cols].to_string(index=False))
-            print("-" * 80)
-            total_pnl = closed_df['PNL'].sum()
-            color = Fore.GREEN if total_pnl >= 0 else Fore.RED
-            print(f"{'TOTAL REALIZED PNL:':<60} {color}{int(total_pnl):+d}{Style.RESET_ALL}")
-            print("=" * 80 + "\n")
