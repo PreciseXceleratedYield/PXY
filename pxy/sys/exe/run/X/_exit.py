@@ -2,6 +2,7 @@
 import sys
 import asyncio
 import os
+import json
 from datetime import datetime, time as dt_time
 import pytz
 import yfinance as yf
@@ -107,6 +108,35 @@ def force_global_account_flatten(client):
         err_msg = f"❌ Critical EOD Fail: {str(e)[:20]}"
         print(_pad_line_to_42(err_msg, Fore.RED, Style.RESET_ALL))
 
+def dump_to_json(closed_df): 
+    try: 
+        file_path = os.path.expanduser("~/pxy/pnl.json") 
+        os.makedirs(os.path.dirname(file_path), exist_ok=True) 
+        
+        IST = pytz.timezone("Asia/Kolkata")
+        if os.path.exists(file_path):
+            mtime = os.path.getmtime(file_path)
+            mtime_date = datetime.fromtimestamp(mtime, tz=pytz.utc).astimezone(IST).date()
+            current_date = datetime.now(IST).date()
+            if mtime_date < current_date:
+                try:
+                    os.remove(file_path)
+                except:
+                    pass
+
+        if closed_df.empty: 
+            data = [] 
+        else: 
+            records = closed_df.copy() 
+            for col in records.columns: 
+                if pd.api.types.is_datetime64_any_dtype(records[col]): 
+                    records[col] = records[col].dt.strftime('%Y-%m-%d %H:%M:%S') 
+            data = records.to_dict(orient='records') 
+        with open(file_path, "w") as f: 
+            json.dump(data, f, indent=4) 
+    except Exception as e: 
+        print(f"Error dumping to JSON: {e}") 
+
 async def exit_cycle():
     IST = pytz.timezone("Asia/Kolkata")
     now = datetime.now(IST).time()
@@ -153,9 +183,11 @@ async def exit_cycle():
     if not ledger:
         print(_pad_line_to_42("⚪ NO ACTIVE TRACKED POSITIONS FOUND", Fore.WHITE + Style.DIM, Style.RESET_ALL))
         print(_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL))
+        dump_to_json(pd.DataFrame())
         return
 
     exit_executed = False
+    closed_matches = []
 
     for index, open_trade in enumerate(ledger):
         trade_pnl = 0.0
@@ -190,16 +222,16 @@ async def exit_cycle():
         trade_line = f" {side_icon} [{index}] {clean_sym} {side_emoji} : {pnl_icon} ₹{pnl_str}"
         print(_pad_line_to_42(trade_line, pnl_color, Style.RESET_ALL))
 
+        closed_matches.append({
+            "Symbol": open_trade['symbol'],
+            "Qty": open_trade['qty'],
+            "Buy_Prc": open_trade['entry_ltp'] if open_trade['txn_type'] == "B" else ltp,
+            "Sell_Prc": ltp if open_trade['txn_type'] == "B" else open_trade['entry_ltp'],
+            "Exit_Time": "OPEN",
+            "PNL": pnl_val_int,
+            "IST_Timestamp": datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S')
+        })
+
+    dump_to_json(pd.DataFrame(closed_matches))
     print(_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL))
-
-# STRICTLY SINGLE-CYCLE RESTRUCTURING: Runs exactly once and exits cleanly
-async def main():
-    try:
-        await exit_cycle()
-    except Exception as e:
-        err_msg = f"⚠️ Exit Failure: {str(e)[:22]}"
-        print(_pad_line_to_42(err_msg, Fore.RED, Style.RESET_ALL))
-
-if __name__ == "__main__":
-    asyncio.run(main())
 
