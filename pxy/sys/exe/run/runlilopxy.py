@@ -2,25 +2,10 @@
 import pandas as pd 
 import json 
 import os 
-from colorama import init, Fore, Style 
 from runclntpxy import get_session 
 from runltpspxy import get_mid_price 
 
-# Initialize colorama for colored console logs
-init(autoreset=True) 
-
 MATCH_MODE = "TAG" 
-DEBUG_MODE = True 
-
-def debug_log(msg, color=Fore.BLUE): 
-    if DEBUG_MODE: 
-        print(f"{color}[DEBUG LILO] {msg}{Style.RESET_ALL}") 
-
-def _print_summary(total_unrealized, total_realized): 
-    color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
-    unreal_str = f"{int(total_unrealized):+06d}" 
-    real_str = f"{int(total_realized):+06d}" 
-    print(f"\n {unreal_str} 🔸 跑 🔸 跑 🥅  {color}{real_str}{Style.RESET_ALL} 🥅\n") 
 
 def dump_to_json(closed_df): 
     try: 
@@ -37,7 +22,7 @@ def dump_to_json(closed_df):
         with open(file_path, "w") as f: 
             json.dump(data, f, indent=4) 
     except Exception as e: 
-        print(f"{Fore.RED}Error dumping to JSON: {e}") 
+        print(f"Error dumping to JSON: {e}") 
 
 def process_lilo_orders(client): 
     try: 
@@ -60,41 +45,25 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
+        # SURGICAL FIX: Safely parse individual string elements away from list manipulation errors
         def get_safe_tag(row): 
-            try:
-                t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
-                t_str = str(t).strip()
-                if '.' in t_str:
-                    t_str = t_str.split('.')[0].strip()
-                if "_S" in t_str:
-                    t_str = t_str.split('_S')[0].strip()
-                elif "_" in t_str:
-                    t_str = t_str.split('_')[0].strip()
-                return t_str if t_str.lower() not in ["nan", "none", "null", ""] else "" 
-            except Exception:
-                return ""
+            t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
+            t_str = str(t).strip()
+            if '.' in t_str:
+                t_str = t_str.split('.')[0].strip() 
+            if "_S" in t_str:
+                t_str = t_str.split('_S')[0].strip()
+            elif "_" in t_str:
+                t_str = t_str.split('_')[0].strip()
+            return t_str if t_str.lower() not in ["nan", "none", "null", ""] else "" 
             
         df["tag"] = df.apply(get_safe_tag, axis=1) 
         closed_matches = [] 
         open_positions = [] 
 
         for symbol, group in df.groupby("trdSym"): 
-            try:
-                raw_tok = str(group["tok"].iloc[0]).strip()
-                if '.' in raw_tok:
-                    raw_tok = raw_tok.split('.')[0].strip()
-                token_id = str(int(float(raw_tok)))
-            except Exception:
-                try:
-                    token_id = str(group["tok"].iloc[0]).strip()
-                except Exception:
-                    token_id = ""
-
-            try:
-                raw_seg = str(group["exSeg"].iloc[0]).strip()
-            except Exception:
-                raw_seg = "nse_fo"
-                
+            token_id = str(group["tok"].iloc[0]).split('.')[0].strip()
+            raw_seg = str(group["exSeg"].iloc[0]).strip()
             ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
             
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records') 
@@ -122,79 +91,98 @@ def process_lilo_orders(client):
                     }) 
                     b["qty"] -= mqty 
 
-            # ==============================================================================
-            # 🛡️ 5-LAYER MULTI-PRIORITY PRICING RESCUE CHAIN MATRIX (KOTAK NEO V2)
-            # ==============================================================================
+            # SURGICAL FIX: Implemented 5-Tier Fallback Pricing Hierarchy
             for b in buys: 
                 if b["qty"] > 0: 
                     live_val = 0.0
-                    debug_log(f"Pricing Request -> Symbol: {symbol} | Token: {token_id} | Segment: {ex_seg}", Fore.WHITE)
                     
-                    # ---------------- LAYER 1: Custom Mid Price Logic ----------------
+                    # Layer 1: Local Mid Price module algorithm
                     try:
                         live_val = get_mid_price(client, token_id, ex_seg)
-                        if live_val > 0:
-                            debug_log(f"  -> Layer 1 [MID CALCULATE SUCCESS] Live Price: {live_val}", Fore.GREEN)
-                    except Exception as e1:
-                        debug_log(f"  Layer 1 Error: {e1}", Fore.RED)
+                    except:
+                        pass
                     
-                    # ---------------- LAYER 2: Native Official V2 Quotes List ----------------
-                    if live_val <= 0 and token_id:
+                    # Layer 2: Official V2 Client Quotes Array mapping
+                    if live_val <= 0:
                         try:
-                            tokens_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
-                            v2_quotes = client.quotes(instrument_tokens=tokens_payload, quote_type="ltp")
-                            
-                            if isinstance(v2_quotes, dict):
-                                data_chunk = v2_quotes.get("data") or v2_quotes.get("message") or v2_quotes
+                            t_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
+                            v2_q = client.quotes(instrument_tokens=t_payload, quote_type="ltp")
+                            if isinstance(v2_q, dict):
+                                data_chunk = v2_q.get("data") or v2_q.get("message") or v2_q
                                 if isinstance(data_chunk, list) and len(data_chunk) > 0:
-                                    first_item = data_chunk[0]
-                                    if isinstance(first_item, dict):
-                                        live_val = float(first_item.get("ltp") or first_item.get("lastTradedPrice") or 0)
+                                    live_val = float(data_chunk[0].get("ltp") or data_chunk[0].get("lastTradedPrice") or 0)
                                 elif isinstance(data_chunk, dict):
                                     live_val = float(data_chunk.get("ltp") or data_chunk.get("lastTradedPrice") or 0)
-                            elif isinstance(v2_quotes, list) and len(v2_quotes) > 0:
-                                first_item = v2_quotes[0]
-                                if isinstance(first_item, dict):
-                                    live_val = float(first_item.get("ltp") or first_item.get("lastTradedPrice") or 0)
-                                
-                            if live_val > 0:
-                                debug_log(f"  -> Layer 2 [V2 QUOTES NATIVE SUCCESS] Live Price: {live_val}", Fore.GREEN)
-                        except Exception as e2:
-                            debug_log(f"  Layer 2 Error: {e2}", Fore.RED)
+                            elif isinstance(v2_q, list) and len(v2_q) > 0:
+                                live_val = float(v2_q[0].get("ltp") or v2_q[0].get("lastTradedPrice") or 0)
+                        except:
+                            pass
 
-                    # ---------------- LAYER 3: Scrip Master Info Matching ----------------
-                    if live_val <= 0 and token_id:
+                    # Layer 3: Master Scrip Search data block query
+                    if live_val <= 0:
                         try:
-                            scrip_res = client.search_scrip(exchangeSegment=ex_seg, instrumentToken=str(token_id))
-                            if isinstance(scrip_res, list) and len(scrip_res) > 0:
-                                first_item = scrip_res[0]
-                                if isinstance(first_item, dict):
-                                    live_val = float(first_item.get("ltp") or first_item.get("lastPrice") or 0)
-                            elif isinstance(scrip_res, dict):
-                                live_val = float(scrip_res.get("ltp") or scrip_res.get("lastPrice") or 0)
-                                
-                            if live_val > 0:
-                                debug_log(f"  -> Layer 3 [V2 SCRIP SEARCH SUCCESS] Live Price: {live_val}", Fore.GREEN)
-                        except Exception as e3:
-                            debug_log(f"  Layer 3 Error: {e3}", Fore.RED)
+                            scr_res = client.search_scrip(exchangeSegment=ex_seg, instrumentToken=str(token_id))
+                            if isinstance(scr_res, list) and len(scr_res) > 0:
+                                live_val = float(scr_res[0].get("ltp") or scr_res[0].get("lastPrice") or 0)
+                            elif isinstance(scr_res, dict):
+                                live_val = float(scr_res.get("ltp") or scr_res.get("lastPrice") or 0)
+                        except:
+                            pass
 
-                    # ---------------- LAYER 4: REST Client Raw HTTP Backdoor ----------------
-                    if live_val <= 0 and token_id and hasattr(client, 'rest_client'):
+                    # Layer 4: Direct REST client HTTP backend backdoor 
+                    if live_val <= 0 and hasattr(client, 'rest_client'):
                         try:
-                            header_params = {
-                                "Sid": client.configuration.edit_sid,
-                                "Auth": client.configuration.edit_token,
-                                "Content-Type": "application/x-www-form-urlencoded"
-                            }
-                            body_params = {
-                                "tokens": f"{ex_seg}|{token_id}",
-                                "quoteType": "ltp"
-                            }
+                            h_params = {"Sid": client.configuration.edit_sid, "Auth": client.configuration.edit_token, "Content-Type": "application/x-www-form-urlencoded"}
+                            b_params = {"tokens": f"{ex_seg}|{token_id}", "quoteType": "ltp"}
                             URL = client.configuration.get_url_details("view_quotes")
-                            resp = client.rest_client.request(url=URL, method='POST', headers=header_params, body=body_params)
-                            
+                            resp = client.rest_client.request(url=URL, method='POST', headers=h_params, body=b_params)
                             if resp and hasattr(resp, 'json'):
-                                json_out = resp.json()
-                                if isinstance(json_out, dict) and "data" in json_out:
-                                    items = json_out["data"]
+                                js_out = resp.json()
+                                if isinstance(js_out, dict) and "data" in js_out:
+                                    items = js_out["data"]
+                                    if isinstance(items, list) and len(items) > 0:
+                                        live_val = float(items[0].get("ltp") or items[0].get("lastTradedPrice") or 0)
+                                    elif isinstance(items, dict):
+                                        live_val = float(items.get("ltp") or items.get("lastTradedPrice") or 0)
+                        except:
+                            pass
 
+                    # Layer 5: Fallback absolute security shield -> Buy Entry Price
+                    if live_val <= 0:
+                        live_val = b["prc"]
+
+                    open_positions.append({ 
+                        "Symbol": symbol, 
+                        "Qty": b["qty"], 
+                        "tok": token_id, 
+                        "tag": b["tag"], 
+                        "Buy_Time": b["dt"], 
+                        "Buy_Prc": b["prc"], 
+                        "Exit_Time": "OPEN", 
+                        "Sell_Prc": live_val, 
+                        "PNL": int((live_val - b["prc"]) * b["qty"]) 
+                    }) 
+
+        open_df = pd.DataFrame(open_positions) 
+        closed_df = pd.DataFrame(closed_matches) 
+        total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0 
+        total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0 
+        _print_summary(total_unrealized, total_realized) 
+        dump_to_json(closed_df) 
+        return open_df, closed_df 
+    except Exception as e: 
+        print(f"[TAG MATCH ERROR]: {e}") 
+        _print_summary(0, 0) 
+        return pd.DataFrame(), pd.DataFrame() 
+
+def _print_summary(total_unrealized, total_realized): 
+    from colorama import Fore, Style, init 
+    init(autoreset=True) 
+    color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
+    unreal_str = f"{int(total_unrealized):+06d}" 
+    real_str = f"{int(total_realized):+06d}" 
+    print(f"\n {unreal_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅  {color}{real_str}{Style.RESET_ALL} 🥅\n") 
+
+if __name__ == "__main__": 
+    client = get_session() 
+    process_lilo_orders(client)
