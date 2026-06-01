@@ -8,6 +8,7 @@ from colorama import Fore, init, Style
 from _sgnl import _pad_line_to_42
 from _ltp import get_option_live_ltp  # Uses your 5-tier fallback script
 from _clnt import get_session
+from _pnl import log_closed_trade      # Imported isolated function directly
 
 LOT_SIZE = 65
 MIN_EXIT_PROFIT = 200
@@ -217,16 +218,17 @@ async def exit_cycle():
             pnl = (option_ltp - t["entry_price"]) * t["qty"]
             if entry_signal in ["SELL", "BEAR"] and pnl > MIN_EXIT_PROFIT:
                 if execute_exit(client, t["symbol"], t["qty"], "S", t["tag"]):
+                    log_closed_trade(t["symbol"], t["qty"], t["tag"], t["token"], t["entry_price"], option_ltp, pnl, "B")
                     continue  
 
         elif t["txn_type"] == "S":
             pnl = (t["entry_price"] - option_ltp) * t["qty"]
             if entry_signal in ["BUY", "BULL"] and pnl > MIN_EXIT_PROFIT:
                 if execute_exit(client, t["symbol"], t["qty"], "B", t["tag"]):
+                    log_closed_trade(t["symbol"], t["qty"], t["tag"], t["token"], t["entry_price"], option_ltp, pnl, "S")
                     continue  
 
         color = Fore.GREEN if pnl >= 0 else Fore.RED
-        # Displaying granular metrics directly tracked via the unique order tag
         print(_pad_line_to_42(
             f"[{i}] {t['tag']} PnL:{int(pnl)}",
             color,
