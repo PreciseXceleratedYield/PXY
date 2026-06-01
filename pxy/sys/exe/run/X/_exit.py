@@ -2,7 +2,6 @@
 import sys
 import asyncio
 import os
-import json
 from datetime import datetime, time as dt_time
 import pytz
 import yfinance as yf
@@ -108,87 +107,6 @@ def force_global_account_flatten(client):
         err_msg = f"❌ Critical EOD Fail: {str(e)[:20]}"
         print(_pad_line_to_42(err_msg, Fore.RED, Style.RESET_ALL))
 
-def dump_to_json(current_live_list): 
-    try: 
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        file_path = os.path.join(current_dir, "pnl.json")
-        
-        IST = pytz.timezone("Asia/Kolkata")
-        existing_records = []
-
-        if os.path.exists(file_path):
-            mtime = os.path.getmtime(file_path)
-            mtime_date = datetime.fromtimestamp(mtime, tz=pytz.utc).astimezone(IST).date()
-            current_date = datetime.now(IST).date()
-            
-            if mtime_date < current_date:
-                try:
-                    os.remove(file_path)
-                except:
-                    pass
-            else:
-                try:
-                    with open(file_path, "r") as f:
-                        existing_records = json.load(f)
-                        if not isinstance(existing_records, list):
-                            existing_records = []
-                except:
-                    pass
-
-        # Build lookup tables to match state changes safely across script executions
-        historical_closed = [r for r in existing_records if r.get("Exit_Time") != "OPEN"]
-        previously_open = [r for r in existing_records if r.get("Exit_Time") == "OPEN"]
-        
-        # Track symbol occurrences in the current active frame to align matching indices
-        current_live_counts = {}
-        processed_live_entries = []
-
-        for item in current_live_list:
-            sym = item["Symbol"]
-            idx = current_live_counts.get(sym, 0)
-            current_live_counts[sym] = idx + 1
-            
-            # Map index unique footprint key directly onto item properties
-            item["_state_key"] = f"{sym}_{idx}"
-            processed_live_entries.append(item)
-
-        # Re-verify and isolate open positions from previous execution frames
-        prev_open_counts = {}
-        for item in previously_open:
-            sym = item["Symbol"]
-            idx = prev_open_counts.get(sym, 0)
-            prev_open_counts[sym] = idx + 1
-            
-            state_key = f"{sym}_{idx}"
-            
-            # If an item was active before but missing now, lock it as inactive (CLOSED)
-            if not any(live.get("_state_key") == state_key for live in processed_live_entries):
-                item["Exit_Time"] = datetime.now(IST).strftime('%Y-%m-%d %H:%M:%S')
-                historical_closed.append(item)
-
-        # Clean state fields before dumping data
-        for live_item in processed_live_entries:
-            if "_state_key" in live_item:
-                del live_item["_state_key"]
-
-        # Final export includes historically closed data mixed with latest tracked snapshots
-        final_dataset = historical_closed + processed_live_entries
-        
-        # DataFrame conversion handles datetime type standardization dynamically
-        df_temp = pd.DataFrame(final_dataset)
-        if not df_temp.empty:
-            for col in df_temp.columns:
-                if pd.api.types.is_datetime64_any_dtype(df_temp[col]):
-                    df_temp[col] = df_temp[col].dt.strftime('%Y-%m-%d %H:%M:%S')
-            data_to_dump = df_temp.to_dict(orient='records')
-        else:
-            data_to_dump = []
-
-        with open(file_path, "w") as f: 
-            json.dump(data_to_dump, f, indent=4) 
-    except Exception as e: 
-        print(f"Error dumping to JSON: {e}") 
-
 async def exit_cycle():
     IST = pytz.timezone("Asia/Kolkata")
     now = datetime.now(IST).time()
@@ -235,12 +153,53 @@ async def exit_cycle():
     if not ledger:
         print(_pad_line_to_42("⚪ NO ACTIVE TRACKED POSITIONS FOUND", Fore.WHITE + Style.DIM, Style.RESET_ALL))
         print(_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL))
-        dump_to_json([])
         return
 
     exit_executed = False
-    current_live_snapshot = []
 
+    for index, open_trade in enumerate(ledger):
+        trade_pnl = 0.0
+        
+        if open_trade['txn_type'] == "B":
+            trade_pnl = (ltp - open_trade['entry_ltp']) * LOT_SIZE
+            side_emoji = "➕"  # Heavy Plus Emoji
+            if entry_signal in ["SELL", "BEAR"] and trade_pnl > MIN_EXIT_PROFIT and not exit_executed:
+                if execute_exit(client, open_trade['symbol'], open_trade['qty'], "S"):
+                    exit_executed = True
+                    break
 
+        elif open_trade['txn_type'] == "S":
+            trade_pnl = (open_trade['entry_ltp'] - ltp) * LOT_SIZE
+            side_emoji = "➖"  # Heavy Minus Emoji
+            if entry_signal in ["BUY", "BULL"] and trade_pnl > MIN_EXIT_PROFIT and not exit_executed:
+                if execute_exit(client, open_trade['symbol'], open_trade['qty'], "B"):
+                    exit_executed = True
+                    break
 
+        pnl_color = Fore.GREEN if trade_pnl >= 0 else Fore.RED
+        pnl_icon = "🍏" if trade_pnl >= 0 else "🍎"
+        side_icon = "🟢" if open_trade['txn_type'] == "B" else "🔴"
+        
+        clean_sym = open_trade['symbol'][-7:] if len(open_trade['symbol']) > 7 else open_trade['symbol']
+        
+        # Forces + or - inside the PNL field dynamically
+        pnl_val_int = int(trade_pnl)
+        pnl_str = f"+{pnl_val_int}" if pnl_val_int >= 0 else f"{pnl_val_int}"
+        
+        # Combined active trade matrix formatted to exactly 42 characters wide with equal-length emojis
+        trade_line = f" {side_icon} [{index}] {clean_sym} {side_emoji} : {pnl_icon} ₹{pnl_str}"
+        print(_pad_line_to_42(trade_line, pnl_color, Style.RESET_ALL))
+
+    print(_pad_line_to_42(border, Fore.YELLOW, Style.RESET_ALL))
+
+# STRICTLY SINGLE-CYCLE RESTRUCTURING: Runs exactly once and exits cleanly
+async def main():
+    try:
+        await exit_cycle()
+    except Exception as e:
+        err_msg = f"⚠️ Exit Failure: {str(e)[:22]}"
+        print(_pad_line_to_42(err_msg, Fore.RED, Style.RESET_ALL))
+
+if __name__ == "__main__":
+    asyncio.run(main())
 
