@@ -179,9 +179,9 @@ if bar_index >= 1
     
     // EXCLUSIVE PRIORITY MATRIX SYNCED DIRECTLY WITH SWAPPED PYTHON LOGIC
     if force_buy
-        is_buy_signal  := true   // Lower Boundary Line Interaction -> FORCEBUY
-    else if force_sell
         is_sell_signal := true   // Upper Boundary Line Interaction -> FORCESELL
+    else if force_sell
+        is_buy_signal  := true   // Lower Boundary Line Interaction -> FORCEBUY
     else if cross_buy
         is_buy_signal  := true   // CROSSBUY
     else if cross_sell
