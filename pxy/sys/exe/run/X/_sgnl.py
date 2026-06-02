@@ -74,7 +74,7 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
         (c1, c1_emoji, f" C1-{c1:.2f}", "█", c1_color),
         (c0, c0_emoji, f" C0-{c0:.2f}", "█", c0_color)
     ]
-    rows.sort(key=lambda item: item[0], reverse=True)
+    rows.sort(key=lambda item: item, reverse=True)
 
     # Print 42-width Header
     print(f"\n{_pad_line_to_42(header_text, YLW, RST)}")
@@ -159,7 +159,6 @@ def calculate_no_repaint_signals(df):
         signal = "BEAR"  # Running candle continues the red trend state
 
     # --- RENDER VISUAL PRINT BAR MATRIX ---
-    # Safe index check to avoid errors if dataframe contains fewer than 3 elements
     has_three = len(closes) >= 3
     _print_console_bar(
         c2=closes[-3] if has_three else closes[-2], 
@@ -235,4 +234,29 @@ def export_chart_json(df, lookback=42):
             
     except Exception as e:
         print(f"Error exporting JSON: {e}")
+
+def get_all_data():
+    """
+    Saves and exposes data to the _entry.py execution script 
+    by extracting the latest trend state out of the exported JSON node.
+    """
+    try:
+        if not os.path.exists(JSON_OUTPUT):
+            return {"entry": "NONE", "price": 0.0}
+            
+        with open(JSON_OUTPUT, "r") as f:
+            data_list = json.load(f)
+            
+        if not data_list or len(data_list) == 0:
+            return {"entry": "NONE", "price": 0.0}
+            
+        # Extract the latest live processed candle entry 
+        latest_node = data_list[-1]
+        
+        return {
+            "entry": latest_node.get("st_trend", "NONE"),
+            "price": latest_node.get("close", 0.0)
+        }
+    except Exception:
+        return {"entry": "NONE", "price": 0.0}
 
