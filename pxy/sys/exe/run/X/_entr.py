@@ -1,4 +1,4 @@
-# _entry.py
+# _entr.py
 import sys
 import asyncio
 from datetime import datetime, date, timedelta, time as dt_time
@@ -151,4 +151,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
