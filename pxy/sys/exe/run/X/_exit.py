@@ -84,7 +84,6 @@ def reconstruct_fifo_ledger_from_orders(client):
             if qty <= 0: 
                 continue
 
-            # --- 🚫 STRICT FILTER WINDOW 🚫 ---
             # If volume netting is 0 OR tag match confirms closed, filter it out completely
             if symbol_net_qty.get(sym, 0) == 0 or tag in closed_tags:
                 continue
@@ -261,7 +260,7 @@ async def exit_cycle():
             pnl = (t["entry_price"] - option_ltp) * t["qty"]
             
             # STRICT AND LOGIC: Must be profitable AND trend must reverse to exit
-            if pnl >= MIN_EXIT_PROFIT and entry_signal in ["BUY", "BULL"]:
+            if pnl >= MIN_EXIT_PROVISO and entry_signal in ["BUY", "BULL"]:
                 trigger_exit = True
 
             if trigger_exit:
@@ -287,4 +286,4 @@ async def main():
         print(_pad_line_to_42(f"❌ Exit Failure: {str(e)[:22]}", Fore.RED, Style.RESET_ALL))
 
 if __name__ == "__main__":
-
+    asyncio.run(main())
