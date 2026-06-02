@@ -1,19 +1,23 @@
 # _map.py
 import asyncio
 import pandas as pd
+from datetime import datetime, time as dt_time
 from colorama import Fore, init, Style
 from _sgnl import _pad_line_to_42
 from _clnt import get_session
 
 init(autoreset=True)
 
-def get_active_strategy_ledger(client, diagnostic_mode=False):
+def get_active_strategy_ledger(client, diagnostic_mode=False, cutoff_time_str="00:00"):
     """
-    Scans broker order logs, nets out volumes by option symbol to handle 
-    manual exits, matches automated tracking tags, filters out specific broker
-    tags containing 'V1L58', and returns a clean Pandas DataFrame of live trades.
+    Scans broker order logs, nets out volumes by option symbol to handle manual exits,
+    matches automated tracking tags, filters out specific broker tags containing 'V1L58',
+    and ignores any strategy tag that was generated before the configurable cutoff time.
     """
     try:
+        # Parse the user's configurable cutoff string (Format HH:MM)
+        cutoff_dt = datetime.strptime(cutoff_time_str, "%H:%M").time()
+        
         order_res = client.order_report()  
         orders = order_res.get("data", []) if isinstance(order_res, dict) else order_res
         if not isinstance(orders, list):
@@ -45,6 +49,7 @@ def get_active_strategy_ledger(client, diagnostic_mode=False):
         raw_entries = {}
         closed_tags = set()
         v1l58_ignored_tags = set()
+        time_ignored_tags = set()
 
         # Step 2A: Collect entry tags closed via standard automated '_X' suffixes
         for o in orders:
@@ -53,7 +58,6 @@ def get_active_strategy_ledger(client, diagnostic_mode=False):
                 continue
             tag = str(o.get("tag") or o.get("ordModNo") or "").strip().upper()
             
-            # Filter out and track any exit tags containing V1L58
             if "V1L58" in tag:
                 v1l58_ignored_tags.add(tag)
                 continue
@@ -70,13 +74,25 @@ def get_active_strategy_ledger(client, diagnostic_mode=False):
             tag = str(o.get("tag") or o.get("ordModNo") or "").strip().upper()
             sym = str(o.get("trdSym", "")).strip().upper()
             
-            # ✅ STRICT FILTER: Drop order immediately if the tag contains V1L58
             if "V1L58" in tag:
                 v1l58_ignored_tags.add(tag)
                 continue
             
             if not (tag.endswith("_B") or tag.endswith("_S")): 
                 continue
+
+            # --- ⏳ CONFIGURABLE TIMESTAMP FILTER LAYER ---
+            try:
+                # Extract the HHMMSS substring directly from the front of your tag (e.g. "095936_B")
+                tag_time_str = tag.split('_')[0]
+                tag_time = datetime.strptime(tag_time_str, "%H%M%S").time()
+                
+                # Drop lot instantly if it was executed prior to your configurable cutoff window
+                if tag_time < cutoff_dt:
+                    time_ignored_tags.add(f"{tag} ({tag_time_str[:2]}:{tag_time_str[2:4]}:{tag_time_str[4:]})")
+                    continue
+            except:
+                pass # Safe fallback for tags that don't match timestamp structures
 
             qty = int(float(o.get("fldQty", 0)))
             if qty <= 0: 
@@ -97,7 +113,6 @@ def get_active_strategy_ledger(client, diagnostic_mode=False):
 
         for tag, details in raw_entries.items():
             sym = details["symbol"]
-            # Netted out via manual exit OR tag matches an explicit closure
             if symbol_net_qty.get(sym, 0) == 0 or tag in closed_tags:
                 closed_trades.append(details)
             else:
@@ -105,6 +120,12 @@ def get_active_strategy_ledger(client, diagnostic_mode=False):
 
         # --- DIAGNOSTIC PASS (Only triggers when running _map.py directly) ---
         if diagnostic_mode:
+            print("\n" + "=" * 50)
+            print(f"⏳ IGNORED STRATEGY TAGS BEFORE CUTOFF TIME: {cutoff_time_str} ({len(time_ignored_tags)})")
+            print("=" * 50)
+            for tt in sorted(time_ignored_tags):
+                print(f"  ⏰ TIME EXCLUDED -> {tt}")
+
             print("\n" + "=" * 50)
             print(f"🚫 EXCLUDED SYSTEM TAGS CONTAINING 'V1L58' ({len(v1l58_ignored_tags)})")
             print("=" * 50)
@@ -126,7 +147,6 @@ def get_active_strategy_ledger(client, diagnostic_mode=False):
                 print(f"  🔥 ACTIVE -> {ot['tag']} | {ot['symbol']} | Qty: {ot['qty']} @ {ot['entry_price']:.2f}")
             print("=" * 50)
 
-        # Strictly return ONLY the open strategy trades as a clean processing DataFrame
         if not open_trades:
             return pd.DataFrame()
             
@@ -142,8 +162,10 @@ async def main():
     if not client: 
         print("❌ Connection failed.")
         return
-    get_active_strategy_ledger(client, diagnostic_mode=True)
+    # Run standalone text diagnostics with a strict test cutoff pass
+    get_active_strategy_ledger(client, diagnostic_mode=True, cutoff_time_str="10:48")
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
