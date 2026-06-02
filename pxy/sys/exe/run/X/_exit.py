@@ -157,7 +157,7 @@ async def process_stateful_exits(client):
         
         pnl_color = Fore.GREEN if booked_pnl >= 0 else Fore.RED
         print(_pad_line_to_42(f"✅ COMPLETED TRADES : {len(completed_trades)}", Fore.WHITE, Style.RESET_ALL))
-        print(_pad_line_to_42(f"💰 BOOKED PnL      : Rs.{booked_pnl:.2f}", pnl_color + Style.BRIGHT, Style.RESET_ALL))
+        print(_pad_line_to_42(f"💰 BOOKED PnL       : Rs.{booked_pnl:.2f}", pnl_color + Style.BRIGHT, Style.RESET_ALL))
         print(_pad_line_to_42(f"🔓 ACTIVE / OPEN    : {len(open_trades)}", Fore.WHITE, Style.RESET_ALL))
         print(_pad_line_to_42(border, Fore.BLUE, Style.RESET_ALL))
 
