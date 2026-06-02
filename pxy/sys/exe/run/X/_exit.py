@@ -11,8 +11,12 @@ from _clnt import get_session
 from _pnl import log_closed_trade      
 from _map import get_active_strategy_ledger  
 
+# =====================================================================
+# 🎛️ USER CONFIGURABLE STRATEGY MATRIX SETTINGS
+# =====================================================================
+MIN_EXIT_PROFIT = 500         # Rupee baseline target barrier threshold
+STRATEGY_CUTOFF_TIME = "10:48" # 📊 ✅ Ignores all tags executed BEFORE this time
 LOT_SIZE = 65
-MIN_EXIT_PROFIT = 500  
 
 init(autoreset=True)
 
@@ -81,13 +85,15 @@ async def exit_cycle():
 
     if index_ltp == 0 or not entry_signal: return
 
-    df_ledger = get_active_strategy_ledger(client, diagnostic_mode=False)
+    # ✅ TRANSMITS CONFIGURABLE TIME CUTOFF VALUE TO THE MATRIX PARSER MODULE
+    df_ledger = get_active_strategy_ledger(client, diagnostic_mode=False, cutoff_time_str=STRATEGY_CUTOFF_TIME)
 
     clear_screen()
     print(_pad_line_to_42("📋 EXIT DASHBOARD", Fore.YELLOW + Style.BRIGHT, Style.RESET_ALL))
     print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
     print(_pad_line_to_42(f"INDEX LTP : {index_ltp}", Fore.CYAN, Style.RESET_ALL))
     print(_pad_line_to_42(f"SIGNAL    : {entry_signal}", Fore.MAGENTA, Style.RESET_ALL))
+    print(_pad_line_to_42(f"CUTOFF    : >= {STRATEGY_CUTOFF_TIME}", Fore.WHITE, Style.RESET_ALL))
     print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
 
     if df_ledger.empty:
