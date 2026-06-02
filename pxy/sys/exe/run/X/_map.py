@@ -10,8 +10,8 @@ init(autoreset=True)
 def get_active_strategy_ledger(client, diagnostic_mode=False):
     """
     Scans broker order logs, nets out volumes by option symbol to handle 
-    manual exits, matches automated tracking tags, and returns a clean 
-    Pandas DataFrame containing only live, unmatched strategy positions.
+    manual exits, matches automated tracking tags, filters out specific broker
+    tags containing 'V1L58', and returns a clean Pandas DataFrame of live trades.
     """
     try:
         order_res = client.order_report()  
@@ -44,6 +44,7 @@ def get_active_strategy_ledger(client, diagnostic_mode=False):
         # STAGE 2: PARSING AUTOMATED REVERSAL TAG MODULES
         raw_entries = {}
         closed_tags = set()
+        v1l58_ignored_tags = set()
 
         # Step 2A: Collect entry tags closed via standard automated '_X' suffixes
         for o in orders:
@@ -51,6 +52,12 @@ def get_active_strategy_ledger(client, diagnostic_mode=False):
             if status != "complete": 
                 continue
             tag = str(o.get("tag") or o.get("ordModNo") or "").strip().upper()
+            
+            # Filter out and track any exit tags containing V1L58
+            if "V1L58" in tag:
+                v1l58_ignored_tags.add(tag)
+                continue
+                
             if tag.endswith("_X"):
                 parent_tag = tag[:-2]
                 closed_tags.add(parent_tag)
@@ -62,6 +69,11 @@ def get_active_strategy_ledger(client, diagnostic_mode=False):
                 continue
             tag = str(o.get("tag") or o.get("ordModNo") or "").strip().upper()
             sym = str(o.get("trdSym", "")).strip().upper()
+            
+            # ✅ STRICT FILTER: Drop order immediately if the tag contains V1L58
+            if "V1L58" in tag:
+                v1l58_ignored_tags.add(tag)
+                continue
             
             if not (tag.endswith("_B") or tag.endswith("_S")): 
                 continue
@@ -94,6 +106,12 @@ def get_active_strategy_ledger(client, diagnostic_mode=False):
         # --- DIAGNOSTIC PASS (Only triggers when running _map.py directly) ---
         if diagnostic_mode:
             print("\n" + "=" * 50)
+            print(f"🚫 EXCLUDED SYSTEM TAGS CONTAINING 'V1L58' ({len(v1l58_ignored_tags)})")
+            print("=" * 50)
+            for vt in sorted(v1l58_ignored_tags):
+                print(f"  ❌ IGNORED -> {vt}")
+
+            print("\n" + "=" * 50)
             print(f"🔒 CLOSED / MATCHED STRATEGY TRADES ({len(closed_trades)})")
             print("=" * 50)
             for ct in sorted(closed_trades, key=lambda x: x['tag']):
@@ -108,7 +126,7 @@ def get_active_strategy_ledger(client, diagnostic_mode=False):
                 print(f"  🔥 ACTIVE -> {ot['tag']} | {ot['symbol']} | Qty: {ot['qty']} @ {ot['entry_price']:.2f}")
             print("=" * 50)
 
-        # Strictly return ONLY the open trades as a clean processing DataFrame
+        # Strictly return ONLY the open strategy trades as a clean processing DataFrame
         if not open_trades:
             return pd.DataFrame()
             
@@ -124,7 +142,6 @@ async def main():
     if not client: 
         print("❌ Connection failed.")
         return
-    # Triggers diagnostic prints but keeps return isolated
     get_active_strategy_ledger(client, diagnostic_mode=True)
 
 if __name__ == "__main__":
