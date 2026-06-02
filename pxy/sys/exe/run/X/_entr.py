@@ -85,37 +85,61 @@ async def trade_cycle():
     data = get_all_data()
     entry_signal = str(data.get("entry", "")).upper().strip()
     ltp = float(data.get("price", 0))
-    if ltp == 0 or entry_signal not in ["BUY", "SELL"]: return
-
+    if ltp == 0 or entry_signal not in ["BUY", "BULL", "SELL", "BEAR"]: return
+   
     client = get_session()
     if not client: return
     
     summary = get_global_position_summary(client)
     global_longs, global_shorts = summary["long"], summary["short"]
 
-    # Maximum safety locking mechanism
-    if global_longs >= 1 and global_shorts >= 1: 
-        print(_pad_line_to_42("🔒 HOLD | POS EXIST | NO TRADE ADDED", "\033[93m", "\033[0m"))
+    # --- GLOBAL QUANTITY PROTECTION CONDITIONS ---
+    current_buy_qty = global_longs * LOT_SIZE
+    current_sell_qty = global_shorts * LOT_SIZE
+
+    # Block new buys if already at or over 65 qty (unless we need to square off a short)
+    if entry_signal in ["BUY", "BULL"] and current_buy_qty >= 65 and global_shorts == 0:
+        print(_pad_line_to_42("🔒 GLOBAL BLOCK | BUY MAX REACHED (65)", "\033[93m", "\033[0m"))
         return
 
-    # --- BUY SIGNAL EXECUTION PIPELINE ---
-    if entry_signal == "BUY":
-        if global_longs < global_shorts or (global_longs == 0 and global_shorts == 0):
+    # Block new shorts if already at or over 65 qty (unless we need to square off a long)
+    if entry_signal in ["SELL", "BEAR"] and current_sell_qty >= 65 and global_longs == 0:
+        print(_pad_line_to_42("🔒 GLOBAL BLOCK | SELL MIN REACHED (-65)", "\033[93m", "\033[0m"))
+        return
+
+    # --- BUY / BULL SIGNAL EXECUTION PIPELINE ---
+    if entry_signal in ["BUY", "BULL"]:
+        if global_shorts > 0:
+            print(_pad_line_to_42("🔄 EXITING BEAR | SQUARING OFF", "\033[95m", "\033[0m"))
+            base_100 = round(ltp / 100) * 100
+            target_strike = base_100 - 50 if abs(ltp - (base_100 - 50)) < abs(ltp - (base_100 + 50)) else base_100 + 50
+            symbol = get_nifty_symbol(target_strike)
+            execute_order(client, symbol, LOT_SIZE, "B")
+            return
+
+        if global_longs == 0:
             target_strike = round(ltp / 100) * 100
             symbol = get_nifty_symbol(target_strike)
             execute_order(client, symbol, LOT_SIZE, "B")
         else:
-            print(_pad_line_to_42("🔒 HOLD | POS EXIST | NO TRADE ADDED", "\033[93m", "\033[0m"))
+            print(_pad_line_to_42("🔒 HOLD | BULL ACTIVE | NO ADD", "\033[93m", "\033[0m"))
 
-    # --- SELL SIGNAL EXECUTION PIPELINE ---
-    elif entry_signal == "SELL":
-        if global_shorts < global_longs or (global_longs == 0 and global_shorts == 0):
+    # --- SELL / BEAR SIGNAL EXECUTION PIPELINE ---
+    elif entry_signal in ["SELL", "BEAR"]:
+        if global_longs > 0:
+            print(_pad_line_to_42("🔄 EXITING BULL | SQUARING OFF", "\033[95m", "\033[0m"))
+            target_strike = round(ltp / 100) * 100
+            symbol = get_nifty_symbol(target_strike)
+            execute_order(client, symbol, LOT_SIZE, "S")
+            return
+
+        if global_shorts == 0:
             base_100 = round(ltp / 100) * 100
             target_strike = base_100 - 50 if abs(ltp - (base_100 - 50)) < abs(ltp - (base_100 + 50)) else base_100 + 50
             symbol = get_nifty_symbol(target_strike)
             execute_order(client, symbol, LOT_SIZE, "S")
         else:
-            print(_pad_line_to_42("🔒 HOLD | POS EXIST | NO TRADE ADDED", "\033[93m", "\033[0m"))
+            print(_pad_line_to_42("🔒 HOLD | BEAR ACTIVE | NO ADD", "\033[93m", "\033[0m"))
 
 # STRICTLY SINGLE-CYCLE RESTRUCTURING: Runs exactly once and exits cleanly
 async def main():
@@ -127,5 +151,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 
