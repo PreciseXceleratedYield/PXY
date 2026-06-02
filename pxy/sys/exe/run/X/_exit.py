@@ -32,7 +32,7 @@ def save_trades(trades):
 def sync_database_from_broker_logs(client):
     """
     Downloads raw broker logs, automatically identifies executed trades,
-    and dynamically builds/repairs trades.json with official pricing data.
+    and dynamically purges rejected/malformed rogue entries from trades.json.
     """
     try:
         order_res = client.order_report()
@@ -41,23 +41,28 @@ def sync_database_from_broker_logs(client):
 
         trades = load_trades()
         completed_exits = set()
+        valid_broker_entries = set()
 
         # Step A: Aggregate all valid completed strategy exit strings
         for o in orders:
-            if str(o.get("stat", "")).strip().lower() != "complete": continue
+            status = str(o.get("stat", "")).strip().lower()
+            if status != "complete": continue
             tag = str(o.get("tag", "")).strip().upper()
             if tag.endswith("_ENTRY_EXIT"):
                 parent_tag = tag.replace("_EXIT", "")
                 completed_exits.add(parent_tag)
+            if tag.endswith("_ENTRY"):
+                valid_broker_entries.add(tag)
 
         # Step B: Identify raw broker entry tags and map to ledger rows
         for o in orders:
-            if str(o.get("stat", "")).strip().lower() != "complete": continue
+            status = str(o.get("stat", "")).strip().lower()
+            if status != "complete": continue
             tag = str(o.get("tag", "")).strip().upper()
             
             if not tag.endswith("_ENTRY"): continue
 
-            # If an order executed on the exchange but isn't inside our file yet, initialize it
+            # If an order executed successfully on the exchange but isn't inside our file yet, initialize it
             if tag not in trades:
                 trades[tag] = {
                     "entry_tag": tag,
@@ -83,6 +88,17 @@ def sync_database_from_broker_logs(client):
                         trades[tag]["exit_price"] = float(o.get("avgPrc", 0))
                         break
 
+        # =====================================================================
+        # 🔥 CRITICAL SAFETY SHIELD: AUTO-PURGE ROGUE / REJECTED TRADES
+        # =====================================================================
+        for tag in list(trades.keys()):
+            if trades[tag]["status"] == "OPEN":
+                # Condition 1: If the trade exists in JSON but NEVER hit the broker's logs as complete
+                # Condition 2: Or if it is stuck with a 0.0 entry price and no execution token
+                if tag not in valid_broker_entries or (trades[tag]["entry_price"] == 0.0 and not trades[tag]["token"]):
+                    print(_pad_line_to_42(f"🗑️ PURGED REJECTED / ROGUE TRADE: {tag}", Fore.RED + Style.BRIGHT, Style.RESET_ALL))
+                    del trades[tag] # Wipe it completely out of memory
+
         save_trades(trades)
     except Exception as e:
         print(_pad_line_to_42(f"⚠️ Sync Error: {str(e)[:22]}", Fore.RED, Style.RESET_ALL))
@@ -105,7 +121,7 @@ def execute_exit(client, symbol, qty, txn_type, entry_tag):
 
 async def process_stateful_exits(client):
     try:
-        # 1. Synchronize database state from live broker server logs
+        # 1. Synchronize database state from live broker server logs & clean bad entries
         sync_database_from_broker_logs(client)
         
         trades = load_trades()
