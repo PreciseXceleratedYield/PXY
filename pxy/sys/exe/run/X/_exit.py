@@ -152,7 +152,7 @@ async def process_stateful_exits(client):
         # 3. Process and display metrics data dashboard layout inside console
         border = "=========================================="
         print(f"\n{_pad_line_to_42(border, Fore.BLUE, Style.RESET_ALL)}")
-        print(_pad_line_to_42("💼 STRATEGY MANAGEMENT LEDGER", Fore.BLUE + Style.BRIGHT, Style.RESET_ALL))
+        print(_pad_line_to_42("PXY® PreciseXceleratedYield Pvt Ltd™", Fore.BLUE + Style.BRIGHT, Style.RESET_ALL))
         print(_pad_line_to_42(border, Fore.BLUE, Style.RESET_ALL))
         
         pnl_color = Fore.GREEN if booked_pnl >= 0 else Fore.RED
