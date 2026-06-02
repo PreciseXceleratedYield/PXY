@@ -1,9 +1,13 @@
 # _map.py
+import asyncio
 import pandas as pd
-from colorama import Fore, Style
+from colorama import Fore, init, Style
 from _sgnl import _pad_line_to_42
+from _clnt import get_session
 
-def get_active_strategy_ledger(client):
+init(autoreset=True)
+
+def get_active_strategy_ledger(client, diagnostic_mode=False):
     """
     Scans broker order logs, nets out volumes by option symbol to handle 
     manual exits, matches automated tracking tags, and returns a clean 
@@ -51,7 +55,7 @@ def get_active_strategy_ledger(client):
                 parent_tag = tag[:-2]
                 closed_tags.add(parent_tag)
 
-        # Step 2B: Compile active strategy entry nodes, dropping closed ones
+        # Step 2B: Compile active strategy entry nodes
         for o in orders:
             status = str(o.get("stat", "")).strip().lower()
             if status != "complete": 
@@ -66,10 +70,6 @@ def get_active_strategy_ledger(client):
             if qty <= 0: 
                 continue
 
-            # If volume netting is 0 OR tag match confirms closed, filter it out completely
-            if symbol_net_qty.get(sym, 0) == 0 or tag in closed_tags:
-                continue
-
             raw_entries[tag] = {
                 "tag": tag,
                 "symbol": sym,
@@ -79,13 +79,54 @@ def get_active_strategy_ledger(client):
                 "token": o.get("tok")  
             }
 
-        # STAGE 3: CONVERT TO DATASTRUCT MATRIX FRAMEWORK
-        if not raw_entries:
+        # PASS 3: Separate entries strictly by structural mapping parameters
+        open_trades = []
+        closed_trades = []
+
+        for tag, details in raw_entries.items():
+            sym = details["symbol"]
+            # Netted out via manual exit OR tag matches an explicit closure
+            if symbol_net_qty.get(sym, 0) == 0 or tag in closed_tags:
+                closed_trades.append(details)
+            else:
+                open_trades.append(details)
+
+        # --- DIAGNOSTIC PASS (Only triggers when running _map.py directly) ---
+        if diagnostic_mode:
+            print("\n" + "=" * 50)
+            print(f"🔒 CLOSED / MATCHED STRATEGY TRADES ({len(closed_trades)})")
+            print("=" * 50)
+            for ct in sorted(closed_trades, key=lambda x: x['tag']):
+                print(f"  ✔️ CLOSED -> {ct['tag']} | {ct['symbol']} @ {ct['entry_price']:.2f}")
+
+            print("\n" + "=" * 50)
+            print(f"🔓 UNMATCHED OPEN STRATEGY TRADES ({len(open_trades)})")
+            print("=" * 50)
+            if not open_trades:
+                print(f"  NO ACTIVE UNMATCHED OPEN TRADES PRESENT")
+            for ot in sorted(open_trades, key=lambda x: x['tag']):
+                print(f"  🔥 ACTIVE -> {ot['tag']} | {ot['symbol']} | Qty: {ot['qty']} @ {ot['entry_price']:.2f}")
+            print("=" * 50)
+
+        # Strictly return ONLY the open trades as a clean processing DataFrame
+        if not open_trades:
             return pd.DataFrame()
             
-        df = pd.DataFrame(raw_entries.values())
-        return df
+        return pd.DataFrame(open_trades)
 
     except Exception as e:
         print(_pad_line_to_42(f"❌ Mapper Error {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
         return pd.DataFrame()
+
+async def main():
+    print(f"{Fore.YELLOW}⏳ Connecting to broker session for diagnostics...")
+    client = get_session()
+    if not client: 
+        print("❌ Connection failed.")
+        return
+    # Triggers diagnostic prints but keeps return isolated
+    get_active_strategy_ledger(client, diagnostic_mode=True)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+
