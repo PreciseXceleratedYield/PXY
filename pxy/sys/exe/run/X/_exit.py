@@ -1,31 +1,58 @@
 # _exit.py
 import asyncio
 import os
-from datetime import datetime, time as dt_time
+import json
 import pytz
-
+from datetime import datetime
 from colorama import Fore, init, Style
 from _sgnl import _pad_line_to_42
 from _ltp import get_option_live_ltp  
 from _clnt import get_session
-from _pnl import log_closed_trade      
-from _map import get_active_strategy_ledger  
 
 # =====================================================================
-# 🎛️ USER CONFIGURABLE STRATEGY MATRIX SETTINGS
+# 🎛️ CONFIGURATION SETTINGS & STATE CONTROL
 # =====================================================================
-MIN_EXIT_PROFIT = 500         # Rupee baseline target barrier threshold
-STRATEGY_CUTOFF_TIME = "10:48" # 📊 ✅ Ignores all tags executed BEFORE this time
-LOT_SIZE = 65
+MIN_EXIT_PROFIT = 500         
+STATE_FILE = "trades.json"
 
 init(autoreset=True)
 
-def clear_screen():
-    os.system('cls' if os.name == 'nt' else 'clear')
+# --- 📁 EMBEDDED LOCAL STATE MANAGEMENT SYSTEM ---
+def load_trades():
+    if not os.path.exists(STATE_FILE): return {}
+    try:
+        with open(STATE_FILE, "r") as f: return json.load(f)
+    except: return {}
 
+def save_trades(trades):
+    try:
+        with open(STATE_FILE, "w") as f: json.dump(trades, f, indent=4)
+    except: pass
+
+def record_entry(entry_tag, symbol, qty, txn_type, entry_price, token):
+    trades = load_trades()
+    trades[entry_tag] = {
+        "entry_tag": entry_tag, "exit_tag": "PENDING", "symbol": symbol,
+        "qty": int(qty), "entry_txn": txn_type, "entry_price": float(entry_price),
+        "exit_price": 0.0, "token": token, "status": "OPEN",
+        "opened_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    save_trades(trades)
+
+def record_exit(entry_tag, exit_tag, exit_price):
+    trades = load_trades()
+    if entry_tag in trades:
+        trades[entry_tag]["exit_tag"] = exit_tag
+        trades[entry_tag]["exit_price"] = float(exit_price)
+        trades[entry_tag]["status"] = "COMPLETED"
+        save_trades(trades)
+
+# --- ⚔️ SAFE LIQUIDATION MODULE ---
 def execute_exit(client, symbol, qty, txn_type, entry_tag):
     try:
-        exit_tag = f"{entry_tag}_X"
+        # Appends matching exit suffix to MMDDHHMMSS_ENTRY key
+        exit_tag = f"{entry_tag}_EXIT"
+        
         params = {
             "exchange_segment": "nse_fo", "product": "NRML", "price": "0",
             "order_type": "MKT", "quantity": str(qty), "validity": "DAY",
@@ -33,106 +60,68 @@ def execute_exit(client, symbol, qty, txn_type, entry_tag):
         }
         res = client.place_order(**params)
         if res and str(res).strip():
-            print(_pad_line_to_42(f"🏁 EXIT | {symbol[:15]} | {exit_tag}", Fore.MAGENTA + Style.BRIGHT, Style.RESET_ALL))
+            print(_pad_line_to_42(f"🏁 COUPLED | {exit_tag}", Fore.MAGENTA + Style.BRIGHT, Style.RESET_ALL))
             return True
     except Exception as e:
         print(_pad_line_to_42(f"❌ Exit Error {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
     return False
 
-def force_global_account_flatten(client):
+async def process_stateful_exits(client):
     try:
-        pos_res = client.positions()
-        positions = pos_res.get("data", [])
-        if not isinstance(positions, list): return
-        for p in positions:
-            net_qty = float(p.get("net_qty", 0))
-            if net_qty == 0: net_qty = float(p.get("flBuyQty", 0)) - float(p.get("flSellQty", 0))
-            if abs(net_qty) <= 0: continue
-            sym = str(p.get("trdSym", "")).upper()
-            if "NIFTY" not in sym or "BANKNIFTY" in sym: continue
-            txn = "S" if net_qty > 0 else "B"
-            print(_pad_line_to_42(f"🚨 EOD EXIT {sym[:15]}", Fore.RED + Style.BRIGHT, Style.RESET_ALL))
-            params = {
-                "exchange_segment": "nse_fo", "product": "NRML", "price": "0",
-                "order_type": "MKT", "quantity": str(int(abs(net_qty))), "validity": "DAY",
-                "trading_symbol": sym, "transaction_type": txn, "amo": "NO", "tag": f"EOD_{datetime.now().strftime('%H%M%S')}"
-            }
-            client.place_order(**params)
-    except Exception as e:
-        print(_pad_line_to_42(f"❌ EOD FAIL {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
-
-async def exit_cycle():
-    IST = pytz.timezone("Asia/Kolkata")
-    now = datetime.now(IST).time()
-    client = get_session()
-    if not client: return
-
-    if dt_time(15, 20) <= now < dt_time(15, 26):
-        clear_screen()
-        print(_pad_line_to_42("⏳ EOD FORCE FLATTEN", Fore.RED + Style.BRIGHT, Style.RESET_ALL))
-        force_global_account_flatten(client)
-        return
-
-    if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 25) <= now < dt_time(15, 31)):
-        clear_screen()
-        print(_pad_line_to_42("⏳ SYSTEM BUFFER", Fore.YELLOW, Style.RESET_ALL))
-        return
-
-    from _sgnl import get_all_data
-    data = get_all_data()
-    entry_signal = str(data.get("entry", "")).upper().strip()
-    index_ltp = float(data.get("price", 0))
-
-    if index_ltp == 0 or not entry_signal: return
-
-    # ✅ TRANSMITS CONFIGURABLE TIME CUTOFF VALUE TO THE MATRIX PARSER MODULE
-    df_ledger = get_active_strategy_ledger(client, diagnostic_mode=False, cutoff_time_str=STRATEGY_CUTOFF_TIME)
-
-    clear_screen()
-    print(_pad_line_to_42("📋 EXIT DASHBOARD", Fore.YELLOW + Style.BRIGHT, Style.RESET_ALL))
-    print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
-    print(_pad_line_to_42(f"INDEX LTP : {index_ltp}", Fore.CYAN, Style.RESET_ALL))
-    print(_pad_line_to_42(f"SIGNAL    : {entry_signal}", Fore.MAGENTA, Style.RESET_ALL))
-    print(_pad_line_to_42(f"CUTOFF    : >= {STRATEGY_CUTOFF_TIME}", Fore.WHITE, Style.RESET_ALL))
-    print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
-
-    if df_ledger.empty:
-        print(_pad_line_to_42("NO ACTIVE STRATEGY TRADES", Fore.WHITE, Style.RESET_ALL))
-        return
-
-    for i, row in df_ledger.iterrows():
-        t = row.to_dict()
-        option_ltp = get_option_live_ltp(client=client, token_id=t["token"], ex_seg="nse_fo", fallback_price=t["entry_price"])
-        pnl = 0.0 
-        trigger_exit = False
+        trades = load_trades()
         
-        if t["txn_type"] == "B":
-            pnl = (option_ltp - t["entry_price"]) * t["qty"]
-            if pnl >= MIN_EXIT_PROFIT and entry_signal in ["SELL", "BEAR"]:
-                trigger_exit = True
-            if trigger_exit:
-                if execute_exit(client, t["symbol"], t["qty"], "S", t["tag"]):
-                    log_closed_trade(t["symbol"], t["qty"], t["tag"], t["token"], t["entry_price"], option_ltp, pnl, "B")
-                    print(_pad_line_to_42(f"✅ EXITED LONG TAG: {t['tag']}", Fore.GREEN, Style.RESET_ALL))
+        # PROTECTION GUARD: Isolate only active open logs
+        open_trades = {k: v for k, v in trades.items() if v["status"] == "OPEN"}
+        
+        if not open_trades:
+            print(_pad_line_to_42("🏖️ DB STATE CLEAN | NO OPEN TRADES", Fore.GREEN, Style.RESET_ALL))
+            return
 
-        elif t["txn_type"] == "S":
-            pnl = (t["entry_price"] - option_ltp) * t["qty"]
-            if pnl >= MIN_EXIT_PROFIT and entry_signal in ["BUY", "BULL"]:
-                trigger_exit = True
-            if trigger_exit:
-                if execute_exit(client, t["symbol"], t["qty"], "B", t["tag"]):
-                    log_closed_trade(t["symbol"], t["qty"], t["tag"], t["token"], t["entry_price"], option_ltp, pnl, "S")
-                    print(_pad_line_to_42(f"✅ EXITED SHORT TAG: {t['tag']}", Fore.GREEN, Style.RESET_ALL))
+        for entry_tag, data in open_trades.items():
+            symbol = data["symbol"]
+            qty = data["qty"]
+            entry_txn = data["entry_txn"]
+            entry_price = data["entry_price"]
+            token = data["token"]
 
-        if not trigger_exit:
-            color = Fore.GREEN if pnl >= 0 else Fore.RED
-            print(_pad_line_to_42(f"[{i}] {t['tag']} PnL:{int(pnl)}", color, Style.RESET_ALL))
+            # Price recovery module from broker logs if needed
+            if entry_price == 0:
+                try:
+                    order_res = client.order_report()
+                    orders = order_res.get("data", []) if isinstance(order_res, dict) else order_res
+                    for o in orders:
+                        if str(o.get("tag", "")).upper() == entry_tag.upper():
+                            entry_price = float(o.get("avgPrc", 0))
+                            break
+                except: pass
+
+            live_ltp = float(get_option_live_ltp(token) if token else 0)
+            if live_ltp == 0: continue
+
+            # Dynamic PnL tracking math based strictly on Entry types
+            if entry_txn == "B":
+                live_pnl = (live_ltp - entry_price) * qty
+                opposite_txn = "S"  # Long exits can ONLY sell
+            else:
+                live_pnl = (entry_price - live_ltp) * qty
+                opposite_txn = "B"  # Short exits can ONLY buy back
+
+            print(_pad_line_to_42(f"📊 {entry_tag} | PnL: Rs.{live_pnl:.2f}", Fore.CYAN, Style.RESET_ALL))
+
+            # Profit threshold check
+            if live_pnl >= MIN_EXIT_PROFIT:
+                print(_pad_line_to_42("🎯 TARGET MET | COUPLING...", Fore.GREEN + Style.BRIGHT, Style.RESET_ALL))
+                success = execute_exit(client, symbol, qty, opposite_txn, entry_tag)
+                if success:
+                    record_exit(entry_tag, f"{entry_tag}_EXIT", live_ltp)
+
+    except Exception as e:
+        print(_pad_line_to_42(f"⚠️ Loop Error: {str(e)[:22]}", Fore.RED, Style.RESET_ALL))
 
 async def main():
-    try:
-        await exit_cycle()
-    except Exception as e:
-        print(_pad_line_to_42(f"❌ Exit Failure: {str(e)[:22]}", Fore.RED, Style.RESET_ALL))
+    client = get_session()
+    if client: 
+        await process_stateful_exits(client)
 
 if __name__ == "__main__":
     asyncio.run(main())
