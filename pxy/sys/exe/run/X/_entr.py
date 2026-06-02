@@ -17,8 +17,9 @@ init(autoreset=True)
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-# ----------------- 🛑 ORDER EXECUTION DEACTIVATED -----------------
+# ----------------- 🛑 ORDER EXECUTION disabled FOR DRY RUN -----------------
 def execute_exit(client, symbol, qty, txn_type, entry_tag):
+    """ Neutralised exit function to ensure safe dry-run monitoring """
     return False 
 
 # ----------------- TRIPLE-STAGE VISUAL MAPPER ENGINE -----------------
@@ -59,7 +60,7 @@ def render_comprehensive_order_diagnostics(client):
         raw_entries = {}
         closed_tags = set()
 
-        # Step 2A: Identify and group exit links
+        # Step 2A: Identify and group exit links ending with _X
         for o in orders:
             if str(o.get("stat", "")).lower() != "complete":
                 continue
@@ -69,7 +70,7 @@ def render_comprehensive_order_diagnostics(client):
                 closed_tags.add(parent_tag)
                 print(_pad_line_to_42(f"  🔒 EXIT FOUND -> Links to Parent: {parent_tag}", Fore.LIGHTRED_EX, Style.RESET_ALL))
 
-        # Step 2B: Map core strategic entry layers
+        # Step 2B: Map core strategic entry layers ending with _BUY or _SELL
         for o in orders:
             if str(o.get("stat", "")).lower() != "complete":
                 continue
@@ -99,7 +100,7 @@ def render_comprehensive_order_diagnostics(client):
         print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
 
         # =====================================================================
-        # STAGE 3: ACTIVE OPEN ORDERS (ISOLATED LEDGER)
+        # STAGE 3: ISOLATED LEDGER FOR FINAL OPEN CHECK
         # =====================================================================
         open_ledger = [details for tag, details in raw_entries.items() if tag not in closed_tags]
         return open_ledger
@@ -163,9 +164,10 @@ async def exit_cycle():
         ))
     print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
 
-# ----------------- ENTRY ROUTINE -----------------
+# ----------------- ENTRY ROUTINE (SINGLE EXECUTION) -----------------
 async def main():
     await exit_cycle()
 
 if __name__ == "__main__":
     asyncio.run(main())
+
