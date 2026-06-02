@@ -8,28 +8,24 @@ init(autoreset=True)
 async def main():
     print(f"{Fore.YELLOW}⏳ Connecting to broker session...")
     client = get_session()
-    if not client: 
-        print(f"{Fore.RED}❌ Connection failed.")
-        return
+    if not client: return
 
     try:
         print(f"{Fore.CYAN}📥 Fetching and filtering trade matrix maps...")
         order_res = client.order_report()
         orders = order_res.get("data", []) if isinstance(order_res, dict) else order_res
 
-        if not isinstance(orders, list): 
-            print(f"{Fore.RED}❌ Invalid broker response.")
-            return
+        if not isinstance(orders, list): return
 
         raw_entries = {}
         closed_tags = set()
 
-        # PASS 1: Find all parent tags that have been closed out via an associated '_X' tag
+        # PASS 1: Identify and isolate ALL entry tags that have been closed with a matching '_X'
         for o in orders:
             if str(o.get("stat", "")).lower() != "complete": continue
             tag = str(o.get("tag") or "").strip().upper()
             if tag.endswith("_X"):
-                parent_tag = tag[:-2]  # Strips out '_X'
+                parent_tag = tag[:-2]  # Strips away '_X' to find the parent tag
                 closed_tags.add(parent_tag)
 
         # PASS 2: Match your real entry tag formats (*_B or *_S)
@@ -37,7 +33,7 @@ async def main():
             if str(o.get("stat", "")).lower() != "complete": continue
             tag = str(o.get("tag") or "").strip().upper()
             
-            # Match exactly the tags we saw in your raw data dump
+            # Match the real strategy formats we discovered in Step 1 (*_B or *_S)
             if not (tag.endswith("_B") or tag.endswith("_S")): continue
 
             qty = int(float(o.get("fldQty", 0)))
@@ -51,7 +47,7 @@ async def main():
                 "tag": tag
             }
 
-        # PASS 3: Sort mapped trades into Open vs Closed structural buckets
+        # PASS 3: Separate entries strictly by checking if the tag was explicitly marked as closed
         open_trades = []
         closed_trades = []
 
@@ -62,7 +58,7 @@ async def main():
                 open_trades.append(details)
 
         # =====================================================================
-        # RENDER Buckets on Screen
+        # DISPLAY MAPPED BUCKETS
         # =====================================================================
         print("\n" + "=" * 50)
         print(f"🔒 CLOSED / MATCHED STRATEGY TRADES ({len(closed_trades)})")
@@ -80,8 +76,9 @@ async def main():
         print("=" * 50)
 
     except Exception as e:
-        print(f"{Fore.RED}❌ Diagnostic runtime error: {str(e)}")
+        print(f"{Fore.RED}❌ Mapping matrix error: {str(e)}")
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
