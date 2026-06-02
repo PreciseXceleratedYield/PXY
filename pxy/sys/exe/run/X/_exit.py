@@ -11,8 +11,7 @@ from _clnt import get_session
 from _pnl import log_closed_trade      # Imported isolated function directly
 
 LOT_SIZE = 65
-MIN_EXIT_PROFIT = 200
-LOOP_INTERVAL_SECONDS = 2  # Continuous execution frequency
+MIN_EXIT_PROFIT = 350
 
 init(autoreset=True)
 
@@ -202,7 +201,7 @@ async def exit_cycle():
         print(_pad_line_to_42("NO ACTIVE TRADES", Fore.WHITE, Style.RESET_ALL))
         return
 
-    # Display and track all isolated open tag records
+    # Display and track all isolated open tag records sequentially
     for i, t in enumerate(ledger):
         option_ltp = get_option_live_ltp(
             client=client,
@@ -248,17 +247,13 @@ async def exit_cycle():
         ))
 
 
-# ---------------- RUNTIME LOOP ----------------
+# ---------------- SINGLE EXECUTION STRUCTURING ----------------
 async def main():
-    print("🔄 Initialising continuous exit tracking engine...")
-    while True:
-        try:
-            await exit_cycle()
-        except Exception as e:
-            print(_pad_line_to_42(f"⚠️ EXIT LOOP FAIL {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
-        
-        # Pause execution to prevent API rate limiting
-        await asyncio.sleep(LOOP_INTERVAL_SECONDS)
+    try:
+        # Runs exactly once and exits cleanly
+        await exit_cycle()
+    except Exception as e:
+        print(_pad_line_to_42(f"❌ Exit Failure: {str(e)[:22]}", Fore.RED, Style.RESET_ALL))
 
 if __name__ == "__main__":
     asyncio.run(main())
