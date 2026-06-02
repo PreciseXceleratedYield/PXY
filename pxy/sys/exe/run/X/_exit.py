@@ -8,6 +8,8 @@ from colorama import Fore, init, Style
 from _sgnl import _pad_line_to_42
 from _ltp import get_option_live_ltp  
 from _clnt import get_session
+import subprocess
+
 
 # =====================================================================
 # 🎛️ CONFIGURATION SETTINGS & STATE CONTROL
@@ -114,6 +116,12 @@ def execute_exit(client, symbol, qty, txn_type, entry_tag):
         res = client.place_order(**params)
         if res and str(res).strip():
             print(_pad_line_to_42(f"🏁 COUPLED | {exit_tag}", Fore.MAGENTA + Style.BRIGHT, Style.RESET_ALL))
+            # --- SURGICAL CHANGE HERE ---
+            try:
+                subprocess.Popen(["python", "_pnl.py"])
+            except Exception as e:
+                print(_pad_line_to_42(f"⚠️ Script Trigger Error: {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
+            # ----------------------------
             return True
     except Exception as e:
         print(_pad_line_to_42(f"❌ Exit Error {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
