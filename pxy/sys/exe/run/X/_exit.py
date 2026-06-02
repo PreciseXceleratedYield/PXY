@@ -9,9 +9,10 @@ from _sgnl import _pad_line_to_42
 from _ltp import get_option_live_ltp  # Uses your 5-tier fallback script
 from _clnt import get_session
 from _pnl import log_closed_trade      # Imported isolated function directly
+from _map import get_active_strategy_ledger  # ✅ Imported new data mapping module
 
 LOT_SIZE = 65
-MIN_EXIT_PROFIT = 500
+MIN_EXIT_PROFIT = 500  
 
 init(autoreset=True)
 
@@ -21,92 +22,8 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
-# ---------------- ORDER LEDGER ----------------
-def reconstruct_fifo_ledger_from_orders(client):
-    """
-    Builds an independent position ledger grouped strictly by unique Entry Tags.
-    Filters out closed tags completely using symbol volume netting and exit tags.
-    """
-    try:
-        order_res = client.order_report()  
-        orders = order_res.get("data", []) if isinstance(order_res, dict) else order_res
-        if not isinstance(orders, list):
-            return []
-
-        # STAGE 1: SYMBOL QUANTITY VOLUME NETTING (Catches Manual App Exits)
-        symbol_net_qty = {}
-        for o in orders:
-            status = str(o.get("stat", "")).strip().lower()
-            if status != "complete": 
-                continue
-                
-            sym = str(o.get("trdSym", "")).strip().upper()
-            txn = str(o.get("trnsTp", "")).strip().upper()
-            qty = int(float(o.get("fldQty", 0)))
-            
-            if qty <= 0 or not sym: 
-                continue
-                
-            if sym not in symbol_net_qty:
-                symbol_net_qty[sym] = 0
-                
-            if txn == "B":
-                symbol_net_qty[sym] += qty
-            elif txn == "S":
-                symbol_net_qty[sym] -= qty
-
-        # STAGE 2: PARSING AND CLASSIFYING STRATEGY TAGS
-        raw_entries = {}
-        closed_tags = set()
-
-        # Step 2A: Collect entry tags closed via standard automated '_X' suffixes
-        for o in orders:
-            status = str(o.get("stat", "")).strip().lower()
-            if status != "complete": 
-                continue
-            tag = str(o.get("tag") or o.get("ordModNo") or "").strip().upper()
-            if tag.endswith("_X"):
-                parent_tag = tag[:-2]
-                closed_tags.add(parent_tag)
-
-        # Step 2B: Compile active strategy entry nodes, dropping closed ones
-        for o in orders:
-            status = str(o.get("stat", "")).strip().lower()
-            if status != "complete": 
-                continue
-            tag = str(o.get("tag") or o.get("ordModNo") or "").strip().upper()
-            sym = str(o.get("trdSym", "")).strip().upper()
-            
-            if not (tag.endswith("_B") or tag.endswith("_S")): 
-                continue
-
-            qty = int(float(o.get("fldQty", 0)))
-            if qty <= 0: 
-                continue
-
-            # If volume netting is 0 OR tag match confirms closed, filter it out completely
-            if symbol_net_qty.get(sym, 0) == 0 or tag in closed_tags:
-                continue
-
-            raw_entries[tag] = {
-                "symbol": sym,
-                "txn_type": str(o.get("trnsTp", "")).upper().strip(),
-                "entry_price": float(o.get("avgPrc", 0)),
-                "qty": qty,
-                "tag": tag,
-                "token": o.get("tok")  
-            }
-
-        return list(raw_entries.values())
-
-    except Exception as e:
-        print(_pad_line_to_42(f"❌ Ledger Error {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
-        return []
-
-
 # ---------------- EXIT ORDER ----------------
 def execute_exit(client, symbol, qty, txn_type, entry_tag):
-    """ Executes real market orders to close the active option positions. """
     try:
         exit_tag = f"{entry_tag}_X"
         params = {
@@ -216,8 +133,8 @@ async def exit_cycle():
     if index_ltp == 0 or not entry_signal:
         return
 
-    # Fetch ledger listing ONLY live unmatched open trades (Closed items filtered out)
-    ledger = reconstruct_fifo_ledger_from_orders(client)
+    # ✅ CALL SEPARATE MAP MODULE MATRIX DATAFRAME
+    df_ledger = get_active_strategy_ledger(client)
 
     clear_screen()
     print(_pad_line_to_42("📋 EXIT DASHBOARD", Fore.YELLOW + Style.BRIGHT, Style.RESET_ALL))
@@ -226,12 +143,14 @@ async def exit_cycle():
     print(_pad_line_to_42(f"SIGNAL    : {entry_signal}", Fore.MAGENTA, Style.RESET_ALL))
     print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
 
-    if not ledger:
+    if df_ledger.empty:
         print(_pad_line_to_42("NO ACTIVE STRATEGY TRADES", Fore.WHITE, Style.RESET_ALL))
         return
 
-    # Process live strategic open orders
-    for i, t in enumerate(ledger):
+    # ✅ ITERATE CLEANLY VIA PANDAS VECTOR ROW MAPS
+    for i, row in df_ledger.iterrows():
+        t = row.to_dict()
+        
         option_ltp = get_option_live_ltp(
             client=client,
             token_id=t["token"],
@@ -246,7 +165,7 @@ async def exit_cycle():
         if t["txn_type"] == "B":
             pnl = (option_ltp - t["entry_price"]) * t["qty"]
             
-            # STRICT AND LOGIC: Must be profitable AND trend must reverse to exit
+            # STRICT AND LOGIC: Profit >= 500 AND Trend Reversal
             if pnl >= MIN_EXIT_PROFIT and entry_signal in ["SELL", "BEAR"]:
                 trigger_exit = True
 
@@ -259,7 +178,7 @@ async def exit_cycle():
         elif t["txn_type"] == "S":
             pnl = (t["entry_price"] - option_ltp) * t["qty"]
             
-            # STRICT AND LOGIC: Must be profitable AND trend must reverse to exit
+            # STRICT AND LOGIC: Profit >= 500 AND Trend Reversal
             if pnl >= MIN_EXIT_PROFIT and entry_signal in ["BUY", "BULL"]:
                 trigger_exit = True
 
@@ -280,7 +199,7 @@ async def exit_cycle():
 # ---------------- SINGLE EXECUTION STRUCTURING ----------------
 async def main():
     try:
-        # Runs exactly once per execution trigger pass and terminates cleanly
+        # Runs exactly once across the active DataFrame records and exits cleanly
         await exit_cycle()
     except Exception as e:
         print(_pad_line_to_42(f"❌ Exit Failure: {str(e)[:22]}", Fore.RED, Style.RESET_ALL))
