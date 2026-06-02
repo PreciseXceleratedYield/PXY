@@ -1,4 +1,4 @@
-# map_orders.py
+# _ord.py
 import asyncio
 from colorama import Fore, init, Style
 from _clnt import get_session
@@ -8,31 +8,36 @@ init(autoreset=True)
 async def main():
     print(f"{Fore.YELLOW}⏳ Connecting to broker session...")
     client = get_session()
-    if not client: return
+    if not client: 
+        print(f"{Fore.RED}❌ Connection failed.")
+        return
 
     try:
+        print(f"{Fore.CYAN}📥 Fetching and filtering trade matrix maps...")
         order_res = client.order_report()
         orders = order_res.get("data", []) if isinstance(order_res, dict) else order_res
 
-        if not isinstance(orders, list): return
+        if not isinstance(orders, list): 
+            print(f"{Fore.RED}❌ Invalid broker response.")
+            return
 
         raw_entries = {}
         closed_tags = set()
 
-        # PASS 1: Identify and isolate ALL entry tags that have been closed with a matching '_X'
+        # PASS 1: Find all parent tags that have been closed out via an associated '_X' tag
         for o in orders:
             if str(o.get("stat", "")).lower() != "complete": continue
             tag = str(o.get("tag") or "").strip().upper()
             if tag.endswith("_X"):
-                parent_tag = tag[:-2]  # Strips away '_X' to find the parent tag
+                parent_tag = tag[:-2]  # Strips out '_X'
                 closed_tags.add(parent_tag)
 
-        # PASS 2: Map original structural strategy entries
+        # PASS 2: Match your real entry tag formats (*_B or *_S)
         for o in orders:
             if str(o.get("stat", "")).lower() != "complete": continue
             tag = str(o.get("tag") or "").strip().upper()
             
-            # Match the real strategy formats we discovered in Step 1 (*_B or *_S)
+            # Match exactly the tags we saw in your raw data dump
             if not (tag.endswith("_B") or tag.endswith("_S")): continue
 
             qty = int(float(o.get("fldQty", 0)))
@@ -46,7 +51,7 @@ async def main():
                 "tag": tag
             }
 
-        # PASS 3: Separate entries strictly by their mapping state
+        # PASS 3: Sort mapped trades into Open vs Closed structural buckets
         open_trades = []
         closed_trades = []
 
@@ -57,7 +62,7 @@ async def main():
                 open_trades.append(details)
 
         # =====================================================================
-        # DISPLAY MAPPED BUCKETS
+        # RENDER Buckets on Screen
         # =====================================================================
         print("\n" + "=" * 50)
         print(f"🔒 CLOSED / MATCHED STRATEGY TRADES ({len(closed_trades)})")
@@ -68,12 +73,14 @@ async def main():
         print("\n" + "=" * 50)
         print(f"🔓 UNMATCHED OPEN STRATEGY TRADES ({len(open_trades)})")
         print("=" * 50)
+        if not open_trades:
+            print(f"{Fore.WHITE}  NO ACTIVE UNMATCHED OPEN TRADES PRESENT")
         for ot in sorted(open_trades, key=lambda x: x['tag']):
             print(f"  🔥 ACTIVE -> {ot['tag']} | {ot['symbol']} | Qty: {ot['qty']} @ {ot['entry_price']:.2f}")
         print("=" * 50)
 
     except Exception as e:
-        print(f"{Fore.RED}❌ Mapping matrix error: {str(e)}")
+        print(f"{Fore.RED}❌ Diagnostic runtime error: {str(e)}")
 
 if __name__ == "__main__":
     asyncio.run(main())
