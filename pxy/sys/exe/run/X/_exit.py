@@ -8,6 +8,7 @@ from colorama import Fore, init, Style
 from _sgnl import _pad_line_to_42
 from _ltp import get_option_live_ltp  # Uses your 5-tier fallback script
 from _clnt import get_session
+from _pnl import log_closed_trade      # Imported isolated function directly
 
 LOT_SIZE = 65
 MIN_EXIT_PROFIT = 200
@@ -20,29 +21,19 @@ def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
-# ----------------🛑 ORDER EXECUTION DEACTIVATED ----------------
-def execute_exit(client, symbol, qty, txn_type, entry_tag):
-    """ Simulated order execution wrapper for risk-free system testing. """
-    print(_pad_line_to_42(f"⚡ SIMULATED EXIT | {entry_tag} -> {txn_type}", Fore.YELLOW + Style.BRIGHT, Style.RESET_ALL))
-    return False 
-
-
-# ---------------- DIAGNOSTIC TAG MATRIX LEDGER ----------------
+# ---------------- ORDER LEDGER ----------------
 def reconstruct_fifo_ledger_from_orders(client):
     """
     Builds an independent position ledger grouped strictly by unique Entry Tags.
-    Uses symbol volume netting to pair strategy entries with system-assigned tags.
+    Filters out closed tags completely using symbol volume netting and exit tags.
     """
     try:
         order_res = client.order_report()  
         orders = order_res.get("data", []) if isinstance(order_res, dict) else order_res
         if not isinstance(orders, list):
-            print(_pad_line_to_42("❌ BROKER API ERROR: Order report data is not a list", Fore.RED, Style.RESET_ALL))
             return []
 
-        # =====================================================================
-        # STAGE 1: SYMBOL QUANTITY VOLUME NETTING (Catches Alphanumeric Exits)
-        # =====================================================================
+        # STAGE 1: SYMBOL QUANTITY VOLUME NETTING (Catches Manual App Exits)
         symbol_net_qty = {}
         for o in orders:
             status = str(o.get("stat", "")).strip().lower()
@@ -64,15 +55,11 @@ def reconstruct_fifo_ledger_from_orders(client):
             elif txn == "S":
                 symbol_net_qty[sym] -= qty
 
-        # =====================================================================
         # STAGE 2: PARSING AND CLASSIFYING STRATEGY TAGS
-        # =====================================================================
-        print("\n" + _pad_line_to_42("🗺️ STAGE 2: STRATEGIC TAG MAPPING", Fore.MAGENTA + Style.BRIGHT, Style.RESET_ALL))
-        
         raw_entries = {}
         closed_tags = set()
 
-        # Step 2A: Find entry tags closed out directly via standard automated '_X' suffixes
+        # Step 2A: Collect entry tags closed via standard automated '_X' suffixes
         for o in orders:
             status = str(o.get("stat", "")).strip().lower()
             if status != "complete": 
@@ -81,9 +68,8 @@ def reconstruct_fifo_ledger_from_orders(client):
             if tag.endswith("_X"):
                 parent_tag = tag[:-2]
                 closed_tags.add(parent_tag)
-                print(_pad_line_to_42(f"  🔒 EXPLICIT LINK -> Exit {tag} closes {parent_tag}", Fore.LIGHTRED_EX, Style.RESET_ALL))
 
-        # Step 2B: Compile active strategy entry nodes
+        # Step 2B: Compile active strategy entry nodes, dropping closed ones
         for o in orders:
             status = str(o.get("stat", "")).strip().lower()
             if status != "complete": 
@@ -98,16 +84,11 @@ def reconstruct_fifo_ledger_from_orders(client):
             if qty <= 0: 
                 continue
 
-            # Check if volume netting closed it before tagging
-            is_netted = symbol_net_qty.get(sym, 0) == 0
-            is_tagged_closed = tag in closed_tags
-
-            if is_netted or is_tagged_closed:
-                map_status = "✔️ FULLY CLOSED (Net Zero)" if is_netted else "✔️ FULLY CLOSED (Tag Match)"
-                print(_pad_line_to_42(f"  {map_status} -> {tag} [{sym}]", Fore.LIGHTBLACK_EX, Style.RESET_ALL))
+            # --- 🚫 STRICT FILTER WINDOW 🚫 ---
+            # If volume netting is 0 OR tag match confirms closed, filter it out completely
+            if symbol_net_qty.get(sym, 0) == 0 or tag in closed_tags:
                 continue
 
-            print(_pad_line_to_42(f"  ⚠️ UNMATCHED ACTIVE POSITION -> {tag} [{sym}]", Fore.LIGHTGREEN_EX, Style.RESET_ALL))
             raw_entries[tag] = {
                 "symbol": sym,
                 "txn_type": str(o.get("trnsTp", "")).upper().strip(),
@@ -117,7 +98,6 @@ def reconstruct_fifo_ledger_from_orders(client):
                 "token": o.get("tok")  
             }
 
-        print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
         return list(raw_entries.values())
 
     except Exception as e:
@@ -125,10 +105,107 @@ def reconstruct_fifo_ledger_from_orders(client):
         return []
 
 
-# ---------------- MAIN RUNTIME ENGINE PASS ----------------
+# ---------------- EXIT ORDER ----------------
+def execute_exit(client, symbol, qty, txn_type, entry_tag):
+    """ Executes real market orders to close the active option positions. """
+    try:
+        exit_tag = f"{entry_tag}_X"
+        params = {
+            "exchange_segment": "nse_fo",
+            "product": "NRML",
+            "price": "0",
+            "order_type": "MKT",
+            "quantity": str(qty),
+            "validity": "DAY",
+            "trading_symbol": symbol,
+            "transaction_type": txn_type,
+            "amo": "NO",
+            "tag": exit_tag
+        }
+
+        res = client.place_order(**params)
+
+        if res and str(res).strip():
+            print(
+                _pad_line_to_42(
+                    f"🏁 EXIT | {symbol[:15]} | {exit_tag}",
+                    Fore.MAGENTA + Style.BRIGHT,
+                    Style.RESET_ALL
+                )
+            )
+            return True
+
+    except Exception as e:
+        print(_pad_line_to_42(f"❌ Exit Error {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
+
+    return False
+
+
+# ---------------- FORCE FLATTEN ----------------
+def force_global_account_flatten(client):
+    try:
+        pos_res = client.positions()
+        positions = pos_res.get("data", [])
+
+        if not isinstance(positions, list):
+            return
+
+        for p in positions:
+            net_qty = float(p.get("net_qty", 0))
+            if net_qty == 0:
+                net_qty = float(p.get("flBuyQty", 0)) - float(p.get("flSellQty", 0))
+
+            if abs(net_qty) <= 0:
+                continue
+
+            sym = str(p.get("trdSym", "")).upper()
+            if "NIFTY" not in sym or "BANKNIFTY" in sym:
+                continue
+
+            txn = "S" if net_qty > 0 else "B"
+
+            print(_pad_line_to_42(
+                f"🚨 EOD EXIT {sym[:15]}",
+                Fore.RED + Style.BRIGHT,
+                Style.RESET_ALL
+            ))
+
+            params = {
+                "exchange_segment": "nse_fo",
+                "product": "NRML",
+                "price": "0",
+                "order_type": "MKT",
+                "quantity": str(int(abs(net_qty))),
+                "validity": "DAY",
+                "trading_symbol": sym,
+                "transaction_type": txn,
+                "amo": "NO",
+                "tag": f"EOD_{datetime.now().strftime('%H%M%S')}"
+            }
+            client.place_order(**params)
+
+    except Exception as e:
+        print(_pad_line_to_42(f"❌ EOD FAIL {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
+
+
+# ---------------- EXIT ENGINE ----------------
 async def exit_cycle():
+    IST = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(IST).time()
+
     client = get_session()
     if not client:
+        return
+
+    if dt_time(15, 20) <= now < dt_time(15, 26):
+        clear_screen()
+        print(_pad_line_to_42("⏳ EOD FORCE FLATTEN", Fore.RED + Style.BRIGHT, Style.RESET_ALL))
+        force_global_account_flatten(client)
+        return
+
+    if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 25) <= now < dt_time(15, 31)):
+        clear_screen()
+        print(_pad_line_to_42("⏳ SYSTEM BUFFER", Fore.YELLOW, Style.RESET_ALL))
         return
 
     from _sgnl import get_all_data
@@ -137,23 +214,24 @@ async def exit_cycle():
     entry_signal = str(data.get("entry", "")).upper().strip()
     index_ltp = float(data.get("price", 0))
 
+    if index_ltp == 0 or not entry_signal:
+        return
+
+    # Fetch ledger listing ONLY live unmatched open trades (Closed items filtered out)
+    ledger = reconstruct_fifo_ledger_from_orders(client)
+
     clear_screen()
-    print(_pad_line_to_42("📋 TAG EXCLUSION STRATEGY ENGINE", Fore.YELLOW + Style.BRIGHT, Style.RESET_ALL))
+    print(_pad_line_to_42("📋 EXIT DASHBOARD", Fore.YELLOW + Style.BRIGHT, Style.RESET_ALL))
     print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
     print(_pad_line_to_42(f"INDEX LTP : {index_ltp}", Fore.CYAN, Style.RESET_ALL))
     print(_pad_line_to_42(f"SIGNAL    : {entry_signal}", Fore.MAGENTA, Style.RESET_ALL))
     print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
 
-    # Pull unmatched strategy open ledger
-    ledger = reconstruct_fifo_ledger_from_orders(client)
-
-    print(_pad_line_to_42("🔓 STAGE 3: ISOLATED LIVE POSITIONS", Fore.GREEN + Style.BRIGHT, Style.RESET_ALL))
     if not ledger:
-        print(_pad_line_to_42("  NO UNMATCHED STRATEGY POSITIONS", Fore.WHITE, Style.RESET_ALL))
-        print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
+        print(_pad_line_to_42("NO ACTIVE STRATEGY TRADES", Fore.WHITE, Style.RESET_ALL))
         return
 
-    # Process and display live unmatched active trades metrics
+    # Process live strategic open orders
     for i, t in enumerate(ledger):
         option_ltp = get_option_live_ltp(
             client=client,
@@ -163,33 +241,50 @@ async def exit_cycle():
         )
 
         pnl = 0.0 
+        trigger_exit = False
         
+        # Long positions processing pipeline (+65 Qty)
         if t["txn_type"] == "B":
             pnl = (option_ltp - t["entry_price"]) * t["qty"]
+            
+            # STRICT AND LOGIC: Must be profitable AND trend must reverse to exit
             if pnl >= MIN_EXIT_PROFIT and entry_signal in ["SELL", "BEAR"]:
-                print(_pad_line_to_42(f"  [⚡] MATCH MET -> {t['tag']}", Fore.YELLOW, Style.RESET_ALL))
+                trigger_exit = True
 
+            if trigger_exit:
+                if execute_exit(client, t["symbol"], t["qty"], "S", t["tag"]):
+                    log_closed_trade(t["symbol"], t["qty"], t["tag"], t["token"], t["entry_price"], option_ltp, pnl, "B")
+                    print(_pad_line_to_42(f"✅ EXITED LONG TAG: {t['tag']}", Fore.GREEN, Style.RESET_ALL))
+
+        # Short positions processing pipeline (-65 Qty)
         elif t["txn_type"] == "S":
             pnl = (t["entry_price"] - option_ltp) * t["qty"]
+            
+            # STRICT AND LOGIC: Must be profitable AND trend must reverse to exit
             if pnl >= MIN_EXIT_PROFIT and entry_signal in ["BUY", "BULL"]:
-                print(_pad_line_to_42(f"  [⚡] MATCH MET -> {t['tag']}", Fore.YELLOW, Style.RESET_ALL))
+                trigger_exit = True
 
-        color = Fore.GREEN if pnl >= 0 else Fore.RED
-        print(_pad_line_to_42(
-            f"  🔥 [{i}] {t['tag']} PnL:{int(pnl)} (LTP:{option_ltp:.2f})",
-            color,
-            Style.RESET_ALL
-        ))
-    print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
+            if trigger_exit:
+                if execute_exit(client, t["symbol"], t["qty"], "B", t["tag"]):
+                    log_closed_trade(t["symbol"], t["qty"], t["tag"], t["token"], t["entry_price"], option_ltp, pnl, "S")
+                    print(_pad_line_to_42(f"✅ EXITED SHORT TAG: {t['tag']}", Fore.GREEN, Style.RESET_ALL))
+
+        if not trigger_exit:
+            color = Fore.GREEN if pnl >= 0 else Fore.RED
+            print(_pad_line_to_42(
+                f"[{i}] {t['tag']} PnL:{int(pnl)}",
+                color,
+                Style.RESET_ALL
+            ))
 
 
-# ---------------- ENTRY ROUTINE (SINGLE EXECUTION) ----------------
+# ---------------- SINGLE EXECUTION STRUCTURING ----------------
 async def main():
     try:
+        # Runs exactly once per execution trigger pass and terminates cleanly
         await exit_cycle()
     except Exception as e:
-        print(_pad_line_to_42(f"❌ Diagnostic Failure: {str(e)[:22]}", Fore.RED, Style.RESET_ALL))
+        print(_pad_line_to_42(f"❌ Exit Failure: {str(e)[:22]}", Fore.RED, Style.RESET_ALL))
 
 if __name__ == "__main__":
-    asyncio.run(main())
 
