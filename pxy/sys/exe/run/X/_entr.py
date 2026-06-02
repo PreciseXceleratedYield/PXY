@@ -4,7 +4,7 @@ import asyncio
 from datetime import datetime, date, timedelta, time as dt_time
 import pytz
 from colorama import Fore, init, Style
-from _sgnl import _pad_line_to_42  # Shared 42-character width constraint engine
+from _sgnl import _pad_line_to_42  
 
 TICKER = "^NSEI"  
 LOT_SIZE = 65     
@@ -59,8 +59,10 @@ def get_global_position_summary(client):
 
 def execute_order(client, symbol, qty, txn_type):
     try:
-        base_tag = datetime.now(pytz.timezone("Asia/Kolkata")).strftime('%H%M%S')
-        order_tag = f"{base_tag}_{txn_type}"
+        # Formats tag explicitly as MMDDHHMMSS_ENTRY
+        base_tag = datetime.now(pytz.timezone("Asia/Kolkata")).strftime('%m%d%H%M%S')
+        order_tag = f"{base_tag}_ENTRY"
+        
         params = {
             "exchange_segment": "nse_fo", "product": "NRML", "price": "0",
             "order_type": "MKT", "quantity": str(qty), "validity": "DAY",
@@ -70,6 +72,14 @@ def execute_order(client, symbol, qty, txn_type):
         if res and str(res).strip():
             out_str = f"🚀 ROUTED|{symbol}|{txn_type}|TAG:{order_tag}"
             print(_pad_line_to_42(out_str, "\033[96m", "\033[0m"))
+            
+            entry_price = float(res.get("price", 0)) if isinstance(res, dict) else 0.0
+            token = res.get("token", "") if isinstance(res, dict) else ""
+            
+            # Imports state manager directly from exit module
+            from _exit import record_entry
+            record_entry(order_tag, symbol, qty, txn_type, entry_price, token)
+            
         return {"stat": "OK" if res and str(res).strip() else "FAIL"}
     except Exception as e:
         return {"stat": "FAIL", "err": str(e)}
@@ -93,21 +103,18 @@ async def trade_cycle():
     summary = get_global_position_summary(client)
     global_longs, global_shorts = summary["long"], summary["short"]
 
-    # --- GLOBAL QUANTITY PROTECTION CONDITIONS ---
     current_buy_qty = global_longs * LOT_SIZE
     current_sell_qty = global_shorts * LOT_SIZE
 
-    # Block new buys if already at or over 65 qty (unless we need to square off a short)
+    # --- STRICT ONE-LOT MAX QUANTITY PROTECTIONS ---
     if entry_signal in ["BUY", "BULL"] and current_buy_qty >= 65 and global_shorts == 0:
         print(_pad_line_to_42("🔒 GLOBAL BLOCK | BUY MAX REACHED (65)", "\033[93m", "\033[0m"))
         return
 
-    # Block new shorts if already at or over 65 qty (unless we need to square off a long)
     if entry_signal in ["SELL", "BEAR"] and current_sell_qty >= 65 and global_longs == 0:
         print(_pad_line_to_42("🔒 GLOBAL BLOCK | SELL MIN REACHED (-65)", "\033[93m", "\033[0m"))
         return
 
-    # --- BUY / BULL SIGNAL EXECUTION PIPELINE ---
     if entry_signal in ["BUY", "BULL"]:
         if global_shorts > 0:
             print(_pad_line_to_42("🔄 EXITING BEAR | SQUARING OFF", "\033[95m", "\033[0m"))
@@ -124,7 +131,6 @@ async def trade_cycle():
         else:
             print(_pad_line_to_42("🔒 HOLD | BULL ACTIVE | NO ADD", "\033[93m", "\033[0m"))
 
-    # --- SELL / BEAR SIGNAL EXECUTION PIPELINE ---
     elif entry_signal in ["SELL", "BEAR"]:
         if global_longs > 0:
             print(_pad_line_to_42("🔄 EXITING BULL | SQUARING OFF", "\033[95m", "\033[0m"))
@@ -141,7 +147,6 @@ async def trade_cycle():
         else:
             print(_pad_line_to_42("🔒 HOLD | BEAR ACTIVE | NO ADD", "\033[93m", "\033[0m"))
 
-# STRICTLY SINGLE-CYCLE RESTRUCTURING: Runs exactly once and exits cleanly
 async def main():
     try:
         await trade_cycle()
