@@ -108,7 +108,7 @@ async def trade_cycle():
         return
 
     # --- BUY / BULL SIGNAL EXECUTION PIPELINE ---
-    if entry_signal in ["BUY"]: #, "BULL"
+    if entry_signal in ["BUY", "BULL"]:
         if global_shorts > 0:
             print(_pad_line_to_42("🔄 EXITING BEAR | SQUARING OFF", "\033[95m", "\033[0m"))
             base_100 = round(ltp / 100) * 100
@@ -125,7 +125,7 @@ async def trade_cycle():
             print(_pad_line_to_42("🔒 HOLD | BULL ACTIVE | NO ADD", "\033[93m", "\033[0m"))
 
     # --- SELL / BEAR SIGNAL EXECUTION PIPELINE ---
-    elif entry_signal in ["SELL"]: #, "BEAR"
+    elif entry_signal in ["SELL", "BEAR"]:
         if global_longs > 0:
             print(_pad_line_to_42("🔄 EXITING BULL | SQUARING OFF", "\033[95m", "\033[0m"))
             target_strike = round(ltp / 100) * 100
