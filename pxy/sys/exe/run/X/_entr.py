@@ -1,173 +1,153 @@
-# _exit.py
+# _entr.py
+import sys
 import asyncio
-import os
-from datetime import datetime, time as dt_time
+from datetime import datetime, date, timedelta, time as dt_time
 import pytz
-
 from colorama import Fore, init, Style
-from _sgnl import _pad_line_to_42
-from _ltp import get_option_live_ltp  
-from _clnt import get_session
+from _sgnl import _pad_line_to_42  # Shared 42-character width constraint engine
 
-LOT_SIZE = 65
-MIN_EXIT_PROFIT = 200
+TICKER = "^NSEI"  
+LOT_SIZE = 65     
+MAX_QTY = 65      
+
+HOLIDAYS = [
+    "26-Jan-2026", "06-Mar-2026", "20-Mar-2026", "31-Mar-2026",
+    "03-Apr-2026", "14-Apr-2026", "01-May-2026", "15-Aug-2026",
+    "02-Oct-2026", "21-Oct-2026", "06-Nov-2026", "24-Nov-2026", "25-Dec-2026"
+]
+HOLIDAYS = [datetime.strptime(h, "%d-%b-%Y").date() for h in HOLIDAYS]
 
 init(autoreset=True)
 
-def clear_screen():
-    os.system('cls' if os.name == 'nt' else 'clear')
+def get_target_tuesday():
+    today = date.today()
+    days_until_tue = (1 - today.weekday() + 7) % 7
+    if today.weekday() <= 1: days_until_tue += 7
+    target_tue = today + timedelta(days=days_until_tue)
+    while target_tue in HOLIDAYS: target_tue -= timedelta(days=1)
+    return target_tue
 
-# ----------------- 🛑 ORDER EXECUTION disabled FOR DRY RUN -----------------
-def execute_exit(client, symbol, qty, txn_type, entry_tag):
-    """ Neutralised exit function to ensure safe dry-run monitoring """
-    return False 
-
-# ----------------- TRIPLE-STAGE VISUAL MAPPER ENGINE -----------------
-def render_comprehensive_order_diagnostics(client):
-    """
-    Fetches raw information directly from the broker report and breaks 
-    the architecture down into explicit processing layers.
-    """
+def get_nifty_symbol(strike):
     try:
-        order_res = client.order_report()  
-        orders = order_res.get("data", []) if isinstance(order_res, dict) else order_res
-        
-        if not isinstance(orders, list):
-            print(_pad_line_to_42("❌ BROKER API ERROR: Data is not a list", Fore.RED, Style.RESET_ALL))
-            return []
+        if not strike or strike == 0: return "NA"
+        opt_type = "CE"
+        expiry = get_target_tuesday()
+        yy = str(expiry.year)[-2:]
+        if (expiry + timedelta(days=7)).month != expiry.month:
+            return f"NIFTY{yy}{expiry.strftime('%b').upper()}{int(strike)}{opt_type}"
+        else:
+            m_map = {10: "O", 11: "N", 12: "D"}
+            return f"NIFTY{yy}{m_map.get(expiry.month, str(expiry.month))}{expiry.day:02d}{int(strike)}{opt_type}"
+    except: return "NA"
 
-        # =====================================================================
-        # STAGE 1: RAW BROKER ORDERS REPORT
-        # =====================================================================
-        print(_pad_line_to_42("📦 STAGE 1: RAW BROKER ORDER BOOK", Fore.CYAN + Style.BRIGHT, Style.RESET_ALL))
-        if not orders:
-            print(_pad_line_to_42("  EMPTY BOOK: No orders found today.", Fore.LIGHTBLACK_EX, Style.RESET_ALL))
-        for idx, o in enumerate(orders):
-            raw_tag = o.get("tag") or o.get("ordModNo") or "NO_TAG"
-            raw_sym = o.get("trdSym", "UNKNOWN")
-            raw_qty = o.get("fldQty", 0)
-            raw_stat = o.get("stat", "UNKNOWN")
-            raw_txn = o.get("trnsTp", "?")
-            print(_pad_line_to_42(f"  [{idx}] {raw_txn} | {raw_sym} | Qty:{raw_qty} | Stat:{raw_stat} | Tag:{raw_tag}", Fore.LIGHTBLACK_EX, Style.RESET_ALL))
-        
-        print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
+def get_global_position_summary(client):
+    gl, gs = 0, 0
+    try:
+        pos_res = client.positions()
+        positions = pos_res.get("data", [])
+        if not isinstance(positions, list): return {"long": 0, "short": 0}
+        for pos in positions:
+            net_qty = float(pos.get("net_qty", 0))
+            if net_qty == 0: net_qty = float(pos.get("flBuyQty", 0)) - float(pos.get("flSellQty", 0))
+            if abs(net_qty) > 0:
+                symbol = str(pos.get("trdSym", "")).upper()
+                if not symbol.endswith("CE") or "NIFTY" not in symbol or "BANKNIFTY" in symbol: continue
+                if net_qty > 0: gl += int(abs(net_qty) / LOT_SIZE)
+                elif net_qty < 0: gs += int(abs(net_qty) / LOT_SIZE)
+    except: pass
+    return {"long": gl, "short": gs}
 
-        # =====================================================================
-        # STAGE 2: MAPPED STRUCTURAL ORDERS
-        # =====================================================================
-        print(_pad_line_to_42("🗺️ STAGE 2: STRATEGIC TAG MAPPING", Fore.MAGENTA + Style.BRIGHT, Style.RESET_ALL))
-        
-        raw_entries = {}
-        closed_tags = set()
-
-        # Step 2A: Identify and group exit links ending with _X
-        for o in orders:
-            if str(o.get("stat", "")).lower() != "complete":
-                continue
-            tag = str(o.get("tag") or o.get("ordModNo") or "").strip().upper()
-            if tag.endswith("_X"):
-                parent_tag = tag[:-2]
-                closed_tags.add(parent_tag)
-                print(_pad_line_to_42(f"  🔒 EXIT FOUND -> Links to Parent: {parent_tag}", Fore.LIGHTRED_EX, Style.RESET_ALL))
-
-        # Step 2B: Map core strategic entry layers ending with _BUY or _SELL
-        for o in orders:
-            if str(o.get("stat", "")).lower() != "complete":
-                continue
-            tag = str(o.get("tag") or o.get("ordModNo") or "").strip().upper()
-            
-            if not (tag.endswith("_BUY") or tag.endswith("_SELL")):
-                continue
-
-            qty = int(float(o.get("fldQty", 0)))
-            if qty <= 0:
-                continue
-
-            raw_entries[tag] = {
-                "symbol": o.get("trdSym", ""),
-                "txn_type": str(o.get("trnsTp", "")).upper().strip(),
-                "entry_price": float(o.get("avgPrc", 0)),
-                "qty": qty,
-                "tag": tag,
-                "token": o.get("tok")  
-            }
-            
-            # Map status tracking visualization directly to console
-            map_status = "⚠️ UNMATCHED" if tag not in closed_tags else "✔️ FULLY CLOSED"
-            map_color = Fore.LIGHTGREEN_EX if tag not in closed_tags else Fore.LIGHTBLACK_EX
-            print(_pad_line_to_42(f"  {map_status} ENTRY -> {tag} ({o.get('trdSym', '')})", map_color, Style.RESET_ALL))
-
-        print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
-
-        # =====================================================================
-        # STAGE 3: ISOLATED LEDGER FOR FINAL OPEN CHECK
-        # =====================================================================
-        open_ledger = [details for tag, details in raw_entries.items() if tag not in closed_tags]
-        return open_ledger
-
+def execute_order(client, symbol, qty, txn_type):
+    try:
+        base_tag = datetime.now(pytz.timezone("Asia/Kolkata")).strftime('%H%M%S')
+        order_tag = f"{base_tag}_{txn_type}"
+        params = {
+            "exchange_segment": "nse_fo", "product": "NRML", "price": "0",
+            "order_type": "MKT", "quantity": str(qty), "validity": "DAY",
+            "trading_symbol": symbol, "transaction_type": txn_type, "amo": "NO", "tag": order_tag  
+        }
+        res = client.place_order(**params)
+        if res and str(res).strip():
+            out_str = f"🚀 ROUTED|{symbol}|{txn_type}|TAG:{order_tag}"
+            print(_pad_line_to_42(out_str, "\033[96m", "\033[0m"))
+        return {"stat": "OK" if res and str(res).strip() else "FAIL"}
     except Exception as e:
-        print(_pad_line_to_42(f"❌ Diagnostic Failure {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
-        return []
+        return {"stat": "FAIL", "err": str(e)}
 
-# ----------------- CORE CYCLE RUNTIME -----------------
-async def exit_cycle():
-    client = get_session()
-    if not client:
-        print(_pad_line_to_42("❌ SERVER SESSION ERROR", Fore.RED, Style.RESET_ALL))
-        return
+async def trade_cycle():
+    IST = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(IST).time()
+    if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 19) <= now < dt_time(15, 31)): return
 
     from _sgnl import get_all_data
+    from _clnt import get_session
+    
     data = get_all_data()
     entry_signal = str(data.get("entry", "")).upper().strip()
-    index_ltp = float(data.get("price", 0))
+    ltp = float(data.get("price", 0))
+    if ltp == 0 or entry_signal not in ["BUY", "BULL", "SELL", "BEAR"]: return
+   
+    client = get_session()
+    if not client: return
+    
+    summary = get_global_position_summary(client)
+    global_longs, global_shorts = summary["long"], summary["short"]
 
-    clear_screen()
-    print(_pad_line_to_42("📋 CORE STRATEGY INSPECTION ENGINE", Fore.YELLOW + Style.BRIGHT, Style.RESET_ALL))
-    print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
-    print(_pad_line_to_42(f"INDEX LTP : {index_ltp}", Fore.CYAN, Style.RESET_ALL))
-    print(_pad_line_to_42(f"SIGNAL    : {entry_signal}", Fore.MAGENTA, Style.RESET_ALL))
-    print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
+    # --- GLOBAL QUANTITY PROTECTION CONDITIONS ---
+    current_buy_qty = global_longs * LOT_SIZE
+    current_sell_qty = global_shorts * LOT_SIZE
 
-    # Trigger structural triple-stage diagnostic report
-    ledger = render_comprehensive_order_diagnostics(client)
-
-    print(_pad_line_to_42("🔓 STAGE 3: FINAL ISOLATED OPEN ORDERS", Fore.GREEN + Style.BRIGHT, Style.RESET_ALL))
-    if not ledger:
-        print(_pad_line_to_42("  NO ACTIVE UNMATCHED TRADES", Fore.WHITE, Style.RESET_ALL))
-        print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
+    # Block new buys if already at or over 65 qty (unless we need to square off a short)
+    if entry_signal in ["BUY", "BULL"] and current_buy_qty >= 65 and global_shorts == 0:
+        print(_pad_line_to_42("🔒 GLOBAL BLOCK | BUY MAX REACHED (65)", "\033[93m", "\033[0m"))
         return
 
-    for i, t in enumerate(ledger):
-        option_ltp = get_option_live_ltp(
-            client=client,
-            token_id=t["token"],
-            ex_seg="nse_fo",
-            fallback_price=t["entry_price"]
-        )
+    # Block new shorts if already at or over 65 qty (unless we need to square off a long)
+    if entry_signal in ["SELL", "BEAR"] and current_sell_qty >= 65 and global_longs == 0:
+        print(_pad_line_to_42("🔒 GLOBAL BLOCK | SELL MIN REACHED (-65)", "\033[93m", "\033[0m"))
+        return
 
-        pnl = 0.0
-        if t["txn_type"] == "B":
-            pnl = (option_ltp - t["entry_price"]) * t["qty"]
-            if pnl >= MIN_EXIT_PROFIT and entry_signal in ["SELL", "BEAR"]:
-                print(_pad_line_to_42(f"  [⚡] MATCH MET -> {t['tag']}", Fore.YELLOW, Style.RESET_ALL))
+    # --- BUY / BULL SIGNAL EXECUTION PIPELINE ---
+    if entry_signal in ["BUY"]: #, "BULL"
+        if global_shorts > 0:
+            print(_pad_line_to_42("🔄 EXITING BEAR | SQUARING OFF", "\033[95m", "\033[0m"))
+            base_100 = round(ltp / 100) * 100
+            target_strike = base_100 - 50 if abs(ltp - (base_100 - 50)) < abs(ltp - (base_100 + 50)) else base_100 + 50
+            symbol = get_nifty_symbol(target_strike)
+            execute_order(client, symbol, LOT_SIZE, "B")
+            return
 
-        elif t["txn_type"] == "S":
-            pnl = (t["entry_price"] - option_ltp) * t["qty"]
-            if pnl >= MIN_EXIT_PROFIT and entry_signal in ["BUY", "BULL"]:
-                print(_pad_line_to_42(f"  [⚡] MATCH MET -> {t['tag']}", Fore.YELLOW, Style.RESET_ALL))
+        if global_longs == 0:
+            target_strike = round(ltp / 100) * 100
+            symbol = get_nifty_symbol(target_strike)
+            execute_order(client, symbol, LOT_SIZE, "B")
+        else:
+            print(_pad_line_to_42("🔒 HOLD | BULL ACTIVE | NO ADD", "\033[93m", "\033[0m"))
 
-        color = Fore.GREEN if pnl >= 0 else Fore.RED
-        print(_pad_line_to_42(
-            f"  🔥 [{i}] {t['tag']} PnL:{int(pnl)} (LTP:{option_ltp:.2f})",
-            color,
-            Style.RESET_ALL
-        ))
-    print(_pad_line_to_42("=" * 42, Fore.YELLOW, Style.RESET_ALL))
+    # --- SELL / BEAR SIGNAL EXECUTION PIPELINE ---
+    elif entry_signal in ["SELL"]: #, "BEAR"
+        if global_longs > 0:
+            print(_pad_line_to_42("🔄 EXITING BULL | SQUARING OFF", "\033[95m", "\033[0m"))
+            target_strike = round(ltp / 100) * 100
+            symbol = get_nifty_symbol(target_strike)
+            execute_order(client, symbol, LOT_SIZE, "S")
+            return
 
-# ----------------- ENTRY ROUTINE (SINGLE EXECUTION) -----------------
+        if global_shorts == 0:
+            base_100 = round(ltp / 100) * 100
+            target_strike = base_100 - 50 if abs(ltp - (base_100 - 50)) < abs(ltp - (base_100 + 50)) else base_100 + 50
+            symbol = get_nifty_symbol(target_strike)
+            execute_order(client, symbol, LOT_SIZE, "S")
+        else:
+            print(_pad_line_to_42("🔒 HOLD | BEAR ACTIVE | NO ADD", "\033[93m", "\033[0m"))
+
+# STRICTLY SINGLE-CYCLE RESTRUCTURING: Runs exactly once and exits cleanly
 async def main():
-    await exit_cycle()
+    try:
+        await trade_cycle()
+    except Exception as e:
+        err_msg = f"⚠️ Entry Failure: {str(e)[:22]}"
+        print(_pad_line_to_42(err_msg, "\033[91m", "\033[0m"))
 
 if __name__ == "__main__":
     asyncio.run(main())
-
