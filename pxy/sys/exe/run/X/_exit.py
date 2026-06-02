@@ -11,7 +11,7 @@ from _clnt import get_session
 from _pnl import log_closed_trade      # Imported isolated function directly
 
 LOT_SIZE = 65
-MIN_EXIT_PROFIT = 200
+MIN_EXIT_PROFIT = 1000
 
 init(autoreset=True)
 
