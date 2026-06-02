@@ -1,4 +1,4 @@
-# get_orders.py
+# map_orders.py
 import asyncio
 from colorama import Fore, init, Style
 from _clnt import get_session
@@ -8,44 +8,73 @@ init(autoreset=True)
 async def main():
     print(f"{Fore.YELLOW}⏳ Connecting to broker session...")
     client = get_session()
-    if not client:
-        print(f"{Fore.RED}❌ Connection Failed: Could not get a valid session.")
-        return
+    if not client: return
 
-    print(f"{Fore.CYAN}📥 Requesting raw order book data...")
     try:
         order_res = client.order_report()
-        
-        # Extract the list from the broker's response wrapper
         orders = order_res.get("data", []) if isinstance(order_res, dict) else order_res
 
-        print("=" * 60)
-        print(f"📊 TOTAL RAW ORDERS FOUND TODAY: {len(orders) if isinstance(orders, list) else 0}")
-        print("=" * 60)
+        if not isinstance(orders, list): return
 
-        if not isinstance(orders, list):
-            print(f"{Fore.RED}Unexpected structural response format: {order_res}")
-            return
+        raw_entries = {}
+        closed_tags = set()
 
-        if not orders:
-            print("No orders recorded on this account for today yet.")
-            return
+        # PASS 1: Identify and isolate ALL entry tags that have been closed with a matching '_X'
+        for o in orders:
+            if str(o.get("stat", "")).lower() != "complete": continue
+            tag = str(o.get("tag") or "").strip().upper()
+            if tag.endswith("_X"):
+                parent_tag = tag[:-2]  # Strips away '_X' to find the parent tag
+                closed_tags.add(parent_tag)
 
-        # Print every single order sequentially
-        for idx, o in enumerate(orders):
-            txn = str(o.get("trnsTp", "?")).upper().strip()   # "B" or "S"
-            sym = o.get("trdSym", "UNKNOWN")                  # Trading Symbol
-            qty = o.get("fldQty", 0)                          # Filled Quantity
-            stat = o.get("stat", "UNKNOWN")                   # Order Status (COMPLETE, REJECTED, etc)
-            tag = o.get("tag") or o.get("ordModNo") or "NONE" # Custom Tag or Reference ID
-            price = o.get("avgPrc", 0)                        # Execution Price
+        # PASS 2: Map original structural strategy entries
+        for o in orders:
+            if str(o.get("stat", "")).lower() != "complete": continue
+            tag = str(o.get("tag") or "").strip().upper()
             
-            print(f"[{idx:02d}] {txn} | {sym} | Qty: {qty} | Price: {price} | Status: {stat} | Tag: {tag}")
-            
-        print("=" * 60)
+            # Match the real strategy formats we discovered in Step 1 (*_B or *_S)
+            if not (tag.endswith("_B") or tag.endswith("_S")): continue
+
+            qty = int(float(o.get("fldQty", 0)))
+            if qty <= 0: continue
+
+            raw_entries[tag] = {
+                "symbol": o.get("trdSym", ""),
+                "txn_type": str(o.get("trnsTp", "")).upper().strip(),
+                "entry_price": float(o.get("avgPrc", 0)),
+                "qty": qty,
+                "tag": tag
+            }
+
+        # PASS 3: Separate entries strictly by their mapping state
+        open_trades = []
+        closed_trades = []
+
+        for tag, details in raw_entries.items():
+            if tag in closed_tags:
+                closed_trades.append(details)
+            else:
+                open_trades.append(details)
+
+        # =====================================================================
+        # DISPLAY MAPPED BUCKETS
+        # =====================================================================
+        print("\n" + "=" * 50)
+        print(f"🔒 CLOSED / MATCHED STRATEGY TRADES ({len(closed_trades)})")
+        print("=" * 50)
+        for ct in sorted(closed_trades, key=lambda x: x['tag']):
+            print(f"  ✔️ CLOSED -> {ct['tag']} | {ct['symbol']} @ {ct['entry_price']:.2f}")
+
+        print("\n" + "=" * 50)
+        print(f"🔓 UNMATCHED OPEN STRATEGY TRADES ({len(open_trades)})")
+        print("=" * 50)
+        for ot in sorted(open_trades, key=lambda x: x['tag']):
+            print(f"  🔥 ACTIVE -> {ot['tag']} | {ot['symbol']} | Qty: {ot['qty']} @ {ot['entry_price']:.2f}")
+        print("=" * 50)
 
     except Exception as e:
-        print(f"{Fore.RED}❌ Critical error reading order book: {str(e)}")
+        print(f"{Fore.RED}❌ Mapping matrix error: {str(e)}")
 
 if __name__ == "__main__":
     asyncio.run(main())
+
