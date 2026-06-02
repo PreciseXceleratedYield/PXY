@@ -74,7 +74,7 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
         (c1, c1_emoji, f" C1-{c1:.2f}", "█", c1_color),
         (c0, c0_emoji, f" C0-{c0:.2f}", "█", c0_color)
     ]
-    rows.sort(key=lambda item: item, reverse=True)
+    rows.sort(key=lambda item: item[0], reverse=True)
 
     # Print 42-width Header
     print(f"\n{_pad_line_to_42(header_text, YLW, RST)}")
@@ -129,10 +129,10 @@ def apply_mode_5_transformation(df):
 
 def calculate_no_repaint_signals(df):
     """
-    Evaluates trends directly from CLOSED, FIXED 1-minute Mode 5 candles.
-    Completely prevents re-painting by comparing index -2 and index -3.
+    Evaluates trends directly from the RUNNING (Live) 1-minute Mode 5 candle.
+    Note: Signals can fluctuate (repaint) dynamically until the candle closes.
     """
-    if df.empty or len(df) < 3:
+    if df.empty or len(df) < 2:
         return 0.0, "NONE"
 
     opens = df['Open'].to_numpy()
@@ -141,28 +141,35 @@ def calculate_no_repaint_signals(df):
     # The actual order execution price is taken from the latest live tick (Index -1)
     live_ltp = float(closes[-1])
 
-    # --- STRICT NO-REPAINT CLOSED CANDLE BOUNDARIES (1-MIN TIMEFRAME) ---
-    # Confirmed Last Closed Candle (Index -2)
-    confirmed_is_bullish = closes[-2] >= opens[-2]
+    # --- LIVE RUNNING CANDLE BOUNDARIES (1-MIN TIMEFRAME) ---
+    # Current Running Candle (Index -1)
+    running_is_bullish = closes[-1] >= opens[-1]
     
-    # Confirmed Prior Closed Candle (Index -3)
-    previously_confirmed_is_bullish = closes[-3] >= opens[-3]
+    # Confirmed Prior Closed Candle (Index -2)
+    previously_confirmed_is_bullish = closes[-2] >= opens[-2]
 
-    # --- THE ABSOLUTE FLIP SIGNAL MATRIX ---
-    if confirmed_is_bullish and not previously_confirmed_is_bullish:
-        signal = "BUY"   # The closed 1-min candle flipped Bearish -> Bullish
-    elif not confirmed_is_bullish and previously_confirmed_is_bullish:
-        signal = "SELL"  # The closed 1-min candle flipped Bullish -> Bearish
-    elif confirmed_is_bullish:
-        signal = "BULL"  # Trend remains locked in a Green state
+    # --- THE RUNNING FLIP SIGNAL MATRIX ---
+    if running_is_bullish and not previously_confirmed_is_bullish:
+        signal = "BUY"   # The live running candle turned Bearish -> Bullish
+    elif not running_is_bullish and previously_confirmed_is_bullish:
+        signal = "SELL"  # The live running candle turned Bullish -> Bearish
+    elif running_is_bullish:
+        signal = "BULL"  # Running candle continues the green trend state
     else:
-        signal = "BEAR"  # Trend remains locked in a Red state
+        signal = "BEAR"  # Running candle continues the red trend state
 
     # --- RENDER VISUAL PRINT BAR MATRIX ---
+    # Safe index check to avoid errors if dataframe contains fewer than 3 elements
+    has_three = len(closes) >= 3
     _print_console_bar(
-        c2=closes[-3], c1=closes[-2], c0=closes[-1],
-        o2=opens[-3], o1=opens[-2], o0=opens[-1],
-        entry=signal, exit_sig="NONE"
+        c2=closes[-3] if has_three else closes[-2], 
+        c1=closes[-2], 
+        c0=closes[-1],
+        o2=opens[-3] if has_three else opens[-2], 
+        o1=opens[-2], 
+        o0=opens[-1],
+        entry=signal, 
+        exit_sig="NONE"
     )
 
     return live_ltp, signal
@@ -224,45 +231,8 @@ def export_chart_json(df, lookback=42):
             output = output[-lookback:]
             
         with open(JSON_OUTPUT, "w") as f:
-            json.dump(output, f, indent=2)
+            json.dump(output, f, indent=4)
             
-    except Exception:
-        pass 
-
-def get_all_data():
-    """
-    Downloads strictly 1 day of 1-minute bars straight from yfinance.
-    Applies Mode 5, maps out verified trend flips, and outputs matrix JSON updates.
-    """
-    try:
-        # Fetching strictly today's 1-minute tracking profile
-        ticker_obj = yf.Ticker(TICKER)
-        df = ticker_obj.history(period="1d", interval="1m")
-        
-        if df.empty:
-            empty_msg = "⚠️ Data Stream Empty: Check Feed"
-            print(_pad_line_to_42(empty_msg, "\033[93m", "\033[0m"))
-            return {"entry": "NONE", "price": 0.0}
-
-        df.dropna(inplace=True)
-        df.index = pd.to_datetime(df.index).tz_convert(TIMEZONE) # IST Timezone Lock
-
-        # Process historical completed rows via Mode 5 transformation matrix
-        transformed_df = apply_mode_5_transformation(df.copy())
-        ltp, signal = calculate_no_repaint_signals(transformed_df)
-        
-        # ---- JSON EXPORTER TARGETING SAME FOLDER WITH BACKFILL ----
-        export_chart_json(transformed_df, lookback=42)
-        
-        return {"entry": signal, "price": ltp}
-
     except Exception as e:
-        err_msg = f"❌ Signal Error: {str(e)[:24]}"
-        print(_pad_line_to_42(err_msg, "\033[91m", "\033[0m"))
-        return {"entry": "NONE", "price": 0.0}
-
-if __name__ == "__main__":
-    test_msg = f"📡 Scanning Market Feed: {TICKER}"
-    print(_pad_line_to_42(test_msg, "\033[93m", "\033[0m"))
-    get_all_data()
+        print(f"Error exporting JSON: {e}")
 
