@@ -11,7 +11,7 @@ from _clnt import get_session
 from _pnl import log_closed_trade      # Imported isolated function directly
 
 LOT_SIZE = 65
-MIN_EXIT_PROFIT = 200
+MIN_EXIT_PROFIT = 500
 
 init(autoreset=True)
 
@@ -260,7 +260,7 @@ async def exit_cycle():
             pnl = (t["entry_price"] - option_ltp) * t["qty"]
             
             # STRICT AND LOGIC: Must be profitable AND trend must reverse to exit
-            if pnl >= MIN_EXIT_PROVISO and entry_signal in ["BUY", "BULL"]:
+            if pnl >= MIN_EXIT_PROFIT and entry_signal in ["BUY", "BULL"]:
                 trigger_exit = True
 
             if trigger_exit:
@@ -287,3 +287,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
