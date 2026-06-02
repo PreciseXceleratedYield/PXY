@@ -73,13 +73,6 @@ def execute_order(client, symbol, qty, txn_type):
             out_str = f"🚀 ROUTED|{symbol}|{txn_type}|TAG:{order_tag}"
             print(_pad_line_to_42(out_str, "\033[96m", "\033[0m"))
             
-            entry_price = float(res.get("price", 0)) if isinstance(res, dict) else 0.0
-            token = res.get("token", "") if isinstance(res, dict) else ""
-            
-            # Imports state manager directly from exit module
-            from _exit import record_entry
-            record_entry(order_tag, symbol, qty, txn_type, entry_price, token)
-            
         return {"stat": "OK" if res and str(res).strip() else "FAIL"}
     except Exception as e:
         return {"stat": "FAIL", "err": str(e)}
@@ -156,3 +149,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
