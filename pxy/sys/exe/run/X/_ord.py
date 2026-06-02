@@ -8,36 +8,48 @@ init(autoreset=True)
 async def main():
     print(f"{Fore.YELLOW}⏳ Connecting to broker session...")
     client = get_session()
-    if not client: return
+    if not client: 
+        print(f"{Fore.RED}❌ Connection failed.")
+        return
 
     try:
         print(f"{Fore.CYAN}📥 Fetching and filtering trade matrix maps...")
         order_res = client.order_report()
         orders = order_res.get("data", []) if isinstance(order_res, dict) else order_res
 
-        if not isinstance(orders, list): return
+        if not isinstance(orders, list): 
+            print(f"{Fore.RED}❌ Invalid broker response structure.")
+            return
 
         raw_entries = {}
         closed_tags = set()
 
-        # PASS 1: Identify and isolate ALL entry tags that have been closed with a matching '_X'
+        # PASS 1: Identify and isolate ALL entry tags closed with an associated '_X' tag (Case-Insensitive)
         for o in orders:
-            if str(o.get("stat", "")).lower() != "complete": continue
-            tag = str(o.get("tag") or "").strip().upper()
+            status = str(o.get("stat", "")).strip().lower()
+            if status != "complete": 
+                continue
+                
+            tag = str(o.get("tag") or o.get("ordModNo") or "").strip().upper()
             if tag.endswith("_X"):
-                parent_tag = tag[:-2]  # Strips away '_X' to find the parent tag
+                parent_tag = tag[:-2]  # Strips away '_X' to extract the original entry timestamp
                 closed_tags.add(parent_tag)
 
-        # PASS 2: Match your real entry tag formats (*_B or *_S)
+        # PASS 2: Collect valid entry formats matching exactly your timestamp codes (*_B or *_S)
         for o in orders:
-            if str(o.get("stat", "")).lower() != "complete": continue
-            tag = str(o.get("tag") or "").strip().upper()
+            status = str(o.get("stat", "")).strip().lower()
+            if status != "complete": 
+                continue
+                
+            tag = str(o.get("tag") or o.get("ordModNo") or "").strip().upper()
             
-            # Match the real strategy formats we discovered in Step 1 (*_B or *_S)
-            if not (tag.endswith("_B") or tag.endswith("_S")): continue
+            # Match exactly the '_B' and '_S' tag signatures found in your raw terminal history logs
+            if not (tag.endswith("_B") or tag.endswith("_S")): 
+                continue
 
             qty = int(float(o.get("fldQty", 0)))
-            if qty <= 0: continue
+            if qty <= 0: 
+                continue
 
             raw_entries[tag] = {
                 "symbol": o.get("trdSym", ""),
@@ -47,7 +59,7 @@ async def main():
                 "tag": tag
             }
 
-        # PASS 3: Separate entries strictly by checking if the tag was explicitly marked as closed
+        # PASS 3: Separate entries into Closed vs Open tracking buckets
         open_trades = []
         closed_trades = []
 
@@ -58,7 +70,7 @@ async def main():
                 open_trades.append(details)
 
         # =====================================================================
-        # DISPLAY MAPPED BUCKETS
+        # DISPLAY BUCKETS RENDERING PASS
         # =====================================================================
         print("\n" + "=" * 50)
         print(f"🔒 CLOSED / MATCHED STRATEGY TRADES ({len(closed_trades)})")
@@ -76,9 +88,8 @@ async def main():
         print("=" * 50)
 
     except Exception as e:
-        print(f"{Fore.RED}❌ Mapping matrix error: {str(e)}")
+        print(f"{Fore.RED}❌ Diagnostic matrix tracking error: {str(e)}")
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 
