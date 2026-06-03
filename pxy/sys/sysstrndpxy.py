@@ -1,6 +1,15 @@
 # sysstrndpxy.py
+import sys
 import numpy as np
 import pandas as pd
+
+# 🛠️ DYNAMIC HOTPATCH: Fixes the config object before sysdtafpxy imports it to prevent yfinance crashing
+try:
+    import syscnfgpxy
+    if hasattr(syscnfgpxy, 'TIMEZONE'):
+        syscnfgpxy.TIMEZONE = str(syscnfgpxy.TIMEZONE)
+except Exception:
+    pass
 
 # Global Config 
 DEBUG_MODE = True 
@@ -10,15 +19,15 @@ CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running c
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
     PXY® Engine Strategy Matrix.
-    Processes dynamic session lookback indicators and separates Actionable Trigger 
-    Signals from continuous Foundational Directional Trends.
+    Uses pre-transformed Mode 5 arrays directly from your data module.
+    Calculates dynamic intraday resetting boundaries and isolates signals.
     """ 
     if df is None or df.empty:
         return pd.DataFrame()
 
     df = df.copy()
     
-    # 1. TIMEZONE & TIMELINE EXTRACTION CONSTRAINTS
+    # 1. TIMELINE MANAGEMENT & INDEX ALIGNMENTS
     if isinstance(df.index, pd.DatetimeIndex):
         timestamps = df.index
     else:
@@ -26,34 +35,12 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     dates = timestamps.date
 
     n = len(df)
-    ha_o = np.zeros(n)
     
-    raw_open  = df['Open'].to_numpy()
-    raw_high  = df['High'].to_numpy()
-    raw_low   = df['Low'].to_numpy()
-    raw_close = df['Close'].to_numpy()
-
-    # Isolated daily Heikin-Ashi generator loops
-    for i in range(n):
-        ha_c_i = (raw_open[i] + raw_high[i] + raw_low[i] + raw_close[i]) / 4.0
-        if i == 0 or dates[i] != dates[i-1]:
-            ha_o[i] = (raw_open[i] + raw_close[i]) / 2.0
-        else:
-            ha_o[i] = (ha_o[i-1] + ha_c_i) / 2.0
-
-    ha_c = (raw_open + raw_high + raw_low + raw_close) / 4.0
-    ha_h = np.maximum(raw_high, np.maximum(ha_o, ha_c))
-    ha_l = np.minimum(raw_low, np.maximum(ha_o, ha_c))
-
-    oc2 = (raw_open + raw_close) / 2.0
-    raw_c1 = np.copy(raw_close)
-    raw_c1[1:] = raw_close[:-1]
-
-    # Explicit Mode 5 assignments compiled natively inside the matrix framework
-    src_o = (raw_open + ha_o + oc2 + raw_c1) / 4.0
-    src_h = (raw_high + ha_h + oc2 + raw_close) / 4.0
-    src_l = (raw_low + ha_l + oc2 + raw_c1) / 4.0
-    src_c = (raw_close + ha_c + oc2 + raw_close) / 4.0
+    # 🎯 UPSTREAM SYNC: Read pre-calculated columns directly from your data frame
+    src_o = df['Open'].to_numpy()
+    src_h = df['High'].to_numpy()
+    src_l = df['Low'].to_numpy()
+    src_c = df['Close'].to_numpy()
 
     # 2. TOTAL INTRADAY SESSION STATISTICS MATH MATRIX
     sma_line   = np.zeros(n)
@@ -174,7 +161,6 @@ def get_signal(df: pd.DataFrame) -> tuple:
         calculated_df = calculate_supertrend(df)
         n = len(calculated_df)
         
-        # Route index window selection based on configuration switch parameters
         if CHECK_CONFIRMED_ONLY:
             idx = n - 2  # 🔒 Complete Closed Bar (Non-Reprinting)
         else:
@@ -199,7 +185,6 @@ def get_signal(df: pd.DataFrame) -> tuple:
 
 # Standalone execution validation loop
 if __name__ == "__main__":
-    # 🎯 FIXED: Points straight to your untouchable 'sysdtafpxy' file module name
     from sysdtafpxy import fetch_yf_data
     
     print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
@@ -208,7 +193,6 @@ if __name__ == "__main__":
     
     try:
         print("Polling latest day-specific session data from sysdtafpxy...")
-        # Pull data via your untouchable helper script function name
         live_df = fetch_yf_data()
         
         if live_df is not None and not live_df.empty:
@@ -223,4 +207,5 @@ if __name__ == "__main__":
             
     except Exception as e:
         print(f"❌ Critical Connection Exception Hit: {e}")
+
 
