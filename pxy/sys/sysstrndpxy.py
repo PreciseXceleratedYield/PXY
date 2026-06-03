@@ -199,7 +199,6 @@ def get_signal(df: pd.DataFrame) -> tuple:
 
 # Standalone execution validation loop
 if __name__ == "__main__":
-    # 🎯 FIXED: Corrected module function import name mapping to match sysdthapxy.py exactly
     from sysdthapxy import fetch_yf_data
     
     print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
@@ -222,5 +221,3 @@ if __name__ == "__main__":
             
     except Exception as e:
         print(f"❌ Critical Connection Exception Hit: {e}")
-
-
