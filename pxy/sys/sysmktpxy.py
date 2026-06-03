@@ -40,7 +40,7 @@ def _print_console_bar(anchor_c, trigger_c, now_c, anchor_o, trigger_o, now_o, e
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
-    print(f"\n{YLW}= GEOMETRIC HIGH-PRIORITY ENTRY ENGINE ={RST}")
+    print(f"\n{YLW}= GEOMETRIC PXY®-PRIORITY ENTRY ENGINE ={RST}")
     for val, label, marker, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
