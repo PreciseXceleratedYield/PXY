@@ -1,4 +1,3 @@
-# _exit.py
 import asyncio
 import os
 import json
@@ -50,8 +49,10 @@ def sync_database_from_broker_logs(client):
             status = str(o.get("stat", "")).strip().lower()
             if status != "complete": continue
             tag = str(o.get("tag", "")).strip().upper()
+            
+            # FIXED: Slicing exactly the last 5 characters ("_EXIT") instead of using .replace()
             if tag.endswith("_ENTRY_EXIT"):
-                parent_tag = tag.replace("_EXIT", "")
+                parent_tag = tag[:-5] 
                 completed_exits.add(parent_tag)
             if tag.endswith("_ENTRY"):
                 valid_broker_entries.add(tag)
@@ -116,12 +117,10 @@ def execute_exit(client, symbol, qty, txn_type, entry_tag):
         res = client.place_order(**params)
         if res and str(res).strip():
             print(_pad_line_to_42(f"🏁 COUPLED | {exit_tag}", Fore.MAGENTA + Style.BRIGHT, Style.RESET_ALL))
-            # --- SURGICAL CHANGE HERE ---
             try:
                 subprocess.Popen(["python", "_pnl.py"])
             except Exception as e:
                 print(_pad_line_to_42(f"⚠️ Script Trigger Error: {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
-            # ----------------------------
             return True
     except Exception as e:
         print(_pad_line_to_42(f"❌ Exit Error {str(e)[:20]}", Fore.RED, Style.RESET_ALL))
@@ -179,51 +178,46 @@ async def process_stateful_exits(client):
             if entry_price == 0: continue
 
             # Fetch active option premium valuation ticker rates safely
-            live_ltp = float(get_option_live_ltp(client, token, "nse_fo", fallback_price=0.0) if token else 0)
-            if live_ltp == 0:
-                print(_pad_line_to_42(f"  ⚠️ {entry_tag[:10]} | Price stream offline", Fore.RED, Style.RESET_ALL))
-                continue
-
-            # Calculate precise running profit figures
+            live_ltp = float(get_option_live_ltp(client, token, "nse_fo", fallback_prc=entry_price))
+            
+            # Compute current active unrealized PnL
             if entry_txn == "B":
-                live_pnl = (live_ltp - entry_price) * qty
-                opposite_txn = "S"
+                unrealized_pnl = (live_ltp - entry_price) * qty
+                exit_txn_type = "S"  # If bought, exit by selling
             else:
-                live_pnl = (entry_price - live_ltp) * qty
-                opposite_txn = "B"
+                unrealized_pnl = (entry_price - live_ltp) * qty
+                exit_txn_type = "B"  # If sold, exit by buying
 
-            # Print detailed monitoring line item for this contract block
-            run_color = Fore.GREEN if live_pnl >= 0 else Fore.RED
-            status_text = f"  🔥 {entry_tag} | {symbol[:15]} | PnL: Rs.{live_pnl:.2f}"
-            print(_pad_line_to_42(status_text, run_color, Style.RESET_ALL))
+            # Dashboard row display
+            pnl_str_color = Fore.GREEN if unrealized_pnl >= 0 else Fore.RED
+            metrics_display = f"{symbol[:10]} | LTP: {live_ltp:.1f} | PnL: Rs.{unrealized_pnl:.1f}"
+            print(_pad_line_to_42(metrics_display, pnl_str_color, Style.RESET_ALL))
 
-            # Profit threshold ceiling safety check
-            if live_pnl >= MIN_EXIT_PROFIT:
-                print(_pad_line_to_42("🎯 TARGET MET | COUPLING...", Fore.GREEN + Style.BRIGHT, Style.RESET_ALL))
-                
-                # Pre-lock database state right before network handshakes to block race condition loops
-                trades[entry_tag]["status"] = "COMPLETED"
-                save_trades(trades)
-                
-                success = execute_exit(client, symbol, qty, opposite_txn, entry_tag)
+            # --- EVALUATION LOGIC GATE ---
+            # Condition (Status == OPEN AND Unrealized PnL >= MIN_EXIT_PROFIT)
+            if unrealized_pnl >= MIN_EXIT_PROFIT:
+                print(_pad_line_to_42(f"🎯 TARGET REACHED FOR {entry_tag}!", Fore.GREEN + Style.BRIGHT, Style.RESET_ALL))
+                # Trigger the market orders instantly
+                success = execute_exit(client, symbol, qty, exit_txn_type, entry_tag)
                 if success:
-                    trades[entry_tag]["exit_price"] = live_ltp
-                    trades[entry_tag]["exit_tag"] = f"{entry_tag}_EXIT"
-                    save_trades(trades)
-                else:
-                    # Automatic rollback protection layer
-                    trades[entry_tag]["status"] = "OPEN"
-                    save_trades(trades)
+                    # Sync immediately to prevent loop duplicates
+                    sync_database_from_broker_logs(client)
                     
         print(_pad_line_to_42(border, Fore.BLUE, Style.RESET_ALL))
 
     except Exception as e:
-        print(_pad_line_to_42(f"⚠️ Loop Error: {str(e)[:22]}", Fore.RED, Style.RESET_ALL))
+        print(_pad_line_to_42(f"⚠️ Loop Error: {str(e)[:30]}", Fore.RED, Style.RESET_ALL))
 
+# --- MAIN EXECUTION HARNESS ---
 async def main():
     client = get_session()
-    if client: 
+    if not client:
+        print("❌ Session failed. Exiting script.")
+        return
+        
+    while True:
         await process_stateful_exits(client)
+        await asyncio.sleep(1)  # 1-second ticks
 
 if __name__ == "__main__":
     asyncio.run(main())
