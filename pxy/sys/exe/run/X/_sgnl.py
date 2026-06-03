@@ -44,8 +44,8 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
     GRN = "\033[92m"
     YLW = "\033[1;93m"
 
-    header_emoji = "🐂" if entry in ["BUY", "BULL"] else "🐻"
-    header_text = f"{header_emoji} GEOMETRIC MATRIX ENGINE"
+    header_emoji = "🟩" if entry in ["BUY", "BULL"] else "🟥"
+    header_text = f"{header_emoji}       PXY® MATRIX ENGINE"
     border_text = "==========================================" 
 
     min_val = min(c2, c1, c0) - 2
@@ -66,9 +66,9 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
     c0_color = GRN if c0 >= o0 else RED
 
     rows = [
-        (c2, c2_emoji, f" C2-{c2:.2f}", "█", c2_color),
-        (c1, c1_emoji, f" C1-{c1:.2f}", "█", c1_color),
-        (c0, c0_emoji, f" C0-{c0:.2f}", "█", c0_color)
+        (c2, c2_emoji,f" C2-{c2:.1f}","█", c2_color),
+        (c1, c1_emoji,f" C1-{c1:.1f}","█", c1_color),
+        (c0, c0_emoji,f" C0-{c0:.1f}","█", c0_color)
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
@@ -80,8 +80,8 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
         combined_visible = f"{left_label}{bar_graph}"
         print(_pad_line_to_42(combined_visible, color, RST))
         
-    sig_emoji = "🔼" if entry in ["BUY", "BULL"] else "🔽"
-    signal_text = f" {sig_emoji} SIGNAL VERIFIED: {entry}"
+    sig_emoji = "🟢 🔼" if entry in ["BUY", "BULL"] else "🔴 🔽"
+    signal_text = f"  {sig_emoji}   SIGNAL VERIFIED: {entry}"
     print(_pad_line_to_42(signal_text, YLW, RST))
     print(f"{_pad_line_to_42(border_text, YLW, RST)}")
 
