@@ -7,18 +7,11 @@ DEBUG_MODE = True
 MA_TYPE = "TSMA"  
 CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running candle (Index -1)
 
-def calculate_sma_42(series: pd.Series) -> np.ndarray: 
-    """ Replaced by Session-Specific SMA inside the main matrix driver """
-    pass
-
-def calculate_tsma_42(series: pd.Series) -> np.ndarray: 
-    """ Replaced by Session-Specific Linear Regression inside the main matrix driver """
-    pass
-
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    PXY® Engine: Re-mapped to your exact original architecture.
-    Calculates Mode 5, runs Intraday Session memory resets, and compiles historical trend strings.
+    PXY® Engine Core Driver Matrix.
+    Transforms data to Mode 5, runs Intraday Session calculations, and isolates 
+    actionable 'Signals' from foundational structural 'Trends'.
     """ 
     if df is None or df.empty:
         return pd.DataFrame()
@@ -60,7 +53,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     src_l = (raw_low + ha_l + oc2 + raw_c1) / 4.0
     src_c = (raw_close + ha_c + oc2 + raw_close) / 4.0
 
-    # 2. DYNAMIC INTRADAY SESSION MEMORY MANAGEMENT
+    # 2. DYNAMIC INTRADAY SESSION MEMORY TRACKING
     sma_line   = np.zeros(n)
     tsma_line  = np.zeros(n)
     hh_session = np.zeros(n)
@@ -98,10 +91,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         hh_session[i] = curr_hh
         ll_session[i] = curr_ll
 
-        # Session-Specific SMA
+        # Intraday Resetting SMA
         sma_line[i] = sum_y / current_count
 
-        # Session-Specific TSMA Linear Regression Line Endpoint
+        # Intraday Resetting TSMA
         tsma_line[i] = src_c[i]
         if current_count > 1:
             num = (current_count * sum_xy) - (sum_x * sum_y)
@@ -116,26 +109,26 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     # 3. CHANNEL STRUCTURAL ASSIGNMENTS
     df['pxy_st_line'] = (base_ma_line + hh_session + ll_session + src_c) / 4.0
-    df['pxy_st_no_ll'] = (base_ma_line + hh_session + src_c) / 3.0 # Upper Boundary Line
-    df['pxy_st_no_hh'] = (base_ma_line + ll_session + src_c) / 3.0 # Lower Boundary Line
+    df['pxy_st_no_ll'] = (base_ma_line + hh_session + src_c) / 3.0 # Upper Boundary
+    df['pxy_st_no_hh'] = (base_ma_line + ll_session + src_c) / 3.0 # Lower Boundary
     df['bar_count_session'] = bar_count_session
     df['src_c'] = src_c
 
-    # Dashboard Compatibility Reference Keys from original structure
-    df['ST'] = df['pxy_st_line'] 
-    df['c1'] = pd.Series(src_c).shift(1).to_numpy()
-    df['st_prev'] = df['ST'].shift(1) 
-
-    # 4. HISTORICAL STATE & MOMENTUM TREND COMPILER LOOPS
+    # 4. EXPLICIT SEPARATION: HISTORICAL SIGNAL AND TREND LOOPS
     st = df['pxy_st_line'].to_numpy()
     no_ll = df['pxy_st_no_ll'].to_numpy()
     no_hh = df['pxy_st_no_hh'].to_numpy()
     
-    st_trend_full = [] 
+    st_signal_history = [] 
+    st_trend_history = []
     
     for i in range(n): 
+        # Base trend assignment: Price up = BULL | Price down = BEAR relative to Center Line
+        current_trend = "BULL" if src_c[i] >= st[i] else "BEAR"
+        st_trend_history.append(current_trend)
+
         if bar_count_session[i] < 2: 
-            st_trend_full.append("BULL" if src_c[i] >= st[i] else "BEAR") 
+            st_signal_history.append("NONE") 
             continue 
             
         c0 = src_c[i]
@@ -143,58 +136,60 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         st0 = st[i]
         st1 = st[i-1]
         
-        # Center Line Crossovers
+        # Center Line Crossover Conditions
         cross_buy  = (c0 > st0) and (c1 <= st1)
         cross_sell = (c0 < st0) and (c1 >= st1)
         
-        # Boundary Line Intersections
+        # Boundary Line Overextensions
         force_buy  = (c0 > no_ll[i]) and (c1 <= no_ll[i-1])
         force_sell = (c0 < no_hh[i]) and (c1 >= no_hh[i-1])
         
-        # Priority Structural Trend Matrix Evaluation
+        # Pure Actionable Signal Processing Logic Matrix
         if force_buy:
-            st_trend_full.append("FORCESELL")
+            st_signal_history.append("FORCESELL")  # Price extreme above upper band
         elif force_sell:
-            st_trend_full.append("FORCEBUY")
+            st_signal_history.append("FORCEBUY")   # Price extreme below lower band
         elif cross_buy:
-            st_trend_full.append("CROSSBUY")
+            st_signal_history.append("CROSSBUY")   # Center line breakout up
         elif cross_sell:
-            st_trend_full.append("CROSSSELL")
+            st_signal_history.append("CROSSSELL")  # Center line breakdown down
         else:
-            # Maintain underlying market baseline tracker state
-            st_trend_full.append("BULL" if c0 >= st0 else "BEAR")
+            st_signal_history.append("NONE")       # No trading trigger on this candle
 
-    df['st_trend_full'] = st_trend_full
+    df['st_signal_full'] = st_signal_history
+    df['st_trend_full'] = st_trend_history
     return df
 
 def get_signal(df: pd.DataFrame) -> tuple:
     """
-    Direct endpoint extractor matching lookups with your Pine configuration switch properties.
+    Direct endpoint extractor pulling specific 'Signal' and 'Trend' values
+    based on the state of the CHECK_CONFIRMED_ONLY configuration switch.
     """
     if df is None or df.empty:
         return "NONE", "NONE"
         
     try:
-        # Run raw historical data frame straight through your calculated Supertrend driver matrix
         calculated_df = calculate_supertrend(df)
         n = len(calculated_df)
         
-        # Resolve array lookups matching your exact Pine switches
+        # Resolve target index lookups
         if CHECK_CONFIRMED_ONLY:
-            idx = n - 2  # 🔒 Completed Candle (Non-Reprinting)
+            idx = n - 2  # 🔒 Completed Closed Candle
         else:
-            idx = n - 1  # ⚡ Live Running Candle (Real-Time Tracker)
-            
-        entry_sig = str(calculated_df.at[calculated_df.index[idx], 'st_trend_full']).upper().strip()
-        exit_sig = entry_sig
+            idx = n - 1  # ⚡ Live Running Candle Now
+
+        # Separate extraction targets
+        active_signal = str(calculated_df.at[calculated_df.index[idx], 'st_signal_full']).upper().strip()
+        active_trend  = str(calculated_df.at[calculated_df.index[idx], 'st_trend_full']).upper().strip()
         
         if DEBUG_MODE:
             print(f"--- PXY ENGINE CONSOLE SUMMARY ---")
             print(f"Target Row Lookup Index   -> {idx}")
             print(f"Session Bar Intraday Count -> {calculated_df.at[calculated_df.index[idx], 'bar_count_session']}")
-            print(f"Active Live Market Signal  -> {entry_sig}\n")
+            print(f"Active Live Market SIGNAL  -> {active_signal}")
+            print(f"Active Live Market TREND   -> {active_trend}\n")
             
-        return entry_sig, exit_sig
+        return active_signal, active_trend
         
     except Exception as e:
         if DEBUG_MODE:
@@ -215,10 +210,10 @@ if __name__ == "__main__":
         
         if live_df is not None and not live_df.empty:
             print(f"Data Successfully Retrieved. Array length: {len(live_df)} intervals.")
-            entry_sig, exit_sig = get_signal(live_df)
+            signal, trend = get_signal(live_df)
             
             print("==================================================")
-            print(f"⚡ LIVE STREAM OUTPUT -> Entry: {entry_sig} | Exit: {exit_sig}")
+            print(f"⚡ LIVE STREAM OUTPUT -> Signal: {signal} | Trend: {trend}")
             print("==================================================\n")
         else:
             print("❌ Error: Upstream module returned an empty or invalid DataFrame frame.")
