@@ -5,7 +5,7 @@ from _sgnl import _pad_line_to_42
 from _clnt import get_session
 from _oms import get_open_candidates_and_pnl
 
-MIN_EXIT_PROFIT = 300
+MIN_EXIT_PROFIT = 250
 init(autoreset=True)
 
 def execute_market_exit(client, symbol, qty, txn_type, entry_tag):
