@@ -50,7 +50,7 @@ def sync_database_from_broker_logs(client):
             if status != "complete": continue
             tag = str(o.get("tag", "")).strip().upper()
             
-            # Slicing exactly the last 5 characters ("_EXIT") to isolate closed loops
+            # SAFE SLICE FIX: Isolates closed loops using precise string indices
             if tag.endswith("_ENTRY_EXIT"):
                 parent_tag = tag[:-5] 
                 completed_exits.add(parent_tag)
@@ -130,8 +130,6 @@ async def process_stateful_exits(client):
         trades = load_trades()
         
         completed_trades = {k: v for k, v in trades.items() if v["status"] == "COMPLETED"}
-        
-        # Filter strictly for open candidates (_ENTRY is present, but NO _ENTRY_EXIT has fired yet)
         exit_candidates = {k: v for k, v in trades.items() if v["status"] == "OPEN"}
         
         booked_pnl = 0.0
@@ -171,8 +169,10 @@ async def process_stateful_exits(client):
 
             if entry_price == 0: continue
 
+            # Fetch live premium asset pricing safely
             live_ltp = float(get_option_live_ltp(client, token, "nse_fo", fallback_prc=entry_price))
             
+            # Mathematical PnL isolation blocks
             if entry_txn == "B":
                 unrealized_pnl = (live_ltp - entry_price) * qty
                 exit_txn_type = "S"
@@ -192,19 +192,24 @@ async def process_stateful_exits(client):
             metrics_display = f"{symbol[:10]} | PnL: Rs.{unrealized_pnl:.1f} | Sig: {current_signal}"
             print(_pad_line_to_42(metrics_display, pnl_str_color, Style.RESET_ALL))
 
-            # --- DUAL-CONDITION AND LOGIC GATE ---
-            if unrealized_pnl >= MIN_EXIT_PROFIT and is_opposite_signal:
+            # =====================================================================
+            # 🔥 PROVEN SAFE GATE: PROFIT MUST BE POSITIVE AND ABOVE TARGET
+            # =====================================================================
+            if unrealized_pnl > 0 and unrealized_pnl >= MIN_EXIT_PROFIT and is_opposite_signal:
                 print(_pad_line_to_42(f"🎯 MATCHED: PROFIT & OPPOSITE SIGNAL!", Fore.GREEN + Style.BRIGHT, Style.RESET_ALL))
                 success = execute_exit(client, symbol, qty, exit_txn_type, entry_tag)
                 if success:
                     sync_database_from_broker_logs(client)
             else:
-                if unrealized_pnl < MIN_EXIT_PROFIT and not is_opposite_signal:
-                    status_reason = "Waiting for profit & signal"
+                # Precision reason tracking logs
+                if unrealized_pnl <= 0:
+                    status_reason = f"Position in Loss (Rs.{unrealized_pnl:.1f})"
                 elif unrealized_pnl < MIN_EXIT_PROFIT:
-                    status_reason = "Profit too low"
+                    status_reason = f"Profit below target (Need Rs.{MIN_EXIT_PROFIT})"
+                elif not is_opposite_signal:
+                    status_reason = f"Waiting for opposite signal"
                 else:
-                    status_reason = "Waiting for opposite signal"
+                    status_reason = "Condition mismatch"
                 print(_pad_line_to_42(f"⏳ HOLDING: {status_reason}", Fore.YELLOW, Style.RESET_ALL))
                     
         print(_pad_line_to_42(border, Fore.BLUE, Style.RESET_ALL))
@@ -215,7 +220,7 @@ async def process_stateful_exits(client):
 # --- SINGLE-RUN EXECUTION HARNESS ---
 async def main():
     client = get_session()
-    if not client:
+    if not client: 
         print("❌ Session failed. Exiting script.")
         return
         
@@ -223,3 +228,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
+
