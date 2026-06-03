@@ -146,15 +146,23 @@ def get_signal(df):
             print(f"PXY Matrix Engine Exception: {e}")
         return "NONE", "NONE"
 if __name__ == "__main__":
-    import sys
     print("\n[PXY ENGINE STATUS] Active Stream Listener Initiated.")
     print(f"Configuration -> CHECK_CONFIRMED_ONLY: {CHECK_CONFIRMED_ONLY}")
     print("--------------------------------------------------")
     
-    # Check if a dataframe variable 'df' already exists in your main runtime environment
-    if 'df' in globals():
-        entry_sig, exit_sig = get_signal(globals()['df'])
-        print(f"\n⚡ LIVE ENGINE OUTPUT -> Entry: {entry_sig} | Exit: {exit_sig}\n")
-    else:
-        print("❌ Stream Warning: No active live DataFrame 'df' detected in global scope.")
-        print("Deploy this module directly inside your main data fetching loop script.")
+    try:
+        print("Fetching latest market data from sysdthapxy...")
+        # Call your actual data module with None to let it pull live exchange data
+        _, _, _, live_df = get_pxy_data(df=None)
+        
+        if live_df is not None and not live_df.empty:
+            print(f"Successfully loaded {len(live_df)} rows of live data.")
+            
+            # Execute your engine signal calculations
+            entry_sig, exit_sig = get_signal(live_df)
+            print(f"\n⚡ LIVE ENGINE OUTPUT -> Entry: {entry_sig} | Exit: {exit_sig}\n")
+        else:
+            print("❌ Error: sysdthapxy returned an empty or invalid DataFrame.")
+            
+    except Exception as e:
+        print(f"❌ Failed to execute live stream check: {e}")
