@@ -188,8 +188,6 @@ def export_supertrend_json(output_file="../syschrtpxy.json"):
         print("No data processed for charting.")
         return None
 
-    # 🚀 CHANGED: Removed df.tail(lookback) so it retains ALL intraday rows from today's session
-
     output = []
     for idx, row in df.iterrows():
         output.append({
@@ -239,20 +237,22 @@ def get_signal(df: pd.DataFrame) -> tuple:
             print(f"PXY Master Output Routing Module Exception: {e}")
         return "NONE", "NONE"
 
+# Standalone execution validation loop
 if __name__ == "__main__":
-    from sysdtafpxy import fetch_yf_data
-    
     print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
     print(f"Configuration -> CHECK_CONFIRMED_ONLY: {CHECK_CONFIRMED_ONLY} | MA_TYPE: {MA_TYPE}")
     print("--------------------------------------------------")
     
     try:
-        print("Polling latest session data from sysdtafpxy...")
-        live_df = fetch_yf_data()
+        print(f"Polling fresh full-day session data directly from yFinance for {TICKER}...")
         
-        if live_df is not None and not live_df.empty:
-            print(f"Data Successfully Retrieved. Analyzing {len(live_df)} matrix intervals.")
-            signal, trend = get_signal(live_df)
+        # Passing an empty frame triggers our internal, unclipped day-session downloader safely
+        dummy_df = pd.DataFrame()
+        calculated_df = calculate_supertrend(dummy_df)
+        
+        if calculated_df is not None and not calculated_df.empty:
+            print(f"Data Successfully Retrieved. Analyzing {len(calculated_df)} session matrix intervals.")
+            signal, trend = get_signal(calculated_df)
             
             print("Exporting full-day session chart configuration matrix elements...")
             export_supertrend_json()
@@ -261,7 +261,7 @@ if __name__ == "__main__":
             print(f"⚡ LIVE STREAM OUTPUT -> Signal: {signal} | Trend: {trend}")
             print("==================================================\n")
         else:
-            print("❌ Error: Upstream module returned an empty or invalid DataFrame frame.")
+            print("❌ Error: Standalone data engine returned an empty or invalid DataFrame.")
             
     except Exception as e:
         print(f"❌ Critical Connection Exception Hit: {e}")
