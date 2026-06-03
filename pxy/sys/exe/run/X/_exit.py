@@ -200,7 +200,7 @@ async def process_stateful_exits(client):
                 # Trigger the market orders instantly
                 success = execute_exit(client, symbol, qty, exit_txn_type, entry_tag)
                 if success:
-                    # Sync immediately to prevent loop duplicates
+                    # Sync immediately to update states before exit
                     sync_database_from_broker_logs(client)
                     
         print(_pad_line_to_42(border, Fore.BLUE, Style.RESET_ALL))
@@ -208,16 +208,15 @@ async def process_stateful_exits(client):
     except Exception as e:
         print(_pad_line_to_42(f"⚠️ Loop Error: {str(e)[:30]}", Fore.RED, Style.RESET_ALL))
 
-# --- MAIN EXECUTION HARNESS ---
+# --- SINGLE-RUN EXECUTION HARNESS ---
 async def main():
     client = get_session()
     if not client:
         print("❌ Session failed. Exiting script.")
         return
         
-    while True:
-        await process_stateful_exits(client)
-        await asyncio.sleep(1)  # 1-second ticks
+    # Runs exactly once, then terminates the process execution cleanly
+    await process_stateful_exits(client)
 
 if __name__ == "__main__":
     asyncio.run(main())
