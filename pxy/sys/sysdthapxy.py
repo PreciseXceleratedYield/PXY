@@ -1,17 +1,6 @@
 # pxy_engine.py
-import sys
 import pandas as pd
 import numpy as np
-
-# 🛠️ DYNAMIC HOTPATCH: Intercepts and fixes the config module object properties before importing data tools
-try:
-    import syscnfgpxy
-    if hasattr(syscnfgpxy, 'TIMEZONE'):
-        syscnfgpxy.TIMEZONE = str(syscnfgpxy.TIMEZONE)
-except Exception:
-    pass
-
-# Upstream link directly to your pristine source data module
 from sysdtafpxy import fetch_yf_data
 
 # ⚡ LIVE ENFORCEMENT ACTIVATED: Set to True to stream active forming bars dynamically
@@ -104,12 +93,4 @@ def get_pxy_data(tickerSymbol=None, df=None):
     pxy_color_series = final_df['pxy_color'].copy()
 
     return pxy_close, pxy_open, pxy_color_series, final_df
-
-if __name__ == "__main__":
-    print("[PXY ENGINE] Live Data Gateway Matrix Test Sequence...")
-    close, open_s, color, final = get_pxy_data()
-    if final is not None and not final.empty:
-        print(f"Test Successful. Loaded Matrix Dimensions: {final.shape}")
-        print(f"Latest Pre-Computed Signal Row Matrix Elements:\n{final[['pxy_signal', 'pxy_color']].tail(2)}")
-
 
