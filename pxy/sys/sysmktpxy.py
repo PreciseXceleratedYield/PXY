@@ -145,3 +145,16 @@ def get_signal(df):
         if DEBUG:
             print(f"PXY Matrix Engine Exception: {e}")
         return "NONE", "NONE"
+if __name__ == "__main__":
+    import sys
+    print("\n[PXY ENGINE STATUS] Active Stream Listener Initiated.")
+    print(f"Configuration -> CHECK_CONFIRMED_ONLY: {CHECK_CONFIRMED_ONLY}")
+    print("--------------------------------------------------")
+    
+    # Check if a dataframe variable 'df' already exists in your main runtime environment
+    if 'df' in globals():
+        entry_sig, exit_sig = get_signal(globals()['df'])
+        print(f"\n⚡ LIVE ENGINE OUTPUT -> Entry: {entry_sig} | Exit: {exit_sig}\n")
+    else:
+        print("❌ Stream Warning: No active live DataFrame 'df' detected in global scope.")
+        print("Deploy this module directly inside your main data fetching loop script.")
