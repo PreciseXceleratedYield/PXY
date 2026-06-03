@@ -44,7 +44,7 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
     GRN = "\033[92m"
     YLW = "\033[1;93m"
 
-    header_emoji = "🐂" if entry in ["BUY", "BULL"] else "🐻"
+    header_emoji = " 🐂" if entry in ["BUY", "BULL"] else "🐻"
     header_text = f"{header_emoji} GEOMETRIC MATRIX ENGINE"
     border_text = "==========================================" 
 
