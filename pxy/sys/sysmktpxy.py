@@ -34,9 +34,9 @@ def _print_console_bar(anchor_c, trigger_c, now_c, anchor_o, trigger_o, now_o, e
     now_color = GRN if now_c >= now_o else RED
 
     rows = [
-        (anchor_c, f"    ② ANCHOR -{anchor_c:.2f}", "█", anchor_color),
-        (trigger_c, f"    ① TRIGGER-{trigger_c:.2f}", "█", trigger_color),
-        (now_c, f"   ⚡ LIVE TRK-{now_c:.2f}", "█", now_color)
+        (anchor_c, f"    ② -{anchor_c:.2f}", "█", anchor_color),
+        (trigger_c, f"    ① -{trigger_c:.2f}", "█", trigger_color),
+        (now_c, f"   ⚡ -{now_c:.2f}", "█", now_color)
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
