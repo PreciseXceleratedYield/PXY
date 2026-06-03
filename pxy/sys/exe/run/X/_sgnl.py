@@ -45,7 +45,7 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
     YLW = "\033[1;93m"
 
     header_emoji = "🟩" if entry in ["BUY", "BULL"] else "🟥"
-    header_text = f"{header_emoji}       PXY® MATRIX ENGINE"
+    header_text = f" {header_emoji}       PXY® MATRIX ENGINE"
     border_text = "==========================================" 
 
     min_val = min(c2, c1, c0) - 2
@@ -81,7 +81,7 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
         print(_pad_line_to_42(combined_visible, color, RST))
         
     sig_emoji = "🟢 🔼" if entry in ["BUY", "BULL"] else "🔴 🔽"
-    signal_text = f"  {sig_emoji}   SIGNAL VERIFIED: {entry}"
+    signal_text = f" {sig_emoji}   SIGNAL VERIFIED: {entry}"
     print(_pad_line_to_42(signal_text, YLW, RST))
     print(f"{_pad_line_to_42(border_text, YLW, RST)}")
 
