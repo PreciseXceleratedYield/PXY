@@ -10,8 +10,9 @@ from sysdthapxy import get_pxy_data
 
 # Global Config
 DEBUG = True
+CHECK_CONFIRMED_ONLY = True  # 🔄 True = Non-Reprinting (Past 2 & Past 1) | False = Live Stream (Past 1 & Live Running)
 
-def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
+def _print_console_bar(anchor_c, trigger_c, now_c, anchor_o, trigger_o, now_o, entry, exit_sig):
     """ Renders the graphical sorted ASCII price matrix layout inside the console terminal. """
     RST = "\033[0m"
     RED = "\033[91m"
@@ -19,8 +20,8 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
     YLW = "\033[1;93m"
     GRAY = "\033[90m"
 
-    min_val = min(c2, c1, c0) - 2
-    max_val = max(c2, c1, c0) + 2
+    min_val = min(anchor_c, trigger_c, now_c) - 2
+    max_val = max(anchor_c, trigger_c, now_c) + 2
     scale_width = 20
 
     def get_clean_bar(val, marker="█"):
@@ -28,14 +29,14 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
         pos = max(1, pos)
         return (marker * pos).ljust(scale_width)
 
-    c2_color = GRN if c2 >= o2 else RED
-    c1_color = GRN if c1 >= o1 else RED
-    c0_color = GRN if c0 >= o0 else RED
+    anchor_color = GRN if anchor_c >= anchor_o else RED
+    trigger_color = GRN if trigger_c >= trigger_o else RED
+    now_color = GRN if now_c >= now_o else RED
 
     rows = [
-        (c2, f"    ② C2-{c2:.2f}", "█", c2_color),
-        (c1, f"    ① C1-{c1:.2f}", "█", c1_color),
-        (c0, f"    ⓪ C0-{c0:.2f}", "█", c0_color)
+        (anchor_c, f"    ② ANCHOR -{anchor_c:.2f}", "█", anchor_color),
+        (trigger_c, f"    ① TRIGGER-{trigger_c:.2f}", "█", trigger_color),
+        (now_c, f"    ⚡ LIVE TRK-{now_c:.2f}", "█", now_color)
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
@@ -76,7 +77,9 @@ def log_sync_state(timestamp, entry, exit_sig, price):
 
 def get_signal(df):
     """ 
-    3-Bar Vector Engine mapped purely to BULL and BEAR output constraints.
+    Dual-Route Strategy Engine mapping either:
+    - Confirmed Mode: Past 2 (Anchor) + Past 1 (Trigger) -> Non-Reprinting
+    - Live Mode: Past 1 (Anchor) + Live Candle (Trigger) -> Real-Time Speed
     """
     if df is None or len(df) < 5:
         return "NONE", "NONE"
@@ -85,39 +88,60 @@ def get_signal(df):
         # 1. RUN DATAFRAME THROUGH THE ENGINE TRUTH MATRIX
         _, _, _, calculated_df = get_pxy_data(df=df)
         
-        if calculated_df is None or "pxy_signal" not in calculated_df.columns:
+        if calculated_df is None:
             return "NONE", "NONE"
 
-        # 2. EXTRACT TRUTH DATA FROM LAST INDEX
-        last_idx = calculated_df.index[-1]
-        raw_signal = str(calculated_df.at[last_idx, "pxy_signal"]).upper().strip()
-        
-        # 3. COORDINATE MAPPING FOR VISUALIZER BAR
-        c0, o0 = float(calculated_df.at[last_idx, 'Close']), float(calculated_df.at[last_idx, 'Open'])
-        c1, o1 = float(calculated_df.iloc[-2]['Close']), float(calculated_df.iloc[-2]['Open'])
-        c2, o2 = float(calculated_df.iloc[-3]['Close']), float(calculated_df.iloc[-3]['Open'])
-
-        # 4. RESOLVE SIGNALS (Pure BULL / BEAR Routing Matrix)
-        # ✅ FIXED: Force conversions from raw BUY/SELL down into BULL/BEAR states
-        if raw_signal in ["BUY", "BULL"]:
-            entry = "BULL"
-            exit_sig = "BULL"
-        elif raw_signal in ["SELL", "BEAR"]:
-            entry = "BEAR"
-            exit_sig = "BEAR"
+        # 2. RESOLVE DYNAMIC OFFSETS BASED ON YOUR SWITCH STATE
+        if CHECK_CONFIRMED_ONLY:
+            # 🔒 Confirmed Non-Reprinting: Past 2 vs Past 1
+            anchor_row = calculated_df.iloc[-3]   # Past 2
+            trigger_row = calculated_df.iloc[-2]  # Past 1
+            log_idx = -2
         else:
-            # Fallback tracking if engine registers a "none" or blank string value
-            entry = "BULL" if c0 >= c1 else "BEAR"
-            exit_sig = entry
+            # ⚡ Live Fast Track: Past 1 vs Live Running Candle
+            anchor_row = calculated_df.iloc[-2]   # Past 1
+            trigger_row = calculated_df.iloc[-1]  # Live Running "Now"
+            log_idx = -1
+
+        # Extract values
+        anchor_c, anchor_o = float(anchor_row['Close']), float(anchor_row['Open'])
+        trigger_c, trigger_o = float(trigger_row['Close']), float(trigger_row['Open'])
+        
+        # Absolute current live reference for the terminal console UI layout
+        now_c, now_o = float(calculated_df.iloc[-1]['Close']), float(calculated_df.iloc[-1]['Open'])
+
+        # 3. CALCULATE DIRECTIONS
+        anchor_is_green = anchor_c >= anchor_o
+        trigger_is_green = trigger_c >= trigger_o
+
+        # 4. EXECUTE UNIFIED MATRIX PATTERNS
+        # Pattern A: Green -> Green
+        if anchor_is_green and trigger_is_green:
+            entry, exit_sig = "BULL", "BULL"
+
+        # Pattern B: Red -> Red
+        elif not anchor_is_green and not trigger_is_green:
+            entry, exit_sig = "BEAR", "BEAR"
+
+        # Pattern C: Green -> Red (Down Flip)
+        elif anchor_is_green and not trigger_is_green:
+            entry, exit_sig = "SELL", "SELL"
+
+        # Pattern D: Red -> Green (Up Flip)
+        elif not anchor_is_green and trigger_is_green:
+            entry, exit_sig = "BUY", "BUY"
+
+        else:
+            entry, exit_sig = "NONE", "NONE"
 
         # 5. DIAGNOSTICS & STREAM LOGGING
         if DEBUG:
-            _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig)
+            _print_console_bar(anchor_c, trigger_c, now_c, anchor_o, trigger_o, now_o, entry, exit_sig)
 
-        log_sync_state(calculated_df.index[-1], entry, exit_sig, c0)
+        log_sync_state(calculated_df.index[log_idx], entry, exit_sig, now_c)
         return entry, exit_sig
 
     except Exception as e:
         if DEBUG:
-            print(f"PXY High-Priority Vector Engine Exception: {e}")
+            print(f"PXY Matrix Engine Exception: {e}")
         return "NONE", "NONE"
