@@ -1,0 +1,97 @@
+//@version=5
+indicator("PXY Engine - Standalone Direction Matrix", overlay=true)
+
+// --- Global Configuration ---
+CHECK_CONFIRMED_ONLY = input.bool(true, title="Check Confirmed Only", tooltip="True = Non-Reprinting (Past 2 vs Past 1) | False = Live Stream (Past 1 vs Live Running Now)")
+
+// --- Detect New Trading Day Session Start (Cuts Yesterday's Data) ---
+bool is_new_day = ta.change(time("D")) != 0
+
+// --- Isolated Mode 5 Matrix Generator (Composite Blend) ---
+var float ha_o = na
+float ha_c = (open + high + low + close) / 4.0
+
+if is_new_day
+    ha_o := (open + close) / 2.0
+else
+    ha_o := na(ha_o) ? (open + close) / 2.0 : (ha_o + ha_c) / 2.0
+
+float ha_h = math.max(high, math.max(ha_o, ha_c))
+float ha_l = math.min(low, math.min(ha_o, ha_c))
+
+float oc2    = (open + close) / 2.0
+float raw_c1 = na(close) ? close : close
+
+// Pure Mode 5 Core Source Candlestick Assignment
+float src_o = (open + ha_o + oc2 + raw_c1) / 4.0
+float src_h = (high + ha_h + oc2 + close) / 4.0
+float src_l = (low + ha_l + oc2 + raw_c1) / 4.0
+float src_c = (close + ha_c + oc2 + close) / 4.0
+
+// Plot Transformed Mode 5 Custom Candlesticks
+candle_color = src_c >= src_o ? color.green : color.red
+plotcandle(src_o, src_h, src_l, src_c, title="Mode 5 Transformed Candles", color=candle_color, wickcolor=candle_color, bordercolor=candle_color)
+
+// --- Track Session Intraday Bar Count ---
+var int bar_count_session = 0
+if is_new_day
+    bar_count_session := 1
+else
+    bar_count_session := bar_count_session + 1
+
+// --- RESOLVE DYNAMIC OFFSETS EXACTLY MATCHING YOUR PYTHON SCRIPT ---
+float anchor_o  = na
+float anchor_c  = na
+float trigger_o = na
+float trigger_c = na
+
+if CHECK_CONFIRMED_ONLY
+    // 🔒 Confirmed Non-Reprinting (Python: anchor = iloc[-3], trigger = iloc[-2])
+    anchor_o  := src_o[2]
+    anchor_c  := src_c[2]
+    trigger_o := src_o[1]
+    trigger_c := src_c[1]
+else
+    // ⚡ Live Fast Track (Python: anchor = iloc[-2], trigger = iloc[-1])
+    anchor_o  := src_o[1]
+    anchor_c  := src_c[1]
+    trigger_o := src_o
+    trigger_c := src_c
+
+// --- CALCULATION SIGNAL DIRECTIONS ---
+bool anchor_is_green  = anchor_c >= anchor_o
+bool trigger_is_green = trigger_c >= trigger_o
+
+// Execution Flag Definitions
+bool is_bull = false
+bool is_bear = false
+bool is_sell = false
+bool is_buy  = false
+
+// Set minimum safety bars printed today to handle the lookup offsets correctly
+int min_bars_required = CHECK_CONFIRMED_ONLY ? 3 : 2
+
+if bar_count_session >= min_bars_required
+    // Pattern A: Green -> Green
+    if anchor_is_green and trigger_is_green
+        is_bull := true
+    
+    // Pattern B: Red -> Red
+    else if not anchor_is_green and not trigger_is_green
+        is_bear := true
+    
+    // Pattern C: Green -> Red (Down Flip)
+    else if anchor_is_green and not trigger_is_green
+        is_sell := true
+    
+    // Pattern D: Red -> Green (Up Flip)
+    else if not anchor_is_green and trigger_is_green
+        is_buy := true
+
+// --- VISUAL OVERLAY INDICATORS ---
+// Sharp execution signals on trend flips
+plotshape(is_buy,  title="Actionable BUY Trigger",  style=shape.triangleup,   location=location.belowbar, color=color.green, size=size.normal)
+plotshape(is_sell, title="Actionable SELL Trigger", style=shape.triangledown, location=location.abovebar, color=color.red,   size=size.normal)
+
+// Sustained Trend background bar highlights
+barcolor(is_bull ? color.new(color.green, 75) : is_bear ? color.new(color.red, 75) : na, title="Sustained Matrix State Color")
