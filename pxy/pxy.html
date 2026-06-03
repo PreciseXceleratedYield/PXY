@@ -847,7 +847,7 @@ let chart, lastSt = null, lastCloses = null;
 async function load() {
     let data;
     try {
-        const res = await fetch('/sys/exe/run/X/_sgnl.json');
+        const res = await fetch('./syschrtpxy.json');
         data = await res.json();
     } catch {
         data = generateDemoData();
@@ -1065,7 +1065,7 @@ function drawMomentumBar(stVals, closes) {
 async function loadPnl() {
     let trades = [];
     try {
-        const res = await fetch('/sys/exe/run/X/pnl.json');
+        const res = await fetch('./pnl.json?_=' + Date.now());
         trades = await res.json();
     } catch { trades = []; }
 
