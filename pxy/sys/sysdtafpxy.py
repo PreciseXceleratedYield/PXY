@@ -1,4 +1,4 @@
-# sysdthapxy.py
+# sysstrndpxy.py
 import os
 import warnings
 from datetime import datetime, time
@@ -15,11 +15,12 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 _RAW_DUMP_DONE = False
 
 def dump_raw_json_in_window(ticker_obj, period="5d", interval="1m"):
-    """Dumps raw JSON converted to target timezone to parent directory if within the overnight time window."""
+    """Dumps raw JSON converted to IST to parent directory if within the overnight time window."""
     global _RAW_DUMP_DONE
     if _RAW_DUMP_DONE:
         return
 
+    # Check IST time window (15:45 PM IST to 09:14 AM IST next day)
     ist_tz = pytz.timezone('Asia/Kolkata')
     now_ist = datetime.now(ist_tz).time()
     start_time = time(15, 45)
@@ -51,7 +52,7 @@ def get_heikin_ashi_ohlc(o, h, l, c):
     ha_c = (o + h + l + c) / 4
     ha_o = np.zeros_like(o)
     if len(o) > 0:
-        ha_o[0] = (o[0] + c[0]) / 2
+        ha_o = (o + c) / 2
     for i in range(1, len(o)):
         ha_o[i] = (ha_o[i-1] + ha_c[i-1]) / 2
     ha_h = np.maximum(h, np.maximum(ha_o, ha_c))
@@ -67,12 +68,13 @@ def get_momentum_ohlc(c):
     """Generates shift momentum OHLC matrices using prior close boundaries (c1 c0)"""
     c1 = np.empty_like(c)
     if len(c) > 0:
-        c1 = np.copy(c)
+        c1 = c
         c1[1:] = c[:-1]
     return c1, c, c1, c
 
 def get_3sma_oc2_ohlc(df, window=4):
     """Generates dynamic SMA OC/2 Pine chart calculation candles (Mode 6)"""
+    # 🎯 UPDATED: Using the dynamic window parameter instead of a hardcoded 3
     sma_o = df['Open'].rolling(window=window, min_periods=1).mean().to_numpy()
     sma_c = df['Close'].rolling(window=window, min_periods=1).mean().to_numpy()
     
@@ -83,6 +85,7 @@ def get_3sma_oc2_ohlc(df, window=4):
     for i in range(n):
         current_ha_c = (sma_o[i] + sma_c[i]) / 2.0
         ha_c[i] = current_ha_c
+        
         if i == 0:
             ha_o[i] = current_ha_c
         else:
@@ -91,6 +94,7 @@ def get_3sma_oc2_ohlc(df, window=4):
     ha_h = np.maximum(ha_o, ha_c)
     ha_l = np.minimum(ha_o, ha_c)
     return ha_o, ha_h, ha_l, ha_c
+
 
 def apply_ohlc_transformation(df, mode=1):
     """Transforms raw arrays into distinct, complete structural OHLC formats"""
@@ -133,29 +137,33 @@ def write_matrix_to_parent_csv(df):
     except Exception as e:
         print(f"CSV_EXPORT_ERROR | Write operation failure: {e}")
 
+# 🎯 FIXED SIGNATURE: Restored 'period' and 'interval' keywords to preserve master system dependencies
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
-    """DYNAMIC TRULY DAY-SPECIFIC SESSION LOOKUP CASCADE"""
+    """DYNAMIC HISTORICAL SLICE RETRIEVAL ENGINE WITH SIGNATURE BACKWARD-COMPATIBILITY"""
     ticker_obj = yf.Ticker(TICKER)
     df = pd.DataFrame()
     
+    # If a specific period is passed by an external script, use it directly
     if period is not None:
         try:
             df = ticker_obj.history(period=period, interval=interval)
         except Exception as e:
             print(f"ERROR: Explicit download failed for period={period} | {e}")
             
+    # If no period is specified, execute your automatic 60-candle lookup cascade loop
     if df.empty:
         for search_period in ["5d", "7d", "max"]:
             try:
                 df = ticker_obj.history(period=search_period, interval=interval)
                 if not df.empty:
                     df.dropna(inplace=True)
-                    break
+                    if len(df) >= target_rows:
+                        break
             except Exception:
                 pass
 
-    if df.empty:
-        print(f"CRITICAL: Failed to collect history profiles.")
+    if df.empty or len(df) < target_rows:
+        print(f"CRITICAL: Failed to collect minimum {target_rows} candles from history profiles.")
         return pd.DataFrame()
         
     if not isinstance(df.index, pd.DatetimeIndex):
@@ -166,17 +174,13 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     else:
         df = df.tz_convert(TIMEZONE)
         
+    # JSON backup operation remains bound to active structure safely
     dump_raw_json_in_window(ticker_obj, period="5d", interval=interval)
         
-    # 🎯 Day-Specific Filter: Extracts ALL session candles printed TODAY only
-    today_date = datetime.now(pytz.timezone(TIMEZONE)).date()
-    today_df = df[df.index.date == today_date].copy()
+    # Isolate exactly the final 60 rows for execution calculations
+    df = df.tail(target_rows).copy()
     
-    # Intraday Emergency Fallback: Context padding for first morning candles
-    if len(today_df) < 5:
-        today_df = df.tail(target_rows).copy()
-    
-    processed_df = apply_ohlc_transformation(today_df, mode=OHLC_MODE)
+    processed_df = apply_ohlc_transformation(df, mode=OHLC_MODE)
     write_matrix_to_parent_csv(processed_df)
     return processed_df
 
@@ -189,6 +193,6 @@ if __name__ == "__main__":
     print(f"=== CURRENTLY ENFORCED DATA TRANSFORMATION MODE: {OHLC_MODE} ===")
     output_df = fetch_yf_data()
     if not output_df.empty:
-        print(f"ENGINE_RUN_SUCCESS | Collected Session Rows Count: {len(output_df)}")
-        print(f"Session Matrix Head:\n{output_df.head(2)}")
+        print(f"ENGINE_RUN_SUCCESS | Collected Rows Count: {len(output_df)}")
+        print(f"Processed Matrix Head:\n{output_df.head(2)}")
 
