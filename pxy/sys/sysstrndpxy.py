@@ -3,6 +3,7 @@ import sys
 import numpy as np
 import pandas as pd
 import pytz
+import yfinance as yf
 from datetime import datetime
 
 # 🛠️ GLOBAL PROJECT HOTPATCH: Overrides config objects at initialization to prevent yfinance/pytz crashes
@@ -16,7 +17,7 @@ try:
 except Exception:
     pass
 
-from syscnfgpxy import TIMEZONE
+from syscnfgpxy import TIMEZONE, TICKER
 
 # Global Config 
 DEBUG_MODE = True 
@@ -26,15 +27,23 @@ CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running c
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
     PXY® Engine Strategy Matrix.
-    Forces full-day intraday context isolation dynamically from raw inputs.
+    Bypasses truncated upstream slices by fetching a fresh full-day session history.
     Calculates dynamic intraday resetting boundaries and isolates signals.
     """ 
-    if df is None or df.empty:
-        return pd.DataFrame()
+    # 🎯 OVERRIDE: Fetch a clean historical multi-day block straight from yfinance 
+    # to guarantee we possess all data points since today's opening bell.
+    try:
+        ticker_obj = yf.Ticker(TICKER)
+        raw_df = ticker_obj.history(period="5d", interval="1m")
+        if not raw_df.empty:
+            df = raw_df
+    except Exception as e:
+        if DEBUG_MODE:
+            print(f"Warning: Independent yFinance download fallback active | {e}")
 
     df = df.copy()
 
-    # 1. 🎯 ISOLATE TRUE DAY-SPECIFIC DATA HISTORIES (Bypasses upstream fixed cutting)
+    # 1. TIMELINE ISOLATION: FILTER FOR TODAY'S SESSION CANDLES ONLY
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
     
@@ -47,8 +56,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     today_date = datetime.now(pytz.timezone(tz_string)).date()
     day_specific_df = df[df.index.date == today_date].copy()
     
-    # Intraday context padding checkpoint for first morning bars
-    if len(day_specific_df) >= 3:
+    # If today's session is active, commit to it entirely
+    if not day_specific_df.empty:
         df = day_specific_df
     
     # 2. TIMELINE MANAGEMENT & INDEX ALIGNMENTS
@@ -160,7 +169,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['st_signal_full'] = st_signal_history
     df['st_trend_full'] = st_trend_history
     
-    # 🎯 DASHBOARD KEY BACKWARD COMPATIBILITY KEYS
+    # 🎯 DASHBOARD BACKWARD-COMPATIBILITY KEYS
     df['ST'] = df['pxy_st_line']
     df['ST_Trend'] = df['st_trend_full']
     return df
@@ -221,6 +230,7 @@ if __name__ == "__main__":
             
     except Exception as e:
         print(f"❌ Critical Connection Exception Hit: {e}")
+
 
 
 
