@@ -1,9 +1,11 @@
 import os
 import json
-from datetime import datetime
+from datetime import datetime, time
+import pytz
 import pandas as pd
 from colorama import Fore, init, Style
 from _sgnl import _pad_line_to_42
+from _ltp import get_option_live_ltp
 
 STATE_FILE = "trades.json"
 init(autoreset=True)
@@ -19,25 +21,43 @@ def save_trades(trades):
         with open(STATE_FILE, "w") as f: json.dump(trades, f, indent=4)
     except: pass
 
-def sync_and_build_dfs(client):
+def get_open_candidates_and_pnl(client):
     """
-    Downloads logs, tracks trades as individual positions based strictly 
-    on matching timestamp prefixes inside GuiOrdId, and builds DataFrames.
+    Centralized OMS Gateway:
+    1. Downloads logs and filters out historical trades executed before 10:00 AM IST.
+    2. Synchronizes open entries and settles finished bracket pairs using unique GuiOrdId timestamps.
+    3. Calculates running unrealized PnL values natively.
+    Returns: (df_open_only, total_booked_pnl)
     """
     try:
         order_res = client.order_report()
         orders = order_res.get("data", []) if isinstance(order_res, dict) else order_res
         if not isinstance(orders, list):
-            return pd.DataFrame(), pd.DataFrame()
+            return pd.DataFrame(), 0.0
 
-        # Isolate complete executions
-        executed_orders = [o for o in orders if str(o.get("stat", "")).strip().lower() == "complete"]
-        
+        # =====================================================================
+        # ⏰ DYNAMIC TIME SHIELD: FILTER OUT HISTORICAL TRADES BEFORE 10:00 AM IST
+        # =====================================================================
+        tz_ist = pytz.timezone("Asia/Kolkata")
+        now_ist = datetime.now(tz_ist)
+        cutoff_datetime = tz_ist.localize(datetime.combine(now_ist.date(), time(10, 0, 0)))
+        cutoff_epoch = int(cutoff_datetime.timestamp())
+
+        executed_orders = []
+        for o in orders:
+            if str(o.get("stat", "")).strip().lower() != "complete": 
+                continue
+            order_time = int(float(o.get("boeSec", 0)))
+            if order_time < cutoff_epoch:
+                continue  # Safe exclusion fence
+            executed_orders.append(o)
+        # =====================================================================
+
         trades = load_trades()
         completed_exits = set()
         valid_broker_entries = set()
 
-        # Step A: Collect all exit timestamps in the broker logs (e.g., '0603094435' from '0603094435_EXIT')
+        # Step A: Collect unique timestamp signatures for closures
         for o in executed_orders:
             gui_id = str(o.get("GuiOrdId", "")).strip().upper()
             if gui_id.endswith("_EXIT") or gui_id.endswith("_ENTRY_EXIT"):
@@ -46,7 +66,7 @@ def sync_and_build_dfs(client):
             if gui_id.endswith("_ENTRY"):
                 valid_broker_entries.add(gui_id)
 
-        # Step B: Log each unique entry into your local JSON tracking file
+        # Step B: Log brand new individual strategy entry legs
         for o in executed_orders:
             gui_id = str(o.get("GuiOrdId", "")).strip().upper()
             if not gui_id.endswith("_ENTRY"): continue
@@ -66,23 +86,20 @@ def sync_and_build_dfs(client):
                     "opened_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
 
-        # Step C: Match completed exit loops strictly by matching timestamp bases
+        # Step C: Complete matching closed brackets
         for entry_tag in list(trades.keys()):
             base_timestamp = entry_tag.replace("_ENTRY", "")
-            
-            # If an exit tag sharing this unique timestamp prefix exists in broker logs, close it
             if base_timestamp in completed_exits and trades[entry_tag]["status"] == "OPEN":
                 trades[entry_tag]["status"] = "COMPLETED"
                 trades[entry_tag]["exit_tag"] = f"{base_timestamp}_EXIT"
                 
-                # Extract the actual execution exit price from that matching exit leg row
                 for o in executed_orders:
                     o_gui = str(o.get("GuiOrdId", "")).strip().upper()
                     if o_gui in [f"{base_timestamp}_EXIT", f"{base_timestamp}_ENTRY_EXIT"]:
                         trades[entry_tag]["exit_price"] = float(o.get("avgPrc", 0))
                         break
 
-        # Step D: Clear rejected/ghost entry data structures
+        # Step D: Auto-purge unexecuted or malformed data anomalies
         for entry_tag in list(trades.keys()):
             if trades[entry_tag]["status"] == "OPEN":
                 if entry_tag not in valid_broker_entries or (trades[entry_tag]["entry_price"] == 0.0 and not trades[entry_tag]["token"]):
@@ -92,27 +109,61 @@ def sync_and_build_dfs(client):
         save_trades(trades)
 
         if not trades:
-            return pd.DataFrame(), pd.DataFrame()
+            return pd.DataFrame(), 0.0
 
-        # Step E: Construct structured pandas sheets for analysis
+        # Convert state ledger to DataFrame
         df_all = pd.DataFrame.from_dict(trades, orient="index")
-        df_open = df_all[df_all["status"] == "OPEN"].copy()
+        if "status" not in df_all.columns:
+            return pd.DataFrame(), 0.0
+
+        # Step E: Calculate realized booked profits from completed rows
         df_done = df_all[df_all["status"] == "COMPLETED"].copy()
-        
-        return df_open, df_done
+        booked_pnl = 0.0
+        if not df_done.empty:
+            for idx, row in df_done.iterrows():
+                qty = row["qty"]
+                e_prc = row["entry_price"]
+                x_prc = row["exit_price"]
+                booked_pnl += (x_prc - e_prc) * qty if row["entry_txn"] == "B" else (e_prc - x_prc) * qty
+
+        # Step F: Isolate OPEN contracts and append pre-calculated live profits
+        df_open = df_all[df_all["status"] == "OPEN"].copy()
+        if not df_open.empty:
+            unrealized_pnl_list = []
+            live_ltp_list = []
+            
+            for idx, row in df_open.iterrows():
+                token = row["token"] if "token" in row else row["tok"]
+                entry_price = row["entry_price"]
+                qty = row["qty"]
+                entry_txn = row["entry_txn"]
+
+                live_ltp = float(get_option_live_ltp(client, token, "nse_fo", fallback_prc=entry_price))
+                live_ltp_list.append(live_ltp)
+
+                # Natively calculate profit mapping structures per individual position
+                pnl = (live_ltp - entry_price) * qty if entry_txn == "B" else (entry_price - live_ltp) * qty
+                unrealized_pnl_list.append(pnl)
+
+            df_open["live_ltp"] = live_ltp_list
+            df_open["unrealized_pnl"] = unrealized_pnl_list
+
+        # Hand over ONLY the open trades data frame along with metrics
+        return df_open, booked_pnl
 
     except Exception as e:
-        print(_pad_line_to_42(f"⚠️ OMS Core Error: {str(e)[:22]}", Fore.RED, Style.RESET_ALL))
-        return pd.DataFrame(), pd.DataFrame()
+        print(_pad_line_to_42(f"⚠️ OMS Error: {str(e)[:22]}", Fore.RED, Style.RESET_ALL))
+        return pd.DataFrame(), 0.0
 
 if __name__ == "__main__":
     from _clnt import get_session
-    print("🧪 Running Fixed Kotak OMS Data Test...")
+    print("🧪 Testing Advanced Filtered OMS Output Pipeline...")
     test_client = get_session()
     if test_client:
-        df_open, df_done = sync_and_build_dfs(test_client)
-        print(f"\n--- [DEBUG] EXIT CANDIDATES (OPEN) Rows: {len(df_open)} ---")
-        if not df_open.empty: print(df_open[["symbol", "qty", "entry_price", "current_signal"]])
-        print(f"\n--- [DEBUG] DONE AND DUSTED Rows: {len(df_done)} ---")
-        if not df_done.empty: print(df_done[["symbol", "qty", "entry_price", "exit_price"]])
+        df_open_only, session_pnl = get_open_candidates_and_pnl(test_client)
+        print(f"\n💰 REALIZED CLOSED SESSION PNL: Rs.{session_pnl:.2f}")
+        print(f"\n--- [DEBUG DF] HANDING OVER OPEN TRADES ONLY ({len(df_open_only)}) ---")
+        if not df_open_only.empty: 
+            print(df_open_only[["symbol", "qty", "entry_price", "live_ltp", "unrealized_pnl", "current_signal"]])
+
 
