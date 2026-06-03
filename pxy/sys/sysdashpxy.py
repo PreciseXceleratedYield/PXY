@@ -1,4 +1,15 @@
-# run_pyc.py
+# sysdashpxy.py
+# 🛠️ GLOBAL PROJECT HOTPATCH: Intercepts and overrides config objects on Line 1 to prevent downstream crashes
+try:
+    import syscnfgpxy
+    if hasattr(syscnfgpxy, 'TIMEZONE'):
+        if hasattr(syscnfgpxy.TIMEZONE, 'zone'):
+            syscnfgpxy.TIMEZONE = str(syscnfgpxy.TIMEZONE.zone)
+        else:
+            syscnfgpxy.TIMEZONE = str(syscnfgpxy.TIMEZONE)
+except Exception:
+    pass
+
 import runpy
 import os
 from colorama import Fore, Style, init
