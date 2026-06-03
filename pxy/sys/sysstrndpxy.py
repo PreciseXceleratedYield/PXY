@@ -2,14 +2,21 @@
 import sys
 import numpy as np
 import pandas as pd
+import pytz
+from datetime import datetime
 
-# 🛠️ DYNAMIC HOTPATCH: Fixes the config object before sysdtafpxy imports it to prevent yfinance crashing
+# 🛠️ GLOBAL PROJECT HOTPATCH: Overrides config objects at initialization to prevent yfinance/pytz crashes
 try:
     import syscnfgpxy
     if hasattr(syscnfgpxy, 'TIMEZONE'):
-        syscnfgpxy.TIMEZONE = str(syscnfgpxy.TIMEZONE)
+        if hasattr(syscnfgpxy.TIMEZONE, 'zone'):
+            syscnfgpxy.TIMEZONE = str(syscnfgpxy.TIMEZONE.zone)
+        else:
+            syscnfgpxy.TIMEZONE = str(syscnfgpxy.TIMEZONE)
 except Exception:
     pass
+
+from syscnfgpxy import TIMEZONE
 
 # Global Config 
 DEBUG_MODE = True 
@@ -19,30 +26,42 @@ CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running c
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
     PXY® Engine Strategy Matrix.
-    Uses pre-transformed Mode 5 arrays directly from your data module.
+    Forces full-day intraday context isolation dynamically from raw inputs.
     Calculates dynamic intraday resetting boundaries and isolates signals.
     """ 
     if df is None or df.empty:
         return pd.DataFrame()
 
     df = df.copy()
-    
-    # 1. TIMELINE MANAGEMENT & INDEX ALIGNMENTS
-    if isinstance(df.index, pd.DatetimeIndex):
-        timestamps = df.index
-    else:
-        timestamps = pd.to_datetime(df['Timestamp'] if 'Timestamp' in df.columns else df.index)
-    dates = timestamps.date
 
+    # 1. 🎯 ISOLATE TRUE DAY-SPECIFIC DATA HISTORIES (Bypasses upstream fixed cutting)
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
+    
+    tz_string = str(TIMEZONE)
+    if df.index.tz is None:
+        df = df.tz_localize('UTC').tz_convert(tz_string)
+    else:
+        df = df.tz_convert(tz_string)
+        
+    today_date = datetime.now(pytz.timezone(tz_string)).date()
+    day_specific_df = df[df.index.date == today_date].copy()
+    
+    # Intraday context padding checkpoint for first morning bars
+    if len(day_specific_df) >= 3:
+        df = day_specific_df
+    
+    # 2. TIMELINE MANAGEMENT & INDEX ALIGNMENTS
+    timestamps = df.index
+    dates = timestamps.date
     n = len(df)
     
-    # 🎯 UPSTREAM SYNC: Read pre-calculated columns directly from your data frame
     src_o = df['Open'].to_numpy()
     src_h = df['High'].to_numpy()
     src_l = df['Low'].to_numpy()
     src_c = df['Close'].to_numpy()
 
-    # 2. TOTAL INTRADAY SESSION STATISTICS MATH MATRIX
+    # 3. TOTAL INTRADAY SESSION STATISTICS MATH MATRIX
     sma_line   = np.zeros(n)
     tsma_line  = np.zeros(n)
     hh_session = np.zeros(n)
@@ -59,7 +78,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     for i in range(n):
         if i == 0 or dates[i] != dates[i-1]:
-            # Morning boundary initialization routine resets calculations to data index 0
             current_count = 1
             sum_y  = src_c[i]
             sum_x  = 0.0
@@ -81,10 +99,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         hh_session[i] = curr_hh
         ll_session[i] = curr_ll
 
-        # Resetting Session SMA
         sma_line[i] = sum_y / current_count
 
-        # Resetting Session Linear Regression Endpoint (TSMA)
         tsma_line[i] = src_c[i]
         if current_count > 1:
             num = (current_count * sum_xy) - (sum_x * sum_y)
@@ -97,14 +113,13 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     base_ma_line = sma_line if MA_TYPE.upper() == "SMA" else tsma_line
 
-    # Channel Line Output Arrays
     df['pxy_st_line'] = (base_ma_line + hh_session + ll_session + src_c) / 4.0
-    df['pxy_st_no_ll'] = (base_ma_line + hh_session + src_c) / 3.0 # Upper Band
-    df['pxy_st_no_hh'] = (base_ma_line + ll_session + src_c) / 3.0 # Lower Band
+    df['pxy_st_no_ll'] = (base_ma_line + hh_session + src_c) / 3.0 
+    df['pxy_st_no_hh'] = (base_ma_line + ll_session + src_c) / 3.0 
     df['bar_count_session'] = bar_count_session
     df['src_c'] = src_c
 
-    # 3. SPLIT LIFECYCLE COMPILATIONS: INDEPENDENT SIGNAL AND TREND ROUTERS
+    # 4. SPLIT LIFECYCLE COMPILATIONS: INDEPENDENT SIGNAL AND TREND ROUTERS
     st = df['pxy_st_line'].to_numpy()
     no_ll = df['pxy_st_no_ll'].to_numpy()
     no_hh = df['pxy_st_no_hh'].to_numpy()
@@ -113,7 +128,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     st_trend_history = []
     
     for i in range(n): 
-        # Foundational continuous trend state tracker: Price Up = BULL | Price Down = BEAR
         current_trend = "BULL" if src_c[i] >= st[i] else "BEAR"
         st_trend_history.append(current_trend)
 
@@ -126,15 +140,12 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         st0 = st[i]
         st1 = st[i-1]
         
-        # Line cross configurations
         cross_buy  = (c0 > st0) and (c1 <= st1)
         cross_sell = (c0 < st0) and (c1 >= st1)
         
-        # Outer exhaustion thresholds
         force_buy  = (c0 > no_ll[i]) and (c1 <= no_ll[i-1])
         force_sell = (c0 < no_hh[i]) and (c1 >= no_hh[i-1])
         
-        # Enforce Priority Conditional Structure
         if force_buy:
             st_signal_history.append("FORCESELL")  
         elif force_sell:
@@ -144,10 +155,14 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         elif cross_sell:
             st_signal_history.append("CROSSSELL")  
         else:
-            st_signal_history.append("NONE") # Registers NONE if no crossover rules hit
+            st_signal_history.append("NONE")
 
     df['st_signal_full'] = st_signal_history
     df['st_trend_full'] = st_trend_history
+    
+    # 🎯 DASHBOARD KEY BACKWARD COMPATIBILITY KEYS
+    df['ST'] = df['pxy_st_line']
+    df['ST_Trend'] = df['st_trend_full']
     return df
 
 def get_signal(df: pd.DataFrame) -> tuple:
@@ -162,9 +177,9 @@ def get_signal(df: pd.DataFrame) -> tuple:
         n = len(calculated_df)
         
         if CHECK_CONFIRMED_ONLY:
-            idx = n - 2  # 🔒 Complete Closed Bar (Non-Reprinting)
+            idx = n - 2  
         else:
-            idx = n - 1  # ⚡ Live Running Forming Candle (Real-Time Tracker)
+            idx = n - 1  
 
         active_signal = str(calculated_df.at[calculated_df.index[idx], 'st_signal_full']).upper().strip()
         active_trend  = str(calculated_df.at[calculated_df.index[idx], 'st_trend_full']).upper().strip()
@@ -183,7 +198,6 @@ def get_signal(df: pd.DataFrame) -> tuple:
             print(f"PXY Master Output Routing Module Exception: {e}")
         return "NONE", "NONE"
 
-# Standalone execution validation loop
 if __name__ == "__main__":
     from sysdtafpxy import fetch_yf_data
     
@@ -192,11 +206,11 @@ if __name__ == "__main__":
     print("--------------------------------------------------")
     
     try:
-        print("Polling latest day-specific session data from sysdtafpxy...")
+        print("Polling latest session data from sysdtafpxy...")
         live_df = fetch_yf_data()
         
         if live_df is not None and not live_df.empty:
-            print(f"Data Successfully Retrieved. Analyzing {len(live_df)} session matrix intervals.")
+            print(f"Data Successfully Retrieved. Analyzing {len(live_df)} matrix intervals.")
             signal, trend = get_signal(live_df)
             
             print("==================================================")
@@ -207,5 +221,6 @@ if __name__ == "__main__":
             
     except Exception as e:
         print(f"❌ Critical Connection Exception Hit: {e}")
+
 
 
