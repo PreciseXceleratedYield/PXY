@@ -4,13 +4,13 @@
 # ------------------------------
 
 # Go to exe folder
-cd "$HOME/pxy/sys/exe/run/X" || { echo "Directory ~/pxy/sys/exe/run/X not found"; exit 1; }
+cd "$HOME/pxy/sys" || { echo "Directory ~/pxy/sys/exe not found"; exit 1; }
 
 # Optional: activate virtual environment if needed
 # source ~/pxy/env/bin/activate
 
 # Run the Python script
-python3 _exe.py
+python3 sysexepxy.py
 
 # Optional: print completion
 echo "exepxy.py execution finished."
