@@ -2,10 +2,11 @@ import os
 import json
 from datetime import datetime
 import pandas as pd
-from colorama import Fore, Style
+from colorama import Fore, init, Style
 from _sgnl import _pad_line_to_42
 
 STATE_FILE = "trades.json"
+init(autoreset=True)
 
 def load_trades():
     if not os.path.exists(STATE_FILE): return {}
@@ -19,31 +20,34 @@ def save_trades(trades):
     except: pass
 
 def sync_and_build_dfs(client):
+    """
+    Downloads logs, tracks trades as individual positions based strictly 
+    on matching timestamp prefixes inside GuiOrdId, and builds DataFrames.
+    """
     try:
         order_res = client.order_report()
         orders = order_res.get("data", []) if isinstance(order_res, dict) else order_res
         if not isinstance(orders, list):
             return pd.DataFrame(), pd.DataFrame()
 
+        # Isolate complete executions
+        executed_orders = [o for o in orders if str(o.get("stat", "")).strip().lower() == "complete"]
+        
         trades = load_trades()
         completed_exits = set()
         valid_broker_entries = set()
 
-        # Step A: Identify closed loops using Kotak's GuiOrdId parameter
-        for o in orders:
-            if str(o.get("stat", "")).strip().lower() != "complete": continue
-            # Kotak Neo API places custom tracking strings inside GuiOrdId
+        # Step A: Collect all exit timestamps in the broker logs (e.g., '0603094435' from '0603094435_EXIT')
+        for o in executed_orders:
             gui_id = str(o.get("GuiOrdId", "")).strip().upper()
-            
-            if gui_id.endswith("_ENTRY_EXIT") or gui_id.endswith("_EXIT"):
-                parent_tag = gui_id.replace("_ENTRY_EXIT", "").replace("_EXIT", "")
-                completed_exits.add(parent_tag)
+            if gui_id.endswith("_EXIT") or gui_id.endswith("_ENTRY_EXIT"):
+                base_timestamp = gui_id.replace("_ENTRY_EXIT", "").replace("_EXIT", "")
+                completed_exits.add(base_timestamp)
             if gui_id.endswith("_ENTRY"):
                 valid_broker_entries.add(gui_id)
 
-        # Step B: Register active exchange entries using dynamic key fields
-        for o in orders:
-            if str(o.get("stat", "")).strip().lower() != "complete": continue
+        # Step B: Log each unique entry into your local JSON tracking file
+        for o in executed_orders:
             gui_id = str(o.get("GuiOrdId", "")).strip().upper()
             if not gui_id.endswith("_ENTRY"): continue
 
@@ -62,34 +66,35 @@ def sync_and_build_dfs(client):
                     "opened_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
 
-        # Step C: Turn open entries into completed matches
-        for tag in list(trades.keys()):
-            # Strip '_ENTRY' to match the root timestamp string identifier
-            base_timestamp = tag.replace("_ENTRY", "")
-            if base_timestamp in completed_exits and trades[tag]["status"] == "OPEN":
-                trades[tag]["status"] = "COMPLETED"
-                trades[tag]["exit_tag"] = f"{base_timestamp}_EXIT"
+        # Step C: Match completed exit loops strictly by matching timestamp bases
+        for entry_tag in list(trades.keys()):
+            base_timestamp = entry_tag.replace("_ENTRY", "")
+            
+            # If an exit tag sharing this unique timestamp prefix exists in broker logs, close it
+            if base_timestamp in completed_exits and trades[entry_tag]["status"] == "OPEN":
+                trades[entry_tag]["status"] = "COMPLETED"
+                trades[entry_tag]["exit_tag"] = f"{base_timestamp}_EXIT"
                 
-                # Extract execution exit value from corresponding loop record
-                for o in orders:
+                # Extract the actual execution exit price from that matching exit leg row
+                for o in executed_orders:
                     o_gui = str(o.get("GuiOrdId", "")).strip().upper()
                     if o_gui in [f"{base_timestamp}_EXIT", f"{base_timestamp}_ENTRY_EXIT"]:
-                        trades[tag]["exit_price"] = float(o.get("avgPrc", 0))
+                        trades[entry_tag]["exit_price"] = float(o.get("avgPrc", 0))
                         break
 
-        # Step D: Auto-purge rogue entries
-        for tag in list(trades.keys()):
-            if trades[tag]["status"] == "OPEN":
-                if tag not in valid_broker_entries or (trades[tag]["entry_price"] == 0.0 and not trades[tag]["token"]):
-                    print(_pad_line_to_42(f"🗑️ PURGED REJECTED: {tag}", Fore.RED + Style.BRIGHT, Style.RESET_ALL))
-                    del trades[tag]
+        # Step D: Clear rejected/ghost entry data structures
+        for entry_tag in list(trades.keys()):
+            if trades[entry_tag]["status"] == "OPEN":
+                if entry_tag not in valid_broker_entries or (trades[entry_tag]["entry_price"] == 0.0 and not trades[entry_tag]["token"]):
+                    print(_pad_line_to_42(f"🗑️ PURGED REJECTED: {entry_tag}", Fore.RED + Style.BRIGHT, Style.RESET_ALL))
+                    del trades[entry_tag]
 
         save_trades(trades)
 
         if not trades:
             return pd.DataFrame(), pd.DataFrame()
 
-        # Step E: Parse structural rows into clear pandas frames
+        # Step E: Construct structured pandas sheets for analysis
         df_all = pd.DataFrame.from_dict(trades, orient="index")
         df_open = df_all[df_all["status"] == "OPEN"].copy()
         df_done = df_all[df_all["status"] == "COMPLETED"].copy()
