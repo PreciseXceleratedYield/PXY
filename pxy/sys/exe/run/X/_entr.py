@@ -1,5 +1,6 @@
-# _entr.py
 import sys
+import os
+import json
 import asyncio
 from datetime import datetime, date, timedelta, time as dt_time
 import pytz
@@ -9,6 +10,7 @@ from _sgnl import _pad_line_to_42
 TICKER = "^NSEI"  
 LOT_SIZE = 65     
 MAX_QTY = 65      
+STATE_FILE = "trades.json"
 
 HOLIDAYS = [
     "26-Jan-2026", "06-Mar-2026", "20-Mar-2026", "31-Mar-2026",
@@ -18,6 +20,27 @@ HOLIDAYS = [
 HOLIDAYS = [datetime.strptime(h, "%d-%b-%Y").date() for h in HOLIDAYS]
 
 init(autoreset=True)
+
+def load_trades():
+    if not os.path.exists(STATE_FILE): return {}
+    try:
+        with open(STATE_FILE, "r") as f: return json.load(f)
+    except: return {}
+
+def broadcast_signal_to_ledger(current_signal):
+    """ Broadcasts active trend signals into json for _exit.py rule mapping """
+    try:
+        trades = load_trades()
+        updated = False
+        for tag in trades:
+            if trades[tag].get("status") == "OPEN":
+                trades[tag]["current_signal"] = str(current_signal).upper().strip()
+                updated = True
+        if updated:
+            with open(STATE_FILE, "w") as f:
+                json.dump(trades, f, indent=4)
+    except Exception as e:
+        print(f"⚠️ Signal Sync Error: {str(e)[:20]}")
 
 def get_target_tuesday():
     today = date.today()
@@ -59,7 +82,6 @@ def get_global_position_summary(client):
 
 def execute_order(client, symbol, qty, txn_type):
     try:
-        # Formats tag explicitly as MMDDHHMMSS_ENTRY
         base_tag = datetime.now(pytz.timezone("Asia/Kolkata")).strftime('%m%d%H%M%S')
         order_tag = f"{base_tag}_ENTRY"
         
@@ -70,9 +92,8 @@ def execute_order(client, symbol, qty, txn_type):
         }
         res = client.place_order(**params)
         if res and str(res).strip():
-            out_str = f"🚀 ROUTED|{symbol}|{txn_type}|TAG:{order_tag}"
+            out_str = f"🚀 ROUTED ENTRY|{symbol}|{txn_type}|TAG:{order_tag}"
             print(_pad_line_to_42(out_str, "\033[96m", "\033[0m"))
-            
         return {"stat": "OK" if res and str(res).strip() else "FAIL"}
     except Exception as e:
         return {"stat": "FAIL", "err": str(e)}
@@ -99,53 +120,42 @@ async def trade_cycle():
     current_buy_qty = global_longs * LOT_SIZE
     current_sell_qty = global_shorts * LOT_SIZE
 
-    # --- STRICT ONE-LOT MAX QUANTITY PROTECTIONS ---
-    if entry_signal in ["BUY", "BULL"] and current_buy_qty >= 65 and global_shorts == 0:
+    # Normalise strategy indicators
+    normalized_signal = "BUY" if entry_signal in ["BUY", "BULL"] else "SELL"
+    
+    # Update active open records with the current signal configuration
+    broadcast_signal_to_ledger(normalized_signal)
+
+    # Enforce strict 65 max lot risk restrictions
+    if normalized_signal == "BUY" and current_buy_qty >= 65:
         print(_pad_line_to_42("🔒 GLOBAL BLOCK | BUY MAX REACHED (65)", "\033[93m", "\033[0m"))
         return
 
-    if entry_signal in ["SELL", "BEAR"] and current_sell_qty >= 65 and global_longs == 0:
+    if normalized_signal == "SELL" and current_sell_qty >= 65:
         print(_pad_line_to_42("🔒 GLOBAL BLOCK | SELL MIN REACHED (-65)", "\033[93m", "\033[0m"))
         return
 
-    if entry_signal in ["BUY", "BULL"]:
-        if global_shorts > 0:
-            print(_pad_line_to_42("🔄 EXITING BEAR | SQUARING OFF", "\033[95m", "\033[0m"))
-            base_100 = round(ltp / 100) * 100
-            target_strike = base_100 - 50 if abs(ltp - (base_100 - 50)) < abs(ltp - (base_100 + 50)) else base_100 + 50
-            symbol = get_nifty_symbol(target_strike)
-            execute_order(client, symbol, LOT_SIZE, "B")
-            return
+    # Trigger entries only if no matching running direction exists
+    if normalized_signal == "BUY" and global_longs == 0:
+        target_strike = round(ltp / 100) * 100
+        symbol = get_nifty_symbol(target_strike)
+        execute_order(client, symbol, LOT_SIZE, "B")
+    elif normalized_signal == "BUY":
+        print(_pad_line_to_42("🔒 HOLD | BULL ACTIVE | NO ADD", "\033[93m", "\033[0m"))
 
-        if global_longs == 0:
-            target_strike = round(ltp / 100) * 100
-            symbol = get_nifty_symbol(target_strike)
-            execute_order(client, symbol, LOT_SIZE, "B")
-        else:
-            print(_pad_line_to_42("🔒 HOLD | BULL ACTIVE | NO ADD", "\033[93m", "\033[0m"))
-
-    elif entry_signal in ["SELL", "BEAR"]:
-        if global_longs > 0:
-            print(_pad_line_to_42("🔄 EXITING BULL | SQUARING OFF", "\033[95m", "\033[0m"))
-            target_strike = round(ltp / 100) * 100
-            symbol = get_nifty_symbol(target_strike)
-            execute_order(client, symbol, LOT_SIZE, "S")
-            return
-
-        if global_shorts == 0:
-            base_100 = round(ltp / 100) * 100
-            target_strike = base_100 - 50 if abs(ltp - (base_100 - 50)) < abs(ltp - (base_100 + 50)) else base_100 + 50
-            symbol = get_nifty_symbol(target_strike)
-            execute_order(client, symbol, LOT_SIZE, "S")
-        else:
-            print(_pad_line_to_42("🔒 HOLD | BEAR ACTIVE | NO ADD", "\033[93m", "\033[0m"))
+    elif normalized_signal == "SELL" and global_shorts == 0:
+        base_100 = round(ltp / 100) * 100
+        target_strike = base_100 - 50 if abs(ltp - (base_100 - 50)) < abs(ltp - (base_100 + 50)) else base_100 + 50
+        symbol = get_nifty_symbol(target_strike)
+        execute_order(client, symbol, LOT_SIZE, "S")
+    elif normalized_signal == "SELL":
+        print(_pad_line_to_42("🔒 HOLD | BEAR ACTIVE | NO ADD", "\033[93m", "\033[0m"))
 
 async def main():
     try:
         await trade_cycle()
     except Exception as e:
-        err_msg = f"⚠️ Entry Failure: {str(e)[:22]}"
-        print(_pad_line_to_42(err_msg, "\033[91m", "\033[0m"))
+        print(_pad_line_to_42(f"⚠️ Entry Failure: {str(e)[:22]}", "\033[91m", "\033[0m"))
 
 if __name__ == "__main__":
     asyncio.run(main())
