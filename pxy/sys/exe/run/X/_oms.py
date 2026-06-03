@@ -32,7 +32,7 @@ def get_open_candidates_and_pnl(client):
         # =====================================================================
         tz_ist = pytz.timezone("Asia/Kolkata")
         now_ist = datetime.now(tz_ist)
-        cutoff_datetime = tz_ist.localize(datetime.combine(now_ist.date(), time(10, 0, 0)))
+        cutoff_datetime = tz_ist.localize(datetime.combine(now_ist.date(), time(10, 20, 0)))
         cutoff_epoch = int(cutoff_datetime.timestamp())
 
         executed_orders = []
