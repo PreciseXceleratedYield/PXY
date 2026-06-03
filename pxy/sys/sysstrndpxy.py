@@ -9,8 +9,7 @@ CHECK_CONFIRMED_ONLY = True  # ðŸ”’ True = Past 2 vs Past 1 (Non-Reprinting) | â
 def get_signal(df: pd.DataFrame) -> tuple:
     """
     Lean Strategic Sorting Engine. 
-    Accepts fully pre-calculated Mode 5 upstream DataFrames containing:
-    'src_c', 'pxy_st_line', 'pxy_st_no_ll', 'pxy_st_no_hh', and 'bar_count_session'.
+    Accepts fully pre-calculated upstream DataFrames and handles flexible column naming.
     """
     if df is None or len(df) < 5:
         return "NONE", "NONE"
@@ -18,13 +17,16 @@ def get_signal(df: pd.DataFrame) -> tuple:
     try:
         n = len(df)
         
-        # 1. EXTRACT DATA DIRECTLY FROM UPSTREAM MATRIX COLUMNS
-        src_c = df['src_c'].to_numpy()
-        pxy_st_line = df['pxy_st_line'].to_numpy()
-        pxy_st_no_ll = df['pxy_st_no_ll'].to_numpy()
-        pxy_st_no_hh = df['pxy_st_no_hh'].to_numpy()
+        # 1. EXTRACT DATA DIRECTLY WITH STANDALONE KEY FALLBACKS
+        # This prevents the key exception error if upstream passes standard names
+        src_c = df['src_c'].to_numpy() if 'src_c' in df.columns else df['Close'].to_numpy()
         
-        # Fallback check if your upstream engine labels the session count differently
+        # Maps line indicator names or their default key strings
+        pxy_st_line = df['pxy_st_line'].to_numpy() if 'pxy_st_line' in df.columns else (df['ST'].to_numpy() if 'ST' in df.columns else df['Close'].to_numpy())
+        pxy_st_no_ll = df['pxy_st_no_ll'].to_numpy() if 'pxy_st_no_ll' in df.columns else pxy_st_line
+        pxy_st_no_hh = df['pxy_st_no_hh'].to_numpy() if 'pxy_st_no_hh' in df.columns else pxy_st_line
+        
+        # Session bar count tracking metric
         bar_count_session = df['bar_count_session'].to_numpy() if 'bar_count_session' in df.columns else np.arange(1, n + 1)
 
         # 2. RESOLVE DYNAMIC LOOKUP INDEXES TO SYNC WITH PINE OFFSETS
@@ -63,13 +65,13 @@ def get_signal(df: pd.DataFrame) -> tuple:
             
             # Pure Priority Routing Matrix Execution
             if force_buy:
-                entry, exit_sig = "FORCESELL", "FORCESELL"  # Overextension Above Upper Band
+                entry, exit_sig = "FORCESELL", "FORCESELL"  
             elif force_sell:
-                entry, exit_sig = "FORCEBUY", "FORCEBUY"    # Overextension Below Lower Band
+                entry, exit_sig = "FORCEBUY", "FORCEBUY"    
             elif cross_buy:
-                entry, exit_sig = "CROSSBUY", "CROSSBUY"    # Center Crossover Buy
+                entry, exit_sig = "CROSSBUY", "CROSSBUY"    
             elif cross_sell:
-                entry, exit_sig = "CROSSSELL", "CROSSSELL"  # Center Crossover Sell
+                entry, exit_sig = "CROSSSELL", "CROSSSELL"  
 
         if DEBUG_MODE:
             print(f"--- PXY STRND PURE STRATEGY MATRIX ---")
