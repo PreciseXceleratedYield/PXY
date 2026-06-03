@@ -26,7 +26,7 @@ def get_open_candidates_and_pnl(client):
     Centralised OMS Gateway:
     1. Downloads logs and filters out historical trades executed before 10:00 AM IST.
     2. Synchronises open entries and settles finished bracket pairs using unique GuiOrdId timestamps.
-    3. Calculates running unrealized PnL values natively with safe type enforcement.
+    3. Calculates running unrealized PnL values natively with correct keyword arguments.
     Returns: (df_open_only, total_booked_pnl)
     """
     try:
@@ -49,7 +49,7 @@ def get_open_candidates_and_pnl(client):
                 continue
             order_time = int(float(o.get("boeSec", 0)))
             if order_time < cutoff_epoch:
-                continue  # Safe morning exclusion fence
+                continue  # Bypasses all early morning trade clutter
             executed_orders.append(o)
         # =====================================================================
 
@@ -111,7 +111,6 @@ def get_open_candidates_and_pnl(client):
         if not trades:
             return pd.DataFrame(), 0.0
 
-        # Convert state ledger to DataFrame
         df_all = pd.DataFrame.from_dict(trades, orient="index")
         if "status" not in df_all.columns:
             return pd.DataFrame(), 0.0
@@ -133,33 +132,30 @@ def get_open_candidates_and_pnl(client):
             live_ltp_list = []
             
             for idx, row in df_open.iterrows():
-                # STRICT TYPE-CAST GUARD: Extract token securely and prevent Series object bypass
                 raw_token = row["token"] if "token" in row else row["tok"]
                 if isinstance(raw_token, pd.Series):
-                    raw_token = raw_token.iloc[0] if not raw_token.empty else ""
+                    raw_token = raw_token.iloc if not raw_token.empty else ""
                 token = str(raw_token).strip()
 
                 entry_price = float(row["entry_price"])
                 qty = int(row["qty"])
                 entry_txn = str(row["entry_txn"]).upper()
 
-                # SAFE INTERLOCK: Prevent engine crash if live data streaming hits a network timeout
+                # FIXED KEYWORD ARGUMENT: fallback_price used precisely as declared in _ltp.py
                 try:
-                    live_ltp = float(get_option_live_ltp(client, token, "nse_fo", fallback_prc=entry_price))
+                    live_ltp = float(get_option_live_ltp(client, token, "nse_fo", fallback_price=entry_price))
                 except Exception as e:
-                    print(_pad_line_to_42(f"⚠️ OMS Error: get_option_live_ltp({token}) failed. Using fallback.", Fore.RED, Style.RESET_ALL))
+                    print(_pad_line_to_42(f"⚠️ OMS Error: get_option_live_ltp execution failed.", Fore.RED, Style.RESET_ALL))
                     live_ltp = entry_price
 
                 live_ltp_list.append(live_ltp)
 
-                # Natively calculate profit mapping structures per individual position
                 pnl = (live_ltp - entry_price) * qty if entry_txn == "B" else (entry_price - live_ltp) * qty
                 unrealized_pnl_list.append(pnl)
 
             df_open["live_ltp"] = live_ltp_list
             df_open["unrealized_pnl"] = unrealized_pnl_list
 
-        # Hand over ONLY the open trades data frame along with metrics
         return df_open, booked_pnl
 
     except Exception as e:
@@ -176,4 +172,5 @@ if __name__ == "__main__":
         print(f"\n--- [DEBUG DF] HANDING OVER OPEN TRADES ONLY ({len(df_open_only)}) ---")
         if not df_open_only.empty: 
             print(df_open_only[["symbol", "qty", "entry_price", "live_ltp", "unrealized_pnl", "current_signal"]])
+
 
