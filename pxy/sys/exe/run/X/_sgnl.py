@@ -1,4 +1,3 @@
-# _sgnl.py
 import os
 import warnings
 import json
@@ -66,9 +65,9 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
     c0_color = GRN if c0 >= o0 else RED
 
     rows = [
-        (c2, c2_emoji,f" C2-{c2:.1f}","█", c2_color),
-        (c1, c1_emoji,f" C1-{c1:.1f}","█", c1_color),
-        (c0, c0_emoji,f" C0-{c0:.1f}","█", c0_color)
+        (c2, c2_emoji, f" C2-{c2:.1f}", "█", c2_color),
+        (c1, c1_emoji, f" C1-{c1:.1f}", "█", c1_color),
+        (c0, c0_emoji, f" C0-{c0:.1f}", "█", c0_color)
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
@@ -81,7 +80,9 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, entry, exit_sig):
         print(_pad_line_to_42(combined_visible, color, RST))
         
     sig_emoji = "🟢 🔼" if entry in ["BUY", "BULL"] else "🔴 🔽"
-    signal_text = f" {sig_emoji}   SIGNAL VERIFIED: {entry}   {sig_emoji"
+    
+    # FIXED: Appended the missing closing curly brace to prevent syntax crash
+    signal_text = f" {sig_emoji}   SIGNAL VERIFIED: {entry}   {sig_emoji}"
     print(_pad_line_to_42(signal_text, YLW, RST))
     print(f"{_pad_line_to_42(border_text, YLW, RST)}")
 
@@ -227,21 +228,21 @@ def get_all_data():
         # Format multi-level columns if explicitly returned by the API
         if isinstance(raw_df.columns, pd.MultiIndex):
             raw_df.columns = raw_df.columns.get_level_values(0)
+        
+        # Guard against blank column index string fragments
+        raw_df.columns = raw_df.columns.str.strip()
 
         # Process mathematical state arrays and update structural records
         transformed_df = apply_mode_5_transformation(raw_df)
-        ltp, signal = calculate_no_repaint_signals(transformed_df)
+        
+        # COMPLETE BLOCK: Hand values over to the calculation matrix and broadcast
+        live_price, trend_signal = calculate_no_repaint_signals(transformed_df)
         export_chart_json(transformed_df)
-
-        return {"entry": signal, "price": ltp}
+        
+        return {"entry": trend_signal, "price": live_price}
+        
     except Exception as e:
-        print(f"Error in structural state acquisition pipeline: {str(e)}")
+        print(f"Error in signal pipeline processing module: {str(e)}")
         return {"entry": "NONE", "price": 0.0}
-
-if __name__ == "__main__":
-    # Internal baseline loop debugging layer execution context
-    print("Testing data ingestion systems engine execution pass...")
-    engine_data = get_all_data()
-    print(f"Result returned to entry script: {engine_data}")
 
 
