@@ -9,16 +9,16 @@ CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running c
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    PXY® Engine Core Driver Matrix.
-    Transforms data to Mode 5, runs Intraday Session calculations, and isolates 
-    actionable 'Signals' from foundational structural 'Trends'.
+    PXY® Engine Strategy Matrix.
+    Processes dynamic session lookback indicators and separates Actionable Trigger 
+    Signals from continuous Foundational Directional Trends.
     """ 
     if df is None or df.empty:
         return pd.DataFrame()
 
     df = df.copy()
     
-    # 1. ISOLATED MODE 5 MATRIX GENERATOR (COMPOSITE BLEND)
+    # 1. TIMEZONE & TIMELINE EXTRACTION CONSTRAINTS
     if isinstance(df.index, pd.DatetimeIndex):
         timestamps = df.index
     else:
@@ -33,6 +33,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     raw_low   = df['Low'].to_numpy()
     raw_close = df['Close'].to_numpy()
 
+    # Isolated daily Heikin-Ashi generator loops
     for i in range(n):
         ha_c_i = (raw_open[i] + raw_high[i] + raw_low[i] + raw_close[i]) / 4.0
         if i == 0 or dates[i] != dates[i-1]:
@@ -48,12 +49,13 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     raw_c1 = np.copy(raw_close)
     raw_c1[1:] = raw_close[:-1]
 
+    # Explicit Mode 5 assignments compiled natively inside the matrix framework
     src_o = (raw_open + ha_o + oc2 + raw_c1) / 4.0
     src_h = (raw_high + ha_h + oc2 + raw_close) / 4.0
     src_l = (raw_low + ha_l + oc2 + raw_c1) / 4.0
     src_c = (raw_close + ha_c + oc2 + raw_close) / 4.0
 
-    # 2. DYNAMIC INTRADAY SESSION MEMORY TRACKING
+    # 2. TOTAL INTRADAY SESSION STATISTICS MATH MATRIX
     sma_line   = np.zeros(n)
     tsma_line  = np.zeros(n)
     hh_session = np.zeros(n)
@@ -70,6 +72,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     for i in range(n):
         if i == 0 or dates[i] != dates[i-1]:
+            # Morning boundary initialization routine resets calculations to data index 0
             current_count = 1
             sum_y  = src_c[i]
             sum_x  = 0.0
@@ -91,10 +94,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         hh_session[i] = curr_hh
         ll_session[i] = curr_ll
 
-        # Intraday Resetting SMA
+        # Resetting Session SMA
         sma_line[i] = sum_y / current_count
 
-        # Intraday Resetting TSMA
+        # Resetting Session Linear Regression Endpoint (TSMA)
         tsma_line[i] = src_c[i]
         if current_count > 1:
             num = (current_count * sum_xy) - (sum_x * sum_y)
@@ -107,14 +110,14 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     base_ma_line = sma_line if MA_TYPE.upper() == "SMA" else tsma_line
 
-    # 3. CHANNEL STRUCTURAL ASSIGNMENTS
+    # Channel Line Output Arrays
     df['pxy_st_line'] = (base_ma_line + hh_session + ll_session + src_c) / 4.0
-    df['pxy_st_no_ll'] = (base_ma_line + hh_session + src_c) / 3.0 # Upper Boundary
-    df['pxy_st_no_hh'] = (base_ma_line + ll_session + src_c) / 3.0 # Lower Boundary
+    df['pxy_st_no_ll'] = (base_ma_line + hh_session + src_c) / 3.0 # Upper Band
+    df['pxy_st_no_hh'] = (base_ma_line + ll_session + src_c) / 3.0 # Lower Band
     df['bar_count_session'] = bar_count_session
     df['src_c'] = src_c
 
-    # 4. EXPLICIT SEPARATION: HISTORICAL SIGNAL AND TREND LOOPS
+    # 3. SPLIT LIFECYCLE COMPILATIONS: INDEPENDENT SIGNAL AND TREND ROUTERS
     st = df['pxy_st_line'].to_numpy()
     no_ll = df['pxy_st_no_ll'].to_numpy()
     no_hh = df['pxy_st_no_hh'].to_numpy()
@@ -123,7 +126,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     st_trend_history = []
     
     for i in range(n): 
-        # Base trend assignment: Price up = BULL | Price down = BEAR relative to Center Line
+        # Foundational continuous trend state tracker: Price Up = BULL | Price Down = BEAR
         current_trend = "BULL" if src_c[i] >= st[i] else "BEAR"
         st_trend_history.append(current_trend)
 
@@ -136,25 +139,25 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         st0 = st[i]
         st1 = st[i-1]
         
-        # Center Line Crossover Conditions
+        # Line cross configurations
         cross_buy  = (c0 > st0) and (c1 <= st1)
         cross_sell = (c0 < st0) and (c1 >= st1)
         
-        # Boundary Line Overextensions
+        # Outer exhaustion thresholds
         force_buy  = (c0 > no_ll[i]) and (c1 <= no_ll[i-1])
         force_sell = (c0 < no_hh[i]) and (c1 >= no_hh[i-1])
         
-        # Pure Actionable Signal Processing Logic Matrix
+        # Enforce Priority Conditional Structure
         if force_buy:
-            st_signal_history.append("FORCESELL")  # Price extreme above upper band
+            st_signal_history.append("FORCESELL")  
         elif force_sell:
-            st_signal_history.append("FORCEBUY")   # Price extreme below lower band
+            st_signal_history.append("FORCEBUY")   
         elif cross_buy:
-            st_signal_history.append("CROSSBUY")   # Center line breakout up
+            st_signal_history.append("CROSSBUY")   
         elif cross_sell:
-            st_signal_history.append("CROSSSELL")  # Center line breakdown down
+            st_signal_history.append("CROSSSELL")  
         else:
-            st_signal_history.append("NONE")       # No trading trigger on this candle
+            st_signal_history.append("NONE") # Registers NONE if no crossover rules hit
 
     df['st_signal_full'] = st_signal_history
     df['st_trend_full'] = st_trend_history
@@ -162,8 +165,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
 def get_signal(df: pd.DataFrame) -> tuple:
     """
-    Direct endpoint extractor pulling specific 'Signal' and 'Trend' values
-    based on the state of the CHECK_CONFIRMED_ONLY configuration switch.
+    Direct array slice endpoint collector matching checkout preferences.
     """
     if df is None or df.empty:
         return "NONE", "NONE"
@@ -172,18 +174,17 @@ def get_signal(df: pd.DataFrame) -> tuple:
         calculated_df = calculate_supertrend(df)
         n = len(calculated_df)
         
-        # Resolve target index lookups
+        # Route index window selection based on configuration switch parameters
         if CHECK_CONFIRMED_ONLY:
-            idx = n - 2  # 🔒 Completed Closed Candle
+            idx = n - 2  # 🔒 Complete Closed Bar (Non-Reprinting)
         else:
-            idx = n - 1  # ⚡ Live Running Candle Now
+            idx = n - 1  # ⚡ Live Running Forming Candle (Real-Time Tracker)
 
-        # Separate extraction targets
         active_signal = str(calculated_df.at[calculated_df.index[idx], 'st_signal_full']).upper().strip()
         active_trend  = str(calculated_df.at[calculated_df.index[idx], 'st_trend_full']).upper().strip()
         
         if DEBUG_MODE:
-            print(f"--- PXY ENGINE CONSOLE SUMMARY ---")
+            print(f"--- PXY STRATEGY EVALUATION SUMMARY ---")
             print(f"Target Row Lookup Index   -> {idx}")
             print(f"Session Bar Intraday Count -> {calculated_df.at[calculated_df.index[idx], 'bar_count_session']}")
             print(f"Active Live Market SIGNAL  -> {active_signal}")
@@ -196,20 +197,20 @@ def get_signal(df: pd.DataFrame) -> tuple:
             print(f"PXY Master Output Routing Module Exception: {e}")
         return "NONE", "NONE"
 
-# --- STANDALONE PRODUCTION LISTENER GATE ---
+# Standalone execution validation loop
 if __name__ == "__main__":
     from sysdthapxy import get_pxy_data
     
     print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
-    print(f"Configuration -> CHECK_CONFIRMED_ONLY: {CHECK_CONFIRMED_ONLY}")
+    print(f"Configuration -> CHECK_CONFIRMED_ONLY: {CHECK_CONFIRMED_ONLY} | MA_TYPE: {MA_TYPE}")
     print("--------------------------------------------------")
     
     try:
-        print("Polling latest day-specific data from sysdthapxy...")
-        _, _, _, live_df = get_pxy_data(df=None)
+        print("Polling latest day-specific session data from sysdthapxy...")
+        live_df = fetch_yf_data()
         
         if live_df is not None and not live_df.empty:
-            print(f"Data Successfully Retrieved. Array length: {len(live_df)} intervals.")
+            print(f"Data Successfully Retrieved. Analyzing {len(live_df)} session matrix intervals.")
             signal, trend = get_signal(live_df)
             
             print("==================================================")
