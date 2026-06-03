@@ -160,7 +160,7 @@ if __name__ == "__main__":
             
             # Execute your engine signal calculations
             entry_sig, exit_sig = get_signal(live_df)
-            print(f"\n⚡ LIVE ENGINE-> Entry: {entry_sig} | Exit: {exit_sig}\n")
+            print(f"\n⚡LIVE ENGINE-> Entry: {entry_sig} | Exit: {exit_sig}\n")
         else:
             print("❌ Error: sysdthapxy returned an empty or invalid DataFrame.")
             
