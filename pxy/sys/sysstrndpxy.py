@@ -30,12 +30,10 @@ def get_signal(df: pd.DataFrame) -> tuple:
         # 2. RESOLVE DYNAMIC LOOKUP INDEXES TO SYNC WITH PINE OFFSETS
         if CHECK_CONFIRMED_ONLY:
             # 🔒 Confirmed Non-Reprinting: Past 2 (n-3) vs Past 1 (n-2)
-            # Perfect sync with Pine Script's [2] vs [1] offsets
             idx_0 = n - 2
             idx_1 = n - 3
         else:
             # ⚡ Live Fast Track: Past 1 (n-2) vs Live Running (n-1)
-            # Perfect sync with Pine Script's [1] vs [0] offsets
             idx_0 = n - 1
             idx_1 = n - 2
 
@@ -55,7 +53,7 @@ def get_signal(df: pd.DataFrame) -> tuple:
         entry, exit_sig = "NONE", "NONE"
         min_bars_required = 3 if CHECK_CONFIRMED_ONLY else 2
 
-        # 4. HIGH-PRIORITY EVALUATION SORTING MATRIX
+        # 4. HIGH-PRIORITY EVALUATION PATTERN SORTING MATRIX
         if bar_count_session[idx_0] >= min_bars_required:
             cross_buy  = (c0 > st0) and (c1 <= st1)
             cross_sell = (c0 < st0) and (c1 >= st1)
@@ -87,5 +85,33 @@ def get_signal(df: pd.DataFrame) -> tuple:
             print(f"PXY Strategy Module Exception Block Met: {e}")
         return "NONE", "NONE"
 
+
+# --- STANDALONE MAIN EXECUTION ENGINE ---
+if __name__ == "__main__":
+    from sysdthapxy import get_pxy_data
+    
+    print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
+    print(f"Configuration -> CHECK_CONFIRMED_ONLY: {CHECK_CONFIRMED_ONLY}")
+    print("--------------------------------------------------")
+    
+    try:
+        print("Polling latest day-specific data from sysdthapxy...")
+        # Pull your live pre-calculated data matrix from upstream
+        _, _, _, live_df = get_pxy_data(df=None)
+        
+        if live_df is not None and not live_df.empty:
+            print(f"Data Successfully Retrieved. Streaming {len(live_df)} historical matrix intervals.")
+            
+            # Pass directly into the strategy processing gate
+            entry_sig, exit_sig = get_signal(live_df)
+            
+            print("==================================================")
+            print(f"⚡ LIVE STREAM OUTPUT -> Entry: {entry_sig} | Exit: {exit_sig}")
+            print("==================================================\n")
+        else:
+            print("❌ Error: Upstream module returned an empty or invalid DataFrame frame.")
+            
+    except Exception as e:
+        print(f"❌ Critical Connection Exception Hit: {e}")
 
 
