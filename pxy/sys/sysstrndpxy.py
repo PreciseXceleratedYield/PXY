@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 import pytz
 import yfinance as yf
+import json
+import os
 from datetime import datetime
 
 # 🛠️ GLOBAL PROJECT HOTPATCH: Overrides config objects at initialization to prevent yfinance/pytz crashes
@@ -174,6 +176,36 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['ST_Trend'] = df['st_trend_full']
     return df
 
+def export_supertrend_json(output_file="../syschrtpxy.json"):
+    """
+    🎯 ABSORBED CHART EXPORT (FULL DAY SPECIFIC)
+    Dumps EVERY single candle printed since today's opening bell straight to the JSON file.
+    """
+    dummy_df = pd.DataFrame()
+    df = calculate_supertrend(dummy_df)
+    
+    if df is None or df.empty:
+        print("No data processed for charting.")
+        return None
+
+    # 🚀 CHANGED: Removed df.tail(lookback) so it retains ALL intraday rows from today's session
+
+    output = []
+    for idx, row in df.iterrows():
+        output.append({
+            "time": str(idx),
+            "close": float(row["Close"]),
+            "p_master": float(row["Close"]),  
+            "st": float(row["ST"]),           
+            "st_trend": str(row["ST_Trend"])  
+        })
+
+    os.makedirs(os.path.dirname(output_file), exist_ok=True) if os.path.dirname(output_file) else None
+    with open(output_file, "w") as f:
+        json.dump(output, f, indent=2)
+
+    return output
+
 def get_signal(df: pd.DataFrame) -> tuple:
     """
     Direct array slice endpoint collector matching checkout preferences.
@@ -222,6 +254,9 @@ if __name__ == "__main__":
             print(f"Data Successfully Retrieved. Analyzing {len(live_df)} matrix intervals.")
             signal, trend = get_signal(live_df)
             
+            print("Exporting full-day session chart configuration matrix elements...")
+            export_supertrend_json()
+            
             print("==================================================")
             print(f"⚡ LIVE STREAM OUTPUT -> Signal: {signal} | Trend: {trend}")
             print("==================================================\n")
@@ -230,7 +265,4 @@ if __name__ == "__main__":
             
     except Exception as e:
         print(f"❌ Critical Connection Exception Hit: {e}")
-
-
-
 
