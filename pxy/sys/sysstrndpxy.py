@@ -199,14 +199,16 @@ def get_signal(df: pd.DataFrame) -> tuple:
 
 # Standalone execution validation loop
 if __name__ == "__main__":
-    from sysdthapxy import fetch_yf_data
+    # 🎯 FIXED: Points straight to your untouchable 'sysdtafpxy' file module name
+    from sysdtafpxy import fetch_yf_data
     
     print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
     print(f"Configuration -> CHECK_CONFIRMED_ONLY: {CHECK_CONFIRMED_ONLY} | MA_TYPE: {MA_TYPE}")
     print("--------------------------------------------------")
     
     try:
-        print("Polling latest day-specific session data from sysdthapxy...")
+        print("Polling latest day-specific session data from sysdtafpxy...")
+        # Pull data via your untouchable helper script function name
         live_df = fetch_yf_data()
         
         if live_df is not None and not live_df.empty:
@@ -221,3 +223,4 @@ if __name__ == "__main__":
             
     except Exception as e:
         print(f"❌ Critical Connection Exception Hit: {e}")
+
