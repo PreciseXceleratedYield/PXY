@@ -1,85 +1,101 @@
 # sysentrpxy.py
-from sysstrndpxy import calculate_supertrend  # <-- Sourced from your upstream module
-from sysmktpxy import get_signal  # <-- Import Tier 2 Network Layer (BULL/BEAR Pure Layer)
-try:
-    from syscnfgpxy import TICKER
-except ImportError:
-    TICKER = "NSE_INDEX"
+"""
+===============================================================================
+PXY EXECUTION OPTION ROUTING ENGINE WITH IST TIME-WINDOW CONTROLS
+===============================================================================
+Timezone Configuration: Aligned strictly to Indian Standard Time (IST) Zone.
+
+Operational Rules Matrix (Indian Markets):
+1. Window [09:15 IST - 09:30 IST]: Bypasses entry core. Routes raw exit_l2.
+   - exit_l2 == "BUY"  -> ATMBUY
+   - exit_l2 == "SELL" -> ATMSELL
+2. Window [After 09:30 IST]: Kick-starts standard entry_l4 structural filters.
+   - CROSSBUY / CROSSSELL -> OTMBUY / OTMSELL
+   - TRENDBUY / TRENDSELL -> ATMBUY / ATMSELL
+3. Fallback Route: If final_signal resolves to "NONE", it extracts the clean
+   raw exit_l2 state to pass straight down to the downstream process.
+===============================================================================
+"""
+
+from sysmktpxy import get_signal
+from syscnfgpxy import TICKER
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import pandas as pd
 
 def get_entry_signal(df=None):
-    # Extract Tier 1 Underlying Upstream Trend States (FORCEBUY, FORCESELL, CROSSBUY, CROSSSELL, BULL, BEAR)
-    st_trend = "SIDE"
+    # 1. Fetch Synced Signals from sysmktpxy
+    entry_l4, exit_l2 = get_signal(df)
+
+    # 2. Establish Base Current Time in Indian Standard Time (IST)
+    tz_ist = ZoneInfo("Asia/Kolkata")
+    current_time_ist = datetime.now(tz_ist).time()
+
+    # Parse dataframe time if present to ensure proper sync with tracking data
     if df is not None and not df.empty:
         try:
-            df_st = calculate_supertrend(df)
-            st_trend = str(df_st['ST_Trend'].iloc[-1]).upper()
+            last_timestamp = df.index[-1]
+            if not isinstance(last_timestamp, pd.Timestamp):
+                last_timestamp = pd.to_datetime(last_timestamp)
+            
+            if last_timestamp.tzinfo is not None:
+                current_time_ist = last_timestamp.astimezone(tz_ist).time()
+            else:
+                current_time_ist = last_timestamp.time()
         except Exception:
-            st_trend = "SIDE"
+            pass
 
-    # --- INDEPENDENT MARKET EXIT LAYER EXTRACTION ---
-    mkt_entry, mkt_exit = "NONE", "NONE"
-    if df is not None and not df.empty:
-        try:
-            mkt_entry, mkt_exit = get_signal(df)
-            mkt_exit = str(mkt_exit).upper().strip()
-        except Exception:
-            mkt_exit = "NONE"
+    # Create explicit time objects for IST boundary matching
+    market_open = datetime.strptime("09:15", "%H:%M").time()
+    time_boundary = datetime.strptime("09:30", "%H:%M").time()
 
-    # --- SYNC EXIT LAYER INDEPENDENTLY FROM SYSMKTPXY ---
-    if mkt_exit in ["BULL", "BEAR", "NONE"]:
-        exit_signal = mkt_exit
-    else:
-        exit_signal = "NONE"
-
-    # Initialize entry signal to clean baseline neutral state
     final_signal = "NONE"
 
-    # --- DIRECT ROUTER ENGINE (NOW SEGREGATING ATM VS ATM CHANNELS) ---
-    # 1. Standard Center Axis Crossover Up -> ATMBUY Execution
-    if st_trend == "CROSSBUY":
-        final_signal = "ATMBUY"
-        
-    # 2. Extreme Lower Band Channel Violation -> ATMBUY Execution
-    elif st_trend == "FORCEBUY":
-        final_signal = "ATMBUY"
-        
-    # 3. Standard Center Axis Crossover Down -> ATMSELL Execution
-    elif st_trend == "CROSSSELL":
-        final_signal = "ATMSELL"
-        
-    # 4. Extreme Upper Band Channel Violation -> ATMSELL Execution
-    elif st_trend == "FORCESELL":
-        final_signal = "ATMSELL"
-        
-    # 5. Unfiltered Pure Baseline Trend States Pass-Through
-    elif st_trend in ["BULL", "BEAR"]:
-        final_signal = st_trend
-        
-    # Fallback handling for early initialization rows ("SIDE")
+    # 3. IST TIME-BASED OPTIONS ROUTING ENGINE
+    if market_open <= current_time_ist < time_boundary:
+        # --- EARLY MORNING OPENING WINDOW: PURE RAW REVERSAL TO ATM ---
+        if exit_l2 == "BUY":
+            final_signal = "ATMBUY"
+        elif exit_l2 == "SELL":
+            final_signal = "ATMSELL"
+        else:
+            final_signal = "NONE"
     else:
-        final_signal = "NONE"
+        # --- STANDARD CONTINUOUS WINDOW: ACTIVE ENTRY FILTER CORE ---
+        if entry_l4 == "CROSSBUY":
+            final_signal = "OTMBUY"
+        elif entry_l4 == "CROSSSELL":
+            final_signal = "OTMSELL"
+        elif entry_l4 == "TRENDBUY":
+            final_signal = "ATMBUY"
+        elif entry_l4 == "TRENDSELL":
+            final_signal = "ATMSELL"
+        else:
+            # Pass BULL, BEAR, or NONE exactly as they are down the line
+            final_signal = entry_l4
 
-    # --- SEPARATED ACTION VS. INFORMATIONAL LOGGER ---
-    is_live_action = final_signal in ["ATMBUY", "ATMSELL", "ATMBUY", "ATMSELL"]
-    
-    if is_live_action:
-        print(f"🔥 En:{final_signal} | Ex:{exit_signal} | St:{st_trend} 🔥")
-    elif final_signal in ["BULL", "BEAR"]:
-        print(f"ℹ️ En:{final_signal} | Ex:{exit_signal} | St:{st_trend}")
-    else:
-        print(f"💤 En:{final_signal} | Ex:{exit_signal} | St:{st_trend}")
+    # 4. LATE OVERRIDE FALLBACK (Strictly for downstream communication pass-through)
+    if final_signal == "NONE":
+        if exit_l2 == "BUY":
+            final_signal = "BUY"
+        elif exit_l2 == "SELL":
+            final_signal = "SELL"
+        else:
+            final_signal = exit_l2  # Safely passes BULL, BEAR, or NONE downstream
 
-    return final_signal, exit_signal
+    # Reporting on active Indian Market signals
+    if final_signal in ["OTMBUY", "OTMSELL", "ATMBUY", "ATMSELL", "BUY", "SELL"]:
+        print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION-{final_signal} 🔥 ".center(40))
+
+    return final_signal, exit_l2
 
 if __name__ == "__main__":
     from sysdtafpxy import fetch_yf_data
-    print("\n=== [TIER 3] Unified STRND Entry + Independent MKT Exit Pipeline Self-Test ===")
     df = fetch_yf_data()
     if df is not None:
         entry, ex = get_entry_signal(df)
         print("-" * 50)
-        print(f"FINAL ENTRY SIGNAL: {entry} | EXIT SIGNAL: {ex}")
+        print(f"FINAL RESULT >> ENTRY: {entry} | EXIT: {ex}")
 
 
 
