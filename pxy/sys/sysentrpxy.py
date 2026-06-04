@@ -6,20 +6,8 @@ PXY EXECUTION OPTION ROUTING ENGINE WITH IST TIME-WINDOW CONTROLS
 Timezone Configuration: Aligned strictly to Indian Standard Time (IST) Zone.
 
 Operational Rules Matrix (Indian Markets):
-1. Window [09:15 IST - 09:30 IST]: Bypasses entry core. Routes raw candle flips to OTM.
-   - exit_sig == "BUY"  -> OTMBUY
-   - exit_sig == "SELL" -> OTMSELL
-2. Window [After 09:30 IST]: Kick-starts priority routing filters.
-   - CROSS OVERRULE (PRIORITY 1) - Hierarchical Structure:
-     * Rank 1: Band Wick Touches -> BB (ATMBUY) / BS (ATMSELL)
-     * Rank 2: Mid-Line Crosses  -> MB (ATMBUY) / MS (ATMSELL)
-     * Rank 3: 15m HA Line Cross -> CB (ATMBUY) / CS (ATMSELL)
-   - TREND FILTER FOLLOWERS (PRIORITY 2):
-     * If Trend is Bullish and exit_sig == "BUY"  -> ATMBUY (Trend Pullback)
-     * If Trend is Bearish and exit_sig == "SELL" -> ATMSELL (Trend Pullback)
-   - OPPOSITE MEAN REVERSION FLIPS (PRIORITY 3):
-     * If Trend is Bullish and exit_sig == "SELL" -> OTMSELL (Counter-Trend Short)
-     * If Trend is Bearish and exit_sig == "BUY"  -> OTMBUY (Counter-Trend Long)
+1. SIMPLIFIED ATM RULE ONLY: All entry signals and breakout crossovers 
+   route exclusively to ATM contracts (ATMBUY / ATMSELL) for baseline testing.
 ===============================================================================
 """
 
@@ -75,69 +63,31 @@ def get_entry_signal(df=None):
         except Exception:
             pass
 
-    market_open = datetime.strptime("09:15", "%H:%M").time()
-    time_boundary = datetime.strptime("09:30", "%H:%M").time()
-
     final_signal = "NONE"
 
-    # 4. IST TIME-BASED OPTIONS ROUTING ENGINE
-    if market_open <= current_time_ist < time_boundary:
-        # --- EARLY MORNING OPENING WINDOW: PURE RAW REVERSAL TO OTM ---
-        if exit_sig == "BUY":
-            final_signal = "OTMBUY"
-        elif exit_sig == "SELL":
-            final_signal = "OTMSELL"
-        else:
-            final_signal = "NONE"
-    else:
-        # --- STANDARD CONTINUOUS WINDOW: PRIORITY EXECUTION CORE ---
+    # 4. FLAT ATM OPTIONS ROUTING MATRIX
+    # Priority 1: Multi-Interval Breakout Indicators
+    if "BB" in cross_event or "MB" in cross_event or "CB" in cross_event:
+        final_signal = "ATMBUY"
+    elif "BS" in cross_event or "MS" in cross_event or "CS" in cross_event:
+        final_signal = "ATMSELL"
         
-        # 👑 PRIORITY 1: Hierarchical Breakout Evaluation Matrix
-        # Rank 1: Volatility Outer Band Wick Touches
-        if "BB" in cross_event:
-            final_signal = "ATMBUY"
-        elif "BS" in cross_event:
-            final_signal = "ATMSELL"
-            
-        # Rank 2: Middle TSMA Line Crossovers
-        elif "MB" in cross_event:
-            final_signal = "ATMBUY"
-        elif "MS" in cross_event:
-            final_signal = "ATMSELL"
-            
-        # Rank 3: Macro 15m Heikin Ashi Open Baseline Crossings
-        elif "CB" in cross_event:
-            final_signal = "ATMBUY"
-        elif "CS" in cross_event:
-            final_signal = "ATMSELL"
-            
-        # 📈 PRIORITY 2: Trend Filter Pullbacks (Aligned with Trend)
-        elif macro_trend == "BULL" and exit_sig == "BUY":
-            final_signal = "ATMBUY"
-        elif macro_trend == "BEAR" and exit_sig == "SELL":
-            final_signal = "ATMSELL"
-            
-        # 🛡️ PRIORITY 3: Opposite Market Flips (Counter-Trend Mean Reversion to OTM)
-        elif macro_trend == "BULL" and exit_sig == "SELL":
-            final_signal = "OTMSELL"
-        elif macro_trend == "BEAR" and exit_sig == "BUY":
-            final_signal = "OTMBUY"
-            
-        else:
-            # Pass remaining native states down the line (BULL, BEAR, or NONE)
-            final_signal = mkt_entry
-
-    # 5. LATE OVERRIDE FALLBACK (Strictly for downstream communication pass-through)
-    if final_signal in ["NONE", "BULL", "BEAR"]:
-        if exit_sig == "BUY":
-            final_signal = "BUY"
-        elif exit_sig == "SELL":
-            final_signal = "SELL"
-        else:
-            final_signal = exit_sig  # Safely passes BULL, BEAR, or NONE downstream
+    # Priority 2: Raw Candle Signals / Inbound Reversals
+    elif exit_sig == "BUY":
+        final_signal = "ATMBUY"
+    elif exit_sig == "SELL":
+        final_signal = "ATMSELL"
+        
+    # Priority 3: Fallback Pass-Through 
+    elif mkt_entry in ["BUY", "BULL"]:
+        final_signal = "ATMBUY"
+    elif mkt_entry in ["SELL", "BEAR"]:
+        final_signal = "ATMSELL"
+    else:
+        final_signal = "NONE"
 
     # Reporting on active Indian Market signals
-    if final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL", "BUY", "SELL"]:
+    if final_signal in ["ATMBUY", "ATMSELL", "BUY", "SELL"]:
         print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION-{final_signal} 🔥 ".center(40))
 
     return final_signal, exit_sig
@@ -148,3 +98,4 @@ if __name__ == "__main__":
     final_route, raw_exit = get_entry_signal(df=None)
     print("-" * 50)
     print(f"FINAL DECISION >> ROUTE STATUS: {final_route} | RAW CANDLE FLIP: {raw_exit}")
+
