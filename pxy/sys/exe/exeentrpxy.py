@@ -13,7 +13,7 @@ from colorama import Fore, init, Style
 DEBUG = False 
 COUNTERBUY = "NO" 
 COOL_DOWN_SECONDS = 65
-MAX_LOTS = 3  # ⚡ MAX RISK PROTECTION PARAMETER (Limits exposure to 3 lots max per side)
+MAX_LOTS_PER_SIDE = 3  # ⚡ STRICT CAP: Maximum 3 Lots per side (Nifty: 195 qty, BankNifty: 90 qty)
 
 init(autoreset=True)
 
@@ -30,7 +30,6 @@ from syscnfgpxy import TICKER
 # --- LOT SIZE LOGIC ---
 t = TICKER.upper().strip()
 LOT_SIZE = 30 if t == "^NSEBANK" else 65 if t == "^NSEI" else None
-MAX_ALLOWED_QTY = (LOT_SIZE * MAX_LOTS) if LOT_SIZE else 0
 
 # --- DEBUG PRINT ---
 def dprint(msg, color=Fore.CYAN):
@@ -163,49 +162,55 @@ async def main():
         elif sig == "STSELL": sig = "ATMSELL"
         dprint(f"SIGNAL: {sig}")
 
-        # --- UPDATED POSITION BALANCING LOGIC (+1 SUPERTREND CUSHION & ATM/OTM) ---
-        dprint("CHECKING POSITION STATE FOR 1:1 WITH +1 BIAS...")
+        # --- POSITION BALANCING LOGIC (+1 SUPERTREND CUSHION & PER-SIDE LIMITS) ---
+        dprint("CHECKING POSITION STATE FOR STRATEGY ENFORCEMENT...")
         pos_raw = str(get_position_summary(client))
         
         # Safe extraction of quantities
         ce_qty = int(re.search(r'(\d+)CE', pos_raw).group(1)) if 'CE' in pos_raw else 0
         pe_qty = int(re.search(r'(\d+)PE', pos_raw).group(1)) if 'PE' in pos_raw else 0
         
-        dprint(f"CURRENT -> CE: {ce_qty} | PE: {pe_qty} | SUPERTREND: {supertrend} | SIGNAL: {sig}")
+        # Calculate exactly how many full lots we are currently holding per side
+        current_ce_lots = ce_qty // LOT_SIZE if LOT_SIZE else 0
+        current_pe_lots = pe_qty // LOT_SIZE if LOT_SIZE else 0
+        
+        dprint(f"CURRENT -> CE: {ce_qty} ({current_ce_lots} Lots) | PE: {pe_qty} ({current_pe_lots} Lots) | SUPERTREND: {supertrend} | SIGNAL: {sig}")
 
         symbol, res = None, {"stat": "SKIPPED"}
         
+        # 🟢 SUPERTREND: BULL (Maintain +1 lot advantage for CE side, respect incoming signal type)
         if supertrend == "BULL":
-            # Enforce CE must be exactly 1 lot higher than PE
-            if ce_qty < (pe_qty + LOT_SIZE):
-                # Hard restriction ceiling check
-                if ce_qty < MAX_ALLOWED_QTY:
-                    if not is_side_cooling("CE"):
-                        # Dynamically uses your ATMBUY or OTMBUY entry signals
-                        symbol = get_symbol(ltp, sig, OTM_DISTANCE)
-                        if symbol and symbol != "NA":
-                            res = execute_order(client, symbol, LOT_SIZE)
-                            if res["stat"] == "OK": set_side_cooling("CE")
+            if sig in ["ATMBUY", "OTMBUY"]:
+                if ce_qty < (pe_qty + LOT_SIZE):
+                    if current_ce_lots < MAX_LOTS_PER_SIDE:
+                        if not is_side_cooling("CE"):
+                            symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+                            if symbol and symbol != "NA":
+                                res = execute_order(client, symbol, LOT_SIZE)
+                                if res["stat"] == "OK": set_side_cooling("CE")
+                    else:
+                        print(f"{Fore.RED}🛑 HARD BLOCK: CE position has hit MAX CAPACITY ({current_ce_lots} lots). Order blocked.")
                 else:
-                    dprint(f"CRITICAL OVERRIDE: CE position ({ce_qty}) is at MAX CAP ({MAX_ALLOWED_QTY}). Order blocked.", Fore.RED)
+                    dprint(f"SKIP: CE({ce_qty}) already has the +1 lot trend advantage over PE({pe_qty})", Fore.YELLOW)
             else:
-                dprint(f"SKIP: CE({ce_qty}) already has the +1 lot advantage over PE({pe_qty})", Fore.YELLOW)
+                dprint(f"SKIP: Supertrend is BULL but entry signal is {sig}. Skipping CE action.", Fore.YELLOW)
 
+        # 🔴 SUPERTREND: BEAR (Maintain +1 lot advantage for PE side, respect incoming signal type)
         elif supertrend == "BEAR":
-            # Enforce PE must be exactly 1 lot higher than CE
-            if pe_qty < (ce_qty + LOT_SIZE):
-                # Hard restriction ceiling check
-                if pe_qty < MAX_ALLOWED_QTY:
-                    if not is_side_cooling("PE"):
-                        # Dynamically uses your ATMSELL or OTMSELL entry signals
-                        symbol = get_symbol(ltp, sig, OTM_DISTANCE)
-                        if symbol and symbol != "NA":
-                            res = execute_order(client, symbol, LOT_SIZE)
-                            if res["stat"] == "OK": set_side_cooling("PE")
+            if sig in ["ATMSELL", "OTMSELL"]:
+                if pe_qty < (ce_qty + LOT_SIZE):
+                    if current_pe_lots < MAX_LOTS_PER_SIDE:
+                        if not is_side_cooling("PE"):
+                            symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+                            if symbol and symbol != "NA":
+                                res = execute_order(client, symbol, LOT_SIZE)
+                                if res["stat"] == "OK": set_side_cooling("PE")
+                    else:
+                        print(f"{Fore.RED}🛑 HARD BLOCK: PE position has hit MAX CAPACITY ({current_pe_lots} lots). Order blocked.")
                 else:
-                    dprint(f"CRITICAL OVERRIDE: PE position ({pe_qty}) is at MAX CAP ({MAX_ALLOWED_QTY}). Order blocked.", Fore.RED)
+                    dprint(f"SKIP: PE({pe_qty}) already has the +1 lot trend advantage over CE({ce_qty})", Fore.YELLOW)
             else:
-                dprint(f"SKIP: PE({pe_qty}) already has the +1 lot advantage over CE({ce_qty})", Fore.YELLOW)
+                dprint(f"SKIP: Supertrend is BEAR but entry signal is {sig}. Skipping PE action.", Fore.YELLOW)
         
         else:
             dprint(f"SKIP: Unknown Supertrend state: {supertrend}", Fore.RED)
@@ -227,4 +232,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
