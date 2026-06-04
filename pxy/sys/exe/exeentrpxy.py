@@ -104,7 +104,7 @@ def execute_order(client, symbol, qty):
             "trading_symbol": symbol,
             "transaction_type": "B",
             "amo": "NO",
-            "tag": order_tag  # <--- NEW: Attaching the HHMMSS tag
+            "tag": order_tag  # Attaching the HHMMSS tag
         }
         
         dprint(f"ORDER PARAMS: {params}", Fore.YELLOW)
@@ -161,43 +161,44 @@ async def main():
         elif sig == "STSELL": sig = "ATMSELL"
         dprint(f"SIGNAL: {sig}")
 
-        # --- UPDATED POSITION BALANCING LOGIC ---
-        dprint("CHECKING POSITIONS FOR BALANCE...")
+        # --- UPDATED POSITION BALANCING LOGIC (+1 SUPERTREND CUSHION & ATM/OTM) ---
+        dprint("CHECKING POSITION STATE FOR 1:1 WITH +1 BIAS...")
         pos_raw = str(get_position_summary(client))
         
-        ce_match = re.search(r'(\d+)CE', pos_raw)
-        pe_match = re.search(r'(\d+)PE', pos_raw)
+        # Safe extraction of quantities
+        ce_qty = int(re.search(r'(\d+)CE', pos_raw).group(1)) if 'CE' in pos_raw else 0
+        pe_qty = int(re.search(r'(\d+)PE', pos_raw).group(1)) if 'PE' in pos_raw else 0
         
-        ce_qty = int(ce_match.group(1)) if ce_match else 0
-        pe_qty = int(pe_match.group(1)) if pe_match else 0
-        
-        dprint(f"CURRENT -> CE: {ce_qty} | PE: {pe_qty}")
+        dprint(f"CURRENT -> CE: {ce_qty} | PE: {pe_qty} | SUPERTREND: {supertrend} | SIGNAL: {sig}")
 
         symbol, res = None, {"stat": "SKIPPED"}
         
-        if sig in ["ATMBUY", "OTMBUY"]:
-            dprint("BRANCH: BALANCE CE")
-            # ONLY BUY if CE is lower than PE, or both are zero
-            if ce_qty < pe_qty or (ce_qty == 0 and pe_qty == 0):
+        if supertrend == "BULL":
+            # Enforce CE must be exactly 1 lot higher than PE
+            if ce_qty < (pe_qty + LOT_SIZE):
                 if not is_side_cooling("CE"):
+                    # Dynamically uses your ATMBUY or OTMBUY entry signals
                     symbol = get_symbol(ltp, sig, OTM_DISTANCE)
                     if symbol and symbol != "NA":
                         res = execute_order(client, symbol, LOT_SIZE)
                         if res["stat"] == "OK": set_side_cooling("CE")
             else:
-                dprint(f"SKIP: CE({ce_qty}) is already balanced with or > PE({pe_qty})", Fore.YELLOW)
+                dprint(f"SKIP: CE({ce_qty}) already has the +1 lot advantage over PE({pe_qty})", Fore.YELLOW)
 
-        elif sig in ["ATMSELL", "OTMSELL"]:
-            dprint("BRANCH: BALANCE PE")
-            # ONLY BUY if PE is lower than CE, or both are zero
-            if pe_qty < ce_qty or (ce_qty == 0 and pe_qty == 0):
+        elif supertrend == "BEAR":
+            # Enforce PE must be exactly 1 lot higher than CE
+            if pe_qty < (ce_qty + LOT_SIZE):
                 if not is_side_cooling("PE"):
+                    # Dynamically uses your ATMSELL or OTMSELL entry signals
                     symbol = get_symbol(ltp, sig, OTM_DISTANCE)
                     if symbol and symbol != "NA":
                         res = execute_order(client, symbol, LOT_SIZE)
                         if res["stat"] == "OK": set_side_cooling("PE")
             else:
-                dprint(f"SKIP: PE({pe_qty}) is already balanced with or > CE({ce_qty})", Fore.YELLOW)
+                dprint(f"SKIP: PE({pe_qty}) already has the +1 lot advantage over CE({ce_qty})", Fore.YELLOW)
+        
+        else:
+            dprint(f"SKIP: Unknown Supertrend state: {supertrend}", Fore.RED)
 
         funds = get_available_funds(client)
 
