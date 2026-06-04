@@ -1,135 +1,98 @@
 //@version=5
-indicator("PXY Engine - Mode 5 Intraday Session Reset", overlay=true)
+indicator("PXY Production Options Router (AB/AS/OB/OS/CB/CS Sync)", overlay=true)
 
-// --- Global Configuration ---
-MA_TYPE = input.string("TSMA", title="MA Type", options=["SMA", "TSMA"])
+// Lock calculations strictly to the 1-minute chart
+is_1min = timeframe.isminutes and timeframe.multiplier == 1
 
-// --- Detect New Trading Day Session Start ---
-bool is_new_day = ta.change(time("D")) != 0
+// --- 1. FETCH AND CALCULATE TRUE HEIKIN-ASHI VALUES ---
+ha_ticker = ticker.heikinashi(syminfo.tickerid)
+ha_open   = request.security(ha_ticker, timeframe.period, open)
+ha_high   = request.security(ha_ticker, timeframe.period, high)
+ha_low    = request.security(ha_ticker, timeframe.period, low)
+ha_close  = request.security(ha_ticker, timeframe.period, close)
 
-// --- Isolated Mode 5 Matrix Generator (Composite Blend) ---
-var float ha_o = na
-float ha_c = (open + high + low + close) / 4.0
+// Define the live HA price source: (HA High + HA Low) / 2
+ha_live_source = (ha_high + ha_low) / 2.0
 
-// Heikin-Ashi calculation resets daily to prevent yesterday's close from bleeding in
-if is_new_day
-    ha_o := (open + close) / 2.0
-else
-    ha_o := na(ha_o) ? (open + close) / 2.0 : (ha_o + ha_c) / 2.0
+// --- 2. THE MASTER BASELINE & MACRO TREND ---
+tsma_380 = ta.linreg(ha_live_source, 380, 0)
+blended_line = is_1min ? (tsma_380 + ha_live_source) / 2.0 : na
 
-float ha_h = math.max(high, math.max(ha_o, ha_c))
-float ha_l = math.min(low, math.min(ha_o, ha_c))
+// Define Macro Trend based on baseline position
+macro_trend_bull = ha_close >= blended_line
+macro_trend_bear = ha_close < blended_line
 
-// Math Engine Transformation Variables
-float oc2    = (open + close) / 2.0
-float raw_c1 = na(close[1]) ? close : close[1]
+// Explicit Crossover Signals (Priority 1 Breakouts)
+has_cross_buy  = ta.crossover(ha_close, blended_line)
+has_cross_sell = ta.crossunder(ha_close, blended_line)
 
-// Pure Mode 5 Core Source Matrix Assignments
-float src_o = (open + ha_o + oc2 + raw_c1) / 4.0
-float src_h = (high + ha_h + oc2 + close) / 4.0
-float src_l = (low + ha_l + oc2 + raw_c1) / 4.0
-float src_c = (close + ha_c + oc2 + close) / 4.0
+// --- 3. HEIKIN-ASHI CANDLE FLIPS (EXIT_SIG) ---
+ha_is_green = ha_close >= ha_open
+ha_is_red   = ha_close < ha_open
 
-// Plot Transformed Mode 5 Custom Candlesticks
-candle_color = src_c >= src_o ? color.green : color.red
-plotcandle(src_o, src_h, src_l, src_c, title="Mode 5 Transformed Candles", color=candle_color, wickcolor=candle_color, bordercolor=candle_color)
+// Detect color switches (flips) from previous candle
+exit_buy  = ha_is_green and not ha_is_green[1]
+exit_sell = ha_is_red and not ha_is_red[1]
 
-// --- Dynamic Intraday Session Math Foundations ---
+// --- 4. IST TIME WINDOW CONTROLS ---
+// Window A: Early Morning Opening (09:15 AM to 09:30 AM IST)
+in_early_window = not na(time(timeframe.period, "0915-0930:23456"))
 
-// Persistent running counts and sums that clear to zero on a new day
-var int bar_count_session = 0
-var float sum_y           = 0.0
-var float sum_x           = 0.0
-var float sum_xx          = 0.0
-var float sum_xy          = 0.0
+// Window B: Standard Continuous Market Session (09:30 AM to 03:40 PM IST)
+in_standard_window = not na(time(timeframe.period, "0930-1540:23456"))
 
-// Absolute Session High & Low trackers that clear every morning
-var float hh_session      = na
-var float ll_session      = na
+// --- 5. EXECUTION ROUTING LOGIC ENGINE ---
+string final_context = "NONE"
 
-if is_new_day
-    bar_count_session := 1
-    sum_y             := src_c
-    sum_x             := 0.0
-    sum_xx            := 0.0
-    sum_xy            := 0.0
-    hh_session        := src_h
-    ll_session        := src_l
-else
-    bar_count_session := bar_count_session + 1
-    // Relative index step inside today's session boundary
-    float idx          = bar_count_session - 1
-    sum_y             := sum_y + src_c
-    sum_x             := sum_x + idx
-    sum_xx            := sum_xx + math.pow(idx, 2)
-    sum_xy            := sum_xy + (idx * src_c)
-    hh_session        := math.max(hh_session, src_h)
-    ll_session        := math.min(ll_session, src_l)
+if is_1min
+    if in_early_window
+        // --- EARLY MORNING WINDOW: PURE REVERSALS TO ATM ---
+        if exit_buy
+            final_context := "AB"
+        if exit_sell
+            final_context := "AS"
+            
+    else if in_standard_window
+        // --- STANDARD CONTINUOUS WINDOW: PRIORITY FILTER ENGINE ---
+        if has_cross_buy
+            final_context := "CB"
+        else if has_cross_sell
+            final_context := "CS"
+        else if macro_trend_bull and exit_buy
+            final_context := "AB"
+        else if macro_trend_bear and exit_sell
+            final_context := "AS"
+        else if macro_trend_bull and exit_sell
+            final_context := "OS"
+        else if macro_trend_bear and exit_buy
+            final_context := "OB"
 
-// 1. Resetting SMA Calculation
-float sma_line = sum_y / bar_count_session
+// --- 6. PLOT VISUALS & LABEL EXECUTION ---
+// Plot custom smooth Heikin-Ashi candles
+ha_color = ha_is_green ? color.green : color.red
+plotcandle(ha_open, ha_high, ha_low, ha_close, title="HA Candles", color=ha_color, wickcolor=ha_color, bordercolor=ha_color)
 
-// 2. Resetting TSMA Calculation
-float tsma_line = src_c
-if bar_count_session > 1
-    float num   = (bar_count_session * sum_xy) - (sum_x * sum_y)
-    float denom = (bar_count_session * sum_xx) - math.pow(sum_x, 2)
-    
-    if denom != 0
-        float slope = num / denom
-        float current_idx = bar_count_session - 1
-        float intercept = (sum_y - (slope * sum_x)) / bar_count_session
-        tsma_line := (slope * current_idx) + intercept
+// Plot the single master baseline trend layer
+plot(blended_line, title="HA Master Baseline", color=color.purple, linewidth=3)
 
-// --- Core Structural Signal Line Formations ---
-base_ma_line = (MA_TYPE == "SMA") ? sma_line : tsma_line
+// Filter for state transitions to plot text tokens cleanly when context switches
+var string last_context = "NONE"
+is_new_signal = final_context != "NONE" and final_context != last_context
+if final_context != "NONE"
+    last_context := final_context
 
-// Reference Structural Boundary Line Formations over active session data
-pxy_st_line  = (base_ma_line + hh_session + ll_session + src_c) / 4.0
-pxy_st_no_ll = (base_ma_line + hh_session + src_c) / 3.0 // Upper Boundary Line
-pxy_st_no_hh = (base_ma_line + ll_session + src_c) / 3.0 // Lower Boundary Line
+// Condition flags for printing shapes
+show_cb = is_new_signal and final_context == "CB"
+show_cs = is_new_signal and final_context == "CS"
+show_ab = is_new_signal and final_context == "AB"
+show_as = is_new_signal and final_context == "AS"
+show_ob = is_new_signal and final_context == "OB"
+show_os = is_new_signal and final_context == "OS"
 
-// Multi-Bar State Array Assignments
-c0 = src_c
-c1 = src_c[1]
-
-st0 = pxy_st_line
-st1 = pxy_st_line[1]
-
-no_ll0 = pxy_st_no_ll
-no_ll1 = pxy_st_no_ll[1]
-
-no_hh0 = pxy_st_no_hh
-no_hh1 = pxy_st_no_hh[1]
-
-// Execution Flag Definitions
-bool is_buy_signal  = false
-bool is_sell_signal = false
-
-// Only evaluate patterns if we have at least 2 bars printed today to prevent yesterday carryover
-if bar_count_session >= 2
-    // Condition Intersections
-    cross_buy  = (c0 > st0) and (c1 <= st1)
-    cross_sell = (c0 < st0) and (c1 >= st1)
-    
-    force_buy  = (c0 > no_ll0) and (c1 <= no_ll1)
-    force_sell = (c0 < no_hh0) and (c1 >= no_hh1)
-    
-    // Priority Signal Sorting Matrix Evaluation
-    if force_buy
-        is_sell_signal := true   // Upper Boundary Overwrite -> FORCESELL
-    else if force_sell
-        is_buy_signal  := true   // Lower Boundary Overwrite -> FORCEBUY
-    else if cross_buy
-        is_buy_signal  := true   // Center Crossover BUY
-    else if cross_sell
-        is_sell_signal := true   // Center Crossover SELL
-
-// --- Visual Overlay Rendering Elements ---
-plot(pxy_st_line, title="PXY ST Line Center", color=color.blue, linewidth=2)
-plot(pxy_st_no_ll, title="PXY ST Upper Boundary", color=color.orange, linewidth=1, style=plot.style_linebr)
-plot(pxy_st_no_hh, title="PXY ST Lower Boundary", color=color.purple, linewidth=1, style=plot.style_linebr)
-
-plotshape(is_buy_signal, title="Buy Signal", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small)
-plotshape(is_sell_signal, title="Sell Signal", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small)
-
+// Plot Tokens on Chart Layout
+plotshape(show_cb, title="Cross Buy Breakout",  style=shape.labelup,   location=location.belowbar, color=color.lime,   textcolor=color.black, text="CB", size=size.small)
+plotshape(show_cs, title="Cross Sell Breakdown", style=shape.labeldown, location=location.abovebar, color=color.orange, textcolor=color.black, text="CS", size=size.small)
+plotshape(show_ab, title="ATM Buy Pullback",    style=shape.labelup,   location=location.belowbar, color=color.green,  textcolor=color.white, text="AB", size=size.small)
+plotshape(show_as, title="ATM Sell Pullback",   style=shape.labeldown, location=location.abovebar, color=color.red,    textcolor=color.white, text="AS", size=size.small)
+plotshape(show_ob, title="OTM Buy Reversal",    style=shape.labelup,   location=location.belowbar, color=color.teal,   textcolor=color.white, text="OB", size=size.small)
+plotshape(show_os, title="OTM Sell Reversal",   style=shape.labeldown, location=location.abovebar, color=color.maroon, textcolor=color.white, text="OS", size=size.small)
