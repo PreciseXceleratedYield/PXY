@@ -401,13 +401,18 @@ def export_supertrend_json(output_file="../syschrtpxy.json"):
 
 def get_signal(df: pd.DataFrame) -> tuple:
     """
-    Direct array slice endpoint collector matching checkout preferences.
+    Direct positional array slice endpoint collector matching checkout preferences.
     """
+    # 🎯 FIX: If fallback/dummy frame is passed, calculate matrix values safely first
     if df is None or df.empty:
+        calculated_df = calculate_supertrend(pd.DataFrame())
+    else:
+        calculated_df = calculate_supertrend(df)
+        
+    if calculated_df is None or calculated_df.empty:
         return "NONE", "NONE"
         
     try:
-        calculated_df = calculate_supertrend(df)
         n = len(calculated_df)
         
         if CHECK_CONFIRMED_ONLY:
@@ -415,8 +420,9 @@ def get_signal(df: pd.DataFrame) -> tuple:
         else:
             idx = n - 1  
 
-        active_signal = str(calculated_df.at[calculated_df.index[idx], 'st_signal_full']).upper().strip()
-        active_trend  = str(calculated_df.at[calculated_df.index[idx], 'st_trend_full']).upper().strip()
+        # 🎯 FIX: Direct .iloc positional calls completely bypass DatetimeIndex structure lookup bugs
+        active_signal = str(calculated_df['st_signal_full'].iloc[idx]).upper().strip()
+        active_trend  = str(calculated_df['ST_Trend'].iloc[idx]).upper().strip()
         
         if DEBUG_MODE:
             print(f"--- PXY STRATEGY EVALUATION SUMMARY ---")
@@ -430,6 +436,7 @@ def get_signal(df: pd.DataFrame) -> tuple:
         if DEBUG_MODE:
             print(f"PXY Master Output Routing Module Exception: {e}")
         return "NONE", "NONE"
+
 
 # Standalone execution validation loop
 if __name__ == "__main__":
