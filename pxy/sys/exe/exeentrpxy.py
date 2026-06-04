@@ -10,7 +10,7 @@ from datetime import datetime, time as dt_time
 from colorama import Fore, init, Style
 
 # --- GLOBAL CONFIG ---
-DEBUG = False 
+DEBUG = True 
 COUNTERBUY = "NO" 
 COOL_DOWN_SECONDS = 65
 MAX_LOTS_PER_SIDE = 3  # ⚡ STRICT CAP: Maximum 3 Lots per side (Nifty: 195 qty, BankNifty: 90 qty)
