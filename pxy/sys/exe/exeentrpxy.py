@@ -92,7 +92,6 @@ def generate_pxy_tag():
 def execute_order(client, symbol, qty):
     dprint(f"ENTER execute_order for {symbol}")
     try:
-        # Generate the unique ID for this specific scalp
         order_tag = generate_pxy_tag()
         
         params = {
@@ -105,15 +104,13 @@ def execute_order(client, symbol, qty):
             "trading_symbol": symbol,
             "transaction_type": "B",
             "amo": "NO",
-            "tag": order_tag  # Attaching the HHMMSS tag
+            "tag": order_tag 
         }
         
         dprint(f"ORDER PARAMS: {params}", Fore.YELLOW)
         res = client.place_order(**params)
         
-        # Log the tag with the response for verification
         print(f"{Fore.CYAN}🚀 ORDER PLACED | SYMBOL: {symbol} | TAG: {order_tag}")
-        
         return {"stat": "OK" if res and str(res).strip() else "FAIL", "raw": res}
     except Exception as e:
         dprint(f"ORDER ERROR: {e}", Fore.RED)
@@ -127,7 +124,6 @@ def parse_net_quantity(pos_raw, option_type):
     text = pos_raw.lower()
     opt = option_type.lower()
     
-    # Matches patterns like "netqty": 65, "quantity": -65, or standalone position values
     patterns = [
         r'(?:netqty|quantity|qty)[\s"\'::-]+([+-]?\d+)(?:.+?' + opt + r'|)',
         r'([+-]?\d+)\s*(?:qty|lots|slots)?\s*(?:of)?\s*[\w\d]+' + opt
@@ -141,7 +137,6 @@ def parse_net_quantity(pos_raw, option_type):
             except ValueError:
                 continue
                 
-    # Fallback option string count rule if structured tags do not exist
     if opt in text and "net" not in text:
         return text.count(opt) * (LOT_SIZE if LOT_SIZE else 1)
         
@@ -180,7 +175,9 @@ async def main():
         try:
             supertrend = str(data.get("supertrend", "")).upper().strip()
             OTM_DISTANCE = 200
-        except: OTM_DISTANCE = 100
+        except: 
+            supertrend = "NONE"
+            OTM_DISTANCE = 100
 
         exit_sig = str(reversal).upper().strip() if reversal else "NONE"
         if not entry_signal: return
@@ -188,59 +185,61 @@ async def main():
         sig = entry_signal.upper().strip()
         if sig == "STBUY": sig = "ATMBUY"
         elif sig == "STSELL": sig = "ATMSELL"
-        dprint(f"SIGNAL: {sig}")
+        dprint(f"SIGNAL: {sig} | SUPERTREND BALANCER: {supertrend}")
 
-        # --- POSITION BALANCING LOGIC (+1 SUPERTREND CUSHION & PER-SIDE LIMITS) ---
+        # --- POSITION BALANCING LOGIC (+1 CUSHION & PER-SIDE LIMITS) ---
         dprint("CHECKING POSITION STATE FOR STRATEGY ENFORCEMENT...")
         pos_raw = str(get_position_summary(client))
         
-        # Robust extraction replacing the broken original regex line
         ce_qty = parse_net_quantity(pos_raw, "CE")
         pe_qty = parse_net_quantity(pos_raw, "PE")
         
-        # Calculate exactly how many full lots we are currently holding per side
         current_ce_lots = ce_qty // LOT_SIZE if LOT_SIZE else 0
         current_pe_lots = pe_qty // LOT_SIZE if LOT_SIZE else 0
         
-        dprint(f"CURRENT -> CE: {ce_qty} ({current_ce_lots} Lots) | PE: {pe_qty} ({current_pe_lots} Lots) | SUPERTREND: {supertrend} | SIGNAL: {sig}")
+        dprint(f"CURRENT -> CE: {ce_qty} ({current_ce_lots} Lots) | PE: {pe_qty} ({current_pe_lots} Lots) | SIGNAL: {sig}")
 
         symbol, res = None, {"stat": "SKIPPED"}
         
-        # 🟢 SUPERTREND: BULL (Maintain +1 lot advantage for CE side, respect incoming signal type)
-        if supertrend == "BULL":
-            if sig in ["ATMBUY", "OTMBUY"]:
-                if ce_qty < (pe_qty + LOT_SIZE):
-                    # Strict Look-Ahead check to guarantee we never trade over 3 lots per side
-                    if (current_ce_lots + 1) <= MAX_LOTS_PER_SIDE:
-                        if not is_side_cooling("CE"):
-                            symbol = get_symbol(ltp, sig, OTM_DISTANCE)
-                            if symbol and symbol != "NA":
-                                res = execute_order(client, symbol, LOT_SIZE)
-                                if res["stat"] == "OK": set_side_cooling("CE")
-                    else:
-                        print(f"{Fore.RED}🛑 HARD BLOCK: Next CE order would exceed MAX CAPACITY ({MAX_LOTS_PER_SIDE} lots). Order blocked.")
-                else:
-                    dprint(f"SKIP: CE({ce_qty}) already has the +1 lot trend advantage over PE({pe_qty})", Fore.YELLOW)
+        # 🟢 CE SIGNAL PROCESSING
+        if sig in ["ATMBUY", "OTMBUY"]:
+            is_balanced = False
+            if supertrend == "BULL":
+                is_balanced = ce_qty < (pe_qty + LOT_SIZE)
             else:
-                dprint(f"SKIP: Supertrend is BULL but entry signal is {sig}. Skipping CE action.", Fore.YELLOW)
+                is_balanced = ce_qty <= pe_qty  # Keep pace equally if supertrend doesn't match
 
-        # 🔴 SUPERTREND: BEAR (Maintain +1 lot advantage for PE side, respect incoming signal type)
-        elif supertrend == "BEAR":
-            if sig in ["ATMSELL", "OTMSELL"]:
-                if pe_qty < (ce_qty + LOT_SIZE):
-                    # Strict Look-Ahead check to guarantee we never trade over 3 lots per side
-                    if (current_pe_lots + 1) <= MAX_LOTS_PER_SIDE:
-                        if not is_side_cooling("PE"):
-                            symbol = get_symbol(ltp, sig, OTM_DISTANCE)
-                            if symbol and symbol != "NA":
-                                res = execute_order(client, symbol, LOT_SIZE)
-                                if res["stat"] == "OK": set_side_cooling("PE")
-                    else:
-                        print(f"{Fore.RED}🛑 HARD BLOCK: Next PE order would exceed MAX CAPACITY ({MAX_LOTS_PER_SIDE} lots). Order blocked.")
+            if is_balanced:
+                if (current_ce_lots + 1) <= MAX_LOTS_PER_SIDE:
+                    if not is_side_cooling("CE"):
+                        symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+                        if symbol and symbol != "NA":
+                            res = execute_order(client, symbol, LOT_SIZE)
+                            if res["stat"] == "OK": set_side_cooling("CE")
                 else:
-                    dprint(f"SKIP: PE({pe_qty}) already has the +1 lot trend advantage over CE({ce_qty})", Fore.YELLOW)
+                    print(f"{Fore.RED}🛑 HARD BLOCK: Next CE order would exceed MAX CAPACITY ({MAX_LOTS_PER_SIDE} lots). Order blocked.")
             else:
-                dprint(f"SKIP: Supertrend is BEAR but entry signal is {sig}. Skipping PE action.", Fore.YELLOW)
+                dprint(f"SKIP: CE({ce_qty}) cannot expand. Supertrend={supertrend} check failed against PE({pe_qty})", Fore.YELLOW)
+
+        # 🔴 PE SIGNAL PROCESSING
+        elif sig in ["ATMSELL", "OTMSELL"]:
+            is_balanced = False
+            if supertrend == "BEAR":
+                is_balanced = pe_qty < (ce_qty + LOT_SIZE)
+            else:
+                is_balanced = pe_qty <= ce_qty  # Keep pace equally if supertrend doesn't match
+
+            if is_balanced:
+                if (current_pe_lots + 1) <= MAX_LOTS_PER_SIDE:
+                    if not is_side_cooling("PE"):
+                        symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+                        if symbol and symbol != "NA":
+                            res = execute_order(client, symbol, LOT_SIZE)
+                            if res["stat"] == "OK": set_side_cooling("PE")
+                else:
+                    print(f"{Fore.RED}🛑 HARD BLOCK: Next PE order would exceed MAX CAPACITY ({MAX_LOTS_PER_SIDE} lots). Order blocked.")
+            else:
+                dprint(f"SKIP: PE({pe_qty}) cannot expand. Supertrend={supertrend} check failed against CE({ce_qty})", Fore.YELLOW)
 
         # --- 📊 ACCOUNT DASHBOARD SUMMARY ---
         try:
@@ -263,4 +262,5 @@ async def main():
         traceback.print_exc()
 
 if __name__ == "__main__":
+    asyncio.run(main())
 
