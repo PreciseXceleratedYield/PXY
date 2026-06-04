@@ -13,9 +13,12 @@ Operational Rules Matrix (Indian Markets):
    - CROSS OVERRULE (PRIORITY 1): 
      * True HA Crossover Above Baseline -> ATMBUY (Immediate Action)
      * True HA Crossover Below Baseline -> ATMSELL (Immediate Action)
-   - TREND FILTERS (PRIORITY 2):
+   - TREND FILTER FOLLOWERS (PRIORITY 2):
      * If Trend is Bullish and exit_sig == "BUY"  -> ATMBUY (Trend Pullback)
      * If Trend is Bearish and exit_sig == "SELL" -> ATMSELL (Trend Pullback)
+   - OPPOSITE MEAN REVERSION FLIPS (PRIORITY 3):
+     * If Trend is Bullish and exit_sig == "SELL" -> OTMSELL (Counter-Trend Short)
+     * If Trend is Bearish and exit_sig == "BUY"  -> OTMBUY (Counter-Trend Long)
 ===============================================================================
 """
 
@@ -29,11 +32,14 @@ from sysmktpxy import get_signal, CHECK_CONFIRMED_ONLY
 from sysstrndpxy import calculate_supertrend
 
 def get_entry_signal(df=None):
-    # 1. Fetch the raw, unfiltered Heikin-Ashi candle state maps
+    # 1. Fetch the raw, unfiltered Heikin-Ashi candle state maps from sysmktpxy
     mkt_entry, exit_sig = get_signal(df)
 
+    # Clean and standardize incoming string formats to avoid whitespace anomalies
+    mkt_entry = str(mkt_entry).upper().strip()
+    exit_sig  = str(exit_sig).upper().strip()
+
     # 2. Extract the underlying 380 baseline macro trend and crossover signals
-    # We pass df=None to let it utilize its internal yFinance multi-day cache
     strnd_df = calculate_supertrend(df=None)
     
     macro_trend = "NEUTRAL"
@@ -95,16 +101,20 @@ def get_entry_signal(df=None):
         elif has_cross_sell:
             final_signal = "ATMSELL"
             
-        # 📈 PRIORITY 2: Trend Filter Pullbacks (Trend is BULL + Heikin-Ashi flips Green)
+        # 📈 PRIORITY 2: Trend Filter Pullbacks (Aligned with Trend)
         elif macro_trend == "BULL" and exit_sig == "BUY":
             final_signal = "ATMBUY"
-            
-        # 📉 PRIORITY 3: Trend Filter Pullbacks (Trend is BEAR + Heikin-Ashi flips Red)
         elif macro_trend == "BEAR" and exit_sig == "SELL":
             final_signal = "ATMSELL"
             
+        # 🛡️ PRIORITY 3: Opposite Market Flips (Counter-Trend Mean Reversion to OTM)
+        elif macro_trend == "BULL" and exit_sig == "SELL":
+            final_signal = "OTMSELL"
+        elif macro_trend == "BEAR" and exit_sig == "BUY":
+            final_signal = "OTMBUY"
+            
         else:
-            # Pass remaining native states down the line
+            # Pass remaining native states down the line (BULL, BEAR, or NONE)
             final_signal = mkt_entry
 
     # 5. LATE OVERRIDE FALLBACK (Strictly for downstream communication pass-through)
@@ -117,7 +127,7 @@ def get_entry_signal(df=None):
             final_signal = exit_sig  # Safely passes BULL, BEAR, or NONE downstream
 
     # Reporting on active Indian Market signals
-    if final_signal in ["ATMBUY", "ATMSELL", "BUY", "SELL"]:
+    if final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL", "BUY", "SELL"]:
         print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION-{final_signal} 🔥 ".center(40))
 
     return final_signal, exit_sig
@@ -128,6 +138,4 @@ if __name__ == "__main__":
     final_route, raw_exit = get_entry_signal(df=None)
     print("-" * 50)
     print(f"FINAL DECISION >> ROUTE STATUS: {final_route} | RAW CANDLE FLIP: {raw_exit}")
-
-
 
