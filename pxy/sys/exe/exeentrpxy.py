@@ -173,6 +173,16 @@ async def main():
         
         dprint(f"CURRENT -> CE: {ce_qty} | PE: {pe_qty}")
 
+        # --- INTERCEPTING DISTANCE OFFSET LOGIC FOR STRIKES ---
+        if "ATM" in sig:
+            current_distance = 0
+        elif "OTM" in sig:
+            current_distance = OTM_DISTANCE
+        else:
+            current_distance = 0
+
+        dprint(f"ROUTING TO BUILDER -> SIGNAL: {sig} | DISTANCE ARGUMENT: {current_distance}")
+
         symbol, res = None, {"stat": "SKIPPED"}
         
         if sig in ["ATMBUY", "OTMBUY"]:
@@ -180,7 +190,8 @@ async def main():
             # ONLY BUY if CE is lower than PE, or both are zero
             if ce_qty < pe_qty or (ce_qty == 0 and pe_qty == 0):
                 if not is_side_cooling("CE"):
-                    symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+                    # CHANGED: Passing the dynamically selected distance value
+                    symbol = get_symbol(ltp, sig, current_distance)
                     if symbol and symbol != "NA":
                         res = execute_order(client, symbol, LOT_SIZE)
                         if res["stat"] == "OK": set_side_cooling("CE")
@@ -192,7 +203,8 @@ async def main():
             # ONLY BUY if PE is lower than CE, or both are zero
             if pe_qty < ce_qty or (ce_qty == 0 and pe_qty == 0):
                 if not is_side_cooling("PE"):
-                    symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+                    # CHANGED: Passing the dynamically selected distance value
+                    symbol = get_symbol(ltp, sig, current_distance)
                     if symbol and symbol != "NA":
                         res = execute_order(client, symbol, LOT_SIZE)
                         if res["stat"] == "OK": set_side_cooling("PE")
