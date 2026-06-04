@@ -24,7 +24,7 @@ def dump_to_json(closed_df):
     except Exception as e: 
         print(f"Error dumping to JSON: {e}") 
 
-def process_lilo_orders(client, start_time="10:00:00"): 
+def process_lilo_orders(client): 
     try: 
         if not client: 
             _print_summary(0, 0) 
@@ -44,12 +44,6 @@ def process_lilo_orders(client, start_time="10:00:00"):
         df["qty"] = pd.to_numeric(df["fldQty"], errors='coerce').fillna(0) 
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
-
-        # Only addition: Time parameter filtering constraint
-        df = df[df["dt"].dt.time >= pd.to_datetime(start_time).time()].copy()
-        if df.empty: 
-            _print_summary(0, 0) 
-            return pd.DataFrame(), pd.DataFrame() 
 
         # SURGICAL FIX: Safely parse individual string elements away from list manipulation errors
         def get_safe_tag(row): 
@@ -171,19 +165,15 @@ def process_lilo_orders(client, start_time="10:00:00"):
 
         open_df = pd.DataFrame(open_positions) 
         closed_df = pd.DataFrame(closed_matches) 
-        
-        dump_to_json(closed_df)
-        
-        total_unrealized = open_df["PNL"].sum() if not open_df.empty else 0
-        total_realized = closed_df["PNL"].sum() if not closed_df.empty else 0
-        
-        _print_summary(total_unrealized, total_realized)
-        
-        return closed_df, open_df
-
-    except Exception as e:
-        print(f"Error processing LILO orders: {e}")
-        return pd.DataFrame(), pd.DataFrame()
+        total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0 
+        total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0 
+        _print_summary(total_unrealized, total_realized) 
+        dump_to_json(closed_df) 
+        return open_df, closed_df 
+    except Exception as e: 
+        print(f"[TAG MATCH ERROR]: {e}") 
+        _print_summary(0, 0) 
+        return pd.DataFrame(), pd.DataFrame() 
 
 def _print_summary(total_unrealized, total_realized): 
     from colorama import Fore, Style, init 
@@ -191,4 +181,8 @@ def _print_summary(total_unrealized, total_realized):
     color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
     unreal_str = f"{int(total_unrealized):+06d}" 
     real_str = f"{int(total_realized):+06d}" 
-    print(f"\n {unreal_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅  {color}{real_str}{Style.RESET_ALL} 🥅\n")
+    print(f"\n {unreal_str} 🔸 🏃‍♂️ 🔸 🏃‍♂️ 🥅  {color}{real_str}{Style.RESET_ALL} 🥅\n") 
+
+if __name__ == "__main__": 
+    client = get_session() 
+    process_lilo_orders(client)
