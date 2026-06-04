@@ -120,29 +120,47 @@ import ast  # Ensure this import is added at the top of your script
 
 def parse_net_quantity(pos_raw, option_type):
     """
-    Surgically extracts held net quantity from position data.
-    Evaluates structures cleanly to prevent string match collision bugs.
+    Surgically parses custom text tables row-by-row.
+    Aggregates matching option entries and safely calculates total lots.
     """
     opt = option_type.upper()
     total_qty = 0
     
-    # 1. Attempt safe literal parsing of the raw string structure
-    try:
-        data = ast.literal_eval(pos_raw)
-    except Exception:
-        # Fallback regex targeting only metric structures if evaluating fails
-        patterns = [
-            r'(?:netqty|quantity|qty)[\s"\'::-]+([+-]?\d+)(?:.+?' + opt.lower() + r'|)',
-            r'([+-]?\d+)\s*(?:qty|lots|slots)?\s*(?:of)?\s*[\w\d]+' + opt.lower()
-        ]
-        for pattern in patterns:
-            match = re.search(pattern, pos_raw.lower())
+    # Split the raw summary block into individual text lines
+    lines = pos_raw.split('\n')
+    
+    for line in lines:
+        cleaned_line = line.strip().upper()
+        
+        # Skip empty lines, dividers, headers, or metadata lines
+        if not cleaned_line or "---" in cleaned_line or "REFRESHED" in cleaned_line or "YMBOL" in cleaned_line:
+            continue
+            
+        # Ensure this specific line belongs to the target option type (CE or PE)
+        if opt in cleaned_line:
+            # Match the first standalone number in the line (representing transaction size/qty)
+            # This bypasses date digits like '26609' inside the symbol string
+            match = re.search(r'\b\d+\b', cleaned_line)
+            
+            # If your broker table prints pure position row instances, each row counts as 1 LOT 
+            # If a row explicitly specifies a separate volume/qty field, we parse that number
             if match:
-                try: 
-                    return abs(int(match.group(1)))
-                except ValueError: 
-                    continue
-        return 0
+                try:
+                    # If your table prints exact quantity numbers (like 65, 130), collect them:
+                    val = int(match.group())
+                    # Guardrail: If it extracted part of a strike price (e.g., 23400) instead of quantity,
+                    # treat the row as a single localized position instance (1 Lot = LOT_SIZE)
+                    if val > 1000: 
+                        total_qty += (LOT_SIZE if LOT_SIZE else 1)
+                    else:
+                        total_qty += val
+                except ValueError:
+                    total_qty += (LOT_SIZE if LOT_SIZE else 1)
+            else:
+                # Fallback: Count the row instance as 1 Lot base size if no distinct number is found
+                total_qty += (LOT_SIZE if LOT_SIZE else 1)
+                
+    return total_qty
 
     # 2. Extract positions safely depending on object shell type
     positions = data if isinstance(data, list) else [data] if isinstance(data, dict) else []
