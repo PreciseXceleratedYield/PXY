@@ -119,6 +119,34 @@ def execute_order(client, symbol, qty):
         dprint(f"ORDER ERROR: {e}", Fore.RED)
         return {"stat": "FAIL", "err": str(e)}
 
+def parse_net_quantity(pos_raw, option_type):
+    """
+    Extracts actual held net quantity from position text.
+    Ignores strike price digits found within long instrument trading symbols.
+    """
+    text = pos_raw.lower()
+    opt = option_type.lower()
+    
+    # Matches patterns like "netqty": 65, "quantity": -65, or standalone position values
+    patterns = [
+        r'(?:netqty|quantity|qty)[\s"\'::-]+([+-]?\d+)(?:.+?' + opt + r'|)',
+        r'([+-]?\d+)\s*(?:qty|lots|slots)?\s*(?:of)?\s*[\w\d]+' + opt
+    ]
+    
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            try:
+                return abs(int(match.group(1)))
+            except ValueError:
+                continue
+                
+    # Fallback option string count rule if structured tags do not exist
+    if opt in text and "net" not in text:
+        return text.count(opt) * (LOT_SIZE if LOT_SIZE else 1)
+        
+    return 0
+
 
 async def main():
     dprint("===== MAIN START =====", Fore.GREEN)
@@ -166,9 +194,9 @@ async def main():
         dprint("CHECKING POSITION STATE FOR STRATEGY ENFORCEMENT...")
         pos_raw = str(get_position_summary(client))
         
-        # Safe extraction of quantities
-        ce_qty = int(re.search(r'(\d+)CE', pos_raw).group(1)) if 'CE' in pos_raw else 0
-        pe_qty = int(re.search(r'(\d+)PE', pos_raw).group(1)) if 'PE' in pos_raw else 0
+        # Robust extraction replacing the broken original regex line
+        ce_qty = parse_net_quantity(pos_raw, "CE")
+        pe_qty = parse_net_quantity(pos_raw, "PE")
         
         # Calculate exactly how many full lots we are currently holding per side
         current_ce_lots = ce_qty // LOT_SIZE if LOT_SIZE else 0
@@ -182,14 +210,15 @@ async def main():
         if supertrend == "BULL":
             if sig in ["ATMBUY", "OTMBUY"]:
                 if ce_qty < (pe_qty + LOT_SIZE):
-                    if current_ce_lots < MAX_LOTS_PER_SIDE:
+                    # Strict Look-Ahead check to guarantee we never trade over 3 lots per side
+                    if (current_ce_lots + 1) <= MAX_LOTS_PER_SIDE:
                         if not is_side_cooling("CE"):
                             symbol = get_symbol(ltp, sig, OTM_DISTANCE)
                             if symbol and symbol != "NA":
                                 res = execute_order(client, symbol, LOT_SIZE)
                                 if res["stat"] == "OK": set_side_cooling("CE")
                     else:
-                        print(f"{Fore.RED}🛑 HARD BLOCK: CE position has hit MAX CAPACITY ({current_ce_lots} lots). Order blocked.")
+                        print(f"{Fore.RED}🛑 HARD BLOCK: Next CE order would exceed MAX CAPACITY ({MAX_LOTS_PER_SIDE} lots). Order blocked.")
                 else:
                     dprint(f"SKIP: CE({ce_qty}) already has the +1 lot trend advantage over PE({pe_qty})", Fore.YELLOW)
             else:
@@ -199,36 +228,39 @@ async def main():
         elif supertrend == "BEAR":
             if sig in ["ATMSELL", "OTMSELL"]:
                 if pe_qty < (ce_qty + LOT_SIZE):
-                    if current_pe_lots < MAX_LOTS_PER_SIDE:
+                    # Strict Look-Ahead check to guarantee we never trade over 3 lots per side
+                    if (current_pe_lots + 1) <= MAX_LOTS_PER_SIDE:
                         if not is_side_cooling("PE"):
                             symbol = get_symbol(ltp, sig, OTM_DISTANCE)
                             if symbol and symbol != "NA":
                                 res = execute_order(client, symbol, LOT_SIZE)
                                 if res["stat"] == "OK": set_side_cooling("PE")
                     else:
-                        print(f"{Fore.RED}🛑 HARD BLOCK: PE position has hit MAX CAPACITY ({current_pe_lots} lots). Order blocked.")
+                        print(f"{Fore.RED}🛑 HARD BLOCK: Next PE order would exceed MAX CAPACITY ({MAX_LOTS_PER_SIDE} lots). Order blocked.")
                 else:
                     dprint(f"SKIP: PE({pe_qty}) already has the +1 lot trend advantage over CE({ce_qty})", Fore.YELLOW)
             else:
                 dprint(f"SKIP: Supertrend is BEAR but entry signal is {sig}. Skipping PE action.", Fore.YELLOW)
-        
-        else:
-            dprint(f"SKIP: Unknown Supertrend state: {supertrend}", Fore.RED)
 
-        funds = get_available_funds(client)
+        # --- 📊 ACCOUNT DASHBOARD SUMMARY ---
+        try:
+            funds = get_available_funds(client)
+        except:
+            funds = 0
 
         print(f"""
  =====================================
          💰  Cash   : {int(funds)}
          📦  Pos    : {pos_raw}
-         🎫  Symbol : {symbol}
+         🎫  Symbol : {symbol if symbol else 'NONE'}
          🎯  Signal : {entry_signal}
          📌  Status : {res.get('stat')}
  =====================================
  """)
-        dprint("===== MAIN END =====", Fore.GREEN)
-    except Exception:
-        print(traceback.format_exc() if DEBUG else "❌ Main error")
+
+    except Exception as main_e:
+        print(f"{Fore.RED}❌ CRITICAL ERROR IN MAIN loop: {main_e}")
+        traceback.print_exc()
 
 if __name__ == "__main__":
-    asyncio.run(main())
+
