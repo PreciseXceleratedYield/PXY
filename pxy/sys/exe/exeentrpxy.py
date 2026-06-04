@@ -116,31 +116,57 @@ def execute_order(client, symbol, qty):
         dprint(f"ORDER ERROR: {e}", Fore.RED)
         return {"stat": "FAIL", "err": str(e)}
 
+import ast  # Ensure this import is added at the top of your script
+
 def parse_net_quantity(pos_raw, option_type):
     """
-    Extracts actual held net quantity from position text.
-    Ignores strike price digits found within long instrument trading symbols.
+    Surgically extracts held net quantity from position data.
+    Evaluates structures cleanly to prevent string match collision bugs.
     """
-    text = pos_raw.lower()
-    opt = option_type.lower()
+    opt = option_type.upper()
+    total_qty = 0
     
-    patterns = [
-        r'(?:netqty|quantity|qty)[\s"\'::-]+([+-]?\d+)(?:.+?' + opt + r'|)',
-        r'([+-]?\d+)\s*(?:qty|lots|slots)?\s*(?:of)?\s*[\w\d]+' + opt
-    ]
+    # 1. Attempt safe literal parsing of the raw string structure
+    try:
+        data = ast.literal_eval(pos_raw)
+    except Exception:
+        # Fallback regex targeting only metric structures if evaluating fails
+        patterns = [
+            r'(?:netqty|quantity|qty)[\s"\'::-]+([+-]?\d+)(?:.+?' + opt.lower() + r'|)',
+            r'([+-]?\d+)\s*(?:qty|lots|slots)?\s*(?:of)?\s*[\w\d]+' + opt.lower()
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, pos_raw.lower())
+            if match:
+                try: 
+                    return abs(int(match.group(1)))
+                except ValueError: 
+                    continue
+        return 0
+
+    # 2. Extract positions safely depending on object shell type
+    positions = data if isinstance(data, list) else [data] if isinstance(data, dict) else []
     
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            try:
-                return abs(int(match.group(1)))
-            except ValueError:
-                continue
-                
-    if opt in text and "net" not in text:
-        return text.count(opt) * (LOT_SIZE if LOT_SIZE else 1)
+    # 3. Surgical iteration through keys to eliminate false positives
+    for pos in positions:
+        if not isinstance(pos, dict):
+            continue
         
-    return 0
+        # Check trading symbol specifically for the target option string
+        tsym = str(pos.get("trading_symbol", pos.get("symbol", ""))).upper()
+        if opt not in tsym:
+            continue
+            
+        # Extract quantitative value from explicit position metric keys
+        for key in ["netqty", "quantity", "qty", "net_quantity", "net_qty"]:
+            if key in pos:
+                try:
+                    total_qty += abs(int(pos[key]))
+                    break # Found quantitative key, move to next position object
+                except (ValueError, TypeError):
+                    pass
+                    
+    return total_qty
 
 
 async def main():
