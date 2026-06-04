@@ -121,9 +121,11 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             intercept = (sum_y - (slope * sum_x)) / tsma_len
             tsma_1m[i] = (slope * (tsma_len - 1)) + intercept
 
-    # ATR 14 Calculation matching TradingView's RMMA smoothing technique
+    # ATR 14 True Range Multi-Factor Variance Loop (FIXED TYPEERROR & EMPTY CHECK)
     tr = np.zeros(n)
-    tr = ha_high_ser.iloc - ha_low_ser.iloc
+    if n > 0:
+        tr = ha_high_ser.to_numpy() - ha_low_ser.to_numpy()
+        
     for i in range(1, n):
         hl = ha_high_ser.iloc[i] - ha_low_ser.iloc[i]
         hc_prev = ha_close_ser.iloc[i-1]
@@ -137,7 +139,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         for i in range(atr_len, n):
             atr_1m[i] = (atr_1m[i-1] * (atr_len - 1) + tr[i]) / atr_len
     else:
-        atr_1m[:] = tr[:]
+        if n > 0:
+            atr_1m[:] = tr[:]
+
 
     upper_band = tsma_1m + (atr_1m * atr_mult)
     lower_band = tsma_1m - (atr_1m * atr_mult)
