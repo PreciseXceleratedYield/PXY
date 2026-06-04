@@ -1,43 +1,3 @@
-"""
-===============================================================================
-PXY AUTOMATED TARGET PRICE MATRIX ENGINE - USER GUIDE (LAYMAN TERMS)
-===============================================================================
-
-WHAT THIS SCRIPT DOES:
-This script automatically calculates the "Target Price" (take-profit price)
-for options trading positions based strictly on the status of your Exit Signal.
-
-HOW EXIT SIGNALS TRIGGER EMERGENCY CHECKS:
-- CALL OPTIONS (CE) Mode: Swaps to emergency mode if Exit Signal is "SELL" or "BEAR".
-- PUT OPTIONS (PE) Mode:  Swaps to emergency mode if Exit Signal is "BUY" or "BULL".
-
-HOW THE CHOSEN TARGET IS DECIDED (THE 3 SCENARIOS):
-1. NORMAL TRADING:
-   - Target Percentage = Market Volatility (ATR) × Its Relevant Power.
-
-2. COUNTER-TREND TRADING (Safety Hold):
-   - If marked as a 'Counter' trade, the target is capped at +99% to hold.
-
-3. OPPOSITE EXIT SIGNAL FIRED (Emergency Exit Filter):
-   - If an opposite exit signal fires, the system checks the current expected return.
-   - If that value is 1.4% or higher, it allows the exit target to be created.
-   - If it is below 1.4%, it locks the target at +99% to hold flat
-     and prevent accidental market order liquidations.
-
-REQUIRED DATA INPUTS (What needs to be in your 'row' data):
-- symbol: The name of the option contract (must contain 'CE' or 'PE').
-- buy_prc / pxy_entry: The price you bought into the trade.
-- atr: Market volatility indicator (Average True Range).
-- counter: Set to 'Y' if this is a counter-trend trade.
-- exit: The active market exit signal ('BUY', 'SELL', 'BULL', 'BEAR', or 'NONE').
-- ce_power / pe_power: The relevant strength multiplier for the option type.
-
-OUTPUT:
-- Returns the exact mathematical target price as a clean decimal number.
-- Returns 0 if data is missing, broken, or invalid.
-===============================================================================
-"""
-
 from datetime import datetime
 from colorama import Fore, Style, init
 import pytz
@@ -87,47 +47,48 @@ def target_price(row):
             return entry_prc
 
         # Ingest parameter context flags directly from your row dictionary keys
-        is_counter = str(
-            row.get("counter", "n")
-        ).upper().strip() == "Y"
+        is_counter = str(row.get("counter", "n")).upper().strip() == "Y"
 
         # Read the raw, unfiltered Exit Signal from upstream data stream
-        active_exit = str(
-            row.get("exit", "NONE")
-        ).upper().strip()
+        active_exit = str(row.get("exit", "NONE")).upper().strip()
 
-        # 4. Capture structural multiplier fields
-        ce_p = f(row.get("ce_power"), 1.0)
-        pe_p = f(row.get("pe_power"), 1.0)
+        # 4. Capture structural multiplier fields (power)
+        ce_power = f(row.get("ce_power"), 1.0)
+        pe_power = f(row.get("pe_power"), 1.0)
 
-        # Pre-compute local market yield definitions: ATR * relevant power only
-        ce_yield = atr_val 
-        pe_yield = atr_val 
-
-        # 5. Core execution logic evaluating multi-value exit signals
+        # 5. Core execution logic evaluating multi-value directional signals
         target_pct = 0.0
 
         if is_ce:
-
+            # RULE: Signal flip (opposite direction) falls back to exactly 1.4
             if active_exit in ["SELL", "BEAR"]:
-                target_pct = ce_yield if ce_yield >= 1.4 else 99.0
-
+                target_pct = 1.4
+            
+            # RULE: Counter trade scaling = ATR * power
             elif is_counter:
-                target_pct = 99.0
-
+                target_pct = atr_val * ce_power
+            
+            # RULE: No counter scaling = Base ATR only
             else:
-                target_pct = ce_yield
+                target_pct = atr_val
 
         elif is_pe:
-
+            # RULE: Signal flip (opposite direction) falls back to exactly 1.4
             if active_exit in ["BUY", "BULL"]:
-                target_pct = pe_yield if pe_yield >= 1.4 else 99.0
-
+                target_pct = 1.4
+            
+            # RULE: Counter trade scaling = ATR * power
             elif is_counter:
-                target_pct = 99.0
-
+                target_pct = atr_val * pe_power
+            
+            # RULE: No counter scaling = Base ATR only
             else:
-                target_pct = pe_yield
+                target_pct = atr_val
+
+        # --- ABSOLUTE SAFETY FLOOR PROTECTION ---
+        # Guarantees that target_pct is never less than 1.4 under any circumstance
+        if target_pct < 1.4:
+            target_pct = 1.4
 
         # 6. Final mathematical target projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
@@ -140,3 +101,4 @@ def target_price(row):
             f"{e}{Style.RESET_ALL}"
         )
         return 0
+
