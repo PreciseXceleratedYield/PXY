@@ -5,6 +5,9 @@ import os
 from runclntpxy import get_session 
 from runltpspxy import get_mid_price 
 
+# TIME FILTER PARAMETER
+FILTER_TIME = "11:28:00"
+
 MATCH_MODE = "TAG" 
 
 def dump_to_json(closed_df): 
@@ -44,6 +47,12 @@ def process_lilo_orders(client):
         df["qty"] = pd.to_numeric(df["fldQty"], errors='coerce').fillna(0) 
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
+
+        # TIME FILTER BLOCK: Ignore trades before the specified time window
+        df = df[df["dt"].dt.time >= pd.to_datetime(FILTER_TIME).time()].copy()
+        if df.empty: 
+            _print_summary(0, 0) 
+            return pd.DataFrame(), pd.DataFrame() 
 
         # SURGICAL FIX: Safely parse individual string elements away from list manipulation errors
         def get_safe_tag(row): 
