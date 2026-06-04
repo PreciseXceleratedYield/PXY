@@ -101,8 +101,8 @@ def target_price(row):
         pe_p = f(row.get("pe_power"), 1.0)
 
         # Pre-compute local market yield definitions: ATR * relevant power only
-        ce_yield = atr_val * ce_p
-        pe_yield = atr_val * pe_p
+        ce_yield = atr_val 
+        pe_yield = atr_val 
 
         # 5. Core execution logic evaluating multi-value exit signals
         target_pct = 0.0
