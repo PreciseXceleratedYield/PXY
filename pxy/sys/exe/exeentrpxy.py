@@ -13,6 +13,7 @@ from colorama import Fore, init, Style
 DEBUG = False 
 COUNTERBUY = "NO" 
 COOL_DOWN_SECONDS = 65
+MAX_LOTS = 3  # ⚡ MAX RISK PROTECTION PARAMETER (Limits exposure to 3 lots max per side)
 
 init(autoreset=True)
 
@@ -29,6 +30,7 @@ from syscnfgpxy import TICKER
 # --- LOT SIZE LOGIC ---
 t = TICKER.upper().strip()
 LOT_SIZE = 30 if t == "^NSEBANK" else 65 if t == "^NSEI" else None
+MAX_ALLOWED_QTY = (LOT_SIZE * MAX_LOTS) if LOT_SIZE else 0
 
 # --- DEBUG PRINT ---
 def dprint(msg, color=Fore.CYAN):
@@ -176,24 +178,32 @@ async def main():
         if supertrend == "BULL":
             # Enforce CE must be exactly 1 lot higher than PE
             if ce_qty < (pe_qty + LOT_SIZE):
-                if not is_side_cooling("CE"):
-                    # Dynamically uses your ATMBUY or OTMBUY entry signals
-                    symbol = get_symbol(ltp, sig, OTM_DISTANCE)
-                    if symbol and symbol != "NA":
-                        res = execute_order(client, symbol, LOT_SIZE)
-                        if res["stat"] == "OK": set_side_cooling("CE")
+                # Hard restriction ceiling check
+                if ce_qty < MAX_ALLOWED_QTY:
+                    if not is_side_cooling("CE"):
+                        # Dynamically uses your ATMBUY or OTMBUY entry signals
+                        symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+                        if symbol and symbol != "NA":
+                            res = execute_order(client, symbol, LOT_SIZE)
+                            if res["stat"] == "OK": set_side_cooling("CE")
+                else:
+                    dprint(f"CRITICAL OVERRIDE: CE position ({ce_qty}) is at MAX CAP ({MAX_ALLOWED_QTY}). Order blocked.", Fore.RED)
             else:
                 dprint(f"SKIP: CE({ce_qty}) already has the +1 lot advantage over PE({pe_qty})", Fore.YELLOW)
 
         elif supertrend == "BEAR":
             # Enforce PE must be exactly 1 lot higher than CE
             if pe_qty < (ce_qty + LOT_SIZE):
-                if not is_side_cooling("PE"):
-                    # Dynamically uses your ATMSELL or OTMSELL entry signals
-                    symbol = get_symbol(ltp, sig, OTM_DISTANCE)
-                    if symbol and symbol != "NA":
-                        res = execute_order(client, symbol, LOT_SIZE)
-                        if res["stat"] == "OK": set_side_cooling("PE")
+                # Hard restriction ceiling check
+                if pe_qty < MAX_ALLOWED_QTY:
+                    if not is_side_cooling("PE"):
+                        # Dynamically uses your ATMSELL or OTMSELL entry signals
+                        symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+                        if symbol and symbol != "NA":
+                            res = execute_order(client, symbol, LOT_SIZE)
+                            if res["stat"] == "OK": set_side_cooling("PE")
+                else:
+                    dprint(f"CRITICAL OVERRIDE: PE position ({pe_qty}) is at MAX CAP ({MAX_ALLOWED_QTY}). Order blocked.", Fore.RED)
             else:
                 dprint(f"SKIP: PE({pe_qty}) already has the +1 lot advantage over CE({ce_qty})", Fore.YELLOW)
         
