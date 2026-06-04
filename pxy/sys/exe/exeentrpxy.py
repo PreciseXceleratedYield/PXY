@@ -247,43 +247,48 @@ async def main():
         
         # 🟢 CE SIGNAL PROCESSING
         if sig in ["ATMBUY", "OTMBUY"]:
-            is_balanced = False
-            if supertrend == "BULL":
-                is_balanced = ce_qty < (pe_qty + LOT_SIZE)
+            # Rule 1: Strict Hard Cap check comes FIRST
+            if (current_ce_lots + 1) > MAX_LOTS_PER_SIDE:
+                print(f"{Fore.RED}🛑 HARD BLOCK: Next CE order would exceed MAX CAPACITY ({MAX_LOTS_PER_SIDE} lots). Order blocked.")
             else:
-                is_balanced = ce_qty <= pe_qty  # Keep pace equally if supertrend doesn't match
+                # Rule 2: Balance checks only run if we are under the cap
+                is_balanced = False
+                if supertrend == "BULL":
+                    is_balanced = ce_qty < (pe_qty + LOT_SIZE)
+                else:
+                    is_balanced = ce_qty <= pe_qty
 
-            if is_balanced:
-                if (current_ce_lots + 1) <= MAX_LOTS_PER_SIDE:
+                if is_balanced:
                     if not is_side_cooling("CE"):
                         symbol = get_symbol(ltp, sig, OTM_DISTANCE)
                         if symbol and symbol != "NA":
                             res = execute_order(client, symbol, LOT_SIZE)
                             if res["stat"] == "OK": set_side_cooling("CE")
                 else:
-                    print(f"{Fore.RED}🛑 HARD BLOCK: Next CE order would exceed MAX CAPACITY ({MAX_LOTS_PER_SIDE} lots). Order blocked.")
-            else:
-                dprint(f"SKIP: CE({ce_qty}) cannot expand. Supertrend={supertrend} check failed against PE({pe_qty})", Fore.YELLOW)
+                    dprint(f"SKIP: CE({ce_qty}) cannot expand. Supertrend={supertrend} check failed against PE({pe_qty})", Fore.YELLOW)
 
         # 🔴 PE SIGNAL PROCESSING
         elif sig in ["ATMSELL", "OTMSELL"]:
-            is_balanced = False
-            if supertrend == "BEAR":
-                is_balanced = pe_qty < (ce_qty + LOT_SIZE)
+            # Rule 1: Strict Hard Cap check comes FIRST
+            if (current_pe_lots + 1) > MAX_LOTS_PER_SIDE:
+                print(f"{Fore.RED}🛑 HARD BLOCK: Next PE order would exceed MAX CAPACITY ({MAX_LOTS_PER_SIDE} lots). Order blocked.")
             else:
-                is_balanced = pe_qty <= ce_qty  # Keep pace equally if supertrend doesn't match
+                # Rule 2: Balance checks only run if we are under the cap
+                is_balanced = False
+                if supertrend == "BEAR":
+                    is_balanced = pe_qty < (ce_qty + LOT_SIZE)
+                else:
+                    is_balanced = pe_qty <= ce_qty
 
-            if is_balanced:
-                if (current_pe_lots + 1) <= MAX_LOTS_PER_SIDE:
+                if is_balanced:
                     if not is_side_cooling("PE"):
                         symbol = get_symbol(ltp, sig, OTM_DISTANCE)
                         if symbol and symbol != "NA":
                             res = execute_order(client, symbol, LOT_SIZE)
                             if res["stat"] == "OK": set_side_cooling("PE")
                 else:
-                    print(f"{Fore.RED}🛑 HARD BLOCK: Next PE order would exceed MAX CAPACITY ({MAX_LOTS_PER_SIDE} lots). Order blocked.")
-            else:
-                dprint(f"SKIP: PE({pe_qty}) cannot expand. Supertrend={supertrend} check failed against CE({ce_qty})", Fore.YELLOW)
+                    dprint(f"SKIP: PE({pe_qty}) cannot expand. Supertrend={supertrend} check failed against CE({ce_qty})", Fore.YELLOW)
+
 
         # --- 📊 ACCOUNT DASHBOARD SUMMARY ---
         try:
