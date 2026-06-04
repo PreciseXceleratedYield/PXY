@@ -10,10 +10,9 @@ from datetime import datetime, time as dt_time
 from colorama import Fore, init, Style
 
 # --- GLOBAL CONFIG ---
-DEBUG = True 
+DEBUG = False 
 COUNTERBUY = "NO" 
-COOL_DOWN_SECONDS = 65
-MAX_LOTS_PER_SIDE = 3  # ⚡ STRICT CAP: Maximum 3 Lots per side (Nifty: 195 qty, BankNifty: 90 qty)
+COOL_DOWN_SECONDS = 60
 
 init(autoreset=True)
 
@@ -92,6 +91,7 @@ def generate_pxy_tag():
 def execute_order(client, symbol, qty):
     dprint(f"ENTER execute_order for {symbol}")
     try:
+        # Generate the unique ID for this specific scalp
         order_tag = generate_pxy_tag()
         
         params = {
@@ -104,87 +104,19 @@ def execute_order(client, symbol, qty):
             "trading_symbol": symbol,
             "transaction_type": "B",
             "amo": "NO",
-            "tag": order_tag 
+            "tag": order_tag  # <--- NEW: Attaching the HHMMSS tag
         }
         
         dprint(f"ORDER PARAMS: {params}", Fore.YELLOW)
         res = client.place_order(**params)
         
+        # Log the tag with the response for verification
         print(f"{Fore.CYAN}🚀 ORDER PLACED | SYMBOL: {symbol} | TAG: {order_tag}")
+        
         return {"stat": "OK" if res and str(res).strip() else "FAIL", "raw": res}
     except Exception as e:
         dprint(f"ORDER ERROR: {e}", Fore.RED)
         return {"stat": "FAIL", "err": str(e)}
-
-import ast  # Ensure this import is added at the top of your script
-
-def parse_net_quantity(pos_raw, option_type):
-    """
-    Surgically parses custom text tables row-by-row.
-    Aggregates matching option entries and safely calculates total lots.
-    """
-    opt = option_type.upper()
-    total_qty = 0
-    
-    # Split the raw summary block into individual text lines
-    lines = pos_raw.split('\n')
-    
-    for line in lines:
-        cleaned_line = line.strip().upper()
-        
-        # Skip empty lines, dividers, headers, or metadata lines
-        if not cleaned_line or "---" in cleaned_line or "REFRESHED" in cleaned_line or "YMBOL" in cleaned_line:
-            continue
-            
-        # Ensure this specific line belongs to the target option type (CE or PE)
-        if opt in cleaned_line:
-            # Match the first standalone number in the line (representing transaction size/qty)
-            # This bypasses date digits like '26609' inside the symbol string
-            match = re.search(r'\b\d+\b', cleaned_line)
-            
-            # If your broker table prints pure position row instances, each row counts as 1 LOT 
-            # If a row explicitly specifies a separate volume/qty field, we parse that number
-            if match:
-                try:
-                    # If your table prints exact quantity numbers (like 65, 130), collect them:
-                    val = int(match.group())
-                    # Guardrail: If it extracted part of a strike price (e.g., 23400) instead of quantity,
-                    # treat the row as a single localized position instance (1 Lot = LOT_SIZE)
-                    if val > 1000: 
-                        total_qty += (LOT_SIZE if LOT_SIZE else 1)
-                    else:
-                        total_qty += val
-                except ValueError:
-                    total_qty += (LOT_SIZE if LOT_SIZE else 1)
-            else:
-                # Fallback: Count the row instance as 1 Lot base size if no distinct number is found
-                total_qty += (LOT_SIZE if LOT_SIZE else 1)
-                
-    return total_qty
-
-    # 2. Extract positions safely depending on object shell type
-    positions = data if isinstance(data, list) else [data] if isinstance(data, dict) else []
-    
-    # 3. Surgical iteration through keys to eliminate false positives
-    for pos in positions:
-        if not isinstance(pos, dict):
-            continue
-        
-        # Check trading symbol specifically for the target option string
-        tsym = str(pos.get("trading_symbol", pos.get("symbol", ""))).upper()
-        if opt not in tsym:
-            continue
-            
-        # Extract quantitative value from explicit position metric keys
-        for key in ["netqty", "quantity", "qty", "net_quantity", "net_qty"]:
-            if key in pos:
-                try:
-                    total_qty += abs(int(pos[key]))
-                    break # Found quantitative key, move to next position object
-                except (ValueError, TypeError):
-                    pass
-                    
-    return total_qty
 
 
 async def main():
@@ -206,7 +138,7 @@ async def main():
         reversal = data.get("exit")
 
         if entry_signal in ["BULL", "BEAR", "NONE", "WAIT", ""]:
-            print(f"{Fore.MAGENTA}🛑 NO-ACTION signal({entry_signal if entry_signal else 'BLANK'})-ACTION skipped")
+            print(f"{Fore.MAGENTA}🛑  NO-ACTION signal({entry_signal if entry_signal else 'BLANK'})- BUY skipped")
             return
 
         # --- SESSION INITIALIZATION (Only runs for actionable signals) ---
@@ -218,10 +150,8 @@ async def main():
 
         try:
             supertrend = str(data.get("supertrend", "")).upper().strip()
-            OTM_DISTANCE = 200
-        except: 
-            supertrend = "NONE"
             OTM_DISTANCE = 100
+        except: OTM_DISTANCE = 100
 
         exit_sig = str(reversal).upper().strip() if reversal else "NONE"
         if not entry_signal: return
@@ -229,86 +159,60 @@ async def main():
         sig = entry_signal.upper().strip()
         if sig == "STBUY": sig = "ATMBUY"
         elif sig == "STSELL": sig = "ATMSELL"
-        dprint(f"SIGNAL: {sig} | SUPERTREND BALANCER: {supertrend}")
+        dprint(f"SIGNAL: {sig}")
 
-        # --- POSITION BALANCING LOGIC (+1 CUSHION & PER-SIDE LIMITS) ---
-        dprint("CHECKING POSITION STATE FOR STRATEGY ENFORCEMENT...")
+        # --- UPDATED POSITION BALANCING LOGIC ---
+        dprint("CHECKING POSITIONS FOR BALANCE...")
         pos_raw = str(get_position_summary(client))
         
-        ce_qty = parse_net_quantity(pos_raw, "CE")
-        pe_qty = parse_net_quantity(pos_raw, "PE")
+        ce_match = re.search(r'(\d+)CE', pos_raw)
+        pe_match = re.search(r'(\d+)PE', pos_raw)
         
-        current_ce_lots = ce_qty // LOT_SIZE if LOT_SIZE else 0
-        current_pe_lots = pe_qty // LOT_SIZE if LOT_SIZE else 0
+        ce_qty = int(ce_match.group(1)) if ce_match else 0
+        pe_qty = int(pe_match.group(1)) if pe_match else 0
         
-        dprint(f"CURRENT -> CE: {ce_qty} ({current_ce_lots} Lots) | PE: {pe_qty} ({current_pe_lots} Lots) | SIGNAL: {sig}")
+        dprint(f"CURRENT -> CE: {ce_qty} | PE: {pe_qty}")
 
         symbol, res = None, {"stat": "SKIPPED"}
         
-        # 🟢 CE SIGNAL PROCESSING
         if sig in ["ATMBUY", "OTMBUY"]:
-            # Rule 1: Strict Hard Cap check comes FIRST
-            if (current_ce_lots + 1) > MAX_LOTS_PER_SIDE:
-                print(f"{Fore.RED}🛑 HARD BLOCK: Next CE order would exceed MAX CAPACITY ({MAX_LOTS_PER_SIDE} lots). Order blocked.")
+            dprint("BRANCH: BALANCE CE")
+            # ONLY BUY if CE is lower than PE, or both are zero
+            if ce_qty < pe_qty or (ce_qty == 0 and pe_qty == 0):
+                if not is_side_cooling("CE"):
+                    symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+                    if symbol and symbol != "NA":
+                        res = execute_order(client, symbol, LOT_SIZE)
+                        if res["stat"] == "OK": set_side_cooling("CE")
             else:
-                # Rule 2: Balance checks only run if we are under the cap
-                is_balanced = False
-                if supertrend == "BULL":
-                    is_balanced = ce_qty < (pe_qty + LOT_SIZE)
-                else:
-                    is_balanced = ce_qty <= pe_qty
+                dprint(f"SKIP: CE({ce_qty}) is already balanced with or > PE({pe_qty})", Fore.YELLOW)
 
-                if is_balanced:
-                    if not is_side_cooling("CE"):
-                        symbol = get_symbol(ltp, sig, OTM_DISTANCE)
-                        if symbol and symbol != "NA":
-                            res = execute_order(client, symbol, LOT_SIZE)
-                            if res["stat"] == "OK": set_side_cooling("CE")
-                else:
-                    dprint(f"SKIP: CE({ce_qty}) cannot expand. Supertrend={supertrend} check failed against PE({pe_qty})", Fore.YELLOW)
-
-        # 🔴 PE SIGNAL PROCESSING
         elif sig in ["ATMSELL", "OTMSELL"]:
-            # Rule 1: Strict Hard Cap check comes FIRST
-            if (current_pe_lots + 1) > MAX_LOTS_PER_SIDE:
-                print(f"{Fore.RED}🛑 HARD BLOCK: Next PE order would exceed MAX CAPACITY ({MAX_LOTS_PER_SIDE} lots). Order blocked.")
+            dprint("BRANCH: BALANCE PE")
+            # ONLY BUY if PE is lower than CE, or both are zero
+            if pe_qty < ce_qty or (ce_qty == 0 and pe_qty == 0):
+                if not is_side_cooling("PE"):
+                    symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+                    if symbol and symbol != "NA":
+                        res = execute_order(client, symbol, LOT_SIZE)
+                        if res["stat"] == "OK": set_side_cooling("PE")
             else:
-                # Rule 2: Balance checks only run if we are under the cap
-                is_balanced = False
-                if supertrend == "BEAR":
-                    is_balanced = pe_qty < (ce_qty + LOT_SIZE)
-                else:
-                    is_balanced = pe_qty <= ce_qty
+                dprint(f"SKIP: PE({pe_qty}) is already balanced with or > CE({ce_qty})", Fore.YELLOW)
 
-                if is_balanced:
-                    if not is_side_cooling("PE"):
-                        symbol = get_symbol(ltp, sig, OTM_DISTANCE)
-                        if symbol and symbol != "NA":
-                            res = execute_order(client, symbol, LOT_SIZE)
-                            if res["stat"] == "OK": set_side_cooling("PE")
-                else:
-                    dprint(f"SKIP: PE({pe_qty}) cannot expand. Supertrend={supertrend} check failed against CE({ce_qty})", Fore.YELLOW)
-
-
-        # --- 📊 ACCOUNT DASHBOARD SUMMARY ---
-        try:
-            funds = get_available_funds(client)
-        except:
-            funds = 0
+        funds = get_available_funds(client)
 
         print(f"""
  =====================================
          💰  Cash   : {int(funds)}
          📦  Pos    : {pos_raw}
-         🎫  Symbol : {symbol if symbol else 'NONE'}
+         🎫  Symbol : {symbol}
          🎯  Signal : {entry_signal}
          📌  Status : {res.get('stat')}
  =====================================
  """)
-
-    except Exception as main_e:
-        print(f"{Fore.RED}❌ CRITICAL ERROR IN MAIN loop: {main_e}")
-        traceback.print_exc()
+        dprint("===== MAIN END =====", Fore.GREEN)
+    except Exception:
+        print(traceback.format_exc() if DEBUG else "❌ Main error")
 
 if __name__ == "__main__":
     asyncio.run(main())
