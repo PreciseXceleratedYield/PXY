@@ -1,94 +1,181 @@
-from datetime import datetime
+import os 
+import time 
+import pytz 
+from datetime import datetime, time as dt_time 
 from colorama import Fore, Style, init
-import pytz
 
-# Initialize colorama for colored terminal output
+# Initialize colorama for clean terminal output formatting
 init(autoreset=True)
-ist = pytz.timezone("Asia/Kolkata")
 
-# Global set to track printed sides for the current refresh cycle
-printed_sides = set()
+# --- CONFIG --- 
+REBUY_ENABLED = True 
+MAX_LAYERS = 6
+COOL_DOWN_SECONDS = 61  # ⏱️ Cooling interval set to exactly 20 seconds
+ATR_MULTIPLIER = 1
 
+def generate_pxy_tag(): 
+    IST = pytz.timezone("Asia/Kolkata") 
+    return datetime.now(IST).strftime('%H%M%S') 
 
-def f(x, d=0.0):
-    """Safely cast input to float, return default if casting fails or value <= 0."""
-    try:
-        val = float(x)
-        return val if val > 0 else d
-    except Exception:
-        return d
+def set_cooling(side): 
+    file_path = f"exebal_cool_{side.lower()}.txt" 
+    with open(file_path, "w") as f: 
+        f.write(str(time.time())) 
 
+def is_cooling(side): 
+    file_path = f"exebal_cool_{side.lower()}.txt" 
+    if not os.path.exists(file_path): 
+        return False 
+    try: 
+        with open(file_path, "r") as f: 
+            last_ts = float(f.read().strip()) 
+            if (time.time() - last_ts) < COOL_DOWN_SECONDS: 
+                return True 
+        os.remove(file_path) 
+        return False 
+    except: 
+        return False 
 
-def i(x, d=0):
-    """Safely cast input to integer, return default if casting fails."""
-    try:
-        return int(float(x))
-    except Exception:
-        return d
+def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, signal, tag):
+    """
+    Renders a strict 42-character width dashboard upon an order trigger event.
+    Accounts for 2-column wide emojis followed by exactly 1 space.
+    """
+    width = 42
+    border = Fore.YELLOW + "=" * width
+    divider = Fore.RED + "-" * width
+    
+    # "🚨 " counts as 3 visual spaces (2 for emoji + 1 space)
+    # Total visual characters = 32. Padding needed = 42 - 32 - 6 = 4 spaces total (2 each side)
+    header_text = "🚨  PXY® ENGINE AVERAGE TRIGGERED  🚨"
+    
+    print("\n" + border)
+    print(Fore.WHITE + header_text.center(width - 2, " ")) # Balanced offset adjust for emoji width
+    print(divider)
+    print(Fore.WHITE + f" • SYMBOL       : {symbol}".ljust(width))
+    print(Fore.WHITE + f" • SIDE OPTION   : {side}".ljust(width))
+    print(Fore.WHITE + f" • ACTIVE SIGNAL : {signal}".ljust(width))
+    print(Fore.WHITE + (f" • TRIGGER LOSS  : " + Fore.RED + f"{current_loss:.2f}%").ljust(width + 5)) # Add color sequence offset
+    print(Fore.WHITE + (f" • ATR TARGET (%): " + Fore.YELLOW + f"{target_threshold:.2f}%").ljust(width + 5))
+    print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(width))
+    print(border + "\n")
 
-
-def target_price(row):
-    """Calculated target price based strictly on ATR and signal direction."""
-    global printed_sides
-
-    try:
-        # 1. Extract base values and powers needed for printing and logic
-        atr_val = f(row.get("atr"), 6.0)
-        ce_power = f(row.get("ce_power"), 1.0)
-        pe_power = f(row.get("pe_power"), 1.0)
+def handle_side_averaging(client, df): 
+    """Averages only if EVERY active position on that side has crossed the power-adjusted ATR threshold.""" 
+    if df is None or df.empty: 
+        return 
         
-        # Format power and ATR to remove trailing decimals if they are whole numbers
-        ce_disp = int(ce_power) if ce_power.is_integer() else ce_power
-        pe_disp = int(pe_power) if pe_power.is_integer() else pe_power
-        atr_disp = int(atr_val) if atr_val.is_integer() else round(atr_val, 2)
+    ist = pytz.timezone("Asia/Kolkata") 
+    now = datetime.now(ist).time() 
+    if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
+        return 
 
-        # 2. Print status line exactly once per refresh cycle using unique data snapshot
-        print_key = f"{atr_disp}_{ce_disp}_{pe_disp}"
-        if print_key not in printed_sides:
-            # Uses the dynamic ATR number inside raw_text to calculate exact centering width
-            raw_text = f"↕️ {atr_disp}  🟢  BUY : {ce_disp}%  🔴  SELL: {pe_disp}%"
-            spaces_needed = max(0, (40 - len(raw_text)) // 2)
-            padding = " " * spaces_needed
+    # 1. Extract string from the last row of the 'exit' column safely
+    if "exit" not in df.columns:
+        return
+    raw_exit_signal = str(df["exit"].iloc[-1]).upper().strip() 
+
+    # 2. Exclusively evaluate the explicit matrix states
+    current_signal = "NONE"
+    if raw_exit_signal in ["BEAR"]:
+        current_signal = "BUY"
+    elif raw_exit_signal in ["BULL"]:
+        current_signal = "SELL"
+
+    # 3. Add side helper column derived from symbol layout
+    df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
+
+    def get_loss(row): 
+        entry = float(row.get("buy_prc", 0)) 
+        ltp = float(row.get("sell_prc", 0)) 
+        return ((ltp - entry) / entry) * 100 if entry > 0 else 0 
+
+    for side in ['CE', 'PE']: 
+        side_df = df[df['side'] == side] 
+        if side_df.empty: 
+            continue 
+
+        # ======================================================== 
+        # 🔄 SIMPLE ALL-OR-NOTHING CONDITION ENGINE
+        # ======================================================== 
+        all_positions_crossed_threshold = True
+        
+        # Scan every single open contract on this specific side
+        for index, row in side_df.iterrows():
+            pos_loss = get_loss(row)
             
-            # Print perfectly centered output with ANSI text coloring
-            print(f"{padding}↕️ {atr_disp}  {Fore.GREEN}🟢  BUY : {ce_disp}%  {Fore.RED}🔴  SELL: {pe_disp}%")
-            printed_sides.add(print_key)
+            # Extract basic ATR value safely
+            raw_atr_pct = float(row.get("atr", 0))
+            
+            # --- APPLY OPPOSITE POWER MATRIX + DYNAMIC FALLBACK ---
+            opp_power = float(row.get("pe_power" if side == 'CE' else "ce_power", 1.0))
+            opp_power = opp_power if opp_power > 0 else 1.0
+            
+            if raw_atr_pct > 0:
+                row_threshold = -((raw_atr_pct + opp_power) * ATR_MULTIPLIER)
+            else:
+                row_threshold = -(14.0 + opp_power)  # Scaled dynamic fallback
+            # ------------------------------------------------------------------------
+            
+            # If even ONE position has NOT crossed the threshold yet, flip the flag to False
+            if pos_loss > row_threshold:
+                all_positions_crossed_threshold = False
+                break  # Stop checking this side immediately, it's not ready to average
 
-        # 3. Entry data health check
-        entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
-        if entry_prc <= 0:
-            return 0
+        # ======================================================== 
+        # 🛡️ THE "DOUBLE LOCK" TRIGGER VALUATION
+        # ======================================================== 
+        # Lock 1: All open side contracts must be past their individual power-adjusted ATR floors
+        loss_hit = all_positions_crossed_threshold
 
-        # 4. Context extractors (Get trade direction from Symbol)
-        symbol = str(row.get("symbol", "unknown")).upper()
-        active_exit = str(row.get("exit", "NONE")).upper().strip()
+        # Lock 2: Match strictly on your dedicated state matrix values
+        signal_matches = (
+            (side == 'CE' and current_signal == "BUY") or
+            (side == 'PE' and current_signal == "SELL")
+        )
 
-        is_ce = "CE" in symbol
-        is_pe = "PE" in symbol
-
-        if not is_ce and not is_pe:
-            return entry_prc
-
-        target_pct = 0.0
-
-        # 5. Core execution logic evaluating directional signals
-        if is_ce:
-            if active_exit in ["SELL", "BEAR"]:  # Opposite side signal
-                target_pct = atr_val
-            else:                                # Same side signal
-                target_pct = atr_val + ce_power
-
-        elif is_pe:
-            if active_exit in ["BUY", "BULL"]:   # Opposite side signal
-                target_pct = atr_val
-            else:                                # Same side signal
-                target_pct = atr_val + pe_power
-
-        # 6. Final mathematical target projection calculation
-        calculated_target = entry_prc * (1 + (target_pct / 100.0))
-        return round(calculated_target, 2)
-
-    except Exception as e:
-        print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
-        return 0
+        # Only execute if both locks are green, cooling clears, and total side rows are within limits
+        if loss_hit and signal_matches: 
+            if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
+                # Pick the latest contract entry of this side to deploy the average order on
+                last_order = side_df.iloc[-1]
+                symbol = last_order['symbol'] 
+                qty = abs(int(last_order['qty'])) 
+                new_tag = generate_pxy_tag() 
+                
+                # Fetch final metrics for terminal report visualization
+                final_loss = get_loss(last_order)
+                raw_atr_pct = float(last_order.get("atr", 0))
+                
+                # --- DYNAMIC FALLBACK FOR REPORTING ---
+                final_power = float(last_order.get("pe_power" if side == 'CE' else "ce_power", 1.0))
+                final_power = final_power if final_power > 0 else 1.0
+                
+                if raw_atr_pct > 0:
+                    final_threshold = -((raw_atr_pct + final_power) * ATR_MULTIPLIER)
+                else:
+                    final_threshold = -(14.0 + final_power)
+                # --------------------------------------------------------
+                
+                print_pxy_trigger_dashboard(side, symbol, final_loss, final_threshold, current_signal, new_tag)
+                
+                try: 
+                    params = { 
+                        "exchange_segment": "nse_fo", 
+                        "product": "NRML", 
+                        "price": "0", 
+                        "order_type": "MKT", 
+                        "quantity": str(qty), 
+                        "trading_symbol": str(symbol), 
+                        "transaction_type": "B", 
+                        "validity": "DAY", 
+                        "amo": "NO", 
+                        "tag": new_tag 
+                    } 
+                    res = client.place_order(**params) 
+                    if res: 
+                        set_cooling(side) 
+                        print(f"{Fore.GREEN}✅ SUCCESS: Order confirmation complete for side {side}.") 
+                except Exception as e: 
+                    print(f"{Fore.RED}❌ Rebuy Failed: {e}")
 
