@@ -60,9 +60,9 @@ def target_price(row):
         target_pct = 0.0
 
         if is_ce:
-            # RULE: Signal flip (opposite direction) falls back to exactly 2.8
+            # RULE: Signal flip (opposite direction) falls back to exactly 1.4
             if active_exit in ["SELL", "BEAR"]:
-                target_pct = 2.8
+                target_pct = 1.4
             
             # RULE: Counter trade scaling = ATR * power
             elif is_counter:
@@ -73,9 +73,9 @@ def target_price(row):
                 target_pct = atr_val
 
         elif is_pe:
-            # RULE: Signal flip (opposite direction) falls back to exactly 2.8
+            # RULE: Signal flip (opposite direction) falls back to exactly 1.4
             if active_exit in ["BUY", "BULL"]:
-                target_pct = 2.8
+                target_pct = 1.4
             
             # RULE: Counter trade scaling = ATR * power
             elif is_counter:
@@ -86,9 +86,9 @@ def target_price(row):
                 target_pct = atr_val
 
         # --- ABSOLUTE SAFETY FLOOR PROTECTION ---
-        # Guarantees that target_pct is never less than 2.8 under any circumstance
-        if target_pct < 2.8:
-            target_pct = 2.8
+        # Guarantees that target_pct is never less than 1.4 under any circumstance
+        if target_pct < 1.4:
+            target_pct = 1.4
 
         # 6. Final mathematical target projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
