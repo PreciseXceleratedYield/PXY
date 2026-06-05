@@ -76,13 +76,13 @@ def target_price(row):
             if active_exit in ["SELL", "BEAR"]:  # Opposite side signal
                 target_pct = atr_val
             else:                                # Same side signal
-                target_pct = atr_val * ce_power
+                target_pct = atr_val + ce_power
 
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   # Opposite side signal
                 target_pct = atr_val
             else:                                # Same side signal
-                target_pct = atr_val * pe_power
+                target_pct = atr_val + pe_power
 
         # 6. Final mathematical target projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
