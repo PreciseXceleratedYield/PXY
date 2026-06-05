@@ -53,7 +53,7 @@ def get_3sma_oc2_ohlc(df, window=4):
             
     ha_h = np.maximum(ha_o, ha_c)
     ha_l = np.minimum(ha_o, ha_c)
-    return ha_o, ha_h, ha_l, ha_c
+    return ha_c, ha_h, ha_l, ha_o
 
 
 def apply_ohlc_transformation(df, mode=1):
