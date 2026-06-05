@@ -66,7 +66,7 @@ def target_price(row):
             
             # RULE: Counter trade scaling = ATR * power
             elif is_counter:
-                target_pct = (atr_val * ce_power) / 2
+                target_pct = (atr_val ** ce_power) / 2
             
             # RULE: No counter scaling = Base ATR only
             else:
@@ -79,7 +79,7 @@ def target_price(row):
             
             # RULE: Counter trade scaling = ATR * power
             elif is_counter:
-                target_pct = (atr_val * pe_power) / 2
+                target_pct = (atr_val ** pe_power) / 2
             
             # RULE: No counter scaling = Base ATR only
             else:
