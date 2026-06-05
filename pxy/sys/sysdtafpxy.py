@@ -137,4 +137,3 @@ if __name__ == "__main__":
     output_df = fetch_yf_data()
     if not output_df.empty:
         print(f"ENGINE_RUN_SUCCESS | Collected Rows Count: {len(output_df)}")
-
