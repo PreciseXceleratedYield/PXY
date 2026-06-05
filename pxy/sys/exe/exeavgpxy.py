@@ -1,6 +1,7 @@
 import os 
 import time 
 import pytz 
+import math
 from datetime import datetime, time as dt_time 
 from colorama import Fore, Style, init
 
@@ -10,8 +11,17 @@ init(autoreset=True)
 # --- CONFIG --- 
 REBUY_ENABLED = True 
 MAX_LAYERS = 6
-COOL_DOWN_SECONDS = 20  # ⏱️ UPDATED: Cooling interval set to exactly 20 seconds
+COOL_DOWN_SECONDS = 61  # ⏱️ Cooling interval set to exactly 61 seconds
 ATR_MULTIPLIER = 1
+
+def safe_float(val, fallback=0.0):
+    """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
+    if val is None or (isinstance(val, float) and math.isnan(val)):
+        return fallback
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return fallback
 
 def generate_pxy_tag(): 
     IST = pytz.timezone("Asia/Kolkata") 
@@ -37,24 +47,38 @@ def is_cooling(side):
         return False 
 
 def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, signal, tag):
-    """Renders a strict 42-character width dashboard ONLY upon an order trigger event."""
+    """
+    Renders a strict 42-character width dashboard upon an order trigger event.
+    Accounts for 2-column wide emojis and dynamically scales color formatting.
+    """
     width = 42
     border = Fore.YELLOW + "=" * width
     divider = Fore.RED + "-" * width
     
+    # "🚨 " counts as 3 visual column widths (2 for emoji + 1 space)
+    header_text = "🚨  PXY® ENGINE AVERAGE TRIGGERED  🚨"
+    
     print("\n" + border)
-    print(Fore.WHITE + " 🚨 PXY® ENGINE AVERAGE TRIGGERED 🚨 ".center(width, " "))
+    print(Fore.WHITE + header_text.center(width - 2, " ")) # Adjusted for double-width emoji offset
     print(divider)
-    print(Fore.WHITE + f" • SYMBOL       : {symbol}")
-    print(Fore.WHITE + f" • SIDE OPTION   : {side}")
-    print(Fore.WHITE + f" • ACTIVE SIGNAL : {signal}")
-    print(Fore.WHITE + f" • TRIGGER LOSS  : " + Fore.RED + f"{current_loss:.2f}%")
-    print(Fore.WHITE + f" • ATR TARGET (%): " + Fore.YELLOW + f"{target_threshold:.2f}%")
-    print(Fore.WHITE + f" • ORDER TAG     : {tag}")
+    print(Fore.WHITE + f" • SYMBOL       : {symbol}".ljust(width))
+    print(Fore.WHITE + f" • SIDE OPTION   : {side}".ljust(width))
+    print(Fore.WHITE + f" • ACTIVE SIGNAL : {signal}".ljust(width))
+    
+    # Dynamic alignment padding calculations to avoid ansi color length bloat
+    loss_str = f" • TRIGGER LOSS  : {current_loss:.2f}%"
+    loss_pad = " " * max(0, width - len(loss_str))
+    print(Fore.WHITE + " • TRIGGER LOSS  : " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + loss_pad)
+    
+    target_str = f" • ATR TARGET (%): {target_threshold:.2f}%"
+    target_pad = " " * max(0, width - len(target_str))
+    print(Fore.WHITE + " • ATR TARGET (%): " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
+    
+    print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(width))
     print(border + "\n")
 
 def handle_side_averaging(client, df): 
-    """Averages only if EVERY active position on that side has crossed the ATR threshold.""" 
+    """Averages only if EVERY active position on that side has crossed the power-adjusted ATR threshold.""" 
     if df is None or df.empty: 
         return 
         
@@ -63,7 +87,7 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
-    # 1. ✅ FIXED: Extract string from the last row of the 'exit' column safely
+    # 1. Extract string from the last row of the 'exit' column safely
     if "exit" not in df.columns:
         return
     raw_exit_signal = str(df["exit"].iloc[-1]).upper().strip() 
@@ -79,8 +103,8 @@ def handle_side_averaging(client, df):
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
 
     def get_loss(row): 
-        entry = float(row.get("buy_prc", 0)) 
-        ltp = float(row.get("sell_prc", 0)) 
+        entry = safe_float(row.get("buy_prc", 0.0)) 
+        ltp = safe_float(row.get("sell_prc", 0.0)) 
         return ((ltp - entry) / entry) * 100 if entry > 0 else 0 
 
     for side in ['CE', 'PE']: 
@@ -97,12 +121,17 @@ def handle_side_averaging(client, df):
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
-            # Extract dynamic ATR ceiling for this specific contract row
-            raw_atr_pct = float(row.get("atr", 0))
+            # --- FIXED: Use safe_float to process raw metrics safely ---
+            raw_atr_pct = safe_float(row.get("atr", 0.0))
+            
+            opp_power = safe_float(row.get("pe_power" if side == 'CE' else "ce_power", 1.0))
+            opp_power = opp_power if opp_power > 0 else 1.0
+            
             if raw_atr_pct > 0:
-                row_threshold = -(raw_atr_pct * ATR_MULTIPLIER)
+                row_threshold = -((raw_atr_pct + opp_power) * ATR_MULTIPLIER)
             else:
-                row_threshold = -14.0
+                row_threshold = -(14.0 + opp_power)  # Scaled dynamic fallback
+            # ------------------------------------------------------------------------
             
             # If even ONE position has NOT crossed the threshold yet, flip the flag to False
             if pos_loss > row_threshold:
@@ -112,10 +141,8 @@ def handle_side_averaging(client, df):
         # ======================================================== 
         # 🛡️ THE "DOUBLE LOCK" TRIGGER VALUATION
         # ======================================================== 
-        # Lock 1: All open side contracts must be past their individual ATR loss floors
         loss_hit = all_positions_crossed_threshold
 
-        # Lock 2: Match strictly on your dedicated state matrix values
         signal_matches = (
             (side == 'CE' and current_signal == "BUY") or
             (side == 'PE' and current_signal == "SELL")
@@ -127,13 +154,22 @@ def handle_side_averaging(client, df):
                 # Pick the latest contract entry of this side to deploy the average order on
                 last_order = side_df.iloc[-1]
                 symbol = last_order['symbol'] 
-                qty = abs(int(last_order['qty'])) 
+                qty = abs(int(safe_float(last_order['qty'], 0.0))) 
                 new_tag = generate_pxy_tag() 
                 
                 # Fetch final metrics for terminal report visualization
                 final_loss = get_loss(last_order)
-                raw_atr_pct = float(last_order.get("atr", 0))
-                final_threshold = -(raw_atr_pct * ATR_MULTIPLIER) if raw_atr_pct > 0 else -14.0
+                raw_atr_pct = safe_float(last_order.get("atr", 0.0))
+                
+                # --- FIXED: Dynamic power lookups with validation fallback ---
+                final_power = safe_float(last_order.get("pe_power" if side == 'CE' else "ce_power", 1.0))
+                final_power = final_power if final_power > 0 else 1.0
+                
+                if raw_atr_pct > 0:
+                    final_threshold = -((raw_atr_pct + final_power) * ATR_MULTIPLIER)
+                else:
+                    final_threshold = -(14.0 + final_power)
+                # --------------------------------------------------------
                 
                 print_pxy_trigger_dashboard(side, symbol, final_loss, final_threshold, current_signal, new_tag)
                 
