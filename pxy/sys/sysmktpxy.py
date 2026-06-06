@@ -10,9 +10,8 @@ from sysdthapxy import get_pxy_data
 
 # Global Config
 DEBUG = True
-CHECK_CONFIRMED_ONLY = False  # 🔄 True = Non-Reprinting (Past 2 & Past 1) | False = Live Stream (Past 1 & Live Running)
 
-def _print_console_bar(anchor_c, trigger_c, now_c, anchor_o, trigger_o, now_o, entry, exit_sig):
+def _print_console_bar(c2_c, c1_c, c0_c, c2_o, c1_o, c0_o, entry, exit_sig):
     """ Renders the graphical sorted ASCII price matrix layout inside the console terminal. """
     RST = "\033[0m"
     RED = "\033[91m"
@@ -20,8 +19,8 @@ def _print_console_bar(anchor_c, trigger_c, now_c, anchor_o, trigger_o, now_o, e
     YLW = "\033[1;93m"
     GRAY = "\033[90m"
 
-    min_val = min(anchor_c, trigger_c, now_c) - 2
-    max_val = max(anchor_c, trigger_c, now_c) + 2
+    min_val = min(c2_c, c1_c, c0_c) - 2
+    max_val = max(c2_c, c1_c, c0_c) + 2
     scale_width = 20
 
     def get_clean_bar(val, marker="█"):
@@ -29,14 +28,14 @@ def _print_console_bar(anchor_c, trigger_c, now_c, anchor_o, trigger_o, now_o, e
         pos = max(1, pos)
         return (marker * pos).ljust(scale_width)
 
-    anchor_color = GRN if anchor_c >= anchor_o else RED
-    trigger_color = GRN if trigger_c >= trigger_o else RED
-    now_color = GRN if now_c >= now_o else RED
+    c2_color = GRN if c2_c >= c2_o else RED
+    c1_color = GRN if c1_c >= c1_o else RED
+    c0_color = GRN if c0_c >= c0_o else RED
 
     rows = [
-        (anchor_c, f"    C2 -{anchor_c:.2f}", "█", anchor_color),
-        (trigger_c, f"    C1 -{trigger_c:.2f}", "█", trigger_color),
-        (now_c, f"    C0 -{now_c:.2f}", "█", now_color)
+        (c2_c, f"    C2 -{c2_c:.2f}", "█", c2_color),
+        (c1_c, f"    C1 -{c1_c:.2f}", "█", c1_color),
+        (c0_c, f"    C0 -{c0_c:.2f}", "█", c0_color)
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
@@ -77,9 +76,9 @@ def log_sync_state(timestamp, entry, exit_sig, price):
 
 def get_signal(df):
     """ 
-    Dual-Route Strategy Engine mapping either:
-    - Confirmed Mode: Past 2 (Anchor) + Past 1 (Trigger) -> Non-Reprinting
-    - Live Mode: Past 1 (Anchor) + Live Candle (Trigger) -> Real-Time Speed
+    Asymmetric Dual-Horizon Strategy Engine:
+    - Entry Horizon: Confirmed Candlesticks Only (Past 2 vs Past 1) -> Zero Reprinting Risk
+    - Exit Horizon : Real-Time Live Running Candlestick (Past 1 vs Live Now) -> Maximum Velocity
     """
     if df is None or len(df) < 5:
         return "NONE", "NONE"
@@ -88,79 +87,77 @@ def get_signal(df):
         # 1. RUN DATAFRAME THROUGH THE ENGINE TRUTH MATRIX
         _, _, _, calculated_df = get_pxy_data(df=df)
         
-        if calculated_df is None:
+        if calculated_df is None or calculated_df.empty:
             return "NONE", "NONE"
 
-        # 2. RESOLVE DYNAMIC OFFSETS BASED ON YOUR SWITCH STATE
-        if CHECK_CONFIRMED_ONLY:
-            # 🔒 Confirmed Non-Reprinting: Past 2 vs Past 1
-            anchor_row = calculated_df.iloc[-3]   # Past 2
-            trigger_row = calculated_df.iloc[-2]  # Past 1
-            log_idx = -2
+        # 2. EXTRACT HISTORICAL CANDLE MATRIX ROWS AS SEPARATE HOVER TIME SLICES
+        c2_row = calculated_df.iloc[-3]  # Past 2 Candle
+        c1_row = calculated_df.iloc[-2]  # Past 1 Candle (Last Completed Close)
+        c0_row = calculated_df.iloc[-1]  # Live Running Candle ("Now" Fluctuating)
+
+        # Unpack absolute pricing metrics
+        c2_c, c2_o = float(c2_row['Close']), float(c2_row['Open'])
+        c1_c, c1_o = float(c1_row['Close']), float(c1_row['Open'])
+        c0_c, c0_o = float(c0_row['Close']), float(c0_row['Open'])
+
+        # Establish binary direction profiles
+        c2_is_green = c2_c >= c2_o
+        c1_is_green = c1_c >= c1_o
+        c0_is_green = c0_c >= c0_o
+
+        # 3. CALCULATE ASYMMETRIC HORIZONS
+
+        # --- A. ENTRY SIGNAL: CONFIRMED ENGINE HORIZON (Past 2 vs Past 1) ---
+        if c2_is_green and c1_is_green:
+            entry = "BULL"
+        elif not c2_is_green and not c1_is_green:
+            entry = "BEAR"
+        elif c2_is_green and not c1_is_green:
+            entry = "SELL"
+        elif not c2_is_green and c1_is_green:
+            entry = "BUY"
         else:
-            # ⚡ Live Fast Track: Past 1 vs Live Running Candle
-            anchor_row = calculated_df.iloc[-2]   # Past 1
-            trigger_row = calculated_df.iloc[-1]  # Live Running "Now"
-            log_idx = -1
+            entry = "NONE"
 
-        # Extract values
-        anchor_c, anchor_o = float(anchor_row['Close']), float(anchor_row['Open'])
-        trigger_c, trigger_o = float(trigger_row['Close']), float(trigger_row['Open'])
-        
-        # Absolute current live reference for the terminal console UI layout
-        now_c, now_o = float(calculated_df.iloc[-1]['Close']), float(calculated_df.iloc[-1]['Open'])
-
-        # 3. CALCULATE DIRECTIONS
-        anchor_is_green = anchor_c >= anchor_o
-        trigger_is_green = trigger_c >= trigger_o
-
-        # 4. EXECUTE UNIFIED MATRIX PATTERNS
-        # Pattern A: Green -> Green
-        if anchor_is_green and trigger_is_green:
-            entry, exit_sig = "BULL", "BULL"
-
-        # Pattern B: Red -> Red
-        elif not anchor_is_green and not trigger_is_green:
-            entry, exit_sig = "BEAR", "BEAR"
-
-        # Pattern C: Green -> Red (Down Flip)
-        elif anchor_is_green and not trigger_is_green:
-            entry, exit_sig = "SELL", "SELL"
-
-        # Pattern D: Red -> Green (Up Flip)
-        elif not anchor_is_green and trigger_is_green:
-            entry, exit_sig = "BUY", "BUY"
-
+        # --- B. EXIT SIGNAL: LIVE ENGINE HORIZON (Past 1 vs Live Running C0) ---
+        if c1_is_green and c0_is_green:
+            exit_sig = "BULL"
+        elif not c1_is_green and not c0_is_green:
+            exit_sig = "BEAR"
+        elif c1_is_green and not c0_is_green:
+            exit_sig = "SELL"
+        elif not c1_is_green and c0_is_green:
+            exit_sig = "BUY"
         else:
-            entry, exit_sig = "NONE", "NONE"
+            exit_sig = "NONE"
 
-        # 5. DIAGNOSTICS & STREAM LOGGING
+        # 4. DIAGNOSTICS & STREAM LOGGING
         if DEBUG:
-            _print_console_bar(anchor_c, trigger_c, now_c, anchor_o, trigger_o, now_o, entry, exit_sig)
+            _print_console_bar(c2_c, c1_c, c0_c, c2_o, c1_o, c0_o, entry, exit_sig)
 
-        log_sync_state(calculated_df.index[log_idx], entry, exit_sig, now_c)
+        # Syncs the JSON file log entry to target the timestamp of the live calculated row
+        log_sync_state(calculated_df.index[-1], entry, exit_sig, c0_c)
+        
         return entry, exit_sig
 
     except Exception as e:
         if DEBUG:
             print(f"PXY Matrix Engine Exception: {e}")
         return "NONE", "NONE"
+
 if __name__ == "__main__":
-    print("\n[PXY ENGINE STATUS] Active Stream Listener Initiated.")
-    print(f"Configuration -> CHECK_CONFIRMED_ONLY: {CHECK_CONFIRMED_ONLY}")
-    print("--------------------------------------------------")
+    print("\n[PXY ENGINE STATUS] Asymmetric Confirmed-Entry / Live-Exit Engine Active.")
+    print("---------------------------------------------------------------------")
     
     try:
         print("Fetching latest market data from sysdthapxy...")
-        # Call your actual data module with None to let it pull live exchange data
         _, _, _, live_df = get_pxy_data(df=None)
         
         if live_df is not None and not live_df.empty:
             print(f"Successfully loaded {len(live_df)} rows of live data.")
             
-            # Execute your engine signal calculations
             entry_sig, exit_sig = get_signal(live_df)
-            print(f"\n⚡LIVE ENGINE-> Entry: {entry_sig} | Exit: {exit_sig}\n")
+            print(f"\n⚡ LIVE ENGINE -> Entry (Confirmed): {entry_sig} | Exit (Live Running): {exit_sig}\n")
         else:
             print("❌ Error: sysdthapxy returned an empty or invalid DataFrame.")
             
