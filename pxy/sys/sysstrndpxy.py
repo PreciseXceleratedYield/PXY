@@ -87,7 +87,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     atr_multiplier = 3.0
     
     if n > 0:
-        atr = tr
+        atr = tr.copy()
     for i in range(1, n):
         atr[i] = (tr[i] + (atr_period - 1) * atr[i-1]) / atr_period
 
@@ -100,10 +100,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     upper_band = np.zeros(n)
     trend_direction = np.ones(n, dtype=int)  # 1 = BULL, -1 = BEAR
 
-    # Initialize first index boundaries
-    lower_band = up_band
-    upper_band = dn_band
-    trend_direction = 1
+    # Initialize first index boundaries cleanly as arrays
+    lower_band[0] = up_band[0]
+    upper_band[0] = dn_band[0]
+    trend_direction[0] = 1
 
     for i in range(1, n):
         lower_band[i] = max(up_band[i], lower_band[i-1]) if ha_close[i-1] > lower_band[i-1] else up_band[i]
@@ -120,6 +120,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['bar_count_session'] = np.arange(1, n + 1)
     df['src_c'] = ha_close
     
+    # Code continues smoothly into Part 2...
+
     # Code continues smoothly into Part 2...
 
     # 5. CONSOLIDATED CONCURRENT SIGNAL MATRIX GENERATOR
