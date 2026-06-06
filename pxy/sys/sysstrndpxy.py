@@ -27,14 +27,15 @@ CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running c
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    PXY® Engine Strategy Matrix - Perfect 5-State Zero-Interaction Dual-Pipe Indicator Framework.
-    - Pipe A (Signal): Pure Heikin-Ashi Flips matching sysmktpxy logic (BUY / SELL / BULL / BEAR / NONE)
-    - Pipe B (Trend) : Pure Supertrend Line (BUY / SELL / BULL / BEAR / NONE)
+    PXY® Engine Strategy Matrix - 3:3 Zero-Interaction Dual-Pipe Framework.
+    - Pipe A (Signal): Pure Heikin-Ashi Flips (BUY / SELL / BULL / BEAR / NONE)
+    - Pipe B (Trend) : Pure 3:3 Supertrend Line (BUY / SELL / BULL / BEAR / NONE)
+    Optimized lookback profile allows standard 1-day historical arrays to stabilize safely.
     """ 
-    # 🎯 OVERRIDE: Fetch a clean historical multi-day block straight from yfinance 
+    # 🎯 OVERRIDE: Fetch historical day-session buffer block from yfinance
     try:
         ticker_obj = yf.Ticker(TICKER)
-        raw_df = ticker_obj.history(period="5d", interval="1m")
+        raw_df = ticker_obj.history(period="3d", interval="1m") # 💡 3-day window keeps it ultra-safe and low lag
         if not raw_df.empty:
             df = raw_df
     except Exception as e:
@@ -62,7 +63,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     ha_low   = df['Low'].to_numpy()
     ha_close = df['Close'].to_numpy()
 
-    # 3. NATIVE TRUE RANGE & SMOOTHED ATR ENGINE (10-PERIOD)
+    # 3. NATIVE TRUE RANGE & SMOOTHED ATR ENGINE (💡 RE-CALIBRATED TO 3-PERIOD)
     tr = np.zeros(n)
     for i in range(n):
         if i == 0:
@@ -73,13 +74,15 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             tr3 = abs(ha_low[i] - ha_close[i-1])
             tr[i] = max(tr1, tr2, tr3)
 
-    # Replicate TradingView's ta.rma exactly
+    # Replicate TradingView's ta.rma exactly using a 3-period rolling matrix window
     atr = np.zeros(n)
-    atr_period = 10
-    atr_multiplier = 3.0
+    atr_period = 3        # ⚡ CALIBRATED TO 3
+    atr_multiplier = 3.0  # ⚡ CALIBRATED TO 3.0
     
     if n >= atr_period:
+        # Seed the initial baseline window average at index 2
         atr[atr_period - 1] = np.mean(tr[0:atr_period])
+        # Smooth remaining entries sequentially using the tighter alpha coefficient
         for i in range(atr_period, n):
             atr[i] = (tr[i] + (atr_period - 1) * atr[i-1]) / atr_period
     else:
@@ -125,8 +128,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             st_trend_history.append(raw_regime)
             continue 
 
-        # --- PIPE 1 ENGINE: PURE HEIKIN-ASHI GATES (MATCHES SYSMKTPXY EXACT LOGIC) ---
-        # Enforces the identical 'c >= o' directional matrix pattern matching rules
+        # --- PIPE 1 ENGINE: PURE HEIKIN-ASHI GATES (sysmktpxy matching logic) ---
         is_anchor_green  = ha_close[i-1] >= ha_open[i-1]
         is_trigger_green = ha_close[i] >= ha_open[i]
 
@@ -146,7 +148,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else:
             st_signal_history.append("NONE")
 
-        # --- PIPE 2 ENGINE: PURE 10:3 SUPERTREND GATES ---
+        # --- PIPE 2 ENGINE: PURE 3:3 SUPERTREND GATES ---
         cross_buy  = (trend_direction[i] == 1)  and (trend_direction[i-1] == -1)
         cross_sell = (trend_direction[i] == -1) and (trend_direction[i-1] == 1)
 
@@ -172,7 +174,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def export_supertrend_json(output_file="../syschrtpxy.json"):
-    """Dumps EVERY single candle printed since today's opening bell straight to the JSON file."""
+    """Dumps EVERY single candle printed straight to the JSON file."""
     dummy_df = pd.DataFrame()
     df = calculate_supertrend(dummy_df)
     
