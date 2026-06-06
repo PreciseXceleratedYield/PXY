@@ -1,24 +1,12 @@
-# sysentrpxy.py
 """
 ===============================================================================
-PXY EXECUTION OPTION ROUTING ENGINE WITH IST TIME-WINDOW CONTROLS
+PXY OPTION ROUTING ENGINE: DIRECT UPSTREAM-FILTERED TRIGGER CORE
 ===============================================================================
-Timezone Configuration: Aligned strictly to Indian Standard Time (IST) Zone.
-
-Operational Rules Matrix (Indian Markets):
-1. Window [09:15 IST - 09:30 IST]: Bypasses entry core. Routes raw candle flips.
-   - exit_sig == "BUY"  -> ATMBUY
-   - exit_sig == "SELL" -> ATMSELL
-2. Window [After 09:30 IST]: Kick-starts priority routing filters.
-   - CROSS OVERRULE (PRIORITY 1): 
-     * True HA Crossover Above Baseline -> ATMBUY (Immediate Action)
-     * True HA Crossover Below Baseline -> ATMSELL (Immediate Action)
-   - TREND FILTER FOLLOWERS (PRIORITY 2):
-     * If Trend is Bullish and exit_sig == "BUY"  -> ATMBUY (Trend Pullback)
-     * If Trend is Bearish and exit_sig == "SELL" -> ATMSELL (Trend Pullback)
-   - OPPOSITE MEAN REVERSION FLIPS (PRIORITY 3):
-     * If Trend is Bullish and exit_sig == "SELL" -> OTMSELL (Counter-Trend Short)
-     * If Trend is Bearish and exit_sig == "BUY"  -> OTMBUY (Counter-Trend Long)
+Operational Rules:
+- EXIT signals originate strictly from sysmktpxy (exit_sig).
+- ENTRY signals originate strictly from your pre-filtered sysstrndpxy.py engine.
+- ZERO RE-CHECKING: Bypasses redundant trend checks since filtering happens upstream.
+- STRICT LOGGING: Console alerts fire ONLY for active options contract placements.
 ===============================================================================
 """
 
@@ -32,31 +20,21 @@ from sysmktpxy import get_signal, CHECK_CONFIRMED_ONLY
 from sysstrndpxy import calculate_supertrend
 
 def get_entry_signal(df=None):
-    # 1. Fetch the raw, unfiltered Heikin-Ashi candle state maps from sysmktpxy
-    mkt_entry, exit_sig = get_signal(df)
+    # 1. Extract EXIT signal strictly from Priority 1 Engine (sysmktpxy)
+    _, exit_sig = get_signal(df)
+    exit_sig = str(exit_sig).upper().strip()
 
-    # Clean and standardize incoming string formats to avoid whitespace anomalies
-    mkt_entry = str(mkt_entry).upper().strip()
-    exit_sig  = str(exit_sig).upper().strip()
-
-    # 2. Extract the underlying 380 baseline macro trend and crossover signals
+    # 2. Extract ENTRY signals strictly from your upstream filtered 10:3 Engine (sysstrndpxy)
     strnd_df = calculate_supertrend(df=None)
-    
-    macro_trend = "NEUTRAL"
-    has_cross_buy = False
-    has_cross_sell = False
+    strnd_signal = "NONE"
 
     if strnd_df is not None and not strnd_df.empty:
-        # Align lookup index to match your switch state (Confirmed vs Live Running)
         idx = -2 if CHECK_CONFIRMED_ONLY else -1
-        
         try:
-            macro_trend = str(strnd_df.iloc[idx]['st_trend_full']).upper().strip()
-            
-            # Identify the explicit structural trend cross event state markers
-            cross_event = str(strnd_df.iloc[idx]['st_signal_full']).upper().strip()
-            has_cross_buy = (cross_event == "CROSSBUY")
-            has_cross_sell = (cross_event == "CROSSSELL")
+            # Captures the pre-filtered direct execution string ('BUY' or 'SELL')
+            raw_strnd = str(strnd_df.iloc[idx]['st_signal_full']).upper().strip()
+            if raw_strnd in ["BUY", "SELL"]:
+                strnd_signal = raw_strnd
         except Exception:
             pass
 
@@ -64,17 +42,12 @@ def get_entry_signal(df=None):
     tz_ist = ZoneInfo("Asia/Kolkata")
     current_time_ist = datetime.now(tz_ist).time()
 
-    # Parse dataframe time if present to ensure proper sync with tracking data
     if strnd_df is not None and not strnd_df.empty:
         try:
             last_timestamp = strnd_df.index[-1]
             if not isinstance(last_timestamp, pd.Timestamp):
                 last_timestamp = pd.to_datetime(last_timestamp)
-            
-            if last_timestamp.tzinfo is not None:
-                current_time_ist = last_timestamp.astimezone(tz_ist).time()
-            else:
-                current_time_ist = last_timestamp.time()
+            current_time_ist = last_timestamp.astimezone(tz_ist).time() if last_timestamp.tzinfo is not None else last_timestamp.time()
         except Exception:
             pass
 
@@ -93,49 +66,34 @@ def get_entry_signal(df=None):
         else:
             final_signal = "NONE"
     else:
-        # --- STANDARD CONTINUOUS WINDOW: PRIORITY EXECUTION CORE ---
-        
-        # 👑 PRIORITY 1: Crossover Breakouts take immediate ATM placement
-        if has_cross_buy:
+        # --- STANDARD CONTINUOUS WINDOW: DIRECT TRIGGER OPTIONS PLACEMENT ---
+        if strnd_signal == "BUY":
             final_signal = "ATMBUY"
-        elif has_cross_sell:
+        elif strnd_signal == "SELL":
             final_signal = "ATMSELL"
-            
-        # 📈 PRIORITY 2: Trend Filter Pullbacks (Aligned with Trend)
-        elif macro_trend == "BULL" and exit_sig == "BUY":
-            final_signal = "ATMBUY"
-        elif macro_trend == "BEAR" and exit_sig == "SELL":
-            final_signal = "ATMSELL"
-            
-        # 🛡️ PRIORITY 3: Opposite Market Flips (Counter-Trend Mean Reversion to OTM)
-        elif macro_trend == "BULL" and exit_sig == "SELL":
-            final_signal = "OTMSELL"
-        elif macro_trend == "BEAR" and exit_sig == "BUY":
-            final_signal = "OTMBUY"
-            
         else:
-            # Pass remaining native states down the line (BULL, BEAR, or NONE)
-            final_signal = mkt_entry
+            final_signal = "NONE"
 
-    # 5. LATE OVERRIDE FALLBACK (Strictly for downstream communication pass-through)
+    # 5. LATE OVERRIDE FALLBACK (Downstream pass-through safety handler)
     if final_signal in ["NONE", "BULL", "BEAR"]:
         if exit_sig == "BUY":
             final_signal = "BUY"
         elif exit_sig == "SELL":
             final_signal = "SELL"
         else:
-            final_signal = exit_sig  # Safely passes BULL, BEAR, or NONE downstream
+            final_signal = exit_sig
 
-    # Reporting on active Indian Market signals
-    if final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL", "BUY", "SELL"]:
+    # 6. OPTIMIZED TELEMETRY ALERT ENGINE
+    # Completely ignores standard text strings. Fires ONLY for actionable option contracts.
+    if final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]:
         print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION-{final_signal} 🔥 ".center(40))
 
     return final_signal, exit_sig
 
 if __name__ == "__main__":
-    print("\n[PXY ROUTER STATUS] Option Route Verification Matrix Active.")
+    print("\n[PXY ROUTER STATUS] Upstream Filtered Option Route Matrix Active.")
     print("-" * 50)
     final_route, raw_exit = get_entry_signal(df=None)
     print("-" * 50)
-    print(f"FINAL DECISION >> ROUTE STATUS: {final_route} | RAW CANDLE FLIP: {raw_exit}")
+    print(f"FINAL DECISION >> ROUTE STATUS: {final_route} | RAW EXIT FROM MKT: {raw_exit}")
 
