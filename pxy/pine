@@ -1,8 +1,8 @@
 //@version=5
-indicator("Supertrend 10:3 & Trend Following Flips", overlay=true, precision=2)
+indicator("Supertrend 3:3 & Trend Following Flips", overlay=true, precision=2)
 
 // --- INPUTS ---
-atrPeriod = input.int(10, title="ATR Length")
+atrPeriod = input.int(3, title="ATR Length")
 atrMult   = input.float(3.0, title="ATR Multiplier")
 
 // --- NATIVE ATR GENERATION & BAND MATRICES ---
@@ -59,3 +59,4 @@ alertcondition(crossBuy,  title="Alert: Cross Buy Switch",  message="CROSSBUY")
 alertcondition(crossSell, title="Alert: Cross Sell Switch", message="CROSSSELL")
 alertcondition(runUp,     title="Alert: Running Up Flip",    message="RUN_UP")
 alertcondition(runDn,     title="Alert: Running Down Flip",  message="RUN_DN")
+
