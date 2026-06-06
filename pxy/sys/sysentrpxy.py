@@ -1,12 +1,14 @@
 """
 ===============================================================================
-PXY OPTION ROUTING ENGINE: HIGH-VELOCITY UPSTREAM-FILTERED ENGINE (DEBUG DEPLOY)
+PXY OPTION ROUTING ENGINE: SUPERTREND CROSSOVER ABSOLUTE PRIORITY
 ===============================================================================
 Operational Rules:
 - EXIT signals originate strictly from sysmktpxy (exit_sig).
-- ENTRY Layer A (👑 PRIORITY 1): Pure structural breakout from sysbbospxy (bos_signal).
-- ENTRY Layer B (📈 PRIORITY 2): Trend-following option contract assignment.
-  Converts BOTH fresh breakout triggers and established trend states to trades.
+- ENTRY Layer A (👑 PRIORITY 1): Pure 10:3 Supertrend Crossover Line Switches.
+  Fires instantly when 'strnd_trend' hits 'BUY' or 'SELL', overruling all loops.
+- ENTRY Layer B (⚡ PRIORITY 2): Pure structural breakouts from sysbbospxy (bos_signal).
+- ENTRY Layer C (📈 PRIORITY 3): Trend-following option contract assignment.
+  Converts running trend placeholder values ('BULL' or 'BEAR') to trades.
 ===============================================================================
 """
 
@@ -118,35 +120,40 @@ def get_entry_signal(df=None):
             final_signal = "NONE"
     else:
         print("🏙️ CURRENT TIMING STATE: Standard Continuous continuous window logic active.")
-        print(f"🛡️ STEP 1: Testing Priority 1 Breakouts (bos_signal == '{bos_signal}')...")
+        print(f"🛡️ STEP 1: Testing Priority 1 Supertrend Crossovers (strnd_trend == '{strnd_trend}')...")
         
-        # 👑 👑 👑 PRIORITY 1: High-Volume 42-Min Structural Breakouts (sysbbospxy) OVERRULE
-        if bos_signal == "BUY":
-            print("  🏆 PRIORITY 1 UNLOCKED: Bullish BOS Structural Breakout confirmed.")
+        # 👑 👑 👑 PRIORITY 1: 10:3 Native Supertrend Crossovers (BUY / SELL) OVERRULE EVERYTHING
+        if strnd_trend == "BUY":
+            print("  🏆 PRIORITY 1 UNLOCKED: Absolute Supertrend Bullish Crossover confirmed.")
             final_signal = "ATMBUY"
-        elif bos_signal == "SELL":
-            print("  🏆 PRIORITY 1 UNLOCKED: Bearish BOS Structural Breakdown confirmed.")
+        elif strnd_trend == "SELL":
+            print("  🏆 PRIORITY 1 UNLOCKED: Absolute Supertrend Bearish Breakdown confirmed.")
             final_signal = "ATMSELL"
             
-        # 📈 PRIORITY 2: Direct Upstream-Filtered Action Gates 
+        # ⚡ PRIORITY 2: High-Volume 42-Min Structural Breakouts (sysbbospxy)
         else:
-            print(f"  ↳ Priority 1 is 'NONE'. Falling down to Step 2: Testing Priority 2 (signal='{strnd_signal}', trend='{strnd_trend}')...")
-            
-            # Diagnostic evaluation logs to map out why the 'and' statement fails
-            cond_buy = (strnd_signal == "BUY" and strnd_trend == "BULL")
-            cond_sell = (strnd_signal == "SELL" and strnd_trend == "BEAR")
-            print(f"    - Testing Condition Call (BUY and BULL): {cond_buy}")
-            print(f"    - Testing Condition Put (SELL and BEAR): {cond_sell}")
-            
-            if strnd_signal == "BUY" and strnd_trend == "BULL":
-                print("  🚀 PRIORITY 2 UNLOCKED: Dynamic Breakout Switch approved.")
+            print(f"  ↳ Priority 1 is '{strnd_trend}'. Falling to Step 2: Testing Priority 2 Breakouts (bos_signal == '{bos_signal}')...")
+            if bos_signal == "BUY":
+                print("  ⚡ PRIORITY 2 UNLOCKED: Bullish BOS Structural Breakout approved.")
                 final_signal = "ATMBUY"
-            elif strnd_signal == "SELL" and strnd_trend == "BEAR":
-                print("  🚀 PRIORITY 2 UNLOCKED: Dynamic Breakdown Switch approved.")
+            elif bos_signal == "SELL":
                 final_signal = "ATMSELL"
+                print("  ⚡ PRIORITY 2 UNLOCKED: Bearish BOS Structural Breakdown approved.")
+
+            # 📈 PRIORITY 3: Trend-Following Pullback and Running Regimes Gates
             else:
-                print("    ❌ All Priority Entry condition gates failed to match parameters.")
-                final_signal = "NONE"
+                print(f"    ↳ Priority 2 is 'NONE'. Falling to Step 3: Testing Priority 3 (signal='{strnd_signal}', trend='{strnd_trend}')...")
+                
+                # Check for strict point-in-time signal matching trend direction parameters
+                if strnd_signal == "BUY" and strnd_trend == "BULL":
+                    print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
+                    final_signal = "ATMBUY"
+                elif strnd_signal == "SELL" and strnd_trend == "BEAR":
+                    print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
+                    final_signal = "ATMSELL"
+                else:
+                    print("    ❌ All waterfall priority logic gates failed to match execution parameters.")
+                    final_signal = "NONE"
 
     # 5. OPTIMIZED TELEMETRY ALERT ENGINE
     print(f"🏁 FINAL ROUTING ENGINE DECISION VALUE: '{final_signal}'")
@@ -162,3 +169,4 @@ if __name__ == "__main__":
     final_route, raw_exit = get_entry_signal(df=None)
     print("-" * 50)
     print(f"FINAL DECISION >> ROUTE STATUS: {final_route} | RAW EXIT FROM MKT: {raw_exit}")
+
