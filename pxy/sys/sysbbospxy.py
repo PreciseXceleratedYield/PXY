@@ -37,11 +37,11 @@ def build_candle_bar(o, h, l, c, width=WIDTH):
     bar += Fore.LIGHTBLACK_EX + "━" * upper_len
     return bar + Style.RESET_ALL
 
-# ---------------- 42-MIN ROLLING API (MIDPOINT OPEN MODIFIED) ----------------
+# ---------------- 42-MIN ROLLING API (SIGNAL POSITION CONVERSION) ----------------
 def get_bos_bar(df):
     try:
         if df is None or len(df) < 42:
-            return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "0.00", "NONE"
+            return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
             
         # 1. Capture Cumulative 42-minute boundaries
         window = df.iloc[-42:]
@@ -68,36 +68,14 @@ def get_bos_bar(df):
         # 3. Calculate 42-Period Simple Moving Average on Close Prices
         sma_42 = float(window['Close'].mean())
         
-        # 4. EXACT PINE SCRIPT MATCH: (SMA42 + LIVE) / 2
-        # Pure 50/50 split midpoint engine.
+        # 4. Pure 50/50 split midpoint engine calculation (Preserved in df metadata if needed)
         bos_value = (sma_42 + c_42) / 2.0
-        bos_str = f"{bos_value:.2f}"
+        if not hasattr(df, 'attrs'):
+            df.attrs = {}
+        df.attrs['bos_numeric_value'] = f"{bos_value:.2f}"
         
-        # Returns the geometric bar, the midpoint string, and the raw structural signal string
-        return visual_bar, bos_str, signal
+        # ✅ EXACT EXPECTED UNPACK: Returns visual bar and structural breakout signal string
+        return visual_bar, signal
         
     except Exception:
-        return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "ERR", "NONE"
-
-if __name__ == "__main__":
-    # Test block template using simulated random array data
-    print("\n[PXY CHART STATUS] Initializing Structural Breakout Test Run via sysbbospxy...")
-    print("-" * 50)
-    
-    # Simulating a mock dataframe layer with required columns
-    np.random.seed(42)
-    mock_data = {
-        "High": np.random.uniform(61000, 61100, size=50),
-        "Low": np.random.uniform(60800, 60900, size=50),
-        "Close": np.random.uniform(60900, 61050, size=50)
-    }
-    mock_df = pd.DataFrame(mock_data)
-    
-    # Run a test execution loop through the core engine function
-    bar, val, sig = get_bos_bar(mock_df)
-    print(f"• VISUAL BAR : {bar}")
-    print(f"• BOS VALUE  : {val}")
-    print(f"• SIGNAL STATUS : {sig}")
-    print("-" * 50)
-
-
+        return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
