@@ -10,7 +10,7 @@ from sysdthapxy import get_pxy_data
 
 # Global Config
 DEBUG = True
-CHECK_CONFIRMED_ONLY = True  # 🔄 True = Non-Reprinting (Past 2 & Past 1) | False = Live Stream (Past 1 & Live Running)
+CHECK_CONFIRMED_ONLY = False  # 🔄 True = Non-Reprinting (Past 2 & Past 1) | False = Live Stream (Past 1 & Live Running)
 
 def _print_console_bar(anchor_c, trigger_c, now_c, anchor_o, trigger_o, now_o, entry, exit_sig):
     """ Renders the graphical sorted ASCII price matrix layout inside the console terminal. """
