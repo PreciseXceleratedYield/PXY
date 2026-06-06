@@ -3,7 +3,7 @@ import numpy as np
 from colorama import Fore, Style, init
 
 # Direct Module Imports from your custom system architecture files
-from sysdtfapxy import fetch_yf_data
+from sysdtafpxy import fetch_yf_data
 from syspowrpxy import get_ce_pe_power
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 
