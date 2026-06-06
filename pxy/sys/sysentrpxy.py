@@ -1,12 +1,12 @@
 """
 ===============================================================================
-PXY OPTION ROUTING ENGINE: DIRECT UPSTREAM-FILTERED TRIGGER CORE
+PXY OPTION ROUTING ENGINE: UPSTREAM-FILTERED DOUBLE-LOCK ENGINE (FIXED)
 ===============================================================================
 Operational Rules:
-- EXIT signals originate strictly from sysmktpxy (exit_sig) [1].
-- ENTRY signals originate strictly from your pre-filtered sysstrndpxy.py engine [1].
-- ZERO RE-CHECKING: Bypasses redundant trend checks since filtering happens upstream [1].
-- STRICT LOGGING: Console alerts fire ONLY for active options contract placements [1].
+- EXIT signals originate strictly from sysmktpxy (exit_sig).
+- ENTRY signals originate strictly from sysstrndpxy.py 10:3 macro trend columns.
+- DOUBLE-LOCK SYNERGY GATES: Executes ONLY when immediate signal matches macro trend.
+- FIXED: Explicitly pulls both signal and trend parameters to ensure ATMBUY routing.
 ===============================================================================
 """
 
@@ -26,13 +26,16 @@ def get_entry_signal(df=None):
 
     # 2. Extract ENTRY signals strictly from your upstream 10:3 Engine (sysstrndpxy)
     strnd_df = calculate_supertrend(df=None)
+    
     strnd_signal = "NONE"
+    strnd_trend = "NEUTRAL"
 
     if strnd_df is not None and not strnd_df.empty:
         idx = -2 if CHECK_CONFIRMED_ONLY else -1
         try:
-            # Captures the pre-filtered direct execution string ('BUY', 'SELL', 'BULL', or 'BEAR')
+            # 💡 FIXED: Successfully extracting BOTH metrics simultaneously from database columns
             strnd_signal = str(strnd_df.iloc[idx]['st_signal_full']).upper().strip()
+            strnd_trend  = str(strnd_df.iloc[idx]['st_trend_full']).upper().strip()
         except Exception:
             pass
 
@@ -64,11 +67,11 @@ def get_entry_signal(df=None):
         else:
             final_signal = "NONE"
     else:
-        # --- STANDARD CONTINUOUS WINDOW: DIRECT TRIGGER OPTIONS PLACEMENT ---
-        # Fixed logic gate: Converts BOTH explicit entry breakouts and running macro trends to option paths
-        if strnd_signal == "BUY" and strnd_signal == "BULL":
+        # --- STANDARD CONTINUOUS WINDOW: DOUBLE-LOCK SYNERGY GATES ---
+        # Converts triggers to option routing strictly under trend alignment agreement
+        if (strnd_signal == "BUY" or strnd_signal == "BULL") and strnd_trend == "BULL":
             final_signal = "ATMBUY"
-        elif strnd_signal == "SELL" and strnd_signal == "BEAR":
+        elif (strnd_signal == "SELL" or strnd_signal == "BEAR") and strnd_trend == "BEAR":
             final_signal = "ATMSELL"
         else:
             final_signal = "NONE"
@@ -76,14 +79,13 @@ def get_entry_signal(df=None):
     # 5. LATE OVERRIDE FALLBACK (Downstream pass-through safety handler)
     if final_signal in ["NONE", "BULL", "BEAR"]:
         if exit_sig == "BUY":
-            final_signal = "BUY"
+            final_signal = "ATMBUY" if strnd_trend == "BULL" else "BUY"
         elif exit_sig == "SELL":
-            final_signal = "SELL"
+            final_signal = "ATMSELL" if strnd_trend == "BEAR" else "SELL"
         else:
             final_signal = exit_sig
 
     # 6. OPTIMIZED TELEMETRY ALERT ENGINE
-    # Completely ignores standard text strings. Fires ONLY for actionable option contracts.
     if final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]:
         print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION-{final_signal} 🔥 ".center(40))
 
@@ -95,4 +97,3 @@ if __name__ == "__main__":
     final_route, raw_exit = get_entry_signal(df=None)
     print("-" * 50)
     print(f"FINAL DECISION >> ROUTE STATUS: {final_route} | RAW EXIT FROM MKT: {raw_exit}")
-
