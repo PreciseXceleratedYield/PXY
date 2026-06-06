@@ -23,14 +23,13 @@ from syscnfgpxy import TIMEZONE, TICKER
 
 # Global Config 
 DEBUG_MODE = True 
-MA_TYPE = "TSMA"  
 CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running candle (Index -1)
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    PXY® Engine Strategy Matrix.
-    Bypasses truncated upstream slices by fetching a fresh full-day session history.
-    Calculates single-line HA TSMA 380 + Live Price / 2 and isolates signal crossovers.
+    PXY® Engine Strategy Matrix - Direct BUY/SELL and Macro Trend Tracker.
+    Bypasses truncated upstream slices by fetching fresh day session histories.
+    Accepts pre-transformed Heikin-Ashi data arrays directly to run trailing locks.
     """ 
     # 🎯 OVERRIDE: Fetch a clean historical multi-day block straight from yfinance 
     try:
@@ -65,98 +64,94 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     if n == 0:
         return df
 
-    # 2. CONVERT STANDARD CANDLES TO PURE HEIKIN-ASHI ARRAYS
-    src_o = df['Open'].to_numpy()
-    src_h = df['High'].to_numpy()
-    src_l = df['Low'].to_numpy()
-    src_c = df['Close'].to_numpy()
+    # 2. EXTRACT PRE-TRANSFORMED DATA ARRAYS
+    ha_open  = df['Open'].to_numpy()
+    ha_high  = df['High'].to_numpy()
+    ha_low   = df['Low'].to_numpy()
+    ha_close = df['Close'].to_numpy()
 
-    ha_open  = np.zeros(n)
-    ha_high  = np.zeros(n)
-    ha_low   = np.zeros(n)
-    ha_close = np.zeros(n)
-
-    # Initialize first candle
-    ha_open[0]  = (src_o[0] + src_c[0]) / 2.0
-    ha_close[0] = (src_o[0] + src_h[0] + src_l[0] + src_c[0]) / 4.0
-    ha_high[0]  = max(src_h[0], ha_open[0], ha_close[0])
-    ha_low[0]   = min(src_l[0], ha_open[0], ha_close[0])
-
-    # Calculate rolling historical Heikin-Ashi matrix
-    for i in range(1, n):
-        ha_close[i] = (src_o[i] + src_h[i] + src_l[i] + src_c[i]) / 4.0
-        ha_open[i]  = (ha_open[i-1] + ha_close[i-1]) / 2.0
-        ha_high[i]  = max(src_h[i], ha_open[i], ha_close[i])
-        ha_low[i]   = min(src_l[i], ha_open[i], ha_close[i])
-
-    # Define live price source: (HA High + HA Low) / 2
-    ha_live_source = (ha_high + ha_low) / 2.0
-
-    # 3. TSMA 380 ROLLING REGRESSION CALCULATION
-    tsma_380 = np.zeros(n)
-    window = 380
-
-    # X-coordinates for the regression window: [0, 1, 2, ... 379]
-    x_reg = np.arange(window)
-    sum_x = np.sum(x_reg)
-    sum_xx = np.sum(x_reg ** 2)
-    denom = (window * sum_xx) - (sum_x ** 2)
-
+    # 3. NATIVE TRUE RANGE & SMOOTHED ATR ENGINE (10-PERIOD)
+    tr = np.zeros(n)
     for i in range(n):
-        if i < window - 1:
-            # Fallback initialization using dynamic window for early session minutes
-            curr_win = i + 1
-            if curr_win <= 1:
-                tsma_380[i] = ha_live_source[i]
-            else:
-                x_sub = np.arange(curr_win)
-                y_sub = ha_live_source[0:i+1]
-                slope, intercept = np.polyfit(x_sub, y_sub, 1)
-                tsma_380[i] = (slope * (curr_win - 1)) + intercept
+        if i == 0:
+            tr[i] = ha_high[i] - ha_low[i]
         else:
-            # Fast matrix tracking for closed window periods
-            y_sub = ha_live_source[i - window + 1 : i + 1]
-            sum_y = np.sum(y_sub)
-            sum_xy = np.sum(x_reg * y_sub)
-            
-            num = (window * sum_xy) - (sum_x * sum_y)
-            slope = num / denom
-            intercept = (sum_y - (slope * sum_x)) / window
-            tsma_380[i] = (slope * (window - 1)) + intercept
+            tr1 = ha_high[i] - ha_low[i]
+            tr2 = abs(ha_high[i] - ha_close[i-1])
+            tr3 = abs(ha_low[i] - ha_close[i-1])
+            tr[i] = max(tr1, tr2, tr3)
 
-    # 4. SINGLE BLENDED LINE ASSIGNMENT: (TSMA 380 + HA Live Source) / 2
-    blended_line = (tsma_380 + ha_live_source) / 2.0
+    # Replicate Pine Script's ta.rma (TradingView's exponential moving average for ATR)
+    atr = np.zeros(n)
+    atr_period = 10
+    atr_multiplier = 3.0
+    
+    if n > 0:
+        atr = tr
+    for i in range(1, n):
+        atr[i] = (tr[i] + (atr_period - 1) * atr[i-1]) / atr_period
 
-    df['pxy_st_line'] = blended_line
+    # 4. ORIGINAL SUPERTREND BAND TRAILING LOCK GATES
+    hl2 = (ha_high + ha_low) / 2.0
+    up_band = hl2 - (atr_multiplier * atr)
+    dn_band = hl2 + (atr_multiplier * atr)
+
+    lower_band = np.zeros(n)
+    upper_band = np.zeros(n)
+    trend_direction = np.ones(n, dtype=int)  # 1 = BULL, -1 = BEAR
+
+    # Initialize first index boundaries
+    lower_band = up_band
+    upper_band = dn_band
+    trend_direction = 1
+
+    for i in range(1, n):
+        lower_band[i] = max(up_band[i], lower_band[i-1]) if ha_close[i-1] > lower_band[i-1] else up_band[i]
+        upper_band[i] = min(dn_band[i], upper_band[i-1]) if ha_close[i-1] < upper_band[i-1] else dn_band[i]
+
+        if trend_direction[i-1] == 1:
+            trend_direction[i] = -1 if ha_close[i] < lower_band[i] else 1
+        else:
+            trend_direction[i] = 1 if ha_close[i] > upper_band[i] else -1
+
+    supertrend_line = np.where(trend_direction == 1, lower_band, upper_band)
+    
+    df['pxy_st_line'] = supertrend_line
     df['bar_count_session'] = np.arange(1, n + 1)
-    df['src_c'] = ha_close  # Swapped with Heikin-Ashi output close
+    df['src_c'] = ha_close
+    
+    # Code continues smoothly into Part 2...
 
-    # 5. SIGNAL PIPELINE INVERSION USING SINGLE MASTER LINE RULES
+    # 5. CONSOLIDATED CONCURRENT SIGNAL MATRIX GENERATOR
     st_signal_history = [] 
     st_trend_history = []
     
     for i in range(n): 
-        current_trend = "BULL" if ha_close[i] >= blended_line[i] else "BEAR"
+        current_trend = "BULL" if trend_direction[i] == 1 else "BEAR"
         st_trend_history.append(current_trend)
 
         if i < 1: 
-            st_signal_history.append("NONE") 
+            st_signal_history.append(current_trend) 
             continue 
-            
-        c0 = ha_close[i]
-        c1 = ha_close[i-1]
-        line0 = blended_line[i]
-        line1 = blended_line[i-1]
+
+        # --- LAYER A: NATIVE SUPERTREND REGIME CROSSOVERS ---
+        cross_buy  = (trend_direction[i] == 1)  and (trend_direction[i-1] == -1)
+        cross_sell = (trend_direction[i] == -1) and (trend_direction[i-1] == 1)
         
-        cross_buy  = (c0 > line0) and (c1 <= line1)
-        cross_sell = (c0 < line0) and (c1 >= line1)
+        # --- LAYER B: TREND-FOLLOWING CONTINUATION FLIPS ---
+        is_candle_green = ha_close[i] > ha_open[i]
+        is_candle_red   = ha_close[i] < ha_open[i]
         
-        if cross_buy:
-            st_signal_history.append("CROSSBUY")   
-        elif cross_sell:
-            st_signal_history.append("CROSSSELL")  
+        run_up = (trend_direction[i] == 1)  and is_candle_green and (ha_close[i-1] <= ha_open[i-1])
+        run_dn = (trend_direction[i] == -1) and is_candle_red   and (ha_close[i-1] >= ha_open[i-1])
+
+        # Flatten outputs directly to standard execution conditions
+        if cross_buy or run_up:
+            st_signal_history.append("BUY")   
+        elif cross_sell or run_dn:
+            st_signal_history.append("SELL")  
         else:
-            st_signal_history.append("NONE")
+            st_signal_history.append(current_trend)  # Fallback: Represents current HA macro trend state
 
     df['st_signal_full'] = st_signal_history
     df['st_trend_full'] = st_trend_history
@@ -167,15 +162,11 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def export_supertrend_json(output_file="../syschrtpxy.json"):
-    """
-    🎯 ABSORBED CHART EXPORT (FULL DAY SPECIFIC)
-    Dumps EVERY single candle printed since today's opening bell straight to the JSON file.
-    """
+    """Dumps EVERY single candle printed since today's opening bell straight to the JSON file."""
     dummy_df = pd.DataFrame()
     df = calculate_supertrend(dummy_df)
     
     if df is None or df.empty:
-        print("No data processed for charting.")
         return None
 
     output = []
@@ -191,13 +182,10 @@ def export_supertrend_json(output_file="../syschrtpxy.json"):
     os.makedirs(os.path.dirname(output_file), exist_ok=True) if os.path.dirname(output_file) else None
     with open(output_file, "w") as f:
         json.dump(output, f, indent=2)
-
     return output
 
 def get_signal(df: pd.DataFrame) -> tuple:
-    """
-    Direct array slice endpoint collector matching checkout preferences.
-    """
+    """Direct array slice endpoint collector matching checkout preferences."""
     if df is None or df.empty:
         return "NONE", "NONE"
         
@@ -205,10 +193,7 @@ def get_signal(df: pd.DataFrame) -> tuple:
         calculated_df = calculate_supertrend(df)
         n = len(calculated_df)
         
-        if CHECK_CONFIRMED_ONLY:
-            idx = n - 2  
-        else:
-            idx = n - 1  
+        idx = n - 2 if CHECK_CONFIRMED_ONLY else n - 1  
 
         active_signal = str(calculated_df.at[calculated_df.index[idx], 'st_signal_full']).upper().strip()
         active_trend  = str(calculated_df.at[calculated_df.index[idx], 'st_trend_full']).upper().strip()
@@ -226,18 +211,9 @@ def get_signal(df: pd.DataFrame) -> tuple:
             print(f"PXY Master Output Routing Module Exception: {e}")
         return "NONE", "NONE"
 
-# Standalone execution validation loop
 if __name__ == "__main__":
     print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
-    print(f"Configuration -> CHECK_CONFIRMED_ONLY: {CHECK_CONFIRMED_ONLY} | MA_TYPE: {MA_TYPE}")
-    print("--------------------------------------------------")
-    
-    # Run test run validation using fallback data block
     dummy = pd.DataFrame()
     signal, trend = get_signal(dummy)
-    export_supertrend_json()
-
-
-
 
 
