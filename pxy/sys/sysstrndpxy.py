@@ -1,24 +1,18 @@
-# sysstrndpxy.py
 import sys
 import numpy as np
 import pandas as pd
 import pytz
-import yfinance as yf
 import json
 import os
 from datetime import datetime
+import warnings
 
-# 🛠️ GLOBAL PROJECT HOTPATCH: Overrides config objects at initialization to prevent yfinance/pytz crashes
-try:
-    import syscnfgpxy
-    if hasattr(syscnfgpxy, 'TIMEZONE'):
-        if hasattr(syscnfgpxy.TIMEZONE, 'zone'):
-            syscnfgpxy.TIMEZONE = str(syscnfgpxy.TIMEZONE.zone)
-        else:
-            syscnfgpxy.TIMEZONE = str(syscnfgpxy.TIMEZONE)
-except Exception:
-    pass
+# Silence future warning constraints completely
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
+# ---- Pure Production Naming Alignment Imports ----
+from sysdtafpxy import fetch_yf_data
+from syskatrpxy import calculate_atr, calculate_dynamic_k
 from syscnfgpxy import TIMEZONE, TICKER
 
 # Global Config 
@@ -28,19 +22,18 @@ CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running c
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
     PXY® Engine Strategy Matrix - 3:3 Zero-Interaction Dual-Pipe Framework.
-    - Pipe A (Signal): Pure Heikin-Ashi Flips (BUY / SELL / BULL / BEAR / NONE)
+    Processes the transformed, multi-mode matrix incoming from upstream supply.
+    - Pipe A (Signal): Upstream Candle Transformed Flips (BUY / SELL / BULL / BEAR / NONE)
     - Pipe B (Trend) : Pure 3:3 Supertrend Line (BUY / SELL / BULL / BEAR / NONE)
-    Optimized lookback profile allows standard 1-day historical arrays to stabilize safely.
     """ 
-    # 🎯 OVERRIDE: Fetch historical day-session buffer block from yfinance
+    # 🎯 OVERRIDE: Fetch historical day-session buffer block from data pipeline file if empty
     try:
-        ticker_obj = yf.Ticker(TICKER)
-        raw_df = ticker_obj.history(period="3d", interval="1m") # 💡 3-day window keeps it ultra-safe and low lag
+        raw_df = fetch_yf_data(period="3d", interval="1m") 
         if not raw_df.empty:
             df = raw_df
     except Exception as e:
         if DEBUG_MODE:
-            print(f"Warning: Independent yFinance download fallback active | {e}")
+            print(f"Warning: Shared pipeline download fallback active | {e}")
 
     df = df.copy()
 
@@ -57,39 +50,37 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     if n == 0:
         return df
 
-    # 2. EXTRACT PRE-TRANSFORMED DATA ARRAYS
-    ha_open  = df['Open'].to_numpy()
-    ha_high  = df['High'].to_numpy()
-    ha_low   = df['Low'].to_numpy()
-    ha_close = df['Close'].to_numpy()
+    # 2. EXTRACT UPSTREAM-TRANSFORMED DATA ARRAYS DIRECTLY
+    src_open  = df['Open'].to_numpy()
+    src_high  = df['High'].to_numpy()
+    src_low   = df['Low'].to_numpy()
+    src_close = df['Close'].to_numpy()
 
-    # 3. NATIVE TRUE RANGE & SMOOTHED ATR ENGINE (💡 RE-CALIBRATED TO 3-PERIOD)
+    # 3. TRUE RANGE & SMOOTHED ATR ENGINE (CALIBRATED TO 3-PERIOD)
     tr = np.zeros(n)
     for i in range(n):
         if i == 0:
-            tr[i] = ha_high[i] - ha_low[i]
+            tr[i] = src_high[i] - src_low[i]
         else:
-            tr1 = ha_high[i] - ha_low[i]
-            tr2 = abs(ha_high[i] - ha_close[i-1])
-            tr3 = abs(ha_low[i] - ha_close[i-1])
+            tr1 = src_high[i] - src_low[i]
+            tr2 = abs(src_high[i] - src_close[i-1])
+            tr3 = abs(src_low[i] - src_close[i-1])
             tr[i] = max(tr1, tr2, tr3)
 
     # Replicate TradingView's ta.rma exactly using a 3-period rolling matrix window
     atr = np.zeros(n)
-    atr_period = 3        # ⚡ CALIBRATED TO 3
-    atr_multiplier = 3.0  # ⚡ CALIBRATED TO 3.0
+    atr_period = 3        
+    atr_multiplier = 3.0  
     
     if n >= atr_period:
-        # Seed the initial baseline window average at index 2
         atr[atr_period - 1] = np.mean(tr[0:atr_period])
-        # Smooth remaining entries sequentially using the tighter alpha coefficient
         for i in range(atr_period, n):
             atr[i] = (tr[i] + (atr_period - 1) * atr[i-1]) / atr_period
     else:
         atr = tr.copy()
 
     # 4. SUPERTREND TRAILING LOCK IMPLEMENTATION
-    hl2 = (ha_high + ha_low) / 2.0
+    hl2 = (src_high + src_low) / 2.0
     up_band = hl2 - (atr_multiplier * atr)
     dn_band = hl2 + (atr_multiplier * atr)
 
@@ -101,26 +92,25 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     upper_band = dn_band
 
     for i in range(1, n):
-        lower_band[i] = max(up_band[i], lower_band[i-1]) if ha_close[i-1] > lower_band[i-1] else up_band[i]
-        upper_band[i] = min(dn_band[i], upper_band[i-1]) if ha_close[i-1] < upper_band[i-1] else dn_band[i]
+        lower_band[i] = max(up_band[i], lower_band[i-1]) if src_close[i-1] > lower_band[i-1] else up_band[i]
+        upper_band[i] = min(dn_band[i], upper_band[i-1]) if src_close[i-1] < upper_band[i-1] else dn_band[i]
 
         if trend_direction[i-1] == 1:
-            trend_direction[i] = -1 if ha_close[i] < lower_band[i] else 1
+            trend_direction[i] = -1 if src_close[i] < lower_band[i] else 1
         else:
-            trend_direction[i] = 1 if ha_close[i] > upper_band[i] else -1
+            trend_direction[i] = 1 if src_close[i] > upper_band[i] else -1
 
     supertrend_line = np.where(trend_direction == 1, lower_band, upper_band)
     
     df['pxy_st_line'] = supertrend_line
     df['bar_count_session'] = np.arange(1, n + 1)
-    df['src_c'] = ha_close
+    df['src_c'] = src_close
     
     # 5. ISOLATED FIVE-STATE DUAL PIPELINE CALCULATION LOOP
     st_signal_history = [] 
     st_trend_history = []
     
     for i in range(n): 
-        # Base status parameters for the trend pipe fallback states
         raw_regime = "BULL" if trend_direction[i] == 1 else "BEAR"
 
         if i < 1: 
@@ -128,22 +118,22 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             st_trend_history.append(raw_regime)
             continue 
 
-        # --- PIPE 1 ENGINE: PURE HEIKIN-ASHI GATES (sysmktpxy matching logic) ---
-        is_anchor_green  = ha_close[i-1] >= ha_open[i-1]
-        is_trigger_green = ha_close[i] >= ha_open[i]
+        # --- PIPE 1 ENGINE: MATCHING UPSTREAM CANDLE GATES ---
+        is_anchor_green  = src_close[i-1] >= src_open[i-1]
+        is_trigger_green = src_close[i] >= src_open[i]
 
-        ha_bull = is_anchor_green and is_trigger_green
-        ha_bear = (not is_anchor_green) and (not is_trigger_green)
-        ha_sell = is_anchor_green and (not is_trigger_green)
-        ha_buy  = (not is_anchor_green) and is_trigger_green
+        src_bull = is_anchor_green and is_trigger_green
+        src_bear = (not is_anchor_green) and (not is_trigger_green)
+        src_sell = is_anchor_green and (not is_trigger_green)
+        src_buy  = (not is_anchor_green) and is_trigger_green
 
-        if ha_buy:
+        if src_buy:
             st_signal_history.append("BUY")
-        elif ha_sell:
+        elif src_sell:
             st_signal_history.append("SELL")
-        elif ha_bull:
+        elif src_bull:
             st_signal_history.append("BULL")
-        elif ha_bear:
+        elif src_bear:
             st_signal_history.append("BEAR")
         else:
             st_signal_history.append("NONE")
@@ -170,6 +160,12 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['ST'] = df['pxy_st_line']
     df['ST_Trend'] = df['st_trend_full']
     df['P_Master'] = df['src_c']
+    
+    # Append the session-grouped 14-period script calculations directly
+    try:
+        df['shared_atr'] = calculate_atr(df)
+    except Exception:
+        df['shared_atr'] = 12.0
     
     return df
 
@@ -212,11 +208,15 @@ def get_signal(df: pd.DataFrame) -> tuple:
         active_signal = str(calculated_df.at[calculated_df.index[idx], 'st_signal_full']).upper().strip()
         active_trend  = str(calculated_df.at[calculated_df.index[idx], 'st_trend_full']).upper().strip()
         
+        latest_atr_val = int(calculated_df.at[calculated_df.index[idx], 'shared_atr'])
+        latest_k_val = calculate_dynamic_k(calculated_df)
+
         if DEBUG_MODE:
             print(f"--- PXY STRATEGY EVALUATION SUMMARY ---")
             print(f"Target Row Lookup Index   -> {idx}")
             print(f"Active Live Market SIGNAL  -> {active_signal}")
-            print(f"Active Live Market TREND   -> {active_trend}\n")
+            print(f"Active Live Market TREND   -> {active_trend}")
+            print(f"Shared Engine Metrics     -> ATR: {latest_atr_val} | Dynamic K: {latest_k_val}\n")
             
         return active_signal, active_trend
         
@@ -229,3 +229,4 @@ if __name__ == "__main__":
     print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
     dummy = pd.DataFrame()
     signal, trend = get_signal(dummy)
+
