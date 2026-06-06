@@ -27,9 +27,9 @@ CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running c
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    PXY® Engine Strategy Matrix - Direct BUY/SELL and Macro Trend Tracker.
-    Maintains a full 5-day continuous stream buffer to prevent lookback starvation.
-    Accepts pre-transformed Heikin-Ashi data arrays directly to run trailing locks.
+    PXY® Engine Strategy Matrix - PURE TREND-BASED GATES.
+    Calculates 10:3 trailing bands and maps signals strictly on true crossover line switches.
+    Completely ignores temporary intrabar candle body color flips.
     """ 
     # 🎯 OVERRIDE: Fetch a clean historical multi-day block straight from yfinance 
     try:
@@ -52,8 +52,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     else:
         df = df.tz_convert(tz_string)
         
-    # --- CRITICAL CORRECTION: REMOVED TODAY_DATE TRUNCATION SQUEEZE ---
-    # Preserves full multiday historical buffer sequence context data
     n = len(df)
     if n == 0:
         return df
@@ -81,9 +79,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     atr_multiplier = 3.0
     
     if n >= atr_period:
-        # Seed the initial baseline window average
         atr[atr_period - 1] = np.mean(tr[0:atr_period])
-        # Smooth remaining entries sequentially
         for i in range(atr_period, n):
             atr[i] = (tr[i] + (atr_period - 1) * atr[i-1]) / atr_period
     else:
@@ -98,7 +94,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     upper_band = np.zeros(n)
     trend_direction = np.ones(n, dtype=int)  # 1 = BULL, -1 = BEAR
 
-    # Initialize entry coordinates
     lower_band[0] = up_band[0]
     upper_band[0] = dn_band[0]
     trend_direction[0] = 1
@@ -118,8 +113,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['bar_count_session'] = np.arange(1, n + 1)
     df['src_c'] = ha_close
     
-    # Code continues smoothly into Part 2...
-    # 5. CONSOLIDATED DIRECT SIGNAL MATRIX GENERATOR
+    # 5. PURE PXY CROSSOVER MATRIX GENERATOR (STRIPPED OF LAYER B FLIPS)
     st_signal_history = [] 
     st_trend_history = []
     
@@ -131,24 +125,17 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             st_signal_history.append(current_trend) 
             continue 
 
-        # --- LAYER A: NATIVE SUPERTREND REGIME CROSSOVERS ---
+        # --- NATIVE SUPERTREND REGIME CROSSOVERS ONLY ---
         cross_buy  = (trend_direction[i] == 1)  and (trend_direction[i-1] == -1)
         cross_sell = (trend_direction[i] == -1) and (trend_direction[i-1] == 1)
-        
-        # --- LAYER B: TREND-FOLLOWING CONTINUATION FLIPS ---
-        is_candle_green = ha_close[i] > ha_open[i]
-        is_candle_red   = ha_close[i] < ha_open[i]
-        
-        run_up = (trend_direction[i] == 1)  and is_candle_green and (ha_close[i-1] <= ha_open[i-1])
-        run_dn = (trend_direction[i] == -1) and is_candle_red   and (ha_close[i-1] >= ha_open[i-1])
 
-        # Standard direct trigger assignment
-        if cross_buy or run_up:
+        # Triggers strictly on line crossovers. Otherwise, remains locked as BULL or BEAR
+        if cross_buy:
             st_signal_history.append("BUY")   
-        elif cross_sell or run_dn:
+        elif cross_sell:
             st_signal_history.append("SELL")  
         else:
-            st_signal_history.append(current_trend)  # Fallback: Represents current macro trend state
+            st_signal_history.append(current_trend)  
 
     df['st_signal_full'] = st_signal_history
     df['st_trend_full'] = st_trend_history
@@ -156,8 +143,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     # 🎯 DASHBOARD BACKWARD-COMPATIBILITY KEYS
     df['ST'] = df['pxy_st_line']
     df['ST_Trend'] = df['st_trend_full']
-    
-    # 🛠️ FIXED: Backward-compatibility key injected to stop syschrtpxy.py KeyError
     df['P_Master'] = df['src_c']
     
     return df
@@ -188,7 +173,6 @@ def export_supertrend_json(output_file="../syschrtpxy.json"):
 def get_signal(df: pd.DataFrame) -> tuple:
     """Direct array slice endpoint collector matching checkout preferences."""
     if df is None or df.empty:
-        # If an empty placeholder is passed upstream, trigger processing fallback sequence
         df = pd.DataFrame()
         
     try:
@@ -216,6 +200,6 @@ def get_signal(df: pd.DataFrame) -> tuple:
         return "NONE", "NONE"
 
 if __name__ == "__main__":
-    print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
+    print("\n[PXY STRND ENGINE] Pure Trend-Based Live Listener Initiated.")
     dummy = pd.DataFrame()
     signal, trend = get_signal(dummy)
