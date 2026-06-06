@@ -20,11 +20,11 @@ def dump_raw_json_in_window(ticker_obj, period="5d", interval="1m"):
     if _RAW_DUMP_DONE:
         return
 
-    # Check IST time window (15:45 PM IST to 09:14 AM IST next day)
+    # Check IST time window (15:30 PM IST to 09:14 AM IST next day)
     ist_tz = pytz.timezone('Asia/Kolkata')
     now_ist = datetime.now(ist_tz).time()
-    start_time = time(15, 45)
-    end_time = time(9, 14)
+    start_time = time(15, 29)
+    end_time = time(15, 14)
 
     if now_ist >= start_time or now_ist <= end_time:
         try:
