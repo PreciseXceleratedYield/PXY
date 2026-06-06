@@ -21,10 +21,11 @@ CHECK_CONFIRMED_ONLY = True  # ⚡ False = Process and trade the LIVE running ca
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    PXY® Engine Strategy Matrix - 3:3 Zero-Interaction Dual-Pipe Framework.
-    Processes the transformed, multi-mode matrix incoming from upstream supply.
-    - Pipe A (Signal): Upstream Candle Transformed Flips (BUY / SELL / BULL / BEAR / NONE)
-    - Pipe B (Trend) : Pure 3:3 Supertrend Line (BUY / SELL / BULL / BEAR / NONE)
+    PXY® Engine Strategy Matrix - Modular Dual-Pipeline Engine.
+    Processes two completely separate, decoupled tracking streams:
+    - Pipe A (Supertrend Matrix): 3:3 Trailing Band Crossovers
+    - Pipe B (SMA Matrix)       : 42-Period Rolling Baseline Crossovers
+    Returns isolated categorical state flags to be matched downstream in the router.
     """ 
     # 🎯 OVERRIDE: Fetch historical day-session buffer block from data pipeline file if empty
     try:
@@ -50,13 +51,14 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     if n == 0:
         return df
 
-    # 2. EXTRACT UPSTREAM-TRANSFORMED DATA ARRAYS DIRECTLY
-    src_open  = df['Open'].to_numpy()
+    # EXTRACT UPSTREAM-TRANSFORMED DATA ARRAYS DIRECTLY
     src_high  = df['High'].to_numpy()
     src_low   = df['Low'].to_numpy()
     src_close = df['Close'].to_numpy()
 
-    # 3. TRUE RANGE & SMOOTHED ATR ENGINE (CALIBRATED TO 3-PERIOD)
+    # ===============================================================================
+    # 📡 PIPELINE A PROCESSING: NATIVE 3:3 SUPERTREND TRAILING LOCKS
+    # ===============================================================================
     tr = np.zeros(n)
     for i in range(n):
         if i == 0:
@@ -67,7 +69,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             tr3 = abs(src_low[i] - src_close[i-1])
             tr[i] = max(tr1, tr2, tr3)
 
-    # Replicate TradingView's ta.rma exactly using a 3-period rolling matrix window
     atr = np.zeros(n)
     atr_period = 3        
     atr_multiplier = 3.0  
@@ -79,14 +80,13 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     else:
         atr = tr.copy()
 
-    # 4. SUPERTREND TRAILING LOCK IMPLEMENTATION
     hl2 = (src_high + src_low) / 2.0
     up_band = hl2 - (atr_multiplier * atr)
     dn_band = hl2 + (atr_multiplier * atr)
 
     lower_band = np.zeros(n)
     upper_band = np.zeros(n)
-    trend_direction = np.ones(n, dtype=int)  # 1 = BULL, -1 = BEAR
+    st_direction = np.ones(n, dtype=int)  # 1 = BULL, -1 = BEAR
 
     lower_band = up_band
     upper_band = dn_band
@@ -95,68 +95,72 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         lower_band[i] = max(up_band[i], lower_band[i-1]) if src_close[i-1] > lower_band[i-1] else up_band[i]
         upper_band[i] = min(dn_band[i], upper_band[i-1]) if src_close[i-1] < upper_band[i-1] else dn_band[i]
 
-        if trend_direction[i-1] == 1:
-            trend_direction[i] = -1 if src_close[i] < lower_band[i] else 1
+        if st_direction[i-1] == 1:
+            st_direction[i] = -1 if src_close[i] < lower_band[i] else 1
         else:
-            trend_direction[i] = 1 if src_close[i] > upper_band[i] else -1
+            st_direction[i] = 1 if src_close[i] > upper_band[i] else -1
 
-    supertrend_line = np.where(trend_direction == 1, lower_band, upper_band)
-    
+    supertrend_line = np.where(st_direction == 1, lower_band, upper_band)
     df['pxy_st_line'] = supertrend_line
-    df['bar_count_session'] = np.arange(1, n + 1)
-    df['src_c'] = src_close
-    
-    # 5. ISOLATED FIVE-STATE DUAL PIPELINE CALCULATION LOOP
-    st_signal_history = [] 
+
+    # ===============================================================================
+    # 📡 PIPELINE B PROCESSING: PURE 42 ROLLING SIMPLE MOVING AVERAGE
+    # ===============================================================================
+    sma_period = 42
+    df['pxy_sma_line'] = df['Close'].rolling(window=sma_period, min_periods=1).mean()
+    sma_line = df['pxy_sma_line'].to_numpy()
+
+    sma_direction = np.ones(n, dtype=int)  # 1 = BULL, -1 = BEAR
+    for i in range(n):
+        if src_close[i] < sma_line[i]:
+            sma_direction[i] = -1
+        else:
+            sma_direction[i] = 1
+
+    # ===============================================================================
+    # 🛠️ ISOLATED FIVE-STATE COUPLING AND VECTOR ARRAY GENERATION
+    # ===============================================================================
     st_trend_history = []
+    sma_trend_history = []
     
     for i in range(n): 
-        raw_regime = "BULL" if trend_direction[i] == 1 else "BEAR"
+        # Base status parameters for the decoupled fallback states
+        raw_st_regime = "BULL" if st_direction[i] == 1 else "BEAR"
+        raw_sma_regime = "BULL" if sma_direction[i] == 1 else "BEAR"
 
         if i < 1: 
-            st_signal_history.append("NONE") 
-            st_trend_history.append(raw_regime)
+            st_trend_history.append(raw_st_regime)
+            sma_trend_history.append(raw_sma_regime)
             continue 
 
-        # --- PIPE 1 ENGINE: MATCHING UPSTREAM CANDLE GATES ---
-        is_anchor_green  = src_close[i-1] >= src_open[i-1]
-        is_trigger_green = src_close[i] >= src_open[i]
+        # --- PIPELINE A ARRAY GATING: PURE SUPERTREND SWITCHES ---
+        st_cross_buy  = (st_direction[i] == 1)  and (st_direction[i-1] == -1)
+        st_cross_sell = (st_direction[i] == -1) and (st_direction[i-1] == 1)
 
-        src_bull = is_anchor_green and is_trigger_green
-        src_bear = (not is_anchor_green) and (not is_trigger_green)
-        src_sell = is_anchor_green and (not is_trigger_green)
-        src_buy  = (not is_anchor_green) and is_trigger_green
-
-        if src_buy:
-            st_signal_history.append("BUY")
-        elif src_sell:
-            st_signal_history.append("SELL")
-        elif src_bull:
-            st_signal_history.append("BULL")
-        elif src_bear:
-            st_signal_history.append("BEAR")
-        else:
-            st_signal_history.append("NONE")
-
-        # --- PIPE 2 ENGINE: PURE 3:3 SUPERTREND GATES ---
-        cross_buy  = (trend_direction[i] == 1)  and (trend_direction[i-1] == -1)
-        cross_sell = (trend_direction[i] == -1) and (trend_direction[i-1] == 1)
-
-        if cross_buy:
+        if st_cross_buy:
             st_trend_history.append("BUY")
-        elif cross_sell:
+        elif st_cross_sell:
             st_trend_history.append("SELL")
-        elif trend_direction[i] == 1:
-            st_trend_history.append("BULL")
-        elif trend_direction[i] == -1:
-            st_trend_history.append("BEAR")
         else:
-            st_trend_history.append("NONE")
+            st_trend_history.append(raw_st_regime)
 
-    df['st_signal_full'] = st_signal_history
+        # --- PIPELINE B ARRAY GATING: PURE 42 SMA SWITCHES ---
+        sma_cross_buy  = (sma_direction[i] == 1)  and (sma_direction[i-1] == -1)
+        sma_cross_sell = (sma_direction[i] == -1) and (sma_direction[i-1] == 1)
+
+        if sma_cross_buy:
+            sma_trend_history.append("BUY")
+        elif sma_cross_sell:
+            sma_trend_history.append("SELL")
+        else:
+            sma_trend_history.append(raw_sma_regime)
+
+    # Save cleanly named vector columns into the calculation frame
     df['st_trend_full'] = st_trend_history
+    df['sma_trend_full'] = sma_trend_history
+    df['src_c'] = src_close
     
-    # 🎯 DASHBOARD BACKWARD-COMPATIBILITY KEYS
+    # 🎯 DASHBOARD BACKWARD-COMPATIBILITY ROUTING KEYS
     df['ST'] = df['pxy_st_line']
     df['ST_Trend'] = df['st_trend_full']
     df['P_Master'] = df['src_c']
@@ -184,7 +188,9 @@ def export_supertrend_json(output_file="../syschrtpxy.json"):
             "close": float(row["Close"]),
             "p_master": float(row["Close"]),  
             "st": float(row["ST"]),           
-            "st_trend": str(row["ST_Trend"])  
+            "st_trend": str(row["ST_Trend"]),
+            "sma_line": float(row["pxy_sma_line"]),
+            "sma_trend": str(row["sma_trend_full"])
         })
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True) if os.path.dirname(output_file) else None
@@ -193,7 +199,7 @@ def export_supertrend_json(output_file="../syschrtpxy.json"):
     return output
 
 def get_signal(df: pd.DataFrame) -> tuple:
-    """Direct array slice endpoint collector matching checkout preferences."""
+    """Unpacks and returns Pipe A and Pipe B states cleanly for routing preferences."""
     if df is None or df.empty:
         df = pd.DataFrame()
         
@@ -205,20 +211,21 @@ def get_signal(df: pd.DataFrame) -> tuple:
         
         idx = n - 2 if CHECK_CONFIRMED_ONLY else n - 1  
 
-        active_signal = str(calculated_df.at[calculated_df.index[idx], 'st_signal_full']).upper().strip()
-        active_trend  = str(calculated_df.at[calculated_df.index[idx], 'st_trend_full']).upper().strip()
+        # Unpack the states completely decoupled from one another
+        active_st_state  = str(calculated_df.at[calculated_df.index[idx], 'st_trend_full']).upper().strip()
+        active_sma_state = str(calculated_df.at[calculated_df.index[idx], 'sma_trend_full']).upper().strip()
         
         latest_atr_val = int(calculated_df.at[calculated_df.index[idx], 'shared_atr'])
         latest_k_val = calculate_dynamic_k(calculated_df)
 
         if DEBUG_MODE:
-            print(f"--- PXY STRATEGY EVALUATION SUMMARY ---")
+            print(f"--- PXY DUAL-PIPE COUPLING SUMMARY ---")
             print(f"Target Row Lookup Index   -> {idx}")
-            print(f"Active Live Market SIGNAL  -> {active_signal}")
-            print(f"Active Live Market TREND   -> {active_trend}")
+            print(f"Pipe A (3:3 Supertrend)   -> {active_st_state}")
+            print(f"Pipe B (42 Rolling SMA)   -> {active_sma_state}")
             print(f"Shared Engine Metrics     -> ATR: {latest_atr_val} | Dynamic K: {latest_k_val}\n")
             
-        return active_signal, active_trend
+        return active_st_state, active_sma_state
         
     except Exception as e:
         if DEBUG_MODE:
@@ -228,5 +235,6 @@ def get_signal(df: pd.DataFrame) -> tuple:
 if __name__ == "__main__":
     print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
     dummy = pd.DataFrame()
-    signal, trend = get_signal(dummy)
+    st_pipe, sma_pipe = get_signal(dummy)
+
 
