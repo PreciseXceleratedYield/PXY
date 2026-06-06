@@ -156,6 +156,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     # 🎯 DASHBOARD BACKWARD-COMPATIBILITY KEYS
     df['ST'] = df['pxy_st_line']
     df['ST_Trend'] = df['st_trend_full']
+    
+    # 🛠️ FIXED: Backward-compatibility key injected to stop syschrtpxy.py KeyError
+    df['P_Master'] = df['src_c']
+    
     return df
 
 def export_supertrend_json(output_file="../syschrtpxy.json"):
@@ -215,5 +219,3 @@ if __name__ == "__main__":
     print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
     dummy = pd.DataFrame()
     signal, trend = get_signal(dummy)
-
-
