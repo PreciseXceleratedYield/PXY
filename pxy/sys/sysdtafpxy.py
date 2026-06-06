@@ -1,51 +1,12 @@
 # sysstrndpxy.py
-import os
 import warnings
-from datetime import datetime, time
 import numpy as np
 import pandas as pd
 import yfinance as yf
 from syscnfgpxy import TICKER, OHLC_MODE, TIMEZONE
-import pytz
 
 # Silence future warning constraints completely
 warnings.simplefilter(action='ignore', category=FutureWarning)
-
-# Track if raw dump has run for this session
-_RAW_DUMP_DONE = False
-
-def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
-    """Dumps raw JSON converted to IST to parent directory if within the overnight time window."""
-    global _RAW_DUMP_DONE
-    if _RAW_DUMP_DONE:
-        return
-
-    # Check IST time window (15:30 PM IST to 09:14 AM IST next day)
-    ist_tz = pytz.timezone('Asia/Kolkata')
-    now_ist = datetime.now(ist_tz).time()
-    start_time = time(15, 29)
-    end_time = time(15, 14)
-
-    if now_ist >= start_time or now_ist <= end_time:
-        try:
-            raw_data = ticker_obj.history(period=period, interval=interval)
-            if not raw_data.empty:
-                if not isinstance(raw_data.index, pd.DatetimeIndex):
-                    raw_data.index = pd.to_datetime(raw_data.index)
-                if raw_data.index.tz is None:
-                    raw_data = raw_data.tz_localize('UTC').tz_convert(TIMEZONE)
-                else:
-                    raw_data = raw_data.tz_convert(TIMEZONE)
-
-                script_directory = os.path.dirname(os.path.abspath(__file__))
-                parent_directory = os.path.dirname(script_directory)
-                base_name = os.path.splitext(os.path.basename(__file__))[0]
-                target_export_path = os.path.join(parent_directory, f"{base_name}.json")
-                
-                raw_data.to_json(target_export_path, date_format='iso', orient='split')
-                _RAW_DUMP_DONE = True
-        except Exception as e:
-            print(f"RAW_JSON_DUMP_ERROR | {e}")
 
 def get_heikin_ashi_ohlc(o, h, l, c):
     """Generates pure Heikin-Ashi smooth trend OHLC matrices"""
@@ -74,7 +35,6 @@ def get_momentum_ohlc(c):
 
 def get_3sma_oc2_ohlc(df, window=4):
     """Generates dynamic SMA OC/2 Pine chart calculation candles (Mode 6)"""
-    # 🎯 UPDATED: Using the dynamic window parameter instead of a hardcoded 3
     sma_o = df['Open'].rolling(window=window, min_periods=1).mean().to_numpy()
     sma_c = df['Close'].rolling(window=window, min_periods=1).mean().to_numpy()
     
@@ -125,19 +85,6 @@ def apply_ohlc_transformation(df, mode=1):
         print(f"SYSTEM_WARNING | Mode {mode} unrecognized. Defaulting to Raw OHLC.")
     return df
 
-def write_matrix_to_parent_csv(df):
-    """Saves data into the parent directory using the script filename string"""
-    try:
-        script_directory = os.path.dirname(os.path.abspath(__file__))
-        parent_directory = os.path.dirname(script_directory)
-        base_name = os.path.splitext(os.path.basename(__file__))[0]
-        base_filename = base_name + ".csv"
-        target_export_path = os.path.join(parent_directory, base_filename)
-        df.to_csv(target_export_path, index=True)
-    except Exception as e:
-        print(f"CSV_EXPORT_ERROR | Write operation failure: {e}")
-
-# 🎯 FIXED SIGNATURE: Restored 'period' and 'interval' keywords to preserve master system dependencies
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
     """DYNAMIC HISTORICAL SLICE RETRIEVAL ENGINE WITH SIGNATURE BACKWARD-COMPATIBILITY"""
     ticker_obj = yf.Ticker(TICKER)
@@ -174,14 +121,10 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     else:
         df = df.tz_convert(TIMEZONE)
         
-    # JSON backup operation remains bound to active structure safely
-    dump_raw_json_in_window(ticker_obj, period="5d", interval=interval)
-        
     # Isolate exactly the final 60 rows for execution calculations
     df = df.tail(target_rows).copy()
     
     processed_df = apply_ohlc_transformation(df, mode=OHLC_MODE)
-    write_matrix_to_parent_csv(processed_df)
     return processed_df
 
 def get_latest_data():
@@ -194,4 +137,3 @@ if __name__ == "__main__":
     output_df = fetch_yf_data()
     if not output_df.empty:
         print(f"ENGINE_RUN_SUCCESS | Collected Rows Count: {len(output_df)}")
-        print(f"Processed Matrix Head:\n{output_df.head(2)}")
