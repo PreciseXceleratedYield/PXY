@@ -27,9 +27,10 @@ CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running c
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    PXY® Engine Strategy Matrix - Direct BUY/SELL and Macro Trend Tracker.
-    Maintains a full 5-day continuous stream buffer to prevent lookback starvation.
-    Accepts pre-transformed Heikin-Ashi data arrays directly to run trailing locks.
+    PXY® Engine Strategy Matrix - Decoupled Dual-Pipe Indicator Framework.
+    - Signal Pipe outputs: BUY / SELL / NONE
+    - Trend Pipe outputs : BUY / SELL / BULL / BEAR
+    Bypasses truncated upstream slices by fetching fresh day session histories.
     """ 
     # 🎯 OVERRIDE: Fetch a clean historical multi-day block straight from yfinance 
     try:
@@ -116,36 +117,46 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['bar_count_session'] = np.arange(1, n + 1)
     df['src_c'] = ha_close
     
-    # 5. CONSOLIDATED DIRECT SIGNAL MATRIX GENERATOR
+    # Code continues smoothly into Part 2...
+    # 5. DECOUPLED DUAL-PIPE CALCULATION CORE (ZERO MATRIX INTERACTION)
     st_signal_history = [] 
     st_trend_history = []
     
     for i in range(n): 
-        current_trend = "BULL" if trend_direction[i] == 1 else "BEAR"
-        st_trend_history.append(current_trend)
+        # Base trend identification holder
+        raw_regime = "BULL" if trend_direction[i] == 1 else "BEAR"
 
         if i < 1: 
-            st_signal_history.append(current_trend) 
+            st_signal_history.append("NONE") 
+            st_trend_history.append(raw_regime)
             continue 
 
-        # --- LAYER A: NATIVE SUPERTREND REGIME CROSSOVERS ---
+        # Structural Crossover Status Flags
         cross_buy  = (trend_direction[i] == 1)  and (trend_direction[i-1] == -1)
         cross_sell = (trend_direction[i] == -1) and (trend_direction[i-1] == 1)
         
-        # --- LAYER B: TREND-FOLLOWING CONTINUATION FLIPS ---
+        # Intrabar Candlestick Continuation Color Flips
         is_candle_green = ha_close[i] > ha_open[i]
         is_candle_red   = ha_close[i] < ha_open[i]
         
         run_up = (trend_direction[i] == 1)  and is_candle_green and (ha_close[i-1] <= ha_open[i-1])
         run_dn = (trend_direction[i] == -1) and is_candle_red   and (ha_close[i-1] >= ha_open[i-1])
 
-        # Standard direct trigger assignment
+        # 🎯 PIPE A: PURE TRIGGER-ONLY SIGNAL ENGINE (BUY / SELL / NONE)
         if cross_buy or run_up:
-            st_signal_history.append("BUY")   
+            st_signal_history.append("BUY")
         elif cross_sell or run_dn:
-            st_signal_history.append("SELL")  
+            st_signal_history.append("SELL")
         else:
-            st_signal_history.append(current_trend)  # Fallback: Represents current macro trend state
+            st_signal_history.append("NONE")  # No events = Strictly NONE
+
+        # 🎯 PIPE B: STRUCTURAL REGIME TREND ENGINE (BUY / SELL / BULL / BEAR)
+        if cross_buy:
+            st_trend_history.append("BUY")
+        elif cross_sell:
+            st_trend_history.append("SELL")
+        else:
+            st_trend_history.append(raw_regime)  # Running trend = BULL or BEAR
 
     df['st_signal_full'] = st_signal_history
     df['st_trend_full'] = st_trend_history
@@ -153,8 +164,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     # 🎯 DASHBOARD BACKWARD-COMPATIBILITY KEYS
     df['ST'] = df['pxy_st_line']
     df['ST_Trend'] = df['st_trend_full']
-    
-    # 🛠️ FIXED: Backward-compatibility key injected to stop syschrtpxy.py KeyError
     df['P_Master'] = df['src_c']
     
     return df
@@ -212,7 +221,6 @@ def get_signal(df: pd.DataFrame) -> tuple:
         return "NONE", "NONE"
 
 if __name__ == "__main__":
-    print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
+    print("\n[PXY STRND ENGINE] Standalone Isolated Dual-Pipe Listener Initiated.")
     dummy = pd.DataFrame()
     signal, trend = get_signal(dummy)
-
