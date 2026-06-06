@@ -1,98 +1,218 @@
-"""
-===============================================================================
-PXY OPTION ROUTING ENGINE: PURE MACRO TREND-BASED EXECUTION CORE
-===============================================================================
-Operational Rules:
-- EXIT signals originate strictly from sysmktpxy (exit_sig).
-- ENTRY signals originate strictly from sysstrndpxy.py 10:3 macro trend.
-- COMPRESSION FILTER: Converts entries STRICTLY based on the major trend line.
-  Completely ignores minor intrabar continuation flips (BUY/SELL on pullbacks).
-===============================================================================
-"""
-
+# sysstrndpxy.py
+import sys
+import numpy as np
 import pandas as pd
+import pytz
+import yfinance as yf
+import json
+import os
 from datetime import datetime
-from zoneinfo import ZoneInfo
-from syscnfgpxy import TICKER
 
-# Ingestion gateways from your exact strategy matrix modules
-from sysmktpxy import get_signal, CHECK_CONFIRMED_ONLY
-from sysstrndpxy import calculate_supertrend
+# 🛠️ GLOBAL PROJECT HOTPATCH: Overrides config objects at initialization to prevent yfinance/pytz crashes
+try:
+    import syscnfgpxy
+    if hasattr(syscnfgpxy, 'TIMEZONE'):
+        if hasattr(syscnfgpxy.TIMEZONE, 'zone'):
+            syscnfgpxy.TIMEZONE = str(syscnfgpxy.TIMEZONE.zone)
+        else:
+            syscnfgpxy.TIMEZONE = str(syscnfgpxy.TIMEZONE)
+except Exception:
+    pass
 
-def get_entry_signal(df=None):
-    # 1. Extract EXIT signal strictly from Priority 1 Engine (sysmktpxy)
-    _, exit_sig = get_signal(df)
-    exit_sig = str(exit_sig).upper().strip()
+from syscnfgpxy import TIMEZONE, TICKER
 
-    # 2. Extract ENTRY signals strictly from your upstream 10:3 Engine (sysstrndpxy)
-    strnd_df = calculate_supertrend(df=None)
+# Global Config 
+DEBUG_MODE = True 
+CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running candle (Index -1)
+
+def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
+    """ 
+    PXY® Engine Strategy Matrix - Direct BUY/SELL and Macro Trend Tracker.
+    Maintains a full 5-day continuous stream buffer to prevent lookback starvation.
+    Accepts pre-transformed Heikin-Ashi data arrays directly to run trailing locks.
+    """ 
+    # 🎯 OVERRIDE: Fetch a clean historical multi-day block straight from yfinance 
+    try:
+        ticker_obj = yf.Ticker(TICKER)
+        raw_df = ticker_obj.history(period="5d", interval="1m")
+        if not raw_df.empty:
+            df = raw_df
+    except Exception as e:
+        if DEBUG_MODE:
+            print(f"Warning: Independent yFinance download fallback active | {e}")
+
+    df = df.copy()
+
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
     
-    # We read the master 'st_trend_full' column to get the pure macro trend direction
-    strnd_trend = "NEUTRAL"
-
-    if strnd_df is not None and not strnd_df.empty:
-        idx = -2 if CHECK_CONFIRMED_ONLY else -1
-        try:
-            # Strictly look at the master trend line direction (BULL or BEAR)
-            strnd_trend = str(strnd_df.iloc[idx]['st_trend_full']).upper().strip()
-        except Exception:
-            pass
-
-    # 3. Establish Base Current Time in Indian Standard Time (IST)
-    tz_ist = ZoneInfo("Asia/Kolkata")
-    current_time_ist = datetime.now(tz_ist).time()
-
-    if strnd_df is not None and not strnd_df.empty:
-        try:
-            last_timestamp = strnd_df.index[-1]
-            if not isinstance(last_timestamp, pd.Timestamp):
-                last_timestamp = pd.to_datetime(last_timestamp)
-            current_time_ist = last_timestamp.astimezone(tz_ist).time() if last_timestamp.tzinfo is not None else last_timestamp.time()
-        except Exception:
-            pass
-
-    market_open = datetime.strptime("09:15", "%H:%M").time()
-    time_boundary = datetime.strptime("09:30", "%H:%M").time()
-
-    final_signal = "NONE"
-
-    # 4. IST TIME-BASED OPTIONS ROUTING ENGINE
-    if market_open <= current_time_ist < time_boundary:
-        # --- EARLY MORNING OPENING WINDOW: PURE RAW REVERSAL TO ATM ---
-        if exit_sig == "BUY":
-            final_signal = "ATMBUY"
-        elif exit_sig == "SELL":
-            final_signal = "ATMSELL"
-        else:
-            final_signal = "NONE"
+    tz_string = str(TIMEZONE)
+    if df.index.tz is None:
+        df = df.tz_localize('UTC').tz_convert(tz_string)
     else:
-        # --- STANDARD CONTINUOUS WINDOW: PURE TREND LINE EXECUTION ONLY ---
-        # Converts strictly based on the master macro trend line (BULL/BEAR)
-        if strnd_trend == "BULL":
-            final_signal = "ATMBUY"
-        elif strnd_trend == "BEAR":
-            final_signal = "ATMSELL"
+        df = df.tz_convert(tz_string)
+        
+    n = len(df)
+    if n == 0:
+        return df
+
+    # 2. EXTRACT PRE-TRANSFORMED DATA ARRAYS
+    ha_open  = df['Open'].to_numpy()
+    ha_high  = df['High'].to_numpy()
+    ha_low   = df['Low'].to_numpy()
+    ha_close = df['Close'].to_numpy()
+
+    # 3. NATIVE TRUE RANGE & SMOOTHED ATR ENGINE (10-PERIOD)
+    tr = np.zeros(n)
+    for i in range(n):
+        if i == 0:
+            tr[i] = ha_high[i] - ha_low[i]
         else:
-            final_signal = "NONE"
+            tr1 = ha_high[i] - ha_low[i]
+            tr2 = abs(ha_high[i] - ha_close[i-1])
+            tr3 = abs(ha_low[i] - ha_close[i-1])
+            tr[i] = max(tr1, tr2, tr3)
 
-    # 5. LATE OVERRIDE FALLBACK (Downstream pass-through safety handler)
-    if final_signal in ["NONE", "BULL", "BEAR"]:
-        if exit_sig == "BUY":
-            final_signal = "BUY"
-        elif exit_sig == "SELL":
-            final_signal = "SELL"
+    # Replicate TradingView's ta.rma exactly
+    atr = np.zeros(n)
+    atr_period = 10
+    atr_multiplier = 3.0
+    
+    if n >= atr_period:
+        # Seed the initial baseline window average
+        atr[atr_period - 1] = np.mean(tr[0:atr_period])
+        # Smooth remaining entries sequentially
+        for i in range(atr_period, n):
+            atr[i] = (tr[i] + (atr_period - 1) * atr[i-1]) / atr_period
+    else:
+        atr = tr.copy()
+
+    # 4. SUPERTREND TRAILING LOCK IMPLEMENTATION
+    hl2 = (ha_high + ha_low) / 2.0
+    up_band = hl2 - (atr_multiplier * atr)
+    dn_band = hl2 + (atr_multiplier * atr)
+
+    lower_band = np.zeros(n)
+    upper_band = np.zeros(n)
+    trend_direction = np.ones(n, dtype=int)  # 1 = BULL, -1 = BEAR
+
+    # Initialize entry coordinates
+    lower_band[0] = up_band[0]
+    upper_band[0] = dn_band[0]
+    trend_direction[0] = 1
+
+    for i in range(1, n):
+        lower_band[i] = max(up_band[i], lower_band[i-1]) if ha_close[i-1] > lower_band[i-1] else up_band[i]
+        upper_band[i] = min(dn_band[i], upper_band[i-1]) if ha_close[i-1] < upper_band[i-1] else dn_band[i]
+
+        if trend_direction[i-1] == 1:
+            trend_direction[i] = -1 if ha_close[i] < lower_band[i] else 1
         else:
-            final_signal = exit_sig
+            trend_direction[i] = 1 if ha_close[i] > upper_band[i] else -1
 
-    # 6. OPTIMIZED TELEMETRY ALERT ENGINE
-    if final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]:
-        print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION-{final_signal} 🔥 ".center(40))
+    supertrend_line = np.where(trend_direction == 1, lower_band, upper_band)
+    
+    df['pxy_st_line'] = supertrend_line
+    df['bar_count_session'] = np.arange(1, n + 1)
+    df['src_c'] = ha_close
+    
+    # 5. CONSOLIDATED DIRECT SIGNAL MATRIX GENERATOR
+    st_signal_history = [] 
+    st_trend_history = []
+    
+    for i in range(n): 
+        current_trend = "BULL" if trend_direction[i] == 1 else "BEAR"
+        st_trend_history.append(current_trend)
 
-    return final_signal, exit_sig
+        if i < 1: 
+            st_signal_history.append(current_trend) 
+            continue 
+
+        # --- LAYER A: NATIVE SUPERTREND REGIME CROSSOVERS ---
+        cross_buy  = (trend_direction[i] == 1)  and (trend_direction[i-1] == -1)
+        cross_sell = (trend_direction[i] == -1) and (trend_direction[i-1] == 1)
+        
+        # --- LAYER B: TREND-FOLLOWING CONTINUATION FLIPS ---
+        is_candle_green = ha_close[i] > ha_open[i]
+        is_candle_red   = ha_close[i] < ha_open[i]
+        
+        run_up = (trend_direction[i] == 1)  and is_candle_green and (ha_close[i-1] <= ha_open[i-1])
+        run_dn = (trend_direction[i] == -1) and is_candle_red   and (ha_close[i-1] >= ha_open[i-1])
+
+        # Standard direct trigger assignment
+        if cross_buy or run_up:
+            st_signal_history.append("BUY")   
+        elif cross_sell or run_dn:
+            st_signal_history.append("SELL")  
+        else:
+            st_signal_history.append(current_trend)  # Fallback: Represents current macro trend state
+
+    df['st_signal_full'] = st_signal_history
+    df['st_trend_full'] = st_trend_history
+    
+    # 🎯 DASHBOARD BACKWARD-COMPATIBILITY KEYS
+    df['ST'] = df['pxy_st_line']
+    df['ST_Trend'] = df['st_trend_full']
+    
+    # 🛠️ FIXED: Backward-compatibility key injected to stop syschrtpxy.py KeyError
+    df['P_Master'] = df['src_c']
+    
+    return df
+
+def export_supertrend_json(output_file="../syschrtpxy.json"):
+    """Dumps EVERY single candle printed since today's opening bell straight to the JSON file."""
+    dummy_df = pd.DataFrame()
+    df = calculate_supertrend(dummy_df)
+    
+    if df is None or df.empty:
+        return None
+
+    output = []
+    for idx, row in df.iterrows():
+        output.append({
+            "time": str(idx),
+            "close": float(row["Close"]),
+            "p_master": float(row["Close"]),  
+            "st": float(row["ST"]),           
+            "st_trend": str(row["ST_Trend"])  
+        })
+
+    os.makedirs(os.path.dirname(output_file), exist_ok=True) if os.path.dirname(output_file) else None
+    with open(output_file, "w") as f:
+        json.dump(output, f, indent=2)
+    return output
+
+def get_signal(df: pd.DataFrame) -> tuple:
+    """Direct array slice endpoint collector matching checkout preferences."""
+    if df is None or df.empty:
+        df = pd.DataFrame()
+        
+    try:
+        calculated_df = calculate_supertrend(df)
+        n = len(calculated_df)
+        if n == 0:
+            return "NONE", "NONE"
+        
+        idx = n - 2 if CHECK_CONFIRMED_ONLY else n - 1  
+
+        active_signal = str(calculated_df.at[calculated_df.index[idx], 'st_signal_full']).upper().strip()
+        active_trend  = str(calculated_df.at[calculated_df.index[idx], 'st_trend_full']).upper().strip()
+        
+        if DEBUG_MODE:
+            print(f"--- PXY STRATEGY EVALUATION SUMMARY ---")
+            print(f"Target Row Lookup Index   -> {idx}")
+            print(f"Active Live Market SIGNAL  -> {active_signal}")
+            print(f"Active Live Market TREND   -> {active_trend}\n")
+            
+        return active_signal, active_trend
+        
+    except Exception as e:
+        if DEBUG_MODE:
+            print(f"PXY Master Output Routing Module Exception: {e}")
+        return "NONE", "NONE"
 
 if __name__ == "__main__":
-    print("\n[PXY ROUTER STATUS] Pure Trend-Based Option Route Matrix Active.")
-    print("-" * 50)
-    final_route, raw_exit = get_entry_signal(df=None)
-    print("-" * 50)
-    print(f"FINAL DECISION >> ROUTE STATUS: {final_route} | RAW EXIT FROM MKT: {raw_exit}")
+    print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
+    dummy = pd.DataFrame()
+    signal, trend = get_signal(dummy)
+
