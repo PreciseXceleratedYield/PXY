@@ -95,9 +95,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     upper_band = np.zeros(n)
     trend_direction = np.ones(n, dtype=int)  # 1 = BULL, -1 = BEAR
 
-    lower_band = up_band
-    upper_band = dn_band
-    trend_direction = 1
+    # ✅ FIXED: Initialized cleanly across arrays without overwriting trend_direction structure
+    lower_band[0] = up_band[0]
+    upper_band[0] = dn_band[0]
+    trend_direction[0] = 1
 
     for i in range(1, n):
         lower_band[i] = max(up_band[i], lower_band[i-1]) if ha_close[i-1] > lower_band[i-1] else up_band[i]
@@ -115,6 +116,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['src_c'] = ha_close
     
     # Code continues smoothly into Part 2...
+
+
     # 5. ZERO-INTERACTION ISOLATED PIPELINE GENERATION LOOP
     st_signal_history = [] 
     st_trend_history = []
