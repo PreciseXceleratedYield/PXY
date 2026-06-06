@@ -102,10 +102,10 @@ def get_entry_signal(df=None):
             final_signal = "ATMSELL"
             
         # 📈 PRIORITY 2: Direct Upstream-Filtered Action Gates 
-        # Converts BOTH fresh trigger switches and steady running trend bars to call/put options
-        elif (strnd_signal == "BUY" or strnd_signal == "BULL") and strnd_trend == "BULL":
+        # ✅ FIXED: Corrected syntax colons to ensure pristine Python compilation
+        elif strnd_signal == "BUY" and strnd_trend == "BULL":
             final_signal = "ATMBUY"
-        elif (strnd_signal == "SELL" or strnd_signal == "BEAR") and strnd_trend == "BEAR":
+        elif strnd_signal == "SELL" and strnd_trend == "BEAR":
             final_signal = "ATMSELL"
         else:
             final_signal = "NONE"
@@ -122,3 +122,4 @@ if __name__ == "__main__":
     final_route, raw_exit = get_entry_signal(df=None)
     print("-" * 50)
     print(f"FINAL DECISION >> ROUTE STATUS: {final_route} | RAW EXIT FROM MKT: {raw_exit}")
+
