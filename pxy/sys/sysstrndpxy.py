@@ -27,10 +27,10 @@ CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running c
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    PXY® Engine Strategy Matrix - Decoupled Dual-Pipe Indicator Framework.
-    - Signal Pipe outputs: BUY / SELL / NONE
-    - Trend Pipe outputs : BUY / SELL / BULL / BEAR
-    Bypasses truncated upstream slices by fetching fresh day session histories.
+    PXY® Engine Strategy Matrix - Pure Zero-Interaction Dual-Pipe Indicator Framework.
+    - Pipe A (Signal): BUY / SELL / NONE
+    - Pipe B (Trend) : BUY / SELL / BULL / BEAR
+    Maintains a full 5-day continuous stream buffer to prevent lookback starvation.
     """ 
     # 🎯 OVERRIDE: Fetch a clean historical multi-day block straight from yfinance 
     try:
@@ -80,9 +80,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     atr_multiplier = 3.0
     
     if n >= atr_period:
-        # Seed the initial baseline window average
         atr[atr_period - 1] = np.mean(tr[0:atr_period])
-        # Smooth remaining entries sequentially
         for i in range(atr_period, n):
             atr[i] = (tr[i] + (atr_period - 1) * atr[i-1]) / atr_period
     else:
@@ -97,10 +95,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     upper_band = np.zeros(n)
     trend_direction = np.ones(n, dtype=int)  # 1 = BULL, -1 = BEAR
 
-    # Initialize entry coordinates
-    lower_band[0] = up_band[0]
-    upper_band[0] = dn_band[0]
-    trend_direction[0] = 1
+    lower_band = up_band
+    upper_band = dn_band
+    trend_direction = 1
 
     for i in range(1, n):
         lower_band[i] = max(up_band[i], lower_band[i-1]) if ha_close[i-1] > lower_band[i-1] else up_band[i]
@@ -118,12 +115,12 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['src_c'] = ha_close
     
     # Code continues smoothly into Part 2...
-    # 5. DECOUPLED DUAL-PIPE CALCULATION CORE (ZERO MATRIX INTERACTION)
+    # 5. ZERO-INTERACTION ISOLATED PIPELINE GENERATION LOOP
     st_signal_history = [] 
     st_trend_history = []
     
     for i in range(n): 
-        # Base trend identification holder
+        # Base status parameter references
         raw_regime = "BULL" if trend_direction[i] == 1 else "BEAR"
 
         if i < 1: 
@@ -142,21 +139,23 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         run_up = (trend_direction[i] == 1)  and is_candle_green and (ha_close[i-1] <= ha_open[i-1])
         run_dn = (trend_direction[i] == -1) and is_candle_red   and (ha_close[i-1] >= ha_open[i-1])
 
-        # 🎯 PIPE A: PURE TRIGGER-ONLY SIGNAL ENGINE (BUY / SELL / NONE)
+        # 🎯 PIPE A: PURE SIGNAL ENGINE (BUY / SELL / NONE)
+        # Evaluates strictly point-in-time micro-events. No trend bleed-through.
         if cross_buy or run_up:
             st_signal_history.append("BUY")
         elif cross_sell or run_dn:
             st_signal_history.append("SELL")
         else:
-            st_signal_history.append("NONE")  # No events = Strictly NONE
+            st_signal_history.append("NONE")
 
-        # 🎯 PIPE B: STRUCTURAL REGIME TREND ENGINE (BUY / SELL / BULL / BEAR)
+        # 🎯 PIPE B: PURE TREND ENGINE (BUY / SELL / BULL / BEAR)
+        # Evaluates strictly macro crossovers and holding states. No candle flip bleed-through.
         if cross_buy:
             st_trend_history.append("BUY")
         elif cross_sell:
             st_trend_history.append("SELL")
         else:
-            st_trend_history.append(raw_regime)  # Running trend = BULL or BEAR
+            st_trend_history.append(raw_regime)
 
     df['st_signal_full'] = st_signal_history
     df['st_trend_full'] = st_trend_history
@@ -224,3 +223,4 @@ if __name__ == "__main__":
     print("\n[PXY STRND ENGINE] Standalone Isolated Dual-Pipe Listener Initiated.")
     dummy = pd.DataFrame()
     signal, trend = get_signal(dummy)
+
