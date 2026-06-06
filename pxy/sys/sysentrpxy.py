@@ -1,14 +1,12 @@
 """
 ===============================================================================
-PXY OPTION ROUTING ENGINE: HIGH-VELOCITY STRUCTURAL BREAKOUT PRIORITY
+PXY OPTION ROUTING ENGINE: HIGH-VELOCITY UPSTREAM-FILTERED ENGINE (REPAIRED)
 ===============================================================================
 Operational Rules:
 - EXIT signals originate strictly from sysmktpxy (exit_sig).
 - ENTRY Layer A (👑 PRIORITY 1): Pure structural breakout from sysbbospxy (bos_signal).
-  If a 42-minute high/low floor is broken, it takes immediate ATM placement.
-- ENTRY Layer B (📈 PRIORITY 2): Trend Breakouts requiring strict 'and' harmony.
-  Fires strictly when a fresh trigger AND the macro trend are in absolute agreement.
-- NO OVERRIDES: Section 5 has been completely stripped out to enforce pure pipe logic.
+- ENTRY Layer B (📈 PRIORITY 2): Trend-following option contract assignment.
+  Converts BOTH fresh breakout triggers and established trend states to trades.
 ===============================================================================
 """
 
@@ -23,18 +21,37 @@ from sysstrndpxy import calculate_supertrend
 from sysbbospxy import get_bos_bar  # Ingesting your 42-min structural breakout engine
 
 def get_entry_signal(df=None):
-    # 1. Extract EXIT signal strictly from Priority 1 Engine (sysmktpxy)
-    _, exit_sig = get_signal(df)
+    """
+    Master Router. Extracts metrics from a single continuous historical data layer
+    to completely prevent index mismatches and lookback starvation crashes.
+    """
+    # 1. DATA SYNCHRONIZATION AND MULTI-INDEX HEADER FLATTENING
+    # If no data frame is passed from the master scheduler loop, seed an active container
+    if df is None or df.empty:
+        import yfinance as yf
+        ticker_obj = yf.Ticker(TICKER)
+        df = ticker_obj.history(period="5d", interval="1m")
+        
+    if df.empty:
+        return "NONE", "NONE"
+        
+    master_df = df.copy()
+    
+    # Clean up multi-index column structures safely to avoid quiet KeyError failures
+    if isinstance(master_df.columns, pd.MultiIndex):
+        master_df.columns = master_df.columns.get_level_values(0)
+
+    # 2. SEGREGATED INGESTION FLOW VIA INDEPENDENT PIPES
+    # Extract EXIT signal strictly from Priority 1 Engine (sysmktpxy)
+    _, exit_sig = get_signal(master_df)
     exit_sig = str(exit_sig).upper().strip()
 
-    # 2. Extract ENTRY signals strictly from your upstream strategy files
-    # --- LAYER A: Query sysbbospxy for immediate high-volume structural breakouts ---
-    dummy_df = pd.DataFrame() if df is None else df.copy()
-    _, bos_signal = get_bos_bar(dummy_df)
+    # Extract ENTRY Layer A: Pure 42-minute high/low structural breakouts
+    _, bos_signal = get_bos_bar(master_df)
     bos_signal = str(bos_signal).upper().strip()
 
-    # --- LAYER B: Query your upstream 10:3 Engine (sysstrndpxy) ---
-    strnd_df = calculate_supertrend(df=None)
+    # Extract ENTRY Layer B: Native 10:3 trailing band vectors
+    strnd_df = calculate_supertrend(master_df)
     
     strnd_signal = "NONE"
     strnd_trend = "NEUTRAL"
@@ -42,7 +59,7 @@ def get_entry_signal(df=None):
     if strnd_df is not None and not strnd_df.empty:
         idx = -2 if CHECK_CONFIRMED_ONLY else -1
         try:
-            # Extract both metrics simultaneously from database columns
+            # Successfully extracting BOTH metrics simultaneously from synchronized arrays
             strnd_signal = str(strnd_df.iloc[idx]['st_signal_full']).upper().strip()
             strnd_trend  = str(strnd_df.iloc[idx]['st_trend_full']).upper().strip()
         except Exception:
@@ -85,15 +102,15 @@ def get_entry_signal(df=None):
             final_signal = "ATMSELL"
             
         # 📈 PRIORITY 2: Direct Upstream-Filtered Action Gates 
-        # Evaluates strict point-in-time trigger AND master macro trend
-        elif strnd_signal == "BUY" and strnd_trend == "BULL":
+        # Converts BOTH fresh trigger switches and steady running trend bars to call/put options
+        elif (strnd_signal == "BUY" or strnd_signal == "BULL") and strnd_trend == "BULL":
             final_signal = "ATMBUY"
-        elif strnd_signal == "SELL" and strnd_trend == "BEAR":
+        elif (strnd_signal == "SELL" or strnd_signal == "BEAR") and strnd_trend == "BEAR":
             final_signal = "ATMSELL"
         else:
             final_signal = "NONE"
 
-    # 6. OPTIMIZED TELEMETRY ALERT ENGINE
+    # 5. OPTIMIZED TELEMETRY ALERT ENGINE
     if final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]:
         print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION-{final_signal} 🔥 ".center(40))
 
