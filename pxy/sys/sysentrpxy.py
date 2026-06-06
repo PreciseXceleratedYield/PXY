@@ -69,9 +69,9 @@ def get_entry_signal(df=None):
     else:
         # --- STANDARD CONTINUOUS WINDOW: DOUBLE-LOCK SYNERGY GATES ---
         # Converts triggers to option routing strictly under trend alignment agreement
-        if (strnd_signal == "BUY" or strnd_signal == "BULL") and strnd_trend == "BULL":
+        if (strnd_signal == "BUY" or strnd_signal == "BULL":
             final_signal = "ATMBUY"
-        elif (strnd_signal == "SELL" or strnd_signal == "BEAR") and strnd_trend == "BEAR":
+        elif (strnd_signal == "SELL" or strnd_signal == "BEAR"):
             final_signal = "ATMSELL"
         else:
             final_signal = "NONE"
