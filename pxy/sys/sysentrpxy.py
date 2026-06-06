@@ -27,7 +27,7 @@ from sysbbospxy import get_bos_bar  # Ingesting your 42-min structural breakout 
 # 🛠️ GLOBAL DEBUGGING SWITCH
 # True = Output full, deep multi-layered telemetry logs
 # False = Silence dashboard chatter completely, only log final actions/errors
-DEBUG_MODE = True
+DEBUG_MODE = False
 
 def get_entry_signal(df=None):
     """
