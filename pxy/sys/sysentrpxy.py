@@ -66,9 +66,9 @@ def get_entry_signal(df=None):
     else:
         # --- STANDARD CONTINUOUS WINDOW: DIRECT TRIGGER OPTIONS PLACEMENT ---
         # Fixed logic gate: Converts BOTH explicit entry breakouts and running macro trends to option paths
-        if strnd_signal == "BUY" or strnd_signal == "BULL":
+        if strnd_signal == "BUY" and strnd_signal == "BULL":
             final_signal = "ATMBUY"
-        elif strnd_signal == "SELL" or strnd_signal == "BEAR":
+        elif strnd_signal == "SELL" and strnd_signal == "BEAR":
             final_signal = "ATMSELL"
         else:
             final_signal = "NONE"
