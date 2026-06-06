@@ -1,3 +1,4 @@
+# sysstrndpxy.py
 import sys
 import numpy as np
 import pandas as pd
@@ -17,7 +18,7 @@ from syscnfgpxy import TIMEZONE, TICKER
 
 # Global Config 
 DEBUG_MODE = False 
-CHECK_CONFIRMED_ONLY = True  # ⚡ False = Process and trade the LIVE running candle (Index -1)
+CHECK_CONFIRMED_ONLY = True  # ⚡ True = Target the closed candle index (-2) | False = Target live running index (-1)
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
