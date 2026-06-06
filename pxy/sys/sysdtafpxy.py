@@ -14,7 +14,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # Track if raw dump has run for this session
 _RAW_DUMP_DONE = False
 
-def dump_raw_json_in_window(ticker_obj, period="5d", interval="1m"):
+def dump_raw_json_in_window(ticker_obj, period="1d", interval="1m"):
     """Dumps raw JSON converted to IST to parent directory if within the overnight time window."""
     global _RAW_DUMP_DONE
     if _RAW_DUMP_DONE:
