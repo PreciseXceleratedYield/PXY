@@ -17,7 +17,7 @@ from syscnfgpxy import TIMEZONE, TICKER
 
 # Global Config 
 DEBUG_MODE = False 
-CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running candle (Index -1)
+CHECK_CONFIRMED_ONLY = True  # ⚡ False = Process and trade the LIVE running candle (Index -1)
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
