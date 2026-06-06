@@ -1,6 +1,6 @@
 """
 ===============================================================================
-PXY OPTION ROUTING ENGINE: DIRECT UPSTREAM-FILTERED TRIGGER CORE
+PXY OPTION ROUTING ENGINE: DIRECT UPSTREAM-FILTERED CORE
 ===============================================================================
 Operational Rules:
 - EXIT signals originate strictly from sysmktpxy (exit_sig).
@@ -24,17 +24,15 @@ def get_entry_signal(df=None):
     _, exit_sig = get_signal(df)
     exit_sig = str(exit_sig).upper().strip()
 
-    # 2. Extract ENTRY signals strictly from your upstream filtered 10:3 Engine (sysstrndpxy)
+    # 2. Extract ENTRY signals strictly from your upstream 10:3 Engine (sysstrndpxy)
     strnd_df = calculate_supertrend(df=None)
     strnd_signal = "NONE"
 
     if strnd_df is not None and not strnd_df.empty:
         idx = -2 if CHECK_CONFIRMED_ONLY else -1
         try:
-            # Captures the pre-filtered direct execution string ('BUY' or 'SELL')
-            raw_strnd = str(strnd_df.iloc[idx]['st_signal_full']).upper().strip()
-            if raw_strnd in ["BUY", "SELL"]:
-                strnd_signal = raw_strnd
+            # Captures the full unfiltered signal array ('BUY', 'SELL', 'BULL', 'BEAR', or 'NONE')
+            strnd_signal = str(strnd_df.iloc[idx]['st_signal_full']).upper().strip()
         except Exception:
             pass
 
@@ -66,10 +64,11 @@ def get_entry_signal(df=None):
         else:
             final_signal = "NONE"
     else:
-        # --- STANDARD CONTINUOUS WINDOW: DIRECT TRIGGER OPTIONS PLACEMENT ---
-        if strnd_signal == "BUY":
+        # --- STANDARD CONTINUOUS WINDOW: MULTI-STATE OPTIONS PLACEMENT ---
+        # Fixed logic gate: Evaluates both trigger events and running trend strings cleanly
+        if strnd_signal == "BUY" or strnd_signal == "BULL":
             final_signal = "ATMBUY"
-        elif strnd_signal == "SELL":
+        elif strnd_signal == "SELL" or strnd_signal == "BEAR":
             final_signal = "ATMSELL"
         else:
             final_signal = "NONE"
@@ -96,4 +95,3 @@ if __name__ == "__main__":
     final_route, raw_exit = get_entry_signal(df=None)
     print("-" * 50)
     print(f"FINAL DECISION >> ROUTE STATUS: {final_route} | RAW EXIT FROM MKT: {raw_exit}")
-
