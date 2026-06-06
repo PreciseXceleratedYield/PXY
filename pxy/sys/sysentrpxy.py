@@ -4,11 +4,12 @@ PXY OPTION ROUTING ENGINE: SUPERTREND CROSSOVER ABSOLUTE PRIORITY
 ===============================================================================
 Operational Rules:
 - EXIT signals originate strictly from sysmktpxy (exit_sig).
-- ENTRY Layer A (👑 PRIORITY 1): Pure 10:3 Supertrend Crossover Line Switches.
+- ENTRY Layer A (👑 PRIORITY 1): Pure 3:3 Supertrend Crossover Line Switches.
   Fires instantly when 'strnd_trend' hits 'BUY' or 'SELL', overruling all loops.
 - ENTRY Layer B (⚡ PRIORITY 2): Pure structural breakouts from sysbbospxy (bos_signal).
 - ENTRY Layer C (📈 PRIORITY 3): Trend-following option contract assignment.
   Converts running trend placeholder values ('BULL' or 'BEAR') to trades.
+  Enforces your custom 'or exit_sig' condition check for fast candle momentum triggers.
 ===============================================================================
 """
 
@@ -66,7 +67,7 @@ def get_entry_signal(df=None):
         print(f"  ❌ ERROR inside sysbbospxy pipeline: {e}")
         bos_signal = "NONE"
 
-    print("📊 Evaluating sysstrndpxy 10:3 supertrend matrices...")
+    print("📊 Evaluating sysstrndpxy 3:3 supertrend matrices...")
     strnd_df = calculate_supertrend(master_df)
     
     strnd_signal = "NONE"
@@ -122,7 +123,7 @@ def get_entry_signal(df=None):
         print("🏙️ CURRENT TIMING STATE: Standard Continuous continuous window logic active.")
         print(f"🛡️ STEP 1: Testing Priority 1 Supertrend Crossovers (strnd_trend == '{strnd_trend}')...")
         
-        # 👑 👑 👑 PRIORITY 1: 10:3 Native Supertrend Crossovers (BUY / SELL) OVERRULE EVERYTHING
+        # 👑 👑 👑 PRIORITY 1: Native 3:3 Supertrend Crossovers (BUY / SELL) OVERRULE EVERYTHING
         if strnd_trend == "BUY":
             print("  🏆 PRIORITY 1 UNLOCKED: Absolute Supertrend Bullish Crossover confirmed.")
             final_signal = "ATMBUY"
@@ -144,11 +145,11 @@ def get_entry_signal(df=None):
             else:
                 print(f"    ↳ Priority 2 is 'NONE'. Falling to Step 3: Testing Priority 3 (signal='{strnd_signal}', trend='{strnd_trend}')...")
                 
-                # Check for strict point-in-time signal matching trend direction parameters
-                if strnd_signal == "BUY" and strnd_trend == "BULL":
+                # Check for strict point-in-time signal matching trend direction parameters (UNTOUCHED UNIFIED LOGIC)
+                if (strnd_signal == "BUY" or exit_sig == "BUY") and strnd_trend == "BULL":
                     print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
                     final_signal = "ATMBUY"
-                elif strnd_signal == "SELL" and strnd_trend == "BEAR":
+                elif (strnd_signal == "SELL" or exit_sig == "SELL") and strnd_trend == "BEAR":
                     print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
                     final_signal = "ATMSELL"
                 else:
