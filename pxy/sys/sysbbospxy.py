@@ -6,7 +6,6 @@ import numpy as np
 init(autoreset=True)
 WIDTH = 42
 
-# ---------------- DETERMINISTIC VISUAL ENGINE (MODIFIED FOR WICK CHAR) ----------------
 def build_candle_bar(o, h, l, c, width=WIDTH):
     o, h, l, c = map(float, (o, h, l, c))
     rng = h - l
@@ -24,36 +23,38 @@ def build_candle_bar(o, h, l, c, width=WIDTH):
         lower_len = width - body_len
     upper_len = width - lower_len - body_len
     bar = ""
-    # lower wick (Using ━)
     bar += Fore.LIGHTBLACK_EX + "━" * lower_len
-    # body (Using █)
     if c > o:
         bar += Fore.GREEN + "█" * body_len
     elif o > c:
         bar += Fore.RED + "█" * body_len
     else:
         bar += Fore.YELLOW + "█" * body_len
-    # upper wick (Using ━)
     bar += Fore.LIGHTBLACK_EX + "━" * upper_len
     return bar + Style.RESET_ALL
 
-# ---------------- 42-MIN ROLLING API (SIGNAL POSITION CONVERSION) ----------------
 def get_bos_bar(df):
     try:
         if df is None or len(df) < 42:
             return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
             
-        # 1. Capture Cumulative 42-minute boundaries
-        window = df.iloc[-42:]
-        h_42 = float(window['High'].max())
-        l_42 = float(window['Low'].min())
-        c_42 = float(window.iloc[-1]['Close'])  # Live current close price
+        # 1. Isolate the previous 41 candles to lock true historic walls
+        historic_window = df.iloc[-42:-1]
+        h_42 = float(historic_window['High'].max())
+        l_42 = float(historic_window['Low'].min())
         
-        # Override the first open with the true High-Low window midpoint
-        o_42 = (h_42 + l_42) / 2.0
+        # Capture separate live running candle values for real-time intersection testing
+        live_candle = df.iloc[-1]
+        c_42 = float(live_candle['Close'])
+        h_live = float(live_candle['High'])
+        l_live = float(live_candle['Low'])
+        
+        # 2. Synchronize visual rendering inputs to absorb complete 42-period bounds smoothly
+        h_render = max(h_42, h_live)
+        l_render = min(l_42, l_live)
+        o_42 = (h_render + l_render) / 2.0
         
         # ⚡ PURE STRUCTURAL BREAKOUT LOGIC GATES
-        # Evaluates the live close price against the structural high/low walls of the 42-bar zone
         signal = "NONE"
         if c_42 > h_42:
             signal = "BUY"
@@ -62,19 +63,19 @@ def get_bos_bar(df):
             signal = "SELL"
             print(f"🔴 {Fore.RED}STRUCTURAL BREAKDOWN: Price {c_42:.2f} Smashed Range Low {l_42:.2f}")
         
-        # 2. Build the visual bar using modified midpoint open parameters
-        visual_bar = build_candle_bar(o_42, h_42, l_42, c_42)
+        # Build the visual bar using corrected midpoint open parameters
+        visual_bar = build_candle_bar(o_42, h_render, l_render, c_42)
         
-        # 3. Calculate 42-Period Simple Moving Average on Close Prices
-        sma_42 = float(window['Close'].mean())
+        # 3. Calculate 42-Period Simple Moving Average on full slice Close Prices
+        full_window = df.iloc[-42:]
+        sma_42 = float(full_window['Close'].mean())
         
-        # 4. Pure 50/50 split midpoint engine calculation (Preserved in df metadata if needed)
+        # 4. Pure 50/50 split midpoint engine calculation
         bos_value = (sma_42 + c_42) / 2.0
         if not hasattr(df, 'attrs'):
             df.attrs = {}
         df.attrs['bos_numeric_value'] = f"{bos_value:.2f}"
         
-        # ✅ EXACT EXPECTED UNPACK: Returns visual bar and structural breakout signal string
         return visual_bar, signal
         
     except Exception:
