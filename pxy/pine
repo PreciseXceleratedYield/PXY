@@ -1,98 +1,61 @@
 //@version=5
-indicator("PXY Production Options Router (AB/AS/OB/OS/CB/CS Sync)", overlay=true)
+indicator("Supertrend 10:3 & Trend Following Flips", overlay=true, precision=2)
 
-// Lock calculations strictly to the 1-minute chart
-is_1min = timeframe.isminutes and timeframe.multiplier == 1
+// --- INPUTS ---
+atrPeriod = input.int(10, title="ATR Length")
+atrMult   = input.float(3.0, title="ATR Multiplier")
 
-// --- 1. FETCH AND CALCULATE TRUE HEIKIN-ASHI VALUES ---
-ha_ticker = ticker.heikinashi(syminfo.tickerid)
-ha_open   = request.security(ha_ticker, timeframe.period, open)
-ha_high   = request.security(ha_ticker, timeframe.period, high)
-ha_low    = request.security(ha_ticker, timeframe.period, low)
-ha_close  = request.security(ha_ticker, timeframe.period, close)
+// --- NATIVE ATR GENERATION & BAND MATRICES ---
+atrValue = ta.atr(atrPeriod)
+float upBand = hl2 - (atrMult * atrValue)
+float dnBand = hl2 + (atrMult * atrValue)
 
-// Define the live HA price source: (HA High + HA Low) / 2
-ha_live_source = (ha_high + ha_low) / 2.0
+// --- MEMORY HOLDERS ---
+var float lowerBand = 0.0
+var float upperBand = 0.0
+var int trendDirection = 1
 
-// --- 2. THE MASTER BASELINE & MACRO TREND ---
-tsma_380 = ta.linreg(ha_live_source, 380, 0)
-blended_line = is_1min ? (tsma_380 + ha_live_source) / 2.0 : na
+// --- STRUCTURAL SUPERTREND LINE LOCKS ---
+lowerBand := (close[1] > lowerBand[1]) ? math.max(upBand, lowerBand[1]) : upBand
+upperBand := (close[1] < upperBand[1]) ? math.min(dnBand, upperBand[1]) : dnBand
 
-// Define Macro Trend based on baseline position
-macro_trend_bull = ha_close >= blended_line
-macro_trend_bear = ha_close < blended_line
+// --- REGIME SHIFT GATES ---
+if close > upperBand[1]
+    trendDirection := 1
+else if close < lowerBand[1]
+    trendDirection := -1
 
-// Explicit Crossover Signals (Priority 1 Breakouts)
-has_cross_buy  = ta.crossover(ha_close, blended_line)
-has_cross_sell = ta.crossunder(ha_close, blended_line)
+float superTrendPlot = trendDirection == 1 ? lowerBand : upperBand
 
-// --- 3. HEIKIN-ASHI CANDLE FLIPS (EXIT_SIG) ---
-ha_is_green = ha_close >= ha_open
-ha_is_red   = ha_close < ha_open
+// --- VISUAL RENDERING ---
+color trendColor = trendDirection == 1 ? color.green : color.red
+plot(superTrendPlot, title="Supertrend Line", color=trendColor, linewidth=2)
 
-// Detect color switches (flips) from previous candle
-exit_buy  = ha_is_green and not ha_is_green[1]
-exit_sell = ha_is_red and not ha_is_red[1]
+// --- SIGNAL STATE TRACKING ---
+// 1. Major Trend Crossover Switches
+bool crossBuy  = (trendDirection == 1) and (trendDirection[1] == -1)
+bool crossSell = (trendDirection == -1) and (trendDirection[1] == 1)
 
-// --- 4. IST TIME WINDOW CONTROLS ---
-// Window A: Early Morning Opening (09:15 AM to 09:30 AM IST)
-in_early_window = not na(time(timeframe.period, "0915-0930:23456"))
+// 2. Trend Following Continuation Flips (Trigger-Only on candle body flip)
+bool isGreenCandle = close > open
+bool isRedCandle   = close < open
 
-// Window B: Standard Continuous Market Session (09:30 AM to 03:40 PM IST)
-in_standard_window = not na(time(timeframe.period, "0930-1540:23456"))
+// RUN_UP: Master trend is already green, and the candle body just flipped from Red to Green
+bool runUp = (trendDirection == 1) and isGreenCandle and (close[1] <= open[1])
+// RUN_DN: Master trend is already red, and the candle body just flipped from Green to Red
+bool runDn = (trendDirection == -1) and isRedCandle and (close[1] >= open[1])
 
-// --- 5. EXECUTION ROUTING LOGIC ENGINE ---
-string final_context = "NONE"
+// --- SHAPE ALERTS CONFIGURATION ---
+// Major Trend Changes (Large triangles with labels)
+plotshape(crossBuy,  title="CROSSBUY Switch",  style=shape.triangleup,   location=location.belowbar, color=color.green, size=size.normal, text="CROSS BUY", textcolor=color.green)
+plotshape(crossSell, title="CROSSSELL Switch", style=shape.triangledown, location=location.abovebar, color=color.red,   size=size.normal, text="CROSS SELL", textcolor=color.red)
 
-if is_1min
-    if in_early_window
-        // --- EARLY MORNING WINDOW: PURE REVERSALS TO ATM ---
-        if exit_buy
-            final_context := "AB"
-        if exit_sell
-            final_context := "AS"
-            
-    else if in_standard_window
-        // --- STANDARD CONTINUOUS WINDOW: PRIORITY FILTER ENGINE ---
-        if has_cross_buy
-            final_context := "CB"
-        else if has_cross_sell
-            final_context := "CS"
-        else if macro_trend_bull and exit_buy
-            final_context := "AB"
-        else if macro_trend_bear and exit_sell
-            final_context := "AS"
-        else if macro_trend_bull and exit_sell
-            final_context := "OS"
-        else if macro_trend_bear and exit_buy
-            final_context := "OB"
+// Running Continuation Signals (Small micro arrows directly inside bars)
+plotshape(runUp and not crossBuy,   title="RUNNING UP Flip",   style=shape.triangleup,   location=location.belowbar, color=color.teal, size=size.small)
+plotshape(runDn and not crossSell,  title="RUNNING DOWN Flip", style=shape.triangledown, location=location.abovebar, color=color.orange, size=size.small)
 
-// --- 6. PLOT VISUALS & LABEL EXECUTION ---
-// Plot custom smooth Heikin-Ashi candles
-ha_color = ha_is_green ? color.green : color.red
-plotcandle(ha_open, ha_high, ha_low, ha_close, title="HA Candles", color=ha_color, wickcolor=ha_color, bordercolor=ha_color)
-
-// Plot the single master baseline trend layer
-plot(blended_line, title="HA Master Baseline", color=color.purple, linewidth=3)
-
-// Filter for state transitions to plot text tokens cleanly when context switches
-var string last_context = "NONE"
-is_new_signal = final_context != "NONE" and final_context != last_context
-if final_context != "NONE"
-    last_context := final_context
-
-// Condition flags for printing shapes
-show_cb = is_new_signal and final_context == "CB"
-show_cs = is_new_signal and final_context == "CS"
-show_ab = is_new_signal and final_context == "AB"
-show_as = is_new_signal and final_context == "AS"
-show_ob = is_new_signal and final_context == "OB"
-show_os = is_new_signal and final_context == "OS"
-
-// Plot Tokens on Chart Layout
-plotshape(show_cb, title="Cross Buy Breakout",  style=shape.labelup,   location=location.belowbar, color=color.lime,   textcolor=color.black, text="CB", size=size.small)
-plotshape(show_cs, title="Cross Sell Breakdown", style=shape.labeldown, location=location.abovebar, color=color.orange, textcolor=color.black, text="CS", size=size.small)
-plotshape(show_ab, title="ATM Buy Pullback",    style=shape.labelup,   location=location.belowbar, color=color.green,  textcolor=color.white, text="AB", size=size.small)
-plotshape(show_as, title="ATM Sell Pullback",   style=shape.labeldown, location=location.abovebar, color=color.red,    textcolor=color.white, text="AS", size=size.small)
-plotshape(show_ob, title="OTM Buy Reversal",    style=shape.labelup,   location=location.belowbar, color=color.teal,   textcolor=color.white, text="OB", size=size.small)
-plotshape(show_os, title="OTM Sell Reversal",   style=shape.labeldown, location=location.abovebar, color=color.maroon, textcolor=color.white, text="OS", size=size.small)
+// --- SYSTEM WEBHOOK CONFIGURATIONS ---
+alertcondition(crossBuy,  title="Alert: Cross Buy Switch",  message="CROSSBUY")
+alertcondition(crossSell, title="Alert: Cross Sell Switch", message="CROSSSELL")
+alertcondition(runUp,     title="Alert: Running Up Flip",    message="RUN_UP")
+alertcondition(runDn,     title="Alert: Running Down Flip",  message="RUN_DN")
