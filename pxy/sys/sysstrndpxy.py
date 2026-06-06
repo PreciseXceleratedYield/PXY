@@ -16,7 +16,7 @@ from syskatrpxy import calculate_atr, calculate_dynamic_k
 from syscnfgpxy import TIMEZONE, TICKER
 
 # Global Config 
-DEBUG_MODE = True 
+DEBUG_MODE = False 
 CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running candle (Index -1)
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
