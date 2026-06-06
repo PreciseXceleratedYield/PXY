@@ -28,7 +28,7 @@ CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running c
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
     PXY® Engine Strategy Matrix - Perfect 5-State Zero-Interaction Dual-Pipe Indicator Framework.
-    - Pipe A (Signal): Pure Heikin-Ashi (BUY / SELL / BULL / BEAR / NONE)
+    - Pipe A (Signal): Pure Heikin-Ashi Flips matching sysmktpxy logic (BUY / SELL / BULL / BEAR / NONE)
     - Pipe B (Trend) : Pure Supertrend Line (BUY / SELL / BULL / BEAR / NONE)
     """ 
     # 🎯 OVERRIDE: Fetch a clean historical multi-day block straight from yfinance 
@@ -125,21 +125,23 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             st_trend_history.append(raw_regime)
             continue 
 
-        # --- PIPE 1 ENGINE: PURE HEIKIN-ASHI GATES ---
-        is_current_green = ha_close[i] > ha_open[i]
-        is_current_red   = ha_close[i] < ha_open[i]
-        is_current_flat  = ha_close[i] == ha_open[i]
+        # --- PIPE 1 ENGINE: PURE HEIKIN-ASHI GATES (MATCHES SYSMKTPXY EXACT LOGIC) ---
+        # Enforces the identical 'c >= o' directional matrix pattern matching rules
+        is_anchor_green  = ha_close[i-1] >= ha_open[i-1]
+        is_trigger_green = ha_close[i] >= ha_open[i]
 
-        ha_flip_up   = is_current_green and (ha_close[i-1] <= ha_open[i-1])
-        ha_flip_down = is_current_red and (ha_close[i-1] >= ha_open[i-1])
+        ha_bull = is_anchor_green and is_trigger_green
+        ha_bear = (not is_anchor_green) and (not is_trigger_green)
+        ha_sell = is_anchor_green and (not is_trigger_green)
+        ha_buy  = (not is_anchor_green) and is_trigger_green
 
-        if ha_flip_up:
+        if ha_buy:
             st_signal_history.append("BUY")
-        elif ha_flip_down:
+        elif ha_sell:
             st_signal_history.append("SELL")
-        elif is_current_green:
+        elif ha_bull:
             st_signal_history.append("BULL")
-        elif is_current_red:
+        elif ha_bear:
             st_signal_history.append("BEAR")
         else:
             st_signal_history.append("NONE")
@@ -222,6 +224,6 @@ def get_signal(df: pd.DataFrame) -> tuple:
         return "NONE", "NONE"
 
 if __name__ == "__main__":
-    print("\n[PXY STRND ENGINE] Standalone Isolated Dual-Pipe Listener Initiated.")
+    print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
     dummy = pd.DataFrame()
     signal, trend = get_signal(dummy)
