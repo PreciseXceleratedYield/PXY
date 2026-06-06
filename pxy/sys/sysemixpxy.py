@@ -65,10 +65,10 @@ def get_live_matrix_signal() -> str:
             # Extract live bar coordinates
             c_close, c_high, c_low, c_open, c_range = df['Close'].iloc[idx], df['High'].iloc[idx], df['Low'].iloc[idx], df['Open'].iloc[idx], df['bar_range'].iloc[idx]
             
-            # Extract historical structural nodes (p1, p2, p3)
-            p1_h, p1_l, p1_c, p1_o = df['high_p1'].iloc[idx], df['low_p1'].iloc[idx], df['close_p1'].iloc[idx], df['open_p1'].iloc[idx]
-            p2_h, p2_l, p2_c, p2_o = df['high_p2'].iloc[idx], df['low_p2'].iloc[idx], df['close_p2'].iloc[idx], df['open_p2'].iloc[idx]
-            p3_h, p3_l, p3_c, p3_o = df['high_p3'].iloc[idx], df['low_p3'].iloc[idx], df['close_p3'].iloc[idx], df['open_p3'].iloc[idx]
+            # Extract historical structural nodes (p1, p2, p3) - FIXED: maps p1_open explicitly
+            p1_h, p1_l, p1_c, p1_open = df['high_p1'].iloc[idx], df['low_p1'].iloc[idx], df['close_p1'].iloc[idx], df['open_p1'].iloc[idx]
+            p2_h, p2_l, p2_c, p2_open = df['high_p2'].iloc[idx], df['low_p2'].iloc[idx], df['close_p2'].iloc[idx], df['open_p2'].iloc[idx]
+            p3_h, p3_l, p3_c, _ = df['high_p3'].iloc[idx], df['low_p3'].iloc[idx], df['close_p3'].iloc[idx], df['open_p3'].iloc[idx]
             
             atr_val = df['atr'].iloc[idx]
             nr7_floor = df['nr7_min'].iloc[idx]
@@ -90,15 +90,15 @@ def get_live_matrix_signal() -> str:
                 df.at[row_index, 'sig_choch'] = "BUY"
 
             # 3. ICT Fair Value Gaps (ICT_FVG)
-            if c_low > p2_h and (p1_c - p1_o) > (1.2 * atr_val):
+            if c_low > p2_h and (p1_c - p1_open) > (1.2 * atr_val):
                 df.at[row_index, 'sig_fvg'] = "BUY"
-            elif c_high < p2_l and (p1_o - p1_c) > (1.2 * atr_val):
+            elif c_high < p2_l and (p1_open - p1_c) > (1.2 * atr_val):
                 df.at[row_index, 'sig_fvg'] = "SELL"
 
             # 4. Mitigated Order Blocks (SMC_OB)
-            if p1_c < p1_o and c_close > p1_h and (c_close - c_open) > (1.0 * atr_val):
+            if p1_c < p1_open and c_close > p1_h and (c_close - c_open) > (1.0 * atr_val):
                 df.at[row_index, 'sig_ob'] = "BUY"
-            elif p1_c > p1_o and c_close < p1_l and (c_open - c_close) > (1.0 * atr_val):
+            elif p1_c > p1_open and c_close < p1_l and (c_open - c_close) > (1.0 * atr_val):
                 df.at[row_index, 'sig_ob'] = "SELL"
 
             # --- ZONE II: LIQUIDITY HUNTS, SWEEPS & TRAPS ---
@@ -134,7 +134,7 @@ def get_live_matrix_signal() -> str:
                 df.at[row_index, 'sig_engulfing'] = "SELL"
 
             # --- ZONE IV: COMPRESSION SQUEEZES ---
-            # 10. Inside Bar Expansion (FIXED PARSING ATTRIBUTE)
+            # 10. Inside Bar Expansion
             if (p1_h < p2_h) and (p1_l > p2_l):
                 if c_close > p1_h:
                     df.at[row_index, 'sig_inside'] = "BUY"
@@ -156,12 +156,12 @@ def get_live_matrix_signal() -> str:
                     df.at[row_index, 'sig_tsqueeze'] = "SELL"
 
             # 13. Island Gap Structural Break
-            if min(c_open, c_close) > max(p1_open, p1_close) and c_close > p1_h:
+            if min(c_open, c_close) > max(p1_open, p1_open) and c_close > p1_h:
                 df.at[row_index, 'sig_island'] = "BUY"
-            elif max(c_open, c_close) < min(p1_open, p1_close) and c_close < p1_l:
+            elif max(c_open, c_close) < min(p1_open, p1_open) and c_close < p1_l:
                 df.at[row_index, 'sig_island'] = "SELL"
 
-        # Function continues smoothly into Part 3...
+        # Code continues smoothly into Part 3...
         # --- THE MASTER DECISIVE PRIORITY SELECTOR ---
         df['exit'] = "NONE"
         df['strategy_source'] = "NONE"
@@ -203,9 +203,10 @@ def get_live_matrix_signal() -> str:
         return "NONE"
 
 if __name__ == "__main__":
-    # Test call execution mapping inside terminal console environment
+    # Runtime execution check inside standard pxy system profiles environment
     live_signal_result = get_live_matrix_signal()
     print(f"RESULT SIGNAL RECEIVED: {live_signal_result}")
+
 
 
 
