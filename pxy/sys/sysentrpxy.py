@@ -3,13 +3,13 @@
 PXY OPTION ROUTING ENGINE: SUPERTREND CROSSOVER ABSOLUTE PRIORITY
 ===============================================================================
 Operational Rules:
-- EXIT signals originate strictly from sysmktpxy (exit_sig).
+- EXIT and ENTRY signals originate strictly from sysmktpxy (exit_sig, entry_sig).
 - ENTRY Layer A (👑 PRIORITY 1): Pure 3:3 Supertrend Crossover Line Switches.
   Fires instantly when 'strnd_trend' hits 'BUY' or 'SELL', overruling all loops.
 - ENTRY Layer B (⚡ PRIORITY 2): Pure structural breakouts from sysbbospxy (bos_signal).
 - ENTRY Layer C (📈 PRIORITY 3): Trend-following option contract assignment.
   Converts running trend placeholder values ('BULL' or 'BEAR') to trades.
-  Enforces your custom 'or exit_sig' condition check for fast candle momentum triggers.
+  Enforces your custom multi-horizon condition check for fast candle momentum triggers.
 ===============================================================================
 """
 
@@ -20,7 +20,7 @@ import traceback  # 🛠️ For tracing silent execution loop failures
 from syscnfgpxy import TICKER
 
 # Ingestion gateways from your exact strategy matrix modules
-from sysmktpxy import get_signal, CHECK_CONFIRMED_ONLY
+from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
 from sysbbospxy import get_bos_bar  # Ingesting your 42-min structural breakout engine
 
@@ -28,6 +28,11 @@ from sysbbospxy import get_bos_bar  # Ingesting your 42-min structural breakout 
 # True = Output full, deep multi-layered telemetry logs
 # False = Silence dashboard chatter completely, only log final actions/errors
 DEBUG_MODE = False
+
+# 🛠️ LOCAL CONFIGURATION FALLBACK
+# Since sysmktpxy operates asymmetrically now, specify your target row lookup preference for Supertrend here
+# True = Target the closed candle index (-2) | False = Target live running index (-1)
+CHECK_CONFIRMED_ONLY = False
 
 def get_entry_signal(df=None):
     """
@@ -63,13 +68,15 @@ def get_entry_signal(df=None):
         print("📡 Pulling execution states from strategy pipes...")
         
     try:
-        _, exit_sig = get_signal(master_df)
+        # Unpack both the asymmetric confirmed Entry and the live running Exit variables
+        entry_sig, exit_sig = get_signal(master_df)
+        entry_sig = str(entry_sig).upper().strip()
         exit_sig = str(exit_sig).upper().strip()
         if DEBUG_MODE:
-            print(f"  -> [sysmktpxy] Raw Exit Signal: '{exit_sig}'")
+            print(f"  -> [sysmktpxy] Raw Entry Signal: '{entry_sig}' | Exit Signal: '{exit_sig}'")
     except Exception as e:
         print(f"  ❌ ERROR inside sysmktpxy pipeline: {e}")
-        exit_sig = "NONE"
+        entry_sig, exit_sig = "NONE", "NONE"
 
     try:
         _, bos_signal = get_bos_bar(master_df)
@@ -140,7 +147,7 @@ def get_entry_signal(df=None):
             final_signal = "NONE"
     else:
         if DEBUG_MODE:
-            print("🏙️ CURRENT TIMING STATE: Standard Continuous continuous window logic active.")
+            print("🏙️ CURRENT TIMING STATE: Standard Continuous window logic active.")
             print(f"🛡️ STEP 1: Testing Priority 1 Supertrend Crossovers (strnd_trend == '{strnd_trend}')...")
         
         # 👑 👑 👑 PRIORITY 1: Native 3:3 Supertrend Crossovers (BUY / SELL) OVERRULE EVERYTHING
@@ -169,14 +176,14 @@ def get_entry_signal(df=None):
             # 📈 PRIORITY 3: Trend-Following Pullback and Running Regimes Gates
             else:
                 if DEBUG_MODE:
-                    print(f"    ↳ Priority 2 is 'NONE'. Falling to Step 3: Testing Priority 3 (signal='{strnd_signal}', trend='{strnd_trend}')...")
+                    print(f"    ↳ Priority 2 is 'NONE'. Falling to Step 3: Testing Priority 3 (signal='{strnd_signal}', entry='{entry_sig}', exit='{exit_sig}', trend='{strnd_trend}')...")
                 
-                # Check for point-in-time signal matching trend direction parameters
-                if (strnd_signal == "BUY" or exit_sig == "BUY") and strnd_trend == "BULL":
+                # Check for point-in-time signal matching trend direction parameters with added multi-horizon checks
+                if (strnd_signal == "BUY" or exit_sig == "BUY" or entry_sig == "BUY") and strnd_trend == "BULL":
                     if DEBUG_MODE:
                         print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
                     final_signal = "ATMBUY"
-                elif (strnd_signal == "SELL" or exit_sig == "SELL") and strnd_trend == "BEAR":
+                elif (strnd_signal == "SELL" or exit_sig == "SELL" or entry_sig == "SELL") and strnd_trend == "BEAR":
                     if DEBUG_MODE:
                         print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
                     final_signal = "ATMSELL"
@@ -203,4 +210,6 @@ if __name__ == "__main__":
     final_route, raw_exit = get_entry_signal(df=None)
     print("-" * 50)
     print(f"FINAL DECISION: {final_route} | RAW EXIT: {raw_exit}")
+
+
 
