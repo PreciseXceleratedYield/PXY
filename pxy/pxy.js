@@ -28,16 +28,18 @@ app.get('/', (req, res) => {
 });
 
 /* =========================
-   RUN PYTHON SCRIPT
+   RUN SHELL SCRIPT AS USER neo
+   NOTE: run this once on server first:
+   echo 'root ALL=(neo) NOPASSWD: ALL' >> /etc/sudoers
    ========================= */
 const ALLOWED_SCRIPTS = [
     'pxyupdate',
-    'runpxy.py',
-    'runchrpxy.py'
+    'runpxy.sh',
+    'runchrpxy.sh'
     // add more script names here as needed
 ];
 
-const SCRIPT_DIR = '/root/pxy'; // change this to your scripts folder if different
+const SCRIPT_DIR = '/root/pxy'; // change if your scripts live elsewhere
 
 app.get('/run/:script', (req, res) => {
     const script = req.params.script;
@@ -45,7 +47,7 @@ app.get('/run/:script', (req, res) => {
         return res.status(403).json({ error: 'Script not allowed' });
     }
     const fullPath = path.join(SCRIPT_DIR, script);
-    exec(`python3 ${fullPath}`, (err, stdout, stderr) => {
+    exec(`sudo -u neo ${fullPath}`, (err, stdout, stderr) => {
         if (err) return res.status(500).json({ error: stderr || err.message });
         res.json({ ok: true, output: stdout });
     });
