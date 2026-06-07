@@ -68,7 +68,18 @@ def place_exit_order(client, row):
         
         if order_response: 
             print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ ORDER PLACED ON EXCHANGE: {params['trading_symbol']} | TAG: {final_tag}") 
+            try:
+                parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                script_path = os.path.join(parent_dir, "xyzpxy.py")
+                if os.path.exists(script_path):
+                    subprocess.Popen(["python3", script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    print(f"{Fore.RED}❌ Script not found at {script_path}")
+            except Exception as script_err:
+                print(f"{Fore.RED}❌ Error launching script: {script_err}")
         return order_response 
+
+
         
     except Exception as e: 
         print(f"{Fore.RED}❌ Exit Order Error: {e}") 
