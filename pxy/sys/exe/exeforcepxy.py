@@ -2,6 +2,7 @@ import sys
 import asyncio
 import os
 import pytz
+import subprocess
 from pathlib import Path
 from datetime import datetime
 from colorama import Fore, init, Style
@@ -72,12 +73,13 @@ async def main():
     print(f"\n{Fore.YELLOW}⚡ === EXECUTOR FORCED ENGINE ===")
     print(f"{Fore.WHITE} [1] FORCE BUY (CE)")
     print(f"{Fore.WHITE} [2] FORCE SELL (PE)")
-    print(f"{Fore.WHITE} [3] CANCEL / EXIT")
+    print(f"{Fore.WHITE} [3] SQUAREOFF")
+    print(f"{Fore.WHITE} [4] EXIT")
     
     # Force the user to pick an accurate route via menu numeric interface
     while True:
         try:
-            choice = input(f"{Fore.CYAN}Select action (1, 2, or 3): {Style.RESET_ALL}").strip()
+            choice = input(f"{Fore.CYAN}Select action (1, 2, 3, or 4): {Style.RESET_ALL}").strip()
             if choice == "1":
                 sig = "ATMBUY"
                 side_label = "CE"
@@ -86,11 +88,19 @@ async def main():
                 sig = "ATMSELL"
                 side_label = "PE"
                 break
-            elif choice in ["3", ""]:
-                print(f"{Fore.YELLOW}❌ Execution aborted.")
+            elif choice == "3":
+                print(f"{Fore.YELLOW}🔄 Triggering Squareoff Script...")
+                target_script = HERE / "exesqrpxy.py"
+                if target_script.exists():
+                    subprocess.run([sys.executable, str(target_script)])
+                else:
+                    print(f"{Fore.RED}❌ File not found: {target_script}")
+                return
+            elif choice in ["4", ""]:
+                print(f"{Fore.YELLOW}❌ Execution exited.")
                 return
             else:
-                print(f"{Fore.RED}Invalid selection. Enter 1 for BUY, 2 for SELL, or 3 to exit.")
+                print(f"{Fore.RED}Invalid selection. Enter 1 for BUY, 2 for SELL, 3 for SQUAREOFF, or 4 to exit.")
         except (KeyboardInterrupt, SystemExit):
             print(f"\n{Fore.YELLOW}❌ Execution aborted.")
             return
@@ -136,4 +146,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
