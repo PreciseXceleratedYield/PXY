@@ -29,7 +29,7 @@ app.get('/', (req, res) => {
 
 /* =========================
    RUN SCRIPT AS USER neo
-   One-time setup on server:
+   Run this ONCE on server before using:
    echo 'root ALL=(neo) NOPASSWD: ALL' >> /etc/sudoers
    ========================= */
 const ALLOWED_SCRIPTS = [
@@ -39,16 +39,21 @@ const ALLOWED_SCRIPTS = [
     // add more here as needed
 ];
 
-const SCRIPT_DIR = '/root/pxy';
+const SCRIPT_DIR = '/home/neo/pxy';
 
 app.get('/run/:script', (req, res) => {
     const script = req.params.script.trim();
+
+    console.log(`[RUN] script="${script}" allowed=${ALLOWED_SCRIPTS.includes(script)}`);
+
     if (!ALLOWED_SCRIPTS.includes(script)) {
-        return res.status(403).json({ ok: false, error: `Script "${script}" is not allowed` });
+        return res.json({ ok: false, error: `Script "${script}" is not allowed` });
     }
+
     const fullPath = path.join(SCRIPT_DIR, script);
+
     exec(`sudo -u neo ${fullPath}`, { timeout: 30000 }, (err, stdout, stderr) => {
-        // always return 200 — let the client decide what to show
+        console.log(`[RUN] done ok=${!err} stdout="${stdout}" stderr="${stderr}"`);
         res.json({
             ok:     !err,
             output: stdout || '',
