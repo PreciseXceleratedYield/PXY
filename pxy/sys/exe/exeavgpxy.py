@@ -116,9 +116,9 @@ def handle_side_averaging(client, df):
 
     # VERIFIED: Tested matrix paths run flawlessly without syntax compilation crashes
     current_signal = "NONE"
-    if raw_entry_signal in ["AVGBUY"] or (raw_exit_signal in ["BEAR"] and pe_power > 5):
+    if raw_entry_signal in ["AVGBUY"] or (raw_exit_signal in ["BEAR"] and pe_power > 15):
         current_signal = "BUY"
-    elif raw_entry_signal in ["AVGSELL"] or (raw_exit_signal in ["BULL"] and ce_power > 5):
+    elif raw_entry_signal in ["AVGSELL"] or (raw_exit_signal in ["BULL"] and ce_power > 15):
         current_signal = "SELL"
 
     # Make a clean dataframe copy to prevent mutations/warnings
