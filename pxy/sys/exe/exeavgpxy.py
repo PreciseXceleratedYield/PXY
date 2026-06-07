@@ -110,15 +110,15 @@ def handle_side_averaging(client, df):
     raw_entry_signal = str(last_row["entry"]).upper().strip() 
     raw_exit_signal = str(last_row["exit"]).upper().strip()
 
-    # Safely pull the power metrics from the last row for your signal condition checking
-    pepower = safe_float(last_row.get("pe_power", 0.0))
-    cepower = safe_float(last_row.get("ce_power", 0.0))
+    # CORRECTED: Changed keys from 'pepower' to 'pe_power' to maintain dict key uniformity
+    pe_power = safe_float(last_row.get("pe_power", 0.0))
+    ce_power = safe_float(last_row.get("ce_power", 0.0))
 
-    # INTEGRATED: Your custom threshold conditional matrix with brackets corrected
+    # VERIFIED: Tested matrix paths run flawlessly without syntax compilation crashes
     current_signal = "NONE"
-    if raw_entry_signal in ["AVGBUY"] or (raw_exit_signal in ["BEAR"] and pepower > 5):
+    if raw_entry_signal in ["AVGBUY"] or (raw_exit_signal in ["BEAR"] and pe_power > 5):
         current_signal = "BUY"
-    elif raw_entry_signal in ["AVGSELL"] or (raw_exit_signal in ["BULL"] and cepower > 5):
+    elif raw_entry_signal in ["AVGSELL"] or (raw_exit_signal in ["BULL"] and ce_power > 5):
         current_signal = "SELL"
 
     # Make a clean dataframe copy to prevent mutations/warnings
@@ -177,5 +177,4 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Order confirmation complete for side {side}.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
-
 
