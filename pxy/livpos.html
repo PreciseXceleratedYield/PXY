@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>PXY® — Live Positions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400&family=Syne:wght@800&display=swap" rel="stylesheet">
+
+<style>
+:root {
+    --bg:   #06080d;
+    --bg2:  #0c101a;
+    --border: rgba(255,255,255,0.07);
+    --text: #e8ecf4;
+    --muted:#5b6478;
+    --bull: #22c55e;
+    --bear: #ef4444;
+    --accent:#3b82f6;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    overflow: hidden;
+}
+
+/* ── HEADER ── */
+#header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 clamp(16px, 3vw, 32px);
+    height: 48px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 18px;
+    color: var(--text);
+}
+.logo sup { font-size: 0.5em; vertical-align: super; color: var(--accent); }
+
+.back-btn {
+    padding: 4px 12px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--muted);
+    font-size: 11px;
+    text-decoration: none;
+    font-family: 'DM Mono', monospace;
+    transition: all 0.2s;
+}
+.back-btn:hover { color: var(--text); }
+
+#clock {
+    font-size: 11px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── MAIN GRID ── */
+#app {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - 48px);
+}
+
+/* positions list — takes all space minus total bar */
+#positions {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: clamp(8px, 1.5vh, 20px) clamp(12px, 2vw, 28px);
+    gap: clamp(4px, 1vh, 12px);
+}
+
+.pos-row {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 clamp(16px, 2.5vw, 32px);
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    gap: 16px;
+    min-height: 0;
+    transition: border-color 0.3s;
+}
+.pos-row.bull { border-left: 4px solid var(--bull); }
+.pos-row.bear { border-left: 4px solid var(--bear); }
+
+.pos-left {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(2px, 0.5vh, 6px);
+    min-width: 0;
+    flex: 1;
+}
+
+.pos-sym {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(18px, 3.5vw, 52px);
+    letter-spacing: 0.04em;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pos-meta {
+    font-size: clamp(9px, 1.2vw, 14px);
+    color: var(--muted);
+    letter-spacing: 0.06em;
+}
+
+.pos-pnl {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(28px, 5.5vw, 86px);
+    letter-spacing: -1px;
+    line-height: 1;
+    flex-shrink: 0;
+    text-align: right;
+}
+.pos-pnl.bull { color: var(--bull); text-shadow: 0 0 30px rgba(34,197,94,0.25); }
+.pos-pnl.bear { color: var(--bear); text-shadow: 0 0 30px rgba(239,68,68,0.25); }
+
+/* ── TOTAL BAR ── */
+#totalBar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 clamp(16px, 2.5vw, 32px);
+    height: clamp(64px, 10vh, 100px);
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    gap: 16px;
+}
+
+.total-label {
+    font-family: 'Syne', sans-serif;
+    font-size: clamp(13px, 1.8vw, 22px);
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.total-count {
+    font-size: clamp(10px, 1.1vw, 14px);
+    color: var(--muted);
+}
+
+#totalPnl {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(42px, 8vw, 120px);
+    letter-spacing: -2px;
+    line-height: 1;
+    transition: color 0.4s;
+}
+#totalPnl.bull { color: var(--bull); text-shadow: 0 0 40px rgba(34,197,94,0.3); }
+#totalPnl.bear { color: var(--bear); text-shadow: 0 0 40px rgba(239,68,68,0.3); }
+
+/* empty state */
+#emptyState {
+    display: none;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+    color: var(--muted);
+    font-size: 14px;
+    letter-spacing: 0.08em;
+}
+#emptyState.show { display: flex; }
+
+/* live dot */
+.live-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--bull); box-shadow: 0 0 6px var(--bull);
+    animation: blink 1.4s ease-in-out infinite;
+    display: inline-block;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+</style>
+</head>
+<body>
+
+<div id="header">
+    <a class="back-btn" href="pxy.html">← DASHBOARD</a>
+    <span class="logo">PXY<sup>®</sup></span>
+    <span id="clock">—</span>
+</div>
+
+<div id="app">
+    <div id="positions">
+        <div id="emptyState">No open positions</div>
+    </div>
+    <div id="totalBar">
+        <div>
+            <div class="total-label"><span class="live-dot"></span>&nbsp; Running P&amp;L</div>
+            <div class="total-count" id="totalCount">0 positions</div>
+        </div>
+        <div id="totalPnl">0</div>
+    </div>
+</div>
+
+<script>
+'use strict';
+
+/* ── CLOCK ── */
+function tick() {
+    document.getElementById('clock').textContent =
+        new Date().toLocaleTimeString('en-IN', { hour12: false });
+}
+tick(); setInterval(tick, 1000);
+
+/* ── FORMAT ── */
+function fmt(n) {
+    return (n >= 0 ? '+' : '') + Math.round(n).toLocaleString('en-IN');
+}
+
+function shortSym(s) {
+    if (!s) return '—';
+    // NIFTY25JUN26C23000 → NIFTY JUN 23000 CE
+    const m = s.match(/([A-Z]+)(\d{2})([A-Z]{3})(\d{2})(C|P)(\d+)/i);
+    if (m) return `${m[1]} ${m[3]}${m[4]} ${m[6]} ${m[5]==='C'?'CE':'PE'}`;
+    return s;
+}
+
+/* ── RENDER ── */
+function render(data) {
+    const pos       = document.getElementById('positions');
+    const empty     = document.getElementById('emptyState');
+    const totalEl   = document.getElementById('totalPnl');
+    const countEl   = document.getElementById('totalCount');
+
+    // clear old rows (keep emptyState)
+    pos.querySelectorAll('.pos-row').forEach(r => r.remove());
+
+    if (!data.length) {
+        empty.classList.add('show');
+        totalEl.textContent = '0';
+        totalEl.className   = '';
+        countEl.textContent = '0 positions';
+        return;
+    }
+
+    empty.classList.remove('show');
+
+    const total = data.reduce((s, d) => s + (d.PNL || 0), 0);
+    const bull  = total >= 0;
+
+    data.forEach(d => {
+        const pnl  = d.PNL || 0;
+        const pbul = pnl >= 0;
+        const isCE = (d.SYMBOL || '').toUpperCase().includes('C');
+        const qty  = d.QTY ?? '—';
+
+        const row = document.createElement('div');
+        row.className = `pos-row ${pbul ? 'bull' : 'bear'}`;
+        row.innerHTML = `
+            <div class="pos-left">
+                <div class="pos-sym">${shortSym(d.SYMBOL)}</div>
+                <div class="pos-meta">Qty ${qty} &nbsp;·&nbsp; ${isCE ? 'CALL · CE' : 'PUT · PE'}</div>
+            </div>
+            <div class="pos-pnl ${pbul ? 'bull' : 'bear'}">${fmt(pnl)}</div>`;
+        pos.appendChild(row);
+    });
+
+    totalEl.textContent = fmt(total);
+    totalEl.className   = `${bull ? 'bull' : 'bear'}`;
+    countEl.textContent = `${data.length} position${data.length !== 1 ? 's' : ''}`;
+}
+
+/* ── LOAD ── */
+async function load() {
+    try {
+        const res  = await fetch('./livpos.json?_=' + Date.now());
+        const data = await res.json();
+        render(data);
+    } catch {
+        render([]);
+    }
+}
+
+load();
+setInterval(load, 3000);
+</script>
+</body>
+</html>
