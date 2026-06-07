@@ -1,34 +1,25 @@
-#!/bin/bash
-
-# Navigate to pxy directory
-cd "$HOME/pxy" || { echo "pxy directory not found! Exiting."; exit 1; }
-
-echo
 echo "       ******** GET UPDATES *******"
 echo
 
 # Fetch latest updates from git
 git fetch --all
-
 echo
+
 echo "       ****** RESET SOFTWARE ******"
 echo
 
 # Reset local changes to match remote main branch
 git reset --hard origin/main
 
-# Copy specific scripts (suppress cp warnings)
-sudo cp "$HOME/pxy" "$HOME/pxy/sys/p" 2>/dev/null
-
 # Copy only files WITHOUT an extension to /usr/local/bin
 for file in "$HOME/pxy"/*; do
     if [ -f "$file" ] && [[ "$file" != *.* ]]; then
-        sudo cp "$file" /usr/local/bin/
+        cp "$file" "$HOME/.local/bin/" 2>/dev/null
     fi
 done
 
 # Make sure copied files are executable
-sudo chmod +x /usr/local/bin/*
+chmod +x "$HOME/.local/bin/"* 2>/dev/null
 
 echo
 echo "       ***** UPDATE COMPLETED *****"
