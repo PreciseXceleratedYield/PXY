@@ -28,28 +28,32 @@ app.get('/', (req, res) => {
 });
 
 /* =========================
-   RUN SHELL SCRIPT AS USER neo
-   NOTE: run this once on server first:
+   RUN SCRIPT AS USER neo
+   One-time setup on server:
    echo 'root ALL=(neo) NOPASSWD: ALL' >> /etc/sudoers
    ========================= */
 const ALLOWED_SCRIPTS = [
     'pxyupdate',
-    'runpxy.sh',
-    'runchrpxy.sh'
-    // add more script names here as needed
+    'runpxy',
+    'runchrpxy'
+    // add more here as needed
 ];
 
-const SCRIPT_DIR = '/root/pxy'; // change if your scripts live elsewhere
+const SCRIPT_DIR = '/root/pxy';
 
 app.get('/run/:script', (req, res) => {
     const script = req.params.script;
     if (!ALLOWED_SCRIPTS.includes(script)) {
-        return res.status(403).json({ error: 'Script not allowed' });
+        return res.status(403).json({ ok: false, error: `Script "${script}" is not allowed` });
     }
     const fullPath = path.join(SCRIPT_DIR, script);
-    exec(`sudo -u neo ${fullPath}`, (err, stdout, stderr) => {
-        if (err) return res.status(500).json({ error: stderr || err.message });
-        res.json({ ok: true, output: stdout });
+    exec(`sudo -u neo ${fullPath}`, { timeout: 30000 }, (err, stdout, stderr) => {
+        // always return 200 — let the client decide what to show
+        res.json({
+            ok:     !err,
+            output: stdout || '',
+            error:  err ? (stderr || err.message || 'Unknown error') : ''
+        });
     });
 });
 
