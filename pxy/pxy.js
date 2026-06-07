@@ -54,7 +54,7 @@ app.post('/run/:script', (req, res) => {
         return res.json({ ok: false, error: 'Password required' });
     }
 
-    const cmd = `su -c "./${script}" neo`;
+    const cmd = `bash ./${script}`;
 
     exec(cmd, {
         timeout: 30000,
