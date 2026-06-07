@@ -279,9 +279,50 @@ html,body {
     <!-- BUTTONS — only visible in full mode -->
     <div id="btnBar">
         <button class="run-btn" onclick="runScript('pxyupdate', this)">▶ Update</button>
-        <button class="run-btn" onclick="runScript('runpxy', this)">▶ Feed</button>
-        <button class="run-btn" onclick="runScript('runchrpxy', this)">▶ Chart</button>
-        <button class="run-btn" onclick="runScript('pxyupdate', this)">▶ Reset</button>
+        <button class="run-btn" onclick="runScript('pxytkovr', this)">▶ Takeover</button>
+        <button class="run-btn" onclick="runScript('dummy1', this)">▶ Dummy 1</button>
+        <button class="run-btn" onclick="runScript('dummy2', this)">▶ Dummy 2</button>
+    </div>
+</div>
+
+<!-- PWD POPUP -->
+<div id="pwdPopup" style="
+    display:none; position:fixed; inset:0; z-index:300;
+    background:rgba(0,0,0,0.6); backdrop-filter:blur(6px);
+    align-items:center; justify-content:center;
+">
+    <div style="
+        background:var(--bg2); border:1px solid var(--border2);
+        border-radius:14px; padding:28px 32px; min-width:280px;
+        display:flex; flex-direction:column; gap:14px; align-items:center;
+        box-shadow:0 24px 60px rgba(0,0,0,0.6);
+    ">
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:15px;letter-spacing:0.06em" id="popupTitle">Run Script</div>
+        <div style="font-size:10px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase">Enter neo password</div>
+        <input type="password" id="neoPwd" placeholder="password"
+               maxlength="20" autofocus
+               style="
+                   width:100%; padding:10px 14px; border-radius:8px;
+                   border:1px solid var(--border2); background:var(--bg3);
+                   color:var(--text); font-family:'DM Mono',monospace;
+                   font-size:16px; text-align:center; letter-spacing:0.14em;
+                   outline:none; transition:border-color 0.2s;
+               "
+               onkeydown="if(event.key==='Enter') confirmRun()">
+        <div style="display:flex;gap:10px;width:100%">
+            <button onclick="cancelRun()" style="
+                flex:1; padding:9px; border-radius:7px;
+                border:1px solid var(--border2); background:transparent;
+                color:var(--muted); font-family:'DM Mono',monospace;
+                font-size:12px; cursor:pointer;
+            ">Cancel</button>
+            <button onclick="confirmRun()" style="
+                flex:1; padding:9px; border-radius:7px;
+                border:1px solid var(--accent); background:rgba(59,130,246,0.12);
+                color:var(--accent); font-family:'Syne',sans-serif;
+                font-weight:700; font-size:13px; cursor:pointer;
+            ">Run</button>
+        </div>
     </div>
 </div>
 
@@ -412,35 +453,56 @@ async function load() {
 load(); setInterval(load, 3000);
 
 /* ── RUN SCRIPT ── */
+let pendingScript = null;
+let pendingBtn    = null;
+
 function runScript(script, btn) {
     if (!fullMode) return;
-    const orig = btn.textContent;
+    pendingScript = script;
+    pendingBtn    = btn;
+    document.getElementById('popupTitle').textContent = `▶ ${script}`;
+    document.getElementById('neoPwd').value = '';
+    const popup = document.getElementById('pwdPopup');
+    popup.style.display = 'flex';
+    setTimeout(() => document.getElementById('neoPwd').focus(), 100);
+}
+
+function cancelRun() {
+    document.getElementById('pwdPopup').style.display = 'none';
+    pendingScript = null; pendingBtn = null;
+}
+
+function confirmRun() {
+    const pwd = document.getElementById('neoPwd').value.trim();
+    if (!pwd) return;
+    document.getElementById('pwdPopup').style.display = 'none';
+
+    const btn    = pendingBtn;
+    const script = pendingScript;
+    const orig   = btn.textContent;
     btn.textContent = '⏳ Running…';
     btn.className   = 'run-btn running';
     btn.disabled    = true;
 
-    fetch(`/run/${script}`)
+    fetch(`/run/${script}`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ pwd })
+    })
         .then(r => r.json())
         .then(d => {
             btn.textContent = d.ok ? '✓ Done' : '✗ Error';
             btn.className   = `run-btn ${d.ok ? 'done' : 'error'}`;
-
-            // show output panel
-            const text  = (d.output || '') + (d.error ? '\n⚠ ' + d.error : '');
-            const label = d.ok ? `✓ ${script} — output` : `✗ ${script} — error`;
-            showOutput(label, text.trim() || '(no output)');
+            const text = (d.output || '') + (d.error ? '\n⚠ ' + d.error : '');
+            showOutput(d.ok ? `✓ ${script}` : `✗ ${script}`, text.trim() || '(no output)');
         })
         .catch(e => {
             btn.textContent = '✗ Error';
             btn.className   = 'run-btn error';
-            showOutput(`✗ ${script} — error`, e.message || 'Network error');
+            showOutput(`✗ ${script}`, e.message || 'Network error');
         })
         .finally(() => {
-            setTimeout(() => {
-                btn.textContent = orig;
-                btn.className   = 'run-btn';
-                btn.disabled    = false;
-            }, 3000);
+            setTimeout(() => { btn.textContent = orig; btn.className = 'run-btn'; btn.disabled = false; }, 3000);
         });
 }
 
