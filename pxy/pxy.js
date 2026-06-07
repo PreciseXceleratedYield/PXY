@@ -54,10 +54,13 @@ app.post('/run/:script', (req, res) => {
         return res.json({ ok: false, error: 'Password required' });
     }
 
-    const fullPath = path.join(SCRIPT_DIR, script);
-    const cmd = `echo '${pwd.replace(/'/g, "'\\''")}' | su -s /bin/bash neo -c "${fullPath}"`;
+    const cmd = `su -c "./${script}" neo`;
 
-    exec(cmd, { timeout: 30000 }, (err, stdout, stderr) => {
+    exec(cmd, {
+        timeout: 30000,
+        cwd: SCRIPT_DIR,
+        env: { ...process.env, HOME: '/home/neo', USER: 'neo', LOGNAME: 'neo' }
+    }, (err, stdout, stderr) => {
         console.log(`[RUN] ok=${!err} out="${stdout}" err="${stderr}"`);
         res.json({
             ok:     !err,
