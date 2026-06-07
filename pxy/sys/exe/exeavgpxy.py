@@ -11,7 +11,7 @@ init(autoreset=True)
 # --- CONFIG --- 
 REBUY_ENABLED = True 
 MAX_LAYERS = 6
-COOL_DOWN_SECONDS = 61  # ⏱️ Cooling interval set to exactly 61 seconds
+COOL_DOWN_SECONDS = 20  # ⏱️ Cooling interval set to exactly 61 seconds
 ATR_MULTIPLIER = 1
 
 def safe_float(val, fallback=0.0):
@@ -90,13 +90,13 @@ def handle_side_averaging(client, df):
     # 1. Extract string from the last row of the 'exit' column safely
     if "exit" not in df.columns:
         return
-    raw_exit_signal = str(df["exit"].iloc[-1]).upper().strip() 
+    raw_exit_signal = str(df["entry"].iloc[-1]).upper().strip() 
 
     # 2. Exclusively evaluate the explicit matrix states
     current_signal = "NONE"
-    if raw_exit_signal in ["BEAR"]:
+    if raw_exit_signal in ["AVGBUY"]:
         current_signal = "BUY"
-    elif raw_exit_signal in ["BULL"]:
+    elif raw_exit_signal in ["AVGSELL"]:
         current_signal = "SELL"
 
     # 3. Add side helper column derived from symbol layout
