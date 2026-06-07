@@ -36,7 +36,7 @@ const ALLOWED_SCRIPTS = [
     'pxyupdate',
     'pxytkovrbuyce',
     'pxytkovrbuype',
-    'pxytkovrsqrce'
+    'pxytkovrsqrce',
     'pxytkovrsqrpe'   
 ];
 
