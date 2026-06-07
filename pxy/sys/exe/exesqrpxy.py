@@ -71,6 +71,16 @@ def exit_all_positions():
     active_df = data.get("active_orders", pd.DataFrame()) 
     market_df = data.get("market_snapshot", pd.DataFrame()) 
     
+    # --- DYNAMIC CLI FILTER BYPASS ---
+    if len(sys.argv) > 1 and not active_df.empty:
+        target_param = sys.argv[1].lower().strip()
+        if target_param == "-ce":
+            print(f"{Fore.YELLOW}⚠️ CLI BYPASS: Filtering ONLY CE positions for immediate square-off.")
+            active_df = active_df[active_df["symbol"].str.contains("CE", na=False)]
+        elif target_param == "-pe":
+            print(f"{Fore.YELLOW}⚠️ CLI BYPASS: Filtering ONLY PE positions for immediate square-off.")
+            active_df = active_df[active_df["symbol"].str.contains("PE", na=False)]
+            
     if active_df.empty: 
         print(f"{Fore.YELLOW}No active positions to exit.{Fore.RESET}") 
         return 
