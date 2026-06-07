@@ -93,3 +93,4 @@ def target_price(row):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0
+
