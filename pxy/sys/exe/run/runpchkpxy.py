@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import sys
+import json
+from pathlib import Path  # Safe cross-platform path handling
 
 def get_position_summary(client=None):
     """
@@ -9,6 +11,7 @@ def get_position_summary(client=None):
     """
     ce_lots = 0
     pe_lots = 0
+    position_dumps = []  # Resets cleanly on every function call
 
     # Fallback session (not recommended inside loops)
     if client is None:
@@ -59,6 +62,13 @@ def get_position_summary(client=None):
                 # --- CALCULATE LOTS ---
                 # Divide quantity by lot size to get count (e.g., 130 / 65 = 2)
                 current_lots = int(abs(net_qty) / lot_size)
+                
+                # Append live market metrics quietly into the local array
+                position_dumps.append({
+                    "SYMBOL": symbol,
+                    "QTY": net_qty,
+                    "PNL": float(pos.get("pnl", pos.get("urmtom", 0)))
+                })
 
                 # --- UPDATE COUNTERS ---
                 if symbol.endswith("CE"):
@@ -66,11 +76,22 @@ def get_position_summary(client=None):
                 elif symbol.endswith("PE"):
                     pe_lots += current_lots
 
+        # 🟢 FIXED: Target the grand-grandparent folder correctly
+        # parents[0] = Parent directory (where the script sits)
+        # parents[1] = Grandparent directory
+        # parents[2] = Grand-grandparent directory
+        target_dir = Path(__file__).resolve().parents[2]
+        target_file = target_dir / "livpos.json"
+
+        # Quietly write JSON output to the grand-grandparent directory
+        with open(target_file, "w") as f:
+            json.dump(position_dumps, f)
+
     except Exception as e:
         print(f"❌ Position Error: {e}")
         return "0CE0PE"
 
-    # Return the actual lot totals
+    # Return the actual lot totals (UNCHANGED ORIGINAL RETURN VALUE)
     return f"{ce_lots}CE{pe_lots}PE"
 
 # ---------------- STANDALONE TEST ----------------
@@ -81,4 +102,5 @@ if __name__ == "__main__":
         print("Actual Lot Summary:", get_position_summary(broker))
     except Exception as e:
         print(f"❌ Test Run Error: {e}")
+
 
