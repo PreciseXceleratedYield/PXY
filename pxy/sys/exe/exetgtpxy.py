@@ -36,6 +36,8 @@ def target_price(row):
         atr_val = f(row.get("atr"), 6.0)
         ce_power = f(row.get("ce_power"), 1.0)
         pe_power = f(row.get("pe_power"), 1.0)
+        ce_depth = f(row.get("hkin_ce_depth"), 1.0)
+        pe_depth = f(row.get("hkin_pe_depth"), 1.0)
         
         # --- FIXED: Avoid direct .is_integer() attribute crash on standard int types ---
         ce_disp = int(ce_power) if float(ce_power).is_integer() else ce_power
@@ -75,14 +77,14 @@ def target_price(row):
         if is_ce:
             if active_exit in ["SELL", "BEAR"]:  # Opposite side signal
                 target_pct = atr_val
-            else:                                # Same side signal
-                target_pct = atr_val + ce_power
+            else:                                # Same side signal (CORRECTED SYNTAX)
+                target_pct = max(atr_val + ce_power, atr_val + ce_depth)
 
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   # Opposite side signal
                 target_pct = atr_val
-            else:                                # Same side signal
-                target_pct = atr_val + pe_power
+            else:                                # Same side signal (CORRECTED SYNTAX)
+                target_pct = max(atr_val + pe_power, atr_val + pe_depth)
 
         # 6. Final mathematical target projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
@@ -91,5 +93,3 @@ def target_price(row):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0
-
-
