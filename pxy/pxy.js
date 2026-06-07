@@ -31,7 +31,7 @@ app.get('/', (req, res) => {
    RUN PYTHON SCRIPT
    ========================= */
 const ALLOWED_SCRIPTS = [
-    'runlilopxy.py',
+    'pxyupdate',
     'runpxy.py',
     'runchrpxy.py'
     // add more script names here as needed
