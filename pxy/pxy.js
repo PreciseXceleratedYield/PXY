@@ -42,7 +42,7 @@ const ALLOWED_SCRIPTS = [
 const SCRIPT_DIR = '/root/pxy';
 
 app.get('/run/:script', (req, res) => {
-    const script = req.params.script;
+    const script = req.params.script.trim();
     if (!ALLOWED_SCRIPTS.includes(script)) {
         return res.status(403).json({ ok: false, error: `Script "${script}" is not allowed` });
     }
