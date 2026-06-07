@@ -194,6 +194,14 @@ def get_entry_signal(df=None):
                     if DEBUG_MODE:
                         print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
                     final_signal = "ATMSELL"
+                elif is_signal_sell and is_trend_bull:
+                    if DEBUG_MODE:
+                        print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
+                    final_signal = "AVGSELL"
+                elif is_signal_buy and is_trend_bear:
+                    if DEBUG_MODE:
+                        print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
+                    final_signal = "AVGBUY"
                 else:
                     if DEBUG_MODE:
                         print("    ❌ All waterfall priority logic gates failed to match execution parameters.")
