@@ -1,6 +1,6 @@
 #!/bin/bash
 # ------------------------------
-# Run exepxy.py from ~/pxy/sys/exe
+# Run exesqrpxy.py from ~/pxy/sys/exe
 # ------------------------------
 
 # Go to exe folder
@@ -9,8 +9,8 @@ cd "$HOME/pxy/sys/exe" || { echo "Directory ~/pxy/sys/exe not found"; exit 1; }
 # Optional: activate virtual environment if needed
 # source ~/pxy/env/bin/activate
 
-# Run the Python script with argument 1 to execute option 1 directly
-python3 exeforcepxy.py 1
+# Run the Python script to squareoff PE positions directly
+python3 exesqrpxy.py -pe
 
-# Optional: print completion
-echo "exeforcepxy.py option 1 execution finished."
+# Matches the actual script executed above
+echo "exesqrpxy.py PE squareoff finished."
