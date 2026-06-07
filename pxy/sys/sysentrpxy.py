@@ -1,3 +1,6 @@
+# ===============================================================================
+# PART 1: MODULE INGESTION, CONFIGURATION, AND DATA PIPELINE MATRIX
+# ===============================================================================
 # sysentrpxy.py
 """
 ===============================================================================
@@ -9,8 +12,10 @@ Operational Rules:
   Fires instantly when 'strnd_trend' OR 'sma_trend' hits 'BUY' or 'SELL'.
 - ENTRY Layer B (⚡ PRIORITY 2): Pure structural breakouts from sysbbospxy (bos_signal).
 - ENTRY Layer C (📈 PRIORITY 3): Trend-following option contract assignment.
-  Triggers BUY if (entry_sig == BUY or exit_sig == BUY) AND (sma_trend == BULL or strnd_trend == BULL).
-  Triggers SELL if (entry_sig == SELL or exit_sig == SELL) AND (sma_trend == BEAR or strnd_trend == BEAR).
+  Triggers AVGSELL if signal is SELL AND both trends are BULL.
+  Triggers AVGBUY if signal is BUY AND both trends are BEAR.
+  Triggers ATMBUY if signal is BUY AND any trend is BULL.
+  Triggers ATMSELL if signal is SELL AND any trend is BEAR.
 ===============================================================================
 """
 
@@ -109,7 +114,9 @@ def get_entry_signal(df=None):
     else:
         if DEBUG_MODE:
             print("  ⚠️ Warning: calculate_supertrend returned an empty or Null DataFrame.")
-
+# ===============================================================================
+# PART 2: TIME ENGINE AND REORDERED WATERFALL ROUTING LOGIC
+# ===============================================================================
     # 3. Establish Base Current Time in Indian Standard Time (IST)
     tz_ist = ZoneInfo("Asia/Kolkata")
     current_time_ist = datetime.now(tz_ist).time()
@@ -178,49 +185,41 @@ def get_entry_signal(df=None):
                 if DEBUG_MODE:
                     print(f"    ↳ Priority 2 is 'NONE'. Falling to Step 3: Testing Priority 3 (entry='{entry_sig}', exit='{exit_sig}', ST_Trend='{strnd_trend}', SMA_Trend='{sma_trend}')...")
                 
-                # 🎯 EITHER/OR LOOKUP ARRAYS
+                # 🎯 LOOKUP ARRAYS
                 is_signal_buy = (entry_sig == "BUY" or exit_sig == "BUY")
                 is_trend_bull = (sma_trend == "BULL" or strnd_trend == "BULL")
+                is_avgtrend_bull = (sma_trend == "BULL" and strnd_trend == "BULL")
 
                 is_signal_sell = (entry_sig == "SELL" or exit_sig == "SELL")
                 is_trend_bear = (sma_trend == "BEAR" or strnd_trend == "BEAR")
+                is_avgtrend_bear = (sma_trend == "BEAR" and strnd_trend == "BEAR")
 
-                # 🚀 Pullback trigger tracking using your exact dual environmental trend qualification
-                if is_signal_buy and is_trend_bull:
+                # 🚀 Reordered Waterfall Logic (Strict AND checks evaluated before broad OR filters)
+                if is_signal_sell and is_avgtrend_bull:
                     if DEBUG_MODE:
-                        print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
+                        print("  🚀 PRIORITY 3 UNLOCKED: Sell signal inside Pure Bull Trend -> AVGSELL approved.")
+                    final_signal = "AVGSELL"
+                    
+                elif is_signal_buy and is_avgtrend_bear:
+                    if DEBUG_MODE:
+                        print("  🚀 PRIORITY 3 UNLOCKED: Buy signal inside Pure Bear Trend -> AVGBUY approved.")
+                    final_signal = "AVGBUY"
+                    
+                elif is_signal_buy and is_trend_bull:
+                    if DEBUG_MODE:
+                        print("  🚀 PRIORITY 3 UNLOCKED: Buy signal matching Bull Trend -> ATMBUY approved.")
                     final_signal = "ATMBUY"
+                    
                 elif is_signal_sell and is_trend_bear:
                     if DEBUG_MODE:
-                        print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
+                        print("  🚀 PRIORITY 3 UNLOCKED: Sell signal matching Bear Trend -> ATMSELL approved.")
                     final_signal = "ATMSELL"
-                elif is_signal_sell and is_trend_bull:
-                    if DEBUG_MODE:
-                        print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
-                    final_signal = "AVGSELL"
-                elif is_signal_buy and is_trend_bear:
-                    if DEBUG_MODE:
-                        print("  🚀 PRIORITY 3 UNLOCKED: Trend Pullback Dynamic Entry approved.")
-                    final_signal = "AVGBUY"
+                    
                 else:
                     if DEBUG_MODE:
                         print("    ❌ All waterfall priority logic gates failed to match execution parameters.")
                     final_signal = "NONE"
 
-    # 5. OPTIMIZED TELEMETRY ALERT ENGINE
-    if DEBUG_MODE:
-        print(f"🏁 FINAL ROUTING ENGINE DECISION VALUE: '{final_signal}'")
-    
-    if final_signal in ["ATMBUY", "ATMSELL", "OTMBUY", "OTMSELL"]:
-        print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION-{final_signal} 🔥 ".center(40))
-
-    if DEBUG_MODE:
-        print("═" * 43 + "\n")
-        
+    # Return final option state routing mapping alongside the original market exit string variable
     return final_signal, exit_sig
 
-if __name__ == "__main__":
-    print("\n[PXY ROUTER STATUS] Upstream Filtered Option Route Matrix Active.")
-    print("-" * 50)
-    final_route, raw_exit = get_entry_signal(df=None)
-    print("-" * 50)
