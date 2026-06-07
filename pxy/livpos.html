@@ -278,11 +278,25 @@ html,body {
 
     <!-- BUTTONS — only visible in full mode -->
     <div id="btnBar">
-        <button class="run-btn" id="btn1" onclick="runScript('pxyupdate', this)">▶ `Update </button>
-        <button class="run-btn" id="btn2" onclick="runScript('runpxy.py', this)">▶ Feed</button>
-        <button class="run-btn" id="btn3" onclick="runScript('runchrpxy.py', this)">▶ Chart</button>
-        <button class="run-btn" id="btn4" onclick="runScript('runpxy.py', this)">▶ Reset</button>
+        <button class="run-btn" onclick="runScript('pxyupdate', this)">▶ Update</button>
+        <button class="run-btn" onclick="runScript('runpxy', this)">▶ Feed</button>
+        <button class="run-btn" onclick="runScript('runchrpxy', this)">▶ Chart</button>
+        <button class="run-btn" onclick="runScript('pxyupdate', this)">▶ Reset</button>
     </div>
+</div>
+
+<!-- MINI OUTPUT TERMINAL -->
+<div id="outputPanel" style="
+    display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
+    width:min(90vw,600px); background:#06080d; border:1px solid rgba(255,255,255,0.14);
+    border-radius:10px; z-index:200; box-shadow:0 16px 48px rgba(0,0,0,0.7);
+    font-family:'DM Mono',monospace; overflow:hidden;
+">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#0c101a;border-bottom:1px solid rgba(255,255,255,0.07)">
+        <span style="font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:#5b6478" id="outputLabel">Output</span>
+        <span onclick="closeOutput()" style="cursor:pointer;color:#5b6478;font-size:12px;padding:0 4px">✕</span>
+    </div>
+    <pre id="outputText" style="padding:12px 16px;font-size:11px;line-height:1.6;color:#e8ecf4;max-height:200px;overflow-y:auto;margin:0;white-space:pre-wrap;word-break:break-all"></pre>
 </div>
 
 <script>
@@ -409,12 +423,35 @@ function runScript(script, btn) {
         .then(r => r.json())
         .then(d => {
             btn.textContent = d.ok ? '✓ Done' : '✗ Error';
-            btn.className   = `run-btn ${d.ok?'done':'error'}`;
+            btn.className   = `run-btn ${d.ok ? 'done' : 'error'}`;
+
+            // show output panel
+            const text  = (d.output || '') + (d.error ? '\n⚠ ' + d.error : '');
+            const label = d.ok ? `✓ ${script} — output` : `✗ ${script} — error`;
+            showOutput(label, text.trim() || '(no output)');
         })
-        .catch(() => { btn.textContent = '✗ Error'; btn.className = 'run-btn error'; })
+        .catch(e => {
+            btn.textContent = '✗ Error';
+            btn.className   = 'run-btn error';
+            showOutput(`✗ ${script} — error`, e.message || 'Network error');
+        })
         .finally(() => {
-            setTimeout(() => { btn.textContent = orig; btn.className = 'run-btn'; btn.disabled = false; }, 2500);
+            setTimeout(() => {
+                btn.textContent = orig;
+                btn.className   = 'run-btn';
+                btn.disabled    = false;
+            }, 3000);
         });
+}
+
+function showOutput(label, text) {
+    document.getElementById('outputLabel').textContent = label;
+    document.getElementById('outputText').textContent  = text;
+    document.getElementById('outputPanel').style.display = 'block';
+}
+
+function closeOutput() {
+    document.getElementById('outputPanel').style.display = 'none';
 }
 </script>
 </body>
