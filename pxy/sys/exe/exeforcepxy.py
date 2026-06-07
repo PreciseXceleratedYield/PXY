@@ -69,70 +69,57 @@ def execute_order(client, symbol, qty):
         print(f"{Fore.RED}❌ EXECUTION ERROR: {e}")
         return {"stat": "FAIL", "err": str(e)}
 
-async def main():
-    while True:
-        print(f"\n{Fore.YELLOW}⚡ === EXECUTOR FORCED ENGINE ===")
-        print(f"{Fore.WHITE} [1] FORCE BUY (CE)")
-        print(f"{Fore.WHITE} [2] FORCE SELL (PE)")
-        print(f"{Fore.WHITE} [3] SQUAREOFF")
-        print(f"{Fore.WHITE} [4] EXIT")
+def run_action(choice):
+    """Processes a chosen action option and fires core execution logic."""
+    if choice in ["4", ""]:
+        print(f"{Fore.YELLOW}❌ Execution exited.")
+        return False  # Break loop
         
-        try:
-            choice = input(f"{Fore.CYAN}Select action (1, 2, 3, or 4): {Style.RESET_ALL}").strip()
-            
-            if choice in ["4", ""]:
-                print(f"{Fore.YELLOW}❌ Execution exited.")
-                break
-                
-            elif choice == "3":
-                print(f"{Fore.YELLOW}🔄 Triggering Squareoff Script...")
-                target_script = HERE / "exesqrpxy.py"
-                if target_script.exists():
-                    subprocess.run([sys.executable, str(target_script)])
-                else:
-                    print(f"{Fore.RED}❌ File not found: {target_script}")
-                continue  # Return to the menu
+    elif choice == "3":
+        print(f"{Fore.YELLOW}🔄 Triggering Squareoff Script...")
+        target_script = HERE / "exesqrpxy.py"
+        if target_script.exists():
+            subprocess.run([sys.executable, str(target_script)])
+        else:
+            print(f"{Fore.RED}❌ File not found: {target_script}")
+        return True  # Keep loop going
 
-            elif choice == "1":
-                sig = "ATMBUY"
-                side_label = "CE"
-            elif choice == "2":
-                sig = "ATMSELL"
-                side_label = "PE"
-            else:
-                print(f"{Fore.RED}Invalid selection. Enter 1 for BUY, 2 for SELL, 3 for SQUAREOFF, or 4 to exit.")
-                continue
+    elif choice == "1":
+        sig = "ATMBUY"
+        side_label = "CE"
+    elif choice == "2":
+        sig = "ATMSELL"
+        side_label = "PE"
+    else:
+        print(f"{Fore.RED}Invalid selection. Enter 1 for BUY, 2 for SELL, 3 for SQUAREOFF, or 4 to exit.")
+        return True
 
-            # This block runs only if Option 1 or 2 is chosen
-            print(f"{Fore.MAGENTA}⚡ FORCED BYPASS TRIGGERED: Generating immediate {sig} ({side_label}) order...")
+    # Core Execution Engine for Option 1 & 2
+    print(f"{Fore.MAGENTA}⚡ FORCED BYPASS TRIGGERED: Generating immediate {sig} ({side_label}) order...")
 
-            # Initialize session directly
-            client = get_session()
-            if not client:
-                print(f"{Fore.RED}Session generation failed.")
-                continue
+    client = get_session()
+    if not client:
+        print(f"{Fore.RED}Session generation failed.")
+        return True
 
-            # Fetch parameters needed for symbol resolution
-            data = get_all_data()
-            ltp = data.get("price")
-            OTM_DISTANCE = 100
+    data = get_all_data()
+    ltp = data.get("price")
+    OTM_DISTANCE = 100
 
-            # Resolve token name
-            symbol = get_symbol(ltp, sig, OTM_DISTANCE)
-            res = {"stat": "SKIPPED"}
+    symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+    res = {"stat": "SKIPPED"}
 
-            if symbol and symbol != "NA":
-                res = execute_order(client, symbol, LOT_SIZE)
-            else:
-                print(f"{Fore.RED}Failed to resolve market symbol for {sig}.")
+    if symbol and symbol != "NA":
+        res = execute_order(client, symbol, LOT_SIZE)
+    else:
+        print(f"{Fore.RED}Failed to resolve market symbol for {sig}.")
 
-            # Status summary block
-            try:
-                funds = get_available_funds(client)
-            except:
-                funds = 0
+    try:
+        funds = get_available_funds(client)
+    except:
+        funds = 0
 
-            print(f"""
+    print(f"""
  =====================================
     ⚡ FORCE TRANSACTION STATUS
  =====================================
@@ -142,12 +129,35 @@ async def main():
     📌 Status : {res.get('stat')}
  =====================================
  """)
+    return True
 
+async def main():
+    # --- CHECK FOR DIRECT COMMAND-LINE ARGUMENT ---
+    if len(sys.argv) > 1:
+        arg_choice = sys.argv[1].strip()
+        dprint(f"Direct bypass triggered via CLI argument: option [{arg_choice}]", Fore.YELLOW)
+        run_action(arg_choice)
+        return  # End execution immediately after processing direct instruction
+
+    # --- FALLBACK TO INTERACTIVE MENU IF NO ARGUMENTS ---
+    while True:
+        print(f"\n{Fore.YELLOW}⚡ === EXECUTOR FORCED ENGINE ===")
+        print(f"{Fore.WHITE} [1] FORCE BUY (CE)")
+        print(f"{Fore.WHITE} [2] FORCE SELL (PE)")
+        print(f"{Fore.WHITE} [3] SQUAREOFF")
+        print(f"{Fore.WHITE} [4] EXIT")
+        
+        try:
+            choice = input(f"{Fore.CYAN}Select action (1, 2, 3, or 4): {Style.RESET_ALL}").strip()
+            should_continue = run_action(choice)
+            if not should_continue:
+                break
         except (KeyboardInterrupt, SystemExit):
             print(f"\n{Fore.YELLOW}❌ Execution aborted.")
             break
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
