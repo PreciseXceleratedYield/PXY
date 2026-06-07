@@ -25,7 +25,7 @@ def safe_float(val, fallback=0.0):
 
 def generate_pxy_tag(): 
     IST = pytz.timezone("Asia/Kolkata") 
-    return datetime.now(IST).strftime('%H%M%S') 
+    return datetime.now(IST).strftime('%H%M%S')
 
 def set_cooling(side): 
     file_path = f"exebal_cool_{side.lower()}.txt" 
@@ -52,15 +52,30 @@ def is_cooling(side):
     except Exception: 
         return False 
 
-def calculate_atr_threshold(row, side):
-    """Calculates the power-adjusted ATR threshold formula dynamically."""
+def calculate_atr_threshold(row, side, is_accelerated_state):
+    """
+    Normal state (AVGBUY/AVGSELL): Uses straight ATR% loss floor.
+    Accelerated State (BEAR/BULL): Instantly drops floor to ATR + max(Opposite Power, Depth).
+    """
     raw_atr_pct = safe_float(row.get("atr", 0.0))
-    opp_power = safe_float(row.get("pe_power" if side == 'CE' else "ce_power", 1.0))
-    opp_power = opp_power if opp_power > 0 else 1.0
     
-    if raw_atr_pct > 0:
-        return -((raw_atr_pct + opp_power) * ATR_MULTIPLIER)
-    return -(14.0 + opp_power)
+    # Extract opposing side metrics for precise downside risk mitigation
+    if side == 'CE':
+        opp_power = safe_float(row.get("pe_power", 1.0))
+        opp_depth = safe_float(row.get("hkin_pe_depth", 1.0))
+    else:
+        opp_power = safe_float(row.get("ce_power", 1.0))
+        opp_depth = safe_float(row.get("hkin_ce_depth", 1.0))
+
+    if is_accelerated_state:
+        # ACCELERATED PANIC STATE: Deep floor protection during an active counter-trend exit signal
+        highest_opp_risk = max(raw_atr_pct + opp_power, raw_atr_pct + opp_depth)
+        return -(highest_opp_risk * ATR_MULTIPLIER)
+    else:
+        # NORMAL STATE: Strict straight ATR loss threshold
+        if raw_atr_pct > 0:
+            return -(raw_atr_pct * ATR_MULTIPLIER)
+        return -14.0  # Raw fallback floor if ATR goes missing
 
 def get_loss(row): 
     """Optimized globally to prevent memory re-allocation inside the loop."""
@@ -94,7 +109,7 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, si
     print(border + "\n")
 
 def handle_side_averaging(client, df): 
-    """Averages only if EVERY active position on that side has crossed the power-adjusted ATR threshold.""" 
+    """Averages positions by explicitly mapping entry signal loops separate from exit trend accelerations.""" 
     if df is None or df.empty: 
         return 
         
@@ -110,17 +125,6 @@ def handle_side_averaging(client, df):
     raw_entry_signal = str(last_row["entry"]).upper().strip() 
     raw_exit_signal = str(last_row["exit"]).upper().strip()
 
-    # CORRECTED: Changed keys from 'pepower' to 'pe_power' to maintain dict key uniformity
-    pe_power = safe_float(last_row.get("pe_power", 0.0))
-    ce_power = safe_float(last_row.get("ce_power", 0.0))
-
-    # VERIFIED: Tested matrix paths run flawlessly without syntax compilation crashes
-    current_signal = "NONE"
-    if raw_entry_signal in ["AVGBUY"] or (raw_exit_signal in ["BEAR"] and pe_power > 15):
-        current_signal = "BUY"
-    elif raw_entry_signal in ["AVGSELL"] or (raw_exit_signal in ["BULL"] and ce_power > 15):
-        current_signal = "SELL"
-
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
@@ -130,23 +134,43 @@ def handle_side_averaging(client, df):
         if side_df.empty: 
             continue 
 
+        # --- EXPLICIT LAYER SYNCHRONIZATION MAPS ---
+        current_signal = "NONE"
+        is_accelerated_state = False
+
+        if side == 'CE':
+            if raw_entry_signal == "AVGBUY":
+                current_signal = "BUY"
+                is_accelerated_state = False
+            elif raw_exit_signal == "BEAR":
+                current_signal = "BUY"
+                is_accelerated_state = True
+
+        elif side == 'PE':
+            if raw_entry_signal == "AVGSELL":
+                current_signal = "SELL"
+                is_accelerated_state = False
+            elif raw_exit_signal == "BULL":
+                current_signal = "SELL"
+                is_accelerated_state = True
+
+        # If no matching trigger signal is active for this side, bypass processing loop
+        if current_signal == "NONE":
+            continue
+
         all_positions_crossed_threshold = True
         
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
-            row_threshold = calculate_atr_threshold(row, side)
+            row_threshold = calculate_atr_threshold(row, side, is_accelerated_state)
             
             if pos_loss > row_threshold:
                 all_positions_crossed_threshold = False
                 break  
 
         loss_hit = all_positions_crossed_threshold
-        signal_matches = (
-            (side == 'CE' and current_signal == "BUY") or
-            (side == 'PE' and current_signal == "SELL")
-        )
 
-        if loss_hit and signal_matches: 
+        if loss_hit: 
             if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
                 last_order = side_df.iloc[-1]
                 symbol = last_order['symbol'] 
@@ -154,7 +178,7 @@ def handle_side_averaging(client, df):
                 new_tag = generate_pxy_tag() 
                 
                 final_loss = get_loss(last_order)
-                final_threshold = calculate_atr_threshold(last_order, side)
+                final_threshold = calculate_atr_threshold(last_order, side, is_accelerated_state)
                 
                 print_pxy_trigger_dashboard(side, symbol, final_loss, final_threshold, current_signal, new_tag)
                 
@@ -177,4 +201,3 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Order confirmation complete for side {side}.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
-
