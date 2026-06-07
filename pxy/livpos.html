@@ -11,218 +11,263 @@
 
 <style>
 :root {
-    --bg:   #06080d;
-    --bg2:  #0c101a;
+    --bg:     #06080d;
+    --bg2:    #0c101a;
+    --bg3:    #111827;
     --border: rgba(255,255,255,0.07);
-    --text: #e8ecf4;
-    --muted:#5b6478;
-    --bull: #22c55e;
-    --bear: #ef4444;
-    --accent:#3b82f6;
+    --border2:rgba(255,255,255,0.14);
+    --text:   #e8ecf4;
+    --muted:  #5b6478;
+    --bull:   #22c55e;
+    --bear:   #ef4444;
+    --accent: #3b82f6;
+    --gold:   #f59e0b;
+}
+[data-theme="light"] {
+    --bg:#f1f5fb; --bg2:#ffffff; --bg3:#e8eef8;
+    --border:rgba(0,0,0,0.07); --border2:rgba(0,0,0,0.14);
+    --text:#0f172a; --muted:#94a3b8; --accent:#2563eb;
+    --bull:#16a34a; --bear:#dc2626; --gold:#d97706;
 }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+html,body {
+    height:100%; background:var(--bg); color:var(--text);
+    font-family:'DM Mono',monospace; overflow:hidden;
+    transition:background 0.35s,color 0.35s;
+}
 
-html, body {
-    height: 100%;
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'DM Mono', monospace;
-    overflow: hidden;
+/* ── PASSWORD OVERLAY ── */
+#pwdOverlay {
+    position:fixed; inset:0; z-index:999;
+    background:var(--bg);
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:20px;
+}
+#pwdOverlay.hidden { display:none; }
+
+.pwd-logo {
+    font-family:'Syne',sans-serif; font-weight:800;
+    font-size:clamp(24px,4vw,36px); color:var(--text);
+}
+.pwd-logo sup { font-size:0.5em; vertical-align:super; color:var(--accent); }
+
+.pwd-label {
+    font-size:11px; letter-spacing:0.16em; text-transform:uppercase;
+    color:var(--muted);
+}
+
+.pwd-input {
+    background:var(--bg2); border:1px solid var(--border2);
+    color:var(--text); font-family:'DM Mono',monospace;
+    font-size:28px; text-align:center; letter-spacing:0.2em;
+    padding:12px 24px; border-radius:10px; outline:none;
+    width:160px; transition:border-color 0.2s;
+}
+.pwd-input:focus { border-color:var(--accent); }
+.pwd-input.error { border-color:var(--bear); animation:shake 0.3s ease; }
+
+@keyframes shake {
+    0%,100%{transform:translateX(0)}
+    25%{transform:translateX(-8px)}
+    75%{transform:translateX(8px)}
+}
+
+.pwd-hint {
+    font-size:10px; color:var(--muted); letter-spacing:0.08em;
+}
+
+/* display mode badge */
+.display-badge {
+    font-size:9px; letter-spacing:0.16em; text-transform:uppercase;
+    color:var(--muted); padding:3px 10px;
+    border:1px solid var(--border2); border-radius:4px;
+    margin-top:8px;
 }
 
 /* ── HEADER ── */
 #header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 clamp(16px, 3vw, 32px);
-    height: 48px;
-    background: var(--bg2);
-    border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 clamp(16px,3vw,32px); height:48px;
+    background:var(--bg2); border-bottom:1px solid var(--border);
+    flex-shrink:0; gap:10px;
+    transition:background 0.35s,border-color 0.35s;
 }
-
-.logo {
-    font-family: 'Syne', sans-serif;
-    font-weight: 800;
-    font-size: 18px;
-    color: var(--text);
-}
-.logo sup { font-size: 0.5em; vertical-align: super; color: var(--accent); }
-
+.hdr-left,.hdr-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
 .back-btn {
-    padding: 4px 12px;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    color: var(--muted);
-    font-size: 11px;
-    text-decoration: none;
-    font-family: 'DM Mono', monospace;
-    transition: all 0.2s;
+    display:flex; align-items:center; gap:5px; padding:4px 11px;
+    border:1px solid var(--border2); border-radius:6px;
+    color:var(--muted); font-size:11px; letter-spacing:0.06em;
+    text-decoration:none; font-family:'DM Mono',monospace; transition:all 0.2s;
 }
-.back-btn:hover { color: var(--text); }
-
-#clock {
-    font-size: 11px;
-    color: var(--muted);
-    font-variant-numeric: tabular-nums;
+.back-btn:hover { color:var(--text); background:var(--bg3); }
+.divider-v { width:1px; height:18px; background:var(--border2); flex-shrink:0; }
+.page-title {
+    font-family:'Syne',sans-serif; font-weight:800;
+    font-size:clamp(13px,1.6vw,17px); letter-spacing:0.06em;
 }
+.logo { font-family:'Syne',sans-serif; font-weight:800; font-size:16px; }
+.logo sup { font-size:0.55em; vertical-align:super; color:var(--accent); }
+.theme-toggle { display:flex; align-items:center; cursor:pointer; user-select:none; }
+.toggle-track {
+    width:34px; height:18px; border-radius:9px;
+    background:var(--bg3); border:1px solid var(--border2);
+    position:relative; transition:background 0.35s;
+}
+[data-theme="light"] .toggle-track { background:var(--accent); border-color:var(--accent); }
+.toggle-thumb {
+    position:absolute; top:3px; left:3px; width:10px; height:10px;
+    border-radius:50%; background:var(--muted);
+    transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),background 0.35s;
+}
+[data-theme="light"] .toggle-thumb { transform:translateX(16px); background:#fff; }
+#clock { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
 
-/* ── MAIN GRID ── */
+/* mode badge in header */
+#modeBadge {
+    font-size:9px; letter-spacing:0.12em; text-transform:uppercase;
+    padding:2px 8px; border-radius:3px; flex-shrink:0;
+}
+#modeBadge.full    { background:rgba(34,197,94,0.13); color:var(--bull); }
+#modeBadge.display { background:rgba(91,100,120,0.15); color:var(--muted); }
+
+/* ── MAIN ── */
 #app {
-    display: flex;
-    flex-direction: column;
-    height: calc(100dvh - 48px);
+    display:flex; flex-direction:column;
+    height:calc(100dvh - 48px);
 }
 
-/* positions list — takes all space minus total bar */
 #positions {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    padding: clamp(8px, 1.5vh, 20px) clamp(12px, 2vw, 28px);
-    gap: clamp(4px, 1vh, 12px);
+    flex:1; display:flex; flex-direction:column; overflow:hidden;
+    padding:clamp(8px,1.5vh,20px) clamp(12px,2vw,28px);
+    gap:clamp(4px,1vh,12px);
 }
 
 .pos-row {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 clamp(16px, 2.5vw, 32px);
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    gap: 16px;
-    min-height: 0;
-    transition: border-color 0.3s;
+    flex:1; display:flex; align-items:center; justify-content:space-between;
+    padding:0 clamp(16px,2.5vw,32px);
+    background:var(--bg2); border:1px solid var(--border);
+    border-radius:10px; gap:16px; min-height:0;
+    transition:border-color 0.3s,background 0.35s;
 }
-.pos-row.bull { border-left: 4px solid var(--bull); }
-.pos-row.bear { border-left: 4px solid var(--bear); }
+.pos-row.bull { border-left:4px solid var(--bull); }
+.pos-row.bear { border-left:4px solid var(--bear); }
 
-.pos-left {
-    display: flex;
-    flex-direction: column;
-    gap: clamp(2px, 0.5vh, 6px);
-    min-width: 0;
-    flex: 1;
-}
-
+.pos-left { display:flex; flex-direction:column; gap:clamp(2px,0.5vh,6px); min-width:0; flex:1; }
 .pos-sym {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(18px, 3.5vw, 52px);
-    letter-spacing: 0.04em;
-    line-height: 1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    font-family:'Bebas Neue',sans-serif;
+    font-size:clamp(18px,3.5vw,52px); letter-spacing:0.04em; line-height:1;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-
-.pos-meta {
-    font-size: clamp(9px, 1.2vw, 14px);
-    color: var(--muted);
-    letter-spacing: 0.06em;
-}
-
+.pos-meta { font-size:clamp(9px,1.2vw,14px); color:var(--muted); letter-spacing:0.06em; }
 .pos-pnl {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(28px, 5.5vw, 86px);
-    letter-spacing: -1px;
-    line-height: 1;
-    flex-shrink: 0;
-    text-align: right;
+    font-family:'Bebas Neue',sans-serif;
+    font-size:clamp(28px,5.5vw,86px); letter-spacing:-1px; line-height:1;
+    flex-shrink:0; text-align:right;
 }
-.pos-pnl.bull { color: var(--bull); text-shadow: 0 0 30px rgba(34,197,94,0.25); }
-.pos-pnl.bear { color: var(--bear); text-shadow: 0 0 30px rgba(239,68,68,0.25); }
+.pos-pnl.bull { color:var(--bull); text-shadow:0 0 30px rgba(34,197,94,0.25); }
+.pos-pnl.bear { color:var(--bear); text-shadow:0 0 30px rgba(239,68,68,0.25); }
 
 /* ── TOTAL BAR ── */
 #totalBar {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 clamp(16px, 2.5vw, 32px);
-    height: clamp(64px, 10vh, 100px);
-    background: var(--bg2);
-    border-top: 1px solid var(--border);
-    gap: 16px;
+    flex-shrink:0; display:flex; align-items:center; justify-content:space-between;
+    padding:0 clamp(16px,2.5vw,32px);
+    height:clamp(64px,10vh,100px);
+    background:var(--bg2); border-top:1px solid var(--border); gap:16px;
+    transition:background 0.35s,border-color 0.35s;
 }
-
 .total-label {
-    font-family: 'Syne', sans-serif;
-    font-size: clamp(13px, 1.8vw, 22px);
-    font-weight: 800;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--muted);
+    font-family:'Syne',sans-serif; font-size:clamp(13px,1.8vw,22px);
+    font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted);
 }
-
-.total-count {
-    font-size: clamp(10px, 1.1vw, 14px);
-    color: var(--muted);
-}
-
+.total-count { font-size:clamp(10px,1.1vw,14px); color:var(--muted); }
 #totalPnl {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: clamp(42px, 8vw, 120px);
-    letter-spacing: -2px;
-    line-height: 1;
-    transition: color 0.4s;
+    font-family:'Bebas Neue',sans-serif;
+    font-size:clamp(42px,8vw,120px); letter-spacing:-2px; line-height:1;
+    transition:color 0.4s;
 }
-#totalPnl.bull { color: var(--bull); text-shadow: 0 0 40px rgba(34,197,94,0.3); }
-#totalPnl.bear { color: var(--bear); text-shadow: 0 0 40px rgba(239,68,68,0.3); }
+#totalPnl.bull { color:var(--bull); text-shadow:0 0 40px rgba(34,197,94,0.3); }
+#totalPnl.bear { color:var(--bear); text-shadow:0 0 40px rgba(239,68,68,0.3); }
 
-/* empty state */
-#emptyState {
-    display: none;
-    flex: 1;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    gap: 10px;
-    color: var(--muted);
-    font-size: 14px;
-    letter-spacing: 0.08em;
+/* ── BUTTON BAR ── */
+#btnBar {
+    display:none; /* hidden in display mode */
+    gap:10px; padding:10px clamp(12px,2vw,28px);
+    background:var(--bg2); border-top:1px solid var(--border); flex-shrink:0;
 }
-#emptyState.show { display: flex; }
+#btnBar.show { display:flex; }
+
+.run-btn {
+    flex:1; padding:clamp(8px,1.5vh,14px) 10px;
+    border-radius:8px; border:1px solid var(--border2);
+    background:var(--bg3); color:var(--text);
+    font-family:'DM Mono',monospace; font-size:clamp(11px,1.2vw,14px);
+    letter-spacing:0.08em; cursor:pointer; transition:all 0.2s;
+}
+.run-btn:hover  { border-color:var(--accent); color:var(--accent); }
+.run-btn:active { opacity:0.7; transform:scale(0.97); }
+.run-btn:disabled { opacity:0.5; cursor:default; }
+.run-btn.running { border-color:var(--gold); color:var(--gold); }
+.run-btn.done    { border-color:var(--bull); color:var(--bull); }
+.run-btn.error   { border-color:var(--bear); color:var(--bear); }
+
+/* empty */
+#emptyState {
+    display:none; flex:1; align-items:center; justify-content:center;
+    flex-direction:column; gap:10px; color:var(--muted);
+    font-size:14px; letter-spacing:0.08em;
+}
+#emptyState.show { display:flex; }
 
 /* live dot */
 .live-dot {
-    width: 6px; height: 6px; border-radius: 50%;
-    background: var(--bull); box-shadow: 0 0 6px var(--bull);
-    animation: blink 1.4s ease-in-out infinite;
-    display: inline-block;
+    width:6px; height:6px; border-radius:50%;
+    background:var(--bull); box-shadow:0 0 6px var(--bull);
+    animation:blink 1.4s ease-in-out infinite; display:inline-block;
 }
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
 </style>
 </head>
 <body>
 
+<!-- PASSWORD OVERLAY -->
+<div id="pwdOverlay">
+    <div class="pwd-logo">PXY<sup>®</sup></div>
+    <div class="pwd-label">Enter password to continue</div>
+    <input type="password" class="pwd-input" id="pwdInput"
+           placeholder="·" maxlength="10" autofocus
+           oninput="checkPwd(this)">
+    <div class="pwd-hint">Press any key to enter display mode without password</div>
+    <button class="back-btn" onclick="enterDisplayMode()" style="margin-top:4px">
+        👁 View Only Mode
+    </button>
+</div>
+
+<!-- HEADER -->
 <div id="header">
-    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+    <div class="hdr-left">
         <a class="back-btn" href="pxy.html">← DASHBOARD</a>
-        <div style="width:1px;height:18px;background:rgba(255,255,255,0.13)"></div>
-        <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(13px,1.6vw,17px);letter-spacing:0.06em">POSITIONS</span>
+        <div class="divider-v"></div>
+        <span class="page-title">POSITIONS</span>
+        <span id="modeBadge" class="display">DISPLAY</span>
     </div>
-    <div style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+    <div class="hdr-right">
         <span id="clock">—</span>
-        <div style="width:1px;height:18px;background:rgba(255,255,255,0.13)"></div>
-        <div id="themeToggle" style="display:flex;align-items:center;cursor:pointer;user-select:none">
-            <div style="width:34px;height:18px;border-radius:9px;background:var(--bg3,#111827);border:1px solid rgba(255,255,255,0.13);position:relative" id="tTrack">
-                <div id="tThumb" style="position:absolute;top:3px;left:3px;width:10px;height:10px;border-radius:50%;background:var(--muted,#5b6478);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1)"></div>
-            </div>
+        <div class="divider-v"></div>
+        <div class="theme-toggle" id="themeToggle">
+            <div class="toggle-track"><div class="toggle-thumb"></div></div>
         </div>
-        <div style="width:1px;height:18px;background:rgba(255,255,255,0.13)"></div>
+        <div class="divider-v"></div>
         <span class="logo">PXY<sup>®</sup></span>
     </div>
 </div>
 
+<!-- MAIN -->
 <div id="app">
     <div id="positions">
         <div id="emptyState">No open positions</div>
     </div>
+
     <div id="totalBar">
         <div>
             <div class="total-label"><span class="live-dot"></span>&nbsp; Running P&amp;L</div>
@@ -230,18 +275,58 @@ html, body {
         </div>
         <div id="totalPnl">0</div>
     </div>
+
+    <!-- BUTTONS — only visible in full mode -->
+    <div id="btnBar">
+        <button class="run-btn" id="btn1" onclick="runScript('runlilopxy.py', this)">▶ PnL</button>
+        <button class="run-btn" id="btn2" onclick="runScript('runpxy.py', this)">▶ Feed</button>
+        <button class="run-btn" id="btn3" onclick="runScript('runchrpxy.py', this)">▶ Chart</button>
+        <button class="run-btn" id="btn4" onclick="runScript('runpxy.py', this)">▶ Reset</button>
+    </div>
 </div>
 
 <script>
 'use strict';
 
+const PASS = '~';
+const KEY  = 'pxy_livpos_auth';
+let fullMode = false;
+
+/* ── PASSWORD ── */
+function checkPwd(input) {
+    if (input.value === PASS) {
+        sessionStorage.setItem(KEY, '1');
+        enterFullMode();
+    } else if (input.value.length >= 1 && input.value !== PASS.slice(0, input.value.length)) {
+        input.classList.add('error');
+        setTimeout(() => { input.classList.remove('error'); input.value = ''; }, 600);
+    }
+}
+
+function enterFullMode() {
+    fullMode = true;
+    document.getElementById('pwdOverlay').classList.add('hidden');
+    document.getElementById('btnBar').classList.add('show');
+    document.getElementById('modeBadge').textContent = 'FULL';
+    document.getElementById('modeBadge').className   = 'full';
+}
+
+function enterDisplayMode() {
+    fullMode = false;
+    document.getElementById('pwdOverlay').classList.add('hidden');
+    document.getElementById('modeBadge').textContent = 'DISPLAY';
+    document.getElementById('modeBadge').className   = 'display';
+}
+
+// auto-enter if already authenticated this session
+window.addEventListener('DOMContentLoaded', () => {
+    if (sessionStorage.getItem(KEY) === '1') enterFullMode();
+});
+
 /* ── THEME ── */
-let isDark = true;
 document.getElementById('themeToggle').addEventListener('click', () => {
-    isDark = !isDark;
-    document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
-    document.getElementById('tThumb').style.transform = isDark ? '' : 'translateX(16px)';
-    document.getElementById('tTrack').style.background = isDark ? '' : 'var(--accent,#2563eb)';
+    const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+    document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
 });
 
 /* ── CLOCK ── */
@@ -258,7 +343,6 @@ function fmt(n) {
 
 function shortSym(s) {
     if (!s) return '—';
-    // NIFTY25JUN26C23000 → NIFTY JUN 23000 CE
     const m = s.match(/([A-Z]+)(\d{2})([A-Z]{3})(\d{2})(C|P)(\d+)/i);
     if (m) return `${m[1]} ${m[3]}${m[4]} ${m[6]} ${m[5]==='C'?'CE':'PE'}`;
     return s;
@@ -266,22 +350,18 @@ function shortSym(s) {
 
 /* ── RENDER ── */
 function render(data) {
-    const pos       = document.getElementById('positions');
-    const empty     = document.getElementById('emptyState');
-    const totalEl   = document.getElementById('totalPnl');
-    const countEl   = document.getElementById('totalCount');
+    const pos     = document.getElementById('positions');
+    const empty   = document.getElementById('emptyState');
+    const totalEl = document.getElementById('totalPnl');
+    const countEl = document.getElementById('totalCount');
 
-    // clear old rows (keep emptyState)
     pos.querySelectorAll('.pos-row').forEach(r => r.remove());
 
     if (!data.length) {
         empty.classList.add('show');
-        totalEl.textContent = '0';
-        totalEl.className   = '';
-        countEl.textContent = '0 positions';
-        return;
+        totalEl.textContent = '0'; totalEl.className = '';
+        countEl.textContent = '0 positions'; return;
     }
-
     empty.classList.remove('show');
 
     const total = data.reduce((s, d) => s + (d.PNL || 0), 0);
@@ -290,38 +370,52 @@ function render(data) {
     data.forEach(d => {
         const pnl  = d.PNL || 0;
         const pbul = pnl >= 0;
-        const isCE = (d.SYMBOL || '').toUpperCase().includes('C');
+        const isCE = (d.SYMBOL || '').match(/C\d+$/i);
         const qty  = d.QTY ?? '—';
-
-        const row = document.createElement('div');
-        row.className = `pos-row ${pbul ? 'bull' : 'bear'}`;
+        const row  = document.createElement('div');
+        row.className = `pos-row ${pbul?'bull':'bear'}`;
         row.innerHTML = `
             <div class="pos-left">
                 <div class="pos-sym">${shortSym(d.SYMBOL)}</div>
-                <div class="pos-meta">Qty ${qty} &nbsp;·&nbsp; ${isCE ? 'CALL · CE' : 'PUT · PE'}</div>
+                <div class="pos-meta">Qty ${qty} &nbsp;·&nbsp; ${isCE?'CALL · CE':'PUT · PE'}</div>
             </div>
-            <div class="pos-pnl ${pbul ? 'bull' : 'bear'}">${fmt(pnl)}</div>`;
+            <div class="pos-pnl ${pbul?'bull':'bear'}">${fmt(pnl)}</div>`;
         pos.appendChild(row);
     });
 
     totalEl.textContent = fmt(total);
-    totalEl.className   = `${bull ? 'bull' : 'bear'}`;
-    countEl.textContent = `${data.length} position${data.length !== 1 ? 's' : ''}`;
+    totalEl.className   = bull ? 'bull' : 'bear';
+    countEl.textContent = `${data.length} position${data.length!==1?'s':''}`;
 }
 
 /* ── LOAD ── */
 async function load() {
     try {
         const res  = await fetch('./livpos.json?_=' + Date.now());
-        const data = await res.json();
-        render(data);
-    } catch {
-        render([]);
-    }
+        render(await res.json());
+    } catch { render([]); }
 }
+load(); setInterval(load, 3000);
 
-load();
-setInterval(load, 3000);
+/* ── RUN SCRIPT ── */
+function runScript(script, btn) {
+    if (!fullMode) return;
+    const orig = btn.textContent;
+    btn.textContent = '⏳ Running…';
+    btn.className   = 'run-btn running';
+    btn.disabled    = true;
+
+    fetch(`/run/${script}`)
+        .then(r => r.json())
+        .then(d => {
+            btn.textContent = d.ok ? '✓ Done' : '✗ Error';
+            btn.className   = `run-btn ${d.ok?'done':'error'}`;
+        })
+        .catch(() => { btn.textContent = '✗ Error'; btn.className = 'run-btn error'; })
+        .finally(() => {
+            setTimeout(() => { btn.textContent = orig; btn.className = 'run-btn'; btn.disabled = false; }, 2500);
+        });
+}
 </script>
 </body>
 </html>
