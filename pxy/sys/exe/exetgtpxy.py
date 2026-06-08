@@ -78,7 +78,7 @@ def target_price(row):
             if active_exit in ["SELL", "BEAR"]:  # Opposite side signal
                 target_pct = atr_val / 3
             else:                                # Same side signal
-                target_pct = max((atr_val / 3), atr_val - (ce_depth / 2))
+                target_pct = max(3, (atr_val / 3), atr_val - (ce_depth / 2))
 
             # Calls project targets UPWARD (+)
             calculated_target = entry_prc * (1 + (target_pct / 100.0))
@@ -87,8 +87,7 @@ def target_price(row):
             if active_exit in ["BUY", "BULL"]:   # Opposite side signal
                 target_pct = atr_val / 3
             else:                                # Same side signal
-                target_pct = max((atr_val / 3), atr_val - (pe_depth / 2))
-
+                target_pct = max(3, (atr_val / 3), atr_val - (pe_depth / 2))
             # Puts project targets DOWNWARD (-)
             calculated_target = entry_prc * (1 - (target_pct / 100.0))
         
