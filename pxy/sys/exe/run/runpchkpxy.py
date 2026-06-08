@@ -82,7 +82,7 @@ def get_position_summary(client=None):
         # parents[0] = Parent directory (where the script sits)
         # parents[1] = Grandparent directory
         # parents[2] = Grand-grandparent directory
-        target_dir = Path(__file__).resolve().parents[2]
+        target_dir = Path(__file__).resolve().parents[3]
         target_file = target_dir / "livpos.json"
 
         # Quietly write JSON output to the grand-grandparent directory
