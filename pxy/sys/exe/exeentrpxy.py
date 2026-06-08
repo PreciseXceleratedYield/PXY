@@ -74,6 +74,7 @@ def set_side_cooling(side):
 dprint("IMPORTING MODULES...")
 try:
     from syspxy import get_all_data
+    from execepepxy import get_target_quantities 
     from runclntpxy import get_session
     from runfundpxy import get_available_funds
     from runpchkpxy import get_position_summary
@@ -172,6 +173,10 @@ async def main():
         pe_qty = int(pe_match.group(1)) if pe_match else 0
         
         dprint(f"CURRENT -> CE: {ce_qty} | PE: {pe_qty}")
+        # --- SURGICAL ADDITION FROM EXECEPEPXY ---
+        supertrend_val = str(data.get("supertrend", "")).upper().strip()
+        max_allowed_ce, max_allowed_pe = get_target_quantities(supertrend_val, ce_qty, pe_qty, LOT_SIZE)
+        dprint(f"SUPERTREND: {supertrend_val} | MAX CE: {max_allowed_ce} | MAX PE: {max_allowed_pe}")
 
         # --- INTERCEPTING DISTANCE OFFSET LOGIC FOR STRIKES ---
         if "ATM" in sig:
@@ -188,7 +193,7 @@ async def main():
         if sig in ["ATMBUY", "OTMBUY"]:
             dprint("BRANCH: BALANCE CE")
             # ONLY BUY if CE is lower than PE, or both are zero
-            if ce_qty < pe_qty or (ce_qty == 0 and pe_qty == 0):
+            if ce_qty < max_allowed_ce or (ce_qty == 0 and pe_qty == 0):
                 if not is_side_cooling("CE"):
                     # CHANGED: Passing the dynamically selected distance value
                     symbol = get_symbol(ltp, sig, current_distance)
@@ -201,7 +206,7 @@ async def main():
         elif sig in ["ATMSELL", "OTMSELL"]:
             dprint("BRANCH: BALANCE PE")
             # ONLY BUY if PE is lower than CE, or both are zero
-            if pe_qty < ce_qty or (ce_qty == 0 and pe_qty == 0):
+            if pe_qty < max_allowed_pe or (ce_qty == 0 and pe_qty == 0):
                 if not is_side_cooling("PE"):
                     # CHANGED: Passing the dynamically selected distance value
                     symbol = get_symbol(ltp, sig, current_distance)
