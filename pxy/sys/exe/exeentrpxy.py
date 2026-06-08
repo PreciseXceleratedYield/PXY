@@ -215,9 +215,9 @@ async def main():
 
         print(f"""
  =====================================
-         💰  Cash   : {int(funds)}
-         📦  Pos    : {pos_raw}
-         🎫  Symbol : {symbol}
+         #💰  Cash   : {int(funds)}
+         #📦  Pos    : {pos_raw}
+         #🎫  Symbol : {symbol}
          🎯  Signal : {entry_signal}
          📌  Status : {res.get('stat')}
  =====================================
