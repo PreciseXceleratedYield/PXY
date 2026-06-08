@@ -49,20 +49,23 @@ def get_position_summary(client=None):
             status = "OPEN" if abs(net_qty) > 0 else "CLOSE"
 
             # --- DUMP ALL POSITIONS (ALL symbols, OPEN or CLOSED) ---
-            # Checks every known Kotak Neo field variant for closed/realised or active PNL
-            pnl_val = (
-                pos.get("rpnl") or 
-                pos.get("fl_realised_pnl") or 
-                pos.get("realised") or 
-                pos.get("urmtom") or 
-                pos.get("pnl") or 
-                pos.get("mtom") or 
-                0
-            )
+            # Kotak Neo often clears 'urmtom'/'pnl' on closed items. 
+            # We calculate PNL via (Total Sell Value - Total Buy Value) to bypass API limitations.
+            try:
+                buy_val = float(pos.get("flBuyAmt", 0)) + float(pos.get("cfBuyAmt", 0))
+                sell_val = float(pos.get("flSellAmt", 0)) + float(pos.get("cfSellAmt", 0))
+                
+                if status == "CLOSE":
+                    pnl_val = sell_val - buy_val
+                else:
+                    pnl_val = float(pos.get("urmtom", pos.get("pnl", sell_val - buy_val)))
+            except Exception:
+                pnl_val = float(pos.get("urmtom", pos.get("pnl", 0)))
+
             position_dumps.append({
                 "SYMBOL": symbol,
                 "QTY": net_qty,
-                "PNL": float(pnl_val) if pnl_val is not None else 0.0,
+                "PNL": float(pnl_val),
                 "STATUS": status
             })
 
@@ -89,10 +92,10 @@ def get_position_summary(client=None):
                     pe_lots += current_lots
 
         # 🟢 FIXED: Target the grand-grandparent folder correctly
-        # parents[0] = Parent directory (where the script sits)
-        # parents[1] = Grandparent directory
-        # parents[2] = Grand-grandparent directory
-        target_dir = Path(__file__).resolve().parents[2]
+        # parents = Parent directory (where the script sits)
+        # parents = Grandparent directory
+        # parents = Grand-grandparent directory
+        target_dir = Path(__file__).resolve().parents
         target_file = target_dir / "livpos.json"
 
         # Quietly write JSON output to the grand-grandparent directory
