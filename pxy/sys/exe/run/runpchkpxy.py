@@ -35,7 +35,8 @@ def get_position_summary(client=None):
             return "0CE0PE"
 
         for pos in positions:
-            # --- Get net quantity ---
+            # --- Normalize symbol and quantity ---
+            symbol = str(pos.get("trdSym", "")).upper()
             net_qty = float(pos.get("net_qty", 0))
             
             # Fallback if broker doesn't send net_qty properly
@@ -44,11 +45,19 @@ def get_position_summary(client=None):
                 sell = float(pos.get("flSellQty", 0))
                 net_qty = buy - sell
 
-            # --- ACTIVE POSITION CHECK ---
+            # --- DETERMINE STATUS BASED ON QTY ---
+            status = "OPEN" if abs(net_qty) > 0 else "CLOSE"
+
+            # --- DUMP ALL POSITIONS (ALL symbols, OPEN or CLOSED) ---
+            position_dumps.append({
+                "SYMBOL": symbol,
+                "QTY": net_qty,
+                "PNL": float(pos.get("pnl", pos.get("urmtom", 0))),
+                "STATUS": status
+            })
+
+            # --- ORIGINAL ACTIVE POSITION CHECK FOR LOTS ---
             if abs(net_qty) > 0:
-                # --- Normalize symbol ---
-                symbol = str(pos.get("trdSym", "")).upper()
-                
                 # --- DETECT INDEX & LOT SIZE ---
                 # We check BANKNIFTY first because "NIFTY" is a substring of "BANKNIFTY"
                 if "BANKNIFTY" in symbol:
@@ -56,19 +65,12 @@ def get_position_summary(client=None):
                 elif "NIFTY" in symbol:
                     lot_size = 65
                 else:
-                    # Skip symbols that are not Nifty or Bank Nifty
+                    # Skip symbols that are not Nifty or Bank Nifty for lot counters
                     continue
 
                 # --- CALCULATE LOTS ---
                 # Divide quantity by lot size to get count (e.g., 130 / 65 = 2)
                 current_lots = int(abs(net_qty) / lot_size)
-                
-                # Append live market metrics quietly into the local array
-                position_dumps.append({
-                    "SYMBOL": symbol,
-                    "QTY": net_qty,
-                    "PNL": float(pos.get("pnl", pos.get("urmtom", 0)))
-                })
 
                 # --- UPDATE COUNTERS ---
                 if symbol.endswith("CE"):
