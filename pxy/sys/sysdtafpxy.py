@@ -9,15 +9,22 @@ from syscnfgpxy import TICKER, OHLC_MODE, TIMEZONE
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 def get_heikin_ashi_ohlc(o, h, l, c):
-    """Generates pure Heikin-Ashi smooth trend OHLC matrices"""
-    ha_c = (o + h + l + c) / 4
-    ha_o = np.zeros_like(o)
-    if len(o) > 0:
-        ha_o = (o + c) / 2
-    for i in range(1, len(o)):
-        ha_o[i] = (ha_o[i-1] + ha_c[i-1]) / 2
-    ha_h = np.maximum(h, np.maximum(ha_o, ha_c))
-    ha_l = np.minimum(l, np.minimum(ha_o, ha_c))
+    """
+    Generates simplified, non-recursive candles matching our Pine Script logic.
+    - Open: Average of current open and current close
+    - High/Low: Raw chart values
+    - Close: Average of current OHLC
+    """
+    # Matches Pine: float py_c = (o + h + l + c) / 4.0
+    ha_c = (o + h + l + c) / 4.0
+    
+    # Matches Pine: float py_o = (o + c) / 2.0
+    ha_o = (o + c) / 2.0
+    
+    # Matches Pine: Keep High and Low raw
+    ha_h = h
+    ha_l = l
+    
     return ha_o, ha_h, ha_l, ha_c
 
 def get_open_close_median_ohlc(o, c):
@@ -72,6 +79,7 @@ def apply_ohlc_transformation(df, mode=1):
     elif mode == 4:
         df['Open'], df['High'], df['Low'], df['Close'] = get_momentum_ohlc(c)
     elif mode == 5:
+        # Mode 5 now blends your modified, simplified Pine formulas instead of standard HA
         ha_o, ha_h, ha_l, ha_c = get_heikin_ashi_ohlc(o, h, l, c)
         oc2_o, oc2_h, oc2_l, oc2_c = get_open_close_median_ohlc(o, c)
         c1c0_o, c1c0_h, c1c0_l, c1c0_c = get_momentum_ohlc(c)
@@ -90,14 +98,12 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     ticker_obj = yf.Ticker(TICKER)
     df = pd.DataFrame()
     
-    # If a specific period is passed by an external script, use it directly
     if period is not None:
         try:
             df = ticker_obj.history(period=period, interval=interval)
         except Exception as e:
             print(f"ERROR: Explicit download failed for period={period} | {e}")
             
-    # If no period is specified, execute your automatic 60-candle lookup cascade loop
     if df.empty:
         for search_period in ["5d", "7d", "max"]:
             try:
@@ -121,7 +127,6 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     else:
         df = df.tz_convert(TIMEZONE)
         
-    # Isolate exactly the final 60 rows for execution calculations
     df = df.tail(target_rows).copy()
     
     processed_df = apply_ohlc_transformation(df, mode=OHLC_MODE)
@@ -137,3 +142,4 @@ if __name__ == "__main__":
     output_df = fetch_yf_data()
     if not output_df.empty:
         print(f"ENGINE_RUN_SUCCESS | Collected Rows Count: {len(output_df)}")
+
