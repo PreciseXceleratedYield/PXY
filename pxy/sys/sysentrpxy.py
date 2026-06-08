@@ -114,7 +114,6 @@ def get_entry_signal(df=None):
     else:
         if DEBUG_MODE:
             print("  ⚠️ Warning: calculate_supertrend returned an empty or Null DataFrame.")
-            
 # ===============================================================================
 # PART 2: TIME ENGINE AND REORDERED WATERFALL ROUTING LOGIC
 # ===============================================================================
@@ -177,27 +176,50 @@ def get_entry_signal(df=None):
                     print("  ⚡ PRIORITY 2 UNLOCKED: Bullish BOS Structural Breakout approved.")
                 final_signal = "ATMBUY"
             elif bos_signal == "SELL":
+                final_signal = "ATMSELL"
                 if DEBUG_MODE:
                     print("  ⚡ PRIORITY 2 UNLOCKED: Bearish BOS Structural Breakdown approved.")
-                final_signal = "ATMSELL"
-                
-            # 📈 PRIORITY 3: Trend-following option contract assignment
+
+            # 📈 PRIORITY 3: Trend-Following Pullback and Running Regimes Gates
             else:
                 if DEBUG_MODE:
-                    print("  ↳ Priority 1 & 2 inactive. Falling to Step 3: Testing Priority 3 Assignment Matrix...")
+                    print(f"    ↳ Priority 2 is 'NONE'. Falling to Step 3: Testing Priority 3 (entry='{entry_sig}', exit='{exit_sig}', ST_Trend='{strnd_trend}', SMA_Trend='{sma_trend}')...")
                 
-                if entry_sig == "SELL" and strnd_trend == "BULL" and sma_trend == "BULL":
+                # 🎯 LOOKUP ARRAYS
+                is_signal_buy = (entry_sig == "BUY" or exit_sig == "BUY")
+                is_trend_bull = (sma_trend == "BULL" or strnd_trend == "BULL")
+                is_avgtrend_bull = (sma_trend == "BULL" and strnd_trend == "BULL")
+
+                is_signal_sell = (entry_sig == "SELL" or exit_sig == "SELL")
+                is_trend_bear = (sma_trend == "BEAR" or strnd_trend == "BEAR")
+                is_avgtrend_bear = (sma_trend == "BEAR" and strnd_trend == "BEAR")
+
+                # 🚀 Reordered Waterfall Logic (Strict AND checks evaluated before broad OR filters)
+                if is_signal_sell and is_avgtrend_bull:
+                    if DEBUG_MODE:
+                        print("  🚀 PRIORITY 3 UNLOCKED: Sell signal inside Pure Bull Trend -> AVGSELL approved.")
                     final_signal = "AVGSELL"
-                elif entry_sig == "BUY" and strnd_trend == "BEAR" and sma_trend == "BEAR":
+                    
+                elif is_signal_buy and is_avgtrend_bear:
+                    if DEBUG_MODE:
+                        print("  🚀 PRIORITY 3 UNLOCKED: Buy signal inside Pure Bear Trend -> AVGBUY approved.")
                     final_signal = "AVGBUY"
-                elif entry_sig == "BUY" and (strnd_trend == "BULL" or sma_trend == "BULL"):
+                    
+                elif is_signal_buy and is_trend_bull:
+                    if DEBUG_MODE:
+                        print("  🚀 PRIORITY 3 UNLOCKED: Buy signal matching Bull Trend -> ATMBUY approved.")
                     final_signal = "ATMBUY"
-                elif entry_sig == "SELL" and (strnd_trend == "BEAR" or sma_trend == "BEAR"):
+                    
+                elif is_signal_sell and is_trend_bear:
+                    if DEBUG_MODE:
+                        print("  🚀 PRIORITY 3 UNLOCKED: Sell signal matching Bear Trend -> ATMSELL approved.")
                     final_signal = "ATMSELL"
+                    
+                else:
+                    if DEBUG_MODE:
+                        print("    ❌ All waterfall priority logic gates failed to match execution parameters.")
+                    final_signal = "NONE"
 
-    if DEBUG_MODE:
-        print(f"🏁 FINAL ROUTED SIGNAL RESULT: {final_signal}")
-        print("═" * 60)
-
+    # Return final option state routing mapping alongside the original market exit string variable
     return final_signal, exit_sig
 
