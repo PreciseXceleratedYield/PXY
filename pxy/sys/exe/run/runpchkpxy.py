@@ -34,6 +34,12 @@ def get_position_summary(client=None):
         if not isinstance(positions, list):
             return "0CE0PE"
 
+        # 🔍 TEMP DEBUG PRINT: Let's see the raw keys available for the first position
+        if positions:
+            print("\n🔍 DEBUG - Available Keys in Kotak Position Object:")
+            print(json.dumps(positions[0], indent=2))
+            print("-" * 50 + "\n")
+
         for pos in positions:
             # --- Normalize symbol and quantity ---
             symbol = str(pos.get("trdSym", "")).upper()
@@ -49,8 +55,6 @@ def get_position_summary(client=None):
             status = "OPEN" if abs(net_qty) > 0 else "CLOSE"
 
             # --- DUMP ALL POSITIONS (ALL symbols, OPEN or CLOSED) ---
-            # Kotak Neo v2 clears floating PNL on closed items. 
-            # We calculate PNL via (Total Sell Value - Total Buy Value) to bypass API reset limitations.
             try:
                 buy_val = float(pos.get("flBuyAmt", 0)) + float(pos.get("cfBuyAmt", 0))
                 sell_val = float(pos.get("flSellAmt", 0)) + float(pos.get("cfSellAmt", 0))
@@ -115,4 +119,5 @@ if __name__ == "__main__":
         print("Actual Lot Summary:", get_position_summary(broker))
     except Exception as e:
         print(f"❌ Test Run Error: {e}")
+
 
