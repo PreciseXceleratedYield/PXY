@@ -49,10 +49,11 @@ def get_position_summary(client=None):
             status = "OPEN" if abs(net_qty) > 0 else "CLOSE"
 
             # --- DUMP ALL POSITIONS (ALL symbols, OPEN or CLOSED) ---
+            pnl_val = pos.get("rpnl", pos.get("urmtom", pos.get("pnl", 0)))
             position_dumps.append({
                 "SYMBOL": symbol,
                 "QTY": net_qty,
-                "PNL": float(pos.get("pnl", pos.get("urmtom", 0))),
+                "PNL": float(pnl_val) if pnl_val is not None else 0.0,
                 "STATUS": status
             })
 
@@ -104,5 +105,3 @@ if __name__ == "__main__":
         print("Actual Lot Summary:", get_position_summary(broker))
     except Exception as e:
         print(f"❌ Test Run Error: {e}")
-
-
