@@ -77,6 +77,7 @@ def get_entry_signal(df=None):
         entry_sig, exit_sig = get_signal(master_df)
         entry_sig = str(entry_sig).upper().strip()
         exit_sig = str(exit_sig).upper().strip()
+        entry_sig = exit_sig
         if DEBUG_MODE:
             print(f"  -> [sysmktpxy] Raw Entry Signal: '{entry_sig}' | Exit Signal: '{exit_sig}'")
     except Exception as e:
