@@ -219,6 +219,7 @@ async def main():
         print(f"""
  ============ BUY ACTION =============
          🎯  Signal : {entry_signal}
+         📦  Pos    : {pos_raw}
          📌  Status : {res.get('stat')}
  =====================================
  """)
