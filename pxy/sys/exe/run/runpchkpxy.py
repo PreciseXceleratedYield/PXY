@@ -91,9 +91,9 @@ def get_position_summary(client=None):
                 elif symbol.endswith("PE"):
                     pe_lots += current_lots
 
-        # 🟢 FIXED: Target the 4th parent folder correctly to reach ~/pxy
-        # parents = run/, parents = exe/, parents = sys/, parents = pxy/
-        target_dir = Path(__file__).resolve().parents
+        # 🟢 FIXED: Explicitly target parents[3] to go 4 levels up to reach ~/pxy
+        # parents[0]=run/, parents[1]=exe/, parents[2]=sys/, parents[3]=pxy/
+        target_dir = Path(__file__).resolve().parents[3]
         target_file = target_dir / "livpos.json"
 
         # Quietly write JSON output to the target directory
