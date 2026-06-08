@@ -91,14 +91,12 @@ def get_position_summary(client=None):
                 elif symbol.endswith("PE"):
                     pe_lots += current_lots
 
-        # 🟢 FIXED: Target the grand-grandparent folder correctly
-        # parents = Parent directory (where the script sits)
-        # parents = Grandparent directory
-        # parents = Grand-grandparent directory
-        target_dir = Path(__file__).resolve().parents
+        # 🟢 FIXED: Target the 4th parent folder correctly to reach ~/pxy
+        # parents[0] = run/, parents[1] = exe/, parents[2] = sys/, parents[3] = pxy/
+        target_dir = Path(__file__).resolve().parents[3]
         target_file = target_dir / "livpos.json"
 
-        # Quietly write JSON output to the grand-grandparent directory
+        # Quietly write JSON output to the target directory
         with open(target_file, "w") as f:
             json.dump(position_dumps, f)
 
@@ -117,5 +115,4 @@ if __name__ == "__main__":
         print("Actual Lot Summary:", get_position_summary(broker))
     except Exception as e:
         print(f"❌ Test Run Error: {e}")
-
 
