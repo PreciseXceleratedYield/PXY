@@ -212,12 +212,13 @@ async def main():
                 dprint(f"SKIP: PE({pe_qty}) is already balanced with or > CE({ce_qty})", Fore.YELLOW)
 
         funds = get_available_funds(client)
-
-        print(f"""
- =====================================
          #💰  Cash   : {int(funds)}
          #📦  Pos    : {pos_raw}
          #🎫  Symbol : {symbol}
+
+        print(f"""
+ =====================================
+
          🎯  Signal : {entry_signal}
          📌  Status : {res.get('stat')}
  =====================================
