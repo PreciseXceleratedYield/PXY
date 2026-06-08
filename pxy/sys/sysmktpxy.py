@@ -37,6 +37,7 @@ def _print_console_bar(c2_c, c1_c, c0_c, c2_color, c1_color, c0_color, entry, ex
     c1_ansi = get_color_ansi(c1_color)
     c0_ansi = get_color_ansi(c0_color)
 
+    # Restored exactly to your original C2/C1/C0 text labeling schema
     rows = [
         (c2_c, f"    C2 -{c2_c:.2f}", c2_ansi),
         (c1_c, f"    C1 -{c1_c:.2f}", c1_ansi),
@@ -44,12 +45,9 @@ def _print_console_bar(c2_c, c1_c, c0_c, c2_color, c1_color, c0_color, entry, ex
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
-    print(f"\n{YLW}= GEOMETRIC PXY®-PRIORITY ENGINE STATE ={RST}")
+    print(f"\n{YLW}= GEOMETRIC PXY®-PRIORITY ENTRY ENGINE ={RST}")
     for val, label, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val)}{GRAY}]{RST}")
-    print(f"{GRAY}----------------------------------------{RST}")
-    print(f"  🔒 ENTRY (Confirm): {entry}")
-    print(f"  📡 EXIT (Upstream): {exit_sig}")
     print(f"{YLW}========================================{RST}")
 
 def log_sync_state(timestamp, entry, exit_sig, price):
@@ -164,5 +162,4 @@ if __name__ == "__main__":
             
     except Exception as e:
         print(f"❌ Failed to execute live stream check: {e}")
-
 
