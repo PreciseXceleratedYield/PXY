@@ -28,9 +28,9 @@ def _print_console_bar(c2_c, c1_c, c0_c, c2_o, c1_o, c0_o, entry, exit_sig):
         pos = max(1, pos)
         return (marker * pos).ljust(scale_width)
 
-    c2_color = GRN if c2_c >= c2_o else RED
-    c1_color = GRN if c1_c >= c1_o else RED
-    c0_color = GRN if c0_c >= c0_o else RED
+    c2_color = GRN if c2_c > c2_o else (RED if c2_c < c2_o else YLW)
+    c1_color = GRN if c1_c > c1_o else (RED if c1_c < c1_o else YLW)
+    c0_color = GRN if c0_c > c0_o else (RED if c0_c < c0_o else YLW)
 
     rows = [
         (c2_c, f"    C2 -{c2_c:.2f}", "█", c2_color),
@@ -100,21 +100,26 @@ def get_signal(df):
         c1_c, c1_o = float(c1_row['Close']), float(c1_row['Open'])
         c0_c, c0_o = float(c0_row['Close']), float(c0_row['Open'])
 
-        # Establish binary direction profiles
-        c2_is_green = c2_c >= c2_o
-        c1_is_green = c1_c >= c1_o
-        c0_is_green = c0_c >= c0_o
+        # Establish strict, mutually exclusive direction profiles
+        c2_is_green = c2_c > c2_o
+        c2_is_red   = c2_c < c2_o
 
-        # 3. CALCULATE ASYMMETRIC HORIZONS
+        c1_is_green = c1_c > c1_o
+        c1_is_red   = c1_c < c1_o
+
+        c0_is_green = c0_c > c0_o
+        c0_is_red   = c0_c < c0_o
+
+        # 3. CALCULATE ASYMMETRIC HORIZONS WITH EXCLUSIVE CONDITIONS
 
         # --- A. ENTRY SIGNAL: CONFIRMED ENGINE HORIZON (Past 2 vs Past 1) ---
         if c2_is_green and c1_is_green:
             entry = "BULL"
-        elif not c2_is_green and not c1_is_green:
+        elif c2_is_red and c1_is_red:
             entry = "BEAR"
-        elif c2_is_green and not c1_is_green:
+        elif c2_is_green and c1_is_red:
             entry = "SELL"
-        elif not c2_is_green and c1_is_green:
+        elif c2_is_red and c1_is_green:
             entry = "BUY"
         else:
             entry = "NONE"
@@ -122,11 +127,11 @@ def get_signal(df):
         # --- B. EXIT SIGNAL: LIVE ENGINE HORIZON (Past 1 vs Live Running C0) ---
         if c1_is_green and c0_is_green:
             exit_sig = "BULL"
-        elif not c1_is_green and not c0_is_green:
+        elif c1_is_red and c0_is_red:
             exit_sig = "BEAR"
-        elif c1_is_green and not c0_is_green:
+        elif c1_is_green and c0_is_red:
             exit_sig = "SELL"
-        elif not c1_is_green and c0_is_green:
+        elif c1_is_red and c0_is_green:
             exit_sig = "BUY"
         else:
             exit_sig = "NONE"
@@ -163,4 +168,3 @@ if __name__ == "__main__":
             
     except Exception as e:
         print(f"❌ Failed to execute live stream check: {e}")
-
