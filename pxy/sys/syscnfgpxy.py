@@ -3,7 +3,7 @@ import pytz
 # ---------------- LOCAL SYSTEM CONFIGURATION ----------------
 PARAMS = {
     "ticker": "^NSEI",          # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X"^GSPC
-    "ohlc_mode": 1           # Change Mode Here: 1=Raw, 2=HA, 3=oc/2, 4=c1c0, 5=Composite Average
+    "ohlc_mode": 2          # Change Mode Here: 1=Raw, 2=HA, 3=oc/2, 4=c1c0, 5=Composite Average
 }
 
 # ---------------- CONSTANTS DERIVED FROM CONFIG ----------------
