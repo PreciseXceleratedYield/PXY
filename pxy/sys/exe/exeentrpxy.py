@@ -201,7 +201,7 @@ async def main():
                         res = execute_order(client, symbol, LOT_SIZE)
                         if res["stat"] == "OK": set_side_cooling("CE")
             else:
-                dprint(f"SKIP: CE({ce_qty}) is already balanced with or > PE({pe_qty})", Fore.YELLOW)
+                dprint(f"SKIP: CE({ce_qty}) has hit or exceeded Supertrend cap({max_allowed_ce})", Fore.YELLOW)
 
         elif sig in ["ATMSELL", "OTMSELL"]:
             dprint("BRANCH: BALANCE PE")
@@ -214,7 +214,7 @@ async def main():
                         res = execute_order(client, symbol, LOT_SIZE)
                         if res["stat"] == "OK": set_side_cooling("PE")
             else:
-                dprint(f"SKIP: PE({pe_qty}) is already balanced with or > CE({ce_qty})", Fore.YELLOW)
+                dprint(f"SKIP: PE({pe_qty}) has hit or exceeded Supertrend cap({max_allowed_pe})", Fore.YELLOW)
 
         funds = get_available_funds(client)
          #💰  Cash   : {int(funds)}
