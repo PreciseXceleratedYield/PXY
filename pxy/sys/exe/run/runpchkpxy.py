@@ -34,12 +34,6 @@ def get_position_summary(client=None):
         if not isinstance(positions, list):
             return "0CE0PE"
 
-        # 🔍 TEMP DEBUG PRINT: Let's see the raw keys available for the first position
-        if positions:
-            print("\n🔍 DEBUG - Available Keys in Kotak Position Object:")
-            print(json.dumps(positions[0], indent=2))
-            print("-" * 50 + "\n")
-
         for pos in positions:
             # --- Normalize symbol and quantity ---
             symbol = str(pos.get("trdSym", "")).upper()
@@ -55,16 +49,18 @@ def get_position_summary(client=None):
             status = "OPEN" if abs(net_qty) > 0 else "CLOSE"
 
             # --- DUMP ALL POSITIONS (ALL symbols, OPEN or CLOSED) ---
+            # Derived mathematically using Neo V2's precise transaction fields
             try:
-                buy_val = float(pos.get("flBuyAmt", 0)) + float(pos.get("cfBuyAmt", 0))
-                sell_val = float(pos.get("flSellAmt", 0)) + float(pos.get("cfSellAmt", 0))
+                buy_amt = float(pos.get("buyAmt", 0))
+                sell_amt = float(pos.get("sellAmt", 0))
                 
                 if status == "CLOSE":
-                    pnl_val = sell_val - buy_val
+                    pnl_val = sell_amt - buy_amt
                 else:
-                    pnl_val = float(pos.get("urmtom", pos.get("pnl", sell_val - buy_val)))
+                    # Fallback chain for open positions, defaulting to math calculation
+                    pnl_val = float(pos.get("urmtom", pos.get("pnl", sell_amt - buy_amt)))
             except Exception:
-                pnl_val = float(pos.get("urmtom", pos.get("pnl", 0)))
+                pnl_val = 0.0
 
             position_dumps.append({
                 "SYMBOL": symbol,
@@ -96,8 +92,8 @@ def get_position_summary(client=None):
                     pe_lots += current_lots
 
         # 🟢 FIXED: Target the 4th parent folder correctly to reach ~/pxy
-        # parents[0] = run/, parents[1] = exe/, parents[2] = sys/, parents[3] = pxy/
-        target_dir = Path(__file__).resolve().parents[3]
+        # parents = run/, parents = exe/, parents = sys/, parents = pxy/
+        target_dir = Path(__file__).resolve().parents
         target_file = target_dir / "livpos.json"
 
         # Quietly write JSON output to the target directory
@@ -119,5 +115,4 @@ if __name__ == "__main__":
         print("Actual Lot Summary:", get_position_summary(broker))
     except Exception as e:
         print(f"❌ Test Run Error: {e}")
-
 
