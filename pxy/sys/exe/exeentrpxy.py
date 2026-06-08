@@ -217,8 +217,7 @@ async def main():
          #🎫  Symbol : {symbol}
 
         print(f"""
- =====================================
-
+ ============ BUY ACTION =============
          🎯  Signal : {entry_signal}
          📌  Status : {res.get('stat')}
  =====================================
