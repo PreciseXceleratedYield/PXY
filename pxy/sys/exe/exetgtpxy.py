@@ -76,29 +76,20 @@ def target_price(row):
         # 5. Core execution logic evaluating directional signals
         if is_ce:
             if active_exit in ["SELL", "BEAR"]:  # Opposite side signal
-                target_pct = 3
-            else:                                # Same side signal
-                target_pct = max(3, (atr_val / 2), atr_val - (ce_depth / 2))
-
-            # Calls project targets UPWARD (+)
-            calculated_target = entry_prc * (1 + (target_pct / 100.0))
+                target_pct = atr_val
+            else:                                # Same side signal (CORRECTED SYNTAX)
+                target_pct = max(atr_val + ce_power, atr_val + ce_depth)
 
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   # Opposite side signal
-                target_pct = 3
-            else:                                # Same side signal
-                target_pct = max(3, (atr_val / 2), atr_val - (pe_depth / 2))
-            # Puts project targets DOWNWARD (-)
-            calculated_target = entry_prc * (1 - (target_pct / 100.0))
-        
-        else:
-            calculated_target = entry_prc
+                target_pct = atr_val
+            else:                                # Same side signal (CORRECTED SYNTAX)
+                target_pct = max(atr_val + pe_power, atr_val + pe_depth)
 
         # 6. Final mathematical target projection calculation
+        calculated_target = entry_prc * (1 + (target_pct / 100.0))
         return round(calculated_target, 2)
-
 
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0
-
