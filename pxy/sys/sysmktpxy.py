@@ -37,11 +37,11 @@ def _print_console_bar(c2_c, c1_c, c0_c, c2_color, c1_color, c0_color, entry, ex
     c1_ansi = get_color_ansi(c1_color)
     c0_ansi = get_color_ansi(c0_color)
 
-    # Restored exactly to your original C2/C1/C0 text labeling schema
+    # Added explicit horizon state descriptors directly to the sorted label schema
     rows = [
-        (c2_c, f"    C2 -{c2_c:.2f}", c2_ansi),
-        (c1_c, f"    C1 -{c1_c:.2f}", c1_ansi),
-        (c0_c, f"    C0 -{c0_c:.2f}", c0_ansi)
+        (c2_c, f"    C2 (Past 2) -{c2_c:.2f}", c2_ansi),
+        (c1_c, f"    C1 (Confirmed) -{c1_c:.2f}", c1_ansi),
+        (c0_c, f"    C0 (Live Running) -{c0_c:.2f}", c0_ansi)
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
