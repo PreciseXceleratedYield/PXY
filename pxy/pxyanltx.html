@@ -771,7 +771,9 @@ function selectTrade(t) {
     });
 
     // NO zoom — keep full chart context
-    setTimeout(() => { redrawMarkers(); showTooltip(t); }, 30);
+    #setTimeout(() => { redrawMarkers(); showTooltip(t); }, 30);
+    setTimeout(() => { redrawMarkers(); }, 30);
+
 }
 
 function clearSelection() {
