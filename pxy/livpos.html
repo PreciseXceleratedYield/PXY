@@ -4,228 +4,275 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#06080d" id="themeColorMeta">
 <title>PXY® — Live Positions</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400&family=Syne:wght@800&display=swap" rel="stylesheet">
-
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <style>
-:root {
-    --bg:     #06080d;
-    --bg2:    #0c101a;
-    --bg3:    #111827;
-    --border: rgba(255,255,255,0.07);
-    --border2:rgba(255,255,255,0.14);
-    --text:   #e8ecf4;
-    --muted:  #5b6478;
-    --bull:   #22c55e;
-    --bear:   #ef4444;
-    --accent: #3b82f6;
-    --gold:   #f59e0b;
+:root,[data-theme="dark"] {
+    --bg:#06080d; --bg2:#0c101a; --bg3:#111827;
+    --border:rgba(255,255,255,0.06); --border2:rgba(255,255,255,0.13);
+    --text:#e8ecf4; --muted:#5b6478; --accent:#3b82f6;
+    --bull:#22c55e; --bear:#ef4444; --gold:#f59e0b;
+    --bull-dim:rgba(34,197,94,0.12); --bear-dim:rgba(239,68,68,0.12);
+    --shadow:rgba(0,0,0,0.55); --header-h:48px;
 }
 [data-theme="light"] {
-    --bg:#f1f5fb; --bg2:#ffffff; --bg3:#e8eef8;
+    --bg:#f1f5fb; --bg2:#ffffff; --bg3:#eef1f8;
     --border:rgba(0,0,0,0.07); --border2:rgba(0,0,0,0.14);
     --text:#0f172a; --muted:#94a3b8; --accent:#2563eb;
     --bull:#16a34a; --bear:#dc2626; --gold:#d97706;
+    --bull-dim:rgba(22,163,74,0.11); --bear-dim:rgba(220,38,38,0.11);
+    --shadow:rgba(0,0,0,0.12);
 }
 
 *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
-html,body {
-    height:100%; background:var(--bg); color:var(--text);
-    font-family:'DM Mono',monospace; overflow:hidden;
-    transition:background 0.35s,color 0.35s;
+html { height:100%; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+body {
+    height:100dvh; display:flex; flex-direction:column;
+    font-family:'DM Mono',monospace; background:var(--bg); color:var(--text);
+    transition:background 0.35s,color 0.35s; overscroll-behavior:none;
+    -webkit-tap-highlight-color:transparent;
 }
+*{scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
 
 /* ── PASSWORD OVERLAY ── */
 #pwdOverlay {
-    position:fixed; inset:0; z-index:999;
-    background:var(--bg);
-    display:flex; flex-direction:column;
-    align-items:center; justify-content:center; gap:20px;
+    position:fixed; inset:0; z-index:999; background:var(--bg);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
 }
 #pwdOverlay.hidden { display:none; }
-
-.pwd-logo {
-    font-family:'Syne',sans-serif; font-weight:800;
-    font-size:clamp(24px,4vw,36px); color:var(--text);
-}
+.pwd-logo { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(22px,4vw,34px); }
 .pwd-logo sup { font-size:0.5em; vertical-align:super; color:var(--accent); }
-
-.pwd-label {
-    font-size:11px; letter-spacing:0.16em; text-transform:uppercase;
-    color:var(--muted);
-}
-
+.pwd-label { font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--muted); }
 .pwd-input {
-    background:var(--bg2); border:1px solid var(--border2);
-    color:var(--text); font-family:'DM Mono',monospace;
-    font-size:28px; text-align:center; letter-spacing:0.2em;
-    padding:12px 24px; border-radius:10px; outline:none;
-    width:160px; transition:border-color 0.2s;
+    background:var(--bg2); border:1px solid var(--border2); color:var(--text);
+    font-family:'DM Mono',monospace; font-size:26px; text-align:center;
+    letter-spacing:0.2em; padding:10px 22px; border-radius:10px;
+    outline:none; width:150px; transition:border-color 0.2s;
 }
 .pwd-input:focus { border-color:var(--accent); }
-.pwd-input.error { border-color:var(--bear); animation:shake 0.3s ease; }
-
-@keyframes shake {
-    0%,100%{transform:translateX(0)}
-    25%{transform:translateX(-8px)}
-    75%{transform:translateX(8px)}
+.pwd-input.error { border-color:var(--bear); animation:shake 0.3s; }
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.pwd-hint { font-size:10px; color:var(--muted); }
+.view-btn {
+    padding:5px 14px; border:1px solid var(--border2); border-radius:6px;
+    color:var(--muted); font-size:11px; background:transparent;
+    font-family:'DM Mono',monospace; cursor:pointer; transition:all 0.2s;
 }
-
-.pwd-hint {
-    font-size:10px; color:var(--muted); letter-spacing:0.08em;
-}
-
-/* display mode badge */
-.display-badge {
-    font-size:9px; letter-spacing:0.16em; text-transform:uppercase;
-    color:var(--muted); padding:3px 10px;
-    border:1px solid var(--border2); border-radius:4px;
-    margin-top:8px;
-}
+.view-btn:hover { color:var(--text); background:var(--bg3); }
 
 /* ── HEADER ── */
 #header {
+    height:var(--header-h); flex-shrink:0;
     display:flex; align-items:center; justify-content:space-between;
-    padding:0 clamp(16px,3vw,32px); height:48px;
+    padding:0 clamp(12px,2.5vw,24px);
     background:var(--bg2); border-bottom:1px solid var(--border);
-    flex-shrink:0; gap:10px;
-    transition:background 0.35s,border-color 0.35s;
+    transition:background 0.35s,border-color 0.35s; gap:10px;
 }
-.hdr-left,.hdr-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+.hdr-l,.hdr-r { display:flex; align-items:center; gap:10px; flex-shrink:0; }
 .back-btn {
     display:flex; align-items:center; gap:5px; padding:4px 11px;
-    border:1px solid var(--border2); border-radius:6px;
-    color:var(--muted); font-size:11px; letter-spacing:0.06em;
-    text-decoration:none; font-family:'DM Mono',monospace; transition:all 0.2s;
+    border:1px solid var(--border2); border-radius:6px; color:var(--muted);
+    font-size:11px; letter-spacing:0.06em; text-decoration:none;
+    font-family:'DM Mono',monospace; transition:all 0.2s;
 }
 .back-btn:hover { color:var(--text); background:var(--bg3); }
-.divider-v { width:1px; height:18px; background:var(--border2); flex-shrink:0; }
-.page-title {
-    font-family:'Syne',sans-serif; font-weight:800;
-    font-size:clamp(13px,1.6vw,17px); letter-spacing:0.06em;
-}
+.dv { width:1px; height:18px; background:var(--border2); flex-shrink:0; }
+.page-title { font-family:'Syne',sans-serif; font-weight:800; font-size:clamp(13px,1.6vw,16px); letter-spacing:0.06em; }
 .logo { font-family:'Syne',sans-serif; font-weight:800; font-size:16px; }
 .logo sup { font-size:0.55em; vertical-align:super; color:var(--accent); }
 .theme-toggle { display:flex; align-items:center; cursor:pointer; user-select:none; }
-.toggle-track {
-    width:34px; height:18px; border-radius:9px;
-    background:var(--bg3); border:1px solid var(--border2);
-    position:relative; transition:background 0.35s;
-}
+.toggle-track { width:34px; height:18px; border-radius:9px; background:var(--bg3); border:1px solid var(--border2); position:relative; transition:background 0.35s; }
 [data-theme="light"] .toggle-track { background:var(--accent); border-color:var(--accent); }
-.toggle-thumb {
-    position:absolute; top:3px; left:3px; width:10px; height:10px;
-    border-radius:50%; background:var(--muted);
-    transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),background 0.35s;
-}
+.toggle-thumb { position:absolute; top:3px; left:3px; width:10px; height:10px; border-radius:50%; background:var(--muted); transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),background 0.35s; }
 [data-theme="light"] .toggle-thumb { transform:translateX(16px); background:#fff; }
-#clock { font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; }
-
-/* mode badge in header */
-#modeBadge {
-    font-size:9px; letter-spacing:0.12em; text-transform:uppercase;
-    padding:2px 8px; border-radius:3px; flex-shrink:0;
-}
-#modeBadge.full    { background:rgba(34,197,94,0.13); color:var(--bull); }
+#clock { font-size:10px; color:var(--muted); font-variant-numeric:tabular-nums; }
+#modeBadge { font-size:9px; letter-spacing:0.1em; text-transform:uppercase; padding:2px 7px; border-radius:3px; flex-shrink:0; }
+#modeBadge.full    { background:var(--bull-dim); color:var(--bull); }
 #modeBadge.display { background:rgba(91,100,120,0.15); color:var(--muted); }
 
-/* ── MAIN ── */
-#app {
-    display:flex; flex-direction:column;
-    height:calc(100dvh - 48px);
-}
-
-#positions {
-    flex:1; display:flex; flex-direction:column; overflow:hidden;
-    padding:clamp(8px,1.5vh,20px) clamp(12px,2vw,28px);
-    gap:clamp(4px,1vh,12px);
-}
-
-.pos-row {
-    flex:1; display:flex; align-items:center; justify-content:space-between;
-    padding:0 clamp(16px,2.5vw,32px);
-    background:var(--bg2); border:1px solid var(--border);
-    border-radius:10px; gap:16px; min-height:0;
-    transition:border-color 0.3s,background 0.35s;
-}
-.pos-row.bull { border-left:4px solid var(--bull); }
-.pos-row.bear { border-left:4px solid var(--bear); }
-
-.pos-left { display:flex; flex-direction:column; gap:clamp(2px,0.5vh,6px); min-width:0; flex:1; }
-.pos-sym {
-    font-family:'Bebas Neue',sans-serif;
-    font-size:clamp(9px,1.8vw,28px); letter-spacing:0.04em; line-height:1;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-.pos-meta { font-size:clamp(9px,1.2vw,14px); color:var(--muted); letter-spacing:0.06em; }
-.pos-pnl {
-    font-family:'Bebas Neue',sans-serif;
-    font-size:clamp(9px,1.8vw,28px); letter-spacing:-1px; line-height:1;
-    flex-shrink:0; text-align:right;
-}
-.pos-pnl.bull { color:var(--bull); text-shadow:0 0 30px rgba(34,197,94,0.25); }
-.pos-pnl.bear { color:var(--bear); text-shadow:0 0 30px rgba(239,68,68,0.25); }
-
-/* ── TOTAL BAR ── */
-#totalBar {
-    flex-shrink:0; display:flex; align-items:center; justify-content:space-between;
-    padding:0 clamp(16px,2.5vw,32px);
-    height:clamp(64px,10vh,100px);
-    background:var(--bg2); border-top:1px solid var(--border); gap:16px;
+/* ── SUMMARY STRIP ── */
+#summaryStrip {
+    flex-shrink:0; display:flex; align-items:center;
+    padding:0 clamp(12px,2.5vw,24px);
+    height:52px; background:var(--bg2); border-bottom:1px solid var(--border);
+    gap:clamp(16px,3vw,32px); overflow-x:auto; scrollbar-width:none;
     transition:background 0.35s,border-color 0.35s;
 }
-.total-label {
-    font-family:'Syne',sans-serif; font-size:clamp(13px,1.8vw,22px);
-    font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:var(--muted);
+#summaryStrip::-webkit-scrollbar { display:none; }
+
+.sum-item { display:flex; flex-direction:column; gap:1px; flex-shrink:0; }
+.sum-label { font-size:8px; letter-spacing:0.16em; text-transform:uppercase; color:var(--muted); }
+.sum-val { font-family:'Syne',sans-serif; font-size:clamp(14px,2vw,20px); font-weight:800; letter-spacing:-0.5px; white-space:nowrap; }
+.sum-val.bull { color:var(--bull); }
+.sum-val.bear { color:var(--bear); }
+.sum-val.blue { color:var(--accent); }
+.sum-val.gold { color:var(--gold); }
+
+.live-dot { width:6px; height:6px; border-radius:50%; background:var(--bull); box-shadow:0 0 6px var(--bull); animation:blink 1.4s infinite; display:inline-block; margin-right:4px; }
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+
+/* ── TABLE WRAP ── */
+#tableWrap {
+    flex:1; overflow-y:auto; overflow-x:auto; min-height:0;
 }
-.total-count { font-size:clamp(10px,1.1vw,14px); color:var(--muted); }
-#totalPnl {
-    font-family:'Bebas Neue',sans-serif;
-    font-size:clamp(42px,8vw,120px); letter-spacing:-2px; line-height:1;
-    transition:color 0.4s;
+
+/* ── POSITIONS TABLE ── */
+#posTable {
+    width:100%; border-collapse:collapse; min-width:480px;
 }
-#totalPnl.bull { color:var(--bull); text-shadow:0 0 40px rgba(34,197,94,0.3); }
-#totalPnl.bear { color:var(--bear); text-shadow:0 0 40px rgba(239,68,68,0.3); }
+
+#posTable thead tr {
+    background:var(--bg2); position:sticky; top:0; z-index:10;
+    transition:background 0.35s;
+}
+#posTable th {
+    padding:8px clamp(10px,1.5vw,18px);
+    text-align:left; font-size:8px; letter-spacing:0.15em;
+    text-transform:uppercase; color:var(--muted); font-weight:400;
+    border-bottom:1px solid var(--border2); white-space:nowrap;
+}
+#posTable th.r { text-align:right; }
+
+#posTable td {
+    padding:10px clamp(10px,1.5vw,18px);
+    border-bottom:1px solid var(--border);
+    font-size:clamp(11px,1.1vw,13px); color:var(--text);
+    white-space:nowrap; transition:background 0.12s;
+}
+#posTable tbody tr:hover td { background:rgba(255,255,255,0.025); }
+#posTable tbody tr:last-child td { border-bottom:none; }
+
+.td-r { text-align:right; }
+.td-sym { font-weight:500; max-width:200px; overflow:hidden; text-overflow:ellipsis; }
+.td-type { padding:1px 7px; border-radius:3px; font-size:10px; font-weight:500; letter-spacing:0.06em; }
+.td-type.ce { background:var(--bull-dim); color:var(--bull); }
+.td-type.pe { background:var(--bear-dim); color:var(--bear); }
+.td-pnl { font-family:'Syne',sans-serif; font-weight:700; font-size:clamp(12px,1.2vw,15px); text-align:right; }
+.td-pnl.bull { color:var(--bull); }
+.td-pnl.bear { color:var(--bear); }
+.td-status { font-size:9px; letter-spacing:0.1em; text-transform:uppercase; }
+.td-status.open   { color:var(--bull); }
+.td-status.closed { color:var(--muted); }
+
+/* row left border */
+#posTable tbody tr.bull-row td:first-child { border-left:3px solid var(--bull); }
+#posTable tbody tr.bear-row td:first-child { border-left:3px solid var(--bear); }
+
+/* ── EMPTY STATE ── */
+#emptyState {
+    display:none; padding:60px 24px;
+    text-align:center; color:var(--muted);
+    font-size:13px; letter-spacing:0.08em;
+}
+#emptyState.show { display:block; }
+
+/* ── TOTAL ROW (footer) ── */
+#posTable tfoot tr td {
+    padding:12px clamp(10px,1.5vw,18px);
+    border-top:1px solid var(--border2);
+    background:var(--bg2); position:sticky; bottom:0;
+    font-size:clamp(10px,0.95vw,12px);
+    transition:background 0.35s;
+}
+.foot-label { font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+.foot-total { font-family:'Syne',sans-serif; font-size:clamp(15px,1.6vw,20px); font-weight:800; text-align:right; }
+.foot-total.bull { color:var(--bull); }
+.foot-total.bear { color:var(--bear); }
 
 /* ── BUTTON BAR ── */
 #btnBar {
-    display:none; /* hidden in display mode */
-    gap:10px; padding:10px clamp(12px,2vw,28px);
-    background:var(--bg2); border-top:1px solid var(--border); flex-shrink:0;
+    display:none; flex-shrink:0;
+    gap:8px; padding:8px clamp(12px,2.5vw,24px);
+    background:var(--bg2); border-top:1px solid var(--border);
+    transition:background 0.35s,border-color 0.35s;
+    overflow-x:auto; scrollbar-width:none;
 }
+#btnBar::-webkit-scrollbar { display:none; }
 #btnBar.show { display:flex; }
 
 .run-btn {
-    flex:1; padding:clamp(8px,1.5vh,14px) 10px;
-    border-radius:8px; border:1px solid var(--border2);
-    background:var(--bg3); color:var(--text);
-    font-family:'DM Mono',monospace; font-size:clamp(11px,1.2vw,14px);
-    letter-spacing:0.08em; cursor:pointer; transition:all 0.2s;
+    flex:1; min-width:100px; padding:8px 12px; border-radius:7px;
+    border:1px solid var(--border2); background:var(--bg3); color:var(--text);
+    font-family:'DM Mono',monospace; font-size:clamp(10px,1vw,12px);
+    letter-spacing:0.06em; cursor:pointer; transition:all 0.2s; white-space:nowrap;
 }
 .run-btn:hover  { border-color:var(--accent); color:var(--accent); }
 .run-btn:active { opacity:0.7; transform:scale(0.97); }
-.run-btn:disabled { opacity:0.5; cursor:default; }
+.run-btn:disabled { opacity:0.4; cursor:default; }
 .run-btn.running { border-color:var(--gold); color:var(--gold); }
 .run-btn.done    { border-color:var(--bull); color:var(--bull); }
 .run-btn.error   { border-color:var(--bear); color:var(--bear); }
 
-/* empty */
-#emptyState {
-    display:none; flex:1; align-items:center; justify-content:center;
-    flex-direction:column; gap:10px; color:var(--muted);
-    font-size:14px; letter-spacing:0.08em;
+/* ── PWD POPUP ── */
+#pwdPopup {
+    display:none; position:fixed; inset:0; z-index:300;
+    background:rgba(0,0,0,0.6); backdrop-filter:blur(6px);
+    align-items:center; justify-content:center;
 }
-#emptyState.show { display:flex; }
+#pwdPopup.open { display:flex; }
+.popup-box {
+    background:var(--bg2); border:1px solid var(--border2); border-radius:14px;
+    padding:28px 32px; min-width:280px; display:flex; flex-direction:column;
+    gap:14px; align-items:center; box-shadow:0 24px 60px var(--shadow);
+}
+.popup-title { font-family:'Syne',sans-serif; font-weight:800; font-size:15px; letter-spacing:0.06em; }
+.popup-label { font-size:10px; color:var(--muted); letter-spacing:0.12em; text-transform:uppercase; }
+.popup-input {
+    width:100%; padding:10px 14px; border-radius:8px;
+    border:1px solid var(--border2); background:var(--bg3); color:var(--text);
+    font-family:'DM Mono',monospace; font-size:16px; text-align:center;
+    letter-spacing:0.14em; outline:none; transition:border-color 0.2s;
+}
+.popup-input:focus { border-color:var(--accent); }
+.popup-row { display:flex; gap:10px; width:100%; }
+.popup-cancel {
+    flex:1; padding:9px; border-radius:7px; border:1px solid var(--border2);
+    background:transparent; color:var(--muted); font-family:'DM Mono',monospace;
+    font-size:12px; cursor:pointer; transition:all 0.15s;
+}
+.popup-cancel:hover { background:var(--bg3); color:var(--text); }
+.popup-run {
+    flex:1; padding:9px; border-radius:7px;
+    border:1px solid var(--accent); background:rgba(59,130,246,0.12);
+    color:var(--accent); font-family:'Syne',sans-serif;
+    font-weight:700; font-size:13px; cursor:pointer; transition:all 0.15s;
+}
+.popup-run:hover { background:rgba(59,130,246,0.22); }
 
-/* live dot */
-.live-dot {
-    width:6px; height:6px; border-radius:50%;
-    background:var(--bull); box-shadow:0 0 6px var(--bull);
-    animation:blink 1.4s ease-in-out infinite; display:inline-block;
+/* ── OUTPUT PANEL ── */
+#outputPanel {
+    display:none; position:fixed; bottom:70px; left:50%; transform:translateX(-50%);
+    width:min(90vw,600px); background:var(--bg); border:1px solid var(--border2);
+    border-radius:10px; z-index:200; box-shadow:0 16px 48px var(--shadow);
+    font-family:'DM Mono',monospace; overflow:hidden;
 }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+.out-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:7px 14px; background:var(--bg2); border-bottom:1px solid var(--border);
+}
+.out-label { font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); }
+.out-close { cursor:pointer; color:var(--muted); font-size:12px; padding:0 3px; }
+.out-close:hover { color:var(--bear); }
+#outputText { padding:12px 16px; font-size:11px; line-height:1.6; color:var(--text); max-height:180px; overflow-y:auto; white-space:pre-wrap; word-break:break-all; }
+
+/* ── RESPONSIVE ── */
+@media (max-width:640px) {
+    :root { --header-h:44px; }
+    #summaryStrip { height:46px; }
+    .col-tok,.col-status { display:none; }
+    .run-btn { min-width:80px; font-size:10px; padding:7px 8px; }
+}
+@media (min-width:1920px) {
+    :root { --header-h:60px; }
+    #posTable td { font-size:15px; padding:14px 24px; }
+    #posTable th { font-size:10px; padding:10px 24px; }
+    .sum-val { font-size:24px; }
+}
 </style>
 </head>
 <body>
@@ -235,130 +282,123 @@ html,body {
     <div class="pwd-logo">PXY<sup>®</sup></div>
     <div class="pwd-label">Enter password to continue</div>
     <input type="password" class="pwd-input" id="pwdInput"
-           placeholder="·" maxlength="10" autofocus
-           oninput="checkPwd(this)">
-    <div class="pwd-hint">Press any key to enter display mode without password</div>
-    <button class="back-btn" onclick="enterDisplayMode()" style="margin-top:4px">
-        👁 View Only Mode
-    </button>
+           placeholder="·" maxlength="10" autofocus oninput="checkPwd(this)">
+    <div class="pwd-hint">Enter password for full access</div>
+    <button class="view-btn" onclick="enterDisplayMode()">👁 View Only</button>
 </div>
 
 <!-- HEADER -->
-<div id="header">
-    <div class="hdr-left">
+<header id="header">
+    <div class="hdr-l">
         <a class="back-btn" href="pxy.html">← DASHBOARD</a>
-        <div class="divider-v"></div>
+        <div class="dv"></div>
         <span class="page-title">POSITIONS</span>
         <span id="modeBadge" class="display">DISPLAY</span>
     </div>
-    <div class="hdr-right">
+    <div class="hdr-r">
         <span id="clock">—</span>
-        <div class="divider-v"></div>
+        <div class="dv"></div>
         <div class="theme-toggle" id="themeToggle">
             <div class="toggle-track"><div class="toggle-thumb"></div></div>
         </div>
-        <div class="divider-v"></div>
+        <div class="dv"></div>
         <span class="logo">PXY<sup>®</sup></span>
+    </div>
+</header>
+
+<!-- SUMMARY STRIP -->
+<div id="summaryStrip">
+    <div class="sum-item">
+        <span class="sum-label"><span class="live-dot"></span>Running P&amp;L</span>
+        <span class="sum-val" id="sumTotal">—</span>
+    </div>
+    <div class="sum-item">
+        <span class="sum-label">Positions</span>
+        <span class="sum-val blue" id="sumCount">—</span>
+    </div>
+    <div class="sum-item">
+        <span class="sum-label">CE Lots</span>
+        <span class="sum-val bull" id="sumCE">—</span>
+    </div>
+    <div class="sum-item">
+        <span class="sum-label">PE Lots</span>
+        <span class="sum-val bear" id="sumPE">—</span>
+    </div>
+    <div class="sum-item">
+        <span class="sum-label">Best</span>
+        <span class="sum-val gold" id="sumBest">—</span>
+    </div>
+    <div class="sum-item">
+        <span class="sum-label">Worst</span>
+        <span class="sum-val bear" id="sumWorst">—</span>
     </div>
 </div>
 
-<!-- MAIN -->
-<div id="app">
-    <div id="positions">
-        <div id="emptyState">No open positions</div>
-    </div>
+<!-- TABLE -->
+<div id="tableWrap">
+    <table id="posTable">
+        <thead>
+            <tr>
+                <th>Symbol</th>
+                <th>Type</th>
+                <th class="r">Qty</th>
+                <th class="r">Lots</th>
+                <th class="r col-status">Status</th>
+                <th class="r">P&amp;L</th>
+            </tr>
+        </thead>
+        <tbody id="posBody"></tbody>
+        <tfoot id="posFoot"></tfoot>
+    </table>
+    <div id="emptyState">No open positions</div>
+</div>
 
-    <div id="totalBar">
-        <div>
-            <div class="total-label"><span class="live-dot"></span>&nbsp; Running P&amp;L</div>
-            <div class="total-count" id="totalCount">0 positions</div>
-        </div>
-        <div id="totalPnl">0</div>
-    </div>
-
-    <!-- BUTTONS — only visible in full mode -->
-    <div id="btnBar">
-        <button class="run-btn" onclick="runScript('pxytkovrbuyce', this)">✅ BUY CE 🟢</button>
-        <button class="run-btn" onclick="runScript('pxytkovrsqrce', this)">⛔ SQR ALL CE 🟢</button>        
-        <button class="run-btn" onclick="runScript('pxyupdate', this)">🔄 UPDATE PXY ⏳</button>
-        <button class="run-btn" onclick="runScript('pxytkovrsqrpe', this)">⛔ SQR ALL PE 🔴</button>
-        <button class="run-btn" onclick="runScript('pxytkovrbuype', this)">✅ BUY PE 🔴</button>
-    </div>
+<!-- BUTTON BAR -->
+<div id="btnBar">
+    <button class="run-btn" onclick="runScript('pxytkovrbuyce', this)">✅ BUY CE</button>
+    <button class="run-btn" onclick="runScript('pxytkovrsqrce', this)">⛔ SQR CE</button>
+    <button class="run-btn" onclick="runScript('pxyupdate', this)">🔄 UPDATE</button>
+    <button class="run-btn" onclick="runScript('pxytkovrsqrpe', this)">⛔ SQR PE</button>
+    <button class="run-btn" onclick="runScript('pxytkovrbuype', this)">✅ BUY PE</button>
 </div>
 
 <!-- PWD POPUP -->
-<div id="pwdPopup" style="
-    display:none; position:fixed; inset:0; z-index:300;
-    background:rgba(0,0,0,0.6); backdrop-filter:blur(6px);
-    align-items:center; justify-content:center;
-">
-    <div style="
-        background:var(--bg2); border:1px solid var(--border2);
-        border-radius:14px; padding:28px 32px; min-width:280px;
-        display:flex; flex-direction:column; gap:14px; align-items:center;
-        box-shadow:0 24px 60px rgba(0,0,0,0.6);
-    ">
-        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:15px;letter-spacing:0.06em" id="popupTitle">Run Script</div>
-        <div style="font-size:10px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase">Enter neo password</div>
-        <input type="password" id="neoPwd" placeholder="password"
-               maxlength="20" autofocus
-               style="
-                   width:100%; padding:10px 14px; border-radius:8px;
-                   border:1px solid var(--border2); background:var(--bg3);
-                   color:var(--text); font-family:'DM Mono',monospace;
-                   font-size:16px; text-align:center; letter-spacing:0.14em;
-                   outline:none; transition:border-color 0.2s;
-               "
-               onkeydown="if(event.key==='Enter') confirmRun()">
-        <div style="display:flex;gap:10px;width:100%">
-            <button onclick="cancelRun()" style="
-                flex:1; padding:9px; border-radius:7px;
-                border:1px solid var(--border2); background:transparent;
-                color:var(--muted); font-family:'DM Mono',monospace;
-                font-size:12px; cursor:pointer;
-            ">Cancel</button>
-            <button onclick="confirmRun()" style="
-                flex:1; padding:9px; border-radius:7px;
-                border:1px solid var(--accent); background:rgba(59,130,246,0.12);
-                color:var(--accent); font-family:'Syne',sans-serif;
-                font-weight:700; font-size:13px; cursor:pointer;
-            ">Run</button>
+<div id="pwdPopup">
+    <div class="popup-box">
+        <div class="popup-title" id="popupTitle">Run Script</div>
+        <div class="popup-label">Enter neo password</div>
+        <input type="password" class="popup-input" id="neoPwd" placeholder="password"
+               maxlength="20" onkeydown="if(event.key==='Enter') confirmRun()">
+        <div class="popup-row">
+            <button class="popup-cancel" onclick="cancelRun()">Cancel</button>
+            <button class="popup-run"    onclick="confirmRun()">Run</button>
         </div>
     </div>
 </div>
 
-<!-- MINI OUTPUT TERMINAL -->
-<div id="outputPanel" style="
-    display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
-    width:min(90vw,600px); background:#06080d; border:1px solid rgba(255,255,255,0.14);
-    border-radius:10px; z-index:200; box-shadow:0 16px 48px rgba(0,0,0,0.7);
-    font-family:'DM Mono',monospace; overflow:hidden;
-">
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#0c101a;border-bottom:1px solid rgba(255,255,255,0.07)">
-        <span style="font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:#5b6478" id="outputLabel">Output</span>
-        <span onclick="closeOutput()" style="cursor:pointer;color:#5b6478;font-size:12px;padding:0 4px">✕</span>
+<!-- OUTPUT PANEL -->
+<div id="outputPanel">
+    <div class="out-header">
+        <span class="out-label" id="outputLabel">Output</span>
+        <span class="out-close" onclick="closeOutput()">✕</span>
     </div>
-    <pre id="outputText" style="padding:12px 16px;font-size:11px;line-height:1.6;color:#e8ecf4;max-height:200px;overflow-y:auto;margin:0;white-space:pre-wrap;word-break:break-all"></pre>
+    <pre id="outputText"></pre>
 </div>
 
 <script>
 'use strict';
 
-const PASS = '~';
-const KEY  = 'pxy_livpos_auth';
+const PASS = '~', KEY = 'pxy_livpos_auth';
 let fullMode = false;
 
 /* ── PASSWORD ── */
 function checkPwd(input) {
-    if (input.value === PASS) {
-        sessionStorage.setItem(KEY, '1');
-        enterFullMode();
-    } else if (input.value.length >= 1 && input.value !== PASS.slice(0, input.value.length)) {
+    if (input.value === PASS) { sessionStorage.setItem(KEY,'1'); enterFullMode(); }
+    else if (input.value.length >= 1 && input.value !== PASS.slice(0, input.value.length)) {
         input.classList.add('error');
-        setTimeout(() => { input.classList.remove('error'); input.value = ''; }, 600);
+        setTimeout(() => { input.classList.remove('error'); input.value=''; }, 600);
     }
 }
-
 function enterFullMode() {
     fullMode = true;
     document.getElementById('pwdOverlay').classList.add('hidden');
@@ -366,15 +406,12 @@ function enterFullMode() {
     document.getElementById('modeBadge').textContent = 'FULL';
     document.getElementById('modeBadge').className   = 'full';
 }
-
 function enterDisplayMode() {
     fullMode = false;
     document.getElementById('pwdOverlay').classList.add('hidden');
     document.getElementById('modeBadge').textContent = 'DISPLAY';
     document.getElementById('modeBadge').className   = 'display';
 }
-
-// auto-enter if already authenticated this session
 window.addEventListener('DOMContentLoaded', () => {
     if (sessionStorage.getItem(KEY) === '1') enterFullMode();
 });
@@ -383,139 +420,138 @@ window.addEventListener('DOMContentLoaded', () => {
 document.getElementById('themeToggle').addEventListener('click', () => {
     const dark = document.documentElement.getAttribute('data-theme') !== 'light';
     document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+    document.getElementById('themeColorMeta')?.setAttribute('content', dark ? '#f1f5fb' : '#06080d');
 });
 
 /* ── CLOCK ── */
 function tick() {
     document.getElementById('clock').textContent =
-        new Date().toLocaleTimeString('en-IN', { hour12: false });
+        new Date().toLocaleTimeString('en-IN', { hour12:false });
 }
 tick(); setInterval(tick, 1000);
 
-/* ── FORMAT ── */
-function fmt(n) {
-    return (n >= 0 ? '+' : '') + Math.round(n).toLocaleString('en-IN');
-}
+/* ── HELPERS ── */
+function fmt(n) { return (n >= 0 ? '+' : '') + Math.round(n).toLocaleString('en-IN'); }
 
 function shortSym(s) {
     if (!s) return '—';
-    const m = s.match(/([A-Z]+)(\d{2})([A-Z]{3})(\d{2})(C|P)(\d+)/i);
-    if (m) return `${m[1]} ${m[3]}${m[4]} ${m[6]} ${m[5]==='C'?'CE':'PE'}`;
-    return s;
+    const m = s.match(/([A-Z]+)\d{2}([A-Z]{3})\d{2}(C|P)(\d+)/i);
+    if (m) return `${m[1]} ${m[2]} ${m[4]} ${m[3]==='C'?'CE':'PE'}`;
+    return s.length > 22 ? s.slice(0,20)+'…' : s;
+}
+
+function lotSize(sym) {
+    return (sym||'').includes('BANKNIFTY') ? 30 : 65;
 }
 
 /* ── RENDER ── */
 function render(data) {
-    const pos     = document.getElementById('positions');
+    const tbody   = document.getElementById('posBody');
+    const tfoot   = document.getElementById('posFoot');
     const empty   = document.getElementById('emptyState');
-    const totalEl = document.getElementById('totalPnl');
-    const countEl = document.getElementById('totalCount');
+    tbody.innerHTML = ''; tfoot.innerHTML = '';
 
-    pos.querySelectorAll('.pos-row').forEach(r => r.remove());
+    const open = data.filter(d => (d.STATUS || 'OPEN') === 'OPEN');
 
-    if (!data.length) {
-        empty.classList.add('show');
-        totalEl.textContent = '0'; totalEl.className = '';
-        countEl.textContent = '0 positions'; return;
-    }
+    // summary strip
+    const total = open.reduce((s,d) => s+(d.PNL||0), 0);
+    const bull  = total >= 0;
+    const best  = open.length ? Math.max(...open.map(d=>d.PNL||0)) : 0;
+    const worst = open.length ? Math.min(...open.map(d=>d.PNL||0)) : 0;
+    const ceLots = open.filter(d=>(d.SYMBOL||'').endsWith('CE'))
+                       .reduce((s,d)=>s+Math.round(Math.abs(d.QTY||0)/lotSize(d.SYMBOL)),0);
+    const peLots = open.filter(d=>(d.SYMBOL||'').endsWith('PE'))
+                       .reduce((s,d)=>s+Math.round(Math.abs(d.QTY||0)/lotSize(d.SYMBOL)),0);
+
+    const sv = document.getElementById('sumTotal');
+    sv.textContent = fmt(total); sv.className = `sum-val ${bull?'bull':'bear'}`;
+    document.getElementById('sumCount').textContent  = open.length;
+    document.getElementById('sumCE').textContent     = ceLots;
+    document.getElementById('sumPE').textContent     = peLots;
+    document.getElementById('sumBest').textContent   = open.length ? fmt(best)  : '—';
+    document.getElementById('sumWorst').textContent  = open.length ? fmt(worst) : '—';
+
+    if (!open.length) { empty.classList.add('show'); return; }
     empty.classList.remove('show');
 
-    const total = data.reduce((s, d) => s + (d.PNL || 0), 0);
-    const bull  = total >= 0;
-
-    data.forEach(d => {
-        const pnl  = d.PNL || 0;
-        const pbul = pnl >= 0;
-        const isCE = (d.SYMBOL || '').match(/C\d+$/i);
-        const qty  = d.QTY ?? '—';
-        const row  = document.createElement('div');
-        row.className = `pos-row ${pbul?'bull':'bear'}`;
-        row.innerHTML = `
-            <div class="pos-left">
-                <div class="pos-sym">${shortSym(d.SYMBOL)}</div>
-                <div class="pos-meta">Qty ${qty} &nbsp;·&nbsp; ${isCE?'CALL · CE':'PUT · PE'}</div>
-            </div>
-            <div class="pos-pnl ${pbul?'bull':'bear'}">${fmt(pnl)}</div>`;
-        pos.appendChild(row);
+    open.forEach(d => {
+        const pnl   = d.PNL || 0;
+        const pbull = pnl >= 0;
+        const isCE  = (d.SYMBOL||'').toUpperCase().endsWith('CE');
+        const qty   = d.QTY ?? '—';
+        const lots  = qty !== '—' ? Math.round(Math.abs(qty)/lotSize(d.SYMBOL)) : '—';
+        const status= d.STATUS || 'OPEN';
+        const tr = document.createElement('tr');
+        tr.className = pbull ? 'bull-row' : 'bear-row';
+        tr.innerHTML = `
+            <td class="td-sym" title="${d.SYMBOL||''}">${shortSym(d.SYMBOL)}</td>
+            <td><span class="td-type ${isCE?'ce':'pe'}">${isCE?'CE':'PE'}</span></td>
+            <td class="td-r">${qty}</td>
+            <td class="td-r">${lots}</td>
+            <td class="td-r col-status"><span class="td-status ${status.toLowerCase()}">${status}</span></td>
+            <td class="td-pnl ${pbull?'bull':'bear'}">${fmt(pnl)}</td>`;
+        tbody.appendChild(tr);
     });
 
-    totalEl.textContent = fmt(total);
-    totalEl.className   = bull ? 'bull' : 'bear';
-    countEl.textContent = `${data.length} position${data.length!==1?'s':''}`;
+    // footer
+    tfoot.innerHTML = `<tr>
+        <td colspan="5" class="foot-label">Total · ${open.length} position${open.length!==1?'s':''}</td>
+        <td class="foot-total ${bull?'bull':'bear'}">${fmt(total)}</td>
+    </tr>`;
 }
 
 /* ── LOAD ── */
 async function load() {
     try {
-        const res  = await fetch('./livpos.json?_=' + Date.now());
+        const res = await fetch('./livpos.json?_=' + Date.now());
         render(await res.json());
     } catch { render([]); }
 }
 load(); setInterval(load, 3000);
 
 /* ── RUN SCRIPT ── */
-let pendingScript = null;
-let pendingBtn    = null;
+let pendingScript = null, pendingBtn = null;
 
 function runScript(script, btn) {
     if (!fullMode) return;
-    pendingScript = script;
-    pendingBtn    = btn;
+    pendingScript = script; pendingBtn = btn;
     document.getElementById('popupTitle').textContent = `▶ ${script}`;
     document.getElementById('neoPwd').value = '';
-    const popup = document.getElementById('pwdPopup');
-    popup.style.display = 'flex';
+    document.getElementById('pwdPopup').classList.add('open');
     setTimeout(() => document.getElementById('neoPwd').focus(), 100);
 }
-
 function cancelRun() {
-    document.getElementById('pwdPopup').style.display = 'none';
+    document.getElementById('pwdPopup').classList.remove('open');
     pendingScript = null; pendingBtn = null;
 }
-
 function confirmRun() {
     const pwd = document.getElementById('neoPwd').value.trim();
     if (!pwd) return;
-    document.getElementById('pwdPopup').style.display = 'none';
+    document.getElementById('pwdPopup').classList.remove('open');
 
-    const btn    = pendingBtn;
-    const script = pendingScript;
-    const orig   = btn.textContent;
-    btn.textContent = '⏳ Running…';
-    btn.className   = 'run-btn running';
-    btn.disabled    = true;
+    const btn = pendingBtn, script = pendingScript, orig = btn.textContent;
+    btn.textContent = '⏳…'; btn.className = 'run-btn running'; btn.disabled = true;
 
     fetch(`/run/${script}`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ pwd })
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ pwd })
     })
-        .then(r => r.json())
-        .then(d => {
-            btn.textContent = d.ok ? '✓ Done' : '✗ Error';
-            btn.className   = `run-btn ${d.ok ? 'done' : 'error'}`;
-            const text = (d.output || '') + (d.error ? '\n⚠ ' + d.error : '');
-            showOutput(d.ok ? `✓ ${script}` : `✗ ${script}`, text.trim() || '(no output)');
-        })
-        .catch(e => {
-            btn.textContent = '✗ Error';
-            btn.className   = 'run-btn error';
-            showOutput(`✗ ${script}`, e.message || 'Network error');
-        })
-        .finally(() => {
-            setTimeout(() => { btn.textContent = orig; btn.className = 'run-btn'; btn.disabled = false; }, 3000);
-        });
+    .then(r => r.json())
+    .then(d => {
+        btn.textContent = d.ok ? '✓ Done' : '✗ Error';
+        btn.className   = `run-btn ${d.ok?'done':'error'}`;
+        const text = (d.output||'') + (d.error ? '\n⚠ '+d.error : '');
+        showOutput(d.ok ? `✓ ${script}` : `✗ ${script}`, text.trim() || '(no output)');
+    })
+    .catch(e => { btn.textContent='✗ Error'; btn.className='run-btn error'; showOutput(`✗ ${script}`, e.message); })
+    .finally(() => { setTimeout(() => { btn.textContent=orig; btn.className='run-btn'; btn.disabled=false; }, 3000); });
 }
-
 function showOutput(label, text) {
     document.getElementById('outputLabel').textContent = label;
     document.getElementById('outputText').textContent  = text;
     document.getElementById('outputPanel').style.display = 'block';
 }
-
-function closeOutput() {
-    document.getElementById('outputPanel').style.display = 'none';
-}
+function closeOutput() { document.getElementById('outputPanel').style.display = 'none'; }
 </script>
 </body>
 </html>
