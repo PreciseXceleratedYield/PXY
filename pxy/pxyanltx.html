@@ -472,7 +472,7 @@ let candles = [], trades = [], btChart = null, activeTrade = null;
 /* ── LOAD ── */
 async function load() {
     const [cr, pr] = await Promise.allSettled([
-        fetch('./sysddmppxy.json?_=' + Date.now()),
+        fetch('./sysdtafpxy.json?_=' + Date.now()),
         fetch('./pnl.json?_='        + Date.now())
     ]);
     if (cr.status === 'fulfilled' && cr.value.ok) candles = parseSplit(await cr.value.json());
@@ -564,7 +564,7 @@ function drawChart() {
     if (!candles.length) return;
     const labels = candles.map(c => {
         const d = new Date(c.t);
-        return d.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:false });
+        return d.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit', hour12:false, timeZone:'Asia/Kolkata' });
     });
     const closes = candles.map(c => c.c);
     const highs  = candles.map(c => c.h);
@@ -631,7 +631,7 @@ function drawChart() {
         document.getElementById('hL').textContent = c.l?.toFixed(2) ?? '—';
         document.getElementById('hC').textContent = c.c?.toFixed(2) ?? '—';
         document.getElementById('hV').textContent = c.v ? Math.round(c.v).toLocaleString('en-IN') : '—';
-        document.getElementById('hT').textContent = new Date(c.t).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false});
+        document.getElementById('hT').textContent = new Date(c.t).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Kolkata'});
     });
 
     setTimeout(redrawMarkers, 80);
@@ -650,15 +650,16 @@ function updateChartColors() {
 
 /* ── MARKER HELPERS ── */
 function tsToIndex(ts) {
-    // normalize — strip timezone suffix and treat as IST for comparison
-    const clean  = String(ts).replace('+05:30','').replace('Z','').replace('T',' ').trim();
-    const target = new Date(clean).getTime();
-    let best=0, bestDiff=Infinity;
-    candles.forEach((c,i) => {
-        const ct    = String(c.t).replace('+05:30','').replace('Z','').replace('T',' ').trim();
-        const cTime = new Date(ct).getTime();
-        const d     = Math.abs(cTime - target);
-        if (d < bestDiff) { bestDiff=d; best=i; }
+    // pnl.json times are IST with no tz info → parse as IST by appending +05:30
+    const tradeStr  = String(ts).trim().replace(' ', 'T');
+    const tradeMs   = new Date(tradeStr.includes('+') ? tradeStr : tradeStr + '+05:30').getTime();
+
+    let best = 0, bestDiff = Infinity;
+    candles.forEach((c, i) => {
+        // chart timestamps are UTC (Z suffix) — convert to ms directly
+        const candleMs = new Date(c.t).getTime();
+        const d = Math.abs(candleMs - tradeMs);
+        if (d < bestDiff) { bestDiff = d; best = i; }
     });
     return best;
 }
