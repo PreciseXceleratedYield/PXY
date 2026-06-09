@@ -158,8 +158,8 @@ async def main():
         if not entry_signal: return
 
         sig = entry_signal.upper().strip()
-        if sig == "STBUY": sig = "ATMBUY"
-        elif sig == "STSELL": sig = "ATMSELL"
+        if sig == "STBUY": sig = "OTMBUY"
+        elif sig == "STSELL": sig = "OTMSELL"
         dprint(f"SIGNAL: {sig}")
 
         # --- UPDATED POSITION BALANCING LOGIC ---
@@ -179,7 +179,7 @@ async def main():
         dprint(f"SUPERTREND: {supertrend_val} | MAX CE: {max_allowed_ce} | MAX PE: {max_allowed_pe}")
 
         # --- INTERCEPTING DISTANCE OFFSET LOGIC FOR STRIKES ---
-        if "ATM" in sig:
+        if "OTM" in sig:
             current_distance = 0
         elif "OTM" in sig:
             current_distance = OTM_DISTANCE
@@ -190,7 +190,7 @@ async def main():
 
         symbol, res = None, {"stat": "SKIPPED"}
         
-        if sig in ["ATMBUY", "OTMBUY"]:
+        if sig in ["OTMBUY", "OTMBUY"]:
             dprint("BRANCH: BALANCE CE")
             # ONLY BUY if CE is lower than PE, or both are zero
             if ce_qty < max_allowed_ce or (ce_qty == 0 and pe_qty == 0):
@@ -203,7 +203,7 @@ async def main():
             else:
                 dprint(f"SKIP: CE({ce_qty}) has hit or exceeded Supertrend cap({max_allowed_ce})", Fore.YELLOW)
 
-        elif sig in ["ATMSELL", "OTMSELL"]:
+        elif sig in ["OTMSELL", "OTMSELL"]:
             dprint("BRANCH: BALANCE PE")
             # ONLY BUY if PE is lower than CE, or both are zero
             if pe_qty < max_allowed_pe or (ce_qty == 0 and pe_qty == 0):
