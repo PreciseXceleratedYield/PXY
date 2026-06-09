@@ -148,9 +148,9 @@ def get_entry_signal(df=None):
         if DEBUG_MODE:
             print("🌅 CURRENT TIMING STATE: Early Morning opening window logic active.")
         if exit_sig == "BUY":
-            final_signal = "ATMBUY"
+            final_signal = "OTMBUY"
         elif exit_sig == "SELL":
-            final_signal = "ATMSELL"
+            final_signal = "OTMSELL"
         else:
             final_signal = "NONE"
     else:
