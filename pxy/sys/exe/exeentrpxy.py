@@ -150,9 +150,11 @@ async def main():
         ltp = data.get("price")
 
         try:
-            supertrend = str(data.get("supertrend", "")).upper().strip()
+            supertrend_val = str(data.get("supertrend", "")).upper().strip()
             OTM_DISTANCE = 100
-        except: OTM_DISTANCE = 100
+        except Exception: 
+            supertrend_val = "NONE"
+            OTM_DISTANCE = 100
 
         exit_sig = str(reversal).upper().strip() if reversal else "NONE"
         if not entry_signal: return
@@ -162,21 +164,31 @@ async def main():
         elif sig == "STSELL": sig = "ATMSELL"
         dprint(f"SIGNAL: {sig}")
 
-        # --- UPDATED POSITION BALANCING LOGIC ---
+        # --- SURGICAL IMPORT RESTORATION FROM EXECEPEPXY ---
+        try:
+            from execepepxy import get_target_quantities
+        except Exception as imp_err:
+            print(f"{Fore.RED}CRITICAL: Failed to import get_target_quantities from execepepxy: {imp_err}")
+            return
+
+        # --- UPDATED POSITION BALANCING LOGIC (LOT BASED) ---
         dprint("CHECKING POSITIONS FOR BALANCE...")
-        pos_raw = str(get_position_summary(client))
+        pos_raw = str(get_position_summary(client)).upper().strip() # Upstream format: "XCEYPE"
         
-        ce_match = re.search(r'(\d+)CE', pos_raw)
-        pe_match = re.search(r'(\d+)PE', pos_raw)
+        # Hard-anchored regex to match your upstream format exactly
+        match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
+        if match:
+            ce_lots = int(match.group(1))
+            pe_lots = int(match.group(2))
+        else:
+            dprint(f"⚠️ Upstream position layout error: '{pos_raw}'. Using fallback 0.", Fore.YELLOW)
+            ce_lots, pe_lots = 0, 0
         
-        ce_qty = int(ce_match.group(1)) if ce_match else 0
-        pe_qty = int(pe_match.group(1)) if pe_match else 0
+        dprint(f"CURRENT -> CE LOTS: {ce_lots} | PE LOTS: {pe_lots}")
         
-        dprint(f"CURRENT -> CE: {ce_qty} | PE: {pe_qty}")
-        # --- SURGICAL ADDITION FROM EXECEPEPXY ---
-        supertrend_val = str(data.get("supertrend", "")).upper().strip()
-        max_allowed_ce, max_allowed_pe = get_target_quantities(supertrend_val, ce_qty, pe_qty, LOT_SIZE)
-        dprint(f"SUPERTREND: {supertrend_val} | MAX CE: {max_allowed_ce} | MAX PE: {max_allowed_pe}")
+        # Fetch target limits directly as clean lot counts
+        max_allowed_ce_lots, max_allowed_pe_lots = get_target_quantities(supertrend_val, ce_lots, pe_lots, LOT_SIZE)
+        dprint(f"SUPERTREND: {supertrend_val} | MAX CE LOTS: {max_allowed_ce_lots} | MAX PE LOTS: {max_allowed_pe_lots}")
 
         # --- INTERCEPTING DISTANCE OFFSET LOGIC FOR STRIKES ---
         if "ATM" in sig:
@@ -192,38 +204,34 @@ async def main():
         
         if sig in ["ATMBUY", "OTMBUY"]:
             dprint("BRANCH: BALANCE CE")
-            # ONLY BUY if CE is lower than PE, or both are zero
-            if ce_qty < max_allowed_ce or (ce_qty == 0 and pe_qty == 0):
+            # FIXED GATE: Passes if under limit, or if empty account has an open target slot (> 0)
+            if (ce_lots < max_allowed_ce_lots) or (ce_lots == 0 and pe_lots == 0 and max_allowed_ce_lots > 0):
                 if not is_side_cooling("CE"):
-                    # CHANGED: Passing the dynamically selected distance value
                     symbol = get_symbol(ltp, sig, current_distance)
                     if symbol and symbol != "NA":
                         res = execute_order(client, symbol, LOT_SIZE)
                         if res["stat"] == "OK": set_side_cooling("CE")
             else:
-                dprint(f"SKIP: CE({ce_qty}) has hit or exceeded Supertrend cap({max_allowed_ce})", Fore.YELLOW)
+                dprint(f"SKIP: CE Lots ({ce_lots}) hit or exceeded strategy limit ({max_allowed_ce_lots})", Fore.YELLOW)
 
         elif sig in ["ATMSELL", "OTMSELL"]:
             dprint("BRANCH: BALANCE PE")
-            # ONLY BUY if PE is lower than CE, or both are zero
-            if pe_qty < max_allowed_pe or (ce_qty == 0 and pe_qty == 0):
+            # FIXED GATE: Passes if under limit, or if empty account has an open target slot (> 0)
+            if (pe_lots < max_allowed_pe_lots) or (ce_lots == 0 and pe_lots == 0 and max_allowed_pe_lots > 0):
                 if not is_side_cooling("PE"):
-                    # CHANGED: Passing the dynamically selected distance value
                     symbol = get_symbol(ltp, sig, current_distance)
                     if symbol and symbol != "NA":
                         res = execute_order(client, symbol, LOT_SIZE)
                         if res["stat"] == "OK": set_side_cooling("PE")
             else:
-                dprint(f"SKIP: PE({pe_qty}) has hit or exceeded Supertrend cap({max_allowed_pe})", Fore.YELLOW)
+                dprint(f"SKIP: PE Lots ({pe_lots}) hit or exceeded strategy limit ({max_allowed_pe_lots})", Fore.YELLOW)
 
         funds = get_available_funds(client)
-         #💰  Cash   : {int(funds)}
-         #📦  Pos    : {pos_raw}
-         #🎫  Symbol : {symbol}
 
         print(f"""
  ============ BUY ACTION =============
          🎯  Signal : {entry_signal}
+         📈  Trend  : {supertrend_val}
          📦  Pos    : {pos_raw}
          📌  Status : {res.get('stat')}
  =====================================
@@ -232,6 +240,8 @@ async def main():
     except Exception:
         print(traceback.format_exc() if DEBUG else "❌ Main error")
 
+
 if __name__ == "__main__":
     asyncio.run(main())
+
 
