@@ -36,3 +36,4 @@ def get_target_quantities(supertrend, ce_lots, pe_lots, lot_size=None):
 
 
 
+
