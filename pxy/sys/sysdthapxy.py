@@ -1,11 +1,11 @@
 # pxy_engine.py
 import pandas as pd
 import numpy as np
-from sysdtafpxy import fetch_yf_data
+from sysstrndpxy import fetch_yf_data  # Note: Points to your file containing Mode 0
 
 # ⚡ LIVE ENFORCEMENT ACTIVATED: Set to True to stream active forming bars dynamically
 USE_FORMING_CANDLE = True  
-CANDLE_STYLE = "CLOSE_MOMENTUM"
+CANDLE_STYLE = "MODE_0_PURE"
 
 def get_pxy_data(tickerSymbol=None, df=None):
     if df is None:
@@ -23,66 +23,52 @@ def get_pxy_data(tickerSymbol=None, df=None):
             return None, None, None, pd.DataFrame()
 
     # ==================================================
-    # ⚡ DATA MATRIX PRE-COMPUTATION
+    # 🎨 COLOR PROCESSING (STRICT MODE 0 PURE BINARY RULES)
     # ==================================================
-    df['c0_close'] = df['Close']          
-    df['c1_close'] = df['Close'].shift(1) 
-    df['c2_close'] = df['Close'].shift(2) 
+    # Since Mode 0 transforms 'Open' and 'Close', we use its structural logic:
+    # A candle is green if Close is >= the previous bar's 3/4 range level.
+    prev_h = df['High'].shift(1)
+    prev_l = df['Low'].shift(1)
+    prev_range = prev_h - prev_l
+    calc_three_quarter = prev_l + (prev_range * 0.75)
+
+    # Every single candle is binary: either it is green, or it defaults to red
+    is_green = df['Close'] >= calc_three_quarter
+    
+    conditions = [is_green]
+    choices = ["green"]
+    df["pxy_color"] = np.select(conditions, choices, default="red")
 
     # ==================================================
-    # 🔥 SIGNAL ENGINE (REAL-TIME STREAM EVALUATION)
+    # 🔥 SIGNAL ENGINE (PURE CANDLE COLOR STATE MATRIX)
     # ==================================================
     signal_array = np.full(len(df), "none", dtype=object)
     
-    # Pre-extract numpy vectors for fast processing loops
-    c0_v = df['c0_close'].to_numpy()
-    c1_v = df['c1_close'].to_numpy()
-    c2_v = df['c2_close'].to_numpy()
+    # Pre-extract color series for fast index looping
+    color_v = df['pxy_color'].to_numpy()
     
     for i in range(len(df)):
-        if i < 2:
+        if i < 1:
             continue
             
-        c0 = float(c0_v[i])
-        c1 = float(c1_v[i])
-        c2 = float(c2_v[i])
+        c0_color = color_v[i]     # Current candle color
+        c1_color = color_v[i-1]   # Previous candle color
         
-        # Rule Trigger A: Flat execution state detected (C1 == C0)
-        if c1 == c0:
-            if c0 > c2:
-                signal_array[i] = "BUY"    
-            elif c0 < c2:
-                signal_array[i] = "SELL"   
-                
-        # Rule Trigger B: Standard directional movement vectors
-        else:
-            if (c1 > c2) and (c0 > c1):
-                signal_array[i] = "BULL"   
-            elif (c1 < c2) and (c0 < c1):
-                signal_array[i] = "BEAR"   
-            elif (c1 < c2 or c1 == c2) and (c0 > c1):
-                signal_array[i] = "BUY"    
-            elif (c1 > c2 or c1 == c2) and (c0 < c1):
-                signal_array[i] = "SELL"   
+        # Rule Switch based purely on color changes
+        if c1_color == "red" and c0_color == "green":
+            signal_array[i] = "BUY"    # Color flipped from Red to Green
+        elif c1_color == "green" and c0_color == "red":
+            signal_array[i] = "SELL"   # Color flipped from Green to Red
+        elif c1_color == "green" and c0_color == "green":
+            signal_array[i] = "BULL"   # Remained Green (Continuation)
+        elif c1_color == "red" and c0_color == "red":
+            signal_array[i] = "BEAR"   # Remained Red (Continuation)
 
     df["pxy_signal"] = signal_array
 
     # ==================================================
-    # 🎨 COLOR PROCESSING (STRICT PRICE RULES)
-    # ==================================================
-    is_green = (df['c0_close'] > df['c1_close']) | ((df['c0_close'] == df['c1_close']) & (df['c0_close'] > df['c2_close']))
-    is_red   = (df['c0_close'] < df['c1_close']) | ((df['c0_close'] == df['c1_close']) & (df['c0_close'] < df['c2_close']))
-
-    conditions = [is_green, is_red]
-    choices = ["green", "red"]
-    
-    df["pxy_color"] = np.select(conditions, choices, default="gray")
-
-    # ==================================================
     # 🛡️ PRODUCTION OUTPUT FILTER (CONNECTED SWITCH)
     # ==================================================
-    # If USE_FORMING_CANDLE is True, process the absolute latest live ticking bar.
-    # If False, drop the incomplete bar to stick to closed historical bars only.
     if USE_FORMING_CANDLE:
         final_df = df.copy()
     else:
@@ -93,4 +79,5 @@ def get_pxy_data(tickerSymbol=None, df=None):
     pxy_color_series = final_df['pxy_color'].copy()
 
     return pxy_close, pxy_open, pxy_color_series, final_df
+
 
