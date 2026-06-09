@@ -180,6 +180,8 @@ body {
     font-size:clamp(11px,1.1vw,13px); color:var(--muted);
     line-height:1.6; border-top:1px solid var(--border); padding-top:12px;
     font-style:italic;
+    display:-webkit-box; -webkit-line-clamp:2;
+    -webkit-box-orient:vertical; overflow:hidden;
 }
 
 /* progress bar */
@@ -543,6 +545,7 @@ function buildScripts() {
         scripts.push({
             tradeIdx: i,
             type: bull ? 'win' : 'loss',
+            short: `${isCE?'Call':'Put'} ${sym.slice(-8)} · ${entry}→${exit} · ${dur}. ${result}`,
             line: `Trade ${i+1} of ${trades.length}. Tag ${tag}. ` +
                   `We bought a ${type} — ${sym} — at ${buy}, quantity ${qty}. ` +
                   `This was a ${dir} view, entered at ${entry}. ` +
@@ -628,9 +631,9 @@ function showTrade(idx) {
         document.getElementById('cardQty').textContent   = t.Qty || '—';
         document.getElementById('cardDur').textContent   = calcDur(t.Buy_Time, t.Exit_Time);
 
-        // find matching script line
+        // find matching script line — use short for card, full for script panel
         const sc = scripts.find(s => s.tradeIdx === idx);
-        document.getElementById('cardComment').textContent = sc ? sc.line : '—';
+        document.getElementById('cardComment').textContent = sc ? (sc.short || sc.line) : '—';
 
         // progress
         document.getElementById('progressFill').style.width = ((idx+1)/trades.length*100) + '%';
