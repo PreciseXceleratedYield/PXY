@@ -70,7 +70,7 @@ def place_exit_order(client, row):
             print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ ORDER PLACED ON EXCHANGE: {params['trading_symbol']} | TAG: {final_tag}") 
             try:
                 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                script_path = os.path.join(parent_dir, "xyzpxy.py")
+                script_path = os.path.join(parent_dir, "sysddmppxy.py")
                 if os.path.exists(script_path):
                     subprocess.Popen(["python3", script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 else:
