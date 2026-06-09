@@ -650,10 +650,14 @@ function updateChartColors() {
 
 /* ── MARKER HELPERS ── */
 function tsToIndex(ts) {
-    const target = new Date(ts).getTime();
+    // normalize — strip timezone suffix and treat as IST for comparison
+    const clean  = String(ts).replace('+05:30','').replace('Z','').replace('T',' ').trim();
+    const target = new Date(clean).getTime();
     let best=0, bestDiff=Infinity;
     candles.forEach((c,i) => {
-        const d = Math.abs(new Date(c.t).getTime() - target);
+        const ct    = String(c.t).replace('+05:30','').replace('Z','').replace('T',' ').trim();
+        const cTime = new Date(ct).getTime();
+        const d     = Math.abs(cTime - target);
         if (d < bestDiff) { bestDiff=d; best=i; }
     });
     return best;
@@ -669,6 +673,7 @@ function redrawMarkers() {
     const svg = document.getElementById('markerLayer');
     svg.innerHTML = '';
     if (!btChart || !trades.length) return;
+    if (!activeTrade) return; // nothing selected — show clean chart
 
     const W = btChart.canvas.offsetWidth;
     const H = btChart.canvas.offsetHeight;
@@ -678,66 +683,62 @@ function redrawMarkers() {
 
     const bull = cssVar('--bull'), bear = cssVar('--bear');
 
-    trades.forEach((t, ti) => {
-        const buyIdx  = tsToIndex(t.Buy_Time);
-        const sellIdx = tsToIndex(t.Exit_Time);
-        const buyPt   = indexToPixel(buyIdx);
-        const sellPt  = indexToPixel(sellIdx);
-        if (!buyPt || !sellPt) return;
+    // only draw the active trade
+    const t = activeTrade;
+    const buyIdx  = tsToIndex(t.Buy_Time);
+    const sellIdx = tsToIndex(t.Exit_Time);
+    const buyPt   = indexToPixel(buyIdx);
+    const sellPt  = indexToPixel(sellIdx);
+    if (!buyPt || !sellPt) return;
 
-        const isCE   = (t.Symbol||'').toUpperCase().endsWith('CE');
-        const isBull = (t.PNL||0) >= 0;
-        const lineC  = isBull ? bull : bear;
-        const dimmed = activeTrade && activeTrade.Tag !== t.Tag;
-        const opacity = dimmed ? '0.1' : '1';
+    const isCE   = (t.Symbol||'').toUpperCase().endsWith('CE');
+    const isBull = (t.PNL||0) >= 0;
+    const lineC  = isBull ? bull : bear;
 
-        // connecting line
-        const line = document.createElementNS('http://www.w3.org/2000/svg','line');
-        line.setAttribute('x1', buyPt.x);  line.setAttribute('y1', buyPt.y);
-        line.setAttribute('x2', sellPt.x); line.setAttribute('y2', sellPt.y);
-        line.setAttribute('stroke', lineC);
-        line.setAttribute('stroke-width', dimmed ? '0.5' : '1.5');
-        line.setAttribute('stroke-dasharray', '4 3');
-        line.setAttribute('opacity', dimmed ? '0.08' : '0.45');
-        svg.appendChild(line);
+    // connecting line
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', buyPt.x);  line.setAttribute('y1', buyPt.y);
+    line.setAttribute('x2', sellPt.x); line.setAttribute('y2', sellPt.y);
+    line.setAttribute('stroke', lineC);
+    line.setAttribute('stroke-width', '1.5');
+    line.setAttribute('stroke-dasharray', '4 3');
+    line.setAttribute('opacity', '0.45');
+    svg.appendChild(line);
 
-        // markers
-        svg.appendChild(makeMark(buyPt.x,  buyPt.y,  isCE?'CEn':'PEn', bull,              ti, t, true,  opacity));
-        svg.appendChild(makeMark(sellPt.x, sellPt.y, isCE?'CEx':'PEx', isBull?bull:bear,  ti, t, false, opacity));
-    });
+    const enLabel = isCE ? 'CEn' : 'PEn';
+    const exLabel = isCE ? 'CEx' : 'PEx';
+
+    svg.appendChild(makeMark(buyPt.x,  buyPt.y,  enLabel, bull,              0, t, true,  '1'));
+    svg.appendChild(makeMark(sellPt.x, sellPt.y, exLabel, isBull ? bull : bear, 0, t, false, '1'));
 
     if (activeTrade) showTooltip(activeTrade);
 }
 
 function makeMark(x, y, label, color, ti, trade, isBuy, opacity) {
-    const g  = document.createElementNS('http://www.w3.org/2000/svg','g');
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
     g.style.cursor = 'pointer';
     g.setAttribute('opacity', opacity);
 
-    const r  = 11;
-    const cy = isBuy ? y + r + 5 : y - r - 5;
+    const size = 8;  // arrow size
+    const gap  = 4;  // gap from candle line
 
-    const circle = document.createElementNS('http://www.w3.org/2000/svg','circle');
-    circle.setAttribute('cx', x); circle.setAttribute('cy', cy);
-    circle.setAttribute('r',  r); circle.setAttribute('fill', color);
-    g.appendChild(circle);
-
-    // two-line text: "CE"/"PE" + "n"/"x"
-    const base = label.slice(0,2), suf = label.slice(2);
-
-    const t1 = document.createElementNS('http://www.w3.org/2000/svg','text');
-    t1.setAttribute('x', x); t1.setAttribute('y', cy-1);
-    t1.setAttribute('text-anchor','middle'); t1.setAttribute('font-size','7');
-    t1.setAttribute('font-family',"'DM Mono',monospace"); t1.setAttribute('font-weight','700');
-    t1.setAttribute('fill','#fff'); t1.textContent = base;
-    g.appendChild(t1);
-
-    const t2 = document.createElementNS('http://www.w3.org/2000/svg','text');
-    t2.setAttribute('x', x); t2.setAttribute('y', cy+7);
-    t2.setAttribute('text-anchor','middle'); t2.setAttribute('font-size','6');
-    t2.setAttribute('font-family',"'DM Mono',monospace");
-    t2.setAttribute('fill','rgba(255,255,255,0.8)'); t2.textContent = suf;
-    g.appendChild(t2);
+    if (isBuy) {
+        // ▲ green arrow BELOW the candle point
+        const ay = y + gap + size;
+        const arrow = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+        arrow.setAttribute('points', `${x},${ay - size} ${x - size},${ay + size} ${x + size},${ay + size}`);
+        arrow.setAttribute('fill', color);
+        arrow.setAttribute('filter', `drop-shadow(0 0 3px ${color})`);
+        g.appendChild(arrow);
+    } else {
+        // ▼ arrow ABOVE the candle point
+        const ay = y - gap - size;
+        const arrow = document.createElementNS('http://www.w3.org/2000/svg','polygon');
+        arrow.setAttribute('points', `${x},${ay + size} ${x - size},${ay - size} ${x + size},${ay - size}`);
+        arrow.setAttribute('fill', color);
+        arrow.setAttribute('filter', `drop-shadow(0 0 3px ${color})`);
+        g.appendChild(arrow);
+    }
 
     g.addEventListener('click', e => { e.stopPropagation(); selectTrade(trade); });
     return g;
@@ -755,17 +756,7 @@ function selectTrade(t) {
         if (match) row.scrollIntoView({ block:'nearest', behavior:'smooth' });
     });
 
-    // zoom chart to trade window
-    const buyIdx  = tsToIndex(t.Buy_Time);
-    const sellIdx = tsToIndex(t.Exit_Time);
-    const pad     = Math.max(8, Math.round((sellIdx - buyIdx) * 0.6));
-    const minI    = Math.max(0, buyIdx - pad);
-    const maxI    = Math.min(candles.length - 1, sellIdx + pad);
-    if (btChart) {
-        btChart.options.scales.x.min = minI;
-        btChart.options.scales.x.max = maxI;
-        btChart.update('none');
-    }
+    // NO zoom — keep full chart context
     setTimeout(redrawMarkers, 30);
 }
 
@@ -775,11 +766,6 @@ function clearSelection() {
         r.classList.remove('active','dimmed');
     });
     document.getElementById('tooltip').style.display = 'none';
-    if (btChart) {
-        btChart.options.scales.x.min = undefined;
-        btChart.options.scales.x.max = undefined;
-        btChart.update('none');
-    }
     setTimeout(redrawMarkers, 30);
 }
 
