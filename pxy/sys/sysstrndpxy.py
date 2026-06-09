@@ -24,8 +24,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """ 
     PXY® Engine Strategy Matrix - Modular Dual-Pipeline Engine.
     Processes two completely separate, decoupled tracking streams:
-    - Pipe A (Supertrend Matrix): 3:3 Trailing Band Crossovers
-    - Pipe B (SMA Matrix)       : 42-Period Rolling Baseline Crossovers
+    - Pipe A (Supertrend Matrix): 3:3 Trailing Band Crossovers (Altered to NONE if SMA conflicts)
+    - Pipe B (SMA Matrix)       : 42-Period Rolling Baseline Crossovers (Left purely independent)
     Returns isolated categorical state flags to be matched downstream in the router.
     """ 
     # 🎯 OVERRIDE: Fetch historical day-session buffer block from data pipeline file if empty
@@ -119,26 +119,32 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             sma_direction[i] = 1
 
     # ===============================================================================
-    # 🛠️ SURGICAL COMPOSITE COUPLING AND VECTOR ARRAY GENERATION
+    # 🛠️ DECOUPLED WATERFALL ASYMMETRIC TREND STATE GENERATION
     # ===============================================================================
     st_trend_history = []
     sma_trend_history = []
     
     for i in range(n): 
-        # Calculate dynamic fallback state based on composite boundaries
-        if src_close[i] > supertrend_line[i] and src_close[i] > sma_line[i]:
-            composite_regime = "BULL"
-        elif src_close[i] < supertrend_line[i] and src_close[i] < sma_line[i]:
-            composite_regime = "BEAR"
+        # 1. Pipeline B: SMA baseline is left purely autonomous and uninfluenced
+        raw_sma_regime = "BULL" if sma_direction[i] == 1 else "BEAR"
+
+        # 2. Pipeline A: Supertrend baseline assesses raw placement first
+        raw_st_regime = "BULL" if st_direction[i] == 1 else "BEAR"
+
+        # 3. Apply validation override: Supertrend matches ONLY if SMA agrees, otherwise filters to NONE
+        if raw_st_regime == "BULL" and raw_sma_regime == "BULL":
+            conditional_st_regime = "BULL"
+        elif raw_st_regime == "BEAR" and raw_sma_regime == "BEAR":
+            conditional_st_regime = "BEAR"
         else:
-            composite_regime = "NONE"
+            conditional_st_regime = "NONE"
 
         if i < 1: 
-            st_trend_history.append(composite_regime)
-            sma_trend_history.append(composite_regime)
+            st_trend_history.append(conditional_st_regime)
+            sma_trend_history.append(raw_sma_regime)
             continue 
 
-        # --- PIPELINE A ARRAY GATING: SUPERTREND SWITCHES ---
+        # --- PIPELINE A ARRAY GATING: SUPERTREND SWITCHES WITH OVERRIDE RULES ---
         st_cross_buy  = (st_direction[i] == 1)  and (st_direction[i-1] == -1)
         st_cross_sell = (st_direction[i] == -1) and (st_direction[i-1] == 1)
 
@@ -147,7 +153,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         elif st_cross_sell:
             st_trend_history.append("SELL")
         else:
-            st_trend_history.append(composite_regime)
+            st_trend_history.append(conditional_st_regime)
 
         # --- PIPELINE B ARRAY GATING: PURE 42 SMA SWITCHES ---
         sma_cross_buy  = (sma_direction[i] == 1)  and (sma_direction[i-1] == -1)
@@ -158,7 +164,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         elif sma_cross_sell:
             sma_trend_history.append("SELL")
         else:
-            sma_trend_history.append(composite_regime)
+            sma_trend_history.append(raw_sma_regime)
 
     # Save cleanly named vector columns into the calculation frame
     df['st_trend_full'] = st_trend_history
@@ -234,6 +240,4 @@ def get_signal(df: pd.DataFrame) -> tuple:
         if DEBUG_MODE:
             print(f"Critical execution fault in system signal unpacker: {e}")
         return "NONE", "NONE"
-
-
 
