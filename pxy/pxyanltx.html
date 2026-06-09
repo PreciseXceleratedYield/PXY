@@ -711,8 +711,6 @@ function redrawMarkers() {
 
     svg.appendChild(makeMark(buyPt.x,  buyPt.y,  enLabel, bull,              0, t, true,  '1'));
     svg.appendChild(makeMark(sellPt.x, sellPt.y, exLabel, isBull ? bull : bear, 0, t, false, '1'));
-
-    if (activeTrade) showTooltip(activeTrade);
 }
 
 function makeMark(x, y, label, color, ti, trade, isBuy, opacity) {
@@ -720,25 +718,40 @@ function makeMark(x, y, label, color, ti, trade, isBuy, opacity) {
     g.style.cursor = 'pointer';
     g.setAttribute('opacity', opacity);
 
-    const size = 8;  // arrow size
-    const gap  = 4;  // gap from candle line
+    const gap  = 14;   // distance from candle line
+    const s    = 5;    // symbol half-size
+    const white = 'rgba(255,255,255,0.9)';
+    const stroke = 1.8;
 
     if (isBuy) {
-        // ▲ green arrow BELOW the candle point
-        const ay = y + gap + size;
-        const arrow = document.createElementNS('http://www.w3.org/2000/svg','polygon');
-        arrow.setAttribute('points', `${x},${ay - size} ${x - size},${ay + size} ${x + size},${ay + size}`);
-        arrow.setAttribute('fill', color);
-        arrow.setAttribute('filter', `drop-shadow(0 0 3px ${color})`);
-        g.appendChild(arrow);
+        // ✓ tick BELOW entry candle
+        const cy = y + gap;
+        const tick = document.createElementNS('http://www.w3.org/2000/svg','polyline');
+        tick.setAttribute('points', `${x-s},${cy} ${x-1},${cy+s} ${x+s},${cy-s+1}`);
+        tick.setAttribute('stroke', white);
+        tick.setAttribute('stroke-width', stroke);
+        tick.setAttribute('fill', 'none');
+        tick.setAttribute('stroke-linecap', 'round');
+        tick.setAttribute('stroke-linejoin', 'round');
+        g.appendChild(tick);
     } else {
-        // ▼ arrow ABOVE the candle point
-        const ay = y - gap - size;
-        const arrow = document.createElementNS('http://www.w3.org/2000/svg','polygon');
-        arrow.setAttribute('points', `${x},${ay + size} ${x - size},${ay - size} ${x + size},${ay - size}`);
-        arrow.setAttribute('fill', color);
-        arrow.setAttribute('filter', `drop-shadow(0 0 3px ${color})`);
-        g.appendChild(arrow);
+        // ✗ cross ABOVE exit candle
+        const cy = y - gap;
+        const l1 = document.createElementNS('http://www.w3.org/2000/svg','line');
+        l1.setAttribute('x1', x-s); l1.setAttribute('y1', cy-s);
+        l1.setAttribute('x2', x+s); l1.setAttribute('y2', cy+s);
+        l1.setAttribute('stroke', white);
+        l1.setAttribute('stroke-width', stroke);
+        l1.setAttribute('stroke-linecap', 'round');
+        g.appendChild(l1);
+
+        const l2 = document.createElementNS('http://www.w3.org/2000/svg','line');
+        l2.setAttribute('x1', x+s); l2.setAttribute('y1', cy-s);
+        l2.setAttribute('x2', x-s); l2.setAttribute('y2', cy+s);
+        l2.setAttribute('stroke', white);
+        l2.setAttribute('stroke-width', stroke);
+        l2.setAttribute('stroke-linecap', 'round');
+        g.appendChild(l2);
     }
 
     g.addEventListener('click', e => { e.stopPropagation(); selectTrade(trade); });
@@ -758,7 +771,7 @@ function selectTrade(t) {
     });
 
     // NO zoom — keep full chart context
-    setTimeout(redrawMarkers, 30);
+    setTimeout(() => { redrawMarkers(); showTooltip(t); }, 30);
 }
 
 function clearSelection() {
