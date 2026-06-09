@@ -10,6 +10,43 @@ FILTER_TIME = "09:00:00"
 
 MATCH_MODE = "TAG" 
 
+# === UNCHANGED: Keep this original function to write pnl.json ===
+def dump_to_json(closed_df): 
+    try: 
+        file_path = os.path.expanduser("~/pxy/pnl.json") 
+        os.makedirs(os.path.dirname(file_path), exist_ok=True) 
+        if closed_df.empty: 
+            data = [] 
+        else: 
+            records = closed_df.copy() 
+            for col in records.columns: 
+                if pd.api.types.is_datetime64_any_dtype(records[col]): 
+                    records[col] = records[col].dt.strftime('%Y-%m-%d %H:%M:%S') 
+            data = records.to_dict(orient='records') 
+        with open(file_path, "w") as f: 
+            json.dump(data, f, indent=4) 
+    except Exception as e: 
+        print(f"Error dumping to JSON: {e}") 
+
+# === ADDON: Your new function to write livpos.json ===
+def dump_livpos_to_json(open_positions): 
+    try: 
+        file_path = os.path.expanduser("~/pxy/livpos.json") 
+        os.makedirs(os.path.dirname(file_path), exist_ok=True) 
+        
+        # Safely convert the existing data to your exact uppercase format
+        livpos_data = [{
+            "SYMBOL": str(p["Symbol"]), 
+            "QTY": float(p["Qty"]), 
+            "PNL": float(p["PNL"])
+        } for p in open_positions]
+        
+        with open(file_path, "w") as f: 
+            json.dump(livpos_data, f, indent=4) 
+    except Exception as e: 
+        print(f"Error dumping livpos to JSON: {e}") 
+
+
 def dump_to_json(closed_df): 
     try: 
         file_path = os.path.expanduser("~/pxy/pnl.json") 
@@ -178,6 +215,7 @@ def process_lilo_orders(client):
         total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0 
         _print_summary(total_unrealized, total_realized) 
         dump_to_json(closed_df) 
+        dump_livpos_to_json(open_positions) 
         return open_df, closed_df 
     except Exception as e: 
         print(f"[TAG MATCH ERROR]: {e}") 
