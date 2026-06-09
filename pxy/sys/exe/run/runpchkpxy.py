@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 import sys
-import json
-from pathlib import Path  # Safe cross-platform path handling
 
 def get_position_summary(client=None):
     """
@@ -11,7 +9,6 @@ def get_position_summary(client=None):
     """
     ce_lots = 0
     pe_lots = 0
-    position_dumps = []  # Resets cleanly on every function call
 
     # Fallback session (not recommended inside loops)
     if client is None:
@@ -35,8 +32,7 @@ def get_position_summary(client=None):
             return "0CE0PE"
 
         for pos in positions:
-            # --- Normalize symbol and quantity ---
-            symbol = str(pos.get("trdSym", "")).upper()
+            # --- Get net quantity ---
             net_qty = float(pos.get("net_qty", 0))
             
             # Fallback if broker doesn't send net_qty properly
@@ -45,32 +41,11 @@ def get_position_summary(client=None):
                 sell = float(pos.get("flSellQty", 0))
                 net_qty = buy - sell
 
-            # --- DETERMINE STATUS BASED ON QTY ---
-            status = "OPEN" if abs(net_qty) > 0 else "CLOSE"
-
-            # --- DUMP ALL POSITIONS (ALL symbols, OPEN or CLOSED) ---
-            # Derived mathematically using Neo V2's precise transaction fields
-            try:
-                buy_amt = float(pos.get("buyAmt", 0))
-                sell_amt = float(pos.get("sellAmt", 0))
-                
-                if status == "CLOSE":
-                    pnl_val = sell_amt - buy_amt
-                else:
-                    # Fallback chain for open positions, defaulting to math calculation
-                    pnl_val = float(pos.get("urmtom", pos.get("pnl", sell_amt - buy_amt)))
-            except Exception:
-                pnl_val = 0.0
-
-            position_dumps.append({
-                "SYMBOL": symbol,
-                "QTY": net_qty,
-                "PNL": float(pnl_val),
-                "STATUS": status
-            })
-
-            # --- ORIGINAL ACTIVE POSITION CHECK FOR LOTS ---
+            # --- ACTIVE POSITION CHECK ---
             if abs(net_qty) > 0:
+                # --- Normalize symbol ---
+                symbol = str(pos.get("trdSym", "")).upper()
+                
                 # --- DETECT INDEX & LOT SIZE ---
                 # We check BANKNIFTY first because "NIFTY" is a substring of "BANKNIFTY"
                 if "BANKNIFTY" in symbol:
@@ -78,7 +53,7 @@ def get_position_summary(client=None):
                 elif "NIFTY" in symbol:
                     lot_size = 65
                 else:
-                    # Skip symbols that are not Nifty or Bank Nifty for lot counters
+                    # Skip symbols that are not Nifty or Bank Nifty
                     continue
 
                 # --- CALCULATE LOTS ---
@@ -91,20 +66,11 @@ def get_position_summary(client=None):
                 elif symbol.endswith("PE"):
                     pe_lots += current_lots
 
-        # 🟢 FIXED: Explicitly target parents[3] to go 4 levels up to reach ~/pxy
-        # parents[0]=run/, parents[1]=exe/, parents[2]=sys/, parents[3]=pxy/
-        target_dir = Path(__file__).resolve().parents[3]
-        target_file = target_dir / "livpos.json"
-
-        # Quietly write JSON output to the target directory
-        with open(target_file, "w") as f:
-            json.dump(position_dumps, f)
-
     except Exception as e:
         print(f"❌ Position Error: {e}")
         return "0CE0PE"
 
-    # Return the actual lot totals (UNCHANGED ORIGINAL RETURN VALUE)
+    # Return the actual lot totals
     return f"{ce_lots}CE{pe_lots}PE"
 
 # ---------------- STANDALONE TEST ----------------
