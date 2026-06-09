@@ -472,7 +472,7 @@ let candles = [], trades = [], btChart = null, activeTrade = null;
 /* ── LOAD ── */
 async function load() {
     const [cr, pr] = await Promise.allSettled([
-        fetch('./sysdtafpxy.json?_=' + Date.now()),
+        fetch('./sysddmppxy.json?_=' + Date.now()),
         fetch('./pnl.json?_='        + Date.now())
     ]);
     if (cr.status === 'fulfilled' && cr.value.ok) candles = parseSplit(await cr.value.json());
