@@ -9,7 +9,7 @@ def get_target_quantities(supertrend, ce_lots, pe_lots, lot_size=None):
     # ---------------------------------------------------------------------
     MODE = "TREND" 
     
-    HARD_MAX_LIMIT_LOTS = 8
+    HARD_MAX_LIMIT_LOTS = 3
 
     # Route A: Absolute Continuous N:N Balance 
     if MODE == "STRICT_NN":
