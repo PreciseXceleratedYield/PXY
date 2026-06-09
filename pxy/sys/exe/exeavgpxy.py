@@ -10,9 +10,9 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 10
-COOL_DOWN_SECONDS = 20  # ⏱️ Cooling interval set to exactly 20 seconds
-ATR_MULTIPLIER = 3
+MAX_LAYERS = 3
+COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 20 seconds
+ATR_MULTIPLIER = 2
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
