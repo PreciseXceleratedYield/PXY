@@ -12,8 +12,8 @@ Operational Rules:
   Fires instantly when 'strnd_trend' OR 'sma_trend' hits 'BUY' or 'SELL'.
 - ENTRY Layer B (⚡ PRIORITY 2): Pure structural breakouts from sysbbospxy (bos_signal).
 - ENTRY Layer C (📈 PRIORITY 3): Trend-following option contract assignment.
-  Triggers AVGSELL if signal is SELL AND both trends are BULL.
-  Triggers AVGBUY if signal is BUY AND both trends are BEAR.
+  Triggers OTMSELL if signal is SELL AND both trends are BULL.
+  Triggers OTMBUY if signal is BUY AND both trends are BEAR.
   Triggers OTMBUY if signal is BUY AND any trend is BULL.
   Triggers OTMSELL if signal is SELL AND any trend is BEAR.
 ===============================================================================
@@ -189,22 +189,22 @@ def get_entry_signal(df=None):
                 # 🎯 LOOKUP ARRAYS
                 is_signal_buy = (entry_sig == "BUY" or exit_sig == "BUY")
                 is_trend_bull = (sma_trend == "BULL" or strnd_trend == "BULL")
-                is_avgtrend_bull = (sma_trend == "BULL" and strnd_trend == "BULL")
+                is_OTMtrend_bull = (sma_trend == "BULL" and strnd_trend == "BULL")
 
                 is_signal_sell = (entry_sig == "SELL" or exit_sig == "SELL")
                 is_trend_bear = (sma_trend == "BEAR" or strnd_trend == "BEAR")
-                is_avgtrend_bear = (sma_trend == "BEAR" and strnd_trend == "BEAR")
+                is_OTMtrend_bear = (sma_trend == "BEAR" and strnd_trend == "BEAR")
 
                 # 🚀 Reordered Waterfall Logic (Strict AND checks evaluated before broad OR filters)
-                if is_signal_sell and is_avgtrend_bull:
+                if is_signal_sell and is_OTMtrend_bull:
                     if DEBUG_MODE:
-                        print("  🚀 PRIORITY 3 UNLOCKED: Sell signal inside Pure Bull Trend -> AVGSELL approved.")
-                    final_signal = "AVGSELL"
+                        print("  🚀 PRIORITY 3 UNLOCKED: Sell signal inside Pure Bull Trend -> OTMSELL approved.")
+                    final_signal = "OTMSELL"
                     
-                elif is_signal_buy and is_avgtrend_bear:
+                elif is_signal_buy and is_OTMtrend_bear:
                     if DEBUG_MODE:
-                        print("  🚀 PRIORITY 3 UNLOCKED: Buy signal inside Pure Bear Trend -> AVGBUY approved.")
-                    final_signal = "AVGBUY"
+                        print("  🚀 PRIORITY 3 UNLOCKED: Buy signal inside Pure Bear Trend -> OTMBUY approved.")
+                    final_signal = "OTMBUY"
                     
                 elif is_signal_buy and is_trend_bull:
                     if DEBUG_MODE:
