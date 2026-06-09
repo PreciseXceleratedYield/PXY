@@ -119,22 +119,26 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             sma_direction[i] = 1
 
     # ===============================================================================
-    # 🛠️ ISOLATED FIVE-STATE COUPLING AND VECTOR ARRAY GENERATION
+    # 🛠️ SURGICAL COMPOSITE COUPLING AND VECTOR ARRAY GENERATION
     # ===============================================================================
     st_trend_history = []
     sma_trend_history = []
     
     for i in range(n): 
-        # Base status parameters for the decoupled fallback states
-        raw_st_regime = "BULL" if st_direction[i] == 1 else "BEAR"
-        raw_sma_regime = "BULL" if sma_direction[i] == 1 else "BEAR"
+        # Calculate dynamic fallback state based on composite boundaries
+        if src_close[i] > supertrend_line[i] and src_close[i] > sma_line[i]:
+            composite_regime = "BULL"
+        elif src_close[i] < supertrend_line[i] and src_close[i] < sma_line[i]:
+            composite_regime = "BEAR"
+        else:
+            composite_regime = "NONE"
 
         if i < 1: 
-            st_trend_history.append(raw_st_regime)
-            sma_trend_history.append(raw_sma_regime)
+            st_trend_history.append(composite_regime)
+            sma_trend_history.append(composite_regime)
             continue 
 
-        # --- PIPELINE A ARRAY GATING: PURE SUPERTREND SWITCHES ---
+        # --- PIPELINE A ARRAY GATING: SUPERTREND SWITCHES ---
         st_cross_buy  = (st_direction[i] == 1)  and (st_direction[i-1] == -1)
         st_cross_sell = (st_direction[i] == -1) and (st_direction[i-1] == 1)
 
@@ -143,7 +147,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         elif st_cross_sell:
             st_trend_history.append("SELL")
         else:
-            st_trend_history.append(raw_st_regime)
+            st_trend_history.append(composite_regime)
 
         # --- PIPELINE B ARRAY GATING: PURE 42 SMA SWITCHES ---
         sma_cross_buy  = (sma_direction[i] == 1)  and (sma_direction[i-1] == -1)
@@ -154,7 +158,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         elif sma_cross_sell:
             sma_trend_history.append("SELL")
         else:
-            sma_trend_history.append(raw_sma_regime)
+            sma_trend_history.append(composite_regime)
 
     # Save cleanly named vector columns into the calculation frame
     df['st_trend_full'] = st_trend_history
@@ -222,20 +226,14 @@ def get_signal(df: pd.DataFrame) -> tuple:
         if DEBUG_MODE:
             print(f"--- PXY DUAL-PIPE COUPLING SUMMARY ---")
             print(f"Target Row Lookup Index   -> {idx}")
-            print(f"Pipe A (3:3 Supertrend)   -> {active_st_state}")
-            print(f"Pipe B (42 Rolling SMA)   -> {active_sma_state}")
-            print(f"Shared Engine Metrics     -> ATR: {latest_atr_val} | Dynamic K: {latest_k_val}\n")
+            print(f"Pipe A state              -> {active_st_state}")
+            print(f"Pipe B state              -> {active_sma_state}")
             
         return active_st_state, active_sma_state
-        
     except Exception as e:
         if DEBUG_MODE:
-            print(f"PXY Master Output Routing Module Exception: {e}")
+            print(f"Critical execution fault in system signal unpacker: {e}")
         return "NONE", "NONE"
 
-if __name__ == "__main__":
-    print("\n[PXY STRND ENGINE] Standalone Live Stream Listener Initiated.")
-    dummy = pd.DataFrame()
-    st_pipe, sma_pipe = get_signal(dummy)
 
 
