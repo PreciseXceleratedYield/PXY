@@ -1,38 +1,38 @@
-def get_target_quantities(supertrend, ce_qty, pe_qty, lot_size):
+def get_target_quantities(supertrend, ce_lots, pe_lots, lot_size=None):
     """
-    Calculates the allowed target quantities based on supertrend bias.
-    Maintains an N+1 lot structure for the favored side up to a hard max of 8.
+    Calculates dynamic target lot limits based on opposite-side counts.
     """
-    HARD_MAX_LIMIT = 8
-
-    # Edge case: No lot size or invalid values
-    if not lot_size or lot_size <= 0:
-        return min(ce_qty, HARD_MAX_LIMIT), min(pe_qty, HARD_MAX_LIMIT)
-
-    # 1. Determine the core baseline 'N' based on the largest current position
-    current_max = max(ce_qty, pe_qty)
+    # ---------------------------------------------------------------------
+    # ⚙️ LOCAL CONFIGURATION SWITCH
+    # "TREND"     -> Maintains N+1 on favored side based on opposite side count.
+    # "STRICT_NN" -> Enforces an absolute, continuous N:N balance across all trends.
+    # ---------------------------------------------------------------------
+    MODE = "TREND" 
     
-    # 2. Derive the base lot size (clamped to ensure it doesn't exceed the hard limit)
-    base_lots = min(current_max, HARD_MAX_LIMIT)
+    HARD_MAX_LIMIT_LOTS = 8
 
-    # 3. Set standard neutral limits
-    max_allowed_ce = base_lots
-    max_allowed_pe = base_lots
+    # Route A: Absolute Continuous N:N Balance 
+    if MODE == "STRICT_NN":
+        max_allowed_ce_lots = pe_lots
+        max_allowed_pe_lots = ce_lots
 
-    # 4. Apply structural asymmetry based on bias
-    if supertrend == "BULL":
-        # CE gets the extra lot, PE is capped at the base structural level
-        max_allowed_ce = base_lots + lot_size
-        max_allowed_pe = max(0, max_allowed_ce - lot_size)
-    elif supertrend == "BEAR":
-        # PE gets the extra lot, CE is capped at the base structural level
-        max_allowed_pe = base_lots + lot_size
-        max_allowed_ce = max(0, max_allowed_pe - lot_size)
+    # Route B: Trend-Driven Asymmetry Matrix (Opposite-Side Base)
+    else:
+        if supertrend == "BULL":
+            max_allowed_ce_lots = pe_lots + 1  # Calls can expand to Put Count + 1
+            max_allowed_pe_lots = ce_lots      # Puts restricted to matching Call Count
+        elif supertrend == "BEAR":
+            max_allowed_pe_lots = ce_lots + 1  # Puts can expand to Call Count + 1
+            max_allowed_ce_lots = pe_lots      # Calls restricted to matching Put Count
+        else:
+            max_allowed_ce_lots = pe_lots      # Flat NONE trend forces strict matching
+            max_allowed_pe_lots = ce_lots
 
-    # 5. Enforce strict final boundary limits
-    max_allowed_ce = min(max_allowed_ce, HARD_MAX_LIMIT)
-    max_allowed_pe = min(max_allowed_pe, HARD_MAX_LIMIT)
+    # Safety structural absolute ceiling constraints
+    max_allowed_ce_lots = min(max_allowed_ce_lots, HARD_MAX_LIMIT_LOTS)
+    max_allowed_pe_lots = min(max_allowed_pe_lots, HARD_MAX_LIMIT_LOTS)
 
-    return max_allowed_ce, max_allowed_pe
+    return max_allowed_ce_lots, max_allowed_pe_lots
+
 
 
