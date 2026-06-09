@@ -1,30 +1,38 @@
 def get_target_quantities(supertrend, ce_qty, pe_qty, lot_size):
     """
     Calculates the allowed target quantities based on supertrend bias.
-    Maintains an N+1 lot structure for the favored side up to a hard max of 6.
+    Maintains an N+1 lot structure for the favored side up to a hard max of 8.
     """
-    # Enforce a hard maximum risk limit across the entire system
     HARD_MAX_LIMIT = 8
 
-    if not lot_size:
-        # If no lot size, clamp current quantities to the hard limit
-        return min(pe_qty, HARD_MAX_LIMIT), min(ce_qty, HARD_MAX_LIMIT)
+    # Edge case: No lot size or invalid values
+    if not lot_size or lot_size <= 0:
+        return min(ce_qty, HARD_MAX_LIMIT), min(pe_qty, HARD_MAX_LIMIT)
 
-    # Default limits allow them to be perfectly equal
-    max_allowed_ce = pe_qty
-    max_allowed_pe = ce_qty
+    # 1. Determine the core baseline 'N' based on the largest current position
+    current_max = max(ce_qty, pe_qty)
+    
+    # 2. Derive the base lot size (clamped to ensure it doesn't exceed the hard limit)
+    base_lots = min(current_max, HARD_MAX_LIMIT)
 
-    # Adjust limits based on the dominant supertrend structure
+    # 3. Set standard neutral limits
+    max_allowed_ce = base_lots
+    max_allowed_pe = base_lots
+
+    # 4. Apply structural asymmetry based on bias
     if supertrend == "BULL":
-        # CE is favored to be N + 1 lot ahead of PE
-        max_allowed_ce = pe_qty + lot_size
+        # CE gets the extra lot, PE is capped at the base structural level
+        max_allowed_ce = base_lots + lot_size
+        max_allowed_pe = max(0, max_allowed_ce - lot_size)
     elif supertrend == "BEAR":
-        # PE is favored to be N + 1 lot ahead of CE
-        max_allowed_pe = ce_qty + lot_size
+        # PE gets the extra lot, CE is capped at the base structural level
+        max_allowed_pe = base_lots + lot_size
+        max_allowed_ce = max(0, max_allowed_pe - lot_size)
 
-    # Cap both sides strictly at your maximum limit of 6
+    # 5. Enforce strict final boundary limits
     max_allowed_ce = min(max_allowed_ce, HARD_MAX_LIMIT)
     max_allowed_pe = min(max_allowed_pe, HARD_MAX_LIMIT)
 
     return max_allowed_ce, max_allowed_pe
+
 
