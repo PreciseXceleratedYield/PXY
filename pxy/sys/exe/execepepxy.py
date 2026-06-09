@@ -4,7 +4,7 @@ def get_target_quantities(supertrend, ce_qty, pe_qty, lot_size):
     Maintains an N+1 lot structure for the favored side up to a hard max of 6.
     """
     # Enforce a hard maximum risk limit across the entire system
-    HARD_MAX_LIMIT = 6
+    HARD_MAX_LIMIT = 8
 
     if not lot_size:
         # If no lot size, clamp current quantities to the hard limit
