@@ -107,7 +107,7 @@ body {
 /* ── MAIN LAYOUT ── */
 #main {
     display:grid;
-    grid-template-columns: 1fr 400px;
+    grid-template-columns: 1fr 1fr;   /* desktop/TV: 50% / 50% */
     grid-template-rows: 1fr;
     height:calc(100dvh - var(--header-h) - 56px);
     overflow:hidden;
@@ -121,7 +121,18 @@ body {
     transition:background 0.35s;
 }
 
-/* video-like stage */
+/* ── RESPONSIVE ── */
+@media (max-width:900px) {
+    /* mobile: vertical split — 70% tile / 30% script */
+    #main {
+        grid-template-columns: 1fr;
+        grid-template-rows: 70% 30%;
+    }
+    #player { border-right:none; border-bottom:1px solid var(--border); }
+}
+@media (max-width:640px) {
+    #main { grid-template-rows: 70% 30%; }
+}
 #stage {
     flex:1; position:relative; overflow:hidden;
     background:radial-gradient(ellipse at 50% 60%, rgba(15,25,50,0.8), var(--bg));
@@ -302,14 +313,6 @@ body {
 
 .bottom-hint { font-size:10px; color:var(--muted); margin-left:auto; line-height:1.4; }
 
-/* ── RESPONSIVE ── */
-@media (max-width:900px) {
-    #main { grid-template-columns:1fr; grid-template-rows:1fr 320px; }
-    #player { border-right:none; border-bottom:1px solid var(--border); }
-}
-@media (max-width:640px) {
-    #main { grid-template-rows:1fr 260px; }
-}
 </style>
 </head>
 <body>
