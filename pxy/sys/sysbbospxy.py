@@ -58,10 +58,10 @@ def get_bos_bar(df):
         signal = "NONE"
         if c_42 > h_42:
             signal = "BUY"
-            print(f"🚀 {Fore.GREEN}STRUCTURAL BREAKOUT: Price {c_42:.2f} Cleared Range High {h_42:.2f}")
+            print(f"🚀 {Fore.GREEN}STRUCTURAL BREAKOUT")
         elif c_42 < l_42:
             signal = "SELL"
-            print(f"🔴 {Fore.RED}STRUCTURAL BREAKDOWN: Price {c_42:.2f} Smashed Range Low {l_42:.2f}")
+            print(f"🔴 {Fore.RED}STRUCTURAL BREAKDOWN")
         
         # Build the visual bar using corrected midpoint open parameters
         visual_bar = build_candle_bar(o_42, h_render, l_render, c_42)
