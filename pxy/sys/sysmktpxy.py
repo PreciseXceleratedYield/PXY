@@ -44,7 +44,7 @@ def _print_console_bar(c2_c, c1_c, c0_c, c2_color, c1_color, c0_color, entry, ex
         (c1_c, f"  C1 (Conf) -{c1_c % 100:05.1f}", c1_ansi),
         (c0_c, f"  C0 (Live) -{c0_c % 100:05.1f}", c0_ansi)
     ]
-    rows.sort(key=lambda item: item[0], reverse=True)
+    #rows.sort(key=lambda item: item[0], reverse=True)
 
     print(f"\n{YLW}= GEOMETRIC PXY®-PRIORITY ENTRY ENGINE ={RST}")
     for val, label, color in rows:
