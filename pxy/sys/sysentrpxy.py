@@ -14,8 +14,8 @@ Operational Rules:
 - ENTRY Layer C (📈 PRIORITY 3): Trend-following option contract assignment.
   Triggers AVGSELL if signal is SELL AND both trends are BULL.
   Triggers AVGBUY if signal is BUY AND both trends are BEAR.
-  Triggers ATMBUY if signal is BUY AND any trend is BULL.
-  Triggers ATMSELL if signal is SELL AND any trend is BEAR.
+  Triggers OTMBUY if signal is BUY AND any trend is BULL.
+  Triggers OTMSELL if signal is SELL AND any trend is BEAR.
 ===============================================================================
 """
 
@@ -162,11 +162,11 @@ def get_entry_signal(df=None):
         if strnd_trend == "BUY" or sma_trend == "BUY":
             if DEBUG_MODE:
                 print("  🏆 PRIORITY 1 UNLOCKED: Absolute Bullish Crossover confirmed.")
-            final_signal = "ATMBUY"
+            final_signal = "OTMBUY"
         elif strnd_trend == "SELL" or sma_trend == "SELL":
             if DEBUG_MODE:
                 print("  🏆 PRIORITY 1 UNLOCKED: Absolute Bearish Breakdown confirmed.")
-            final_signal = "ATMSELL"
+            final_signal = "OTMSELL"
             
         # ⚡ PRIORITY 2: High-Volume 42-Min Structural Breakouts (sysbbospxy)
         else:
@@ -175,9 +175,9 @@ def get_entry_signal(df=None):
             if bos_signal == "BUY":
                 if DEBUG_MODE:
                     print("  ⚡ PRIORITY 2 UNLOCKED: Bullish BOS Structural Breakout approved.")
-                final_signal = "ATMBUY"
+                final_signal = "OTMBUY"
             elif bos_signal == "SELL":
-                final_signal = "ATMSELL"
+                final_signal = "OTMSELL"
                 if DEBUG_MODE:
                     print("  ⚡ PRIORITY 2 UNLOCKED: Bearish BOS Structural Breakdown approved.")
 
@@ -208,13 +208,13 @@ def get_entry_signal(df=None):
                     
                 elif is_signal_buy and is_trend_bull:
                     if DEBUG_MODE:
-                        print("  🚀 PRIORITY 3 UNLOCKED: Buy signal matching Bull Trend -> ATMBUY approved.")
-                    final_signal = "ATMBUY"
+                        print("  🚀 PRIORITY 3 UNLOCKED: Buy signal matching Bull Trend -> OTMBUY approved.")
+                    final_signal = "OTMBUY"
                     
                 elif is_signal_sell and is_trend_bear:
                     if DEBUG_MODE:
-                        print("  🚀 PRIORITY 3 UNLOCKED: Sell signal matching Bear Trend -> ATMSELL approved.")
-                    final_signal = "ATMSELL"
+                        print("  🚀 PRIORITY 3 UNLOCKED: Sell signal matching Bear Trend -> OTMSELL approved.")
+                    final_signal = "OTMSELL"
                     
                 else:
                     if DEBUG_MODE:
