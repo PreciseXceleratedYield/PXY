@@ -570,7 +570,7 @@ function drawChart() {
     const highs  = candles.map(c => c.h);
     const lows   = candles.map(c => c.l);
     const isBull = closes.at(-1) >= closes[0];
-    const lineC  = isBull ? cssVar('--bull') : cssVar('--bear');
+    const lineC  = 'rgba(255,255,255,0.7)';
 
     if (btChart) { btChart.destroy(); btChart = null; }
 
@@ -720,7 +720,7 @@ function makeMark(x, y, label, color, ti, trade, isBuy, opacity) {
 
     const gap  = 14;   // distance from candle line
     const s    = 5;    // symbol half-size
-    const white = 'rgba(255,255,255,0.9)';
+    const white = isBuy ? '#22c55e' : '#ef4444';
     const stroke = 1.8;
 
     if (isBuy) {
