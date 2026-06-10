@@ -120,8 +120,6 @@ body {
 #tableWrap {
     flex:1; overflow-y:auto; overflow-x:auto; min-height:0;
 }
-
-/* ── POSITIONS TABLE ── */
 #posTable {
     width:100%; border-collapse:collapse; min-width:480px;
 }
@@ -184,29 +182,81 @@ body {
 .foot-total.bull { color:var(--bull); }
 .foot-total.bear { color:var(--bear); }
 
-/* ── BUTTON BAR ── */
+/* ── BODY WRAP (table + buttons side by side) ── */
+#bodyWrap {
+    flex:1; display:flex; overflow:hidden; min-height:0;
+}
+
+/* ── TABLE WRAP ── */
+#tableWrap {
+    flex:1; overflow-y:auto; overflow-x:auto; min-height:0;
+}
+
+/* ── BUTTON BAR — right vertical column ── */
 #btnBar {
     display:none; flex-shrink:0;
-    gap:8px; padding:8px clamp(12px,2.5vw,24px);
-    background:var(--bg2); border-top:1px solid var(--border);
+    flex-direction:column;
+    gap:8px; padding:12px 10px;
+    width:clamp(90px,12vw,130px);
+    background:var(--bg2); border-left:1px solid var(--border);
     transition:background 0.35s,border-color 0.35s;
-    overflow-x:auto; scrollbar-width:none;
+    overflow-y:auto; scrollbar-width:none;
+    align-items:stretch;
 }
 #btnBar::-webkit-scrollbar { display:none; }
 #btnBar.show { display:flex; }
 
 .run-btn {
-    flex:1; min-width:100px; padding:8px 12px; border-radius:7px;
+    padding:clamp(10px,1.5vh,16px) 8px; border-radius:7px;
     border:1px solid var(--border2); background:var(--bg3); color:var(--text);
-    font-family:'DM Mono',monospace; font-size:clamp(10px,1vw,12px);
-    letter-spacing:0.06em; cursor:pointer; transition:all 0.2s; white-space:nowrap;
+    font-family:'DM Mono',monospace; font-size:clamp(9px,0.9vw,11px);
+    letter-spacing:0.05em; cursor:pointer; transition:all 0.2s;
+    white-space:normal; text-align:center; line-height:1.4;
 }
-.run-btn:hover  { border-color:var(--accent); color:var(--accent); }
 .run-btn:active { opacity:0.7; transform:scale(0.97); }
 .run-btn:disabled { opacity:0.4; cursor:default; }
-.run-btn.running { border-color:var(--gold); color:var(--gold); }
-.run-btn.done    { border-color:var(--bull); color:var(--bull); }
-.run-btn.error   { border-color:var(--bear); color:var(--bear); }
+.run-btn.running { border-color:var(--gold) !important; color:var(--gold) !important; }
+.run-btn.done    { border-color:var(--bull) !important; color:var(--bull) !important; }
+.run-btn.error   { border-color:var(--bear) !important; color:var(--bear) !important; }
+
+/* CE = green */
+.run-btn.ce-btn {
+    border-color:rgba(34,197,94,0.35);
+    color:var(--bull);
+    background:var(--bull-dim);
+}
+.run-btn.ce-btn:hover { background:rgba(34,197,94,0.22); border-color:var(--bull); }
+
+/* PE = red */
+.run-btn.pe-btn {
+    border-color:rgba(239,68,68,0.35);
+    color:var(--bear);
+    background:var(--bear-dim);
+}
+.run-btn.pe-btn:hover { background:rgba(239,68,68,0.22); border-color:var(--bear); }
+
+/* UPDATE = mixed gradient border */
+.run-btn.upd-btn {
+    border-color:transparent;
+    color:var(--text);
+    background:linear-gradient(var(--bg3),var(--bg3)) padding-box,
+               linear-gradient(135deg, var(--bull), var(--bear)) border-box;
+    border:1px solid transparent;
+}
+.run-btn.upd-btn:hover { opacity:0.85; }
+
+/* mobile — buttons go back to bottom */
+@media (max-width:640px) {
+    #bodyWrap { flex-direction:column; }
+    #btnBar {
+        flex-direction:row; width:100%; height:auto;
+        border-left:none; border-top:1px solid var(--border);
+        padding:8px clamp(10px,2vw,16px);
+        overflow-x:auto; overflow-y:hidden;
+        align-items:center;
+    }
+    .run-btn { flex:1; min-width:70px; padding:8px 6px; white-space:nowrap; }
+}
 
 /* ── PWD POPUP ── */
 #pwdPopup {
@@ -334,6 +384,9 @@ body {
     </div>
 </div>
 
+<!-- BODY WRAP -->
+<div id="bodyWrap">
+
 <!-- TABLE -->
 <div id="tableWrap">
     <table id="posTable">
@@ -353,14 +406,16 @@ body {
     <div id="emptyState">No open positions</div>
 </div>
 
-<!-- BUTTON BAR -->
+<!-- BUTTON BAR — right column -->
 <div id="btnBar">
-    <button class="run-btn" onclick="runScript('pxytkovrbuyce', this)">✅ BUY CE</button>
-    <button class="run-btn" onclick="runScript('pxytkovrsqrce', this)">⛔ SQR CE</button>
-    <button class="run-btn" onclick="runScript('pxyupdate', this)">🔄 UPDATE</button>
-    <button class="run-btn" onclick="runScript('pxytkovrsqrpe', this)">⛔ SQR PE</button>
-    <button class="run-btn" onclick="runScript('pxytkovrbuype', this)">✅ BUY PE</button>
+    <button class="run-btn ce-btn"  onclick="runScript('pxytkovrbuyce', this)">✅ BUY CE</button>
+    <button class="run-btn ce-btn"  onclick="runScript('pxytkovrsqrce', this)">⛔ SQR CE</button>
+    <button class="run-btn upd-btn" onclick="runScript('pxyupdate', this)">🔄 UPDATE</button>
+    <button class="run-btn pe-btn"  onclick="runScript('pxytkovrsqrpe', this)">⛔ SQR PE</button>
+    <button class="run-btn pe-btn"  onclick="runScript('pxytkovrbuype', this)">✅ BUY PE</button>
 </div>
+
+</div><!-- /bodyWrap -->
 
 <!-- PWD POPUP -->
 <div id="pwdPopup">
