@@ -9,9 +9,8 @@ IST = pytz.timezone("Asia/Kolkata")
 # ==================================================
 # 🔧 REVISED CONFIG: COMPRESSION DETECTOR TIME DECAY
 # ==================================================
-BASE_DECAY_RATE = 0.0
+DECAY_RATE_PER_HOUR = 0.01  # 1% decay per hour
 PNL_THRESHOLD = 0.0
-GRACE_WINDOW_SECS = 1800  # 30 minutes grace window in seconds
 
 def dynamic_entry(row):
     try:
@@ -45,56 +44,33 @@ def dynamic_entry(row):
             else:
                 entry_time = entry_time.astimezone(IST)
 
-        # ---------------- CALC ELAPSED ----------------
+        # ---------------- CALC ELAPSED HOURS ----------------
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
+        elapsed_hours = elapsed_secs / 3600.0  # Convert to fractional hours
 
-        # ---------------- DUAL-PHASE DECAY SYSTEM ----------------
-        if elapsed_secs <= GRACE_WINDOW_SECS:
-            # Phase 1: Flat baseline decay time loop
-            active_decay_rate = BASE_DECAY_RATE
-            phase_tag = "EARLY ROOM (1.0x)"
-        else:
-            # Phase 2: After 30 minutes, evaluate compression state triggers
-            ce_depth = float(row.get("hkin_ce_depth", 1.0))
-            pe_depth = float(row.get("hkin_pe_depth", 1.0))
-            past_depth_str = str(row.get("hkin_past_depth", "NA")).upper().strip()
-            
-            # CRITICAL TRIGGER SQUEEZE CONDITION: Run past depth ONLY when both are 1
-            if ce_depth == 1.0 and pe_depth == 1.0:
-                if "CE" in symbol and "CE" in past_depth_str:
-                    match = re.search(r'CE(\d+)', past_depth_str)
-                    depth = float(match.group(1)) if match else 1.0
-                elif "PE" in symbol and "PE" in past_depth_str:
-                    match = re.search(r'PE(\d+)', past_depth_str)
-                    depth = float(match.group(1)) if match else 1.0
-                else:
-                    depth = 1.0
-                phase_tag = f"SQUEEZE PAST ACCEL ({depth:.1f}x)"
-            else:
-                # MODIFIED FALLBACK: No standard depth penalty allowed. Defaults strictly to pure time decay.
-                depth = 1.0
-                phase_tag = "(1.0x)"
-
-            # Protect against negative depth adjustments or zero values safely
-            if depth <= 0:
-                depth = 1.0
-
-            active_decay_rate = BASE_DECAY_RATE * depth
-
-        # ---------------- PURE DECAY RULE ----------------
+        # ---------------- PERCENTAGE DECAY RULE ----------------
         if pnl <= PNL_THRESHOLD:
-            decay_amount = elapsed_secs * active_decay_rate
-            dynamic_val = original_price - decay_amount
+            # Formula: Total % to decay = elapsed hours * 1%
+            total_decay_percentage = elapsed_hours * DECAY_RATE_PER_HOUR
+            
+            # Calculate the final dynamic value after decay
+            dynamic_val = original_price * (1.0 - total_decay_percentage)
+            
+            # Ensure price doesn't decay below zero
+            dynamic_val = max(dynamic_val, 0.0)
+            
+            decay_amount = original_price - dynamic_val
             clean_symbol = re.sub(r'^(NIFTY|BANKNIFTY)26', '', symbol)
             
-            if decay_amount > 0.5:
-                print(f"{clean_symbol} | {phase_tag} DECAY: -{decay_amount:.2f} PTS")
+            if decay_amount > 0.05:
+                print(f"{clean_symbol} | DECAY (1% / hr): -{decay_amount:.2f} PTS ({elapsed_hours:.2f} hrs elapsed)")
         else:
             dynamic_val = original_price
             
         return round(dynamic_val, 2)
         
     except Exception as e:
+        print(f"Error in dynamic_entry: {e}")
         return original_price
 
 
