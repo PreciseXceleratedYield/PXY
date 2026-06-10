@@ -41,8 +41,8 @@ DEBUG_MODE = False
 CHECK_CONFIRMED_ONLY = False
 
 # 🛠️ INDEPENDENT STRATEGY SWITCHES
-ENABLE_EARLY_MORNING_WINDOW = False  # True = Process 09:15-09:30 entries | False = Skip layer completely
-ENABLE_BOS_BREAKOUT_ENGINE  = False  # True = Process structural breakouts     | False = Skip layer completely
+ENABLE_EARLY_MORNING_WINDOW = True  # True = Process 09:15-09:30 entries | False = Skip layer completely
+ENABLE_BOS_BREAKOUT_ENGINE  = True  # True = Process structural breakouts     | False = Skip layer completely
 
 def get_entry_signal(df=None):
     """
