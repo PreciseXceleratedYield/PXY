@@ -7,7 +7,7 @@ def get_target_quantities(supertrend, ce_lots, pe_lots, lot_size=None):
     # "TREND"     -> Maintains N+1 on favored side based on opposite side count.
     # "STRICT_NN" -> Enforces an absolute, continuous N:N balance across all trends.
     # ---------------------------------------------------------------------
-    MODE = "TREND" 
+    MODE = "STRICT_NN" 
     
     HARD_MAX_LIMIT_LOTS = 3
 
