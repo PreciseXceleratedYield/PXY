@@ -10,12 +10,13 @@ Operational Rules:
 - EXIT and ENTRY signals originate strictly from sysmktpxy (exit_sig, entry_sig).
 - ENTRY Layer A (👑 PRIORITY 1): Pure Dual-Pipe Crossover Line Switches.
   Fires instantly when 'strnd_trend' OR 'sma_trend' hits 'BUY' or 'SELL'.
+  Assigns ATM contracts on line crossovers.
 - ENTRY Layer B (⚡ PRIORITY 2): Pure structural breakouts from sysbbospxy (bos_signal).
 - ENTRY Layer C (📈 PRIORITY 3): Trend-following option contract assignment.
-  Triggers OTMSELL if signal is SELL AND both trends are BULL.
-  Triggers OTMBUY if signal is BUY AND both trends are BEAR.
-  Triggers OTMBUY if signal is BUY AND any trend is BULL.
-  Triggers OTMSELL if signal is SELL AND any trend is BEAR.
+  Triggers ATMSELL if signal is SELL AND both trends are BULL (Aligned).
+  Triggers ATMBUY if signal is BUY AND both trends are BEAR (Aligned).
+  Triggers OTMBUY if signal is BUY AND any trend is BULL (Partial/Unaligned).
+  Triggers OTMSELL if signal is SELL AND any trend is BEAR (Partial/Unaligned).
 ===============================================================================
 """
 
@@ -40,8 +41,8 @@ DEBUG_MODE = False
 CHECK_CONFIRMED_ONLY = False
 
 # 🛠️ INDEPENDENT STRATEGY SWITCHES
-ENABLE_EARLY_MORNING_WINDOW = False  # True = Process 09:15-09:30 entries | False = Skip layer completely
-ENABLE_BOS_BREAKOUT_ENGINE  = False  # True = Process structural breakouts     | False = Skip layer completely
+ENABLE_EARLY_MORNING_WINDOW = True  # True = Process 09:15-09:30 entries | False = Skip layer completely
+ENABLE_BOS_BREAKOUT_ENGINE  = True  # True = Process structural breakouts     | False = Skip layer completely
 
 def get_entry_signal(df=None):
     """
@@ -169,15 +170,15 @@ def get_entry_signal(df=None):
             print("🏙️ CURRENT TIMING STATE: Standard Continuous window logic active.")
             print(f"🛡️ STEP 1: Testing Priority 1 Dual Crossovers (ST: '{strnd_trend}', SMA: '{sma_trend}')...")
         
-        # 👑 PRIORITY 1: Native Dual-Pipeline Crossovers (Either Pipe A OR Pipe B Crossovers Trigger Instantly)
+        # 👑 PRIORITY 1: Native Dual-Pipeline Crossovers (Fires instantly on line crossings -> now assigned to ATM)
         if strnd_trend == "BUY" or sma_trend == "BUY":
             if DEBUG_MODE:
                 print("  🏆 PRIORITY 1 UNLOCKED: Absolute Bullish Crossover confirmed.")
-            final_signal = "OTMBUY"
+            final_signal = "ATMBUY"
         elif strnd_trend == "SELL" or sma_trend == "SELL":
             if DEBUG_MODE:
                 print("  🏆 PRIORITY 1 UNLOCKED: Absolute Bearish Breakdown confirmed.")
-            final_signal = "OTMSELL"
+            final_signal = "ATMSELL"
             
         # ⚡ PRIORITY 2: High-Volume 42-Min Structural Breakouts (sysbbospxy)
         elif ENABLE_BOS_BREAKOUT_ENGINE:
@@ -195,26 +196,35 @@ def get_entry_signal(df=None):
                 # Fallback to Priority 3 if BOS layer is ON but returns no signal
                 if DEBUG_MODE:
                     print("  ↳ Priority 2 active but no breakout found. Falling to Step 3...")
+                
+                # --- STRICT DUAL-TREND ALIGNMENT RULES (AND -> ATM | OR -> OTM) ---
                 if entry_sig == "SELL" and strnd_trend == "BULL" and sma_trend == "BULL":
-                    final_signal = "OTMSELL"
+                    final_signal = "ATMSELL"
                 elif entry_sig == "BUY" and strnd_trend == "BEAR" and sma_trend == "BEAR":
-                    final_signal = "OTMBUY"
+                    final_signal = "ATMBUY"
                 elif entry_sig == "BUY" and (strnd_trend == "BULL" or sma_trend == "BULL"):
                     final_signal = "OTMBUY"
                 elif entry_sig == "SELL" and (strnd_trend == "BEAR" or sma_trend == "BEAR"):
                     final_signal = "OTMSELL"
+                else:
+                    final_signal = "NONE"
         
         # 📈 PRIORITY 3: Fallback straight here if Priority 1 is inactive AND the BOS switch is turned off
         else:
             if DEBUG_MODE:
                 print("  ⏩ Priority 2 Engine is OFF. Skipping straight to Priority 3 Trend Assignment...")
+            
+            # --- STRICT DUAL-TREND ALIGNMENT RULES (AND -> ATM | OR -> OTM) ---
             if entry_sig == "SELL" and strnd_trend == "BULL" and sma_trend == "BULL":
-                final_signal = "OTMSELL"
+                final_signal = "ATMSELL"
             elif entry_sig == "BUY" and strnd_trend == "BEAR" and sma_trend == "BEAR":
-                final_signal = "OTMBUY"
+                final_signal = "ATMBUY"
             elif entry_sig == "BUY" and (strnd_trend == "BULL" or sma_trend == "BULL"):
                 final_signal = "OTMBUY"
             elif entry_sig == "SELL" and (strnd_trend == "BEAR" or sma_trend == "BEAR"):
                 final_signal = "OTMSELL"
+            else:
+                final_signal = "NONE"
 
     return final_signal, exit_sig
+
