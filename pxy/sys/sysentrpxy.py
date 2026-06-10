@@ -199,12 +199,12 @@ def get_entry_signal(df=None):
                 if is_signal_sell and is_SMAST_bull:
                     if DEBUG_MODE:
                         print("  🚀 PRIORITY 3 UNLOCKED: Sell signal inside Pure Bull Trend -> OTMSELL approved.")
-                    final_signal = "AVGSELL"
+                    final_signal = "OTMSELL"
                     
                 elif is_signal_buy and is_SMAST_bear:
                     if DEBUG_MODE:
                         print("  🚀 PRIORITY 3 UNLOCKED: Buy signal inside Pure Bear Trend -> OTMBUY approved.")
-                    final_signal = "AVGBUY"
+                    final_signal = "OTMBUY"
                     
                 elif is_signal_buy and is_trend_bull:
                     if DEBUG_MODE:
