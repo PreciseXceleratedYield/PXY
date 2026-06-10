@@ -11,8 +11,8 @@ init(autoreset=True)
 # --- CONFIG --- 
 REBUY_ENABLED = True 
 MAX_LAYERS = 3
-COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 20 seconds
-ATR_MULTIPLIER = 2
+COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
+ATR_MULTIPLIER = 1
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -54,10 +54,11 @@ def is_cooling(side):
 
 def calculate_atr_threshold(row, side, is_accelerated_state):
     """
-    Normal state (AVGBUY/AVGSELL): Uses straight ATR% loss floor.
-    Accelerated State (BEAR/BULL): Instantly drops floor to ATR + max(Opposite Power, Depth).
+    Normal state (AVGBUY/AVGSELL): Uses straight (ATR * ATR_MULTIPLIER) loss floor.
+    Accelerated State (BEAR/BULL): Uses (ATR * ATR_MULTIPLIER) + max(Opposite Power, Opposite Depth).
     """
     raw_atr_pct = safe_float(row.get("atr", 0.0))
+    base_atr_loss = raw_atr_pct * ATR_MULTIPLIER
     
     # Extract opposing side metrics for precise downside risk mitigation
     if side == 'CE':
@@ -68,13 +69,14 @@ def calculate_atr_threshold(row, side, is_accelerated_state):
         opp_depth = safe_float(row.get("hkin_ce_depth", 1.0))
 
     if is_accelerated_state:
-        # ACCELERATED PANIC STATE: Deep floor protection during an active counter-trend exit signal
-        highest_opp_risk = max(raw_atr_pct + opp_power, raw_atr_pct + opp_depth)
-        return -(highest_opp_risk * ATR_MULTIPLIER)
+        # ACCELERATED PANIC STATE: (ATR * 2) + max(Opposite Power, Opposite Depth)
+        highest_opp_risk = max(opp_power, opp_depth)
+        total_loss_pct = base_atr_loss + highest_opp_risk
+        return -total_loss_pct
     else:
-        # NORMAL STATE: Strict straight ATR loss threshold
-        if raw_atr_pct > 0:
-            return -(raw_atr_pct * ATR_MULTIPLIER)
+        # NORMAL STATE: Strict straight ATR * 2 loss threshold
+        if base_atr_loss > 0:
+            return -base_atr_loss
         return -14.0  # Raw fallback floor if ATR goes missing
 
 def get_loss(row): 
@@ -201,3 +203,4 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Order confirmation complete for side {side}.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+
