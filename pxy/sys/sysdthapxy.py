@@ -4,7 +4,7 @@ import numpy as np
 from sysstrndpxy import fetch_yf_data  # Note: Points to your file containing Mode 0
 
 # ⚡ LIVE ENFORCEMENT ACTIVATED: Set to True to stream active forming bars dynamically
-USE_FORMING_CANDLE = False  
+USE_FORMING_CANDLE = True  
 CANDLE_STYLE = "MODE_0_PURE"
 
 def get_pxy_data(tickerSymbol=None, df=None):
