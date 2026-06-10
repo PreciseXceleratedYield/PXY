@@ -9,7 +9,7 @@ IST = pytz.timezone("Asia/Kolkata")
 # ==================================================
 # 🔧 REVISED CONFIG: COMPRESSION DETECTOR TIME DECAY
 # ==================================================
-DECAY_RATE_PER_HOUR = 0.01  # 1% decay per hour
+DECAY_RATE_PER_HOUR = 0.02  # 1% decay per hour
 PNL_THRESHOLD = 0.0
 
 def dynamic_entry(row):
