@@ -54,7 +54,7 @@ def is_cooling(side):
 
 def calculate_atr_threshold(row, side, is_accelerated_state):
     """
-    Normal state (AVGBUY/AVGSELL): Uses straight (ATR * ATR_MULTIPLIER) loss floor.
+    Normal state (OTMBUY/OTMSELL): Uses straight (ATR * ATR_MULTIPLIER) loss floor.
     Accelerated State (BEAR/BULL): Uses (ATR * ATR_MULTIPLIER) + max(Opposite Power, Opposite Depth).
     """
     raw_atr_pct = safe_float(row.get("atr", 0.0))
@@ -141,7 +141,7 @@ def handle_side_averaging(client, df):
         is_accelerated_state = False
 
         if side == 'CE':
-            if raw_entry_signal == "AVGBUY":
+            if raw_entry_signal == "OTMBUY":
                 current_signal = "BUY"
                 is_accelerated_state = False
             elif raw_exit_signal == "BEAR":
@@ -149,7 +149,7 @@ def handle_side_averaging(client, df):
                 is_accelerated_state = True
 
         elif side == 'PE':
-            if raw_entry_signal == "AVGSELL":
+            if raw_entry_signal == "OTMSELL":
                 current_signal = "SELL"
                 is_accelerated_state = False
             elif raw_exit_signal == "BULL":
