@@ -39,6 +39,12 @@ DEBUG_MODE = False
 # True = Target the closed candle index (-2) | False = Target live running index (-1)
 CHECK_CONFIRMED_ONLY = False
 
+# 🛠️ LAYER EXECUTION SWITCHES (True = Enable Layer | False = Skip Layer)
+ENABLE_LAYER_EARLY_MORNING = True  # Switches Early Morning Window (09:15 - 09:30)
+ENABLE_LAYER_A = True              # Switches Priority 1: Native Dual-Pipeline Crossovers
+ENABLE_LAYER_B = True              # Switches Priority 2: 42-Min Structural Breakouts (BOS)
+ENABLE_LAYER_C = True              # Switches Priority 3: Trend-Following Option Assignment
+
 def get_entry_signal(df=None):
     """
     Master Router with Deep Telemetry Monitoring.
@@ -115,6 +121,7 @@ def get_entry_signal(df=None):
     else:
         if DEBUG_MODE:
             print("  ⚠️ Warning: calculate_supertrend returned an empty or Null DataFrame.")
+            
 # ===============================================================================
 # PART 2: TIME ENGINE AND REORDERED WATERFALL ROUTING LOGIC
 # ===============================================================================
@@ -147,80 +154,63 @@ def get_entry_signal(df=None):
     if market_open <= current_time_ist < time_boundary:
         if DEBUG_MODE:
             print("🌅 CURRENT TIMING STATE: Early Morning opening window logic active.")
-        if exit_sig == "BUY":
-            final_signal = "OTMBUY"
-        elif exit_sig == "SELL":
-            final_signal = "OTMSELL"
+        
+        # Early Morning Window execution layer switch wrapper
+        if ENABLE_LAYER_EARLY_MORNING:
+            if exit_sig == "BUY":
+                final_signal = "OTMBUY"
+            elif exit_sig == "SELL":
+                final_signal = "OTMSELL"
+            else:
+                final_signal = "NONE"
         else:
+            if DEBUG_MODE:
+                print("  ⚠️ Early morning entry layer disabled. Skipping signal assignment.")
             final_signal = "NONE"
     else:
         if DEBUG_MODE:
             print("🏙️ CURRENT TIMING STATE: Standard Continuous window logic active.")
-            print(f"🛡️ STEP 1: Testing Priority 1 Dual Crossovers (ST: '{strnd_trend}', SMA: '{sma_trend}')...")
-        
-        # 👑 PRIORITY 1: Native Dual-Pipeline Crossovers (Either Pipe A OR Pipe B Crossovers Trigger Instantly)
-        if strnd_trend == "BUY" or sma_trend == "BUY":
+            
+        # 👑 PRIORITY 1: Native Dual-Pipeline Crossovers (Layer A)
+        if ENABLE_LAYER_A and (strnd_trend == "BUY" or sma_trend == "BUY"):
             if DEBUG_MODE:
                 print("  🏆 PRIORITY 1 UNLOCKED: Absolute Bullish Crossover confirmed.")
             final_signal = "OTMBUY"
-        elif strnd_trend == "SELL" or sma_trend == "SELL":
+        elif ENABLE_LAYER_A and (strnd_trend == "SELL" or sma_trend == "SELL"):
             if DEBUG_MODE:
                 print("  🏆 PRIORITY 1 UNLOCKED: Absolute Bearish Breakdown confirmed.")
             final_signal = "OTMSELL"
             
-        # ⚡ PRIORITY 2: High-Volume 42-Min Structural Breakouts (sysbbospxy)
+        # ⚡ PRIORITY 2: High-Volume 42-Min Structural Breakouts (Layer B)
+        elif ENABLE_LAYER_B and bos_signal == "BUY":
+            if DEBUG_MODE:
+                print("  ⚡ PRIORITY 2 UNLOCKED: Bullish BOS Structural Breakout approved.")
+            final_signal = "OTMBUY"
+        elif ENABLE_LAYER_B and bos_signal == "SELL":
+            if DEBUG_MODE:
+                print("  ⚡ PRIORITY 2 UNLOCKED: Bearish BOS Structural Breakout approved.")
+            final_signal = "OTMSELL"
+            
+        # 📈 PRIORITY 3: Trend-Following Option Assignment Matrix (Layer C)
+        elif ENABLE_LAYER_C:
+            if DEBUG_MODE:
+                print("  ↳ Layer A & B inactive/bypassed. Testing Layer C Trend-Following Logic...")
+            
+            if entry_sig == "SELL" and strnd_trend == "BULL" and sma_trend == "BULL":
+                final_signal = "OTMSELL"
+            elif entry_sig == "BUY" and strnd_trend == "BEAR" and sma_trend == "BEAR":
+                final_signal = "OTMBUY"
+            elif entry_sig == "BUY" and (strnd_trend == "BULL" or sma_trend == "BULL"):
+                final_signal = "OTMBUY"
+            elif entry_sig == "SELL" and (strnd_trend == "BEAR" or sma_trend == "BEAR"):
+                final_signal = "OTMSELL"
+            else:
+                final_signal = "NONE"
         else:
             if DEBUG_MODE:
-                print(f"  ↳ Priority 1 is inactive. Falling to Step 2: Testing Priority 2 Breakouts (bos_signal == '{bos_signal}')...")
-            if bos_signal == "BUY":
-                if DEBUG_MODE:
-                    print("  ⚡ PRIORITY 2 UNLOCKED: Bullish BOS Structural Breakout approved.")
-                final_signal = "OTMBUY"
-            elif bos_signal == "SELL":
-                final_signal = "OTMSELL"
-                if DEBUG_MODE:
-                    print("  ⚡ PRIORITY 2 UNLOCKED: Bearish BOS Structural Breakdown approved.")
+                print("  ❌ All priority layers exhausted or disabled. Routing engine returning NONE.")
+            final_signal = "NONE"
 
-            # 📈 PRIORITY 3: Trend-Following Pullback and Running Regimes Gates
-            else:
-                if DEBUG_MODE:
-                    print(f"    ↳ Priority 2 is 'NONE'. Falling to Step 3: Testing Priority 3 (entry='{entry_sig}', exit='{exit_sig}', ST_Trend='{strnd_trend}', SMA_Trend='{sma_trend}')...")
-                
-                # 🎯 LOOKUP ARRAYS
-                is_signal_buy = (entry_sig == "BUY" or exit_sig == "BUY")
-                is_trend_bull = (sma_trend == "BULL" or strnd_trend == "BULL")
-                is_SMAST_bull = (sma_trend == "BULL" and strnd_trend == "BULL")
-
-                is_signal_sell = (entry_sig == "SELL" or exit_sig == "SELL")
-                is_trend_bear = (sma_trend == "BEAR" or strnd_trend == "BEAR")
-                is_SMAST_bear = (sma_trend == "BEAR" and strnd_trend == "BEAR")
-
-                # 🚀 Reordered Waterfall Logic (Strict AND checks evaluated before broad OR filters)
-                if is_signal_sell and is_SMAST_bull:
-                    if DEBUG_MODE:
-                        print("  🚀 PRIORITY 3 UNLOCKED: Sell signal inside Pure Bull Trend -> OTMSELL approved.")
-                    final_signal = "OTMSELL"
-                    
-                elif is_signal_buy and is_SMAST_bear:
-                    if DEBUG_MODE:
-                        print("  🚀 PRIORITY 3 UNLOCKED: Buy signal inside Pure Bear Trend -> OTMBUY approved.")
-                    final_signal = "OTMBUY"
-                    
-                elif is_signal_buy and is_trend_bull:
-                    if DEBUG_MODE:
-                        print("  🚀 PRIORITY 3 UNLOCKED: Buy signal matching Bull Trend -> OTMBUY approved.")
-                    final_signal = "OTMBUY"
-                    
-                elif is_signal_sell and is_trend_bear:
-                    if DEBUG_MODE:
-                        print("  🚀 PRIORITY 3 UNLOCKED: Sell signal matching Bear Trend -> OTMSELL approved.")
-                    final_signal = "OTMSELL"
-                    
-                else:
-                    if DEBUG_MODE:
-                        print("    ❌ All waterfall priority logic gates failed to match execution parameters.")
-                    final_signal = "NONE"
-
-    # Return final option state routing mapping alongside the original market exit string variable
     return final_signal, exit_sig
+
 
