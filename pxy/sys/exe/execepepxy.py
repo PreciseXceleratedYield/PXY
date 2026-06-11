@@ -1,7 +1,8 @@
 import pytz
 from datetime import datetime, time
 
-def get_target_quantities_ist(supertrend, ce_lots, pe_lots, lot_size=None):
+# Change this line in execepepxy.py
+def get_target_quantities(supertrend, ce_lots, pe_lots, lot_size=None):
     """
     Calculates target lot limits by independently tracking live Indian Standard Time (IST).
     """
