@@ -9,14 +9,17 @@ IST = pytz.timezone("Asia/Kolkata")
 # ==================================================
 # 🔧 REVISED CONFIG: COMPRESSION DETECTOR TIME DECAY
 # ==================================================
-DECAY_RATE_PER_HOUR = 0.02  # 1% decay per hour
+DECAY_RATE_PER_HOUR = 0.02  # 2% decay per hour
 PNL_THRESHOLD = 0.0
 
-# Track the single oldest entry dynamically per runtime processing cycle
-_oldest_record = {"elapsed_hours": -1.0, "message": None}
+# Tracks the single worst/oldest trade separately for CE and PE
+_worst_trades = {
+    "CE": {"elapsed_hours": -1.0, "message": None},
+    "PE": {"elapsed_hours": -1.0, "message": None}
+}
 
 def dynamic_entry(row):
-    global _oldest_record
+    global _worst_trades
     try:
         original_price = float(row.get("buy_prc", 0))
         entry_time_val = row.get("buy_time")
@@ -31,18 +34,13 @@ def dynamic_entry(row):
         # ---------------- PARSE ENTRY TIME ----------------
         if isinstance(entry_time_val, str):
             try:
-                # Try full format
                 entry_time = datetime.strptime(entry_time_val, "%Y-%m-%d %H:%M:%S")
                 entry_time = IST.localize(entry_time)
             except:
-                # Fallback for just time "HH:MM:SS"
                 parts = list(map(int, str(entry_time_val).split(":")[-3:]))
                 entry_time = now.replace(hour=parts[0], minute=parts[1], second=parts[2], microsecond=0)
         else:
-            # Handle Numpy/Pandas types
             entry_time = pd.to_datetime(entry_time_val)
-            
-            # CRITICAL FIX: Ensure timezone awareness
             if entry_time.tzinfo is None:
                 entry_time = IST.localize(entry_time)
             else:
@@ -50,26 +48,33 @@ def dynamic_entry(row):
 
         # ---------------- CALC ELAPSED HOURS ----------------
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
-        elapsed_hours = elapsed_secs / 3600.0  # Convert to fractional hours
+        elapsed_hours = elapsed_secs / 3600.0 
 
         # ---------------- PERCENTAGE DECAY RULE ----------------
         if pnl <= PNL_THRESHOLD:
-            # Formula: Total % to decay = elapsed hours * 1%
             total_decay_percentage = elapsed_hours * DECAY_RATE_PER_HOUR
-            
-            # Calculate the final dynamic value after decay
             dynamic_val = original_price * (1.0 - total_decay_percentage)
-            
-            # Ensure price doesn't decay below zero
             dynamic_val = max(dynamic_val, 0.0)
             
             decay_amount = original_price - dynamic_val
-            clean_symbol = re.sub(r'^(NIFTY|BANKNIFTY)26', '', symbol)
+            pct_given_away = total_decay_percentage * 100.0
             
-            # Identify if this row is older than any previously assessed record
-            if decay_amount > 0.05 and elapsed_hours > _oldest_record["elapsed_hours"]:
-                _oldest_record["elapsed_hours"] = elapsed_hours
-                _oldest_record["message"] = f"{clean_symbol} | DECAY (1% / hr): -{decay_amount:.2f} PTS ({elapsed_hours:.2f} hrs elapsed)"
+            # Determine Option Type
+            opt_type = None
+            if symbol.endswith("CE"):
+                opt_type = "CE"
+            elif symbol.endswith("PE"):
+                opt_type = "PE"
+                
+            # Track worst trade independently for CE and PE if type is identified
+            if opt_type and decay_amount > 0.05 and elapsed_hours > _worst_trades[opt_type]["elapsed_hours"]:
+                clean_symbol = re.sub(r'^(NIFTY|BANKNIFTY)26', '', symbol)
+                _worst_trades[opt_type]["elapsed_hours"] = elapsed_hours
+                _worst_trades[opt_type]["message"] = (
+                    f"WORST {opt_type} | {clean_symbol} | "
+                    f"GAVE AWAY: {pct_given_away:.1f}% (-{decay_amount:.2f} PTS) | "
+                    f"ELAPSED: {elapsed_hours:.2f} hrs"
+                )
         else:
             dynamic_val = original_price
             
@@ -79,12 +84,21 @@ def dynamic_entry(row):
         print(f"Error in dynamic_entry: {e}")
         return original_price
 
-# Explicit standalone print interface to trigger after Dataframe maps complete
 def print_oldest_decay():
-    """Prints the single oldest tracked contract decay calculation and clears memory state."""
-    global _oldest_record
-    if _oldest_record["message"] is not None:
-        print(_oldest_record["message"])
-    # Reset internal memory block tracking for the next runtime calculation phase
-    _oldest_record = {"elapsed_hours": -1.0, "message": None}
+    """Prints the worst decayed CE and PE trades, then flushes runtime memory."""
+    global _worst_trades
+    
+    # Print CE if recorded
+    if _worst_trades["CE"]["message"] is not None:
+        print(_worst_trades["CE"]["message"])
+        
+    # Print PE if recorded
+    if _worst_trades["PE"]["message"] is not None:
+        print(_worst_trades["PE"]["message"])
+        
+    # Reset internal memory block
+    _worst_trades = {
+        "CE": {"elapsed_hours": -1.0, "message": None},
+        "PE": {"elapsed_hours": -1.0, "message": None}
+    }
 
