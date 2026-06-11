@@ -196,9 +196,9 @@ def get_entry_signal(df=None):
         # ⚡ PRIORITY 3: HIGH-VOLUME 42-MIN STRUCTURAL BREAKOUTS (ATM Breakout Execution)
         elif ENABLE_BOS_BREAKOUT_ENGINE:
             if bos_signal == "BUY":
-                final_signal = "ATMBUY"
+                final_signal = "BOS"
             elif bos_signal == "SELL":
-                final_signal = "ATMSELL"
+                final_signal = "BOS"
             else:
                 # --- PRIORITY 4 FALLBACK INSIDE ENGINE: STANDARD TREND SEGMENTATION (OTM) ---
                 if entry_sig == "BUY" and (strnd_trend in ["BUY", "BULL"] or strnd_trend in ["BUY", "BULL"]):
