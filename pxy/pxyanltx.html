@@ -700,7 +700,7 @@ function redrawMarkers() {
     const line = document.createElementNS('http://www.w3.org/2000/svg','line');
     line.setAttribute('x1', buyPt.x);  line.setAttribute('y1', buyPt.y);
     line.setAttribute('x2', sellPt.x); line.setAttribute('y2', sellPt.y);
-    line.setAttribute('stroke', '#f59e0b');
+    line.setAttribute('stroke', isCE ? '#22c55e' : '#ef4444');
     line.setAttribute('stroke-width', '1.5');
     line.setAttribute('stroke-dasharray', 'none');
     line.setAttribute('opacity', '0.45');
