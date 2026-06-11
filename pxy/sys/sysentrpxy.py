@@ -157,9 +157,9 @@ def get_entry_signal(df=None):
         
         if ENABLE_EARLY_MORNING_WINDOW:
             if exit_sig == "BUY":
-                final_signal = "OTMBUY"  
+                final_signal = "GOOD-MORNING"  
             elif exit_sig == "SELL":
-                final_signal = "OTMSELL" 
+                final_signal = "GOOD-MORNING" 
             else:
                 final_signal = "NONE"
         else:
