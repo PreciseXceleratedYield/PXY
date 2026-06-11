@@ -1,3 +1,6 @@
+# ===============================================================================
+# PART 1: DECOUPLED DATA SETUP AND PURE VECTOR PIPELINE MATRIX
+# ===============================================================================
 # sysstrndpxy.py
 import sys
 import numpy as np
@@ -23,9 +26,9 @@ CHECK_CONFIRMED_ONLY = True  # ⚡ True = Target the closed candle index (-2) | 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
     PXY® Engine Strategy Matrix - Modular Dual-Pipeline Engine.
-    Processes two completely separate, decoupled tracking streams:
-    - Pipe A (Supertrend Matrix): 3:3 Trailing Band Crossovers (Altered to NONE if SMA conflicts)
-    - Pipe B (SMA Matrix)       : 42-Period Rolling Baseline Crossovers (Left purely independent)
+    Processes two completely separate, 100% DECOUPLED tracking streams:
+    - Pipe A (Supertrend Matrix): Pure 3:3 Trailing Band Crossovers.
+    - Pipe B (SMA Matrix)       : 42-Period Rolling Baseline Crossovers.
     Returns isolated categorical state flags to be matched downstream in the router.
     """ 
     # 🎯 OVERRIDE: Fetch historical day-session buffer block from data pipeline file if empty
@@ -117,7 +120,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             sma_direction[i] = -1
         else:
             sma_direction[i] = 1
-
+# ===============================================================================
+# PART 2: DECOUPLED WATERFALL LOOP AND SYSTEM EXTRACTION FRAMEWORK
+# ===============================================================================
     # ===============================================================================
     # 🛠️ DECOUPLED WATERFALL ASYMMETRIC TREND STATE GENERATION
     # ===============================================================================
@@ -125,26 +130,20 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     sma_trend_history = []
     
     for i in range(n): 
-        # 1. Pipeline B: SMA baseline is left purely autonomous and uninfluenced
+        # 1. Pipeline B: SMA Baseline is left purely autonomous and uninfluenced
         raw_sma_regime = "BULL" if sma_direction[i] == 1 else "BEAR"
 
-        # 2. Pipeline A: Supertrend baseline assesses raw placement first
+        # 2. Pipeline A: Supertrend baseline tracks its own position 
         raw_st_regime = "BULL" if st_direction[i] == 1 else "BEAR"
 
-        # 3. Apply validation override: Supertrend matches ONLY if SMA agrees, otherwise filters to NONE
-        if raw_st_regime == "BULL" and raw_sma_regime == "BULL":
-            conditional_st_regime = "BULL"
-        elif raw_st_regime == "BEAR" and raw_sma_regime == "BEAR":
-            conditional_st_regime = "BEAR"
-        else:
-            conditional_st_regime = "NONE"
-
+        # 🚨 FIX: Removed conditional "NONE" filtering override completely.
+        # Indicators pass their authentic structural states directly to the router.
         if i < 1: 
-            st_trend_history.append(conditional_st_regime)
+            st_trend_history.append(raw_st_regime)
             sma_trend_history.append(raw_sma_regime)
             continue 
 
-        # --- PIPELINE A ARRAY GATING: SUPERTREND SWITCHES WITH OVERRIDE RULES ---
+        # --- PIPELINE A ARRAY GATING: SUPERTREND SWITCHES ---
         st_cross_buy  = (st_direction[i] == 1)  and (st_direction[i-1] == -1)
         st_cross_sell = (st_direction[i] == -1) and (st_direction[i-1] == 1)
 
@@ -153,7 +152,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         elif st_cross_sell:
             st_trend_history.append("SELL")
         else:
-            st_trend_history.append(conditional_st_regime)
+            st_trend_history.append(raw_st_regime)
 
         # --- PIPELINE B ARRAY GATING: PURE 42 SMA SWITCHES ---
         sma_cross_buy  = (sma_direction[i] == 1)  and (sma_direction[i-1] == -1)
