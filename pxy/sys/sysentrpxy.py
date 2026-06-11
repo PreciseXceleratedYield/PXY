@@ -11,8 +11,8 @@ Operational Rules:
 - REQUIREMENT: entry_sig is explicitly set equal to exit_sig.
 - 🌅 MORNING WINDOW (09:15-09:30): Assigns strictly OTM contracts.
 - 👑 PRIORITY 1 (Counter-Trend): Assigns AVG contracts for position averaging.
-- 🏆 PRIORITY 2 (Line Crossovers): Assigns high-sensitivity ATM contracts.
-- ⚡ PRIORITY 3 (Structural Breakouts): Assigns structural breakout ATM contracts.
+- 🏆 PRIORITY 2 (Line Crossovers): Assigns high-sensitivity OTM contracts.
+- ⚡ PRIORITY 3 (Structural Breakouts): Assigns structural breakout OTM contracts.
 - 📈 PRIORITY 4 (Trend Following Fallback): Assigns budget-friendly OTM contracts.
 ===============================================================================
 """
@@ -37,7 +37,7 @@ CHECK_CONFIRMED_ONLY = False
 # 🛠️ INDEPENDENT STRATEGY SWITCHES
 # CHANGE THESE TO True OR False INDEPENDENTLY ANYTIME
 ENABLE_EARLY_MORNING_WINDOW = True  # True = Trade morning window (OTM) | False = Completely skip morning window logic
-ENABLE_BOS_BREAKOUT_ENGINE  = True  # True = Trade 42-min Breakouts (ATM) | False = Completely skip breakout engine logic
+ENABLE_BOS_BREAKOUT_ENGINE  = True  # True = Trade 42-min Breakouts (OTM) | False = Completely skip breakout engine logic
 
 def get_entry_signal(df=None):
     """
@@ -184,16 +184,16 @@ def get_entry_signal(df=None):
                 print("  🚨 AVERAGING LAYER UNLOCKED: Long entry inside structural Bear trend. Assigning AVGBUY.")
             final_signal = "AVGBUY"
         
-        # 🏆 PRIORITY 2: NATIVE DUAL-PIPELINE CROSSOVERS (ATM Fast Execution)
+        # 🏆 PRIORITY 2: NATIVE DUAL-PIPELINE CROSSOVERS (OTM Fast Execution)
         elif strnd_trend in ["BUY", "SELL"] or strnd_trend in ["BUY", "SELL"]:
             if DEBUG_MODE:
-                print("  🏆 PRIORITY 2 UNLOCKED: Absolute Trend Line Crossover confirmed. Assigning ATM.")
+                print("  🏆 PRIORITY 2 UNLOCKED: Absolute Trend Line Crossover confirmed. Assigning OTM.")
             if strnd_trend == "BUY" or strnd_trend == "BUY":
-                final_signal = "ATMBUY"
+                final_signal = "OTMBUY"
             elif strnd_trend == "SELL" or strnd_trend == "SELL":
-                final_signal = "ATMSELL"
+                final_signal = "OTMSELL"
             
-        # ⚡ PRIORITY 3: HIGH-VOLUME 42-MIN STRUCTURAL BREAKOUTS (ATM Breakout Execution)
+        # ⚡ PRIORITY 3: HIGH-VOLUME 42-MIN STRUCTURAL BREAKOUTS (OTM Breakout Execution)
         elif ENABLE_BOS_BREAKOUT_ENGINE:
             if bos_signal == "BUY":
                 final_signal = "BOS"
