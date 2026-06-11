@@ -145,13 +145,16 @@ def run_snapshot():
     for idx, r in df.iterrows(): 
         sym = str(r.get('symbol',''))[:21] 
         
+        # Calculate trailing spaces using raw characters before adding color strings
+        padding = " " * max(0, 20 - len(sym))
+        
         # Colorize CE word green and PE word red inside the symbol string
         if "CE" in sym:
-            sym_display = sym.replace("CE", f"{Fore.GREEN}CE{Fore.RESET}")
+            sym_display = sym.replace("CE", f"{Fore.GREEN}CE{Fore.RESET}") + padding
         elif "PE" in sym:
-            sym_display = sym.replace("PE", f"{Fore.RED}PE{Fore.RESET}")
+            sym_display = sym.replace("PE", f"{Fore.RED}PE{Fore.RESET}") + padding
         else:
-            sym_display = sym
+            sym_display = sym + padding
 
         st_display, is_target_hit = compute_st_fixed(r) 
         if is_target_hit: 
@@ -159,8 +162,8 @@ def run_snapshot():
         pnl_val = int(r.get('pnl', 0)) 
         p_col = Fore.GREEN if pnl_val > 0 else Fore.RED if pnl_val < 0 else Fore.WHITE 
         
-        # Swapped {sym:<20} for {sym_display:<20} to implement the color format change
-        print(f" {sym_display:<20}{st_display:<12}{p_col}{pnl_val:>8}") 
+        # Cleaned layout printing using pre-calculated visual column width
+        print(f" {sym_display}{st_display:<12}{p_col}{pnl_val:>8}") 
     print("-" * 42) 
     print(f"{Fore.WHITE}Refreshed: {datetime.now(IST).strftime('%H:%M:%S')}") 
 
