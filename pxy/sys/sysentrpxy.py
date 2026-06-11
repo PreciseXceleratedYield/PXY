@@ -109,7 +109,7 @@ def get_entry_signal(df=None):
             print(f"  -> Target lookup row index: {idx} (CHECK_CONFIRMED_ONLY: {CHECK_CONFIRMED_ONLY})")
         try:
             strnd_trend = str(strnd_df.iloc[idx]['st_trend_full']).upper().strip()   # Pipe A: 3:3 Supertrend
-            strnd_trend   = str(strnd_df.iloc[idx]['strnd_trend_full']).upper().strip()  # Pipe B: 42 Rolling SMA
+            #strnd_trend   = str(strnd_df.iloc[idx]['strnd_trend_full']).upper().strip()  # Pipe B: 42 Rolling SMA
             if DEBUG_MODE:
                 print(f"  -> [sysstrndpxy] Pipe A (Supertrend): '{strnd_trend}' | Pipe B (42 SMA): '{strnd_trend}'")
         except Exception as e:
