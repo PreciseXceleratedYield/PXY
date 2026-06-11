@@ -9,11 +9,11 @@ PXY OPTION ROUTING ENGINE: FINAL MASTER PRODUCTION MATRIX
 Operational Rules:
 - EXIT and ENTRY signals originate strictly from sysmktpxy (exit_sig, entry_sig).
 - REQUIREMENT: entry_sig is explicitly set equal to exit_sig.
-- 🌅 MORNING WINDOW (09:15-09:30): Assigns strictly OTM contracts.
+- 🌅 MORNING WINDOW (09:15-09:30): Assigns strictly ATM contracts.
 - 👑 PRIORITY 1 (Counter-Trend): Assigns AVG contracts for position averaging.
-- 🏆 PRIORITY 2 (Line Crossovers): Assigns high-sensitivity OTM contracts.
-- ⚡ PRIORITY 3 (Structural Breakouts): Assigns structural breakout OTM contracts.
-- 📈 PRIORITY 4 (Trend Following Fallback): Assigns budget-friendly OTM contracts.
+- 🏆 PRIORITY 2 (Line Crossovers): Assigns high-sensitivity ATM contracts.
+- ⚡ PRIORITY 3 (Structural Breakouts): Assigns structural breakout ATM contracts.
+- 📈 PRIORITY 4 (Trend Following Fallback): Assigns budget-friendly ATM contracts.
 ===============================================================================
 """
 
@@ -36,8 +36,8 @@ CHECK_CONFIRMED_ONLY = False
 
 # 🛠️ INDEPENDENT STRATEGY SWITCHES
 # CHANGE THESE TO True OR False INDEPENDENTLY ANYTIME
-ENABLE_EARLY_MORNING_WINDOW = True  # True = Trade morning window (OTM) | False = Completely skip morning window logic
-ENABLE_BOS_BREAKOUT_ENGINE  = True  # True = Trade 42-min Breakouts (OTM) | False = Completely skip breakout engine logic
+ENABLE_EARLY_MORNING_WINDOW = True  # True = Trade morning window (ATM) | False = Completely skip morning window logic
+ENABLE_BOS_BREAKOUT_ENGINE  = True  # True = Trade 42-min Breakouts (ATM) | False = Completely skip breakout engine logic
 
 def get_entry_signal(df=None):
     """
@@ -184,36 +184,36 @@ def get_entry_signal(df=None):
                 print("  🚨 AVERAGING LAYER UNLOCKED: Long entry inside structural Bear trend. Assigning AVGBUY.")
             final_signal = "AVGBUY"
         
-        # 🏆 PRIORITY 2: NATIVE DUAL-PIPELINE CROSSOVERS (OTM Fast Execution)
+        # 🏆 PRIORITY 2: NATIVE DUAL-PIPELINE CROSSOVERS (ATM Fast Execution)
         elif strnd_trend in ["BUY", "SELL"] or strnd_trend in ["BUY", "SELL"]:
             if DEBUG_MODE:
-                print("  🏆 PRIORITY 2 UNLOCKED: Absolute Trend Line Crossover confirmed. Assigning OTM.")
+                print("  🏆 PRIORITY 2 UNLOCKED: Absolute Trend Line Crossover confirmed. Assigning ATM.")
             if strnd_trend == "BUY" or strnd_trend == "BUY":
-                final_signal = "OTMBUY"
+                final_signal = "ATMBUY"
             elif strnd_trend == "SELL" or strnd_trend == "SELL":
-                final_signal = "OTMSELL"
+                final_signal = "ATMSELL"
             
-        # ⚡ PRIORITY 3: HIGH-VOLUME 42-MIN STRUCTURAL BREAKOUTS (OTM Breakout Execution)
+        # ⚡ PRIORITY 3: HIGH-VOLUME 42-MIN STRUCTURAL BREAKOUTS (ATM Breakout Execution)
         elif ENABLE_BOS_BREAKOUT_ENGINE:
             if bos_signal == "BUY":
                 final_signal = "BOS"
             elif bos_signal == "SELL":
                 final_signal = "BOS"
             else:
-                # --- PRIORITY 4 FALLBACK INSIDE ENGINE: STANDARD TREND SEGMENTATION (OTM) ---
+                # --- PRIORITY 4 FALLBACK INSIDE ENGINE: STANDARD TREND SEGMENTATION (ATM) ---
                 if entry_sig == "BUY" and (strnd_trend in ["BUY", "BULL"] or strnd_trend in ["BUY", "BULL"]):
-                    final_signal = "OTMBUY"
+                    final_signal = "ATMBUY"
                 elif entry_sig == "SELL" and (strnd_trend in ["SELL", "BEAR"] or strnd_trend in ["SELL", "BEAR"]):
-                    final_signal = "OTMSELL"
+                    final_signal = "ATMSELL"
                 else:
                     final_signal = "NONE"
         
-        # 📈 PRIORITY 4: Standard Trend-Following Fallback (OTM)
+        # 📈 PRIORITY 4: Standard Trend-Following Fallback (ATM)
         else:
             if entry_sig == "BUY" and (strnd_trend in ["BUY", "BULL"] or strnd_trend in ["BUY", "BULL"]):
-                final_signal = "OTMBUY"
+                final_signal = "ATMBUY"
             elif entry_sig == "SELL" and (strnd_trend in ["SELL", "BEAR"] or strnd_trend in ["SELL", "BEAR"]):
-                final_signal = "OTMSELL"
+                final_signal = "ATMSELL"
             else:
                 final_signal = "NONE"
 
