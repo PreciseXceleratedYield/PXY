@@ -4,19 +4,16 @@
 # sysentrpxy.py
 """
 ===============================================================================
-PXY OPTION ROUTING ENGINE: SUPERTREND & SMA DUAL-PIPE COUPLING
+PXY OPTION ROUTING ENGINE: FINAL MASTER PRODUCTION MATRIX
 ===============================================================================
 Operational Rules:
 - EXIT and ENTRY signals originate strictly from sysmktpxy (exit_sig, entry_sig).
-- ENTRY Layer A (👑 PRIORITY 1): Pure Dual-Pipe Crossover Line Switches.
-  Fires instantly when 'strnd_trend' OR 'sma_trend' hits 'BUY' or 'SELL'.
-  Assigns ATM contracts on line crossovers.
-- ENTRY Layer B (⚡ PRIORITY 2): Pure structural breakouts from sysbbospxy (bos_signal).
-- ENTRY Layer C (📈 PRIORITY 3): Trend-following option contract assignment.
-  Triggers ATMSELL if signal is SELL AND both trends are BULL (Aligned).
-  Triggers ATMBUY if signal is BUY AND both trends are BEAR (Aligned).
-  Triggers OTMBUY if signal is BUY AND any trend is BULL (Partial/Unaligned).
-  Triggers OTMSELL if signal is SELL AND any trend is BEAR (Partial/Unaligned).
+- REQUIREMENT: entry_sig is explicitly set equal to exit_sig.
+- 🌅 MORNING WINDOW (09:15-09:30): Assigns strictly OTM contracts.
+- 👑 PRIORITY 1 (Counter-Trend): Assigns AVG contracts for position averaging.
+- 🏆 PRIORITY 2 (Line Crossovers): Assigns high-sensitivity ATM contracts.
+- ⚡ PRIORITY 3 (Structural Breakouts): Assigns structural breakout ATM contracts.
+- 📈 PRIORITY 4 (Trend Following Fallback): Assigns budget-friendly OTM contracts.
 ===============================================================================
 """
 
@@ -32,17 +29,15 @@ from sysstrndpxy import calculate_supertrend
 from sysbbospxy import get_bos_bar  # Ingesting your 42-min structural breakout engine
 
 # 🛠️ GLOBAL DEBUGGING SWITCH
-# True = Output full, deep multi-layered telemetry logs
-# False = Silence dashboard chatter completely, only log final actions/errors
 DEBUG_MODE = False
 
 # 🛠️ LOCAL CONFIGURATION FALLBACK
-# True = Target the closed candle index (-2) | False = Target live running index (-1)
 CHECK_CONFIRMED_ONLY = False
 
 # 🛠️ INDEPENDENT STRATEGY SWITCHES
-ENABLE_EARLY_MORNING_WINDOW = True  # True = Process 09:15-09:30 entries | False = Skip layer completely
-ENABLE_BOS_BREAKOUT_ENGINE  = True  # True = Process structural breakouts     | False = Skip layer completely
+# CHANGE THESE TO True OR False INDEPENDENTLY ANYTIME
+ENABLE_EARLY_MORNING_WINDOW = True  # True = Trade morning window (OTM) | False = Completely skip morning window logic
+ENABLE_BOS_BREAKOUT_ENGINE  = True  # True = Trade 42-min Breakouts (ATM) | False = Completely skip breakout engine logic
 
 def get_entry_signal(df=None):
     """
@@ -82,7 +77,10 @@ def get_entry_signal(df=None):
         entry_sig, exit_sig = get_signal(master_df)
         entry_sig = str(entry_sig).upper().strip()
         exit_sig = str(exit_sig).upper().strip()
+        
+        # 🚨 Explicitly setting entry_sig equal to exit_sig as requested
         entry_sig = exit_sig
+        
         if DEBUG_MODE:
             print(f"  -> [sysmktpxy] Raw Entry Signal: '{entry_sig}' | Exit Signal: '{exit_sig}'")
     except Exception as e:
@@ -121,7 +119,7 @@ def get_entry_signal(df=None):
         if DEBUG_MODE:
             print("  ⚠️ Warning: calculate_supertrend returned an empty or Null DataFrame.")
 # ===============================================================================
-# PART 2: TIME ENGINE AND REORDERED WATERFALL ROUTING LOGIC
+# PART 2: TIME ENGINE AND CUSTOM STRIKE ALLOCATION WATERFALL LOGIC
 # ===============================================================================
     # 3. Establish Base Current Time in Indian Standard Time (IST)
     tz_ist = ZoneInfo("Asia/Kolkata")
@@ -148,6 +146,10 @@ def get_entry_signal(df=None):
 
     final_signal = "NONE"
 
+    # Normalize mixed trend statuses across modules safely ("BUY" and "BULL" are treated identically)
+    is_struct_bull = strnd_trend in ["BUY", "BULL"] and sma_trend in ["BUY", "BULL"]
+    is_struct_bear = strnd_trend in ["SELL", "BEAR"] and sma_trend in ["SELL", "BEAR"]
+
     # 4. IST TIME-BASED OPTIONS ROUTING ENGINE
     if market_open <= current_time_ist < time_boundary:
         if DEBUG_MODE:
@@ -155,76 +157,64 @@ def get_entry_signal(df=None):
         
         if ENABLE_EARLY_MORNING_WINDOW:
             if exit_sig == "BUY":
-                final_signal = "OTMBUY"
+                final_signal = "OTMBUY"  
             elif exit_sig == "SELL":
-                final_signal = "OTMSELL"
+                final_signal = "OTMSELL" 
             else:
                 final_signal = "NONE"
         else:
+            # 🚨 If switch is False, skip morning logic entirely and process live conditions instead
             if DEBUG_MODE:
-                print("  ⚠️ Early morning entry layer disabled. Skipping signal assignment.")
-            final_signal = "NONE"
+                print("⏩ Morning Layer is OFF. Falling straight into continuous live engine rules.")
+            pass # Fall out of this block to execute standard live routing below instead
             
-    else:
+    # Continuous live processing (executes outside morning hours, or during morning hours if layer is disabled)
+    if final_signal == "NONE":
         if DEBUG_MODE:
             print("🏙️ CURRENT TIMING STATE: Standard Continuous window logic active.")
-            print(f"🛡️ STEP 1: Testing Priority 1 Dual Crossovers (ST: '{strnd_trend}', SMA: '{sma_trend}')...")
         
-        # 👑 PRIORITY 1: Native Dual-Pipeline Crossovers (Fires instantly on line crossings -> now assigned to ATM)
-        if strnd_trend == "BUY" or sma_trend == "BUY":
+        # 👑 PRIORITY 1: STRICT COUNTER-TREND POSITION AVERAGING ENGINE (AVG)
+        if entry_sig == "SELL" and is_struct_bull:
             if DEBUG_MODE:
-                print("  🏆 PRIORITY 1 UNLOCKED: Absolute Bullish Crossover confirmed.")
-            final_signal = "ATMBUY"
-        elif strnd_trend == "SELL" or sma_trend == "SELL":
-            if DEBUG_MODE:
-                print("  🏆 PRIORITY 1 UNLOCKED: Absolute Bearish Breakdown confirmed.")
-            final_signal = "ATMSELL"
+                print("  🚨 AVERAGING LAYER UNLOCKED: Short entry inside structural Bull trend. Assigning AVGSELL.")
+            final_signal = "AVGSELL"
             
-        # ⚡ PRIORITY 2: High-Volume 42-Min Structural Breakouts (sysbbospxy)
-        elif ENABLE_BOS_BREAKOUT_ENGINE:
+        elif entry_sig == "BUY" and is_struct_bear:
             if DEBUG_MODE:
-                print(f"  ↳ Priority 1 is inactive. Falling to Step 2: Testing Priority 2 Breakouts (bos_signal == '{bos_signal}')...")
+                print("  🚨 AVERAGING LAYER UNLOCKED: Long entry inside structural Bear trend. Assigning AVGBUY.")
+            final_signal = "AVGBUY"
+        
+        # 🏆 PRIORITY 2: NATIVE DUAL-PIPELINE CROSSOVERS (ATM Fast Execution)
+        elif strnd_trend in ["BUY", "SELL"] or sma_trend in ["BUY", "SELL"]:
+            if DEBUG_MODE:
+                print("  🏆 PRIORITY 2 UNLOCKED: Absolute Trend Line Crossover confirmed. Assigning ATM.")
+            if strnd_trend == "BUY" or sma_trend == "BUY":
+                final_signal = "ATMBUY"
+            elif strnd_trend == "SELL" or sma_trend == "SELL":
+                final_signal = "ATMSELL"
+            
+        # ⚡ PRIORITY 3: HIGH-VOLUME 42-MIN STRUCTURAL BREAKOUTS (ATM Breakout Execution)
+        elif ENABLE_BOS_BREAKOUT_ENGINE:
             if bos_signal == "BUY":
-                if DEBUG_MODE:
-                    print("  ⚡ PRIORITY 2 UNLOCKED: Bullish BOS Structural Breakout approved.")
-                final_signal = "OTMBUY"
+                final_signal = "ATMBUY"
             elif bos_signal == "SELL":
-                if DEBUG_MODE:
-                    print("  ⚡ PRIORITY 2 UNLOCKED: Bearish BOS Structural Breakout approved.")
-                final_signal = "OTMSELL"
+                final_signal = "ATMSELL"
             else:
-                # Fallback to Priority 3 if BOS layer is ON but returns no signal
-                if DEBUG_MODE:
-                    print("  ↳ Priority 2 active but no breakout found. Falling to Step 3...")
-                
-                # --- STRICT DUAL-TREND ALIGNMENT RULES (AND -> ATM | OR -> OTM) ---
-                if entry_sig == "SELL" and strnd_trend == "BULL" and sma_trend == "BULL":
-                    final_signal = "ATMSELL"
-                elif entry_sig == "BUY" and strnd_trend == "BEAR" and sma_trend == "BEAR":
-                    final_signal = "ATMBUY"
-                elif entry_sig == "BUY" and (strnd_trend == "BULL" or sma_trend == "BULL"):
+                # --- PRIORITY 4 FALLBACK INSIDE ENGINE: STANDARD TREND SEGMENTATION (OTM) ---
+                if entry_sig == "BUY" and (strnd_trend in ["BUY", "BULL"] or sma_trend in ["BUY", "BULL"]):
                     final_signal = "OTMBUY"
-                elif entry_sig == "SELL" and (strnd_trend == "BEAR" or sma_trend == "BEAR"):
+                elif entry_sig == "SELL" and (strnd_trend in ["SELL", "BEAR"] or sma_trend in ["SELL", "BEAR"]):
                     final_signal = "OTMSELL"
                 else:
                     final_signal = "NONE"
         
-        # 📈 PRIORITY 3: Fallback straight here if Priority 1 is inactive AND the BOS switch is turned off
+        # 📈 PRIORITY 4: Standard Trend-Following Fallback (OTM)
         else:
-            if DEBUG_MODE:
-                print("  ⏩ Priority 2 Engine is OFF. Skipping straight to Priority 3 Trend Assignment...")
-            
-            # --- STRICT DUAL-TREND ALIGNMENT RULES (AND -> ATM | OR -> OTM) ---
-            if entry_sig == "SELL" and strnd_trend == "BULL" and sma_trend == "BULL":
-                final_signal = "ATMSELL"
-            elif entry_sig == "BUY" and strnd_trend == "BEAR" and sma_trend == "BEAR":
-                final_signal = "ATMBUY"
-            elif entry_sig == "BUY" and (strnd_trend == "BULL" or sma_trend == "BULL"):
+            if entry_sig == "BUY" and (strnd_trend in ["BUY", "BULL"] or sma_trend in ["BUY", "BULL"]):
                 final_signal = "OTMBUY"
-            elif entry_sig == "SELL" and (strnd_trend == "BEAR" or sma_trend == "BEAR"):
+            elif entry_sig == "SELL" and (strnd_trend in ["SELL", "BEAR"] or sma_trend in ["SELL", "BEAR"]):
                 final_signal = "OTMSELL"
             else:
                 final_signal = "NONE"
 
     return final_signal, exit_sig
-
