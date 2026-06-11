@@ -12,7 +12,11 @@ IST = pytz.timezone("Asia/Kolkata")
 DECAY_RATE_PER_HOUR = 0.02  # 1% decay per hour
 PNL_THRESHOLD = 0.0
 
+# Track the single oldest entry dynamically per runtime processing cycle
+_oldest_record = {"elapsed_hours": -1.0, "message": None}
+
 def dynamic_entry(row):
+    global _oldest_record
     try:
         original_price = float(row.get("buy_prc", 0))
         entry_time_val = row.get("buy_time")
@@ -62,8 +66,10 @@ def dynamic_entry(row):
             decay_amount = original_price - dynamic_val
             clean_symbol = re.sub(r'^(NIFTY|BANKNIFTY)26', '', symbol)
             
-            if decay_amount > 0.05:
-                print(f"{clean_symbol} | DECAY (1% / hr): -{decay_amount:.2f} PTS ({elapsed_hours:.2f} hrs elapsed)")
+            # Identify if this row is older than any previously assessed record
+            if decay_amount > 0.05 and elapsed_hours > _oldest_record["elapsed_hours"]:
+                _oldest_record["elapsed_hours"] = elapsed_hours
+                _oldest_record["message"] = f"{clean_symbol} | DECAY (1% / hr): -{decay_amount:.2f} PTS ({elapsed_hours:.2f} hrs elapsed)"
         else:
             dynamic_val = original_price
             
@@ -73,5 +79,12 @@ def dynamic_entry(row):
         print(f"Error in dynamic_entry: {e}")
         return original_price
 
-
+# Explicit standalone print interface to trigger after Dataframe maps complete
+def print_oldest_decay():
+    """Prints the single oldest tracked contract decay calculation and clears memory state."""
+    global _oldest_record
+    if _oldest_record["message"] is not None:
+        print(_oldest_record["message"])
+    # Reset internal memory block tracking for the next runtime calculation phase
+    _oldest_record = {"elapsed_hours": -1.0, "message": None}
 
