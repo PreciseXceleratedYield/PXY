@@ -1,4 +1,3 @@
-
 # exit_script.py 
 import pandas as pd 
 import os 
@@ -78,8 +77,6 @@ def place_exit_order(client, row):
             except Exception as script_err:
                 print(f"{Fore.RED}❌ Error launching script: {script_err}")
         return order_response 
-
-
         
     except Exception as e: 
         print(f"{Fore.RED}❌ Exit Order Error: {e}") 
@@ -147,14 +144,26 @@ def run_snapshot():
     print("-" * 42) 
     for idx, r in df.iterrows(): 
         sym = str(r.get('symbol',''))[:21] 
+        
+        # Colorize CE word green and PE word red inside the symbol string
+        if "CE" in sym:
+            sym_display = sym.replace("CE", f"{Fore.GREEN}CE{Fore.RESET}")
+        elif "PE" in sym:
+            sym_display = sym.replace("PE", f"{Fore.RED}PE{Fore.RESET}")
+        else:
+            sym_display = sym
+
         st_display, is_target_hit = compute_st_fixed(r) 
         if is_target_hit: 
             verify_and_exit(client, r) 
         pnl_val = int(r.get('pnl', 0)) 
         p_col = Fore.GREEN if pnl_val > 0 else Fore.RED if pnl_val < 0 else Fore.WHITE 
-        print(f" {sym:<20}{st_display:<12}{p_col}{pnl_val:>8}") 
+        
+        # Swapped {sym:<20} for {sym_display:<20} to implement the color format change
+        print(f" {sym_display:<20}{st_display:<12}{p_col}{pnl_val:>8}") 
     print("-" * 42) 
     print(f"{Fore.WHITE}Refreshed: {datetime.now(IST).strftime('%H:%M:%S')}") 
 
 if __name__ == "__main__": 
     run_snapshot()
+
