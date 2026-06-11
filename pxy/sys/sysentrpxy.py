@@ -101,7 +101,7 @@ def get_entry_signal(df=None):
     strnd_df = calculate_supertrend(master_df)
     
     strnd_trend = "NEUTRAL"
-    sma_trend = "NEUTRAL"
+    strnd_trend = "NEUTRAL"
 
     if strnd_df is not None and not strnd_df.empty:
         idx = -2 if CHECK_CONFIRMED_ONLY else -1
@@ -109,9 +109,9 @@ def get_entry_signal(df=None):
             print(f"  -> Target lookup row index: {idx} (CHECK_CONFIRMED_ONLY: {CHECK_CONFIRMED_ONLY})")
         try:
             strnd_trend = str(strnd_df.iloc[idx]['st_trend_full']).upper().strip()   # Pipe A: 3:3 Supertrend
-            sma_trend   = str(strnd_df.iloc[idx]['sma_trend_full']).upper().strip()  # Pipe B: 42 Rolling SMA
+            strnd_trend   = str(strnd_df.iloc[idx]['strnd_trend_full']).upper().strip()  # Pipe B: 42 Rolling SMA
             if DEBUG_MODE:
-                print(f"  -> [sysstrndpxy] Pipe A (Supertrend): '{strnd_trend}' | Pipe B (42 SMA): '{sma_trend}'")
+                print(f"  -> [sysstrndpxy] Pipe A (Supertrend): '{strnd_trend}' | Pipe B (42 SMA): '{strnd_trend}'")
         except Exception as e:
             print(f"  ❌ ERROR parsing sysstrndpxy array columns: {e}")
             print(traceback.format_exc())
@@ -147,8 +147,8 @@ def get_entry_signal(df=None):
     final_signal = "NONE"
 
     # Normalize mixed trend statuses across modules safely ("BUY" and "BULL" are treated identically)
-    is_struct_bull = strnd_trend in ["BUY", "BULL"] and sma_trend in ["BUY", "BULL"]
-    is_struct_bear = strnd_trend in ["SELL", "BEAR"] and sma_trend in ["SELL", "BEAR"]
+    is_struct_bull = strnd_trend in ["BUY", "BULL"] and strnd_trend in ["BUY", "BULL"]
+    is_struct_bear = strnd_trend in ["SELL", "BEAR"] and strnd_trend in ["SELL", "BEAR"]
 
     # 4. IST TIME-BASED OPTIONS ROUTING ENGINE
     if market_open <= current_time_ist < time_boundary:
@@ -185,12 +185,12 @@ def get_entry_signal(df=None):
             final_signal = "AVGBUY"
         
         # 🏆 PRIORITY 2: NATIVE DUAL-PIPELINE CROSSOVERS (ATM Fast Execution)
-        elif strnd_trend in ["BUY", "SELL"] or sma_trend in ["BUY", "SELL"]:
+        elif strnd_trend in ["BUY", "SELL"] or strnd_trend in ["BUY", "SELL"]:
             if DEBUG_MODE:
                 print("  🏆 PRIORITY 2 UNLOCKED: Absolute Trend Line Crossover confirmed. Assigning ATM.")
-            if strnd_trend == "BUY" or sma_trend == "BUY":
+            if strnd_trend == "BUY" or strnd_trend == "BUY":
                 final_signal = "ATMBUY"
-            elif strnd_trend == "SELL" or sma_trend == "SELL":
+            elif strnd_trend == "SELL" or strnd_trend == "SELL":
                 final_signal = "ATMSELL"
             
         # ⚡ PRIORITY 3: HIGH-VOLUME 42-MIN STRUCTURAL BREAKOUTS (ATM Breakout Execution)
@@ -201,18 +201,18 @@ def get_entry_signal(df=None):
                 final_signal = "ATMSELL"
             else:
                 # --- PRIORITY 4 FALLBACK INSIDE ENGINE: STANDARD TREND SEGMENTATION (OTM) ---
-                if entry_sig == "BUY" and (strnd_trend in ["BUY", "BULL"] or sma_trend in ["BUY", "BULL"]):
+                if entry_sig == "BUY" and (strnd_trend in ["BUY", "BULL"] or strnd_trend in ["BUY", "BULL"]):
                     final_signal = "OTMBUY"
-                elif entry_sig == "SELL" and (strnd_trend in ["SELL", "BEAR"] or sma_trend in ["SELL", "BEAR"]):
+                elif entry_sig == "SELL" and (strnd_trend in ["SELL", "BEAR"] or strnd_trend in ["SELL", "BEAR"]):
                     final_signal = "OTMSELL"
                 else:
                     final_signal = "NONE"
         
         # 📈 PRIORITY 4: Standard Trend-Following Fallback (OTM)
         else:
-            if entry_sig == "BUY" and (strnd_trend in ["BUY", "BULL"] or sma_trend in ["BUY", "BULL"]):
+            if entry_sig == "BUY" and (strnd_trend in ["BUY", "BULL"] or strnd_trend in ["BUY", "BULL"]):
                 final_signal = "OTMBUY"
-            elif entry_sig == "SELL" and (strnd_trend in ["SELL", "BEAR"] or sma_trend in ["SELL", "BEAR"]):
+            elif entry_sig == "SELL" and (strnd_trend in ["SELL", "BEAR"] or strnd_trend in ["SELL", "BEAR"]):
                 final_signal = "OTMSELL"
             else:
                 final_signal = "NONE"
