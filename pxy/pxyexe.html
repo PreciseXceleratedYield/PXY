@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#06080d" id="themeColorMeta">
+<title>PXY® — Actions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="dark"]{
+    --bg:#06080d;--bg2:#0c101a;--bg3:#111827;
+    --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.13);
+    --text:#e8ecf4;--muted:#5b6478;--accent:#3b82f6;
+    --bull:#22c55e;--bear:#ef4444;--gold:#f59e0b;
+    --bull-dim:rgba(34,197,94,0.12);--bear-dim:rgba(239,68,68,0.12);
+    --header-h:52px;--bottom-h:80px;
+}
+[data-theme="light"]{
+    --bg:#f1f5fb;--bg2:#ffffff;--bg3:#eef1f8;
+    --border:rgba(0,0,0,0.07);--border2:rgba(0,0,0,0.14);
+    --text:#0f172a;--muted:#94a3b8;--accent:#2563eb;
+    --bull:#16a34a;--bear:#dc2626;--gold:#d97706;
+    --bull-dim:rgba(22,163,74,0.11);--bear-dim:rgba(220,38,38,0.11);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{height:100%;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+body{
+    height:100dvh;display:flex;flex-direction:column;
+    font-family:'DM Mono',monospace;background:var(--bg);color:var(--text);
+    transition:background 0.35s,color 0.35s;overscroll-behavior:none;
+    -webkit-tap-highlight-color:transparent;overflow:hidden;
+}
+*{scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+::-webkit-scrollbar{width:3px;}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* ── HEADER ── */
+#header{
+    height:var(--header-h);flex-shrink:0;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:0 clamp(14px,3vw,28px);
+    background:var(--bg2);border-bottom:1px solid var(--border);gap:12px;
+    transition:background 0.35s,border-color 0.35s;
+}
+.hdr-l,.hdr-r{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.back-btn{display:flex;align-items:center;gap:5px;padding:4px 11px;border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:11px;letter-spacing:0.06em;text-decoration:none;font-family:'DM Mono',monospace;transition:all 0.2s;}
+.back-btn:hover{color:var(--text);background:var(--bg3);}
+.dv{width:1px;height:18px;background:var(--border2);}
+.page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(14px,1.8vw,18px);letter-spacing:0.06em;}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;}
+.logo sup{font-size:0.55em;vertical-align:super;color:var(--accent);}
+.theme-toggle{display:flex;align-items:center;cursor:pointer;user-select:none;}
+.toggle-track{width:34px;height:18px;border-radius:9px;background:var(--bg3);border:1px solid var(--border2);position:relative;transition:background 0.35s;}
+[data-theme="light"] .toggle-track{background:var(--accent);border-color:var(--accent);}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:10px;height:10px;border-radius:50%;background:var(--muted);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);}
+[data-theme="light"] .toggle-thumb{transform:translateX(16px);background:#fff;}
+#clock{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;}
+
+/* ── PASSWORD OVERLAY ── */
+#pwdOverlay{position:fixed;inset:0;z-index:999;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;}
+#pwdOverlay.hidden{display:none;}
+.pwd-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(22px,4vw,34px);}
+.pwd-logo sup{font-size:0.5em;vertical-align:super;color:var(--accent);}
+.pwd-label{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);}
+.pwd-input{background:var(--bg2);border:1px solid var(--border2);color:var(--text);font-family:'DM Mono',monospace;font-size:26px;text-align:center;letter-spacing:0.2em;padding:10px 22px;border-radius:10px;outline:none;width:150px;transition:border-color 0.2s;}
+.pwd-input:focus{border-color:var(--accent);}
+.pwd-input.error{border-color:var(--bear);animation:shake 0.3s;}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+.view-btn{padding:5px 14px;border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:11px;background:transparent;font-family:'DM Mono',monospace;cursor:pointer;transition:all 0.2s;}
+.view-btn:hover{color:var(--text);background:var(--bg3);}
+
+/* ── MAIN SPLIT ── */
+#main{flex:1;display:flex;overflow:hidden;min-height:0;}
+
+/* ── CE PANEL (left) ── */
+#cePanel{
+    flex:1;display:flex;flex-direction:column;
+    border-right:1px solid var(--border);
+    transition:border-color 0.35s;
+}
+
+/* ── PE PANEL (right) ── */
+#pePanel{
+    flex:1;display:flex;flex-direction:column;
+}
+
+.panel-header{
+    height:40px;flex-shrink:0;display:flex;align-items:center;
+    padding:0 clamp(14px,2.5vw,24px);gap:8px;
+    background:var(--bg2);border-bottom:1px solid var(--border);
+    transition:background 0.35s,border-color 0.35s;
+}
+.ph-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.ph-dot.bull{background:var(--bull);box-shadow:0 0 6px var(--bull);}
+.ph-dot.bear{background:var(--bear);box-shadow:0 0 6px var(--bear);}
+.ph-label{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(13px,1.4vw,16px);letter-spacing:0.08em;}
+.ph-label.bull{color:var(--bull);}
+.ph-label.bear{color:var(--bear);}
+
+.btn-col{
+    flex:1;display:flex;flex-direction:column;
+    padding:clamp(10px,2vh,20px) clamp(14px,2.5vw,24px);
+    gap:clamp(8px,1.5vh,16px);
+    overflow-y:auto;
+}
+
+/* ── ACTION BUTTON ── */
+.act-btn{
+    flex:1;min-height:60px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:4px;padding:14px;border-radius:12px;
+    font-family:'Syne',sans-serif;font-weight:700;
+    font-size:clamp(14px,1.6vw,18px);letter-spacing:0.05em;
+    cursor:pointer;transition:all 0.2s;border:1px solid;
+    -webkit-tap-highlight-color:transparent;
+}
+.act-btn:active{transform:scale(0.97);opacity:0.8;}
+.act-btn:disabled{opacity:0.4;cursor:default;}
+
+.act-btn.ce{
+    background:var(--bull-dim);border-color:rgba(34,197,94,0.3);color:var(--bull);
+}
+.act-btn.ce:hover{background:rgba(34,197,94,0.22);border-color:var(--bull);}
+
+.act-btn.pe{
+    background:var(--bear-dim);border-color:rgba(239,68,68,0.3);color:var(--bear);
+}
+.act-btn.pe:hover{background:rgba(239,68,68,0.22);border-color:var(--bear);}
+
+.act-btn.running{border-color:var(--gold)!important;color:var(--gold)!important;background:rgba(245,158,11,0.1)!important;}
+.act-btn.done   {border-color:var(--bull)!important;color:var(--bull)!important;}
+.act-btn.error  {border-color:var(--bear)!important;color:var(--bear)!important;}
+
+.act-sub{font-family:'DM Mono',monospace;font-size:clamp(9px,0.9vw,11px);font-weight:400;opacity:0.7;letter-spacing:0.06em;}
+
+/* ── BOTTOM BAR ── */
+#bottomBar{
+    height:var(--bottom-h);flex-shrink:0;
+    display:flex;align-items:center;
+    padding:clamp(8px,1.5vh,14px) clamp(14px,2.5vw,24px);
+    gap:clamp(10px,2vw,20px);
+    background:var(--bg2);border-top:1px solid var(--border);
+    transition:background 0.35s,border-color 0.35s;
+}
+
+.sys-btn{
+    flex:1;height:100%;border-radius:10px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:4px;font-family:'Syne',sans-serif;font-weight:800;
+    font-size:clamp(14px,1.8vw,20px);letter-spacing:0.06em;
+    cursor:pointer;transition:all 0.2s;border:1px solid;
+    -webkit-tap-highlight-color:transparent;
+}
+.sys-btn:active{transform:scale(0.98);opacity:0.8;}
+.sys-btn:disabled{opacity:0.4;cursor:default;}
+.sys-btn-sub{font-family:'DM Mono',monospace;font-size:clamp(9px,0.85vw,11px);font-weight:400;opacity:0.65;letter-spacing:0.08em;}
+
+.sys-btn.config{
+    background:rgba(59,130,246,0.1);border-color:rgba(59,130,246,0.3);color:var(--accent);
+}
+.sys-btn.config:hover{background:rgba(59,130,246,0.2);border-color:var(--accent);}
+
+.sys-btn.update{
+    background:linear-gradient(135deg,var(--bull-dim),var(--bear-dim));
+    border-color:transparent;color:var(--text);
+    border:1px solid transparent;
+    background-clip:padding-box;
+    outline:1px solid rgba(100,100,100,0.2);
+}
+.sys-btn.update:hover{outline-color:var(--gold);}
+
+.sys-btn.running{border-color:var(--gold)!important;color:var(--gold)!important;}
+.sys-btn.done   {border-color:var(--bull)!important;color:var(--bull)!important;}
+.sys-btn.error  {border-color:var(--bear)!important;color:var(--bear)!important;}
+
+/* ── PWD POPUP ── */
+#pwdPopup{display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;}
+#pwdPopup.open{display:flex;}
+.popup-box{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:28px 32px;min-width:280px;display:flex;flex-direction:column;gap:14px;align-items:center;box-shadow:0 24px 60px rgba(0,0,0,0.6);}
+.popup-title{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;letter-spacing:0.06em;}
+.popup-label{font-size:10px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;}
+.popup-input{width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-family:'DM Mono',monospace;font-size:16px;text-align:center;letter-spacing:0.14em;outline:none;transition:border-color 0.2s;}
+.popup-input:focus{border-color:var(--accent);}
+.popup-row{display:flex;gap:10px;width:100%;}
+.popup-cancel{flex:1;padding:9px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;}
+.popup-run{flex:1;padding:9px;border-radius:7px;border:1px solid var(--accent);background:rgba(59,130,246,0.12);color:var(--accent);font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;}
+
+/* ── OUTPUT ── */
+#outputPanel{display:none;position:fixed;bottom:90px;left:50%;transform:translateX(-50%);width:min(90vw,600px);background:var(--bg);border:1px solid var(--border2);border-radius:10px;z-index:200;box-shadow:0 16px 48px rgba(0,0,0,0.6);overflow:hidden;}
+.out-hdr{display:flex;align-items:center;justify-content:space-between;padding:7px 14px;background:var(--bg2);border-bottom:1px solid var(--border);}
+.out-lbl{font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);}
+.out-x{cursor:pointer;color:var(--muted);font-size:12px;padding:0 3px;}
+.out-x:hover{color:var(--bear);}
+#outputText{padding:12px 16px;font-size:11px;line-height:1.6;color:var(--text);max-height:180px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;font-family:'DM Mono',monospace;}
+
+/* mobile */
+@media(max-width:640px){
+    :root{--header-h:44px;--bottom-h:70px;}
+    #main{flex-direction:column;}
+    #cePanel{border-right:none;border-bottom:1px solid var(--border);}
+    .act-btn{min-height:48px;font-size:14px;}
+    .sys-btn{font-size:14px;}
+}
+@media(min-width:1920px){
+    :root{--header-h:64px;--bottom-h:100px;}
+    .act-btn{font-size:22px;}
+    .sys-btn{font-size:26px;}
+}
+</style>
+</head>
+<body>
+
+<!-- PASSWORD OVERLAY -->
+<div id="pwdOverlay">
+    <div class="pwd-logo">PXY<sup>®</sup></div>
+    <div class="pwd-label">Actions require authentication</div>
+    <input type="password" class="pwd-input" id="pwdInput"
+           placeholder="·" maxlength="10" autofocus oninput="checkPwd(this)">
+    <button class="view-btn" onclick="enterDisplayMode()">👁 View Only</button>
+</div>
+
+<!-- HEADER -->
+<header id="header">
+    <div class="hdr-l">
+        <a class="back-btn" href="web/webpxy.html">← DASHBOARD</a>
+        <div class="dv"></div>
+        <span class="page-title">ACTIONS</span>
+    </div>
+    <div class="hdr-r">
+        <span id="clock">—</span>
+        <div class="dv"></div>
+        <div class="theme-toggle" id="themeToggle">
+            <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        </div>
+        <div class="dv"></div>
+        <span class="logo">PXY<sup>®</sup></span>
+    </div>
+</header>
+
+<!-- MAIN -->
+<div id="main">
+
+    <!-- LEFT: CE -->
+    <div id="cePanel">
+        <div class="panel-header">
+            <div class="ph-dot bull"></div>
+            <span class="ph-label bull">CALL · CE</span>
+        </div>
+        <div class="btn-col">
+            <button class="act-btn ce" onclick="runScript('pxybuyce',this)">
+                ✅ BUY CE
+                <span class="act-sub">Force buy call option</span>
+            </button>
+            <button class="act-btn ce" onclick="runScript('pxysqrce',this)">
+                ⛔ SQUARE OFF CE
+                <span class="act-sub">Close all call positions</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- RIGHT: PE -->
+    <div id="pePanel">
+        <div class="panel-header">
+            <div class="ph-dot bear"></div>
+            <span class="ph-label bear">PUT · PE</span>
+        </div>
+        <div class="btn-col">
+            <button class="act-btn pe" onclick="runScript('pxybuype',this)">
+                ✅ BUY PE
+                <span class="act-sub">Force buy put option</span>
+            </button>
+            <button class="act-btn pe" onclick="runScript('pxysqrpe',this)">
+                ⛔ SQUARE OFF PE
+                <span class="act-sub">Close all put positions</span>
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<!-- BOTTOM BAR -->
+<div id="bottomBar">
+    <button class="sys-btn config" onclick="runScript('pxyconfig',this)">
+        ⚙️ PXYCONFIG
+        <span class="sys-btn-sub">System configuration</span>
+    </button>
+    <button class="sys-btn update" onclick="runScript('pxyupdate',this)">
+        🔄 PXYUPDATE
+        <span class="sys-btn-sub">Pull latest & reset</span>
+    </button>
+</div>
+
+<!-- PWD POPUP -->
+<div id="pwdPopup">
+    <div class="popup-box">
+        <div class="popup-title" id="popupTitle">Confirm Action</div>
+        <div class="popup-label">Enter neo password</div>
+        <input type="password" class="popup-input" id="neoPwd" placeholder="password"
+               maxlength="20" onkeydown="if(event.key==='Enter') confirmRun()">
+        <div class="popup-row">
+            <button class="popup-cancel" onclick="cancelRun()">Cancel</button>
+            <button class="popup-run"    onclick="confirmRun()">Execute</button>
+        </div>
+    </div>
+</div>
+
+<!-- OUTPUT -->
+<div id="outputPanel">
+    <div class="out-hdr">
+        <span class="out-lbl" id="outputLabel">Output</span>
+        <span class="out-x" onclick="closeOutput()">✕</span>
+    </div>
+    <pre id="outputText"></pre>
+</div>
+
+<script>
+'use strict';
+const PASS='~',KEY='pxy_actions_auth';
+let fullMode=false,pendingScript=null,pendingBtn=null;
+
+/* ── PWD ── */
+function checkPwd(input){
+    if(input.value===PASS){sessionStorage.setItem(KEY,'1');enterFullMode();}
+    else if(input.value.length>=1&&input.value!==PASS.slice(0,input.value.length)){
+        input.classList.add('error');setTimeout(()=>{input.classList.remove('error');input.value='';},600);
+    }
+}
+function enterFullMode(){
+    fullMode=true;
+    document.getElementById('pwdOverlay').classList.add('hidden');
+}
+function enterDisplayMode(){
+    fullMode=false;
+    document.getElementById('pwdOverlay').classList.add('hidden');
+    document.querySelectorAll('.act-btn,.sys-btn').forEach(b=>{b.disabled=true;b.style.opacity='0.3';});
+}
+window.addEventListener('DOMContentLoaded',()=>{
+    if(sessionStorage.getItem(KEY)==='1')enterFullMode();
+});
+
+/* ── THEME ── */
+document.getElementById('themeToggle').addEventListener('click',()=>{
+    const dark=document.documentElement.getAttribute('data-theme')!=='light';
+    document.documentElement.setAttribute('data-theme',dark?'light':'dark');
+});
+
+/* ── CLOCK ── */
+function tick(){document.getElementById('clock').textContent=new Date().toLocaleTimeString('en-IN',{hour12:false});}
+tick();setInterval(tick,1000);
+
+/* ── RUN ── */
+function runScript(script,btn){
+    if(!fullMode){alert('Authentication required');return;}
+    pendingScript=script;pendingBtn=btn;
+    document.getElementById('popupTitle').textContent=`▶ ${script}`;
+    document.getElementById('neoPwd').value='';
+    document.getElementById('pwdPopup').classList.add('open');
+    setTimeout(()=>document.getElementById('neoPwd').focus(),100);
+}
+function cancelRun(){
+    document.getElementById('pwdPopup').classList.remove('open');
+    pendingScript=null;pendingBtn=null;
+}
+function confirmRun(){
+    const pwd=document.getElementById('neoPwd').value.trim();
+    if(!pwd)return;
+    document.getElementById('pwdPopup').classList.remove('open');
+    const btn=pendingBtn,script=pendingScript,orig=btn.innerHTML;
+    btn.innerHTML=`⏳ Running…<span class="act-sub">${script}</span>`;
+    btn.className=btn.className.replace(/(ce|pe|config|update)/,'')+'running';
+    btn.disabled=true;
+    fetch(`/run/${script}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pwd})})
+    .then(r=>r.json())
+    .then(d=>{
+        btn.innerHTML=d.ok?`✓ Done<span class="act-sub">success</span>`:`✗ Error<span class="act-sub">failed</span>`;
+        btn.className=btn.className.replace('running',d.ok?'done':'error');
+        const text=(d.output||'')+(d.error?'\n⚠ '+d.error:'');
+        showOutput(d.ok?`✓ ${script}`:`✗ ${script}`,text.trim()||'(no output)');
+    })
+    .catch(e=>{btn.innerHTML=`✗ Error<span class="act-sub">network</span>`;btn.className=btn.className.replace('running','error');showOutput(`✗ ${script}`,e.message);})
+    .finally(()=>{setTimeout(()=>{btn.innerHTML=orig;btn.className=btn.className.replace(/(running|done|error)/,'');btn.disabled=false;},3000);});
+}
+function showOutput(label,text){
+    document.getElementById('outputLabel').textContent=label;
+    document.getElementById('outputText').textContent=text;
+    document.getElementById('outputPanel').style.display='block';
+}
+function closeOutput(){document.getElementById('outputPanel').style.display='none';}
+</script>
+</body>
+</html>
