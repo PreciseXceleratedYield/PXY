@@ -40,9 +40,9 @@ def _print_console_bar(c2_c, c1_c, c0_c, c2_color, c1_color, c0_color, entry, ex
     # Added explicit horizon state descriptors directly to the sorted label schema
 
     rows = [
-        (c0_c, f" ✊ C0 (Live) -{c0_c % 100:05.1f}", c0_ansi),
-        (c1_c, f" ☝️ C1 (Conf) -{c1_c % 100:05.1f}", c1_ansi),
-        (c2_c, f" ✌️ C2 (Past) -{c2_c % 100:05.1f}", c2_ansi)
+        (c0_c, f" 0 (Live) -{c0_c % 100:05.1f}", c0_ansi),
+        (c1_c, f" 1 (Conf) -{c1_c % 100:05.1f}", c1_ansi),
+        (c2_c, f" 2 (Past) -{c2_c % 100:05.1f}", c2_ansi)
     ]
     #rows.sort(key=lambda item: item[0], reverse=True)
 
