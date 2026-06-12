@@ -34,10 +34,10 @@ app.get('/', (req, res) => {
    ========================= */
 const ALLOWED_SCRIPTS = [
     'pxyupdate',
-    'pxytkovrbuyce',
-    'pxytkovrbuype',
-    'pxytkovrsqrce',
-    'pxytkovrsqrpe'   
+    'pxybuyce',
+    'pxybuype',
+    'pxysqrce',
+    'pxysqrpe'   
 ];
 
 const SCRIPT_DIR = '/home/neo/pxy';
