@@ -1,3 +1,5 @@
+#!/bin/bash
+
 echo "       ******** GET UPDATES *******"
 echo
 
@@ -11,15 +13,27 @@ echo
 # Reset local changes to match remote main branch
 git reset --hard origin/main
 
-# Copy only files WITHOUT an extension to /usr/local/bin
-for file in "$HOME/pxy"/*; do
-    if [ -f "$file" ] && [[ "$file" != *.* ]]; then
-        cp "$file" "$HOME/.local/bin/" 2>/dev/null
+echo
+echo "       ****** SYNC BINARIES *******"
+echo
+
+# Ensure local bin directory exists
+mkdir -p "$HOME/.local/bin"
+
+# Loop through everything starting with pxy, or files without an extension
+for file in "$HOME/pxy"/pxy* "$HOME/pxy"/*; do
+    # Ensure it is a valid file, not a directory
+    if [ -f "$file" ]; then
+        filename=$(basename "$file")
+        
+        # Check Condition 1: Starts with 'pxy' OR Condition 2: Has no extension
+        if [[ "$filename" == pxy* ]] || [[ "$filename" != *.* ]]; then
+            cp "$file" "$HOME/.local/bin/" 2>/dev/null
+            chmod +x "$HOME/.local/bin/$filename" 2>/dev/null
+            echo "-> Installed command: $filename"
+        fi
     fi
 done
-
-# Make sure copied files are executable
-chmod +x "$HOME/.local/bin/"* 2>/dev/null
 
 echo
 echo "       ***** UPDATE COMPLETED *****"
