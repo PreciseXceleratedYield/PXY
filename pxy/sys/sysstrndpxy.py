@@ -183,7 +183,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
-def export_supertrend_json(output_file="../syschrtpxy.json"):
+def export_supertrend_json(output_file="../web/webchrtpxy.json"):
     """Dumps EVERY single candle printed straight to the JSON file."""
     dummy_df = pd.DataFrame()
     df = calculate_supertrend(dummy_df)
