@@ -6,7 +6,7 @@ def get_target_quantities(supertrend, ce_lots, pe_lots, lot_size=None):
     """
     Calculates target lot limits by independently tracking live Indian Standard Time (IST).
     """
-    MODE = "TREND" 
+    MODE = "STRICT_NN" #"TREND" 
     
     # 1. Fetch live time independently forced to Indian Standard Time (IST)
     ist_tz = pytz.timezone('Asia/Kolkata')
