@@ -31,7 +31,7 @@ def dump_to_json(closed_df):
 # === ADDON: Your new function to write livpos.json ===
 def dump_livpos_to_json(open_positions): 
     try: 
-        file_path = os.path.expanduser("~/pxy/livpos.json") 
+        file_path = os.path.expanduser("~/pxy/web/webpospxy.json") 
         os.makedirs(os.path.dirname(file_path), exist_ok=True) 
         
         # Safely convert the existing data to your exact uppercase format
