@@ -138,7 +138,7 @@ def get_entry_signal(df=None):
             pass
 
     market_open = datetime.strptime("09:15", "%H:%M").time()
-    time_boundary = datetime.strptime("09:17", "%H:%M").time()
+    time_boundary = datetime.strptime("09:30", "%H:%M").time()
 
     if DEBUG_MODE:
         print(f"⏰ Synchronized IST Execution Time: {current_time_ist.strftime('%H:%M:%S')}")
@@ -157,9 +157,9 @@ def get_entry_signal(df=None):
         
         if ENABLE_EARLY_MORNING_WINDOW:
             if exit_sig == "BUY":
-                final_signal = "GOOD-MORNING"  
+                final_signal = "ATMBUY"  
             elif exit_sig == "SELL":
-                final_signal = "GOOD-MORNING" 
+                final_signal = "ATMSELL" 
             else:
                 final_signal = "NONE"
         else:
