@@ -51,11 +51,16 @@ def run_independent_engine():
             else:
                 raw_data = raw_data.tz_convert(TIMEZONE)
 
-            # 🟢 STEP 4: RESOLVE PRODUCTION DUMP DIRECTORIES
+            # 🟢 STEP 4: RESOLVE PRODUCTION DUMP DIRECTORIES (UPDATED TO PARENT'S OTHER CHILD 'WEB' DIR)
             script_directory = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
             parent_directory = os.path.dirname(script_directory)
-            base_name = os.path.splitext(os.path.basename(__file__))[0] if '__file__' in locals() else "sysddmppxy"
-            target_export_path = os.path.join(parent_directory, f"{base_name}.json")
+            
+            # Target the parallel 'web' sibling directory
+            target_web_directory = os.path.join(parent_directory, "web")
+            os.makedirs(target_web_directory, exist_ok=True)
+            
+            base_name = os.path.splitext(os.path.basename(__file__))[0] if '__file__' in locals() else "webdaypxy"
+            target_export_path = os.path.join(target_web_directory, f"{base_name}.json")
             
             # 🟢 STEP 5: DUMP ENTIRE RAW COMPONENT DATA MATRIX
             raw_data.to_json(target_export_path, date_format='iso', orient='split')
