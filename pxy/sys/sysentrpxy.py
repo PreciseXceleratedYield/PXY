@@ -16,9 +16,9 @@ Waterfall Priorities:
 - 🏆 PRIORITY 2: Jumping SMA Crossovers (TBUY / TSELL Only) -> Assigned strictly to ATM.
 - 📊 DIRECT ALIGNMENT ROUTING MATRIX:
     - If entry is BUY and trend line is BULL/TBUY  -> ATMBUY (Priority 3)
-    - If entry is BUY and trend line is BEAR/TSELL -> AVGBUY (Priority 4)
+    - If entry is BUY and trend line is BEAR/TSELL -> OTMBUY (Priority 4)
     - If entry is SELL and trend line is BEAR/TSELL -> ATMSELL (Priority 3)
-    - If entry is SELL and trend line is BULL/TBUY  -> AVGSELL (Priority 4)
+    - If entry is SELL and trend line is BULL/TBUY  -> OTMSELL (Priority 4)
 ===============================================================================
 """
 
@@ -173,12 +173,12 @@ def get_entry_signal(df=None):
             print("  📊 UNLOCKED DIRECT ALIGNMENT ROUTING: Applying simplified trend alignment check.")
         
         if raw_entry == "BUY":
-            # Aligned: ATMBUY (P3) | Counter-Trend: AVGBUY (P4)
-            final_signal = "ATMBUY" if is_line_bull else "AVGBUY"
+            # Aligned: ATMBUY (P3) | Counter-Trend: OTMBUY (P4)
+            final_signal = "ATMBUY" if is_line_bull else "OTMBUY"
             
         elif raw_entry == "SELL":
-            # Aligned: ATMSELL (P3) | Counter-Trend: AVGSELL (P4)
-            final_signal = "ATMSELL" if is_line_bear else "AVGSELL"
+            # Aligned: ATMSELL (P3) | Counter-Trend: OTMSELL (P4)
+            final_signal = "ATMSELL" if is_line_bear else "OTMSELL"
             
         else:
             final_signal = "NONE"
