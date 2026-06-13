@@ -1,5 +1,8 @@
+import json
+import os
+from datetime import datetime
 from sysdashpxy import get_full_snapshot
-from systdaypxy import get_market_snapshot
+from sysdaypxy import get_market_snapshot
 from sysvixpxy import get_market_context, expand_vix, expand_sentiment
 from syscnfgpxy import TICKER
 
@@ -24,6 +27,9 @@ def get_all_data():
 
     # -------- COMBINE --------
     data = {
+        # ===== SYSTEM TIMING =====
+        "timestamp": datetime.now().isoformat(),
+
         # ===== DASH =====
         "bias": dash.get("bias"),
         "o_change": dash.get("o_change"),
@@ -71,6 +77,22 @@ def get_all_data():
         "global_flag": sentiment_flag,
         "global_sentiment": sentiment_text
     }
+
+    # -------- 📁 TARGET: pxy/web DIRECTORY --------
+    # current_dir points to pxy/sys
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    
+    # target_dir points to pxy/web (steps up one level out of sys, then enters web)
+    target_dir = os.path.abspath(os.path.join(current_dir, "..", "web"))
+    
+    # Safeguard: Create web folder if it's missing
+    os.makedirs(target_dir, exist_ok=True) 
+    
+    target_file = os.path.join(target_dir, "webdashpxy.json")
+    
+    # Overwrite deployment
+    with open(target_file, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=4)
 
     return data
 
