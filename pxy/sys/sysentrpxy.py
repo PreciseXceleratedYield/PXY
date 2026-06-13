@@ -79,7 +79,7 @@ def get_entry_signal(df=None):
         # Unpack both the asymmetric confirmed Entry and the live running Exit variables
         # Note: We capture the simplified raw_entry (BUY/SELL) from sysmktpxy here
         raw_entry, exit_sig = get_signal(master_df)
-        raw_entry = str(raw_entry).upper().strip()
+        raw_entry = str(exit_sig).upper().strip()
         exit_sig = str(exit_sig).upper().strip()
         
         # 🚨 Explicit production requirement: entry_sig maps to exit_sig for transitional triggers
