@@ -1,5 +1,5 @@
 # ===============================================================================
-# PART 1: MODULE INGESTION, CONFIGURATION, AND DATA PIPELINE MATRIX
+# PART 1 & 2: MASTER OPTION ROUTING ENGINE (PRODUCTION VERIFIED MATRIX)
 # ===============================================================================
 # sysentrpxy.py
 """
@@ -9,24 +9,29 @@ PXY OPTION ROUTING ENGINE: FINAL MASTER PRODUCTION MATRIX
 Operational Rules:
 - EXIT and ENTRY signals originate strictly from sysmktpxy (exit_sig, entry_sig).
 - REQUIREMENT: entry_sig is explicitly set equal to exit_sig.
-- 🌅 MORNING WINDOW (09:15-09:30): Assigns strictly OTM contracts.
-- 👑 PRIORITY 2 (BOS Breakout Engine): Assigns high-sensitivity OTM contracts.
-- 🏆 PRIORITY 3 (Supertrend Cross): Assigns structural layout OTM contracts.
-- ⚡ PRIORITY 4 (Opposite Flip / Counter-Trend): Assigns AVG contracts.
-- 📈 PRIORITY 5 (Trend Following Fallback): Assigns budget-friendly ATM contracts.
+- PRESERVATION LOCK: exit_sig from sysmktpxy is preserved unmutated to the very end.
+
+Waterfall Priorities:
+- 👑 PRIORITY 1: All BOS Breakouts (MBUY / NBUY / MSELL / NSELL) -> Assigned strictly to ATM.
+- 🏆 PRIORITY 2: Jumping SMA Crossovers (TBUY / TSELL Only) -> Assigned strictly to ATM.
+- 📊 DIRECT ALIGNMENT ROUTING MATRIX:
+    - If entry is FBUY and trend line is BULL/TBUY  -> ATMBUY (Priority 3)
+    - If entry is FBUY and trend line is BEAR/TSELL -> AVGBUY (Priority 4)
+    - If entry is FSELL and trend line is BEAR/TSELL -> ATMSELL (Priority 3)
+    - If entry is FSELL and trend line is BULL/TBUY  -> AVGSELL (Priority 4)
 ===============================================================================
 """
 
 import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import traceback  # 🛠️ For tracing silent execution loop failures
+import traceback  
 from syscnfgpxy import TICKER
 
 # Ingestion gateways from your exact strategy matrix modules
 from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
-from sysbbospxy import get_bos_bar  # Ingesting your 42-min structural breakout engine
+from sysbbospxy import get_bos_bar  
 
 # 🛠️ GLOBAL DEBUGGING SWITCH
 DEBUG_MODE = False
@@ -36,20 +41,23 @@ CHECK_CONFIRMED_ONLY = False
 
 def get_entry_signal(df=None):
     """
-    Master Router with Deep Telemetry Monitoring.
+    Master Option Router Orchestrator.
+    Processes multi-module signal feeds sequentially through a structured, 
+    time-independent waterfall to output targeted contract tiers.
     """
     if DEBUG_MODE:
         print("\n" + "🔍 DEBUG START: INITIALIZING ROUTER SCAN 🔍".center(60, "═"))
     
+    # Initialize baseline string states to guarantee scope safety across error gates
+    raw_entry = "NONE"
+    
     # 1. DATA SYNCHRONIZATION AND MULTI-INDEX HEADER FLATTENING
     if df is None or df.empty:
         if DEBUG_MODE:
-            print("💡 Dataframe empty or None. Fetching fresh 5-day continuous stream buffer from yfinance...")
+            print("💡 Dataframe empty or None. Fetching fresh continuous stream buffer...")
         import yfinance as yf
         ticker_obj = yf.Ticker(TICKER)
         df = ticker_obj.history(period="5d", interval="1m")
-        if DEBUG_MODE:
-            print(f"📦 Successfully downloaded data matrix. Shape: {df.shape}")
         
     if df.empty:
         print("❌ CRITICAL: Data stream returned an empty dataframe from yfinance framework.")
@@ -63,17 +71,18 @@ def get_entry_signal(df=None):
             print("🛠️ MultiIndex column detected. Flattening columns to avoid KeyError loops...")
         master_df.columns = master_df.columns.get_level_values(0)
 
-    # 2. SEGREGATED INGESTION FLOW VIA INDEPENDENT PIPES
+    # 2. SEGREGATED STRATEGY MODULE INGESTION PIPELINES
     if DEBUG_MODE:
         print("📡 Pulling execution states from strategy pipes...")
         
     try:
         # Unpack both the asymmetric confirmed Entry and the live running Exit variables
-        entry_sig, exit_sig = get_signal(master_df)
-        entry_sig = str(entry_sig).upper().strip()
+        # Note: We capture raw_entry from sysmktpxy before performing the required override loop
+        raw_entry, exit_sig = get_signal(master_df)
+        raw_entry = str(raw_entry).upper().strip()
         exit_sig = str(exit_sig).upper().strip()
         
-        # 🚨 Explicitly setting entry_sig equal to exit_sig as requested
+        # 🚨 Explicit production requirement: entry_sig maps to exit_sig for transitional triggers
         entry_sig = exit_sig
         
         if DEBUG_MODE:
@@ -81,8 +90,10 @@ def get_entry_signal(df=None):
     except Exception as e:
         print(f"  ❌ ERROR inside sysmktpxy pipeline: {e}")
         entry_sig, exit_sig = "NONE", "NONE"
+        raw_entry = "NONE"
 
     try:
+        # Extract breakout signals from your 42-min structural breakout engine
         _, bos_signal = get_bos_bar(master_df)
         bos_signal = str(bos_signal).upper().strip()
         if DEBUG_MODE:
@@ -92,7 +103,7 @@ def get_entry_signal(df=None):
         bos_signal = "NONE"
 
     if DEBUG_MODE:
-        print("📊 Evaluating sysstrndpxy modular dual-pipeline matrix...")
+        print("📊 Evaluating sysstrndpxy modular single-pipeline matrix...")
     strnd_df = calculate_supertrend(master_df)
     
     strnd_trend = "NEUTRAL"
@@ -102,20 +113,18 @@ def get_entry_signal(df=None):
         if DEBUG_MODE:
             print(f"  -> Target lookup row index: {idx} (CHECK_CONFIRMED_ONLY: {CHECK_CONFIRMED_ONLY})")
         try:
-            # SOLELY DEPENDING ON SUPERTREND (PIPE A)
-            strnd_trend = str(strnd_df.iloc[idx]['st_trend_full']).upper().strip()   
+            # SOLELY DEPENDING ON THE UNIFIED JUMPING SMA TRACKING LINE
+            strnd_trend = str(strnd_df.iloc[idx]['sma_trend_full']).upper().strip()   
             if DEBUG_MODE:
-                print(f"  -> [sysstrndpxy] Supertrend (st_trend_full): '{strnd_trend}'")
+                print(f"  -> [sysstrndpxy] Jumping Line Trend (sma_trend_full): '{strnd_trend}'")
         except Exception as e:
             print(f"  ❌ ERROR parsing sysstrndpxy array columns: {e}")
             print(traceback.format_exc())
     else:
         if DEBUG_MODE:
             print("  ⚠️ Warning: calculate_supertrend returned an empty or Null DataFrame.")
-# ===============================================================================
-# PART 2: TIME ENGINE AND CUSTOM STRIKE ALLOCATION WATERFALL LOGIC
-# ===============================================================================
-    # 3. Establish Base Current Time in Indian Standard Time (IST)
+
+    # 3. Timezone Synchronization Engine (IST Lock)
     tz_ist = ZoneInfo("Asia/Kolkata")
     current_time_ist = datetime.now(tz_ist).time()
 
@@ -124,79 +133,60 @@ def get_entry_signal(df=None):
             last_timestamp = strnd_df.index[-1]
             if not isinstance(last_timestamp, pd.Timestamp):
                 last_timestamp = pd.to_datetime(last_timestamp)
-            if last_timestamp.tzinfo is not None:
-                current_time_ist = last_timestamp.astimezone(tz_ist).time()
+            
+            # Force the incoming historical index timestamp into localized IST parameters
+            if last_timestamp.tzinfo is None:
+                current_time_ist = last_timestamp.tz_localize("UTC").tz_convert(tz_ist).time()
             else:
-                current_time_ist = last_timestamp.time()
+                current_time_ist = last_timestamp.tz_convert(tz_ist).time()
         except Exception:
             pass
 
-    market_open = datetime.strptime("09:15", "%H:%M").time()
-    time_boundary = datetime.strptime("09:30", "%H:%M").time()
-
     if DEBUG_MODE:
         print(f"⏰ Synchronized IST Execution Time: {current_time_ist.strftime('%H:%M:%S')}")
-        print(f"🔓 Market Window Threshold Locks: Open={market_open} | Boundary={time_boundary}")
 
+    # Determine underlying jumping line structural states cleanly
+    is_line_bull = strnd_trend in ["BUY", "TBUY", "BULL"]
+    is_line_bear = strnd_trend in ["SELL", "TSELL", "BEAR"]
+
+    # 4. MULTI-PRIORITY OPTIONS ROUTING ENGINE WATERFALL
     final_signal = "NONE"
 
-    # Normalize mixed trend statuses across modules safely ("BUY" and "BULL" are treated identically)
-    is_struct_bull = strnd_trend in ["BUY", "BULL"]
-    is_struct_bear = strnd_trend in ["SELL", "BEAR"]
-
-    # 4. IST TIME-BASED OPTIONS ROUTING ENGINE
-    if market_open <= current_time_ist < time_boundary:
+    # 👑 PRIORITY 1: ALL BOS STRUCTURAL BREAKOUTS (No Time Lock -> ATM Target)
+    # Listens continuously to all core opening and standard session breakout variants
+    if bos_signal in ["MBUY", "NBUY", "MSELL", "NSELL"]:
         if DEBUG_MODE:
-            print("🌅 CURRENT TIMING STATE: Early Morning opening window logic active.")
+            print("  👑 PRIORITY 1 UNLOCKED: Structural Breakout verified. Assigning ATM.")
+        if bos_signal in ["MBUY", "NBUY"]:
+            final_signal = "ATMBUY"
+        elif bos_signal in ["MSELL", "NSELL"]:
+            final_signal = "ATMSELL"
+            
+    # 🏆 PRIORITY 2: NATIVE TREND ENGINE CROSSOVERS (TBUY / TSELL Only -> ATM Target Track)
+    elif strnd_trend in ["TBUY", "TSELL"]:
+        if DEBUG_MODE:
+            print("  🏆 PRIORITY 2 UNLOCKED: Absolute Trend Line Crossover confirmed. Assigning ATM.")
+        if strnd_trend == "TBUY":
+            final_signal = "ATMBUY"
+        elif strnd_trend == "TSELL":
+            final_signal = "ATMSELL"
+            
+    # 📊 DIRECT ALIGNMENT ROUTING GATEWAY (Priority 3 & Priority 4)
+    # Extracts entry flips (FBUY/FSELL) and filters their target strikes directly against the line trend
+    else:
+        if DEBUG_MODE:
+            print("  📊 UNLOCKED DIRECT ALIGNMENT ROUTING: Applying structural filter matrix checks.")
         
-        if exit_sig == "BUY":
-            final_signal = "OTMBUY"  
-        elif exit_sig == "SELL":
-            final_signal = "OTMSELL" 
+        if raw_entry == "FBUY":
+            # Aligned: ATMBUY | Counter-Trend: AVGBUY
+            final_signal = "ATMBUY" if is_line_bull else "AVGBUY"
+            
+        elif raw_entry == "FSELL":
+            # Aligned: ATMSELL | Counter-Trend: AVGSELL
+            final_signal = "ATMSELL" if is_line_bear else "AVGSELL"
+            
         else:
             final_signal = "NONE"
-            
-    # Continuous live processing (executes outside morning hours, or during morning hours if layer yields NONE)
-    if final_signal == "NONE":
-        if DEBUG_MODE:
-            print("🏙️ CURRENT TIMING STATE: Standard Continuous window logic active.")
-        
-        # 👑 PRIORITY 2: HIGH-VOLUME 42-MIN STRUCTURAL BREAKOUTS (OTM Breakout Execution)
-        if bos_signal in ["BUY", "SELL"]:
-            if DEBUG_MODE:
-                print("  👑 PRIORITY 2 UNLOCKED: High-Volume 42-Min Structural Breakout detected. Assigning OTM.")
-            if bos_signal == "BUY":
-                final_signal = "OTMBUY"
-            elif bos_signal == "SELL":
-                final_signal = "OTMSELL"
-        
-        # 🏆 PRIORITY 3: NATIVE DUAL-PIPELINE CROSSOVERS (OTM Fast Execution)
-        elif strnd_trend in ["BUY", "SELL"]:
-            if DEBUG_MODE:
-                print("  🏆 PRIORITY 3 UNLOCKED: Absolute Trend Line Crossover confirmed. Assigning OTM.")
-            if strnd_trend == "BUY":
-                final_signal = "OTMBUY"
-            elif strnd_trend == "SELL":
-                final_signal = "OTMSELL"
-            
-        # ⚡ PRIORITY 4: OPPOSITE FLIP / STRICT COUNTER-TREND POSITION AVERAGING ENGINE (AVG)
-        elif (entry_sig == "SELL" and is_struct_bull) or (entry_sig == "BUY" and is_struct_bear):
-            if DEBUG_MODE:
-                print("  🚨 PRIORITY 4 UNLOCKED: Opposite Flip. Activating Counter-Trend Averaging. Assigning AVG.")
-            if entry_sig == "SELL" and is_struct_bull:
-                final_signal = "AVGSELL"
-            elif entry_sig == "BUY" and is_struct_bear:
-                final_signal = "AVGBUY"
 
-        # 📈 PRIORITY 5: Standard Trend-Following Fallback (ATM)
-        else:
-            if DEBUG_MODE:
-                print("  📈 PRIORITY 5 UNLOCKED: Standard Trend-Following Fallback applying.")
-            if entry_sig == "BUY" and is_struct_bull:
-                final_signal = "ATMBUY"
-            elif entry_sig == "SELL" and is_struct_bear:
-                final_signal = "ATMSELL"
-            else:
-                final_signal = "NONE"
-
+    # 🔒 Pure unmutated pass of exit_sig directly from sysmktpxy out to your automated broker execution layer
     return final_signal, exit_sig
