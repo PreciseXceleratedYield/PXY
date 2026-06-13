@@ -2,7 +2,7 @@ import json
 import os
 from datetime import datetime
 from sysdashpxy import get_full_snapshot
-from sysdaypxy import get_market_snapshot
+from systdaypxy import get_market_snapshot  # 🔥 FIXED: Kept your original 'systdaypxy'
 from sysvixpxy import get_market_context, expand_vix, expand_sentiment
 from syscnfgpxy import TICKER
 
@@ -79,10 +79,7 @@ def get_all_data():
     }
 
     # -------- 📁 TARGET: pxy/web DIRECTORY --------
-    # current_dir points to /home/neo/V1L58/pxy/sys
     current_dir = os.path.dirname(os.path.abspath(__file__))
-    
-    # target_dir points to /home/neo/V1L58/pxy/web
     target_dir = os.path.abspath(os.path.join(current_dir, "..", "web"))
     
     # Safeguard: Create web folder if it's missing
@@ -102,3 +99,4 @@ if __name__ == "__main__":
     data = get_all_data()
     for k, v in data.items():
         print(f"{k:18}: {v}")
+
