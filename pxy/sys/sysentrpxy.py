@@ -1,5 +1,5 @@
 # ===============================================================================
-# PART 1 & 2: MASTER OPTION ROUTING ENGINE (PRODUCTION VERIFIED MATRIX)
+# FINAL MASTER PRODUCTION MATRIX: STREAMLINED SIMPLIFIED 4-TIER WATERFALL
 # ===============================================================================
 # sysentrpxy.py
 """
@@ -15,10 +15,10 @@ Waterfall Priorities:
 - 👑 PRIORITY 1: All BOS Breakouts (MBUY / NBUY / MSELL / NSELL) -> Assigned strictly to ATM.
 - 🏆 PRIORITY 2: Jumping SMA Crossovers (TBUY / TSELL Only) -> Assigned strictly to ATM.
 - 📊 DIRECT ALIGNMENT ROUTING MATRIX:
-    - If entry is FBUY and trend line is BULL/TBUY  -> ATMBUY (Priority 3)
-    - If entry is FBUY and trend line is BEAR/TSELL -> AVGBUY (Priority 4)
-    - If entry is FSELL and trend line is BEAR/TSELL -> ATMSELL (Priority 3)
-    - If entry is FSELL and trend line is BULL/TBUY  -> AVGSELL (Priority 4)
+    - If entry is BUY and trend line is BULL/TBUY  -> ATMBUY (Priority 3)
+    - If entry is BUY and trend line is BEAR/TSELL -> AVGBUY (Priority 4)
+    - If entry is SELL and trend line is BEAR/TSELL -> ATMSELL (Priority 3)
+    - If entry is SELL and trend line is BULL/TBUY  -> AVGSELL (Priority 4)
 ===============================================================================
 """
 
@@ -26,12 +26,12 @@ import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import traceback  
-from syscnfgpxy import TICKER
 
 # Ingestion gateways from your exact strategy matrix modules
 from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
 from sysbbospxy import get_bos_bar  
+from syscnfgpxy import TICKER
 
 # 🛠️ GLOBAL DEBUGGING SWITCH
 DEBUG_MODE = False
@@ -42,8 +42,8 @@ CHECK_CONFIRMED_ONLY = False
 def get_entry_signal(df=None):
     """
     Master Option Router Orchestrator.
-    Processes multi-module signal feeds sequentially through a structured, 
-    time-independent waterfall to output targeted contract tiers.
+    Ingests simplified BUY/SELL framework signals and routes via a structured, 
+    multi-tier waterfall to output targeted contract tiers.
     """
     if DEBUG_MODE:
         print("\n" + "🔍 DEBUG START: INITIALIZING ROUTER SCAN 🔍".center(60, "═"))
@@ -77,7 +77,7 @@ def get_entry_signal(df=None):
         
     try:
         # Unpack both the asymmetric confirmed Entry and the live running Exit variables
-        # Note: We capture raw_entry from sysmktpxy before performing the required override loop
+        # Note: We capture the simplified raw_entry (BUY/SELL) from sysmktpxy here
         raw_entry, exit_sig = get_signal(master_df)
         raw_entry = str(raw_entry).upper().strip()
         exit_sig = str(exit_sig).upper().strip()
@@ -119,10 +119,6 @@ def get_entry_signal(df=None):
                 print(f"  -> [sysstrndpxy] Jumping Line Trend (sma_trend_full): '{strnd_trend}'")
         except Exception as e:
             print(f"  ❌ ERROR parsing sysstrndpxy array columns: {e}")
-            print(traceback.format_exc())
-    else:
-        if DEBUG_MODE:
-            print("  ⚠️ Warning: calculate_supertrend returned an empty or Null DataFrame.")
 
     # 3. Timezone Synchronization Engine (IST Lock)
     tz_ist = ZoneInfo("Asia/Kolkata")
@@ -153,7 +149,6 @@ def get_entry_signal(df=None):
     final_signal = "NONE"
 
     # 👑 PRIORITY 1: ALL BOS STRUCTURAL BREAKOUTS (No Time Lock -> ATM Target)
-    # Listens continuously to all core opening and standard session breakout variants
     if bos_signal in ["MBUY", "NBUY", "MSELL", "NSELL"]:
         if DEBUG_MODE:
             print("  👑 PRIORITY 1 UNLOCKED: Structural Breakout verified. Assigning ATM.")
@@ -172,21 +167,22 @@ def get_entry_signal(df=None):
             final_signal = "ATMSELL"
             
     # 📊 DIRECT ALIGNMENT ROUTING GATEWAY (Priority 3 & Priority 4)
-    # Extracts entry flips (FBUY/FSELL) and filters their target strikes directly against the line trend
+    # Extracts entry flips using your standard BUY/SELL framework configuration strings
     else:
         if DEBUG_MODE:
-            print("  📊 UNLOCKED DIRECT ALIGNMENT ROUTING: Applying structural filter matrix checks.")
+            print("  📊 UNLOCKED DIRECT ALIGNMENT ROUTING: Applying simplified trend alignment check.")
         
-        if raw_entry == "FBUY":
-            # Aligned: ATMBUY | Counter-Trend: AVGBUY
+        if raw_entry == "BUY":
+            # Aligned: ATMBUY (P3) | Counter-Trend: AVGBUY (P4)
             final_signal = "ATMBUY" if is_line_bull else "AVGBUY"
             
-        elif raw_entry == "FSELL":
-            # Aligned: ATMSELL | Counter-Trend: AVGSELL
+        elif raw_entry == "SELL":
+            # Aligned: ATMSELL (P3) | Counter-Trend: AVGSELL (P4)
             final_signal = "ATMSELL" if is_line_bear else "AVGSELL"
             
         else:
             final_signal = "NONE"
 
-    # 🔒 Pure unmutated pass of exit_sig directly from sysmktpxy out to your automated broker execution layer
+    # 🔒 Pure unaltered pass of exit_sig directly from sysmktpxy out to your automated broker execution layer
     return final_signal, exit_sig
+
