@@ -532,7 +532,7 @@ function renderSideCandle(id, raw, is42){
 let chart;
 async function loadChart(){
     try{
-        const r=await fetch('./syschrtpxy.json?_='+Date.now());
+        const r=await fetch('./webchrtpxy.json?_='+Date.now());
         const data=await r.json();
         const closes=Array.isArray(data)?data.map(d=>d.close||d.Close):[];
         const st=Array.isArray(data)?data.map(d=>d.st):[];
