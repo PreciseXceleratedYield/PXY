@@ -125,9 +125,9 @@ def get_signal(df):
         elif c2_is_red and c1_is_red:
             entry = "BEAR"
         elif c2_is_green and c1_is_red:
-            entry = "SELL"
+            entry = "FSELL"
         elif c2_is_red and c1_is_green:
-            entry = "BUY"
+            entry = "FBUY"
         else:
             entry = "NONE"
 
