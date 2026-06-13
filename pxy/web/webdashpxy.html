@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#06080d" id="themeColorMeta">
+<title>PXY® — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="dark"]{
+    --bg:#06080d;--bg2:#0c101a;--bg3:#111827;
+    --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.13);
+    --text:#e8ecf4;--muted:#5b6478;--accent:#3b82f6;
+    --bull:#22c55e;--bear:#ef4444;--gold:#f59e0b;
+    --bull-dim:rgba(34,197,94,0.12);--bear-dim:rgba(239,68,68,0.12);
+    --header-h:52px;
+}
+[data-theme="light"]{
+    --bg:#f1f5fb;--bg2:#ffffff;--bg3:#eef1f8;
+    --border:rgba(0,0,0,0.07);--border2:rgba(0,0,0,0.14);
+    --text:#0f172a;--muted:#94a3b8;--accent:#2563eb;
+    --bull:#16a34a;--bear:#dc2626;--gold:#d97706;
+    --bull-dim:rgba(22,163,74,0.11);--bear-dim:rgba(220,38,38,0.11);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{height:100%;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+body{
+    min-height:100dvh;font-family:'DM Mono',monospace;
+    background:var(--bg);color:var(--text);
+    transition:background 0.35s,color 0.35s;
+    overscroll-behavior:none;-webkit-tap-highlight-color:transparent;
+}
+*{scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* ── HEADER ── */
+#header{
+    position:sticky;top:0;z-index:100;
+    height:var(--header-h);display:flex;align-items:center;justify-content:space-between;
+    padding:0 clamp(12px,2.5vw,24px);
+    background:var(--bg2);border-bottom:1px solid var(--border);
+    gap:10px;transition:background 0.35s,border-color 0.35s;
+}
+.hdr-l,.hdr-r{display:flex;align-items:center;gap:10px;flex-shrink:0;}
+.back-btn{display:flex;align-items:center;gap:5px;padding:4px 11px;border:1px solid var(--border2);border-radius:6px;color:var(--muted);font-size:11px;letter-spacing:0.06em;text-decoration:none;font-family:'DM Mono',monospace;transition:all 0.2s;}
+.back-btn:hover{color:var(--text);background:var(--bg3);}
+.dv{width:1px;height:18px;background:var(--border2);flex-shrink:0;}
+.page-title{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(13px,1.6vw,17px);letter-spacing:0.06em;}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;}
+.logo sup{font-size:0.55em;vertical-align:super;color:var(--accent);}
+#clock{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;}
+.theme-toggle{display:flex;align-items:center;cursor:pointer;user-select:none;}
+.toggle-track{width:34px;height:18px;border-radius:9px;background:var(--bg3);border:1px solid var(--border2);position:relative;transition:background 0.35s;}
+[data-theme="light"] .toggle-track{background:var(--accent);border-color:var(--accent);}
+.toggle-thumb{position:absolute;top:3px;left:3px;width:10px;height:10px;border-radius:50%;background:var(--muted);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);}
+[data-theme="light"] .toggle-thumb{transform:translateX(16px);background:#fff;}
+
+/* live dot */
+#liveDot{width:6px;height:6px;border-radius:50%;background:var(--bull);box-shadow:0 0 6px var(--bull);animation:blink 1.4s infinite;flex-shrink:0;}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
+
+/* ── TOP HERO STRIP ── */
+#heroStrip{
+    display:flex;align-items:stretch;
+    background:var(--bg2);border-bottom:1px solid var(--border);
+    overflow-x:auto;scrollbar-width:none;
+    transition:background 0.35s,border-color 0.35s;
+}
+#heroStrip::-webkit-scrollbar{display:none;}
+
+.hero-item{
+    display:flex;flex-direction:column;justify-content:center;
+    padding:clamp(12px,2vh,20px) clamp(16px,2.5vw,28px);
+    border-right:1px solid var(--border);flex-shrink:0;gap:4px;
+    transition:border-color 0.35s;
+}
+.hero-item:last-child{border-right:none;}
+.hero-label{font-size:8px;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);}
+.hero-val{
+    font-family:'Syne',sans-serif;font-weight:800;
+    font-size:clamp(20px,3vw,36px);letter-spacing:-0.5px;line-height:1;
+}
+.hero-val.bull{color:var(--bull);text-shadow:0 0 20px rgba(34,197,94,0.25);}
+.hero-val.bear{color:var(--bear);text-shadow:0 0 20px rgba(239,68,68,0.25);}
+.hero-val.gold{color:var(--gold);}
+.hero-val.blue{color:var(--accent);}
+.hero-val.neutral{color:var(--text);}
+.hero-sub{font-size:clamp(9px,0.85vw,11px);color:var(--muted);}
+
+/* ── MAIN GRID ── */
+#grid{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    grid-template-rows:auto auto;
+    gap:clamp(8px,1.5vw,16px);
+    padding:clamp(10px,2vw,20px) clamp(12px,2.5vw,24px);
+}
+
+/* ── CARD ── */
+.card{
+    background:var(--bg2);border:1px solid var(--border);
+    border-radius:12px;overflow:hidden;
+    transition:background 0.35s,border-color 0.35s;
+}
+.card-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 16px;border-bottom:1px solid var(--border);
+    background:var(--bg3);transition:background 0.35s,border-color 0.35s;
+}
+.card-title{font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);}
+.card-badge{
+    font-size:9px;letter-spacing:0.1em;text-transform:uppercase;
+    padding:2px 7px;border-radius:3px;font-weight:500;
+}
+.card-badge.bull{background:var(--bull-dim);color:var(--bull);}
+.card-badge.bear{background:var(--bear-dim);color:var(--bear);}
+.card-badge.gold{background:rgba(245,158,11,0.12);color:var(--gold);}
+.card-badge.blue{background:rgba(59,130,246,0.12);color:var(--accent);}
+.card-badge.muted{background:rgba(91,100,120,0.15);color:var(--muted);}
+
+.card-body{padding:14px 16px;display:flex;flex-direction:column;gap:8px;}
+
+/* ── KV ROWS ── */
+.kv-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:4px 0;border-bottom:1px solid var(--border);}
+.kv-row:last-child{border-bottom:none;}
+.kv-key{font-size:clamp(9px,0.85vw,11px);color:var(--muted);letter-spacing:0.05em;white-space:nowrap;}
+.kv-val{font-size:clamp(10px,0.95vw,12px);font-weight:500;text-align:right;white-space:nowrap;}
+.kv-val.bull{color:var(--bull);}
+.kv-val.bear{color:var(--bear);}
+.kv-val.gold{color:var(--gold);}
+.kv-val.blue{color:var(--accent);}
+
+/* ── SIGNAL CARD (big) ── */
+.signal-card{grid-column:span 1;}
+
+/* ── CANDLE VISUAL ── */
+#candleVisual{
+    padding:10px 16px 14px;
+    display:flex;gap:1px;align-items:flex-end;flex-wrap:nowrap;overflow:hidden;
+}
+.cv-bar{
+    flex:1;min-width:4px;border-radius:2px 2px 0 0;
+    transition:height 0.3s ease;
+}
+
+/* ── BOS BAR ── */
+#bosWrap{padding:10px 16px 14px;}
+#bosTrack{
+    height:18px;border-radius:4px;overflow:hidden;
+    background:var(--bg3);border:1px solid var(--border);
+    display:flex;align-items:center;
+}
+.bos-seg{height:100%;}
+.bos-val-txt{font-size:10px;color:var(--muted);margin-top:5px;text-align:center;}
+
+/* ── POWER METER ── */
+.power-row{display:flex;align-items:center;gap:10px;padding:6px 0;}
+.power-label{font-size:10px;color:var(--muted);width:80px;flex-shrink:0;}
+.power-track{flex:1;height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;}
+.power-fill{height:100%;border-radius:4px;transition:width 0.5s ease;}
+.power-fill.bull{background:var(--bull);}
+.power-fill.bear{background:var(--bear);}
+.power-num{font-size:10px;width:24px;text-align:right;flex-shrink:0;}
+.power-num.bull{color:var(--bull);}
+.power-num.bear{color:var(--bear);}
+
+/* ── TIMESTAMP ── */
+#tsRow{padding:8px 16px;font-size:9px;color:var(--muted);letter-spacing:0.06em;border-top:1px solid var(--border);text-align:right;}
+
+/* full-width card */
+.full-width{grid-column:1/-1;}
+.half-width{grid-column:span 1;}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){
+    #grid{grid-template-columns:1fr 1fr;}
+}
+@media(max-width:640px){
+    :root{--header-h:44px;}
+    #grid{grid-template-columns:1fr;gap:8px;padding:8px;}
+    .hero-val{font-size:clamp(18px,5vw,28px);}
+}
+@media(min-width:1920px){
+    :root{--header-h:64px;}
+    .hero-val{font-size:48px;}
+    .kv-key{font-size:13px;}
+    .kv-val{font-size:14px;}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header id="header">
+    <div class="hdr-l">
+        <a class="back-btn" href="pxy.html">← DASHBOARD</a>
+        <div class="dv"></div>
+        <span class="page-title">PXY DASHBOARD</span>
+    </div>
+    <div class="hdr-r">
+        <span id="liveDot"></span>
+        <span id="clock">—</span>
+        <div class="dv"></div>
+        <div class="theme-toggle" id="themeToggle">
+            <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        </div>
+        <div class="dv"></div>
+        <span class="logo">PXY<sup>®</sup></span>
+    </div>
+</header>
+
+<!-- HERO STRIP -->
+<div id="heroStrip">
+    <div class="hero-item">
+        <span class="hero-label">Price</span>
+        <span class="hero-val neutral" id="hPrice">—</span>
+        <span class="hero-sub" id="hBias">—</span>
+    </div>
+    <div class="hero-item">
+        <span class="hero-label">Supertrend</span>
+        <span class="hero-val" id="hST">—</span>
+        <span class="hero-sub" id="hSTLine">ST: —</span>
+    </div>
+    <div class="hero-item">
+        <span class="hero-label">Direction</span>
+        <span class="hero-val" id="hDir">—</span>
+        <span class="hero-sub" id="hEntry">Entry: —</span>
+    </div>
+    <div class="hero-item">
+        <span class="hero-label">Exit Signal</span>
+        <span class="hero-val" id="hExit">—</span>
+        <span class="hero-sub" id="hHkin">Hkin: —</span>
+    </div>
+    <div class="hero-item">
+        <span class="hero-label">VIX</span>
+        <span class="hero-val" id="hVix">—</span>
+        <span class="hero-sub" id="hVixMode">—</span>
+    </div>
+    <div class="hero-item">
+        <span class="hero-label">Global</span>
+        <span class="hero-val" id="hGlobal">—</span>
+        <span class="hero-sub" id="hGlobalSentiment">—</span>
+    </div>
+</div>
+
+<!-- GRID -->
+<div id="grid">
+
+    <!-- MARKET DATA -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Market Data</span>
+            <span class="card-badge blue" id="badgeTO">TO —</span>
+        </div>
+        <div class="card-body">
+            <div class="kv-row"><span class="kv-key">Price</span><span class="kv-val" id="mPrice">—</span></div>
+            <div class="kv-row"><span class="kv-key">High</span><span class="kv-val bull" id="mHigh">—</span></div>
+            <div class="kv-row"><span class="kv-key">Low</span><span class="kv-val bear" id="mLow">—</span></div>
+            <div class="kv-row"><span class="kv-key">Prev Close (YC)</span><span class="kv-val" id="mYC">—</span></div>
+            <div class="kv-row"><span class="kv-key">O Change</span><span class="kv-val" id="mOChange">—</span></div>
+            <div class="kv-row"><span class="kv-key">M Change</span><span class="kv-val" id="mMChange">—</span></div>
+        </div>
+    </div>
+
+    <!-- SIGNALS -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Signals</span>
+            <span class="card-badge" id="badgeBias">—</span>
+        </div>
+        <div class="card-body">
+            <div class="kv-row"><span class="kv-key">Bias</span><span class="kv-val" id="sBias">—</span></div>
+            <div class="kv-row"><span class="kv-key">Supertrend</span><span class="kv-val" id="sST">—</span></div>
+            <div class="kv-row"><span class="kv-key">Super Line</span><span class="kv-val" id="sSTLine">—</span></div>
+            <div class="kv-row"><span class="kv-key">Direction</span><span class="kv-val" id="sDir">—</span></div>
+            <div class="kv-row"><span class="kv-key">Entry</span><span class="kv-val" id="sEntry">—</span></div>
+            <div class="kv-row"><span class="kv-key">Exit</span><span class="kv-val" id="sExit">—</span></div>
+        </div>
+    </div>
+
+    <!-- HEIKEN ASHI -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Heiken Ashi</span>
+            <span class="card-badge" id="badgeHkin">—</span>
+        </div>
+        <div class="card-body">
+            <div class="kv-row"><span class="kv-key">Signal</span><span class="kv-val" id="hkSignal">—</span></div>
+            <div class="kv-row"><span class="kv-key">Past Depth</span><span class="kv-val" id="hkPast">—</span></div>
+            <div class="kv-row"><span class="kv-key">CE Depth</span><span class="kv-val bull" id="hkCE">—</span></div>
+            <div class="kv-row"><span class="kv-key">PE Depth</span><span class="kv-val bear" id="hkPE">—</span></div>
+            <div class="kv-row"><span class="kv-key">ATR</span><span class="kv-val gold" id="hkATR">—</span></div>
+            <div class="kv-row"><span class="kv-key">KATR</span><span class="kv-val gold" id="hkKATR">—</span></div>
+        </div>
+    </div>
+
+    <!-- CE vs PE POWER -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">CE vs PE Power</span>
+        </div>
+        <div class="card-body">
+            <div class="power-row">
+                <span class="power-label">CE Power</span>
+                <div class="power-track"><div class="power-fill bull" id="pCEPow" style="width:50%"></div></div>
+                <span class="power-num bull" id="pCEPowN">—</span>
+            </div>
+            <div class="power-row">
+                <span class="power-label">PE Power</span>
+                <div class="power-track"><div class="power-fill bear" id="pPEPow" style="width:50%"></div></div>
+                <span class="power-num bear" id="pPEPowN">—</span>
+            </div>
+            <div class="power-row">
+                <span class="power-label">CE Force</span>
+                <div class="power-track"><div class="power-fill bull" id="pCEFor" style="width:50%"></div></div>
+                <span class="power-num bull" id="pCEForN">—</span>
+            </div>
+            <div class="power-row">
+                <span class="power-label">PE Force</span>
+                <div class="power-track"><div class="power-fill bear" id="pPEFor" style="width:50%"></div></div>
+                <span class="power-num bear" id="pPEForN">—</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIX & GLOBAL -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">VIX &amp; Global</span>
+        </div>
+        <div class="card-body">
+            <div class="kv-row"><span class="kv-key">VIX Flag</span><span class="kv-val" id="vVixFlag">—</span></div>
+            <div class="kv-row"><span class="kv-key">VIX Mode</span><span class="kv-val" id="vVixMode">—</span></div>
+            <div class="kv-row"><span class="kv-key">Global Flag</span><span class="kv-val" id="vGlobalFlag">—</span></div>
+            <div class="kv-row"><span class="kv-key">Global Sentiment</span><span class="kv-val" id="vGlobalSent">—</span></div>
+        </div>
+    </div>
+
+    <!-- BOS BAR -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Break of Structure</span>
+            <span class="card-badge muted" id="badgeBOS">—</span>
+        </div>
+        <div id="bosWrap">
+            <div id="bosTrack"></div>
+            <div class="bos-val-txt" id="bosValTxt">—</div>
+        </div>
+    </div>
+
+    <!-- CANDLE VISUAL full width -->
+    <div class="card full-width">
+        <div class="card-header">
+            <span class="card-title">Candle Sequence</span>
+            <span class="card-badge muted" id="badgeCandles">— candles</span>
+        </div>
+        <div id="candleVisual"></div>
+        <div id="tsRow">Last update: —</div>
+    </div>
+
+</div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+
+/* ── THEME ── */
+$('themeToggle').addEventListener('click', () => {
+    const dark = document.documentElement.getAttribute('data-theme') !== 'light';
+    document.documentElement.setAttribute('data-theme', dark ? 'light' : 'dark');
+});
+
+/* ── CLOCK ── */
+function tick() { $('clock').textContent = new Date().toLocaleTimeString('en-IN', { hour12: false }); }
+tick(); setInterval(tick, 1000);
+
+/* ── ANSI STRIP ── */
+function stripAnsi(s) { return String(s || '').replace(/\u001b\[[0-9;]*m/g, ''); }
+
+/* ── PARSE CANDLE VISUAL ── */
+function parseCandles(raw) {
+    // extract ANSI colored numbers: \u001b[92m = green (bull), \u001b[91m = bear
+    const result = [];
+    const re = /\u001b\[(\d+)m(\d+)\u001b\[0m/g;
+    let m;
+    while ((m = re.exec(raw)) !== null) {
+        result.push({ n: +m[2], bull: m[1] === '92' });
+    }
+    return result;
+}
+
+/* ── COLOR HELPERS ── */
+function bullBear(val) {
+    const v = String(val || '').toUpperCase();
+    if (['BULL', 'UP', 'BUY', 'CE', 'POSITIVE', 'G'].some(k => v.includes(k))) return 'bull';
+    if (['BEAR', 'DOWN', 'SELL', 'PE', 'NEGATIVE', 'R'].some(k => v.includes(k))) return 'bear';
+    if (['NONE', 'SIDEWAYS', 'NEUTRAL'].some(k => v.includes(k))) return 'gold';
+    return 'blue';
+}
+
+function set(id, val, cls) {
+    const el = $(id); if (!el) return;
+    el.textContent = val ?? '—';
+    if (cls) el.className = el.className.replace(/\b(bull|bear|gold|blue|neutral|muted)\b/g, '') + ' ' + cls;
+}
+
+function badge(id, text, cls) {
+    const el = $(id); if (!el) return;
+    el.textContent = text;
+    el.className = `card-badge ${cls}`;
+}
+
+/* ── RENDER ── */
+function render(d) {
+    // HERO
+    set('hPrice',  d.price,      bullBear(d.direction));
+    set('hBias',   d.bias);
+    set('hST',     d.supertrend, bullBear(d.supertrend));
+    set('hSTLine', `ST: ${d.super_line ?? '—'}`);
+    set('hDir',    d.direction,  bullBear(d.direction));
+    set('hEntry',  `Entry: ${d.entry ?? '—'}`);
+    set('hExit',   d.exit,       bullBear(d.exit));
+    set('hHkin',   `Hkin: ${d.hkin_signal ?? '—'}`);
+    set('hVix',    d.vix_flag,   d.vix_flag === 'G' ? 'bull' : 'bear');
+    set('hVixMode',d.vix_mode);
+    set('hGlobal', d.global_flag, d.global_flag === 'G' ? 'bull' : 'bear');
+    set('hGlobalSentiment', d.global_sentiment);
+
+    // MARKET DATA
+    badge('badgeTO', `TO ${d.TO ?? '—'}`, 'blue');
+    set('mPrice',   d.price);
+    set('mHigh',    d.high,    'bull');
+    set('mLow',     d.low,     'bear');
+    set('mYC',      d.YC);
+    set('mOChange', `${d.o_change ?? '—'}%`, d.o_change >= 0 ? 'bull' : 'bear');
+    set('mMChange', `${d.m_change ?? '—'}%`, d.m_change >= 0 ? 'bull' : 'bear');
+
+    // SIGNALS
+    const biasCls = bullBear(d.bias);
+    badge('badgeBias', d.bias ?? '—', biasCls);
+    set('sBias',    d.bias,        biasCls);
+    set('sST',      d.supertrend,  bullBear(d.supertrend));
+    set('sSTLine',  d.super_line);
+    set('sDir',     d.direction,   bullBear(d.direction));
+    set('sEntry',   d.entry ?? 'NONE', d.entry && d.entry !== 'NONE' ? bullBear(d.entry) : 'gold');
+    set('sExit',    d.exit  ?? 'NONE', d.exit  && d.exit  !== 'NONE' ? bullBear(d.exit)  : 'gold');
+
+    // HEIKEN ASHI
+    const hkCls = bullBear(d.hkin_signal);
+    badge('badgeHkin', d.hkin_signal ?? '—', hkCls);
+    set('hkSignal', d.hkin_signal, hkCls);
+    set('hkPast',   d.hkin_past_depth);
+    set('hkCE',     d.hkin_ce_depth, 'bull');
+    set('hkPE',     d.hkin_pe_depth, 'bear');
+    set('hkATR',    d.atr,  'gold');
+    set('hkKATR',   d.katr, 'gold');
+
+    // POWER METERS
+    const maxPow = 5;
+    function setPower(fillId, numId, val, cls) {
+        const el = $(fillId); if (el) el.style.width = Math.min(100, (val / maxPow) * 100) + '%';
+        set(numId, val, cls);
+    }
+    setPower('pCEPow', 'pCEPowN', d.ce_power, 'bull');
+    setPower('pPEPow', 'pPEPowN', d.pe_power, 'bear');
+    setPower('pCEFor', 'pCEForN', d.ce_force, 'bull');
+    setPower('pPEFor', 'pPEForN', d.pe_force, 'bear');
+
+    // VIX & GLOBAL
+    set('vVixFlag',    d.vix_flag,          d.vix_flag   === 'G' ? 'bull' : 'bear');
+    set('vVixMode',    d.vix_mode,          bullBear(d.vix_mode));
+    set('vGlobalFlag', d.global_flag,       d.global_flag === 'G' ? 'bull' : 'bear');
+    set('vGlobalSent', d.global_sentiment,  bullBear(d.global_sentiment));
+
+    // BOS
+    const bosClean = stripAnsi(d.bos_bar || '');
+    const bosVal   = stripAnsi(d.bos_val || 'NONE');
+    badge('badgeBOS', bosVal, bosVal !== 'NONE' ? bullBear(bosVal) : 'muted');
+    $('bosValTxt').textContent = bosVal;
+    // render BOS bar as colored segments
+    const bosTrack = $('bosTrack');
+    bosTrack.innerHTML = '';
+    const bosRaw = String(d.bos_bar || '');
+    const bosSegs = [];
+    const bosRe   = /\u001b\[(\d+)m([^\u001b]+)\u001b\[0m/g;
+    let bm;
+    while ((bm = bosRe.exec(bosRaw)) !== null) {
+        bosSegs.push({ code: bm[1], text: bm[2] });
+    }
+    if (bosSegs.length) {
+        bosSegs.forEach(seg => {
+            const div = document.createElement('div');
+            div.className = 'bos-seg';
+            const isActive = seg.code === '32';
+            const isGrey   = seg.code === '90';
+            div.style.flex  = seg.text.length;
+            div.style.background = isActive ? 'var(--bull)' : isGrey ? 'var(--bg3)' : 'var(--muted)';
+            bosTrack.appendChild(div);
+        });
+    } else {
+        // plain text fallback
+        const total = bosClean.length;
+        const filled = (bosClean.match(/█/g) || []).length;
+        const div1 = document.createElement('div');
+        div1.className='bos-seg'; div1.style.flex=total-filled; div1.style.background='var(--bg3)';
+        const div2 = document.createElement('div');
+        div2.className='bos-seg'; div2.style.flex=filled; div2.style.background='var(--bull)';
+        bosTrack.appendChild(div1); bosTrack.appendChild(div2);
+    }
+
+    // CANDLE VISUAL
+    const candles = parseCandles(d.candle_visual || '');
+    const cv = $('candleVisual');
+    cv.innerHTML = '';
+    badge('badgeCandles', `${candles.length} candles`, 'muted');
+    const maxN = Math.max(...candles.map(c => c.n), 1);
+    candles.forEach(c => {
+        const bar = document.createElement('div');
+        bar.className = 'cv-bar';
+        const hPct = Math.max(20, (c.n / maxN) * 100);
+        bar.style.height = hPct + '%';
+        bar.style.background = c.bull ? 'var(--bull)' : 'var(--bear)';
+        bar.style.opacity = '0.8';
+        bar.title = `${c.n} ${c.bull ? '▲' : '▼'}`;
+        cv.appendChild(bar);
+    });
+    cv.style.height = '60px';
+
+    // TIMESTAMP
+    $('tsRow').textContent = `Last update: ${d.timestamp ? d.timestamp.replace('T', ' ').slice(0, 19) : '—'}`;
+
+    // HEADER glow
+    const isUp = String(d.direction || '').toUpperCase() === 'UP';
+    $('header').style.boxShadow = isUp
+        ? '0 1px 0 rgba(34,197,94,0.28)'
+        : '0 1px 0 rgba(239,68,68,0.28)';
+}
+
+/* ── LOAD ── */
+async function load() {
+    try {
+        const res = await fetch('./webdashpxy.json?_=' + Date.now());
+        const d   = await res.json();
+        render(d);
+    } catch (e) {
+        console.error('Failed to load webdashpxy.json', e);
+    }
+}
+
+load();
+setInterval(load, 3000);
+</script>
+</body>
+</html>
