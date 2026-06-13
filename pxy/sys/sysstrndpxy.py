@@ -144,9 +144,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         sma_cross_sell = (trend_direction[i] == -1) and (trend_direction[i-1] == 1)
 
         if sma_cross_buy:
-            sma_trend_history.append("BUY")
+            sma_trend_history.append("TBUY")
         elif sma_cross_sell:
-            sma_trend_history.append("SELL")
+            sma_trend_history.append("TSELL")
         else:
             sma_trend_history.append(raw_sma_regime)
 
