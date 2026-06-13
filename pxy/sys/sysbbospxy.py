@@ -16,11 +16,11 @@ def print_fixed_width_alert(msg, emojis, color_code):
     text_width = len(msg)
     current_width = emoji_width + text_width
     
-    # Fill the remaining space with dots or spaces to hit exactly 40 characters
+    # Fill the remaining space with dots to hit exactly 40 characters
     padding_needed = max(0, 40 - current_width)
     padding = "." * padding_needed
     
-    # Print with color formatting (ANSI color codes do not occupy visual terminal width)
+    # Print with color formatting (ANSI codes do not occupy visual terminal width)
     print(f"{color_code}{Style.BRIGHT}{''.join(emojis)} {msg}{padding}")
 
 def build_candle_bar(o, h, l, c, width=WIDTH):
@@ -67,6 +67,19 @@ def get_bos_bar(df):
         l_live = float(live_candle['Low'])
         c_42 = float(live_candle['Close'])
         
+        # --- LIVE RUNNING & IMMEDIATE CLOSED CANDLE FILTER ---
+        # Look at the previous 2 candles back to see where the breakout started
+        prev_candle = df.iloc[-2]
+        prev_close = float(prev_candle['Close'])
+        
+        # Check if the market was still inside the wall just before this move
+        was_inside = (l_42 <= prev_close <= h_42)
+        
+        # Also allow if the previous candle WAS the immediate first breakout candle itself
+        prev_was_breakout = (prev_close > h_42)
+        prev_was_breakdown = (prev_close < l_42)
+        # -----------------------------------------------------
+
         # Calculate Marubozu (MRB) intensity
         live_range = h_live - l_live
         live_body = abs(c_42 - o_live)
@@ -77,16 +90,19 @@ def get_bos_bar(df):
         l_render = min(l_42, l_live)
         o_42 = (h_render + l_render) / 2.0
         
-        # ⚡ MERGED BREAKOUT & MRB LOGIC GATES (WITH FIXED 40-WIDTH PRINT STATEMENTS)
+        # ⚡ LIVE RUNNING & IMMEDIATE CLOSED CANDLE SIGNAL ENGINE
         signal = "NONE"
-        if c_42 > h_42:
+        
+        # Trigger BUY: Running candle breakout OR immediate first closed candle after breakout
+        if c_42 > h_42 and (was_inside or prev_was_breakout):
             signal = "BUY"
             if is_mrb and c_42 > o_live:
                 print_fixed_width_alert("BUY: STRONG UP TREND NOW!", ["🚀", "🔥"], Fore.GREEN)
             else:
                 print_fixed_width_alert("BUY: BREAKOUT UPPER WALL!", ["🚀"], Fore.GREEN)
                 
-        elif c_42 < l_42:
+        # Trigger SELL: Running candle breakdown OR immediate first closed candle after breakdown
+        elif c_42 < l_42 and (was_inside or prev_was_breakdown):
             signal = "SELL"
             if is_mrb and c_42 < o_live:
                 print_fixed_width_alert("SELL: STRONG DOWN TREND!", ["🔴", "🔥"], Fore.RED)
@@ -110,4 +126,5 @@ def get_bos_bar(df):
         
     except Exception:
         return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
+
 
