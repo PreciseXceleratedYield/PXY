@@ -223,3 +223,36 @@ def get_signal(df: pd.DataFrame) -> str:
         if DEBUG_MODE:
             print(f"Critical execution fault in system signal unpacker: {e}")
         return "NONE"
+# ===============================================================================
+# 🚀 DIRECT LIVE PRODUCTION EXECUTION BLOCK
+# ===============================================================================
+if __name__ == "__main__":
+    print("--- STARTING LIVE PXY JUMPING 42 SMA MONITOR ENGINE ---")
+    
+    # Initialize empty DataFrame to trigger internal live data pipeline fetcher
+    live_df = pd.DataFrame()
+    
+    # Run structural calculation matrix
+    processed_df = calculate_supertrend(live_df)
+    
+    if processed_df is not None and not processed_df.empty:
+        # Extract live index lookup position based on production gating parameter
+        idx_pos = -2 if CHECK_CONFIRMED_ONLY else -1
+        target_index = processed_df.index[idx_pos]
+        
+        # Pull latest metric array steps directly
+        live_time = target_index.strftime('%Y-%m-%d %H:%M:%S %Z')
+        live_close = float(processed_df.at[target_index, 'Close'])
+        live_line = float(processed_df.at[target_index, 'pxy_sma_line'])
+        live_state = str(processed_df.at[target_index, 'sma_trend_full'])
+        
+        print(f"Target Row Index Position -> {idx_pos} ({'CLOSED BAR' if CHECK_CONFIRMED_ONLY else 'LIVE TICK'})")
+        print(f"Timestamp   : {live_time}")
+        print(f"Close Price : {live_close:.2f}")
+        print(f"Engine Line : {live_line:.2f}")
+        print(f"Trend State : {live_state}")
+        
+        # Trigger real-time visual web JSON synchronization layout dump
+        export_supertrend_json()
+    else:
+        print("CRITICAL: Engine calculation aborted | Upstream data stream arrived empty.")
