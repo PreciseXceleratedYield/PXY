@@ -6,6 +6,23 @@ import numpy as np
 init(autoreset=True)
 WIDTH = 42
 
+def print_fixed_width_alert(msg, emojis, color_code):
+    """
+    Constructs and prints a sentence that is exactly 40 terminal characters wide.
+    Each emoji counts as 2 characters, and standard text counts as 1.
+    """
+    # Each emoji takes 2 visual character slots
+    emoji_width = len(emojis) * 2
+    text_width = len(msg)
+    current_width = emoji_width + text_width
+    
+    # Fill the remaining space with dots or spaces to hit exactly 40 characters
+    padding_needed = max(0, 40 - current_width)
+    padding = "." * padding_needed
+    
+    # Print with color formatting (ANSI color codes do not occupy visual terminal width)
+    print(f"{color_code}{Style.BRIGHT}{''.join(emojis)} {msg}{padding}")
+
 def build_candle_bar(o, h, l, c, width=WIDTH):
     o, h, l, c = map(float, (o, h, l, c))
     rng = h - l
@@ -45,23 +62,36 @@ def get_bos_bar(df):
         
         # Capture separate live running candle values for real-time intersection testing
         live_candle = df.iloc[-1]
-        c_42 = float(live_candle['Close'])
+        o_live = float(live_candle['Open'])
         h_live = float(live_candle['High'])
         l_live = float(live_candle['Low'])
+        c_42 = float(live_candle['Close'])
+        
+        # Calculate Marubozu (MRB) intensity
+        live_range = h_live - l_live
+        live_body = abs(c_42 - o_live)
+        is_mrb = (live_body / live_range) >= 0.95 if live_range > 0 else False
         
         # 2. Synchronize visual rendering inputs to absorb complete 42-period bounds smoothly
         h_render = max(h_42, h_live)
         l_render = min(l_42, l_live)
         o_42 = (h_render + l_render) / 2.0
         
-        # ⚡ PURE STRUCTURAL BREAKOUT LOGIC GATES
+        # ⚡ MERGED BREAKOUT & MRB LOGIC GATES (WITH FIXED 40-WIDTH PRINT STATEMENTS)
         signal = "NONE"
         if c_42 > h_42:
             signal = "BUY"
-            print(f"🚀 {Fore.GREEN}STRUCTURAL BREAKOUT")
+            if is_mrb and c_42 > o_live:
+                print_fixed_width_alert("BUY: STRONG UP TREND NOW!", ["🚀", "🔥"], Fore.GREEN)
+            else:
+                print_fixed_width_alert("BUY: BREAKOUT UPPER WALL!", ["🚀"], Fore.GREEN)
+                
         elif c_42 < l_42:
             signal = "SELL"
-            print(f"🔴 {Fore.RED}STRUCTURAL BREAKDOWN")
+            if is_mrb and c_42 < o_live:
+                print_fixed_width_alert("SELL: STRONG DOWN TREND!", ["🔴", "🔥"], Fore.RED)
+            else:
+                print_fixed_width_alert("SELL: BREAKDOWN LOWER WALL", ["🔴"], Fore.RED)
         
         # Build the visual bar using corrected midpoint open parameters
         visual_bar = build_candle_bar(o_42, h_render, l_render, c_42)
@@ -80,3 +110,4 @@ def get_bos_bar(df):
         
     except Exception:
         return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
+
