@@ -79,10 +79,10 @@ def get_all_data():
     }
 
     # -------- 📁 TARGET: pxy/web DIRECTORY --------
-    # current_dir points to pxy/sys
+    # current_dir points to /home/neo/V1L58/pxy/sys
     current_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # target_dir points to pxy/web (steps up one level out of sys, then enters web)
+    # target_dir points to /home/neo/V1L58/pxy/web
     target_dir = os.path.abspath(os.path.join(current_dir, "..", "web"))
     
     # Safeguard: Create web folder if it's missing
