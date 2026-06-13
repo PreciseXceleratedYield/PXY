@@ -67,7 +67,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     atr_length = 3
     atr_mult   = 3.0
     
-    # Step A: Base rolling calculation using pre-calculated close
+    # Step A: Base rolling calculation (ta.sma)
     df['sma_baseline'] = df['Close'].rolling(window=sma_period, min_periods=1).mean()
     sma_baseline = df['sma_baseline'].to_numpy()
     
@@ -80,48 +80,42 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         t3 = abs(src_low[i] - src_close[i-1])
         tr_mod[i] = max(t1, t2, t3)
         
+    # Step C: Welles Wilder Smoothing matching Pine Script ta.atr() exactly
     atr_val = np.zeros(n)
-    if n >= atr_length:
-        atr_val[atr_length - 1] = np.mean(tr_mod[0:atr_length])
-        for i in range(atr_length, n):
-            atr_val[i] = (tr_mod[i] + (atr_length - 1) * atr_val[i-1]) / atr_length
-    else:
+    if n > 0:
         atr_val = tr_mod.copy()
+        for i in range(1, n):
+            # Pine RMA formula: (prev * (length - 1) + current) / length
+            atr_val[i] = (atr_val[i-1] * (atr_length - 1) + tr_mod[i]) / atr_length
 
     basic_upper = sma_baseline + (atr_val * atr_mult)
     basic_lower = sma_baseline - (atr_val * atr_mult)
 
-    final_upper     = np.full(n, np.nan)
-    final_lower     = np.full(n, np.nan)
+    final_upper     = np.zeros(n)
+    final_lower     = np.zeros(n)
     trend_direction = np.ones(n, dtype=int) # 1 = BULL, -1 = BEAR
 
-    for i in range(n):
-        if i == 0:
-            final_upper[i] = basic_upper[i]
-            final_lower[i] = basic_lower[i]
-            trend_direction[i] = 1 if src_close[i] >= sma_baseline[i] else -1
-            continue
+    # Initialize the first index bar memory cells
+    final_upper[0] = basic_upper[0]
+    final_lower[0] = basic_lower[0]
+    trend_direction[0] = 1 if src_close[0] >= sma_baseline[0] else -1
 
-        # Trail and Lock Loop Logic
-        # Upper level tracking logic
-        if np.isnan(final_upper[i-1]):
+    for i in range(1, n):
+        # ---- UPPER TRAIL LOCK (Exact copy of Pine's ternary logic) ----
+        # final_upper := ((basic_upper < final_upper or close > final_upper) ? basic_upper : final_upper)
+        if (basic_upper[i] < final_upper[i-1]) or (src_close[i-1] > final_upper[i-1]):
             final_upper[i] = basic_upper[i]
         else:
-            if (basic_upper[i] < final_upper[i-1]) or (src_close[i-1] > final_upper[i-1]):
-                final_upper[i] = basic_upper[i]
-            else:
-                final_upper[i] = final_upper[i-1]
+            final_upper[i] = final_upper[i-1]
 
-        # Lower level tracking logic
-        if np.isnan(final_lower[i-1]):
+        # ---- LOWER TRAIL LOCK (Exact copy of Pine's ternary logic) ----
+        # final_lower := ((basic_lower > final_lower or close < final_lower) ? basic_lower : final_lower)
+        if (basic_lower[i] > final_lower[i-1]) or (src_close[i-1] < final_lower[i-1]):
             final_lower[i] = basic_lower[i]
         else:
-            if (basic_lower[i] > final_lower[i-1]) or (src_close[i-1] < final_lower[i-1]):
-                final_lower[i] = basic_lower[i]
-            else:
-                final_lower[i] = final_lower[i-1]
+            final_lower[i] = final_lower[i-1]
 
-        # Direction State Gate
+        # ---- DIRECTION SWITCH GATE ----
         prev_dir = trend_direction[i-1]
         if prev_dir == 1 and src_close[i] < final_lower[i]:
             trend_direction[i] = -1
