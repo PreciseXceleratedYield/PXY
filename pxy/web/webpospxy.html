@@ -282,7 +282,7 @@ window.addEventListener('mousemove',e=>{
 let chart;
 async function loadChart(){
     let data;
-    try{const r=await fetch('./syschrtpxy.json?_='+Date.now());data=await r.json();}catch{return;}
+    try{const r=await fetch('./webchrtpxy.json?_='+Date.now());data=await r.json();}catch{return;}
     const closes=Array.isArray(data)?data.map(d=>d.close||d.Close):[];
     const st=Array.isArray(data)?data.map(d=>d.st):[];
     if(!closes.length)return;
