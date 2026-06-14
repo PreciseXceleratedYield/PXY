@@ -10,7 +10,7 @@ cd "$HOME/pxy/sys/exe" || { echo "Directory ~/pxy/sys/exe not found"; exit 1; }
 # source ~/pxy/env/bin/activate
 
 # Run the Python script
-python3 exepxy.py
+python3 exemonpxy.py
 
 # Optional: print completion
 echo "exepxy.py execution finished."
