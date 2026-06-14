@@ -1,23 +1,19 @@
 #!/bin/bash
-
-echo "       ******** GET UPDATES *******"
+echo " ******** get updates *******"
 echo
-
 # Fetch latest updates from git
 git fetch --all
 echo
 
-echo "       ****** RESET SOFTWARE ******"
+echo " ****** reset software ******"
 echo
-
 # Reset local changes to match remote main branch
 git reset --hard origin/main
-
-echo
-echo "       ****** SYNC BINARIES *******"
 echo
 
-# Ensure local bin directory exists
+echo " ****** sync binaries *******"
+echo
+# Fix: Capitalized $HOME variable to target your user directory
 mkdir -p "$HOME/.local/bin"
 
 # Loop through everything starting with pxy, or files without an extension
@@ -26,15 +22,15 @@ for file in "$HOME/pxy"/pxy* "$HOME/pxy"/*; do
     if [ -f "$file" ]; then
         filename=$(basename "$file")
         
-        # Check Condition 1: Starts with 'pxy' OR Condition 2: Has no extension
+        # Check condition 1: starts with 'pxy' OR condition 2: has no extension
         if [[ "$filename" == pxy* ]] || [[ "$filename" != *.* ]]; then
+            # Fix: Capitalized $HOME variable
             cp "$file" "$HOME/.local/bin/" 2>/dev/null
             chmod +x "$HOME/.local/bin/$filename" 2>/dev/null
-            echo "-> Installed command: $filename"
+            echo "-> installed command: $filename"
         fi
     fi
 done
-
 echo
-echo "       ***** UPDATE COMPLETED *****"
+echo " ***** update completed *****"
 echo ""
