@@ -85,10 +85,10 @@ def run_action(choice):
         return True  # Keep loop going
 
     elif choice == "1":
-        sig = "ATMBUY"
+        sig = "OTMBUY"
         side_label = "CE"
     elif choice == "2":
-        sig = "ATMSELL"
+        sig = "OTMSELL"
         side_label = "PE"
     else:
         print(f"{Fore.RED}Invalid selection. Enter 1 for BUY, 2 for SELL, 3 for SQUAREOFF, or 4 to exit.")
