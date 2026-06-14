@@ -13,21 +13,20 @@ echo
 
 echo " ****** sync binaries *******"
 echo
-# Fix: Capitalized $HOME variable to target your user directory
+# Ensure local bin directory exists
 mkdir -p "$HOME/.local/bin"
 
-# Loop through everything starting with pxy, or files without an extension
-for file in "$HOME/pxy"/pxy* "$HOME/pxy"/*; do
+# Loop through files in the directory
+for file in "$HOME/pxy"/*; do
     # Ensure it is a valid file, not a directory
     if [ -f "$file" ]; then
         filename=$(basename "$file")
         
-        # Check condition 1: starts with 'pxy' OR condition 2: has no extension
-        if [[ "$filename" == pxy* ]] || [[ "$filename" != *.* ]]; then
-            # Fix: Capitalized $HOME variable
+        # Strict condition: File must NOT contain any dot (.) character
+        if [[ "$filename" != *.* ]]; then
             cp "$file" "$HOME/.local/bin/" 2>/dev/null
             chmod +x "$HOME/.local/bin/$filename" 2>/dev/null
-            echo "-> installed command: $filename"
+            echo "-> installed executable command: $filename"
         fi
     fi
 done
