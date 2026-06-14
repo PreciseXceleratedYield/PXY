@@ -2,6 +2,9 @@ import os
 import time 
 import pytz 
 import math
+import sys
+import subprocess
+from pathlib import Path
 from datetime import datetime, time as dt_time 
 from colorama import Fore, Style, init
 
@@ -12,7 +15,7 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 3
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-ATR_MULTIPLIER = 5
+FIXED_THRESHOLD_PCT = -10.0  # 🎯 Hard-anchored to exactly -10.0% loss floor
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -22,10 +25,6 @@ def safe_float(val, fallback=0.0):
         return float(val)
     except (ValueError, TypeError):
         return fallback
-
-def generate_pxy_tag(): 
-    IST = pytz.timezone("Asia/Kolkata") 
-    return datetime.now(IST).strftime('%H%M%S')
 
 def set_cooling(side): 
     file_path = f"exebal_cool_{side.lower()}.txt" 
@@ -52,45 +51,18 @@ def is_cooling(side):
     except Exception: 
         return False 
 
-def calculate_atr_threshold(row, side, is_accelerated_state):
-    """
-    Normal state (AVGBUY/AVGSELL): Uses straight (ATR * ATR_MULTIPLIER) loss floor.
-    Accelerated State (BEAR/BULL): Uses (ATR * ATR_MULTIPLIER) + max(Opposite Power, Opposite Depth).
-    """
-    raw_atr_pct = safe_float(row.get("atr", 0.0))
-    base_atr_loss = raw_atr_pct * ATR_MULTIPLIER
-    
-    # Extract opposing side metrics for precise downside risk mitigation
-    if side == 'CE':
-        opp_power = safe_float(row.get("pe_power", 1.0))
-        opp_depth = safe_float(row.get("hkin_pe_depth", 1.0))
-    else:
-        opp_power = safe_float(row.get("ce_power", 1.0))
-        opp_depth = safe_float(row.get("hkin_ce_depth", 1.0))
-
-    if is_accelerated_state:
-        # ACCELERATED PANIC STATE: (ATR * 2) + max(Opposite Power, Opposite Depth)
-        highest_opp_risk = max(opp_power, opp_depth)
-        total_loss_pct = base_atr_loss + highest_opp_risk
-        return -total_loss_pct
-    else:
-        # NORMAL STATE: Strict straight ATR * 2 loss threshold
-        if base_atr_loss > 0:
-            return -base_atr_loss
-        return -14.0  # Raw fallback floor if ATR goes missing
-
 def get_loss(row): 
     """Optimized globally to prevent memory re-allocation inside the loop."""
     entry = safe_float(row.get("buy_prc", 0.0)) 
     ltp = safe_float(row.get("sell_prc", 0.0)) 
     return ((ltp - entry) / entry) * 100 if entry > 0 else 0 
 
-def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, signal, tag):
-    """Renders a strict 42-character width dashboard upon an order trigger event."""
+def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, signal):
+    """Renders a clean 42-character width dashboard upon an order routing event."""
     width = 42
     border = Fore.YELLOW + "=" * width
     divider = Fore.RED + "-" * width
-    header_text = "🚨  PXY® ENGINE AVERAGE TRIGGERED  🚨"
+    header_text = "🚨  PXY® ENGINE OTM HANDOVER  🚨"
     
     print("\n" + border)
     print(Fore.WHITE + header_text.center(width - 2, " ")) 
@@ -99,19 +71,19 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, si
     print(Fore.WHITE + f" • SIDE OPTION   : {side}".ljust(width))
     print(Fore.WHITE + f" • ACTIVE SIGNAL : {signal}".ljust(width))
     
-    loss_str = f" • TRIGGER LOSS  : {current_loss:.2f}%"
+    loss_str = f" • LAST LAYER LSS: {current_loss:.2f}%"
     loss_pad = " " * max(0, width - len(loss_str))
-    print(Fore.WHITE + " • TRIGGER LOSS  : " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + loss_pad)
+    print(Fore.WHITE + " • LAST LAYER LSS: " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + loss_pad)
     
-    target_str = f" • ATR TARGET (%): {target_threshold:.2f}%"
+    target_str = f" • TARGET THRESH : {target_threshold:.2f}%"
     target_pad = " " * max(0, width - len(target_str))
-    print(Fore.WHITE + " • ATR TARGET (%): " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
+    print(Fore.WHITE + " • TARGET THRESH : " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
     
-    print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(width))
+    print(Fore.WHITE + " • TAG STATUS    : MANAGED BY EXEFORCE".ljust(width))
     print(border + "\n")
 
 def handle_side_averaging(client, df): 
-    """Averages positions by explicitly mapping entry signal loops separate from exit trend accelerations.""" 
+    """Strictly processes position tracking ONLY on active OTMBUY or OTMSELL signals.""" 
     if df is None or df.empty: 
         return 
         
@@ -120,12 +92,15 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
-    if "entry" not in df.columns or "exit" not in df.columns:
+    if "entry" not in df.columns:
         return
         
     last_row = df.iloc[-1]
     raw_entry_signal = str(last_row["entry"]).upper().strip() 
-    raw_exit_signal = str(last_row["exit"]).upper().strip()
+
+    # 🛑 CRITICAL INTERCEPT DOOR: Stop dead if the signal isn't EXACTLY OTMBUY or OTMSELL
+    if raw_entry_signal not in ["OTMBUY", "OTMSELL"]:
+        return
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
@@ -136,37 +111,31 @@ def handle_side_averaging(client, df):
         if side_df.empty: 
             continue 
 
-        # --- EXPLICIT LAYER SYNCHRONIZATION MAPS ---
+        # --- EXPLICIT OTM SIGNAL SANITY FILTER ---
         current_signal = "NONE"
-        is_accelerated_state = False
 
-        if side == 'CE':
-            if raw_entry_signal == "AVGBUY":
-                current_signal = "BUY"
-                is_accelerated_state = False
-            elif raw_exit_signal == "BEAR":
-                current_signal = "BUY"
-                is_accelerated_state = True
+        # CE side acts ONLY if upstream system is actively pumping OTMBUY
+        if side == 'CE' and raw_entry_signal == "OTMBUY":
+            current_signal = "OTMBUY"
 
-        elif side == 'PE':
-            if raw_entry_signal == "AVGSELL":
-                current_signal = "SELL"
-                is_accelerated_state = False
-            elif raw_exit_signal == "BULL":
-                current_signal = "SELL"
-                is_accelerated_state = True
+        # PE side acts ONLY if upstream system is actively pumping OTMSELL
+        elif side == 'PE' and raw_entry_signal == "OTMSELL":
+            current_signal = "OTMSELL"
 
-        # If no matching trigger signal is active for this side, bypass processing loop
+        # If this option chain side does not mirror the live OTM trigger, skip instantly
         if current_signal == "NONE":
             continue
 
+        # Start with assumption that it's safe to fire
         all_positions_crossed_threshold = True
         
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
-            row_threshold = calculate_atr_threshold(row, side, is_accelerated_state)
             
-            if pos_loss > row_threshold:
+            # 🔄 FIXED MATHEMATICAL COMPARISON:
+            # If ANY position is safer than -10% (e.g., -4.5% > -10.0%), 
+            # then NOT all positions are down past the threshold. Fail and break.
+            if pos_loss > FIXED_THRESHOLD_PCT:
                 all_positions_crossed_threshold = False
                 break  
 
@@ -176,31 +145,31 @@ def handle_side_averaging(client, df):
             if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
                 last_order = side_df.iloc[-1]
                 symbol = last_order['symbol'] 
-                qty = abs(int(safe_float(last_order['qty'], 0.0))) 
-                new_tag = generate_pxy_tag() 
-                
                 final_loss = get_loss(last_order)
-                final_threshold = calculate_atr_threshold(last_order, side, is_accelerated_state)
                 
-                print_pxy_trigger_dashboard(side, symbol, final_loss, final_threshold, current_signal, new_tag)
+                # Render clean notification box before handover execution
+                print_pxy_trigger_dashboard(side, symbol, final_loss, FIXED_THRESHOLD_PCT, current_signal)
                 
+                # --- AUTOMATED PARAMETER HANDOFF TO EXEFORCE PXY ---
                 try: 
-                    params = { 
-                        "exchange_segment": "nse_fo", 
-                        "product": "NRML", 
-                        "price": "0", 
-                        "order_type": "MKT", 
-                        "quantity": str(qty), 
-                        "trading_symbol": str(symbol), 
-                        "transaction_type": "B", 
-                        "validity": "DAY", 
-                        "amo": "NO", 
-                        "tag": new_tag 
-                    } 
-                    res = client.place_order(**params) 
-                    if res: 
+                    # Parameter "1" maps to CE (OTMBUY), Parameter "2" maps to PE (OTMSELL)
+                    cli_param = "1" if side == "CE" else "2"
+                    
+                    target_script = Path(__file__).resolve().parent / "exeforcepxy.py"
+                    
+                    if target_script.exists():
+                        print(f"{Fore.YELLOW}🔄 Routing OTM task to {target_script.name} with parameter [{cli_param}]...")
+                        
+                        # Runs: python exeforcepxy.py 1 (or 2)
+                        subprocess.run([sys.executable, str(target_script), cli_param], check=True)
+                        
                         set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: Order confirmation complete for side {side}.") 
+                        print(f"{Fore.GREEN}✅ SUCCESS: Handover complete for side {side}.") 
+                    else:
+                        print(f"{Fore.RED}❌ File Check Error: Script not found at {target_script}")
+                        
+                except subprocess.CalledProcessError as sub_err:
+                    print(f"{Fore.RED}❌ Runtime Execution Error inside exeforcepxy: {sub_err}")
                 except Exception as e: 
-                    print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+                    print(f"{Fore.RED}❌ System Automation Handover Failed: {e}")
 
