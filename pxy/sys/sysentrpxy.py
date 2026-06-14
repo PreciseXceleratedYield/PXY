@@ -1,7 +1,14 @@
 # sysentrpxy.py
 """
 ===============================================================================
-PXY OPTION ROUTING ENGINE: COMPACT EXCLUSIVE MASTER PRODUCTION MATRIX
+PXY OPTION ROUTING ENGINE: EXCLUSIVE SYMMETRIC TREND ROUTER (ATM / OTM)
+===============================================================================
+Operational Rules:
+- EXIT raw signals cascade unmutated to the very end.
+- ENTRY signals arrive pre-converted from sysmktpxy strictly as BUY or SELL.
+- Strike Selection:
+  - Trend Aligned     -> ATM BUY / ATM SELL
+  - Trend Not Aligned -> OTM BUY / OTM SELL
 ===============================================================================
 """
 
@@ -13,7 +20,7 @@ def get_entry_signal(df):
         return "NONE", "NONE"
 
     # 1. READ RAW CASCADED PIPELINE STATES FROM GATEWAY
-    # raw_entry is guaranteed by sysmktpxy to only be "BUY", "SELL", or "NONE"
+    # raw_entry is already guaranteed by sysmktpxy to be only "BUY", "SELL", or "NONE"
     raw_entry, exit_sig = get_signal(df)
     exit_sig = str(exit_sig).upper().strip()
     entry_sig = str(raw_entry).upper().strip()
@@ -21,7 +28,7 @@ def get_entry_signal(df):
     if entry_sig not in ["BUY", "SELL"]:
         return "NONE", exit_sig
 
-    # 2. EVALUATE SUPERTREND ALIGNMENT (ATM ONLY)
+    # 2. EVALUATE SUPERTREND ALIGNMENT
     strnd_df = calculate_supertrend(df)
     strnd_trend = "NEUTRAL"
 
@@ -31,12 +38,26 @@ def get_entry_signal(df):
         except Exception:
             pass
 
-    # Exclusive Alignment Strike Routing Logic Processing
-    if entry_sig == "BUY" and strnd_trend in ["BUY", "TBUY", "BULL"]:
-        final_signal = "ATMBUY"
-    elif entry_sig == "SELL" and strnd_trend in ["SELL", "TSELL", "BEAR"]:
-        final_signal = "ATMSELL"
-    else:
-        final_signal = "NONE"
+    # Establish absolute direction flags from the master supertrend line
+    is_trend_bull = strnd_trend in ["BUY", "TBUY", "BULL"]
+    is_trend_bear = strnd_trend in ["SELL", "TSELL", "BEAR"]
+
+    # 3. EXCLUSIVE SYMMETRIC STRIKE ROUTING PROCESSING
+    if entry_sig == "BUY":
+        # Trend Aligned -> ATM | Trend Not Aligned -> OTM
+        final_signal = "ATMBUY" if is_trend_bull else "OTMBUY"
+        
+    else:  # entry_sig is strictly "SELL"
+        # Trend Aligned -> ATM | Trend Not Aligned -> OTM
+        final_signal = "ATMSELL" if is_trend_bear else "OTMSELL"
 
     return final_signal, exit_sig
+
+if __name__ == "__main__":
+    from sysdthapxy import get_pxy_data
+    _, _, _, live_df = get_pxy_data(df=None)
+    
+    if not live_df.empty:
+        final_route, cascaded_exit = get_entry_signal(live_df)
+        print(f"ROUTE TARGET CONTRACT: {final_route} | UNMUTATED EXIT SIGNAL: {cascaded_exit}")
+
