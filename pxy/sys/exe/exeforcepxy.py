@@ -85,10 +85,10 @@ def run_action(choice):
         return True  # Keep loop going
 
     elif choice == "1":
-        sig = "OTMBUY"
+        sig = "ATMBUY"
         side_label = "CE"
     elif choice == "2":
-        sig = "OTMSELL"
+        sig = "ATMSELL"
         side_label = "PE"
     else:
         print(f"{Fore.RED}Invalid selection. Enter 1 for BUY, 2 for SELL, 3 for SQUAREOFF, or 4 to exit.")
@@ -104,9 +104,9 @@ def run_action(choice):
 
     data = get_all_data()
     ltp = data.get("price")
-    OTM_DISTANCE = 100
+    ATM_DISTANCE = 100
 
-    symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+    symbol = get_symbol(ltp, sig, ATM_DISTANCE)
     res = {"stat": "SKIPPED"}
 
     if symbol and symbol != "NA":
