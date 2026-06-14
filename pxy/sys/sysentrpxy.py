@@ -19,11 +19,14 @@ Waterfall Priorities:
     - If entry is BUY and trend line is BEAR/TSELL -> OTMBUY (Priority 4)
     - If entry is SELL and trend line is BEAR/TSELL -> ATMSELL (Priority 3)
     - If entry is SELL and trend line is BULL/TBUY  -> OTMSELL (Priority 4)
+    
+- ⏱️ TIME BUFFER MODIFICATION:
+    - Between 09:15 IST and 09:30 IST, all ATM signals are automatically forced to OTM.
 ===============================================================================
 """
 
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, time as dt_time
 from zoneinfo import ZoneInfo
 import traceback  
 
@@ -183,6 +186,13 @@ def get_entry_signal(df=None):
         else:
             final_signal = "NONE"
 
+    # ⚡ 5. MARKET OPENING BUFFER CONVERSION (09:15:00 <= Time < 09:30:00)
+    # Checks if market is inside opening 15-minute high-volatility range
+    if dt_time(9, 15) <= current_time_ist < dt_time(9, 30):
+        if "ATM" in final_signal:
+            if DEBUG_MODE:
+                print(f"⏰ TIME INTERCEPT (9:15-9:30 AM): Converting '{final_signal}' to OTM to minimize risk.")
+            final_signal = final_signal.replace("ATM", "OTM")
+
     # 🔒 Pure unaltered pass of exit_sig directly from sysmktpxy out to your automated broker execution layer
     return final_signal, exit_sig
-
