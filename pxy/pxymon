@@ -1,16 +1,28 @@
 #!/bin/bash
 # ------------------------------
-# Run exepxy.py from ~/pxy/sys/exe
+# Run syspxy.py every 10 seconds
 # ------------------------------
 
-# Go to exe folder
-cd "$HOME/pxy/sys" || { echo "Directory ~/pxy/sys/exe not found"; exit 1; }
+# Go to sys folder (done once before the loop starts)
+cd "$HOME/pxy/sys" || { echo "Directory ~/pxy/sys not found"; exit 1; }
 
 # Optional: activate virtual environment if needed
 # source ~/pxy/env/bin/activate
 
-# Run the Python script
-python3 syspxy.py
+echo "Starting loop. Press [CTRL+C] to stop."
+echo "----------------------------------------"
 
-# Optional: print completion
-echo "syspxy.py execution finished."
+# Infinite loop
+while true; do
+    echo "[$(date +%T)] Running syspxy.py..."
+    
+    # Run the Python script
+    python3 syspxy.py
+    
+    echo "[$(date +%T)] syspxy.py execution finished."
+    echo "Waiting 10 seconds..."
+    echo "----------------------------------------"
+    
+    # Sleep for 10 seconds before the next iteration
+    sleep 10
+done
