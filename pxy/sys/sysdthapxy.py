@@ -1,11 +1,11 @@
 # pxy_engine.py
 import pandas as pd
 import numpy as np
-from sysstrndpxy import fetch_yf_data  # Note: Points to your file containing Mode 0
+from sysdtafpxy import fetch_yf_data  
+from syscnfgpxy import OHLC_MODE  # Dynamically ingest the true active mode
 
 # ⚡ LIVE ENFORCEMENT ACTIVATED: Set to True to stream active forming bars dynamically
 USE_FORMING_CANDLE = True  
-CANDLE_STYLE = "MODE_0_PURE"
 
 def get_pxy_data(tickerSymbol=None, df=None):
     if df is None:
@@ -23,17 +23,19 @@ def get_pxy_data(tickerSymbol=None, df=None):
             return None, None, None, pd.DataFrame()
 
     # ==================================================
-    # 🎨 COLOR PROCESSING (STRICT MODE 0 PURE BINARY RULES)
+    # 🎨 COLOR PROCESSING (DYNAMIC SYSTEM-WIDE MODE ADAPTATION)
     # ==================================================
-    # Since Mode 0 transforms 'Open' and 'Close', we use its structural logic:
-    # A candle is green if Close is >= the previous bar's 3/4 range level.
-    prev_h = df['High'].shift(1)
-    prev_l = df['Low'].shift(1)
-    prev_range = prev_h - prev_l
-    calc_three_quarter = prev_l + (prev_range * 0.75)
-
-    # Every single candle is binary: either it is green, or it defaults to red
-    is_green = df['Close'] >= calc_three_quarter
+    # Automatically adapts color parsing logic based on the upstream mode
+    if OHLC_MODE == 1:
+        # Strict Mode 1: Use raw market engine logic
+        prev_h = df['High'].shift(1)
+        prev_l = df['Low'].shift(1)
+        prev_range = prev_h - prev_l
+        calc_three_quarter = prev_l + (prev_range * 0.75)
+        is_green = df['Close'] >= calc_three_quarter
+    else:
+        # Transformed Modes (0, 2, 3, etc.): Process the geometry sent by upstream
+        is_green = df['Close'] >= df['Open']
     
     conditions = [is_green]
     choices = ["green"]
@@ -79,5 +81,6 @@ def get_pxy_data(tickerSymbol=None, df=None):
     pxy_color_series = final_df['pxy_color'].copy()
 
     return pxy_close, pxy_open, pxy_color_series, final_df
+
 
 
