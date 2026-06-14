@@ -15,7 +15,7 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 2
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-FIXED_THRESHOLD_PCT = -10.0  # 🎯 Hard-anchored to exactly -10.0% loss floor
+FIXED_THRESHOLD_PCT = -13.0  # 🎯 Hard-anchored to exactly -10.0% loss floor
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
