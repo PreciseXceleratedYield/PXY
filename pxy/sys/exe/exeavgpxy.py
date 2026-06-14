@@ -13,7 +13,7 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 3
+MAX_LAYERS = 2
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
 FIXED_THRESHOLD_PCT = -10.0  # 🎯 Hard-anchored to exactly -10.0% loss floor
 
@@ -62,7 +62,7 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, si
     width = 42
     border = Fore.YELLOW + "=" * width
     divider = Fore.RED + "-" * width
-    header_text = "🚨  PXY® ENGINE OTM HANDOVER  🚨"
+    header_text = "🚨  PXY® ENGINE SIGNAL HANDOVER  🚨"
     
     print("\n" + border)
     print(Fore.WHITE + header_text.center(width - 2, " ")) 
@@ -83,7 +83,7 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, si
     print(border + "\n")
 
 def handle_side_averaging(client, df): 
-    """Strictly processes position tracking ONLY on active OTMBUY or OTMSELL signals.""" 
+    """Strictly processes position tracking ONLY on active exit column BUY or SELL signals.""" 
     if df is None or df.empty: 
         return 
         
@@ -92,14 +92,14 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
-    if "entry" not in df.columns:
+    if "exit" not in df.columns:
         return
         
     last_row = df.iloc[-1]
-    raw_entry_signal = str(last_row["entry"]).upper().strip() 
+    raw_exit_signal = str(last_row["exit"]).upper().strip() 
 
-    # 🛑 CRITICAL INTERCEPT DOOR: Stop dead if the signal isn't EXACTLY OTMBUY or OTMSELL
-    if raw_entry_signal not in ["OTMBUY", "OTMSELL"]:
+    # 🛑 CRITICAL INTERCEPT DOOR: Stop dead if the exit signal isn't EXACTLY BUY or SELL
+    if raw_exit_signal not in ["BUY", "SELL"]:
         return
 
     # Make a clean dataframe copy to prevent mutations/warnings
@@ -111,18 +111,18 @@ def handle_side_averaging(client, df):
         if side_df.empty: 
             continue 
 
-        # --- EXPLICIT OTM SIGNAL SANITY FILTER ---
+        # --- EXPLICIT SIGNAL SANITY FILTER FROM EXIT COLUMN ---
         current_signal = "NONE"
 
-        # CE side acts ONLY if upstream system is actively pumping OTMBUY
-        if side == 'CE' and raw_entry_signal == "OTMBUY":
-            current_signal = "OTMBUY"
+        # CE side acts ONLY if the exit column is pumping "BUY"
+        if side == 'CE' and raw_exit_signal == "BUY":
+            current_signal = "BUY"
 
-        # PE side acts ONLY if upstream system is actively pumping OTMSELL
-        elif side == 'PE' and raw_entry_signal == "OTMSELL":
-            current_signal = "OTMSELL"
+        # PE side acts ONLY if the exit column is pumping "SELL"
+        elif side == 'PE' and raw_exit_signal == "SELL":
+            current_signal = "SELL"
 
-        # If this option chain side does not mirror the live OTM trigger, skip instantly
+        # If this option chain side does not mirror the live trigger, skip instantly
         if current_signal == "NONE":
             continue
 
@@ -132,7 +132,7 @@ def handle_side_averaging(client, df):
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
-            # 🔄 FIXED MATHEMATICAL COMPARISON:
+            # 🔄 MATHEMATICAL VERIFICATION:
             # If ANY position is safer than -10% (e.g., -4.5% > -10.0%), 
             # then NOT all positions are down past the threshold. Fail and break.
             if pos_loss > FIXED_THRESHOLD_PCT:
@@ -152,13 +152,13 @@ def handle_side_averaging(client, df):
                 
                 # --- AUTOMATED PARAMETER HANDOFF TO EXEFORCE PXY ---
                 try: 
-                    # Parameter "1" maps to CE (OTMBUY), Parameter "2" maps to PE (OTMSELL)
+                    # Parameter "1" maps to CE (BUY), Parameter "2" maps to PE (SELL)
                     cli_param = "1" if side == "CE" else "2"
                     
                     target_script = Path(__file__).resolve().parent / "exeforcepxy.py"
                     
                     if target_script.exists():
-                        print(f"{Fore.YELLOW}🔄 Routing OTM task to {target_script.name} with parameter [{cli_param}]...")
+                        print(f"{Fore.YELLOW}🔄 Routing task to {target_script.name} with parameter [{cli_param}]...")
                         
                         # Runs: python exeforcepxy.py 1 (or 2)
                         subprocess.run([sys.executable, str(target_script), cli_param], check=True)
