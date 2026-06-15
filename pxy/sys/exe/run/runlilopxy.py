@@ -49,7 +49,7 @@ def dump_livpos_to_json(open_positions):
 
 def dump_to_json(closed_df): 
     try: 
-        file_path = os.path.expanduser("~/pxy/pnl.json") 
+        file_path = os.path.expanduser("../web/webpnlpxy.json") 
         os.makedirs(os.path.dirname(file_path), exist_ok=True) 
         if closed_df.empty: 
             data = [] 
