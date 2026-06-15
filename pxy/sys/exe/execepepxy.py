@@ -14,7 +14,7 @@ def get_target_quantities(supertrend, ce_lots, pe_lots, lot_size=None):
         
     # 2. Independent Guard Limit evaluation based purely on IST
     if time(9, 15) <= current_time_ist <= time(9, 30):
-        HARD_MAX_LIMIT_LOTS = 3
+        HARD_MAX_LIMIT_LOTS = 1
     else:
         HARD_MAX_LIMIT_LOTS = 3
 
