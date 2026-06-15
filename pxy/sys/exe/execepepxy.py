@@ -16,7 +16,7 @@ def get_target_quantities(supertrend, ce_lots, pe_lots, lot_size=None):
     if time(9, 15) <= current_time_ist <= time(9, 30):
         HARD_MAX_LIMIT_LOTS = 1
     else:
-        HARD_MAX_LIMIT_LOTS = 3
+        HARD_MAX_LIMIT_LOTS = 5
 
     # Route A: Absolute Continuous N:N Balance 
     if MODE == "STRICT_NN":
