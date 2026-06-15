@@ -1077,7 +1077,7 @@ function drawMomentumBar(stVals, closes) {
 async function loadPnl() {
     let trades = [];
     try {
-        const res = await fetch('./web/webpnlpxy.json?_=' + Date.now());
+        const res = await fetch('./webpnlpxy.json?_=' + Date.now());
         trades = await res.json();
     } catch { trades = []; }
 
