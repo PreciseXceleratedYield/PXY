@@ -13,7 +13,7 @@ MATCH_MODE = "TAG"
 # === UNCHANGED: Keep this original function to write pnl.json ===
 def dump_to_json(closed_df): 
     try: 
-        file_path = os.path.expanduser("~/pxy/web/webpnlpxy.json") 
+        file_path = os.path.expanduser("../web/webpnlpxy.json") 
         os.makedirs(os.path.dirname(file_path), exist_ok=True) 
         if closed_df.empty: 
             data = [] 
@@ -31,7 +31,7 @@ def dump_to_json(closed_df):
 # === ADDON: Your new function to write livpos.json ===
 def dump_livpos_to_json(open_positions): 
     try: 
-        file_path = os.path.expanduser("~/pxy/web/webpospxy.json") 
+        file_path = os.path.expanduser("../web/webpospxy.json") 
         os.makedirs(os.path.dirname(file_path), exist_ok=True) 
         
         # Safely convert the existing data to your exact uppercase format
