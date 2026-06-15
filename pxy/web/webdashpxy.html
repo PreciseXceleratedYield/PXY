@@ -578,7 +578,7 @@ function updateChartTheme(){
 /* ── LOAD: livpos.json (positions) ── */
 async function loadPos(){
     let data=[];
-    try{const r=await fetch('./livpos.json?_='+Date.now());data=await r.json();}catch{}
+    try{const r=await fetch('./webpospxy.json?_='+Date.now());data=await r.json();}catch{}
     const open=data.filter(d=>(d.STATUS||'OPEN')==='OPEN');
     const total=open.reduce((s,d)=>s+(d.PNL||0),0);
     const bull=total>=0;
@@ -609,7 +609,7 @@ async function loadPos(){
 /* ── LOAD: pnl.json (trades) ── */
 async function loadTrades(){
     let data=[];
-    try{const r=await fetch('./pnl.json?_='+Date.now());data=await r.json();}catch{}
+    try{const r=await fetch('./webpnlpxy.json?_='+Date.now());data=await r.json();}catch{}
     const total=data.reduce((s,d)=>s+(d.PNL||0),0);
     const bull=total>=0;
     set('ptTradesPnl',fmt(total),bull?'bull':'bear');
