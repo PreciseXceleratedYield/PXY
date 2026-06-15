@@ -1,14 +1,14 @@
 # sysentrpxy.py
 """
 ===============================================================================
-PXY OPTION ROUTING ENGINE: EXCLUSIVE SYMMETRIC TREND ROUTER (ATM / OTM)
+PXY OPTION ROUTING ENGINE: EXCLUSIVE SYMMETRIC TREND ROUTER (ATM / ATM)
 ===============================================================================
 Operational Rules:
 - EXIT raw signals cascade unmutated to the very end.
 - ENTRY signals arrive pre-converted from sysmktpxy strictly as BUY or SELL.
 - Strike Selection:
   - Trend Aligned     -> ATM BUY / ATM SELL
-  - Trend Not Aligned -> OTM BUY / OTM SELL
+  - Trend Not Aligned -> ATM BUY / ATM SELL
 ===============================================================================
 """
 
@@ -44,12 +44,12 @@ def get_entry_signal(df):
 
     # 3. EXCLUSIVE SYMMETRIC STRIKE ROUTING PROCESSING
     if entry_sig == "BUY":
-        # Trend Aligned -> ATM | Trend Not Aligned -> OTM
-        final_signal = "ATMBUY" if is_trend_bull else "OTMBUY"
+        # Trend Aligned -> ATM | Trend Not Aligned -> ATM
+        final_signal = "ATMBUY" if is_trend_bull else "ATMBUY"
         
     else:  # entry_sig is strictly "SELL"
-        # Trend Aligned -> ATM | Trend Not Aligned -> OTM
-        final_signal = "ATMSELL" if is_trend_bear else "OTMSELL"
+        # Trend Aligned -> ATM | Trend Not Aligned -> ATM
+        final_signal = "ATMSELL" if is_trend_bear else "ATMSELL"
 
     return final_signal, exit_sig
 
