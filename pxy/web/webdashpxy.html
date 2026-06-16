@@ -41,7 +41,16 @@ body{
 ::-webkit-scrollbar{width:2px;height:2px;}
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
 
-/* ══ ROW 1: HERO BAR ══ */
+/* ══ CANDLE BAR (top) ══ */
+#candleBar{
+    height:var(--candle-h);flex-shrink:0;
+    display:flex;align-items:center;
+    background:var(--bg2);border-bottom:1px solid var(--border);
+    padding:0 8px;gap:0;overflow:hidden;
+    transition:background 0.35s,border-color 0.35s;
+}
+
+/* ══ HERO BAR (below candles) ══ */
 #heroBar{
     height:var(--hero-h);flex-shrink:0;
     display:flex;align-items:stretch;
@@ -56,8 +65,7 @@ body{
     flex:1;min-width:0;gap:1px;
 }
 .hero-cell:last-child{border-right:none;}
-.hero-cell.fixed{flex:0 0 auto;}
-.hero-cell.narrow { flex: 0.5; }
+.hero-cell.narrow{flex:0.5;}
 
 .hc-label{font-size:7px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);white-space:nowrap;}
 .hc-val{
@@ -72,12 +80,8 @@ body{
 .hc-val.neutral{color:var(--text);}
 .hc-val.muted{color:var(--muted);}
 
-/* nav items in hero */
-.hero-nav{
-    display:flex;align-items:center;gap:6px;
-    padding:0 clamp(8px,1.5vw,14px);
-    flex-shrink:0;
-}
+/* nav */
+.hero-nav{display:flex;align-items:center;gap:6px;padding:0 clamp(8px,1.5vw,14px);flex-shrink:0;}
 .back-btn{display:flex;align-items:center;gap:4px;padding:3px 9px;border:1px solid var(--border2);border-radius:5px;color:var(--muted);font-size:10px;text-decoration:none;font-family:'DM Mono',monospace;transition:all 0.2s;white-space:nowrap;}
 .back-btn:hover{color:var(--text);background:var(--bg3);}
 .dv{width:1px;height:16px;background:var(--border2);flex-shrink:0;}
@@ -89,110 +93,42 @@ body{
 .toggle-thumb{position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:50%;background:var(--muted);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);}
 [data-theme="light"] .toggle-thumb{transform:translateX(13px);background:#fff;}
 
-/* ══ ROW 2: CANDLE SEQUENCE ══ */
-#candleBar{
-    height:var(--candle-h);flex-shrink:0;
-    display:flex;align-items:center;
-    background:var(--bg2);border-bottom:1px solid var(--border);
-    padding:0 8px;gap:0;overflow:hidden;
-    transition:background 0.35s,border-color 0.35s;
-}
-
-.candle-seq{
-    flex:1;display:flex;align-items:flex-end;
-    gap:2px;height:100%;padding:6px 4px 4px;overflow:hidden;
-}
-
-.cs-unit{
-    display:flex;flex-direction:column;align-items:center;
-    flex:1;min-width:0;gap:1px;
-}
-.cs-bar{
-    width:100%;max-width:16px;border-radius:2px 2px 0 0;
-    /* fixed height — no incremental growth */
-    height:24px;
-    flex-shrink:0;
-}
+/* candle seq */
+.candle-seq{flex:1;display:flex;align-items:flex-end;gap:2px;height:100%;padding:6px 4px 4px;overflow:hidden;}
+.cs-unit{display:flex;flex-direction:column;align-items:center;flex:1;min-width:0;gap:1px;}
+.cs-bar{width:100%;max-width:16px;border-radius:2px 2px 0 0;height:24px;flex-shrink:0;}
 .cs-bar.bull{background:var(--bull);opacity:0.85;}
 .cs-bar.bear{background:var(--bear);opacity:0.85;}
-.cs-num{
-    font-size:8px;font-weight:500;
-    white-space:nowrap;
-}
+.cs-num{font-size:8px;font-weight:500;white-space:nowrap;}
 .cs-num.bull{color:var(--bull);}
 .cs-num.bear{color:var(--bear);}
+.candle-label{font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);writing-mode:vertical-rl;text-orientation:mixed;padding:0 4px;flex-shrink:0;}
 
-/* label left of candle strip */
-.candle-label{
-    font-size:8px;letter-spacing:0.14em;text-transform:uppercase;
-    color:var(--muted);writing-mode:vertical-rl;text-orientation:mixed;
-    padding:0 4px;flex-shrink:0;
-}
+/* ══ MIDDLE ══ */
+#middle{flex:1;display:flex;overflow:hidden;min-height:0;}
 
-/* ══ MIDDLE: MAIN PANELS ══ */
-#middle{
-    flex:1;display:flex;overflow:hidden;min-height:0;
-}
-
-/* 42min vertical candle — far left */
-.side-candle{
-    width:clamp(24px,3vw,40px);flex-shrink:0;
-    background:var(--bg2);border-right:1px solid var(--border);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:8px 4px;gap:4px;
-    transition:background 0.35s,border-color 0.35s;
-}
+.side-candle{width:clamp(24px,3vw,40px);flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px;gap:4px;transition:background 0.35s,border-color 0.35s;}
 .side-candle.right{border-right:none;border-left:1px solid var(--border);}
 .side-lbl{font-size:7px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);writing-mode:vertical-rl;flex-shrink:0;}
-.side-candle-wrap{
-    flex:1;width:100%;display:flex;flex-direction:column;align-items:center;
-    justify-content:flex-start;padding:4px 0;gap:1px;overflow:hidden;
-}
+.side-candle-wrap{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:4px 0;gap:1px;overflow:hidden;}
 .sc-seg{width:clamp(8px,1.5vw,14px);border-radius:1px;flex-shrink:0;}
 
 /* ══ 3 PANELS ══ */
 #panels{flex:1;display:flex;overflow:hidden;min-width:0;}
-
-.panel{
-    flex:1;display:flex;flex-direction:column;
-    border-right:1px solid var(--border);overflow:hidden;
-    transition:border-color 0.35s;min-width:0;
-}
+.panel{flex:1;display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden;transition:border-color 0.35s;min-width:0;}
 .panel:last-child{border-right:none;}
-
-.panel-top{
-    flex-shrink:0;
-    display:flex;align-items:center;justify-content:space-between;
-    padding:0 10px;height:32px;
-    background:var(--bg2);border-bottom:1px solid var(--border);
-    transition:background 0.35s,border-color 0.35s;gap:8px;overflow:hidden;
-}
+.panel-top{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 10px;height:32px;background:var(--bg2);border-bottom:1px solid var(--border);transition:background 0.35s,border-color 0.35s;gap:8px;overflow:hidden;}
 .pt-label{font-size:8px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);flex-shrink:0;}
-.pt-val{
-    font-family:'Syne',sans-serif;font-weight:800;
-    font-size:clamp(12px,1.4vw,16px);
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-}
+.pt-val{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(12px,1.4vw,16px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pt-val.bull{color:var(--bull);}
 .pt-val.bear{color:var(--bear);}
 
-/* chart panel */
 #chartPanel{position:relative;flex:1;overflow:hidden;background:var(--bg);}
-#chartPanel .grid-overlay{
-    position:absolute;inset:0;pointer-events:none;z-index:0;
-    background-image:linear-gradient(var(--grid) 1px,transparent 1px),
-                     linear-gradient(90deg,var(--grid) 1px,transparent 1px);
-    background-size:50px 50px;
-}
+#chartPanel .grid-overlay{position:absolute;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:50px 50px;}
 #chartPanel canvas{position:absolute;inset:0;width:100%!important;height:100%!important;z-index:1;}
 
-/* positions panel */
 #posPanel{flex:1;overflow-y:auto;}
-.pos-row-item{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:7px 10px;border-bottom:1px solid var(--border);gap:8px;
-    transition:background 0.12s;
-}
+.pos-row-item{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--border);gap:8px;transition:background 0.12s;}
 .pos-row-item:hover{background:var(--bg3);}
 .pri-left{display:flex;flex-direction:column;gap:1px;min-width:0;}
 .pri-sym{font-size:clamp(9px,0.9vw,11px);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -205,13 +141,8 @@ body{
 .pri-type.pe{background:var(--bear-dim);color:var(--bear);}
 #posEmpty{padding:24px 10px;text-align:center;color:var(--muted);font-size:11px;}
 
-/* trades panel */
 #tradePanel{flex:1;overflow-y:auto;}
-.trade-row-item{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:7px 10px;border-bottom:1px solid var(--border);gap:8px;
-    transition:background 0.12s;
-}
+.trade-row-item{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid var(--border);gap:8px;transition:background 0.12s;}
 .trade-row-item:hover{background:var(--bg3);}
 .tri-left{display:flex;flex-direction:column;gap:1px;min-width:0;}
 .tri-sym{font-size:clamp(9px,0.9vw,11px);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -222,34 +153,13 @@ body{
 #tradeEmpty{padding:24px 10px;text-align:center;color:var(--muted);font-size:11px;}
 
 /* ══ BOTTOM BAR ══ */
-#bottomBar{
-    height:var(--bottom-h);flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;
-    background:var(--bg2);border-top:1px solid var(--border);
-    transition:background 0.35s,border-color 0.35s;
-    position:relative;overflow:hidden;
-}
-#brandName{
-    font-family:'Syne',sans-serif;font-weight:800;
-    font-size:clamp(11px,1.4vw,16px);letter-spacing:0.1em;
-    color:var(--text);transition:color 0.35s;
-    text-align:center;
-}
+#bottomBar{height:var(--bottom-h);flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--bg2);border-top:1px solid var(--border);transition:background 0.35s,border-color 0.35s;position:relative;overflow:hidden;}
+#brandName{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(11px,1.4vw,16px);letter-spacing:0.1em;color:var(--text);transition:color 0.35s;text-align:center;}
 #brandName sup{font-size:0.55em;vertical-align:super;color:var(--accent);}
-
-/* BOS flash */
-@keyframes bosFlashGreen{
-    0%,100%{color:var(--bull);text-shadow:0 0 20px rgba(34,197,94,0.8);}
-    50%{color:rgba(34,197,94,0.3);text-shadow:none;}
-}
-@keyframes bosFlashRed{
-    0%,100%{color:var(--bear);text-shadow:0 0 20px rgba(239,68,68,0.8);}
-    50%{color:rgba(239,68,68,0.3);text-shadow:none;}
-}
+@keyframes bosFlashGreen{0%,100%{color:var(--bull);text-shadow:0 0 20px rgba(34,197,94,0.8);}50%{color:rgba(34,197,94,0.3);text-shadow:none;}}
+@keyframes bosFlashRed{0%,100%{color:var(--bear);text-shadow:0 0 20px rgba(239,68,68,0.8);}50%{color:rgba(239,68,68,0.3);text-shadow:none;}}
 #brandName.bos-bull{animation:bosFlashGreen 0.8s infinite;}
-#brandName.bos-bear{animation:bosFlashRed   0.8s infinite;}
-
-/* clock in bottom right */
+#brandName.bos-bear{animation:bosFlashRed 0.8s infinite;}
 #btClock{position:absolute;right:12px;font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;}
 
 /* ══ RESPONSIVE ══ */
@@ -274,10 +184,8 @@ body{
 </head>
 <body>
 
-<!-- ══ ROW 1: HERO BAR ══ -->
+<!-- ══ ROW 1: CANDLE SEQUENCE ══ -->
 <div id="candleBar">
-
-    <!-- nav / logo left -->
     <div class="hero-nav">
         <a class="back-btn" href="webpxy.html">← PXY</a>
         <div class="dv"></div>
@@ -288,11 +196,17 @@ body{
         </div>
         <div class="dv"></div>
     </div>
-        <div class="hero-cell narrow">
+    <span class="candle-label">Candles</span>
+    <div class="candle-seq" id="candleSeq"></div>
+</div>
+
+<!-- ══ ROW 2: HERO BAR ══ -->
+<div id="heroBar">
+    <div class="hero-cell narrow">
         <span class="hc-label">🟢</span>
         <span class="hc-val bull" id="hcCEDep">—</span>
     </div>
-        <div class="hero-cell narrow">
+    <div class="hero-cell narrow">
         <span class="hc-label">🟨</span>
         <span class="hc-val bull" id="hcCEPow">—</span>
     </div>
@@ -320,13 +234,6 @@ body{
         <span class="hc-label">🔴</span>
         <span class="hc-val bear" id="hcPEDep">—</span>
     </div>
-
-</div>
-
-<!-- ══ ROW 2: CANDLE SEQUENCE ══ -->
-<div id="heroBar">
-    <span class="candle-label">Candles</span>
-    <div class="candle-seq" id="candleSeq"></div>
 </div>
 
 <!-- ══ MIDDLE ══ -->
@@ -414,8 +321,15 @@ function bullBear(v){
     const s=String(v||'').toUpperCase();
     if(['BULL','UP','BUY','CE','POSITIVE'].some(k=>s.includes(k)))return'bull';
     if(['BEAR','DOWN','SELL','PE','NEGATIVE'].some(k=>s.includes(k)))return'bear';
-    if(['NONE'].some(k=>s===k))return'muted';
+    if(s==='NONE')return'muted';
     return'gold';
+}
+function emojify(v){
+    const s=String(v||'').toUpperCase();
+    if(s.includes('BUY')||s.includes('BULL'))return'🟢';
+    if(s.includes('SELL')||s.includes('BEAR'))return'🔴';
+    if(s==='NONE')return'⚪';
+    return v;
 }
 function set(id,val,cls){
     const el=$(id);if(!el)return;
@@ -440,27 +354,24 @@ async function loadDash(){
 }
 
 function renderDash(d){
-    // hero bar
-    set('hcPrice',  d.price,          'neutral');
-    set('hcATR',    `${d.atr??'—'} / ${d.katr??'—'}`, 'gold');
-    set('hcDir',    d.direction,       bullBear(d.direction));
-    set('hcTrend',  d.supertrend,      bullBear(d.supertrend));
-    set('hcEntry',  d.entry??'NONE',   d.entry&&d.entry!=='NONE'?bullBear(d.entry):'muted');
-    set('hcExit',   d.exit??'NONE',    d.exit&&d.exit!=='NONE'?bullBear(d.exit):'muted');
-    set('hcCEDep',  d.hkin_ce_depth,   'bull');
-    set('hcPEDep',  d.hkin_pe_depth,   'bear');
-    set('hcCEPow',  d.ce_power,        'bull');
-    set('hcPEPow',  d.pe_power,        'bear');
-    set('ptPrice',  d.price,           bullBear(d.direction));
+    set('hcATR',   `${d.atr??'—'} / ${d.katr??'—'}`, 'gold');
+    set('hcTrend', emojify(d.supertrend), bullBear(d.supertrend));
+    set('hcEntry', emojify(d.entry??'NONE'), d.entry&&d.entry!=='NONE'?bullBear(d.entry):'muted');
+    set('hcExit',  emojify(d.exit??'NONE'),  d.exit&&d.exit!=='NONE'?bullBear(d.exit):'muted');
+    set('hcCEDep', d.hkin_ce_depth, 'bull');
+    set('hcPEDep', d.hkin_pe_depth, 'bear');
+    set('hcCEPow', d.ce_power,      'bull');
+    set('hcPEPow', d.pe_power,      'bear');
+    set('ptPrice', d.price,         bullBear(d.direction));
 
-    // header glow
+    // hero bar glow
     const isUp=String(d.direction||'').toUpperCase()==='UP';
     $('heroBar').style.boxShadow=isUp?'0 1px 0 rgba(34,197,94,0.3)':'0 1px 0 rgba(239,68,68,0.3)';
 
     // candle sequence
     renderCandleSeq(d.candle_visual||'');
 
-    // BOS flash on brand
+    // BOS flash
     const bosVal=stripAnsi(d.bos_val||'NONE').trim().toUpperCase();
     const brand=$('brandName');
     brand.className='';
@@ -468,8 +379,8 @@ function renderDash(d){
         brand.classList.add(bullBear(bosVal)==='bull'?'bos-bull':'bos-bear');
     }
 
-    // day candle bar (day_candle)
-    renderSideCandle('sideDay', d.day_candle||'', false);
+    // day candle
+    renderSideCandle('sideDay', d.day_candle||'');
 }
 
 /* ── CANDLE SEQUENCE ── */
@@ -479,48 +390,32 @@ function renderCandleSeq(raw){
     const re=/\u001b\[(\d+)m(\d+)\u001b\[0m/g;
     let m;
     const items=[];
-    while((m=re.exec(raw))!==null){
-        items.push({n:+m[2],bull:m[1]==='92'});
-    }
+    while((m=re.exec(raw))!==null){items.push({n:+m[2],bull:m[1]==='92'});}
     if(!items.length)return;
     items.forEach(c=>{
-        const unit=document.createElement('div');
-        unit.className='cs-unit';
-        const bar=document.createElement('div');
-        bar.className=`cs-bar ${c.bull?'bull':'bear'}`;
-        const num=document.createElement('div');
-        num.className=`cs-num ${c.bull?'bull':'bear'}`;
+        const unit=document.createElement('div');unit.className='cs-unit';
+        const bar=document.createElement('div');bar.className=`cs-bar ${c.bull?'bull':'bear'}`;
+        const num=document.createElement('div');num.className=`cs-num ${c.bull?'bull':'bear'}`;
         num.textContent=c.n;
-        unit.appendChild(bar);
-        unit.appendChild(num);
+        unit.appendChild(bar);unit.appendChild(num);
         seq.appendChild(unit);
     });
 }
 
-/* ── SIDE CANDLE (vertical bar) ── */
-function renderSideCandle(id, raw, is42){
-    const wrap=$(id);
-    if(!wrap)return;
+/* ── SIDE CANDLE ── */
+function renderSideCandle(id, raw){
+    const wrap=$(id);if(!wrap)return;
     wrap.innerHTML='';
-
-    // parse ANSI colored blocks
     const re=/\u001b\[(\d+)m([^\u001b]+)\u001b\[0m/g;
-    let m;
-    const segs=[];
-    while((m=re.exec(raw))!==null){
-        segs.push({code:m[1],len:m[2].length});
-    }
+    let m;const segs=[];
+    while((m=re.exec(raw))!==null){segs.push({code:m[1],len:m[2].length});}
     if(!segs.length){
-        // plain fallback
         const div=document.createElement('div');
-        div.className='sc-seg';
-        div.style.flex='1';div.style.background='var(--muted)';
+        div.className='sc-seg';div.style.flex='1';div.style.background='var(--muted)';
         wrap.appendChild(div);return;
     }
-    const total=segs.reduce((s,sg)=>s+sg.len,0);
     segs.forEach(sg=>{
-        const div=document.createElement('div');
-        div.className='sc-seg';
+        const div=document.createElement('div');div.className='sc-seg';
         div.style.flex=sg.len;
         div.style.background=sg.code==='31'?'var(--bear)':sg.code==='32'?'var(--bull)':'var(--bg3)';
         div.style.width='100%';
@@ -528,7 +423,7 @@ function renderSideCandle(id, raw, is42){
     });
 }
 
-/* ── LOAD: syschrtpxy.json (chart) ── */
+/* ── CHART ── */
 let chart;
 async function loadChart(){
     try{
@@ -575,7 +470,7 @@ function updateChartTheme(){
     chart.update('none');
 }
 
-/* ── LOAD: livpos.json (positions) ── */
+/* ── POSITIONS ── */
 async function loadPos(){
     let data=[];
     try{const r=await fetch('./webpospxy.json?_='+Date.now());data=await r.json();}catch{}
@@ -583,55 +478,39 @@ async function loadPos(){
     const total=open.reduce((s,d)=>s+(d.PNL||0),0);
     const bull=total>=0;
     set('ptPosPnl',fmt(total),bull?'bull':'bear');
-
     const panel=$('posPanel');
     panel.querySelectorAll('.pos-row-item').forEach(r=>r.remove());
     if(!open.length){$('posEmpty').style.display='block';return;}
     $('posEmpty').style.display='none';
-
     open.forEach(d=>{
         const pnl=d.PNL||0,pbull=pnl>=0;
         const isCE=(d.SYMBOL||'').toUpperCase().endsWith('CE');
         const qty=d.QTY??'—';
         const lots=qty!=='—'?Math.round(Math.abs(qty)/lotSize(d.SYMBOL)):'—';
-        const row=document.createElement('div');
-        row.className='pos-row-item';
-        row.innerHTML=`<div class="pri-left">
-            <span class="pri-sym">${shortSym(d.SYMBOL)}</span>
-            <span class="pri-meta">Qty ${qty} · ${lots} lots</span>
-        </div>
-        <span class="pri-type ${isCE?'ce':'pe'}">${isCE?'CE':'PE'}</span>
-        <span class="pri-pnl ${pbull?'bull':'bear'}">${fmt(pnl)}</span>`;
+        const row=document.createElement('div');row.className='pos-row-item';
+        row.innerHTML=`<div class="pri-left"><span class="pri-sym">${shortSym(d.SYMBOL)}</span><span class="pri-meta">Qty ${qty} · ${lots} lots</span></div><span class="pri-type ${isCE?'ce':'pe'}">${isCE?'CE':'PE'}</span><span class="pri-pnl ${pbull?'bull':'bear'}">${fmt(pnl)}</span>`;
         panel.appendChild(row);
     });
 }
 
-/* ── LOAD: pnl.json (trades) ── */
+/* ── TRADES ── */
 async function loadTrades(){
     let data=[];
     try{const r=await fetch('./webpnlpxy.json?_='+Date.now());data=await r.json();}catch{}
     const total=data.reduce((s,d)=>s+(d.PNL||0),0);
     const bull=total>=0;
     set('ptTradesPnl',fmt(total),bull?'bull':'bear');
-
     const panel=$('tradePanel');
     panel.querySelectorAll('.trade-row-item').forEach(r=>r.remove());
     if(!data.length){$('tradeEmpty').style.display='block';return;}
     $('tradeEmpty').style.display='none';
-
     const sorted=[...data].sort((a,b)=>new Date(b.Exit_Time)-new Date(a.Exit_Time));
     sorted.forEach(t=>{
         const pnl=t.PNL||0,pbull=pnl>=0;
-        const isCE=(t.Symbol||'').toUpperCase().endsWith('CE');
         const entry=String(t.Buy_Time||'').slice(11,16);
         const exit=String(t.Exit_Time||'').slice(11,16);
-        const row=document.createElement('div');
-        row.className='trade-row-item';
-        row.innerHTML=`<div class="tri-left">
-            <span class="tri-sym">${shortSym(t.Symbol)} #${t.Tag||'—'}</span>
-            <span class="tri-meta">${entry}→${exit} · Qty ${t.Qty??'—'}</span>
-        </div>
-        <span class="tri-pnl ${pbull?'bull':'bear'}">${fmt(pnl)}</span>`;
+        const row=document.createElement('div');row.className='trade-row-item';
+        row.innerHTML=`<div class="tri-left"><span class="tri-sym">${shortSym(t.Symbol)} #${t.Tag||'—'}</span><span class="tri-meta">${entry}→${exit} · Qty ${t.Qty??'—'}</span></div><span class="tri-pnl ${pbull?'bull':'bear'}">${fmt(pnl)}</span>`;
         panel.appendChild(row);
     });
 }
