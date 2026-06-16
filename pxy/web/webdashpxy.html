@@ -59,19 +59,19 @@ body{
 }
 
 .hero-cell{
-    display:flex;flex-direction:column;justify-content:center;
+    display:flex;flex-direction:column;justify-content:center;align-items:center;
     padding:0 clamp(8px,1.5vw,18px);
     border-right:1px solid var(--border);
-    flex:1;min-width:0;gap:1px;
+    flex:1;min-width:0;gap:1px;text-align:center;
 }
 .hero-cell:last-child{border-right:none;}
-.hero-cell.narrow{flex:0.5;}
+.hero-cell.narrow{flex:1;}
 
-.hc-label{font-size:7px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);white-space:nowrap;}
+.hc-label{font-size:7px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);white-space:nowrap;text-align:center;}
 .hc-val{
     font-family:'Syne',sans-serif;font-weight:800;
     font-size:clamp(13px,1.8vw,20px);letter-spacing:-0.3px;white-space:nowrap;
-    overflow:hidden;text-overflow:ellipsis;
+    overflow:hidden;text-overflow:ellipsis;text-align:center;
 }
 .hc-val.bull{color:var(--bull);}
 .hc-val.bear{color:var(--bear);}
@@ -211,11 +211,11 @@ body{
         <span class="hc-val bull" id="hcCEPow">—</span>
     </div>
     <div class="hero-cell">
-        <span class="hc-label">🛫🛫🛫</span>
+        <span class="hc-label">Entry</span>
         <span class="hc-val" id="hcEntry">—</span>
     </div>
     <div class="hero-cell">
-        <span class="hc-label">🛬🛬🛬</span>
+        <span class="hc-label">Exit</span>
         <span class="hc-val" id="hcExit">—</span>
     </div>
     <div class="hero-cell narrow">
@@ -223,7 +223,7 @@ body{
         <span class="hc-val gold" id="hcATR">—</span>
     </div>
     <div class="hero-cell">
-        <span class="hc-label">🚀🚀🚀</span>
+        <span class="hc-label">Trend</span>
         <span class="hc-val" id="hcTrend">—</span>
     </div>
     <div class="hero-cell narrow">
