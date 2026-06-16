@@ -83,8 +83,8 @@ def get_flipped_geometry_ohlc(o, h, l, c):
     prev_range = prev_h - prev_l
 
     # Target calculation matrices
-    calc_quarter = prev_l + (prev_range * 0.40)
-    calc_three_quarter = prev_l + (prev_range * 0.60)
+    calc_quarter = prev_l + (prev_range * 0.01)
+    calc_three_quarter = prev_l + (prev_range * 0.99)
 
     # Determine green trend logic state
     is_green = (c >= calc_three_quarter)
