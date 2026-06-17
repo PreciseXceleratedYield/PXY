@@ -62,45 +62,46 @@ def get_3sma_oc2_ohlc(df, window=4):
     ha_l = np.minimum(ha_o, ha_c)
     return ha_o, ha_h, ha_l, ha_c
 
+import numpy as np
+
 def get_flipped_geometry_ohlc(o, h, l, c):
     """
-    Generates flipped candle geometry based on previous candle ranges (Mode 0)
-    - Open: 1/4 level of prev range if Green, 3/4 level if Red
-    - High: Raw high, forced up to prev close if Red
-    - Low: Raw low, forced down to prev close if Green
-    - Close: Standard close
+    Generates full-body flipped candle geometry (No Wicks).
+    - Open: 75% level of prev H-L range if Green, 25% level if Red
+    - High: Standard Raw High
+    - Low: Standard Raw Low
+    - Close: Standard Close
     """
     n = len(c)
     mod_o = np.zeros(n)
-    mod_h = np.zeros(n)
-    mod_l = np.zeros(n)
+    mod_h = h.copy()  # Keeps raw High (full body boundary)
+    mod_l = l.copy()  # Keeps raw Low (full body boundary)
     mod_c = c.copy()
 
-    # Calculate arrays shifted by 1 position representing the previous bar state
+    # Shift arrays by 1 to reference the past bar
     prev_h = np.roll(h, 1)
     prev_l = np.roll(l, 1)
     prev_c = np.roll(c, 1)
+    
+    # Range is the full body (High to Low)
     prev_range = prev_h - prev_l
 
-    # Target calculation matrices
+    # Calculate execution levels
     calc_quarter = prev_l + (prev_range * 0.25)
     calc_three_quarter = prev_l + (prev_range * 0.75)
 
-    # Determine green trend logic state
-    is_green = (c >= calc_three_quarter)
+    # Past candle is Green if its close is above or equal to its 75% level
+    was_green = (prev_c >= calc_three_quarter)
 
-    # Vectorized conditional geometry mapping
-    mod_o = np.where(is_green, calc_quarter, calc_three_quarter)
-    mod_h = np.where(is_green, h, np.maximum(h, prev_c))
-    mod_l = np.where(is_green, np.minimum(l, prev_c), l)
+    # Set incoming Open based on past candle state
+    mod_o = np.where(was_green, calc_three_quarter, calc_quarter)
 
-    # Seed initial row index to default raw states to handle missing boundary data gracefully
+    # Handle first index boundary fallback
     if n > 0:
         mod_o[0] = o[0]
-        mod_h[0] = h[0]
-        mod_l[0] = l[0]
 
     return mod_o, mod_h, mod_l, mod_c
+
 
 def apply_ohlc_transformation(df, mode=1):
     """Transforms raw arrays into distinct, complete structural OHLC formats"""
