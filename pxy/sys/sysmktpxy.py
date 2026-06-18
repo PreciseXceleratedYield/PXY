@@ -49,8 +49,7 @@ def _print_console_bar(c2_c, c1_c, c0_c, c2_color, c1_color, c0_color, entry, ex
 def get_signal(df):
     """ 
     Symmetric Live Ingestion Engine:
-    - Exit Horizon: Direct raw signal ingestion from upstream strategy cascade.
-    - Entry Horizon: Maps raw signals dynamically (BULL -> BUY, BEAR -> SELL).
+    - Directly extracts raw signal from upstream and passes it to entry/exit horizons.
     """
     if df is None or len(df) < 5:
         return "NONE", "NONE"
@@ -63,28 +62,20 @@ def get_signal(df):
             return "NONE", "NONE"
 
         # 2. EXTRACT PRE-COMPUTED STRAT MATRIX VALUES VIA UPSTREAM HOVER TIME SLICES
-        c2_color = str(calculated_df.iloc[-3]['pxy_color']).lower().strip()  # Past 2 Candle Color
-        c1_color = str(calculated_df.iloc[-2]['pxy_color']).lower().strip()  # Past 1 Candle Color (Last Closed)
-        c0_color = str(calculated_df.iloc[-1]['pxy_color']).lower().strip()  # Live Running Candle Color ("Now")
+        c2_color = str(calculated_df.iloc[-3]['pxy_color']).lower().strip()
+        c1_color = str(calculated_df.iloc[-2]['pxy_color']).lower().strip()
+        c0_color = str(calculated_df.iloc[-1]['pxy_color']).lower().strip()
 
-        # Extract absolute price metrics to feed back into the graphical ASCII printer
+        # Extract absolute price metrics for the visualizer
         c2_c = float(calculated_df.iloc[-3]['Close'])
         c1_c = float(calculated_df.iloc[-2]['Close'])
         c0_c = float(calculated_df.iloc[-1]['Close'])
 
-        # 3. DIRECT UPSTREAM INTEGRATION ON THE LIVE RUNNING CANDLE (-1)
+        # 3. DIRECT RAW SIGNAL PASS-THROUGH
         upstream_signal = str(calculated_df.iloc[-1]['pxy_signal']).upper().strip()
         
-        # Raw value pass straight to exit parameter logic
+        entry = upstream_signal
         exit_sig = upstream_signal
-
-        # Transmute entry states: map continuation signals straight into directional actions
-        if upstream_signal == "BULL":
-            entry = "BUY"
-        elif upstream_signal == "BEAR":
-            entry = "SELL"
-        else:
-            entry = upstream_signal
 
         # 4. DIAGNOSTICS
         if DEBUG:
@@ -109,11 +100,12 @@ if __name__ == "__main__":
             print(f"Successfully loaded {len(live_df)} rows of live streaming data.")
             
             entry_sig, exit_sig = get_signal(live_df)
-            print(f"\n⚡ LIVE ENGINE -> Entry (Mapped): {entry_sig} | Exit (Upstream): {exit_sig}\n")
+            print(f"\n⚡ LIVE ENGINE -> Entry (As-Is): {entry_sig} | Exit (As-Is): {exit_sig}\n")
         else:
             print("❌ Error: Upstream architecture returned an empty or invalid DataFrame.")
             
     except Exception as e:
         print(f"❌ Failed to execute live stream check: {e}")
+
 
 
