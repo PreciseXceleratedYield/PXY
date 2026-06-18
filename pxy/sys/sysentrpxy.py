@@ -1,116 +1,70 @@
 """
 ===============================================================================
-PXY OPTION ROUTING ENGINE: EXCLUSIVE SYMMETRIC TREND ROUTER (ATM / ATM)
+PXY OPTION ROUTING ENGINE: DIRECT EXCLUSIVE MULTI-SIGNAL ROUTER (ATM / ATM)
 ===============================================================================
-Operational Matrix (Strictly Blueprint Table Synced):
-- SUPER: BULL -> ENTRY: BULL     | EXIT: BULL
-- SUPER: BEAR -> ENTRY: BEAR     | EXIT: BEAR
-- SUPER: SELL -> ENTRY: ATMSELL  | SELL
-- SUPER: BUY  -> ENTRY: ATMBUY   | BUY
+Operational Matrix (Strict Priority Filter Rule Set):
+- STRND: BUY  -> ENTRY: ATMBUY   | EXIT: From Upstream (Priority Trigger)
+- STRND: SELL -> ENTRY: ATMSELL  | EXIT: From Upstream (Priority Trigger)
+- STRND: BULL -> ENTRY: ATMBUY if MKTPXY Entry == "BUY" else NONE
+- STRND: BEAR -> ENTRY: ATMSELL if MKTPXY Entry == "SELL" else NONE
 ===============================================================================
 """
 
-import numpy as np
 import pandas as pd
-import yfinance as yf
+
+# Direct structural pipeline imports from your local files
+from sysstrndpxy import get_signal as get_strnd_signal
+from sysmktpxy import get_signal as get_mkt_signals
 
 
-def get_entry_signal(df=None, symbol="^NSEI", period=1, factor=1.0):
-    """Calculates normal, industry-standard Supertrend using close-price confirmation.
+def calculate_option_route(df: pd.DataFrame = None) -> tuple:
+    """Combines inputs from strndpxy and mktpxy to calculate the direct 
 
-    Matches standard charts out-of-the-box.
+    option routing tokens, completely bypassing raw data fetching.
     """
-    # 1. ENFORCE COMPATIBILITY: CHECK IF THE FIRST ARGUMENT IS A DATAFRAME OR SYMBOL
-    if isinstance(df, str):
-        symbol = df
-        df = None
+    # 1. DIRECT INGESTION FROM UPSTREAM SOURCE PIPELINES
+    # Default to an empty dataframe to prevent internal crashes if none is passed
+    target_df = pd.DataFrame() if df is None else df
 
-    if df is None:
-        df = yf.download(symbol, period="5d", interval="1m", progress=False)
+    # Pull structural strategy signals directly
+    strnd_state = str(get_strnd_signal(target_df)).upper().strip()
 
-    if df is None or df.empty:
-        return "NONE", "NONE"
+    # Pull ingestion matrix signals directly (Straight take unpacker)
+    mkt_entry, mkt_exit = get_mkt_signals(target_df)
+    mkt_entry = str(mkt_entry).upper().strip()
+    mkt_exit = str(mkt_exit).upper().strip()
 
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = [col for col in df.columns]
+    # 2. ASSIGN UNALTERED CASCADED EXIT SIGNAL
+    # Explicitly leaves the exit signal from upstream completely as-is
+    exit_sig = mkt_exit
 
-    df = df.copy()
+    # 3. EXCLUSIVE PRIORITY FILTER ROUTING MATRIX
+    # Priority 1: Direct Active Crossing Signals from your strategy engine
+    if strnd_state == "BUY":
+        final_entry = "ATMBUY"
+    elif strnd_state == "SELL":
+        final_entry = "ATMSELL"
 
-    # Case-insensitive column verification
-    col_mapping = {col.lower(): col for col in df.columns}
-    for req in ["high", "low", "close"]:
-        if req not in col_mapping:
-            return "NONE", "NONE"
+    # Priority 2: Filtered Trend Regimes matched against mktpxy entry tokens
+    elif strnd_state == "BULL":
+        final_entry = "ATMBUY" if mkt_entry == "BUY" else "NONE"
+    elif strnd_state == "BEAR":
+        final_entry = "ATMSELL" if mkt_entry == "SELL" else "NONE"
 
-    high = df[col_mapping["high"]].values
-    low = df[col_mapping["low"]].values
-    close = df[col_mapping["close"]].values
-
-    # 2. CALCULATE STANDARD ATR (1-PERIOD)
-    prev_close = np.roll(close, 1)
-    prev_close[0] = close[0]
-
-    tr1 = high - low
-    tr2 = np.abs(high - prev_close)
-    tr3 = np.abs(low - prev_close)
-    tr = np.maximum(tr1, np.maximum(tr2, tr3))
-
-    # Calculate rolling mean (ATR) using standard pandas rolling windows
-    atr = pd.Series(tr).rolling(window=period, min_periods=1).mean().values
-
-    # 3. CLASSIC SUPERTREND CALCULATION ENGINE
-    hl2 = (high + low) / 2
-    basic_upper = hl2 + (factor * atr)
-    basic_lower = hl2 - (factor * atr)
-
-    upper_band = np.zeros(len(df))
-    lower_band = np.zeros(len(df))
-    trend = np.ones(len(df))  # 1 for Green/Buy, -1 for Red/Sell
-
-    for i in range(len(df)):
-        if i == 0:
-            upper_band[i] = basic_upper[i]
-            lower_band[i] = basic_lower[i]
-            continue
-
-        # Normal Supertrend trailing band calculations
-        if basic_upper[i] < upper_band[i - 1] or close[i - 1] > upper_band[i - 1]:
-            upper_band[i] = basic_upper[i]
-        else:
-            upper_band[i] = upper_band[i - 1]
-
-        if basic_lower[i] > lower_band[i - 1] or close[i - 1] < lower_band[i - 1]:
-            lower_band[i] = basic_lower[i]
-        else:
-            lower_band[i] = lower_band[i - 1]
-
-        # Normal trend direction switch using candle confirmation (Close Price)
-        if close[i] > upper_band[i]:
-            trend[i] = 1
-        elif close[i] < lower_band[i]:
-            trend[i] = -1
-        else:
-            trend[i] = trend[i - 1]
-
-    # Map numbers back to operational string matrix rules
-    super_state = "BUY" if trend[-1] == 1 else "SELL"
-
-    # 4. MATCH CODES ACCORDING TO THE BLUEPRINT MATRIX
-    if super_state == "BULL":
-        final_signal, exit_sig = "ATMBUY", "BULL"
-    elif super_state == "BEAR":
-        final_signal, exit_sig = "ATMSELL", "BEAR"
-    elif super_state == "SELL":
-        final_signal, exit_sig = "ATMSELL", "SELL"
-    elif super_state == "BUY":
-        final_signal, exit_sig = "ATMBUY", "BUY"
+    # Default fallback protection
     else:
-        final_signal, exit_sig = "NONE", "NONE"
+        final_entry = "NONE"
 
-    return final_signal, exit_sig
+    return final_entry, exit_sig
 
 
 if __name__ == "__main__":
-    final_route, cascaded_exit = get_entry_signal(df=None, symbol="^NSEI")
-    print(f"ENTRY: {final_route} | EXIT: {cascaded_exit}")
+    print("--- STARTING LIVE MULTI-SIGNAL EXCLUSIVE ROUTER HUB ---")
+
+    # Pass an empty placeholder to trigger the internal logic of your base modules
+    final_route, cascaded_exit = calculate_option_route(df=None)
+
+    print("\n⚡ PIPELINE RESULTS:")
+    print(f"-> FINAL ENTRY : {final_route}")
+    print(f"-> CASCADED EXIT: {cascaded_exit}\n")
 
