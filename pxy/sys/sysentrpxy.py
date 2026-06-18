@@ -5,8 +5,8 @@ PXY OPTION ROUTING ENGINE: EXCLUSIVE SYMMETRIC TREND ROUTER (ATM / ATM)
 Operational Matrix (Strictly Blueprint Table Synced):
 - SUPER: BULL -> ENTRY: BULL     | EXIT: BULL
 - SUPER: BEAR -> ENTRY: BEAR     | EXIT: BEAR
-- SUPER: SELL -> ENTRY: ATMSELL  | EXIT: SELL
-- SUPER: BUY  -> ENTRY: ATMBUY   | EXIT: BUY
+- SUPER: SELL -> ENTRY: ATMSELL  | SELL
+- SUPER: BUY  -> ENTRY: ATMBUY   | BUY
 ===============================================================================
 """
 
@@ -16,9 +16,9 @@ import yfinance as yf
 
 
 def get_entry_signal(df=None, symbol="^NSEI", period=1, factor=1.0):
-    """Calculates ATR & Supertrend inline using instantaneous touch confirmation
+    """Calculates normal, industry-standard Supertrend using close-price confirmation.
 
-    instead of waiting for candle close.
+    Matches standard charts out-of-the-box.
     """
     # 1. ENFORCE COMPATIBILITY: CHECK IF THE FIRST ARGUMENT IS A DATAFRAME OR SYMBOL
     if isinstance(df, str):
@@ -36,73 +36,64 @@ def get_entry_signal(df=None, symbol="^NSEI", period=1, factor=1.0):
 
     df = df.copy()
 
-    # Ensure required columns are present and case-insensitive
+    # Case-insensitive column verification
     col_mapping = {col.lower(): col for col in df.columns}
     for req in ["high", "low", "close"]:
         if req not in col_mapping:
             return "NONE", "NONE"
 
-    high = df[col_mapping["high"]]
-    low = df[col_mapping["low"]]
-    close = df[col_mapping["close"]]
-    prev_close = close.shift(1)
+    high = df[col_mapping["high"]].values
+    low = df[col_mapping["low"]].values
+    close = df[col_mapping["close"]].values
 
-    # 2. CALCULATE INLINE ATR (1-PERIOD)
+    # 2. CALCULATE STANDARD ATR (1-PERIOD)
+    prev_close = np.roll(close, 1)
+    prev_close[0] = close[0]
+
     tr1 = high - low
-    tr2 = (high - prev_close).abs()
-    tr3 = (low - prev_close).abs()
+    tr2 = np.abs(high - prev_close)
+    tr3 = np.abs(low - prev_close)
+    tr = np.maximum(tr1, np.maximum(tr2, tr3))
 
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    df["ATR"] = tr.rolling(window=period).mean()
+    # Calculate rolling mean (ATR) using standard pandas rolling windows
+    atr = pd.Series(tr).rolling(window=period, min_periods=1).mean().values
 
-    # 3. CALCULATE INLINE SUPERTREND BANDS
+    # 3. CLASSIC SUPERTREND CALCULATION ENGINE
     hl2 = (high + low) / 2
-    df["Basic_Upper"] = hl2 + (factor * df["ATR"])
-    df["Basic_Lower"] = hl2 - (factor * df["ATR"])
+    basic_upper = hl2 + (factor * atr)
+    basic_lower = hl2 - (factor * atr)
 
     upper_band = np.zeros(len(df))
     lower_band = np.zeros(len(df))
-    trend = np.zeros(len(df))  # 1 for Buy/Bull, -1 for Sell/Bear
+    trend = np.ones(len(df))  # 1 for Green/Buy, -1 for Red/Sell
 
-    # Compute bands iteratively across historical rows
     for i in range(len(df)):
         if i == 0:
-            upper_band[i] = df["Basic_Upper"].iloc[i]
-            lower_band[i] = df["Basic_Lower"].iloc[i]
-            trend[i] = 1
+            upper_band[i] = basic_upper[i]
+            lower_band[i] = basic_lower[i]
             continue
 
-        # Fast tracking upper band constraints
-        if (df["Basic_Upper"].iloc[i] < upper_band[i - 1]) or (
-            close.iloc[i - 1] > upper_band[i - 1]
-        ):
-            upper_band[i] = df["Basic_Upper"].iloc[i]
+        # Normal Supertrend trailing band calculations
+        if basic_upper[i] < upper_band[i - 1] or close[i - 1] > upper_band[i - 1]:
+            upper_band[i] = basic_upper[i]
         else:
             upper_band[i] = upper_band[i - 1]
 
-        # Fast tracking lower band constraints
-        if (df["Basic_Lower"].iloc[i] > lower_band[i - 1]) or (
-            close.iloc[i - 1] < lower_band[i - 1]
-        ):
-            lower_band[i] = df["Basic_Lower"].iloc[i]
+        if basic_lower[i] > lower_band[i - 1] or close[i - 1] < lower_band[i - 1]:
+            lower_band[i] = basic_lower[i]
         else:
             lower_band[i] = lower_band[i - 1]
 
-        # INSTANT TOUCH CONFIRMATION LOGIC
-        # High touching upper band triggers buy; Low touching lower band triggers sell
-        if high.iloc[i] >= upper_band[i]:
+        # Normal trend direction switch using candle confirmation (Close Price)
+        if close[i] > upper_band[i]:
             trend[i] = 1
-        elif low.iloc[i] <= lower_band[i]:
+        elif close[i] < lower_band[i]:
             trend[i] = -1
         else:
             trend[i] = trend[i - 1]
 
     # Map numbers back to operational string matrix rules
-    df["Signal"] = np.where(trend == 1, "BUY", "SELL")
-
-    last_idx = -1
-    raw_sig = df["Signal"].iloc[last_idx]
-    super_state = str(raw_sig).upper().strip()
+    super_state = "BUY" if trend[-1] == 1 else "SELL"
 
     # 4. MATCH CODES ACCORDING TO THE BLUEPRINT MATRIX
     if super_state == "BULL":
@@ -122,5 +113,4 @@ def get_entry_signal(df=None, symbol="^NSEI", period=1, factor=1.0):
 if __name__ == "__main__":
     final_route, cascaded_exit = get_entry_signal(df=None, symbol="^NSEI")
     print(f"ENTRY: {final_route} | EXIT: {cascaded_exit}")
-
 
