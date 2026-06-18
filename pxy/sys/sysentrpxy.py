@@ -1,4 +1,3 @@
-# sysentrpxy.py
 """
 ===============================================================================
 PXY OPTION ROUTING ENGINE: EXCLUSIVE SYMMETRIC TREND ROUTER (ATM / ATM)
@@ -24,7 +23,8 @@ def get_entry_signal(df=None):
         return "NONE", "NONE"
 
     # 1. EVALUATE MATRIX VALUES VIA 1-PERIOD / 1-FACTOR RULES
-    strnd_df = calculate_supertrend(df, period=1, factor=1.0)
+    # Arguments passed positionally to avoid keyword mismatch errors
+    strnd_df = calculate_supertrend(df, 1, 1.0)
     super_state = "NEUTRAL"
 
     if strnd_df is not None and not strnd_df.empty:
@@ -52,5 +52,6 @@ if __name__ == "__main__":
     # Standard independent execution loop block fetching data out of sysdtafpxy
     final_route, cascaded_exit = get_entry_signal(df=None)
     print(f"ENTRY: {final_route} | EXIT: {cascaded_exit}")
+
 
 
