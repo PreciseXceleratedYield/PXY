@@ -1,5 +1,5 @@
 # ===============================================================================
-# SINGLE PIPELINE ENGINE: PURE JUMPING 42 SMA TRACKING ENGINE LINE ONLY
+# SINGLE PIPELINE ENGINE: CORE 1:1 SUPERTREND ENGINE ONLY
 # ===============================================================================
 # sysstrndpxy.py
 import sys
@@ -21,14 +21,13 @@ from syscnfgpxy import TIMEZONE, TICKER
 
 # Global Config 
 DEBUG_MODE = False 
-CHECK_CONFIRMED_ONLY = True  # ⚡ True = Target the closed candle index (-2) | False = Target live running index (-1)
+CHECK_CONFIRMED_ONLY = False  # ⚡ False = Target live running index (-1) for real-time changes
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    PXY® Engine Strategy Matrix - Unified Single-Pipeline Line Engine.
-    Processes a single cohesive tracking line system over upstream Mode 0 candles:
-    - Jumping 42 SMA Tracking Engine Line directly over upstream pricing inputs.
-    Returns isolated categorical state flags to be matched downstream in the router.
+    Core 1:1 Supertrend Single-Pipeline Engine.
+    Uses a 1-period ATR and 1.0 Factor over the median price baseline.
+    Returns: BULL, BEAR, BUY, or SELL.
     """ 
     # 🎯 OVERRIDE: Fetch historical day-session buffer block from data pipeline file if empty
     try:
@@ -61,17 +60,15 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     src_close = df['Close'].to_numpy()
 
     # ===============================================================================
-    # 📡 UNIFIED PIPELINE TRACK: JUMPING 42 SMA TRACKING ENGINE LINE
+    # 📡 1:1 SUPERTREND ENGINE TRACK
     # ===============================================================================
-    sma_period = 42
-    atr_length = 3
-    atr_mult   = 3.0
+    atr_length = 1
+    atr_mult   = 1.0
     
-    # Step A: Base rolling calculation (ta.sma)
-    df['sma_baseline'] = df['Close'].rolling(window=sma_period, min_periods=1).mean()
-    sma_baseline = df['sma_baseline'].to_numpy()
+    # Core Supertrend standard tracking baseline (HL2)
+    hl2_baseline = (src_high + src_low) / 2.0
     
-    # Step B: Compute continuous true range over upstream Mode 0 inputs
+    # Compute continuous true range over upstream Mode 0 inputs
     tr_mod = np.zeros(n)
     tr_mod = src_high - src_low
     for i in range(1, n):
@@ -80,36 +77,29 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         t3 = abs(src_low[i] - src_close[i-1])
         tr_mod[i] = max(t1, t2, t3)
         
-    # Step C: Welles Wilder Smoothing matching Pine Script ta.atr() exactly
-    atr_val = np.zeros(n)
-    if n > 0:
-        atr_val = tr_mod.copy()
-        for i in range(1, n):
-            # Pine RMA formula: (prev * (length - 1) + current) / length
-            atr_val[i] = (atr_val[i-1] * (atr_length - 1) + tr_mod[i]) / atr_length
+    # 1-Period ATR Window (Direct TR mapping)
+    atr_val = tr_mod.copy()
 
-    basic_upper = sma_baseline + (atr_val * atr_mult)
-    basic_lower = sma_baseline - (atr_val * atr_mult)
+    basic_upper = hl2_baseline + (atr_val * atr_mult)
+    basic_lower = hl2_baseline - (atr_val * atr_mult)
 
     final_upper     = np.zeros(n)
     final_lower     = np.zeros(n)
     trend_direction = np.ones(n, dtype=int) # 1 = BULL, -1 = BEAR
 
     # Initialize the first index bar memory cells
-    final_upper[0] = basic_upper[0]
-    final_lower[0] = basic_lower[0]
-    trend_direction[0] = 1 if src_close[0] >= sma_baseline[0] else -1
+    final_upper = basic_upper
+    final_lower = basic_lower
+    trend_direction = 1 if src_close >= hl2_baseline else -1
 
     for i in range(1, n):
-        # ---- UPPER TRAIL LOCK (Exact copy of Pine's ternary logic) ----
-        # final_upper := ((basic_upper < final_upper or close > final_upper) ? basic_upper : final_upper)
+        # ---- UPPER TRAIL LOCK ----
         if (basic_upper[i] < final_upper[i-1]) or (src_close[i-1] > final_upper[i-1]):
             final_upper[i] = basic_upper[i]
         else:
             final_upper[i] = final_upper[i-1]
 
-        # ---- LOWER TRAIL LOCK (Exact copy of Pine's ternary logic) ----
-        # final_lower := ((basic_lower > final_lower or close < final_lower) ? basic_lower : final_lower)
+        # ---- LOWER TRAIL LOCK ----
         if (basic_lower[i] > final_lower[i-1]) or (src_close[i-1] < final_lower[i-1]):
             final_lower[i] = basic_lower[i]
         else:
@@ -139,14 +129,14 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             sma_trend_history.append(raw_sma_regime)
             continue 
 
-        # --- PIPELINE GATING: JUMPING 42 SMA ENGINE SWITCHES ---
+        # --- PIPELINE GATING: JUMPING 1:1 SUPERTREND SWITCHES ---
         sma_cross_buy  = (trend_direction[i] == 1)  and (trend_direction[i-1] == -1)
         sma_cross_sell = (trend_direction[i] == -1) and (trend_direction[i-1] == 1)
 
         if sma_cross_buy:
-            sma_trend_history.append("TBUY")
+            sma_trend_history.append("BUY")
         elif sma_cross_sell:
-            sma_trend_history.append("TSELL")
+            sma_trend_history.append("SELL")
         else:
             sma_trend_history.append(raw_sma_regime)
 
@@ -223,11 +213,12 @@ def get_signal(df: pd.DataFrame) -> str:
         if DEBUG_MODE:
             print(f"Critical execution fault in system signal unpacker: {e}")
         return "NONE"
+
 # ===============================================================================
 # 🚀 DIRECT LIVE PRODUCTION EXECUTION BLOCK
 # ===============================================================================
 if __name__ == "__main__":
-    print("--- STARTING LIVE PXY JUMPING 42 SMA MONITOR ENGINE ---")
+    print("--- STARTING LIVE PXY JUMPING 1:1 MONITOR ENGINE ---")
     
     # Initialize empty DataFrame to trigger internal live data pipeline fetcher
     live_df = pd.DataFrame()
@@ -256,3 +247,4 @@ if __name__ == "__main__":
         export_supertrend_json()
     else:
         print("CRITICAL: Engine calculation aborted | Upstream data stream arrived empty.")
+
