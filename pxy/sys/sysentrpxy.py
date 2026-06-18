@@ -113,9 +113,9 @@ def get_entry_signal(df=None, symbol="^NSEI", period=1, factor=1.0):
 
     # 4. MATCH CODES ACCORDING TO THE BLUEPRINT MATRIX
     if super_state == "BULL":
-        final_signal, exit_sig = "BULL", "BULL"
+        final_signal, exit_sig = "ATMBUY", "BULL"
     elif super_state == "BEAR":
-        final_signal, exit_sig = "BEAR", "BEAR"
+        final_signal, exit_sig = "ATMSELL", "BEAR"
     elif super_state == "SELL":
         final_signal, exit_sig = "ATMSELL", "SELL"
     elif super_state == "BUY":
@@ -125,10 +125,5 @@ def get_entry_signal(df=None, symbol="^NSEI", period=1, factor=1.0):
 
     return final_signal, exit_sig
 
-
-if __name__ == "__main__":
-    # Standard independent execution loop block fetching data dynamically via yfinance
-    final_route, cascaded_exit = get_entry_signal(df=None, symbol="^NSEI")
-    print(f"ENTRY: {final_route} | EXIT: {cascaded_exit}")
 
 
