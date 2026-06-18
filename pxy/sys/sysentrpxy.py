@@ -3,61 +3,54 @@
 ===============================================================================
 PXY OPTION ROUTING ENGINE: EXCLUSIVE SYMMETRIC TREND ROUTER (ATM / ATM)
 ===============================================================================
-Operational Rules:
-- EXIT raw signals cascade unmutated to the very end.
-- ENTRY signals arrive pre-converted from sysmktpxy strictly as BUY or SELL.
-- Strike Selection:
-  - Trend Aligned     -> ATM BUY / ATM SELL
-  - Trend Not Aligned -> ATM BUY / ATM SELL
+Operational Matrix (Strictly Blueprint Table Synced):
+- SUPER: BULL -> ENTRY: BULL     | EXIT: BULL
+- SUPER: BEAR -> ENTRY: BEAR     | EXIT: BEAR
+- SUPER: SELL -> ENTRY: ATMSELL  | EXIT: SELL
+- SUPER: BUY  -> ENTRY: ATMBUY   | EXIT: BUY
 ===============================================================================
 """
 
-from sysmktpxy import get_signal
+from sysdtafpxy import fetch_yf_data  # Natively gets data here
 from sysstrndpxy import calculate_supertrend
 
-def get_entry_signal(df):
+
+def get_entry_signal(df=None):
+    # If no data frame is supplied into parameters, automatically extract from sysdtafpxy source
+    if df is None:
+        df = fetch_yf_data()
+
     if df is None or df.empty:
         return "NONE", "NONE"
 
-    # 1. READ RAW CASCADED PIPELINE STATES FROM GATEWAY
-    # raw_entry is already guaranteed by sysmktpxy to be only "BUY", "SELL", or "NONE"
-    raw_entry, exit_sig = get_signal(df)
-    exit_sig = str(exit_sig).upper().strip()
-    entry_sig = str(raw_entry).upper().strip()
-
-    if entry_sig not in ["BUY", "SELL"]:
-        return "NONE", exit_sig
-
-    # 2. EVALUATE SUPERTREND ALIGNMENT
-    strnd_df = calculate_supertrend(df)
-    strnd_trend = "NEUTRAL"
+    # 1. EVALUATE MATRIX VALUES VIA 1-PERIOD / 1-FACTOR RULES
+    strnd_df = calculate_supertrend(df, period=1, factor=1.0)
+    super_state = "NEUTRAL"
 
     if strnd_df is not None and not strnd_df.empty:
         try:
-            strnd_trend = str(strnd_df.iloc[-1]['sma_trend_full']).upper().strip()   
+            super_state = str(strnd_df.iloc[-1]["Signal"]).upper().strip()
         except Exception:
             pass
 
-    # Establish absolute direction flags from the master supertrend line
-    is_trend_bull = strnd_trend in ["BUY", "TBUY", "BULL"]
-    is_trend_bear = strnd_trend in ["SELL", "TSELL", "BEAR"]
-
-    # 3. EXCLUSIVE SYMMETRIC STRIKE ROUTING PROCESSING
-    if entry_sig == "BUY":
-        # Trend Aligned -> ATM | Trend Not Aligned -> ATM
-        final_signal = "ATMBUY" if is_trend_bull else "ATMBUY"
-        
-    else:  # entry_sig is strictly "SELL"
-        # Trend Aligned -> ATM | Trend Not Aligned -> ATM
-        final_signal = "ATMSELL" if is_trend_bear else "ATMSELL"
+    # 2. MATCH CODES ACCORDING TO YOUR Blueprint MATRIX IMAGE
+    if super_state == "BULL":
+        final_signal, exit_sig = "BULL", "BULL"
+    elif super_state == "BEAR":
+        final_signal, exit_sig = "BEAR", "BEAR"
+    elif super_state == "SELL":
+        final_signal, exit_sig = "ATMSELL", "SELL"
+    elif super_state == "BUY":
+        final_signal, exit_sig = "ATMBUY", "BUY"
+    else:
+        final_signal, exit_sig = "NONE", "NONE"
 
     return final_signal, exit_sig
 
+
 if __name__ == "__main__":
-    from sysdthapxy import get_pxy_data
-    _, _, _, live_df = get_pxy_data(df=None)
-    
-    if not live_df.empty:
-        final_route, cascaded_exit = get_entry_signal(live_df)
-        print(f"ROUTE TARGET CONTRACT: {final_route} | UNMUTATED EXIT SIGNAL: {cascaded_exit}")
+    # Standard independent execution loop block fetching data out of sysdtafpxy
+    final_route, cascaded_exit = get_entry_signal(df=None)
+    print(f"ENTRY: {final_route} | EXIT: {cascaded_exit}")
+
 
