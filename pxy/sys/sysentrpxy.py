@@ -16,25 +16,21 @@ import yfinance as yf
 
 
 def get_entry_signal(df=None, symbol="^NSEI", period=1, factor=1.0):
-    """Calculates ATR & Supertrend inline. Accepts either an existing DataFrame
+    """Calculates ATR & Supertrend inline using instantaneous touch confirmation
 
-    or a ticker symbol string to download data automatically.
+    instead of waiting for candle close.
     """
     # 1. ENFORCE COMPATIBILITY: CHECK IF THE FIRST ARGUMENT IS A DATAFRAME OR SYMBOL
-    # If the user passed a string as the first positional argument, treat it as symbol
     if isinstance(df, str):
         symbol = df
         df = None
 
-    # If no DataFrame is passed or available, fetch it from yfinance directly
     if df is None:
         df = yf.download(symbol, period="5d", interval="1m", progress=False)
 
     if df is None or df.empty:
-        print(f"[DEBUG] DataFrame is None or empty. (Symbol: {symbol})")
         return "NONE", "NONE"
 
-    # Flatten multi-index columns if present (common in newer yfinance versions)
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = [col for col in df.columns]
 
@@ -44,10 +40,8 @@ def get_entry_signal(df=None, symbol="^NSEI", period=1, factor=1.0):
     col_mapping = {col.lower(): col for col in df.columns}
     for req in ["high", "low", "close"]:
         if req not in col_mapping:
-            print(f"[DEBUG] Missing required column: '{req}'. Available columns: {list(df.columns)}")
             return "NONE", "NONE"
 
-    # Normalize internal variable mapping to data columns
     high = df[col_mapping["high"]]
     low = df[col_mapping["low"]]
     close = df[col_mapping["close"]]
@@ -59,18 +53,16 @@ def get_entry_signal(df=None, symbol="^NSEI", period=1, factor=1.0):
     tr3 = (low - prev_close).abs()
 
     tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    # 1-period ATR is simply the True Range itself
     df["ATR"] = tr.rolling(window=period).mean()
 
-    # 3. CALCULATE INLINE SUPERTREND (1-PERIOD, 1.0 MULTIPLIER)
+    # 3. CALCULATE INLINE SUPERTREND BANDS
     hl2 = (high + low) / 2
     df["Basic_Upper"] = hl2 + (factor * df["ATR"])
     df["Basic_Lower"] = hl2 - (factor * df["ATR"])
 
-    # Initialize tracking bands and trend tracks
     upper_band = np.zeros(len(df))
     lower_band = np.zeros(len(df))
-    trend = np.zeros(len(df))  # 1 for Green/Buy/Bull, -1 for Red/Sell/Bear
+    trend = np.zeros(len(df))  # 1 for Buy/Bull, -1 for Sell/Bear
 
     # Compute bands iteratively across historical rows
     for i in range(len(df)):
@@ -96,10 +88,11 @@ def get_entry_signal(df=None, symbol="^NSEI", period=1, factor=1.0):
         else:
             lower_band[i] = lower_band[i - 1]
 
-        # Toggle structural trend direction flipped by close breakers
-        if close.iloc[i] > upper_band[i]:
+        # INSTANT TOUCH CONFIRMATION LOGIC
+        # High touching upper band triggers buy; Low touching lower band triggers sell
+        if high.iloc[i] >= upper_band[i]:
             trend[i] = 1
-        elif close.iloc[i] < lower_band[i]:
+        elif low.iloc[i] <= lower_band[i]:
             trend[i] = -1
         else:
             trend[i] = trend[i - 1]
@@ -125,5 +118,9 @@ def get_entry_signal(df=None, symbol="^NSEI", period=1, factor=1.0):
 
     return final_signal, exit_sig
 
+
+if __name__ == "__main__":
+    final_route, cascaded_exit = get_entry_signal(df=None, symbol="^NSEI")
+    print(f"ENTRY: {final_route} | EXIT: {cascaded_exit}")
 
 
