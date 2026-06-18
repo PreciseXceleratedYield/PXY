@@ -12,18 +12,17 @@ Operational Matrix (Strict Priority Filter Rule Set):
 
 import pandas as pd
 
-# Direct structural pipeline imports from your local files
+# Direct structural pipeline imports from your local engine modules
 from sysstrndpxy import get_signal as get_strnd_signal
 from sysmktpxy import get_signal as get_mkt_signals
 
 
-def calculate_option_route(df: pd.DataFrame = None) -> tuple:
+def get_entry_signal(df=None):
     """Combines inputs from strndpxy and mktpxy to calculate the direct 
 
-    option routing tokens, completely bypassing raw data fetching.
+    option routing tokens, matched 1:1 for execution framework compatibility.
     """
     # 1. DIRECT INGESTION FROM UPSTREAM SOURCE PIPELINES
-    # Default to an empty dataframe to prevent internal crashes if none is passed
     target_df = pd.DataFrame() if df is None else df
 
     # Pull structural strategy signals directly
@@ -41,30 +40,29 @@ def calculate_option_route(df: pd.DataFrame = None) -> tuple:
     # 3. EXCLUSIVE PRIORITY FILTER ROUTING MATRIX
     # Priority 1: Direct Active Crossing Signals from your strategy engine
     if strnd_state == "BUY":
-        final_entry = "ATMBUY"
+        final_signal = "ATMBUY"
     elif strnd_state == "SELL":
-        final_entry = "ATMSELL"
+        final_signal = "ATMSELL"
 
     # Priority 2: Filtered Trend Regimes matched against mktpxy entry tokens
     elif strnd_state == "BULL":
-        final_entry = "ATMBUY" if mkt_entry == "BUY" else "NONE"
+        final_signal = "ATMBUY" if mkt_entry == "BUY" else "NONE"
     elif strnd_state == "BEAR":
-        final_entry = "ATMSELL" if mkt_entry == "SELL" else "NONE"
+        final_signal = "ATMSELL" if mkt_entry == "SELL" else "NONE"
 
     # Default fallback protection
     else:
-        final_entry = "NONE"
+        final_signal = "NONE"
 
-    return final_entry, exit_sig
+    return final_signal, exit_sig
 
 
 if __name__ == "__main__":
     print("--- STARTING LIVE MULTI-SIGNAL EXCLUSIVE ROUTER HUB ---")
+    final_route, cascaded_exit = get_entry_signal(df=None)
 
-    # Pass an empty placeholder to trigger the internal logic of your base modules
-    final_route, cascaded_exit = calculate_option_route(df=None)
-
-    print("\n⚡ PIPELINE RESULTS:")
+    print("\n⚡ PIPELINE DIAGNOSTICS:")
     print(f"-> FINAL ENTRY : {final_route}")
     print(f"-> CASCADED EXIT: {cascaded_exit}\n")
+
 
