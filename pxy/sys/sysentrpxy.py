@@ -35,9 +35,9 @@ def get_entry_signal(df=None):
 
     # 2. MATCH CODES ACCORDING TO YOUR Blueprint MATRIX IMAGE
     if super_state == "BULL":
-        final_signal, exit_sig = "BULL", "BULL"
+        final_signal, exit_sig = "ATMBUY", "BULL"
     elif super_state == "BEAR":
-        final_signal, exit_sig = "BEAR", "BEAR"
+        final_signal, exit_sig = "ATMSELL", "BEAR"
     elif super_state == "SELL":
         final_signal, exit_sig = "ATMSELL", "SELL"
     elif super_state == "BUY":
