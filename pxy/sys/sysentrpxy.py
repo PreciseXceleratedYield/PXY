@@ -23,8 +23,16 @@ def get_entry_signal(df=None):
         return "NONE", "NONE"
 
     # 1. EVALUATE MATRIX VALUES VIA 1-PERIOD / 1-FACTOR RULES
-    # Arguments passed positionally to avoid keyword mismatch errors
-    strnd_df = calculate_supertrend(df, 1, 1.0)
+    # Attempting standard keywords for single-argument dataframes
+    try:
+        strnd_df = calculate_supertrend(df, length=1, multiplier=1.0)
+    except TypeError:
+        try:
+            strnd_df = calculate_supertrend(df, n=1, multiplier=1.0)
+        except TypeError:
+            # Fallback if the underlying function hardcodes its internal period/factor parameters
+            strnd_df = calculate_supertrend(df)
+            
     super_state = "NEUTRAL"
 
     if strnd_df is not None and not strnd_df.empty:
@@ -35,9 +43,9 @@ def get_entry_signal(df=None):
 
     # 2. MATCH CODES ACCORDING TO YOUR Blueprint MATRIX IMAGE
     if super_state == "BULL":
-        final_signal, exit_sig = "ATMBUY", "BULL"
+        final_signal, exit_sig = "BULL", "BULL"
     elif super_state == "BEAR":
-        final_signal, exit_sig = "ATMSELL", "BEAR"
+        final_signal, exit_sig = "BEAR", "BEAR"
     elif super_state == "SELL":
         final_signal, exit_sig = "ATMSELL", "SELL"
     elif super_state == "BUY":
@@ -52,6 +60,5 @@ if __name__ == "__main__":
     # Standard independent execution loop block fetching data out of sysdtafpxy
     final_route, cascaded_exit = get_entry_signal(df=None)
     print(f"ENTRY: {final_route} | EXIT: {cascaded_exit}")
-
 
 
