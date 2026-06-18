@@ -87,10 +87,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     final_lower     = np.zeros(n)
     trend_direction = np.ones(n, dtype=int) # 1 = BULL, -1 = BEAR
 
-    # Initialize the first index bar memory cells
-    final_upper = basic_upper
-    final_lower = basic_lower
-    trend_direction = 1 if src_close >= hl2_baseline else -1
+    # Initialize the first index bar memory cells Safely across Vector
+    final_upper = basic_upper.copy()
+    final_lower = basic_lower.copy()
+    trend_direction = np.where(src_close >= hl2_baseline, 1, -1)
 
     for i in range(1, n):
         # ---- UPPER TRAIL LOCK ----
