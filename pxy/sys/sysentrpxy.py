@@ -15,31 +15,45 @@ import pandas as pd
 import yfinance as yf
 
 
-def get_entry_signal(symbol="^NSEI", period=1, factor=1.0):
-    """Downloads Yahoo Finance data, calculates ATR & Supertrend inline,
+def get_entry_signal(df=None, symbol="^NSEI", period=1, factor=1.0):
+    """Calculates ATR & Supertrend inline. Accepts either an existing DataFrame
 
-    and maps the final signal matching the operational blueprint.
+    or a ticker symbol string to download data automatically.
     """
-    # 1. FETCH YF DATA DIRECTLY
-    # Using 5d history to ensure enough lookback rows for 1-period calculations
-    df = yf.download(symbol, period="5d", interval="1m", progress=False)
+    # 1. ENFORCE COMPATIBILITY: CHECK IF THE FIRST ARGUMENT IS A DATAFRAME OR SYMBOL
+    # If the user passed a string as the first positional argument, treat it as symbol
+    if isinstance(df, str):
+        symbol = df
+        df = None
+
+    # If no DataFrame is passed or available, fetch it from yfinance directly
+    if df is None:
+        df = yf.download(symbol, period="5d", interval="1m", progress=False)
 
     if df is None or df.empty:
-        print(f"[DEBUG] Failed to fetch data for {symbol} from Yahoo Finance.")
+        print(f"[DEBUG] DataFrame is None or empty. (Symbol: {symbol})")
         return "NONE", "NONE"
 
     # Flatten multi-index columns if present (common in newer yfinance versions)
     if isinstance(df.columns, pd.MultiIndex):
-        df.columns = [col[0] for col in df.columns]
+        df.columns = [col for col in df.columns]
 
     df = df.copy()
 
-    # 2. CALCULATE INLINE ATR (1-PERIOD)
-    high = df["High"]
-    low = df["Low"]
-    close = df["Close"]
-    prev_close = df["Close"].shift(1)
+    # Ensure required columns are present and case-insensitive
+    col_mapping = {col.lower(): col for col in df.columns}
+    for req in ["high", "low", "close"]:
+        if req not in col_mapping:
+            print(f"[DEBUG] Missing required column: '{req}'. Available columns: {list(df.columns)}")
+            return "NONE", "NONE"
 
+    # Normalize internal variable mapping to data columns
+    high = df[col_mapping["high"]]
+    low = df[col_mapping["low"]]
+    close = df[col_mapping["close"]]
+    prev_close = close.shift(1)
+
+    # 2. CALCULATE INLINE ATR (1-PERIOD)
     tr1 = high - low
     tr2 = (high - prev_close).abs()
     tr3 = (low - prev_close).abs()
@@ -93,12 +107,8 @@ def get_entry_signal(symbol="^NSEI", period=1, factor=1.0):
     # Map numbers back to operational string matrix rules
     df["Signal"] = np.where(trend == 1, "BUY", "SELL")
 
-    # Override standard labels if explicit BULL/BEAR conditions are detected
-    # (e.g. if close breaks extreme bands with large extension)
     last_idx = -1
     raw_sig = df["Signal"].iloc[last_idx]
-
-    # Additional structural safety check to avoid lookback errors
     super_state = str(raw_sig).upper().strip()
 
     # 4. MATCH CODES ACCORDING TO THE BLUEPRINT MATRIX
@@ -117,8 +127,8 @@ def get_entry_signal(symbol="^NSEI", period=1, factor=1.0):
 
 
 if __name__ == "__main__":
-    # Runs automatically using Nifty 50 Index tracking ticker (^NSEI) as default
-    final_route, cascaded_exit = get_entry_signal(symbol="^NSEI")
+    # Standard independent execution loop block fetching data dynamically via yfinance
+    final_route, cascaded_exit = get_entry_signal(df=None, symbol="^NSEI")
     print(f"ENTRY: {final_route} | EXIT: {cascaded_exit}")
 
 
