@@ -37,11 +37,11 @@ def get_sma(df: pd.DataFrame, period: int = 42) -> dict:
         "df_with_sma": df  # Return df to pass to json exporter
     }
 
-def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "SiblingFolderName") -> None:
+def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
     """
     Constructs a single-candle OHLC row using the latest data point.
     O = Latest SMA, H = Latest High, L = Latest Low, C = Latest Close.
-    Overwrites websmapxy.json in the sibling directory.
+    Overwrites websmapxy.json in the specified sibling directory.
     """
     if df is None or df.empty or 'SMA' not in df.columns:
         print("Invalid data. Cannot dump single candle JSON.")
@@ -58,7 +58,7 @@ def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "SiblingFolderNam
         'C': float(latest_row['Close'])
     }]
     
-    # Build absolute paths for sibling folder
+    # Build absolute paths for sibling folder 'web'
     base_dir = os.path.dirname(os.path.abspath(__file__))
     parent_dir = os.path.dirname(base_dir)
     sibling_dir = os.path.join(parent_dir, target_folder_name)
@@ -69,7 +69,7 @@ def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "SiblingFolderNam
     # Save (always replaces existing file)
     json_path = os.path.join(sibling_dir, 'websmapxy.json')
     
-    # Dump directly using pandas frame to match formatting
+    # Dump directly using pandas frame
     pd.DataFrame(candle_data).to_json(json_path, orient='records', indent=4)
     print(f"Candle data replaced successfully at: {json_path}")
 
@@ -91,8 +91,6 @@ if __name__ == "__main__":
             
         print(f"\n{color}{output}{Style.RESET_ALL}\n")
         
-        # Dump the single latest row to the sibling folder
+        # Dump the single latest row to the 'web' folder
         if "df_with_sma" in result:
-            dump_ohlc_json(result["df_with_sma"], target_folder_name="SiblingFolderName")
-
-
+            dump_ohlc_json(result["df_with_sma"], target_folder_name="web")
