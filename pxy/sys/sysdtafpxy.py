@@ -62,14 +62,10 @@ def get_3sma_oc2_ohlc(df, window=4):
     ha_l = np.minimum(ha_o, ha_c)
     return ha_o, ha_h, ha_l, ha_c
 
-import numpy as np
-
-import numpy as np
-
 def get_flipped_geometry_ohlc(o, h, l, c):
     """
-    Generates candle geometry based on previous candle ranges (Mode 50% Midpoint)
-    - Open: Exact center (High + Low) / 2 of the previous candle range
+    Generates flipped candle geometry based on previous candle ranges (Mode 0)
+    - Open: 1/4 level of prev range if Green, 3/4 level if Red
     - High: Raw high, forced up to prev close if Red
     - Low: Raw low, forced down to prev close if Green
     - Close: Standard close
@@ -84,15 +80,17 @@ def get_flipped_geometry_ohlc(o, h, l, c):
     prev_h = np.roll(h, 1)
     prev_l = np.roll(l, 1)
     prev_c = np.roll(c, 1)
+    prev_range = prev_h - prev_l
 
-    # Simplified threshold calculation: pure (H + L) / 2 midpoint of the previous bar
-    calc_midpoint = (prev_h + prev_l) / 2.0
+    # Target calculation matrices
+    calc_quarter = prev_l + (prev_range * 0.25)
+    calc_three_quarter = prev_l + (prev_range * 0.75)
 
-    # Determine green trend logic state based on the midpoint
-    is_green = (c >= calc_midpoint)
+    # Determine green trend logic state
+    is_green = (c >= calc_three_quarter)
 
     # Vectorized conditional geometry mapping
-    mod_o = np.full(n, calc_midpoint)  # Next candle open is strictly previous midpoint
+    mod_o = np.where(is_green, calc_quarter, calc_three_quarter)
     mod_h = np.where(is_green, h, np.maximum(h, prev_c))
     mod_l = np.where(is_green, np.minimum(l, prev_c), l)
 
@@ -103,9 +101,6 @@ def get_flipped_geometry_ohlc(o, h, l, c):
         mod_l[0] = l[0]
 
     return mod_o, mod_h, mod_l, mod_c
-
-
-
 
 def apply_ohlc_transformation(df, mode=1):
     """Transforms raw arrays into distinct, complete structural OHLC formats"""
@@ -189,5 +184,3 @@ if __name__ == "__main__":
     output_df = fetch_yf_data()
     if not output_df.empty:
         print(f"ENGINE_RUN_SUCCESS | Collected Rows Count: {len(output_df)}")
-
-
