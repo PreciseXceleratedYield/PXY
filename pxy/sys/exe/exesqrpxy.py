@@ -1,6 +1,6 @@
-# exesqrpxy.py
 import sys 
 import os 
+import subprocess
 
 # Add the 'run' subfolder of the current script to Python path 
 current_dir = os.path.dirname(os.path.abspath(__file__)) 
@@ -54,7 +54,24 @@ def place_exit_order(client, row):
         } 
         
         print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ EXITING POSITION: {symbol} Qty: {qty} | TAG: {final_tag}") 
-        return client.place_order(**params) 
+        
+        # FIX: Defined order_response properly first, then executed background script
+        order_response = client.place_order(**params) 
+        
+        # --- SURGICAL BACKGROUND LAUNCHER ---
+        if order_response:
+            try:
+                parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                script_path = os.path.join(parent_dir, "sysddmppxy.py")
+                if os.path.exists(script_path):
+                    subprocess.Popen(["python3", script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                else:
+                    print(f"{Fore.RED}❌ Script not found at {script_path}")
+            except Exception as script_err:
+                print(f"{Fore.RED}❌ Error launching script: {script_err}")
+
+        return order_response
+
     except Exception as e: 
         print(f"{Fore.RED}❌ Exit Order Error for {row.get('symbol')}: {e}") 
         return None 
@@ -96,7 +113,6 @@ def exit_all_positions():
             
         if now < exit_all_after: 
             if direction == "UP" and "PE" in symbol: 
-                # FIX: Passed the entire row object to handle tag extraction
                 place_exit_order(client, row) 
             elif direction == "DOWN" and "CE" in symbol: 
                 place_exit_order(client, row) 
