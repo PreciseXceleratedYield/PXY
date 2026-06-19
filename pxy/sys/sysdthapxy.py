@@ -5,7 +5,7 @@ from sysdtafpxy import fetch_yf_data
 from syscnfgpxy import OHLC_MODE  # Dynamically ingest the true active mode
 
 # ⚡ LIVE ENFORCEMENT ACTIVATED: Set to True to stream active forming bars dynamically
-USE_FORMING_CANDLE = True  
+USE_FORMING_CANDLE = False  
 
 def get_pxy_data(tickerSymbol=None, df=None):
     if df is None:
