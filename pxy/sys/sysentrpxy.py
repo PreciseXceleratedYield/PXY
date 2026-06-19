@@ -1,20 +1,15 @@
 """
 ===============================================================================
-PXY OPTION ROUTING ENGINE: TWO-TIER UNIFIED ATM MASTER ROUTER
+PXY OPTION ROUTING ENGINE: TWO-TIER SMA BOUNDARY COMPASS MASTER ROUTER
 ===============================================================================
-Operational Matrix & Unified Token Routing Rules:
-- TIER 1 (PRIMARY ABSOLUTE PRIORITY): 
-  ATMBUY  -> Triggered ONLY on an exact active breakthrough CROSSOVER (BUY).
-  ATMSELL -> Triggered ONLY on an exact active breakthrough CROSSOVER (SELL).
+Operational Matrix & Absolute SMA Boundary Filters:
+- GLOBAL HARD BIAS GATES:
+  * ATMBUY is ONLY allowed if Close > 42 SMA. Otherwise, forces NONE.
+  * ATMSELL is ONLY allowed if Close < 42 SMA. Otherwise, forces NONE.
 
-- TIER 2 (SECONDARY FIXED PRIORITY - UNIFIED): 
-  ATMBUY  -> Triggered contextually when price is in the middle:
-             Strictly ABOVE the 42 SMA AND Strictly BELOW the Supertrend (ST)
-             AND SMA is BULL, ST is BEAR, and Entry is BUY.
-             
-  ATMSELL -> Triggered contextually when price is in the middle:
-             Strictly BELOW the 42 SMA AND Strictly ABOVE the Supertrend (ST)
-             AND SMA is BEAR, ST is BULL, and Entry is SELL.
+- EXPLICIT CANCELLATION BLOCKS (FORCED TO NONE):
+  * A downside cross below ST that happens ABOVE the SMA becomes NONE.
+  * An upside cross above ST that happens BELOW the SMA becomes NONE.
 ===============================================================================
 """
 
@@ -31,7 +26,7 @@ def get_entry_signal(df=None):
     """
     Calculates 1:1 option routing tokens. Enforces crossovers as absolute 
     first priority, and strictly aligned middle-zone entries as second priority.
-    All successful route selections are unified strictly to ATM contract codes.
+    All paths pass through an absolute SMA filtering barrier before release.
     """
     # 1. DIRECT INGESTION FROM UPSTREAM SOURCE PIPELINES
     target_df = pd.DataFrame() if df is None else df.copy()
@@ -67,37 +62,53 @@ def get_entry_signal(df=None):
     # ===============================================================================
     # 📡 TIER 1: CROSSOVER BREAKOUT TRIGGERS (ABSOLUTE FIRST PRIORITY)
     # ===============================================================================
-    # Checks for active crossover breakouts first to override all middle-zone signals
+    # Checks for active crossover breakouts first
     if strnd_state == "BUY" or sma_state == "BUY":
         final_signal = "ATMBUY"
-        return final_signal, exit_sig
         
     elif strnd_state == "SELL" or sma_state == "SELL":
         final_signal = "ATMSELL"
-        return final_signal, exit_sig
 
     # ===============================================================================
-    # 🔄 TIER 2: CONTEXTUAL MIDDLE ENTRY SIGNALS (STRICT SECOND PRIORITY)
+    # 🔄 TIER 2: CONTEXTUAL MIDDLE ENTRY SIGNALS (SECONDARY PRIORITY)
     # ===============================================================================
-    # Checked ONLY if no active crossover breakthrough is currently printing
+    # Checked ONLY if no active crossover breakthrough was captured above
+    else:
+        # 🟢 UNIFIED ATM BUY FLIP ZONE: Price is trapped in the middle
+        if latest_close > latest_sma and latest_close < latest_st_line:
+            if sma_state == "BULL" and strnd_state == "BEAR" and mkt_entry == "BUY":
+                final_signal = "ATMBUY"
+            
+        # 🔴 UNIFIED ATM SELL FLIP ZONE: Price is trapped in the middle
+        elif latest_close < latest_sma and latest_close > latest_st_line:
+            if sma_state == "BEAR" and strnd_state == "BULL" and mkt_entry == "SELL":
+                final_signal = "ATMSELL"
+
+    # ===============================================================================
+    # ⛔ CRITICAL STEP 4: ABSOLUTE SMA PHYSICAL LOCATION GATING OVERRIDES
+    # ===============================================================================
+    # Enforces the absolute baseline rules. Intercepts and blocks invalid spatial crosses.
     
-    # 🟢 UNIFIED ATM BUY FLIP ZONE: Price is trapped in the middle
-    if latest_close > latest_sma and latest_close < latest_st_line:
-        if sma_state == "BULL" and strnd_state == "BEAR" and mkt_entry == "BUY":
-            final_signal = "ATMBUY"
-        
-    # 🔴 UNIFIED ATM SELL FLIP ZONE: Price is trapped in the middle
-    elif latest_close < latest_sma and latest_close > latest_st_line:
-        if sma_state == "BEAR" and strnd_state == "BULL" and mkt_entry == "SELL":
-            final_signal = "ATMSELL"
+    if final_signal == "ATMBUY":
+        # Block buy if price is physically located below the 42 SMA threshold line
+        # Covers the case: "cross above ST and below SMA becomes NONE"
+        if latest_close <= latest_sma:
+            final_signal = "NONE"
+
+    elif final_signal == "ATMSELL":
+        # Block sell if price is physically located above the 42 SMA threshold line
+        # Covers the case: "cross below ST and above SMA becomes NONE"
+        if latest_close >= latest_sma:
+            final_signal = "NONE"
 
     return final_signal, exit_sig
 
 
 if __name__ == "__main__":
-    print("--- STARTING LIVE MULTI-SIGNAL CONTEXTUAL UNIFIED ATM ROUTER HUB ---")
+    print("--- STARTING LIVE MULTI-SIGNAL CONTEXTUAL SMA BOUNDARY ROUTER HUB ---")
     final_route, cascaded_exit = get_entry_signal(df=None)
 
     print("\n⚡ PIPELINE DIAGNOSTICS:")
     print(f"-> FINAL ENTRY  : {final_route}")
     print(f"-> CASCADED EXIT : {cascaded_exit}\n")
+
