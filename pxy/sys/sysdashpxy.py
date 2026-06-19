@@ -10,7 +10,7 @@ from sysdthapxy import get_pxy_data
 from syshkinpxy import detect_pxy_flip_signal
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
-from sysatrndpxy import ‎calculate_atrnd_supertrend
+from sysstrndpxy import calculate_supertrend
 from syspwerpxy import get_ce_pe_power
 from sysentrpxy import get_entry_signal
 from sysdeptpxy import get_candle_visual
