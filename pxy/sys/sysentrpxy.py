@@ -13,7 +13,7 @@ Operational Matrix (Strict Priority Filter Rule Set):
 import pandas as pd
 
 # Direct structural pipeline imports from your local engine modules
-from sysstrndpxy import get_signal as get_strnd_signal
+from syssatrndpxy import get_signal as get_strnd_signal
 from sysmktpxy import get_signal as get_mkt_signals
 
 
