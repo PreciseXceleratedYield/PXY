@@ -8,6 +8,35 @@ from syscnfgpxy import TICKER, OHLC_MODE, TIMEZONE
 # Silence future warning constraints completely
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+def get_recursive_ohlc4_ohlc(o, h, l, c):
+    """
+    Generates recursive OHLC/4 transformed candles matching the Pine Script:
+    - Close (new_c) = (o + h + l + c) / 4
+    - Open (new_o)  = previous candle's new_c (or current open if first row)
+    - High (new_h)  = max of raw high, new_o, and new_c
+    - Low (new_l)   = min of raw low, new_o, and new_c
+    """
+    n = len(c)
+    mod_o = np.zeros(n)
+    mod_h = np.zeros(n)
+    mod_l = np.zeros(n)
+    mod_c = np.zeros(n)
+    
+    # Calculate Close first since it depends strictly on raw values per row
+    mod_c = (o + h + l + c) / 4.0
+    
+    # Process recursive layout sequentially due to historical dependencies
+    for i in range(n):
+        if i == 0:
+            mod_o[i] = o[i]
+        else:
+            mod_o[i] = mod_c[i-1] # Previous Close becomes Next Open
+            
+        mod_h[i] = max(h[i], mod_o[i], mod_c[i])
+        mod_l[i] = min(l[i], mod_o[i], mod_c[i])
+        
+    return mod_o, mod_h, mod_l, mod_c
+
 def get_heikin_ashi_ohlc(o, h, l, c):
     """
     Generates simplified, non-recursive candles matching our Pine Script logic.
@@ -15,16 +44,10 @@ def get_heikin_ashi_ohlc(o, h, l, c):
     - High/Low: Raw chart values
     - Close: Average of current OHLC
     """
-    # Matches Pine: float py_c = (o + h + l + c) / 4.0
     ha_c = (o + h + l + c) / 4.0
-    
-    # Matches Pine: float py_o = (o + c) / 2.0
     ha_o = (o + c) / 2.0
-    
-    # Matches Pine: Keep High and Low raw
     ha_h = h
     ha_l = l
-    
     return ha_o, ha_h, ha_l, ha_c
 
 def get_open_close_median_ohlc(o, c):
@@ -63,38 +86,27 @@ def get_3sma_oc2_ohlc(df, window=4):
     return ha_o, ha_h, ha_l, ha_c
 
 def get_flipped_geometry_ohlc(o, h, l, c):
-    """
-    Generates flipped candle geometry based on previous candle ranges (Mode 0)
-    - Open: 1/4 level of prev range if Green, 3/4 level if Red
-    - High: Raw high, forced up to prev close if Red
-    - Low: Raw low, forced down to prev close if Green
-    - Close: Standard close
-    """
+    """Generates flipped candle geometry based on previous candle ranges (Mode 0)"""
     n = len(c)
     mod_o = np.zeros(n)
     mod_h = np.zeros(n)
     mod_l = np.zeros(n)
     mod_c = c.copy()
 
-    # Calculate arrays shifted by 1 position representing the previous bar state
     prev_h = np.roll(h, 1)
     prev_l = np.roll(l, 1)
     prev_c = np.roll(c, 1)
     prev_range = prev_h - prev_l
 
-    # Target calculation matrices
     calc_quarter = prev_l + (prev_range * 0.25)
     calc_three_quarter = prev_l + (prev_range * 0.75)
 
-    # Determine green trend logic state
     is_green = (c >= calc_three_quarter)
 
-    # Vectorized conditional geometry mapping
     mod_o = np.where(is_green, calc_quarter, calc_three_quarter)
     mod_h = np.where(is_green, h, np.maximum(h, prev_c))
     mod_l = np.where(is_green, np.minimum(l, prev_c), l)
 
-    # Seed initial row index to default raw states to handle missing boundary data gracefully
     if n > 0:
         mod_o[0] = o[0]
         mod_h[0] = h[0]
@@ -121,7 +133,6 @@ def apply_ohlc_transformation(df, mode=1):
     elif mode == 4:
         df['Open'], df['High'], df['Low'], df['Close'] = get_momentum_ohlc(c)
     elif mode == 5:
-        # Mode 5 now blends your modified, simplified Pine formulas instead of standard HA
         ha_o, ha_h, ha_l, ha_c = get_heikin_ashi_ohlc(o, h, l, c)
         oc2_o, oc2_h, oc2_l, oc2_c = get_open_close_median_ohlc(o, c)
         c1c0_o, c1c0_h, c1c0_l, c1c0_c = get_momentum_ohlc(c)
@@ -131,6 +142,9 @@ def apply_ohlc_transformation(df, mode=1):
         df['Close'] = (c + ha_c + oc2_c + c1c0_c) / 4
     elif mode == 6:
         df['Open'], df['High'], df['Low'], df['Close'] = get_3sma_oc2_ohlc(df)
+    elif mode == 7:
+        # EXECUTE RECURSIVE OHLC/4 SYSTEM TRANSFORM
+        df['Open'], df['High'], df['Low'], df['Close'] = get_recursive_ohlc4_ohlc(o, h, l, c)
     else:
         print(f"SYSTEM_WARNING | Mode {mode} unrecognized. Defaulting to Raw OHLC.")
     return df
@@ -184,3 +198,4 @@ if __name__ == "__main__":
     output_df = fetch_yf_data()
     if not output_df.empty:
         print(f"ENGINE_RUN_SUCCESS | Collected Rows Count: {len(output_df)}")
+
