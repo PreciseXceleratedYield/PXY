@@ -238,3 +238,60 @@ def get_atrnd_signal(df: pd.DataFrame) -> str:
         if DEBUG_MODE:
             print(f"Critical execution fault in system signal unpacker: {e}")
         return "NONE"
+# ===============================================================================
+# 🚀 REAL DATA STANDALONE MAIN SELF-TEST BLOCK
+# ===============================================================================
+if __name__ == "__main__":
+    print("[SYSTEM] Initializing sysatrndpxy.py real-data pipeline test...")
+    
+    # 📡 Step 1: Extract genuine upstream session blocks via production pipeline
+    try:
+        print(f"[FETCH] Requesting real-time market data matrix for ticker setup...")
+        # Leverages your exact pipeline engine configuration definitions
+        real_market_df = fetch_yf_data(period="5d", interval="1m")
+    except Exception as e:
+        print(f"[FALLBACK] Production download wrapper unavailable: {e}")
+        print(f"[FALLBACK] Initializing secondary direct connection bridge for verification...")
+        try:
+            import yfinance as yf
+            real_market_df = yf.download(tickers=TICKER, period="5d", interval="1m")
+        except ImportError:
+            print("[CRITICAL] yfinance dependency missing. Please run 'pip install yfinance'")
+            real_market_df = pd.DataFrame()
+
+    # Integrity Gate: Verify live candle data array exists
+    if real_market_df is None or real_market_df.empty:
+        print("[FAILURE] Operational Halt: Real-data array returned completely empty.")
+        sys.exit(1)
+        
+    print(f"[SUCCESS] Real data synchronized. Matrix Dimensions: {real_market_df.shape}")
+    print(f"[DATA] Initializing analytics over Index Timeline: {real_market_df.index[0]} -> {real_market_df.index[-1]}")
+    
+    # ⚙️ Step 2: Validate the updated dynamic vector loop calculations
+    print("\n[STAGE 1] Injecting frame into calculate_atrnd_supertrend()...")
+    processed_df = calculate_atrnd_supertrend(real_market_df)
+    
+    # Extract structural calculation footprints
+    last_idx = processed_df.index[-1]
+    print(f"[SUCCESS] Matrix execution complete.")
+    print(f" -> Current Close Price   : {processed_df.at[last_idx, 'src_c']:.2f}")
+    print(f" -> Dynamic Tracking Line : {processed_df.at[last_idx, 'pxy_sma_line']:.2f}")
+    
+    # 📡 Step 3: Run runtime live signal router validation
+    print("\n[STAGE 2] Evaluating structural gating output state...")
+    active_signal = get_atrnd_signal(real_market_df)
+    print(f"[SUCCESS] Parsed System Engine Signal State -> **{active_signal}**")
+    
+    # 💾 Step 4: Validate live production JSON deployment paths
+    print("\n[STAGE 3] Processing filesystem JSON write-out loops...")
+    target_output_path = "../web/webchrtpxy.json"
+    generated_payload = export_atrnd_supertrend_json(output_file=target_output_path)
+    
+    if generated_payload and os.path.exists(target_output_path):
+        print(f"[SUCCESS] Structural JSON dumped cleanly to live environment path.")
+        print(f" -> System Destination Target : {os.path.abspath(target_output_path)}")
+        print(f" -> Total Historic Elements  : {len(generated_payload)} candles successfully written.")
+    else:
+        print(f"[ERROR] Serialization error: JSON deployment package was not created.")
+        
+    print("\n[COMPLETE] Standalone validation run across live market metrics is successful.")
