@@ -1,13 +1,16 @@
-"""""
+# Save this file as sysoptrouterpxy.py
+"""
 ===============================================================================
-PXY OPTION ROUTING ENGINE: DIRECT EXCLUSIVE ST-ONLY ROUTER (CONSOLIDATED ST)
+PXY OPTION ROUTING ENGINE: DIRECT EXCLUSIVE ST-ONLY ROUTER + SMA ALIGNMENT FILTER
 ===============================================================================
 Operational Matrix:
 - EXIT PIPE (Unfiltered): Sourced from Upstream ST, outputs BULL or BEAR
-- ENTRY PIPE (Filtered): 
-    - STRND: BUY / BULL  -> ATMBUY
-    - STRND: SELL / BEAR -> ATMSELL
-    - Otherwise          -> NONE
+- ENTRY PIPE (Dynamic Delta Allocation): 
+    - STRND: BULL AND SMA: NORTH -> ATMBUY  (Matched Trend / Higher Delta)
+    - STRND: BULL AND SMA: SOUTH -> OTMBUY  (Counter Trend / Lower Delta)
+    - STRND: BEAR AND SMA: SOUTH -> ATMSELL (Matched Trend / Higher Delta)
+    - STRND: BEAR AND SMA: NORTH -> OTMSELL (Counter Trend / Lower Delta)
+    - Otherwise                  -> NONE
 ===============================================================================
 """
 
@@ -18,7 +21,6 @@ import numpy as np
 import pandas as pd
 
 # 1. RUNTIME ENGINE SAME-DIRECTORY PATH ALIGNMENT
-# Pin search context explicitly to its own location to handle isolated automation runners
 local_dir = os.path.dirname(os.path.abspath(__file__))
 if local_dir not in sys.path:
     sys.path.insert(0, local_dir)
@@ -26,7 +28,6 @@ if local_dir not in sys.path:
 # 2. ROBUST PIPELINE IMPORTS WITH EXPLICIT BACKUPS
 try:
     from sysatrndpxy import get_atrnd_signal as get_signal
-
 except ModuleNotFoundError:
     try:
         strnd_spec = importlib.util.spec_from_file_location("sysstrndpxy", os.path.join(local_dir, "sysstrndpxy.py"))
@@ -37,16 +38,22 @@ except ModuleNotFoundError:
         print(f"\n[CRITICAL] PLATFORM CORE IMPORT FAILURE: {fatal_err}")
         raise fatal_err
 
+# Import your binary 42-SMA engine function
+try:
+    from syssmapxy import get_sma
+except ModuleNotFoundError:
+    print("\n[CRITICAL] syssmapxy.py engine module missing from local directory.")
+    raise
 
 def get_entry_signal(df=None):
     """Processes upstream ST signals, standardizes tokens to BULL/BEAR,
 
-    and splits them into an unfiltered exit pipe and an ATM entry pipe.
+    checks alignment with 42-SMA, and routes to ATM or OTM option types.
     """
     # 3. DIRECT INGESTION FROM UPSTREAM SOURCE PIPELINE
     target_df = pd.DataFrame() if df is None else df
 
-    # Pull the raw, unfiltered structural strategy signal directly from your corrected module
+    # Pull the raw, unfiltered structural strategy signal
     raw_strnd_signal = str(get_signal(target_df)).strip().upper()
 
     # 4. CONSOLIDATE UPSTREAM TOKENS TO PURE BULL / BEAR
@@ -60,11 +67,23 @@ def get_entry_signal(df=None):
     # 5. UNFILTERED CASCADED EXIT PIPE
     exit_sig = normalized_signal
 
-    # 6. FILTERED ENTRY ROUTING MATRIX MAPPED TO ATM TOKENS
+    # 6. RUN THE 42-SMA DIRECTIONAL FILTERING ENGINE
+    sma_result = get_sma(target_df, period=42)
+    sma_direction = sma_result.get("status", "NA") # "NORTH" or "SOUTH"
+
+    # 7. ROUTING MATRIX FOR ATM AND OTM SEGREGATION
     if normalized_signal == "BULL":
-        final_signal = "ATMBUY"
+        if sma_direction == "NORTH":
+            final_signal = "ATMBUY"   # Trend Aligned
+        else:
+            final_signal = "OTMBUY"   # Counter-Trend Protection
+            
     elif normalized_signal == "BEAR":
-        final_signal = "ATMSELL"
+        if sma_direction == "SOUTH":
+            final_signal = "ATMSELL"  # Trend Aligned
+        else:
+            final_signal = "OTMSELL"  # Counter-Trend Protection
+            
     else:
         final_signal = "NONE"
 
@@ -74,7 +93,7 @@ def get_entry_signal(df=None):
 if __name__ == "__main__":
     print("--- STARTING LIVE ST-ONLY EXCLUSIVE ROUTER HUB ---")
     
-    # Attempt to locate and pull data frame matrix from your data pipeline utility
+    # Attempt to locate and pull data frame matrix
     try:
         if os.path.exists(os.path.join(local_dir, "sysdtafpxy.py")):
             dta_spec = importlib.util.spec_from_file_location("sysdtafpxy", os.path.join(local_dir, "sysdtafpxy.py"))
