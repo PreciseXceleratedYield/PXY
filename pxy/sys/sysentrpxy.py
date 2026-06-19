@@ -28,7 +28,8 @@ if local_dir not in sys.path:
 # 2. ROBUST PIPELINE IMPORTS WITH EXPLICIT BACKUPS
 try:
     from syssmapxy import get_sma
-    from sysstrndpxy import get_signal as get_strnd_signal
+    from sysatrndpxy import get_atrnd_signal as get_signal, calculate_atrnd_supertrend as calculate_supertrend
+
 except ModuleNotFoundError:
     try:
         # Fallback to absolute file spec handlers if implicit paths are locked by shell environment
