@@ -1,7 +1,6 @@
 import os 
 import time 
 import pytz 
-import math
 from datetime import datetime, time as dt_time 
 from colorama import Fore, Style, init
 
@@ -12,11 +11,11 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 5
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-ATR_MULTIPLIER = 5
+FIXED_LOSS_THRESHOLD = -20.0  # 🎯 Fixed averaging threshold set to -20%
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
-    if val is None or (isinstance(val, float) and math.isnan(val)):
+    if val is None:
         return fallback
     try:
         return float(val)
@@ -52,33 +51,6 @@ def is_cooling(side):
     except Exception: 
         return False 
 
-def calculate_atr_threshold(row, side, is_accelerated_state):
-    """
-    Normal state (AVGBUY/AVGSELL): Uses straight (ATR * ATR_MULTIPLIER) loss floor.
-    Accelerated State (BEAR/BULL): Uses (ATR * ATR_MULTIPLIER) + max(Opposite Power, Opposite Depth).
-    """
-    raw_atr_pct = safe_float(row.get("atr", 0.0))
-    base_atr_loss = raw_atr_pct * ATR_MULTIPLIER
-    
-    # Extract opposing side metrics for precise downside risk mitigation
-    if side == 'CE':
-        opp_power = safe_float(row.get("pe_power", 1.0))
-        opp_depth = safe_float(row.get("hkin_pe_depth", 1.0))
-    else:
-        opp_power = safe_float(row.get("ce_power", 1.0))
-        opp_depth = safe_float(row.get("hkin_ce_depth", 1.0))
-
-    if is_accelerated_state:
-        # ACCELERATED PANIC STATE: (ATR * 2) + max(Opposite Power, Opposite Depth)
-        highest_opp_risk = max(opp_power, opp_depth)
-        total_loss_pct = base_atr_loss + highest_opp_risk
-        return -total_loss_pct
-    else:
-        # NORMAL STATE: Strict straight ATR * 2 loss threshold
-        if base_atr_loss > 0:
-            return -base_atr_loss
-        return -14.0  # Raw fallback floor if ATR goes missing
-
 def get_loss(row): 
     """Optimized globally to prevent memory re-allocation inside the loop."""
     entry = safe_float(row.get("buy_prc", 0.0)) 
@@ -103,15 +75,15 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, si
     loss_pad = " " * max(0, width - len(loss_str))
     print(Fore.WHITE + " • TRIGGER LOSS  : " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + loss_pad)
     
-    target_str = f" • ATR TARGET (%): {target_threshold:.2f}%"
+    target_str = f" • FIXED TARGET (%): {target_threshold:.2f}%"
     target_pad = " " * max(0, width - len(target_str))
-    print(Fore.WHITE + " • ATR TARGET (%): " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
+    print(Fore.WHITE + " • FIXED TARGET (%): " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
     
     print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(width))
     print(border + "\n")
 
 def handle_side_averaging(client, df): 
-    """Averages positions by explicitly mapping entry signal loops separate from exit trend accelerations.""" 
+    """Averages positions based strictly on specific exit trend signals and a fixed loss threshold.""" 
     if df is None or df.empty: 
         return 
         
@@ -120,11 +92,10 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
-    if "entry" not in df.columns or "exit" not in df.columns:
+    if "exit" not in df.columns:
         return
         
     last_row = df.iloc[-1]
-    raw_entry_signal = str(last_row["entry"]).upper().strip() 
     raw_exit_signal = str(last_row["exit"]).upper().strip()
 
     # Make a clean dataframe copy to prevent mutations/warnings
@@ -136,25 +107,15 @@ def handle_side_averaging(client, df):
         if side_df.empty: 
             continue 
 
-        # --- EXPLICIT LAYER SYNCHRONIZATION MAPS ---
         current_signal = "NONE"
-        is_accelerated_state = False
 
-        if side == 'CE':
-            if raw_exit_signal == "BUY":
-                current_signal = "BUY"
-                is_accelerated_state = False
-            elif raw_exit_signal == "BUY":
-                current_signal = "BUY"
-                is_accelerated_state = True
+        # CE only averages on exit signal "BULL"
+        if side == 'CE' and raw_exit_signal == "BULL":
+            current_signal = "BULL"
 
-        elif side == 'PE':
-            if raw_exit_signal == "SELL":
-                current_signal = "SELL"
-                is_accelerated_state = False
-            elif raw_exit_signal == "SELL":
-                current_signal = "SELL"
-                is_accelerated_state = True
+        # PE only averages on exit signal "BEAR"
+        elif side == 'PE' and raw_exit_signal == "BEAR":
+            current_signal = "BEAR"
 
         # If no matching trigger signal is active for this side, bypass processing loop
         if current_signal == "NONE":
@@ -164,9 +125,9 @@ def handle_side_averaging(client, df):
         
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
-            row_threshold = calculate_atr_threshold(row, side, is_accelerated_state)
             
-            if pos_loss > row_threshold:
+            # Checks if the position loss is worse than -20% (e.g., -25% is less than -20%)
+            if pos_loss > FIXED_LOSS_THRESHOLD:
                 all_positions_crossed_threshold = False
                 break  
 
@@ -180,9 +141,8 @@ def handle_side_averaging(client, df):
                 new_tag = generate_pxy_tag() 
                 
                 final_loss = get_loss(last_order)
-                final_threshold = calculate_atr_threshold(last_order, side, is_accelerated_state)
                 
-                print_pxy_trigger_dashboard(side, symbol, final_loss, final_threshold, current_signal, new_tag)
+                print_pxy_trigger_dashboard(side, symbol, final_loss, FIXED_LOSS_THRESHOLD, current_signal, new_tag)
                 
                 try: 
                     params = { 
