@@ -1,121 +1,138 @@
-"""
+"""""
 ===============================================================================
-PXY OPTION ROUTING ENGINE: DIRECT EXCLUSIVE ST-ONLY ROUTER (SMA FILTERED)
+PXY OPTION ROUTING ENGINE: TWO-PIPE DIRECT MARKET FILTER (BULL/BEAR ONLY)
 ===============================================================================
 Operational Matrix:
-- EXIT PIPE (Unfiltered): Exactly as received from Upstream ST
+- EXIT PIPE (Unfiltered): Exactly as received from Upstream (BULL/BEAR)
 - ENTRY PIPE (Filtered): 
-    - STRND: BUY  -> If Close >= SMA -> ATMBUY  | If Close < SMA -> OTMBUY
-    - STRND: SELL -> If Close >= SMA -> OTMSELL | If Close < SMA -> ATMSELL
-    - STRND: BULL -> BULL
-    - STRND: BEAR -> BEAR
-    - Otherwise   -> NONE
+    - MKT_SIGNAL: BULL -> ATMBUY
+    - MKT_SIGNAL: BEAR -> ATMSELL
+    - Otherwise        -> NONE
 ===============================================================================
 """
 
 import os
 import sys
-import importlib.util
+import warnings
 import numpy as np
 import pandas as pd
+import yfinance as yf
+
+# Silence future warning constraints completely
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
+# =============================================================================
+# EXCLUSIVE STANDALONE PLATFORM CONFIGURATION (NO EXTERNAL DEPENDENCIES)
+# =============================================================================
+TICKER = "^NSEI"             # Target trading asset (NIFTY 50 Official Yahoo Ticker)
+INTERVAL = "1m"            # Real-time streaming bar chart interval
+PERIOD = "5d"              # Historical data fetch footprint buffer
+TIMEZONE = "Asia/Kolkata"  # Target market localized coordinate string for NSE India
 
 # 1. RUNTIME ENGINE SAME-DIRECTORY PATH ALIGNMENT
-# Pin search context explicitly to its own location to handle isolated automation runners
 local_dir = os.path.dirname(os.path.abspath(__file__))
 if local_dir not in sys.path:
     sys.path.insert(0, local_dir)
 
-# 2. ROBUST PIPELINE IMPORTS WITH EXPLICIT BACKUPS
-try:
-    from syssmapxy import get_sma
-    from sysatrndpxy import get_atrnd_signal as get_signal, calculate_atrnd_supertrend as calculate_supertrend
 
-except ModuleNotFoundError:
-    try:
-        # Fallback to absolute file spec handlers if implicit paths are locked by shell environment
-        sma_spec = importlib.util.spec_from_file_location("syssmapxy", os.path.join(local_dir, "syssmapxy.py"))
-        syssmapxy = importlib.util.module_from_spec(sma_spec)
-        sma_spec.loader.exec_module(syssmapxy)
-        get_sma = syssmapxy.get_sma
+def calculate_tsma_7(series):
+    """Computes a 7-period Time Series Moving Average (Linear Regression Curve)
 
-        strnd_spec = importlib.util.spec_from_file_location("sysstrndpxy", os.path.join(local_dir, "sysstrndpxy.py"))
-        sysstrndpxy = importlib.util.module_from_spec(strnd_spec)
-        strnd_spec.loader.exec_module(sysstrndpxy)
-        get_strnd_signal = sysstrndpxy.get_signal
-    except Exception as fatal_err:
-        print(f"\n[CRITICAL] PLATFORM CORE IMPORT FAILURE: {fatal_err}")
-        raise fatal_err
+    matching the mathematical logic of TradingView's ta.linreg(close, 7, 0).
+    """
+    length = 7
+    if len(series) < length:
+        return pd.Series(np.nan, index=series.index)
+        
+    # Pre-calculate linear regression multipliers for least squares matrix
+    x = np.arange(length)
+    x_mean = x.mean()
+    x_deviations = x - x_mean
+    var_x = (x_deviations ** 2).sum()
+
+    def get_last_fitted_value(window):
+        if len(window) < length:
+            return np.nan
+        y = np.array(window)
+        y_mean = y.mean()
+        # Calculate slope (m) and intercept (b)
+        slope = (x_deviations * (y - y_mean)).sum() / var_x
+        intercept = y_mean - slope * x_mean
+        return intercept + slope * (length - 1)
+
+    # Apply rolling linear regression curve lookup
+    return series.rolling(window=length).apply(get_last_fitted_value, raw=True)
 
 
 def get_entry_signal(df=None):
-    """Splits upstream ST signals into two paths: an unfiltered exit pipe
+    """Calculates a 7-period TSMA on Close data to define trend vectors.
 
-    and an SMA-filtered entry filter pipe mapping crossings to ATM/OTM tokens.
+    Enforces exclusive conditional checks without a default baseline assumption.
     """
-    # 3. DIRECT INGESTION FROM UPSTREAM SOURCE PIPELINE
-    target_df = pd.DataFrame() if df is None else df
+    # 2. TARGET DATAFRAME HANDLING & DIRECT AUTO-FETCH IF NONE PASSED
+    if df is None or df.empty:
+        try:
+            ticker_obj = yf.Ticker(TICKER)
+            target_df = ticker_obj.history(period=PERIOD, interval=INTERVAL)
+            if not target_df.empty:
+                target_df.dropna(inplace=True)
+                if target_df.index.tz is None:
+                    target_df = target_df.tz_localize('UTC').tz_convert(TIMEZONE)
+                else:
+                    target_df = target_df.tz_convert(TIMEZONE)
+            else:
+                return "NONE", "NONE"
+        except Exception:
+            return "NONE", "NONE"
+    else:
+        target_df = df
 
-    # Pull the raw, unfiltered structural strategy signal directly from your corrected module
-    raw_strnd_signal = str(get_strnd_signal(target_df)).strip()
-    
-    # Standardize string format for entry conditional matching logic
-    strnd_state = raw_strnd_signal.upper()
+    # Double check final structure requirements before starting calculation
+    if target_df.empty or len(target_df) < 8 or 'Close' not in target_df.columns:
+        return "NONE", "NONE"
 
-    # 4. UNFILTERED CASCADED EXIT PIPE
-    # Passes the upstream token out completely as-is, with no alterations
-    exit_sig = raw_strnd_signal
+    try:
+        # 3. COMPUTE 7-PERIOD TSMA ENGINE VALUE
+        close_series = target_df['Close']
+        tsma_values = calculate_tsma_7(close_series)
+        
+        # Pull latest completed candle metrics (n-1 row index alignment)
+        current_close = float(close_series.iloc[-1])
+        current_tsma = float(tsma_values.iloc[-1])
 
-    # 5. SMA CO-LOCATED FILTER MATRIX CALCULATIONS
-    sma_data = get_sma(target_df, period=42)
-    sma_value = sma_data["value"]
-    
-    # Extract the correct index row alignment matching your ST engine (n-2 for confirmed close)
-    if target_df is not None and not target_df.empty and 'Close' in target_df.columns:
-        if len(target_df) >= 2:
-            latest_close = float(target_df['Close'].iloc[-2]) # ⚡ Tied directly to same candle as get_signal
+        # 4. EXCLUSIVE CONDITIONAL MATCHING LAYER
+        if pd.isna(current_tsma):
+            raw_signal = "NONE"
+        elif current_close > current_tsma:
+            raw_signal = "BULL"
+        elif current_close < current_tsma:
+            raw_signal = "BEAR"
         else:
-            latest_close = float(target_df['Close'].iloc[-1])
-    else:
-        latest_close = 0.0
+            raw_signal = "NONE"
 
-    # Determine position relative to SMA (True if above or equal, False if below)
-    is_above_sma = (latest_close >= sma_value) and (sma_data["status"] != "NA")
+        # 5. UNFILTERED CASCADED EXIT PIPE
+        exit_sig = raw_signal
 
-    # 6. FILTERED ENTRY ROUTING MATRIX WITH SMA CONDITIONALS
-    if strnd_state == "BUY":
-        final_signal = "ATMBUY" if is_above_sma else "OTMBUY"
-        
-    elif strnd_state == "SELL":
-        final_signal = "OTMSELL" if is_above_sma else "ATMSELL"
-        
-    elif strnd_state in ["BULL", "BEAR"]:
-        final_signal = strnd_state
-        
-    else:
+        # 6. ENTRY PIPE: EXCLUSIVE ATM REWRITE CONVERSION MATRIX
+        if raw_signal == "BULL":
+            final_signal = "ATMBUY"
+        elif raw_signal == "BEAR":
+            final_signal = "ATMSELL"
+        else:
+            final_signal = "NONE"
+
+    except Exception:
         final_signal = "NONE"
+        exit_sig = "NONE"
 
     return final_signal, exit_sig
 
 
 if __name__ == "__main__":
-    print("--- STARTING LIVE ST-ONLY EXCLUSIVE ROUTER HUB WITH SMA ---")
+    print(f"--- STARTING STANDALONE PXY ENGINE FOR Ticker: {TICKER} ---")
     
-    # Attempt to locate and pull data frame matrix from your data pipeline utility
-    try:
-        if os.path.exists(os.path.join(local_dir, "sysdtafpxy.py")):
-            dta_spec = importlib.util.spec_from_file_location("sysdtafpxy", os.path.join(local_dir, "sysdtafpxy.py"))
-            sysdtafpxy = importlib.util.module_from_spec(dta_spec)
-            dta_spec.loader.exec_module(sysdtafpxy)
-            fetch_yf_data = sysdtafpxy.fetch_yf_data
-        else:
-            from sysdtafpxy import fetch_yf_data
-            
-        production_df = fetch_yf_data()
-    except Exception:
-        print("[WARNING] sysdtafpxy module unavailable. Sourcing empty matrix.")
-        production_df = None
-        
-    final_route, cascaded_exit = get_entry_signal(df=production_df)
+    # Run signal execution using autonomous internal data download loop
+    final_route, cascaded_exit = get_entry_signal(df=None)
 
     print("\n⚡ PIPELINE DIAGNOSTICS:")
     print(f"-> FINAL ENTRY : {final_route}")
