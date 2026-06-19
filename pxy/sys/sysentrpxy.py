@@ -18,33 +18,31 @@ import sys
 import numpy as np
 import pandas as pd
 
-# 1. RUNTIME DIRECTORY PATH RESOLUTION
-# Dynamically resolves module discovery for sysstrndpxy and syssmapxy
-current_script_path = os.path.dirname(os.path.abspath(__file__))
-# Moves up 2 directories from /sys/exe/ to the core /pxy/ application root
-project_root = os.path.abspath(os.path.join(current_script_path, "..", ".."))
-
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+# 1. ENFORCE LOCAL DIRECTORY LOOKUP FOR CO-LOCATED IMPORTS
+# Gets the exact folder where this script lives and places it at the front of Python's search path
+local_dir = os.path.dirname(os.path.abspath(__file__))
+if local_dir not in sys.path:
+    sys.path.insert(0, local_dir)
 
 # 2. FRAMEWORK PIPELINE ENGINE IMPORTS
 try:
     from syssmapxy import get_sma
     from sysstrndpxy import get_signal as get_strnd_signal
 except ModuleNotFoundError as e:
-    # Fail-safe print showing exact system lookup paths if layout differs
-    print(f"\n[CRITICAL] PATH ERROR: {e}")
-    print(f"[DEBUG] Executing Script Dir: {current_script_path}")
-    print(f"[DEBUG] Injected Root Target: {project_root}")
-    print("[DEBUG] Current sys.path directories searched:")
-    for path in sys.path:
-        print(f" -> {path}")
+    print(f"\n[CRITICAL] SAME-DIRECTORY IMPORT FAILURE: {e}")
+    print(f"[DEBUG] Local execution directory: {local_dir}")
+    print("[DEBUG] Files currently visible inside this folder:")
+    try:
+        for file in os.listdir(local_dir):
+            if file.endswith('.py'):
+                print(f" -> {file}")
+    except Exception as read_err:
+        print(f" -> Could not list folder contents: {read_err}")
     raise e
 
 
 def get_entry_signal(df=None):
     """Splits upstream ST signals into two paths: an unfiltered exit pipe
-
     and an SMA-filtered entry filter pipe mapping crossings to ATM/OTM tokens.
     """
     # 3. DIRECT INGESTION FROM UPSTREAM SOURCE PIPELINE
@@ -57,7 +55,6 @@ def get_entry_signal(df=None):
     strnd_state = raw_strnd_signal.upper()
 
     # 4. UNFILTERED CASCADED EXIT PIPE
-    # Passes the upstream token out completely as-is, with no alterations
     exit_sig = raw_strnd_signal
 
     # 5. SMA FILTER DATA EXTRACTION
@@ -95,7 +92,6 @@ if __name__ == "__main__":
     # Sync with live historical engine frame safely via your data fetcher
     try:
         from sysdtafpxy import fetch_yf_data
-
         production_df = fetch_yf_data()
     except ModuleNotFoundError:
         print("[WARNING] sysdtafpxy data module not found. Falling back to empty test frame.")
@@ -106,6 +102,5 @@ if __name__ == "__main__":
     print("\n⚡ PIPELINE DIAGNOSTICS:")
     print(f"-> FINAL ENTRY : {final_route}")
     print(f"-> CASCADED EXIT: {cascaded_exit}\n")
-
 
 
