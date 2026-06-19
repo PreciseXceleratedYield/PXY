@@ -67,7 +67,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     # 📡 1:1 SUPERTREND ENGINE TRACK
     # ===============================================================================
     atr_length = 1
-    atr_mult   = 1.0
+    atr_mult   = 0.5
     
     # Core Supertrend standard tracking baseline (HL2)
     hl2_baseline = (src_high + src_low) / 2.0
