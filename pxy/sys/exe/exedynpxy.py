@@ -9,13 +9,13 @@ IST = pytz.timezone("Asia/Kolkata")
 # ==================================================
 # 🔧 REVISED CONFIG: COMPRESSION DETECTOR TIME DECAY
 # ==================================================
-DECAY_RATE_PER_HOUR = 0.000  # 2% decay per hour
+DECAY_RATE_PER_MIN = 0.0005  # 0.05% decay per minute (0.05 / 100)
 PNL_THRESHOLD = 0.0
 
-# Tracks the single worst/oldest trade separately for CE and PE
+# Tracks the single worst/oldest trade separately for CE and PE (using minutes)
 _worst_trades = {
-    "CE": {"elapsed_hours": -1.0, "message": None},
-    "PE": {"elapsed_hours": -1.0, "message": None}
+    "CE": {"elapsed_mins": -1.0, "message": None},
+    "PE": {"elapsed_mins": -1.0, "message": None}
 }
 
 def dynamic_entry(row):
@@ -46,13 +46,13 @@ def dynamic_entry(row):
             else:
                 entry_time = entry_time.astimezone(IST)
 
-        # ---------------- CALC ELAPSED HOURS ----------------
+        # ---------------- CALC ELAPSED MINUTES ----------------
         elapsed_secs = max((now - entry_time).total_seconds(), 0)
-        elapsed_hours = elapsed_secs / 3600.0 
+        elapsed_mins = elapsed_secs / 60.0 
 
         # ---------------- PERCENTAGE DECAY RULE ----------------
         if pnl <= PNL_THRESHOLD:
-            total_decay_percentage = elapsed_hours * DECAY_RATE_PER_HOUR
+            total_decay_percentage = elapsed_mins * DECAY_RATE_PER_MIN
             dynamic_val = original_price * (1.0 - total_decay_percentage)
             dynamic_val = max(dynamic_val, 0.0)
             
@@ -67,13 +67,13 @@ def dynamic_entry(row):
                 opt_type = "PE"
                 
             # Track worst trade independently for CE and PE if type is identified
-            if opt_type and decay_amount > 0.05 and elapsed_hours > _worst_trades[opt_type]["elapsed_hours"]:
+            if opt_type and decay_amount > 0.05 and elapsed_mins > _worst_trades[opt_type]["elapsed_mins"]:
                 clean_symbol = re.sub(r'^(NIFTY|BANKNIFTY)26', '', symbol)
-                _worst_trades[opt_type]["elapsed_hours"] = elapsed_hours
+                _worst_trades[opt_type]["elapsed_mins"] = elapsed_mins
                 _worst_trades[opt_type]["message"] = (
                     f"WORST {opt_type} | {clean_symbol} | "
-                    f"GAVE AWAY: {pct_given_away:.1f}% (-{decay_amount:.2f} PTS) | "
-                    f"ELAPSED: {elapsed_hours:.2f} hrs"
+                    f"GAVE AWAY: {pct_given_away:.2f}% (-{decay_amount:.2f} PTS) | "
+                    f"ELAPSED: {elapsed_mins:.2f} mins"
                 )
         else:
             dynamic_val = original_price
@@ -98,7 +98,6 @@ def print_oldest_decay():
         
     # Reset internal memory block
     _worst_trades = {
-        "CE": {"elapsed_hours": -1.0, "message": None},
-        "PE": {"elapsed_hours": -1.0, "message": None}
+        "CE": {"elapsed_mins": -1.0, "message": None},
+        "PE": {"elapsed_mins": -1.0, "message": None}
     }
-
