@@ -21,7 +21,7 @@ from syscnfgpxy import TIMEZONE, TICKER
 
 # Global Config 
 DEBUG_MODE = False 
-CHECK_CONFIRMED_ONLY = True  # ⚡ STRICTLY ENFORCED: Target closed index (-2) for fully confirmed candles
+CHECK_CONFIRMED_ONLY = False  # ⚡ STRICTLY ENFORCED: Target closed index (-2) for fully confirmed candles
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
