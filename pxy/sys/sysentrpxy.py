@@ -2,11 +2,14 @@
 ===============================================================================
 PXY OPTION ROUTING ENGINE: DIRECT EXCLUSIVE ST-ONLY ROUTER (ATM / ATM)
 ===============================================================================
-Operational Matrix (Strict Priority Filter Rule Set):
-- STRND: BUY  -> ENTRY: ATMBUY   | EXIT: From Upstream ST (Priority Trigger)
-- STRND: SELL -> ENTRY: ATMSELL  | EXIT: From Upstream ST (Priority Trigger)
-- STRND: BULL -> ENTRY: NONE     | EXIT: From Upstream ST (Priority Trigger)
-- STRND: BEAR -> ENTRY: NONE     | EXIT: From Upstream ST (Priority Trigger)
+Operational Matrix:
+- EXIT PIPE (Unfiltered): Exactly as received from Upstream ST
+- ENTRY PIPE (Filtered): 
+    - STRND: BUY  -> ATMBUY
+    - STRND: SELL -> ATMSELL
+    - STRND: BULL -> BULL
+    - STRND: BEAR -> BEAR
+    - Otherwise   -> NONE
 ===============================================================================
 """
 
@@ -17,37 +20,31 @@ from sysstrndpxy import get_signal as get_strnd_signal
 
 
 def get_entry_signal(df=None):
-    """Combines inputs from strndpxy to calculate the direct option routing tokens,
+    """Splits upstream ST signals into two paths: an unfiltered exit pipe
 
-    matched 1:1 for execution framework compatibility.
+    and an ATM entry filter pipe mapping crossings to ATM tokens and trends to regimes.
     """
-    # 1. DIRECT INGESTION FROM UPSTREAM SOURCE PIPELINES
+    # 1. DIRECT INGESTION FROM UPSTREAM SOURCE PIPELINE
     target_df = pd.DataFrame() if df is None else df
 
-    # Pull structural strategy signals directly
-    strnd_state = str(get_strnd_signal(target_df)).upper().strip()
+    # Pull the raw, unfiltered structural strategy signal directly
+    raw_strnd_signal = str(get_strnd_signal(target_df)).strip()
+    
+    # Standardize string format for entry conditional matching logic
+    strnd_state = raw_strnd_signal.upper()
 
-    # 2. ASSIGN UNALTERED CASCADED EXIT SIGNAL FROM UPSTREAM ST
-    # Directly map exit triggers to the raw, unfiltered upstream ST states
-    if strnd_state in ["SELL", "BEAR"]:
-        exit_sig = "BUY"
-    elif strnd_state in ["BUY", "BULL"]:
-        exit_sig = "SELL"
-    else:
-        exit_sig = "NONE"
+    # 2. UNFILTERED CASCADED EXIT PIPE
+    # Passes the upstream token out completely as-is, with no alterations
+    exit_sig = raw_strnd_signal
 
-    # 3. EXCLUSIVE PRIORITY FILTER ROUTING MATRIX (ST-ONLY)
-    # Priority 1: Direct Active Crossing Signals from your strategy engine
+    # 3. FILTERED ENTRY ROUTING MATRIX
+    # Converts crossings to execution tokens, retains trend regimes, defaults to NONE
     if strnd_state == "BUY":
         final_signal = "ATMBUY"
     elif strnd_state == "SELL":
         final_signal = "ATMSELL"
-
-    # Priority 2: Standard Trend Regimes (No executions on continuation bars)
     elif strnd_state in ["BULL", "BEAR"]:
-        final_signal = "NONE"
-
-    # Default fallback protection
+        final_signal = strnd_state
     else:
         final_signal = "NONE"
 
@@ -61,4 +58,5 @@ if __name__ == "__main__":
     print("\n⚡ PIPELINE DIAGNOSTICS:")
     print(f"-> FINAL ENTRY : {final_route}")
     print(f"-> CASCADED EXIT: {cascaded_exit}\n")
+
 
