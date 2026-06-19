@@ -163,7 +163,6 @@ async def main():
         if sig == "STBUY": sig = "ATMBUY"
         elif sig == "STSELL": sig = "ATMSELL"
         dprint(f"SIGNAL: {sig}")
-
         # --- SURGICAL IMPORT RESTORATION FROM EXECEPEPXY ---
         try:
             from execepepxy import get_target_quantities
@@ -202,10 +201,13 @@ async def main():
 
         symbol, res = None, {"stat": "SKIPPED"}
         
+        # ⚡ Surgical Independent Check: Directly true if flat setup
+        is_flat_bypass = (ce_lots == 0 and pe_lots == 0)
+
         if sig in ["ATMBUY", "OTMBUY"]:
             dprint("BRANCH: BALANCE CE")
-            # FIXED GATE: Passes if under limit, or if empty account has an open target slot (> 0)
-            if (ce_lots < max_allowed_ce_lots) or (ce_lots == 0 and pe_lots == 0 and max_allowed_ce_lots > 0):
+            # FIXED GATE: Skips limit restrictions instantly if flat, otherwise respects your exact original parameters
+            if is_flat_bypass or (ce_lots < max_allowed_ce_lots) or (ce_lots == 0 and pe_lots == 0 and max_allowed_ce_lots > 0):
                 if not is_side_cooling("CE"):
                     symbol = get_symbol(ltp, sig, current_distance)
                     if symbol and symbol != "NA":
@@ -216,8 +218,8 @@ async def main():
 
         elif sig in ["ATMSELL", "OTMSELL"]:
             dprint("BRANCH: BALANCE PE")
-            # FIXED GATE: Passes if under limit, or if empty account has an open target slot (> 0)
-            if (pe_lots < max_allowed_pe_lots) or (ce_lots == 0 and pe_lots == 0 and max_allowed_pe_lots > 0):
+            # FIXED GATE: Skips limit restrictions instantly if flat, otherwise respects your exact original parameters
+            if is_flat_bypass or (pe_lots < max_allowed_pe_lots) or (ce_lots == 0 and pe_lots == 0 and max_allowed_pe_lots > 0):
                 if not is_side_cooling("PE"):
                     symbol = get_symbol(ltp, sig, current_distance)
                     if symbol and symbol != "NA":
