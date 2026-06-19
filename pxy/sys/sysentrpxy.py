@@ -30,9 +30,9 @@ def get_entry_signal(df=None):
     # 2. ASSIGN UNALTERED CASCADED EXIT SIGNAL FROM UPSTREAM ST
     # Directly map exit triggers to the raw, unfiltered upstream ST states
     if strnd_state in ["SELL", "BEAR"]:
-        exit_sig = "EXIT_BUY"
+        exit_sig = "BUY"
     elif strnd_state in ["BUY", "BULL"]:
-        exit_sig = "EXIT_SELL"
+        exit_sig = "SELL"
     else:
         exit_sig = "NONE"
 
