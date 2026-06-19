@@ -1,15 +1,13 @@
-"""
+"""""
 ===============================================================================
-PXY OPTION ROUTING ENGINE: DIRECT EXCLUSIVE ST-ONLY ROUTER (SMA FILTERED)
+PXY OPTION ROUTING ENGINE: DIRECT EXCLUSIVE ROUTER HUB (MKT PXY ATM INTEGRATED)
 ===============================================================================
 Operational Matrix:
-- EXIT PIPE (Unfiltered): Exactly as received from Upstream ST
+- EXIT PIPE (Unfiltered): Exactly as received from Upstream sysmktpxy
 - ENTRY PIPE (Filtered): 
-    - STRND: BUY  -> If Close >= SMA -> ATMBUY  | If Close < SMA -> OTMBUY
-    - STRND: SELL -> If Close >= SMA -> OTMSELL | If Close < SMA -> ATMSELL
-    - STRND: BULL -> BULL
-    - STRND: BEAR -> BEAR
-    - Otherwise   -> NONE
+    - MKT_SIGNAL: BUY  -> ATMBUY
+    - MKT_SIGNAL: SELL -> ATMSELL
+    - Otherwise        -> As-Is from Upstream
 ===============================================================================
 """
 
@@ -25,74 +23,52 @@ local_dir = os.path.dirname(os.path.abspath(__file__))
 if local_dir not in sys.path:
     sys.path.insert(0, local_dir)
 
-# 2. ROBUST PIPELINE IMPORTS WITH EXPLICIT BACKUPS
+# 2. ROBUST PIPELINE IMPORTS WITH EXPLICIT BACKUPS (ONLY MKT PXY)
 try:
-    from syssmapxy import get_sma
-    from sysatrndpxy import get_atrnd_signal as get_signal, calculate_atrnd_supertrend as calculate_supertrend
+    from sysmktpxy import get_signal as get_mktpxy_signal
 
 except ModuleNotFoundError:
     try:
         # Fallback to absolute file spec handlers if implicit paths are locked by shell environment
-        sma_spec = importlib.util.spec_from_file_location("syssmapxy", os.path.join(local_dir, "syssmapxy.py"))
-        syssmapxy = importlib.util.module_from_spec(sma_spec)
-        sma_spec.loader.exec_module(syssmapxy)
-        get_sma = syssmapxy.get_sma
-
-        strnd_spec = importlib.util.spec_from_file_location("sysstrndpxy", os.path.join(local_dir, "sysstrndpxy.py"))
-        sysstrndpxy = importlib.util.module_from_spec(strnd_spec)
-        strnd_spec.loader.exec_module(sysstrndpxy)
-        get_strnd_signal = sysstrndpxy.get_signal
+        mktpxy_spec = importlib.util.spec_from_file_location("sysmktpxy", os.path.join(local_dir, "sysmktpxy.py"))
+        sysmktpxy = importlib.util.module_from_spec(mktpxy_spec)
+        mktpxy_spec.loader.exec_module(sysmktpxy)
+        get_mktpxy_signal = sysmktpxy.get_signal
     except Exception as fatal_err:
         print(f"\n[CRITICAL] PLATFORM CORE IMPORT FAILURE: {fatal_err}")
         raise fatal_err
 
 
 def get_entry_signal(df=None):
-    """Splits upstream ST signals into two paths: an unfiltered exit pipe
+    """Sources signals from sysmktpxy. Passes the exit pipe unfiltered,
 
-    and an SMA-filtered entry filter pipe mapping crossings to ATM/OTM tokens.
+    and filters the entry pipe by mapping BUY/SELL strictly to ATM tokens.
     """
     # 3. DIRECT INGESTION FROM UPSTREAM SOURCE PIPELINE
     target_df = pd.DataFrame() if df is None else df
 
-    # Pull the raw, unfiltered structural strategy signal directly from your corrected module
-    raw_strnd_signal = str(get_strnd_signal(target_df)).strip()
-    
-    # Standardize string format for entry conditional matching logic
-    strnd_state = raw_strnd_signal.upper()
+    # 4. FETCH SIGNALS FROM THE IMPORTED sysmktpxy ENGINE DIRECTLY
+    try:
+        # Extracts raw entry and exit streams natively from your module
+        mktpxy_entry, mktpxy_exit = get_mktpxy_signal(target_df)
+        
+        # Standardize strings for accurate evaluation
+        raw_entry = str(mktpxy_entry).upper().strip()
+        
+        # 5. UNFILTERED CASCADED EXIT PIPE
+        exit_sig = str(mktpxy_exit).strip()
 
-    # 4. UNFILTERED CASCADED EXIT PIPE
-    # Passes the upstream token out completely as-is, with no alterations
-    exit_sig = raw_strnd_signal
-
-    # 5. SMA CO-LOCATED FILTER MATRIX CALCULATIONS
-    sma_data = get_sma(target_df, period=42)
-    sma_value = sma_data["value"]
-    
-    # Extract the correct index row alignment matching your ST engine (n-2 for confirmed close)
-    if target_df is not None and not target_df.empty and 'Close' in target_df.columns:
-        if len(target_df) >= 2:
-            latest_close = float(target_df['Close'].iloc[-2]) # ⚡ Tied directly to same candle as get_signal
+        # 6. ENTRY PIPE: BUY/SELL ATM REWRITE MATRIX
+        if raw_entry == "BUY":
+            final_signal = "ATMBUY"
+        elif raw_entry == "SELL":
+            final_signal = "ATMSELL"
         else:
-            latest_close = float(target_df['Close'].iloc[-1])
-    else:
-        latest_close = 0.0
+            final_signal = str(mktpxy_entry).strip() # Keeps BULL, BEAR, NONE, etc. completely untouched
 
-    # Determine position relative to SMA (True if above or equal, False if below)
-    is_above_sma = (latest_close >= sma_value) and (sma_data["status"] != "NA")
-
-    # 6. FILTERED ENTRY ROUTING MATRIX WITH SMA CONDITIONALS
-    if strnd_state == "BUY":
-        final_signal = "ATMBUY" if is_above_sma else "OTMBUY"
-        
-    elif strnd_state == "SELL":
-        final_signal = "OTMSELL" if is_above_sma else "ATMSELL"
-        
-    elif strnd_state in ["BULL", "BEAR"]:
-        final_signal = strnd_state
-        
-    else:
+    except Exception:
         final_signal = "NONE"
+        exit_sig = "NONE"
 
     return final_signal, exit_sig
 
