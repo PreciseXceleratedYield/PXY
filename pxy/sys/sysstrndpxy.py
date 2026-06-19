@@ -29,14 +29,18 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     Uses a 1-period ATR and 1.0 Factor over the median price baseline.
     Returns: BULL, BEAR, BUY, or SELL.
     """ 
-    # 🎯 OVERRIDE: Fetch historical day-session buffer block from data pipeline file if empty
-    try:
-        raw_df = fetch_yf_data(period="3d", interval="1m") 
-        if not raw_df.empty:
-            df = raw_df
-    except Exception as e:
-        if DEBUG_MODE:
-            print(f"Warning: Shared pipeline download fallback active | {e}")
+    # 🎯 FIX: Only fetch fallback historical buffer block if df is truly empty or None
+    if df is None or df.empty:
+        try:
+            raw_df = fetch_yf_data(period="3d", interval="1m") 
+            if raw_df is not None and not raw_df.empty:
+                df = raw_df
+            else:
+                return pd.DataFrame()
+        except Exception as e:
+            if DEBUG_MODE:
+                print(f"Warning: Shared pipeline download fallback active | {e}")
+            return pd.DataFrame()
 
     df = df.copy()
 
@@ -159,8 +163,13 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
-def export_supertrend_json(output_file="../web/webchrtpxy.json"):
-    """Dumps EVERY single candle printed straight to the JSON file."""
+def export_supertrend_json(output_file=None):
+    """Dumps EVERY single candle printed straight to the JSON file using explicit paths."""
+    # 🎯 FIX: Absolute root system resolution to stop path breaks in /sys/exe/ loop
+    if output_file is None:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        output_file = os.path.abspath(os.path.join(base_dir, "web", "webchrtpxy.json"))
+        
     dummy_df = pd.DataFrame()
     df = calculate_supertrend(dummy_df)
     
@@ -179,7 +188,10 @@ def export_supertrend_json(output_file="../web/webchrtpxy.json"):
             "sma_trend": str(row["sma_trend_full"])
         })
 
-    os.makedirs(os.path.dirname(output_file), exist_ok=True) if os.path.dirname(output_file) else None
+    out_dir = os.path.dirname(output_file)
+    if out_dir and not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
+        
     with open(output_file, "w") as f:
         json.dump(output, f, indent=2)
     return output
@@ -192,7 +204,7 @@ def get_signal(df: pd.DataFrame) -> str:
     try:
         calculated_df = calculate_supertrend(df)
         n = len(calculated_df)
-        if n == 0:
+        if n < 2:
             return "NONE"
         
         # ⚡ LOCKED EXCLUSIVELY TO INDEX n - 2 TO GUARANTEE CONFIRMED SIGNALS ONLY
@@ -201,14 +213,6 @@ def get_signal(df: pd.DataFrame) -> str:
         # Unpack state from single pipeline setup
         active_sma_state = str(calculated_df.at[calculated_df.index[idx], 'sma_trend_full']).upper().strip()
         
-        latest_atr_val = int(calculated_df.at[calculated_df.index[idx], 'shared_atr'])
-        latest_k_val = calculate_dynamic_k(calculated_df)
-
-        if DEBUG_MODE:
-            print(f"--- PXY SINGLE-PIPE MONITOR SUMMARY ---")
-            print(f"Target Row Lookup Index   -> {idx}")
-            print(f"Active Trend state        -> {active_sma_state}")
-            
         return active_sma_state
     except Exception as e:
         if DEBUG_MODE:
@@ -222,4 +226,6 @@ if __name__ == "__main__":
     print("--- STARTING LIVE PXY JUMPING 1:1 MONITOR ENGINE ---")
     live_df = pd.DataFrame()
     processed_df = calculate_supertrend(live_df)
+    if not processed_df.empty:
+        print(f"[SUCCESS] Calculated trend columns. Total Data Vectors: {len(processed_df)}")
 
