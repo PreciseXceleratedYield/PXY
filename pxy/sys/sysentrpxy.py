@@ -13,7 +13,7 @@ Operational Matrix (Strict Priority Filter Rule Set):
 import pandas as pd
 
 # Direct structural pipeline imports from your local engine modules
-from syssatrndpxy import get_signal as get_strnd_signal
+from sysstrndpxy import get_signal as get_strnd_signal
 from sysmktpxy import get_signal as get_mkt_signals
 
 
@@ -64,5 +64,3 @@ if __name__ == "__main__":
     print("\n⚡ PIPELINE DIAGNOSTICS:")
     print(f"-> FINAL ENTRY : {final_route}")
     print(f"-> CASCADED EXIT: {cascaded_exit}\n")
-
-
