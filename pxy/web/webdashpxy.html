@@ -393,7 +393,7 @@ function renderCandleSeq(raw){
     const items=[];
     while((m=re.exec(raw))!==null){items.push({n:+m[2],bull:m[1]==='92'});}
     if(!items.length)return;
-    items.forEach(c=>{
+    items.reverse().forEach(c=>{
         const unit=document.createElement('div');
         unit.style.cssText='display:flex;align-items:center;gap:2px;width:100%;flex-shrink:0;';
         const bar=document.createElement('div');
