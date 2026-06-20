@@ -191,7 +191,7 @@ body{
 
 /* ══ RIGHT PANEL: positions + trades ══ */
 #rightWrap{
-    flex:1;display:flex;flex-direction:column;
+    flex:1.5;display:flex;flex-direction:column;
     border-right:1px solid var(--border);
     min-width:0;overflow:hidden;
 }
@@ -231,9 +231,9 @@ body{
 #tradeScroll{flex:1;overflow-y:auto;}
 
 .t-row{
-    display:grid;grid-template-columns:1fr auto auto;
+    display:grid;grid-template-columns:auto 1fr auto;
     align-items:center;gap:8px;
-    padding:6px 12px;border-bottom:1px solid var(--border);
+    padding:5px 10px;border-bottom:1px solid var(--border);
     transition:background 0.12s;cursor:default;
 }
 .t-row:hover{background:var(--bg3);}
@@ -246,22 +246,22 @@ body{
 
 /* ══ RIGHT: candle seq ══ */
 #candleSide{
-    width:28px;flex-shrink:0;
+    width:42px;flex-shrink:0;
     background:var(--bg2);border-left:1px solid var(--border);
     display:flex;flex-direction:column;align-items:center;
-    padding:6px 3px;gap:2px;
+    padding:6px 4px;gap:2px;
     transition:background 0.3s,border-color 0.3s;overflow:hidden;
 }
 #candleList{
     flex:1;width:100%;display:flex;flex-direction:column;
-    gap:1px;overflow:hidden;padding:0 1px;
+    gap:2px;overflow:hidden;padding:0 2px;
 }
 .cl-item{
-    display:flex;align-items:center;gap:2px;
+    display:flex;align-items:center;gap:3px;
     flex-shrink:0;
 }
-.cl-dot{width:8px;height:8px;border-radius:1px;flex-shrink:0;}
-.cl-num{font-size:8px;font-weight:600;line-height:1;}
+.cl-dot{width:12px;height:12px;border-radius:2px;flex-shrink:0;}
+.cl-num{font-size:12px;font-weight:600;line-height:1;}
 
 /* ══ BOTTOM ══ */
 #botBar{
@@ -384,7 +384,7 @@ body{
     </div>
 
     <!-- POSITIONS + TRADES -->
-    <div id="rightWrap" style="flex:1.5;">
+    <div id="rightWrap">
 
         <!-- POSITIONS -->
         <div id="posSection">
@@ -708,11 +708,11 @@ async function loadTrades(){
         const exit=String(t.Exit_Time||'').slice(11,16);
         const row=document.createElement('div');row.className='t-row';
         row.innerHTML=`
+            <span class="t-tag">#${t.Tag||'—'}</span>
             <div>
                 <div class="t-sym">${shortSym(t.Symbol)}</div>
                 <div class="t-meta">${entry}→${exit} · Qty ${t.Qty??'—'}</div>
             </div>
-            <span class="t-tag">#${t.Tag||'—'}</span>
             <span class="t-pnl ${pb?'bull':'bear'}">${fmt(pnl)}</span>`;
         scroll.appendChild(row);
     });
