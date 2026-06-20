@@ -525,6 +525,7 @@ async function loadTrades(){
         const v = tradeSortCol==='pnl'  ? (a.PNL||0)-(b.PNL||0)
                 : tradeSortCol==='exit' ? new Date(b.Exit_Time)-new Date(a.Exit_Time)
                 : tradeSortCol==='sym'  ? (a.Symbol||'').localeCompare(b.Symbol||'')
+                : tradeSortCol==='tag'  ? String(a.Tag||'').localeCompare(String(b.Tag||''))
                 : new Date(b.Exit_Time)-new Date(a.Exit_Time);
         return tradeSortAsc ? -v : v;
     });
@@ -533,7 +534,7 @@ async function loadTrades(){
         const entry=String(t.Buy_Time||'').slice(11,16);
         const exit=String(t.Exit_Time||'').slice(11,16);
         const row=document.createElement('div');row.className='trade-row-item';
-        row.innerHTML=`<div class="tri-left"><span class="tri-sym">${shortSym(t.Symbol)}</span><span class="tri-meta">${entry}→${exit} · Qty ${t.Qty??'—'}</span></div><span class="tri-tag">#${t.Tag||'—'}</span><span class="tri-pnl ${pbull?'bull':'bear'}">${fmt(pnl)}</span>`;
+        row.innerHTML=`<div class="tri-left"><span class="tri-sym">${shortSym(t.Symbol)}</span><span class="tri-meta">${entry}→${exit} · Qty ${t.Qty??'—'}</span></div><span class="tri-tag" style="cursor:pointer" onclick="sortTrades('tag')">#${t.Tag||'—'}</span><span class="tri-pnl ${pbull?'bull':'bear'}">${fmt(pnl)}</span>`;
         panel.appendChild(row);
     });
 }
