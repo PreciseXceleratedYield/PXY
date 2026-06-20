@@ -150,6 +150,7 @@ body{
 .tri-pnl{font-family:'Syne',sans-serif;font-weight:700;font-size:clamp(11px,1.2vw,14px);flex-shrink:0;}
 .tri-pnl.bull{color:var(--bull);}
 .tri-pnl.bear{color:var(--bear);}
+.tri-tag{font-size:clamp(9px,0.85vw,11px);color:var(--accent);flex-shrink:0;white-space:nowrap;}
 #tradeEmpty{padding:24px 10px;text-align:center;color:var(--muted);font-size:11px;}
 
 /* ══ BOTTOM BAR ══ */
@@ -532,7 +533,7 @@ async function loadTrades(){
         const entry=String(t.Buy_Time||'').slice(11,16);
         const exit=String(t.Exit_Time||'').slice(11,16);
         const row=document.createElement('div');row.className='trade-row-item';
-        row.innerHTML=`<div class="tri-left"><span class="tri-sym">${shortSym(t.Symbol)} #${t.Tag||'—'}</span><span class="tri-meta">${entry}→${exit} · Qty ${t.Qty??'—'}</span></div><span class="tri-pnl ${pbull?'bull':'bear'}">${fmt(pnl)}</span>`;
+        row.innerHTML=`<div class="tri-left"><span class="tri-sym">${shortSym(t.Symbol)}</span><span class="tri-meta">${entry}→${exit} · Qty ${t.Qty??'—'}</span></div><span class="tri-tag">#${t.Tag||'—'}</span><span class="tri-pnl ${pbull?'bull':'bear'}">${fmt(pnl)}</span>`;
         panel.appendChild(row);
     });
 }
