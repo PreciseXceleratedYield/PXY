@@ -39,23 +39,32 @@ def get_sma(df: pd.DataFrame, period: int = 42) -> dict:
 
 def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
     """
-    Constructs a single-candle OHLC row using the latest data point.
-    O = Latest SMA, H = Latest High, L = Latest Low, C = Latest Close.
-    Overwrites websmapxy.json in the specified sibling directory.
+    Constructs a custom 42-period trend-tracking candle.
+    O = Latest 42-SMA value
+    H = Highest price point across the LAST 42 candles
+    L = Lowest price point across the LAST 42 candles
+    C = Current Live / Close price
     """
     if df is None or df.empty or 'SMA' not in df.columns:
         print("Invalid data. Cannot dump single candle JSON.")
         return
         
-    # Extract only the last row for a single candle
+    # 1. Grab the last 42 rows to find the absolute range boundaries
+    window_42 = df.iloc[-42:]
+    
+    # 2. Extract the latest single row for Open (SMA) and Close (Live)
     latest_row = df.iloc[-1]
     
-    # Construct the single row dictionary
+    # 3. Calculate highest and lowest points across the full 42-candle window
+    highest_price = window_42['High'].max()
+    lowest_price = window_42['Low'].min()
+    
+    # Construct the tracking candle dictionary
     candle_data = [{
-        'O': float(latest_row['SMA']),
-        'H': float(latest_row['High']),
-        'L': float(latest_row['Low']),
-        'C': float(latest_row['Close'])
+        'O': float(latest_row['SMA']),     # SMA price is open
+        'H': float(highest_price),         # Highest price point in 42 candles
+        'L': float(lowest_price),          # Lowest price point in 42 candles
+        'C': float(latest_row['Close'])    # Live price is close
     }]
     
     # Build absolute paths for sibling folder 'web'
@@ -71,7 +80,7 @@ def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
     
     # Dump directly using pandas frame
     pd.DataFrame(candle_data).to_json(json_path, orient='records', indent=4)
-    print(f"Candle data replaced successfully at: {json_path}")
+    print(f"Custom Trend Candle replaced successfully at: {json_path}")
 
 if __name__ == "__main__":
     df = fetch_yf_data()
@@ -91,6 +100,7 @@ if __name__ == "__main__":
             
         print(f"\n{color}{output}{Style.RESET_ALL}\n")
         
-        # Dump the single latest row to the 'web' folder
+        # Dump the custom window row to the 'web' folder
         if "df_with_sma" in result:
             dump_ohlc_json(result["df_with_sma"], target_folder_name="web")
+
