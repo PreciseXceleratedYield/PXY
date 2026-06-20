@@ -67,7 +67,7 @@ body{
 .hero-cell:last-child{border-right:none;}
 .hero-cell.narrow{flex:1;}
 
-.hc-label{font-size:7px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);white-space:nowrap;text-align:center;font-family:'Syne',sans-serif;font-weight:800;}
+.hc-label{font-size:7px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);white-space:nowrap;text-align:center;}
 .hc-val{
     font-family:'Syne',sans-serif;font-weight:800;
     font-size:clamp(13px,1.8vw,20px);letter-spacing:-0.3px;white-space:nowrap;
@@ -203,11 +203,11 @@ body{
 <!-- ══ ROW 2: HERO BAR ══ -->
 <div id="heroBar">
     <div class="hero-cell narrow">
-        <span class="hc-label">CE Depth</span>
+        <span class="hc-label">🟢</span>
         <span class="hc-val bull" id="hcCEDep">—</span>
     </div>
     <div class="hero-cell narrow">
-        <span class="hc-label">CE Power</span>
+        <span class="hc-label">🟨</span>
         <span class="hc-val bull" id="hcCEPow">—</span>
     </div>
     <div class="hero-cell">
@@ -227,11 +227,11 @@ body{
         <span class="hc-val" id="hcTrend">—</span>
     </div>
     <div class="hero-cell narrow">
-        <span class="hc-label">PE Power</span>
+        <span class="hc-label">🟨</span>
         <span class="hc-val bear" id="hcPEPow">—</span>
     </div>
     <div class="hero-cell narrow">
-        <span class="hc-label">PE Depth</span>
+        <span class="hc-label">🔴</span>
         <span class="hc-val bear" id="hcPEDep">—</span>
     </div>
 </div>
@@ -248,8 +248,8 @@ body{
     <!-- 3 panels -->
     <div id="panels">
 
-        <!-- CHART -->
-        <div class="panel">
+        <!-- CHART — 2x width -->
+        <div class="panel" style="flex:2;">
             <div class="panel-top">
                 <span class="pt-label">Chart · NIFTY</span>
                 <span class="pt-val" id="ptPrice">—</span>
@@ -260,34 +260,39 @@ body{
             </div>
         </div>
 
-        <!-- POSITIONS -->
-        <div class="panel">
-            <div class="panel-top">
-                <span class="pt-label">Positions</span>
-                <span class="pt-val" id="ptPosPnl">—</span>
-            </div>
-            <div id="posPanel">
-                <div id="posEmpty">No open positions</div>
-            </div>
-        </div>
+        <!-- POSITIONS + TRADES stacked -->
+        <div class="panel" style="flex:1;display:flex;flex-direction:column;">
 
-        <!-- TRADES -->
-        <div class="panel">
-            <div class="panel-top">
-                <span class="pt-label">Trades</span>
-                <span class="pt-val" id="ptTradesPnl">—</span>
+            <!-- POSITIONS top half -->
+            <div style="flex:1;display:flex;flex-direction:column;border-bottom:1px solid var(--border);overflow:hidden;min-height:0;">
+                <div class="panel-top">
+                    <span class="pt-label" style="cursor:pointer" onclick="sortPositions('sym')">Positions ↕</span>
+                    <span class="pt-val" id="ptPosPnl">—</span>
+                </div>
+                <div id="posPanel" style="flex:1;overflow-y:auto;">
+                    <div id="posEmpty">No open positions</div>
+                </div>
             </div>
-            <div id="tradePanel">
-                <div id="tradeEmpty">No trades today</div>
+
+            <!-- TRADES bottom half -->
+            <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;">
+                <div class="panel-top">
+                    <span class="pt-label" style="cursor:pointer" onclick="sortTrades('pnl')">Trades ↕</span>
+                    <span class="pt-val" id="ptTradesPnl">—</span>
+                </div>
+                <div id="tradePanel" style="flex:1;overflow-y:auto;">
+                    <div id="tradeEmpty">No trades today</div>
+                </div>
             </div>
+
         </div>
 
     </div>
 
-    <!-- Day candle — far right -->
+    <!-- Right candle — websmapxy.json -->
     <div class="side-candle right" id="sideRight">
-        <span class="side-lbl">Day</span>
-        <div class="side-candle-wrap" id="sideDay"></div>
+        <span class="side-lbl">SMA</span>
+        <div class="side-candle-wrap" id="sideDayWrap"></div>
     </div>
 
 </div>
@@ -431,7 +436,10 @@ async function loadChart(){
         const data=await r.json();
         const closes=Array.isArray(data)?data.map(d=>d.close||d.Close):[];
         const st=Array.isArray(data)?data.map(d=>d.st):[];
-        if(closes.length)drawChart(closes,st);
+        if(closes.length){
+            drawChart(closes,st);
+            render42Candle(closes);
+        }
     }catch(e){}
 }
 
@@ -482,6 +490,13 @@ async function loadPos(){
     panel.querySelectorAll('.pos-row-item').forEach(r=>r.remove());
     if(!open.length){$('posEmpty').style.display='block';return;}
     $('posEmpty').style.display='none';
+    // sort
+    open.sort((a,b)=>{
+        const v = posSortCol==='pnl' ? (a.PNL||0)-(b.PNL||0)
+                : posSortCol==='sym' ? (a.SYMBOL||'').localeCompare(b.SYMBOL||'')
+                : (a.PNL||0)-(b.PNL||0);
+        return posSortAsc ? v : -v;
+    });
     open.forEach(d=>{
         const pnl=d.PNL||0,pbull=pnl>=0;
         const isCE=(d.SYMBOL||'').toUpperCase().endsWith('CE');
@@ -504,8 +519,15 @@ async function loadTrades(){
     panel.querySelectorAll('.trade-row-item').forEach(r=>r.remove());
     if(!data.length){$('tradeEmpty').style.display='block';return;}
     $('tradeEmpty').style.display='none';
-    const sorted=[...data].sort((a,b)=>new Date(b.Exit_Time)-new Date(a.Exit_Time));
-    sorted.forEach(t=>{
+    // sort
+    data.sort((a,b)=>{
+        const v = tradeSortCol==='pnl'  ? (a.PNL||0)-(b.PNL||0)
+                : tradeSortCol==='exit' ? new Date(b.Exit_Time)-new Date(a.Exit_Time)
+                : tradeSortCol==='sym'  ? (a.Symbol||'').localeCompare(b.Symbol||'')
+                : new Date(b.Exit_Time)-new Date(a.Exit_Time);
+        return tradeSortAsc ? -v : v;
+    });
+    data.forEach(t=>{
         const pnl=t.PNL||0,pbull=pnl>=0;
         const entry=String(t.Buy_Time||'').slice(11,16);
         const exit=String(t.Exit_Time||'').slice(11,16);
@@ -515,16 +537,100 @@ async function loadTrades(){
     });
 }
 
+/* ── 42 MIN CANDLE from chart data ── */
+function render42Candle(closes){
+    const wrap=$('side42');if(!wrap)return;
+    wrap.innerHTML='';
+    const last42=closes.slice(-42);
+    if(!last42.length)return;
+    const high=Math.max(...last42),low=Math.min(...last42),range=high-low||1;
+    // group into ~6 segments of 7 candles each
+    const segments=7;
+    const size=Math.ceil(last42.length/segments);
+    for(let i=0;i<segments;i++){
+        const chunk=last42.slice(i*size,(i+1)*size);
+        if(!chunk.length)continue;
+        const open=chunk[0],close=chunk[chunk.length-1];
+        const bull=close>=open;
+        const pct=Math.max(8,(Math.abs(close-open)/range)*100);
+        const div=document.createElement('div');
+        div.className='sc-seg';
+        div.style.flex=pct;
+        div.style.background=bull?'var(--bull)':'var(--bear)';
+        div.style.width='100%';
+        div.style.borderRadius='2px';
+        wrap.appendChild(div);
+    }
+}
+
+/* ── RIGHT CANDLE from websmapxy.json ── */
+async function loadSmaCandle(){
+    try{
+        const r=await fetch('./websmapxy.json?_='+Date.now());
+        const data=await r.json();
+        if(!Array.isArray(data)||!data.length)return;
+        const wrap=$('sideDayWrap');if(!wrap)return;
+        wrap.innerHTML='';
+        // render as OHLC proportional vertical bar
+        data.forEach(c=>{
+            const bull=c.C>=c.O;
+            const range=c.H-c.L||1;
+            // upper wick
+            const upperH=((c.H-Math.max(c.O,c.C))/range)*100;
+            // body
+            const bodyH=(Math.abs(c.C-c.O)/range)*100;
+            // lower wick
+            const lowerH=((Math.min(c.O,c.C)-c.L)/range)*100;
+
+            if(upperH>0){
+                const uw=document.createElement('div');
+                uw.className='sc-seg';uw.style.flex=Math.max(2,upperH);
+                uw.style.width='3px';uw.style.background='var(--muted)';uw.style.borderRadius='1px';
+                wrap.appendChild(uw);
+            }
+            const body=document.createElement('div');
+            body.className='sc-seg';body.style.flex=Math.max(4,bodyH);
+            body.style.width='100%';
+            body.style.background=bull?'var(--bull)':'var(--bear)';
+            body.style.borderRadius='2px';
+            wrap.appendChild(body);
+
+            if(lowerH>0){
+                const lw=document.createElement('div');
+                lw.className='sc-seg';lw.style.flex=Math.max(2,lowerH);
+                lw.style.width='3px';lw.style.background='var(--muted)';lw.style.borderRadius='1px';
+                wrap.appendChild(lw);
+            }
+        });
+    }catch(e){}
+}
+
+/* ── SORTABLE TABLES ── */
+let posSortCol='pnl', posSortAsc=false;
+let tradeSortCol='exit', tradeSortAsc=false;
+
+function sortPositions(col){
+    if(posSortCol===col) posSortAsc=!posSortAsc;
+    else { posSortCol=col; posSortAsc=false; }
+    loadPos();
+}
+function sortTrades(col){
+    if(tradeSortCol===col) tradeSortAsc=!tradeSortAsc;
+    else { tradeSortCol=col; tradeSortAsc=false; }
+    loadTrades();
+}
+
 /* ── RESIZE ── */
 const ro=new ResizeObserver(()=>{if(chart)chart.resize();});
 ro.observe($('chartPanel'));
 
 /* ── START ── */
-loadDash();loadChart();loadPos();loadTrades();
-setInterval(loadDash,  3000);
-setInterval(loadChart, 3000);
-setInterval(loadPos,   3000);
-setInterval(loadTrades,5000);
+loadDash();loadChart();loadPos();loadTrades();loadSmaCandle();
+setInterval(loadDash,    3000);
+setInterval(loadChart,   3000);
+setInterval(loadPos,     3000);
+setInterval(loadTrades,  5000);
+setInterval(loadSmaCandle,5000);
 </script>
 </body>
 </html>
