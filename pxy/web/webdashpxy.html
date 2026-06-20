@@ -267,7 +267,7 @@ body{
             <div style="flex:1;display:flex;flex-direction:column;border-bottom:1px solid var(--border);overflow:hidden;min-height:0;">
                 <div class="panel-top">
                     <span class="pt-label" style="cursor:pointer" onclick="sortPositions('sym')">Positions ↕</span>
-                    <span class="pt-val" id="ptPosPnl">—</span>
+                    <span class="pt-val" id="ptPosPnl" style="cursor:pointer" onclick="sortPositions('pnl')">—</span>
                 </div>
                 <div id="posPanel" style="flex:1;overflow-y:auto;">
                     <div id="posEmpty">No open positions</div>
@@ -277,8 +277,8 @@ body{
             <!-- TRADES bottom half -->
             <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;min-height:0;">
                 <div class="panel-top">
-                    <span class="pt-label" style="cursor:pointer" onclick="sortTrades('pnl')">Trades ↕</span>
-                    <span class="pt-val" id="ptTradesPnl">—</span>
+                    <span class="pt-label" style="cursor:pointer" onclick="sortTrades('sym')">Trades ↕</span>
+                    <span class="pt-val" id="ptTradesPnl" style="cursor:pointer" onclick="sortTrades('pnl')">—</span>
                 </div>
                 <div id="tradePanel" style="flex:1;overflow-y:auto;">
                     <div id="tradeEmpty">No trades today</div>
