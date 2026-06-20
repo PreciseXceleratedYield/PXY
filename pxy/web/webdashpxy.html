@@ -157,30 +157,24 @@ body{
     min-width:0;overflow:hidden;
 }
 .pw-hdr{
-    height:28px;flex-shrink:0;
-    display:flex;align-items:center;justify-content:space-between;
-    padding:0 12px;
+    height:26px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:space-around;
+    padding:0 8px;
     background:var(--bg2);border-bottom:1px solid var(--border);
-    gap:8px;overflow:hidden;
+    gap:4px;overflow:hidden;
     transition:background 0.3s,border-color 0.3s;
-}
-.pw-lbl{
-    font-size:7.5px;letter-spacing:0.18em;text-transform:uppercase;
-    color:var(--muted);flex-shrink:0;
 }
 .pw-sort{
     font-size:7.5px;letter-spacing:0.12em;text-transform:uppercase;
-    color:var(--muted);cursor:pointer;flex-shrink:0;
-    padding:1px 5px;border-radius:3px;transition:all 0.15s;
+    color:var(--muted);cursor:pointer;flex:1;text-align:center;
+    padding:2px 4px;border-radius:3px;transition:all 0.15s;
     border:1px solid transparent;
 }
-.pw-sort:hover{color:var(--accent);border-color:var(--accent);}
-.pw-val{
-    font-family:'Syne',sans-serif;font-weight:800;
-    font-size:clamp(11px,1.3vw,15px);white-space:nowrap;
-}
-.pw-val.bull{color:var(--bull);}
-.pw-val.bear{color:var(--bear);}
+.pw-sort:hover{color:var(--accent);border-color:rgba(59,130,246,0.3);}
+
+/* grey out trade symbols */
+#tradeScroll .t-sym{color:var(--muted);}
+#tradeScroll .t-meta{color:rgba(91,100,120,0.7);}
 
 #chartBox{
     flex:1;position:relative;overflow:hidden;
@@ -381,12 +375,8 @@ body{
         <div class="sc-wrap" id="smaWrap"></div>
     </div>
 
-    <!-- CHART -->
+    <!-- CHART — no header -->
     <div id="chartWrap">
-        <div class="pw-hdr">
-            <span class="pw-lbl">NIFTY · Live</span>
-            <span class="pw-val white" id="ptPrice">—</span>
-        </div>
         <div id="chartBox">
             <div class="grid-over"></div>
             <canvas id="priceChart"></canvas>
@@ -394,17 +384,14 @@ body{
     </div>
 
     <!-- POSITIONS + TRADES -->
-    <div id="rightWrap">
+    <div id="rightWrap" style="flex:1.5;">
 
         <!-- POSITIONS -->
         <div id="posSection">
             <div class="pw-hdr">
-                <span class="pw-lbl">Positions</span>
-                <div style="display:flex;gap:5px;align-items:center">
-                    <span class="pw-sort" onclick="sortPos('tag')">#TAG</span>
-                    <span class="pw-sort" onclick="sortPos('sym')">SYM</span>
-                    <span class="pw-sort" onclick="sortPos('pnl')">P&amp;L</span>
-                </div>
+                <span class="pw-sort" onclick="sortPos('tag')">#Tag ↕</span>
+                <span class="pw-sort" onclick="sortPos('sym')">Sym ↕</span>
+                <span class="pw-sort" onclick="sortPos('pnl')">P&amp;L ↕</span>
             </div>
             <div id="posScroll">
                 <div class="empty-msg" id="posEmpty">No open positions</div>
@@ -414,12 +401,9 @@ body{
         <!-- TRADES -->
         <div id="tradeSection">
             <div class="pw-hdr">
-                <span class="pw-lbl">Trades</span>
-                <div style="display:flex;gap:5px;align-items:center">
-                    <span class="pw-sort" onclick="sortTrd('tag')">#TAG</span>
-                    <span class="pw-sort" onclick="sortTrd('sym')">SYM</span>
-                    <span class="pw-sort" onclick="sortTrd('pnl')">P&amp;L</span>
-                </div>
+                <span class="pw-sort" onclick="sortTrd('tag')">#Tag ↕</span>
+                <span class="pw-sort" onclick="sortTrd('sym')">Sym ↕</span>
+                <span class="pw-sort" onclick="sortTrd('pnl')">P&amp;L ↕</span>
             </div>
             <div id="tradeScroll">
                 <div class="empty-msg" id="tradeEmpty">No trades today</div>
@@ -667,7 +651,9 @@ async function loadPos(){
     const open=data.filter(d=>(d.STATUS||'OPEN')==='OPEN');
     const total=open.reduce((s,d)=>s+(d.PNL||0),0);
     const bull=total>=0;
-    set('ptPosPnl',fmt(total),bull?'bull':'bear');
+    const posEl=$('ptPosPnl');
+    posEl.textContent=fmt(total);
+    posEl.className='bot-pnl '+(bull?'bull':'bear');
     const scroll=$('posScroll');
     scroll.querySelectorAll('.p-row').forEach(r=>r.remove());
     if(!open.length){$('posEmpty').style.display='block';return;}
@@ -703,7 +689,9 @@ async function loadTrades(){
     try{data=await fetch('./webpnlpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     const total=data.reduce((s,d)=>s+(d.PNL||0),0);
     const bull=total>=0;
-    set('ptTradesPnl',fmt(total),bull?'bull':'bear');
+    const trdEl=$('ptTradesPnl');
+    trdEl.textContent=fmt(total);
+    trdEl.className='bot-pnl '+(bull?'bull':'bear');
     const scroll=$('tradeScroll');
     scroll.querySelectorAll('.t-row').forEach(r=>r.remove());
     if(!data.length){$('tradeEmpty').style.display='block';return;}
