@@ -155,7 +155,7 @@ body{
 
 /* ══ CHART PANEL ══ */
 #chartWrap{
-    flex:2;display:flex;flex-direction:column;
+    width:50%;flex-shrink:0;display:flex;flex-direction:column;
     border-right:1px solid var(--border);
     min-width:0;overflow:hidden;
 }
@@ -194,7 +194,7 @@ body{
 
 /* ══ RIGHT PANEL: positions + trades ══ */
 #rightWrap{
-    flex:1.5;display:flex;flex-direction:column;
+    width:15%;flex-shrink:0;display:flex;flex-direction:column;
     border-right:1px solid var(--border);
     min-width:0;overflow:hidden;
 }
@@ -249,7 +249,7 @@ body{
 
 /* ══ TERMINAL ══ */
 #termWrap{
-    width:clamp(140px,14vw,200px);flex-shrink:0;
+    width:25%;flex-shrink:0;
     display:flex;flex-direction:column;
     border-left:1px solid var(--border);border-right:1px solid var(--border);
     background:var(--bg);overflow:hidden;
@@ -265,7 +265,7 @@ body{
 
 /* ══ RIGHT: candle seq ══ */
 #candleSide{
-    width:42px;flex-shrink:0;
+    width:5%;flex-shrink:0;
     background:var(--bg2);border-left:1px solid var(--border);
     display:flex;flex-direction:column;align-items:center;
     padding:6px 4px;gap:2px;
@@ -379,7 +379,7 @@ body{
     </div>
 
     <!-- CHART — no header -->
-    <div id="chartWrap" style="flex:1.55;">
+    <div id="chartWrap">
         <div id="chartBox">
             <div class="grid-over"></div>
             <canvas id="priceChart"></canvas>
