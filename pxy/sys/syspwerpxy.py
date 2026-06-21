@@ -15,12 +15,13 @@ TOTAL_WIDTH = 42
 def get_ce_pe_power(df=None):
     if df is None:
         df = fetch_yf_data(period="2d", interval="1m")
+        
     """
     Calculate CE/PE power based on last move and ATR using 1-min data.
     Returns:
         direction (str): 'Up', 'Down', 'Flat'
-        CEPower (int): 1-10
-        PEPower (int): 1-10
+        CEPower (int): 1-5
+        PEPower (int): 1-5
     """
     # Fetch data: fallback if insufficient rows
     df = fetch_yf_data(period="2d", interval="1m")
@@ -42,9 +43,9 @@ def get_ce_pe_power(df=None):
     last_move = float(df['Close'].iloc[-1] - df['Close'].iloc[-2])
     raw_power = abs(last_move / atr.iloc[-1])
 
-    # Scale 1-10
-    scaled_power = int(raw_power / RAW_POWER_MAX * 10)
-    scaled_power = max(1, min(scaled_power, 10))
+    # Scale 1-5 (Maintains identical underlying momentum sensitivity)
+    scaled_power = int(raw_power / RAW_POWER_MAX * 5)
+    scaled_power = max(1, min(scaled_power, 5))
 
     # Determine direction and powers
     if last_move > 0:
