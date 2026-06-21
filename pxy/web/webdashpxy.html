@@ -10,6 +10,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css">
+<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <style>
 :root,[data-theme="dark"]{
     --bg:       #06080d;
@@ -191,7 +194,7 @@ body{
 
 /* ══ RIGHT PANEL: positions + trades ══ */
 #rightWrap{
-    flex:0.5;display:flex;flex-direction:column;
+    flex:1.5;display:flex;flex-direction:column;
     border-right:1px solid var(--border);
     min-width:0;overflow:hidden;
 }
@@ -244,6 +247,22 @@ body{
 .t-pnl.bull{color:var(--bull);}
 .t-pnl.bear{color:var(--bear);}
 
+/* ══ TERMINAL ══ */
+#termWrap{
+    width:clamp(140px,14vw,200px);flex-shrink:0;
+    display:flex;flex-direction:column;
+    border-left:1px solid var(--border);border-right:1px solid var(--border);
+    background:var(--bg);overflow:hidden;
+    transition:border-color 0.3s;
+}
+#termBox{
+    flex:1;overflow:hidden;
+    background:#000;
+    font-size:10px;
+}
+#termBox .xterm{height:100%!important;}
+#termBox .xterm-viewport{background:transparent!important;}
+
 /* ══ RIGHT: candle seq ══ */
 #candleSide{
     width:42px;flex-shrink:0;
@@ -260,8 +279,8 @@ body{
     display:flex;align-items:center;gap:3px;
     flex-shrink:0;
 }
-.cl-dot{width:24px;height:24px;border-radius:3px;flex-shrink:0;}
-.cl-num{font-size:24px;font-weight:600;line-height:1;}
+.cl-dot{width:12px;height:12px;border-radius:2px;flex-shrink:0;}
+.cl-num{font-size:12px;font-weight:600;line-height:1;}
 
 /* ══ BOTTOM ══ */
 #botBar{
@@ -360,11 +379,19 @@ body{
     </div>
 
     <!-- CHART — no header -->
-    <div id="chartWrap">
+    <div id="chartWrap" style="flex:1.55;">
         <div id="chartBox">
             <div class="grid-over"></div>
             <canvas id="priceChart"></canvas>
         </div>
+    </div>
+
+    <!-- TERMINAL -->
+    <div id="termWrap">
+        <div class="pw-hdr" style="justify-content:center;">
+            <span class="side-lbl" style="writing-mode:horizontal-tb;font-size:8px;letter-spacing:0.14em;">TERMINAL</span>
+        </div>
+        <div id="termBox"></div>
     </div>
 
     <!-- POSITIONS + TRADES -->
@@ -742,12 +769,47 @@ async function loadTrades(){
     });
 }
 
+/* ── TERMINAL ── */
+function initTerminal(){
+    const term = new Terminal({
+        convertEol: true,
+        scrollback: 200,
+        fontFamily: "'DM Mono', monospace",
+        fontSize:   10,
+        lineHeight: 1.4,
+        cursorBlink:false,
+        disableStdin:true,
+        theme:{
+            background:'#000000',
+            foreground:'#e8ecf4',
+            green:'#22c55e',
+            red:'#ef4444',
+            yellow:'#f59e0b',
+            cyan:'#22d3ee',
+            brightBlack:'#374151',
+        }
+    });
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open($('termBox'));
+    setTimeout(()=>fitAddon.fit(), 50);
+    new ResizeObserver(()=>fitAddon.fit()).observe($('termBox'));
+
+    const proto = location.protocol==='https:'?'wss':'ws';
+    const ws = new WebSocket(`${proto}://${location.host}`);
+    ws.onmessage = e => {
+        term.clear();
+        term.write(e.data);
+    };
+    ws.onerror = ()=>term.write('\r\n\x1b[31m[connection error]\x1b[0m');
+}
+
 /* ── RESIZE ── */
 const ro=new ResizeObserver(()=>{if(chart)chart.resize();});
 ro.observe($('chartBox'));
 
 /* ── START ── */
-loadDash();loadChart();loadPos();loadTrades();loadSma();
+loadDash();loadChart();loadPos();loadTrades();loadSma();initTerminal();
 setInterval(loadDash,  3000);
 setInterval(loadChart, 3000);
 setInterval(loadPos,   3000);
