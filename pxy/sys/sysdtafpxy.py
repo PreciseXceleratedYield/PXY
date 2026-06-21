@@ -1,4 +1,4 @@
-# sysstrndpxy.py
+#sysdtafpxy.py
 import warnings
 import numpy as np
 import pandas as pd
@@ -7,6 +7,37 @@ from syscnfgpxy import TICKER, OHLC_MODE, TIMEZONE
 
 # Silence future warning constraints completely
 warnings.simplefilter(action='ignore', category=FutureWarning)
+
+def get_custom_continuous_ohlc(o, h, l, c):
+    """
+    Generates custom continuous candles matching the Pine Script (Mode 9):
+    - Close: High if raw candle is green (c >= o), Low if red (c < o)
+    - Open: Previous candle's custom close (or raw open if first row)
+    - High: Max of raw high, custom open, and custom close
+    - Low: Min of raw low, custom open, and custom close
+    """
+    n = len(c)
+    mod_o = np.zeros(n)
+    mod_h = np.zeros(n)
+    mod_l = np.zeros(n)
+    mod_c = np.zeros(n)
+    
+    for i in range(n):
+        # 1. Determine close based on raw candle direction
+        is_green = c[i] >= o[i]
+        mod_c[i] = h[i] if is_green else l[i]
+        
+        # 2. Open becomes the previous candle's close
+        if i == 0:
+            mod_o[i] = o[i]
+        else:
+            mod_o[i] = mod_c[i-1]
+            
+        # 3. Maintain boundaries relative to the new structural ranges
+        mod_h[i] = max(h[i], mod_o[i], mod_c[i])
+        mod_l[i] = min(l[i], mod_o[i], mod_c[i])
+        
+    return mod_o, mod_h, mod_l, mod_c
 
 def get_recursive_ohlc4_ohlc(o, h, l, c):
     """
@@ -145,6 +176,9 @@ def apply_ohlc_transformation(df, mode=1):
     elif mode == 7:
         # EXECUTE RECURSIVE OHLC/4 SYSTEM TRANSFORM
         df['Open'], df['High'], df['Low'], df['Close'] = get_recursive_ohlc4_ohlc(o, h, l, c)
+    elif mode == 9:
+        # EXECUTE CUSTOM HIGH/LOW CONTINUOUS TRANSFORM
+        df['Open'], df['High'], df['Low'], df['Close'] = get_custom_continuous_ohlc(o, h, l, c)
     else:
         print(f"SYSTEM_WARNING | Mode {mode} unrecognized. Defaulting to Raw OHLC.")
     return df
@@ -198,4 +232,3 @@ if __name__ == "__main__":
     output_df = fetch_yf_data()
     if not output_df.empty:
         print(f"ENGINE_RUN_SUCCESS | Collected Rows Count: {len(output_df)}")
-
