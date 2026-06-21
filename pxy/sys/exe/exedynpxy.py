@@ -9,7 +9,7 @@ IST = pytz.timezone("Asia/Kolkata")
 # ==================================================
 # 🔧 REVISED CONFIG: COMPRESSION DETECTOR TIME DECAY
 # ==================================================
-DECAY_RATE_PER_MIN = 0.0005  # 0.05% decay per minute (0.05 / 100)
+DECAY_RATE_PER_MIN = 0.0000  # 0.05% decay per minute (0.05 / 100)
 PNL_THRESHOLD = 0.0
 
 # Tracks the single worst/oldest trade separately for CE and PE (using minutes)
