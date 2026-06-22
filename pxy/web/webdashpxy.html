@@ -20,10 +20,10 @@
    SMA left candle is fixed 28px, excluded from % calc
 ══════════════════════════════════════════ */
 :root {
-    --w-chart:    65%;   /* Chart */
-    --w-terminal: 20%;   /* Terminal */
+    --w-chart:    50%;   /* Chart */
+    --w-terminal: 25%;   /* Terminal */
     --w-trades:   15%;   /* Positions + Trades */
-    --w-candles:   2%;   /* Depth/Power histogram */
+    --w-candles:   5%;   /* Depth/Power histogram */
     /* remaining ~5% is SMA fixed candle (28px) */
 }
 
@@ -234,28 +234,6 @@ body{
 #termBox .xterm{height:100%!important;}
 #termBox .xterm-viewport{background:transparent!important;}
 
-/* DEPTH/POWER candle panel */
-#dpPanel{
-    width:var(--w-candles);flex-shrink:0;
-    display:flex;flex-direction:column;
-    background:var(--bg2);overflow:hidden;
-}
-.dp-hdr{
-    height:22px;flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;
-    border-bottom:1px solid var(--border);
-    font-size:6px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);
-}
-#dpBody{
-    flex:1;display:flex;flex-direction:column;
-    align-items:center;padding:4px 3px;gap:2px;overflow:hidden;
-}
-.dp-item{
-    display:flex;align-items:center;gap:2px;width:100%;flex-shrink:0;
-}
-.dp-dot{border-radius:2px;flex-shrink:0;}
-.dp-num{font-size:10px;font-weight:700;line-height:1;}
-
 /* BOTTOM */
 #botBar{
     height:var(--bot);flex-shrink:0;
@@ -282,14 +260,22 @@ body{
 #clk{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0;}
 
 @media(max-width:900px){
-    #smaSide,#dpPanel,#termWrap{display:none;}
-    #chartWrap{width:60%;}
-    #rightWrap{width:40%;}
+    #smaSide{display:none;}
+    #body{flex-direction:column;}
+    #chartWrap,#termWrap,#rightWrap{width:100%;flex-shrink:0;}
+    #chartWrap{height:35vh;}
+    #termWrap{height:25vh;border-right:none;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+    #rightWrap{height:calc(40vh - var(--bot));flex-direction:row;border-right:none;}
+    #posSection{border-bottom:none;border-right:1px solid var(--border2);}
+    #tradeSection{border-right:none;}
 }
 @media(max-width:640px){
     :root{--hdr:44px;--bot:26px;}
     .sc-val{font-size:14px;}
-    #chartWrap,#rightWrap{width:50%;}
+    .sc-lbl{font-size:8px;}
+    #chartWrap{height:40vh;}
+    #termWrap{height:20vh;}
+    #rightWrap{height:calc(40vh - var(--bot));}
 }
 @media(min-width:1920px){
     :root{--hdr:64px;--bot:40px;}
@@ -329,10 +315,10 @@ body{
         <span class="sc-val" id="hcTrend">—</span>
     </div>
 
-    <!-- DEPTH/POWER histogram -->
+    <!-- DEPTH/POWER — emoji text on top bar -->
     <div class="sig-cell dp-cell" id="cellDP">
-        <span class="sc-lbl">Depth · Power</span>
-        <div id="dpHistogram"></div>
+        <span class="sc-lbl">📊 Depth · ⚡ Power</span>
+        <span class="sc-val" id="dpText">—</span>
     </div>
 </div>
 
@@ -379,11 +365,6 @@ body{
         <div id="termBox"></div>
     </div>
 
-    <!-- DEPTH/POWER vertical panel -->
-    <div id="dpPanel">
-        <div class="dp-hdr">Depth · Power</div>
-        <div id="dpBody"></div>
-    </div>
 
 </div>
 
@@ -491,11 +472,8 @@ async function loadDash(){
     }catch(e){console.error('dash',e);}
 }
 
-/* ── DEPTH/POWER HISTOGRAM ── */
+/* ── DEPTH/POWER — emoji text ── */
 function renderDPHistogram(raw, cePow, pePow){
-    const hist=$('dpHistogram');hist.innerHTML='';
-    const dpBody=$('dpBody');dpBody.innerHTML='';
-
     const re=/\u001b\[(\d+)m(\d+)\u001b\[0m/g;
     let m;const items=[];
     while((m=re.exec(raw))!==null)items.push({n:+m[2],bull:m[1]==='92'});
@@ -506,48 +484,20 @@ function renderDPHistogram(raw, cePow, pePow){
     let si=items.length-1;
     while(si>0&&items[si-1].bull===last.bull)si--;
     const streak=items.slice(si);
+    const depth=streak.length;
     const power=last.bull?cePow:pePow;
-    const BASE_H=28;
+    const emoji=last.bull?'🟢':'🔴';
+    const powEmoji='⚡';
 
-    // TOP BAR histogram — equal height bars, number = power value, latest glows
-    streak.forEach((c,i)=>{
-        const isLatest=(i===streak.length-1);
-        const bar=document.createElement('div');
-        bar.className=`dp-bar ${c.bull?'bull':'bear'}${isLatest?' latest':''}`;
-        bar.style.height=BASE_H+'px';
-        bar.style.color=c.bull?'var(--bull)':'var(--bear)';
-        if(isLatest){
-            bar.style.height=Math.min(BASE_H*power,BASE_H)+'px';
-            bar.title=`Power: ${power}`;
-        }
-        hist.appendChild(bar);
-    });
+    // format: 📊{depth}{emoji} ⚡{power}
+    const el=$('dpText');
+    if(!el)return;
+    el.textContent=`📊${depth}${emoji} ${powEmoji}${power}`;
+    el.className='sc-val '+(last.bull?'bull':'bear');
 
-    // RIGHT PANEL — vertical streak with dot + power number
-    const toRender=[...streak].reverse();
-    const opposite=si>0?items[si-1]:null;
-    if(opposite)toRender.push(opposite);
-
-    toRender.forEach((c,i)=>{
-        const isLatest=i===0;
-        const isOpp=opposite&&i===toRender.length-1;
-        const sz=isLatest?Math.round(16*Math.min(power,2)):16;
-        const item=document.createElement('div');
-        item.className='dp-item';
-        item.style.opacity=isOpp?'0.35':'1';
-        const dot=document.createElement('div');
-        dot.className='dp-dot';
-        dot.style.width=sz+'px';dot.style.height=sz+'px';
-        dot.style.background=c.bull?'var(--bull)':'var(--bear)';
-        if(isLatest)dot.style.boxShadow=c.bull?'0 0 8px var(--bull)':'0 0 8px var(--bear)';
-        const num=document.createElement('span');
-        num.className='dp-num';
-        num.style.color=c.bull?'var(--bull)':'var(--bear)';
-        num.style.fontSize=isLatest?Math.round(10*Math.min(power,2))+'px':'10px';
-        num.textContent=isLatest?power:c.n;
-        item.appendChild(dot);item.appendChild(num);
-        dpBody.appendChild(item);
-    });
+    // cell accent
+    const cell=$('cellDP');
+    cell.className='sig-cell dp-cell '+(last.bull?'bull-cell':'bear-cell');
 }
 
 /* ── SMA SIDE CANDLE ── */
