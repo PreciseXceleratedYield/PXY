@@ -7,13 +7,13 @@ init(autoreset=True)
 # ---- Pure Production Naming Alignment Imports ----
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_pxy_data
-from syshkinpxy import detect_pxy_flip_signal
+from sysdptpxy import detect_pxy_flip_signal
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
 from sysstrndpxy import calculate_supertrend
 from syspwerpxy import get_ce_pe_power
 from sysentrpxy import get_entry_signal
-from sysdeptpxy import get_candle_visual
+from syscseqpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
 from syssadxpxy import calculate_adx
