@@ -1,5 +1,5 @@
 # =============================================================================== #
-# UNIFIED ENGINE: FAST 1:1 TIME SERIES MOVING AVERAGE 9 WITH DOWNSTREAM COUPLING #
+# UNIFIED ENGINE: DYNAMIC PROPORTIONAL OPTION DEPTH MA 7 (UNCAPPED PIPELINE)     #
 # =============================================================================== #
 import os
 import sys
@@ -11,12 +11,14 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from sysdtafpxy import fetch_yf_data
 from syscnfgpxy import TIMEZONE
+# Dynamic Integration: Import depth metrics from your script
+from syshkinpxy import detect_pxy_flip_signal
 
 DEBUG_MODE = False
 CHECK_CONFIRMED_ONLY = False # False = reads running live candle (index -1)
 
 def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
-    """Dumps TSMA(9) metrics using backward-compatible mapping keys to protect downstream."""
+    """Dumps metrics using backward-compatible mapping keys to protect downstream."""
     if df is None or df.empty:
         return []
         
@@ -46,7 +48,7 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
     return output
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """Computes TSMA 9 via rolling OLS and maps legacy aliases to preserve downstream scripts."""
+    """Computes TSMA using a 7 baseline modified by absolute option depth difference."""
     if df is None or df.empty:
         try:
             df = fetch_yf_data(period="3d", interval="1m")
@@ -68,23 +70,49 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         
     src_close = df['Close'].to_numpy()
     tsma_line = np.zeros(n)
+    sma_line_42 = np.zeros(n)
     
-    # --- VECTORIZED LINEAR REGRESSION SETUP ---
-    p = 9 # HARDCODED: Fixed 9-period lookback window for calculation stability
-    x = np.arange(p)
-    x_mean = x.mean()
-    x_deviations = x - x_mean
-    x_var = np.sum(x_deviations ** 2)
+    # Pre-calculate standard 42 SMA for structural coupling requirements
+    df_sma = df['Close'].rolling(window=42, min_periods=1).mean().to_numpy()
     
-    # Fast OLS Line rolling projection loop
+    # Baseline period constant
+    BASE_PERIOD = 7
+    
+    # Fast OLS Line rolling projection loop with dynamic window adjustment
     for i in range(n):
+        # Step A: Slice data up to the current bar to mock real-time index sequence
+        current_sliced_df = df.iloc[:i+1]
+        
+        # Step B: Safe extraction of Option Matrix parameters from syshkinpxy
+        try:
+            _, _, ce_depth, pe_depth = detect_pxy_flip_signal(df=current_sliced_df)
+            # Step C: Dynamic Formulation -> 7 + absolute difference(pe_depth - ce_depth)
+            p = BASE_PERIOD + abs(int(ce_depth) - int(pe_depth))
+        except Exception:
+            p = BASE_PERIOD # Production runtime fallback boundary layer
+            
+        # Absolute boundary validation clamp
+        if p < 2:
+            p = 2
+            
+        # Verify execution historical window boundary limits 
         if i < (p - 1):
             tsma_line[i] = src_close[i]
             continue
             
+        # Standardize local lookback vector space metrics
+        x = np.arange(p)
+        x_mean = x.mean()
+        x_deviations = x - x_mean
+        x_var = np.sum(x_deviations ** 2)
+        
         y_slice = src_close[i - p + 1 : i + 1]
         
-        # Textbook OLS covariance formulation
+        # Guard against zero variance anomalies
+        if x_var == 0:
+            tsma_line[i] = src_close[i]
+            continue
+            
         slope = np.sum(x_deviations * y_slice) / x_var
         intercept = y_slice.mean() - (slope * x_mean)
         tsma_line[i] = (slope * (p - 1)) + intercept
@@ -93,7 +121,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     trend_direction = np.where(src_close >= tsma_line, 1, -1)
     
     # Correct zero-boundary lag holes
-    for i in range(1, p - 1):
+    for i in range(1, BASE_PERIOD):
         if i < n:
             trend_direction[i] = 1 if src_close[i] >= src_close[i-1] else -1
         
@@ -114,6 +142,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             
     # --- PRODUCTION STATE RETURN VALUES ---
     df['sma_line'] = tsma_line
+    df['sma_line_42'] = df_sma # Decoupled persistent 42 SMA column
     df['sma_trend'] = sma_trend_history
     
     # --- DOWNSTREAM ALIAS COMPATIBILITY LAYER ---
@@ -125,7 +154,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['ST'] = tsma_line
     df['ST_Trend'] = sma_trend_history
     df['P_Master'] = src_close
-    df['shared_atr'] = 9.0 # Replaced with static fallback representation
+    df['shared_atr'] = 7.0 
     
     return df
 
@@ -144,7 +173,7 @@ def get_signal(df: pd.DataFrame) -> str:
         return "NONE"
 
 if __name__ == "__main__":
-    print("--- STARTING UNIFIED LIVE TIME SERIES MA 9 ENGINE ---")
+    print("--- STARTING UNIFIED LIVE TIME SERIES MA 7 OPTION DEPTH PIPELINE ---")
     live_df = pd.DataFrame()
     processed_df = calculate_supertrend(live_df)
     
@@ -154,3 +183,4 @@ if __name__ == "__main__":
         print(f"[STATUS] Active Pipeline Signal: {get_signal(processed_df)}")
     else:
         print("[WARNING] Engine execution finished with an empty dataset.")
+
