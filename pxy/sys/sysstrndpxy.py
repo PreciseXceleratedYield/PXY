@@ -1,5 +1,5 @@
 # =============================================================================== #
-# UNIFIED ENGINE: 3/4 SCALED DYNAMIC ATR TIME SERIES MA ENGINE (FALLBACK 5)       #
+# UNIFIED ENGINE: FAST 1:1 TIME SERIES MOVING AVERAGE 9 WITH DOWNSTREAM COUPLING #
 # =============================================================================== #
 import os
 import sys
@@ -14,34 +14,9 @@ from syscnfgpxy import TIMEZONE
 
 DEBUG_MODE = False
 CHECK_CONFIRMED_ONLY = False # False = reads running live candle (index -1)
-ATR_PERIOD = 14
-ERROR_FALLBACK = 5 # Production baseline fallback if error or null occurs
-
-def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series: 
-    """Computes session-grouped True Range series completely uncapped."""
-    df_local = df.copy()
-    if not isinstance(df_local.index, pd.DatetimeIndex):
-        df_local.index = pd.to_datetime(df_local.index)
-        
-    high, low, close = df_local['High'], df_local['Low'], df_local['Close'] 
-    prev_close = close.shift(1) 
-    
-    tr = pd.concat([
-        high - low, 
-        (high - prev_close).abs(), 
-        (low - prev_close).abs()
-    ], axis=1).max(axis=1) 
-    
-    date_groups = df_local.index.date
-    atr = tr.groupby(date_groups, group_keys=False).apply(
-        lambda x: x.rolling(window=period, min_periods=1).mean()
-    )
-    
-    # Clean check: If zero or NaN, use ERROR_FALLBACK, otherwise keep raw upstream value
-    return atr.apply(lambda x: float(ERROR_FALLBACK) if (x == 0 or pd.isna(x)) else float(x))
 
 def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
-    """Dumps dynamic metric metrics using backward-compatible mapping keys."""
+    """Dumps TSMA(9) metrics using backward-compatible mapping keys to protect downstream."""
     if df is None or df.empty:
         return []
         
@@ -71,7 +46,7 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
     return output
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """Computes TSMA using 3/4 of the upstream ATR value with an error fallback of 5."""
+    """Computes TSMA 9 via rolling OLS and maps legacy aliases to preserve downstream scripts."""
     if df is None or df.empty:
         try:
             df = fetch_yf_data(period="3d", interval="1m")
@@ -90,44 +65,26 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     n = len(df)
     if n == 0:
         return df
-
-    # Calculate raw upstream ATR array
-    atr_series = calculate_atr(df, period=ATR_PERIOD)
-    raw_atr = atr_series.to_numpy()
+        
     src_close = df['Close'].to_numpy()
     tsma_line = np.zeros(n)
     
+    # --- VECTORIZED LINEAR REGRESSION SETUP ---
+    p = 9 # HARDCODED: Fixed 9-period lookback window for calculation stability
+    x = np.arange(p)
+    x_mean = x.mean()
+    x_deviations = x - x_mean
+    x_var = np.sum(x_deviations ** 2)
+    
     # Fast OLS Line rolling projection loop
     for i in range(n):
-        # FIXED: Error returns 5, otherwise calculate exactly 3/4 (75%) of upstream ATR
-        if np.isnan(raw_atr[i]) or raw_atr[i] == ERROR_FALLBACK:
-            p = ERROR_FALLBACK
-        else:
-            # Multiply by 3/4 and round to nearest legal integer step
-            p = int(np.round(raw_atr[i] * 0.75))
-            
-        # Absolute safety clamp: ensure an active lookback window can never be zero or negative
-        if p < 2:
-            p = 2
-            
-        # Verify execution historical window boundary limits 
         if i < (p - 1):
             tsma_line[i] = src_close[i]
             continue
             
-        # Standardize local lookback vector space metrics
-        x = np.arange(p)
-        x_mean = x.mean()
-        x_deviations = x - x_mean
-        x_var = np.sum(x_deviations ** 2)
-        
         y_slice = src_close[i - p + 1 : i + 1]
         
-        # Guard against zero variance anomalies
-        if x_var == 0:
-            tsma_line[i] = src_close[i]
-            continue
-            
+        # Textbook OLS covariance formulation
         slope = np.sum(x_deviations * y_slice) / x_var
         intercept = y_slice.mean() - (slope * x_mean)
         tsma_line[i] = (slope * (p - 1)) + intercept
@@ -136,7 +93,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     trend_direction = np.where(src_close >= tsma_line, 1, -1)
     
     # Correct zero-boundary lag holes
-    for i in range(1, 4):
+    for i in range(1, p - 1):
         if i < n:
             trend_direction[i] = 1 if src_close[i] >= src_close[i-1] else -1
         
@@ -168,7 +125,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['ST'] = tsma_line
     df['ST_Trend'] = sma_trend_history
     df['P_Master'] = src_close
-    df['shared_atr'] = raw_atr
+    df['shared_atr'] = 9.0 # Replaced with static fallback representation
     
     return df
 
@@ -187,7 +144,7 @@ def get_signal(df: pd.DataFrame) -> str:
         return "NONE"
 
 if __name__ == "__main__":
-    print(f"--- STARTING UNIFIED LIVE TIME SERIES MA (3/4 ATR SCALE) ENGINE ---")
+    print("--- STARTING UNIFIED LIVE TIME SERIES MA 9 ENGINE ---")
     live_df = pd.DataFrame()
     processed_df = calculate_supertrend(live_df)
     
