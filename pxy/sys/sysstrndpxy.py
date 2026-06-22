@@ -69,7 +69,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     # --- VECTORIZED LINEAR REGRESSION SETUP ---
     p = 7
     x = np.arange(p)
-    x_deviations = x - x.mean()
+    x_mean = x.mean()
+    x_deviations = x - x_mean
     x_var = np.sum(x_deviations ** 2)
 
     # Fast OLS Line rolling projection loop
@@ -79,15 +80,18 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             continue
         
         y_slice = src_close[i - p + 1 : i + 1]
-        slope = np.sum(x_deviations * (y_slice - y_slice.mean())) / x_var
-        tsma_line[i] = (slope * (p - p.mean())) + y_slice.mean()
+        y_mean = y_slice.mean()
+        slope = np.sum(x_deviations * (y_slice - y_mean)) / x_var
+        
+        # 🎯 FIX: Corrected OLS projection line using array time mean variables
+        tsma_line[i] = (slope * (p - 1 - x_mean)) + y_mean
 
     # Direct logic comparison arrays 
     trend_direction = np.where(src_close >= tsma_line, 1, -1)
     
     # Correct zero-boundary lag holes
     for i in range(1, p - 1):
-        trend_direction[i] = 1 if src_close[i] >= src_close[0] else -1
+        trend_direction[i] = 1 if src_close[i] >= src_close[i-1] else -1
 
     # Native state generation tracking
     sma_trend_history = []
@@ -133,3 +137,4 @@ if __name__ == "__main__":
     if not processed_df.empty:
         print(f"[SUCCESS] Calculated. Total Rows: {len(processed_df)}")
         export_supertrend_json(processed_df)
+
