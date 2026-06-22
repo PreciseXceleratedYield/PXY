@@ -486,7 +486,7 @@ function renderDPHistogram(raw, cePow, pePow){
     const streak=items.slice(si);
     const depth=streak.length;
     const power=last.bull?cePow:pePow;
-    const emoji=last.bull?'🚦':'🚦';
+    const emoji=last.bull?' 🚦':' 🚦';
     const powEmoji='⚡';
 
     // format: 📊{depth}{emoji} ⚡{power}
