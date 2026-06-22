@@ -130,13 +130,13 @@ def get_entry_signal(df=None):
         if sma_direction == "NORTH":
             final_signal = "ATMBUY"   # Trend Aligned
         else:
-            final_signal = "OTMBUY"   # Counter-Trend Protection
+            final_signal = "ATMBUY #OTMBUY"   # Counter-Trend Protection
             
     elif normalized_signal == "BEAR":
         if sma_direction == "SOUTH":
             final_signal = "ATMSELL"  # Trend Aligned
         else:
-            final_signal = "OTMSELL"  # Counter-Trend Protection
+            final_signal = "ATMSELL #OTMSELL"  # Counter-Trend Protection
             
     else:
         final_signal = "NONE"
