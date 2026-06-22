@@ -1,5 +1,5 @@
 # =============================================================================== #
-# UNIFIED ENGINE: FAST 1:1 TIME SERIES MOVING AVERAGE 7 WITH INTEGRATED JSON      #
+# UNIFIED ENGINE: FAST 1:1 TIME SERIES MOVING AVERAGE 7 WITH DOWNSTREAM COUPLING  #
 # =============================================================================== #
 import os
 import sys
@@ -16,7 +16,7 @@ DEBUG_MODE = False
 CHECK_CONFIRMED_ONLY = False  # False = reads running live candle (index -1)
 
 def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
-    """Dumps clean TSMA(7) vector metrics straight to the chart output path."""
+    """Dumps TSMA(7) metrics using backward-compatible mapping keys to protect downstream."""
     if df is None or df.empty:
         return []
 
@@ -29,6 +29,9 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
         output.append({
             "time": str(idx),
             "close": float(row["Close"]),
+            "p_master": float(row["Close"]),
+            "st": float(row["ST"]),           
+            "st_trend": str(row["ST_Trend"]),
             "sma_line": float(row["sma_line"]),
             "sma_trend": str(row["sma_trend"])
         })
@@ -43,7 +46,7 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
     return output
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """Computes TSMA 7 via rolling OLS and maps strict cross signals directly."""
+    """Computes TSMA 7 via rolling OLS and maps legacy aliases to preserve downstream scripts."""
     if df is None or df.empty:
         try:
             df = fetch_yf_data(period="3d", interval="1m")
@@ -82,8 +85,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         y_slice = src_close[i - p + 1 : i + 1]
         y_mean = y_slice.mean()
         slope = np.sum(x_deviations * (y_slice - y_mean)) / x_var
-        
-        # 🎯 FIX: Corrected OLS projection line using array time mean variables
         tsma_line[i] = (slope * (p - 1 - x_mean)) + y_mean
 
     # Direct logic comparison arrays 
@@ -112,6 +113,17 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['sma_line'] = tsma_line
     df['sma_trend'] = sma_trend_history
 
+    # --- 🎯 DOWNSTREAM ALIAS COMPATIBILITY LAYER ---
+    df['pxy_sma_line'] = tsma_line
+    df['sma_trend_full'] = sma_trend_history
+    df['src_c'] = src_close
+    df['pxy_st_line'] = tsma_line
+    df['st_trend_full'] = sma_trend_history
+    df['ST'] = tsma_line
+    df['ST_Trend'] = sma_trend_history
+    df['P_Master'] = src_close
+    df['shared_atr'] = 12.0
+
     return df
 
 def get_signal(df: pd.DataFrame) -> str:
@@ -137,4 +149,3 @@ if __name__ == "__main__":
     if not processed_df.empty:
         print(f"[SUCCESS] Calculated. Total Rows: {len(processed_df)}")
         export_supertrend_json(processed_df)
-
