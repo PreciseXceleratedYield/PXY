@@ -12,7 +12,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 from sysdtafpxy import fetch_yf_data
 from syscnfgpxy import TIMEZONE
 # Dynamic Integration: Import depth metrics from your script
-from syshkinpxy import detect_pxy_flip_signal
+from sysdptpxy import detect_pxy_flip_signal
 
 DEBUG_MODE = False
 CHECK_CONFIRMED_ONLY = False # False = reads running live candle (index -1)
