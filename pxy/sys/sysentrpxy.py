@@ -1,10 +1,19 @@
 # Save this file as sysoptrouterpxy.py
 """
 ===============================================================================
-PXY OPTION ROUTING ENGINE: DIRECT EXCLUSIVE ST-ONLY ROUTER + SMA ALIGNMENT FILTER
+PXY OPTION ROUTING ENGINE: MULTI-MODE ROUTER HUB (MKT-RAW / STRND-SMA-CONDITION)
 ===============================================================================
 Operational Matrix:
-- EXIT PIPE (Unfiltered): Sourced from Upstream ST, outputs BULL or BEAR
+
+[MODE = RAW] -> Directional Pass-Through (Sourced 100% from sysmktpxy)
+- EXIT PIPE  (Normalized): Sourced from raw upstream market exit, outputs BULL or BEAR
+- ENTRY PIPE : Sourced from raw upstream entry
+               - BUY BULL -> ATMBUY  (Long Entry)
+               - SELL BEAR -> ATMSELL (Short Entry)
+               - Otherwise -> NONE
+
+[MODE = CONDITION] -> Legacy Ruleset (Sourced from Upstream ST + 42-SMA Filter)
+- EXIT PIPE  (Unfiltered): Sourced from Upstream ST, outputs BULL or BEAR
 - ENTRY PIPE (Dynamic Delta Allocation): 
     - STRND: BULL AND SMA: NORTH -> ATMBUY  (Matched Trend / Higher Delta)
     - STRND: BULL AND SMA: SOUTH -> OTMBUY  (Counter Trend / Lower Delta)
@@ -19,6 +28,9 @@ import sys
 import importlib.util
 import numpy as np
 import pandas as pd
+
+# Global Switch Layer: Choose "RAW" or "CONDITION"
+MODE = "RAW"
 
 # 1. RUNTIME ENGINE SAME-DIRECTORY PATH ALIGNMENT
 local_dir = os.path.dirname(os.path.abspath(__file__))
@@ -45,6 +57,13 @@ except ModuleNotFoundError:
     print("\n[CRITICAL] syssmapxy.py engine module missing from local directory.")
     raise
 
+# Dynamic Import for Clean RAW Mode
+try:
+    from sysmktpxy import get_signal as get_mktpxy_signal
+except ModuleNotFoundError:
+    get_mktpxy_signal = None
+
+
 def get_entry_signal(df=None):
     """Processes upstream ST signals, standardizes tokens to BULL/BEAR,
 
@@ -53,6 +72,41 @@ def get_entry_signal(df=None):
     # 3. DIRECT INGESTION FROM UPSTREAM SOURCE PIPELINE
     target_df = pd.DataFrame() if df is None else df
 
+    # =========================================================================
+    # PIPELINE VARIANT: CLEAN RAW MODE (Sourced cleanly from sysmktpxy)
+    # =========================================================================
+    if MODE == "RAW":
+        if get_mktpxy_signal is None:
+            print("\n[CRITICAL] sysmktpxy.py module missing from local directory.")
+            return "NONE", "NONE"
+            
+        raw_entry, raw_exit = get_mktpxy_signal(target_df)
+        
+        # Clean text inputs for consistent string matching
+        raw_entry_clean = str(raw_entry).strip().upper()
+        raw_exit_clean = str(raw_exit).strip().upper()
+        
+        # A. ENTRY ROUTING MATRIX
+        if raw_entry_clean in ["BUY BULL", "BUY", "BULL"]:
+            final_signal = "ATMBUY"
+        elif raw_entry_clean in ["SELL BEAR", "SELL", "BEAR"]:
+            final_signal = "ATMSELL"
+        else:
+            final_signal = "NONE"
+            
+        # B. EXIT ROUTING MATRIX (CONSOLIDATE TO PURE BULL / BEAR)
+        if raw_exit_clean in ["BUY BULL", "BUY", "BULL"]:
+            exit_sig = "BULL"
+        elif raw_exit_clean in ["SELL BEAR", "SELL", "BEAR"]:
+            exit_sig = "BEAR"
+        else:
+            exit_sig = "NONE"
+            
+        return final_signal, exit_sig
+
+    # =========================================================================
+    # ORIGINAL PIPELINE: CONDITION MODE (100% Untouched Legacy Code Block)
+    # =========================================================================
     # Pull the raw, unfiltered structural strategy signal
     raw_strnd_signal = str(get_signal(target_df)).strip().upper()
 
@@ -91,7 +145,7 @@ def get_entry_signal(df=None):
 
 
 if __name__ == "__main__":
-    print("--- STARTING LIVE ST-ONLY EXCLUSIVE ROUTER HUB ---")
+    print(f"--- STARTING LIVE ST-ONLY EXCLUSIVE ROUTER HUB [MODE: {MODE}] ---")
     
     # Attempt to locate and pull data frame matrix
     try:
@@ -113,5 +167,4 @@ if __name__ == "__main__":
     print("\n⚡ PIPELINE DIAGNOSTICS:")
     print(f"-> FINAL ENTRY : {final_route}")
     print(f"-> CASCADED EXIT: {cascaded_exit}\n")
-
 
