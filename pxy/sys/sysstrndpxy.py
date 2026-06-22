@@ -1,5 +1,5 @@
 # =============================================================================== #
-# UNIFIED ENGINE: DYNAMIC ATR LOOKBACK TIME SERIES MA WITH DOWNSTREAM COUPLING    #
+# UNIFIED ENGINE: 3/4 SCALED DYNAMIC ATR TIME SERIES MA ENGINE (FALLBACK 5)       #
 # =============================================================================== #
 import os
 import sys
@@ -15,9 +15,10 @@ from syscnfgpxy import TIMEZONE
 DEBUG_MODE = False
 CHECK_CONFIRMED_ONLY = False # False = reads running live candle (index -1)
 ATR_PERIOD = 14
+ERROR_FALLBACK = 5 # Production baseline fallback if error or null occurs
 
 def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series: 
-    """Computes session-grouped True Range series with a production fallback boundary cap."""
+    """Computes session-grouped True Range series completely uncapped."""
     df_local = df.copy()
     if not isinstance(df_local.index, pd.DatetimeIndex):
         df_local.index = pd.to_datetime(df_local.index)
@@ -36,7 +37,8 @@ def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
         lambda x: x.rolling(window=period, min_periods=1).mean()
     )
     
-    return atr.apply(lambda x: 12.0 if (x == 0 or pd.isna(x) or x > 12.0) else x)
+    # Clean check: If zero or NaN, use ERROR_FALLBACK, otherwise keep raw upstream value
+    return atr.apply(lambda x: float(ERROR_FALLBACK) if (x == 0 or pd.isna(x)) else float(x))
 
 def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
     """Dumps dynamic metric metrics using backward-compatible mapping keys."""
@@ -69,7 +71,7 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
     return output
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """Computes TSMA using a dynamic, rounded ATR lookback window with a strict floor of 7."""
+    """Computes TSMA using 3/4 of the upstream ATR value with an error fallback of 5."""
     if df is None or df.empty:
         try:
             df = fetch_yf_data(period="3d", interval="1m")
@@ -89,18 +91,25 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     if n == 0:
         return df
 
-    # Calculate and round the ATR array for lookback calculation
+    # Calculate raw upstream ATR array
     atr_series = calculate_atr(df, period=ATR_PERIOD)
-    rounded_atr = np.round(atr_series.to_numpy())
+    raw_atr = atr_series.to_numpy()
     src_close = df['Close'].to_numpy()
     tsma_line = np.zeros(n)
     
-    # Fast OLS Line rolling projection loop with dynamic execution bounds
+    # Fast OLS Line rolling projection loop
     for i in range(n):
-        # Enforce dynamic lookback window with a absolute floor value of 7
-        raw_p = rounded_atr[i] if not np.isnan(rounded_atr[i]) else 7
-        p = int(max(7, raw_p))
-        
+        # FIXED: Error returns 5, otherwise calculate exactly 3/4 (75%) of upstream ATR
+        if np.isnan(raw_atr[i]) or raw_atr[i] == ERROR_FALLBACK:
+            p = ERROR_FALLBACK
+        else:
+            # Multiply by 3/4 and round to nearest legal integer step
+            p = int(np.round(raw_atr[i] * 0.75))
+            
+        # Absolute safety clamp: ensure an active lookback window can never be zero or negative
+        if p < 2:
+            p = 2
+            
         # Verify execution historical window boundary limits 
         if i < (p - 1):
             tsma_line[i] = src_close[i]
@@ -126,8 +135,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     # Direct logic comparison arrays
     trend_direction = np.where(src_close >= tsma_line, 1, -1)
     
-    # Correct zero-boundary lag holes up to absolute floor boundary
-    for i in range(1, 6):
+    # Correct zero-boundary lag holes
+    for i in range(1, 4):
         if i < n:
             trend_direction[i] = 1 if src_close[i] >= src_close[i-1] else -1
         
@@ -159,7 +168,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['ST'] = tsma_line
     df['ST_Trend'] = sma_trend_history
     df['P_Master'] = src_close
-    df['shared_atr'] = atr_series.to_numpy()
+    df['shared_atr'] = raw_atr
     
     return df
 
@@ -178,7 +187,7 @@ def get_signal(df: pd.DataFrame) -> str:
         return "NONE"
 
 if __name__ == "__main__":
-    print("--- STARTING UNIFIED LIVE TIME SERIES MA (DYNAMIC MIN 7) ENGINE ---")
+    print(f"--- STARTING UNIFIED LIVE TIME SERIES MA (3/4 ATR SCALE) ENGINE ---")
     live_df = pd.DataFrame()
     processed_df = calculate_supertrend(live_df)
     
