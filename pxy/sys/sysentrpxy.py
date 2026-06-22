@@ -30,7 +30,7 @@ import numpy as np
 import pandas as pd
 
 # Global Switch Layer: Choose "RAW" or "CONDITION"
-MODE = "RAW"
+MODE = "CONDITION"
 
 # 1. RUNTIME ENGINE SAME-DIRECTORY PATH ALIGNMENT
 local_dir = os.path.dirname(os.path.abspath(__file__))
@@ -130,13 +130,13 @@ def get_entry_signal(df=None):
         if sma_direction == "NORTH":
             final_signal = "ATMBUY"   # Trend Aligned
         else:
-            final_signal = "ATMBUY #OTMBUY"   # Counter-Trend Protection
+            final_signal = "ATMBUY" #OTMBUY   # Counter-Trend Protection
             
     elif normalized_signal == "BEAR":
         if sma_direction == "SOUTH":
             final_signal = "ATMSELL"  # Trend Aligned
         else:
-            final_signal = "ATMSELL #OTMSELL"  # Counter-Trend Protection
+            final_signal = "ATMSELL"  #OTMSELL # Counter-Trend Protection
             
     else:
         final_signal = "NONE"
