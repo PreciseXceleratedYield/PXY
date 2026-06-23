@@ -84,12 +84,12 @@ def target_price(row):
         # 6. Core execution logic evaluating directional signals
         if is_ce:
             if active_exit in ["SELL", "BEAR"]:  
-                target_pct = hce_d + ce_p
+                target_pct = 1
             else:                                
                 target_pct = max(2.0, (hce_d * ce_p))
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   
-                target_pct = hpe_d + pe_p
+                target_pct = 1
             else:                                
                 target_pct = max(2.0, (hpe_d * pe_p))
                 
