@@ -58,10 +58,10 @@ def target_price(row):
             print(f"{padding}↕️ {atr_disp}  {Fore.GREEN}🟢  BUY : {ce_disp}%  {Fore.RED}🔴  SELL: {pe_disp}%")
             printed_sides.add(print_key)
 
-        # 3. Entry data health check
-        entry_prc = i(row.get("pxy_entry") or row.get("buy_prc"))
+        # 3. Entry data health check (FIXED: Cast to float using f() to protect decimals)
+        entry_prc = f(row.get("pxy_entry") or row.get("buy_prc"))
         if entry_prc <= 0:
-            return 0
+            return 0.0
 
         # 4. Context extractors
         symbol = str(row.get("symbol", "unknown")).upper()
@@ -71,7 +71,7 @@ def target_price(row):
         is_pe = "PE" in symbol
 
         if not is_ce and not is_pe:
-            return entry_prc
+            return round(entry_prc, 2)
 
         # 5. Extract Option Matrix parameters for math target calculation
         hce_d = f(row.get("hkin_ce_depth"), 1.0)
@@ -86,12 +86,12 @@ def target_price(row):
             if active_exit in ["SELL", "BEAR"]:  
                 target_pct = hce_d + ce_p
             else:                                
-                target_pct = hce_d * ce_p  
+                target_pct = max(2.0, (hce_d * ce_p))
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   
                 target_pct = hpe_d + pe_p
             else:                                
-                target_pct = hpe_d * pe_p
+                target_pct = max(2.0, (hpe_d * pe_p))
                 
         # 7. Final mathematical target projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
@@ -99,6 +99,5 @@ def target_price(row):
 
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
-        return 0
-
+        return 0.0
 
