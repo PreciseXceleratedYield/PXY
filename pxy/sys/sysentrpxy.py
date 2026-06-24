@@ -7,16 +7,16 @@ Operational Matrix:
 [MODE = RAW] -> Directional Pass-Through (Sourced 100% from sysmktpxy)
   - EXIT PIPE (Normalized): Sourced from raw upstream market exit, outputs BULL or BEAR
   - ENTRY PIPE : Sourced from raw upstream entry
-    - BUY BULL -> ATMBUY (Long Entry)
-    - SELL BEAR -> ATMSELL (Short Entry)
+    - BUY BULL -> OTMBUY (Long Entry)
+    - SELL BEAR -> OTMSELL (Short Entry)
     - Otherwise -> NONE
 [MODE = CONDITION] -> Legacy Ruleset (Sourced from Upstream ST + 42-SMA Filter)
   - EXIT PIPE (Unfiltered): Sourced from Upstream ST, outputs BULL or BEAR
   - ENTRY PIPE (Dynamic Delta Allocation):
-    - STRND: BULL AND SMA: NORTH -> ATMBUY (Matched Trend / Higher Delta)
-    - STRND: BULL AND SMA: SOUTH -> ATMBUY (Counter Trend / Lower Delta)
-    - STRND: BEAR AND SMA: SOUTH -> ATMSELL (Matched Trend / Higher Delta)
-    - STRND: BEAR AND SMA: NORTH -> ATMSELL (Counter Trend / Lower Delta)
+    - STRND: BULL AND SMA: NORTH -> OTMBUY (Matched Trend / Higher Delta)
+    - STRND: BULL AND SMA: SOUTH -> OTMBUY (Counter Trend / Lower Delta)
+    - STRND: BEAR AND SMA: SOUTH -> OTMSELL (Matched Trend / Higher Delta)
+    - STRND: BEAR AND SMA: NORTH -> OTMSELL (Counter Trend / Lower Delta)
     - Otherwise -> NONE
 ===============================================================================
 """
@@ -82,7 +82,7 @@ def is_otm_only_window():
 
 def get_entry_signal(df=None):
     """Processes upstream ST signals, standardizes tokens to BULL/BEAR, checks 
-    alignment with 42-SMA, and routes to ATM or OTM option types.
+    alignment with 42-SMA, and routes to OTM or OTM option types.
     """
     # 3. DIRECT INGESTION FROM UPSTREAM SOURCE PIPELINE
     target_df = pd.DataFrame() if df is None else df
@@ -102,9 +102,9 @@ def get_entry_signal(df=None):
         
         # A. ENTRY ROUTING MATRIX
         if raw_entry_clean in ["BUY BULL", "BUY", "BULL"]:
-            final_signal = "ATMBUY"
+            final_signal = "OTMBUY"
         elif raw_entry_clean in ["SELL BEAR", "SELL", "BEAR"]:
-            final_signal = "ATMSELL"
+            final_signal = "OTMSELL"
         else:
             final_signal = "NONE"
             
@@ -138,30 +138,30 @@ def get_entry_signal(df=None):
         sma_result = get_sma(target_df, period=42)
         sma_direction = sma_result.get("status", "NA")  # "NORTH" or "SOUTH"
         
-        # 7. ROUTING MATRIX FOR ATM AND OTM SEGREGATION
+        # 7. ROUTING MATRIX FOR OTM AND OTM SEGREGATION
         if normalized_signal == "BULL":
             if sma_direction == "NORTH":
-                final_signal = "ATMBUY"  # Trend Aligned
+                final_signal = "OTMBUY"  # Trend Aligned
             else:
-                final_signal = "ATMBUY"  # OTMBUY # Counter-Trend Protection
+                final_signal = "OTMBUY"  # OTMBUY # Counter-Trend Protection
         elif normalized_signal == "BEAR":
             if sma_direction == "SOUTH":
-                final_signal = "ATMSELL"  # Trend Aligned
+                final_signal = "OTMSELL"  # Trend Aligned
             else:
-                final_signal = "ATMSELL"  # OTMSELL # Counter-Trend Protection
+                final_signal = "OTMSELL"  # OTMSELL # Counter-Trend Protection
         else:
             final_signal = "NONE"
 
     # =========================================================================
-    # TIME-BASED OVERRIDE INTERCEPTOR (Only converts ATM to OTM between 09:15-09:30 IST)
+    # TIME-BASED OVERRIDE INTERCEPTOR (Only converts OTM to OTM between 09:15-09:30 IST)
     # =========================================================================
     if is_otm_only_window():
-        if final_signal == "ATMBUY":
+        if final_signal == "OTMBUY":
             final_signal = "OTMBUY"
-            print("⏰ [WINDOW INTERCEPT] 09:15 - 09:30 IST: Converted ATMBUY to OTMBUY")
-        elif final_signal == "ATMSELL":
+            print("⏰ [WINDOW INTERCEPT] 09:15 - 09:30 IST: Converted OTMBUY to OTMBUY")
+        elif final_signal == "OTMSELL":
             final_signal = "OTMSELL"
-            print("⏰ [WINDOW INTERCEPT] 09:15 - 09:30 IST: Converted ATMSELL to OTMSELL")
+            print("⏰ [WINDOW INTERCEPT] 09:15 - 09:30 IST: Converted OTMSELL to OTMSELL")
 
     return final_signal, exit_sig
 
