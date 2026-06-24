@@ -52,7 +52,7 @@ MODE 7: Recursive OHLC/4 Candle Framework (ACTIVE DEFAULT)
 # ---------------- LOCAL SYSTEM CONFIGURATION ----------------
 PARAMS = {
     "ticker": "BTC-USD",          # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
-    "ohlc_mode": 0                # Switch Modes here (0 through 7)
+    "ohlc_mode": 1                # Switch Modes here (0 through 7)
 }
 
 # ---------------- CONSTANTS DERIVED FROM CONFIG ----------------
