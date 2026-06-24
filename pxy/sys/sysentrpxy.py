@@ -4,28 +4,27 @@
 PXY OPTION ROUTING ENGINE: MULTI-MODE ROUTER HUB (MKT-RAW / STRND-SMA-CONDITION)
 ===============================================================================
 Operational Matrix:
-
 [MODE = RAW] -> Directional Pass-Through (Sourced 100% from sysmktpxy)
-- EXIT PIPE  (Normalized): Sourced from raw upstream market exit, outputs BULL or BEAR
-- ENTRY PIPE : Sourced from raw upstream entry
-               - BUY BULL -> ATMBUY  (Long Entry)
-               - SELL BEAR -> ATMSELL (Short Entry)
-               - Otherwise -> NONE
-
+  - EXIT PIPE (Normalized): Sourced from raw upstream market exit, outputs BULL or BEAR
+  - ENTRY PIPE : Sourced from raw upstream entry
+    - BUY BULL -> ATMBUY (Long Entry)
+    - SELL BEAR -> ATMSELL (Short Entry)
+    - Otherwise -> NONE
 [MODE = CONDITION] -> Legacy Ruleset (Sourced from Upstream ST + 42-SMA Filter)
-- EXIT PIPE  (Unfiltered): Sourced from Upstream ST, outputs BULL or BEAR
-- ENTRY PIPE (Dynamic Delta Allocation): 
-    - STRND: BULL AND SMA: NORTH -> ATMBUY  (Matched Trend / Higher Delta)
-    - STRND: BULL AND SMA: SOUTH -> OTMBUY  (Counter Trend / Lower Delta)
+  - EXIT PIPE (Unfiltered): Sourced from Upstream ST, outputs BULL or BEAR
+  - ENTRY PIPE (Dynamic Delta Allocation):
+    - STRND: BULL AND SMA: NORTH -> ATMBUY (Matched Trend / Higher Delta)
+    - STRND: BULL AND SMA: SOUTH -> ATMBUY (Counter Trend / Lower Delta)
     - STRND: BEAR AND SMA: SOUTH -> ATMSELL (Matched Trend / Higher Delta)
-    - STRND: BEAR AND SMA: NORTH -> OTMSELL (Counter Trend / Lower Delta)
-    - Otherwise                  -> NONE
+    - STRND: BEAR AND SMA: NORTH -> ATMSELL (Counter Trend / Lower Delta)
+    - Otherwise -> NONE
 ===============================================================================
 """
-
 import os
 import sys
 import importlib.util
+from datetime import datetime
+import zoneinfo
 import numpy as np
 import pandas as pd
 
@@ -64,10 +63,26 @@ except ModuleNotFoundError:
     get_mktpxy_signal = None
 
 
-def get_entry_signal(df=None):
-    """Processes upstream ST signals, standardizes tokens to BULL/BEAR,
+def is_otm_only_window():
+    """Returns True if current Indian Standard Time (IST) is between 09:15 and 09:30."""
+    try:
+        tz_ist = zoneinfo.ZoneInfo("Asia/Kolkata")
+        now_ist = datetime.now(tz_ist)
+        
+        # Calculate market minutes from midnight
+        current_minutes = now_ist.hour * 60 + now_ist.minute
+        start_window = 9 * 60 + 15  # 09:15
+        end_window = 9 * 60 + 30    # 09:30
+        
+        return start_window <= current_minutes < end_window
+    except Exception as e:
+        print(f"[WARNING] Timezone check failed ({e}). Defaulting to standard routing.")
+        return False
 
-    checks alignment with 42-SMA, and routes to ATM or OTM option types.
+
+def get_entry_signal(df=None):
+    """Processes upstream ST signals, standardizes tokens to BULL/BEAR, checks 
+    alignment with 42-SMA, and routes to ATM or OTM option types.
     """
     # 3. DIRECT INGESTION FROM UPSTREAM SOURCE PIPELINE
     target_df = pd.DataFrame() if df is None else df
@@ -79,7 +94,6 @@ def get_entry_signal(df=None):
         if get_mktpxy_signal is None:
             print("\n[CRITICAL] sysmktpxy.py module missing from local directory.")
             return "NONE", "NONE"
-            
         raw_entry, raw_exit = get_mktpxy_signal(target_df)
         
         # Clean text inputs for consistent string matching
@@ -101,45 +115,53 @@ def get_entry_signal(df=None):
             exit_sig = "BEAR"
         else:
             exit_sig = "NONE"
-            
-        return final_signal, exit_sig
 
     # =========================================================================
     # ORIGINAL PIPELINE: CONDITION MODE (100% Untouched Legacy Code Block)
     # =========================================================================
-    # Pull the raw, unfiltered structural strategy signal
-    raw_strnd_signal = str(get_signal(target_df)).strip().upper()
-
-    # 4. CONSOLIDATE UPSTREAM TOKENS TO PURE BULL / BEAR
-    if raw_strnd_signal in ["BUY", "BULL"]:
-        normalized_signal = "BULL"
-    elif raw_strnd_signal in ["SELL", "BEAR"]:
-        normalized_signal = "BEAR"
     else:
-        normalized_signal = "NONE"
-
-    # 5. UNFILTERED CASCADED EXIT PIPE
-    exit_sig = normalized_signal
-
-    # 6. RUN THE 42-SMA DIRECTIONAL FILTERING ENGINE
-    sma_result = get_sma(target_df, period=42)
-    sma_direction = sma_result.get("status", "NA") # "NORTH" or "SOUTH"
-
-    # 7. ROUTING MATRIX FOR ATM AND OTM SEGREGATION
-    if normalized_signal == "BULL":
-        if sma_direction == "NORTH":
-            final_signal = "ATMBUY"   # Trend Aligned
+        # Pull the raw, unfiltered structural strategy signal
+        raw_strnd_signal = str(get_signal(target_df)).strip().upper()
+        
+        # 4. CONSOLIDATE UPSTREAM TOKENS TO PURE BULL / BEAR
+        if raw_strnd_signal in ["BUY", "BULL"]:
+            normalized_signal = "BULL"
+        elif raw_strnd_signal in ["SELL", "BEAR"]:
+            normalized_signal = "BEAR"
         else:
-            final_signal = "ATMBUY" #OTMBUY   # Counter-Trend Protection
+            normalized_signal = "NONE"
             
-    elif normalized_signal == "BEAR":
-        if sma_direction == "SOUTH":
-            final_signal = "ATMSELL"  # Trend Aligned
+        # 5. UNFILTERED CASCADED EXIT PIPE
+        exit_sig = normalized_signal
+        
+        # 6. RUN THE 42-SMA DIRECTIONAL FILTERING ENGINE
+        sma_result = get_sma(target_df, period=42)
+        sma_direction = sma_result.get("status", "NA")  # "NORTH" or "SOUTH"
+        
+        # 7. ROUTING MATRIX FOR ATM AND OTM SEGREGATION
+        if normalized_signal == "BULL":
+            if sma_direction == "NORTH":
+                final_signal = "ATMBUY"  # Trend Aligned
+            else:
+                final_signal = "ATMBUY"  # OTMBUY # Counter-Trend Protection
+        elif normalized_signal == "BEAR":
+            if sma_direction == "SOUTH":
+                final_signal = "ATMSELL"  # Trend Aligned
+            else:
+                final_signal = "ATMSELL"  # OTMSELL # Counter-Trend Protection
         else:
-            final_signal = "ATMSELL"  #OTMSELL # Counter-Trend Protection
-            
-    else:
-        final_signal = "NONE"
+            final_signal = "NONE"
+
+    # =========================================================================
+    # TIME-BASED OVERRIDE INTERCEPTOR (Only converts ATM to OTM between 09:15-09:30 IST)
+    # =========================================================================
+    if is_otm_only_window():
+        if final_signal == "ATMBUY":
+            final_signal = "OTMBUY"
+            print("⏰ [WINDOW INTERCEPT] 09:15 - 09:30 IST: Converted ATMBUY to OTMBUY")
+        elif final_signal == "ATMSELL":
+            final_signal = "OTMSELL"
+            print("⏰ [WINDOW INTERCEPT] 09:15 - 09:30 IST: Converted ATMSELL to OTMSELL")
 
     return final_signal, exit_sig
 
@@ -156,14 +178,13 @@ if __name__ == "__main__":
             fetch_yf_data = sysdtafpxy.fetch_yf_data
         else:
             from sysdtafpxy import fetch_yf_data
-            
         production_df = fetch_yf_data()
     except Exception:
         print("[WARNING] sysdtafpxy module unavailable. Sourcing empty matrix.")
         production_df = None
         
     final_route, cascaded_exit = get_entry_signal(df=production_df)
-
+    
     print("\n⚡ PIPELINE DIAGNOSTICS:")
     print(f"-> FINAL ENTRY : {final_route}")
     print(f"-> CASCADED EXIT: {cascaded_exit}\n")
