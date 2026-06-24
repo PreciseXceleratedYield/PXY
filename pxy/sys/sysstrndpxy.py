@@ -1,21 +1,12 @@
-# =============================================================================== #
-# UNIFIED ENGINE: DYNAMIC PROPORTIONAL OPTION DEPTH MA 7 (UNCAPPED PIPELINE)     #
-# =============================================================================== #
+# sysstrndpxy.py
 import os
 import sys
 import json
-import numpy as np
 import pandas as pd
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
-
+import numpy as np
 from sysdtafpxy import fetch_yf_data
-from syscnfgpxy import TIMEZONE
-# Dynamic Integration: Import depth metrics from your script
-from sysdptpxy import detect_pxy_flip_signal
 
-DEBUG_MODE = False
-CHECK_CONFIRMED_ONLY = False # False = reads running live candle (index -1)
+DEBUG_MODE = True
 
 def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
     """Dumps metrics using backward-compatible mapping keys to protect downstream."""
@@ -47,140 +38,121 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
         
     return output
 
-def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """Computes TSMA using a 7 baseline modified by absolute option depth difference."""
-    if df is None or df.empty:
-        try:
-            df = fetch_yf_data(period="3d", interval="1m")
-            if df is None or df.empty:
-                return pd.DataFrame()
-        except Exception:
-            return pd.DataFrame()
-            
-    df = df.copy()
-    if not isinstance(df.index, pd.DatetimeIndex):
-        df.index = pd.to_datetime(df.index)
+def calculate_tsma_42(series: pd.Series) -> np.ndarray:
+    """
+    Calculates a strict 42-row Time Series Moving Average (Linear Regression).
+    Uses a fast linear algebra slope projection over the pre-padded matrix rows.
+    """
+    y = series.to_numpy()
+    n = len(y)
+    tsma_output = np.empty(n)
+    
+    # First row fallback (cannot regress a single isolated point)
+    tsma_output[0] = y[0]
+    
+    # Linear algebra loop over the index rows
+    for i in range(1, n):
+        # Window size matches row count, capped at 42 lookback rows
+        current_window = min(i + 1, 42)
+        y_slice = y[i - current_window + 1 : i + 1]
         
-    tz_str = str(TIMEZONE)
-    df = df.tz_localize('UTC').tz_convert(tz_str) if df.index.tz is None else df.tz_convert(tz_str)
-    
-    n = len(df)
-    if n == 0:
-        return df
-        
-    src_close = df['Close'].to_numpy()
-    tsma_line = np.zeros(n)
-    sma_line_42 = np.zeros(n)
-    
-    # Pre-calculate standard 42 SMA for structural coupling requirements
-    df_sma = df['Close'].rolling(window=42, min_periods=1).mean().to_numpy()
-    
-    # Baseline period constant
-    BASE_PERIOD = 7
-    
-    # Fast OLS Line rolling projection loop with dynamic window adjustment
-    for i in range(n):
-        # Step A: Slice data up to the current bar to mock real-time index sequence
-        current_sliced_df = df.iloc[:i+1]
-        
-        # Step B: Safe extraction of Option Matrix parameters from syshkinpxy
-        try:
-            _, _, ce_depth, pe_depth = detect_pxy_flip_signal(df=current_sliced_df)
-            # Step C: Dynamic Formulation -> 7 + absolute difference(pe_depth - ce_depth)
-            p = BASE_PERIOD + abs(int(ce_depth) - int(pe_depth))
-        except Exception:
-            p = BASE_PERIOD # Production runtime fallback boundary layer
-            
-        # Absolute boundary validation clamp
-        if p < 2:
-            p = 2
-            
-        # Verify execution historical window boundary limits 
-        if i < (p - 1):
-            tsma_line[i] = src_close[i]
-            continue
-            
-        # Standardize local lookback vector space metrics
-        x = np.arange(p)
+        # Build independent time grid index vector x: [0, 1, 2... window_len - 1]
+        x = np.arange(current_window)
         x_mean = x.mean()
-        x_deviations = x - x_mean
-        x_var = np.sum(x_deviations ** 2)
+        y_mean = y_slice.mean()
         
-        y_slice = src_close[i - p + 1 : i + 1]
+        # Calculate Ordinary Least Squares regression parameters
+        slope = np.sum((x - x_mean) * (y_slice - y_mean)) / np.sum((x - x_mean) ** 2)
+        intercept = y_mean - slope * x_mean
         
-        # Guard against zero variance anomalies
-        if x_var == 0:
-            tsma_line[i] = src_close[i]
-            continue
-            
-        slope = np.sum(x_deviations * y_slice) / x_var
-        intercept = y_slice.mean() - (slope * x_mean)
-        tsma_line[i] = (slope * (p - 1)) + intercept
+        # Project endpoint location line value at current position index i
+        tsma_output[i] = slope * (current_window - 1) + intercept
+        
+    return tsma_output
 
-    # Direct logic comparison arrays
-    trend_direction = np.where(src_close >= tsma_line, 1, -1)
+def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    PXY® Engine: Pure TSMA 42 Price Midpoint Engine
+    - Slices down to a strict 50-row tail matrix vector.
+    - Runs completely on upstream pre-transformed Mode 5 datasets.
+    - Forces the ST baseline to track the 50/50 blend of TSMA 42 and Live Close.
+    """
+    # Slice the clean matrix down to exactly 50 rows
+    df = df.tail(50).copy()
     
-    # Correct zero-boundary lag holes
-    for i in range(1, BASE_PERIOD):
-        if i < n:
-            trend_direction[i] = 1 if src_close[i] >= src_close[i-1] else -1
+    # Create sequential bar tracker integers from 1 to 50
+    df['bar_count'] = np.arange(1, 51)
+    
+    # Process Pure TSMA 42 Baseline Wave over Mode 5 Closings
+    tsma_42_line = calculate_tsma_42(df['Close'])
+    
+    # NEW ST LINE MATH: Pure 1:1 price weight fusion blending TSMA 42 with Live Close
+    df['ST'] = (tsma_42_line + df['Close'].to_numpy()) / 2.0
+    
+    # State-machine trend tracking loop matching the Pine engine
+    st_trend = []
+    prev_trend = "SIDE"
+    
+    for i in range(len(df)):
+        curr_close = df['Close'].iloc[i]
+        curr_line = df['ST'].iloc[i]
         
-    # Native state generation tracking
-    sma_trend_history = []
-    for i in range(n):
-        regime = "BULL" if trend_direction[i] == 1 else "BEAR"
-        if i < 1:
-            sma_trend_history.append(regime)
+        if pd.isna(curr_line):
+            st_trend.append("SIDE")
             continue
             
-        if trend_direction[i] == 1 and trend_direction[i-1] == -1:
-            sma_trend_history.append("BUY")
-        elif trend_direction[i] == -1 and trend_direction[i-1] == 1:
-            sma_trend_history.append("SELL")
+        if curr_close > curr_line:
+            new_trend = "UP" if prev_trend in ["UP", "BUY"] else "BUY"
+        elif curr_close < curr_line:
+            new_trend = "DOWN" if prev_trend in ["DOWN", "SELL"] else "SELL"
         else:
-            sma_trend_history.append(regime)
+            new_trend = "SIDE"
             
-    # --- PRODUCTION STATE RETURN VALUES ---
-    df['sma_line'] = tsma_line
-    df['sma_line_42'] = df_sma # Decoupled persistent 42 SMA column
-    df['sma_trend'] = sma_trend_history
-    
+        st_trend.append(new_trend)
+        prev_trend = new_trend
+        
+    df['ST_Trend'] = st_trend
+
     # --- DOWNSTREAM ALIAS COMPATIBILITY LAYER ---
-    df['pxy_sma_line'] = tsma_line
-    df['sma_trend_full'] = sma_trend_history
-    df['src_c'] = src_close
-    df['pxy_st_line'] = tsma_line
-    df['st_trend_full'] = sma_trend_history
-    df['ST'] = tsma_line
-    df['ST_Trend'] = sma_trend_history
-    df['P_Master'] = src_close
-    df['shared_atr'] = 7.0 
+    # Populate exact keys to match what the json exporting loop requires
+    df['sma_line'] = df['ST']
+    df['sma_trend'] = df['ST_Trend']
     
     return df
 
-def get_signal(df: pd.DataFrame) -> str:
-    """Unpacks and returns the clean active pipeline trend signal state."""
+def get_signal(df=None):
+    """Downstream communication port processing execution metrics"""
+    if df is None:
+        df = fetch_yf_data()
+        
     if df is None or df.empty:
-        df = pd.DataFrame()
+        return "NONE", 0.0
+        
     try:
-        calc_df = calculate_supertrend(df)
-        n = len(calc_df)
-        if n < 2:
-            return "NONE"
-        idx = n - 2 if CHECK_CONFIRMED_ONLY else n - 1
-        return str(calc_df.at[calc_df.index[idx], 'sma_trend']).upper().strip()
-    except Exception:
-        return "NONE"
+        df_st = calculate_supertrend(df)
+        last = df_st.iloc[-1]
+        return str(last['ST_Trend']), float(last['ST'])
+    except Exception as e:
+        if DEBUG_MODE:
+            print(f"PXY Error: {e}")
+        return "NONE", 0.0
 
 if __name__ == "__main__":
-    print("--- STARTING UNIFIED LIVE TIME SERIES MA 7 OPTION DEPTH PIPELINE ---")
-    live_df = pd.DataFrame()
-    processed_df = calculate_supertrend(live_df)
+    print("=== Upgraded Mode 5 TSMA 42 Midpoint Engine Self-Test ===")
     
-    if not processed_df.empty:
-        print(f"[SUCCESS] Calculated. Total Rows: {len(processed_df)}")
+    # Ingest data through upstream data feed
+    raw_df = fetch_yf_data()
+    
+    if raw_df is not None and not raw_df.empty:
+        processed_df = calculate_supertrend(raw_df)
+        print(f"[SUCCESS] Calculated Matrix. Sliced Rows: {len(processed_df)}")
+        
+        # Fire structural JSON dumping matrix engine
         export_supertrend_json(processed_df)
-        print(f"[STATUS] Active Pipeline Signal: {get_signal(processed_df)}")
+        
+        trend_signal, st_line_value = get_signal(raw_df)
+        print(f"CURRENT SYSTEM SIGNAL: {trend_signal} | LINE METRIC: {st_line_value:.2f}")
     else:
-        print("[WARNING] Engine execution finished with an empty dataset.")
+        print("[WARNING] Upstream connection returned an empty historical matrix.")
+
 
