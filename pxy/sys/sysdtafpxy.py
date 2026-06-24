@@ -1,4 +1,4 @@
-#sysdtafpxy.py
+# sysdtafpxy.py
 import warnings
 import numpy as np
 import pandas as pd
@@ -32,6 +32,30 @@ def get_shifted_heikin_ashi_ohlc(o, h, l, c):
             
     return ha_o, ha_h, ha_l, ha_c
 
+def get_simplified_ha_ohlc_mode1(o, h, l, c):
+    """
+    Generates simplified non-recursive candles (Mode 1):
+    - Close: (Current Open + Current High + Current Low + Current Close) / 4.0 [OHLC4]
+    - Open: (Previous Open + Previous High + Previous Low + Previous Close) / 4.0 [Previous OHLC4]
+    - High/Low: Raw chart values pass through directly
+    """
+    n = len(c)
+    ha_o = np.zeros(n)
+    ha_h = h.copy()
+    ha_l = l.copy()
+    
+    # 1. Close is always the current bar's raw OHLC4
+    ha_c = (o + h + l + c) / 4.0
+    
+    # 2. Open is always the previous bar's raw OHLC4
+    for i in range(n):
+        if i == 0:
+            ha_o[i] = o[i] # Fallback to raw open on the first array row
+        else:
+            ha_o[i] = (o[i-1] + h[i-1] + l[i-1] + c[i-1]) / 4.0
+            
+    return ha_o, ha_h, ha_l, ha_c
+
 def apply_ohlc_transformation(df, mode=0):
     """Transforms raw arrays into the single distinct structural format"""
     if df.empty: 
@@ -44,6 +68,9 @@ def apply_ohlc_transformation(df, mode=0):
     
     if mode == 0:
         df['Open'], df['High'], df['Low'], df['Close'] = get_shifted_heikin_ashi_ohlc(o, h, l, c)
+    elif mode == 1:
+        # Route explicitly to the new Mode 1 engine
+        df['Open'], df['High'], df['Low'], df['Close'] = get_simplified_ha_ohlc_mode1(o, h, l, c)
     else:
         print(f"SYSTEM_WARNING | Mode {mode} unrecognized. Defaulting to Mode 0 structure.")
         df['Open'], df['High'], df['Low'], df['Close'] = get_shifted_heikin_ashi_ohlc(o, h, l, c)
@@ -88,3 +115,4 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     
     processed_df = apply_ohlc_transformation(df, mode=OHLC_MODE)
     return processed_df
+
