@@ -73,23 +73,19 @@ def calculate_tsma_42(series: pd.Series) -> np.ndarray:
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
     PXY® Engine: Pure TSMA 42 Price Midpoint Engine
-    - Slices down to a strict 50-row tail matrix vector.
-    - Runs completely on upstream pre-transformed Mode 5 datasets.
+    - Runs calculations on full data history to match Pine Script calculations exactly.
+    - Slices down to a strict 50-row tail matrix vector at the very end of processing.
     - Forces the ST baseline to track the 50/50 blend of TSMA 42 and Live Close.
     """
-    # Slice the clean matrix down to exactly 50 rows
-    df = df.tail(50).copy()
+    df = df.copy()
     
-    # Create sequential bar tracker integers from 1 to 50
-    df['bar_count'] = np.arange(1, 51)
-    
-    # Process Pure TSMA 42 Baseline Wave over Mode 5 Closings
+    # 1. Process Pure TSMA 42 Baseline Wave over FULL Closings first
     tsma_42_line = calculate_tsma_42(df['Close'])
     
-    # NEW ST LINE MATH: Pure 1:1 price weight fusion blending TSMA 42 with Live Close
+    # 2. NEW ST LINE MATH: Pure 1:1 price weight fusion blending TSMA 42 with Live Close
     df['ST'] = (tsma_42_line + df['Close'].to_numpy()) / 2.0
     
-    # State-machine trend tracking loop matching the Pine engine
+    # 3. State-machine trend tracking loop matching the Pine engine
     st_trend = []
     prev_trend = "SIDE"
     
@@ -114,9 +110,12 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['ST_Trend'] = st_trend
 
     # --- DOWNSTREAM ALIAS COMPATIBILITY LAYER ---
-    # Populate exact keys to match what the json exporting loop requires
     df['sma_line'] = df['ST']
     df['sma_trend'] = df['ST_Trend']
+    
+    # 4. FIXED: Slice the clean matrix down to exactly 50 rows *AFTER* calculations are complete
+    df = df.tail(50).copy()
+    df['bar_count'] = np.arange(1, 51)
     
     return df
 
@@ -144,12 +143,14 @@ if __name__ == "__main__":
     raw_df = fetch_yf_data()
     
     if raw_df is not None and not raw_df.empty:
+        # Step 1: Compute metrics on the complete history to protect the moving average lookback
         processed_df = calculate_supertrend(raw_df)
-        print(f"[SUCCESS] Calculated Matrix. Sliced Rows: {len(processed_df)}")
+        print(f"[SUCCESS] Calculated Matrix. Sliced Rows for Export: {len(processed_df)}")
         
-        # Fire structural JSON dumping matrix engine
+        # Step 2: Fire structural JSON dumping matrix engine (Exports the 50-row slice)
         export_supertrend_json(processed_df)
         
+        # Step 3: Pull system status signal string
         trend_signal, st_line_value = get_signal(raw_df)
         print(f"CURRENT SYSTEM SIGNAL: {trend_signal} | LINE METRIC: {st_line_value:.2f}")
     else:
