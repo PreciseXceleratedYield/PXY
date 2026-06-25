@@ -11,7 +11,7 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 6
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-FIXED_LOSS_THRESHOLD = -14  # 🎯 Fixed averaging threshold set to -20%
+FIXED_LOSS_THRESHOLD = -15  # 🎯 Fixed averaging threshold set to -15%
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -82,8 +82,24 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, si
     print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(width))
     print(border + "\n")
 
+def extract_verified_entry_signal(df):
+    """
+    Safely inspects the structural entry signal state column.
+    Extracts purely structural AVGBUY or AVGSELL signals from the 'entry' column.
+    """
+    if "entry" not in df.columns or df.empty:
+        return "NONE"
+        
+    # Standard lookback to closed candle to prevent signal flashing
+    if len(df) >= 2:
+        target_row = df.iloc[-2]
+    else:
+        target_row = df.iloc[-1]
+        
+    return str(target_row["entry"]).upper().strip()
+
 def handle_side_averaging(client, df): 
-    """Averages positions based strictly on specific exit trend signals and a fixed loss threshold.""" 
+    """Averages positions based strictly on specific entry AVGBUY / AVGSELL signals and fixed loss thresholds.""" 
     if df is None or df.empty: 
         return 
         
@@ -92,11 +108,10 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
-    if "exit" not in df.columns:
+    # Verify and extract signal from dataframe history (Looks strictly for AVGBUY/AVGSELL in 'entry')
+    raw_entry_signal = extract_verified_entry_signal(df)
+    if raw_entry_signal not in ["AVGBUY", "AVGSELL"]:
         return
-        
-    last_row = df.iloc[-1]
-    raw_exit_signal = str(last_row["exit"]).upper().strip()
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
@@ -109,15 +124,15 @@ def handle_side_averaging(client, df):
 
         current_signal = "NONE"
 
-        # CE only averages on exit signal "BULL"
-        if side == 'CE' and raw_exit_signal == "BULL":
-            current_signal = "BULL"
+        # CE only averages on entry signal "AVGBUY"
+        if side == 'CE' and raw_entry_signal == "AVGBUY":
+            current_signal = "AVGBUY"
 
-        # PE only averages on exit signal "BEAR"
-        elif side == 'PE' and raw_exit_signal == "BEAR":
-            current_signal = "BEAR"
+        # PE only averages on entry signal "AVGSELL"
+        elif side == 'PE' and raw_entry_signal == "AVGSELL":
+            current_signal = "AVGSELL"
 
-        # If no matching trigger signal is active for this side, bypass processing loop
+        # If no matching signal is active for this side, bypass processing loop
         if current_signal == "NONE":
             continue
 
@@ -126,8 +141,9 @@ def handle_side_averaging(client, df):
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
-            # Checks if the position loss is worse than -20% (e.g., -25% is less than -20%)
-            if pos_loss > FIXED_LOSS_THRESHOLD:
+            # --- FIXED LOGIC GAP USING ABSOLUTE VALUES ---
+            # Corrects negative sign parsing (e.g. abs(-17%) < abs(-15%) resolves correctly)
+            if abs(pos_loss) < abs(FIXED_LOSS_THRESHOLD):
                 all_positions_crossed_threshold = False
                 break  
 
@@ -163,3 +179,4 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Order confirmation complete for side {side}.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+
