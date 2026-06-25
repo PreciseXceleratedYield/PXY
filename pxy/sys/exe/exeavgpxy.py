@@ -11,7 +11,7 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 6
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-FIXED_LOSS_THRESHOLD = -10  # 🎯 Baseline threshold set to -10%
+DEFAULT_ATR_PCT = 5.0   # 🛡️ Fallback percentage threshold if 'atr' row context is missing
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -62,7 +62,7 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, su
     width = 42
     border = Fore.YELLOW + "=" * width
     divider = Fore.RED + "-" * width
-    header_text = "🚨  PXY® ENGINE AVERAGE TRIGGERED  🚨"
+    header_text = "🚨  PXY® ENGINE ATR-PCT TRIGGERED  🚨"
     
     print("\n" + border)
     print(Fore.WHITE + header_text.center(width - 2, " ")) 
@@ -89,7 +89,7 @@ def extract_supertrend_state(df):
     return str(df['supertrend'].iloc[-1]).upper().strip()
 
 def handle_side_averaging(client, df): 
-    """Averages positions scaling thresholds dynamically between 1/2 and full depth via Supertrend checks.""" 
+    """Averages positions scaling thresholds dynamically via row ATR percentages and trend alignments.""" 
     if df is None or df.empty: 
         return 
         
@@ -101,12 +101,8 @@ def handle_side_averaging(client, df):
     # Extract dynamic macro direction mapping 
     supertrend_state = extract_supertrend_state(df)
 
-    # Calculate current target thresholds upfront for console logging stability
-    ce_target = FIXED_LOSS_THRESHOLD / 3.0 if supertrend_state == "NORTH" else FIXED_LOSS_THRESHOLD
-    pe_target = FIXED_LOSS_THRESHOLD / 3.0 if supertrend_state == "SOUTH" else FIXED_LOSS_THRESHOLD
-
-    # Visual Matrix Monitor broadcast line (keeps terminal clean and informative)
-    print(f"{Fore.CYAN}   📢 Now Going @ {supertrend_state} PE@{pe_target:.0f}% AND CE@{ce_target:.0f}% ")
+    # Visual Matrix Monitor broadcast line
+    print(f"{Fore.CYAN}   📢 Now Going @ {supertrend_state} | Running Row-Level ATR Percentage Scaling Matrix")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
@@ -117,16 +113,37 @@ def handle_side_averaging(client, df):
         if side_df.empty: 
             continue 
 
-        # Assign calculated threshold based on current iteration loop side target parameters
-        dynamic_threshold = ce_target if side == "CE" else pe_target
-
         all_positions_crossed_threshold = True
-        
+        last_calculated_threshold = 0.0
+
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
-            # --- EVALUATE AGAINST DYNAMIC THRESHOLD MATRIX ---
-            if abs(pos_loss) < abs(dynamic_threshold):
+            # Extract raw ATR percentage from the specific row context
+            base_atr_pct = safe_float(row.get("atr"), fallback=DEFAULT_ATR_PCT)
+            
+            # --- EVALUATE MATRIX BASED ON TREND DIRECTION ---
+            if side == "CE":
+                if supertrend_state == "NORTH":
+                    # Right Trend: Tighter cushion (divide by 2)
+                    dynamic_threshold = -(base_atr_pct / 2.0)
+                else:
+                    # Wrong Trend: Wider safety cushion (multiply by 2)
+                    dynamic_threshold = -(base_atr_pct * 2.0)
+            else: # side == "PE"
+                if supertrend_state == "SOUTH":
+                    # Right Trend: Tighter cushion (divide by 2)
+                    dynamic_threshold = -(base_atr_pct / 2.0)
+                else:
+                    # Wrong Trend: Wider safety cushion (multiply by 2)
+                    dynamic_threshold = -(base_atr_pct * 2.0)
+
+            # Keep track of the threshold value for output stability
+            last_calculated_threshold = dynamic_threshold
+
+            # Since loss numbers are negative (-5% vs -10%), 
+            # if pos_loss is greater than dynamic_threshold, it hasn't dropped enough yet.
+            if pos_loss > dynamic_threshold:
                 all_positions_crossed_threshold = False
                 break  
 
@@ -141,7 +158,7 @@ def handle_side_averaging(client, df):
                 
                 final_loss = get_loss(last_order)
                 
-                print_pxy_trigger_dashboard(side, symbol, final_loss, dynamic_threshold, supertrend_state, new_tag)
+                print_pxy_trigger_dashboard(side, symbol, final_loss, last_calculated_threshold, supertrend_state, new_tag)
                 
                 try: 
                     params = { 
@@ -159,7 +176,7 @@ def handle_side_averaging(client, df):
                     res = client.place_order(**params) 
                     if res: 
                         set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: Position processing complete. side {side} AVERAGED.") 
+                        print(f"{Fore.GREEN}✅ SUCCESS: Position processing complete. side {side} AVERAGED via dynamic trend matrix.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
 
