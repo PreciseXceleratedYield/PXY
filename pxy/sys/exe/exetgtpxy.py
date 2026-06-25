@@ -84,14 +84,14 @@ def target_price(row):
         # 6. Core execution logic evaluating directional signals
         if is_ce:
             if active_exit in ["SELL", "BEAR"]:  
-                target_pct = 3
+                target_pct = atr_val / 2
             else:                                
-                target_pct = 99
+                target_pct = atr_val
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   
-                target_pct = 3
+                target_pct = atr_val / 2
             else:                                
-                target_pct = 99
+                target_pct = atr_val
                 
         # 7. Final mathematical target projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
