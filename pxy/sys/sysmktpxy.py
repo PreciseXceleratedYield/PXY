@@ -85,7 +85,7 @@ def _print_console_bar(c1, o1, c0, o0, execution_state):
 
     rows = [
         (c1, f"CLOSED C1-{c1:.2f}", "█", c1_color),
-        (c0, f"RUNNING C0-{c0:.2f}", "█", c0_color)  # Live tick visual anchor
+        (c0, f"ACTIVE C0-{c0:.2f}", "█", c0_color)  # Live tick visual anchor
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
