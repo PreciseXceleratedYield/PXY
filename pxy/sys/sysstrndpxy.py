@@ -1,4 +1,17 @@
 # sysstrndpxy.py
+"""
+===============================================================================
+PXY GEOMETRIC ENGINE CORE SYSTEM DOCUMENTATION MASTER INDEX
+===============================================================================
+ULTRA-SIMPLE MOVING AVERAGE CROSSOVER SYSTEM (MODE 5 REPLACEMENT)
+1. NORTH State - Formula: 21 SMA > 42 SMA
+2. SOUTH State - Formula: 21 SMA < 42 SMA
+3. EQUAL State - Lookback to previous candle to define direction (-2 condition)
+
+ENTRY PIPE: Confirmed Closed Candle (Index -2)
+EXIT PIPE:  Running Live Candle (Index -1)
+===============================================================================
+"""
 import os
 import sys
 import json
@@ -9,7 +22,7 @@ from sysdtafpxy import fetch_yf_data
 DEBUG_MODE = True
 
 def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
-    """Dumps metrics using backward-compatible mapping keys to protect downstream."""
+    """Dumps metrics using backward-compatible mapping keys. Considers only 42 SMA for lines."""
     if df is None or df.empty:
         return []
         
@@ -23,10 +36,10 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
             "time": str(idx),
             "close": float(row["Close"]),
             "p_master": float(row["Close"]),
-            "st": float(row["ST"]),
+            "st": float(row["sma42"]),          # Configured strictly to 42 SMA
             "st_trend": str(row["ST_Trend"]),
-            "sma_line": float(row["sma_line"]),
-            "sma_trend": str(row["sma_trend"])
+            "sma_line": float(row["sma42"]),    # Configured strictly to 42 SMA
+            "sma_trend": str(row["ST_Trend"])
         })
         
     out_dir = os.path.dirname(output_file)
@@ -38,106 +51,100 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
         
     return output
 
-def calculate_tsma_42(series: pd.Series) -> np.ndarray:
+def calculate_direction_for_all_rows(df: pd.DataFrame) -> list:
     """
-    Calculates a strict 42-row Time Series Moving Average (Linear Regression).
-    Uses a fast linear algebra slope projection over the pre-padded matrix rows.
+    Computes trend state for every row in the historical matrix.
+    If 21 SMA == 42 SMA, it drops back iteratively (-2 condition) to find the trend state.
     """
-    y = series.to_numpy()
-    n = len(y)
-    tsma_output = np.empty(n)
+    trends = []
+    s21_vals = df['sma21'].to_numpy()
+    s42_vals = df['sma42'].to_numpy()
     
-    # First row fallback (cannot regress a single isolated point)
-    tsma_output[0] = y[0]
-    
-    # Linear algebra loop over the index rows
-    for i in range(1, n):
-        # Window size matches row count, capped at 42 lookback rows
-        current_window = min(i + 1, 42)
-        y_slice = y[i - current_window + 1 : i + 1]
-        
-        # Build independent time grid index vector x: [0, 1, 2... window_len - 1]
-        x = np.arange(current_window)
-        x_mean = x.mean()
-        y_mean = y_slice.mean()
-        
-        # Calculate Ordinary Least Squares regression parameters
-        slope = np.sum((x - x_mean) * (y_slice - y_mean)) / np.sum((x - x_mean) ** 2)
-        intercept = y_mean - slope * x_mean
-        
-        # Project endpoint location line value at current position index i
-        tsma_output[i] = slope * (current_window - 1) + intercept
-        
-    return tsma_output
+    for i in range(len(df)):
+        if pd.isna(s21_vals[i]) or pd.isna(s42_vals[i]):
+            trends.append("NONE")
+            continue
+            
+        # Standard crossover checks
+        if s21_vals[i] > s42_vals[i]:
+            trends.append("NORTH")
+        elif s21_vals[i] < s42_vals[i]:
+            trends.append("SOUTH")
+        else:
+            # Tiebreaker logic: crawl backward through the array until a trend is resolved
+            lookback_idx = i - 1
+            resolved_trend = "NONE"
+            while lookback_idx >= 0:
+                if pd.isna(s21_vals[lookback_idx]) or pd.isna(s42_vals[lookback_idx]):
+                    break
+                if s21_vals[lookback_idx] > s42_vals[lookback_idx]:
+                    resolved_trend = "NORTH"
+                    break
+                elif s21_vals[lookback_idx] < s42_vals[lookback_idx]:
+                    resolved_trend = "SOUTH"
+                    break
+                lookback_idx -= 1
+            trends.append(resolved_trend)
+            
+    return trends
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
-    PXY® Engine: Pure TSMA 42 Price Midpoint Engine
-    - Runs calculations on full data history to match Pine Script calculations exactly.
-    - Slices down to a strict 50-row tail matrix vector at the very end of processing.
-    - Forces the ST baseline to track the 50/50 blend of TSMA 42 and Live Close.
+    PXY® Engine: Refactored SMA Crossover Processor
+    - Computes 21 and 42 period Simple Moving Averages on full history data.
+    - Generates direction arrays processing the tiebreaker equality loop.
+    - Tail slices to 50 rows for strict compliance with charts and logging buffers.
     """
     df = df.copy()
     
-    # 1. Process Pure TSMA 42 Baseline Wave over FULL Closings first
-    tsma_42_line = calculate_tsma_42(df['Close'])
+    # 1. Compute basic rolling averages straight from dataset
+    df['sma21'] = df['Close'].rolling(window=21).mean()
+    df['sma42'] = df['Close'].rolling(window=42).mean()
     
-    # 2. NEW ST LINE MATH: Pure 1:1 price weight fusion blending TSMA 42 with Live Close
-    df['ST'] = (tsma_42_line + df['Close'].to_numpy()) / 2.0
-    
-    # 3. State-machine trend tracking loop matching the Pine engine
-    st_trend = []
-    prev_trend = "SIDE"
-    
-    for i in range(len(df)):
-        curr_close = df['Close'].iloc[i]
-        curr_line = df['ST'].iloc[i]
-        
-        if pd.isna(curr_line):
-            st_trend.append("SIDE")
-            continue
-            
-        if curr_close > curr_line:
-            new_trend = "UP" if prev_trend in ["UP", "BUY"] else "BUY"
-        elif curr_close < curr_line:
-            new_trend = "DOWN" if prev_trend in ["DOWN", "SELL"] else "SELL"
-        else:
-            new_trend = "SIDE"
-            
-        st_trend.append(new_trend)
-        prev_trend = new_trend
-        
-    df['ST_Trend'] = st_trend
+    # 2. Assign system trends based on simple structural cross logic
+    df['ST_Trend'] = calculate_direction_for_all_rows(df)
 
     # --- DOWNSTREAM ALIAS COMPATIBILITY LAYER ---
-    df['sma_line'] = df['ST']
+    # Enforces 42 SMA line assignment across core structural variables
+    df['ST'] = df['sma42']
+    df['sma_line'] = df['sma42']
     df['sma_trend'] = df['ST_Trend']
     
-    # 4. FIXED: Slice the clean matrix down to exactly 50 rows *AFTER* calculations are complete
+    # 3. Slice the clean matrix down to exactly 50 rows AFTER calculations are complete
     df = df.tail(50).copy()
     df['bar_count'] = np.arange(1, 51)
     
     return df
 
 def get_signal(df=None):
-    """Downstream communication port processing execution metrics"""
+    """
+    Downstream communication port processing execution metrics.
+    Separates Entry signals (Confirmed Index -2) and Exit signals (Running Live Index -1).
+    """
     if df is None:
         df = fetch_yf_data()
         
-    if df is None or df.empty:
-        return "NONE", 0.0
+    if df is None or len(df) < 42:
+        return "NONE", "NONE"
         
     try:
+        # Run calculations on pure raw history first to shield rolling calculations
         df_st = calculate_supertrend(df)
-        last = df_st.iloc[-1]
-        return str(last['ST_Trend']), float(last['ST'])
+        
+        # ENTRY PIPE -> Evaluates index -2 (Confirmed bar trend direction)
+        entry_signal = str(df_st['ST_Trend'].iloc[-2])
+        
+        # EXIT PIPE -> Evaluates index -1 (Running live bar trend direction)
+        exit_signal = str(df_st['ST_Trend'].iloc[-1])
+        
+        return entry_signal, exit_signal
     except Exception as e:
         if DEBUG_MODE:
             print(f"PXY Error: {e}")
-        return "NONE", 0.0
+        return "NONE", "NONE"
 
 if __name__ == "__main__":
-    print("=== Upgraded Mode 5 TSMA 42 Midpoint Engine Self-Test ===")
+    print("=== Upgraded Simple 21/42 SMA Geometric Engine Self-Test ===")
     
     # Ingest data through upstream data feed
     raw_df = fetch_yf_data()
@@ -150,10 +157,12 @@ if __name__ == "__main__":
         # Step 2: Fire structural JSON dumping matrix engine (Exports the 50-row slice)
         export_supertrend_json(processed_df)
         
-        # Step 3: Pull system status signal string
-        trend_signal, st_line_value = get_signal(raw_df)
-        print(f"CURRENT SYSTEM SIGNAL: {trend_signal} | LINE METRIC: {st_line_value:.2f}")
+        # Step 3: Pull system status split pipelines
+        entry_sig, exit_sig = get_signal(raw_df)
+        print(f"CURRENT ENTRY SIGNAL (CONFIRMED): {entry_sig}")
+        print(f"CURRENT EXIT SIGNAL (RUNNING):   {exit_sig}")
     else:
         print("[WARNING] Upstream connection returned an empty historical matrix.")
+
 
 
