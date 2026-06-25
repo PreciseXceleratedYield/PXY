@@ -77,7 +77,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             sma_trend_history.append(raw_sma_regime)
             continue 
 
-        # --- PIPELINE GATING: SMA 50CROSSOVER SWITCHES ---
+        # --- PIPELINE GATING: SMA 50 CROSSOVER SWITCHES ---
         sma_cross_buy  = (sma_direction[i] == 1)  and (sma_direction[i-1] == -1)
         sma_cross_sell = (sma_direction[i] == -1) and (sma_direction[i-1] == 1)
 
@@ -186,5 +186,6 @@ if __name__ == "__main__":
         export_supertrend_json(processed_df)
     else:
         print("CRITICAL: Engine calculation aborted | Upstream data stream arrived empty.")
+
 
 
