@@ -1,40 +1,78 @@
-"""
-===============================================================================
-PXY GEOMETRIC ENGINE CORE SYSTEM DOCUMENTATION MASTER INDEX
-===============================================================================
-PART 1: RAW CANDLESTICK BASE STATES (UNFILTERED) - CONFIRMED PIPELINE
-1. Bullish Reversal Rebound State (BUY)       - Formula: (C1 < O1) AND (C0 > O0)
-2. Bullish Trend Continuation State (BULL)    - Formula: (C1 > O1) AND (C0 > O0)
-3. Bearish Reversal Breakdown State (SELL)    - Formula: (C1 > O1) AND (C0 < O0)
-4. Bearish Trend Continuation State (BEAR)    - Formula: (C1 < O1) AND (C0 < O0)
-5. Equilibrium Flat Market State (NONE)       - Formula: (C0 == O0)
-===============================================================================
-"""
-
+import os
+import sys
+import json
 import numpy as np
 import pandas as pd
-import json
-import os
 from datetime import datetime
 from sysdtafpxy import fetch_yf_data
 
-# Global Config
+# Global Configuration
 DEBUG = True
 
-def _print_console_bar(c2, c1, c0, o2, o1, o0, signal_state):
-    """
-    Renders the graphical sorted ASCII price matrix layout inside the console terminal.
-    Dynamically tracks the relative positions of structural prices.
-    """
-    # ANSI escape code constants
-    RST = "\033[0m"          # Reset Color
-    RED = "\033[91m"          # Red for Bearish
-    GRN = "\033[92m"          # Green for Bullish
-    YLW = "\033[1;93m"        # Bold Yellow for Highlight/Trend
-    GRAY = "\033[90m"         # Dim Gray for layout lines
+def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
+    """Dumps tracking metrics using backward-compatible structure for downstream charts."""
+    if df is None or df.empty:
+        return []
+    
+    if output_file is None:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        output_file = os.path.abspath(os.path.join(base_dir, "web", "webchrtpxy.json"))
+        
+    output = []
+    for idx, row in df.iterrows():
+        output.append({
+            "time": str(idx),
+            "close": float(row["Close"]),
+            "p_master": float(row["Close"]),
+            "st": float(row["Close"]),         
+            "st_trend": str(row["sma_trend"]), 
+            "sma_line": float(row["Close"]),   
+            "sma_trend": str(row["sma_trend"])
+        })
+        
+    out_dir = os.path.dirname(output_file)
+    if out_dir and not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
+        
+    with open(output_file, "w") as f:
+        json.dump(output, f, indent=2)
+        
+    return output
 
-    min_val = min(c2, c1, c0) - 2
-    max_val = max(c2, c1, c0) + 2
+def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    PXY® Geometric Data Matrix Framework
+    Calculates historical BULL/BEAR states for the chart file generator loop.
+    """
+    df = df.copy()
+    n = len(df)
+    
+    trends = ["NONE"] * n
+    close_vals = df['Close'].to_numpy()
+    open_vals = df['Open'].to_numpy()
+    
+    for i in range(1, n):
+        # Base candle state tracking loop
+        trends[i] = "BULL" if close_vals[i] >= open_vals[i] else "BEAR"
+        
+    df['sma_trend'] = trends
+    
+    # Slice matrix to exactly 50 rows for JSON dashboard compliance
+    df = df.tail(50).copy()
+    df['bar_count'] = np.arange(1, len(df) + 1)
+    
+    return df
+
+def _print_console_bar(c1, o1, c0, o0, execution_state):
+    """Renders the graphical console display profiling closed vs running candles."""
+    RST = "\033[0m"
+    RED = "\033[91m"
+    GRN = "\033[92m"
+    YLW = "\033[1;93m"
+    GRAY = "\033[90m"
+
+    min_val = min(c1, c0, o1, o0) - 2
+    max_val = max(c1, c0, o1, o0) + 2
     scale_width = 20
 
     def get_clean_bar(val, marker="█"):
@@ -42,16 +80,12 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, signal_state):
         pos = max(1, pos)
         return (marker * pos).ljust(scale_width)
 
-    # Contextual candle coloring evaluation logic based on Open arrays
-    c2_color = GRN if c2 >= o2 else RED
     c1_color = GRN if c1 >= o1 else RED
     c0_color = GRN if c0 >= o0 else RED
 
-    # Build row items for descending sort logic (highest price on top)
     rows = [
-        (c2, f"C2-{c2:.2f}", "█", c2_color),
-        (c1, f"C1-{c1:.2f}", "█", c1_color),
-        (c0, f"C0-{c0:.2f}", "█", c0_color)
+        (c1, f"CLOSED C1-{c1:.2f}", "█", c1_color),
+        (c0, f"RUNNING C0-{c0:.2f}", "█", c0_color)
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
@@ -59,13 +93,10 @@ def _print_console_bar(c2, c1, c0, o2, o1, o0, signal_state):
     for val, label, marker, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
-    print(f"       GEOMETRIC STATE (CONFIRMED): {YLW}{signal_state}{RST}")
+    print(f"       ACTIVE PIPELINE STATE: {YLW}{execution_state}{RST}")
 
 def log_sync_state(timestamp, signal_state, price):
-    """
-    Logs the synchronized system state variables into a local rolling JSON buffer.
-    Maintains a maximum lookback history of exactly 100 entries inside ~/pxy/tv_sync_log.json.
-    """
+    """Logs the system state variables into a rolling 100-entry file."""
     try:
         dir_path = os.path.expanduser("~/pxy")
         os.makedirs(dir_path, exist_ok=True)
@@ -95,46 +126,42 @@ def log_sync_state(timestamp, signal_state, price):
 
 def get_signal(df=None):
     """
-    Main signal generation function mapped to a single pipeline stream:
-    - Evaluates ONLY the last completely CONFIRMED candle sequence (Index -2 and Index -3)
-    - Returns identical strings for entry and exit to ensure absolute tracking harmony.
+    Main pipeline stream evaluating running candle vs the previous closed candle.
+    Forces absolute entry/exit string match synchronization.
     """
     if df is None:
         df = fetch_yf_data()
         
-    if df is None or len(df) < 3:
+    if df is None or len(df) < 2:
         return "NONE", "NONE"
 
     try:
-        # --- 1. EXTRACT GEOMETRY FOR THE CONFIRMED CANDLE PIPELINE (INDEX -2 & INDEX -3) ---
-        conf_row = df.iloc[-2]
-        conf_prev_row = df.iloc[-3]
-        conf_historical_row = df.iloc[-4] if len(df) >= 4 else df.iloc[-3]
-        
-        c0_conf, o0_conf = float(conf_row['Close']), float(conf_row['Open'])
-        c1_conf, o1_conf = float(conf_prev_row['Close']), float(conf_prev_row['Open'])
-        c2_conf, o2_conf = float(conf_historical_row['Close']), float(conf_historical_row['Open'])
+        # --- 1. EXTRACT DATA FOR CLOSED CANDLE (INDEX -2) ---
+        closed_row = df.iloc[-2]
+        c1, o1 = float(closed_row['Close']), float(closed_row['Open'])
 
-        # --- 2. CALCULATE UNIFIED GEOMETRIC STATE ---
-        signal_state = "NONE"
-        if c1_conf < o1_conf and c0_conf > o0_conf:
-            signal_state = "BUY"
-        elif c1_conf > o1_conf and c0_conf > o0_conf:
-            signal_state = "BULL"
-        elif c1_conf > o1_conf and c0_conf < o0_conf:
-            signal_state = "SELL"
-        elif c1_conf < o1_conf and c0_conf < o0_conf:
-            signal_state = "BEAR"
+        # --- 2. EXTRACT DATA FOR LIVE RUNNING CANDLE (INDEX -1) ---
+        live_row = df.iloc[-1]
+        c0, o0 = float(live_row['Close']), float(live_row['Open'])
 
-        # --- 3. HOUSEKEEPING & LOGGING VIA STABLE METRICS ---
+        # --- 3. COMPARE RUNNING AND CLOSED CANDLE DIRECTIONS ---
+        # 1. Check current live candle shape first
+        if c0 > o0:
+            execution_state = "BULL"
+        elif c0 < o0:
+            execution_state = "BEAR"
+        else:
+            # Tiebreaker: Fall back directly to the confirmed closed candle baseline
+            execution_state = "BULL" if c1 >= o1 else "BEAR"
+
+        # --- 4. TELEMETRY MONITORING & STORAGE ---
         if DEBUG:
-            _print_console_bar(c2_conf, c1_conf, c0_conf, o2_conf, o1_conf, o0_conf, signal_state)
+            _print_console_bar(c1, o1, c0, o0, execution_state)
             
-        # Log state using the timestamp of the confirmed index (-2)
-        log_sync_state(df.index[-2], signal_state, c0_conf)
+        log_sync_state(df.index[-1], execution_state, c0)
         
-        # Dual-return of the unified state string to preserve global engine compatibility
-        return signal_state, signal_state
+        # Dual-return alignment matching entry and exit variables identically
+        return execution_state, execution_state
 
     except Exception as e:
         if DEBUG:
@@ -142,7 +169,20 @@ def get_signal(df=None):
         return "NONE", "NONE"
 
 if __name__ == "__main__":
-    # Test script compatibility harness
-    signal, _ = get_signal()
-    print(f"\nCalculated Operational Engine State: {signal}")
+    print("=== STARTING PXY LIVE RUNNING CANDLE GEOMETRIC ENGINE ===")
+    raw_df = fetch_yf_data()
+    
+    if raw_df is not None and not raw_df.empty:
+        # Generate chart dataset framework
+        processed_df = calculate_supertrend(raw_df)
+        print(f"[SUCCESS] Calculated Matrix. Sliced Rows for Export: {len(processed_df)}")
+        
+        # Sync and update chart dashboard JSON files
+        export_supertrend_json(processed_df)
+        
+        signal, _ = get_signal(raw_df)
+        print(f"\nCalculated Operational Engine State: {signal}")
+    else:
+        print("[WARNING] Upstream connection returned an empty historical dataset matrix.")
+
 
