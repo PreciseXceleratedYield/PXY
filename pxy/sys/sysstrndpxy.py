@@ -1,186 +1,249 @@
-# =============================================================================== #
-# UNIFIED ENGINE: DYNAMIC PROPORTIONAL OPTION DEPTH MA 7 (UNCAPPED PIPELINE)     #
-# =============================================================================== #
-import os
+# ===============================================================================
+# SINGLE PIPELINE ENGINE: CORE 1:1 SUPERTREND ENGINE ONLY
+# ===============================================================================
+# sysstrndpxy.py
 import sys
-import json
 import numpy as np
 import pandas as pd
+import pytz
+import json
+import os
+from datetime import datetime
 import warnings
+
+# Silence future warning constraints completely
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+# ---- Pure Production Naming Alignment Imports ----
 from sysdtafpxy import fetch_yf_data
-from syscnfgpxy import TIMEZONE
-# Dynamic Integration: Import depth metrics from your script
-from sysdptpxy import detect_pxy_flip_signal
+from syskatrpxy import calculate_atr, calculate_dynamic_k
+from syscnfgpxy import TIMEZONE, TICKER
 
-DEBUG_MODE = False
-CHECK_CONFIRMED_ONLY = False # False = reads running live candle (index -1)
+# Global Config 
+DEBUG_MODE = False 
+CHECK_CONFIRMED_ONLY = False  # ⚡ False = Target live running index (-1) for real-time changes
 
-def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
-    """Dumps metrics using backward-compatible mapping keys to protect downstream."""
+def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
+    """ 
+    Core 1:1 Supertrend Single-Pipeline Engine.
+    Uses a 1-period ATR and 1.0 Factor over the median price baseline.
+    Returns: BULL, BEAR, BUY, or SELL.
+    """ 
+    # 🎯 OVERRIDE: Fetch historical day-session buffer block from data pipeline file if empty
+    try:
+        raw_df = fetch_yf_data(period="3d", interval="1m") 
+        if not raw_df.empty:
+            df = raw_df
+    except Exception as e:
+        if DEBUG_MODE:
+            print(f"Warning: Shared pipeline download fallback active | {e}")
+
+    df = df.copy()
+
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
+    
+    tz_string = str(TIMEZONE)
+    if df.index.tz is None:
+        df = df.tz_localize('UTC').tz_convert(tz_string)
+    else:
+        df = df.tz_convert(tz_string)
+        
+    n = len(df)
+    if n == 0:
+        return df
+
+    # EXTRACT UPSTREAM PRE-CALCULATED MODE 0 OHLC DATA ARRAYS
+    src_open  = df['Open'].to_numpy()
+    src_high  = df['High'].to_numpy()
+    src_low   = df['Low'].to_numpy()
+    src_close = df['Close'].to_numpy()
+
+    # ===============================================================================
+    # 📡 1:1 SUPERTREND ENGINE TRACK
+    # ===============================================================================
+    atr_length = 1
+    atr_mult   = 1.0
+    
+    # Core Supertrend standard tracking baseline (HL2)
+    hl2_baseline = (src_high + src_low) / 2.0
+    
+    # Compute continuous true range over upstream Mode 0 inputs
+    tr_mod = np.zeros(n)
+    tr_mod = src_high - src_low
+    for i in range(1, n):
+        t1 = src_high[i] - src_low[i]
+        t2 = abs(src_high[i] - src_close[i-1])
+        t3 = abs(src_low[i] - src_close[i-1])
+        tr_mod[i] = max(t1, t2, t3)
+        
+    # 1-Period ATR Window (Direct TR mapping)
+    atr_val = tr_mod.copy()
+
+    basic_upper = hl2_baseline + (atr_val * atr_mult)
+    basic_lower = hl2_baseline - (atr_val * atr_mult)
+
+    final_upper     = np.zeros(n)
+    final_lower     = np.zeros(n)
+    trend_direction = np.ones(n, dtype=int) # 1 = BULL, -1 = BEAR
+
+    # Initialize the first index bar memory cells Safely across Vector
+    final_upper = basic_upper.copy()
+    final_lower = basic_lower.copy()
+    trend_direction = np.where(src_close >= hl2_baseline, 1, -1)
+
+    for i in range(1, n):
+        # ---- UPPER TRAIL LOCK ----
+        if (basic_upper[i] < final_upper[i-1]) or (src_close[i-1] > final_upper[i-1]):
+            final_upper[i] = basic_upper[i]
+        else:
+            final_upper[i] = final_upper[i-1]
+
+        # ---- LOWER TRAIL LOCK ----
+        if (basic_lower[i] > final_lower[i-1]) or (src_close[i-1] < final_lower[i-1]):
+            final_lower[i] = basic_lower[i]
+        else:
+            final_lower[i] = final_lower[i-1]
+
+        # ---- DIRECTION SWITCH GATE ----
+        prev_dir = trend_direction[i-1]
+        if prev_dir == 1 and src_close[i] < final_lower[i]:
+            trend_direction[i] = -1
+        elif prev_dir == -1 and src_close[i] > final_upper[i]:
+            trend_direction[i] = 1
+        else:
+            trend_direction[i] = prev_dir
+
+    jumping_supertrend = np.where(trend_direction == 1, final_lower, final_upper)
+    df['pxy_sma_line'] = jumping_supertrend
+
+    # ===============================================================================
+    # 🛠️ UNIFIED SINGLE ASYMMETRIC TREND STATE GENERATION
+    # ===============================================================================
+    sma_trend_history = []
+    
+    for i in range(n): 
+        raw_sma_regime = "BULL" if trend_direction[i] == 1 else "BEAR"
+
+        if i < 1: 
+            sma_trend_history.append(raw_sma_regime)
+            continue 
+
+        # --- PIPELINE GATING: JUMPING 1:1 SUPERTREND SWITCHES ---
+        sma_cross_buy  = (trend_direction[i] == 1)  and (trend_direction[i-1] == -1)
+        sma_cross_sell = (trend_direction[i] == -1) and (trend_direction[i-1] == 1)
+
+        if sma_cross_buy:
+            sma_trend_history.append("BUY")
+        elif sma_cross_sell:
+            sma_trend_history.append("SELL")
+        else:
+            sma_trend_history.append(raw_sma_regime)
+
+    # Save cleanly named vector columns into the calculation frame
+    df['sma_trend_full'] = sma_trend_history
+    df['src_c'] = src_close
+    
+    # 🎯 DASHBOARD BACKWARD-COMPATIBILITY ROUTING KEYS
+    df['pxy_st_line'] = df['pxy_sma_line']
+    df['st_trend_full'] = df['sma_trend_full']
+    df['ST'] = df['pxy_sma_line']
+    df['ST_Trend'] = df['sma_trend_full']
+    df['P_Master'] = df['src_c']
+    
+    # Append the session-grouped 14-period script calculations directly
+    try:
+        df['shared_atr'] = calculate_atr(df)
+    except Exception:
+        df['shared_atr'] = 12.0
+    
+    return df
+
+def export_supertrend_json(output_file="../web/webchrtpxy.json"):
+    """Dumps EVERY single candle printed straight to the JSON file."""
+    dummy_df = pd.DataFrame()
+    df = calculate_supertrend(dummy_df)
+    
     if df is None or df.empty:
-        return []
-        
-    if output_file is None:
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        output_file = os.path.abspath(os.path.join(base_dir, "web", "webchrtpxy.json"))
-        
+        return None
+
     output = []
     for idx, row in df.iterrows():
         output.append({
             "time": str(idx),
             "close": float(row["Close"]),
-            "p_master": float(row["Close"]),
-            "st": float(row["ST"]),
-            "st_trend": str(row["ST_Trend"]),
-            "sma_line": float(row["sma_line"]),
-            "sma_trend": str(row["sma_trend"])
+            "p_master": float(row["Close"]),  
+            "st": float(row["pxy_sma_line"]),           
+            "st_trend": str(row["sma_trend_full"]),
+            "sma_line": float(row["pxy_sma_line"]),
+            "sma_trend": str(row["sma_trend_full"])
         })
-        
-    out_dir = os.path.dirname(output_file)
-    if out_dir and not os.path.exists(out_dir):
-        os.makedirs(out_dir, exist_ok=True)
-        
+
+    os.makedirs(os.path.dirname(output_file), exist_ok=True) if os.path.dirname(output_file) else None
     with open(output_file, "w") as f:
         json.dump(output, f, indent=2)
-        
     return output
 
-def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """Computes TSMA using a 7 baseline modified by absolute option depth difference."""
-    if df is None or df.empty:
-        try:
-            df = fetch_yf_data(period="3d", interval="1m")
-            if df is None or df.empty:
-                return pd.DataFrame()
-        except Exception:
-            return pd.DataFrame()
-            
-    df = df.copy()
-    if not isinstance(df.index, pd.DatetimeIndex):
-        df.index = pd.to_datetime(df.index)
-        
-    tz_str = str(TIMEZONE)
-    df = df.tz_localize('UTC').tz_convert(tz_str) if df.index.tz is None else df.tz_convert(tz_str)
-    
-    n = len(df)
-    if n == 0:
-        return df
-        
-    src_close = df['Close'].to_numpy()
-    tsma_line = np.zeros(n)
-    sma_line_42 = np.zeros(n)
-    
-    # Pre-calculate standard 42 SMA for structural coupling requirements
-    df_sma = df['Close'].rolling(window=42, min_periods=1).mean().to_numpy()
-    
-    # Baseline period constant
-    BASE_PERIOD = 7
-    
-    # Fast OLS Line rolling projection loop with dynamic window adjustment
-    for i in range(n):
-        # Step A: Slice data up to the current bar to mock real-time index sequence
-        current_sliced_df = df.iloc[:i+1]
-        
-        # Step B: Safe extraction of Option Matrix parameters from syshkinpxy
-        try:
-            _, _, ce_depth, pe_depth = detect_pxy_flip_signal(df=current_sliced_df)
-            # Step C: Dynamic Formulation -> 7 + absolute difference(pe_depth - ce_depth)
-            p = BASE_PERIOD + abs(int(ce_depth) - int(pe_depth))
-        except Exception:
-            p = BASE_PERIOD # Production runtime fallback boundary layer
-            
-        # Absolute boundary validation clamp
-        if p < 2:
-            p = 2
-            
-        # Verify execution historical window boundary limits 
-        if i < (p - 1):
-            tsma_line[i] = src_close[i]
-            continue
-            
-        # Standardize local lookback vector space metrics
-        x = np.arange(p)
-        x_mean = x.mean()
-        x_deviations = x - x_mean
-        x_var = np.sum(x_deviations ** 2)
-        
-        y_slice = src_close[i - p + 1 : i + 1]
-        
-        # Guard against zero variance anomalies
-        if x_var == 0:
-            tsma_line[i] = src_close[i]
-            continue
-            
-        slope = np.sum(x_deviations * y_slice) / x_var
-        intercept = y_slice.mean() - (slope * x_mean)
-        tsma_line[i] = (slope * (p - 1)) + intercept
-
-    # Direct logic comparison arrays
-    trend_direction = np.where(src_close >= tsma_line, 1, -1)
-    
-    # Correct zero-boundary lag holes
-    for i in range(1, BASE_PERIOD):
-        if i < n:
-            trend_direction[i] = 1 if src_close[i] >= src_close[i-1] else -1
-        
-    # Native state generation tracking
-    sma_trend_history = []
-    for i in range(n):
-        regime = "BULL" if trend_direction[i] == 1 else "BEAR"
-        if i < 1:
-            sma_trend_history.append(regime)
-            continue
-            
-        if trend_direction[i] == 1 and trend_direction[i-1] == -1:
-            sma_trend_history.append("BUY")
-        elif trend_direction[i] == -1 and trend_direction[i-1] == 1:
-            sma_trend_history.append("SELL")
-        else:
-            sma_trend_history.append(regime)
-            
-    # --- PRODUCTION STATE RETURN VALUES ---
-    df['sma_line'] = tsma_line
-    df['sma_line_42'] = df_sma # Decoupled persistent 42 SMA column
-    df['sma_trend'] = sma_trend_history
-    
-    # --- DOWNSTREAM ALIAS COMPATIBILITY LAYER ---
-    df['pxy_sma_line'] = tsma_line
-    df['sma_trend_full'] = sma_trend_history
-    df['src_c'] = src_close
-    df['pxy_st_line'] = tsma_line
-    df['st_trend_full'] = sma_trend_history
-    df['ST'] = tsma_line
-    df['ST_Trend'] = sma_trend_history
-    df['P_Master'] = src_close
-    df['shared_atr'] = 7.0 
-    
-    return df
-
 def get_signal(df: pd.DataFrame) -> str:
-    """Unpacks and returns the clean active pipeline trend signal state."""
+    """Unpacks and returns the sole pipeline state cleanly for routing preferences."""
     if df is None or df.empty:
         df = pd.DataFrame()
+        
     try:
-        calc_df = calculate_supertrend(df)
-        n = len(calc_df)
-        if n < 2:
+        calculated_df = calculate_supertrend(df)
+        n = len(calculated_df)
+        if n == 0:
             return "NONE"
-        idx = n - 2 if CHECK_CONFIRMED_ONLY else n - 1
-        return str(calc_df.at[calc_df.index[idx], 'sma_trend']).upper().strip()
-    except Exception:
+        
+        idx = n - 2 if CHECK_CONFIRMED_ONLY else n - 1  
+
+        # Unpack state from single pipeline setup
+        active_sma_state = str(calculated_df.at[calculated_df.index[idx], 'sma_trend_full']).upper().strip()
+        
+        latest_atr_val = int(calculated_df.at[calculated_df.index[idx], 'shared_atr'])
+        latest_k_val = calculate_dynamic_k(calculated_df)
+
+        if DEBUG_MODE:
+            print(f"--- PXY SINGLE-PIPE MONITOR SUMMARY ---")
+            print(f"Target Row Lookup Index   -> {idx}")
+            print(f"Active Trend state        -> {active_sma_state}")
+            
+        return active_sma_state
+    except Exception as e:
+        if DEBUG_MODE:
+            print(f"Critical execution fault in system signal unpacker: {e}")
         return "NONE"
 
+# ===============================================================================
+# 🚀 DIRECT LIVE PRODUCTION EXECUTION BLOCK
+# ===============================================================================
 if __name__ == "__main__":
-    print("--- STARTING UNIFIED LIVE TIME SERIES MA 7 OPTION DEPTH PIPELINE ---")
+    print("--- STARTING LIVE PXY JUMPING 1:1 MONITOR ENGINE ---")
+    
+    # Initialize empty DataFrame to trigger internal live data pipeline fetcher
     live_df = pd.DataFrame()
+    
+    # Run structural calculation matrix
     processed_df = calculate_supertrend(live_df)
     
-    if not processed_df.empty:
-        print(f"[SUCCESS] Calculated. Total Rows: {len(processed_df)}")
-        export_supertrend_json(processed_df)
-        print(f"[STATUS] Active Pipeline Signal: {get_signal(processed_df)}")
+    if processed_df is not None and not processed_df.empty:
+        # Extract live index lookup position based on production gating parameter
+        idx_pos = -2 if CHECK_CONFIRMED_ONLY else -1
+        target_index = processed_df.index[idx_pos]
+        
+        # Pull latest metric array steps directly
+        live_time = target_index.strftime('%Y-%m-%d %H:%M:%S %Z')
+        live_close = float(processed_df.at[target_index, 'Close'])
+        live_line = float(processed_df.at[target_index, 'pxy_sma_line'])
+        live_state = str(processed_df.at[target_index, 'sma_trend_full'])
+        
+        print(f"Target Row Index Position -> {idx_pos} ({'CLOSED BAR' if CHECK_CONFIRMED_ONLY else 'LIVE TICK'})")
+        print(f"Timestamp   : {live_time}")
+        print(f"Close Price : {live_close:.2f}")
+        print(f"Engine Line : {live_line:.2f}")
+        print(f"Trend State : {live_state}")
+        
+        # Trigger real-time visual web JSON synchronization layout dump
+        export_supertrend_json()
     else:
-        print("[WARNING] Engine execution finished with an empty dataset.")
-
+        print("CRITICAL: Engine calculation aborted | Upstream data stream arrived empty.")
