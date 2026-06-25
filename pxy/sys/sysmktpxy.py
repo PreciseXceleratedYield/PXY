@@ -10,7 +10,7 @@ from sysdtafpxy import fetch_yf_data
 DEBUG = True
 
 def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
-    """Dumps tracking metrics using backward-compatible structure for downstream charts."""
+    """Dumps tracking metrics using backward-compatible structure for live downstream charts."""
     if df is None or df.empty:
         return []
     
@@ -42,7 +42,7 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
     PXY® Geometric Data Matrix Framework
-    Calculates historical BULL/BEAR states for the chart file generator loop.
+    Calculates BULL/BEAR states up to the active live tick for chart synchronization.
     """
     df = df.copy()
     n = len(df)
@@ -51,8 +51,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     close_vals = df['Close'].to_numpy()
     open_vals = df['Open'].to_numpy()
     
-    for i in range(1, n):
-        # Base candle state tracking loop
+    for i in range(0, n):
+        # Every index calculates its own immediate state (Live candle included)
         trends[i] = "BULL" if close_vals[i] >= open_vals[i] else "BEAR"
         
     df['sma_trend'] = trends
@@ -64,7 +64,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def _print_console_bar(c1, o1, c0, o0, execution_state):
-    """Renders the graphical console display profiling closed vs running candles."""
+    """Renders the graphical console display profiling the active live running candle."""
     RST = "\033[0m"
     RED = "\033[91m"
     GRN = "\033[92m"
@@ -85,18 +85,18 @@ def _print_console_bar(c1, o1, c0, o0, execution_state):
 
     rows = [
         (c1, f"CLOSED C1-{c1:.2f}", "█", c1_color),
-        (c0, f"RUNNING C0-{c0:.2f}", "█", c0_color)
+        (c0, f"RUNNING C0-{c0:.2f}", "█", c0_color)  # Live tick visual anchor
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
-    print(f"\n{YLW}=== GEOMETRIC ENGINE CONSOLE MONITOR ==={RST}")
+    print(f"\n{YLW}=== GEOMETRIC ENGINE CONSOLE MONITOR (LIVE) ==={RST}")
     for val, label, marker, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
-    print(f"       ACTIVE PIPELINE STATE: {YLW}{execution_state}{RST}")
+    print(f"       ACTIVE RUNNING CANDLE STATE: {YLW}{execution_state}{RST}")
 
 def log_sync_state(timestamp, signal_state, price):
-    """Logs the system state variables into a rolling 100-entry file."""
+    """Logs the active system state variables directly using live active parameters."""
     try:
         dir_path = os.path.expanduser("~/pxy")
         os.makedirs(dir_path, exist_ok=True)
@@ -126,8 +126,8 @@ def log_sync_state(timestamp, signal_state, price):
 
 def get_signal(df=None):
     """
-    Main pipeline stream evaluating running candle vs the previous closed candle.
-    Forces absolute entry/exit string match synchronization.
+    Main pipeline stream evaluating ONLY the active live running candle (Index -1).
+    Completely bypasses confirmed historical lockouts to prevent execution latency.
     """
     if df is None:
         df = fetch_yf_data()
@@ -136,28 +136,28 @@ def get_signal(df=None):
         return "NONE", "NONE"
 
     try:
-        # --- 1. EXTRACT DATA FOR CLOSED CANDLE (INDEX -2) ---
+        # --- 1. EXTRACT DATA FOR PREVIOUS CLOSED CANDLE (INDEX -2) ---
         closed_row = df.iloc[-2]
         c1, o1 = float(closed_row['Close']), float(closed_row['Open'])
 
-        # --- 2. EXTRACT DATA FOR LIVE RUNNING CANDLE (INDEX -1) ---
+        # --- 2. EXTRACT DATA FOR LIVE ACTIVE RUNNING CANDLE (INDEX -1) ---
         live_row = df.iloc[-1]
         c0, o0 = float(live_row['Close']), float(live_row['Open'])
 
-        # --- 3. COMPARE RUNNING AND CLOSED CANDLE DIRECTIONS ---
-        # 1. Check current live candle shape first
+        # --- 3. EXECUTE EXCLUSIVE LIVE RUNNING LOGIC MATCHING ---
         if c0 > o0:
             execution_state = "BULL"
         elif c0 < o0:
             execution_state = "BEAR"
         else:
-            # Tiebreaker: Fall back directly to the confirmed closed candle baseline
+            # Absolute tiebreaker using historical reference layer
             execution_state = "BULL" if c1 >= o1 else "BEAR"
 
         # --- 4. TELEMETRY MONITORING & STORAGE ---
         if DEBUG:
             _print_console_bar(c1, o1, c0, o0, execution_state)
             
+        # Log and tag system state using active running index timestamp (-1)
         log_sync_state(df.index[-1], execution_state, c0)
         
         # Dual-return alignment matching entry and exit variables identically
@@ -173,7 +173,7 @@ if __name__ == "__main__":
     raw_df = fetch_yf_data()
     
     if raw_df is not None and not raw_df.empty:
-        # Generate chart dataset framework
+        # Process and sync dynamic data frame matrices
         processed_df = calculate_supertrend(raw_df)
         print(f"[SUCCESS] Calculated Matrix. Sliced Rows for Export: {len(processed_df)}")
         
@@ -181,8 +181,6 @@ if __name__ == "__main__":
         export_supertrend_json(processed_df)
         
         signal, _ = get_signal(raw_df)
-        print(f"\nCalculated Operational Engine State: {signal}")
+        print(f"\nCalculated Dynamic Live State: {signal}")
     else:
         print("[WARNING] Upstream connection returned an empty historical dataset matrix.")
-
-
