@@ -3,77 +3,49 @@
 PXY OPTION ROUTING ENGINE WITH STREAMLINED CROSSOVER MATRIX
 ===============================================================================
 Operational Rules Matrix:
-1. BULL / BEAR Candlesticks: Passes downstream unconditionally without conversion.
-2. Trend Engine BUY / SELL: Ultimate priority route, maps straight to OTM.
-3. Market Engine BUY / SELL: Maps to OTM if Trend is aligned, else falls back to AVG.
+1. BULL / BEAR Candlesticks: Passes downstream unconditionally as pure exit signal.
+2. BUY / SELL Cross: Maps directly to entry options (OTMBUY / OTMSELL) without filter.
 ===============================================================================
 """
 
 from sysmktpxy import get_signal as get_market_shape
-from sysstrndpxy import get_signal as get_trend_state
 from syscnfgpxy import TICKER
 from datetime import datetime
-from zoneinfo import ZoneInfo
 import pandas as pd
 
 def get_entry_signal(df=None):
-    # 1. Fetch market candle geometry and macro 42 SMA trends independently
+    """
+    Direct routing pipeline mapping closed vs running market states.
+    - BULL / BEAR -> Passed through exactly (Pure Exit Signal Profile)
+    - BUY / SELL   -> Converted directly to OTMBUY / OTMSELL (Pure Entry Profile)
+    """
+    # 1. Fetch raw geometric market state from your engine
     mkt_entry, exit_l2 = get_market_shape(df)
-    trend_entry, _ = get_trend_state(df)  # Returns BUY, SELL, NORTH, SOUTH from 42 SMA
-
-    # 2. Establish Time Metrics for Logging/Sync Verification (IST Zone)
-    tz_ist = ZoneInfo("Asia/Kolkata")
-    current_time_ist = datetime.now(tz_ist).time()
-
-    if df is not None and not df.empty:
-        try:
-            last_timestamp = df.index[-1]
-            if not isinstance(last_timestamp, pd.Timestamp):
-                last_timestamp = pd.to_datetime(last_timestamp)
-            
-            if last_timestamp.tzinfo is not None:
-                current_time_ist = last_timestamp.astimezone(tz_ist).time()
-            else:
-                current_time_ist = last_timestamp.time()
-        except Exception:
-            pass
 
     final_signal = "NONE"
 
-    # 3. RULE 1: UNCONDITIONAL PASS-THROUGH FOR CONTINUATION STATES
+    # 2. STRIPPED FILTER MATRIX ROUTING PIPELINE
     if mkt_entry in ["BULL", "BEAR"]:
+        # Unconditional pass-through for straight continuation states
         final_signal = mkt_entry
 
-    # 4. RULE 2: TREND ENGINE CROSSOVERS GO STRAIGHT TO OTM
-    elif trend_entry == "BUY":
+    elif mkt_entry == "BUY":
+        # Straight crossover conversion to OTM asset targets
         final_signal = "OTMBUY"
-    elif trend_entry == "SELL":
+
+    elif mkt_entry == "SELL":
+        # Straight crossover conversion to OTM asset targets
         final_signal = "OTMSELL"
 
-    # 5. RULE 3: MARKET ENGINE SIGNAL CROSS-FILTRATION LAYER
-    elif mkt_entry == "BUY":
-        # Maps to OTM if trend is aligned, otherwise falls back to AVG
-        final_signal = "OTMBUY" if trend_entry == "NORTH" else "AVGBUY"
-        
-    elif mkt_entry == "SELL":
-        # Maps to OTM if trend is aligned, otherwise falls back to AVG
-        final_signal = "OTMSELL" if trend_entry == "SOUTH" else "AVGSELL"
-
-    # 6. SYSTEM STABILITY FALLBACK
     else:
-        # Default tracking structure for quiet market intervals
-        if trend_entry == "NORTH":
-            final_signal = "AVGBUY"
-        elif trend_entry == "SOUTH":
-            final_signal = "AVGSELL"
-        else:
-            final_signal = "NONE"
+        # Default safety fallback state
+        final_signal = "NONE"
 
     # Console Status Reporting Actions
     if final_signal != "NONE":
-        print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION-{final_signal} 🔥 ".center(40))
+        print(f"🔥 [ROUTING ENGINE ACTION] -> {final_signal} 🔥")
 
-    # Returns processed final_signal and completely untouched raw exit_l2
+    # Returns the direct final_signal and completely untouched raw exit_l2 pipeline
     return final_signal, exit_l2
 
 if __name__ == "__main__":
@@ -83,7 +55,4 @@ if __name__ == "__main__":
         entry, ex = get_entry_signal(df)
         print("-" * 50)
         print(f"FINAL RESULT >> ENTRY: {entry} | EXIT: {ex}")
-
-
-
 
