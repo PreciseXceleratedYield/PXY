@@ -12,6 +12,7 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
     """
     Dumps metrics using backward-compatible mapping keys.
     Considers only the 21 SMA for structural line mappings.
+    MATCHES ORIGINAL JSON STRUCTURE EXACTLY.
     """
     if df is None or df.empty:
         return []
@@ -22,6 +23,7 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
         
     output = []
     for idx, row in df.iterrows():
+        # Maps your new 21 SMA data columns into the exact JSON keys expected downstream
         output.append({
             "time": str(idx),
             "close": float(row["Close"]),
@@ -156,7 +158,4 @@ if __name__ == "__main__":
         print(f"CURRENT CONSTRUCT SIGNAL (CONFIRMED EXIT): {exit_sig}")
     else:
         print("[WARNING] Upstream connection returned an empty historical matrix.")
-
-
-
 
