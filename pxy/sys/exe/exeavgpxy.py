@@ -102,8 +102,8 @@ def handle_side_averaging(client, df):
     supertrend_state = extract_supertrend_state(df)
 
     # Calculate current target thresholds upfront for console logging stability
-    ce_target = FIXED_LOSS_THRESHOLD / 2.0 if supertrend_state == "NORTH" else FIXED_LOSS_THRESHOLD
-    pe_target = FIXED_LOSS_THRESHOLD / 2.0 if supertrend_state == "SOUTH" else FIXED_LOSS_THRESHOLD
+    ce_target = FIXED_LOSS_THRESHOLD / 3.0 if supertrend_state == "NORTH" else FIXED_LOSS_THRESHOLD
+    pe_target = FIXED_LOSS_THRESHOLD / 3.0 if supertrend_state == "SOUTH" else FIXED_LOSS_THRESHOLD
 
     # Visual Matrix Monitor broadcast line (keeps terminal clean and informative)
     print(f"{Fore.CYAN}   📢 Now Going @ {supertrend_state} PE@{pe_target:.0f}% AND CE@{ce_target:.0f}% ")
