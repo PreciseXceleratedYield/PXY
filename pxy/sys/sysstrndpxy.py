@@ -46,7 +46,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     sma42_arr = sma42_series.to_numpy()
     
     # --- 2. Blend with Live Close Price ---
-    blended_line = (sma42_arr)
+    blended_line = (sma42_arr + src_close) / 2.0
     df['pxy_sma_line'] = blended_line
     
     # Evaluate tracking direction relative to the blended baseline matrix
