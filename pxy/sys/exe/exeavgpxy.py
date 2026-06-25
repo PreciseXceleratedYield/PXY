@@ -142,8 +142,11 @@ def handle_side_averaging(client, df):
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
-            # Ensures averaging triggers only if positions have declined past the boundary limit
-            if pos_loss > FIXED_LOSS_THRESHOLD:
+            # --- FIXED LOGIC GAP USING ABSOLUTE VALUES ---
+            # Converts negative metrics into absolute values for mathematical logic safety.
+            # Example: abs(-17%) becomes 17%. abs(-14%) becomes 14%.
+            # If 17% loss is LESS than 14% target threshold, then the boundary layer has not been breached.
+            if abs(pos_loss) < abs(FIXED_LOSS_THRESHOLD):
                 all_positions_crossed_threshold = False
                 break  
 
