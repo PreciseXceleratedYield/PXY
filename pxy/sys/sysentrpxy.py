@@ -3,7 +3,7 @@
 PXY OPTION ROUTING ENGINE WITH STREAMLINED CROSSOVER MATRIX
 ===============================================================================
 Operational Rules Matrix:
-1. ENTRY Pipeline: Converted cleanly into option targets (OTMBUY / OTMSELL).
+1. ENTRY Pipeline: Converted cleanly into option targets (ATMBUY / ATMSELL).
 2. EXIT Pipeline  : Returns the raw structural engine profile (BULL / BEAR).
 ===============================================================================
 """
@@ -15,8 +15,8 @@ import pandas as pd
 def get_entry_signal(df=None):
     """
     Direct routing pipeline mapping live raw directions.
-    - UP (ACTIVE > CLOSED)   -> ENTRY: OTMBUY  | EXIT: BULL
-    - DOWN (ACTIVE < CLOSED) -> ENTRY: OTMSELL | EXIT: BEAR
+    - UP (ACTIVE > CLOSED)   -> ENTRY: ATMBUY  | EXIT: BULL
+    - DOWN (ACTIVE < CLOSED) -> ENTRY: ATMSELL | EXIT: BEAR
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -30,11 +30,11 @@ def get_entry_signal(df=None):
 
     # 2. MATCH AND ROUTE SHAPES UNCONDITIONALLY
     if direction == "UP":
-        entry_signal = "OTMBUY"
+        entry_signal = "ATMBUY"
         exit_signal = "BULL"
 
     elif direction == "DOWN":
-        entry_signal = "OTMSELL"
+        entry_signal = "ATMSELL"
         exit_signal = "BEAR"
 
     # Console Status Reporting Actions
