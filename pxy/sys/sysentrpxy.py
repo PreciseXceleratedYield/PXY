@@ -3,46 +3,46 @@
 PXY OPTION ROUTING ENGINE WITH STREAMLINED CROSSOVER MATRIX
 ===============================================================================
 Operational Rules Matrix:
-1. BULL / BUY States: Maps directly to entry options (OTMBUY) without filter.
-2. BEAR / SELL States: Maps directly to entry options (OTMSELL) without filter.
+1. ENTRY Pipeline: Converted cleanly into option targets (OTMBUY / OTMSELL).
+2. EXIT Pipeline  : Returns the raw structural engine profile (BULL / BEAR).
 ===============================================================================
 """
 
-from sysmktpxy import get_signal as get_market_shape
+from sysexitpxy import detect_raw_direction
 from syscnfgpxy import TICKER
-from datetime import datetime
 import pandas as pd
 
 def get_entry_signal(df=None):
     """
-    Direct routing pipeline mapping live market states straight to OTM entries.
-    - BULL / BUY  -> Converted directly to OTMBUY
-    - BEAR / SELL -> Converted directly to OTMSELL
+    Direct routing pipeline mapping live raw directions.
+    - UP (ACTIVE > CLOSED)   -> ENTRY: OTMBUY  | EXIT: BULL
+    - DOWN (ACTIVE < CLOSED) -> ENTRY: OTMSELL | EXIT: BEAR
     """
-    # 1. Fetch raw geometric live market state from your engine
-    mkt_entry, exit_l2 = get_market_shape(df)
+    if df is None:
+        from sysdtafpxy import fetch_yf_data
+        df = fetch_yf_data()
 
-    final_signal = "NONE"
+    # 1. Fetch raw direction state directly from your sysexitpxy file engine
+    _, direction = detect_raw_direction(df)
 
-    # 2. PURE ENTRY OTM ROUTING MATRIX
-    if mkt_entry in ["BULL", "BUY"]:
-        # Direct conversion to Out-The-Money Call options entry
-        final_signal = "OTMBUY"
+    entry_signal = "NONE"
+    exit_signal = "NONE"
 
-    elif mkt_entry in ["BEAR", "SELL"]:
-        # Direct conversion to Out-The-Money Put options entry
-        final_signal = "OTMSELL"
+    # 2. MATCH AND ROUTE SHAPES UNCONDITIONALLY
+    if direction == "UP":
+        entry_signal = "OTMBUY"
+        exit_signal = "BULL"
 
-    else:
-        # Default safety fallback state for flat market profiles (NONE)
-        final_signal = "NONE"
+    elif direction == "DOWN":
+        entry_signal = "OTMSELL"
+        exit_signal = "BEAR"
 
     # Console Status Reporting Actions
-    if final_signal != "NONE":
-        print(f"🔥 [ROUTING ENGINE ENTRY ACTION] -> {final_signal} 🔥")
+    if entry_signal != "NONE":
+        print(f"🔥 [ROUTING ACTION] -> ENTRY: {entry_signal} | EXIT: {exit_signal} 🔥")
 
-    # Returns the processed entry signal and completely untouched raw exit_l2 pipeline
-    return final_signal, exit_l2
+    # Returns processed option entry and the explicit structural exit string
+    return entry_signal, exit_signal
 
 if __name__ == "__main__":
     from sysdtafpxy import fetch_yf_data
