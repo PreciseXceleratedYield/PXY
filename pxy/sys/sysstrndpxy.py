@@ -1,6 +1,98 @@
-# ===============================================================================
-# SINGLE PIPELINE ENGINE: CORE 1:1 SUPERTREND ENGINE ONLY
-# ===============================================================================
+# sys/exe/dynentrypxy.py
+import pandas as pd
+from colorama import Fore, Style, init
+
+# Initialize colorama for colored terminal output
+init(autoreset=True)
+
+# Global tracking structures
+printed_sides = set()
+
+def f(x, d=0.0):
+    """Safely cast input to float, return default if casting fails or value <= 0."""
+    try:
+        val = float(x)
+        return val if val > 0 else d
+    except Exception:
+        return d
+
+def i(x, d=0):
+    """Safely cast input to integer, return default if casting fails."""
+    try:
+        return int(float(x))
+    except Exception:
+        return d
+
+def dynamic_entry(row):
+    """Returns the raw entry price from row dictionary entries with no tracking variables."""
+    try:
+        return round(float(row.get("buy_prc", 0)), 2)
+    except Exception:
+        return 0.0
+
+def target_price(row):
+    """Calculates target price based strictly on matrix parameters and signal direction."""
+    global printed_sides
+    try:
+        # 1. Extract base values and powers needed for printing and logic
+        atr_val = f(row.get("atr"), 6.0)
+        ce_power = f(row.get("ce_power"), 1.0)
+        pe_power = f(row.get("pe_power"), 1.0)
+        
+        ce_disp = int(ce_power) if float(ce_power).is_integer() else ce_power
+        pe_disp = int(pe_power) if float(pe_power).is_integer() else pe_power
+        atr_disp = int(atr_val) if float(atr_val).is_integer() else round(atr_val, 2)
+
+        # 2. Print status line exactly once per refresh cycle using unique data snapshot
+        print_key = f"{atr_disp}_{ce_disp}_{pe_disp}"
+        if print_key not in printed_sides:
+            raw_display_len = len(f" {atr_disp} BUY : {ce_disp}% SELL: {pe_disp}%") + 6
+            spaces_needed = max(0, (40 - raw_display_len) // 2)
+            padding = " " * spaces_needed
+            print(f"{padding}↕️ {atr_disp} {Fore.GREEN}🟢 BUY : {ce_disp}% {Fore.RED}🔴 SELL: {pe_disp}%")
+            printed_sides.add(print_key)
+
+        # 3. Entry data health check (Handles explicit zero payloads cleanly)
+        entry_prc = f(row.get("pxy_entry") if row.get("pxy_entry") is not None else row.get("buy_prc"))
+        if entry_prc <= 0:
+            return 0.0
+
+        # 4. Context extractors
+        symbol = str(row.get("symbol", "unknown")).upper()
+        active_exit = str(row.get("exit", "NONE")).upper().strip()
+        is_ce = "CE" in symbol
+        is_pe = "PE" in symbol
+        
+        if not is_ce and not is_pe:
+            return round(entry_prc, 2)
+
+        # 5. Extract Option Matrix parameters
+        hce_d = f(row.get("hkin_ce_depth"), 1.0)
+        hpe_d = f(row.get("hkin_pe_depth"), 1.0)
+        ce_p = f(row.get("ce_power"), 1.0)
+        pe_p = f(row.get("pe_power"), 1.0)
+        
+        target_pct = 0.0
+
+        # 6. Core execution logic evaluating directional signals
+        if is_ce:
+            if active_exit in ["SELL", "BEAR"]:
+                target_pct = atr_val / 2
+            else:
+                target_pct = atr_val
+        elif is_pe:
+            if active_exit in ["BUY", "BULL"]:
+                target_pct = atr_val / 2
+            else:
+                target_pct = atr_val
+
+        # 7. Final mathematical target projection calculation
+        calculated_target = entry_prc * (1 + (target_pct / 100.0))
+        return round(calculated_target, 2)
+
+    except Exception as e:
+        print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
+        return 0.0
 # sysstrndpxy.py
 import sys
 import numpy as np
@@ -25,11 +117,11 @@ CHECK_CONFIRMED_ONLY = False  # ⚡ False = Target live running index (-1) for r
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    Core 1:1 Supertrend Single-Pipeline Engine.
-    Uses a 1-period ATR and 1.0 Factor over the median price baseline.
-    Returns: BULL, BEAR, BUY, or SELL.
+    Blended Pipeline Engine.
+    Calculates SMA 42 and a 7-period, 7.0 Factor Supertrend.
+    Averages both engines into a hybrid tracking line.
+    Returns: BULL, BEAR, BUY, or SELL based on the blended trend regime.
     """ 
-    # 🎯 OVERRIDE: Fetch historical day-session buffer block from data pipeline file if empty
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m") 
         if not raw_df.empty:
@@ -60,16 +152,20 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     src_close = df['Close'].to_numpy()
 
     # ===============================================================================
-    # 📡 1:1 SUPERTREND ENGINE TRACK
+    # 📈 COMPUTE SMA 42 COMPONENT
     # ===============================================================================
-    atr_length = 1
-    atr_mult   = 1.0
+    sma42_series = df['Close'].rolling(window=42).mean()
+    sma42_series = sma42_series.bfill()
+    sma42_arr = sma42_series.to_numpy()
+
+    # ===============================================================================
+    # 📡 COMPUTE 7:7 SUPERTREND COMPONENT
+    # ===============================================================================
+    st7_length = 7
+    st7_mult   = 7.0
     
-    # Core Supertrend standard tracking baseline (HL2)
     hl2_baseline = (src_high + src_low) / 2.0
     
-    # Compute continuous true range over upstream Mode 0 inputs
-    tr_mod = np.zeros(n)
     tr_mod = src_high - src_low
     for i in range(1, n):
         t1 = src_high[i] - src_low[i]
@@ -77,35 +173,33 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         t3 = abs(src_low[i] - src_close[i-1])
         tr_mod[i] = max(t1, t2, t3)
         
-    # 1-Period ATR Window (Direct TR mapping)
-    atr_val = tr_mod.copy()
+    tr_series = pd.Series(tr_mod)
+    atr7_series = tr_series.rolling(window=st7_length).mean()
+    atr7_series = atr7_series.bfill()
+    atr7_arr = atr7_series.to_numpy()
 
-    basic_upper = hl2_baseline + (atr_val * atr_mult)
-    basic_lower = hl2_baseline - (atr_val * atr_mult)
+    basic_upper = hl2_baseline + (atr7_arr * st7_mult)
+    basic_lower = hl2_baseline - (atr7_arr * st7_mult)
 
     final_upper     = np.zeros(n)
     final_lower     = np.zeros(n)
-    trend_direction = np.ones(n, dtype=int) # 1 = BULL, -1 = BEAR
+    trend_direction = np.ones(n, dtype=int)
 
-    # Initialize the first index bar memory cells Safely across Vector
     final_upper = basic_upper.copy()
     final_lower = basic_lower.copy()
     trend_direction = np.where(src_close >= hl2_baseline, 1, -1)
 
     for i in range(1, n):
-        # ---- UPPER TRAIL LOCK ----
         if (basic_upper[i] < final_upper[i-1]) or (src_close[i-1] > final_upper[i-1]):
             final_upper[i] = basic_upper[i]
         else:
             final_upper[i] = final_upper[i-1]
 
-        # ---- LOWER TRAIL LOCK ----
         if (basic_lower[i] > final_lower[i-1]) or (src_close[i-1] < final_lower[i-1]):
             final_lower[i] = basic_lower[i]
         else:
             final_lower[i] = final_lower[i-1]
 
-        # ---- DIRECTION SWITCH GATE ----
         prev_dir = trend_direction[i-1]
         if prev_dir == 1 and src_close[i] < final_lower[i]:
             trend_direction[i] = -1
@@ -114,8 +208,16 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else:
             trend_direction[i] = prev_dir
 
-    jumping_supertrend = np.where(trend_direction == 1, final_lower, final_upper)
-    df['pxy_sma_line'] = jumping_supertrend
+    st7_line = np.where(trend_direction == 1, final_lower, final_upper)
+
+    # ===============================================================================
+    # 🎛️ BLENDED HYBRID MATRICES (SMA42 + SUPERTREND7:7) / 2
+    # ===============================================================================
+    blended_line = (sma42_arr + st7_line) / 2.0
+    df['pxy_sma_line'] = blended_line
+
+    blended_direction = np.ones(n, dtype=int)
+    blended_direction = np.where(src_close >= blended_line, 1, -1)
 
     # ===============================================================================
     # 🛠️ UNIFIED SINGLE ASYMMETRIC TREND STATE GENERATION
@@ -123,15 +225,14 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     sma_trend_history = []
     
     for i in range(n): 
-        raw_sma_regime = "BULL" if trend_direction[i] == 1 else "BEAR"
+        raw_sma_regime = "BULL" if blended_direction[i] == 1 else "BEAR"
 
         if i < 1: 
             sma_trend_history.append(raw_sma_regime)
             continue 
 
-        # --- PIPELINE GATING: JUMPING 1:1 SUPERTREND SWITCHES ---
-        sma_cross_buy  = (trend_direction[i] == 1)  and (trend_direction[i-1] == -1)
-        sma_cross_sell = (trend_direction[i] == -1) and (trend_direction[i-1] == 1)
+        sma_cross_buy  = (blended_direction[i] == 1)  and (blended_direction[i-1] == -1)
+        sma_cross_sell = (blended_direction[i] == -1) and (blended_direction[i-1] == 1)
 
         if sma_cross_buy:
             sma_trend_history.append("BUY")
@@ -140,18 +241,16 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else:
             sma_trend_history.append(raw_sma_regime)
 
-    # Save cleanly named vector columns into the calculation frame
     df['sma_trend_full'] = sma_trend_history
     df['src_c'] = src_close
     
-    # 🎯 DASHBOARD BACKWARD-COMPATIBILITY ROUTING KEYS
+    # Dashboard Mappings
     df['pxy_st_line'] = df['pxy_sma_line']
     df['st_trend_full'] = df['sma_trend_full']
     df['ST'] = df['pxy_sma_line']
     df['ST_Trend'] = df['sma_trend_full']
     df['P_Master'] = df['src_c']
     
-    # Append the session-grouped 14-period script calculations directly
     try:
         df['shared_atr'] = calculate_atr(df)
     except Exception:
@@ -159,10 +258,11 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
-def export_supertrend_json(output_file="../web/webchrtpxy.json"):
+def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
     """Dumps EVERY single candle printed straight to the JSON file."""
-    dummy_df = pd.DataFrame()
-    df = calculate_supertrend(dummy_df)
+    if df is None or df.empty:
+        dummy_df = pd.DataFrame()
+        df = calculate_supertrend(dummy_df)
     
     if df is None or df.empty:
         return None
@@ -196,8 +296,6 @@ def get_signal(df: pd.DataFrame) -> str:
             return "NONE"
         
         idx = n - 2 if CHECK_CONFIRMED_ONLY else n - 1  
-
-        # Unpack state from single pipeline setup
         active_sma_state = str(calculated_df.at[calculated_df.index[idx], 'sma_trend_full']).upper().strip()
         
         latest_atr_val = int(calculated_df.at[calculated_df.index[idx], 'shared_atr'])
@@ -218,20 +316,15 @@ def get_signal(df: pd.DataFrame) -> str:
 # 🚀 DIRECT LIVE PRODUCTION EXECUTION BLOCK
 # ===============================================================================
 if __name__ == "__main__":
-    print("--- STARTING LIVE PXY JUMPING 1:1 MONITOR ENGINE ---")
+    print("--- STARTING LIVE PXY BLENDED SMA/ST MONITOR ENGINE ---")
     
-    # Initialize empty DataFrame to trigger internal live data pipeline fetcher
     live_df = pd.DataFrame()
-    
-    # Run structural calculation matrix
     processed_df = calculate_supertrend(live_df)
     
     if processed_df is not None and not processed_df.empty:
-        # Extract live index lookup position based on production gating parameter
         idx_pos = -2 if CHECK_CONFIRMED_ONLY else -1
         target_index = processed_df.index[idx_pos]
         
-        # Pull latest metric array steps directly
         live_time = target_index.strftime('%Y-%m-%d %H:%M:%S %Z')
         live_close = float(processed_df.at[target_index, 'Close'])
         live_line = float(processed_df.at[target_index, 'pxy_sma_line'])
@@ -243,7 +336,7 @@ if __name__ == "__main__":
         print(f"Engine Line : {live_line:.2f}")
         print(f"Trend State : {live_state}")
         
-        # Trigger real-time visual web JSON synchronization layout dump
-        export_supertrend_json()
+        export_supertrend_json(processed_df)
     else:
         print("CRITICAL: Engine calculation aborted | Upstream data stream arrived empty.")
+
