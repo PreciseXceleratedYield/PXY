@@ -106,7 +106,7 @@ def handle_side_averaging(client, df):
     pe_target = FIXED_LOSS_THRESHOLD / 2.0 if supertrend_state == "SOUTH" else FIXED_LOSS_THRESHOLD
 
     # Visual Matrix Monitor broadcast line (keeps terminal clean and informative)
-    print(f"{Fore.CYAN}📢 PE@{pe_target:.1f}% AND CE@{ce_target:.1f}% AVERAGING MATRIX ACTIVE [Trend: {supertrend_state}]")
+    print(f"{Fore.CYAN}📢 Now Going@{supertrend_state} PE@{pe_target:.0f}% AND CE@{ce_target:.0f}% ]")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
