@@ -11,7 +11,7 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 6
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-FIXED_LOSS_THRESHOLD = -10  # 🎯 Fixed averaging threshold set to -7%
+FIXED_LOSS_THRESHOLD = -10  # 🎯 Baseline threshold set to -10%
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -57,7 +57,7 @@ def get_loss(row):
     ltp = safe_float(row.get("sell_prc", 0.0)) 
     return ((ltp - entry) / entry) * 100 if entry > 0 else 0 
 
-def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag):
+def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, supertrend_state, tag):
     """Renders a strict 42-character width dashboard upon an order trigger event."""
     width = 42
     border = Fore.YELLOW + "=" * width
@@ -69,20 +69,27 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     print(divider)
     print(Fore.WHITE + f" • SYMBOL       : {symbol}".ljust(width))
     print(Fore.WHITE + f" • SIDE OPTION   : {side}".ljust(width))
+    print(Fore.WHITE + f" • SUPERTREND    : {supertrend_state}".ljust(width))
     
     loss_str = f" • TRIGGER LOSS  : {current_loss:.2f}%"
     loss_pad = " " * max(0, width - len(loss_str))
     print(Fore.WHITE + " • TRIGGER LOSS  : " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + loss_pad)
     
-    target_str = f" • FIXED TARGET (%): {target_threshold:.2f}%"
+    target_str = f" • DYNAMIC TARGET: {target_threshold:.2f}%"
     target_pad = " " * max(0, width - len(target_str))
-    print(Fore.WHITE + " • FIXED TARGET (%): " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
+    print(Fore.WHITE + " • DYNAMIC TARGET: " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
     
     print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(width))
     print(border + "\n")
 
+def extract_supertrend_state(df):
+    """Safely extracts the latest global supertrend marker state from dataset columns."""
+    if "supertrend" not in df.columns or df.empty:
+        return "NONE"
+    return str(df['supertrend'].iloc[-1]).upper().strip()
+
 def handle_side_averaging(client, df): 
-    """Averages positions based strictly on raw fixed loss thresholds without signal checks.""" 
+    """Averages positions scaling thresholds dynamically between 1/2 and full depth via Supertrend checks.""" 
     if df is None or df.empty: 
         return 
         
@@ -90,6 +97,16 @@ def handle_side_averaging(client, df):
     now = datetime.now(ist).time() 
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
+
+    # Extract dynamic macro direction mapping 
+    supertrend_state = extract_supertrend_state(df)
+
+    # Calculate current target thresholds upfront for console logging stability
+    ce_target = FIXED_LOSS_THRESHOLD / 2.0 if supertrend_state == "NORTH" else FIXED_LOSS_THRESHOLD
+    pe_target = FIXED_LOSS_THRESHOLD / 2.0 if supertrend_state == "SOUTH" else FIXED_LOSS_THRESHOLD
+
+    # Visual Matrix Monitor broadcast line (keeps terminal clean and informative)
+    print(f"{Fore.CYAN}📢 PE@{pe_target:.1f}% AND CE@{ce_target:.1f}% AVERAGING MATRIX ACTIVE [Trend: {supertrend_state}]")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
@@ -100,14 +117,16 @@ def handle_side_averaging(client, df):
         if side_df.empty: 
             continue 
 
+        # Assign calculated threshold based on current iteration loop side target parameters
+        dynamic_threshold = ce_target if side == "CE" else pe_target
+
         all_positions_crossed_threshold = True
         
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
-            # --- FIXED LOGIC GAP USING ABSOLUTE VALUES ---
-            # Checks if absolute loss size is smaller than target threshold
-            if abs(pos_loss) < abs(FIXED_LOSS_THRESHOLD):
+            # --- EVALUATE AGAINST DYNAMIC THRESHOLD MATRIX ---
+            if abs(pos_loss) < abs(dynamic_threshold):
                 all_positions_crossed_threshold = False
                 break  
 
@@ -122,7 +141,7 @@ def handle_side_averaging(client, df):
                 
                 final_loss = get_loss(last_order)
                 
-                print_pxy_trigger_dashboard(side, symbol, final_loss, FIXED_LOSS_THRESHOLD, new_tag)
+                print_pxy_trigger_dashboard(side, symbol, final_loss, dynamic_threshold, supertrend_state, new_tag)
                 
                 try: 
                     params = { 
@@ -140,7 +159,7 @@ def handle_side_averaging(client, df):
                     res = client.place_order(**params) 
                     if res: 
                         set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: Order confirmation complete for side {side}.") 
+                        print(f"{Fore.GREEN}✅ SUCCESS: Position processing complete. side {side} AVERAGED.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
 
