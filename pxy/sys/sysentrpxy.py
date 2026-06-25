@@ -6,11 +6,11 @@ PXY EXECUTION OPTION ROUTING ENGINE WITH IST TIME-WINDOW CONTROLS
 Timezone Configuration: Aligned strictly to Indian Standard Time (IST) Zone.
 
 Operational Rules Matrix (Indian Markets):
-1. Window [09:15 IST - 09:30 IST]: Bypasses entry core. Routes raw exit_l2 to ATM.
-   - exit_l2 == "BUY" or "NORTH" -> ATMBUY
-   - exit_l2 == "SELL" or "SOUTH" -> ATMSELL
+1. Window [09:15 IST - 09:30 IST]: Bypasses entry core. Routes raw exit_l2 to OTM.
+   - exit_l2 == "BUY" or "NORTH" -> OTMBUY
+   - exit_l2 == "SELL" or "SOUTH" -> OTMSELL
 2. Window [After 09:30 IST]: Strict Entry Core Filtering.
-   - ALL Trend-Aligned & Crossovers (BUY, SELL, NORTH, SOUTH) -> ATMBUY / ATMSELL
+   - ALL Trend-Aligned & Crossovers (BUY, SELL, NORTH, SOUTH) -> OTMBUY / OTMSELL
    - Any non-aligned or ambiguous states -> AVGBUY / AVGSELL fallback
 3. Fallback Route: Preserves structural reporting states downstream.
 ===============================================================================
@@ -53,19 +53,19 @@ def get_entry_signal(df=None):
 
     # 3. IST TIME-BASED OPTIONS ROUTING ENGINE
     if market_open <= current_time_ist < time_boundary:
-        # --- EARLY MORNING OPENING WINDOW: ALL ACTIVE MOTIONS ROUTE TO ATM ---
+        # --- EARLY MORNING OPENING WINDOW: ALL ACTIVE MOTIONS ROUTE TO OTM ---
         if exit_l2 in ["BUY", "NORTH"]:
-            final_signal = "ATMBUY"
+            final_signal = "OTMBUY"
         elif exit_l2 in ["SELL", "SOUTH"]:
-            final_signal = "ATMSELL"
+            final_signal = "OTMSELL"
         else:
             final_signal = "NONE"
     else:
-        # --- STANDARD CONTINUOUS WINDOW: TREND-ALIGNED & CROSSOVER PASS TO ATM ---
+        # --- STANDARD CONTINUOUS WINDOW: TREND-ALIGNED & CROSSOVER PASS TO OTM ---
         if entry_l4 in ["BUY", "NORTH"]:
-            final_signal = "ATMBUY"
+            final_signal = "OTMBUY"
         elif entry_l4 in ["SELL", "SOUTH"]:
-            final_signal = "ATMSELL"
+            final_signal = "OTMSELL"
         else:
             # --- DEFENSIVE FALLBACK LAYER: UNALIGNED STATES RESOLVE TO AVG ---
             if exit_l2 in ["BUY", "NORTH"]:
@@ -85,7 +85,7 @@ def get_entry_signal(df=None):
             final_signal = exit_l2  # Safely passes remaining codes downstream
 
     # Reporting on active Indian Market signals
-    if final_signal in ["ATMBUY", "ATMSELL", "AVGBUY", "AVGSELL", "BUY", "SELL"]:
+    if final_signal in ["OTMBUY", "OTMSELL", "AVGBUY", "AVGSELL", "BUY", "SELL"]:
         print(f"⏰ [IST: {current_time_ist.strftime('%H:%M:%S')}] 🔥 ACTION-{final_signal} 🔥 ".center(40))
 
     return final_signal, exit_l2
@@ -97,4 +97,5 @@ if __name__ == "__main__":
         entry, ex = get_entry_signal(df)
         print("-" * 50)
         print(f"FINAL RESULT >> ENTRY: {entry} | EXIT: {ex}")
+
 
