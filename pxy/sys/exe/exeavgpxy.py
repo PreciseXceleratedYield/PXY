@@ -9,9 +9,9 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 3
+MAX_LAYERS = 6
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-FIXED_LOSS_THRESHOLD = -14  # 🎯 Fixed averaging threshold set to -14%
+FIXED_LOSS_THRESHOLD = -10  # 🎯 Fixed averaging threshold set to -20%
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -82,25 +82,8 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, si
     print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(width))
     print(border + "\n")
 
-def extract_verified_entry_signal(df):
-    """
-    Safely inspects the structural entry signal state column.
-    Uses the last fully completed historical candle to prevent real-time signal flashing.
-    """
-    if "exit" not in df.columns or df.empty:
-        return "NONE"
-        
-    # If using real-time historical data streams, df.iloc[-1] is the unclosed candle.
-    # df.iloc[-2] represents the last verified finalized closed historical bar.
-    if len(df) >= 2:
-        target_row = df.iloc[-2]
-    else:
-        target_row = df.iloc[-1]
-        
-    return str(target_row["exit"]).upper().strip()
-
 def handle_side_averaging(client, df): 
-    """Averages positions based strictly on specific closed entry signals and fixed loss thresholds.""" 
+    """Averages positions based strictly on specific exit trend signals and a fixed loss threshold.""" 
     if df is None or df.empty: 
         return 
         
@@ -109,12 +92,13 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
-    # Verify and extract signal from the dataframe history
-    raw_entry_signal = extract_verified_entry_signal(df)
-    if raw_entry_signal == "NONE":
+    if "exit" not in df.columns:
         return
+        
+    last_row = df.iloc[-1]
+    raw_exit_signal = str(last_row["exit"]).upper().strip()
 
-    # Make a clean dataframe copy to prevent pandas SettingWithCopy warnings
+    # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
 
@@ -125,15 +109,15 @@ def handle_side_averaging(client, df):
 
         current_signal = "NONE"
 
-        # CE only averages on entry signal flag "AVGBUY"
-        if side == 'CE' and raw_entry_signal == "AVGBUY":
-            current_signal = "AVGBUY"
+        # CE only averages on exit signal "BULL"
+        if side == 'CE' and raw_exit_signal == "BULL":
+            current_signal = "BULL"
 
-        # PE only averages on entry signal flag "AVGSELL"
-        elif side == 'PE' and raw_entry_signal == "AVGSELL":
-            current_signal = "AVGSELL"
+        # PE only averages on exit signal "BEAR"
+        elif side == 'PE' and raw_exit_signal == "BEAR":
+            current_signal = "BEAR"
 
-        # If no valid trigger matching this execution track is found, skip parsing loop
+        # If no matching trigger signal is active for this side, bypass processing loop
         if current_signal == "NONE":
             continue
 
@@ -142,11 +126,8 @@ def handle_side_averaging(client, df):
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
-            # --- FIXED LOGIC GAP USING ABSOLUTE VALUES ---
-            # Converts negative metrics into absolute values for mathematical logic safety.
-            # Example: abs(-17%) becomes 17%. abs(-14%) becomes 14%.
-            # If 17% loss is LESS than 14% target threshold, then the boundary layer has not been breached.
-            if abs(pos_loss) < abs(FIXED_LOSS_THRESHOLD):
+            # Checks if the position loss is worse than -20% (e.g., -25% is less than -20%)
+            if pos_loss > FIXED_LOSS_THRESHOLD:
                 all_positions_crossed_threshold = False
                 break  
 
@@ -182,4 +163,3 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Order confirmation complete for side {side}.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
-
