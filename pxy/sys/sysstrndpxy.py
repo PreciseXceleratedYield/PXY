@@ -1,5 +1,5 @@
-# sysstrndpxy.py
 """
+# sysstrndpxy.py 
 ===============================================================================
 PXY GEOMETRIC ENGINE CORE SYSTEM DOCUMENTATION MASTER INDEX
 ===============================================================================
@@ -9,7 +9,7 @@ ULTRA-SIMPLE MOVING AVERAGE CROSSOVER SYSTEM (MODE 5 REPLACEMENT)
 3. EQUAL State - Lookback to previous candle to define direction (-2 condition)
 
 ENTRY PIPE: Confirmed Closed Candle (Index -2)
-EXIT PIPE:  Running Live Candle (Index -1)
+EXIT PIPE: Running Live Candle (Index -1)
 ===============================================================================
 """
 import os
@@ -25,7 +25,7 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
     """Dumps metrics using backward-compatible mapping keys. Considers only 42 SMA for lines."""
     if df is None or df.empty:
         return []
-        
+    
     if output_file is None:
         base_dir = os.path.dirname(os.path.abspath(__file__))
         output_file = os.path.abspath(os.path.join(base_dir, "web", "webchrtpxy.json"))
@@ -36,9 +36,9 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
             "time": str(idx),
             "close": float(row["Close"]),
             "p_master": float(row["Close"]),
-            "st": float(row["sma42"]),          # Configured strictly to 42 SMA
+            "st": float(row["sma42"]),  # Configured strictly to 42 SMA
             "st_trend": str(row["ST_Trend"]),
-            "sma_line": float(row["sma42"]),    # Configured strictly to 42 SMA
+            "sma_line": float(row["sma42"]),  # Configured strictly to 42 SMA
             "sma_trend": str(row["ST_Trend"])
         })
         
@@ -103,7 +103,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     
     # 2. Assign system trends based on simple structural cross logic
     df['ST_Trend'] = calculate_direction_for_all_rows(df)
-
+    
     # --- DOWNSTREAM ALIAS COMPATIBILITY LAYER ---
     # Enforces 42 SMA line assignment across core structural variables
     df['ST'] = df['sma42']
@@ -113,13 +113,13 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     # 3. Slice the clean matrix down to exactly 50 rows AFTER calculations are complete
     df = df.tail(50).copy()
     df['bar_count'] = np.arange(1, 51)
-    
     return df
 
 def get_signal(df=None):
     """
     Downstream communication port processing execution metrics.
     Separates Entry signals (Confirmed Index -2) and Exit signals (Running Live Index -1).
+    Detects physical line crossovers to output BUY / SELL trigger signals.
     """
     if df is None:
         df = fetch_yf_data()
@@ -131,13 +131,30 @@ def get_signal(df=None):
         # Run calculations on pure raw history first to shield rolling calculations
         df_st = calculate_supertrend(df)
         
-        # ENTRY PIPE -> Evaluates index -2 (Confirmed bar trend direction)
-        entry_signal = str(df_st['ST_Trend'].iloc[-2])
+        # Pull required history rows for crossover confirmation
+        # Index -3: Previous Confirmed, Index -2: Current Confirmed, Index -1: Live Running
+        trend_minus_3 = str(df_st['ST_Trend'].iloc[-3])
+        trend_minus_2 = str(df_st['ST_Trend'].iloc[-2])
+        trend_minus_1 = str(df_st['ST_Trend'].iloc[-1])
         
-        # EXIT PIPE -> Evaluates index -1 (Running live bar trend direction)
-        exit_signal = str(df_st['ST_Trend'].iloc[-1])
-        
+        # --- ENTRY PIPE (Index -2: Confirmed Closed Bar) ---
+        if trend_minus_3 != "NORTH" and trend_minus_2 == "NORTH":
+            entry_signal = "BUY"
+        elif trend_minus_3 != "SOUTH" and trend_minus_2 == "SOUTH":
+            entry_signal = "SELL"
+        else:
+            entry_signal = trend_minus_2  # Standard state (NORTH/SOUTH/NONE)
+            
+        # --- EXIT PIPE (Index -1: Live Running Bar) ---
+        if trend_minus_2 != "NORTH" and trend_minus_1 == "NORTH":
+            exit_signal = "BUY"
+        elif trend_minus_2 != "SOUTH" and trend_minus_1 == "SOUTH":
+            exit_signal = "SELL"
+        else:
+            exit_signal = trend_minus_1  # Standard state (NORTH/SOUTH/NONE)
+            
         return entry_signal, exit_signal
+        
     except Exception as e:
         if DEBUG_MODE:
             print(f"PXY Error: {e}")
@@ -160,9 +177,10 @@ if __name__ == "__main__":
         # Step 3: Pull system status split pipelines
         entry_sig, exit_sig = get_signal(raw_df)
         print(f"CURRENT ENTRY SIGNAL (CONFIRMED): {entry_sig}")
-        print(f"CURRENT EXIT SIGNAL (RUNNING):   {exit_sig}")
+        print(f"CURRENT EXIT SIGNAL (RUNNING): {exit_sig}")
     else:
         print("[WARNING] Upstream connection returned an empty historical matrix.")
+
 
 
 
