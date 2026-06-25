@@ -1,8 +1,12 @@
 import os 
+import re
 import time 
 import pytz 
 from datetime import datetime, time as dt_time 
 from colorama import Fore, Style, init
+
+# 🔍 Routing package path into the "run" subdirectory explicitly
+from run.runpchkpxy import get_position_summary
 
 # Initialize colorama for clean terminal output formatting
 init(autoreset=True)
@@ -11,7 +15,7 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 6
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-DEFAULT_ATR_PCT = 5.0   # 🛡️ Fallback percentage threshold if 'atr' row context is missing
+FIXED_ATR_PCT = 10.0    # 🎯 Hardcoded baseline ATR percentage set exactly to 10%
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -57,19 +61,19 @@ def get_loss(row):
     ltp = safe_float(row.get("sell_prc", 0.0)) 
     return ((ltp - entry) / entry) * 100 if entry > 0 else 0 
 
-def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, supertrend_state, tag):
+def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, abs_factor):
     """Renders a strict 42-character width dashboard upon an order trigger event."""
     width = 42
     border = Fore.YELLOW + "=" * width
     divider = Fore.RED + "-" * width
-    header_text = "🚨  PXY® ENGINE ATR-PCT TRIGGERED  🚨"
+    header_text = "🚨 PXY® ABSOLUTE GEOMETRY TRIGGERED 🚨"
     
     print("\n" + border)
     print(Fore.WHITE + header_text.center(width - 2, " ")) 
     print(divider)
     print(Fore.WHITE + f" • SYMBOL       : {symbol}".ljust(width))
-    print(Fore.WHITE + f" • SIDE OPTION   : {side}".ljust(width))
-    print(Fore.WHITE + f" • SUPERTREND    : {supertrend_state}".ljust(width))
+    print(Fore.WHITE + f" • SIDE OPTION   : {side} ({ce_count}CE vs {pe_count}PE)".ljust(width))
+    print(Fore.WHITE + f" • BALANCE FACTOR: {abs_factor}".ljust(width))
     
     loss_str = f" • TRIGGER LOSS  : {current_loss:.2f}%"
     loss_pad = " " * max(0, width - len(loss_str))
@@ -82,14 +86,8 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, su
     print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(width))
     print(border + "\n")
 
-def extract_supertrend_state(df):
-    """Safely extracts the latest global supertrend marker state from dataset columns."""
-    if "supertrend" not in df.columns or df.empty:
-        return "NONE"
-    return str(df['supertrend'].iloc[-1]).upper().strip()
-
 def handle_side_averaging(client, df): 
-    """Averages positions scaling thresholds dynamically via row ATR percentages and trend alignments.""" 
+    """Averages positions scaling thresholds dynamically via upstream lot layout regex parsing.""" 
     if df is None or df.empty: 
         return 
         
@@ -98,11 +96,30 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
-    # Extract dynamic macro direction mapping 
-    supertrend_state = extract_supertrend_state(df)
+    # Live position string extraction matching your exact upstream format
+    pos_raw = str(get_position_summary(client)).upper().strip()
+    match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
+    
+    if match:
+        ce_lots = int(match.group(1))
+        pe_lots = int(match.group(2))
+    else:
+        ce_lots, pe_lots = 0, 0
+    
+    # Calculate pure absolute lot spread (forces absolute floor layer of 1)
+    raw_difference = abs(ce_lots - pe_lots)
+    abs_factor = max(1, raw_difference)
 
-    # Visual Matrix Monitor broadcast line
-    print(f"{Fore.CYAN}   📢 Now Going @ {supertrend_state} | Running Row-Level ATR Percentage Scaling Matrix")
+    # Establish independent lesser vs heavier directional designations
+    if ce_lots < pe_lots:
+        ce_is_lesser, pe_is_lesser = True, False
+    elif pe_lots < ce_lots:
+        ce_is_lesser, pe_is_lesser = False, True
+    else:
+        ce_is_lesser, pe_is_lesser = False, False  # Balanced state
+
+    # Clean system telemetry message stream line
+    print(f"{Fore.CYAN}   📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Applied ABS Factor: {abs_factor}")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
@@ -116,33 +133,22 @@ def handle_side_averaging(client, df):
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
 
+        # Assign corresponding weight metrics for current evaluation loop step
+        side_is_lesser = ce_is_lesser if side == "CE" else pe_is_lesser
+
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
-            # Extract raw ATR percentage from the specific row context
-            base_atr_pct = safe_float(row.get("atr"), fallback=DEFAULT_ATR_PCT)
-            
-            # --- EVALUATE MATRIX BASED ON TREND DIRECTION ---
-            if side == "CE":
-                if supertrend_state == "NORTH":
-                    # Right Trend: Tighter cushion (divide by 2)
-                    dynamic_threshold = -(base_atr_pct / 2.0)
-                else:
-                    # Wrong Trend: Wider safety cushion (multiply by 2)
-                    dynamic_threshold = -(base_atr_pct * 2.0)
-            else: # side == "PE"
-                if supertrend_state == "SOUTH":
-                    # Right Trend: Tighter cushion (divide by 2)
-                    dynamic_threshold = -(base_atr_pct / 2.0)
-                else:
-                    # Wrong Trend: Wider safety cushion (multiply by 2)
-                    dynamic_threshold = -(base_atr_pct * 2.0)
+            # --- EVALUATE MATRIX CALCULATIONS VIA 10% FIXED BASE ---
+            if side_is_lesser or abs_factor == 1:
+                # Lesser side or balanced: DIVIDE fixed baseline by absolute difference
+                dynamic_threshold = -(FIXED_ATR_PCT / float(abs_factor))
+            else:
+                # Heavier side: MULTIPLY fixed baseline by absolute difference
+                dynamic_threshold = -(FIXED_ATR_PCT * float(abs_factor))
 
-            # Keep track of the threshold value for output stability
             last_calculated_threshold = dynamic_threshold
 
-            # Since loss numbers are negative (-5% vs -10%), 
-            # if pos_loss is greater than dynamic_threshold, it hasn't dropped enough yet.
             if pos_loss > dynamic_threshold:
                 all_positions_crossed_threshold = False
                 break  
@@ -158,7 +164,7 @@ def handle_side_averaging(client, df):
                 
                 final_loss = get_loss(last_order)
                 
-                print_pxy_trigger_dashboard(side, symbol, final_loss, last_calculated_threshold, supertrend_state, new_tag)
+                print_pxy_trigger_dashboard(side, symbol, final_loss, last_calculated_threshold, new_tag, ce_lots, pe_lots, abs_factor)
                 
                 try: 
                     params = { 
@@ -176,7 +182,7 @@ def handle_side_averaging(client, df):
                     res = client.place_order(**params) 
                     if res: 
                         set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: Position processing complete. side {side} AVERAGED via dynamic trend matrix.") 
+                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Upstream Subdirectory Module.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
 
