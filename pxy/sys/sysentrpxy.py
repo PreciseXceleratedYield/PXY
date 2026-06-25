@@ -3,8 +3,8 @@
 PXY OPTION ROUTING ENGINE WITH STREAMLINED CROSSOVER MATRIX
 ===============================================================================
 Operational Rules Matrix:
-1. BULL / BEAR Candlesticks: Passes downstream unconditionally as pure exit signal.
-2. BUY / SELL Cross: Maps directly to entry options (OTMBUY / OTMSELL) without filter.
+1. BULL / BUY States: Maps directly to entry options (OTMBUY) without filter.
+2. BEAR / SELL States: Maps directly to entry options (OTMSELL) without filter.
 ===============================================================================
 """
 
@@ -15,37 +15,33 @@ import pandas as pd
 
 def get_entry_signal(df=None):
     """
-    Direct routing pipeline mapping closed vs running market states.
-    - BULL / BEAR -> Passed through exactly (Pure Exit Signal Profile)
-    - BUY / SELL   -> Converted directly to OTMBUY / OTMSELL (Pure Entry Profile)
+    Direct routing pipeline mapping live market states straight to OTM entries.
+    - BULL / BUY  -> Converted directly to OTMBUY
+    - BEAR / SELL -> Converted directly to OTMSELL
     """
-    # 1. Fetch raw geometric market state from your engine
+    # 1. Fetch raw geometric live market state from your engine
     mkt_entry, exit_l2 = get_market_shape(df)
 
     final_signal = "NONE"
 
-    # 2. STRIPPED FILTER MATRIX ROUTING PIPELINE
-    if mkt_entry in ["BULL", "BEAR"]:
-        # Unconditional pass-through for straight continuation states
-        final_signal = mkt_entry
-
-    elif mkt_entry == "BUY":
-        # Straight crossover conversion to OTM asset targets
+    # 2. PURE ENTRY OTM ROUTING MATRIX
+    if mkt_entry in ["BULL", "BUY"]:
+        # Direct conversion to Out-The-Money Call options entry
         final_signal = "OTMBUY"
 
-    elif mkt_entry == "SELL":
-        # Straight crossover conversion to OTM asset targets
+    elif mkt_entry in ["BEAR", "SELL"]:
+        # Direct conversion to Out-The-Money Put options entry
         final_signal = "OTMSELL"
 
     else:
-        # Default safety fallback state
+        # Default safety fallback state for flat market profiles (NONE)
         final_signal = "NONE"
 
     # Console Status Reporting Actions
     if final_signal != "NONE":
-        print(f"🔥 [ROUTING ENGINE ACTION] -> {final_signal} 🔥")
+        print(f"🔥 [ROUTING ENGINE ENTRY ACTION] -> {final_signal} 🔥")
 
-    # Returns the direct final_signal and completely untouched raw exit_l2 pipeline
+    # Returns the processed entry signal and completely untouched raw exit_l2 pipeline
     return final_signal, exit_l2
 
 if __name__ == "__main__":
@@ -55,4 +51,5 @@ if __name__ == "__main__":
         entry, ex = get_entry_signal(df)
         print("-" * 50)
         print(f"FINAL RESULT >> ENTRY: {entry} | EXIT: {ex}")
+
 
