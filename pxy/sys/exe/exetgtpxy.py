@@ -84,12 +84,12 @@ def target_price(row):
         # 6. Core execution logic evaluating directional signals
         if is_ce:
             if active_exit in ["SELL", "BEAR"]:  
-                target_pct = 1
+                target_pct = 1.4
             else:                                
                 target_pct = 99
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   
-                target_pct = 1
+                target_pct = 1.4
             else:                                
                 target_pct = 99
                 
