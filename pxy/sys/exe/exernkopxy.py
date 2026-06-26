@@ -29,7 +29,6 @@ RENKO_STATE_FILE = os.path.abspath(os.path.join(current_dir, "../../web/webrinko
 
 # RISK CONFIGURATION CONSTANTS
 TRAILING_DROP_LIMIT = 3000.0  # Absolute Rupee drawdown allowed from the peak
-LOOP_INTERVAL_SECONDS = 1.0   # 1-second interval execution tracking speed
 EMERGENCY_RETRY_SECONDS = 5.0 # Repeat interval if threshold is breached
 
 
@@ -99,106 +98,99 @@ def enforce_morning_time_gate():
             sys.stdout.flush()
             time.sleep(1.0)
         else:
-            print(f"\n\n⏰ {Fore.GREEN}{Style.BRIGHT}09:30 AM IST REACHED! COMMENCING MORNING DATA VERIFICATION...")
+            # Check a localized marker flag so it only purges once at 9:30 AM
+            state = load_session_state()
+            last_update_time = state.get("updated_timestamp", "")
+            today_str = now_ist.strftime("%Y-%m-%d")
             
-            # 🛡️ SURGICAL SOURCE FILE DATE CHECK
-            today_date_str = now_ist.strftime("%Y-%m-%d")
+            if today_str not in last_update_time:
+                print(f"\n\n⏰ {Fore.GREEN}{Style.BRIGHT}09:30 AM IST PASSED! RUNNING MORNING DATA PURGE...")
+                
+                # SURGICAL SOURCE FILE DATE CHECK
+                for target_file_path in [PNL_JSON_PATH, POS_JSON_PATH]:
+                    if os.path.exists(target_file_path):
+                        file_mod_timestamp = os.path.getmtime(target_file_path)
+                        file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, IST).strftime("%Y-%m-%d")
+                        
+                        if file_mod_date_str != today_str:
+                            print(f"⚠️  {Fore.YELLOW}STALE FILE DETECTED: {os.path.basename(target_file_path)} belongs to yesterday ({file_mod_date_str}).")
+                            try:
+                                with open(target_file_path, "w") as fw:
+                                    json.dump([], fw)
+                                print(f"🧹 {Fore.GREEN}Successfully purged stale data from {os.path.basename(target_file_path)}.")
+                            except Exception as file_err:
+                                print(f"{Fore.RED}❌ Error clearing stale file: {file_err}")
+                
+                save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
+                print(f"🧹 {Fore.CYAN}Cleaned up tracking cache file: {RENKO_STATE_FILE}\n")
             
-            for target_file_path in [PNL_JSON_PATH, POS_JSON_PATH]:
-                if os.path.exists(target_file_path):
-                    # Extract the absolute last modified timestamp from the filesystem
-                    file_mod_timestamp = os.path.getmtime(target_file_path)
-                    file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, IST).strftime("%Y-%m-%d")
-                    
-                    # If file date doesn't match today's date string, it is stale data from yesterday
-                    if file_mod_date_str != today_date_str:
-                        print(f"⚠️  {Fore.YELLOW}STALE FILE DETECTED: {os.path.basename(target_file_path)} belongs to yesterday ({file_mod_date_str}).")
-                        try:
-                            # Force overwrite file to an absolute blank JSON array
-                            with open(target_file_path, "w") as fw:
-                                json.dump([], fw)
-                            print(f"🧹 {Fore.GREEN}Successfully purged stale data from {os.path.basename(target_file_path)}.")
-                        except Exception as file_err:
-                            print(f"{Fore.RED}❌ Error clearing stale file: {file_err}")
-            
-            # Flush trailing tracking parameters completely back to ground zero
-            save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
-            print(f"🧹 {Fore.CYAN}Cleaned up tracking cache file: {RENKO_STATE_FILE}")
-            print(f"✅ {Fore.GREEN}System parameters fully initialized. Launching Trailing Engine Matrix Loops!\n")
             has_cleaned_history = True
 
 
 def start_trailing_engine():
-    # ⏱️ Activate Time and History Gate immediately upon system startup
+    # ⏱️ Activate and check Time/History Gate rules first
     enforce_morning_time_gate()
 
-    # 🔄 Load freshly cleaned state matrix directly from the web dashboard tracking file
+    # 🔄 Load existing state metrics matrix from your web interface JSON tracking file
     initial_state = load_session_state()
     session_peak_pnl = float(initial_state.get("session_peak_pnl", 0.0))
     
-    print(f"{Fore.CYAN}{Style.BRIGHT}🚀 High-Resolution Conditional Breaking Trailing Engine Live.")
-    print(f"Tracking UI Sync File: {Fore.WHITE}{RENKO_STATE_FILE}\n")
+    try:
+        # 1. Read running and booked performance pools directly from LILO dumps
+        realised_pnl = safe_load_json_pnl(PNL_JSON_PATH)
+        unrealised_pnl = safe_load_json_pnl(POS_JSON_PATH)
+        
+        # 2. Combine values to generate accurate, real-time live portfolio performance
+        current_net_pnl = realised_pnl + unrealised_pnl
+        
+        # 3. Maintain High-Water Mark Peak
+        if current_net_pnl > session_peak_pnl:
+            session_peak_pnl = current_net_pnl
+            
+        # 4. Compute the active trailing exit trigger line dynamically from your absolute peak
+        active_exit_line = session_peak_pnl - TRAILING_DROP_LIMIT
+        
+        # 5. Persist the complete metrics matrix out to your web dashboard tracking file
+        save_session_state(session_peak_pnl, current_net_pnl, active_exit_line)
+        
+        # 6. Print single high-utility telemetry status check line
+        print(
+            f"📊 PnL Net: {Fore.YELLOW}₹{current_net_pnl:,.2f}{Style.RESET_ALL} | "
+            f"Peak: {Fore.GREEN}₹{session_peak_pnl:,.2f}{Style.RESET_ALL} | "
+            f"Exit Floor: {Fore.RED}₹{active_exit_line:,.2f}{Style.RESET_ALL} | "
+            f"Loss Trigger: {Fore.RED}{Style.BRIGHT}₹{active_exit_line:,.2f}{Style.RESET_ALL}"
+        )
+        
+        # 7. 🔥 CORE CONDITIONAL SINGLE-PASS LOGIC
+        if current_net_pnl <= active_exit_line:
+            # 🚨 THRESHOLD IS HIT: Enter infinite emergency retry loop. NEVER BREAK OUT.
+            print(f"\n🚨 {Fore.RED}{Style.BRIGHT}LOSS TRIGGER BREACHED! Entering persistent emergency loop...")
+            script_path = os.path.join(current_dir, "exesqrpxy.py")
+            
+            while True:
+                print(f"⚡ [{time.strftime('%H:%M:%S')}] {Fore.MAGENTA}Firing emergency square-off subprocess...")
+                try:
+                    if os.path.exists(script_path):
+                        subprocess.run(["python3", script_path, "-all"], stdout=sys.stdout, stderr=sys.stderr)
+                    else:
+                        print(f"{Fore.RED}❌ Square-off script missing at: {script_path}")
+                except Exception as err:
+                    print(f"{Fore.RED}❌ Subprocess routing failure: {err}")
+                
+                # Hard flush states to zero inside the web file on every pass
+                save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
+                
+                print(f"⏳ {Fore.YELLOW}Retry pass complete. Re-firing in {EMERGENCY_RETRY_SECONDS} seconds...\n")
+                time.sleep(EMERGENCY_RETRY_SECONDS)
+        
+        else:
+            # ✅ THRESHOLD NOT HIT: Terminate the script immediately as requested
+            # This allows your upstream manager shell or core script loop to continue instantly
+            sys.exit(0)
 
-    while True:
-        try:
-            # 1. Read running and booked performance pools directly from clean dumps
-            realised_pnl = safe_load_json_pnl(PNL_JSON_PATH)
-            unrealised_pnl = safe_load_json_pnl(POS_JSON_PATH)
-            
-            # 2. Combine values to generate accurate, real-time live portfolio performance
-            current_net_pnl = realised_pnl + unrealised_pnl
-            
-            # 3. Maintain High-Water Mark: Updates continuously on every single rupee increase
-            if current_net_pnl > session_peak_pnl:
-                session_peak_pnl = current_net_pnl
-                
-            # 4. Compute the active trailing exit trigger line dynamically from your absolute peak
-            active_exit_line = session_peak_pnl - TRAILING_DROP_LIMIT
-            
-            # 5. Persist the complete metrics matrix out to your web dashboard tracking file
-            save_session_state(session_peak_pnl, current_net_pnl, active_exit_line)
-            
-            # 6. Stream continuous running data telemetry to the console
-            sys.stdout.write(
-                f"\r📊 PnL Net: {Fore.YELLOW}₹{current_net_pnl:,.2f}{Style.RESET_ALL} | "
-                f"Peak: {Fore.GREEN}₹{session_peak_pnl:,.2f}{Style.RESET_ALL} | "
-                f"Exit Floor: {Fore.RED}₹{active_exit_line:,.2f}{Style.RESET_ALL} | "
-                f"Loss Trigger: {Fore.RED}{Style.BRIGHT}₹{active_exit_line:,.2f}{Style.RESET_ALL}    "
-            )
-            sys.stdout.flush()
-            
-            # 7. CORE CONDITION LOOP RULES EVALUATION
-            if current_net_pnl <= active_exit_line:
-                print(f"\n\n{Fore.RED}{Style.BRIGHT}🚨 LOSS TRIGGER BREACHED (Net ₹{current_net_pnl:,.2f} <= Trigger ₹{active_exit_line:,.2f})! Entering persistent emergency loop...")
-                
-                script_path = os.path.join(current_dir, "exesqrpxy.py")
-                
-                while True:
-                    print(f"⚡ [{time.strftime('%H:%M:%S')}] {Fore.MAGENTA}Firing emergency square-off script subprocess...")
-                    try:
-                        if os.path.exists(script_path):
-                            subprocess.run(["python3", script_path, "-all"], stdout=sys.stdout, stderr=sys.stderr)
-                        else:
-                            print(f"{Fore.RED}❌ Square-off script missing at: {script_path}")
-                    except Exception as err:
-                        print(f"{Fore.RED}❌ Subprocess routing failure: {err}")
-                    
-                    save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
-                    
-                    print(f"⏳ {Fore.YELLOW}Emergency execution pass complete. Holding loop. Re-firing in {EMERGENCY_RETRY_SECONDS} seconds...\n")
-                    time.sleep(EMERGENCY_RETRY_SECONDS)
-            
-            else:
-                pass
-                
-            time.sleep(LOOP_INTERVAL_SECONDS)
-
-        except KeyboardInterrupt:
-            print(f"\n{Fore.YELLOW}⏹ Trailing monitoring execution suspended by user.")
-            break
-        except Exception as e:
-            time.sleep(LOOP_INTERVAL_SECONDS)
-            continue
+    except Exception as e:
+        print(f"{Fore.RED}Execution Error inside tracker engine: {e}")
+        sys.exit(1)
 
 
 if __name__ == "__main__":
