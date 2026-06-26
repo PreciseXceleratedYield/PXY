@@ -134,12 +134,13 @@ body{
     transition:background 0.3s,box-shadow 0.5s;
 }
 .sig-cell{
-    flex:1 1 0;min-width:0;
+    flex:2 1 0;min-width:0;
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     padding:0 4px;gap:2px;
     border-right:1px solid var(--border);
     position:relative;overflow:hidden;
 }
+#cellDP{flex:4 1 0;}
 .sig-cell:last-child{border-right:none;}
 .sig-cell::after{
     content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
@@ -768,7 +769,7 @@ let termFit=null;
 function initTerminal(){
     const term=new Terminal({
         convertEol:true,scrollback:300,fontFamily:"'DM Mono',monospace",
-        fontSize:15,lineHeight:1.45,cursorBlink:false,disableStdin:true,
+        fontSize:15.5,lineHeight:1.45,cursorBlink:false,disableStdin:true,
         theme:{background:'#000000',foreground:'#e8ecf4',green:'#22c55e',
                red:'#ef4444',yellow:'#f59e0b',cyan:'#22d3ee',brightBlack:'#374151'}
     });
