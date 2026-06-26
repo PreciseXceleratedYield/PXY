@@ -490,8 +490,7 @@ function emojify(v){
     const s=String(v||'').toUpperCase();
     if(s.includes('BUY')||s.includes('BULL'))return'🟢';
     if(s.includes('SELL')||s.includes('BEAR'))return'🔴';
-    if(s==='NONE')return'—';
-    return v;
+    return v||'—';
 }
 function setVal(id,val,c){
     const el=$(id);if(!el)return;
@@ -513,6 +512,21 @@ async function loadDash(){
     try{
         const d=await fetch('./webdashpxy.json?_='+Date.now()).then(r=>r.json());
 
+        setVal('hcEntry',emojify(d.entry??'NONE'),cls(d.entry??'NONE'));
+        setVal('hcExit', emojify(d.exit??'NONE'), cls(d.exit??'NONE'));
+        setVal('hcTrend',emojify(d.supertrend),cls(d.supertrend));
+
+        [{id:'cellEntry',v:d.entry},{id:'cellExit',v:d.exit},{id:'cellTrend',v:d.supertrend}
+        ].forEach(({id,v})=>{
+            const el=$(id);if(!el)return;
+            el.className='sig-cell';
+            const c=cls(v||'');
+            if(c==='bull')el.classList.add('bull-cell');
+            else if(c==='bear')el.classList.add('bear-cell');
+        });
+
+        renderDPHistogram(d.candle_visual||'',d.ce_power||1,d.pe_power||1);
+
         // header glow
         const up=String(d.direction||'').toUpperCase()==='UP';
         $('topBar').style.boxShadow=up
@@ -526,6 +540,26 @@ async function loadDash(){
     }catch(e){console.error('dash',e);}
 }
 
+
+/* ══════════════════════════════════════
+   DEPTH/POWER
+══════════════════════════════════════ */
+function renderDPHistogram(raw,cePow,pePow){
+    const re=/\u001b\[(\d+)m(\d+)\u001b\[0m/g;
+    let m;const items=[];
+    while((m=re.exec(raw))!==null)items.push({n:+m[2],bull:m[1]==='92'});
+    if(!items.length)return;
+    const last=items[items.length-1];
+    let si=items.length-1;
+    while(si>0&&items[si-1].bull===last.bull)si--;
+    const depth=items.length-si;
+    const power=last.bull?cePow:pePow;
+    const el=$('dpText');if(!el)return;
+    el.textContent=`📊${depth} 🚦 ⚡${power}`;
+    el.className='sc-val '+(last.bull?'bull':'bear');
+    const cell=$('cellDP');if(!cell)return;
+    cell.className='sig-cell '+(last.bull?'bull-cell':'bear-cell');
+}
 
 /* ══════════════════════════════════════
    MOMENTUM CANDLE — exact copy from webpxy.html
