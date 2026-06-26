@@ -11,22 +11,28 @@ from colorama import Fore, Style, init
 # Initialize colorama for clean terminal output formatting
 init(autoreset=True)
 
-# 🔍 Explicit path routing to establish the system footprint layout
+# 🔍 STRATEGIC FOOTPRINT: Explicit path isolation handling
 current_dir = os.path.dirname(os.path.abspath(__file__))
+# Map the 'run' subdirectory where your lilo code resides
+run_dir = os.path.join(current_dir, "run")
+
 if current_dir not in sys.path:
     sys.path.append(current_dir)
+if run_dir not in sys.path:
+    sys.path.append(run_dir)
 
-# CONFIGURABLE FILE PATHS (Directly mapped to your LILO dumped outputs)
-PNL_JSON_PATH = os.path.abspath(os.path.join(current_dir, "../web/webpnlpxy.json"))
-POS_JSON_PATH = os.path.abspath(os.path.join(current_dir, "../web/webpospxy.json"))
+# CONFIGURABLE FILE PATHS (Surgically aligned to your true directory architecture)
+# Moving up TWO folders (../../) from sys/exe/ lands perfectly in pxy/web/
+PNL_JSON_PATH = os.path.abspath(os.path.join(current_dir, "../../web/webpnlpxy.json"))
+POS_JSON_PATH = os.path.abspath(os.path.join(current_dir, "../../web/webpospxy.json"))
 
-# 💾 WEB INTERFACE AND SESSION MEMORY STATE PATH
-RENKO_STATE_FILE = os.path.abspath(os.path.join(current_dir, "../web/webrinkopxy.json"))
+# 💾 WEB DASHBOARD PERSISTENT DATA INTERFACE NODE
+RENKO_STATE_FILE = os.path.abspath(os.path.join(current_dir, "../../web/webrinkopxy.json"))
 
-# RISK METRICS
-TRAILING_DROP_LIMIT = 3000.0  # Absolute Rupee drop allowed from the absolute peak
-LOOP_INTERVAL_SECONDS = 1.0   # 1-second background polling cycle
-EMERGENCY_RETRY_SECONDS = 5.0 # Repeat interval if threshold is hit
+# RISK CONFIGURATION CONSTANTS
+TRAILING_DROP_LIMIT = 3000.0  # Absolute Rupee drawdown allowed from the peak
+LOOP_INTERVAL_SECONDS = 1.0   # 1-second interval execution tracking speed
+EMERGENCY_RETRY_SECONDS = 5.0 # Repeat interval if threshold is breached
 
 
 def safe_load_json_pnl(file_path):
@@ -44,6 +50,7 @@ def safe_load_json_pnl(file_path):
             return sum(float(row.get("PNL", 0.0)) for row in data)
         return 0.0
     except Exception:
+        # Blocks reading collisions if files are loaded exactly mid-write by lilo loop
         return 0.0
 
 
@@ -86,7 +93,7 @@ def enforce_morning_time_gate():
     while not has_cleaned_history:
         now_ist = datetime.now(IST)
         
-        # ⏱️ CRITICAL TIME GATE LOCKOUT: 09:00 AM to 09:30 AM
+        # ⏱️ TIME GATE BOUNDARY LOCK: 09:00 AM to 09:30 AM
         if 9 <= now_ist.hour < 10 and now_ist.minute < 30:
             sys.stdout.write(
                 f"\r⏳ {Fore.YELLOW}TIME GATE ACTIVE: System locked from 09:00 to 09:30 AM IST. "
@@ -149,6 +156,7 @@ def start_trailing_engine():
                 # 🚨 THRESHOLD IS HIT: Lock inside this execution block. DO NOT EXIT THE LOOP.
                 print(f"\n\n{Fore.RED}{Style.BRIGHT}🚨 LOSS TRIGGER BREACHED (Net ₹{current_net_pnl:,.2f} <= Trigger ₹{active_exit_line:,.2f})! Entering persistent emergency loop...")
                 
+                # SQR Script sits right alongside this master tracker file in the core folder execution directory
                 script_path = os.path.join(current_dir, "exesqrpxy.py")
                 
                 # Persistent emergency cycle repeats here forever until manually stopped or positions clear
@@ -159,15 +167,15 @@ def start_trailing_engine():
                             # Executes the self-running script with unconditional exit flag
                             subprocess.run(["python3", script_path, "-all"], stdout=sys.stdout, stderr=sys.stderr)
                         else:
-                            print(f"{Fore.RED}❌ Square-off script missing at: {script_path}")
+                            print(f"{Fore.RED}❌ Square-off script missing at execution path: {script_path}")
                     except Exception as err:
-                        print(f"{Fore.RED}❌ Subprocess routing failure: {err}")
+                        print(f"{Fore.RED}❌ Subprocess execution framework failure: {err}")
                     
-                    # Force hard flush to zero inside the web file on every loop pass
+                    # Force hard flush to zero inside the web file on every loop pass to alert front-end panels
                     save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
                     
                     # ⏱️ 5-Second persistent retry interval holding parameter
-                    print(f"⏳ {Fore.YELLOW}Emergency step complete. Holding loop. Re-firing in {EMERGENCY_RETRY_SECONDS} seconds...\n")
+                    print(f"⏳ {Fore.YELLOW}Emergency execution pass complete. Holding loop. Re-firing in {EMERGENCY_RETRY_SECONDS} seconds...\n")
                     time.sleep(EMERGENCY_RETRY_SECONDS)
             
             else:
@@ -186,4 +194,5 @@ def start_trailing_engine():
 
 if __name__ == "__main__":
     start_trailing_engine()
+
 
