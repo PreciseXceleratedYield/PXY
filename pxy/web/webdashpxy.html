@@ -134,10 +134,10 @@ body{
 #momentumBar{
     height:36px;flex-shrink:0;
     display:flex;align-items:center;
-    padding:0 clamp(10px,2vw,18px);
-    gap:clamp(8px,1.5vw,16px);
+    padding:0 clamp(10px,2vw,14px);
+    gap:clamp(6px,1vw,12px);
     background:var(--bg2);
-    border-top:1px solid var(--border);
+    border-bottom:1px solid var(--border);
     transition:background 0.35s,border-color 0.35s;
     overflow:hidden;
 }
@@ -256,6 +256,49 @@ body{
     color:var(--muted);text-align:center;transition:all 0.3s;
 }
 #brand sup{font-size:0.5em;vertical-align:super;color:var(--accent);}
+/* ══ RISK BAR ══ */
+#riskBar{
+    height:44px;flex-shrink:0;
+    display:flex;align-items:center;
+    padding:0 clamp(10px,2vw,18px);
+    gap:clamp(8px,1.5vw,16px);
+    background:var(--bg2);
+    border-top:1px solid var(--border2);
+    transition:background 0.3s,border-color 0.3s;
+    overflow:hidden;
+}
+.rsk-group{display:flex;flex-direction:column;align-items:flex-start;gap:1px;flex-shrink:0;}
+.rsk-group.rsk-net{align-items:center;}
+.rsk-group.rsk-floor{align-items:flex-end;}
+.rsk-lbl{font-size:7px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;}
+.rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(11px,1.3vw,15px);white-space:nowrap;}
+.rsk-val.bull{color:var(--bull);}
+.rsk-val.bear{color:var(--bear);}
+.rsk-val.gold{color:var(--gold);}
+/* track */
+.rsk-track-wrap{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+#rskTrack{
+    height:10px;border-radius:5px;
+    background:var(--bg3);border:1px solid var(--border2);
+    position:relative;overflow:hidden;
+}
+#rskThumb{
+    position:absolute;top:0;bottom:0;left:0;
+    border-radius:5px;
+    background:linear-gradient(to right,var(--bear),var(--bull));
+    transition:width 0.5s ease;
+}
+#rskFloorLine{
+    position:absolute;top:0;bottom:0;width:2px;
+    background:var(--bear);opacity:0.85;
+    box-shadow:0 0 6px var(--bear);
+    transition:left 0.5s ease;
+}
+#rskTrackLabels{
+    display:flex;justify-content:space-between;
+    font-size:7px;color:var(--muted);
+}
+
 @keyframes flashG{0%,100%{color:var(--bull);text-shadow:0 0 16px rgba(34,197,94,0.7);}50%{color:rgba(34,197,94,0.25);text-shadow:none;}}
 @keyframes flashR{0%,100%{color:var(--bear);text-shadow:0 0 16px rgba(239,68,68,0.7);}50%{color:rgba(239,68,68,0.25);text-shadow:none;}}
 #brand.bos-bull{animation:flashG 0.9s infinite;}
@@ -320,7 +363,7 @@ body{
     </div>
 
     <div class="sig-cell dp-cell" id="cellDP">
-        <span class="sc-lbl"> Depth |||||||||| Power</span>
+        <span class="sc-lbl"> Depth ||||| Power</span>
         <span class="sc-val" id="dpText">—</span>
     </div>
 </div>
@@ -336,6 +379,13 @@ body{
 
     <!-- CHART -->
     <div id="chartWrap">
+        <!-- Momentum candle shares chart column space -->
+        <div id="momentumBar">
+            <span class="mom-lbl">Momentum</span>
+            <div id="momentumCanvasWrap">
+                <canvas id="momentumCandle"></canvas>
+            </div>
+        </div>
         <div id="chartBox">
             <div class="grid-over"></div>
             <canvas id="priceChart"></canvas>
@@ -364,12 +414,29 @@ body{
 
 
 </div>
-
-<!-- ══ MOMENTUM CANDLE BAR ══ -->
-<div id="momentumBar">
-    <span class="mom-lbl">Momentum</span>
-    <div id="momentumCanvasWrap">
-        <canvas id="momentumCandle"></canvas>
+<!-- ══ RISK BAR ══ -->
+<div id="riskBar">
+    <div class="rsk-group">
+        <span class="rsk-lbl">🚨 Exit Floor</span>
+        <span class="rsk-val bear" id="rskFloor">—</span>
+    </div>
+    <div class="rsk-track-wrap">
+        <div id="rskTrack">
+            <div id="rskThumb"></div>
+            <div id="rskFloorLine"></div>
+        </div>
+        <div id="rskTrackLabels">
+            <span id="rskFloorLbl">—</span>
+            <span id="rskPeakLbl">—</span>
+        </div>
+    </div>
+    <div class="rsk-group rsk-net">
+        <span class="rsk-lbl">💰 Net P&L</span>
+        <span class="rsk-val" id="rskNet">—</span>
+    </div>
+    <div class="rsk-group rsk-peak">
+        <span class="rsk-lbl">📈 Peak</span>
+        <span class="rsk-val" id="rskPeak">—</span>
     </div>
 </div>
 
@@ -568,12 +635,12 @@ function renderDPHistogram(raw, cePow, pePow){
     const streak=items.slice(si);
     const depth=streak.length;
     const power=last.bull?cePow:pePow;
-    const emoji=last.bull?'  🚦🚦':'  🚦🚦';
+    const emoji=last.bull?' 🚦':' 🚦';
     const powEmoji='⚡';
 
     const el=$('dpText');
     if(!el)return;
-    el.textContent=`📊 ${depth}${emoji} ${powEmoji}${power}`;
+    el.textContent=`📊${depth}${emoji} ${powEmoji}${power}`;
     el.className='sc-val '+(last.bull?'bull':'bear');
 
     const cell=$('cellDP');
@@ -722,6 +789,41 @@ function initTerminal(){
     ws.onerror=()=>term.write('\r\n\x1b[31m[connection error]\x1b[0m');
 }
 
+/* ── RISK BAR ── */
+async function loadRisk(){
+    let d={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-3000};
+    try{d=await fetch('./webrinkopxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    const peak=d.session_peak_pnl??0;
+    const net=d.current_net_pnl??0;
+    const floor=d.active_exit_line??-3000;
+
+    // labels
+    const fmtR=n=>(n>=0?'+':'')+Math.round(n).toLocaleString('en-IN');
+    $('rskPeak').textContent ='₹'+Math.round(peak).toLocaleString('en-IN');
+    $('rskPeak').className   ='rsk-val '+(peak>=0?'bull':'bear');
+    $('rskNet').textContent  ='₹'+fmtR(net);
+    $('rskNet').className    ='rsk-val '+(net>=0?'bull':'bear');
+    $('rskFloor').textContent='₹'+Math.round(floor).toLocaleString('en-IN');
+
+    // track: range from floor to peak (or 0 to peak if peak>0)
+    const lo=Math.min(floor,0,net);
+    const hi=Math.max(peak,0,net);
+    const range=hi-lo||1;
+    // thumb width = how far net is from lo toward hi
+    const pct=Math.max(0,Math.min(100,((net-lo)/range)*100));
+    // floor line position
+    const floorPct=Math.max(0,Math.min(100,((floor-lo)/range)*100));
+    $('rskThumb').style.width=pct+'%';
+    $('rskFloorLine').style.left=floorPct+'%';
+    $('rskFloorLbl').textContent='₹'+Math.round(floor).toLocaleString('en-IN');
+    $('rskPeakLbl').textContent ='₹'+Math.round(peak).toLocaleString('en-IN');
+
+    // danger glow on riskBar when net is near floor
+    const danger=peak>0&&net<=(floor+(Math.abs(floor)*0.15));
+    $('riskBar').style.boxShadow=danger
+        ?'0 0 0 1px rgba(239,68,68,0.5),0 0 20px rgba(239,68,68,0.12)':'';
+}
+
 /* ── RESIZE — redraw momentum candle when panel resizes ── */
 new ResizeObserver(()=>{
     if(chart)chart.resize();
@@ -733,11 +835,12 @@ new ResizeObserver(()=>{
 }).observe($('momentumCanvasWrap'));
 
 /* ── START ── */
-loadDash();loadChart();loadPos();loadTrades();initTerminal();
+loadDash();loadChart();loadPos();loadTrades();loadRisk();initTerminal();
 setInterval(loadDash,   3000);
 setInterval(loadChart,  3000);
 setInterval(loadPos,    3000);
 setInterval(loadTrades, 5000);
+setInterval(loadRisk,   4000);
 </script>
 </body>
 </html>
