@@ -13,7 +13,7 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 6
+MAX_LAYERS = 3
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
 FIXED_ATR_PCT = 10.0    # 🎯 Hardcoded baseline ATR percentage set exactly to 10%
 
