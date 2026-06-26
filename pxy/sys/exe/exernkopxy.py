@@ -14,7 +14,7 @@ init(autoreset=True)
 # 🛡️ GLOBAL OPERATIONAL SWITCH CONFIGURATION
 # True  = Absolute Execution Mode (Locks terminal loop and flattens all entries every 5s)
 # False = Warning Mode Only (Prints warning message to console and breaks cleanly to main loop)
-EXECUTE_SQUARE_OFF = True  
+EXECUTE_SQUARE_OFF = False  
 
 # 🔍 STRATEGIC FOOTPRINT: Explicit path isolation handling
 current_dir = os.path.dirname(os.path.abspath(__file__))
