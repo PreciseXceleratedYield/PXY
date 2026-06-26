@@ -31,6 +31,7 @@
     --shadow:rgba(0,0,0,0.55);
     /* layout heights */
     --hdr:48px;
+    --sig:56px;
     --chart:22vh;
     --mom:34px;
     --pnl:40px;
@@ -59,7 +60,7 @@ html{
 body{
     height:100dvh;
     display:grid;
-    grid-template-rows: var(--hdr) var(--chart) var(--mom) var(--pnl) 1fr var(--tab);
+    grid-template-rows: var(--hdr) var(--sig) var(--chart) var(--mom) var(--pnl) 1fr var(--tab);
     overflow:hidden;
     font-family:'DM Mono',monospace;
     background:var(--bg);color:var(--text);
@@ -121,6 +122,46 @@ body{
 }
 
 /* sig-cell strip removed */
+
+/* ══════════════════════════════════════════
+   SIGNAL STRIP — 4 equal cells (Entry/Exit/Trend/Depth·Power)
+══════════════════════════════════════════ */
+#sigStrip{
+    display:flex;align-items:stretch;
+    background:var(--bg2);
+    border-bottom:1px solid var(--border2);
+    overflow:hidden;
+    transition:background 0.3s,box-shadow 0.5s;
+}
+.sig-cell{
+    flex:1 1 0;min-width:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:0 4px;gap:2px;
+    border-right:1px solid var(--border);
+    position:relative;overflow:hidden;
+}
+.sig-cell:last-child{border-right:none;}
+.sig-cell::after{
+    content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+    border-radius:2px 2px 0 0;transition:background 0.3s;
+}
+.sig-cell.bull-cell::after{background:var(--bull);box-shadow:0 0 8px var(--bull);}
+.sig-cell.bear-cell::after{background:var(--bear);box-shadow:0 0 8px var(--bear);}
+.sig-cell.gold-cell::after{background:var(--gold);}
+.sc-lbl{
+    font-size:8px;letter-spacing:0.08em;text-transform:uppercase;
+    color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    width:100%;text-align:center;
+}
+.sc-val{
+    font-family:'Syne',sans-serif;font-weight:800;font-size:16px;
+    white-space:nowrap;line-height:1;
+    overflow:hidden;text-overflow:ellipsis;width:100%;text-align:center;
+}
+.sc-val.bull{color:var(--bull);}
+.sc-val.bear{color:var(--bear);}
+.sc-val.gold{color:var(--gold);}
+.sc-val.dim {color:var(--muted);}
 
 /* ══════════════════════════════════════════
    CHART
@@ -311,7 +352,25 @@ body{
     </div>
 </header>
 
-<!-- ══ CHART ══ -->
+<!-- ══ SIGNAL STRIP ══ -->
+<div id="sigStrip">
+    <div class="sig-cell" id="cellEntry">
+        <span class="sc-lbl">🛫 Entry</span>
+        <span class="sc-val" id="hcEntry">—</span>
+    </div>
+    <div class="sig-cell" id="cellExit">
+        <span class="sc-lbl">🛬 Exit</span>
+        <span class="sc-val" id="hcExit">—</span>
+    </div>
+    <div class="sig-cell" id="cellTrend">
+        <span class="sc-lbl">🚀 Trend</span>
+        <span class="sc-val" id="hcTrend">—</span>
+    </div>
+    <div class="sig-cell" id="cellDP">
+        <span class="sc-lbl">Depth · Power</span>
+        <span class="sc-val" id="dpText">—</span>
+    </div>
+</div>
 <div id="chartBox">
     <div class="grid-over"></div>
     <canvas id="priceChart"></canvas>
