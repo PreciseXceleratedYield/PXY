@@ -11,6 +11,11 @@ from colorama import Fore, Style, init
 # Initialize colorama for clean terminal output formatting
 init(autoreset=True)
 
+# 🛡️ GLOBAL OPERATIONAL SWITCH CONFIGURATION
+# True  = Absolute Execution Mode (Locks terminal loop and flattens all entries every 5s)
+# False = Warning Mode Only (Prints warning message to console and breaks cleanly to main loop)
+EXECUTE_SQUARE_OFF = True  
+
 # 🔍 STRATEGIC FOOTPRINT: Explicit path isolation handling
 current_dir = os.path.dirname(os.path.abspath(__file__))
 run_dir = os.path.join(current_dir, "run")
@@ -161,31 +166,38 @@ def start_trailing_engine():
             f"Loss Trigger: {Fore.RED}{Style.BRIGHT}₹{active_exit_line:,.2f}{Style.RESET_ALL}"
         )
         
-        # 7. 🔥 CORE CONDITIONAL SINGLE-PASS LOGIC
+        # 7. 🔥 CORE CONDITIONAL MODE EVALUATION
         if current_net_pnl <= active_exit_line:
-            # 🚨 THRESHOLD IS HIT: Enter infinite emergency retry loop. NEVER BREAK OUT.
-            print(f"\n🚨 {Fore.RED}{Style.BRIGHT}LOSS TRIGGER BREACHED! Entering persistent emergency loop...")
-            script_path = os.path.join(current_dir, "exesqrpxy.py")
             
-            while True:
-                print(f"⚡ [{time.strftime('%H:%M:%S')}] {Fore.MAGENTA}Firing emergency square-off subprocess...")
-                try:
-                    if os.path.exists(script_path):
-                        subprocess.run(["python3", script_path, "-all"], stdout=sys.stdout, stderr=sys.stderr)
-                    else:
-                        print(f"{Fore.RED}❌ Square-off script missing at: {script_path}")
-                except Exception as err:
-                    print(f"{Fore.RED}❌ Subprocess routing failure: {err}")
+            # MODE A: EXECUTION MODE (EXECUTE_SQUARE_OFF = True)
+            if EXECUTE_SQUARE_OFF:
+                print(f"\n🚨 {Fore.RED}{Style.BRIGHT}LOSS TRIGGER BREACHED! Entering persistent emergency closeloop...")
+                script_path = os.path.join(current_dir, "exesqrpxy.py")
                 
-                # Hard flush states to zero inside the web file on every pass
-                save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
-                
-                print(f"⏳ {Fore.YELLOW}Retry pass complete. Re-firing in {EMERGENCY_RETRY_SECONDS} seconds...\n")
-                time.sleep(EMERGENCY_RETRY_SECONDS)
+                while True:
+                    print(f"⚡ [{time.strftime('%H:%M:%S')}] {Fore.MAGENTA}Firing emergency square-off subprocess...")
+                    try:
+                        if os.path.exists(script_path):
+                            subprocess.run(["python3", script_path, "-all"], stdout=sys.stdout, stderr=sys.stderr)
+                        else:
+                            print(f"{Fore.RED}❌ Square-off script missing at: {script_path}")
+                    except Exception as err:
+                        print(f"{Fore.RED}❌ Subprocess routing failure: {err}")
+                    
+                    # Force hard flush states to zero inside the web file on every pass
+                    save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
+                    
+                    print(f"⏳ {Fore.YELLOW}Retry pass complete. Re-firing in {EMERGENCY_RETRY_SECONDS} seconds...\n")
+                    time.sleep(EMERGENCY_RETRY_SECONDS)
+            
+            # MODE B: WARNING MODE ONLY (EXECUTE_SQUARE_OFF = False)
+            else:
+                print(f"\n⚠️  {Fore.YELLOW}{Style.BRIGHT}⚠️  WARNING TARGET BREACHED: Net ₹{current_net_pnl:,.2f} dropped below limit floor ₹{active_exit_line:,.2f}!")
+                print(f"⚠️  [SWITCH NOTICE]: EXECUTE_SQUARE_OFF is disabled. Exiting checker loop pass with safe break.")
+                sys.exit(0)
         
         else:
-            # ✅ THRESHOLD NOT HIT: Terminate the script immediately as requested
-            # This allows your upstream manager shell or core script loop to continue instantly
+            # ✅ THRESHOLD NOT HIT: Terminate the script single pass check immediately to resume main loop execution
             sys.exit(0)
 
     except Exception as e:
