@@ -129,25 +129,24 @@ body{
 #body{flex:1;display:flex;overflow:hidden;min-height:0;}
 
 /* ══════════════════════════════════════════
-   MOMENTUM CANDLE — left fixed panel
-   Exact replica of webpxy.html bottom bar candle,
-   rotated 90° to sit vertically
+   MOMENTUM CANDLE — horizontal bar above botBar
 ══════════════════════════════════════════ */
-#momentumSide{
-    width:48px;flex-shrink:0;
-    background:var(--bg2);border-left:1px solid var(--border);
-    display:flex;flex-direction:column;align-items:center;
-    padding:6px 4px 4px;gap:4px;
-    transition:background 0.3s,border-color 0.3s;
+#momentumBar{
+    height:36px;flex-shrink:0;
+    display:flex;align-items:center;
+    padding:0 clamp(10px,2vw,18px);
+    gap:clamp(8px,1.5vw,16px);
+    background:var(--bg2);
+    border-top:1px solid var(--border);
+    transition:background 0.35s,border-color 0.35s;
     overflow:hidden;
 }
-.side-lbl{
-    font-size:6px;letter-spacing:0.14em;text-transform:uppercase;
-    color:var(--muted);writing-mode:vertical-rl;flex-shrink:0;
+.mom-lbl{
+    font-size:clamp(8px,0.85vw,10px);letter-spacing:0.13em;text-transform:uppercase;
+    color:var(--muted);white-space:nowrap;flex-shrink:0;
 }
-/* Canvas wrapper — fills the remaining space */
 #momentumCanvasWrap{
-    flex:1;width:100%;
+    flex:1;height:28px;
     position:relative;
     background:var(--bg3);
     border-radius:6px;
@@ -363,14 +362,15 @@ body{
         </div>
     </div>
 
-    <!-- MOMENTUM CANDLE — rightmost -->
-    <div id="momentumSide">
-        <span class="side-lbl">Momentum</span>
-        <div id="momentumCanvasWrap">
-            <canvas id="momentumCandle"></canvas>
-        </div>
-    </div>
 
+</div>
+
+<!-- ══ MOMENTUM CANDLE BAR ══ -->
+<div id="momentumBar">
+    <span class="mom-lbl">Momentum</span>
+    <div id="momentumCanvasWrap">
+        <canvas id="momentumCandle"></canvas>
+    </div>
 </div>
 
 <!-- ══ BOTTOM ══ -->
@@ -436,9 +436,7 @@ function shortSym(s){
 function lotSz(s){return(s||'').includes('BANKNIFTY')?30:65;}
 
 /* ══════════════════════════════════════
-   MOMENTUM CANDLE BAR
-   Exact replica from webpxy.html — drawn vertically
-   (canvas is tall & narrow; we rotate the draw axis)
+   MOMENTUM CANDLE BAR — horizontal, exact copy from webpxy.html
 ══════════════════════════════════════ */
 let lastMoSt = null, lastMoCloses = null;
 
@@ -456,21 +454,9 @@ function drawMomentumBar(stVals, closes) {
     canvas.style.height = rect.height + 'px';
     ctx.scale(dpr, dpr);
 
-    // We rotate the coordinate system so the horizontal candle
-    // from webpxy.html draws top-to-bottom instead of left-to-right.
-    // Strategy: translate+rotate, then use W (height) as the "width" axis
-    // and H (width) as the "height" axis.
-    const W = rect.height;   // logical "width" of the candle (vertical extent)
-    const H = rect.width;    // logical "height" of the candle (cross-axis)
-
-    ctx.clearRect(0, 0, rect.width, rect.height);
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
     if (W < 10 || H < 6) return;
-
-    // rotate canvas: origin moves to top-right, x goes downward, y goes left
-    ctx.save();
-    ctx.translate(rect.width, 0);
-    ctx.rotate(Math.PI / 2);
-    // now drawing in [0..W] x [0..H] maps vertically on screen
 
     const PADX  = 8;
     const midY  = H / 2;
@@ -489,8 +475,8 @@ function drawMomentumBar(stVals, closes) {
     const wLow  = Math.min(...rc.slice(-8), ...rs.slice(-8));
     const isBull = close >= open;
 
-    const bodyColor  = isBull ? cssVar('--bull') : cssVar('--bear');
-    const glowColor  = isBull ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)';
+    const bodyColor = isBull ? cssVar('--bull') : cssVar('--bear');
+    const glowColor = isBull ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)';
 
     // track
     const tg = ctx.createLinearGradient(0, 0, W, 0);
@@ -530,8 +516,6 @@ function drawMomentumBar(stVals, closes) {
     ctx.beginPath();
     ctx.roundRect(bx1 + 2, midY - bodyH/2 + 2, Math.max(bW - 4, 2), Math.max(bodyH * 0.3, 3), 2);
     ctx.fill();
-
-    ctx.restore();
 }
 
 /* ── SIGNAL DASH ── */
