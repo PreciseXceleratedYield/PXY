@@ -13,7 +13,6 @@ init(autoreset=True)
 
 # 🔍 STRATEGIC FOOTPRINT: Explicit path isolation handling
 current_dir = os.path.dirname(os.path.abspath(__file__))
-# Map the 'run' subdirectory where your lilo code resides
 run_dir = os.path.join(current_dir, "run")
 
 if current_dir not in sys.path:
@@ -22,7 +21,6 @@ if run_dir not in sys.path:
     sys.path.append(run_dir)
 
 # CONFIGURABLE FILE PATHS (Surgically aligned to your true directory architecture)
-# Moving up TWO folders (../../) from sys/exe/ lands perfectly in pxy/web/
 PNL_JSON_PATH = os.path.abspath(os.path.join(current_dir, "../../web/webpnlpxy.json"))
 POS_JSON_PATH = os.path.abspath(os.path.join(current_dir, "../../web/webpospxy.json"))
 
@@ -50,7 +48,6 @@ def safe_load_json_pnl(file_path):
             return sum(float(row.get("PNL", 0.0)) for row in data)
         return 0.0
     except Exception:
-        # Blocks reading collisions if files are loaded exactly mid-write by lilo loop
         return 0.0
 
 
@@ -85,7 +82,7 @@ def save_session_state(peak_value, current_net, exit_line):
 def enforce_morning_time_gate():
     """Blocks execution from 09:00:00 AM to 09:30:00 AM IST.
 
-    Performs a clean data wipe exactly at 09:30:00 AM IST.
+    Validates file age at 09:30 AM and wipes historical files if stale.
     """
     IST = pytz.timezone("Asia/Kolkata")
     has_cleaned_history = False
@@ -102,12 +99,31 @@ def enforce_morning_time_gate():
             sys.stdout.flush()
             time.sleep(1.0)
         else:
-            # 🔥 09:30:00 AM TRIPPED: Run historical file purge and reset parameters cleanly
-            print(f"\n\n⏰ {Fore.GREEN}{Style.BRIGHT}⏰ 09:30 AM IST REACHED! COMMENCING MORNING RISK PURGE...")
+            print(f"\n\n⏰ {Fore.GREEN}{Style.BRIGHT}09:30 AM IST REACHED! COMMENCING MORNING DATA VERIFICATION...")
             
-            # Flush web interface historical states completely back to ground zero
+            # 🛡️ SURGICAL SOURCE FILE DATE CHECK
+            today_date_str = now_ist.strftime("%Y-%m-%d")
+            
+            for target_file_path in [PNL_JSON_PATH, POS_JSON_PATH]:
+                if os.path.exists(target_file_path):
+                    # Extract the absolute last modified timestamp from the filesystem
+                    file_mod_timestamp = os.path.getmtime(target_file_path)
+                    file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, IST).strftime("%Y-%m-%d")
+                    
+                    # If file date doesn't match today's date string, it is stale data from yesterday
+                    if file_mod_date_str != today_date_str:
+                        print(f"⚠️  {Fore.YELLOW}STALE FILE DETECTED: {os.path.basename(target_file_path)} belongs to yesterday ({file_mod_date_str}).")
+                        try:
+                            # Force overwrite file to an absolute blank JSON array
+                            with open(target_file_path, "w") as fw:
+                                json.dump([], fw)
+                            print(f"🧹 {Fore.GREEN}Successfully purged stale data from {os.path.basename(target_file_path)}.")
+                        except Exception as file_err:
+                            print(f"{Fore.RED}❌ Error clearing stale file: {file_err}")
+            
+            # Flush trailing tracking parameters completely back to ground zero
             save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
-            print(f"🧹 {Fore.CYAN}Cleaned up historical cache file: {RENKO_STATE_FILE}")
+            print(f"🧹 {Fore.CYAN}Cleaned up tracking cache file: {RENKO_STATE_FILE}")
             print(f"✅ {Fore.GREEN}System parameters fully initialized. Launching Trailing Engine Matrix Loops!\n")
             has_cleaned_history = True
 
@@ -125,7 +141,7 @@ def start_trailing_engine():
 
     while True:
         try:
-            # 1. Read running and booked performance pools directly from LILO dumps
+            # 1. Read running and booked performance pools directly from clean dumps
             realised_pnl = safe_load_json_pnl(PNL_JSON_PATH)
             unrealised_pnl = safe_load_json_pnl(POS_JSON_PATH)
             
@@ -142,7 +158,7 @@ def start_trailing_engine():
             # 5. Persist the complete metrics matrix out to your web dashboard tracking file
             save_session_state(session_peak_pnl, current_net_pnl, active_exit_line)
             
-            # 6. Stream continuous running data telemetry including explicit loss trigger metrics to the console
+            # 6. Stream continuous running data telemetry to the console
             sys.stdout.write(
                 f"\r📊 PnL Net: {Fore.YELLOW}₹{current_net_pnl:,.2f}{Style.RESET_ALL} | "
                 f"Peak: {Fore.GREEN}₹{session_peak_pnl:,.2f}{Style.RESET_ALL} | "
@@ -153,33 +169,26 @@ def start_trailing_engine():
             
             # 7. CORE CONDITION LOOP RULES EVALUATION
             if current_net_pnl <= active_exit_line:
-                # 🚨 THRESHOLD IS HIT: Lock inside this execution block. DO NOT EXIT THE LOOP.
                 print(f"\n\n{Fore.RED}{Style.BRIGHT}🚨 LOSS TRIGGER BREACHED (Net ₹{current_net_pnl:,.2f} <= Trigger ₹{active_exit_line:,.2f})! Entering persistent emergency loop...")
                 
-                # SQR Script sits right alongside this master tracker file in the core folder execution directory
                 script_path = os.path.join(current_dir, "exesqrpxy.py")
                 
-                # Persistent emergency cycle repeats here forever until manually stopped or positions clear
                 while True:
                     print(f"⚡ [{time.strftime('%H:%M:%S')}] {Fore.MAGENTA}Firing emergency square-off script subprocess...")
                     try:
                         if os.path.exists(script_path):
-                            # Executes the self-running script with unconditional exit flag
                             subprocess.run(["python3", script_path, "-all"], stdout=sys.stdout, stderr=sys.stderr)
                         else:
-                            print(f"{Fore.RED}❌ Square-off script missing at execution path: {script_path}")
+                            print(f"{Fore.RED}❌ Square-off script missing at: {script_path}")
                     except Exception as err:
-                        print(f"{Fore.RED}❌ Subprocess execution framework failure: {err}")
+                        print(f"{Fore.RED}❌ Subprocess routing failure: {err}")
                     
-                    # Force hard flush to zero inside the web file on every loop pass to alert front-end panels
                     save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
                     
-                    # ⏱️ 5-Second persistent retry interval holding parameter
                     print(f"⏳ {Fore.YELLOW}Emergency execution pass complete. Holding loop. Re-firing in {EMERGENCY_RETRY_SECONDS} seconds...\n")
                     time.sleep(EMERGENCY_RETRY_SECONDS)
             
             else:
-                # ✅ THRESHOLD NOT HIT: Break the current iteration loop pass cleanly as requested
                 pass
                 
             time.sleep(LOOP_INTERVAL_SECONDS)
@@ -194,5 +203,4 @@ def start_trailing_engine():
 
 if __name__ == "__main__":
     start_trailing_engine()
-
 
