@@ -573,7 +573,7 @@ function renderDPHistogram(raw, cePow, pePow){
 
     const el=$('dpText');
     if(!el)return;
-    el.textContent=`📊${depth}${emoji} ${powEmoji}${power}`;
+    el.textContent=`📊 ${depth}${emoji} ${powEmoji}${power}`;
     el.className='sc-val '+(last.bull?'bull':'bear');
 
     const cell=$('cellDP');
