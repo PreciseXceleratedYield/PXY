@@ -135,7 +135,7 @@ body{
 ══════════════════════════════════════════ */
 #momentumSide{
     width:48px;flex-shrink:0;
-    background:var(--bg2);border-right:1px solid var(--border);
+    background:var(--bg2);border-left:1px solid var(--border);
     display:flex;flex-direction:column;align-items:center;
     padding:6px 4px 4px;gap:4px;
     transition:background 0.3s,border-color 0.3s;
@@ -329,12 +329,10 @@ body{
 <!-- ══ BODY ══ -->
 <div id="body">
 
-    <!-- MOMENTUM CANDLE — left fixed panel -->
-    <div id="momentumSide">
-        <span class="side-lbl">Momentum</span>
-        <div id="momentumCanvasWrap">
-            <canvas id="momentumCandle"></canvas>
-        </div>
+    <!-- TERMINAL — leftmost -->
+    <div id="termWrap">
+        <div class="term-hdr">Terminal</div>
+        <div id="termBox"></div>
     </div>
 
     <!-- CHART -->
@@ -365,10 +363,12 @@ body{
         </div>
     </div>
 
-    <!-- TERMINAL -->
-    <div id="termWrap">
-        <div class="term-hdr">Terminal</div>
-        <div id="termBox"></div>
+    <!-- MOMENTUM CANDLE — rightmost -->
+    <div id="momentumSide">
+        <span class="side-lbl">Momentum</span>
+        <div id="momentumCanvasWrap">
+            <canvas id="momentumCandle"></canvas>
+        </div>
     </div>
 
 </div>
