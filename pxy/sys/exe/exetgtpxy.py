@@ -2,10 +2,10 @@
 import pandas as pd
 from colorama import Fore, Style, init
 
-# Initialize colorama for colored terminal output
+# Initialize colorama for clean, colored terminal output formatting
 init(autoreset=True)
 
-# Global tracking structures
+# Global tracking structures to prevent log flooding on rapid tick cycles
 printed_sides = set()
 
 
@@ -35,11 +35,15 @@ def dynamic_entry(row):
 
 
 def target_price(row):
-    """Calculates target price based strictly on matrix parameters and signal direction."""
+    """Calculates individual option layer target price using dynamic matrices.
+    
+    Aligned Trades : max(ATR * Power, ATR * Depth) with no upper limit for maximum extraction.
+    Hostile Trades : ATR / Power down to a 1.0% floor (instant crash cutting).
+    """
     global printed_sides
 
     try:
-        # 1. Extract base values and powers needed for printing and logic
+        # 1. Extract baseline metrics safely
         atr_val = f(row.get("atr"), 6.0)
         ce_power = f(row.get("ce_power"), 1.0)
         pe_power = f(row.get("pe_power"), 1.0)
@@ -48,7 +52,7 @@ def target_price(row):
         pe_disp = int(pe_power) if float(pe_power).is_integer() else pe_power
         atr_disp = int(atr_val) if float(atr_val).is_integer() else round(atr_val, 2)
 
-        # 2. Print status line exactly once per refresh cycle using unique data snapshot
+        # 2. Print dashboard status line once per unique data configuration refresh
         print_key = f"{atr_disp}_{ce_disp}_{pe_disp}"
         if print_key not in printed_sides:
             raw_display_len = len(f" {atr_disp}    BUY : {ce_disp}%    SELL: {pe_disp}%") + 6  
@@ -58,12 +62,12 @@ def target_price(row):
             print(f"{padding}↕️ {atr_disp}  {Fore.GREEN}🟢  BUY : {ce_disp}%  {Fore.RED}🔴  SELL: {pe_disp}%")
             printed_sides.add(print_key)
 
-        # 3. Entry data health check (FIXED: Cast to float using f() to protect decimals)
+        # 3. Entry data execution health check
         entry_prc = f(row.get("pxy_entry") or row.get("buy_prc"))
         if entry_prc <= 0:
             return 0.0
 
-        # 4. Context extractors
+        # 4. Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
         active_exit = str(row.get("exit", "NONE")).upper().strip()
 
@@ -73,27 +77,36 @@ def target_price(row):
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
 
-        # 5. Extract Option Matrix parameters for math target calculation
-        hce_d = f(row.get("hkin_ce_depth"), 1.0)
-        hpe_d = f(row.get("hkin_pe_depth"), 1.0)
-        ce_p = f(row.get("ce_power"), 1.0)
-        pe_p = f(row.get("pe_power"), 1.0)
+        # 5. Extract Option Matrix parameters (Enforce absolute 1.0 minimum to prevent ZeroDivisionError)
+        hce_d = max(1.0, f(row.get("hkin_ce_depth"), 1.0))
+        hpe_d = max(1.0, f(row.get("hkin_pe_depth"), 1.0))
+        ce_p = max(1.0, f(row.get("ce_power"), 1.0))
+        pe_p = max(1.0, f(row.get("pe_power"), 1.0))
 
         target_pct = 0.0
 
         # 6. Core execution logic evaluating directional signals
         if is_ce:
             if active_exit in ["SELL", "BEAR"]:  
-                target_pct = atr_val / 2
+                # Counter-Trend: Threat is high. If Power shoots to 10, target collapses to ~1% for an immediate cut.
+                target_pct = atr_val / pe_p
             else:                                
-                target_pct = atr_val + ce_p
+                # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
+                target_pct = max((atr_val * ce_p), (atr_val * hce_d))
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   
-                target_pct = atr_val / 2
+                # Counter-Trend: Threat is high. Collapse target via division to execute tight scratch exit.
+                target_pct = atr_val / ce_p
             else:                                
-                target_pct = atr_val + pe_p
+                # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
+                target_pct = max((atr_val * pe_p), (atr_val * hpe_d))
                 
-        # 7. Final mathematical target projection calculation
+        # 🔥 HIGH SPEED BANDWIDTH GUARDRAIL
+        # Floor set to 1.0% to allow emergency division exits to execute instantly.
+        # Upper ceiling removed completely to allow uncapped, realistic momentum expansions.
+        target_pct = max(1.0, target_pct)
+
+        # 7. Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
         return round(calculated_target, 2)
 
