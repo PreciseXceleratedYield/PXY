@@ -86,12 +86,12 @@ def target_price(row):
             if active_exit in ["SELL", "BEAR"]:  
                 target_pct = atr_val / 2
             else:                                
-                target_pct = atr_val
+                target_pct = atr_val + ce_p
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   
                 target_pct = atr_val / 2
             else:                                
-                target_pct = atr_val
+                target_pct = atr_val + pe_p
                 
         # 7. Final mathematical target projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
