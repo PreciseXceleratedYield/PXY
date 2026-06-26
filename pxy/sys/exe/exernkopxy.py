@@ -76,21 +76,29 @@ def save_session_state(peak_value, current_net, exit_line):
 
 
 def enforce_morning_time_gate():
-    """Blocks execution until exactly 09:30 AM IST, then performs a clean historical data wipe."""
+    """Blocks execution from 09:00:00 AM to 09:30:00 AM IST.
+
+    Performs a clean data wipe exactly at 09:30:00 AM IST.
+    """
     IST = pytz.timezone("Asia/Kolkata")
     has_cleaned_history = False
 
     while not has_cleaned_history:
         now_ist = datetime.now(IST)
-        if now_ist.hour < 9 or (now_ist.hour == 9 and now_ist.minute < 30):
+        
+        # ⏱️ CRITICAL TIME GATE LOCKOUT: 09:00 AM to 09:30 AM
+        if 9 <= now_ist.hour < 10 and now_ist.minute < 30:
             sys.stdout.write(
-                f"\r⏳ {Fore.YELLOW}TIME GATE ACTIVE: System locked until 09:30:00 AM IST. "
+                f"\r⏳ {Fore.YELLOW}TIME GATE ACTIVE: System locked from 09:00 to 09:30 AM IST. "
                 f"Current Time: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}    "
             )
             sys.stdout.flush()
             time.sleep(1.0)
         else:
+            # 🔥 09:30:00 AM TRIPPED: Run historical file purge and reset parameters cleanly
             print(f"\n\n⏰ {Fore.GREEN}{Style.BRIGHT}⏰ 09:30 AM IST REACHED! COMMENCING MORNING RISK PURGE...")
+            
+            # Flush web interface historical states completely back to ground zero
             save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
             print(f"🧹 {Fore.CYAN}Cleaned up historical cache file: {RENKO_STATE_FILE}")
             print(f"✅ {Fore.GREEN}System parameters fully initialized. Launching Trailing Engine Matrix Loops!\n")
@@ -178,3 +186,4 @@ def start_trailing_engine():
 
 if __name__ == "__main__":
     start_trailing_engine()
+
