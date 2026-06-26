@@ -100,6 +100,7 @@ parent_scripts = [
     HERE.parent / "sysvixpxy.py",
     HERE.parent / "sysdashpxy.py",
     HERE / "exeentrpxy.py",
+    HERE / "exernkopxy.py",
     HERE / "exeexitpxy.py"
 ]
 
@@ -127,8 +128,10 @@ while True:
 
             # -------- CORE LOGIC WITH SWITCH --------
             if SIMPLE_MODE:
+                safe_run(HERE / "exernkopxy.py")
                 safe_run(HERE / "exeexitpxy.py")
                 safe_run(HERE / "exeentrpxy.py")
+                
             else:
                 if ce_qty > 0 and ce_qty == pe_qty:
                     safe_run(HERE / "exeexitpxy.py")
