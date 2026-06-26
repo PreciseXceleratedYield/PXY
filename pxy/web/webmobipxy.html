@@ -244,10 +244,10 @@ body{
 }
 .p-row.bull-r{border-left:3px solid var(--bull);}
 .p-row.bear-r{border-left:3px solid var(--bear);}
-.p-sym,.t-sym{font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.p-meta,.t-meta{font-size:8px;color:var(--muted);margin-top:2px;}
-.t-tag,.p-tag{font-size:10px;color:var(--accent);flex-shrink:0;font-weight:500;}
-.p-pnl,.t-pnl{font-family:'Syne',sans-serif;font-weight:700;font-size:13px;flex-shrink:0;text-align:right;}
+.p-sym,.t-sym{font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.p-meta,.t-meta{font-size:7px;color:var(--muted);margin-top:2px;}
+.t-tag,.p-tag{font-size:9px;color:var(--accent);flex-shrink:0;font-weight:500;}
+.p-pnl,.t-pnl{font-family:'Syne',sans-serif;font-weight:700;font-size:12px;flex-shrink:0;text-align:right;}
 .p-pnl.bull,.t-pnl.bull{color:var(--bull);}
 .p-pnl.bear,.t-pnl.bear{color:var(--bear);}
 #panTrades .t-sym{color:var(--muted);}
@@ -675,7 +675,7 @@ let termFit=null;
 function initTerminal(){
     const term=new Terminal({
         convertEol:true,scrollback:300,fontFamily:"'DM Mono',monospace",
-        fontSize:14,lineHeight:1.45,cursorBlink:false,disableStdin:true,
+        fontSize:15,lineHeight:1.45,cursorBlink:false,disableStdin:true,
         theme:{background:'#000000',foreground:'#e8ecf4',green:'#22c55e',
                red:'#ef4444',yellow:'#f59e0b',cyan:'#22d3ee',brightBlack:'#374151'}
     });
