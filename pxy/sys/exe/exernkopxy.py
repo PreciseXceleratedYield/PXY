@@ -127,18 +127,19 @@ def start_trailing_engine():
             # 5. Persist the complete metrics matrix out to your web dashboard tracking file
             save_session_state(session_peak_pnl, current_net_pnl, active_exit_line)
             
-            # 6. Stream continuous running data telemetry to the terminal console
+            # 6. Stream continuous running data telemetry including explicit loss trigger metrics to the console
             sys.stdout.write(
                 f"\r📊 PnL Net: {Fore.YELLOW}₹{current_net_pnl:,.2f}{Style.RESET_ALL} | "
                 f"Peak: {Fore.GREEN}₹{session_peak_pnl:,.2f}{Style.RESET_ALL} | "
-                f"Exit Trigger Floor: {Fore.RED}₹{active_exit_line:,.2f}{Style.RESET_ALL}    "
+                f"Exit Floor: {Fore.RED}₹{active_exit_line:,.2f}{Style.RESET_ALL} | "
+                f"Loss Trigger: {Fore.RED}{Style.BRIGHT}₹{active_exit_line:,.2f}{Style.RESET_ALL}    "
             )
             sys.stdout.flush()
             
-            # 7. 🔥 CORE CONDITION LOOP RULES EVALUATION
+            # 7. CORE CONDITION LOOP RULES EVALUATION
             if current_net_pnl <= active_exit_line:
                 # 🚨 THRESHOLD IS HIT: Lock inside this execution block. DO NOT EXIT THE LOOP.
-                print(f"\n\n{Fore.RED}{Style.BRIGHT}🚨 TRAILING STOP BREAKER TRIPPED! entering persistent emergency loop...")
+                print(f"\n\n{Fore.RED}{Style.BRIGHT}🚨 LOSS TRIGGER BREACHED (Net ₹{current_net_pnl:,.2f} <= Trigger ₹{active_exit_line:,.2f})! Entering persistent emergency loop...")
                 
                 script_path = os.path.join(current_dir, "exesqrpxy.py")
                 
@@ -163,7 +164,6 @@ def start_trailing_engine():
             
             else:
                 # ✅ THRESHOLD NOT HIT: Break the current iteration loop pass cleanly as requested
-                # This drops processing out of this specific block to refresh your variables
                 pass
                 
             time.sleep(LOOP_INTERVAL_SECONDS)
@@ -172,7 +172,7 @@ def start_trailing_engine():
             print(f"\n{Fore.YELLOW}⏹ Trailing monitoring execution suspended by user.")
             break
         except Exception as e:
-            time.shape(LOOP_INTERVAL_SECONDS)
+            time.sleep(LOOP_INTERVAL_SECONDS)
             continue
 
 
