@@ -14,7 +14,7 @@ init(autoreset=True)
 # 🛡️ GLOBAL OPERATIONAL SWITCH CONFIGURATION
 # True  = Absolute Execution Mode (Locks terminal loop and flattens all entries every 5s)
 # False = Warning Mode Only (Prints warning message to console and breaks cleanly to main loop)
-EXECUTE_SQUARE_OFF = False  
+EXECUTE_SQUARE_OFF = True  
 
 # 🔍 STRATEGIC FOOTPRINT: Explicit path isolation handling
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -103,7 +103,6 @@ def enforce_morning_time_gate():
             sys.stdout.flush()
             time.sleep(1.0)
         else:
-            # Check a localized marker flag so it only purges once at 9:30 AM
             state = load_session_state()
             last_update_time = state.get("updated_timestamp", "")
             today_str = now_ist.strftime("%Y-%m-%d")
@@ -111,7 +110,6 @@ def enforce_morning_time_gate():
             if today_str not in last_update_time:
                 print(f"\n\n⏰ {Fore.GREEN}{Style.BRIGHT}09:30 AM IST PASSED! RUNNING MORNING DATA PURGE...")
                 
-                # SURGICAL SOURCE FILE DATE CHECK
                 for target_file_path in [PNL_JSON_PATH, POS_JSON_PATH]:
                     if os.path.exists(target_file_path):
                         file_mod_timestamp = os.path.getmtime(target_file_path)
@@ -133,10 +131,8 @@ def enforce_morning_time_gate():
 
 
 def start_trailing_engine():
-    # ⏱️ Activate and check Time/History Gate rules first
     enforce_morning_time_gate()
 
-    # 🔄 Load existing state metrics matrix from your web interface JSON tracking file
     initial_state = load_session_state()
     session_peak_pnl = float(initial_state.get("session_peak_pnl", 0.0))
     
@@ -158,20 +154,25 @@ def start_trailing_engine():
         # 5. Persist the complete metrics matrix out to your web dashboard tracking file
         save_session_state(session_peak_pnl, current_net_pnl, active_exit_line)
         
-        # 6. Print single high-utility telemetry status check line
+        # 🔥 Dynamic 'k' Notation Generator for Compressed Terminal UI Layout
+        sign_prefix = "+" if active_exit_line > 0 else ""
+        if active_exit_line == 0:
+            exit_display_str = "0.0k"
+        else:
+            exit_display_str = f"{sign_prefix}{active_exit_line / 1000.0:.1f}k"
+        
+        # 6. 🔥 RE-ENGINEERED ULTRALIGHT CONSOLE LOGGER STREAM (No Redundancy)
         print(
-            f"📊 PnL Net: {Fore.YELLOW}₹{current_net_pnl:,.2f}{Style.RESET_ALL} | "
+            f"📊 Net: {Fore.YELLOW}₹{current_net_pnl:,.2f}{Style.RESET_ALL} | "
             f"Peak: {Fore.GREEN}₹{session_peak_pnl:,.2f}{Style.RESET_ALL} | "
-            f"Exit Floor: {Fore.RED}₹{active_exit_line:,.2f}{Style.RESET_ALL} | "
-            f"Loss Trigger: {Fore.RED}{Style.BRIGHT}₹{active_exit_line:,.2f}{Style.RESET_ALL}"
+            f"Exit @{Fore.RED}{Style.BRIGHT}{exit_display_str}{Style.RESET_ALL}"
         )
         
-        # 7. 🔥 CORE CONDITIONAL MODE EVALUATION
+        # 7. CORE CONDITIONAL MODE EVALUATION
         if current_net_pnl <= active_exit_line:
             
-            # MODE A: EXECUTION MODE (EXECUTE_SQUARE_OFF = True)
             if EXECUTE_SQUARE_OFF:
-                print(f"\n🚨 {Fore.RED}{Style.BRIGHT}LOSS TRIGGER BREACHED! Entering persistent emergency closeloop...")
+                print(f"\n🚨 {Fore.RED}{Style.BRIGHT}LOSS TRIGGER BREACHED (Net ₹{current_net_pnl:,.2f} <= Limit {exit_display_str})! Entering persistent emergency loop...")
                 script_path = os.path.join(current_dir, "exesqrpxy.py")
                 
                 while True:
@@ -184,15 +185,13 @@ def start_trailing_engine():
                     except Exception as err:
                         print(f"{Fore.RED}❌ Subprocess routing failure: {err}")
                     
-                    # Force hard flush states to zero inside the web file on every pass
                     save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
                     
                     print(f"⏳ {Fore.YELLOW}Retry pass complete. Re-firing in {EMERGENCY_RETRY_SECONDS} seconds...\n")
                     time.sleep(EMERGENCY_RETRY_SECONDS)
             
-            # MODE B: WARNING MODE ONLY (EXECUTE_SQUARE_OFF = False)
             else:
-                print(f"\n⚠️  {Fore.YELLOW}{Style.BRIGHT}⚠️  WARNING TARGET BREACHED: Net ₹{current_net_pnl:,.2f} dropped below limit floor ₹{active_exit_line:,.2f}!")
+                print(f"\n⚠️  {Fore.YELLOW}{Style.BRIGHT}⚠️  WARNING TARGET BREACHED: Net dropped below floor threshold {exit_display_str}!")
                 print(f"⚠️  [SWITCH NOTICE]: EXECUTE_SQUARE_OFF is disabled. Exiting checker loop pass with safe break.")
                 sys.exit(0)
         
@@ -207,4 +206,5 @@ def start_trailing_engine():
 
 if __name__ == "__main__":
     start_trailing_engine()
+
 
