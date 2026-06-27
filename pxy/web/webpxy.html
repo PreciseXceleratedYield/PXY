@@ -81,15 +81,13 @@ body{
 /* ══ HAMBURGER MENU ══ */
 #menu{position:relative;}
 .menu-btn{
-    display:flex;align-items:center;gap:5px;
-    padding:5px 10px;border:1px solid var(--border2);border-radius:6px;
-    font-size:clamp(9px,0.9vw,11px);letter-spacing:0.07em;
-    color:var(--muted);background:transparent;
-    font-family:'DM Mono',monospace;cursor:pointer;
-    transition:all 0.2s;-webkit-tap-highlight-color:transparent;
-    touch-action:manipulation;white-space:nowrap;
+    display:flex;align-items:center;
+    padding:4px 6px;border:none;border-radius:6px;
+    background:transparent;cursor:pointer;
+    transition:opacity 0.2s;-webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;
 }
-.menu-btn:hover,.menu-btn:active{color:var(--text);background:var(--bg3);}
+.menu-btn:hover,.menu-btn:active{opacity:0.75;}
 .menu-icon{display:flex;flex-direction:column;gap:3px;}
 .menu-icon span{display:block;width:13px;height:1px;background:currentColor;}
 
@@ -371,8 +369,7 @@ body{
     <div class="nav-sec">
         <div id="menu">
             <div class="menu-btn" id="menuBtn">
-                <div class="menu-icon"><span></span><span></span><span></span></div>
-                <span style="color:#f59e0b">PXY®</span>
+                <span class="logo">PXY<sup>®</sup></span>
             </div>
             <div id="dropdown">
                 <a class="nav-item" href="webtrnxpxy.html">
@@ -390,10 +387,11 @@ body{
                 <a class="nav-item" href="webanltxpxy.html">
                     <span class="nav-label">ANALYTICS</span><span class="nav-arrow">→</span>
                 </a>
+                <a class="nav-item" href="webpxy.html">
+                    <span class="nav-label">TERMINAL</span><span class="nav-arrow">→</span>
+                </a>
             </div>
         </div>
-        <div class="dv"></div>
-        <span class="logo">PXY<sup>®</sup></span>
         <div class="dv"></div>
         <div class="theme-toggle" id="themeToggle">
             <div class="toggle-track"><div class="toggle-thumb"></div></div>
