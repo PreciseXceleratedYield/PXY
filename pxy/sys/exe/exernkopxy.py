@@ -161,10 +161,10 @@ def start_trailing_engine():
         else:
             exit_display_str = f"{sign_prefix}{active_exit_line / 1000.0:.1f}k"
         
-        # 6. 🔥 RE-ENGINEERED ULTRALIGHT CONSOLE LOGGER STREAM (No Redundancy)
+        # 6. 🔥 ULTRALIGHT CONSOLE LOGGER STREAM (Stripped of Decimals)
         print(
-            f"📊 Net: {Fore.YELLOW}₹{current_net_pnl:,.2f}{Style.RESET_ALL} | "
-            f"Peak: {Fore.GREEN}₹{session_peak_pnl:,.2f}{Style.RESET_ALL} | "
+            f"📊 Net: {Fore.YELLOW}₹{current_net_pnl:,.0f}{Style.RESET_ALL} | "
+            f"Peak: {Fore.GREEN}₹{session_peak_pnl:,.0f}{Style.RESET_ALL} | "
             f"Exit @{Fore.RED}{Style.BRIGHT}{exit_display_str}{Style.RESET_ALL}"
         )
         
@@ -172,7 +172,7 @@ def start_trailing_engine():
         if current_net_pnl <= active_exit_line:
             
             if EXECUTE_SQUARE_OFF:
-                print(f"\n🚨 {Fore.RED}{Style.BRIGHT}LOSS TRIGGER BREACHED (Net ₹{current_net_pnl:,.2f} <= Limit {exit_display_str})! Entering persistent emergency loop...")
+                print(f"\n🚨 {Fore.RED}{Style.BRIGHT}LOSS TRIGGER BREACHED (Net ₹{current_net_pnl:,.0f} <= Limit {exit_display_str})! Entering persistent emergency loop...")
                 script_path = os.path.join(current_dir, "exesqrpxy.py")
                 
                 while True:
@@ -196,7 +196,7 @@ def start_trailing_engine():
                 sys.exit(0)
         
         else:
-            # ✅ THRESHOLD NOT HIT: Terminate the script single pass check immediately to resume main loop execution
+            # ✅ THRESHOLD NOT HIT: Terminate script pass instantly to resume orchestrator processing
             sys.exit(0)
 
     except Exception as e:
