@@ -40,7 +40,6 @@ except Exception as e:
     sys.exit(1)
 
 # ---------------- FIX 2: API TIMEOUT WRAPPER ----------------
-# UPDATED: Set to 7 seconds
 def call_with_timeout(func, timeout=10, *args, **kwargs):
     with ThreadPoolExecutor(max_workers=1) as executor:
         future = executor.submit(func, *args, **kwargs)
@@ -54,25 +53,25 @@ def call_with_timeout(func, timeout=10, *args, **kwargs):
             return None
 
 # ---------------- HELPER FUNCTIONS ----------------
-def run_script(script_path):
+def run_script(script_path, timeout=20):
     if not Path(script_path).exists():
         print(f"⚠️ SKIP: script not found -> {script_path}")
         print("━" * 42)
         return
     try:
-        # ✅ SUCCESS: Sub-script execution safety threshold extended to 1 minute (60 seconds)
-        subprocess.run(['python3', str(script_path)], check=True, timeout=20)
+        # ✅ Dynamic timeout value is passed here (None means run forever)
+        subprocess.run(['python3', str(script_path)], check=True, timeout=timeout)
     except subprocess.TimeoutExpired:
-        print(f"⏱ TIMEOUT: script stuck -> {script_path} ⚠️")
+        print(f"⏱ TIMEOUT: script stuck after {timeout}s -> {script_path} ⚠️")
     except subprocess.CalledProcessError:
         print(f"❌ RUN ERR: script execution failed -> {script_path} ⚠️")
     except Exception as e:
         print(f"❌ RUN ERR: unexpected failure -> {script_path} ⚠️")
     print("━" * 42)
 
-def safe_run(script_path):
+def safe_run(script_path, timeout=20):
     try:
-        run_script(script_path)
+        run_script(script_path, timeout=timeout)
     except Exception:
         print("⚠️ SAFE RUN: unexpected error occurred ⚠️")
 
@@ -104,8 +103,12 @@ parent_scripts = [
     HERE / "exeexitpxy.py"
 ]
 
+# Run parent scripts with the exception applied
 for s in parent_scripts:
-    safe_run(s)
+    if s.name == "exernkopxy.py":
+        safe_run(s, timeout=None)  # Infinite exception
+    else:
+        safe_run(s, timeout=20)    # Standard limit
 
 while True:
     if in_market_hours():
@@ -128,25 +131,25 @@ while True:
 
             # -------- CORE LOGIC WITH SWITCH --------
             if SIMPLE_MODE:
-                safe_run(HERE / "exernkopxy.py")
-                safe_run(HERE / "exeexitpxy.py")
-                safe_run(HERE / "exeentrpxy.py")
+                safe_run(HERE / "exernkopxy.py", timeout=None)  # Infinite exception
+                safe_run(HERE / "exeexitpxy.py", timeout=20)
+                safe_run(HERE / "exeentrpxy.py", timeout=20)
                 
             else:
                 if ce_qty > 0 and ce_qty == pe_qty:
-                    safe_run(HERE / "exeexitpxy.py")
+                    safe_run(HERE / "exeexitpxy.py", timeout=20)
                 elif ce_qty == 0 and pe_qty == 0:
-                    safe_run(HERE / "exeentrpxy.py")
+                    safe_run(HERE / "exeentrpxy.py", timeout=20)
                 else:
-                    safe_run(HERE / "exeexitpxy.py")
-                    safe_run(HERE / "exeentrpxy.py")
+                    safe_run(HERE / "exeexitpxy.py", timeout=20)
+                    safe_run(HERE / "exeentrpxy.py", timeout=20)
 
             fancy_pause(7) # 7-second pause between sub-iterations
             loop_counter += 1
             
     else:
         print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
-        safe_run(HERE.parent / "sysslefpxy.py")
+        safe_run(HERE.parent / "sysslefpxy.py", timeout=20)
         fancy_pause(7)
         while not in_market_hours():
             print("⏳ WAIT: market opens at 09:16 IST 📡", end="\r")
