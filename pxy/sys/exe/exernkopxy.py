@@ -170,11 +170,13 @@ def start_trailing_engine():
             f"Exit @{Fore.RED}{Style.BRIGHT}{exit_display_str}{Style.RESET_ALL}"
         )
         
+        # -------- TRIGGER AND BREAK LOGIC TIMELINE --------
         if current_net_pnl <= active_exit_line:
             if EXECUTE_SQUARE_OFF:
                 print(f"\n🚨 {Fore.RED}{Style.BRIGHT}LOSS TRIGGER BREACHED (Net ₹{current_net_pnl:,.0f} <= Limit {exit_display_str})! Entering persistent emergency loop...")
                 script_path = os.path.join(current_dir, "exesqrpxy.py")
                 
+                # 🔄 RUN FOREVER LOGIC: This block runs continuously if triggered
                 while True:
                     print(f"⚡ [{time.strftime('%H:%M:%S')}] {Fore.MAGENTA}Firing emergency square-off subprocess...")
                     try:
@@ -192,6 +194,7 @@ def start_trailing_engine():
                 print(f"\n⚠️  {Fore.YELLOW}{Style.BRIGHT}⚠️  WARNING TARGET BREACHED: Net dropped below floor threshold {exit_display_str}!")
                 sys.exit(0)
         else:
+            # ✅ BREAK ENGINE OUT: Safe condition verified. Clean exit returns control to your main supervisor.
             sys.exit(0)
 
     except Exception as e:
@@ -201,6 +204,4 @@ def start_trailing_engine():
 
 if __name__ == "__main__":
     start_trailing_engine()
-
-
 
