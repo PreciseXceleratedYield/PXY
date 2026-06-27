@@ -20,9 +20,9 @@
    Momentum candle left is fixed 48px, excluded from % calc
 ══════════════════════════════════════════ */
 :root {
-    --w-chart:    55%;   /* Chart */
-    --w-terminal: 25%;   /* Terminal */
-    --w-trades:   20%;   /* Positions + Trades */
+    --w-chart:    65%;   /* Chart */
+    --w-terminal: 20%;   /* Terminal */
+    --w-trades:   15%;   /* Positions + Trades */
     /* remaining space is momentum candle (48px) */
 }
 
@@ -258,7 +258,8 @@ body{
     width:var(--w-terminal);flex-shrink:0;
     display:flex;flex-direction:column;
     border-right:1px solid var(--border);
-    background:#000;overflow:hidden;
+    background:radial-gradient(ellipse at 50% 80%,rgba(15,25,50,0.4) 0%,transparent 70%),var(--bg);
+    overflow:hidden;
 }
 .term-hdr{
     height:22px;flex-shrink:0;
@@ -269,6 +270,7 @@ body{
 #termBox{flex:1;overflow:hidden;}
 #termBox .xterm{height:100%!important;}
 #termBox .xterm-viewport{background:transparent!important;}
+#termBox .xterm-screen{background:transparent!important;}
 
 /* BOTTOM */
 #botBar{
@@ -416,8 +418,8 @@ body{
                 <a class="nav-item" href="webanltxpxy.html">
                     <span class="nav-label">ANALYTICS</span>
                 </a>
-                <a class="nav-item" href="webdashpxy.html">
-                    <span class="nav-label">DASHBOARD</span>
+                <a class="nav-item" href="webpxy.html">
+                    <span class="nav-label">TERMINAL</span>
                 </a>
             </div>
         </div>
@@ -847,7 +849,7 @@ function initTerminal(){
     const term=new Terminal({
         convertEol:true,scrollback:200,fontFamily:"'DM Mono',monospace",
         fontSize:10,lineHeight:1.4,cursorBlink:false,disableStdin:true,
-        theme:{background:'#000000',foreground:'#e8ecf4',green:'#22c55e',
+        theme:{background:'#00000000',foreground:'#e8ecf4',green:'#22c55e',
                red:'#ef4444',yellow:'#f59e0b',cyan:'#22d3ee',brightBlack:'#374151'}
     });
     const fit=new FitAddon.FitAddon();
