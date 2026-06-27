@@ -33,6 +33,7 @@
     --bull:#22c55e;--bear:#ef4444;--gold:#f59e0b;
     --bull-dim:rgba(34,197,94,0.10);--bear-dim:rgba(239,68,68,0.10);
     --grid:rgba(255,255,255,0.028);
+    --shadow:rgba(0,0,0,0.55);
     --hdr:52px;--bot:32px;
     --track-mid:rgba(255,255,255,0.09);
     --term-bg:#06080d;
@@ -44,6 +45,7 @@
     --bull:#16a34a;--bear:#dc2626;--gold:#d97706;
     --bull-dim:rgba(22,163,74,0.10);--bear-dim:rgba(220,38,38,0.10);
     --grid:rgba(0,0,0,0.035);
+    --shadow:rgba(0,0,0,0.14);
     --track-mid:rgba(0,0,0,0.07);
     --term-bg:#f8fafc;
 }
@@ -74,13 +76,44 @@ body{
     padding:0 clamp(10px,1.5vw,18px);
     border-right:1px solid var(--border);flex-shrink:0;
 }
-.back-btn{
-    display:flex;align-items:center;gap:4px;padding:3px 9px;
-    border:1px solid var(--border2);border-radius:5px;
-    color:var(--muted);font-size:10px;letter-spacing:0.05em;
-    text-decoration:none;font-family:'DM Mono',monospace;transition:all 0.2s;
+.back-btn{display:none;}/* removed */
+
+/* ══ HAMBURGER MENU ══ */
+#menu{position:relative;}
+.menu-btn{
+    display:flex;align-items:center;gap:5px;
+    padding:5px 10px;border:1px solid var(--border2);border-radius:6px;
+    font-size:clamp(9px,0.9vw,11px);letter-spacing:0.07em;
+    color:var(--muted);background:transparent;
+    font-family:'DM Mono',monospace;cursor:pointer;
+    transition:all 0.2s;-webkit-tap-highlight-color:transparent;
+    touch-action:manipulation;white-space:nowrap;
 }
-.back-btn:hover{color:var(--text);background:var(--bg3);}
+.menu-btn:hover,.menu-btn:active{color:var(--text);background:var(--bg3);}
+.menu-icon{display:flex;flex-direction:column;gap:3px;}
+.menu-icon span{display:block;width:13px;height:1px;background:currentColor;}
+
+#dropdown{
+    position:fixed;top:var(--hdr);left:0;
+    background:var(--bg2);border:1px solid var(--border2);
+    border-radius:0 0 10px 10px;overflow:hidden;
+    display:none;min-width:200px;
+    box-shadow:0 16px 40px var(--shadow);
+    z-index:9999;transition:background 0.3s;
+}
+#menu.open #dropdown{display:block;}
+
+.nav-item{
+    display:flex;align-items:center;gap:10px;
+    padding:13px 16px;text-decoration:none;
+    color:var(--text);border-bottom:1px solid var(--border);
+    transition:background 0.15s;cursor:pointer;
+}
+.nav-item:last-child{border-bottom:none;}
+.nav-item:hover,.nav-item:active{background:var(--bg3);}
+.nav-label{font-family:'Syne',sans-serif;font-size:13px;font-weight:700;letter-spacing:0.08em;flex:1;}
+.nav-arrow{font-size:12px;color:var(--muted);transition:transform 0.2s;}
+.nav-item:hover .nav-arrow{transform:translateX(3px);color:var(--accent);}
 .dv{width:1px;height:16px;background:var(--border2);flex-shrink:0;}
 .logo{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;}
 .logo sup{font-size:0.5em;vertical-align:super;color:var(--accent);}
@@ -336,7 +369,32 @@ body{
 <!-- ══ TOP BAR ══ -->
 <div id="topBar">
     <div class="nav-sec">
-        <a class="back-btn" href="webpxy.html">← PXY</a>
+        <div id="menu">
+            <div class="menu-btn" id="menuBtn">
+                <div class="menu-icon"><span></span><span></span><span></span></div>
+                <span style="color:#f59e0b">PXY®</span>
+            </div>
+            <div id="dropdown">
+                <a class="nav-item" href="webtrnxpxy.html">
+                    <span class="nav-label">TRADES</span><span class="nav-arrow">→</span>
+                </a>
+                <a class="nav-item" href="../pxyexe.html">
+                    <span class="nav-label">ACTIONS</span><span class="nav-arrow">→</span>
+                </a>
+                <a class="nav-item" href="webrptspxy.html">
+                    <span class="nav-label">REPORTS</span><span class="nav-arrow">→</span>
+                </a>
+                <a class="nav-item" href="webpospxy.html">
+                    <span class="nav-label">POSITIONS</span><span class="nav-arrow">→</span>
+                </a>
+                <a class="nav-item" href="webanltxpxy.html">
+                    <span class="nav-label">ANALYTICS</span><span class="nav-arrow">→</span>
+                </a>
+                <a class="nav-item" href="webpxy.html">
+                    <span class="nav-label">TERMINAL</span><span class="nav-arrow">→</span>
+                </a>
+            </div>
+        </div>
         <div class="dv"></div>
         <span class="logo">PXY<sup>®</sup></span>
         <div class="dv"></div>
@@ -458,6 +516,21 @@ body{
 'use strict';
 const $=id=>document.getElementById(id);
 function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+
+/* ── MENU ── */
+const menu=$('menu'),menuBtn=$('menuBtn');
+menuBtn.addEventListener('click',      e=>{e.stopPropagation();menu.classList.toggle('open');});
+menuBtn.addEventListener('touchend',   e=>{e.preventDefault();e.stopPropagation();menu.classList.toggle('open');});
+document.addEventListener('click',     e=>{if(!menu.contains(e.target))menu.classList.remove('open');});
+document.addEventListener('keydown',   e=>{if(e.key==='Escape')menu.classList.remove('open');});
+document.querySelectorAll('.nav-item').forEach(item=>{
+    item.addEventListener('touchend',e=>{
+        e.stopPropagation();
+        const href=item.getAttribute('href');
+        if(href&&href!=='#'){menu.classList.remove('open');window.location.href=href;}
+    });
+    item.addEventListener('click',e=>{e.stopPropagation();menu.classList.remove('open');});
+});
 
 /* ── THEME ── */
 $('themeToggle').addEventListener('click',()=>{
