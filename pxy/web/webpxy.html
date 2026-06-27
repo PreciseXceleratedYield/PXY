@@ -20,9 +20,9 @@
    Momentum candle left is fixed 48px, excluded from % calc
 ══════════════════════════════════════════ */
 :root {
-    --w-chart:    57%;   /* Chart */
-    --w-terminal: 24%;   /* Terminal */
-    --w-trades:   19%;   /* Positions + Trades */
+    --w-chart:    65%;   /* Chart */
+    --w-terminal: 20%;   /* Terminal */
+    --w-trades:   15%;   /* Positions + Trades */
     /* remaining space is momentum candle (48px) */
 }
 
@@ -849,7 +849,7 @@ function initTerminal(){
     const term=new Terminal({
         convertEol:true,scrollback:200,fontFamily:"'DM Mono',monospace",
         fontSize:10,lineHeight:1.4,cursorBlink:false,disableStdin:true,
-        theme:{background:'#00000000',foreground:'#e8ecf4',green:'#22c55e',
+        theme:{background:'#00000000',foreground:'#8899bb',green:'#22c55e',
                red:'#ef4444',yellow:'#f59e0b',cyan:'#22d3ee',brightBlack:'#374151'}
     });
     const fit=new FitAddon.FitAddon();
