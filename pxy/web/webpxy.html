@@ -20,9 +20,9 @@
    Momentum candle left is fixed 48px, excluded from % calc
 ══════════════════════════════════════════ */
 :root {
-    --w-chart:    65%;   /* Chart */
-    --w-terminal: 20%;   /* Terminal */
-    --w-trades:   15%;   /* Positions + Trades */
+    --w-chart:    55%;   /* Chart */
+    --w-terminal: 25%;   /* Terminal */
+    --w-trades:   20%;   /* Positions + Trades */
     /* remaining space is momentum candle (48px) */
 }
 
@@ -889,7 +889,7 @@ function drawRiskCandle(floor, net, peak){
 
     const PADX = 10;
     const midY = H/2;
-    const bodyH = Math.max(8, H*0.45);
+    const bodyH = Math.max(8, H*0.25);
 
     // range: floor (left) → peak (right)
     const lo = floor;               // always floor at left edge
