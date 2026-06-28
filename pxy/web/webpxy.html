@@ -411,9 +411,6 @@ body{
                 <a class="nav-item" href="webanltxpxy.html">
                     <span class="nav-label">ANALYTICS</span>
                 </a>
-                <a class="nav-item" href="webpxy.html">
-                    <span class="nav-label">TERMINAL</span>
-                </a>
             </div>
         </div>
     </div>
@@ -837,58 +834,11 @@ async function loadTrades(){
     });
 }
 
-/* ── DEVICE INTELLIGENCE ── */
-function detectDevice(){
-    const w  = window.innerWidth;
-    const dpr = window.devicePixelRatio || 1;
-    const touch = navigator.maxTouchPoints > 0;
-
-    // TV: wide screen + high res + no touch
-    if(w >= 1920)               return 'tv';
-    // Mobile: narrow or touch + narrow
-    if(w <= 768 || (touch && w <= 1024)) return 'mobile';
-    // Tablet
-    if(w <= 1280)               return 'tablet';
-    // Desktop default
-    return 'desktop';
-}
-
-function applyDeviceLayout(){
-    const dev = detectDevice();
-    const root = document.documentElement.style;
-
-    // Panel widths & terminal font per device
-    const cfg = {
-        tv:      { chart:'52%', term:'28%', trades:'20%', termFont:14, rowFont:'11px', metaFont:'8px',  pnlFont:'14px' },
-        desktop: { chart:'55%', term:'25%', trades:'20%', termFont:10, rowFont:'10px', metaFont:'7px',  pnlFont:'12px' },
-        tablet:  { chart:'50%', term:'28%', trades:'22%', termFont:11, rowFont:'10px', metaFont:'7px',  pnlFont:'12px' },
-        mobile:  { chart:'55%', term:'25%', trades:'20%', termFont:12, rowFont:'10px', metaFont:'7px',  pnlFont:'12px' },
-    }[dev];
-
-    root.setProperty('--w-chart',   cfg.chart);
-    root.setProperty('--w-terminal',cfg.term);
-    root.setProperty('--w-trades',  cfg.trades);
-
-    // Inject dynamic row/pnl font sizes
-    let styleEl = $('deviceStyle');
-    if(!styleEl){ styleEl=document.createElement('style'); styleEl.id='deviceStyle'; document.head.appendChild(styleEl); }
-    styleEl.textContent = `
-        .p-sym,.t-sym { font-size:${cfg.rowFont} !important; }
-        .p-meta,.t-meta { font-size:${cfg.metaFont} !important; }
-        .t-tag,.p-tag { font-size:${cfg.rowFont} !important; }
-        .p-pnl,.t-pnl { font-size:${cfg.pnlFont} !important; }
-    `;
-
-    return cfg.termFont;
-}
-
 /* ── TERMINAL ── */
 function initTerminal(){
-    const termFont = applyDeviceLayout();
-
     const term=new Terminal({
         convertEol:true,scrollback:200,fontFamily:"'DM Mono',monospace",
-        fontSize:termFont,lineHeight:1.4,cursorBlink:false,disableStdin:true,
+        fontSize:10,lineHeight:1.4,cursorBlink:false,disableStdin:true,
         theme:{background:'#00000000',foreground:'#8899bb',green:'#22c55e',
                red:'#ef4444',yellow:'#f59e0b',cyan:'#22d3ee',brightBlack:'#374151'}
     });
@@ -901,9 +851,6 @@ function initTerminal(){
     ws.onmessage=e=>{term.clear();term.write(e.data);};
     ws.onerror=()=>term.write('\r\n\x1b[31m[connection error]\x1b[0m');
 }
-
-// Re-apply on resize (e.g. rotation, window resize on desktop)
-window.addEventListener('resize', ()=>{ applyDeviceLayout(); });
 
 /* ── RISK BAR ── */
 async function loadRisk(){
@@ -939,7 +886,7 @@ function drawRiskCandle(floor, net, peak){
 
     const PADX = 10;
     const midY = H/2;
-    const bodyH = Math.max(8, H*0.25);
+    const bodyH = Math.max(8, H*0.45);
 
     // range: floor (left) → peak (right)
     const lo = floor;               // always floor at left edge
