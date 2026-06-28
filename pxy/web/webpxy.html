@@ -78,23 +78,25 @@ body{
 }
 .back-btn{display:none;}/* removed */
 
-/* ══ HAMBURGER MENU ══ */
+/* ══ HAMBURGER MENU — vertical dots, extreme left ══ */
 #menu{position:relative;}
 .menu-btn{
-    display:flex;align-items:center;
-    padding:4px 6px;border:none;border-radius:6px;
+    display:flex;align-items:center;justify-content:center;
+    width:32px;height:32px;
+    border:none;border-radius:6px;
     background:transparent;cursor:pointer;
-    transition:opacity 0.2s;-webkit-tap-highlight-color:transparent;
+    transition:background 0.2s;-webkit-tap-highlight-color:transparent;
     touch-action:manipulation;
 }
-.menu-btn:hover,.menu-btn:active{opacity:0.75;}
-.menu-icon{display:flex;flex-direction:column;gap:3px;}
-.menu-icon span{display:block;width:13px;height:1px;background:currentColor;}
+.menu-btn:hover,.menu-btn:active{background:var(--bg3);}
+.dots-icon{display:flex;flex-direction:column;gap:3px;align-items:center;}
+.dots-icon span{display:block;width:3px;height:3px;border-radius:50%;background:var(--muted);}
+.menu-btn:hover .dots-icon span{background:var(--text);}
 
 #dropdown{
-    position:fixed;top:var(--hdr);right:0;
+    position:fixed;top:var(--hdr);left:0;
     background:var(--bg2);border:1px solid var(--border2);
-    border-radius:0 0 0 10px;overflow:hidden;
+    border-radius:0 0 10px 0;overflow:hidden;
     display:none;width:max-content;
     box-shadow:0 16px 40px var(--shadow);
     z-index:9999;transition:background 0.3s;
@@ -115,7 +117,7 @@ body{
 .dv{width:1px;height:16px;background:var(--border2);flex-shrink:0;}
 .logo{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;}
 .logo sup{font-size:0.5em;vertical-align:super;color:var(--accent);}
-.logo-lg{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--text);white-space:nowrap;}
+.logo-lg{font-family:'Syne',sans-serif;font-weight:800;font-size:22px;color:var(--text);white-space:nowrap;pointer-events:none;user-select:none;}
 .logo-lg sup{font-size:0.5em;vertical-align:super;color:var(--accent);}
 .theme-toggle{display:flex;align-items:center;cursor:pointer;user-select:none;}
 .toggle-track{width:28px;height:15px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2);position:relative;transition:background 0.3s;}
@@ -364,6 +366,35 @@ body{
 <!-- ══ TOP BAR ══ -->
 <div id="topBar">
 
+    <!-- EXTREME LEFT: vertical dots menu -->
+    <div class="nav-sec" style="padding:0 10px;">
+        <div id="menu">
+            <button class="menu-btn" id="menuBtn" aria-label="Menu">
+                <span class="dots-icon">
+                    <span></span><span></span><span></span>
+                </span>
+            </button>
+            <div id="dropdown">
+                <a class="nav-item" href="webtrnxpxy.html">
+                    <span class="nav-label">TRADES</span>
+                </a>
+                <a class="nav-item" href="../pxyexe.html">
+                    <span class="nav-label">ACTIONS</span>
+                </a>
+                <a class="nav-item" href="webrptspxy.html">
+                    <span class="nav-label">REPORTS</span>
+                </a>
+                <a class="nav-item" href="webpospxy.html">
+                    <span class="nav-label">POSITIONS</span>
+                </a>
+                <a class="nav-item" href="webanltxpxy.html">
+                    <span class="nav-label">ANALYTICS</span>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIGNAL CELLS -->
     <div class="sig-cell" id="cellEntry">
         <span class="sc-lbl">🛫 Entry</span>
         <span class="sc-val" id="hcEntry">—</span>
@@ -385,34 +416,13 @@ body{
         <span class="sc-val" id="dpText">—</span>
     </div>
 
-    <!-- RIGHT: logo = menu trigger + theme toggle, extreme right -->
+    <!-- RIGHT: logo (static) + theme toggle -->
     <div class="nav-sec" style="border-right:none;border-left:1px solid var(--border);">
         <div class="theme-toggle" id="themeToggle">
             <div class="toggle-track"><div class="toggle-thumb"></div></div>
         </div>
         <div class="dv"></div>
-        <div id="menu">
-            <div class="menu-btn" id="menuBtn">
-                <span class="logo-lg">PXY<sup>®</sup></span>
-            </div>
-            <div id="dropdown">
-                <a class="nav-item" href="webtrnxpxy.html">
-                    <span class="nav-label">TRADES</span>
-                </a>
-                <a class="nav-item" href="../pxyexe.html">
-                    <span class="nav-label">ACTIONS</span>
-                </a>
-                <a class="nav-item" href="webrptspxy.html">
-                    <span class="nav-label">REPORTS</span>
-                </a>
-                <a class="nav-item" href="webpospxy.html">
-                    <span class="nav-label">POSITIONS</span>
-                </a>
-                <a class="nav-item" href="webanltxpxy.html">
-                    <span class="nav-label">ANALYTICS</span>
-                </a>
-            </div>
-        </div>
+        <span class="logo-lg">PXY<sup>®</sup></span>
     </div>
 </div>
 
