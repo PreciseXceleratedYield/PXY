@@ -425,7 +425,7 @@ body{
             <div class="toggle-track"><div class="toggle-thumb"></div></div>
         </div>
         <div class="dv"></div>
-        <span class="logo-lg">PXY<sup>®</sup></span>
+        <span class="logo-lg" id="logoRefresh" style="cursor:pointer;" title="Refresh">PXY<sup>®</sup></span>
     </div>
 </div>
 
@@ -1104,7 +1104,10 @@ new ResizeObserver(()=>{
     loadRisk();
 }).observe($('riskBar'));
 
-/* ── START ── */
+/* ── LOGO REFRESH ── */
+$('logoRefresh').addEventListener('click',()=>{
+    loadDash();loadChart();loadPos();loadTrades();loadRisk();
+});
 loadDash();loadChart();loadPos();loadTrades();loadRisk();initTerminal();
 setInterval(loadDash,   3000);
 setInterval(loadChart,  3000);
