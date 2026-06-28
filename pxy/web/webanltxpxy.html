@@ -832,7 +832,7 @@ async function loadTrades(){
     const te=$('ptTradesPnl');te.textContent=fmt(total);te.className='bot-pnl '+(bull?'bull':'bear');
     const scroll=$('tradeScroll');
     scroll.querySelectorAll('.t-row').forEach(r=>r.remove());
-    if(!data.length){$('tradeEmpty').style.display='block';return;}
+    if(!data.length){$('tradeEmpty').style.display='block';clearSelection();return;}
     $('tradeEmpty').style.display='none';
     data.sort((a,b)=>{
         const v=trCol==='pnl'?(a.PNL||0)-(b.PNL||0)
