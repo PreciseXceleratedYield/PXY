@@ -507,6 +507,21 @@ body{
     <span id="clk">—</span>
 </div>
 
+<!-- ══ PXYUPDATE PWD POPUP ══ -->
+<div id="updPopup" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:28px 32px;min-width:280px;display:flex;flex-direction:column;gap:14px;align-items:center;box-shadow:0 24px 60px rgba(0,0,0,0.6);">
+        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:15px;letter-spacing:0.06em;">🔄 PXYUPDATE</div>
+        <div style="font-size:10px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;">Enter neo password</div>
+        <input type="password" id="updPwd" placeholder="password" maxlength="20"
+               style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-family:'DM Mono',monospace;font-size:16px;text-align:center;letter-spacing:0.14em;outline:none;transition:border-color 0.2s;"
+               onkeydown="if(event.key==='Enter')confirmUpdate();if(event.key==='Escape')cancelUpdate();">
+        <div style="display:flex;gap:10px;width:100%;">
+            <button onclick="cancelUpdate()" style="flex:1;padding:9px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;">Cancel</button>
+            <button onclick="confirmUpdate()" style="flex:1;padding:9px;border-radius:7px;border:1px solid var(--accent);background:rgba(59,130,246,0.12);color:var(--accent);font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">Execute</button>
+        </div>
+    </div>
+</div>
+
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
@@ -964,6 +979,15 @@ function drawRiskCandle(floor, net, peak){
     ctx.beginPath(); ctx.moveTo(peakX, midY-bodyH/2-2); ctx.lineTo(peakX, midY+bodyH/2+2); ctx.stroke();
     ctx.globalAlpha=1;
 
+    // net label on candle body
+    const netLabel=(net>=0?'+':'')+Math.round(net).toLocaleString('en-IN');
+    ctx.font=`600 10px 'DM Mono',monospace`;
+    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    const labelX=Math.min(Math.max(netX, floorX+24), W-36);
+    ctx.fillText(netLabel, labelX, midY);
+
     // danger glow on bar
     $('riskBar').style.boxShadow = danger
         ? '0 0 0 1px rgba(239,68,68,0.5),0 0 20px rgba(239,68,68,0.12)'
@@ -1079,13 +1103,40 @@ function selectTrade(t){
         row.classList.toggle('dimmed',!match);
         if(match)row.scrollIntoView({block:'nearest',behavior:'smooth'});
     });
-    setTimeout(redrawMarkers,30);
+    // switch chart to day candle source (same as backtest)
+    loadDayChart();
+}
+
+async function loadDayChart(){
+    try{
+        const data=await fetch('./webdaypxy.json?_='+Date.now()).then(r=>r.json());
+        // parse same way as backtest parseSplit
+        let candles=[];
+        if(Array.isArray(data)){
+            candles=data.map(r=>({
+                t:r.time||r.timestamp||null,
+                c:r.Close??r.close,
+                st:r.st??null
+            }));
+        }else if(data.columns){
+            const ci=k=>data.columns.indexOf(k);
+            const C=ci('Close'),ST=ci('st');
+            candles=data.index.map((ts,i)=>({t:ts,c:data.data[i][C],st:ST>=0?data.data[i][ST]:null}));
+        }
+        chartCandles=candles;
+        chartSliceStart=0;
+        const closes=candles.map(d=>d.c);
+        const st=candles.map(d=>d.st);
+        if(closes.length){ drawChart(closes,st); setTimeout(redrawMarkers,80); }
+    }catch(e){console.error('dayChart',e);}
 }
 
 function clearSelection(){
     activeTrade=null;
     document.querySelectorAll('.t-row').forEach(r=>r.classList.remove('active','dimmed'));
     const svg=$('markerLayer');if(svg)svg.innerHTML='';
+    // restore default chart source
+    loadChart();
 }
 
 /* ── RESIZE — redraw momentum candle when panel resizes ── */
@@ -1104,10 +1155,32 @@ new ResizeObserver(()=>{
     loadRisk();
 }).observe($('riskBar'));
 
-/* ── LOGO REFRESH ── */
+/* ── LOGO → PXYUPDATE ── */
 $('logoRefresh').addEventListener('click',()=>{
-    loadDash();loadChart();loadPos();loadTrades();loadRisk();
+    const p=$('updPopup');
+    p.style.display='flex';
+    setTimeout(()=>$('updPwd').focus(),80);
 });
+function cancelUpdate(){
+    $('updPopup').style.display='none';
+    $('updPwd').value='';
+}
+function confirmUpdate(){
+    const pwd=$('updPwd').value.trim();
+    if(!pwd)return;
+    $('updPopup').style.display='none';
+    $('updPwd').value='';
+    const logo=$('logoRefresh');
+    const orig=logo.innerHTML;
+    logo.innerHTML='⏳';
+    fetch('/run/pxyupdate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pwd})})
+    .then(r=>r.json())
+    .then(d=>{
+        logo.innerHTML=d.ok?'✓':'✗';
+        setTimeout(()=>{logo.innerHTML=orig;},2500);
+    })
+    .catch(()=>{logo.innerHTML='✗';setTimeout(()=>{logo.innerHTML=orig;},2500);});
+}
 loadDash();loadChart();loadPos();loadTrades();loadRisk();initTerminal();
 setInterval(loadDash,   3000);
 setInterval(loadChart,  3000);
