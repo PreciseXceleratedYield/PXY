@@ -165,9 +165,10 @@ def start_trailing_engine():
             exit_display_str = f"{sign_prefix}{active_exit_line / 1000.0:.1f}k"
         
         print(
-            f"📊 Net: {Fore.YELLOW}₹{current_net_pnl:,.0f}{Style.RESET_ALL} | "
-            f"Peak: {Fore.GREEN}₹{session_peak_pnl:,.0f}{Style.RESET_ALL} | "
-            f"Exit @{Fore.RED}{Style.BRIGHT}{exit_display_str}{Style.RESET_ALL}"
+            f"Exit @{Fore.RED}{Style.BRIGHT}{exit_display_str}{Style.RESET_ALL} |"
+            f"📊 Net: {Fore.GREEN}₹{current_net_pnl:,.0f}{Style.RESET_ALL} | "
+            f"Peak: {Fore.YELLOW}₹{session_peak_pnl:,.0f}{Style.RESET_ALL} "
+
         )
         
         # -------- TRIGGER AND BREAK LOGIC TIMELINE --------
