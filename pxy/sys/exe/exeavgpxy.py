@@ -145,7 +145,7 @@ def handle_side_averaging(client, df):
                 dynamic_threshold = -(FIXED_ATR_PCT / float(abs_factor))
             else:
                 # Heavier side: MULTIPLY fixed baseline by absolute difference
-                dynamic_threshold = -(FIXED_ATR_PCT * float(abs_factor))
+                dynamic_threshold = -(FIXED_ATR_PCT * (float(abs_factor)/2))
 
             last_calculated_threshold = dynamic_threshold
 
