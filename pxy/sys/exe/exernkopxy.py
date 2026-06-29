@@ -92,7 +92,7 @@ def enforce_morning_time_gate():
         
         # Define strict absolute boundary markers
         gate_start = dt_time(9, 0, 0)
-        gate_end = dt_time(9, 15, 0)
+        gate_end = dt_time(9, 16, 0)
         
         # 🛡️ PHASE 1: Pre-9:00 AM Early Morning Holding Pattern
         if now_time < gate_start:
@@ -106,7 +106,7 @@ def enforce_morning_time_gate():
         # 🛡️ PHASE 2: 09:00 AM to 09:29:59 AM Strict Time Gate Lockout
         elif gate_start <= now_time < gate_end:
             sys.stdout.write(
-                f"\r⏳ {Fore.YELLOW}TIME GATE ACTIVE: System locked from 09:00 to 09:15 AM IST. "
+                f"\r⏳ {Fore.YELLOW}TIME GATE ACTIVE: System locked from 09:00 to 09:16 AM IST. "
                 f"Current Time: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}    "
             )
             sys.stdout.flush()
