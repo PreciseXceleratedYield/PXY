@@ -107,7 +107,7 @@ def handle_side_averaging(client, df):
         ce_lots, pe_lots = 0, 0
     
     # Calculate pure absolute lot spread (forces absolute floor layer of 1)
-    raw_difference = abs(ce_lots - pe_lots)
+    raw_difference = abs(ce_lots - pe_lots) + 1
     abs_factor = max(1, raw_difference)
 
     # Establish independent lesser vs heavier directional designations
