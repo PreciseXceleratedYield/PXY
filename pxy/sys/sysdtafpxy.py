@@ -17,49 +17,48 @@ def apply_ohlc_transformation(df, mode=1):
     # Mode 1 is strictly pure raw candles (No alterations)
     return df
 
-def detect_oc2_patterns(df):
+def transform_to_oc2_candles(df):
     """
-    Detects Bullish and Bearish OC/2 patterns based on Body Open/Close relationships.
-    Adds 'OC2_Signal' column: 1 for Bullish, -1 for Bearish, 0 for None.
+    Transforms the OHLC structure into custom OC/2 candles:
+    - Present Open  = Previous Candle's (Open + Close) / 2
+    - Present Close = Present Candle's (Open + Close) / 2
     """
     if df.empty or len(df) < 2:
-        df['OC2_Signal'] = 0
         return df
 
-    # Shifted values to reference the previous candle (candle 1)
-    prev_open = df['Open'].shift(1)
-    prev_close = df['Close'].shift(1)
-    
-    current_open = df['Open']
-    current_close = df['Close']
+    # 1. Calculate raw midpoints for every row
+    raw_midpoint = (df['Open'] + df['Close']) / 2
 
-    # Define bullish and bearish states for candles
-    is_prev_bearish = prev_close < prev_open
-    is_prev_bullish = prev_close > prev_open
-    is_curr_bullish = current_close > current_open
-    is_curr_bearish = current_close < current_open
+    # 2. Map the structural modifications
+    df['Custom_Close'] = raw_midpoint
+    df['Custom_Open'] = raw_midpoint.shift(1)  # The present open is the previous candle's OC/2
 
-    # OC/2 Logic Conditions
-    # Bullish: Previous was Red, Current is Green, Current Open <= Previous Close, Current Close >= Previous Open
-    bullish_oc2 = is_prev_bearish & is_curr_bullish & (current_open <= prev_close) & (current_close >= prev_open)
-    
-    # Bearish: Previous was Green, Current is Red, Current Open >= Previous Close, Current Close <= Previous Open
-    bearish_oc2 = is_prev_bullish & is_curr_bearish & (current_open >= prev_close) & (current_close <= prev_open)
+    # 3. Clean up the very first row since it won't have a previous candle
+    # Using .iloc[0] safely updates the fallback using native raw open price
+    df.iloc[0, df.columns.get_loc('Custom_Open')] = df.iloc[0, df.columns.get_loc('Open')]
 
-    # Initialize signal array
-    conditions = [bullish_oc2, bearish_oc2]
-    choices = [1, -1] # 1 = Bullish OC/2, -1 = Bearish OC/2
-    
-    df['OC2_Signal'] = np.select(conditions, choices, default=0)
+    # 4. Readjust High and Low so wicks don't cut through the newly calculated body boundaries
+    df['Custom_High'] = df[['High', 'Custom_Open', 'Custom_Close']].max(axis=1)
+    df['Custom_Low'] = df[['Low', 'Custom_Open', 'Custom_Close']].min(axis=1)
+
+    # 5. Overwrite the standard OHLC columns so your downstream system reads the clean custom candles natively
+    df['Open'] = df['Custom_Open']
+    df['High'] = df['Custom_High']
+    df['Low'] = df['Custom_Low']
+    df['Close'] = df['Custom_Close']
+
+    # 6. Drop temporary columns to keep the final output DataFrame clean
+    df.drop(columns=['Custom_Open', 'Custom_High', 'Custom_Low', 'Custom_Close'], inplace=True)
+
     return df
 
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
-    """DYNAMIC HISTORICAL SLICE RETRIEVAL ENGINE FOR RAW MODE 1 DATA WITH OC/2 DETECTION"""
+    """DYNAMIC HISTORICAL SLICE RETRIEVAL ENGINE FOR CUSTOM OC/2 MATHEMATICAL CANDLES"""
     ticker_obj = yf.Ticker(TICKER)
     df = pd.DataFrame()
     
-    # Warmup window to accommodate the 42 SMA calculation smoothly
-    buffer_rows = target_rows + 45
+    # Warmup window adjusted (+47) to accommodate both SMA_42 and the candle .shift(1) smoothly
+    buffer_rows = target_rows + 47
 
     if period is not None:
         try:
@@ -92,11 +91,10 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
         
     processed_df = apply_ohlc_transformation(df.copy(), mode=OHLC_MODE)
     
-    # Calculate 42 SMA directly on the raw closing prices
+    # Calculate 42 SMA directly on the raw closing prices before custom candle transformation
     processed_df['SMA_42'] = processed_df['Close'].rolling(window=42).mean()
     
-    # Inject the OC/2 pattern detection before slicing out the final tails
-    processed_df = detect_oc2_patterns(processed_df)
+    # Apply your custom OC/2 candle transformation to the matrix
+    processed_df = transform_to_oc2_candles(processed_df)
     
     return processed_df.tail(target_rows)
-
