@@ -268,6 +268,18 @@ body{
 #tradeScroll .t-meta{color:rgba(91,100,120,0.7);}
 .empty-msg{padding:20px 8px;text-align:center;color:var(--muted);font-size:10px;letter-spacing:0.06em;}
 
+#hDivider{
+    width:5px;flex-shrink:0;cursor:col-resize;
+    background:var(--bg);border-right:1px solid var(--border);
+    position:relative;transition:background 0.2s;
+}
+#hDivider:hover{background:var(--bg3);}
+#hDivider::after{
+    content:'';position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    width:2px;height:36px;background:var(--border2);border-radius:2px;
+}
+
 /* TERMINAL */
 #termWrap{
     width:var(--w-terminal);flex-shrink:0;
@@ -302,7 +314,7 @@ body{
 .bot-pnl.bear{color:var(--bear);}
 #brand{
     flex:1;font-family:'Syne',sans-serif;font-weight:800;
-    font-size:clamp(5px,0.6vw,7px);letter-spacing:0.12em;
+    font-size:clamp(10px,1.2vw,14px);letter-spacing:0.12em;
     color:var(--muted);text-align:center;transition:all 0.3s;
 }
 #brand sup{font-size:0.5em;vertical-align:super;color:var(--accent);}
@@ -338,8 +350,6 @@ body{
 
 @keyframes flashG{0%,100%{color:var(--bull);text-shadow:0 0 16px rgba(34,197,94,0.7);}50%{color:rgba(34,197,94,0.25);text-shadow:none;}}
 @keyframes flashR{0%,100%{color:var(--bear);text-shadow:0 0 16px rgba(239,68,68,0.7);}50%{color:rgba(239,68,68,0.25);text-shadow:none;}}
-@keyframes flashW{0%,100%{color:rgba(255,255,255,0.7);}50%{color:rgba(255,255,255,0.12);}}
-#brand{animation:flashW 2.4s ease-in-out infinite;}
 #brand.bos-bull{animation:flashG 0.9s infinite;}
 #brand.bos-bear{animation:flashR 0.9s infinite;}
 #clk{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0;}
@@ -444,6 +454,8 @@ body{
         <div id="termBox"></div>
     </div>
 
+    <div id="hDivider"></div>
+
     <!-- CHART -->
     <div id="chartWrap">
         <!-- Momentum candle shares chart column space -->
@@ -474,6 +486,7 @@ body{
                 <span class="pw-sort" onclick="sortTrd('tag')">#Tag ↕</span>
                 <span class="pw-sort" onclick="sortTrd('sym')">Sym ↕</span>
                 <span class="pw-sort" onclick="sortTrd('pnl')">P&amp;L ↕</span>
+                <span class="pw-sort" id="dlTrades" title="Download trades JSON" style="flex:0 0 auto;color:var(--accent);">⬇</span>
             </div>
             <div id="tradeScroll"><div class="empty-msg" id="tradeEmpty">No trades</div></div>
         </div>
@@ -484,7 +497,7 @@ body{
 <!-- ══ RISK BAR ══ -->
 <div id="riskBar">
     <div class="rsk-group rsk-net">
-        <span class="rsk-lbl">💰 Net P&L</span>
+        <span class="rsk-lbl">⛔ Loss Threshold</span>
         <span class="rsk-val" id="rskNet">—</span>
     </div>
     <div class="rsk-candle-wrap">
@@ -553,6 +566,31 @@ $('themeToggle').addEventListener('click',()=>{
     // redraw momentum candle on theme change
     if(lastMoSt&&lastMoCloses) drawMomentumBar(lastMoSt, lastMoCloses);
 });
+
+/* ── DIVIDER DRAG (terminal ↔ chart) ── */
+const hDivider=$('hDivider'), termWrapEl=$('termWrap');
+let hDragging=false;
+hDivider.addEventListener('mousedown',()=>{hDragging=true;document.body.style.cursor='col-resize';});
+window.addEventListener('mouseup',()=>{hDragging=false;document.body.style.cursor='';});
+window.addEventListener('mousemove',e=>{
+    if(!hDragging)return;
+    const bodyRect=$('body')?.getBoundingClientRect?.()||document.getElementById('body').getBoundingClientRect();
+    const newW=e.clientX-bodyRect.left;
+    if(newW<120||newW>bodyRect.width*0.6)return;
+    termWrapEl.style.width=newW+'px';
+    if(chart)chart.resize();
+});
+hDivider.addEventListener('touchstart',()=>{hDragging=true;},{passive:true});
+window.addEventListener('touchend',()=>{hDragging=false;});
+window.addEventListener('touchmove',e=>{
+    if(!hDragging)return;
+    const t=e.touches[0];
+    const bodyRect=document.getElementById('body').getBoundingClientRect();
+    const newW=t.clientX-bodyRect.left;
+    if(newW<120||newW>bodyRect.width*0.6)return;
+    termWrapEl.style.width=newW+'px';
+    if(chart)chart.resize();
+},{passive:true});
 
 /* ── CLOCK ── */
 function tick(){$('clk').textContent=new Date().toLocaleTimeString('en-IN',{hour12:false});}
@@ -843,9 +881,11 @@ async function loadPos(){
 let trCol='pnl',trAsc=false;
 function sortTrd(col){trCol===col?trAsc=!trAsc:(trCol=col,trAsc=false);loadTrades();}
 
+let lastTradesData=[];
 async function loadTrades(){
     let data=[];
     try{data=await fetch('./webpnlpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    lastTradesData=data;
     const total=data.reduce((s,d)=>s+(d.PNL||0),0);
     const bull=total>=0;
     const te=$('ptTradesPnl');te.textContent=fmt(total);te.className='bot-pnl '+(bull?'bull':'bear');
@@ -904,8 +944,8 @@ async function loadRisk(){
     const fmtR = n=>(n>=0?'+':'')+Math.round(n).toLocaleString('en-IN');
     $('rskPeak').textContent = '₹'+Math.round(peak).toLocaleString('en-IN');
     $('rskPeak').className   = 'rsk-val '+(peak>=0?'bull':'bear');
-    $('rskNet').textContent  = '₹'+fmtR(net);
-    $('rskNet').className    = 'rsk-val '+(net>=0?'bull':'bear');
+    $('rskNet').textContent  = '₹'+Math.round(floor).toLocaleString('en-IN');
+    $('rskNet').className    = 'rsk-val bear';
 
     drawRiskCandle(floor, net, peak);
 }
@@ -980,11 +1020,11 @@ function drawRiskCandle(floor, net, peak){
     ctx.fillStyle='rgba(255,255,255,0.12)';
     ctx.beginPath(); ctx.roundRect(bx1+2, midY-bodyH/2+2, Math.max(bW-4,2), Math.max(bodyH*0.3,2), 2); ctx.fill();
 
-    // net label centred on candle body
+    // net label centred on candle body — contrast-aware color
     const netLabel = (net>=0?'+':'')+Math.round(net).toLocaleString('en-IN');
     const fontSize = Math.round(Math.min(14, Math.max(10, H*0.28)));
     ctx.font = `800 ${fontSize}px 'Syne',sans-serif`;
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = isBull ? '#06160d' : '#ffffff'; // dark navy on green, white on red
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const labelX = (bx1 + bx2) / 2;
@@ -1000,16 +1040,26 @@ function drawRiskCandle(floor, net, peak){
 /* ── TRADE SELECTION + MARKERS ── */
 let activeTrade = null;
 
+function parseAnyTs(raw){
+    if(raw==null)return NaN;
+    let s=String(raw).trim();
+    if(!s)return NaN;
+    s=s.replace(' ','T');
+    if(!/[zZ]|[+-]\d\d:?\d\d$/.test(s)) s+='+05:30'; // assume IST if no tz
+    const ms=new Date(s).getTime();
+    return ms;
+}
+
 function tsToIndex(ts){
     // match trade timestamp to nearest candle in the displayed slice
-    const tradeStr = String(ts||'').trim().replace(' ','T');
-    const tradeMs  = new Date(tradeStr.includes('+')?tradeStr:tradeStr+'+05:30').getTime();
+    const tradeMs  = parseAnyTs(ts);
     const slice    = chartCandles.slice(chartSliceStart);
     let best=0, bestDiff=Infinity;
     slice.forEach((c,i)=>{
-        const t=c.t||c.time||c.timestamp||c.datetime||c.date||null;
-        if(!t)return;
-        const candleMs=new Date(String(t).trim().replace(' ','T').includes('+')?String(t).trim().replace(' ','T'):String(t).trim().replace(' ','T')+'+05:30').getTime();
+        const t=c.t??c.time??c.timestamp??c.datetime??c.date??null;
+        if(t==null)return;
+        const candleMs=parseAnyTs(t);
+        if(isNaN(candleMs))return;
         const d=Math.abs(candleMs-tradeMs);
         if(d<bestDiff){bestDiff=d;best=i;}
     });
@@ -1130,7 +1180,7 @@ async function loadDayChart(){
         chartSliceStart=0;
         const closes=candles.map(d=>d.c);
         const st=candles.map(d=>d.st);
-        if(closes.length){ drawChart(closes,st,true); setTimeout(redrawMarkers,80); }
+        if(closes.length){ drawChart(closes,st,true); setTimeout(redrawMarkers,150); setTimeout(redrawMarkers,400); }
     }catch(e){console.error('dayChart',e);}
 }
 
@@ -1157,6 +1207,16 @@ new ResizeObserver(()=>{
     const c=$('rskCanvas');if(c)c.dispatchEvent(new Event('resize'));
     loadRisk();
 }).observe($('riskBar'));
+
+/* ── DOWNLOAD TRADES JSON ── */
+$('dlTrades').addEventListener('click',()=>{
+    const blob=new Blob([JSON.stringify(lastTradesData,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url; a.download='webpnlpxy_'+Date.now()+'.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+});
 
 /* ── LOGO → PXYUPDATE ── */
 $('logoRefresh').addEventListener('click',()=>{
