@@ -8,21 +8,22 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 ATR_PERIOD = 14
-K_MIN = 1
-K_MAX = 3
+K_MIN = 1.0
+K_MAX = 3.0
 TOTAL_WIDTH = 42
-MIN_FLOOR = 5 # Adjusted: New production absolute floor layer
 
-# Production scale anchors
+# Production boundaries & safety fallbacks
+MIN_FLOOR = 6.0         # Locked: Absolute minimum ceiling/floor floor
+MAX_CEILING = 12.0      # Locked: Absolute maximum ceiling
+FALLBACK_ATR = 8.0      # Updated: Target safety anchor for errors/missing data
+
+# Production scale anchors for dynamic K (Synchronized with ATR limits)
 ATR_SCALE_MIN = 6.0
 ATR_SCALE_MAX = 12.0
-
-# Synchronized fallback safety anchors for errors or missing data
-FALLBACK_ATR = 9
 FALLBACK_K = 2.0
 
 def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
-    # Return a safe series containing fallback defaults if dataframe is unusable
+    """Calculates session-isolated rolling ATR with strict 6.0-12.0 bounding and 8.0 fallback."""
     if df is None or df.empty or len(df) < 1:
         return pd.Series([float(FALLBACK_ATR)])
     
@@ -32,10 +33,11 @@ def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
     if not isinstance(df_local.index, pd.DatetimeIndex):
         df_local.index = pd.to_datetime(df_local.index)
         
-    # Guard against missing essential columns
+    # Standardize column casing to prevent runtime KeyErrors
+    df_local.columns = [col.capitalize() for col in df_local.columns]
     required_cols = ['High', 'Low', 'Close']
+    
     if not all(col in df_local.columns for col in required_cols):
-        # FIXED: Added fallback 'None' to the ternary operator
         return pd.Series([float(FALLBACK_ATR)], index=df_local.index if not df_local.empty else None)
         
     high, low, close = df_local['High'], df_local['Low'], df_local['Close']
@@ -55,10 +57,11 @@ def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
         lambda x: x.rolling(window=period, min_periods=1).mean()
     )
     
-    # FIXED: If the market flatlines or values are NaN, it safely drops down to your floor of 5.
-    return atr.apply(lambda x: float(MIN_FLOOR) if (x == 0 or pd.isna(x)) else max(float(MIN_FLOOR), x))
+    # Floor, Ceiling, and NaN safety mapping (Strictly bounds output between 6.0 and 12.0)
+    return atr.apply(lambda x: float(FALLBACK_ATR) if pd.isna(x) or x == 0 else max(MIN_FLOOR, min(MAX_CEILING, float(x))))
 
 def calculate_dynamic_k(df: pd.DataFrame, atr_period=ATR_PERIOD, k_min=K_MIN, k_max=K_MAX) -> float:
+    """Calculates inverse exponential K value scaled safely against latest ATR."""
     if df is None or df.empty:
         return FALLBACK_K
         
@@ -68,18 +71,20 @@ def calculate_dynamic_k(df: pd.DataFrame, atr_period=ATR_PERIOD, k_min=K_MIN, k_
         
     latest_atr = atr_series.iloc[-1]
     
-    # FIXED: In the event of a data problem or a 0 value, return safe fallback baseline K of 2.0
+    # In the event of a data problem or a 0 value, return safe fallback baseline K
     if pd.isna(latest_atr) or latest_atr == 0:
         return FALLBACK_K
         
-    # Strictly cap input ATR parameters between 6 and 12
+    # Strictly cap input ATR parameters between production anchors
     clamped_atr = max(ATR_SCALE_MIN, min(latest_atr, ATR_SCALE_MAX))
     
     # Normalized position between 0.0 and 1.0
     norm_atr = (clamped_atr - ATR_SCALE_MIN) / (ATR_SCALE_MAX - ATR_SCALE_MIN)
     
-    # Exponential scaling logic using natural base (e) growth
-    k_dynamic = k_min + (k_max - k_min) * ((np.exp(norm_atr) - 1) / (np.e - 1))
+    # Inverse exponential scaling logic
+    # Low Volatility (norm_atr -> 0) yields K_MAX
+    # High Volatility (norm_atr -> 1) yields K_MIN
+    k_dynamic = k_max - (k_max - k_min) * ((np.exp(norm_atr) - 1) / (np.e - 1))
     
     return round(k_dynamic, 2)
 
@@ -97,7 +102,7 @@ if __name__ == "__main__":
         val = atr_series.iloc[-1] if not atr_series.empty else float(FALLBACK_ATR)
         
         # Check if calculated value is invalid; if so, trigger fallback layout
-        if pd.isna(val) or val == 0:
+        if pd.isna(val) or val == 0 or len(atr_series) <= 1:
             val = float(FALLBACK_ATR)
             dynamic_k = FALLBACK_K
             
@@ -107,8 +112,8 @@ if __name__ == "__main__":
         spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
         print(left_text + spacing + right_text)
     else:
-        # FIXED: Synchronized static empty workspace layout to match requested fallback parameters
-        left_text = f"ATR:{FALLBACK_ATR}"
+        # Synchronized static empty workspace layout
+        left_text = f"ATR:{int(FALLBACK_ATR)}"
         right_text = f"K:{FALLBACK_K}"
         spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
         print(left_text + spacing + right_text)
