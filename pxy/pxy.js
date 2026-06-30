@@ -34,7 +34,7 @@ app.get('/', (req, res) => {
    ========================= */
 const ALLOWED_SCRIPTS = [
     'pxyupdate',
-    'pxysqrce',   
+    'pxysqrall',   
     'pxybuyce',
     'pxybuype',
     'pxysqrce',
