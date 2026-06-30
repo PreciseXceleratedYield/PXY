@@ -13,7 +13,7 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 5
+MAX_LAYERS = 3
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
 FIXED_ATR_PCT = 10.0    # 🎯 Hardcoded baseline ATR percentage set exactly to 10%
 
@@ -98,7 +98,9 @@ def handle_side_averaging(client, df):
 
     # Live position string extraction matching your exact upstream format
     pos_raw = str(get_position_summary(client)).upper().strip()
-    match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
+    
+    # 🔍 Extract lots from format (e.g., "3CE2PE EXIT BULL" or "3CE2PE")
+    match = re.search(r'(\d+)CE(\d+)PE', pos_raw)
     
     if match:
         ce_lots = int(match.group(1))
@@ -107,7 +109,7 @@ def handle_side_averaging(client, df):
         ce_lots, pe_lots = 0, 0
     
     # Calculate pure absolute lot spread (forces absolute floor layer of 1)
-    raw_difference = abs(ce_lots - pe_lots) + 1
+    raw_difference = abs(ce_lots - pe_lots)
     abs_factor = max(1, raw_difference)
 
     # Establish independent lesser vs heavier directional designations
@@ -119,13 +121,19 @@ def handle_side_averaging(client, df):
         ce_is_lesser, pe_is_lesser = False, False  # Balanced state
 
     # Clean system telemetry message stream line
-    print(f"{Fore.CYAN}📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Factor:{abs_factor}")
+    print(f"{Fore.CYAN}   📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Applied ABS Factor: {abs_factor} | Status: {pos_raw}")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
 
     for side in ['CE', 'PE']: 
+        # 🚨 STRICT STRATEGY DIRECTION LOCKS 🚨
+        if side == "CE" and "EXIT BULL" not in pos_raw:
+            continue
+        if side == "PE" and "EXIT BEAR" not in pos_raw:
+            continue
+
         side_df = df[df['side'] == side] 
         if side_df.empty: 
             continue 
@@ -145,7 +153,7 @@ def handle_side_averaging(client, df):
                 dynamic_threshold = -(FIXED_ATR_PCT / float(abs_factor))
             else:
                 # Heavier side: MULTIPLY fixed baseline by absolute difference
-                dynamic_threshold = -(FIXED_ATR_PCT * (float(abs_factor)/2))
+                dynamic_threshold = -(FIXED_ATR_PCT * float(abs_factor))
 
             last_calculated_threshold = dynamic_threshold
 
@@ -182,8 +190,7 @@ def handle_side_averaging(client, df):
                     res = client.place_order(**params) 
                     if res: 
                         set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED.") 
+                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Upstream Subdirectory Module.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
-
 
