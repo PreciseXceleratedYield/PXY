@@ -5,8 +5,9 @@ import pytz
 from datetime import datetime, time as dt_time 
 from colorama import Fore, Style, init
 
-# 🔍 Routing package path into the "run" subdirectory explicitly
+# 🔍 Routing package paths into the "run" and local directories explicitly
 from run.runpchkpxy import get_position_summary
+from syskatrpxy import calculate_atr  # Added indicator module link
 
 # Initialize colorama for clean terminal output formatting
 init(autoreset=True)
@@ -14,8 +15,8 @@ init(autoreset=True)
 # --- CONFIG --- 
 REBUY_ENABLED = True 
 MAX_LAYERS = 3
-COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-FIXED_ATR_PCT = 10.0    # 🎯 Hardcoded baseline ATR percentage set exactly to 10%
+COOL_DOWN_SECONDS = 60  
+FALLBACK_ATR = 9.0  # Dynamic default baseline if data source fails entirely
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -61,19 +62,19 @@ def get_loss(row):
     ltp = safe_float(row.get("sell_prc", 0.0)) 
     return ((ltp - entry) / entry) * 100 if entry > 0 else 0 
 
-def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, abs_factor):
+def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, visual_factor):
     """Renders a strict 42-character width dashboard upon an order trigger event."""
     width = 42
     border = Fore.YELLOW + "=" * width
     divider = Fore.RED + "-" * width
-    header_text = "🚨 PXY® ABSOLUTE GEOMETRY TRIGGERED 🚨"
+    header_text = "🚨 PXY® DYNAMIC ATR RATIO TRIGGERED 🚨"
     
     print("\n" + border)
     print(Fore.WHITE + header_text.center(width - 2, " ")) 
     print(divider)
     print(Fore.WHITE + f" • SYMBOL       : {symbol}".ljust(width))
     print(Fore.WHITE + f" • SIDE OPTION   : {side} ({ce_count}CE vs {pe_count}PE)".ljust(width))
-    print(Fore.WHITE + f" • BALANCE FACTOR: {abs_factor}".ljust(width))
+    print(Fore.WHITE + f" • SMOOTH FACTOR : {visual_factor:.2f}".ljust(width))
     
     loss_str = f" • TRIGGER LOSS  : {current_loss:.2f}%"
     loss_pad = " " * max(0, width - len(loss_str))
@@ -86,8 +87,8 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(width))
     print(border + "\n")
 
-def handle_side_averaging(client, df): 
-    """Averages positions scaling thresholds dynamically via upstream lot layout regex parsing.""" 
+def handle_side_averaging(client, df, hist_df=None): 
+    """Averages positions scaling thresholds dynamically via upstream lot ratio proportional scaling and dynamic ATR.""" 
     if df is None or df.empty: 
         return 
         
@@ -96,30 +97,34 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
+    # 📈 Resolve dynamic baseline percentage via incoming historical price dataframe
+    try:
+        if hist_df is not None and not hist_df.empty:
+            atr_series = calculate_atr(hist_df)
+            raw_atr = atr_series.iloc[-1] if not atr_series.empty else FALLBACK_ATR
+            # Secure clamping strictly bounded between min 6.0 and max 12.0
+            dynamic_base_pct = max(6.0, min(safe_float(raw_atr, FALLBACK_ATR), 12.0))
+        else:
+            dynamic_base_pct = FALLBACK_ATR
+    except Exception:
+        dynamic_base_pct = FALLBACK_ATR
+
     # Live position string extraction matching your exact upstream format
     pos_raw = str(get_position_summary(client)).upper().strip()
     match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
     
     if match:
-        ce_lots = int(match.group(1))
-        pe_lots = int(match.group(2))
+        raw_ce = int(match.group(1))
+        raw_pe = int(match.group(2))
     else:
-        ce_lots, pe_lots = 0, 0
+        raw_ce, raw_pe = 0, 0
     
-    # Calculate pure absolute lot spread (forces absolute floor layer of 1)
-    raw_difference = abs(ce_lots - pe_lots)
-    abs_factor = raw_difference + 1
-
-    # Establish independent lesser vs heavier directional designations
-    if ce_lots < pe_lots:
-        ce_is_lesser, pe_is_lesser = True, False
-    elif pe_lots < ce_lots:
-        ce_is_lesser, pe_is_lesser = False, True
-    else:
-        ce_is_lesser, pe_is_lesser = False, False  # Balanced state
-
+    # 📈 Always add +1 to both sides for smooth scaling calculations
+    ce_lots = raw_ce + 1
+    pe_lots = raw_pe + 1
+    
     # Clean system telemetry message stream line
-    print(f"{Fore.CYAN}   📢 Lots: {ce_lots}CE vs {pe_lots}PE | Factor: {abs_factor}")
+    print(f"{Fore.CYAN}   📢 Grid Shift: {raw_ce}CE vs {raw_pe}PE | Dynamic Base: {dynamic_base_pct:.2f}%")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
@@ -133,11 +138,13 @@ def handle_side_averaging(client, df):
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
 
-        # Assign corresponding weight metrics for current evaluation loop step
-        side_is_lesser = ce_is_lesser if side == "CE" else pe_is_lesser
+        # Proportional ratio calculations are safe with shifted counts
+        if side == "CE":
+            side_factor = ce_lots / pe_lots
+        else:
+            side_factor = pe_lots / ce_lots
 
         for index, row in side_df.iterrows():
-            # 🚨 STATED CONDITION: Filter matching row-level 'exit' fields 🚨
             row_exit = str(row.get('exit', '')).upper().strip()
             if side == "CE" and row_exit != "BULL":
                 all_positions_crossed_threshold = False
@@ -148,14 +155,8 @@ def handle_side_averaging(client, df):
 
             pos_loss = get_loss(row)
             
-            # --- EVALUATE MATRIX CALCULATIONS VIA 10% FIXED BASE ---
-            if side_is_lesser or abs_factor == 1:
-                # Lesser side or balanced: DIVIDE fixed baseline by absolute difference
-                dynamic_threshold = -(FIXED_ATR_PCT / float(abs_factor))
-            else:
-                # Heavier side: MULTIPLY fixed baseline by absolute difference
-                dynamic_threshold = -(FIXED_ATR_PCT * float(abs_factor))
-
+            # --- EVALUATE MATRIX CALCULATIONS VIA DYNAMIC ATR SMOOTHED RATIO ---
+            dynamic_threshold = -(dynamic_base_pct * side_factor)
             last_calculated_threshold = dynamic_threshold
 
             if pos_loss > dynamic_threshold:
@@ -173,7 +174,8 @@ def handle_side_averaging(client, df):
                 
                 final_loss = get_loss(last_order)
                 
-                print_pxy_trigger_dashboard(side, symbol, final_loss, last_calculated_threshold, new_tag, ce_lots, pe_lots, abs_factor)
+                # Pass counts to dashboard for verification
+                print_pxy_trigger_dashboard(side, symbol, final_loss, last_calculated_threshold, new_tag, raw_ce, raw_pe, side_factor)
                 
                 try: 
                     params = { 
@@ -191,7 +193,8 @@ def handle_side_averaging(client, df):
                     res = client.place_order(**params) 
                     if res: 
                         set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Upstream Subdirectory Module.") 
+                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Dynamic Clamped ATR Engine.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+
 
