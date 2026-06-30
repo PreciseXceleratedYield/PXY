@@ -8,7 +8,8 @@ Operational Rules Matrix:
 ===============================================================================
 """
 
-from sysexitpxy import detect_raw_direction
+# Import the signal function directly from your new geometric engine script
+from your_new_engine_filename import get_signal  # <-- Change to your actual file name
 from syscnfgpxy import TICKER
 import pandas as pd
 
@@ -22,13 +23,13 @@ def get_entry_signal(df=None):
         from sysdtafpxy import fetch_yf_data
         df = fetch_yf_data()
 
-    # 1. Fetch raw direction state directly from your sysexitpxy file engine
-    _, direction = detect_raw_direction(df)
+    # 1. Fetch raw direction state directly from your new engine file
+    direction, _ = get_signal(df)
 
     entry_signal = "NONE"
     exit_signal = "NONE"
 
-    # 2. MATCH AND ROUTE SHAPES UNCONDITIONALLY
+    # 2. MATCH AND ROUTE SHAPES UNCONDITIONALLY (Mapping UP/DOWN to BULL/BEAR)
     if direction == "UP":
         entry_signal = "ATMBUY"
         exit_signal = "BULL"
