@@ -75,18 +75,6 @@ def _print_console_bar(c1, c0, execution_state):
     YLW = "\033[1;93m"
     GRAY = "\033[90m"
 
-    min_val = min(c1, c0) - 2
-    max_val = max(c1, c0) + 2
-    scale_width = 20
-
-def _print_console_bar(c1, c0, execution_state):
-    """Renders the graphical console display profiling the active live running candle."""
-    RST = "\033[0m"
-    RED = "\033[91m"
-    GRN = "\033[92m"
-    YLW = "\033[1;93m"
-    GRAY = "\033[90m"
-
     min_val = min(int(c1), int(c0)) - 2
     max_val = max(int(c1), int(c0)) + 2
     scale_width = 20
@@ -104,14 +92,13 @@ def _print_console_bar(c1, c0, execution_state):
         (int(c1), f"CLOSED C1-{int(c1)}", "█", GRAY),
         (int(c0), f"ACTIVE C0-{int(c0)}", "█", state_color)  # Live tick visual anchor
     ]
-    rows.sort(key=lambda item: item, reverse=True)
+    rows.sort(key=lambda item: item[0], reverse=True)
 
     print(f"\n{YLW}=== GEOMETRIC ENGINE CONSOLE MONITOR (LIVE) ==={RST}")
     for val, label, marker, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
     print(f"       ACTIVE RUNNING CANDLE STATE: {state_color}{execution_state}{RST}")
-
 
 def log_sync_state(timestamp, signal_state, price):
     """Logs the active system state variables directly using live active parameters."""
@@ -170,7 +157,7 @@ def get_signal(df=None):
         else:
             execution_state = "NONE"
 
-    # --- 4. TELEMETRY MONITORING & STORAGE ---
+        # --- 4. TELEMETRY MONITORING & STORAGE ---
         if DEBUG:
             _print_console_bar(c1, c0, execution_state)
             
