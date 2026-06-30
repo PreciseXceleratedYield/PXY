@@ -97,7 +97,7 @@ def enforce_morning_time_gate():
         # 🛡️ PHASE 1: Pre-9:00 AM Early Morning Holding Pattern
         if now_time < gate_start:
             sys.stdout.write(
-                f"\r⏳ {Fore.CYAN}EARLY MORNING HOLD: Waiting for 09:00 AM market startup setup window. "
+                f"\r⏳ {Fore.CYAN}EHOLD"
                 f"Current Time: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}    "
             )
             sys.stdout.flush()
