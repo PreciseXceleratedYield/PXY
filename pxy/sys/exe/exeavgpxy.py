@@ -7,7 +7,6 @@ from colorama import Fore, Style, init
 
 # 🔍 Routing package paths into the "run" and local directories explicitly
 from run.runpchkpxy import get_position_summary
-from syskatrpxy import calculate_atr  # Added indicator module link
 
 # Initialize colorama for clean terminal output formatting
 init(autoreset=True)
@@ -97,15 +96,11 @@ def handle_side_averaging(client, df, hist_df=None):
     if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
         return 
 
-    # 📈 Resolve dynamic baseline percentage via incoming historical price dataframe
+    # 📈 Extract ATR directly from the dataframe column instead of an external file module
     try:
-        if hist_df is not None and not hist_df.empty:
-            atr_series = calculate_atr(hist_df)
-            raw_atr = atr_series.iloc[-1] if not atr_series.empty else FALLBACK_ATR
-            # Secure clamping strictly bounded between min 6.0 and max 12.0
-            dynamic_base_pct = max(6.0, min(safe_float(raw_atr, FALLBACK_ATR), 12.0))
-        else:
-            dynamic_base_pct = FALLBACK_ATR
+        raw_atr = safe_float(df.iloc[-1].get('atr', FALLBACK_ATR), FALLBACK_ATR)
+        # Secure clamping strictly bounded between min 6.0 and max 12.0
+        dynamic_base_pct = max(6.0, min(raw_atr, 12.0))
     except Exception:
         dynamic_base_pct = FALLBACK_ATR
 
