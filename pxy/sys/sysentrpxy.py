@@ -9,7 +9,7 @@ Operational Rules Matrix:
 """
 
 # Import the signal function directly from your new geometric engine script
-from your_new_engine_filename import get_signal  # <-- Change to your actual file name
+from sysmktpxy import get_signal  # <-- Change to your actual file name
 from syscnfgpxy import TICKER
 import pandas as pd
 
