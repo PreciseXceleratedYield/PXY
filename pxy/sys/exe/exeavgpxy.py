@@ -123,12 +123,22 @@ def handle_side_averaging(client, df, hist_df=None):
     ce_lots = raw_ce + 1
     pe_lots = raw_pe + 1
     
-    # Clean system telemetry message stream line
-    print(f"{Fore.CYAN}   📢 Grid Shift: {raw_ce}CE vs {raw_pe}PE | Dynamic Base: {dynamic_base_pct:.2f}%")
-
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
+
+    # 📊 38-Width Clean Telemetry Dashboard Matrix
+    ce_mult = 1.5 if (not df[df['side']=='CE'].empty and df[df['side']=='CE']['exit'].str.upper().str.strip().eq('BEAR').any()) else 1.0
+    pe_mult = 1.5 if (not df[df['side']=='PE'].empty and df[df['side']=='PE']['exit'].str.upper().str.strip().eq('BULL').any()) else 1.0
+    
+    tgt_ce = -(dynamic_base_pct * (ce_lots / pe_lots) * ce_mult)
+    tgt_pe = -(dynamic_base_pct * (pe_lots / ce_lots) * pe_mult)
+
+    print(Fore.YELLOW + "┌" + "─" * 36 + "┐")
+    print(Fore.CYAN + f"│ 🛰️  GRID: {raw_ce}CE vs {raw_pe}PE".ljust(37) + "│")
+    print(Fore.WHITE + f"│ 🟢 CE TARGET : {tgt_ce:.2f}%".ljust(37) + "│")
+    print(Fore.WHITE + f"│ 🔴 PE TARGET : {tgt_pe:.2f}%".ljust(37) + "│")
+    print(Fore.YELLOW + "└" + "─" * 36 + "┘")
 
     for side in ['CE', 'PE']: 
         side_df = df[df['side'] == side] 
@@ -146,17 +156,18 @@ def handle_side_averaging(client, df, hist_df=None):
 
         for index, row in side_df.iterrows():
             row_exit = str(row.get('exit', '')).upper().strip()
-            if side == "CE" and row_exit != "BULL":
-                all_positions_crossed_threshold = False
-                break
-            if side == "PE" and row_exit != "BEAR":
-                all_positions_crossed_threshold = False
-                break
+
+            # 🔄 Determine safety multiplier based on candle color state
+            signal_multiplier = 1.0
+            if side == "CE" and row_exit == "BEAR":
+                signal_multiplier = 1.5
+            elif side == "PE" and row_exit == "BULL":
+                signal_multiplier = 1.5
 
             pos_loss = get_loss(row)
             
             # --- EVALUATE MATRIX CALCULATIONS VIA DYNAMIC ATR SMOOTHED RATIO ---
-            dynamic_threshold = -(dynamic_base_pct * side_factor)
+            dynamic_threshold = -(dynamic_base_pct * side_factor * signal_multiplier)
             last_calculated_threshold = dynamic_threshold
 
             if pos_loss > dynamic_threshold:
@@ -196,5 +207,4 @@ def handle_side_averaging(client, df, hist_df=None):
                         print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Dynamic Clamped ATR Engine.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
-
 
