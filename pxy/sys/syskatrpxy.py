@@ -12,12 +12,12 @@ K_MIN = 1.0
 K_MAX = 3.0
 TOTAL_WIDTH = 42
 
-# Only keeping basic fallback constants if data is missing completely
-FALLBACK_ATR = 50.0      # Adjusted higher to better reflect a typical 14-candle sum baseline
+# Fallback constants if data is missing completely
+FALLBACK_ATR = 1.0      # Set to 1.0 since the new ratio hovers around 1.0 for an average candle
 FALLBACK_K = 2.0
 
 def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
-    """Calculates session-isolated custom 14-candle High-Low SUM with NO hard limits."""
+    """Calculates your custom relative volatility ratio: ((High - Low) * 14) / 14-Period Sum."""
     if df is None or df.empty or len(df) < 1:
         return pd.Series([float(FALLBACK_ATR)])
     
@@ -36,39 +36,43 @@ def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
         
     high, low = df_local['High'], df_local['Low']
     
-    # Pure High minus Low calculation (Direction and gaps are ignored)
+    # 1. Pure High minus Low calculation
     candle_range = high - low
     
     # Define date groups from index for session grouping
     date_groups = df_local.index.date
     
-    # Group rolling window SUM computations by session dates
-    atr = candle_range.groupby(date_groups, group_keys=False).apply(
+    # 2. Calculate the 14-period rolling sum
+    rolling_sum = candle_range.groupby(date_groups, group_keys=False).apply(
         lambda x: x.rolling(window=period, min_periods=1).sum()
     )
     
-    # Only map NaNs/zeros to fallback; no more floor or ceiling clamping
+    # 3. Apply your custom formula: (Current Range * 14) / Rolling Sum
+    # Replacing 0 with NaN temporarily to prevent division-by-zero errors
+    atr = (candle_range * 14) / rolling_sum.replace(0, np.nan)
+    
+    # Map NaNs back to fallback
     return atr.apply(lambda x: float(FALLBACK_ATR) if pd.isna(x) or x == 0 else float(x))
 
 def calculate_dynamic_k(df: pd.DataFrame, atr_period=ATR_PERIOD, k_min=K_MIN, k_max=K_MAX) -> float:
-    """Calculates inverse exponential K value scaled dynamically against the dataset's actual min/max."""
+    """Calculates inverse exponential K value scaled dynamically against the dataset's actual ratio range."""
     if df is None or df.empty:
         return FALLBACK_K
         
     atr_series = calculate_atr(df, period=atr_period)
-    if atr_series.empty:
+    if atr_series.empty or len(atr_series) < 2:
         return FALLBACK_K
         
-    latest_atr = atr_series.iloc[-1]
+    # Read from the just past closed candle (iloc[-2]) to avoid live repainting bugs
+    latest_atr = atr_series.iloc[-2] if len(atr_series) >= 2 else atr_series.iloc[-1]
     
     if pd.isna(latest_atr) or latest_atr == 0:
         return FALLBACK_K
         
-    # Dynamically find the min and max from your actual history instead of hardcoded 6.0 and 12.0
+    # Dynamically find the min and max from your actual history
     atr_scale_min = atr_series.min()
     atr_scale_max = atr_series.max()
     
-    # Avoid division by zero if all values are identical
     if atr_scale_max == atr_scale_min:
         return FALLBACK_K
         
@@ -86,24 +90,24 @@ if __name__ == "__main__":
     except Exception:
         df = None
         
-    if df is not None and not df.empty and len(df) >= 1:
+    if df is not None and not df.empty and len(df) >= 2:
         atr_series = calculate_atr(df)
         dynamic_k = calculate_dynamic_k(df)
         
-        val = atr_series.iloc[-1] if not atr_series.empty else float(FALLBACK_ATR)
+        # Pull the value of the just past closed candle (iloc[-2])
+        val = atr_series.iloc[-2]
         
-        if pd.isna(val) or val == 0 or len(atr_series) <= 1:
+        if pd.isna(val) or val == 0:
             val = float(FALLBACK_ATR)
             dynamic_k = FALLBACK_K
             
-        # Display the real un-clamped raw number
-        atr_display = int(np.round(val))
-        left_text = f"ATR:{atr_display}"
+        # Display the actual returned float value (rounded to 2 decimals since it's a ratio)
+        left_text = f"ATR:{round(val, 2)}"
         right_text = f"K:{dynamic_k}"
         spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
         print(left_text + spacing + right_text)
     else:
-        left_text = f"ATR:{int(FALLBACK_ATR)}"
+        left_text = f"ATR:{float(FALLBACK_ATR)}"
         right_text = f"K:{FALLBACK_K}"
         spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
         print(left_text + spacing + right_text)
