@@ -137,6 +137,7 @@ body{
 .sig-cell:hover{background:rgba(255,255,255,0.015);}
 .sig-cell::after{
     content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:2px 2px 0 0;
+    background:rgba(255,255,255,0.13);
     transition:background 0.3s;
 }
 .sig-cell.bull-cell::after{background:var(--bull);box-shadow:0 0 8px var(--bull);}
@@ -144,19 +145,20 @@ body{
 .sig-cell.gold-cell::after{background:var(--gold);}
 
 .sc-lbl{
-    font-size:clamp(9px,1vw,13px);letter-spacing:0.12em;text-transform:uppercase;
-    color:var(--muted);white-space:nowrap;font-family:'DM Mono',monospace;
+    font-size:clamp(7px,0.75vw,9px);letter-spacing:0.10em;text-transform:uppercase;
+    color:rgba(255,255,255,0.18);white-space:nowrap;font-family:'DM Mono',monospace;
 }
 .sc-val{
     font-family:'Syne',sans-serif;font-weight:800;
     font-size:clamp(14px,2vw,24px);
     letter-spacing:-0.2px;white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis;line-height:1;
+    color:#c8845a;
 }
 .sc-val.bull{color:var(--bull);}
 .sc-val.bear{color:var(--bear);}
-.sc-val.gold{color:var(--gold);}
-.sc-val.dim {color:var(--muted);}
+.sc-val.gold{color:#c8845a;}
+.sc-val.dim {color:rgba(255,255,255,0.18);}
 
 .sig-cell.dp-cell{flex:2;padding:0 4px;}
 
@@ -292,13 +294,13 @@ body{
     transition:background 0.3s,border-color 0.3s;
 }
 #botLeft,#botRight{display:flex;align-items:center;gap:6px;flex-shrink:0;}
-.bot-lbl{font-size:8px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);}
-.bot-pnl{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(12px,1.4vw,16px);}
+.bot-lbl{font-size:7px;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.18);}
+.bot-pnl{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(12px,1.4vw,16px);color:#c8845a;}
 .bot-pnl.bull{color:var(--bull);}
 .bot-pnl.bear{color:var(--bear);}
 #brand{
     flex:1;font-family:'Syne',sans-serif;font-weight:800;
-    font-size:clamp(10px,1.2vw,14px);letter-spacing:0.12em;
+    font-size:clamp(5px,0.6vw,7px);letter-spacing:0.12em;
     color:var(--muted);text-align:center;transition:all 0.3s;
 }
 #brand sup{font-size:0.5em;vertical-align:super;color:var(--accent);}
@@ -316,8 +318,8 @@ body{
 .rsk-group{display:flex;flex-direction:column;gap:2px;flex-shrink:0;}
 .rsk-group.rsk-net{align-items:flex-start;}
 .rsk-group.rsk-peak{align-items:flex-end;}
-.rsk-lbl{font-size:7px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);white-space:nowrap;}
-.rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(11px,1.3vw,15px);white-space:nowrap;}
+.rsk-lbl{font-size:7px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(255,255,255,0.18);white-space:nowrap;}
+.rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(11px,1.3vw,15px);white-space:nowrap;color:#c8845a;}
 .rsk-val.bull{color:var(--bull);}
 .rsk-val.bear{color:var(--bear);}
 /* risk candle */
@@ -442,12 +444,9 @@ body{
     <div id="chartWrap">
         <!-- Momentum candle shares chart column space -->
         <div id="momentumBar">
-            <span class="mom-lbl">Momentum</span>
-            <span class="mom-num" id="momST">—</span>
             <div id="momentumCanvasWrap">
                 <canvas id="momentumCandle"></canvas>
             </div>
-            <span class="mom-num" id="momClose">—</span>
         </div>
         <div id="chartBox">
             <div class="grid-over"></div>
@@ -756,10 +755,11 @@ async function loadChart(){
         }
     }catch{}
 }
-function drawChart(closes,st){
+function drawChart(closes,st,noSlice){
     const MAX=60,pad=4;
-    chartSliceStart=Math.max(0,closes.length-MAX);
-    const c=closes.slice(-MAX),s=st.slice(-MAX);
+    const c=noSlice?closes:closes.slice(-MAX);
+    const s=noSlice?st:st.slice(-MAX);
+    chartSliceStart=noSlice?0:Math.max(0,closes.length-MAX);
     const isBull=(c.at(-1)??0)>=(c.at(-2)??0);
     const lc=isBull?cssVar('--bull'):cssVar('--bear');
     const labels=[...c.map((_,i)=>i),...Array(pad).fill('')];
@@ -925,15 +925,15 @@ function drawRiskCandle(floor, net, peak){
     const midY = H/2;
     const bodyH = Math.max(8, H*0.15);
 
-    // range: floor (left) → peak (right)
-    const lo = floor;               // always floor at left edge
-    const hi = Math.max(peak, 0);   // peak at right edge (at least 0)
+    // range: peak-3000 (left/low) → peak (right/high), net is current
+    const lo = peak - 3000;
+    const hi = Math.max(peak, net, 0);
     const range = hi - lo || 1;
     const toX = v => Math.max(PADX, Math.min(W-PADX, ((v-lo)/range)*(W-PADX*2)+PADX));
 
     const netX   = toX(net);
-    const floorX = toX(floor);   // always PADX (left wall)
-    const peakX  = toX(hi);      // always W-PADX (right wall)
+    const floorX = toX(lo);   // always PADX (left wall)
+    const peakX  = toX(hi);   // always W-PADX (right wall)
     const zeroX  = toX(0);
 
     // danger: net within 15% of floor range
@@ -979,13 +979,13 @@ function drawRiskCandle(floor, net, peak){
     ctx.beginPath(); ctx.moveTo(peakX, midY-bodyH/2-2); ctx.lineTo(peakX, midY+bodyH/2+2); ctx.stroke();
     ctx.globalAlpha=1;
 
-    // net label on candle body
+    // net label on candle body — brick color, same font as sc-val
     const netLabel=(net>=0?'+':'')+Math.round(net).toLocaleString('en-IN');
-    ctx.font=`600 10px 'DM Mono',monospace`;
-    ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.font=`700 10px 'DM Mono',monospace`;
+    ctx.fillStyle='#c8845a';
     ctx.textAlign='center';
     ctx.textBaseline='middle';
-    const labelX=Math.min(Math.max(netX, floorX+24), W-36);
+    const labelX=Math.min(Math.max(netX, floorX+28), W-36);
     ctx.fillText(netLabel, labelX, midY);
 
     // danger glow on bar
@@ -1127,7 +1127,7 @@ async function loadDayChart(){
         chartSliceStart=0;
         const closes=candles.map(d=>d.c);
         const st=candles.map(d=>d.st);
-        if(closes.length){ drawChart(closes,st); setTimeout(redrawMarkers,80); }
+        if(closes.length){ drawChart(closes,st,true); setTimeout(redrawMarkers,80); }
     }catch(e){console.error('dayChart',e);}
 }
 
