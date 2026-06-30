@@ -12,7 +12,7 @@ K_MIN = 1.0
 K_MAX = 3.0
 TOTAL_WIDTH = 42
 
-# Production boundaries & safety fallbacks
+# Production boundaries & safety fallbacks (Adjust these if your custom sum exceeds 12.0)
 MIN_FLOOR = 6.0         # Locked: Absolute minimum ceiling/floor floor
 MAX_CEILING = 12.0      # Locked: Absolute maximum ceiling
 FALLBACK_ATR = 8.0      # Updated: Target safety anchor for errors/missing data
@@ -23,7 +23,7 @@ ATR_SCALE_MAX = 12.0
 FALLBACK_K = 2.0
 
 def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
-    """Calculates session-isolated rolling ATR with strict 6.0-12.0 bounding and 8.0 fallback."""
+    """Calculates session-isolated custom 14-candle High-Low SUM with strict bounding and fallback."""
     if df is None or df.empty or len(df) < 1:
         return pd.Series([float(FALLBACK_ATR)])
     
@@ -35,33 +35,28 @@ def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
         
     # Standardize column casing to prevent runtime KeyErrors
     df_local.columns = [col.capitalize() for col in df_local.columns]
-    required_cols = ['High', 'Low', 'Close']
+    required_cols = ['High', 'Low']
     
     if not all(col in df_local.columns for col in required_cols):
         return pd.Series([float(FALLBACK_ATR)], index=df_local.index if not df_local.empty else None)
         
-    high, low, close = df_local['High'], df_local['Low'], df_local['Close']
-    prev_close = close.shift(1)
+    high, low = df_local['High'], df_local['Low']
     
-    # Calculate Standard True Range
-    tr = pd.concat([
-        high - low,
-        (high - prev_close).abs(),
-        (low - prev_close).abs()
-    ], axis=1).max(axis=1)
+    # --- CUSTOM CALCULATION IMPLEMENTATION HERE ---
+    # Pure High minus Low calculation (Direction and gaps are ignored)
+    candle_range = high - low
     
-    # Group rolling window mean computations by session dates
-    # to perfectly replicate TradingView chart indicator breaks at 9:15 AM
-    date_groups = df_local.index.date
-    atr = tr.groupby(date_groups, group_keys=False).apply(
-        lambda x: x.rolling(window=period, min_periods=1).mean()
+    # Group rolling window SUM computations by session dates (Replaces rolling mean)
+    atr = candle_range.groupby(date_groups, group_keys=False).apply(
+        lambda x: x.rolling(window=period, min_periods=1).sum()
     )
+    # -----------------------------------------------
     
     # Floor, Ceiling, and NaN safety mapping (Strictly bounds output between 6.0 and 12.0)
     return atr.apply(lambda x: float(FALLBACK_ATR) if pd.isna(x) or x == 0 else max(MIN_FLOOR, min(MAX_CEILING, float(x))))
 
 def calculate_dynamic_k(df: pd.DataFrame, atr_period=ATR_PERIOD, k_min=K_MIN, k_max=K_MAX) -> float:
-    """Calculates inverse exponential K value scaled safely against latest ATR."""
+    """Calculates inverse exponential K value scaled safely against latest custom range sum."""
     if df is None or df.empty:
         return FALLBACK_K
         
@@ -82,8 +77,6 @@ def calculate_dynamic_k(df: pd.DataFrame, atr_period=ATR_PERIOD, k_min=K_MIN, k_
     norm_atr = (clamped_atr - ATR_SCALE_MIN) / (ATR_SCALE_MAX - ATR_SCALE_MIN)
     
     # Inverse exponential scaling logic
-    # Low Volatility (norm_atr -> 0) yields K_MAX
-    # High Volatility (norm_atr -> 1) yields K_MIN
     k_dynamic = k_max - (k_max - k_min) * ((np.exp(norm_atr) - 1) / (np.e - 1))
     
     return round(k_dynamic, 2)
@@ -117,3 +110,4 @@ if __name__ == "__main__":
         right_text = f"K:{FALLBACK_K}"
         spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
         print(left_text + spacing + right_text)
+
