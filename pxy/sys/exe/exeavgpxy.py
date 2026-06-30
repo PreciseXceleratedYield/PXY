@@ -98,9 +98,7 @@ def handle_side_averaging(client, df):
 
     # Live position string extraction matching your exact upstream format
     pos_raw = str(get_position_summary(client)).upper().strip()
-    
-    # 🔍 Extract lots from format (e.g., "3CE2PE EXIT BULL" or "3CE2PE")
-    match = re.search(r'(\d+)CE(\d+)PE', pos_raw)
+    match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
     
     if match:
         ce_lots = int(match.group(1))
@@ -121,19 +119,13 @@ def handle_side_averaging(client, df):
         ce_is_lesser, pe_is_lesser = False, False  # Balanced state
 
     # Clean system telemetry message stream line
-    print(f"{Fore.CYAN}   📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Applied ABS Factor: {abs_factor} | Status: {pos_raw}")
+    print(f"{Fore.CYAN}   📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Applied ABS Factor: {abs_factor}")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
 
     for side in ['CE', 'PE']: 
-        # 🚨 STRICT STRATEGY DIRECTION LOCKS 🚨
-        if side == "CE" and "EXIT BULL" not in pos_raw:
-            continue
-        if side == "PE" and "EXIT BEAR" not in pos_raw:
-            continue
-
         side_df = df[df['side'] == side] 
         if side_df.empty: 
             continue 
@@ -145,6 +137,15 @@ def handle_side_averaging(client, df):
         side_is_lesser = ce_is_lesser if side == "CE" else pe_is_lesser
 
         for index, row in side_df.iterrows():
+            # 🚨 STATED CONDITION: Filter matching row-level 'exit' fields 🚨
+            row_exit = str(row.get('exit', '')).upper().strip()
+            if side == "CE" and row_exit != "BULL":
+                all_positions_crossed_threshold = False
+                break
+            if side == "PE" and row_exit != "BEAR":
+                all_positions_crossed_threshold = False
+                break
+
             pos_loss = get_loss(row)
             
             # --- EVALUATE MATRIX CALCULATIONS VIA 10% FIXED BASE ---
