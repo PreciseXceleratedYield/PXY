@@ -6,7 +6,7 @@ from runclntpxy import get_session
 from runltpspxy import get_mid_price 
 
 # TIME FILTER PARAMETER
-FILTER_TIME = "11:30:00"
+FILTER_TIME = "11:38:00"
 
 MATCH_MODE = "TAG" 
 
