@@ -12,18 +12,12 @@ K_MIN = 1.0
 K_MAX = 3.0
 TOTAL_WIDTH = 42
 
-# Production boundaries & safety fallbacks (Note: Custom sums may easily exceed 12.0)
-MIN_FLOOR = 6.0         # Locked: Absolute minimum ceiling/floor floor
-MAX_CEILING = 12.0      # Locked: Absolute maximum ceiling
-FALLBACK_ATR = 8.0      # Updated: Target safety anchor for errors/missing data
-
-# Production scale anchors for dynamic K (Synchronized with ATR limits)
-ATR_SCALE_MIN = 6.0
-ATR_SCALE_MAX = 12.0
+# Only keeping basic fallback constants if data is missing completely
+FALLBACK_ATR = 50.0      # Adjusted higher to better reflect a typical 14-candle sum baseline
 FALLBACK_K = 2.0
 
 def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
-    """Calculates session-isolated custom 14-candle High-Low SUM with strict bounding and fallback."""
+    """Calculates session-isolated custom 14-candle High-Low SUM with NO hard limits."""
     if df is None or df.empty or len(df) < 1:
         return pd.Series([float(FALLBACK_ATR)])
     
@@ -48,16 +42,16 @@ def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
     # Define date groups from index for session grouping
     date_groups = df_local.index.date
     
-    # Group rolling window SUM computations by session dates (Replaces rolling mean)
+    # Group rolling window SUM computations by session dates
     atr = candle_range.groupby(date_groups, group_keys=False).apply(
         lambda x: x.rolling(window=period, min_periods=1).sum()
     )
     
-    # Floor, Ceiling, and NaN safety mapping (Strictly bounds output between 6.0 and 12.0)
-    return atr.apply(lambda x: float(FALLBACK_ATR) if pd.isna(x) or x == 0 else max(MIN_FLOOR, min(MAX_CEILING, float(x))))
+    # Only map NaNs/zeros to fallback; no more floor or ceiling clamping
+    return atr.apply(lambda x: float(FALLBACK_ATR) if pd.isna(x) or x == 0 else float(x))
 
 def calculate_dynamic_k(df: pd.DataFrame, atr_period=ATR_PERIOD, k_min=K_MIN, k_max=K_MAX) -> float:
-    """Calculates inverse exponential K value scaled safely against latest custom range sum."""
+    """Calculates inverse exponential K value scaled dynamically against the dataset's actual min/max."""
     if df is None or df.empty:
         return FALLBACK_K
         
@@ -67,15 +61,19 @@ def calculate_dynamic_k(df: pd.DataFrame, atr_period=ATR_PERIOD, k_min=K_MIN, k_
         
     latest_atr = atr_series.iloc[-1]
     
-    # In the event of a data problem or a 0 value, return safe fallback baseline K
     if pd.isna(latest_atr) or latest_atr == 0:
         return FALLBACK_K
         
-    # Strictly cap input ATR parameters between production anchors
-    clamped_atr = max(ATR_SCALE_MIN, min(latest_atr, ATR_SCALE_MAX))
+    # Dynamically find the min and max from your actual history instead of hardcoded 6.0 and 12.0
+    atr_scale_min = atr_series.min()
+    atr_scale_max = atr_series.max()
     
-    # Normalized position between 0.0 and 1.0
-    norm_atr = (clamped_atr - ATR_SCALE_MIN) / (ATR_SCALE_MAX - ATR_SCALE_MIN)
+    # Avoid division by zero if all values are identical
+    if atr_scale_max == atr_scale_min:
+        return FALLBACK_K
+        
+    # Normalized position between 0.0 and 1.0 based entirely on actual data range
+    norm_atr = (latest_atr - atr_scale_min) / (atr_scale_max - atr_scale_min)
     
     # Inverse exponential scaling logic
     k_dynamic = k_max - (k_max - k_min) * ((np.exp(norm_atr) - 1) / (np.e - 1))
@@ -88,25 +86,23 @@ if __name__ == "__main__":
     except Exception:
         df = None
         
-    # Force safety fallback triggers on data fetch errors
     if df is not None and not df.empty and len(df) >= 1:
         atr_series = calculate_atr(df)
         dynamic_k = calculate_dynamic_k(df)
         
         val = atr_series.iloc[-1] if not atr_series.empty else float(FALLBACK_ATR)
         
-        # Check if calculated value is invalid; if so, trigger fallback layout
         if pd.isna(val) or val == 0 or len(atr_series) <= 1:
             val = float(FALLBACK_ATR)
             dynamic_k = FALLBACK_K
             
+        # Display the real un-clamped raw number
         atr_display = int(np.round(val))
         left_text = f"ATR:{atr_display}"
         right_text = f"K:{dynamic_k}"
         spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
         print(left_text + spacing + right_text)
     else:
-        # Synchronized static empty workspace layout
         left_text = f"ATR:{int(FALLBACK_ATR)}"
         right_text = f"K:{FALLBACK_K}"
         spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
