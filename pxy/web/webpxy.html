@@ -148,7 +148,7 @@ body{
 
 .sc-lbl{
     font-size:clamp(7px,0.75vw,9px);letter-spacing:0.10em;text-transform:uppercase;
-    color:var(--lbl-grey);white-space:nowrap;font-family:'DM Mono',monospace;
+    color:#ffffff;white-space:nowrap;font-family:'DM Mono',monospace;
 }
 .sc-val{
     font-family:'Syne',sans-serif;font-weight:800;
@@ -296,7 +296,7 @@ body{
     transition:background 0.3s,border-color 0.3s;
 }
 #botLeft,#botRight{display:flex;align-items:center;gap:6px;flex-shrink:0;}
-.bot-lbl{font-size:7px;letter-spacing:0.14em;text-transform:uppercase;color:var(--lbl-grey);}
+.bot-lbl{font-size:7px;letter-spacing:0.14em;text-transform:uppercase;color:#ffffff;}
 .bot-pnl{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(12px,1.4vw,16px);color:#ffffff;}
 .bot-pnl.bull{color:var(--bull);}
 .bot-pnl.bear{color:var(--bear);}
@@ -320,7 +320,7 @@ body{
 .rsk-group{display:flex;flex-direction:column;gap:2px;flex-shrink:0;}
 .rsk-group.rsk-net{align-items:flex-start;}
 .rsk-group.rsk-peak{align-items:flex-end;}
-.rsk-lbl{font-size:7px;letter-spacing:0.12em;text-transform:uppercase;color:var(--lbl-grey);white-space:nowrap;}
+.rsk-lbl{font-size:7px;letter-spacing:0.12em;text-transform:uppercase;color:#ffffff;white-space:nowrap;}
 .rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(11px,1.3vw,15px);white-space:nowrap;color:#ffffff;}
 .rsk-val.bull{color:var(--bull);}
 .rsk-val.bear{color:var(--bear);}
@@ -925,75 +925,73 @@ function drawRiskCandle(floor, net, peak){
     const W = rect.width, H = rect.height;
     ctx.clearRect(0,0,W,H);
 
-    const PADX = 10;
+    const PADX = 14;
     const midY = H/2;
-    const bodyH = Math.max(8, H*0.15);
+    const bodyH = Math.max(10, H*0.45);
 
-    // range: peak-3000 (left/low) → peak (right/high), net is current
-    const lo = peak - 3000;
-    const hi = Math.max(peak, net, 0);
+    // OHLC: low=-3000, open=0, close=net, high=peak
+    const lo  = -3000;
+    const hi  = Math.max(peak, 10);  // peak is high
+    const open = 0;
+    const close = net;
     const range = hi - lo || 1;
-    const toX = v => Math.max(PADX, Math.min(W-PADX, ((v-lo)/range)*(W-PADX*2)+PADX));
+    const toX = v => Math.max(PADX, Math.min(W-PADX, ((v - lo) / range) * (W - PADX*2) + PADX));
 
-    const netX   = toX(net);
-    const floorX = toX(lo);   // always PADX (left wall)
-    const peakX  = toX(hi);   // always W-PADX (right wall)
-    const zeroX  = toX(0);
+    const lowX   = toX(lo);    // left wall  (-3000)
+    const highX  = toX(hi);    // right wall (peak)
+    const openX  = toX(open);  // zero line
+    const closeX = toX(close); // net position
 
-    // danger: net within 15% of floor range
-    const danger = net <= floor + Math.abs(floor)*0.15;
-    const bodyColor = danger ? cssVar('--bear') : net>=0 ? cssVar('--bull') : cssVar('--bear');
-    const glowColor = danger ? 'rgba(239,68,68,0.7)' : net>=0 ? 'rgba(34,197,94,0.45)' : 'rgba(239,68,68,0.45)';
+    const isBull = close >= open; // net >= 0
+    const bodyColor = isBull ? cssVar('--bull') : cssVar('--bear');
+    const glowColor = isBull ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)';
 
-    // track line
-    const tg = ctx.createLinearGradient(0,0,W,0);
-    tg.addColorStop(0,   'rgba(239,68,68,0.25)');
-    tg.addColorStop(0.5, cssVar('--track-mid'));
-    tg.addColorStop(1,   'rgba(34,197,94,0.25)');
-    ctx.strokeStyle=tg; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(PADX,midY); ctx.lineTo(W-PADX,midY); ctx.stroke();
+    // wick: full range low→high
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(lowX, midY); ctx.lineTo(highX, midY); ctx.stroke();
 
-    // floor wall (left red tick)
-    ctx.strokeStyle=cssVar('--bear'); ctx.lineWidth=2; ctx.globalAlpha=0.7;
-    ctx.beginPath(); ctx.moveTo(floorX, midY-bodyH/2-2); ctx.lineTo(floorX, midY+bodyH/2+2); ctx.stroke();
-    ctx.globalAlpha=1;
+    // low tick (red, left)
+    ctx.strokeStyle = cssVar('--bear'); ctx.lineWidth = 2; ctx.globalAlpha = 0.8;
+    ctx.beginPath(); ctx.moveTo(lowX, midY-bodyH/2); ctx.lineTo(lowX, midY+bodyH/2); ctx.stroke();
 
-    // zero line (subtle)
-    if(zeroX>PADX+4 && zeroX<W-PADX-4){
-        ctx.strokeStyle=cssVar('--muted'); ctx.lineWidth=1; ctx.globalAlpha=0.3;
+    // high tick (green, right)
+    ctx.strokeStyle = cssVar('--bull'); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(highX, midY-bodyH/2); ctx.lineTo(highX, midY+bodyH/2); ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // zero dashed line
+    if(openX > PADX+2 && openX < W-PADX-2){
+        ctx.strokeStyle='rgba(255,255,255,0.25)'; ctx.lineWidth=1;
         ctx.setLineDash([3,3]);
-        ctx.beginPath(); ctx.moveTo(zeroX,midY-bodyH/2); ctx.lineTo(zeroX,midY+bodyH/2); ctx.stroke();
-        ctx.setLineDash([]); ctx.globalAlpha=1;
+        ctx.beginPath(); ctx.moveTo(openX, midY-bodyH/2); ctx.lineTo(openX, midY+bodyH/2); ctx.stroke();
+        ctx.setLineDash([]);
     }
 
-    // body: from floor to net
-    const bx1 = floorX, bx2 = netX;
-    const bW  = Math.max(bx2-bx1, 4);
-    ctx.shadowColor=glowColor; ctx.shadowBlur = danger ? 18 : 8;
-    ctx.fillStyle=bodyColor;
+    // body: open(0) → close(net)
+    const bx1 = Math.min(openX, closeX);
+    const bx2 = Math.max(openX, closeX);
+    const bW  = Math.max(bx2 - bx1, 4);
+    ctx.shadowColor = glowColor; ctx.shadowBlur = 10;
+    ctx.fillStyle = bodyColor;
     ctx.beginPath(); ctx.roundRect(bx1, midY-bodyH/2, bW, bodyH, 4); ctx.fill();
-    ctx.shadowBlur=0;
+    ctx.shadowBlur = 0;
 
     // shine
     ctx.fillStyle='rgba(255,255,255,0.12)';
     ctx.beginPath(); ctx.roundRect(bx1+2, midY-bodyH/2+2, Math.max(bW-4,2), Math.max(bodyH*0.3,2), 2); ctx.fill();
 
-    // peak tick (right green)
-    ctx.strokeStyle=cssVar('--bull'); ctx.lineWidth=2; ctx.globalAlpha=0.7;
-    ctx.beginPath(); ctx.moveTo(peakX, midY-bodyH/2-2); ctx.lineTo(peakX, midY+bodyH/2+2); ctx.stroke();
-    ctx.globalAlpha=1;
-
-    // net label on candle body — brick color, matching rsk-val font size
-    const netLabel=(net>=0?'+':'')+Math.round(net).toLocaleString('en-IN');
-    const fontSize=Math.round(Math.min(15,Math.max(11,W*0.013)));
-    ctx.font=`800 ${fontSize}px 'Syne',sans-serif`;
-    ctx.fillStyle='#ffffff';
-    ctx.textAlign='center';
-    ctx.textBaseline='middle';
-    const labelX=Math.min(Math.max(netX, floorX+36), W-40);
+    // net label centred on candle body
+    const netLabel = (net>=0?'+':'')+Math.round(net).toLocaleString('en-IN');
+    const fontSize = Math.round(Math.min(14, Math.max(10, H*0.28)));
+    ctx.font = `800 ${fontSize}px 'Syne',sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const labelX = (bx1 + bx2) / 2;
     ctx.fillText(netLabel, labelX, midY);
 
-    // danger glow on bar
+    // danger glow
+    const danger = net <= lo + Math.abs(lo)*0.15;
     $('riskBar').style.boxShadow = danger
         ? '0 0 0 1px rgba(239,68,68,0.5),0 0 20px rgba(239,68,68,0.12)'
         : '';
@@ -1009,7 +1007,7 @@ function tsToIndex(ts){
     const slice    = chartCandles.slice(chartSliceStart);
     let best=0, bestDiff=Infinity;
     slice.forEach((c,i)=>{
-        const t=c.time||c.timestamp||c.datetime||c.date||null;
+        const t=c.t||c.time||c.timestamp||c.datetime||c.date||null;
         if(!t)return;
         const candleMs=new Date(String(t).trim().replace(' ','T').includes('+')?String(t).trim().replace(' ','T'):String(t).trim().replace(' ','T')+'+05:30').getTime();
         const d=Math.abs(candleMs-tradeMs);
