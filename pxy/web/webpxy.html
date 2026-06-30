@@ -227,6 +227,7 @@ body{
     width:var(--w-trades);flex-shrink:0;
     display:flex;flex-direction:column;
     border-right:1px solid var(--border);min-width:0;overflow:hidden;
+    position:relative;
 }
 #posSection{flex:1;display:flex;flex-direction:column;border-bottom:1px solid var(--border2);overflow:hidden;min-height:0;}
 #posScroll{flex:1;overflow-y:auto;}
@@ -473,6 +474,20 @@ body{
 
     <!-- POSITIONS + TRADES -->
     <div id="rightWrap">
+
+        <!-- ACTIONS OVERLAY — covers positions+trades panel only -->
+        <div id="actionsMenu" style="display:none;position:absolute;inset:0;z-index:50;background:rgba(11,15,26,0.82);backdrop-filter:blur(1px);flex-direction:column;gap:6px;padding:10px 8px;overflow-y:auto;">
+            <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:12px;letter-spacing:0.08em;text-align:center;color:var(--text);padding:4px 0 6px;border-bottom:1px solid var(--border2);flex-shrink:0;">PXY<sup style="color:var(--accent);">®</sup> ACTIONS</div>
+            <button class="amenu-btn sqrall" data-script="pxysqrall">⛔ SQUARE OFF ALL<span class="amenu-sub">Close all positions immediately</span></button>
+            <button class="amenu-btn ce" data-script="pxybuyce">✅ BUY CE<span class="amenu-sub">Force buy call option</span></button>
+            <button class="amenu-btn ce" data-script="pxysqrce">⛔ SQUARE OFF CE<span class="amenu-sub">Close all call positions</span></button>
+            <button class="amenu-btn pe" data-script="pxybuype">✅ BUY PE<span class="amenu-sub">Force buy put option</span></button>
+            <button class="amenu-btn pe" data-script="pxysqrpe">⛔ SQUARE OFF PE<span class="amenu-sub">Close all put positions</span></button>
+            <button class="amenu-btn config" data-script="pxyconfig">⚙️ PXYCONFIG<span class="amenu-sub">Open config on GitHub</span></button>
+            <button class="amenu-btn update" data-script="pxyupdate">🔄 PXYUPDATE<span class="amenu-sub">Pull latest & reset</span></button>
+            <button id="amenuClose" style="margin-top:4px;padding:7px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;flex-shrink:0;">✕ Close</button>
+        </div>
+
         <div id="posSection">
             <div class="pw-hdr">
                 <span class="pw-sort" onclick="sortPos('tag')">#Tag ↕</span>
@@ -497,7 +512,7 @@ body{
 <!-- ══ RISK BAR ══ -->
 <div id="riskBar">
     <div class="rsk-group rsk-net">
-        <span class="rsk-lbl">⛔ Loss Threshold</span>
+        <span class="rsk-lbl">⛔ Stop</span>
         <span class="rsk-val" id="rskNet">—</span>
     </div>
     <div class="rsk-candle-wrap">
@@ -521,22 +536,6 @@ body{
         <span class="bot-pnl" id="ptTradesPnl">—</span>
     </div>
     <span id="clk">—</span>
-</div>
-
-<!-- ══ LOGO ACTIONS MENU ══ -->
-<div id="actionsMenu" style="display:none;position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,0.65);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
-    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:20px;min-width:280px;max-width:340px;display:flex;flex-direction:column;gap:10px;box-shadow:0 24px 60px rgba(0,0,0,0.6);">
-        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:14px;letter-spacing:0.08em;text-align:center;margin-bottom:4px;">PXY<sup style="color:var(--accent);">®</sup> ACTIONS</div>
-
-        <button class="amenu-btn ce" data-script="pxybuyce">✅ BUY CE<span class="amenu-sub">Force buy call option</span></button>
-        <button class="amenu-btn ce" data-script="pxysqrce">⛔ SQUARE OFF CE<span class="amenu-sub">Close all call positions</span></button>
-        <button class="amenu-btn pe" data-script="pxybuype">✅ BUY PE<span class="amenu-sub">Force buy put option</span></button>
-        <button class="amenu-btn pe" data-script="pxysqrpe">⛔ SQUARE OFF PE<span class="amenu-sub">Close all put positions</span></button>
-        <button class="amenu-btn config" data-script="pxyconfig">⚙️ PXYCONFIG<span class="amenu-sub">System configuration</span></button>
-        <button class="amenu-btn update" data-script="pxyupdate">🔄 PXYUPDATE<span class="amenu-sub">Pull latest & reset</span></button>
-
-        <button id="amenuClose" style="margin-top:6px;padding:8px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;">Close</button>
-    </div>
 </div>
 
 <!-- ══ PWD CONFIRM POPUP (for action menu items) ══ -->
@@ -566,12 +565,23 @@ body{
 <style>
 .amenu-btn{
     display:flex;flex-direction:column;align-items:flex-start;gap:2px;
-    padding:10px 14px;border-radius:9px;border:1px solid var(--border2);
-    background:var(--bg3);color:var(--text);font-family:'Syne',sans-serif;
-    font-weight:700;font-size:13px;letter-spacing:0.03em;cursor:pointer;
-    transition:all 0.15s;text-align:left;
+    padding:8px 10px;border-radius:7px;border:1px solid var(--border2);
+    background:rgba(17,24,39,0.5);color:var(--text);font-family:'Syne',sans-serif;
+    font-weight:700;font-size:11px;letter-spacing:0.03em;cursor:pointer;
+    transition:all 0.15s;text-align:left;flex-shrink:0;width:100%;
 }
-.amenu-btn:hover{background:var(--bg);}
+.amenu-btn:hover{background:rgba(17,24,39,0.85);}
+.amenu-btn.sqrall{border-color:rgba(239,68,68,0.6);color:#ff6b6b;background:rgba(239,68,68,0.12);}
+.amenu-btn.sqrall:hover{background:rgba(239,68,68,0.25);}
+.amenu-btn.ce{border-color:rgba(34,197,94,0.3);color:var(--bull);}
+.amenu-btn.ce:hover{background:rgba(34,197,94,0.18);}
+.amenu-btn.pe{border-color:rgba(239,68,68,0.3);color:var(--bear);}
+.amenu-btn.pe:hover{background:rgba(239,68,68,0.18);}
+.amenu-btn.config{border-color:rgba(59,130,246,0.3);color:var(--accent);}
+.amenu-btn.config:hover{background:rgba(59,130,246,0.18);}
+.amenu-btn.update{border-color:rgba(245,158,11,0.4);color:var(--gold);}
+.amenu-btn.update:hover{background:rgba(245,158,11,0.18);}
+.amenu-sub{font-family:'DM Mono',monospace;font-size:8px;font-weight:400;opacity:0.65;letter-spacing:0.05em;}
 .amenu-btn.ce{border-color:rgba(34,197,94,0.3);color:var(--bull);}
 .amenu-btn.ce:hover{background:rgba(34,197,94,0.12);}
 .amenu-btn.pe{border-color:rgba(239,68,68,0.3);color:var(--bear);}
@@ -1277,13 +1287,16 @@ $('logoRefresh').addEventListener('click',()=>{
 $('amenuClose').addEventListener('click',()=>{
     $('actionsMenu').style.display='none';
 });
-$('actionsMenu').addEventListener('click',e=>{
-    if(e.target.id==='actionsMenu')$('actionsMenu').style.display='none';
-});
 
 document.querySelectorAll('.amenu-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
-        pendingScript=btn.dataset.script;
+        const script=btn.dataset.script;
+        if(script==='pxyconfig'){
+            window.open('https://github.com/kcbpcc/V1L58/tree/main','_blank');
+            $('actionsMenu').style.display='none';
+            return;
+        }
+        pendingScript=script;
         $('actionsMenu').style.display='none';
         $('updTitle').textContent='▶ '+pendingScript;
         $('updPwd').value='';
