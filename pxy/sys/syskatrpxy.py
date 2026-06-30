@@ -12,7 +12,7 @@ K_MIN = 1.0
 K_MAX = 3.0
 TOTAL_WIDTH = 42
 
-# Production boundaries & safety fallbacks (Adjust these if your custom sum exceeds 12.0)
+# Production boundaries & safety fallbacks (Note: Custom sums may easily exceed 12.0)
 MIN_FLOOR = 6.0         # Locked: Absolute minimum ceiling/floor floor
 MAX_CEILING = 12.0      # Locked: Absolute maximum ceiling
 FALLBACK_ATR = 8.0      # Updated: Target safety anchor for errors/missing data
@@ -42,15 +42,16 @@ def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
         
     high, low = df_local['High'], df_local['Low']
     
-    # --- CUSTOM CALCULATION IMPLEMENTATION HERE ---
     # Pure High minus Low calculation (Direction and gaps are ignored)
     candle_range = high - low
+    
+    # Define date groups from index for session grouping
+    date_groups = df_local.index.date
     
     # Group rolling window SUM computations by session dates (Replaces rolling mean)
     atr = candle_range.groupby(date_groups, group_keys=False).apply(
         lambda x: x.rolling(window=period, min_periods=1).sum()
     )
-    # -----------------------------------------------
     
     # Floor, Ceiling, and NaN safety mapping (Strictly bounds output between 6.0 and 12.0)
     return atr.apply(lambda x: float(FALLBACK_ATR) if pd.isna(x) or x == 0 else max(MIN_FLOOR, min(MAX_CEILING, float(x))))
@@ -110,4 +111,5 @@ if __name__ == "__main__":
         right_text = f"K:{FALLBACK_K}"
         spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
         print(left_text + spacing + right_text)
+
 
