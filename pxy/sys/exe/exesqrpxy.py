@@ -1,3 +1,4 @@
+# sysexitpxy.py
 import sys 
 import os 
 import subprocess
@@ -88,10 +89,14 @@ def exit_all_positions():
     active_df = data.get("active_orders", pd.DataFrame()) 
     market_df = data.get("market_snapshot", pd.DataFrame()) 
     
-    # --- DYNAMIC CLI FILTER BYPASS ---
+    # --- DYNAMIC CLI FILTER BYPASS & PANIC SWITCH ---
+    force_all_bypass = False
     if len(sys.argv) > 1 and not active_df.empty:
         target_param = sys.argv[1].lower().strip()
-        if target_param == "-ce":
+        if target_param == "-all":
+            print(f"{Fore.RED}{Style.BRIGHT}🚨 PANIC BYPASS: Nilling out ALL active positions immediately!")
+            force_all_bypass = True
+        elif target_param == "-ce":
             print(f"{Fore.YELLOW}⚠️ CLI BYPASS: Filtering ONLY CE positions for immediate square-off.")
             active_df = active_df[active_df["symbol"].str.contains("CE", na=False)]
         elif target_param == "-pe":
@@ -111,18 +116,19 @@ def exit_all_positions():
         if not symbol or qty == 0: 
             continue 
             
-        if now < exit_all_after: 
+        # If the manual panic flag is active or it is past 3:25 PM, flatten immediately
+        if force_all_bypass or now >= exit_all_after: 
+            place_exit_order(client, row) 
+        else: 
+            # Normal rule-based trend management
             if direction == "UP" and "PE" in symbol: 
                 place_exit_order(client, row) 
             elif direction == "DOWN" and "CE" in symbol: 
                 place_exit_order(client, row) 
             else: 
                 print(f"{Fore.CYAN}Holding {symbol} | Direction: {direction}") 
-        else: 
-            place_exit_order(client, row) 
             
     print(f"{Fore.GREEN}{Style.BRIGHT}✅ Exit attempt completed.") 
 
 if __name__ == "__main__": 
     exit_all_positions()
-
