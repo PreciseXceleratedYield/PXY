@@ -37,7 +37,7 @@
     --hdr:52px;--bot:32px;
     --track-mid:rgba(255,255,255,0.09);
     --term-bg:#06080d;
-    --lbl-grey:rgba(255,255,255,0.22);
+    --lbl-grey:rgba(255,255,255,0.38);
 }
 [data-theme="light"]{
     --bg:#f0f4fb;--bg2:#ffffff;--bg3:#e8eef8;
@@ -155,11 +155,11 @@ body{
     font-size:clamp(14px,2vw,24px);
     letter-spacing:-0.2px;white-space:nowrap;
     overflow:hidden;text-overflow:ellipsis;line-height:1;
-    color:#c8845a;
+    color:#ffffff;
 }
 .sc-val.bull{color:var(--bull);}
 .sc-val.bear{color:var(--bear);}
-.sc-val.gold{color:#c8845a;}
+.sc-val.gold{color:#ffffff;}
 .sc-val.dim {color:var(--lbl-grey);}
 
 .sig-cell.dp-cell{flex:2;padding:0 4px;}
@@ -297,7 +297,7 @@ body{
 }
 #botLeft,#botRight{display:flex;align-items:center;gap:6px;flex-shrink:0;}
 .bot-lbl{font-size:7px;letter-spacing:0.14em;text-transform:uppercase;color:var(--lbl-grey);}
-.bot-pnl{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(12px,1.4vw,16px);color:#c8845a;}
+.bot-pnl{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(12px,1.4vw,16px);color:#ffffff;}
 .bot-pnl.bull{color:var(--bull);}
 .bot-pnl.bear{color:var(--bear);}
 #brand{
@@ -321,7 +321,7 @@ body{
 .rsk-group.rsk-net{align-items:flex-start;}
 .rsk-group.rsk-peak{align-items:flex-end;}
 .rsk-lbl{font-size:7px;letter-spacing:0.12em;text-transform:uppercase;color:var(--lbl-grey);white-space:nowrap;}
-.rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(11px,1.3vw,15px);white-space:nowrap;color:#c8845a;}
+.rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:clamp(11px,1.3vw,15px);white-space:nowrap;color:#ffffff;}
 .rsk-val.bull{color:var(--bull);}
 .rsk-val.bear{color:var(--bear);}
 /* risk candle */
@@ -987,7 +987,7 @@ function drawRiskCandle(floor, net, peak){
     const netLabel=(net>=0?'+':'')+Math.round(net).toLocaleString('en-IN');
     const fontSize=Math.round(Math.min(15,Math.max(11,W*0.013)));
     ctx.font=`800 ${fontSize}px 'Syne',sans-serif`;
-    ctx.fillStyle='#c8845a';
+    ctx.fillStyle='#ffffff';
     ctx.textAlign='center';
     ctx.textBaseline='middle';
     const labelX=Math.min(Math.max(netX, floorX+36), W-40);
