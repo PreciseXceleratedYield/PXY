@@ -90,13 +90,13 @@ def target_price(row):
             if active_exit in ["SELL", "BEAR"]:  # Counter-Trend: Threat is high.
                 target_pct = 2
             else:  # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
-                target_pct = max(2, max(ce_p, (atr_val - hce_d)))
+                target_pct = atr_val * ce_p #max(2, max(ce_p, (atr_val - hce_d)))
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:  # Counter-Trend: Threat is high.
                 target_pct = 2
             else:  # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
                 # FIXED: Added the missing comma after 1.4 and cleaned redundant brackets
-                target_pct = max(2, max(pe_p, (atr_val - hpe_d)))
+                target_pct = atr_val * pe_p #max(2, max(pe_p, (atr_val - hpe_d)))
 
                 
         # 🔥 HIGH SPEED BANDWIDTH GUARDRAIL
