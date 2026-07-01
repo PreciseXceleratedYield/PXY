@@ -12,7 +12,7 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # 🛡️ GLOBAL OPERATIONAL SWITCH CONFIGURATION
-EXECUTE_SQUARE_OFF = True  
+EXECUTE_SQUARE_OFF = False  
 
 # 🔍 STRATEGIC FOOTPRINT: Explicit path isolation handling
 current_dir = os.path.dirname(os.path.abspath(__file__))
