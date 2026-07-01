@@ -87,6 +87,7 @@ body{
 #termBox .xterm-viewport{background:transparent!important;}
 #termBox .xterm-screen{background:transparent!important;}
 
+#panePositions{position:relative;}
 /* POSITIONS TAB — vertical split */
 #posPane{display:flex;flex-direction:column;height:100%;}
 #posTop{flex:1;min-height:0;display:flex;flex-direction:column;border-bottom:1px solid var(--border2);overflow:hidden;}
@@ -111,6 +112,8 @@ body{
 .p-pnl.bull,.t-pnl.bull{color:var(--bull);}
 .p-pnl.bear,.t-pnl.bear{color:var(--bear);}
 .t-sym{color:var(--muted);}
+.t-row.active{background:var(--bg3);border-left:2px solid var(--accent);padding-left:8px;}
+.t-row.dimmed{opacity:0.3;}
 .empty-msg{padding:20px;text-align:center;color:var(--muted);font-size:10px;}
 
 /* CHART TAB */
@@ -216,7 +219,9 @@ body{
 
     <!-- POSITIONS + TRADES (vertical split) -->
     <div class="tab-pane" id="panePositions">
-        <div id="posPane">
+
+        <!-- Normal positions/trades view -->
+        <div id="posPane" style="display:flex;flex-direction:column;height:100%;">
             <div id="posTop">
                 <div class="pane-hdr">
                     <span>📍 Positions</span>
@@ -232,6 +237,20 @@ body{
                 <div class="pane-scroll" id="tradeScroll"><div class="empty-msg" id="tradeEmpty">No trades</div></div>
             </div>
         </div>
+
+        <!-- Trade chart overlay — slides over when trade clicked -->
+        <div id="tradeChartOverlay" style="display:none;position:absolute;inset:0;flex-direction:column;background:var(--bg);z-index:10;">
+            <div style="height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 10px;background:var(--bg2);border-bottom:1px solid var(--border2);">
+                <span id="tradeChartLabel" style="font-size:9px;color:var(--muted);letter-spacing:0.10em;text-transform:uppercase;">— trade —</span>
+                <span style="font-size:9px;color:var(--muted);">double-tap to close</span>
+            </div>
+            <div id="tradeChartBox" style="flex:1;position:relative;overflow:hidden;background:var(--bg);">
+                <div class="grid-over"></div>
+                <canvas id="tradeChart"></canvas>
+                <svg id="tradeMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;overflow:visible;"></svg>
+            </div>
+        </div>
+
     </div>
 
     <!-- CHART -->
@@ -535,7 +554,167 @@ async function loadPos(){
     });
 }
 
-/* ── TRADES ── */
+/* ── TRADE CHART IN POSITIONS TAB ── */
+let tradeChart=null, tradeCandles=[], activeTrade=null;
+
+function parseAnyTs(raw){
+    if(raw==null)return NaN;
+    let s=String(raw).trim().replace(' ','T');
+    if(!/[zZ]|[+-]\d\d:?\d\d$/.test(s))s+='+05:30';
+    return new Date(s).getTime();
+}
+function tsToTradeIndex(ts){
+    const tradeMs=parseAnyTs(ts);
+    let best=0,bestDiff=Infinity;
+    tradeCandles.forEach((c,i)=>{
+        const t=c.t??c.time??c.timestamp??null;
+        if(t==null)return;
+        const d=Math.abs(parseAnyTs(t)-tradeMs);
+        if(d<bestDiff){bestDiff=d;best=i;}
+    });
+    return best;
+}
+function indexToTradePixel(idx){
+    const meta=tradeChart?.getDatasetMeta(0);
+    const pt=meta?.data[idx];
+    return pt?{x:pt.x,y:pt.y}:null;
+}
+
+async function openTradeChart(t){
+    activeTrade=t;
+    const isCE=(t.Symbol||'').toUpperCase().endsWith('CE');
+    const pnl=t.PNL||0;
+    $('tradeChartLabel').textContent=`${shortSym(t.Symbol)} · #${t.Tag||'—'} · ${pnl>=0?'+':''}${Math.round(pnl).toLocaleString('en-IN')}`;
+    $('tradeChartOverlay').style.display='flex';
+
+    // load day candles
+    try{
+        const data=await fetch('./webdaypxy.json?_='+Date.now()).then(r=>r.json());
+        if(Array.isArray(data)){
+            tradeCandles=data.map(r=>({t:r.time||r.timestamp||null,c:r.Close??r.close,st:r.st??null}));
+        }else if(data.columns){
+            const ci=k=>data.columns.indexOf(k);
+            const C=ci('Close'),ST=ci('st');
+            tradeCandles=data.index.map((ts,i)=>({t:ts,c:data.data[i][C],st:ST>=0?data.data[i][ST]:null}));
+        }
+    }catch(e){tradeCandles=[];}
+
+    const closes=tradeCandles.map(d=>d.c);
+    const st=tradeCandles.map(d=>d.st);
+    drawTradeChart(closes,st);
+    setTimeout(()=>redrawTradeMarkers(),200);
+    setTimeout(()=>redrawTradeMarkers(),500);
+}
+
+function drawTradeChart(closes,st){
+    const pad=4;
+    const labels=[...closes.map((_,i)=>i),...Array(pad).fill('')];
+    const cp=[...closes,...Array(pad).fill(null)];
+    const sp=[...st,...Array(pad).fill(null)];
+    if(tradeChart){tradeChart.destroy();tradeChart=null;}
+    tradeChart=new Chart($('tradeChart'),{
+        type:'line',
+        data:{labels,datasets:[
+            {data:cp,borderColor:'rgba(255,255,255,0.75)',borderWidth:1.5,pointRadius:0,fill:true,tension:0.2,
+             backgroundColor:ctx2=>{
+                 const g=ctx2.chart.ctx.createLinearGradient(0,0,0,ctx2.chart.height);
+                 g.addColorStop(0,'rgba(255,255,255,0.06)');g.addColorStop(1,'rgba(0,0,0,0)');return g;}},
+            {data:sp,borderColor:'rgba(202,138,4,0.65)',borderWidth:1,borderDash:[4,4],pointRadius:0,fill:false,tension:0.2}
+        ]},
+        options:{animation:false,responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:false},tooltip:{enabled:false}},
+            scales:{
+                x:{display:false},
+                y:{display:true,position:'right',
+                   grid:{color:cssVar('--grid'),drawBorder:false},
+                   ticks:{color:cssVar('--muted'),font:{family:"'DM Mono',monospace",size:9},maxTicksLimit:5}}
+            }}
+    });
+}
+
+function redrawTradeMarkers(){
+    const svg=$('tradeMarkerLayer');
+    svg.innerHTML='';
+    if(!tradeChart||!activeTrade||!tradeCandles.length)return;
+    const W=tradeChart.canvas.offsetWidth,H=tradeChart.canvas.offsetHeight;
+    svg.setAttribute('viewBox',`0 0 ${W} ${H}`);
+    svg.style.width=W+'px';svg.style.height=H+'px';
+
+    const t=activeTrade;
+    const buyIdx=tsToTradeIndex(t.Buy_Time);
+    const sellIdx=tsToTradeIndex(t.Exit_Time||t.Buy_Time);
+    const buyPt=indexToTradePixel(buyIdx);
+    const sellPt=indexToTradePixel(sellIdx);
+    if(!buyPt||!sellPt)return;
+
+    const isCE=(t.Symbol||'').toUpperCase().endsWith('CE');
+    const isBull=(t.PNL||0)>=0;
+    const lineC=isCE?cssVar('--bull'):cssVar('--bear');
+
+    // connecting line
+    const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',buyPt.x);line.setAttribute('y1',buyPt.y);
+    line.setAttribute('x2',sellPt.x);line.setAttribute('y2',sellPt.y);
+    line.setAttribute('stroke',lineC);line.setAttribute('stroke-width','2');line.setAttribute('opacity','0.4');
+    svg.appendChild(line);
+
+    // entry ✓ tick
+    svg.appendChild(makeTradeMarker(buyPt.x,buyPt.y,true,cssVar('--bull')));
+    // exit ✗ cross
+    svg.appendChild(makeTradeMarker(sellPt.x,sellPt.y,false,isBull?cssVar('--bull'):cssVar('--bear')));
+}
+
+function makeTradeMarker(x,y,isBuy,color){
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g');
+    const gap=14,s=6,sw=2.5;
+    // glow circle
+    const circle=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    circle.setAttribute('cx',x);circle.setAttribute('cy',isBuy?y+gap:y-gap);
+    circle.setAttribute('r',10);circle.setAttribute('fill',color);circle.setAttribute('opacity','0.12');
+    g.appendChild(circle);
+    if(isBuy){
+        const cy=y+gap;
+        const tick=document.createElementNS('http://www.w3.org/2000/svg','polyline');
+        tick.setAttribute('points',`${x-s},${cy} ${x-1},${cy+s} ${x+s},${cy-s+1}`);
+        tick.setAttribute('stroke',color);tick.setAttribute('stroke-width',sw);
+        tick.setAttribute('fill','none');tick.setAttribute('stroke-linecap','round');tick.setAttribute('stroke-linejoin','round');
+        g.appendChild(tick);
+    }else{
+        const cy=y-gap;
+        ['1','2'].forEach((_,i)=>{
+            const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+            l.setAttribute('x1',i===0?x-s:x+s);l.setAttribute('y1',cy-s);
+            l.setAttribute('x2',i===0?x+s:x-s);l.setAttribute('y2',cy+s);
+            l.setAttribute('stroke',color);l.setAttribute('stroke-width',sw);l.setAttribute('stroke-linecap','round');
+            g.appendChild(l);
+        });
+    }
+    return g;
+}
+
+function closeTradeChart(){
+    activeTrade=null;
+    $('tradeChartOverlay').style.display='none';
+    if(tradeChart){tradeChart.destroy();tradeChart=null;}
+    // re-highlight no rows
+    document.querySelectorAll('.t-row').forEach(r=>r.classList.remove('active','dimmed'));
+}
+
+// double-tap on trade chart overlay to close
+let lastTap=0;
+$('tradeChartOverlay').addEventListener('click',()=>{
+    const now=Date.now();
+    if(now-lastTap<350){closeTradeChart();}
+    lastTap=now;
+});
+// also double-click for desktop
+$('tradeChartOverlay').addEventListener('dblclick',closeTradeChart);
+
+new ResizeObserver(()=>{
+    if(tradeChart){tradeChart.resize();setTimeout(redrawTradeMarkers,60);}
+}).observe($('tradeChartBox'));
+
+/* ── TRADES — wire click ── */
 async function loadTrades(){
     let data=[];
     try{data=await fetch('./webpnlpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
@@ -550,10 +729,19 @@ async function loadTrades(){
         const entry=String(t.Buy_Time||'').slice(11,16);
         const exit=String(t.Exit_Time||'').slice(11,16);
         const row=document.createElement('div');row.className='t-row';
+        row.dataset.tag=String(t.Tag||'');
+        row.style.cursor='pointer';
         row.innerHTML=`<span class="t-tag">#${t.Tag||'—'}</span>
             <div><div class="t-sym">${shortSym(t.Symbol)}</div>
                  <div class="t-meta">${entry}→${exit}·Qty ${t.Qty??'—'}</div></div>
             <span class="t-pnl ${pb?'bull':'bear'}">${fmt(pnl)}</span>`;
+        row.addEventListener('click',()=>{
+            document.querySelectorAll('.t-row').forEach(r=>{
+                r.classList.toggle('active',r===row);
+                r.classList.toggle('dimmed',r!==row);
+            });
+            openTradeChart(t);
+        });
         scroll.appendChild(row);
     });
 }
