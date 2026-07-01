@@ -195,11 +195,15 @@ function initTerm(){
         convertEol:true,scrollback:500,
         fontFamily:"'DM Mono',monospace",
         fontSize:14,lineHeight:1.45,
+        scrollback:500,
+        fontFamily:"'DM Mono',monospace",
         cursorBlink:false,disableStdin:true,
+        convertEol:true,
         theme:{background:'#00000000',foreground:'#8899bb',
                green:'#22c55e',red:'#ef4444',yellow:'#f59e0b',
                cyan:'#22d3ee',brightBlack:'#374151'}
     });
+    document.getElementById('termBox').style.padding='0 14px';
     fit = new FitAddon.FitAddon();
     term.loadAddon(fit);
     term.open(document.getElementById('termBox'));
