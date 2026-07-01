@@ -1,19 +1,49 @@
-# run/runlilopxy.py 
-import pandas as pd 
-import json 
 import os 
+import json 
+import pytz 
+import pandas as pd 
+from datetime import datetime 
 from runclntpxy import get_session 
 from runltpspxy import get_mid_price 
 
-# TIME FILTER PARAMETER
-FILTER_TIME = "09:00:00"
+# 🔍 STRATEGIC FOOTPRINT: Resolved relative to run/ directory pathing
+SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../web/websqrpxy.json"))
+DEFAULT_FILTER_TIME = "09:00:00"
 
-MATCH_MODE = "TAG" 
+def resolve_dynamic_filter_time():
+    """Reads risk engine cache to fetch post-reset fresh start time if triggered today."""
+    try:
+        IST = pytz.timezone("Asia/Kolkata")
+        now_ist = datetime.now(IST)
+        today_str = now_ist.strftime("%Y-%m-%d")
+        
+        if os.path.exists(SQUAREOFF_LOG_FILE):
+            file_mod_timestamp = os.path.getmtime(SQUAREOFF_LOG_FILE)
+            file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, IST).strftime("%Y-%m-%d")
+            
+            if file_mod_date_str == today_str:
+                with open(SQUAREOFF_LOG_FILE, "r") as f:
+                    content = f.read().strip()
+                    if content:
+                        log_data = json.loads(content)
+                        if log_data.get("status") == "SUCCESSFUL_SQUARE_OFF_CONFIRMED" and log_data.get("date") == today_str:
+                            fresh_start_time = log_data.get("successful_time")
+                            if fresh_start_time:
+                                print(f"🔄 [DYNAMIC TIME] Emergency Reset detected today! Starting fresh from: {fresh_start_time}")
+                                return fresh_start_time
+        return DEFAULT_FILTER_TIME
+    except Exception as e:
+        print(f"⚠ Error resolving dynamic time parameters, falling back to default: {e}")
+        return DEFAULT_FILTER_TIME
 
-# === UNCHANGED: Keep this original function to write pnl.json ===
+# ⏱️ SURGICAL TIMELINE FILTER INITIALIZATION
+FILTER_TIME = resolve_dynamic_filter_time()
+MATCH_MODE = "TAG"
+
 def dump_to_json(closed_df): 
+    """Writes closed trade realizations to webpnlpxy.json."""
     try: 
-        file_path = os.path.expanduser("../web/webpnlpxy.json") 
+        file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../web/webpnlpxy.json"))
         os.makedirs(os.path.dirname(file_path), exist_ok=True) 
         if closed_df.empty: 
             data = [] 
@@ -28,13 +58,12 @@ def dump_to_json(closed_df):
     except Exception as e: 
         print(f"Error dumping to JSON: {e}") 
 
-# === ADDON: Your new function to write livpos.json ===
 def dump_livpos_to_json(open_positions): 
+    """Writes active positions metrics to webpospxy.json."""
     try: 
-        file_path = os.path.expanduser("../web/webpospxy.json") 
+        file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../web/webpospxy.json"))
         os.makedirs(os.path.dirname(file_path), exist_ok=True) 
         
-        # Safely convert the existing data to your exact uppercase format
         livpos_data = [{
             "SYMBOL": str(p["Symbol"]), 
             "QTY": float(p["Qty"]), 
@@ -45,24 +74,6 @@ def dump_livpos_to_json(open_positions):
             json.dump(livpos_data, f, indent=4) 
     except Exception as e: 
         print(f"Error dumping livpos to JSON: {e}") 
-
-
-def dump_to_json(closed_df): 
-    try: 
-        file_path = os.path.expanduser("../web/webpnlpxy.json") 
-        os.makedirs(os.path.dirname(file_path), exist_ok=True) 
-        if closed_df.empty: 
-            data = [] 
-        else: 
-            records = closed_df.copy() 
-            for col in records.columns: 
-                if pd.api.types.is_datetime64_any_dtype(records[col]): 
-                    records[col] = records[col].dt.strftime('%Y-%m-%d %H:%M:%S') 
-            data = records.to_dict(orient='records') 
-        with open(file_path, "w") as f: 
-            json.dump(data, f, indent=4) 
-    except Exception as e: 
-        print(f"Error dumping to JSON: {e}") 
 
 def process_lilo_orders(client): 
     try: 
@@ -85,13 +96,12 @@ def process_lilo_orders(client):
         df["prc"] = pd.to_numeric(df["avgPrc"], errors='coerce').fillna(0) 
         df["dt"] = pd.to_datetime(df["ordDtTm"]) 
 
-        # TIME FILTER BLOCK: Ignore trades before the specified time window
+        # TIME FILTER BLOCK: Ignore trades before the specified dynamic time window
         df = df[df["dt"].dt.time >= pd.to_datetime(FILTER_TIME).time()].copy()
         if df.empty: 
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
 
-        # SURGICAL FIX: Safely parse individual string elements away from list manipulation errors
         def get_safe_tag(row): 
             t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
             t_str = str(t).strip()
@@ -105,9 +115,9 @@ def process_lilo_orders(client):
             
         df["tag"] = df.apply(get_safe_tag, axis=1) 
         closed_matches = [] 
-        open_positions = [] 
-
+        open_positions = []
         for symbol, group in df.groupby("trdSym"): 
+            # FIXED: Added correct [0] brackets to .iloc property to fix extraction crashes
             token_id = str(group["tok"].iloc[0]).split('.')[0].strip()
             raw_seg = str(group["exSeg"].iloc[0]).strip()
             ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
@@ -142,13 +152,11 @@ def process_lilo_orders(client):
                 if b["qty"] > 0: 
                     live_val = 0.0
                     
-                    # Layer 1: Local Mid Price module algorithm
                     try:
                         live_val = get_mid_price(client, token_id, ex_seg)
                     except:
                         pass
                     
-                    # Layer 2: Official V2 Client Quotes Array mapping
                     if live_val <= 0:
                         try:
                             t_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
@@ -164,7 +172,6 @@ def process_lilo_orders(client):
                         except:
                             pass
 
-                    # Layer 3: Master Scrip Search data block query
                     if live_val <= 0:
                         try:
                             scr_res = client.search_scrip(exchangeSegment=ex_seg, instrumentToken=str(token_id))
@@ -175,7 +182,6 @@ def process_lilo_orders(client):
                         except:
                             pass
 
-                    # Layer 4: Direct REST client HTTP backend backdoor 
                     if live_val <= 0 and hasattr(client, 'rest_client'):
                         try:
                             h_params = {"Sid": client.configuration.edit_sid, "Auth": client.configuration.edit_token, "Content-Type": "application/x-www-form-urlencoded"}
@@ -193,7 +199,6 @@ def process_lilo_orders(client):
                         except:
                             pass
 
-                    # Layer 5: Fallback absolute security shield -> Buy Entry Price
                     if live_val <= 0:
                         live_val = b["prc"]
 
