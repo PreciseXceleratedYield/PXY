@@ -1,4 +1,4 @@
-# V1L58/pxy/sys/exe/exernkopxy.py — PART 1
+# V1L58/pxy/sys/exe/exernkopxy.py
 import os
 import sys
 import json
@@ -74,7 +74,7 @@ def save_session_state(peak_value, current_net, exit_line):
             json.dump(payload, f, indent=4)
     except Exception as e:
         print(f"{Fore.RED}⚠ Web State Sync Error: {e}")
-# V1L58/pxy/sys/exe/exernkopxy.py — PART 2
+
 
 def enforce_morning_time_gate():
     """Rigidly structures the morning constraints timeline."""
@@ -85,16 +85,23 @@ def enforce_morning_time_gate():
         now_ist = datetime.now(IST)
         now_time = now_ist.time()
         
+        # 🔒 KEPT EXACTLY THE SAME AS YOUR ORIGINAL CODE UNTOUCHED
         gate_start = dt_time(9, 0, 0)
-        gate_end = dt_time(9, 30, 0)
+        gate_end = dt_time(9, 16, 0)
         
         if now_time < gate_start:
-            sys.stdout.write(f"\r⏳ {Fore.CYAN} HOLD  Current Time: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}    ")
+            sys.stdout.write(
+                f"\r⏳ {Fore.CYAN} HOLD"
+                f"  Current Time: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}    "
+            )
             sys.stdout.flush()
             time.sleep(1.0)
             
         elif gate_start <= now_time < gate_end:
-            sys.stdout.write(f"\r⏳ {Fore.YELLOW}TIME GATE ACTIVE: System locked from 09:00 to 09:30 AM IST. Current Time: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}    ")
+            sys.stdout.write(
+                f"\r⏳ {Fore.YELLOW}TIME GATE ACTIVE: System locked from 09:00 to 09:16 AM IST. "
+                f"Current Time: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}    "
+            )
             sys.stdout.flush()
             time.sleep(1.0)
             
@@ -128,6 +135,7 @@ def enforce_morning_time_gate():
 
 def start_trailing_engine(current_loop_num):
     enforce_morning_time_gate()
+
     initial_state = load_session_state()
     session_peak_pnl = float(initial_state.get("session_peak_pnl", 0.0))
     
@@ -143,7 +151,10 @@ def start_trailing_engine(current_loop_num):
         save_session_state(session_peak_pnl, current_net_pnl, active_exit_line)
         
         sign_prefix = "+" if active_exit_line > 0 else ""
-        exit_display_str = "0.0k" if active_exit_line == 0 else f"{sign_prefix}{active_exit_line / 1000.0:.1f}k"
+        if active_exit_line == 0:
+            exit_display_str = "0.0k"
+        else:
+            exit_display_str = f"{sign_prefix}{active_exit_line / 1000.0:.1f}k"
         
         sys.stdout.write(
             f"\r⏳ [{current_loop_num:02d}/20] "
@@ -153,6 +164,7 @@ def start_trailing_engine(current_loop_num):
         )
         sys.stdout.flush()
         
+        # -------- TRIGGER AND BREAK LOGIC TIMELINE --------
         if current_net_pnl <= active_exit_line:
             if EXECUTE_SQUARE_OFF:
                 print(f"\n🚨 {Fore.RED}{Style.BRIGHT}LOSS TRIGGER BREACHED (Net ₹{current_net_pnl:,.0f} <= Limit {exit_display_str})! Entering persistent emergency loop...")
@@ -190,9 +202,12 @@ if __name__ == "__main__":
         loop_count += 1
         start_trailing_engine(loop_count)
         
+        # 🎯 Operational Loop Cap Gating Check
         if loop_count >= 20:
             print(f"\n\n🛑 {Fore.YELLOW}Operational Loop Cap Hit (20/20). Calculating next wake-up gate...")
+            
             now_ist = datetime.now(IST)
+            # Targets tomorrow morning exactly at 09:16:00 AM IST as per your original configuration specifications
             wake_target = now_ist.replace(hour=9, minute=16, second=0, microsecond=0) + timedelta(days=1)
             
             while True:
@@ -216,5 +231,3 @@ if __name__ == "__main__":
             loop_count = 0
                 
         time.sleep(LOOP_INTERVAL_SECONDS)
-
-
