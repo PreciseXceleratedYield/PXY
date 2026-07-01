@@ -129,11 +129,11 @@ def handle_side_averaging(client, df, hist_df=None):
     tgt_ce = -(dynamic_base_pct * (ce_lots / pe_lots) * ce_mult)
     tgt_pe = -(dynamic_base_pct * (pe_lots / ce_lots) * pe_mult)
 
-    print(Fore.YELLOW + "┌" + "─" * 36 + "┐")
+    print(Fore.YELLOW + "┌" + "─" * 37 + "┐")
     print(Fore.CYAN + f"│ 🛰️  GRID: {raw_ce}CE vs {raw_pe}PE".ljust(38) + "│")
     print(Fore.WHITE + f"│ 🟢 CE TARGET : {tgt_ce:.2f}%".ljust(37) + "│")
     print(Fore.WHITE + f"│ 🔴 PE TARGET : {tgt_pe:.2f}%".ljust(37) + "│")
-    print(Fore.YELLOW + "└" + "─" * 36 + "┘")
+    print(Fore.YELLOW + "└" + "─" * 37 + "┘")
 
     for side in ['CE', 'PE']: 
         side_df = df[df['side'] == side] 
