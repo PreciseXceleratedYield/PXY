@@ -40,7 +40,7 @@ def get_entry_signal(df=None):
 
     # Console Status Reporting Actions
     if entry_signal != "NONE":
-        print(f"🔥 [ACTION] -> {entry_signal} | {exit_signal} 🔥")
+        print(f"      🔥 [ACTION] -> {entry_signal} | {exit_signal} 🔥")
 
     # Returns processed option entry and the explicit structural exit string
     return entry_signal, exit_signal
