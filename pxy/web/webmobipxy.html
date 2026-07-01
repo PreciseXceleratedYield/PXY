@@ -128,16 +128,13 @@ body{
 <!-- HEADER -->
 <div id="hdr">
     <div class="hdr-l">
-        <a class="back-btn" href="webdashpxy.html">← DASH</a>
+        <button id="reconnectBtn" class="back-btn">↺ Reconnect</button>
         <div id="statusDot" title="WebSocket status"></div>
         <span id="statusLbl" style="font-size:9px;color:var(--muted);letter-spacing:0.1em;">CONNECTING</span>
     </div>
     <div class="hdr-r">
         <span id="clk">—</span>
-        <div class="toggle-wrap" id="themeToggle">
-            <div class="toggle-track"><div class="toggle-thumb"></div></div>
-        </div>
-        <span class="logo">PXY<sup>®</sup></span>
+        <span class="logo" id="logoRefresh" style="cursor:pointer;" title="Actions">PXY<sup>®</sup></span>
     </div>
 </div>
 
@@ -159,29 +156,12 @@ body{
     </div>
 </div>
 
-<!-- FOOTER -->
-<div id="ftr">
-    <span class="ftr-lbl">Terminal</span>
-    <button id="reconnectBtn">↺ Reconnect</button>
+<div id="ftr" style="height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0 16px;background:var(--bg2);border-top:1px solid var(--border2);transition:background 0.3s,border-color 0.3s;">
+    <span class="ftr-lbl">Terminal · PXY®</span>
 </div>
 
 <script>
 'use strict';
-
-/* ── THEME ── */
-document.getElementById('themeToggle').addEventListener('click',()=>{
-    const dark=document.documentElement.getAttribute('data-theme')!=='light';
-    document.documentElement.setAttribute('data-theme',dark?'light':'dark');
-    if(term)applyTheme();
-});
-function applyTheme(){
-    const dark=document.documentElement.getAttribute('data-theme')!=='light';
-    term.options.theme = dark
-        ? {background:'#00000000',foreground:'#8899bb',green:'#22c55e',
-           red:'#ef4444',yellow:'#f59e0b',cyan:'#22d3ee',brightBlack:'#374151'}
-        : {background:'#00000000',foreground:'#1e293b',green:'#16a34a',
-           red:'#dc2626',yellow:'#d97706',cyan:'#0891b2',brightBlack:'#94a3b8'};
-}
 
 /* ── CLOCK ── */
 function tick(){document.getElementById('clk').textContent=new Date().toLocaleTimeString('en-IN',{hour12:false});}
@@ -330,6 +310,129 @@ setInterval(loadRisk,4000);
 /* ── START ── */
 initTerm();
 connect();
+</script>
+<!-- ══ ACTIONS MENU (anchored to header right) ══ -->
+<div id="actionsMenu" style="display:none;position:fixed;top:44px;right:0;z-index:9998;width:240px;background:rgba(11,15,26,0.92);backdrop-filter:blur(4px);border:1px solid var(--border2);border-radius:0 0 0 12px;padding:10px 8px;flex-direction:column;gap:6px;box-shadow:0 16px 40px rgba(0,0,0,0.6);">
+    <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.08em;text-align:center;color:var(--text);padding:2px 0 6px;border-bottom:1px solid var(--border2);flex-shrink:0;">PXY<sup style="color:var(--accent);">®</sup> ACTIONS</div>
+    <button class="amenu-btn sqrall" data-script="pxysqrall">⛔ SQUARE OFF ALL<span class="amenu-sub">Close all positions</span></button>
+    <button class="amenu-btn ce"     data-script="pxybuyce" >✅ BUY CE<span class="amenu-sub">Force buy call option</span></button>
+    <button class="amenu-btn ce"     data-script="pxysqrce" >⛔ SQUARE OFF CE<span class="amenu-sub">Close all call positions</span></button>
+    <button class="amenu-btn pe"     data-script="pxybuype" >✅ BUY PE<span class="amenu-sub">Force buy put option</span></button>
+    <button class="amenu-btn pe"     data-script="pxysqrpe" >⛔ SQUARE OFF PE<span class="amenu-sub">Close all put positions</span></button>
+    <button class="amenu-btn config" data-script="pxyconfig">⚙️ PXYCONFIG<span class="amenu-sub">Open config on GitHub</span></button>
+    <button class="amenu-btn update" data-script="pxyupdate">🔄 PXYUPDATE<span class="amenu-sub">Pull latest & reset</span></button>
+    <button id="amenuClose" style="margin-top:4px;padding:7px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;">✕ Close</button>
+</div>
+
+<!-- ══ PWD POPUP ══ -->
+<div id="updPopup" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);backdrop-filter:blur(6px);align-items:center;justify-content:center;">
+    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:28px 32px;min-width:260px;display:flex;flex-direction:column;gap:14px;align-items:center;box-shadow:0 24px 60px rgba(0,0,0,0.6);">
+        <div id="updTitle" style="font-family:'Syne',sans-serif;font-weight:800;font-size:14px;letter-spacing:0.06em;">▶ script</div>
+        <div style="font-size:10px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;">Enter neo password</div>
+        <input type="password" id="updPwd" placeholder="password" maxlength="20"
+               style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-family:'DM Mono',monospace;font-size:16px;text-align:center;letter-spacing:0.14em;outline:none;"
+               onkeydown="if(event.key==='Enter')confirmUpdate();if(event.key==='Escape')cancelUpdate();">
+        <div style="display:flex;gap:10px;width:100%;">
+            <button onclick="cancelUpdate()" style="flex:1;padding:9px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;">Cancel</button>
+            <button onclick="confirmUpdate()" style="flex:1;padding:9px;border-radius:7px;border:1px solid var(--accent);background:rgba(59,130,246,0.12);color:var(--accent);font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">Execute</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ OUTPUT TOAST ══ -->
+<div id="actionOutput" style="display:none;position:fixed;bottom:80px;left:50%;transform:translateX(-50%);width:min(90vw,380px);background:var(--bg2);border:1px solid var(--border2);border-radius:10px;z-index:9999;box-shadow:0 16px 48px rgba(0,0,0,0.6);overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:var(--bg3);border-bottom:1px solid var(--border);">
+        <span id="aoLabel" style="font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);">Output</span>
+        <span onclick="document.getElementById('actionOutput').style.display='none'" style="cursor:pointer;color:var(--muted);font-size:12px;">✕</span>
+    </div>
+    <pre id="aoText" style="padding:10px 12px;font-size:11px;line-height:1.5;color:var(--text);max-height:140px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;font-family:'DM Mono',monospace;"></pre>
+</div>
+
+<style>
+.amenu-btn{
+    display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+    padding:8px 10px;border-radius:7px;border:1px solid var(--border2);
+    background:rgba(17,24,39,0.5);color:var(--text);font-family:'Syne',sans-serif;
+    font-weight:700;font-size:11px;letter-spacing:0.03em;cursor:pointer;
+    transition:all 0.15s;text-align:left;width:100%;
+}
+.amenu-btn:hover{background:rgba(17,24,39,0.85);}
+.amenu-btn.sqrall{border-color:rgba(239,68,68,0.6);color:#ff6b6b;background:rgba(239,68,68,0.12);}
+.amenu-btn.sqrall:hover{background:rgba(239,68,68,0.28);}
+.amenu-btn.ce{border-color:rgba(34,197,94,0.3);color:var(--bull);}
+.amenu-btn.ce:hover{background:rgba(34,197,94,0.18);}
+.amenu-btn.pe{border-color:rgba(239,68,68,0.3);color:var(--bear);}
+.amenu-btn.pe:hover{background:rgba(239,68,68,0.18);}
+.amenu-btn.config{border-color:rgba(59,130,246,0.3);color:var(--accent);}
+.amenu-btn.config:hover{background:rgba(59,130,246,0.18);}
+.amenu-btn.update{border-color:rgba(245,158,11,0.4);color:var(--gold);}
+.amenu-btn.update:hover{background:rgba(245,158,11,0.18);}
+.amenu-sub{font-family:'DM Mono',monospace;font-size:8px;font-weight:400;opacity:0.65;letter-spacing:0.05em;}
+</style>
+
+<script>
+/* ── ACTIONS MENU ── */
+let pendingScript=null;
+const logo=document.getElementById('logoRefresh');
+const amenu=document.getElementById('actionsMenu');
+
+logo.addEventListener('click',e=>{
+    e.stopPropagation();
+    amenu.style.display=amenu.style.display==='flex'?'none':'flex';
+});
+document.getElementById('amenuClose').addEventListener('click',()=>{ amenu.style.display='none'; });
+document.addEventListener('click',e=>{ if(!amenu.contains(e.target)&&e.target!==logo) amenu.style.display='none'; });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') amenu.style.display='none'; });
+
+document.querySelectorAll('.amenu-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+        const script=btn.dataset.script;
+        if(script==='pxyconfig'){
+            window.open('https://github.com/kcbpcc/V1L58/tree/main','_blank');
+            amenu.style.display='none';
+            return;
+        }
+        pendingScript=script;
+        amenu.style.display='none';
+        document.getElementById('updTitle').textContent='▶ '+script;
+        document.getElementById('updPwd').value='';
+        document.getElementById('updPopup').style.display='flex';
+        setTimeout(()=>document.getElementById('updPwd').focus(),80);
+    });
+});
+
+function cancelUpdate(){
+    document.getElementById('updPopup').style.display='none';
+    document.getElementById('updPwd').value='';
+    pendingScript=null;
+}
+function confirmUpdate(){
+    const pwd=document.getElementById('updPwd').value.trim();
+    if(!pwd||!pendingScript)return;
+    const script=pendingScript;
+    document.getElementById('updPopup').style.display='none';
+    document.getElementById('updPwd').value='';
+    pendingScript=null;
+    const orig=logo.innerHTML;
+    logo.innerHTML='⏳';
+    fetch(`/run/${script}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pwd})})
+    .then(r=>r.json())
+    .then(d=>{
+        logo.innerHTML=d.ok?'✓':'✗';
+        setTimeout(()=>{logo.innerHTML=orig;},2500);
+        const text=(d.output||'')+(d.error?'\n⚠ '+d.error:'');
+        document.getElementById('aoLabel').textContent=d.ok?`✓ ${script}`:`✗ ${script}`;
+        document.getElementById('aoText').textContent=text.trim()||'(no output)';
+        document.getElementById('actionOutput').style.display='block';
+    })
+    .catch(e=>{
+        logo.innerHTML='✗';
+        setTimeout(()=>{logo.innerHTML=orig;},2500);
+        document.getElementById('aoLabel').textContent=`✗ ${script}`;
+        document.getElementById('aoText').textContent=e.message;
+        document.getElementById('actionOutput').style.display='block';
+    });
+}
 </script>
 </body>
 </html>
