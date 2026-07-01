@@ -112,7 +112,7 @@ def execute_order(client, symbol, qty):
         res = client.place_order(**params)
         
         # Log the tag with the response for verification
-        print(f"{Fore.CYAN}       🚀  {symbol} | {order_tag}")
+        print(f"{Fore.CYAN}        🚀  {symbol} | {order_tag}")
         
         return {"stat": "OK" if res and str(res).strip() else "FAIL", "raw": res}
     except Exception as e:
