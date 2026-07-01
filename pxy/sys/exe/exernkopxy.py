@@ -1,11 +1,11 @@
-# V1L58/pxy/sys/exe/exernkopxy.py
+# V1L58/pxy/sys/exe/exernkopxy.py — PART 1
 import os
 import sys
 import json
 import time
 import subprocess
 import pytz
-from datetime import datetime, time as dt_time
+from datetime import datetime, time as dt_time, timedelta
 from colorama import Fore, Style, init
 
 # Initialize colorama for clean terminal output formatting
@@ -74,15 +74,10 @@ def save_session_state(peak_value, current_net, exit_line):
             json.dump(payload, f, indent=4)
     except Exception as e:
         print(f"{Fore.RED}⚠ Web State Sync Error: {e}")
-
+# V1L58/pxy/sys/exe/exernkopxy.py — PART 2
 
 def enforce_morning_time_gate():
-    """Rigidly structures the morning constraints timeline.
-    
-    00:00 AM - 08:59 AM IST: Wait passively (Market hasn't opened setup windows)
-    09:00 AM - 09:29 AM IST: Hard lockout time gate active
-    09:30 AM IST onwards    : Performs clean sweep once and opens tracking loops
-    """
+    """Rigidly structures the morning constraints timeline."""
     IST = pytz.timezone("Asia/Kolkata")
     has_cleaned_history = False
 
@@ -90,29 +85,19 @@ def enforce_morning_time_gate():
         now_ist = datetime.now(IST)
         now_time = now_ist.time()
         
-        # Define strict absolute boundary markers
         gate_start = dt_time(9, 0, 0)
-        gate_end = dt_time(9, 16, 0)
+        gate_end = dt_time(9, 30, 0)
         
-        # 🛡️ PHASE 1: Pre-9:00 AM Early Morning Holding Pattern
         if now_time < gate_start:
-            sys.stdout.write(
-                f"\r⏳ {Fore.CYAN} HOLD"
-                f"  Current Time: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}    "
-            )
+            sys.stdout.write(f"\r⏳ {Fore.CYAN} HOLD  Current Time: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}    ")
             sys.stdout.flush()
             time.sleep(1.0)
             
-        # 🛡️ PHASE 2: 09:00 AM to 09:29:59 AM Strict Time Gate Lockout
         elif gate_start <= now_time < gate_end:
-            sys.stdout.write(
-                f"\r⏳ {Fore.YELLOW}TIME GATE ACTIVE: System locked from 09:00 to 09:16 AM IST. "
-                f"Current Time: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}    "
-            )
+            sys.stdout.write(f"\r⏳ {Fore.YELLOW}TIME GATE ACTIVE: System locked from 09:00 to 09:30 AM IST. Current Time: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}    ")
             sys.stdout.flush()
             time.sleep(1.0)
             
-        # 🛡️ PHASE 3: 09:30:00 AM or Later -> Execute Cleanup once and break out
         else:
             state = load_session_state()
             last_update_time = state.get("updated_timestamp", "")
@@ -141,9 +126,8 @@ def enforce_morning_time_gate():
             has_cleaned_history = True
 
 
-def start_trailing_engine():
+def start_trailing_engine(current_loop_num):
     enforce_morning_time_gate()
-
     initial_state = load_session_state()
     session_peak_pnl = float(initial_state.get("session_peak_pnl", 0.0))
     
@@ -159,25 +143,21 @@ def start_trailing_engine():
         save_session_state(session_peak_pnl, current_net_pnl, active_exit_line)
         
         sign_prefix = "+" if active_exit_line > 0 else ""
-        if active_exit_line == 0:
-            exit_display_str = "0.0k"
-        else:
-            exit_display_str = f"{sign_prefix}{active_exit_line / 1000.0:.1f}k"
+        exit_display_str = "0.0k" if active_exit_line == 0 else f"{sign_prefix}{active_exit_line / 1000.0:.1f}k"
         
-        print(
-            f"Exit@{Fore.RED}₹{Style.BRIGHT}{exit_display_str}{Style.RESET_ALL} |"
+        sys.stdout.write(
+            f"\r⏳ [{current_loop_num:02d}/20] "
+            f"Exit@{Fore.RED}₹{Style.BRIGHT}{exit_display_str}{Style.RESET_ALL} | "
             f"📊 Net:{Fore.GREEN}₹{current_net_pnl:,.0f}{Style.RESET_ALL} | "
-            f"Peak@{Fore.YELLOW}₹{session_peak_pnl:,.0f}{Style.RESET_ALL} "
-
+            f"Peak@{Fore.YELLOW}₹{session_peak_pnl:,.0f}{Style.RESET_ALL}   "
         )
+        sys.stdout.flush()
         
-        # -------- TRIGGER AND BREAK LOGIC TIMELINE --------
         if current_net_pnl <= active_exit_line:
             if EXECUTE_SQUARE_OFF:
                 print(f"\n🚨 {Fore.RED}{Style.BRIGHT}LOSS TRIGGER BREACHED (Net ₹{current_net_pnl:,.0f} <= Limit {exit_display_str})! Entering persistent emergency loop...")
                 script_path = os.path.join(current_dir, "exesqrpxy.py")
                 
-                # 🔄 RUN FOREVER LOGIC: This block runs continuously if triggered
                 while True:
                     print(f"⚡ [{time.strftime('%H:%M:%S')}] {Fore.MAGENTA}Firing emergency square-off subprocess...")
                     try:
@@ -193,16 +173,48 @@ def start_trailing_engine():
                     time.sleep(EMERGENCY_RETRY_SECONDS)
             else:
                 print(f"\n⚠️  {Fore.YELLOW}{Style.BRIGHT}⚠️  WARNING TARGET BREACHED: Net dropped below floor threshold {exit_display_str}!")
-                sys.exit(0)
+                return
         else:
-            # ✅ BREAK ENGINE OUT: Safe condition verified. Clean exit returns control to your main supervisor.
-            sys.exit(0)
+            return
 
     except Exception as e:
-        print(f"{Fore.RED}Execution Error inside tracker engine: {e}")
-        sys.exit(1)
+        print(f"\n{Fore.RED}Execution Error inside tracker engine: {e}")
+        return
 
 
 if __name__ == "__main__":
-    start_trailing_engine()
+    IST = pytz.timezone("Asia/Kolkata")
+    loop_count = 0
+    
+    while True:
+        loop_count += 1
+        start_trailing_engine(loop_count)
+        
+        if loop_count >= 20:
+            print(f"\n\n🛑 {Fore.YELLOW}Operational Loop Cap Hit (20/20). Calculating next wake-up gate...")
+            now_ist = datetime.now(IST)
+            wake_target = now_ist.replace(hour=9, minute=16, second=0, microsecond=0) + timedelta(days=1)
+            
+            while True:
+                current_time = datetime.now(IST)
+                seconds_remaining = int((wake_target - current_time).total_seconds())
+                
+                if seconds_remaining <= 0:
+                    break
+                    
+                hours, remainder = divmod(seconds_remaining, 3600)
+                minutes, seconds = divmod(remainder, 60)
+                
+                sys.stdout.write(
+                    f"\r🛌 {Fore.CYAN}HIBERNATING until 09:16 AM IST tomorrow. "
+                    f"Time Remaining: {hours:02d}h {minutes:02d}m {seconds:02d}s {Style.RESET_ALL}"
+                )
+                sys.stdout.flush()
+                time.sleep(1.0)
+            
+            print(f"\n⏰ {Fore.GREEN}Waking up! Resetting core engine iteration parameters for the new session.\n")
+            loop_count = 0
+                
+        time.sleep(LOOP_INTERVAL_SECONDS)
+
 
