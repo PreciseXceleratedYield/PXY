@@ -106,7 +106,7 @@ def enforce_morning_time_gate():
         now_ist = datetime.now(IST)
         now_time = now_ist.time()
         
-        gate_start = dt_time(9, 0, 0)
+        gate_start = dt_time(6, 0, 0)
         gate_end = dt_time(9, 16, 0)
         
         # 🛡️ PHASE 1: Pre-9:00 AM Early Morning Holding Pattern
