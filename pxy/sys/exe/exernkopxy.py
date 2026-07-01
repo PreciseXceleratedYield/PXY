@@ -122,7 +122,7 @@ def enforce_morning_time_gate():
         elif gate_start <= now_time < gate_end:
             sys.stdout.write(
                 f"\r⏳ {Fore.YELLOW}[DEBUG-GATE: LOCKED]"
-                f" System locked from 09:00 to 09:16 AM. Current: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}   "
+                f" System locked from 06:00 to 09:16 AM. Current: {now_ist.strftime('%H:%M:%S')}{Style.RESET_ALL}   "
             )
             sys.stdout.flush()
             time.sleep(1.0)
