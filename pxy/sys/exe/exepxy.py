@@ -7,6 +7,7 @@ from colorama import init, Fore, Style
 import sys
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import os  # ✅ Added for screen clearing
 
 # ✅ SWITCH ADDED
 SIMPLE_MODE = True  # Set to True to remove CE/PE check and run both scripts every loop
@@ -90,6 +91,7 @@ def in_market_hours():
     return (0 <= now.weekday() <= 4 and dt_time(9, 16) <= now.time() <= dt_time(15, 29))
 
 # ---------------- MAIN LOOP ----------------
+os.system('clear')  # ✅ Initial screen clear
 print("\n🚀 INIT: main market loop starting now 📡")
 loop_counter = 1
 
@@ -108,33 +110,34 @@ for s in parent_scripts:
     if s.name == "exernkopxy.py":
         safe_run(s, timeout=None)  # Infinite exception
     else:
-        safe_run(s, timeout=20)    # Standard limit
+        safe_run(s, timeout=20)  # Standard limit
 
 while True:
+    os.system('clear')  # ✅ Clears Ubuntu screen at the start of every main loop iteration
+    
     if in_market_hours():
         live_status("🚀 LOOP: waiting trigger 📊")
         
         for sub_itr in range(1, 31):
             # API call with 7s timeout
             pos_summary = call_with_timeout(get_position_summary, 7, client)
-            
             if not pos_summary:
                 pos_summary = "0CE0PE"
-                
+            
             try:
                 ce_qty = int(pos_summary.split("CE")[0])
                 pe_qty = int(pos_summary.split("CE")[1].replace("PE", ""))
             except Exception:
                 ce_qty, pe_qty = 0, 0
                 
-            live_status(f"📊 Loop#{loop_counter} Sub#{sub_itr} CE:{ce_qty} PE:{pe_qty}")
-
+            os.system('clear')  # ✅ Clears screen before printing the updated live loop status
+            print(f"📊 Loop#{loop_counter} Sub#{sub_itr} CE:{ce_qty} PE:{pe_qty}")
+            
             # -------- CORE LOGIC WITH SWITCH --------
             if SIMPLE_MODE:
                 safe_run(HERE / "exernkopxy.py", timeout=None)  # Infinite exception
                 safe_run(HERE / "exeexitpxy.py", timeout=20)
                 safe_run(HERE / "exeentrpxy.py", timeout=20)
-                
             else:
                 if ce_qty > 0 and ce_qty == pe_qty:
                     safe_run(HERE / "exeexitpxy.py", timeout=20)
@@ -143,17 +146,20 @@ while True:
                 else:
                     safe_run(HERE / "exeexitpxy.py", timeout=20)
                     safe_run(HERE / "exeentrpxy.py", timeout=20)
-
-            fancy_pause(7) # 7-second pause between sub-iterations
-            loop_counter += 1
+                    
+            fancy_pause(7)  # 7-second pause between sub-iterations
             
+        loop_counter += 1
     else:
         print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
         safe_run(HERE.parent / "sysslefpxy.py", timeout=20)
         fancy_pause(7)
+        
         while not in_market_hours():
+            os.system('clear')  # ✅ Clears screen while waiting overnight so logs don't stack up
             print("⏳ WAIT: market opens at 09:16 IST 📡", end="\r")
             time.sleep(60)
+            
         print("\n🚀 MKT OPEN: resuming main loop now 📈")
 
 
