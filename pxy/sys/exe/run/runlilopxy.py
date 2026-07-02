@@ -7,7 +7,7 @@ from runclntpxy import get_session
 from runltpspxy import get_mid_price 
 
 # 🔍 STRATEGIC FOOTPRINT: Resolved relative to run/ directory pathing
-SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../web/websqrpxy.json"))
+SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/websqrpxy.json"))
 DEFAULT_FILTER_TIME = "09:00:00"
 
 def resolve_dynamic_filter_time():
@@ -43,7 +43,7 @@ MATCH_MODE = "TAG"
 def dump_to_json(closed_df): 
     """Writes closed trade realizations to webpnlpxy.json."""
     try: 
-        file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../web/webpnlpxy.json"))
+        file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/webpnlpxy.json"))
         os.makedirs(os.path.dirname(file_path), exist_ok=True) 
         if closed_df.empty: 
             data = [] 
@@ -61,7 +61,7 @@ def dump_to_json(closed_df):
 def dump_livpos_to_json(open_positions): 
     """Writes active positions metrics to webpospxy.json."""
     try: 
-        file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../web/webpospxy.json"))
+        file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/webpospxy.json"))
         os.makedirs(os.path.dirname(file_path), exist_ok=True) 
         
         livpos_data = [{
