@@ -88,10 +88,10 @@ body{
 #termBox .xterm-screen{background:transparent!important;}
 
 #panePositions{position:relative;}
-/* POSITIONS TAB — vertical split */
+/* POSITIONS TAB — 40/60 split */
 #posPane{display:flex;flex-direction:column;height:100%;}
-#posTop{flex:1;min-height:0;display:flex;flex-direction:column;border-bottom:1px solid var(--border2);overflow:hidden;}
-#posBot{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
+#posTop{height:40%;flex-shrink:0;display:flex;flex-direction:column;border-bottom:1px solid var(--border2);overflow:hidden;position:relative;}
+#posBot{height:60%;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;}
 .pane-hdr{
     height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
     padding:0 10px;background:var(--bg2);border-bottom:1px solid var(--border);
@@ -100,15 +100,15 @@ body{
 .pane-scroll{flex:1;overflow-y:auto;}
 .p-row,.t-row{
     display:grid;grid-template-columns:auto 1fr auto;
-    align-items:center;gap:6px;padding:6px 10px;
+    align-items:center;gap:8px;padding:10px 12px;
     border-bottom:1px solid var(--border);cursor:default;
 }
 .p-row.bull-r{border-left:2px solid var(--bull);}
 .p-row.bear-r{border-left:2px solid var(--bear);}
-.p-sym,.t-sym{font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.p-meta,.t-meta{font-size:8px;color:var(--muted);margin-top:1px;}
-.p-tag,.t-tag{font-size:9px;color:var(--accent);flex-shrink:0;font-weight:500;}
-.p-pnl,.t-pnl{font-family:'Syne',sans-serif;font-weight:700;font-size:12px;flex-shrink:0;text-align:right;}
+.p-sym,.t-sym{font-size:20px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.p-meta,.t-meta{font-size:16px;color:var(--muted);margin-top:1px;}
+.p-tag,.t-tag{font-size:18px;color:var(--accent);flex-shrink:0;font-weight:500;}
+.p-pnl,.t-pnl{font-family:'Syne',sans-serif;font-weight:700;font-size:22px;flex-shrink:0;text-align:right;}
 .p-pnl.bull,.t-pnl.bull{color:var(--bull);}
 .p-pnl.bear,.t-pnl.bear{color:var(--bear);}
 .t-sym{color:var(--muted);}
@@ -217,18 +217,30 @@ body{
         <div id="termBox"></div>
     </div>
 
-    <!-- POSITIONS + TRADES (vertical split) -->
+    <!-- POSITIONS + TRADES (40/60 split) -->
     <div class="tab-pane" id="panePositions">
-
-        <!-- Normal positions/trades view -->
-        <div id="posPane" style="display:flex;flex-direction:column;height:100%;">
+        <div id="posPane">
             <div id="posTop">
                 <div class="pane-hdr">
                     <span>📍 Positions</span>
                     <span id="posPnlLabel" style="color:var(--bull);">—</span>
                 </div>
                 <div class="pane-scroll" id="posScroll"><div class="empty-msg" id="posEmpty">No positions</div></div>
+
+                <!-- Trade chart overlay — covers ONLY posTop (40%) -->
+                <div id="tradeChartOverlay" style="display:none;position:absolute;inset:0;flex-direction:column;background:var(--bg);z-index:10;">
+                    <div style="height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 10px;background:var(--bg2);border-bottom:1px solid var(--border2);">
+                        <span id="tradeChartLabel" style="font-size:9px;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">— trade —</span>
+                        <span style="font-size:9px;color:var(--muted);flex-shrink:0;margin-left:6px;">2× close</span>
+                    </div>
+                    <div id="tradeChartBox" style="flex:1;position:relative;overflow:hidden;background:var(--bg);">
+                        <div class="grid-over"></div>
+                        <canvas id="tradeChart"></canvas>
+                        <svg id="tradeMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;overflow:visible;"></svg>
+                    </div>
+                </div>
             </div>
+
             <div id="posBot">
                 <div class="pane-hdr">
                     <span>📋 Trades</span>
@@ -237,20 +249,6 @@ body{
                 <div class="pane-scroll" id="tradeScroll"><div class="empty-msg" id="tradeEmpty">No trades</div></div>
             </div>
         </div>
-
-        <!-- Trade chart overlay — slides over when trade clicked -->
-        <div id="tradeChartOverlay" style="display:none;position:absolute;inset:0;flex-direction:column;background:var(--bg);z-index:10;">
-            <div style="height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 10px;background:var(--bg2);border-bottom:1px solid var(--border2);">
-                <span id="tradeChartLabel" style="font-size:9px;color:var(--muted);letter-spacing:0.10em;text-transform:uppercase;">— trade —</span>
-                <span style="font-size:9px;color:var(--muted);">double-tap to close</span>
-            </div>
-            <div id="tradeChartBox" style="flex:1;position:relative;overflow:hidden;background:var(--bg);">
-                <div class="grid-over"></div>
-                <canvas id="tradeChart"></canvas>
-                <svg id="tradeMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;overflow:visible;"></svg>
-            </div>
-        </div>
-
     </div>
 
     <!-- CHART -->
@@ -282,7 +280,7 @@ body{
 <!-- TAB BAR -->
 <div id="tabBar">
     <button class="tab-btn active" data-tab="paneTerminal" id="tabTerminal">
-        <span class="tab-icon">⌨️</span>TERMINAL
+        <span class="tab-icon">🖥️</span>TERMINAL
     </button>
     <button class="tab-btn" data-tab="panePositions" id="tabPositions">
         <span class="tab-icon">📊</span>POSITIONS
