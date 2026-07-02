@@ -64,14 +64,14 @@ def target_price(row):
         if active_exit in ["SELL", "BEAR"]:  # Counter-Trend / Hostile
             ce_target_pct = atr_val / 2
         else:  # Aligned Trend: ((ATR * Same-Side Power) + Same-Side Depth)
-            ce_target_pct = (atr_val * ce_p) + hce_d
+            ce_target_pct = 99 #(atr_val * ce_p) + hce_d
         ce_target_pct = max(1.0, ce_target_pct)
 
         # --- Evaluate Put (SELL) Side ---
         if active_exit in ["BUY", "BULL"]:  # Counter-Trend / Hostile
             pe_target_pct = atr_val / 2
         else:  # Aligned Trend: ((ATR * Same-Side Power) + Same-Side Depth)
-            pe_target_pct = (atr_val * pe_p) + hpe_d
+            pe_target_pct = 99 #(atr_val * pe_p) + hpe_d
         pe_target_pct = max(1.0, pe_target_pct)
 
         # 5. DUAL-SIDE DASHBOARD PRINT LINE
