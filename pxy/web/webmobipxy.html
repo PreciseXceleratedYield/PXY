@@ -90,19 +90,19 @@ body{
 #panePositions{position:relative;}
 /* POSITIONS TAB — 40/60 split */
 #posPane{display:flex;flex-direction:column;height:100%;}
-#posTop{height:40%;flex-shrink:0;display:flex;flex-direction:column;border-bottom:1px solid var(--border2);overflow:hidden;position:relative;}
-#posBot{height:60%;flex-shrink:0;display:flex;flex-direction:column;overflow:hidden;}
+#posTop{height:40%;flex-shrink:0;display:flex;flex-direction:column;border-bottom:1px solid var(--border2);position:relative;}
+#posBot{height:60%;flex-shrink:0;display:flex;flex-direction:column;}
 .pane-hdr{
     height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
     padding:0 10px;background:var(--bg2);border-bottom:1px solid var(--border);
     font-size:8px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);
 }
-.pane-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}.p-row,.t-row{
+.pane-scroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+.p-row,.t-row{
     display:grid;grid-template-columns:auto 1fr auto;
     align-items:center;gap:6px;padding:6px 10px;
     border-bottom:1px solid var(--border);cursor:default;
 }
-.pane-scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;}
 .p-row.bull-r{border-left:2px solid var(--bull);}
 .p-row.bear-r{border-left:2px solid var(--bear);}
 .p-sym,.t-sym{font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
