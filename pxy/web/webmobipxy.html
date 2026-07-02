@@ -385,11 +385,8 @@ function emojify(v){
 function shortSym(s){
     if(!s)return'—';
     const m=s.match(/([A-Z]+)\d{2}([A-Z]{3})\d{2}(C|P)(\d+)/i);
-    if(m){
-        // e.g. "NIFTY MAY 24000 CE" → compact 7 chars: "24000CE"
-        return`${m[4]}${m[3]==='C'?'CE':'PE'}`;
-    }
-    return s.length>7?s.slice(0,6)+'…':s;
+    if(m)return`${m[2]} ${m[4]} ${m[3]==='C'?'CE':'PE'}`;
+    return s.length>12?s.slice(0,11)+'…':s;
 }
 function lotSz(s){return(s||'').includes('BANKNIFTY')?30:65;}
 
