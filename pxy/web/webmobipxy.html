@@ -89,15 +89,24 @@ body{
 
 #panePositions{position:relative;}
 /* POSITIONS TAB — 40/60 split */
-#posPane{display:flex;flex-direction:column;height:100%;overflow:hidden;}
-#posTop{height:40%;display:flex;flex-direction:column;border-bottom:1px solid var(--border2);position:relative;overflow:hidden;}
-#posBot{height:60%;display:flex;flex-direction:column;overflow:hidden;}
+#posPane{display:flex;flex-direction:column;height:100%;}
+#posTop{height:40%;display:flex;flex-direction:column;border-bottom:1px solid var(--border2);position:relative;}
+#posBot{height:60%;display:flex;flex-direction:column;}
 .pane-hdr{
     height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
     padding:0 10px;background:var(--bg2);border-bottom:1px solid var(--border);
     font-size:8px;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);
 }
-.pane-scroll{flex:1;overflow-y:scroll;-webkit-overflow-scrolling:touch;min-height:0;}
+#posScroll{
+    height:calc(40vh - 26px);
+    overflow-y:scroll;
+    -webkit-overflow-scrolling:touch;
+}
+#tradeScroll{
+    height:calc(60vh - 26px);
+    overflow-y:scroll;
+    -webkit-overflow-scrolling:touch;
+}
 .p-row,.t-row{
     display:grid;grid-template-columns:auto 1fr auto;
     align-items:center;gap:6px;padding:6px 10px;
