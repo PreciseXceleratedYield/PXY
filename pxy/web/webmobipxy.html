@@ -462,7 +462,7 @@ function connect(){
     const proto=location.protocol==='https:'?'wss':'ws';
     ws=new WebSocket(`${proto}://${location.host}`);
     ws.onopen=()=>{setStatus('connected');term.clear();term.write('\x1b[32m[connected]\x1b[0m\r\n');};
-    ws.onmessage=e=>{term.clear();term.write(e.data);};
+    ws.onmessage=e=>{term.write(e.data);term.scrollToBottom();};
     ws.onerror=()=>{setStatus('error');term.write('\r\n\x1b[31m[connection error]\x1b[0m');};
     ws.onclose=()=>{setStatus('offline');term.write('\r\n\x1b[33m[disconnected]\x1b[0m');};
 }
