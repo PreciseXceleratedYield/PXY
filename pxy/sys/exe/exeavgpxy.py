@@ -107,7 +107,6 @@ def handle_side_averaging(client, df, hist_df=None):
     # Live position string extraction matching your exact upstream format
     pos_raw = str(get_position_summary(client)).upper().strip()
     match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
-    
     if match:
         raw_ce = int(match.group(1))
         raw_pe = int(match.group(2))
@@ -122,13 +121,38 @@ def handle_side_averaging(client, df, hist_df=None):
     df = df.copy()
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
 
-    # 📊 38-Width Clean Telemetry Dashboard Matrix
-    ce_mult = 1.5 if (not df[df['side']=='CE'].empty and df[df['side']=='CE']['exit'].str.upper().str.strip().eq('BEAR').any()) else 1.0
-    pe_mult = 1.5 if (not df[df['side']=='PE'].empty and df[df['side']=='PE']['exit'].str.upper().str.strip().eq('BULL').any()) else 1.0
-    
-    tgt_ce = -(dynamic_base_pct * (ce_lots / pe_lots) * ce_mult)
-    tgt_pe = -(dynamic_base_pct * (pe_lots / ce_lots) * pe_mult)
+    # 📊 Extract accurate dynamic power and depth metrics from the dataframe stream tail
+    # Enforces absolute 1.0 minimum bounds to protect against math errors
+    try:
+        last_row = df.iloc[-1]
+        current_ce_power = max(1.0, safe_float(last_row.get('ce_power', 1.0)))
+        current_pe_power = max(1.0, safe_float(last_row.get('pe_power', 1.0)))
+        current_ce_depth = max(1.0, safe_float(last_row.get('hkin_ce_depth', 1.0)))
+        current_pe_depth = max(1.0, safe_float(last_row.get('hkin_pe_depth', 1.0)))
+    except Exception:
+        current_ce_power, current_pe_power = 1.0, 1.0
+        current_ce_depth, current_pe_depth = 1.0, 1.0
 
+    # 🔄 CALCULATE ACCURATE TARGET BOUNDARIES ONCE (Depth added as a flat addition at final calculation step)
+    # --- CE Target Calculation ---
+    ce_base_step = dynamic_base_pct * (ce_lots / pe_lots)
+    if not df[df['side']=='CE'].empty and df[df['side']=='CE']['exit'].str.upper().str.strip().eq('BEAR').any():
+        # Hostile Bear Side: ((ATR * Ratio) * Opposite PE Power) + Opposite PE Depth
+        tgt_ce = -((ce_base_step * current_pe_power) + current_pe_depth)
+    else:
+        # Favourable/Aligned Side: ATR * Ratio
+        tgt_ce = -ce_base_step
+
+    # --- PE Target Calculation ---
+    pe_base_step = dynamic_base_pct * (pe_lots / ce_lots)
+    if not df[df['side']=='PE'].empty and df[df['side']=='PE']['exit'].str.upper().str.strip().eq('BULL').any():
+        # Hostile Bull Side: ((ATR * Ratio) * Opposite CE Power) + Opposite CE Depth
+        tgt_pe = -((pe_base_step * current_ce_power) + current_ce_depth)
+    else:
+        # Favourable/Aligned Side: ATR * Ratio
+        tgt_pe = -pe_base_step
+
+    # 📊 38-Width Clean Telemetry Dashboard Matrix Box
     print(Fore.YELLOW + "┌" + "─" * 39 + "┐")
     print(Fore.CYAN + f"│      ⚖️ GRID: {raw_ce}CE vs {raw_pe}PE".ljust(40) + "│")
     print(Fore.WHITE + f"│      🟢 CE TARGET : {tgt_ce:.2f}%".ljust(40) + "│")
@@ -146,25 +170,17 @@ def handle_side_averaging(client, df, hist_df=None):
         # Proportional ratio calculations are safe with shifted counts
         if side == "CE":
             side_factor = ce_lots / pe_lots
+            dynamic_threshold = tgt_ce  # Map directly to pre-calculated top block math
         else:
             side_factor = pe_lots / ce_lots
+            dynamic_threshold = tgt_pe  # Map directly to pre-calculated top block math
+
+        last_calculated_threshold = dynamic_threshold
 
         for index, row in side_df.iterrows():
-            row_exit = str(row.get('exit', '')).upper().strip()
-
-            # 🔄 Determine safety multiplier based on candle color state
-            signal_multiplier = 1.0
-            if side == "CE" and row_exit == "BEAR":
-                signal_multiplier = 1.5
-            elif side == "PE" and row_exit == "BULL":
-                signal_multiplier = 1.5
-
             pos_loss = get_loss(row)
             
-            # --- EVALUATE MATRIX CALCULATIONS VIA DYNAMIC ATR SMOOTHED RATIO ---
-            dynamic_threshold = -(dynamic_base_pct * side_factor * signal_multiplier)
-            last_calculated_threshold = dynamic_threshold
-
+            # Position checks against the strict pre-calculated boundary
             if pos_loss > dynamic_threshold:
                 all_positions_crossed_threshold = False
                 break  
