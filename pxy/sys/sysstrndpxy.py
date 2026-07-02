@@ -18,7 +18,7 @@ DEBUG_MODE = False
 CHECK_CONFIRMED_ONLY = False  
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
-    """ Pure SuperTrend (1, 3) Pipeline Engine mapped to Legacy Target Channel Keys """
+    """ True SuperTrend (1, 3) Pipeline Engine with Explicit 'exit' Column Injections """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m") 
         if not raw_df.empty:
@@ -45,7 +45,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     # --- Compute ATR Length 1 Logic ---
     prev_close = np.roll(src_close, 1)
-    prev_close[0] = src_close[0] # Edge protection boundary
+    prev_close = src_close # Boundary conditions safety
     
     tr1 = src_high - src_low
     tr2 = np.abs(src_high - prev_close)
@@ -113,6 +113,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             # Persistent memory states for standard continuation bars
             sma_trend_history.append("BULL" if trend[i] == 1 else "BEAR")
 
+    # --- Direct Injection of the 'exit' Column to Prevent Downstream Crashes ---
+    df['exit'] = sma_trend_history
     df['pxy_sma_line'] = supertrend_line
     df['sma_trend_full'] = sma_trend_history
     df['src_c'] = src_close
@@ -127,12 +129,12 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     try:
         df['shared_atr'] = calculate_atr(df)
     except Exception:
-        df['shared_atr'] = 12.0
+        df['shared_atr'] = atr1
     
     return df
 
 def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
-    """ Dumps exact candle framework data matrix directly to JSON """
+    """ Dumps exact candle framework data matrix directly to JSON with exit fields """
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
     
@@ -145,10 +147,11 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
             "time": str(idx),
             "close": float(row["Close"]),
             "p_master": float(row["Close"]),  
-            "st": float(row["pxy_sma_line"]),       # SuperTrend Line
-            "st_trend": str(row["sma_trend_full"]), # Strict 4-State Output
-            "sma_line": float(row["pxy_sma_line"]), # Legacy Key Kept Alive
-            "sma_trend": str(row["sma_trend_full"]) # Legacy Key Kept Alive
+            "st": float(row["pxy_sma_line"]),       
+            "st_trend": str(row["sma_trend_full"]), 
+            "sma_line": float(row["pxy_sma_line"]), 
+            "sma_trend": str(row["sma_trend_full"]),
+            "exit": str(row["sma_trend_full"])       # Injected tracking key for json structural parity
         })
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True) if os.path.dirname(output_file) else None
