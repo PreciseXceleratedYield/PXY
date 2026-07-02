@@ -136,18 +136,18 @@ def handle_side_averaging(client, df, hist_df=None):
     # 🔄 CALCULATE ACCURATE TARGET BOUNDARIES ONCE (Depth added as a flat addition at final calculation step)
     # --- CE Target Calculation ---
     ce_base_step = dynamic_base_pct * (ce_lots / pe_lots)
-    if not df[df['side']=='CE'].empty and df[df['side']=='CE']['exit'].str.upper().str.strip().eq('BEAR').any():
+    if not df[df['side']=='CE'].empty and df[df['side']=='CE']['supertrend'].str.upper().str.strip().isin(['BEAR', 'SELL']).any():
         # Hostile Bear Side: ((ATR * Ratio) * Opposite PE Power) + Opposite PE Depth
-        tgt_ce = -((ce_base_step * current_pe_power) + current_pe_depth)
+        tgt_ce = -33 #((ce_base_step * current_pe_power) + current_pe_depth)
     else:
         # Favourable/Aligned Side: ATR * Ratio
         tgt_ce = -ce_base_step
 
     # --- PE Target Calculation ---
     pe_base_step = dynamic_base_pct * (pe_lots / ce_lots)
-    if not df[df['side']=='PE'].empty and df[df['side']=='PE']['exit'].str.upper().str.strip().eq('BULL').any():
+    if not df[df['side']=='PE'].empty and df[df['side']=='PE']['supertrend'].str.upper().str.strip().isin(['BULL', 'BUY']).any():
         # Hostile Bull Side: ((ATR * Ratio) * Opposite CE Power) + Opposite CE Depth
-        tgt_pe = -((pe_base_step * current_ce_power) + current_ce_depth)
+        tgt_pe = -33 #((pe_base_step * current_ce_power) + current_ce_depth)
     else:
         # Favourable/Aligned Side: ATR * Ratio
         tgt_pe = -pe_base_step
