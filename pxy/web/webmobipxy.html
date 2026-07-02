@@ -232,8 +232,12 @@ body{
         <div id="posPane">
             <div id="posTop">
                 <div class="pane-hdr">
-                    <span>📍 Positions</span>
-                    <span id="posPnlLabel" style="color:var(--bull);">—</span>
+                    <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📍 Positions</span>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span id="posPnlLabel" style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--bull);">—</span>
+                        <span class="sort-btn" onclick="sortPos('tag')" id="posSortTag" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--border);">#</span>
+                        <span class="sort-btn" onclick="sortPos('pnl')" id="posSortPnl" style="font-size:8px;color:var(--accent);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--accent);">P&L↕</span>
+                    </div>
                 </div>
                 <div class="pane-scroll" id="posScroll"><div class="empty-msg" id="posEmpty">No positions</div></div>
 
@@ -253,8 +257,12 @@ body{
 
             <div id="posBot">
                 <div class="pane-hdr">
-                    <span>📋 Trades</span>
-                    <span id="tradePnlLabel" style="color:var(--bull);">—</span>
+                    <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📋 Trades</span>
+                    <div style="display:flex;align-items:center;gap:6px;">
+                        <span id="tradePnlLabel" style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--bull);">—</span>
+                        <span class="sort-btn" onclick="sortTrd('tag')" id="trdSortTag" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--border);">#</span>
+                        <span class="sort-btn" onclick="sortTrd('pnl')" id="trdSortPnl" style="font-size:8px;color:var(--accent);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--accent);">P&L↕</span>
+                    </div>
                 </div>
                 <div class="pane-scroll" id="tradeScroll"><div class="empty-msg" id="tradeEmpty">No trades</div></div>
             </div>
@@ -377,10 +385,39 @@ function emojify(v){
 function shortSym(s){
     if(!s)return'—';
     const m=s.match(/([A-Z]+)\d{2}([A-Z]{3})\d{2}(C|P)(\d+)/i);
-    if(m)return`${m[1]} ${m[2]} ${m[4]} ${m[3]==='C'?'CE':'PE'}`;
-    return s.length>16?s.slice(0,14)+'…':s;
+    if(m){
+        // e.g. "NIFTY MAY 24000 CE" → compact 7 chars: "24000CE"
+        return`${m[4]}${m[3]==='C'?'CE':'PE'}`;
+    }
+    return s.length>7?s.slice(0,6)+'…':s;
 }
 function lotSz(s){return(s||'').includes('BANKNIFTY')?30:65;}
+
+/* ── SORT STATE ── */
+let psCol='pnl',psAsc=false;
+let trCol='pnl',trAsc=false;
+
+function sortPos(col){
+    if(psCol===col)psAsc=!psAsc;else{psCol=col;psAsc=false;}
+    // update button highlight
+    ['tag','pnl'].forEach(c=>{
+        const btn=$('posSortTag');const btn2=$('posSortPnl');
+        if(btn)btn.style.borderColor=psCol==='tag'?cssVar('--accent'):cssVar('--border');
+        if(btn)btn.style.color=psCol==='tag'?cssVar('--accent'):cssVar('--muted');
+        if(btn2)btn2.style.borderColor=psCol==='pnl'?cssVar('--accent'):cssVar('--border');
+        if(btn2)btn2.style.color=psCol==='pnl'?cssVar('--accent'):cssVar('--muted');
+    });
+    loadPos();
+}
+function sortTrd(col){
+    if(trCol===col)trAsc=!trAsc;else{trCol=col;trAsc=false;}
+    const btn=$('trdSortTag');const btn2=$('trdSortPnl');
+    if(btn)btn.style.borderColor=trCol==='tag'?cssVar('--accent'):cssVar('--border');
+    if(btn)btn.style.color=trCol==='tag'?cssVar('--accent'):cssVar('--muted');
+    if(btn2)btn2.style.borderColor=trCol==='pnl'?cssVar('--accent'):cssVar('--border');
+    if(btn2)btn2.style.color=trCol==='pnl'?cssVar('--accent'):cssVar('--muted');
+    loadTrades();
+}
 
 /* ── TABS ── */
 function switchTab(tabId){
@@ -588,6 +625,10 @@ async function loadPos(){
     scroll.querySelectorAll('.p-row').forEach(r=>r.remove());
     if(!open.length){$('posEmpty').style.display='block';return;}
     $('posEmpty').style.display='none';
+    open.sort((a,b)=>{
+        const v=psCol==='pnl'?(a.PNL||0)-(b.PNL||0):String(a.Tag||'').localeCompare(String(b.Tag||''));
+        return psAsc?v:-v;
+    });
     open.forEach(d=>{
         const pnl=d.PNL||0,pb=pnl>=0,isCE=(d.SYMBOL||'').toUpperCase().endsWith('CE');
         const qty=d.QTY??'—',lots=qty!=='—'?Math.round(Math.abs(qty)/lotSz(d.SYMBOL)):'—';
@@ -772,6 +813,10 @@ async function loadTrades(){
     scroll.querySelectorAll('.t-row').forEach(r=>r.remove());
     if(!data.length){$('tradeEmpty').style.display='block';return;}
     $('tradeEmpty').style.display='none';
+    data.sort((a,b)=>{
+        const v=trCol==='pnl'?(a.PNL||0)-(b.PNL||0):String(a.Tag||'').localeCompare(String(b.Tag||''));
+        return trAsc?v:-v;
+    });
     data.forEach(t=>{
         const pnl=t.PNL||0,pb=pnl>=0;
         const entry=String(t.Buy_Time||'').slice(11,16);
