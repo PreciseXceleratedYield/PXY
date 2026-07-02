@@ -100,9 +100,9 @@ def handle_side_averaging(client, df, hist_df=None):
     try:
         raw_atr = safe_float(df.iloc[-1].get('atr', FALLBACK_ATR), FALLBACK_ATR)
         # Secure clamping strictly bounded between min 6.0 and max 12.0
-        dynamic_base_pct = max(6.0, min(raw_atr, 12.0))
+        dynamic_base_pct = 10 #max(6.0, min(raw_atr, 12.0))
     except Exception:
-        dynamic_base_pct = FALLBACK_ATR
+        dynamic_base_pct = 10 #FALLBACK_ATR
 
     # Live position string extraction matching your exact upstream format
     pos_raw = str(get_position_summary(client)).upper().strip()
