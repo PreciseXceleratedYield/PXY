@@ -52,8 +52,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     tr3 = np.abs(src_low - prev_close)
     true_range = np.maximum(tr1, np.maximum(tr2, tr3))
     
-    # ATR 1 is functionally identical to the single bar True Range array
-    atr1 = pd.Series(true_range).rolling(window=1).mean().fillna(true_range).to_numpy()
+    # ATR 1 Calculation (Fixed the fillna TypeError by wrapping it in pd.Series)
+    atr1 = pd.Series(true_range).rolling(window=1).mean().fillna(pd.Series(true_range)).to_numpy()
 
     # --- True SuperTrend Dynamic Bands ---
     atr_factor = 3.0
@@ -151,7 +151,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
             "st_trend": str(row["sma_trend_full"]), 
             "sma_line": float(row["pxy_sma_line"]), 
             "sma_trend": str(row["sma_trend_full"]),
-            "exit": str(row["sma_trend_full"])       # Injected tracking key for json structural parity
+            "exit": str(row["sma_trend_full"])       
         })
 
     os.makedirs(os.path.dirname(output_file), exist_ok=True) if os.path.dirname(output_file) else None
