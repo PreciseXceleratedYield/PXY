@@ -278,6 +278,19 @@ body{
     </div>
 </div>
 
+<!-- PNL BAR -->
+<div id="pnlBar" style="height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:var(--bg2);border-top:1px solid var(--border);gap:8px;">
+    <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:7px;letter-spacing:0.12em;text-transform:uppercase;color:#ffffff;">Running P&L</span>
+        <span id="pnlRunning" style="font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#ffffff;">—</span>
+    </div>
+    <div style="width:1px;height:14px;background:var(--border2);"></div>
+    <div style="display:flex;align-items:center;gap:6px;">
+        <span style="font-size:7px;letter-spacing:0.12em;text-transform:uppercase;color:#ffffff;">Booked P&L</span>
+        <span id="pnlBooked" style="font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#ffffff;">—</span>
+    </div>
+</div>
+
 <!-- TAB BAR -->
 <div id="tabBar">
     <button class="tab-btn active" data-tab="paneTerminal" id="tabTerminal">
@@ -561,6 +574,7 @@ async function loadPos(){
     const open=data.filter(d=>(d.STATUS||'OPEN')==='OPEN');
     const total=open.reduce((s,d)=>s+(d.PNL||0),0);
     const lbl=$('posPnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
+    const r=$('pnlRunning');r.textContent=fmt(total);r.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const scroll=$('posScroll');
     scroll.querySelectorAll('.p-row').forEach(r=>r.remove());
     if(!open.length){$('posEmpty').style.display='block';return;}
@@ -744,6 +758,7 @@ async function loadTrades(){
     try{data=await fetch('./webpnlpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     const total=data.reduce((s,d)=>s+(d.PNL||0),0);
     const lbl=$('tradePnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
+    const b=$('pnlBooked');b.textContent=fmt(total);b.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const scroll=$('tradeScroll');
     scroll.querySelectorAll('.t-row').forEach(r=>r.remove());
     if(!data.length){$('tradeEmpty').style.display='block';return;}
