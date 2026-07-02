@@ -93,7 +93,7 @@ def handle_side_averaging(client, df, hist_df=None):
         
     ist = pytz.timezone("Asia/Kolkata") 
     now = datetime.now(ist).time() 
-    if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
+    if not REBUY_ENABLED or not (dt_time(9,19) <= now <= dt_time(15,10)): 
         return 
 
     # 📈 Extract ATR directly from the dataframe column instead of an external file module
