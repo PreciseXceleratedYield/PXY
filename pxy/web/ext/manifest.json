@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "PreciseXceleratedYield Pvt Ltd™",
+  "short_name": "PreciseXceleratedYield Pvt Ltd™",
+  "version": "1.0.0",
+  "description": "PXY® — Mobile trading dashboard in side panel.",
+  "icons": {
+    "16":  "icons/pxy16.png",
+    "32":  "icons/pxy32.png",
+    "48":  "icons/pxy48.png",
+    "128": "icons/pxy128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16":  "icons/pxy16.png",
+      "32":  "icons/pxy32.png",
+      "48":  "icons/pxy48.png",
+      "128": "icons/pxy128.png"
+    },
+    "default_title": "PreciseXceleratedYield Pvt Ltd™"
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["tabs", "sidePanel"],
+  "host_permissions": ["http://20.219.25.209/*"]
+}
