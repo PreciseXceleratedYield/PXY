@@ -13,7 +13,7 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 3
+MAX_LAYERS = 5
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
 FIXED_ATR_PCT = 10.0    # 🎯 Hardcoded baseline ATR percentage set exactly to 10%
 
@@ -107,7 +107,7 @@ def handle_side_averaging(client, df):
         ce_lots, pe_lots = 0, 0
     
     # Calculate pure absolute lot spread (forces absolute floor layer of 1)
-    raw_difference = abs(ce_lots - pe_lots)
+    raw_difference = abs(ce_lots - pe_lots) + 1
     abs_factor = max(1, raw_difference)
 
     # Establish independent lesser vs heavier directional designations
@@ -119,7 +119,7 @@ def handle_side_averaging(client, df):
         ce_is_lesser, pe_is_lesser = False, False  # Balanced state
 
     # Clean system telemetry message stream line
-    print(f"{Fore.CYAN} 📢  Upstream Lots: {ce_lots}CE vs {pe_lots}PE |{abs_factor}")
+    print(f"{Fore.CYAN}📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Factor:{abs_factor}")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
@@ -145,7 +145,7 @@ def handle_side_averaging(client, df):
                 dynamic_threshold = -(FIXED_ATR_PCT / float(abs_factor))
             else:
                 # Heavier side: MULTIPLY fixed baseline by absolute difference
-                dynamic_threshold = -(FIXED_ATR_PCT * float(abs_factor))
+                dynamic_threshold = -(FIXED_ATR_PCT * (float(abs_factor)/2))
 
             last_calculated_threshold = dynamic_threshold
 
@@ -182,6 +182,6 @@ def handle_side_averaging(client, df):
                     res = client.place_order(**params) 
                     if res: 
                         set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Upstream Subdirectory Module.") 
+                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
