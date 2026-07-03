@@ -57,14 +57,14 @@ def get_entry_signal(df=None):
         if direction == "UP":
             entry_signal = "ATMBUY"   # Aligned -> Target ATM
         else:
-            entry_signal = "NTMBUY"   # Misaligned / Protection Filter -> Target NTM
+            entry_signal = "BEAR"   # Misaligned / Protection Filter -> Target NTM
 
     elif current_regime == "BEAR":
         # Check alignment: Geometric engine says DOWN while SuperTrend is BEAR
         if direction == "DOWN":
             entry_signal = "ATMSELL"  # Aligned -> Target ATM
         else:
-            entry_signal = "NTMSELL"  # Misaligned / Protection Filter -> Target NTM
+            entry_signal = "BULL"  # Misaligned / Protection Filter -> Target NTM
 
     # Console Status Reporting Actions
     if entry_signal != "NONE":
