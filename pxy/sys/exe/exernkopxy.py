@@ -138,21 +138,30 @@ def verify_and_purge_stale_cache():
         
         save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
         print(f"🧹 {Fore.CYAN}Cleaned up tracking cache file: {RENKO_STATE_FILE}\n")
+from datetime import datetime
+import pytz
+
 def write_squareoff_success_log():
-    """Generates a tracking timestamp payload confirming positions are completely cleared."""
+    """Generates a tracking timestamp payload confirming positions are completely cleared in IST."""
     try:
         os.makedirs(os.path.dirname(SQUAREOFF_LOG_FILE), exist_ok=True)
+        
+        # --- FIXED: Explicitly force Indian Standard Time ---
+        ist_tz = pytz.timezone('Asia/Kolkata')
+        now_ist = datetime.now(ist_tz)
+        
         log_payload = {
             "status": "SUCCESSFUL_SQUARE_OFF_CONFIRMED",
-            "date": time.strftime('%Y-%m-%d'),
-            "successful_time": time.strftime('%H:%M:%S'),
-            "unix_timestamp": int(time.time())
+            "date": now_ist.strftime('%Y-%m-%d'),
+            "successful_time": now_ist.strftime('%H:%M:%S'),
+            "unix_timestamp": int(now_ist.timestamp()) # Unix time is inherently global UTC
         }
         with open(SQUAREOFF_LOG_FILE, "w") as fw:
             json.dump(log_payload, fw, indent=4)
         print(f"💾 {Fore.GREEN}Success entry documented in: {os.path.basename(SQUAREOFF_LOG_FILE)}")
     except Exception as e:
         print(f"{Fore.RED}❌ Error writing square-off log: {e}")
+
 
 
 def start_trailing_engine():
