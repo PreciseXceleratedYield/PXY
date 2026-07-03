@@ -13,7 +13,7 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 5
+MAX_LAYERS = 3
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
 FIXED_ATR_PCT = 10.0    # 🎯 Hardcoded baseline ATR percentage set exactly to 10%
 
@@ -107,7 +107,7 @@ def handle_side_averaging(client, df):
         ce_lots, pe_lots = 0, 0
     
     # Calculate pure absolute lot spread (forces absolute floor layer of 1)
-    raw_difference = abs(ce_lots - pe_lots) + 1
+    raw_difference = abs(ce_lots - pe_lots)
     abs_factor = max(1, raw_difference)
 
     # Establish independent lesser vs heavier directional designations
@@ -118,15 +118,8 @@ def handle_side_averaging(client, df):
     else:
         ce_is_lesser, pe_is_lesser = False, False  # Balanced state
 
-    # 📊 Extract historical supertrend status safely from the streaming tail row
-    try:
-        st_tail = str(df.iloc[-1].get('supertrend', 'NONE')).upper().strip()
-    except Exception:
-        st_tail = 'NONE'
-
     # Clean system telemetry message stream line
-    print(f"{Fore.CYAN} ⚖️ Upstream Lots: {ce_lots} CE vs {pe_lots} PE ⚖️")
-    print(f"{Fore.CYAN}⚙️ Factor: {abs_factor} | 📈 Supertrend: {st_tail}")
+    print(f"{Fore.CYAN} 📢  Upstream Lots: {ce_lots}CE vs {pe_lots}PE |{abs_factor}")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
@@ -152,26 +145,10 @@ def handle_side_averaging(client, df):
                 dynamic_threshold = -(FIXED_ATR_PCT / float(abs_factor))
             else:
                 # Heavier side: MULTIPLY fixed baseline by absolute difference
-                dynamic_threshold = -(FIXED_ATR_PCT * (float(abs_factor)/2))
-
-            # --- INTRODUCE SUPERTREND SENSITIVITY MODIFIERS ON TOP ---
-            if side == "CE":
-                st_favourable = st_tail in ["BUY", "BULL"]
-                st_opposite = st_tail in ["SELL", "BEAR"]
-            else:
-                st_favourable = st_tail in ["SELL", "BEAR"]
-                st_opposite = st_tail in ["BUY", "BULL"]
-
-            if st_opposite:
-                # Opposite Trend: Require double the loss depth (* 2) before allowing buy triggers
-                dynamic_threshold = dynamic_threshold * 2.0
-            elif st_favourable:
-                # Favourable Trend: Reduce needed loss floor threshold by half (1/2) for faster triggers
-                dynamic_threshold = dynamic_threshold * 0.5
+                dynamic_threshold = -(FIXED_ATR_PCT * float(abs_factor))
 
             last_calculated_threshold = dynamic_threshold
 
-            # YOUR EXACT LOGIC BLOCK AND OPERATORS SUSTAINED COMPLETELY AS PROVINDED:
             if pos_loss > dynamic_threshold:
                 all_positions_crossed_threshold = False
                 break  
@@ -205,8 +182,6 @@ def handle_side_averaging(client, df):
                     res = client.place_order(**params) 
                     if res: 
                         set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED.") 
+                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Upstream Subdirectory Module.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
-
-
