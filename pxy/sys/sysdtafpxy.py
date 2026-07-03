@@ -2,23 +2,30 @@ import warnings
 import numpy as np 
 import pandas as pd 
 import yfinance as yf 
-from syscnfgpxy import TICKER, OHLC_MODE, TIMEZONE 
+from syscnfgpxy import TICKER, TIMEZONE  # Removed OHLC_MODE import since it is hardcoded now
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-def apply_ohlc_transformation(df, mode=1):
-    """Passes through raw arrays unchanged for Mode 1"""
+def apply_ohlc_transformation(df):
+    """Applies Mode 0: Custom candle transformation logic matching Pine Script."""
     if df.empty:
         return df
         
-    if mode != 1:
-        print(f"SYSTEM_WARNING | Mode {mode} unrecognized. Defaulting to Mode 1 Raw Candles.")
-        
-    # Mode 1 is strictly pure raw candles (No alterations)
+    # Step 1: Detect raw candle color based on standard close/open
+    is_green = df['Close'] >= df['Open']
+    
+    # Step 2: Dynamically calculate Custom Close based on candle color
+    df['Close'] = np.where(is_green, (df['Close'] + df['High']) / 2, (df['Close'] + df['Low']) / 2)
+    
+    # Step 3: Recalculate Custom Open, High, and Low boundaries
+    df['Open'] = (df['High'] + df['Low'] + df['Close']) / 3
+    df['High'] = df[['High', 'Open', 'Close']].max(axis=1)
+    df['Low'] = df[['Low', 'Open', 'Close']].min(axis=1)
+    
     return df
 
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
-    """DYNAMIC HISTORICAL SLICE RETRIEVAL ENGINE FOR RAW MODE 1 DATA"""
+    """DYNAMIC HISTORICAL SLICE RETRIEVAL ENGINE FOR DATA"""
     ticker_obj = yf.Ticker(TICKER)
     df = pd.DataFrame()
     
@@ -54,9 +61,11 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     else:
         df = df.tz_convert(TIMEZONE)
         
-    processed_df = apply_ohlc_transformation(df.copy(), mode=OHLC_MODE)
+    # Directly process using the mandatory transformed candle engine
+    processed_df = apply_ohlc_transformation(df.copy())
     
-    # Calculate 42 SMA directly on the raw closing prices
+    # Calculate 42 SMA directly on the transformed closing prices
     processed_df['SMA_42'] = processed_df['Close'].rolling(window=42).mean()
     
     return processed_df.tail(target_rows)
+
