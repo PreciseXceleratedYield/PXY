@@ -18,7 +18,7 @@ DEBUG_MODE = False
 CHECK_CONFIRMED_ONLY = False  
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
-    """ True SuperTrend (1, 3) Pipeline Engine with Explicit 'exit' Column Injections """
+    """ Pure SuperTrend Engine with Constant ATR (10.0) and Factor (1.0) on Pre-Transformed Data """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m") 
         if not raw_df.empty:
@@ -39,33 +39,25 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     if n == 0:
         return df
 
+    # --- 1. Directly Read Already-Transformed Data Arrays ---
     src_close = df['Close'].to_numpy()
     src_high = df['High'].to_numpy()
     src_low = df['Low'].to_numpy()
 
-    # --- Compute ATR Length 1 Logic ---
-    prev_close = np.roll(src_close, 1)
-    prev_close = src_close # Boundary conditions safety
-    
-    tr1 = src_high - src_low
-    tr2 = np.abs(src_high - prev_close)
-    tr3 = np.abs(src_low - prev_close)
-    true_range = np.maximum(tr1, np.maximum(tr2, tr3))
-    
-    # ATR 1 Calculation (Fixed the fillna TypeError by wrapping it in pd.Series)
-    atr1 = pd.Series(true_range).rolling(window=1).mean().fillna(pd.Series(true_range)).to_numpy()
+    # --- 2. Fixed Parameter SuperTrend Setup ---
+    atr_factor = 1.0
+    custom_atr = 10.0 # Constant distance value
 
-    # --- True SuperTrend Dynamic Bands ---
-    atr_factor = 3.0
     hl2 = (src_high + src_low) / 2.0
-    basic_ub = hl2 + (atr_factor * atr1)
-    basic_lb = hl2 - (atr_factor * atr1)
+    basic_ub = hl2 + (atr_factor * custom_atr) # Exactly hl2 + 10
+    basic_lb = hl2 - (atr_factor * custom_atr) # Exactly hl2 - 10
 
     final_ub = np.zeros(n)
     final_lb = np.zeros(n)
     supertrend_line = np.zeros(n)
     trend = np.ones(n) 
 
+    # --- 3. Memory Band-Locking Loop ---
     for i in range(n):
         if i == 0:
             final_ub[i] = basic_ub[i]
@@ -101,7 +93,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             sma_trend_history.append("BULL" if trend[i] == 1 else "BEAR")
             continue 
 
-        # Capture precise crossover moments
         cross_buy  = (trend[i] == 1)  and (trend[i-1] == -1)
         cross_sell = (trend[i] == -1) and (trend[i-1] == 1)
 
@@ -110,26 +101,21 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         elif cross_sell:
             sma_trend_history.append("SELL")
         else:
-            # Persistent memory states for standard continuation bars
             sma_trend_history.append("BULL" if trend[i] == 1 else "BEAR")
 
-    # --- Direct Injection of the 'exit' Column to Prevent Downstream Crashes ---
+    # --- Structural Injection Mappings ---
     df['exit'] = sma_trend_history
     df['pxy_sma_line'] = supertrend_line
     df['sma_trend_full'] = sma_trend_history
-    df['src_c'] = src_close
+    df['src_c'] = src_close 
     
-    # Backward compatibility mappings for downstream stability
     df['pxy_st_line'] = df['pxy_sma_line']
     df['st_trend_full'] = df['sma_trend_full']
     df['ST'] = df['pxy_sma_line']
     df['ST_Trend'] = df['sma_trend_full']
     df['P_Master'] = df['src_c']
     
-    try:
-        df['shared_atr'] = calculate_atr(df)
-    except Exception:
-        df['shared_atr'] = atr1
+    df['shared_atr'] = custom_atr
     
     return df
 
@@ -146,7 +132,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
         output.append({
             "time": str(idx),
             "close": float(row["Close"]),
-            "p_master": float(row["Close"]),  
+            "p_master": float(row["src_c"]), 
             "st": float(row["pxy_sma_line"]),       
             "st_trend": str(row["sma_trend_full"]), 
             "sma_line": float(row["pxy_sma_line"]), 
@@ -160,7 +146,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
     return output
 
 if __name__ == "__main__":
-    print("--- STARTING LIVE PXY PURE SMA 42 MONITOR ENGINE ---")
+    print("--- STARTING LIVE PXY FIXED ATR ENGINE (PRE-TRANSFORMED DATA) ---")
     
     processed_df = calculate_supertrend(pd.DataFrame())
     
@@ -171,7 +157,7 @@ if __name__ == "__main__":
         print(f"Target Row Index Position -> {idx_pos} ({'CLOSED BAR' if CHECK_CONFIRMED_ONLY else 'LIVE TICK'})")
         print(f"Timestamp   : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"Close Price : {float(processed_df.at[target_index, 'Close']):.2f}")
-        print(f"SMA 42 Line : {float(processed_df.at[target_index, 'pxy_sma_line']):.2f}")
+        print(f"ST 10.0 Line: {float(processed_df.at[target_index, 'pxy_sma_line']):.2f}")
         print(f"Trend State : {str(processed_df.at[target_index, 'sma_trend_full'])}")
         
         export_supertrend_json(processed_df)
