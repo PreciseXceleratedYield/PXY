@@ -87,7 +87,7 @@ def target_price(row):
             pe_target_pct = 99
         elif st_pe_aligned and exit_pe_hostile:
             # Supertrend aligned BUT Exit NOT aligned -> 9
-            pe_target_pct = 9
+            pe_target_pct = 3
         else:
             pe_target_pct = 1.4
             
