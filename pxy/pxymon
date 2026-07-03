@@ -1,6 +1,6 @@
 #!/bin/bash
 # ------------------------------
-# Run sysmonpxy.py every 10 seconds
+# Run sysdashpxy.py every 10 seconds
 # ------------------------------
 
 # Go to sys folder (done once before the loop starts)
@@ -14,12 +14,12 @@ echo "----------------------------------------"
 
 # Infinite loop
 while true; do
-    echo "[$(date +%T)] Running sysmonpxy.py..."
+    echo "[$(date +%T)] Running sysdashpxy.py..."
     
     # Run the Python script
-    python3 sysmonpxy.py
+    python3 sysdashpxy.py
     
-    echo "[$(date +%T)] sysmonpxy.py execution finished."
+    echo "[$(date +%T)] sysdashpxy.py execution finished."
     echo "Waiting 10 seconds..."
     echo "----------------------------------------"
     
