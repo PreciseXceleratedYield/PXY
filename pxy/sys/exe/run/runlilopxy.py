@@ -29,7 +29,7 @@ def resolve_dynamic_filter_time():
                         if log_data.get("status") == "SUCCESSFUL_SQUARE_OFF_CONFIRMED" and log_data.get("date") == today_str:
                             fresh_start_time = log_data.get("successful_time")
                             if fresh_start_time:
-                                print(f"🔄 [DYNAMIC TIME] Emergency Reset detected today! Starting fresh from: {fresh_start_time}")
+                                print(f"🔄 Reset detected! Fresh start: {fresh_start_time}")
                                 return fresh_start_time
         return DEFAULT_FILTER_TIME
     except Exception as e:
