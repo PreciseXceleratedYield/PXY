@@ -125,7 +125,7 @@ def handle_side_averaging(client, df):
         st_tail = 'NONE'
 
     # Clean system telemetry message stream line
-    print(f"{Fore.CYAN}⚖️ Upstream Lots: {ce_lots} CE vs {pe_lots} PE")
+    print(f"{Fore.CYAN}⚖️ Upstream Lots: {ce_lots} CE vs {pe_lots} PE ⚖️")
     print(f"{Fore.CYAN}⚙️ Factor: {abs_factor} | 📈 Supertrend: {st_tail}")
 
     # Make a clean dataframe copy to prevent mutations/warnings
