@@ -158,6 +158,7 @@ while True:
         while not in_market_hours():
             os.system('clear')  # ✅ Clears screen while waiting overnight so logs don't stack up
             safe_run(HERE.parent / "syscprtpxy.py")
+            safe_run(HERE.parent / "syscprtpxy.py")
             print("⏳ WAIT: market opens at 09:16 IST 📡", end="\r")
             time.sleep(60)
 
