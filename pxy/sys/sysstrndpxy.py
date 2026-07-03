@@ -40,8 +40,9 @@ def calculate_pinescript_atr(df: pd.DataFrame, period: int) -> pd.Series:
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    Implements your custom Pine Script Logic:
-    Combines a standard 50 SMA and a dynamic 5/5 Supertrend into a single averaged line.
+    Implements your customized multi-average strategy pipeline.
+    Averages SMA 50, SMA 21, and a dynamic 5/5 Supertrend into a single line,
+    while using SMA 21 crossovers and Supertrend states to define a custom regime matrix.
     """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m") 
@@ -65,13 +66,15 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     # --- Pine Script Inputs ---
     sma_length = 50
+    sma21_length = 21
     st_length = 5
     st_multiplier = 5.0
 
-    # 1. Component One: Calculate 50 SMA
+    # 1. Component One & Two: Calculate Moving Averages
     sma50 = calculate_sma(df['Close'], sma_length).to_numpy()
+    sma21 = calculate_sma(df['Close'], sma21_length).to_numpy()
 
-    # 2. Component Two: Calculate Standard 5-Period ATR for Supertrend
+    # 2. Component Three: Calculate Standard 5-Period ATR for Supertrend
     atr_series = calculate_pinescript_atr(df, st_length)
     custom_atr = atr_series.to_numpy()
 
@@ -123,31 +126,36 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
         st_line[i] = final_lb[i] if trend[i] == 1 else final_ub[i]
 
-    # --- 3. Mathematical Blend: (SMA 50 + Supertrend Line) / 2 ---
-    # We use np.nan to handle rows prior to the 50 SMA cutoff period safely
-    combined_line = np.where(np.isnan(sma50), np.nan, (sma50 + st_line) / 2.0)
+    # --- 3. Mathematical Blend: (SMA 50 + SMA 21 + Supertrend Line) / 3 ---
+    # Safe protection against NaN alignment errors early in the backtest data frame
+    combined_line = np.where(np.isnan(sma50) | np.isnan(sma21), np.nan, (sma50 + sma21 + st_line) / 3.0)
 
-    # --- Generate Strict 4-State Structural Regime Matrix ---
-    sma_trend_history = []
+    # --- 4. Custom Matrix Logic (BUY / SELL / BULL / BEAR / SIDE) ---
+    custom_regime_history = []
     for i in range(n): 
-        if i < 1: 
-            sma_trend_history.append("BULL" if trend[i] == 1 else "BEAR")
+        if i < 1 or np.isnan(sma21[i]) or np.isnan(sma21[i-1]): 
+            custom_regime_history.append("SIDE")
             continue 
 
-        cross_buy  = (trend[i] == 1)  and (trend[i-1] == -1)
-        cross_sell = (trend[i] == -1) and (trend[i-1] == 1)
+        # Crossover checks for live price crossing SMA 21
+        cross_buy  = (src_close[i] > sma21[i]) and (src_close[i-1] <= sma21[i-1])
+        cross_sell = (src_close[i] < sma21[i]) and (src_close[i-1] >= sma21[i-1])
 
         if cross_buy:
-            sma_trend_history.append("BUY")
+            custom_regime_history.append("BUY")
         elif cross_sell:
-            sma_trend_history.append("SELL")
+            custom_regime_history.append("SELL")
+        elif (src_close[i] > sma21[i]) and (trend[i] == 1):
+            custom_regime_history.append("BULL")
+        elif (src_close[i] < sma21[i]) and (trend[i] == -1):
+            custom_regime_history.append("BEAR")
         else:
-            sma_trend_history.append("BULL" if trend[i] == 1 else "BEAR")
+            custom_regime_history.append("SIDE")
 
     # --- Structural Injection Mappings to match JSON Engine requirements ---
-    df['exit'] = sma_trend_history
-    df['pxy_sma_line'] = combined_line       # Overriding with your unified line output
-    df['sma_trend_full'] = sma_trend_history
+    df['exit'] = custom_regime_history
+    df['pxy_sma_line'] = combined_line       # Overriding with your unified three-way average
+    df['sma_trend_full'] = custom_regime_history
     df['src_c'] = src_close 
     
     df['pxy_st_line'] = df['pxy_sma_line']
@@ -170,7 +178,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
 
     output = []
     for idx, row in df.iterrows():
-        # Skip initial rows where the 50 SMA / Combined Line hasn't computed yet
+        # Skip initial rows where indicators haven't fully computed yet
         if np.isnan(row["pxy_sma_line"]):
             continue
             
@@ -191,7 +199,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
     return output
 
 if __name__ == "__main__":
-    print("--- STARTING LIVE PXY UNIFIED SMA + SUPERTREND ENGINE ---")
+    print("--- STARTING LIVE PXY UNIFIED SMA + SMA21 + SUPERTREND ENGINE ---")
     
     processed_df = calculate_supertrend(pd.DataFrame())
     
@@ -208,3 +216,4 @@ if __name__ == "__main__":
         export_supertrend_json(processed_df)
     else:
         print("CRITICAL: Upstream data empty.")
+
