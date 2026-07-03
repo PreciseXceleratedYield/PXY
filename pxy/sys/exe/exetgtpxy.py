@@ -62,8 +62,8 @@ def target_price(row):
         exit_ce_hostile = active_exit in ["SELL", "BEAR"]  # NONE, BUY, BULL are aligned
 
         if not st_ce_aligned:
-            # Supertrend NOT aligned for CE (Exit does not matter) -> 0.99
-            ce_target_pct = 0.99
+            # Supertrend NOT aligned for CE (Exit does not matter) -> 3
+            ce_target_pct = 3
         elif st_ce_aligned and not exit_ce_hostile:
             # Supertrend aligned AND Exit aligned (including NONE) -> 99
             ce_target_pct = 99
@@ -71,7 +71,7 @@ def target_price(row):
             # Supertrend aligned BUT Exit NOT aligned -> 9
             ce_target_pct = 9
         else:
-            ce_target_pct = 0.99
+            ce_target_pct = 3
 
         ce_target_pct = max(0.0, ce_target_pct)
 
@@ -80,8 +80,8 @@ def target_price(row):
         exit_pe_hostile = active_exit in ["BUY", "BULL"]  # NONE, SELL, BEAR are aligned
 
         if not st_pe_aligned:
-            # Supertrend NOT aligned for PE (Exit does not matter) -> 0.99
-            pe_target_pct = 0.99
+            # Supertrend NOT aligned for PE (Exit does not matter) -> 3
+            pe_target_pct = 3
         elif st_pe_aligned and not exit_pe_hostile:
             # Supertrend aligned AND Exit aligned (including NONE) -> 99
             pe_target_pct = 99
@@ -89,7 +89,7 @@ def target_price(row):
             # Supertrend aligned BUT Exit NOT aligned -> 9
             pe_target_pct = 9
         else:
-            pe_target_pct = 0.99
+            pe_target_pct = 3
             
         pe_target_pct = max(0.0, pe_target_pct)
 
