@@ -202,7 +202,7 @@ body{
         <div class="sig-cell" id="cellExit"><span class="sc-lbl">🛬 Exit</span><span class="sc-val" id="hcExit">—</span></div>
         <div class="sig-cell" id="cellTrend"><span class="sc-lbl">🚀 Trend</span><span class="sc-val" id="hcTrend">—</span></div>
         <div class="sig-cell" id="cellATR"><span class="sc-lbl">📐 ATR/KATR</span><span class="sc-val" id="hcATR">—</span></div>
-        <div class="sig-cell" id="cellDP" style="flex:2;"><span class="sc-lbl">Depth ⚡ Power</span><span class="sc-val" id="dpText">—</span></div>
+        <div class="sig-cell" id="cellDP" style="flex:2;"><span class="sc-lbl">Depth ⚡⚡ Power</span><span class="sc-val" id="dpText">—</span></div>
     </div>
     <div class="hdr-r">
         <span class="logo" id="logoRefresh">PXY<sup>®</sup></span>
@@ -488,7 +488,7 @@ async function loadDash(){
             const power=last.bull?cePow:pePow;
             const dpEl=$('dpText');
             if(dpEl){
-                dpEl.textContent=`📊${depth} 🚦 ⚡${power}`;
+                dpEl.textContent=`📊${depth} 🚦 ⚡${cePow} ⚡${pePow}`;
                 dpEl.className='sc-val '+(last.bull?'bull':'bear');
             }
             const cellDP=$('cellDP');
