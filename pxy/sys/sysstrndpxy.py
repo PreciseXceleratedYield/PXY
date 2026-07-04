@@ -20,6 +20,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """ 
     Implements a strict 21/50 SMA matrix using explicit mutually exclusive states.
     Uses inclusive operators (>=, <=) to eliminate mathematical ties without an else statement.
+    Fixes length mismatch bugs by enforcing isolated single-append logic on early indices.
     """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m") 
@@ -62,19 +63,22 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
         # Handle startup warm up rows safely
         if i < 1:
-            start_bull = (close_val >= s21) and (s21 >= s50)
-            start_bear = (close_val < s21) and (s21 < s50)
+            start_bull  = (close_val > s21) and (s21 >= s50)
+            start_bear  = (close_val < s21) and (s21 < s50)
             start_hside = (s21 >= s50) and (close_val <= s21)
-            start_lside = (s21 < s50) and (close_val > s21)
+            start_lside = (s21 < s50) and (close_val >= s21)
             
+            state = "NONE"
             if start_bull:
-                custom_regime_history.append("BULL")
+                state = "BULL"
             if start_bear:
-                custom_regime_history.append("BEAR")
+                state = "BEAR"
             if start_hside:
-                custom_regime_history.append("HSIDE")
+                state = "HSIDE"
             if start_lside:
-                custom_regime_history.append("LSIDE")
+                state = "LSIDE"
+                
+            custom_regime_history.append(state)
             continue
 
         # 1. Active Cross Triggers
@@ -120,6 +124,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['shared_atr'] = np.zeros(n) 
     
     return df
+
 
 def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
     """ Dumps exact candle framework data matrix directly to JSON with exit fields """
