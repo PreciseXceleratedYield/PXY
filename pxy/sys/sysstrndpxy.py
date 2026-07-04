@@ -18,9 +18,9 @@ CHECK_CONFIRMED_ONLY = False
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    Implements a strict 21/50 SMA matrix simplified down to two structural regimes.
+    Implements a strict 21/50 SMA matrix running on pure exclusive logic tracks.
     21 above or equal to 50 is BULL. 21 below 50 is BEAR.
-    Uses strict, mutually exclusive conditions without any else statements.
+    Wipes out all fallback logic loops and else blocks completely.
     """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m") 
@@ -60,11 +60,11 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         s21 = sma21[i]
         s50 = sma50[i]
 
-        # 1. Clear Mutually Exclusive Conditions
+        # 1. Clear Mutually Exclusive Structural Flags
         is_bull_trend = (s21 >= s50)
         is_bear_trend = (s21 < s50)
 
-        # 2. Strict Assignment Flow (No Else)
+        # 2. Strict Isolated Assignment Track (No Else, No Elif)
         state = "NONE"
         if is_bull_trend:
             state = "BULL"
@@ -99,6 +99,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
 
     output = []
     for idx, row in df.iterrows():
+        # EXACT fields preserved matching your downstream server layout perfectly
         output.append({
             "time": str(idx),
             "close": float(row["Close"]),
@@ -121,16 +122,11 @@ if __name__ == "__main__":
     processed_df = calculate_supertrend(pd.DataFrame())
     
     if processed_df is not None and not processed_df.empty:
-        idx_pos = -2 if CHECK_CONFIRMED_ONLY else -1
-        target_index = processed_df.index[idx_pos]
-        
-        print(f"Target Row Index Position -> {idx_pos} ({'CLOSED BAR' if CHECK_CONFIRMED_ONLY else 'LIVE TICK'})")
+        target_index = processed_df.index[-1]
         print(f"Timestamp   : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"Close Price : {float(processed_df.at[target_index, 'Close']):.2f}")
-        print(f"21 SMA Line Matrix Value   : {float(processed_df.at[target_index, 'pxy_sma_line']):.2f}")
+        print(f"21 SMA Value: {float(processed_df.at[target_index, 'pxy_sma_line']):.2f}")
         print(f"Trend State : {str(processed_df.at[target_index, 'sma_trend_full'])}")
-        
         export_supertrend_json(processed_df)
     else:
         print("CRITICAL: Upstream data empty.")
-
