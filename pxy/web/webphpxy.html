@@ -60,7 +60,8 @@ body{
     position:relative;
 }
 .sig-cell:last-child{border-right:none;}
-.sig-cell::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:2px 2px 0 0;}
+.sig-cell::after{display:none;}
+.hdr-l::after,.hdr-r::after{display:none;}
 .sig-cell.bull-cell::after{background:var(--bull);box-shadow:0 0 6px var(--bull);}
 .sig-cell.bear-cell::after{background:var(--bear);box-shadow:0 0 6px var(--bear);}
 .sig-cell.gold-cell::after{background:var(--gold);}
