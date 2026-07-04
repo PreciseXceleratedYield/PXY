@@ -11,39 +11,14 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from sysdtafpxy import fetch_yf_data
+from syskatrpxy import calculate_atr, calculate_dynamic_k
 from syscnfgpxy import TIMEZONE, TICKER
 
 DEBUG_MODE = False 
 CHECK_CONFIRMED_ONLY = False  
 
-def calculate_sma(series: pd.Series, period: int) -> pd.Series:
-    """Helper function to calculate standard Simple Moving Average (SMA)"""
-    return series.rolling(window=period).mean()
-
-def calculate_pinescript_atr(df: pd.DataFrame, period: int) -> pd.Series:
-    """
-    Calculates Wilder's RMA (Moving Average used by TradingView for ATR).
-    Matches Pine Script's ta.atr(length) functionality exactly.
-    """
-    high = df['High']
-    low = df['Low']
-    close_prev = df['Close'].shift(1)
-    
-    # Calculate True Range (TR)
-    tr1 = high - low
-    tr2 = (high - close_prev).abs()
-    tr3 = (low - close_prev).abs()
-    tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-    
-    # Pine Script's ta.rma (Wilder's Exponential Moving Average)
-    return tr.ewm(alpha=1.0 / period, adjust=False).mean()
-
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
-    """ 
-    Implements your customized multi-average strategy pipeline.
-    Averages SMA 50, SMA 21, and a dynamic 5/5 Supertrend into a single line,
-    while using SMA 21 crossovers and Supertrend states to define a custom regime matrix.
-    """
+    """ True SuperTrend (1, 3) Pipeline Engine with Explicit 'exit' Column Injections """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m") 
         if not raw_df.empty:
@@ -64,46 +39,39 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     if n == 0:
         return df
 
-    # --- Pine Script Inputs ---
-    sma_length = 50
-    sma21_length = 21
-    st_length = 5
-    st_multiplier = 5.0
-
-    # 1. Component One & Two: Calculate Moving Averages
-    sma50 = calculate_sma(df['Close'], sma_length).to_numpy()
-    sma21 = calculate_sma(df['Close'], sma21_length).to_numpy()
-
-    # 2. Component Three: Calculate Standard 5-Period ATR for Supertrend
-    atr_series = calculate_pinescript_atr(df, st_length)
-    custom_atr = atr_series.to_numpy()
-
-    # Read necessary pricing arrays
     src_close = df['Close'].to_numpy()
     src_high = df['High'].to_numpy()
     src_low = df['Low'].to_numpy()
 
+    # --- Compute ATR Length 1 Logic ---
+    prev_close = np.roll(src_close, 1)
+    prev_close = src_close # Boundary conditions safety
+    
+    tr1 = src_high - src_low
+    tr2 = np.abs(src_high - prev_close)
+    tr3 = np.abs(src_low - prev_close)
+    true_range = np.maximum(tr1, np.maximum(tr2, tr3))
+    
+    # ATR 1 Calculation (Fixed the fillna TypeError by wrapping it in pd.Series)
+    atr1 = pd.Series(true_range).rolling(window=1).mean().fillna(pd.Series(true_range)).to_numpy()
+
+    # --- True SuperTrend Dynamic Bands ---
+    atr_factor = 3.0
     hl2 = (src_high + src_low) / 2.0
-    basic_ub = hl2 + (st_multiplier * custom_atr)
-    basic_lb = hl2 - (st_multiplier * custom_atr)
+    basic_ub = hl2 + (atr_factor * atr1)
+    basic_lb = hl2 - (atr_factor * atr1)
 
     final_ub = np.zeros(n)
     final_lb = np.zeros(n)
-    st_line = np.zeros(n)
+    supertrend_line = np.zeros(n)
     trend = np.ones(n) 
 
-    # --- Supertrend Processing Engine ---
     for i in range(n):
         if i == 0:
             final_ub[i] = basic_ub[i]
             final_lb[i] = basic_lb[i]
-            st_line[i] = final_ub[i] if src_close[i] <= final_ub[i] else final_lb[i]
-            trend[i] = 1 if src_close[i] > st_line[i] else -1
-            continue
-
-        # Check if ATR is valid yet (prevents NaN issues early in the data)
-        if np.isnan(custom_atr[i]):
-            st_line[i] = src_close[i]
+            supertrend_line[i] = final_ub[i] if src_close[i] <= final_ub[i] else final_lb[i]
+            trend[i] = 1 if src_close[i] > supertrend_line[i] else -1
             continue
 
         # Mathematical Memory Lock on Upper Band 
@@ -124,47 +92,44 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else:
             trend[i] = -1 if src_close[i] <= final_ub[i] else 1
 
-        st_line[i] = final_lb[i] if trend[i] == 1 else final_ub[i]
+        supertrend_line[i] = final_lb[i] if trend[i] == 1 else final_ub[i]
 
-    # --- 3. Mathematical Blend: (SMA 50 + SMA 21 + Supertrend Line) / 3 ---
-    # Safe protection against NaN alignment errors early in the backtest data frame
-    combined_line = np.where(np.isnan(sma50) | np.isnan(sma21), np.nan, (sma50 + sma21 + st_line) / 3.0)
-
-    # --- 4. Custom Matrix Logic (BUY / SELL / BULL / BEAR / SIDE) ---
-    custom_regime_history = []
+    # --- Generate Strict 4-State Structural Regime Matrix ---
+    sma_trend_history = []
     for i in range(n): 
-        if i < 1 or np.isnan(sma21[i]) or np.isnan(sma21[i-1]): 
-            custom_regime_history.append("SIDE")
+        if i < 1: 
+            sma_trend_history.append("BULL" if trend[i] == 1 else "BEAR")
             continue 
 
-        # Crossover checks for live price crossing SMA 21
-        cross_buy  = (src_close[i] > sma21[i]) and (src_close[i-1] <= sma21[i-1])
-        cross_sell = (src_close[i] < sma21[i]) and (src_close[i-1] >= sma21[i-1])
+        # Capture precise crossover moments
+        cross_buy  = (trend[i] == 1)  and (trend[i-1] == -1)
+        cross_sell = (trend[i] == -1) and (trend[i-1] == 1)
 
         if cross_buy:
-            custom_regime_history.append("BUY")
+            sma_trend_history.append("BUY")
         elif cross_sell:
-            custom_regime_history.append("SELL")
-        elif (src_close[i] > sma21[i]) and (trend[i] == 1):
-            custom_regime_history.append("BULL")
-        elif (src_close[i] < sma21[i]) and (trend[i] == -1):
-            custom_regime_history.append("BEAR")
+            sma_trend_history.append("SELL")
         else:
-            custom_regime_history.append("SIDE")
+            # Persistent memory states for standard continuation bars
+            sma_trend_history.append("BULL" if trend[i] == 1 else "BEAR")
 
-    # --- Structural Injection Mappings to match JSON Engine requirements ---
-    df['exit'] = custom_regime_history
-    df['pxy_sma_line'] = combined_line       # Overriding with your unified three-way average
-    df['sma_trend_full'] = custom_regime_history
-    df['src_c'] = src_close 
+    # --- Direct Injection of the 'exit' Column to Prevent Downstream Crashes ---
+    df['exit'] = sma_trend_history
+    df['pxy_sma_line'] = supertrend_line
+    df['sma_trend_full'] = sma_trend_history
+    df['src_c'] = src_close
     
+    # Backward compatibility mappings for downstream stability
     df['pxy_st_line'] = df['pxy_sma_line']
     df['st_trend_full'] = df['sma_trend_full']
     df['ST'] = df['pxy_sma_line']
     df['ST_Trend'] = df['sma_trend_full']
     df['P_Master'] = df['src_c']
     
-    df['shared_atr'] = custom_atr
+    try:
+        df['shared_atr'] = calculate_atr(df)
+    except Exception:
+        df['shared_atr'] = atr1
     
     return df
 
@@ -178,14 +143,10 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
 
     output = []
     for idx, row in df.iterrows():
-        # Skip initial rows where indicators haven't fully computed yet
-        if np.isnan(row["pxy_sma_line"]):
-            continue
-            
         output.append({
             "time": str(idx),
             "close": float(row["Close"]),
-            "p_master": float(row["src_c"]), 
+            "p_master": float(row["Close"]),  
             "st": float(row["pxy_sma_line"]),       
             "st_trend": str(row["sma_trend_full"]), 
             "sma_line": float(row["pxy_sma_line"]), 
@@ -199,7 +160,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
     return output
 
 if __name__ == "__main__":
-    print("--- STARTING LIVE PXY UNIFIED SMA + SMA21 + SUPERTREND ENGINE ---")
+    print("--- STARTING LIVE PXY PURE SMA 42 MONITOR ENGINE ---")
     
     processed_df = calculate_supertrend(pd.DataFrame())
     
@@ -210,7 +171,7 @@ if __name__ == "__main__":
         print(f"Target Row Index Position -> {idx_pos} ({'CLOSED BAR' if CHECK_CONFIRMED_ONLY else 'LIVE TICK'})")
         print(f"Timestamp   : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"Close Price : {float(processed_df.at[target_index, 'Close']):.2f}")
-        print(f"Combined Line Matrix Value: {float(processed_df.at[target_index, 'pxy_sma_line']):.2f}")
+        print(f"SMA 42 Line : {float(processed_df.at[target_index, 'pxy_sma_line']):.2f}")
         print(f"Trend State : {str(processed_df.at[target_index, 'sma_trend_full'])}")
         
         export_supertrend_json(processed_df)
