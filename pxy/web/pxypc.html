@@ -365,11 +365,11 @@ function initTerm(){
     new ResizeObserver(()=>fit.fit()).observe($('termBox'));
 }
 function setStatus(state){
-    const dot=$('statusDot'),lbl=$('statusLbl');
+    const dot=$('statusDot');
     dot.className='';
-    if(state==='connected'){dot.classList.add('connected');lbl.textContent='LIVE';}
-    else if(state==='error'){dot.classList.add('error');lbl.textContent='ERROR';}
-    else{lbl.textContent='OFFLINE';}
+    if(state==='connected'){dot.classList.add('connected');dot.title='LIVE';}
+    else if(state==='error'){dot.classList.add('error');dot.title='ERROR';}
+    else{dot.title='OFFLINE';}
 }
 function connect(){
     if(ws){try{ws.close();}catch(e){}}
