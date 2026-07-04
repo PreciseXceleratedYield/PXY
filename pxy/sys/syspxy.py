@@ -1,19 +1,13 @@
+# syspxy.py
 import json
 import os
 from datetime import datetime
 from sysdashpxy import get_full_snapshot
-from systdaypxy import get_market_snapshot  # 🔥 FIXED: Kept your original 'systdaypxy'
+from systdaypxy import get_market_snapshot  # Keep your original 'systdaypxy'
 from sysvixpxy import get_market_context, expand_vix, expand_sentiment
 from syscnfgpxy import TICKER
 
-# 🔥 ADD THIS
-from syschrtpxy import export_supertrend_json
-
-
 def get_all_data():
-    # -------- RUN CHART GENERATION FIRST --------
-    export_supertrend_json()
-
     # -------- CORE --------
     core = get_full_snapshot() or {}
 
@@ -35,7 +29,7 @@ def get_all_data():
         "o_change": dash.get("o_change"),
         "m_change": dash.get("m_change"),
 
-        # 🔥 RENAMED FIELDS
+        # RENAMED FIELDS
         "TO": dash.get("open"),
         "high": dash.get("high"),
         "low": dash.get("low"),
@@ -58,7 +52,7 @@ def get_all_data():
         "ce_power": core.get("ce_power"),
         "pe_power": core.get("pe_power"),
 
-        # 🔥 FORCE FIX (SINGLE ADDITION)
+        # FORCE FIX (SINGLE ADDITION)
         "ce_force": core.get("ce_force", 1.0),
         "pe_force": core.get("pe_force", 1.0),
 
@@ -68,7 +62,7 @@ def get_all_data():
         # ===== NEW =====
         "candle_visual": core.get("candle_visual", ""),
         "bos_bar": core.get("bos_bar", "NONE"),
-        "bos_val": core.get("bos_val", "0%"),  # <--- ADD THIS LINE
+        "bos_val": core.get("bos_val", "0%"),
         "day_candle": core.get("day_candle", ""),
 
         # ===== VIX =====
