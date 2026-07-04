@@ -1,8 +1,3 @@
-
-simplyfiy ....
-
-
-
 # sysstrndpxy.py
 import sys
 import numpy as np
