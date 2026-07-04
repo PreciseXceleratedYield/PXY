@@ -76,7 +76,11 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     padding:0 4px;gap:1px;border-right:1px solid var(--border);position:relative;
 }
 .sig-cell:last-child{border-right:none;}
-.sig-cell::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:2px 2px 0 0;}
+.sig-cell::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:2px 2px 0 0;background:rgba(180,180,200,0.35);}
+.sig-cell.bull-cell::after{background:var(--bull);box-shadow:0 0 6px var(--bull);}
+.sig-cell.bear-cell::after{background:var(--bear);box-shadow:0 0 6px var(--bear);}
+.hdr-l,.hdr-r{position:relative;}
+.hdr-l::after,.hdr-r::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:2px 2px 0 0;background:rgba(180,180,200,0.35);}
 .sig-cell.bull-cell::after{background:var(--bull);box-shadow:0 0 6px var(--bull);}
 .sig-cell.bear-cell::after{background:var(--bear);box-shadow:0 0 6px var(--bear);}
 .sc-lbl{font-size:7px;letter-spacing:0.08em;text-transform:uppercase;color:#ffffff;white-space:nowrap;}
