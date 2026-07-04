@@ -405,7 +405,7 @@ async function loadDash(){
             const last=items[items.length-1];let si=items.length-1;
             while(si>0&&items[si-1].bull===last.bull)si--;
             const depth=items.length-si,power=last.bull?cePow:pePow;
-            const dpEl=$('dpText');if(dpEl){dpEl.textContent=`📊${depth} 🚦 ⚡${cePow} ⚡${pePow}`;dpEl.className='sc-val '+(last.bull?'bull':'bear');}
+            const dpEl=$('dpText');if(dpEl){dpEl.textContent=`📊${depth} 🚦 ⚡${power}`;dpEl.className='sc-val '+(last.bull?'bull':'bear');}
             const cellDP=$('cellDP');if(cellDP){cellDP.className='sig-cell';cellDP.style.flex='2';cellDP.classList.add(last.bull?'bull-cell':'bear-cell');}
         }
     }catch(e){}
