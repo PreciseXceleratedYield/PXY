@@ -18,9 +18,8 @@ CHECK_CONFIRMED_ONLY = False
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    Implements a simplified single-average pipeline.
-    Tracks a 9-period TSMA line, using its crossovers and price relative 
-    positioning to define the regime matrix. Keeps downstream structures intact.
+    Implements a strict 21/50 SMA matrix using explicit mutually exclusive states.
+    Uses inclusive operators (>=, <=) to eliminate mathematical ties without an else statement.
     """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m") 
@@ -42,56 +41,74 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     if n == 0:
         return df
 
-    # --- Pine Script Inputs ---
-    tsma_length = 9     
+    # --- Moving Average Parameters ---
+    sma21_length = 21
+    sma50_length = 50     
 
-    # Read pricing array
+    # Calculate SMAs using standard pandas rolling windows
+    df['sma21'] = df['Close'].rolling(window=sma21_length, min_periods=1).mean()
+    df['sma50'] = df['Close'].rolling(window=sma50_length, min_periods=1).mean()
+
     src_close = df['Close'].to_numpy()
+    sma21 = df['sma21'].to_numpy()
+    sma50 = df['sma50'].to_numpy()
 
-    # Calculate 9-Period Time Series Moving Average (Linear Regression End Value)
-    tsma9 = np.zeros(n)
-    for i in range(n):
-        window_size = min(tsma_length, i + 1)
-        y = src_close[i - window_size + 1 : i + 1]
-        x = np.arange(window_size)
-        
-        x_mean = x.mean()
-        y_mean = y.mean()
-        
-        num = np.sum((x - x_mean) * (y - y_mean))
-        den = np.sum((x - x_mean) ** 2)
-        slope = num / den if den != 0 else 0.0
-        intercept = y_mean - slope * x_mean
-        
-        tsma9[i] = slope * (window_size - 1) + intercept
-
-    # --- Custom Matrix Logic (BUY / SELL / BULL / BEAR) ---
+    # --- Custom Matrix Logic with Mutually Exclusive Rules ---
     custom_regime_history = []
     for i in range(n): 
-        if i < 1: 
-            if src_close[i] >= tsma9[i]:
+        close_val = src_close[i]
+        s21 = sma21[i]
+        s50 = sma50[i]
+
+        # Handle startup warm up rows safely
+        if i < 1:
+            start_bull = (close_val >= s21) and (s21 >= s50)
+            start_bear = (close_val < s21) and (s21 < s50)
+            start_hside = (s21 >= s50) and (close_val <= s21)
+            start_lside = (s21 < s50) and (close_val > s21)
+            
+            if start_bull:
                 custom_regime_history.append("BULL")
-            else:
+            if start_bear:
                 custom_regime_history.append("BEAR")
-            continue 
+            if start_hside:
+                custom_regime_history.append("HSIDE")
+            if start_lside:
+                custom_regime_history.append("LSIDE")
+            continue
 
-        # Crossover checks for live price crossing TSMA 9
-        cross_buy  = (src_close[i] > tsma9[i]) and (src_close[i-1] <= tsma9[i-1])
-        cross_sell = (src_close[i] < tsma9[i]) and (src_close[i-1] >= tsma9[i-1])
+        # 1. Active Cross Triggers
+        is_cross_buy  = (close_val > s21) and (src_close[i-1] <= sma21[i-1])
+        is_cross_sell = (close_val < s21) and (src_close[i-1] >= sma21[i-1])
 
-        if cross_buy:
-            custom_regime_history.append("BUY")
-        elif cross_sell:
-            custom_regime_history.append("SELL")
-        elif src_close[i] >= tsma9[i]:
-            custom_regime_history.append("BULL")
-        else:
-            custom_regime_history.append("BEAR")
+        # 2. Structural Regime States (Inclusive operators absorb ties perfectly)
+        is_bull_regime  = (not is_cross_buy) and (not is_cross_sell) and (close_val > s21) and (s21 >= s50)
+        is_bear_regime  = (not is_cross_buy) and (not is_cross_sell) and (close_val < s21) and (s21 < s50)
+        is_hside_regime = (not is_cross_buy) and (not is_cross_sell) and (s21 >= s50) and (close_val <= s21)
+        is_lside_regime = (not is_cross_buy) and (not is_cross_sell) and (s21 < s50) and (close_val >= s21)
+
+        # Initialize tracking reference state
+        state = "NONE"
+
+        # Sequential independent condition triggers
+        if is_cross_buy:
+            state = "BUY"
+        if is_cross_sell:
+            state = "SELL"
+        if is_bull_regime:
+            state = "BULL"
+        if is_bear_regime:
+            state = "BEAR"
+        if is_hside_regime:
+            state = "HSIDE"
+        if is_lside_regime:
+            state = "LSIDE"
+
+        custom_regime_history.append(state)
 
     # --- Direct Injection Pipeline to Match JSON UI Server Layout Exactly ---
-    # We assign tsma9 to pxy_sma_line so downstream json mapping finds it seamlessly
     df['exit'] = custom_regime_history
-    df['pxy_sma_line'] = tsma9       
+    df['pxy_sma_line'] = sma21       
     df['sma_trend_full'] = custom_regime_history
     df['src_c'] = src_close 
     
@@ -100,7 +117,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['ST'] = df['pxy_sma_line']
     df['ST_Trend'] = df['sma_trend_full']
     df['P_Master'] = df['src_c']
-    df['shared_atr'] = np.zeros(n) # Placeholder to preserve structure without calculation overhead
+    df['shared_atr'] = np.zeros(n) 
     
     return df
 
@@ -131,7 +148,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
     return output
 
 if __name__ == "__main__":
-    print("--- STARTING LIVE PXY UNIFIED TSMA9 ONLY ENGINE ---")
+    print("--- STARTING LIVE PXY UNIFIED EXCLUSIVE MATRIX ENGINE ---")
     
     processed_df = calculate_supertrend(pd.DataFrame())
     
@@ -142,11 +159,9 @@ if __name__ == "__main__":
         print(f"Target Row Index Position -> {idx_pos} ({'CLOSED BAR' if CHECK_CONFIRMED_ONLY else 'LIVE TICK'})")
         print(f"Timestamp   : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"Close Price : {float(processed_df.at[target_index, 'Close']):.2f}")
-        print(f"TSMA Line Matrix Value     : {float(processed_df.at[target_index, 'pxy_sma_line']):.2f}")
+        print(f"21 SMA Line Matrix Value   : {float(processed_df.at[target_index, 'pxy_sma_line']):.2f}")
         print(f"Trend State : {str(processed_df.at[target_index, 'sma_trend_full'])}")
         
         export_supertrend_json(processed_df)
     else:
         print("CRITICAL: Upstream data empty.")
-
-
