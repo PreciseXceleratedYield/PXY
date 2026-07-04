@@ -14,7 +14,7 @@ DEBUG_MODE = False
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
     Implements a vectorized 21/50 SMA engine.
-    Safely calculates 'sma_trend_full' for downstream routing engines.
+    Safely calculates 'sma_trend_full' and 'ST_Trend' for downstream engines/dashboards.
     """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m")
@@ -39,9 +39,12 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['sma21'] = df['Close'].rolling(window=21, min_periods=1).mean()
     df['sma50'] = df['Close'].rolling(window=50, min_periods=1).mean()
 
-    # Vectorized Trend Matrix - CRITICAL FOR SYSOPTIONRTPXY.PY COMPATIBILITY
+    # Vectorized Trend Matrix - CRITICAL FOR DOWNSTREAM COMPATIBILITY
     df['sma_trend_full'] = np.where(df['sma21'] >= df['sma50'], "BULL", "BEAR")
     df.loc[df['sma21'].isna() | df['sma50'].isna(), 'sma_trend_full'] = "NONE"
+
+    # RESTORED ALIAS FOR SYSDASHPXY.PY COMPATIBILITY
+    df['ST_Trend'] = df['sma_trend_full']
 
     return df
 
