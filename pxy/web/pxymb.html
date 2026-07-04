@@ -354,7 +354,7 @@ const $=id=>document.getElementById(id);
 function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
 
 /* ── CLOCK ── */
-function tick(){$('clk').textContent=new Date().toLocaleTimeString('en-IN',{hour12:false});}
+function tick(){const el=$('clk');if(el)el.textContent=new Date().toLocaleTimeString('en-IN',{hour12:false});}
 tick();setInterval(tick,1000);
 
 /* ── HELPERS ── */
