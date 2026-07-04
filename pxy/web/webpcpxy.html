@@ -271,7 +271,7 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 </div>
 
 <!-- ACTIONS MENU -->
-<div id="actionsMenu" style="display:none;position:fixed;top:44px;right:0;z-index:9998;width:240px;background:rgba(11,15,26,0.95);backdrop-filter:blur(4px);border:1px solid var(--border2);border-radius:0 0 0 12px;padding:10px 8px;flex-direction:column;gap:6px;box-shadow:0 16px 40px rgba(0,0,0,0.6);">
+<div id="actionsMenu" style="display:none;position:fixed;top:44px;left:0;z-index:9998;width:240px;background:rgba(11,15,26,0.95);backdrop-filter:blur(4px);border:1px solid var(--border2);border-radius:0 0 12px 0;padding:10px 8px;flex-direction:column;gap:6px;box-shadow:0 16px 40px rgba(0,0,0,0.6);">
     <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.08em;text-align:center;color:var(--text);padding:2px 0 6px;border-bottom:1px solid var(--border2);">PXY<sup style="color:var(--accent);">®</sup> ACTIONS</div>
     <button class="amenu-btn sqrall" data-script="pxysqrall">⛔ SQUARE OFF ALL<span class="amenu-sub">Close all positions</span></button>
     <button class="amenu-btn ce"     data-script="pxybuyce">✅ BUY CE<span class="amenu-sub">Force buy call</span></button>
@@ -417,26 +417,38 @@ let chart,lastMoSt=null,lastMoCloses=null;
 async function loadChart(){
     try{
         const data=await fetch('./webchrtpxy.json?_='+Date.now()).then(r=>r.json());
-        const closes=Array.isArray(data)?data.map(d=>d.close||d.Close):[];
-        const st=Array.isArray(data)?data.map(d=>d.st):[];
-        if(closes.length){drawChart(closes,st);drawMomentumBar(st,closes);}
+        if(!Array.isArray(data)||!data.length)return;
+        const prices=data.map(d=>d.price??d.close??d.Close);
+        const sma21=data.map(d=>d.sma21??null);
+        const sma50=data.map(d=>d.sma50??null);
+        drawChart(prices,sma21,sma50);
+        drawMomentumBar(sma21,prices);
     }catch(e){}
 }
-function drawChart(closes,st){
+function drawChart(prices,sma21,sma50){
     if(!activeTrade){
-        const MAX=60,pad=4,c=closes.slice(-MAX),s=st.slice(-MAX);
-        const isBull=(c.at(-1)??0)>=(c.at(-2)??0),lc=isBull?cssVar('--bull'):cssVar('--bear');
-        const labels=[...c.map((_,i)=>i),...Array(pad).fill('')];
-        const cp=[...c,...Array(pad).fill(null)],sp=[...s,...Array(pad).fill(null)];
+        const MAX=60,pad=4;
+        const p=prices.slice(-MAX),s21=sma21.slice(-MAX),s50=sma50.slice(-MAX);
+        const isBull=(p.at(-1)??0)>=(p.at(-2)??0),lc=isBull?cssVar('--bull'):cssVar('--bear');
+        const labels=[...p.map((_,i)=>i),...Array(pad).fill('')];
+        const pd=[...p,...Array(pad).fill(null)];
+        const s21d=[...s21,...Array(pad).fill(null)];
+        const s50d=[...s50,...Array(pad).fill(null)];
         if(!chart){
             chart=new Chart($('priceChart'),{type:'line',data:{labels,datasets:[
-                {data:cp,borderColor:lc,borderWidth:1.5,pointRadius:0,fill:true,tension:0.35,
+                {data:pd,borderColor:lc,borderWidth:1.5,pointRadius:0,fill:true,tension:0.35,
                  backgroundColor:ctx2=>{const g=ctx2.chart.ctx.createLinearGradient(0,0,0,ctx2.chart.height);g.addColorStop(0,isBull?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)');g.addColorStop(1,'rgba(0,0,0,0)');return g;}},
-                {data:sp,borderColor:'rgba(202,138,4,0.65)',borderWidth:1,borderDash:[4,4],pointRadius:0,fill:false,tension:0.3}
+                {data:s21d,borderColor:'rgba(202,138,4,0.75)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false,tension:0.3},
+                {data:s50d,borderColor:'rgba(34,211,238,0.55)',borderWidth:1,borderDash:[],pointRadius:0,fill:false,tension:0.3}
             ]},options:{animation:false,responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{enabled:false}},
                 scales:{x:{display:false},y:{display:true,position:'right',grid:{color:cssVar('--grid'),drawBorder:false},ticks:{color:cssVar('--muted'),font:{family:"'DM Mono',monospace",size:9},maxTicksLimit:5}}}}});
         }else{
-            chart.data.labels=labels;chart.data.datasets[0].data=cp;chart.data.datasets[0].borderColor=lc;chart.data.datasets[1].data=sp;chart.update('none');
+            chart.data.labels=labels;
+            chart.data.datasets[0].data=pd;chart.data.datasets[0].borderColor=lc;
+            chart.data.datasets[0].backgroundColor=ctx2=>{const g=ctx2.chart.ctx.createLinearGradient(0,0,0,ctx2.chart.height);g.addColorStop(0,isBull?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)');g.addColorStop(1,'rgba(0,0,0,0)');return g;};
+            chart.data.datasets[1].data=s21d;
+            chart.data.datasets[2].data=s50d;
+            chart.update('none');
         }
     }
 }
