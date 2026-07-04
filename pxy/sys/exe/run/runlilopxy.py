@@ -9,7 +9,6 @@ from runltpspxy import get_mid_price
 # 🔍 STRATEGIC FOOTPRINT: Resolved relative to run/ directory pathing
 SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/websqrpxy.json"))
 DEFAULT_FILTER_TIME = "09:16:00"
-
 def resolve_dynamic_filter_time():
     """Reads risk engine cache to fetch post-reset fresh start time if triggered today."""
     try:
@@ -26,11 +25,19 @@ def resolve_dynamic_filter_time():
                     content = f.read().strip()
                     if content:
                         log_data = json.loads(content)
-                        if log_data.get("status") == "SUCCESSFUL_SQUARE_OFF_CONFIRMED" and log_data.get("date") == today_str:
-                            fresh_start_time = log_data.get("successful_time")
-                            if fresh_start_time:
-                                print(f"🔄 Reset detected! Fresh start: {fresh_start_time}")
-                                return fresh_start_time
+                        
+                        # 🎯 THE DESIGN SOLVER: If it's a list, look at the first element. If empty list, fallback to empty dict.
+                        if isinstance(log_data, list):
+                            log_data = log_data[0] if len(log_data) > 0 else {}
+                        
+                        # If it's not a dict at this point (or is empty), .get() safely handles it or returns None
+                        if isinstance(log_data, dict):
+                            if log_data.get("status") == "SUCCESSFUL_SQUARE_OFF_CONFIRMED" and log_data.get("date") == today_str:
+                                fresh_start_time = log_data.get("successful_time")
+                                if fresh_start_time:
+                                    print(f"🔄 Reset detected! Fresh start: {fresh_start_time}")
+                                    return fresh_start_time
+                                    
         return DEFAULT_FILTER_TIME
     except Exception as e:
         print(f"⚠ Error resolving dynamic time parameters, falling back to default: {e}")
