@@ -106,7 +106,7 @@ def get_entry_signal(df=None):
     # =========================================================================
     if entry_signal != "NONE":
         print(f"          SUPER: {current_regime} | MOVE: {direction}")
-        print(f"       ENTRY: {entry_signal} | EXIT: {exit_signal}")
+        print(f"         ENTRY: {entry_signal} | EXIT: {exit_signal}")
 
     return entry_signal, exit_signal
 
