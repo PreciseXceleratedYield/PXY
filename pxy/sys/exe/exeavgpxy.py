@@ -137,6 +137,20 @@ def handle_side_averaging(client, df):
         side_is_lesser = ce_is_lesser if side == "CE" else pe_is_lesser
 
         for index, row in side_df.iterrows():
+            # -------------------------------------------------------------
+            # 🛡️ ROW-LEVEL SUPERTREND FILTER GUARDRAIL
+            # -------------------------------------------------------------
+            supertrend_status = str(row.get('supertrend', 'NONE'))
+            
+            if side == "CE" and supertrend_status != "BULL":
+                all_positions_crossed_threshold = False
+                break
+                
+            if side == "PE" and supertrend_status != "BEAR":
+                all_positions_crossed_threshold = False
+                break
+            # -------------------------------------------------------------
+
             pos_loss = get_loss(row)
             
             # --- EVALUATE MATRIX CALCULATIONS VIA 10% FIXED BASE ---
@@ -185,3 +199,4 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+
