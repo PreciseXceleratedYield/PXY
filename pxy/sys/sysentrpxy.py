@@ -5,15 +5,14 @@ PXY OPTION ROUTING ENGINE WITH STREAMLINED CROSSOVER MATRIX & REGIME PRIORITY
 ===============================================================================
 Operational Rules Matrix:
 1. EXIT Pipeline  : Unconditionally mapped to get_signal (UP -> BULL | DOWN -> BEAR).
-2. ENTRY Pipeline : Filtered by SuperTrend crossover and continuation regimes.
-                    SIDE state bypasses filters and follows live direction.
+2. ENTRY Pipeline : Filtered by strict, mutually exclusive structural regimes.
 ===============================================================================
 """
 
 # Import the signal functions from your engines
 from sysmktpxy import get_signal      # Direction engine (UP / DOWN)
-from sysstrndpxy import calculate_supertrend  # Structural engine (BUY / SELL / BULL / BEAR / SIDE)
-from syscnfgpxy import TICKER
+from sysstrndpxy import calculate_supertrend  # Structural engine (BULL / BEAR)
+from syscnfgpxy import TIMEZONE, TICKER
 import pandas as pd
 from datetime import datetime
 import pytz
@@ -21,8 +20,8 @@ import pytz
 def get_entry_signal(df=None):
     """
     Advanced routing pipeline mapping structural trend regimes against execution signals.
-    Exits follow live direction unconditionally. Entries utilize SuperTrend filtering, 
-    while SIDE state lets direction flow through completely unfiltered.
+    Exits follow live direction unconditionally. All conditions run on 100% 
+    isolated exclusive tracks with zero nested fallback layers or loops.
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -34,7 +33,7 @@ def get_entry_signal(df=None):
     # 1. Extract the geometric movement direction (UP / DOWN)
     direction, _ = get_signal(df)
 
-    # 2. Extract the true SuperTrend regime matrix state (BUY / SELL / BULL / BEAR / SIDE)
+    # 2. Extract the true SuperTrend regime matrix state (BULL / BEAR)
     processed_df = calculate_supertrend(df)
     current_regime = str(processed_df['sma_trend_full'].iloc[-1]) # Last row state
 
@@ -60,15 +59,6 @@ def get_entry_signal(df=None):
     
     is_morning_otm_window = (time_in_minutes >= start_window_minutes) and (time_in_minutes <= end_window_minutes)
 
-    # =========================================================================
-    # MATRIX STATE NORMALIZATION LAYER (Strictly Force to BULL or BEAR internal keys)
-    # =========================================================================
-    normalized_regime = "NONE"
-    if current_regime in ["BUY", "BULL", "HSIDE"]:
-        normalized_regime = "BULL"
-    if current_regime in ["SELL", "BEAR", "LSIDE"]:
-        normalized_regime = "BEAR"
-
     entry_signal = "NONE"
     
     # =========================================================================
@@ -77,40 +67,43 @@ def get_entry_signal(df=None):
     exit_signal = "BULL" if direction == "UP" else "BEAR"
 
     # =========================================================================
-    # ENTRY FILTER MATRIX & PRIORITY LAYER
+    # ENTRY FILTER MATRIX & PRIORITY LAYER (Strictly Exclusive & Flattened)
     # =========================================================================
     
-    # --- TIER 1 PRIORITY: ABSOLUTE CROSSOVER MOMENTS ---
-    if current_regime == "BUY":
-        entry_signal = "OTMBUY" if is_morning_otm_window else "ATMBUY"
+    # --- 1. MORNING SESSION CODES (09:15 - 09:30 IST) ---
+    is_morning_buy_trigger  = (is_morning_otm_window) and (current_regime == "BULL") and (direction == "UP")
+    is_morning_sell_trigger = (is_morning_otm_window) and (current_regime == "BEAR") and (direction == "DOWN")
+    
+    # --- 2. STANDARD SESSION CODES (09:31 IST ONWARDS) ---
+    is_standard_buy_trigger  = (not is_morning_otm_window) and (current_regime == "BULL") and (direction == "UP")
+    is_standard_sell_trigger = (not is_morning_otm_window) and (current_regime == "BEAR") and (direction == "DOWN")
+    
+    # --- 3. TIME-AGNOSTIC PROTECTIVE CODES ---
+    is_bull_hedge_trigger = (current_regime == "BULL") and (direction == "DOWN")
+    is_bear_hedge_trigger = (current_regime == "BEAR") and (direction == "UP")
+
+    # --- 4. EXCLUSIVE SIGNAL DIRECT ASSIGNMENT RUNTIME (No Elif, No Else) ---
+    if is_morning_buy_trigger:
+        entry_signal = "OTMBUY"
         
-    elif current_regime == "SELL":
-        entry_signal = "OTMSELL" if is_morning_otm_window else "ATMSELL"
+    if is_morning_sell_trigger:
+        entry_signal = "OTMSELL"
+        
+    if is_standard_buy_trigger:
+        entry_signal = "ATMBUY"
+        
+    if is_standard_sell_trigger:
+        entry_signal = "ATMSELL"
+        
+    if is_bull_hedge_trigger:
+        entry_signal = "BEAR"
+        
+    if is_bear_hedge_trigger:
+        entry_signal = "BULL"
 
-    # --- TIER 2 PRIORITY: PERSISTENT CONTINUATION STATES ---
-    elif normalized_regime == "BULL":
-        # Check alignment: Geometric engine says UP while SuperTrend is BULL
-        if direction == "UP":
-            entry_signal = "OTMBUY" if is_morning_otm_window else "ATMBUY"   # Aligned -> Target ATM/OTM
-        else:
-            entry_signal = "BEAR"   # Misaligned / Protection Filter -> Target NTM
-
-    elif normalized_regime == "BEAR":
-        # Check alignment: Geometric engine says DOWN while SuperTrend is BEAR
-        if direction == "DOWN":
-            entry_signal = "OTMSELL" if is_morning_otm_window else "ATMSELL"  # Aligned -> Target ATM/OTM
-        else:
-            entry_signal = "BULL"  # Misaligned / Protection Filter -> Target NTM
-
-    # --- TIER 3 PRIORITY: SIDE CHOPPY REGIME (UNFILTERED BYPASS) ---
-    elif current_regime == "SIDE":
-        # SIDE should not filter anything. Let direction dictate execution completely.
-        if direction == "UP":
-            entry_signal = "OTMBUY" if is_morning_otm_window else "ATMBUY"
-        elif direction == "DOWN":
-            entry_signal = "OTMSELL" if is_morning_otm_window else "ATMSELL"
-
-    # Console Status Reporting Actions
+    # =========================================================================
+    # KEEPING PRINT LINES EXACTLY LIKE ORIGINAL CODE
+    # =========================================================================
     if entry_signal != "NONE":
         print(f"          SUPER: {current_regime} | MOVE: {direction}")
         print(f"       ENTRY: {entry_signal} | EXIT: {exit_signal}")
@@ -124,4 +117,3 @@ if __name__ == "__main__":
         entry, ex = get_entry_signal(df)
         print("-" * 50)
         print(f"FINAL PROCESSED EXECUTION >> ENTRY: {entry} | EXIT: {ex}")
-
