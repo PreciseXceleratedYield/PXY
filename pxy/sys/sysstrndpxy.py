@@ -18,9 +18,9 @@ CHECK_CONFIRMED_ONLY = False
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
-    Implements a strict 21/50 SMA matrix using explicit mutually exclusive states.
-    Uses inclusive operators (>=, <=) to eliminate mathematical ties without an else statement.
-    Fixes length mismatch bugs by enforcing isolated single-append logic on early indices.
+    Implements a strict 21/50 SMA matrix simplified down to two structural regimes.
+    21 above or equal to 50 is BULL. 21 below 50 is BEAR.
+    Uses strict, mutually exclusive conditions without any else statements.
     """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m") 
@@ -54,59 +54,22 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     sma21 = df['sma21'].to_numpy()
     sma50 = df['sma50'].to_numpy()
 
-    # --- Custom Matrix Logic with Mutually Exclusive Rules ---
+    # --- Custom Matrix Logic with Simplified Rules ---
     custom_regime_history = []
     for i in range(n): 
-        close_val = src_close[i]
         s21 = sma21[i]
         s50 = sma50[i]
 
-        # Handle startup warm up rows safely
-        if i < 1:
-            start_bull  = (close_val > s21) and (s21 >= s50)
-            start_bear  = (close_val < s21) and (s21 < s50)
-            start_hside = (s21 >= s50) and (close_val <= s21)
-            start_lside = (s21 < s50) and (close_val >= s21)
-            
-            state = "NONE"
-            if start_bull:
-                state = "BULL"
-            if start_bear:
-                state = "BEAR"
-            if start_hside:
-                state = "HSIDE"
-            if start_lside:
-                state = "LSIDE"
-                
-            custom_regime_history.append(state)
-            continue
+        # 1. Clear Mutually Exclusive Conditions
+        is_bull_trend = (s21 >= s50)
+        is_bear_trend = (s21 < s50)
 
-        # 1. Active Cross Triggers
-        is_cross_buy  = (close_val > s21) and (src_close[i-1] <= sma21[i-1])
-        is_cross_sell = (close_val < s21) and (src_close[i-1] >= sma21[i-1])
-
-        # 2. Structural Regime States (Inclusive operators absorb ties perfectly)
-        is_bull_regime  = (not is_cross_buy) and (not is_cross_sell) and (close_val > s21) and (s21 >= s50)
-        is_bear_regime  = (not is_cross_buy) and (not is_cross_sell) and (close_val < s21) and (s21 < s50)
-        is_hside_regime = (not is_cross_buy) and (not is_cross_sell) and (s21 >= s50) and (close_val <= s21)
-        is_lside_regime = (not is_cross_buy) and (not is_cross_sell) and (s21 < s50) and (close_val >= s21)
-
-        # Initialize tracking reference state
+        # 2. Strict Assignment Flow (No Else)
         state = "NONE"
-
-        # Sequential independent condition triggers
-        if is_cross_buy:
-            state = "BUY"
-        if is_cross_sell:
-            state = "SELL"
-        if is_bull_regime:
+        if is_bull_trend:
             state = "BULL"
-        if is_bear_regime:
+        if is_bear_trend:
             state = "BEAR"
-        if is_hside_regime:
-            state = "HSIDE"
-        if is_lside_regime:
-            state = "LSIDE"
 
         custom_regime_history.append(state)
 
@@ -170,3 +133,4 @@ if __name__ == "__main__":
         export_supertrend_json(processed_df)
     else:
         print("CRITICAL: Upstream data empty.")
+
