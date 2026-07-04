@@ -53,13 +53,7 @@ body{
 }
 .reconnect-btn:active{color:var(--accent);border-color:var(--accent);}
 
-/* ── SIGNAL BAR (chart tab) ── */
-#sigBar{
-    flex-shrink:0;display:none;
-    height:48px;align-items:stretch;
-    background:var(--bg2);border-bottom:1px solid var(--border2);
-}
-#sigBar.visible{display:flex;}
+/* ── SIGNAL BAR ── */
 .sig-cell{
     flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
     padding:0 4px;gap:1px;border-right:1px solid var(--border);
@@ -200,23 +194,20 @@ body{
 <!-- HEADER -->
 <div id="hdr">
     <div class="hdr-l">
-        <button class="reconnect-btn" id="reconnectBtn">↺</button>
+        <button class="reconnect-btn" id="reconnectBtn" title="Reconnect">↺</button>
         <div id="statusDot"></div>
-        <span id="statusLbl" style="font-size:9px;color:var(--muted);letter-spacing:0.1em;">CONNECTING</span>
+    </div>
+    <div id="sigBar" style="flex:1;display:flex;align-items:stretch;height:100%;margin:0 6px;border-left:1px solid var(--border2);border-right:1px solid var(--border2);">
+        <div class="sig-cell" id="cellEntry"><span class="sc-lbl">🛫 Entry</span><span class="sc-val" id="hcEntry">—</span></div>
+        <div class="sig-cell" id="cellExit"><span class="sc-lbl">🛬 Exit</span><span class="sc-val" id="hcExit">—</span></div>
+        <div class="sig-cell" id="cellTrend"><span class="sc-lbl">🚀 Trend</span><span class="sc-val" id="hcTrend">—</span></div>
+        <div class="sig-cell" id="cellATR"><span class="sc-lbl">📐 ATR/KATR</span><span class="sc-val" id="hcATR">—</span></div>
+        <div class="sig-cell" id="cellDP" style="flex:2;"><span class="sc-lbl">Depth ⚡ Power</span><span class="sc-val" id="dpText">—</span></div>
     </div>
     <div class="hdr-r">
         <span id="clk">—</span>
         <span class="logo" id="logoRefresh">PXY<sup>®</sup></span>
     </div>
-</div>
-
-<!-- SIGNAL BAR (chart tab only) -->
-<div id="sigBar">
-    <div class="sig-cell" id="cellEntry"><span class="sc-lbl">🛫 Entry</span><span class="sc-val" id="hcEntry">—</span></div>
-    <div class="sig-cell" id="cellExit"><span class="sc-lbl">🛬 Exit</span><span class="sc-val" id="hcExit">—</span></div>
-    <div class="sig-cell" id="cellTrend"><span class="sc-lbl">🚀 Trend</span><span class="sc-val" id="hcTrend">—</span></div>
-    <div class="sig-cell" id="cellATR"><span class="sc-lbl">📐 ATR/KATR</span><span class="sc-val" id="hcATR">—</span></div>
-    <div class="sig-cell" id="cellDP" style="flex:2;"><span class="sc-lbl">Depth ⚡ Power</span><span class="sc-val" id="dpText">—</span></div>
 </div>
 
 <!-- TAB CONTENT -->
@@ -420,8 +411,6 @@ function switchTab(tabId){
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     $(tabId).classList.add('active');
     document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
-    // show/hide signal bar on chart tab
-    $('sigBar').classList.toggle('visible', tabId==='paneChart');
     // fit terminal if switching to it
     if(tabId==='paneTerminal'&&fit)setTimeout(()=>fit.fit(),50);
     if(tabId==='paneChart'&&chart)setTimeout(()=>{chart.resize();drawMomentumBar(lastMoSt,lastMoCloses);},50);
@@ -445,11 +434,11 @@ function initTerm(){
     new ResizeObserver(()=>fit.fit()).observe($('termBox'));
 }
 function setStatus(state){
-    const dot=$('statusDot'),lbl=$('statusLbl');
+    const dot=$('statusDot');
     dot.className='';
-    if(state==='connected'){dot.classList.add('connected');lbl.textContent='LIVE';}
-    else if(state==='error'){dot.classList.add('error');lbl.textContent='ERROR';}
-    else{lbl.textContent='OFFLINE';}
+    if(state==='connected'){dot.classList.add('connected');dot.title='LIVE';}
+    else if(state==='error'){dot.classList.add('error');dot.title='ERROR';}
+    else{dot.title='OFFLINE';}
 }
 function connect(){
     if(ws){try{ws.close();}catch(e){}}
