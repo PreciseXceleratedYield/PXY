@@ -488,7 +488,7 @@ async function loadDash(){
             const power=last.bull?cePow:pePow;
             const dpEl=$('dpText');
             if(dpEl){
-                dpEl.textContent=`📊${depth} 🚦 ⚡${cePow} ⚡${pePow}`;
+                dpEl.textContent=`📊${depth} 🚦 ⚡${power}`;
                 dpEl.className='sc-val '+(last.bull?'bull':'bear');
             }
             const cellDP=$('cellDP');
