@@ -41,8 +41,8 @@ def calculate_pinescript_atr(df: pd.DataFrame, period: int) -> pd.Series:
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
     """ 
     Implements your customized multi-average strategy pipeline.
-    Averages SMA 50, SMA 21, and a dynamic 5/5 Supertrend into a single line,
-    while using SMA 21 crossovers and Supertrend states to define a custom regime matrix.
+    Averages SMA 50, TSMA 9, and a dynamic 5/5 Supertrend into a single line,
+    while using TSMA 9 crossovers and Supertrend states to define a custom regime matrix.
     """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m") 
@@ -66,23 +66,38 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     # --- Pine Script Inputs ---
     sma_length = 50
-    sma21_length = 21
+    tsma_length = 9     # Replaced SMA 21 length with 9-period TSMA
     st_length = 5
     st_multiplier = 5.0
 
-    # 1. Component One & Two: Calculate Moving Averages
-    # Fill early NaNs with raw close series to prevent downstream serialization breaks
+    # 1. Component One: Calculate SMA 50
     sma50 = calculate_sma(df['Close'], sma_length).fillna(df['Close']).to_numpy()
-    sma21 = calculate_sma(df['Close'], sma21_length).fillna(df['Close']).to_numpy()
-
-    # 2. Component Three: Calculate Standard 5-Period ATR for Supertrend
-    atr_series = calculate_pinescript_atr(df, st_length).fillna(0.0)
-    custom_atr = atr_series.to_numpy()
 
     # Read necessary pricing arrays
     src_close = df['Close'].to_numpy()
     src_high = df['High'].to_numpy()
     src_low = df['Low'].to_numpy()
+
+    # Calculate Component Two: 9-Period Time Series Moving Average (Linear Regression End Value)
+    tsma9 = np.zeros(n)
+    for i in range(n):
+        window_size = min(tsma_length, i + 1)
+        y = src_close[i - window_size + 1 : i + 1]
+        x = np.arange(window_size)
+        
+        x_mean = x.mean()
+        y_mean = y.mean()
+        
+        num = np.sum((x - x_mean) * (y - y_mean))
+        den = np.sum((x - x_mean) ** 2)
+        slope = num / den if den != 0 else 0.0
+        intercept = y_mean - slope * x_mean
+        
+        tsma9[i] = slope * (window_size - 1) + intercept
+
+    # 2. Component Three: Calculate Standard 5-Period ATR for Supertrend
+    atr_series = calculate_pinescript_atr(df, st_length).fillna(0.0)
+    custom_atr = atr_series.to_numpy()
 
     hl2 = (src_high + src_low) / 2.0
     basic_ub = hl2 + (st_multiplier * custom_atr)
@@ -122,9 +137,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
         st_line[i] = final_lb[i] if trend[i] == 1 else final_ub[i]
 
-    # --- 3. Mathematical Blend: (SMA 50 + SMA 21 + Supertrend Line) / 3 ---
-    # Safe protection against NaN alignment errors early in the dataframe
-    combined_line = (sma50 + sma21 + st_line) / 3.0
+    # --- 3. Mathematical Blend: (SMA 50 + TSMA 9 + Supertrend Line) / 3 ---
+    combined_line = (sma50 + tsma9 + st_line) / 3.0
 
     # --- 4. Custom Matrix Logic (BUY / SELL / BULL / BEAR / SIDE) ---
     custom_regime_history = []
@@ -133,17 +147,17 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
             custom_regime_history.append("SIDE")
             continue 
 
-        # Crossover checks for live price crossing SMA 21
-        cross_buy  = (src_close[i] > sma21[i]) and (src_close[i-1] <= sma21[i-1])
-        cross_sell = (src_close[i] < sma21[i]) and (src_close[i-1] >= sma21[i-1])
+        # Crossover checks for live price crossing TSMA 9 instead of SMA 21
+        cross_buy  = (src_close[i] > tsma9[i]) and (src_close[i-1] <= tsma9[i-1])
+        cross_sell = (src_close[i] < tsma9[i]) and (src_close[i-1] >= tsma9[i-1])
 
         if cross_buy:
             custom_regime_history.append("BUY")
         elif cross_sell:
             custom_regime_history.append("SELL")
-        elif (src_close[i] > sma21[i]) and (trend[i] == 1):
+        elif (src_close[i] > tsma9[i]) and (trend[i] == 1):
             custom_regime_history.append("BULL")
-        elif (src_close[i] < sma21[i]) and (trend[i] == -1):
+        elif (src_close[i] < tsma9[i]) and (trend[i] == -1):
             custom_regime_history.append("BEAR")
         else:
             custom_regime_history.append("SIDE")
@@ -190,7 +204,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
     return output
 
 if __name__ == "__main__":
-    print("--- STARTING LIVE PXY UNIFIED SMA + SMA21 + SUPERTREND ENGINE ---")
+    print("--- STARTING LIVE PXY UNIFIED SMA + TSMA9 + SUPERTREND ENGINE ---")
     
     processed_df = calculate_supertrend(pd.DataFrame())
     
@@ -207,5 +221,6 @@ if __name__ == "__main__":
         export_supertrend_json(processed_df)
     else:
         print("CRITICAL: Upstream data empty.")
+
 
 
