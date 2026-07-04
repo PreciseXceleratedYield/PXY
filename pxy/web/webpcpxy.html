@@ -169,7 +169,7 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
         <div class="sig-cell" id="cellExit"><span class="sc-lbl">🛬 Exit</span><span class="sc-val" id="hcExit">—</span></div>
         <div class="sig-cell" id="cellTrend"><span class="sc-lbl">🚀 Trend</span><span class="sc-val" id="hcTrend">—</span></div>
         <div class="sig-cell" id="cellATR"><span class="sc-lbl">📐 ATR/KATR</span><span class="sc-val" id="hcATR">—</span></div>
-        <div class="sig-cell" id="cellDP" style="flex:2;"><span class="sc-lbl">Depth ⚡ Power</span><span class="sc-val" id="dpText">—</span></div>
+        <div class="sig-cell" id="cellDP" style="flex:2;"><span class="sc-lbl">Depth ⚡⚡ Power</span><span class="sc-val" id="dpText">—</span></div>
     </div>
 
     <div class="hdr-r">
@@ -405,7 +405,7 @@ async function loadDash(){
             const last=items[items.length-1];let si=items.length-1;
             while(si>0&&items[si-1].bull===last.bull)si--;
             const depth=items.length-si,power=last.bull?cePow:pePow;
-            const dpEl=$('dpText');if(dpEl){dpEl.textContent=`📊${depth} 🚦 ⚡${power}`;dpEl.className='sc-val '+(last.bull?'bull':'bear');}
+            const dpEl=$('dpText');if(dpEl){dpEl.textContent=`📊${depth} 🚦 ⚡${cePow} ⚡${pePow}`;dpEl.className='sc-val '+(last.bull?'bull':'bear');}
             const cellDP=$('cellDP');if(cellDP){cellDP.className='sig-cell';cellDP.style.flex='2';cellDP.classList.add(last.bull?'bull-cell':'bear-cell');}
         }
     }catch(e){}
