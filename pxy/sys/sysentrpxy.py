@@ -78,8 +78,8 @@ def get_entry_signal(df=None):
 
     # Console Status Reporting Actions
     if entry_signal != "NONE":
-        print(f"       🔥 [ACTION REGIME] -> SuperTrend: {current_regime} | Direction: {direction}")
-        print(f"       🔥 [ROUTING OUT]   -> ENTRY: {entry_signal} | EXIT: {exit_signal} 🔥")
+        print(f"SUPER: {current_regime} | MOVE: {direction}")
+        print(f"ENTRY: {entry_signal} | EXIT: {exit_signal}")
 
     return entry_signal, exit_signal
 
