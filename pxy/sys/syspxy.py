@@ -7,7 +7,13 @@ from systdaypxy import get_market_snapshot  # Keep your original 'systdaypxy'
 from sysvixpxy import get_market_context, expand_vix, expand_sentiment
 from syscnfgpxy import TICKER
 
+# Import the clean json exporter from your streamlined trend engine
+from sysstrndpxy import export_supertrend_json
+
 def get_all_data():
+    # -------- RUN TREND CHART GENERATION FIRST --------
+    export_supertrend_json()
+
     # -------- CORE --------
     core = get_full_snapshot() or {}
 
