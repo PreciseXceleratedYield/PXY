@@ -1,0 +1,15 @@
+{
+  "name": "PreciseXceleratedYield Pvt Ltd™",
+  "short_name": "PXY®",
+  "description": "PXY® Trading Dashboard",
+  "start_url": "/web/mbl/mblpxy.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#06080d",
+  "theme_color": "#06080d",
+  "icons": [
+    { "src": "/web/mbl/icons/mbl192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/web/mbl/icons/mbl512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/web/mbl/icons/mbl512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
