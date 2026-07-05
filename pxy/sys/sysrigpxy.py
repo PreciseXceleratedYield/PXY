@@ -11,10 +11,10 @@ from syscnfgpxy import TIMEZONE
 
 DEBUG_MODE = False
 
-def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 50, upper_mult: float = 2.0, lower_mult: float = 2.0) -> pd.DataFrame:
+def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 42, upper_mult: float = 2.0, lower_mult: float = 2.0) -> pd.DataFrame:
     """
     Translates TradingView Pine Script Linear Regression Channel calculations to Python.
-    Hardcoded for a 50-candle execution footprint to match your live data stream size.
+    Hardcoded for a 42-candle lookback window.
     """
     try:
         raw_df = fetch_yf_data()
@@ -26,7 +26,7 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 50, uppe
         df = df.copy()
 
     if df.empty or len(df) < length:
-        # Fallback columns initialization to guarantee downstream stability
+        # Guarantee downstream environment stability via zero/nan matrix footprints
         df['linreg_base'] = np.nan
         df['linreg_upper'] = np.nan
         df['linreg_lower'] = np.nan
@@ -45,86 +45,88 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 50, uppe
     tz_string = str(TIMEZONE)
     df = df.tz_localize('UTC').tz_convert(tz_string) if df.index.tz is None else df.tz_convert(tz_string)
 
-    # Prepare calculation arrays for the 50-candle window slice
-    x_indices = np.arange(1, length + 1, dtype=float)
-    y_values = df['Close'].iloc[-length:].values
-    
-    # Calculate Linear Regression variables matching calcSlope function exactly
-    sumX = np.sum(x_indices)
-    sumY = np.sum(y_values)
-    sumXSqr = np.sum(x_indices ** 2)
-    sumXY = np.sum(x_indices * y_values)
-    
+    # 1-to-1 Pine Loop Replication Setup (Chronological Reversal Mapping)
+    source_vals = df['Close'].iloc[-length:].values[::-1] 
+    high_vals = df['High'].iloc[-length:].values[::-1]
+    low_vals = df['Low'].iloc[-length:].values[::-1]
+
+    sumX = 0.0
+    sumY = 0.0
+    sumXSqr = 0.0
+    sumXY = 0.0
+
+    for i in range(length):
+        val = source_vals[i]
+        per = i + 1.0
+        sumX += per
+        sumY += val
+        sumXSqr += per * per
+        sumXY += val * per
+
     slope = (length * sumXY - sumX * sumY) / (length * sumXSqr - sumX * sumX)
     average = sumY / length
     intercept = average - slope * sumX / length + slope
-    
-    # Replicating startPrice and endPrice calculations
-    end_price = intercept
-    start_price = intercept + slope * (length - 1)
-    
-    # Calculate Standard Deviation, Pearson's R, Max High Dev, and Max Low Dev matching calcDev function
-    high_vals = df['High'].iloc[-length:].values
-    low_vals = df['Low'].iloc[-length:].values
-    source_vals = df['Close'].iloc[-length:].values
-    
+
+    # Calculate exact matching deviations mirroring calcDev loop bounds precisely
+    std_dev_acc = 0.0
+    dsxx = 0.0
+    dsyy = 0.0
+    dsxy = 0.0
     periods = length - 1
-    daY = intercept + slope * periods / 2
+    daY = intercept + slope * periods / 2.0
     
-    # Generate the linear base regression array path across the 50-candle block
-    val_track = intercept + slope * np.arange(length)
-    
-    # Find max absolute price distance points for fallback deviations
-    up_dev_array = high_vals - val_track
-    dn_dev_array = val_track - low_vals
-    upDev = np.max(up_dev_array) if np.max(up_dev_array) > 0 else 0.0
-    dnDev = np.max(dn_dev_array) if np.max(dn_dev_array) > 0 else 0.0
-    
-    # Calculated Pearson R matrices
-    dxt = source_vals - average
-    dyt = val_track - daY
-    dsxx = np.sum(dxt * dxt)
-    dsyy = np.sum(dyt * dyt)
-    dsxy = np.sum(dxt * dyt)
-    
-    std_dev_acc = np.sum((source_vals - val_track) ** 2)
-    std_dev = np.sqrt(std_dev_acc / (1 if periods == 0 else periods))
+    val = intercept
+    val_track = np.zeros(length)
+
+    for j in range(length):
+        val_track[j] = val
+        
+        dxt = source_vals[j] - average
+        dyt = val - daY
+        
+        price_diff = source_vals[j] - val
+        std_dev_acc += price_diff * price_diff
+        
+        dsxx += dxt * dxt
+        dsyy += dyt * dyt
+        dsxy += dxt * dyt
+        
+        val += slope
+
+    # Exact Pine Script Variance Calculation
+    divisor = 1.0 if periods == 0 else float(periods)
+    std_dev = np.sqrt(std_dev_acc / divisor)
     pearson_r = 0.0 if (dsxx == 0 or dsyy == 0) else (dsxy / np.sqrt(dsxx * dsyy))
-    
-    # Calculate upper/lower band start and end values
-    upper_start_price = start_price + (upper_mult * std_dev)
-    upper_end_price = end_price + (upper_mult * std_dev)
-    lower_start_price = start_price - (lower_mult * std_dev)
-    lower_end_price = end_price - (lower_mult * std_dev)
-    
-    # Calculate trend metrics (Pine Script: float trend = math.sign(startPrice - endPrice))
-    trend_val = np.sign(start_price - end_price)
+
+    # Calculate trend metrics
+    start_price = intercept + slope * (length - 1)
+    trend_val = np.sign(start_price - intercept)
     trend_direction = "BULL" if trend_val < 0 else "BEAR"
-    
-    # Back-fill channel values into the dataframe timeline strictly across the historical footprint
+
+    # Project the arrays back into standard chronological sequence (past -> present)
     base_line_series = np.full(len(df), np.nan)
     upper_line_series = np.full(len(df), np.nan)
     lower_line_series = np.full(len(df), np.nan)
-    
-    # Generate current array trend lines reversed to match chronological timeline index
+
+    # Load values back onto chronological timeline
     base_line_series[-length:] = val_track[::-1]
     upper_line_series[-length:] = (val_track + (upper_mult * std_dev))[::-1]
     lower_line_series[-length:] = (val_track - (lower_mult * std_dev))[::-1]
-    
+
     df['linreg_base'] = base_line_series
     df['linreg_upper'] = upper_line_series
     df['linreg_lower'] = lower_line_series
     df['sma_trend_full'] = trend_direction
-    
-    # COMPATIBILITY ALIASES (Preserves downstream sysdashpxy.py tracking matrix hooks)
+
+    # COMPATIBILITY ALIASES
     df['ST_Trend'] = df['sma_trend_full']
     df['ST'] = df['linreg_base'].ffill().fillna(0.0)
-    
-    # Attach single-value metrics to df properties for execution accessibility
+
+    # Attach single-value metrics properties
     df.attrs['pearson_r'] = pearson_r
     df.attrs['std_dev'] = std_dev
     df.attrs['slope'] = slope
-    
+
     return df
 
 def export_regression_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
@@ -167,4 +169,5 @@ if __name__ == "__main__":
         print(f"Channel State: {str(processed_df.at[target_index, 'sma_trend_full'])}")
         export_regression_json(processed_df)
     else:
-        print("CRITICAL: Upstream data has fewer than 50 rows. Calculation skipped.")
+        print("CRITICAL: Upstream data has fewer than 42 rows. Calculation skipped.")
+
