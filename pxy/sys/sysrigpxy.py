@@ -11,10 +11,10 @@ from syscnfgpxy import TIMEZONE
 
 DEBUG_MODE = False
 
-def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 100, upper_mult: float = 2.0, lower_mult: float = 2.0) -> pd.DataFrame:
+def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 50, upper_mult: float = 2.0, lower_mult: float = 2.0) -> pd.DataFrame:
     """
     Translates TradingView Pine Script Linear Regression Channel calculations to Python.
-    Uses the identical upstream data source context with zero parameter overrides.
+    Hardcoded for a 50-candle execution footprint to match your live data stream size.
     """
     try:
         raw_df = fetch_yf_data()
@@ -26,7 +26,7 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 100, upp
         df = df.copy()
 
     if df.empty or len(df) < length:
-        # Prevent silent failures down the line by initializing empty fallback columns if data is too short
+        # Fallback columns initialization to guarantee downstream stability
         df['linreg_base'] = np.nan
         df['linreg_upper'] = np.nan
         df['linreg_lower'] = np.nan
@@ -45,7 +45,7 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 100, upp
     tz_string = str(TIMEZONE)
     df = df.tz_localize('UTC').tz_convert(tz_string) if df.index.tz is None else df.tz_convert(tz_string)
 
-    # Prepare calculation arrays for the most recent window slice (replicating barstate.islast logic)
+    # Prepare calculation arrays for the 50-candle window slice
     x_indices = np.arange(1, length + 1, dtype=float)
     y_values = df['Close'].iloc[-length:].values
     
@@ -71,7 +71,7 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 100, upp
     periods = length - 1
     daY = intercept + slope * periods / 2
     
-    # Generate the linear base regression array path across the lookback block
+    # Generate the linear base regression array path across the 50-candle block
     val_track = intercept + slope * np.arange(length)
     
     # Find max absolute price distance points for fallback deviations
@@ -156,22 +156,15 @@ if __name__ == "__main__":
     print("--- STARTING LIVE PXY LINEAR REGRESSION RUNTIME MATRIX ENGINE ---")
     processed_df = calculate_linear_regression_channel(pd.DataFrame())
     
-    if processed_df is not None and not processed_df.empty:
+    if processed_df is not None and not processed_df.empty and 'linreg_base' in processed_df.columns and not pd.isna(processed_df.iloc[-1]['linreg_base']):
         target_index = processed_df.index[-1]
         print(f"Timestamp    : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"Close Price  : {float(processed_df.at[target_index, 'Close']):.2f}")
-        
-        # Safe conditional print tracking to protect against short data frames
-        if 'linreg_base' in processed_df.columns and not pd.isna(processed_df.at[target_index, 'linreg_base']):
-            print(f"LinReg Base  : {float(processed_df.at[target_index, 'linreg_base']):.2f}")
-            print(f"LinReg Upper : {float(processed_df.at[target_index, 'linreg_upper']):.2f}")
-            print(f"LinReg Lower : {float(processed_df.at[target_index, 'linreg_lower']):.2f}")
-            print(f"Pearson's R  : {processed_df.attrs.get('pearson_r', 0.0):.6f}")
-            print(f"Channel State: {str(processed_df.at[target_index, 'sma_trend_full'])}")
-        else:
-            print("CRITICAL: Data slice length is less than requested channel calculation window (100).")
-            
+        print(f"LinReg Base  : {float(processed_df.at[target_index, 'linreg_base']):.2f}")
+        print(f"LinReg Upper : {float(processed_df.at[target_index, 'linreg_upper']):.2f}")
+        print(f"LinReg Lower : {float(processed_df.at[target_index, 'linreg_lower']):.2f}")
+        print(f"Pearson's R  : {processed_df.attrs.get('pearson_r', 0.0):.6f}")
+        print(f"Channel State: {str(processed_df.at[target_index, 'sma_trend_full'])}")
         export_regression_json(processed_df)
     else:
-        print("CRITICAL: Upstream data completely empty.")
-
+        print("CRITICAL: Upstream data has fewer than 50 rows. Calculation skipped.")
