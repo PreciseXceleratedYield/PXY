@@ -68,7 +68,7 @@ def get_entry_signal(df=None):
     is_morning_buy_trigger = (is_morning_window) and (direction == "UP")
     is_morning_sell_trigger = (is_morning_window) and (direction == "DOWN")
 
-    # --- 2. STANDARD SESSION CODES (09:31 IST ONWARDS) -> LATER DO OTM ---
+    # --- 2. STANDARD SESSION CODES (09:31 IST ONWARDS) -> LATER DO ATM ---
     is_standard_buy_trigger = (not is_morning_window) and (direction == "UP")
     is_standard_sell_trigger = (not is_morning_window) and (direction == "DOWN")
 
@@ -78,9 +78,9 @@ def get_entry_signal(df=None):
     if is_morning_sell_trigger:
         entry_signal = "ATMSELL"
     if is_standard_buy_trigger:
-        entry_signal = "OTMBUY"
+        entry_signal = "ATMBUY"
     if is_standard_sell_trigger:
-        entry_signal = "OTMSELL"
+        entry_signal = "ATMSELL"
 
     # =========================================================================
     # KEEPING PRINT LINES EXACTLY LIKE ORIGINAL CODE
