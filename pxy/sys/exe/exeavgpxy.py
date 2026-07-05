@@ -2,11 +2,12 @@ import os
 import re
 import time 
 import pytz 
-from datetime import datetime, time as dt_time 
+from datetime import datetime
 from colorama import Fore, Style, init
 
-# 🔍 Routing package path into the "run" subdirectory explicitly
+# 🔍 Routing package paths explicitly
 from run.runpchkpxy import get_position_summary
+from sysmktpxy import get_signal  # 📈 Imported to track active market direction
 
 # Initialize colorama for clean terminal output formatting
 init(autoreset=True)
@@ -15,7 +16,6 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 6
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-FIXED_ATR_PCT = 10.0    # 🎯 Hardcoded baseline ATR percentage set exactly to 10%
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -61,12 +61,12 @@ def get_loss(row):
     ltp = safe_float(row.get("sell_prc", 0.0)) 
     return ((ltp - entry) / entry) * 100 if entry > 0 else 0 
 
-def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, abs_factor):
+def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, abs_factor, rule_type):
     """Renders a strict 42-character width dashboard upon an order trigger event."""
     width = 42
     border = Fore.YELLOW + "=" * width
     divider = Fore.RED + "-" * width
-    header_text = "🚨 PXY® ABSOLUTE GEOMETRY TRIGGERED 🚨"
+    header_text = f"🚨 PXY® {rule_type} TRIGGERED 🚨"
     
     print("\n" + border)
     print(Fore.WHITE + header_text.center(width - 2, " ")) 
@@ -79,9 +79,9 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     loss_pad = " " * max(0, width - len(loss_str))
     print(Fore.WHITE + " • TRIGGER LOSS  : " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + loss_pad)
     
-    target_str = f" • DYNAMIC TARGET: {target_threshold:.2f}%"
+    target_str = f" • TRIGGER GATE  : {target_threshold:.2f}%"
     target_pad = " " * max(0, width - len(target_str))
-    print(Fore.WHITE + " • DYNAMIC TARGET: " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
+    print(Fore.WHITE + " • TRIGGER GATE  : " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
     
     print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(width))
     print(border + "\n")
@@ -91,12 +91,15 @@ def handle_side_averaging(client, df):
     if df is None or df.empty: 
         return 
         
-    ist = pytz.timezone("Asia/Kolkata") 
-    now = datetime.now(ist).time() 
-    if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): 
+    # ⏱️ TIME RESTRICTIONS COMPLETELY REMOVED HERE
+    if not REBUY_ENABLED: 
         return 
 
-    # Live position string extraction matching your exact upstream format
+    # 1. Fetch live market direction to establish directional trend gates
+    direction, _ = get_signal(df)
+    market_trend = "BULL" if direction == "UP" else "BEAR"
+
+    # 2. Live position string extraction matching your exact upstream format
     pos_raw = str(get_position_summary(client)).upper().strip()
     match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
     
@@ -112,64 +115,60 @@ def handle_side_averaging(client, df):
 
     # Establish independent lesser vs heavier directional designations
     if ce_lots < pe_lots:
-        ce_is_lesser, pe_is_lesser = True, False
+        ce_is_lighter, pe_is_lighter = True, False
+        is_balanced = False
     elif pe_lots < ce_lots:
-        ce_is_lesser, pe_is_lesser = False, True
+        ce_is_lighter, pe_is_lighter = False, True
+        is_balanced = False
     else:
-        ce_is_lesser, pe_is_lesser = False, False  # Balanced state
+        ce_is_lighter, pe_is_lighter = False, False  # Balanced state
+        is_balanced = True
 
     # Clean system telemetry message stream line
-    print(f"{Fore.CYAN}📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Factor:{abs_factor}")
+    print(f"{Fore.CYAN}📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Factor:{abs_factor} | Trend: {market_trend}")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
 
     for side in ['CE', 'PE']: 
+        # 🛡️ TREND FILTER DIRECTION GATES: Block non-aligned side execution immediately
+        if side == "CE" and market_trend != "BULL":
+            continue
+        if side == "PE" and market_trend != "BEAR":
+            continue
+
         side_df = df[df['side'] == side] 
         if side_df.empty: 
             continue 
 
-        all_positions_crossed_threshold = True
-        last_calculated_threshold = 0.0
+        side_is_lighter = ce_is_lighter if side == "CE" else pe_is_lighter
 
-        # Assign corresponding weight metrics for current evaluation loop step
-        side_is_lesser = ce_is_lesser if side == "CE" else pe_is_lesser
-
-        for index, row in side_df.iterrows():
-            # -------------------------------------------------------------
-            # 🛡️ ROW-LEVEL SUPERTREND FILTER GUARDRAIL
-            # -------------------------------------------------------------
-            supertrend_status = str(row.get('supertrend', 'NONE'))
+        # =========================================================================
+        # 🚦 STRUCTURAL RE-ENTRY MATRIX (THE GEOMETRIC RULES ENGINE)
+        # =========================================================================
+        if is_balanced:
+            # 🟢 BALANCED STATE: Standard grid layer gate at -7.0% (ALL must cross below)
+            target_threshold = -7.0
+            trigger_fired = all(get_loss(row) <= target_threshold for _, row in side_df.iterrows())
+            rule_type = "ALL (BALANCED)"
             
-            if side == "CE" and supertrend_status != "BULL":
-                all_positions_crossed_threshold = False
-                break
-                
-            if side == "PE" and supertrend_status != "BEAR":
-                all_positions_crossed_threshold = False
-                break
-            # -------------------------------------------------------------
-
-            pos_loss = get_loss(row)
+        elif side_is_lighter:
+            # 🔹 LIGHTER SIDE TRACK: Any single contract drops below +1.4% profit
+            target_threshold = 1.4
+            trigger_fired = any(get_loss(row) <= target_threshold for _, row in side_df.iterrows())
+            rule_type = "ANY (LIGHTER)"
             
-            # --- EVALUATE MATRIX CALCULATIONS VIA 10% FIXED BASE ---
-            if side_is_lesser or abs_factor == 1:
-                # Lesser side or balanced: DIVIDE fixed baseline by absolute difference
-                dynamic_threshold = -(FIXED_ATR_PCT / float(abs_factor))
-            else:
-                # Heavier side: MULTIPLY fixed baseline by absolute difference
-                dynamic_threshold = -(FIXED_ATR_PCT * (float(abs_factor)/2))
+        else:
+            # 🔺 HEAVIER SIDE TRACK: All contracts must drop past -7.0% loss
+            target_threshold = -7.0
+            trigger_fired = all(get_loss(row) <= target_threshold for _, row in side_df.iterrows())
+            rule_type = "ALL (HEAVIER)"
 
-            last_calculated_threshold = dynamic_threshold
-
-            if pos_loss > dynamic_threshold:
-                all_positions_crossed_threshold = False
-                break  
-
-        loss_hit = all_positions_crossed_threshold
-
-        if loss_hit: 
+        # =========================================================================
+        # 🚀 ORDER EXECUTION RUNTIME LAUNCHPAD
+        # =========================================================================
+        if trigger_fired: 
             if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
                 last_order = side_df.iloc[-1]
                 symbol = last_order['symbol'] 
@@ -178,7 +177,7 @@ def handle_side_averaging(client, df):
                 
                 final_loss = get_loss(last_order)
                 
-                print_pxy_trigger_dashboard(side, symbol, final_loss, last_calculated_threshold, new_tag, ce_lots, pe_lots, abs_factor)
+                print_pxy_trigger_dashboard(side, symbol, final_loss, target_threshold, new_tag, ce_lots, pe_lots, abs_factor, rule_type)
                 
                 try: 
                     params = { 
@@ -196,7 +195,6 @@ def handle_side_averaging(client, df):
                     res = client.place_order(**params) 
                     if res: 
                         set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED.") 
+                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via {rule_type} gate.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
-
