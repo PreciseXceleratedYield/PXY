@@ -35,10 +35,10 @@ def dynamic_entry(row):
 
 
 def target_price(row):
-    """Calculates individual option layer target price using specific static matrices.
+    """Calculates individual option layer target price using static alignment matrices.
     
-    Aligned Trades : Hardcoded directly to a massive 99.0% breakout capture target.
-    Hostile Trades : Fixed strictly to a tight 1.4% crash cutting threshold.
+    Aligned Trades     : Hardcoded directly to a massive 99.0% breakout capture target.
+    Not Aligned Trades : Fixed strictly to a tight 1.4% profit target for quick scratch containment.
     """
     global printed_sides
 
@@ -67,7 +67,7 @@ def target_price(row):
         if entry_prc <= 0:
             return 0.0
 
-        # 4. Context string extractors
+        # 4. Context string extractors mapped directly from your row payload schema
         symbol = str(row.get("symbol", "unknown")).upper()
         active_exit = str(row.get("exit", "NONE")).upper().strip()
 
@@ -79,7 +79,7 @@ def target_price(row):
 
         target_pct = 0.0
 
-        # 5. Core execution logic evaluating explicit target values
+        # 5. Core execution logic evaluating explicit target values based on matching alignment
         if is_ce:
             if active_exit in ["SELL", "BEAR"]:  
                 # Counter-Trend (Not Aligned): Hard-locked to a tight 1.4% cut target
