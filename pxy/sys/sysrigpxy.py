@@ -14,11 +14,11 @@ DEBUG_MODE = False
 def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 100, upper_mult: float = 2.0, lower_mult: float = 2.0) -> pd.DataFrame:
     """
     Translates TradingView Pine Script Linear Regression Channel calculations to Python.
-    Calculates Slope, Intercept, Standard Deviation Bands, Pearson's R, and Trend Directions.
+    Uses the identical upstream data source context with zero parameter overrides.
     """
     try:
-        # Request data slice to cover calculation footprint safely
-        raw_df = fetch_yf_data(period="1mo", interval="1m")
+        # Reverted to pull strictly from your clean pipeline source configuration
+        raw_df = fetch_yf_data()
         if raw_df is not None and not raw_df.empty:
             df = raw_df.copy()
     except Exception as e:
@@ -37,8 +37,6 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 100, upp
     df = df.tz_localize('UTC').tz_convert(tz_string) if df.index.tz is None else df.tz_convert(tz_string)
 
     # Prepare calculation arrays for the most recent window slice (replicating barstate.islast logic)
-    # Pine Script loops backwards from index 0 to length-1, where index 0 is the current live bar.
-    # Therefore, our X array maps backwards: current bar is index 1, preceding is 2, up to length.
     x_indices = np.arange(1, length + 1, dtype=float)
     y_values = df['Close'].iloc[-length:].values
     
@@ -53,7 +51,6 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 100, upp
     intercept = average - slope * sumX / length + slope
     
     # Replicating startPrice and endPrice calculations
-    # Pine Script: startPrice = i + s * (length - 1) | endPrice = i
     end_price = intercept
     start_price = intercept + slope * (length - 1)
     
@@ -66,7 +63,6 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 100, upp
     daY = intercept + slope * periods / 2
     
     # Generate the linear base regression array path across the lookback block
-    # Pine Script increments 'val' inside its tracking loop by 'val += slope'
     val_track = intercept + slope * np.arange(length)
     
     # Find max absolute price distance points for fallback deviations
@@ -94,15 +90,15 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 100, upp
     
     # Calculate trend metrics (Pine Script: float trend = math.sign(startPrice - endPrice))
     trend_val = np.sign(start_price - end_price)
-    trend_direction = "BULL" if trend_val < 0 else "BEAR" # Negative slope implies upward channel progression in Pine indices mapping
+    trend_direction = "BULL" if trend_val < 0 else "BEAR"
     
     # Back-fill channel values into the dataframe timeline strictly across the historical footprint
     base_line_series = np.full(len(df), np.nan)
     upper_line_series = np.full(len(df), np.nan)
     lower_line_series = np.full(len(df), np.nan)
     
-    # Generate current array trend lines
-    base_line_series[-length:] = val_track[::-1] # Reverse line array to overlay correctly along chronological timeline index
+    # Generate current array trend lines reversed to match chronological timeline index
+    base_line_series[-length:] = val_track[::-1]
     upper_line_series[-length:] = (val_track + (upper_mult * std_dev))[::-1]
     lower_line_series[-length:] = (val_track - (lower_mult * std_dev))[::-1]
     
@@ -133,7 +129,6 @@ def export_regression_json(df: pd.DataFrame = None, output_file="../web/webchrtp
 
     output = []
     for idx, row in df.iterrows():
-        # Fills JSON layout safely. linreg_base maps to sma21 key, linreg_upper maps to sma50 key
         output.append({
             "time": str(idx),
             "price": float(row["Close"]),
@@ -164,3 +159,4 @@ if __name__ == "__main__":
         export_regression_json(processed_df)
     else:
         print("CRITICAL: Upstream data empty.")
+
