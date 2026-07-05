@@ -2,12 +2,11 @@ import os
 import re
 import time 
 import pytz 
-from datetime import datetime
+from datetime import datetime, time as dt_time 
 from colorama import Fore, Style, init
 
-# 🔍 Routing package paths explicitly
+# 🔍 Routing package path into the "run" subdirectory explicitly
 from run.runpchkpxy import get_position_summary
-from sysmktpxy import get_signal  # 📈 Imported to track active market direction
 
 # Initialize colorama for clean terminal output formatting
 init(autoreset=True)
@@ -16,6 +15,7 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 6
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
+FIXED_ATR_PCT = 7.0     # 🎯 Baseline reset to exactly 7.0% to match matrix requirements
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -56,12 +56,12 @@ def is_cooling(side):
         return False 
 
 def get_loss(row): 
-    """Optimized globally to prevent memory re-allocation inside the loop."""
+    """Optimized globally to calculate contract return metrics cleanly."""
     entry = safe_float(row.get("buy_prc", 0.0)) 
     ltp = safe_float(row.get("sell_prc", 0.0)) 
     return ((ltp - entry) / entry) * 100 if entry > 0 else 0 
 
-def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, abs_factor, rule_type):
+def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, abs_factor, rule_type, net_value):
     """Renders a strict 42-character width dashboard upon an order trigger event."""
     width = 42
     border = Fore.YELLOW + "=" * width
@@ -79,27 +79,30 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     loss_pad = " " * max(0, width - len(loss_str))
     print(Fore.WHITE + " • TRIGGER LOSS  : " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + loss_pad)
     
-    target_str = f" • TRIGGER GATE  : {target_threshold:.2f}%"
+    target_str = f" • DYNAMIC TARGET: {target_threshold:.2f}%"
     target_pad = " " * max(0, width - len(target_str))
-    print(Fore.WHITE + " • TRIGGER GATE  : " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
+    print(Fore.WHITE + " • DYNAMIC TARGET: " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
+    
+    print(divider)
+    print(Fore.CYAN + f" • ACTIVE VALUE  : ₹{net_value:,.2f}".ljust(width))
+    print(divider)
     
     print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(width))
     print(border + "\n")
 
 def handle_side_averaging(client, df): 
-    """Averages positions scaling thresholds dynamically via upstream lot layout regex parsing.""" 
+    """Averages positions tracking live worth (sell_prc) balanced via rupee net worth differences.""" 
     if df is None or df.empty: 
         return 
         
-    # ⏱️ TIME RESTRICTIONS COMPLETELY REMOVED HERE
-    if not REBUY_ENABLED: 
+    ist = pytz.timezone("Asia/Kolkata") 
+    now = datetime.now(ist).time() 
+    
+    # ⏱️ TIME MATRIX CONFIG: Strict trading window set between 09:20 and 15:10 IST
+    if not REBUY_ENABLED or not (dt_time(9,20) <= now <= dt_time(15,10)): 
         return 
 
-    # 1. Fetch live market direction to establish directional trend gates
-    direction, _ = get_signal(df)
-    market_trend = "BULL" if direction == "UP" else "BEAR"
-
-    # 2. Live position string extraction matching your exact upstream format
+    # Live position string extraction matching your exact upstream format
     pos_raw = str(get_position_summary(client)).upper().strip()
     match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
     
@@ -115,60 +118,94 @@ def handle_side_averaging(client, df):
 
     # Establish independent lesser vs heavier directional designations
     if ce_lots < pe_lots:
-        ce_is_lighter, pe_is_lighter = True, False
+        ce_is_lesser, pe_is_lesser = True, False
         is_balanced = False
     elif pe_lots < ce_lots:
-        ce_is_lighter, pe_is_lighter = False, True
+        ce_is_lesser, pe_is_lesser = False, True
         is_balanced = False
     else:
-        ce_is_lighter, pe_is_lighter = False, False  # Balanced state
+        ce_is_lesser, pe_is_lesser = False, False  # Balanced state
         is_balanced = True
-
-    # Clean system telemetry message stream line
-    print(f"{Fore.CYAN}📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Factor:{abs_factor} | Trend: {market_trend}")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
 
-    for side in ['CE', 'PE']: 
-        # 🛡️ TREND FILTER DIRECTION GATES: Block non-aligned side execution immediately
-        if side == "CE" and market_trend != "BULL":
-            continue
-        if side == "PE" and market_trend != "BEAR":
-            continue
+    # =========================================================================
+    # 💰 NET WORTH CALCULATOR (DRIVEN ENTIRELY BY LIVE PRICE 'sell_prc')
+    # =========================================================================
+    current_value = {'CE': 0.0, 'PE': 0.0}
+    for idx, row in df.iterrows():
+        row_side = str(row.get('side', ''))
+        if row_side in ['CE', 'PE']:
+            live_price = safe_float(row.get('sell_prc', 0.0))  # Net worth now
+            quantity = abs(int(safe_float(row.get('qty', 0.0))))
+            current_value[row_side] += (quantity * live_price)
 
+    # Output your live asset worth equilibrium metrics to console stream
+    print(f"{Fore.CYAN}📢 Lots: {ce_lots}CE vs {pe_lots}PE | Basket Active Value >> CE: ₹{current_value['CE']:,.2f} | PE: ₹{current_value['PE']:,.2f}")
+
+    for side in ['CE', 'PE']: 
         side_df = df[df['side'] == side] 
         if side_df.empty: 
             continue 
 
-        side_is_lighter = ce_is_lighter if side == "CE" else pe_is_lighter
+        # Assign corresponding weight metrics for current evaluation loop step
+        side_is_lesser = ce_is_lesser if side == "CE" else pe_is_lesser
 
         # =========================================================================
-        # 🚦 STRUCTURAL RE-ENTRY MATRIX (THE GEOMETRIC RULES ENGINE)
+        # 🚦 STRUCTURAL RE-ENTRY MATRIX LAYER
         # =========================================================================
         if is_balanced:
-            # 🟢 BALANCED STATE: Standard grid layer gate at -7.0% (ALL must cross below)
-            target_threshold = -7.0
-            trigger_fired = all(get_loss(row) <= target_threshold for _, row in side_df.iterrows())
+            # 🟢 BALANCED STATE: Standard layer gate at -7.0% (ALL must cross)
+            dynamic_threshold = -7.0
+            trigger_fired = all(get_loss(row) <= dynamic_threshold for _, row in side_df.iterrows())
             rule_type = "ALL (BALANCED)"
             
-        elif side_is_lighter:
-            # 🔹 LIGHTER SIDE TRACK: Any single contract drops below +1.4% profit
-            target_threshold = 1.4
-            trigger_fired = any(get_loss(row) <= target_threshold for _, row in side_df.iterrows())
+        elif side_is_lesser:
+            # 🔹 LIGHTER SIDE TRACK: Any single contract drops below +1.4% profit threshold
+            dynamic_threshold = 1.4
+            trigger_fired = any(get_loss(row) <= dynamic_threshold for _, row in side_df.iterrows())
             rule_type = "ANY (LIGHTER)"
             
         else:
-            # 🔺 HEAVIER SIDE TRACK: All contracts must drop past -7.0% loss
-            target_threshold = -7.0
-            trigger_fired = all(get_loss(row) <= target_threshold for _, row in side_df.iterrows())
+            # 🔺 HEAVIER SIDE TRACK: Every single contract must drop past -7.0% loss floor
+            dynamic_threshold = -7.0
+            trigger_fired = all(get_loss(row) <= dynamic_threshold for _, row in side_df.iterrows())
             rule_type = "ALL (HEAVIER)"
 
         # =========================================================================
-        # 🚀 ORDER EXECUTION RUNTIME LAUNCHPAD
+        # 🛡️ ROW-LEVEL EXIT SIGNAL FILTER GATING & ₹1 NET WORTH DIFFERENCE CHECK
         # =========================================================================
-        if trigger_fired: 
+        trend_aligned = True
+        for index, row in side_df.iterrows():
+            exit_status = str(row.get('exit', 'NONE')).upper().strip()
+            
+            # Enforce strict direction rules: CE averages only when exit is BULL
+            if side == "CE" and exit_status != "BULL":
+                trend_aligned = False
+                break
+                
+            # Enforce strict direction rules: PE averages only when exit is BEAR
+            if side == "PE" and exit_status != "BEAR":
+                trend_aligned = False
+                break
+
+            # 🛡️ THE ₹1 NET INVESTMENT OFFSET BUFFER ENGINE (+1 / -1 re-balancing space)
+            # Only add that extra contract to the favorable lighter side if its total live worth
+            # lags behind the heavy side by AT LEAST ₹1 extra.
+            if not is_balanced and side_is_lesser:
+                opposing_side = 'PE' if side == 'CE' else 'CE'
+                capital_difference = current_value[opposing_side] - current_value[side]
+                
+                if capital_difference < 1.0:
+                    trend_aligned = False
+                    break
+
+        # Combine dynamic matrix thresholds with the final buffered logic gate
+        loss_hit = trigger_fired and trend_aligned
+
+        if loss_hit: 
             if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
                 last_order = side_df.iloc[-1]
                 symbol = last_order['symbol'] 
@@ -177,7 +214,10 @@ def handle_side_averaging(client, df):
                 
                 final_loss = get_loss(last_order)
                 
-                print_pxy_trigger_dashboard(side, symbol, final_loss, target_threshold, new_tag, ce_lots, pe_lots, abs_factor, rule_type)
+                print_pxy_trigger_dashboard(
+                    side, symbol, final_loss, dynamic_threshold, new_tag, 
+                    ce_lots, pe_lots, abs_factor, rule_type, current_value[side]
+                )
                 
                 try: 
                     params = { 
