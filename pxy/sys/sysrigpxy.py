@@ -14,7 +14,7 @@ DEBUG_MODE = False
 def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 42, upper_mult: float = 2.0, lower_mult: float = 2.0) -> pd.DataFrame:
     """
     Translates TradingView Pine Script Linear Regression Channel calculations to Python.
-    Hardcoded for a 42-candle lookback window.
+    Features 100% mathematical synchronization with the Pine Script loop indexing.
     """
     try:
         raw_df = fetch_yf_data()
@@ -26,7 +26,6 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 42, uppe
         df = df.copy()
 
     if df.empty or len(df) < length:
-        # Guarantee downstream environment stability via zero/nan matrix footprints
         df['linreg_base'] = np.nan
         df['linreg_upper'] = np.nan
         df['linreg_lower'] = np.nan
@@ -38,7 +37,6 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 42, uppe
         df.attrs['slope'] = 0.0
         return df
 
-    # Safe Datetime Index Normalisation
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
     
@@ -67,7 +65,6 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 42, uppe
     average = sumY / length
     intercept = average - slope * sumX / length + slope
 
-    # Calculate exact matching deviations mirroring calcDev loop bounds precisely
     std_dev_acc = 0.0
     dsxx = 0.0
     dsyy = 0.0
@@ -80,35 +77,33 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 42, uppe
 
     for j in range(length):
         val_track[j] = val
-        
         dxt = source_vals[j] - average
         dyt = val - daY
-        
         price_diff = source_vals[j] - val
         std_dev_acc += price_diff * price_diff
-        
         dsxx += dxt * dxt
         dsyy += dyt * dyt
         dsxy += dxt * dyt
-        
         val += slope
 
-    # Exact Pine Script Variance Calculation
     divisor = 1.0 if periods == 0 else float(periods)
     std_dev = np.sqrt(std_dev_acc / divisor)
     pearson_r = 0.0 if (dsxx == 0 or dsyy == 0) else (dsxy / np.sqrt(dsxx * dsyy))
 
-    # Calculate trend metrics
+    # CRITICAL ORIENTATION FIX:
+    # endPrice in Pine is intercept (Current Live Bar)
+    # startPrice in Pine is intercept + slope * (length - 1) (Oldest Past Bar)
     start_price = intercept + slope * (length - 1)
-    trend_val = np.sign(start_price - intercept)
-    trend_direction = "BULL" if trend_val < 0 else "BEAR"
+    
+    if intercept > start_price:
+        trend_direction = "BULL"
+    else:
+        trend_direction = "BEAR"
 
-    # Project the arrays back into standard chronological sequence (past -> present)
     base_line_series = np.full(len(df), np.nan)
     upper_line_series = np.full(len(df), np.nan)
     lower_line_series = np.full(len(df), np.nan)
 
-    # Load values back onto chronological timeline
     base_line_series[-length:] = val_track[::-1]
     upper_line_series[-length:] = (val_track + (upper_mult * std_dev))[::-1]
     lower_line_series[-length:] = (val_track - (lower_mult * std_dev))[::-1]
@@ -118,11 +113,9 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 42, uppe
     df['linreg_lower'] = lower_line_series
     df['sma_trend_full'] = trend_direction
 
-    # COMPATIBILITY ALIASES
     df['ST_Trend'] = df['sma_trend_full']
     df['ST'] = df['linreg_base'].ffill().fillna(0.0)
 
-    # Attach single-value metrics properties
     df.attrs['pearson_r'] = pearson_r
     df.attrs['std_dev'] = std_dev
     df.attrs['slope'] = slope
@@ -130,9 +123,6 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 42, uppe
     return df
 
 def export_regression_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
-    """
-    Dumps clean structural data matrix to JSON matching legacy channel payload parameters.
-    """
     if df is None or df.empty:
         df = calculate_linear_regression_channel(pd.DataFrame())
         if df is None or df.empty:
@@ -169,5 +159,4 @@ if __name__ == "__main__":
         print(f"Channel State: {str(processed_df.at[target_index, 'sma_trend_full'])}")
         export_regression_json(processed_df)
     else:
-        print("CRITICAL: Upstream data has fewer than 42 rows. Calculation skipped.")
-
+        print("CRITICAL: Upstream data error or insufficient data rows.")
