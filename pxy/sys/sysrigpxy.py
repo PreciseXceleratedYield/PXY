@@ -17,7 +17,6 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 100, upp
     Uses the identical upstream data source context with zero parameter overrides.
     """
     try:
-        # Reverted to pull strictly from your clean pipeline source configuration
         raw_df = fetch_yf_data()
         if raw_df is not None and not raw_df.empty:
             df = raw_df.copy()
@@ -27,6 +26,16 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 100, upp
         df = df.copy()
 
     if df.empty or len(df) < length:
+        # Prevent silent failures down the line by initializing empty fallback columns if data is too short
+        df['linreg_base'] = np.nan
+        df['linreg_upper'] = np.nan
+        df['linreg_lower'] = np.nan
+        df['sma_trend_full'] = "NONE"
+        df['ST_Trend'] = "NONE"
+        df['ST'] = 0.0
+        df.attrs['pearson_r'] = 0.0
+        df.attrs['std_dev'] = 0.0
+        df.attrs['slope'] = 0.0
         return df
 
     # Safe Datetime Index Normalisation
@@ -151,12 +160,18 @@ if __name__ == "__main__":
         target_index = processed_df.index[-1]
         print(f"Timestamp    : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"Close Price  : {float(processed_df.at[target_index, 'Close']):.2f}")
-        print(f"LinReg Base  : {float(processed_df.at[target_index, 'linreg_base']):.2f}")
-        print(f"LinReg Upper : {float(processed_df.at[target_index, 'linreg_upper']):.2f}")
-        print(f"LinReg Lower : {float(processed_df.at[target_index, 'linreg_lower']):.2f}")
-        print(f"Pearson's R  : {processed_df.attrs.get('pearson_r', 0.0):.6f}")
-        print(f"Channel State: {str(processed_df.at[target_index, 'sma_trend_full'])}")
+        
+        # Safe conditional print tracking to protect against short data frames
+        if 'linreg_base' in processed_df.columns and not pd.isna(processed_df.at[target_index, 'linreg_base']):
+            print(f"LinReg Base  : {float(processed_df.at[target_index, 'linreg_base']):.2f}")
+            print(f"LinReg Upper : {float(processed_df.at[target_index, 'linreg_upper']):.2f}")
+            print(f"LinReg Lower : {float(processed_df.at[target_index, 'linreg_lower']):.2f}")
+            print(f"Pearson's R  : {processed_df.attrs.get('pearson_r', 0.0):.6f}")
+            print(f"Channel State: {str(processed_df.at[target_index, 'sma_trend_full'])}")
+        else:
+            print("CRITICAL: Data slice length is less than requested channel calculation window (100).")
+            
         export_regression_json(processed_df)
     else:
-        print("CRITICAL: Upstream data empty.")
+        print("CRITICAL: Upstream data completely empty.")
 
