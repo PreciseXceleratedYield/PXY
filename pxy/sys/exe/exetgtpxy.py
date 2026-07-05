@@ -35,15 +35,15 @@ def dynamic_entry(row):
 
 
 def target_price(row):
-    """Calculates individual option layer target price using dynamic matrices.
+    """Calculates individual option layer target price using specific static matrices.
     
-    Aligned Trades : max(ATR * Power, ATR * Depth) with no upper limit for maximum extraction.
-    Hostile Trades : ATR / Power down to a 1.0% floor (instant crash cutting).
+    Aligned Trades : Hardcoded directly to a massive 99.0% breakout capture target.
+    Hostile Trades : Fixed strictly to a tight 1.4% crash cutting threshold.
     """
     global printed_sides
 
     try:
-        # 1. Extract baseline metrics safely
+        # 1. Extract baseline metrics safely for status telemetry line
         atr_val = f(row.get("atr"), 6.0)
         ce_power = f(row.get("ce_power"), 1.0)
         pe_power = f(row.get("pe_power"), 1.0)
@@ -77,36 +77,25 @@ def target_price(row):
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
 
-        # 5. Extract Option Matrix parameters (Enforce absolute 1.0 minimum to prevent ZeroDivisionError)
-        hce_d = max(1.0, f(row.get("hkin_ce_depth"), 1.0))
-        hpe_d = max(1.0, f(row.get("hkin_pe_depth"), 1.0))
-        ce_p = max(1.0, f(row.get("ce_power"), 1.0))
-        pe_p = max(1.0, f(row.get("pe_power"), 1.0))
-
         target_pct = 0.0
 
-        # 6. Core execution logic evaluating directional signals
+        # 5. Core execution logic evaluating explicit target values
         if is_ce:
             if active_exit in ["SELL", "BEAR"]:  
-                # Counter-Trend: Threat is high. If Power shoots to 10, target collapses to ~1% for an immediate cut.
-                target_pct = 3 #atr_val / pe_p
+                # Counter-Trend (Not Aligned): Hard-locked to a tight 1.4% cut target
+                target_pct = 1.4
             else:                                
-                # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
-                target_pct = 99 #max((atr_val * ce_p), (atr_val * hce_d))
+                # Aligned Trend: Hardcoded directly to a massive 99.0% extraction percentage
+                target_pct = 99.0
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   
-                # Counter-Trend: Threat is high. Collapse target via division to execute tight scratch exit.
-                target_pct = 3 #atr_val / ce_p
+                # Counter-Trend (Not Aligned): Hard-locked to a tight 1.4% cut target
+                target_pct = 1.4
             else:                                
-                # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
-                target_pct = 99 #max((atr_val * pe_p), (atr_val * hpe_d))
+                # Aligned Trend: Hardcoded directly to a massive 99.0% extraction percentage
+                target_pct = 99.0
                 
-        # 🔥 HIGH SPEED BANDWIDTH GUARDRAIL
-        # Floor set to 1.0% to allow emergency division exits to execute instantly.
-        # Upper ceiling removed completely to allow uncapped, realistic momentum expansions.
-        target_pct = max(1.0, target_pct)
-
-        # 7. Final mathematical target premium projection calculation
+        # 6. Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
         return round(calculated_target, 2)
 
