@@ -1,4 +1,3 @@
-# sysrigpxy.py
 import os
 import json
 import numpy as np
@@ -39,15 +38,13 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
 
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
-    
+        
     tz_string = str(TIMEZONE)
     df = df.tz_localize('UTC').tz_convert(tz_string) if df.index.tz is None else df.tz_convert(tz_string)
 
     # 1-to-1 Pine Loop Replication Setup (Chronological Reversal Mapping)
-    source_vals = df['Close'].iloc[-length:].values[::-1] 
-    high_vals = df['High'].iloc[-length:].values[::-1]
-    low_vals = df['Low'].iloc[-length:].values[::-1]
-
+    source_vals = df['Close'].iloc[-length:].values[::-1]
+    
     sumX = 0.0
     sumY = 0.0
     sumXSqr = 0.0
@@ -69,9 +66,9 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
     dsxx = 0.0
     dsyy = 0.0
     dsxy = 0.0
+    
     periods = length - 1
     daY = intercept + slope * periods / 2.0
-    
     val = intercept
     val_track = np.zeros(length)
 
@@ -88,13 +85,10 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
 
     divisor = 1.0 if periods == 0 else float(periods)
     std_dev = np.sqrt(std_dev_acc / divisor)
+    
     pearson_r = 0.0 if (dsxx == 0 or dsyy == 0) else (dsxy / np.sqrt(dsxx * dsyy))
 
-    # CRITICAL ORIENTATION FIX:
-    # endPrice in Pine is intercept (Current Live Bar)
-    # startPrice in Pine is intercept + slope * (length - 1) (Oldest Past Bar)
     start_price = intercept + slope * (length - 1)
-    
     if intercept > start_price:
         trend_direction = "BULL"
     else:
@@ -111,8 +105,28 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
     df['linreg_base'] = base_line_series
     df['linreg_upper'] = upper_line_series
     df['linreg_lower'] = lower_line_series
-    df['sma_trend_full'] = trend_direction
 
+    # --- NEW: BUY/SELL SIGNAL CONDITION LOGIC ---
+    # 1. Identify breaks relative to boundaries
+    high_above_upper = df['High'] > df['linreg_upper']
+    low_below_lower = df['Low'] < df['linreg_lower']
+
+    # 2. Check if ANY of the past 3 candles (t-1, t-2, t-3) triggered a break
+    past_3_high_broke = high_above_upper.shift(1).rolling(3).max() == 1
+    past_3_low_broke = low_below_lower.shift(1).rolling(3).max() == 1
+
+    # 3. Check current candle confirmation (t)
+    current_below_upper = df['Close'] < df['linreg_upper']
+    current_above_lower = df['Close'] > df['linreg_lower']
+
+    # 4. Synthesize final conditions
+    sell_signal = past_3_high_broke & current_below_upper
+    buy_signal = past_3_low_broke & current_above_lower
+
+    # 5. Map to state (prioritise Signals, fallback to underlying Trend Direction)
+    channel_state = np.where(sell_signal, "SELL", np.where(buy_signal, "BUY", trend_direction))
+    
+    df['sma_trend_full'] = channel_state
     df['ST_Trend'] = df['sma_trend_full']
     df['ST'] = df['linreg_base'].ffill().fillna(0.0)
 
@@ -125,16 +139,18 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
 def export_regression_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
     if df is None or df.empty:
         df = calculate_linear_regression_channel(pd.DataFrame())
-        if df is None or df.empty:
-            return None
+    if df is None or df.empty:
+        return None
 
     output = []
     for idx, row in df.iterrows():
         output.append({
             "time": str(idx),
             "price": float(row["Close"]),
-            "sma21": float(row["linreg_base"]) if not pd.isna(row["linreg_base"]) else 0.0,
-            "sma50": float(row["linreg_upper"]) if not pd.isna(row["linreg_upper"]) else 0.0
+            "linreg_base": float(row["linreg_base"]) if not pd.isna(row["linreg_base"]) else 0.0,
+            "linreg_upper": float(row["linreg_upper"]) if not pd.isna(row["linreg_upper"]) else 0.0,
+            "linreg_lower": float(row["linreg_lower"]) if not pd.isna(row["linreg_lower"]) else 0.0,
+            "signal": str(row["sma_trend_full"])
         })
 
     if os.path.dirname(output_file):
@@ -142,6 +158,7 @@ def export_regression_json(df: pd.DataFrame = None, output_file="../web/webchrtp
         
     with open(output_file, "w") as f:
         json.dump(output, f, indent=2)
+        
     return output
 
 if __name__ == "__main__":
@@ -160,3 +177,4 @@ if __name__ == "__main__":
         export_regression_json(processed_df)
     else:
         print("CRITICAL: Upstream data error or insufficient data rows.")
+
