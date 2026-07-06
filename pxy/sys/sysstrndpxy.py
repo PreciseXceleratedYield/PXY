@@ -1,40 +1,91 @@
-import sys
+# sysstrndpxy.py
+import os
+import json
+import numpy as np
+import pandas as pd
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
-# Import executors cleanly from the two specialized module environments
-from sysstrndrigpxy import calculate_linear_regression_channel, export_regression_json
-from sysstrndnrmlpxy import calculate_supertrend, export_supertrend_json
+from sysdtafpxy import fetch_yf_data
+from syscnfgpxy import TIMEZONE
 
-# =========================================================================
-# SYSTEM SPECIFIC EXECUTIVE SWITCHER DISPATCH CONFIG
-# =========================================================================
-# Set to 1 -> Executes sysstrndrigpxy.py (Linear Regression Channel Logic)
-# Set to 2 -> Executes sysstrndnrmlpxy.py (Normal 21/50 SMA Engine Matrix)
-STRATEGY_MODE = 1 
-# =========================================================================
+DEBUG_MODE = False
 
-def dispatch_engine():
+def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Acts as a pure traffic controller, immediately handing off execution
-    to independent modules without changing data payloads internally.
+    Implements a vectorized 21/50 SMA engine.
+    Restores internal memory aliases needed to stop downstream system crashes.
     """
-    print(f"[SWITCHER] Initiating strategy routing script pipeline...")
+    try:
+        raw_df = fetch_yf_data(period="3d", interval="1m")
+        if raw_df is not None and not raw_df.empty:
+            df = raw_df.copy()
+    except Exception as e:
+        if DEBUG_MODE:
+            print(f"Warning: Shared pipeline download fallback active | {e}")
+        df = df.copy()
 
-    if STRATEGY_MODE == 1:
-        print("[SWITCHER] Handoff -> sysstrndrigpxy.py (Regression Channel)")
-        processed_df = calculate_linear_regression_channel(None)
-        export_regression_json(processed_df)
-        print("[SWITCHER] Execution path 1 closed cleanly.")
+    if df.empty:
+        return df
+
+    # Safe Datetime Index Normalisation
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
+    
+    tz_string = str(TIMEZONE)
+    df = df.tz_localize('UTC').tz_convert(tz_string) if df.index.tz is None else df.tz_convert(tz_string)
+
+    # Core Calculations
+    df['sma21'] = df['Close'].rolling(window=21, min_periods=1).mean()
+    df['sma50'] = df['Close'].rolling(window=50, min_periods=1).mean()
+
+    # Vectorized Trend Matrix - CRITICAL FOR OPTIONS ENGINE & DASHBOARD
+    df['sma_trend_full'] = np.where(df['sma21'] >= df['sma50'], "BULL", "BEAR")
+    df.loc[df['sma21'].isna() | df['sma50'].isna(), 'sma_trend_full'] = "NONE"
+
+    # RESTORED ALIASES FOR COMPATIBILITY (sysdashpxy.py & sysoptionrtpxy.py)
+    df['ST_Trend'] = df['sma_trend_full']
+    df['ST'] = df['sma21']
+
+    return df
+
+def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
+    """
+    Dumps clean structural data matrix to JSON containing ONLY requested keys.
+    """
+    if df is None or df.empty:
+        df = calculate_supertrend(pd.DataFrame())
+        if df is None or df.empty:
+            return None
+
+    output = []
+    for idx, row in df.iterrows():
+        # Extracted strictly requested 4-key schema payload
+        output.append({
+            "time": str(idx),
+            "price": float(row["Close"]),
+            "sma21": float(row["sma21"]) if not pd.isna(row["sma21"]) else 0.0,
+            "sma50": float(row["sma50"]) if not pd.isna(row["sma50"]) else 0.0
+        })
+
+    if os.path.dirname(output_file):
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
         
-    elif STRATEGY_MODE == 2:
-        print("[SWITCHER] Handoff -> sysstrndnrmlpxy.py (Normal SMA Matrix)")
-        processed_df = calculate_supertrend(None)
-        export_supertrend_json(processed_df)
-        print("[SWITCHER] Execution path 2 closed cleanly.")
-        
-    else:
-        print(f"[CRITICAL ERROR] Unknown Strategy Assignment ID: {STRATEGY_MODE}")
-        sys.exit(1)
+    with open(output_file, "w") as f:
+        json.dump(output, f, indent=2)
+    return output
 
 if __name__ == "__main__":
-    dispatch_engine()
-
+    print("--- STARTING LIVE PXY UNIFIED EXCLUSIVE MATRIX ENGINE ---")
+    processed_df = calculate_supertrend(pd.DataFrame())
+    
+    if processed_df is not None and not processed_df.empty:
+        target_index = processed_df.index[-1]
+        print(f"Timestamp   : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        print(f"Close Price : {float(processed_df.at[target_index, 'Close']):.2f}")
+        print(f"21 SMA Value: {float(processed_df.at[target_index, 'sma21']):.2f}")
+        print(f"50 SMA Value: {float(processed_df.at[target_index, 'sma50']):.2f}")
+        print(f"Trend State : {str(processed_df.at[target_index, 'sma_trend_full'])}")
+        export_supertrend_json(processed_df)
+    else:
+        print("CRITICAL: Upstream data empty.")
