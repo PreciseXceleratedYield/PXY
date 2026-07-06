@@ -106,24 +106,16 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
     df['linreg_upper'] = upper_line_series
     df['linreg_lower'] = lower_line_series
 
-    # --- NEW: BUY/SELL SIGNAL CONDITION LOGIC ---
-    # 1. Identify breaks relative to boundaries
-    high_above_upper = df['High'] > df['linreg_upper']
-    low_below_lower = df['Low'] < df['linreg_lower']
+    # --- CHOSEN LOGIC: HIGH AND LOW WICK INTERSECTION TRACKING ---
+    # Evaluates the absolute maximum high and absolute minimum low points
+    high_touches_upper = df['High'] >= df['linreg_upper']
+    low_touches_lower = df['Low'] <= df['linreg_lower']
 
-    # 2. Check if ANY of the past 3 candles (t-1, t-2, t-3) triggered a break
-    past_3_high_broke = high_above_upper.shift(1).rolling(3).max() == 1
-    past_3_low_broke = low_below_lower.shift(1).rolling(3).max() == 1
+    # rolling(3) looks at current candle (t) and previous two candles (t-1, t-2)
+    sell_signal = high_touches_upper.rolling(3).max() == 1
+    buy_signal = low_touches_lower.rolling(3).max() == 1
 
-    # 3. Check current candle confirmation (t)
-    current_below_upper = df['Close'] < df['linreg_upper']
-    current_above_lower = df['Close'] > df['linreg_lower']
-
-    # 4. Synthesize final conditions
-    sell_signal = past_3_high_broke & current_below_upper
-    buy_signal = past_3_low_broke & current_above_lower
-
-    # 5. Map to state (prioritise Signals, fallback to underlying Trend Direction)
+    # Map state outputs sequentially: SELL takes priority, then BUY, else default to Trend State
     channel_state = np.where(sell_signal, "SELL", np.where(buy_signal, "BUY", trend_direction))
     
     df['sma_trend_full'] = channel_state
@@ -162,7 +154,7 @@ def export_regression_json(df: pd.DataFrame = None, output_file="../web/webchrtp
     return output
 
 if __name__ == "__main__":
-    print("--- STARTING LIVE PXY LINEAR REGRESSION RUNTIME MATRIX ENGINE ---")
+    print("--- STARTING LIVE PXY LINE BRACKET ENGAGEMENT ENGINE ---")
     processed_df = calculate_linear_regression_channel(pd.DataFrame())
     
     if processed_df is not None and not processed_df.empty and 'linreg_base' in processed_df.columns and not pd.isna(processed_df.iloc[-1]['linreg_base']):
