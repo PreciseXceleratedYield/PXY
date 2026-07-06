@@ -83,17 +83,17 @@ def target_price(row):
         if is_ce:
             if active_exit in ["SELL", "BEAR"]:  
                 # Counter-Trend (Not Aligned): Hard-locked to a tight 1.4% cut target
-                target_pct = 7
+                target_pct = atr_val
             else:                                
                 # Aligned Trend: Hardcoded directly to a massive 99.0% extraction percentage
-                target_pct = 7 * ce_power
+                target_pct = atr_val * ce_power
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   
                 # Counter-Trend (Not Aligned): Hard-locked to a tight 1.4% cut target
-                target_pct = 7 
+                target_pct = atr_val 
             else:                                
                 # Aligned Trend: Hardcoded directly to a massive 99.0% extraction percentage
-                target_pct = 7 * pe_power
+                target_pct = atr_val * pe_power
                 
         # 6. Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
