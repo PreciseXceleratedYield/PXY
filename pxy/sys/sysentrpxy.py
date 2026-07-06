@@ -1,12 +1,12 @@
 import numpy as np
 import pandas as pd
-from sysmktpxy import get_signal  # Original direction engine fallback (UP / DOWN)
+from sysmktpxy import get_signal  # Direction engine fallback (UP / DOWN)
 
 def get_entry_signal(df=None, length: int = 21, upper_mult: float = 1.4, lower_mult: float = 1.4):
     """
     Advanced routing pipeline driven exclusively by Linear Regression Channel states.
     Priority 1: Upper/Lower wick touches (Current & Past) override everything.
-    Priority 2 (Entry Fallback): Uses the original sysmktpxy get_signal tool.
+    Priority 2 (Entry Fallback): Uses sysmktpxy get_signal (UP->BULL / DOWN->BEAR).
     Priority 2 (Exit Fallback): Always follows the structural channel direction.
     """
     if df is None:
@@ -56,29 +56,31 @@ def get_entry_signal(df=None, length: int = 21, upper_mult: float = 1.4, lower_m
     low_touches_lower = (current_low <= linreg_lower) or (prev_low <= linreg_lower)
 
     # =========================================================================
-    # PRIORITY EXECUTION MATRIX (Touch overrides all | Fallback to sysmktpxy)
+    # PRIORITY EXECUTION MATRIX (Touch overrides all | Fallback with Translation)
     # =========================================================================
     if high_touches_upper:
         entry_signal = "ATMSELL"
         exit_signal = "BEAR"
-        log_state = "TOUCH_UPPER_SELL"
+        log_state = "SELL"
     elif low_touches_lower:
         entry_signal = "ATMBUY"
         exit_signal = "BULL"
-        log_state = "TOUCH_LOWER_BUY"
+        log_state = "BUY"
     else:
-        # ENTRY FALLBACK: Call your original engine to get "UP" or "DOWN"
+        # ENTRY FALLBACK: Fetch raw engine directional framework
         direction, _ = get_signal(df)
-        entry_signal = "ATMBUY" if direction == "UP" else "ATMSELL"
         
-        # EXIT FALLBACK: Always strictly follows the structural channel slope direction
+        # Translate raw UP/DOWN keys directly into structural BULL/BEAR values
+        fallback_direction = "BULL" if direction == "UP" else "BEAR"
+        
+        entry_signal = "ATMBUY" if fallback_direction == "BULL" else "ATMSELL"
         exit_signal = channel_trend
-        log_state = f"FALLBACK_ENGINE_{direction}"
+        log_state = fallback_direction
 
     # =========================================================================
     # SYSTEM OUTPUT TERMINAL LOGS
     # =========================================================================
-    print(f" ROUTE LOG: {log_state}")
+    print(f" MOVE: {log_state}")
     print(f" ENTRY: {entry_signal} | EXIT: {exit_signal}")
         
     return entry_signal, exit_signal
