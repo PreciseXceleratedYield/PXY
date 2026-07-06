@@ -165,8 +165,8 @@ def handle_side_averaging(client, df):
             rule_type = "ALL (BALANCED)"
             
         elif side_is_lesser:
-            # 🔹 LIGHTER SIDE TRACK: Any single contract drops below +1.4% profit threshold
-            dynamic_threshold = 1.4
+            # 🔹 LIGHTER SIDE TRACK: Any single contract drops below +3.4% profit threshold
+            dynamic_threshold = 3.4
             trigger_fired = any(get_loss(row) <= dynamic_threshold for _, row in side_df.iterrows())
             rule_type = "ANY (LIGHTER)"
             
