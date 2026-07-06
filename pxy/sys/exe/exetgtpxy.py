@@ -83,14 +83,14 @@ def target_price(row):
         if is_ce:
             if active_exit in ["SELL", "BEAR"]:  
                 # Counter-Trend (Not Aligned): Hard-locked to a tight 1.4% cut target
-                target_pct = atr_val
+                target_pct = atr_val/2
             else:                                
                 # Aligned Trend: Hardcoded directly to a massive 99.0% extraction percentage
                 target_pct = atr_val * ce_power
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   
                 # Counter-Trend (Not Aligned): Hard-locked to a tight 1.4% cut target
-                target_pct = atr_val 
+                target_pct = atr_val/2
             else:                                
                 # Aligned Trend: Hardcoded directly to a massive 99.0% extraction percentage
                 target_pct = atr_val * pe_power
