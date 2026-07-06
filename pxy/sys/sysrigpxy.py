@@ -10,7 +10,7 @@ from syscnfgpxy import TIMEZONE
 
 DEBUG_MODE = False
 
-def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, upper_mult: float = 2.0, lower_mult: float = 2.0) -> pd.DataFrame:
+def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, upper_mult: float = 1.4, lower_mult: float = 1.4) -> pd.DataFrame:
     """
     Translates TradingView Pine Script Linear Regression Channel calculations to Python.
     Features 100% mathematical synchronization with the Pine Script loop indexing.
