@@ -143,7 +143,9 @@ def handle_side_averaging(client, df):
             current_value[row_side] += (quantity * live_price)
 
     # Output your live asset worth equilibrium metrics to console stream
-    print(f"{Fore.CYAN}📢 Lots: {ce_lots}CE vs {pe_lots}PE | Basket Active Value >> CE: ₹{current_value['CE']:,.2f} | PE: ₹{current_value['PE']:,.2f}")
+    print(f"{Fore.CYAN}📢 Lots: {ce_lots}CE vs {pe_lots}PE")
+    print(f"{Fore.CYAN}💰 CE: ₹{current_value['CE']:,} | | PE: ₹{current_value['PE']:,}")
+
 
     for side in ['CE', 'PE']: 
         side_df = df[df['side'] == side] 
