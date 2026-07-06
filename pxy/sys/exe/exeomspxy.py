@@ -1,161 +1,198 @@
-import os 
-import re
-import time 
-import pytz 
-from datetime import datetime, time as dt_time 
-from colorama import Fore, Style, init
+# exeomspxy.py
+import sys
+from pathlib import Path
+import pandas as pd
+import numpy as np
+from exepomspxy import print_market_dashboard
 
-# 🔍 Routing package path into the "run" subdirectory explicitly
-from run.runpchkpxy import get_position_summary
+# --- GLOBAL DEBUG SWITCH ---
+DEBUG = False
 
-# Initialize colorama for clean terminal output formatting
-init(autoreset=True)
+def dprint(msg):
+    if DEBUG:
+        print(f"[DEBUG] {msg}")
 
-# --- CONFIG --- 
-REBUY_ENABLED = True 
-MAX_LAYERS = 6
-COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-FIXED_ATR_PCT = 7.0     # 🎯 Baseline reset to exactly 7.0% to match matrix requirements
+# ---------------- PATH SETUP ----------------
+HERE = Path(__file__).resolve().parent
+RUN_PATH = HERE / "run"
+if str(RUN_PATH) not in sys.path:
+    sys.path.insert(0, str(RUN_PATH))
 
-def safe_float(val, fallback=0.0):
-    """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
-    if val is None:
-        return fallback
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return fallback
+# Find syspxy.py in parent directories
+syspxy_path = None
+for parent in HERE.parents:
+    if (parent / 'syspxy.py').exists() or (parent / 'syspxy.pyc').exists():
+        syspxy_path = parent
+        break
 
-def generate_pxy_tag(): 
-    IST = pytz.timezone("Asia/Kolkata") 
-    return datetime.now(IST).strftime('%H%M%S')
+if syspxy_path:
+    sys.path.insert(0, str(syspxy_path))
 
-def set_cooling(side): 
-    file_path = f"exebal_cool_{side.lower()}.txt" 
-    try:
-        with open(file_path, "w") as f: 
-            f.write(str(time.time())) 
-    except Exception as e:
-        print(f"{Fore.RED}⚠️ Cooldown Write Error: {e}")
+try:
+    import syspxy
+except:
+    syspxy = None
 
-def is_cooling(side): 
-    file_path = f"exebal_cool_{side.lower()}.txt" 
-    if not os.path.exists(file_path): 
-        return False 
-    try: 
-        with open(file_path, "r") as f: 
-            last_ts = float(f.read().strip()) 
-            if (time.time() - last_ts) < COOL_DOWN_SECONDS: 
-                return True 
+# IMPORT LOCAL MODULES
+try:
+    from runlilopxy import process_lilo_orders, get_session
+    from runltpspxy import get_mid_price
+except ImportError as e:
+    print(f"❌ Critical Import Error: {e}")
+    process_lilo_orders = get_session = get_mid_price = None
+
+# EXTERNAL CALCS
+try:
+    from exedynpxy import dynamic_entry as pxy_dyn
+except:
+    pxy_dyn = lambda row: row.get("buy_prc", 0)
+
+try:
+    from exetgtpxy import target_price as pxy_tgt_calc
+except:
+    pxy_tgt_calc = lambda row: 0
+
+try:
+    from exeslpxy import stop_loss as pxy_sl_calc
+except:
+    pxy_sl_calc = lambda row: 0
+
+# ---------------- MAIN FUNCTION ----------------
+
+def get_combined_data(map_active_with_market=True, add_calcs=True):
+    combined = {"market_snapshot": pd.DataFrame(), "active_orders": pd.DataFrame()}
+
+    # --- 1. MKT SNAPSHOT ---
+    market_df = pd.DataFrame()
+    if syspxy:
         try:
-            os.remove(file_path) 
-        except FileNotFoundError:
-            pass
-        return False 
-    except Exception: 
-        return False 
+            market_data = syspxy.get_all_data()
+            market_df = pd.DataFrame([market_data])
+            print_market_dashboard(market_df)
+        except:
+            market_df = pd.DataFrame()
+    combined["market_snapshot"] = market_df
 
-def get_loss(row): 
-    """Key matrix return function."""
-    entry = safe_float(row.get("buy_prc", 0.0)) 
-    ltp = safe_float(row.get("sell_prc", 0.0)) 
-    return ((ltp - entry) / entry) * 100 if entry > 0 else 0 
+    # --- 2. ACTIVE ORDERS (LILO + BROKER SYNC) ---
+    active_df = pd.DataFrame()
+    client = None
 
-def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, abs_factor, rule_type, net_value):
-    """Renders a strict 42-character width dashboard upon an order trigger event."""
-    width = 42
-    border = Fore.YELLOW + "=" * width
-    divider = Fore.RED + "-" * width
-    header_text = f"🚨 PXY® {rule_type} TRIGGERED 🚨"
-    
-    print("\n" + border)
-    print(Fore.WHITE + header_text.center(width - 2, " ")) 
-    print(divider)
-    print(Fore.WHITE + f" • SYMBOL       : {symbol}".ljust(width))
-    print(Fore.WHITE + f" • SIDE OPTION   : {side} ({ce_count}CE vs {pe_count}PE)".ljust(width))
-    print(Fore.WHITE + f" • BALANCE FACTOR: {abs_factor}".ljust(width))
-    
-    loss_str = f" • TRIGGER LOSS  : {current_loss:.2f}%"
-    loss_pad = " " * max(0, width - len(loss_str))
-    print(Fore.WHITE + " • TRIGGER LOSS  : " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + loss_pad)
-    
-    target_str = f" • DYNAMIC TARGET: {target_threshold:.2f}%"
-    target_pad = " " * max(0, width - len(target_str))
-    print(Fore.WHITE + " • DYNAMIC TARGET: " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
-    
-    print(divider)
-    print(Fore.CYAN + f" • ACTIVE VALUE  : ₹{net_value:,.2f}".ljust(width))
-    print(divider)
-    
-    print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(width))
-    print(border + "\n")
+    if process_lilo_orders and get_session:
+        try:
+            client = get_session()
+            if client:
+                # A. Get unmatched orders from stateless LILO engine
+                active_df, _ = process_lilo_orders(client)
+                
+                if not active_df.empty:
+                    # B. CRITICAL FIX: Standardize casing BEFORE filtering or accessing 'symbol'
+                    active_df.columns = [c.lower() for c in active_df.columns]
+                    
+                    # C. SAFETY SYNC: Filter by Real Broker Positions
+                    pos_res = client.positions()
+                    if pos_res and "data" in pos_res:
+                        pos_df = pd.DataFrame(pos_res["data"])
+                        
+                        if not pos_df.empty:
+                            # Calculate net holdings (Buy - Sell)
+                            # Only symbols with a positive net balance should be on the dashboard
+                            real_holdings = pos_df[
+                                (pos_df['flBuyQty'].astype(float) - pos_df['flSellQty'].astype(float)) > 0
+                            ]['trdSym'].tolist()
 
-def handle_side_averaging(client, df): 
-    """Averages positions tracking live worth (sell_prc) balanced via rupee net worth differences.""" 
-    if df is None or df.empty: 
-        return 
-        
-    ist = pytz.timezone("Asia/Kolkata") 
-    now = datetime.now(ist).time() 
-    if not REBUY_ENABLED or not (dt_time(9,20) <= now <= dt_time(15,10)): 
-        return 
+                            # Filter strategy orders to match actual broker holdings
+                            active_df = active_df[active_df['symbol'].isin(real_holdings)].copy()
+                    
+                    # D. Final Column Cleaning (Tag cleanup)
+                    if not active_df.empty:
+                        active_df['tag'] = active_df['tag'].astype(str).str.split('.').str[0].replace('nan', '').str.strip()
+                        
+        except Exception as e:
+            print(f"OMS DATA ERROR: {e}")
+            active_df = pd.DataFrame()
 
-    pos_raw = str(get_position_summary(client)).upper().strip()
-    match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
-    ce_lots, pe_lots = (int(match.group(1)), int(match.group(2))) if match else (0, 0)
-    abs_factor = max(1, abs(ce_lots - pe_lots) + 1)
+    if active_df.empty:
+        return combined
 
-    if ce_lots < pe_lots: ce_is_lesser, pe_is_lesser, is_balanced = True, False, False
-    elif pe_lots < ce_lots: ce_is_lesser, pe_is_lesser, is_balanced = False, True, False
-    else: ce_is_lesser, pe_is_lesser, is_balanced = False, False, True
+    # ==============================
+    # CE / PE COUNTER LOGIC
+    # ==============================
+    active_df["opt_type"] = active_df["symbol"].str[-2:].str.upper()
+    ce_count = (active_df["opt_type"] == "CE").sum()
+    pe_count = (active_df["opt_type"] == "PE").sum()
 
-    df = df.copy()
-    df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
-
-    current_value = {'CE': 0.0, 'PE': 0.0}
-    for idx, row in df.iterrows():
-        row_side = str(row.get('side', ''))
-        if row_side in ['CE', 'PE']:
-            current_value[row_side] += (safe_float(row.get('sell_prc', 0.0)) * abs(int(safe_float(row.get('qty', 0.0)))))
-
-    print(f"{Fore.CYAN}📢 Lots: {ce_lots}CE vs {pe_lots}PE | Basket Active Value >> CE: ₹{current_value['CE']:,.2f} | PE: ₹{current_value['PE']:,.2f}")
-
-    for side in ['CE', 'PE']: 
-        side_df = df[df['side'] == side] 
-        if side_df.empty: continue 
-
-        side_is_lesser = ce_is_lesser if side == "CE" else pe_is_lesser
-
-        if is_balanced:
-            dynamic_threshold = -7.0
-            trigger_fired = all(get_loss(row) <= dynamic_threshold for _, row in side_df.iterrows())
-            rule_type = "ALL (BALANCED)"
-        elif side_is_lesser:
-            dynamic_threshold = 1.4
-            trigger_fired = any(get_loss(row) <= dynamic_threshold for _, row in side_df.iterrows())
-            rule_type = "ANY (LIGHTER)"
+    def mark_counter(row):
+        if ce_count == pe_count: return "Y"
+        if ce_count > pe_count:
+            return "N" if row["opt_type"] == "CE" else "Y"
         else:
-            dynamic_threshold = -7.0
-            trigger_fired = all(get_loss(row) <= dynamic_threshold for _, row in side_df.iterrows())
-            rule_type = "ALL (HEAVIER)"
+            return "N" if row["opt_type"] == "PE" else "Y"
 
-        trend_aligned = True
-        for index, row in side_df.iterrows():
-            exit_status = str(row.get('exit', 'NONE')).upper().strip()
-            if side == "CE" and exit_status != "BULL": trend_aligned = False; break
-            if side == "PE" and exit_status != "BEAR": trend_aligned = False; break
+    active_df["counter"] = active_df.apply(mark_counter, axis=1)
 
-            if not is_balanced and side_is_lesser:
-                opposing_side = 'PE' if side == 'CE' else 'CE'
-                if (current_value[opposing_side] - current_value[side]) < 1.0: trend_aligned = False; break
+    # --- 3. DYNAMIC VALUATION UPDATE ---
+    if client and get_mid_price:
+        def update_metrics(row):
+            # Refresh LTP only if necessary
+            if float(row.get("sell_prc", 0)) <= 0:
+                token_id = row.get("tok") or row.get("token")
+                curr_val = get_mid_price(client, token_id)
+                if curr_val > 0:
+                    row["sell_prc"] = curr_val
+                    buy_avg = float(row.get("buy_prc", 0))
+                    qty = float(row.get("qty", 0))
+                    row["pnl"] = round((curr_val - buy_avg) * qty, 2)
+            return row
+        
+        active_df = active_df.apply(update_metrics, axis=1)
 
-        if trigger_fired and trend_aligned: 
-            if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
-                last_order = side_df.iloc[-1]
-                symbol, qty, new_tag = last_order['symbol'], abs(int(safe_float(last_order['qty'], 0.0))), generate_pxy_tag() 
-                print_pxy_trigger_dashboard(side, symbol, get_loss(last_order), dynamic_threshold, new_tag, ce_lots, pe_lots, abs_factor, rule_type, current_value[side])
-                try: 
-                    params = {"exchange_segment": "nse_fo", "product": "NRML", "price": "0", "order_type": "MKT", "quantity": str(qty), "trading_symbol": str(symbol), "transaction_type": "B", "validity": "DAY", "amo": "NO", "tag": new_tag} 
-                    if client.place_order(**params): set_cooling(side); print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via {rule_type} gate.") 
-                except Exception as e: print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+    # --- 4. MKT SYNC ---
+    if map_active_with_market and not market_df.empty:
+        for col in market_df.columns:
+            active_df[col] = market_df[col].iloc[-1]
 
+    # --- 5. THE PXY OMS CALCULATION CHAIN ---
+    if add_calcs:
+        active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
+        active_df["pxy_tgt"] = active_df.apply(pxy_tgt_calc, axis=1)
+        active_df["pxy_sl"] = active_df.apply(pxy_sl_calc, axis=1)
+
+    combined["active_orders"] = active_df
+    return combined
+
+if __name__ == "__main__":
+    # 1. Fetch data through your existing combined function
+    data = get_combined_data()
+    
+    # 2. PRINT ACTIVE POSITIONS
+    print("\n" + "="*80)
+    print(f"{'OMS LIVE PXY DASHBOARD (ACTIVE)':^80}")
+    print("="*80)
+    
+    active_df = data.get("active_orders", pd.DataFrame())
+    if not active_df.empty:
+        cols = ["symbol", "tag", "qty", "buy_prc", "sell_prc", "pnl", "pxy_tgt", "pxy_sl"]
+        available_cols = [c for c in cols if c in active_df.columns]
+        print(active_df[available_cols].to_string(index=False))
+    else:
+        print(f"{'No Active Positions':^80}")
+    print("="*80)
+
+    # 3. PRINT CLOSED POSITIONS (Today's Realized History)
+    client = get_session()
+    if client:
+        # We call process_lilo_orders again or modify get_combined_data to return both.
+        # Calling it here ensures we get the most recent 'closed_df'.
+        _, closed_df = process_lilo_orders(client)
+        
+        if not closed_df.empty:
+            print(f"\n{'TODAY\'S CLOSED POSITIONS (INACTIVE)':^80}")
+            print("-" * 80)
+            # Match the column names returned by runlilopxy.py
+            c_cols = ["Symbol", "Tag", "Qty", "Buy_Prc", "Sell_Prc", "PNL"]
+            print(closed_df[c_cols].to_string(index=False))
+            print("-" * 80)
+            total_pnl = closed_df['PNL'].sum()
+            color = Fore.GREEN if total_pnl >= 0 else Fore.RED
+            print(f"{'TOTAL REALIZED PNL:':<60} {color}{int(total_pnl):+d}{Style.RESET_ALL}")
+            print("=" * 80 + "\n")
