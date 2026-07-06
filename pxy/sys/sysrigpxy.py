@@ -1,46 +1,52 @@
-import os
-import json
-import numpy as np
-import pandas as pd
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+import os 
+import json 
+import numpy as np 
+import pandas as pd 
+import warnings 
+warnings.simplefilter(action='ignore', category=FutureWarning) 
 
-from sysdtafpxy import fetch_yf_data
-from syscnfgpxy import TIMEZONE
+from sysdtafpxy import fetch_yf_data 
+from syscnfgpxy import TIMEZONE 
 
-DEBUG_MODE = False
+DEBUG_MODE = False 
 
 def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, upper_mult: float = 1.4, lower_mult: float = 1.4) -> pd.DataFrame:
     """
     Translates TradingView Pine Script Linear Regression Channel calculations to Python.
-    Features 100% mathematical synchronization with the Pine Script loop indexing.
+    Filters buy/sell signals to evaluate only the past closed candle and running candle.
     """
     try:
         raw_df = fetch_yf_data()
         if raw_df is not None and not raw_df.empty:
             df = raw_df.copy()
     except Exception as e:
-        if DEBUG_MODE:
+        if DEBUG_MODE: 
             print(f"Warning: Shared pipeline download fallback active | {e}")
         df = df.copy()
 
+    # Pre-allocate output columns safely to handle early exits
+    df['linreg_base'] = np.nan
+    df['linreg_upper'] = np.nan
+    df['linreg_lower'] = np.nan
+    df['sma_trend_full'] = "NONE"
+    df['ST_Trend'] = "NONE"
+    df['ST'] = 0.0
+    
+    df.attrs['pearson_r'] = 0.0
+    df.attrs['std_dev'] = 0.0
+    df.attrs['slope'] = 0.0
+
     if df.empty or len(df) < length:
-        df['linreg_base'] = np.nan
-        df['linreg_upper'] = np.nan
-        df['linreg_lower'] = np.nan
-        df['sma_trend_full'] = "NONE"
-        df['ST_Trend'] = "NONE"
-        df['ST'] = 0.0
-        df.attrs['pearson_r'] = 0.0
-        df.attrs['std_dev'] = 0.0
-        df.attrs['slope'] = 0.0
         return df
 
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
         
     tz_string = str(TIMEZONE)
-    df = df.tz_localize('UTC').tz_convert(tz_string) if df.index.tz is None else df.tz_convert(tz_string)
+    if df.index.tz is None:
+        df = df.tz_localize('UTC').tz_convert(tz_string)
+    else:
+        df = df.tz_convert(tz_string)
 
     # 1-to-1 Pine Loop Replication Setup (Chronological Reversal Mapping)
     source_vals = df['Close'].iloc[-length:].values[::-1]
@@ -86,14 +92,15 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
     divisor = 1.0 if periods == 0 else float(periods)
     std_dev = np.sqrt(std_dev_acc / divisor)
     
-    pearson_r = 0.0 if (dsxx == 0 or dsyy == 0) else (dsxy / np.sqrt(dsxx * dsyy))
+    if dsxx == 0 or dsyy == 0:
+        pearson_r = 0.0
+    else:
+        pearson_r = dsxy / np.sqrt(dsxx * dsyy)
 
     start_price = intercept + slope * (length - 1)
-    if intercept > start_price:
-        trend_direction = "BULL"
-    else:
-        trend_direction = "BEAR"
+    trend_direction = "BULL" if intercept <= start_price else "BEAR"
 
+    # Map calculations back to the active tracking window
     base_line_series = np.full(len(df), np.nan)
     upper_line_series = np.full(len(df), np.nan)
     lower_line_series = np.full(len(df), np.nan)
@@ -106,18 +113,21 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
     df['linreg_upper'] = upper_line_series
     df['linreg_lower'] = lower_line_series
 
-    # --- CHOSEN LOGIC: HIGH AND LOW WICK INTERSECTION TRACKING ---
-    # Evaluates the absolute maximum high and absolute minimum low points
+    # --- CHOSEN LOGIC: RUNNING AND PAST CLOSED CANDLE ONLY ---
     high_touches_upper = df['High'] >= df['linreg_upper']
     low_touches_lower = df['Low'] <= df['linreg_lower']
 
-    # rolling(3) looks at current candle (t) and previous two candles (t-1, t-2)
-    sell_signal = high_touches_upper.rolling(3).max() == 1
-    buy_signal = low_touches_lower.rolling(3).max() == 1
+    # Rolling window of 2 captures only the running candle (t) and past closed candle (t-1)
+    sell_signal = high_touches_upper.rolling(2, min_periods=1).max() == 1
+    buy_signal = low_touches_lower.rolling(2, min_periods=1).max() == 1
 
-    # Map state outputs sequentially: SELL takes priority, then BUY, else default to Trend State
     channel_state = np.where(sell_signal, "SELL", np.where(buy_signal, "BUY", trend_direction))
     
+    # Strip flag artifacts from historical rows to isolate current execution states
+    channel_state[:len(df) - length] = "NONE"
+    if len(channel_state) >= 2:
+        channel_state[:-2] = "NONE"
+
     df['sma_trend_full'] = channel_state
     df['ST_Trend'] = df['sma_trend_full']
     df['ST'] = df['linreg_base'].ffill().fillna(0.0)
@@ -157,7 +167,9 @@ if __name__ == "__main__":
     print("--- STARTING LIVE PXY LINE BRACKET ENGAGEMENT ENGINE ---")
     processed_df = calculate_linear_regression_channel(pd.DataFrame())
     
-    if processed_df is not None and not processed_df.empty and 'linreg_base' in processed_df.columns and not pd.isna(processed_df.iloc[-1]['linreg_base']):
+    if (processed_df is not None and not processed_df.empty and 
+        'linreg_base' in processed_df.columns and not pd.isna(processed_df.iloc[-1]['linreg_base'])):
+        
         target_index = processed_df.index[-1]
         print(f"Timestamp    : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"Close Price  : {float(processed_df.at[target_index, 'Close']):.2f}")
@@ -166,6 +178,7 @@ if __name__ == "__main__":
         print(f"LinReg Lower : {float(processed_df.at[target_index, 'linreg_lower']):.2f}")
         print(f"Pearson's R  : {processed_df.attrs.get('pearson_r', 0.0):.6f}")
         print(f"Channel State: {str(processed_df.at[target_index, 'sma_trend_full'])}")
+        
         export_regression_json(processed_df)
     else:
         print("CRITICAL: Upstream data error or insufficient data rows.")
