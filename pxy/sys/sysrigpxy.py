@@ -13,7 +13,8 @@ DEBUG_MODE = False
 def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, upper_mult: float = 1.4, lower_mult: float = 1.4) -> pd.DataFrame:
     """
     Translates TradingView Pine Script Linear Regression Channel calculations to Python.
-    Filters buy/sell signals to evaluate only the past closed candle and running candle.
+    Evaluates BUY/SELL signals on the last two candles with structural priority, 
+    falling back to BULL/BEAR comparison based on the previous closed candle.
     """
     try:
         raw_df = fetch_yf_data()
@@ -97,9 +98,6 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
     else:
         pearson_r = dsxy / np.sqrt(dsxx * dsyy)
 
-    start_price = intercept + slope * (length - 1)
-    trend_direction = "BULL" if intercept <= start_price else "BEAR"
-
     # Map calculations back to the active tracking window
     base_line_series = np.full(len(df), np.nan)
     upper_line_series = np.full(len(df), np.nan)
@@ -117,13 +115,18 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
     high_touches_upper = df['High'] >= df['linreg_upper']
     low_touches_lower = df['Low'] <= df['linreg_lower']
 
-    # Rolling window of 2 captures only the running candle (t) and past closed candle (t-1)
+    # Rolling window of 2 captures running candle (t) and past closed candle (t-1)
     sell_signal = high_touches_upper.rolling(2, min_periods=1).max() == 1
     buy_signal = low_touches_lower.rolling(2, min_periods=1).max() == 1
 
-    channel_state = np.where(sell_signal, "SELL", np.where(buy_signal, "BUY", trend_direction))
+    # Dynamic fallback direction: Check if running candle is above or below the previous close
+    # Using shift(1) ensures a row-by-row historical fallback match if needed
+    candle_comparison = np.where(df['Close'] > df['Close'].shift(1), "BULL", "BEAR")
+
+    # Layer states with structural priorities (SELL > BUY > BULL/BEAR)
+    channel_state = np.where(sell_signal, "SELL", np.where(buy_signal, "BUY", candle_comparison))
     
-    # Strip flag artifacts from historical rows to isolate current execution states
+    # Strip flag artifacts from older history to isolate execution states to the last two bars
     channel_state[:len(df) - length] = "NONE"
     if len(channel_state) >= 2:
         channel_state[:-2] = "NONE"
