@@ -10,11 +10,10 @@ from syscnfgpxy import TIMEZONE
 
 DEBUG_MODE = False 
 
-def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, upper_mult: float = 1.4, lower_mult: float = 1.4) -> pd.DataFrame:
+def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 21, upper_mult: float = 1.4, lower_mult: float = 1.4) -> pd.DataFrame:
     """
-    Translates TradingView Pine Script Linear Regression Channel calculations to Python.
-    Evaluates BUY/SELL signals on the last two candles with structural priority, 
-    falling back to BULL/BEAR comparison based on the previous closed candle.
+    Translates TradingView Pine Script v6 Linear Regression Channel calculations to Python.
+    Maintains 100% mathematical synchronization with ta.linreg slopes and wicks touches.
     """
     try:
         raw_df = fetch_yf_data()
@@ -25,7 +24,7 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
             print(f"Warning: Shared pipeline download fallback active | {e}")
         df = df.copy()
 
-    # Pre-allocate output columns safely to handle early exits
+    # Safely pre-allocate system columns
     df['linreg_base'] = np.nan
     df['linreg_upper'] = np.nan
     df['linreg_lower'] = np.nan
@@ -49,46 +48,41 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
     else:
         df = df.tz_convert(tz_string)
 
-    # 1-to-1 Pine Loop Replication Setup (Chronological Reversal Mapping)
-    source_vals = df['Close'].iloc[-length:].values[::-1]
+    # Replicate TradingView's lookback context array mapping
+    source_vals = df['Close'].iloc[-length:].values
     
-    sumX = 0.0
-    sumY = 0.0
-    sumXSqr = 0.0
-    sumXY = 0.0
+    # Generate X coordinates matching chronological index steps
+    x = np.arange(length)
+    y = source_vals
+    
+    # Calculate Standard Least Squares Linear Regression
+    slope, intercept = np.polyfit(x, y, 1)
+    
+    # Derive exact boundary points to replicate ta.linreg(source, length, 0)
+    start_price = intercept                  # Corresponds to oldest lookback bar line point
+    end_price = intercept + slope * (length - 1)  # Corresponds to live candle point
 
-    for i in range(length):
-        val = source_vals[i]
-        per = i + 1.0
-        sumX += per
-        sumY += val
-        sumXSqr += per * per
-        sumXY += val * per
-
-    slope = (length * sumXY - sumX * sumY) / (length * sumXSqr - sumX * sumX)
-    average = sumY / length
-    intercept = average - slope * sumX / length + slope
-
+    # Match custom Pine Script standard deviation loop structure
+    average = np.mean(source_vals)
+    periods = length - 1
+    daY = start_price + slope * periods / 2.0
+    
     std_dev_acc = 0.0
     dsxx = 0.0
     dsyy = 0.0
     dsxy = 0.0
-    
-    periods = length - 1
-    daY = intercept + slope * periods / 2.0
-    val = intercept
-    val_track = np.zeros(length)
 
+    # Process chronologically to mirror the lookback window calculations exactly
     for j in range(length):
-        val_track[j] = val
+        val = start_price + slope * j
         dxt = source_vals[j] - average
         dyt = val - daY
         price_diff = source_vals[j] - val
+        
         std_dev_acc += price_diff * price_diff
         dsxx += dxt * dxt
         dsyy += dyt * dyt
         dsxy += dxt * dyt
-        val += slope
 
     divisor = 1.0 if periods == 0 else float(periods)
     std_dev = np.sqrt(std_dev_acc / divisor)
@@ -98,14 +92,20 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
     else:
         pearson_r = dsxy / np.sqrt(dsxx * dsyy)
 
-    # Map calculations back to the active tracking window
+    # 100% Synchronized Pine Direction Gateway: isBullish = endPrice > startPrice
+    trend_direction = "BULL" if end_price > start_price else "BEAR"
+
+    # Generate full line arrays for the calculated lookback series window
+    val_track = start_price + slope * np.arange(length)
+
     base_line_series = np.full(len(df), np.nan)
     upper_line_series = np.full(len(df), np.nan)
     lower_line_series = np.full(len(df), np.nan)
 
-    base_line_series[-length:] = val_track[::-1]
-    upper_line_series[-length:] = (val_track + (upper_mult * std_dev))[::-1]
-    lower_line_series[-length:] = (val_track - (lower_mult * std_dev))[::-1]
+    # Map arrays back into the active historical trailing slice
+    base_line_series[-length:] = val_track
+    upper_line_series[-length:] = val_track + (upper_mult * std_dev)
+    lower_line_series[-length:] = val_track - (lower_mult * std_dev)
 
     df['linreg_base'] = base_line_series
     df['linreg_upper'] = upper_line_series
@@ -119,14 +119,13 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 14, uppe
     sell_signal = high_touches_upper.rolling(2, min_periods=1).max() == 1
     buy_signal = low_touches_lower.rolling(2, min_periods=1).max() == 1
 
-    # Dynamic fallback direction: Check if running candle is above or below the previous close
-    # Using shift(1) ensures a row-by-row historical fallback match if needed
+    # Alternative execution tracking if candle closes over or under previous close thresholds
     candle_comparison = np.where(df['Close'] > df['Close'].shift(1), "BULL", "BEAR")
 
-    # Layer states with structural priorities (SELL > BUY > BULL/BEAR)
+    # Priority Engine Layering: SELL > BUY > BULL / BEAR Fallback
     channel_state = np.where(sell_signal, "SELL", np.where(buy_signal, "BUY", candle_comparison))
     
-    # Strip flag artifacts from older history to isolate execution states to the last two bars
+    # Completely eliminate historical row artifacts outside execution focus window
     channel_state[:len(df) - length] = "NONE"
     if len(channel_state) >= 2:
         channel_state[:-2] = "NONE"
@@ -185,6 +184,5 @@ if __name__ == "__main__":
         export_regression_json(processed_df)
     else:
         print("CRITICAL: Upstream data error or insufficient data rows.")
-
 
 
