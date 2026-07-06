@@ -151,7 +151,7 @@ body{
 #riskBar{
     height:44px;flex-shrink:0;display:flex;align-items:center;
     padding:0 12px;gap:10px;background:var(--bg2);
-    border-top:1px solid var(--border2);overflow:hidden;
+    border-bottom:1px solid var(--border2);overflow:hidden;
 }
 .rsk-grp{display:flex;flex-direction:column;gap:1px;flex-shrink:0;}
 .rsk-lbl{font-size:7px;letter-spacing:0.10em;text-transform:uppercase;color:#ffffff;white-space:nowrap;}
@@ -211,6 +211,19 @@ body{
     <div class="hdr-r">
         <div id="statusDot"></div>
         <button class="reconnect-btn" id="reconnectBtn" title="Reconnect">↺</button>
+    </div>
+</div>
+
+<!-- RISK BAR -->
+<div id="riskBar">
+    <div class="rsk-grp">
+        <span class="rsk-lbl">⛔ Stop</span>
+        <span class="rsk-val" id="rskNet">—</span>
+    </div>
+    <div class="rsk-candle-wrap"><canvas id="rskCanvas"></canvas></div>
+    <div class="rsk-grp" style="align-items:flex-end;">
+        <span class="rsk-lbl">📈 Peak</span>
+        <span class="rsk-val" id="rskPeak">—</span>
     </div>
 </div>
 
@@ -275,19 +288,6 @@ body{
         </div>
     </div>
 
-</div>
-
-<!-- RISK BAR -->
-<div id="riskBar">
-    <div class="rsk-grp">
-        <span class="rsk-lbl">⛔ Stop</span>
-        <span class="rsk-val" id="rskNet">—</span>
-    </div>
-    <div class="rsk-candle-wrap"><canvas id="rskCanvas"></canvas></div>
-    <div class="rsk-grp" style="align-items:flex-end;">
-        <span class="rsk-lbl">📈 Peak</span>
-        <span class="rsk-val" id="rskPeak">—</span>
-    </div>
 </div>
 
 <!-- PNL BAR -->
