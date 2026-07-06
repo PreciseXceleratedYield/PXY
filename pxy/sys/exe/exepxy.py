@@ -152,7 +152,7 @@ while True:
         loop_counter += 1
     else:
         print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
-        safe_run(HERE.parent / "sysslefpxy.py", timeout=20)
+        safe_run(HERE.parent / "sysrigpxy.py", timeout=20)
         fancy_pause(7)
         
         while not in_market_hours():
