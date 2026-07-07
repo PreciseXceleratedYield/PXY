@@ -3,22 +3,17 @@ import pandas as pd
 
 def get_entry_signal(df=None):
     """
-    Advanced routing pipeline driven by completed Heikin-Ashi candle transitions.
+    Advanced routing pipeline driven strictly by closed Heikin-Ashi candle color comparisons.
     
-    Rules Engine:
-    - GREEN to RED (completed)   -> Actionable ATMSELL
-    - RED to GREEN (completed)   -> Actionable ATMBUY
-    - GREEN to GREEN (completed) -> Non-actionable BULL
-    - RED to RED (completed)     -> Non-actionable BEAR
-    - No match / Flat Doji       -> NONE
+    This engine evaluates data PURELY based on the color transition of the two most 
+    recently completed candles. It applies no external filters or secondary conditions.
     
-    Args:
-        df (pd.DataFrame, optional): Dataframe containing transformed Heikin-Ashi 
-                                     Open, High, Low, and Close columns. 
-                                     Defaults to fetching live data via system engine.
-
-    Returns:
-        tuple[str, str]: A pair of string tokens representing (entry_signal, exit_signal).
+    Synchronized Rules Engine:
+    - GREEN to RED (completed)   -> Entry: ATMSELL | Exit: BEAR
+    - RED to GREEN (completed)   -> Entry: ATMBUY  | Exit: BULL
+    - GREEN to GREEN (completed) -> Entry: BULL    | Exit: BULL
+    - RED to RED (completed)     -> Entry: BEAR    | Exit: BEAR
+    - No match / Flat Doji       -> Entry: NONE    | Exit: NONE
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -27,39 +22,41 @@ def get_entry_signal(df=None):
         return "NONE", "NONE"
 
     # =========================================================================
-    # HEIKIN-ASHI CANDLE COLOR DETECTION ENGINE
+    # PURE HEIKIN-ASHI CLOSED CANDLE COLOR DETECTION
     # =========================================================================
-    # Check the color of the most recently completed candle (t-1)
+    # Candle (t-1): The most recently COMPLETED and closed candle
     is_prev_green = df['Close'].iloc[-2] > df['Open'].iloc[-2]
     is_prev_red = df['Close'].iloc[-2] < df['Open'].iloc[-2]
     
-    # Check the color of the candle before that (t-2) to capture the sequence transition
+    # Candle (t-2): The closed candle directly BEFORE the most recent one
     is_prior_green = df['Close'].iloc[-3] > df['Open'].iloc[-3]
     is_prior_red = df['Close'].iloc[-3] < df['Open'].iloc[-3]
 
     # =========================================================================
-    # PATTERN MATCHING ROUTING MATRIX
+    # TWO-CANDLE COLOR PATTERN ROUTING MATRIX
     # =========================================================================
     entry_signal = "NONE"
+    exit_signal = "NONE"
     
-    # Rule 1: GREEN to RED transition (Completed) -> SELL
+    # Rule 1: GREEN to RED transition (Two completed candles)
     if is_prior_green and is_prev_red:
         entry_signal = "ATMSELL"
+        exit_signal = "BEAR"
         
-    # Rule 2: RED to GREEN transition (Completed) -> BUY
+    # Rule 2: RED to GREEN transition (Two completed candles)
     elif is_prior_red and is_prev_green:
         entry_signal = "ATMBUY"
+        exit_signal = "BULL"
         
-    # Rule 3: GREEN to GREEN continuation (Completed) -> BULL
+    # Rule 3: GREEN to GREEN continuation (Two completed candles)
     elif is_prior_green and is_prev_green:
         entry_signal = "BULL"
+        exit_signal = "BULL"
         
-    # Rule 4: RED to RED continuation (Completed) -> BEAR
+    # Rule 4: RED to RED continuation (Two completed candles)
     elif is_prior_red and is_prev_red:
         entry_signal = "BEAR"
-
-    # Exit engine unconditionally maps to match the entry signal structure
-    exit_signal = entry_signal
+        exit_signal = "BEAR"
 
     # =========================================================================
     # SYSTEM OUTPUT TERMINAL LOGS
@@ -67,6 +64,5 @@ def get_entry_signal(df=None):
     print(f" ENTRY: {entry_signal} | EXIT: {exit_signal}")
         
     return entry_signal, exit_signal
-
 
 
