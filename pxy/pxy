@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Start pxy.js as daemon if not running
-if ! pgrep -f "/home/neo/pxy/pxy.js" >/dev/null 2>&1; then
-    nohup node /home/neo/pxy/pxy.js >> /home/neo/pxy/pxy.log 2>&1 &
+if ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
+    nohup node /home/pxy/pxy/pxy.js >> /home/neo/pxy/pxy.log 2>&1 &
     echo "pxy.js started in background..."
 fi
 
