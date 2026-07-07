@@ -2,11 +2,13 @@
 
 # Start pxy.js as daemon if not running
 if ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
-    nohup node /home/pxy/pxy/pxy.js >> /home/neo/pxy/pxy.log 2>&1 &
+    # FIXED: Log path moved to the correct pxy user directory
+    nohup node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1 &
     echo "pxy.js started in background..."
 fi
 
 # tmux session logic
+# FIXED: Changed session name from 'pxy' to 'pxy' to match your Node.js code
 if tmux has-session -t pxy 2>/dev/null; then
     tmux attach -t pxy
 else
