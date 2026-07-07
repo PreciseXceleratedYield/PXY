@@ -42,23 +42,19 @@ def export_supertrend_json(df: pd.DataFrame, output_file=None) -> list:
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
     PXY® Geometric Data Matrix Framework
-    Calculates UP/DOWN states up to the active live tick for chart synchronization.
+    Calculates BULL/BEAR states up to the active live tick for chart synchronization.
     """
     df = df.copy()
     n = len(df)
     
     trends = ["NONE"] * n
     close_vals = df['Close'].to_numpy()
+    open_vals = df['Open'].to_numpy()
     
-    # Process historical trends based on sequential close logic
-    for i in range(1, n):
-        if close_vals[i] > close_vals[i - 1]:
-            trends[i] = "UP"
-        elif close_vals[i] < close_vals[i - 1]:
-            trends[i] = "DOWN"
-        else:
-            trends[i] = "NONE"
-            
+    for i in range(0, n):
+        # Every index calculates its own immediate state (Live candle included)
+        trends[i] = "BULL" if close_vals[i] >= open_vals[i] else "BEAR"
+        
     df['sma_trend'] = trends
     
     # Slice matrix to exactly 50 rows for JSON dashboard compliance
@@ -67,7 +63,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     
     return df
 
-def _print_console_bar(c1, c0, execution_state):
+def _print_console_bar(c1, o1, c0, o0, execution_state):
     """Renders the graphical console display profiling the active live running candle."""
     RST = "\033[0m"
     RED = "\033[91m"
@@ -75,8 +71,8 @@ def _print_console_bar(c1, c0, execution_state):
     YLW = "\033[1;93m"
     GRAY = "\033[90m"
 
-    min_val = min(int(c1), int(c0)) - 2
-    max_val = max(int(c1), int(c0)) + 2
+    min_val = min(c1, c0, o1, o0) - 2
+    max_val = max(c1, c0, o1, o0) + 2
     scale_width = 20
 
     def get_clean_bar(val, marker="█"):
@@ -84,21 +80,20 @@ def _print_console_bar(c1, c0, execution_state):
         pos = max(1, pos)
         return (marker * pos).ljust(scale_width)
 
-    # Color assignment bound to directional results
-    state_color = GRN if execution_state == "UP" else (RED if execution_state == "DOWN" else YLW)
+    c1_color = GRN if c1 >= o1 else RED
+    c0_color = GRN if c0 >= o0 else RED
 
-    # Integer transformations applied directly within the structural statements
     rows = [
-        (int(c1), f"CLOSED C1-{int(c1)}", "█", GRAY),
-        (int(c0), f"ACTIVE C0-{int(c0)}", "█", state_color)  # Live tick visual anchor
+        (c1, f"CLOSED C1-{c1:.2f}", "█", c1_color),
+        (c0, f"ACTIVE C0-{c0:.2f}", "█", c0_color)  # Live tick visual anchor
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
-    print(f"\n{YLW}==GEOMETRIC ENGINE CONSOLE MONITOR(LIVE)=={RST}")
+    print(f"\n{YLW}=== GEOMETRIC ENGINE CONSOLE MONITOR (LIVE) ==={RST}")
     for val, label, marker, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
-    print(f"{YLW}=========================================={RST}")
-    print(f"       ACTIVE RUNNING CANDLE STATE: {state_color}{execution_state}{RST}")
+    print(f"{YLW}========================================{RST}")
+    print(f"       ACTIVE RUNNING CANDLE STATE: {YLW}{execution_state}{RST}")
 
 def log_sync_state(timestamp, signal_state, price):
     """Logs the active system state variables directly using live active parameters."""
@@ -143,23 +138,24 @@ def get_signal(df=None):
     try:
         # --- 1. EXTRACT DATA FOR PREVIOUS CLOSED CANDLE (INDEX -2) ---
         closed_row = df.iloc[-2]
-        c1 = float(closed_row['Close'])
+        c1, o1 = float(closed_row['Close']), float(closed_row['Open'])
 
         # --- 2. EXTRACT DATA FOR LIVE ACTIVE RUNNING CANDLE (INDEX -1) ---
         live_row = df.iloc[-1]
-        c0 = float(live_row['Close'])
+        c0, o0 = float(live_row['Close']), float(live_row['Open'])
 
         # --- 3. EXECUTE EXCLUSIVE LIVE RUNNING LOGIC MATCHING ---
-        if c0 > c1:
-            execution_state = "UP"
-        elif c0 < c1:
-            execution_state = "DOWN"
+        if c0 > o0:
+            execution_state = "BULL"
+        elif c0 < o0:
+            execution_state = "BEAR"
         else:
-            execution_state = "NONE"
+            # Absolute tiebreaker using historical reference layer
+            execution_state = "BULL" if c1 >= o1 else "BEAR"
 
         # --- 4. TELEMETRY MONITORING & STORAGE ---
         if DEBUG:
-            _print_console_bar(c1, c0, execution_state)
+            _print_console_bar(c1, o1, c0, o0, execution_state)
             
         # Log and tag system state using active running index timestamp (-1)
         log_sync_state(df.index[-1], execution_state, c0)
@@ -188,4 +184,3 @@ if __name__ == "__main__":
         print(f"\nCalculated Dynamic Live State: {signal}")
     else:
         print("[WARNING] Upstream connection returned an empty historical dataset matrix.")
-
