@@ -30,7 +30,7 @@ app.get('/', (req, res) => {
 });
 
 /* =========================
-   RUN SCRIPT AS USER neo
+   RUN SCRIPT AS USER pxy
    ========================= */
 const ALLOWED_SCRIPTS = [
     'pxyupdate',
@@ -41,7 +41,7 @@ const ALLOWED_SCRIPTS = [
     'pxysqrpe'   
 ];
 
-const SCRIPT_DIR = '/home/neo/pxy';
+const SCRIPT_DIR = '/home/pxy/pxy';
 
 app.post('/run/:script', (req, res) => {
     const script = req.params.script.trim();
@@ -61,7 +61,7 @@ app.post('/run/:script', (req, res) => {
     exec(cmd, {
         timeout: 30000,
         cwd: SCRIPT_DIR,
-        env: { ...process.env, HOME: '/home/neo', USER: 'neo', LOGNAME: 'neo' }
+        env: { ...process.env, HOME: '/home/pxy', USER: 'pxy', LOGNAME: 'pxy' }
     }, (err, stdout, stderr) => {
         console.log(`[RUN] ok=${!err} out="${stdout}" err="${stderr}"`);
         res.json({
