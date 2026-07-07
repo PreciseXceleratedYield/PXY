@@ -7,9 +7,9 @@ if ! pgrep -f "/home/neo/pxy/pxy.js" >/dev/null 2>&1; then
 fi
 
 # tmux session logic
-if tmux has-session -t npxy 2>/dev/null; then
-    tmux attach -t npxy
+if tmux has-session -t pxy 2>/dev/null; then
+    tmux attach -t pxy
 else
-    tmux new -s npxy -d 'pxyexe'
-    tmux attach -t npxy
+    tmux new -s pxy -d 'pxyexe'
+    tmux attach -t pxy
 fi
