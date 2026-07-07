@@ -51,8 +51,8 @@ MODE 7: Recursive OHLC/4 Candle Framework (ACTIVE DEFAULT)
 
 # ---------------- LOCAL SYSTEM CONFIGURATION ----------------
 PARAMS = {
-    "ticker": "BTC-USD",          # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
-    "ohlc_mode": 0                # Switch Modes here (0 through 7)
+    "ticker": "^NSEI",          # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
+    "ohlc_mode": 1                # Switch Modes here (0 through 7)
 }
 
 # ---------------- CONSTANTS DERIVED FROM CONFIG ----------------
@@ -66,4 +66,3 @@ if __name__ == "__main__":
     print(f"TARGET TICKER  : {TICKER}")
     print(f"ACTIVE MODE    : {OHLC_MODE}")
     print(f"SYSTEM TIMEZONE: {TIMEZONE}")
-
