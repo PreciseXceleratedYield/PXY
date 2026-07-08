@@ -13,48 +13,70 @@ def apply_ohlc_transformation(df, mode=1):
         
     df_out = df.copy()
     
-    # MODE 1: Raw Baseline (Unaltered)
-    if mode == 1:
-        return df_out
-        
-    # MODE 2: Simplified Heikin-Ashi (Non-Recursive)
-    elif mode == 2:
-        close_vals = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4.0
-        open_vals = (df['Open'] + df['Close']) / 2.0
-        df_out['Close'] = close_vals
-        df_out['Open'] = open_vals
-        # High / Low are kept completely at raw chart levels per specification
+    # Pre-calculate component datasets for clean matrix blending in Mode 4
+    # MODE 0 Arrays
+    m0_vals = df['Close'].values
+    
+    # MODE 1 Arrays (Raw)
+    m1_open  = df['Open'].values
+    m1_high  = df['High'].values
+    m1_low   = df['Low'].values
+    m1_close = df['Close'].values
+    
+    # MODE 2 Arrays (Recursive HA)
+    m2_close = (m1_open + m1_high + m1_low + m1_close) / 4.0
+    m2_open = np.zeros(len(df))
+    m2_open[0] = (m1_open[0] + m1_close[0]) / 2.0
+    for i in range(1, len(df)):
+        m2_open[i] = (m2_open[i-1] + m2_close[i-1]) / 2.0
+    m2_high = np.maximum(m1_high, np.maximum(m2_open, m2_close))
+    m2_low  = np.minimum(m1_low, np.minimum(m2_open, m2_close))
+    
+    # MODE 3 Arrays
+    m3_vals = ((df['Open'] + df['Close']) / 2.0).values
+
+    # MODE RUNTIME ROUTER
+    if mode == 0:
+        df_out['Open']  = m0_vals
+        df_out['High']  = m0_vals
+        df_out['Low']   = m0_vals
+        df_out['Close'] = m0_vals
         return df_out
 
-    # MODE 7: Recursive OHLC/4 Candle Framework (Standard Heikin-Ashi)
-    elif mode == 7:
-        ha_close = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4.0
-        ha_open = np.zeros(len(df))
-        
-        # Initialize the first row
-        ha_open[0] = (df['Open'].iloc[0] + df['Close'].iloc[0]) / 2.0
-        
-        # Recursive calculation loop for open values
-        for i in range(1, len(df)):
-            ha_open[i] = (ha_open[i-1] + ha_close.iloc[i-1]) / 2.0
-            
-        df_out['Close'] = ha_close
-        df_out['Open'] = ha_open
-        df_out['High'] = np.maximum(df['High'].values, np.maximum(ha_open, ha_close))
-        df_out['Low'] = np.minimum(df['Low'].values, np.minimum(ha_open, ha_close))
+    elif mode == 1:
         return df_out
         
-    # Fallback for other modes
+    elif mode == 2:
+        df_out['Open']  = m2_open
+        df_out['High']  = m2_high
+        df_out['Low']   = m2_low
+        df_out['Close'] = m2_close
+        return df_out
+
+    elif mode == 3:
+        df_out['Open']  = m3_vals
+        df_out['High']  = m3_vals
+        df_out['Low']   = m3_vals
+        df_out['Close'] = m3_vals
+        return df_out
+
+    # MODE 4: Blended Matrix (Mean Average of Mode 0, 1, 2, and 3)
+    elif mode == 4:
+        df_out['Open']  = (m0_vals + m1_open  + m2_open  + m3_vals) / 4.0
+        df_out['High']  = (m0_vals + m1_high  + m2_high  + m3_vals) / 4.0
+        df_out['Low']   = (m0_vals + m1_low   + m2_low   + m3_vals) / 4.0
+        df_out['Close'] = (m0_vals + m1_close + m2_close + m3_vals) / 4.0
+        return df_out
+        
     else:
-        print(f"SYSTEM_WARNING | Mode {mode} unimplemented/unrecognized. Defaulting to Mode 1 Raw Candles.")
+        print(f"SYSTEM_WARNING | Mode {mode} unrecognized. Defaulting to Mode 1 Raw Candles.")
         return df_out
 
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
-    """DYNAMIC HISTORICAL SLICE RETRIEVAL ENGINE FOR RAW MODE 1 DATA"""
+    """DYNAMIC HISTORICAL SLICE RETRIEVAL ENGINE FOR DATA RECOVERY"""
     ticker_obj = yf.Ticker(TICKER)
     df = pd.DataFrame()
     
-    # Warmup window to accommodate the 42 SMA calculation smoothly
     buffer_rows = target_rows + 45
 
     if period is not None:
@@ -92,4 +114,5 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     processed_df['SMA_42'] = processed_df['Close'].rolling(window=42).mean()
     
     return processed_df.tail(target_rows)
+
 
