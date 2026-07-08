@@ -8,32 +8,34 @@ Operational Rules Matrix:
 ===============================================================================
 """
 
-from sysexitpxy import detect_raw_direction
-from syscnfgpxy import TICKER
 import pandas as pd
+from syscnfgpxy import TICKER
+# Feed directly from the newly integrated geometric pxy_engine
+from sysmktpxy import get_signal 
 
 def get_entry_signal(df=None):
     """
-    Direct routing pipeline mapping live raw directions.
-    - UP (ACTIVE > CLOSED)   -> ENTRY: ATMBUY  | EXIT: BULL
-    - DOWN (ACTIVE < CLOSED) -> ENTRY: ATMSELL | EXIT: BEAR
+    Direct routing pipeline mapping live raw directions from pxy_engine.
+    - BULL (ACTIVE > CLOSED) -> ENTRY: ATMBUY  | EXIT: BULL
+    - BEAR (ACTIVE < CLOSED) -> ENTRY: ATMSELL | EXIT: BEAR
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
         df = fetch_yf_data()
 
-    # 1. Fetch raw direction state directly from your sysexitpxy file engine
-    _, direction = detect_raw_direction(df)
+    # 1. Fetch live active state directly from your geometric engine module
+    # get_signal returns (execution_state, execution_state) i.e. ("BULL"/"BEAR", "BULL"/"BEAR")
+    direction, _ = get_signal(df)
 
     entry_signal = "NONE"
     exit_signal = "NONE"
 
-    # 2. MATCH AND ROUTE SHAPES UNCONDITIONALLY
-    if direction == "UP":
+    # 2. MATCH AND ROUTE SHAPES UNCONDITIONALLY FROM PXY_ENGINE
+    if direction == "BULL":
         entry_signal = "ATMBUY"
         exit_signal = "BULL"
 
-    elif direction == "DOWN":
+    elif direction == "BEAR":
         entry_signal = "ATMSELL"
         exit_signal = "BEAR"
 
@@ -51,3 +53,4 @@ if __name__ == "__main__":
         entry, ex = get_entry_signal(df)
         print("-" * 50)
         print(f"FINAL RESULT >> ENTRY: {entry} | EXIT: {ex}")
+
