@@ -52,14 +52,14 @@ body{
 #clk{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;}
 .reconnect-btn{
     padding:3px 9px;border-radius:5px;border:1px solid var(--border2);
-    background:transparent;color:var(--muted);font-family:'DM Mono',monospace;
+    background:transparent;color:#ffffff;font-family:'DM Mono',monospace;
     font-size:11px;cursor:pointer;transition:all 0.2s;
 }
 .reconnect-btn:active{color:var(--accent);border-color:var(--accent);}
 
 /* ── SIGNAL BAR ── */
 .sig-cell{
-    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    flex:1;min-width:6ch;display:flex;flex-direction:column;align-items:center;justify-content:center;
     padding:0 4px;gap:1px;border-right:1px solid var(--border);
     position:relative;
 }
@@ -201,29 +201,11 @@ body{
     <div class="hdr-l">
         <span class="logo" id="logoRefresh">PXY<sup>®</sup></span>
     </div>
-    <div id="sigBar" style="flex:1;display:flex;align-items:stretch;height:100%;margin:0 6px;border-left:1px solid var(--border2);border-right:1px solid var(--border2);">
-        <div class="sig-cell" id="cellEntry"><span class="sc-lbl">🛫 Entry</span><span class="sc-val" id="hcEntry">—</span></div>
-        <div class="sig-cell" id="cellExit"><span class="sc-lbl">🛬 Exit</span><span class="sc-val" id="hcExit">—</span></div>
-        <div class="sig-cell" id="cellTrend"><span class="sc-lbl">🚀 Trend</span><span class="sc-val" id="hcTrend">—</span></div>
-        <div class="sig-cell" id="cellATR"><span class="sc-lbl">📐 ATR/K</span><span class="sc-val" id="hcATR">—</span></div>
-        <div class="sig-cell" id="cellDP" style="flex:2;"><span class="sc-lbl">Depth ⚡⚡ Power</span><span class="sc-val" id="dpText">—</span></div>
-    </div>
+    <div style="flex:1;"></div>
     <div class="hdr-r">
+        <span id="brandHdr" style="font-family:'Syne',sans-serif;font-weight:700;font-size:10px;letter-spacing:0.06em;color:var(--muted);white-space:nowrap;">PreciseXceleratedYield Pvt Ltd<sup style="color:var(--accent);">™</sup></span>
         <div id="statusDot"></div>
         <button class="reconnect-btn" id="reconnectBtn" title="Reconnect">↺</button>
-    </div>
-</div>
-
-<!-- RISK BAR -->
-<div id="riskBar">
-    <div class="rsk-grp">
-        <span class="rsk-lbl">⛔ Stop</span>
-        <span class="rsk-val" id="rskNet">—</span>
-    </div>
-    <div class="rsk-candle-wrap"><canvas id="rskCanvas"></canvas></div>
-    <div class="rsk-grp" style="align-items:flex-end;">
-        <span class="rsk-lbl">📈 Peak</span>
-        <span class="rsk-val" id="rskPeak">—</span>
     </div>
 </div>
 
@@ -290,17 +272,32 @@ body{
 
 </div>
 
-<!-- PNL BAR -->
-<div id="pnlBar" style="height:32px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:var(--bg2);border-top:1px solid var(--border);gap:8px;">
-    <div style="display:flex;align-items:center;gap:6px;">
-        <span style="font-size:7px;letter-spacing:0.12em;text-transform:uppercase;color:#ffffff;">Running P&L</span>
-        <span id="pnlRunning" style="font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#ffffff;">—</span>
+<!-- RISK BAR — just above bottom -->
+<div id="riskBar">
+    <div class="rsk-grp">
+        <span class="rsk-lbl">⛔ Stop</span>
+        <span class="rsk-val" id="rskNet">—</span>
     </div>
-    <div style="width:1px;height:14px;background:var(--border2);"></div>
-    <div style="display:flex;align-items:center;gap:6px;">
-        <span style="font-size:7px;letter-spacing:0.12em;text-transform:uppercase;color:#ffffff;">Booked P&L</span>
-        <span id="pnlBooked" style="font-family:'Syne',sans-serif;font-weight:800;font-size:13px;color:#ffffff;">—</span>
+    <div class="rsk-candle-wrap"><canvas id="rskCanvas"></canvas></div>
+    <div class="rsk-grp" style="align-items:flex-end;">
+        <span class="rsk-lbl">📈 Peak</span>
+        <span class="rsk-val" id="rskPeak">—</span>
     </div>
+</div>
+
+<!-- PNL BAR — absolute bottom (with signal bar in middle) -->
+<div id="pnlBar" style="height:36px;flex-shrink:0;display:flex;align-items:stretch;background:var(--bg2);border-top:1px solid var(--border);">
+    <div class="sig-cell" style="flex-shrink:0;padding:0 8px;"><span class="sc-lbl">💰</span><span class="sc-val" id="pnlRunning">—</span></div>
+
+    <div id="sigBar" style="flex:1;display:flex;align-items:stretch;height:100%;min-width:0;border-left:1px solid var(--border2);border-right:1px solid var(--border2);">
+        <div class="sig-cell" id="cellEntry"><span class="sc-lbl">🛫</span><span class="sc-val" id="hcEntry">—</span></div>
+        <div class="sig-cell" id="cellExit"><span class="sc-lbl">🛬</span><span class="sc-val" id="hcExit">—</span></div>
+        <div class="sig-cell" id="cellTrend"><span class="sc-lbl">🚀</span><span class="sc-val" id="hcTrend">—</span></div>
+        <div class="sig-cell" id="cellATR"><span class="sc-lbl">📐</span><span class="sc-val" id="hcATR">—</span></div>
+        <div class="sig-cell" id="cellDP" style="flex:2;"><span class="sc-lbl">⚡⚡</span><span class="sc-val" id="dpText">—</span></div>
+    </div>
+
+    <div class="sig-cell" style="flex-shrink:0;padding:0 8px;"><span class="sc-lbl">✅</span><span class="sc-val" id="pnlBooked">—</span></div>
 </div>
 
 <!-- TAB BAR -->
