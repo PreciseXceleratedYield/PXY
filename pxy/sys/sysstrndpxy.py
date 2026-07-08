@@ -1,130 +1,91 @@
 # sysstrndpxy.py
-import sys
+import os
+import json
 import numpy as np
 import pandas as pd
-import pytz
-import json
-import os
-from datetime import datetime
 import warnings
-
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from sysdtafpxy import fetch_yf_data
-from syskatrpxy import calculate_atr, calculate_dynamic_k
-from syscnfgpxy import TIMEZONE, TICKER
+from syscnfgpxy import TIMEZONE
 
-DEBUG_MODE = False 
-CHECK_CONFIRMED_ONLY = False  
+DEBUG_MODE = False
 
-def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame: 
-    """ Pure SMA 42 Pipeline Engine mapped to Legacy Target Channel Keys """
+def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Implements a vectorized 21/50 SMA engine.
+    Restores internal memory aliases needed to stop downstream system crashes.
+    """
     try:
-        raw_df = fetch_yf_data(period="3d", interval="1m") 
-        if not raw_df.empty:
-            df = raw_df
+        raw_df = fetch_yf_data(period="3d", interval="1m")
+        if raw_df is not None and not raw_df.empty:
+            df = raw_df.copy()
     except Exception as e:
         if DEBUG_MODE:
             print(f"Warning: Shared pipeline download fallback active | {e}")
+        df = df.copy()
 
-    df = df.copy()
+    if df.empty:
+        return df
 
+    # Safe Datetime Index Normalisation
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
     
     tz_string = str(TIMEZONE)
     df = df.tz_localize('UTC').tz_convert(tz_string) if df.index.tz is None else df.tz_convert(tz_string)
-        
-    n = len(df)
-    if n == 0:
-        return df
 
-    src_close = df['Close'].to_numpy()
+    # Core Calculations
+    df['sma21'] = df['Close'].rolling(window=21, min_periods=1).mean()
+    df['sma50'] = df['Close'].rolling(window=50, min_periods=1).mean()
 
-    # --- Compute Pure SMA 42 Baseline ---
-    sma42_series = df['Close'].rolling(window=42).mean().bfill()
-    sma42_arr = sma42_series.to_numpy()
-    
-    df['pxy_sma_line'] = sma42_arr
-    
-    # Evaluate positioning relative to the raw 42 line
-    sma_direction = np.where(src_close >= sma42_arr, 1, -1)
+    # Vectorized Trend Matrix - CRITICAL FOR OPTIONS ENGINE & DASHBOARD
+    df['sma_trend_full'] = np.where(df['sma21'] >= df['sma50'], "BULL", "BEAR")
+    df.loc[df['sma21'].isna() | df['sma50'].isna(), 'sma_trend_full'] = "NONE"
 
-    # --- Generate Structural Regime State Changes ---
-    sma_trend_history = []
-    for i in range(n): 
-        raw_sma_regime = "BULL" if sma_direction[i] == 1 else "BEAR"
-        if i < 1: 
-            sma_trend_history.append(raw_sma_regime)
-            continue 
-
-        sma_cross_buy  = (sma_direction[i] == 1)  and (sma_direction[i-1] == -1)
-        sma_cross_sell = (sma_direction[i] == -1) and (sma_direction[i-1] == 1)
-
-        if sma_cross_buy:
-            sma_trend_history.append("BUY")
-        elif sma_cross_sell:
-            sma_trend_history.append("SELL")
-        else:
-            sma_trend_history.append(raw_sma_regime)
-
-    df['sma_trend_full'] = sma_trend_history
-    df['src_c'] = src_close
-    
-    # Backward compatibility mappings for dashboard data feeds
-    df['pxy_st_line'] = df['pxy_sma_line']
-    df['st_trend_full'] = df['sma_trend_full']
-    df['ST'] = df['pxy_sma_line']
+    # RESTORED ALIASES FOR COMPATIBILITY (sysdashpxy.py & sysoptionrtpxy.py)
     df['ST_Trend'] = df['sma_trend_full']
-    df['P_Master'] = df['src_c']
-    
-    try:
-        df['shared_atr'] = calculate_atr(df)
-    except Exception:
-        df['shared_atr'] = 12.0
-    
+    df['ST'] = df['sma21']
+
     return df
 
 def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
-    """ Dumps exact candle framework data matrix directly to JSON """
+    """
+    Dumps clean structural data matrix to JSON containing ONLY requested keys.
+    """
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
-    
-    if df is None or df.empty:
-        return None
+        if df is None or df.empty:
+            return None
 
     output = []
     for idx, row in df.iterrows():
+        # Extracted strictly requested 4-key schema payload
         output.append({
             "time": str(idx),
-            "close": float(row["Close"]),
-            "p_master": float(row["Close"]),  
-            "st": float(row["pxy_sma_line"]),       # Raw SMA 42 Line
-            "st_trend": str(row["sma_trend_full"]), 
-            "sma_line": float(row["pxy_sma_line"]),
-            "sma_trend": str(row["sma_trend_full"])
+            "price": float(row["Close"]),
+            "sma21": float(row["sma21"]) if not pd.isna(row["sma21"]) else 0.0,
+            "sma50": float(row["sma50"]) if not pd.isna(row["sma50"]) else 0.0
         })
 
-    os.makedirs(os.path.dirname(output_file), exist_ok=True) if os.path.dirname(output_file) else None
+    if os.path.dirname(output_file):
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        
     with open(output_file, "w") as f:
         json.dump(output, f, indent=2)
     return output
 
 if __name__ == "__main__":
-    print("--- STARTING LIVE PXY PURE SMA 42 MONITOR ENGINE ---")
-    
+    print("--- STARTING LIVE PXY UNIFIED EXCLUSIVE MATRIX ENGINE ---")
     processed_df = calculate_supertrend(pd.DataFrame())
     
     if processed_df is not None and not processed_df.empty:
-        idx_pos = -2 if CHECK_CONFIRMED_ONLY else -1
-        target_index = processed_df.index[idx_pos]
-        
-        print(f"Target Row Index Position -> {idx_pos} ({'CLOSED BAR' if CHECK_CONFIRMED_ONLY else 'LIVE TICK'})")
+        target_index = processed_df.index[-1]
         print(f"Timestamp   : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"Close Price : {float(processed_df.at[target_index, 'Close']):.2f}")
-        print(f"SMA 42 Line : {float(processed_df.at[target_index, 'pxy_sma_line']):.2f}")
+        print(f"21 SMA Value: {float(processed_df.at[target_index, 'sma21']):.2f}")
+        print(f"50 SMA Value: {float(processed_df.at[target_index, 'sma50']):.2f}")
         print(f"Trend State : {str(processed_df.at[target_index, 'sma_trend_full'])}")
-        
         export_supertrend_json(processed_df)
     else:
         print("CRITICAL: Upstream data empty.")
