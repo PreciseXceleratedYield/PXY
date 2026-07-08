@@ -1,3 +1,4 @@
+# pxy_engine.py
 import os
 import sys
 import json
@@ -168,6 +169,46 @@ def get_signal(df=None):
             print(f"Signal Processing Engine Exception: {e}")
         return "NONE", "NONE"
 
+# =====================================================================
+# ⚙️ BACKWARD-COMPATIBLE ADAPTER FOR ORIGINAL GET_PXY_DATA FUNCTION
+# =====================================================================
+def get_pxy_data(tickerSymbol=None, df=None):
+    """
+    Adapter function to maintain compatibility with original module routing requests.
+    Processes the raw data through the geometric supertrend engine.
+    """
+    if df is None:
+        df = fetch_yf_data()
+        
+    if df is None or df.empty:
+        return None, None, None, pd.DataFrame()
+        
+    # Safeguard: Separate processing safely from global reference memory
+    df = df.copy()
+    required_cols = ['Open', 'High', 'Low', 'Close']
+    for col in required_cols:
+        if col not in df.columns:
+            return None, None, None, pd.DataFrame()
+
+    # Pass data frame through the updated supertrend calculations matrix
+    processed_df = calculate_supertrend(df)
+    
+    # Export downstream files for live chart syncing 
+    export_supertrend_json(processed_df)
+    
+    # Map the calculation states back to original green/red outputs 
+    # BULL mapping -> green, BEAR mapping -> red
+    is_green = processed_df['sma_trend'] == "BULL"
+    conditions = [is_green]
+    choices = ["green"]
+    processed_df["pxy_color"] = np.select(conditions, choices, default="red")
+    
+    pxy_close = processed_df['Close'].copy()
+    pxy_open = processed_df['Open'].copy()
+    pxy_color_series = processed_df['pxy_color'].copy()
+    
+    return pxy_close, pxy_open, pxy_color_series, processed_df
+
 if __name__ == "__main__":
     print("=== STARTING PXY LIVE RUNNING CANDLE GEOMETRIC ENGINE ===")
     raw_df = fetch_yf_data()
@@ -184,3 +225,4 @@ if __name__ == "__main__":
         print(f"\nCalculated Dynamic Live State: {signal}")
     else:
         print("[WARNING] Upstream connection returned an empty historical dataset matrix.")
+
