@@ -410,7 +410,7 @@ function switchTab(tabId){
     document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
     // fit terminal if switching to it
     if(tabId==='paneTerminal'&&fit)setTimeout(()=>fit.fit(),50);
-    if(tabId==='paneChart'&&chart)setTimeout(()=>{chart.resize();drawMomentumBar(lastMoSt,lastMoCloses);},50);
+    if(tabId==='paneChart'&&lastCandles)setTimeout(()=>{drawChart(lastCandles);drawMomentumBar(lastMoSt,lastMoCloses);},50);
 }
 document.querySelectorAll('.tab-btn').forEach(btn=>{
     btn.addEventListener('click',()=>switchTab(btn.dataset.tab));
@@ -500,63 +500,124 @@ async function loadDash(){
 }
 
 /* ── CHART ── */
-let chart,lastMoSt=null,lastMoCloses=null;
+let lastCandles=null,lastMoSt=null,lastMoCloses=null;
 async function loadChart(){
     try{
         const data=await fetch('./webchrtpxy.json?_='+Date.now()).then(r=>r.json());
         if(!Array.isArray(data)||!data.length)return;
-        const prices=data.map(d=>d.price??d.close??d.Close);
-        const sma21=data.map(d=>d.sma21??null);
-        const sma50=data.map(d=>d.sma50??null);
-        drawChart(prices,sma21,sma50);
-        drawMomentumBar(sma21,prices);
+        const candles=data.map(d=>({
+            o:d.open??d.o??null, h:d.high??d.h??null, l:d.low??d.l??null,
+            c:d.close??d.Close??d.price??null,
+            sma21:d.sma21||null, sma50:d.sma50||null
+        }));
+        lastCandles=candles;
+        drawChart(candles);
+        drawMomentumBar(candles.map(c=>c.sma21), candles.map(c=>c.c));
     }catch(e){}
 }
-function drawChart(prices,sma21,sma50){
-    const MAX=60,pad=4;
-    const p=prices.slice(-MAX),s21=sma21.slice(-MAX),s50=sma50.slice(-MAX);
-    // price color based on previous close
-    const isBull=(p.at(-1)??0)>=(p.at(-2)??0);
-    const lc=isBull?cssVar('--bull'):cssVar('--bear');
-    const labels=[...p.map((_,i)=>i),...Array(pad).fill('')];
-    const pd=[...p,...Array(pad).fill(null)];
-    const s21d=[...s21,...Array(pad).fill(null)];
-    const s50d=[...s50,...Array(pad).fill(null)];
-    if(!chart){
-        chart=new Chart($('priceChart'),{
-            type:'line',
-            data:{labels,datasets:[
-                // price line — green/red, filled
-                {data:pd,borderColor:lc,borderWidth:1.5,pointRadius:0,fill:true,tension:0.35,
-                 backgroundColor:ctx2=>{
-                     const g=ctx2.chart.ctx.createLinearGradient(0,0,0,ctx2.chart.height);
-                     g.addColorStop(0,isBull?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)');
-                     g.addColorStop(1,'rgba(0,0,0,0)');return g;}},
-                // SMA21 — dotted amber
-                {data:s21d,borderColor:'rgba(202,138,4,0.75)',borderWidth:1,borderDash:[3,3],pointRadius:0,fill:false,tension:0.3},
-                // SMA50 — thin solid cyan
-                {data:s50d,borderColor:'rgba(34,211,238,0.55)',borderWidth:1,borderDash:[],pointRadius:0,fill:false,tension:0.3}
-            ]},
-            options:{animation:false,responsive:true,maintainAspectRatio:false,
-                plugins:{legend:{display:false},tooltip:{enabled:false}},
-                scales:{
-                    x:{display:false},
-                    y:{display:true,position:'right',
-                       grid:{color:cssVar('--grid'),drawBorder:false},
-                       ticks:{color:cssVar('--muted'),font:{family:"'DM Mono',monospace",size:9},maxTicksLimit:5}}
-                }}
-        });
-    }else{
-        chart.data.labels=labels;
-        chart.data.datasets[0].data=pd;chart.data.datasets[0].borderColor=lc;
-        chart.data.datasets[0].backgroundColor=ctx2=>{
-            const g=ctx2.chart.ctx.createLinearGradient(0,0,0,ctx2.chart.height);
-            g.addColorStop(0,isBull?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)');
-            g.addColorStop(1,'rgba(0,0,0,0)');return g;};
-        chart.data.datasets[1].data=s21d;
-        chart.data.datasets[2].data=s50d;
-        chart.update('none');
+function drawChart(candles){
+    const canvas=$('priceChart');
+    if(!canvas)return;
+    const ctx=canvas.getContext('2d');
+    const dpr=window.devicePixelRatio||1;
+    const rect=canvas.parentElement.getBoundingClientRect();
+    canvas.width=rect.width*dpr;canvas.height=rect.height*dpr;
+    canvas.style.width=rect.width+'px';canvas.style.height=rect.height+'px';
+    ctx.scale(dpr,dpr);
+    const W=rect.width,H=rect.height;
+    ctx.clearRect(0,0,W,H);
+    if(!candles||!candles.length)return;
+
+    const MAX=60;
+    const vis=candles.slice(-MAX);
+    const n=vis.length;
+    if(!n)return;
+
+    let lo=Infinity,hi=-Infinity;
+    vis.forEach(c=>{
+        if(c.l!=null)lo=Math.min(lo,c.l);
+        if(c.h!=null)hi=Math.max(hi,c.h);
+        if(c.sma21){lo=Math.min(lo,c.sma21);hi=Math.max(hi,c.sma21);}
+        if(c.sma50){lo=Math.min(lo,c.sma50);hi=Math.max(hi,c.sma50);}
+    });
+    if(!isFinite(lo)||!isFinite(hi))return;
+    const pad=(hi-lo)*0.08||1;
+    lo-=pad;hi+=pad;
+    const range=hi-lo||1;
+
+    const rightPad=40;
+    const plotW=W-rightPad;
+    const cw=plotW/n;
+    const bodyW=Math.max(2,cw*0.6);
+    const toY=v=>H-((v-lo)/range)*H;
+    const toX=i=>i*cw+cw/2;
+
+    // grid + price labels
+    ctx.strokeStyle=cssVar('--grid');ctx.lineWidth=1;
+    ctx.font="8px 'DM Mono',monospace";
+    ctx.fillStyle=cssVar('--muted');
+    ctx.textAlign='left';ctx.textBaseline='middle';
+    const ticks=4;
+    for(let t=0;t<=ticks;t++){
+        const v=lo+(range*t/ticks);
+        const y=toY(v);
+        ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(plotW,y);ctx.stroke();
+        ctx.fillText(v.toFixed(1),plotW+4,y);
     }
+
+    // candles — 3D rounded bodies with glow + shine
+    vis.forEach((c,i)=>{
+        if(c.o==null||c.h==null||c.l==null||c.c==null)return;
+        const x=toX(i);
+        const isBull=c.c>=c.o;
+        const color=isBull?cssVar('--bull'):cssVar('--bear');
+        const glow=isBull?'rgba(34,197,94,0.5)':'rgba(239,68,68,0.5)';
+
+        ctx.strokeStyle=color;ctx.lineWidth=1;
+        ctx.beginPath();
+        ctx.moveTo(x,toY(c.h));ctx.lineTo(x,toY(c.l));
+        ctx.stroke();
+
+        const yOpen=toY(c.o),yClose=toY(c.c);
+        const bodyTop=Math.min(yOpen,yClose);
+        const bodyH=Math.max(2,Math.abs(yClose-yOpen));
+        const bx=x-bodyW/2;
+        const r=Math.min(2.5,bodyW/3);
+
+        ctx.shadowColor=glow;ctx.shadowBlur=5;
+        ctx.fillStyle=color;
+        ctx.beginPath();
+        ctx.roundRect(bx,bodyTop,bodyW,bodyH,r);
+        ctx.fill();
+        ctx.shadowBlur=0;
+
+        ctx.fillStyle='rgba(255,255,255,0.2)';
+        ctx.beginPath();
+        ctx.roundRect(bx+1,bodyTop+1,Math.max(bodyW-2,1),Math.max(bodyH*0.28,1),1.5);
+        ctx.fill();
+    });
+
+    // SMA21 dotted
+    ctx.strokeStyle='rgba(202,138,4,0.8)';ctx.lineWidth=1.2;ctx.setLineDash([3,3]);
+    ctx.beginPath();
+    let started=false;
+    vis.forEach((c,i)=>{
+        if(!c.sma21)return;
+        const x=toX(i),y=toY(c.sma21);
+        if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+    });
+    ctx.stroke();ctx.setLineDash([]);
+
+    // SMA50 solid thin
+    ctx.strokeStyle='rgba(34,211,238,0.65)';ctx.lineWidth=1;
+    ctx.beginPath();
+    started=false;
+    vis.forEach((c,i)=>{
+        if(!c.sma50)return;
+        const x=toX(i),y=toY(c.sma50);
+        if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
 }
 function drawMomentumBar(stVals,closes){
     if(!stVals||!closes||!stVals.length||!closes.length)return;
@@ -605,7 +666,7 @@ function drawMomentumBar(stVals,closes){
     ctx.beginPath();ctx.roundRect(bx1+2,midY-bodyH/2+2,Math.max(bW-4,2),Math.max(bodyH*0.3,2),2);ctx.fill();
 }
 new ResizeObserver(()=>{
-    if(chart)chart.resize();
+    if(lastCandles)drawChart(lastCandles);
     if(lastMoSt&&lastMoCloses)drawMomentumBar(lastMoSt,lastMoCloses);
 }).observe($('chartBox'));
 
