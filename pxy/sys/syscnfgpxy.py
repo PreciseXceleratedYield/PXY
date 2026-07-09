@@ -32,7 +32,7 @@ MODE 4: Blended Average Ensemble (ACTIVE DEFAULT)
 
 # ---------------- LOCAL SYSTEM CONFIGURATION ----------------
 PARAMS = {
-    "ticker": "BTC-USD",          # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
+    "ticker": "^NSEI",          # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
     "ohlc_mode": 4               # Switch Modes here (0 through 4)
 }
 
