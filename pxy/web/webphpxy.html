@@ -580,20 +580,27 @@ function drawChart(candles){
 
         const yOpen=toY(c.o),yClose=toY(c.c);
         const bodyTop=Math.min(yOpen,yClose);
-        const bodyH=Math.max(2,Math.abs(yClose-yOpen));
+        const bodyH=Math.max(3,Math.abs(yClose-yOpen));
         const bx=x-bodyW/2;
-        const r=Math.min(2.5,bodyW/3);
+        const r=bodyW/2;
 
-        ctx.shadowColor=glow;ctx.shadowBlur=5;
-        ctx.fillStyle=color;
+        const cylGrad=ctx.createLinearGradient(bx,0,bx+bodyW,0);
+        cylGrad.addColorStop(0,   isBull?'#0d3d1f':'#4a0e0e');
+        cylGrad.addColorStop(0.35,color);
+        cylGrad.addColorStop(0.5, isBull?'#6ee7a0':'#ff8a8a');
+        cylGrad.addColorStop(0.65,color);
+        cylGrad.addColorStop(1,   isBull?'#0d3d1f':'#4a0e0e');
+
+        ctx.shadowColor=glow;ctx.shadowBlur=6;
+        ctx.fillStyle=cylGrad;
         ctx.beginPath();
         ctx.roundRect(bx,bodyTop,bodyW,bodyH,r);
         ctx.fill();
         ctx.shadowBlur=0;
 
-        ctx.fillStyle='rgba(255,255,255,0.2)';
+        ctx.fillStyle='rgba(255,255,255,0.35)';
         ctx.beginPath();
-        ctx.roundRect(bx+1,bodyTop+1,Math.max(bodyW-2,1),Math.max(bodyH*0.28,1),1.5);
+        ctx.ellipse(x,bodyTop+r*0.5,r*0.85,Math.max(r*0.35,1.2),0,0,Math.PI*2);
         ctx.fill();
     });
 
