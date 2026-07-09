@@ -24,9 +24,10 @@ def _print_console_bar(c1, o1, c0, o0, execution_state):
     c0_color = GRN if c0 >= o0 else RED
 
     rows = [
-        (c1, f"CLOSED C1-{c1:.2f}", "█", c1_color),
-        (c0, f"ACTIVE C0-{c0:.2f}", "█", c0_color)
+        (int(c1), f"CLOSED C1-{int(c1)}", "█", c1_color),
+        (int(c0), f"ACTIVE C0-{int(c0)}", "█", c0_color)
     ]
+
     rows.sort(key=lambda item: item, reverse=True)
 
     print(f"\n{YLW}=GEOMETRIC ENGINE CONSOLE MONITOR (LIVE)={RST}")
