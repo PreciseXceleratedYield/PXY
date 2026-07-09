@@ -51,7 +51,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
 def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
     """
-    Dumps clean structural data matrix to JSON containing ONLY requested keys.
+    Dumps clean structural data matrix to JSON containing OHLC and SMAs.
     """
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
@@ -60,10 +60,13 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
 
     output = []
     for idx, row in df.iterrows():
-        # Extracted strictly requested 4-key schema payload
+        # Replaced single price entry with explicit OHLC candle payload
         output.append({
             "time": str(idx),
-            "price": float(row["Close"]),
+            "open": float(row["Open"]),
+            "high": float(row["High"]),
+            "low": float(row["Low"]),
+            "close": float(row["Close"]),
             "sma21": float(row["sma21"]) if not pd.isna(row["sma21"]) else 0.0,
             "sma50": float(row["sma50"]) if not pd.isna(row["sma50"]) else 0.0
         })
@@ -82,10 +85,11 @@ if __name__ == "__main__":
     if processed_df is not None and not processed_df.empty:
         target_index = processed_df.index[-1]
         print(f"Timestamp   : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-        print(f"Close Price : {float(processed_df.at[target_index, 'Close']):.2f}")
+        print(f"O:{float(processed_df.at[target_index, 'Open']):.2f} H:{float(processed_df.at[target_index, 'High']):.2f} L:{float(processed_df.at[target_index, 'Low']):.2f} C:{float(processed_df.at[target_index, 'Close']):.2f}")
         print(f"21 SMA Value: {float(processed_df.at[target_index, 'sma21']):.2f}")
         print(f"50 SMA Value: {float(processed_df.at[target_index, 'sma50']):.2f}")
         print(f"Trend State : {str(processed_df.at[target_index, 'sma_trend_full'])}")
         export_supertrend_json(processed_df)
     else:
         print("CRITICAL: Upstream data empty.")
+
