@@ -34,7 +34,7 @@ def _print_console_bar(c1, o1, c0, o0, execution_state):
     for val, label, marker, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
-    print(f"       ACTIVE RUNNING CANDLE STATE: {YLW}{execution_state}{RST}")
+    print(f"       ACTIVE RUNNING CANDLE : {YLW}{execution_state}{RST}")
 
 def get_signal(df=None):
     """
