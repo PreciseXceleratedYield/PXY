@@ -3,18 +3,22 @@
 # Target execution directory
 cd /home/pxy/pxy || exit 1
 
-# Check if the tmux session 'pxy' already exists
-if ! tmux has-session -t pxy 2>/dev/null; then
-    echo "Starting pxy.js inside a new isolated tmux session..."
-    
-    # 1. Create a new detached session named 'pxy'
-    tmux new-session -d -s pxy
-    
-    # 2. Send the node command to the session and execute it (C-m simulates Enter)
-    tmux send-keys -t pxy "node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1" C-m
-    
-    echo "pxy.js started successfully in background."
+# Check if we are already inside a tmux environment
+if [ -n "$TMUX" ]; then
+    # Already inside tmux: check if pxy.js is already running
+    if ! pgrep -f "node /home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
+        echo "Inside TMUX session. Launching pxy.js in the background..."
+        node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1 &
+    else
+        echo "pxy.js is already running."
+    fi
+else
+    # Standard terminal: Use the dedicated 'pxy' tmux session
+    if ! tmux has-session -t pxy 2>/dev/null; then
+        echo "Starting pxy.js inside a new isolated tmux session..."
+        tmux new-session -d -s pxy
+        tmux send-keys -t pxy "node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1" C-m
+        echo "pxy.js started successfully."
+    fi
+    tmux attach -t pxy
 fi
-
-# Attach to the tmux session to view the interface
-tmux attach -t pxy
