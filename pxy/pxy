@@ -9,7 +9,7 @@ fi
 # 2. Start the trading terminal inside tmux ONLY if it does not exist
 if ! tmux has-session -t pxy 2>/dev/null; then
     # Launches pxyexe safely inside an isolated background session layout
-    tmux new-session -d -s pxy "bash -c 'cd /home/pxy/pxy && ./pxyexe; exec bash'"
+    tmux new-session -d -s pxy "bash -c 'cd /home/pxy/pxy && pxyexe; exec bash'"
     echo "Trading terminal started in background."
 else
     echo "Trading terminal is already running."
