@@ -39,7 +39,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'pxy.html')); 
 }); 
 
-/* ========================= RUN SCRIPT AS USER pxy IN pxy/pxy ========================= */ 
+/* ========================= RUN SCRIPT WITH PYTHON ENV ACTIVATED ========================= */ 
 const ALLOWED_SCRIPTS = [ 
     'pxyupdate', 'pxysqrall', 'pxybuyce', 'pxybuype', 'pxysqrce', 'pxysqrpe' 
 ]; 
@@ -59,16 +59,20 @@ app.post('/run/:script', (req, res) => {
     } 
     
     const runAsUser = process.env.USER === 'root' ? 'sudo -u pxy ' : '';
-    const cmd = `${runAsUser}bash --login -c "cd /home/pxy/pxy && ${script}"`; 
+    
+    // FIXED: Navigates to working dir, activates your python environment, then launches the short command name directly
+    const cmd = `${runAsUser}bash --login -c "cd /home/pxy/pxy && [ -f ~/env/bin/activate ] && source ~/env/bin/activate; export PATH=/home/pxy/pxy:\\$PATH; ${script}"`; 
     
     exec(cmd, { 
         timeout: 30000, 
         cwd: SCRIPT_DIR, 
         env: { 
-            PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/pxy/.local/bin',
+            // FIXED: Prepended your Python virtual environment binary block to execution PATH variable mapping
+            PATH: '/home/pxy/env/bin:/home/pxy/pxy:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/pxy/.local/bin',
             HOME: '/home/pxy', 
             USER: 'pxy', 
-            LOGNAME: 'pxy' 
+            LOGNAME: 'pxy',
+            VIRTUAL_ENV: '/home/pxy/env'
         } 
     }, (err, stdout, stderr) => { 
         console.log(`[RUN] ok=${!err} out="${stdout}" err="${stderr}"`); 
@@ -81,7 +85,7 @@ app.post('/run/:script', (req, res) => {
 }); 
 
 
-/* ========================= WEBSOCKET (FIXED) ========================= */ 
+/* ========================= WEBSOCKET ========================= */ 
 wss.on('connection', (ws) => { 
     console.log('[WS] client connected. total clients:', wss.clients.size); 
     
@@ -96,7 +100,6 @@ wss.on('connection', (ws) => {
         if (isProcessing) return; 
         isProcessing = true;
 
-        // FIXED: Force captures the exact base terminal pane (pxy:0.0) without empty fallbacks
         const captureCmd = 'tmux has-session -t pxy 2>/dev/null && tmux capture-pane -t pxy:0.0 -pS -200 -J -e';
         
         exec(captureCmd, (err, stdout, stderr) => { 
@@ -133,7 +136,7 @@ wss.on('connection', (ws) => {
 /* ========================= START ========================= */ 
 const listenServer = (port) => {
     server.listen(port, '0.0.0.0', () => { 
-        console.log(`Server running on http://0.0.0:${port}`); 
+        console.log(`Server running on http://0.0.0.0:${port}`); 
     });
 };
 
