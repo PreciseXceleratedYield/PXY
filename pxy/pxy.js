@@ -39,7 +39,7 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'pxy.html')); 
 }); 
 
-/* ========================= RUN SCRIPT AS USER pxy ========================= */ 
+/* ========================= RUN SCRIPT AS USER pxy IN pxy/pxy ========================= */ 
 const ALLOWED_SCRIPTS = [ 
     'pxyupdate', 'pxysqrall', 'pxybuyce', 'pxybuype', 'pxysqrce', 'pxysqrpe' 
 ]; 
@@ -58,13 +58,20 @@ app.post('/run/:script', (req, res) => {
         return res.status(400).json({ ok: false, error: 'Password required' }); 
     } 
     
-    // Security Fix: Prevent command injection by explicitly running only the hardcoded filename
-    const cmd = `bash ./${script}`; 
+    // FIX: Explicitly cd into /home/pxy/pxy inside the subshell execution context
+    // and run as pxy using a login shell wrapper to match the user environment.
+    const runAsUser = process.env.USER === 'root' ? 'sudo -u pxy ' : '';
+    const cmd = `${runAsUser}bash --login -c "cd /home/pxy/pxy && ./${script}"`; 
     
     exec(cmd, { 
         timeout: 30000, 
         cwd: SCRIPT_DIR, 
-        env: { ...process.env, HOME: '/home/pxy', USER: 'pxy', LOGNAME: 'pxy' } 
+        env: { 
+            PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/pxy/.local/bin',
+            HOME: '/home/pxy', 
+            USER: 'pxy', 
+            LOGNAME: 'pxy' 
+        } 
     }, (err, stdout, stderr) => { 
         console.log(`[RUN] ok=${!err} out="${stdout}" err="${stderr}"`); 
         res.json({ 
@@ -74,6 +81,7 @@ app.post('/run/:script', (req, res) => {
         }); 
     }); 
 }); 
+
 
 /* ========================= WEBSOCKET ========================= */ 
 wss.on('connection', (ws) => { 
