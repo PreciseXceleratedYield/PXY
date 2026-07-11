@@ -1,24 +1,17 @@
 #!/bin/bash
 
-# Target execution directory
+# Target directory
 cd /home/pxy/pxy || exit 1
 
-# Check if we are already inside a tmux environment
-if [ -n "$TMUX" ]; then
-    # Already inside tmux: check if pxy.js is already running
-    if ! pgrep -f "node /home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
-        echo "Inside TMUX session. Launching pxy.js in the background..."
-        node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1 &
-    else
-        echo "pxy.js is already running."
-    fi
-else
-    # Standard terminal: Use the dedicated 'pxy' tmux session
-    if ! tmux has-session -t pxy 2>/dev/null; then
-        echo "Starting pxy.js inside a new isolated tmux session..."
-        tmux new-session -d -s pxy
-        tmux send-keys -t pxy "node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1" C-m
-        echo "pxy.js started successfully."
-    fi
+# Verify if the engine is running before attempting to attach
+if tmux has-session -t pxy 2>/dev/null; then
+    echo "Attaching to live pxy console..."
+    echo "Tip: Press 'Ctrl + B' then tap 'D' to safely disconnect without closing the application."
+    sleep 1
     tmux attach -t pxy
+else
+    echo "Error: pxy background session is not running."
+    echo "Please execute './pxystart' first to initiate the workspace."
+    exit 1
 fi
+
