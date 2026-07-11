@@ -59,7 +59,7 @@ app.post('/run/:script', (req, res) => {
     } 
     
     const runAsUser = process.env.USER === 'root' ? 'sudo -u pxy ' : '';
-    const cmd = `${runAsUser}bash --login -c "cd /home/pxy/pxy && ./${script}"`; 
+    const cmd = `${runAsUser}bash --login -c "cd /home/pxy/pxy && ${script}"`; 
     
     exec(cmd, { 
         timeout: 30000, 
