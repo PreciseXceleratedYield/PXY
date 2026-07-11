@@ -58,8 +58,6 @@ app.post('/run/:script', (req, res) => {
         return res.status(400).json({ ok: false, error: 'Password required' }); 
     } 
     
-    // FIX: Explicitly cd into /home/pxy/pxy inside the subshell execution context
-    // and run as pxy using a login shell wrapper to match the user environment.
     const runAsUser = process.env.USER === 'root' ? 'sudo -u pxy ' : '';
     const cmd = `${runAsUser}bash --login -c "cd /home/pxy/pxy && ./${script}"`; 
     
@@ -83,11 +81,11 @@ app.post('/run/:script', (req, res) => {
 }); 
 
 
-/* ========================= WEBSOCKET ========================= */ 
+/* ========================= WEBSOCKET (FIXED) ========================= */ 
 wss.on('connection', (ws) => { 
     console.log('[WS] client connected. total clients:', wss.clients.size); 
     
-    let isProcessing = false; // Flag to prevent command stacking if exec takes > 500ms
+    let isProcessing = false; 
 
     const interval = setInterval(() => { 
         if (ws.readyState !== WebSocket.OPEN) {
@@ -95,13 +93,14 @@ wss.on('connection', (ws) => {
             return;
         }
 
-        if (isProcessing) return; // Skip iteration if the previous tmux exec is still working
+        if (isProcessing) return; 
         isProcessing = true;
 
-        const captureCmd = 'tmux has-session -t pxy 2>/dev/null && tmux capture-pane -t pxy -pS -200 -J -e || tmux capture-pane -pS -200 -J -e';
+        // FIXED: Force captures the exact base terminal pane (pxy:0.0) without empty fallbacks
+        const captureCmd = 'tmux has-session -t pxy 2>/dev/null && tmux capture-pane -t pxy:0.0 -pS -200 -J -e';
         
         exec(captureCmd, (err, stdout, stderr) => { 
-            isProcessing = false; // Release lock
+            isProcessing = false; 
 
             if (err) { 
                 console.error('[WS] tmux exec error:', err.message); 
@@ -148,3 +147,4 @@ server.on('error', (err) => {
 });
 
 listenServer(PORT);
+
