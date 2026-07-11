@@ -9,7 +9,6 @@ const app = express();
 const server = http.createServer(app); 
 const wss = new WebSocket.Server({ server }); 
 
-// FIXED: Clean fallback strategy for port access
 const PORT = process.env.PORT || 80; 
 
 /* ========================= STATIC ROOT ========================= */ 
@@ -70,10 +69,12 @@ wss.on('connection', (ws) => {
     console.log('[WS] client connected. total clients:', wss.clients.size); 
     
     const interval = setInterval(() => { 
-        // Captures output from the 'pxy' tmux session managed by the pxy bash file
-        exec('tmux capture-pane -t pxy -pS -200 -J -e', (err, stdout, stderr) => { 
+        // FIXED: Dynamically target 'pxy' session if it exists, otherwise fall back to current active pane
+        const captureCmd = 'tmux has-session -t pxy 2>/dev/null && tmux capture-pane -t pxy -pS -200 -J -e || tmux capture-pane -pS -200 -J -e';
+        
+        exec(captureCmd, (err, stdout, stderr) => { 
             if (err) { 
-                console.error('[WS] tmux exec error:', err.message, '| stderr:', stderr); 
+                console.error('[WS] tmux exec error:', err.message); 
                 return; 
             } 
             if (!stdout) { 
@@ -97,12 +98,11 @@ wss.on('connection', (ws) => {
 }); 
 
 /* ========================= START ========================= */ 
-// FIXED: Graceful error fallback if Port 80 is blocked by OS permissions
 server.listen(PORT, '0.0.0.0', () => { 
     console.log(`Server running on http://localhost:${PORT}`); 
 }).on('error', (err) => {
     if (err.code === 'EACCES') {
-        console.error(`[ERROR] Port ${PORT} requires root privileges. Falling back to port 8080...`);
+        console.error(`[ERROR] Port ${PORT} requires root privileges. Trying port 8080...`);
         server.listen(8080, '0.0.0.0');
     } else {
         console.error('[SERVER ERROR]', err);
