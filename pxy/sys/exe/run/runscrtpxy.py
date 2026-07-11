@@ -2,7 +2,7 @@
 # Keep this file private and never share it.
 
 # This is the "Consumer Key" (API Access Token) from your Neo Dashboard
-CONSUMER_KEY = "80c76374-b547-4160-b0a9-ce577f59f658"
+CONSUMER_KEY = "3df1249d-b3c5-417a-8365-49015d92eb54"
 
 # This is optional for some Python v2.0.1 setups, 
 # but included for full compatibility
