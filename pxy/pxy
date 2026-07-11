@@ -6,8 +6,9 @@ echo "       PXY SERVER MANAGEMENT         "
 echo "====================================="
 echo "1) Start/Leave Services (Safe to close window)"
 echo "2) Kill All Services (Full Stop)"
+echo "3) Attach to Trading Terminal (Live View)"
 echo "====================================="
-read -p "Select an option [1-2]: " OPTION
+read -p "Select an option [1-3]: " OPTION
 
 case $OPTION in
     1)
@@ -58,8 +59,21 @@ case $OPTION in
         echo "All services completely stopped."
         ;;
 
+    3)
+        echo ""
+        # Check if the tmux session is actually alive before trying to connect
+        if tmux has-session -t pxy 2>/dev/null; then
+            echo "Attaching to live session... (Press Ctrl+B, then D to safely exit anytime)"
+            sleep 1
+            tmux attach -t pxy
+        else
+            echo "[X] Error: The trading terminal is not running. Run Option 1 first!"
+        fi
+        ;;
+
     *)
         echo "Invalid option. Exiting."
         exit 1
         ;;
 esac
+
