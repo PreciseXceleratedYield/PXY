@@ -4,7 +4,7 @@
   "description": "Terminal + 2-hour HA chart viewer",
   "main": "pxy.js",
   "scripts": {
-    "start": "sudo node pxy.js"
+    "start": "node pxy.js"
   },
   "dependencies": {
     "express": "^4.18.2",
