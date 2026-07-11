@@ -1,17 +1,18 @@
 #!/bin/bash
 
-# Start pxy.js as daemon if not running
+# 1. Start the Node.js web server if it is not running
 if ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
-    # FIXED: Log path moved to the correct pxy user directory
     nohup node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1 &
-    echo "pxy.js started in background..."
+    echo "Web dashboard server started..."
 fi
 
-# tmux session logic
-# FIXED: Changed session name from 'pxy' to 'pxy' to match your Node.js code
-if tmux has-session -t pxy 2>/dev/null; then
-    tmux attach -t pxy
+# 2. Start the trading terminal inside tmux ONLY if it does not exist
+if ! tmux has-session -t pxy 2>/dev/null; then
+    # Launches pxyexe safely inside an isolated background session layout
+    tmux new-session -d -s pxy "bash -c 'cd /home/pxy/pxy && ./pxyexe; exec bash'"
+    echo "Trading terminal started in background."
 else
-    tmux new -s pxy -d 'pxyexe'
-    tmux attach -t pxy
+    echo "Trading terminal is already running."
 fi
+
+echo "Setup verified! You can now safely close this window."
