@@ -127,12 +127,12 @@ body{
 /* CHART TAB */
 #chartPane{display:flex;flex-direction:column;}
 #momentumBar{
-    height:32px;flex-shrink:0;display:flex;align-items:center;
-    padding:0 10px;gap:8px;background:var(--bg2);border-bottom:1px solid var(--border);
-    overflow:hidden;
+    width:28px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:8px 0;gap:8px;background:var(--bg2);border-right:1px solid var(--border);
+    overflow:hidden;height:100%;
 }
 #momentumCanvasWrap{
-    flex:1;height:24px;position:relative;background:var(--bg3);
+    flex:1;width:20px;position:relative;background:var(--bg3);
     border-radius:5px;border:1px solid var(--border);overflow:hidden;
 }
 #momentumCanvasWrap canvas{position:absolute;inset:0;width:100%!important;height:100%!important;}
@@ -204,6 +204,7 @@ body{
     <div style="flex:1;"></div>
     <div class="hdr-r">
         <span id="brandHdr" style="font-family:'Syne',sans-serif;font-weight:700;font-size:10px;letter-spacing:0.06em;color:var(--muted);white-space:nowrap;">PreciseXceleratedYield Pvt Ltd<sup style="color:var(--accent);">™</sup></span>
+        <span id="clk" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:0.03em;white-space:nowrap;">—</span>
         <div id="statusDot"></div>
         <button class="reconnect-btn" id="reconnectBtn" title="Reconnect">↺</button>
     </div>
@@ -260,11 +261,11 @@ body{
     </div>
 
     <!-- CHART -->
-    <div class="tab-pane" id="paneChart">
+    <div class="tab-pane" id="paneChart" style="flex-direction:row;">
         <div id="momentumBar">
             <div id="momentumCanvasWrap"><canvas id="momentumCandle"></canvas></div>
         </div>
-        <div id="chartBox">
+        <div id="chartBox" style="flex:1;">
             <div class="grid-over"></div>
             <canvas id="priceChart"></canvas>
         </div>
@@ -351,9 +352,15 @@ body{
 const $=id=>document.getElementById(id);
 function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
 
-/* ── CLOCK ── */
-function tick(){const el=$('clk');if(el)el.textContent=new Date().toLocaleTimeString('en-IN',{hour12:false});}
-tick();setInterval(tick,1000);
+/* ── HOSTNAME ── */
+async function loadHostname(){
+    try{
+        const d=await fetch('./hostname').then(r=>r.json());
+        const el=$('clk');
+        if(el)el.textContent='@'+String(d.hostname||'—').split('.')[0].toUpperCase();
+    }catch(e){const el=$('clk');if(el)el.textContent='—';}
+}
+loadHostname();
 
 /* ── HELPERS ── */
 function fmt(n){return(n>=0?'+':'')+Math.round(n).toLocaleString('en-IN');}
@@ -573,7 +580,7 @@ function drawChart(candles){
         const color=isBull?cssVar('--bull'):cssVar('--bear');
         const glow=isBull?'rgba(34,197,94,0.5)':'rgba(239,68,68,0.5)';
 
-        ctx.strokeStyle=color;ctx.lineWidth=1;
+        ctx.strokeStyle='rgba(255,255,255,0.85)';ctx.lineWidth=1;
         ctx.beginPath();
         ctx.moveTo(x,toY(c.h));ctx.lineTo(x,toY(c.l));
         ctx.stroke();
@@ -638,13 +645,13 @@ function drawMomentumBar(stVals,closes){
     ctx.scale(dpr,dpr);
     const W=rect.width,H=rect.height;
     ctx.clearRect(0,0,W,H);
-    if(W<10||H<4)return;
-    const PADX=8,midY=H/2,bodyH=Math.max(8,H*0.45);
+    if(W<4||H<10)return;
+    const PADY=8,midX=W/2,bodyW=Math.max(8,W*0.45);
     const recent=60;
     const rc=closes.slice(-recent),rs=stVals.slice(-recent);
     const all=[...rc,...rs];
     const high=Math.max(...all),low=Math.min(...all),range=high-low||1;
-    const toX=v=>((v-low)/range)*(W-PADX*2)+PADX;
+    const toY=v=>H-PADY-((v-low)/range)*(H-PADY*2);
     const open=stVals.at(-1),close=closes.at(-1);
     const wHigh=Math.max(...rc.slice(-8),...rs.slice(-8));
     const wLow=Math.min(...rc.slice(-8),...rs.slice(-8));
@@ -652,25 +659,25 @@ function drawMomentumBar(stVals,closes){
     const bodyColor=isBull?cssVar('--bull'):cssVar('--bear');
     const glowColor=isBull?'rgba(34,197,94,0.5)':'rgba(239,68,68,0.5)';
     // track
-    const tg=ctx.createLinearGradient(0,0,W,0);
+    const tg=ctx.createLinearGradient(0,0,0,H);
     tg.addColorStop(0,'rgba(0,0,0,0)');tg.addColorStop(0.08,cssVar('--track-mid'));
     tg.addColorStop(0.92,cssVar('--track-mid'));tg.addColorStop(1,'rgba(0,0,0,0)');
     ctx.strokeStyle=tg;ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(PADX,midY);ctx.lineTo(W-PADX,midY);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(midX,PADY);ctx.lineTo(midX,H-PADY);ctx.stroke();
     // wick
-    const wx1=toX(wLow),wx2=toX(wHigh);
+    const wy1=toY(wLow),wy2=toY(wHigh);
     ctx.strokeStyle=bodyColor;ctx.lineWidth=1.5;ctx.globalAlpha=0.45;
-    ctx.beginPath();ctx.moveTo(wx1,midY);ctx.lineTo(wx2,midY);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(midX,wy1);ctx.lineTo(midX,wy2);ctx.stroke();
     ctx.globalAlpha=1;
-    const capH=Math.max(5,H*0.28);
-    [wx1,wx2].forEach(x=>{ctx.beginPath();ctx.moveTo(x,midY-capH/2);ctx.lineTo(x,midY+capH/2);ctx.stroke();});
+    const capW=Math.max(5,W*0.28);
+    [wy1,wy2].forEach(y=>{ctx.beginPath();ctx.moveTo(midX-capW/2,y);ctx.lineTo(midX+capW/2,y);ctx.stroke();});
     // body
-    const bx1=toX(Math.min(open,close)),bx2=toX(Math.max(open,close)),bW=Math.max(bx2-bx1,4);
+    const by1=toY(Math.max(open,close)),by2=toY(Math.min(open,close)),bH=Math.max(by2-by1,4);
     ctx.shadowColor=glowColor;ctx.shadowBlur=10;ctx.fillStyle=bodyColor;
-    ctx.beginPath();ctx.roundRect(bx1,midY-bodyH/2,bW,bodyH,3);ctx.fill();
+    ctx.beginPath();ctx.roundRect(midX-bodyW/2,by1,bodyW,bH,3);ctx.fill();
     ctx.shadowBlur=0;
     ctx.fillStyle='rgba(255,255,255,0.12)';
-    ctx.beginPath();ctx.roundRect(bx1+2,midY-bodyH/2+2,Math.max(bW-4,2),Math.max(bodyH*0.3,2),2);ctx.fill();
+    ctx.beginPath();ctx.roundRect(midX-bodyW/2+2,by1+2,Math.max(bodyW-4,2),Math.max(bH*0.3,2),2);ctx.fill();
 }
 new ResizeObserver(()=>{
     if(lastCandles)drawChart(lastCandles);
@@ -878,7 +885,9 @@ async function loadTrades(){
     if(!data.length){$('tradeEmpty').style.display='block';return;}
     $('tradeEmpty').style.display='none';
     data.sort((a,b)=>{
-        const v=trCol==='pnl'?(a.PNL||0)-(b.PNL||0):String(a.Tag||'').localeCompare(String(b.Tag||''));
+        let v;
+        if(trCol==='pnl')v=(a.PNL||0)-(b.PNL||0);
+        else{const ta=parseFloat(a.Tag),tb=parseFloat(b.Tag);v=(!isNaN(ta)&&!isNaN(tb))?ta-tb:String(a.Tag||'').localeCompare(String(b.Tag||''));}
         return trAsc?v:-v;
     });
     data.forEach(t=>{
