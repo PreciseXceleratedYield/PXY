@@ -1,18 +1,65 @@
 #!/bin/bash
 
-# 1. Start the Node.js web server if it is not running
-if ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
-    nohup node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1 &
-    echo "Web dashboard server started..."
-fi
+clear
+echo "====================================="
+echo "       PXY SERVER MANAGEMENT         "
+echo "====================================="
+echo "1) Start/Leave Services (Safe to close window)"
+echo "2) Kill All Services (Full Stop)"
+echo "====================================="
+read -p "Select an option [1-2]: " OPTION
 
-# 2. Start the trading terminal inside tmux ONLY if it does not exist
-if ! tmux has-session -t pxy 2>/dev/null; then
-    # Launches pxyexe safely inside an isolated background session layout
-    tmux new-session -d -s pxy "bash -c 'cd /home/pxy/pxy && pxyexe; exec bash'"
-    echo "Trading terminal started in background."
-else
-    echo "Trading terminal is already running."
-fi
+case $OPTION in
+    1)
+        echo ""
+        echo "Initializing services..."
+        
+        # 1. Start the Node.js web server if it is not running
+        if ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
+            nohup node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1 &
+            echo "[✔] Web dashboard server started..."
+        else
+            echo "[-] Web dashboard server is already running."
+        fi
 
-echo "Setup verified! You can now safely close this window."
+        # 2. Start the trading terminal inside tmux ONLY if it does not exist
+        if ! tmux has-session -t pxy 2>/dev/null; then
+            tmux new-session -d -s pxy "bash -c 'cd /home/pxy/pxy && ./pxyexe; exec bash'"
+            echo "[✔] Trading terminal started in background."
+        else
+            echo "[-] Trading terminal is already running."
+        fi
+
+        echo ""
+        echo "Setup verified! You can now safely close this terminal window."
+        ;;
+        
+    2)
+        echo ""
+        echo "Stopping all PXY services..."
+
+        # 1. Force kill the Node.js web server
+        if pgrep -f "pxy.js" >/dev/null 2>&1; then
+            pkill -9 -f pxy.js
+            echo "[✔] Node.js server stopped."
+        else
+            echo "[-] Node.js server was not running."
+        fi
+
+        # 2. Kill the tmux terminal core session
+        if tmux has-session -t pxy 2>/dev/null; then
+            tmux kill-session -t pxy
+            echo "[✔] Tmux trading session killed."
+        else
+            echo "[-] No active tmux session found."
+        fi
+
+        echo ""
+        echo "All services completely stopped."
+        ;;
+
+    *)
+        echo "Invalid option. Exiting."
+        exit 1
+        ;;
+esac
