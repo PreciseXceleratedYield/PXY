@@ -69,7 +69,11 @@ wss.on('connection', (ws) => {
     console.log('[WS] client connected. total clients:', wss.clients.size); 
     
     const interval = setInterval(() => { 
-        // FIXED: Dynamically target 'pxy' session if it exists, otherwise fall back to current active pane
+        if (ws.readyState !== WebSocket.OPEN) {
+            clearInterval(interval);
+            return;
+        }
+
         const captureCmd = 'tmux has-session -t pxy 2>/dev/null && tmux capture-pane -t pxy -pS -200 -J -e || tmux capture-pane -pS -200 -J -e';
         
         exec(captureCmd, (err, stdout, stderr) => { 
@@ -77,15 +81,15 @@ wss.on('connection', (ws) => {
                 console.error('[WS] tmux exec error:', err.message); 
                 return; 
             } 
-            if (!stdout) { 
-                return; 
-            } 
-            if (ws.readyState !== WebSocket.OPEN) { 
-                return; 
-            } 
-            ws.send(stdout, (sendErr) => { 
-                if (sendErr) console.error('[WS] send error:', sendErr.message); 
-            }); 
+            if (!stdout) return; 
+            
+            if (ws.readyState === WebSocket.OPEN) { 
+                ws.send(stdout, (sendErr) => { 
+                    if (sendErr) console.error('[WS] send error:', sendErr.message); 
+                }); 
+            } else {
+                clearInterval(interval);
+            }
         }); 
     }, 500); 
 
@@ -94,7 +98,10 @@ wss.on('connection', (ws) => {
         clearInterval(interval); 
     }); 
     
-    ws.on('error', (e) => console.error('[WS] socket error:', e.message)); 
+    ws.on('error', (e) => {
+        console.error('[WS] socket error:', e.message);
+        clearInterval(interval);
+    }); 
 }); 
 
 /* ========================= START ========================= */ 
