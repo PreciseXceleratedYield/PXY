@@ -3,6 +3,7 @@ const http       = require('http');
 const WebSocket  = require('ws');
 const { exec }   = require('child_process');
 const path       = require('path');
+const os         = require('os');
 const app    = express();
 const server = http.createServer(app);
 const wss    = new WebSocket.Server({ server });
@@ -12,6 +13,12 @@ const PORT   = 80;
    ========================= */
 app.use(express.static(__dirname));
 app.use(express.json());
+/* =========================
+   HOSTNAME ROUTE
+   ========================= */
+app.get('/hostname', (req, res) => {
+    res.json({ hostname: os.hostname() });
+});
 /* =========================
    EXPLICIT JSON ROUTE
    ========================= */
