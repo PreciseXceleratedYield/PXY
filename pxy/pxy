@@ -1,119 +1,142 @@
 #!/bin/bash
 
-# =====================================================================
-# ENVIRONMENT & DIRECTORY CONFIGURATION
-# =====================================================================
-cd /home/pxy/pxy || { echo "Error: Could not change directory"; exit 1; }
-
+# ========================================
+# ENVIRONMENT CONFIGURATION
+# ========================================
+cd /home/pxy/pxy || exit 1
 if [ -f "$HOME/env/bin/activate" ]; then
     source "$HOME/env/bin/activate"
-else
-    echo "[!] Warning: Virtual environment profile '~/env/bin/activate' not found."
 fi
-
-# Ensure current folder is inside execution path environment for safety
 export PATH=$PWD:$PATH
 
-# =====================================================================
-#       PXY SERVER MANAGEMENT MENU LOOP
-# =====================================================================
+# ========================================
+# RENDER HELPER (FIXED 42 CHAR WIDTH)
+# ========================================
+draw_border() {
+    echo "=========================================="
+}
+
+# ========================================
+# TRADING SUBMENU (UNIFORM WIDTH)
+# ========================================
+show_trading_menu() {
+    while true; do
+        clear
+        draw_border
+        echo "          PXY TRADING OPERATIONS          "
+        draw_border
+        echo "1) pxybuyce  - Execute Order [Buy CE] "
+        echo "2) pxybuype  - Execute Order [Buy PE] "
+        echo "3) pxysqrce  - Close Position [Sqr CE]"
+        echo "4) pxysqrpe  - Close Position [Sqr PE]"
+        echo "5) pxysqrall - Close Position [Sqr All]"
+        echo "6) Back      - Return Main System Menu"
+        draw_border
+        read -p "Select option [1-6]: " SUBOPT
+
+        case $SUBOPT in
+            1) echo ""; pxybuyce; read -p "Done. Press [Enter]...";;
+            2) echo ""; pxybuype; read -p "Done. Press [Enter]...";;
+            3) echo ""; pxysqrce; read -p "Done. Press [Enter]...";;
+            4) echo ""; pxysqrpe; read -p "Done. Press [Enter]...";;
+            5) echo ""; pxysqrall; read -p "Done. Press [Enter]...";;
+            6) break;;
+            *) echo "Invalid choice."; sleep 1;;
+        esac
+    done
+}
+
+# ========================================
+# MAIN MANAGEMENT LOOP (UNIFORM WIDTH)
+# ========================================
 while true; do
     clear
-    echo "====================================="
-    echo "       PXY SERVER MANAGEMENT         "
-    echo "====================================="
-    echo "0) Run PXY Update (Foreground - Live View)"
-    echo "1) Start/Leave Services (Safe to close window)"
-    echo "2) Kill All Services (Full Stop)"
-    echo "3) Attach to Trading Terminal (Live View)"
-    echo "4) Exit Menu"
-    echo "====================================="
-    read -p "Select an option [0-4]: " OPTION
+    draw_border
+    echo "            PXY ENGINE CONSOLE            "
+    draw_border
+    echo "0) pxyupdate - Run Foreground Live View"
+    echo "1) pxyinit   - Start Background Engine"
+    echo "2) pxykill   - Stop All Active Systems"
+    echo "3) pxyview   - Attach Terminal Session"
+    echo "4) pxytrade  - Open Operations Submenu"
+    echo "5) pxyexit   - Close Engine Management"
+    draw_border
+    read -p "Select option [0-5]: " OPTION
 
     case $OPTION in
         0)
             echo ""
-            echo "Starting PXY Update in foreground..."
-            echo "-------------------------------------"
+            draw_border
+            echo "        RUNNING FOREGROUND UPDATE         "
+            draw_border
             pxyupdate
-            echo "-------------------------------------"
-            echo "Update process finished."
-            read -p "Press [Enter] to return to menu..."
+            draw_border
+            read -p "Press [Enter] to return..."
             ;;
 
         1)
             echo ""
-            echo "Initializing services..."
-            
-            # 1. Start the Node.js web server if it is not running
+            echo "Initializing Node Server..."
             if ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
                 nohup node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1 &
-                echo "[✔] Web dashboard server started..."
+                echo "[✔] Web dashboard started."
             else
-                echo "[-] Web dashboard server is already running."
+                echo "[-] Web dashboard already running."
             fi
 
-            # 2. Start the trading terminal inside tmux ONLY if it does not exist
+            echo "Initializing Trading Engine..."
             if ! tmux has-session -t pxy 2>/dev/null; then
                 tmux new-session -d -s pxy "bash -c 'cd /home/pxy/pxy && source ~/env/bin/activate && pxyexe; exec bash'"
-                echo "[✔] Trading terminal started in background."
+                echo "[✔] Terminal engine running background."
             else
-                echo "[-] Trading terminal is already running."
+                echo "[-] Terminal engine already running."
             fi
-
             echo ""
-            echo "Setup verified! You can now safely close this terminal window."
-            read -p "Press [Enter] to return to menu..."
+            echo "Safe to disconnect your console window."
+            read -p "Press [Enter] to return..."
             ;;
             
         2)
             echo ""
-            echo "Stopping all PXY services..."
-
-            # 1. Force kill the Node.js web server
+            echo "Terminating Web Server..."
             if pgrep -f "pxy.js" >/dev/null 2>&1; then
                 pkill -9 -f pxy.js
-                echo "[✔] Node.js server stopped."
-            else
-                echo "[-] Node.js server was not running."
+                echo "[✔] Stopped web core."
             fi
 
-            # 2. Kill the main tmux trading session
+            echo "Terminating Core Engines..."
             if tmux has-session -t pxy 2>/dev/null; then
                 tmux kill-session -t pxy
-                echo "[✔] Tmux trading session killed."
-            else
-                echo "[-] No active trading session found."
+                echo "[✔] Killed active trading session."
             fi
-
-            echo ""
-            echo "All services completely stopped."
-            read -p "Press [Enter] to return to menu..."
+            read -p "Press [Enter] to return..."
             ;;
 
         3)
             echo ""
             if tmux has-session -t pxy 2>/dev/null; then
-                echo "Attaching to live session... (Press Ctrl+B, then D to safely exit anytime)"
+                echo "Attaching... (Press Ctrl+B, D to exit)"
                 sleep 1
                 tmux attach -t pxy
-                # Note: When you safely detach (Ctrl+B, D), it returns you to the menu loop automatically!
             else
-                echo "[X] Error: The trading terminal is not running. Run Option 1 first!"
-                read -p "Press [Enter] to return to menu..."
+                echo "[X] Engine offline. Run Option 1 first!"
+                read -p "Press [Enter] to return..."
             fi
             ;;
 
         4)
+            show_trading_menu
+            ;;
+
+        5)
             echo ""
-            echo "Exiting management menu. Goodbye!"
+            echo "Exiting management shell. Goodbye!"
             break
             ;;
 
         *)
-            echo ""
-            echo "[!] Invalid option selected."
-            read -p "Press [Enter] to try again..."
+            echo "[!] Invalid input configuration."
+            sleep 1
             ;;
     esac
 done
