@@ -308,7 +308,7 @@ function cssVar(n){return getComputedStyle(document.documentElement).getProperty
 /* ── HOSTNAME ── */
 async function loadHostname(){
     try{
-        const d=await fetch('./hostname').then(r=>r.json());
+        const d=await fetch('/hostname').then(r=>r.json());
         $('clk').textContent='@'+String(d.hostname||'—').split('.')[0].toUpperCase();
     }catch(e){$('clk').textContent='—';}
 }
