@@ -1,5 +1,21 @@
 #!/bin/bash
 
+# =====================================================================
+# ENVIRONMENT & DIRECTORY CONFIGURATION (FIXED)
+# =====================================================================
+# Move into the working directory safely without disrupting execution
+cd /home/pxy/pxy || { echo "Error: Could not change directory"; exit 1; }
+
+# Activate your custom environment settings if they exist
+if [ -f "$HOME/env/bin/activate" ]; then
+    source "$HOME/env/bin/activate"
+else
+    echo "[!] Warning: Virtual environment profile '~/env/bin/activate' not found."
+fi
+
+# =====================================================================
+#       PXY SERVER MANAGEMENT MENU
+# =====================================================================
 clear
 echo "====================================="
 echo "       PXY SERVER MANAGEMENT         "
@@ -25,7 +41,8 @@ case $OPTION in
 
         # 2. Start the trading terminal inside tmux ONLY if it does not exist
         if ! tmux has-session -t pxy 2>/dev/null; then
-            tmux new-session -d -s pxy "bash -c 'cd /home/pxy/pxy && pxyexe; exec bash'"
+            # Pass environment settings directly into the persistent subshell context
+            tmux new-session -d -s pxy "bash -c 'cd /home/pxy/pxy && source ~/env/bin/activate && ./pxyexe; exec bash'"
             echo "[✔] Trading terminal started in background."
         else
             echo "[-] Trading terminal is already running."
@@ -61,7 +78,6 @@ case $OPTION in
 
     3)
         echo ""
-        # Check if the tmux session is actually alive before trying to connect
         if tmux has-session -t pxy 2>/dev/null; then
             echo "Attaching to live session... (Press Ctrl+B, then D to safely exit anytime)"
             sleep 1
@@ -76,4 +92,3 @@ case $OPTION in
         exit 1
         ;;
 esac
-
