@@ -42,7 +42,7 @@ case $OPTION in
         # 2. Start the trading terminal inside tmux ONLY if it does not exist
         if ! tmux has-session -t pxy 2>/dev/null; then
             # Pass environment settings directly into the persistent subshell context
-            tmux new-session -d -s pxy "bash -c 'cd /home/pxy/pxy && source ~/env/bin/activate && ./pxyexe; exec bash'"
+            tmux new-session -d -s pxy "bash -c 'cd /home/pxy/pxy && source ~/env/bin/activate && /pxyexe; exec bash'"
             echo "[✔] Trading terminal started in background."
         else
             echo "[-] Trading terminal is already running."
