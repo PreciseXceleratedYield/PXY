@@ -1,17 +1,18 @@
 #!/bin/bash
 
 # =====================================================================
-# ENVIRONMENT & DIRECTORY CONFIGURATION (FIXED)
+# ENVIRONMENT & DIRECTORY CONFIGURATION
 # =====================================================================
-# Move into the working directory safely without disrupting execution
 cd /home/pxy/pxy || { echo "Error: Could not change directory"; exit 1; }
 
-# Activate your custom environment settings if they exist
 if [ -f "$HOME/env/bin/activate" ]; then
     source "$HOME/env/bin/activate"
 else
     echo "[!] Warning: Virtual environment profile '~/env/bin/activate' not found."
 fi
+
+# Ensure current folder is inside execution path environment for safety
+export PATH=$PWD:$PATH
 
 # =====================================================================
 #       PXY SERVER MANAGEMENT MENU
@@ -20,13 +21,30 @@ clear
 echo "====================================="
 echo "       PXY SERVER MANAGEMENT         "
 echo "====================================="
+echo "0) Run PXY Update (Background Process)"
 echo "1) Start/Leave Services (Safe to close window)"
 echo "2) Kill All Services (Full Stop)"
 echo "3) Attach to Trading Terminal (Live View)"
 echo "====================================="
-read -p "Select an option [1-3]: " OPTION
+read -p "Select an option [0-3]: " OPTION
 
 case $OPTION in
+    0)
+        echo ""
+        echo "Initializing PXY Update process..."
+        
+        # Check if an update is already running to avoid conflicts
+        if ! tmux has-session -t pxy_update 2>/dev/null; then
+            # Run pxyupdate without ./
+            tmux new-session -d -s pxy_update "bash -c 'cd /home/pxy/pxy && source ~/env/bin/activate && pxyupdate; exec bash'"
+            echo "[✔] pxyupdate started in the background (Session: pxy_update)."
+            echo "You can safely close this terminal window now."
+        else
+            echo "[-] An update process (pxy_update) is already running!"
+            echo "To see it, type: tmux attach -t pxy_update"
+        fi
+        ;;
+
     1)
         echo ""
         echo "Initializing services..."
@@ -41,7 +59,7 @@ case $OPTION in
 
         # 2. Start the trading terminal inside tmux ONLY if it does not exist
         if ! tmux has-session -t pxy 2>/dev/null; then
-            # Pass environment settings directly into the persistent subshell context
+            # Run pxyexe without ./
             tmux new-session -d -s pxy "bash -c 'cd /home/pxy/pxy && source ~/env/bin/activate && pxyexe; exec bash'"
             echo "[✔] Trading terminal started in background."
         else
@@ -64,12 +82,18 @@ case $OPTION in
             echo "[-] Node.js server was not running."
         fi
 
-        # 2. Kill the tmux terminal core session
+        # 2. Kill the main tmux trading session
         if tmux has-session -t pxy 2>/dev/null; then
             tmux kill-session -t pxy
             echo "[✔] Tmux trading session killed."
         else
-            echo "[-] No active tmux session found."
+            echo "[-] No active trading session found."
+        fi
+
+        # 3. Kill the update session if it exists
+        if tmux has-session -t pxy_update 2>/dev/null; then
+            tmux kill-session -t pxy_update
+            echo "[✔] Tmux update session killed."
         fi
 
         echo ""
