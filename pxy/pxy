@@ -1,17 +1,23 @@
 #!/bin/bash
 
-# Start pxy.js as daemon if not running
-if ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
-    # FIXED: Log path moved to the correct pxy user directory
-    nohup node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1 &
-    echo "pxy.js started in background..."
+# Configuration variables
+NODE_CMD="node /home/pxy/pxy/pxy.js"
+LOG_FILE="/home/pxy/pxy/pxy.log"
+
+# 1. Start pxy.js web server as a daemon if it is not running
+if ! pgrep -f "$NODE_CMD" >/dev/null 2>&1; then
+    nohup $NODE_CMD >> "$LOG_FILE" 2>&1 &
+    echo "pxy.js web server started in background..."
+    sleep 1
 fi
 
-# tmux session logic
-# FIXED: Changed session name from 'pxy' to 'pxy' to match your Node.js code
-if tmux has-session -t pxy 2>/dev/null; then
-    tmux attach -t pxy
+# 2. Manage the persistent 'tmuxpxy' tmux session 
+if tmux has-session -t tmuxpxy 2>/dev/null; then
+    echo "Attaching to existing 'tmuxpxy' session..."
+    tmux attach -t tmuxpxy
 else
-    tmux new -s pxy -d 'pxyexe'
-    tmux attach -t pxy
+    echo "Creating and attaching to new 'tmuxpxy' session..."
+    # Spawns a real bash shell inside 'tmuxpxy' so it stays open in the background
+    tmux new-session -s tmuxpxy -d 'bash'
+    tmux attach -t tmuxpxy
 fi
