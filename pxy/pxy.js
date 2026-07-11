@@ -77,7 +77,7 @@ app.post('/run/:script', (req, res) => {
    ========================= */
 wss.on('connection', (ws) => {
     const interval = setInterval(() => {
-        exec('tmux capture-pane -t npxy -pS -200 -J -e', (err, stdout) => {
+        exec('tmux capture-pane -t pxy -pS -200 -J -e', (err, stdout) => {
             if (!err && stdout) ws.send(stdout);
         });
     }, 500);
