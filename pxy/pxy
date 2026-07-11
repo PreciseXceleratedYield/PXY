@@ -1,25 +1,17 @@
 #!/bin/bash
 
-# Target directory
-cd /home/pxy/pxy || exit 1
+# Start pxy.js as daemon if not running
+if ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
+    # FIXED: Log path moved to the correct pxy user directory
+    nohup node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1 &
+    echo "pxy.js started in background..."
+fi
 
-# Verify if the engine is running before attempting to attach
+# tmux session logic
+# FIXED: Changed session name from 'pxy' to 'pxy' to match your Node.js code
 if tmux has-session -t pxy 2>/dev/null; then
-    
-    # FIX: Check if we are already inside an active tmux environment
-    if [ -n "$TMUX" ]; then
-        echo "Inside an active tmux session. Switching client to 'pxy' workspace..."
-        sleep 0.5
-        tmux switch-client -t pxy
-    else
-        echo "Attaching to live pxy console..."
-        echo "Tip: Press 'Ctrl + B' then tap 'D' to safely disconnect without closing the application."
-        sleep 1
-        tmux attach -t pxy
-    fi
-
+    tmux attach -t pxy
 else
-    echo "Error: pxy background session is not running."
-    echo "Please execute './pxystart' first to initiate the workspace."
-    exit 1
+    tmux new -s pxy -d 'pxyexe'
+    tmux attach -t pxy
 fi
