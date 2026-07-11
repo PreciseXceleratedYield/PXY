@@ -5,13 +5,21 @@ cd /home/pxy/pxy || exit 1
 
 # Verify if the engine is running before attempting to attach
 if tmux has-session -t pxy 2>/dev/null; then
-    echo "Attaching to live pxy console..."
-    echo "Tip: Press 'Ctrl + B' then tap 'D' to safely disconnect without closing the application."
-    sleep 1
-    tmux attach -t pxy
+    
+    # FIX: Check if we are already inside an active tmux environment
+    if [ -n "$TMUX" ]; then
+        echo "Inside an active tmux session. Switching client to 'pxy' workspace..."
+        sleep 0.5
+        tmux switch-client -t pxy
+    else
+        echo "Attaching to live pxy console..."
+        echo "Tip: Press 'Ctrl + B' then tap 'D' to safely disconnect without closing the application."
+        sleep 1
+        tmux attach -t pxy
+    fi
+
 else
     echo "Error: pxy background session is not running."
     echo "Please execute './pxystart' first to initiate the workspace."
     exit 1
 fi
-
