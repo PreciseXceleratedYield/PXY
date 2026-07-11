@@ -165,7 +165,7 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     <span id="brandHdr" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Syne',sans-serif;font-weight:700;font-size:15px;letter-spacing:0.06em;color:var(--muted);white-space:nowrap;pointer-events:none;">PreciseXceleratedYield Pvt Ltd<sup style="color:var(--accent);">™</sup></span>
     <div style="flex:1;"></div>
     <div class="hdr-r">
-        <span id="clk">—</span>
+        <span id="clk" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.04em;">—</span>
         <div id="statusDot" title="Connection status"></div>
         <button class="reconnect-btn" id="reconnectBtn" title="Reconnect">↺</button>
     </div>
@@ -305,9 +305,14 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 const $=id=>document.getElementById(id);
 function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
 
-/* ── CLOCK ── */
-function tick(){$('clk').textContent=new Date().toLocaleTimeString('en-IN',{hour12:false});}
-tick();setInterval(tick,1000);
+/* ── HOSTNAME ── */
+async function loadHostname(){
+    try{
+        const d=await fetch('./hostname').then(r=>r.json());
+        $('clk').textContent='@'+String(d.hostname||'—').split('.')[0].toUpperCase();
+    }catch(e){$('clk').textContent='—';}
+}
+loadHostname();
 
 /* ── HELPERS ── */
 function fmt(n){return(n>=0?'+':'')+Math.round(n).toLocaleString('en-IN');}
