@@ -7,7 +7,7 @@
 cd "$HOME/pxy/sys" || { echo "Directory ~/pxy/sys/exe not found"; exit 1; }
 
 # Optional: activate virtual environment if needed
-# source ~/pxy/env/bin/activate
+source ~/pxy/env/bin/activate
 
 # Run the Python script
 python3 sysexepxy.py
