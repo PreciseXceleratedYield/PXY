@@ -25,12 +25,12 @@ show_trading_menu() {
         draw_border
         echo "          PXY TRADING OPERATIONS          "
         draw_border
-        echo "1) pxybuyce  - Execute Order [Buy CE] "
-        echo "2) pxybuype  - Execute Order [Buy PE] "
-        echo "3) pxysqrce  - Close Position [Sqr CE]"
-        echo "4) pxysqrpe  - Close Position [Sqr PE]"
-        echo "5) pxysqrall - Close Position [Sqr All]"
-        echo "6) Back      - Return Main System Menu"
+        echo "1) Buy-CE    - Execute Order [Buy CE]   "
+        echo "2) Buy-PE    - Execute Order [Buy PE]   "
+        echo "3) Sqr-CE    - Close Position [Sqr CE]  "
+        echo "4) Sqr-PE    - Close Position [Sqr PE]  "
+        echo "5) Sqr-All   - Close Position [Sqr All] "
+        echo "6) Back      - Return Main System Menu  "
         draw_border
         read -p "Select option [1-6]: " SUBOPT
 
@@ -54,17 +54,33 @@ while true; do
     draw_border
     echo "            PXY ENGINE CONSOLE            "
     draw_border
-    echo "0) pxyupdate - Run Foreground Live View"
-    echo "1) pxyinit   - Start Background Engine"
-    echo "2) pxykill   - Stop All Active Systems"
-    echo "3) pxyview   - Attach Terminal Session"
-    echo "4) pxytrade  - Open Operations Submenu"
-    echo "5) pxyexit   - Close Engine Management"
+    echo "0) Stop      - Kill All Active Systems"
+    echo "1) Update    - Run Foreground Live View"
+    echo "2) Start     - Start Background Engine"
+    echo "3) View      - Attach Terminal Session"
+    echo "4) Trade     - Open Operations Submenu"
+    echo "5) Exit      - Close Engine Management"
     draw_border
     read -p "Select option [0-5]: " OPTION
 
     case $OPTION in
         0)
+            echo ""
+            echo "Terminating Web Server..."
+            if pgrep -f "pxy.js" >/dev/null 2>&1; then
+                pkill -9 -f pxy.js
+                echo "[✔] Stopped web core."
+            fi
+
+            echo "Terminating Core Engines..."
+            if tmux has-session -t pxy 2>/dev/null; then
+                tmux kill-session -t pxy
+                echo "[✔] Killed active trading session."
+            fi
+            read -p "Press [Enter] to return..."
+            ;;
+
+        1)
             echo ""
             draw_border
             echo "        RUNNING FOREGROUND UPDATE         "
@@ -74,7 +90,7 @@ while true; do
             read -p "Press [Enter] to return..."
             ;;
 
-        1)
+        2)
             echo ""
             echo "Initializing Node Server..."
             if ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
@@ -95,22 +111,6 @@ while true; do
             echo "Safe to disconnect your console window."
             read -p "Press [Enter] to return..."
             ;;
-            
-        2)
-            echo ""
-            echo "Terminating Web Server..."
-            if pgrep -f "pxy.js" >/dev/null 2>&1; then
-                pkill -9 -f pxy.js
-                echo "[✔] Stopped web core."
-            fi
-
-            echo "Terminating Core Engines..."
-            if tmux has-session -t pxy 2>/dev/null; then
-                tmux kill-session -t pxy
-                echo "[✔] Killed active trading session."
-            fi
-            read -p "Press [Enter] to return..."
-            ;;
 
         3)
             echo ""
@@ -119,7 +119,7 @@ while true; do
                 sleep 1
                 tmux attach -t pxy
             else
-                echo "[X] Engine offline. Run Option 1 first!"
+                echo "[X] Engine offline. Run Option 2 first!"
                 read -p "Press [Enter] to return..."
             fi
             ;;
