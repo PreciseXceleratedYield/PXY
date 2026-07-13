@@ -1,4 +1,3 @@
-
 import warnings
 import numpy as np
 import pandas as pd
@@ -38,7 +37,7 @@ def _get_ha_values(df):
 def apply_ohlc_transformation(df, mode=1):
     """
     Executes exactly 6 structural, isolated OHLC mathematical transformations:
-    Mode 0: Hyper-Sensitive Modified Candles (Pine Script Port)
+    Mode 0: Hyper-Sensitive Modified Close Candles (Green Close=High, Red Close=Low)
     Mode 1: Raw Candles
     Mode 2: Mid-Body (OC/2) Pure Math Candles
     Mode 3: Full Range (OHLC/4) Pure Math Candles
@@ -55,8 +54,8 @@ def apply_ohlc_transformation(df, mode=1):
     raw_c = df['Close'].copy()
     
     if mode == 0:
-        out['High'] = np.where(raw_c >= raw_o, raw_c, raw_h)
-        out['Low'] = np.where(raw_c < raw_o, raw_c, raw_l)
+        # Green (Close >= Open) maps Close to High | Red (Close < Open) maps Close to Low
+        out['Close'] = np.where(raw_c >= raw_o, raw_h, raw_l)
         return out
 
     elif mode == 1:
@@ -73,11 +72,11 @@ def apply_ohlc_transformation(df, mode=1):
         out['Open'], out['High'], out['Low'], out['Close'] = ha_o, ha_h, ha_l, ha_c
         
     elif mode == 5:
-        # Component 0: Mode 0 implementation
+        # Component 0: Updated Mode 0 implementation (Close shifts to High/Low)
         m0_o = raw_o
-        m0_h = np.where(raw_c >= raw_o, raw_c, raw_h)
-        m0_l = np.where(raw_c < raw_o, raw_c, raw_l)
-        m0_c = raw_c
+        m0_h = raw_h
+        m0_l = raw_l
+        m0_c = np.where(raw_c >= raw_o, raw_h, raw_l)
 
         # Component 1: Mode 1 implementation
         m1_o, m1_h, m1_l, m1_c = raw_o, raw_h, raw_l, raw_c
