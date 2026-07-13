@@ -4,7 +4,7 @@ import pytz
 # ---------------- LOCAL SYSTEM CONFIGURATION ----------------
 PARAMS = {
     "ticker": "^NSEI",          # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
-    "ohlc_mode": 1               # Switch Modes here (0 through 4)
+    "ohlc_mode": 5               # Switch Modes here (0 through 4)
 }
 
 # ---------------- CONSTANTS DERIVED FROM CONFIG ----------------
