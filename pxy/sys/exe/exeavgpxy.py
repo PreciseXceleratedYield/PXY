@@ -139,6 +139,17 @@ def handle_side_averaging(client, df):
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
+            # --- STRICT ADDITIONAL DIRECTIONAL CHECK ON THE ROW ---
+            row_exit = str(row.get("exit", "")).strip().upper()
+            
+            if side == "CE" and row_exit != "BULL":
+                all_positions_crossed_threshold = False
+                break
+                
+            if side == "PE" and row_exit != "BEAR":
+                all_positions_crossed_threshold = False
+                break
+            
             # --- EVALUATE MATRIX CALCULATIONS VIA 10% FIXED BASE ---
             if side_is_lesser or abs_factor == 1:
                 # Lesser side or balanced: DIVIDE fixed baseline by absolute difference
@@ -185,3 +196,4 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+
