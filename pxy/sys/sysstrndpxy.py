@@ -8,7 +8,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from sysdtafpxy import fetch_yf_data
 from syscnfgpxy import TIMEZONE
-# Import the custom 30-length linear regression function
+# Securely import our custom rolling logic matrix engine
 from sysrigpxy import calculate_linear_regression_channel
 
 DEBUG_MODE = False
@@ -16,7 +16,7 @@ DEBUG_MODE = False
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
     Implements a unified Linear Regression (length 30) direction engine.
-    Trend is strictly defined by the standalone regression line slope.
+    Trend is strictly defined by the standalone rolling regression line slope trajectory.
     """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m")
@@ -37,15 +37,13 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     tz_string = str(TIMEZONE)
     df = df.tz_localize('UTC').tz_convert(tz_string) if df.index.tz is None else df.tz_convert(tz_string)
 
-    # 1. Process Linear Regression Line (Length 30) from your imported file
-    # This automatically updates df with 'linreg_base' and the trailing focus signals
+    # 1. Process Rolling Linear Regression Line (Length 30) from your imported file
     df = calculate_linear_regression_channel(df, length=30)
 
-    # 2. Retain 50 SMA strictly for operational JSON payload requirements
+    # 2. Retain 50 SMA strictly for operational JSON payload layout requirements
     df['sma50'] = df['Close'].rolling(window=50, min_periods=1).mean()
 
-    # 3. Synchronize trend variables strictly with the regression module state
-    # This inherits the pure BULL/BEAR output calculated inside sysrigpxy
+    # 3. Synchronize trend variables strictly with the rolling module state
     df['sma_trend_full'] = df['sma_trend_full']
 
     # RESTORED ALIASES FOR COMPATIBILITY (sysdashpxy.py & sysoptionrtpxy.py)
@@ -57,6 +55,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
     """
     Dumps clean structural data matrix to JSON containing OHLC, LinReg base, and 50 SMA.
+    Ensures continuous values are passed into the keys instead of empty fallbacks.
     """
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
