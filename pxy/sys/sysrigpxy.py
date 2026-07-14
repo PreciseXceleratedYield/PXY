@@ -14,7 +14,7 @@ DEBUG_MODE = False
 def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> pd.DataFrame:
     """
     Calculates a continuous rolling linear regression line across the entire dataset.
-    Eliminates historical 0.0/NaN artifacts from exported JSON matrices.
+    Automatically prints a color-coded status bar based on the latest trend state.
     """
     try:
         raw_df = fetch_yf_data()
@@ -54,7 +54,6 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> p
     rolling_bases = np.full(len(df), np.nan)
     rolling_slopes = np.full(len(df), 0.0)
 
-    # Slide window chronologically across the entire dataset timeline
     for i in range(length - 1, len(df)):
         y = close_series[i - length + 1 : i + 1]
         y_sum = y.sum()
@@ -63,7 +62,6 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> p
         slope = (length * xy_sum - x_sum * y_sum) / divisor
         intercept = (y_sum - slope * x_sum) / length
         
-        # end_price is the current value of the rolling regression tracking line
         end_price = intercept + slope * (length - 1)
         
         rolling_bases[i] = end_price
@@ -82,12 +80,21 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> p
     if not pd.isna(rolling_slopes[-1]):
         df.attrs['slope'] = float(rolling_slopes[-1])
 
+    # --- AUTOMATIC TERMINAL PRINT ENGAGEMENT LAYER ---
+    latest_val = float(df['linreg_base'].iloc[-1])
+    latest_state = str(df['sma_trend_full'].iloc[-1])
+    
+    # ANSI Color mapping definition 
+    color_code = "\033[92m" if latest_state == "BULL" else "\033[91m" if latest_state == "BEAR" else "\033[93m"
+    reset_code = "\033[0m"
+    
+    # This executes and prints out on every single call pipeline trigger
+    print(f"{color_code}~~~~~~~~~~~~~~<{latest_val:.2f}>~~~~~~~~~~~~~~{reset_code}")
+
     return df
 
 if __name__ == "__main__":
-    print("--- TESTING ROLLING RIG ENGINE ALONE ---")
-    test_df = calculate_linear_regression_channel(pd.DataFrame())
-    if not test_df.empty:
-        print(f"Latest Calculated Base: {test_df['linreg_base'].iloc[-1]:.2f}")
-        print(f"Latest Trend Output   : {test_df['sma_trend_full'].iloc[-1]}")
+    # Internal module quick verification diagnostic check
+    calculate_linear_regression_channel(pd.DataFrame())
+
 
