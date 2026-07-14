@@ -1,12 +1,13 @@
 #!/bin/bash
-
 # ========================================
 # ENVIRONMENT CONFIGURATION
 # ========================================
 cd /home/pxy/pxy || exit 1
+
 if [ -f "$HOME/env/bin/activate" ]; then
     source "$HOME/env/bin/activate"
 fi
+
 export PATH=$PWD:$PATH
 
 # ========================================
@@ -25,15 +26,14 @@ show_trading_menu() {
         draw_border
         echo "          PXY TRADING OPERATIONS          "
         draw_border
-        echo "1) Buy-CE    - Execute Order [Buy CE]   "
-        echo "2) Buy-PE    - Execute Order [Buy PE]   "
-        echo "3) Sqr-CE    - Close Position [Sqr CE]  "
-        echo "4) Sqr-PE    - Close Position [Sqr PE]  "
-        echo "5) Sqr-All   - Close Position [Sqr All] "
-        echo "6) Back      - Return Main System Menu  "
+        echo "1) Buy-CE  - Execute Order [Buy CE]       "
+        echo "2) Buy-PE  - Execute Order [Buy PE]       "
+        echo "3) Sqr-CE  - Close Position [Sqr CE]      "
+        echo "4) Sqr-PE  - Close Position [Sqr PE]      "
+        echo "5) Sqr-All - Close Position [Sqr All]     "
+        echo "6) Back    - Return Main System Menu      "
         draw_border
         read -p "Select option [1-6]: " SUBOPT
-
         case $SUBOPT in
             1) echo ""; pxybuyce; read -p "Done. Press [Enter]...";;
             2) echo ""; pxybuype; read -p "Done. Press [Enter]...";;
@@ -47,6 +47,64 @@ show_trading_menu() {
 }
 
 # ========================================
+# TEST SUBMENU (EXECUTE RECENT PYTHON)
+# ========================================
+show_test_menu() {
+    while true; do
+        clear
+        draw_border
+        echo "          PXY SCRIPT TEST MENU            "
+        draw_border
+        
+        # Find 5 most recent .py files in home dir and store in array
+        # Suppressing permission errors from system directories
+        mapfile -t PY_FILES < <(find "$HOME" -type f -name "*.py" -not -path '*/.*' 2>/dev/null -printf '%T@ %p\n' | sort -rn | head -n 5 | cut -d' ' -f2-)
+        
+        # Check if any python files were found
+        if [ ${#PY_FILES[@]} -eq 0 ]; then
+            echo "No python files found in $HOME."
+            echo "6) Back    - Return Main System Menu"
+            draw_border
+            read -p "Press [Enter] to return..."
+            break
+        fi
+
+        # Dynamically print the 5 files
+        for i in "${!PY_FILES[@]}"; do
+            # Format file path for display (relative to home to save space)
+            DISPLAY_NAME=$(echo "${PY_FILES[$i]}" | sed "s|^$HOME|~|")
+            printf "%d) Execute - %-28s\n" $((i+1)) "$DISPLAY_NAME"
+        done
+        echo "6) Back    - Return Main System Menu"
+        draw_border
+        
+        read -p "Select option [1-6]: " TESTOPT
+        
+        if [ "$TESTOPT" -eq 6 ] 2>/dev/null; then
+            break
+        elif [ "$TESTOPT" -ge 1 ] && [ "$TESTOPT" -le ${#PY_FILES[@]} ] 2>/dev/null; then
+            SELECTED_FILE="${PY_FILES[$((TESTOPT-1))]}"
+            echo ""
+            draw_border
+            echo "Executing: $SELECTED_FILE"
+            draw_border
+            
+            # Execute with active virtual environment
+            if [ -f "$HOME/env/bin/activate" ]; then
+                source "$HOME/env/bin/activate"
+            fi
+            python3 "$SELECTED_FILE"
+            
+            draw_border
+            read -p "Execution finished. Press [Enter]..."
+        else
+            echo "[!] Invalid selection."
+            sleep 1
+        fi
+    done
+}
+
+# ========================================
 # MAIN MANAGEMENT LOOP (UNIFORM WIDTH)
 # ========================================
 while true; do
@@ -54,15 +112,15 @@ while true; do
     draw_border
     echo "            PXY ENGINE CONSOLE            "
     draw_border
-    echo "0) Stop      - Kill All Active Systems"
-    echo "1) Update    - Run Foreground Live View"
-    echo "2) Start     - Start Background Engine"
-    echo "3) View      - Attach Terminal Session"
-    echo "4) Trade     - Open Operations Submenu"
-    echo "5) Exit      - Close Engine Management"
+    echo "0) Stop   - Kill All Active Systems"
+    echo "1) Update - Run Foreground Live View"
+    echo "2) Start  - Start Background Engine"
+    echo "3) View   - Attach Terminal Session"
+    echo "4) Trade  - Open Operations Submenu"
+    echo "5) Test   - Execute Recent Python Scripts"
+    echo "6) Exit   - Close Engine Management"
     draw_border
-    read -p "Select option [0-5]: " OPTION
-
+    read -p "Select option [0-6]: " OPTION
     case $OPTION in
         0)
             echo ""
@@ -71,7 +129,6 @@ while true; do
                 pkill -9 -f pxy.js
                 echo "[✔] Stopped web core."
             fi
-
             echo "Terminating Core Engines..."
             if tmux has-session -t pxy 2>/dev/null; then
                 tmux kill-session -t pxy
@@ -79,17 +136,15 @@ while true; do
             fi
             read -p "Press [Enter] to return..."
             ;;
-
         1)
             echo ""
             draw_border
-            echo "        RUNNING FOREGROUND UPDATE         "
+            echo "       RUNNING FOREGROUND UPDATE        "
             draw_border
             pxyupdate
             draw_border
             read -p "Press [Enter] to return..."
             ;;
-
         2)
             echo ""
             echo "Initializing Node Server..."
@@ -111,7 +166,6 @@ while true; do
             echo "Safe to disconnect your console window."
             read -p "Press [Enter] to return..."
             ;;
-
         3)
             echo ""
             if tmux has-session -t pxy 2>/dev/null; then
@@ -123,21 +177,22 @@ while true; do
                 read -p "Press [Enter] to return..."
             fi
             ;;
-
         4)
             show_trading_menu
             ;;
-
         5)
+            show_test_menu
+            ;;
+        6)
             echo ""
             echo "Exiting management shell. Goodbye!"
             break
             ;;
-
         *)
             echo "[!] Invalid input configuration."
             sleep 1
             ;;
     esac
 done
+
 
