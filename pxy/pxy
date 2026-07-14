@@ -34,6 +34,12 @@ show_trading_menu() {
         echo "6) Back    - Return Main System Menu      "
         draw_border
         read -p "Select option [1-6]: " SUBOPT
+        
+        # If user presses Enter without input, exit the menu
+        if [ -z "$SUBOPT" ]; then
+            break
+        fi
+
         case $SUBOPT in
             1) echo ""; pxybuyce; read -p "Done. Press [Enter]...";;
             2) echo ""; pxybuype; read -p "Done. Press [Enter]...";;
@@ -57,7 +63,6 @@ show_test_menu() {
         draw_border
         
         # Find 5 most recent .py files in home dir and store in array
-        # Suppressing permission errors from system directories
         mapfile -t PY_FILES < <(find "$HOME" -type f -name "*.py" -not -path '*/.*' 2>/dev/null -printf '%T@ %p\n' | sort -rn | head -n 5 | cut -d' ' -f2-)
         
         # Check if any python files were found
@@ -69,9 +74,8 @@ show_test_menu() {
             break
         fi
 
-        # Dynamically print the 5 files
+        # Dynamically print found files
         for i in "${!PY_FILES[@]}"; do
-            # Format file path for display (relative to home to save space)
             DISPLAY_NAME=$(echo "${PY_FILES[$i]}" | sed "s|^$HOME|~|")
             printf "%d) Execute - %-28s\n" $((i+1)) "$DISPLAY_NAME"
         done
@@ -80,9 +84,15 @@ show_test_menu() {
         
         read -p "Select option [1-6]: " TESTOPT
         
-        if [ "$TESTOPT" -eq 6 ] 2>/dev/null; then
+        # If user presses Enter without input, exit the menu
+        if [ -z "$TESTOPT" ]; then
             break
-        elif [ "$TESTOPT" -ge 1 ] && [ "$TESTOPT" -le ${#PY_FILES[@]} ] 2>/dev/null; then
+        fi
+        
+        if [ "$TESTOPT" = "6" ]; then
+            break
+        # Use regex comparison to validate selection cleanly without integer errors
+        elif [[ "$TESTOPT" =~ ^[1-5]$ ]] && [ "$TESTOPT" -le ${#PY_FILES[@]} ]; then
             SELECTED_FILE="${PY_FILES[$((TESTOPT-1))]}"
             echo ""
             draw_border
@@ -121,6 +131,14 @@ while true; do
     echo "6) Exit   - Close Engine Management"
     draw_border
     read -p "Select option [0-6]: " OPTION
+    
+    # If user presses Enter without input, exit the main console completely
+    if [ -z "$OPTION" ]; then
+        echo ""
+        echo "Exiting management shell. Goodbye!"
+        break
+    fi
+
     case $OPTION in
         0)
             echo ""
@@ -194,5 +212,4 @@ while true; do
             ;;
     esac
 done
-
 
