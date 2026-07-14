@@ -1,17 +1,17 @@
 # sysrigpxy.py
-import os 
-import json 
-import numpy as np 
-import pandas as pd 
-import warnings 
-warnings.simplefilter(action='ignore', category=FutureWarning) 
+import os
+import json
+import numpy as np
+import pandas as pd
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
-from sysdtafpxy import fetch_yf_data 
-from syscnfgpxy import TIMEZONE 
+from sysdtafpxy import fetch_yf_data
+from syscnfgpxy import TIMEZONE
 
-DEBUG_MODE = False 
+DEBUG_MODE = False
 
-def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> pd.DataFrame:
+def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 13) -> pd.DataFrame:
     """
     Calculates a continuous rolling linear regression line across the entire dataset.
     Safely prints exactly one color-coded status bar based on the trend state.
@@ -23,9 +23,10 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> p
             if raw_df is not None and not raw_df.empty:
                 df = raw_df.copy()
     except Exception as e:
-        if DEBUG_MODE: 
+        if DEBUG_MODE:
             print(f"Warning: Shared pipeline download fallback active | {e}")
-        df = df.copy()
+            
+    df = df.copy()
 
     # Pre-allocate columns with standard type formats
     df['linreg_base'] = np.nan
@@ -39,7 +40,7 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> p
 
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
-        
+
     tz_string = str(TIMEZONE)
     if df.index.tz is None:
         df = df.tz_localize('UTC').tz_convert(tz_string)
@@ -60,12 +61,11 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> p
         y = close_series[i - length + 1 : i + 1]
         y_sum = y.sum()
         xy_sum = (x * y).sum()
-        
+
         slope = (length * xy_sum - x_sum * y_sum) / divisor
         intercept = (y_sum - slope * x_sum) / length
-        
         end_price = intercept + slope * (length - 1)
-        
+
         rolling_bases[i] = end_price
         rolling_slopes[i] = slope
 
@@ -85,11 +85,16 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> p
     # --- AUTOMATIC TERMINAL PRINT ENGAGEMENT LAYER ---
     latest_val = float(df['linreg_base'].iloc[-1])
     latest_state = str(df['sma_trend_full'].iloc[-1])
-    
+
     color_code = "\033[92m" if latest_state == "BULL" else "\033[91m" if latest_state == "BEAR" else "\033[93m"
     reset_code = "\033[0m"
     
-    print(f"{color_code}~~~~~~~~~~~~~~<{latest_val:.2f}>~~~~~~~~~~~~~~{reset_code}")
+    # Creates a nice status text string like: " BULL <1234.56> "
+    text_content = f" {latest_state} <{latest_val:.2f}> "
+    # Pads the string symmetrically with '~' to lock it at exactly 42 characters wide
+    status_bar = text_content.center(42, "~")
+    
+    print(f"{color_code}{status_bar}{reset_code}")
 
     return df
 
