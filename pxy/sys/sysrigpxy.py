@@ -1,3 +1,4 @@
+# sysrigpxy.py
 import os 
 import json 
 import numpy as np 
@@ -12,8 +13,8 @@ DEBUG_MODE = False
 
 def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> pd.DataFrame:
     """
-    Translates TradingView Pine Script v6 Linear Regression Channel calculations to Python.
-    Maintains 100% mathematical synchronization with ta.linreg slopes.
+    Calculates a continuous rolling linear regression line across the entire dataset.
+    Eliminates historical 0.0/NaN artifacts from exported JSON matrices.
     """
     try:
         raw_df = fetch_yf_data()
@@ -24,12 +25,11 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> p
             print(f"Warning: Shared pipeline download fallback active | {e}")
         df = df.copy()
 
-    # Safely pre-allocate system columns
+    # Pre-allocate columns with standard type formats
     df['linreg_base'] = np.nan
     df['sma_trend_full'] = "NONE"
     df['ST_Trend'] = "NONE"
     df['ST'] = 0.0
-    
     df.attrs['slope'] = 0.0
 
     if df.empty or len(df) < length:
@@ -44,88 +44,50 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> p
     else:
         df = df.tz_convert(tz_string)
 
-    # Replicate TradingView's lookback context array mapping
-    source_vals = df['Close'].iloc[-length:].values
-    
-    # Generate X coordinates matching chronological index steps
+    # --- VECTORIZED ROLLING LINEAR REGRESSION CORE ---
     x = np.arange(length)
-    y = source_vals
-    
-    # Calculate Standard Least Squares Linear Regression
-    slope, intercept = np.polyfit(x, y, 1)
-    
-    # Derive exact boundary points to replicate ta.linreg(source, length, 0)
-    start_price = intercept                  
-    end_price = intercept + slope * (length - 1)  
+    x_sum = x.sum()
+    x_sum_sq = (x ** 2).sum()
+    divisor = (length * x_sum_sq) - (x_sum ** 2)
 
-    # 100% Synchronized Pine Direction Gateway: isBullish = endPrice > startPrice
-    trend_direction = "BULL" if end_price > start_price else "BEAR"
+    close_series = df['Close'].values
+    rolling_bases = np.full(len(df), np.nan)
+    rolling_slopes = np.full(len(df), 0.0)
 
-    # Generate base line arrays for the calculated lookback series window
-    val_track = start_price + slope * np.arange(length)
+    # Slide window chronologically across the entire dataset timeline
+    for i in range(length - 1, len(df)):
+        y = close_series[i - length + 1 : i + 1]
+        y_sum = y.sum()
+        xy_sum = (x * y).sum()
+        
+        slope = (length * xy_sum - x_sum * y_sum) / divisor
+        intercept = (y_sum - slope * x_sum) / length
+        
+        # end_price is the current value of the rolling regression tracking line
+        end_price = intercept + slope * (length - 1)
+        
+        rolling_bases[i] = end_price
+        rolling_slopes[i] = slope
 
-    base_line_series = np.full(len(df), np.nan)
-    base_line_series[-length:] = val_track
+    df['linreg_base'] = rolling_bases
 
-    df['linreg_base'] = base_line_series
+    # --- VECTORIZED TREND CONFIGURATION LAYER ---
+    df['sma_trend_full'] = np.where(rolling_slopes > 0, "BULL", np.where(rolling_slopes < 0, "BEAR", "NONE"))
+    df.loc[df['linreg_base'].isna(), 'sma_trend_full'] = "NONE"
 
-    # Map state strictly onto the active execution tracking window
-    channel_state = np.full(len(df), "NONE", dtype=object)
-    
-    # Populate the live trading signals over the focus windows
-    channel_state[-length:] = trend_direction
-    
-    # Completely eliminate historical row artifacts outside execution focus window
-    if len(channel_state) >= 2:
-        channel_state[:-2] = "NONE"
-
-    df['sma_trend_full'] = channel_state
+    # Synchronize internal dashboard aliases seamlessly
     df['ST_Trend'] = df['sma_trend_full']
     df['ST'] = df['linreg_base'].ffill().fillna(0.0)
 
-    df.attrs['slope'] = slope
+    if not pd.isna(rolling_slopes[-1]):
+        df.attrs['slope'] = float(rolling_slopes[-1])
 
     return df
 
-def export_regression_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
-    if df is None or df.empty:
-        df = calculate_linear_regression_channel(pd.DataFrame())
-    if df is None or df.empty:
-        return None
-
-    output = []
-    for idx, row in df.iterrows():
-        output.append({
-            "time": str(idx),
-            "price": float(row["Close"]),
-            "linreg_base": float(row["linreg_base"]) if not pd.isna(row["linreg_base"]) else 0.0,
-            "signal": str(row["sma_trend_full"])
-        })
-
-    if os.path.dirname(output_file):
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-        
-    with open(output_file, "w") as f:
-        json.dump(output, f, indent=2)
-        
-    return output
-
 if __name__ == "__main__":
-    print("--- STARTING LIVE PXY LINE BRACKET ENGAGEMENT ENGINE ---")
-    processed_df = calculate_linear_regression_channel(pd.DataFrame())
-    
-    if (processed_df is not None and not processed_df.empty and 
-        'linreg_base' in processed_df.columns and not pd.isna(processed_df.iloc[-1]['linreg_base'])):
-        
-        target_index = processed_df.index[-1]
-        print(f"Timestamp    : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-        print(f"Close Price  : {float(processed_df.at[target_index, 'Close']):.2f}")
-        print(f"LinReg Base  : {float(processed_df.at[target_index, 'linreg_base']):.2f}")
-        print(f"Channel State: {str(processed_df.at[target_index, 'sma_trend_full'])}")
-        
-        export_regression_json(processed_df)
-    else:
-        print("CRITICAL: Upstream data error or insufficient data rows.")
-
-
+    print("--- TESTING ROLLING RIG ENGINE ALONE ---")
+    test_df = calculate_linear_regression_channel(pd.DataFrame())
+    if not test_df.empty:
+        print(f"Latest Calculated Base: {test_df['linreg_base'].iloc[-1]:.2f}")
+        print(f"Latest Trend Output   : {test_df['sma_trend_full'].iloc[-1]}")
 
