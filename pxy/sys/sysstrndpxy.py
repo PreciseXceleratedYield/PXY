@@ -39,7 +39,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     # 1. Process Linear Regression Line (Length 30) from your imported file
     # This automatically updates df with 'linreg_base' and the trailing focus signals
-    df = calculate_linear_regression_channel(df, length=30)
+    df = calculate_linear_regression_channel(df, length=21)
 
     # 2. Retain 50 SMA strictly for operational JSON payload requirements
     df['sma50'] = df['Close'].rolling(window=50, min_periods=1).mean()
