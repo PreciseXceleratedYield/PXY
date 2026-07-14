@@ -15,7 +15,6 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 3
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-FIXED_ATR_PCT = 10.0    # 🎯 Hardcoded baseline ATR percentage set exactly to 10%
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -150,13 +149,18 @@ def handle_side_averaging(client, df):
                 all_positions_crossed_threshold = False
                 break
             
-            # --- EVALUATE MATRIX CALCULATIONS VIA 10% FIXED BASE ---
+            # --- DYNAMIC ATR EXTRACT WITH FALLBACK TO 10 ---
+            extracted_atr = safe_float(row.get("atr", None), fallback=10.0)
+            row_atr = extracted_atr if extracted_atr > 0 else 10.0
+            dynamic_atr_baseline = row_atr * 2.0
+
+            # --- EVALUATE MATRIX CALCULATIONS VIA DYNAMIC ATR BASELINE ---
             if side_is_lesser or abs_factor == 1:
-                # Lesser side or balanced: DIVIDE fixed baseline by absolute difference
-                dynamic_threshold = -(FIXED_ATR_PCT / float(abs_factor))
+                # Lesser side or balanced: DIVIDE dynamic baseline by absolute difference
+                dynamic_threshold = -(dynamic_atr_baseline / float(abs_factor))
             else:
-                # Heavier side: MULTIPLY fixed baseline by absolute difference
-                dynamic_threshold = -(FIXED_ATR_PCT * float(abs_factor))
+                # Heavier side: MULTIPLY dynamic baseline by absolute difference
+                dynamic_threshold = -(dynamic_atr_baseline * float(abs_factor))
 
             last_calculated_threshold = dynamic_threshold
 
@@ -196,4 +200,3 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
-
