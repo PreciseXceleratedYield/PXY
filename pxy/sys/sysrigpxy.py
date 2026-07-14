@@ -11,15 +11,17 @@ from syscnfgpxy import TIMEZONE
 
 DEBUG_MODE = False 
 
-def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> pd.DataFrame:
+def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30, silent: bool = False) -> pd.DataFrame:
     """
     Calculates a continuous rolling linear regression line across the entire dataset.
-    Automatically prints a color-coded status bar based on the latest trend state.
+    Controlled by a silent flag parameter to eliminate duplicate terminal print logging bars.
     """
     try:
-        raw_df = fetch_yf_data()
-        if raw_df is not None and not raw_df.empty:
-            df = raw_df.copy()
+        # Check if the input dataframe already has the data to prevent duplicate downloading
+        if df is None or df.empty or 'Close' not in df.columns:
+            raw_df = fetch_yf_data()
+            if raw_df is not None and not raw_df.empty:
+                df = raw_df.copy()
     except Exception as e:
         if DEBUG_MODE: 
             print(f"Warning: Shared pipeline download fallback active | {e}")
@@ -80,21 +82,19 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 30) -> p
     if not pd.isna(rolling_slopes[-1]):
         df.attrs['slope'] = float(rolling_slopes[-1])
 
-    # --- AUTOMATIC TERMINAL PRINT ENGAGEMENT LAYER ---
-    latest_val = float(df['linreg_base'].iloc[-1])
-    latest_state = str(df['sma_trend_full'].iloc[-1])
-    
-    # ANSI Color mapping definition 
-    color_code = "\033[92m" if latest_state == "BULL" else "\033[91m" if latest_state == "BEAR" else "\033[93m"
-    reset_code = "\033[0m"
-    
-    # This executes and prints out on every single call pipeline trigger
-    print(f"{color_code}~~~~~~~~~~~~~~<{latest_val:.2f}>~~~~~~~~~~~~~~{reset_code}")
+    # --- CONTROLLED TERMINAL PRINT ENGAGEMENT LAYER ---
+    if not silent:
+        latest_val = float(df['linreg_base'].iloc[-1])
+        latest_state = str(df['sma_trend_full'].iloc[-1])
+        
+        color_code = "\033[92m" if latest_state == "BULL" else "\033[91m" if latest_state == "BEAR" else "\033[93m"
+        reset_code = "\033[0m"
+        
+        print(f"{color_code}~~~~~~~~~~~~~~<{latest_val:.2f}>~~~~~~~~~~~~~~{reset_code}")
 
     return df
 
 if __name__ == "__main__":
-    # Internal module quick verification diagnostic check
-    calculate_linear_regression_channel(pd.DataFrame())
+    calculate_linear_regression_channel(pd.DataFrame(), silent=False)
 
 
