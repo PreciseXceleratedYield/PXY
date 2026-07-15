@@ -139,7 +139,7 @@ def handle_side_averaging(client, df):
             extracted_atr = safe_float(row.get("atr", 0.0))
             
             # --- MIN 6 AND MAX 16 STRICT CAP LOGIC ---
-            row_atr_baseline = max(6.0, min(16.0, extracted_atr))
+            row_atr_baseline = (max(6.0, min(16.0, extracted_atr))) * 2
 
             # Evaluates: -ATR * ((own_count + 1) / (opp_count + 1))
             dynamic_threshold = -row_atr_baseline * (float(own_count + 1) / float(opp_count + 1))
