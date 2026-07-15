@@ -152,7 +152,7 @@ def handle_side_averaging(client, df):
             # --- DYNAMIC ATR EXTRACT WITH FALLBACK TO 10 ---
             extracted_atr = safe_float(row.get("atr", None), fallback=10.0)
             row_atr = extracted_atr if extracted_atr > 0 else 10.0
-            dynamic_atr_baseline = 12 #row_atr * 2.0
+            dynamic_atr_baseline = 7 #row_atr * 2.0
 
             # --- EVALUATE MATRIX CALCULATIONS VIA DYNAMIC ATR BASELINE ---
             if side_is_lesser or abs_factor == 1:
