@@ -141,11 +141,11 @@ def handle_side_averaging(client, df):
             # --- STRICT ADDITIONAL DIRECTIONAL CHECK ON THE ROW ---
             row_exit = str(row.get("exit", "")).strip().upper()
             
-            if side == "CE" and row_exit != "BULL":
+            if side == "CE" and row_exit != "XXX": #"BULL":
                 all_positions_crossed_threshold = False
                 break
                 
-            if side == "PE" and row_exit != "BEAR":
+            if side == "PE" and row_exit != "XXX": #"BEAR":
                 all_positions_crossed_threshold = False
                 break
             
