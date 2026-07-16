@@ -166,7 +166,7 @@ def handle_side_averaging(client, df):
             # Kept raw baseline ATR tracking here (No * 2 multiplier)
             extracted_atr = (ce_p + pe_p + hce_d + hpe_d)
             row_atr_baseline = max(6.0, min(16.0, extracted_atr))
-            active_atr_baseline = row_atr_baseline
+            active_atr_baseline = row_atr_baseline * 2
 
             # --- SWITCH SELECTION LOGIC ---
             if USE_BALANCED_RATIO:
@@ -191,7 +191,7 @@ def handle_side_averaging(client, df):
                     active_depth = hce_d     # Opposite Depth (CE)
                 
                 # Formula: min(-ATR_Baseline * Opposite Power, -ATR_Baseline * Opposite Depth)
-                dynamic_threshold = min(float(-row_atr_baseline * active_power), float(-row_atr_baseline * active_depth))
+                dynamic_threshold = min(float(-active_atr_baseline * active_power), float(-active_atr_baseline * active_depth))
 
             last_calculated_threshold = dynamic_threshold
 
