@@ -149,18 +149,10 @@ def handle_side_averaging(client, df):
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
 
-            # --- STRICT DIRECTIONAL SIGNAL VERIFICATION (OPPOSITE) ---
-            row_exit = str(row.get("exit", "")).strip().upper()
-            if side == "CE" and row_exit != "XXX":
-                all_positions_crossed_threshold = False
-                break
-            if side == "PE" and row_exit != "XXX":
-                all_positions_crossed_threshold = False
-                break
-
             # --- DYNAMIC ATR EXTRACTED DIRECTLY FROM THE ROW ---
+            # Raw baseline ATR tracking: the multiplier has been completely removed
             extracted_atr = safe_float(row.get("atr", 0.0))
-            row_atr_baseline = (max(6.0, min(16.0, extracted_atr))) * 2
+            row_atr_baseline = max(6.0, min(16.0, extracted_atr))
             active_atr_baseline = row_atr_baseline
 
             # --- EXTRACT OPTION PARAMETERS AND INJECT HIGH SPEED SAFE-GUARDS ---
@@ -199,7 +191,6 @@ def handle_side_averaging(client, df):
             last_calculated_threshold = dynamic_threshold
 
             # Compare individual position loss against the calculated execution threshold
-            # E.g. If pos_loss is -13.0 and threshold is -9.0, then -13.0 <= -9.0 is True.
             if pos_loss > dynamic_threshold:
                 all_positions_crossed_threshold = False
                 break
