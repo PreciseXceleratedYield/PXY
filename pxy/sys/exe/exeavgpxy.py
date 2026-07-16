@@ -161,6 +161,12 @@ def handle_side_averaging(client, df):
             pe_p = max(1.0, safe_float(row.get("pe_power"), 1.0))
             hce_d = max(1.0, safe_float(row.get("hkin_ce_depth"), 1.0))
             hpe_d = max(1.0, safe_float(row.get("hkin_pe_depth"), 1.0))
+            
+            # --- MIN 6 AND MAX 16 STRICT CAP LOGIC ---
+            # Kept raw baseline ATR tracking here (No * 2 multiplier)
+            extracted_atr = (ce_p + pe_p + hce_d + hpe_d)
+            row_atr_baseline = max(6.0, min(16.0, extracted_atr))
+            active_atr_baseline = row_atr_baseline
 
             # --- SWITCH SELECTION LOGIC ---
             if USE_BALANCED_RATIO:
