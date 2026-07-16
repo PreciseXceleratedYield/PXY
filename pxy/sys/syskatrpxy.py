@@ -7,7 +7,7 @@ from colorama import Fore, Style, init
 
 init(autoreset=True)
 
-ATR_PERIOD = 14
+ATR_PERIOD = 50
 K_MIN = 1
 K_MAX = 3
 TOTAL_WIDTH = 42
