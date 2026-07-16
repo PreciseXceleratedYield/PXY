@@ -142,7 +142,7 @@ def handle_side_averaging(client, df):
 
         # --- MAX LAYER PROTECTION CHECK ---
         if own_count >= MAX_LAYERS:
-            print(f"{Fore.YELLOW}      ⚠️ {side} Layer Limit Reached ({own_count}/{MAX_LAYERS}). Rebuy Blocked.")
+            print(f"{Fore.YELLOW}     ⚠️ {side} Layer Limit Reached ({own_count}/{MAX_LAYERS}).")
             continue
 
         for index, row in side_df.iterrows():
