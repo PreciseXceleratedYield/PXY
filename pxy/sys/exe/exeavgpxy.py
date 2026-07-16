@@ -142,16 +142,16 @@ def handle_side_averaging(client, df):
 
             # --- STRICT DIRECTIONAL SIGNAL VERIFICATION (OPPOSITE) ---
             row_exit = str(row.get("exit", "")).strip().upper()
-            if side == "CE" and row_exit != "XXX":
+            if side == "CE" :
                 all_positions_crossed_threshold = False
                 break
-            if side == "PE" and row_exit != "XXX":
+            if side == "PE" :
                 all_positions_crossed_threshold = False
                 break
 
             # --- DYNAMIC ATR EXTRACTED DIRECTLY FROM THE ROW ---
             extracted_atr = safe_float(row.get("atr", 0.0))
-            row_atr_baseline = (max(6.0, min(16.0, extracted_atr))) * 2
+            row_atr_baseline = (max(6.0, min(16.0, extracted_atr)))
             active_atr_baseline = row_atr_baseline
 
             # --- EXTRACT OPTION PARAMETERS AND INJECT HIGH SPEED SAFE-GUARDS ---
