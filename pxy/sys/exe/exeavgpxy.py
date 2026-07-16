@@ -9,7 +9,7 @@ from colorama import Fore, Style, init
 from run.runpchkpxy import get_position_summary
 
 # 📦 Pure explicit extraction from your customized external execution script module
-from exeaxgpxy import send_market_order
+from exeagxpxy import send_market_order
 
 # Initialize colorama for clean terminal output formatting
 init(autoreset=True)
@@ -66,23 +66,24 @@ def get_loss(row):
     ltp = safe_float(row.get("sell_prc", 0.0))
     return ((ltp - entry) / entry) * 100 if entry > 0 else 0
 
-def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, own_m, opp_m, atr_baseline):
+def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, opp_m, atr_baseline, balance_mult):
     """Renders a strict 44-character width dashboard upon an order trigger event without ANSI padding distortion."""
     width = 44
     border = Fore.YELLOW + "=" * width
     divider = Fore.RED + "-" * width
-    header_text = "🚨 PXY® UNIFIED MATRIX TRIGGERED 🚨"
+    header_text = "🚨 PXY® OPP-MATRIX TRIGGERED 🚨"
     
     print("\n" + border)
     print(Fore.WHITE + header_text.center(width - 2, " "))
     print(divider)
     
+    # Calculate text layout lengths first to ensure clean border boundaries
     lines = [
         f" • SYMBOL       : {symbol}",
         f" • SIDE OPTION  : {side} ({ce_count}CE vs {pe_count}PE)",
         f" • ATR BASELINE : {atr_baseline:.2f}",
-        f" • OWN MAX (P/D): {own_m:.1f}%",
-        f" • OPP MAX (P/D): {opp_m:.1f}%"
+        f" • OPP MAX (P/D): {opp_m:.1f}%",
+        f" • BALANCE MULT : {balance_mult:.2f}x"
     ]
     
     for line in lines:
@@ -102,7 +103,7 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     print(border + "\n")
 
 def handle_side_averaging(client, df):
-    """Averages positions via a fully integrated volatility, matrix parameter scaling, and dynamic balancing ratio loop."""
+    """Averages positions scaling thresholds via strict counter-side matrix tracking and dynamic ratio balancing."""
     if df is None or df.empty:
         return
         
@@ -134,9 +135,9 @@ def handle_side_averaging(client, df):
         last_calculated_threshold = 0.0
         
         # Track parameters for complete dashboard transparency
-        active_own_matrix = 1.0
         active_opp_matrix = 1.0
         active_atr_baseline = 0.0
+        active_balance_multiplier = 1.0
 
         if side == "CE":
             own_count = ce_lots
@@ -163,22 +164,20 @@ def handle_side_averaging(client, df):
             hce_d = max(1.0, safe_float(row.get("hkin_ce_depth"), 1.0))
             hpe_d = max(1.0, safe_float(row.get("hkin_pe_depth"), 1.0))
 
-            # --- COMBINED GEOMETRIC MATRIX LOGIC ---
+            # --- STRICT COUNTER-SIDE THREAT MATRIX LOGIC ---
             if side == "CE":
-                own_matrix_factor = max(ce_p, hce_d)   # CE Power vs CE Depth
-                opp_matrix_factor = max(pe_p, hpe_d)   # PE Power vs PE Depth
+                opp_matrix_factor = max(pe_p, hpe_d)   # Threat strictly evaluated from counter PE velocity
             else:
-                own_matrix_factor = max(pe_p, hpe_d)   # PE Power vs PE Depth
-                opp_matrix_factor = max(ce_p, hce_d)   # CE Power vs CE Depth
+                opp_matrix_factor = max(ce_p, hce_d)   # Threat strictly evaluated from counter CE velocity
 
-            active_own_matrix = own_matrix_factor
             active_opp_matrix = opp_matrix_factor
 
-            # --- UNIFIED FORMULA ---
-            # Multiplies ATR Baseline by Own Scale Factor, Opposite Scale Factor, and Upstream Lot Balance Multiplier
+            # --- UNIFIED STRIPPED FORMULA ---
+            # Threshold = -ATR Baseline * Opposite Scale Factor * Lot Balance Geometric Ratio
             balance_multiplier = float(own_count + 1) / float(opp_count + 1)
-            dynamic_threshold = -row_atr_baseline * own_matrix_factor * opp_matrix_factor * balance_multiplier
-
+            active_balance_multiplier = balance_multiplier
+            
+            dynamic_threshold = -row_atr_baseline * opp_matrix_factor * balance_multiplier
             last_calculated_threshold = dynamic_threshold
 
             # Break early if position loss is above (less negative than) threshold limit
@@ -208,9 +207,9 @@ def handle_side_averaging(client, df):
                     tag=new_tag,
                     ce_count=ce_lots,
                     pe_count=pe_lots,
-                    own_m=active_own_matrix,
                     opp_m=active_opp_matrix,
-                    atr_baseline=active_atr_baseline
+                    atr_baseline=active_atr_baseline,
+                    balance_mult=active_balance_multiplier
                 )
                 
                 print(f"{Fore.GREEN}🛒 [EXECUTION] Sending market order to buy Layer {own_count + 1} for {symbol}...")
@@ -224,4 +223,5 @@ def handle_side_averaging(client, df):
                 
                 if success:
                     set_cooling(side)
-                    print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Unified Matrix.")
+                    print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Clean Threat Threshold.")
+
