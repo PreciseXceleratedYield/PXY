@@ -142,10 +142,10 @@ def handle_side_averaging(client, df):
 
             # --- STRICT DIRECTIONAL SIGNAL VERIFICATION (OPPOSITE) ---
             row_exit = str(row.get("exit", "")).strip().upper()
-            if side == "CE" and row_exit != "BULL":
+            if side == "CE" and row_exit != "XXX":
                 all_positions_crossed_threshold = False
                 break
-            if side == "PE" and row_exit != "BEAR":
+            if side == "PE" and row_exit != "XXX":
                 all_positions_crossed_threshold = False
                 break
 
