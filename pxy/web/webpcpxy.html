@@ -59,7 +59,7 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     font-family:'Syne',sans-serif;font-weight:800;font-size:11px;color:var(--text);
 }
 
-#colTerminal{width:21.29%;}
+#colTerminal{width:26.29%;}
 #colPositions{width:25%;}
 #colChart{flex:1;}
 
@@ -105,8 +105,8 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     padding:0 8px;background:var(--bg2);border-bottom:1px solid var(--border);
     font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);
 }
-#posScroll{height:calc(40vh - 70px);overflow-y:scroll;-webkit-overflow-scrolling:touch;}
-#tradeScroll{height:200px;overflow-y:scroll;-webkit-overflow-scrolling:touch;}
+#posScroll{flex:1;min-height:0;overflow-y:scroll;-webkit-overflow-scrolling:touch;}
+#tradeScroll{flex:1;min-height:0;overflow-y:scroll;-webkit-overflow-scrolling:touch;}
 .p-row,.t-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--border);cursor:default;}
 .p-row.bull-r{border-left:2px solid var(--bull);}
 .p-row.bear-r{border-left:2px solid var(--bear);}
@@ -175,11 +175,14 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 <div id="hostMenu" style="display:none;position:fixed;top:44px;right:0;z-index:9998;width:270px;max-height:70vh;overflow-y:auto;background:rgba(11,15,26,0.97);backdrop-filter:blur(4px);border:1px solid var(--border2);border-radius:0 0 0 12px;padding:12px 10px;flex-direction:column;gap:6px;box-shadow:0 16px 40px rgba(0,0,0,0.6);">
     <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:12px;letter-spacing:0.08em;text-align:center;color:var(--text);padding:2px 0 8px;border-bottom:1px solid var(--border2);">🔗 BOOKMARKS</div>
     <div id="hostMenuList" style="display:flex;flex-direction:column;gap:5px;"></div>
-    <div style="border-top:1px solid var(--border2);margin-top:6px;padding-top:10px;display:flex;flex-direction:column;gap:7px;">
+
+    <div id="hmForm" style="display:none;border-top:1px solid var(--border2);margin-top:6px;padding-top:10px;flex-direction:column;gap:7px;">
+        <input id="hmName" placeholder="Name" style="padding:8px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;">
         <input id="hmUrl" placeholder="https://..." style="padding:8px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;">
-        <input id="hmNote" placeholder="note (shown as tooltip)" style="padding:8px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;">
-        <button id="hmAddBtn" style="padding:8px;border-radius:6px;border:1px solid var(--accent);background:rgba(59,130,246,0.12);color:var(--accent);font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;">+ Add URL</button>
+        <input id="hmNote" placeholder="Tooltip note" style="padding:8px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;">
+        <button id="hmAddBtn" style="padding:8px;border-radius:6px;border:1px solid var(--accent);background:rgba(59,130,246,0.12);color:var(--accent);font-family:'Syne',sans-serif;font-weight:700;font-size:12px;cursor:pointer;">Save</button>
     </div>
+
     <button id="hmClose" style="margin-top:2px;padding:7px;border-radius:6px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;">✕ Close</button>
 </div>
 
@@ -190,6 +193,7 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     background:rgba(17,24,39,0.5);cursor:pointer;transition:background 0.15s;
 }
 .hbm-item:hover{background:rgba(17,24,39,0.85);}
+.hbm-item.hbm-add{border-color:var(--accent);color:var(--accent);justify-content:center;font-weight:700;}
 .hbm-label{font-family:'DM Mono',monospace;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;}
 .hbm-del{font-size:12px;color:var(--muted);cursor:pointer;flex-shrink:0;padding:0 3px;}
 .hbm-del:hover{color:var(--bear);}
@@ -342,20 +346,15 @@ loadHostname();
 const BM_KEY='pxy_bookmarks';
 function bmLoad(){try{return JSON.parse(localStorage.getItem(BM_KEY)||'[]');}catch(e){return [];}}
 function bmSave(arr){localStorage.setItem(BM_KEY,JSON.stringify(arr));}
-function bmLabel(url){try{return new URL(url).hostname;}catch(e){return url.slice(0,32);}}
 function bmRender(){
     const list=$('hostMenuList');
     const items=bmLoad();
     list.innerHTML='';
-    if(!items.length){
-        list.innerHTML='<div style="text-align:center;color:var(--muted);font-size:11px;padding:10px 0;">No bookmarks yet</div>';
-        return;
-    }
     items.forEach((it,i)=>{
         const row=document.createElement('div');
         row.className='hbm-item';
         row.title=it.note||'';
-        row.innerHTML=`<span class="hbm-label">${it.note?('📝 '+bmLabel(it.url)):bmLabel(it.url)}</span><span class="hbm-del" data-i="${i}">✕</span>`;
+        row.innerHTML=`<span class="hbm-label">${it.name||'(unnamed)'}</span><span class="hbm-del" data-i="${i}">✕</span>`;
         row.addEventListener('click',(e)=>{
             if(e.target.classList.contains('hbm-del')){
                 e.stopPropagation();
@@ -366,10 +365,20 @@ function bmRender(){
         });
         list.appendChild(row);
     });
+    const addRow=document.createElement('div');
+    addRow.className='hbm-item hbm-add';
+    addRow.innerHTML='<span class="hbm-label" style="text-align:center;">+ Add URL</span>';
+    addRow.addEventListener('click',()=>{
+        const form=$('hmForm');
+        form.style.display=form.style.display==='flex'?'none':'flex';
+        if(form.style.display==='flex')setTimeout(()=>$('hmName').focus(),50);
+    });
+    list.appendChild(addRow);
 }
 const hostMenuEl=$('hostMenu');
 $('clk').addEventListener('click',e=>{
     e.stopPropagation();
+    $('hmForm').style.display='none';
     bmRender();
     hostMenuEl.style.display=hostMenuEl.style.display==='flex'?'none':'flex';
 });
@@ -378,14 +387,16 @@ document.addEventListener('click',e=>{
     if(!hostMenuEl.contains(e.target)&&e.target!==$('clk'))hostMenuEl.style.display='none';
 });
 $('hmAddBtn').addEventListener('click',()=>{
+    const name=$('hmName').value.trim();
     const url=$('hmUrl').value.trim();
     const note=$('hmNote').value.trim();
     if(!url)return;
     const full=/^https?:\/\//i.test(url)?url:'https://'+url;
     const arr=bmLoad();
-    arr.push({url:full,note});
+    arr.push({name:name||full,url:full,note});
     bmSave(arr);
-    $('hmUrl').value='';$('hmNote').value='';
+    $('hmName').value='';$('hmUrl').value='';$('hmNote').value='';
+    $('hmForm').style.display='none';
     bmRender();
 });
 
