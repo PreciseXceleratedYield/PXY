@@ -149,7 +149,7 @@ def handle_side_averaging(client, df):
             pos_loss = get_loss(row)
 
             # --- DYNAMIC ATR EXTRACTED DIRECTLY FROM THE ROW ---
-            extracted_atr = safe_float(row.get("atr", 0.0))
+            extracted_atr = safe_float(row.get("atr", 0.0)) * 2
             
             # --- MIN 6 AND MAX 16 STRICT CAP LOGIC ---
             # Kept raw baseline ATR tracking here (No * 2 multiplier)
