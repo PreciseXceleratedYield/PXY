@@ -84,9 +84,7 @@ def target_price(row):
         pe_p = max(1.0, f(row.get("pe_power"), 1.0))
 
         target_pct = 0.0
-        extracted_atr = (ce_p + pe_p + hce_d + hpe_d)
-        row_atr_baseline = max(6.0, min(16.0, extracted_atr))
-        atr_val = row_atr_baseline
+
         # 6. Core execution logic evaluating directional signals
         if is_ce:
             if active_exit in ["SELL", "BEAR"]:  
@@ -115,4 +113,3 @@ def target_price(row):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
-
