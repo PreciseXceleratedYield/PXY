@@ -126,13 +126,13 @@ def handle_side_averaging(client, df):
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
         
-        # Safe scope initializations to prevent UnboundLocalErrors on fast loop failures
+        # Safe scope initializations to feed your Part 1 dashboard footprint flawlessly
         active_power = 1.0
         active_depth = 1.0
         active_atr_baseline = 0.0
         mode_label = "BALANCED RATIO" if USE_BALANCED_RATIO else "FIXED ATR OPP"
 
-        # --- DYNAMIC RATIO COUNTS ---
+        # --- DYNAMIC RATIO ALGORITHM INTEGRATION ---
         if side == "CE":
             own_count = ce_lots
             opp_count = pe_lots
@@ -141,7 +141,6 @@ def handle_side_averaging(client, df):
             opp_count = ce_lots
 
         # --- MAX LAYER PROTECTION CHECK ---
-        # Blocks the current trading side early if active layers meet or exceed configuration caps
         if own_count >= MAX_LAYERS:
             print(f"{Fore.YELLOW}      ⚠️ {side} Layer Limit Reached ({own_count}/{MAX_LAYERS}). Rebuy Blocked.")
             continue
@@ -150,12 +149,14 @@ def handle_side_averaging(client, df):
             pos_loss = get_loss(row)
 
             # --- DYNAMIC ATR EXTRACTED DIRECTLY FROM THE ROW ---
-            # Raw baseline ATR tracking: the multiplier has been completely removed
             extracted_atr = safe_float(row.get("atr", 0.0))
+            
+            # --- MIN 6 AND MAX 16 STRICT CAP LOGIC ---
+            # Kept raw baseline ATR tracking here (No * 2 multiplier)
             row_atr_baseline = max(6.0, min(16.0, extracted_atr))
             active_atr_baseline = row_atr_baseline
 
-            # --- EXTRACT OPTION PARAMETERS AND INJECT HIGH SPEED SAFE-GUARDS ---
+            # --- EXTRACT OPTION PARAMETERS FOR DASHBOARD MATRIX ---
             ce_p = max(1.0, safe_float(row.get("ce_power"), 1.0))
             pe_p = max(1.0, safe_float(row.get("pe_power"), 1.0))
             hce_d = max(1.0, safe_float(row.get("hkin_ce_depth"), 1.0))
@@ -163,7 +164,6 @@ def handle_side_averaging(client, df):
 
             # --- SWITCH SELECTION LOGIC ---
             if USE_BALANCED_RATIO:
-                # Option 1: Maintain Ratio Geometry (Uses maximum of current side's momentum parameters)
                 if side == "CE":
                     active_power = ce_p
                     active_depth = hce_d
@@ -177,7 +177,6 @@ def handle_side_averaging(client, df):
                 dynamic_threshold = -row_atr_baseline * matrix_multiplier * (float(own_count + 1) / float(opp_count + 1))
             
             else:
-                # Option 2: Fixed ATR-Scaled Mode (Both sides evaluate BOTH opposite criteria individually via ATR baseline)
                 if side == "CE":
                     active_power = pe_p      # Opposite Power (PE)
                     active_depth = hpe_d     # Opposite Depth (PE)
@@ -196,56 +195,51 @@ def handle_side_averaging(client, df):
                 break
 
         loss_hit = all_positions_crossed_threshold
-        
-        # --- TIME GUARDED AVERAGING ORDER EXECUTION SYSTEM ---
         if loss_hit:
-            # 1. Verify that standard time cooldown has elapsed for this specific transaction side
-            if is_cooling(side):
-                print(f"{Fore.YELLOW}      ⏱️ {side} Averaging condition met but blocked by active {COOL_DOWN_SECONDS}s Cooldown.")
-                continue
-
-            # Extract row-specific tags safely for accurate dashboard data rendering
-            representative_row = side_df.iloc[0]
-            symbol_tag = str(representative_row.get("symbol", f"UNKNOWN_{side}"))
-            current_loss_pct = get_loss(representative_row)
-            order_pxy_tag = generate_pxy_tag()
-
-            # 2. Render strict layout telemetry console dashboard 
-            print_pxy_trigger_dashboard(
-                side=side,
-                symbol=symbol_tag,
-                current_loss=current_loss_pct,
-                target_threshold=last_calculated_threshold,
-                tag=order_pxy_tag,
-                ce_count=ce_lots,
-                pe_count=pe_lots,
-                power=active_power,
-                depth=active_depth,
-                mode_str=mode_label,
-                atr_baseline=active_atr_baseline
-            )
-
-            # 3. PLACE ACTIVE BROKER MARKET REBUY ORDER LOGIC HERE
-            print(f"{Fore.GREEN}🛒 [EXECUTION] Sending market order to buy Layer {own_count + 1} for {symbol_tag}...")
-            
-            # --- LIVE ACTIVATION LAYER ---
-            # Set your desired execution lot quantity size rules dynamically below
-            execution_qty = 25  
-            
-            try:
-                # Active implementation line communicating directly with the client instance
-                client.place_order(
-                    symbol=symbol_tag, 
-                    quantity=execution_qty, 
-                    side="BUY", 
-                    type="MARKET", 
-                    tag=order_pxy_tag
+            # Combined conditional validation verifying layer limitations and directory cooldown state
+            if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side):
+                last_order = side_df.iloc[-1]
+                symbol = last_order['symbol']
+                qty = abs(int(safe_float(last_order['qty'], 0.0)))
+                new_tag = generate_pxy_tag()
+                final_loss = get_loss(last_order)
+                
+                # Render modified dashboard matching your Part 1 11-argument function signature
+                print_pxy_trigger_dashboard(
+                    side=side,
+                    symbol=symbol,
+                    current_loss=final_loss,
+                    target_threshold=last_calculated_threshold,
+                    tag=new_tag,
+                    ce_count=ce_lots,
+                    pe_count=pe_lots,
+                    power=active_power,
+                    depth=active_depth,
+                    mode_str=mode_label,
+                    atr_baseline=active_atr_baseline
                 )
-                print(f"{Fore.GREEN}✅ API SUCCESS: Order confirmed on exchange matching tag: {order_pxy_tag}")
-            except Exception as api_err:
-                print(f"{Fore.RED}❌ API ERROR: Order dispatch failed. Broker message: {api_err}")
-
-            # 4. Lock time boundary state records immediately to prevent multi-firing race loops
-            set_cooling(side)
+                
+                print(f"{Fore.GREEN}🛒 [EXECUTION] Sending market order to buy Layer {own_count + 1} for {symbol}...")
+                
+                try:
+                    # Restored your original working Kotak NeoAPI dictionary unpack layout configuration mapping
+                    params = {
+                        "exchange_segment": "nse_fo",
+                        "product": "NRML",
+                        "price": "0",
+                        "order_type": "MKT",
+                        "quantity": str(qty),
+                        "trading_symbol": str(symbol),
+                        "transaction_type": "B",
+                        "validity": "DAY",
+                        "amo": "NO",
+                        "tag": new_tag
+                    }
+                    res = client.place_order(**params)
+                    if res:
+                        set_cooling(side)
+                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Ratio Threshold.")
+                except Exception as e:
+                    print(f"{Fore.RED}❌ Rebuy Failed: {e}")
 
 
