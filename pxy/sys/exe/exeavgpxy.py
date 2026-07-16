@@ -15,6 +15,11 @@ REBUY_ENABLED = True
 MAX_LAYERS = 3
 COOL_DOWN_SECONDS = 60 # ⏱️ Cooling interval set to exactly 60 seconds
 
+# 🔥 SWITCH FOR THE BALANCING FACTOR
+# True  = Maintains upstream lot layout ratio geometry formula
+# False = Maintains fixed ATR-scaled mode (min(-ATR * opposite power, -ATR * opposite depth)) with no comparison
+USE_BALANCED_RATIO = False
+
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
     if val is None:
@@ -59,7 +64,7 @@ def get_loss(row):
     ltp = safe_float(row.get("sell_prc", 0.0))
     return ((ltp - entry) / entry) * 100 if entry > 0 else 0
 
-def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count):
+def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, power, depth, mode_str, atr_baseline):
     """Renders a strict 42-character width dashboard upon an order trigger event."""
     width = 42
     border = Fore.YELLOW + "=" * width
@@ -70,6 +75,9 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     print(divider)
     print(Fore.WHITE + f" • SYMBOL       : {symbol}".ljust(width))
     print(Fore.WHITE + f" • SIDE OPTION  : {side} ({ce_count}CE vs {pe_count}PE)".ljust(width))
+    print(Fore.WHITE + f" • ENGINE MODE  : {mode_str}".ljust(width))
+    print(Fore.WHITE + f" • ATR BASELINE : {atr_baseline:.2f}".ljust(width))
+    print(Fore.WHITE + f" • MATRIX PWR/DP: {power:.1f}% / {depth:.1f}%".ljust(width))
     
     loss_str = f" • TRIGGER LOSS : {current_loss:.2f}%"
     loss_pad = " " * max(0, width - len(loss_str))
@@ -82,7 +90,7 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     print(border + "\n")
 
 def handle_side_averaging(client, df):
-    """Averages positions scaling thresholds dynamically via upstream lot layout ratio formula."""
+    """Averages positions scaling thresholds dynamically via balanced ratio or fixed volatility-scaled mode switch."""
     if df is None or df.empty:
         return
         
@@ -101,7 +109,7 @@ def handle_side_averaging(client, df):
         ce_lots, pe_lots = 0, 0
 
     # Clean system telemetry message stream line showcasing live counts
-    print(f"{Fore.CYAN} 📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE")
+    print(f"{Fore.CYAN} 📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Balanced Mode: {USE_BALANCED_RATIO}")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
@@ -114,8 +122,14 @@ def handle_side_averaging(client, df):
 
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
+        
+        # Safe scope initializations to prevent UnboundLocalErrors on fast loop failures
+        active_power = 1.0
+        active_depth = 1.0
+        active_atr_baseline = 0.0
+        mode_label = "BALANCED RATIO" if USE_BALANCED_RATIO else "FIXED ATR OPP"
 
-        # --- DYNAMIC RATIO ALGORITHM INTEGRATION ---
+        # --- DYNAMIC RATIO COUNTS ---
         if side == "CE":
             own_count = ce_lots
             opp_count = pe_lots
@@ -137,15 +151,46 @@ def handle_side_averaging(client, df):
 
             # --- DYNAMIC ATR EXTRACTED DIRECTLY FROM THE ROW ---
             extracted_atr = safe_float(row.get("atr", 0.0))
-            
-            # --- MIN 6 AND MAX 16 STRICT CAP LOGIC ---
             row_atr_baseline = (max(6.0, min(16.0, extracted_atr))) * 2
+            active_atr_baseline = row_atr_baseline
 
-            # Evaluates: -ATR * ((own_count + 1) / (opp_count + 1))
-            dynamic_threshold = -row_atr_baseline * (float(own_count + 1) / float(opp_count + 1))
+            # --- EXTRACT OPTION PARAMETERS AND INJECT HIGH SPEED SAFE-GUARDS ---
+            ce_p = max(1.0, safe_float(row.get("ce_power"), 1.0))
+            pe_p = max(1.0, safe_float(row.get("pe_power"), 1.0))
+            hce_d = max(1.0, safe_float(row.get("hkin_ce_depth"), 1.0))
+            hpe_d = max(1.0, safe_float(row.get("hkin_pe_depth"), 1.0))
+
+            # --- SWITCH SELECTION LOGIC ---
+            if USE_BALANCED_RATIO:
+                # Option 1: Maintain Ratio Geometry (Uses maximum of current side's momentum parameters)
+                if side == "CE":
+                    active_power = ce_p
+                    active_depth = hce_d
+                    matrix_multiplier = max(ce_p, hce_d)
+                else:
+                    active_power = pe_p
+                    active_depth = hpe_d
+                    matrix_multiplier = max(pe_p, hpe_d)
+                
+                # Evaluates: -ATR_Baseline * Multiplier * ((own_count + 1) / (opp_count + 1))
+                dynamic_threshold = -row_atr_baseline * matrix_multiplier * (float(own_count + 1) / float(opp_count + 1))
+            
+            else:
+                # Option 2: Fixed ATR-Scaled Mode (Both sides evaluate BOTH opposite criteria individually via ATR baseline)
+                if side == "CE":
+                    active_power = pe_p      # Opposite Power (PE)
+                    active_depth = hpe_d     # Opposite Depth (PE)
+                else:
+                    active_power = ce_p      # Opposite Power (CE)
+                    active_depth = hce_d     # Opposite Depth (CE)
+                
+                # Formula: min(-ATR_Baseline * Opposite Power, -ATR_Baseline * Opposite Depth)
+                # Selects the deeper negative number to create a stronger safety cushion
+                dynamic_threshold = min(float(-row_atr_baseline * active_power), float(-row_atr_baseline * active_depth))
+
             last_calculated_threshold = dynamic_threshold
 
-            # Compare individual position loss against the calculated ratio threshold
+            # Compare individual position loss against the calculated execution threshold
             if pos_loss > dynamic_threshold:
                 all_positions_crossed_threshold = False
                 break
@@ -160,7 +205,10 @@ def handle_side_averaging(client, df):
                 final_loss = get_loss(last_order)
                 
                 # Render modified dashboard
-                print_pxy_trigger_dashboard(side, symbol, final_loss, last_calculated_threshold, new_tag, ce_lots, pe_lots)
+                print_pxy_trigger_dashboard(
+                    side, symbol, final_loss, last_calculated_threshold, new_tag, 
+                    ce_lots, pe_lots, active_power, active_depth, mode_label, active_atr_baseline
+                )
                 
                 try:
                     params = {
@@ -178,6 +226,7 @@ def handle_side_averaging(client, df):
                     res = client.place_order(**params)
                     if res:
                         set_cooling(side)
-                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Ratio Threshold.")
+                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Engine Threshold Rule.")
                 except Exception as e:
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+
