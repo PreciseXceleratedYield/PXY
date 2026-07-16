@@ -109,7 +109,7 @@ def handle_side_averaging(client, df):
         ce_lots, pe_lots = 0, 0
 
     # Clean system telemetry message stream line showcasing live counts
-    print(f"{Fore.CYAN} 📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Balanced Mode: {USE_BALANCED_RATIO}")
+    print(f"{Fore.CYAN}      📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE ")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
