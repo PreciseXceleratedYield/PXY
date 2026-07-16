@@ -161,12 +161,6 @@ def handle_side_averaging(client, df):
             pe_p = max(1.0, safe_float(row.get("pe_power"), 1.0))
             hce_d = max(1.0, safe_float(row.get("hkin_ce_depth"), 1.0))
             hpe_d = max(1.0, safe_float(row.get("hkin_pe_depth"), 1.0))
-            
-            # --- MIN 6 AND MAX 16 STRICT CAP LOGIC ---
-            # Kept raw baseline ATR tracking here (No * 2 multiplier)
-            extracted_atr = (ce_p + pe_p + hce_d + hpe_d)
-            row_atr_baseline = max(6.0, min(16.0, extracted_atr))
-            active_atr_baseline = row_atr_baseline * 2
 
             # --- SWITCH SELECTION LOGIC ---
             if USE_BALANCED_RATIO:
@@ -191,7 +185,7 @@ def handle_side_averaging(client, df):
                     active_depth = hce_d     # Opposite Depth (CE)
                 
                 # Formula: min(-ATR_Baseline * Opposite Power, -ATR_Baseline * Opposite Depth)
-                dynamic_threshold = min(float(-active_atr_baseline * active_power), float(-active_atr_baseline * active_depth))
+                dynamic_threshold = min(float(-row_atr_baseline * active_power), float(-row_atr_baseline * active_depth))
 
             last_calculated_threshold = dynamic_threshold
 
@@ -247,5 +241,3 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Ratio Threshold.")
                 except Exception as e:
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
-
-
