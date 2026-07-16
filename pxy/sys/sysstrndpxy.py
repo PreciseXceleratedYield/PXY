@@ -1,4 +1,3 @@
-# sysstrndpxy.py
 import os
 import json
 import numpy as np
@@ -13,8 +12,9 @@ DEBUG_MODE = False
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Implements a vectorized 21/50 SMA engine.
-    Restores internal memory aliases needed to stop downstream system crashes.
+    Implements a strict bear-biased vectorized SMA engine.
+    BULL condition requires price to be higher than both SMA lines.
+    Restores internal memory aliases to stop downstream dashboard crashes.
     """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m")
@@ -39,11 +39,11 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['sma21'] = df['Close'].rolling(window=21, min_periods=1).mean()
     df['sma50'] = df['Close'].rolling(window=50, min_periods=1).mean()
 
-    # Vectorized Trend Matrix - CRITICAL FOR OPTIONS ENGINE & DASHBOARD
-    df['sma_trend_full'] = np.where(df['sma21'] >= df['sma50'], "BULL", "BEAR")
+    # Bear Bias Matrix - Must clear BOTH lines to be BULL, else default to BEAR
+    df['sma_trend_full'] = np.where((df['Close'] > df['sma21']) & (df['Close'] > df['sma50']), "BULL", "BEAR")
     df.loc[df['sma21'].isna() | df['sma50'].isna(), 'sma_trend_full'] = "NONE"
 
-    # RESTORED ALIASES FOR COMPATIBILITY (sysdashpxy.py & sysoptionrtpxy.py)
+    # DOWNSTREAM COMPATIBILITY ALIASES (For sysdashpxy.py & sysoptionrtpxy.py)
     df['ST_Trend'] = df['sma_trend_full']
     df['ST'] = df['sma21']
 
@@ -60,7 +60,6 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
 
     output = []
     for idx, row in df.iterrows():
-        # Replaced single price entry with explicit OHLC candle payload
         output.append({
             "time": str(idx),
             "open": float(row["Open"]),
@@ -92,5 +91,6 @@ if __name__ == "__main__":
         export_supertrend_json(processed_df)
     else:
         print("CRITICAL: Upstream data empty.")
+
 
 
