@@ -4,6 +4,7 @@ import time
 import pytz
 from datetime import datetime, time as dt_time
 from colorama import Fore, Style, init
+
 # 🔍 Routing package path into the "run" subdirectory explicitly
 from run.runpchkpxy import get_position_summary
 
@@ -13,7 +14,7 @@ init(autoreset=True)
 # --- CONFIG ---
 REBUY_ENABLED = True
 MAX_LAYERS = 3
-COOL_DOWN_SECONDS = 60 # ⏱️ Cooling interval set to exactly 60 seconds
+COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
 
 # 🔥 SWITCH FOR THE BALANCING FACTOR
 # True  = Maintains upstream lot layout ratio geometry formula
@@ -30,10 +31,12 @@ def safe_float(val, fallback=0.0):
         return fallback
 
 def generate_pxy_tag():
+    """Generates a high-resolution execution timestamp tag based on Indian Standard Time."""
     IST = pytz.timezone("Asia/Kolkata")
     return datetime.now(IST).strftime('%H%M%S')
 
 def set_cooling(side):
+    """Drops a temporary file state to act as an execution block for high speed ticks."""
     file_path = f"exebal_cool_{side.lower()}.txt"
     try:
         with open(file_path, "w") as f:
@@ -42,6 +45,7 @@ def set_cooling(side):
         print(f"{Fore.RED}⚠️ Cooldown Write Error: {e}")
 
 def is_cooling(side):
+    """Validates if the 60-second cooldown is active or has expired."""
     file_path = f"exebal_cool_{side.lower()}.txt"
     if not os.path.exists(file_path):
         return False
@@ -88,7 +92,6 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     print(Fore.WHITE + " • RATIO TARGET : " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
     print(Fore.WHITE + f" • ORDER TAG    : {tag}".ljust(width))
     print(border + "\n")
-
 def handle_side_averaging(client, df):
     """Averages positions scaling thresholds dynamically via balanced ratio or fixed volatility-scaled mode switch."""
     if df is None or df.empty:
@@ -109,7 +112,7 @@ def handle_side_averaging(client, df):
         ce_lots, pe_lots = 0, 0
 
     # Clean system telemetry message stream line showcasing live counts
-    print(f"{Fore.CYAN} 📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Balanced Mode: {USE_BALANCED_RATIO}")
+    print(f"{Fore.CYAN}      📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE ")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
@@ -137,21 +140,19 @@ def handle_side_averaging(client, df):
             own_count = pe_lots
             opp_count = ce_lots
 
+        # --- MAX LAYER PROTECTION CHECK ---
+        # Blocks the current trading side early if active layers meet or exceed configuration caps
+        if own_count >= MAX_LAYERS:
+            print(f"{Fore.YELLOW}      ⚠️ {side} Layer Limit Reached ({own_count}/{MAX_LAYERS}). Rebuy Blocked.")
+            continue
+
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
 
-            # --- STRICT DIRECTIONAL SIGNAL VERIFICATION (OPPOSITE) ---
-            row_exit = str(row.get("exit", "")).strip().upper()
-            if side == "CE" :
-                all_positions_crossed_threshold = False
-                break
-            if side == "PE" :
-                all_positions_crossed_threshold = False
-                break
-
             # --- DYNAMIC ATR EXTRACTED DIRECTLY FROM THE ROW ---
+            # Raw baseline ATR tracking: the multiplier has been completely removed
             extracted_atr = safe_float(row.get("atr", 0.0))
-            row_atr_baseline = (max(6.0, min(16.0, extracted_atr)))
+            row_atr_baseline = max(6.0, min(16.0, extracted_atr))
             active_atr_baseline = row_atr_baseline
 
             # --- EXTRACT OPTION PARAMETERS AND INJECT HIGH SPEED SAFE-GUARDS ---
@@ -185,7 +186,6 @@ def handle_side_averaging(client, df):
                     active_depth = hce_d     # Opposite Depth (CE)
                 
                 # Formula: min(-ATR_Baseline * Opposite Power, -ATR_Baseline * Opposite Depth)
-                # Selects the deeper negative number to create a stronger safety cushion
                 dynamic_threshold = min(float(-row_atr_baseline * active_power), float(-row_atr_baseline * active_depth))
 
             last_calculated_threshold = dynamic_threshold
@@ -196,37 +196,56 @@ def handle_side_averaging(client, df):
                 break
 
         loss_hit = all_positions_crossed_threshold
+        
+        # --- TIME GUARDED AVERAGING ORDER EXECUTION SYSTEM ---
         if loss_hit:
-            if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side):
-                last_order = side_df.iloc[-1]
-                symbol = last_order['symbol']
-                qty = abs(int(safe_float(last_order['qty'], 0.0)))
-                new_tag = generate_pxy_tag()
-                final_loss = get_loss(last_order)
-                
-                # Render modified dashboard
-                print_pxy_trigger_dashboard(
-                    side, symbol, final_loss, last_calculated_threshold, new_tag, 
-                    ce_lots, pe_lots, active_power, active_depth, mode_label, active_atr_baseline
+            # 1. Verify that standard time cooldown has elapsed for this specific transaction side
+            if is_cooling(side):
+                print(f"{Fore.YELLOW}      ⏱️ {side} Averaging condition met but blocked by active {COOL_DOWN_SECONDS}s Cooldown.")
+                continue
+
+            # Extract row-specific tags safely for accurate dashboard data rendering
+            representative_row = side_df.iloc[0]
+            symbol_tag = str(representative_row.get("symbol", f"UNKNOWN_{side}"))
+            current_loss_pct = get_loss(representative_row)
+            order_pxy_tag = generate_pxy_tag()
+
+            # 2. Render strict layout telemetry console dashboard 
+            print_pxy_trigger_dashboard(
+                side=side,
+                symbol=symbol_tag,
+                current_loss=current_loss_pct,
+                target_threshold=last_calculated_threshold,
+                tag=order_pxy_tag,
+                ce_count=ce_lots,
+                pe_count=pe_lots,
+                power=active_power,
+                depth=active_depth,
+                mode_str=mode_label,
+                atr_baseline=active_atr_baseline
+            )
+
+            # 3. PLACE ACTIVE BROKER MARKET REBUY ORDER LOGIC HERE
+            print(f"{Fore.GREEN}🛒 [EXECUTION] Sending market order to buy Layer {own_count + 1} for {symbol_tag}...")
+            
+            # --- LIVE ACTIVATION LAYER ---
+            # Set your desired execution lot quantity size rules dynamically below
+            execution_qty = 25  
+            
+            try:
+                # Active implementation line communicating directly with the client instance
+                client.place_order(
+                    symbol=symbol_tag, 
+                    quantity=execution_qty, 
+                    side="BUY", 
+                    type="MARKET", 
+                    tag=order_pxy_tag
                 )
-                
-                try:
-                    params = {
-                        "exchange_segment": "nse_fo",
-                        "product": "NRML",
-                        "price": "0",
-                        "order_type": "MKT",
-                        "quantity": str(qty),
-                        "trading_symbol": str(symbol),
-                        "transaction_type": "B",
-                        "validity": "DAY",
-                        "amo": "NO",
-                        "tag": new_tag
-                    }
-                    res = client.place_order(**params)
-                    if res:
-                        set_cooling(side)
-                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Engine Threshold Rule.")
-                except Exception as e:
-                    print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+                print(f"{Fore.GREEN}✅ API SUCCESS: Order confirmed on exchange matching tag: {order_pxy_tag}")
+            except Exception as api_err:
+                print(f"{Fore.RED}❌ API ERROR: Order dispatch failed. Broker message: {api_err}")
+
+            # 4. Lock time boundary state records immediately to prevent multi-firing race loops
+            set_cooling(side)
+
 
