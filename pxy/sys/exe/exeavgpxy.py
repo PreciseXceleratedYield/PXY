@@ -9,7 +9,7 @@ from colorama import Fore, Style, init
 from run.runpchkpxy import get_position_summary
 
 # 📦 Pure explicit extraction from your customized external execution script module
-from exeagxpxy import send_market_order
+from exeaxgpxy import send_market_order
 
 # Initialize colorama for clean terminal output formatting
 init(autoreset=True)
