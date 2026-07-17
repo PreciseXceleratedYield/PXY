@@ -54,7 +54,7 @@ def get_entry_signal(df=None):
 
     # Console Status Reporting Actions
     if entry_signal != "WAIT":
-        print(f"      🔥 [ACTION] -> ENTRY: {entry_signal} | EXIT: {exit_signal} 🔥")
+        print(f"   🔥 [ACTION] -> ENTRY: {entry_signal} | EXIT: {exit_signal} 🔥")
     else:
         print(f"[WAIT]-Mismatch (MKT:{mkt_dir} | ST:{exit_dir})")
 
