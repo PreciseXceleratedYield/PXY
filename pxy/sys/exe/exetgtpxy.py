@@ -38,7 +38,7 @@ def target_price(row):
     """Calculates individual option layer target price using dynamic matrices.
     
     Aligned Trades   : max(ATR * Power, ATR * Depth) with no upper limit for maximum extraction.
-    Supertrend Bonus : Doubles the target percentage if Supertrend direction aligns with the trade.
+    direction Bonus : Doubles the target percentage if direction direction aligns with the trade.
     Hostile Trades   : ATR / Power down to a 1.0% floor (instant crash cutting).
     """
     global printed_sides
@@ -71,7 +71,7 @@ def target_price(row):
         # 4. Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
         active_exit = str(row.get("exit", "NONE")).upper().strip()
-        supertrend = str(row.get("supertrend", "NONE")).upper().strip()
+        direction = str(row.get("direction", "NONE")).upper().strip()
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
@@ -96,8 +96,8 @@ def target_price(row):
                 # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
                 target_pct = max((atr_val * ce_p), (atr_val * hce_d)) / 2
                 
-                # ⚡ ADDED FILTER: Supertrend Alignment (CE + BULL = Double Target)
-                if supertrend == "BULL":
+                # ⚡ ADDED FILTER: direction Alignment (CE + BULL = Double Target)
+                if direction == "UP":
                     target_pct = target_pct * 2
                     
         elif is_pe:
@@ -108,8 +108,8 @@ def target_price(row):
                 # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
                 target_pct = max((atr_val * pe_p), (atr_val * hpe_d)) / 2
                 
-                # ⚡ ADDED FILTER: Supertrend Alignment (PE + BEAR = Double Target)
-                if supertrend == "BEAR":
+                # ⚡ ADDED FILTER: direction Alignment (PE + BEAR = Double Target)
+                if direction == "DOWN":
                     target_pct = target_pct * 2
                 
         # 🔥 HIGH SPEED BANDWIDTH GUARDRAIL
