@@ -4,7 +4,7 @@
 PXY OPTION ROUTING ENGINE WITH STREAMLINED CROSSOVER MATRIX
 ===============================================================================
 Operational Rules Matrix:
-1. ENTRY Pipeline: Converted cleanly into option targets (ATMBUY / ATMSELL / STANDBY).
+1. ENTRY Pipeline: Converted cleanly into option targets (ATMBUY / ATMSELL / WAIT).
                    Requires strict directional alignment between both engines.
 2. EXIT Pipeline  : Derived unfiltered and directly from the sysmktpxy engine.
 ===============================================================================
@@ -39,7 +39,7 @@ def get_entry_signal(df=None):
         exit_dir = "NONE"
     # ---------------------------------------------------
 
-    entry_signal = "STANDBY"
+    entry_signal = "WAIT"
     
     # 2. ROUTE EXIT PIPELINE PURELY & UNFILTERED (Directly from sysmktpxy)
     exit_signal = mkt_dir if mkt_dir in ["BULL", "BEAR"] else "NONE"
@@ -50,13 +50,13 @@ def get_entry_signal(df=None):
     elif mkt_dir == "BEAR" and exit_dir == "BEAR":
         entry_signal = "ATMSELL"
     else:
-        entry_signal = "STANDBY"
+        entry_signal = "WAIT"
 
     # Console Status Reporting Actions
-    if entry_signal != "STANDBY":
+    if entry_signal != "WAIT":
         print(f"      🔥 [ACTION] -> ENTRY: {entry_signal} | EXIT: {exit_signal} 🔥")
     else:
-        print(f"[STANDBY]-Mismatch (MKT:{mkt_dir} | ST:{exit_dir})")
+        print(f"[WAIT]-Mismatch (MKT:{mkt_dir} | ST:{exit_dir})")
 
     # Returns processed option entry and the explicit structural exit string
     return entry_signal, exit_signal
