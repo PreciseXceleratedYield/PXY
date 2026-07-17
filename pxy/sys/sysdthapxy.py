@@ -19,43 +19,44 @@ def get_pxy_data(tickerSymbol=None, df=None):
             return None, None, None, pd.DataFrame()
 
     # ==================================================
-    # 🕯️ PURE HEIKIN-ASHI TRANSFORM (SYNTHETIC ONLY)
+    # 🕯️ NEW CUSTOM CANDLE TRANSFORM (LAST OHLC/4 OPEN)
     # ==================================================
-    ha_df = pd.DataFrame(index=df.index)
+    custom_df = pd.DataFrame(index=df.index)
     
-    # 1. HA Close is the average of standard Open, High, Low, and Close
-    ha_df['Close'] = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
+    # 1. Current Close is exactly the original market close
+    custom_df['Close'] = df['Close']
 
-    # 2. HA Open is the average of the prior HA Open and prior HA Close
-    ha_open = np.zeros(len(df))
-    ha_open[0] = df['Open'].iloc[0]  # Explicitly seeds the very first candle
+    # 2. Current Open is exactly the previous candle's full OHLC average (OHLC / 4)
+    # Calculate the raw OHLC/4 for every row first
+    raw_ohlc_4 = (df['Open'] + df['High'] + df['Low'] + df['Close']) / 4
     
-    close_vals = ha_df['Close'].values
-    for i in range(1, len(df)):
-        ha_open[i] = (ha_open[i-1] + close_vals[i-1]) / 2
-        
-    ha_df['Open'] = ha_open
+    # Shift it forward by 1 bar so last candle's OHLC/4 becomes the current candle's Open
+    custom_df['Open'] = raw_ohlc_4.shift(1)
+    
+    # Seed the very first row safely to avoid a NaN starting point
+    custom_df.iloc[0, custom_df.columns.get_loc('Open')] = raw_ohlc_4.iloc[0]
 
-    # 3. HA High and Low pick the absolute extremes out of market and HA values
-    ha_df['High'] = np.maximum(df['High'].values, np.maximum(ha_df['Open'].values, ha_df['Close'].values))
-    ha_df['Low'] = np.minimum(df['Low'].values, np.minimum(ha_df['Open'].values, ha_df['Close'].values))
-
-    # ==================================================
-    # 🎨 COLOR PROCESSING (HA CLOSE VS HA OPEN)
-    # ==================================================
-    # Green when HA Close is above or equal to HA Open; otherwise Red
-    is_green = ha_df['Close'] >= ha_df['Open']
-    ha_df["pxy_color"] = np.select([is_green], ["green"], default="red")
+    # 3. High and Low bound logically to the new open/close matrix
+    custom_df['High'] = np.maximum(df['High'].values, np.maximum(custom_df['Open'].values, custom_df['Close'].values))
+    custom_df['Low'] = np.minimum(df['Low'].values, np.minimum(custom_df['Open'].values, custom_df['Close'].values))
 
     # ==================================================
-    # 🛡️ PRODUCTION OUTPUT FILTER (PURE HA PASSTHROUGH)
+    # 🎨 COLOR PROCESSING (CUSTOM CLOSE VS CUSTOM OPEN)
     # ==================================================
-    final_df = ha_df.copy()
-    pxy_close = final_df['Close'].copy()  # Delivers pure HA Close Series
-    pxy_open = final_df['Open'].copy()    # Delivers pure HA Open Series
+    # Green when Custom Close is above or equal to Custom Open; otherwise Red
+    is_green = custom_df['Close'] >= custom_df['Open']
+    custom_df["pxy_color"] = np.select([is_green], ["green"], default="red")
+
+    # ==================================================
+    # 🛡️ PRODUCTION OUTPUT FILTER (SAME SIGNATURE PASSTHROUGH)
+    # ==================================================
+    final_df = custom_df.copy()
+    pxy_close = final_df['Close'].copy()  # Delivers Custom Close Series (Original Close)
+    pxy_open = final_df['Open'].copy()    # Delivers Custom Open Series (Last OHLC/4)
     pxy_color_series = final_df['pxy_color'].copy()
     
     return pxy_close, pxy_open, pxy_color_series, final_df
+
 
 
 
