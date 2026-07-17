@@ -1,4 +1,4 @@
-# exit_script.py 
+# exeexitpxy.py
 import pandas as pd 
 import os 
 import time 
@@ -11,9 +11,20 @@ from exeomspxy import get_combined_data
 from runclntpxy import get_session 
 from exeavgpxy import handle_side_averaging 
 
+# IMPORT SYSTEM CO-PROCESSOR 
+from exeexppxy import analyze_targets_and_sides, process_metrics_print_and_dump, dump_idle_json
+
 init(autoreset=True) 
 
 DEBUG_MODE = True 
+
+# ==========================================================
+# CONFIGURATION SWITCH (LOCKED IN CONTROLLER)
+# Options: 
+#   "one" -> Exits individual positions as they hit targets.
+#   "all" -> Exits a side only when ALL positions on that side hit targets.
+# ==========================================================
+EXIT_MODE = "all" 
 
 def debug_log(msg, color=Fore.BLUE): 
     if DEBUG_MODE: 
@@ -30,15 +41,12 @@ def place_exit_order(client, row):
     try: 
         existing_tag = row.get('tag') 
         
-        # Clean and extract the original entry tag baseline
         if existing_tag and str(existing_tag).lower() not in ['nan', 'none', '']: 
-            # Strip away any existing suffix tokens if present
-            base_tag = str(existing_tag).split('_')[0].strip()
+            base_tag = str(existing_tag).split('_').strip()
         else: 
             IST = pytz.timezone("Asia/Kolkata")
             base_tag = datetime.now(IST).strftime('%H%M%S')
             
-        # FIX: Structure final tag with explicit sell suffix code
         final_tag = f"{base_tag}{get_sell_suffix()}"
             
         params = { 
@@ -103,23 +111,6 @@ def verify_and_exit(client, row):
     except Exception as e: 
         print(f"{Fore.RED}❌ Safety Check Crash: {e}") 
 
-def compute_st_fixed(row): 
-    try: 
-        ltp = float(row.get("sell_prc", 0)) 
-        tgt = float(row.get("pxy_tgt", 0)) 
-        entry = float(row.get("pxy_entry", 0)) 
-        if ltp <= 0 or entry <= 0: 
-            return "%00⚪ 00%", False 
-        entry_pct = int(((ltp - entry) / entry) * 100) 
-        tgt_pct = int(((tgt - ltp) / entry) * 100) 
-        entry_pct = max(-99, min(99, entry_pct)) 
-        tgt_pct = max(0, min(99, tgt_pct)) 
-        color, dot = (Fore.GREEN, "🟢") if entry_pct > 0 else (Fore.RED, "🔴") if entry_pct < 0 else (Fore.WHITE, "⚪") 
-        st_str = f"{color}%{abs(entry_pct):02d}{dot}{Fore.RESET} {tgt_pct:02d}%" 
-        return st_str, (ltp >= tgt) 
-    except: 
-        return "%00⚪ 00%", False 
-
 def run_snapshot(): 
     IST = pytz.timezone("Asia/Kolkata") 
     now = datetime.now(IST).time() 
@@ -136,37 +127,29 @@ def run_snapshot():
     client = get_session() 
     if df.empty: 
         print(f"{Fore.YELLOW}No active orders. System idling...") 
+        dump_idle_json(EXIT_MODE)
         return 
 
     handle_side_averaging(client, df) 
-    print("━" * 42) 
-    print(f" {Fore.CYAN}{Style.BRIGHT}{'SYMBOL':<20}{'ST':^8}{'PL':>8}") 
-    print("-" * 42) 
-    for idx, r in df.iterrows(): 
-        sym = str(r.get('symbol',''))[:21] 
-        
-        # Calculate trailing spaces using raw characters before adding color strings
-        padding = " " * max(0, 20 - len(sym))
-        
-        # Colorize CE word green and PE word red inside the symbol string
-        if "CE" in sym:
-            sym_display = sym.replace("CE", f"{Fore.GREEN}CE{Fore.RESET}") + padding
-        elif "PE" in sym:
-            sym_display = sym.replace("PE", f"{Fore.RED}PE{Fore.RESET}") + padding
-        else:
-            sym_display = sym + padding
+    
+    # Check execution context metrics from helper module
+    side_all_targets_hit = analyze_targets_and_sides(df)
 
-        st_display, is_target_hit = compute_st_fixed(r) 
-        if is_target_hit: 
-            verify_and_exit(client, r) 
-        pnl_val = int(r.get('pnl', 0)) 
-        p_col = Fore.GREEN if pnl_val > 0 else Fore.RED if pnl_val < 0 else Fore.WHITE 
-        
-        # Cleaned layout printing using pre-calculated visual column width
-        print(f" {sym_display}{st_display:<12}{p_col}{pnl_val:>8}") 
-    print("-" * 42) 
-    print(f"{Fore.WHITE}Refreshed: {datetime.now(IST).strftime('%H:%M:%S')}") 
+    # Proactive Core Execution Routing Logic Block
+    for idx, r in df.iterrows():
+        sym = str(r.get('symbol', ''))
+        ltp = float(r.get("sell_prc", 0))
+        tgt = float(r.get("pxy_tgt", 0))
+
+        if EXIT_MODE == "all":
+            if ("CE" in sym and side_all_targets_hit["CE"]) or ("PE" in sym and side_all_targets_hit["PE"]):
+                verify_and_exit(client, r)
+        else:
+            if ltp >= tgt:
+                verify_and_exit(client, r)
+
+    # Pass rendering, logging prints, and final file writing to the tracker helper
+    process_metrics_print_and_dump(df, side_all_targets_hit, EXIT_MODE)
 
 if __name__ == "__main__": 
     run_snapshot()
-
