@@ -167,7 +167,7 @@ def handle_side_averaging(client, df):
             pos_loss = get_loss(row)
             
             # --- VOLATILITY BASELINE CAP ---
-            extracted_atr = safe_float(row.get("atr", 0.0)) * 1
+            extracted_atr = 10 #safe_float(row.get("atr", 0.0)) * 1
             row_atr_baseline = max(6.0, min(16.0, extracted_atr))
             active_atr_baseline = row_atr_baseline
 
@@ -187,7 +187,7 @@ def handle_side_averaging(client, df):
 
             # --- UNIFIED STRIPPED FORMULA ---
             # Threshold = -ATR Baseline * Opposite Scale Factor * Lot Balance Geometric Ratio
-            balance_multiplier = float(own_count + 1) / float(opp_count + 1)
+            balance_multiplier = max(1.0, float(own_count + 1) / float(opp_count + 1))
             active_balance_multiplier = balance_multiplier
             
             dynamic_threshold = -row_atr_baseline * opp_matrix_factor * balance_multiplier
