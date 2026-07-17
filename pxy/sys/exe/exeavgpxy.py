@@ -167,7 +167,7 @@ def handle_side_averaging(client, df):
             pos_loss = get_loss(row)
             
             # --- VOLATILITY BASELINE CAP ---
-            extracted_atr = safe_float(row.get("atr", 0.0)) * 1.7
+            extracted_atr = safe_float(row.get("atr", 0.0)) * 1
             row_atr_baseline = max(6.0, min(16.0, extracted_atr))
             active_atr_baseline = row_atr_baseline
 
