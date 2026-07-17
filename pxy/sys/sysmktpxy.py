@@ -1,9 +1,11 @@
 # pxy_engine.py
+import pandas as pd
+import numpy as np
 from sysdthapxy import fetch_yf_data 
 
 DEBUG = True
 
-def _print_console_bar(c1, o1, c0, o0, execution_state):
+def _print_console_bar(c1, c0, execution_state):
     """Renders the graphical console display profiling the active live running candle."""
     RST = "\033[0m"
     RED = "\033[91m"
@@ -11,49 +13,51 @@ def _print_console_bar(c1, o1, c0, o0, execution_state):
     YLW = "\033[1;93m"
     GRAY = "\033[90m"
 
-    min_val = min(c1, c0, o1, o0) - 2
-    max_val = max(c1, c0, o1, o0) + 2
+    # Set up drawing limits based on the current open and close
+    min_val = min(c1, c0) - 2
+    max_val = max(c1, c0) + 2
     scale_width = 20
 
-    def get_clean_bar(val, marker="█"):
+    def get_clean_bar(val):
         pos = int(((val - min_val) / (max_val - min_val)) * scale_width) if max_val != min_val else 1
         pos = max(1, pos)
-        return (marker * pos).ljust(scale_width)
+        return ("█" * pos).ljust(scale_width)
 
-    c1_color = GRN if c1 >= o1 else RED
-    c0_color = GRN if c0 >= o0 else RED
+    # HA Trend Color: Green if Close >= Open, Red if Close < Open
+    candle_color = GRN if c0 >= c1 else RED
 
     rows = [
-        (int(c1), f"CLOSED C1-{int(c1)}", "█", c1_color),
-        (int(c0), f"ACTIVE C0-{int(c0)}", "█", c0_color)
+        (int(c1), f"OPEN  C1-{int(c1)}", candle_color),
+        (int(c0), f"CLOSE C0-{int(c0)}", candle_color)
     ]
 
-    rows.sort(key=lambda item: item, reverse=True)
+    # Sort rows so the higher price prints on top of the console graph
+    rows.sort(key=lambda item: item[0], reverse=True)
 
     print(f"\n{YLW}=GEOMETRIC ENGINE CONSOLE MONITOR(LIVE)={RST}")
-    for val, label, marker, color in rows:
-        print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val, marker)}{GRAY}]{RST}")
+    for val, label, color in rows:
+        print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
-    print(f"       ACTIVE RUNNING CANDLE : {YLW}{execution_state}{RST}")
+    print(f"       CURRENT CANDLE DIRECTION : {YLW}{execution_state}{RST}")
 
 def get_signal(df=None):
     """
-    Evaluates the live running candle against the previous closed candle using strict boundaries.
+    Evaluates the current live running candle's internal direction.
     Returns: (entry_signal, exit_signal) -> ("BULL", "BULL"), ("BEAR", "BEAR"), or ("NONE", "NONE")
     """
     if df is None:
         df = fetch_yf_data()
         
-    if df is None or len(df) < 2:
+    if df is None or df.empty:
         return "NONE", "NONE"
 
     try:
-        # Extract previous closed candle (C1) and active live candle (C0)
-        c1 = float(df.iloc[-2]['Close'])
-        c0 = float(df.iloc[-1]['Close'])
+        # Extract variables from the absolute newest, active candle in the data feed
+        c1 = float(df.iloc[-1]['Open'])   # Current HA Open mapped to c1
+        c0 = float(df.iloc[-1]['Close'])  # Current HA Close mapped to c0
 
         # =====================================================================
-        # 🛡️ EXCLUSIVE CONDITIONAL COMPARE MATRIX (NO SYSTEM DEFAULTS)
+        # 🛡️ EXCLUSIVE CONDITIONAL COMPARE MATRIX (CURRENT CANDLE DIRECTION)
         # =====================================================================
         if c0 > c1:
             execution_state = "BULL"
@@ -62,15 +66,13 @@ def get_signal(df=None):
             execution_state = "BEAR"
             
         else:
-            # Explicit lockout: Absolute physical flat line with no movement
+            # Flatline condition where open equals close exactly
             execution_state = "NONE"
         # =====================================================================
 
         # Render geometric profile layout 
         if DEBUG:
-            _print_console_bar(float(df.iloc[-2]['Close']), float(df.iloc[-2]['Open']), 
-                               float(df.iloc[-1]['Close']), float(df.iloc[-1]['Open']), 
-                               execution_state)
+            _print_console_bar(c1, c0, execution_state)
             
         # Split twin signals directly to downstream pipelines
         return execution_state, execution_state
@@ -85,4 +87,5 @@ if __name__ == "__main__":
     if df is not None and not df.empty:
         entry, ex = get_signal(df)
         print(f"SPLIT OUTPUT SIGNALS >> ENTRY: {entry} | EXIT: {ex}")
+
 
