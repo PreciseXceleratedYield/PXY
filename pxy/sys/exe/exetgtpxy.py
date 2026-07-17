@@ -103,7 +103,7 @@ def target_price(row):
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   
                 # Counter-Trend: Threat is high. Collapse target via division to execute tight scratch exit.
-                target_pct = 2
+                target_pct = 4
             else:                                
                 # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
                 target_pct = 91
