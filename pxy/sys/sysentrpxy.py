@@ -1,53 +1,55 @@
+# pxy_routing_engine.py
 """
 ===============================================================================
-PXY OPTION ROUTING ENGINE WITH STREAMLINED CROSSOVER MATRIX
+PXY OPTION ROUTING ENGINE WITH INDEPENDENT SEPARATION MATRIX
 ===============================================================================
 Operational Rules Matrix:
-1. ENTRY Pipeline: Converted cleanly into option targets (ATMBUY / ATMSELL / NONE).
-2. EXIT Pipeline  : Returns the raw structural engine profile (BULL / BEAR / NONE).
+1. ENTRY Pipeline: Driven exclusively by sysmktpxy (get_signal) -> ATMBUY/ATMSELL.
+2. EXIT Pipeline : Driven exclusively by sysexitpxy (detect_raw_direction) -> BULL/BEAR.
+3. No cross-checking or verification checks between systems.
 ===============================================================================
 """
 
 import pandas as pd
 from syscnfgpxy import TICKER
-# Direct streaming source connection from your geometric core engine module
 from sysmktpxy import get_signal 
+from sysexitpxy import detect_raw_direction
 
 def get_entry_signal(df=None):
     """
-    Direct routing pipeline mapping live exclusive raw signals from sysmktpxy.
-    - BULL (ACTIVE > PREVIOUS CLOSE) -> ENTRY: ATMBUY  | EXIT: BULL
-    - BEAR (ACTIVE < PREVIOUS CLOSE) -> ENTRY: ATMSELL | EXIT: BEAR
-    - NONE (ACTIVE == PREVIOUS CLOSE) -> ENTRY: NONE    | EXIT: NONE
+    Direct routing pipeline mapping live exclusive raw signals.
+    ENTRY uses sysmktpxy -> maps to ATMBUY/ATMSELL/NONE.
+    EXIT uses sysexitpxy -> maps to BULL/BEAR/NONE.
     """
     if df is None:
-        # FIX: Corrected source module naming conventions to track live ticks safely
-        from sysdthapxy import fetch_yf_data
+        from sysdtafpxy import fetch_yf_data
         df = fetch_yf_data()
 
-    # 1. Fetch live active state directly from your geometric module matrix
-    # Returns: (execution_state, execution_state)
-    direction, _ = get_signal(df)
+    # 1. Fetch ENTRY direction from the geometric module (sysmktpxy)
+    mkt_dir, _ = get_signal(df)
 
-    entry_signal = "NONE"
-    exit_signal = "NONE"
+    # 2. Fetch EXIT direction from the direct exit tracker (sysexitpxy)
+    _, exit_dir = detect_raw_direction(df)
 
-    # 2. MATCH AND ROUTE SHAPES WITH MUTUALLY EXCLUSIVE STRUCTURAL SIGNALS
-    if direction == "BULL":
+    # 3. Route ENTRY logic directly (mkt_dir -> entry_signal)
+    if mkt_dir == "BULL":
         entry_signal = "ATMBUY"
-        exit_signal = "BULL"
-
-    elif direction == "BEAR":
+    elif mkt_dir == "BEAR":
         entry_signal = "ATMSELL"
-        exit_signal = "BEAR"
-        
-    elif direction == "NONE":
+    else:
         entry_signal = "NONE"
+
+    # 4. Route EXIT logic directly (exit_dir -> exit_signal)
+    if exit_dir == "UP":
+        exit_signal = "BULL"
+    elif exit_dir == "DOWN":
+        exit_signal = "BEAR"
+    else:
         exit_signal = "NONE"
 
     # Console Status Reporting Actions
-    if entry_signal != "NONE":
-        print(f"      🔥 [ACTION] -> {entry_signal} | {exit_signal}🔥")
+    if entry_signal != "NONE" or exit_signal != "NONE":
+        print(f"      🔥 [ACTION] -> ENTRY: {entry_signal} | EXIT: {exit_signal} 🔥")
     else:
         print("💤 [STANDBY] -> Market Flat Line Detected. Action Terminated. 💤")
 
@@ -55,7 +57,7 @@ def get_entry_signal(df=None):
     return entry_signal, exit_signal
 
 if __name__ == "__main__":
-    from sysdthapxy import fetch_yf_data
+    from sysdtafpxy import fetch_yf_data
     df = fetch_yf_data()
     if df is not None:
         entry, ex = get_entry_signal(df)
