@@ -56,7 +56,7 @@ def get_entry_signal(df=None):
     if entry_signal != "STANDBY":
         print(f"      🔥 [ACTION] -> ENTRY: {entry_signal} | EXIT: {exit_signal} 🔥")
     else:
-        print(f"💤 [STANDBY] -> Mismatch (MKT: {mkt_dir} | ST: {exit_dir})💤")
+        print(f"💤[STANDBY]-Mismatch (MKT:{mkt_dir} | ST:{exit_dir})💤")
 
     # Returns processed option entry and the explicit structural exit string
     return entry_signal, exit_signal
