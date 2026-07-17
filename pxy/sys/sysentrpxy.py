@@ -48,7 +48,7 @@ def get_entry_signal(df=None):
     # 3. ENFORCE ALIGNMENT LOGIC FOR ENTRY PIPELINE
     if mkt_dir == "BULL" and exit_dir == "BULL":
         entry_signal = "ATMBUY"
-    elif mkt_dir == "BEAR" and exit_dir == "BEAR" TYPE:
+    elif mkt_dir == "BEAR" and exit_dir == "BEAR":
         entry_signal = "ATMSELL"
     else:
         entry_signal = "WAIT"
