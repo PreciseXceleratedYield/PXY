@@ -151,6 +151,19 @@ def handle_side_averaging(client, df):
             continue
 
         for index, row in side_df.iterrows():
+            # --- DIRECTION FIELD EXTRACTION & VERIFICATION ---
+            row_direction = str(row.get("direction", "")).upper().strip()
+            
+            # CE can only average when direction is UP
+            if side == "CE" and row_direction != "UP":
+                all_positions_crossed_threshold = False
+                break
+                
+            # PE can only average when direction is DOWN
+            if side == "PE" and row_direction != "DOWN":
+                all_positions_crossed_threshold = False
+                break
+
             pos_loss = get_loss(row)
             
             # --- VOLATILITY BASELINE CAP ---
@@ -224,4 +237,5 @@ def handle_side_averaging(client, df):
                 if success:
                     set_cooling(side)
                     print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Clean Threat Threshold.")
+
 
