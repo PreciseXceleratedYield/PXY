@@ -91,26 +91,26 @@ def target_price(row):
         if is_ce:
             if active_exit in ["SELL", "BEAR"]:  
                 # Counter-Trend: Threat is high. If Power shoots to 10, target collapses to ~1% for an immediate cut.
-                target_pct = atr_val / 2
+                target_pct = 1.9
             else:                                
                 # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
-                target_pct = max((atr_val * ce_p), (atr_val * hce_d)) / 2
+                target_pct = 91
                 
                 # ⚡ ADDED FILTER: Supertrend Alignment (CE + BULL = Double Target)
                 if supertrend == "BULL":
-                    target_pct = target_pct * 2
+                    target_pct = 91
                     
         elif is_pe:
             if active_exit in ["BUY", "BULL"]:   
                 # Counter-Trend: Threat is high. Collapse target via division to execute tight scratch exit.
-                target_pct = atr_val / 2
+                target_pct = 2
             else:                                
                 # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
-                target_pct = max((atr_val * pe_p), (atr_val * hpe_d)) / 2
+                target_pct = 91
                 
                 # ⚡ ADDED FILTER: Supertrend Alignment (PE + BEAR = Double Target)
                 if supertrend == "BEAR":
-                    target_pct = target_pct * 2
+                    target_pct = 91
                 
         # 🔥 HIGH SPEED BANDWIDTH GUARDRAIL
         # Floor set to 1.0% to allow emergency division exits to execute instantly.
