@@ -8,8 +8,6 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # -------------------- Hardcoded constants --------------------
-ROLLING_WINDOW_MINUTES = 2.5  # previously from PARAMS
-ROWS_PER_MINUTE = 1  # assuming 1-min candles
 TOTAL_WIDTH = 42
 
 # -------------------- Direction logic --------------------
@@ -18,29 +16,30 @@ def detect_raw_direction(df: pd.DataFrame) -> tuple:
     Returns:
         (latest_price, direction)
     
-    Raw Close direction logic:
-    - UP: last closed candle < current candle
-    - DOWN: last closed candle > current candle
-    - NONE: if no movement or insufficient data
+    Intraday Candle Structural Logic:
+    - UP  : Running Close > Current Candle Open
+    - DOWN: Running Close < Current Candle Open
+    - NONE: Running Close == Current Candle Open or missing data
     """
-    window_size = int(ROLLING_WINDOW_MINUTES * ROWS_PER_MINUTE)
-    df_window = df.tail(window_size)
-
-    closes = df_window['Close'].tolist()
-    if len(closes) < 2:
+    if df is None or df.empty:
         return (None, "NONE")
 
-    last_closed = closes[-2]
-    current_candle = closes[-1]
+    # Extract the absolute latest candle row from the data feed
+    latest_row = df.iloc[-1]
 
-    if current_candle > last_closed:
+    # Assign core metrics using current candle structural bounds
+    current_candle_open = latest_row['Open']
+    running_close = latest_row['Close']
+
+    # Evaluate dynamic direction state
+    if running_close > current_candle_open:
         direction = "UP"
-    elif current_candle < last_closed:
+    elif running_close < current_candle_open:
         direction = "DOWN"
     else:
         direction = "NONE"
 
-    return (current_candle, direction)
+    return (running_close, direction)
 
 # -------------------- Self-runnable test --------------------
 if __name__ == "__main__":
@@ -48,8 +47,8 @@ if __name__ == "__main__":
     df = fetch_yf_data()
     price, direction = detect_raw_direction(df)
 
-    # Convert price to integer
-    price_int = int(price) if price is not None else "-"
+    # Convert price to integer safely using rounding logic
+    price_int = int(round(price)) if price is not None else "-"
 
     # Apply color
     if direction == "UP":
@@ -74,3 +73,4 @@ if __name__ == "__main__":
 
     # Print final line
     print(left_text_colored + spacing + right_text_colored)
+
