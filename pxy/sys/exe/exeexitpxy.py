@@ -34,7 +34,7 @@ def get_sell_suffix():
     """Generates an explicit sell suffix code with millisecond resolution"""
     IST = pytz.timezone("Asia/Kolkata")
     ms = datetime.now(IST).strftime('%f')[:-3]
-    return f"_S{ms}" # Returns pattern like _S412
+    return f"_S{ms}" 
 
 def place_exit_order(client, row): 
     """Triggers Sell order by appending an explicit _S{ms} suffix to the entry tag.""" 
@@ -42,7 +42,6 @@ def place_exit_order(client, row):
         existing_tag = row.get('tag') 
         
         if existing_tag and str(existing_tag).lower() not in ['nan', 'none', '']: 
-            # FIXED: Grabbed index 0 of the list before calling .strip() to prevent AttributeError
             base_tag = str(existing_tag).split('_')[0].strip()
         else: 
             IST = pytz.timezone("Asia/Kolkata")
@@ -133,14 +132,13 @@ def run_snapshot():
 
     handle_side_averaging(client, df) 
     
-    # Check execution context metrics from helper module
     side_all_targets_hit = analyze_targets_and_sides(df)
 
-    # DYNAMIC MODE ASSESSMENT: Count active entries per side in your tracking data
+    # DYNAMIC COUNT ASSESSMENT: Extract exact row integer using index 0
     ce_count = df[df['symbol'].str.contains('CE', na=False, case=True)].shape[0]
     pe_count = df[df['symbol'].str.contains('PE', na=False, case=True)].shape[0]
 
-    debug_log(f"Active Hedge Matrix Structure -> CE Legs: {ce_count} | PE Legs: {pe_count}", Fore.CYAN)
+    debug_log(f"Active Hedge Matrix Structure -> CE Split Rows: {ce_count} | PE Split Rows: {pe_count}", Fore.CYAN)
 
     # Proactive Core Execution Routing Logic Block
     for idx, r in df.iterrows():
@@ -148,23 +146,37 @@ def run_snapshot():
         ltp = float(r.get("sell_prc", 0))
         tgt = float(r.get("pxy_tgt", 0))
 
-        # Dynamically switch mode: if both sides are alive, honor the system-wide "all" constraint.
-        # If one side has completely flatlined, flip to "one" to salvage single target executions.
-        if ce_count > 0 and pe_count > 0:
-            effective_mode = EXIT_MODE  # Keeps 'all' rule intact for full hedge structures
-        else:
-            effective_mode = "one"     # Switches to 'one' since opposite side is empty
+        # Condition 1: Solo Side Active
+        if ce_count == 0 or pe_count == 0:
+            effective_mode = "one"
+            debug_log(f"Solo Side Active ({sym}). Mode: SINGLE TARGET.", Fore.YELLOW)
 
+        # Condition 2: Perfectly Equal Row Count Symmetry -> Enforce "All-or-Nothing"
+        elif ce_count == pe_count:
+            effective_mode = EXIT_MODE  
+            debug_log(f"Hedge Matrix Equalized ({ce_count} == {pe_count} rows). Mode: ALL-OR-NOTHING.", Fore.BLUE)
+
+        # Condition 3: Imbalanced Structural Rows
+        else:
+            if "CE" in sym and ce_count > pe_count:
+                effective_mode = "one"
+                debug_log(f"Heavy Side: CE ({ce_count} > {pe_count} rows). Mode: SINGLE TARGET.", Fore.MAGENTA)
+            elif "PE" in sym and pe_count > ce_count:
+                effective_mode = "one"
+                debug_log(f"Heavy Side: PE ({pe_count} > {ce_count} rows). Mode: SINGLE TARGET.", Fore.MAGENTA)
+            else:
+                effective_mode = "all"
+                debug_log(f"Lighter Side Protected Matrix Lot ({sym}). Mode: ALL-OR-NOTHING.", Fore.BLUE)
+
+        # Route Order Processing Operations
         if effective_mode == "all":
             if ("CE" in sym and side_all_targets_hit.get("CE", False)) or ("PE" in sym and side_all_targets_hit.get("PE", False)):
                 verify_and_exit(client, r)
         else:
-            # "one" mode routing execution rule
             if ltp >= tgt:
-                print(f"{Fore.GREEN}🎯 Dynamic Single Target Hit ({sym}): LTP {ltp} >= TGT {tgt} (Opposite side is clear)")
+                print(f"{Fore.GREEN}🎯 Dynamic Single Target Hit ({sym}): LTP {ltp} >= TGT {tgt} (Imbalanced Side Execution)")
                 verify_and_exit(client, r)
 
-    # Pass rendering, logging prints, and final file writing to the tracker helper
     process_metrics_print_and_dump(df, side_all_targets_hit, EXIT_MODE)
 
 if __name__ == "__main__": 
