@@ -190,10 +190,22 @@ while true; do
 
             echo "Initializing Trading Engine..."
             if ! tmux has-session -t pxy 2>/dev/null; then
-                # FIX: Spawn a clean, persistent session
+                # 1. Spawn a clean, isolated background tmux environment
                 tmux new-session -d -s pxy
-                # FIX: Stream the output to both screen AND a log file so errors are never lost
-                tmux send-keys -t pxy "cd /home/pxy/pxy && source ~/env/bin/activate && pxyexe 2>&1 | tee $ENGINE_LOG" C-m
+                
+                # 2. Force the engine window to stay open even if a code crash occurs
+                tmux set-option -t pxy remain-on-exit on
+
+                # 3. Print clear visual setup confirmations directly onto the buffer
+                tmux send-keys -t pxy "clear" C-m
+                tmux send-keys -t pxy "echo '=========================================='" C-m
+                tmux send-keys -t pxy "echo ' [STARTING] Booting PXY Trading Engine... '" C-m
+                tmux send-keys -t pxy "echo '=========================================='" C-m
+                tmux send-keys -t pxy "cd /home/pxy/pxy && source ~/env/bin/activate" C-m
+                tmux send-keys -t pxy "echo 'Executing engine executable binary...'" C-m
+                
+                # 4. Fire the engine and pipe all runtime data simultaneously to terminal and logfile
+                tmux send-keys -t pxy "pxyexe 2>&1 | tee $ENGINE_LOG" C-m
                 echo "[✔] Terminal engine running in background."
             else
                 echo "[-] Terminal engine already running."
@@ -207,10 +219,10 @@ while true; do
             if tmux has-session -t pxy 2>/dev/null; then
                 echo "Attaching to active live session..."
                 echo "-> TIP: Press [Ctrl+B] then [D] to disconnect cleanly."
-                sleep 1.5
-                tmux attach -t pxy
+                sleep 0.5
+                # FIX: Forces a complete pixel redraw of the target client session to kill the blank screen
+                tmux attach -t pxy \; refresh-client
             else
-                # FIX: If the engine died, read the saved error stream to show you exactly why it failed
                 echo "[X] Engine is offline or terminated unexpectedly!"
                 draw_border
                 echo "      LAST 25 LINES OF SYSTEM LOGS:       "
