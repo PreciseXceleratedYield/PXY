@@ -4,6 +4,7 @@ const WebSocket = require('ws');
 const { exec } = require('child_process'); 
 const path = require('path'); 
 const os = require('os'); 
+const fs = require('fs'); // ✅ Added to safely handle file stream arrays
 
 const app = express(); 
 const server = http.createServer(app); 
@@ -44,6 +45,7 @@ const ALLOWED_SCRIPTS = [
     'pxyupdate', 'pxysqrall', 'pxybuyce', 'pxybuype', 'pxysqrce', 'pxysqrpe' 
 ]; 
 const SCRIPT_DIR = '/home/pxy/pxy'; 
+const ENGINE_LOG = '/home/pxy/pxy/engine_boot.log'; // ✅ Registered Engine Log Path
 
 app.post('/run/:script', (req, res) => { 
     const script = req.params.script.trim(); 
@@ -60,14 +62,12 @@ app.post('/run/:script', (req, res) => {
     
     const runAsUser = process.env.USER === 'root' ? 'sudo -u pxy ' : '';
     
-    // FIXED: Navigates to working dir, activates your python environment, then launches the short command name directly
     const cmd = `${runAsUser}bash --login -c "cd /home/pxy/pxy && [ -f ~/env/bin/activate ] && source ~/env/bin/activate; export PATH=/home/pxy/pxy:\\$PATH; ${script}"`; 
     
     exec(cmd, { 
         timeout: 30000, 
         cwd: SCRIPT_DIR, 
         env: { 
-            // FIXED: Prepended your Python virtual environment binary block to execution PATH variable mapping
             PATH: '/home/pxy/env/bin:/home/pxy/pxy:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/pxy/.local/bin',
             HOME: '/home/pxy', 
             USER: 'pxy', 
@@ -100,15 +100,20 @@ wss.on('connection', (ws) => {
         if (isProcessing) return; 
         isProcessing = true;
 
-        const captureCmd = 'tmux has-session -t pxy 2>/dev/null && tmux capture-pane -t pxy:0.0 -pS -200 -J -e';
+        // FIXED: Checked if the nohup script is running. If yes, read the last 100 log file lines instead of using tmux capture
+        const captureCmd = `pgrep -f "sysexepxy.py" >/dev/null && [ -f ${ENGINE_LOG} ] && tail -n 100 ${ENGINE_LOG}`;
         
         exec(captureCmd, (err, stdout, stderr) => { 
             isProcessing = false; 
 
             if (err) { 
-                console.error('[WS] tmux exec error:', err.message); 
+                // If engine process isn't running, send an explicit notice to the dashboard console
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send("[SYSTEM STATUS] Engine offline. Please use option 2 in Console to start background modules.");
+                }
                 return; 
             } 
+            
             if (!stdout) return; 
             
             if (ws.readyState === WebSocket.OPEN) { 
@@ -150,4 +155,3 @@ server.on('error', (err) => {
 });
 
 listenServer(PORT);
-
