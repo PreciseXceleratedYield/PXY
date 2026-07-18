@@ -161,9 +161,12 @@ while true; do
         0|k)
             echo ""
             echo "Terminating Web Server..."
-            if pgrep -f "pxy.js" >/dev/null 2>&1; then
-                pkill -9 -f pxy.js
+            if tmux has-session -t pxy-web 2>/dev/null; then
+                tmux kill-session -t pxy-web
                 echo "[✔] Stopped web core."
+            elif pgrep -f "pxy.js" >/dev/null 2>&1; then
+                pkill -9 -f pxy.js
+                echo "[✔] Stopped fallback web core."
             fi
             echo "Terminating Core Engines..."
             if tmux has-session -t pxy 2>/dev/null; then
@@ -184,10 +187,10 @@ while true; do
         2|s)
             echo ""
             echo "Initializing Node Server..."
-            # Using independent background execution structure via node running inside a detached session
-            if ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
-                nohup node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1 &
-                echo "[✔] Web dashboard started."
+            # Launch Node inside its own isolated tmux session to protect against shell closure
+            if ! tmux has-session -t pxy-web 2>/dev/null && ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
+                tmux new-session -d -s pxy-web "bash -c 'cd /home/pxy/pxy && node pxy.js >> pxy.log 2>&1'"
+                echo "[✔] Web dashboard started in background (tmux)."
             else
                 echo "[-] Web dashboard already running."
             fi
