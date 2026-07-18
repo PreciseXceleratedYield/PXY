@@ -14,6 +14,14 @@ def f(x, d=0.0):
         return d
 
 
+def dynamic_entry(row):
+    """Returns the raw entry price from row dictionary entries with no tracking variables."""
+    try:
+        return round(float(row.get("buy_prc", 0)), 2)
+    except (ValueError, TypeError):
+        return 0.0
+
+
 def target_price(row):
     """Calculates individual option layer target price using static thresholds.
     
