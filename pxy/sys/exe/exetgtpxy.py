@@ -1,12 +1,8 @@
-# sys/exe/dynentrypxy.py
-import pandas as pd
+# sys/exe/exetgtpxy.py
 from colorama import Fore, Style, init
 
 # Initialize colorama for clean, colored terminal output formatting
 init(autoreset=True)
-
-# Global tracking structures to prevent log flooding on rapid tick cycles
-printed_sides = set()
 
 
 def f(x, d=0.0):
@@ -14,64 +10,25 @@ def f(x, d=0.0):
     try:
         val = float(x)
         return val if val > 0 else d
-    except Exception:
+    except (ValueError, TypeError):
         return d
-
-
-def i(x, d=0):
-    """Safely cast input to integer, return default if casting fails."""
-    try:
-        return int(float(x))
-    except Exception:
-        return d
-
-
-def dynamic_entry(row):
-    """Returns the raw entry price from row dictionary entries with no tracking variables."""
-    try:
-        return round(float(row.get("buy_prc", 0)), 2)
-    except Exception:
-        return 0.0
 
 
 def target_price(row):
-    """Calculates individual option layer target price using dynamic matrices.
+    """Calculates individual option layer target price using static thresholds.
     
-    Aligned Trades   : max(ATR * Power, ATR * Depth) with no upper limit for maximum extraction.
-    Supertrend Bonus : Doubles the target percentage if Supertrend direction aligns with the trade.
-    Hostile Trades   : ATR / Power down to a 1.0% floor (instant crash cutting).
+    Aligned Trades : Hardcoded 41% target expansion.
+    Hostile Trades : Hardcoded 1.4% crash cutting target floor.
     """
-    global printed_sides
-
     try:
-        # 1. Extract baseline metrics safely
-        atr_val = f(row.get("atr"), 6.0)
-        ce_power = f(row.get("ce_power"), 1.0)
-        pe_power = f(row.get("pe_power"), 1.0)
-        
-        ce_disp = int(ce_power) if float(ce_power).is_integer() else ce_power
-        pe_disp = int(pe_power) if float(pe_power).is_integer() else pe_power
-        atr_disp = int(atr_val) if float(atr_val).is_integer() else round(atr_val, 2)
-
-        # 2. Print dashboard status line once per unique data configuration refresh
-        print_key = f"{atr_disp}_{ce_disp}_{pe_disp}"
-        if print_key not in printed_sides:
-            raw_display_len = len(f" {atr_disp}    BUY : {ce_disp}%    SELL: {pe_disp}%") + 6  
-            spaces_needed = max(0, (40 - raw_display_len) // 2)
-            padding = " " * spaces_needed
-            
-            print(f"{padding}↕️ {atr_disp}  {Fore.GREEN}🟢  BUY : {ce_disp}%  {Fore.RED}🔴  SELL: {pe_disp}%")
-            printed_sides.add(print_key)
-
-        # 3. Entry data execution health check
+        # 1. Entry data execution health check
         entry_prc = f(row.get("pxy_entry") or row.get("buy_prc"))
         if entry_prc <= 0:
             return 0.0
 
-        # 4. Context string extractors
+        # 2. Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
         active_exit = str(row.get("exit", "NONE")).upper().strip()
-        supertrend = str(row.get("supertrend", "NONE")).upper().strip()
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
@@ -79,48 +36,25 @@ def target_price(row):
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
 
-        # 5. Extract Option Matrix parameters (Enforce absolute 1.0 minimum to prevent ZeroDivisionError)
-        hce_d = max(1.0, f(row.get("hkin_ce_depth"), 1.0))
-        hpe_d = max(1.0, f(row.get("hkin_pe_depth"), 1.0))
-        ce_p = max(1.0, f(row.get("ce_power"), 1.0))
-        pe_p = max(1.0, f(row.get("pe_power"), 1.0))
-
         target_pct = 0.0
 
-        # 6. Core execution logic evaluating directional signals
+        # 3. Core execution logic evaluating directional signals using hardcoded metrics
         if is_ce:
-            if active_exit in ["SELL", "BEAR"]:  
-                # Counter-Trend: Threat is high. If Power shoots to 10, target collapses to ~1% for an immediate cut.
-                target_pct = 1.9
+            if active_exit in ("SELL", "BEAR"):  
+                target_pct = 1.4
             else:                                
-                # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
-                target_pct = 91
-                
-                # ⚡ ADDED FILTER: Supertrend Alignment (CE + BULL = Double Target)
-                if supertrend == "BULL":
-                    target_pct = 91
-                    
+                target_pct = 41
         elif is_pe:
-            if active_exit in ["BUY", "BULL"]:   
-                # Counter-Trend: Threat is high. Collapse target via division to execute tight scratch exit.
-                target_pct = 4
+            if active_exit in ("BUY", "BULL"):   
+                target_pct = 1.4
             else:                                
-                # Aligned Trend: Automatically execute whichever structural momentum spike is higher.
-                target_pct = 91
-                
-                # ⚡ ADDED FILTER: Supertrend Alignment (PE + BEAR = Double Target)
-                if supertrend == "BEAR":
-                    target_pct = 91
-                
-        # 🔥 HIGH SPEED BANDWIDTH GUARDRAIL
-        # Floor set to 1.0% to allow emergency division exits to execute instantly.
-        # Upper ceiling removed completely to allow uncapped, realistic momentum expansions.
-        target_pct = max(1.0, target_pct)
+                target_pct = 41
 
-        # 7. Final mathematical target premium projection calculation
+        # 4. Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
         return round(calculated_target, 2)
 
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
+
