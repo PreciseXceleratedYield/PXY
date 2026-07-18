@@ -116,7 +116,7 @@ def calculate_dynamic_profit_target(file_path):
                 return 0.0
                 
             total_legs = ce_count + pe_count
-            return float(total_legs * 1000.0)
+            return float(total_legs * 1500.0)
             
     except Exception as e:
         print(f"{Fore.RED}⚠ Option Leg Parser Error on {os.path.basename(file_path)}: {e}")
@@ -211,7 +211,7 @@ def start_trailing_engine():
         unrealised_pnl = safe_load_json_pnl(POS_JSON_PATH)
         current_net_pnl = realised_pnl + unrealised_pnl
         
-        # Calculate dynamic target. Profit target matches total legs * 1000 if both CE and PE exist.
+        # Calculate dynamic target. Profit target matches total legs * 1500 if both CE and PE exist.
         profit_target = calculate_dynamic_profit_target(POS_JSON_PATH)
         
         # Shift peak upwards dynamically if cumulative returns hit new records
