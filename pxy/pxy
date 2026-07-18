@@ -10,6 +10,9 @@ fi
 
 export PATH=$PWD:$PATH
 
+# Create a log file path to capture engine output
+ENGINE_LOG="/home/pxy/pxy/engine_boot.log"
+
 # ========================================
 # RENDER HELPER (FIXED 42 CHAR WIDTH)
 # ========================================
@@ -35,7 +38,6 @@ show_trading_menu() {
         draw_border
         read -p "Select option [1-6]: " SUBOPT
         
-        # If user presses Enter without input, exit the menu
         if [ -z "$SUBOPT" ]; then
             break
         fi
@@ -62,10 +64,8 @@ show_test_menu() {
         echo "          PXY SCRIPT TEST MENU            "
         draw_border
         
-        # Find 5 most recent .py files in home dir and store in array
         mapfile -t PY_FILES < <(find "$HOME" -type f -name "*.py" -not -path '*/.*' 2>/dev/null -printf '%T@ %p\n' | sort -rn | head -n 5 | cut -d' ' -f2-)
         
-        # Check if any python files were found
         if [ ${#PY_FILES[@]} -eq 0 ]; then
             echo "No python files found in $HOME."
             echo "6) Back    - Return Main System Menu"
@@ -74,7 +74,6 @@ show_test_menu() {
             break
         fi
 
-        # Dynamically print found files
         for i in "${!PY_FILES[@]}"; do
             DISPLAY_NAME=$(echo "${PY_FILES[$i]}" | sed "s|^$HOME|~|")
             printf "%d) Execute - %-28s\n" $((i+1)) "$DISPLAY_NAME"
@@ -85,7 +84,6 @@ show_test_menu() {
         
         read -p "Select option [1-7]: " TESTOPT
         
-        # If user presses Enter without input, exit the menu
         if [ -z "$TESTOPT" ]; then
             break
         fi
@@ -106,7 +104,6 @@ show_test_menu() {
                 draw_border
             done
             read -p "All script executions finished. Press [Enter]..."
-        # Use regex comparison to validate selection cleanly without integer errors
         elif [[ "$TESTOPT" =~ ^[1-5]$ ]] && [ "$TESTOPT" -le ${#PY_FILES[@]} ]; then
             SELECTED_FILE="${PY_FILES[$((TESTOPT-1))]}"
             echo ""
@@ -114,7 +111,6 @@ show_test_menu() {
             echo "Executing: $SELECTED_FILE"
             draw_border
             
-            # Execute with active virtual environment
             if [ -f "$HOME/env/bin/activate" ]; then
                 source "$HOME/env/bin/activate"
             fi
@@ -147,10 +143,8 @@ while true; do
     draw_border
     read -p "Select option [0-6 or k-x]: " OPTION
     
-    # Convert input to lowercase to support uppercase key variants smoothly
     OPTION=$(echo "$OPTION" | tr '[:upper:]' '[:lower:]')
 
-    # If user presses Enter without input, exit the main console completely
     if [ -z "$OPTION" ]; then
         echo ""
         echo "Exiting management shell. Goodbye!"
@@ -187,7 +181,6 @@ while true; do
         2|s)
             echo ""
             echo "Initializing Node Server..."
-            # Launch Node inside its own isolated tmux session to protect against shell closure
             if ! tmux has-session -t pxy-web 2>/dev/null && ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
                 tmux new-session -d -s pxy-web "bash -c 'cd /home/pxy/pxy && node pxy.js >> pxy.log 2>&1'"
                 echo "[✔] Web dashboard started in background (tmux)."
@@ -197,8 +190,11 @@ while true; do
 
             echo "Initializing Trading Engine..."
             if ! tmux has-session -t pxy 2>/dev/null; then
-                tmux new-session -d -s pxy "bash -c 'cd /home/pxy/pxy && source ~/env/bin/activate && pxyexe; exec bash'"
-                echo "[✔] Terminal engine running background."
+                # FIX: Spawn a clean, persistent session
+                tmux new-session -d -s pxy
+                # FIX: Stream the output to both screen AND a log file so errors are never lost
+                tmux send-keys -t pxy "cd /home/pxy/pxy && source ~/env/bin/activate && pxyexe 2>&1 | tee $ENGINE_LOG" C-m
+                echo "[✔] Terminal engine running in background."
             else
                 echo "[-] Terminal engine already running."
             fi
@@ -209,11 +205,22 @@ while true; do
         3|v)
             echo ""
             if tmux has-session -t pxy 2>/dev/null; then
-                echo "Attaching... (Press Ctrl+B, D to exit)"
-                sleep 1
+                echo "Attaching to active live session..."
+                echo "-> TIP: Press [Ctrl+B] then [D] to disconnect cleanly."
+                sleep 1.5
                 tmux attach -t pxy
             else
-                echo "[X] Engine offline. Run Option 2 first!"
+                # FIX: If the engine died, read the saved error stream to show you exactly why it failed
+                echo "[X] Engine is offline or terminated unexpectedly!"
+                draw_border
+                echo "      LAST 25 LINES OF SYSTEM LOGS:       "
+                draw_border
+                if [ -f "$ENGINE_LOG" ]; then
+                    tail -n 25 "$ENGINE_LOG"
+                else
+                    echo "No log history file found at $ENGINE_LOG"
+                fi
+                draw_border
                 read -p "Press [Enter] to return..."
             fi
             ;;
@@ -229,8 +236,9 @@ while true; do
             break
             ;;
         *)
-            echo "[!] Invalid input configuration."
+            echo "Invalid option."
             sleep 1
             ;;
     esac
 done
+
