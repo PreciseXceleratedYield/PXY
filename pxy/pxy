@@ -2,7 +2,7 @@
 # ========================================
 # ENVIRONMENT CONFIGURATION
 # ========================================
-cd /home/pxy/pxy || exit 1
+cd /home/pxy/pxy/sys || exit 1
 
 if [ -f "$HOME/env/bin/activate" ]; then
     source "$HOME/env/bin/activate"
@@ -190,22 +190,19 @@ while true; do
 
             echo "Initializing Trading Engine..."
             if ! tmux has-session -t pxy 2>/dev/null; then
-                # 1. Spawn a clean, isolated background tmux environment
+                # Spawn background pane session safely
                 tmux new-session -d -s pxy
-                
-                # 2. Force the engine window to stay open even if a code crash occurs
                 tmux set-option -t pxy remain-on-exit on
 
-                # 3. Print clear visual setup confirmations directly onto the buffer
+                # Send startup diagnostic signals to trace progress
                 tmux send-keys -t pxy "clear" C-m
                 tmux send-keys -t pxy "echo '=========================================='" C-m
-                tmux send-keys -t pxy "echo ' [STARTING] Booting PXY Trading Engine... '" C-m
+                tmux send-keys -t pxy "echo ' [STARTING] Booting Python Engine Core... '" C-m
                 tmux send-keys -t pxy "echo '=========================================='" C-m
-                tmux send-keys -t pxy "cd /home/pxy/pxy && source ~/env/bin/activate" C-m
-                tmux send-keys -t pxy "echo 'Executing engine executable binary...'" C-m
+                tmux send-keys -t pxy "cd /home/pxy/pxy/sys && source ~/env/bin/activate" C-m
                 
-                # 4. Fire the engine and pipe all runtime data simultaneously to terminal and logfile
-                tmux send-keys -t pxy "pxyexe 2>&1 | tee $ENGINE_LOG" C-m
+                # Execute Python loop and direct data stream to both screen and file
+                tmux send-keys -t pxy "python3 sysexepxy.py 2>&1 | tee $ENGINE_LOG" C-m
                 echo "[✔] Terminal engine running in background."
             else
                 echo "[-] Terminal engine already running."
@@ -220,7 +217,7 @@ while true; do
                 echo "Attaching to active live session..."
                 echo "-> TIP: Press [Ctrl+B] then [D] to disconnect cleanly."
                 sleep 0.5
-                # FIX: Forces a complete pixel redraw of the target client session to kill the blank screen
+                # Sync terminal graphics arrays instantly to prevent blank black screen
                 tmux attach -t pxy \; refresh-client
             else
                 echo "[X] Engine is offline or terminated unexpectedly!"
