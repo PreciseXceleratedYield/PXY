@@ -676,20 +676,21 @@ new ResizeObserver(()=>{if(lastCandles)drawChart(lastCandles);if(lastMoSt&&lastM
 
 /* ── POSITIONS ── */
 async function loadPos(){
-    let data=[];try{data=await fetch('./webpospxy.json?_='+Date.now()).then(r=>r.json());}catch{}
-    const open=data.filter(d=>(d.STATUS||'OPEN')==='OPEN');
-    const total=open.reduce((s,d)=>s+(d.PNL||0),0);
+    let data={positions:[]};try{data=await fetch('./webactpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    const open=data.positions||[];
+    const total=open.reduce((s,d)=>s+(d.pnl||0),0);
     const lbl=$('posPnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const r=$('pnlRunning');r.textContent=fmt(total);r.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const scroll=$('posScroll');scroll.querySelectorAll('.p-row').forEach(r=>r.remove());
     if(!open.length){$('posEmpty').style.display='block';return;}$('posEmpty').style.display='none';
-    open.sort((a,b)=>{const v=psCol==='pnl'?(a.PNL||0)-(b.PNL||0):String(a.Tag||'').localeCompare(String(b.Tag||''));return psAsc?v:-v;});
+    open.sort((a,b)=>{const v=psCol==='pnl'?(a.pnl||0)-(b.pnl||0):String(a.symbol||'').localeCompare(String(b.symbol||''));return psAsc?v:-v;});
     open.forEach(d=>{
-        const pnl=d.PNL||0,pb=pnl>=0,isCE=(d.SYMBOL||'').toUpperCase().endsWith('CE');
-        const qty=d.QTY??'—',lots=qty!=='—'?Math.round(Math.abs(qty)/lotSz(d.SYMBOL)):'—';
+        const pnl=d.pnl||0,pb=pnl>=0,isCE=(d.side||'').toUpperCase()==='CE';
+        const entryPct=d.entry_percentage??'—',targetPct=d.target_percentage??'—';
+        const crossed=d.target_crossed?'🎯':'';
         const row=document.createElement('div');row.className=`p-row ${pb?'bull-r':'bear-r'}`;
-        row.innerHTML=`<span class="p-tag">#${d.Tag||'—'}</span>
-            <div><div class="p-sym">${shortSym(d.SYMBOL)}</div><div class="p-meta">${qty}·${lots}L·${isCE?'CE':'PE'}</div></div>
+        row.innerHTML=`<span class="p-tag">${isCE?'CE':'PE'}</span>
+            <div><div class="p-sym">${shortSym(d.symbol)}</div><div class="p-meta">E${entryPct}%·T${targetPct}%${crossed}</div></div>
             <span class="p-pnl ${pb?'bull':'bear'}">${fmt(pnl)}</span>`;
         scroll.appendChild(row);
     });
