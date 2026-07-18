@@ -141,11 +141,11 @@ while true; do
     echo "1/u) Update - Run Foreground Live View"
     echo "2/s) Start  - Start Background Engine"
     echo "3/v) View   - Attach Terminal Session"
-    echo "4/m) Manage - Open Operations Submenu"
+    echo "4/e) Enter  - Open Operations Submenu"
     echo "5/t) Test   - Execute Recent Python Scripts"
-    echo "6/e) Exit   - Close Engine Management"
+    echo "6/x) Exit   - Close Engine Management"
     draw_border
-    read -p "Select option [0-6 or k-e]: " OPTION
+    read -p "Select option [0-6 or k-x]: " OPTION
     
     # Convert input to lowercase to support uppercase key variants smoothly
     OPTION=$(echo "$OPTION" | tr '[:upper:]' '[:lower:]')
@@ -184,6 +184,7 @@ while true; do
         2|s)
             echo ""
             echo "Initializing Node Server..."
+            # Using independent background execution structure via node running inside a detached session
             if ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
                 nohup node /home/pxy/pxy/pxy.js >> /home/pxy/pxy/pxy.log 2>&1 &
                 echo "[✔] Web dashboard started."
@@ -213,13 +214,13 @@ while true; do
                 read -p "Press [Enter] to return..."
             fi
             ;;
-        4|m)
+        4|e)
             show_trading_menu
             ;;
         5|t)
             show_test_menu
             ;;
-        6|e)
+        6|x)
             echo ""
             echo "Exiting management shell. Goodbye!"
             break
