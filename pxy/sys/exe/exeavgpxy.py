@@ -6,7 +6,7 @@ from colorama import Fore
 # 🔍 Routing package path into the "run" subdirectory explicitly
 from run.runpchkpxy import get_position_summary
 
-# 📦 Import cleaned tracking operators and UI desks directly from the helper file
+# 📦 Pure explicit extraction from your customized external helper script module
 from exeaxgpxy import (
     send_market_order, 
     set_cooling, 
@@ -93,8 +93,16 @@ def handle_side_averaging(client, df):
         active_opp_matrix, active_atr_baseline, active_balance_multiplier = 1.0, 0.0, 1.0
 
         for index, row in side_df.iterrows():
-            row_direction = str(row.get("direction", "")).upper().strip()
-            if (side == "CE" and row_direction != "UP") or (side == "PE" and row_direction != "DOWN"):
+            # --- EXIT SIGNAL FIELD EXTRACTION & VERIFICATION ---
+            row_exit_signal = str(row.get("exit", "")).upper().strip()
+            
+            # CE can only average when exit is BULL
+            if side == "CE" and row_exit_signal != "BULL":
+                all_positions_crossed_threshold = False
+                continue  # Skips single row out of trend without stalling remaining positions
+                
+            # PE can only average when exit is BEAR
+            if side == "PE" and row_exit_signal != "BEAR":
                 all_positions_crossed_threshold = False
                 continue  # Skips single row out of trend without stalling remaining positions
 
@@ -124,7 +132,7 @@ def handle_side_averaging(client, df):
             dynamic_threshold = -row_atr_baseline * opp_matrix_factor * balance_multiplier
             last_calculated_threshold = dynamic_threshold
 
-            # Risk Protection: If even one active positional row does not cross the barrier, defer trading.
+            # Risk Protection: Defer averaging if even one contract row has not broken the barrier
             if pos_loss > dynamic_threshold:
                 all_positions_crossed_threshold = False
 
@@ -157,4 +165,3 @@ def handle_side_averaging(client, df):
                 print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Clean Threat Threshold.")
             else:
                 print(f"{Fore.RED}❌ CRITICAL: NeoAPI refused or dropped connection. Order not filled.")
-
