@@ -80,9 +80,10 @@ show_test_menu() {
             printf "%d) Execute - %-28s\n" $((i+1)) "$DISPLAY_NAME"
         done
         echo "6) Back    - Return Main System Menu"
+        echo "7) All     - Execute All Functions At Once"
         draw_border
         
-        read -p "Select option [1-6]: " TESTOPT
+        read -p "Select option [1-7]: " TESTOPT
         
         # If user presses Enter without input, exit the menu
         if [ -z "$TESTOPT" ]; then
@@ -91,6 +92,20 @@ show_test_menu() {
         
         if [ "$TESTOPT" = "6" ]; then
             break
+        elif [ "$TESTOPT" = "7" ]; then
+            echo ""
+            draw_border
+            echo "Executing All Python Scripts Sequentially..."
+            draw_border
+            if [ -f "$HOME/env/bin/activate" ]; then
+                source "$HOME/env/bin/activate"
+            fi
+            for SELECTED_FILE in "${PY_FILES[@]}"; do
+                echo "-> Running: $SELECTED_FILE"
+                python3 "$SELECTED_FILE"
+                draw_border
+            done
+            read -p "All script executions finished. Press [Enter]..."
         # Use regex comparison to validate selection cleanly without integer errors
         elif [[ "$TESTOPT" =~ ^[1-5]$ ]] && [ "$TESTOPT" -le ${#PY_FILES[@]} ]; then
             SELECTED_FILE="${PY_FILES[$((TESTOPT-1))]}"
@@ -122,16 +137,19 @@ while true; do
     draw_border
     echo "            PXY ENGINE CONSOLE            "
     draw_border
-    echo "0) Stop   - Kill All Active Systems"
-    echo "1) Update - Run Foreground Live View"
-    echo "2) Start  - Start Background Engine"
-    echo "3) View   - Attach Terminal Session"
-    echo "4) Trade  - Open Operations Submenu"
-    echo "5) Test   - Execute Recent Python Scripts"
-    echo "6) Exit   - Close Engine Management"
+    echo "0/k) Stop   - Kill All Active Systems"
+    echo "1/u) Update - Run Foreground Live View"
+    echo "2/s) Start  - Start Background Engine"
+    echo "3/v) View   - Attach Terminal Session"
+    echo "4/m) Manage - Open Operations Submenu"
+    echo "5/t) Test   - Execute Recent Python Scripts"
+    echo "6/e) Exit   - Close Engine Management"
     draw_border
-    read -p "Select option [0-6]: " OPTION
+    read -p "Select option [0-6 or k-e]: " OPTION
     
+    # Convert input to lowercase to support uppercase key variants smoothly
+    OPTION=$(echo "$OPTION" | tr '[:upper:]' '[:lower:]')
+
     # If user presses Enter without input, exit the main console completely
     if [ -z "$OPTION" ]; then
         echo ""
@@ -140,7 +158,7 @@ while true; do
     fi
 
     case $OPTION in
-        0)
+        0|k)
             echo ""
             echo "Terminating Web Server..."
             if pgrep -f "pxy.js" >/dev/null 2>&1; then
@@ -154,7 +172,7 @@ while true; do
             fi
             read -p "Press [Enter] to return..."
             ;;
-        1)
+        1|u)
             echo ""
             draw_border
             echo "       RUNNING FOREGROUND UPDATE        "
@@ -163,7 +181,7 @@ while true; do
             draw_border
             read -p "Press [Enter] to return..."
             ;;
-        2)
+        2|s)
             echo ""
             echo "Initializing Node Server..."
             if ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
@@ -184,7 +202,7 @@ while true; do
             echo "Safe to disconnect your console window."
             read -p "Press [Enter] to return..."
             ;;
-        3)
+        3|v)
             echo ""
             if tmux has-session -t pxy 2>/dev/null; then
                 echo "Attaching... (Press Ctrl+B, D to exit)"
@@ -195,13 +213,13 @@ while true; do
                 read -p "Press [Enter] to return..."
             fi
             ;;
-        4)
+        4|m)
             show_trading_menu
             ;;
-        5)
+        5|t)
             show_test_menu
             ;;
-        6)
+        6|e)
             echo ""
             echo "Exiting management shell. Goodbye!"
             break
