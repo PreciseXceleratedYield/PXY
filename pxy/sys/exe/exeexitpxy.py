@@ -42,7 +42,8 @@ def place_exit_order(client, row):
         existing_tag = row.get('tag') 
         
         if existing_tag and str(existing_tag).lower() not in ['nan', 'none', '']: 
-            base_tag = str(existing_tag).split('_').strip()
+            # FIXED: Grabbed index 0 of the list before calling .strip() to prevent AttributeError
+            base_tag = str(existing_tag).split('_')[0].strip()
         else: 
             IST = pytz.timezone("Asia/Kolkata")
             base_tag = datetime.now(IST).strftime('%H%M%S')
@@ -135,17 +136,32 @@ def run_snapshot():
     # Check execution context metrics from helper module
     side_all_targets_hit = analyze_targets_and_sides(df)
 
+    # DYNAMIC MODE ASSESSMENT: Count active entries per side in your tracking data
+    ce_count = df[df['symbol'].str.contains('CE', na=False, case=True)].shape[0]
+    pe_count = df[df['symbol'].str.contains('PE', na=False, case=True)].shape[0]
+
+    debug_log(f"Active Hedge Matrix Structure -> CE Legs: {ce_count} | PE Legs: {pe_count}", Fore.CYAN)
+
     # Proactive Core Execution Routing Logic Block
     for idx, r in df.iterrows():
         sym = str(r.get('symbol', ''))
         ltp = float(r.get("sell_prc", 0))
         tgt = float(r.get("pxy_tgt", 0))
 
-        if EXIT_MODE == "all":
-            if ("CE" in sym and side_all_targets_hit["CE"]) or ("PE" in sym and side_all_targets_hit["PE"]):
+        # Dynamically switch mode: if both sides are alive, honor the system-wide "all" constraint.
+        # If one side has completely flatlined, flip to "one" to salvage single target executions.
+        if ce_count > 0 and pe_count > 0:
+            effective_mode = EXIT_MODE  # Keeps 'all' rule intact for full hedge structures
+        else:
+            effective_mode = "one"     # Switches to 'one' since opposite side is empty
+
+        if effective_mode == "all":
+            if ("CE" in sym and side_all_targets_hit.get("CE", False)) or ("PE" in sym and side_all_targets_hit.get("PE", False)):
                 verify_and_exit(client, r)
         else:
+            # "one" mode routing execution rule
             if ltp >= tgt:
+                print(f"{Fore.GREEN}🎯 Dynamic Single Target Hit ({sym}): LTP {ltp} >= TGT {tgt} (Opposite side is clear)")
                 verify_and_exit(client, r)
 
     # Pass rendering, logging prints, and final file writing to the tracker helper
@@ -153,3 +169,4 @@ def run_snapshot():
 
 if __name__ == "__main__": 
     run_snapshot()
+
