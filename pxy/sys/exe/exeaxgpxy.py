@@ -1,18 +1,16 @@
-
+# exeexppxy.py
 import os
 import time
+import json
+import pandas as pd
 from colorama import Fore, Style, init
 
-# Initialize colorama for clean terminal output formatting
 init(autoreset=True)
 
-COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
+COOL_DOWN_SECONDS = 60  
 
 def send_market_order(client, symbol, qty, tag):
-    """
-    Handles isolated Kotak NeoAPI order placement.
-    Returns True on success, False on failure.
-    """
+    """Handles isolated Kotak NeoAPI order placement."""
     try:
         params = {
             "exchange_segment": "nse_fo",
@@ -33,7 +31,7 @@ def send_market_order(client, symbol, qty, tag):
         return False
 
 def set_cooling(side):
-    """Drops a temporary file state to act as an execution block for high speed ticks."""
+    """Drops a temporary file state to act as an execution block."""
     file_path = f"exebal_cool_{side.lower()}.txt"
     try:
         with open(file_path, "w") as f:
@@ -42,7 +40,7 @@ def set_cooling(side):
         print(f"{Fore.RED}⚠️ Cooldown Write Error: {e}")
 
 def is_cooling(side):
-    """Validates if the 60-second cooldown is active with safe Windows handle closure."""
+    """Validates if the 60-second cooldown is active."""
     file_path = f"exebal_cool_{side.lower()}.txt"
     if not os.path.exists(file_path):
         return False
@@ -66,8 +64,24 @@ def is_cooling(side):
         pass
     return False
 
+def analyze_targets_and_sides(df):
+    """Evaluates if every single open tracking row inside a wing matches target requirements."""
+    results = {"CE": False, "PE": False}
+    if df.empty:
+        return results
+        
+    for side in ["CE", "PE"]:
+        side_rows = df[df['symbol'].str.contains(side, na=False, case=True)]
+        if not side_rows.empty:
+            all_hit = all(float(r.get('sell_prc', 0)) >= float(r.get('pxy_tgt', 0)) for _, r in side_rows.iterrows())
+            results[side] = all_hit
+    return results
+
 def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, opp_m, atr_baseline, balance_mult):
-    """Renders a strict 44-character width dashboard upon an order trigger event without ANSI padding distortion."""
+    """Renders a strict 44-character width dashboard without ANSI padding string calculation distortion."""
+    clean_ce = ce_count if not isinstance(ce_count, tuple) else int(ce_count[0])
+    clean_pe = pe_count if not isinstance(pe_count, tuple) else int(pe_count[0])
+    
     width = 44
     border = Fore.YELLOW + "=" * width
     divider = Fore.RED + "-" * width
@@ -79,23 +93,20 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     
     lines = [
         f" • SYMBOL       : {symbol}",
-        f" • SIDE OPTION  : {side} ({ce_count}CE vs {pe_count}PE)",
+        f" • SIDE OPTION  : {side} ({clean_ce}CE vs {clean_pe}PE)",
         f" • ATR BASELINE : {atr_baseline:.2f}",
         f" • OPP MAX (P/D): {opp_m:.1f}%",
         f" • BALANCE MULT : {balance_mult:.2f}x"
     ]
     
     for line in lines:
-        padded_line = line.ljust(width)
-        print(Fore.WHITE + padded_line)
+        print(Fore.WHITE + line.ljust(width))
     
-    loss_str = f" • TRIGGER LOSS : {current_loss:.2f}%"
-    loss_pad = " " * max(0, width - len(loss_str))
-    print(Fore.WHITE + " • TRIGGER LOSS : " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + loss_pad)
+    loss_raw = f" • TRIGGER LOSS : {current_loss:.2f}%"
+    print(Fore.WHITE + " • TRIGGER LOSS : " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + " " * max(0, width - len(loss_raw)))
     
-    target_str = f" • MATRIX TARGET: {target_threshold:.2f}%"
-    target_pad = " " * max(0, width - len(target_str))
-    print(Fore.WHITE + " • MATRIX TARGET: " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + target_pad)
+    target_raw = f" • MATRIX TARGET: {target_threshold:.2f}%"
+    print(Fore.WHITE + " • MATRIX TARGET: " + Fore.YELLOW + f"{target_threshold:.2f}%" + Style.RESET_ALL + " " * max(0, width - len(target_raw)))
     
     tag_str = f" • ORDER TAG    : {tag}".ljust(width)
     print(Fore.WHITE + tag_str)
@@ -103,5 +114,57 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
 
 def print_exposure_map(ce_lots, pe_lots, ce_invested, pe_invested):
     """Outputs symmetric integer-based financial capital allocation maps onto terminal ticks."""
-    print(f"{Fore.CYAN}      📢 Upstream Lots: {ce_lots}CE vs {pe_lots}PE ")
-    print(f"{Fore.MAGENTA}      💼 Exposure Map : CE₹{ce_invested:,} ⚖️ ₹{pe_invested:,}PE")
+    clean_ce = ce_lots if not isinstance(ce_lots, tuple) else int(ce_lots[0])
+    clean_pe = pe_lots if not isinstance(pe_lots, tuple) else int(pe_lots[0])
+    
+    print(f"{Fore.CYAN}      📢 Upstream Lots: {clean_ce}CE vs {clean_pe}PE ")
+    print(f"{Fore.MAGENTA}      💼 Exposure Map : CE₹{int(ce_invested):,} ⚖️ ₹{int(pe_invested):,}PE")
+
+def process_metrics_print_and_dump(df, side_all_targets_hit, config_mode):
+    """Processes system calculations on active ticks and dumps state metrics."""
+    ce_rows = df[df['symbol'].str.contains('CE', na=False, case=True)]
+    pe_rows = df[df['symbol'].str.contains('PE', na=False, case=True)]
+    
+    ce_lots = ce_rows.shape[0]
+    pe_lots = pe_rows.shape[0]
+    
+    # Mathematical independent row evaluation for entry pricing matrices
+    ce_invested = (ce_rows['qty'].abs() * ce_rows['entry_prc']).sum() if not ce_rows.empty else 0.0
+    pe_invested = (pe_rows['qty'].abs() * pe_rows['entry_prc']).sum() if not pe_rows.empty else 0.0
+    
+    print_exposure_map(ce_lots, pe_lots, ce_invested, pe_invested)
+    
+    out_data = {
+        "status": "active",
+        "ce_count": int(ce_lots),
+        "pe_count": int(pe_lots),
+        "ce_invested": float(ce_invested),
+        "pe_invested": float(pe_invested),
+        "ce_all_hit": side_all_targets_hit.get("CE", False),
+        "pe_all_hit": side_all_targets_hit.get("PE", False),
+        "system_config_mode": config_mode,
+        "timestamp": time.time()
+    }
+    try:
+        with open("sysmetrics_exit.json", "w") as f:
+            json.dump(out_data, f, indent=4)
+    except Exception as e:
+        print(f"{Fore.RED}⚠️ Metrics File Dump Error: {e}")
+
+def dump_idle_json(config_mode):
+    """Writes empty structured state schemas when systems are idling."""
+    out_data = {
+        "status": "idle",
+        "ce_count": 0,
+        "pe_count": 0,
+        "ce_invested": 0.0,
+        "pe_invested": 0.0,
+        "system_config_mode": config_mode,
+        "timestamp": time.time()
+    }
+    try:
+        with open("sysmetrics_exit.json", "w") as f:
+            json.dump(out_data, f, indent=4)
+    except Exception:
+        pass
+
