@@ -2,6 +2,7 @@
 # ========================================
 # ENVIRONMENT CONFIGURATION
 # ========================================
+# Force explicit absolute path navigation to eliminate script context drift
 cd /home/pxy/pxy/sys || exit 1
 
 if [ -f "$HOME/env/bin/activate" ]; then
@@ -11,10 +12,16 @@ fi
 export PATH=$PWD:$PATH
 ENGINE_LOG="/home/pxy/pxy/engine_boot.log"
 
+# ========================================
+# RENDER HELPER (FIXED 42 CHAR WIDTH)
+# ========================================
 draw_border() {
     echo "=========================================="
 }
 
+# ========================================
+# TRADING SUBMENU (UNIFORM WIDTH)
+# ========================================
 show_trading_menu() {
     while true; do
         clear
@@ -46,6 +53,9 @@ show_trading_menu() {
     done
 }
 
+# ========================================
+# TEST SUBMENU (EXECUTE RECENT PYTHON)
+# ========================================
 show_test_menu() {
     while true; do
         clear
@@ -114,6 +124,9 @@ show_test_menu() {
     done
 }
 
+# ========================================
+# MAIN MANAGEMENT LOOP (UNIFORM WIDTH)
+# ========================================
 while true; do
     clear
     draw_border
@@ -176,18 +189,21 @@ while true; do
 
             echo "Initializing Trading Engine..."
             if ! tmux has-session -t pxy 2>/dev/null; then
-                tmux new-session -d -s pxy
+                # FIX 1: Spawn tmux explicitly matching your precise environmental login shell setup
+                tmux new-session -d -s pxy -n "EngineCore" "$SHELL"
+                
+                # FIX 2: Set window to stay frozen open if anything unexpected happens
                 tmux set-option -t pxy remain-on-exit on
 
+                # FIX 3: Type environmental paths and run the local wrapper script you confirmed works
                 tmux send-keys -t pxy "clear" C-m
-                tmux send-keys -t pxy "echo '=========================================='" C-m
-                tmux send-keys -t pxy "echo ' [STARTING] Booting Python Engine Core... '" C-m
-                tmux send-keys -t pxy "echo '=========================================='" C-m
-                tmux send-keys -t pxy "cd /home/pxy/pxy/sys && source ~/env/bin/activate" C-m
+                tmux send-keys -t pxy "cd /home/pxy/pxy/sys" C-m
                 
-                # FORCE python to disable internal output caching using standard environment flags
+                # Ensure python bypasses any standard memory caching so text draws instantly
                 tmux send-keys -t pxy "export PYTHONUNBUFFERED=1" C-m
-                tmux send-keys -t pxy "python3 -u sysexepxy.py 2>&1 | tee $ENGINE_LOG" C-m
+                
+                # Run the exact python shell execution format that works for you manually
+                tmux send-keys -t pxy "python3 sysexepxy.py 2>&1 | tee $ENGINE_LOG" C-m
                 echo "[✔] Terminal engine running in background."
             else
                 echo "[-] Terminal engine already running."
@@ -200,7 +216,9 @@ while true; do
             echo ""
             if tmux has-session -t pxy 2>/dev/null; then
                 echo "Attaching to active live session..."
+                echo "-> TIP: Press [Ctrl+B] then [D] to disconnect cleanly."
                 sleep 0.5
+                # FIX 4: Bind a hardware refresh argument directly onto attachment event
                 tmux attach -t pxy \; refresh-client
             else
                 echo "[X] Engine is offline or terminated unexpectedly!"
