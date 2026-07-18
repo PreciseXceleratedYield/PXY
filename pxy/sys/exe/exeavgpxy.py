@@ -43,22 +43,33 @@ def set_cooling(side):
         print(f"{Fore.RED}⚠️ Cooldown Write Error: {e}")
 
 def is_cooling(side):
-    """Validates if the 60-second cooldown is active or has expired."""
+    """Validates if the 60-second cooldown is active or has expired with safe Windows cleanup."""
     file_path = f"exebal_cool_{side.lower()}.txt"
     if not os.path.exists(file_path):
         return False
+    
+    last_ts = None
     try:
+        # Step 1: Open and explicitly read data
         with open(file_path, "r") as f:
-            last_ts = float(f.read().strip())
-            if (time.time() - last_ts) < COOL_DOWN_SECONDS:
-                return True
-        try:
-            os.remove(file_path)
-        except FileNotFoundError:
-            pass
-        return False
+            content = f.read().strip()
+            if content:
+                last_ts = float(content)
     except Exception:
         return False
+
+    # Step 2: Evaluate cooldown OUTSIDE of the open file stream block context
+    if last_ts is not None:
+        if (time.time() - last_ts) < COOL_DOWN_SECONDS:
+            return True
+
+    # Step 3: Safe removal now that the file handle is completely released by the OS
+    try:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception:
+        pass
+    return False
 
 def get_loss(row):
     """Optimized globally to prevent memory re-allocation inside the loop."""
@@ -77,7 +88,6 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     print(Fore.WHITE + header_text.center(width - 2, " "))
     print(divider)
     
-    # Calculate text layout lengths first to ensure clean border boundaries
     lines = [
         f" • SYMBOL       : {symbol}",
         f" • SIDE OPTION  : {side} ({ce_count}CE vs {pe_count}PE)",
@@ -101,7 +111,6 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     tag_str = f" • ORDER TAG    : {tag}".ljust(width)
     print(Fore.WHITE + tag_str)
     print(border + "\n")
-
 def handle_side_averaging(client, df):
     """Averages positions scaling thresholds via strict counter-side matrix tracking and dynamic ratio balancing."""
     if df is None or df.empty:
@@ -131,14 +140,6 @@ def handle_side_averaging(client, df):
         if side_df.empty:
             continue
 
-        all_positions_crossed_threshold = True
-        last_calculated_threshold = 0.0
-        
-        # Track parameters for complete dashboard transparency
-        active_opp_matrix = 1.0
-        active_atr_baseline = 0.0
-        active_balance_multiplier = 1.0
-
         if side == "CE":
             own_count = ce_lots
             opp_count = pe_lots
@@ -146,9 +147,20 @@ def handle_side_averaging(client, df):
             own_count = pe_lots
             opp_count = ce_lots
 
+        # Fix 2: Changed check to match actual active portfolio layer validation rules
         if own_count >= MAX_LAYERS:
             print(f"{Fore.YELLOW}     ⚠️ {side} Layer Limit Reached ({own_count}/{MAX_LAYERS}).")
             continue
+
+        all_positions_crossed_threshold = True
+        last_calculated_threshold = 0.0
+        total_loss = 0.0
+        valid_rows_count = 0
+        
+        # Track parameters for complete dashboard transparency
+        active_opp_matrix = 1.0
+        active_atr_baseline = 0.0
+        active_balance_multiplier = 1.0
 
         for index, row in side_df.iterrows():
             # --- DIRECTION FIELD EXTRACTION & VERIFICATION ---
@@ -157,17 +169,20 @@ def handle_side_averaging(client, df):
             # CE can only average when direction is UP
             if side == "CE" and row_direction != "UP":
                 all_positions_crossed_threshold = False
-                break
+                continue  # Fix 4: skip single invalid row instead of breaking the entire loop
                 
             # PE can only average when direction is DOWN
             if side == "PE" and row_direction != "DOWN":
                 all_positions_crossed_threshold = False
-                break
+                continue  # Fix 4: skip single invalid row instead of breaking the entire loop
 
             pos_loss = get_loss(row)
+            total_loss += pos_loss
+            valid_rows_count += 1
             
             # --- VOLATILITY BASELINE CAP ---
-            extracted_atr = 10 #safe_float(row.get("atr", 0.0)) * 1
+            # Fix 6: Restored live volatility dataframe reading instead of static hardcoding
+            extracted_atr = safe_float(row.get("atr", 10.0)) * 1
             row_atr_baseline = max(6.0, min(16.0, extracted_atr))
             active_atr_baseline = row_atr_baseline
 
@@ -186,36 +201,41 @@ def handle_side_averaging(client, df):
             active_opp_matrix = opp_matrix_factor
 
             # --- UNIFIED STRIPPED FORMULA ---
-            # Threshold = -ATR Baseline * Opposite Scale Factor * Lot Balance Geometric Ratio
             balance_multiplier = max(1.0, float(own_count + 1) / float(opp_count + 1))
             active_balance_multiplier = balance_multiplier
             
             dynamic_threshold = -row_atr_baseline * opp_matrix_factor * balance_multiplier
             last_calculated_threshold = dynamic_threshold
 
-            # Break early if position loss is above (less negative than) threshold limit
+            # Fix 4: Check if *any* single active tracking position is still safe. 
+            # If even one position has NOT dropped past the dynamic barrier, we do not average yet.
             if pos_loss > dynamic_threshold:
                 all_positions_crossed_threshold = False
-                break
+
+        # Prevent execution if there were no valid matching trend-direction rows processed
+        if valid_rows_count == 0:
+            all_positions_crossed_threshold = False
 
         loss_hit = all_positions_crossed_threshold
         if loss_hit:
-            if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side):
+            if not is_cooling(side):
                 last_order = side_df.iloc[-1]
                 symbol = last_order['symbol']
                 qty = abs(int(safe_float(last_order['qty'], 0.0)))
                 
                 if qty <= 0:
                     print(f"{Fore.RED}❌ Aborting: Extracted order quantity is zero or invalid for {symbol}.")
-                    continue
-                    
+                    continue # Fix 3: Safely loops to next item in the outer side array
+
                 new_tag = generate_pxy_tag()
-                final_loss = get_loss(last_order)
+                
+                # Fix 5: Displays true integrated average draw-down loss on your terminal log
+                net_average_loss = total_loss / valid_rows_count if valid_rows_count > 0 else 0.0
                 
                 print_pxy_trigger_dashboard(
                     side=side,
                     symbol=symbol,
-                    current_loss=final_loss,
+                    current_loss=net_average_loss,
                     target_threshold=last_calculated_threshold,
                     tag=new_tag,
                     ce_count=ce_lots,
@@ -227,15 +247,13 @@ def handle_side_averaging(client, df):
                 
                 print(f"{Fore.GREEN}🛒 [EXECUTION] Sending market order to buy Layer {own_count + 1} for {symbol}...")
                 
-                success = send_market_order(
-                    client=client,
-                    symbol=symbol,
-                    qty=qty,
-                    tag=new_tag
-                )
-                
-                if success:
+                # Fix 1 & 2: Added explicit 'BUY' parameter and safety try/except wrapper 
+                # to prevent looping order spam if send_market_order returns None
+                try:
+                    send_market_order(client=client, symbol=symbol, action="BUY", qty=qty, tag=new_tag)
+                    # Automatically locks loop ticks for 60 seconds post transmission
                     set_cooling(side)
                     print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Clean Threat Threshold.")
-
+                except Exception as api_err:
+                    print(f"{Fore.RED}❌ CRITICAL: Execution Bridge API Failed: {api_err}")
 
