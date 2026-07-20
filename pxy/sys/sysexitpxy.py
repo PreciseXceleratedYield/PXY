@@ -1,6 +1,18 @@
+import pandas as pd
+from syscnfgpxy import PARAMS  # Only TICKER will be used
+from sysdtafpxy import fetch_yf_data
+from colorama import Fore, Style, init
+
+# Initialize Colorama
+init(autoreset=True)
+
+# -------------------- Hardcoded constants --------------------
+TOTAL_WIDTH = 42
+
+# -------------------- Direction logic --------------------
 def detect_raw_direction(df: pd.DataFrame) -> tuple:
     """
-    Compares the running candle (C0) against the previous candle (C1).
+    Compares the running candle (C0) against the previous completed candle (C1).
     
     Returns:
         (latest_price, direction)
@@ -14,15 +26,15 @@ def detect_raw_direction(df: pd.DataFrame) -> tuple:
     if df is None or len(df) < 2:
         return (None, "NONE")
 
-    # Extract the last two rows
+    # Extract the last two rows (C1 and C0)
     c1_row = df.iloc[-2]  # Previous completed candle
     c0_row = df.iloc[-1]  # Current running candle
 
     # Assign close values
     c1_close = c1_row['Close']
-    c0_close = c0_row['Close']  # This is the running price
+    c0_close = c0_row['Close']  # Running current price
 
-    # Evaluate direction based on C1 vs C0
+    # Evaluate dynamic direction state
     if c0_close > c1_close:
         direction = "UP"
     elif c0_close < c1_close:
@@ -31,5 +43,38 @@ def detect_raw_direction(df: pd.DataFrame) -> tuple:
         direction = "NONE"
 
     return (c0_close, direction)
+
+# -------------------- Self-runnable test --------------------
+if __name__ == "__main__":
+    # Fetch data for TICKER from config
+    df = fetch_yf_data()
+    price, direction = detect_raw_direction(df)
+
+    # Convert price to integer safely using rounding logic
+    price_int = int(round(price)) if price is not None else "-"
+
+    # Apply color
+    if direction == "UP":
+        color = Fore.GREEN
+    elif direction == "DOWN":
+        color = Fore.RED
+    else:
+        color = Fore.YELLOW
+
+    left_text = f"Price:{price_int}"
+    right_text = f"Mullu:{direction}"
+
+    # Color only price and direction
+    left_text_colored = color + left_text + Style.RESET_ALL
+    right_text_colored = color + right_text + Style.RESET_ALL
+
+    # Calculate spacing for 42-char width
+    space_width = TOTAL_WIDTH - len(left_text) - len(right_text)
+    if space_width < 0:
+        space_width = 1
+    spacing = " " * space_width
+
+    # Print final line
+    print(left_text_colored + spacing + right_text_colored)
 
 
