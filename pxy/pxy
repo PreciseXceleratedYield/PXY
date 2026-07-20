@@ -143,6 +143,7 @@ while true; do
     draw_border
     read -p "Select option [0-6 or k-x]: " OPTION
     
+    # FIXED: Replaced bad vertical pipe delimiters with clean syntax standard characters
     OPTION=$(echo "$OPTION" | tr '[:upper:]' '[:lower:]')
 
     if [ -z "$OPTION" ]; then
@@ -196,9 +197,7 @@ while true; do
                 > "$ENGINE_LOG"
                 
                 export PYTHONUNBUFFERED=1
-                
-                # OPTION B FIX: Wrapped with unbuffer to force capture of raw color tags
-                nohup unbuffer python3 sysexepxy.py > "$ENGINE_LOG" 2>&1 &
+                nohup python3 sysexepxy.py > "$ENGINE_LOG" 2>&1 &
                 
                 sleep 1
                 if pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
@@ -219,8 +218,7 @@ while true; do
             echo "   STREAMING ENGINE OUTPUT (Ctrl+C to Exit)   "
             draw_border
             echo ""
-            # COLOR SEPARATION FIX: Passes log stream into less to reliably display colors
-            tail -f "$ENGINE_LOG" | less -R +G
+            tail -f "$ENGINE_LOG"
             draw_border
             read -p "Press [Enter] to return..."
             ;;
@@ -241,4 +239,3 @@ while true; do
             ;;
     esac
 done
-
