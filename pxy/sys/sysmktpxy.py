@@ -1,34 +1,27 @@
 # pxy_engine.py
 import pandas as pd
 import numpy as np
-from sysdthapxy import fetch_yf_data 
+from sysdtafpxy import fetch_yf_data  # ✅ Updated import to fetch from sysdtafpxy
 
 DEBUG = True
 
 def get_pxy_data(df):
     """
-    Transforms raw OHLC data into pure Heikin-Ashi (HA) metrics.
-    Ensures accurate live candle calculation by handling history recursively.
+    Processes normal market OHLC candle values.
+    Returns the current running close and the previous candle's static close.
     """
     df = df.copy()
-    raw_open = df['Open'].values
-    raw_high = df['High'].values
-    raw_low = df['Low'].values
+    
+    # Extract clean numpy arrays from raw data frames
     raw_close = df['Close'].values
     
-    n = len(df)
-    ha_open = np.zeros(n)
-    ha_close = np.zeros(n)
+    # Pull running close (current active candle)
+    c0 = float(raw_close[-1])
+    
+    # Pull previous close (last finished candle) safely
+    c1 = float(raw_close[-2]) if len(raw_close) > 1 else c0
 
-    # 1. Pure HA Close (Average of current OHLC)
-    ha_close = (raw_open + raw_high + raw_low + raw_close) / 4.0
-
-    # 2. Pure HA Open (Recursive Formula)
-    ha_open[0] = (raw_open[0] + raw_close[0]) / 2.0
-    for i in range(1, n):
-        ha_open[i] = (ha_open[i-1] + ha_close[i-1]) / 2.0
-
-    return ha_open, ha_close
+    return c1, c0
 
 def _print_console_bar(c1, c0, execution_state):
     """Renders the graphical console display profiling the active live running candle."""
@@ -48,18 +41,18 @@ def _print_console_bar(c1, c0, execution_state):
         pos = max(1, pos)
         return ("█" * pos).ljust(scale_width)
 
-    # HA Trend Color: Green if Close >= Open, Red if Close < Open
+    # Trend Color: Green if running Close (c0) >= previous Close (c1), else Red
     candle_color = GRN if c0 >= c1 else RED
 
     rows = [
-        (c1, f"HA_OPEN  C1-{int(c1)}", candle_color),
-        (c0, f"HA_CLOSE C0-{int(c0)}", candle_color)
+        (c1, f"PREV_CLOSE c1-{int(c1)}", candle_color),
+        (c0, f"RUN__CLOSE c0-{int(c0)}", candle_color)
     ]
 
     # Sort rows so the higher price prints on top of the console graph
     rows.sort(key=lambda item: item[0], reverse=True)
 
-    print(f"\n{YLW}=PURE HA GEOMETRIC ENGINE CONSOLE MONITOR(LIVE)={RST}")
+    print(f"\n{YLW}=RAW MOMENTUM PXY ENGINE CONSOLE MONITOR(LIVE)={RST}")
     for val, label, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
@@ -67,7 +60,7 @@ def _print_console_bar(c1, c0, execution_state):
 
 def get_signal(df=None):
     """
-    Evaluates the current live running candle's internal direction using pure HA.
+    Evaluates the current live running candle's internal direction using raw close comparisons.
     Returns: (entry_signal, exit_signal) -> ("BULL", "BULL"), ("BEAR", "BEAR"), or ("NONE", "NONE")
     """
     if df is None:
@@ -77,15 +70,11 @@ def get_signal(df=None):
         return "NONE", "NONE"
 
     try:
-        # Run pure Heikin-Ashi calculation across the historical chain
-        ha_open, ha_close = get_pxy_data(df)
-        
-        # Pull the absolute newest, active live candle values
-        c1 = float(ha_open[-1])   # Current Pure HA Open
-        c0 = float(ha_close[-1])  # Current Pure HA Close
+        # Run raw previous close vs running close comparison mapping
+        c1, c0 = get_pxy_data(df)
 
         # =====================================================================
-        # 🛡️ EXCLUSIVE CONDITIONAL COMPARE MATRIX (CURRENT CANDLE DIRECTION)
+        # 🛡️ EXCLUSIVE CONDITIONAL COMPARE MATRIX (PREV CLOSE VS RUNNING CLOSE)
         # =====================================================================
         if c0 > c1:
             execution_state = "BULL"
@@ -94,7 +83,7 @@ def get_signal(df=None):
             execution_state = "BEAR"
             
         else:
-            # Flatline condition where open equals close exactly
+            # Flatline condition where running close equals previous close exactly
             execution_state = "NONE"
         # =====================================================================
 
@@ -115,4 +104,5 @@ if __name__ == "__main__":
     if df is not None and not df.empty:
         entry, ex = get_signal(df)
         print(f"SPLIT OUTPUT SIGNALS >> ENTRY: {entry} | EXIT: {ex}")
+
 
