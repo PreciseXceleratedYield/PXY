@@ -99,23 +99,23 @@ def handle_side_averaging(client, df):
             # CE can only average when exit is BULL
             if side == "CE" and row_exit_signal != "BULL":
                 all_positions_crossed_threshold = False
-                continue  
+                continue  # Skips single row out of trend without stalling remaining positions
                 
             # PE can only average when exit is BEAR
             if side == "PE" and row_exit_signal != "BEAR":
                 all_positions_crossed_threshold = False
-                continue  
+                continue  # Skips single row out of trend without stalling remaining positions
 
             pos_loss = get_loss(row)
             total_loss += pos_loss
             valid_rows_count += 1
             
             # --- VOLATILITY BASELINE ---
-            extracted_atr = safe_float(row.get("atr"), 10.0)
+            extracted_atr = (safe_float(row.get("atr", 10.0))) * 1
             row_atr_baseline = max(6.0, min(16.0, extracted_atr))
             active_atr_baseline = row_atr_baseline
 
-            # --- PARAMETER EXTRACTION (Fixed safe_float fallbacks) ---
+            # --- PARAMETER EXTRACTION ---
             ce_p = max(1.0, safe_float(row.get("ce_power"), 1.0))
             pe_p = max(1.0, safe_float(row.get("pe_power"), 1.0))
             hce_d = max(1.0, safe_float(row.get("hkin_ce_depth"), 1.0))
@@ -139,16 +139,11 @@ def handle_side_averaging(client, df):
         if valid_rows_count == 0:
             all_positions_crossed_threshold = False
 
-        if all_positions_crossed_threshold:
+        if all_positions_crossed_threshold and not is_cooling(side):
             last_order = side_df.iloc[-1]
             symbol = last_order['symbol']
-            
-            # FIXED: Target cooling metrics directly to the specific execution SYMBOL string
-            if is_cooling(symbol):
-                print(f"{Fore.YELLOW}     ⏳ Skipping {symbol}: Layer cooling window is active.")
-                continue
-                
             qty = abs(int(safe_float(last_order['qty'], 0.0)))
+            
             if qty <= 0:
                 print(f"{Fore.RED}❌ Aborting: Extracted order quantity is zero or invalid for {symbol}.")
                 continue
@@ -164,10 +159,9 @@ def handle_side_averaging(client, df):
             
             print(f"{Fore.GREEN}🛒 [EXECUTION] Sending market order to buy Layer {own_count + 1} for {symbol}...")
             
-            # FIXED: Set the cooling lockout tracking using the exact contract symbol string
+            # Fire boolean execution check to avoid loop-breaking runaway orders
             if send_market_order(client=client, symbol=symbol, qty=qty, tag=new_tag):
-                set_cooling(symbol)
-                print(f"{Fore.GREEN}✅ SUCCESS: Symbol {symbol} AVERAGED via Clean Threat Threshold.")
+                set_cooling(side)
+                print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Clean Threat Threshold.")
             else:
                 print(f"{Fore.RED}❌ CRITICAL: NeoAPI refused or dropped connection. Order not filled.")
-
