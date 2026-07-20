@@ -7,7 +7,7 @@ def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
     """
     Processes raw market OHLC candles.
     Accepts an active live_tick dictionary to update the running candle in real-time.
-    Colors candles based on raw Close-to-Close momentum logic.
+    Colors candles based on running Close vs the previous candle's static Close.
     """
     if df is None:
         df = fetch_yf_data()
@@ -41,16 +41,16 @@ def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
     custom_df['Close'] = df['Close'].values
 
     # ==================================================
-    # 🎨 COLOR PROCESSING (RAW CLOSE VS PREVIOUS RAW CLOSE)
+    # 🎨 COLOR PROCESSING (RUNNING CLOSE VS PREVIOUS CLOSE)
     # ==================================================
-    # Shift the Close array to get the previous candle's close for every row
+    # Shift the Close array to get the previous candle's static close for every row
     prev_close_series = custom_df['Close'].shift(1)
     
-    # MOMENTUM COLOR MATRIX: Green when current raw Close >= previous raw Close
+    # Color rule: Green when running Close >= previous candle's Close
     is_green = custom_df['Close'] >= prev_close_series
     custom_df["pxy_color"] = np.select([is_green], ["green"], default="red")
     
-    # Seed the first index color safely since shift(1) leaves row 0 as NaN
+    # Seed the first index color safely since row 0 has no previous close (NaN)
     custom_df.iloc[0, custom_df.columns.get_loc('pxy_color')] = "green" if custom_df['Close'].iloc[0] >= custom_df['Open'].iloc[0] else "red"
 
     # ==================================================
@@ -62,3 +62,4 @@ def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
     pxy_color_series = final_df['pxy_color'].copy()
     
     return pxy_close, pxy_open, pxy_color_series, final_df
+
