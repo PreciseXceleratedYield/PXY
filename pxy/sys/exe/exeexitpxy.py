@@ -24,7 +24,7 @@ DEBUG_MODE = False
 #   "one" -> Exits individual positions as they hit targets.
 #   "all" -> Exits a side only when ALL positions on that side hit targets.
 # ==========================================================
-EXIT_MODE = "all" 
+EXIT_MODE = "one" 
 
 def debug_log(msg, color=Fore.BLUE): 
     if DEBUG_MODE: 
