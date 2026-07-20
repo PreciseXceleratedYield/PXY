@@ -117,8 +117,21 @@ def print_exposure_map(ce_lots, pe_lots, ce_invested, pe_invested):
     clean_ce = ce_lots if not isinstance(ce_lots, tuple) else int(ce_lots[0])
     clean_pe = pe_lots if not isinstance(pe_lots, tuple) else int(pe_lots[0])
     
-    print(f"{Fore.CYAN}    📢 Upstream Lots: {clean_ce}CE vs {clean_pe}PE ")
-    print(f"{Fore.MAGENTA}    💼  CE₹{int(ce_invested):,} ⚖️ ₹{int(pe_invested):,}PE")
+    # 1. Generate uncolored content to measure exact text length
+    lots_plain = f"📢 Lots: {clean_ce}CE ⚖️ {clean_pe}PE "
+    money_plain = f"💼 Money CE₹{int(ce_invested):,} ⚖️ ₹{int(pe_invested):,}PE"
+
+    # 2. Calculate necessary padding for a total width of 40 characters
+    lots_pad_l = (40 - len(lots_plain)) // 2
+    lots_pad_r = 40 - len(lots_plain) - lots_pad_l
+    
+    money_pad_l = (40 - len(money_plain)) // 2
+    money_pad_r = 40 - len(money_plain) - money_pad_l
+
+    # 3. Print the centered, color-applied output blocks
+    print(" " * lots_pad_l + f"{Fore.CYAN}{lots_plain}" + Style.RESET_ALL + " " * lots_pad_r)
+    print(" " * money_pad_l + f"{Fore.MAGENTA}{money_plain}" + Style.RESET_ALL + " " * money_pad_r)
+
 
 def process_metrics_print_and_dump(df, side_all_targets_hit, config_mode):
     """Processes system calculations on active ticks and dumps state metrics."""
