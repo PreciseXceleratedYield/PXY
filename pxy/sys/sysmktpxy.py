@@ -43,8 +43,16 @@ def _print_console_bar(c1, c0, execution_state):
     ]
     rows.sort(key=lambda item: item[0], reverse=True)
 
+    # Dynamic indicator assignment for the header string replacement
+    if execution_state == "BULL":
+        indicator = "🟢"
+    elif execution_state == "BEAR":
+        indicator = "🔴"
+    else:
+        indicator = "⚪"
+
     # All text boundaries and lines are measured to exactly 42 characters wide
-    print(f"\n{YLW}====== PXY MONITOR LIVE ENGINE (42) ====={RST}")
+    print(f"\n{YLW}====== PXY MONITOR LIVE ENGINE  {indicator}  ====={RST}")
     for val, label, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val)}{GRAY}]{RST}")
     print(f"{YLW}=========================================={RST}")
@@ -89,5 +97,4 @@ if __name__ == "__main__":
         entry, ex = get_signal(df)
         # Production output script signals formatted layout block
         print(f"OUT >> ENTRY: {entry:<4} | EXIT: {ex:<4}")
-
 
