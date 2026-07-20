@@ -117,8 +117,8 @@ def print_exposure_map(ce_lots, pe_lots, ce_invested, pe_invested):
     clean_ce = ce_lots if not isinstance(ce_lots, tuple) else int(ce_lots[0])
     clean_pe = pe_lots if not isinstance(pe_lots, tuple) else int(pe_lots[0])
     
-    print(f"{Fore.CYAN}      📢 Upstream Lots: {clean_ce}CE vs {clean_pe}PE ")
-    print(f"{Fore.MAGENTA}      💼 Exposure Map : CE₹{int(ce_invested):,} ⚖️ ₹{int(pe_invested):,}PE")
+    print(f"{Fore.CYAN}    📢 Upstream Lots: {clean_ce}CE vs {clean_pe}PE ")
+    print(f"{Fore.MAGENTA}   💼  CE₹{int(ce_invested):,} ⚖️ ₹{int(pe_invested):,}PE")
 
 def process_metrics_print_and_dump(df, side_all_targets_hit, config_mode):
     """Processes system calculations on active ticks and dumps state metrics."""
