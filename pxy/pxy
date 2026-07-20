@@ -75,7 +75,6 @@ show_test_menu() {
         
         for i in "${!PY_FILES[@]}"; do
             DISPLAY_NAME=$(echo "${PY_FILES[$i]}" | sed "s|^$HOME|~|")
-            # Enforce strict character limits on python file paths
             printf "%d) 🐍 Exec   - %-23s\n" $((i+1)) "${DISPLAY_NAME:0:23}"
         done
         echo "x) ↩️ Back    - Return Main Menu"
@@ -191,7 +190,8 @@ while true; do
             echo ""
             echo "Initializing Node Server..."
             if ! tmux has-session -t pxy-web 2>/dev/null && ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
-                tmux new-session -d -s pxy-web "bash -c 'cd /home/pxy/pxy && node pxy.js'"
+                # Restrict terminal history memory strictly to 500 lines
+                tmux new-session -d -s pxy-web "bash -c 'tmux set-option history-limit 500; cd /home/pxy/pxy && node pxy.js'"
                 echo "[✔] Web dashboard started in background (tmux)."
             else
                 echo "[-] Web dashboard already running."
@@ -199,7 +199,8 @@ while true; do
 
             echo "Initializing Trading Engine..."
             if ! tmux has-session -t pxy-engine 2>/dev/null && ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
-                tmux new-session -d -s pxy-engine "bash -c 'cd /home/pxy/pxy/sys; if [ -f \"\$HOME/env/bin/activate\" ]; then source \"\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; python3 sysexepxy.py'"
+                # Restrict terminal history memory strictly to 500 lines
+                tmux new-session -d -s pxy-engine "bash -c 'tmux set-option history-limit 500; cd /home/pxy/pxy/sys; if [ -f \"\$HOME/env/bin/activate\" ]; then source \"\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; python3 sysexepxy.py'"
                 
                 sleep 1
                 if tmux has-session -t pxy-engine 2>/dev/null; then
