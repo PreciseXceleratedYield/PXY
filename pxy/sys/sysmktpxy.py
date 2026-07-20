@@ -4,8 +4,6 @@ import numpy as np
 import time
 from sysdtafpxy import fetch_yf_data
 
-# Import your data engine module cleanly
-import pxy_engine
 
 DEBUG = True
 
