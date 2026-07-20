@@ -52,7 +52,7 @@ def _print_console_bar(c1, c0, execution_state):
     # Sort rows so the higher price prints on top of the console graph
     rows.sort(key=lambda item: item[0], reverse=True)
 
-    print(f"\n{YLW}=RAW MOMENTUM PXY ENGINE CONSOLE MONITOR(LIVE)={RST}")
+    print(f"\n{YLW}= MOMENTUM PXY ENGINE CONSOLE MONITOR(LIVE)={RST}")
     for val, label, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val)}{GRAY}]{RST}")
     print(f"{YLW}========================================{RST}")
