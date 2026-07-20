@@ -3,18 +3,18 @@
 PXY OPTION ROUTING ENGINE WITH SIMPLIFIED CO-ROUTING PIPELINES
 ===============================================================================
 Operational Rules Matrix:
-1. Operational window is driven completely and exclusively by sysexitpxy.
+1. Operational window is driven completely and exclusively by sysmktpxy.
 ===============================================================================
 """
 
 import pandas as pd
 from syscnfgpxy import TICKER
-from sysexitpxy import detect_raw_direction
+from sysmktpxy import get_signal  # ✅ Solo retrieval derived directly from sysmktpxy
 
 def get_entry_signal(df=None):
     """
     Dynamically routes option entry and structural exit signals together 
-    based strictly on sysexitpxy parameters. Returns raw strings silently.
+    based strictly on sysmktpxy parameters. Returns raw strings silently.
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -23,14 +23,14 @@ def get_entry_signal(df=None):
     if df is None or df.empty:
         return "NONE", "NONE"
 
-    # 1. Dynamic Execution Block using only sysexitpxy
-    _, exit_dir = detect_raw_direction(df)
+    # 1. Dynamic Execution Block pulling exclusively from your running momentum engine
+    entry_dir, exit_dir = get_signal(df)
     
-    # Route Entry and Exit based on raw direction
-    if exit_dir == "UP":
+    # Route Entry and Exit based on raw direction (BULL / BEAR) from sysmktpxy
+    if entry_dir == "BULL":
         entry_signal = "ATMBUY"
         exit_signal = "BULL"
-    elif exit_dir == "DOWN":
+    elif entry_dir == "BEAR":
         entry_signal = "ATMSELL"
         exit_signal = "BEAR"
     else:
@@ -44,5 +44,4 @@ if __name__ == "__main__":
     df = fetch_yf_data()
     if df is not None and not df.empty:
         entry, ex = get_entry_signal(df)
-
-
+        print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry} | EXIT_SIG: {ex}")
