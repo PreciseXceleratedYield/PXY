@@ -138,7 +138,7 @@ while true; do
     echo "k) 🛑 Stop   - Kill Active Engines"
     echo "u) 🔄 Update - Foreground Live View"
     echo "s) 🚀 Start  - Launch Tmux Engines"
-    echo "v) 👁️ View   - Attach Engine Tmux"
+    echo "v) 🔭 View   - Attach Engine Tmux"
     echo "e) 🛒 Enter  - Trading Operations"
     echo "t) 🧪 Test   - Run Python Scripts"
     echo "x) ❌ Exit   - Close Dashboard"
