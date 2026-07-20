@@ -7,7 +7,7 @@ Operational Rules Matrix:
 ===============================================================================
 """
 
-import pandas as pd
+import pandas as pd  # Added import back here
 from syscnfgpxy import TICKER
 from sysexitpxy import detect_raw_direction
 
