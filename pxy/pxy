@@ -9,9 +9,6 @@ if [ -f "$HOME/env/bin/activate" ]; then
 fi
 
 export PATH=$PWD:$PATH
-ENGINE_LOG="/home/pxy/pxy/engine_boot.log"
-
-touch "$ENGINE_LOG"
 
 # ========================================
 # RENDER HELPER (FIXED 42 CHAR WIDTH)
@@ -21,7 +18,7 @@ draw_border() {
 }
 
 # ========================================
-# TRADING SUBMENU (UNIFORM WIDTH)
+# TRADING SUBMENU (NUMBERS RESTORED)
 # ========================================
 show_trading_menu() {
     while true; do
@@ -55,7 +52,7 @@ show_trading_menu() {
 }
 
 # ========================================
-# TEST SUBMENU (EXECUTE RECENT PYTHON)
+# TEST SUBMENU (ALL = 'a', SCRIPTS = 1-5)
 # ========================================
 show_test_menu() {
     while true; do
@@ -68,29 +65,37 @@ show_test_menu() {
         
         if [ ${#PY_FILES[@]} -eq 0 ]; then
             echo "No python files found in $HOME."
-            echo "6) Back    - Return Main System Menu"
+            echo "x) Back    - Return Main System Menu"
             draw_border
             read -p "Press [Enter] to return..."
             break
         fi
 
+        # 'a' is reserved for running all scripts sequentially
+        echo "a) All     - Execute All Functions At Once"
+        
+        # Dynamic files map back to clean, predictable numbers 1 to 5
         for i in "${!PY_FILES[@]}"; do
             DISPLAY_NAME=$(echo "${PY_FILES[$i]}" | sed "s|^$HOME|~|")
             printf "%d) Execute - %-28s\n" $((i+1)) "$DISPLAY_NAME"
         done
-        echo "6) Back    - Return Main System Menu"
-        echo "7) All     - Execute All Functions At Once"
+        echo "x) Back    - Return Main System Menu"
         draw_border
         
-        read -p "Select option [1-7]: " TESTOPT
+        read -p "Select option [a, 1-5, x]: " TESTOPT
         
         if [ -z "$TESTOPT" ]; then
             break
         fi
         
-        if [ "$TESTOPT" = "6" ]; then
+        # Lowercase only for alphabetical inputs
+        if [[ "$TESTOPT" =~ [A-Za-z] ]]; then
+            TESTOPT=$(echo "$TESTOPT" | tr '[:upper:]' '[:lower:]')
+        fi
+        
+        if [ "$TESTOPT" = "x" ]; then
             break
-        elif [ "$TESTOPT" = "7" ]; then
+        elif [ "$TESTOPT" = "a" ]; then
             echo ""
             draw_border
             echo "Executing All Python Scripts Sequentially..."
@@ -126,24 +131,23 @@ show_test_menu() {
 }
 
 # ========================================
-# MAIN MANAGEMENT LOOP (UNIFORM WIDTH)
+# MAIN MANAGEMENT LOOP (ALPHA ONLY OPTIONS)
 # ========================================
 while true; do
     clear
     draw_border
     echo "            PXY ENGINE CONSOLE            "
     draw_border
-    echo "0/k) Stop   - Kill All Active Systems"
-    echo "1/u) Update - Run Foreground Live View"
-    echo "2/s) Start  - Start Background Engine"
-    echo "3/v) View   - Attach Terminal Session"
-    echo "4/e) Enter  - Open Operations Submenu"
-    echo "5/t) Test   - Execute Recent Python Scripts"
-    echo "6/x) Exit   - Close Engine Management"
+    echo "k) Stop   - Kill All Active Systems"
+    echo "u) Update - Run Foreground Live View"
+    echo "s) Start  - Start Background Engines"
+    echo "v) View   - Attach Engine Tmux Session"
+    echo "e) Enter  - Open Operations Submenu"
+    echo "t) Test   - Execute Recent Python Scripts"
+    echo "x) Exit   - Close Engine Management"
     draw_border
-    read -p "Select option [0-6 or k-x]: " OPTION
+    read -p "Select option [k-x]: " OPTION
     
-    # FIXED: Replaced bad vertical pipe delimiters with clean syntax standard characters
     OPTION=$(echo "$OPTION" | tr '[:upper:]' '[:lower:]')
 
     if [ -z "$OPTION" ]; then
@@ -153,7 +157,7 @@ while true; do
     fi
 
     case $OPTION in
-        0|k)
+        k)
             echo ""
             echo "Terminating Web Server..."
             if tmux has-session -t pxy-web 2>/dev/null; then
@@ -164,16 +168,19 @@ while true; do
                 echo "[✔] Stopped fallback web core."
             fi
             
-            echo "Terminating Core Engines..."
-            if pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
+            echo "Terminating Trading Engine..."
+            if tmux has-session -t pxy-engine 2>/dev/null; then
+                tmux kill-session -t pxy-engine
+                echo "[✔] Stopped trading engine tmux session."
+            elif pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
                 pkill -f "sysexepxy.py"
-                echo "[✔] Killed background trading script process."
+                echo "[✔] Killed fallback trading script process."
             else
-                echo "[-] Background trading script was not running."
+                echo "[-] Trading engine was not running."
             fi
             read -p "Press [Enter] to return..."
             ;;
-        1|u)
+        u)
             echo ""
             draw_border
             echo "       RUNNING FOREGROUND UPDATE        "
@@ -182,53 +189,51 @@ while true; do
             draw_border
             read -p "Press [Enter] to return..."
             ;;
-        2|s)
+        s)
             echo ""
             echo "Initializing Node Server..."
             if ! tmux has-session -t pxy-web 2>/dev/null && ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
-                tmux new-session -d -s pxy-web "bash -c 'cd /home/pxy/pxy && node pxy.js >> pxy.log 2>&1'"
+                tmux new-session -d -s pxy-web "bash -c 'cd /home/pxy/pxy && node pxy.js'"
                 echo "[✔] Web dashboard started in background (tmux)."
             else
                 echo "[-] Web dashboard already running."
             fi
 
             echo "Initializing Trading Engine..."
-            if ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
-                > "$ENGINE_LOG"
-                
-                export PYTHONUNBUFFERED=1
-                nohup python3 sysexepxy.py > "$ENGINE_LOG" 2>&1 &
+            if ! tmux has-session -t pxy-engine 2>/dev/null && ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
+                tmux new-session -d -s pxy-engine "bash -c 'cd /home/pxy/pxy/sys; if [ -f \"\$HOME/env/bin/activate\" ]; then source \"\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; python3 sysexepxy.py'"
                 
                 sleep 1
-                if pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
-                    echo "[✔] Python engine running successfully in background."
+                if tmux has-session -t pxy-engine 2>/dev/null; then
+                    echo "[✔] Python engine running successfully inside tmux session 'pxy-engine'."
                 else
-                    echo "[X] Engine failed to boot! Check option 3 for error trace logs."
+                    echo "[X] Engine failed to boot! Check tmux manually."
                 fi
             else
-                echo "[-] Python engine is already running in background."
+                echo "[-] Python engine is already running."
             fi
             echo ""
             read -p "Press [Enter] to return..."
             ;;
-        3|v)
+        v)
             echo ""
-            clear
-            draw_border
-            echo "   STREAMING ENGINE OUTPUT (Ctrl+C to Exit)   "
-            draw_border
-            echo ""
-            tail -f "$ENGINE_LOG"
-            draw_border
-            read -p "Press [Enter] to return..."
+            if tmux has-session -t pxy-engine 2>/dev/null; then
+                echo "Attaching to 'pxy-engine' in normal interactive mode."
+                echo "To return to menu without closing: Press 'Ctrl+B' then 'D'."
+                sleep 2
+                tmux attach-session -t pxy-engine
+            else
+                echo "[X] No active 'pxy-engine' tmux session found to attach."
+                read -p "Press [Enter] to return..."
+            fi
             ;;
-        4|e)
+        e)
             show_trading_menu
             ;;
-        5|t)
+        t)
             show_test_menu
             ;;
-        6|x)
+        x)
             echo ""
             echo "Exiting management shell. Goodbye!"
             break
