@@ -30,6 +30,103 @@ app.get('/hostname', (req, res) => {
     res.json({ hostname: os.hostname() }); 
 }); 
 
+/* ========================= PXYCONFIG — READ/SAVE runscrtpxy.py =========================
+   pxy.js runs from pxy/ (this file's dir) → down into sys/exe/run/
+   runscrtpxy.py = actual private secrets file (may not exist yet)
+   runpxy.py     = template file (structure/comments, always kept in repo)
+   ========================= */
+const CONFIG_FILE_PATH   = path.resolve(__dirname, 'sys/exe/run/runscrtpxy.py');
+const TEMPLATE_FILE_PATH = path.resolve(__dirname, 'sys/exe/run/runpxy.py');
+const CONFIG_FIELDS = [
+    'CONSUMER_KEY', 'CONSUMER_SECRET', 'MOBILE_NUMBER',
+    'UCC', 'MPIN', 'TOTP_SECRET_KEY', 'ENVIRONMENT'
+];
+
+function extractFields(content) {
+    const values = {};
+    CONFIG_FIELDS.forEach(key => {
+        const re = new RegExp(`^${key}\\s*=\\s*["']([^"']*)["']`, 'm');
+        const match = content.match(re);
+        values[key] = match ? match[1] : '';
+    });
+    return values;
+}
+
+app.get('/pxyconfig-read', (req, res) => {
+    fs.readFile(CONFIG_FILE_PATH, 'utf8', (err, content) => {
+        if (!err) {
+            return res.json({ ok: true, values: extractFields(content), path: CONFIG_FILE_PATH });
+        }
+        if (err.code !== 'ENOENT') {
+            return res.json({ ok: false, error: `Cannot read config: ${err.message}` });
+        }
+        // runscrtpxy.py missing — fall back to template for field structure/placeholders
+        fs.readFile(TEMPLATE_FILE_PATH, 'utf8', (tErr, tContent) => {
+            if (tErr) {
+                const values = {};
+                CONFIG_FIELDS.forEach(key => { values[key] = ''; });
+                return res.json({ ok: true, values, path: CONFIG_FILE_PATH, notFound: true, noTemplate: true });
+            }
+            res.json({ ok: true, values: extractFields(tContent), path: CONFIG_FILE_PATH, notFound: true });
+        });
+    });
+});
+
+app.post('/pxyconfig-save', (req, res) => {
+    const pwd = (req.body.pwd || '').trim();
+    if (!pwd) {
+        return res.status(400).json({ ok: false, error: 'Password required' });
+    }
+    const updates = req.body.values || {};
+
+    fs.readFile(CONFIG_FILE_PATH, 'utf8', (err, content) => {
+        const isMissing = err && err.code === 'ENOENT';
+        if (err && !isMissing) {
+            return res.json({ ok: false, error: `Cannot read config: ${err.message}` });
+        }
+
+        const proceedWithBase = (base) => {
+            let updated = base;
+            CONFIG_FIELDS.forEach(key => {
+                if (Object.prototype.hasOwnProperty.call(updates, key)) {
+                    const val = String(updates[key] ?? '').replace(/"/g, '\\"');
+                    const re = new RegExp(`^(${key}\\s*=\\s*)["'][^"']*["']`, 'm');
+                    if (re.test(updated)) {
+                        updated = updated.replace(re, `$1"${val}"`);
+                    } else {
+                        updated += `\n${key} = "${val}"\n`;
+                    }
+                }
+            });
+
+            fs.mkdir(path.dirname(CONFIG_FILE_PATH), { recursive: true }, (mkdirErr) => {
+                if (mkdirErr) {
+                    return res.json({ ok: false, error: `Cannot create directory: ${mkdirErr.message}` });
+                }
+                fs.writeFile(CONFIG_FILE_PATH, updated, 'utf8', (writeErr) => {
+                    if (writeErr) {
+                        return res.json({ ok: false, error: `Cannot write config: ${writeErr.message}` });
+                    }
+                    console.log(`[PXYCONFIG] config file ${isMissing ? 'created from template' : 'updated'} by request`);
+                    res.json({ ok: true, created: isMissing });
+                });
+            });
+        };
+
+        if (!isMissing) {
+            return proceedWithBase(content);
+        }
+
+        // runscrtpxy.py missing — build it from runpxy.py's structure instead of a generic header
+        fs.readFile(TEMPLATE_FILE_PATH, 'utf8', (tErr, tContent) => {
+            const base = tErr
+                ? '# Kotak Neo API Credentials\n# Auto-created by PXYCONFIG editor\n'
+                : tContent;
+            proceedWithBase(base);
+        });
+    });
+});
+
 /* ========================= EXPLICIT JSON ROUTE ========================= */ 
 app.get('/pxy.json', (req, res) => { 
     res.sendFile(path.join(__dirname, 'pxy.json')); 
