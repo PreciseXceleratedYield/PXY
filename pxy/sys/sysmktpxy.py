@@ -1,46 +1,24 @@
-# pxy_engine.py
+# pxy_signals.py
 import pandas as pd
 import numpy as np
-from sysdthapxy import fetch_yf_data 
+import time
+from sysdtafpxy import fetch_yf_data
+
+# Import your data engine module cleanly
+import pxy_engine
 
 DEBUG = True
 
-def get_pxy_data(df):
-    """
-    Transforms raw OHLC data into pure Heikin-Ashi (HA) metrics.
-    Ensures accurate live candle calculation by handling history recursively.
-    """
-    df = df.copy()
-    raw_open = df['Open'].values
-    raw_high = df['High'].values
-    raw_low = df['Low'].values
-    raw_close = df['Close'].values
-    
-    n = len(df)
-    ha_open = np.zeros(n)
-    ha_close = np.zeros(n)
-
-    # 1. Pure HA Close (Average of current OHLC)
-    ha_close = (raw_open + raw_high + raw_low + raw_close) / 4.0
-
-    # 2. Pure HA Open (Recursive Formula)
-    ha_open[0] = (raw_open[0] + raw_close[0]) / 2.0
-    for i in range(1, n):
-        ha_open[i] = (ha_open[i-1] + ha_close[i-1]) / 2.0
-
-    return ha_open, ha_close
-
-def _print_console_bar(c1, c0, execution_state):
-    """Renders the graphical console display profiling the active live running candle."""
+def _print_console_bar(prev_c, curr_c, execution_state, pxy_color):
+    """Renders the visual monitor mapping current running close against previous close baseline."""
     RST = "\033[0m"
     RED = "\033[91m"
     GRN = "\033[92m"
     YLW = "\033[1;93m"
     GRAY = "\033[90m"
 
-    # Set up drawing limits based on the current open and close
-    min_val = min(c1, c0) - 2
-    max_val = max(c1, c0) + 2
+    min_val = min(prev_c, curr_c) - 2
+    max_val = max(prev_c, curr_c) + 2
     scale_width = 20
 
     def get_clean_bar(val):
@@ -48,26 +26,25 @@ def _print_console_bar(c1, c0, execution_state):
         pos = max(1, pos)
         return ("█" * pos).ljust(scale_width)
 
-    # HA Trend Color: Green if Close >= Open, Red if Close < Open
-    candle_color = GRN if c0 >= c1 else RED
+    # Pick console brush directly from the data engine's color assignment
+    candle_color = GRN if pxy_color == "green" else RED
 
     rows = [
-        (c1, f"HA_OPEN  C1-{int(c1)}", candle_color),
-        (c0, f"HA_CLOSE C0-{int(c0)}", candle_color)
+        (curr_c, f"RUNNING HA_CLOSE  C0-{round(curr_c, 2)}", candle_color),
+        (prev_c, f"PREVIOUS HA_CLOSE C1-{round(prev_c, 2)}", GRAY)
     ]
-
-    # Sort rows so the higher price prints on top of the console graph
     rows.sort(key=lambda item: item[0], reverse=True)
 
-    print(f"\n{YLW}=PURE HA GEOMETRIC ENGINE CONSOLE MONITOR(LIVE)={RST}")
+    print(f"\n{YLW}=MOMENTUM ENGINE MONITOR: HA CLOSE VS PREV CLOSE={RST}")
     for val, label, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val)}{GRAY}]{RST}")
-    print(f"{YLW}========================================{RST}")
-    print(f"       CURRENT CANDLE DIRECTION : {YLW}{execution_state}{RST}")
+    print(f"{YLW}======================================================={RST}")
+    print(f"       LIVE MOMENTUM DIRECTION : {candle_color}{execution_state}{RST}")
 
-def get_signal(df=None):
+
+def get_signal(df=None, live_tick=None):
     """
-    Evaluates the current live running candle's internal direction using pure HA.
+    Evaluates market direction comparing current running HA close to previous HA close.
     Returns: (entry_signal, exit_signal) -> ("BULL", "BULL"), ("BEAR", "BEAR"), or ("NONE", "NONE")
     """
     if df is None:
@@ -77,32 +54,32 @@ def get_signal(df=None):
         return "NONE", "NONE"
 
     try:
-        # Run pure Heikin-Ashi calculation across the historical chain
-        ha_open, ha_close = get_pxy_data(df)
+        # Cross-module call straight into your mathematical data framework
+        _, _, pxy_color_series, final_df = pxy_engine.get_pxy_data(df=df, live_tick=live_tick)
         
-        # Pull the absolute newest, active live candle values
-        c1 = float(ha_open[-1])   # Current Pure HA Open
-        c0 = float(ha_close[-1])  # Current Pure HA Close
+        if len(final_df) < 2:
+            return "NONE", "NONE"
+
+        # MOMENTUM MATRIX: Extract current unclosed close vs last completely closed close
+        prev_ha_close = float(final_df['Close'].iloc[-2]) 
+        curr_ha_close = float(final_df['Close'].iloc[-1]) 
+        running_color = pxy_color_series.iloc[-1]          
 
         # =====================================================================
-        # 🛡️ EXCLUSIVE CONDITIONAL COMPARE MATRIX (CURRENT CANDLE DIRECTION)
+        # 🛡️ MOMENTUM COMPLIANT SIGNALS MATRIX
         # =====================================================================
-        if c0 > c1:
+        if running_color == "green" and curr_ha_close > prev_ha_close:
             execution_state = "BULL"
-            
-        elif c0 < c1:
+        elif running_color == "red" and curr_ha_close < prev_ha_close:
             execution_state = "BEAR"
-            
         else:
-            # Flatline condition where open equals close exactly
             execution_state = "NONE"
         # =====================================================================
 
-        # Render geometric profile layout 
+        # Render layout tracking the baseline comparison
         if DEBUG:
-            _print_console_bar(c1, c0, execution_state)
+            _print_console_bar(prev_ha_close, curr_ha_close, execution_state, running_color)
             
-        # Split twin signals directly to downstream pipelines
         return execution_state, execution_state
 
     except Exception as e:
@@ -110,10 +87,42 @@ def get_signal(df=None):
             print(f"Signal Processing Engine Exception: {e}")
         return "NONE", "NONE"
 
+
+def run_live_pipeline():
+    """Simulates your complete live stream ticker environment inside terminal."""
+    print("Connecting to live streaming engine...")
+    historical_df = fetch_yf_data()
+    
+    if historical_df is not None and not historical_df.empty:
+        base_open = historical_df['Open'].iloc[-1]
+        base_high = historical_df['High'].iloc[-1]
+        base_low = historical_df['Low'].iloc[-1]
+        running_price = historical_df['Close'].iloc[-1]
+        
+        print("Streaming live ticks now. Press Ctrl+C to terminate.")
+        try:
+            for tick in range(1, 6):
+                # Fluctuate the price live up and down
+                running_price += np.random.uniform(-1.0, 1.0)
+                base_high = max(base_high, running_price)
+                base_low = min(base_low, running_price)
+                
+                live_packet = {
+                    'Open': base_open,
+                    'High': base_high,
+                    'Low': base_low,
+                    'Close': running_price
+                }
+                
+                entry, ex = get_signal(historical_df, live_tick=live_packet)
+                print(f"🔄 Tick {tick} | Spot raw price: {round(running_price, 2)} | Momentum Signal: {entry}")
+                time.sleep(1.5)
+                
+        except KeyboardInterrupt:
+            print("\nStream halted cleanly.")
+
 if __name__ == "__main__":
-    df = fetch_yf_data()
-    if df is not None and not df.empty:
-        entry, ex = get_signal(df)
-        print(f"SPLIT OUTPUT SIGNALS >> ENTRY: {entry} | EXIT: {ex}")
+    # Execute loop instantly on launch
+    run_live_pipeline()
 
 
