@@ -4,7 +4,10 @@ const WebSocket = require('ws');
 const { exec } = require('child_process'); 
 const path = require('path'); 
 const os = require('os'); 
-const fs = require('fs'); // ✅ Added to safely handle file stream arrays
+const fs = require('fs'); 
+
+// Dynamic execution environment tracing flag
+const IS_DEBUG = process.argv.includes('--debug');
 
 const app = express(); 
 const server = http.createServer(app); 
@@ -30,11 +33,7 @@ app.get('/hostname', (req, res) => {
     res.json({ hostname: os.hostname() }); 
 }); 
 
-/* ========================= PXYCONFIG — READ/SAVE runscrtpxy.py =========================
-   pxy.js runs from pxy/ (this file's dir) → down into sys/exe/run/
-   runscrtpxy.py = actual private secrets file (may not exist yet)
-   runpxy.py     = template file (structure/comments, always kept in repo)
-   ========================= */
+/* ========================= PXYCONFIG — READ/SAVE runscrtpxy.py ========================= */
 const CONFIG_FILE_PATH   = path.resolve(__dirname, 'sys/exe/run/runscrtpxy.py');
 const TEMPLATE_FILE_PATH = path.resolve(__dirname, 'sys/exe/run/runpxy.py');
 const CONFIG_FIELDS = [
@@ -53,6 +52,7 @@ function extractFields(content) {
 }
 
 app.get('/pxyconfig-read', (req, res) => {
+    if (IS_DEBUG) console.log(`[DEBUG] Reading config profile from: ${CONFIG_FILE_PATH}`);
     fs.readFile(CONFIG_FILE_PATH, 'utf8', (err, content) => {
         if (!err) {
             return res.json({ ok: true, values: extractFields(content), path: CONFIG_FILE_PATH });
@@ -60,7 +60,7 @@ app.get('/pxyconfig-read', (req, res) => {
         if (err.code !== 'ENOENT') {
             return res.json({ ok: false, error: `Cannot read config: ${err.message}` });
         }
-        // runscrtpxy.py missing — fall back to template for field structure/placeholders
+        if (IS_DEBUG) console.log('[DEBUG] Config missing. Cascading down to fallback template...');
         fs.readFile(TEMPLATE_FILE_PATH, 'utf8', (tErr, tContent) => {
             if (tErr) {
                 const values = {};
@@ -78,6 +78,8 @@ app.post('/pxyconfig-save', (req, res) => {
         return res.status(400).json({ ok: false, error: 'Password required' });
     }
     const updates = req.body.values || {};
+
+    if (IS_DEBUG) console.log('[DEBUG] Intercepted incoming config update package.');
 
     fs.readFile(CONFIG_FILE_PATH, 'utf8', (err, content) => {
         const isMissing = err && err.code === 'ENOENT';
@@ -117,7 +119,6 @@ app.post('/pxyconfig-save', (req, res) => {
             return proceedWithBase(content);
         }
 
-        // runscrtpxy.py missing — build it from runpxy.py's structure instead of a generic header
         fs.readFile(TEMPLATE_FILE_PATH, 'utf8', (tErr, tContent) => {
             const base = tErr
                 ? '# Kotak Neo API Credentials\n# Auto-created by PXYCONFIG editor\n'
@@ -142,7 +143,6 @@ const ALLOWED_SCRIPTS = [
     'pxyupdate', 'pxysqrall', 'pxybuyce', 'pxybuype', 'pxysqrce', 'pxysqrpe' 
 ]; 
 const SCRIPT_DIR = '/home/pxy/pxy'; 
-const ENGINE_LOG = '/home/pxy/pxy/engine_boot.log'; // ✅ Registered Engine Log Path
 
 app.post('/run/:script', (req, res) => { 
     const script = req.params.script.trim(); 
@@ -158,9 +158,10 @@ app.post('/run/:script', (req, res) => {
     } 
     
     const runAsUser = process.env.USER === 'root' ? 'sudo -u pxy ' : '';
-    
     const cmd = `${runAsUser}bash --login -c "cd /home/pxy/pxy && [ -f ~/env/bin/activate ] && source ~/env/bin/activate; export PATH=/home/pxy/pxy:\\$PATH; ${script}"`; 
     
+    if (IS_DEBUG) console.log(`[DEBUG] Executing system call command: ${cmd}`);
+
     exec(cmd, { 
         timeout: 30000, 
         cwd: SCRIPT_DIR, 
@@ -181,8 +182,7 @@ app.post('/run/:script', (req, res) => {
     }); 
 }); 
 
-
-/* ========================= WEBSOCKET ========================= */ 
+/* ========================= WEBSOCKET (500-LINE TMUX BUFFER ONLY) ========================= */ 
 wss.on('connection', (ws) => { 
     console.log('[WS] client connected. total clients:', wss.clients.size); 
     
@@ -197,16 +197,18 @@ wss.on('connection', (ws) => {
         if (isProcessing) return; 
         isProcessing = true;
 
-        // FIXED: Checked if the nohup script is running. If yes, read the last 100 log file lines instead of using tmux capture
-        const captureCmd = `pgrep -f "sysexepxy.py" >/dev/null && [ -f ${ENGINE_LOG} ] && tail -n 100 ${ENGINE_LOG}`;
+        // MATCHED SYNC PARAMETER: Pulls up to 500 lines directly out of active tmux terminal pane memory
+        const captureCmd = `tmux has-session -t pxy-engine 2>/dev/null && tmux capture-pane -pt pxy-engine -S -500`;
         
+        if (IS_DEBUG) console.log('[DEBUG] WebSocket polling tmux screen buffer memory...');
+
         exec(captureCmd, (err, stdout, stderr) => { 
             isProcessing = false; 
 
             if (err) { 
-                // If engine process isn't running, send an explicit notice to the dashboard console
+                if (IS_DEBUG) console.log('[DEBUG] tmux has-session query rejected. Engine offline.');
                 if (ws.readyState === WebSocket.OPEN) {
-                    ws.send("[SYSTEM STATUS] Engine offline. Please use option 2 in Console to start background modules.");
+                    ws.send("[SYSTEM STATUS] Engine offline. Please use option 's' in the Console script to start background modules.");
                 }
                 return; 
             } 
@@ -238,7 +240,8 @@ wss.on('connection', (ws) => {
 /* ========================= START ========================= */ 
 const listenServer = (port) => {
     server.listen(port, '0.0.0.0', () => { 
-        console.log(`Server running on http://0.0.0.0:${port}`); 
+        console.log(`Server running on http://0.0.0:${port}`); 
+        if (IS_DEBUG) console.log('[DEBUG] Server tracking operations with debug flag enabled.');
     });
 };
 
