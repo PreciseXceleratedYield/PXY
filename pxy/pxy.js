@@ -182,7 +182,13 @@ app.post('/run/:script', (req, res) => {
     }); 
 }); 
 
-/* ========================= WEBSOCKET (500-LINE TMUX BUFFER ONLY) ========================= */ 
+/* ========================= WEBSOCKET (500-LINE TMUX BUFFER ONLY) =========================
+   Session name matches your console script's tmux session: pxy-engine
+   -e flag is REQUIRED to preserve ANSI color escape codes — without it,
+   capture-pane strips all color and the terminal renders as flat gray.
+   ========================= */
+const TMUX_SESSION_NAME = 'pxy-engine';
+
 wss.on('connection', (ws) => { 
     console.log('[WS] client connected. total clients:', wss.clients.size); 
     
@@ -197,8 +203,9 @@ wss.on('connection', (ws) => {
         if (isProcessing) return; 
         isProcessing = true;
 
-        // MATCHED SYNC PARAMETER: Pulls up to 500 lines directly out of active tmux terminal pane memory
-        const captureCmd = `tmux has-session -t pxy-engine 2>/dev/null && tmux capture-pane -pt pxy-engine -S -500`;
+        // Pulls up to 500 lines directly out of active tmux terminal pane memory
+        // -e preserves color/attribute escape sequences, -J joins wrapped lines
+        const captureCmd = `tmux has-session -t ${TMUX_SESSION_NAME} 2>/dev/null && tmux capture-pane -pt ${TMUX_SESSION_NAME} -S -500 -e -J`;
         
         if (IS_DEBUG) console.log('[DEBUG] WebSocket polling tmux screen buffer memory...');
 
@@ -208,7 +215,7 @@ wss.on('connection', (ws) => {
             if (err) { 
                 if (IS_DEBUG) console.log('[DEBUG] tmux has-session query rejected. Engine offline.');
                 if (ws.readyState === WebSocket.OPEN) {
-                    ws.send("[SYSTEM STATUS] Engine offline. Please use option 's' in the Console script to start background modules.");
+                    ws.send(`[SYSTEM STATUS] tmux session "${TMUX_SESSION_NAME}" not found. Start it with: tmux new -s ${TMUX_SESSION_NAME}`);
                 }
                 return; 
             } 
@@ -240,7 +247,7 @@ wss.on('connection', (ws) => {
 /* ========================= START ========================= */ 
 const listenServer = (port) => {
     server.listen(port, '0.0.0.0', () => { 
-        console.log(`Server running on http://0.0.0:${port}`); 
+        console.log(`Server running on http://0.0.0.0:${port}`); 
         if (IS_DEBUG) console.log('[DEBUG] Server tracking operations with debug flag enabled.');
     });
 };
