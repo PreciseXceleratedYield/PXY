@@ -54,7 +54,7 @@ def _print_console_bar(c1, c0, execution_state):
     # All text boundaries and lines are measured to exactly 42 characters wide
     print(f"\n{YLW}====== PXY MONITOR LIVE ENGINE  {indicator}  ====={RST}")
     for val, label, color in rows:
-        print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val)}{GRAY}]{RST}")
+        print(f"     {color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val)}{GRAY}]{RST}")
     print(f"{YLW}=========================================={RST}")
     #print(f" DIR : {YLW}{execution_state:<34}{RST}")
 
