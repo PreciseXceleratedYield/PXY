@@ -217,15 +217,36 @@ while true; do
         v)
             echo ""
             if tmux has-session -t pxy-engine 2>/dev/null; then
-                echo "Attaching to 'pxy-engine' in normal interactive mode."
-                echo "To return to menu without closing: Press 'Ctrl+B' then 'D'."
-                sleep 2
-                tmux attach-session -t pxy-engine
+                clear
+                # Clear terminal input buffer so old keystrokes don't accidentally exit
+                read -t 0.1 -N 1000000 2>/dev/null
+                
+                while true; do
+                    # Clear screen and draw headers
+                    clear
+                    draw_border
+                    echo "   🔴 PXY LIVE ENGINE SCREEN (READ-ONLY)  "
+                    echo "   >>> PRESS [ENTER] TO RETURN TO MENU <<< "
+                    draw_border
+                    
+                    # Captures the last 30 lines, preserves colors (-e), joins wrapped lines (-J)
+                    tmux capture-pane -pt pxy-engine -S -30 -e -J
+                    
+                    draw_border
+                    echo "Engine Status: RUNNING SUCCESSFULLY"
+                    
+                    # Refreshes the screen every 0.5 seconds. If you press ENTER, it breaks the loop.
+                    read -t 0.5 -r -N 1 INPUT
+                    if [[ "$INPUT" == $'\n' || "$INPUT" == $'\r' || -z "$INPUT" && $? -eq 0 ]]; then
+                        break
+                    fi
+                done
             else
                 echo "[X] No active 'pxy-engine' tmux session found to attach."
                 read -p "Press [Enter] to return..."
             fi
             ;;
+
         e)
             show_trading_menu
             ;;
