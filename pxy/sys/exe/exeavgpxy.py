@@ -126,7 +126,7 @@ def handle_side_averaging(client, df):
             active_opp_matrix = opp_matrix_factor
 
             # --- SMOOTHED GEOMETRIC RATIO FORMULA ---
-            balance_multiplier = max(1.0, float(own_count + 1) / float(opp_count + 1))
+            balance_multiplier = max(1.0, float(max(1, own_count)) / float(max(1, opp_count)))
             active_balance_multiplier = balance_multiplier
             
             dynamic_threshold = -row_atr_baseline * opp_matrix_factor * balance_multiplier
