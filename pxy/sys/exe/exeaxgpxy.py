@@ -1,4 +1,4 @@
-# exeexppxy.py
+# exeaxgpxy.py
 import os
 import time
 import json
@@ -132,6 +132,46 @@ def print_exposure_map(ce_lots, pe_lots, ce_invested, pe_invested):
     print(" " * lots_pad_l + f"{Fore.CYAN}{lots_plain}" + Style.RESET_ALL + " " * lots_pad_r)
     print(" " * money_pad_l + f"{Fore.MAGENTA}{money_plain}" + Style.RESET_ALL + " " * money_pad_r)
 
+def print_exit_performance_card(symbol, qty, buy_prc, sell_prc):
+    """Renders a strict 40-character wide execution metric card with clean padding alignments."""
+    w = 40
+    border = Fore.GREEN + "╔" + "═"*(w-2) + "╗"
+    footer = Fore.GREEN + "╚" + "═"*(w-2) + "╝"
+    
+    # Metric Calculations
+    qty_val = abs(int(qty))
+    buy_val = float(buy_prc)
+    sell_val = float(sell_prc)
+    
+    total_buy = buy_val * qty_val
+    total_sell = sell_val * qty_val
+    pnl = total_sell - total_buy
+    pnl_pct = ((sell_val - buy_val) / buy_val * 100) if buy_val > 0 else 0.0
+    
+    # Formatting fields 
+    pnl_color = Fore.GREEN if pnl >= 0 else Fore.RED
+    pnl_sign = "+" if pnl >= 0 else ""
+    
+    # Base layout strings to accurately track true string width
+    line_hdr  = f"📊 TRADE EXIT PERFORMANCE".center(w-2)
+    line_sym  = f" 🔹 SYMBOL   : {symbol}"
+    line_qty  = f" 🔹 QUANTITY : {qty_val}"
+    line_buy  = f" 📥 BUY PRIC : ₹{buy_val:.2f}"
+    line_sell = f" 📤 SELL PRIC: ₹{sell_val:.2f}"
+    line_pnl  = f" 💵 PROFIT   : {pnl_sign}₹{pnl:.2f}"
+    line_pct  = f" 📈 RETURN % : {pnl_sign}{pnl_pct:.2f}%"
+
+    print("\n" + border)
+    print(Fore.WHITE + Style.BRIGHT + line_hdr)
+    print(Fore.GREEN + "╠" + "═"*(w-2) + "╣")
+    print(Fore.WHITE + line_sym.ljust(w-2))
+    print(Fore.WHITE + line_qty.ljust(w-2))
+    print(Fore.CYAN + line_buy.ljust(w-2))
+    print(Fore.YELLOW + line_sell.ljust(w-2))
+    print(Fore.GREEN + "╟" + "─"*(w-2) + "╢")
+    print(pnl_color + Style.BRIGHT + line_pnl.ljust(w-2))
+    print(pnl_color + Style.BRIGHT + line_pct.ljust(w-2))
+    print(footer + "\n")
 
 def process_metrics_print_and_dump(df, side_all_targets_hit, config_mode):
     """Processes system calculations on active ticks and dumps state metrics."""
@@ -155,7 +195,7 @@ def process_metrics_print_and_dump(df, side_all_targets_hit, config_mode):
         "pe_invested": float(pe_invested),
         "ce_all_hit": side_all_targets_hit.get("CE", False),
         "pe_all_hit": side_all_targets_hit.get("PE", False),
-        "system_config_mode": config_mode,
+        "system_config_mode": str(config_mode).lower(),  # Clean string normalization
         "timestamp": time.time()
     }
     try:
@@ -172,7 +212,7 @@ def dump_idle_json(config_mode):
         "pe_count": 0,
         "ce_invested": 0.0,
         "pe_invested": 0.0,
-        "system_config_mode": config_mode,
+        "system_config_mode": str(config_mode).lower(),
         "timestamp": time.time()
     }
     try:
@@ -180,4 +220,3 @@ def dump_idle_json(config_mode):
             json.dump(out_data, f, indent=4)
     except Exception:
         pass
-
