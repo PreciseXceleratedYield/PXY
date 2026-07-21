@@ -818,11 +818,13 @@ new ResizeObserver(()=>{
 }).observe($('chartBox'));
 
 /* ── POSITIONS ── */
+let runningTotal=0,bookedTotal=0;
 async function loadPos(){
     let data={positions:[]};
     try{data=await fetch('./webactpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     const open=data.positions||[];
     const total=open.reduce((s,d)=>s+(d.pnl||0),0);
+    runningTotal=total;
     const lbl=$('posPnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const r=$('pnlRunning');r.textContent=fmt(total);r.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const scroll=$('posScroll');
@@ -839,7 +841,7 @@ async function loadPos(){
         const crossed=d.target_crossed?'🎯':'';
         const row=document.createElement('div');
         row.className=`p-row ${pb?'bull-r':'bear-r'}`;
-        row.innerHTML=`<span class="p-tag">${isCE?'CE':'PE'}</span>
+        row.innerHTML=`<span class="p-tag" style="color:${isCE?cssVar('--bull'):cssVar('--bear')};">${isCE?'CE':'PE'}</span>
             <div><div class="p-sym">${shortSym(d.symbol)}</div>
                  <div class="p-meta">E${entryPct}%·T${targetPct}%${crossed}</div></div>
             <span class="p-pnl ${pb?'bull':'bear'}">${fmt(pnl)}</span>`;
@@ -1012,6 +1014,7 @@ async function loadTrades(){
     let data=[];
     try{data=await fetch('./webpnlpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     const total=data.reduce((s,d)=>s+(d.PNL||0),0);
+    bookedTotal=total;
     const lbl=$('tradePnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const b=$('pnlBooked');b.textContent=fmt(total);b.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const scroll=$('tradeScroll');
@@ -1048,9 +1051,10 @@ async function loadTrades(){
 
 /* ── RISK BAR ── */
 async function loadRisk(){
-    let d={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-3000};
+    let d={session_peak_pnl:0,active_exit_line:-3000};
     try{d=await fetch('./webrinkopxy.json?_='+Date.now()).then(r=>r.json());}catch{}
-    const peak=d.session_peak_pnl??0,net=d.current_net_pnl??0,floor=d.active_exit_line??-3000;
+    const peak=d.session_peak_pnl??0,floor=d.active_exit_line??-3000;
+    const net=runningTotal+bookedTotal;
     $('rskPeak').textContent='₹'+Math.round(peak).toLocaleString('en-IN');
     $('rskPeak').className='rsk-val '+(peak>=0?'bull':'bear');
     $('rskNet').textContent='₹'+Math.round(floor).toLocaleString('en-IN');
