@@ -21,8 +21,8 @@ DEBUG_MODE = False
 # ==========================================================
 # CONFIGURATION SWITCH (LOCKED IN CONTROLLER)
 # Options: 
-#   "one" -> Exits individual positions as they hit targets.
-#   "all" -> Exits a side only when ALL positions on that side hit targets.
+#   "one" -> ALWAYS exits individual positions as they hit targets.
+#   "all" -> Dynamic Hybrid Matrix (evaluates balance / protects sides).
 # ==========================================================
 EXIT_MODE = "one" 
 
@@ -134,7 +134,7 @@ def run_snapshot():
     
     side_all_targets_hit = analyze_targets_and_sides(df)
 
-    # DYNAMIC COUNT ASSESSMENT: Extract exact row integer using index 0
+    # DYNAMIC COUNT ASSESSMENT: Extract exact row integers
     ce_count = df[df['symbol'].str.contains('CE', na=False, case=True)].shape[0]
     pe_count = df[df['symbol'].str.contains('PE', na=False, case=True)].shape[0]
 
@@ -146,27 +146,34 @@ def run_snapshot():
         ltp = float(r.get("sell_prc", 0))
         tgt = float(r.get("pxy_tgt", 0))
 
-        # Condition 1: Solo Side Active
-        if ce_count == 0 or pe_count == 0:
+        # RULE 1: If user locked script to "one", enforce strict single exits everywhere
+        if EXIT_MODE == "one":
             effective_mode = "one"
-            debug_log(f"Solo Side Active ({sym}). Mode: SINGLE TARGET.", Fore.YELLOW)
+            debug_log(f"Global Enforced Single Exit Mode ({sym}). Mode: SINGLE TARGET.", Fore.GREEN)
 
-        # Condition 2: Perfectly Equal Row Count Symmetry -> Enforce "All-or-Nothing"
-        elif ce_count == pe_count:
-            effective_mode = EXIT_MODE  
-            debug_log(f"Hedge Matrix Equalized ({ce_count} == {pe_count} rows). Mode: ALL-OR-NOTHING.", Fore.BLUE)
-
-        # Condition 3: Imbalanced Structural Rows
+        # RULE 2: If user selected "all", activate the hybrid dynamic processing matrix
         else:
-            if "CE" in sym and ce_count > pe_count:
+            # Condition A: Solo Side Active
+            if ce_count == 0 or pe_count == 0:
                 effective_mode = "one"
-                debug_log(f"Heavy Side: CE ({ce_count} > {pe_count} rows). Mode: SINGLE TARGET.", Fore.MAGENTA)
-            elif "PE" in sym and pe_count > ce_count:
-                effective_mode = "one"
-                debug_log(f"Heavy Side: PE ({pe_count} > {ce_count} rows). Mode: SINGLE TARGET.", Fore.MAGENTA)
+                debug_log(f"Dynamic Matrix: Solo Side Active ({sym}). Mode: SINGLE TARGET.", Fore.YELLOW)
+
+            # Condition B: Perfectly Equal Row Count Symmetry -> Enforce All-or-Nothing
+            elif ce_count == pe_count:
+                effective_mode = "all"  
+                debug_log(f"Dynamic Matrix: Balanced Symmetry ({ce_count} == {pe_count}). Mode: ALL-OR-NOTHING.", Fore.BLUE)
+
+            # Condition C: Imbalanced Structural Rows
             else:
-                effective_mode = "all"
-                debug_log(f"Lighter Side Protected Matrix Lot ({sym}). Mode: ALL-OR-NOTHING.", Fore.BLUE)
+                if "CE" in sym and ce_count > pe_count:
+                    effective_mode = "one"
+                    debug_log(f"Dynamic Matrix: Heavy Side CE ({ce_count} > {pe_count}). Mode: SINGLE TARGET.", Fore.MAGENTA)
+                elif "PE" in sym and pe_count > ce_count:
+                    effective_mode = "one"
+                    debug_log(f"Dynamic Matrix: Heavy Side PE ({pe_count} > {ce_count}). Mode: SINGLE TARGET.", Fore.MAGENTA)
+                else:
+                    effective_mode = "all"
+                    debug_log(f"Dynamic Matrix: Lighter Side Protected ({sym}). Mode: ALL-OR-NOTHING.", Fore.CYAN)
 
         # Route Order Processing Operations
         if effective_mode == "all":
@@ -174,11 +181,10 @@ def run_snapshot():
                 verify_and_exit(client, r)
         else:
             if ltp >= tgt:
-                print(f"{Fore.GREEN}🎯 Dynamic Single Target Hit ({sym}): LTP {ltp} >= TGT {tgt} (Imbalanced Side Execution)")
+                print(f"{Fore.GREEN}🎯 Target Hit ({sym}): LTP {ltp} >= TGT {tgt} [Execution Mode: {effective_mode.upper()}]")
                 verify_and_exit(client, r)
 
     process_metrics_print_and_dump(df, side_all_targets_hit, EXIT_MODE)
 
 if __name__ == "__main__": 
     run_snapshot()
-
