@@ -93,25 +93,28 @@ def handle_side_averaging(client, df):
         active_opp_matrix, active_atr_baseline, active_balance_multiplier = 1.0, 0.0, 1.0
 
         for index, row in side_df.iterrows():
-            # --- EXIT SIGNAL FIELD EXTRACTION & VERIFICATION ---
-            row_exit_signal = str(row.get("exit", "")).upper().strip()
+            # --- VOLATILITY BASELINE & RATIO DEPENDENCIES ---
+            extracted_atr = safe_float(row.get("atr", 10.0))
             
-            # CE can only average when exit is BULL
-            if side == "CE" and row_exit_signal != "BULL":
-                all_positions_crossed_threshold = False
-                continue  # Skips single row out of trend without stalling remaining positions
+            # --- EXIT SIGNAL FIELD EXTRACTION & VERIFICATION ---
+            # Condition triggers when ATR value is 7 or more than 7
+            if extracted_atr >= 7:
+                row_exit_signal = str(row.get("exit", "")).upper().strip()
                 
-            # PE can only average when exit is BEAR
-            if side == "PE" and row_exit_signal != "BEAR":
-                all_positions_crossed_threshold = False
-                continue  # Skips single row out of trend without stalling remaining positions
+                # CE can only average when exit is BULL
+                if side == "CE" and row_exit_signal != "BULL":
+                    all_positions_crossed_threshold = False
+                    continue  # Skips single row out of trend without stalling remaining positions
+                    
+                # PE can only average when exit is BEAR
+                if side == "PE" and row_exit_signal != "BEAR":
+                    all_positions_crossed_threshold = False
+                    continue  # Skips single row out of trend without stalling remaining positions
 
             pos_loss = get_loss(row)
             total_loss += pos_loss
             valid_rows_count += 1
             
-            # --- VOLATILITY BASELINE ---
-            extracted_atr = (safe_float(row.get("atr", 10.0))) * 1
             row_atr_baseline = max(6.0, min(16.0, extracted_atr))
             active_atr_baseline = row_atr_baseline
 
