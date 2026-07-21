@@ -1109,7 +1109,15 @@ document.addEventListener('click',e=>{if(!amenu.contains(e.target)&&e.target!==l
 document.querySelectorAll('.amenu-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
         const script=btn.dataset.script;
-        if(script==='pxyconfig'){amenu.style.display='none';openConfigModal();return;}
+        if(script==='pxyconfig'){
+            amenu.style.display='none';
+            pendingScript='__pxyconfig_view__';
+            $('updTitle').textContent='▶ View PXYCONFIG';
+            $('updPwd').value='';
+            $('updPopup').style.display='flex';
+            setTimeout(()=>$('updPwd').focus(),80);
+            return;
+        }
         pendingScript=script;amenu.style.display='none';
         $('updTitle').textContent='▶ '+script;$('updPwd').value='';
         $('updPopup').style.display='flex';setTimeout(()=>$('updPwd').focus(),80);
@@ -1118,6 +1126,13 @@ document.querySelectorAll('.amenu-btn').forEach(btn=>{
 function cancelUpdate(){$('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;}
 function confirmUpdate(){
     const pwd=$('updPwd').value.trim();if(!pwd||!pendingScript)return;
+
+    // special path: viewing pxyconfig — password required just to open it
+    if(pendingScript==='__pxyconfig_view__'){
+        $('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;
+        openConfigModal();
+        return;
+    }
 
     // special path: saving pxyconfig fields
     if(pendingScript==='__pxyconfig_save__'){
