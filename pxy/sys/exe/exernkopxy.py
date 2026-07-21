@@ -71,12 +71,22 @@ def safe_load_json_pnl(file_path):
                 for row in data:
                     if not isinstance(row, dict):
                         continue
-                    val = row.get("PNL") or row.get("pnl") or row.get("unrealized") or row.get("realized") or 0.0
-                    total_pnl += float(val)
+                    # FIX: key-presence check instead of `or`-chain, so a
+                    # legitimate 0.0 value doesn't fall through to the next key.
+                    val = 0.0
+                    for key in ("PNL", "pnl", "unrealized", "realized"):
+                        if key in row and row[key] is not None:
+                            val = float(row[key])
+                            break
+                    total_pnl += val
                 return total_pnl
             elif isinstance(data, dict):
-                val = data.get("PNL") or data.get("pnl") or data.get("total_pnl") or 0.0
-                return float(val)
+                val = 0.0
+                for key in ("PNL", "pnl", "total_pnl"):
+                    if key in data and data[key] is not None:
+                        val = float(data[key])
+                        break
+                return val
             return 0.0
             
     except Exception as e:
@@ -103,8 +113,12 @@ def calculate_dynamic_profit_target(file_path):
             for row in rows:
                 if not isinstance(row, dict):
                     continue
-                symbol = str(row.get("symbol") or row.get("tradingsymbol") or row.get("instrument") or "").upper()
-                quantity = abs(float(row.get("quantity") or row.get("qty") or row.get("netqty") or 0.0))
+                # FIX: actual payload uses uppercase "SYMBOL"/"QTY" keys —
+                # the lowercase-only lookups here were always missing, so
+                # ce_count/pe_count stayed 0 and this function always
+                # returned 0.0 regardless of real CE/PE mix.
+                symbol = str(row.get("SYMBOL") or row.get("symbol") or row.get("tradingsymbol") or row.get("instrument") or "").upper()
+                quantity = abs(float(row.get("QTY") or row.get("qty") or row.get("quantity") or row.get("netqty") or 0.0))
                 
                 if quantity > 0:
                     if "CE" in symbol:
