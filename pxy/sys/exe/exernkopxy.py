@@ -28,7 +28,7 @@ RENKO_STATE_FILE = os.path.abspath(os.path.join(current_dir, "../../web/webrinko
 SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(current_dir, "../../web/websqrpxy.json"))
 
 # RISK CONFIGURATION CONSTANTS
-TRAILING_DROP_LIMIT = 9000.0
+TRAILING_DROP_LIMIT = 13000.0
 EMERGENCY_RETRY_SECONDS = 5.0
 LOOP_INTERVAL_SECONDS = 1.0
 
@@ -81,45 +81,6 @@ def safe_load_json_pnl(file_path):
             
     except Exception as e:
         print(f"{Fore.RED}⚠ Critical Parse Error on {os.path.basename(file_path)}: {e}")
-        return 0.0
-
-
-def calculate_dynamic_profit_target(file_path):
-    """Counts all active CE/PE legs. Returns 0.0 if positions are strictly single-sided."""
-    if not os.path.exists(file_path):
-        return 0.0
-        
-    try:
-        with open(file_path, "r") as f:
-            content = f.read().strip()
-            if not content:
-                return 0.0
-            data = json.loads(content)
-            
-            ce_count = 0
-            pe_count = 0
-            rows = data if isinstance(data, list) else [data]
-            
-            for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                symbol = str(row.get("symbol") or row.get("tradingsymbol") or row.get("instrument") or "").upper()
-                quantity = abs(float(row.get("quantity") or row.get("qty") or row.get("netqty") or 0.0))
-                
-                if quantity > 0:
-                    if "CE" in symbol:
-                        ce_count += 1
-                    elif "PE" in symbol:
-                        pe_count += 1
-            
-            if ce_count == 0 or pe_count == 0:
-                return 0.0
-                
-            total_legs = ce_count + pe_count
-            return float(total_legs * 1500.0)
-            
-    except Exception as e:
-        print(f"{Fore.RED}⚠ Option Leg Parser Error on {os.path.basename(file_path)}: {e}")
         return 0.0
 
 
@@ -177,6 +138,9 @@ def verify_and_purge_stale_cache():
         
         save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
         print(f"🧹 {Fore.CYAN}Cleaned up tracking cache file: {RENKO_STATE_FILE}\n")
+from datetime import datetime
+import pytz
+
 def write_squareoff_success_log():
     """Generates a tracking timestamp payload confirming positions are completely cleared in IST."""
     try:
@@ -199,6 +163,7 @@ def write_squareoff_success_log():
         print(f"{Fore.RED}❌ Error writing square-off log: {e}")
 
 
+
 def start_trailing_engine():
     """Monitors live data boundaries and executes targeted output grepping when limits are hit."""
     verify_and_purge_stale_cache()
@@ -211,9 +176,6 @@ def start_trailing_engine():
         unrealised_pnl = safe_load_json_pnl(POS_JSON_PATH)
         current_net_pnl = realised_pnl + unrealised_pnl
         
-        # Calculate dynamic target. Profit target matches total legs * 1500 if both CE and PE exist.
-        profit_target = calculate_dynamic_profit_target(POS_JSON_PATH)
-        
         # Shift peak upwards dynamically if cumulative returns hit new records
         if current_net_pnl > session_peak_pnl:
             session_peak_pnl = current_net_pnl
@@ -223,31 +185,14 @@ def start_trailing_engine():
         
         sign_prefix = "+" if active_exit_line > 0 else ""
         exit_display_str = "0.0k" if active_exit_line == 0 else f"{sign_prefix}{active_exit_line / 1000.0:.1f}k"
-        target_display_str = "OFF (Single Side)" if profit_target == 0.0 else f"+₹{profit_target:,.0f}"
         
         print(
             f"Exit@{Fore.RED}₹{Style.BRIGHT}{exit_display_str}{Style.RESET_ALL} | "
-            f"🎯 Target:{Fore.CYAN}{target_display_str}{Style.RESET_ALL}"
-        )
-        print(
             f"📊 Net:{Fore.GREEN}₹{current_net_pnl:,.0f}{Style.RESET_ALL} | "
             f"Peak@{Fore.YELLOW}₹{session_peak_pnl:,.0f}{Style.RESET_ALL}"
         )
-
         
         # -------- TRIGGER AND BREAK LOGIC TIMELINE --------
-        
-        # 1. New Check: Take Profit Target Evaluation (Fires only if target > 0.0)
-        if profit_target > 0.0 and current_net_pnl >= profit_target:
-            if EXECUTE_SQUARE_OFF:
-                print(f"\n🚨 {Fore.GREEN}{Style.BRIGHT}PROFIT TARGET HIT ({target_display_str})! Entering live confirmation verification loop...")
-                # Re-uses your exact baseline loop structure below to run the exit sequence
-                current_net_pnl = active_exit_line 
-            else:
-                print(f"\n⚠️  {Fore.YELLOW}{Style.BRIGHT}PROFIT TARGET HIT: Threshold {target_display_str} reached but execution disabled.")
-                sys.exit(0)
-
-        # 2. Baseline Check: Trailing Stop Loss Evaluation
         if current_net_pnl <= active_exit_line:
             if EXECUTE_SQUARE_OFF:
                 print(f"\n🚨 {Fore.RED}{Style.BRIGHT}LOSS TRIGGER BREACHED! Entering live confirmation verification loop...")
@@ -323,4 +268,3 @@ def start_trailing_engine():
 
 if __name__ == "__main__":
     start_trailing_engine()
-
