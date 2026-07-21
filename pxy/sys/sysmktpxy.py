@@ -56,7 +56,7 @@ def _print_console_bar(c1, c0, execution_state):
     for val, label, color in rows:
         print(f"{color}{label}{RST} : {GRAY}[{color}{get_clean_bar(val)}{GRAY}]{RST}")
     print(f"{YLW}=========================================={RST}")
-    print(f" DIR : {YLW}{execution_state:<34}{RST}")
+    #print(f" DIR : {YLW}{execution_state:<34}{RST}")
 
 def get_signal(df=None):
     """
