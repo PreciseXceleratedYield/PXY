@@ -256,12 +256,17 @@ def start_trailing_engine():
         pnl_color = Fore.GREEN if current_net_pnl >= 0 else Fore.RED
         floor_color = Fore.YELLOW if active_exit_line > INITIAL_LOSS_FLOOR else Fore.RED
         
+        # Line 1: Primary Risk Strategy Lines (Floor and Target Metrics)
         print(
             f"📉 Floor: {floor_color}₹{active_exit_line:,.0f}{Style.RESET_ALL} | "
-            f"🎯 Target: {Fore.CYAN}{target_display_str}{Style.RESET_ALL} | "
+            f"🎯 Target: {Fore.CYAN}{target_display_str}{Style.RESET_ALL}"
+        )
+        # Line 2: Running Performance Statistics (Peak and Active Net PnL)
+        print(
             f"📈 Peak: {Fore.GREEN}₹{session_peak_pnl:,.0f}{Style.RESET_ALL} | "
             f"📊 Net PnL: {pnl_color}₹{current_net_pnl:,.0f}{Style.RESET_ALL}"
         )
+
 
         # =====================================================================
         # 🛡️ SINGLE-PASS THRESHOLD BREACH CHECKS
