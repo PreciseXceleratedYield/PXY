@@ -15,8 +15,9 @@ from exeaxgpxy import (
 
 # --- CONFIG ---
 REBUY_ENABLED = True
+TREND_CHECK_ENABLED = False  # 🎛️ SWITCH: True = Care about BULL/BEAR, False = Ignore trend signals completely
 MAX_LAYERS = 6
-BASE_LOT_SIZE = 25    # 🎯 Hardcoded fixed lot size to prevent accidental compounding
+BASE_LOT_SIZE = 25          # 🎯 Hardcoded fixed lot size to prevent accidental compounding
 
 def safe_float(val, fallback=0.0):
     if val is None: return fallback
@@ -37,7 +38,7 @@ def handle_side_averaging(client, df):
     
     ist = pytz.timezone("Asia/Kolkata")
     now = datetime.now(ist).time()
-    if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): return
+    if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,5)): return
 
     # 1. Parse current live layers from upstream package
     pos_raw = str(get_position_summary(client)).upper().strip()
@@ -78,20 +79,19 @@ def handle_side_averaging(client, df):
         active_atr = 0.0
 
         for index, row in side_df.iterrows():
-            # 🚦 SIMPLE TREND FILTER
-            trend_signal = str(row.get("exit", "")).upper().strip()
-            if side == "CE" and trend_signal != "BULL":
-                all_conditions_met = False
-                continue
-            if side == "PE" and trend_signal != "BEAR":
-                all_conditions_met = False
-                continue
+            # 🚦 TREND FILTER CONDITIONAL SWITCH
+            if TREND_CHECK_ENABLED:
+                trend_signal = str(row.get("exit", "")).upper().strip()
+                if side == "CE" and trend_signal != "BULL":
+                    all_conditions_met = False
+                    continue
+                if side == "PE" and trend_signal != "BEAR":
+                    all_conditions_met = False
+                    continue
 
             # 📉 ATR * 2 BASELINE THRESHOLD
-            # Multiplies the raw ATR value by 2 to double the entry distance requirement.
-            # Example: ATR is 7.0, Ratio is 1.0 -> Dynamic Threshold becomes -(7.0 * 2) * 1.0 = -14.0%
             row_atr = safe_float(row.get("atr", 10.0))
-            active_atr = row_atr * 2
+            active_atr = row_atr * 1.4
             dynamic_threshold = -active_atr * ratio_multiplier
             last_calculated_threshold = dynamic_threshold
 
