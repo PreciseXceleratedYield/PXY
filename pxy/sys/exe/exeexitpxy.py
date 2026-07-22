@@ -16,7 +16,7 @@ from exeexppxy import analyze_targets_and_sides, process_metrics_print_and_dump,
 
 init(autoreset=True) 
 
-DEBUG_MODE = False 
+DEBUG_MODE = True 
 
 # ==========================================================
 # CONFIGURATION SWITCH (LOCKED IN CONTROLLER)
