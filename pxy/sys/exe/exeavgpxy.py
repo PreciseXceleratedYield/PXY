@@ -3,168 +3,127 @@ import pytz
 from datetime import datetime, time as dt_time
 from colorama import Fore
 
-# 🔍 Routing package path into the "run" subdirectory explicitly
-from run.runpchkpxy import get_position_summary
-
-# 📦 Pure explicit extraction from your customized external helper script module
-from exeaxgpxy import (
+# 🔍 Routing package paths
+from run.runpchkpxy import get_position_summary 
+from exeaxgpxy import ( 
     send_market_order, 
     set_cooling, 
     is_cooling, 
     print_pxy_trigger_dashboard, 
-    print_exposure_map
+    print_exposure_map 
 )
 
 # --- CONFIG ---
 REBUY_ENABLED = True
 MAX_LAYERS = 6
+BASE_LOT_SIZE = 25    # 🎯 Hardcoded fixed lot size to prevent accidental compounding
 
 def safe_float(val, fallback=0.0):
-    """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
-    if val is None:
-        return fallback
-    try:
-        return float(val)
-    except (ValueError, TypeError):
-        return fallback
+    if val is None: return fallback
+    try: return float(val)
+    except (ValueError, TypeError): return fallback
 
 def generate_pxy_tag():
-    """Generates a high-resolution execution timestamp tag based on Indian Standard Time."""
     IST = pytz.timezone("Asia/Kolkata")
     return datetime.now(IST).strftime('%H%M%S')
 
 def get_loss(row):
-    """Optimized globally to prevent memory re-allocation inside the loop."""
     entry = safe_float(row.get("buy_prc", 0.0))
     ltp = safe_float(row.get("sell_prc", 0.0))
     return ((ltp - entry) / entry) * 100 if entry > 0 else 0
 
 def handle_side_averaging(client, df):
-    """Averages positions scaling thresholds via strict counter-side matrix tracking and dynamic ratio balancing."""
-    if df is None or df.empty:
-        return
-        
+    if df is None or df.empty: return
+    
     ist = pytz.timezone("Asia/Kolkata")
     now = datetime.now(ist).time()
-    if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)):
-        return
+    if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,10)): return
 
-    # Extract upstream lots matching your regex structure
+    # 1. Parse current live layers from upstream package
     pos_raw = str(get_position_summary(client)).upper().strip()
     match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
     ce_lots, pe_lots = (int(match.group(1)), int(match.group(2))) if match else (0, 0)
 
-    # 💰 Calculate true integer-casted position capital invested per side
-    ce_invested = 0
-    pe_invested = 0
-    
+    # 2. Map tracking matrix
+    ce_invested, pe_invested = 0, 0
     df = df.copy()
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper()
-
+    
     for idx, row in df.iterrows():
-        row_qty = abs(safe_float(row.get("qty", 0.0)))
-        row_buy_prc = safe_float(row.get("buy_prc", 0.0))
-        position_cost = int(row_qty * row_buy_prc)
-        
-        if row['side'] == 'CE':
-            ce_invested += position_cost
-        elif row['side'] == 'PE':
-            pe_invested += position_cost
+        cost = int(abs(safe_float(row.get("qty", 0.0))) * safe_float(row.get("buy_prc", 0.0)))
+        if row['side'] == 'CE': ce_invested += cost
+        elif row['side'] == 'PE': pe_invested += cost
 
-    # 📊 Route the compiled integer metrics out to your helper map logger
     print_exposure_map(ce_lots, pe_lots, ce_invested, pe_invested)
 
+    # 3. Process Execution Loop
     for side in ['CE', 'PE']:
         side_df = df[df['side'] == side]
-        if side_df.empty:
-            continue
+        if side_df.empty: continue
 
         own_count = ce_lots if side == "CE" else pe_lots
         opp_count = pe_lots if side == "CE" else ce_lots
 
         if own_count >= MAX_LAYERS:
-            print(f"{Fore.YELLOW}     ⚠️ {side} Layer Limit Reached ({own_count}/{MAX_LAYERS}).")
+            print(f"{Fore.YELLOW} ⚠️ {side} Layer Limit Reached ({own_count}/{MAX_LAYERS}).")
             continue
 
-        all_positions_crossed_threshold = True
-        last_calculated_threshold = 0.0
+        # ⚖️ SIMPLE RATIO BALANCER
+        ratio_multiplier = max(1.0, float(max(1, own_count)) / float(max(1, opp_count)))
+
+        all_conditions_met = True
         total_loss = 0.0
-        valid_rows_count = 0
-        active_opp_matrix, active_atr_baseline, active_balance_multiplier = 1.0, 0.0, 1.0
+        valid_rows = 0
+        last_calculated_threshold = 0.0
+        active_atr = 0.0
 
         for index, row in side_df.iterrows():
-            # --- VOLATILITY BASELINE & RATIO DEPENDENCIES ---
-            extracted_atr = safe_float(row.get("atr", 10.0))
-            
-            # --- EXIT SIGNAL FIELD EXTRACTION & VERIFICATION ---
-            # Condition triggers when ATR value is 7 or more than 7
-            if extracted_atr >= 7:
-                row_exit_signal = str(row.get("exit", "")).upper().strip()
-                
-                # CE can only average when exit is BULL
-                if side == "CE" and row_exit_signal != "BULL":
-                    all_positions_crossed_threshold = False
-                    continue  # Skips single row out of trend without stalling remaining positions
-                    
-                # PE can only average when exit is BEAR
-                if side == "PE" and row_exit_signal != "BEAR":
-                    all_positions_crossed_threshold = False
-                    continue  # Skips single row out of trend without stalling remaining positions
+            # 🚦 SIMPLE TREND FILTER
+            trend_signal = str(row.get("exit", "")).upper().strip()
+            if side == "CE" and trend_signal != "BULL":
+                all_conditions_met = False
+                continue
+            if side == "PE" and trend_signal != "BEAR":
+                all_conditions_met = False
+                continue
+
+            # 📉 ATR * 2 BASELINE THRESHOLD
+            # Multiplies the raw ATR value by 2 to double the entry distance requirement.
+            # Example: ATR is 7.0, Ratio is 1.0 -> Dynamic Threshold becomes -(7.0 * 2) * 1.0 = -14.0%
+            row_atr = safe_float(row.get("atr", 10.0))
+            active_atr = row_atr * 2
+            dynamic_threshold = -active_atr * ratio_multiplier
+            last_calculated_threshold = dynamic_threshold
 
             pos_loss = get_loss(row)
             total_loss += pos_loss
-            valid_rows_count += 1
-            
-            row_atr_baseline = max(6.0, min(16.0, extracted_atr))
-            active_atr_baseline = row_atr_baseline
+            valid_rows += 1
 
-            # --- PARAMETER EXTRACTION ---
-            ce_p = max(1.0, safe_float(row.get("ce_power"), 1.0))
-            pe_p = max(1.0, safe_float(row.get("pe_power"), 1.0))
-            hce_d = max(1.0, safe_float(row.get("hkin_ce_depth"), 1.0))
-            hpe_d = max(1.0, safe_float(row.get("hkin_pe_depth"), 1.0))
+            # Verify if position loss has dropped past the widened threshold
+            if pos_loss > dynamic_threshold:  # e.g., -6% is greater than -14% (not down enough)
+                all_conditions_met = False
 
-            # --- THREAT BALANCING ---
-            opp_matrix_factor = max(pe_p, hpe_d) if side == "CE" else max(ce_p, hce_d)
-            active_opp_matrix = opp_matrix_factor
+        if valid_rows == 0:
+            all_conditions_met = False
 
-            # --- SMOOTHED GEOMETRIC RATIO FORMULA ---
-            balance_multiplier = max(1.0, float(max(1, own_count)) / float(max(1, opp_count)))
-            active_balance_multiplier = balance_multiplier
-            
-            dynamic_threshold = -row_atr_baseline * opp_matrix_factor * balance_multiplier
-            last_calculated_threshold = dynamic_threshold
-
-            # Risk Protection: Defer averaging if even one contract row has not broken the barrier
-            if pos_loss > dynamic_threshold:
-                all_positions_crossed_threshold = False
-
-        if valid_rows_count == 0:
-            all_positions_crossed_threshold = False
-
-        if all_positions_crossed_threshold and not is_cooling(side):
+        # 🛒 Execution Gate
+        if all_conditions_met and not is_cooling(side):
             last_order = side_df.iloc[-1]
             symbol = last_order['symbol']
-            qty = abs(int(safe_float(last_order['qty'], 0.0)))
-            
-            if qty <= 0:
-                print(f"{Fore.RED}❌ Aborting: Extracted order quantity is zero or invalid for {symbol}.")
-                continue
-
             new_tag = generate_pxy_tag()
-            net_average_loss = total_loss / valid_rows_count
-            
-            # Forward formatting values to helper script module
+            net_average_loss = total_loss / valid_rows
+
+            # Forwarding clean values back to dashboard logger
             print_pxy_trigger_dashboard(
-                side, symbol, net_average_loss, last_calculated_threshold, new_tag,
-                ce_lots, pe_lots, active_opp_matrix, active_atr_baseline, active_balance_multiplier
+                side, symbol, net_average_loss, last_calculated_threshold, new_tag, 
+                ce_lots, pe_lots, 1.0, active_atr, ratio_multiplier
             )
             
-            print(f"{Fore.GREEN}🛒 [EXECUTION] Sending market order to buy Layer {own_count + 1} for {symbol}...")
+            print(f"{Fore.GREEN}🛒 [EXECUTION] Sending market order for Layer {own_count + 1} -> {symbol}...")
             
-            # Fire boolean execution check to avoid loop-breaking runaway orders
-            if send_market_order(client=client, symbol=symbol, qty=qty, tag=new_tag):
+            if send_market_order(client=client, symbol=symbol, qty=BASE_LOT_SIZE, tag=new_tag):
                 set_cooling(side)
-                print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED via Clean Threat Threshold.")
+                print(f"{Fore.GREEN}✅ SUCCESS: Side {side} Averaged via ATR*2 Ratio.")
             else:
-                print(f"{Fore.RED}❌ CRITICAL: NeoAPI refused or dropped connection. Order not filled.")
+                print(f"{Fore.RED}❌ CRITICAL: Order execution failed.")
+
