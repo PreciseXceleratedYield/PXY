@@ -35,7 +35,6 @@ SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(current_dir, "../../web/websqr
 INITIAL_LOSS_FLOOR = -9000.0
 DYNAMIC_RISK_BAND = 9000.0  # Distance maintained behind the day's peak profit
 EMERGENCY_RETRY_SECONDS = 5.0
-LOOP_INTERVAL_SECONDS = 1.0
 
 
 def safe_load_realised_pnl(file_path):
@@ -54,8 +53,7 @@ def safe_load_realised_pnl(file_path):
         file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, IST).strftime("%Y-%m-%d")
         
         if file_mod_date_str != today_str:
-            sys.stdout.write(f"\r⚠️  {Fore.YELLOW}STALE REALISED DATA BLOCKED...{Style.RESET_ALL}\n")
-            sys.stdout.flush()
+            print(f"⚠️  {Fore.YELLOW}STALE REALISED DATA BLOCKED...{Style.RESET_ALL}")
             return 0.0
 
         with open(file_path, "r", encoding="utf-8") as f:
@@ -96,8 +94,7 @@ def safe_load_unrealised_pnl(file_path):
         file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, IST).strftime("%Y-%m-%d")
         
         if file_mod_date_str != today_str:
-            sys.stdout.write(f"\r⚠️  {Fore.YELLOW}STALE UNREALISED DATA BLOCKED...{Style.RESET_ALL}\n")
-            sys.stdout.flush()
+            print(f"⚠️  {Fore.YELLOW}STALE UNREALISED DATA BLOCKED...{Style.RESET_ALL}")
             return 0.0
 
         with open(file_path, "r", encoding="utf-8") as f:
@@ -148,7 +145,6 @@ def calculate_dynamic_profit_target(file_path):
                 except (ValueError, TypeError):
                     quantity = 0.0
                     
-                # Guard against partial residue lots or micro decimal positions
                 if quantity > 0.1:
                     active_rows_count += 1
                         
@@ -194,7 +190,7 @@ def verify_and_purge_stale_cache():
     state = load_session_state()
     
     if today_str not in state.get("updated_timestamp", ""):
-        print(f"\n⏰ {Fore.GREEN}NEW TRADING DAY! PURGING STALE FILES...")
+        print(f"⏰ {Fore.GREEN}NEW TRADING DAY! PURGING STALE FILES...")
         for path in [PNL_JSON_PATH, POS_JSON_PATH, SQUAREOFF_LOG_FILE]:
             if os.path.exists(path):
                 try:
@@ -228,92 +224,78 @@ def write_squareoff_success_log():
 # =====================================================================
 
 def start_trailing_engine():
-    """Monitors live data boundaries continuously.
-    Implements a dynamic -9000 floor trailing method linked directly to daily peak profits.
+    """Executes a single-shot verification pass. No infinite monitoring loop here.
+    If thresholds are breached, fires the triple-confirmation exit loop.
     """
     verify_and_purge_stale_cache()
     
-    # Load past session state to handle mid-day core engine restarts safely
+    # Load session state historical high memory
     initial_state = load_session_state()
     session_peak_pnl = float(initial_state.get("session_peak_pnl", 0.0))
     
-    # Calculate baseline trailing exit line parameter
-    active_exit_line = session_peak_pnl - DYNAMIC_RISK_BAND
-    if active_exit_line < INITIAL_LOSS_FLOOR:
-        active_exit_line = INITIAL_LOSS_FLOOR
+    try:
+        # 1. Gather live operational data metrics from web files
+        realised_pnl = safe_load_realised_pnl(PNL_JSON_PATH)    
+        unrealised_pnl = safe_load_unrealised_pnl(POS_JSON_PATH) 
+        current_net_pnl = realised_pnl + unrealised_pnl         
+        profit_target = calculate_dynamic_profit_target(POS_JSON_PATH)
+        
+        # 2. Dynamic Trailing calculation rule
+        if current_net_pnl > session_peak_pnl:
+            session_peak_pnl = current_net_pnl
+            
+        active_exit_line = session_peak_pnl - DYNAMIC_RISK_BAND
+        if active_exit_line < INITIAL_LOSS_FLOOR:
+            active_exit_line = INITIAL_LOSS_FLOOR
+        
+        # 3. Persist current metrics back to state file
+        save_session_state(session_peak_pnl, current_net_pnl, active_exit_line)
+        
+        # 4. Format terminal status display line
+        target_display_str = "OFF (No Rows)" if profit_target == 0.0 else f"+₹{profit_target:,.0f}"
+        pnl_color = Fore.GREEN if current_net_pnl >= 0 else Fore.RED
+        floor_color = Fore.YELLOW if active_exit_line > INITIAL_LOSS_FLOOR else Fore.RED
+        
+        print(
+            f"📉 Floor: {floor_color}₹{active_exit_line:,.0f}{Style.RESET_ALL} | "
+            f"🎯 Target: {Fore.CYAN}{target_display_str}{Style.RESET_ALL} | "
+            f"📈 Peak: {Fore.GREEN}₹{session_peak_pnl:,.0f}{Style.RESET_ALL} | "
+            f"📊 Net PnL: {pnl_color}₹{current_net_pnl:,.0f}{Style.RESET_ALL}"
+        )
 
-    print(f"\n🚀 {Fore.CYAN}STARTING DYNAMIC TRAILING RUNTIME ENGINE... [INITIAL FLOOR @ -₹9,000]{Style.RESET_ALL}\n")
-    
-    while True:
-        try:
-            # 1. Gather live operational data metrics from web files
-            realised_pnl = safe_load_realised_pnl(PNL_JSON_PATH)    # Booked PnL
-            unrealised_pnl = safe_load_unrealised_pnl(POS_JSON_PATH) # Running PnL
-            current_net_pnl = realised_pnl + unrealised_pnl         # Total Net PnL
-            profit_target = calculate_dynamic_profit_target(POS_JSON_PATH)
-            
-            # 2. Dynamic Trailing Core Update Step Rule logic
-            if current_net_pnl > session_peak_pnl:
-                session_peak_pnl = current_net_pnl
-                # Reduce risk footprint dynamically by shifting the floor up with the peak
-                active_exit_line = session_peak_pnl - DYNAMIC_RISK_BAND
-            
-            # Ensure the tracking floor never sinks beneath our absolute start day cap
-            if active_exit_line < INITIAL_LOSS_FLOOR:
-                active_exit_line = INITIAL_LOSS_FLOOR
-            
-            # 3. Persist current operational states for the monitoring dashboard
-            save_session_state(session_peak_pnl, current_net_pnl, active_exit_line)
-            
-            # 4. Format terminal logging display strings
-            target_display_str = "OFF (No Rows)" if profit_target == 0.0 else f"+₹{profit_target:,.0f}"
-            pnl_color = Fore.GREEN if current_net_pnl >= 0 else Fore.RED
-            floor_color = Fore.YELLOW if active_exit_line > INITIAL_LOSS_FLOOR else Fore.RED
-            
-            # Single-line terminal carriage return ticker
-            sys.stdout.write(
-                f"\r📉 Floor:{floor_color}₹{active_exit_line:,.0f}{Style.RESET_ALL} | "
-                f"🎯 Target:{Fore.CYAN}{target_display_str}{Style.RESET_ALL} | "
-                f"📈 Peak: {Fore.GREEN}₹{session_peak_pnl:,.0f}{Style.RESET_ALL} | "
-                f"📊 Net PnL:{pnl_color}₹{current_net_pnl:,.0f}{Style.RESET_ALL}      "
-            )
-            sys.stdout.flush()
+        # =====================================================================
+        # 🛡️ SINGLE-PASS THRESHOLD BREACH CHECKS
+        # =====================================================================
+        
+        # Condition A: Dynamic Take Profit Target Evaluation
+        if profit_target > 0.0 and current_net_pnl >= profit_target:
+            if EXECUTE_SQUARE_OFF:
+                print(f"🎯 {Fore.GREEN}PROFIT TARGET HIT! Launching Triple-Confirmation Square-off...{Style.RESET_ALL}")
+                execute_emergency_sequence(current_dir, session_peak_pnl, current_net_pnl, active_exit_line)
+            else:
+                print(f"⚠️ {Fore.YELLOW}PROFIT TARGET HIT but EXECUTE_SQUARE_OFF is disabled.{Style.RESET_ALL}")
+                sys.exit(0)
 
-            # =====================================================================
-            # 🛡️ EVALUATION & BREACH DETECTION TIMELINE
-            # =====================================================================
-            
-            # Condition A: Dynamic Take Profit Target Evaluation (Checked against Total NET PnL)
-            if profit_target > 0.0 and current_net_pnl >= profit_target:
-                if EXECUTE_SQUARE_OFF:
-                    print(f"\n\n🎯 {Fore.GREEN}PROFIT TARGET HIT! Triggering exit routine...{Style.RESET_ALL}")
-                    execute_emergency_sequence(current_dir, session_peak_pnl, current_net_pnl, active_exit_line)
-                else:
-                    print(f"\n\n⚠️ {Fore.YELLOW}PROFIT TARGET HIT but EXECUTE_SQUARE_OFF is disabled.{Style.RESET_ALL}")
-                    sys.exit(0)
-
-            # Condition B: Dynamic Trailing Floor Evaluation (Checked against Total NET PnL)
-            elif current_net_pnl <= active_exit_line:
-                if EXECUTE_SQUARE_OFF:
-                    print(f"\n\n🚨 {Fore.RED}NET PNL BREACHED TRAILING FLOOR (₹{active_exit_line:,.0f})! Entering exit loop...{Style.RESET_ALL}")
-                    execute_emergency_sequence(current_dir, session_peak_pnl, current_net_pnl, active_exit_line)
-                else:
-                    print(f"\n\n⚠️ {Fore.YELLOW}WARNING: Trailing floor violated. Protection disabled.{Style.RESET_ALL}")
-                    sys.exit(0)
-            
-            # Heartbeat check cadence interval
-            time.sleep(LOOP_INTERVAL_SECONDS)
-            
-        except KeyboardInterrupt:
-            print(f"\n\n👋 {Fore.YELLOW}Engine monitoring terminated manually by user.{Style.RESET_ALL}")
+        # Condition B: Dynamic Trailing Floor Evaluation
+        elif current_net_pnl <= active_exit_line:
+            if EXECUTE_SQUARE_OFF:
+                print(f"🚨 {Fore.RED}NET PNL BREACHED TRAILING FLOOR! Launching Triple-Confirmation Square-off...{Style.RESET_ALL}")
+                execute_emergency_sequence(current_dir, session_peak_pnl, current_net_pnl, active_exit_line)
+            else:
+                print(f"⚠️ {Fore.YELLOW}WARNING: Trailing floor violated. Protection disabled.{Style.RESET_ALL}")
+                sys.exit(0)
+                
+        # If everything is safe, let the script end cleanly so your external wrapper can repeat it
+        else:
             sys.exit(0)
-        except Exception as e:
-            print(f"\n{Fore.RED}❌ Execution Error inside tracker loop: {e}{Style.RESET_ALL}")
-            time.sleep(EMERGENCY_RETRY_SECONDS)
+            
+    except Exception as e:
+        print(f"{Fore.RED}❌ Execution Check Error: {e}{Style.RESET_ALL}")
+        sys.exit(1)
 
 
 def execute_emergency_sequence(current_dir, final_peak, final_net, final_floor):
-    """Encapsulated execution framework to clear orders and confirm empty account positions."""
+    """Enforces a rigorous triple-consecutive check to verify account safety before completely exiting."""
     script_path = os.path.join(current_dir, "exesqrpxy.py")
     python_executable = sys.executable if sys.executable else "python"
     no_active_positions_counter = 0
@@ -349,27 +331,27 @@ def execute_emergency_sequence(current_dir, final_peak, final_net, final_floor):
                 
                 if found_phrase_in_this_run:
                     no_active_positions_counter += 1
-                    print(f"🎯 Grep Match! Confirmation Count: ({no_active_positions_counter}/3)")
+                    print(f"🎯 Safety Match! Confirmation Count: ({no_active_positions_counter}/3)")
                 else:
                     no_active_positions_counter = 0  
                     
                 if no_active_positions_counter >= 3:
-                    print(f"\n✅ {Fore.GREEN}TRIPLE MATCH CONFIRMED: No open operational positions remain.{Style.RESET_ALL}")
+                    print(f"\n✅ {Fore.GREEN}TRIPLE CONFIRMATION MET: Account confirmed flat.{Style.RESET_ALL}")
                     write_squareoff_success_log()
                     save_session_state(final_peak, final_net, final_floor)
                     sys.exit(0)
                     
             except Exception as proc_err:
-                print(f"{Fore.RED}❌ Subprocess execution framework routing error: {proc_err}{Style.RESET_ALL}")
+                print(f"{Fore.RED}❌ Subprocess error: {proc_err}{Style.RESET_ALL}")
                 no_active_positions_counter = 0
         else:
             print(f"{Fore.RED}❌ Critical error: Square-off script missing at {script_path}{Style.RESET_ALL}")
             missing_script_attempts += 1
             if missing_script_attempts >= 3:
-                print(f"🚨 {Fore.RED}FATAL: Core dependency unavailable. Manual fallback required!{Style.RESET_ALL}")
+                print(f"🚨 {Fore.RED}FATAL: Execution script completely missing. Manual intervention required!{Style.RESET_ALL}")
                 sys.exit(1)
         
-        print(f"⏳ Retry block pass done. Re-verifying in {EMERGENCY_RETRY_SECONDS} seconds...\n")
+        print(f"⏳ Re-verifying account status in {EMERGENCY_RETRY_SECONDS} seconds...\n")
         time.sleep(EMERGENCY_RETRY_SECONDS)
 # =====================================================================
 # 🚀 PART 3: MAIN EXECUTION ENTRY POINT
