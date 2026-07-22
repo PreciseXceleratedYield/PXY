@@ -30,17 +30,17 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 /* ── HEADER ── */
 #hdr{
     height:44px;display:flex;align-items:center;justify-content:space-between;
-    padding:0 16px;background:#ffe135;border-bottom:1px solid rgba(0,0,0,0.15);
+    padding:0 16px;background:var(--bg2);border-bottom:1px solid var(--border2);
     flex-shrink:0;
 }
 .hdr-l,.hdr-r{display:flex;align-items:center;gap:10px;}
-.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:#000;cursor:pointer;user-select:none;}
-.logo sup{font-size:0.5em;vertical-align:super;color:#7a5c00;}
+.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:18px;color:var(--text);cursor:pointer;user-select:none;}
+.logo sup{font-size:0.5em;vertical-align:super;color:var(--accent);}
 #statusDot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background 0.3s;}
 #statusDot.connected{background:var(--bull);box-shadow:0 0 6px var(--bull);}
 #statusDot.error{background:var(--bear);box-shadow:0 0 6px var(--bear);}
 #clk{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums;}
-.reconnect-btn{padding:4px 10px;border-radius:5px;border:1px solid rgba(0,0,0,0.3);background:transparent;color:#000;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all 0.2s;}
+.reconnect-btn{padding:4px 10px;border-radius:5px;border:1px solid var(--border2);background:transparent;color:#ffffff;font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;transition:all 0.2s;}
 .reconnect-btn:hover{color:var(--accent);border-color:var(--accent);}
 .col-lbl{font-size:9px;letter-spacing:0.16em;text-transform:uppercase;color:var(--muted);padding:0 8px;border-left:1px solid var(--border2);}
 
@@ -163,10 +163,10 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     <div class="hdr-l">
         <span class="logo" id="logoRefresh">PXY<sup>®</sup></span>
     </div>
-    <span id="brandHdr" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Syne',sans-serif;font-weight:700;font-size:15px;letter-spacing:0.06em;color:#000;white-space:nowrap;pointer-events:none;">PreciseXceleratedYield Pvt Ltd<sup style="color:#7a5c00;">™</sup></span>
+    <span id="brandHdr" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Syne',sans-serif;font-weight:700;font-size:15px;letter-spacing:0.06em;color:var(--muted);white-space:nowrap;pointer-events:none;">PreciseXceleratedYield Pvt Ltd<sup style="color:var(--accent);">™</sup></span>
     <div style="flex:1;"></div>
     <div class="hdr-r">
-        <span id="clk" style="font-family:'DM Mono',monospace;font-size:11px;color:#000;font-weight:700;letter-spacing:0.04em;cursor:pointer;" title="Bookmarks">—</span>
+        <span id="clk" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.04em;cursor:pointer;" title="Bookmarks">—</span>
         <div id="statusDot" title="Connection status"></div>
         <button class="reconnect-btn" id="reconnectBtn" title="Reconnect">↺</button>
     </div>
@@ -450,6 +450,12 @@ $('hmAddBtn').addEventListener('click',()=>{
 
 /* ── HELPERS ── */
 function fmt(n){return(n>=0?'+':'')+Math.round(n).toLocaleString('en-IN');}
+function fmtK(n){
+    const sign=n<0?'-':'';
+    const abs=Math.abs(n);
+    if(abs>=1000)return sign+(abs/1000).toFixed(abs%1000===0?0:1)+'K';
+    return sign+Math.round(abs).toLocaleString('en-IN');
+}
 function cls(v){
     const s=String(v||'').toUpperCase();
     if(['BULL','UP','BUY','CE','POSITIVE'].some(k=>s.includes(k)))return'bull';
@@ -757,7 +763,7 @@ async function loadRisk(){
     const peak=d.session_peak_pnl??0,floor=d.active_exit_line??-3000;
     const net=runningTotal+bookedTotal;
     $('rskPeak').textContent='₹'+Math.round(peak).toLocaleString('en-IN');$('rskPeak').className='rsk-val '+(peak>=0?'bull':'bear');
-    $('rskNet').textContent='₹'+Math.round(floor).toLocaleString('en-IN');$('rskNet').className='rsk-val bear';
+    $('rskNet').textContent='₹'+fmtK(floor);$('rskNet').className='rsk-val bear';
     drawRiskCandle(floor,net,peak);
 }
 function drawRiskCandle(floor,net,peak){
