@@ -4,25 +4,28 @@ from datetime import datetime, time as dt_time
 from colorama import Fore
 
 # 🔍 Routing package paths
-from run.runpchkpxy import get_position_summary 
-from exeaxgpxy import ( 
-    send_market_order, 
-    set_cooling, 
-    is_cooling, 
-    print_pxy_trigger_dashboard, 
-    print_exposure_map 
+from run.runpchkpxy import get_position_summary
+from exeaxgpxy import (
+    send_market_order,
+    set_cooling,
+    is_cooling,
+    print_pxy_trigger_dashboard,
+    print_exposure_map
 )
 
 # --- CONFIG ---
 REBUY_ENABLED = True
 TREND_CHECK_ENABLED = False  # 🎛️ SWITCH: True = Care about BULL/BEAR, False = Ignore trend signals completely
 MAX_LAYERS = 6
-BASE_LOT_SIZE = 25          # 🎯 Hardcoded fixed lot size to prevent accidental compounding
+BASE_LOT_SIZE = 25  # 🎯 Hardcoded fixed lot size to prevent accidental compounding
 
 def safe_float(val, fallback=0.0):
-    if val is None: return fallback
-    try: return float(val)
-    except (ValueError, TypeError): return fallback
+    if val is None:
+        return fallback
+    try:
+        return float(val)
+    except (ValueError, TypeError):
+        return fallback
 
 def generate_pxy_tag():
     IST = pytz.timezone("Asia/Kolkata")
@@ -34,11 +37,14 @@ def get_loss(row):
     return ((ltp - entry) / entry) * 100 if entry > 0 else 0
 
 def handle_side_averaging(client, df):
-    if df is None or df.empty: return
-    
+    if df is None or df.empty:
+        return
+
     ist = pytz.timezone("Asia/Kolkata")
     now = datetime.now(ist).time()
-    if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,5)): return
+    
+    if not REBUY_ENABLED or not (dt_time(9,30) <= now <= dt_time(15,5)):
+        return
 
     # 1. Parse current live layers from upstream package
     pos_raw = str(get_position_summary(client)).upper().strip()
@@ -52,27 +58,31 @@ def handle_side_averaging(client, df):
     
     for idx, row in df.iterrows():
         cost = int(abs(safe_float(row.get("qty", 0.0))) * safe_float(row.get("buy_prc", 0.0)))
-        if row['side'] == 'CE': ce_invested += cost
-        elif row['side'] == 'PE': pe_invested += cost
-
+        if row['side'] == 'CE':
+            ce_invested += cost
+        elif row['side'] == 'PE':
+            pe_invested += cost
+            
     print_exposure_map(ce_lots, pe_lots, ce_invested, pe_invested)
 
     # 3. Process Execution Loop
     for side in ['CE', 'PE']:
         side_df = df[df['side'] == side]
-        if side_df.empty: continue
+        if side_df.empty:
+            continue
 
         own_count = ce_lots if side == "CE" else pe_lots
         opp_count = pe_lots if side == "CE" else ce_lots
 
         if own_count >= MAX_LAYERS:
-            print(f"{Fore.YELLOW} ⚠️ {side} Layer Limit Reached ({own_count}/{MAX_LAYERS}).")
+            print(f"{Fore.YELLOW} ⚠ {side} Layer Limit Reached ({own_count}/{MAX_LAYERS}).")
             continue
 
         # ⚖️ SIMPLE RATIO BALANCER
         ratio_multiplier = max(1.0, float(max(1, own_count)) / float(max(1, opp_count)))
 
-        all_conditions_met = True
+        # State vars for accumulation tracking
+        trigger_row = None
         total_loss = 0.0
         valid_rows = 0
         last_calculated_threshold = 0.0
@@ -83,10 +93,8 @@ def handle_side_averaging(client, df):
             if TREND_CHECK_ENABLED:
                 trend_signal = str(row.get("exit", "")).upper().strip()
                 if side == "CE" and trend_signal != "BULL":
-                    all_conditions_met = False
                     continue
                 if side == "PE" and trend_signal != "BEAR":
-                    all_conditions_met = False
                     continue
 
             # 📉 ATR * 2 BASELINE THRESHOLD
@@ -99,28 +107,23 @@ def handle_side_averaging(client, df):
             total_loss += pos_loss
             valid_rows += 1
 
-            # Verify if position loss has dropped past the widened threshold
-            if pos_loss > dynamic_threshold:  # e.g., -6% is greater than -14% (not down enough)
-                all_conditions_met = False
+            # Save the row if it breaches the averaging execution threshold
+            if pos_loss <= dynamic_threshold:
+                trigger_row = row
 
-        if valid_rows == 0:
-            all_conditions_met = False
-
-        # 🛒 Execution Gate
-        if all_conditions_met and not is_cooling(side):
-            last_order = side_df.iloc[-1]
-            symbol = last_order['symbol']
+        # 🛒 Execution Gate (Only fires if a row crossed threshold and cooling is down)
+        if trigger_row is not None and valid_rows > 0 and not is_cooling(side):
+            symbol = trigger_row['symbol']
             new_tag = generate_pxy_tag()
             net_average_loss = total_loss / valid_rows
 
-            # Forwarding clean values back to dashboard logger
+            # UI Dashboard prints ONLY inside the true execution scope
             print_pxy_trigger_dashboard(
-                side, symbol, net_average_loss, last_calculated_threshold, new_tag, 
+                side, symbol, net_average_loss, last_calculated_threshold, new_tag,
                 ce_lots, pe_lots, 1.0, active_atr, ratio_multiplier
             )
-            
+
             print(f"{Fore.GREEN}🛒 [EXECUTION] Sending market order for Layer {own_count + 1} -> {symbol}...")
-            
             if send_market_order(client=client, symbol=symbol, qty=BASE_LOT_SIZE, tag=new_tag):
                 set_cooling(side)
                 print(f"{Fore.GREEN}✅ SUCCESS: Side {side} Averaged via ATR*2 Ratio.")
