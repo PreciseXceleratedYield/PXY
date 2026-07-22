@@ -24,10 +24,10 @@ def apply_ohlc_transformation(df, mode=1):
     raw_c = df['Close'].to_numpy()
     
     # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles
-    # Green Close (Close >= Open) -> Transforms to High
-    # Red Close (Close < Open) -> Transforms to Low
+    # Green Close (Close >= Open) -> Transforms to (Close + High) / 2
+    # Red Close (Close < Open)   -> Transforms to (Close + Low) / 2
     if mode == 0:
-        out['Close'] = np.where(raw_c >= raw_o, raw_h, raw_l)
+        out['Close'] = np.where(raw_c >= raw_o, (raw_c + raw_h) / 2.0, (raw_c + raw_l) / 2.0)
         return out
 
     # Mode 1: Raw Candles
@@ -99,5 +99,3 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
         
     processed_df = apply_ohlc_transformation(df, mode=OHLC_MODE)
     return processed_df.tail(target_rows)
-
-
