@@ -31,8 +31,8 @@ POS_JSON_PATH = os.path.abspath(os.path.join(current_dir, "../../web/webpospxy.j
 RENKO_STATE_FILE = os.path.abspath(os.path.join(current_dir, "../../web/webrinkopxy.json"))
 SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(current_dir, "../../web/websqrpxy.json"))
 
-# RISK CONFIGURATION CONSTANTS
-TRAILING_DROP_LIMIT = 9000.0
+# RISK CONFIGURATION CONSTANTS (HARD-CODED ABSOLUTE LOSS FLOOR)
+HARD_LOSS_FLOOR = -9999.0
 EMERGENCY_RETRY_SECONDS = 5.0
 LOOP_INTERVAL_SECONDS = 1.0
 
@@ -132,11 +132,11 @@ def calculate_dynamic_profit_target(file_path):
 
 def load_session_state():
     if not os.path.exists(RENKO_STATE_FILE):
-        return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": -TRAILING_DROP_LIMIT}
+        return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": HARD_LOSS_FLOOR}
     try:
         with open(RENKO_STATE_FILE, "r") as f: return json.load(f)
     except Exception:
-        return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": -TRAILING_DROP_LIMIT}
+        return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": HARD_LOSS_FLOOR}
 
 
 def save_session_state(peak_value, current_net, exit_line):
@@ -165,7 +165,7 @@ def verify_and_purge_stale_cache():
                     try:
                         with open(path, "w") as fw: json.dump([], fw)
                     except Exception: pass
-        save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
+        save_session_state(0.0, 0.0, HARD_LOSS_FLOOR)
 
 
 def write_squareoff_success_log():
@@ -186,90 +186,125 @@ def write_squareoff_success_log():
 # =====================================================================
 
 def start_trailing_engine():
-    """Monitors live data boundaries and executes targeted output grepping when limits are hit."""
+    """Monitors live data boundaries continuously.
+    Uses a hard-coded absolute loss floor of -9999.
+    """
     verify_and_purge_stale_cache()
-    initial_state = load_session_state()
-    session_peak_pnl = float(initial_state.get("session_peak_pnl", 0.0))
     
-    try:
-        realised_pnl = safe_load_realised_pnl(PNL_JSON_PATH)
-        unrealised_pnl = safe_load_unrealised_pnl(POS_JSON_PATH)
-        current_net_pnl = realised_pnl + unrealised_pnl
-        profit_target = calculate_dynamic_profit_target(POS_JSON_PATH)
-        
-        if current_net_pnl > session_peak_pnl:
-            session_peak_pnl = current_net_pnl
+    # HARD-CODED ABSOLUTE LOSS FLOOR BOUNDARY
+    active_exit_line = HARD_LOSS_FLOOR
+    
+    print(f"\n🚀 {Fore.CYAN}STARTING RUNTIME ENGINE... [HARD-CODED FLOOR ACTIVE @ -₹9,999]{Style.RESET_ALL}\n")
+    
+    while True:
+        try:
+            # 1. Gather live operational data metrics from web files
+            realised_pnl = safe_load_realised_pnl(PNL_JSON_PATH)    # Booked PnL
+            unrealised_pnl = safe_load_unrealised_pnl(POS_JSON_PATH) # Running PnL
+            current_net_pnl = realised_pnl + unrealised_pnl         # Total Net PnL
+            profit_target = calculate_dynamic_profit_target(POS_JSON_PATH)
             
-        active_exit_line = session_peak_pnl - TRAILING_DROP_LIMIT
-        save_session_state(session_peak_pnl, current_net_pnl, active_exit_line)
-        
-        sign_prefix = "+" if active_exit_line > 0 else ""
-        exit_display_str = "0.0k" if active_exit_line == 0 else f"{sign_prefix}{active_exit_line / 1000.0:.1f}k"
-        target_display_str = "OFF (Single Side)" if profit_target == 0.0 else f"+₹{profit_target:,.0f}"
-        
-        print(f"Exit@{Fore.RED}₹{Style.BRIGHT}{exit_display_str}{Style.RESET_ALL} | 🎯 Target:{Fore.CYAN}{target_display_str}{Style.RESET_ALL}")
-        print(f"📊 Net:{Fore.GREEN}₹{current_net_pnl:,.0f}{Style.RESET_ALL} | Peak@{Fore.YELLOW}₹{session_peak_pnl:,.0f}{Style.RESET_ALL}")
+            # 2. Persist current operational states for the monitoring dashboard
+            save_session_state(0.0, current_net_pnl, active_exit_line)
+            
+            # 3. Format terminal logging display strings
+            target_display_str = "OFF (Single Side)" if profit_target == 0.0 else f"+₹{profit_target:,.0f}"
+            pnl_color = Fore.GREEN if current_net_pnl >= 0 else Fore.RED
+            
+            # Single-line terminal carriage return ticker
+            sys.stdout.write(
+                f"\rFloor:{Fore.RED}₹-9,999{Style.RESET_ALL} | "
+                f"🎯 Target:{Fore.CYAN}{target_display_str}{Style.RESET_ALL} | "
+                f"📊 Net PnL:{pnl_color}₹{current_net_pnl:,.0f}{Style.RESET_ALL}      "
+            )
+            sys.stdout.flush()
 
-        # -------- TRIGGER AND BREAK LOGIC TIMELINE --------
-        
-        # 1. Take Profit Target Evaluation
-        if profit_target > 0.0 and current_net_pnl >= profit_target:
-            if EXECUTE_SQUARE_OFF:
-                print(f"\n🚨 {Fore.GREEN}PROFIT TARGET HIT! Entering verification loop...")
-                current_net_pnl = active_exit_line 
-            else:
-                print(f"\n⚠️  PROFIT TARGET HIT but execution disabled."); sys.exit(0)
+            # =====================================================================
+            # 🛡️ EVALUATION & BREACH DETECTION TIMELINE
+            # =====================================================================
+            
+            # Condition A: Dynamic Take Profit Target Evaluation (Checked against Total NET PnL)
+            if profit_target > 0.0 and current_net_pnl >= profit_target:
+                if EXECUTE_SQUARE_OFF:
+                    print(f"\n\n🎯 {Fore.GREEN}PROFIT TARGET HIT! Triggering exit routine...{Style.RESET_ALL}")
+                    execute_emergency_sequence(current_dir)
+                else:
+                    print(f"\n\n⚠️ {Fore.YELLOW}PROFIT TARGET HIT but EXECUTE_SQUARE_OFF is disabled.{Style.RESET_ALL}")
+                    sys.exit(0)
 
-        # 2. Trailing Stop Loss Evaluation
-        if current_net_pnl <= active_exit_line:
-            if EXECUTE_SQUARE_OFF:
-                print(f"\n🚨 {Fore.RED}LOSS TRIGGER BREACHED! Entering loop...")
-                script_path = os.path.join(current_dir, "exesqrpxy.py")
-                python_executable = sys.executable if sys.executable else "python"
-                no_active_positions_counter = 0
-                
-                while True:
-                    print(f"⚡ [{time.strftime('%H:%M:%S')}] Firing: {python_executable} exesqrpxy.py -all")
-                    if os.path.exists(script_path):
-                        try:
-                            process = subprocess.Popen(
-                                [python_executable, script_path, "-all"],
-                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
-                            )
-                            found_phrase_in_this_run = False
-                            for line in process.stdout:
-                                sys.stdout.write(line); sys.stdout.flush()
-                                if "No active positions to exit" in line:
-                                    found_phrase_in_this_run = True
-                            process.wait()
-                            
-                            if found_phrase_in_this_run:
-                                no_active_positions_counter += 1
-                                print(f"🎯 Grep Match! Count: ({no_active_positions_counter}/3)")
-                            else:
-                                no_active_positions_counter = 0  
-                                
-                            if no_active_positions_counter >= 3:
-                                print(f"\n✅ TRIPLE MATCH CONFIRMED: No positions remain active.")
-                                write_squareoff_success_log()
-                                save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
-                                sys.exit(0)
-                        except Exception as proc_err:
-                            print(f"{Fore.RED}❌ Process routing engine error: {proc_err}")
-                            no_active_positions_counter = 0
-                    else:
-                        print(f"{Fore.RED}❌ Square-off script missing at: {script_path}")
-                    
-                    save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
-                    print(f"⏳ Retry pass complete. Re-checking in {EMERGENCY_RETRY_SECONDS} seconds...\n")
-                    time.sleep(EMERGENCY_RETRY_SECONDS)
-            else:
-                print(f"\n⚠️  WARNING TARGET BREACHED: {exit_display_str} violated!"); sys.exit(0)
-        else:
+            # Condition B: Absolute Fixed Floor Evaluation (Checked against Total NET PnL)
+            elif current_net_pnl <= active_exit_line:
+                if EXECUTE_SQUARE_OFF:
+                    print(f"\n\n🚨 {Fore.RED}NET PNL BREACHED FIXED -9,999 FLOOR! Entering exit loop...{Style.RESET_ALL}")
+                    execute_emergency_sequence(current_dir)
+                else:
+                    print(f"\n\n⚠️ {Fore.YELLOW}WARNING: Net PnL floor (-₹9,999) violated. Protection disabled.{Style.RESET_ALL}")
+                    sys.exit(0)
+            
+            # Heartbeat check cadence interval
+            time.sleep(LOOP_INTERVAL_SECONDS)
+            
+        except KeyboardInterrupt:
+            print(f"\n\n👋 {Fore.YELLOW}Engine monitoring terminated manually by user.{Style.RESET_ALL}")
             sys.exit(0)
-    except Exception as e:
-        print(f"{Fore.RED}Execution Error inside tracker engine: {e}"); sys.exit(1)
+        except Exception as e:
+            print(f"\n{Fore.RED}❌ Execution Error inside tracker loop: {e}{Style.RESET_ALL}")
+            time.sleep(EMERGENCY_RETRY_SECONDS)
 
 
+def execute_emergency_sequence(current_dir):
+    """Encapsulated execution framework to clear orders and confirm empty account positions."""
+    script_path = os.path.join(current_dir, "exesqrpxy.py")
+    python_executable = sys.executable if sys.executable else "python"
+    no_active_positions_counter = 0
+    missing_script_attempts = 0
+    
+    while True:
+        print(f"⚡ [{time.strftime('%H:%M:%S')}] Firing: {python_executable} exesqrpxy.py -all")
+        
+        if os.path.exists(script_path):
+            try:
+                process = subprocess.Popen(
+                    [python_executable, script_path, "-all"],
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1
+                )
+                
+                found_phrase_in_this_run = False
+                for line in process.stdout:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+                    if "No active positions to exit" in line:
+                        found_phrase_in_this_run = True
+                process.wait()
+                
+                if found_phrase_in_this_run:
+                    no_active_positions_counter += 1
+                    print(f"🎯 Grep Match! Confirmation Count: ({no_active_positions_counter}/3)")
+                else:
+                    no_active_positions_counter = 0  
+                    
+                if no_active_positions_counter >= 3:
+                    print(f"\n✅ {Fore.GREEN}TRIPLE MATCH CONFIRMED: No open operational positions remain.{Style.RESET_ALL}")
+                    write_squareoff_success_log()
+                    save_session_state(0.0, 0.0, HARD_LOSS_FLOOR)
+                    sys.exit(0)
+                    
+            except Exception as proc_err:
+                print(f"{Fore.RED}❌ Subprocess execution framework routing error: {proc_err}{Style.RESET_ALL}")
+                no_active_positions_counter = 0
+        else:
+            print(f"{Fore.RED}❌ Critical error: Square-off script missing at {script_path}{Style.RESET_ALL}")
+            missing_script_attempts += 1
+            if missing_script_attempts >= 3:
+                print(f"🚨 {Fore.RED}FATAL: Core dependency unavailable. Manual fallback required!{Style.RESET_ALL}")
+                sys.exit(1)
+        
+        print(f"⏳ Retry block pass done. Re-verifying in {EMERGENCY_RETRY_SECONDS} seconds...\n")
+        time.sleep(EMERGENCY_RETRY_SECONDS)
+
+
+# =====================================================================
+# 🚀 PART 3: MAIN EXECUTION ENTRY POINT
+# =====================================================================
 if __name__ == "__main__":
     start_trailing_engine()
