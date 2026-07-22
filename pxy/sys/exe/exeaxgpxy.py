@@ -117,18 +117,15 @@ def print_exposure_map(ce_lots, pe_lots, ce_invested, pe_invested):
     clean_ce = ce_lots if not isinstance(ce_lots, tuple) else int(ce_lots[0])
     clean_pe = pe_lots if not isinstance(pe_lots, tuple) else int(pe_lots[0])
     
-    # 1. Generate uncolored content to measure exact text length
     lots_plain = f"📢 Lots: {clean_ce}CE ⚖️ {clean_pe}PE "
     money_plain = f"💼 Money CE₹{int(ce_invested):,} ⚖️ ₹{int(pe_invested):,}PE"
 
-    # 2. Calculate necessary padding for a total width of 40 characters
     lots_pad_l = (40 - len(lots_plain)) // 2
     lots_pad_r = 40 - len(lots_plain) - lots_pad_l
     
     money_pad_l = (40 - len(money_plain)) // 2
     money_pad_r = 40 - len(money_plain) - money_pad_l
 
-    # 3. Print the centered, color-applied output blocks
     print(" " * lots_pad_l + f"{Fore.CYAN}{lots_plain}" + Style.RESET_ALL + " " * lots_pad_r)
     print(" " * money_pad_l + f"{Fore.MAGENTA}{money_plain}" + Style.RESET_ALL + " " * money_pad_r)
 
@@ -138,7 +135,6 @@ def print_exit_performance_card(symbol, qty, buy_prc, sell_prc):
     border = Fore.GREEN + "╔" + "═"*(w-2) + "╗"
     footer = Fore.GREEN + "╚" + "═"*(w-2) + "╝"
     
-    # Metric Calculations
     qty_val = abs(int(qty))
     buy_val = float(buy_prc)
     sell_val = float(sell_prc)
@@ -148,11 +144,9 @@ def print_exit_performance_card(symbol, qty, buy_prc, sell_prc):
     pnl = total_sell - total_buy
     pnl_pct = ((sell_val - buy_val) / buy_val * 100) if buy_val > 0 else 0.0
     
-    # Formatting fields 
     pnl_color = Fore.GREEN if pnl >= 0 else Fore.RED
     pnl_sign = "+" if pnl >= 0 else ""
     
-    # Base layout strings to accurately track true string width
     line_hdr  = f"📊 TRADE EXIT PERFORMANCE".center(w-2)
     line_sym  = f" 🔹 SYMBOL   : {symbol}"
     line_qty  = f" 🔹 QUANTITY : {qty_val}"
@@ -181,7 +175,6 @@ def process_metrics_print_and_dump(df, side_all_targets_hit, config_mode):
     ce_lots = ce_rows.shape[0]
     pe_lots = pe_rows.shape[0]
     
-    # Mathematical independent row evaluation for entry pricing matrices
     ce_invested = (ce_rows['qty'].abs() * ce_rows['entry_prc']).sum() if not ce_rows.empty else 0.0
     pe_invested = (pe_rows['qty'].abs() * pe_rows['entry_prc']).sum() if not pe_rows.empty else 0.0
     
@@ -195,7 +188,7 @@ def process_metrics_print_and_dump(df, side_all_targets_hit, config_mode):
         "pe_invested": float(pe_invested),
         "ce_all_hit": side_all_targets_hit.get("CE", False),
         "pe_all_hit": side_all_targets_hit.get("PE", False),
-        "system_config_mode": str(config_mode).lower(),  # Clean string normalization
+        "system_config_mode": str(config_mode).lower(),
         "timestamp": time.time()
     }
     try:
@@ -218,5 +211,5 @@ def dump_idle_json(config_mode):
     try:
         with open("sysmetrics_exit.json", "w") as f:
             json.dump(out_data, f, indent=4)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"{Fore.RED}⚠️ Metrics Idle File Dump Error: {e}")
