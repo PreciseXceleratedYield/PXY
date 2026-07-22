@@ -23,8 +23,15 @@ def apply_ohlc_transformation(df, mode=1):
     raw_l = df['Low'].to_numpy()
     raw_c = df['Close'].to_numpy()
     
+    # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles
+    # Green Close (Close >= Open) -> Transforms to High
+    # Red Close (Close < Open) -> Transforms to Low
+    if mode == 0:
+        out['Close'] = np.where(raw_c >= raw_o, raw_h, raw_l)
+        return out
+
     # Mode 1: Raw Candles
-    if mode == 1:
+    elif mode == 1:
         return out
         
     # Mode 2: Mid-Body (Only Close changes to OC/2)
@@ -45,11 +52,9 @@ def apply_ohlc_transformation(df, mode=1):
         m3_c = (raw_o + raw_h + raw_l + raw_c) / 4.0
         
         # Step 2: Solve the algebraic circular equation for Mode 4's Close
-        # m4_c = (m1_c + m2_c + m3_c + m4_c) / 4 -> resolves to a 3-part matrix average
         m4_c = (m1_c + m2_c + m3_c) / 3.0
         
         # Step 3: Solve the algebraic circular equations for Open, High, and Low
-        # Mode 1, 2, and 3 all use raw values, resolving the final average back to raw
         out['Open'] = raw_o
         out['High'] = raw_h
         out['Low'] = raw_l
@@ -94,4 +99,5 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
         
     processed_df = apply_ohlc_transformation(df, mode=OHLC_MODE)
     return processed_df.tail(target_rows)
+
 
