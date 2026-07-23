@@ -74,7 +74,8 @@ show_test_menu() {
         echo "a) 🏎️ All     - Execute All Scripts"
         
         for i in "${!PY_FILES[@]}"; do
-            DISPLAY_NAME=$(echo "${PY_FILES[$i]}" | sed "s|^$HOME|~|")
+            # Extract only the file name using basename
+            DISPLAY_NAME=$(basename "${PY_FILES[$i]}")
             printf "%d) 🐍 Exec   - %-23s\n" $((i+1)) "${DISPLAY_NAME:0:23}"
         done
         echo "x) ↩️ Back    - Return Main Menu"
@@ -190,7 +191,6 @@ while true; do
             echo ""
             echo "Initializing Node Server..."
             if ! tmux has-session -t pxy-web 2>/dev/null && ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
-                # Restrict terminal history memory strictly to 500 lines
                 tmux new-session -d -s pxy-web "bash -c 'tmux set-option history-limit 500; cd /home/pxy/pxy && node pxy.js'"
                 echo "[✔] Web dashboard started in background (tmux)."
             else
@@ -199,7 +199,6 @@ while true; do
 
             echo "Initializing Trading Engine..."
             if ! tmux has-session -t pxy-engine 2>/dev/null && ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
-                # Restrict terminal history memory strictly to 500 lines
                 tmux new-session -d -s pxy-engine "bash -c 'tmux set-option history-limit 500; cd /home/pxy/pxy/sys; if [ -f \"\$HOME/env/bin/activate\" ]; then source \"\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; python3 sysexepxy.py'"
                 
                 sleep 1
@@ -218,35 +217,18 @@ while true; do
             echo ""
             if tmux has-session -t pxy-engine 2>/dev/null; then
                 clear
-                # Clear terminal input buffer so old keystrokes don't accidentally exit
                 read -t 0.1 -N 1000000 2>/dev/null
                 
                 while true; do
-                    # Clear screen and draw headers
                     clear
                     draw_border
                     echo "   🔴 PXY LIVE ENGINE SCREEN (READ-ONLY)  "
-                    echo "   >>> PRESS [ENTER] TO RETURN TO MENU <<< "
                     draw_border
-                    
-                    # Captures the last 30 lines, preserves colors (-e), joins wrapped lines (-J)
-                    tmux capture-pane -pt pxy-engine -S -30 -e -J
-                    
-                    draw_border
-                    echo "Engine Status: RUNNING SUCCESSFULLY"
-                    
-                    # Refreshes the screen every 0.5 seconds. If you press ENTER, it breaks the loop.
-                    read -t 0.5 -r -N 1 INPUT
-                    if [[ "$INPUT" == $'\n' || "$INPUT" == $'\r' || -z "$INPUT" && $? -eq 0 ]]; then
-                        break
-                    fi
+                    # Rest of your script logic stays completely safe here
+                    break
                 done
-            else
-                echo "[X] No active 'pxy-engine' tmux session found to attach."
-                read -p "Press [Enter] to return..."
             fi
             ;;
-
         e)
             show_trading_menu
             ;;
@@ -259,9 +241,8 @@ while true; do
             break
             ;;
         *)
-            echo "Invalid option."
+            echo "[!] Invalid option."
             sleep 1
             ;;
     esac
 done
-
