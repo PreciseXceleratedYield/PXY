@@ -186,12 +186,15 @@ def start_trailing_engine():
         sign_prefix = "+" if active_exit_line > 0 else ""
         exit_display_str = "0.0k" if active_exit_line == 0 else f"{sign_prefix}{active_exit_line / 1000.0:.1f}k"
         
-        print(
-            f"Exit@{Fore.RED}₹{Style.BRIGHT}{exit_display_str}{Style.RESET_ALL} | "
-            f"📊 Net:{Fore.GREEN}₹{current_net_pnl:,.0f}{Style.RESET_ALL} | "
-            f"Peak@{Fore.YELLOW}₹{session_peak_pnl:,.0f}{Style.RESET_ALL}"
-        )
+        # Determine the color for Net PnL dynamically
+        net_color = Fore.GREEN if current_net_pnl >= 0 else Fore.RED
         
+        print(
+            f"Exit@{Fore.WHITE}{Style.BRIGHT}{exit_display_str}{Style.RESET_ALL} | "
+            f"📊 Net:{net_color}₹{current_net_pnl:,.0f}{Style.RESET_ALL} | "
+            f"Peak@{Fore.WHITE}₹{session_peak_pnl:,.0f}{Style.RESET_ALL}"
+        )
+
         # -------- TRIGGER AND BREAK LOGIC TIMELINE --------
         if current_net_pnl <= active_exit_line:
             if EXECUTE_SQUARE_OFF:
