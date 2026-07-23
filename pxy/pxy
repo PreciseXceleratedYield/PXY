@@ -156,26 +156,33 @@ while true; do
     case $OPTION in
         k)
             echo ""
-            echo "Terminating Web Server..."
-            if tmux has-session -t pxy-web 2>/dev/null; then
-                tmux kill-session -t pxy-web
-                echo "[✔] Stopped web core."
-            elif pgrep -f "pxy.js" >/dev/null 2>&1; then
-                pkill -9 -f pxy.js
-                echo "[✔] Stopped fallback web core."
-            fi
-            
-            echo "Terminating Trading Engine..."
-            if tmux has-session -t pxy-engine 2>/dev/null; then
-                tmux kill-session -t pxy-engine
-                echo "[✔] Stopped trading engine tmux session."
-            elif pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
-                pkill -f "sysexepxy.py"
-                echo "[✔] Killed fallback trading script process."
+            read -s -p "Enter password to kill engine: " KILL_PASS
+            echo ""
+            if [ "$KILL_PASS" != "1" ]; then
+                echo "[!] Access Denied. Incorrect password."
+                sleep 1.5
             else
-                echo "[-] Trading engine was not running."
+                echo "Terminating Web Server..."
+                if tmux has-session -t pxy-web 2>/dev/null; then
+                    tmux kill-session -t pxy-web
+                    echo "[✔] Stopped web core."
+                elif pgrep -f "pxy.js" >/dev/null 2>&1; then
+                    pkill -9 -f pxy.js
+                    echo "[✔] Stopped fallback web core."
+                fi
+                
+                echo "Terminating Trading Engine..."
+                if tmux has-session -t pxy-engine 2>/dev/null; then
+                    tmux kill-session -t pxy-engine
+                    echo "[✔] Stopped trading engine tmux session."
+                elif pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
+                    pkill -f "sysexepxy.py"
+                    echo "[✔] Killed fallback trading script process."
+                else
+                    echo "[-] Trading engine was not running."
+                fi
+                read -p "Press [Enter] to return..."
             fi
-            read -p "Press [Enter] to return..."
             ;;
         u)
             echo ""
