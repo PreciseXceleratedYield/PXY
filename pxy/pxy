@@ -74,7 +74,7 @@ show_test_menu() {
         echo "a) ✅ All     - Execute All Scripts"
         
         for i in "${!PY_FILES[@]}"; do
-            DISPLAY_NAME=$(basename "${PY_FILES[$i]}")
+            DISPLAY_NAME=$(echo "${PY_FILES[$i]}" | sed "s|^$HOME|~|")
             printf "%d) 🐍 Exec   - %-23s\n" $((i+1)) "${DISPLAY_NAME:0:23}"
         done
         echo "x) ❌ Back    - Return Main Menu"
@@ -190,6 +190,7 @@ while true; do
             echo ""
             echo "Initializing Node Server..."
             if ! tmux has-session -t pxy-web 2>/dev/null && ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
+                # Restrict terminal history memory strictly to 500 lines
                 tmux new-session -d -s pxy-web "bash -c 'tmux set-option history-limit 500; cd /home/pxy/pxy && node pxy.js'"
                 echo "[✔] Web dashboard started in background (tmux)."
             else
@@ -198,6 +199,7 @@ while true; do
 
             echo "Initializing Trading Engine..."
             if ! tmux has-session -t pxy-engine 2>/dev/null && ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
+                # Restrict terminal history memory strictly to 500 lines
                 tmux new-session -d -s pxy-engine "bash -c 'tmux set-option history-limit 500; cd /home/pxy/pxy/sys; if [ -f \"\$HOME/env/bin/activate\" ]; then source \"\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; python3 sysexepxy.py'"
                 
                 sleep 1
@@ -216,15 +218,14 @@ while true; do
             echo ""
             if tmux has-session -t pxy-engine 2>/dev/null; then
                 clear
+                # Clear terminal input buffer so old keystrokes don't accidentally exit
                 read -t 0.1 -N 1000000 2>/dev/null
                 
-                while true; do
-                    clear
-                    draw_border
-                    echo "   🔴 PXY LIVE ENGINE SCREEN (READ-ONLY)  "
-                    draw_border
-                    break
-                done
+                # Attach to your live console window safely in read-only mode (-r)
+                tmux attach-session -r -t pxy-engine
+            else
+                echo "[!] Trading engine session 'pxy-engine' is not running."
+                read -p "Press [Enter] to return..."
             fi
             ;;
         e)
