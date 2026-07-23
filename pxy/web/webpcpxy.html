@@ -758,10 +758,10 @@ async function loadTrades(){
 
 /* ── RISK BAR ── */
 async function loadRisk(){
-    let d={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-3000};
+    let d={session_peak_pnl:0,active_exit_line:-3000};
     try{d=await fetch('./webrinkopxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     const peak=Math.round(d.session_peak_pnl??0);
-    const net=Math.round(d.current_net_pnl??0);
+    const net=Math.round(runningTotal+bookedTotal);
     const floor=Math.round(d.active_exit_line??-3000);
     $('rskPeak').textContent='₹'+peak.toLocaleString('en-IN');$('rskPeak').className='rsk-val '+(peak>=0?'bull':'bear');
     $('rskNet').textContent='₹'+fmtK(floor);$('rskNet').className='rsk-val bear';
