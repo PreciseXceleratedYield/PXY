@@ -31,7 +31,7 @@ show_trading_menu() {
         echo "3) 🟩 Sqr-CE  - [Square-off CE]"
         echo "4) 🟥 Sqr-PE  - [Square-off PE]"
         echo "5) 💥 Sqr-All - [Close All Positions]"
-        echo "6) ❌ Back    - Return Main Menu"
+        echo "6) ↩️ Back    - Return Main Menu"
         draw_border
         read -p "Select option [1-6]: " SUBOPT
         
@@ -65,19 +65,19 @@ show_test_menu() {
         
         if [ ${#PY_FILES[@]} -eq 0 ]; then
             echo "No python files found in $HOME."
-            echo "x) ❌ Back    - Return Main Menu"
+            echo "x) ↩️ Back    - Return Main Menu"
             draw_border
             read -p "Press [Enter] to return..."
             break
         fi
 
-        echo "a) ✅ All     - Execute All Scripts"
+        echo "a) 🏎️ All     - Execute All Scripts"
         
         for i in "${!PY_FILES[@]}"; do
             DISPLAY_NAME=$(echo "${PY_FILES[$i]}" | sed "s|^$HOME|~|")
             printf "%d) 🐍 Exec   - %-23s\n" $((i+1)) "${DISPLAY_NAME:0:23}"
         done
-        echo "x) ❌ Back    - Return Main Menu"
+        echo "x) ↩️ Back    - Return Main Menu"
         draw_border
         
         read -p "Select option [a, 1-5, x]: " TESTOPT
@@ -221,13 +221,32 @@ while true; do
                 # Clear terminal input buffer so old keystrokes don't accidentally exit
                 read -t 0.1 -N 1000000 2>/dev/null
                 
-                # Attach to your live console window safely in read-only mode (-r)
-                tmux attach-session -r -t pxy-engine
+                while true; do
+                    # Clear screen and draw headers
+                    clear
+                    draw_border
+                    echo "   🔴 PXY LIVE ENGINE SCREEN (READ-ONLY)  "
+                    echo "   >>> PRESS [ENTER] TO RETURN TO MENU <<< "
+                    draw_border
+                    
+                    # Captures the last 30 lines, preserves colors (-e), joins wrapped lines (-J)
+                    tmux capture-pane -pt pxy-engine -S -30 -e -J
+                    
+                    draw_border
+                    echo "Engine Status: RUNNING SUCCESSFULLY"
+                    
+                    # Refreshes the screen every 0.5 seconds. If you press ENTER, it breaks the loop.
+                    read -t 0.5 -r -N 1 INPUT
+                    if [[ "$INPUT" == $'\n' || "$INPUT" == $'\r' || -z "$INPUT" && $? -eq 0 ]]; then
+                        break
+                    fi
+                done
             else
-                echo "[!] Trading engine session 'pxy-engine' is not running."
+                echo "[X] No active 'pxy-engine' tmux session found to attach."
                 read -p "Press [Enter] to return..."
             fi
             ;;
+
         e)
             show_trading_menu
             ;;
@@ -240,7 +259,7 @@ while true; do
             break
             ;;
         *)
-            echo "[!] Invalid option."
+            echo "Invalid option."
             sleep 1
             ;;
     esac
