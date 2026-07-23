@@ -31,7 +31,7 @@ show_trading_menu() {
         echo "3) 🟩 Sqr-CE  - [Square-off CE]"
         echo "4) 🟥 Sqr-PE  - [Square-off PE]"
         echo "5) 💥 Sqr-All - [Close All Positions]"
-        echo "6) ↩️ Back    - Return Main Menu"
+        echo "6)  ↩️ Back    - Return Main Menu"
         draw_border
         read -p "Select option [1-6]: " SUBOPT
         
@@ -78,7 +78,7 @@ show_test_menu() {
             DISPLAY_NAME=$(basename "${PY_FILES[$i]}")
             printf "%d) 🐍 Exec   - %-23s\n" $((i+1)) "${DISPLAY_NAME:0:23}"
         done
-        echo "x)  ↩️  Back    - Return Main Menu"
+        echo "x)  ↩️ Back    - Return Main Menu"
         draw_border
         
         read -p "Select option [a, 1-5, x]: " TESTOPT
