@@ -61,7 +61,7 @@ def get_loss(row):
     ltp = safe_float(row.get("sell_prc", 0.0)) 
     return ((ltp - entry) / entry) * 100 if entry > 0 else 0 
 
-def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, abs_factor):
+def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, abs_factor, trend):
     """Renders a strict 42-character width dashboard upon an order trigger event."""
     width = 42
     border = Fore.YELLOW + "=" * width
@@ -74,6 +74,7 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     print(Fore.WHITE + f" • SYMBOL       : {symbol}".ljust(width))
     print(Fore.WHITE + f" • SIDE OPTION   : {side} ({ce_count}CE vs {pe_count}PE)".ljust(width))
     print(Fore.WHITE + f" • BALANCE FACTOR: {abs_factor}".ljust(width))
+    print(Fore.WHITE + f" • ACTIVE TREND  : {trend}".ljust(width))
     
     loss_str = f" • TRIGGER LOSS  : {current_loss:.2f}%"
     loss_pad = " " * max(0, width - len(loss_str))
@@ -106,9 +107,14 @@ def handle_side_averaging(client, df):
     else:
         ce_lots, pe_lots = 0, 0
     
-    # Calculate pure absolute lot spread (forces absolute floor layer of 1)
+    # Calculate pure absolute lot spread
     raw_difference = abs(ce_lots - pe_lots)
-    abs_factor = max(1, raw_difference)
+    
+    # Ensures a 1-lot tilt scales to factor 2 immediately instead of treating it like a tie (factor 1)
+    if raw_difference == 0:
+        abs_factor = 1
+    else:
+        abs_factor = raw_difference + 1
 
     # Establish independent lesser vs heavier directional designations
     if ce_lots < pe_lots:
@@ -116,10 +122,10 @@ def handle_side_averaging(client, df):
     elif pe_lots < ce_lots:
         ce_is_lesser, pe_is_lesser = False, True
     else:
-        ce_is_lesser, pe_is_lesser = False, False  # Balanced state
+        ce_is_lesser, pe_is_lesser = False, False  # True balanced state
 
     # Clean system telemetry message stream line
-    print(f"{Fore.CYAN}    📢  Upstream Lots: {ce_lots}CE vs {pe_lots}PE |{abs_factor}")
+    print(f"{Fore.CYAN}    📢  Upstream Lots: {ce_lots}CE vs {pe_lots}PE | Calculated Balance Factor: {abs_factor}")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
@@ -130,21 +136,30 @@ def handle_side_averaging(client, df):
         if side_df.empty: 
             continue 
 
+        # --- EXTRACT AND ENFORCE TREND STATUS DIRECTIONALLY ---
+        # Grabs the value from the last active row tracking this specific side option
+        last_row = side_df.iloc[-1]
+        active_exit = str(last_row.get("exit", "NONE")).upper().strip()
+
+        # Fail-Safe Guardrail: Stop averaging execution immediately if trend direction does not match side type
+        if side == 'CE' and active_exit != 'BULL':
+            continue
+        if side == 'PE' and active_exit != 'BEAR':
+            continue
+
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
-
-        # Assign corresponding weight metrics for current evaluation loop step
         side_is_lesser = ce_is_lesser if side == "CE" else pe_is_lesser
 
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
             # --- EVALUATE MATRIX CALCULATIONS VIA 10% FIXED BASE ---
-            if side_is_lesser or abs_factor == 1:
-                # Lesser side or balanced: DIVIDE fixed baseline by absolute difference
+            if ce_lots == pe_lots:
+                dynamic_threshold = -FIXED_ATR_PCT
+            elif side_is_lesser:
                 dynamic_threshold = -(FIXED_ATR_PCT / float(abs_factor))
             else:
-                # Heavier side: MULTIPLY fixed baseline by absolute difference
                 dynamic_threshold = -(FIXED_ATR_PCT * float(abs_factor))
 
             last_calculated_threshold = dynamic_threshold
@@ -157,14 +172,13 @@ def handle_side_averaging(client, df):
 
         if loss_hit: 
             if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
-                last_order = side_df.iloc[-1]
-                symbol = last_order['symbol'] 
-                qty = abs(int(safe_float(last_order['qty'], 0.0))) 
+                symbol = last_row['symbol'] 
+                qty = abs(int(safe_float(last_row['qty'], 0.0))) 
                 new_tag = generate_pxy_tag() 
                 
-                final_loss = get_loss(last_order)
+                final_loss = get_loss(last_row)
                 
-                print_pxy_trigger_dashboard(side, symbol, final_loss, last_calculated_threshold, new_tag, ce_lots, pe_lots, abs_factor)
+                print_pxy_trigger_dashboard(side, symbol, final_loss, last_calculated_threshold, new_tag, ce_lots, pe_lots, abs_factor, active_exit)
                 
                 try: 
                     params = { 
@@ -182,6 +196,6 @@ def handle_side_averaging(client, df):
                     res = client.place_order(**params) 
                     if res: 
                         set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED.") 
+                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED under {active_exit} Trend.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
