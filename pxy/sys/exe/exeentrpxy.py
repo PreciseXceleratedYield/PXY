@@ -129,7 +129,7 @@ async def main():
         dprint(f"TIME CHECK: {now}")
 
         # 1. Check Market Timing First
-        if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 3) <= now < dt_time(15, 31)):
+        if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 16) <= now < dt_time(15, 31)):
             print(f"{Fore.YELLOW}⏳ Market buffer time - skipped")
             return
 
