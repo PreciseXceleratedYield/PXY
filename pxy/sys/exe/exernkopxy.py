@@ -15,7 +15,7 @@ init(autoreset=True)
 # =====================================================================
 
 # 🛡️ GLOBAL OPERATIONAL SWITCH CONFIGURATION
-EXECUTE_SQUARE_OFF = True  # LIVE PROTECTION ACTIVATED
+EXECUTE_SQUARE_OFF = False  # LIVE PROTECTION ACTIVATED
 
 # 🔍 STRATEGIC FOOTPRINT: Explicit path isolation handling
 current_dir = os.path.dirname(os.path.abspath(__file__))
