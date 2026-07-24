@@ -531,7 +531,7 @@ async function loadDash(){
         setV('hcEntry',emojify(d.entry??'NONE'),cls(d.entry||''));
         setV('hcExit', emojify(d.exit??'NONE'), cls(d.exit||''));
         setV('hcTrend',emojify(d.supertrend),   cls(d.supertrend||''));
-        setV('hcATR',  `${d.atr??'—'}/${d.katr??'—'}`, 'sc-val');
+        setV('hcATR',  `${d.atr??'—'}`, 'sc-val');
         ['cellEntry','cellExit','cellTrend','cellATR'].forEach(id=>{
             const el=$(id);if(!el)return;el.className='sig-cell';
             const v=id==='cellEntry'?d.entry:id==='cellExit'?d.exit:id==='cellTrend'?d.supertrend:'';
