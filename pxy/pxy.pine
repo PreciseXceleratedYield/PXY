@@ -1,34 +1,80 @@
 //@version=5
-indicator("Multi-Condition Price Color", overlay=true)
+indicator("PreciseXceleratedYield Pvt Ltd™", overlay=true)
 
-// Inputs for SMA lengths
-sma21_len = input.int(21, title="SMA 21 Length")
-sma50_len = input.int(50, title="SMA 50 Length")
+// ==========================================
+// CONFIGURATION & INPUTS
+// ==========================================
+int mode = input.int(0, title="OHLC Mode", minval=0, maxval=5, 
+     tooltip="0: Hyper-Sensitive, 1: Raw, 2: Mid-Body, 3: Full Range, 4: Heikin-Ashi, 5: Master Ensemble")
 
-// Calculate SMAs
-sma21 = ta.sma(close, sma21_len)
-sma50 = ta.sma(close, sma50_len)
+int sma_length = input.int(50, title="SMA Length", minval=1)
 
-// Conditions
-// C1: price > 21 and 21 > 50
-cond1 = close > sma21 and sma21 > sma50
-// C2: price < 21 and 21 < 50
-cond2 = close < sma21 and sma21 < sma50
-// C3: 21 > 50 and price is not above 21
-cond3 = sma21 > sma50 and close <= sma21
-// C4: 21 < 50 and price > 21
-cond4 = sma21 < sma50 and close > sma21
+// ==========================================
+// VECTORIZED OHLC MODE TRANSFORMATIONS
+// ==========================================
+// Capture raw candle data arrays in memory
+float raw_o = open
+float raw_h = high
+float raw_l = low
+float raw_c = close
 
-// Color assignment based on conditions
-price_color = cond1 ? color.new(color.green, 0) : 
-              cond2 ? color.new(color.red, 0) : 
-              cond3 ? color.new(color.green, 60) : 
-              cond4 ? color.new(color.red, 60) : 
-              color.gray
+// Initialize output variables
+float out_o = raw_o
+float out_h = raw_h
+float out_l = raw_l
+float out_c = raw_c
 
-// Plotting the lines
-plot(sma21, title="SMA 21", color=color.blue, linewidth=2)
-plot(sma50, title="SMA 50", color=color.orange, linewidth=2)
+// --- Mode 0: Hyper-Sensitive Modified Close ---
+float m0_c = raw_c >= raw_o ? (raw_c + raw_h) / 2.0 : (raw_c + raw_l) / 2.0
 
-// Plotting Price Line with conditional color
-plot(close, title="Price Line", color=price_color, linewidth=3)
+// --- Mode 1: Raw Candles ---
+float m1_c = raw_c
+
+// --- Mode 2: Mid-Body (OC/2) ---
+float m2_c = (raw_o + raw_c) / 2.0
+
+// --- Mode 3: Full Range (OHLC/4) ---
+float m3_c = (raw_o + raw_h + raw_l + raw_c) / 4.0
+
+// --- Mode 4: Standard Heikin-Ashi ---
+// HA Close is the average of current OHLC
+float m4_c = (raw_o + raw_h + raw_l + raw_c) / 4.0
+// HA Open uses historical state recursion (handled natively by Pine using logic history)
+float m4_o = na(out_o[1]) ? (raw_o + raw_c) / 2.0 : (out_o[1] + out_c[1]) / 2.0
+
+// --- Mode 5: Master Ensemble Average ---
+float m5_c = (m0_c + m1_c + m2_c + m3_c + m4_c) / 5.0
+
+// ==========================================
+// SWITCH EXECUTION ENGINE
+// ==========================================
+if mode == 0
+    out_c := m0_c
+else if mode == 1
+    out_c := m1_c
+else if mode == 2
+    out_c := m2_c
+else if mode == 3
+    out_c := m3_c
+else if mode == 4
+    out_o := m4_o
+    out_c := m4_c
+    out_h := math.max(raw_h, math.max(out_o, out_c))
+    out_l := math.min(raw_l, math.min(out_o, out_c))
+else if mode == 5
+    out_c := m5_c
+
+// ==========================================
+// INDICATOR CALCULATIONS & PLOTTING
+// ==========================================
+// Dynamic SMA calculation derived from the active mode's transformed Close
+float mode_sma = ta.sma(out_c, sma_length)
+
+// Plot the SMA line on the chart
+plot(mode_sma, title="Mode-Based SMA", color=color.blue, linewidth=2)
+
+// Optional: Plot the transformed candle bars directly on the chart layout
+plotcandle(out_o, out_h, out_l, out_c, title="Transformed Candles", 
+           color = out_c >= out_o ? color.green : color.red, 
+           wickcolor = out_c >= out_o ? color.green : color.red)
+
