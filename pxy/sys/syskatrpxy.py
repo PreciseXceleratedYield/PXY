@@ -1,7 +1,6 @@
 # syskatrpxy.py
 import pandas as pd
 import numpy as np
-import sys
 from sysdtafpxy import fetch_yf_data
 from syscnfgpxy import PARAMS
 from colorama import Fore, Style, init
@@ -12,6 +11,8 @@ ATR_PERIOD = 14
 K_MIN = 1
 K_MAX = 3
 TOTAL_WIDTH = 42
+MIN_FLOOR = 5      # Absolute floor layer
+MAX_CEILING = 15   # Absolute ceiling layer
 
 def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
     df_local = df.copy()
@@ -19,13 +20,6 @@ def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
     # Secure time index parsing
     if not isinstance(df_local.index, pd.DatetimeIndex):
         df_local.index = pd.to_datetime(df_local.index)
-        
-    # Fix MultiIndex columns for any index without changing original variables
-    if isinstance(df_local.columns, pd.MultiIndex):
-        if 'Price' in df_local.columns.levels:
-            df_local = df_local.xs('Price', axis=1, level=0)
-        else:
-            df_local.columns = df_local.columns.get_level_values(0)
         
     high, low, close = df_local['High'], df_local['Low'], df_local['Close']
     prev_close = close.shift(1)
@@ -43,18 +37,18 @@ def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
         lambda x: x.rolling(window=period, min_periods=1).mean()
     )
     
-    # NO CAPS: Pure mathematical ATR values
-    return atr
+    # MODIFIED: Fallbacks to MIN_FLOOR, and clips all valid ATR values between 5 and 15
+    return atr.apply(lambda x: float(MIN_FLOOR) if (x == 0 or pd.isna(x)) else float(np.clip(x, MIN_FLOOR, MAX_CEILING)))
 
 def calculate_dynamic_k(df: pd.DataFrame, atr_period=ATR_PERIOD, k_min=K_MIN, k_max=K_MAX) -> float:
     atr_series = calculate_atr(df, period=atr_period)
-    if atr_series.empty or atr_series.isna().all():
+    if atr_series.empty:
         return 2.0
         
     latest_atr = atr_series.iloc[-1]
     atr_subset = atr_series.iloc[-atr_period:].values if len(atr_series) >= atr_period else atr_series.values
     
-    atr_mean = np.nanmean(atr_subset) if len(atr_subset) > 0 else 0.0
+    atr_mean = atr_subset.mean() if len(atr_subset) > 0 else float(MIN_FLOOR)
     
     if pd.isna(latest_atr) or atr_mean == 0:
         return 2.0
@@ -63,23 +57,17 @@ def calculate_dynamic_k(df: pd.DataFrame, atr_period=ATR_PERIOD, k_min=K_MIN, k_
     return round(max(min(k_dynamic, k_max), k_min), 2)
 
 if __name__ == "__main__":
-    # RESTORED TO ORIGINAL: Reads completely via your original setup
-    df = fetch_yf_data() 
-    
+    df = fetch_yf_data()
     if df is not None and not df.empty and len(df) >= 1:
         atr_series = calculate_atr(df)
         dynamic_k = calculate_dynamic_k(df)
         
-        val = atr_series.iloc[-1] if not atr_series.empty else np.nan
-        
-        if not pd.isna(val):
-            atr_display = str(int(np.round(val)))
-        else:
-            atr_display = "N/A"
+        val = atr_series.iloc[-1] if not atr_series.empty else float(MIN_FLOOR)
+        atr_display = int(np.round(val)) if (not pd.isna(val) and val != 0) else MIN_FLOOR
         
         left_text = f"ATR:{atr_display}"
         right_text = f"K:{dynamic_k}"
         spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
         print(left_text + spacing + right_text)
     else:
-        print(f"ATR:N/A" + (" " * 31) + "K:2.0")
+        print(f"ATR:{MIN_FLOOR}" + (" " * 29) + "K:2.0")
