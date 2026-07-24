@@ -106,7 +106,12 @@ body{
     overflow-y:scroll;
     -webkit-overflow-scrolling:touch;
 }
-.p-row,.t-row{
+.p-row{
+    display:grid;grid-template-columns:auto 1fr auto auto;
+    align-items:center;gap:6px;padding:6px 10px;
+    border-bottom:1px solid var(--border);cursor:default;
+}
+.t-row{
     display:grid;grid-template-columns:auto 1fr auto;
     align-items:center;gap:6px;padding:6px 10px;
     border-bottom:1px solid var(--border);cursor:default;
@@ -114,7 +119,7 @@ body{
 .p-row.bull-r{border-left:2px solid var(--bull);}
 .p-row.bear-r{border-left:2px solid var(--bear);}
 .p-sym,.t-sym{font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.p-meta{font-size:10px;color:#ffe135;font-weight:600;margin-top:1px;}
+.p-st{font-size:10px;color:#ffe135;font-weight:700;flex-shrink:0;white-space:nowrap;text-align:right;}
 .t-meta{font-size:8px;color:var(--muted);margin-top:1px;}
 .p-tag,.t-tag{font-size:9px;color:var(--accent);flex-shrink:0;font-weight:500;}
 .p-pnl,.t-pnl{font-family:'Syne',sans-serif;font-weight:700;font-size:12px;flex-shrink:0;text-align:right;}
@@ -204,7 +209,7 @@ body{
     </div>
     <div style="flex:1;"></div>
     <div class="hdr-r">
-        <span id="brandHdr" style="font-family:'Syne',sans-serif;font-weight:700;font-size:10px;letter-spacing:0.06em;white-space:nowrap;"><span style="color:var(--bull);">Precise</span><span style="color:var(--bear);">X</span><span style="color:var(--bull);">celeratedYield Pvt Ltd</span><sup style="color:var(--accent);">™</sup></span>
+        <span id="brandHdr" style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;letter-spacing:0.06em;white-space:nowrap;"><span style="color:var(--bull);">P</span><span style="color:#fff;">recise</span><span style="color:var(--bear);">X</span><span style="color:#fff;">celerated</span><span style="color:var(--bull);">Y</span><span style="color:#fff;">ield Pvt Ltd</span><sup style="color:var(--accent);">™</sup></span>
         <span id="clk" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:0.03em;white-space:nowrap;cursor:pointer;" title="Bookmarks">—</span>
         <div id="statusDot"></div>
         <button class="reconnect-btn" id="reconnectBtn" title="Reconnect">↺</button>
@@ -848,8 +853,8 @@ async function loadPos(){
         const row=document.createElement('div');
         row.className=`p-row ${pb?'bull-r':'bear-r'}`;
         row.innerHTML=`<span class="p-tag" style="color:${isCE?cssVar('--bull'):cssVar('--bear')};">${isCE?'CE':'PE'}</span>
-            <div><div class="p-sym">${shortSym(d.symbol)}</div>
-                 <div class="p-meta">E${entryPct}%·T${targetPct}%${crossed}</div></div>
+            <span class="p-sym">${shortSym(d.symbol)}</span>
+            <span class="p-st">E${entryPct}:T${targetPct}${crossed}</span>
             <span class="p-pnl ${pb?'bull':'bear'}">${fmt(pnl)}</span>`;
         scroll.appendChild(row);
     });
@@ -1068,7 +1073,9 @@ async function loadRisk(){
     $('rskNet').className='rsk-val bear';
     drawRiskCandle(floor,net,peak);
 }
+let lastFloor=-3000,lastNet=0,lastPeak=10;
 function drawRiskCandle(floor,net,peak){
+    lastFloor=floor;lastNet=net;lastPeak=peak;
     const canvas=$('rskCanvas');if(!canvas)return;
     const ctx=canvas.getContext('2d'),dpr=window.devicePixelRatio||1;
     const rect=canvas.parentElement.getBoundingClientRect();
@@ -1094,12 +1101,15 @@ function drawRiskCandle(floor,net,peak){
         ctx.beginPath();ctx.moveTo(openX,midY-bodyH/2);ctx.lineTo(openX,midY+bodyH/2);ctx.stroke();
         ctx.setLineDash([]);
     }
-    const netLabel=(net>=0?'+':'')+Math.round(net).toLocaleString('en-IN');
-    const fz=Math.round(Math.min(13,Math.max(9,H*0.28)));
+    const netLabel='₹'+(net>=0?'+':'')+Math.round(net).toLocaleString('en-IN');
+    const fz=Math.round(Math.min(18,Math.max(13,H*0.4)));
     ctx.font=`800 ${fz}px 'Syne',sans-serif`;
-    const textW=ctx.measureText(netLabel).width+12; // padding
+    const textW=ctx.measureText(netLabel).width+14;
     const bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX),bW=Math.max(bx2-bx1,textW);
-    ctx.shadowColor=glowColor;ctx.shadowBlur=10;ctx.fillStyle=bodyColor;
+    // pulsing glow — breathing effect to signal live/running state
+    const pulse=0.5+0.5*Math.sin(Date.now()/500);
+    const pulseBlur=8+pulse*10;
+    ctx.shadowColor=glowColor;ctx.shadowBlur=pulseBlur;ctx.fillStyle=bodyColor;
     ctx.beginPath();ctx.roundRect(bx1,midY-bodyH/2,bW,bodyH,4);ctx.fill();
     ctx.shadowBlur=0;
     ctx.fillStyle='rgba(255,255,255,0.12)';
@@ -1108,9 +1118,18 @@ function drawRiskCandle(floor,net,peak){
     ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText(netLabel,(bx1+bx2)/2,midY);
     const danger=net<=lo+Math.abs(lo)*0.15;
-    $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,68,68,0.5),0 0 16px rgba(239,68,68,0.12)':'';
+    $('riskBar').style.boxShadow=danger
+        ?`0 0 0 1px rgba(239,68,68,0.6),0 0 ${16+pulse*10}px rgba(239,68,68,${0.12+pulse*0.1})`
+        :`0 0 ${4+pulse*6}px ${glowColor}`;
 }
-new ResizeObserver(loadRisk).observe($('riskBar'));
+// continuous breathing animation for the candle glow
+let riskAnimId=null;
+function riskAnimLoop(){
+    drawRiskCandle(lastFloor,lastNet,lastPeak);
+    riskAnimId=requestAnimationFrame(riskAnimLoop);
+}
+riskAnimId=requestAnimationFrame(riskAnimLoop);
+new ResizeObserver(()=>{}).observe($('riskBar'));
 
 /* ── ACTIONS MENU ── */
 let pendingScript=null;
