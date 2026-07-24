@@ -37,7 +37,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     # 1. Pure Supertrend Engine (Period 3, Multiplier 1.5)
     atr_period = 3
-    atr_multiplier = 1.5  # Jump factor cut in half (3.0 / 2)
+    atr_multiplier = 2  # Jump factor cut in half (3.0 / 2)
     
     # Calculate ATR components
     high_low = df['High'] - df['Low']
