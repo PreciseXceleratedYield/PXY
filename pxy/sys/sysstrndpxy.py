@@ -12,9 +12,9 @@ DEBUG_MODE = False
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Implements a strict vectorized pure Supertrend engine (Period 3, Multiplier 3).
+    Implements a strict vectorized pure Supertrend engine (Period 3, Multiplier 1.5).
+    Multiplier factor is cut exactly in half (3.0 / 2 = 1.5) to reduce jump distance.
     Duplicates the Supertrend calculation across both downstream tracker slots.
-    Price above Supertrend = BULL | Price below Supertrend = BEAR.
     """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m")
@@ -35,9 +35,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     tz_string = str(TIMEZONE)
     df = df.tz_convert(tz_string) if df.index.tz is not None else df.tz_localize('UTC').tz_convert(tz_string)
 
-    # 1. Pure Supertrend Engine (Period 3, Multiplier 3)
+    # 1. Pure Supertrend Engine (Period 3, Multiplier 1.5)
     atr_period = 3
-    atr_multiplier = 3.0
+    atr_multiplier = 1.5  # Jump factor cut in half (3.0 / 2)
     
     # Calculate ATR components
     high_low = df['High'] - df['Low']
@@ -88,12 +88,11 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['st_line'] = supertrend_values
 
     # DOWNSTREAM COMPATIBILITY ALIASES (Duplicates Supertrend into both legacy tracking keys)
-    df['sma21'] = df['st_line']   # Maps Supertrend to the first JSON/Chart placeholder
-    df['sma50'] = df['st_line']   # Maps Supertrend to the second JSON/Chart placeholder
+    df['sma21'] = df['st_line']   # Maps Supertrend to the first JSON placeholder
+    df['sma50'] = df['st_line']   # Maps Supertrend to the second JSON placeholder
     df['ST'] = df['st_line']
 
     # 2. Direct Price Trend Verification Engine
-    # Price ABOVE Supertrend is BULL | Price BELOW Supertrend is BEAR
     df['sma_trend_full'] = np.where(df['Close'] > df['st_line'], "BULL", "BEAR")
     df.loc[df['st_line'].isna(), 'sma_trend_full'] = "NONE"
     
@@ -102,9 +101,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
-    """
-    Dumps clean structural data matrix to JSON matching your exact pipeline contracts.
-    """
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
         if df is None or df.empty:
@@ -118,8 +114,8 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
             "high": float(row["High"]),
             "low": float(row["Low"]),
             "close": float(row["Close"]),
-            "sma21": float(row["sma21"]) if not pd.isna(row["sma21"]) else 0.0,   # Supertrend 3,3 value
-            "sma50": float(row["sma50"]) if not pd.isna(row["sma50"]) else 0.0    # Duplicate Supertrend 3,3 value
+            "sma21": float(row["sma21"]) if not pd.isna(row["sma21"]) else 0.0,   # Supertrend 3, 1.5 value
+            "sma50": float(row["sma50"]) if not pd.isna(row["sma50"]) else 0.0    # Duplicate Supertrend value
         })
 
     if os.path.dirname(output_file):
@@ -137,8 +133,7 @@ if __name__ == "__main__":
         target_index = processed_df.index[-1]
         print(f"Timestamp   : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"O:{float(processed_df.at[target_index, 'Open']):.2f} H:{float(processed_df.at[target_index, 'High']):.2f} L:{float(processed_df.at[target_index, 'Low']):.2f} C:{float(processed_df.at[target_index, 'Close']):.2f}")
-        print(f"ST Line Value: {float(processed_df.at[target_index, 'sma21']):.2f} (Pure Supertrend 3,3)")
-        print(f"Placeholder  : {float(processed_df.at[target_index, 'sma50']):.2f} (Duplicate)")
+        print(f"ST Line Value: {float(processed_df.at[target_index, 'sma21']):.2f} (Pure Supertrend 3, 1.5)")
         print(f"Trend State  : {str(processed_df.at[target_index, 'sma_trend_full'])}")
         export_supertrend_json(processed_df)
     else:
