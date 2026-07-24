@@ -139,7 +139,7 @@ def handle_side_averaging(client, df):
         # --- EXTRACT AND ENFORCE TREND STATUS DIRECTIONALLY ---
         # Grabs the value from the last active row tracking this specific side option
         last_row = side_df.iloc[-1]
-        active_exit = str(last_row.get("exit", "NONE")).upper().strip()
+        active_exit = str(last_row.get("supertrend", "NONE")).upper().strip()
 
         # Fail-Safe Guardrail: Stop averaging execution immediately if trend direction does not match side type
         if side == 'CE' and active_exit != 'BULL':
