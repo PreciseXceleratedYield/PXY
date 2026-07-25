@@ -793,25 +793,14 @@ function drawRiskCandle(floor,net,peak){
     ctx.font=`800 ${fz}px 'Syne',sans-serif`;
     const textW=ctx.measureText(netLabel).width+14;
     const bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX),bW=Math.max(bx2-bx1,textW);
-    const pulse=0.5+0.5*Math.sin(Date.now()/500);
-    const pulseBlur=8+pulse*10;
-    ctx.shadowColor=glowColor;ctx.shadowBlur=pulseBlur;ctx.fillStyle=bodyColor;ctx.beginPath();ctx.roundRect(bx1,midY-bodyH/2,bW,bodyH,4);ctx.fill();ctx.shadowBlur=0;
+    const pulse=0;
+    ctx.shadowColor=glowColor;ctx.shadowBlur=10;ctx.fillStyle=bodyColor;ctx.beginPath();ctx.roundRect(bx1,midY-bodyH/2,bW,bodyH,4);ctx.fill();ctx.shadowBlur=0;
     ctx.fillStyle='rgba(255,255,255,0.12)';ctx.beginPath();ctx.roundRect(bx1+2,midY-bodyH/2+2,Math.max(bW-4,2),Math.max(bodyH*0.3,2),2);ctx.fill();
     ctx.fillStyle=isBull?'#06160d':'#ffffff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(netLabel,(bx1+bx2)/2,midY);
     const danger=net<=lo+Math.abs(lo)*0.15;
-    $('riskBar').style.boxShadow=danger
-        ?`0 0 0 1px rgba(239,68,68,0.6),0 0 ${16+pulse*10}px rgba(239,68,68,${0.12+pulse*0.1})`
-        :`0 0 ${4+pulse*6}px ${glowColor}`;
+    $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,68,68,0.5),0 0 16px rgba(239,68,68,0.12)':'';
 }
-let riskAnimId=null,lastRiskFrame=0;
-function riskAnimLoop(ts){
-    if(!lastRiskFrame||ts-lastRiskFrame>=100){
-        lastRiskFrame=ts;
-        drawRiskCandle(lastFloor,lastNet,lastPeak);
-    }
-    riskAnimId=requestAnimationFrame(riskAnimLoop);
-}
-riskAnimId=requestAnimationFrame(riskAnimLoop);
+new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($('riskBar'));
 
 /* ── TRADE CHART ── */
 let tradeChart=null,tradeCandles=[],activeTrade=null;
