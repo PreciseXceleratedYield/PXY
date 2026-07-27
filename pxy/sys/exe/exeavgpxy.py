@@ -15,7 +15,7 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 7
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-FIXED_ATR_PCT = 5.0    # 🎯 Hardcoded baseline ATR percentage set exactly to 10%
+FIXED_ATR_PCT = 7.0    # 🎯 Hardcoded baseline ATR percentage set exactly to 10%
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -144,14 +144,7 @@ def handle_side_averaging(client, df):
         supertrend = str(last_row.get("supertrend", "NONE")).upper().strip()
         
         # 2. Parse the exit signal
-        exit_signal = str(last_row.get("exit", "NONE")).upper().strip()
-        
-        # 3. Determine active exit status based on alignment
-        active_exit = (
-            "BULL" if (supertrend == "BULL" and exit_signal == "BULL")
-            else "BEAR" if (supertrend == "BEAR" and exit_signal == "BEAR")
-            else "NONE"
-        )
+        active_exit = str(last_row.get("exit", "NONE")).upper().strip()
 
         # Fail-Safe Guardrail: Stop averaging execution immediately if trend direction does not match side type
         if side == 'CE' and active_exit != 'BULL':
