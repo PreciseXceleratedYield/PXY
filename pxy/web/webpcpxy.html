@@ -98,15 +98,15 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 #chartBox canvas{position:absolute;inset:0;width:100%!important;height:100%!important;z-index:1;}
 
 /* ── POSITIONS + TRADES ── */
-#posTop{height:40%;display:flex;flex-direction:column;border-bottom:1px solid var(--border2);position:relative;}
-#posBot{height:60%;display:flex;flex-direction:column;}
+#posTop{height:40%;min-height:0;display:flex;flex-direction:column;border-bottom:1px solid var(--border2);position:relative;overflow:hidden;}
+#posBot{height:60%;min-height:0;display:flex;flex-direction:column;overflow:hidden;}
 .pane-hdr{
     height:26px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
     padding:0 8px;background:var(--bg2);border-bottom:1px solid var(--border);
     font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);
 }
-#posScroll{flex:1;min-height:0;overflow-y:scroll;-webkit-overflow-scrolling:touch;}
-#tradeScroll{flex:1;min-height:0;overflow-y:scroll;-webkit-overflow-scrolling:touch;}
+#posScroll{height:0;flex-grow:1;flex-shrink:1;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;}
+#tradeScroll{height:0;flex-grow:1;flex-shrink:1;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;}
 .p-row{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--border);cursor:default;}
 .t-row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--border);cursor:default;}
 .p-row.bull-r{border-left:2px solid var(--bull);}
@@ -633,28 +633,40 @@ function drawChart(candles){
         const bodyTop=Math.min(yOpen,yClose);
         const bodyH=Math.max(3,Math.abs(yClose-yOpen));
         const bx=x-bodyW/2;
-        const r=bodyW/2;
+        const depth=Math.max(2,Math.min(4,bodyW*0.25));
 
-        // cylindrical gradient — dark edges, bright center (left-to-right)
-        const cylGrad=ctx.createLinearGradient(bx,0,bx+bodyW,0);
-        cylGrad.addColorStop(0,   isBull?'#0d3d1f':'#4a0e0e');
-        cylGrad.addColorStop(0.35,color);
-        cylGrad.addColorStop(0.5, isBull?'#6ee7a0':'#ff8a8a');
-        cylGrad.addColorStop(0.65,color);
-        cylGrad.addColorStop(1,   isBull?'#0d3d1f':'#4a0e0e');
+        const darkShade=isBull?'#0d3d1f':'#4a0e0e';
+        const lightShade=isBull?'#6ee7a0':'#ff8a8a';
 
         ctx.shadowColor=glow;ctx.shadowBlur=6;
-        ctx.fillStyle=cylGrad;
+
+        // right side face (darker) — 3D box depth
+        ctx.fillStyle=darkShade;
         ctx.beginPath();
-        ctx.roundRect(bx,bodyTop,bodyW,bodyH,r);
+        ctx.moveTo(bx+bodyW,bodyTop);
+        ctx.lineTo(bx+bodyW+depth,bodyTop-depth);
+        ctx.lineTo(bx+bodyW+depth,bodyTop+bodyH-depth);
+        ctx.lineTo(bx+bodyW,bodyTop+bodyH);
+        ctx.closePath();ctx.fill();
+
+        // top face (lighter) — 3D box depth
+        ctx.fillStyle=lightShade;
+        ctx.beginPath();
+        ctx.moveTo(bx,bodyTop);
+        ctx.lineTo(bx+depth,bodyTop-depth);
+        ctx.lineTo(bx+bodyW+depth,bodyTop-depth);
+        ctx.lineTo(bx+bodyW,bodyTop);
+        ctx.closePath();ctx.fill();
+
+        // front face (flat square)
+        ctx.fillStyle=color;
+        ctx.beginPath();
+        ctx.rect(bx,bodyTop,bodyW,bodyH);
         ctx.fill();
         ctx.shadowBlur=0;
 
-        // top cap highlight (cylinder end ellipse)
-        ctx.fillStyle='rgba(255,255,255,0.35)';
-        ctx.beginPath();
-        ctx.ellipse(x,bodyTop+r*0.5,r*0.85,Math.max(r*0.35,1.2),0,0,Math.PI*2);
-        ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,0.2)';
+        ctx.fillRect(bx,bodyTop,bodyW,Math.max(1,bodyH*0.12));
     });
 
     ctx.strokeStyle='rgba(202,138,4,0.8)';ctx.lineWidth=1.2;ctx.setLineDash([3,3]);
