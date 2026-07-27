@@ -15,7 +15,7 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 7
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-FIXED_ATR_PCT = 7.0    # 🎯 Hardcoded baseline ATR percentage set exactly to 10%
+FIXED_ATR_PCT = 7.0  # 🎯 Hardcoded baseline ATR percentage (-X baseline)
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -76,9 +76,9 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     print(Fore.WHITE + f" • BALANCE FACTOR: {abs_factor}".ljust(width))
     print(Fore.WHITE + f" • ACTIVE TREND  : {trend}".ljust(width))
     
-    loss_str = f" • TRIGGER LOSS  : {current_loss:.2f}%"
+    loss_str = f" • CURRENT RETURN: {current_loss:.2f}%"
     loss_pad = " " * max(0, width - len(loss_str))
-    print(Fore.WHITE + " • TRIGGER LOSS  : " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + loss_pad)
+    print(Fore.WHITE + " • CURRENT RETURN: " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + loss_pad)
     
     target_str = f" • DYNAMIC TARGET: {target_threshold:.2f}%"
     target_pad = " " * max(0, width - len(target_str))
@@ -139,18 +139,19 @@ def handle_side_averaging(client, df):
         # --- EXTRACT AND ENFORCE TREND STATUS DIRECTIONALLY ---
         # Grabs the value from the last active row tracking this specific side option
         last_row = side_df.iloc[-1]
-        
-        # 1. Parse the supertrend signal
-        supertrend = str(last_row.get("supertrend", "NONE")).upper().strip()
-        
-        # 2. Parse the exit signal
         active_exit = str(last_row.get("exit", "NONE")).upper().strip()
 
-        # Fail-Safe Guardrail: Stop averaging execution immediately if trend direction does not match side type
-        if side == 'CE' and active_exit != 'BULL':
-            continue
-        if side == 'PE' and active_exit != 'BEAR':
-            continue
+        # =========================================================================
+        # 🆕 DYNAMIC ATR ADJUSTMENT BLOCK (Top of the evaluation loop)
+        # =========================================================================
+        # Check if the active market trend matches this side's operational bias
+        is_trend_matched = False
+        if (side == 'CE' and active_exit == 'BULL') or (side == 'PE' and active_exit == 'BEAR'):
+            is_trend_matched = True
+
+        # Dynamically scale the local variable used in calculations below
+        current_atr_pct = FIXED_ATR_PCT if is_trend_matched else (FIXED_ATR_PCT * 2.0)
+        # =========================================================================
 
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
@@ -159,13 +160,13 @@ def handle_side_averaging(client, df):
         for index, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
-            # --- EVALUATE MATRIX CALCULATIONS VIA 10% FIXED BASE ---
+            # --- EVALUATE MATRIX CALCULATIONS VIA NEGATIVE BOUNDS ---
             if ce_lots == pe_lots:
-                dynamic_threshold = -FIXED_ATR_PCT
+                dynamic_threshold = -current_atr_pct
             elif side_is_lesser:
-                dynamic_threshold = -(FIXED_ATR_PCT / float(abs_factor))
+                dynamic_threshold = -(current_atr_pct / float(abs_factor))
             else:
-                dynamic_threshold = -(FIXED_ATR_PCT * float(abs_factor))
+                dynamic_threshold = -(current_atr_pct * float(abs_factor))
 
             last_calculated_threshold = dynamic_threshold
 
@@ -204,3 +205,4 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED under {active_exit} Trend.") 
                 except Exception as e: 
                     print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+
