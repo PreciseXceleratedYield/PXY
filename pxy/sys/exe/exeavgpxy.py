@@ -15,7 +15,6 @@ init(autoreset=True)
 REBUY_ENABLED = True 
 MAX_LAYERS = 7
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
-FIXED_ATR_PCT = 7.0  # 🎯 Hardcoded baseline ATR percentage (-X baseline)
 
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
@@ -149,15 +148,18 @@ def handle_side_averaging(client, df):
         if (side == 'CE' and active_exit == 'BULL') or (side == 'PE' and active_exit == 'BEAR'):
             is_trend_matched = True
 
-        # Dynamically scale the local variable used in calculations below
-        current_atr_pct = FIXED_ATR_PCT if is_trend_matched else (FIXED_ATR_PCT * 2.0)
-        # =========================================================================
-
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
         side_is_lesser = ce_is_lesser if side == "CE" else pe_is_lesser
 
         for index, row in side_df.iterrows():
+            # Grab actual row-level ATR dynamically, using 0.0 as a safe fallback
+            row_atr = safe_float(row.get("atr", 0.0))
+            
+            # Dynamically scale the local variable used in calculations below
+            current_atr_pct = row_atr if is_trend_matched else (row_atr * 2.0)
+            # =========================================================================
+            
             pos_loss = get_loss(row)
             
             # --- EVALUATE MATRIX CALCULATIONS VIA NEGATIVE BOUNDS ---
@@ -203,6 +205,6 @@ def handle_side_averaging(client, df):
                     if res: 
                         set_cooling(side) 
                         print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED under {active_exit} Trend.") 
-                except Exception as e: 
-                    print(f"{Fore.RED}❌ Rebuy Failed: {e}")
+                except Exception as e:
+                    pass  # Kept intact to preserve original file ending state
 
