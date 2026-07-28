@@ -14,6 +14,14 @@ def f(x, d=0.0):
         return d
 
 
+def i(x, d=0):
+    """Safely cast input to integer, return default if casting fails."""
+    try:
+        return int(x)
+    except (ValueError, TypeError):
+        return d
+
+
 def dynamic_entry(row):
     """Returns the raw entry price from row dictionary entries with no tracking variables."""
     try:
@@ -23,18 +31,28 @@ def dynamic_entry(row):
 
 
 def target_price(row):
-    """Calculates individual option layer target price using static thresholds.
+    """Calculates individual option layer target price using dynamic volatility variables.
     
-    Aligned Trades : Hardcoded 41% target expansion.
-    Hostile Trades : Hardcoded 1.4% crash cutting target floor.
+    Aligned Trades : 1.4 * max(depth, power) target expansion percentage.
+    Hostile Trades : 1.4% target percentage fallback floor.
     """
     try:
-        # 1. Entry data execution health check
+        # 1️⃣ Entry data execution health check
         entry_prc = f(row.get("pxy_entry") or row.get("buy_prc"))
         if entry_prc <= 0:
             return 0.0
 
-        # 2. Context string extractors
+        # 2️⃣ INPUTS (SAFE)
+        ce_p = f(row.get("ce_power", 1))
+        pe_p = f(row.get("pe_power", 1))
+
+        ce_d = i(row.get("hkin_ce_depth", 0))
+        pe_d = i(row.get("hkin_pe_depth", 0))
+
+        atr = f(row.get("atr", 0))
+        katr = max(f(row.get("katr", 1)), 0.001)  # prevent divide-by-zero
+
+        # 3️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
         active_exit = str(row.get("exit", "NONE")).upper().strip()
 
@@ -46,19 +64,19 @@ def target_price(row):
 
         target_pct = 0.0
 
-        # 3. Core execution logic evaluating directional signals using hardcoded metrics
+        # 4️⃣ Dynamic execution logic using power and depth matrix
         if is_ce:
-            if active_exit in ("SELL", "BEAR"):  
-                target_pct = 3
-            else:                                
-                target_pct = 30
+            if active_exit in ("SELL", "BEAR"):  # Hostile (Not Aligned)
+                target_pct = 1.4
+            else:                                # Aligned
+                target_pct = 1.4 * max(ce_d, ce_p)
         elif is_pe:
-            if active_exit in ("BUY", "BULL"):   
-                target_pct = 3
-            else:                                
-                target_pct = 30
+            if active_exit in ("BUY", "BULL"):   # Hostile (Not Aligned)
+                target_pct = 1.4
+            else:                                # Aligned
+                target_pct = 1.4 * max(pe_d, pe_p)
 
-        # 4. Final mathematical target premium projection calculation
+        # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
         return round(calculated_target, 2)
 
