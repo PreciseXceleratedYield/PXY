@@ -125,7 +125,7 @@ def handle_side_averaging(client, df):
         ce_is_lesser, pe_is_lesser = False, False  # True balanced state
 
     # Clean system telemetry message stream line
-    print(f"{Fore.CYAN}    📢  Lots: {ce_lots}CE vs {pe_lots}PE | ⚖️ {abs_factor}")
+    print(f"{Fore.CYAN}        📢  Lots: {ce_lots}CE vs {pe_lots}PE | ⚖️ {abs_factor}")
 
     # Make a clean dataframe copy to prevent mutations/warnings
     df = df.copy()
