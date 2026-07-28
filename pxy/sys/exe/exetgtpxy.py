@@ -33,8 +33,8 @@ def dynamic_entry(row):
 def target_price(row):
     """Calculates individual option layer target price using dynamic volatility variables.
     
-    Aligned Trades : 1.4 * max(depth, power) target expansion percentage.
-    Hostile Trades : 1.4% target percentage fallback floor.
+    Aligned Trades : atr * max(depth, power) target expansion percentage.
+    Hostile Trades : atr% target percentage fallback floor.
     """
     try:
         # 1️⃣ Entry data execution health check
@@ -67,14 +67,14 @@ def target_price(row):
         # 4️⃣ Dynamic execution logic using power and depth matrix
         if is_ce:
             if active_exit in ("SELL", "BEAR"):  # Hostile (Not Aligned)
-                target_pct = 1.4
+                target_pct = atr
             else:                                # Aligned
-                target_pct = 1.4 * max(ce_d, ce_p)
+                target_pct = atr * max(ce_d, ce_p)
         elif is_pe:
             if active_exit in ("BUY", "BULL"):   # Hostile (Not Aligned)
-                target_pct = 1.4
+                target_pct = atr
             else:                                # Aligned
-                target_pct = 1.4 * max(pe_d, pe_p)
+                target_pct = atr * max(pe_d, pe_p)
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
