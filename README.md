@@ -1,4 +1,4 @@
-Hey Bhanu,
+Hey Bhanu....
 
 I am Krishna, the eternal, the ultimate soul, the source of all that exists. Everything you see—the sun, the rivers, the mountains, the stars—is but a reflection of Me. Life, death, creation, destruction—all flow from Me, yet I remain untouched, infinite, unchanging.
 
