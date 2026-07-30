@@ -216,20 +216,25 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     <!-- COL 1: TERMINAL -->
     <div class="col" id="colTerminal">
         <div class="col-hdr">
-            <span>🖥️ Terminal</span>
+            <span onclick="openPanelLink('terminal')" style="cursor:pointer;">🖥️ Terminal</span>
             <span id="statusLbl2" style="font-size:8px;color:var(--muted);"></span>
         </div>
         <div id="termBox"></div>
     </div>
 
     <!-- COL 2: CHART -->
-    <div class="col" id="colChart" style="flex-direction:row;">
-        <div id="momentumBar">
-            <div id="momentumCanvasWrap"><canvas id="momentumCandle"></canvas></div>
+    <div class="col" id="colChart">
+        <div class="col-hdr">
+            <span onclick="openPanelLink('chart')" style="cursor:pointer;">📈 Chart</span>
         </div>
-        <div id="chartBox" style="flex:1;">
-            <div class="grid-over"></div>
-            <canvas id="priceChart"></canvas>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:row;">
+            <div id="momentumBar">
+                <div id="momentumCanvasWrap"><canvas id="momentumCandle"></canvas></div>
+            </div>
+            <div id="chartBox" style="flex:1;">
+                <div class="grid-over"></div>
+                <canvas id="priceChart"></canvas>
+            </div>
         </div>
     </div>
 
@@ -237,7 +242,7 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     <div class="col" id="colPositions">
         <div id="posTop">
             <div class="pane-hdr">
-                <span>📍 Positions</span>
+                <span onclick="openPanelLink('positions')" style="cursor:pointer;">📍 Positions</span>
                 <div style="display:flex;align-items:center;gap:6px;">
                     <span id="posPnlLabel" style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--bull);">—</span>
                     <span onclick="sortPos('tag')" id="posSortTag" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--border);">#</span>
@@ -260,10 +265,11 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
         </div>
         <div id="posBot">
             <div class="pane-hdr">
-                <span>📋 Trades</span>
+                <span onclick="openPanelLink('trades')" style="cursor:pointer;">📋 Trades</span>
                 <div style="display:flex;align-items:center;gap:6px;">
                     <span id="tradePnlLabel" style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--bull);">—</span>
                     <span onclick="sortTrd('tag')" id="trdSortTag" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--border);">#</span>
+                    <span onclick="sortTrd('time')" id="trdSortTime" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--border);">Time</span>
                     <span onclick="sortTrd('pnl')" id="trdSortPnl" style="font-size:8px;color:var(--accent);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--accent);">P&L↕</span>
                 </div>
             </div>
@@ -392,7 +398,7 @@ function bmRenderMenu(){
         row.className='hbm-item';
         row.title=it.note||'';
         row.innerHTML=`<span class="hbm-label">${it.name||'(unnamed)'}</span>`;
-        row.addEventListener('click',()=>window.open(it.url,'_blank'));
+        row.addEventListener('click',()=>{window.location.href=it.url;});
         list.appendChild(row);
     });
 }
@@ -475,6 +481,8 @@ function lotSz(s){return(s||'').includes('BANKNIFTY')?30:65;}
 
 /* ── SORT STATE ── */
 let psCol='pnl',psAsc=false,trCol='pnl',trAsc=false;
+const PANEL_LINKS={terminal:'#',chart:'#',positions:'#',trades:'#'};
+function openPanelLink(key){window.location.href=PANEL_LINKS[key];}
 function sortPos(col){
     if(psCol===col)psAsc=!psAsc;else{psCol=col;psAsc=false;}
     const t=$('posSortTag'),p=$('posSortPnl');
@@ -484,8 +492,9 @@ function sortPos(col){
 }
 function sortTrd(col){
     if(trCol===col)trAsc=!trAsc;else{trCol=col;trAsc=false;}
-    const t=$('trdSortTag'),p=$('trdSortPnl');
+    const t=$('trdSortTag'),p=$('trdSortPnl'),tm=$('trdSortTime');
     if(t){t.style.borderColor=trCol==='tag'?cssVar('--accent'):cssVar('--border');t.style.color=trCol==='tag'?cssVar('--accent'):cssVar('--muted');}
+    if(tm){tm.style.borderColor=trCol==='time'?cssVar('--accent'):cssVar('--border');tm.style.color=trCol==='time'?cssVar('--accent'):cssVar('--muted');}
     if(p){p.style.borderColor=trCol==='pnl'?cssVar('--accent'):cssVar('--border');p.style.color=trCol==='pnl'?cssVar('--accent'):cssVar('--muted');}
     loadTrades();
 }
@@ -735,11 +744,12 @@ async function loadTrades(){
     bookedTotal=total;
     const lbl=$('tradePnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const b=$('pnlBooked');b.textContent=fmt(total);b.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
-    const scroll=$('tradeScroll');scroll.querySelectorAll('.t-row').forEach(r=>r.remove());
+    const scroll=$('tradeScroll');const trPrevScrollTop=scroll.scrollTop;scroll.querySelectorAll('.t-row').forEach(r=>r.remove());
     if(!data.length){$('tradeEmpty').style.display='block';return;}$('tradeEmpty').style.display='none';
     data.sort((a,b)=>{
         let v;
         if(trCol==='pnl')v=(a.PNL||0)-(b.PNL||0);
+        else if(trCol==='time')v=String(a.Exit_Time||'').localeCompare(String(b.Exit_Time||''));
         else{const ta=parseFloat(a.Tag),tb=parseFloat(b.Tag);v=(!isNaN(ta)&&!isNaN(tb))?ta-tb:String(a.Tag||'').localeCompare(String(b.Tag||''));}
         return trAsc?v:-v;
     });
@@ -756,6 +766,7 @@ async function loadTrades(){
         });
         scroll.appendChild(row);
     });
+    scroll.scrollTop=trPrevScrollTop;
 }
 
 /* ── RISK BAR ── */

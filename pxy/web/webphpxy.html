@@ -256,6 +256,9 @@ body{
 
     <!-- TERMINAL -->
     <div class="tab-pane active" id="paneTerminal">
+        <div class="pane-hdr">
+            <span onclick="openPanelLink('terminal')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">🖥️ Terminal</span>
+        </div>
         <div id="termBox"></div>
     </div>
 
@@ -264,7 +267,7 @@ body{
         <div id="posPane">
             <div id="posTop">
                 <div class="pane-hdr">
-                    <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📍 Positions</span>
+                    <span onclick="openPanelLink('positions')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📍 Positions</span>
                     <div style="display:flex;align-items:center;gap:6px;">
                         <span id="posPnlLabel" style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--bull);">—</span>
                         <span class="sort-btn" onclick="sortPos('tag')" id="posSortTag" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--border);">#</span>
@@ -289,10 +292,11 @@ body{
 
             <div id="posBot">
                 <div class="pane-hdr">
-                    <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📋 Trades</span>
+                    <span onclick="openPanelLink('trades')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📋 Trades</span>
                     <div style="display:flex;align-items:center;gap:6px;">
                         <span id="tradePnlLabel" style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--bull);">—</span>
                         <span class="sort-btn" onclick="sortTrd('tag')" id="trdSortTag" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--border);">#</span>
+                        <span class="sort-btn" onclick="sortTrd('time')" id="trdSortTime" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--border);">Time</span>
                         <span class="sort-btn" onclick="sortTrd('pnl')" id="trdSortPnl" style="font-size:8px;color:var(--accent);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--accent);">P&L↕</span>
                     </div>
                 </div>
@@ -302,13 +306,18 @@ body{
     </div>
 
     <!-- CHART -->
-    <div class="tab-pane" id="paneChart" style="flex-direction:row;">
-        <div id="momentumBar">
-            <div id="momentumCanvasWrap"><canvas id="momentumCandle"></canvas></div>
+    <div class="tab-pane" id="paneChart">
+        <div class="pane-hdr">
+            <span onclick="openPanelLink('chart')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📈 Chart</span>
         </div>
-        <div id="chartBox" style="flex:1;">
-            <div class="grid-over"></div>
-            <canvas id="priceChart"></canvas>
+        <div style="flex:1;min-height:0;display:flex;flex-direction:row;">
+            <div id="momentumBar">
+                <div id="momentumCanvasWrap"><canvas id="momentumCandle"></canvas></div>
+            </div>
+            <div id="chartBox" style="flex:1;">
+                <div class="grid-over"></div>
+                <canvas id="priceChart"></canvas>
+            </div>
         </div>
     </div>
 
@@ -442,7 +451,7 @@ function bmRenderMenu(){
         row.className='hbm-item';
         row.title=it.note||'';
         row.innerHTML=`<span class="hbm-label">${it.name||'(unnamed)'}</span>`;
-        row.addEventListener('click',()=>window.open(it.url,'_blank'));
+        row.addEventListener('click',()=>{window.location.href=it.url;});
         list.appendChild(row);
     });
 }
@@ -529,6 +538,8 @@ function lotSz(s){return(s||'').includes('BANKNIFTY')?30:65;}
 /* ── SORT STATE ── */
 let psCol='pnl',psAsc=false;
 let trCol='pnl',trAsc=false;
+const PANEL_LINKS={terminal:'#',chart:'#',positions:'#',trades:'#'};
+function openPanelLink(key){window.location.href=PANEL_LINKS[key];}
 
 function sortPos(col){
     if(psCol===col)psAsc=!psAsc;else{psCol=col;psAsc=false;}
@@ -544,9 +555,11 @@ function sortPos(col){
 }
 function sortTrd(col){
     if(trCol===col)trAsc=!trAsc;else{trCol=col;trAsc=false;}
-    const btn=$('trdSortTag');const btn2=$('trdSortPnl');
+    const btn=$('trdSortTag');const btn2=$('trdSortPnl');const btn3=$('trdSortTime');
     if(btn)btn.style.borderColor=trCol==='tag'?cssVar('--accent'):cssVar('--border');
     if(btn)btn.style.color=trCol==='tag'?cssVar('--accent'):cssVar('--muted');
+    if(btn3)btn3.style.borderColor=trCol==='time'?cssVar('--accent'):cssVar('--border');
+    if(btn3)btn3.style.color=trCol==='time'?cssVar('--accent'):cssVar('--muted');
     if(btn2)btn2.style.borderColor=trCol==='pnl'?cssVar('--accent'):cssVar('--border');
     if(btn2)btn2.style.color=trCol==='pnl'?cssVar('--accent'):cssVar('--muted');
     loadTrades();
@@ -1035,6 +1048,7 @@ async function loadTrades(){
     data.sort((a,b)=>{
         let v;
         if(trCol==='pnl')v=(a.PNL||0)-(b.PNL||0);
+        else if(trCol==='time')v=String(a.Exit_Time||'').localeCompare(String(b.Exit_Time||''));
         else{const ta=parseFloat(a.Tag),tb=parseFloat(b.Tag);v=(!isNaN(ta)&&!isNaN(tb))?ta-tb:String(a.Tag||'').localeCompare(String(b.Tag||''));}
         return trAsc?v:-v;
     });
