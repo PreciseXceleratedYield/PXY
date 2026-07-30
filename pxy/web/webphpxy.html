@@ -86,7 +86,6 @@ body{
 #termBox .xterm-viewport{background:transparent!important;}
 #termBox .xterm-screen{background:transparent!important;}
 
-#panePositions{position:relative;}
 /* POSITIONS TAB — 40/60 split */
 #posPane{display:flex;flex-direction:column;height:100%;}
 #posTop{height:40%;display:flex;flex-direction:column;border-bottom:1px solid var(--border2);position:relative;}
@@ -1029,6 +1028,7 @@ async function loadTrades(){
     const lbl=$('tradePnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const b=$('pnlBooked');b.textContent=fmt(total);b.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const scroll=$('tradeScroll');
+    const trPrevScrollTop=scroll.scrollTop;
     scroll.querySelectorAll('.t-row').forEach(r=>r.remove());
     if(!data.length){$('tradeEmpty').style.display='block';return;}
     $('tradeEmpty').style.display='none';
@@ -1058,6 +1058,7 @@ async function loadTrades(){
         });
         scroll.appendChild(row);
     });
+    scroll.scrollTop=trPrevScrollTop;
 }
 
 /* ── RISK BAR ── */
