@@ -30,7 +30,7 @@ def resolve_active_ticker():
     if current_minutes < cutoff_minutes:
         return "^NSEI"
     else:
-        return "MCL=F"
+        return "CL=F"
 
 # ---------------- LOCAL SYSTEM CONFIGURATION ----------------
 PARAMS = {
