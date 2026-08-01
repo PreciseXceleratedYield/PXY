@@ -12,6 +12,20 @@ K_MIN = 1
 K_MAX = 3
 TOTAL_WIDTH = 42
 
+def scale_atr_value(val: float) -> float:
+    """Scales ATR: minimum of 5.0, and after 10 grows slowly (every 2 points makes 0.5 point)."""
+    if pd.isna(val) or val <= 0:
+        return 7.0
+    
+    # Enforce minimum boundary of 5
+    if val < 5.0:
+        return 5.0
+    # Apply compression framework over 10
+    if val > 10.0:
+        return 10.0 + (val - 10.0) / 4.0
+        
+    return float(val)
+
 def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
     try:
         df_local = df.copy()
@@ -36,8 +50,8 @@ def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
             lambda x: x.rolling(window=period, min_periods=1).mean()
         )
         
-        # Error / Empty state fallback altered strictly to 7.0
-        return atr.apply(lambda x: 7.0 if (x <= 0 or pd.isna(x)) else float(x))
+        # Apply the slow-growth scaling logic and fallback
+        return atr.apply(scale_atr_value)
     except Exception:
         # Absolute fallback return array structure populated with 7.0
         if df is not None and not df.empty:
@@ -82,4 +96,3 @@ if __name__ == "__main__":
             print(f"ATR:7" + (" " * 33) + "K:2.0")
     except Exception:
         print(f"ATR:7" + (" " * 33) + "K:2.0")
-
