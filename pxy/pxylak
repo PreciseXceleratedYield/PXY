@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# Target server details
+REMOTE_USER="pxy"
+REMOTE_HOST="52.140.126.202"
+REMOTE_PASS="Pxy@tatlako00"
+
+# Check if sshpass is installed, install if missing
+if ! command -v sshpass &> /dev/null; then
+    echo "sshpass is not installed. Installing..."
+    if [ -f /etc/debian_version ]; then
+        sudo apt-get update && sudo apt-get install -y sshpass
+    elif [ -f /etc/redhat-release ]; then
+        sudo yum install -y sshpass
+    fi
+fi
+
+# Jump to the server and open interactive terminal
+sshpass -p "$REMOTE_PASS" ssh -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST"
