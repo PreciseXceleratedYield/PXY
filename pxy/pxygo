@@ -1,1 +1,1 @@
-cd /home/pxy/pxy/sys && source /home/pxy/env/bin/activate && exec bash
+cd /home/pxy/pxy/sys && source /home/pxy/env/bin/activate
