@@ -2,7 +2,7 @@
 
 # Target server details
 REMOTE_USER="pxy"
-REMOTE_HOST="52.140.126.202"
+REMOTE_HOST="40.80.88.158"
 REMOTE_PASS="Pxy@tatlako00"
 
 # Check if sshpass is installed, install if missing
