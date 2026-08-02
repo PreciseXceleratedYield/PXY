@@ -1,0 +1,67 @@
+#!/bin/bash
+
+# Target server credentials
+REMOTE_USER="pxy"
+REMOTE_PASS="Pxy@tatlako00"
+
+# Predefined server mapping
+BHANU_IP="52.140.126.163"
+LAKSHMI_IP="40.80.88.158"
+
+# Check if sshpass is installed, install if missing
+if ! command -v sshpass &> /dev/null; then
+    echo "sshpass is not installed. Installing..."
+    if [ -f /etc/debian_version ]; then
+        sudo apt-get update && sudo apt-get install -y sshpass
+    elif [ -f /etc/redhat-release ]; then
+        sudo yum install -y sshpass
+    fi
+fi
+
+while true; do
+    clear
+    echo "================================="
+    echo "      SSH CONNECTION MENU        "
+    echo "================================="
+    echo "1) Connect to Bhanu   ($BHANU_IP)"
+    echo "2) Connect to Lakshmi ($LAKSHMI_IP)"
+    echo "3) Connect to a custom IP"
+    echo "4) Exit"
+    echo "================================="
+    
+    read -p "Select an option [1-4]: " CHOICE
+    
+    case $CHOICE in
+        1)
+            REMOTE_HOST="$BHANU_IP"
+            ;;
+        2)
+            REMOTE_HOST="$LAKSHMI_IP"
+            ;;
+        3)
+            read -p "Enter custom IP address: " REMOTE_HOST
+            if [ -z "$REMOTE_HOST" ]; then
+                echo "Invalid IP. Press Enter to try again."
+                read
+                continue
+            fi
+            ;;
+        4)
+            echo "Exiting..."
+            exit 0
+            ;;
+        *)
+            echo "Invalid choice. Press Enter to try again."
+            read
+            continue
+            ;;
+    esac
+
+    # Execute SSH Connection
+    echo "Connecting to $REMOTE_HOST..."
+    sshpass -p "$REMOTE_PASS" ssh -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST"
+    
+    # Pause after session ends before returning to menu
+    echo "Session closed. Press Enter to return to menu."
+    read
+done
