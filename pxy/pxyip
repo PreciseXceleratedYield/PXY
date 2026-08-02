@@ -8,13 +8,34 @@ REMOTE_PASS="Pxy@tatlako00"
 BHANU_IP="52.140.126.163"
 LAKSHMI_IP="40.80.88.158"
 
-# Check if sshpass is installed, install if missing
+# Check if sshpass is installed, install based on OS if missing
 if ! command -v sshpass &> /dev/null; then
-    echo "sshpass is not installed. Installing..."
-    if [ -f /etc/debian_version ]; then
-        sudo apt-get update && sudo apt-get install -y sshpass
-    elif [ -f /etc/redhat-release ]; then
-        sudo yum install -y sshpass
+    echo "sshpass is not installed. Detecting OS..."
+    
+    # macOS Detection
+    if [ "$(uname)" == "Darwin" ]; then
+        if ! command -v brew &> /dev/null; then
+            echo "Error: Homebrew is not installed. Please install Homebrew (https://brew.sh) to automate this setup."
+            exit 1
+        else
+            echo "Installing sshpass via Homebrew on macOS..."
+            brew install esolitos/ipa/sshpass
+        fi
+        
+    # Linux Detection
+    elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+        echo "Installing sshpass on Linux..."
+        if [ -f /etc/debian_version ]; then
+            sudo apt-get update && sudo apt-get install -y sshpass
+        elif [ -f /etc/redhat-release ]; then
+            sudo yum install -y sshpass
+        else
+            echo "Unsupported Linux distribution. Please install sshpass manually."
+            exit 1
+        fi
+    else
+        echo "Unknown Operating System. Please install sshpass manually."
+        exit 1
     fi
 fi
 
@@ -65,3 +86,4 @@ while true; do
     echo "Session closed. Press Enter to return to menu."
     read
 done
+
