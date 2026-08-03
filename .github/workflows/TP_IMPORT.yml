@@ -14,10 +14,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Push to PRD
-        env:
-          MY_SECRET_TOKEN: ${{ secrets.TP_IMPORT }}
-        run: |
-          git remote add target "https://x-access-token:${MY_SECRET_TOKEN}@://github.com"
-          git push target main --force
-
+      - name: Force Sync to PRD
+        uses: pixta-dev/repository-mirroring-action@v1
+        with:
+          target_repo_url: "https://github.com"
+          token: ${{ secrets.TP_IMPORT }}
