@@ -168,7 +168,7 @@ def handle_side_averaging(client, df):
             elif side_is_lesser:
                 dynamic_threshold = -(current_atr_pct / float(abs_factor))
             else:
-                dynamic_threshold = -current_atr_pct
+                dynamic_threshold = -current_atr_pct - (current_atr_pct / float(abs_factor))
                 #dynamic_threshold = -(current_atr_pct * float(abs_factor))
 
             last_calculated_threshold = dynamic_threshold
