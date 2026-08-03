@@ -16,5 +16,5 @@ jobs:
 
       - name: Push to PRD
         run: |
-          git remote add target https://x-access-token:${{ secrets.TP-IMPORT }}@://github.com
+          git remote add target https://x-access-token:${{ secrets.TP_IMPORT }}@://github.com
           git push target main --force
