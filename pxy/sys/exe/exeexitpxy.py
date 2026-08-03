@@ -116,11 +116,14 @@ def run_snapshot():
     now = datetime.now(IST).time() 
     if dt_time(15, 17) <= now < dt_time(15, 30): 
         try: 
+            # Keep the path pointing strictly to the file itself
             exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exesqrpxy.py") 
             if os.path.exists(exe_path): 
-                subprocess.run(["python3", exe_path], check=True) 
+                # Pass "-all" as a separate element in the list
+                subprocess.run(["python3", exe_path, "-all"], check=True) 
         except Exception as e: 
-            print(f"{Fore.RED}❌ Square-off Error: {e}") 
+            print(f"{Fore.RED}❌ Square-off Error: {e}")
+
 
     data = get_combined_data() 
     df = data.get("active_orders", pd.DataFrame()) 
