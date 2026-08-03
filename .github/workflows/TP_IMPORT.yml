@@ -1,4 +1,4 @@
-name: TP-IMPORT
+name: TP_IMPORT
 
 on:
   push:
