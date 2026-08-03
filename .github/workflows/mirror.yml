@@ -1,0 +1,26 @@
+name: Mirror DEV to PRD
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - '**'
+
+  workflow_dispatch:
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout DEV repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Mirror all branches and tags to PRD
+        run: |
+          git remote add mirror https://x-access-token:${{ secrets.TP }}@github.com/PreciseXceleratedYield-Pvt-Ltd/PRD.git
+          git fetch --all --tags
+          git push --mirror mirror
