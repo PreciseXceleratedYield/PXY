@@ -6,7 +6,6 @@ on:
       - '**'
     tags:
       - '**'
-
   workflow_dispatch:
 
 jobs:
@@ -14,13 +13,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout DEV repository
+      - name: Checkout DEV
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          fetch-tags: true
 
-      - name: Mirror all branches and tags to PRD
+      - name: Configure Git
         run: |
-          git remote add mirror https://x-access-token:${{ secrets.TP }}@github.com/PreciseXceleratedYield-Pvt-Ltd/PRD.git
-          git fetch --all --tags
-          git push --mirror mirror
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+      - name: Mirror DEV to PRD
+        env:
+          TOKEN: ${{ secrets.TP }}
+        run: |
+          git remote add prd https://x-access-token:${TOKEN}@github.com/PreciseXceleratedYield-Pvt-Ltd/PRD.git
+          git push --mirror prd
