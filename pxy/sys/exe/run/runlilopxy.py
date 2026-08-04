@@ -8,9 +8,21 @@ from runltpspxy import get_mid_price
 
 # 🔍 STRATEGIC FOOTPRINT: Resolved relative to run/ directory pathing
 SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/websqrpxy.json"))
+
+# ---------------------------------------------------------
+# ⚙️ GLOBAL PRIORITY OVERRIDE
+# ---------------------------------------------------------
+HARD_RESET = True           # True = Skip log file entirely and force priority time | False = Check log file first
 DEFAULT_FILTER_TIME = "09:39:00"
+# ---------------------------------------------------------
+
 def resolve_dynamic_filter_time():
     """Reads risk engine cache to fetch post-reset fresh start time if triggered today."""
+    # 🔒 SYSTEM OVERRIDE PRIORITY CHECK
+    if HARD_RESET:
+        print(f"🔒 HARD_RESET is ACTIVE. Overriding file check. Priority Time: {DEFAULT_FILTER_TIME}")
+        return DEFAULT_FILTER_TIME
+
     try:
         IST = pytz.timezone("Asia/Kolkata")
         now_ist = datetime.now(IST)
@@ -18,7 +30,8 @@ def resolve_dynamic_filter_time():
         
         if os.path.exists(SQUAREOFF_LOG_FILE):
             file_mod_timestamp = os.path.getmtime(SQUAREOFF_LOG_FILE)
-            file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, IST).strftime("%Y-%m-%d")
+            # Safe localization from system epoch time to IST
+            file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, pytz.utc).astimezone(IST).strftime("%Y-%m-%d")
             
             if file_mod_date_str == today_str:
                 with open(SQUAREOFF_LOG_FILE, "r") as f:
@@ -42,6 +55,7 @@ def resolve_dynamic_filter_time():
     except Exception as e:
         print(f"⚠ Error resolving dynamic time parameters, falling back to default: {e}")
         return DEFAULT_FILTER_TIME
+
 
 # ⏱️ SURGICAL TIMELINE FILTER INITIALIZATION
 FILTER_TIME = resolve_dynamic_filter_time()
