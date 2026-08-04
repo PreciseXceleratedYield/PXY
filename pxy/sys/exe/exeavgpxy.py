@@ -157,7 +157,7 @@ def handle_side_averaging(client, df):
             row_atr = safe_float(row.get("atr", 0.0))
             
             # Dynamically scale the local variable used in calculations below
-            current_atr_pct = (row_atr * 1.4) if is_trend_matched else (row_atr * 3.0)
+            current_atr_pct = (row_atr * 1.0) if is_trend_matched else (row_atr * 3.0)
             # =========================================================================
             
             pos_loss = get_loss(row)
