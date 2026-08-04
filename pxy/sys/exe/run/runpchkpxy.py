@@ -11,7 +11,7 @@ def get_position_summary(client=None):
     # ⚙️ CONFIGURABLE MANUAL OFFSETS (Set these to fix ghost positions)
     # If the API incorrectly says you have 1 CE, set offset_ce_lots = 1
     # ---------------------------------------------------------
-    offset_ce_lots = 1  # Subtracts this many lots from the CE total
+    offset_ce_lots = 0  # Subtracts this many lots from the CE total
     offset_pe_lots = 0  # Subtracts this many lots from the PE total
     # ---------------------------------------------------------
 
