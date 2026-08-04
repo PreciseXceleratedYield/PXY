@@ -11,7 +11,7 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # 🛡️ GLOBAL OPERATIONAL SWITCH CONFIGURATION
-EXECUTE_SQUARE_OFF = False  # LIVE PROTECTION ACTIVATED
+EXECUTE_SQUARE_OFF = False # LIVE PROTECTION ACTIVATED
 
 # 🔍 STRATEGIC FOOTPRINT: Explicit path isolation handling
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -32,15 +32,10 @@ TRAILING_DROP_LIMIT = 9000.0
 EMERGENCY_RETRY_SECONDS = 5.0
 LOOP_INTERVAL_SECONDS = 1.0
 
-
 def safe_load_json_pnl(file_path):
-    """Safely extracts cumulative metrics. 
-    
-    Rejects data and returns 0.0 if the file timestamp belongs to a previous day.
-    """
+    """Safely extracts cumulative metrics. Rejects data and returns 0.0 if the file timestamp belongs to a previous day. """
     if not os.path.exists(file_path):
         return 0.0
-        
     try:
         IST = pytz.timezone("Asia/Kolkata")
         now_ist = datetime.now(IST)
@@ -53,12 +48,12 @@ def safe_load_json_pnl(file_path):
         # 🛑 If file date does not match today, treat as 0.0 to prevent stale carries
         if file_mod_date_str != today_str:
             sys.stdout.write(
-                f"\r⚠️  {Fore.YELLOW}STALE DATA BLOCKED: {os.path.basename(file_path)} "
+                f"\r⚠️ {Fore.YELLOW}STALE DATA BLOCKED: {os.path.basename(file_path)} "
                 f"is from {file_mod_date_str}. Assuming 0.0 until updated today.{Style.RESET_ALL}\n"
             )
             sys.stdout.flush()
             return 0.0
-
+            
         # 📄 Proceed to read file if it has today's date
         with open(file_path, "r") as f:
             content = f.read().strip()
@@ -66,23 +61,21 @@ def safe_load_json_pnl(file_path):
                 return 0.0
             data = json.loads(content)
             
-            if isinstance(data, list):
-                total_pnl = 0.0
-                for row in data:
-                    if not isinstance(row, dict):
-                        continue
-                    val = row.get("PNL") or row.get("pnl") or row.get("unrealized") or row.get("realized") or 0.0
-                    total_pnl += float(val)
-                return total_pnl
-            elif isinstance(data, dict):
-                val = data.get("PNL") or data.get("pnl") or data.get("total_pnl") or 0.0
-                return float(val)
-            return 0.0
-            
-    except Exception as e:
-        print(f"{Fore.RED}⚠ Critical Parse Error on {os.path.basename(file_path)}: {e}")
+        if isinstance(data, list):
+            total_pnl = 0.0
+            for row in data:
+                if not isinstance(row, dict):
+                    continue
+                val = row.get("PNL") or row.get("pnl") or row.get("unrealized") or row.get("realized") or 0.0
+                total_pnl += float(val)
+            return total_pnl
+        elif isinstance(data, dict):
+            val = data.get("PNL") or data.get("pnl") or data.get("total_pnl") or 0.0
+            return float(val)
         return 0.0
-
+    except Exception as e:
+        print(f"{Fore.RED}⚠️ Critical Parse Error on {os.path.basename(file_path)}: {e}")
+        return 0.0
 
 def load_session_state():
     if not os.path.exists(RENKO_STATE_FILE):
@@ -92,7 +85,6 @@ def load_session_state():
             return json.load(f)
     except Exception:
         return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": -TRAILING_DROP_LIMIT}
-
 
 def save_session_state(peak_value, current_net, exit_line):
     try:
@@ -106,8 +98,7 @@ def save_session_state(peak_value, current_net, exit_line):
         with open(RENKO_STATE_FILE, "w") as f:
             json.dump(payload, f, indent=4)
     except Exception as e:
-        print(f"{Fore.RED}⚠ Web State Sync Error: {e}")
-
+        print(f"{Fore.RED}⚠️ Web State Sync Error: {e}")
 
 def verify_and_purge_stale_cache():
     """Instantly clears stale web files if their update dates don't match today's date."""
@@ -121,23 +112,24 @@ def verify_and_purge_stale_cache():
     if today_str not in last_update_time:
         print(f"\n⏰ {Fore.GREEN}{Style.BRIGHT}NEW TRADING DAY DETECTED! RUNNING INSTANT DATA PURGE...")
         
-        # Purge files including the new square-off tracker file
+        # Purge files including the new square-off tracker file for target_file_path in [PNL_JSON_PATH, POS_JSON_PATH, SQUAREOFF_LOG_FILE]:
         for target_file_path in [PNL_JSON_PATH, POS_JSON_PATH, SQUAREOFF_LOG_FILE]:
             if os.path.exists(target_file_path):
                 file_mod_timestamp = os.path.getmtime(target_file_path)
                 file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, IST).strftime("%Y-%m-%d")
-                
                 if file_mod_date_str != today_str:
-                    print(f"⚠️  {Fore.YELLOW}STALE FILE DETECTED: {os.path.basename(target_file_path)} belongs to yesterday ({file_mod_date_str}).")
+                    print(f"⚠️ {Fore.YELLOW}STALE FILE DETECTED: {os.path.basename(target_file_path)} belongs to yesterday ({file_mod_date_str}).")
                     try:
                         with open(target_file_path, "w") as fw:
                             json.dump([], fw)
                         print(f"🧹 {Fore.GREEN}Successfully purged stale data from {os.path.basename(target_file_path)}.")
                     except Exception as file_err:
                         print(f"{Fore.RED}❌ Error clearing stale file: {file_err}")
-        
+                        
+        # Peak explicitly reset to 0.0 on morning purge
         save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
         print(f"🧹 {Fore.CYAN}Cleaned up tracking cache file: {RENKO_STATE_FILE}\n")
+
 from datetime import datetime
 import pytz
 
@@ -145,11 +137,9 @@ def write_squareoff_success_log():
     """Generates a tracking timestamp payload confirming positions are completely cleared in IST."""
     try:
         os.makedirs(os.path.dirname(SQUAREOFF_LOG_FILE), exist_ok=True)
-        
         # --- FIXED: Explicitly force Indian Standard Time ---
         ist_tz = pytz.timezone('Asia/Kolkata')
         now_ist = datetime.now(ist_tz)
-        
         log_payload = {
             "status": "SUCCESSFUL_SQUARE_OFF_CONFIRMED",
             "date": now_ist.strftime('%Y-%m-%d'),
@@ -161,9 +151,6 @@ def write_squareoff_success_log():
         print(f"💾 {Fore.GREEN}Success entry documented in: {os.path.basename(SQUAREOFF_LOG_FILE)}")
     except Exception as e:
         print(f"{Fore.RED}❌ Error writing square-off log: {e}")
-
-
-
 def start_trailing_engine():
     """Monitors live data boundaries and executes targeted output grepping when limits are hit."""
     verify_and_purge_stale_cache()
@@ -245,6 +232,7 @@ def start_trailing_engine():
                             if no_active_positions_counter >= 3:
                                 print(f"\n✅ {Fore.GREEN}{Style.BRIGHT}TRIPLE MATCH CONFIRMED: No positions remain active.")
                                 write_squareoff_success_log()
+                                # Peak explicitly reset to 0.0 here upon final confirmed exit
                                 save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
                                 sys.exit(0)
                                 
@@ -254,11 +242,12 @@ def start_trailing_engine():
                     else:
                         print(f"{Fore.RED}❌ Square-off script missing at: {script_path}")
                     
+                    # Peak explicitly reset to 0.0 here during loop retry passes
                     save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
                     print(f"⏳ {Fore.YELLOW}Retry pass complete. Re-checking loop in {EMERGENCY_RETRY_SECONDS} seconds...\n")
                     time.sleep(EMERGENCY_RETRY_SECONDS)
             else:
-                print(f"\n⚠️  {Fore.YELLOW}{Style.BRIGHT}WARNING TARGET BREACHED: Threshold line {exit_display_str} violated!")
+                print(f"\n⚠️ {Fore.YELLOW}{Style.BRIGHT}WARNING TARGET BREACHED: Threshold line {exit_display_str} violated!")
                 sys.exit(0)
         else:
             # ✅ BREAK ENGINE OUT: Safe condition verified. Return control to shell loop supervisor.
@@ -271,4 +260,3 @@ def start_trailing_engine():
 
 if __name__ == "__main__":
     start_trailing_engine()
-
