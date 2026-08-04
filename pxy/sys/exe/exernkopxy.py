@@ -11,7 +11,7 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # 🛡️ GLOBAL OPERATIONAL SWITCH CONFIGURATION
-EXECUTE_SQUARE_OFF = True  # LIVE PROTECTION ACTIVATED
+EXECUTE_SQUARE_OFF = False  # LIVE PROTECTION ACTIVATED
 
 # 🔍 STRATEGIC FOOTPRINT: Explicit path isolation handling
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -28,7 +28,7 @@ RENKO_STATE_FILE = os.path.abspath(os.path.join(current_dir, "../../web/webrinko
 SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(current_dir, "../../web/websqrpxy.json"))
 
 # RISK CONFIGURATION CONSTANTS
-TRAILING_DROP_LIMIT = -9000.0
+TRAILING_DROP_LIMIT = 9000.0
 EMERGENCY_RETRY_SECONDS = 5.0
 LOOP_INTERVAL_SECONDS = 1.0
 
