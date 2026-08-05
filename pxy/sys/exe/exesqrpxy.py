@@ -1,4 +1,4 @@
-# sysexitpxy.py
+# exesqrpxy.py
 import sys 
 import os 
 import subprocess
@@ -56,21 +56,10 @@ def place_exit_order(client, row):
         
         print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ EXITING POSITION: {symbol} Qty: {qty} | TAG: {final_tag}") 
         
-        # FIX: Defined order_response properly first, then executed background script
+        # FIX: Defined order_response properly first
         order_response = client.place_order(**params) 
         
-        # --- SURGICAL BACKGROUND LAUNCHER ---
-        if order_response:
-            try:
-                parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                script_path = os.path.join(parent_dir, "sysddmppxy.py")
-                if os.path.exists(script_path):
-                    subprocess.Popen(["python3", script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                else:
-                    print(f"{Fore.RED}❌ Script not found at {script_path}")
-            except Exception as script_err:
-                print(f"{Fore.RED}❌ Error launching script: {script_err}")
-
+        # FIX FOR VM FREEZE: Background launcher process loop removed from here entirely!
         return order_response
 
     except Exception as e: 
@@ -110,6 +99,9 @@ def exit_all_positions():
     direction = market_df["direction"].iloc[-1] if not market_df.empty and "direction" in market_df.columns else None 
     exit_all_after = dt_time(15, 25) # 3:25 PM 
     
+    # FIX FOR VM FREEZE: Track if any single trade actually fires an order response
+    any_order_placed = False
+    
     for _, row in active_df.iterrows(): 
         symbol = row.get("symbol") 
         qty = row.get("qty", 0) 
@@ -118,15 +110,31 @@ def exit_all_positions():
             
         # If the manual panic flag is active or it is past 3:25 PM, flatten immediately
         if force_all_bypass or now >= exit_all_after: 
-            place_exit_order(client, row) 
+            if place_exit_order(client, row):
+                any_order_placed = True
         else: 
             # Normal rule-based trend management
             if direction == "UP" and "PE" in symbol: 
-                place_exit_order(client, row) 
+                if place_exit_order(client, row):
+                    any_order_placed = True
             elif direction == "DOWN" and "CE" in symbol: 
-                place_exit_order(client, row) 
+                if place_exit_order(client, row):
+                    any_order_placed = True
             else: 
                 print(f"{Fore.CYAN}Holding {symbol} | Direction: {direction}") 
+                
+    # --- FIX FOR VM FREEZE: SURGICAL BACKGROUND LAUNCHER OUTSIDE THE LOOP ---
+    # Fires EXACTLY ONCE to update your data matrices safely without crashing the storage
+    if any_order_placed:
+        try:
+            parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            script_path = os.path.join(parent_dir, "sysddmppxy.py")
+            if os.path.exists(script_path):
+                subprocess.Popen(["python3", script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                print(f"{Fore.RED}❌ Script not found at {script_path}")
+        except Exception as script_err:
+            print(f"{Fore.RED}❌ Error launching script: {script_err}")
             
     print(f"{Fore.GREEN}{Style.BRIGHT}✅ Exit attempt completed.") 
 
