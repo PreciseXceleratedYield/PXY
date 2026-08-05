@@ -111,18 +111,22 @@ def verify_and_exit(client, row):
     except Exception as e: 
         print(f"{Fore.RED}❌ Safety Check Crash: {e}") 
 
-def run_snapshot(): 
-    IST = pytz.timezone("Asia/Kolkata") 
-    now = datetime.now(IST).time() 
-    if dt_time(15, 5) <= now < dt_time(15, 50): 
-        try: 
+def run_snapshot():
+    IST = pytz.timezone("Asia/Kolkata")
+    now = datetime.now(IST).time()
+    
+    if dt_time(14, 37) <= now < dt_time(15, 50):
+        try:
             # Keep the path pointing strictly to the file itself
-            exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exesqrpxy.py") 
-            if os.path.exists(exe_path): 
-                # Pass "-all" as a separate element in the list
-                subprocess.run(["python3", exe_path, "-all"], check=True) 
-        except Exception as e: 
+            exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exesqrpxy.py")
+            
+            if os.path.exists(exe_path):
+                # Removed "-all" from the list
+                subprocess.run(["python3", exe_path], check=True)
+                
+        except Exception as e:
             print(f"{Fore.RED}❌ Square-off Error: {e}")
+
 
 
     data = get_combined_data() 
@@ -191,3 +195,4 @@ def run_snapshot():
 
 if __name__ == "__main__": 
     run_snapshot()
+
