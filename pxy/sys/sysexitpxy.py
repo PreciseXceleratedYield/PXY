@@ -1,6 +1,7 @@
+#sysexitpxy.py
+import os
 import pandas as pd
 from syscnfgpxy import PARAMS  # Only TICKER will be used
-from sysdtafpxy import fetch_yf_data
 from colorama import Fore, Style, init
 
 # Initialize Colorama
@@ -8,6 +9,28 @@ init(autoreset=True)
 
 # -------------------- Hardcoded constants --------------------
 TOTAL_WIDTH = 42
+
+def load_cached_data() -> pd.DataFrame:
+    """
+    Safely reads the already-dumped JSON matrix from your background engine,
+    completely bypassing yfinance disk-caching bottlenecks.
+    """
+    try:
+        script_directory = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
+        parent_directory = os.path.dirname(script_directory)
+        
+        # Target the parallel 'web' sibling directory where sysddmppxy.py dumps JSON
+        json_path = os.path.join(parent_directory, "web", "sysddmppxy.json")
+        
+        if not os.path.exists(json_path):
+            return None
+            
+        # Read the json file matching the 'split' orientation used by your engine
+        df = pd.read_json(json_path, orient='split')
+        return df
+    except Exception as e:
+        print(f"{Fore.RED}Error reading cache matrix: {e}")
+        return None
 
 # -------------------- Direction logic --------------------
 def detect_raw_direction(df: pd.DataFrame) -> tuple:
@@ -46,8 +69,8 @@ def detect_raw_direction(df: pd.DataFrame) -> tuple:
 
 # -------------------- Self-runnable test --------------------
 if __name__ == "__main__":
-    # Fetch data for TICKER from config
-    df = fetch_yf_data()
+    # FIX: Swapped out high-disk fetch_yf_data() for fast 2ms cache parsing
+    df = load_cached_data()
     price, direction = detect_raw_direction(df)
 
     # Convert price to integer safely using rounding logic
@@ -76,5 +99,6 @@ if __name__ == "__main__":
 
     # Print final line
     print(left_text_colored + spacing + right_text_colored)
+
 
 
