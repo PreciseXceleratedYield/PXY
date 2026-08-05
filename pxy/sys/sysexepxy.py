@@ -39,7 +39,7 @@ def send_telegram(msg):
 # ---------------- IST TIMEZONE ----------------
 IST = pytz.timezone("Asia/Kolkata")
 MARKET_OPEN  = dt_time(9, 16)
-MARKET_CLOSE = dt_time(15, 25)
+MARKET_CLOSE = dt_time(15, 45)
 
 def now_ist():
     """Return current IST datetime"""
