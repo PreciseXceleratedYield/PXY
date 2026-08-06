@@ -7,6 +7,10 @@ from colorama import Fore, Style, init
 
 init(autoreset=True)
 
+# Configuration Switches
+USE_FIXED_ATR = True  # Set to False to use the dynamic ATR calculations
+ATR_FIXED_VALUE = 9
+
 ATR_PERIOD = 14
 K_MIN = 1
 K_MAX = 3
@@ -16,24 +20,26 @@ def scale_atr_value(val: float) -> float:
     """Scales ATR: minimum of 5.0, and after 10 grows slowly (every 2 points makes 0.5 point)."""
     if pd.isna(val) or val <= 0:
         return 7.0
-    
     # Enforce minimum boundary of 5
     if val < 5.0:
         return 5.0
     # Apply compression framework over 10
     if val > 10.0:
         return 10.0 + (val - 10.0) / 4.0
-        
     return float(val)
 
 def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
     try:
+        if USE_FIXED_ATR:
+            if df is not None and not df.empty:
+                return pd.Series(float(ATR_FIXED_VALUE), index=df.index)
+            return pd.Series([float(ATR_FIXED_VALUE)])
+
         df_local = df.copy()
-        
         # Secure time index parsing
         if not isinstance(df_local.index, pd.DatetimeIndex):
             df_local.index = pd.to_datetime(df_local.index)
-            
+        
         high, low, close = df_local['High'], df_local['Low'], df_local['Close']
         prev_close = close.shift(1)
         
@@ -63,13 +69,11 @@ def calculate_dynamic_k(df: pd.DataFrame, atr_period=ATR_PERIOD, k_min=K_MIN, k_
         atr_series = calculate_atr(df, period=atr_period)
         if atr_series.empty:
             return 2.0
-            
         latest_atr = atr_series.iloc[-1]
         atr_subset = atr_series.iloc[-atr_period:].values if len(atr_series) >= atr_period else atr_series.values
         
         # Fallback to 7.0 instead of epsilon to protect calculation bounds
         atr_mean = atr_subset.mean() if len(atr_subset) > 0 else 7.0
-        
         if pd.isna(latest_atr) or atr_mean == 0:
             return 2.0
             
@@ -96,3 +100,4 @@ if __name__ == "__main__":
             print(f"ATR:7" + (" " * 33) + "K:2.0")
     except Exception:
         print(f"ATR:7" + (" " * 33) + "K:2.0")
+
