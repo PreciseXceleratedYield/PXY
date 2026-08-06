@@ -115,7 +115,7 @@ def run_snapshot():
     IST = pytz.timezone("Asia/Kolkata")
     now = datetime.now(IST).time()
     
-    if dt_time(14, 51) <= now < dt_time(15, 50):
+    if dt_time(14, 46) <= now < dt_time(15, 50):
         try:
             # Keep the path pointing strictly to the file itself
             exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exesqrpxy.py")
@@ -195,4 +195,5 @@ def run_snapshot():
 
 if __name__ == "__main__": 
     run_snapshot()
+
 
