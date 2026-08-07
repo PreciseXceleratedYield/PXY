@@ -69,7 +69,7 @@ def target_price(row):
         if is_ce:
             # 1. Full Acceleration: Super Trend is BULL and Exit is either BULL or BUY
             if active_super == "BULL" and active_exit in ("BULL", "BUY"):
-                target_pct = atr * max(ce_d, ce_p)
+                target_pct = atr * ce_p #max(ce_d, ce_p)
                 
             # 2. Complete Counter-Trend: Super Trend is BEAR and Exit is BEAR or SELL
             elif active_super == "BEAR" and active_exit in ("SELL", "BEAR"):
@@ -82,7 +82,7 @@ def target_price(row):
         elif is_pe:
             # 1. Full Acceleration: Super Trend is BEAR and Exit is either BEAR or SELL
             if active_super == "BEAR" and active_exit in ("BEAR", "SELL"):
-                target_pct = atr * max(pe_d, pe_p)
+                target_pct = atr * pe_p #max(pe_d, pe_p)
                 
             # 2. Complete Counter-Trend: Super Trend is BULL and Exit is BULL or BUY
             elif active_super == "BULL" and active_exit in ("BUY", "BULL"):
