@@ -8,7 +8,7 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # Configuration Switches
-USE_FIXED_ATR = False  # Set to False to use the dynamic ATR calculations
+USE_FIXED_ATR = True  # Set to False to use the dynamic ATR calculations
 ATR_FIXED_VALUE = 9
 
 ATR_PERIOD = 14
