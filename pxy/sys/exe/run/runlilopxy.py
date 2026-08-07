@@ -248,8 +248,8 @@ def _print_summary(open_positions, closed_matches, unreal_str="", real_str="", c
         # Reconstruct the original production strings on the fly
         from colorama import Fore, Style
         color_node = Fore.GREEN if total_realized >= 0 else Fore.RED
-        unreal_str = f"UNREALIZED: {total_unrealized:+d}"
-        real_str = f"REALIZED: {total_realized:+d}"
+        unreal_str = f": {total_unrealized:+d}"
+        real_str = f": {total_realized:+d}"
         
         # Print your existing layout
         print(f"\n     🏃‍♂️ 🔸  {unreal_str}  🔸  🏃‍♂️   🥅  {color_node}{real_str}{Style.RESET_ALL}  🥅\n")
@@ -284,7 +284,7 @@ def _print_summary(open_positions, closed_matches, unreal_str="", real_str="", c
     # --- SURGICAL 40-CHARACTER BALANCED DISPLAY GENERATION ---
     ce_str = f"CE-{int(ce_invested)}"
     pe_str = f"{int(pe_invested)}-PE"
-    mid_divider = "💵 ⚖️ 💵"
+    mid_divider = "💵 ⚖️  💵"
     
     total_padding_needed = max(0, 40 - len(ce_str) - len(pe_str) - 5)
     left_padding = total_padding_needed // 2
