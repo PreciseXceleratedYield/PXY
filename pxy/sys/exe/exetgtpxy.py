@@ -55,6 +55,7 @@ def target_price(row):
         # 3️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
         active_exit = str(row.get("exit", "NONE")).upper().strip()
+        active_super = str(row.get("supertrend", "NONE")).upper().strip()
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
@@ -67,12 +68,18 @@ def target_price(row):
         # 4️⃣ Dynamic execution logic using power and depth matrix
         if is_ce:
             if active_exit in ("SELL", "BEAR"):  # Hostile (Not Aligned)
-                target_pct = atr / 3
+                if active_super == "BULL":
+                    target_pct = atr
+                else:
+                    target_pct = atr / 3
             else:                                # Aligned
                 target_pct = atr * max(ce_d, ce_p)
         elif is_pe:
             if active_exit in ("BUY", "BULL"):   # Hostile (Not Aligned)
-                target_pct = atr / 3
+                if active_super == "BEAR":
+                    target_pct = atr
+                else:
+                    target_pct = atr / 3
             else:                                # Aligned
                 target_pct = atr * max(pe_d, pe_p)
 
