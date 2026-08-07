@@ -67,21 +67,30 @@ def target_price(row):
 
         # 4️⃣ Dynamic execution logic using power and depth matrix
         if is_ce:
-            if active_exit in ("SELL", "BEAR"):  # Hostile (Not Aligned)
-                if active_super == "BULL":
-                    target_pct = atr
-                else:
-                    target_pct = atr / 2
-            else:                                # Aligned
+            # 1. Full Acceleration: Super Trend is BULL and Exit is either BULL or BUY
+            if active_super == "BULL" and active_exit in ("BULL", "BUY"):
                 target_pct = atr * max(ce_d, ce_p)
+                
+            # 2. Complete Counter-Trend: Super Trend is BEAR and Exit is BEAR or SELL
+            elif active_super == "BEAR" and active_exit in ("SELL", "BEAR"):
+                target_pct = atr / 2
+                
+            # 3. Mixed/Neutral Conditions
+            else:
+                target_pct = atr
+
         elif is_pe:
-            if active_exit in ("BUY", "BULL"):   # Hostile (Not Aligned)
-                if active_super == "BEAR":
-                    target_pct = atr
-                else:
-                    target_pct = atr / 2
-            else:                                # Aligned
+            # 1. Full Acceleration: Super Trend is BEAR and Exit is either BEAR or SELL
+            if active_super == "BEAR" and active_exit in ("BEAR", "SELL"):
                 target_pct = atr * max(pe_d, pe_p)
+                
+            # 2. Complete Counter-Trend: Super Trend is BULL and Exit is BULL or BUY
+            elif active_super == "BULL" and active_exit in ("BUY", "BULL"):
+                target_pct = atr / 2
+                
+            # 3. Mixed/Neutral Conditions
+            else:
+                target_pct = atr
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
