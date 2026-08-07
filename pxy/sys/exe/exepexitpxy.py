@@ -66,7 +66,7 @@ def place_exit_order(client, row, sym_col, qty_col):
             return None
 
         if existing_tag and str(existing_tag).lower() not in ['nan', 'none', '']:
-            base_tag = str(existing_tag).split('_')[0].strip()
+            base_tag = str(existing_tag).split('_').strip()
         else:
             import pytz
             from datetime import datetime
