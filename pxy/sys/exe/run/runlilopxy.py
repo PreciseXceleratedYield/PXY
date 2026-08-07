@@ -286,7 +286,7 @@ def _print_summary(open_positions, closed_matches, unreal_str="", real_str="", c
     pe_str = f"{int(pe_invested)}-PE"
     mid_divider = "💵 ⚖️  💵"
     
-    total_padding_needed = max(0, 40 - len(ce_str) - len(pe_str) - 5)
+    total_padding_needed = max(0, 38 - len(ce_str) - len(pe_str) - 5)
     left_padding = total_padding_needed // 2
     right_padding = total_padding_needed - left_padding
     
