@@ -85,6 +85,27 @@ def place_exit_order(client, row, sym_col, qty_col):
         traceback.print_exc()
         return None
 
+def print_portfolio_table(summary_list):
+    """Prints a perfectly aligned ASCII table containing Symbol, Qty, and calculated PnL metrics."""
+    if not summary_list:
+        return
+    print(f"\n{Style.BRIGHT}{Fore.YELLOW}+-------------------------+--------+------------+------------+------------+")
+    print(f"{Style.BRIGHT}{Fore.YELLOW}| SYMBOL                  | QTY    | MID PRICE  | AVG PRICE  | PNL POINTS |")
+    print(f"{Style.BRIGHT}{Fore.YELLOW}+-------------------------+--------+------------+------------+------------+")
+    for item in summary_list:
+        sym = f"{item['symbol']:23}"
+        qty = f"{item['qty']:6}"
+        mid = f"{item['mid']:10.2f}"
+        avg = f"{item['avg']:10.2f}"
+        pnl = item['pnl']
+        
+        # Colorize PnL visually based on positive or negative values
+        pnl_color = Fore.GREEN if pnl >= 0 else Fore.RED
+        pnl_str = f"{pnl_color}{pnl:10.2f}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
+        
+        print(f"| {sym} | {qty} | {mid} | {avg} | {pnl_str} |")
+    print(f"+-------------------------+--------+------------+------------+------------+\n")
+
 def main():
     try:
         client = get_session()
@@ -118,12 +139,23 @@ def main():
         avg_col = next((c for c in active_df.columns if c.lower() in ['avg_price', 'average_price', 'buy_price', 'netavgprc', 'buy_avg_price', 'prc']), None)
 
         any_order_placed = False
+        table_summary_data = []
+
         for _, row in active_df.iterrows():
             try:
                 symbol = str(row.get(sym_col, "")).upper().strip()
                 qty = pms.safe_int_convert(row.get(qty_col), 0)
                 if not symbol or symbol in ['NAN', 'NONE', ''] or qty == 0:
                     continue
+
+                avg_price = pms.safe_float_convert(row.get(avg_col), 0.0)
+                live_price = pms.fetch_live_mid_price(client, row, token_col, seg_col)
+                pnl_points = live_price - avg_price if live_price > 0.0 else 0.0
+
+                # Append metrics map for the summary table
+                table_summary_data.append({
+                    "symbol": symbol, "qty": qty, "mid": live_price, "avg": avg_price, "pnl": pnl_points
+                })
 
                 if ("CE" in symbol and exit_signal in ["BULL", "BUY"]) or ("PE" in symbol and exit_signal in ["BEAR", "SELL"]):
                     print(f"{Fore.CYAN}🛡️ MOMENTUM HOLD: Keeping {symbol} | Signal is {exit_signal}")
@@ -133,9 +165,7 @@ def main():
                     print(f"{Fore.RED}[DEBUG ALERT] Core headers missing for {symbol}. Action: DO NOTHING.")
                     continue
 
-                avg_price = pms.safe_float_convert(row.get(avg_col), None)
-                live_price = pms.fetch_live_mid_price(client, row, token_col, seg_col)
-                if avg_price is None or live_price <= 0.0:
+                if avg_price <= 0.0 or live_price <= 0.0:
                     print(f"{Fore.RED}[DEBUG ALERT] Pricing lookup failed/zero for {symbol}. Action: DO NOTHING.")
                     continue
 
@@ -145,13 +175,12 @@ def main():
                     continue
                     
                 target_profit_points, count = math_result
-                points_gained = live_price - avg_price
 
-                if points_gained < target_profit_points:
-                    print(f"{Fore.YELLOW}⏳ TARGET NOT MET: Holding {symbol} | Gained: {points_gained:.2f} / Target: {target_profit_points:.2f} (Count: {count:.2f})")
+                if pnl_points < target_profit_points:
+                    print(f"{Fore.YELLOW}⏳ TARGET NOT MET: Holding {symbol} | Gained: {pnl_points:.2f} / Target: {target_profit_points:.2f} (Count: {count:.2f})")
                     continue
                 else:
-                    print(f"{Fore.GREEN}🎯 TARGET ACHIEVED: {symbol} reached {points_gained:.2f} points (Target: {target_profit_points:.2f})")
+                    print(f"{Fore.GREEN}🎯 TARGET ACHIEVED: {symbol} reached {pnl_points:.2f} points (Target: {target_profit_points:.2f})")
 
                 if place_exit_order(client, row, sym_col, qty_col):
                     any_order_placed = True
@@ -159,6 +188,9 @@ def main():
                 print(f"{Fore.RED}[DEBUG CRITICAL] Row iteration failed for position {row.get(sym_col, 'UNKNOWN')}. Action: DO NOTHING.")
                 traceback.print_exc()
                 continue
+
+        # Print the dynamic terminal table for monitoring
+        print_portfolio_table(table_summary_data)
 
         if any_order_placed:
             try:
