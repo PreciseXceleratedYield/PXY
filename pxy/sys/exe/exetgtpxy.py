@@ -71,7 +71,7 @@ def target_price(row):
                 if active_super == "BULL":
                     target_pct = atr
                 else:
-                    target_pct = atr / 3
+                    target_pct = atr / 2
             else:                                # Aligned
                 target_pct = atr * max(ce_d, ce_p)
         elif is_pe:
@@ -79,7 +79,7 @@ def target_price(row):
                 if active_super == "BEAR":
                     target_pct = atr
                 else:
-                    target_pct = atr / 3
+                    target_pct = atr / 2
             else:                                # Aligned
                 target_pct = atr * max(pe_d, pe_p)
 
