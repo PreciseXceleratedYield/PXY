@@ -99,7 +99,6 @@ def print_portfolio_table(summary_list):
         avg = f"{item['avg']:10.2f}"
         pnl = item['pnl']
         
-        # Colorize PnL visually based on positive or negative values
         pnl_color = Fore.GREEN if pnl >= 0 else Fore.RED
         pnl_str = f"{pnl_color}{pnl:10.2f}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
         
@@ -113,11 +112,7 @@ def main():
             print(f"{Fore.RED}❌ Broker session authentication failed.")
             return
 
-        active_df = pms.get_positions_df(client)
-        if active_df.empty:
-            print(f"{Fore.YELLOW}No active positions detected at broker.")
-            return
-
+        # 1. READ SYSTEM STATUS PANEL FIRST
         atr_val, exit_signal = None, "NONE"
         if syspxy is not None and hasattr(syspxy, 'get_all_data'):
             try:
@@ -131,6 +126,13 @@ def main():
                 print(f"{Fore.RED}[DEBUG CRITICAL] syspxy data extraction failure. Action: DO NOTHING.")
                 traceback.print_exc()
                 return
+
+        # 2. RUN REAL-TIME BROKER DATA DISCOVERY
+        active_df = pms.get_positions_df(client)
+        if active_df.empty:
+            print(f"{Fore.YELLOW}⚠️  No active positions detected at broker portfolio. Standing by.")
+            print(f"{Fore.GREEN}{Style.BRIGHT}🚀 Risk loop pass completed.")
+            return
 
         sym_col = "symbol" if "symbol" in active_df.columns else "trading_symbol"
         qty_col = "qty" if "qty" in active_df.columns else ("netqty" if "netqty" in active_df.columns else "quantity")
@@ -152,7 +154,6 @@ def main():
                 live_price = pms.fetch_live_mid_price(client, row, token_col, seg_col)
                 pnl_points = live_price - avg_price if live_price > 0.0 else 0.0
 
-                # Append metrics map for the summary table
                 table_summary_data.append({
                     "symbol": symbol, "qty": qty, "mid": live_price, "avg": avg_price, "pnl": pnl_points
                 })
@@ -189,7 +190,6 @@ def main():
                 traceback.print_exc()
                 continue
 
-        # Print the dynamic terminal table for monitoring
         print_portfolio_table(table_summary_data)
 
         if any_order_placed:
