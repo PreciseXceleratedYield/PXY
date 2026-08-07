@@ -73,11 +73,11 @@ def target_price(row):
                 
             # 2. Complete Counter-Trend: Super Trend is BEAR and Exit is BEAR or SELL
             elif active_super == "BEAR" and active_exit in ("SELL", "BEAR"):
-                target_pct = atr / 2
+                target_pct = atr / 3
                 
             # 3. Mixed/Neutral Conditions
             else:
-                target_pct = atr
+                target_pct = atr / 2
 
         elif is_pe:
             # 1. Full Acceleration: Super Trend is BEAR and Exit is either BEAR or SELL
@@ -86,11 +86,11 @@ def target_price(row):
                 
             # 2. Complete Counter-Trend: Super Trend is BULL and Exit is BULL or BUY
             elif active_super == "BULL" and active_exit in ("BUY", "BULL"):
-                target_pct = atr / 2
+                target_pct = atr / 3
                 
             # 3. Mixed/Neutral Conditions
             else:
-                target_pct = atr
+                target_pct = atr / 2
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
