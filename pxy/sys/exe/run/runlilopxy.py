@@ -234,55 +234,65 @@ def process_lilo_orders(client):
         _print_summary(0, 0) 
         return pd.DataFrame(), pd.DataFrame() 
 
-def _print_summary(open_positions, closed_matches, unreal_str, real_str, color):
+def _print_summary(open_positions, closed_matches, unreal_str="", real_str="", color=""):
     """
     Prints your live tracking summary dashboard to the terminal.
-    Enhanced strictly at the print layer to show side investments with ZERO downstream impact.
+    Uses default arguments to perfectly support calls with only 2 parameters.
     """
-    # 1. Print your existing summary string line exactly as it was
-    print(f"\n     🏃‍♂️ 🔸  {unreal_str}  🔸  🏃‍♂️   🥅  {color}{real_str}{Style.RESET_ALL}  🥅\n")
-    
-    # 2. Extract and calculate side investments completely on the fly
-    ce_invested = 0.0
-    pe_invested = 0.0
-    
-    if hasattr(open_positions, 'to_dict'):
-        positions_list = open_positions.to_dict(orient='records')
-    elif isinstance(open_positions, list):
-        positions_list = open_positions
-    else:
-        positions_list = []
-
-    for pos in positions_list:
-        symbol = str(pos.get("Symbol", pos.get("symbol", ""))).upper()
-        qty = float(pos.get("Qty", pos.get("qty", 0)))
-        buy_prc = float(pos.get("Buy_Prc", pos.get("buy_prc", 0.0)))
+    # Check if this was a 2-argument fallback call: _print_summary(total_unrealized, total_realized)
+    # If closed_matches is an integer/float, it means the old code sent numbers instead of objects
+    if isinstance(open_positions, (int, float)) or isinstance(closed_matches, (int, float)):
+        total_unrealized = int(open_positions)
+        total_realized = int(closed_matches)
         
-        if symbol.endswith("CE"):
-            ce_invested += (qty * buy_prc)
-        elif symbol.endswith("PE"):
-            pe_invested += (qty * buy_prc)
+        # Reconstruct the original production strings on the fly
+        from colorama import Fore, Style
+        color_node = Fore.GREEN if total_realized >= 0 else Fore.RED
+        unreal_str = f"UNREALIZED: {total_unrealized:+d}"
+        real_str = f"REALIZED: {total_realized:+d}"
+        
+        # Print your existing layout
+        print(f"\n     🏃‍♂️ 🔸  {unreal_str}  🔸  🏃‍♂️   🥅  {color_node}{real_str}{Style.RESET_ALL}  🥅\n")
+        
+        # When called with just numbers (empty/error state), there are no live positions to compute
+        ce_invested = 0.0
+        pe_invested = 0.0
+    else:
+        # This handles the 5-argument layout if passed by other modules
+        print(f"\n     🏃‍♂️ 🔸  {unreal_str}  🔸  🏃‍♂️   🥅  {color}{real_str}{Style.RESET_ALL}  🥅\n")
+        
+        ce_invested = 0.0
+        pe_invested = 0.0
+        
+        if hasattr(open_positions, 'to_dict'):
+            positions_list = open_positions.to_dict(orient='records')
+        elif isinstance(open_positions, list):
+            positions_list = open_positions
+        else:
+            positions_list = []
 
-    # 3. 🆕 SURGICAL 40-CHARACTER BALANCED DISPLAY GENERATION
-    # Formats to whole numbers for crisp alignment layout
+        for pos in positions_list:
+            symbol = str(pos.get("Symbol", pos.get("symbol", ""))).upper()
+            qty = float(pos.get("Qty", pos.get("qty", 0)))
+            buy_prc = float(pos.get("Buy_Prc", pos.get("buy_prc", 0.0)))
+            
+            if symbol.endswith("CE"):
+                ce_invested += (qty * buy_prc)
+            elif symbol.endswith("PE"):
+                pe_invested += (qty * buy_prc)
+
+    # --- SURGICAL 40-CHARACTER BALANCED DISPLAY GENERATION ---
     ce_str = f"CE-{int(ce_invested)}"
     pe_str = f"{int(pe_invested)}-PE"
-    
-    # Mid-point separator asset (Length of '💵 ⚖️ 💵' is 5 text spaces)
     mid_divider = "💵 ⚖️ 💵"
     
-    # Dynamically allocate padding space for the remaining 35 slot blocks
     total_padding_needed = max(0, 40 - len(ce_str) - len(pe_str) - 5)
     left_padding = total_padding_needed // 2
     right_padding = total_padding_needed - left_padding
     
-    # Construct a perfectly filled 40-character wide dashboard string row
     balanced_row = f"{ce_str:<{len(ce_str) + left_padding}}{mid_divider}{pe_str:>{len(pe_str) + right_padding}}"
     
-    # Print it with your dashboard's standard indentation margin
     print(f"        {balanced_row}\n")
-
- 
 
 if __name__ == "__main__": 
     client = get_session() 
