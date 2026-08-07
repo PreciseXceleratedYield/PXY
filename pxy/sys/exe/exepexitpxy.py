@@ -62,7 +62,7 @@ def main():
                 atr_val = pms.safe_float_convert(sys_data.get("atr"), None)
                 exit_raw = sys_data.get("exit")
                 if exit_raw and not pd.isna(exit_raw): exit_signal = str(exit_raw).upper().strip()
-                print(f"{Fore.BLUE}🪜 ATR Level: {atr_val} | ⚡⚡ Exit Level: {exit_signal}")
+                print(f"{Fore.YELLOW}🪜 ATR Level: {atr_val} | ⚡⚡ Exit Level: {exit_signal}")
             except Exception:
                 print(f"{Fore.RED}[DEBUG CRITICAL] syspxy failure."); traceback.print_exc(); return
 
