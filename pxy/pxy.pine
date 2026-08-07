@@ -73,8 +73,13 @@ float mode_sma = ta.sma(out_c, sma_length)
 // Plot the SMA line on the chart
 plot(mode_sma, title="Mode-Based SMA", color=color.blue, linewidth=2)
 
+// Determine candle color condition based on the selected mode
+// Mode 2 checks current close against previous close; other modes check close against open.
+bool is_bullish = mode == 2 ? (out_c >= out_c[1]) : (out_c >= out_o)
+color candle_color = is_bullish ? color.green : color.red
+
 // Optional: Plot the transformed candle bars directly on the chart layout
 plotcandle(out_o, out_h, out_l, out_c, title="Transformed Candles", 
-           color = out_c >= out_o ? color.green : color.red, 
-           wickcolor = out_c >= out_o ? color.green : color.red)
+           color = candle_color, 
+           wickcolor = candle_color)
 
