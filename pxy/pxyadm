@@ -1,40 +1,38 @@
 #!/bin/bash
 
-# Target server credentials
+# 🔒 Target server credentials
 REMOTE_USER="pxy"
 REMOTE_PASS="Pxy@tatlako00"
 
-# Predefined server mapping
+# 🌐 Predefined server mapping
 BHANU_IP="52.140.126.163"
 LAKSHMI_IP="40.80.88.158"
 
-# Check if sshpass is installed, install based on OS if missing
+# 🔍 Check if sshpass is installed, install based on OS if missing
 if ! command -v sshpass &> /dev/null; then
-    echo "sshpass is not installed. Detecting OS..."
-    
-    # macOS Detection
+    echo "⚠️ sshpass is not installed. Detecting OS..."
+    # 🍏 macOS Detection
     if [ "$(uname)" == "Darwin" ]; then
         if ! command -v brew &> /dev/null; then
-            echo "Error: Homebrew is not installed. Please install Homebrew (https://brew.sh) to automate this setup."
+            echo "❌ Error: Homebrew is not installed. Please install Homebrew (https://brew.sh) to automate this setup."
             exit 1
         else
-            echo "Installing sshpass via Homebrew on macOS..."
+            echo "⚙️ Installing sshpass via Homebrew on macOS..."
             brew install esolitos/ipa/sshpass
         fi
-        
-    # Linux Detection
+    # 🐧 Linux Detection
     elif [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
-        echo "Installing sshpass on Linux..."
+        echo "⚙️ Installing sshpass on Linux..."
         if [ -f /etc/debian_version ]; then
             sudo apt-get update && sudo apt-get install -y sshpass
         elif [ -f /etc/redhat-release ]; then
             sudo yum install -y sshpass
         else
-            echo "Unsupported Linux distribution. Please install sshpass manually."
+            echo "❌ Unsupported Linux distribution. Please install sshpass manually."
             exit 1
         fi
     else
-        echo "Unknown Operating System. Please install sshpass manually."
+        echo "❌ Unknown Operating System. Please install sshpass manually."
         exit 1
     fi
 fi
@@ -42,48 +40,42 @@ fi
 while true; do
     clear
     echo "================================="
-    echo "      SSH CONNECTION MENU        "
+    echo "   ⬛📈📉  PXY SYSTEM MENU  ®️   "
     echo "================================="
-    echo "1) Connect to Bhanu   ($BHANU_IP)"
-    echo "2) Connect to Lakshmi ($LAKSHMI_IP)"
-    echo "3) Connect to a custom IP"
-    echo "4) Exit"
+    echo "1) Go to Bhanu ☀️"
+    echo "2) Go to Lakshmi 🪷"
+    echo "e) Go-Out / Exit 🚪"
     echo "================================="
     
-    read -p "Select an option [1-4]: " CHOICE
-    
+    read -p "Select an option [1-2 or Enter to Exit]: " CHOICE
+
+    # Check if the user pressed Enter (empty input) or 'e'
+    if [ -z "$CHOICE" ] || [ "$CHOICE" == "e" ]; then
+        echo "👋 Exiting... Goodbye!"
+        exit 0
+    fi
+
     case $CHOICE in
         1)
             REMOTE_HOST="$BHANU_IP"
+            SERVER_NAME="Bhanu ☀️"
             ;;
         2)
             REMOTE_HOST="$LAKSHMI_IP"
-            ;;
-        3)
-            read -p "Enter custom IP address: " REMOTE_HOST
-            if [ -z "$REMOTE_HOST" ]; then
-                echo "Invalid IP. Press Enter to try again."
-                read
-                continue
-            fi
-            ;;
-        4)
-            echo "Exiting..."
-            exit 0
+            SERVER_NAME="Lakshmi 🪷"
             ;;
         *)
-            echo "Invalid choice. Press Enter to try again."
+            echo "❌ Invalid choice. Press Enter to try again."
             read
             continue
             ;;
     esac
 
-    # Execute SSH Connection
-    echo "Connecting to $REMOTE_HOST..."
+    # 🚀 Execute SSH Connection
+    echo "🚀 Connecting to $SERVER_NAME ($REMOTE_HOST)..."
     sshpass -p "$REMOTE_PASS" ssh -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST"
-    
-    # Pause after session ends before returning to menu
-    echo "Session closed. Press Enter to return to menu."
+
+    # 🛑 Pause after session ends before returning to menu
+    echo "🔌 Session closed. Press Enter to return to menu."
     read
 done
-
