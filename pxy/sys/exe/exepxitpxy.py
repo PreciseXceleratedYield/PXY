@@ -36,9 +36,14 @@ def calculate_target_profit(qty, atr_val):
 def square_off_entire_type(client, active_df, target_type):
     try:
         # Filter down to the matching option side block
-        target_rows = active_df[active_df["opt_type"].str.upper().strip() == target_type]
+        target_rows = active_df[active_df["opt_type"].str.upper().strip() == target_type].copy()
         
-        # Loop through row-by-row to preserve each unique position's base tracking tag
+        # 🎯 SORTING UPGRADE: Convert PNL to numeric and sort highest profit rows to the top
+        if "pnl" in target_rows.columns:
+            target_rows["pnl_numeric"] = pd.to_numeric(target_rows["pnl"], errors='coerce').fillna(0.0)
+            target_rows = target_rows.sort_values(by="pnl_numeric", ascending=False)
+        
+        # Loop through row-by-row (now explicitly prioritized by highest profit)
         for _, row in target_rows.iterrows():
             symbol, qty = row.get("symbol"), pms.safe_int_convert(row.get("qty"), 0)
             if not symbol or qty == 0: continue
@@ -57,7 +62,8 @@ def square_off_entire_type(client, active_df, target_type):
                 "quantity": str(abs(qty)), "validity": "DAY", "trading_symbol": str(symbol),
                 "transaction_type": "S", "amo": "NO", "tag": f"{base_tag}{pms.get_sell_suffix()}"
             }
-            print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ BULK TYPE EXIT -> {target_type}: {symbol} Qty: {qty} | Tag: {params['tag']}")
+            row_pnl = row.get('pnl', 0)
+            print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ HIGHEST PROFIT FIRST EXIT -> {target_type}: {symbol} Qty: {qty} | PnL: {row_pnl} | Tag: {params['tag']}")
             client.place_order(**params)
         return True
     except Exception: 
