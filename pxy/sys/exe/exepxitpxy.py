@@ -3,6 +3,7 @@ import os
 import subprocess
 import traceback
 from pathlib import Path
+from datetime import datetime
 import pandas as pd
 from colorama import Fore, Style, init
 
@@ -34,21 +35,34 @@ def calculate_target_profit(qty, atr_val):
 
 def square_off_entire_type(client, active_df, target_type):
     try:
+        # Filter down to the matching option side block
         target_rows = active_df[active_df["opt_type"].str.upper().strip() == target_type]
+        
+        # Loop through row-by-row to preserve each unique position's base tracking tag
         for _, row in target_rows.iterrows():
             symbol, qty = row.get("symbol"), pms.safe_int_convert(row.get("qty"), 0)
             if not symbol or qty == 0: continue
+            
             tag = row.get('tag')
-            base_tag = str(tag).split('_')[0].strip() if tag and str(tag).lower() not in ['nan', 'none', ''] else datetime.now().strftime('%H%M%S')
+            clean_tag = str(tag).strip()
+            
+            # Check for invalid configurations to assign a timestamp fallback string cleanly
+            if not tag or clean_tag.lower() in ['nan', 'none', '']:
+                base_tag = datetime.now().strftime('%H%M%S')
+            else:
+                base_tag = clean_tag.split('_')[0].strip()
+            
             params = {
                 "exchange_segment": "nse_fo", "product": "NRML", "price": "0", "order_type": "MKT",
                 "quantity": str(abs(qty)), "validity": "DAY", "trading_symbol": str(symbol),
                 "transaction_type": "S", "amo": "NO", "tag": f"{base_tag}{pms.get_sell_suffix()}"
             }
-            print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ BULK TYPE EXIT -> {target_type}: {symbol} Qty: {qty}")
+            print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ BULK TYPE EXIT -> {target_type}: {symbol} Qty: {qty} | Tag: {params['tag']}")
             client.place_order(**params)
         return True
-    except Exception: return False
+    except Exception: 
+        traceback.print_exc()
+        return False
 
 def main():
     try:
