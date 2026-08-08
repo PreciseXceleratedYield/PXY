@@ -60,7 +60,7 @@ def main():
             atr_val = pms.safe_float_convert(sys_data.get("atr"), None)
             exit_raw = sys_data.get("exit")
             if exit_raw and not pd.isna(exit_raw): exit_signal = str(exit_raw).upper().strip()
-            print(f"{Fore.BLUE}📊 CONTEXT -> Global ATR: {atr_val} | Global Exit Level: {exit_signal}")
+            print(f"{Fore.BLUE}🪜 ATR Level: {atr_val} |🚥 Exit Level: {exit_signal}")
 
         active_df = pms.fetch_upstream_active_df()
         summary_df = pms.generate_option_summary(active_df)
