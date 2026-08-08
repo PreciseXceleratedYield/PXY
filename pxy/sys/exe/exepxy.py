@@ -102,6 +102,7 @@ parent_scripts = [
     HERE.parent / "sysdashpxy.py",
     HERE / "exeentrpxy.py",
     HERE / "exernkopxy.py",
+    HERE / "exepxitpxy.py",
     HERE / "exeexitpxy.py"
 ]
 
@@ -136,15 +137,17 @@ while True:
             # -------- CORE LOGIC WITH SWITCH --------
             if SIMPLE_MODE:
                 safe_run(HERE / "exernkopxy.py", timeout=None)  # Infinite exception
+                safe_run(HERE / "exepxitpxy.py", timeout=20)
                 safe_run(HERE / "exeexitpxy.py", timeout=20)
-                #safe_run(HERE.parent / "sysrigpxy.py", timeout=20)
                 safe_run(HERE / "exeentrpxy.py", timeout=20)
             else:
                 if ce_qty > 0 and ce_qty == pe_qty:
+                    safe_run(HERE / "exepxitpxy.py", timeout=20)
                     safe_run(HERE / "exeexitpxy.py", timeout=20)
                 elif ce_qty == 0 and pe_qty == 0:
                     safe_run(HERE / "exeentrpxy.py", timeout=20)
                 else:
+                    safe_run(HERE / "exepxitpxy.py", timeout=20)
                     safe_run(HERE / "exeexitpxy.py", timeout=20)
                     safe_run(HERE / "exeentrpxy.py", timeout=20)
                     
