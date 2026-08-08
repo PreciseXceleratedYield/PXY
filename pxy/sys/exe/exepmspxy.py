@@ -72,19 +72,29 @@ def print_portfolio_table(active_rows_df, summary_df):
         print(f"{'No Active Rows Found':^80}")
     print("="*80)
     
-    print(f"\n{Style.BRIGHT}{Fore.YELLOW}  SDN   QTY    INVST   CURRNT     DIFF    PNL_% ")
+def print_portfolio_table(active_rows_df, summary_df):
+    print("\n" + "="*80)
+    print(f"{'OMS LIVE PXY DASHBOARD (INDIVIDUAL ACTIVE ROWS)':^80}")
+    print("="*80)
+    if not active_rows_df.empty:
+        cols = ["symbol", "tag", "qty", "buy_prc", "sell_prc", "pnl", "pxy_tgt", "pxy_sl"]
+        print(active_rows_df[[c for c in cols if c in active_rows_df.columns]].to_string(index=False))
+    else:
+        print(f"{'No Active Rows Found':^80}")
+    print("="*80)
+    
+    print(f"\n{Style.BRIGHT}{Fore.YELLOW}  SDN   QTY    INVST      PNL    PNL_% ")
     if not summary_df.empty:
         for _, row in summary_df.iterrows():
             side = f"{str(row.get('SIDE'))[:3]:>3}"
             qty = f"{safe_int_convert(row.get('QTY')):>4}"
             inv = f"{safe_int_convert(row.get('INVESTED')):>6}"
-            cur = f"{safe_int_convert(row.get('CURRENT')):>6}"
             dif_val = safe_int_convert(row.get('DIFF'))
             dif = f"{dif_val:>6}"
             pct = f"{safe_float_convert(row.get('PNL_%'), 0.0):>4.1f}%"
             pnl_color = Fore.GREEN if dif_val >= 0 else Fore.RED
             c_dif = f"{pnl_color}{dif}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
             c_pct = f"{pnl_color}{pct}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
-            print(f"  {side}   {qty}   {inv}   {cur}   {c_dif}   {c_pct} ")
+            print(f"  {side}   {qty}   {inv}   {c_dif}   {c_pct} ")
     else:
-        print(f"  {'No Records Generated':^45}  ")
+        print(f"  {'No Records Generated':^35}  ")
