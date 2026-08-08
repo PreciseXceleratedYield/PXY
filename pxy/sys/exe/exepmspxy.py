@@ -11,6 +11,10 @@ from colorama import Fore, Style
 # --- UPSTREAM LOCAL OMS DATA INGESTION ---
 from exeomspxy import get_combined_data
 
+# ==================== CONFIGURATION SWITCHES ====================
+DEBUG_MODE = False  # False = Summary Only (Normal) | True = Portfolio + Summary (Debug)
+# ================================================================
+
 def safe_float_convert(val, default=None):
     if val is None or pd.isna(val): return default
     try: return float(str(val).replace(',', '').strip())
@@ -62,27 +66,19 @@ def generate_option_summary(active_df):
         print(f"Summary Error: {e}"); return pd.DataFrame()
 
 def print_portfolio_table(active_rows_df, summary_df):
-    print("\n" + "="*80)
-    print(f"{'OMS LIVE PXY DASHBOARD (INDIVIDUAL ACTIVE ROWS)':^80}")
-    print("="*80)
-    if not active_rows_df.empty:
-        cols = ["symbol", "tag", "qty", "buy_prc", "sell_prc", "pnl", "pxy_tgt", "pxy_sl"]
-        print(active_rows_df[[c for c in cols if c in active_rows_df.columns]].to_string(index=False))
-    else:
-        print(f"{'No Active Rows Found':^80}")
-    print("="*80)
+    # Only print individual active rows if explicitly in Debug Mode
+    if DEBUG_MODE:
+        print("\n" + "="*80)
+        print(f"{'OMS LIVE PXY DASHBOARD (INDIVIDUAL ACTIVE ROWS)':^80}")
+        print("="*80)
+        if not active_rows_df.empty:
+            cols = ["symbol", "tag", "qty", "buy_prc", "sell_prc", "pnl", "pxy_tgt", "pxy_sl"]
+            print(active_rows_df[[c for c in cols if c in active_rows_df.columns]].to_string(index=False))
+        else:
+            print(f"{'No Active Rows Found':^80}")
+        print("="*80)
     
-def print_portfolio_table(active_rows_df, summary_df):
-    print("\n" + "="*80)
-    print(f"{'OMS LIVE PXY DASHBOARD (INDIVIDUAL ACTIVE ROWS)':^80}")
-    print("="*80)
-    if not active_rows_df.empty:
-        cols = ["symbol", "tag", "qty", "buy_prc", "sell_prc", "pnl", "pxy_tgt", "pxy_sl"]
-        print(active_rows_df[[c for c in cols if c in active_rows_df.columns]].to_string(index=False))
-    else:
-        print(f"{'No Active Rows Found':^80}")
-    print("="*80)
-    
+    # Summary section is mandatory and prints regardless of the mode
     print(f"\n{Style.BRIGHT}{Fore.YELLOW}  SDN   QTY    INVST      PNL    PNL_% ")
     if not summary_df.empty:
         for _, row in summary_df.iterrows():
@@ -98,3 +94,11 @@ def print_portfolio_table(active_rows_df, summary_df):
             print(f"  {side}   {qty}   {inv}   {c_dif}   {c_pct} ")
     else:
         print(f"  {'No Records Generated':^35}  ")
+
+def run_dashboard():
+    active_df = fetch_upstream_active_df()
+    summary_df = generate_option_summary(active_df)
+    print_portfolio_table(active_df, summary_df)
+
+if __name__ == "__main__":
+    run_dashboard()
