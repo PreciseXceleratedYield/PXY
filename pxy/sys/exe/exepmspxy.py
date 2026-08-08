@@ -1,20 +1,15 @@
 import sys
 import os
-import subprocess
 import traceback
 from pathlib import Path
 import pandas as pd
+import numpy as np
 import pytz
 from datetime import datetime
 from colorama import Fore, Style
 
-# --- DYNAMIC SUBDIRECTORY PATH SCANNING FOR HELPER ---
-HERE = Path(__file__).resolve().parent
-run_dir = os.path.join(str(HERE), "run")
-if run_dir not in sys.path:
-    sys.path.append(run_dir)
-
-from runltpspxy import get_mid_price
+# --- UPSTREAM LOCAL OMS DATA INGESTION ---
+from exeomspxy import get_combined_data
 
 def safe_float_convert(val, default=None):
     if val is None or pd.isna(val): return default
@@ -30,50 +25,68 @@ def get_sell_suffix():
     IST = pytz.timezone("Asia/Kolkata")
     return f"_S{datetime.now(IST).strftime('%f')[:-3]}"
 
-def fetch_live_mid_price(client, row, token_col, seg_col):
-    live_val = 0.0
-    raw_token = row.get(token_col) if token_col else None
-    token_id = str(raw_token).split('.')[0].strip() if raw_token else None
-    raw_seg = str(row.get(seg_col, "nse_fo")).strip()
-    ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
-    if not client or not token_id: return live_val
-    try: live_val = float(get_mid_price(client, token_id, ex_seg))
-    except Exception: pass
-    if live_val <= 0:
-        try:
-            t_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
-            v2_q = client.quotes(instrument_tokens=t_payload, quote_type="ltp")
-            chunk = v2_q.get("data") or v2_q.get("message") or v2_q if isinstance(v2_q, dict) else v2_q
-            if isinstance(chunk, list) and len(chunk) > 0: live_val = float(chunk[0].get("ltp") or chunk[0].get("lastTradedPrice") or 0)
-            elif isinstance(chunk, dict): live_val = float(chunk.get("ltp") or chunk.get("lastTradedPrice") or 0)
-        except Exception: pass
-    if live_val <= 0:
-        try:
-            scr_res = client.search_scrip(exchangeSegment=ex_seg, instrumentToken=str(token_id))
-            if isinstance(scr_res, list) and len(scr_res) > 0: live_val = float(scr_res[0].get("ltp") or scr_res[0].get("lastPrice") or 0)
-            elif isinstance(scr_res, dict): live_val = float(scr_res.get("ltp") or scr_res.get("lastPrice") or 0)
-        except Exception: pass
-    return live_val
-
-def get_positions_df(client):
+def fetch_upstream_active_df():
     try:
-        res = client.positions()
-        return pd.DataFrame(res["data"]) if res and "data" in res and res["data"] else pd.DataFrame()
+        data = get_combined_data() or {}
+        return data.get("active_orders", pd.DataFrame())
     except Exception:
-        print(f"{Fore.RED}[DEBUG CRITICAL] Broker API Positions Call Crashed. Full Traceback:")
-        traceback.print_exc(); return pd.DataFrame()
+        print(f"{Fore.RED}[DEBUG CRITICAL] Ingestion failure."); traceback.print_exc()
+        return pd.DataFrame()
 
-def print_portfolio_table(summary_list):
-    print(f"\n{Style.BRIGHT}{Fore.YELLOW}+-------------------------+--------+------------+------------+------------+")
-    print(f"{Style.BRIGHT}{Fore.YELLOW}| SYMBOL                  | QTY    | MID PRICE  | AVG PRICE  | PNL POINTS |")
-    print(f"{Style.BRIGHT}{Fore.YELLOW}+-------------------------+--------+------------+------------+------------+")
-    if not summary_list:
-        msg = "No active tracking rows inside portfolio matrix."
-        print(f"| {Fore.LIGHTBLACK_EX}{msg:64}{Style.BRIGHT}{Fore.YELLOW} |")
-    else:
-        for item in summary_list:
-            sym, qty, mid, avg, pnl = f"{item['symbol']:23}", f"{item['qty']:6}", f"{item['mid']:10.2f}", f"{item['avg']:10.2f}", item['pnl']
-            pnl_str = f"{Fore.GREEN if pnl >= 0 else Fore.RED}{pnl:10.2f}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
-            print(f"| {sym} | {qty} | {mid} | {avg} | {pnl_str} |")
-    print(f"+-------------------------+--------+------------+------------+------------+\n")
+def generate_option_summary(active_df):
+    if active_df is None or active_df.empty or "opt_type" not in active_df.columns:
+        return pd.DataFrame(columns=["SIDE", "QTY", "INVESTED", "CURRENT", "DIFF", "PNL_%"])
+    try:
+        summary_df = active_df.copy()
+        summary_df["qty"] = summary_df["qty"].astype(float)
+        summary_df["buy_prc"] = summary_df["buy_prc"].astype(float)
+        summary_df["invested"] = summary_df["qty"] * summary_df["buy_prc"]
+        summary_df["diff"] = summary_df["pnl"].astype(float)
+        summary_df["current_val"] = summary_df["invested"] + summary_df["diff"]
+        
+        grouped = summary_df.groupby("opt_type").agg(
+            qty=("qty", "sum"), invested=("invested", "sum"),
+            current=("current_val", "sum"), diff=("diff", "sum")
+        ).reset_index().rename(columns={"opt_type": "symbol"})
+        
+        total_row = pd.DataFrame([{
+            "symbol": "TOT", "qty": summary_df["qty"].sum(),
+            "invested": summary_df["invested"].sum(),
+            "current": summary_df["current_val"].sum(), "diff": summary_df["diff"].sum()
+        }])
+        
+        final_summary = pd.concat([grouped, total_row], ignore_index=True)
+        final_summary["pnl_pct"] = np.where(final_summary["invested"] > 0, round((final_summary["diff"] / final_summary["invested"]) * 100, 1), 0.0)
+        return final_summary.rename(columns={"symbol": "SIDE", "qty": "QTY", "invested": "INVESTED", "current": "CURRENT", "diff": "DIFF", "pnl_pct": "PNL_%"})
+    except Exception as e:
+        print(f"Summary Error: {e}"); return pd.DataFrame()
 
+def print_portfolio_table(active_rows_df, summary_df):
+    print("\n" + "="*80)
+    print(f"{'OMS LIVE PXY DASHBOARD (INDIVIDUAL ACTIVE ROWS)':^80}")
+    print("="*80)
+    if not active_rows_df.empty:
+        cols = ["symbol", "tag", "qty", "buy_prc", "sell_prc", "pnl", "pxy_tgt", "pxy_sl"]
+        print(active_rows_df[[c for c in cols if c in active_rows_df.columns]].to_string(index=False))
+    else: print(f"{'No Active Rows Found':^80}")
+    print("="*80)
+
+    print(f"\n{Style.BRIGHT}{Fore.YELLOW}+-----+------+--------+--------+--------+--------+")
+    print(f"{Style.BRIGHT}{Fore.YELLOW}| SDN | QTY  | INVST  | CURRNT | DIFF   | PNL_%  |")
+    print(f"{Style.BRIGHT}{Fore.YELLOW}+-----+------+--------+--------+--------+--------+")
+    if not summary_df.empty:
+        for _, row in summary_df.iterrows():
+            side = f"{str(row.get('SIDE'))[:3]:>3}"
+            qty = f"{safe_int_convert(row.get('QTY')):>4}"
+            inv = f"{safe_int_convert(row.get('INVESTED')):>6}"
+            cur = f"{safe_int_convert(row.get('CURRENT')):>6}"
+            dif_val = safe_int_convert(row.get('DIFF'))
+            dif = f"{dif_val:>6}"
+            pct = f"{safe_float_convert(row.get('PNL_%'), 0.0):>4.1f}%"
+            
+            pnl_color = Fore.GREEN if dif_val >= 0 else Fore.RED
+            c_dif = f"{pnl_color}{dif}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
+            c_pct = f"{pnl_color}{pct}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
+            print(f"| {side} | {qty} | {inv} | {cur} | {c_dif} | {c_pct} |")
+    else: print(f"| {'No Records Generated':^45} |")
+    print(f"+-----+------+--------+--------+--------+--------+\n")
