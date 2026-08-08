@@ -94,11 +94,3 @@ def print_portfolio_table(active_rows_df, summary_df):
             print(f"  {side}   {qty}   {inv}   {c_dif}   {c_pct} ")
     else:
         print(f"  {'No Records Generated':^35}  ")
-
-def run_dashboard():
-    active_df = fetch_upstream_active_df()
-    summary_df = generate_option_summary(active_df)
-    print_portfolio_table(active_df, summary_df)
-
-if __name__ == "__main__":
-    run_dashboard()
