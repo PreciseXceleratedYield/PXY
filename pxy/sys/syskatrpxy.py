@@ -21,8 +21,8 @@ def scale_atr_value(val: float) -> float:
     if pd.isna(val) or val <= 0:
         return 7.0
     # Enforce minimum boundary of 7
-    if val < 5.0:
-        return 5.0
+    if val < 7.0:
+        return 7.0
     # Apply compression framework over 10
     if val > 10.0:
         return 10.0 + (val - 10.0) / 4.0
