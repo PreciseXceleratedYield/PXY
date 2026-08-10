@@ -1,3 +1,4 @@
+#exepmspxy.py
 import sys
 import os
 import traceback
@@ -6,7 +7,10 @@ import pandas as pd
 import numpy as np
 import pytz
 from datetime import datetime
-from colorama import Fore, Style
+from colorama import Fore, Style, init
+
+# Initialize Colorama for consistent cross-platform terminal colors
+init(autoreset=True)
 
 # --- UPSTREAM LOCAL OMS DATA INGESTION ---
 from exeomspxy import get_combined_data
@@ -22,12 +26,12 @@ def safe_float_convert(val, default=None):
 
 def safe_int_convert(val, default=0):
     if val is None or pd.isna(val): return default
-    try: return int(str(val).split('.')[0].replace(',', '').strip())
+    try: return int(str(val).split('.').replace(',', '').strip())
     except Exception: return default
 
 def get_sell_suffix():
     IST = pytz.timezone("Asia/Kolkata")
-    return f"_S{datetime.now(IST).strftime('%f')[:-3]}"
+    return f"_S{datetime.now(IST).strftime('%f')[:-]}"
 
 def fetch_upstream_active_df():
     try:
@@ -48,6 +52,7 @@ def generate_option_summary(active_df):
         summary_df["diff"] = summary_df["pnl"].astype(float)
         summary_df["current_val"] = summary_df["invested"] + summary_df["diff"]
         
+        # Grouping by option side (CE/PE)
         grouped = summary_df.groupby("opt_type").agg(
             qty=("qty", "sum"), invested=("invested", "sum"),
             current=("current_val", "sum"), diff=("diff", "sum")
@@ -60,8 +65,14 @@ def generate_option_summary(active_df):
         }])
         
         final_summary = pd.concat([grouped, total_row], ignore_index=True)
-        final_summary["pnl_pct"] = np.where(final_summary["invested"] > 0, round((final_summary["diff"] / final_summary["invested"]) * 100, 1), 0.0)
-        return final_summary.rename(columns={"symbol": "SIDE", "qty": "QTY", "invested": "INVESTED", "current": "CURRENT", "diff": "DIFF", "pnl_pct": "PNL_%"})
+        # Calculate PnL percentage based on points (DIFF) vs total investment
+        final_summary["pnl_pct"] = np.where(final_summary["invested"] > 0, 
+                                           round((final_summary["diff"] / final_summary["invested"]) * 100, 1), 0.0)
+        
+        return final_summary.rename(columns={
+            "symbol": "SIDE", "qty": "QTY", "invested": "INVESTED", 
+            "current": "CURRENT", "diff": "DIFF", "pnl_pct": "PNL_%"
+        })
     except Exception as e:
         print(f"Summary Error: {e}"); return pd.DataFrame()
 
@@ -73,54 +84,55 @@ def print_portfolio_table(active_rows_df, summary_df):
         print("="*80)
         if not active_rows_df.empty:
             cols = ["symbol", "tag", "qty", "buy_prc", "sell_prc", "pnl", "pxy_tgt", "pxy_sl"]
-            print(active_rows_df[[c for c in cols if c in active_rows_df.columns]].to_string(index=False))
+            print(active_rows_df[[c for c in cols if c in active_rows_dfcolumns]].to_string(index=False))
         else:
             print(f"{'No Active Rows Found':^80}")
         print("="*80)
     
-    # Summary header section
+    # Summary header section with labels
     print(f"\n{Style.BRIGHT}{Fore.YELLOW}  SDN   QTY    INVST      PNL    PNL_% ")
     print("=" * 42)  # Top line directly below labels
     
     if not summary_df.empty:
-        # Filter breakdown rows (CE, PE) and total row (TOT) separately
+        # Separate breakdown rows (CE, PE) and total row (TOT)
         breakdown_df = summary_df[summary_df["SIDE"] != "TOT"]
         total_df = summary_df[summary_df["SIDE"] == "TOT"]
         
-        # Print active options breakdown rows
+        # Print breakdown rows
         for _, row in breakdown_df.iterrows():
-            side = f"{str(row.get('SIDE'))[:3]:>3}"
+            side = f"{str(row.get('SIDE'))[:]:>3}"
             qty = f"{safe_int_convert(row.get('QTY')):>4}"
             inv = f"{safe_int_convert(row.get('INVESTED')):>6}"
             dif_val = safe_int_convert(row.get('DIFF'))
             dif = f"{dif_val:>6}"
             pct = f"{safe_float_convert(row.get('PNL_%'), 0.0):>4.1f}%"
             pnl_color = Fore.GREEN if dif_val >= 0 else Fore.RED
+            
             c_dif = f"{pnl_color}{dif}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
             c_pct = f"{pnl_color}{pct}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
             print(f"  {side}   {qty}   {inv}   {c_dif}   {c_pct} ")
             
-        # Print intermediate line right above the TOT metrics row
+        # Intermediate border right above TOT row
         print(f"{Style.RESET_ALL}" + "=" * 42 + f"{Style.BRIGHT}{Fore.YELLOW}")
         
-        # Print final calculation row safely
+        # Print final TOT calculation row safely
         if not total_df.empty:
-            t_row = total_df.iloc[0]  # Extracts row safely without causing Series attribute bugs
-            side = f"{str(t_row.get('SIDE'))[:3]:>3}"
+            t_row = total_df.iloc
+            side = f"{str(t_row.get('SIDE'))[:]:>3}"
             qty = f"{safe_int_convert(t_row.get('QTY')):>4}"
             inv = f"{safe_int_convert(t_row.get('INVESTED')):>6}"
             dif_val = safe_int_convert(t_row.get('DIFF'))
             dif = f"{dif_val:>6}"
             pct = f"{safe_float_convert(t_row.get('PNL_%'), 0.0):>4.1f}%"
             pnl_color = Fore.GREEN if dif_val >= 0 else Fore.RED
+            
             c_dif = f"{pnl_color}{dif}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
             c_pct = f"{pnl_color}{pct}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
             print(f"  {side}   {qty}   {inv}   {c_dif}   {c_pct} ")
     else:
         print(f"  {'No Records Generated':^35}  ")
         
-    # Standardize final terminal color reset state
-    print(f"{Style.RESET_ALL}")
+    print(f"{Style.RESET_ALL}") # Standard terminal reset
 
 def main():
     active_df = fetch_upstream_active_df()
@@ -129,4 +141,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
