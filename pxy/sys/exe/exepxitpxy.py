@@ -9,15 +9,24 @@ from colorama import Fore, Style, init
 
 # --- DYNAMIC PATH SCANNING ---
 HERE = Path(__file__).resolve().parent
+
+# Fix: Dynamically find and inject the 'run' folder for runclntpxy
+run_dir = HERE / 'run'
+if run_dir.exists() and str(run_dir) not in sys.path:
+    sys.path.insert(0, str(run_dir))
+
 syspxy_path = next((p for p in HERE.parents if (p / 'syspxy.py').exists() or (p / 'syspxy.pyc').exists()), None)
 if syspxy_path: sys.path.insert(0, str(syspxy_path))
 
 try: import syspxy
 except Exception: syspxy = None
 
-from runclntpxy import get_session
+# Fix: Safely fallback for exepmspxy path context 
 try: import exepmspxy as pms
 except ImportError: sys.path.insert(0, str(HERE)); import exepmspxy as pms
+
+# Now that path injection is configured correctly, import runclntpxy
+from runclntpxy import get_session
 
 init(autoreset=True)
 
