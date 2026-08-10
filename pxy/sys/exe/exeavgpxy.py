@@ -157,7 +157,7 @@ def handle_side_averaging(client, df):
             row_atr = safe_float(row.get("atr", 0.0))
             
             # Dynamically scale the local variable used in calculations below
-            current_atr_pct = (row_atr * 1.0) if is_trend_matched else (row_atr * 2.0)
+            current_atr_pct = (row_atr * 1.0) if is_trend_matched else (row_atr * 1.0)
             # =========================================================================
             
             pos_loss = get_loss(row)
@@ -166,9 +166,11 @@ def handle_side_averaging(client, df):
             if ce_lots == pe_lots:
                 dynamic_threshold = -current_atr_pct
             elif side_is_lesser:
-                dynamic_threshold = -(current_atr_pct / float(abs_factor))
+                dynamic_threshold = -current_atr_pct
+                #dynamic_threshold = -(current_atr_pct / float(abs_factor))
             else:
-                dynamic_threshold = -(current_atr_pct * float(abs_factor))
+                dynamic_threshold = -current_atr_pct
+                #dynamic_threshold = -(current_atr_pct * float(abs_factor))
 
             last_calculated_threshold = dynamic_threshold
 
