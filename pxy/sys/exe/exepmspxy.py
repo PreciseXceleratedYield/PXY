@@ -31,7 +31,7 @@ def safe_int_convert(val, default=0):
 
 def get_sell_suffix():
     IST = pytz.timezone("Asia/Kolkata")
-    return f"_S{datetime.now(IST).strftime('%f')[:-]}"
+    return f"_S{datetime.now(IST).strftime('%f')[:-3]}"
 
 def fetch_upstream_active_df():
     try:
