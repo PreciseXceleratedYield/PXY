@@ -78,10 +78,17 @@ def print_portfolio_table(active_rows_df, summary_df):
             print(f"{'No Active Rows Found':^80}")
         print("="*80)
     
-    # Summary section is mandatory and prints regardless of the mode
+    # Summary header section
     print(f"\n{Style.BRIGHT}{Fore.YELLOW}  SDN   QTY    INVST      PNL    PNL_% ")
+    print("=" * 42)  # Top line directly below labels
+    
     if not summary_df.empty:
-        for _, row in summary_df.iterrows():
+        # Filter breakdown rows (CE, PE) and total row (TOT) separately
+        breakdown_df = summary_df[summary_df["SIDE"] != "TOT"]
+        total_df = summary_df[summary_df["SIDE"] == "TOT"]
+        
+        # Print active options breakdown rows
+        for _, row in breakdown_df.iterrows():
             side = f"{str(row.get('SIDE'))[:3]:>3}"
             qty = f"{safe_int_convert(row.get('QTY')):>4}"
             inv = f"{safe_int_convert(row.get('INVESTED')):>6}"
@@ -92,5 +99,34 @@ def print_portfolio_table(active_rows_df, summary_df):
             c_dif = f"{pnl_color}{dif}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
             c_pct = f"{pnl_color}{pct}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
             print(f"  {side}   {qty}   {inv}   {c_dif}   {c_pct} ")
+            
+        # Print intermediate line right above the TOT metrics row
+        print(f"{Style.RESET_ALL}" + "=" * 42 + f"{Style.BRIGHT}{Fore.YELLOW}")
+        
+        # Print final calculation row safely
+        if not total_df.empty:
+            t_row = total_df.iloc[0]  # Extracts row safely without causing Series attribute bugs
+            side = f"{str(t_row.get('SIDE'))[:3]:>3}"
+            qty = f"{safe_int_convert(t_row.get('QTY')):>4}"
+            inv = f"{safe_int_convert(t_row.get('INVESTED')):>6}"
+            dif_val = safe_int_convert(t_row.get('DIFF'))
+            dif = f"{dif_val:>6}"
+            pct = f"{safe_float_convert(t_row.get('PNL_%'), 0.0):>4.1f}%"
+            pnl_color = Fore.GREEN if dif_val >= 0 else Fore.RED
+            c_dif = f"{pnl_color}{dif}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
+            c_pct = f"{pnl_color}{pct}{Style.RESET_ALL}{Style.BRIGHT}{Fore.YELLOW}"
+            print(f"  {side}   {qty}   {inv}   {c_dif}   {c_pct} ")
     else:
         print(f"  {'No Records Generated':^35}  ")
+        
+    # Standardize final terminal color reset state
+    print(f"{Style.RESET_ALL}")
+
+def main():
+    active_df = fetch_upstream_active_df()
+    summary_df = generate_option_summary(active_df)
+    print_portfolio_table(active_df, summary_df)
+
+if __name__ == "__main__":
+    main()
+
