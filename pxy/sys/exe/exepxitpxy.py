@@ -149,7 +149,7 @@ def main():
 
                 # Comparing actual % return vs your calculated ATR % threshold
                 if total_pnl_pct < target_profit_pct:
-                    print(f"{Fore.YELLOW}⏳ TARGET NOT MET: {opt_type} PnL %: {total_pnl_pct:.2f}% / Target: {target_profit_pct:.2f}%")
+                    print(f"{Fore.YELLOW}⏳ {opt_type} PnL %: {total_pnl_pct:.2f}% / Target: {target_profit_pct:.2f}%")
                 else:
                     print(f"{Fore.GREEN}🎯 TARGET ACHIEVED: {opt_type} bulk exit triggered at {total_pnl_pct:.2f}%.")
                     if square_off_entire_type(client, active_df, opt_type):
