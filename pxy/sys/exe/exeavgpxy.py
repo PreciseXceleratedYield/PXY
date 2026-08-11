@@ -106,16 +106,37 @@ def handle_side_averaging(client, df):
     ce_lots = int(ce_match.group(1)) if ce_match else 0
     pe_lots = int(pe_match.group(2)) if pe_match else 0
 
-    print(f"{Fore.CYAN}        📢  Lots: {ce_lots}CE vs {pe_lots}PE")
-
     # Clean dataframe copy to isolate mutations cleanly
     df = df.copy()
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
 
-    # 💰 Vectorised calculations of raw row-level investment sums per side
+    # 💰 Vectorised calculations of raw row-level investment sums & cumulative PNL per side
     df['row_invested'] = df['qty'].apply(safe_float) * df['buy_prc'].apply(safe_float)
+    df['row_pnl'] = df.get('pnl', 0.0).apply(safe_float)
+    
     ce_investment = float(df[df['side'] == 'CE']['row_invested'].sum())
     pe_investment = float(df[df['side'] == 'PE']['row_invested'].sum())
+    
+    ce_pnl = float(df[df['side'] == 'CE']['row_pnl'].sum())
+    pe_pnl = float(df[df['side'] == 'PE']['row_pnl'].sum())
+
+    # =========================================================================
+    # 📊 TELEMETRY REAL-TIME METRICS PORTFOLIO DASHBOARD (STRICT 40 WIDTH)
+    # =========================================================================
+    width = 40
+    print("\n" + Fore.CYAN + "=" * width)
+    print(Fore.CYAN + f" {'SIDE':<4}   {'WEIGHT':>7}   {'NO':>2}   {'PNL':>6}")
+    print(Fore.CYAN + "-" * width)
+    
+    ce_pnl_val = int(round(ce_pnl))
+    ce_pnl_color = Fore.GREEN if ce_pnl_val >= 0 else Fore.RED
+    print(Fore.WHITE + f"  CE     {int(round(ce_investment)):>7}   {ce_lots:>2}   " + ce_pnl_color + f"{ce_pnl_val:>6}")
+    
+    pe_pnl_val = int(round(pe_pnl))
+    pe_pnl_color = Fore.GREEN if pe_pnl_val >= 0 else Fore.RED
+    print(Fore.WHITE + f"  PE     {int(round(pe_investment)):>7}   {pe_lots:>2}   " + pe_pnl_color + f"{pe_pnl_val:>6}")
+    print(Fore.CYAN + "=" * width + "\n")
+    # =========================================================================
 
     for side in ['CE', 'PE']: 
         side_df = df[df['side'] == side] 
@@ -154,7 +175,6 @@ def handle_side_averaging(client, df):
             money_factor = float(own_money) / float(opposite_money)
 
         # 🛑 RIGID PRODUCTION SAFETY CEILING AND FLOOR CAPPING
-        # Combines independent factors and applies min/max boundaries flawlessly
         compound_factor = count_factor * money_factor
         compound_factor = max(0.2, min(5.0, compound_factor))
 
@@ -173,8 +193,7 @@ def handle_side_averaging(client, df):
             dynamic_threshold = -(current_atr_pct * compound_factor)
             last_calculated_threshold = dynamic_threshold
 
-            # 🛠️ STRATEGIC TRIGGER LOGIC CHECK (Flipped Inequality Corrected)
-            # If current loss is better than threshold (closer to zero), do not allow execution.
+            # 🛠️ STRATEGIC TRIGGER LOGIC CHECK
             if pos_loss > dynamic_threshold:
                 all_positions_crossed_threshold = False
                 break  
