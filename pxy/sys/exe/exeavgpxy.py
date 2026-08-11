@@ -13,7 +13,7 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 7
+MAX_LAYERS = 2
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
 
 def safe_float(val, fallback=0.0):
@@ -21,7 +21,7 @@ def safe_float(val, fallback=0.0):
     if val is None:
         return fallback
     try:
-        return float(val)
+        return float(str(val).replace(',', '').strip())
     except (ValueError, TypeError):
         return fallback
 
@@ -60,7 +60,7 @@ def get_loss(row):
     ltp = safe_float(row.get("sell_prc", 0.0)) 
     return ((ltp - entry) / entry) * 100 if entry > 0 else 0 
 
-def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, abs_factor, trend):
+def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, tag, ce_count, pe_count, count_factor, money_factor, trend):
     """Renders a strict 42-character width dashboard upon an order trigger event."""
     width = 42
     border = Fore.YELLOW + "=" * width
@@ -72,7 +72,8 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     print(divider)
     print(Fore.WHITE + f" • SYMBOL       : {symbol}".ljust(width))
     print(Fore.WHITE + f" • SIDE OPTION   : {side} ({ce_count}CE vs {pe_count}PE)".ljust(width))
-    print(Fore.WHITE + f" • BALANCE FACTOR: {abs_factor}".ljust(width))
+    print(Fore.WHITE + f" • COUNT FACTOR  : {count_factor:.4f}".ljust(width))
+    print(Fore.WHITE + f" • MONEY FACTOR  : {money_factor:.4f}".ljust(width))
     print(Fore.WHITE + f" • ACTIVE TREND  : {trend}".ljust(width))
     
     loss_str = f" • CURRENT RETURN: {current_loss:.2f}%"
@@ -87,7 +88,7 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     print(border + "\n")
 
 def handle_side_averaging(client, df): 
-    """Averages positions scaling thresholds dynamically via upstream lot layout regex parsing.""" 
+    """Averages positions scaling loss thresholds dynamically using compounded Count and Money Factors.""" 
     if df is None or df.empty: 
         return 
         
@@ -96,39 +97,25 @@ def handle_side_averaging(client, df):
     if not REBUY_ENABLED or not (dt_time(9,17) <= now <= dt_time(15,1)): 
         return 
 
-    # Live position string extraction matching your exact upstream format
-    pos_raw = str(get_position_summary(client)).upper().strip()
-    match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
+    # Robust position string extraction handling potential whitespace variances
+    pos_raw = str(get_position_summary(client)).upper().replace(" ", "").strip()
     
-    if match:
-        ce_lots = int(match.group(1))
-        pe_lots = int(match.group(2))
-    else:
-        ce_lots, pe_lots = 0, 0
+    ce_match = re.search(r'(\d+)CE', pos_raw)
+    pe_match = re.search(r'(\d+)PE', pos_raw)
     
-    # Calculate pure absolute lot spread
-    raw_difference = abs(ce_lots - pe_lots)
-    
-    # Ensures a 1-lot tilt scales to factor 2 immediately instead of treating it like a tie (factor 1)
-    if raw_difference == 0:
-        abs_factor = 1
-    else:
-        abs_factor = raw_difference + 1
+    ce_lots = int(ce_match.group(1)) if ce_match else 0
+    pe_lots = int(pe_match.group(2)) if pe_match else 0
 
-    # Establish independent lesser vs heavier directional designations
-    if ce_lots < pe_lots:
-        ce_is_lesser, pe_is_lesser = True, False
-    elif pe_lots < ce_lots:
-        ce_is_lesser, pe_is_lesser = False, True
-    else:
-        ce_is_lesser, pe_is_lesser = False, False  # True balanced state
+    print(f"{Fore.CYAN}        📢  Lots: {ce_lots}CE vs {pe_lots}PE")
 
-    # Clean system telemetry message stream line
-    print(f"{Fore.CYAN}        📢  Lots: {ce_lots}CE vs {pe_lots}PE | ⚖️ {abs_factor}")
-
-    # Make a clean dataframe copy to prevent mutations/warnings
+    # Clean dataframe copy to isolate mutations cleanly
     df = df.copy()
     df['side'] = df['symbol'].astype(str).str[-2:].str.upper() 
+
+    # 💰 Vectorised calculations of raw row-level investment sums per side
+    df['row_invested'] = df['qty'].apply(safe_float) * df['buy_prc'].apply(safe_float)
+    ce_investment = float(df[df['side'] == 'CE']['row_invested'].sum())
+    pe_investment = float(df[df['side'] == 'PE']['row_invested'].sum())
 
     for side in ['CE', 'PE']: 
         side_df = df[df['side'] == side] 
@@ -136,57 +123,76 @@ def handle_side_averaging(client, df):
             continue 
 
         # --- EXTRACT AND ENFORCE TREND STATUS DIRECTIONALLY ---
-        # Grabs the value from the last active row tracking this specific side option
         last_row = side_df.iloc[-1]
         active_exit = str(last_row.get("exit", "NONE")).upper().strip()
 
+        # 🎯 Target trend condition check: Only buy CE on BULL/BUY and PE on BEAR/SELL
+        if side == 'CE' and active_exit not in ['BUY', 'BULL']:
+            continue
+        if side == 'PE' and active_exit not in ['SELL', 'BEAR']:
+            continue
+
         # =========================================================================
-        # 🆕 DYNAMIC ATR ADJUSTMENT BLOCK (Top of the evaluation loop)
+        # 📊 UNIFIED SIDE-BY-SIDE DUAL FACTOR ANALYSIS
         # =========================================================================
-        # Check if the active market trend matches this side's operational bias
-        is_trend_matched = False
-        if (side == 'CE' and active_exit == 'BULL') or (side == 'PE' and active_exit == 'BEAR'):
-            is_trend_matched = True
+        own_count = ce_lots if side == 'CE' else pe_lots
+        opposite_count = pe_lots if side == 'CE' else ce_lots
+
+        own_money = ce_investment if side == 'CE' else pe_investment
+        opposite_money = pe_investment if side == 'CE' else ce_investment
+
+        # 1️⃣ Structural Count Factor (Short-circuit to 1.0 if EITHER side lot is 0)
+        if ce_lots == 0 or pe_lots == 0 or ce_lots == pe_lots:
+            count_factor = 1.0
+        else:
+            count_factor = float(own_count) / float(opposite_count)
+
+        # 2️⃣ Financial Capital Money Factor (Short-circuit to 1.0 if EITHER side investment is 0)
+        if ce_investment <= 0.0 or pe_investment <= 0.0 or ce_investment == pe_investment:
+            money_factor = 1.0
+        else:
+            money_factor = float(own_money) / float(opposite_money)
+
+        # 🛑 RIGID PRODUCTION SAFETY CEILING AND FLOOR CAPPING
+        # Combines independent factors and applies min/max boundaries flawlessly
+        compound_factor = count_factor * money_factor
+        compound_factor = max(0.2, min(5.0, compound_factor))
 
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
-        side_is_lesser = ce_is_lesser if side == "CE" else pe_is_lesser
 
         for index, row in side_df.iterrows():
-            # Grab actual row-level ATR dynamically, using 0.0 as a safe fallback
-            row_atr = safe_float(row.get("atr", 0.0))
-            
-            # Dynamically scale the local variable used in calculations below
-            current_atr_pct = (row_atr * 1.0) if is_trend_matched else (row_atr * 2.0)
-            # =========================================================================
-            
+            real_atr = safe_float(row.get("atr", 0.0))
+            if real_atr <= 0:
+                real_atr = 5.0
+                
+            current_atr_pct = max(10.0, 1.0 * real_atr)
             pos_loss = get_loss(row)
             
-            # --- EVALUATE MATRIX CALCULATIONS VIA NEGATIVE BOUNDS ---
-            if ce_lots == pe_lots:
-                dynamic_threshold = -current_atr_pct
-            elif side_is_lesser:
-                dynamic_threshold = -(current_atr_pct / float(abs_factor))
-            else:
-                dynamic_threshold = -(current_atr_pct * float(abs_factor))
-
+            # Formulate final guarded dynamic loss threshold percentage
+            dynamic_threshold = -(current_atr_pct * compound_factor)
             last_calculated_threshold = dynamic_threshold
 
+            # 🛠️ STRATEGIC TRIGGER LOGIC CHECK (Flipped Inequality Corrected)
+            # If current loss is better than threshold (closer to zero), do not allow execution.
             if pos_loss > dynamic_threshold:
                 all_positions_crossed_threshold = False
                 break  
+        # =========================================================================
 
-        loss_hit = all_positions_crossed_threshold
-
-        if loss_hit: 
-            if len(side_df) < (MAX_LAYERS + 1) and not is_cooling(side): 
+        # Final confirmation check before execution routing
+        if all_positions_crossed_threshold and len(side_df) < (MAX_LAYERS + 1): 
+            if not is_cooling(side): 
                 symbol = last_row['symbol'] 
                 qty = abs(int(safe_float(last_row['qty'], 0.0))) 
                 new_tag = generate_pxy_tag() 
                 
                 final_loss = get_loss(last_row)
                 
-                print_pxy_trigger_dashboard(side, symbol, final_loss, last_calculated_threshold, new_tag, ce_lots, pe_lots, abs_factor, active_exit)
+                print_pxy_trigger_dashboard(
+                    side, symbol, final_loss, last_calculated_threshold, new_tag, 
+                    ce_lots, pe_lots, count_factor, money_factor, active_exit
+                )
                 
                 try: 
                     params = { 
@@ -206,4 +212,5 @@ def handle_side_averaging(client, df):
                         set_cooling(side) 
                         print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED under {active_exit} Trend.") 
                 except Exception as e:
-                    pass  # Kept intact to preserve original file ending state
+                    print(f"{Fore.RED}⚠️ ORDER PLACEMENT CRITICAL ERROR: {e}")
+
