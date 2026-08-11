@@ -67,14 +67,14 @@ def target_price(row):
         # 4️⃣ Dynamic execution logic using power and depth matrix
         if is_ce:
             if active_exit in ("SELL", "BEAR"):  # Hostile (Not Aligned)
-                target_pct = atr / 2
+                target_pct = 1.4
             else:                                # Aligned
-                target_pct = atr #* max(ce_d, ce_p)
+                target_pct = 99
         elif is_pe:
             if active_exit in ("BUY", "BULL"):   # Hostile (Not Aligned)
-                target_pct = atr / 2
+                target_pct = 1.4
             else:                                # Aligned
-                target_pct = atr #* max(pe_d, pe_p)
+                target_pct = 99
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
