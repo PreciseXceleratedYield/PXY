@@ -125,21 +125,32 @@ def handle_side_averaging(client, df):
     pe_pnl = float(df[df['side'] == 'PE']['row_pnl'].sum())
 
     # =========================================================================
-    # 📊 TELEMETRY REAL-TIME METRICS PORTFOLIO DASHBOARD (STRICT 40 WIDTH)
+    # 📊 TELEMETRY REAL-TIME METRICS PORTFOLIO DASHBOARD (STRICT 48 WIDTH)
     # =========================================================================
-    width = 40
+    # Pre-calculate exact compound factor values for display
+    def calc_side_factor(own_inv, opp_inv, own_lts, opp_lts):
+        c_fac = 1.0 if (own_lts == 0 or opp_lts == 0 or own_lts == opp_lts) else float(own_lts) / float(opp_lts)
+        m_fac = 1.0 if (own_inv <= 0.0 or opp_inv <= 0.0 or own_inv == opp_inv) else float(own_inv) / float(opp_inv)
+        return max(0.2, min(5.0, c_fac * m_fac))
+
+    ce_fctr = calc_side_factor(ce_investment, pe_investment, ce_lots, pe_lots)
+    pe_fctr = calc_side_factor(pe_investment, ce_investment, pe_lots, ce_lots)
+
+    width = 48
     print("\n" + Fore.CYAN + "=" * width)
-    print(Fore.CYAN + f" {'SIDE':<4}   {'WEIGHT':>7}   {'NO':>2}   {'PNL':>6}")
+    print(Fore.CYAN + f" {'SIDE':<4}   {'WEIGHT':>7}   {'NO':>2}   {'FCTR':>5}   {'PNL':>6}")
     print(Fore.CYAN + "-" * width)
     
     ce_pnl_val = int(round(ce_pnl))
     ce_pnl_color = Fore.GREEN if ce_pnl_val >= 0 else Fore.RED
-    print(Fore.WHITE + f"  CE     {int(round(ce_investment)):>7}   {ce_lots:>2}   " + ce_pnl_color + f"{ce_pnl_val:>6}")
+    print(Fore.WHITE + f"  CE     {int(round(ce_investment)):>7}   {ce_lots:>2}   {ce_fctr:>5.1f}   " + ce_pnl_color + f"{ce_pnl_val:>6}")
     
     pe_pnl_val = int(round(pe_pnl))
     pe_pnl_color = Fore.GREEN if pe_pnl_val >= 0 else Fore.RED
-    print(Fore.WHITE + f"  PE     {int(round(pe_investment)):>7}   {pe_lots:>2}   " + pe_pnl_color + f"{pe_pnl_val:>6}")
+    print(Fore.WHITE + f"  PE     {int(round(pe_investment)):>7}   {pe_lots:>2}   {pe_fctr:>5.1f}   " + pe_pnl_color + f"{pe_pnl_val:>6}")
     print(Fore.CYAN + "=" * width + "\n")
+    # =========================================================================
+
     # =========================================================================
 
     for side in ['CE', 'PE']: 
