@@ -94,7 +94,7 @@ def handle_side_averaging(client, df):
         
     ist = pytz.timezone("Asia/Kolkata") 
     now = datetime.now(ist).time() 
-    if not REBUY_ENABLED or not (dt_time(9,17) <= now <= dt_time(14,25)): 
+    if not REBUY_ENABLED or not (dt_time(9,17) <= now <= dt_time(14,36)): 
         return 
 
     # Robust position string extraction handling potential whitespace variances
