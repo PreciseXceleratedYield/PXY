@@ -82,7 +82,7 @@ def target_price(row):
                 rev_compound_factor = max(0.2, min(5.0, rev_count_factor * rev_money_factor))
                 
                 # FIX: Apply calculation and enforce a strict minimum baseline target floor of 1.4%
-                target_pct = max(2.4, 2.4 * rev_compound_factor)
+                target_pct = max(2.0, 2.0 * rev_compound_factor)
             else:                                # Aligned
                 target_pct = 33.0
 
@@ -106,7 +106,7 @@ def target_price(row):
                 rev_compound_factor = max(0.2, min(5.0, rev_count_factor * rev_money_factor))
                 
                 # FIX: Apply calculation and enforce a strict minimum baseline target floor of 1.4%
-                target_pct = max(2.4, 2.4 * rev_compound_factor)
+                target_pct = max(2.0, 2.0 * rev_compound_factor)
             else:                                # Aligned
                 target_pct = 33.0
 
