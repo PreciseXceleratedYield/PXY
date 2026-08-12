@@ -13,7 +13,7 @@ init(autoreset=True)
 
 # --- CONFIG --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 2
+MAX_LAYERS = 4
 COOL_DOWN_SECONDS = 60  # ⏱️ Cooling interval set to exactly 60 seconds
 
 def safe_float(val, fallback=0.0):
@@ -186,7 +186,7 @@ def handle_side_averaging(client, df):
             if real_atr <= 0:
                 real_atr = 5.0
                 
-            current_atr_pct = max(10.0, 1.0 * real_atr)
+            current_atr_pct = min(14.0, 2 * real_atr)
             pos_loss = get_loss(row)
             
             # Formulate final guarded dynamic loss threshold percentage
