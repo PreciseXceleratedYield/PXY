@@ -100,15 +100,11 @@ def handle_side_averaging(client, df):
     # Robust position string extraction handling potential whitespace variances
     pos_raw = str(get_position_summary(client)).upper().replace(" ", "").strip()
     
-    # Robust position string extraction handling potential whitespace variances
-    pos_raw = str(get_position_summary(client)).upper().replace(" ", "").strip()
-    
     ce_match = re.search(r'(\d+)CE', pos_raw)
     pe_match = re.search(r'(\d+)PE', pos_raw)
     
     ce_lots = int(ce_match.group(1)) if ce_match else 0
-    pe_lots = int(pe_match.group(1)) if pe_match else 0  # <--- Changed group(2) to group(1)
-
+    pe_lots = int(pe_match.group(1)) if pe_match else 0  # Fixed IndexError
 
     # Clean dataframe copy to isolate mutations cleanly
     df = df.copy()
@@ -127,9 +123,14 @@ def handle_side_averaging(client, df):
     # =========================================================================
     # 📊 TELEMETRY REAL-TIME METRICS PORTFOLIO DASHBOARD (STRICT 40 WIDTH)
     # =========================================================================
-    # Pre-calculate exact compound factor values for display
+    # Pre-calculate exact compound factor values for display using updated baseline rules
     def calc_side_factor(own_inv, opp_inv, own_lts, opp_lts):
-        c_fac = 1.0 if (own_lts == 0 or opp_lts == 0 or own_lts == opp_lts) else float(own_lts) / float(opp_lts)
+        # Count Factor: Always initiate 1 as baseline if lots are 0
+        adj_own_lts = max(1, own_lts)
+        adj_opp_lts = max(1, opp_lts)
+        c_fac = float(adj_own_lts) / float(adj_opp_lts)
+        
+        # Money Factor: Core structural protection rules
         m_fac = 1.0 if (own_inv <= 0.0 or opp_inv <= 0.0 or own_inv == opp_inv) else float(own_inv) / float(opp_inv)
         return max(0.2, min(5.0, c_fac * m_fac))
 
@@ -138,7 +139,7 @@ def handle_side_averaging(client, df):
 
     width = 40
     print("\n" + Fore.CYAN + "=" * width)
-    # Exact column spacing string matching your specs
+    # Exact column spacing string matching your layout specifications
     print(Fore.CYAN + f" {'SIDE':<3}  {'WEIGHT':>7}  {'NO':>2}  {'FCTR':>4}  {'PNL':>7}")
     print(Fore.CYAN + "-" * width)
     
@@ -151,8 +152,6 @@ def handle_side_averaging(client, df):
     print(Fore.WHITE + f"  PE   {int(round(pe_investment)):>7}  {pe_lots:>2}  {pe_fctr:>4.1f}  " + pe_pnl_color + f"{pe_pnl_val:>7}")
     print(Fore.CYAN + "=" * width + "\n")
     # =========================================================================
-
-
     for side in ['CE', 'PE']: 
         side_df = df[df['side'] == side] 
         if side_df.empty: 
@@ -177,13 +176,12 @@ def handle_side_averaging(client, df):
         own_money = ce_investment if side == 'CE' else pe_investment
         opposite_money = pe_investment if side == 'CE' else ce_investment
 
-        # 1️⃣ Structural Count Factor (Short-circuit to 1.0 if EITHER side lot is 0)
-        if ce_lots == 0 or pe_lots == 0 or ce_lots == pe_lots:
-            count_factor = 1.0
-        else:
-            count_factor = float(own_count) / float(opposite_count)
+        # 1️⃣ LIVE CALCULATED COUNT FACTOR (Always initiated at 1 baseline if 0)
+        adj_own_count = max(1, own_count)
+        adj_opposite_count = max(1, opposite_count)
+        count_factor = float(adj_own_count) / float(adj_opposite_count)
 
-        # 2️⃣ Financial Capital Money Factor (Short-circuit to 1.0 if EITHER side investment is 0)
+        # 2️⃣ Financial Capital Money Factor (Kept original logic rules)
         if ce_investment <= 0.0 or pe_investment <= 0.0 or ce_investment == pe_investment:
             money_factor = 1.0
         else:
@@ -204,7 +202,7 @@ def handle_side_averaging(client, df):
             current_atr_pct = min(14.0, 2 * real_atr)
             pos_loss = get_loss(row)
             
-            # Formulate final guarded dynamic loss threshold percentage
+            # Formulate final guarded dynamic loss threshold percentage using live compound_factor
             dynamic_threshold = -(current_atr_pct * compound_factor)
             last_calculated_threshold = dynamic_threshold
 
@@ -247,4 +245,3 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED under {active_exit} Trend.") 
                 except Exception as e:
                     print(f"{Fore.RED}⚠️ ORDER PLACEMENT CRITICAL ERROR: {e}")
-
