@@ -150,7 +150,38 @@ def handle_side_averaging(client, df):
     pe_pnl_val = int(round(pe_pnl))
     pe_pnl_color = Fore.GREEN if pe_pnl_val >= 0 else Fore.RED
     print(Fore.WHITE + f"  PE   {int(round(pe_investment)):>7}  {pe_lots:>2}  {pe_fctr:>4.1f}  " + pe_pnl_color + f"{pe_pnl_val:>7}")
+    
+    # =========================================================================
+    # ⚖️ ADDITIONAL TELEMETRY 40-WIDTH ANCHOR BALANCE BAR
+    # =========================================================================
+    print(Fore.CYAN + "-" * width)
+
+    total_investment = ce_investment + pe_investment
+    
+    # 📐 Math Breakdown for Exact 40 Width:
+    # 2 spaces (Left Padding) + 2 chars (Left ⚖️) + 30 slots (Track + Needle) + 2 chars (Right ⚖️) + 4 spaces (Right Padding) = 40 Chars
+    bar_track_width = 30  
+    
+    if total_investment > 0:
+        ce_ratio = float(ce_investment) / float(total_investment)
+        # 30 slots minus 1 for needle = 29 tracks to distribute
+        needle_position = int(round(ce_ratio * (bar_track_width - 1)))
+    else:
+        needle_position = (bar_track_width - 1) // 2
+
+    # Safety boundaries cap
+    needle_position = max(0, min(bar_track_width - 1, needle_position))
+    
+    # Track calculations: Left is Green (Bullish CE), Right is Red (Bearish PE)
+    left_green_bar = "━" * needle_position
+    right_red_bar = "━" * (bar_track_width - 1 - needle_position)
+    needle = Fore.YELLOW + Style.BRIGHT + "₹"
+    
+    # Render with exact padding constraints to guarantee no layout overflow
+    print("  " + Fore.WHITE + "⚖️" + Fore.GREEN + left_green_bar + needle + Fore.RED + right_red_bar + Fore.WHITE + "⚖️" + "    ")
     print(Fore.CYAN + "=" * width + "\n")
+
+
     # =========================================================================
     for side in ['CE', 'PE']: 
         side_df = df[df['side'] == side] 
