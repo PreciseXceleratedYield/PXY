@@ -124,7 +124,7 @@ while True:
             if ce_qty == 0 or pe_qty == 0:
                 run_script(HERE / "exeentrpxy.py", timeout=20)
             else:
-                print(f"{Fore.YELLOW}⏳ Entry skipped - Both CE ({ce_qty}) and PE ({pe_qty}) are active.")
+                print(f"{Fore.YELLOW}⏳ Entry skipped - CE ({ce_qty}) and PE ({pe_qty})")
                     
             fancy_pause(7)
             
