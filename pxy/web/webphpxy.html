@@ -750,7 +750,7 @@ function drawChart(candles){
             const x=toX(i),y=toY(c.c);
             if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
         });
-        ctx.strokeStyle=cssVar('--accent');ctx.lineWidth=1.5;ctx.stroke();
+        ctx.strokeStyle='rgba(200,200,205,0.55)';ctx.lineWidth=1;ctx.stroke();
     }else{
     vis.forEach((c,i)=>{
         if(c.o==null||c.h==null||c.l==null||c.c==null)return;
@@ -804,7 +804,7 @@ function drawChart(candles){
     ctx.stroke();ctx.setLineDash([]);
 
     // SMA50 solid thin
-    ctx.strokeStyle='rgba(34,211,238,0.65)';ctx.lineWidth=1;
+    ctx.strokeStyle='rgba(160,160,166,0.75)';ctx.lineWidth=2.5;
     ctx.beginPath();
     started=false;
     vis.forEach((c,i)=>{
