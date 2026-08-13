@@ -14,7 +14,7 @@
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
 <style>
 :root,[data-theme="dark"]{
-    --bg:#06080d;--bg2:#0b0f1a;--bg3:#111827;
+    --bg:#12141a;--bg2:#181c26;--bg3:#20242e;
     --border:rgba(255,255,255,0.06);--border2:rgba(255,255,255,0.13);
     --text:#e2e8f4;--muted:#4a5568;--accent:#3b82f6;
     --bull:#22c55e;--bear:#ef4444;--gold:#f59e0b;
@@ -226,6 +226,10 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     <div class="col" id="colChart">
         <div class="col-hdr">
             <span onclick="openPanelLink('chart')" style="cursor:pointer;">📈 Chart</span>
+            <span style="display:flex;gap:4px;">
+                <span onclick="setChartMode('candle')" id="chartModeCandle" style="font-size:8px;color:var(--accent);cursor:pointer;padding:1px 6px;border-radius:3px;border:1px solid var(--accent);">Candles</span>
+                <span onclick="setChartMode('line')" id="chartModeLine" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 6px;border-radius:3px;border:1px solid var(--border);">Line</span>
+            </span>
         </div>
         <div style="flex:1;min-height:0;display:flex;flex-direction:row;">
             <div id="momentumBar">
@@ -562,6 +566,14 @@ async function loadDash(){
 
 /* ── CHART ── */
 let lastCandles=null,lastMoSt=null,lastMoCloses=null;
+let chartMode='candle';
+function setChartMode(mode){
+    chartMode=mode;
+    const c=$('chartModeCandle'),l=$('chartModeLine');
+    if(c){c.style.borderColor=mode==='candle'?cssVar('--accent'):cssVar('--border');c.style.color=mode==='candle'?cssVar('--accent'):cssVar('--muted');}
+    if(l){l.style.borderColor=mode==='line'?cssVar('--accent'):cssVar('--border');l.style.color=mode==='line'?cssVar('--accent'):cssVar('--muted');}
+    if(lastCandles)drawChart(lastCandles);
+}
 async function loadChart(){
     try{
         const data=await fetch('./webchrtpxy.json?_='+Date.now()).then(r=>r.json());
@@ -594,6 +606,7 @@ function drawChart(candles){
     const vis=candles.slice(-MAX);
     const n=vis.length;
     if(!n)return;
+    const startIdx=candles.length-n;
 
     let lo=Infinity,hi=-Infinity;
     vis.forEach(c=>{
@@ -626,10 +639,25 @@ function drawChart(candles){
         ctx.fillText(v.toFixed(1),plotW+6,y);
     }
 
+    if(chartMode==='line'){
+        ctx.beginPath();
+        let started=false;
+        vis.forEach((c,i)=>{
+            if(c.c==null)return;
+            const x=toX(i),y=toY(c.c);
+            if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+        });
+        ctx.strokeStyle=cssVar('--accent');ctx.lineWidth=1.5;ctx.stroke();
+        if(started){
+            ctx.lineTo(toX(n-1),H);ctx.lineTo(toX(0),H);ctx.closePath();
+            ctx.fillStyle='rgba(59,130,246,0.12)';ctx.fill();
+        }
+    }else{
     vis.forEach((c,i)=>{
         if(c.o==null||c.h==null||c.l==null||c.c==null)return;
         const x=toX(i);
-        const isBull=c.c>=c.o;
+        const prevClose=i>0?vis[i-1].c:(candles[startIdx-1]?.c??c.o);
+        const isBull=prevClose!=null?c.c>=prevClose:c.c>=c.o;
         const color=isBull?cssVar('--bull'):cssVar('--bear');
         const glow=isBull?'rgba(34,197,94,0.5)':'rgba(239,68,68,0.5)';
 
@@ -665,6 +693,7 @@ function drawChart(candles){
         ctx.ellipse(x,bodyTop+r*0.5,r*0.85,Math.max(r*0.35,1.2),0,0,Math.PI*2);
         ctx.fill();
     });
+    }
 
     ctx.strokeStyle='rgba(202,138,4,0.8)';ctx.lineWidth=1.2;ctx.setLineDash([3,3]);
     ctx.beginPath();
