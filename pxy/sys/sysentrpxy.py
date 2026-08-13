@@ -28,10 +28,10 @@ def get_entry_signal(df=None):
     
     # Route Entry and Exit based on raw direction (BULL / BEAR) from sysmktpxy
     if entry_dir == "BULL":
-        entry_signal = "ATMBUY"
+        entry_signal = "OTMBUY"
         exit_signal = "BULL"
     elif entry_dir == "BEAR":
-        entry_signal = "ATMSELL"
+        entry_signal = "OTMSELL"
         exit_signal = "BEAR"
     else:
         entry_signal = "NONE"
