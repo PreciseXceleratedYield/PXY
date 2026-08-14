@@ -81,7 +81,7 @@ while True:
         run_script(HERE / "exeentrpxy.py", timeout=30)
             
         # Updated cooldown window to 30 seconds
-        fancy_pause(30)
+        fancy_pause(6)
         loop_counter += 1
         
     else:
