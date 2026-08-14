@@ -93,7 +93,7 @@ while True:
             os.system('clear')
             run_script(HERE.parent / "syscprtpxy.py", timeout=30)
             print(" ⏳   WAIT : market opens at 09:16 IST  📡", end="\r")
-            time.sleep(60)
+            time.sleep(6)
 
         print("\n🚀 MKT OPEN: resuming main loop now 📈")
 
