@@ -273,6 +273,6 @@ def handle_side_averaging(client, df):
                     res = client.place_order(**params) 
                     if res: 
                         set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: Side {side} AVERAGED under {active_exit} Trend.") 
+                        print(f"{Fore.GREEN}✅ SUCCESS: {side} AVERAGED by {active_exit}.") 
                 except Exception as e:
                     print(f"{Fore.RED}⚠️ ORDER PLACEMENT CRITICAL ERROR: {e}")
