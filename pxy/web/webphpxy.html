@@ -208,8 +208,8 @@ body{
     </div>
     <div style="flex:1;"></div>
     <div class="hdr-r">
-        <span id="brandHdr" style="font-family:'Syne',sans-serif;font-weight:700;font-size:9px;letter-spacing:0.06em;white-space:nowrap;"><span style="color:var(--bull);">P</span><span style="color:#fff;">recise</span><span style="color:var(--bear);">X</span><span style="color:#fff;">celerated</span><span style="color:var(--bull);">Y</span><span style="color:#fff;">ield Pvt Ltd</span><sup style="color:var(--accent);">™</sup></span>
-        <span id="clk" style="font-family:'DM Mono',monospace;font-size:9px;color:var(--accent);letter-spacing:0.03em;white-space:nowrap;cursor:pointer;" title="Bookmarks">—</span>
+        <span id="brandHdr" style="font-family:'Syne',sans-serif;font-weight:700;font-size:9px;letter-spacing:0.06em;white-space:nowrap;"><span style="color:var(--bull);">P</span><span style="color:var(--muted);">recise</span><span style="color:var(--bear);">X</span><span style="color:var(--muted);">celerated</span><span style="color:var(--bull);">Y</span><span style="color:var(--muted);">ield Pvt Ltd</span><sup style="color:var(--muted);">™</sup></span>
+        <span id="clk" style="font-family:'DM Mono',monospace;font-size:9px;color:#fff;letter-spacing:0.03em;white-space:nowrap;cursor:pointer;" title="Clients">—</span>
         <div id="statusDot"></div>
         <button class="reconnect-btn" id="reconnectBtn" title="Reconnect">↺</button>
     </div>
@@ -218,7 +218,7 @@ body{
 <!-- ══ HOST BOOKMARKS MENU ══ -->
 <div id="hostMenu" style="display:none;position:fixed;top:44px;right:0;z-index:9998;width:250px;max-height:70vh;overflow-y:auto;background:rgba(11,15,26,0.97);backdrop-filter:blur(4px);border:1px solid var(--border2);border-radius:0 0 0 12px;padding:10px 8px;flex-direction:column;gap:6px;box-shadow:0 16px 40px rgba(0,0,0,0.6);">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0 6px;border-bottom:1px solid var(--border2);">
-        <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.08em;color:var(--text);">🔗 BOOKMARKS</span>
+        <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:11px;letter-spacing:0.08em;color:var(--text);">🔗 CLIENTS</span>
         <span id="hmGear" title="Manage bookmarks" style="cursor:pointer;font-size:13px;padding:2px 4px;border-radius:5px;">⚙️</span>
     </div>
 
@@ -738,7 +738,7 @@ function drawChart(candles){
         const v=lo+(range*t/ticks);
         const y=toY(v);
         ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(plotW,y);ctx.stroke();
-        ctx.fillText(v.toFixed(1),plotW+4,y);
+        ctx.fillText(Math.round(v),plotW+4,y);
     }
 
     // candles — 3D rounded bodies with glow + shine

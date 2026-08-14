@@ -164,10 +164,10 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     <div class="hdr-l">
         <span class="logo" id="logoRefresh">PXY<sup>®</sup></span>
     </div>
-    <span id="brandHdr" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Syne',sans-serif;font-weight:700;font-size:18px;letter-spacing:0.06em;white-space:nowrap;pointer-events:none;"><span style="color:var(--bull);">P</span><span style="color:#fff;">recise</span><span style="color:var(--bear);">X</span><span style="color:#fff;">celerated</span><span style="color:var(--bull);">Y</span><span style="color:#fff;">ield Pvt Ltd</span><sup style="color:var(--accent);">™</sup></span>
+    <span id="brandHdr" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Syne',sans-serif;font-weight:700;font-size:18px;letter-spacing:0.06em;white-space:nowrap;pointer-events:none;"><span style="color:var(--bull);">P</span><span style="color:var(--muted);">recise</span><span style="color:var(--bear);">X</span><span style="color:var(--muted);">celerated</span><span style="color:var(--bull);">Y</span><span style="color:var(--muted);">ield Pvt Ltd</span><sup style="color:var(--muted);">™</sup></span>
     <div style="flex:1;"></div>
     <div class="hdr-r">
-        <span id="clk" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--accent);letter-spacing:0.04em;cursor:pointer;" title="Bookmarks">—</span>
+        <span id="clk" style="font-family:'DM Mono',monospace;font-size:11px;color:#fff;letter-spacing:0.04em;cursor:pointer;" title="Clients">—</span>
         <div id="statusDot" title="Connection status"></div>
         <button class="reconnect-btn" id="reconnectBtn" title="Reconnect">↺</button>
     </div>
@@ -176,7 +176,7 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 <!-- ══ HOST BOOKMARKS MENU ══ -->
 <div id="hostMenu" style="display:none;position:fixed;top:44px;right:0;z-index:9998;width:270px;max-height:70vh;overflow-y:auto;background:rgba(11,15,26,0.97);backdrop-filter:blur(4px);border:1px solid var(--border2);border-radius:0 0 0 12px;padding:12px 10px;flex-direction:column;gap:6px;box-shadow:0 16px 40px rgba(0,0,0,0.6);">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:2px 0 8px;border-bottom:1px solid var(--border2);">
-        <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:12px;letter-spacing:0.08em;color:var(--text);">🔗 BOOKMARKS</span>
+        <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:12px;letter-spacing:0.08em;color:var(--text);">🔗 CLIENTS</span>
         <span id="hmGear" title="Manage bookmarks" style="cursor:pointer;font-size:14px;padding:2px 4px;border-radius:5px;transition:background 0.15s;">⚙️</span>
     </div>
 
@@ -636,7 +636,7 @@ function drawChart(candles){
         const v=lo+(range*t/ticks);
         const y=toY(v);
         ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(plotW,y);ctx.stroke();
-        ctx.fillText(v.toFixed(1),plotW+6,y);
+        ctx.fillText(Math.round(v),plotW+6,y);
     }
 
     if(chartMode==='line'){
