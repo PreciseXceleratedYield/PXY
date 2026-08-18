@@ -228,9 +228,9 @@ def handle_side_averaging(client, df):
         # Evaluates active_trend state to assign the specific 2.0x risk buffer
         trend_multiplier = 1.0
         if side == 'PE' and active_trend in ['BUY', 'BULL']:
-            trend_multiplier = 2.0
+            trend_multiplier = 1.4
         elif side == 'CE' and active_trend in ['SELL', 'BEAR']:
-            trend_multiplier = 2.0
+            trend_multiplier = 1.4
     
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
