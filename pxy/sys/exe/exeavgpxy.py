@@ -183,50 +183,58 @@ def handle_side_averaging(client, df):
 
 
     # =========================================================================
-    for side in ['CE', 'PE']: 
-        side_df = df[df['side'] == side] 
-        if side_df.empty: 
-            continue 
-
+    for side in ['CE', 'PE']:
+        side_df = df[df['side'] == side]
+        if side_df.empty:
+            continue
+            
         # --- EXTRACT AND ENFORCE TREND STATUS DIRECTIONALLY ---
         last_row = side_df.iloc[-1]
-        #active_exit = str(last_row.get("exit", "NONE")).upper().strip()
-        active_exit = str(last_row.get("supertrend", "NONE")).upper().strip()
-
-
+        active_exit = str(last_row.get("exit", "NONE")).upper().strip()
+        active_trend = str(last_row.get("supertrend", "NONE")).upper().strip()
+        
         # 🎯 Target trend condition check: Only buy CE on BULL/BUY and PE on BEAR/SELL
+        # (Kept exactly as original — no overrides on the structural layout filters)
         if side == 'CE' and active_exit not in ['BUY', 'BULL']:
             continue
         if side == 'PE' and active_exit not in ['SELL', 'BEAR']:
             continue
-
+            
         # =========================================================================
         # 📊 UNIFIED SIDE-BY-SIDE DUAL FACTOR ANALYSIS
         # =========================================================================
         own_count = ce_lots if side == 'CE' else pe_lots
         opposite_count = pe_lots if side == 'CE' else ce_lots
-
+        
         own_money = ce_investment if side == 'CE' else pe_investment
         opposite_money = pe_investment if side == 'CE' else ce_investment
-
+        
         # 1️⃣ LIVE CALCULATED COUNT FACTOR (Always initiated at 1 baseline if 0)
         adj_own_count = max(1, own_count)
         adj_opposite_count = max(1, opposite_count)
         count_factor = float(adj_own_count) / float(adj_opposite_count)
-
+        
         # 2️⃣ Financial Capital Money Factor (Kept original logic rules)
         if ce_investment <= 0.0 or pe_investment <= 0.0 or ce_investment == pe_investment:
             money_factor = 1.0
         else:
             money_factor = float(own_money) / float(opposite_money)
-
+            
         # 🛑 RIGID PRODUCTION SAFETY CEILING AND FLOOR CAPPING
         compound_factor = count_factor * money_factor
         compound_factor = max(0.2, min(5.0, compound_factor))
-
+        
+        # 📊 LAYERED TREND FACTOR MAP
+        # Evaluates active_trend state to assign the specific 2.0x risk buffer
+        trend_multiplier = 1.0
+        if side == 'PE' and active_trend in ['BUY', 'BULL']:
+            trend_multiplier = 2.0
+        elif side == 'CE' and active_trend in ['SELL', 'BEAR']:
+            trend_multiplier = 2.0
+    
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
-
+        
         for index, row in side_df.iterrows():
             real_atr = safe_float(row.get("atr", 0.0))
             if real_atr <= 0:
@@ -235,23 +243,22 @@ def handle_side_averaging(client, df):
             current_atr_pct = min(14.0, 2 * real_atr)
             pos_loss = get_loss(row)
             
-            # Formulate final guarded dynamic loss threshold percentage using live compound_factor
-            dynamic_threshold = -(current_atr_pct * compound_factor)
+            # Formulate final guarded dynamic loss threshold percentage using live trend_multiplier
+            dynamic_threshold = -(current_atr_pct * compound_factor * trend_multiplier)
             last_calculated_threshold = dynamic_threshold
-
+            
             # 🛠️ STRATEGIC TRIGGER LOGIC CHECK
             if pos_loss > dynamic_threshold:
                 all_positions_crossed_threshold = False
-                break  
-        # =========================================================================
-
-        # Final confirmation check before execution routing
-        if all_positions_crossed_threshold and len(side_df) < (MAX_LAYERS + 1): 
-            if not is_cooling(side): 
-                symbol = last_row['symbol'] 
-                qty = abs(int(safe_float(last_row['qty'], 0.0))) 
-                new_tag = generate_pxy_tag() 
+                break
                 
+        # =========================================================================
+        # Final confirmation check before execution routing
+        if all_positions_crossed_threshold and len(side_df) < (MAX_LAYERS + 1):
+            if not is_cooling(side):
+                symbol = last_row['symbol']
+                qty = abs(int(safe_float(last_row['qty'], 0.0)))
+                new_tag = generate_pxy_tag()
                 final_loss = get_loss(last_row)
                 
                 print_pxy_trigger_dashboard(
@@ -259,22 +266,23 @@ def handle_side_averaging(client, df):
                     ce_lots, pe_lots, count_factor, money_factor, active_exit
                 )
                 
-                try: 
-                    params = { 
-                        "exchange_segment": "nse_fo", 
-                        "product": "NRML", 
-                        "price": "0", 
-                        "order_type": "MKT", 
-                        "quantity": str(qty), 
-                        "trading_symbol": str(symbol), 
-                        "transaction_type": "B", 
-                        "validity": "DAY", 
-                        "amo": "NO", 
-                        "tag": new_tag 
-                    } 
-                    res = client.place_order(**params) 
-                    if res: 
-                        set_cooling(side) 
-                        print(f"{Fore.GREEN}✅ SUCCESS: {side} AVERAGED by {active_exit}.") 
+                try:
+                    params = {
+                        "exchange_segment": "nse_fo",
+                        "product": "NRML",
+                        "price": "0",
+                        "order_type": "MKT",
+                        "quantity": str(qty),
+                        "trading_symbol": str(symbol),
+                        "transaction_type": "B",
+                        "validity": "DAY",
+                        "amo": "NO",
+                        "tag": new_tag
+                    }
+                    res = client.place_order(**params)
+                    if res:
+                        set_cooling(side)
+                        print(f"{Fore.GREEN}✅ SUCCESS: {side} AVERAGED by {active_exit}. (Trend Factor: {trend_multiplier}x)")
                 except Exception as e:
                     print(f"{Fore.RED}⚠️ ORDER PLACEMENT CRITICAL ERROR: {e}")
+
