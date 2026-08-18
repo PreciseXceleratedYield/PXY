@@ -31,7 +31,7 @@ float m0_c = raw_c >= raw_o ? (raw_c + raw_h) / 2.0 : (raw_c + raw_l) / 2.0
 float m1_c = raw_c
 
 // --- Mode 2: Mid-Body (OC/2) ---
-float m2_c = (raw_o + raw_c) / 2.0
+float m2_c = (raw_o + raw_c + raw_c) / 3.0
 
 // --- Mode 3: Full Range (OHLC/4) ---
 float m3_c = (raw_o + raw_h + raw_l + raw_c) / 4.0
