@@ -240,7 +240,7 @@ def handle_side_averaging(client, df):
             if real_atr <= 0:
                 real_atr = 5.0
                 
-            current_atr_pct = min(14.0, 2 * real_atr)
+            current_atr_pct = min(14.0, 1.4 * real_atr)
             pos_loss = get_loss(row)
             
             # Formulate final guarded dynamic loss threshold percentage using live trend_multiplier
