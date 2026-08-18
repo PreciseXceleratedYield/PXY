@@ -36,7 +36,7 @@ def apply_ohlc_transformation(df, mode=1):
         
     # Mode 2: Mid-Body (Only Close changes to OC/2)
     elif mode == 2:
-        out['Close'] = (raw_o + raw_c) / 2.0
+        out['Close'] = (raw_o + raw_c + raw_c) / 3.0
         return out
         
     # Mode 3: Full Range (Only Close changes to OHLC/4)
