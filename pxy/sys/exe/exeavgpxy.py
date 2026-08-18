@@ -190,7 +190,9 @@ def handle_side_averaging(client, df):
 
         # --- EXTRACT AND ENFORCE TREND STATUS DIRECTIONALLY ---
         last_row = side_df.iloc[-1]
-        active_exit = str(last_row.get("exit", "NONE")).upper().strip()
+        #active_exit = str(last_row.get("exit", "NONE")).upper().strip()
+        active_exit = str(last_row.get("supertrend", "NONE")).upper().strip()
+
 
         # 🎯 Target trend condition check: Only buy CE on BULL/BUY and PE on BEAR/SELL
         if side == 'CE' and active_exit not in ['BUY', 'BULL']:
