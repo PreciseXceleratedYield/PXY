@@ -38,8 +38,8 @@ def get_entry_signal(df=None):
         entry_signal = "OTMBUY" if trend == "BEAR" else "ATMBUY"
         exit_signal = "BULL"
     elif entry_dir == "BEAR":
-        # While TREND IS BULL we do OTMBUY, flip to OTMSELL otherwise
-        entry_signal = "OTMBUY" if trend == "BULL" else "OTMSELL"
+        # While TREND IS BULL we do OTMSELL, flip to ATMSELL otherwise
+        entry_signal = "OTMSELL" if trend == "BULL" else "ATMSELL"
         exit_signal = "BEAR"
     else:
         entry_signal = "NONE"
