@@ -218,7 +218,7 @@ def handle_side_averaging(client, df):
             pos_loss = get_loss(row)
             
             # Formulate dynamic loss threshold percentage directly using final factor
-            dynamic_threshold = -(current_atr_pct * execution_final_factor)
+            dynamic_threshold = -10 #-(current_atr_pct * execution_final_factor)
             last_calculated_threshold = dynamic_threshold
             
             # 🛠️ STRATEGIC TRIGGER LOGIC CHECK
