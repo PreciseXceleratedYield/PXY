@@ -11,9 +11,8 @@ DEBUG_MODE = False
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculates 50 SMA Supertrend (Period 1, Factor 1).
-    Maps the Supertrend line as an alias for ALL indicators (st_line, ST, sma21, sma50).
-    Determines BULL/BEAR trend state strictly by Price (Close) vs this Supertrend line.
+    Maintains function name for external compatibility.
+    Calculates 50 SMA and maps it cleanly across all required systems.
     """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m")
@@ -34,89 +33,26 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     tz_string = str(TIMEZONE)
     df = df.tz_convert(tz_string) if df.index.tz is not None else df.tz_localize('UTC').tz_convert(tz_string)
 
-    # 1. Base 50 SMA Calculation
+    # Calculate 50 Simple Moving Average using pure pandas (No numpy needed)
     df['sma_50_core'] = df['Close'].rolling(window=50, min_periods=1).mean()
 
-    # 2. True Supertrend (Period 1, Factor 1) Calculations based on 50 SMA
-    high_low = df['High'] - df['Low']
-    high_close_prev = (df['High'] - df['Close'].shift(1)).abs()
-    low_close_prev = (df['Low'] - df['Close'].shift(1)).abs()
+    # CRITICAL: Keep identical column names so no downstream parts break
+    df['st_line'] = df['sma_50_core']
+    df['sma21'] = df['sma_50_core']   
+    df['sma50'] = df['sma_50_core']   
+    df['ST'] = df['sma_50_core']
+
+    # Keep structural trend names intact
+    df['sma_trend_full'] = "BEAR"
+    df.loc[df['Close'] > df['sma_50_core'], 'sma_trend_full'] = "BULL"
+    df.loc[df['sma_50_core'].isna(), 'sma_trend_full'] = "NONE"
     
-    df['tr'] = pd.concat([high_low, high_close_prev, low_close_prev], axis=1).max(axis=1)
-    df['atr_1'] = df['tr'].rolling(window=1, min_periods=1).mean()
-
-    # Generate basic bands around the 50 SMA
-    factor = 1.0
-    df['basic_ub'] = df['sma_50_core'] + (factor * df['atr_1'])
-    df['basic_lb'] = df['sma_50_core'] - (factor * df['atr_1'])
-
-    # Implement trailing bands and directional crossover processing
-    st_line = []
-    st_trend_internal = []
-    
-    curr_dir = "BULL"  
-    prev_ub = 0.0
-    prev_lb = 0.0
-    prev_sma = 0.0
-
-    for idx, row in df.iterrows():
-        sma_val = row['sma_50_core']
-        ub_val = row['basic_ub']
-        lb_val = row['basic_lb']
-
-        if pd.isna(sma_val) or pd.isna(ub_val) or pd.isna(lb_val):
-            st_line.append(sma_val if not pd.isna(sma_val) else 0.0)
-            st_trend_internal.append("NONE")
-            continue
-
-        # Calculate Trailing Final Bands for Current Candle
-        final_ub = min(ub_val, prev_ub) if prev_ub > 0 and prev_sma < prev_ub else ub_val
-        final_lb = max(lb_val, prev_lb) if prev_lb > 0 and prev_sma > prev_lb else lb_val
-
-        # Crossover Logic Evaluated Against Prior Step Bands
-        if curr_dir == "BULL" and sma_val < final_lb:
-            curr_dir = "BEAR"
-        elif curr_dir == "BEAR" and sma_val > final_ub:
-            curr_dir = "BULL"
-
-        # Assign Final Active Line Segment
-        current_st_line = final_lb if curr_dir == "BULL" else final_ub
-        st_line.append(current_st_line)
-        st_trend_internal.append(curr_dir)
-
-        # Update historical memory variables
-        prev_ub = final_ub
-        prev_lb = final_lb
-        prev_sma = sma_val
-
-    # 3. CRITICAL Downstream Key Mapping Management (Supertrend Line is alias for ALL)
-    df['st_line'] = st_line
-    df['ST'] = st_line
-    df['sma21'] = st_line              
-    df['sma50'] = st_line    
-
-    # 4. Define Trend States STRICTLY by Price (Close) relative to the Supertrend Line
-    final_trends = []
-    for idx, row in df.iterrows():
-        close_val = row['Close']
-        line_val = row['st_line']
-        
-        if pd.isna(close_val) or line_val == 0.0 or pd.isna(line_val):
-            final_trends.append("NONE")
-        elif close_val > line_val:
-            final_trends.append("BULL")
-        elif close_val < line_val:
-            final_trends.append("BEAR")
-        else:
-            final_trends.append("NONE")
-
-    df['sma_trend_full'] = final_trends
-    df['ST_Trend'] = final_trends
+    df['ST_Trend'] = df['sma_trend_full']
 
     return df
 
 def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
-    """Maintains exact original function structure. Both fields dump the Supertrend Line data."""
+    """Maintains exact original function name for JSON export"""
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
         if df is None or df.empty:
@@ -130,8 +66,8 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
             "high": float(row["High"]),
             "low": float(row["Low"]),
             "close": float(row["Close"]),
-            "sma21": float(row["sma21"]) if not pd.isna(row["sma21"]) else 0.0, # Supertrend Line Alias 1
-            "sma50": float(row["sma50"]) if not pd.isna(row["sma50"]) else 0.0  # Supertrend Line Alias 2
+            "sma21": float(row["sma21"]) if not pd.isna(row["sma21"]) else 0.0,
+            "sma50": float(row["sma50"]) if not pd.isna(row["sma50"]) else 0.0 
         })
 
     if os.path.dirname(output_file):
@@ -149,10 +85,8 @@ if __name__ == "__main__":
         target_index = processed_df.index[-1]
         print(f"Timestamp   : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"O:{float(processed_df.at[target_index, 'Open']):.2f} H:{float(processed_df.at[target_index, 'High']):.2f} L:{float(processed_df.at[target_index, 'Low']):.2f} C:{float(processed_df.at[target_index, 'Close']):.2f}")
-        print(f"SMA50 Value (ST Line Alias): {float(processed_df.at[target_index, 'sma50']):.2f}")
-        print(f"SMA21 Value (ST Line Alias): {float(processed_df.at[target_index, 'sma21']):.2f}")
-        print(f"Trend State (Price vs ST)  : {str(processed_df.at[target_index, 'sma_trend_full'])}")
+        print(f"ST Line Value: {float(processed_df.at[target_index, 'sma21']):.2f} (50 SMA Alternative)")
+        print(f"Trend State  : {str(processed_df.at[target_index, 'sma_trend_full'])}")
         export_supertrend_json(processed_df)
     else:
         print("CRITICAL: Upstream data empty.")
-
