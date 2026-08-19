@@ -33,9 +33,8 @@ def dynamic_entry(row):
 def target_price(row):
     """Calculates individual option layer target price using dynamic volatility variables.
     
-    Aligned Trades : 33% target premium projection.
-    Hostile Trades : 1.4% base expanded dynamically via REVERSED (Opposite / Own) Count & Money factors.
-                     Guaranteed to maintain a strict minimum floor of 1.4%.
+    Aligned Trades : atr * max(depth, power) target expansion percentage.
+    Hostile Trades : atr% target percentage fallback floor.
     """
     try:
         # 1️⃣ Entry data execution health check
@@ -43,7 +42,17 @@ def target_price(row):
         if entry_prc <= 0:
             return 0.0
 
-        # 2️⃣ Context string extractors
+        # 2️⃣ INPUTS (SAFE)
+        ce_p = f(row.get("ce_power", 1))
+        pe_p = f(row.get("pe_power", 1))
+
+        ce_d = i(row.get("hkin_ce_depth", 0))
+        pe_d = i(row.get("hkin_pe_depth", 0))
+
+        atr = f(row.get("atr", 0))
+        katr = max(f(row.get("katr", 1)), 0.001)  # prevent divide-by-zero
+
+        # 3️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
         active_exit = str(row.get("exit", "NONE")).upper().strip()
 
@@ -53,62 +62,19 @@ def target_price(row):
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
 
-        # 3️⃣ Extraction of structural telemetry data injected into the row
-        ce_lots = i(row.get("ce_lots", 0))
-        pe_lots = i(row.get("pe_lots", 0))
-        ce_investment = f(row.get("ce_investment", 0.0))
-        pe_investment = f(row.get("pe_investment", 0.0))
-
         target_pct = 0.0
 
-        # 4️⃣ Dynamic execution logic using reversed factor framework scaling 1.4% base
+        # 4️⃣ Dynamic execution logic using power and depth matrix
         if is_ce:
             if active_exit in ("SELL", "BEAR"):  # Hostile (Not Aligned)
-                # 🔄 REVERSED: Opposite (PE) / Own (CE)
-                own_count, opp_count = ce_lots, pe_lots
-                own_money, opp_money = ce_investment, pe_investment
-
-                if ce_lots == 0 or pe_lots == 0 or ce_lots == pe_lots:
-                    rev_count_factor = 1.0
-                else:
-                    rev_count_factor = float(opp_count) / float(own_count)
-
-                if ce_investment <= 0.0 or pe_investment <= 0.0 or ce_investment == pe_investment:
-                    rev_money_factor = 1.0
-                else:
-                    rev_money_factor = float(opp_money) / float(own_money)
-
-                # Safe compounding cap bounds protection (Floor: 0.2, Ceiling: 5.0)
-                rev_compound_factor = max(0.2, min(5.0, rev_count_factor * rev_money_factor))
-                
-                # FIX: Apply calculation and enforce a strict minimum baseline target floor of 1.4%
-                target_pct = 2 #max(2.0, 2.0 * rev_compound_factor)
+                target_pct = atr /3
             else:                                # Aligned
-                target_pct = 33.0
-
+                target_pct = atr * max(ce_d, ce_p)
         elif is_pe:
             if active_exit in ("BUY", "BULL"):   # Hostile (Not Aligned)
-                # 🔄 REVERSED: Opposite (CE) / Own (PE)
-                own_count, opp_count = pe_lots, ce_lots
-                own_money, opp_money = pe_investment, ce_investment
-
-                if ce_lots == 0 or pe_lots == 0 or ce_lots == pe_lots:
-                    rev_count_factor = 1.0
-                else:
-                    rev_count_factor = float(opp_count) / float(own_count)
-
-                if ce_investment <= 0.0 or pe_investment <= 0.0 or ce_investment == pe_investment:
-                    rev_money_factor = 1.0
-                else:
-                    rev_money_factor = float(opp_money) / float(own_money)
-
-                # Safe compounding cap bounds protection (Floor: 0.2, Ceiling: 5.0)
-                rev_compound_factor = max(0.2, min(5.0, rev_count_factor * rev_money_factor))
-                
-                # FIX: Apply calculation and enforce a strict minimum baseline target floor of 1.4%
-                target_pct = 2 #max(2.0, 2.0 * rev_compound_factor)
+                target_pct = atr /3
             else:                                # Aligned
-                target_pct = 33.0
+                target_pct = atr * max(pe_d, pe_p)
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
