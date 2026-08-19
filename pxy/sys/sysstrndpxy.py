@@ -11,8 +11,9 @@ DEBUG_MODE = False
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Calculates 50 SMA and a true Supertrend (Period 1, Factor 1) using the 50 SMA 
-    as the tracking baseline. Maintains full downstream key/column compatibility.
+    Calculates 50 SMA and a true Supertrend (Period 1, Factor 1) using the 50 SMA.
+    Maps the Supertrend line explicitly to 'sma21' and sets all system trends 
+    directly to the Supertrend state.
     """
     try:
         raw_df = fetch_yf_data(period="3d", interval="1m")
@@ -37,7 +38,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['sma_50_core'] = df['Close'].rolling(window=50, min_periods=1).mean()
 
     # 2. True Supertrend (Period 1, Factor 1) Calculations based on 50 SMA
-    # ATR Period 1 is simply the True Range (TR)
     high_low = df['High'] - df['Low']
     high_close_prev = (df['High'] - df['Close'].shift(1)).abs()
     low_close_prev = (df['Low'] - df['Close'].shift(1)).abs()
@@ -73,7 +73,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         # Trailing Lower Band tracking
         final_lb = max(lb_val, prev_lb) if prev_lb > 0 and sma_val > prev_lb else lb_val
 
-        # Crossover Directional Flip logic
+        # Crossover Directional Flip logic (50 SMA crossing the bands)
         if curr_dir == "BULL" and sma_val < final_lb:
             curr_dir = "BEAR"
         elif curr_dir == "BEAR" and sma_val > final_ub:
@@ -90,16 +90,17 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     # 3. CRITICAL Downstream Key Mapping Management
     df['st_line'] = st_line
     df['ST'] = st_line
-    df['sma21'] = df['sma_50_core']   # Kept fallback key map 1
-    df['sma50'] = df['sma_50_core']   # Kept fallback key map 2
+    df['sma21'] = st_line              # Supertrend line values mapped directly to sma21
+    df['sma50'] = df['sma_50_core']    # True 50 SMA base mapped directly to sma50
     
+    # CRITICAL: Overriding downstream trend metrics with exact Supertrend states
     df['sma_trend_full'] = st_trend
     df['ST_Trend'] = st_trend
 
     return df
 
 def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtpxy.json"):
-    """Maintains downstream JSON naming while adding precise Supertrend values"""
+    """Maintains exact original function structure and keys for downstream compatibility"""
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
         if df is None or df.empty:
@@ -113,9 +114,8 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file="../web/webchrtp
             "high": float(row["High"]),
             "low": float(row["Low"]),
             "close": float(row["Close"]),
-            "sma21": float(row["sma21"]) if not pd.isna(row["sma21"]) else 0.0,
-            "sma50": float(row["sma50"]) if not pd.isna(row["sma50"]) else 0.0,
-            "st_line": float(row["st_line"]) if not pd.isna(row["st_line"]) else 0.0  # Appended ST line metrics to JSON tracking
+            "sma21": float(row["sma21"]) if not pd.isna(row["sma21"]) else 0.0, # Supertrend line
+            "sma50": float(row["sma50"]) if not pd.isna(row["sma50"]) else 0.0  # 50 SMA baseline
         })
 
     if os.path.dirname(output_file):
@@ -133,9 +133,10 @@ if __name__ == "__main__":
         target_index = processed_df.index[-1]
         print(f"Timestamp   : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"O:{float(processed_df.at[target_index, 'Open']):.2f} H:{float(processed_df.at[target_index, 'High']):.2f} L:{float(processed_df.at[target_index, 'Low']):.2f} C:{float(processed_df.at[target_index, 'Close']):.2f}")
-        print(f"SMA 50 Value: {float(processed_df.at[target_index, 'sma50']):.2f}")
-        print(f"ST Line Value: {float(processed_df.at[target_index, 'st_line']):.2f} (Supertrend 1-1 over SMA)")
-        print(f"Trend State  : {str(processed_df.at[target_index, 'ST_Trend'])}")
+        print(f"SMA50 Value (50 SMA Base)  : {float(processed_df.at[target_index, 'sma50']):.2f}")
+        print(f"SMA21 Value (ST Line Data) : {float(processed_df.at[target_index, 'sma21']):.2f}")
+        print(f"Trend State (True ST Trend): {str(processed_df.at[target_index, 'sma_trend_full'])}")
         export_supertrend_json(processed_df)
     else:
         print("CRITICAL: Upstream data empty.")
+
