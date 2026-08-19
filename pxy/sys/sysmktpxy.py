@@ -7,7 +7,7 @@ DEBUG = True
 # --- MODE SWITCH ---
 # "LIVE"   -> Uses live running candle [-1] vs previous closed [-2]
 # "CLOSED" -> Uses last closed candle [-2] vs prior closed [-3]
-CANDLE_MODE = "LIVE"  
+CANDLE_MODE = "CLOSED"  
 
 def get_pxy_data(df, mode="LIVE"):
     """
