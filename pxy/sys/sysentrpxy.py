@@ -10,7 +10,7 @@ Operational Rules Matrix:
 import pandas as pd
 from syscnfgpxy import TICKER
 from sysmktpxy import get_signal  # ✅ Solo retrieval derived directly from sysmktpxy
-from systrndpxy import calculate_supertrend
+from sysstrndpxy import calculate_supertrend
 
 def get_entry_signal(df=None):
     """
