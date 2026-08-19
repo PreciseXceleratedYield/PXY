@@ -108,9 +108,9 @@ def calc_final_factor(own_inv, opp_inv, own_lts, opp_lts, side_name, active_trnd
     # 3️⃣ Layered Trend Factor inclusion (1.4x buffer map)
     trend_multiplier = 1.0
     if side_name == 'PE' and active_trnd in ['BUY', 'BULL']:
-        trend_multiplier = 1.4
+        trend_multiplier = 2
     elif side_name == 'CE' and active_trnd in ['SELL', 'BEAR']:
-        trend_multiplier = 1.4
+        trend_multiplier = 2
         
     return base_compound * trend_multiplier
 
