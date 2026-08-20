@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # Configuration Switches
 USE_FIXED_ATR = False  # Set to False to use the dynamic ATR calculations
-ATR_FIXED_VALUE = 9
+ATR_FIXED_VALUE = 5
 
 ATR_PERIOD = 14
 K_MIN = 1
@@ -20,12 +20,12 @@ def scale_atr_value(val: float) -> float:
     """Scales ATR: minimum of 5.0, and after 10 grows slowly (every 2 points makes 0.5 point)."""
     if pd.isna(val) or val <= 0:
         return 5.0
-    # Enforce minimum boundary of 7
+    # Enforce minimum boundary of 5
     if val < 5.0:
         return 5.0
-    # Apply compression framework over 10
-    if val > 7.0:
-        return 7.0 + (val - 7.0) / 4.0
+    # Apply compression framework over 8
+    if val > 8.0:
+        return 8.0 
     return float(val)
 
 def calculate_atr(df: pd.DataFrame, period=ATR_PERIOD) -> pd.Series:
