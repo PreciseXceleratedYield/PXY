@@ -9,7 +9,7 @@ from syscnfgpxy import PARAMS
 from colorama import Fore, Style, init
 
 # 🎯 IMPORT UNTOUCHED SIGNAL ROUTER NATIVELY (Returns 4 values)
-from syskatrpxy import detect_pxy_flip_signal
+from sysdptpxy import detect_pxy_flip_signal
 
 # Initialize colorama terminal auto-reset formatting hooks
 init(autoreset=True)
