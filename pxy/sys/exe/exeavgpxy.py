@@ -6,7 +6,7 @@ from datetime import datetime
 from colorama import Fore, Style
 
 # Direct module dependency linking to inherit all variables from the helper script
-from exeavgnextgenpxy import (
+from exehvgpxy import (
     REBUY_ENABLED, MAX_LAYERS, IST, MARKET_START, MARKET_END, 
     pxysqrce, pxysqrpe, safe_float, generate_pxy_tag, is_cooling, 
     set_cooling, get_loss, print_pxy_trigger_dashboard
