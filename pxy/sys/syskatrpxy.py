@@ -31,8 +31,8 @@ def scale_atr_value(val: float) -> float:
     raw_val = float(val)
     
     # 🎯 APPLY BOUNDED CAPPING ENGINE (MIN = 3, MAX = 9)
-    if raw_val < 3.0:
-        return 3.0
+    if raw_val < 1.0:
+        return 1.0
     if raw_val > 9.0:
         return 9.0
         
