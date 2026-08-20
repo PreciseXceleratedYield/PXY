@@ -113,8 +113,8 @@ def handle_side_averaging(client, df):
     ce_weight_int = int(round(ce_investment))
     pe_weight_int = int(round(pe_investment))
     
-    left_label = f"CE({ce_weight_int})"
-    right_label = f"({pe_weight_int})PE"
+    left_label = f"{ce_weight_int}"
+    right_label = f"{pe_weight_int}"
     
     available_track_slots = SCALE_WIDTH - len(left_label) - len(right_label)
     total_weight = ce_investment + pe_investment
