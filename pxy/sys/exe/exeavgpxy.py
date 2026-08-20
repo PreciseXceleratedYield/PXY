@@ -89,9 +89,9 @@ def handle_side_averaging(client, df):
     pe_sts = "✔️" if pe_avg_loss <= pe_rule_tgt and pe_lots > 0 else "❌"
 
     if ce_target_crossed:
-        pxysqrce()
+        pass #pxysqrce()
     if pe_target_crossed:
-        pxysqrpe()
+        pass #pxysqrpe()
 
     # =============================================================================
     # PART 6: TELEMETRY STREAM PANEL GRAPHICS & BALANCED GEOMETRIC RATIO BAR
