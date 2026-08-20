@@ -48,7 +48,7 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int) -> int:
         p_depth_clean = safe_int_convert(pe_d, fallback=1)
         
         # 🎯 ATR MATH: Pure sum of all 3 depth metrics
-        raw_depth_sum = past_val_extracted + c_depth_clean + p_depth_clean
+        raw_depth_sum = c_depth_clean + p_depth_clean #past_val_extracted + c_depth_clean + p_depth_clean
         
         # Enforce strict minimum floor boundary of 5
         if raw_depth_sum < 5:
