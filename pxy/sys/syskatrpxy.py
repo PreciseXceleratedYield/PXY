@@ -8,14 +8,14 @@ from sysdtafpxy import fetch_yf_data
 from syscnfgpxy import PARAMS
 from colorama import Fore, Style, init
 
-# 🎯 IMPORT UNTOUCHED SIGNAL ROUTER NATIVELY (Returns 4 values)
-from sysdptpxy import detect_pxy_flip_signal
+# 🎯 IMPORT UNTOUCHED SIGNAL ROUTER NATIVELY (Returns exactly 4 values)
+from syspxyflip import detect_pxy_flip_signal
 
 # Initialize colorama terminal auto-reset formatting hooks
 init(autoreset=True)
 
 # Configuration Switches
-USE_FIXED_ATR = False  # Set to False to use the dynamic matrix depth calculations
+USE_FIXED_ATR = False  
 ATR_FIXED_VALUE = 9
 TOTAL_WIDTH = 42
 
@@ -23,13 +23,16 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int) -> int:
     """
     Extracts numbers from past_depth_str, ce_depth, and pe_depth.
     Sums all three numbers together and enforces ONLY a strict minimum of 5.
+    Maximum can grow higher infinitely to any value.
     """
     try:
-        # Extract integer digits cleanly from past_depth_str (e.g., 'CE4' -> 4)
+        # Extract integer digits cleanly from past_depth_str (e.g., 'CE4' -> ['4'])
         digits = re.findall(r'\d+', str(past_str))
-        past_val_extracted = int(digits) if digits else 0
         
-        # 🎯 ATR MATH: Pure sum of all 3 depth metrics
+        # 🎯 FIX: Select the index element from the list to prevent list-to-int conversion crashes
+        past_val_extracted = int(digits[0]) if digits else 0
+        
+        # 🎯 MATRIX SUM MATH: Pure sum of all 3 depth metrics
         raw_depth_sum = past_val_extracted + int(ce_d) + int(pe_d)
         
         # Enforce strict minimum floor boundary of 5
@@ -49,6 +52,7 @@ def calculate_atr(df: pd.DataFrame) -> pd.Series:
             return pd.Series([float(ATR_FIXED_VALUE)])
 
         # 🎯 FETCH DEPTH PARAMETERS FROM YOUR UNCHANGED SIGNAL MODULE
+        # Unpacks exactly 4 original values: signal, past_depth_str, ce_depth, pe_depth
         _, past_depth_str, ce_depth, pe_depth = detect_pxy_flip_signal(df=df)
         
         # Process depth integers through the pure sum calculator
@@ -88,7 +92,6 @@ if __name__ == "__main__":
             val = atr_series.iloc[-1] if not atr_series.empty else 5.0
             atr_display = int(np.round(val))
             
-            # Displays both parameters as pure integers inside the dashboard panel layout frame
             left_text = f"ATR:{atr_display}"
             right_text = f"K:{int(dynamic_k)}"
             spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
@@ -97,4 +100,3 @@ if __name__ == "__main__":
             print("ATR:5" + (" " * 33) + "K:2")
     except Exception:
         print("ATR:5" + (" " * 33) + "K:2")
-
