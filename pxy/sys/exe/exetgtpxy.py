@@ -49,7 +49,7 @@ def target_price(row):
         ce_d = i(row.get("hkin_ce_depth", 0))
         pe_d = i(row.get("hkin_pe_depth", 0))
 
-        atr = 5 #f(row.get("atr", 0))
+        atr = f(row.get("atr", 0))
         katr = max(f(row.get("katr", 1)), 0.001)  # prevent divide-by-zero
 
         # 3️⃣ Context string extractors
