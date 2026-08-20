@@ -32,7 +32,7 @@ def handle_side_averaging(client, df):
     # =============================================================================
     # PART 5: CORE POSITION COMPILATION, DATA PARSERS & MATRIX RESOLUTIONS
     # =============================================================================
-    # Isolated local memory space to prevent accidental downstream mutations
+    # Deep copy to fully isolate operations and prevent setting-with-copy warnings
     working_df = df.copy()
     
     # Safe standardized execution for underlying option contract side mapping
@@ -72,22 +72,22 @@ def handle_side_averaging(client, df):
     ce_matrix_self = max(ce_depth, ce_power)
     pe_matrix_self = max(pe_depth, pe_power)
     
-    # 📊 AGT LIMIT VALUE RESOLUTION: -10 * max(Opposite Depth, Opposite Power)
-    ce_agt = int(round(-10.0 * pe_matrix_self))
-    pe_agt = int(round(-10.0 * ce_matrix_self))
-    
-    # 🎯 DYNAMIC TARGET FORMULA RESOLUTION (Tracks positive return targets)
+    # 🎯 VOLATILITY-UNIFIED TARGET FORMULA RESOLUTION: (ATR / LOTS) * OWN MATRIX SCALE
     ce_atr = safe_float(ce_last.get("atr", 0.0))
     pe_atr = safe_float(pe_last.get("atr", 0.0))
     
     ce_tgt = int(round(((ce_atr / ce_lots) * ce_matrix_self))) if ce_lots > 0 else 0
     pe_tgt = int(round(((pe_atr / pe_lots) * pe_matrix_self))) if pe_lots > 0 else 0
 
+    # 📊 VOLATILITY-UNIFIED AGT RESOLUTION: (-2 * Own ATR) * Opposite Matrix Scale
+    ce_agt = int(round((-2.0 * ce_atr) * pe_matrix_self))
+    pe_agt = int(round((-2.0 * pe_atr) * ce_matrix_self))
+
     # --- RULE CRITERIA PARSING ---
     ce_avg_loss = get_loss(ce_last) if not ce_rows.empty else 0.0
     pe_avg_loss = get_loss(pe_last) if not pe_rows.empty else 0.0
     
-    # 🎯 MONITOR TARGET PERCENTAGE CROSSINGS (ACTUAL % >= TGT %)
+    # 🎯 MONITOR TARGET PERCENTAGE CROSSINGS (ACTUAL % >= POSITIVE TGT %)
     ce_target_crossed = ce_avg_loss >= ce_tgt if ce_lots > 0 else False
     pe_target_crossed = pe_avg_loss >= pe_tgt if pe_lots > 0 else False
 
@@ -152,26 +152,30 @@ def handle_side_averaging(client, df):
         last_calculated_threshold = 0.0
         
         opp_matrix = pe_matrix_self if side == 'CE' else ce_matrix_self
+        side_atr = ce_atr if side == 'CE' else pe_atr
         
-        # Resolve invariant dynamic threshold parameters mapping negative space
+        # 🎯 VOLATILITY-UNIFIED DOWNSIDE THRESHOLD RULE: -2 * ATR
+        base_drawdown_limit = -2.0 * side_atr
+        
+        # Resolve matrix rules using the new volatility scaling bounds (Negative Spaces)
         if side == 'CE':
             if active_exit in ['SELL', 'BEAR']:
-                dynamic_threshold = -10.0 * opp_matrix
+                dynamic_threshold = base_drawdown_limit * opp_matrix
             else:
-                dynamic_threshold = -10.0
+                dynamic_threshold = base_drawdown_limit
         else:  # side == 'PE'
             if active_exit in ['BUY', 'BULL']:
-                dynamic_threshold = -10.0 * opp_matrix
+                dynamic_threshold = base_drawdown_limit * opp_matrix
             else:
-                dynamic_threshold = -10.0
+                dynamic_threshold = base_drawdown_limit
                 
         last_calculated_threshold = dynamic_threshold
         
-        # 🎯 INDIVIDUAL ROW MONITORING LOOP
+        # --- SCAN INDIVIDUAL POSITION ROWS ---
         for _, row in side_df.iterrows():
             pos_loss = get_loss(row)
             
-            # Checks every row separately against the target negative drawdown boundary
+            # 🎯 ORIGINAL NEGATIVE LOGIC COMPLETELY PRESERVED AS VERIFIED CORRECT
             if not (dynamic_threshold > pos_loss):
                 all_positions_crossed_threshold = False
                 break
@@ -199,6 +203,7 @@ def handle_side_averaging(client, df):
                         set_cooling(side)
                         print(f"{Fore.GREEN}✅ SUCCESS: {side} AVERAGED by {active_exit}.")
                 except Exception as e:
-                    logger.error(f"Order placement critical execution failure on side {side}: {e}", exc_info=True)
+                    logger.error(f"Order placement critical tracking failure on side {side}: {e}", exc_info=True)
                     print(f"{Fore.RED}⚠️ ORDER PLACEMENT CRITICAL ERROR: {e}")
+
 
