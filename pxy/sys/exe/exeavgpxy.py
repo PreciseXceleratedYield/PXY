@@ -85,8 +85,9 @@ def handle_side_averaging(client, df):
     ce_target_crossed = ce_avg_loss >= ce_tgt if ce_lots > 0 else False
     pe_target_crossed = pe_avg_loss >= pe_tgt if pe_lots > 0 else False
 
-    ce_sts = "✔️" if ce_avg_loss <= ce_rule_tgt and ce_lots > 0 else "❌"
-    pe_sts = "✔️" if pe_avg_loss <= pe_rule_tgt and pe_lots > 0 else "❌"
+    # 🎯 FIX: Status indicators now accurately map straight to target fulfillment flags
+    ce_sts = "✔️" if ce_target_crossed else "❌"
+    pe_sts = "✔️" if pe_target_crossed else "❌"
 
     if ce_target_crossed:
         pass #pxysqrce()
@@ -112,17 +113,14 @@ def handle_side_averaging(client, df):
     print(Fore.WHITE + f"  PE   {pe_lots:>2}   " + pe_pnl_color + f"{pe_pnl_val:>8}" + Style.RESET_ALL + f"   {pe_agt:>4}   {pe_tgt:>4}   {pe_sts}")
     print(Fore.CYAN + "-" * P_WIDTH)
 
-    # --- DRAW THE DYNAMIC GEOMETRIC BALANCE BAR (40-CHAR MATRICES SAFE) ---
+    # --- DRAW THE DYNAMIC GEOMETRIC BALANCE BAR (RE-SCALED TO 40) ---
     ce_weight_int = int(round(ce_investment))
     pe_weight_int = int(round(pe_investment))
     
     left_label = f"{ce_weight_int}"
     right_label = f"{pe_weight_int}"
     
-    # Mathematical Layout Breakdown: 
-    # Total Width (40) - 2 front spaces - 2 spaces flanking the ⚖️ emoji - 2 width units for the emoji itself
     track_slots = P_WIDTH - len(left_label) - len(right_label) - 6
-    
     total_weight = ce_investment + pe_investment
     ce_ratio = ce_investment / total_weight if total_weight > 0 else 0.5
     
@@ -132,7 +130,6 @@ def handle_side_averaging(client, df):
     left_dash_track = "━" * left_dashes_count
     right_dash_track = "━" * right_dashes_count
     
-    # Explicit 40-character safe print boundary block
     print("  " + Fore.GREEN + left_label + Fore.GREEN + left_dash_track + Fore.WHITE + "⚖️" + Fore.RED + right_dash_track + Fore.RED + right_label)
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
 
@@ -175,8 +172,7 @@ def handle_side_averaging(client, df):
             
             last_calculated_threshold = dynamic_threshold
             
-            # 🎯 DIRECT NEGATIVE THRESHOLD TRACKING CHECK
-            # Triggers strictly when threshold > loss (e.g. -10.0 > -12.0 is True)
+            # 🎯 Threshold condition mapping (threshold > loss)
             if not (dynamic_threshold > pos_loss):
                 all_positions_crossed_threshold = False
                 break
@@ -205,3 +201,4 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.GREEN}✅ SUCCESS: {side} AVERAGED by {active_exit}.")
                 except Exception as e:
                     print(f"{Fore.RED}⚠️ ORDER PLACEMENT CRITICAL ERROR: {e}")
+
