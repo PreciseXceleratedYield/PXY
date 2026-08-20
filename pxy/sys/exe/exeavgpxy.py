@@ -7,8 +7,8 @@ from colorama import Fore, Style
 
 # Direct module dependency linking to inherit all variables from the helper script
 from exeavgnextgenpxy import (
-    REBUY_ENABLED, MAX_LAYERS, IST, MARKET_START, MARKET_END, 
-    pxysqrce, pxysqrpe, safe_float, generate_pxy_tag, is_cooling, 
+    REBUY_ENABLED, MAX_LAYERS, PANEL_WIDTH, SCALE_WIDTH, IST, MARKET_START, 
+    MARKET_END, pxysqrce, pxysqrpe, safe_float, generate_pxy_tag, is_cooling, 
     set_cooling, get_loss, print_pxy_trigger_dashboard
 )
 from run.runpchkpxy import get_position_summary
@@ -60,11 +60,11 @@ def handle_side_averaging(client, df):
     ce_matrix_self = max(ce_depth, ce_power)
     pe_matrix_self = max(pe_depth, pe_power)
     
-    # 📊 AGT LIMIT VALUE RESOLUTION: Always evaluates as a negative metric
+    # 📊 AGT LIMIT VALUE RESOLUTION: -10 * max(Opposite Depth, Opposite Power)
     ce_agt = int(round(-10.0 * pe_matrix_self))
     pe_agt = int(round(-10.0 * ce_matrix_self))
     
-    # 🎯 DYNAMIC TARGET FORMULA RESOLUTION: Converts to absolute positive floor
+    # 🎯 DYNAMIC TARGET FORMULA RESOLUTION: (ATR / NO) * max(Own Depth, Own Power)
     ce_atr = safe_float(ce_last.get("atr", 0.0))
     pe_atr = safe_float(pe_last.get("atr", 0.0))
     
@@ -78,13 +78,12 @@ def handle_side_averaging(client, df):
     ce_rule_tgt = ce_agt if ce_exit in ['SELL', 'BEAR'] else -10
     pe_rule_tgt = pe_agt if pe_exit in ['BUY', 'BULL'] else -10
     
-    # Force current metric calculation strictly into negative spectrum values
-    ce_avg_loss = -abs(safe_float(get_loss(ce_last))) if not ce_rows.empty else 0.0
-    pe_avg_loss = -abs(safe_float(get_loss(pe_last))) if not pe_rows.empty else 0.0
+    ce_avg_loss = get_loss(ce_last) if not ce_rows.empty else 0.0
+    pe_avg_loss = get_loss(pe_last) if not pe_rows.empty else 0.0
     
-    # 🎯 TARGET CROSSING CORRECTION: e.g. -11 <= -10 is True (Triggers target squareoff)
-    ce_target_crossed = ce_avg_loss <= -abs(ce_tgt) if ce_lots > 0 and ce_tgt > 0 else False
-    pe_target_crossed = pe_avg_loss <= -abs(pe_tgt) if pe_lots > 0 and pe_tgt > 0 else False
+    # 🎯 MONITOR TARGET TARGET CROSSINGS (ACTUAL % >= TGT)
+    ce_target_crossed = ce_avg_loss >= ce_tgt if ce_lots > 0 else False
+    pe_target_crossed = pe_avg_loss >= pe_tgt if pe_lots > 0 else False
 
     ce_sts = "✔️" if ce_avg_loss <= ce_rule_tgt and ce_lots > 0 else "❌"
     pe_sts = "✔️" if pe_avg_loss <= pe_rule_tgt and pe_lots > 0 else "❌"
@@ -97,41 +96,37 @@ def handle_side_averaging(client, df):
     # =============================================================================
     # PART 6: TELEMETRY STREAM PANEL GRAPHICS & BALANCED GEOMETRIC RATIO BAR
     # =============================================================================
-    # Strict 40-character maximum width enforcement
-    P_WIDTH = 40 
-    
-    print("\n" + Fore.CYAN + "=" * P_WIDTH)
-    print(Fore.CYAN + " OPT  LOT       PNL    AGT    TGT  STS")
-    print(Fore.CYAN + "-" * P_WIDTH)
+    print("\n" + Fore.CYAN + "=" * PANEL_WIDTH)
+    print(Fore.CYAN + f" {'OP':<2}  {'NO':>2}   {'PNL':>7}   {'AGT':>4}   {'TGT':>4}  {'STS':>2}")
+    print(Fore.CYAN + "-" * PANEL_WIDTH)
     
     ce_pnl_val = int(round(ce_pnl))
     ce_pnl_color = Fore.CYAN + Style.BRIGHT if ce_target_crossed else (Fore.GREEN if ce_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f"  CE   {ce_lots:>2}   " + ce_pnl_color + f"{ce_pnl_val:>8}" + Style.RESET_ALL + f"   {ce_agt:>4}   {ce_tgt:>4}   {ce_sts}")
+    print(Fore.WHITE + f"  CE  {ce_lots:>2}   " + ce_pnl_color + f"{ce_pnl_val:>7}" + Style.RESET_ALL + f"   {ce_agt:>4}   {ce_tgt:>4}   {ce_sts}")
     
     pe_pnl_val = int(round(pe_pnl))
     pe_pnl_color = Fore.CYAN + Style.BRIGHT if pe_target_crossed else (Fore.GREEN if pe_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f"  PE   {pe_lots:>2}   " + pe_pnl_color + f"{pe_pnl_val:>8}" + Style.RESET_ALL + f"   {pe_agt:>4}   {pe_tgt:>4}   {pe_sts}")
-    print(Fore.CYAN + "-" * P_WIDTH)
+    print(Fore.WHITE + f"  PE  {pe_lots:>2}   " + pe_pnl_color + f"{pe_pnl_val:>7}" + Style.RESET_ALL + f"   {pe_agt:>4}   {pe_tgt:>4}   {pe_sts}")
+    print(Fore.CYAN + "-" * PANEL_WIDTH)
 
-    # --- DRAW THE DYNAMIC GEOMETRIC BALANCE BAR (RE-SCALED TO 40) ---
+    # --- DRAW THE DYNAMIC GEOMETRIC BALANCE BAR ---
     ce_weight_int = int(round(ce_investment))
     pe_weight_int = int(round(pe_investment))
     
     left_label = f"{ce_weight_int}"
     right_label = f"{pe_weight_int}"
     
-    track_slots = P_WIDTH - len(left_label) - len(right_label) - 6
+    available_track_slots = SCALE_WIDTH - len(left_label) - len(right_label)
     total_weight = ce_investment + pe_investment
     ce_ratio = ce_investment / total_weight if total_weight > 0 else 0.5
     
-    left_dashes_count = max(0, min(track_slots, int(round(ce_ratio * track_slots))))
-    right_dashes_count = max(0, track_slots - left_dashes_count)
+    left_dashes_count = max(0, min(available_track_slots, int(round(ce_ratio * available_track_slots))))
+    right_dashes_count = max(0, available_track_slots - left_dashes_count)
     
     left_dash_track = "━" * left_dashes_count
     right_dash_track = "━" * right_dashes_count
-    
     print("  " + Fore.GREEN + left_label + Fore.GREEN + left_dash_track + Fore.WHITE + "⚖️" + Fore.RED + right_dash_track + Fore.RED + right_label)
-    print(Fore.CYAN + "=" * P_WIDTH + "\n")
+    print(Fore.CYAN + "=" * PANEL_WIDTH + "\n")
 
     # =============================================================================
     # PART 7: MULTI-LAYER DOWNWARD DIRECTIONAL MATRIX AVERAGING LOOPS
@@ -153,8 +148,7 @@ def handle_side_averaging(client, df):
         loop_pe_d = safe_float(last_row.get("hkin_pe_depth") or last_row.get("pe_d", 1.0))
         
         for index, row in side_df.iterrows():
-            # Force raw loss parameters into clean negative values to protect comparison boundaries
-            pos_loss = -abs(safe_float(get_loss(row)))
+            pos_loss = get_loss(row)
             
             if side == 'CE':
                 if active_exit in ['BUY', 'BULL']:
@@ -171,13 +165,8 @@ def handle_side_averaging(client, df):
                 else:
                     dynamic_threshold = -10.0
             
-            # Lock threshold logic to negative boundaries
-            dynamic_threshold = -abs(dynamic_threshold)
             last_calculated_threshold = dynamic_threshold
             
-            # 🎯 RE-AVERAGE SIGNALS CONDITION:
-            # If current loss is better than threshold (e.g., -5.0 > -10.0), it hasn't crossed yet. Break immediately.
-            # If loss is worse (e.g., -11.0 > -10.0 is False), loop bypasses break and stays True for averaging.
             if pos_loss > dynamic_threshold:
                 all_positions_crossed_threshold = False
                 break
@@ -188,7 +177,7 @@ def handle_side_averaging(client, df):
                 symbol = last_row['symbol']
                 qty = abs(int(safe_float(last_row['qty'], 0.0)))
                 new_tag = generate_pxy_tag()
-                final_loss = -abs(safe_float(get_loss(last_row)))
+                final_loss = get_loss(last_row)
                 
                 print_pxy_trigger_dashboard(
                     side, symbol, final_loss, last_calculated_threshold, new_tag, 
