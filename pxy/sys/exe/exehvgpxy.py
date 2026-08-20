@@ -1,12 +1,11 @@
 # =============================================================================
-# HELPER MODULE: exeavgnextgenpxy.py
+# HELPER MODULE: exehvgpxy.py
 # =============================================================================
 
 # =============================================================================
 # PART 1: SYSTEM PARAMETERS & TELEMETRY CONFIGURATION
 # =============================================================================
 import os
-import re
 import time 
 import pytz 
 from datetime import datetime, time as dt_time 
@@ -113,13 +112,13 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
     print(Fore.WHITE + f" • SIDE OPTION   : {side} ({ce_count}CE vs {pe_count}PE)".ljust(PANEL_WIDTH))
     print(Fore.WHITE + f" • ACTIVE TREND  : {trend}".ljust(PANEL_WIDTH))
     
-    loss_str = f" • CURRENT RETURN: {current_loss:.2f}%"
-    loss_pad = " " * max(0, PANEL_WIDTH - len(loss_str))
-    print(Fore.WHITE + " • CURRENT RETURN: " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + loss_pad)
+    # Text length padding applied prior to injecting ANSI escape sequence styles
+    loss_txt = f" • CURRENT RETURN: {current_loss:.2f}%"
+    print(Fore.WHITE + " • CURRENT RETURN: " + Fore.RED + f"{current_loss:.2f}%" + Style.RESET_ALL + " " * max(0, PANEL_WIDTH - len(loss_txt) - 13))
     
-    target_str = f" • DYNAMIC TARGET: {int(round(target_threshold))}%"
-    target_pad = " " * max(0, PANEL_WIDTH - len(target_str))
-    print(Fore.WHITE + " • DYNAMIC TARGET: " + Fore.YELLOW + f"{int(round(target_threshold))}%" + Style.RESET_ALL + target_pad)
+    target_txt = f" • DYNAMIC TARGET: {int(round(target_threshold))}%"
+    print(Fore.WHITE + " • DYNAMIC TARGET: " + Fore.YELLOW + f"{int(round(target_threshold))}%" + Style.RESET_ALL + " " * max(0, PANEL_WIDTH - len(target_txt) - 16))
     
     print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(PANEL_WIDTH))
     print(border + "\n")
+
