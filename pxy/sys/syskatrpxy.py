@@ -9,7 +9,7 @@ from syscnfgpxy import PARAMS
 from colorama import Fore, Style, init
 
 # 🎯 IMPORT UNTOUCHED SIGNAL ROUTER NATIVELY (Returns exactly 4 values)
-from sysdptpxy import detect_pxy_flip_signal
+from syspxyflip import detect_pxy_flip_signal
 
 # Initialize colorama terminal auto-reset formatting hooks
 init(autoreset=True)
@@ -19,18 +19,36 @@ USE_FIXED_ATR = False
 ATR_FIXED_VALUE = 9
 TOTAL_WIDTH = 42
 
+def safe_int_convert(val, fallback=1) -> int:
+    """Prevents calculation crashes from empty fields, None, or invalid text types."""
+    if val is None:
+        return fallback
+    try:
+        # Convert to string, strip whitespace, and parse clean decimals
+        clean_str = str(val).replace(',', '').strip()
+        if not clean_str:
+            return fallback
+        return int(round(float(clean_str)))
+    except (ValueError, TypeError):
+        return fallback
+
 def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int) -> int:
     """
     Extracts numbers from past_depth_str, ce_depth, and pe_depth.
     Sums all three numbers together and enforces ONLY a strict minimum of 5.
+    Maximum can grow higher infinitely to any value.
     """
     try:
-        # Extract integer digits cleanly from past_depth_str (e.g., 'CE4' -> ['4'])
+        # Clean string extraction for past depth digit sequences (e.g. 'PE4' -> ['4'])
         digits = re.findall(r'\d+', str(past_str))
-        past_val_extracted = int(digits) if digits else 0
+        past_val_extracted = int(digits[0]) if digits else 0
+        
+        # 🎯 SECURE DATA CONVERSIONS: Prevents type errors from interrupting loop steps
+        c_depth_clean = safe_int_convert(ce_d, fallback=1)
+        p_depth_clean = safe_int_convert(pe_d, fallback=1)
         
         # 🎯 ATR MATH: Pure sum of all 3 depth metrics
-        raw_depth_sum = past_val_extracted + int(ce_d) + int(pe_d)
+        raw_depth_sum = past_val_extracted + c_depth_clean + p_depth_clean
         
         # Enforce strict minimum floor boundary of 5
         if raw_depth_sum < 5:
@@ -46,7 +64,7 @@ def calculate_atr_from_snapshot(past_depth_str: str, ce_depth: int, pe_depth: in
 
 def calculate_k_from_snapshot(ce_depth: int, pe_depth: int) -> int:
     """Calculates K directly using pre-fetched snapshot variables to prevent timing lags."""
-    return int(ce_depth) + int(pe_depth)
+    return safe_int_convert(ce_depth, fallback=1) + safe_int_convert(pe_depth, fallback=1)
 
 # --- BACKWARD COMPATIBILITY METHODS FOR EXTERNAL SCRIPT LINKS ---
 def calculate_atr(df: pd.DataFrame) -> pd.Series:
@@ -60,7 +78,7 @@ def calculate_atr(df: pd.DataFrame) -> pd.Series:
 def calculate_dynamic_k(df: pd.DataFrame) -> int:
     try:
         _, _, ce_d, pe_d = detect_pxy_flip_signal(df=df)
-        return int(ce_d) + int(pe_d)
+        return safe_int_convert(ce_d, fallback=1) + safe_int_convert(pe_d, fallback=1)
     except Exception:
         return 2
 
@@ -72,14 +90,13 @@ if __name__ == "__main__":
         df = fetch_yf_data()
         if df is not None and not df.empty and len(df) >= 1:
             
-            # 🎯 CRITICAL FIX: Pull data from your signal script EXACTLY ONCE per loop turn
+            # 🎯 PULL DATA ONCE: Synchronizes calculation pools instantly
             _, past_depth_str, ce_depth, pe_depth = detect_pxy_flip_signal(df=df)
             
-            # Pass the identical variables into both formula blocks simultaneously
             final_atr = calculate_atr_from_snapshot(past_depth_str, ce_depth, pe_depth)
             final_k = calculate_k_from_snapshot(ce_depth, pe_depth)
             
-            # Display perfectly synchronized integer metrics
+            # Display perfectly synchronized metrics within terminal frames
             left_text = f"ATR:{final_atr}"
             right_text = f"K:{final_k}"
             spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
@@ -88,4 +105,5 @@ if __name__ == "__main__":
             print("ATR:5" + (" " * 33) + "K:2")
     except Exception:
         print("ATR:5" + (" " * 33) + "K:2")
+
 
