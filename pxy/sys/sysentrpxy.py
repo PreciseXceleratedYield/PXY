@@ -34,12 +34,12 @@ def get_entry_signal(df=None):
     
     # Route Entry and Exit based on raw direction (BULL / BEAR) from sysmktpxy
     if entry_dir == "BULL":
-        # While TREND IS BEAR we do OTMBUY, flip to ATMBUY otherwise
-        entry_signal = "OTMBUY" if trend == "BEAR" else "ATMBUY"
+        # While TREND IS BEAR we do ATMBUY, flip to ATMBUY otherwise
+        entry_signal = "ATMBUY" if trend == "BEAR" else "ATMBUY"
         exit_signal = "BULL"
     elif entry_dir == "BEAR":
-        # While TREND IS BULL we do OTMSELL, flip to ATMSELL otherwise
-        entry_signal = "OTMSELL" if trend == "BULL" else "ATMSELL"
+        # While TREND IS BULL we do ATMSELL, flip to ATMSELL otherwise
+        entry_signal = "ATMSELL" if trend == "BULL" else "ATMSELL"
         exit_signal = "BEAR"
     else:
         entry_signal = "NONE"
