@@ -1,5 +1,5 @@
 //@version=5
-indicator("PreciseXceleratedYield Pvt Ltd™ - Supertrend Edition", overlay=true)
+indicator("PreciseXceleratedYield Pvt Ltd™", overlay=true)
 
 // ==========================================
 // CONFIGURATION & INPUTS
@@ -31,7 +31,7 @@ float m0_c = raw_c >= raw_o ? (raw_c + raw_h) / 2.0 : (raw_c + raw_l) / 2.0
 float m1_c = raw_c
 
 // --- Mode 2: Mid-Body (OC/2) ---
-float m2_c = (raw_o + raw_c + raw_c) / 3.0
+float m2_c = (raw_o + raw_c) / 2.0
 
 // --- Mode 3: Full Range (OHLC/4) ---
 float m3_c = (raw_o + raw_h + raw_l + raw_c) / 4.0
@@ -65,67 +65,20 @@ else if mode == 5
     out_c := m5_c
 
 // ==========================================
-// BASELINE INDICATOR CALCULATION
+// INDICATOR CALCULATIONS & PLOTTING
 // ==========================================
 // Dynamic SMA calculation derived from the active mode's transformed Close
 float mode_sma = ta.sma(out_c, sma_length)
 
-// ==========================================
-// SUPERTREND ON MODE-SMA ENGINE (Period 1, Factor 1)
-// ==========================================
-float atr_1 = ta.atr(1)
-float basic_ub = mode_sma + (1.0 * atr_1)
-float basic_lb = mode_sma - (1.0 * atr_1)
+// Plot the SMA line on the chart
+plot(mode_sma, title="Mode-Based SMA", color=color.blue, linewidth=2)
 
-// Initialize trailing bands and system trend variables
-var float final_ub = na
-var float final_lb = na
-var int internal_dir = 1 // 1 for BULL, -1 for BEAR
-var float supertrend_line = na
-
-// Capture historical values from previous bar to prevent lookahead jumps
-float prev_ub = final_ub[1]
-float prev_lb = final_lb[1]
-float prev_sma = mode_sma[1]
-
-// Calculate trailing Upper Band
-if not na(prev_ub) and prev_sma < prev_ub
-    final_ub := math.min(basic_ub, prev_ub)
-else
-    final_ub := basic_ub
-
-// Calculate trailing Lower Band
-if not na(prev_lb) and prev_sma > prev_lb
-    final_lb := math.max(basic_lb, prev_lb)
-else
-    final_lb := basic_lb
-
-// Evaluate Crossover Logic against prior bands to manage trend flips
-if internal_dir == 1 and mode_sma < final_lb
-    internal_dir := -1
-else if internal_dir == -1 and mode_sma > final_ub
-    internal_dir := 1
-
-// Assign active Supertrend Line price mapping
-supertrend_line := internal_dir == 1 ? final_lb : final_ub
-
-// ==========================================
-// TREND DEFINITION & PLOTTING ENGINE
-// ==========================================
-// CRITICAL: Trend is determined strictly by asset Price (Close) above or below this line
-bool is_st_bull = close > supertrend_line
-color supertrend_color = is_st_bull ? color.green : color.red
-
-// Plot the unified Supertrend line (Replaces original mode_sma plot)
-plot(supertrend_line, title="Supertrend Line (Alias for All)", color=supertrend_color, linewidth=2)
-
-// Determine candle color condition based on the selected execution mode
+// Determine candle color condition based on the selected mode
+// Mode 2 checks current close against previous close; other modes check close against open.
 bool is_bullish = mode == 2 ? (out_c >= out_c[1]) : (out_c >= out_o)
 color candle_color = is_bullish ? color.green : color.red
 
-// Plot the transformed candle bars directly on the chart layout
+// Optional: Plot the transformed candle bars directly on the chart layout
 plotcandle(out_o, out_h, out_l, out_c, title="Transformed Candles", 
            color = candle_color, 
            wickcolor = candle_color)
-
-
