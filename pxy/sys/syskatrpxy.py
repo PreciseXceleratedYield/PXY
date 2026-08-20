@@ -9,7 +9,7 @@ from syscnfgpxy import PARAMS
 from colorama import Fore, Style, init
 
 # 🎯 IMPORT UNTOUCHED SIGNAL ROUTER NATIVELY (Returns exactly 4 values)
-from sysdptpxy import detect_pxy_flip_signal
+from syspxyflip import detect_pxy_flip_signal
 
 # Initialize colorama terminal auto-reset formatting hooks
 init(autoreset=True)
@@ -23,16 +23,13 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int) -> int:
     """
     Extracts numbers from past_depth_str, ce_depth, and pe_depth.
     Sums all three numbers together and enforces ONLY a strict minimum of 5.
-    Maximum can grow higher infinitely to any value.
     """
     try:
         # Extract integer digits cleanly from past_depth_str (e.g., 'CE4' -> ['4'])
         digits = re.findall(r'\d+', str(past_str))
+        past_val_extracted = int(digits) if digits else 0
         
-        # 🎯 FIX: Select the index element from the list to prevent list-to-int conversion crashes
-        past_val_extracted = int(digits[0]) if digits else 0
-        
-        # 🎯 MATRIX SUM MATH: Pure sum of all 3 depth metrics
+        # 🎯 ATR MATH: Pure sum of all 3 depth metrics
         raw_depth_sum = past_val_extracted + int(ce_d) + int(pe_d)
         
         # Enforce strict minimum floor boundary of 5
@@ -43,60 +40,52 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int) -> int:
     except Exception:
         return 5
 
+def calculate_atr_from_snapshot(past_depth_str: str, ce_depth: int, pe_depth: int) -> int:
+    """Calculates ATR directly using pre-fetched snapshot variables to prevent timing lags."""
+    return scale_atr_value_from_depth(past_depth_str, ce_depth, pe_depth)
+
+def calculate_k_from_snapshot(ce_depth: int, pe_depth: int) -> int:
+    """Calculates K directly using pre-fetched snapshot variables to prevent timing lags."""
+    return int(ce_depth) + int(pe_depth)
+
+# --- BACKWARD COMPATIBILITY METHODS FOR EXTERNAL SCRIPT LINKS ---
 def calculate_atr(df: pd.DataFrame) -> pd.Series:
-    """Generates dynamic option volatility series derived from matrix color streak depths."""
     try:
-        if USE_FIXED_ATR:
-            if df is not None and not df.empty:
-                return pd.Series(float(ATR_FIXED_VALUE), index=df.index)
-            return pd.Series([float(ATR_FIXED_VALUE)])
-
-        # 🎯 FETCH DEPTH PARAMETERS FROM YOUR UNCHANGED SIGNAL MODULE
-        # Unpacks exactly 4 original values: signal, past_depth_str, ce_depth, pe_depth
-        _, past_depth_str, ce_depth, pe_depth = detect_pxy_flip_signal(df=df)
-        
-        # Process depth integers through the pure sum calculator
-        resolved_atr_value = scale_atr_value_from_depth(past_depth_str, ce_depth, pe_depth)
-
-        # Populate structural series matching dataframe timeline layout
-        if df is not None and not df.empty:
-            return pd.Series(float(resolved_atr_value), index=df.index)
-        return pd.Series([float(resolved_atr_value)])
-
+        _, past_str, ce_d, pe_d = detect_pxy_flip_signal(df=df)
+        val = scale_atr_value_from_depth(past_str, ce_d, pe_d)
+        return pd.Series(float(val), index=df.index) if df is not None and not df.empty else pd.Series([float(val)])
     except Exception:
-        if df is not None and not df.empty:
-            return pd.Series(5.0, index=df.index)
-        return pd.Series([5.0])
+        return pd.Series(5.0, index=df.index) if df is not None and not df.empty else pd.Series([5.0])
 
 def calculate_dynamic_k(df: pd.DataFrame) -> int:
-    """
-    🎯 K METHOD: Calculates K as a direct pure sum of 2 fields (pe_depth + ce_depth).
-    """
     try:
-        # Fetch fresh raw parameters from unchanged script module
-        _, _, ce_depth, pe_depth = detect_pxy_flip_signal(df=df)
-        
-        # 🎯 K MATH: Pure sum of the 2 active metrics
-        k_calculated = int(pe_depth) + int(ce_depth)
-        return int(k_calculated)
+        _, _, ce_d, pe_d = detect_pxy_flip_signal(df=df)
+        return int(ce_d) + int(pe_d)
     except Exception:
         return 2
 
+# =============================================================================
+# UNIFIED SNAPSHOTTING EXECUTION BLOCK
+# =============================================================================
 if __name__ == "__main__":
     try:
         df = fetch_yf_data()
         if df is not None and not df.empty and len(df) >= 1:
-            atr_series = calculate_atr(df)
-            dynamic_k = calculate_dynamic_k(df)
             
-            val = atr_series.iloc[-1] if not atr_series.empty else 5.0
-            atr_display = int(np.round(val))
+            # 🎯 CRITICAL FIX: Pull data from your signal script EXACTLY ONCE per loop turn
+            _, past_depth_str, ce_depth, pe_depth = detect_pxy_flip_signal(df=df)
             
-            left_text = f"ATR:{atr_display}"
-            right_text = f"K:{int(dynamic_k)}"
+            # Pass the identical variables into both formula blocks simultaneously
+            final_atr = calculate_atr_from_snapshot(past_depth_str, ce_depth, pe_depth)
+            final_k = calculate_k_from_snapshot(ce_depth, pe_depth)
+            
+            # Display perfectly synchronized integer metrics
+            left_text = f"ATR:{final_atr}"
+            right_text = f"K:{final_k}"
             spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
             print(left_text + spacing + right_text)
         else:
             print("ATR:5" + (" " * 33) + "K:2")
     except Exception:
         print("ATR:5" + (" " * 33) + "K:2")
+
