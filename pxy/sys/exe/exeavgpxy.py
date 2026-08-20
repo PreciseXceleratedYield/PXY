@@ -7,8 +7,8 @@ from colorama import Fore, Style
 
 # Direct module dependency linking to inherit all variables from the helper script
 from exeavgnextgenpxy import (
-    REBUY_ENABLED, MAX_LAYERS, PANEL_WIDTH, SCALE_WIDTH, IST, MARKET_START, 
-    MARKET_END, pxysqrce, pxysqrpe, safe_float, generate_pxy_tag, is_cooling, 
+    REBUY_ENABLED, MAX_LAYERS, IST, MARKET_START, MARKET_END, 
+    pxysqrce, pxysqrpe, safe_float, generate_pxy_tag, is_cooling, 
     set_cooling, get_loss, print_pxy_trigger_dashboard
 )
 from run.runpchkpxy import get_position_summary
@@ -96,37 +96,45 @@ def handle_side_averaging(client, df):
     # =============================================================================
     # PART 6: TELEMETRY STREAM PANEL GRAPHICS & BALANCED GEOMETRIC RATIO BAR
     # =============================================================================
-    print("\n" + Fore.CYAN + "=" * PANEL_WIDTH)
-    print(Fore.CYAN + f" {'OP':<2}  {'NO':>2}   {'PNL':>7}   {'AGT':>4}   {'TGT':>4}  {'STS':>2}")
-    print(Fore.CYAN + "-" * PANEL_WIDTH)
+    # Strict 40-character maximum width configuration
+    P_WIDTH = 40 
+    
+    print("\n" + Fore.CYAN + "=" * P_WIDTH)
+    print(Fore.CYAN + " OPT  LOT       PNL    AGT    TGT  STS")
+    print(Fore.CYAN + "-" * P_WIDTH)
     
     ce_pnl_val = int(round(ce_pnl))
     ce_pnl_color = Fore.CYAN + Style.BRIGHT if ce_target_crossed else (Fore.GREEN if ce_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f"  CE  {ce_lots:>2}   " + ce_pnl_color + f"{ce_pnl_val:>7}" + Style.RESET_ALL + f"   {ce_agt:>4}   {ce_tgt:>4}   {ce_sts}")
+    print(Fore.WHITE + f"  CE   {ce_lots:>2}   " + ce_pnl_color + f"{ce_pnl_val:>8}" + Style.RESET_ALL + f"   {ce_agt:>4}   {ce_tgt:>4}   {ce_sts}")
     
     pe_pnl_val = int(round(pe_pnl))
     pe_pnl_color = Fore.CYAN + Style.BRIGHT if pe_target_crossed else (Fore.GREEN if pe_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f"  PE  {pe_lots:>2}   " + pe_pnl_color + f"{pe_pnl_val:>7}" + Style.RESET_ALL + f"   {pe_agt:>4}   {pe_tgt:>4}   {pe_sts}")
-    print(Fore.CYAN + "-" * PANEL_WIDTH)
+    print(Fore.WHITE + f"  PE   {pe_lots:>2}   " + pe_pnl_color + f"{pe_pnl_val:>8}" + Style.RESET_ALL + f"   {pe_agt:>4}   {pe_tgt:>4}   {pe_sts}")
+    print(Fore.CYAN + "-" * P_WIDTH)
 
-    # --- DRAW THE DYNAMIC GEOMETRIC BALANCE BAR ---
+    # --- DRAW THE DYNAMIC GEOMETRIC BALANCE BAR (40-CHAR MATRICES SAFE) ---
     ce_weight_int = int(round(ce_investment))
     pe_weight_int = int(round(pe_investment))
     
     left_label = f"{ce_weight_int}"
     right_label = f"{pe_weight_int}"
     
-    available_track_slots = SCALE_WIDTH - len(left_label) - len(right_label)
+    # Mathematical Layout Breakdown: 
+    # Total Width (40) - 2 front spaces - 2 spaces flanking the ⚖️ emoji - 2 width units for the emoji itself
+    track_slots = P_WIDTH - len(left_label) - len(right_label) - 6
+    
     total_weight = ce_investment + pe_investment
     ce_ratio = ce_investment / total_weight if total_weight > 0 else 0.5
     
-    left_dashes_count = max(0, min(available_track_slots, int(round(ce_ratio * available_track_slots))))
-    right_dashes_count = max(0, available_track_slots - left_dashes_count)
+    left_dashes_count = max(0, min(track_slots, int(round(ce_ratio * track_slots))))
+    right_dashes_count = max(0, track_slots - left_dashes_count)
     
     left_dash_track = "━" * left_dashes_count
     right_dash_track = "━" * right_dashes_count
+    
+    # Explicit 40-character safe print boundary block
     print("  " + Fore.GREEN + left_label + Fore.GREEN + left_dash_track + Fore.WHITE + "⚖️" + Fore.RED + right_dash_track + Fore.RED + right_label)
-    print(Fore.CYAN + "=" * PANEL_WIDTH + "\n")
+    print(Fore.CYAN + "=" * P_WIDTH + "\n")
 
     # =============================================================================
     # PART 7: MULTI-LAYER DOWNWARD DIRECTIONAL MATRIX AVERAGING LOOPS
@@ -167,7 +175,9 @@ def handle_side_averaging(client, df):
             
             last_calculated_threshold = dynamic_threshold
             
-            if pos_loss > dynamic_threshold:
+            # 🎯 DIRECT NEGATIVE THRESHOLD TRACKING CHECK
+            # Triggers strictly when threshold > loss (e.g. -10.0 > -12.0 is True)
+            if not (dynamic_threshold > pos_loss):
                 all_positions_crossed_threshold = False
                 break
                 
