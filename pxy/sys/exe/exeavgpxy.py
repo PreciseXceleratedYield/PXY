@@ -95,9 +95,11 @@ def handle_side_averaging(client, df):
     pe_sts = "✔️" if pe_target_crossed else "❌"
 
     if ce_target_crossed:
-        pass  # Reserved hook: pxysqrce()
+        pass  # import subprocess; subprocess.run(["pxysqrce"])
+
     if pe_target_crossed:
-        pass  # Reserved hook: pxysqrpe()
+        pass  # import subprocess; subprocess.run(["pxysqrpe"])
+
 
     # =============================================================================
     # PART 6: TELEMETRY STREAM PANEL GRAPHICS & BALANCED GEOMETRIC RATIO BAR
