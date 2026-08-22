@@ -16,51 +16,42 @@ def apply_ohlc_transformation(df, mode=1):
     """
     if df.empty:
         return df
-        
+
     out = df.copy()
     raw_o = df['Open'].to_numpy()
     raw_h = df['High'].to_numpy()
     raw_l = df['Low'].to_numpy()
     raw_c = df['Close'].to_numpy()
-    
-    # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles
-    # Green Close (Close >= Open) -> Transforms to (Close + High) / 2
-    # Red Close (Close < Open)   -> Transforms to (Close + Low) / 2
+
+    # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles (Original fallback structure)
     if mode == 0:
         out['Close'] = np.where(raw_c >= raw_o, (raw_c + raw_h) / 2.0, (raw_c + raw_l) / 2.0)
         return out
 
-    # Mode 1: Raw Candles
+    # ⚡ Mode 1: Raw Candles
     elif mode == 1:
         return out
-        
-    # Mode 2: Mid-Body (Only Close changes to OC/2)
+
+    # ⚡ Mode 2: OC/2
     elif mode == 2:
-        out['Close'] = (raw_o + raw_c + raw_c + raw_c) / 4.0
+        out['Close'] = (raw_o + raw_c) / 2.0
         return out
-        
-    # Mode 3: Full Range (Only Close changes to OHLC/4)
+
+    # ⚡ Mode 3: OCC/3
     elif mode == 3:
-        out['Close'] = (raw_o + raw_h + raw_l + raw_c) / 4.0
+        out['Close'] = (raw_o + (2 * raw_c)) / 3.0
         return out
-        
-    # Mode 4: Average OHLC of Modes 1, 2, 3, and 4 (All columns transform)
+
+    # ⚡ Mode 4: OCCC/4
     elif mode == 4:
-        # Step 1: Pre-calculate the Close values for Modes 1, 2, and 3
-        m1_c = raw_c
-        m2_c = (raw_o + raw_c) / 2.0
-        m3_c = (raw_o + raw_h + raw_l + raw_c) / 4.0
-        
-        # Step 2: Solve the algebraic circular equation for Mode 4's Close
-        m4_c = (m1_c + m2_c + m3_c) / 3.0
-        
-        # Step 3: Solve the algebraic circular equations for Open, High, and Low
-        out['Open'] = raw_o
-        out['High'] = raw_h
-        out['Low'] = raw_l
-        out['Close'] = (m1_c + m2_c + m3_c + m4_c) / 4.0
+        out['Close'] = (raw_o + (3 * raw_c)) / 4.0
         return out
-        
+
+    # ⚡ Mode 5: OHLCC/5
+    elif mode == 5:
+        out['Close'] = (raw_o + raw_h + raw_l + (2 * raw_c)) / 5.0
+        return out
+
     return out
 
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
