@@ -103,11 +103,11 @@ def handle_side_averaging(client, df):
 
     if ce_target_crossed and ce_active_exit in ['SELL', 'BEAR']:
         import subprocess
-        subprocess.run(["pxysqrce"])
+        pass #subprocess.run(["pxysqrce"])
 
     if pe_target_crossed and pe_active_exit in ['BUY', 'BULL']:
         import subprocess
-        subprocess.run(["pxysqrpe"])
+        pass #subprocess.run(["pxysqrpe"])
     # =============================================================================
     # PART 6: TELEMETRY STREAM PANEL GRAPHICS & BALANCED GEOMETRIC RATIO BAR
     # =============================================================================
