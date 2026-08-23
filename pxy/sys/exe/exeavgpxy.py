@@ -59,6 +59,11 @@ def handle_side_averaging(client, df):
     ce_factor = ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
     pe_factor = pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
 
+    # 🚀 TRIGGER ENTRY MODULE IF EITHER WING HAS ZERO EXPOSURE
+    if ce_investment == 0.0 or pe_investment == 0.0:
+        import subprocess
+        subprocess.run(["python", "exeentrpxy.py"])
+
     ce_pnl = float(ce_rows['row_pnl'].sum())
     pe_pnl = float(pe_rows['row_pnl'].sum())
     
@@ -214,5 +219,4 @@ def handle_side_averaging(client, df):
                 except Exception as e:
                     logger.error(f"Order placement critical tracking failure on side {side}: {e}", exc_info=True)
                     print(f"{Fore.RED}⚠️ ORDER PLACEMENT CRITICAL ERROR: {e}")
-
 
