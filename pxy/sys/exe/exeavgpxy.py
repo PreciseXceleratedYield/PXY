@@ -56,6 +56,9 @@ def handle_side_averaging(client, df):
     ce_investment = float(ce_rows['row_invested'].sum())
     pe_investment = float(pe_rows['row_invested'].sum())
     
+    ce_factor = ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
+    pe_factor = pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
+
     ce_pnl = float(ce_rows['row_pnl'].sum())
     pe_pnl = float(pe_rows['row_pnl'].sum())
     
@@ -94,13 +97,17 @@ def handle_side_averaging(client, df):
     ce_sts = "✔️" if ce_target_crossed else "❌"
     pe_sts = "✔️" if pe_target_crossed else "❌"
 
-    if ce_target_crossed:
-        pass  # import subprocess; subprocess.run(["pxysqrce"])
+    # Extract exit fields directly from the side snapshots since they are identical across rows
+    ce_active_exit = str(ce_last.get("exit", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
+    pe_active_exit = str(pe_last.get("exit", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
 
-    if pe_target_crossed:
-        pass  # import subprocess; subprocess.run(["pxysqrpe"])
+    if ce_target_crossed and ce_active_exit in ['SELL', 'BEAR']:
+        import subprocess
+        subprocess.run(["pxysqrce"])
 
-
+    if pe_target_crossed and pe_active_exit in ['BUY', 'BULL']:
+        import subprocess
+        subprocess.run(["pxysqrpe"])
     # =============================================================================
     # PART 6: TELEMETRY STREAM PANEL GRAPHICS & BALANCED GEOMETRIC RATIO BAR
     # =============================================================================
@@ -148,7 +155,7 @@ def handle_side_averaging(client, df):
             continue
             
         last_row = side_df.iloc[-1]
-        active_exit = str(last_row.get("exit", "NONE")).upper().strip()
+        active_exit = ce_active_exit if side == 'CE' else pe_active_exit
     
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
@@ -156,20 +163,20 @@ def handle_side_averaging(client, df):
         opp_matrix = pe_matrix_self if side == 'CE' else ce_matrix_self
         side_atr = ce_atr if side == 'CE' else pe_atr
         
-        # 🎯 VOLATILITY-UNIFIED DOWNSIDE THRESHOLD RULE: -2 * ATR
-        base_drawdown_limit = -2.0 * side_atr
+        # 🎯 VOLATILITY-UNIFIED DOWNSIDE THRESHOLD RULE: -1 * ATR
+        base_drawdown_limit = -1.0 * side_atr
         
         # Resolve matrix rules using the new volatility scaling bounds (Negative Spaces)
         if side == 'CE':
             if active_exit in ['SELL', 'BEAR']:
-                dynamic_threshold = base_drawdown_limit * opp_matrix
+                dynamic_threshold = (base_drawdown_limit * opp_matrix * ce_factor) + base_drawdown_limit
             else:
-                dynamic_threshold = base_drawdown_limit
+                dynamic_threshold = (base_drawdown_limit * ce_factor) + base_drawdown_limit
         else:  # side == 'PE'
             if active_exit in ['BUY', 'BULL']:
-                dynamic_threshold = base_drawdown_limit * opp_matrix
+                dynamic_threshold = (base_drawdown_limit * opp_matrix * pe_factor) + base_drawdown_limit
             else:
-                dynamic_threshold = base_drawdown_limit
+                dynamic_threshold = (base_drawdown_limit * pe_factor) + base_drawdown_limit
                 
         last_calculated_threshold = dynamic_threshold
         
