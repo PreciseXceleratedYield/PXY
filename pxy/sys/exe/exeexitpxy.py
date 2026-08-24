@@ -115,19 +115,21 @@ def run_snapshot():
     IST = pytz.timezone("Asia/Kolkata")
     now = datetime.now(IST).time()
     
-    if dt_time(15, 11) <= now < dt_time(15, 50):
+    # Base path to the script
+    exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exesqrpxy.py")
+    
+    if os.path.exists(exe_path):
         try:
-            # Keep the path pointing strictly to the file itself
-            exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exesqrpxy.py")
-            
-            if os.path.exists(exe_path):
-                # Removed "-all" from the list
+            # 1. Runs from 15:11 up to 15:14:59 (Without "-all")
+            if dt_time(15, 11) <= now < dt_time(15, 15):
                 subprocess.run(["python3", exe_path], check=True)
+                
+            # 2. Runs from 15:15 up to 15:49:59 (With "-all")
+            elif dt_time(15, 15) <= now < dt_time(15, 50):
+                subprocess.run(["python3", exe_path, "-all"], check=True)
                 
         except Exception as e:
             print(f"{Fore.RED}❌ Square-off Error: {e}")
-
-
 
     data = get_combined_data() 
     df = data.get("active_orders", pd.DataFrame()) 
