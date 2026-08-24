@@ -169,14 +169,14 @@ def handle_side_averaging(client, df):
         # Resolve matrix rules using the new volatility scaling bounds (Negative Spaces)
         if side == 'CE':
             if active_exit in ['SELL', 'BEAR']:
-                dynamic_threshold = (base_drawdown_limit * opp_matrix * ce_factor) + base_drawdown_limit
+                dynamic_threshold = (base_drawdown_limit * opp_matrix * ce_factor) + (base_drawdown_limit/2)
             else:
-                dynamic_threshold = (base_drawdown_limit * ce_factor) + base_drawdown_limit
+                dynamic_threshold = (base_drawdown_limit * ce_factor) + (base_drawdown_limit/2)
         else:  # side == 'PE'
             if active_exit in ['BUY', 'BULL']:
-                dynamic_threshold = (base_drawdown_limit * opp_matrix * pe_factor) + base_drawdown_limit
+                dynamic_threshold = (base_drawdown_limit * opp_matrix * pe_factor) + (base_drawdown_limit/2)
             else:
-                dynamic_threshold = (base_drawdown_limit * pe_factor) + base_drawdown_limit
+                dynamic_threshold = (base_drawdown_limit * pe_factor) + (base_drawdown_limit/2)
                 
         last_calculated_threshold = dynamic_threshold
         
