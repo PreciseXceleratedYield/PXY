@@ -91,17 +91,25 @@ def handle_side_averaging(client, df):
     pe_lots_factor = (pe_lots + 1) / (ce_lots + 1) if ce_lots >= 0 else 1.0
 
     # --- PRE-CALCULATE DYNAMIC THRESHOLDS MULTIPLIED ACROSS THE WHOLE THING ---
-    ce_base_drawdown_limit = -1.0 * ce_atr
-    if ce_active_exit in ['SELL', 'BEAR']:
-        ce_dynamic_threshold = ((ce_base_drawdown_limit * pe_matrix_self * ce_factor) + (ce_base_drawdown_limit / 2)) * ce_lots_factor
+    ce_base_drawdown_limit = -ce_atr
+    if ce_active_exit in ["SELL", "BEAR"]:
+        ce_dynamic_threshold = (
+            ce_base_drawdown_limit * (pe_matrix_self * ce_factor + 1) * ce_lots_factor
+        )
     else:
-        ce_dynamic_threshold = ((ce_base_drawdown_limit * ce_factor) + (ce_base_drawdown_limit / 2)) * ce_lots_factor
+        ce_dynamic_threshold = (
+            ce_base_drawdown_limit * (ce_factor + 1) * ce_lots_factor
+        )
 
-    pe_base_drawdown_limit = -1.0 * pe_atr
-    if pe_active_exit in ['BUY', 'BULL']:
-        pe_dynamic_threshold = ((pe_base_drawdown_limit * ce_matrix_self * pe_factor) + (pe_base_drawdown_limit / 2)) * pe_lots_factor
+    pe_base_drawdown_limit = -pe_atr
+    if pe_active_exit in ["BUY", "BULL"]:
+        pe_dynamic_threshold = (
+            pe_base_drawdown_limit * (ce_matrix_self * pe_factor + 1) * pe_lots_factor
+        )
     else:
-        pe_dynamic_threshold = ((pe_base_drawdown_limit * pe_factor) + (pe_base_drawdown_limit / 2)) * pe_lots_factor
+        pe_dynamic_threshold = (
+            pe_base_drawdown_limit * (pe_factor + 1) * pe_lots_factor
+        )
 
     # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO COMBINED DYNAMIC THRESHOLDS
     ce_agt = int(round(ce_dynamic_threshold))
