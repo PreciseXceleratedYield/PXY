@@ -26,7 +26,7 @@ SCALE_WIDTH = 40
 # --- TIMEZONES & CLOCK BOUNDARIES ---
 IST = pytz.timezone("Asia/Kolkata") 
 MARKET_START = dt_time(9, 17)
-MARKET_END = dt_time(14, 36)
+MARKET_END = dt_time(15, 11)
 
 # =============================================================================
 # PART 2: HARDWARE SYSTEM COMMAND TERMINAL ROUTERS
