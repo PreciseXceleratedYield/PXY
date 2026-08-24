@@ -86,20 +86,24 @@ def handle_side_averaging(client, df):
     ce_active_exit = str(ce_last.get("exit", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
     pe_active_exit = str(pe_last.get("exit", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
 
-    # --- PRE-CALCULATE DYNAMIC THRESHOLDS TO ASIGN TO AGT ENGINES ---
+    # --- ZERO-DIVISION SHIELDED LOTS FACTOR ENGINE ---
+    ce_lots_factor = (ce_lots + 1) / (pe_lots + 1) if pe_lots >= 0 else 1.0
+    pe_lots_factor = (pe_lots + 1) / (ce_lots + 1) if ce_lots >= 0 else 1.0
+
+    # --- PRE-CALCULATE DYNAMIC THRESHOLDS MULTIPLIED ACROSS THE WHOLE THING ---
     ce_base_drawdown_limit = -1.0 * ce_atr
     if ce_active_exit in ['SELL', 'BEAR']:
-        ce_dynamic_threshold = (ce_base_drawdown_limit * pe_matrix_self * ce_factor) + (ce_base_drawdown_limit / 2)
+        ce_dynamic_threshold = ((ce_base_drawdown_limit * pe_matrix_self * ce_factor) + (ce_base_drawdown_limit / 2)) * ce_lots_factor
     else:
-        ce_dynamic_threshold = (ce_base_drawdown_limit * ce_factor) + (ce_base_drawdown_limit / 2)
+        ce_dynamic_threshold = ((ce_base_drawdown_limit * ce_factor) + (ce_base_drawdown_limit / 2)) * ce_lots_factor
 
     pe_base_drawdown_limit = -1.0 * pe_atr
     if pe_active_exit in ['BUY', 'BULL']:
-        pe_dynamic_threshold = (pe_base_drawdown_limit * ce_matrix_self * pe_factor) + (pe_base_drawdown_limit / 2)
+        pe_dynamic_threshold = ((pe_base_drawdown_limit * ce_matrix_self * pe_factor) + (pe_base_drawdown_limit / 2)) * pe_lots_factor
     else:
-        pe_dynamic_threshold = (pe_base_drawdown_limit * pe_factor) + (pe_base_drawdown_limit / 2)
+        pe_dynamic_threshold = ((pe_base_drawdown_limit * pe_factor) + (pe_base_drawdown_limit / 2)) * pe_lots_factor
 
-    # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO DYNAMIC THRESHOLD
+    # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO COMBINED DYNAMIC THRESHOLDS
     ce_agt = int(round(ce_dynamic_threshold))
     pe_agt = int(round(pe_dynamic_threshold))
 
@@ -173,7 +177,7 @@ def handle_side_averaging(client, df):
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
         
-        # Link loops instantly to the identical pre-calculated threshold values
+        # Link loops instantly to the identical combined factor thresholds
         if side == 'CE':
             dynamic_threshold = ce_dynamic_threshold
         else: # side == 'PE'
@@ -215,4 +219,5 @@ def handle_side_averaging(client, df):
                 except Exception as e:
                     logger.error(f"Order placement critical tracking failure on side {side}: {e}", exc_info=True)
                     print(f"{Fore.RED}⚠️ ORDER PLACEMENT CRITICAL ERROR: {e}")
+
 
