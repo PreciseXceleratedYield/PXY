@@ -1,5 +1,5 @@
 # =============================================================================
-# MAIN MODULE: exeavgpxy.py
+# MAIN MODULE: exeavgpxy.py [PART 1: PARSERS & TELEMETRY STREAM PANEL]
 # =============================================================================
 import re
 import logging
@@ -82,9 +82,26 @@ def handle_side_averaging(client, df):
     ce_tgt = int(round(((ce_atr / ce_lots) * ce_matrix_self))) if ce_lots > 0 else 0
     pe_tgt = int(round(((pe_atr / pe_lots) * pe_matrix_self))) if pe_lots > 0 else 0
 
-    # 📊 VOLATILITY-UNIFIED AGT RESOLUTION: (-2 * Own ATR) * Opposite Matrix Scale
-    ce_agt = int(round((-2.0 * ce_atr) * pe_matrix_self))
-    pe_agt = int(round((-2.0 * pe_atr) * ce_matrix_self))
+    # Extract exit fields directly from the side snapshots since they are identical across rows
+    ce_active_exit = str(ce_last.get("exit", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
+    pe_active_exit = str(pe_last.get("exit", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
+
+    # --- PRE-CALCULATE DYNAMIC THRESHOLDS TO ASIGN TO AGT ENGINES ---
+    ce_base_drawdown_limit = -1.0 * ce_atr
+    if ce_active_exit in ['SELL', 'BEAR']:
+        ce_dynamic_threshold = (ce_base_drawdown_limit * pe_matrix_self * ce_factor) + (ce_base_drawdown_limit / 2)
+    else:
+        ce_dynamic_threshold = (ce_base_drawdown_limit * ce_factor) + (ce_base_drawdown_limit / 2)
+
+    pe_base_drawdown_limit = -1.0 * pe_atr
+    if pe_active_exit in ['BUY', 'BULL']:
+        pe_dynamic_threshold = (pe_base_drawdown_limit * ce_matrix_self * pe_factor) + (pe_base_drawdown_limit / 2)
+    else:
+        pe_dynamic_threshold = (pe_base_drawdown_limit * pe_factor) + (pe_base_drawdown_limit / 2)
+
+    # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO DYNAMIC THRESHOLD
+    ce_agt = int(round(ce_dynamic_threshold))
+    pe_agt = int(round(pe_dynamic_threshold))
 
     # --- RULE CRITERIA PARSING ---
     ce_avg_loss = get_loss(ce_last) if not ce_rows.empty else 0.0
@@ -97,10 +114,6 @@ def handle_side_averaging(client, df):
     ce_sts = "✔️" if ce_target_crossed else "❌"
     pe_sts = "✔️" if pe_target_crossed else "❌"
 
-    # Extract exit fields directly from the side snapshots since they are identical across rows
-    ce_active_exit = str(ce_last.get("exit", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
-    pe_active_exit = str(pe_last.get("exit", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
-
     if ce_target_crossed and ce_active_exit in ['SELL', 'BEAR']:
         import subprocess
         pass #subprocess.run(["pxysqrce"])
@@ -108,6 +121,7 @@ def handle_side_averaging(client, df):
     if pe_target_crossed and pe_active_exit in ['BUY', 'BULL']:
         import subprocess
         pass #subprocess.run(["pxysqrpe"])
+        
     # =============================================================================
     # PART 6: TELEMETRY STREAM PANEL GRAPHICS & BALANCED GEOMETRIC RATIO BAR
     # =============================================================================
@@ -145,7 +159,6 @@ def handle_side_averaging(client, df):
     
     print("  " + Fore.GREEN + left_label + Fore.GREEN + left_dash_track + Fore.WHITE + "⚖️" + Fore.RED + right_dash_track + Fore.RED + right_label)
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
-
     # =============================================================================
     # PART 7: MULTI-LAYER DOWNWARD DIRECTIONAL MATRIX AVERAGING LOOPS
     # =============================================================================
@@ -160,23 +173,11 @@ def handle_side_averaging(client, df):
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
         
-        opp_matrix = pe_matrix_self if side == 'CE' else ce_matrix_self
-        side_atr = ce_atr if side == 'CE' else pe_atr
-        
-        # 🎯 VOLATILITY-UNIFIED DOWNSIDE THRESHOLD RULE: -1 * ATR
-        base_drawdown_limit = -1.0 * side_atr
-        
-        # Resolve matrix rules using the new volatility scaling bounds (Negative Spaces)
+        # Link loops instantly to the identical pre-calculated threshold values
         if side == 'CE':
-            if active_exit in ['SELL', 'BEAR']:
-                dynamic_threshold = (base_drawdown_limit * opp_matrix * ce_factor) + (base_drawdown_limit/2)
-            else:
-                dynamic_threshold = (base_drawdown_limit * ce_factor) + (base_drawdown_limit/2)
-        else:  # side == 'PE'
-            if active_exit in ['BUY', 'BULL']:
-                dynamic_threshold = (base_drawdown_limit * opp_matrix * pe_factor) + (base_drawdown_limit/2)
-            else:
-                dynamic_threshold = (base_drawdown_limit * pe_factor) + (base_drawdown_limit/2)
+            dynamic_threshold = ce_dynamic_threshold
+        else: # side == 'PE'
+            dynamic_threshold = pe_dynamic_threshold
                 
         last_calculated_threshold = dynamic_threshold
         
@@ -214,3 +215,4 @@ def handle_side_averaging(client, df):
                 except Exception as e:
                     logger.error(f"Order placement critical tracking failure on side {side}: {e}", exc_info=True)
                     print(f"{Fore.RED}⚠️ ORDER PLACEMENT CRITICAL ERROR: {e}")
+
