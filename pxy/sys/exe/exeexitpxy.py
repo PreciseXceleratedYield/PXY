@@ -154,6 +154,7 @@ def run_snapshot():
         sym = str(r.get('symbol', ''))
         ltp = float(r.get("sell_prc", 0))
         tgt = float(r.get("pxy_tgt", 0))
+        pnl = float(r.get("pnl", 0))
 
         # RULE 1: If user locked script to "one", enforce strict single exits everywhere
         if EXIT_MODE == "one":
@@ -187,15 +188,14 @@ def run_snapshot():
         # Route Order Processing Operations
         if effective_mode == "all":
             if ("CE" in sym and side_all_targets_hit.get("CE", False)) or ("PE" in sym and side_all_targets_hit.get("PE", False)):
-                verify_and_exit(client, r)
+                if pnl >= 140:
+                    verify_and_exit(client, r)
         else:
-            if ltp >= tgt:
-                print(f"{Fore.GREEN}🎯 Target Hit ({sym}): LTP {ltp} >= TGT {tgt} [Execution Mode: {effective_mode.upper()}]")
+            if ltp >= tgt and pnl >= 140:
+                print(f"{Fore.GREEN}🎯 Target Hit & PnL Met ({sym}): LTP {ltp} >= TGT {tgt} | PnL {pnl} >= 140 [Execution Mode: {effective_mode.upper()}]")
                 verify_and_exit(client, r)
 
     process_metrics_print_and_dump(df, side_all_targets_hit, EXIT_MODE)
 
 if __name__ == "__main__": 
     run_snapshot()
-
-
