@@ -205,25 +205,39 @@ def handle_side_averaging(client, df):
         # --- PLACE SYSTEM AVERAGING ORDER ---
         if all_positions_crossed_threshold and len(side_df) < (MAX_LAYERS + 1):
             if not is_cooling(side):
+                import os          # ✅ Required for absolute path assembly
+                import subprocess  # ✅ Required for system shell routing
+                
                 symbol = last_row['symbol']
-                qty = abs(int(safe_float(last_row['qty'], 0.0)))
-                new_tag = generate_pxy_tag()
                 final_loss = get_loss(last_row)
                 
                 print_pxy_trigger_dashboard(
-                    side, symbol, final_loss, last_calculated_threshold, new_tag, 
+                    side, symbol, final_loss, last_calculated_threshold, "AUTO_MANAGED", 
                     ce_lots, pe_lots, active_exit
                 )
                 
-                try:
-                    params = {
-                        "exchange_segment": "nse_fo", "product": "NRML", "price": "0",
-                        "order_type": "MKT", "quantity": str(qty), "trading_symbol": str(symbol),
-                        "transaction_type": "B", "validity": "DAY", "amo": "NO", "tag": new_tag
-                    }
-                    if client.place_order(**params):
+                # Dynamic absolute base path to the target script file
+                exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exeforcepxy.py")
+                
+                if os.path.exists(exe_path):
+                    try:
+                        # 1️⃣ Map system script positional argument based on contract side
+                        action_flag = "1" if side == "CE" else "2"
+                        cmd = ["python3", exe_path, action_flag]
+                        
+                        # 2️⃣ Execute terminal command cleanly via absolute path framework
+                        subprocess.run(cmd, check=True)
+                        
+                        # 3️⃣ Success tracking update
                         set_cooling(side)
-                        print(f"{Fore.GREEN}✅ SUCCESS: {side} AVERAGED by {active_exit}.")
-                except Exception as e:
-                    logger.error(f"Order placement critical tracking failure on side {side}: {e}", exc_info=True)
-                    print(f"{Fore.RED}⚠️ ORDER PLACEMENT CRITICAL ERROR: {e}")
+                        print(f"{Fore.GREEN}✅ SUCCESS: {side} Averaging triggered via absolute path execution.")
+                        
+                    except subprocess.CalledProcessError as e:
+                        logger.error(f"Absolute shell execution failure on exeforcepxy.py: {e}", exc_info=True)
+                        print(f"{Fore.RED}⚠️ TERMINAL PIPELINE EXECUTION ERROR: {e}")
+                    except Exception as e:
+                        logger.error(f"Critical execution tracking failure on side {side}: {e}", exc_info=True)
+                        print(f"{Fore.RED}⚠️ CRITICAL INTEGRATION ERROR: {e}")
+                else:
+                    print(f"{Fore.RED}❌ CRITICAL FILE ERROR: Target script not found at {exe_path}")
+
