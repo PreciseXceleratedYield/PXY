@@ -31,10 +31,11 @@ def dynamic_entry(row):
 
 
 def target_price(row):
-    """Calculates individual option layer target price using dynamic volatility variables.
+    """Calculates individual option layer target price using advanced cross-indicator alignment matrices.
     
-    Aligned Trades : atr * max(depth, power) target expansion percentage.
-    Hostile Trades : atr% target percentage fallback floor.
+    1. SuperTrend Opposite              -> 1.4% Target
+    2. Entry Opposite                   -> atr / 2 Target
+    3. Fully Aligned (ST + Entry)       -> 99% Target
     """
     try:
         # 1️⃣ Entry data execution health check
@@ -43,18 +44,12 @@ def target_price(row):
             return 0.0
 
         # 2️⃣ INPUTS (SAFE)
-        ce_p = f(row.get("ce_power", 1))
-        pe_p = f(row.get("pe_power", 1))
-
-        ce_d = i(row.get("hkin_ce_depth", 0))
-        pe_d = i(row.get("hkin_pe_depth", 0))
-
         atr = f(row.get("atr", 0))
-        katr = max(f(row.get("katr", 1)), 0.001)  # prevent divide-by-zero
 
-        # 3️⃣ Context string extractors
+        # 3️⃣ Context and Alignment Extraction
         symbol = str(row.get("symbol", "unknown")).upper()
-        active_exit = str(row.get("exit", "NONE")).upper().strip()
+        st_trend = str(row.get("ST_Trend", "NONE")).upper().strip()       # SuperTrend State
+        entry_sig = str(row.get("entry_signal", "NONE")).upper().strip()  # Generated Entry Type ("OTMBUY", "OTMSELL", "BULL", "BEAR")
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
@@ -64,17 +59,28 @@ def target_price(row):
 
         target_pct = 0.0
 
-        # 4️⃣ Dynamic execution logic using power and depth matrix
+        # 4️⃣ Advanced Tri-Layer Matrix Evaluation Loop
         if is_ce:
-            if active_exit in ("SELL", "BEAR"):  # Hostile (Not Aligned)
+            # Check 1: SuperTrend Profile Check (Opposite State)
+            if st_trend in ("BEAR", "SELL"):
                 target_pct = 1.4
-            else:                                # Aligned
-                target_pct = 99 #atr * max(ce_d, ce_p)
+            # Check 2: Entry Signal Profile Check (Opposite State / Counter-Trend Play)
+            elif entry_sig in ("OTMSELL", "BEAR"):
+                target_pct = atr / 2.0 if atr > 0 else 1.4  # Fallback to floor if atr is empty
+            # Check 3: Full structural pipeline alignment
+            else:
+                target_pct = 99.0
+
         elif is_pe:
-            if active_exit in ("BUY", "BULL"):   # Hostile (Not Aligned)
+            # Check 1: SuperTrend Profile Check (Opposite State)
+            if st_trend in ("BULL", "BUY"):
                 target_pct = 1.4
-            else:                                # Aligned
-                target_pct = 99 #atr * max(pe_d, pe_p)
+            # Check 2: Entry Signal Profile Check (Opposite State / Counter-Trend Play)
+            elif entry_sig in ("OTMBUY", "BULL"):
+                target_pct = atr / 2.0 if atr > 0 else 1.4  # Fallback to floor if atr is empty
+            # Check 3: Full structural pipeline alignment
+            else:
+                target_pct = 99.0
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
@@ -83,4 +89,5 @@ def target_price(row):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
+
 
