@@ -69,12 +69,12 @@ def target_price(row):
             if active_exit in ("SELL", "BEAR"):  # Hostile (Not Aligned)
                 target_pct = 1.4
             else:                                # Aligned
-                target_pct = atr * max(ce_d, ce_p)
+                target_pct = 41 #atr * max(ce_d, ce_p)
         elif is_pe:
             if active_exit in ("BUY", "BULL"):   # Hostile (Not Aligned)
                 target_pct = 1.4
             else:                                # Aligned
-                target_pct = atr * max(pe_d, pe_p)
+                target_pct = 41 #atr * max(pe_d, pe_p)
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
