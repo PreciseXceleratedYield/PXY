@@ -34,10 +34,10 @@ def get_entry_signal(df=None):
 
     # Route Entry and Exit based on pure SuperTrend profile state
     if trend == "BULL":
-        entry_signal = "ATMBUY"
+        entry_signal = "OTMBUY"
         exit_signal = "BULL"
     elif trend == "BEAR":
-        entry_signal = "ATMSELL"
+        entry_signal = "OTMSELL"
         exit_signal = "BEAR"
     else:
         entry_signal = "NONE"
