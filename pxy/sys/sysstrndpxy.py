@@ -13,7 +13,7 @@ DEBUG_MODE = False
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
   """Maintains function name for external compatibility.
 
-  Calculates Supertrend (ATR Length: 7, Factor: 2) and maps it cleanly across all
+  Calculates Supertrend (ATR Length: 5, Factor: 2) and maps it cleanly across all
   required systems.
   """
   try:
