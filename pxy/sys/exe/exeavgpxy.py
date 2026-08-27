@@ -98,7 +98,7 @@ def handle_side_averaging(client, df):
         ) * 41
     else:
         ce_dynamic_threshold = (
-            ce_base_drawdown_limit * (ce_factor + 0) * ce_lots_factor
+            ce_base_drawdown_limit * (ce_factor + 1) * ce_lots_factor
         ) * 1.4
 
     pe_base_drawdown_limit = -pe_atr
@@ -108,7 +108,7 @@ def handle_side_averaging(client, df):
         ) * 41
     else:
         pe_dynamic_threshold = (
-            pe_base_drawdown_limit * (pe_factor + 0) * pe_lots_factor
+            pe_base_drawdown_limit * (pe_factor + 1) * pe_lots_factor
         ) * 1.4
 
     # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO COMBINED DYNAMIC THRESHOLDS
@@ -240,4 +240,3 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.RED}⚠️ CRITICAL INTEGRATION ERROR: {e}")
                 else:
                     print(f"{Fore.RED}❌ CRITICAL FILE ERROR: Target script not found at {exe_path}")
-
