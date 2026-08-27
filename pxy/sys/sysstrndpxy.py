@@ -13,8 +13,8 @@ DEBUG_MODE = False
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
   """Maintains function name for external compatibility.
 
-  Calculates Supertrend (ATR Length: 7, Factor: 3) and maps it cleanly across all
-  required systems.
+  Calculates Supertrend (ATR Length: 9, Factor: 3) using standard market 
+  volatility with Wilder's smoothing method.
   """
   try:
     raw_df = fetch_yf_data(period='3d', interval='1m')
@@ -38,7 +38,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
       else df.tz_localize('UTC').tz_convert(tz_string)
   )
 
-  # Calculate ATR (Length = 7) using Wilder's smoothing
+  # Calculate ATR using standard price action metrics
   high = df['High']
   low = df['Low']
   close = df['Close']
@@ -47,10 +47,12 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
   tr2 = (high - close.shift(1)).abs()
   tr3 = (low - close.shift(1)).abs()
   tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-  atr = tr.ewm(alpha=1 / 7, adjust=False).mean()
+  
+  # 🎯 UPDATED ATR LENGTH TO 9 (Alpha = 1 / Length for Wilder's Smoothing)
+  atr = tr.ewm(alpha=1 / 9, adjust=False).mean()
 
-  # Supertrend parameters: Factor = 2, ATR length = 7
-  multiplier = 2.0
+  # 🎯 UPDATED MULTIPLIER FACTOR TO 3.0
+  multiplier = 3.0
   hl2 = (high + low) / 2
   basic_upper = hl2 + (multiplier * atr)
   basic_lower = hl2 - (multiplier * atr)
@@ -153,10 +155,9 @@ if __name__ == '__main__':
     )
     print(
         f"ST Line Value: {float(processed_df.at[target_index, 'sma21']):.2f}"
-        ' (Supertrend 7, 2)'
+        ' (Supertrend 9, 3)'
     )
     print(f"Trend State : {str(processed_df.at[target_index, 'ST_Trend'])}")
     export_supertrend_json(processed_df)
   else:
     print('CRITICAL: Upstream data empty.')
-
