@@ -53,7 +53,7 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int, ce_p: int = 
         p_power_clean = safe_int_convert(pe_p, fallback=1)
         
         # 🎯 NEW ATR FORMULA FORMULATION
-        raw_depth_sum = c_depth_clean + p_depth_clean + c_power_clean + p_power_clean
+        raw_depth_sum = c_depth_clean + p_depth_clean + c_power_clean + p_power_clean + 1
         
         # Enforce strict minimum floor boundary of 5
         if raw_depth_sum < 5:
