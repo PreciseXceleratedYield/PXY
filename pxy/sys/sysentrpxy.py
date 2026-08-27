@@ -5,6 +5,8 @@ PXY OPTION ROUTING ENGINE WITH HYBRID PIPELINES (SUPERTREND + MKTPXY)
 Operational Rules Matrix:
 1. Entry signals are driven by absolute matrix conditions between SuperTrend and Market Proxy.
 2. Structural exit windows are governed strictly by sysmktpxy execution.
+3. Time Filter: From 9:00 AM to 10:00 AM IST, entry signals ignore SuperTrend and rely 
+   strictly on exit_dir. Normal hybrid logic resumes after 10:00 AM IST.
 ===============================================================================
 """
 import pandas as pd
@@ -37,26 +39,42 @@ def get_entry_signal(df=None):
     # Fixed alignment gap: iloc[-1] targets the exact same closed window bar
     trend = processed_st_df['ST_Trend'].iloc[-1]
 
+    # Extract current time components from the last row's index (assumed to be DatetimeIndex)
+    latest_time = processed_st_df.index[-1].time()
+    start_time = pd.Timestamp("09:00:00").time()
+    end_time = pd.Timestamp("10:00:00").time()
+
     # ===== HYBRID MATRIX ROUTING EVALUATION =====
     
-    if trend == "BULL":
+    # 9:00 AM to 10:00 AM IST Window: Filter entry signal strictly by exit_dir
+    if start_time <= latest_time < end_time:
         if exit_dir == "BULL":
             entry_signal = "OTMBUY"
         elif exit_dir == "BEAR":
-            entry_signal = "BEAR"
-        else:
-            entry_signal = "NONE"
-            
-    elif trend == "BEAR":
-        if exit_dir == "BEAR":
             entry_signal = "OTMSELL"
-        elif exit_dir == "BULL":
-            entry_signal = "BULL"
         else:
             entry_signal = "NONE"
             
+    # Post-10:00 AM IST: Normal Matrix Execution
     else:
-        entry_signal = "NONE"
+        if trend == "BULL":
+            if exit_dir == "BULL":
+                entry_signal = "OTMBUY"
+            elif exit_dir == "BEAR":
+                entry_signal = "BEAR"
+            else:
+                entry_signal = "NONE"
+                
+        elif trend == "BEAR":
+            if exit_dir == "BEAR":
+                entry_signal = "OTMSELL"
+            elif exit_dir == "BULL":
+                entry_signal = "BULL"
+            else:
+                entry_signal = "NONE"
+                
+        else:
+            entry_signal = "NONE"
 
     # Evaluate Exit Profile via Market Proxy Direction
     if exit_dir in ["BULL", "BEAR"]:
@@ -72,4 +90,5 @@ if __name__ == "__main__":
     if df is not None and not df.empty:
         entry, ex = get_entry_signal(df)
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry} | EXIT_SIG: {ex}")
+
 
