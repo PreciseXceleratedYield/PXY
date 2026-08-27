@@ -94,11 +94,11 @@ def handle_side_averaging(client, df):
     ce_base_drawdown_limit = -ce_atr
     if ce_active_exit in ["SELL", "BEAR"]:
         ce_dynamic_threshold = (
-            ce_base_drawdown_limit * (pe_matrix_self * ce_factor + 1) * ce_lots_factor
+            ce_base_drawdown_limit * (pe_matrix_self * ce_factor + 0.4) * ce_lots_factor
         ) * 41
     else:
         ce_dynamic_threshold = (
-            ce_base_drawdown_limit * (ce_factor + 1) * ce_lots_factor
+            ce_base_drawdown_limit * (ce_factor + 0.4) * ce_lots_factor
         ) * 1.4
 
     pe_base_drawdown_limit = -pe_atr
