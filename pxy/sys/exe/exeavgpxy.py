@@ -96,16 +96,16 @@ def handle_side_averaging(client, df):
         ce_dynamic_threshold = ce_base_drawdown_limit * 5
     else:
         ce_dynamic_threshold = (
-            ce_base_drawdown_limit * (ce_factor + 1) * ce_lots_factor
-        ) * 1
+            ce_base_drawdown_limit * (ce_factor ) * ce_lots_factor
+        ) * 1.4
 
     pe_base_drawdown_limit = -pe_atr
     if pe_active_exit in ["BUY", "BULL"]:
         pe_dynamic_threshold = pe_base_drawdown_limit * 5
     else:
         pe_dynamic_threshold = (
-            pe_base_drawdown_limit * (pe_factor + 1) * pe_lots_factor
-        ) * 1
+            pe_base_drawdown_limit * (pe_factor ) * pe_lots_factor
+        ) * 1.4
 
     # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO COMBINED DYNAMIC THRESHOLDS
     ce_agt = int(round(ce_dynamic_threshold))
