@@ -12,7 +12,7 @@ from colorama import Fore, Style, init
 from sysdptpxy import detect_pxy_flip_signal
 
 # 🎯 IMPORT EXTERNAL POWER ENGINE NATIVELY
-from syspowrpxy import get_ce_pe_power
+from syspwerpxy import get_ce_pe_power
 
 # Initialize colorama terminal auto-reset formatting hooks
 init(autoreset=True)
