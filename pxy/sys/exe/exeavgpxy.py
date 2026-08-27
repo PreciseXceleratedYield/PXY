@@ -37,7 +37,7 @@ def handle_side_averaging(client, df):
     
     # Safe standardized execution for underlying option contract side mapping
     working_df['side'] = working_df['symbol'].astype(str).str[-2:].str.upper() 
-    working_df['row_invested'] = working_df['qty'].apply(safe_float) * working_df['sell_prc'].apply(safe_float)
+    working_df['row_invested'] = working_df['qty'].apply(safe_float) * ((working_df['sell_prc'].apply(safe_float) + working_df['sell_prc'].apply(safe_float))/2)
     working_df['row_pnl'] = working_df.get('pnl', 0.0).apply(safe_float)
 
     # Compile explicit state summaries from position snapshots
