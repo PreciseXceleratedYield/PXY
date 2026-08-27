@@ -52,7 +52,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
   atr = tr.ewm(alpha=1 / 3, adjust=False).mean()
 
   # 🎯 UPDATED MULTIPLIER FACTOR TO 3.0
-  multiplier = 3.0
+  multiplier = 1.7
   hl2 = (high + low) / 2
   basic_upper = hl2 + (multiplier * atr)
   basic_lower = hl2 - (multiplier * atr)
