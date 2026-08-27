@@ -11,6 +11,9 @@ from colorama import Fore, Style, init
 # 🎯 IMPORT UNTOUCHED SIGNAL ROUTER NATIVELY (Returns exactly 4 values)
 from sysdptpxy import detect_pxy_flip_signal
 
+# 🎯 IMPORT EXTERNAL POWER ENGINE NATIVELY
+from syspowrpxy import get_ce_pe_power
+
 # Initialize colorama terminal auto-reset formatting hooks
 init(autoreset=True)
 
@@ -32,11 +35,11 @@ def safe_int_convert(val, fallback=1) -> int:
     except (ValueError, TypeError):
         return fallback
 
-def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int) -> int:
+def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int, ce_p: int = 1, pe_p: int = 1) -> int:
     """
     Extracts numbers from past_depth_str, ce_depth, and pe_depth.
-    Sums all three numbers together and enforces ONLY a strict minimum of 5.
-    Maximum can grow higher infinitely to any value.
+    🎯 ATR MATH: Sum of CE Depth + PE Depth + CE Power + PE Power.
+    Enforces ONLY a strict minimum of 5. Maximum can grow higher infinitely.
     """
     try:
         # Clean string extraction for past depth digit sequences (e.g. 'PE4' -> ['4'])
@@ -46,9 +49,11 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int) -> int:
         # 🎯 SECURE DATA CONVERSIONS: Prevents type errors from interrupting loop steps
         c_depth_clean = safe_int_convert(ce_d, fallback=1)
         p_depth_clean = safe_int_convert(pe_d, fallback=1)
+        c_power_clean = safe_int_convert(ce_p, fallback=1)
+        p_power_clean = safe_int_convert(pe_p, fallback=1)
         
-        # 🎯 ATR MATH: Pure sum of all 3 depth metrics
-        raw_depth_sum = c_depth_clean + p_depth_clean #past_val_extracted + c_depth_clean + p_depth_clean
+        # 🎯 NEW ATR FORMULA FORMULATION
+        raw_depth_sum = c_depth_clean + p_depth_clean + c_power_clean + p_power_clean
         
         # Enforce strict minimum floor boundary of 5
         if raw_depth_sum < 5:
@@ -58,9 +63,9 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int) -> int:
     except Exception:
         return 5
 
-def calculate_atr_from_snapshot(past_depth_str: str, ce_depth: int, pe_depth: int) -> int:
+def calculate_atr_from_snapshot(past_depth_str: str, ce_depth: int, pe_depth: int, ce_power: int, pe_power: int) -> int:
     """Calculates ATR directly using pre-fetched snapshot variables to prevent timing lags."""
-    return scale_atr_value_from_depth(past_depth_str, ce_depth, pe_depth)
+    return scale_atr_value_from_depth(past_depth_str, ce_depth, pe_depth, ce_power, pe_power)
 
 def calculate_k_from_snapshot(ce_depth: int, pe_depth: int) -> int:
     """Calculates K directly using pre-fetched snapshot variables to prevent timing lags."""
@@ -70,7 +75,8 @@ def calculate_k_from_snapshot(ce_depth: int, pe_depth: int) -> int:
 def calculate_atr(df: pd.DataFrame) -> pd.Series:
     try:
         _, past_str, ce_d, pe_d = detect_pxy_flip_signal(df=df)
-        val = scale_atr_value_from_depth(past_str, ce_d, pe_d)
+        _, ce_p, pe_p = get_ce_pe_power(df)
+        val = scale_atr_value_from_depth(past_str, ce_d, pe_d, ce_p, pe_p)
         return pd.Series(float(val), index=df.index) if df is not None and not df.empty else pd.Series([float(val)])
     except Exception:
         return pd.Series(5.0, index=df.index) if df is not None and not df.empty else pd.Series([5.0])
@@ -92,8 +98,9 @@ if __name__ == "__main__":
             
             # 🎯 PULL DATA ONCE: Synchronizes calculation pools instantly
             _, past_depth_str, ce_depth, pe_depth = detect_pxy_flip_signal(df=df)
+            _, ce_power, pe_power = get_ce_pe_power(df)
             
-            final_atr = calculate_atr_from_snapshot(past_depth_str, ce_depth, pe_depth)
+            final_atr = calculate_atr_from_snapshot(past_depth_str, ce_depth, pe_depth, ce_power, pe_power)
             final_k = calculate_k_from_snapshot(ce_depth, pe_depth)
             
             # Display perfectly synchronized metrics within terminal frames
@@ -105,5 +112,6 @@ if __name__ == "__main__":
             print("ATR:5" + (" " * 33) + "K:2")
     except Exception:
         print("ATR:5" + (" " * 33) + "K:2")
+
 
 
