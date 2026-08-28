@@ -1,8 +1,10 @@
 # =============================================================================
-# MAIN MODULE: exeavgpxy.py [PART 1: PARSERS & TELEMETRY STREAM PANEL]
+# MAIN MODULE: exeavgpxy.py [PART 1: PARSERS & DATA MATRIX RESOLUTIONS]
 # =============================================================================
 import re
+import os
 import logging
+import subprocess
 from datetime import datetime
 from colorama import Fore, Style
 
@@ -37,8 +39,13 @@ def handle_side_averaging(client, df):
     
     # Safe standardized execution for underlying option contract side mapping
     working_df['side'] = working_df['symbol'].astype(str).str[-2:].str.upper() 
-    working_df['row_invested'] = working_df['qty'].apply(safe_float) * (working_df['sell_prc'].apply(safe_float) )
-    working_df['row_pnl'] = working_df.get('pnl', 0.0).apply(safe_float)
+    working_df['row_invested'] = working_df['qty'].apply(safe_float) * (working_df['sell_prc'].apply(safe_float))
+    
+    # Shield against missing pnl column series failure
+    if 'pnl' in working_df.columns:
+        working_df['row_pnl'] = working_df['pnl'].apply(safe_float)
+    else:
+        working_df['row_pnl'] = 0.0
 
     # Compile explicit state summaries from position snapshots
     pos_raw = str(get_position_summary(client)).upper().replace(" ", "").strip()
@@ -53,11 +60,31 @@ def handle_side_averaging(client, df):
     ce_rows = working_df[working_df['side'] == 'CE']
     pe_rows = working_df[working_df['side'] == 'PE']
     
-    ce_investment = float(ce_rows['row_invested'].sum())
-    pe_investment = float(pe_rows['row_invested'].sum())
+    # 💰 MATHEMATICALLY ROBUST OVERALL PERFORMANCE PERCENTAGE MATRIX
+    if not ce_rows.empty:
+        ce_total_cost = (ce_rows['qty'].apply(safe_float) * ce_rows['buy_prc'].apply(safe_float)).sum()
+        ce_total_value = (ce_rows['qty'].apply(safe_float) * ce_rows['sell_prc'].apply(safe_float)).sum()
+        ce_overall_pnl_pct = ((ce_total_value - ce_total_cost) / ce_total_cost) * 100 if ce_total_cost > 0 else 0.0
+    else:
+        ce_overall_pnl_pct = 0.0
+
+    if not pe_rows.empty:
+        pe_total_cost = (pe_rows['qty'].apply(safe_float) * pe_rows['buy_prc'].apply(safe_float)).sum()
+        pe_total_value = (pe_rows['qty'].apply(safe_float) * pe_rows['sell_prc'].apply(safe_float)).sum()
+        pe_overall_pnl_pct = ((pe_total_value - pe_total_cost) / pe_total_cost) * 100 if pe_total_cost > 0 else 0.0
+    else:
+        pe_overall_pnl_pct = 0.0
+
+    # Convert overall performance matrix to a positive "loss value" to safely hit targets
+    ce_avg_loss = -ce_overall_pnl_pct if ce_overall_pnl_pct < 0 else 0.0
+    pe_avg_loss = -pe_overall_pnl_pct if pe_overall_pnl_pct < 0 else 0.0
+
+    # Structural exposure factor resolutions
+    ce_investment = float(ce_rows['row_invested'].sum()) if not ce_rows.empty else 0.0
+    pe_investment = float(pe_rows['row_invested'].sum()) if not pe_rows.empty else 0.0
     
-    ce_factor = ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
-    pe_factor = pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
+    ce_invst_factor = ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
+    pe_invst_factor = pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
 
     ce_pnl = float(ce_rows['row_pnl'].sum())
     pe_pnl = float(pe_rows['row_pnl'].sum())
@@ -75,12 +102,11 @@ def handle_side_averaging(client, df):
     ce_matrix_self = max(ce_depth, ce_power)
     pe_matrix_self = max(pe_depth, pe_power)
     
-    # 🎯 VOLATILITY-UNIFIED TARGET FORMULA RESOLUTION: (ATR / LOTS) * OWN MATRIX SCALE
-    ce_atr = safe_float(ce_last.get("atr", 0.0))
-    pe_atr = safe_float(pe_last.get("atr", 0.0))
+    # 🎯 VOLATILITY-UNIFIED TARGET FORMULA RESOLUTION: GLOBAL ATR ENGINE
+    atr = safe_float(working_df['atr'].iloc[0]) if 'atr' in working_df.columns and not working_df.empty else 0.0
     
-    ce_tgt = int(round(((ce_atr / ce_lots) * ce_matrix_self))) if ce_lots > 0 else 0
-    pe_tgt = int(round(((pe_atr / pe_lots) * pe_matrix_self))) if pe_lots > 0 else 0
+    ce_tgt = int(round(((atr / ce_lots) * ce_matrix_self))) if ce_lots > 0 else 0
+    pe_tgt = int(round(((atr / pe_lots) * pe_matrix_self))) if pe_lots > 0 else 0
 
     # Extract exit fields directly from the side snapshots since they are identical across rows
     ce_avg_entry = str(ce_last.get("entry", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
@@ -93,19 +119,19 @@ def handle_side_averaging(client, df):
     # --- PRE-CALCULATE DYNAMIC THRESHOLDS MULTIPLIED ACROSS THE WHOLE THING ---
     
     # --- CALL OPTION (CE) SIDE RISK CALCULATIONS ---
-    ce_base_drawdown_limit = -ce_atr * 1.4
+    ce_base_drawdown_limit = -atr * 1.4
     if "MBUY" in ce_avg_entry:
         ce_dynamic_threshold = (
-            ce_base_drawdown_limit * ce_factor * ce_lots_factor
+            ce_base_drawdown_limit * ce_invst_factor * ce_lots_factor
         ) * 1.4
     else:
         ce_dynamic_threshold = ce_base_drawdown_limit * 14
 
     # --- PUT OPTION (PE) SIDE RISK CALCULATIONS ---
-    pe_base_drawdown_limit = -pe_atr * 1.4
+    pe_base_drawdown_limit = -atr * 1.4
     if "MSELL" in pe_avg_entry:
         pe_dynamic_threshold = (
-            pe_base_drawdown_limit * pe_factor * pe_lots_factor
+            pe_base_drawdown_limit * pe_invst_factor * pe_lots_factor
         ) * 1.4
     else:
         pe_dynamic_threshold = pe_base_drawdown_limit * 14
@@ -113,42 +139,36 @@ def handle_side_averaging(client, df):
     # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO COMBINED DYNAMIC THRESHOLDS
     ce_agt = int(round(ce_dynamic_threshold))
     pe_agt = int(round(pe_dynamic_threshold))
-
-    # --- RULE CRITERIA PARSING ---
-    ce_avg_loss = get_loss(ce_last) if not ce_rows.empty else 0.0
-    pe_avg_loss = get_loss(pe_last) if not pe_rows.empty else 0.0
     
-    # 🎯 MONITOR TARGET PERCENTAGE CROSSINGS (ACTUAL % >= POSITIVE TGT %)
+    # 🎯 MONITOR TARGET PERCENTAGE CROSSINGS (ACTUAL OVERALL LOSS >= POSITIVE TGT %)
     ce_target_crossed = ce_avg_loss >= ce_tgt if ce_lots > 0 else False
     pe_target_crossed = pe_avg_loss >= pe_tgt if pe_lots > 0 else False
 
     ce_sts = "✔️" if ce_target_crossed else "❌"
     pe_sts = "✔️" if pe_target_crossed else "❌"
 
-    if ce_target_crossed and ce_avg_entry in ['SELL', 'BEAR']:
-        import subprocess
-        pass #subprocess.run(["pxysqrce"])
+    # Synchronized with the dynamic string matching pattern rules
+    if ce_target_crossed and "MBUY" in ce_avg_entry:
+        pass  # subprocess.run(["pxysqrce"])
 
-    if pe_target_crossed and pe_avg_entry in ['BUY', 'BULL']:
-        import subprocess
-        pass #subprocess.run(["pxysqrpe"])
-        
+    if pe_target_crossed and "MSELL" in pe_avg_entry:
+        pass  # subprocess.run(["pxysqrpe"])
     # =============================================================================
     # PART 6: TELEMETRY STREAM PANEL GRAPHICS & BALANCED GEOMETRIC RATIO BAR
     # =============================================================================
-    P_WIDTH = 40 
+    P_WIDTH = 40  # Preserved standard size width
     
     print("\n" + Fore.CYAN + "=" * P_WIDTH)
-    print(Fore.CYAN + " OPT  LOT       PNL    AGT    TGT  STS")
+    print(Fore.CYAN + "OPT LOT     PNL   AGT   TGT STS")
     print(Fore.CYAN + "-" * P_WIDTH)
     
     ce_pnl_val = int(round(ce_pnl))
     ce_pnl_color = Fore.CYAN + Style.BRIGHT if ce_target_crossed else (Fore.GREEN if ce_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f"  CE   {ce_lots:>2}   " + ce_pnl_color + f"{ce_pnl_val:>8}" + Style.RESET_ALL + f"   {ce_agt:>4}   {ce_tgt:>4}   {ce_sts}")
+    print(Fore.WHITE + f" CE  {ce_lots:>2} " + ce_pnl_color + f"{ce_pnl_val:>7}" + Style.RESET_ALL + f"  {ce_agt:>4}  {ce_tgt:>4}  {ce_sts}")
     
     pe_pnl_val = int(round(pe_pnl))
     pe_pnl_color = Fore.CYAN + Style.BRIGHT if pe_target_crossed else (Fore.GREEN if pe_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f"  PE   {pe_lots:>2}   " + pe_pnl_color + f"{pe_pnl_val:>8}" + Style.RESET_ALL + f"   {pe_agt:>4}   {pe_tgt:>4}   {pe_sts}")
+    print(Fore.WHITE + f" PE  {pe_lots:>2} " + pe_pnl_color + f"{pe_pnl_val:>7}" + Style.RESET_ALL + f"  {pe_agt:>4}  {pe_tgt:>4}  {pe_sts}")
     print(Fore.CYAN + "-" * P_WIDTH)
 
     # --- DRAW THE DYNAMIC GEOMETRIC BALANCE BAR ---
@@ -170,6 +190,7 @@ def handle_side_averaging(client, df):
     
     print("  " + Fore.GREEN + left_label + Fore.GREEN + left_dash_track + Fore.WHITE + "⚖️" + Fore.RED + right_dash_track + Fore.RED + right_label)
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
+
     # =============================================================================
     # PART 7: MULTI-LAYER DOWNWARD DIRECTIONAL MATRIX AVERAGING LOOPS
     # =============================================================================
@@ -182,14 +203,7 @@ def handle_side_averaging(client, df):
         active_exit = ce_avg_entry if side == 'CE' else pe_avg_entry
     
         all_positions_crossed_threshold = True
-        last_calculated_threshold = 0.0
-        
-        # Link loops instantly to the identical combined factor thresholds
-        if side == 'CE':
-            dynamic_threshold = ce_dynamic_threshold
-        else: # side == 'PE'
-            dynamic_threshold = pe_dynamic_threshold
-                
+        dynamic_threshold = ce_dynamic_threshold if side == 'CE' else pe_dynamic_threshold
         last_calculated_threshold = dynamic_threshold
         
         # --- SCAN INDIVIDUAL POSITION ROWS ---
@@ -201,12 +215,9 @@ def handle_side_averaging(client, df):
                 all_positions_crossed_threshold = False
                 break
                 
-        # --- PLACE SYSTEM AVERAGING ORDER ---
+        # --- PLACE LIVE SYSTEM AVERAGING ORDER ---
         if all_positions_crossed_threshold and len(side_df) < (MAX_LAYERS + 1):
             if not is_cooling(side):
-                import os          # ✅ Required for absolute path assembly
-                import subprocess  # ✅ Required for system shell routing
-                
                 symbol = last_row['symbol']
                 final_loss = get_loss(last_row)
                 
@@ -224,7 +235,7 @@ def handle_side_averaging(client, df):
                         action_flag = "1" if side == "CE" else "2"
                         cmd = ["python3", exe_path, action_flag]
                         
-                        # 2️⃣ Execute terminal command cleanly via absolute path framework
+                        # 2️⃣ Execute live terminal order command cleanly via shell pipeline
                         subprocess.run(cmd, check=True)
                         
                         # 3️⃣ Success tracking update
@@ -239,3 +250,4 @@ def handle_side_averaging(client, df):
                         print(f"{Fore.RED}⚠️ CRITICAL INTEGRATION ERROR: {e}")
                 else:
                     print(f"{Fore.RED}❌ CRITICAL FILE ERROR: Target script not found at {exe_path}")
+
