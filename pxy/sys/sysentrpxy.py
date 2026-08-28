@@ -2,7 +2,7 @@
 # PXY OPTION ROUTING ENGINE (PURE TSMA SIGNALS ONLY)
 # ===============================================================================
 import pandas as pd
-from sysrtsmapxy import calculate_linear_regression_channel
+from systsmapxy import calculate_linear_regression_channel
 
 def get_entry_signal(df=None):
     """
