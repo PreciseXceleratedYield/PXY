@@ -91,7 +91,7 @@ def handle_side_averaging(client, df):
     pe_lots_factor = (pe_lots + 1) / (ce_lots + 1) if ce_lots >= 0 else 1.0
 
     # --- PRE-CALCULATE DYNAMIC THRESHOLDS MULTIPLIED ACROSS THE WHOLE THING ---
-    ce_base_drawdown_limit = -ce_atr
+    ce_base_drawdown_limit = -ce_atr * 1.4
     if ce_active_exit in ["SELL", "BEAR"]:
         ce_dynamic_threshold = ce_base_drawdown_limit * 14
     else:
@@ -99,7 +99,7 @@ def handle_side_averaging(client, df):
             ce_base_drawdown_limit * (ce_factor ) * ce_lots_factor
         ) * 1.4
 
-    pe_base_drawdown_limit = -pe_atr
+    pe_base_drawdown_limit = -pe_atr * 1.4
     if pe_active_exit in ["BUY", "BULL"]:
         pe_dynamic_threshold = pe_base_drawdown_limit * 14
     else:
