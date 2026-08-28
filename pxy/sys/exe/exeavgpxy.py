@@ -83,8 +83,8 @@ def handle_side_averaging(client, df):
     pe_tgt = int(round(((pe_atr / pe_lots) * pe_matrix_self))) if pe_lots > 0 else 0
 
     # Extract exit fields directly from the side snapshots since they are identical across rows
-    ce_active_exit = str(ce_last.get("supertrend", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
-    pe_active_exit = str(pe_last.get("supertrend", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
+    ce_active_exit = str(ce_last.get("exit", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
+    pe_active_exit = str(pe_last.get("exit", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
 
     # --- ZERO-DIVISION SHIELDED LOTS FACTOR ENGINE ---
     ce_lots_factor = (ce_lots + 1) / (pe_lots + 1) if pe_lots >= 0 else 1.0
