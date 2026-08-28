@@ -48,9 +48,13 @@ def target_price(row):
 
         ce_d = i(row.get("hkin_ce_depth", 0))
         pe_d = i(row.get("hkin_pe_depth", 0))
-
+        
         atr = f(row.get("atr", 0))
         katr = max(f(row.get("katr", 1)), 0.001)  # prevent divide-by-zero
+
+        # Extract raw bos_val to check if it's text "NONE" or blank
+        raw_bos = str(row.get("bos_val", "NONE")).upper().strip()
+        is_bos_none = (raw_bos == "NONE" or raw_bos == "")
 
         # 3️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
@@ -69,12 +73,13 @@ def target_price(row):
             if active_exit in ("SELL", "BEAR"):  # Hostile (Not Aligned)
                 target_pct = 1.4
             else:                                # Aligned
-                target_pct = atr #* max(ce_d, ce_p)
+                target_pct = atr if is_bos_none else atr * atr
+                
         elif is_pe:
             if active_exit in ("BUY", "BULL"):   # Hostile (Not Aligned)
                 target_pct = 1.4
             else:                                # Aligned
-                target_pct = atr #* max(pe_d, pe_p)
+                target_pct = atr if is_bos_none else atr * atr
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1 + (target_pct / 100.0))
