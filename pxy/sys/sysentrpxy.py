@@ -13,8 +13,9 @@ from sysstrndpxy import calculate_supertrend
 def get_entry_signal(df=None):
     """Routes options positioning based on an absolute decoupled hybrid matrix:
 
-    Entries & Exits -> SuperTrend trend state combined with Market Proxy outcomes.
-    Evaluation window matches current real-time IST clock.
+    Entries -> Pure SuperTrend trend state combined with specific Market Proxy
+    outcomes. Exits   -> Pure sysmktpxy dynamic signals. Evaluation window matches
+    current real-time IST clock.
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -37,16 +38,15 @@ def get_entry_signal(df=None):
 
     # CONSTANTS - Pure Naive Time Objects for Evaluation
     start_time = pd.Timestamp("09:00:00").time()
-    end_time = pd.Timestamp("09:30:00").time()  # SYSTEM UPDATE: Window capped at 9:30 AM
+    end_time = pd.Timestamp("10:00:00").time()
 
     # REAL-TIME SYSTEM FIX: Fetch exact current live time in IST
     ist_tz = ZoneInfo("Asia/Kolkata")
     latest_time = datetime.now(ist_tz).time()
 
     # ===== HYBRID MATRIX ROUTING EVALUATION ===== #
-    # 9:00 AM to 9:30 AM IST Window: Filter signals strictly by exit_dir
+    # 9:00 AM to 10:00 AM IST Window: Filter entry signal strictly by exit_dir
     if start_time <= latest_time < end_time:
-        # --- Entry Signal Window Logic ---
         if exit_dir == "BULL":
             entry_signal = "OTMBUY"
         elif exit_dir == "BEAR":
@@ -54,15 +54,8 @@ def get_entry_signal(df=None):
         else:
             entry_signal = "NONE"
 
-        # --- Exit Signal Window Logic ---
-        if exit_dir in ["BULL", "BEAR"]:
-            exit_signal = exit_dir
-        else:
-            exit_signal = "NONE"
-
-    # Post-9:30 AM IST: Normal Matrix Execution
+    # Post-10:00 AM IST: Normal Matrix Execution
     else:
-        # --- Post-9:30 AM Entry Signal Matrix ---
         if trend == "BULL":
             if exit_dir == "BULL":
                 entry_signal = "OTMBUY"
@@ -80,23 +73,11 @@ def get_entry_signal(df=None):
         else:
             entry_signal = "NONE"
 
-        # --- Post-9:30 AM Exit Signal Matrix ---
-        if trend == "BULL":
-            if exit_dir == "BULL":
-                exit_signal = "BULL"
-            elif exit_dir == "BEAR":
-                exit_signal = "HOLD"
-            else:
-                exit_signal = "NONE"
-        elif trend == "BEAR":
-            if exit_dir == "BEAR":
-                exit_signal = "BEAR"
-            elif exit_dir == "BULL":
-                exit_signal = "HOLD"
-            else:
-                exit_signal = "NONE"
-        else:
-            exit_signal = "NONE"
+    # Evaluate Exit Profile via Market Proxy Direction
+    if exit_dir in ["BULL", "BEAR"]:
+        exit_signal = exit_dir
+    else:
+        exit_signal = "NONE"
 
     return entry_signal, exit_signal
 
@@ -108,7 +89,3 @@ if __name__ == "__main__":
     if df is not None and not df.empty:
         entry, ex = get_entry_signal(df)
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry} | EXIT_SIG: {ex}")
-
-
-
-
