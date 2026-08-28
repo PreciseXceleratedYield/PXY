@@ -83,8 +83,8 @@ def handle_side_averaging(client, df):
     pe_tgt = int(round(((pe_atr / pe_lots) * pe_matrix_self))) if pe_lots > 0 else 0
 
     # Extract exit fields directly from the side snapshots since they are identical across rows
-    ce_active_exit = str(ce_last.get("exit", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
-    pe_active_exit = str(pe_last.get("exit", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
+    ce_avg_entry = str(ce_last.get("entry", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
+    pe_avg_entry = str(pe_last.get("entry", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
 
     # --- ZERO-DIVISION SHIELDED LOTS FACTOR ENGINE ---
     ce_lots_factor = (ce_lots + 1) / (pe_lots + 1) if pe_lots >= 0 else 1.0
@@ -92,7 +92,7 @@ def handle_side_averaging(client, df):
 
     # --- PRE-CALCULATE DYNAMIC THRESHOLDS MULTIPLIED ACROSS THE WHOLE THING ---
     ce_base_drawdown_limit = -ce_atr * 1.4
-    if ce_active_exit in ["SELL", "BEAR"]:
+    if ce_avg_entry in ["SELL", "BEAR"]:
         ce_dynamic_threshold = ce_base_drawdown_limit * 14
     else:
         ce_dynamic_threshold = (
@@ -100,7 +100,7 @@ def handle_side_averaging(client, df):
         ) * 1.4
 
     pe_base_drawdown_limit = -pe_atr * 1.4
-    if pe_active_exit in ["BUY", "BULL"]:
+    if pe_avg_entry in ["BUY", "BULL"]:
         pe_dynamic_threshold = pe_base_drawdown_limit * 14
     else:
         pe_dynamic_threshold = (
@@ -122,11 +122,11 @@ def handle_side_averaging(client, df):
     ce_sts = "✔️" if ce_target_crossed else "❌"
     pe_sts = "✔️" if pe_target_crossed else "❌"
 
-    if ce_target_crossed and ce_active_exit in ['SELL', 'BEAR']:
+    if ce_target_crossed and ce_avg_entry in ['SELL', 'BEAR']:
         import subprocess
         pass #subprocess.run(["pxysqrce"])
 
-    if pe_target_crossed and pe_active_exit in ['BUY', 'BULL']:
+    if pe_target_crossed and pe_avg_entry in ['BUY', 'BULL']:
         import subprocess
         pass #subprocess.run(["pxysqrpe"])
         
@@ -176,7 +176,7 @@ def handle_side_averaging(client, df):
             continue
             
         last_row = side_df.iloc[-1]
-        active_exit = ce_active_exit if side == 'CE' else pe_active_exit
+        active_exit = ce_avg_entry if side == 'CE' else pe_avg_entry
     
         all_positions_crossed_threshold = True
         last_calculated_threshold = 0.0
