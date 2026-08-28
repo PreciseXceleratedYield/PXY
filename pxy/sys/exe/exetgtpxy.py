@@ -71,13 +71,13 @@ def target_price(row):
         # 4️⃣ Dynamic execution logic using power and depth matrix
         if is_ce:
             if active_exit in ("SELL", "BEAR"):  # Hostile (Not Aligned)
-                target_pct = 1.4
+                target_pct = atr / 1.4
             else:                                # Aligned
                 target_pct = atr if is_bos_none else atr * 1.4
                 
         elif is_pe:
             if active_exit in ("BUY", "BULL"):   # Hostile (Not Aligned)
-                target_pct = 1.4
+                target_pct = atr / 1.4
             else:                                # Aligned
                 target_pct = atr if is_bos_none else atr * 1.4
 
