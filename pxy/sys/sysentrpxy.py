@@ -1,14 +1,6 @@
-"""
-===============================================================================
-PXY OPTION ROUTING ENGINE WITH HYBRID PIPELINES (SUPERTREND + MKTPXY)
-===============================================================================
-Operational Rules Matrix:
-1. Entry signals are driven by absolute matrix conditions between SuperTrend and Market Proxy.
-2. Structural exit windows are governed strictly by sysmktpxy execution.
-3. Time Filter: From 9:00 AM to 10:00 AM IST, entry signals ignore SuperTrend and rely 
-   strictly on exit_dir. Normal hybrid logic resumes after 10:00 AM IST.
-===============================================================================
-"""
+# ===============================================================================
+# PXY OPTION ROUTING ENGINE WITH HYBRID PIPELINES (SUPERTREND + MKTPXY)
+# ===============================================================================
 import pandas as pd
 from syscnfgpxy import TICKER
 from sysmktpxy import get_signal 
@@ -39,10 +31,19 @@ def get_entry_signal(df=None):
     # Fixed alignment gap: iloc[-1] targets the exact same closed window bar
     trend = processed_st_df['ST_Trend'].iloc[-1]
 
-    # Extract current time components from the last row's index (assumed to be DatetimeIndex)
-    latest_time = processed_st_df.index[-1].time()
+    # CONSTANTS - Pure Naive Time Objects for Evaluation
     start_time = pd.Timestamp("09:00:00").time()
     end_time = pd.Timestamp("10:00:00").time()
+
+    # SYSTEM FIX: Ensure index is datetime, normalize to IST, then extract naive time
+    latest_timestamp = pd.to_datetime(processed_st_df.index[-1])
+    
+    if latest_timestamp.tz is None:
+        # If naive, assume it's already IST or localize based on your data feed profile
+        latest_time = latest_timestamp.time()
+    else:
+        # If timezone aware (e.g. UTC from yfinance), safely convert to IST first
+        latest_time = latest_timestamp.tz_convert("Asia/Kolkata").time()
 
     # ===== HYBRID MATRIX ROUTING EVALUATION =====
     
