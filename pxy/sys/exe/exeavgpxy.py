@@ -56,8 +56,8 @@ def handle_side_averaging(client, df):
     ce_investment = float(ce_rows['row_invested'].sum())
     pe_investment = float(pe_rows['row_invested'].sum())
     
-    ce_factor = 1 #ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
-    pe_factor = 1 #pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
+    ce_factor = ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
+    pe_factor = pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
 
     ce_pnl = float(ce_rows['row_pnl'].sum())
     pe_pnl = float(pe_rows['row_pnl'].sum())
