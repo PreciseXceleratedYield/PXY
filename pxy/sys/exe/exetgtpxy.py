@@ -58,7 +58,7 @@ def target_price(row):
 
         # 3️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
-        active_exit = str(row.get("exit", "NONE")).upper().strip()
+        active_exit = str(row.get("supertrend", "NONE")).upper().strip()
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
