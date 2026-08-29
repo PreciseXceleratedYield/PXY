@@ -8,7 +8,7 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # -------------------- Hardcoded constants --------------------
-LOOKBACK_PERIOD = 3
+LOOKBACK_PERIOD = 5
 TOTAL_WIDTH = 42
 
 # -------------------- CE/PE Power Calculation --------------------
