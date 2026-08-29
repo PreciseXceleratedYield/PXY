@@ -95,4 +95,3 @@ if __name__ == "__main__":
     # Print single line
     print(left_text_colored + spacing + right_text_colored)
 
-
