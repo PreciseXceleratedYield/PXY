@@ -192,7 +192,7 @@ def handle_side_averaging(client, df):
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
 
     # =============================================================================
-    # PART 7: MULTI-LAYER DOWNWARD DIRECTIONAL MATRIX AVERAGING LOOPS
+    # PART 7: NATIVE INLINE MULTI-LAYER DOWNWARD DIRECTIONAL MATRIX AVERAGING ENGINE
     # =============================================================================
     for side in ['CE', 'PE']:
         side_df = ce_rows if side == 'CE' else pe_rows
@@ -200,10 +200,17 @@ def handle_side_averaging(client, df):
             continue
             
         last_row = side_df.iloc[-1]
-        active_exit = ce_avg_entry if side == 'CE' else pe_avg_entry
+        active_exit = ce_active_exit if side == 'CE' else pe_active_exit
     
         all_positions_crossed_threshold = True
-        dynamic_threshold = ce_dynamic_threshold if side == 'CE' else pe_dynamic_threshold
+        last_calculated_threshold = 0.0
+        
+        # Link loops instantly to the identical combined factor thresholds
+        if side == 'CE':
+            dynamic_threshold = ce_dynamic_threshold
+        else: # side == 'PE'
+            dynamic_threshold = pe_dynamic_threshold
+                
         last_calculated_threshold = dynamic_threshold
         
         # --- SCAN INDIVIDUAL POSITION ROWS ---
@@ -215,39 +222,41 @@ def handle_side_averaging(client, df):
                 all_positions_crossed_threshold = False
                 break
                 
-        # --- PLACE LIVE SYSTEM AVERAGING ORDER ---
+        # --- PLACE SYSTEM AVERAGING ORDER DIRECTLY VIA CLIENT ---
         if all_positions_crossed_threshold and len(side_df) < (MAX_LAYERS + 1):
             if not is_cooling(side):
                 symbol = last_row['symbol']
+                qty = abs(int(safe_float(last_row.get('qty', 0.0))))
+                new_tag = generate_pxy_tag()
                 final_loss = get_loss(last_row)
                 
+                # Render deployment state trace directly to the stream panel
                 print_pxy_trigger_dashboard(
-                    side, symbol, final_loss, last_calculated_threshold, "AUTO_MANAGED", 
+                    side, symbol, final_loss, last_calculated_threshold, new_tag, 
                     ce_lots, pe_lots, active_exit
                 )
                 
-                # Dynamic absolute base path to the target script file
-                exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exeforcepxy.py")
-                
-                if os.path.exists(exe_path):
-                    try:
-                        # 1️⃣ Map system script positional argument based on contract side
-                        action_flag = "1" if side == "CE" else "2"
-                        cmd = ["python3", exe_path, action_flag]
-                        
-                        # 2️⃣ Execute live terminal order command cleanly via shell pipeline
-                        subprocess.run(cmd, check=True)
-                        
-                        # 3️⃣ Success tracking update
+                try:
+                    # Construct optimized parameters dictionary mapped for standard F&O parameters
+                    params = {
+                        "exchange_segment": "nse_fo", 
+                        "product": "NRML", 
+                        "price": "0",
+                        "order_type": "MKT", 
+                        "quantity": str(qty), 
+                        "trading_symbol": str(symbol),
+                        "transaction_type": "B", 
+                        "validity": "DAY", 
+                        "amo": "NO", 
+                        "tag": new_tag
+                    }
+                    
+                    # Execute synchronous API order call against active broker infrastructure
+                    if client.place_order(**params):
                         set_cooling(side)
-                        print(f"{Fore.GREEN}✅ SUCCESS: {side} Averaging triggered via absolute path execution.")
+                        print(f"{Fore.GREEN}✅ SUCCESS: {side} NATIVELY AVERAGED by {active_exit} tracking engine. Tag: {new_tag}")
                         
-                    except subprocess.CalledProcessError as e:
-                        logger.error(f"Absolute shell execution failure on exeforcepxy.py: {e}", exc_info=True)
-                        print(f"{Fore.RED}⚠️ TERMINAL PIPELINE EXECUTION ERROR: {e}")
-                    except Exception as e:
-                        logger.error(f"Critical execution tracking failure on side {side}: {e}", exc_info=True)
-                        print(f"{Fore.RED}⚠️ CRITICAL INTEGRATION ERROR: {e}")
-                else:
-                    print(f"{Fore.RED}❌ CRITICAL FILE ERROR: Target script not found at {exe_path}")
+                except Exception as e:
+                    logger.error(f"Order placement critical tracking failure on side {side}: {e}", exc_info=True)
+                    print(f"{Fore.RED}⚠️ ORDER PLACEMENT CRITICAL ERROR: {e}")
 
