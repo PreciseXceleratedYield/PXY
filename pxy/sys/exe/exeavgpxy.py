@@ -1,24 +1,23 @@
 # =============================================================================
-# MAIN MODULE: exeavgpxy.py [PART 1: DATA PARSERS & TELEMETRY STREAM PANEL]
+# MAIN MODULE: exeavgpxy.py [PART 1: PARSERS & DATA MATRIX RESOLUTIONS]
 # =============================================================================
 import re
 import os
 import logging
 import subprocess
 from datetime import datetime
-from colorama import Fore, Style, init
+from colorama import Fore, Style
 
 # Direct module dependency linking to inherit all variables from the helper script
 from exehvgpxy import (
-    REBUY_ENABLED, MAX_LAYERS, IST, MARKET_START, MARKET_END, 
-    pxysqrce, pxysqrpe, safe_float, generate_pxy_tag, is_cooling, 
+    REBUY_ENABLED, MAX_LAYERS, IST, MARKET_START, MARKET_END,
+    pxysqrce, pxysqrpe, safe_float, generate_pxy_tag, is_cooling,
     set_cooling, get_loss, print_pxy_trigger_dashboard
 )
 from run.runpchkpxy import get_position_summary
 
 # Configure localized robust module logger
 logger = logging.getLogger("exeavgpxy")
-init(autoreset=True)
 
 def handle_side_averaging(client, df): 
     """
@@ -84,8 +83,8 @@ def handle_side_averaging(client, df):
     ce_investment = float(ce_rows['row_invested'].sum()) if not ce_rows.empty else 0.0
     pe_investment = float(pe_rows['row_invested'].sum()) if not pe_rows.empty else 0.0
     
-    ce_factor = ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
-    pe_factor = pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
+    ce_invst_factor = ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
+    pe_invst_factor = pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
 
     ce_pnl = float(ce_rows['row_pnl'].sum())
     pe_pnl = float(pe_rows['row_pnl'].sum())
@@ -109,7 +108,7 @@ def handle_side_averaging(client, df):
     ce_tgt = int(round(((atr / ce_lots) * ce_matrix_self))) if ce_lots > 0 else 0
     pe_tgt = int(round(((atr / pe_lots) * pe_matrix_self))) if pe_lots > 0 else 0
 
-    # Extract entry fields directly from the side snapshots since they are identical across rows
+    # Extract exit fields directly from the side snapshots since they are identical across rows
     ce_avg_entry = str(ce_last.get("entry", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
     pe_avg_entry = str(pe_last.get("entry", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
 
@@ -118,19 +117,22 @@ def handle_side_averaging(client, df):
     pe_lots_factor = (pe_lots + 1) / (ce_lots + 1) if ce_lots >= 0 else 1.0
 
     # --- PRE-CALCULATE DYNAMIC THRESHOLDS MULTIPLIED ACROSS THE WHOLE THING ---
-    ce_base_drawdown_limit = -atr
+    
+    # --- CALL OPTION (CE) SIDE RISK CALCULATIONS ---
+    ce_base_drawdown_limit = -atr * 1.4
     if "MBUY" in ce_avg_entry:
         ce_dynamic_threshold = (
-            ce_base_drawdown_limit * ce_factor * ce_lots_factor
-        ) + (2 * ce_base_drawdown_limit )
+            ce_base_drawdown_limit * ce_invst_factor * ce_lots_factor
+        ) + ce_base_drawdown_limit
     else:
         ce_dynamic_threshold = ce_base_drawdown_limit * 14
 
-    pe_base_drawdown_limit = -atr
+    # --- PUT OPTION (PE) SIDE RISK CALCULATIONS ---
+    pe_base_drawdown_limit = -atr * 1.4
     if "MSELL" in pe_avg_entry:
         pe_dynamic_threshold = (
-            pe_base_drawdown_limit * pe_factor * pe_lots_factor
-        ) + (2 * pe_base_drawdown_limit )
+            pe_base_drawdown_limit * pe_invst_factor * pe_lots_factor
+        ) + pe_base_drawdown_limit
     else:
         pe_dynamic_threshold = pe_base_drawdown_limit * 14
 
@@ -145,11 +147,12 @@ def handle_side_averaging(client, df):
     ce_sts = "✔️" if ce_target_crossed else "❌"
     pe_sts = "✔️" if pe_target_crossed else "❌"
 
+    # Synchronized with the dynamic string matching pattern rules
     if ce_target_crossed and "MBUY" in ce_avg_entry:
-        pass  # Synchronized execution hooks
+        pass  # Synchronized system hooks
 
     if pe_target_crossed and "MSELL" in pe_avg_entry:
-        pass  # Synchronized execution hooks
+        pass  # Synchronized system hooks
 
     # =============================================================================
     # MAIN MODULE: exeavgpxy.py [PART 2: TELEMETRY & INLINE ORDER PLACEMENT ENGINE]
@@ -157,19 +160,19 @@ def handle_side_averaging(client, df):
     # =============================================================================
     # PART 6: TELEMETRY STREAM PANEL GRAPHICS & BALANCED GEOMETRIC RATIO BAR
     # =============================================================================
-    P_WIDTH = 40  # Preserved standard size width
+    P_WIDTH = 40 # Preserved standard size width
     
     print("\n" + Fore.CYAN + "=" * P_WIDTH)
-    print(Fore.CYAN + "OPT LOT PNL AGT TGT STS")
+    print(Fore.CYAN + "OPT LOT     PNL   AGT   TGT STS")
     print(Fore.CYAN + "-" * P_WIDTH)
     
     ce_pnl_val = int(round(ce_pnl))
     ce_pnl_color = Fore.CYAN + Style.BRIGHT if ce_target_crossed else (Fore.GREEN if ce_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f" CE  {ce_lots:>2} " + ce_pnl_color + f"{ce_pnl_val:>7}" + Style.RESET_ALL + f" {ce_agt:>4} {ce_tgt:>4} {ce_sts}")
+    print(Fore.WHITE + f" CE  {ce_lots:>2} " + ce_pnl_color + f"{ce_pnl_val:>7}" + Style.RESET_ALL + f"  {ce_agt:>4}  {ce_tgt:>4}  {ce_sts}")
     
     pe_pnl_val = int(round(pe_pnl))
     pe_pnl_color = Fore.CYAN + Style.BRIGHT if pe_target_crossed else (Fore.GREEN if pe_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f" PE  {pe_lots:>2} " + pe_pnl_color + f"{pe_pnl_val:>7}" + Style.RESET_ALL + f" {pe_agt:>4} {pe_tgt:>4} {pe_sts}")
+    print(Fore.WHITE + f" PE  {pe_lots:>2} " + pe_pnl_color + f"{pe_pnl_val:>7}" + Style.RESET_ALL + f"  {pe_agt:>4}  {pe_tgt:>4}  {pe_sts}")
     print(Fore.CYAN + "-" * P_WIDTH)
 
     # --- DRAW THE DYNAMIC GEOMETRIC BALANCE BAR ---
