@@ -9,12 +9,16 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 DEBUG_MODE = False
 
+# --- CONFIGURATION SECTION ---
+SUPERTREND_PERIOD = 1
+SUPERTREND_FACTOR = 1
+# -----------------------------
+
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
   """Maintains function name for external compatibility.
 
-  Calculates Supertrend (ATR Length: 3, Factor: 3) using standard market 
-  volatility with Wilder's smoothing method.
+  Calculates Supertrend using standard market volatility with Wilder's smoothing method.
   """
   try:
     raw_df = fetch_yf_data(period='3d', interval='1m')
@@ -48,11 +52,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
   tr3 = (low - close.shift(1)).abs()
   tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
   
-  # 🎯 UPDATED ATR LENGTH TO 3 (Alpha = 1 / Length for Wilder's Smoothing)
-  atr = tr.ewm(alpha=1 / 3, adjust=False).mean()
+  # Alpha = 1 / Length for Wilder's Smoothing
+  atr = tr.ewm(alpha=1 / SUPERTREND_PERIOD, adjust=False).mean()
 
-  # 🎯 UPDATED MULTIPLIER FACTOR TO 3.0
-  multiplier = 1.4
+  multiplier = SUPERTREND_FACTOR
   hl2 = (high + low) / 2
   basic_upper = hl2 + (multiplier * atr)
   basic_lower = hl2 - (multiplier * atr)
@@ -155,10 +158,11 @@ if __name__ == '__main__':
     )
     print(
         f"ST Line Value: {float(processed_df.at[target_index, 'sma21']):.2f}"
-        ' (Supertrend 3, 3)'
+        f" (Supertrend {SUPERTREND_PERIOD}, {SUPERTREND_FACTOR})"
     )
     print(f"Trend State : {str(processed_df.at[target_index, 'ST_Trend'])}")
     export_supertrend_json(processed_df)
   else:
     print('CRITICAL: Upstream data empty.')
+
 
