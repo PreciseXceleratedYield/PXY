@@ -1,74 +1,57 @@
 # sysrtsmapxy.py
-import os
-import json
 import numpy as np
 import pandas as pd
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
-
 from sysdtafpxy import fetch_yf_data
-from syscnfgpxy import TIMEZONE
-
-DEBUG_MODE = False
 
 def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 9) -> pd.DataFrame:
     """
-    Calculates a continuous rolling linear regression line across the entire dataset.
-    Signals BULL when Close price is above the line, and BEAR when below the line.
+    Calculates 9-period Close TSMA average with raw Close.
+    Defines and prints BULL/BEAR by comparing current average to previous average.
     """
-    try:
-        if df is None or df.empty or 'Close' not in df.columns:
-            raw_df = fetch_yf_data()
-            if raw_df is not None and not raw_df.empty:
-                df = raw_df.copy()
-    except Exception as e:
-        if DEBUG_MODE:
-            print(f"Warning: Shared pipeline download fallback active | {e}")
+    if df is None or df.empty or 'Close' not in df.columns:
+        df = fetch_yf_data()
+        if df is None or df.empty:
+            return pd.DataFrame()
             
     df = df.copy()
-
-    # Pre-allocate columns with standard type formats
-    df['linreg_base'] = np.nan
-    df['sma_trend_full'] = "NONE"
-    df['ST_Trend'] = "NONE"
-    df['ST'] = 0.0
-    df.attrs['slope'] = 0.0
-
-    if df.empty or len(df) < length:
+    if len(df) < length:
         return df
 
-    if not isinstance(df.index, pd.DatetimeIndex):
-        df.index = pd.to_datetime(df.index)
-
-    tz_string = str(TIMEZONE)
-    if df.index.tz is None:
-        df = df.tz_localize('UTC').tz_convert(tz_string)
-    else:
-        df = df.tz_convert(tz_string)
-
-    # --- VECTORIZED ROLLING LINEAR REGRESSION CORE ---
+    # --- VECTORIZED ROLLING LINEAR REGRESSION FOR CLOSE ---
     x = np.arange(length)
     x_sum = x.sum()
     x_sum_sq = (x ** 2).sum()
     divisor = (length * x_sum_sq) - (x_sum ** 2)
 
-    close_series = df['Close'].values
-    rolling_bases = np.full(len(df), np.nan)
-    rolling_slopes = np.full(len(df), 0.0)
+    raw_c = df['Close'].values
+    f_close = np.full(len(df), np.nan)
 
     for i in range(length - 1, len(df)):
-        y = close_series[i - length + 1 : i + 1]
-        y_sum = y.sum()
-        xy_sum = (x * y).sum()
+        y_c = raw_c[i - length + 1 : i + 1]
 
-        slope = (length * xy_sum - x_sum * y_sum) / divisor
-        intercept = (y_sum - slope * x_sum) / length
-        end_price = intercept + slope * (length - 1)
+        slope_c = (length * (x * y_c).sum() - x_sum * y_c.sum()) / divisor
+        tsma_c = ((y_c.sum() - slope_c * x_sum) / length) + slope_c * (length - 1)
+        f_close[i] = (tsma_c + raw_c[i]) / 2.0
 
-        rolling_bases[i] = end_price
-        rolling_slopes[i] = slope
+    df['final_close'] = f_close
 
-    df['linreg_base'] = rolling_bases
+    # --- TREND EVALUATION: CURRENT VS PREVIOUS RUNNING AVERAGE ---
+    df['sma_trend_full'] = np.where(df['final_close'] > df['final_close'].shift(1), "BULL", 
+                           np.where(df['final_close'] < df['final_close'].shift(1), "BEAR", "NONE"))
+    
+    df.loc[df['final_close'].isna() | df['final_close'].shift(1).isna(), 'sma_trend_full'] = "NONE"
+
+    # --- AUTOMATIC TERMINAL PRINT ENGAGEMENT LAYER ---
+    latest_val = float(df['final_close'].iloc[-1])
+    latest_state = str(df['sma_trend_full'].iloc[-1])
+
+    color_code = "\033[92m" if latest_state == "BULL" else "\033[91m" if latest_state == "BEAR" else "\033[93m"
+    print(f"{color_code}{f' {latest_state} <{latest_val:.2f}> ' :~^42}\033[0m")
+
+    return df
+
+if __name__ == "__main__":
+    calculate_linear_regression_channel(pd.DataFrame())
 
     # --- VECTORIZED TREND CONFIGURATION LAYER (PRICE VS LINE) ---
     # BULL if Close > Linear Regression line; BEAR if Close < Linear Regression line
