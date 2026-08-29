@@ -1,4 +1,5 @@
 # syspowrpxy.py
+import math
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
 from colorama import Fore, Style, init
@@ -7,8 +8,7 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # -------------------- Hardcoded constants --------------------
-ATR_PERIOD = 14
-RAW_POWER_MAX = 3
+LOOKBACK_PERIOD = 3
 TOTAL_WIDTH = 42
 
 # -------------------- CE/PE Power Calculation --------------------
@@ -17,37 +17,45 @@ def get_ce_pe_power(df=None):
         df = fetch_yf_data(period="2d", interval="1m")
         
     """
-    Calculate CE/PE power based on last move and ATR using 1-min data.
+    Calculate CE/PE power based on last move compared against the 
+    average absolute move of the last 3 closed candles.
     Returns:
         direction (str): 'Up', 'Down', 'Flat'
-        CEPower (int): 1-5
-        PEPower (int): 1-5
+        CEPower (int): 1-9
+        PEPower (int): 1-9
     """
-    # Fetch data: fallback if insufficient rows
-    df = fetch_yf_data(period="2d", interval="1m")
-    if df.empty or len(df) < 2:
+    # Fetch data: fallback if insufficient rows (Need at least 5 rows for 3 closed moves + 1 running)
+    if df is None or df.empty or len(df) < 5:
+        df = fetch_yf_data(period="2d", interval="1m")
+    if df.empty or len(df) < 5:
         df = fetch_yf_data(period="5d", interval="1m")
-    if df.empty or len(df) < 2:
+    if df.empty or len(df) < 5:
         return "Flat", 1, 1  # fallback
 
-    df = df[['Open','High','Low','Close']].astype(float).copy()
+    df = df[['Close']].astype(float).copy()
 
-    # ATR calculation
-    high_low = df['High'] - df['Low']
-    high_close = (df['High'] - df['Close'].shift(1)).abs()
-    low_close = (df['Low'] - df['Close'].shift(1)).abs()
-    tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
-    atr = tr.rolling(ATR_PERIOD, min_periods=1).mean()
+    # 1. Calculate absolute candle price changes (Close to Close)
+    df['move'] = df['Close'] - df['Close'].shift(1)
+    df['abs_move'] = df['move'].abs()
 
-    # Last move
-    last_move = float(df['Close'].iloc[-1] - df['Close'].iloc[-2])
-    raw_power = abs(last_move / atr.iloc[-1])
+    # 2. Average the absolute moves of the last 3 CLOSED candles (excluding current running one)
+    avg_closed_move_3 = df['abs_move'].shift(1).rolling(window=LOOKBACK_PERIOD, min_periods=1).mean()
 
-    # Scale 1-5 (Maintains identical underlying momentum sensitivity)
-    scaled_power = int(raw_power / RAW_POWER_MAX * 5)
-    scaled_power = max(1, min(scaled_power, 5))
+    # 3. Track the current running candle's net move
+    last_move = float(df['move'].iloc[-1])
+    
+    # 4. Compute the raw ratio against the closed baseline
+    current_baseline = avg_closed_move_3.iloc[-1]
+    raw_power = abs(last_move / current_baseline) if current_baseline > 0 else 0
 
-    # Determine direction and powers
+    # 5. Step Scale logic (1.00 or less = 1 | 1.01 to 1.99 = 2 | 2.00 to 2.99 = 3 etc.)
+    if raw_power <= 1.0:
+        scaled_power = 1
+    else:
+        scaled_power = math.ceil(raw_power)
+        scaled_power = min(scaled_power, 9)  # Cap maximum power at 9
+
+    # Determine direction and assign powers
     if last_move > 0:
         direction = "Up"
         CEPower = scaled_power
@@ -86,4 +94,5 @@ if __name__ == "__main__":
 
     # Print single line
     print(left_text_colored + spacing + right_text_colored)
+
 
