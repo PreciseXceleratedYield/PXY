@@ -119,22 +119,22 @@ def handle_side_averaging(client, df):
     # --- PRE-CALCULATE DYNAMIC THRESHOLDS MULTIPLIED ACROSS THE WHOLE THING ---
     
     # --- CALL OPTION (CE) SIDE RISK CALCULATIONS ---
-    ce_base_drawdown_limit = -atr * 1.4
+    ce_base_drawdown_limit = -atr
     if "MBUY" in ce_avg_entry:
         ce_dynamic_threshold = (
             ce_base_drawdown_limit * ce_invst_factor * ce_lots_factor
         ) + ce_base_drawdown_limit
     else:
-        ce_dynamic_threshold = ce_base_drawdown_limit * 14
+        ce_dynamic_threshold = ce_base_drawdown_limit * atr
 
     # --- PUT OPTION (PE) SIDE RISK CALCULATIONS ---
-    pe_base_drawdown_limit = -atr * 1.4
+    pe_base_drawdown_limit = -atr
     if "MSELL" in pe_avg_entry:
         pe_dynamic_threshold = (
             pe_base_drawdown_limit * pe_invst_factor * pe_lots_factor
         ) + pe_base_drawdown_limit
     else:
-        pe_dynamic_threshold = pe_base_drawdown_limit * 14
+        pe_dynamic_threshold = pe_base_drawdown_limit * atr
 
     # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO COMBINED DYNAMIC THRESHOLDS
     ce_agt = int(round(ce_dynamic_threshold))
