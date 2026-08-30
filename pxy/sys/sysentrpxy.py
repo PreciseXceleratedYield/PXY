@@ -10,7 +10,7 @@ from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
 
 # CONFIGURATION SWITCHES
-USE_TREND = "NO"  # Options: "YES" or "NO"
+USE_TREND = "YES"  # Options: "YES" or "NO"
 
 
 def get_entry_signal(df=None):
