@@ -9,6 +9,9 @@ from syscnfgpxy import TICKER
 from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
 
+# CONFIGURATION SWITCHES
+USE_TREND = "YES"  # Options: "YES" or "NO"
+
 
 def get_entry_signal(df=None):
     """Routes options positioning based on an absolute decoupled hybrid matrix:
@@ -28,14 +31,6 @@ def get_entry_signal(df=None):
     # 1. Pipeline Segment A: Extract dynamic structural exit matrix from market proxy
     _, exit_dir = get_signal(df)
 
-    # 2. Pipeline Segment B: Process technical SuperTrend profiles
-    processed_st_df = calculate_supertrend(df.copy())
-    if processed_st_df.empty:
-        return "NONE", "NONE"
-
-    # Target the exact same closed window bar trend
-    trend = processed_st_df["ST_Trend"].iloc[-1]
-
     # CONSTANTS - Pure Naive Time Objects for Evaluation
     start_time = pd.Timestamp("09:00:00").time()
     end_time = pd.Timestamp("09:30:00").time()
@@ -45,8 +40,10 @@ def get_entry_signal(df=None):
     latest_time = datetime.now(ist_tz).time()
 
     # ===== HYBRID MATRIX ROUTING EVALUATION ===== #
-    # 9:00 AM to 10:00 AM IST Window: Filter entry signal strictly by exit_dir
-    if start_time <= latest_time < end_time:
+    
+    # CASE 1: 9:00 AM to 9:30 AM IST Window OR USE_TREND is turned off
+    # Filter entry signal strictly by exit_dir without executing technical SuperTrend
+    if (start_time <= latest_time < end_time) or (USE_TREND == "NO"):
         if exit_dir == "BULL":
             entry_signal = "OTMBUY"
         elif exit_dir == "BEAR":
@@ -54,8 +51,16 @@ def get_entry_signal(df=None):
         else:
             entry_signal = "NONE"
 
-    # Post-10:00 AM IST: Normal Matrix Execution
+    # CASE 2: Post-9:30 AM IST and USE_TREND is enabled
     else:
+        # 2. Pipeline Segment B: Process technical SuperTrend profiles
+        processed_st_df = calculate_supertrend(df.copy())
+        if processed_st_df.empty:
+            return "NONE", "NONE"
+
+        # Target the exact same closed window bar trend
+        trend = processed_st_df["ST_Trend"].iloc[-1]
+
         if trend == "BULL":
             if exit_dir == "BULL":
                 entry_signal = "OTMBUY"
@@ -88,4 +93,6 @@ if __name__ == "__main__":
     df = fetch_yf_data()
     if df is not None and not df.empty:
         entry, ex = get_entry_signal(df)
+        print(f"USE_TREND CONFIG: {USE_TREND}")
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry} | EXIT_SIG: {ex}")
+
