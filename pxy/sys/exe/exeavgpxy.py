@@ -125,7 +125,12 @@ def handle_side_averaging(client, df):
             ce_base_drawdown_limit * ce_invst_factor * ce_lots_factor
         ) + ce_base_drawdown_limit
     else:
-        ce_dynamic_threshold = ce_base_drawdown_limit * atr
+        # Calculate raw positive absolute value (atr * atr)
+        raw_ce_val = atr * atr
+        # Apply the flattening modifier at 25
+        dampened_ce_val = min(raw_ce_val, 25.0) + max(0.0, (raw_ce_val - 25.0) / 4.0)
+        # Flip back to negative drawdown threshold
+        ce_dynamic_threshold = -dampened_ce_val
 
     # --- PUT OPTION (PE) SIDE RISK CALCULATIONS ---
     pe_base_drawdown_limit = -atr
@@ -134,7 +139,13 @@ def handle_side_averaging(client, df):
             pe_base_drawdown_limit * pe_invst_factor * pe_lots_factor
         ) + pe_base_drawdown_limit
     else:
-        pe_dynamic_threshold = pe_base_drawdown_limit * atr
+        # Calculate raw positive absolute value (atr * atr)
+        raw_pe_val = atr * atr
+        # Apply the flattening modifier at 25
+        dampened_pe_val = min(raw_pe_val, 25.0) + max(0.0, (raw_pe_val - 25.0) / 4.0)
+        # Flip back to negative drawdown threshold
+        pe_dynamic_threshold = -dampened_pe_val
+
 
     # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO COMBINED DYNAMIC THRESHOLDS
     ce_agt = int(round(ce_dynamic_threshold))
