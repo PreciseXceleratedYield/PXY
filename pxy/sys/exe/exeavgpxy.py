@@ -76,8 +76,25 @@ def handle_side_averaging(client, df):
         pe_overall_pnl_pct = 0.0
 
     # Convert overall performance matrix to a positive "loss value" to safely hit targets
+
+    
+    # =====================================================================
+    # 📉 RISK & LOSS TRACKING GROUP (Flipped to Positive Magnitudes)
+    # =====================================================================
+    # Tracks the raw magnitude of your downside risk. 
+    # Captures losses only; returns 0.0 if the position is winning or flat.
     ce_avg_loss = -ce_overall_pnl_pct if ce_overall_pnl_pct < 0 else 0.0
     pe_avg_loss = -pe_overall_pnl_pct if pe_overall_pnl_pct < 0 else 0.0
+    
+    
+    # =====================================================================
+    # 📈 TARGET & PROFIT TRACKING GROUP (Pure Positive Performance)
+    # =====================================================================
+    # Tracks the raw magnitude of your upside performance.
+    # Captures profits only; returns 0.0 if the position is losing or flat.
+    ce_avg_profit = ce_overall_pnl_pct if ce_overall_pnl_pct > 0 else 0.0
+    pe_avg_profit = pe_overall_pnl_pct if pe_overall_pnl_pct > 0 else 0.0
+
 
     # Structural exposure factor resolutions
     ce_investment = float(ce_rows['row_invested'].sum()) if not ce_rows.empty else 0.0
@@ -167,8 +184,8 @@ def handle_side_averaging(client, df):
     pe_agt = int(round(pe_dynamic_threshold))
     
     # 🎯 MONITOR TARGET PERCENTAGE CROSSINGS (ACTUAL OVERALL LOSS >= POSITIVE TGT %)
-    ce_target_crossed = ce_avg_loss >= ce_tgt if ce_lots > 0 else False
-    pe_target_crossed = pe_avg_loss >= pe_tgt if pe_lots > 0 else False
+    ce_target_crossed = ce_avg_profit >= ce_tgt if ce_lots > 0 else False
+    pe_target_crossed = pe_avg_profit >= pe_tgt if pe_lots > 0 else False
 
     ce_sts = "✔️" if ce_target_crossed else "❌"
     pe_sts = "✔️" if pe_target_crossed else "❌"
