@@ -54,7 +54,7 @@ def call_with_timeout(func, timeout=10, *args, **kwargs):
             return None
 
 # ---------------- HELPER FUNCTIONS ----------------
-def run_script(script_path, timeout=20):
+def run_script(script_path, timeout=45):
     if not Path(script_path).exists():
         print(f"⚠️ SKIP: script not found -> {script_path}")
         print("━" * 42)
@@ -70,7 +70,7 @@ def run_script(script_path, timeout=20):
         print(f"❌ RUN ERR: unexpected failure -> {script_path} ⚠️")
     print("━" * 42)
 
-def safe_run(script_path, timeout=20):
+def safe_run(script_path, timeout=45):
     try:
         run_script(script_path, timeout=timeout)
     except Exception:
@@ -110,7 +110,7 @@ for s in parent_scripts:
     if s.name == "exernkopxy.py":
         safe_run(s, timeout=None)  # Infinite exception
     else:
-        safe_run(s, timeout=20)  # Standard limit
+        safe_run(s, timeout=45)  # Standard limit
 
 while True:
     os.system('clear')  # ✅ Clears Ubuntu screen at the start of every main loop iteration
@@ -136,24 +136,24 @@ while True:
             # -------- CORE LOGIC WITH SWITCH --------
             if SIMPLE_MODE:
                 safe_run(HERE / "exernkopxy.py", timeout=None)  # Infinite exception
-                safe_run(HERE / "exeexitpxy.py", timeout=20)
-                #safe_run(HERE.parent / "sysrigpxy.py", timeout=20)
-                safe_run(HERE / "exeentrpxy.py", timeout=20)
+                safe_run(HERE / "exeexitpxy.py", timeout=45)
+                #safe_run(HERE.parent / "sysrigpxy.py", timeout=45)
+                safe_run(HERE / "exeentrpxy.py", timeout=45)
             else:
                 if ce_qty > 0 and ce_qty == pe_qty:
-                    safe_run(HERE / "exeexitpxy.py", timeout=20)
+                    safe_run(HERE / "exeexitpxy.py", timeout=45)
                 elif ce_qty == 0 and pe_qty == 0:
-                    safe_run(HERE / "exeentrpxy.py", timeout=20)
+                    safe_run(HERE / "exeentrpxy.py", timeout=45)
                 else:
-                    safe_run(HERE / "exeexitpxy.py", timeout=20)
-                    safe_run(HERE / "exeentrpxy.py", timeout=20)
+                    safe_run(HERE / "exeexitpxy.py", timeout=45)
+                    safe_run(HERE / "exeentrpxy.py", timeout=45)
                     
             fancy_pause(7)  # 7-second pause between sub-iterations
             
         loop_counter += 1
     else:
         print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
-        safe_run(HERE.parent / "sysslefpxy.py", timeout=20)
+        safe_run(HERE.parent / "sysslefpxy.py", timeout=45)
         fancy_pause(7)
         
         while not in_market_hours():
