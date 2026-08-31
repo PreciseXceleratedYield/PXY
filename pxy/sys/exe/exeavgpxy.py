@@ -203,20 +203,43 @@ def handle_side_averaging(client, df):
     # =============================================================================
     # PART 6: TELEMETRY STREAM PANEL GRAPHICS & BALANCED GEOMETRIC RATIO BAR
     # =============================================================================
-    P_WIDTH = 40 # Preserved standard size width
+    P_WIDTH = 40
     
     print("\n" + Fore.CYAN + "=" * P_WIDTH)
-    print(Fore.CYAN + "OPT LOT     PNL   AGT   TGT STS")
+    # Header matching the new right-aligned layout columns (3+1 + 3+1 + 4+1 + 3+1 + 3+1 + 15 = 40)
+    print(Fore.CYAN + "OPT LOT  AGT STS TGT                PNL")
     print(Fore.CYAN + "-" * P_WIDTH)
     
+    # --- CE Row ---
     ce_pnl_val = int(round(ce_pnl))
     ce_pnl_color = Fore.CYAN + Style.BRIGHT if ce_target_crossed else (Fore.GREEN if ce_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f" CE  {ce_lots:>2} " + ce_pnl_color + f"{ce_pnl_val:>7}" + Style.RESET_ALL + f"  {ce_agt:>4}  {ce_tgt:>4}  {ce_sts}")
     
+    # Strict column breakdown with exactly 1 trailing space acting as padding
+    ce_opt_col = f"{'CE':>3} "         # 3 chars + 1 space padding = 4
+    ce_lot_col = f"{ce_lots:>3} "      # 3 chars + 1 space padding = 4
+    ce_agt_col = f"{ce_agt:>4} "       # 4 chars + 1 space padding = 5
+    ce_sts_col = f"{ce_sts:>3} "       # 3 chars + 1 space padding = 4
+    ce_tgt_col = f"{ce_tgt:>3} "       # 3 chars + 1 space padding = 4
+    ce_pnl_str = f"{ce_pnl_val:>15}"   # Flexible padding fills the remaining 15 chars (no trailing space)
+    
+    # Print string safely splitting text and color formatting to maintain the 40-char width
+    print(Fore.WHITE + ce_opt_col + ce_lot_col + ce_agt_col + ce_sts_col + ce_tgt_col + ce_pnl_color + ce_pnl_str + Style.RESET_ALL)
+    
+    # --- PE Row ---
     pe_pnl_val = int(round(pe_pnl))
     pe_pnl_color = Fore.CYAN + Style.BRIGHT if pe_target_crossed else (Fore.GREEN if pe_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f" PE  {pe_lots:>2} " + pe_pnl_color + f"{pe_pnl_val:>7}" + Style.RESET_ALL + f"  {pe_agt:>4}  {pe_tgt:>4}  {pe_sts}")
+    
+    pe_opt_col = f"{'PE':>3} "
+    pe_lot_col = f"{pe_lots:>3} "
+    pe_agt_col = f"{pe_agt:>4} "
+    pe_sts_col = f"{pe_sts:>3} "
+    pe_tgt_col = f"{pe_tgt:>3} "
+    pe_pnl_str = f"{pe_pnl_val:>15}"
+    
+    print(Fore.WHITE + pe_opt_col + pe_lot_col + pe_agt_col + pe_sts_col + pe_tgt_col + pe_pnl_color + pe_pnl_str + Style.RESET_ALL)
+    
     print(Fore.CYAN + "-" * P_WIDTH)
+
 
     # --- DRAW THE DYNAMIC GEOMETRIC BALANCE BAR ---
     ce_weight_int = int(round(ce_investment))
