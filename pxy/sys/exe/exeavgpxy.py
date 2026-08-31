@@ -112,39 +112,54 @@ def handle_side_averaging(client, df):
     ce_avg_entry = str(ce_last.get("entry", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
     pe_avg_entry = str(pe_last.get("entry", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
 
+
     # --- ZERO-DIVISION SHIELDED LOTS FACTOR ENGINE ---
     ce_lots_factor = (ce_lots + 1) / (pe_lots + 1) if pe_lots >= 0 else 1.0
     pe_lots_factor = (pe_lots + 1) / (ce_lots + 1) if ce_lots >= 0 else 1.0
 
     # --- PRE-CALCULATE DYNAMIC THRESHOLDS MULTIPLIED ACROSS THE WHOLE THING ---
+    supertrend = str(pe_last.get("supertrend", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
     
     # --- CALL OPTION (CE) SIDE RISK CALCULATIONS ---
     ce_base_drawdown_limit = -atr
+    
     if "MBUY" in ce_avg_entry:
-        ce_dynamic_threshold = (
-            ce_base_drawdown_limit * ce_invst_factor * ce_lots_factor
-        ) + ce_base_drawdown_limit
+        # Condition 1: CE Trend-Following
+        ce_dynamic_threshold = (ce_base_drawdown_limit * ce_invst_factor * ce_lots_factor) + ce_base_drawdown_limit
+        
+        # Aligned with BULL trend? Tighten risk by cutting allowance in half
+        if supertrend == "BULL":
+            ce_dynamic_threshold = ce_dynamic_threshold / 2
     else:
-        # Calculate raw positive absolute value (atr * atr)
+        # Condition 2: CE Mean Reversion
         raw_ce_val = atr * atr
-        # Apply the flattening modifier at 25
         dampened_ce_val = min(raw_ce_val, 25.0) + max(0.0, (raw_ce_val - 25.0) / 4.0)
-        # Flip back to negative drawdown threshold
         ce_dynamic_threshold = -dampened_ce_val
-
+        
+        # Aligned with BULL trend? Tighten risk by cutting allowance in half
+        if supertrend == "BULL":
+            ce_dynamic_threshold = ce_dynamic_threshold / 2
+    
+    
     # --- PUT OPTION (PE) SIDE RISK CALCULATIONS ---
     pe_base_drawdown_limit = -atr
+    
     if "MSELL" in pe_avg_entry:
-        pe_dynamic_threshold = (
-            pe_base_drawdown_limit * pe_invst_factor * pe_lots_factor
-        ) + pe_base_drawdown_limit
+        # Condition 3: PE Trend-Following
+        pe_dynamic_threshold = (pe_base_drawdown_limit * pe_invst_factor * pe_lots_factor) + pe_base_drawdown_limit
+        
+        # Aligned with BEAR trend? Tighten risk by cutting allowance in half
+        if supertrend == "BEAR":
+            pe_dynamic_threshold = pe_dynamic_threshold / 2
     else:
-        # Calculate raw positive absolute value (atr * atr)
+        # Condition 4: PE Mean Reversion
         raw_pe_val = atr * atr
-        # Apply the flattening modifier at 25
         dampened_pe_val = min(raw_pe_val, 25.0) + max(0.0, (raw_pe_val - 25.0) / 4.0)
-        # Flip back to negative drawdown threshold
         pe_dynamic_threshold = -dampened_pe_val
+        
+        # Aligned with BEAR trend? Tighten risk by cutting allowance in half
+        if supertrend == "BEAR":
+            pe_dynamic_threshold = pe_dynamic_threshold / 2
 
 
     # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO COMBINED DYNAMIC THRESHOLDS
