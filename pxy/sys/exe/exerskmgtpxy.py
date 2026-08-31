@@ -31,7 +31,7 @@ def check_trend_collapse_exit(df, client):
             exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exesqrpxy.py")
             if os.path.exists(exe_path):
                 print(f"{Fore.RED}🚀 Executing Master Square-Off Engine via Risk Management module (exerskmgtpxy.py)...{Style.RESET_ALL}\n")
-                #subprocess.run(["python3", exe_path, "-all"], check=True)
+                subprocess.run(["python3", exe_path, "-all"], check=True)
                 return True  # Signal that a global square-off occurred
     except Exception as e:
         print(f"⚠️ Error inside external trend collapse evaluation: {e}")
