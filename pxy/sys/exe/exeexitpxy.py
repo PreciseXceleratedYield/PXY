@@ -14,6 +14,12 @@ from exeavgpxy import handle_side_averaging
 # IMPORT SYSTEM CO-PROCESSOR 
 from exeexppxy import analyze_targets_and_sides, process_metrics_print_and_dump, dump_idle_json
 
+# 🎯 UPDATED FILE IMPORT NAME: Pointing directly to exerskmgtpxy.py
+try:
+    from exerskmgtpxy import check_trend_collapse_exit
+except ImportError:
+    check_trend_collapse_exit = lambda df, client: False
+
 init(autoreset=True) 
 
 DEBUG_MODE = False 
@@ -138,7 +144,10 @@ def run_snapshot():
         print(f"{Fore.YELLOW}No active orders. System idling...") 
         dump_idle_json(EXIT_MODE)
         return 
-
+        
+    # 🎯 SURGICAL ADDITION: Intercept system state before averaging fires
+    if check_trend_collapse_exit(df, client): return
+        
     handle_side_averaging(client, df) 
     
     side_all_targets_hit = analyze_targets_and_sides(df)
