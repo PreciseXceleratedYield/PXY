@@ -34,7 +34,7 @@ def dynamic_entry(row):
 
 def target_price(row):
     """Calculates individual option layer target price using dynamic volatility variables.
-    
+
     Aligned Trades   : atr * atr (Normal growth up to 25, 4:1 dampened growth thereafter).
     Sideways Trades  : Strict ATR alone (Quick escape targeting to beat sideways Theta decay).
     Hostile Trades   : Fixed 1.4% target percentage floor.
@@ -51,7 +51,7 @@ def target_price(row):
 
         ce_d = i(row.get("hkin_ce_depth", 0))
         pe_d = i(row.get("hkin_pe_depth", 0))
-        
+
         atr = f(row.get("atr", 0))
         katr = max(f(row.get("katr", 1)), 0.001)  # prevent divide-by-zero
 
@@ -73,28 +73,33 @@ def target_price(row):
             if supertrend == "SIDE":
                 # Sideways Market Strategy: Take strict ATR expansion alone
                 target_pct = atr
-            elif active_exit in ("SELL", "BEAR"): 
+            elif active_exit in ("SELL", "BEAR"):
                 # Hostile Strategy: Flat protective percentage floor
                 target_pct = 1.4
-            else: 
+            else:
                 # Aligned Strategy: Full flattened ATR^2 formula
-                target_pct = min(atr * atr, 25.0) + max(0.0, (atr * atr - 25.0) / 4.0)
-                
+                target_pct = min(atr * atr, 25.0) + max(
+                    0.0, (atr * atr - 25.0) / 4.0
+                )
+
         elif is_pe:
             if supertrend == "SIDE":
                 # Sideways Market Strategy: Take strict ATR expansion alone
                 target_pct = atr
-            elif active_exit in ("BUY", "BULL"): 
+            elif active_exit in ("BUY", "BULL"):
                 # Hostile Strategy: Flat protective percentage floor
                 target_pct = 1.4
-            else: 
+            else:
                 # Aligned Strategy: Full flattened ATR^2 formula
-                target_pct = min(atr * atr, 25.0) + max(0.0, (atr * atr - 25.0) / 4.0)
+                target_pct = min(atr * atr, 25.0) + max(
+                    0.0, (atr * atr - 25.0) / 4.0
+                )
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
         return round(calculated_target, 2)
 
-except Exception as e:
-    print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
-    return 0.0
+    except Exception as e:
+        print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
+        return 0.0
+
