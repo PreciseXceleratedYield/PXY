@@ -11,7 +11,7 @@ DEBUG_MODE = False
 
 # --- CONFIGURATION SECTION ---
 SUPERTREND_PERIOD = 1.0
-SUPERTREND_FACTOR = 0.7
+SUPERTREND_FACTOR = 3.0
 # -----------------------------
 
 
