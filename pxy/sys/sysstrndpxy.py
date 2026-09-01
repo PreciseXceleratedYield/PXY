@@ -111,10 +111,17 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else:
             final_trend.append('SIDE')
 
-    # Mapping lines requested for dump allocation
-    df['sma21'] = st1_line       # Supertrend (7, 3) mapped as requested
-    df['st_line'] = st2_line     # Supertrend (3, 7) mapped as requested
-    df['ST_Trend'] = pd.Series(final_trend, index=df.index)
+    st_trend_series = pd.Series(final_trend, index=df.index)
+
+    # CRITICAL FALLBACKS: Keep all requested structural vectors intact
+    df['sma21'] = st1_line
+    df['st_line'] = st2_line
+    
+    # Fill structural columns with values so downstream readers don't throw KeyErrors
+    df['sma50'] = st2_line  
+    df['ST'] = st1_line
+    df['sma_trend_full'] = st_trend_series
+    df['ST_Trend'] = st_trend_series
 
     return df
 
@@ -122,7 +129,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 def export_supertrend_json(
     df: pd.DataFrame = None, output_file='../web/webchrtpxy.json'
 ):
-    """Exports custom dump configurations mapping sma21 and st_line lines."""
+    """Exports and retains legacy key frames alongside requested updates."""
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
     if df is None or df.empty:
@@ -137,6 +144,8 @@ def export_supertrend_json(
             'close': float(row['Close']),
             'sma21': float(row['sma21']) if not pd.isna(row['sma21']) else 0.0,
             'st_line': float(row['st_line']) if not pd.isna(row['st_line']) else 0.0,
+            # Legacy keys kept intact so web chart rendering maps don't break
+            'sma50': float(row['sma50']) if not pd.isna(row['sma50']) else 0.0,
             'trend': str(row['ST_Trend'])
         })
     if os.path.dirname(output_file):
@@ -166,6 +175,4 @@ if __name__ == '__main__':
         export_supertrend_json(processed_df)
     else:
         print('CRITICAL: Upstream data empty.')
-
-
 
