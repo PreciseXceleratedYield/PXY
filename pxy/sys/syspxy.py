@@ -49,7 +49,7 @@ def get_all_data():
 
         "atr": core.get("atr"),
         "katr": core.get("katr"),
-        "price": core.get("price")+50,
+        "price": core.get("price"),
         "direction": core.get("direction"),
 
         "supertrend": core.get("supertrend"),
