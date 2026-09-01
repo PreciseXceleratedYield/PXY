@@ -1,4 +1,6 @@
-# sys/exe/exetgtpxy.py
+# =============================================================================
+# MAIN MODULE: exetgtpxy.py
+# =============================================================================
 from colorama import Fore, Style, init
 
 # Initialize colorama for clean, colored terminal output formatting
@@ -33,8 +35,9 @@ def dynamic_entry(row):
 def target_price(row):
     """Calculates individual option layer target price using dynamic volatility variables.
     
-    Aligned Trades : atr * atr (Normal growth up to 25, 4:1 dampened growth thereafter).
-    Hostile Trades : Fixed 1.4% target percentage floor.
+    Aligned Trades   : atr * atr (Normal growth up to 25, 4:1 dampened growth thereafter).
+    Sideways Trades  : Strict ATR alone (Quick escape targeting to beat sideways Theta decay).
+    Hostile Trades   : Fixed 1.4% target percentage floor.
     """
     try:
         # 1️⃣ Entry data execution health check
@@ -52,13 +55,10 @@ def target_price(row):
         atr = f(row.get("atr", 0))
         katr = max(f(row.get("katr", 1)), 0.001)  # prevent divide-by-zero
 
-        # Extract raw bos_val to check if it's text "NONE" or blank
-        raw_bos = str(row.get("bos_val", "NONE")).upper().strip()
-        is_bos_none = (raw_bos == "NONE" or raw_bos == "")
-
         # 3️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
         active_exit = str(row.get("exit", "NONE")).upper().strip()
+        supertrend = str(row.get("supertrend", "NONE")).upper().strip()
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
@@ -68,23 +68,33 @@ def target_price(row):
 
         target_pct = 0.0
 
-        # 4️⃣ Dynamic execution logic using flattened ATR^2 capping formula
+        # 4️⃣ 3-Tier Target Profit Matrix Engine
         if is_ce:
-            if active_exit in ("SELL", "BEAR"):  # Hostile (Not Aligned)
+            if supertrend == "SIDE":
+                # Sideways Market Strategy: Take strict ATR expansion alone
+                target_pct = atr
+            elif active_exit in ("SELL", "BEAR"): 
+                # Hostile Strategy: Flat protective percentage floor
                 target_pct = 1.4
-            else:                                # Aligned
-                target_pct = min(atr**2, 25.0) + max(0.0, (atr**2 - 25.0) / 4.0)
+            else: 
+                # Aligned Strategy: Full flattened ATR^2 formula
+                target_pct = min(atr * atr, 25.0) + max(0.0, (atr * atr - 25.0) / 4.0)
                 
         elif is_pe:
-            if active_exit in ("BUY", "BULL"):   # Hostile (Not Aligned)
+            if supertrend == "SIDE":
+                # Sideways Market Strategy: Take strict ATR expansion alone
+                target_pct = atr
+            elif active_exit in ("BUY", "BULL"): 
+                # Hostile Strategy: Flat protective percentage floor
                 target_pct = 1.4
-            else:                                # Aligned
-                target_pct = min(atr**2, 25.0) + max(0.0, (atr**2 - 25.0) / 4.0)
+            else: 
+                # Aligned Strategy: Full flattened ATR^2 formula
+                target_pct = min(atr * atr, 25.0) + max(0.0, (atr * atr - 25.0) / 4.0)
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
         return round(calculated_target, 2)
 
-    except Exception as e:
-        print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
-        return 0.0
+except Exception as e:
+    print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
+    return 0.0
