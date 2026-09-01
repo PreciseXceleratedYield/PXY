@@ -146,7 +146,7 @@ def handle_side_averaging(client, df):
         
         # Aligned with BULL trend? Tighten risk by cutting allowance in half
         if supertrend == "BULL":
-            ce_dynamic_threshold = ce_dynamic_threshold / 2
+            ce_dynamic_threshold = ce_dynamic_threshold 
     else:
         # Condition 2: CE Mean Reversion
         raw_ce_val = atr * atr
@@ -155,7 +155,7 @@ def handle_side_averaging(client, df):
         
         # Aligned with BULL trend? Tighten risk by cutting allowance in half
         if supertrend == "BULL":
-            ce_dynamic_threshold = ce_dynamic_threshold / 2
+            ce_dynamic_threshold = ce_dynamic_threshold 
     
     
     # --- PUT OPTION (PE) SIDE RISK CALCULATIONS ---
