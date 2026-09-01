@@ -133,37 +133,64 @@ def handle_side_averaging(client, df):
     # --- ZERO-DIVISION SHIELDED LOTS FACTOR ENGINE ---
     ce_lots_factor = 1 #(ce_lots + 1) / (pe_lots + 1) if pe_lots >= 0 else 1.0
     pe_lots_factor = 1 #(pe_lots + 1) / (ce_lots + 1) if ce_lots >= 0 else 1.0
-
+###########################################################################################################
     # --- PRE-CALCULATE DYNAMIC THRESHOLDS MULTIPLIED ACROSS THE WHOLE THING ---
-    supertrend = str(pe_last.get("supertrend", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
+    supertrend = (
+        str(pe_last.get("supertrend", "NONE")).upper().strip()
+        if not pe_rows.empty
+        else "NONE"
+    )
     
     # --- CALL OPTION (CE) SIDE RISK CALCULATIONS ---
-    atr = 5
     ce_base_drawdown_limit = -atr
     
-    if "MBUY" in ce_avg_entry:
-        # Condition 1: CE Trend-Following
-        ce_dynamic_threshold = (ce_base_drawdown_limit * ce_invst_factor * ce_lots_factor) + ce_base_drawdown_limit
+    if supertrend == "BEAR":
+        # Condition 1: Supertrend is OPPOSITE
+        ce_dynamic_threshold = -66.0
+    elif supertrend == "SIDE":
+        # Condition 2: Supertrend is SIDE (Uses full formula with added base limit)
+        ce_dynamic_threshold = (
+            ce_base_drawdown_limit * ce_invst_factor * ce_lots_factor
+        ) + ce_base_drawdown_limit
+    elif "MBUY" in ce_avg_entry:
+        # Condition 3: MBUY and Trend is BULL (Removes added ce_base_drawdown_limit)
+        ce_dynamic_threshold = (
+            ce_base_drawdown_limit * ce_invst_factor * ce_lots_factor
+        )
     else:
-        # Condition 2: CE Mean Reversion
+        # Condition 4: CE Mean Reversion Default
         raw_ce_val = atr * atr
-        dampened_ce_val = min(raw_ce_val, 25.0) + max(0.0, (raw_ce_val - 25.0) / 4.0)
+        dampened_ce_val = min(raw_ce_val, 25.0) + max(
+            0.0, (raw_ce_val - 25.0) / 4.0
+        )
         ce_dynamic_threshold = -dampened_ce_val
-        
+    
     
     # --- PUT OPTION (PE) SIDE RISK CALCULATIONS ---
     pe_base_drawdown_limit = -atr
     
-    if "MSELL" in pe_avg_entry:
-        # Condition 3: PE Trend-Following
-        pe_dynamic_threshold = (pe_base_drawdown_limit * pe_invst_factor * pe_lots_factor) + pe_base_drawdown_limit
+    if supertrend == "BULL":
+        # Condition 1: Supertrend is OPPOSITE
+        pe_dynamic_threshold = -66.0
+    elif supertrend == "SIDE":
+        # Condition 2: Supertrend is SIDE (Uses full formula with added base limit)
+        pe_dynamic_threshold = (
+            pe_base_drawdown_limit * pe_invst_factor * pe_lots_factor
+        ) + pe_base_drawdown_limit
+    elif "MSELL" in pe_avg_entry:
+        # Condition 3: MSELL and Trend is BEAR (Removes added pe_base_drawdown_limit)
+        pe_dynamic_threshold = (
+            pe_base_drawdown_limit * pe_invst_factor * pe_lots_factor
+        )
     else:
-        # Condition 4: PE Mean Reversion
+        # Condition 4: PE Mean Reversion Default
         raw_pe_val = atr * atr
-        dampened_pe_val = min(raw_pe_val, 25.0) + max(0.0, (raw_pe_val - 25.0) / 4.0)
+        dampened_pe_val = min(raw_pe_val, 25.0) + max(
+            0.0, (raw_pe_val - 25.0) / 4.0
+        )
         pe_dynamic_threshold = -dampened_pe_val
 
-
+###########################################################################################################
 
     # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO COMBINED DYNAMIC THRESHOLDS
     ce_agt = int(round(ce_dynamic_threshold))
