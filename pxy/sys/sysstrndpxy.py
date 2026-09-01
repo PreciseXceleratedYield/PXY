@@ -18,7 +18,7 @@ SUPERTREND_FACTOR = 0.7
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
   """Maintains function name for external compatibility.
 
-  Calculates Supertrend using standard market volatility with Wilder's smoothing method.
+  Calculates a precise, non-collapsing Supertrend (1.0, 0.7) matching chart math rules.
   """
   try:
     raw_df = fetch_yf_data(period='3d', interval='1m')
@@ -73,40 +73,37 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
       st_trend.iloc[i] = 'BEAR'
       continue
 
-    # Final Upper Band
-    if (
-        basic_upper.iloc[i] < final_upper.iloc[i - 1]
-        or close.iloc[i - 1] > final_upper.iloc[i - 1]
-    ):
+    prev_upper = final_upper.iloc[i - 1]
+    prev_lower = final_lower.iloc[i - 1]
+    prev_trend = st_trend.iloc[i - 1]
+
+    # Final Upper Band locking logic
+    if basic_upper.iloc[i] < prev_upper or close.iloc[i - 1] > prev_upper:
       final_upper.iloc[i] = basic_upper.iloc[i]
     else:
-      final_upper.iloc[i] = final_upper.iloc[i - 1]
+      final_upper.iloc[i] = prev_upper
 
-    # Final Lower Band
-    if (
-        basic_lower.iloc[i] > final_lower.iloc[i - 1]
-        or close.iloc[i - 1] < final_lower.iloc[i - 1]
-    ):
+    # Final Lower Band locking logic
+    if basic_lower.iloc[i] > prev_lower or close.iloc[i - 1] < prev_lower:
       final_lower.iloc[i] = basic_lower.iloc[i]
     else:
-      final_lower.iloc[i] = final_lower.iloc[i - 1]
+      final_lower.iloc[i] = prev_lower
 
-    # Supertrend direction
-    prev_st = supertrend.iloc[i - 1]
-    if prev_st == final_upper.iloc[i - 1]:
+    # Secure Direction State Switches by checking previous execution context
+    if prev_trend == 'BEAR':
       if close.iloc[i] > final_upper.iloc[i]:
-        supertrend.iloc[i] = final_lower.iloc[i]
         st_trend.iloc[i] = 'BULL'
+        supertrend.iloc[i] = final_lower.iloc[i]
       else:
-        supertrend.iloc[i] = final_upper.iloc[i]
         st_trend.iloc[i] = 'BEAR'
-    else:
+        supertrend.iloc[i] = final_upper.iloc[i]
+    else:  # prev_trend == 'BULL'
       if close.iloc[i] < final_lower.iloc[i]:
-        supertrend.iloc[i] = final_upper.iloc[i]
         st_trend.iloc[i] = 'BEAR'
+        supertrend.iloc[i] = final_upper.iloc[i]
       else:
-        supertrend.iloc[i] = final_lower.iloc[i]
         st_trend.iloc[i] = 'BULL'
+        supertrend.iloc[i] = final_lower.iloc[i]
 
   # CRITICAL: Keep identical column names so no downstream parts break
   df['st_line'] = supertrend
@@ -164,5 +161,6 @@ if __name__ == '__main__':
     export_supertrend_json(processed_df)
   else:
     print('CRITICAL: Upstream data empty.')
+
 
 
