@@ -229,12 +229,12 @@ def handle_side_averaging(client, df):
     pe_pnl_val = int(round(pe_pnl))
     pe_pnl_color = Fore.CYAN + Style.BRIGHT if pe_target_crossed else (Fore.GREEN if pe_pnl_val >= 0 else Fore.RED)
     
-    pe_opt_col = f"{'PE':>3} "
-    pe_lot_col = f"{pe_lots:>3} "
-    pe_agt_col = f"{pe_agt:>4} "
-    pe_sts_col = f"{pe_sts:>3} "
-    pe_tgt_col = f"{pe_tgt:>3} "
-    pe_pnl_str = f"{pe_pnl_val:>15}"
+    pe_opt_col = f"{'PE':>4} "
+    pe_lot_col = f"{pe_lots:>4} "
+    pe_agt_col = f"{pe_agt:>5} "
+    pe_sts_col = f"{pe_sts:>4} "
+    pe_tgt_col = f"{pe_tgt:>4} "
+    pe_pnl_str = f"{pe_pnl_val:>11}"
     
     print(Fore.WHITE + pe_opt_col + pe_lot_col + pe_agt_col + pe_sts_col + pe_tgt_col + pe_pnl_color + pe_pnl_str + Style.RESET_ALL)
     
