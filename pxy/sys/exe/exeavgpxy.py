@@ -138,25 +138,18 @@ def handle_side_averaging(client, df):
     supertrend = str(pe_last.get("supertrend", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
     
     # --- CALL OPTION (CE) SIDE RISK CALCULATIONS ---
+    atr = 5
     ce_base_drawdown_limit = -atr
     
     if "MBUY" in ce_avg_entry:
         # Condition 1: CE Trend-Following
         ce_dynamic_threshold = (ce_base_drawdown_limit * ce_invst_factor * ce_lots_factor) + ce_base_drawdown_limit
-        
-        # Aligned with BULL trend? Tighten risk by cutting allowance in half
-        if supertrend == "BULL":
-            ce_dynamic_threshold = ce_dynamic_threshold 
     else:
         # Condition 2: CE Mean Reversion
         raw_ce_val = atr * atr
         dampened_ce_val = min(raw_ce_val, 25.0) + max(0.0, (raw_ce_val - 25.0) / 4.0)
         ce_dynamic_threshold = -dampened_ce_val
         
-        # Aligned with BULL trend? Tighten risk by cutting allowance in half
-        if supertrend == "BULL":
-            ce_dynamic_threshold = ce_dynamic_threshold 
-    
     
     # --- PUT OPTION (PE) SIDE RISK CALCULATIONS ---
     pe_base_drawdown_limit = -atr
@@ -164,19 +157,12 @@ def handle_side_averaging(client, df):
     if "MSELL" in pe_avg_entry:
         # Condition 3: PE Trend-Following
         pe_dynamic_threshold = (pe_base_drawdown_limit * pe_invst_factor * pe_lots_factor) + pe_base_drawdown_limit
-        
-        # Aligned with BEAR trend? Tighten risk by cutting allowance in half
-        if supertrend == "BEAR":
-            pe_dynamic_threshold = pe_dynamic_threshold 
     else:
         # Condition 4: PE Mean Reversion
         raw_pe_val = atr * atr
         dampened_pe_val = min(raw_pe_val, 25.0) + max(0.0, (raw_pe_val - 25.0) / 4.0)
         pe_dynamic_threshold = -dampened_pe_val
-        
-        # Aligned with BEAR trend? Tighten risk by cutting allowance in half
-        if supertrend == "BEAR":
-            pe_dynamic_threshold = pe_dynamic_threshold 
+
 
 
     # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO COMBINED DYNAMIC THRESHOLDS
