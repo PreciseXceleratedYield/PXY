@@ -27,22 +27,25 @@ CONFIG = {
 
 
 def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
-    """Optimised helper using NumPy arrays to compute standard Supertrend bands."""
+    """Helper to compute standard Supertrend bands using a safe pandas-to-numpy pipeline."""
     high = df['High'].to_numpy()
     low = df['Low'].to_numpy()
     close = df['Close'].to_numpy()
 
+    # Calculate True Range elements safely without mutating raw series data
     tr1 = high - low
     
-    close_shifted = np.empty_like(close)
-    if len(close) > 0:
-        close_shifted = close
-        close_shifted[1:] = close[:-1]
+    # Safe shift using pandas to guarantee matching Wilder/ATR boundary alignment
+    close_shifted = df['Close'].shift(1).to_numpy()
+    # Handle the initial element to prevent NaN breaks in array operations
+    if len(close_shifted) > 0:
+        close_shifted[0] = close[0]
 
     tr2 = np.abs(high - close_shifted)
     tr3 = np.abs(low - close_shifted)
     tr = np.maximum(tr1, np.maximum(tr2, tr3))
     
+    # Wilder's Smoothing via EWM
     atr = pd.Series(tr, index=df.index).ewm(alpha=1 / period, adjust=False).mean().to_numpy()
 
     hl2 = (high + low) / 2
@@ -67,16 +70,19 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
         prev_lower = final_lower[i - 1]
         prev_trend = st_trend[i - 1]
 
+        # Final Upper Band locking logic
         if basic_upper[i] < prev_upper or close[i - 1] > prev_upper:
             final_upper[i] = basic_upper[i]
         else:
             final_upper[i] = prev_upper
 
+        # Final Lower Band locking logic
         if basic_lower[i] > prev_lower or close[i - 1] < prev_lower:
             final_lower[i] = basic_lower[i]
         else:
             final_lower[i] = prev_lower
 
+        # Secure Direction State Switches
         if prev_trend == 'BEAR':
             if close[i] > final_upper[i]:
                 st_trend.append('BULL')
@@ -84,7 +90,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
             else:
                 st_trend.append('BEAR')
                 supertrend[i] = final_upper[i]
-        else:
+        else:  # prev_trend == 'BULL'
             if close[i] < final_lower[i]:
                 st_trend.append('BEAR')
                 supertrend[i] = final_upper[i]
@@ -98,10 +104,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """Calculates Dual Supertrends using dynamically defined parameters from CONFIG.
     
-    Matrix matching logic applied:
-    - If ST1 and ST2 are both BULL -> BULL
-    - If ST1 and ST2 are both BEAR -> BEAR
-    - If they conflict -> SIDE
+    If both trends match, outputs BULL/BEAR, otherwise SIDE.
     """
     try:
         raw_df = fetch_yf_data(period='3d', interval='1m')
@@ -115,6 +118,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
 
+    # Safe Datetime Index Normalisation
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
     tz_string = str(TIMEZONE)
@@ -124,10 +128,11 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else df.tz_localize('UTC').tz_convert(tz_string)
     )
 
+    # Compute both Supertrends using values loaded directly from CONFIG
     st1_line, st1_trend = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
     st2_line, st2_trend = _compute_single_st(df, period=CONFIG["ST2"]["PERIOD"], factor=CONFIG["ST2"]["FACTOR"])
 
-    # Vectorised Matrix Evaluation Layer (Replaced the loop)
+    # Determine aligned matrices (BULL/BEAR if agreed, else SIDE)
     st_trend_series = pd.Series(
         np.where(st1_trend == st2_trend, st1_trend, 'SIDE'),
         index=df.index
@@ -147,7 +152,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 def export_supertrend_json(
     df: pd.DataFrame = None, output_file='../web/webchrtpxy.json'
 ):
-    """Exports data to JSON using Unix timestamps for frontend charting compatibility."""
+    """Exports and retains legacy key frames alongside requested configuration variables."""
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
     if df is None or df.empty:
@@ -155,7 +160,7 @@ def export_supertrend_json(
     output = []
     for idx, row in df.iterrows():
         output.append({
-            'time': int(idx.timestamp()), 
+            'time': int(idx.timestamp()),
             'open': float(row['Open']),
             'high': float(row['High']),
             'low': float(row['Low']),
