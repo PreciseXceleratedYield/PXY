@@ -10,7 +10,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 DEBUG_MODE = False
 
 # --- CONFIGURATION SECTION ---
-SUPERTREND_PERIOD = 3.0
+SUPERTREND_PERIOD = 1.0
 SUPERTREND_FACTOR = 0.7
 # -----------------------------
 
