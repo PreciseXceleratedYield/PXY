@@ -215,12 +215,12 @@ def handle_side_averaging(client, df):
     ce_pnl_color = Fore.CYAN + Style.BRIGHT if ce_target_crossed else (Fore.GREEN if ce_pnl_val >= 0 else Fore.RED)
     
     # Strict column breakdown with exactly 1 trailing space acting as padding
-    ce_opt_col = f"{'CE':>3} "         # 3 chars + 1 space padding = 4
-    ce_lot_col = f"{ce_lots:>3} "      # 3 chars + 1 space padding = 4
-    ce_agt_col = f"{ce_agt:>4} "       # 4 chars + 1 space padding = 5
-    ce_sts_col = f"{ce_sts:>3} "       # 3 chars + 1 space padding = 4
-    ce_tgt_col = f"{ce_tgt:>3} "       # 3 chars + 1 space padding = 4
-    ce_pnl_str = f"{ce_pnl_val:>15}"   # Flexible padding fills the remaining 15 chars (no trailing space)
+    ce_opt_col = f"{'CE':>4} "         # 3 chars + 1 space padding = 4
+    ce_lot_col = f"{ce_lots:>4} "      # 3 chars + 1 space padding = 4
+    ce_agt_col = f"{ce_agt:>5} "       # 4 chars + 1 space padding = 5
+    ce_sts_col = f"{ce_sts:>4} "       # 3 chars + 1 space padding = 4
+    ce_tgt_col = f"{ce_tgt:>4} "       # 3 chars + 1 space padding = 4
+    ce_pnl_str = f"{ce_pnl_val:>11}"   # Flexible padding fills the remaining 15 chars (no trailing space)
     
     # Print string safely splitting text and color formatting to maintain the 40-char width
     print(Fore.WHITE + ce_opt_col + ce_lot_col + ce_agt_col + ce_sts_col + ce_tgt_col + ce_pnl_color + ce_pnl_str + Style.RESET_ALL)
