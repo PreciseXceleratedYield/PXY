@@ -167,7 +167,7 @@ def handle_side_averaging(client, df):
         
         # Aligned with BEAR trend? Tighten risk by cutting allowance in half
         if supertrend == "BEAR":
-            pe_dynamic_threshold = pe_dynamic_threshold / 2
+            pe_dynamic_threshold = pe_dynamic_threshold 
     else:
         # Condition 4: PE Mean Reversion
         raw_pe_val = atr * atr
@@ -176,7 +176,7 @@ def handle_side_averaging(client, df):
         
         # Aligned with BEAR trend? Tighten risk by cutting allowance in half
         if supertrend == "BEAR":
-            pe_dynamic_threshold = pe_dynamic_threshold / 2
+            pe_dynamic_threshold = pe_dynamic_threshold 
 
 
     # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO COMBINED DYNAMIC THRESHOLDS
