@@ -16,7 +16,7 @@ init(autoreset=True)
 
 # --- SYSTEM SETTINGS --- 
 REBUY_ENABLED = True 
-MAX_LAYERS = 6
+MAX_LAYERS = 7
 COOL_DOWN_SECONDS = 60  
 
 # --- PANEL DISPLAY CONFIG ---
