@@ -9,20 +9,17 @@ from syscnfgpxy import TICKER
 from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
 
-# CONFIGURATION SWITCHES
-USE_TREND = "YES"  # Options: "YES" or "NO"
-
 
 def get_entry_signal(df=None):
     """Routes options positioning based on an absolute decoupled hybrid matrix:
 
-    Entries -> Pure SuperTrend trend state combined with specific Market Proxy
-    outcomes. Exits   -> Pure sysmktpxy dynamic signals. Evaluation window matches
-    current real-time IST clock.
+    Entries -> Pure SuperTrend trend state combined with specific Market Proxy outcomes.
+               Bypassed strictly during the 9:00 AM - 9:30 AM morning window.
+    Exits   -> Driven strictly by raw exit_dir, completely ignoring trend parameters. 
+    Evaluation window matches current real-time IST clock.
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
-
         df = fetch_yf_data()
 
     if df is None or df.empty:
@@ -39,11 +36,11 @@ def get_entry_signal(df=None):
     ist_tz = ZoneInfo("Asia/Kolkata")
     latest_time = datetime.now(ist_tz).time()
 
-    # ===== HYBRID MATRIX ROUTING EVALUATION ===== #
+    # ===== HYBRID MATRIX ENTRY ROUTING EVALUATION ===== #
     
-    # CASE 1: 9:00 AM to 9:30 AM IST Window OR USE_TREND is turned off
-    # Filter entry signal strictly by exit_dir without executing technical SuperTrend
-    if (start_time <= latest_time < end_time) or (USE_TREND == "NO"):
+    # MORNING ONLY: 9:00 AM to 9:30 AM IST Window Bypasses Trend
+    # Entry signal tracks exit_dir strictly without executing technical SuperTrend
+    if start_time <= latest_time < end_time:
         if exit_dir == "BULL":
             entry_signal = "OTMBUY"
         elif exit_dir == "BEAR":
@@ -51,7 +48,7 @@ def get_entry_signal(df=None):
         else:
             entry_signal = "NONE"
 
-    # CASE 2: Post-9:30 AM IST and USE_TREND is enabled
+    # ALL OTHER TIMES: Trend is always enforced natively
     else:
         # 2. Pipeline Segment B: Process technical SuperTrend profiles
         processed_st_df = calculate_supertrend(df.copy())
@@ -61,24 +58,18 @@ def get_entry_signal(df=None):
         # Target the exact same closed window bar trend
         trend = processed_st_df["ST_Trend"].iloc[-1]
 
-        if trend == "BULL":
-            if exit_dir == "BULL":
-                entry_signal = "OTMBUY"
-            elif exit_dir == "BEAR":
-                entry_signal = "BEAR"
-            else:
-                entry_signal = "NONE"
-        elif trend == "BEAR":
-            if exit_dir == "BEAR":
-                entry_signal = "OTMSELL"
-            elif exit_dir == "BULL":
-                entry_signal = "BULL"
-            else:
-                entry_signal = "NONE"
+        if (trend == "BULL" or trend == "SIDE") and exit_dir == "BULL":
+            entry_signal = "OTMBUY"
+        elif (trend == "BEAR" or trend == "SIDE") and exit_dir == "BEAR":
+            entry_signal = "OTMSELL"
+        elif trend == "BULL" and exit_dir == "BEAR":
+            entry_signal = "BEAR"
+        elif trend == "BEAR" and exit_dir == "BULL":
+            entry_signal = "BULL"
         else:
             entry_signal = "NONE"
 
-    # Evaluate Exit Profile via Market Proxy Direction
+    # ===== GLOBAL EXIT SIGNAL MATRIX (Completely independent of time/trend) ===== #
     if exit_dir in ["BULL", "BEAR"]:
         exit_signal = exit_dir
     else:
@@ -93,6 +84,5 @@ if __name__ == "__main__":
     df = fetch_yf_data()
     if df is not None and not df.empty:
         entry, ex = get_entry_signal(df)
-        print(f"USE_TREND CONFIG: {USE_TREND}")
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry} | EXIT_SIG: {ex}")
 
