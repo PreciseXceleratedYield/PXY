@@ -144,7 +144,7 @@ def handle_side_averaging(client, df):
     
     # --- PRE-CALCULATE IDENTICAL MEAN REVERSION VALUE ---
     raw_val = atr * atr
-    dampened_val = max(raw_val, 25.0) + max(0.0, (raw_val - 25.0) / 4.0) + raw_val
+    dampened_val = max(16, min(raw_val, 66))
     
     # --- CALL OPTION (CE) SIDE RISK CALCULATIONS ---
     ce_base_drawdown_limit = -atr
