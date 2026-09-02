@@ -15,8 +15,8 @@ DEBUG_MODE = False
 # ==============================================================================
 CONFIG = {
     "ST1": {
-        "PERIOD": 3.0,   # Fast Supertrend Period
-        "FACTOR": 1.0    # Fast Supertrend Multiplier
+        "PERIOD": 1.0,   # Fast Supertrend Period
+        "FACTOR": 3.0    # Fast Supertrend Multiplier
     },
     "ST2": {
         "PERIOD": 1.0,   # Slow Supertrend Period
