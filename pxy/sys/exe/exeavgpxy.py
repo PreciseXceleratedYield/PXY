@@ -141,7 +141,10 @@ def handle_side_averaging(client, df):
         if not pe_rows.empty
         else "NONE"
     )
-    
+    # --- SIMPLIFIED TREND FACTORS ---
+    ce_trend_factor = 0.7 if supertrend == "BULL" else 1.0
+    pe_trend_factor = 0.7 if supertrend == "BEAR" else 1.0
+
     # --- PRE-CALCULATE IDENTICAL MEAN REVERSION VALUE ---
     raw_val = atr * atr
     dampened_val = max(16, min(raw_val, 66))
@@ -150,7 +153,7 @@ def handle_side_averaging(client, df):
     ce_base_drawdown_limit = -atr
     if "MBUY" in ce_avg_entry:
         ce_dynamic_threshold = (
-            ce_base_drawdown_limit * (((ce_invst_factor * 3) + ce_lots_factor) / 4)
+            ce_base_drawdown_limit * (((ce_invst_factor * 3) + ce_lots_factor) / 4) * ce_trend_factor
         )
     else:
         ce_dynamic_threshold = -dampened_val
@@ -159,7 +162,7 @@ def handle_side_averaging(client, df):
     pe_base_drawdown_limit = -atr
     if "MSELL" in pe_avg_entry:
         pe_dynamic_threshold = (
-            pe_base_drawdown_limit * (((pe_invst_factor * 3) + pe_lots_factor) / 4)
+            pe_base_drawdown_limit * (((pe_invst_factor * 3) + pe_lots_factor) / 4) * pe_trend_factor
         )
     else:
         pe_dynamic_threshold = -dampened_val
