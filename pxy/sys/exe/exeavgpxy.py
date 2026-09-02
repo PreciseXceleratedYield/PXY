@@ -147,7 +147,7 @@ def handle_side_averaging(client, df):
     dampened_val = max(raw_val, 25.0) + max(0.0, (raw_val - 25.0) / 4.0) + raw_val
     
     # --- CALL OPTION (CE) SIDE RISK CALCULATIONS ---
-    ce_base_drawdown_limit = -atr/2
+    ce_base_drawdown_limit = -atr
     if "MBUY" in ce_avg_entry:
         ce_dynamic_threshold = (
             ce_base_drawdown_limit * (((ce_invst_factor * 3) + ce_lots_factor) / 4)
@@ -156,7 +156,7 @@ def handle_side_averaging(client, df):
         ce_dynamic_threshold = -dampened_val
     
     # --- PUT OPTION (PE) SIDE RISK CALCULATIONS ---
-    pe_base_drawdown_limit = -atr/2
+    pe_base_drawdown_limit = -atr
     if "MSELL" in pe_avg_entry:
         pe_dynamic_threshold = (
             pe_base_drawdown_limit * (((pe_invst_factor * 3) + pe_lots_factor) / 4)
