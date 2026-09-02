@@ -127,7 +127,7 @@ def run_snapshot():
     if os.path.exists(exe_path):
         try:
             # 1. Runs from 15:11 up to 15:14:59 (Without "-all")
-            if dt_time(15, 11) <= now < dt_time(15, 15):
+            if dt_time(15, 14) <= now < dt_time(15, 15):
                 subprocess.run(["python3", exe_path], check=True)
                 
             # 2. Runs from 15:15 up to 15:49:59 (With "-all")
