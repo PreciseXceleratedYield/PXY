@@ -1,79 +1,32 @@
 //@version=5
-indicator("PreciseXceleratedYield Pvt Ltd™", overlay=true)
+indicator("PXY®", overlay=true)
 
-// ==========================================
-// CONFIGURATION & INPUTS
-// ==========================================
-int mode = input.int(1, title="OHLC Mode", minval=0, maxval=5, 
-     tooltip="0: Hyper-Sensitive, 1: Raw, 2: OC/2, 3: OCC/3, 4: OCCC/4, 5: OHLCC/5")
+// 1. Define Open as the Actual Close of the previous candle
+custom_open = na(close) ? open : close
 
-int sma_length = input.int(50, title="SMA Length", minval=1)
+// 2. Calculate your custom Close value
+custom_close = close >= open ? (close + high) / 2.0 : (close + low) / 2.0
 
-// ==========================================
-// VECTORIZED OHLC MODE TRANSFORMATIONS
-// ==========================================
-// Capture raw candle data arrays in memory
-float raw_o = open
-float raw_h = high
-float raw_l = low
-float raw_c = close
+// 3. Adjust High and Low to encapsulate the new Open and Close boundaries
+custom_high = math.max(high, math.max(custom_open, custom_close))
+custom_low  = math.min(low, math.min(custom_open, custom_close))
 
-// Initialize output variables
-float out_o = raw_o
-float out_h = raw_h
-float out_l = raw_l
-float out_c = raw_c
+// 4. Color Logic: Compare current custom close to the PREVIOUS custom close
+candle_color = custom_close >= custom_close[1] ? color.green : color.red
 
-// --- Mode 0: Hyper-Sensitive Modified Close ---
-float m0_c = raw_c >= raw_o ? (raw_c + raw_h) / 2.0 : (raw_c + raw_l) / 2.0
+// 5. Plot the custom candles
+plotcandle(custom_open, custom_high, custom_low, custom_close, 
+           title="Custom Continuous Candles", 
+           color=candle_color, 
+           wickcolor=candle_color, 
+           bordercolor=candle_color)
 
-// --- Mode 1: Raw Candles ---
-float m1_c = raw_c
+// 6. Supertrend #1 (Period 1, Factor 1.1)
+[st1, dir1] = ta.supertrend(1.1, 1)
+plot(dir1 < 0 ? st1 : na, color=color.green, title="ST 1 Up", linewidth=2, style=plot.style_linebr)
+plot(dir1 > 0 ? st1 : na, color=color.red, title="ST 1 Down", linewidth=2, style=plot.style_linebr)
 
-// --- Mode 2: Mid-Body (OC/2) ---
-float m2_c = (raw_o + raw_c) / 2.0
-
-// --- Mode 3: OCC/3 ---
-float m3_c = (raw_o + (2.0 * raw_c)) / 3.0
-
-// --- Mode 4: OCCC/4 ---
-float m4_c = (raw_o + (3.0 * raw_c)) / 4.0
-
-// --- Mode 5: OHLCC/5 ---
-float m5_c = (raw_o + raw_h + raw_l + (2.0 * raw_c)) / 5.0
-
-// ==========================================
-// SWITCH EXECUTION ENGINE
-// ==========================================
-if mode == 0
-    out_c := m0_c
-else if mode == 1
-    out_c := m1_c
-else if mode == 2
-    out_c := m2_c
-else if mode == 3
-    out_c := m3_c
-else if mode == 4
-    out_c := m4_c
-else if mode == 5
-    out_c := m5_c
-
-// ==========================================
-// INDICATOR CALCULATIONS & PLOTTING
-// ==========================================
-// Dynamic SMA calculation derived from the active mode's transformed Close
-float mode_sma = ta.sma(out_c, sma_length)
-
-// Plot the SMA line on the chart
-plot(mode_sma, title="Mode-Based SMA", color=color.blue, linewidth=2)
-
-// Determine candle color condition based on the selected mode
-// Modes 2, 3, 4, 5 modify the Close relative to Open, so we check if the new close beats the raw open
-bool is_bullish = out_c >= raw_o
-color candle_color = is_bullish ? color.green : color.red
-
-// Optional: Plot the transformed candle bars directly on the chart layout
-plotcandle(out_o, out_h, out_l, out_c, title="Transformed Candles", 
-           color = candle_color, 
-           wickcolor = candle_color)
-
+// 7. Supertrend #2 (Period 3, Factor 3.3)
+[st2, dir2] = ta.supertrend(3.3, 3)
+plot(dir2 < 0 ? st2 : na, color=color.teal, title="ST 2 Up", linewidth=3, style=plot.style_linebr)
+plot(dir2 > 0 ? st2 : na, color=color.maroon, title="ST 2 Down", linewidth=3, style=plot.style_linebr)
