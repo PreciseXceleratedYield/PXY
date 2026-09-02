@@ -48,8 +48,8 @@ def target_price(row):
         
         # Calculate volatility component once for the Aligned Strategy
         raw_vol = atr * atr
-        vol_component = 25.0 if raw_vol <= 25.0 else 25.0 + ((raw_vol - 25.0) / 4.0)
-
+        vol_component = raw_vol/2
+        
         # 3️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
         active_exit = str(row.get("exit", "NONE")).upper().strip()
