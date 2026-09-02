@@ -131,8 +131,8 @@ def handle_side_averaging(client, df):
 
 
     # --- ZERO-DIVISION SHIELDED LOTS FACTOR ENGINE ---
-    ce_lots_factor = (ce_lots + 1) / (pe_lots + 1)
-    pe_lots_factor = (pe_lots + 1) / (ce_lots + 1)
+    ce_lots_factor = 1 #(ce_lots + 1) / (pe_lots + 1)
+    pe_lots_factor = 1 #(pe_lots + 1) / (ce_lots + 1)
 
 ###########################################################################################################
     # --- PRE-CALCULATE DYNAMIC THRESHOLDS MULTIPLIED ACROSS THE WHOLE THING ---
