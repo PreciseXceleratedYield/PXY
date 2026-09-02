@@ -1,8 +1,40 @@
+# sys/exe/exetgtpxy.py
+from colorama import Fore, Style, init
+
+# Initialize colorama for clean, colored terminal output formatting
+init(autoreset=True)
+
+
+def f(x, d=0.0):
+    """Safely cast input to float, return default if casting fails or value <= 0."""
+    try:
+        val = float(x)
+        return val if val > 0 else d
+    except (ValueError, TypeError):
+        return d
+
+
+def i(x, d=0):
+    """Safely cast input to integer, return default if casting fails."""
+    try:
+        return int(x)
+    except (ValueError, TypeError):
+        return d
+
+
+def dynamic_entry(row):
+    """Returns the raw entry price from row dictionary entries with no tracking variables."""
+    try:
+        return round(float(row.get("buy_prc", 0)), 2)
+    except (ValueError, TypeError):
+        return 0.0
+
+
 def target_price(row):
     """Calculates individual option layer target price using dynamic volatility variables.
 
-    Aligned Trades   : atr * atr (Minimum floor of 25.0, 4:1 dampened growth thereafter).
-    Sideways Trades  : Strict ATR alone (Quick escape targeting to beat sideways Theta decay).
+    Aligned Trades   : atr + vol_component (Minimum floor of 25.0, 4:1 dampened growth thereafter).
+    Sideways Trades  : Strict ATR alone split by 1.4 (Quick escape targeting to beat sideways Theta decay).
     Hostile Trades   : Fixed 1.4% target percentage floor.
     """
     try:
@@ -55,5 +87,3 @@ def target_price(row):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
-
-
