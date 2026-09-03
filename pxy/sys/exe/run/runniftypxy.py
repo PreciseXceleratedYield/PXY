@@ -71,7 +71,7 @@ def get_symbol(price, side, otm_distance):
         atm = round_to_strike(price)
 
         # apply daily buffer
-        atm_adjusted = atm + ATM_BUFFER
+        atm_adjusted = round_to_strike(atm + ATM_BUFFER)
 
         # ---------------- OTM SHIFT ----------------
         if "OTM" in side:
