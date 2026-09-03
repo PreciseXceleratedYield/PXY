@@ -1189,6 +1189,13 @@ document.querySelectorAll('.amenu-btn').forEach(btn=>{
 function cancelUpdate(){$('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;}
 function confirmUpdate(){
     const pwd=$('updPwd').value.trim();if(!pwd||!pendingScript)return;
+    if(pwd!=='1'){
+        const inp=$('updPwd');
+        inp.style.borderColor=cssVar('--bear');inp.value='';inp.placeholder='wrong password';
+        setTimeout(()=>{inp.style.borderColor='var(--border2)';inp.placeholder='password';},1000);
+        inp.focus();
+        return;
+    }
 
     // special path: viewing pxyconfig — password required just to open it
     if(pendingScript==='__pxyconfig_view__'){
