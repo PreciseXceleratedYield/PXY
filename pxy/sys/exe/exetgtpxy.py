@@ -48,12 +48,14 @@ def target_price(row):
         
         # Calculate volatility component once for the Aligned Strategy
         raw_vol = atr + atr
-        vol_component = max(8, min(raw_val, 66))
+        # Fixed: Changed 'raw_val' to 'raw_vol' to map to the correct local variable
+        vol_component = max(8, min(raw_vol, 66))
         
         # 3️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
         active_exit = str(row.get("exit", "NONE")).upper().strip()
         supertrend = str(row.get("supertrend", "NONE")).upper().strip()
+        boss = str(row.get("bos_val", "NONE")).upper().strip()
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
@@ -70,7 +72,7 @@ def target_price(row):
             elif active_exit in ("SELL", "BEAR"):
                 target_pct = 1.4
             else:
-                target_pct = atr + vol_component
+                target_pct = (atr + vol_component) if boss == "NBUY" else vol_component
 
         elif is_pe:
             if supertrend == "SIDE":
@@ -78,7 +80,7 @@ def target_price(row):
             elif active_exit in ("BUY", "BULL"):
                 target_pct = 1.4
             else:
-                target_pct = atr + vol_component
+                target_pct = (atr + vol_component) if boss == "NSELL" else vol_component
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
