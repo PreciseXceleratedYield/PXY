@@ -47,8 +47,8 @@ def target_price(row):
         atr = f(row.get("atr", 0))
         
         # Calculate volatility component once for the Aligned Strategy
-        raw_vol = atr * atr
-        vol_component = max(16, min(raw_val, 66))
+        raw_vol = atr + atr
+        vol_component = max(8, min(raw_val, 66))
         
         # 3️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
