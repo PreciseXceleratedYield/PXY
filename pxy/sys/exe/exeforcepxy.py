@@ -104,9 +104,25 @@ def run_action(choice):
 
     data = get_all_data()
     ltp = data.get("price")
-    OTM_DISTANCE = 100
+
+    # --- DYNAMIC OTM DISTANCE BY DAY OF THE WEEK (IST) ---
+    ist = pytz.timezone("Asia/Kolkata")
+    current_day = datetime.now(ist).strftime('%A')
+    
+    day_otm_mapping = {
+        "Monday": 100,
+        "Tuesday": 50,
+        "Wednesday": 0,
+        "Thursday": -50,
+        "Friday": -100
+    }
+    
+    # Fallback to 100 for weekends
+    OTM_DISTANCE = day_otm_mapping.get(current_day, 100)
+    dprint(f"Today is {current_day}. Applied OTM Distance: {OTM_DISTANCE}", Fore.YELLOW)
 
     symbol = get_symbol(ltp, sig, OTM_DISTANCE)
+
     res = {"stat": "SKIPPED"}
 
     if symbol and symbol != "NA":
