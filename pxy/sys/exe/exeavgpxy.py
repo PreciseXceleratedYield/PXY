@@ -141,6 +141,12 @@ def handle_side_averaging(client, df):
         if not pe_rows.empty
         else "NONE"
     )
+    boss = (
+        str(pe_last.get("bos_val", "NONE")).upper().strip()
+        if not pe_rows.empty
+        else "NONE"
+    )
+    
     # --- SIMPLIFIED TREND FACTORS ---
     ce_trend_factor = 0.75 if supertrend == "BULL" else 1.0
     pe_trend_factor = 0.75 if supertrend == "BEAR" else 1.0
@@ -156,7 +162,7 @@ def handle_side_averaging(client, df):
             (((ce_invst_factor * 3) + ce_lots_factor) / 4) + ce_trend_factor
         )
     else:
-        ce_dynamic_threshold = -dampened_val
+        ce_dynamic_threshold = (-dampened_val * 2) if boss == "NSELL" else -dampened_val
     
     # --- PUT OPTION (PE) SIDE RISK CALCULATIONS ---
     pe_base_drawdown_limit = -atr
@@ -165,7 +171,7 @@ def handle_side_averaging(client, df):
             (((pe_invst_factor * 3) + pe_lots_factor) / 4) + pe_trend_factor
         )
     else:
-        pe_dynamic_threshold = -dampened_val
+        pe_dynamic_threshold = (-dampened_val * 2) if boss == "NBUY" else -dampened_val
 
 
 
