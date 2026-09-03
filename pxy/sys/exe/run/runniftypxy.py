@@ -3,7 +3,8 @@ from pathlib import Path
 from datetime import datetime, date, timedelta
 
 # ---------------- CONFIG ----------------
-STRIKE_STEP = 100
+# Adjusted to 50 to allow valid Nifty 50-point step intervals while locking the last digit to 0
+STRIKE_STEP = 50
 
 # DAILY ATM BUFFER (you can change daily without touching logic)
 ATM_BUFFER = 0  
@@ -38,6 +39,7 @@ def is_monthly_expiry(expiry_date):
 
 
 def round_to_strike(price):
+    # Snaps directly to the nearest 50 interval (Ensures the last digit is always 0)
     return int(round(float(price) / STRIKE_STEP) * STRIKE_STEP)
 
 
@@ -47,7 +49,7 @@ def get_symbol(price, side, otm_distance):
     """
     Signal-driven symbol builder:
     - Math is accumulated directly first (Price + Buffer ± Weekday Distance)
-    - Enforces strict exchange validity by rounding to the nearest 100 at the end
+    - Enforces valid exchange tracking by rounding to the nearest 50 step at the end.
     """
     try:
         if not price or price == 0:
@@ -76,7 +78,7 @@ def get_symbol(price, side, otm_distance):
         else:
             raw_strike = raw_base
 
-        # 3. Round to the nearest 100 strike step later (Guarantees last digits are always 00)
+        # 3. Round to nearest 50 later (Guarantees last digit is 0, allowing both xx00 and xx50)
         strike = round_to_strike(raw_strike)
 
         # ---------------- EXPIRY ----------------
@@ -96,4 +98,3 @@ def get_symbol(price, side, otm_distance):
     except Exception as e:
         print(f"❌ Symbol Generation Error: {e}")
         return "NA"
-
