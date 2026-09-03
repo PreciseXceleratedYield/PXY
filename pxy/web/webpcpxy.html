@@ -80,11 +80,13 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 .hdr-l::after,.hdr-r::after{display:none;}
 .sig-cell.bull-cell::after{background:var(--bull);box-shadow:0 0 6px var(--bull);}
 .sig-cell.bear-cell::after{background:var(--bear);box-shadow:0 0 6px var(--bear);}
+.sig-cell.side-cell::after{background:#facc15;box-shadow:0 0 6px #facc15;}
 .sc-lbl{font-size:7px;letter-spacing:0.08em;text-transform:uppercase;color:#ffffff;white-space:nowrap;}
 .sc-val{font-family:'Syne',sans-serif;font-weight:800;font-size:12px;white-space:nowrap;color:#ffffff;line-height:1;}
 .sc-val.bull{color:var(--bull);}
 .sc-val.bear{color:var(--bear);}
 .sc-val.dim{color:var(--muted);}
+.sc-val.side{color:#facc15;}
 
 /* ── CHART ── */
 #momentumBar{
@@ -471,12 +473,14 @@ function cls(v){
     const s=String(v||'').toUpperCase();
     if(['BULL','UP','BUY','CE','POSITIVE'].some(k=>s.includes(k)))return'bull';
     if(['BEAR','DOWN','SELL','PE','NEGATIVE'].some(k=>s.includes(k)))return'bear';
+    if(s.includes('SIDE'))return'side';
     return'dim';
 }
 function emojify(v){
     const s=String(v||'').toUpperCase();
-    if(s.includes('BUY')||s.includes('BULL'))return'🟢';
-    if(s.includes('SELL')||s.includes('BEAR'))return'🔴';
+    if(s.includes('BUY')||s.includes('BULL'))return'🟩';
+    if(s.includes('SELL')||s.includes('BEAR'))return'🟥';
+    if(s.includes('SIDE'))return'🟨';
     if(s==='NONE')return'—';
     return v;
 }
