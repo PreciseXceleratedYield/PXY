@@ -1,4 +1,5 @@
-# run/runsymbpxy.py
+import sys
+from pathlib import Path
 from datetime import datetime, date, timedelta
 
 # ---------------- CONFIG ----------------
@@ -45,10 +46,9 @@ def round_to_strike(price):
 def get_symbol(price, side, otm_distance):
     """
     Signal-driven symbol builder:
-    - ATM = base strike + buffer
-    - OTM = ATM ± fixed 200 points
+    - Math is accumulated directly first (Price + Buffer ± Weekday Distance)
+    - Enforces strict exchange validity by rounding to the nearest 100 at the end
     """
-
     try:
         if not price or price == 0:
             return "NA"
@@ -58,29 +58,26 @@ def get_symbol(price, side, otm_distance):
         # ---------------- SIGNAL MAP ----------------
         if side in ["ATMBUY", "OTMBUY"]:
             opt_type = "CE"
-            mode = "ATM"
-
         elif side in ["ATMSELL", "OTMSELL"]:
             opt_type = "PE"
-            mode = "ATM"
-
         else:
             return "NA"
 
-        # ---------------- ATM BASE ----------------
-        atm = round_to_strike(price)
+        # ---------------- STRIKE RESOLUTION ----------------
+        # 1. Establish the raw baseline price plus your daily buffer
+        raw_base = float(price) + float(ATM_BUFFER)
 
-        # apply daily buffer
-        atm_adjusted = round_to_strike(atm + ATM_BUFFER)
-
-        # ---------------- OTM SHIFT ----------------
+        # 2. Add or subtract the weekday distance offset first in pure float arithmetic
         if "OTM" in side:
             if opt_type == "CE":
-                strike = atm_adjusted + otm_distance
+                raw_strike = raw_base + float(otm_distance)
             else:
-                strike = atm_adjusted - otm_distance
+                raw_strike = raw_base - float(otm_distance)
         else:
-            strike = atm_adjusted
+            raw_strike = raw_base
+
+        # 3. Round to the nearest 100 strike step later (Guarantees last digits are always 00)
+        strike = round_to_strike(raw_strike)
 
         # ---------------- EXPIRY ----------------
         expiry = get_target_tuesday()
@@ -99,3 +96,4 @@ def get_symbol(price, side, otm_distance):
     except Exception as e:
         print(f"❌ Symbol Generation Error: {e}")
         return "NA"
+
