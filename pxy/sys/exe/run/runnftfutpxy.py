@@ -1,30 +1,32 @@
 import json
-from datetime import datetime
 import calendar
+from datetime import datetime
+from colorama import Fore, Style, init
 from runclntpxy import get_session
+
+# Initialize colorama terminal formatting hooks
+init(autoreset=True)
 
 def get_current_month_future_symbol():
     """
     Dynamically constructs the exact text symbol name Kotak expects 
-    for the current month's NIFTY Future contract.
-    Example format: NIFTY26SEPFUT
+    for the current month's NIFTY Future contract, accounting for 
+    automated last-Thursday rollover logic.
     """
     now = datetime.now()
     year_short = now.strftime("%y")       # e.g., '26'
     month_abc = now.strftime("%b").upper() # e.g., 'SEP'
     
-    # Check if the market has passed the last Thursday of the current month
-    # to roll over to the next month's future contract automatically.
+    # Calculate the last Thursday of the current month
     c = calendar.Calendar(firstweekday=calendar.MONDAY)
     month_cal = c.monthdatescalendar(now.year, now.month)
     
-    # Extract the last Thursday date of this month
     last_thursday = [
         day for week in month_cal 
         for day in week if day.weekday() == calendar.THURSDAY and day.month == now.month
-    ][-1]  # <--- FIXED: Syntax corrected to grab the last index securely
+    ][-1]
     
-    # If today is past the last Thursday trading cutoff, roll over to the next month
+    # If today is past the last Thursday trading cutoff, roll over to the next contract month
     if now.date() > last_thursday:
         next_month = now.month + 1 if now.month < 12 else 1
         next_year = now.year if now.month < 12 else now.year + 1
@@ -34,78 +36,62 @@ def get_current_month_future_symbol():
 
     return f"NIFTY{year_short}{month_abc}FUT"
 
+def fetch_nifty_future_ohlc():
+    # 1. Initialize your established session wrapper
+    session = get_session()
+    if not session:
+        print(f"{Fore.RED}❌ Authentication Failed: Session could not be initialized.")
+        return
 
-def find_and_get_mid_price(client, symbol_text: str, segment: str = "nse_fo") -> float:
-    """
-    1. Finds the token for the constructed future symbol text.
-    2. Uses your exact working options processing structure with quote_type="depth".
-    """
     try:
-        print(f"1. Querying token ID for symbol string: {symbol_text}")
-        # Search directly by the exact constructed symbol to return only 1 row
-        search_result = client.search_scrip(exchange_segment=segment, symbol=symbol_text)
+        # 2. Generate the deterministic text symbol contract name
+        target_symbol = get_current_month_future_symbol()
+        print(f"📡 Target Created: {Fore.CYAN}{target_symbol}")
+        print("🔍 Querying server for numeric token assignment...")
         
-        if not search_result or 'data' not in search_result or len(search_result['data']) == 0:
-            print(f"Error: Symbol {symbol_text} not found on server search.")
-            return 0.0
+        # 3. Targeted micro-search using exact match parameters to protect RAM limits
+        search_result = session.search_scrip(
+            exchange_segment="nse_fo", 
+            symbol=target_symbol
+        )
+        
+        if not search_result or 'data' not in search_result or not search_result['data']:
+            print(f"{Fore.RED}❌ Error: No token data payload returned for {target_symbol}.")
+            return
 
-        # Unpack the first object from search result data list to get token
-        scrip_data = search_result['data'][0] if isinstance(search_result['data'], list) else search_result['data']
+        # Extract structural dictionary data frames safely
+        scrip_data = search_result['data']
         token = scrip_data.get("instrument_token") or scrip_data.get("pSymbolToken")
         trading_symbol = scrip_data.get("trading_symbol") or scrip_data.get("pTrdSymbol")
         
-        print(f"2. Found Live Token: {token} ({trading_symbol})")
-        print("3. Fetching live quote metrics via market depth...")
+        if not token:
+            print(f"{Fore.RED}❌ Error: Structural token key parsing mapping failure.")
+            return
 
-        # Construct payload with found token
-        instr = [{"instrument_token": str(token), "exchange_segment": segment}]
-        
-        # Pull market depth payload exactly like your working options method
-        res = client.quotes(instrument_tokens=instr, quote_type="depth")
+        print(f"🎯 Target Locked: {Fore.GREEN}{trading_symbol} {Fore.WHITE}(Token ID: {token})")
+        print("📈 Requesting live market OHLC data metrics...")
 
-        # Your exact unwrapping logic
-        if not res or not isinstance(res, list) or len(res) == 0:
-            return 0.0
+        # 4. Request the light, optimized OHLC data dictionary block
+        instrument_payload = [
+            {
+                "instrument_token": str(token),
+                "exchange_segment": "nse_fo"
+            }
+        ]
         
-        data = res[0] 
-        
-        depth = data.get("depth", {})
-        buy_list = depth.get("buy", [])
-        sell_list = depth.get("sell", [])
+        quote_response = session.quotes(
+            instrument_tokens=instrument_payload,
+            quote_type="ohlc"
+        )
 
-        # Process bid/ask from your working structure
-        bid = float(buy_list[0].get("price", 0)) if buy_list else 0.0
-        ask = float(sell_list[0].get("price", 0)) if sell_list else 0.0
-        
-        if bid > 0 and ask > 0:
-            return round((bid + ask) / 2, 2)
-        
-        # Fallback to last_price
-        return float(data.get("last_price", 0))
-        
+        # 5. Output Clean Terminal Visual Payload
+        print(f"\n{Fore.YELLOW}================ NIFTY FUTURE LIVE OHLC ================")
+        print(json.dumps(quote_response, indent=4))
+        print(f"{Fore.YELLOW}========================================================")
+
     except Exception as e:
-        print(f"Execution Error inside logic: {e}")
-        return 0.0
-
-
-def main():
-    # 1. Initialize session using runclntpxy.py
-    session = get_session()
-    if not session:
-        print("Failed to authenticate session context.")
-        return
-
-    # 2. Get dynamic month symbol text
-    target_symbol = get_current_month_future_symbol()
-
-    # 3. Find token and use token to return live price
-    live_price = find_and_get_mid_price(session, symbol_text=target_symbol)
-    
-    print("\n================================")
-    print(f"NIFTY FUTURE LIVE PRICE: {live_price}")
-    print("================================\n")
-
+        print(f"{Fore.RED}❌ Execution Engine Crash: {e}")
 
 if __name__ == "__main__":
-    main()
+    fetch_nifty_future_ohlc()
 
