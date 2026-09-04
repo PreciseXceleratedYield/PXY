@@ -5,21 +5,22 @@ from runclntpxy import get_session
 
 def get_current_month_expiry_date():
     """
-    Calculates the exact last Tuesday date string for the current month 
-    matching Kotak's F&O string layout (e.g., '29SEP26').
+    Calculates the exact last Tuesday day integer for the current month
+    and formats it to match Kotak's F&O string layout (e.g., '29SEP26').
     """
     today = datetime.today()
     year = today.year
     month = today.month
     
-    # Generate calendar framework for the current month
+    # Generate calendar framework for the current month (list of weekly lists)
     month_cal = calendar.monthcalendar(year, month)
     
-    # Extract the last week that has a Tuesday (Index 1 = Tuesday)
-    if month_cal[-1] != 0:
-        last_tuesday_day = month_cal[-1]
+    # Tuesday is index 1 in calendar.monthcalendar (0=Mon, 1=Tue, ..., 6=Sun)
+    # Start from the last week of the month and look for a non-zero Tuesday
+    if month_cal[-1][1] != 0:
+        last_tuesday_day = month_cal[-1][1]
     else:
-        last_tuesday_day = month_cal[-2]
+        last_tuesday_day = month_cal[-2][1]
         
     expiry_date_str = f"{last_tuesday_day:02d}{today.strftime('%b').upper()}{str(year)[2:]}"
     return expiry_date_str
@@ -42,8 +43,6 @@ def autodetect_and_get_quotes():
     
     # 2. Call the official Kotak Neo v2 '.quotes()' endpoint method
     try:
-        # Crucial Fix: The internal SDK requires the key name to be 'instrument_token' 
-        # even when passing a textual string symbol name layout.
         instrument_payload = [
             {
                 "instrument_token": target_symbol,
@@ -55,19 +54,15 @@ def autodetect_and_get_quotes():
         quote_response = session.quotes(instrument_tokens=instrument_payload)
         
         if quote_response:
-            # Inside Kotak Neo SDK, successful responses are packaged inside a 'data' array
-            # or returned as a flat list of matching instruments.
             data_list = []
             if isinstance(quote_response, dict):
                 data_list = quote_response.get("data", [])
                 if not data_list and "message" not in quote_response:
-                    # In case the payload has alternative key lists
                     data_list = [quote_response]
             elif isinstance(quote_response, list):
                 data_list = quote_response
 
             if data_list and len(data_list) > 0:
-                # Unpack the first instrument dictionary payload match
                 instrument_data = data_list[0]
                 
                 # Retrieve variable parameters safely
@@ -84,11 +79,10 @@ def autodetect_and_get_quotes():
                 print(f"\n❌ Response format parsed empty or returned an error block.")
                 print(f"Server Payload: {quote_response}")
         else:
-            print("\n❌ Server returned an completely empty response framework.")
+            print("\n❌ Server returned a completely empty response framework.")
             
     except Exception as e:
         print(f"API Connection Exception: {e}")
 
 if __name__ == "__main__":
     autodetect_and_get_quotes()
-
