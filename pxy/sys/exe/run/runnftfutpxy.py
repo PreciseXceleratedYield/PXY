@@ -64,7 +64,7 @@ def main():
     print()
 
     # --------------------------------------------------------
-    # SEARCH NIFTY
+    # SEARCH
     # --------------------------------------------------------
 
     response = session.search_scrip(
@@ -72,12 +72,8 @@ def main():
         symbol="NIFTY"
     )
 
-    print("Search response:")
-    print(response)
-    print()
-
     # --------------------------------------------------------
-    # NORMALIZE RESPONSE
+    # NORMALIZE
     # --------------------------------------------------------
 
     if isinstance(response, list):
@@ -101,37 +97,24 @@ def main():
         return
 
     # --------------------------------------------------------
-    # FIND FUTURE
+    # FIND CURRENT MONTH FUTURE
     # --------------------------------------------------------
 
     month = expiry.strftime("%b").upper()
     year = expiry.strftime("%y")
 
     nifty_symbol = None
+    nifty_token = None
 
     for item in results:
 
         if not isinstance(item, dict):
             continue
 
-        # Print fields so we know exactly what Kotak returns
-        symbol = (
-            item.get("pTrdSymbol")
-            or item.get("pSymbol")
-            or item.get("pSymbolName")
-            or item.get("symbol")
-            or item.get("tsym")
-            or item.get("neo_symbol")
-            or ""
-        )
+        symbol = str(
+            item.get("pTrdSymbol") or ""
+        ).upper()
 
-        symbol = str(symbol).upper()
-
-        # Current month NIFTY future
-        #
-        # Example:
-        # NIFTY26SEPFUT
-        #
         if (
             symbol.startswith("NIFTY")
             and month in symbol
@@ -140,6 +123,10 @@ def main():
         ):
 
             nifty_symbol = symbol
+
+            # Numeric security/token
+            nifty_token = item.get("pSymbol")
+
             break
 
     # --------------------------------------------------------
@@ -149,15 +136,6 @@ def main():
     if nifty_symbol is None:
 
         print("❌ Current month NIFTY FUT not found")
-        print()
-        print("NIFTY candidates:")
-
-        for item in results:
-
-            if isinstance(item, dict):
-
-                print(item)
-
         return
 
     # --------------------------------------------------------
@@ -166,18 +144,19 @@ def main():
 
     print("✅ NIFTY FUT FOUND")
     print(f"Neo Symbol : {nifty_symbol}")
+    print(f"pSymbol    : {nifty_token}")
     print()
 
     # --------------------------------------------------------
-    # GET LIVE QUOTE
+    # LIVE QUOTE
     # --------------------------------------------------------
 
     try:
 
         quote = session.quotes(
-            exchange_segment=EXCHANGE_SEGMENT,
-            instrument_tokens=nifty_symbol,
-            quote_type="ltp"
+            EXCHANGE_SEGMENT,
+            [nifty_symbol],
+            "ltp"
         )
 
     except Exception as e:
@@ -187,7 +166,7 @@ def main():
         return
 
     # --------------------------------------------------------
-    # DISPLAY
+    # RESPONSE
     # --------------------------------------------------------
 
     print("Quote response:")
@@ -195,7 +174,7 @@ def main():
     print()
 
     # --------------------------------------------------------
-    # FIND LTP
+    # LTP
     # --------------------------------------------------------
 
     ltp = None
@@ -226,7 +205,9 @@ def main():
 
     else:
 
-        print("⚠️ LTP not found in response")
+        print("⚠️ LTP not found")
+        print("Full quote response:")
+        print(quote)
 
 
 if __name__ == "__main__":
