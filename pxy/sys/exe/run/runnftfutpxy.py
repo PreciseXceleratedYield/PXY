@@ -1,92 +1,50 @@
 import json
-from datetime import datetime
-import calendar
+import time
 from runclntpxy import get_session
 
-def get_current_month_future_symbol():
-    """
-    Dynamically constructs the exact text symbol name Kotak expects 
-    for the current month's NIFTY Future contract.
-    Example output format: NIFTY24SEPFUT
-    """
-    now = datetime.now()
-    year_short = now.strftime("%y")     # e.g., '26'
-    month_abc = now.strftime("%b").upper() # e.g., 'SEP'
+def get_nifty_future_live_price():
+    print("Initializing API session connection...")
     
-    # Check if we have passed the last Thursday of the current month
-    # If yes, we need to roll over to the next month's contract dynamically
-    c = calendar.Calendar(firstweekday=calendar.MONDAY)
-    month_cal = c.monthdatescalendar(now.year, now.month)
-    
-    # Extract the last Thursday date
-    last_thursday = [
-        day for week in month_cal 
-        for day in week if day.weekday() == calendar.THURSDAY and day.month == now.month
-    ][-1]
-    
-    # If today is past the last Thursday trading cutoff, roll over to the next month
-    if now.date() > last_thursday:
-        next_month = now.month + 1 if now.month < 12 else 1
-        next_year = now.year if now.month < 12 else now.year + 1
-        next_date = datetime(next_year, next_month, 1)
-        year_short = next_date.strftime("%y")
-        month_abc = next_date.strftime("%b").upper()
-
-    constructed_symbol = f"NIFTY{year_short}{month_abc}FUT"
-    return constructed_symbol
-
-def main():
-    # 1. Construct the target symbol text
-    target_symbol = get_current_month_future_symbol()
-    print(f"1. Constructed target text symbol: {target_symbol}")
-
-    # 2. Authenticate session
-    session = get_session()
-    if not session:
+    # Attempting connection via your client framework
+    try:
+        session = get_session()
+    except Exception as auth_err:
+        print(f"Critically blocked by Kotak's Authentication Gateway: {auth_err}")
+        print("💡 Solution: Change your network IP (restart router) or verify your API keys are still active on the Neo Portal.")
         return
 
+    if not session:
+        print("Session authentication returned empty object due to connection drop.")
+        return
+
+    # Hardcode this month's exact, true current numerical token to completely bypass search engines
+    # Replace this string token ID with the exact dynamic numeric ID active for the current month.
+    NIFTY_LIVE_TOKEN = "35011" 
+
     try:
-        print(f"2. Fetching the exact token ID for {target_symbol}...")
+        print(f"Requesting LTP payload for Token ID: {NIFTY_LIVE_TOKEN}...")
         
-        # Pull only this one explicit symbol match from the server
-        search_result = session.search_scrip(
-            exchange_segment="nse_fo", 
-            symbol=target_symbol
-        )
-        
-        if not search_result or 'data' not in search_result or not search_result['data']:
-            print("Error: Could not retrieve a token match for this specific constructed symbol name.")
-            return
-
-        # Isolate the precise match row
-        contract_data = search_result['data'][0]
-        token = contract_data.get('instrument_token') or contract_data.get('pSymbolToken')
-        trading_symbol = contract_data.get('trading_symbol') or contract_data.get('pTrdSymbol')
-        
-        print(f"Target Token Found -> Name: {trading_symbol} | Token ID: {token}")
-
-        # 3. Pull live market OHLC data metrics using the isolated straight token
-        print("3. Querying latest market quotes payload...")
         instrument_payload = [
             {
-                "instrument_token": str(token),
+                "instrument_token": str(NIFTY_LIVE_TOKEN),
                 "exchange_segment": "nse_fo"
             }
         ]
         
+        # 'ltp' payload request returns only the live price text block instantly
         quote_response = session.quotes(
             instrument_tokens=instrument_payload,
-            quote_type="ohlc"
+            quote_type="ltp"
         )
 
-        print("\n===== NIFTY FUTURE LATEST OHLC =====")
+        print("\n===== NIFTY FUTURE LIVE PRICE =====")
         print(json.dumps(quote_response, indent=4))
 
     except Exception as e:
-        print(f"API Execution Failure: {e}")
+        print(f"Live Price API Pipeline Error: {e}")
 
 if __name__ == "__main__":
-    main()
+    get_nifty_future_live_price()
 
 
 
