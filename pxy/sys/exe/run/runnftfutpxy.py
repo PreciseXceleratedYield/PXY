@@ -15,18 +15,27 @@ def download_futures_tokens_direct():
     print("Session authenticated successfully! ✅")
     
     try:
-        # Extract headers directly from your authenticated SDK session object
-        access_token = session.access_token
-        neo_header = session.neo_header
+        # Extract the headers map that the NeoAPI class uses internally
+        # By default, Kotak SDK packages authorization data into 'session.headers'
+        sdk_headers = getattr(session, "headers", {})
         
-        # Determine the correct base URL based on your SDK environment setup
-        base_url = "https://kotakneo.com" if session.environment == "prod" else "https://kotak.com"
+        # Pull key values out cleanly
+        access_token = sdk_headers.get("Authorization")
+        neo_header = sdk_headers.get("Neo-Header")
         
-        # Endpoint to fetch master script links
+        # Fallback safeguard in case token extraction fails
+        if not access_token or not neo_header:
+            print("Direct header extract failed. Attempting fallback mapping keys...")
+            access_token = getattr(session, "access_token", None) or sdk_headers.get("bearer")
+            neo_header = getattr(session, "neo_header", None) or sdk_headers.get("neo-header")
+
+        # Determine the environment API URL
+        base_url = "https://api.kotakneo.com" if getattr(session, "environment", "prod") == "prod" else "https://kotak.com"
         file_paths_url = f"{base_url}/script-details/1.0/masterscrip/file-paths"
         
+        # Build clean request parameters
         headers = {
-            "Authorization": f"Bearer {access_token}",
+            "Authorization": access_token if "Bearer" in str(access_token) else f"Bearer {access_token}",
             "Neo-Header": neo_header,
             "Content-Type": "application/json"
         }
@@ -38,7 +47,7 @@ def download_futures_tokens_direct():
             data = response.json()
             fno_file_url = None
             
-            # Find the NSE F&O (Futures & Options) link in the list
+            # Locate the NSE Futures and Options (nse_fo) CSV path
             for item in data.get("data", []):
                 if item.get("exchange") == "nse_fo":
                     fno_file_url = item.get("filePath")
@@ -47,10 +56,8 @@ def download_futures_tokens_direct():
             if fno_file_url:
                 print(f"Downloading file directly from Kotak servers: {fno_file_url}")
                 
-                # Fetch the actual CSV from the provided link
+                # Read and standardize the CSV file data
                 df = pd.read_csv(fno_file_url)
-                
-                # Strip spaces from column headers to prevent key mismatch bugs
                 df.columns = df.columns.str.strip()
                 
                 output_filename = "kotak_neo_nse_fo_tokens.csv"
@@ -67,11 +74,9 @@ def download_futures_tokens_direct():
             print(f"Failed to fetch paths. HTTP Status: {response.status_code}")
             print(f"Error Message: {response.text}")
             
-    except AttributeError:
-        print("Error: Unable to find access_token or neo_header attributes inside the SDK session.")
-        print("Please check your neo_api_client version.")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        print(f"An unexpected error occurred during processing: {e}")
 
 if __name__ == "__main__":
     download_futures_tokens_direct()
+
