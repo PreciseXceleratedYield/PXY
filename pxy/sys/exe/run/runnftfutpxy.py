@@ -1,4 +1,4 @@
-```python
+
 from runclntpxy import get_session
 from datetime import datetime, timedelta
 import csv
@@ -342,4 +342,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-```
+
