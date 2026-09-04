@@ -1,10 +1,9 @@
 import os
-import shutil
-import glob
+import pandas as pd
 # Import your authenticated session function from runclntpxy.py
 from runclntpxy import get_session 
 
-def export_kotak_tokens():
+def download_tokens_via_sdk_session():
     print("Initializing session via runclntpxy...")
     session = get_session()
     
@@ -15,38 +14,54 @@ def export_kotak_tokens():
     print("Session authenticated successfully! ✅")
     
     try:
-        segment = "nse_fo"
-        print(f"Requesting '{segment}' Scrip Master using native SDK wrapper...")
+        # 1. Borrow the pre-authenticated network session layer directly from the SDK
+        # The NeoAPI wrapper handles token refreshes internally via session.client.session
+        http_session = session.client.session
         
-        # 1. Let the official Kotak Neo SDK handle the download internally 
-        session.scrip_master(exchange_segment=segment)
+        # 2. Get environment configuration
+        base_url = "https://api.kotakneo.com" if getattr(session, "environment", "prod") == "prod" else "https://kotak.com"
+        file_paths_url = f"{base_url}/script-details/1.0/masterscrip/file-paths"
         
-        # 2. Automatically locate the hidden file inside neo_api_client directory
-        import neo_api_client
-        sdk_dir = os.path.dirname(neo_api_client.__file__)
-        hidden_data_dir = os.path.join(sdk_dir, "data")
+        print("Requesting master scrip URLs via authenticated SDK session...")
         
-        print(f"Scanning internal cache directory: {hidden_data_dir}")
+        # Hit the file path engine using Kotak SDK's verified internal networking
+        response = http_session.get(file_paths_url)
         
-        # Look for any .csv files matching 'nse_fo' or 'ScripMaster' inside that folder
-        csv_files = glob.glob(os.path.join(hidden_data_dir, f"*{segment}*.csv")) + \
-                    glob.glob(os.path.join(hidden_data_dir, "*.csv"))
-        
-        if csv_files:
-            # Pick the newest downloaded master file found
-            newest_file = max(csv_files, key=os.path.getctime)
-            destination_path = "./kotak_neo_nse_fo_tokens.csv"
+        if response.status_code == 200:
+            data = response.json()
+            fno_file_url = None
             
-            # Copy it out cleanly to your current folder
-            shutil.copy(newest_file, destination_path)
-            print(f"\nSuccess! Token CSV exported cleanly to current folder: '{destination_path}' 🚀")
+            # Extract the target download link for NSE Futures & Options
+            for item in data.get("data", []):
+                if item.get("exchange") == "nse_fo":
+                    fno_file_url = item.get("filePath")
+                    break
+                    
+            if fno_file_url:
+                print(f"File found! Downloading from: {fno_file_url}")
+                
+                # Fetch and pull down the CSV through the authenticated connection
+                df = pd.read_csv(fno_file_url)
+                
+                # Clean up column header spacing properties
+                df.columns = df.columns.str.strip()
+                
+                # Save the file straight into your local workspace directory
+                output_filename = "kotak_neo_nse_fo_tokens.csv"
+                df.to_csv(output_filename, index=False)
+                
+                print(f"\nSuccess! File written cleanly to local directory: '{output_filename}' 🚀")
+                print("--- Data Preview ---")
+                print(df[['pToken', 'pSymbol', 'pExpiryDate']].head(5))
+            else:
+                print("Could not find the 'nse_fo' exchange segment in Kotak's server listing.")
         else:
-            print("\nThe SDK finished executing, but no local CSV file cache was found.")
-            print("Please ensure your machine has active internet connectivity.")
-
+            print(f"Network Request Failed. Status: {response.status_code}, Msg: {response.text}")
+            
     except Exception as e:
         print(f"An unexpected error occurred during processing: {e}")
 
 if __name__ == "__main__":
-    export_kotak_tokens()
+    download_tokens_via_sdk_session()
+
 
