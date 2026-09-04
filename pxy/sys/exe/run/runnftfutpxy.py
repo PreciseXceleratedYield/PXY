@@ -20,8 +20,7 @@ def download_futures_tokens_direct():
         neo_header = session.neo_header
         
         # Determine the correct base URL based on your SDK environment setup
-        # If your environment is set to 'prod', use production api
-        base_url = "https://api.kotakneo.com" if session.environment == "prod" else "https://kotak.com"
+        base_url = "https://kotakneo.com" if session.environment == "prod" else "https://kotak.com"
         
         # Endpoint to fetch master script links
         file_paths_url = f"{base_url}/script-details/1.0/masterscrip/file-paths"
@@ -75,4 +74,4 @@ def download_futures_tokens_direct():
         print(f"An unexpected error occurred: {e}")
 
 if __name__ == "__main__":
-    download_futures_tokens_direct():
+    download_futures_tokens_direct()
