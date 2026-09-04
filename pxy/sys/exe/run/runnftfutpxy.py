@@ -1,14 +1,21 @@
 ```python
 from runclntpxy import get_session
 from datetime import datetime, timedelta
+import csv
+import os
 
 
 EXCHANGE_SEGMENT = "nse_fo"
-UNDERLYING = "NIFTY"
+SEARCH_SYMBOL = "NIFTY"
 
+CSV_FILE = "nifty_search.csv"
+
+
+# ============================================================
+# LAST TUESDAY
+# ============================================================
 
 def last_tuesday(year, month):
-    """Return the last Tuesday of the given month."""
 
     if month == 12:
         next_month = datetime(year + 1, 1, 1)
@@ -17,54 +24,120 @@ def last_tuesday(year, month):
 
     day = next_month - timedelta(days=1)
 
-    while day.weekday() != 1:   # Tuesday
+    while day.weekday() != 1:
         day -= timedelta(days=1)
 
     return day
 
 
+# ============================================================
+# CURRENT MONTH EXPIRY
+# ============================================================
+
 def get_current_month_expiry():
-    """Return current month's expiry, or next month's if already expired."""
 
     now = datetime.now()
 
-    expiry = last_tuesday(now.year, now.month)
+    expiry = last_tuesday(
+        now.year,
+        now.month
+    )
 
     if now.date() > expiry.date():
 
         if now.month == 12:
-            expiry = last_tuesday(now.year + 1, 1)
+            expiry = last_tuesday(
+                now.year + 1,
+                1
+            )
         else:
-            expiry = last_tuesday(now.year, now.month + 1)
+            expiry = last_tuesday(
+                now.year,
+                now.month + 1
+            )
 
     return expiry
 
 
-def get_nifty_future(session, expiry):
-    """Find current-month NIFTY FUT from Kotak Neo."""
+# ============================================================
+# NORMALIZE SEARCH RESPONSE
+# ============================================================
 
-    response = session.search_scrip(
-        exchange_segment=EXCHANGE_SEGMENT,
-        symbol=UNDERLYING
-    )
+def normalize_results(response):
 
     if isinstance(response, list):
-        results = response
+        return response
 
-    elif isinstance(response, dict):
-        results = response.get("data", [])
+    if isinstance(response, dict):
 
-        if isinstance(results, dict):
-            results = [results]
+        data = response.get("data", [])
 
-    else:
-        results = []
+        if isinstance(data, dict):
+            return [data]
+
+        if isinstance(data, list):
+            return data
+
+    return []
+
+
+# ============================================================
+# DUMP SEARCH RESPONSE TO CSV
+# ============================================================
+
+def dump_to_csv(results):
 
     if not results:
-        return None, None
+        return
+
+    # Collect every field returned by Kotak
+    fields = set()
+
+    for row in results:
+
+        if isinstance(row, dict):
+            fields.update(row.keys())
+
+    fields = sorted(fields)
+
+    with open(
+        CSV_FILE,
+        "w",
+        newline="",
+        encoding="utf-8"
+    ) as f:
+
+        writer = csv.DictWriter(
+            f,
+            fieldnames=fields,
+            extrasaction="ignore"
+        )
+
+        writer.writeheader()
+
+        for row in results:
+
+            if isinstance(row, dict):
+                writer.writerow(row)
+
+    print(f"💾 Search data dumped : {CSV_FILE}")
+    print(f"📊 Records            : {len(results)}")
+
+
+# ============================================================
+# FIND NIFTY FUTURE
+# ============================================================
+
+def find_nifty_future(results, expiry):
 
     month = expiry.strftime("%b").upper()
     year = expiry.strftime("%y")
+
+    expected_symbol = f"NIFTY{year}{month}FUT"
+
+    print()
+    print(f"Looking for : {expected_symbol}")
+    print()
 
     for item in results:
 
@@ -75,26 +148,36 @@ def get_nifty_future(session, expiry):
             item.get("pTrdSymbol") or ""
         ).upper()
 
-        if (
-            symbol == f"NIFTY{year}{month}FUT"
-        ):
-            return symbol, item.get("pSymbol")
+        if symbol == expected_symbol:
 
-    return None, None
+            token = item.get("pSymbol")
+
+            return symbol, token, item
+
+    return None, None, None
 
 
-def get_ltp(session, neo_symbol):
-    """Get live LTP using Kotak Neo quotes API."""
+# ============================================================
+# GET LTP
+# ============================================================
+
+def get_ltp(session, token):
 
     try:
 
-        # Kotak Neo SDK quotes() accepts:
-        # quotes(exchange_segment, instrument_tokens)
+        # IMPORTANT:
+        # Kotak Neo quotes expects the exchange segment
+        # and instrument token list.
 
         response = session.quotes(
             EXCHANGE_SEGMENT,
-            neo_symbol
+            [str(token)]
         )
+
+        print()
+        print("Quote response:")
+        print(response)
+        print()
 
         if not isinstance(response, dict):
             return None
@@ -114,8 +197,7 @@ def get_ltp(session, neo_symbol):
                 or data.get("pLastPrice")
             )
 
-            if ltp is not None:
-                return ltp
+            return ltp
 
         return None
 
@@ -127,74 +209,152 @@ def get_ltp(session, neo_symbol):
         return None
 
 
+# ============================================================
+# MAIN
+# ============================================================
+
 def main():
 
     print()
-    print("=" * 50)
+    print("=" * 55)
     print("PXY - NIFTY FUTURE LIVE PRICE")
-    print("=" * 50)
+    print("=" * 55)
 
-    # --------------------------------------------------
+    # --------------------------------------------------------
     # LOGIN
-    # --------------------------------------------------
+    # --------------------------------------------------------
 
     session = get_session()
 
     if session is None:
+
         print("❌ Login failed")
         return
 
-    # --------------------------------------------------
+    # --------------------------------------------------------
     # EXPIRY
-    # --------------------------------------------------
+    # --------------------------------------------------------
 
     expiry = get_current_month_expiry()
 
-    print(f"Expiry : {expiry.strftime('%d-%b-%Y')}")
+    print(
+        f"Expiry : {expiry.strftime('%d-%b-%Y')}"
+    )
+
     print("Searching NIFTY...")
     print()
 
-    # --------------------------------------------------
-    # FIND FUTURE
-    # --------------------------------------------------
+    # --------------------------------------------------------
+    # SEARCH
+    # --------------------------------------------------------
 
-    nifty_symbol, nifty_token = get_nifty_future(
-        session,
-        expiry
+    try:
+
+        response = session.search_scrip(
+            exchange_segment=EXCHANGE_SEGMENT,
+            symbol=SEARCH_SYMBOL
+        )
+
+    except Exception as e:
+
+        print("❌ Search error:")
+        print(e)
+        return
+
+    results = normalize_results(response)
+
+    if not results:
+
+        print("❌ No search results")
+        return
+
+    print(
+        f"✅ Search results : {len(results)}"
+    )
+
+    # --------------------------------------------------------
+    # DUMP EVERYTHING
+    # --------------------------------------------------------
+
+    dump_to_csv(results)
+
+    # --------------------------------------------------------
+    # FIND CURRENT MONTH FUT
+    # --------------------------------------------------------
+
+    nifty_symbol, nifty_token, nifty_data = (
+        find_nifty_future(
+            results,
+            expiry
+        )
     )
 
     if nifty_symbol is None:
 
-        print("❌ Current month NIFTY FUT not found")
+        print()
+        print("❌ NIFTY FUT not found")
+        print(
+            f"Expected : NIFTY"
+            f"{expiry.strftime('%y%b').upper()}"
+            f"FUT"
+        )
+
         return
 
+    print("=" * 55)
     print("✅ NIFTY FUT FOUND")
+    print("=" * 55)
+
     print(f"Neo Symbol : {nifty_symbol}")
     print(f"pSymbol    : {nifty_token}")
-    print()
 
-    # --------------------------------------------------
-    # LIVE PRICE
-    # --------------------------------------------------
+    # --------------------------------------------------------
+    # PRINT COMPLETE FUT ROW
+    # --------------------------------------------------------
+
+    print()
+    print("Future instrument data:")
+
+    for key, value in nifty_data.items():
+
+        print(
+            f"{key:<20} : {value}"
+        )
+
+    # --------------------------------------------------------
+    # TOKEN CHECK
+    # --------------------------------------------------------
+
+    if nifty_token is None:
+
+        print()
+        print("❌ pSymbol/token missing")
+        return
+
+    # --------------------------------------------------------
+    # LIVE QUOTE
+    # --------------------------------------------------------
 
     ltp = get_ltp(
         session,
-        nifty_symbol
+        nifty_token
     )
 
     if ltp is None:
 
-        print("❌ LTP not available")
+        print("❌ LTP not found")
         return
 
-    # --------------------------------------------------
-    # OUTPUT
-    # --------------------------------------------------
+    # --------------------------------------------------------
+    # FINAL OUTPUT
+    # --------------------------------------------------------
 
-    print("=" * 50)
+    print()
+    print("=" * 55)
     print(f"NIFTY FUT : {nifty_symbol}")
+    print(f"TOKEN     : {nifty_token}")
     print(f"LIVE LTP  : {ltp}")
-    print("=" * 50)
+    print("=" * 55)
 
 
 if __name__ == "__main__":
