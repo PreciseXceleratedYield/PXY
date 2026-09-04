@@ -1,8 +1,11 @@
+import re
 from datetime import datetime
 import calendar
-import json
+from colorama import Fore, Style, init
 # Import your authenticated session function from runclntpxy.py
 from runclntpxy import get_session 
+
+init(autoreset=True)
 
 def get_current_month_expiry_date():
     """
@@ -13,16 +16,16 @@ def get_current_month_expiry_date():
     year = today.year
     month = today.month
     
-    # Generate calendar framework for the current month
+    # Generate calendar framework for the current month (list of weekly integer arrays)
     month_cal = calendar.monthcalendar(year, month)
     
-    # Identify the last week list containing Tuesday (Index 1)
-    if month_cal[-] != 0:
-        last_tuesday_day = month_cal[-]
+    # Identify the last week list containing a valid Tuesday (Index 1)
+    if month_cal[-1][1] != 0:
+        last_tuesday_day = month_cal[-1][1]
     else:
-        last_tuesday_day = month_cal[-]
+        last_tuesday_day = month_cal[-2][1]
         
-    expiry_date_str = f"{last_tuesday_day:02d}{today.strftime('%b').upper()}{str(year)[:]}"
+    expiry_date_str = f"{last_tuesday_day:02d}{today.strftime('%b').upper()}{str(year)[2:]}"
     return expiry_date_str
 
 def autodetect_and_get_quotes():
@@ -30,7 +33,7 @@ def autodetect_and_get_quotes():
     session = get_session()
     
     if not session:
-        print("Error: Authentication failed.")
+        print(f"{Fore.RED}Error: Authentication failed.")
         return
 
     print("Session authenticated successfully! ✅")
@@ -57,13 +60,13 @@ def autodetect_and_get_quotes():
         token, ltp, trading_symbol = None, None, None
         
         if quote_response:
-            # Standardize different SDK wrapper return variants (dict vs list layers)
-            data_list = quote_response.get("data",) if isinstance(quote_response, dict) else quote_response
+            # Standardize different market return variants (dict vs list layers)
+            data_list = quote_response.get("data") if isinstance(quote_response, dict) else quote_response
             if isinstance(data_list, dict):
                 data_list = [data_list]
                 
             if isinstance(data_list, list) and len(data_list) > 0:
-                instrument_data = data_list
+                instrument_data = data_list[0]
                 token = instrument_data.get('tok') or instrument_data.get('pToken') or instrument_data.get('instrument_token')
                 ltp = instrument_data.get('ltp') or instrument_data.get('pLastTradedPrice') or instrument_data.get('last_price')
                 trading_symbol = instrument_data.get('tsym') or instrument_data.get('pSymbol') or instrument_data.get('symbol')
@@ -94,11 +97,10 @@ def autodetect_and_get_quotes():
                             
                             fresh_data = fresh_quote.get("data", fresh_quote) if isinstance(fresh_quote, dict) else fresh_quote
                             if isinstance(fresh_data, list) and len(fresh_data) > 0:
-                                fresh_data = fresh_data
+                                fresh_data = fresh_data[0]
                             elif isinstance(fresh_data, dict) and "data" in fresh_data:
-                                # Safe unpack for secondary dictionary wrappers
                                 if isinstance(fresh_data["data"], list) and len(fresh_data["data"]) > 0:
-                                    fresh_data = fresh_data["data"]
+                                    fresh_data = fresh_data["data"][0]
                                     
                             ltp = fresh_data.get('ltp') or fresh_data.get('last_price') or fresh_data.get('pLastTradedPrice')
                             break
@@ -115,4 +117,3 @@ def autodetect_and_get_quotes():
 
 if __name__ == "__main__":
     autodetect_and_get_quotes()
-
