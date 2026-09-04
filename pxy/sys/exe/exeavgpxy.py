@@ -162,7 +162,7 @@ def handle_side_averaging(client, df):
     if "MBUY" in ce_avg_entry:
         ce_dynamic_threshold = ((ce_base_drawdown_limit * (
             (((ce_invst_factor * 3) + ce_lots_factor) / 4))) + (ce_base_drawdown_limit * ce_trend_factor)
-        )
+        ) / 1.4 
     else:
         ce_dynamic_threshold = (-dampened_val * 2) if boss == "NSELL" else -dampened_val
     
@@ -171,7 +171,7 @@ def handle_side_averaging(client, df):
     if "MSELL" in pe_avg_entry:
         pe_dynamic_threshold = ((pe_base_drawdown_limit * (
             (((pe_invst_factor * 3) + pe_lots_factor) / 4))) + (pe_base_drawdown_limit * pe_trend_factor)
-        )
+        ) / 1.4 
     else:
         pe_dynamic_threshold = (-dampened_val * 2) if boss == "NBUY" else -dampened_val
 
