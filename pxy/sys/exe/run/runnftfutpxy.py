@@ -1,4 +1,4 @@
-```python
+
 from runclntpxy import get_session
 from datetime import datetime, timedelta
 import csv
