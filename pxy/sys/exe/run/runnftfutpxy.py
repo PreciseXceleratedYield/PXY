@@ -12,38 +12,56 @@ def fetch_futures_tokens_live():
 
     print("Session authenticated successfully! ✅")
     
-    try:
-        print("Searching for active NIFTY Futures instruments via SDK...")
-        
-        # Pull the scrip search mapping dictionary directly from Kotak API 
-        raw_data = session.search_scrip(
-            exchange_segment="nse_fo", 
-            symbol="NIFTY",
-            option_type="FUT"
-        )
-        
-        if raw_data:
-            # Print a quick diagnostic trace to see exactly what Kotak returned
-            print(f"DEBUG - Raw Data Type: {type(raw_data)}")
+    # List of common text query formats Kotak accepts for Futures
+    search_variations = ["NIFTY-FUT", "NIFTY FUT", "NIFTY"]
+    raw_data = None
+    
+    for variant in search_variations:
+        try:
+            print(f"Searching for active instruments using string: '{variant}'...")
+            res = session.search_scrip(
+                exchange_segment="nse_fo", 
+                symbol=variant,
+                option_type="FUT"
+            )
             
-            # Safe parsing logic: Force dictionary types into a list shell
+            # Verify if the response contains actual data records rather than an error message
+            if res and isinstance(res, dict) and "message" not in res:
+                raw_data = res
+                print(f"Success found matching records with variation: '{variant}'!")
+                break
+            elif res and isinstance(res, list):
+                raw_data = res
+                print(f"Success found matching records with variation: '{variant}'!")
+                break
+        except Exception as search_err:
+            continue
+
+    if not raw_data:
+        # Fallback loop: Attempt search without the option_type constraint 
+        print("Retrying broad index search variations without strict option_type filter...")
+        for variant in ["NIFTY-FUT", "NIFTY FUT"]:
+            try:
+                res = session.search_scrip(exchange_segment="nse_fo", symbol=variant)
+                if res and isinstance(res, (dict, list)) and "message" not in str(res):
+                    raw_data = res
+                    break
+            except:
+                continue
+
+    if raw_data:
+        try:
+            # Normalize dictionary vs list formats safely
             if isinstance(raw_data, dict):
-                # If it's a nested dictionary with a 'data' key, target that array list
                 if "data" in raw_data:
                     data_payload = raw_data["data"]
-                    if isinstance(data_payload, dict):
-                        df = pd.DataFrame([data_payload])
-                    else:
-                        df = pd.DataFrame(data_payload)
+                    df = pd.DataFrame([data_payload] if isinstance(data_payload, dict) else data_payload)
                 else:
                     df = pd.DataFrame([raw_data])
-            elif isinstance(raw_data, list):
-                df = pd.DataFrame(raw_data)
             else:
-                print(f"Unknown data structure returned: {raw_data}")
-                return
-            
-            # Clean up column header spacing properties
+                df = pd.DataFrame(raw_data)
+                
+            # Strip trailing invisible spaces from headers
             df.columns = df.columns.str.strip()
             
             # Save the clean tokens list into your local folder
@@ -53,17 +71,18 @@ def fetch_futures_tokens_live():
             print(f"\nSuccess! Tokens written to: '{output_file}' 🚀")
             print("--- Found Active Nifty Futures ---")
             
-            # Display target tracking metrics cleanly
+            # Dynamic output layout display tracking
             display_cols = [c for c in ['pToken', 'pSymbol', 'pExpiryDate', 'tok', 'tsym', 'exp'] if c in df.columns]
             if display_cols:
                 print(df[display_cols].to_string(index=False))
             else:
                 print(df.head(10).to_string(index=False))
-        else:
-            print("The API executed but returned an empty list or None.")
-            
-    except Exception as e:
-        print(f"An unexpected error occurred during API communication: {e}")
+                
+        except Exception as parse_err:
+            print(f"Error compiling response dataframe: {parse_err}")
+    else:
+        print("\n❌ The API executed but all variant combinations returned no data records.")
+        print("Verify your account segment authorizations for NSE F&O inside your Kotak App.")
 
 if __name__ == "__main__":
     fetch_futures_tokens_live()
