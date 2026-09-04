@@ -21,8 +21,8 @@ def get_current_month_future_symbol():
     # Extract the last Thursday date of this month
     last_thursday = [
         day for week in month_cal 
-        for day in week if dayweekday() == calendarTHURSDAY and daymonth == nowmonth
-    ][-]
+        for day in week if day.weekday() == calendar.THURSDAY and day.month == now.month
+    ][-1]  # <--- FIXED: Syntax corrected to grab the last index securely
     
     # If today is past the last Thursday trading cutoff, roll over to the next month
     if now.date() > last_thursday:
@@ -50,7 +50,7 @@ def find_and_get_mid_price(client, symbol_text: str, segment: str = "nse_fo") ->
             return 0.0
 
         # Unpack the first object from search result data list to get token
-        scrip_data = search_result['data'] if isinstance(search_result['data'], list) else search_result['data']
+        scrip_data = search_result['data'][0] if isinstance(search_result['data'], list) else search_result['data']
         token = scrip_data.get("instrument_token") or scrip_data.get("pSymbolToken")
         trading_symbol = scrip_data.get("trading_symbol") or scrip_data.get("pTrdSymbol")
         
@@ -67,15 +67,15 @@ def find_and_get_mid_price(client, symbol_text: str, segment: str = "nse_fo") ->
         if not res or not isinstance(res, list) or len(res) == 0:
             return 0.0
         
-        data = res 
+        data = res[0] 
         
         depth = data.get("depth", {})
-        buy_list = depth.get("buy",)
-        sell_list = depth.get("sell",)
+        buy_list = depth.get("buy", [])
+        sell_list = depth.get("sell", [])
 
         # Process bid/ask from your working structure
-        bid = float(buy_list.get("price", 0)) if buy_list else 0.0
-        ask = float(sell_list.get("price", 0)) if sell_list else 0.0
+        bid = float(buy_list[0].get("price", 0)) if buy_list else 0.0
+        ask = float(sell_list[0].get("price", 0)) if sell_list else 0.0
         
         if bid > 0 and ask > 0:
             return round((bid + ask) / 2, 2)
