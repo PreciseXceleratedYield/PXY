@@ -111,10 +111,10 @@ def run_action(choice):
     
     day_otm_mapping = {
         "Monday": 100,
-        "Tuesday": 50,
-        "Wednesday": 0,
-        "Thursday": -50,
-        "Friday": -100
+        "Tuesday": 75,
+        "Wednesday": 50,
+        "Thursday": 25,
+        "Friday": 0
     }
     
     # Fallback to 100 for weekends
