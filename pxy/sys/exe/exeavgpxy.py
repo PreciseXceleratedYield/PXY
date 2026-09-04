@@ -133,8 +133,8 @@ def handle_side_averaging(client, df):
 
 
     # --- ZERO-DIVISION SHIELDED LOTS FACTOR ENGINE ---
-    ce_lots_factor = 1 #(ce_lots + 1) / (pe_lots + 1)
-    pe_lots_factor = 1 #(pe_lots + 1) / (ce_lots + 1)
+    ce_lots_factor = (ce_lots + 1) / (pe_lots + 1)
+    pe_lots_factor = (pe_lots + 1) / (ce_lots + 1)
 
 ###########################################################################################################
     # --- PRE-CALCULATE DYNAMIC THRESHOLDS MULTIPLIED ACROSS THE WHOLE THING ---
@@ -161,7 +161,7 @@ def handle_side_averaging(client, df):
     ce_base_drawdown_limit = -atr
     if "MBUY" in ce_avg_entry:
         ce_dynamic_threshold = ce_base_drawdown_limit * (
-            (((ce_invst_factor * 3) + ce_lots_factor) / 4) + ce_trend_factor
+            (((ce_invst_factor * 3) + ce_lots_factor) / 4) + (ce_base_drawdown_limit * ce_trend_factor)
         )
     else:
         ce_dynamic_threshold = (-dampened_val * 2) if boss == "NSELL" else -dampened_val
@@ -170,7 +170,7 @@ def handle_side_averaging(client, df):
     pe_base_drawdown_limit = -atr
     if "MSELL" in pe_avg_entry:
         pe_dynamic_threshold = pe_base_drawdown_limit * (
-            (((pe_invst_factor * 3) + pe_lots_factor) / 4) + pe_trend_factor
+            (((pe_invst_factor * 3) + pe_lots_factor) / 4) + (pe_base_drawdown_limit * pe_trend_factor)
         )
     else:
         pe_dynamic_threshold = (-dampened_val * 2) if boss == "NBUY" else -dampened_val
