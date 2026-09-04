@@ -154,7 +154,7 @@ def handle_side_averaging(client, df):
     pe_trend_factor = 0.75 if supertrend == "BEAR" else 1.0
 
     # --- PRE-CALCULATE IDENTICAL MEAN REVERSION VALUE ---
-    raw_val = atr * atr
+    raw_val = (atr * atr) + atr
     dampened_val = max(20, min(raw_val, 66))
     
     # --- CALL OPTION (CE) SIDE RISK CALCULATIONS ---
