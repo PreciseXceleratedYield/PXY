@@ -14,36 +14,42 @@ def get_this_month_future_price_fixed():
     try:
         print("🔍 Querying server passing ALL explicit values for this month's Future...")
 
-        # PASSING ALL VALUES: This forces Kotak to return ONLY 1 ROW.
-        # For September 2026, the expiry string format is "24SEP2026"
+        # KOTAK NEO FIX: 'symbol' parameter requires the complete string "NIFTY26SEPFUT" 
+        # to guarantee a precise backend row match in the 'nse_fo' segment.
         search_result = session.search_scrip(
             exchange_segment="nse_fo", 
-            symbol="NIFTY",
+            symbol="NIFTY26SEPFUT",
             expiry="24SEP2026",
-            option_type="X",       # "X" or blank "" signals Stock/Index Futures to Kotak's backend
-            strike_price="0"       # Futures don't have a strike price, so pass "0" or "0.00"
+            option_type="X",       # "X" signals Futures to Kotak's backend
+            strike_price="0"       # Futures don't have a strike price
         )
         
+        # Fallback wrapper in case your SDK variant prefers blank arguments for futures
         if not search_result or 'data' not in search_result or len(search_result['data']) == 0:
-            print(f"{Fore.RED}❌ No rows returned. Trying fallback parameters...")
-            # Fallback wrapper if your specific SDK version expects blank options strings
+            print(f"{Fore.RED}⚠️ No rows returned with explicit filters. Trying fallback parameters...")
             search_result = session.search_scrip(
                 exchange_segment="nse_fo", 
-                symbol="NIFTY",
+                symbol="NIFTY26SEPFUT",
                 expiry="24SEP2026",
                 option_type="",
                 strike_price=""
             )
 
         if not search_result or 'data' not in search_result or len(search_result['data']) == 0:
-            print(f"{Fore.RED}❌ Error: Could not fetch contract row.")
+            print(f"{Fore.RED}❌ Error: Could not fetch contract row from Scrip Master.")
             return
 
         # Process the single row safely from the list array
         scrip_data = search_result['data'][0] if isinstance(search_result['data'], list) else search_result['data']
-        token = scrip_data.get("instrument_token") or scrip_data.get("pSymbolToken")
-        trading_symbol = scrip_data.get("trading_symbol") or scrip_data.get("pTrdSymbol")
         
+        # Check both API layout naming variants to ensure cross-version compatibility
+        token = scrip_data.get("instrument_token") or scrip_data.get("pSymbolToken") or scrip_data.get("pToken")
+        trading_symbol = scrip_data.get("trading_symbol") or scrip_data.get("pTrdSymbol") or scrip_data.get("pTrdSym")
+        
+        if not token:
+            print(f"{Fore.RED}❌ Error: Token key field missing in response payload.")
+            return
+
         print(f"🎯 Target Locked -> Name: {Fore.GREEN}{trading_symbol} {Fore.WHITE}| Token: {Fore.GREEN}{token}")
 
         # 2. Fetch the market depth price using your verified configuration layout
@@ -77,5 +83,6 @@ def get_this_month_future_price_fixed():
 
 if __name__ == "__main__":
     get_this_month_future_price_fixed()
+
 
 
