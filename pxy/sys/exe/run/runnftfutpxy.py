@@ -1,50 +1,55 @@
 import json
-import time
 from runclntpxy import get_session
 
-def get_nifty_future_live_price():
-    print("Initializing API session connection...")
-    
-    # Attempting connection via your client framework
+def get_nifty_future_live_price(client, token: str, segment: str = "nse_fo") -> float:
+    """
+    Fetches the precise live price of the NIFTY Future contract 
+    using your working options depth processing structure.
+    """
     try:
-        session = get_session()
-    except Exception as auth_err:
-        print(f"Critically blocked by Kotak's Authentication Gateway: {auth_err}")
-        print("💡 Solution: Change your network IP (restart router) or verify your API keys are still active on the Neo Portal.")
-        return
-
-    if not session:
-        print("Session authentication returned empty object due to connection drop.")
-        return
-
-    # Hardcode this month's exact, true current numerical token to completely bypass search engines
-    # Replace this string token ID with the exact dynamic numeric ID active for the current month.
-    NIFTY_LIVE_TOKEN = "35011" 
-
-    try:
-        print(f"Requesting LTP payload for Token ID: {NIFTY_LIVE_TOKEN}...")
+        instr = [{"instrument_token": str(token), "exchange_segment": segment}]
         
-        instrument_payload = [
-            {
-                "instrument_token": str(NIFTY_LIVE_TOKEN),
-                "exchange_segment": "nse_fo"
-            }
-        ]
+        # Pull market depth payload exactly like your working options method
+        res = client.quotes(instrument_tokens=instr, quote_type="depth")
+
+        if not res or not isinstance(res, list) or len(res) == 0:
+            print("Error: Empty or invalid payload array.")
+            return 0.0
         
-        # 'ltp' payload request returns only the live price text block instantly
-        quote_response = session.quotes(
-            instrument_tokens=instrument_payload,
-            quote_type="ltp"
-        )
+        data = res[0]
+        depth = data.get("depth", {})
+        buy_list = depth.get("buy", [])
+        sell_list = depth.get("sell", [])
 
-        print("\n===== NIFTY FUTURE LIVE PRICE =====")
-        print(json.dumps(quote_response, indent=4))
-
+        # Process the bid/ask spread
+        bid = float(buy_list[0].get("price", 0)) if buy_list else 0.0
+        ask = float(sell_list[0].get("price", 0)) if sell_list else 0.0
+        
+        if bid > 0 and ask > 0:
+            return round((bid + ask) / 2, 2)
+        
+        # Fallback to the last traded price if depth arrays are blank
+        return float(data.get("last_price", 0))
     except Exception as e:
-        print(f"Live Price API Pipeline Error: {e}")
+        print(f"Tracking error: {e}")
+        return 0.0
 
 if __name__ == "__main__":
-    get_nifty_future_live_price()
-
+    # 1. Initialize session using your client script
+    session = get_session()
+    
+    if session:
+        # 2. Assign the exact NIFTY Future numerical token for the current month
+        # (Look up this 5-digit number on your Kotak App or Watchlist info panel)
+        NIFTY_CURRENT_FUTURE_TOKEN = "YOUR_5_DIGIT_FUTURE_TOKEN" 
+        
+        # 3. Pull the calculated execution price
+        live_price = get_nifty_future_live_price(session, token=NIFTY_CURRENT_FUTURE_TOKEN)
+        
+        print("\n================================")
+        print(f"NIFTY FUTURE LIVE PRICE: {live_price}")
+        print("================================\n")
+    else:
+        print("Failed to authenticate session context.")
 
 
