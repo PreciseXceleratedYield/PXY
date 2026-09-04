@@ -8,7 +8,6 @@ def get_current_month_expiry():
 
     cal = calendar.monthcalendar(today.year, today.month)
 
-    # Last Tuesday
     expiry_day = next(
         week[calendar.TUESDAY]
         for week in reversed(cal)
@@ -36,25 +35,38 @@ def get_nifty_future_price():
         symbol="NIFTY"
     )
 
-    data = response.get("data", response)
+    # Kotak can return either a list or dictionary
+    if isinstance(response, list):
+        data = response
 
-    if isinstance(data, dict):
-        data = [data]
+    elif isinstance(response, dict):
+        data = response.get("data", [])
+
+        if isinstance(data, dict):
+            data = [data]
+
+    else:
+        data = []
 
     token = None
     symbol = None
 
     for item in data:
 
-        tsym = str(
+        symbol_name = str(
             item.get("pSymbolName")
             or item.get("pTrdSymbol")
+            or item.get("pSymbol")
             or item.get("tsym")
             or ""
         ).upper()
 
-        # Current-month NIFTY FUT only
-        if target in tsym and "CE" not in tsym and "PE" not in tsym:
+        # Current month NIFTY FUT
+        if (
+            target in symbol_name
+            and "CE" not in symbol_name
+            and "PE" not in symbol_name
+        ):
 
             symbol = (
                 item.get("pSymbolName")
@@ -74,6 +86,10 @@ def get_nifty_future_price():
         print(f"❌ {target} FUT not found")
         return
 
+    print(f"Found: {symbol}")
+    print(f"Token: {token}")
+
+    # Get live quote
     quote = session.quotes(
         instrument_tokens=[
             {
@@ -83,10 +99,17 @@ def get_nifty_future_price():
         ]
     )
 
-    quote_data = quote.get("data", quote)
+    if isinstance(quote, list):
+        quote_data = quote[0]
 
-    if isinstance(quote_data, list):
-        quote_data = quote_data[0]
+    elif isinstance(quote, dict):
+        quote_data = quote.get("data", quote)
+
+        if isinstance(quote_data, list):
+            quote_data = quote_data[0]
+
+    else:
+        quote_data = {}
 
     ltp = (
         quote_data.get("ltp")
