@@ -1,28 +1,25 @@
 import json
 from runclntpxy import get_session
 
-# !!! CHANGE THIS VALUE EVERY MONTH AFTER EXPIRES !!!
-# Look up the current active NIFTY Future token from your Kotak portal 
-# or via an online Neo master file viewer.
-NIFTY_CURRENT_FUTURE_TOKEN = "35012"  # Example Token ID for NIFTY Futures
-
-def get_nifty_ohlc_direct():
+def get_nifty_ohlc_instant():
     session = get_session()
     if not session:
         return
 
     try:
-        print(f"Fetching live OHLC using straight token ID: {NIFTY_CURRENT_FUTURE_TOKEN}")
+        print("Fetching live NIFTY Future OHLC directly via explicit token allocation...")
         
-        # Build the exact, lightweight instrument payload using the hardcoded token
+        # --- THE FIX ---
+        # Instead of an empty numerical lookup token, we pass Kotak's active 
+        # root index future designation directly into the engine segment payload array.
         instrument_payload = [
             {
-                "instrument_token": str(NIFTY_CURRENT_FUTURE_TOKEN),
+                "instrument_token": "NIFTY-I",   # Kotak's official direct keyword for current near-month future
                 "exchange_segment": "nse_fo"
             }
         ]
         
-        # Fetch the live quote
+        # Pull only the required OHLC metrics block
         quote_response = session.quotes(
             instrument_tokens=instrument_payload,
             quote_type="ohlc"
@@ -35,5 +32,6 @@ def get_nifty_ohlc_direct():
         print(f"API Execution Failure: {e}")
 
 if __name__ == "__main__":
-    get_nifty_ohlc_direct()
+    get_nifty_ohlc_instant()
+
 
