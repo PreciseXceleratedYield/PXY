@@ -240,6 +240,18 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
             <div id="chartBox" style="flex:1;">
                 <div class="grid-over"></div>
                 <canvas id="priceChart"></canvas>
+                <!-- trade chart overlay -->
+                <div id="tradeChartOverlay">
+                    <div style="height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:var(--bg2);border-bottom:1px solid var(--border2);">
+                        <span id="tradeChartLabel" style="font-size:9px;color:var(--muted);letter-spacing:0.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">— trade —</span>
+                        <span style="font-size:9px;color:var(--muted);flex-shrink:0;margin-left:6px;cursor:pointer;" onclick="closeTradeChart()">✕</span>
+                    </div>
+                    <div id="tradeChartBox">
+                        <div class="grid-over"></div>
+                        <canvas id="tradeChart"></canvas>
+                        <svg id="tradeMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;overflow:visible;"></svg>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -256,18 +268,6 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
                 </div>
             </div>
             <div id="posScroll"><div class="empty-msg" id="posEmpty">No positions</div></div>
-            <!-- trade chart overlay -->
-            <div id="tradeChartOverlay">
-                <div style="height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:var(--bg2);border-bottom:1px solid var(--border2);">
-                    <span id="tradeChartLabel" style="font-size:9px;color:var(--muted);letter-spacing:0.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">— trade —</span>
-                    <span style="font-size:9px;color:var(--muted);flex-shrink:0;margin-left:6px;cursor:pointer;" onclick="closeTradeChart()">✕</span>
-                </div>
-                <div id="tradeChartBox">
-                    <div class="grid-over"></div>
-                    <canvas id="tradeChart"></canvas>
-                    <svg id="tradeMarkerLayer" style="position:absolute;inset:0;pointer-events:none;z-index:3;overflow:visible;"></svg>
-                </div>
-            </div>
         </div>
         <div id="posBot">
             <div class="pane-hdr">
@@ -748,6 +748,7 @@ async function loadPos(){
     const open=data.positions||[];
     const total=open.reduce((s,d)=>s+(d.pnl||0),0);
     runningTotal=total;
+    refreshRiskCandle();
     const lbl=$('posPnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const r=$('pnlRunning');r.textContent=fmt(total);r.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const scroll=$('posScroll');scroll.querySelectorAll('.p-row').forEach(r=>r.remove());
@@ -771,6 +772,7 @@ async function loadTrades(){
     let data=[];try{data=await fetch('./webpnlpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     const total=data.reduce((s,d)=>s+(d.PNL||0),0);
     bookedTotal=total;
+    refreshRiskCandle();
     const lbl=$('tradePnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const b=$('pnlBooked');b.textContent=fmt(total);b.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const scroll=$('tradeScroll');const trPrevScrollTop=scroll.scrollTop;scroll.querySelectorAll('.t-row').forEach(r=>r.remove());
@@ -840,6 +842,7 @@ function drawRiskCandle(floor,net,peak){
     const danger=net<=lo+Math.abs(lo)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5),0 0 16px rgba(239,83,80,0.12)':'';
 }
+function refreshRiskCandle(){drawRiskCandle(lastFloor,Math.round(runningTotal+bookedTotal),lastPeak);}
 new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($('riskBar'));
 
 /* ── TRADE CHART ── */

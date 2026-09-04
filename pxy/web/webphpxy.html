@@ -877,6 +877,7 @@ async function loadPos(){
     const open=data.positions||[];
     const total=open.reduce((s,d)=>s+(d.pnl||0),0);
     runningTotal=total;
+    refreshRiskCandle();
     const lbl=$('posPnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const r=$('pnlRunning');r.textContent=fmt(total);r.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const scroll=$('posScroll');
@@ -1067,6 +1068,7 @@ async function loadTrades(){
     try{data=await fetch('./webpnlpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     const total=data.reduce((s,d)=>s+(d.PNL||0),0);
     bookedTotal=total;
+    refreshRiskCandle();
     const lbl=$('tradePnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const b=$('pnlBooked');b.textContent=fmt(total);b.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const scroll=$('tradeScroll');
@@ -1161,6 +1163,7 @@ function drawRiskCandle(floor,net,peak){
     const danger=net<=lo+Math.abs(lo)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5),0 0 16px rgba(239,83,80,0.12)':'';
 }
+function refreshRiskCandle(){drawRiskCandle(lastFloor,Math.round(runningTotal+bookedTotal),lastPeak);}
 new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($('riskBar'));
 
 /* ── ACTIONS MENU ── */
