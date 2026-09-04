@@ -1,6 +1,5 @@
 from datetime import datetime
 import calendar
-import json
 # Import your authenticated session function from runclntpxy.py
 from runclntpxy import get_session 
 
@@ -17,10 +16,10 @@ def get_current_month_expiry_date():
     month_cal = calendar.monthcalendar(year, month)
     
     # Extract the last week that has a Tuesday (Index 1 = Tuesday)
-    if month_cal[-1][1] != 0:
-        last_tuesday_day = month_cal[-1][1]
+    if month_cal[-1] != 0:
+        last_tuesday_day = month_cal[-1]
     else:
-        last_tuesday_day = month_cal[-2][1]
+        last_tuesday_day = month_cal[-2]
         
     expiry_date_str = f"{last_tuesday_day:02d}{today.strftime('%b').upper()}{str(year)[2:]}"
     return expiry_date_str
@@ -43,38 +42,49 @@ def autodetect_and_get_quotes():
     
     # 2. Call the official Kotak Neo v2 '.quotes()' endpoint method
     try:
-        # Build the exact request structure required by the SDK documentation
+        # Crucial Fix: The internal SDK requires the key name to be 'instrument_token' 
+        # even when passing a textual string symbol name layout.
         instrument_payload = [
             {
-                "exchange_segment": "nse_fo",
-                "symbol": target_symbol
+                "instrument_token": target_symbol,
+                "exchange_segment": "nse_fo"
             }
         ]
         
         print("Requesting quote matrix from Kotak engine...")
         quote_response = session.quotes(instrument_tokens=instrument_payload)
         
-        # Parse output data
         if quote_response:
-            # Handle if the SDK returns data wrapped inside a 'data' key or a direct list/dict
-            data_block = quote_response.get("data", quote_response) if isinstance(quote_response, dict) else quote_response
-            
-            # If the response comes back as a list, unpack the first entry
-            if isinstance(data_block, list) and len(data_block) > 0:
-                data_block = data_block[0]
+            # Inside Kotak Neo SDK, successful responses are packaged inside a 'data' array
+            # or returned as a flat list of matching instruments.
+            data_list = []
+            if isinstance(quote_response, dict):
+                data_list = quote_response.get("data", [])
+                if not data_list and "message" not in quote_response:
+                    # In case the payload has alternative key lists
+                    data_list = [quote_response]
+            elif isinstance(quote_response, list):
+                data_list = quote_response
+
+            if data_list and len(data_list) > 0:
+                # Unpack the first instrument dictionary payload match
+                instrument_data = data_list[0]
                 
-            # Extract key variables directly
-            token = data_block.get('tok') or data_block.get('pToken') or data_block.get('instrument_token')
-            ltp = data_block.get('ltp') or data_block.get('pLastTradedPrice') or data_block.get('last_price')
-            trading_symbol = data_block.get('tsym') or data_block.get('pSymbol') or data_block.get('symbol')
-            
-            print("\n==============================")
-            print(f"  DETECTED : {trading_symbol if trading_symbol else target_symbol}")
-            print(f"  TOKEN    : {token}")
-            print(f"  LIVE LTP : ₹ {ltp}")
-            print("==============================")
+                # Retrieve variable parameters safely
+                token = instrument_data.get('tok') or instrument_data.get('pToken') or instrument_data.get('instrument_token')
+                ltp = instrument_data.get('ltp') or instrument_data.get('pLastTradedPrice') or instrument_data.get('last_price')
+                trading_symbol = instrument_data.get('tsym') or instrument_data.get('pSymbol') or instrument_data.get('symbol')
+                
+                print("\n==============================")
+                print(f"  SYMBOL : {trading_symbol if trading_symbol else target_symbol}")
+                print(f"  TOKEN  : {token}")
+                print(f"  LTP    : ₹ {ltp}")
+                print("==============================")
+            else:
+                print(f"\n❌ Response format parsed empty or returned an error block.")
+                print(f"Server Payload: {quote_response}")
         else:
-            print(f"\n❌ Server returned an empty response. Response payload: {quote_response}")
+            print("\n❌ Server returned an completely empty response framework.")
             
     except Exception as e:
         print(f"API Connection Exception: {e}")
