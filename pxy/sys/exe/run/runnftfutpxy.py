@@ -4,60 +4,55 @@ from runclntpxy import get_session  # Change 'your_filename' to your actual scri
 import json
 import pandas as pd
 
-
-def get_nifty_future_ohlc():
+def get_nifty_current_future_ohlc():
+    # 1. Initialize session
     session = get_session()
+    
     if not session:
         print("Failed to initialize session.")
         return
 
     try:
-        print("\n1. Fetching Scrip Master file for NSE F&O...")
+        print("\n1. Fetching NIFTY Future instrument parameters...")
         
-        # Pull the complete live scrip file for futures & options directly
-        # This returns a temporary local CSV path or direct dataframe download
-        scrip_file_info = session.scrip_master(exchange_segment="nse_fo")
+        # Correct arguments according to Kotak Neo SDK specs
+        search_result = session.search_scrip(
+            exchange_segment="nse_fo", 
+            symbol="NIFTY"
+        )
         
-        if not scrip_file_info or 'file_path' not in scrip_file_info:
-            print("Fallback: Attempting direct text-based scrip search...")
-            # If scrip master fails, retry search_scrip using the correct 'search_text' parameter
-            search_result = session.search_scrip(exchange_segment="nse_fo", search_text="NIFTY")
-            if not search_result or 'data' not in search_result:
-                print("Error: Search engine returned empty data payload.")
-                return
-            contracts_df = pd.DataFrame(search_result['data'])
-        else:
-            # Read Kotak's official scrip master CSV file
-            contracts_df = pd.read_csv(scrip_file_info['file_path'])
-
-        # 2. Strict Filter: Extract only NIFTY Index Futures (FUTIDX)
-        # Columns in scrip master usually use lowercase keys or mapped names
-        # We ensure casing compatibility for 'pSymbol' / 'symbol' and 'pInstType' / 'instrument_type'
-        contracts_df.columns = contracts_df.columns.str.lower()
-        
-        future_contracts = contracts_df[
-            (contracts_df['symbol'].str.upper() == 'NIFTY') & 
-            (contracts_df['instrument_type'] == 'FUTIDX')
-        ].copy()
-
-        if future_contracts.empty:
-            print("Error: No active NIFTY Future contracts located in file.")
+        # Check if response payload is valid
+        if not search_result or 'data' not in search_result or not search_result['data']:
+            print("Error: Empty data payload. Check your segment permissions or API status.")
             return
 
-        # Sort by expiry date to ensure index 0 is always the closest current month expiry
-        # If 'expiry_date' exists as a unix timestamp or text string, we sort it ascending
-        if 'expiry' in future_contracts.columns:
-            future_contracts = future_contracts.sort_values(by='expiry')
+        # 2. Extract Index Futures (FUTIDX)
+        # Note: Kotak Neo client maps raw API fields dynamically, so we safely check both potential casing types.
+        future_contracts = []
+        for item in search_result['data']:
+            inst_type = item.get('instrument_type') or item.get('pInstType') or ""
+            if inst_type.upper() == 'FUTIDX':
+                future_contracts.append(item)
 
-        # Select the nearest active current month future contract
-        current_month_fut = future_contracts.iloc[0]
-        token = current_month_fut['instrument_token']
-        trading_symbol = current_month_fut['trading_symbol']
-        exchange = "nse_fo"
+        if not future_contracts:
+            print("Error: No active NIFTY Future contracts found in search array.")
+            return
+
+        # Kotak natively sorts closest contracts first. Index 0 is our Current Month.
+        current_month_fut = future_contracts[0]
         
-        print(f"Targeting: {trading_symbol} | Token ID: {token}")
+        # Support fallback variations for dictionary keys returned by search endpoint
+        token = current_month_fut.get('instrument_token') or current_month_fut.get('pSymbolToken')
+        trading_symbol = current_month_fut.get('trading_symbol') or current_month_fut.get('pTrdSymbol')
+        exchange = current_month_fut.get('exchange_segment') or "nse_fo"
+        
+        if not token:
+            print("Error: Could not extract Instrument Token ID from contract data.")
+            return
 
-        # 3. Requesting Live OHLC Market Payload
+        print(f"Targeting Contract: {trading_symbol} | Token ID: {token}")
+
+        # 3. Pull Live Market OHLC Data 
         instrument_payload = [
             {
                 "instrument_token": str(token),
@@ -70,6 +65,7 @@ def get_nifty_future_ohlc():
             quote_type="ohlc"
         )
 
+        # 4. Display Results
         print("\n===== NIFTY FUTURE OHLC RESULTS =====")
         print(json.dumps(quote_response, indent=4))
 
@@ -77,5 +73,5 @@ def get_nifty_future_ohlc():
         print(f"API Execution Failure: {e}")
 
 if __name__ == "__main__":
-    get_nifty_future_ohlc()
+    get_nifty_current_future_ohlc()
 
