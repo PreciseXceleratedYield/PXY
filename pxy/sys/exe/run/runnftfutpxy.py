@@ -1,9 +1,10 @@
 import os
+import requests
 import pandas as pd
 # Import your authenticated session function from runclntpxy.py
 from runclntpxy import get_session 
 
-def download_futures_tokens():
+def download_futures_tokens_direct():
     print("Initializing session via runclntpxy...")
     session = get_session()
     
@@ -14,40 +15,64 @@ def download_futures_tokens():
     print("Session authenticated successfully! ✅")
     
     try:
-        print("Requesting 'nse_fo' Scrip Master data...")
+        # Extract headers directly from your authenticated SDK session object
+        access_token = session.access_token
+        neo_header = session.neo_header
         
-        # 1. By default, the SDK method returns the data or internal file info
-        # Let's call it and capture its output
-        scrip_data = session.scrip_master(exchange_segment="nse_fo")
+        # Determine the correct base URL based on your SDK environment setup
+        # If your environment is set to 'prod', use production api
+        base_url = "https://api.kotakneo.com" if session.environment == "prod" else "https://kotak.com"
         
-        # 2. Check where the SDK hid the file natively
-        # The library saves data to: python_env/lib/site-packages/neo_api_client/data/
-        import neo_api_client
-        sdk_dir = os.path.dirname(neo_api_client.__file__)
-        hidden_csv_path = os.path.join(sdk_dir, "data", "nse_fo.csv")
+        # Endpoint to fetch master script links
+        file_paths_url = f"{base_url}/script-details/1.0/masterscrip/file-paths"
         
-        output_filename = "kotak_neo_nse_fo_tokens.csv"
-
-        if os.path.exists(hidden_csv_path):
-            # 3. Read it from the hidden directory and save a copy here!
-            df = pd.read_csv(hidden_csv_path)
-            df.to_csv(output_filename, index=False)
-            print(f"Success! Found SDK cache and saved it locally as: '{output_filename}' ✅")
-            print("\nFirst 5 rows of your tokens:")
-            print(df.head(5))
-        else:
-            # Fallback if your SDK version treats the return structure as text/json
-            if scrip_data:
-                print("SDK did not write a file but returned data. Writing file manually...")
-                # Assuming standard format, adjust if scrip_data is a direct list/dict
-                df = pd.DataFrame(scrip_data)
-                df.to_csv(output_filename, index=False)
-                print(f"Saved data manually to '{output_filename}' ✅")
-            else:
-                print("The SDK executed but did not return data or cache a file. Verify exchange segment name.")
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Neo-Header": neo_header,
+            "Content-Type": "application/json"
+        }
+        
+        print("Fetching Master Scrip downloadable file links...")
+        response = requests.get(file_paths_url, headers=headers)
+        
+        if response.status_code == 200:
+            data = response.json()
+            fno_file_url = None
+            
+            # Find the NSE F&O (Futures & Options) link in the list
+            for item in data.get("data", []):
+                if item.get("exchange") == "nse_fo":
+                    fno_file_url = item.get("filePath")
+                    break
+            
+            if fno_file_url:
+                print(f"Downloading file directly from Kotak servers: {fno_file_url}")
                 
+                # Fetch the actual CSV from the provided link
+                df = pd.read_csv(fno_file_url)
+                
+                # Strip spaces from column headers to prevent key mismatch bugs
+                df.columns = df.columns.str.strip()
+                
+                output_filename = "kotak_neo_nse_fo_tokens.csv"
+                df.to_csv(output_filename, index=False)
+                
+                print(f"\nSuccess! File saved cleanly as '{output_filename}' in your folder. ✅")
+                print("--- Data Preview ---")
+                print(df.head(5))
+                
+            else:
+                print("Could not find the 'nse_fo' exchange segment in the response data.")
+                print(f"Server response was: {data}")
+        else:
+            print(f"Failed to fetch paths. HTTP Status: {response.status_code}")
+            print(f"Error Message: {response.text}")
+            
+    except AttributeError:
+        print("Error: Unable to find access_token or neo_header attributes inside the SDK session.")
+        print("Please check your neo_api_client version.")
     except Exception as e:
-        print(f"An error occurred: {e}")
+        print(f"An unexpected error occurred: {e}")
 
 if __name__ == "__main__":
-    download_futures_tokens()
+    download_futures_tokens_direct():
