@@ -2,17 +2,8 @@ from runclntpxy import get_session
 from datetime import datetime, timedelta
 
 
-# ============================================================
-# CONFIG
-# ============================================================
-
 EXCHANGE_SEGMENT = "nse_fo"
-SEARCH_SYMBOL = "NIFTY"
 
-
-# ============================================================
-# GET LAST TUESDAY OF MONTH
-# ============================================================
 
 def last_tuesday(year, month):
 
@@ -23,23 +14,18 @@ def last_tuesday(year, month):
 
     day = next_month - timedelta(days=1)
 
-    while day.weekday() != 1:       # Tuesday
+    while day.weekday() != 1:
         day -= timedelta(days=1)
 
     return day
 
 
-# ============================================================
-# CURRENT MONTH EXPIRY
-# ============================================================
-
-def get_expiry():
+def get_current_month_expiry():
 
     now = datetime.now()
 
     expiry = last_tuesday(now.year, now.month)
 
-    # If expiry has already passed, use next month
     if now.date() > expiry.date():
 
         if now.month == 12:
@@ -49,10 +35,6 @@ def get_expiry():
 
     return expiry
 
-
-# ============================================================
-# MAIN
-# ============================================================
 
 def main():
 
@@ -75,22 +57,29 @@ def main():
     # EXPIRY
     # --------------------------------------------------------
 
-    expiry = get_expiry()
+    expiry = get_current_month_expiry()
 
     print(f"Expiry : {expiry.strftime('%d-%b-%Y')}")
     print("Searching NIFTY...")
     print()
 
     # --------------------------------------------------------
-    # SEARCH
+    # SEARCH NIFTY
     # --------------------------------------------------------
 
     response = session.search_scrip(
         exchange_segment=EXCHANGE_SEGMENT,
-        symbol=SEARCH_SYMBOL
+        symbol="NIFTY"
     )
 
-    # Kotak can return a LIST
+    print("Search response:")
+    print(response)
+    print()
+
+    # --------------------------------------------------------
+    # NORMALIZE RESPONSE
+    # --------------------------------------------------------
+
     if isinstance(response, list):
 
         results = response
@@ -109,97 +98,66 @@ def main():
     if not results:
 
         print("❌ No NIFTY instruments found")
-        print(response)
         return
 
     # --------------------------------------------------------
     # FIND FUTURE
     # --------------------------------------------------------
 
-    expiry_str = expiry.strftime("%d%b%y").upper()
+    month = expiry.strftime("%b").upper()
+    year = expiry.strftime("%y")
 
-    found_symbol = None
-    found_token = None
+    nifty_symbol = None
 
     for item in results:
 
         if not isinstance(item, dict):
             continue
 
-        # Try common Kotak fields
-        symbol = str(
+        # Print fields so we know exactly what Kotak returns
+        symbol = (
             item.get("pTrdSymbol")
             or item.get("pSymbol")
+            or item.get("pSymbolName")
             or item.get("symbol")
             or item.get("tsym")
+            or item.get("neo_symbol")
             or ""
-        ).upper()
-
-        instrument = str(
-            item.get("pInstrumentName")
-            or item.get("instrument")
-            or ""
-        ).upper()
-
-        expiry_value = str(
-            item.get("pExpiryDate")
-            or item.get("expiry")
-            or ""
-        ).upper()
-
-        token = (
-            item.get("pToken")
-            or item.get("token")
-            or item.get("tok")
-            or item.get("instrument_token")
         )
 
-        text = f"{symbol} {instrument} {expiry_value}"
+        symbol = str(symbol).upper()
 
-        # NIFTY + FUT
-        if "NIFTY" not in text:
-            continue
-
-        if "FUT" not in text:
-            continue
-
-        # Current month
+        # Current month NIFTY future
+        #
+        # Example:
+        # NIFTY26SEPFUT
+        #
         if (
-            expiry_str in text
-            or expiry.strftime("%b").upper() in text
-            and expiry.strftime("%y") in text
+            symbol.startswith("NIFTY")
+            and month in symbol
+            and year in symbol
+            and symbol.endswith("FUT")
         ):
 
-            found_symbol = symbol
-            found_token = str(token)
-
+            nifty_symbol = symbol
             break
 
     # --------------------------------------------------------
     # NOT FOUND
     # --------------------------------------------------------
 
-    if not found_symbol:
+    if nifty_symbol is None:
 
         print("❌ Current month NIFTY FUT not found")
         print()
-        print("Available NIFTY results:")
+        print("NIFTY candidates:")
 
         for item in results:
 
             if isinstance(item, dict):
 
-                symbol = (
-                    item.get("pTrdSymbol")
-                    or item.get("pSymbol")
-                    or item.get("symbol")
-                    or item.get("tsym")
-                    or ""
-                )
+                print(item)
 
-                print(" ", symbol)
-
-        print()
         return
 
     # --------------------------------------------------------
@@ -207,23 +165,18 @@ def main():
     # --------------------------------------------------------
 
     print("✅ NIFTY FUT FOUND")
-    print(f"Symbol : {found_symbol}")
-    print(f"Token  : {found_token}")
+    print(f"Neo Symbol : {nifty_symbol}")
     print()
 
     # --------------------------------------------------------
-    # GET LIVE PRICE
+    # GET LIVE QUOTE
     # --------------------------------------------------------
 
     try:
 
         quote = session.quotes(
-            instrument_tokens=[
-                {
-                    "exchange_segment": EXCHANGE_SEGMENT,
-                    "instrument_token": found_token
-                }
-            ],
+            exchange_segment=EXCHANGE_SEGMENT,
+            instrument_tokens=nifty_symbol,
             quote_type="ltp"
         )
 
@@ -234,15 +187,15 @@ def main():
         return
 
     # --------------------------------------------------------
-    # DISPLAY RESPONSE
+    # DISPLAY
     # --------------------------------------------------------
 
-    print("Quote:")
+    print("Quote response:")
     print(quote)
     print()
 
     # --------------------------------------------------------
-    # EXTRACT LTP
+    # FIND LTP
     # --------------------------------------------------------
 
     ltp = None
@@ -258,28 +211,23 @@ def main():
 
             ltp = (
                 data.get("ltp")
+                or data.get("LTP")
                 or data.get("last_price")
                 or data.get("pLtp")
                 or data.get("pLastPrice")
-                or data.get("LTP")
             )
 
     if ltp is not None:
 
         print("=" * 50)
-        print(f"NIFTY FUT : {found_symbol}")
+        print(f"NIFTY FUT : {nifty_symbol}")
         print(f"LIVE LTP  : {ltp}")
         print("=" * 50)
 
     else:
 
-        print("⚠️ LTP field not identified.")
-        print("Check the Quote response above.")
+        print("⚠️ LTP not found in response")
 
-
-# ============================================================
-# RUN
-# ============================================================
 
 if __name__ == "__main__":
     main()
