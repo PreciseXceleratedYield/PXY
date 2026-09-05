@@ -11,7 +11,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 DEBUG_MODE = False
 
 # ==============================================================================
-# 🎛️ MASTER CONFIGURATION LAYER
+# 🎛️ MASTER CONFIGURATION LAYER (Synchronized to 3 and 1.4)
 # ==============================================================================
 CONFIG = {
     "ST1": {
@@ -54,7 +54,6 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     mirror_line = np.zeros(length)
     st_trend = []
 
-    # Persistent Anchor Point tracking variable
     anchor_price = hl2[0] if length > 0 else 0.0
 
     for i in range(length):
@@ -70,37 +69,33 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
         prev_lower = final_lower[i - 1]
         prev_trend = st_trend[i - 1]
 
-        # Final Upper Band locking logic
         if basic_upper[i] < prev_upper or close[i - 1] > prev_upper:
             final_upper[i] = basic_upper[i]
         else:
             final_upper[i] = prev_upper
 
-        # Final Lower Band locking logic
         if basic_lower[i] > prev_lower or close[i - 1] < prev_lower:
             final_lower[i] = basic_lower[i]
         else:
             final_lower[i] = prev_lower
 
-        # Secure Direction State Switches & Anchor Capture on Trend Jump
         if prev_trend == 'BEAR':
             if close[i] > final_upper[i]:
                 st_trend.append('BULL')
                 supertrend[i] = final_lower[i]
-                anchor_price = hl2[i]  # Capture Anchor on Jump
+                anchor_price = hl2[i]
             else:
                 st_trend.append('BEAR')
                 supertrend[i] = final_upper[i]
-        else:  # prev_trend == 'BULL'
+        else:
             if close[i] < final_lower[i]:
                 st_trend.append('BEAR')
                 supertrend[i] = final_upper[i]
-                anchor_price = hl2[i]  # Capture Anchor on Jump
+                anchor_price = hl2[i]
             else:
                 st_trend.append('BULL')
                 supertrend[i] = final_lower[i]
 
-        # Compute the absolute inverse slope line mirror
         st_distance_from_anchor = supertrend[i] - anchor_price
         mirror_line[i] = anchor_price - st_distance_from_anchor
 
@@ -108,12 +103,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """Calculates Dual Supertrends and applies the 3-Zone Market Classifier logic.
-    
-    BULL: Price > Max(ST, Mirror)
-    BEAR: Price < Min(ST, Mirror)
-    SIDE: Price is inside/between the two boundaries
-    """
+    """Calculates Dual Supertrends and applies the 3-Zone Market Classifier logic."""
     try:
         raw_df = fetch_yf_data(period='3d', interval='1m')
         if raw_df is not None and not raw_df.empty:
@@ -135,12 +125,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else df.tz_localize('UTC').tz_convert(tz_string)
     )
 
-    # Compute both Supertrend structures along with their respective Inverted Mirror Lines
     st1_line, st1_mirror = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
     st2_line, st2_mirror = _compute_single_st(df, period=CONFIG["ST2"]["PERIOD"], factor=CONFIG["ST2"]["FACTOR"])
 
-    # --- 3-ZONE CLASSIFIER MATRIX LAYERING ---
-    # Using ST1 as our primary engine reference point to isolate channel bounds
     close_arr = df['Close'].to_numpy()
     st_arr = st1_line.to_numpy()
     mirror_arr = st1_mirror.to_numpy()
@@ -148,7 +135,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     highest_bound = np.maximum(st_arr, mirror_arr)
     lowest_bound = np.minimum(st_arr, mirror_arr)
     
-    # Vectorized sorting layer mapping exactly to your rules
     classifier_conditions = [
         (close_arr > highest_bound),
         (close_arr < lowest_bound)
@@ -159,7 +145,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         index=df.index
     )
 
-    # CRITICAL DOWNSIDE BACKWARD COMPATIBILITY PROTECTIONS
     df['sma21'] = st1_line
     df['st_line'] = st2_line
     df['sma50'] = st2_line  
@@ -167,7 +152,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['sma_trend_full'] = st_trend_series
     df['ST_Trend'] = st_trend_series
     
-    # Hidden helper columns appended so you can pull mirror data tracking downstream if needed
     df['st1_mirror'] = st1_mirror
     df['st2_mirror'] = st2_mirror
 
@@ -177,7 +161,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 def export_supertrend_json(
     df: pd.DataFrame = None, output_file='../web/webchrtpxy.json'
 ):
-    """Exports and retains legacy key frames alongside requested configuration variables."""
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
     if df is None or df.empty:
@@ -222,3 +205,4 @@ if __name__ == '__main__':
         export_supertrend_json(processed_df)
     else:
         print('CRITICAL: Upstream data empty.')
+
