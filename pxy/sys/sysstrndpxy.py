@@ -27,17 +27,13 @@ CONFIG = {
 
 
 def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
-    """Helper to compute standard Supertrend bands using a safe pandas-to-numpy pipeline."""
+    """Helper to compute standard Supertrend bands and an absolute inverse mirror line."""
     high = df['High'].to_numpy()
     low = df['Low'].to_numpy()
     close = df['Close'].to_numpy()
 
-    # Calculate True Range elements safely without mutating raw series data
     tr1 = high - low
-    
-    # Safe shift using pandas to guarantee matching Wilder/ATR boundary alignment
     close_shifted = df['Close'].shift(1).to_numpy()
-    # Handle the initial element to prevent NaN breaks in array operations
     if len(close_shifted) > 0:
         close_shifted[0] = close[0]
 
@@ -45,7 +41,6 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     tr3 = np.abs(low - close_shifted)
     tr = np.maximum(tr1, np.maximum(tr2, tr3))
     
-    # Wilder's Smoothing via EWM
     atr = pd.Series(tr, index=df.index).ewm(alpha=1 / period, adjust=False).mean().to_numpy()
 
     hl2 = (high + low) / 2
@@ -56,7 +51,11 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     final_upper = np.zeros(length)
     final_lower = np.zeros(length)
     supertrend = np.zeros(length)
+    mirror_line = np.zeros(length)
     st_trend = []
+
+    # Persistent Anchor Point tracking variable
+    anchor_price = hl2[0] if length > 0 else 0.0
 
     for i in range(length):
         if i == 0:
@@ -64,6 +63,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
             final_lower[i] = basic_lower[i]
             supertrend[i] = final_upper[i]
             st_trend.append('BEAR')
+            mirror_line[i] = anchor_price - (supertrend[i] - anchor_price)
             continue
 
         prev_upper = final_upper[i - 1]
@@ -82,11 +82,12 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
         else:
             final_lower[i] = prev_lower
 
-        # Secure Direction State Switches
+        # Secure Direction State Switches & Anchor Capture on Trend Jump
         if prev_trend == 'BEAR':
             if close[i] > final_upper[i]:
                 st_trend.append('BULL')
                 supertrend[i] = final_lower[i]
+                anchor_price = hl2[i]  # Capture Anchor on Jump
             else:
                 st_trend.append('BEAR')
                 supertrend[i] = final_upper[i]
@@ -94,17 +95,24 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
             if close[i] < final_lower[i]:
                 st_trend.append('BEAR')
                 supertrend[i] = final_upper[i]
+                anchor_price = hl2[i]  # Capture Anchor on Jump
             else:
                 st_trend.append('BULL')
                 supertrend[i] = final_lower[i]
 
-    return pd.Series(supertrend, index=df.index), pd.Series(st_trend, index=df.index)
+        # Compute the absolute inverse slope line mirror
+        st_distance_from_anchor = supertrend[i] - anchor_price
+        mirror_line[i] = anchor_price - st_distance_from_anchor
+
+    return pd.Series(supertrend, index=df.index), pd.Series(mirror_line, index=df.index)
 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """Calculates Dual Supertrends using dynamically defined parameters from CONFIG.
+    """Calculates Dual Supertrends and applies the 3-Zone Market Classifier logic.
     
-    If both trends match, outputs BULL/BEAR, otherwise SIDE.
+    BULL: Price > Max(ST, Mirror)
+    BEAR: Price < Min(ST, Mirror)
+    SIDE: Price is inside/between the two boundaries
     """
     try:
         raw_df = fetch_yf_data(period='3d', interval='1m')
@@ -118,7 +126,6 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     if df.empty:
         return df
 
-    # Safe Datetime Index Normalisation
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
     tz_string = str(TIMEZONE)
@@ -128,13 +135,27 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else df.tz_localize('UTC').tz_convert(tz_string)
     )
 
-    # Compute both Supertrends using values loaded directly from CONFIG
-    st1_line, st1_trend = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
-    st2_line, st2_trend = _compute_single_st(df, period=CONFIG["ST2"]["PERIOD"], factor=CONFIG["ST2"]["FACTOR"])
+    # Compute both Supertrend structures along with their respective Inverted Mirror Lines
+    st1_line, st1_mirror = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
+    st2_line, st2_mirror = _compute_single_st(df, period=CONFIG["ST2"]["PERIOD"], factor=CONFIG["ST2"]["FACTOR"])
 
-    # Determine aligned matrices (BULL/BEAR if agreed, else SIDE)
+    # --- 3-ZONE CLASSIFIER MATRIX LAYERING ---
+    # Using ST1 as our primary engine reference point to isolate channel bounds
+    close_arr = df['Close'].to_numpy()
+    st_arr = st1_line.to_numpy()
+    mirror_arr = st1_mirror.to_numpy()
+    
+    highest_bound = np.maximum(st_arr, mirror_arr)
+    lowest_bound = np.minimum(st_arr, mirror_arr)
+    
+    # Vectorized sorting layer mapping exactly to your rules
+    classifier_conditions = [
+        (close_arr > highest_bound),
+        (close_arr < lowest_bound)
+    ]
+    classifier_choices = ['BULL', 'BEAR']
     st_trend_series = pd.Series(
-        np.where(st1_trend == st2_trend, st1_trend, 'SIDE'),
+        np.select(classifier_conditions, classifier_choices, default='SIDE'),
         index=df.index
     )
 
@@ -145,6 +166,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['ST'] = st1_line
     df['sma_trend_full'] = st_trend_series
     df['ST_Trend'] = st_trend_series
+    
+    # Hidden helper columns appended so you can pull mirror data tracking downstream if needed
+    df['st1_mirror'] = st1_mirror
+    df['st2_mirror'] = st2_mirror
 
     return df
 
@@ -191,10 +216,9 @@ if __name__ == '__main__':
         )
         print(
             f"ST1 ({CONFIG['ST1']['PERIOD']},{CONFIG['ST1']['FACTOR']}) [sma21]: {float(processed_df.at[target_index, 'sma21']):.2f} | "
-            f"ST2 ({CONFIG['ST2']['PERIOD']},{CONFIG['ST2']['FACTOR']}) [st_line]: {float(processed_df.at[target_index, 'st_line']):.2f}"
+            f"ST1 Mirror Line Tracker: {float(processed_df.at[target_index, 'st1_mirror']):.2f}"
         )
-        print(f"Aggregated Trend State : {str(processed_df.at[target_index, 'ST_Trend'])}")
+        print(f"Aggregated 3-Zone Trend State : {str(processed_df.at[target_index, 'ST_Trend'])}")
         export_supertrend_json(processed_df)
     else:
         print('CRITICAL: Upstream data empty.')
-
