@@ -476,7 +476,22 @@ function cls(v){
     if(s.includes('SIDE'))return'side';
     return'dim';
 }
-function emojify(v){
+function emojifyEntry(v){
+    const s=String(v||'').toUpperCase();
+    if(s.includes('BUY')||s.includes('BULL'))return'🟢';
+    if(s.includes('SELL')||s.includes('BEAR'))return'🔴';
+    if(s==='NONE')return'—';
+    return v;
+}
+function emojifyExit(v){
+    const s=String(v||'').toUpperCase();
+    if(s.includes('BUY')||s.includes('BULL'))return'▲';
+    if(s.includes('SELL')||s.includes('BEAR'))return'▼';
+    if(s.includes('SIDE'))return'●';
+    if(s==='NONE')return'—';
+    return v;
+}
+function emojifyTrend(v){
     const s=String(v||'').toUpperCase();
     if(s.includes('BUY')||s.includes('BULL'))return'🟩';
     if(s.includes('SELL')||s.includes('BEAR'))return'🟥';
@@ -545,9 +560,9 @@ async function loadDash(){
     try{
         const d=await fetch('./webdashpxy.json?_='+Date.now()).then(r=>r.json());
         const setV=(id,val,c)=>{const el=$(id);if(!el)return;el.textContent=val??'—';if(c){el.className='sc-val';if(c!=='sc-val')el.classList.add(c);}};
-        setV('hcEntry',emojify(d.entry??'NONE'),cls(d.entry||''));
-        setV('hcExit', emojify(d.exit??'NONE'), cls(d.exit||''));
-        setV('hcTrend',emojify(d.supertrend),   cls(d.supertrend||''));
+        setV('hcEntry',emojifyEntry(d.entry??'NONE'),cls(d.entry||''));
+        setV('hcExit', emojifyExit(d.exit??'NONE'), cls(d.exit||''));
+        setV('hcTrend',emojifyTrend(d.supertrend),   cls(d.supertrend||''));
         setV('hcATR',  `${d.atr??'—'}`, 'sc-val');
         ['cellEntry','cellExit','cellTrend','cellATR'].forEach(id=>{
             const el=$(id);if(!el)return;el.className='sig-cell';
