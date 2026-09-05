@@ -1,32 +1,63 @@
 //@version=5
-indicator("PXY®", overlay=true)
+indicator("PXY® with Config Table", overlay=true)
 
-// 1. Define Open as the Actual Close of the previous candle
-custom_open = na(close) ? open : close
+// ==========================================
+// 1. Inputs (Configuration Numbers)
+// ==========================================
+gp_st1   = "Supertrend #1 Configuration"
+st1_len  = input.int(1, title="ST 1 Period (Length)", minval=1, group=gp_st1)
+st1_fact = input.float(1.1, title="ST 1 Factor", step=0.1, group=gp_st1)
 
-// 2. Calculate your custom Close value
+gp_st2   = "Supertrend #2 Configuration"
+st2_len  = input.int(3, title="ST 2 Period (Length)", minval=1, group=gp_st2)
+st2_fact = input.float(3.3, title="ST 2 Factor", step=0.1, group=gp_st2)
+
+// ==========================================
+// 2. Custom Candle Logic
+// ==========================================
+custom_open = na(close[1]) ? open : close[1]
 custom_close = close >= open ? (close + high) / 2.0 : (close + low) / 2.0
-
-// 3. Adjust High and Low to encapsulate the new Open and Close boundaries
 custom_high = math.max(high, math.max(custom_open, custom_close))
 custom_low  = math.min(low, math.min(custom_open, custom_close))
 
-// 4. Color Logic: Compare current custom close to the PREVIOUS custom close
 candle_color = custom_close >= custom_close[1] ? color.green : color.red
 
-// 5. Plot the custom candles
 plotcandle(custom_open, custom_high, custom_low, custom_close, 
            title="Custom Continuous Candles", 
            color=candle_color, 
            wickcolor=candle_color, 
            bordercolor=candle_color)
 
-// 6. Supertrend #1 (Period 1, Factor 1.1)
-[st1, dir1] = ta.supertrend(1.1, 1)
+// ==========================================
+// 3. Supertrend Indicators (Using Input Numbers)
+// ==========================================
+[st1, dir1] = ta.supertrend(st1_fact, st1_len)
 plot(dir1 < 0 ? st1 : na, color=color.green, title="ST 1 Up", linewidth=2, style=plot.style_linebr)
 plot(dir1 > 0 ? st1 : na, color=color.red, title="ST 1 Down", linewidth=2, style=plot.style_linebr)
 
-// 7. Supertrend #2 (Period 3, Factor 3.3)
-[st2, dir2] = ta.supertrend(3.3, 3)
+[st2, dir2] = ta.supertrend(st2_fact, st2_len)
 plot(dir2 < 0 ? st2 : na, color=color.teal, title="ST 2 Up", linewidth=3, style=plot.style_linebr)
 plot(dir2 > 0 ? st2 : na, color=color.maroon, title="ST 2 Down", linewidth=3, style=plot.style_linebr)
+
+// ==========================================
+// 4. Dynamic Configuration Table
+// ==========================================
+var table configTable = table.new(position = position.top_right, columns = 3, rows = 3, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.gray)
+
+if barstate.islast
+    // Table Headers
+    table.cell(configTable, 0, 0, "Indicator", text_color=color.white, bgcolor=color.gray, text_size=size.small)
+    table.cell(configTable, 1, 0, "Config (Len, Fact)", text_color=color.white, bgcolor=color.gray, text_size=size.small)
+    table.cell(configTable, 2, 0, "Status", text_color=color.white, bgcolor=color.gray, text_size=size.small)
+    
+    // Row 1: Supertrend #1 Config Numbers & Status
+    bool st1Bullish = dir1 < 0
+    table.cell(configTable, 0, 1, "Supertrend #1", text_color=color.white, text_size=size.small)
+    table.cell(configTable, 1, 1, str.tostring(st1_len) + " , " + str.tostring(st1_fact), text_color=color.white, text_size=size.small)
+    table.cell(configTable, 2, 1, st1Bullish ? "BULLISH" : "BEARISH", bgcolor=st1Bullish ? color.green : color.red, text_color=color.white, text_size=size.small)
+    
+    // Row 2: Supertrend #2 Config Numbers & Status
+    bool st2Bullish = dir2 < 0
+    table.cell(configTable, 0, 2, "Supertrend #2", text_color=color.white, text_size=size.small)
+    table.cell(configTable, 1, 2, str.tostring(st2_len) + " , " + str.tostring(st2_fact), text_color=color.white, text_size=size.small)
+    table.cell(configTable, 2, 2, st2Bullish ? "BULLISH" : "BEARISH", bgcolor=st2Bullish ? color.teal : color.maroon, text_color=color.white, text_size=size.small)
