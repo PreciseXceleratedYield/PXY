@@ -3,8 +3,6 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from syscnfgpxy import TICKER
-# Corrected import targeting the newly named trend classifier script
-from sysdtstpxy import get_market_trend 
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -12,10 +10,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 TIMEZONE = 'Asia/Kolkata'
 
 def apply_ohlc_transformation(df, mode=1):
-    """
-    Executes structural, isolated mathematical transformations based on explicit modes.
-    No recursive loops are utilized.
-    """
+    """Executes structural, isolated mathematical transformations based on explicit modes."""
     if df.empty:
         return df
 
@@ -25,7 +20,7 @@ def apply_ohlc_transformation(df, mode=1):
     raw_l = df['Low'].to_numpy()
     raw_c = df['Close'].to_numpy()
 
-    # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles (Active when market is SIDE)
+    # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles (Triggered if market is SIDE)
     if mode == 0:
         out['Close'] = np.where(raw_c >= raw_o, (raw_c + raw_h) / 2.0, (raw_c + raw_l) / 2.0)
         return out
@@ -34,7 +29,7 @@ def apply_ohlc_transformation(df, mode=1):
     elif mode == 1:
         return out
 
-    # ⚡ Mode 2: OC/2 (Active when market is BULL or BEAR)
+    # ⚡ Mode 2: OC/2 (Triggered if market is BULL or BEAR)
     elif mode == 2:
         out['Close'] = (raw_o + raw_c) / 2.0
         return out
@@ -90,7 +85,11 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     else:
         df = df.tz_convert(TIMEZONE)
         
-    # --- AUTO-SWITCH ENGINE MODE MECHANICS ---
+    # ==========================================================================
+    # ⚡ LOCAL IMPORT SHIELD: Prevents Circular Dependency Faults
+    # ==========================================================================
+    from sysstrndpxy import get_market_trend
+    
     # Step 1: Run raw data through classifier to detect current market structure
     market_state = get_market_trend(df)
     
