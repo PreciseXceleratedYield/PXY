@@ -16,9 +16,10 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     close = df['Close'].to_numpy()
 
     tr1 = high - low
+    # FIX: Properly shift the close array to capture historical gaps
     close_shifted = df['Close'].shift(1).to_numpy()
     if len(close_shifted) > 0:
-        close_shifted = close
+        close_shifted[0] = close[0]
 
     tr2 = np.abs(high - close_shifted)
     tr3 = np.abs(low - close_shifted)
@@ -38,7 +39,8 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     mirror_line = np.zeros(length)
     st_trend = []
 
-    anchor_price = hl2 if length > 0 else 0.0
+    # FIX: Extract the first scalar value instead of copying the whole array
+    anchor_price = float(hl2[0]) if length > 0 else 0.0
 
     for i in range(length):
         if i == 0:
@@ -67,7 +69,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
             if close[i] > final_upper[i]:
                 st_trend.append('BULL')
                 supertrend[i] = final_lower[i]
-                anchor_price = hl2[i]
+                anchor_price = float(hl2[i])
             else:
                 st_trend.append('BEAR')
                 supertrend[i] = final_upper[i]
@@ -75,7 +77,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
             if close[i] < final_lower[i]:
                 st_trend.append('BEAR')
                 supertrend[i] = final_upper[i]
-                anchor_price = hl2[i]
+                anchor_price = float(hl2[i])
             else:
                 st_trend.append('BULL')
                 supertrend[i] = final_lower[i]
