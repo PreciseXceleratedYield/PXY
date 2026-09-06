@@ -107,7 +107,8 @@ def run_action(choice):
 
     # --- DYNAMIC OTM DISTANCE BY DAY OF THE WEEK (IST) ---
     ist = pytz.timezone("Asia/Kolkata")
-    current_day = datetime.now(ist).strftime('%A')
+    now_ist = datetime.now(ist)
+    current_day = now_ist.strftime('%A')
     
     day_otm_mapping = {
         "Monday": 100,
@@ -118,8 +119,21 @@ def run_action(choice):
     }
     
     # Fallback to 100 for weekends
-    OTM_DISTANCE = day_otm_mapping.get(current_day, 100)
-    dprint(f"Today is {current_day}. Applied OTM Distance: {OTM_DISTANCE}", Fore.YELLOW)
+    base_otm_distance = day_otm_mapping.get(current_day, 100)
+    
+    # Define time-based variable x (100 inside 9:15-9:30 IST, 0 otherwise)
+    start_time = now_ist.replace(hour=9, minute=15, second=0, microsecond=0)
+    end_time = now_ist.replace(hour=9, minute=30, second=0, microsecond=0)
+    
+    if start_time <= now_ist <= end_time:
+        x = 100
+    else:
+        x = 0
+        
+    # Calculate final OTM distance
+    OTM_DISTANCE = base_otm_distance + x
+    
+    dprint(f"Today is {current_day}. Base: {base_otm_distance}, x: {x}. Applied OTM Distance: {OTM_DISTANCE}", Fore.YELLOW)
 
     symbol = get_symbol(ltp, sig, OTM_DISTANCE)
 
