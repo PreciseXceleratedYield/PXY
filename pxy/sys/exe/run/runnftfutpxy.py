@@ -158,31 +158,42 @@ def cached_contract_valid(row, current_expiry):
 
 
 # ============================================================
-# GET LAST TRADED PRICE (LTP)
+# GET LIVE OHLC AND PRICE DATA
 # ============================================================
-def get_ltp(client, token: str, segment: str = "nse_fo") -> float:
-    """Gets direct Last Traded Price (LTP) from Kotak Neo/Neo API."""
+def get_ohlc_data(client, token: str, segment: str = "nse_fo") -> dict:
+    """Gets direct OHLC and LTP from Kotak Neo/Neo API."""
     try:
         instr = [{"instrument_token": str(token), "exchange_segment": segment}]
-        res = client.quotes(instrument_tokens=instr, quote_type="ltp")
+        
+        # Switched quote_type to "ohlc" to pull the whole day's boundary metrics
+        res = client.quotes(instrument_tokens=instr, quote_type="ohlc")
 
         if not res or not isinstance(res, list) or len(res) == 0:
-            return 0.0
+            return {}
 
         data = res[0] if isinstance(res, list) else res
-        return float(data.get("ltp") or data.get("last_price") or 0.0)
+        
+        # Pull nested ohlc dictionary fields from response payload
+        ohlc_block = data.get("ohlc", {})
+        
+        return {
+            "price": float(data.get("last_price") or data.get("ltp") or 0.0),
+            "open": float(ohlc_block.get("open") or 0.0),
+            "high": float(ohlc_block.get("high") or 0.0),
+            "low": float(ohlc_block.get("low") or 0.0),
+            "close": float(ohlc_block.get("close") or 0.0)
+        }
         
     except Exception:
-        return 0.0
+        return {}
 
 
 # ============================================================
-# WRITE PRICE TO JSON
+# WRITE ALL DATA FIELDS TO JSON
 # ============================================================
-def save_price_to_json(price: float):
-    """Overwrites the JSON file with the latest price only."""
+def save_data_to_json(data: dict):
+    """Overwrites the target JSON tracking file with structured price & OHLC data."""
     try:
-        data = {"price": price}
         with open(JSON_OUTPUT_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
     except Exception:
@@ -225,22 +236,23 @@ def main():
         return
 
     token = future["token"]
-    price = get_ltp(client, token, EXCHANGE_SEGMENT)
+    
+    # Capture the full updated OHLC dictionary
+    market_data = get_ohlc_data(client, token, EXCHANGE_SEGMENT)
 
-    if price <= 0:
+    if not market_data or market_data.get("price", 0.0) <= 0:
         return
 
-    # Overwrite the price into the target JSON file
-    save_price_to_json(price)
+    # Overwrite price and explicit bounds into the target file
+    save_data_to_json(market_data)
 
     # Extract month string (e.g., extracts "SEP" from "NIFTY26SEPFUT")
     raw_symbol = future["symbol"].upper()
     expiry_month = "".join([i for i in raw_symbol.replace("NIFTY", "").replace("FUT", "") if not i.isdigit()])
 
     # Clean single-line production output
-    print(f"NIFTY {expiry_month} FUT trading at {price:.2f}")
+    print(f"NIFTY {expiry_month} FUT trading at {market_data['price']:.2f}")
 
 
 if __name__ == "__main__":
     main()
-
