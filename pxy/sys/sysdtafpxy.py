@@ -13,23 +13,24 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 TIMEZONE = 'Asia/Kolkata'
 
 # ==========================================================================
-# ⚡ ABSOLUTE PATH ALIGNMENT FOR THE RUN DIRECTORY
+# ⚡ EXACT PATH ALIGNMENT FOR SYS/EXE/RUN DIRECTORY STRUCTURE
 # ==========================================================================
-# Determines the current file's directory (sys/)
+# BASE_DIR evaluates directly to your absolute 'sys/' directory path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# Locks onto the exact target directory: sys/exe/run/
+
+# Maps directly down into the subdirectory: sys/exe/run/
 RUN_DIR = os.path.join(BASE_DIR, "exe", "run")
 
-# Maps the absolute file paths directly inside the run directory
+# Absolute path bindings targeting the two files inside the run/ folder
 SCRIPT_PATH = os.path.join(RUN_DIR, "runnftfutpxy.py")
 JSON_FILE_PATH = os.path.join(RUN_DIR, "nftfut.json")
 
 
 def run_nftfut_module():
-    """Executes runnftfutpxy.py inside its own folder to ensure local file creation."""
+    """Executes runnftfutpxy.py directly within the sys/exe/run/ subdirectory layer."""
     if os.path.exists(SCRIPT_PATH):
         try:
-            # cwd=RUN_DIR ensures that the script runs inside sys/exe/run/
+            # cwd=RUN_DIR forces the tracking subsystem script to execute inside sys/exe/run/
             subprocess.run(
                 ["python", SCRIPT_PATH], 
                 cwd=RUN_DIR,
@@ -41,7 +42,7 @@ def run_nftfut_module():
             pass
 
 def get_live_futures_price():
-    """Reads and returns the flat price from the JSON file inside the run directory."""
+    """Reads and parses the flat price from the JSON file inside the run directory."""
     if os.path.exists(JSON_FILE_PATH):
         try:
             with open(JSON_FILE_PATH, "r", encoding="utf-8") as f:
@@ -96,7 +97,7 @@ def apply_ohlc_transformation(df, mode=1):
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
     """Dynamic historical ingestion engine utilizing vectorized structural transformations"""
     
-    # Step 0: Execute the external script and fetch the latest live price from the run directory
+    # Step 0: Execute the module script and fetch the latest price from the run directory
     run_nftfut_module()
     fut_price = get_live_futures_price()
 
