@@ -7,7 +7,6 @@ from syscnfgpxy import TIMEZONE
 from sysdtafpxy import fetch_yf_data
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
-
 DEBUG_MODE = False
 
 # ==============================================================================
