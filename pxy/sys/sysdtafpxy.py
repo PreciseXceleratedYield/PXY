@@ -2,7 +2,9 @@ import warnings
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from syscnfgpxy import TICKER, OHLC_MODE
+from syscnfgpxy import TICKER
+# Corrected import targeting the newly named trend classifier script
+from sysdtstpxy import get_market_trend 
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -23,7 +25,7 @@ def apply_ohlc_transformation(df, mode=1):
     raw_l = df['Low'].to_numpy()
     raw_c = df['Close'].to_numpy()
 
-    # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles (Original fallback structure)
+    # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles (Active when market is SIDE)
     if mode == 0:
         out['Close'] = np.where(raw_c >= raw_o, (raw_c + raw_h) / 2.0, (raw_c + raw_l) / 2.0)
         return out
@@ -32,7 +34,7 @@ def apply_ohlc_transformation(df, mode=1):
     elif mode == 1:
         return out
 
-    # ⚡ Mode 2: OC/2
+    # ⚡ Mode 2: OC/2 (Active when market is BULL or BEAR)
     elif mode == 2:
         out['Close'] = (raw_o + raw_c) / 2.0
         return out
@@ -88,5 +90,13 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     else:
         df = df.tz_convert(TIMEZONE)
         
-    processed_df = apply_ohlc_transformation(df, mode=OHLC_MODE)
+    # --- AUTO-SWITCH ENGINE MODE MECHANICS ---
+    # Step 1: Run raw data through classifier to detect current market structure
+    market_state = get_market_trend(df)
+    
+    # Step 2: Assign logic mode dynamically based on state output (0 for SIDE, else 2)
+    dynamic_mode = 0 if market_state == 'SIDE' else 2
+    
+    # Step 3: Transform close values using the runtime calculated mode switch
+    processed_df = apply_ohlc_transformation(df, mode=dynamic_mode)
     return processed_df.tail(target_rows)
