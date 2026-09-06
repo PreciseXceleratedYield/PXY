@@ -1,5 +1,5 @@
 # =============================================================================
-# MAIN MODULE: exeavgpxy.py [PART 1: PARSERS & DATA MATRIX RESOLUTIONS]
+# MAIN MODULE: exeavgpxy.py [PART 1: SYSTEM PATHS, IMPORTS & DATA MATRICES]
 # =============================================================================
 import re
 import os
@@ -56,7 +56,7 @@ def handle_side_averaging(client, df):
     pe_match = re.search(r'(\d+)PE', pos_raw)
     
     ce_lots = int(ce_match.group(1)) if ce_match else 0
-    pe_lots = int(pe_match.group(1)) if pe_match else 0  
+    pe_lots = int(pe_match.group(2)) if pe_match else 0  
     
     # Aggregate dimensional matrix groupings
     ce_rows = working_df[working_df['side'] == 'CE']
@@ -76,10 +76,6 @@ def handle_side_averaging(client, df):
         pe_overall_pnl_pct = ((pe_total_value - pe_total_cost) / pe_total_cost) * 100 if pe_total_cost > 0 else 0.0
     else:
         pe_overall_pnl_pct = 0.0
-
-    # Convert overall performance matrix to a positive "loss value" to safely hit targets
-
-    
     # =====================================================================
     # 📉 RISK & LOSS TRACKING GROUP (Flipped to Positive Magnitudes)
     # =====================================================================
@@ -88,7 +84,6 @@ def handle_side_averaging(client, df):
     ce_avg_loss = -ce_overall_pnl_pct if ce_overall_pnl_pct < 0 else 0.0
     pe_avg_loss = -pe_overall_pnl_pct if pe_overall_pnl_pct < 0 else 0.0
     
-    
     # =====================================================================
     # 📈 TARGET & PROFIT TRACKING GROUP (Pure Positive Performance)
     # =====================================================================
@@ -96,7 +91,6 @@ def handle_side_averaging(client, df):
     # Captures profits only; returns 0.0 if the position is losing or flat.
     ce_avg_profit = ce_overall_pnl_pct if ce_overall_pnl_pct > 0 else 0.0
     pe_avg_profit = pe_overall_pnl_pct if pe_overall_pnl_pct > 0 else 0.0
-
 
     # Structural exposure factor resolutions
     ce_investment = float(ce_rows['row_invested'].sum()) if not ce_rows.empty else 0.0
@@ -131,12 +125,10 @@ def handle_side_averaging(client, df):
     ce_avg_entry = str(ce_last.get("entry", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
     pe_avg_entry = str(pe_last.get("entry", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
 
-
     # --- ZERO-DIVISION SHIELDED LOTS FACTOR ENGINE ---
-    ce_lots_factor = 1 #(ce_lots + 1) / (pe_lots + 1)
-    pe_lots_factor = 1 #(pe_lots + 1) / (ce_lots + 1)
+    ce_lots_factor = 1 
+    pe_lots_factor = 1 
 
-###########################################################################################################
     # --- PRE-CALCULATE DYNAMIC THRESHOLDS MULTIPLIED ACROSS THE WHOLE THING ---
     supertrend = (
         str(pe_last.get("supertrend", "NONE")).upper().strip()
@@ -158,7 +150,6 @@ def handle_side_averaging(client, df):
     dampened_val = max(24, min(raw_val, 76))
     
     # --- CALL OPTION (CE) SIDE RISK CALCULATIONS ---
-
     ce_base_drawdown_limit = -atr
     if "MBUY" in ce_avg_entry:
         ce_dynamic_threshold = ((ce_base_drawdown_limit * ce_invst_factor) + (ce_base_drawdown_limit * ce_trend_factor)) / 1.4 
@@ -172,10 +163,6 @@ def handle_side_averaging(client, df):
     else:
         pe_dynamic_threshold = (-dampened_val * 2) if boss == "NBUY" else -dampened_val
 
-
-
-###########################################################################################################
-
     # 📊 VOLATILITY-UNIFIED AGT RESOLUTION LINKED TO COMBINED DYNAMIC THRESHOLDS
     ce_agt = int(round(ce_dynamic_threshold))
     pe_agt = int(round(pe_dynamic_threshold))
@@ -187,23 +174,18 @@ def handle_side_averaging(client, df):
     ce_sts = "✔️" if ce_target_crossed else "❌"
     pe_sts = "✔️" if pe_target_crossed else "❌"
 
-    # Synchronized with the dynamic string matching pattern rules
     if ce_target_crossed and "MBUY" in ce_avg_entry:
-        pass  # Synchronized system hooks
+        pass  
 
     if pe_target_crossed and "MSELL" in pe_avg_entry:
-        pass  # Synchronized system hooks
+        pass  
 
-    # =============================================================================
-    # MAIN MODULE: exeavgpxy.py [PART 2: TELEMETRY & INLINE ORDER PLACEMENT ENGINE]
-    # =============================================================================
     # =============================================================================
     # PART 6: TELEMETRY STREAM PANEL GRAPHICS & BALANCED GEOMETRIC RATIO BAR
     # =============================================================================
     P_WIDTH = 40
     
     print("\n" + Fore.CYAN + "=" * P_WIDTH)
-    # Exact 40-character header right-aligned to match data fields
     print(Fore.CYAN + " OPT LOT  AGT STS TGT                PNL")
     print(Fore.CYAN + "-" * P_WIDTH)
     
@@ -211,15 +193,13 @@ def handle_side_averaging(client, df):
     ce_pnl_val = int(round(ce_pnl))
     ce_pnl_color = Fore.CYAN + Style.BRIGHT if ce_target_crossed else (Fore.GREEN if ce_pnl_val >= 0 else Fore.RED)
     
-    # Strict column breakdown mapping precisely to the header indexes
-    ce_opt_col = f"{'CE':>4} "         # Width 5:  4 chars right-aligned + 1 space
-    ce_lot_col = f"{ce_lots:>3} "      # Width 4:  3 chars right-aligned + 1 space
-    ce_agt_col = f"{ce_agt:>4} "       # Width 5:  4 chars right-aligned + 1 space
-    ce_sts_col = f"{ce_sts:>3} "       # Width 4:  3 chars right-aligned + 1 space
-    ce_tgt_col = f"{ce_tgt:>3} "       # Width 4:  3 chars right-aligned + 1 space
-    ce_pnl_str = f"{ce_pnl_val:>18}"   # Width 18: Remaining space right-aligned (No space padding)
+    ce_opt_col = f"{'CE':>4} "         
+    ce_lot_col = f"{ce_lots:>3} "      
+    ce_agt_col = f"{ce_agt:>4} "       
+    ce_sts_col = f"{ce_sts:>3} "       
+    ce_tgt_col = f"{ce_tgt:>3} "       
+    ce_pnl_str = f"{ce_pnl_val:>18}"   
     
-    # Print string safely splitting text and color formatting to maintain the 40-char width
     print(Fore.WHITE + ce_opt_col + ce_lot_col + ce_agt_col + ce_sts_col + ce_tgt_col + ce_pnl_color + ce_pnl_str + Style.RESET_ALL)
     
     # --- PE Row ---
@@ -234,9 +214,7 @@ def handle_side_averaging(client, df):
     pe_pnl_str = f"{pe_pnl_val:>18}"
     
     print(Fore.WHITE + pe_opt_col + pe_lot_col + pe_agt_col + pe_sts_col + pe_tgt_col + pe_pnl_color + pe_pnl_str + Style.RESET_ALL)
-    
     print(Fore.CYAN + "-" * P_WIDTH)
-
 
     # --- DRAW THE DYNAMIC GEOMETRIC BALANCE BAR ---
     ce_weight_int = int(round(ce_investment))
@@ -257,10 +235,12 @@ def handle_side_averaging(client, df):
     
     print("  " + Fore.GREEN + left_label + Fore.GREEN + left_dash_track + Fore.WHITE + "⚖️" + Fore.RED + right_dash_track + Fore.RED + right_label)
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
-
     # =============================================================================
     # PART 7: MULTI-LAYER DOWNWARD DIRECTIONAL MATRIX AVERAGING LOOPS
     # =============================================================================
+    # EXECUTION TOGGLE: "SCRIPT" for terminal pipeline execution, "AVERAGE" for native inline order
+    EXECUTION_MODE = "SCRIPT"
+
     for side in ['CE', 'PE']:
         side_df = ce_rows if side == 'CE' else pe_rows
         if side_df.empty:
@@ -286,35 +266,64 @@ def handle_side_averaging(client, df):
         if all_positions_crossed_threshold and len(side_df) < (MAX_LAYERS + 1):
             if not is_cooling(side):
                 symbol = last_row['symbol']
+                qty = abs(int(safe_float(last_row.get('qty', 0.0))))
                 final_loss = get_loss(last_row)
                 
-                print_pxy_trigger_dashboard(
-                    side, symbol, final_loss, last_calculated_threshold, "AUTO_MANAGED", 
-                    ce_lots, pe_lots, active_exit
-                )
-                
-                # Dynamic absolute base path to the target script file
-                exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exeforcepxy.py")
-                
-                if os.path.exists(exe_path):
+                # --- OPTION BRANCH 1: NATIVE INLINE ORDER PLACEMENT ---
+                if EXECUTION_MODE == "AVERAGE":
+                    new_tag = generate_pxy_tag()
+                    print_pxy_trigger_dashboard(
+                        side, symbol, final_loss, last_calculated_threshold, new_tag, 
+                        ce_lots, pe_lots, active_exit
+                    )
                     try:
-                        # 1️⃣ Map system script positional argument based on contract side
-                        action_flag = "1" if side == "CE" else "2"
-                        cmd = ["python3", exe_path, action_flag]
-                        
-                        # 2️⃣ Execute live terminal order command cleanly via shell pipeline
-                        subprocess.run(cmd, check=True)
-                        
-                        # 3️⃣ Success tracking update
-                        set_cooling(side)
-                        print(f"{Fore.GREEN}✅ SUCCESS: {side} Averaging triggered via absolute path execution.")
-                        
-                    except subprocess.CalledProcessError as e:
-                        logger.error(f"Absolute shell execution failure on exeforcepxy.py: {e}", exc_info=True)
-                        print(f"{Fore.RED}⚠️ TERMINAL PIPELINE EXECUTION ERROR: {e}")
+                        params = {
+                            "exchange_segment": "nse_fo", 
+                            "product": "NRML", 
+                            "price": "0",
+                            "order_type": "MKT", 
+                            "quantity": str(qty), 
+                            "trading_symbol": str(symbol),
+                            "transaction_type": "B", 
+                            "validity": "DAY", 
+                            "amo": "NO", 
+                            "tag": new_tag
+                        }
+                        if client.place_order(**params):
+                            set_cooling(side)
+                            print(f"{Fore.GREEN}✅ SUCCESS: {side} NATIVELY AVERAGED by {active_exit} tracking engine. Tag: {new_tag}")
                     except Exception as e:
-                        logger.error(f"Critical execution tracking failure on side {side}: {e}", exc_info=True)
-                        print(f"{Fore.RED}⚠️ CRITICAL INTEGRATION ERROR: {e}")
-                else:
-                    print(f"{Fore.RED}❌ CRITICAL FILE ERROR: Target script not found at {exe_path}")
+                        logger.error(f"Order placement critical tracking failure on side {side}: {e}", exc_info=True)
+                        print(f"{Fore.RED}⚠️ ORDER PLACEMENT CRITICAL ERROR: {e}")
 
+                # --- OPTION BRANCH 2: SUBPROCESS SCRIPT PIPELINE TERMINAL ROUTE ---
+                elif EXECUTION_MODE == "SCRIPT":
+                    print_pxy_trigger_dashboard(
+                        side, symbol, final_loss, last_calculated_threshold, "AUTO_MANAGED", 
+                        ce_lots, pe_lots, active_exit
+                    )
+                    
+                    # Dynamic absolute base path to the target script file
+                    exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "exeforcepxy.py")
+                    
+                    if os.path.exists(exe_path):
+                        try:
+                            # 1️⃣ Map system script positional argument based on contract side
+                            action_flag = "1" if side == "CE" else "2"
+                            cmd = ["python3", exe_path, action_flag]
+                            
+                            # 2️⃣ Execute live terminal order command cleanly via shell pipeline
+                            subprocess.run(cmd, check=True)
+                            
+                            # 3️⃣ Success tracking update
+                            set_cooling(side)
+                            print(f"{Fore.GREEN}✅ SUCCESS: {side} Averaging triggered via absolute path execution.")
+                            
+                        except subprocess.CalledProcessError as e:
+                            logger.error(f"Absolute shell execution failure on exeforcepxy.py: {e}", exc_info=True)
+                            print(f"{Fore.RED}⚠️ TERMINAL PIPELINE EXECUTION ERROR: {e}")
+                        except Exception as e:
+                            logger.error(f"Critical execution tracking failure on side {side}: {e}", exc_info=True)
+                            print(f"{Fore.RED}⚠️ CRITICAL INTEGRATION ERROR: {e}")
+                    else:
+                        print(f"{Fore.RED}❌ CRITICAL FILE ERROR: Target script not found at {exe_path}")
