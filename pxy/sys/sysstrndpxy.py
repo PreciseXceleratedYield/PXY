@@ -4,7 +4,6 @@ import warnings
 import numpy as np
 import pandas as pd
 from syscnfgpxy import TIMEZONE
-from sysdtafpxy import fetch_yf_data
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 DEBUG_MODE = False
@@ -101,28 +100,57 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     return pd.Series(supertrend, index=df.index), pd.Series(mirror_line, index=df.index)
 
 
+def get_market_trend(df: pd.DataFrame) -> str:
+    """
+    Evaluates the data frame using the 3-Zone Market Classifier layout.
+    Returns: 'BULL', 'BEAR', or 'SIDE' based strictly on the current candle.
+    Used by sysdtafpxy.py to determine auto-switching logic modes.
+    """
+    if df is None or df.empty or len(df) < 2:
+        return 'SIDE'
+
+    st1_line, st1_mirror = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
+    
+    close_curr = float(df['Close'].iloc[-1])
+    st_curr = float(st1_line.iloc[-1])
+    mirror_curr = float(st1_mirror.iloc[-1])
+    
+    highest_bound = max(st_curr, mirror_curr)
+    lowest_bound = min(st_curr, mirror_curr)
+    
+    if close_curr > highest_bound:
+        return 'BULL'
+    elif close_curr < lowest_bound:
+        return 'BEAR'
+    else:
+        return 'SIDE'
+
+
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """Calculates Dual Supertrends and applies the 3-Zone Market Classifier logic."""
-    try:
-        raw_df = fetch_yf_data(period='3d', interval='1m')
-        if raw_df is not None and not raw_df.empty:
-            df = raw_df.copy()
-    except Exception as e:
-        if DEBUG_MODE:
-            print(f'Warning: Shared pipeline download fallback active | {e}')
-        df = df.copy()
+    if df.empty:
+        # If an empty container is passed, attempt fallback acquisition securely
+        from sysdtafpxy import fetch_yf_data
+        try:
+            raw_df = fetch_yf_data(period='3d', interval='1m')
+            if raw_df is not None and not raw_df.empty:
+                df = raw_df.copy()
+        except Exception as e:
+            if DEBUG_MODE:
+                print(f'Warning: Shared pipeline download fallback active | {e}')
+            df = df.copy()
 
     if df.empty:
         return df
 
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
+        
     tz_string = str(TIMEZONE)
-    df = (
-        df.tz_convert(tz_string)
-        if df.index.tz is not None
-        else df.tz_localize('UTC').tz_convert(tz_string)
-    )
+    if df.index.tz is not None:
+        df = df.tz_convert(tz_string)
+    else:
+        df = df.tz_localize('UTC').tz_convert(tz_string)
 
     st1_line, st1_mirror = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
     st2_line, st2_mirror = _compute_single_st(df, period=CONFIG["ST2"]["PERIOD"], factor=CONFIG["ST2"]["FACTOR"])
@@ -185,6 +213,7 @@ def export_supertrend_json(
 
 
 if __name__ == '__main__':
+    from sysdtafpxy import fetch_yf_data
     print('--- STARTING LIVE PXY UNIFIED EXCLUSIVE MATRIX ENGINE ---')
     processed_df = calculate_supertrend(pd.DataFrame())
     if processed_df is not None and not processed_df.empty:
