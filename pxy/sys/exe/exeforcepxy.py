@@ -8,7 +8,7 @@ from datetime import datetime
 from colorama import Fore, init, Style
 
 # --- CONFIG ---
-DEBUG = True  
+DEBUG = False  
 
 init(autoreset=True)
 
