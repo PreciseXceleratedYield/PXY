@@ -1,63 +1,70 @@
 //@version=5
-indicator("PXY® with Config Table", overlay=true)
+indicator("Supertrend 3:1.4 - 3-State Market Classifier", overlay=true)
 
-// ==========================================
-// 1. Inputs (Configuration Numbers)
-// ==========================================
-gp_st1   = "Supertrend #1 Configuration"
-st1_len  = input.int(1, title="ST 1 Period (Length)", minval=1, group=gp_st1)
-st1_fact = input.float(1.1, title="ST 1 Factor", step=0.1, group=gp_st1)
+// --- Inputs (Updated to 3 and 1.4) ---
+atrPeriod  = input.int(3, title="ATR Period")
+multiplier = input.float(1.4, title="Multiplier")
+showBackground = input.bool(true, title="Color Background by State")
 
-gp_st2   = "Supertrend #2 Configuration"
-st2_len  = input.int(3, title="ST 2 Period (Length)", minval=1, group=gp_st2)
-st2_fact = input.float(3.3, title="ST 2 Factor", step=0.1, group=gp_st2)
+// --- 1. Standard Supertrend Calculation ---
+atrValue = ta.atr(atrPeriod)
+src      = hl2
 
-// ==========================================
-// 2. Custom Candle Logic
-// ==========================================
-custom_open = na(close[1]) ? open : close[1]
-custom_close = close >= open ? (close + high) / 2.0 : (close + low) / 2.0
-custom_high = math.max(high, math.max(custom_open, custom_close))
-custom_low  = math.min(low, math.min(custom_open, custom_close))
+upperBandBasic = src + multiplier * atrValue
+lowerBandBasic = src - multiplier * atrValue
 
-candle_color = custom_close >= custom_close[1] ? color.green : color.red
+var float upBand = na
+var float dnBand = na
+var int trend    = 1
 
-plotcandle(custom_open, custom_high, custom_low, custom_close, 
-           title="Custom Continuous Candles", 
-           color=candle_color, 
-           wickcolor=candle_color, 
-           bordercolor=candle_color)
+prevUpBand = nz(upBand, upperBandBasic)
+prevDnBand = nz(dnBand, lowerBandBasic)
 
-// ==========================================
-// 3. Supertrend Indicators (Using Input Numbers)
-// ==========================================
-[st1, dir1] = ta.supertrend(st1_fact, st1_len)
-plot(dir1 < 0 ? st1 : na, color=color.green, title="ST 1 Up", linewidth=2, style=plot.style_linebr)
-plot(dir1 > 0 ? st1 : na, color=color.red, title="ST 1 Down", linewidth=2, style=plot.style_linebr)
+upBand := src < prevUpBand ? math.min(upperBandBasic, prevUpBand) : upperBandBasic
+dnBand := src > prevDnBand ? math.max(lowerBandBasic, prevDnBand) : lowerBandBasic
 
-[st2, dir2] = ta.supertrend(st2_fact, st2_len)
-plot(dir2 < 0 ? st2 : na, color=color.teal, title="ST 2 Up", linewidth=3, style=plot.style_linebr)
-plot(dir2 > 0 ? st2 : na, color=color.maroon, title="ST 2 Down", linewidth=3, style=plot.style_linebr)
+// Trend Switch / Jump Trigger
+prevTrend = trend
+if trend == -1 and ta.crossover(close, prevUpBand)
+    trend := 1
+else if trend == 1 and ta.crossunder(close, prevDnBand)
+    trend := -1
 
-// ==========================================
-// 4. Dynamic Configuration Table
-// ==========================================
-var table configTable = table.new(position = position.top_right, columns = 3, rows = 3, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.gray)
+stLine = (trend == 1) ? dnBand : upBand
 
-if barstate.islast
-    // Table Headers
-    table.cell(configTable, 0, 0, "Indicator", text_color=color.white, bgcolor=color.gray, text_size=size.small)
-    table.cell(configTable, 1, 0, "Config (Len, Fact)", text_color=color.white, bgcolor=color.gray, text_size=size.small)
-    table.cell(configTable, 2, 0, "Status", text_color=color.white, bgcolor=color.gray, text_size=size.small)
-    
-    // Row 1: Supertrend #1 Config Numbers & Status
-    bool st1Bullish = dir1 < 0
-    table.cell(configTable, 0, 1, "Supertrend #1", text_color=color.white, text_size=size.small)
-    table.cell(configTable, 1, 1, str.tostring(st1_len) + " , " + str.tostring(st1_fact), text_color=color.white, text_size=size.small)
-    table.cell(configTable, 2, 1, st1Bullish ? "BULLISH" : "BEARISH", bgcolor=st1Bullish ? color.green : color.red, text_color=color.white, text_size=size.small)
-    
-    // Row 2: Supertrend #2 Config Numbers & Status
-    bool st2Bullish = dir2 < 0
-    table.cell(configTable, 0, 2, "Supertrend #2", text_color=color.white, text_size=size.small)
-    table.cell(configTable, 1, 2, str.tostring(st2_len) + " , " + str.tostring(st2_fact), text_color=color.white, text_size=size.small)
-    table.cell(configTable, 2, 2, st2Bullish ? "BULLISH" : "BEARISH", bgcolor=st2Bullish ? color.teal : color.maroon, text_color=color.white, text_size=size.small)
+// --- 2. Anchor Tracking for Inverse Mirror Logic ---
+var float anchorPrice = na
+
+if trend != prevTrend
+    anchorPrice := src
+
+if barstate.isfirst
+    anchorPrice := src
+
+// Compute the Inverted Slope Mirror Line
+stDistanceFromAnchor = stLine - anchorPrice
+mirrorLine = anchorPrice - stDistanceFromAnchor
+
+// --- 3. Evaluate the Three-State Market Filter ---
+highestLine = math.max(stLine, mirrorLine)
+lowestLine  = math.min(stLine, mirrorLine)
+
+string marketState = "SIDE"
+color stateBgColor = color.new(color.gray, 95)
+
+if close > highestLine
+    marketState := "BULL"
+    stateBgColor := color.new(color.green, 92)
+else if close < lowestLine
+    marketState := "BEAR"
+    stateBgColor := color.new(color.red, 92)
+else
+    marketState := "SIDE"
+    stateBgColor := color.new(color.orange, 94)
+
+// --- 4. Visual Plots ---
+stColor = (trend == 1) ? color.green : color.red
+plot(stLine, color=stColor, linewidth=3, title="Standard Supertrend")
+plot(mirrorLine, color=color.new(stColor, 40), linewidth=2, title="Inverse Mirror Line")
+
+bgcolor(showBackground ? stateBgColor : na, title="Market Condition Background")
