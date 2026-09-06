@@ -239,7 +239,7 @@ def handle_side_averaging(client, df):
     # PART 7: MULTI-LAYER DOWNWARD DIRECTIONAL MATRIX AVERAGING LOOPS
     # =============================================================================
     # EXECUTION TOGGLE: "SCRIPT" for terminal pipeline execution, "AVERAGE" for native inline order
-    EXECUTION_MODE = "SCRIPT"
+    EXECUTION_MODE = "AVERAGE"
 
     for side in ['CE', 'PE']:
         side_df = ce_rows if side == 'CE' else pe_rows
