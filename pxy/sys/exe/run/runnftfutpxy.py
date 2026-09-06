@@ -170,31 +170,26 @@ def cached_contract_valid(row, current_expiry):
 
 
 # ============================================================
-# GET MID PRICE
+# GET LAST TRADED PRICE (LTP)
 # ============================================================
-def get_mid_price(client, token: str, segment: str = "nse_fo") -> float:
-    """Calculates real-time bid/ask spread mid-price or falls back to LTP."""
+def get_ltp(client, token: str, segment: str = "nse_fo") -> float:
+    """Gets direct Last Traded Price (LTP) from Kotak Neo/Neo API."""
     try:
         instr = [{"instrument_token": str(token), "exchange_segment": segment}]
-        res = client.quotes(instrument_tokens=instr, quote_type="depth")
+        
+        # Switched quote_type to "ltp" for a faster, lighter response payload
+        res = client.quotes(instrument_tokens=instr, quote_type="ltp")
 
         if not res or not isinstance(res, list) or len(res) == 0:
             return 0.0
 
         data = res[0]
-        depth = data.get("depth", {})
-        buy_list = depth.get("buy", [])
-        sell_list = depth.get("sell", [])
-
-        bid = float(buy_list[0].get("price", 0)) if buy_list else 0.0
-        ask = float(sell_list[0].get("price", 0)) if sell_list else 0.0
-
-        if bid > 0 and ask > 0:
-            return round((bid + ask) / 2, 2)
-
-        return float(data.get("last_price", 0))
+        
+        # Read the explicit ltp key from response dictionary
+        return float(data.get("ltp") or data.get("last_price") or 0.0)
+        
     except Exception as e:
-        print(f"❌ Market data price error: {e}")
+        print(f"❌ Market data LTP error: {e}")
         return 0.0
 
 
@@ -246,7 +241,7 @@ def get_nifty_future(client):
 # ============================================================
 def main():
     print("\n" + "=" * 55)
-    print("PXY - NIFTY FUTURE LIVE PRICE MODULE")
+    print("PXY - NIFTY FUTURE LIVE LTP MODULE")
     print("=" * 55)
 
     client = get_session()
@@ -263,7 +258,7 @@ def main():
     symbol = future["symbol"]
 
     print(f"\n📡 Requesting stream quote for : {symbol} [Token: {token}]")
-    price = get_mid_price(client, token, EXCHANGE_SEGMENT)
+    price = get_ltp(client, token, EXCHANGE_SEGMENT)
 
     if price <= 0:
         print("❌ Execution halted: Verified price is unavailable or out-of-bounds")
@@ -278,7 +273,7 @@ def main():
     print(f"Symbol   : {symbol}")
     print(f"Token    : {token}")
     print(f"Expiry   : {future['expiry']}")
-    print(f"Mid Price: {price:.2f}")
+    print(f"LTP      : {price:.2f}")
     print("=" * 55 + "\n")
 
 
