@@ -15,13 +15,9 @@ TIMEZONE = 'Asia/Kolkata'
 # ==========================================================================
 # ⚡ EXACT PATH ALIGNMENT FOR SYS/EXE/RUN DIRECTORY STRUCTURE
 # ==========================================================================
-# BASE_DIR evaluates directly to your absolute 'sys/' directory path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-# Maps directly down into the subdirectory: sys/exe/run/
 RUN_DIR = os.path.join(BASE_DIR, "exe", "run")
 
-# Absolute path bindings targeting the two files inside the run/ folder
 SCRIPT_PATH = os.path.join(RUN_DIR, "runnftfutpxy.py")
 JSON_FILE_PATH = os.path.join(RUN_DIR, "nftfut.json")
 
@@ -30,7 +26,6 @@ def run_nftfut_module():
     """Executes runnftfutpxy.py directly within the sys/exe/run/ subdirectory layer."""
     if os.path.exists(SCRIPT_PATH):
         try:
-            # cwd=RUN_DIR forces the tracking subsystem script to execute inside sys/exe/run/
             subprocess.run(
                 ["python", SCRIPT_PATH], 
                 cwd=RUN_DIR,
@@ -63,31 +58,31 @@ def apply_ohlc_transformation(df, mode=1):
     raw_l = df['Low'].to_numpy()
     raw_c = df['Close'].to_numpy()
 
-    # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles (Triggered if market is SIDE)
+    # Mode 0: Hyper-Sensitive Modified Close Candles (Triggered if market is SIDE)
     if mode == 0:
         out['Close'] = np.where(raw_c >= raw_o, (raw_c + raw_h) / 2.0, (raw_c + raw_l) / 2.0)
         return out
 
-    # ⚡ Mode 1: Raw Candles
+    # Mode 1: Raw Candles
     elif mode == 1:
         return out
 
-    # ⚡ Mode 2: OC/2 (Triggered if market is BULL or BEAR)
+    # Mode 2: OC/2 (Triggered if market is BULL or BEAR)
     elif mode == 2:
         out['Close'] = (raw_o + raw_c) / 2.0
         return out
 
-    # ⚡ Mode 3: OCC/3
+    # Mode 3: OCC/3
     elif mode == 3:
         out['Close'] = (raw_o + (2 * raw_c)) / 3.0
         return out
 
-    # ⚡ Mode 4: OCCC/4
+    # Mode 4: OCCC/4
     elif mode == 4:
         out['Close'] = (raw_o + (3 * raw_c)) / 4.0
         return out
 
-    # ⚡ Mode 5: OHLCC/5
+    # Mode 5: OHLCC/5
     elif mode == 5:
         out['Close'] = (raw_o + raw_h + raw_l + (2 * raw_c)) / 5.0
         return out
@@ -136,12 +131,29 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     # ==========================================================================
     # ⚡ CORE PRE-PROCESSING LAYER: ALL-FIELD VECTORIZED OHLC CO-AVERAGING
     # ==========================================================================
-    # FIRST ACTION: Averages all four raw metrics with the live futures price baseline
     if fut_price > 0:
+        # --- VERIFICATION PRINT START ---
+        print("\n" + "="*70)
+        print(f"🔄 DATAFRAME INGESTION PRE-PROCESSOR")
+        print(f"📥 Successfully parsed JSON tracking file: {JSON_FILE_PATH}")
+        print(f"📈 Extracted Live Nifty Future Price: {fut_price:.2f}")
+        print("="*70)
+        print("📋 Before Co-Averaging Core Dataframe Sample (Raw Spot Data):")
+        print(df[['Open', 'High', 'Low', 'Close']].tail(3))
+        # ---------------------------------
+
         df['Open']  = (df['Open'] + fut_price) / 2.0
         df['High']  = (df['High'] + fut_price) / 2.0
         df['Low']   = (df['Low'] + fut_price) / 2.0
         df['Close'] = (df['Close'] + fut_price) / 2.0
+
+        # --- VERIFICATION PRINT END ---
+        print("\n📊 After Vectorized OHLC Co-Averaging Engine Baseline:")
+        print(df[['Open', 'High', 'Low', 'Close']].tail(3))
+        print("="*70 + "\n")
+        # -------------------------------
+    else:
+        print(f"\n⚠️ Alert: JSON price validation failed or read 0.0 from {JSON_FILE_PATH}. Skipping math matrix merge.\n")
         
     # ==========================================================================
     # ⚡ LOCAL IMPORT SHIELD: Prevents Circular Dependency Faults
