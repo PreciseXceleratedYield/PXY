@@ -3,6 +3,7 @@ import asyncio
 import os
 import pytz
 import subprocess
+import json
 from pathlib import Path
 from datetime import datetime
 from colorama import Fore, init, Style
@@ -102,8 +103,13 @@ def run_action(choice):
         print(f"{Fore.RED}Session generation failed.")
         return True
 
+    subprocess.run([sys.executable, str(RUN_DIR / "runnftfutpxy.py")])
+
+    with open(RUN_DIR / "nftfut.json", "r") as f:
+        json_value = float(json.load(f).get("price"))
+
     data = get_all_data()
-    ltp = data.get("price")
+    ltp = (float(data.get("price")) + json_value) / 2
 
     # --- DYNAMIC OTM DISTANCE BY DAY OF THE WEEK (IST) ---
     ist = pytz.timezone("Asia/Kolkata")
@@ -188,6 +194,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
-
-
