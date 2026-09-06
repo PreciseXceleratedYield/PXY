@@ -1,6 +1,6 @@
-
 from runclntpxy import get_session
 from datetime import datetime, timedelta
+import json
 import csv
 import os
 
@@ -9,6 +9,7 @@ import os
 # ============================================================
 EXCHANGE_SEGMENT = "nse_fo"
 CSV_FILE = "nifty_fut.csv"
+JSON_OUTPUT_FILE = "nftfut.json"
 
 
 # ============================================================
@@ -155,7 +156,6 @@ def cached_contract_valid(row, current_expiry):
         return False
 
     try:
-        # Multi-format fallback parsing logic for the cached date string
         if "-" in expiry_text:
             cached_expiry = datetime.strptime(expiry_text, "%Y-%m-%d")
         else:
@@ -186,7 +186,6 @@ def get_mid_price(client, token: str, segment: str = "nse_fo") -> float:
         buy_list = depth.get("buy", [])
         sell_list = depth.get("sell", [])
 
-        # Fetch front of the order book queue
         bid = float(buy_list[0].get("price", 0)) if buy_list else 0.0
         ask = float(sell_list[0].get("price", 0)) if sell_list else 0.0
 
@@ -200,13 +199,26 @@ def get_mid_price(client, token: str, segment: str = "nse_fo") -> float:
 
 
 # ============================================================
+# WRITE PRICE TO JSON
+# ============================================================
+def save_price_to_json(price: float):
+    """Overwrites the JSON file with the latest price only."""
+    try:
+        data = {"price": price}
+        with open(JSON_OUTPUT_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4)
+        print(f"📝 Overwrote : {JSON_OUTPUT_FILE}")
+    except Exception as e:
+        print(f"❌ JSON write error: {e}")
+
+
+# ============================================================
 # GET / CREATE FUTURES CONTRACT
 # ============================================================
 def get_nifty_future(client):
     current_expiry = get_current_month_expiry()
     print(f"Target Expiry Timeframe : {current_expiry.strftime('%d-%b-%Y')}")
 
-    # 1. Evaluate cache viability
     cached = read_futures_csv()
     if cached:
         if cached_contract_valid(cached, current_expiry):
@@ -216,12 +228,10 @@ def get_nifty_future(client):
     else:
         print("📄 No cached contract layout discovered")
 
-    # 2. Fetch fresh token from broker lookup map
     row = search_nifty_future(client, current_expiry)
     if row is None:
         return None
 
-    # 3. Commit schema record to disk
     save_futures_csv(row)
     return {
         "symbol": row.get("pTrdSymbol"),
@@ -258,6 +268,9 @@ def main():
     if price <= 0:
         print("❌ Execution halted: Verified price is unavailable or out-of-bounds")
         return
+
+    # Overwrite the price into the target file
+    save_price_to_json(price)
 
     print("\n" + "=" * 55)
     print("📈 LIVE MATRIX UPDATE")
