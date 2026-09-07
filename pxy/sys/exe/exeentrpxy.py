@@ -95,17 +95,21 @@ def execute_order(client, symbol, qty):
         # Generate the unique ID for this specific scalp
         order_tag = generate_pxy_tag()
         
+        # FIXED: Using a safe nominal Limit price ceiling with type "L" 
+        # to ensure an immediate match while bypassing exchange 'LTP not available' rejections
+        fallback_limit_price = 5.00
+        
         params = {
             "exchange_segment": "nse_fo",
             "product": "NRML",
-            "price": "0",
-            "order_type": "MKT",
+            "price": f"{fallback_limit_price:.2f}",
+            "order_type": "L",  # Strictly 'L' or 'Limit' for Kotak Neo SDK validation
             "quantity": str(qty),
             "validity": "DAY",
             "trading_symbol": symbol,
             "transaction_type": "B",
             "amo": "NO",
-            "tag": order_tag  # <--- NEW: Attaching the HHMMSS tag
+            "tag": order_tag
         }
         
         dprint(f"ORDER PARAMS: {params}", Fore.YELLOW)
@@ -113,8 +117,17 @@ def execute_order(client, symbol, qty):
         
         # Log the tag with the response for verification
         print(f"{Fore.CYAN}        🚀 {symbol} | {order_tag}")
+        print(f"{Fore.MAGENTA}📬 [DEBUG] RAW API RESPONSE: {res}")
         
-        return {"stat": "OK" if res and str(res).strip() else "FAIL", "raw": res}
+        # Strict validation checks matching Kotak Neo response payload patterns
+        is_valid_success = False
+        if isinstance(res, dict):
+            stat_flag = str(res.get("stat", "")).upper()
+            err_msg = str(res.get("errMsg", "")).lower()
+            if (stat_flag == "OK" or res.get("stCode") == 0) and "rejected" not in err_msg:
+                is_valid_success = True
+        
+        return {"stat": "OK" if is_valid_success else "FAIL", "raw": res}
     except Exception as e:
         dprint(f"ORDER ERROR: {e}", Fore.RED)
         return {"stat": "FAIL", "err": str(e)}
@@ -147,7 +160,8 @@ async def main():
         if not client:
             return
 
-        ltp = data.get("price")
+        # Core anchor spot calculation price for downstream processing
+        spot_reference_price = float(data.get("price", 0))
 
         try:
             supertrend_val = str(data.get("supertrend", "")).upper().strip()
@@ -163,6 +177,7 @@ async def main():
         if sig == "STBUY": sig = "ATMBUY"
         elif sig == "STSELL": sig = "ATMSELL"
         dprint(f"SIGNAL: {sig}")
+        
         # --- SURGICAL IMPORT RESTORATION FROM EXECEPEPXY ---
         try:
             from execepepxy import get_target_quantities
@@ -200,17 +215,25 @@ async def main():
         dprint(f"ROUTING TO BUILDER -> SIGNAL: {sig} | DISTANCE ARGUMENT: {current_distance}")
 
         symbol, res = None, {"stat": "SKIPPED"}
-        
-        # ⚡ Surgical Independent Check: Directly true if flat setup
         is_flat_bypass = (ce_lots == 0 and pe_lots == 0)
 
         if sig in ["ATMBUY", "OTMBUY"]:
             dprint("BRANCH: BALANCE CE")
-            # FIXED GATE: Skips limit restrictions instantly if flat, otherwise respects your exact original parameters
             if is_flat_bypass or (ce_lots < max_allowed_ce_lots) or (ce_lots == 0 and pe_lots == 0 and max_allowed_ce_lots > 0):
                 if not is_side_cooling("CE"):
-                    symbol = get_symbol(ltp, sig, current_distance)
+                    # Step A: Generate the option target contract code name first using spot data
+                    symbol = get_symbol(spot_reference_price, sig, current_distance)
                     if symbol and symbol != "NA":
+                        # Step B: Run the generic token-LTP subprocess using the derived option contract name
+                        print(f"{Fore.CYAN}🔍 Querying live data registry for option: {symbol}...")
+                        subprocess.run([sys.executable, str(RUN_DIR / "runtknltppxy.py"), symbol])
+                        
+                        # Step C: Read back premium context updates from the single output file
+                        with open(RUN_DIR / "nftfut.json", "r") as f:
+                            ltp = float(json.load(f).get("price", 0))
+                        print(f"{Fore.GREEN}🎯 Premium option target context resolved: {ltp:.2f}")
+                        
+                        # Place execution order
                         res = execute_order(client, symbol, LOT_SIZE)
                         if res["stat"] == "OK": set_side_cooling("CE")
             else:
@@ -218,11 +241,21 @@ async def main():
 
         elif sig in ["ATMSELL", "OTMSELL"]:
             dprint("BRANCH: BALANCE PE")
-            # FIXED GATE: Skips limit restrictions instantly if flat, otherwise respects your exact original parameters
             if is_flat_bypass or (pe_lots < max_allowed_pe_lots) or (ce_lots == 0 and pe_lots == 0 and max_allowed_pe_lots > 0):
                 if not is_side_cooling("PE"):
-                    symbol = get_symbol(ltp, sig, current_distance)
+                    # Step A: Generate the option target contract code name first using spot data
+                    symbol = get_symbol(spot_reference_price, sig, current_distance)
                     if symbol and symbol != "NA":
+                        # Step B: Run the generic token-LTP subprocess using the derived option contract name
+                        print(f"{Fore.CYAN}🔍 Querying live data registry for option: {symbol}...")
+                        subprocess.run([sys.executable, str(RUN_DIR / "runtknltppxy.py"), symbol])
+                        
+                        # Step C: Read back premium context updates from the single output file
+                        with open(RUN_DIR / "nftfut.json", "r") as f:
+                            ltp = float(json.load(f).get("price", 0))
+                        print(f"{Fore.GREEN}🎯 Premium option target context resolved: {ltp:.2f}")
+                        
+                        # Place execution order
                         res = execute_order(client, symbol, LOT_SIZE)
                         if res["stat"] == "OK": set_side_cooling("PE")
             else:
@@ -241,7 +274,3 @@ async def main():
         dprint("===== MAIN END =====", Fore.GREEN)
     except Exception:
         print(traceback.format_exc() if DEBUG else "❌ Main error")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
