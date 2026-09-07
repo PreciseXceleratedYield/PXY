@@ -95,12 +95,15 @@ def execute_order(client, symbol, qty):
     try:
         order_tag = generate_pxy_tag()
         
-        # 1. Base parameters for standard Market order
+        # Safe flat baseline limit price for illiquid or un-traded OTM premium contracts
+        # The exchange will automatically fill you at the best available lower seller price
+        fallback_limit_price = 5.00 
+        
         params = {
             "exchange_segment": "nse_fo",
             "product": "NRML",
-            "price": "0",
-            "order_type": "MKT",
+            "price": f"{fallback_limit_price:.2f}", # Formatted string representation
+            "order_type": "L",                     # Strictly 'L' or 'Limit' for Neo SDK
             "quantity": str(qty),
             "validity": "DAY",
             "trading_symbol": symbol,
@@ -109,44 +112,21 @@ def execute_order(client, symbol, qty):
             "tag": order_tag
         }
         
-        dprint(f"ORDER PARAMS SENT TO API (Attempt 1 - MKT): {params}", Fore.YELLOW)
+        dprint(f"DISPATCHING LIMIT ORDER: {params}", Fore.YELLOW)
         res = client.place_order(**params)
         print(f"{Fore.MAGENTA}📬 [DEBUG] RAW API RESPONSE: {res}")
         
-        # 2. Enhanced Error Sniffer for LTP Issues
-        has_ltp_error = False
-        if isinstance(res, dict):
-            err_msg = str(res.get("errMsg", "")).lower()
-            if "ltp not available" in err_msg or "last traded price" in err_msg or res.get("stCode") == 1041:
-                has_ltp_error = True
-
-        if has_ltp_error:
-            print(f"{Fore.YELLOW}⚠️ Market order rejected (stCode 1041). Executing automated LIMIT fallback...")
-            
-            # Use a conservative premium estimation strategy for far OTM contracts to guarantee a fill 
-            # while protecting capital. 2.00 to 5.00 INR handles morning open orderbook gaps.
-            fallback_limit_price = 5.00 
-            
-            params["order_type"] = "LMT"
-            params["price"] = str(fallback_limit_price)
-            params["tag"] = generate_pxy_tag()  # Generate a fresh timestamp tag for retry
-            
-            dprint(f"ORDER PARAMS SENT TO API (Attempt 2 - LMT Fallback): {params}", Fore.YELLOW)
-            res = client.place_order(**params)
-            print(f"{Fore.MAGENTA}📬 [DEBUG] RAW API RESPONSE (LIMIT RETRY): {res}")
-
-        # 3. Final validation logic matching your broker's custom format
+        # Strict validation checks matching Kotak Neo architecture
         is_valid_success = False
         if isinstance(res, dict):
-            # Check both possible success markers depending on internal status strings
             stat_flag = str(res.get("stat", "")).upper()
-            err_msg_final = str(res.get("errMsg", "")).lower()
+            err_msg = str(res.get("errMsg", "")).lower()
             
-            if (stat_flag == "OK" or res.get("stCode") == 0) and "rejected" not in err_msg_final:
+            if (stat_flag == "OK" or res.get("stCode") == 0) and "rejected" not in err_msg:
                 is_valid_success = True
 
         if is_valid_success:
-            print(f"{Fore.GREEN}        🚀 SUCCESS -> {symbol} | {params['tag']}")
+            print(f"{Fore.GREEN}        🚀 SUCCESS -> {symbol} | {order_tag}")
             return {"stat": "OK", "raw": res}
         else:
             print(f"{Fore.RED}        ❌ FAILURE STATUS RETURNED -> {symbol} | {order_tag}")
@@ -156,6 +136,7 @@ def execute_order(client, symbol, qty):
         print(f"{Fore.RED}💥 [DEBUG] CRITICAL EXCEPTION DURING API EXECUTION:")
         print(traceback.format_exc())
         return {"stat": "FAIL", "err": str(e)}
+
 
 async def main():
     dprint("===== MAIN START =====", Fore.GREEN)
