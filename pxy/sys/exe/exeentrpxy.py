@@ -91,17 +91,17 @@ def generate_pxy_tag():
     return datetime.now(ist).strftime('%H%M%S')
 
 def execute_order(client, symbol, qty):
-    print(f"{Fore.CYAN}🔍 [DEBUG] ENTER execute_order for {symbol} | Requested Qty (Lots/Shares): {qty}")
+    print(f"{Fore.CYAN}🔍 [DEBUG] ENTER execute_order for {symbol} | Qty: {qty}")
     try:
         order_tag = generate_pxy_tag()
         
-        # Verify if qty needs to be multiplied by LOT_SIZE before reaching params
+        # 1. Base parameters for standard Market order
         params = {
             "exchange_segment": "nse_fo",
             "product": "NRML",
             "price": "0",
-            "order_type": "MKT",
-            "quantity": str(qty), 
+            "order_type": "MKT",  # Initial attempt
+            "quantity": str(qty),
             "validity": "DAY",
             "trading_symbol": symbol,
             "transaction_type": "B",
@@ -109,36 +109,62 @@ def execute_order(client, symbol, qty):
             "tag": order_tag
         }
         
-        dprint(f"ORDER PARAMS SENT TO API: {params}", Fore.YELLOW)
-        
-        # Live execution call
+        dprint(f"ORDER PARAMS SENT TO API (Attempt 1 - MKT): {params}", Fore.YELLOW)
         res = client.place_order(**params)
+        print(f"{Fore.MAGENTA}📬 [DEBUG] RAW API RESPONSE: {res}")
         
-        # DUMP RAW RESPONSE FOR INSPECTION
-        print(f"{Fore.MAGENTA}📬 [DEBUG] RAW API RESPONSE FROM BROKER: {res} (Type: {type(res)})")
-        
-        # Advanced inspection logic for nested rejection codes
+        # 2. Check for LTP failure to trigger automatic Limit Order fallback
+        if res and isinstance(res, dict) and "LTP not available" in res.get("errMsg", ""):
+            print(f"{Fore.YELLOW}⚠️ Market order rejected due to missing LTP. Retrying with LIMIT order fallback...")
+            
+            # Fetch current quote to find a valid price target
+            try:
+                # Replace 'get_quote' with your broker's actual quote/market depth fetching method
+                quote = client.get_quote(exchange_segment="nse_fo", trading_symbol=symbol)
+                # Fallback path: Use best ask price, or close price if ask is 0
+                best_ask = float(quote.get("ask", 0)) if quote else 0
+                
+                if best_ask <= 0:
+                    # If there's absolutely no market depth, use a safe nominal baseline or close price
+                    best_ask = float(quote.get("close", 0)) if quote else 0.05 
+                
+                # Add a minor price protection buffer (e.g., +0.50 paise) so it acts like a market order fill
+                limit_price = round(best_ask + 0.50, 2)
+                
+            except Exception as quote_err:
+                print(f"{Fore.RED}⚠️ Could not fetch live quote ({quote_err}). Using nominal fallback price.")
+                limit_price = 1.00 # Safe fallback floor for illiquid premium execution
+
+            # Update parameters for Limit execution
+            params["order_type"] = "LMT"
+            params["price"] = str(limit_price)
+            params["tag"] = generate_pxy_tag() # New timestamp tag
+            
+            dprint(f"ORDER PARAMS SENT TO API (Attempt 2 - LMT at {limit_price}): {params}", Fore.YELLOW)
+            res = client.place_order(**params)
+            print(f"{Fore.MAGENTA}📬 [DEBUG] RAW API RESPONSE (LIMIT OVERRIDE): {res}")
+
+        # 3. Final validation logic
         is_valid_success = False
-        if res:
-            res_str = str(res).lower()
-            # If the response explicitly states failure/rejection, do not mark as OK
-            if "reject" in res_str or "error" in res_str or "fail" in res_str:
-                print(f"{Fore.RED}❌ [DEBUG] Broker accepted the payload but rejected execution inside the response!")
-                is_valid_success = False
-            else:
+        if res and isinstance(res, dict):
+            stat_flag = str(res.get("stat", "")).lower()
+            err_msg = str(res.get("errMsg", "")).lower()
+            
+            if stat_flag == "ok" and "rejected" not in err_msg:
                 is_valid_success = True
 
         if is_valid_success:
-            print(f"{Fore.GREEN}        🚀 SUCCESS -> {symbol} | {order_tag}")
+            print(f"{Fore.GREEN}        🚀 SUCCESS -> {symbol} | {params['tag']}")
             return {"stat": "OK", "raw": res}
         else:
-            print(f"{Fore.RED}        ❌ FAILURE STATUS RETURNED BY BROKER -> {symbol} | {order_tag}")
+            print(f"{Fore.RED}        ❌ FAILURE STATUS RETURNED -> {symbol} | {order_tag}")
             return {"stat": "FAIL", "raw": res}
 
     except Exception as e:
         print(f"{Fore.RED}💥 [DEBUG] CRITICAL EXCEPTION DURING API EXECUTION:")
         print(traceback.format_exc())
         return {"stat": "FAIL", "err": str(e)}
+
 
 
 
