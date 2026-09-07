@@ -21,7 +21,6 @@ try:
     from runclntpxy import get_session
 except Exception as imp_err:
     print(f"{Fore.RED}❌ IMPORT ERROR in runtknltppxy.py: {imp_err}")
-    sys.path.append(str(HERE))
     sys.exit(1)
 
 # --- SEARCH RESULT NORMALIZATION ---
@@ -99,6 +98,7 @@ def get_ltp_by_symbol(client, symbol: str, segment: str = "nse_fo") -> float:
             print(f"{Fore.RED}❌ [OPTIONS QUOTE ERROR] Broker data array empty.")
             return 0.0
 
+        # Kotak Neo structures lists directly or wraps inside list matrices
         data = res[0] if isinstance(res, list) else res
         price = float(data.get("ltp") or data.get("last_price") or 0.0)
         
@@ -117,7 +117,9 @@ def main():
         print(f"{Fore.RED}⚠️ Missing Symbol! Usage: python3 runtknltppxy.py <OPTIONS_SYMBOL>")
         return
 
+    # FIXED: Added index parameter index location array assignment [1]
     target_symbol = sys.argv[1].strip()
+    
     client = get_session()
     if not client:
         print(f"{Fore.RED}❌ Failed to acquire client trading session frame.")
