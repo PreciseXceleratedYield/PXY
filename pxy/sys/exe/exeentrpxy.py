@@ -91,16 +91,17 @@ def generate_pxy_tag():
     return datetime.now(ist).strftime('%H%M%S')
 
 def execute_order(client, symbol, qty):
-    dprint(f"ENTER execute_order for {symbol}")
+    print(f"{Fore.CYAN}🔍 [DEBUG] ENTER execute_order for {symbol} | Requested Qty (Lots/Shares): {qty}")
     try:
         order_tag = generate_pxy_tag()
         
+        # Verify if qty needs to be multiplied by LOT_SIZE before reaching params
         params = {
             "exchange_segment": "nse_fo",
             "product": "NRML",
             "price": "0",
             "order_type": "MKT",
-            "quantity": str(qty),
+            "quantity": str(qty), 
             "validity": "DAY",
             "trading_symbol": symbol,
             "transaction_type": "B",
@@ -108,13 +109,37 @@ def execute_order(client, symbol, qty):
             "tag": order_tag
         }
         
-        dprint(f"ORDER PARAMS: {params}", Fore.YELLOW)
+        dprint(f"ORDER PARAMS SENT TO API: {params}", Fore.YELLOW)
+        
+        # Live execution call
         res = client.place_order(**params)
-        print(f"{Fore.CYAN}        🚀 {symbol} | {order_tag}")
-        return {"stat": "OK" if res and str(res).strip() else "FAIL", "raw": res}
+        
+        # DUMP RAW RESPONSE FOR INSPECTION
+        print(f"{Fore.MAGENTA}📬 [DEBUG] RAW API RESPONSE FROM BROKER: {res} (Type: {type(res)})")
+        
+        # Advanced inspection logic for nested rejection codes
+        is_valid_success = False
+        if res:
+            res_str = str(res).lower()
+            # If the response explicitly states failure/rejection, do not mark as OK
+            if "reject" in res_str or "error" in res_str or "fail" in res_str:
+                print(f"{Fore.RED}❌ [DEBUG] Broker accepted the payload but rejected execution inside the response!")
+                is_valid_success = False
+            else:
+                is_valid_success = True
+
+        if is_valid_success:
+            print(f"{Fore.GREEN}        🚀 SUCCESS -> {symbol} | {order_tag}")
+            return {"stat": "OK", "raw": res}
+        else:
+            print(f"{Fore.RED}        ❌ FAILURE STATUS RETURNED BY BROKER -> {symbol} | {order_tag}")
+            return {"stat": "FAIL", "raw": res}
+
     except Exception as e:
-        dprint(f"ORDER ERROR: {e}", Fore.RED)
+        print(f"{Fore.RED}💥 [DEBUG] CRITICAL EXCEPTION DURING API EXECUTION:")
+        print(traceback.format_exc())
         return {"stat": "FAIL", "err": str(e)}
+
 
 
 async def main():
