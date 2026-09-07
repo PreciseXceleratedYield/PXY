@@ -3,13 +3,12 @@ import asyncio
 import os
 import pytz
 import subprocess
-import json
 from pathlib import Path
 from datetime import datetime
 from colorama import Fore, init, Style
 
 # --- CONFIG ---
-DEBUG = False  
+DEBUG = True  
 
 init(autoreset=True)
 
@@ -103,46 +102,11 @@ def run_action(choice):
         print(f"{Fore.RED}Session generation failed.")
         return True
 
-    subprocess.run([sys.executable, str(RUN_DIR / "runnftfutpxy.py")])
-
-    with open(RUN_DIR / "nftfut.json", "r") as f:
-        json_value = float(json.load(f).get("price"))
-
     data = get_all_data()
-    ltp = (float(data.get("price")) + json_value) / 2
-
-    # --- DYNAMIC OTM DISTANCE BY DAY OF THE WEEK (IST) ---
-    ist = pytz.timezone("Asia/Kolkata")
-    now_ist = datetime.now(ist)
-    current_day = now_ist.strftime('%A')
-    
-    day_otm_mapping = {
-        "Monday": 100,
-        "Tuesday": 75,
-        "Wednesday": 50,
-        "Thursday": 25,
-        "Friday": 0
-    }
-    
-    # Fallback to 100 for weekends
-    base_otm_distance = day_otm_mapping.get(current_day, 100)
-    
-    # Define time-based variable x (100 inside 9:15-9:30 IST, 0 otherwise)
-    start_time = now_ist.replace(hour=9, minute=15, second=0, microsecond=0)
-    end_time = now_ist.replace(hour=9, minute=30, second=0, microsecond=0)
-    
-    if start_time <= now_ist <= end_time:
-        x = 100
-    else:
-        x = 0
-        
-    # Calculate final OTM distance
-    OTM_DISTANCE = base_otm_distance + x
-    
-    dprint(f"Today is {current_day}. Base: {base_otm_distance}, x: {x}. Applied OTM Distance: {OTM_DISTANCE}", Fore.YELLOW)
+    ltp = data.get("price")
+    OTM_DISTANCE = 100
 
     symbol = get_symbol(ltp, sig, OTM_DISTANCE)
-
     res = {"stat": "SKIPPED"}
 
     if symbol and symbol != "NA":
