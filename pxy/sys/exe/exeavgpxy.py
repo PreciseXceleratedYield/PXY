@@ -56,7 +56,7 @@ def handle_side_averaging(client, df):
     pe_match = re.search(r'(\d+)PE', pos_raw)
     
     ce_lots = int(ce_match.group(1)) if ce_match else 0
-    pe_lots = int(pe_match.group(2)) if pe_match else 0  
+    pe_lots = int(pe_match.group(1)) if pe_match else 0  
     
     # Aggregate dimensional matrix groupings
     ce_rows = working_df[working_df['side'] == 'CE']
