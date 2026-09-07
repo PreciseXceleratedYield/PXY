@@ -55,6 +55,7 @@ def handle_side_averaging(client, df):
     ce_match = re.search(r'(\d+)CE', pos_raw)
     pe_match = re.search(r'(\d+)PE', pos_raw)
     
+    # 🎯 FIX 1: Synced to use group(1) since single match parenthetical arrays only contain index 1
     ce_lots = int(ce_match.group(1)) if ce_match else 0
     pe_lots = int(pe_match.group(1)) if pe_match else 0  
     
@@ -98,7 +99,6 @@ def handle_side_averaging(client, df):
     
     ce_invst_factor = ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
     pe_invst_factor = pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
-
     ce_pnl = float(ce_rows['row_pnl'].sum())
     pe_pnl = float(pe_rows['row_pnl'].sum())
     
@@ -117,6 +117,10 @@ def handle_side_averaging(client, df):
     
     # 🎯 VOLATILITY-UNIFIED TARGET FORMULA RESOLUTION: GLOBAL ATR ENGINE
     atr = safe_float(working_df['atr'].iloc[0]) if 'atr' in working_df.columns and not working_df.empty else 0.0
+    
+    # 🎯 FIX 2: Moved up here so raw_val is fully initialized before the target formula loop tries to evaluate variables!
+    raw_val = (atr * atr) + (atr + atr)
+    dampened_val = max(24, min(raw_val, 76))
     
     ce_tgt = int(round(((atr / ce_lots) * ce_matrix_self))) if ce_lots > 0 else 0
     pe_tgt = int(round(((atr / pe_lots) * pe_matrix_self))) if pe_lots > 0 else 0
@@ -144,10 +148,6 @@ def handle_side_averaging(client, df):
     # --- SIMPLIFIED TREND FACTORS ---
     ce_trend_factor = 0.75 if supertrend == "BULL" else 1.0
     pe_trend_factor = 0.75 if supertrend == "BEAR" else 1.0
-
-    # --- PRE-CALCULATE IDENTICAL MEAN REVERSION VALUE ---
-    raw_val = (atr * atr) + (atr + atr)
-    dampened_val = max(24, min(raw_val, 76))
     
     # --- CALL OPTION (CE) SIDE RISK CALCULATIONS ---
     ce_base_drawdown_limit = -atr
@@ -198,8 +198,7 @@ def handle_side_averaging(client, df):
     ce_agt_col = f"{ce_agt:>4} "       
     ce_sts_col = f"{ce_sts:>3} "       
     ce_tgt_col = f"{ce_tgt:>3} "       
-    ce_pnl_str = f"{ce_pnl_val:>18}"   
-    
+    ce_pnl_str = f"{ce_pnl_val:>18}"
     print(Fore.WHITE + ce_opt_col + ce_lot_col + ce_agt_col + ce_sts_col + ce_tgt_col + ce_pnl_color + ce_pnl_str + Style.RESET_ALL)
     
     # --- PE Row ---
@@ -327,3 +326,4 @@ def handle_side_averaging(client, df):
                             print(f"{Fore.RED}⚠️ CRITICAL INTEGRATION ERROR: {e}")
                     else:
                         print(f"{Fore.RED}❌ CRITICAL FILE ERROR: Target script not found at {exe_path}")
+
