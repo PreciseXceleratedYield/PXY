@@ -115,13 +115,13 @@ def handle_side_averaging(client, df):
     boss = str(pe_last.get("bos_val", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
     
     # --- CLEAN DIRECT INVESTMENT ADJUSTED DRAWDOWN LIMITS ---
-    ce_base_drawdown_limit = -atr
+    ce_base_drawdown_limit = -atr * 1.4
     if "MBUY" in ce_avg_entry:
         ce_dynamic_threshold = ce_base_drawdown_limit * ce_invst_factor
     else:
         ce_dynamic_threshold = (-dampened_val * 2) if boss == "NSELL" else -dampened_val
     
-    pe_base_drawdown_limit = -atr
+    pe_base_drawdown_limit = -atr * 1.4
     if "MSELL" in pe_avg_entry:
         pe_dynamic_threshold = pe_base_drawdown_limit * pe_invst_factor
     else:
