@@ -152,14 +152,14 @@ def handle_side_averaging(client, df):
     # --- CALL OPTION (CE) SIDE RISK CALCULATIONS ---
     ce_base_drawdown_limit = -atr
     if "MBUY" in ce_avg_entry:
-        ce_dynamic_threshold = ((ce_base_drawdown_limit * ce_invst_factor) + (ce_base_drawdown_limit * ce_trend_factor)) / 1.4 
+        ce_dynamic_threshold = ((ce_base_drawdown_limit * ce_invst_factor) + (ce_base_drawdown_limit * ce_trend_factor)) / 2 
     else:
         ce_dynamic_threshold = (-dampened_val * 2) if boss == "NSELL" else -dampened_val
     
     # --- PUT OPTION (PE) SIDE RISK CALCULATIONS ---
     pe_base_drawdown_limit = -atr
     if "MSELL" in pe_avg_entry:
-        pe_dynamic_threshold = ((pe_base_drawdown_limit * pe_invst_factor) + (pe_base_drawdown_limit * pe_trend_factor)) / 1.4 
+        pe_dynamic_threshold = ((pe_base_drawdown_limit * pe_invst_factor) + (pe_base_drawdown_limit * pe_trend_factor)) / 2
     else:
         pe_dynamic_threshold = (-dampened_val * 2) if boss == "NBUY" else -dampened_val
 
