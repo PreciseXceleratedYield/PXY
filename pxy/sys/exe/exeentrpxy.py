@@ -5,10 +5,11 @@ import time
 import pytz
 import traceback
 import re
+import json
 from pathlib import Path
 from datetime import datetime, time as dt_time
 from colorama import Fore, init, Style
-
+import subprocess
 # --- GLOBAL CONFIG ---
 DEBUG = False 
 COUNTERBUY = "NO" 
@@ -92,7 +93,6 @@ def generate_pxy_tag():
 def execute_order(client, symbol, qty):
     dprint(f"ENTER execute_order for {symbol}")
     try:
-        # Generate the unique ID for this specific scalp
         order_tag = generate_pxy_tag()
         
         params = {
@@ -105,15 +105,12 @@ def execute_order(client, symbol, qty):
             "trading_symbol": symbol,
             "transaction_type": "B",
             "amo": "NO",
-            "tag": order_tag  # <--- NEW: Attaching the HHMMSS tag
+            "tag": order_tag
         }
         
         dprint(f"ORDER PARAMS: {params}", Fore.YELLOW)
         res = client.place_order(**params)
-        
-        # Log the tag with the response for verification
         print(f"{Fore.CYAN}        🚀 {symbol} | {order_tag}")
-        
         return {"stat": "OK" if res and str(res).strip() else "FAIL", "raw": res}
     except Exception as e:
         dprint(f"ORDER ERROR: {e}", Fore.RED)
@@ -125,15 +122,36 @@ async def main():
     try:
         reset_daily_cooling()
         IST = pytz.timezone("Asia/Kolkata")
-        now = datetime.now(IST).time()
+        now_ist = datetime.now(IST)
+        now = now_ist.time()
         dprint(f"TIME CHECK: {now}")
 
         # 1. Check Market Timing First
-        if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15,11) <= now < dt_time(15, 50)):
+        if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 11) <= now < dt_time(15, 50)):
             print(f"{Fore.YELLOW}⏳ Market buffer time - skipped")
             return
 
-        # 2. Fetch Data and Check Signal Status
+        # --- 2. EARLY CE/PE POSITION CHECK ---
+        # Fetching session early specifically to pull positions before running anything else
+        client = get_session()
+        if not client:
+            return
+
+        pos_raw = str(get_position_summary(client)).upper().strip() # Upstream format: "XCEYPE"
+        match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
+        if match:
+            ce_lots = int(match.group(1))
+            pe_lots = int(match.group(2))
+        else:
+            dprint(f"⚠️ Upstream position layout error: '{pos_raw}'. Using fallback 0.", Fore.YELLOW)
+            ce_lots, pe_lots = 0, 0
+
+        # CRITICAL RE-ROUTE GATE: If both sides have active positions, completely skip execution loop
+        if ce_lots > 0 and pe_lots > 0:
+            print(f"{Fore.YELLOW}I will handover to balance agent")
+            return
+
+        # 3. Fetch Data and Check Signal Status
         data = get_all_data()
         entry_signal = str(data.get("entry", "")).upper().strip()
         reversal = data.get("exit")
@@ -142,16 +160,36 @@ async def main():
             print(f"{Fore.MAGENTA}🛑  NO-ACTION signal({entry_signal if entry_signal else 'BLANK'})- BUY skipped")
             return
 
-        # --- SESSION INITIALIZATION (Only runs for actionable signals) ---
-        client = get_session()
-        if not client:
-            return
+        # Run script in the sub-directory
+        subprocess.run([sys.executable, str(RUN_DIR / "runnftfutpxy.py")])
 
-        ltp = data.get("price")
+        # Read the price from the JSON file in the sub-directory
+        with open(RUN_DIR / "nftfut.json", "r") as f:
+            json_value = float(json.load(f).get("price"))
+
+        # Fetch original LTP and calculate mathematical average
+        ltp = (float(data.get("price")) + json_value) / 2
 
         try:
             supertrend_val = str(data.get("supertrend", "")).upper().strip()
-            OTM_DISTANCE = 100
+            
+            # --- DYNAMIC OTM DISTANCE BY DAY OF THE WEEK (IST) ---
+            current_day = now_ist.strftime('%A')
+            day_otm_mapping = {
+                "Monday": 100,
+                "Tuesday": 75,
+                "Wednesday": 50,
+                "Thursday": 25,
+                "Friday": 0
+            }
+            base_otm_distance = day_otm_mapping.get(current_day, 100)
+            
+            # Time-based variable x (100 inside 9:15-9:30 IST, 0 otherwise)
+            start_time = now_ist.replace(hour=9, minute=15, second=0, microsecond=0)
+            end_time = now_ist.replace(hour=9, minute=30, second=0, microsecond=0)
+            x = 100 if start_time <= now_ist <= end_time else 0
+            
+            OTM_DISTANCE = base_otm_distance + x
         except Exception: 
             supertrend_val = "NONE"
             OTM_DISTANCE = 100
@@ -163,6 +201,7 @@ async def main():
         if sig == "STBUY": sig = "ATMBUY"
         elif sig == "STSELL": sig = "ATMSELL"
         dprint(f"SIGNAL: {sig}")
+        
         # --- SURGICAL IMPORT RESTORATION FROM EXECEPEPXY ---
         try:
             from execepepxy import get_target_quantities
@@ -170,19 +209,6 @@ async def main():
             print(f"{Fore.RED}CRITICAL: Failed to import get_target_quantities from execepepxy: {imp_err}")
             return
 
-        # --- UPDATED POSITION BALANCING LOGIC (LOT BASED) ---
-        dprint("CHECKING POSITIONS FOR BALANCE...")
-        pos_raw = str(get_position_summary(client)).upper().strip() # Upstream format: "XCEYPE"
-        
-        # Hard-anchored regex to match your upstream format exactly
-        match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
-        if match:
-            ce_lots = int(match.group(1))
-            pe_lots = int(match.group(2))
-        else:
-            dprint(f"⚠️ Upstream position layout error: '{pos_raw}'. Using fallback 0.", Fore.YELLOW)
-            ce_lots, pe_lots = 0, 0
-        
         dprint(f"CURRENT -> CE LOTS: {ce_lots} | PE LOTS: {pe_lots}")
         
         # Fetch target limits directly as clean lot counts
@@ -200,13 +226,10 @@ async def main():
         dprint(f"ROUTING TO BUILDER -> SIGNAL: {sig} | DISTANCE ARGUMENT: {current_distance}")
 
         symbol, res = None, {"stat": "SKIPPED"}
-        
-        # ⚡ Surgical Independent Check: Directly true if flat setup
         is_flat_bypass = (ce_lots == 0 and pe_lots == 0)
 
         if sig in ["ATMBUY", "OTMBUY"]:
             dprint("BRANCH: BALANCE CE")
-            # FIXED GATE: Skips limit restrictions instantly if flat, otherwise respects your exact original parameters
             if is_flat_bypass or (ce_lots < max_allowed_ce_lots) or (ce_lots == 0 and pe_lots == 0 and max_allowed_ce_lots > 0):
                 if not is_side_cooling("CE"):
                     symbol = get_symbol(ltp, sig, current_distance)
@@ -218,7 +241,6 @@ async def main():
 
         elif sig in ["ATMSELL", "OTMSELL"]:
             dprint("BRANCH: BALANCE PE")
-            # FIXED GATE: Skips limit restrictions instantly if flat, otherwise respects your exact original parameters
             if is_flat_bypass or (pe_lots < max_allowed_pe_lots) or (ce_lots == 0 and pe_lots == 0 and max_allowed_pe_lots > 0):
                 if not is_side_cooling("PE"):
                     symbol = get_symbol(ltp, sig, current_distance)
