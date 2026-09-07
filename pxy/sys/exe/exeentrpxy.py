@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from datetime import datetime, time as dt_time
 from colorama import Fore, init, Style
-
+import subprocess
 # --- GLOBAL CONFIG ---
 DEBUG = True  # FORCED TRUE to enable complete scannable runtime visibility
 COUNTERBUY = "NO" 
