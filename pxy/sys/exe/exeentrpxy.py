@@ -11,7 +11,7 @@ from datetime import datetime, time as dt_time
 from colorama import Fore, init, Style
 import subprocess
 # --- GLOBAL CONFIG ---
-DEBUG = False 
+DEBUG = True 
 COUNTERBUY = "NO" 
 COOL_DOWN_SECONDS = 35
 
