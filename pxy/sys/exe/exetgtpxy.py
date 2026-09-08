@@ -77,7 +77,7 @@ def target_price(row):
 
         elif is_pe:
             if supertrend == "SIDE":
-                target_pct = atr / 1.4
+                target_pct = 1.4
             elif active_exit in ("BUY", "BULL"):
                 target_pct = 1.4
             else:
