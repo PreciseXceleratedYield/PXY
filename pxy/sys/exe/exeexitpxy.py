@@ -199,7 +199,7 @@ def run_snapshot():
                 is_ce_hit = side_all_targets_hit.get("CE", False)
                 is_pe_hit = side_all_targets_hit.get("PE", False)
                 if ("CE" in sym and is_ce_hit) or ("PE" in sym and is_pe_hit):
-                    if pnl >= 140:
+                    if pnl >= 100:
                         verify_and_exit(client, r)
         else:
             if ltp >= tgt and pnl >= 140:
