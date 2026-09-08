@@ -68,17 +68,13 @@ def target_price(row):
 
         # 4️⃣ 3-Tier Target Profit Matrix Engine
         if is_ce:
-            if supertrend == "SIDE":
-                target_pct = atr / 1.4
-            elif active_exit in ("SELL", "BEAR"):
+            if active_exit in ("SELL", "BEAR"):
                 target_pct = 1.4
             else:
                 target_pct = (atr + vol_component) if boss == "NBUY" else vol_component
 
         elif is_pe:
-            if supertrend == "SIDE":
-                target_pct = 1.4
-            elif active_exit in ("BUY", "BULL"):
+            if active_exit in ("BUY", "BULL"):
                 target_pct = 1.4
             else:
                 target_pct = (atr + vol_component) if boss == "NSELL" else vol_component
