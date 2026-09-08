@@ -38,7 +38,7 @@ def get_entry_signal(df=None):
 
     # ===== HYBRID MATRIX ENTRY ROUTING EVALUATION ===== #
     
-    # MORNING ONLY: 9:00 AM to 9:30 AM IST Window Bypasses Trend
+    # MORNING ONLY: 9:00 AM to 9:20 AM IST Window Bypasses Trend
     # Entry signal tracks exit_dir strictly without executing technical SuperTrend
     if start_time <= latest_time < end_time:
         if exit_dir == "BULL":
