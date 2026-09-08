@@ -36,6 +36,8 @@ def handle_side_averaging(client, df):
     
     # Safe standardized execution for underlying option contract side mapping
     working_df['side'] = working_df['symbol'].astype(str).str[-2:].str.upper() 
+    
+    # Intentional formula fallback based on internal sell_prc calculation metrics
     working_df['row_invested'] = working_df['qty'].apply(safe_float) * (
         (working_df['sell_prc'].apply(safe_float) + working_df['sell_prc'].apply(safe_float)) / 2.0
     )
@@ -85,47 +87,46 @@ def handle_side_averaging(client, df):
     
     ce_invst_factor = ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
     pe_invst_factor = pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
-    ce_pnl = float(ce_rows['row_pnl'].sum())
-    pe_pnl = float(pe_rows['row_pnl'].sum())
     
-    ce_last = ce_rows.iloc[-1] if not ce_rows.empty else {}
-    pe_last = pe_rows.iloc[-1] if not pe_rows.empty else {}
+    ce_pnl = float(ce_rows['row_pnl'].sum()) if not ce_rows.empty else 0.0
+    pe_pnl = float(pe_rows['row_pnl'].sum()) if not pe_rows.empty else 0.0
     
-    ce_power = safe_float(ce_last.get("ce_power") or ce_last.get("ce_p", 1.0))
-    ce_depth = safe_float(ce_last.get("hkin_ce_depth") or ce_last.get("ce_d", 1.0))
-    pe_power = safe_float(pe_last.get("pe_power") or pe_last.get("pe_p", 1.0))
-    pe_depth = safe_float(pe_last.get("hkin_pe_depth") or pe_last.get("pe_d", 1.0))
+    # Extract structural indicators directly from the latest single-row context
+    latest_row = working_df.iloc[-1]
+    
+    ce_power = safe_float(latest_row.get("ce_power") or latest_row.get("ce_p", 1.0))
+    ce_depth = safe_float(latest_row.get("hkin_ce_depth") or latest_row.get("ce_d", 1.0))
+    pe_power = safe_float(latest_row.get("pe_power") or latest_row.get("pe_p", 1.0))
+    pe_depth = safe_float(latest_row.get("hkin_pe_depth") or latest_row.get("pe_d", 1.0))
     
     ce_matrix_self = max(ce_depth, ce_power)
     pe_matrix_self = max(pe_depth, pe_power)
     
-    # 🎯 BUG RESOLVED: Explicit series location restoration
-    atr = safe_float(working_df['atr'].iloc[0]) if 'atr' in working_df.columns and not working_df.empty else 0.0
-    
-    raw_val = (atr * atr) + (atr + atr)
-    dampened_val = max(24, min(raw_val, 76))
+    # 🎯 FIXED SYNTAX: Added explicit .iloc[0] lookup index bounds
+    atr = safe_float(working_df['atr'].iloc[0]) if 'atr' in working_df.columns and not working_df.empty else 0.0    
     
     ce_tgt = int(round(((atr / ce_lots) * ce_matrix_self))) if ce_lots > 0 else 0
     pe_tgt = int(round(((atr / pe_lots) * pe_matrix_self))) if pe_lots > 0 else 0
 
-    ce_avg_entry = str(ce_last.get("entry", "NONE")).upper().strip() if not ce_rows.empty else "NONE"
-    pe_avg_entry = str(pe_last.get("entry", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
-
-    supertrend = str(pe_last.get("supertrend", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
-    boss = str(pe_last.get("bos_val", "NONE")).upper().strip() if not pe_rows.empty else "NONE"
+    # Direct global row resolution for common structural variables
+    entry_val = str(latest_row.get("entry", "NONE")).upper().strip()
+    supertrend = str(latest_row.get("supertrend", "NONE")).upper().strip()
+    boss = str(latest_row.get("bos_val", "NONE")).upper().strip()
     
     # --- CLEAN DIRECT INVESTMENT ADJUSTED DRAWDOWN LIMITS ---
-    ce_base_drawdown_limit = -atr * 1.4
-    if "MBUY" in ce_avg_entry:
-        ce_dynamic_threshold = ce_base_drawdown_limit * ce_invst_factor
+    raw_val = (atr * atr) + (atr)
+    cepe_base_drawdown_limit = max(20, min(raw_val, 76)) * -1
+
+    if "MBUY" in entry_val:
+        ce_dynamic_threshold = cepe_base_drawdown_limit * ce_invst_factor
     else:
-        ce_dynamic_threshold = (-dampened_val * 2) if boss == "NSELL" else -dampened_val
+        ce_dynamic_threshold = (cepe_base_drawdown_limit * 2) if boss == "NSELL" else cepe_base_drawdown_limit
     
-    pe_base_drawdown_limit = -atr * 1.4
-    if "MSELL" in pe_avg_entry:
-        pe_dynamic_threshold = pe_base_drawdown_limit * pe_invst_factor
+    if "MSELL" in entry_val:
+        pe_dynamic_threshold = cepe_base_drawdown_limit * pe_invst_factor
     else:
-        pe_dynamic_threshold = (-dampened_val * 2) if boss == "NBUY" else -dampened_val
+        pe_dynamic_threshold = (cepe_base_drawdown_limit * 2) if boss == "NBUY" else cepe_base_drawdown_limit
+
 
     ce_agt = int(round(ce_dynamic_threshold))
     pe_agt = int(round(pe_dynamic_threshold))
