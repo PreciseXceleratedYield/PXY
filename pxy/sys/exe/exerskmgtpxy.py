@@ -23,7 +23,7 @@ def check_trend_collapse_exit(df, client):
         combined_depth = ce_depth + pe_depth
 
         # 3️⃣ CRITICAL ACCELERATION MATCH
-        if active_count > 3 and combined_depth < 3:
+        if active_count > 5 and combined_depth < 3:
             print(f"\n🚨 {Fore.YELLOW}{Style.BRIGHT}TREND COLLAPSE ALIGNED (PRE-AVERAGING)!{Style.RESET_ALL}")
             print(f"📊 Rows: {active_count} | Global PNL: +{active_pnl_sum:.2f} | Combined Depth: {combined_depth}")
             print(f"{Fore.RED}🚀 Executing Master Square-Off Engine via external script...{Style.RESET_ALL}\n")
