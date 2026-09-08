@@ -30,7 +30,7 @@ def get_entry_signal(df=None):
 
     # CONSTANTS - Pure Naive Time Objects for Evaluation
     start_time = pd.Timestamp("09:00:00").time()
-    end_time = pd.Timestamp("09:30:00").time()
+    end_time = pd.Timestamp("09:20:00").time()
 
     # REAL-TIME SYSTEM FIX: Fetch exact current live time in IST
     ist_tz = ZoneInfo("Asia/Kolkata")
