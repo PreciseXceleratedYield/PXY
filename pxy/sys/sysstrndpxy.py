@@ -14,7 +14,7 @@ DEBUG_MODE = False
 CONFIG = {
     "ST1": {
         "PERIOD": 1.0,   # Supertrend Period
-        "FACTOR": 0.5   # Supertrend Multiplier
+        "FACTOR": 0.1   # Supertrend Multiplier
     }
 }
 # ==============================================================================
