@@ -6,7 +6,7 @@ def exeagtpxy(atr, ce_invst_factor, pe_invst_factor, entry_val, boss, supertrend
     Includes supertrend parameter for future trailing or filter modifications.
     """
     # 1️⃣ Calculate clean direct investment-adjusted base drawdown limit
-    raw_val = (atr * atr) + atr
+    raw_val = (atr * atr)
     cepe_base_drawdown_limit = max(20, min(raw_val, 76)) * -1
 
     # 2️⃣ Apply balancing conditions to extract definitive negative limits for CE
