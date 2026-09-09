@@ -7,10 +7,10 @@ def exeagtpxy(atr, ce_invst_factor, pe_invst_factor, entry_val, boss, supertrend
     """
     # 1️⃣ Calculate clean direct investment-adjusted base drawdown limit
     raw_val = (atr * atr)
-    cepe_base_drawdown_limit = max(20, min(raw_val, 76)) * -1
+    cepe_base_drawdown_limit = max(16, min(raw_val, 76)) * -1
 
     # 2️⃣ Apply balancing conditions to extract definitive negative limits for CE
-    if "MBUY" in entry_val and "SIDE" in supertrend:
+    if "SIDE" in supertrend:
         ce_dynamic_threshold = cepe_base_drawdown_limit * ce_invst_factor
     else:
         ce_dynamic_threshold = (
@@ -20,7 +20,7 @@ def exeagtpxy(atr, ce_invst_factor, pe_invst_factor, entry_val, boss, supertrend
         )
 
     # 3️⃣ Apply balancing conditions to extract definitive negative limits for PE
-    if "MSELL" in entry_val and "SIDE" in supertrend:
+    if "SIDE" in supertrend:
         pe_dynamic_threshold = cepe_base_drawdown_limit * pe_invst_factor
     else:
         pe_dynamic_threshold = (
