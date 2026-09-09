@@ -212,7 +212,7 @@ def handle_side_averaging(client, df):
         ce_final_loss = get_loss(ce_last_row)
         
         # ⚡ Rule Check A: Trending Momentum Override (Calls External Script Route)
-        ce_force_script = (supertrend == "BULL" and "MBUY" in entry_val and (1.4 * ce_investment < pe_investment))
+        ce_force_script = (supertrend == "BULL" and "MBUY" in entry_val and (1.4 * ce_investment) < pe_investment)
         
         # ⚖️ Rule Check B: Standard Drawdown Risk (Original negative coordinate math comparison)
         ce_crossed_threshold = (supertrend == "SIDE" and "MBUY" in entry_val and ce_dynamic_threshold > ce_final_loss)
@@ -267,7 +267,7 @@ def handle_side_averaging(client, df):
         pe_final_loss = get_loss(pe_last_row)
         
         # ⚡ Rule Check A: Trending Momentum Override (Calls External Script Route)
-        pe_force_script = (supertrend == "BEAR" and "MSELL" in entry_val and and (1.4 * pe_investment < ce_investment))
+        pe_force_script = (supertrend == "BEAR" and "MSELL" in entry_val and and (1.4 * pe_investment) < ce_investment)
         
         # ⚖️ Rule Check B: Standard Drawdown Risk (Original negative coordinate math comparison)
         pe_crossed_threshold = (supertrend == "SIDE" and "MSELL" in entry_val and pe_dynamic_threshold > pe_final_loss)
