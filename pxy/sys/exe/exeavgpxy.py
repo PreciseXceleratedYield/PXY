@@ -1,6 +1,7 @@
 # =============================================================================
 # MAIN MODULE: exeavgpxy.py 
 # UNIFIED STRUCTURAL DATA AGGREGATION, TELEMETRY & SNAPSHOT ROUTING ENGINE
+# [PART 1: SYSTEM PATHS, IMPORTS & DATA MATRICES]
 # =============================================================================
 import re
 import logging
@@ -9,8 +10,9 @@ from colorama import Fore, Style
 
 # Direct module dependency linking to inherit essential infrastructure variables
 from exehvgpxy import (
-    REBUY_ENABLED, IST, MARKET_START, MARKET_END,
-    safe_float, generate_pxy_tag, get_loss, print_pxy_trigger_dashboard
+    REBUY_ENABLED, MAX_LAYERS, IST, MARKET_START, MARKET_END,
+    safe_float, generate_pxy_tag, is_cooling, set_cooling, get_loss,
+    print_pxy_trigger_dashboard
 )
 from run.runpchkpxy import get_position_summary
 
@@ -73,7 +75,7 @@ def print_telemetry_dashboard(p):
 
 
 def handle_side_averaging(client, df): 
-    """Executes pure threshold-based automated averaging loops for derivative positions."""
+    """Executes safe threshold-based automated averaging loops for derivative positions."""
     if df is None or df.empty: 
         return 
         
@@ -152,18 +154,22 @@ def handle_side_averaging(client, df):
     }
 
     print_telemetry_dashboard(p_packet)
-
     # -------------------------------------------------------------------------
-    # 🟢 CALL OPTION (CE) DIRECT THRESHOLD TRACKER
+    # [PART 2: ZERO-LOOP PURE DYNAMIC THRESHOLD EXECUTION MATRIX]
     # -------------------------------------------------------------------------
-    if not ce_rows.empty:
+    
+    # -------------------------------------------------------------------------
+    # 🟢 CALL OPTION (CE) SAFE DIRECT THRESHOLD TRACKER
+    # -------------------------------------------------------------------------
+    if not ce_rows.empty and not is_cooling("CE") and len(ce_rows) < (MAX_LAYERS + 1):
         ce_last_row = ce_rows.iloc[-1]
         ce_symbol = ce_last_row['symbol']
         ce_qty = abs(int(safe_float(ce_last_row.get('qty', 0.0))))
         ce_final_loss = get_loss(ce_last_row)
         
-        if abs(ce_final_loss) >= abs(ce_dynamic_threshold):
-            logger.info(f"⚖️ CE TRIGGERED: Loss ({ce_final_loss}%) >= Threshold ({ce_dynamic_threshold}%).")
+        # ⚖️ Signed Negative Math: True when final loss drops below threshold boundary (e.g., -30 <= -18)
+        if ce_final_loss <= ce_dynamic_threshold:
+            logger.info(f"⚖️ CE TRIGGERED: Loss ({ce_final_loss}%) <= Threshold ({ce_dynamic_threshold}%).")
             try:
                 new_tag = generate_pxy_tag()
                 print_pxy_trigger_dashboard("CE", ce_symbol, ce_final_loss, ce_dynamic_threshold, new_tag, ce_lots, pe_lots, "AUTO")
@@ -172,22 +178,25 @@ def handle_side_averaging(client, df):
                     "quantity": str(ce_qty), "trading_symbol": str(ce_symbol), "transaction_type": "B", 
                     "validity": "DAY", "amo": "NO", "tag": new_tag
                 }
+                # Lock script processing loop instantly before dispatching network request
+                set_cooling("CE")
                 if client.place_order(**params):
                     print(f"{Fore.GREEN}✅ SUCCESS: CE Averaged. Tag: {new_tag}")
             except Exception as e:
                 logger.error(f"CE Native placement tracking error: {e}", exc_info=True)
 
     # -------------------------------------------------------------------------
-    # 🔴 PUT OPTION (PE) DIRECT THRESHOLD TRACKER
+    # 🔴 PUT OPTION (PE) SAFE DIRECT THRESHOLD TRACKER
     # -------------------------------------------------------------------------
-    if not pe_rows.empty:
+    if not pe_rows.empty and not is_cooling("PE") and len(pe_rows) < (MAX_LAYERS + 1):
         pe_last_row = pe_rows.iloc[-1]
         pe_symbol = pe_last_row['symbol']
         pe_qty = abs(int(safe_float(pe_last_row.get('qty', 0.0))))
         pe_final_loss = get_loss(pe_last_row)
         
-        if abs(pe_final_loss) >= abs(pe_dynamic_threshold):
-            logger.info(f"⚖️ PE TRIGGERED: Loss ({pe_final_loss}%) >= Threshold ({pe_dynamic_threshold}%).")
+        # ⚖️ Signed Negative Math: True when final loss drops below threshold boundary (e.g., -30 <= -18)
+        if pe_final_loss <= pe_dynamic_threshold:
+            logger.info(f"⚖️ PE TRIGGERED: Loss ({pe_final_loss}%) <= Threshold ({pe_dynamic_threshold}%).")
             try:
                 new_tag = generate_pxy_tag()
                 print_pxy_trigger_dashboard("PE", pe_symbol, pe_final_loss, pe_dynamic_threshold, new_tag, ce_lots, pe_lots, "AUTO")
@@ -196,8 +205,9 @@ def handle_side_averaging(client, df):
                     "quantity": str(pe_qty), "trading_symbol": str(pe_symbol), "transaction_type": "B", 
                     "validity": "DAY", "amo": "NO", "tag": new_tag
                 }
+                # Lock script processing loop instantly before dispatching network request
+                set_cooling("PE")
                 if client.place_order(**params):
                     print(f"{Fore.GREEN}✅ SUCCESS: PE Averaged. Tag: {new_tag}")
             except Exception as e:
                 logger.error(f"PE Native placement tracking error: {e}", exc_info=True)
-
