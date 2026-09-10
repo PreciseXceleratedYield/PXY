@@ -8,7 +8,7 @@ from datetime import datetime
 from colorama import Fore, Style
 
 # Import the newly isolated threshold calculation engine
-from exeagtpxy import exeagtpxy
+from exeagtpxy import getexeagtpxy
 
 # Direct module dependency linking to inherit essential infrastructure variables
 from exehvgpxy import (
@@ -149,7 +149,7 @@ def handle_side_averaging(client, df):
     super_trend = str(row.get("supertrend", "NONE")).upper().strip()
     active_exit = str(row.get("exit", "NONE")).upper().strip()
     
-    ce_dynamic_threshold, pe_dynamic_threshold = exeagtpxy(atr, ce_invst_factor, pe_invst_factor, active_exit, super_trend)
+    ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(atr, ce_invst_factor, pe_invst_factor, active_exit, super_trend)
 
     # Extract absolute native loss percentages from positions safely for visual transmission
     ce_lgt_val = get_loss(ce_rows.iloc[-1]) if not ce_rows.empty else 0.0
