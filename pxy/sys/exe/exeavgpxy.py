@@ -37,18 +37,19 @@ def print_telemetry_dashboard(p):
     
     P_WIDTH = 40 
     print("\n" + Fore.CYAN + "=" * P_WIDTH)
-    print(Fore.CYAN + " OPT  LOT   LGT   AGT  STS  TGT        PNL")
+    print(Fore.CYAN + " OPT  LOT   LGT   AGT  STS  TGT      PNL")
     print(Fore.CYAN + "-" * P_WIDTH)
     
+    # Character Breakdown: 4 + 1 + 4 + 1 + 5 + 1 + 5 + 1 + 4 + 1 + 4 + 1 + 8 = 40 total characters
     ce_lgt = int(round(p["ce_lgt"]))
     ce_pnl_val = int(round(p["ce_pnl"]))
     ce_pnl_color = Fore.CYAN + Style.BRIGHT if ce_target_crossed else (Fore.GREEN if ce_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f"{'CE':>4} {p['ce_lots']:>4} {ce_lgt:>5} {ce_agt:>5} {ce_sts:>4} {p['ce_tgt']:>4} " + ce_pnl_color + f"{ce_pnl_val:>10}" + Style.RESET_ALL)
+    print(Fore.WHITE + f"{'CE':>4} {p['ce_lots']:>4} {ce_lgt:>5} {ce_agt:>5} {ce_sts:>4} {p['ce_tgt']:>4} " + ce_pnl_color + f"{ce_pnl_val:>8}" + Style.RESET_ALL)
     
     pe_lgt = int(round(p["pe_lgt"]))
     pe_pnl_val = int(round(p["pe_pnl"]))
     pe_pnl_color = Fore.CYAN + Style.BRIGHT if pe_target_crossed else (Fore.GREEN if pe_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f"{'PE':>4} {p['pe_lots']:>4} {pe_lgt:>5} {pe_agt:>5} {pe_sts:>4} {p['pe_tgt']:>4} " + pe_pnl_color + f"{pe_pnl_val:>10}" + Style.RESET_ALL)
+    print(Fore.WHITE + f"{'PE':>4} {p['pe_lots']:>4} {pe_lgt:>5} {pe_agt:>5} {pe_sts:>4} {p['pe_tgt']:>4} " + pe_pnl_color + f"{pe_pnl_val:>8}" + Style.RESET_ALL)
     print(Fore.CYAN + "-" * P_WIDTH)
 
     ce_weight_int = int(round(p["ce_investment"]))
@@ -65,6 +66,7 @@ def print_telemetry_dashboard(p):
     
     print("  " + Fore.GREEN + left_label + Fore.GREEN + ("━" * left_dashes_count) + Fore.WHITE + "⚖️" + Fore.RED + ("━" * right_dashes_count) + Fore.RED + right_label)
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
+
 # =============================================================================
 # MAIN MODULE: exeavgpxy.py - PART 2
 # DATA PARSING ENGINE & REAL-TIME RISK METRIC DISPATCHER
