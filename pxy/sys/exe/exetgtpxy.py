@@ -30,8 +30,8 @@ def i(x, d=0):
 def target_price(row):
     """Calculates individual option layer target price using exit conditions.
 
-    Favorite Trade Status: (atr * atr) percentage target setup. Hostile Trade Status: Strict
-    1.4% percentage floor buffer.
+    Favorite Trade Status: (atr * atr) percentage target setup. Hostile Trade
+    Status: Strict 1.4% percentage floor buffer.
     """
     try:
         # 1️⃣ Entry data execution health check
@@ -58,17 +58,21 @@ def target_price(row):
         # 4️⃣ Exit-Value Only Target Matrix Logic
         if is_ce:
             # Hostile conditions for Calls
-            if (super_trend in ("SELL", "BEAR")) or (active_exit in ("SELL", "BEAR")):
+            if active_exit in ("SELL", "BEAR"):
                 target_pct = 1.4
+            elif super_trend in ("SELL", "BEAR"):
+                target_pct = atr / 1.4
             else:
-                target_pct = atr * atr
+                target_pct = atr**1.4
 
         elif is_pe:
             # Hostile conditions for Puts
-            if (super_trend in ("BUY", "BULL")) or (active_exit in ("BUY", "BULL")):
+            if active_exit in ("BUY", "BULL"):  # Corrected syntax here
                 target_pct = 1.4
+            elif super_trend in ("BUY", "BULL"):
+                target_pct = atr / 1.4
             else:
-                target_pct = atr * atr
+                target_pct = atr**1.4
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
@@ -77,5 +81,6 @@ def target_price(row):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
+
 
 
