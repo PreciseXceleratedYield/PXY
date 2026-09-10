@@ -1,12 +1,14 @@
 # =============================================================================
-# MAIN MODULE: exeavgpxy.py 
-# UNIFIED STRUCTURAL DATA AGGREGATION, TELEMETRY & SNAPSHOT ROUTING ENGINE
-# [PART 1: SYSTEM PATHS, IMPORTS & DATA MATRICES]
+# MAIN MODULE: exeavgpxy.py - PART 1
+# UNIFIED STRUCTURAL DATA AGGREGATION & TELEMETRY ENGINE
 # =============================================================================
 import re
 import logging
 from datetime import datetime
 from colorama import Fore, Style
+
+# Import the newly isolated threshold calculation engine
+from exeagtpxy import exeagtpxy
 
 # Direct module dependency linking to inherit essential infrastructure variables
 from exehvgpxy import (
@@ -18,17 +20,6 @@ from run.runpchkpxy import get_position_summary
 
 # Configure localized robust module logger
 logger = logging.getLogger("exeavgpxy")
-
-
-def exeagtpxy(atr, ce_invst_factor, pe_invst_factor):
-    """Calculates direct investment-adjusted dynamic drawdown thresholds."""
-    raw_val = atr * atr
-    cepe_base_drawdown_limit = (max(16, min(raw_val, 76)) * -1)
-
-    ce_dynamic_threshold = cepe_base_drawdown_limit * ce_invst_factor * ce_invst_factor
-    pe_dynamic_threshold = cepe_base_drawdown_limit * pe_invst_factor * pe_invst_factor
-
-    return ce_dynamic_threshold, pe_dynamic_threshold
 
 
 def print_telemetry_dashboard(p):
@@ -46,16 +37,18 @@ def print_telemetry_dashboard(p):
     
     P_WIDTH = 40 
     print("\n" + Fore.CYAN + "=" * P_WIDTH)
-    print(Fore.CYAN + " OPT  LOT   AGT  STS  TGT            PNL")
+    print(Fore.CYAN + " OPT  LOT   LGT   AGT  STS  TGT        PNL")
     print(Fore.CYAN + "-" * P_WIDTH)
     
+    ce_lgt = int(round(p["ce_lgt"]))
     ce_pnl_val = int(round(p["ce_pnl"]))
     ce_pnl_color = Fore.CYAN + Style.BRIGHT if ce_target_crossed else (Fore.GREEN if ce_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f"{'CE':>4} {p['ce_lots']:>4} {ce_agt:>5} {ce_sts:>4} {p['ce_tgt']:>4} " + ce_pnl_color + f"{ce_pnl_val:>14}" + Style.RESET_ALL)
+    print(Fore.WHITE + f"{'CE':>4} {p['ce_lots']:>4} {ce_lgt:>5} {ce_agt:>5} {ce_sts:>4} {p['ce_tgt']:>4} " + ce_pnl_color + f"{ce_pnl_val:>10}" + Style.RESET_ALL)
     
+    pe_lgt = int(round(p["pe_lgt"]))
     pe_pnl_val = int(round(p["pe_pnl"]))
     pe_pnl_color = Fore.CYAN + Style.BRIGHT if pe_target_crossed else (Fore.GREEN if pe_pnl_val >= 0 else Fore.RED)
-    print(Fore.WHITE + f"{'PE':>4} {p['pe_lots']:>4} {pe_agt:>5} {pe_sts:>4} {p['pe_tgt']:>4} " + pe_pnl_color + f"{pe_pnl_val:>14}" + Style.RESET_ALL)
+    print(Fore.WHITE + f"{'PE':>4} {p['pe_lots']:>4} {pe_lgt:>5} {pe_agt:>5} {pe_sts:>4} {p['pe_tgt']:>4} " + pe_pnl_color + f"{pe_pnl_val:>10}" + Style.RESET_ALL)
     print(Fore.CYAN + "-" * P_WIDTH)
 
     ce_weight_int = int(round(p["ce_investment"]))
@@ -72,7 +65,10 @@ def print_telemetry_dashboard(p):
     
     print("  " + Fore.GREEN + left_label + Fore.GREEN + ("━" * left_dashes_count) + Fore.WHITE + "⚖️" + Fore.RED + ("━" * right_dashes_count) + Fore.RED + right_label)
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
-
+# =============================================================================
+# MAIN MODULE: exeavgpxy.py - PART 2
+# DATA PARSING ENGINE & REAL-TIME RISK METRIC DISPATCHER
+# =============================================================================
 
 def handle_side_averaging(client, df): 
     """Executes safe threshold-based automated averaging loops for derivative positions."""
@@ -144,13 +140,19 @@ def handle_side_averaging(client, df):
     ce_tgt = int(round(((atr / ce_lots) * ce_matrix_self))) if ce_lots > 0 else 0
     pe_tgt = int(round(((atr / pe_lots) * pe_matrix_self))) if pe_lots > 0 else 0
 
+    # Execute computation using imported function
     ce_dynamic_threshold, pe_dynamic_threshold = exeagtpxy(atr, ce_invst_factor, pe_invst_factor)
+
+    # Extract absolute native loss percentages from positions safely for visual transmission
+    ce_lgt_val = get_loss(ce_rows.iloc[-1]) if not ce_rows.empty else 0.0
+    pe_lgt_val = get_loss(pe_rows.iloc[-1]) if not pe_rows.empty else 0.0
 
     p_packet = {
         "ce_lots": ce_lots, "pe_lots": pe_lots, "ce_tgt": ce_tgt, "pe_tgt": pe_tgt, 
         "ce_pnl": ce_pnl, "pe_pnl": pe_pnl, "ce_avg_profit": ce_avg_profit, "pe_avg_profit": pe_avg_profit,
         "ce_investment": ce_investment, "pe_investment": pe_investment,
-        "ce_dynamic_threshold": ce_dynamic_threshold, "pe_dynamic_threshold": pe_dynamic_threshold
+        "ce_dynamic_threshold": ce_dynamic_threshold, "pe_dynamic_threshold": pe_dynamic_threshold,
+        "ce_lgt": ce_lgt_val, "pe_lgt": pe_lgt_val
     }
 
     print_telemetry_dashboard(p_packet)
