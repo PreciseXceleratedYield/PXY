@@ -60,14 +60,14 @@ def target_price(row):
             if active_exit in ("SELL", "BEAR"):
                 target_pct = 1.4
             else:
-                target_pct = atr * atr
+                target_pct = atr
 
         elif is_pe:
             # Hostile conditions for Puts
             if active_exit in ("BUY", "BULL"):
                 target_pct = 1.4
             else:
-                target_pct = atr * atr
+                target_pct = atr
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
