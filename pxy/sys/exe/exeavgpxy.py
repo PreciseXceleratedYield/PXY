@@ -32,15 +32,17 @@ def print_telemetry_dashboard(p):
     ce_target_crossed = p["ce_avg_profit"] >= p["ce_tgt"] if p["ce_lots"] > 0 else False
     pe_target_crossed = p["pe_avg_profit"] >= p["pe_tgt"] if p["pe_lots"] > 0 else False
 
-    ce_sts = "✔️" if ce_target_crossed else "❌"
-    pe_sts = "✔️" if pe_target_crossed else "❌"
+    # Switched from variable-length Emojis to clean 2-char ASCII states to protect space alignment
+    ce_sts = "OK" if ce_target_crossed else "NO"
+    pe_sts = "OK" if pe_target_crossed else "NO"
     
     P_WIDTH = 40 
     print("\n" + Fore.CYAN + "=" * P_WIDTH)
     print(Fore.CYAN + " OPT  LOT   LGT   AGT  STS  TGT      PNL")
     print(Fore.CYAN + "-" * P_WIDTH)
     
-    # Character Breakdown: 4 + 1 + 4 + 1 + 5 + 1 + 5 + 1 + 4 + 1 + 4 + 1 + 8 = 40 total characters
+    # Grid Layout Grid Blueprint (Exact 40 characters):
+    # OPT[3] + ' '[1] + LOT[4] + ' '[1] + LGT[5] + ' '[1] + AGT[5] + ' '[1] + STS[4] + ' '[1] + TGT[4] + ' '[1] + PNL[9] = 40 chars
     ce_lgt = int(round(p["ce_lgt"]))
     ce_pnl_val = int(round(p["ce_pnl"]))
     ce_pnl_color = Fore.CYAN + Style.BRIGHT if ce_target_crossed else (Fore.GREEN if ce_pnl_val >= 0 else Fore.RED)
@@ -66,6 +68,7 @@ def print_telemetry_dashboard(p):
     
     print("  " + Fore.GREEN + left_label + Fore.GREEN + ("━" * left_dashes_count) + Fore.WHITE + "⚖️" + Fore.RED + ("━" * right_dashes_count) + Fore.RED + right_label)
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
+
 
 # =============================================================================
 # MAIN MODULE: exeavgpxy.py - PART 2
