@@ -1,17 +1,22 @@
 # =============================================================================== #
-# PXY OPTION ROUTING ENGINE - PURE SUPERTREND PIPELINE (NO TIME RESTRICTIONS)
+# PXY OPTION ROUTING ENGINE WITH HYBRID PIPELINES (SUPERTREND + MKTPXY)
 # =============================================================================== #
 
+from datetime import datetime
+from zoneinfo import ZoneInfo  # Python 3.9+ standard library for timezones
 import pandas as pd
 from syscnfgpxy import TICKER
+from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
 
 
 def get_entry_signal(df=None):
-    """Routes options positioning strictly based on the technical SuperTrend trend state.
+    """Routes options positioning based on an absolute decoupled hybrid matrix:
 
-    Entries -> Driven purely by SuperTrend.
-    Exits   -> Driven purely by SuperTrend.
+    Entries -> Pure SuperTrend trend state combined with specific Market Proxy outcomes.
+               Bypassed strictly during the 9:00 AM - 9:30 AM morning window.
+    Exits   -> Driven strictly by raw exit_dir, completely ignoring trend parameters. 
+    Evaluation window matches current real-time IST clock.
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -20,25 +25,49 @@ def get_entry_signal(df=None):
     if df is None or df.empty:
         return "NONE", "NONE"
 
-    # Process technical SuperTrend profiles
-    processed_st_df = calculate_supertrend(df.copy())
-    if processed_st_df.empty:
-        return "NONE", "NONE"
+    # 1. Pipeline Segment A: Extract dynamic structural exit matrix from market proxy
+    _, exit_dir = get_signal(df)
 
-    # Target the exact same closed window bar trend
-    trend = processed_st_df["ST_Trend"].iloc[-1]
+    # CONSTANTS - Pure Naive Time Objects for Evaluation
+    start_time = pd.Timestamp("09:00:00").time()
+    end_time = pd.Timestamp("09:30:00").time()
 
-    # ===== PURE SUPERTREND ENTRY ROUTING ===== #
-    if trend in ["BULL", "SIDE"]:
-        entry_signal = "OTMBUY"
-    elif trend in ["BEAR", "SIDE"]:
-        entry_signal = "OTMSELL"
+    # REAL-TIME SYSTEM FIX: Fetch exact current live time in IST
+    ist_tz = ZoneInfo("Asia/Kolkata")
+    latest_time = datetime.now(ist_tz).time()
+
+    # ===== HYBRID MATRIX ENTRY ROUTING EVALUATION ===== #
+    
+    # MORNING ONLY: 9:00 AM to 9:30 AM IST Window Bypasses Trend
+    # Entry signal tracks exit_dir strictly without executing technical SuperTrend
+    if start_time <= latest_time < end_time:
+        if exit_dir == "BULL":
+            entry_signal = "OTMBUY"
+        elif exit_dir == "BEAR":
+            entry_signal = "OTMSELL"
+        else:
+            entry_signal = "NONE"
+
+    # ALL OTHER TIMES: Trend is always enforced natively
     else:
-        entry_signal = "NONE"
+        # 2. Pipeline Segment B: Process technical SuperTrend profiles
+        processed_st_df = calculate_supertrend(df.copy())
+        if processed_st_df.empty:
+            return "NONE", "NONE"
 
-    # ===== PURE SUPERTREND EXIT SIGNAL MATRIX ===== #
-    if trend in ["BULL", "BEAR"]:
-        exit_signal = trend
+        # Target the exact same closed window bar trend
+        trend = processed_st_df["ST_Trend"].iloc[-1]
+
+        if exit_dir == "BULL":
+            entry_signal = "OTMBUY"
+        elif exit_dir == "BEAR":
+            entry_signal = "OTMSELL"
+        else:
+            entry_signal = "NONE"
+
+    # ===== GLOBAL EXIT SIGNAL MATRIX (Completely independent of time/trend) ===== #
+    if exit_dir in ["BULL", "BEAR"]:
+        exit_signal = exit_dir
     else:
         exit_signal = "NONE"
 
