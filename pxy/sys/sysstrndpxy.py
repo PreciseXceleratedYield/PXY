@@ -9,16 +9,12 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 DEBUG_MODE = False
 
 # ==============================================================================
-# 🎛️ MASTER CONFIGURATION LAYER (Synchronized to 3 and 1.4)
+# 🎛️ MASTER CONFIGURATION LAYER (Unified to Single ST | Strict Dynamic Check)
 # ==============================================================================
 CONFIG = {
     "ST1": {
-        "PERIOD": 3.0,   # Fast Supertrend Period
-        "FACTOR": 3.0    # Fast Supertrend Multiplier
-    },
-    "ST2": {
-        "PERIOD": 3.0,   # Slow Supertrend Period
-        "FACTOR": 3.0    # Slow Supertrend Multiplier
+        "PERIOD": 3.0,   # Supertrend Period
+        "FACTOR": 3.0    # Supertrend Multiplier
     }
 }
 # ==============================================================================
@@ -102,34 +98,28 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
 
 def get_market_trend(df: pd.DataFrame) -> str:
     """
-    Evaluates the data frame using the 3-Zone Market Classifier layout.
-    Returns: 'BULL', 'BEAR', or 'SIDE' based strictly on the current candle.
-    Used by sysdtafpxy.py to determine auto-switching logic modes.
+    Evaluates the data frame layout.
+    Returns: 'BULL' or 'BEAR' exclusively, 'NONE' if identical down to the exact tick.
     """
     if df is None or df.empty or len(df) < 2:
-        return 'SIDE'
+        return 'NONE'
 
-    st1_line, st1_mirror = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
+    st1_line, _ = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
     
     close_curr = float(df['Close'].iloc[-1])
     st_curr = float(st1_line.iloc[-1])
-    mirror_curr = float(st1_mirror.iloc[-1])
     
-    highest_bound = max(st_curr, mirror_curr)
-    lowest_bound = min(st_curr, mirror_curr)
-    
-    if close_curr > highest_bound:
+    if close_curr > st_curr:
         return 'BULL'
-    elif close_curr < lowest_bound:
+    elif close_curr < st_curr:
         return 'BEAR'
     else:
-        return 'SIDE'
+        return 'NONE'
 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """Calculates Dual Supertrends and applies the 3-Zone Market Classifier logic."""
+    """Calculates Single Supertrend and applies strict boundary conditions."""
     if df.empty:
-        # If an empty container is passed, attempt fallback acquisition securely
         from sysdtafpxy import fetch_yf_data
         try:
             raw_df = fetch_yf_data(period='3d', interval='1m')
@@ -153,34 +143,31 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         df = df.tz_localize('UTC').tz_convert(tz_string)
 
     st1_line, st1_mirror = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
-    st2_line, st2_mirror = _compute_single_st(df, period=CONFIG["ST2"]["PERIOD"], factor=CONFIG["ST2"]["FACTOR"])
 
     close_arr = df['Close'].to_numpy()
     st_arr = st1_line.to_numpy()
-    mirror_arr = st1_mirror.to_numpy()
     
-    highest_bound = np.maximum(st_arr, mirror_arr)
-    lowest_bound = np.minimum(st_arr, mirror_arr)
-    
+    # Zero-buffer exclusive layout check
     classifier_conditions = [
-        (close_arr > highest_bound),
-        (close_arr < lowest_bound)
+        (close_arr > st_arr),
+        (close_arr < st_arr)
     ]
     classifier_choices = ['BULL', 'BEAR']
     st_trend_series = pd.Series(
-        np.select(classifier_conditions, classifier_choices, default='SIDE'),
+        np.select(classifier_conditions, classifier_choices, default='NONE'),
         index=df.index
     )
 
+    # Downstream data structural preservation mapping
     df['sma21'] = st1_line
-    df['st_line'] = st2_line
-    df['sma50'] = st2_line  
+    df['st_line'] = st1_line
+    df['sma50'] = st1_line  
     df['ST'] = st1_line
     df['sma_trend_full'] = st_trend_series
     df['ST_Trend'] = st_trend_series
     
     df['st1_mirror'] = st1_mirror
-    df['st2_mirror'] = st2_mirror
+    df['st2_mirror'] = st1_mirror  # Redundant mapping duplicate prevents downstream data key exceptions
 
     return df
 
@@ -233,3 +220,4 @@ if __name__ == '__main__':
         export_supertrend_json(processed_df)
     else:
         print('CRITICAL: Upstream data empty.')
+
