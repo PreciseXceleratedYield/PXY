@@ -44,7 +44,7 @@ def target_price(row):
 
         # 3️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
-        active_exit = str(row.get("exit", "NONE")).upper().strip()
+        super_trend = str(row.get("supertrend", "NONE")).upper().strip()
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
@@ -57,17 +57,17 @@ def target_price(row):
         # 4️⃣ Exit-Value Only Target Matrix Logic
         if is_ce:
             # Hostile conditions for Calls
-            if active_exit in ("SELL", "BEAR"):
+            if super_trend in ("SELL", "BEAR"):
                 target_pct = 1.4
             else:
-                target_pct = atr
+                target_pct = atr * atr
 
         elif is_pe:
             # Hostile conditions for Puts
-            if active_exit in ("BUY", "BULL"):
+            if super_trend in ("BUY", "BULL"):
                 target_pct = 1.4
             else:
-                target_pct = atr
+                target_pct = atr * atr
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
