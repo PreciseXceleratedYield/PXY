@@ -3,7 +3,7 @@
 # ISOLATED DYNAMIC DRAWDOWN THRESHOLD CALCULATOR
 # =============================================================================
 
-def exeagtpxy(atr, ce_invst_factor, pe_invst_factor):
+def exeagtpxy(atr, ce_invst_factor, pe_invst_factor, active_exit, super_trend):
     """Calculates direct investment-adjusted dynamic drawdown thresholds."""
     raw_val = atr * atr
     cepe_base_drawdown_limit = (max(16, min(raw_val, 76)) * -1)
