@@ -275,8 +275,8 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
                 <div style="display:flex;align-items:center;gap:6px;">
                     <span id="tradePnlLabel" style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--bull);">—</span>
                     <span onclick="sortTrd('tag')" id="trdSortTag" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--border);">#</span>
-                    <span onclick="sortTrd('time')" id="trdSortTime" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--border);">Time</span>
-                    <span onclick="sortTrd('pnl')" id="trdSortPnl" style="font-size:8px;color:var(--accent);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--accent);">P&L↕</span>
+                    <span onclick="sortTrd('time')" id="trdSortTime" style="font-size:8px;color:var(--accent);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--accent);">Time</span>
+                    <span onclick="sortTrd('pnl')" id="trdSortPnl" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 4px;border-radius:3px;border:1px solid var(--border);">P&L↕</span>
                 </div>
             </div>
             <div id="tradeScroll"><div class="empty-msg" id="tradeEmpty">No trades</div></div>
@@ -503,7 +503,7 @@ function shortSym(s){if(!s)return'—';return s;}
 function lotSz(s){return(s||'').includes('BANKNIFTY')?30:65;}
 
 /* ── SORT STATE ── */
-let psCol='pnl',psAsc=false,trCol='pnl',trAsc=false;
+let psCol='pnl',psAsc=false,trCol='time',trAsc=false;
 const PANEL_LINKS={terminal:'#',chart:'#',positions:'#',trades:'#'};
 function openPanelLink(key){window.location.href=PANEL_LINKS[key];}
 function sortPos(col){
