@@ -1,5 +1,5 @@
 //@version=5
-indicator("Supertrend 3:1.4 - 3-State Market Classifier", overlay=true)
+indicator("PXY.PINE", overlay=true)
 
 // --- Inputs (Updated to 3 and 1.4) ---
 atrPeriod  = input.int(3, title="ATR Period")
