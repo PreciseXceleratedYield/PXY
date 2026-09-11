@@ -26,7 +26,7 @@ logger = logging.getLogger("exeavgpxy")
 # -------------------------------------------------------------------------
 # 🎛️ RISK CONFIGURATION MATRIX SWITCH
 # -------------------------------------------------------------------------
-USE_OVERALL_LOSS = False  # False = Overall Average Loss | False = Latest Row Layer Only
+USE_OVERALL_LOSS = True  # True = Overall Average Loss | False = Least Loss Layer Per Side
 
 
 def print_telemetry_dashboard(p):
@@ -152,13 +152,14 @@ def handle_side_averaging(client, df):
     
     ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(atr, ce_invst_factor, pe_invst_factor, active_exit, super_trend)
 
-    # 🎛️ DYNAMIC PROFILE CALCULATION SWITCH BASED ON USER VARIABLE
+    # 🎛️ CORE PROFILE SWITCH: TRACK OVERALL OR COMPUTE THE LEAST LOSS POSITION LAYER
     if USE_OVERALL_LOSS:
         ce_lgt_val = ce_overall_pnl_pct
         pe_lgt_val = pe_overall_pnl_pct
     else:
-        ce_lgt_val = get_loss(ce_rows.iloc[-1]) if not ce_rows.empty else 0.0
-        pe_lgt_val = get_loss(pe_rows.iloc[-1]) if not pe_rows.empty else 0.0
+        # Math Check: Since losses are signed negatives (e.g., -5% vs -35%), .max() extracts the least loss value.
+        ce_lgt_val = ce_rows.apply(get_loss, axis=1).max() if not ce_rows.empty else 0.0
+        pe_lgt_val = pe_rows.apply(get_loss, axis=1).max() if not pe_rows.empty else 0.0
 
     ce_agt = int(round(ce_dynamic_threshold))
     pe_agt = int(round(pe_dynamic_threshold))
@@ -192,7 +193,7 @@ def handle_side_averaging(client, df):
     except Exception as json_err:
         logger.error(f"Failed to dump telemetry matrix payload to json: {json_err}")
 
-    # Dispatch metrics downstream into execution routine module
+    # Dispatch tracking metrics down to executor engine
     execute_side_averaging_matrix(
         client=client, 
         ce_rows=ce_rows, 
@@ -204,3 +205,4 @@ def handle_side_averaging(client, df):
         ce_lots=ce_lots, 
         pe_lots=pe_lots
     )
+
