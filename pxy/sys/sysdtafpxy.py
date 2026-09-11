@@ -9,6 +9,8 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # Explicitly enforce Indian Standard Time zone mapping
 TIMEZONE = 'Asia/Kolkata'
 
+import numpy as np
+
 def apply_ohlc_transformation(df, mode=1):
     """Executes structural, isolated mathematical transformations based on explicit modes."""
     if df.empty:
@@ -22,6 +24,9 @@ def apply_ohlc_transformation(df, mode=1):
 
     # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles (Triggered if market is SIDE)
     if mode == 0:
+        # Override the Open price to match the actual raw Close
+        out['Open'] = raw_c
+        # Calculate the custom close transformation matrix
         out['Close'] = np.where(raw_c >= raw_o, (raw_c + raw_h) / 2.0, (raw_c + raw_l) / 2.0)
         return out
 
@@ -50,6 +55,7 @@ def apply_ohlc_transformation(df, mode=1):
         return out
 
     return out
+
 
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
     """Dynamic historical ingestion engine utilizing vectorized structural transformations"""
