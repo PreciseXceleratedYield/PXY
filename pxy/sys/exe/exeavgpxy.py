@@ -156,17 +156,29 @@ def handle_side_averaging(client, df):
     ce_lgt_val = get_loss(ce_rows.iloc[-1]) if not ce_rows.empty else 0.0
     pe_lgt_val = get_loss(pe_rows.iloc[-1]) if not pe_rows.empty else 0.0
 
+    ce_agt = int(round(ce_dynamic_threshold))
+    pe_agt = int(round(pe_dynamic_threshold))
+    ce_target_crossed = ce_avg_profit >= ce_tgt if ce_lots > 0 else False
+    pe_target_crossed = pe_avg_profit >= pe_tgt if pe_lots > 0 else False
+    ce_sts = "OK" if ce_target_crossed else "NO"
+    pe_sts = "OK" if pe_target_crossed else "NO"
+
     p_packet = {
         "ce_lots": ce_lots, "pe_lots": pe_lots, "ce_tgt": ce_tgt, "pe_tgt": pe_tgt, 
         "ce_pnl": ce_pnl, "pe_pnl": pe_pnl, "ce_avg_profit": ce_avg_profit, "pe_avg_profit": pe_overall_pnl_pct,
         "ce_investment": ce_investment, "pe_investment": pe_investment,
         "ce_dynamic_threshold": ce_dynamic_threshold, "pe_dynamic_threshold": pe_dynamic_threshold,
-        "ce_lgt": ce_lgt_val, "pe_lgt": pe_lgt_val
+        "ce_lgt": ce_lgt_val, "pe_lgt": pe_lgt_val,
+        # FIXED: Added explicit layout mapping mimicking exact header data output blocks
+        "console_dump": {
+            "header": " OPT  LOT   LGT   AGT  STS  TGT      PNL",
+            "ce_line": f"{'CE':>4} {ce_lots:>4} {int(round(ce_lgt_val)):>5} {ce_agt:>5} {ce_sts:>4} {ce_tgt:>4} {int(round(ce_pnl)):>8}",
+            "pe_line": f"{'PE':>4} {pe_lots:>4} {int(round(pe_lgt_val)):>5} {pe_agt:>5} {pe_sts:>4} {pe_tgt:>4} {int(round(pe_pnl)):>8}"
+        }
     }
 
     print_telemetry_dashboard(p_packet)
 
-    # FIXED: Check/create directory structure and dump payload to file on every single loop iteration
     try:
         output_path = "../web/webavgpxy.json"
         dir_name = os.path.dirname(output_path)
@@ -178,6 +190,7 @@ def handle_side_averaging(client, df):
             json.dump(p_packet, f, indent=2)
     except Exception as json_err:
         logger.error(f"Failed to dump telemetry matrix payload to json: {json_err}")
+
 
 
     # -------------------------------------------------------------------------
