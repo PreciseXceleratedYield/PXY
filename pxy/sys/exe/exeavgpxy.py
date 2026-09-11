@@ -9,14 +9,14 @@ import logging
 from datetime import datetime
 from colorama import Fore, Style
 
-# Import the newly isolated threshold calculation engine
+# Import the isolated components
 from exeagtpxy import getexeagtpxy
+from avgaxepxy import execute_side_averaging_matrix
 
 # Direct module dependency linking to inherit essential infrastructure variables
 from exehvgpxy import (
     REBUY_ENABLED, MAX_LAYERS, IST, MARKET_START, MARKET_END,
-    safe_float, generate_pxy_tag, is_cooling, set_cooling, get_loss,
-    print_pxy_trigger_dashboard
+    safe_float, get_loss
 )
 from run.runpchkpxy import get_position_summary
 
@@ -34,7 +34,7 @@ def print_telemetry_dashboard(p):
     ce_target_crossed = p["ce_avg_profit"] >= p["ce_tgt"] if p["ce_lots"] > 0 else False
     pe_target_crossed = p["pe_avg_profit"] >= p["pe_tgt"] if p["pe_lots"] > 0 else False
 
-    # Switched from variable-length Emojis to clean 2-char ASCII states to protect space alignment
+    # Clean 2-char ASCII states to protect space alignment
     ce_sts = "OK" if ce_target_crossed else "NO"
     pe_sts = "OK" if pe_target_crossed else "NO"
     
@@ -43,8 +43,6 @@ def print_telemetry_dashboard(p):
     print(Fore.CYAN + " OPT  LOT   LGT   AGT  STS  TGT      PNL")
     print(Fore.CYAN + "-" * P_WIDTH)
     
-    # Grid Layout Grid Blueprint (Exact 40 characters):
-    # OPT + ' ' + LOT + ' ' + LGT + ' ' + AGT + ' ' + STS + ' ' + TGT + ' ' + PNL = 40 chars
     ce_lgt = int(round(p["ce_lgt"]))
     ce_pnl_val = int(round(p["ce_pnl"]))
     ce_pnl_color = Fore.CYAN + Style.BRIGHT if ce_target_crossed else (Fore.GREEN if ce_pnl_val >= 0 else Fore.RED)
@@ -56,14 +54,16 @@ def print_telemetry_dashboard(p):
     print(Fore.WHITE + f"{'PE':>4} {p['pe_lots']:>4} {pe_lgt:>5} {pe_agt:>5} {pe_sts:>4} {p['pe_tgt']:>4} " + pe_pnl_color + f"{pe_pnl_val:>8}" + Style.RESET_ALL)
     print(Fore.CYAN + "-" * P_WIDTH)
 
-    ce_weight_int = int(round(p["ce_investment"]))
-    pe_weight_int = int(round(p["pe_investment"]))
+    ce_investment = p.get("ce_investment", 0.0)
+    pe_investment = p.get("pe_investment", 0.0)
+    ce_weight_int = int(round(ce_investment))
+    pe_weight_int = int(round(pe_investment))
     left_label = f"{ce_weight_int}"
     right_label = f"{pe_weight_int}"
     
     track_slots = P_WIDTH - len(left_label) - len(right_label) - 6
-    total_weight = p["ce_investment"] + p["pe_investment"]
-    ce_ratio = p["ce_investment"] / total_weight if total_weight > 0 else 0.5
+    total_weight = ce_investment + pe_investment
+    ce_ratio = ce_investment / total_weight if total_weight > 0 else 0.5
     
     left_dashes_count = max(0, min(track_slots, int(round(ce_ratio * track_slots))))
     right_dashes_count = max(0, track_slots - left_dashes_count)
@@ -71,10 +71,6 @@ def print_telemetry_dashboard(p):
     print("  " + Fore.GREEN + left_label + Fore.GREEN + ("━" * left_dashes_count) + Fore.WHITE + "⚖️" + Fore.RED + ("━" * right_dashes_count) + Fore.RED + right_label)
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
 
-
-# =============================================================================
-# DATA PARSING ENGINE & REAL-TIME RISK METRIC DISPATCHER
-# =============================================================================
 
 def handle_side_averaging(client, df): 
     """Executes safe threshold-based automated averaging loops for derivative positions."""
@@ -133,7 +129,6 @@ def handle_side_averaging(client, df):
     ce_pnl = float(ce_rows['row_pnl'].sum()) if not ce_rows.empty else 0.0
     pe_pnl = float(pe_rows['row_pnl'].sum()) if not pe_rows.empty else 0.0
     
-    # Extract snapshot properties from the last row mapping structure
     latest_row = working_df.iloc[-1]
     ce_power = safe_float(latest_row.get("ce_power") or latest_row.get("ce_p", 1.0))
     ce_depth = safe_float(latest_row.get("hkin_ce_depth") or latest_row.get("ce_d", 1.0))
@@ -152,9 +147,9 @@ def handle_side_averaging(client, df):
     
     ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(atr, ce_invst_factor, pe_invst_factor, active_exit, super_trend)
 
-    # Extract absolute native loss percentages from positions safely for visual transmission
-    ce_lgt_val = get_loss(ce_rows.iloc[-1]) if not ce_rows.empty else 0.0
-    pe_lgt_val = get_loss(pe_rows.iloc[-1]) if not pe_rows.empty else 0.0
+    # SUCCESS: Now tracks structural OVERALL loss statistics directly for both print & dump
+    ce_lgt_val = ce_overall_pnl_pct
+    pe_lgt_val = pe_overall_pnl_pct
 
     ce_agt = int(round(ce_dynamic_threshold))
     pe_agt = int(round(pe_dynamic_threshold))
@@ -165,11 +160,10 @@ def handle_side_averaging(client, df):
 
     p_packet = {
         "ce_lots": ce_lots, "pe_lots": pe_lots, "ce_tgt": ce_tgt, "pe_tgt": pe_tgt, 
-        "ce_pnl": ce_pnl, "pe_pnl": pe_pnl, "ce_avg_profit": ce_avg_profit, "pe_avg_profit": pe_overall_pnl_pct,
+        "ce_pnl": ce_pnl, "pe_pnl": pe_pnl, "ce_avg_profit": ce_avg_profit, "pe_avg_profit": pe_avg_profit,
         "ce_investment": ce_investment, "pe_investment": pe_investment,
         "ce_dynamic_threshold": ce_dynamic_threshold, "pe_dynamic_threshold": pe_dynamic_threshold,
         "ce_lgt": ce_lgt_val, "pe_lgt": pe_lgt_val,
-        # FIXED: Added explicit layout mapping mimicking exact header data output blocks
         "console_dump": {
             "header": " OPT  LOT   LGT   AGT  STS  TGT      PNL",
             "ce_line": f"{'CE':>4} {ce_lots:>4} {int(round(ce_lgt_val)):>5} {ce_agt:>5} {ce_sts:>4} {ce_tgt:>4} {int(round(ce_pnl)):>8}",
@@ -182,71 +176,22 @@ def handle_side_averaging(client, df):
     try:
         output_path = "../web/webavgpxy.json"
         dir_name = os.path.dirname(output_path)
-        
         if dir_name and not os.path.exists(dir_name):
             os.makedirs(dir_name, exist_ok=True)
-            
         with open(output_path, "w") as f:
             json.dump(p_packet, f, indent=2)
     except Exception as json_err:
         logger.error(f"Failed to dump telemetry matrix payload to json: {json_err}")
 
-
-
-    # -------------------------------------------------------------------------
-    # [PART 2: ZERO-LOOP PURE DYNAMIC THRESHOLD EXECUTION MATRIX]
-    # -------------------------------------------------------------------------
-    
-    # -------------------------------------------------------------------------
-    # 🟢 CALL OPTION (CE) SAFE DIRECT THRESHOLD TRACKER
-    # -------------------------------------------------------------------------
-    if not ce_rows.empty and not is_cooling("CE") and len(ce_rows) < (MAX_LAYERS + 1):
-        ce_last_row = ce_rows.iloc[-1]
-        ce_symbol = ce_last_row['symbol']
-        ce_qty = abs(int(safe_float(ce_last_row.get('qty', 0.0))))
-        ce_final_loss = get_loss(ce_last_row)
-        
-        # ⚖️ Signed Negative Math: True when final loss drops below threshold boundary (e.g., -30 <= -18)
-        if ce_final_loss <= ce_dynamic_threshold:
-            logger.info(f"⚖️ CE TRIGGERED: Loss ({ce_final_loss}%) <= Threshold ({ce_dynamic_threshold}%).")
-            try:
-                new_tag = generate_pxy_tag()
-                print_pxy_trigger_dashboard("CE", ce_symbol, ce_final_loss, ce_dynamic_threshold, new_tag, ce_lots, pe_lots, "AUTO")
-                params = {
-                    "exchange_segment": "nse_fo", "product": "NRML", "price": "0", "order_type": "MKT", 
-                    "quantity": str(ce_qty), "trading_symbol": str(ce_symbol), "transaction_type": "B", 
-                    "validity": "DAY", "amo": "NO", "tag": new_tag
-                }
-                # Lock script processing loop instantly before dispatching network request
-                set_cooling("CE")
-                if client.place_order(**params):
-                    print(f"{Fore.GREEN}✅ SUCCESS: CE Averaged. Tag: {new_tag}")
-            except Exception as e:
-                logger.error(f"CE Native placement tracking error: {e}", exc_info=True)
-
-    # -------------------------------------------------------------------------
-    # 🔴 PUT OPTION (PE) SAFE DIRECT THRESHOLD TRACKER
-    # -------------------------------------------------------------------------
-    if not pe_rows.empty and not is_cooling("PE") and len(pe_rows) < (MAX_LAYERS + 1):
-        pe_last_row = pe_rows.iloc[-1]
-        pe_symbol = pe_last_row['symbol']
-        pe_qty = abs(int(safe_float(pe_last_row.get('qty', 0.0))))
-        pe_final_loss = get_loss(pe_last_row)
-        
-        # ⚖️ Signed Negative Math: True when final loss drops below threshold boundary (e.g., -30 <= -18)
-        if pe_final_loss <= pe_dynamic_threshold:
-            logger.info(f"⚖️ PE TRIGGERED: Loss ({pe_final_loss}%) <= Threshold ({pe_dynamic_threshold}%).")
-            try:
-                new_tag = generate_pxy_tag()
-                print_pxy_trigger_dashboard("PE", pe_symbol, pe_final_loss, pe_dynamic_threshold, new_tag, ce_lots, pe_lots, "AUTO")
-                params = {
-                    "exchange_segment": "nse_fo", "product": "NRML", "price": "0", "order_type": "MKT", 
-                    "quantity": str(pe_qty), "trading_symbol": str(pe_symbol), "transaction_type": "B", 
-                    "validity": "DAY", "amo": "NO", "tag": new_tag
-                }
-                # Lock script processing loop instantly before dispatching network request
-                set_cooling("PE")
-                if client.place_order(**params):
-                    print(f"{Fore.GREEN}✅ SUCCESS: PE Averaged. Tag: {new_tag}")
-            except Exception as e:
-                logger.error(f"PE Native placement tracking error: {e}", exc_info=True)
+    # Dispatch to decoupled absolute execution handler passing down verified tracking states
+    execute_side_averaging_matrix(
+        client=client, 
+        ce_rows=ce_rows, 
+        pe_rows=pe_rows, 
+        ce_lgt_val=ce_lgt_val, 
+        pe_lgt_val=pe_lgt_val, 
+        ce_dynamic_threshold=ce_dynamic_threshold, 
+        pe_dynamic_threshold=pe_dynamic_threshold, 
+        ce_lots=ce_lots, 
+        pe_lots=pe_lots
+    )
