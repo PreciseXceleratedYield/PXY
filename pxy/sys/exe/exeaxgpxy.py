@@ -1,5 +1,5 @@
 # =============================================================================
-# EXECUTOR MODULE: avgaxepxy.py
+# EXECUTOR MODULE: exeaxgpxy.py
 # DECOUPLED SAFE DIRECT THRESHOLD TRACKER & PLACEMENT ENGINE
 # =============================================================================
 import logging
