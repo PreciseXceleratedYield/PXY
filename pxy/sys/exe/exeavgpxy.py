@@ -11,7 +11,7 @@ from colorama import Fore, Style
 
 # Import the isolated components
 from exeagtpxy import getexeagtpxy
-from exeaxgpxy import execute_side_averaging_matrix
+from exeagxpxy import execute_side_averaging_matrix
 
 # Direct module dependency linking to inherit essential infrastructure variables
 from exehvgpxy import (
@@ -22,6 +22,11 @@ from run.runpchkpxy import get_position_summary
 
 # Configure localized robust module logger
 logger = logging.getLogger("exeavgpxy")
+
+# -------------------------------------------------------------------------
+# 🎛️ RISK CONFIGURATION MATRIX SWITCH
+# -------------------------------------------------------------------------
+USE_OVERALL_LOSS = True  # True = Overall Average Loss | False = Latest Row Layer Only
 
 
 def print_telemetry_dashboard(p):
@@ -147,9 +152,13 @@ def handle_side_averaging(client, df):
     
     ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(atr, ce_invst_factor, pe_invst_factor, active_exit, super_trend)
 
-    # SUCCESS: Now tracks structural OVERALL loss statistics directly for both print & dump
-    ce_lgt_val = ce_overall_pnl_pct
-    pe_lgt_val = pe_overall_pnl_pct
+    # 🎛️ DYNAMIC PROFILE CALCULATION SWITCH BASED ON USER VARIABLE
+    if USE_OVERALL_LOSS:
+        ce_lgt_val = ce_overall_pnl_pct
+        pe_lgt_val = pe_overall_pnl_pct
+    else:
+        ce_lgt_val = get_loss(ce_rows.iloc[-1]) if not ce_rows.empty else 0.0
+        pe_lgt_val = get_loss(pe_rows.iloc[-1]) if not pe_rows.empty else 0.0
 
     ce_agt = int(round(ce_dynamic_threshold))
     pe_agt = int(round(pe_dynamic_threshold))
@@ -183,7 +192,7 @@ def handle_side_averaging(client, df):
     except Exception as json_err:
         logger.error(f"Failed to dump telemetry matrix payload to json: {json_err}")
 
-    # Dispatch to decoupled absolute execution handler passing down verified tracking states
+    # Dispatch metrics downstream into execution routine module
     execute_side_averaging_matrix(
         client=client, 
         ce_rows=ce_rows, 
