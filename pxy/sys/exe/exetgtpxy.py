@@ -63,7 +63,7 @@ def target_price(row):
             elif super_trend in ("SELL", "BEAR"):
                 target_pct = atr / 1.4
             else:
-                target_pct = atr**1.4
+                target_pct = atr**atr
 
         elif is_pe:
             # Hostile conditions for Puts
@@ -72,7 +72,7 @@ def target_price(row):
             elif super_trend in ("BUY", "BULL"):
                 target_pct = atr / 1.4
             else:
-                target_pct = atr**1.4
+                target_pct = atr**atr
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
