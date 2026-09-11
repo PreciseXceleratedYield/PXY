@@ -26,7 +26,7 @@ logger = logging.getLogger("exeavgpxy")
 # -------------------------------------------------------------------------
 # 🎛️ RISK CONFIGURATION MATRIX SWITCH
 # -------------------------------------------------------------------------
-USE_OVERALL_LOSS = True  # True = Overall Average Loss | False = Least Loss Layer Per Side
+USE_OVERALL_LOSS = False  # True = Overall Average Loss | False = Least Loss Layer Per Side
 
 
 def print_telemetry_dashboard(p):
