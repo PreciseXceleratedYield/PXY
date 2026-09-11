@@ -9,46 +9,55 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 DEBUG_MODE = False
 
 # ==============================================================================
-# 🎛️ MASTER CONFIGURATION LAYER (Unified to Single ST | Strict Dynamic Check)
+# 🎛️ MASTER CONFIGURATION LAYER (PXY Universal Framework Parameters)
 # ==============================================================================
 CONFIG = {
     "ST1": {
-        "PERIOD": 1.0,   # Supertrend Period
-        "FACTOR": 0.1    # Supertrend Multiplier
+        "PERIOD": 3.0,   # ATR Period synced to Pine Script (Updated from 1 to 3)
+        "FACTOR": 1.4    # Multiplier synced to Pine Script (Updated from 0.1 to 1.4)
     }
 }
 # ==============================================================================
 
 
 def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
-    """Helper to compute standard Supertrend bands and an absolute inverse mirror line."""
+    """Helper to compute standard Supertrend bands and the absolute inverse mirror line.
+    
+    Uses standard crossover logic matching the Pine Script structure exactly.
+    """
     high = df['High'].to_numpy()
     low = df['Low'].to_numpy()
     close = df['Close'].to_numpy()
 
+    length = len(df)
+    if length == 0:
+        return pd.Series(dtype=float), pd.Series(dtype=float)
+
+    # Base source uses hl2 midpoint average natively
+    src = (high + low) / 2.0
+
+    # Calculate ATR Volatility Pipeline matching ta.sma(tr, period) tracking
     tr1 = high - low
     close_shifted = df['Close'].shift(1).to_numpy()
-    if len(close_shifted) > 0:
-        close_shifted[0] = close[0]
+    close_shifted[0] = close[0]
 
     tr2 = np.abs(high - close_shifted)
     tr3 = np.abs(low - close_shifted)
     tr = np.maximum(tr1, np.maximum(tr2, tr3))
     
-    atr = pd.Series(tr, index=df.index).ewm(alpha=1 / period, adjust=False).mean().to_numpy()
+    # Linear rolling simple moving average matching standard script indicators
+    atr = pd.Series(tr, index=df.index).rolling(window=int(period), min_periods=1).mean().to_numpy()
 
-    hl2 = (high + low) / 2
-    basic_upper = hl2 + (factor * atr)
-    basic_lower = hl2 - (factor * atr)
+    basic_upper = src + (factor * atr)
+    basic_lower = src - (factor * atr)
 
-    length = len(df)
     final_upper = np.zeros(length)
     final_lower = np.zeros(length)
     supertrend = np.zeros(length)
     mirror_line = np.zeros(length)
     st_trend = []
 
-    anchor_price = hl2[0] if length > 0 else 0.0
+    anchor_price = src[0]
 
     for i in range(length):
         if i == 0:
@@ -63,21 +72,16 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
         prev_lower = final_lower[i - 1]
         prev_trend = st_trend[i - 1]
 
-        if basic_upper[i] < prev_upper or close[i - 1] > prev_upper:
-            final_upper[i] = basic_upper[i]
-        else:
-            final_upper[i] = prev_upper
+        # Trailing Band Calculations
+        final_upper[i] = basic_upper[i] if (src[i] < prev_upper or basic_upper[i] < prev_upper) else prev_upper
+        final_lower[i] = basic_lower[i] if (src[i] > prev_lower or basic_lower[i] > prev_lower) else prev_lower
 
-        if basic_lower[i] > prev_lower or close[i - 1] < prev_lower:
-            final_lower[i] = basic_lower[i]
-        else:
-            final_lower[i] = prev_lower
-
+        # Evaluate System Crossovers Strictly Against the Calculated Band Trajectories
         if prev_trend == 'BEAR':
             if close[i] > final_upper[i]:
                 st_trend.append('BULL')
                 supertrend[i] = final_lower[i]
-                anchor_price = hl2[i]
+                anchor_price = src[i]
             else:
                 st_trend.append('BEAR')
                 supertrend[i] = final_upper[i]
@@ -85,11 +89,12 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
             if close[i] < final_lower[i]:
                 st_trend.append('BEAR')
                 supertrend[i] = final_upper[i]
-                anchor_price = hl2[i]
+                anchor_price = src[i]
             else:
                 st_trend.append('BULL')
                 supertrend[i] = final_lower[i]
 
+        # Compute the Spacetime Anchor Inverted Mirror Line
         st_distance_from_anchor = supertrend[i] - anchor_price
         mirror_line[i] = anchor_price - st_distance_from_anchor
 
@@ -98,27 +103,33 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
 
 def get_market_trend(df: pd.DataFrame) -> str:
     """
-    Evaluates the data frame layout.
-    Returns: 'BULL' or 'BEAR' exclusively, 'NONE' if identical down to the exact tick.
+    Evaluates raw data frame layouts via intermediate calculations.
+    Returns: 'BULL', 'BEAR', or 'SIDE' based on the Three-State Market Filter layout.
     """
     if df is None or df.empty or len(df) < 2:
-        return 'NONE'
+        return 'SIDE'
 
-    st1_line, _ = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
+    # ⚡ SHIELD PROTECTION: Extract state purely using raw close variables 
+    # to bypass recursive loops before applying dynamic conversions
+    st_line, mirror_line = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
     
     close_curr = float(df['Close'].iloc[-1])
-    st_curr = float(st1_line.iloc[-1])
+    st_curr = float(st_line.iloc[-1])
+    mirror_curr = float(mirror_line.iloc[-1])
     
-    if close_curr > st_curr:
+    highest_line = max(st_curr, mirror_curr)
+    lowest_line = min(st_curr, mirror_curr)
+
+    if close_curr > highest_line:
         return 'BULL'
-    elif close_curr < st_curr:
+    elif close_curr < lowest_line:
         return 'BEAR'
     else:
-        return 'NONE'
+        return 'SIDE'
 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """Calculates Single Supertrend and applies strict boundary conditions."""
+    """Calculates Universal Supertrend Master Matrix and returns structural states."""
     if df.empty:
         from sysdtafpxy import fetch_yf_data
         try:
@@ -146,15 +157,19 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     close_arr = df['Close'].to_numpy()
     st_arr = st1_line.to_numpy()
+    mirror_arr = st1_mirror.to_numpy()
     
-    # Zero-buffer exclusive layout check
+    highest_arr = np.maximum(st_arr, mirror_arr)
+    lowest_arr = np.minimum(st_arr, mirror_arr)
+    
+    # Complete Three-State Vectorized Evaluation Engine
     classifier_conditions = [
-        (close_arr > st_arr),
-        (close_arr < st_arr)
+        (close_arr > highest_arr),
+        (close_arr < lowest_arr)
     ]
     classifier_choices = ['BULL', 'BEAR']
     st_trend_series = pd.Series(
-        np.select(classifier_conditions, classifier_choices, default='NONE'),
+        np.select(classifier_conditions, classifier_choices, default='SIDE'),
         index=df.index
     )
 
@@ -167,7 +182,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['ST_Trend'] = st_trend_series
     
     df['st1_mirror'] = st1_mirror
-    df['st2_mirror'] = st1_mirror  # Redundant mapping duplicate prevents downstream data key exceptions
+    df['st2_mirror'] = st1_mirror 
 
     return df
 
