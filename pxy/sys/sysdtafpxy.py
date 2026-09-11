@@ -94,7 +94,7 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     market_state = get_market_trend(df)
     
     # Step 2: Assign logic mode dynamically based on state output (0 for SIDE, else 1)
-    dynamic_mode = 2 if market_state == 'SIDE' else 2
+    dynamic_mode = 1 if market_state == 'SIDE' else 1
     
     # Step 3: Transform close values using the runtime calculated mode switch
     processed_df = apply_ohlc_transformation(df, mode=dynamic_mode)
