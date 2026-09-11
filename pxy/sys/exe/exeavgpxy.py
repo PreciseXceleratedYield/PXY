@@ -11,7 +11,7 @@ from colorama import Fore, Style
 
 # Import the isolated components
 from exeagtpxy import getexeagtpxy
-from avgaxepxy import execute_side_averaging_matrix
+from exeaxgpxy import execute_side_averaging_matrix
 
 # Direct module dependency linking to inherit essential infrastructure variables
 from exehvgpxy import (
