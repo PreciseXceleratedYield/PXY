@@ -13,8 +13,8 @@ DEBUG_MODE = False
 # ==============================================================================
 CONFIG = {
     "ST1": {
-        "PERIOD": 3.0,   # ATR Period synced to Pine Script (Updated from 1 to 3)
-        "FACTOR": 1.4    # Multiplier synced to Pine Script (Updated from 0.1 to 1.4)
+        "PERIOD": 3.0,   # ATR Period synced to Pine Script
+        "FACTOR": 1.4    # Multiplier synced to Pine Script
     }
 }
 # ==============================================================================
@@ -23,7 +23,7 @@ CONFIG = {
 def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     """Helper to compute standard Supertrend bands and the absolute inverse mirror line.
     
-    Uses standard crossover logic matching the Pine Script structure exactly.
+    Fixed tracking engine preventing bi-directional band jumping.
     """
     high = df['High'].to_numpy()
     low = df['Low'].to_numpy()
@@ -36,11 +36,11 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     # Base source uses hl2 midpoint average natively
     src = (high + low) / 2.0
 
-    # Calculate ATR Volatility Pipeline matching ta.sma(tr, period) tracking
+    # --- CORRECTED TRUE RANGE COMPUTATION ---
     tr1 = high - low
     close_shifted = df['Close'].shift(1).to_numpy()
-    if len(close_shifted) > 0:
-        close_shifted[0] = close[0]
+    if length > 0:
+        close_shifted[0] = close[0]  # Safe seed allocation
 
     tr2 = np.abs(high - close_shifted)
     tr3 = np.abs(low - close_shifted)
@@ -73,16 +73,25 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
         prev_lower = final_lower[i - 1]
         prev_trend = st_trend[i - 1]
 
-        # Trailing Band Calculations
-        final_upper[i] = basic_upper[i] if (src[i] < prev_upper or basic_upper[i] < prev_upper) else prev_upper
-        final_lower[i] = basic_lower[i] if (src[i] > prev_lower or basic_lower[i] > prev_lower) else prev_lower
+        # --- CORRECTED TRAILING BAND RETENTION LOGIC ---
+        # Upper band can only move down during a downtrend unless breached
+        if basic_upper[i] < prev_upper or close[i - 1] > prev_upper:
+            final_upper[i] = basic_upper[i]
+        else:
+            final_upper[i] = prev_upper
 
-        # Evaluate System Crossovers Strictly Against the Calculated Band Trajectories
+        # Lower band can only move up during an uptrend unless breached
+        if basic_lower[i] > prev_lower or close[i - 1] < prev_lower:
+            final_lower[i] = basic_lower[i]
+        else:
+            final_lower[i] = prev_lower
+
+        # --- EVALUATE TREND SWITCH MATRIX ---
         if prev_trend == 'BEAR':
             if close[i] > final_upper[i]:
                 st_trend.append('BULL')
                 supertrend[i] = final_lower[i]
-                anchor_price = src[i]
+                anchor_price = src[i]  # Reset spacetime anchor on trend shift
             else:
                 st_trend.append('BEAR')
                 supertrend[i] = final_upper[i]
@@ -90,7 +99,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
             if close[i] < final_lower[i]:
                 st_trend.append('BEAR')
                 supertrend[i] = final_upper[i]
-                anchor_price = src[i]
+                anchor_price = src[i]  # Reset spacetime anchor on trend shift
             else:
                 st_trend.append('BULL')
                 supertrend[i] = final_lower[i]
@@ -110,8 +119,6 @@ def get_market_trend(df: pd.DataFrame) -> str:
     if df is None or df.empty or len(df) < 2:
         return 'SIDE'
 
-    # ⚡ SHIELD PROTECTION: Extract state purely using raw close variables 
-    # to bypass recursive loops before applying dynamic conversions
     st_line, mirror_line = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
     
     close_curr = float(df['Close'].iloc[-1])
