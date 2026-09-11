@@ -9,7 +9,9 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # Explicitly enforce Indian Standard Time zone mapping
 TIMEZONE = 'Asia/Kolkata'
 
-import numpy as np
+# CONFIGURATION INTERFACE: Set string ("0" to "5" or "00" to "05") or integers
+SELECTED_MODE = "02" 
+
 
 def apply_ohlc_transformation(df, mode=1):
     """Executes structural, isolated mathematical transformations based on explicit modes."""
@@ -22,11 +24,9 @@ def apply_ohlc_transformation(df, mode=1):
     raw_l = df['Low'].to_numpy()
     raw_c = df['Close'].to_numpy()
 
-    # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles (Triggered if market is SIDE)
+    # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles 
     if mode == 0:
-        # Override the Open price to match the actual raw Close
         out['Open'] = raw_c
-        # Calculate the custom close transformation matrix
         out['Close'] = np.where(raw_c >= raw_o, (raw_c + raw_h) / 2.0, (raw_c + raw_l) / 2.0)
         return out
 
@@ -34,7 +34,7 @@ def apply_ohlc_transformation(df, mode=1):
     elif mode == 1:
         return out
 
-    # ⚡ Mode 2: OC/2 (Triggered if market is BULL or BEAR)
+    # ⚡ Mode 2: OC/2
     elif mode == 2:
         out['Close'] = (raw_o + raw_c) / 2.0
         return out
@@ -99,8 +99,22 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     # Step 1: Run raw data through classifier to detect current market structure
     market_state = get_market_trend(df)
     
-    # Step 2: Assign logic mode dynamically based on state output (0 for SIDE, else 1)
-    dynamic_mode = 0 if market_state == 'SIDE' else 0
+    # Step 2: Dynamic Switch Selection Engine (PXY Universal Master Matrix)
+    mode_str = str(SELECTED_MODE).strip()
+    
+    # Detect Nested Flexible Matrix Modes ("00", "01", "02", "03", "04", "05")
+    if len(mode_str) == 2 and mode_str.startswith("0"):
+        if market_state == 'SIDE':
+            dynamic_mode = 0  # Mode 0 forced while running sideways
+        else:
+            dynamic_mode = int(mode_str[1])  # Target digit forced in trend breakouts
+            
+    # Fallback to Standard Single-Digit Constant Modes (0 to 5)
+    else:
+        try:
+            dynamic_mode = int(mode_str)
+        except ValueError:
+            dynamic_mode = 1  # Raw fallback protection if parsing fails
     
     # Step 3: Transform close values using the runtime calculated mode switch
     processed_df = apply_ohlc_transformation(df, mode=dynamic_mode)
