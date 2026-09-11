@@ -1,5 +1,5 @@
 # =============================================================================
-# MAIN MODULE: exeavgpxy.py - PART 1
+# MAIN MODULE: exeavgpxy.py
 # UNIFIED STRUCTURAL DATA AGGREGATION & TELEMETRY ENGINE
 # =============================================================================
 import re
@@ -71,7 +71,6 @@ def print_telemetry_dashboard(p):
 
 
 # =============================================================================
-# MAIN MODULE: exeavgpxy.py - PART 2
 # DATA PARSING ENGINE & REAL-TIME RISK METRIC DISPATCHER
 # =============================================================================
 
@@ -132,6 +131,7 @@ def handle_side_averaging(client, df):
     ce_pnl = float(ce_rows['row_pnl'].sum()) if not ce_rows.empty else 0.0
     pe_pnl = float(pe_rows['row_pnl'].sum()) if not pe_rows.empty else 0.0
     
+    # Extract snapshot properties from the last row mapping structure
     latest_row = working_df.iloc[-1]
     ce_power = safe_float(latest_row.get("ce_power") or latest_row.get("ce_p", 1.0))
     ce_depth = safe_float(latest_row.get("hkin_ce_depth") or latest_row.get("ce_d", 1.0))
@@ -145,9 +145,9 @@ def handle_side_averaging(client, df):
     ce_tgt = int(round(((atr / ce_lots) * ce_matrix_self))) if ce_lots > 0 else 0
     pe_tgt = int(round(((atr / pe_lots) * pe_matrix_self))) if pe_lots > 0 else 0
 
-    # Execute computation using imported function
-    super_trend = str(row.get("supertrend", "NONE")).upper().strip()
-    active_exit = str(row.get("exit", "NONE")).upper().strip()
+    # FIXED: Replaced 'row' with 'latest_row' to properly resolve NameError
+    super_trend = str(latest_row.get("supertrend", "NONE")).upper().strip()
+    active_exit = str(latest_row.get("exit", "NONE")).upper().strip()
     
     ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(atr, ce_invst_factor, pe_invst_factor, active_exit, super_trend)
 
@@ -157,13 +157,14 @@ def handle_side_averaging(client, df):
 
     p_packet = {
         "ce_lots": ce_lots, "pe_lots": pe_lots, "ce_tgt": ce_tgt, "pe_tgt": pe_tgt, 
-        "ce_pnl": ce_pnl, "pe_pnl": pe_pnl, "ce_avg_profit": ce_avg_profit, "pe_avg_profit": pe_avg_profit,
+        "ce_pnl": ce_pnl, "pe_pnl": pe_pnl, "ce_avg_profit": ce_avg_profit, "pe_avg_profit": pe_overall_pnl_pct,
         "ce_investment": ce_investment, "pe_investment": pe_investment,
         "ce_dynamic_threshold": ce_dynamic_threshold, "pe_dynamic_threshold": pe_dynamic_threshold,
         "ce_lgt": ce_lgt_val, "pe_lgt": pe_lgt_val
     }
 
     print_telemetry_dashboard(p_packet)
+
     # -------------------------------------------------------------------------
     # [PART 2: ZERO-LOOP PURE DYNAMIC THRESHOLD EXECUTION MATRIX]
     # -------------------------------------------------------------------------
