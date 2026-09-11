@@ -1,5 +1,5 @@
 # =============================================================================
-# EXECUTOR MODULE: exeaxgpxy.py
+# EXECUTOR MODULE: exeagxpxy.py
 # DECOUPLED SAFE DIRECT THRESHOLD TRACKER & PLACEMENT ENGINE
 # =============================================================================
 import logging
@@ -26,9 +26,8 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
         ce_symbol = ce_last_row['symbol']
         ce_qty = abs(int(safe_float(ce_last_row.get('qty', 0.0))))
         
-        # SUCCESS: Evaluates execution boundary strictly against overall aggregated loss spectrum
         if ce_lgt_val <= ce_dynamic_threshold:
-            logger.info(f"⚖️ CE TRIGGERED: Overall Loss ({ce_lgt_val}%) <= Threshold ({ce_dynamic_threshold}%).")
+            logger.info(f"⚖️ CE TRIGGERED: Metric Value ({ce_lgt_val}%) <= Threshold ({ce_dynamic_threshold}%).")
             try:
                 new_tag = generate_pxy_tag()
                 print_pxy_trigger_dashboard("CE", ce_symbol, ce_lgt_val, ce_dynamic_threshold, new_tag, ce_lots, pe_lots, "AUTO")
@@ -39,7 +38,7 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
                 }
                 set_cooling("CE")
                 if client.place_order(**params):
-                    print(f"{Fore.GREEN}✅ SUCCESS: CE Averaged based on Overall Loss. Tag: {new_tag}")
+                    print(f"{Fore.GREEN}✅ SUCCESS: CE Averaged. Tag: {new_tag}")
             except Exception as e:
                 logger.error(f"CE Native placement tracking error: {e}", exc_info=True)
 
@@ -51,9 +50,8 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
         pe_symbol = pe_last_row['symbol']
         pe_qty = abs(int(safe_float(pe_last_row.get('qty', 0.0))))
         
-        # SUCCESS: Evaluates execution boundary strictly against overall aggregated loss spectrum
         if pe_lgt_val <= pe_dynamic_threshold:
-            logger.info(f"⚖️ PE TRIGGERED: Overall Loss ({pe_lgt_val}%) <= Threshold ({pe_dynamic_threshold}%).")
+            logger.info(f"⚖️ PE TRIGGERED: Metric Value ({pe_lgt_val}%) <= Threshold ({pe_dynamic_threshold}%).")
             try:
                 new_tag = generate_pxy_tag()
                 print_pxy_trigger_dashboard("PE", pe_symbol, pe_lgt_val, pe_dynamic_threshold, new_tag, ce_lots, pe_lots, "AUTO")
@@ -64,6 +62,6 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
                 }
                 set_cooling("PE")
                 if client.place_order(**params):
-                    print(f"{Fore.GREEN}✅ SUCCESS: PE Averaged based on Overall Loss. Tag: {new_tag}")
+                    print(f"{Fore.GREEN}✅ SUCCESS: PE Averaged. Tag: {new_tag}")
             except Exception as e:
                 logger.error(f"PE Native placement tracking error: {e}", exc_info=True)
