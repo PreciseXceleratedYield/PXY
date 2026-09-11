@@ -148,8 +148,8 @@ body{
     background:radial-gradient(ellipse at 50% 80%,rgba(15,25,50,0.4) 0%,transparent 70%),var(--bg);
 }
 #optOverlay{position:absolute;left:6px;z-index:4;pointer-events:none;background:rgba(24,28,38,0.62);backdrop-filter:blur(3px);border:1px solid var(--border2);border-radius:4px;padding:3px 2px;display:none;}
-.opt-tbl{border-collapse:collapse;font-family:'DM Mono',monospace;font-size:9px;color:var(--text);}
-.opt-tbl th{padding:1px 6px;color:var(--muted);font-weight:500;text-align:right;border-bottom:1px solid var(--border2);white-space:nowrap;}
+.opt-tbl{border-collapse:collapse;font-family:'DM Mono',monospace;font-size:12.6px;color:var(--text);}
+.opt-tbl th{padding:1px 6px;color:var(--muted);font-weight:700;text-align:right;border-bottom:1px solid var(--border2);white-space:nowrap;}
 .opt-tbl td{padding:1px 6px;text-align:right;white-space:nowrap;}
 .opt-tbl tr.opt-ce td:first-child{border-left:2px solid var(--bull);}
 .opt-tbl tr.opt-pe td:first-child{border-left:2px solid var(--bear);}
@@ -1344,12 +1344,20 @@ async function loadOptSummary(){
     const headCols=cd.header.trim().split(/\s+/).slice(1);
     const ceCols=cd.ce_line.trim().split(/\s+/).slice(1);
     const peCols=cd.pe_line.trim().split(/\s+/).slice(1);
+    const stsIdx=headCols.indexOf('STS');
+    const fmtCell=(v,i)=>{
+        if(i!==stsIdx)return v;
+        const s=String(v).toUpperCase();
+        if(s==='YES')return'✅';
+        if(s==='NO')return'❌';
+        return v;
+    };
     let html='<table class="opt-tbl"><thead><tr>';
     headCols.forEach(h=>html+=`<th>${h}</th>`);
     html+='</tr></thead><tbody><tr class="opt-ce">';
-    ceCols.forEach(v=>html+=`<td>${v}</td>`);
+    ceCols.forEach((v,i)=>html+=`<td>${fmtCell(v,i)}</td>`);
     html+='</tr><tr class="opt-pe">';
-    peCols.forEach(v=>html+=`<td>${v}</td>`);
+    peCols.forEach((v,i)=>html+=`<td>${fmtCell(v,i)}</td>`);
     html+='</tr></tbody></table>';
     ov.innerHTML=html;
     ov.style.display='block';
