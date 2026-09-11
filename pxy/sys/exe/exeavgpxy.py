@@ -3,6 +3,8 @@
 # UNIFIED STRUCTURAL DATA AGGREGATION & TELEMETRY ENGINE
 # =============================================================================
 import re
+import os
+import json
 import logging
 from datetime import datetime
 from colorama import Fore, Style
@@ -42,7 +44,7 @@ def print_telemetry_dashboard(p):
     print(Fore.CYAN + "-" * P_WIDTH)
     
     # Grid Layout Grid Blueprint (Exact 40 characters):
-    # OPT[3] + ' '[1] + LOT[4] + ' '[1] + LGT[5] + ' '[1] + AGT[5] + ' '[1] + STS[4] + ' '[1] + TGT[4] + ' '[1] + PNL[9] = 40 chars
+    # OPT + ' ' + LOT + ' ' + LGT + ' ' + AGT + ' ' + STS + ' ' + TGT + ' ' + PNL = 40 chars
     ce_lgt = int(round(p["ce_lgt"]))
     ce_pnl_val = int(round(p["ce_pnl"]))
     ce_pnl_color = Fore.CYAN + Style.BRIGHT if ce_target_crossed else (Fore.GREEN if ce_pnl_val >= 0 else Fore.RED)
@@ -145,7 +147,6 @@ def handle_side_averaging(client, df):
     ce_tgt = int(round(((atr / ce_lots) * ce_matrix_self))) if ce_lots > 0 else 0
     pe_tgt = int(round(((atr / pe_lots) * pe_matrix_self))) if pe_lots > 0 else 0
 
-    # FIXED: Replaced 'row' with 'latest_row' to properly resolve NameError
     super_trend = str(latest_row.get("supertrend", "NONE")).upper().strip()
     active_exit = str(latest_row.get("exit", "NONE")).upper().strip()
     
@@ -164,6 +165,20 @@ def handle_side_averaging(client, df):
     }
 
     print_telemetry_dashboard(p_packet)
+
+    # FIXED: Check/create directory structure and dump payload to file on every single loop iteration
+    try:
+        output_path = "../web/webavgpxy.json"
+        dir_name = os.path.dirname(output_path)
+        
+        if dir_name and not os.path.exists(dir_name):
+            os.makedirs(dir_name, exist_ok=True)
+            
+        with open(output_path, "w") as f:
+            json.dump(p_packet, f, indent=2)
+    except Exception as json_err:
+        logger.error(f"Failed to dump telemetry matrix payload to json: {json_err}")
+
 
     # -------------------------------------------------------------------------
     # [PART 2: ZERO-LOOP PURE DYNAMIC THRESHOLD EXECUTION MATRIX]
