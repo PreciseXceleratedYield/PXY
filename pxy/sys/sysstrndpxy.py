@@ -39,7 +39,8 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     # Calculate ATR Volatility Pipeline matching ta.sma(tr, period) tracking
     tr1 = high - low
     close_shifted = df['Close'].shift(1).to_numpy()
-    close_shifted[0] = close[0]
+    if len(close_shifted) > 0:
+        close_shifted[0] = close[0]
 
     tr2 = np.abs(high - close_shifted)
     tr3 = np.abs(low - close_shifted)
@@ -57,7 +58,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     mirror_line = np.zeros(length)
     st_trend = []
 
-    anchor_price = src[0]
+    anchor_price = src[0] if length > 0 else 0.0
 
     for i in range(length):
         if i == 0:
@@ -173,18 +174,22 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         index=df.index
     )
 
-    # Downstream data structural preservation mapping
-    df['sma21'] = st1_line
-    df['st_line'] = st1_line
-    df['sma50'] = st1_line  
-    df['ST'] = st1_line
+    # ==========================================================================
+    # ⚡ EXPLICIT MAP REFLECTION CORRECTIONS
+    # ==========================================================================
+    df['sma21'] = st1_mirror           # Map sma21 explicitly to the Inverse Mirror Line
+    df['st_line'] = st1_line           # Map st_line explicitly to original Supertrend
+    df['ST'] = st1_line                # Map ST explicitly to original Supertrend
+    
+    # Structural keys preserved for legacy backend mapping compatibilities
+    df['sma50'] = st1_line             
     df['sma_trend_full'] = st_trend_series
     df['ST_Trend'] = st_trend_series
-    
     df['st1_mirror'] = st1_mirror
     df['st2_mirror'] = st1_mirror 
 
     return df
+
 
 
 def export_supertrend_json(
