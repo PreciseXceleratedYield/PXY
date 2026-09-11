@@ -96,6 +96,12 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 #momentumCanvasWrap{flex:1;width:22px;position:relative;background:var(--bg3);border-radius:4px;border:1px solid var(--border);overflow:hidden;}
 #momentumCanvasWrap canvas{position:absolute;inset:0;width:100%!important;height:100%!important;}
 #chartBox{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 80%,rgba(15,25,50,0.4) 0%,transparent 70%),var(--bg);}
+#optOverlay{position:absolute;left:6px;z-index:4;pointer-events:none;background:rgba(24,28,38,0.62);backdrop-filter:blur(3px);border:1px solid var(--border2);border-radius:4px;padding:3px 2px;display:none;}
+.opt-tbl{border-collapse:collapse;font-family:'DM Mono',monospace;font-size:9px;color:var(--text);}
+.opt-tbl th{padding:1px 6px;color:var(--muted);font-weight:500;text-align:right;border-bottom:1px solid var(--border2);white-space:nowrap;}
+.opt-tbl td{padding:1px 6px;text-align:right;white-space:nowrap;}
+.opt-tbl tr.opt-ce td:first-child{border-left:2px solid var(--bull);}
+.opt-tbl tr.opt-pe td:first-child{border-left:2px solid var(--bear);}
 .grid-over{position:absolute;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:40px 40px;}
 #chartBox canvas{position:absolute;inset:0;width:100%!important;height:100%!important;z-index:1;}
 
@@ -240,6 +246,7 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
             <div id="chartBox" style="flex:1;">
                 <div class="grid-over"></div>
                 <canvas id="priceChart"></canvas>
+                <div id="optOverlay"></div>
                 <!-- trade chart overlay -->
                 <div id="tradeChartOverlay">
                     <div style="height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:var(--bg2);border-bottom:1px solid var(--border2);">
@@ -605,6 +612,7 @@ async function loadChart(){
         lastCandles=candles;
         drawChart(candles);
         drawMomentumBar(candles.map(c=>c.sma21), candles.map(c=>c.c));
+        positionOptOverlay();
     }catch(e){}
 }
 function drawChart(candles){
@@ -754,7 +762,7 @@ function drawMomentumBar(stVals,closes){
     ctx.shadowColor=glowColor;ctx.shadowBlur=7;ctx.fillStyle=bodyColor;ctx.beginPath();ctx.roundRect(midX-bodyW/2,by1,bodyW,bH,3);ctx.fill();ctx.shadowBlur=0;
     ctx.fillStyle='rgba(255,255,255,0.12)';ctx.beginPath();ctx.roundRect(midX-bodyW/2+2,by1+2,Math.max(bodyW-4,2),Math.max(bH*0.3,2),2);ctx.fill();
 }
-new ResizeObserver(()=>{if(lastCandles)drawChart(lastCandles);if(lastMoSt&&lastMoCloses)drawMomentumBar(lastMoSt,lastMoCloses);}).observe($('chartBox'));
+new ResizeObserver(()=>{if(lastCandles)drawChart(lastCandles);if(lastMoSt&&lastMoCloses)drawMomentumBar(lastMoSt,lastMoCloses);positionOptOverlay();}).observe($('chartBox'));
 
 /* ── POSITIONS ── */
 let runningTotal=0,bookedTotal=0;
@@ -1045,9 +1053,44 @@ $('cfgSave').addEventListener('click',()=>{
 
 /* ── START ── */
 initTerm();connect();
-loadDash();loadChart();loadPos();loadTrades();loadRisk();
+function positionOptOverlay(){
+    const ov=$('optOverlay');
+    if(!ov||ov.style.display==='none'||!lastCandles||!lastCandles.length)return;
+    let lo=Infinity,hi=-Infinity;
+    lastCandles.slice(-60).forEach(c=>{
+        if(c.h!=null)hi=Math.max(hi,c.h);
+        if(c.l!=null)lo=Math.min(lo,c.l);
+    });
+    if(!isFinite(lo)||!isFinite(hi))return;
+    const mid=(lo+hi)/2;
+    const lastClose=lastCandles[lastCandles.length-1]?.c;
+    if(lastClose==null)return;
+    if(lastClose>mid){ov.style.top='auto';ov.style.bottom='6px';}
+    else{ov.style.top='6px';ov.style.bottom='auto';}
+}
+async function loadOptSummary(){
+    let d=null;try{d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    const ov=$('optOverlay');
+    if(!d||!d.console_dump){ov.style.display='none';return;}
+    const cd=d.console_dump;
+    const headCols=cd.header.trim().split(/\s+/).slice(1);
+    const ceCols=cd.ce_line.trim().split(/\s+/).slice(1);
+    const peCols=cd.pe_line.trim().split(/\s+/).slice(1);
+    let html='<table class="opt-tbl"><thead><tr>';
+    headCols.forEach(h=>html+=`<th>${h}</th>`);
+    html+='</tr></thead><tbody><tr class="opt-ce">';
+    ceCols.forEach(v=>html+=`<td>${v}</td>`);
+    html+='</tr><tr class="opt-pe">';
+    peCols.forEach(v=>html+=`<td>${v}</td>`);
+    html+='</tr></tbody></table>';
+    ov.innerHTML=html;
+    ov.style.display='block';
+    positionOptOverlay();
+}
+
+loadDash();loadChart();loadPos();loadTrades();loadRisk();loadOptSummary();
 setInterval(loadDash,3000);setInterval(()=>{if(!activeTrade)loadChart();},3000);
-setInterval(loadPos,3000);setInterval(loadTrades,5000);setInterval(loadRisk,4000);
+setInterval(loadPos,3000);setInterval(loadTrades,5000);setInterval(loadRisk,4000);setInterval(loadOptSummary,3000);
 </script>
 </body>
 </html>
