@@ -26,7 +26,7 @@ logger = logging.getLogger("exeavgpxy")
 # -------------------------------------------------------------------------
 # 🎛️ RISK CONFIGURATION MATRIX SWITCH
 # -------------------------------------------------------------------------
-USE_OVERALL_LOSS = True  # True = Overall Average Loss | False = Latest Row Layer Only
+USE_OVERALL_LOSS = False  # False = Overall Average Loss | False = Latest Row Layer Only
 
 
 def print_telemetry_dashboard(p):
