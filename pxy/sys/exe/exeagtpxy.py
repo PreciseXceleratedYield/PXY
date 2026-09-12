@@ -9,7 +9,7 @@ def getexeagtpxy(
 ):
     """Calculates investment-adjusted dynamic drawdown thresholds by defining the
     investment base first, applying trend/side factors, and capping the absolute 
-    maximum value at 99.
+    maximum value at 49.0 (ensuring final outputs do not drop below -49.0).
     """
     # 1️⃣ Stage 1: Volatility base clamping (Kept positive at this stage)
     raw_val = atr * atr
@@ -29,7 +29,7 @@ def getexeagtpxy(
     
     # --- Calls (CE) Trend Logic Overlay ---
     if s_trend == "SIDE":
-        ce_dynamic_threshold = ce_base_invested * 0.7
+        ce_dynamic_threshold = ce_base_invested 
     elif s_trend == "BEAR" and a_exit == "BEAR":
         ce_dynamic_threshold = ce_base_invested**1.4
     elif s_trend == "BEAR" and a_exit == "BULL":
@@ -39,7 +39,7 @@ def getexeagtpxy(
 
     # --- Puts (PE) Trend Logic Overlay ---
     if s_trend == "SIDE":
-        pe_dynamic_threshold = pe_base_invested * 0.7
+        pe_dynamic_threshold = pe_base_invested 
     elif s_trend == "BULL" and a_exit == "BULL":
         pe_dynamic_threshold = pe_base_invested**1.4
     elif s_trend == "BULL" and a_exit == "BEAR":
@@ -47,9 +47,10 @@ def getexeagtpxy(
     else:
         pe_dynamic_threshold = pe_base_invested
 
-    # 4️⃣ Hard ceiling enforcement: Cap absolute threshold numbers at 99
-    ce_final_abs = min(ce_dynamic_threshold, 99.0)
-    pe_final_abs = min(pe_dynamic_threshold, 99.0)
+    # 4️⃣ Hard ceiling enforcement: Cap absolute threshold numbers at 49.0
+    ce_final_abs = min(ce_dynamic_threshold, 49.0)
+    pe_final_abs = min(pe_dynamic_threshold, 49.0)
 
     # 5️⃣ Apply the negative sign uniformly at the final return point
     return round(ce_final_abs * -1.0, 2), round(pe_final_abs * -1.0, 2)
+
