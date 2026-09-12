@@ -7,6 +7,10 @@ from colorama import Fore, Style, init
 # Initialize colorama for clean, colored terminal output formatting
 init(autoreset=True)
 
+# Global Switch Configuration
+# Valid Options: 'SUPERTREND' or 'EXIT' (Defaults to 'SUPERTREND' on invalid input)
+TARGET_MODE = 'SUPERTREND'
+
 
 def f(x, d=0.0):
     """Safely cast input to float, return default if casting fails or value <=
@@ -28,11 +32,12 @@ def i(x, d=0):
 
 
 def target_price(row):
-    """Calculates individual option layer target price using exit conditions.
+    """Calculates individual option layer target price using isolated binary matrices.
 
-    Favorite Trade Status: (atr * atr) percentage target setup. 
-    Chop/Sideways Status: Defensive (atr) percentage setup.
-    Hostile Trade Status: Strict 1.4% percentage floor buffer.
+    Execution logic uses your original row processing structure:
+      - Fully Aligned / Favourable: (atr * atr) percentage target setup.
+      - Anything Else (Opposite, Neutral, or Side): Strict 1.4% floor target.
+      
     Capping Constraint: target_pct is strictly capped at a maximum of 49.0.
     """
     try:
@@ -46,8 +51,7 @@ def target_price(row):
 
         # 3️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
-        super_trend = str(row.get("supertrend", "NONE")).upper().strip()
-        active_exit = str(row.get("exit", "NONE")).upper().strip()
+        mode = str(TARGET_MODE).upper().strip()
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
@@ -57,30 +61,22 @@ def target_price(row):
 
         target_pct = 0.0
 
-        # 4️⃣ Dynamic Target Matrix Logic incorporating SIDE State
-        if is_ce:
-            # Check for sideways/chop state first
-            if "SIDE" in (super_trend, active_exit):
-                target_pct = atr 
-            # Hostile conditions for Calls
-            elif active_exit in ("SELL", "BEAR"):
-                target_pct = 1.4
-            elif super_trend in ("SELL", "BEAR"):
-                target_pct = atr / 1.4
-            else:
-                target_pct = atr * atr
+        # 4️⃣ Symmetrical Binary Evaluation Matrices (Aligned vs Else)
+        if mode == "EXIT":
+            active_exit = str(row.get("exit", "NONE")).upper().strip()
+            
+            if is_ce:
+                target_pct = atr * atr if active_exit in ("BUY", "BULL", "NONE") else 1.4
+            elif is_pe:
+                target_pct = atr * atr if active_exit in ("SELL", "BEAR", "NONE") else 1.4
 
-        elif is_pe:
-            # Check for sideways/chop state first
-            if "SIDE" in (super_trend, active_exit):
-                target_pct = atr 
-            # Hostile conditions for Puts
-            elif active_exit in ("BUY", "BULL"):
-                target_pct = 1.4
-            elif super_trend in ("BUY", "BULL"):
-                target_pct = atr / 1.4
-            else:
-                target_pct = atr * atr
+        else:  # Fallback Default: 'SUPERTREND' Mode
+            super_trend = str(row.get("supertrend", "NONE")).upper().strip()
+            
+            if is_ce:
+                target_pct = atr * atr if super_trend in ("BUY", "BULL", "NONE") else 1.4
+            elif is_pe:
+                target_pct = atr * atr if super_trend in ("SELL", "BEAR", "NONE") else 1.4
 
         # 5️⃣ Hard ceiling enforcement: Cap absolute target percentage at 49.0
         target_pct = min(target_pct, 49.0)
@@ -92,4 +88,5 @@ def target_price(row):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
+
 
