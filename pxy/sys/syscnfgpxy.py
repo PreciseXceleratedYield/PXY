@@ -1,5 +1,5 @@
 # syscnfgpxy.py
-"""
+""
 Executes exactly 6 structural, isolated OHLC mathematical transformations:
 Mode 0: Hyper-Sensitive Modified Close Candles (Green Close=(High+Close)/2, Red Close=(Low+Close)/2)
 Mode 1: Raw Candles
