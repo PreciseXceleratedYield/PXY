@@ -184,9 +184,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     # ==========================================================================
     # ⚡ EXPLICIT MAP REFLECTION CORRECTIONS
     # ==========================================================================
-    df['sma21'] = st1_line           # Map sma21 explicitly to the Inverse Mirror Line
+    df['sma21'] = st1_mirror           # Map sma21 explicitly to the Inverse Mirror Line
     df['st_line'] = st1_line           # Map st_line explicitly to original Supertrend
-    df['ST'] = st1_mirror                # Map ST explicitly to original Supertrend
+    df['ST'] = st1_line                # Map ST explicitly to original Supertrend
     
     # Structural keys preserved for legacy backend mapping compatibilities
     df['sma50'] = st1_line             
@@ -247,4 +247,3 @@ if __name__ == '__main__':
         export_supertrend_json(processed_df)
     else:
         print('CRITICAL: Upstream data empty.')
-
