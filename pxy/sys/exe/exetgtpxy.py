@@ -9,7 +9,7 @@ init(autoreset=True)
 
 # Global Switch Configuration
 # Valid Options: 'SUPERTREND' or 'EXIT' (Defaults to 'SUPERTREND' on invalid input)
-TARGET_MODE = 'SUPERTREND'
+TARGET_MODE = 'EXIT'
 
 
 def f(x, d=0.0):
