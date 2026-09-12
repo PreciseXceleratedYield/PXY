@@ -33,29 +33,55 @@ body{
     height:100dvh;display:flex;flex-direction:column;
     font-family:'DM Mono',monospace;background:var(--bg);color:var(--text);
     overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;
+    font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
 }
-*{scrollbar-width:thin;scrollbar-color:var(--border2) transparent;}
-::-webkit-scrollbar{width:2px;height:2px;}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+@keyframes flashUp{0%{background:rgba(38,166,154,0.35);}100%{background:transparent;}}
+@keyframes flashDown{0%{background:rgba(239,83,80,0.35);}100%{background:transparent;}}
+.flash-up{animation:flashUp 0.6s ease-out;}
+.flash-down{animation:flashDown 0.6s ease-out;}
+*{scrollbar-width:thin;scrollbar-color:var(--bg3) transparent;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px;border:1px solid var(--border2);}
+::-webkit-scrollbar-thumb:hover{background:var(--muted);}
 
 /* ── HEADER ── */
 #hdr{
     height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
-    padding:0 12px;background:var(--bg2);border-bottom:1px solid var(--border2);
+    padding:0 12px;position:relative;
+    background:linear-gradient(90deg,var(--bg2) 0%,var(--bg3) 100%);
+    box-shadow:0 4px 16px rgba(0,0,0,0.45);
+}
+#hdr::after{
+    content:'';position:absolute;left:0;right:0;bottom:-1px;height:2px;
+    background:linear-gradient(90deg,var(--accent) 0%,var(--bull) 50%,var(--gold) 100%);
 }
 .hdr-l,.hdr-r{display:flex;align-items:center;gap:8px;}
-.logo{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;color:var(--text);cursor:pointer;user-select:none;}
-.logo sup{font-size:0.5em;vertical-align:super;color:var(--accent);}
+.logo{
+    font-family:'Syne',sans-serif;font-weight:800;font-size:17px;cursor:pointer;user-select:none;
+    position:relative;padding-left:10px;
+    background:linear-gradient(90deg,#fff 0%,var(--accent) 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.logo::before{
+    content:'';position:absolute;left:0;top:1px;bottom:1px;width:3px;
+    background:linear-gradient(180deg,var(--accent),var(--bull));border-radius:2px;
+}
+.logo sup{font-size:0.5em;vertical-align:super;color:var(--gold);-webkit-text-fill-color:var(--gold);}
 #statusDot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background 0.3s;}
 #statusDot.connected{background:var(--bull);box-shadow:0 0 6px var(--bull);}
 #statusDot.error{background:var(--bear);box-shadow:0 0 6px var(--bear);}
-#clk{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;}
+#clk{font-variant-numeric:tabular-nums;}
 .reconnect-btn{
     padding:3px 9px;border-radius:5px;border:1px solid var(--border2);
-    background:transparent;color:#ffffff;font-family:'DM Mono',monospace;
+    background:var(--bg3);color:#ffffff;font-family:'DM Mono',monospace;
     font-size:11px;cursor:pointer;transition:all 0.2s;
 }
 .reconnect-btn:active{color:var(--accent);border-color:var(--accent);}
+.pane-hdr.hdr-term{border-left:3px solid var(--accent);}
+.pane-hdr.hdr-chart{border-left:3px solid var(--gold);}
+.pane-hdr.hdr-pos{border-left:3px solid var(--bull);}
+.pane-hdr.hdr-trades{border-left:3px solid var(--bear);}
 
 /* ── SIGNAL BAR ── */
 .sig-cell{
@@ -117,8 +143,10 @@ body{
     align-items:center;gap:6px;padding:6px 10px;
     border-bottom:1px solid var(--border);cursor:default;
 }
-.p-row.bull-r{border-left:2px solid var(--bull);}
-.p-row.bear-r{border-left:2px solid var(--bear);}
+.p-row.bull-r{border-left:2px solid var(--bull);background:rgba(38,166,154,0.05);}
+.p-row.bear-r{border-left:2px solid var(--bear);background:rgba(239,83,80,0.05);}
+.t-row.bull-r{border-left:2px solid var(--bull);background:rgba(38,166,154,0.05);}
+.t-row.bear-r{border-left:2px solid var(--bear);background:rgba(239,83,80,0.05);}
 .p-sym,.t-sym{font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .p-st{font-size:10px;color:#ffe135;font-weight:700;flex-shrink:0;white-space:nowrap;text-align:right;}
 .t-meta{font-size:8px;color:var(--muted);margin-top:1px;}
@@ -264,7 +292,7 @@ body{
 
     <!-- TERMINAL -->
     <div class="tab-pane active" id="paneTerminal">
-        <div class="pane-hdr">
+        <div class="pane-hdr hdr-term">
             <span onclick="openPanelLink('terminal')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">🖥️ Terminal</span>
         </div>
         <div id="termBox"></div>
@@ -274,7 +302,7 @@ body{
     <div class="tab-pane" id="panePositions">
         <div id="posPane">
             <div id="posTop">
-                <div class="pane-hdr">
+                <div class="pane-hdr hdr-pos">
                     <span onclick="openPanelLink('positions')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📍 Positions</span>
                     <div style="display:flex;align-items:center;gap:6px;">
                         <span id="posPnlLabel" style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--bull);">—</span>
@@ -299,7 +327,7 @@ body{
             </div>
 
             <div id="posBot">
-                <div class="pane-hdr">
+                <div class="pane-hdr hdr-trades">
                     <span onclick="openPanelLink('trades')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📋 Trades</span>
                     <div style="display:flex;align-items:center;gap:6px;">
                         <span id="tradePnlLabel" style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--bull);">—</span>
@@ -315,7 +343,7 @@ body{
 
     <!-- CHART -->
     <div class="tab-pane" id="paneChart">
-        <div class="pane-hdr">
+        <div class="pane-hdr hdr-chart">
             <span onclick="openPanelLink('chart')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📈 Chart</span>
             <span style="display:flex;gap:4px;">
                 <span onclick="setChartMode('candle')" id="chartModeCandle" style="font-size:8px;color:var(--accent);cursor:pointer;padding:1px 6px;border-radius:3px;border:1px solid var(--accent);">Candles</span>
@@ -895,15 +923,21 @@ new ResizeObserver(()=>{
 
 /* ── POSITIONS ── */
 let runningTotal=0,bookedTotal=0;
+let prevPosPnl=null,prevTradePnl=null;
+function flashEl(el,cls){if(!el)return;el.classList.remove('flash-up','flash-down');void el.offsetWidth;el.classList.add(cls);}
 async function loadPos(){
     let data={positions:[]};
     try{data=await fetch('./webactpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     const open=data.positions||[];
     const total=open.reduce((s,d)=>s+(d.pnl||0),0);
+    const posPnlChanged=prevPosPnl!==null&&total!==prevPosPnl;
+    const posPnlUp=posPnlChanged&&total>prevPosPnl;
     runningTotal=total;
     refreshRiskCandle();
     const lbl=$('posPnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const r=$('pnlRunning');r.textContent=fmt(total);r.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
+    if(posPnlChanged){flashEl(lbl,posPnlUp?'flash-up':'flash-down');flashEl(r,posPnlUp?'flash-up':'flash-down');}
+    prevPosPnl=total;
     const scroll=$('posScroll');
     scroll.querySelectorAll('.p-row').forEach(r=>r.remove());
     if(!open.length){$('posEmpty').style.display='block';return;}
@@ -1091,10 +1125,14 @@ async function loadTrades(){
     let data=[];
     try{data=await fetch('./webpnlpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     const total=data.reduce((s,d)=>s+(d.PNL||0),0);
+    const tradePnlChanged=prevTradePnl!==null&&total!==prevTradePnl;
+    const tradePnlUp=tradePnlChanged&&total>prevTradePnl;
     bookedTotal=total;
     refreshRiskCandle();
     const lbl=$('tradePnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
     const b=$('pnlBooked');b.textContent=fmt(total);b.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
+    if(tradePnlChanged){flashEl(lbl,tradePnlUp?'flash-up':'flash-down');flashEl(b,tradePnlUp?'flash-up':'flash-down');}
+    prevTradePnl=total;
     const scroll=$('tradeScroll');
     const trPrevScrollTop=scroll.scrollTop;
     scroll.querySelectorAll('.t-row').forEach(r=>r.remove());
@@ -1111,7 +1149,7 @@ async function loadTrades(){
         const pnl=t.PNL||0,pb=pnl>=0;
         const entry=String(t.Buy_Time||'').slice(11,16);
         const exit=String(t.Exit_Time||'').slice(11,16);
-        const row=document.createElement('div');row.className='t-row';
+        const row=document.createElement('div');row.className=`t-row ${pb?'bull-r':'bear-r'}`;
         row.dataset.tag=String(t.Tag||'');
         row.style.cursor='pointer';
         row.innerHTML=`<span class="t-tag">#${t.Tag||'—'}</span>
@@ -1187,7 +1225,11 @@ function drawRiskCandle(floor,net,peak){
     const danger=net<=lo+Math.abs(lo)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5),0 0 16px rgba(239,83,80,0.12)':'';
 }
-function refreshRiskCandle(){drawRiskCandle(lastFloor,Math.round(runningTotal+bookedTotal),lastPeak);}
+function refreshRiskCandle(){
+    const net=Math.round(runningTotal+bookedTotal);
+    document.title='₹'+fmt(net)+' · PXY®';
+    drawRiskCandle(lastFloor,net,lastPeak);
+}
 new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($('riskBar'));
 
 /* ── ACTIONS MENU ── */
