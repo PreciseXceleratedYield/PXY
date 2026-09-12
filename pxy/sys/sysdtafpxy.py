@@ -10,7 +10,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 TIMEZONE = 'Asia/Kolkata'
 
 # CONFIGURATION INTERFACE: Set string ("0" to "5" or "00" to "05") or integers
-SELECTED_MODE = "00" 
+SELECTED_MODE = "02" 
 
 
 def apply_ohlc_transformation(df, mode=1):
