@@ -8,7 +8,7 @@ from syscnfgpxy import TICKER
 from sysmktpxy import get_signal
 
 # PIPELINE CONFIGURATION SWITCH: Set to "ST" for SuperTrend or "MKT" for Market Proxy
-PIPE = "MKT" 
+PIPE = "ST" 
 
 
 def execute_mkt_pipeline(df):
