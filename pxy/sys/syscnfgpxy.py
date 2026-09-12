@@ -1,5 +1,5 @@
 # syscnfgpxy.py
-""
+"""
 Executes exactly 6 structural, isolated OHLC mathematical transformations:
 Mode 0: Hyper-Sensitive Modified Close Candles (Green Close=(High+Close)/2, Red Close=(Low+Close)/2)
 Mode 1: Raw Candles
@@ -15,7 +15,6 @@ import pytz
 # ---------------- LOCAL SYSTEM CONFIGURATION ----------------
 PARAMS = {
     "ticker": "^NSEI",          # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
-    "ohlc_mode": 1       # Switch Modes here (0 through 5)
 }
 
 # ---------------- CONSTANTS DERIVED FROM CONFIG ----------------
