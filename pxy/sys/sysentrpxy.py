@@ -2,6 +2,7 @@
 # PXY OPTION ROUTING ENGINE WITH HYBRID PIPELINE SWITCH (ST / MKT)
 # =============================================================================== #
 
+from datetime import datetime
 import pandas as pd
 from syscnfgpxy import TICKER
 from sysmktpxy import get_signal
@@ -10,11 +11,31 @@ from sysmktpxy import get_signal
 PIPE = "MKT" 
 
 
+def execute_mkt_pipeline(df):
+    """
+    Core Market Proxy routing rule. Consolidating this logic guarantees 
+    identical behavior across the Morning Filter, MKT Config, and SIDE fallbacks.
+    """
+    _, exit_dir = get_signal(df)
+
+    if exit_dir == "BULL":
+        return "OTMBUY", "BULL"
+    elif exit_dir == "BEAR":
+        return "OTMSELL", "BEAR"
+    else:
+        return "NONE", "NONE"
+
+
 def get_entry_signal(df=None):
     """Routes options positioning based on the configured pipeline switch:
 
     Entries -> Driven by SuperTrend directions ("ST") or Market Proxy outcomes ("MKT").
     Exits   -> Mirrors the active pipeline's structural direction layout.
+    
+    Priority Hierarchy:
+    1. Morning Filter (09:15 - 09:30 AM) -> HIGHEST PRIORITY. Forces MKT logic instantly.
+    2. PIPE Switch ("MKT") -> Bypasses ST, executes MKT logic.
+    3. PIPE Switch ("ST") -> Evaluates SuperTrend. If "SIDE", falls back to MKT logic.
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -23,46 +44,44 @@ def get_entry_signal(df=None):
     if df is None or df.empty:
         return "NONE", "NONE"
 
-    # ===== PIPELINE ROUTING ENGINE ===== #
+    # ----- PRIORITY 1: MORNING FILTER CHECK ----- #
+    if isinstance(df.index, pd.DatetimeIndex) and len(df) > 0:
+        current_time = df.index[-1].time()
+    else:
+        current_time = datetime.now().time()
 
-    if PIPE == "ST":
+    forced_mkt_start = datetime.strptime("09:15", "%H:%M").time()
+    forced_mkt_end = datetime.strptime("09:30", "%H:%M").time()
+    
+    # Absolute top priority bypass
+    if forced_mkt_start <= current_time <= forced_mkt_end:
+        return execute_mkt_pipeline(df)
+
+    # ===== PIPELINE ROUTING ENGINE ===== #
+    
+    # PRIORITY 2: Configured directly to Market Proxy Matrix
+    if PIPE == "MKT":
+        return execute_mkt_pipeline(df)
+
+    # PRIORITY 3: Configured to SuperTrend Supreme Profile
+    elif PIPE == "ST":
         from sysstrndpxy import calculate_supertrend
         
-        # 1. Process technical SuperTrend profiles
         processed_st_df = calculate_supertrend(df.copy())
         if processed_st_df.empty:
             return "NONE", "NONE"
 
-        # Target the exact closed window bar trend profile ("BULL" or "BEAR")
         trend = processed_st_df["ST_Trend"].iloc[-1]
 
-        # Route entries and exits via SuperTrend values
         if trend == "BULL":
-            entry_signal = "OTMBUY"
-            exit_signal = "BULL"
+            return "OTMBUY", "BULL"
         elif trend == "BEAR":
-            entry_signal = "OTMSELL"
-            exit_signal = "BEAR"
+            return "OTMSELL", "BEAR"
         else:
-            entry_signal = "NONE"
-            exit_signal = "NONE"
+            # Fallback when SuperTrend is "SIDE" or undefined
+            return execute_mkt_pipeline(df)
 
-    else:  # Default to "MKT" Pipeline Matrix
-        # 1. Extract dynamic structural matrix from market proxy
-        _, exit_dir = get_signal(df)
-
-        # Route entries and exits via Market Proxy direction
-        if exit_dir == "BULL":
-            entry_signal = "OTMBUY"
-            exit_signal = "BULL"
-        elif exit_dir == "BEAR":
-            entry_signal = "OTMSELL"
-            exit_signal = "BEAR"
-        else:
-            entry_signal = "NONE"
-            exit_signal = "NONE"
-
-    return entry_signal, exit_signal
+    return "NONE", "NONE"
 
 
 if __name__ == "__main__":
@@ -73,6 +92,5 @@ if __name__ == "__main__":
         print(f"RUNNING ENGINE MATRIX PROFILE [PIPE={PIPE}]")
         entry, ex = get_entry_signal(df)
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry} | EXIT_SIG: {ex}")
-
 
 
