@@ -30,8 +30,10 @@ def i(x, d=0):
 def target_price(row):
     """Calculates individual option layer target price using exit conditions.
 
-    Favorite Trade Status: (atr * atr) percentage target setup. Hostile Trade
-    Status: Strict 1.4% percentage floor buffer.
+    Favorite Trade Status: (atr * atr) percentage target setup. 
+    Chop/Sideways Status: Defensive (atr) percentage setup.
+    Hostile Trade Status: Strict 1.4% percentage floor buffer.
+    Capping Constraint: target_pct is strictly capped at a maximum of 99.0.
     """
     try:
         # 1️⃣ Entry data execution health check
@@ -55,26 +57,35 @@ def target_price(row):
 
         target_pct = 0.0
 
-        # 4️⃣ Exit-Value Only Target Matrix Logic
+        # 4️⃣ Dynamic Target Matrix Logic incorporating SIDE State
         if is_ce:
+            # Check for sideways/chop state first
+            if "SIDE" in (super_trend, active_exit):
+                target_pct = atr 
             # Hostile conditions for Calls
-            if active_exit in ("SELL", "BEAR"):
+            elif active_exit in ("SELL", "BEAR"):
                 target_pct = 1.4
             elif super_trend in ("SELL", "BEAR"):
                 target_pct = atr / 1.4
             else:
-                target_pct = atr**atr
+                target_pct = atr * atr
 
         elif is_pe:
+            # Check for sideways/chop state first
+            if "SIDE" in (super_trend, active_exit):
+                target_pct = atr 
             # Hostile conditions for Puts
-            if active_exit in ("BUY", "BULL"):  # Corrected syntax here
+            elif active_exit in ("BUY", "BULL"):
                 target_pct = 1.4
             elif super_trend in ("BUY", "BULL"):
                 target_pct = atr / 1.4
             else:
-                target_pct = atr**atr
+                target_pct = atr * atr
 
-        # 5️⃣ Final mathematical target premium projection calculation
+        # 5️⃣ Hard ceiling enforcement: Cap absolute target percentage at 99.0
+        target_pct = min(target_pct, 99.0)
+
+        # 6️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
         return round(calculated_target, 2)
 
