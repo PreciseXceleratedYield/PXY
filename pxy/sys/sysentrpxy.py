@@ -32,10 +32,10 @@ def get_entry_signal(df=None):
     trend = processed_st_df["ST_Trend"].iloc[-1]
 
     if trend == "BULL":
-        return "OTMBUY", "BULL"
+        return "ATMBUY", "BULL"
     
     elif trend == "BEAR":
-        return "OTMSELL", "BEAR"
+        return "ATMSELL", "BEAR"
     
     elif trend == "SIDE":
         # SuperTrend is "SIDE": Entry is strictly blocked.
