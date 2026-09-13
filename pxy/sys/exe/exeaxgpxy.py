@@ -6,7 +6,7 @@ import os
 import logging
 from colorama import Fore, Style
 from exeagtpxy import decide
-from exeacgpxy import safe_float # LINKED DIRECTLY TO ACG LAYER
+from exeacgpxy import safe_float, side_overall_pnl_pct, is_cooling, set_cooling
 
 logger = logging.getLogger("exeavgpxy.exeaxgpxy")
 
@@ -42,9 +42,20 @@ def _points_profit(rows):
 
 
 def _fire(side, decision):
+    """Fires the shell wrapper for a non-hold decision, gated by a System-B-only
+    cooldown so a fill/feed lag can't cause the same action to double-fire."""
+    if decision == "hold":
+        return
+
+    cool_key = f"{side}_TGT"  # separate namespace from System A's "CE"/"PE" locks
+    if is_cooling(cool_key):
+        return
+
     if decision == "square_off":
+        set_cooling(cool_key)
         (pxysqrce if side == "CE" else pxysqrpe)()
     elif decision == "fresh_buy":
+        set_cooling(cool_key)
         (pxybuyce if side == "CE" else pxybuype)()
 
 
@@ -57,11 +68,9 @@ def run_target_engine(active_exit, ce_rows, pe_rows, ce_avg_profit, pe_avg_profi
     ce_points = _points_profit(ce_rows)
     pe_points = _points_profit(pe_rows)
 
-    from exeacgpxy import side_overall_pnl_pct
     ce_net = side_overall_pnl_pct(ce_rows)
     pe_net = side_overall_pnl_pct(pe_rows)
 
-    # Route decision tracking via unified strategy brain layout
     ce_decision, ce_aligned = decide(
         "CE", active_exit, ce_avg_profit, ce_points, ce_lots, ce_empty, pe_empty,
         pe_net, pe_points, pe_lots
@@ -71,12 +80,6 @@ def run_target_engine(active_exit, ce_rows, pe_rows, ce_avg_profit, pe_avg_profi
         ce_net, ce_points, ce_lots
     )
 
-    # Strict Either/Or Exit Filter Shield Execution Block
-    if ce_decision == "square_off" and pe_decision == "fresh_buy":
-        pe_decision = "hold"
-    if pe_decision == "square_off" and ce_decision == "fresh_buy":
-        ce_decision = "hold"
-
     _fire("CE", ce_decision)
     _fire("PE", pe_decision)
 
@@ -84,4 +87,3 @@ def run_target_engine(active_exit, ce_rows, pe_rows, ce_avg_profit, pe_avg_profi
         "CE": (ce_decision, ce_aligned, ce_points),
         "PE": (pe_decision, pe_aligned, pe_points),
     }
-

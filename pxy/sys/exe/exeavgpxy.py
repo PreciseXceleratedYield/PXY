@@ -22,14 +22,14 @@ from run.runpchkpxy import get_position_summary
 logger = logging.getLogger("exeavgpxy")
 
 # System A & B unified to monitor aggregate bulk position metrics
-USE_OVERALL_LOSS = True  
+USE_OVERALL_LOSS = True
 
 
 def print_telemetry_dashboard(p):
     """Streamlined dashboard: RUN column cleanly arranged between LGT and TGT."""
     if not p:
         return
-    P_WIDTH = 36  
+    P_WIDTH = 36
     print("\n" + Fore.CYAN + "=" * P_WIDTH)
     print(Fore.CYAN + " OPT  LOT   LGT   RUN   TGT      PNL")
     print(Fore.CYAN + "-" * P_WIDTH)
@@ -43,7 +43,7 @@ def print_telemetry_dashboard(p):
         decision = p[f"{side}_decision"].upper()
 
         pnl_color = (Fore.CYAN + Style.BRIGHT) if decision == "SQUARE_OFF" else (Fore.GREEN if pnl_val >= 0 else Fore.RED)
-        
+
         print(Fore.WHITE + f"{side.upper():>4} {lots:>4} {lgt:>5} {run_pct_val:>5} {tgt_txt:>5} "
               + pnl_color + f"{pnl_val:>8}" + Style.RESET_ALL)
 
@@ -108,16 +108,16 @@ def handle_side_averaging(client, df):
         ce_lgt_val = ce_rows.apply(get_loss, axis=1).max() if not ce_rows.empty else 0.0
         pe_lgt_val = pe_rows.apply(get_loss, axis=1).max() if not pe_rows.empty else 0.0
 
-    # System B Evaluation Engine 
+    # System B Evaluation Engine
     b_result = run_target_engine(active_exit, ce_rows, pe_rows, ce_avg_profit, pe_avg_profit, ce_lots, pe_lots)
-    ce_decision, pe_decision = b_result["CE"], b_result["PE"]
+    ce_decision, pe_decision = b_result["CE"][0], b_result["PE"][0]
 
     p_packet = {
         "ce_lots": ce_lots, "pe_lots": pe_lots,
         "ce_pnl": ce_pnl, "pe_pnl": pe_pnl,
         "ce_investment": ce_investment, "pe_investment": pe_investment,
         "ce_lgt": ce_dynamic_threshold, "pe_lgt": pe_dynamic_threshold,
-        "ce_run_pct": ce_lgt_val, "pe_run_pct": pe_lgt_val,            
+        "ce_run_pct": ce_lgt_val, "pe_run_pct": pe_lgt_val,
         "ce_aligned": ce_aligned, "pe_aligned": pe_aligned,
         "ce_decision": ce_decision, "pe_decision": pe_decision,
     }

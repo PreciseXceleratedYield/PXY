@@ -33,7 +33,7 @@ def safe_float(val, fallback=0.0):
 
 
 def side_overall_pnl_pct(rows):
-    """Blended (overall) P&L% across all layers on one side. Used by System B."""
+    """Blended (overall) P&L% across all layers on one side. Used by System A and B."""
     if rows is None or rows.empty:
         return 0.0
     total_cost = (rows['qty'].apply(safe_float) * rows['buy_prc'].apply(safe_float)).sum()
@@ -42,9 +42,8 @@ def side_overall_pnl_pct(rows):
 
 
 def generate_pxy_tag():
-    """Generates localized order tag identification markers locked to a 0 final digit."""
-    base_tag = datetime.now(IST).strftime('%H%M%S')
-    return base_tag[:-1] + "0"
+    """Generates localized order tag identification markers."""
+    return datetime.now(IST).strftime('%H%M%S')
 
 
 def set_cooling(side):
@@ -104,4 +103,3 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
 
     print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(PANEL_WIDTH))
     print(border + "\n")
-

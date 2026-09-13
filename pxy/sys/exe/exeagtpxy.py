@@ -16,8 +16,9 @@ logger = logging.getLogger("exeavgpxy.strategy")
 # -----------------------------------------------------------------------------
 # 📊 SECTION 1: SYSTEM A THRESHOLD PROCESSING & PLACEMENT LOGIC
 # -----------------------------------------------------------------------------
-SYSTEM_A_BASE_THRESHOLD = 15.0  
+SYSTEM_A_BASE_THRESHOLD = 15.0
 ABS_CAP = 49.0
+
 
 def getexeagtpxy(ce_invst_factor, pe_invst_factor):
     """Calculates investment-adjusted dynamic drawdown thresholds from capital weights."""
@@ -34,7 +35,7 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
                                   ce_dynamic_threshold, pe_dynamic_threshold, ce_lots, pe_lots,
                                   ce_aligned, pe_aligned):
     """Executes network orders for System A when pullback boundaries are breached."""
-    
+
     # 🟢 CALL OPTION (CE) SIDE LAYER GATEWAY
     if ce_aligned and not ce_rows.empty and not is_cooling("CE") and len(ce_rows) < (MAX_LAYERS + 1):
         ce_last_row = ce_rows.iloc[-1]
@@ -88,6 +89,7 @@ FLOOR_PCT = 1.4
 FLOOR_BASE_POINTS = 140
 FLOOR_STEP_POINTS = 100
 
+
 def is_aligned(side, active_exit):
     """CE aligns with a BULL exit signal; PE aligns with a BEAR exit signal."""
     a_exit = str(active_exit).upper().strip()
@@ -98,16 +100,27 @@ def is_aligned(side, active_exit):
         return a_exit == "BEAR"
     return False
 
+
 def points_floor(lots):
     """140 for the first lot, +100 for each additional layer."""
     if lots <= 0:
         return 0
     return FLOOR_BASE_POINTS + FLOOR_STEP_POINTS * (lots - 1)
 
+
+def can_exit(side, active_exit, profit_pct, points_profit, lots):
+    """True if this side's OWN real target condition is currently met —
+    99% if aligned, 1.4%+points-floor if not. Used to check whether the
+    OPPOSITE side is already good to flatten before firing a fresh buy."""
+    if is_aligned(side, active_exit):
+        return profit_pct >= ALIGNED_TARGET_PCT
+    return profit_pct >= FLOOR_PCT and points_profit >= points_floor(lots)
+
+
 def decide(side, active_exit, avg_profit_pct, points_profit, lots,
-           side_rows_empty, other_side_rows_empty, other_side_profit_pct, 
+           side_rows_empty, other_side_rows_empty, other_side_profit_pct,
            other_side_points, other_side_lots):
-    """Returns (decision, aligned) matching sequential strategy configurations."""
+    """Returns (decision, aligned) — single-action-per-iteration guaranteed."""
     aligned = is_aligned(side, active_exit)
 
     if aligned:
@@ -115,19 +128,17 @@ def decide(side, active_exit, avg_profit_pct, points_profit, lots,
             return "square_off", aligned
         return "hold", aligned
 
-    # --- COUNTER-TREND / MISALIGNED TRACK ---
+    # --- NOT ALIGNED: force-exit check first ---
     floor = points_floor(lots)
     if avg_profit_pct >= FLOOR_PCT and points_profit >= floor:
         return "square_off", aligned
 
-    # --- OPPOSITE SIDE FRESH BUY GATE ---
+    # --- Bad luck: floor not cleared. Fill missing leg only if the
+    #     running side isn't already about to exit on its own real target. ---
     if side_rows_empty and not other_side_rows_empty:
-        other_floor = points_floor(other_side_lots)
-        running_side_can_exit = (other_side_profit_pct >= FLOOR_PCT and other_side_points >= other_floor)
-        
-        if running_side_can_exit:
+        other_side = "PE" if side == "CE" else "CE"
+        if can_exit(other_side, active_exit, other_side_profit_pct, other_side_points, other_side_lots):
             return "hold", aligned
-            
         return "fresh_buy", aligned
 
     return "hold", aligned
