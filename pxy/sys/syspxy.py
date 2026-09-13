@@ -1,6 +1,7 @@
 # syspxy.py
 import json
 import os
+import subprocess
 from datetime import datetime
 from sysdashpxy import get_full_snapshot
 from systdaypxy import get_market_snapshot  # Keep your original 'systdaypxy'
@@ -11,7 +12,14 @@ from syscnfgpxy import TICKER
 from sysstrndpxy import export_supertrend_json
 
 def get_all_data():
-    # -------- RUN TREND CHART GENERATION FIRST --------
+    # -------- RUN THE SCRIPT GLOBALLY FIRST --------
+    try:
+        # Runs 'pxyfut' as a general terminal command from anywhere
+        subprocess.run(["pxyfut"], check=True)
+    except (subprocess.CalledProcessError, FileNotFoundError) as e:
+        print(f"Warning: Could not execute 'pxyfut' command: {e}")
+
+    # -------- RUN TREND CHART GENERATION SECOND --------
     export_supertrend_json()
 
     # -------- CORE --------
