@@ -23,7 +23,7 @@ CONFIG = {
 def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     """Helper to compute PXY Supertrend bands and the mirror line.
     
-    Stripped and focused entirely on the core band and mirror logic.
+    Fixed assignment logic to handle clean float scalars instead of sequence arrays.
     """
     high = df['High'].to_numpy()
     low = df['Low'].to_numpy()
@@ -63,7 +63,8 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     mirror_line = np.zeros(length)
     st_trend = np.ones(length)  # 1 = BULL, -1 = BEAR
 
-    anchor_price = src if length > 0 else 0.0
+    # FIX: Seed with the first element scalar float instead of the full array sequence
+    anchor_price = float(src[0]) if length > 0 else 0.0
 
     for i in range(length):
         if i == 0:
@@ -92,10 +93,10 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
         # --- ALIGNED TREND SWITCH MATRIX (Crossover tracked by m0) ---
         if prev_trend == -1 and m0[i] > prev_upper:  
             current_trend = 1
-            anchor_price = src[i]
+            anchor_price = float(src[i])
         elif prev_trend == 1 and m0[i] < prev_lower:  
             current_trend = -1
-            anchor_price = src[i]
+            anchor_price = float(src[i])
         else:
             current_trend = prev_trend
 
