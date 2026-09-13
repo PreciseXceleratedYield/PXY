@@ -1,6 +1,6 @@
 # =============================================================================
-# INFRASTRUCTURE COMPONENT: exehvgpxy.py
-# GLOBAL CONSTRAINTS, ARITHMETIC GUARDS & FILESYSTEM COOLDOWN LOCKS
+# INFRASTRUCTURE FRAMEWORK LAYER: exeacgpxy.py (acg)
+# CORE PROJECT VARIABLES, CONSTRAINTS & MULTI-LAYER RUNTIME SAFETY LOCKS
 # =============================================================================
 import os
 import time
@@ -44,7 +44,6 @@ def side_overall_pnl_pct(rows):
 def generate_pxy_tag():
     """Generates localized order tag identification markers locked to a 0 final digit."""
     base_tag = datetime.now(IST).strftime('%H%M%S')
-    # FIX: Replaces the final character string to ensure a strict 0 digit termination sequence
     return base_tag[:-1] + "0"
 
 
@@ -105,5 +104,4 @@ def print_pxy_trigger_dashboard(side, symbol, current_loss, target_threshold, ta
 
     print(Fore.WHITE + f" • ORDER TAG     : {tag}".ljust(PANEL_WIDTH))
     print(border + "\n")
-
 
