@@ -201,27 +201,32 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 def export_supertrend_json(
     df: pd.DataFrame = None, output_file='../web/webchrtpxy.json'
 ):
-    """Exports structured historical data containing only close (price line), st_line, and mirror_line."""
+    """Exports structured historical data: OHLC (for candles), st_line + trend
+    (for coloring), and mirror_line (always neutral)."""
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
     if df is None or df.empty:
         return None
-        
+
     output = []
     for idx, row in df.iterrows():
         output.append({
             'time': int(idx.timestamp()),
+            'open': float(row['Open']) if not pd.isna(row['Open']) else 0.0,
+            'high': float(row['High']) if not pd.isna(row['High']) else 0.0,
+            'low': float(row['Low']) if not pd.isna(row['Low']) else 0.0,
             'close': float(row['Close']),
             'st_line': float(row['st_line']) if not pd.isna(row['st_line']) else 0.0,
-            'mirror_line': float(row['st_mirror']) if not pd.isna(row['st_mirror']) else 0.0
+            'mirror_line': float(row['st_mirror']) if not pd.isna(row['st_mirror']) else 0.0,
+            'trend': str(row.get('ST_Trend', 'SIDE')) if not pd.isna(row.get('ST_Trend', 'SIDE')) else 'SIDE'
         })
-        
+
     if os.path.dirname(output_file):
         os.makedirs(os.path.dirname(output_file), exist_ok=True)
-        
+
     with open(output_file, 'w') as f:
         json.dump(output, f, indent=2)
-        
+
     return output
 
 
