@@ -1,5 +1,5 @@
 # =============================================================================
-# MAIN CONTROLLER: exeavgpxy.py
+# MAIN CONTROLLER MODULE: exeavgpxy.py (avg)
 # MASTER TELEMETRY ORCHESTRATOR & AGGREGATION LOOP
 # =============================================================================
 import re
@@ -10,9 +10,10 @@ from datetime import datetime
 from colorama import Fore, Style
 
 from exeagtpxy import getexeagtpxy, is_aligned, execute_side_averaging_matrix
-from exefirpxy import run_target_engine
+from exeaxgpxy import run_target_engine
 
-from exehvgpxy import (
+# SYNCHRONIZED TO CORE VARIABLES & GUARDS MODULAR LAYER (acg)
+from exeacgpxy import (
     REBUY_ENABLED, MAX_LAYERS, IST, MARKET_START, MARKET_END,
     safe_float, get_loss, side_overall_pnl_pct
 )
@@ -38,8 +39,6 @@ def print_telemetry_dashboard(p):
         lgt = int(round(p[f"{side}_lgt"]))
         tgt_txt = "99" if p[f"{side}_aligned"] else "1.4+"
         pnl_val = int(round(p[f"{side}_pnl"]))
-        
-        # FIX: Enforces clean integer tracking directly under the RUN header
         run_pct_val = int(round(p[f"{side}_run_pct"]))
         decision = p[f"{side}_decision"].upper()
 
@@ -97,7 +96,6 @@ def handle_side_averaging(client, df):
     ce_pnl = float(ce_rows['row_pnl'].sum()) if not ce_rows.empty else 0.0
     pe_pnl = float(pe_rows['row_pnl'].sum()) if not pe_rows.empty else 0.0
 
-    # Primary structural directive: Driven exclusively by the exit field, no SuperTrend
     active_exit = str(working_df.iloc[-1].get("exit", "NONE")).upper().strip()
     ce_aligned = is_aligned("CE", active_exit)
     pe_aligned = is_aligned("PE", active_exit)
@@ -144,4 +142,3 @@ def handle_side_averaging(client, df):
         ce_lots=ce_lots, pe_lots=pe_lots,
         ce_aligned=ce_aligned, pe_aligned=pe_aligned,
     )
-
