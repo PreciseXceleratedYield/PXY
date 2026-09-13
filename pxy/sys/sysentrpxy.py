@@ -1,5 +1,5 @@
 # =============================================================================== #
-# PXY OPTION ROUTING ENGINE - HYBRID SUPERTREND PROFILE (ST + MARKET MATRIX)
+# PXY OPTION ROUTING ENGINE - PURE SUPERTREND PROFILE (ST ONLY)
 # =============================================================================== #
 
 import pandas as pd
@@ -8,11 +8,12 @@ from sysmktpxy import get_signal
 
 
 def get_entry_signal(df=None):
-    """Routes options positioning using a Hybrid SuperTrend Profile:
+    """Routes options positioning purely based on the SuperTrend Profile:
 
-    Primary (BULL/BEAR) -> Driven strictly by SuperTrend directions.
-    Fallback (SIDE)      -> Synchronously hands over to Market Matrix rules.
-    Exits                -> Always mirrors the active entry direction.
+    Entries -> Driven strictly by SuperTrend directions ("BULL" / "BEAR").
+               If SuperTrend is "SIDE", entry is explicitly forced to "NONE".
+    Exits   -> Matches entry direction for "BULL" / "BEAR".
+               If SuperTrend is "SIDE", exit falls back to the Market Matrix layout.
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -21,7 +22,7 @@ def get_entry_signal(df=None):
     if df is None or df.empty:
         return "NONE", "NONE"
 
-    # ===== HYBRID SUPERTREND ENGINE ===== #
+    # ===== PURE SUPERTREND ENGINE ===== #
     from sysstrndpxy import calculate_supertrend
     
     processed_st_df = calculate_supertrend(df.copy())
@@ -30,23 +31,21 @@ def get_entry_signal(df=None):
 
     trend = processed_st_df["ST_Trend"].iloc[-1]
 
-    # 1. Direct SuperTrend Execution
     if trend == "BULL":
         return "ATMBUY", "BULL"
     
     elif trend == "BEAR":
         return "ATMSELL", "BEAR"
     
-    # 2. Synchronized Side Trend Fallback (Mix Mode)
     elif trend == "SIDE":
+        # SuperTrend is "SIDE": Entry is strictly blocked.
+        # Exit pulls the active direction as-is from the baseline market layout rule.
         _, mkt_exit_dir = get_signal(df)
         
-        if mkt_exit_dir == "BULL":
-            return "ATMBUY", "BULL"
-        elif mkt_exit_dir == "BEAR":
-            return "ATMSELL", "BEAR"
-        else:
-            return "NONE", "NONE"
+        if mkt_exit_dir not in ["BULL", "BEAR"]:
+            mkt_exit_dir = "NONE"
+            
+        return "NONE", mkt_exit_dir
         
     else:
         # Catch-all safety fallback for unexpected data anomalies
@@ -58,7 +57,7 @@ if __name__ == "__main__":
 
     df = fetch_yf_data()
     if df is not None and not df.empty:
-        print("RUNNING ENGINE MATRIX PROFILE [HYBRID ST/MKT MODE]")
+        print("RUNNING ENGINE MATRIX PROFILE [PURE ST MODE]")
         entry, ex = get_entry_signal(df)
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry} | EXIT_SIG: {ex}")
 
