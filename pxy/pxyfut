@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# Navigate to the execution directory
+cd "$HOME/pxy/sys/exe/run" || { echo "Error: Directory ~/pxy/sys/exe/run not found"; exit 1; }
+
+# Optional: Activate virtual environment if needed
+# source "$HOME/pxy/env/bin/activate"
+
+# Run the Python script
+python3 runnftfutpxy.py
+
+echo "got the FUT price"
