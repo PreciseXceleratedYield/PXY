@@ -4,7 +4,7 @@ from datetime import datetime, date, timedelta
 
 # ---------------- CONFIG ----------------
 # Adjusted to 50 to allow valid Nifty 50-point step intervals while locking the last digit to 0
-STRIKE_STEP = 100
+STRIKE_STEP = 50
 
 # DAILY ATM BUFFER (you can change daily without touching logic)
 ATM_BUFFER = 0  
