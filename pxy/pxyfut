@@ -9,4 +9,4 @@ cd "$HOME/pxy/sys/exe/run" || { echo "Error: Directory ~/pxy/sys/exe/run not fou
 # Run the Python script
 python3 runnftfutpxy.py
 
-echo "got the FUT price"
+#echo "got the FUT price"
