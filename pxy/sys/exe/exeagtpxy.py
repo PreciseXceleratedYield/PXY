@@ -1,11 +1,12 @@
 # =============================================================================
-# STRATEGY BRAIN MODULE: exeagtpxy.py
-# CONSOLIDATED LOGIC ENGINE FOR SYSTEM A (AVERAGING) & SYSTEM B (DECISION MATRICES)
+# STRATEGY INTEGRATION LAYER: exeagtpxy.py (agt)
+# CORE MATHEMATICAL MODELLING ENGINE FOR SYSTEM A AND CRITICAL ALIGNMENTS
 # =============================================================================
 import logging
 from colorama import Fore
 
-from exehvgpxy import (
+# MAPPED TO ACG CORE INFRASTRUCTURE FRAMEWORK FILE
+from exeacgpxy import (
     MAX_LAYERS, safe_float, generate_pxy_tag, is_cooling, set_cooling,
     print_pxy_trigger_dashboard
 )
@@ -120,7 +121,6 @@ def decide(side, active_exit, avg_profit_pct, points_profit, lots,
         return "square_off", aligned
 
     # --- OPPOSITE SIDE FRESH BUY GATE ---
-    # Intercept missing legs only if the open position cannot execute an exit
     if side_rows_empty and not other_side_rows_empty:
         other_floor = points_floor(other_side_lots)
         running_side_can_exit = (other_side_profit_pct >= FLOOR_PCT and other_side_points >= other_floor)
