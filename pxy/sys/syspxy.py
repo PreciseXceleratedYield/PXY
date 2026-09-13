@@ -33,6 +33,28 @@ def get_all_data():
     vix_text = expand_vix(vix_flag) if vix_flag else None
     sentiment_text = expand_sentiment(sentiment_flag) if sentiment_flag else None
 
+    # -------- DYNAMIC PRICE LOGIC (FUT AVERAGE OR FALLBACK) --------
+    base_price = core.get("price", 0)
+    final_price = base_price + 50  # Keep your original blind +50 as the default fallback
+    
+    fut_file_path = os.path.expanduser("~/pxy/sys/exe/run/nftfut.json")
+    if os.path.exists(fut_file_path):
+        try:
+            with open(fut_file_path, "r", encoding="utf-8") as f:
+                fut_data = json.load(f)
+                fut_price = fut_data.get("price")
+                
+                if fut_price is not None:
+                    # Check if the FUT price is within ±200 of our base price
+                    if abs(base_price - fut_price) <= 200:
+                        final_price = (base_price + fut_price) / 2
+                    else:
+                        print(f"Warning: FUT price ({fut_price}) outside ±200 range of base ({base_price}). Using fallback.")
+        except Exception as e:
+            print(f"Warning: Failed to read or parse nftfut.json: {e}")
+    else:
+        print(f"Warning: {fut_file_path} not found. Using fallback price calculation.")
+
     # -------- COMBINE --------
     data = {
         # ===== SYSTEM TIMING =====
@@ -57,7 +79,7 @@ def get_all_data():
 
         "atr": core.get("atr"),
         "katr": core.get("katr"),
-        "price": core.get("price") + 50,
+        "price": final_price,  # DYNAMICALLY COMPUTED PRICE
         "direction": core.get("direction"),
 
         "supertrend": core.get("supertrend"),
@@ -107,4 +129,5 @@ if __name__ == "__main__":
     data = get_all_data()
     for k, v in data.items():
         print(f"{k:18}: {v}")
+
 
