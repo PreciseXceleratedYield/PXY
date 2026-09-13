@@ -63,7 +63,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     mirror_line = np.zeros(length)
     st_trend = np.ones(length)  # 1 = BULL, -1 = BEAR
 
-    anchor_price = src[0] if length > 0 else 0.0
+    anchor_price = src if length > 0 else 0.0
 
     for i in range(length):
         if i == 0:
@@ -111,10 +111,31 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
 
 
 def get_market_trend(df: pd.DataFrame) -> str:
-    """Evaluates the instant market state based on the calculated dual-line script bands."""
-    if df is None or df.empty:
+    """
+    Evaluates raw data frame layouts via intermediate calculations.
+    Safe for upstream fetch scripts; does not look for pre-existing matrix columns.
+    """
+    if df is None or df.empty or len(df) < 2:
         return 'SIDE'
-    return str(df['ST_Trend'].iloc[-1])
+
+    # Compute supertrend metrics dynamically on raw high/low/close metrics
+    st_line, mirror_line, m0_series = _compute_single_st(
+        df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
+    )
+    
+    m0_curr = float(m0_series.iloc[-1])
+    st_curr = float(st_line.iloc[-1])
+    mirror_curr = float(mirror_line.iloc[-1])
+    
+    highest_line = max(st_curr, mirror_curr)
+    lowest_line = min(st_curr, mirror_curr)
+
+    if m0_curr > highest_line:
+        return 'BULL'
+    elif m0_curr < lowest_line:
+        return 'BEAR'
+    else:
+        return 'SIDE'
 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
@@ -218,4 +239,5 @@ if __name__ == '__main__':
         export_supertrend_json(processed_df)
     else:
         print('CRITICAL: Upstream data empty.')
+
 
