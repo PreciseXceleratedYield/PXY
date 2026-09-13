@@ -63,7 +63,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     mirror_line = np.zeros(length)
     st_trend = np.ones(length)  # 1 = BULL, -1 = BEAR
 
-    # FIX: Seed with the first element scalar float instead of the full array sequence
+    # Seed with the first element scalar float instead of the full array sequence
     anchor_price = float(src[0]) if length > 0 else 0.0
 
     for i in range(length):
@@ -188,6 +188,12 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['st_line'] = st1_line           
     df['st_mirror'] = st1_mirror       
     df['ST_Trend'] = st_trend_series   
+    
+    # ==========================================================================
+    # 🔗 LEGACY COMPATIBILITY ROUTING (Fixes sysdashpxy.py KeyError Exceptions)
+    # ==========================================================================
+    df['ST'] = st1_line                # Explicitly mirrors st_line to pass dashboard checks
+    df['st1_mirror'] = st1_mirror      # Explicitly maps mirror to historical references
 
     return df
 
