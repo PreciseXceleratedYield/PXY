@@ -12,7 +12,7 @@ copyright_notice = (
     "of this software, in whole or in part, is strictly prohibited without explicit written consent. "
     "Violations constitute severe infringement and will trigger immediate legal action, including injunctive relief, "
     "substantial statutory financial penalties, and criminal prosecution where applicable. PXY® actively monitors "
-    "and ruthlessly enforces its intellectual property rights to the fullest extent of law."
+    "and enforces its intellectual property rights to the fullest extent of law."
 )
 
 # Maintain exact same box width
