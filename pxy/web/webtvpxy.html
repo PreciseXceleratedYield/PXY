@@ -1126,15 +1126,15 @@ function positionOptOverlay(){
 }
 async function loadOptSummary(){
     let d=null;try{d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    d=d||{};
     const ov=$('optOverlay');
-    if(!d||d.ce_lots==null){ov.style.display='none';return;}
     const cols=['LOT','INV','PNL','LGT','RUN','TGT','STS','DO'];
     const toK=n=>Math.round((n||0)/1000)+'k';
     const rnd=n=>Math.round(n||0);
     const doIcon=s=>({hold:'✋',square_off:'⛔',fresh_buy:'🆕'}[String(s||'').toLowerCase()]??String(s||''));
     const plainSign=n=>(Number(n||0)>=0?'+':'')+Math.round(n||0);
     const buildRow=(lots,pnl,inv,lgt,runPct,aligned,decision)=>[
-        lots, toK(inv), plainSign(pnl), rnd(lgt), rnd(runPct),
+        lots??'—', toK(inv), plainSign(pnl), rnd(lgt), rnd(runPct),
         aligned?'99':'1.4', aligned?'✅':'❌', doIcon(decision)
     ];
     const ceRow=buildRow(d.ce_lots,d.ce_pnl,d.ce_investment,d.ce_lgt,d.ce_run_pct,d.ce_aligned,d.ce_decision);
