@@ -44,10 +44,10 @@ def target_price(row):
 
         # 3️⃣ Symmetrical Binary Evaluation Matrices (Aligned vs Else)
         if is_ce:
-            target_pct = 99.0 if active_exit in ("BUY", "BULL", "NONE") else 1.4
+            target_pct = 99 if active_exit in ("BUY", "BULL", "NONE") else 99
             
         elif is_pe:
-            target_pct = 99.0 if active_exit in ("SELL", "BEAR", "NONE") else 1.4
+            target_pct = 99 if active_exit in ("SELL", "BEAR", "NONE") else 99
 
         # 4️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
