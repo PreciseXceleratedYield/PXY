@@ -1,5 +1,6 @@
 from rich import print
 from rich.table import Table
+import rich.box as box
 import textwrap
 from syscolrpxy import SILVER, UNDERLINE, RED, GREEN, YELLOW, RESET, BRIGHT_YELLOW, BRIGHT_RED, BRIGHT_GREEN, BOLD, GREY
 
@@ -25,7 +26,7 @@ perfect_lines = []
 for idx, line in enumerate(raw_lines):
     words = line.split()
     
-    # Handle the final line or lines with a single word to prevent divide-by-zero gaps
+    # Don't stretch the absolute last line of a paragraph or lines with single words
     if idx == len(raw_lines) - 1 or len(words) <= 1:
         perfect_lines.append(line.ljust(width))
         continue
@@ -50,14 +51,15 @@ for idx, line in enumerate(raw_lines):
 # Recombine into a single string for the table layout
 final_justified_notice = "\n".join(perfect_lines)
 
-# Create a table with dim border configuration
-table = Table(border_style="dim", box=None if not hasattr(Table, 'box') else Table.box)
+# Create a table with dim border configuration using a valid rich box style
+table = Table(border_style="dim", box=box.SQUARE)
 
 # Add the column header centered exactly
-table.add_column("PXY® PreciseXceleratedYield Pvt Ltd™", style="dim", justify="center", width=width)
+table.add_column("PXY® PreciseXceleratedYield Pvt Ltd™", style="dim", justify="center")
 
 # Add the justified content block
 table.add_row(final_justified_notice, style="dim", justify="left")
 
 # Display the table layout
 print(table)
+
