@@ -120,10 +120,11 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 #momentumCanvasWrap{flex:1;width:22px;position:relative;background:var(--bg3);border-radius:4px;border:1px solid var(--border);overflow:hidden;}
 #momentumCanvasWrap canvas{position:absolute;inset:0;width:100%!important;height:100%!important;}
 #chartBox{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 80%,rgba(15,25,50,0.4) 0%,transparent 70%),var(--bg);}
-#optOverlay{position:absolute;right:6px;z-index:4;pointer-events:none;background:rgba(24,28,38,0.62);backdrop-filter:blur(3px);border:1px solid var(--border2);border-radius:4px;padding:3px 2px;display:none;}
-.opt-tbl{border-collapse:collapse;font-family:'DM Mono',monospace;font-size:12.6px;color:var(--text);}
-.opt-tbl th{padding:1px 6px;color:var(--muted);font-weight:700;text-align:right;border-bottom:1px solid var(--border2);white-space:nowrap;}
-.opt-tbl td{padding:1px 6px;text-align:right;white-space:nowrap;}
+#optOverlay{flex-shrink:0;background:var(--bg2);border-top:1px solid var(--border2);}
+#optOverlay:empty{display:none;}
+.opt-tbl{width:100%;table-layout:fixed;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:12.6px;color:var(--text);}
+.opt-tbl th{padding:2px 4px;color:var(--muted);font-weight:700;text-align:center;border-bottom:1px solid var(--border2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.opt-tbl td{padding:2px 4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .opt-tbl tr.opt-ce td:first-child{border-left:2px solid var(--bull);}
 .opt-tbl tr.opt-pe td:first-child{border-left:2px solid var(--bear);}
 .grid-over{position:absolute;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:40px 40px;}
@@ -269,7 +270,6 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
             <div id="chartBox" style="flex:1;">
                 <div class="grid-over"></div>
                 <canvas id="priceChart"></canvas>
-                <div id="optOverlay"></div>
                 <!-- trade chart overlay -->
                 <div id="tradeChartOverlay">
                     <div style="height:24px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 8px;background:var(--bg2);border-bottom:1px solid var(--border2);">
@@ -287,6 +287,7 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
                 <div id="momentumCanvasWrap"><canvas id="momentumCandle"></canvas></div>
             </div>
         </div>
+        <div id="optOverlay"></div>
     </div>
 
     <!-- COL 3: POSITIONS + TRADES -->
@@ -638,7 +639,6 @@ async function loadChart(){
         lastCandles=candles;
         drawChart(candles);
         drawMomentumBar(candles);
-        positionOptOverlay();
     }catch(e){}
 }
 function drawChart(candles){
@@ -804,7 +804,7 @@ function drawMomentumBar(candles){
     ctx.shadowColor=glowColor;ctx.shadowBlur=7;ctx.fillStyle=bodyColor;ctx.beginPath();ctx.roundRect(midX-bodyW/2,by1,bodyW,bH,3);ctx.fill();ctx.shadowBlur=0;
     ctx.fillStyle='rgba(255,255,255,0.12)';ctx.beginPath();ctx.roundRect(midX-bodyW/2+2,by1+2,Math.max(bodyW-4,2),Math.max(bH*0.3,2),2);ctx.fill();
 }
-new ResizeObserver(()=>{if(lastCandles)drawChart(lastCandles);if(lastMoCandles)drawMomentumBar(lastMoCandles);positionOptOverlay();}).observe($('chartBox'));
+new ResizeObserver(()=>{if(lastCandles)drawChart(lastCandles);if(lastMoCandles)drawMomentumBar(lastMoCandles);}).observe($('chartBox'));
 
 /* ── POSITIONS ── */
 let runningTotal=0,bookedTotal=0;
@@ -919,7 +919,7 @@ function drawRiskCandle(floor,net,peak){
 }
 function refreshRiskCandle(){
     const net=Math.round(runningTotal+bookedTotal);
-    document.title='₹'+fmt(net)+' · PXY®';
+    document.title='₹'+fmt(net)+' · PXY® · '+location.hostname;
     drawRiskCandle(lastFloor,net,lastPeak);
 }
 new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($('riskBar'));
@@ -1109,21 +1109,6 @@ $('cfgSave').addEventListener('click',()=>{
 
 /* ── START ── */
 initTerm();connect();
-function positionOptOverlay(){
-    const ov=$('optOverlay');
-    if(!ov||ov.style.display==='none'||!lastCandles||!lastCandles.length)return;
-    let lo=Infinity,hi=-Infinity;
-    lastCandles.slice(-60).forEach(c=>{
-        if(c.h!=null)hi=Math.max(hi,c.h);
-        if(c.l!=null)lo=Math.min(lo,c.l);
-    });
-    if(!isFinite(lo)||!isFinite(hi))return;
-    const mid=(lo+hi)/2;
-    const lastClose=lastCandles[lastCandles.length-1]?.c;
-    if(lastClose==null)return;
-    if(lastClose>mid){ov.style.top='auto';ov.style.bottom='6px';}
-    else{ov.style.top='6px';ov.style.bottom='auto';}
-}
 async function loadOptSummary(){
     let d=null;try{d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     d=d||{};
@@ -1148,7 +1133,6 @@ async function loadOptSummary(){
     html+='</tr></tbody></table>';
     ov.innerHTML=html;
     ov.style.display='block';
-    positionOptOverlay();
 }
 
 loadDash();loadChart();loadPos();loadTrades();loadRisk();loadOptSummary();
