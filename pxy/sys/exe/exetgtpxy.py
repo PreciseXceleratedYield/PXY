@@ -44,10 +44,10 @@ def target_price(row):
 
         # 3️⃣ Symmetrical Binary Evaluation Matrices (Strictly BULL / BEAR)
         if is_ce:
-            target_pct = 1.4 if derived_entry == "BEAR" else 99.0
+            target_pct = 99 if derived_entry == "BEAR" else 99.0
             
         elif is_pe:
-            target_pct = 1.4 if derived_entry == "BULL" else 99.0
+            target_pct = 99 if derived_entry == "BULL" else 99.0
 
         # 4️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
