@@ -9,7 +9,7 @@ from colorama import init, Fore, Style
 
 from exeomspxy import get_combined_data 
 from runclntpxy import get_session 
-from exeavgpxy import handle_side_averaging 
+# from exeavgpxy import handle_side_averaging 
 
 # IMPORT SYSTEM CO-PROCESSOR 
 from exeexppxy import analyze_targets_and_sides, process_metrics_print_and_dump, dump_idle_json
@@ -147,7 +147,7 @@ def run_snapshot():
     # 🎯 SURGICAL ADDITION: Intercept system state before averaging fires
     if check_trend_collapse_exit(df, client): return
         
-    handle_side_averaging(client, df) 
+    # handle_side_averaging(client, df) 
     
     side_all_targets_hit = analyze_targets_and_sides(df)
 
@@ -210,3 +210,4 @@ def run_snapshot():
 
 if __name__ == "__main__": 
     run_snapshot()
+
