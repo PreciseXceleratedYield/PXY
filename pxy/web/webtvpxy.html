@@ -750,7 +750,7 @@ function drawChart(candles){
         const c0=vis[i-1],c1=vis[i];
         if(c0.st_line==null||c1.st_line==null)continue;
         const trend=String(c1.trend||c0.trend||'SIDE').toUpperCase();
-        ctx.strokeStyle=trend==='BULL'?cssVar('--bull'):trend==='BEAR'?cssVar('--bear'):cssVar('--gold');
+        ctx.strokeStyle=trend==='BULL'?cssVar('--bull'):trend==='BEAR'?cssVar('--bear'):'rgba(255,255,255,0.85)';
         ctx.beginPath();
         ctx.moveTo(toX(i-1),toY(c0.st_line));
         ctx.lineTo(toX(i),toY(c1.st_line));
@@ -1128,11 +1128,16 @@ async function loadOptSummary(){
     let d=null;try{d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     const ov=$('optOverlay');
     if(!d||d.ce_lots==null){ov.style.display='none';return;}
-    const cols=['LOT','PNL','INV','LGT','RUN%','ALIGN','DECISION'];
-    const dec=n=>Number(n||0).toFixed(2);
-    const decision=s=>String(s||'').replace(/_/g,' ').toUpperCase();
-    const ceRow=[d.ce_lots,fmt(d.ce_pnl),Math.round(d.ce_investment||0).toLocaleString('en-IN'),dec(d.ce_lgt),dec(d.ce_run_pct)+'%',d.ce_aligned?'✅':'❌',decision(d.ce_decision)];
-    const peRow=[d.pe_lots,fmt(d.pe_pnl),Math.round(d.pe_investment||0).toLocaleString('en-IN'),dec(d.pe_lgt),dec(d.pe_run_pct)+'%',d.pe_aligned?'✅':'❌',decision(d.pe_decision)];
+    const cols=['LOT','INV','PNL','LGT','RUN','TGT','STS','DO'];
+    const toK=n=>Math.round((n||0)/1000)+'k';
+    const rnd=n=>Math.round(n||0);
+    const doIcon=s=>({hold:'✋',square_off:'⛔',fresh_buy:'🆕'}[String(s||'').toLowerCase()]??String(s||''));
+    const buildRow=(lots,pnl,inv,lgt,runPct,aligned,decision)=>[
+        lots, toK(inv), fmt(pnl), rnd(lgt), Number(runPct||0).toFixed(2),
+        aligned?'99':'1.4+', aligned?'✅':'❌', doIcon(decision)
+    ];
+    const ceRow=buildRow(d.ce_lots,d.ce_pnl,d.ce_investment,d.ce_lgt,d.ce_run_pct,d.ce_aligned,d.ce_decision);
+    const peRow=buildRow(d.pe_lots,d.pe_pnl,d.pe_investment,d.pe_lgt,d.pe_run_pct,d.pe_aligned,d.pe_decision);
     let html='<table class="opt-tbl"><thead><tr>';
     cols.forEach(h=>html+=`<th>${h}</th>`);
     html+='</tr></thead><tbody><tr class="opt-ce">';
