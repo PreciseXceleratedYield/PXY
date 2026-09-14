@@ -3,7 +3,7 @@ from rich.table import Table
 import textwrap
 from syscolrpxy import SILVER, UNDERLINE, RED, GREEN, YELLOW, RESET, BRIGHT_YELLOW, BRIGHT_RED, BRIGHT_GREEN, BOLD, GREY
 
-# Expanded Copyright Notice
+# Large legal text block maintained
 copyright_notice = (
     "The PXY® trading tool, including its source code, algorithmic logic, user interfaces, documentation, "
     "and design elements, is protected by international copyright laws, proprietary intellectual property treaties, "
@@ -15,11 +15,39 @@ copyright_notice = (
     "and ruthlessly enforces its intellectual property rights to the fullest extent of law."
 )
 
-# Set the desired width to match the header length
+# Maintain exact same box width
 width = 38
 
-# Use textwrap to format the text with a fixed width
-wrapped_notice = textwrap.fill(copyright_notice, width, break_long_words=False)
+# Break the long text into 38-character wrapped lines
+raw_lines = textwrap.wrap(copyright_notice, width=width, break_long_words=False)
+perfect_lines = []
+
+for idx, line in enumerate(raw_lines):
+    words = line.split()
+    # Don't stretch the absolute last line of a paragraph (standard typography rule)
+    if idx == len(raw_lines) - 1 or len(words) <= 1:
+        perfect_lines.append(line.ljust(width))
+        continue
+    
+    # Calculate how many spaces we need to perfectly hit 38 characters
+    total_chars = sum(len(w) for w in words)
+    total_spaces_needed = width - total_chars
+    
+    # Evenly spread the spaces between the words
+    spaces_between_words = total_spaces_needed // (len(words) - 1)
+    extra_spaces = total_spaces_needed % (len(words) - 1)
+    
+    justified_line = ""
+    for i, word in enumerate(words[:-1]):
+        # Add the base spaces plus any leftover remainder spaces to flush right perfectly
+        space_padding = spaces_between_words + (1 if i < extra_spaces else 0)
+        justified_line += word + (" " * space_padding)
+    justified_line += words[-1] # Add the last word of the line
+    
+    perfect_lines.append(justified_line)
+
+# Recombine into a single string for the table
+final_justified_notice = "\n".join(perfect_lines)
 
 # Create a table with dim border
 table = Table(border_style="dim")
@@ -27,8 +55,9 @@ table = Table(border_style="dim")
 # Add the column header centered
 table.add_column("PXY® PreciseXceleratedYield Pvt Ltd™", style="dim", justify="center")
 
-# Add the row with full text justification for clean margins
-table.add_row(wrapped_notice, style="dim", justify="full")
+# Add the row with left justification since our logic already handles the perfect right-side flush
+table.add_row(final_justified_notice, style="dim", justify="left")
 
 # Display the table without extra space
 print(table)
+
