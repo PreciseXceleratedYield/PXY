@@ -1,7 +1,6 @@
 from rich import print
 from rich.table import Table
 import rich.box as box
-import textwrap
 from syscolrpxy import SILVER, UNDERLINE, RED, GREEN, YELLOW, RESET, BRIGHT_YELLOW, BRIGHT_RED, BRIGHT_GREEN, BOLD, GREY
 
 # Large legal text block maintained
@@ -19,34 +18,67 @@ copyright_notice = (
 # Maintain exact same box width
 width = 38
 
-# Break the long text into 38-character wrapped lines
-raw_lines = textwrap.wrap(copyright_notice, width=width, break_long_words=False)
+# Split text into original individual words to process sequentially
+words = copyright_notice.split()
 perfect_lines = []
+current_line_words = []
+current_len = 0
 
-for idx, line in enumerate(raw_lines):
-    words = line.split()
+for word in words:
+    # Check length if we were to add this word normally with a space
+    added_len = len(word) + (1 if current_line_words else 0)
     
-    # Don't stretch the absolute last line of a paragraph or lines with single words
-    if idx == len(raw_lines) - 1 or len(words) <= 1:
-        perfect_lines.append(line.ljust(width))
-        continue
-    
-    # Calculate exact space allocation needed to hit exactly 38 characters
-    total_chars = sum(len(w) for w in words)
-    total_spaces_needed = width - total_chars
-    
-    # Dynamically spread the whitespaces evenly across all word gaps
-    spaces_between_words = total_spaces_needed // (len(words) - 1)
-    extra_spaces = total_spaces_needed % (len(words) - 1)
-    
-    justified_line = ""
-    for i, word in enumerate(words[:-1]):
-        # Inject primary calculated space padding along with fractional remaining spaces
-        space_padding = spaces_between_words + (1 if i < extra_spaces else 0)
-        justified_line += word + (" " * space_padding)
-    justified_line += words[-1]
-    
-    perfect_lines.append(justified_line)
+    if current_len + added_len <= width:
+        current_line_words.append(word)
+        current_len += added_len
+    else:
+        # Word doesn't fit normally. Determine how much room is left on this line
+        space_available = width - current_len - (1 if current_line_words else 0)
+        
+        # If there's enough room for a decent fragment and a hyphen (at least 2 chars of the word + '-')
+        if space_available >= 3:
+            if current_line_words:
+                # Add space before the fragment if it's not the start of the line
+                fragment_size = space_available - 1
+                word_fragment = word[:fragment_size]
+                remaining_word = word[fragment_size:]
+                current_line_words.append(word_fragment + "-")
+            else:
+                fragment_size = space_available
+                word_fragment = word[:fragment_size]
+                remaining_word = word[fragment_size:]
+                current_line_words.append(word_fragment + "-")
+                
+            perfect_lines.append(" ".join(current_line_words))
+            current_line_words = [remaining_word]
+            current_len = len(remaining_word)
+        else:
+            # Not enough space for a hyphenated break; push the entire word to the next line
+            # Justify the current finished line before storing it
+            if current_line_words:
+                line_str = " ".join(current_line_words)
+                total_chars = sum(len(w) for w in current_line_words)
+                total_spaces_needed = width - total_chars
+                
+                if len(current_line_words) > 1:
+                    spaces_between = total_spaces_needed // (len(current_line_words) - 1)
+                    extra_spaces = total_spaces_needed % (len(current_line_words) - 1)
+                    justified_line = ""
+                    for i, w in enumerate(current_line_words[:-1]):
+                        pad = spaces_between + (1 if i < extra_spaces else 0)
+                        justified_line += w + (" " * pad)
+                    justified_line += current_line_words[-1]
+                    perfect_lines.append(justified_line)
+                else:
+                    perfect_lines.append(line_str.ljust(width))
+            
+            current_line_words = [word]
+            current_len = len(word)
+
+# Handle the absolute last line remaining in the buffer
+if current_line_words:
+    last_line = " ".join(current_line_words)
+    perfect_lines.append(last_line.ljust(width))
 
 # Recombine into a single string for the table layout
 final_justified_notice = "\n".join(perfect_lines)
@@ -54,13 +86,12 @@ final_justified_notice = "\n".join(perfect_lines)
 # Create a table with dim border configuration using a valid rich box style
 table = Table(border_style="dim", box=box.SQUARE)
 
-# Add the column header centered exactly (this manages the layout alignment rules)
+# Add the column header centered exactly
 table.add_column("PXY® PreciseXceleratedYield Pvt Ltd™", style="dim", justify="center")
 
-# Add the justified content block (Removed the invalid justify argument)
+# Add the row with the perfect-width text string
 table.add_row(final_justified_notice, style="dim")
 
 # Display the table layout
 print(table)
-
 
