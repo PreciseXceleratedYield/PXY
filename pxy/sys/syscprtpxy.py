@@ -24,40 +24,40 @@ perfect_lines = []
 
 for idx, line in enumerate(raw_lines):
     words = line.split()
-    # Don't stretch the absolute last line of a paragraph (standard typography rule)
+    
+    # Handle the final line or lines with a single word to prevent divide-by-zero gaps
     if idx == len(raw_lines) - 1 or len(words) <= 1:
         perfect_lines.append(line.ljust(width))
         continue
     
-    # Calculate how many spaces we need to perfectly hit 38 characters
+    # Calculate exact space allocation needed to hit exactly 38 characters
     total_chars = sum(len(w) for w in words)
     total_spaces_needed = width - total_chars
     
-    # Evenly spread the spaces between the words
+    # Dynamically spread the whitespaces evenly across all word gaps
     spaces_between_words = total_spaces_needed // (len(words) - 1)
     extra_spaces = total_spaces_needed % (len(words) - 1)
     
     justified_line = ""
     for i, word in enumerate(words[:-1]):
-        # Add the base spaces plus any leftover remainder spaces to flush right perfectly
+        # Inject primary calculated space padding along with fractional remaining spaces
         space_padding = spaces_between_words + (1 if i < extra_spaces else 0)
         justified_line += word + (" " * space_padding)
-    justified_line += words[-1] # Add the last word of the line
+    justified_line += words[-1]
     
     perfect_lines.append(justified_line)
 
-# Recombine into a single string for the table
+# Recombine into a single string for the table layout
 final_justified_notice = "\n".join(perfect_lines)
 
-# Create a table with dim border
-table = Table(border_style="dim")
+# Create a table with dim border configuration
+table = Table(border_style="dim", box=None if not hasattr(Table, 'box') else Table.box)
 
-# Add the column header centered
-table.add_column("PXY® PreciseXceleratedYield Pvt Ltd™", style="dim", justify="center")
+# Add the column header centered exactly
+table.add_column("PXY® PreciseXceleratedYield Pvt Ltd™", style="dim", justify="center", width=width)
 
-# Add the row with left justification since our logic already handles the perfect right-side flush
+# Add the justified content block
 table.add_row(final_justified_notice, style="dim", justify="left")
 
-# Display the table without extra space
+# Display the table layout
 print(table)
-
