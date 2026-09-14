@@ -3,7 +3,7 @@ from rich.table import Table
 import textwrap
 from syscolrpxy import SILVER, UNDERLINE, RED, GREEN, YELLOW, RESET, BRIGHT_YELLOW, BRIGHT_RED, BRIGHT_GREEN, BOLD, GREY
 
-# Expanded Copyright Notice (~2.5x original length)
+# Expanded Copyright Notice
 copyright_notice = (
     "The PXY® trading tool, including its source code, algorithmic logic, user interfaces, documentation, "
     "and design elements, is protected by international copyright laws, proprietary intellectual property treaties, "
@@ -15,21 +15,20 @@ copyright_notice = (
     "and ruthlessly enforces its intellectual property rights to the fullest extent of law."
 )
 
-# Set the desired width
+# Set the desired width to match the header length
 width = 38
 
 # Use textwrap to format the text with a fixed width
 wrapped_notice = textwrap.fill(copyright_notice, width, break_long_words=False)
 
-# Create a table with dim border and text color
+# Create a table with dim border
 table = Table(border_style="dim")
 
-# Add the column header "PXY® PreciseXceleratedYield Pvt Ltd™" in gray color
-table.add_column("PXY® PreciseXceleratedYield Pvt Ltd™", style="dim")
+# Add the column header centered
+table.add_column("PXY® PreciseXceleratedYield Pvt Ltd™", style="dim", justify="center")
 
-# Add the row with the wrapped notice in gray color
-table.add_row(wrapped_notice, style="dim")
+# Add the row with full text justification for clean margins
+table.add_row(wrapped_notice, style="dim", justify="full")
 
 # Display the table without extra space
 print(table)
-
