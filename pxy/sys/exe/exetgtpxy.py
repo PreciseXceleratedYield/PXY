@@ -32,7 +32,7 @@ def target_price(row):
 
         # 2️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
-        active_exit = str(row.get("exit", "NONE")).upper().strip()
+        derived_entry = str(row.get("entry", "NONE")).upper().strip()
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
@@ -44,10 +44,10 @@ def target_price(row):
 
         # 3️⃣ Symmetrical Binary Evaluation Matrices (Aligned vs Else)
         if is_ce:
-            target_pct = 99 if active_exit in ("BUY", "BULL", "NONE") else 99
+            target_pct = 99 if derived_entry in ("BUY", "BULL", "NONE") else 99
             
         elif is_pe:
-            target_pct = 99 if active_exit in ("SELL", "BEAR", "NONE") else 99
+            target_pct = 99 if derived_entry in ("SELL", "BEAR", "NONE") else 99
 
         # 4️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
