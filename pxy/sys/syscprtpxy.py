@@ -54,12 +54,13 @@ final_justified_notice = "\n".join(perfect_lines)
 # Create a table with dim border configuration using a valid rich box style
 table = Table(border_style="dim", box=box.SQUARE)
 
-# Add the column header centered exactly
+# Add the column header centered exactly (this manages the layout alignment rules)
 table.add_column("PXY® PreciseXceleratedYield Pvt Ltd™", style="dim", justify="center")
 
-# Add the justified content block
-table.add_row(final_justified_notice, style="dim", justify="left")
+# Add the justified content block (Removed the invalid justify argument)
+table.add_row(final_justified_notice, style="dim")
 
 # Display the table layout
 print(table)
+
 
