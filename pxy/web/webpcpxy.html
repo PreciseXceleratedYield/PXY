@@ -1132,9 +1132,10 @@ async function loadOptSummary(){
     const toK=n=>Math.round((n||0)/1000)+'k';
     const rnd=n=>Math.round(n||0);
     const doIcon=s=>({hold:'✋',square_off:'⛔',fresh_buy:'🆕'}[String(s||'').toLowerCase()]??String(s||''));
+    const plainSign=n=>(Number(n||0)>=0?'+':'')+Math.round(n||0);
     const buildRow=(lots,pnl,inv,lgt,runPct,aligned,decision)=>[
-        lots, toK(inv), fmt(pnl), rnd(lgt), Number(runPct||0).toFixed(2),
-        aligned?'99':'1.4+', aligned?'✅':'❌', doIcon(decision)
+        lots, toK(inv), plainSign(pnl), rnd(lgt), rnd(runPct),
+        aligned?'99':'1.4', aligned?'✅':'❌', doIcon(decision)
     ];
     const ceRow=buildRow(d.ce_lots,d.ce_pnl,d.ce_investment,d.ce_lgt,d.ce_run_pct,d.ce_aligned,d.ce_decision);
     const peRow=buildRow(d.pe_lots,d.pe_pnl,d.pe_investment,d.pe_lgt,d.pe_run_pct,d.pe_aligned,d.pe_decision);
