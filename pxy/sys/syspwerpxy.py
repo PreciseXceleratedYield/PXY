@@ -1,4 +1,4 @@
-# syspowrpxy.py
+# syspwerpxy.py
 import math
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
