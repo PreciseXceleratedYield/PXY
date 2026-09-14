@@ -1,7 +1,3 @@
-# =============================================================================
-# ENGINE COMPONENT MODULE: exetgtpxy.py
-# INDIVIDUAL POSITION LEVEL TARGET PRICE ENGINE (PURE EXIT ALIGNMENT PROFILE)
-# =============================================================================
 from colorama import Fore, Style, init
 
 # Initialize colorama for clean, colored terminal output formatting
@@ -21,8 +17,8 @@ def target_price(row):
     """Calculates individual option layer target price using exit status alignment.
 
     Execution logic:
-      - Opposite / Counter-Trend (BEAR for CE, BULL for PE): Strict 1.4% floor target.
-      - Aligned / Favourable (BULL for CE, BEAR for PE): Strict 99.0% target setup.
+      - Opposite / Counter-Trend (EXITCE for CE, EXITPE for PE exclusively): Strict 1.4% floor target.
+      - Aligned / Favourable / Any other state: Strict 99.0% target setup.
     """
     try:
         # 1️⃣ Entry data execution health check
@@ -42,12 +38,12 @@ def target_price(row):
 
         target_pct = 0.0
 
-        # 3️⃣ Symmetrical Binary Evaluation Matrices (Strictly BULL / BEAR)
+        # 3️⃣ Symmetrical Binary Evaluation Matrices (Strictly Exclusive Mappings)
         if is_ce:
-            target_pct = 99 if derived_entry == "BEAR" else 99
+            target_pct = 1.4 if derived_entry == "EXITCE" else 99
             
         elif is_pe:
-            target_pct = 99 if derived_entry == "BULL" else 99
+            target_pct = 1.4 if derived_entry == "EXITPE" else 99
 
         # 4️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
@@ -56,5 +52,4 @@ def target_price(row):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
-
 
