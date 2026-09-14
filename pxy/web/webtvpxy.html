@@ -288,6 +288,19 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
             </div>
         </div>
         <div id="optOverlay"></div>
+
+        <!-- RISK BAR -->
+        <div id="riskBar">
+            <div class="rsk-grp">
+                <span class="rsk-lbl">⛔ Stop</span>
+                <span class="rsk-val" id="rskNet">—</span>
+            </div>
+            <div class="rsk-candle-wrap"><canvas id="rskCanvas"></canvas></div>
+            <div class="rsk-grp" style="align-items:flex-end;">
+                <span class="rsk-lbl">📈 Peak</span>
+                <span class="rsk-val" id="rskPeak">—</span>
+            </div>
+        </div>
     </div>
 
     <!-- COL 3: POSITIONS + TRADES -->
@@ -317,19 +330,6 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
         </div>
     </div>
 
-</div>
-
-<!-- RISK BAR — just above bottom -->
-<div id="riskBar">
-    <div class="rsk-grp">
-        <span class="rsk-lbl">⛔ Stop</span>
-        <span class="rsk-val" id="rskNet">—</span>
-    </div>
-    <div class="rsk-candle-wrap"><canvas id="rskCanvas"></canvas></div>
-    <div class="rsk-grp" style="align-items:flex-end;">
-        <span class="rsk-lbl">📈 Peak</span>
-        <span class="rsk-val" id="rskPeak">—</span>
-    </div>
 </div>
 
 <!-- PNL BAR — absolute bottom (with signal bar in middle) -->
@@ -1116,7 +1116,7 @@ async function loadOptSummary(){
     const cols=['LOT','INV','PNL','LGT','RUN','TGT','STS','DO'];
     const toK=n=>Math.round((n||0)/1000)+'k';
     const rnd=n=>Math.round(n||0);
-    const doIcon=s=>({hold:'✋',square_off:'⛔',fresh_buy:'🆕'}[String(s||'').toLowerCase()]??String(s||''));
+    const doIcon=s=>({hold:'✋',square_off:'⛔',fresh_buy:'🆕'}[String(s||'').toLowerCase()]??'⏳');
     const plainSign=n=>(Number(n||0)>=0?'+':'')+Math.round(n||0);
     const buildRow=(lots,pnl,inv,lgt,runPct,aligned,decision)=>[
         lots??'—', toK(inv), plainSign(pnl), rnd(lgt), rnd(runPct),

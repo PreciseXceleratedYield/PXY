@@ -1375,7 +1375,7 @@ async function loadOptSummary(){
     const cols=['LOT','INV','PNL','LGT','RUN','TGT','STS','DO'];
     const toK=n=>Math.round((n||0)/1000)+'k';
     const rnd=n=>Math.round(n||0);
-    const doIcon=s=>({hold:'✋',square_off:'⛔',fresh_buy:'🆕'}[String(s||'').toLowerCase()]??String(s||''));
+    const doIcon=s=>({hold:'✋',square_off:'⛔',fresh_buy:'🆕'}[String(s||'').toLowerCase()]??'⏳');
     const plainSign=n=>(Number(n||0)>=0?'+':'')+Math.round(n||0);
     const buildRow=(lots,pnl,inv,lgt,runPct,aligned,decision)=>[
         lots??'—', toK(inv), plainSign(pnl), rnd(lgt), rnd(runPct),
