@@ -9,7 +9,6 @@ from colorama import init, Fore, Style
 
 from exeomspxy import get_combined_data 
 from runclntpxy import get_session 
-# from exeavgpxy import handle_side_averaging 
 
 # IMPORT SYSTEM CO-PROCESSOR 
 from exeexppxy import analyze_targets_and_sides, process_metrics_print_and_dump, dump_idle_json
@@ -23,14 +22,6 @@ except ImportError:
 init(autoreset=True) 
 
 DEBUG_MODE = False 
-
-# ==========================================================
-# CONFIGURATION SWITCH (LOCKED IN CONTROLLER)
-# Options: 
-#   "one" -> ALWAYS exits individual positions as they hit targets.
-#   "all" -> Dynamic Hybrid Matrix (evaluates balance / protects sides).
-# ==========================================================
-EXIT_MODE = "one" 
 
 def debug_log(msg, color=Fore.BLUE): 
     if DEBUG_MODE: 
@@ -116,6 +107,7 @@ def verify_and_exit(client, row):
             print(f"{Fore.YELLOW}🚫 Blocked: [{symbol}] not found in broker positions.") 
     except Exception as e: 
         print(f"{Fore.RED}❌ Safety Check Crash: {e}")
+
 def run_snapshot():
     IST = pytz.timezone("Asia/Kolkata")
     now = datetime.now(IST).time()
@@ -141,72 +133,29 @@ def run_snapshot():
     client = get_session() 
     if df.empty: 
         print(f"{Fore.YELLOW}No active orders. System idling...") 
-        dump_idle_json(EXIT_MODE)
+        dump_idle_json("one")
         return 
         
-    # 🎯 SURGICAL ADDITION: Intercept system state before averaging fires
+    # 🎯 SURGICAL ADDITION: Intercept system state before target analysis fires
     if check_trend_collapse_exit(df, client): return
         
-    # handle_side_averaging(client, df) 
-    
     side_all_targets_hit = analyze_targets_and_sides(df)
 
-    # DYNAMIC COUNT ASSESSMENT: Extract exact row integers
-    ce_count = df[df['symbol'].str.contains('CE', na=False, case=True)].shape[0]
-    pe_count = df[df['symbol'].str.contains('PE', na=False, case=True)].shape[0]
-
-    debug_log(f"Active Hedge Matrix Structure -> CE Split Rows: {ce_count} | PE Split Rows: {pe_count}", Fore.CYAN)
-
-    # Proactive Core Execution Routing Logic Block
+    # Proactive Core Execution Routing Logic Block (Pure Single Targets)
     for idx, r in df.iterrows():
         sym = str(r.get('symbol', ''))
         ltp = float(r.get("sell_prc", 0))
         tgt = float(r.get("pxy_tgt", 0))
         pnl = float(r.get("pnl", 0))
 
-        # RULE 1: If user locked script to "one", enforce strict single exits everywhere
-        if EXIT_MODE == "one":
-            effective_mode = "one"
-            debug_log(f"Global Enforced Single Exit Mode ({sym}). Mode: SINGLE TARGET.", Fore.GREEN)
+        debug_log(f"Global Enforced Single Exit Mode ({sym}). Mode: SINGLE TARGET.", Fore.GREEN)
 
-        # RULE 2: If user selected "all", activate the hybrid dynamic processing matrix
-        else:
-            # Condition A: Solo Side Active
-            if ce_count == 0 or pe_count == 0:
-                effective_mode = "one"
-                debug_log(f"Dynamic Matrix: Solo Side Active ({sym}). Mode: SINGLE TARGET.", Fore.YELLOW)
+        # Pure Linear Target Evaluation Pool
+        if ltp >= tgt and pnl >= 140:
+            print(f"{Fore.GREEN}🎯 Target Hit & PnL Met ({sym}): LTP {ltp} >= TGT {tgt} | PnL {pnl} >= 140 [Execution Mode: ONE]")
+            verify_and_exit(client, r)
 
-            # Condition B: Perfectly Equal Row Count Symmetry -> Enforce All-or-Nothing
-            elif ce_count == pe_count:
-                effective_mode = "all"  
-                debug_log(f"Dynamic Matrix: Balanced Symmetry ({ce_count} == {pe_count}). Mode: ALL-OR-NOTHING.", Fore.BLUE)
-
-            # Condition C: Imbalanced Structural Rows
-            else:
-                if "CE" in sym and ce_count > pe_count:
-                    effective_mode = "one"
-                    debug_log(f"Dynamic Matrix: Heavy Side CE ({ce_count} > {pe_count}). Mode: SINGLE TARGET.", Fore.MAGENTA)
-                elif "PE" in sym and pe_count > ce_count:
-                    effective_mode = "one"
-                    debug_log(f"Dynamic Matrix: Heavy Side PE ({pe_count} > {ce_count}). Mode: SINGLE TARGET.", Fore.MAGENTA)
-                else:
-                    effective_mode = "all"
-                    debug_log(f"Dynamic Matrix: Lighter Side Protected ({sym}). Mode: ALL-OR-NOTHING.", Fore.CYAN)
-
-        # Route Order Processing Operations
-        if effective_mode == "all":
-            if isinstance(side_all_targets_hit, dict):
-                is_ce_hit = side_all_targets_hit.get("CE", False)
-                is_pe_hit = side_all_targets_hit.get("PE", False)
-                if ("CE" in sym and is_ce_hit) or ("PE" in sym and is_pe_hit):
-                    if pnl >= 140:
-                        verify_and_exit(client, r)
-        else:
-            if ltp >= tgt and pnl >= 140:
-                print(f"{Fore.GREEN}🎯 Target Hit & PnL Met ({sym}): LTP {ltp} >= TGT {tgt} | PnL {pnl} >= 140 [Execution Mode: {effective_mode.upper()}]")
-                verify_and_exit(client, r)
-
-    process_metrics_print_and_dump(df, side_all_targets_hit, EXIT_MODE)
+    process_metrics_print_and_dump(df, side_all_targets_hit, "one")
 
 if __name__ == "__main__": 
     run_snapshot()
