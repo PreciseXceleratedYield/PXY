@@ -6,11 +6,7 @@ import pytz
 from colorama import init, Fore, Style
 import sys
 from pathlib import Path
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
-import os  # ✅ Added for screen clearing
-
-# ✅ SWITCH ADDED
-SIMPLE_MODE = True  # Set to True to remove CE/PE check and run both scripts every loop
+import os  # ✅ Kept for screen clearing
 
 # ---------------- INIT ----------------
 init(autoreset=True)
@@ -21,37 +17,6 @@ HERE = Path(__file__).resolve().parent
 RUN_DIR = HERE / "run"
 sys.path.insert(0, str(RUN_DIR))
 sys.path.insert(0, str(HERE))
-
-# ---------------- IMPORT POSITION CHECK ----------------
-try:
-    from runpchkpxy import get_position_summary
-except Exception:
-    print("⚠️ WARN: position summary import failed ⚠️")
-    get_position_summary = lambda client=None: "0CE0PE"
-
-# ---------------- CREATE CLIENT ONCE (FIXED) ----------------
-try:
-    from runclntpxy import get_session
-    client = get_session()
-    if not client:
-        print("❌ FATAL: Unable to create trading session")
-        sys.exit(1)
-except Exception as e:
-    print(f"❌ Client Init Failed: {e}")
-    sys.exit(1)
-
-# ---------------- FIX 2: API TIMEOUT WRAPPER ----------------
-def call_with_timeout(func, timeout=10, *args, **kwargs):
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(func, *args, **kwargs)
-        try:
-            return future.result(timeout=timeout)
-        except TimeoutError:
-            print("⏱ API TIMEOUT: position fetch took too long ⚠️")
-            return None
-        except Exception as e:
-            print(f"❌ API ERROR: {e}")
-            return None
 
 # ---------------- HELPER FUNCTIONS ----------------
 def run_script(script_path, timeout=45):
@@ -92,7 +57,7 @@ def in_market_hours():
 
 # ---------------- MAIN LOOP ----------------
 os.system('clear')  # ✅ Initial screen clear
-print("\n🚀 INIT: main market loop starting now 📡")
+print("\n🚀 INIT: main market loop starting now [SIMPLE MODE ONLY] 📡")
 loop_counter = 1
 
 # Initial system check scripts
@@ -119,34 +84,14 @@ while True:
         live_status("🚀 LOOP: waiting trigger 📊")
         
         for sub_itr in range(1, 31):
-            # API call with 7s timeout
-            pos_summary = call_with_timeout(get_position_summary, 7, client)
-            if not pos_summary:
-                pos_summary = "0CE0PE"
+            os.system('clear')  # ✅ Clears screen before printing the loop iteration index
+            print(f"📊 Loop#{loop_counter} Sub#{sub_itr} | Execution Stack Running...")
             
-            try:
-                ce_qty = int(pos_summary.split("CE")[0])
-                pe_qty = int(pos_summary.split("CE")[1].replace("PE", ""))
-            except Exception:
-                ce_qty, pe_qty = 0, 0
-                
-            os.system('clear')  # ✅ Clears screen before printing the updated live loop status
-            print(f"📊 Loop#{loop_counter} Sub#{sub_itr} CE:{ce_qty} PE:{pe_qty}")
-            
-            # -------- CORE LOGIC WITH SWITCH --------
-            if SIMPLE_MODE:
-                safe_run(HERE / "exernkopxy.py", timeout=None)  # Infinite exception
-                safe_run(HERE / "exeexitpxy.py", timeout=45)
-                #safe_run(HERE.parent / "sysrigpxy.py", timeout=45)
-                safe_run(HERE / "exeentrpxy.py", timeout=45)
-            else:
-                if ce_qty > 0 and ce_qty == pe_qty:
-                    safe_run(HERE / "exeexitpxy.py", timeout=45)
-                elif ce_qty == 0 and pe_qty == 0:
-                    safe_run(HERE / "exeentrpxy.py", timeout=45)
-                else:
-                    safe_run(HERE / "exeexitpxy.py", timeout=45)
-                    safe_run(HERE / "exeentrpxy.py", timeout=45)
+            # -------- REARRANGED RE-ORDERED CORE EXECUTION STACK --------
+            safe_run(HERE / "exernkopxy.py", timeout=None)  # 1️⃣ Infinite exception
+            safe_run(HERE / "exeexitpxy.py", timeout=45)    # 2️⃣ Clean target exit evaluation (Locks profits first)
+            safe_run(HERE / "exeentrpxy.py", timeout=45)    # 3️⃣ Entry generation script (Deploys new layout)
+            safe_run(HERE / "exeenexpxy.py", timeout=45)    # 4️⃣ Balancing / Averaging Engine (Runs adjustments last)
                     
             fancy_pause(7)  # 7-second pause between sub-iterations
             
@@ -158,9 +103,9 @@ while True:
         
         while not in_market_hours():
             os.system('clear')  # ✅ Clears screen while waiting overnight so logs don't stack up
-            safe_run(HERE.parent / "syscprtpxy.py")
-            safe_run(HERE.parent / "syscprtpxy.py")
+            safe_run(HERE.parent / "syscprtpxy.py")  # Fixed: Duplicate entry removed here
             print(" ⏳   WAIT : market opens at 09:16 IST  📡", end="\r")
             time.sleep(60)
 
         print("\n🚀 MKT OPEN: resuming main loop now 📈")
+
