@@ -11,7 +11,7 @@ def get_entry_signal(df=None):
     """Routes options positioning purely based on the SuperTrend Profile:
 
     Entries -> Driven strictly by SuperTrend directions ("BULL" / "BEAR").
-               If SuperTrend is "SIDE", entry mirrors the baseline market layout.
+               If SuperTrend is "SIDE", entry is explicitly forced to "NONE".
     Exits   -> Matches entry direction for "BULL" / "BEAR".
                If SuperTrend is "SIDE", exit falls back to the Market Matrix layout.
     """
@@ -31,31 +31,21 @@ def get_entry_signal(df=None):
 
     trend = processed_st_df["ST_Trend"].iloc[-1]
 
-    # Fetch baseline signals upfront
-    _, mkt_exit_dir = get_signal(df)
-
     if trend == "BULL":
-        if mkt_exit_dir == "BULL":
-            return "ATMBUY", "BULL"
-        elif mkt_exit_dir == "BEAR":
-            return "BEAR", "BULL"
-        else:
-            return "NONE", "BULL"
+        return "ATMBUY", "BULL"
     
     elif trend == "BEAR":
-        if mkt_exit_dir == "BEAR":
-            return "ATMSELL", "BEAR"
-        elif mkt_exit_dir == "BULL":
-            return "BULL", "BEAR"
-        else:
-            return "NONE", "BEAR"
-            
+        return "ATMSELL", "BEAR"
+    
     elif trend == "SIDE":
-        # SuperTrend is "SIDE": Both Entry and Exit now mirror the baseline market layout rule.
+        # SuperTrend is "SIDE": Entry is strictly blocked.
+        # Exit pulls the active direction as-is from the baseline market layout rule.
+        _, mkt_exit_dir = get_signal(df)
+        
         if mkt_exit_dir not in ["BULL", "BEAR"]:
             mkt_exit_dir = "NONE"
             
-        return mkt_exit_dir, mkt_exit_dir
+        return "NONE", mkt_exit_dir
         
     else:
         # Catch-all safety fallback for unexpected data anomalies
