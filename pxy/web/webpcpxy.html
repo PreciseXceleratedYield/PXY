@@ -617,7 +617,7 @@ async function loadDash(){
 }
 
 /* ── CHART ── */
-let lastCandles=null,lastMoSt=null,lastMoCloses=null;
+let lastCandles=null,lastMoCandles=null;
 let chartMode='candle';
 function setChartMode(mode){
     chartMode=mode;
@@ -633,11 +633,11 @@ async function loadChart(){
         const candles=data.map(d=>({
             o:d.open??d.o??null, h:d.high??d.h??null, l:d.low??d.l??null,
             c:d.close??d.Close??d.price??null,
-            sma21:d.sma21||null, sma50:d.sma50||null
+            st_line:d.st_line??null, mirror_line:d.mirror_line??null, trend:d.trend||null
         }));
         lastCandles=candles;
         drawChart(candles);
-        drawMomentumBar(candles.map(c=>c.sma21), candles.map(c=>c.c));
+        drawMomentumBar(candles);
         positionOptOverlay();
     }catch(e){}
 }
@@ -665,8 +665,8 @@ function drawChart(candles){
     vis.forEach(c=>{
         if(c.l!=null)lo=Math.min(lo,c.l);
         if(c.h!=null)hi=Math.max(hi,c.h);
-        if(c.sma21){lo=Math.min(lo,c.sma21);hi=Math.max(hi,c.sma21);}
-        if(c.sma50){lo=Math.min(lo,c.sma50);hi=Math.max(hi,c.sma50);}
+        if(c.st_line!=null){lo=Math.min(lo,c.st_line);hi=Math.max(hi,c.st_line);}
+        if(c.mirror_line!=null){lo=Math.min(lo,c.mirror_line);hi=Math.max(hi,c.mirror_line);}
     });
     if(!isFinite(lo)||!isFinite(hi))return;
     const pad=(hi-lo)*0.08||1;
@@ -744,51 +744,67 @@ function drawChart(candles){
     });
     }
 
-    ctx.strokeStyle='rgba(202,138,4,0.8)';ctx.lineWidth=1.2;ctx.setLineDash([3,3]);
-    ctx.beginPath();
-    let started=false;
-    vis.forEach((c,i)=>{
-        if(!c.sma21)return;
-        const x=toX(i),y=toY(c.sma21);
-        if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
-    });
-    ctx.stroke();ctx.setLineDash([]);
+    // ST_LINE — colored per-segment by trend (BULL/BEAR/SIDE)
+    ctx.lineWidth=1.6;
+    for(let i=1;i<n;i++){
+        const c0=vis[i-1],c1=vis[i];
+        if(c0.st_line==null||c1.st_line==null)continue;
+        const trend=String(c1.trend||c0.trend||'SIDE').toUpperCase();
+        ctx.strokeStyle=trend==='BULL'?cssVar('--bull'):trend==='BEAR'?cssVar('--bear'):cssVar('--gold');
+        ctx.beginPath();
+        ctx.moveTo(toX(i-1),toY(c0.st_line));
+        ctx.lineTo(toX(i),toY(c1.st_line));
+        ctx.stroke();
+    }
 
-    ctx.strokeStyle='rgba(160,160,166,0.75)';ctx.lineWidth=2.5;
+    // MIRROR_LINE — always neutral white
+    ctx.strokeStyle='rgba(255,255,255,0.55)';ctx.lineWidth=1;
     ctx.beginPath();
-    started=false;
+    let mStarted=false;
     vis.forEach((c,i)=>{
-        if(!c.sma50)return;
-        const x=toX(i),y=toY(c.sma50);
-        if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+        if(c.mirror_line==null)return;
+        const x=toX(i),y=toY(c.mirror_line);
+        if(!mStarted){ctx.moveTo(x,y);mStarted=true;}else ctx.lineTo(x,y);
     });
     ctx.stroke();
 }
-function drawMomentumBar(stVals,closes){
-    if(!stVals||!closes||!stVals.length||!closes.length)return;
-    lastMoSt=stVals;lastMoCloses=closes;
+function drawMomentumBar(candles){
+    if(!candles||!candles.length)return;
+    lastMoCandles=candles;
+    const last=candles.at(-1);
+    if(!last||last.c==null||last.st_line==null||last.mirror_line==null)return;
     const canvas=$('momentumCandle'),ctx=canvas.getContext('2d'),dpr=window.devicePixelRatio||1;
     const rect=canvas.parentElement.getBoundingClientRect();
     canvas.width=rect.width*dpr;canvas.height=rect.height*dpr;canvas.style.width=rect.width+'px';canvas.style.height=rect.height+'px';
     ctx.scale(dpr,dpr);const W=rect.width,H=rect.height;ctx.clearRect(0,0,W,H);if(W<4||H<10)return;
     const PADY=8,midX=W/2,bodyW=Math.max(8,W*0.45);
-    const rc=closes.slice(-60),rs=stVals.slice(-60),all=[...rc,...rs];
+    const recent=candles.slice(-60);
+    const all=recent.flatMap(c=>[c.c,c.st_line,c.mirror_line]).filter(v=>v!=null);
     const high=Math.max(...all),low=Math.min(...all),range=high-low||1;
     // value 'high' maps to top (y=PADY), 'low' maps to bottom (y=H-PADY) — inverted like a chart
     const toY=v=>H-PADY-((v-low)/range)*(H-PADY*2);
-    const open=stVals.at(-1),close=closes.at(-1);
-    const wHigh=Math.max(...rc.slice(-8),...rs.slice(-8)),wLow=Math.min(...rc.slice(-8),...rs.slice(-8));
-    const isBull=close>=open,bodyColor=isBull?cssVar('--bull'):cssVar('--bear'),glowColor=isBull?'rgba(38,166,154,0.35)':'rgba(239,83,80,0.35)';
+
+    // trend drives color: BULL/BEAR = breakout beyond both lines, SIDE = still inside the channel
+    const trend=String(last.trend||'SIDE').toUpperCase();
+    const bodyColor=trend==='BULL'?cssVar('--bull'):trend==='BEAR'?cssVar('--bear'):'#e5e7eb';
+    const glowColor=trend==='BULL'?'rgba(38,166,154,0.35)':trend==='BEAR'?'rgba(239,83,80,0.35)':'rgba(229,231,235,0.3)';
+
     const tg=ctx.createLinearGradient(0,0,0,H);tg.addColorStop(0,'rgba(0,0,0,0)');tg.addColorStop(0.08,cssVar('--track-mid'));tg.addColorStop(0.92,cssVar('--track-mid'));tg.addColorStop(1,'rgba(0,0,0,0)');
     ctx.strokeStyle=tg;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(midX,PADY);ctx.lineTo(midX,H-PADY);ctx.stroke();
-    const wy1=toY(wLow),wy2=toY(wHigh);
+
+    // wick = the st_line <-> mirror_line channel at the current bar
+    const chHigh=Math.max(last.st_line,last.mirror_line),chLow=Math.min(last.st_line,last.mirror_line);
+    const wy1=toY(chLow),wy2=toY(chHigh);
     ctx.strokeStyle=bodyColor;ctx.lineWidth=1.5;ctx.globalAlpha=0.45;ctx.beginPath();ctx.moveTo(midX,wy1);ctx.lineTo(midX,wy2);ctx.stroke();ctx.globalAlpha=1;
     const capW=Math.max(5,W*0.28);[wy1,wy2].forEach(y=>{ctx.beginPath();ctx.moveTo(midX-capW/2,y);ctx.lineTo(midX+capW/2,y);ctx.stroke();});
+
+    // body = close <-> st_line (how far price has moved from the trend line, colored by trend state)
+    const open=last.st_line,close=last.c;
     const by1=toY(Math.max(open,close)),by2=toY(Math.min(open,close)),bH=Math.max(by2-by1,4);
     ctx.shadowColor=glowColor;ctx.shadowBlur=7;ctx.fillStyle=bodyColor;ctx.beginPath();ctx.roundRect(midX-bodyW/2,by1,bodyW,bH,3);ctx.fill();ctx.shadowBlur=0;
     ctx.fillStyle='rgba(255,255,255,0.12)';ctx.beginPath();ctx.roundRect(midX-bodyW/2+2,by1+2,Math.max(bodyW-4,2),Math.max(bH*0.3,2),2);ctx.fill();
 }
-new ResizeObserver(()=>{if(lastCandles)drawChart(lastCandles);if(lastMoSt&&lastMoCloses)drawMomentumBar(lastMoSt,lastMoCloses);positionOptOverlay();}).observe($('chartBox'));
+new ResizeObserver(()=>{if(lastCandles)drawChart(lastCandles);if(lastMoCandles)drawMomentumBar(lastMoCandles);positionOptOverlay();}).observe($('chartBox'));
 
 /* ── POSITIONS ── */
 let runningTotal=0,bookedTotal=0;
@@ -1111,25 +1127,18 @@ function positionOptOverlay(){
 async function loadOptSummary(){
     let d=null;try{d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     const ov=$('optOverlay');
-    if(!d||!d.console_dump){ov.style.display='none';return;}
-    const cd=d.console_dump;
-    const headCols=cd.header.trim().split(/\s+/).slice(1);
-    const ceCols=cd.ce_line.trim().split(/\s+/).slice(1);
-    const peCols=cd.pe_line.trim().split(/\s+/).slice(1);
-    const stsIdx=headCols.findIndex(h=>h.trim().toUpperCase()==='STS');
-    const fmtCell=(v,i)=>{
-        if(i!==stsIdx)return v;
-        const s=String(v).trim().toUpperCase();
-        if(['YES','Y','TRUE','1','OK'].includes(s))return'✅';
-        if(['NO','N','FALSE','0'].includes(s))return'❌';
-        return v;
-    };
+    if(!d||d.ce_lots==null){ov.style.display='none';return;}
+    const cols=['LOT','PNL','INV','LGT','RUN%','ALIGN','DECISION'];
+    const dec=n=>Number(n||0).toFixed(2);
+    const decision=s=>String(s||'').replace(/_/g,' ').toUpperCase();
+    const ceRow=[d.ce_lots,fmt(d.ce_pnl),Math.round(d.ce_investment||0).toLocaleString('en-IN'),dec(d.ce_lgt),dec(d.ce_run_pct)+'%',d.ce_aligned?'✅':'❌',decision(d.ce_decision)];
+    const peRow=[d.pe_lots,fmt(d.pe_pnl),Math.round(d.pe_investment||0).toLocaleString('en-IN'),dec(d.pe_lgt),dec(d.pe_run_pct)+'%',d.pe_aligned?'✅':'❌',decision(d.pe_decision)];
     let html='<table class="opt-tbl"><thead><tr>';
-    headCols.forEach(h=>html+=`<th>${h}</th>`);
+    cols.forEach(h=>html+=`<th>${h}</th>`);
     html+='</tr></thead><tbody><tr class="opt-ce">';
-    ceCols.forEach((v,i)=>html+=`<td>${fmtCell(v,i)}</td>`);
+    ceRow.forEach(v=>html+=`<td>${v}</td>`);
     html+='</tr><tr class="opt-pe">';
-    peCols.forEach((v,i)=>html+=`<td>${fmtCell(v,i)}</td>`);
+    peRow.forEach(v=>html+=`<td>${v}</td>`);
     html+='</tr></tbody></table>';
     ov.innerHTML=html;
     ov.style.display='block';
