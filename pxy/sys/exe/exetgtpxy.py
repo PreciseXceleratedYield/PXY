@@ -21,8 +21,8 @@ def target_price(row):
     """Calculates individual option layer target price using exit status alignment.
 
     Execution logic:
-      - Exit Aligned / Favourable: Strict 99.0% target setup.
-      - Anything Else (Opposite or Neutral): Strict 1.4% floor target.
+      - Opposite / Counter-Trend (BEAR for CE, BULL for PE): Strict 1.4% floor target.
+      - Aligned / Favourable (BULL for CE, BEAR for PE): Strict 99.0% target setup.
     """
     try:
         # 1️⃣ Entry data execution health check
@@ -32,7 +32,7 @@ def target_price(row):
 
         # 2️⃣ Context string extractors
         symbol = str(row.get("symbol", "unknown")).upper()
-        derived_entry = str(row.get("entry", "NONE")).upper().strip()
+        derived_entry = str(row.get("entry", "")).upper().strip()
 
         is_ce = "CE" in symbol
         is_pe = "PE" in symbol
@@ -42,12 +42,12 @@ def target_price(row):
 
         target_pct = 0.0
 
-        # 3️⃣ Symmetrical Binary Evaluation Matrices (Aligned vs Else)
+        # 3️⃣ Symmetrical Binary Evaluation Matrices (Strictly BULL / BEAR)
         if is_ce:
-            target_pct = 99 if derived_entry in ("BUY", "BULL", "NONE") else 99
+            target_pct = 1.4 if derived_entry == "BEAR" else 99.0
             
         elif is_pe:
-            target_pct = 99 if derived_entry in ("SELL", "BEAR", "NONE") else 99
+            target_pct = 1.4 if derived_entry == "BULL" else 99.0
 
         # 4️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
