@@ -83,7 +83,14 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     font-family:'Syne',sans-serif;font-weight:800;font-size:11px;color:var(--text);
 }
 
-#colTerminal{width:21%;border-right:none;}
+#colTerminal{width:26%;border-right:none;transition:width 0.25s ease;overflow:hidden;position:relative;}
+#colTerminal.collapsed{width:8px;}
+#colTerminal.collapsed .col-hdr,#colTerminal.collapsed #termBox{opacity:0;pointer-events:none;transition:opacity 0.15s ease;}
+#colTerminal:not(.collapsed) .col-hdr,#colTerminal:not(.collapsed) #termBox{opacity:1;transition:opacity 0.2s ease 0.08s;}
+#colTerminal.collapsed::after{
+    content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+    background:linear-gradient(180deg,var(--accent),var(--bull));opacity:0.7;
+}
 #colPositions{width:25%;}
 #colChart{flex:1;}
 
@@ -408,6 +415,25 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
+
+// Terminal column: auto-hide (collapses to a thin edge strip; hover to reveal)
+// Placed here, right after $, and wrapped defensively so it always runs
+// regardless of whether WebSocket/xterm/Chart.js init later succeeds or throws.
+try{
+    const tCol=document.getElementById('colTerminal');
+    if(tCol){
+        let tHideTimer=null;
+        tCol.classList.add('collapsed');
+        tCol.addEventListener('mouseenter',()=>{
+            clearTimeout(tHideTimer);
+            tCol.classList.remove('collapsed');
+            setTimeout(()=>{try{fit&&fit.fit();}catch(e){}},260);
+        });
+        tCol.addEventListener('mouseleave',()=>{
+            tHideTimer=setTimeout(()=>tCol.classList.add('collapsed'),450);
+        });
+    }
+}catch(e){}
 function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
 
 /* ── HOSTNAME ── */
