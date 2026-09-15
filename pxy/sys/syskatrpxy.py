@@ -60,12 +60,12 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int, ce_p: int = 
         raw_depth_sum = c_depth_clean + p_depth_clean + c_power_clean + p_power_clean
         
         # Enforce strict minimum floor boundary of 5
-        if raw_depth_sum < 5:
-            return 5
+        if raw_depth_sum < 4:
+            return 4
             
         return int(raw_depth_sum)
     except Exception:
-        return 5
+        return 4
 
 def calculate_atr_from_snapshot(past_depth_str: str, ce_depth: int, pe_depth: int, ce_power: int, pe_power: int) -> int:
     """Calculates ATR directly using pre-fetched snapshot variables to prevent timing lags."""
