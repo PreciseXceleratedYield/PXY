@@ -19,7 +19,7 @@ init(autoreset=True)
 
 # 🎯 MULTI-MODE CONFIGURATION OPTIONS Matrix
 # Options: "Dynamic", "Static", "Standard ATR (14)"
-ATR_MODE = "Static"  
+ATR_MODE = "Standard ATR (14)"  
 ATR_STATIC_VALUE = 7
 TOTAL_WIDTH = 42
 
