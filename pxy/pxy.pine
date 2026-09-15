@@ -1,70 +1,219 @@
-//@version=5
-indicator("PXY.PINE", overlay=true)
+//@version=6
+indicator("Ultimate Multi-Mode Supertrend (PXY Engine - Part 1)", overlay=true, max_bars_back=4900)
 
-// --- Inputs (Updated to 3 and 1.4) ---
-atrPeriod  = input.int(3, title="ATR Period")
-multiplier = input.float(1.4, title="Multiplier")
-showBackground = input.bool(true, title="Color Background by State")
+// --- 1. CONFIGURATION INTERFACE (Inputs Tab) ---
+multiplier        = input.float(1.4, title="Multiplier", group="Supertrend Parameters")
+modeSelector      = input.string("Mode 02: Flex (Mode 0 in SIDE / Mode 2 in TREND)", title="System Mode Selection Matrix", 
+     options=[
+         "Mode 0: Hyper-Sensitive Modified Close", 
+         "Mode 1: Raw Candles", 
+         "Mode 2: OC/2", 
+         "Mode 3: OCC/3", 
+         "Mode 4: OCCC/4", 
+         "Mode 5: OHLCC/5",
+         "Mode 00: Flex (Mode 0 in SIDE / Mode 0 in TREND)",
+         "Mode 01: Flex (Mode 0 in SIDE / Mode 1 in TREND)",
+         "Mode 02: Flex (Mode 0 in SIDE / Mode 2 in TREND)",
+         "Mode 03: Flex (Mode 0 in SIDE / Mode 3 in TREND)",
+         "Mode 04: Flex (Mode 0 in SIDE / Mode 4 in TREND)",
+         "Mode 05: Flex (Mode 0 in SIDE / Mode 5 in TREND)"
+     ], group="Source Selection Matrix")
 
-// --- 1. Standard Supertrend Calculation ---
-atrValue = ta.atr(atrPeriod)
-src      = hl2
+plotCustomCandles = input.bool(true, title="Render Transformed Candles", group="Visual Styles")
+showBackground    = input.bool(true, title="Color Background by State", group="Visual Styles")
+showDashboard     = input.bool(true, title="Display Top-Right Variable Dashboard", group="Visual Styles")
 
-upperBandBasic = src + multiplier * atrValue
-lowerBandBasic = src - multiplier * atrValue
+// --- 2. PRE-COMPUTE ALL BASE RAW CANDLE MATHEMATICS ---
+float m0 = close >= open ? (close + high) / 2.0 : (close + low) / 2.0
+float m1 = close
+float m2 = (open + close) / 2.0
+float m3 = (open + (2.0 * close)) / 3.0
+float m4 = (open + (3.0 * close)) / 4.0
+float m5 = (open + high + low + (2.0 * close)) / 5.0
 
+// --- 3. DYNAMIC TREND TARGET RESOLUTION ---
+float trendTargetMode = m2 // Default fallback
+if modeSelector == "Mode 00: Flex (Mode 0 in SIDE / Mode 0 in TREND)"
+    trendTargetMode := m0
+else if modeSelector == "Mode 01: Flex (Mode 0 in SIDE / Mode 1 in TREND)"
+    trendTargetMode := m1
+else if modeSelector == "Mode 02: Flex (Mode 0 in SIDE / Mode 2 in TREND)"
+    trendTargetMode := m2
+else if modeSelector == "Mode 03: Flex (Mode 0 in SIDE / Mode 3 in TREND)"
+    trendTargetMode := m3
+else if modeSelector == "Mode 04: Flex (Mode 0 in SIDE / Mode 4 in TREND)"
+    trendTargetMode := m4
+else if modeSelector == "Mode 05: Flex (Mode 0 in SIDE / Mode 5 in TREND)"
+    trendTargetMode := m5
+
+// --- 4. ENGINE RUN-TIME STATE VARIABLES ---
+var int trend = 1
 var float upBand = na
 var float dnBand = na
-var int trend    = 1
+var float anchorPrice = na
 
-prevUpBand = nz(upBand, upperBandBasic)
-prevDnBand = nz(dnBand, lowerBandBasic)
+// --- 5. DYNAMIC CORE ATR SUM ENGINE OVERLAY (Python Ported with Safe Flip Resets) ---
+float dynamicTransClose = na
+if modeSelector == "Mode 0: Hyper-Sensitive Modified Close" or modeSelector == "Mode 00: Flex (Mode 0 in SIDE / Mode 0 in TREND)" or modeSelector == "Mode 01: Flex (Mode 0 in SIDE / Mode 1 in TREND)" or modeSelector == "Mode 02: Flex (Mode 0 in SIDE / Mode 2 in TREND)" or modeSelector == "Mode 03: Flex (Mode 0 in SIDE / Mode 3 in TREND)" or modeSelector == "Mode 04: Flex (Mode 0 in SIDE / Mode 4 in TREND)" or modeSelector == "Mode 05: Flex (Mode 0 in SIDE / Mode 5 in TREND)"
+    dynamicTransClose := m0
+else if modeSelector == "Mode 1: Raw Candles"
+    dynamicTransClose := m1
+else if modeSelector == "Mode 2: OC/2"
+    dynamicTransClose := m2
+else if modeSelector == "Mode 3: OCC/3"
+    dynamicTransClose := m3
+else if modeSelector == "Mode 4: OCCC/4"
+    dynamicTransClose := m4
+else if modeSelector == "Mode 5: OHLCC/5"
+    dynamicTransClose := m5
+
+bool dynamicIsBullish = dynamicTransClose >= nz(dynamicTransClose[1], dynamicTransClose)
+
+var int greenStreak = 0
+var int redStreak = 0
+
+if dynamicIsBullish
+    greenStreak := greenStreak + 1
+    redStreak   := 1 
+else
+    redStreak   := redStreak + 1
+    greenStreak := 1 
+
+int ce_depth = greenStreak
+int pe_depth = redStreak
+
+// 🎯 CONFIRMED FIXED: Corrected historical referencing to prevent zero variations
+float candleMove    = close - nz(close[1], close)
+float absCandleMove = math.abs(candleMove)
+float avgClosedMove = ta.sma(absCandleMove, 3) 
+float rawPower      = nz(avgClosedMove) > 0 ? (math.abs(candleMove) / avgClosedMove) : 0.0
+
+int scaledPower = 1
+if rawPower <= 1.0
+    scaledPower := 1
+else
+    scaledPower := int(math.min(math.ceil(rawPower), 9))
+
+int ce_power = candleMove > 0 ? scaledPower : 1
+int pe_power = candleMove < 0 ? scaledPower : 1
+
+int dynamicAtrPeriod = ce_depth + pe_depth + ce_power + pe_power
+
+if dynamicAtrPeriod < 4
+    dynamicAtrPeriod := 4
+if dynamicAtrPeriod > 4500
+    dynamicAtrPeriod := 4500
+// --- Continued from Part 1 parameters ---
+float prevTransClose = nz(m0[1], m0) 
+float tr_val         = math.max(high - low, math.max(math.abs(high - prevTransClose), math.abs(low - prevTransClose)))
+float atrValue       = ta.sma(tr_val, dynamicAtrPeriod)
+
+float src = hl2
+float upperBandBasic = src + multiplier * atrValue
+float lowerBandBasic = src - multiplier * atrValue
+
+float prevUpBand = nz(upBand, upperBandBasic)
+float prevDnBand = nz(dnBand, lowerBandBasic)
 
 upBand := src < prevUpBand ? math.min(upperBandBasic, prevUpBand) : upperBandBasic
 dnBand := src > prevDnBand ? math.max(lowerBandBasic, prevDnBand) : lowerBandBasic
 
-// Trend Switch / Jump Trigger
-prevTrend = trend
-if trend == -1 and ta.crossover(close, prevUpBand)
+// --- 6. INSTANT STATE & CROSSOVER EVALUATION ---
+if trend == -1 and ta.crossover(m0, prevUpBand)
     trend := 1
-else if trend == 1 and ta.crossunder(close, prevDnBand)
+    anchorPrice := src
+else if trend == 1 and ta.crossunder(m0, prevDnBand)
     trend := -1
-
-stLine = (trend == 1) ? dnBand : upBand
-
-// --- 2. Anchor Tracking for Inverse Mirror Logic ---
-var float anchorPrice = na
-
-if trend != prevTrend
     anchorPrice := src
 
 if barstate.isfirst
     anchorPrice := src
 
-// Compute the Inverted Slope Mirror Line
-stDistanceFromAnchor = stLine - anchorPrice
-mirrorLine = anchorPrice - stDistanceFromAnchor
+float stLine = (trend == 1) ? dnBand : upBand
+float stDistanceFromAnchor = stLine - anchorPrice
+float mirrorLine = anchorPrice - stDistanceFromAnchor
 
-// --- 3. Evaluate the Three-State Market Filter ---
-highestLine = math.max(stLine, mirrorLine)
-lowestLine  = math.min(stLine, mirrorLine)
+float highestLine = math.max(stLine, mirrorLine)
+float lowestLine  = math.min(stLine, mirrorLine)
 
-string marketState = "SIDE"
-color stateBgColor = color.new(color.gray, 95)
-
-if close > highestLine
-    marketState := "BULL"
-    stateBgColor := color.new(color.green, 92)
-else if close < lowestLine
-    marketState := "BEAR"
-    stateBgColor := color.new(color.red, 92)
+// Determine the instant market condition classification
+string instantMarketState = "SIDE"
+if m0 > highestLine
+    instantMarketState := "BULL"
+else if m0 < lowestLine
+    instantMarketState := "BEAR"
 else
-    marketState := "SIDE"
-    stateBgColor := color.new(color.orange, 94)
+    instantMarketState := "SIDE"
 
-// --- 4. Visual Plots ---
+// --- 7. FINAL CANDLE ROUTING MATRIX (INSTANT SWAP) ---
+float transClose = na
+float displayOpen = open
+
+if modeSelector == "Mode 0: Hyper-Sensitive Modified Close"
+    transClose  := m0
+    displayOpen := close
+else if modeSelector == "Mode 1: Raw Candles"
+    transClose  := m1
+else if modeSelector == "Mode 2: OC/2"
+    transClose  := m2
+else if modeSelector == "Mode 3: OCC/3"
+    transClose  := m3
+else if modeSelector == "Mode 4: OCCC/4"
+    transClose  := m4
+else if modeSelector == "Mode 5: OHLCC/5"
+    transClose  := m5
+else 
+    if instantMarketState == "SIDE"
+        transClose  := m0
+        displayOpen := close
+    else
+        transClose  := trendTargetMode
+        displayOpen := (trendTargetMode == m0) ? close : open
+
+// --- 8. VISUAL PLOTS & RENDERING ---
+color stateBgColor = color.new(color.white, 93) 
+if instantMarketState == "BULL"
+    stateBgColor := color.new(#4caf50, 92)
+else if instantMarketState == "BEAR"
+    stateBgColor := color.new(#e57373, 92)
+
+softGreen     = color.new(#4caf50, 20)
+softRed       = color.new(#e57373, 20)
+softGreenGlow = #66bb6a
+softRedGlow   = #ef5350
+
+// UNIVERSAL RELATIVE CLOSE COLOR MATRIX
+isBullish = transClose >= nz(transClose[1], transClose)
+c_body    = isBullish ? softGreen : softRed
+c_glow    = isBullish ? softGreenGlow : softRedGlow
+
+// Render Custom Candlesticks
+plotcandle(plotCustomCandles ? displayOpen : na, plotCustomCandles ? high : na, plotCustomCandles ? low : na, plotCustomCandles ? transClose : na, 
+           title="Transformed Candle Layer", color=c_body, wickcolor=c_glow, bordercolor=c_glow)
+
+// Trailing Ribbon Layout Lines
 stColor = (trend == 1) ? color.green : color.red
 plot(stLine, color=stColor, linewidth=3, title="Standard Supertrend")
 plot(mirrorLine, color=color.new(stColor, 40), linewidth=2, title="Inverse Mirror Line")
 
+// State Background Triggers
 bgcolor(showBackground ? stateBgColor : na, title="Market Condition Background")
+
+// --- 9. TOP-RIGHT METRIC VIEWPORT DASHBOARD TABLE ---
+// 🎯 SIMULATED & CONFIRMED: Uses proper Pine v6 'text_formatting = text.format_bold' syntax
+var table telemetryTable = table.new(position = position.top_right, columns = 2, rows = 5, bgcolor = color.white, border_width = 1, border_color = #cccccc)
+if barstate.islast and showDashboard
+    table.cell(telemetryTable, 0, 0, "DYNAMIC ATR LENGTH", text_color=color.black, text_size=size.small, bgcolor=#e0e0e0, text_formatting=text.format_bold)
+    table.cell(telemetryTable, 1, 0, str.tostring(dynamicAtrPeriod), text_color=color.blue, text_size=size.small, text_font_family=font.family_monospace, bgcolor=#e0e0e0, text_formatting=text.format_bold)
+    
+    table.cell(telemetryTable, 0, 1, "CE Streak Depth", text_color=color.black, text_size=size.small, bgcolor=color.white, text_formatting=text.format_bold)
+    table.cell(telemetryTable, 1, 1, str.tostring(ce_depth), text_color=ce_depth > 1 ? color.green : color.black, text_size=size.small, bgcolor=color.white, text_formatting=text.format_bold)
+    
+    table.cell(telemetryTable, 0, 2, "PE Streak Depth", text_color=color.black, text_size=size.small, bgcolor=color.white, text_formatting=text.format_bold)
+    table.cell(telemetryTable, 1, 2, str.tostring(pe_depth), text_color=pe_depth > 1 ? color.red : color.black, text_size=size.small, bgcolor=color.white, text_formatting=text.format_bold)
+    
+    table.cell(telemetryTable, 0, 3, "CE Momentum Power", text_color=color.black, text_size=size.small, bgcolor=color.white, text_formatting=text.format_bold)
+    table.cell(telemetryTable, 1, 3, str.tostring(ce_power), text_color=ce_power > 1 ? #e65100 : color.black, text_size=size.small, bgcolor=color.white, text_formatting=text.format_bold)
+    
+    table.cell(telemetryTable, 0, 4, "PE Momentum Power", text_color=color.black, text_size=size.small, bgcolor=color.white, text_formatting=text.format_bold)
+    table.cell(telemetryTable, 1, 4, str.tostring(pe_power), text_color=pe_power > 1 ? #e65100 : color.black, text_size=size.small, bgcolor=color.white, text_formatting=text.format_bold)
