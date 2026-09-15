@@ -18,7 +18,7 @@ from syspwerpxy import get_ce_pe_power
 init(autoreset=True)
 
 # Configuration Switches
-USE_FIXED_ATR = True  
+USE_FIXED_ATR = False  
 ATR_FIXED_VALUE = 7
 TOTAL_WIDTH = 42
 
