@@ -18,8 +18,8 @@ from syspwerpxy import get_ce_pe_power
 init(autoreset=True)
 
 # Configuration Switches
-USE_FIXED_ATR = False  
-ATR_FIXED_VALUE = 9
+USE_FIXED_ATR = True  
+ATR_FIXED_VALUE = 7
 TOTAL_WIDTH = 42
 
 def safe_int_convert(val, fallback=1) -> int:
