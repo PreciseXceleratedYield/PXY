@@ -5,6 +5,9 @@ import numpy as np
 import pandas as pd
 from syscnfgpxy import TIMEZONE
 
+# 🎯 IMPORT THE ORIGINAL ATR VALUE DIRECTLY FROM YOUR UNTOUCHED ENGINE
+from syskatrpxy import calculate_atr
+
 warnings.simplefilter(action='ignore', category=FutureWarning)
 DEBUG_MODE = False
 
@@ -40,19 +43,8 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     # --- 2. INTERMEDIATE ATR BOUNDARY ENGINE ---
     src = (high + low) / 2.0  # hl2 native midpoint
     
-    tr = np.zeros(length)
-    for i in range(length):
-        if i == 0:
-            tr[i] = high[i] - low[i]
-        else:
-            prevTransClose = m0[i - 1]  # Pine uses nz(m0, m0)
-            tr1 = high[i] - low[i]
-            tr2 = np.abs(high[i] - prevTransClose)
-            tr3 = np.abs(low[i] - prevTransClose)
-            tr[i] = max(tr1, max(tr2, tr3))
-
-    # Linear rolling simple moving average (ta.sma)
-    atr = pd.Series(tr, index=df.index).rolling(window=int(period), min_periods=1).mean().to_numpy()
+    # 🎯 RETRIEVE ATR DIRECTLY FROM THE INTERFACE MODULE AS REQUESTED
+    atr = calculate_atr(df).to_numpy()
 
     basic_upper = src + (factor * atr)
     basic_lower = src - (factor * atr)
