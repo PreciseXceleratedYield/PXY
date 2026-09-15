@@ -22,8 +22,8 @@ ABS_CAP = 49.0
 
 def getexeagtpxy(ce_invst_factor, pe_invst_factor):
     """Calculates investment-adjusted dynamic drawdown thresholds from capital weights."""
-    ce_base_invested = SYSTEM_A_BASE_THRESHOLD * ce_invst_factor * ce_invst_factor
-    pe_base_invested = SYSTEM_A_BASE_THRESHOLD * pe_invst_factor * pe_invst_factor
+    ce_base_invested = SYSTEM_A_BASE_THRESHOLD * ce_invst_factor * ce_invst_factor * ce_invst_factor
+    pe_base_invested = SYSTEM_A_BASE_THRESHOLD * pe_invst_factor * pe_invst_factor * pe_invst_factor
 
     ce_final_abs = min(ce_base_invested, ABS_CAP)
     pe_final_abs = min(pe_base_invested, ABS_CAP)
