@@ -96,8 +96,8 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 /* ── SIGNAL BAR (in header) ── */
 #sigBar{border-left:1px solid var(--border2);border-right:1px solid var(--border2);}
 .sig-cell{
-    flex:1;min-width:6ch;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:0 4px;gap:1px;border-right:1px solid var(--border);position:relative;
+    flex:1;min-width:5ch;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:0 3px;gap:1px;border-right:1px solid var(--border);position:relative;
 }
 .sig-cell:last-child{border-right:none;}
 .sig-cell::after{display:none;}
@@ -105,8 +105,8 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 .sig-cell.bull-cell::after{background:var(--bull);box-shadow:0 0 6px var(--bull);}
 .sig-cell.bear-cell::after{background:var(--bear);box-shadow:0 0 6px var(--bear);}
 .sig-cell.side-cell::after{background:#facc15;box-shadow:0 0 6px #facc15;}
-.sc-lbl{font-size:7px;letter-spacing:0.08em;text-transform:uppercase;color:#ffffff;white-space:nowrap;}
-.sc-val{font-family:'Syne',sans-serif;font-weight:800;font-size:12px;white-space:nowrap;color:#ffffff;line-height:1;}
+.sc-lbl{font-size:7px;letter-spacing:0.06em;text-transform:uppercase;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
+.sc-val{font-family:'Syne',sans-serif;font-weight:800;font-size:11px;white-space:nowrap;color:var(--text);line-height:1;}
 .sc-val.bull{color:var(--bull);}
 .sc-val.bear{color:var(--bear);}
 .sc-val.dim{color:var(--muted);}
@@ -165,11 +165,11 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 /* ── RISK BAR ── */
 #riskBar{
     height:44px;flex-shrink:0;display:flex;align-items:center;
-    padding:0 16px;gap:14px;background:var(--bg2);border-bottom:1px solid var(--border2);
+    padding:0 10px;gap:8px;background:var(--bg2);border-bottom:1px solid var(--border2);
 }
 .rsk-grp{display:flex;flex-direction:column;gap:1px;flex-shrink:0;}
-.rsk-lbl{font-size:7px;letter-spacing:0.10em;text-transform:uppercase;color:#ffffff;white-space:nowrap;}
-.rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:13px;white-space:nowrap;color:#ffffff;}
+.rsk-lbl{font-size:7px;letter-spacing:0.10em;text-transform:uppercase;color:var(--text);white-space:nowrap;}
+.rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:12px;white-space:nowrap;color:var(--text);}
 .rsk-val.bull{color:var(--bull);}
 .rsk-val.bear{color:var(--bear);}
 .rsk-candle-wrap{flex:1;min-width:0;height:30px;position:relative;overflow:hidden;border-radius:5px;background:var(--bg3);border:1px solid var(--border);}
@@ -301,6 +301,21 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
                 <span class="rsk-val" id="rskPeak">—</span>
             </div>
         </div>
+
+        <!-- PNL BAR (with signal bar in middle) -->
+        <div id="pnlBar" style="display:flex;align-items:stretch;">
+            <div class="sig-cell" style="flex-shrink:0;padding:0 6px;min-width:5ch;"><span class="sc-lbl">Running P&L</span><span class="sc-val" id="pnlRunning">—</span></div>
+
+            <div id="sigBar" style="flex:1;display:flex;align-items:stretch;height:100%;min-width:0;border-left:1px solid var(--border2);border-right:1px solid var(--border2);">
+                <div class="sig-cell" id="cellEntry"><span class="sc-lbl">🛫 Entry</span><span class="sc-val" id="hcEntry">—</span></div>
+                <div class="sig-cell" id="cellExit"><span class="sc-lbl">🛬 Exit</span><span class="sc-val" id="hcExit">—</span></div>
+                <div class="sig-cell" id="cellTrend"><span class="sc-lbl">🚀 Trend</span><span class="sc-val" id="hcTrend">—</span></div>
+                <div class="sig-cell" id="cellATR"><span class="sc-lbl">📐 ATR</span><span class="sc-val" id="hcATR">—</span></div>
+                <div class="sig-cell" id="cellDP" style="flex:2;"><span class="sc-lbl">Depth ⚡⚡ Power</span><span class="sc-val" id="dpText">—</span></div>
+            </div>
+
+            <div class="sig-cell" style="flex-shrink:0;padding:0 6px;min-width:5ch;"><span class="sc-lbl">Booked P&L</span><span class="sc-val" id="pnlBooked">—</span></div>
+        </div>
     </div>
 
     <!-- COL 3: POSITIONS + TRADES -->
@@ -330,22 +345,6 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
         </div>
     </div>
 
-</div>
-
-<!-- PNL BAR — absolute bottom (with signal bar in middle) -->
-<div id="pnlBar" style="display:flex;align-items:stretch;">
-    <div class="sig-cell" style="flex-shrink:0;padding:0 6px;min-width:5ch;"><span class="sc-lbl">Running P&L</span><span class="sc-val" id="pnlRunning">—</span></div>
-
-    <div id="sigBar" style="flex:1;display:flex;align-items:stretch;height:100%;min-width:0;border-left:1px solid var(--border2);border-right:1px solid var(--border2);">
-        <div class="sig-cell" id="cellEntry"><span class="sc-lbl">🛫 Entry</span><span class="sc-val" id="hcEntry">—</span></div>
-        <div class="sig-cell" id="cellExit"><span class="sc-lbl">🛬 Exit</span><span class="sc-val" id="hcExit">—</span></div>
-        <div class="sig-cell" id="cellTrend"><span class="sc-lbl">🚀 Trend</span><span class="sc-val" id="hcTrend">—</span></div>
-        <div class="sig-cell" id="cellATR"><span class="sc-lbl">📐 ATR</span><span class="sc-val" id="hcATR">—</span></div>
-        <div class="sig-cell" id="cellDP" style="flex:2;"><span class="sc-lbl">Depth ⚡⚡ Power</span><span class="sc-val" id="dpText">—</span></div>
-    </div>
-
-    <div class="sig-cell" style="flex-shrink:0;padding:0 6px;min-width:5ch;"><span class="sc-lbl">Booked P&L</span><span class="sc-val" id="pnlBooked">—</span></div>
-    </div>
 </div>
 
 <!-- ACTIONS MENU -->
@@ -512,6 +511,8 @@ function cls(v){
 }
 function emojifyEntry(v){
     const s=String(v||'').toUpperCase();
+    if(s==='EXITCE')return'▲';
+    if(s==='EXITPE')return'▼';
     if(s.includes('BUY')||s.includes('BULL'))return'🟢';
     if(s.includes('SELL')||s.includes('BEAR'))return'🔴';
     if(s==='NONE')return'—';
