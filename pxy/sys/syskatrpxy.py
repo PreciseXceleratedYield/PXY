@@ -17,9 +17,10 @@ from syspwerpxy import get_ce_pe_power
 # Initialize colorama terminal auto-reset formatting hooks
 init(autoreset=True)
 
-# Configuration Switches
-USE_FIXED_ATR = True  
-ATR_FIXED_VALUE = 7
+# 🎯 MULTI-MODE CONFIGURATION OPTIONS Matrix
+# Options: "Dynamic", "Static", "Standard ATR (14)"
+ATR_MODE = "Static"  
+ATR_STATIC_VALUE = 7
 TOTAL_WIDTH = 42
 
 def safe_int_convert(val, fallback=1) -> int:
@@ -41,9 +42,11 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int, ce_p: int = 
     🎯 ATR MATH: Sum of CE Depth + PE Depth + CE Power + PE Power.
     Enforces ONLY a strict minimum of 5. Maximum can grow higher infinitely.
     """
-    # 🎯 FIX: Check configuration flag first
-    if USE_FIXED_ATR:
-        return ATR_FIXED_VALUE
+    # 🎯 MODE CONTROL SYSTEM
+    if ATR_MODE == "Static":
+        return ATR_STATIC_VALUE
+    elif ATR_MODE == "Standard ATR (14)":
+        return 14
 
     try:
         # Clean string extraction for past depth digit sequences (e.g. 'PE4' -> ['4'])
@@ -56,21 +59,23 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int, ce_p: int = 
         c_power_clean = safe_int_convert(ce_p, fallback=1)
         p_power_clean = safe_int_convert(pe_p, fallback=1)
         
-        # 🎯 NEW ATR FORMULA FORMULATION
+        # 🎯 DYNAMIC ATR FORMULA FORMULATION
         raw_depth_sum = c_depth_clean + p_depth_clean + c_power_clean + p_power_clean
         
-        # Enforce strict minimum floor boundary of 5
-        if raw_depth_sum < 4:
-            return 4
+        # Enforce strict minimum floor boundary rule of 5
+        if raw_depth_sum < 5:
+            return 5
             
         return int(raw_depth_sum)
     except Exception:
-        return 4
+        return 5
 
 def calculate_atr_from_snapshot(past_depth_str: str, ce_depth: int, pe_depth: int, ce_power: int, pe_power: int) -> int:
     """Calculates ATR directly using pre-fetched snapshot variables to prevent timing lags."""
-    if USE_FIXED_ATR:
-        return ATR_FIXED_VALUE
+    if ATR_MODE == "Static":
+        return ATR_STATIC_VALUE
+    elif ATR_MODE == "Standard ATR (14)":
+        return 14
     return scale_atr_value_from_depth(past_depth_str, ce_depth, pe_depth, ce_power, pe_power)
 
 def calculate_k_from_snapshot(ce_depth: int, pe_depth: int) -> int:
@@ -80,15 +85,22 @@ def calculate_k_from_snapshot(ce_depth: int, pe_depth: int) -> int:
 # --- BACKWARD COMPATIBILITY METHODS FOR EXTERNAL SCRIPT LINKS ---
 def calculate_atr(df: pd.DataFrame) -> pd.Series:
     try:
-        if USE_FIXED_ATR:
-            val = ATR_FIXED_VALUE
+        if ATR_MODE == "Static":
+            val = ATR_STATIC_VALUE
+        elif ATR_MODE == "Standard ATR (14)":
+            val = 14
         else:
             _, past_str, ce_d, pe_d = detect_pxy_flip_signal(df=df)
             _, ce_p, pe_p = get_ce_pe_power(df)
             val = scale_atr_value_from_depth(past_str, ce_d, pe_d, ce_p, pe_p)
         return pd.Series(float(val), index=df.index) if df is not None and not df.empty else pd.Series([float(val)])
     except Exception:
-        fallback_val = float(ATR_FIXED_VALUE) if USE_FIXED_ATR else 5.0
+        if ATR_MODE == "Static":
+            fallback_val = float(ATR_STATIC_VALUE)
+        elif ATR_MODE == "Standard ATR (14)":
+            fallback_val = 14.0
+        else:
+            fallback_val = 5.0
         return pd.Series(fallback_val, index=df.index) if df is not None and not df.empty else pd.Series([fallback_val])
 
 def calculate_dynamic_k(df: pd.DataFrame) -> int:
@@ -119,8 +131,9 @@ if __name__ == "__main__":
             spacing = " " * max(TOTAL_WIDTH - len(left_text) - len(right_text), 1)
             print(left_text + spacing + right_text)
         else:
-            fallback_atr = ATR_FIXED_VALUE if USE_FIXED_ATR else 5
-            print(f"ATR:{fallback_atr}" + (" " * (34 - len(str(fallback_atr)))) + "K:2")
+            default_atr = ATR_STATIC_VALUE if ATR_MODE == "Static" else (14 if ATR_MODE == "Standard ATR (14)" else 5)
+            print(f"ATR:{default_atr}" + (" " * (34 - len(str(default_atr)))) + "K:2")
     except Exception:
-        fallback_atr = ATR_FIXED_VALUE if USE_FIXED_ATR else 5
-        print(f"ATR:{fallback_atr}" + (" " * (34 - len(str(fallback_atr)))) + "K:2")
+        default_atr = ATR_STATIC_VALUE if ATR_MODE == "Static" else (14 if ATR_MODE == "Standard ATR (14)" else 5)
+        print(f"ATR:{default_atr}" + (" " * (34 - len(str(default_atr)))) + "K:2")
+
