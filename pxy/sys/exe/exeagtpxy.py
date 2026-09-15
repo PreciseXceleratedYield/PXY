@@ -17,7 +17,7 @@ logger = logging.getLogger("exeavgpxy.strategy")
 # 📊 SECTION 1: SYSTEM A THRESHOLD PROCESSING & PLACEMENT LOGIC
 # -----------------------------------------------------------------------------
 SYSTEM_A_BASE_THRESHOLD = 25.0
-ABS_CAP = 49.0
+ABS_CAP = 77.0
 
 
 def getexeagtpxy(ce_invst_factor, pe_invst_factor):
