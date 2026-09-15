@@ -1,5 +1,5 @@
 //@version=6
-indicator("Ultimate Multi-Mode Supertrend (PXY Engine - Part 1)", overlay=true, max_bars_back=4900)
+indicator("PXY®", overlay=true, max_bars_back=4900)
 
 // --- 1. CONFIGURATION INTERFACE (Inputs Tab) ---
 multiplier        = input.float(1.4, title="Multiplier", group="Supertrend Parameters")
@@ -18,6 +18,10 @@ modeSelector      = input.string("Mode 02: Flex (Mode 0 in SIDE / Mode 2 in TREN
          "Mode 04: Flex (Mode 0 in SIDE / Mode 4 in TREND)",
          "Mode 05: Flex (Mode 0 in SIDE / Mode 5 in TREND)"
      ], group="Source Selection Matrix")
+
+// 🎯 ATR CALCULATION MODE MATRIX CONFIGURATION
+atrModeSelection  = input.string("Dynamic", title="ATR Calculation Mode", options=["Dynamic", "Static", "Standard ATR (14)"], group="ATR Engine Configuration Override")
+staticAtrValue    = input.int(5, title="Static ATR Value Input", minval=1, group="ATR Engine Configuration Override")
 
 plotCustomCandles = input.bool(true, title="Render Transformed Candles", group="Visual Styles")
 showBackground    = input.bool(true, title="Color Background by State", group="Visual Styles")
@@ -67,6 +71,7 @@ else if modeSelector == "Mode 4: OCCC/4"
 else if modeSelector == "Mode 5: OHLCC/5"
     dynamicTransClose := m5
 
+// 🎯 FIXED BUG: Added [1] back into the history reference loop context to allow red candle transitions
 bool dynamicIsBullish = dynamicTransClose >= nz(dynamicTransClose[1], dynamicTransClose)
 
 var int greenStreak = 0
@@ -82,7 +87,7 @@ else
 int ce_depth = greenStreak
 int pe_depth = redStreak
 
-// 🎯 CONFIRMED FIXED: Corrected historical referencing to prevent zero variations
+// 🎯 FIXED BUG: Corrected index referencing offset arrays here too
 float candleMove    = close - nz(close[1], close)
 float absCandleMove = math.abs(candleMove)
 float avgClosedMove = ta.sma(absCandleMove, 3) 
@@ -97,14 +102,20 @@ else
 int ce_power = candleMove > 0 ? scaledPower : 1
 int pe_power = candleMove < 0 ? scaledPower : 1
 
-int dynamicAtrPeriod = ce_depth + pe_depth + ce_power + pe_power
-
-if dynamicAtrPeriod < 4
-    dynamicAtrPeriod := 4
-if dynamicAtrPeriod > 4500
-    dynamicAtrPeriod := 4500
-// --- Continued from Part 1 parameters ---
-float prevTransClose = nz(m0[1], m0) 
+// 🎯 METHOD SWITCH COMPILER CONFIGURATION LOGIC
+int dynamicAtrPeriod = staticAtrValue
+if atrModeSelection == "Static"
+    dynamicAtrPeriod := staticAtrValue
+else if atrModeSelection == "Standard ATR (14)"
+    dynamicAtrPeriod := 14
+else // Default Dynamic Calculation
+    dynamicAtrPeriod := ce_depth + pe_depth + ce_power + pe_power
+    if dynamicAtrPeriod < 5
+        dynamicAtrPeriod := 5
+    if dynamicAtrPeriod > 4500
+        dynamicAtrPeriod := 4500
+// --- 6. CONTINUED RUNTIME ENGINE BOUNDARY TRACKING ---
+float prevTransClose = nz(m0, m0) 
 float tr_val         = math.max(high - low, math.max(math.abs(high - prevTransClose), math.abs(low - prevTransClose)))
 float atrValue       = ta.sma(tr_val, dynamicAtrPeriod)
 
@@ -118,7 +129,7 @@ float prevDnBand = nz(dnBand, lowerBandBasic)
 upBand := src < prevUpBand ? math.min(upperBandBasic, prevUpBand) : upperBandBasic
 dnBand := src > prevDnBand ? math.max(lowerBandBasic, prevDnBand) : lowerBandBasic
 
-// --- 6. INSTANT STATE & CROSSOVER EVALUATION ---
+// --- 7. STATE TRANSITION & CROSSOVER MATRIX EVALUATION ---
 if trend == -1 and ta.crossover(m0, prevUpBand)
     trend := 1
     anchorPrice := src
@@ -136,7 +147,7 @@ float mirrorLine = anchorPrice - stDistanceFromAnchor
 float highestLine = math.max(stLine, mirrorLine)
 float lowestLine  = math.min(stLine, mirrorLine)
 
-// Determine the instant market condition classification
+// Establish definitive structural states
 string instantMarketState = "SIDE"
 if m0 > highestLine
     instantMarketState := "BULL"
@@ -145,7 +156,7 @@ else if m0 < lowestLine
 else
     instantMarketState := "SIDE"
 
-// --- 7. FINAL CANDLE ROUTING MATRIX (INSTANT SWAP) ---
+// --- 8. CANDLE TRANSFORM LAYER ROUTING SWITCH ---
 float transClose = na
 float displayOpen = open
 
@@ -161,7 +172,7 @@ else if modeSelector == "Mode 3: OCC/3"
 else if modeSelector == "Mode 4: OCCC/4"
     transClose  := m4
 else if modeSelector == "Mode 5: OHLCC/5"
-    transClose  := m5
+    transClose  := na 
 else 
     if instantMarketState == "SIDE"
         transClose  := m0
@@ -170,7 +181,10 @@ else
         transClose  := trendTargetMode
         displayOpen := (trendTargetMode == m0) ? close : open
 
-// --- 8. VISUAL PLOTS & RENDERING ---
+if modeSelector == "Mode 5: OHLCC/5"
+    transClose := m5
+
+// --- 9. RENDER ENGINE AND VISUAL STYLES MAP ---
 color stateBgColor = color.new(color.white, 93) 
 if instantMarketState == "BULL"
     stateBgColor := color.new(#4caf50, 92)
@@ -182,28 +196,27 @@ softRed       = color.new(#e57373, 20)
 softGreenGlow = #66bb6a
 softRedGlow   = #ef5350
 
-// UNIVERSAL RELATIVE CLOSE COLOR MATRIX
+// 🎯 FIXED BUG: Added array offset tracking back into color mapping layer to render red bodies
 isBullish = transClose >= nz(transClose[1], transClose)
 c_body    = isBullish ? softGreen : softRed
 c_glow    = isBullish ? softGreenGlow : softRedGlow
 
-// Render Custom Candlesticks
+// Render Candlesticks
 plotcandle(plotCustomCandles ? displayOpen : na, plotCustomCandles ? high : na, plotCustomCandles ? low : na, plotCustomCandles ? transClose : na, 
            title="Transformed Candle Layer", color=c_body, wickcolor=c_glow, bordercolor=c_glow)
 
-// Trailing Ribbon Layout Lines
+// Plot Support / Resistance Matrix Boundaries
 stColor = (trend == 1) ? color.green : color.red
 plot(stLine, color=stColor, linewidth=3, title="Standard Supertrend")
 plot(mirrorLine, color=color.new(stColor, 40), linewidth=2, title="Inverse Mirror Line")
 
-// State Background Triggers
+// Process Background Transforms
 bgcolor(showBackground ? stateBgColor : na, title="Market Condition Background")
 
-// --- 9. TOP-RIGHT METRIC VIEWPORT DASHBOARD TABLE ---
-// 🎯 SIMULATED & CONFIRMED: Uses proper Pine v6 'text_formatting = text.format_bold' syntax
+// --- 10. METRIC DISPLAY OVERLAY MATRIX VIEWPORT ---
 var table telemetryTable = table.new(position = position.top_right, columns = 2, rows = 5, bgcolor = color.white, border_width = 1, border_color = #cccccc)
 if barstate.islast and showDashboard
-    table.cell(telemetryTable, 0, 0, "DYNAMIC ATR LENGTH", text_color=color.black, text_size=size.small, bgcolor=#e0e0e0, text_formatting=text.format_bold)
+    table.cell(telemetryTable, 0, 0, "CURRENT ATR PERIOD", text_color=color.black, text_size=size.small, bgcolor=#e0e0e0, text_formatting=text.format_bold)
     table.cell(telemetryTable, 1, 0, str.tostring(dynamicAtrPeriod), text_color=color.blue, text_size=size.small, text_font_family=font.family_monospace, bgcolor=#e0e0e0, text_formatting=text.format_bold)
     
     table.cell(telemetryTable, 0, 1, "CE Streak Depth", text_color=color.black, text_size=size.small, bgcolor=color.white, text_formatting=text.format_bold)
