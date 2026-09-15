@@ -6,7 +6,7 @@ def get_entry_signal(df=None):
     """Routes options positioning purely based on the SuperTrend Profile.
     
     Pipeline Isolation Architecture:
-    - Entry Pipe (entry): Routes structural tokens (ATMBUY, ATMSELL, EXITCE, EXITPE, NONE).
+    - Entry Pipe (entry): Routes structural tokens (OTMBUY, OTMSELL, EXITCE, EXITPE, NONE).
     - Exit Pipe (ex): Routes baseline directional flags (BULL, BEAR, NONE).
     
     Global Failure State Rule:
@@ -39,18 +39,18 @@ def get_entry_signal(df=None):
     # ===== ROUTING ENGINE MATRIX ===== #
     if trend == "BULL":
         if mkt_exit_dir == "BULL":
-            return "ATMBUY", "BULL"
+            return "OTMBUY", "BULL"
         elif mkt_exit_dir == "BEAR":
             return "EXITCE", "BULL"
 
     elif trend == "BEAR":
         if mkt_exit_dir == "BEAR":
-            return "ATMSELL", "BEAR"
+            return "OTMSELL", "BEAR"
         elif mkt_exit_dir == "BULL":
             return "EXITPE", "BEAR"
 
     elif trend == "SIDE":
-        # Sideways protection layout: entries convert strictly into non-ATM exit mitigators
+        # Sideways protection layout: entries convert strictly into non-OTM exit mitigators
         if mkt_exit_dir == "BULL":
             return "EXITPE", "BULL"
         elif mkt_exit_dir == "BEAR":
