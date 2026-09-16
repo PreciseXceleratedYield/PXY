@@ -12,7 +12,11 @@ def f(x, d=0.0):
         return d
 
 def target_price(row):
-    # Calculates individual option layer target price using exit status alignment.
+    """Calculates individual option layer target price using exit status alignment.
+    
+    Protects positions by forcing an immediate ATR-based tight target when the router
+    issues either a native exit or an explicit opposite-direction signal.
+    """
     try:
         # 1️⃣ Entry data execution health check
         entry_prc = f(row.get('pxy_entry') or row.get('buy_prc'))
@@ -22,7 +26,7 @@ def target_price(row):
         # 2️⃣ Context string extractors and numeric ATR extraction
         symbol = str(row.get('symbol', 'unknown')).upper()
         derived_entry = str(row.get('entry', '')).upper().strip()
-        atr_val = f(row.get('atr'), d=1.4)  # Fallback to 1.4% or your preferred default if invalid/zero
+        atr_val = f(row.get('atr'), d=1.4)  # Fallback to 1.4% preferred default if invalid/zero
         
         is_ce = 'CE' in symbol
         is_pe = 'PE' in symbol
@@ -31,11 +35,20 @@ def target_price(row):
             
         target_pct = 0.0
         
-        # 3️⃣ Symmetrical Binary Evaluation Matrices (Strictly Exclusive Mappings)
+        # 3️⃣ Symmetrical Risk Matrices (Isolating true opposite trend shifts)
         if is_ce:
-            target_pct = atr_val/1 if derived_entry == 'EXITCE' else 99.0
+            # Defensive target if native exit OR standard bearish entry triggers
+            if derived_entry in ['EXITCE', 'OTMSELL']:
+                target_pct = atr_val / 1.0
+            else:
+                target_pct = 99.0
+                
         elif is_pe:
-            target_pct = atr_val/1 if derived_entry == 'EXITPE' else 99.0
+            # Defensive target if native exit OR standard bullish entry triggers
+            if derived_entry in ['EXITPE', 'OTMBUY']:
+                target_pct = atr_val / 1.0
+            else:
+                target_pct = 99.0
             
         # 4️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
