@@ -83,7 +83,7 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     font-family:'Syne',sans-serif;font-weight:800;font-size:11px;color:var(--text);
 }
 
-#colTerminal{width:21%;border-right:none;transition:width 0.25s ease;overflow:hidden;position:relative;}
+#colTerminal{width:26%;border-right:none;transition:width 0.25s ease;overflow:hidden;position:relative;}
 #colTerminal.collapsed{width:8px;}
 #colTerminal.collapsed .col-hdr,#colTerminal.collapsed #termBox{opacity:0;pointer-events:none;transition:opacity 0.15s ease;}
 #colTerminal:not(.collapsed) .col-hdr,#colTerminal:not(.collapsed) #termBox{opacity:1;transition:opacity 0.2s ease 0.08s;}
@@ -91,7 +91,14 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
     background:linear-gradient(180deg,var(--accent),var(--bull));opacity:0.7;
 }
-#colPositions{width:25%;}
+#colPositions{width:25%;transition:width 0.25s ease;overflow:hidden;position:relative;}
+#colPositions.collapsed{width:8px;}
+#colPositions.collapsed #posTop,#colPositions.collapsed #posBot{opacity:0;pointer-events:none;transition:opacity 0.15s ease;}
+#colPositions:not(.collapsed) #posTop,#colPositions:not(.collapsed) #posBot{opacity:1;transition:opacity 0.2s ease 0.08s;}
+#colPositions.collapsed::after{
+    content:'';position:absolute;right:0;top:0;bottom:0;width:3px;
+    background:linear-gradient(180deg,var(--bull),var(--bear));opacity:0.7;
+}
 #colChart{flex:1;}
 
 /* ── TERMINAL ── */
@@ -431,6 +438,22 @@ try{
         });
         tCol.addEventListener('mouseleave',()=>{
             tHideTimer=setTimeout(()=>tCol.classList.add('collapsed'),450);
+        });
+    }
+}catch(e){}
+
+// Positions+Trades column: auto-hide (collapses to a thin edge strip; hover to reveal)
+try{
+    const pCol=document.getElementById('colPositions');
+    if(pCol){
+        let pHideTimer=null;
+        pCol.classList.add('collapsed');
+        pCol.addEventListener('mouseenter',()=>{
+            clearTimeout(pHideTimer);
+            pCol.classList.remove('collapsed');
+        });
+        pCol.addEventListener('mouseleave',()=>{
+            pHideTimer=setTimeout(()=>pCol.classList.add('collapsed'),450);
         });
     }
 }catch(e){}
