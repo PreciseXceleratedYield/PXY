@@ -12,8 +12,9 @@ from syspwerpxy import get_ce_pe_power
 
 init(autoreset=True)
 
-# 🎯 CONFIG MATRIX
-ATR_MODE = "Standard ATR (14)"  # Switched to active standard calculation
+# 🎯 MULTI-MODE NUMERIC CONFIGURATION MATRIX
+# 1 = Static, 2 = Standard ATR (14), 3 = Dynamic
+ATR_MODE = 3  
 ATR_STATIC_VALUE = 7
 TOTAL_WIDTH = 40
 
@@ -34,7 +35,6 @@ def calculate_true_14_atr(df: pd.DataFrame) -> float:
         if df is None or df.empty or len(df) < 15:
             return 14.0
         
-        # Standardise headers to lowercase for secure calculation matrix processing
         df_clean = df.copy()
         df_clean.columns = [c.lower() for c in df_clean.columns]
         
@@ -42,7 +42,6 @@ def calculate_true_14_atr(df: pd.DataFrame) -> float:
         low = df_clean['low']
         close_prev = df_clean['close'].shift(1)
         
-        # Math True Range pools
         tr1 = high - low
         tr2 = (high - close_prev).abs()
         tr3 = (low - close_prev).abs()
@@ -72,9 +71,9 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int, ce_p: int = 
 # --- BACKWARD COMPATIBILITY LINKERS FOR OUTSIDE POOLS ---
 def calculate_atr(df: pd.DataFrame) -> pd.Series:
     try:
-        if ATR_MODE == "Static":
+        if ATR_MODE == 1:
             val = float(ATR_STATIC_VALUE)
-        elif ATR_MODE == "Standard ATR (14)":
+        elif ATR_MODE == 2:
             val = calculate_true_14_atr(df)
         else:
             _, past_str, ce_d, pe_d = detect_pxy_flip_signal(df=df)
@@ -83,7 +82,7 @@ def calculate_atr(df: pd.DataFrame) -> pd.Series:
             
         return pd.Series(val, index=df.index) if df is not None and not df.empty else pd.Series([val])
     except Exception:
-        fb = 14.0 if ATR_MODE == "Standard ATR (14)" else (float(ATR_STATIC_VALUE) if ATR_MODE == "Static" else 5.0)
+        fb = 14.0 if ATR_MODE == 2 else (float(ATR_STATIC_VALUE) if ATR_MODE == 1 else 5.0)
         return pd.Series(fb, index=df.index) if df is not None and not df.empty else pd.Series([fb])
 
 def calculate_dynamic_k(df: pd.DataFrame) -> int:
@@ -101,9 +100,9 @@ if __name__ == "__main__":
         final_k = 2
         
         if df is not None and not df.empty:
-            if ATR_MODE == "Static":
+            if ATR_MODE == 1:
                 final_atr = int(ATR_STATIC_VALUE)
-            elif ATR_MODE == "Standard ATR (14)":
+            elif ATR_MODE == 2:
                 final_atr = int(round(calculate_true_14_atr(df)))
             else:
                 _, past_depth_str, ce_depth, pe_depth = detect_pxy_flip_signal(df=df)
@@ -118,10 +117,8 @@ if __name__ == "__main__":
         spc = " " * max(TOTAL_WIDTH - len(l_txt) - len(r_txt), 1)
         print(l_txt + spc + r_txt)
     except Exception:
-        default_atr = 14 if ATR_MODE == "Standard ATR (14)" else (ATR_STATIC_VALUE if ATR_MODE == "Static" else 5)
+        default_atr = 14 if ATR_MODE == 2 else (ATR_STATIC_VALUE if ATR_MODE == 1 else 5)
         l_txt = f"ATR:{default_atr}"
         r_txt = "K:2"
         spc = " " * max(TOTAL_WIDTH - len(l_txt) - len(r_txt), 1)
         print(l_txt + spc + r_txt)
-
-
