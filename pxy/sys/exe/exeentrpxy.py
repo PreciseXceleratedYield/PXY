@@ -5,12 +5,13 @@ import pytz
 import traceback
 import re
 import subprocess
+import stat
 from pathlib import Path
 from datetime import datetime, time as dt_time
 from colorama import Fore, init, Style
 
 # --- GLOBAL CONFIG ---
-DEBUG = True  # 🌟 FORCED TRUE: Let's see the exact error traceback
+DEBUG = False  # Set to True if you need to debug downstream binary errors
 COUNTERBUY = "NO" 
 COOL_DOWN_SECONDS = 35
 
@@ -71,7 +72,7 @@ try:
     from runpchkpxy import get_position_summary
     dprint("IMPORTS OK", Fore.GREEN)
 except Exception as e:
-    print(f"{Fore.RED}IMP ERR: {str(e)}"); traceback.print_exc(); sys.exit(1)
+    print(f"{Fore.RED}IMP ERR: {str(e)}"); sys.exit(1)
 
 
 def main():
@@ -128,7 +129,7 @@ def main():
         
         # Upfront Gate: CE PE Weight Check
         if ce_lots >= 1 and pe_lots >= 1:
-            print(f"{Fore.YELLOW}⚠️ CE|PE Weighted already,")
+            print(f"{Fore.YELLOW}⚠️  CE|PE Weighted already,")
             print(f"{Fore.YELLOW}  handing to AVG")
             return
 
@@ -139,8 +140,8 @@ def main():
         res = {"stat": "SKIPPED"}
         is_flat = (ce_lots == 0 and pe_lots == 0)
 
-        # 6. Routing Engine (Using hardcoded parent absolute path to match your structure)
-        pxy_root = Path("/home/pxy/PXY/pxy")
+        # 6. Routing Engine (Corrected to verified lowercase directory structure)
+        pxy_root = Path("/home/pxy/pxy")
 
         if "BUY" in sig:
             dprint("BRANCH: CE")
@@ -148,7 +149,12 @@ def main():
                 if not is_side_cooling("CE"):
                     dprint("Run pxybuyce", Fore.CYAN)
                     exe_path = str(pxy_root / "pxybuyce")
-                    dprint(f"Path Check: {exe_path}", Fore.WHITE)
+                    
+                    # Dynamically fix execution rights if missing
+                    try:
+                        st = os.stat(exe_path)
+                        os.chmod(exe_path, st.st_mode | stat.S_IEXEC)
+                    except: pass
                     
                     s_res = subprocess.run([exe_path], capture_output=True, text=True)
                     if s_res.returncode == 0:
@@ -165,7 +171,12 @@ def main():
                 if not is_side_cooling("PE"):
                     dprint("Run pxybuype", Fore.CYAN)
                     exe_path = str(pxy_root / "pxybuype")
-                    dprint(f"Path Check: {exe_path}", Fore.WHITE)
+                    
+                    # Dynamically fix execution rights if missing
+                    try:
+                        st = os.stat(exe_path)
+                        os.chmod(exe_path, st.st_mode | stat.S_IEXEC)
+                    except: pass
                     
                     s_res = subprocess.run([exe_path], capture_output=True, text=True)
                     if s_res.returncode == 0:
@@ -184,9 +195,7 @@ def main():
         print(f"{Fore.WHITE}=" * 40)
         dprint("===== END =====", Fore.GREEN)
     except Exception:
-        # This will now print the exact line number and variable that threw the error
-        print(f"{Fore.RED}❌ CRITICAL SCRIPT FAULT:")
-        print(traceback.format_exc())
+        print(traceback.format_exc() if DEBUG else "❌ Error encountered")
 
 
 if __name__ == "__main__":
