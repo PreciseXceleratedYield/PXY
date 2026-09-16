@@ -135,7 +135,6 @@ def main():
         max_ce, max_pe = get_target_quantities(ce_lots, pe_lots, LOT_SIZE)
         dprint(f"MAX C:{max_ce} | P:{max_pe}")
 
-        res = {"stat": "SKIPPED"}
         is_flat = (ce_lots == 0 and pe_lots == 0)
 
         # 6. Routing Engine (Matching exact execution framework of your reference code)
@@ -146,9 +145,7 @@ def main():
                     print(f"{Fore.GREEN}{Style.BRIGHT}🟢 FRESH ENTRY: Firing command 'pxybuyce'...")
                     try:
                         os.system("pxybuyce")
-                        res = {"stat": "OK"}
                     except Exception as e:
-                        res = {"stat": "FAIL"}
                         print(f"{Fore.RED}⚠️ Failed to execute pxybuyce: {e}")
             else:
                 dprint("CE limit hit", Fore.YELLOW)
@@ -160,19 +157,11 @@ def main():
                     print(f"{Fore.GREEN}{Style.BRIGHT}🟢 FRESH ENTRY: Firing command 'pxybuype'...")
                     try:
                         os.system("pxybuype")
-                        res = {"stat": "OK"}
                     except Exception as e:
-                        res = {"stat": "FAIL"}
                         print(f"{Fore.RED}⚠️ Failed to execute pxybuype: {e}")
             else:
                 dprint("PE limit hit", Fore.YELLOW)
 
-        # Final Summary Panel (Strictly 40 characters wide)
-        print(f"{Fore.WHITE}=" * 40)
-        print(f" 🎯 Sig  : {entry_signal[:27]}")
-        print(f" 📦 Pos  : {pos_raw[:27]}")
-        print(f" 📌 Stat : {res.get('stat')}")
-        print(f"{Fore.WHITE}=" * 40)
         dprint("===== END =====", Fore.GREEN)
     except Exception:
         print(traceback.format_exc() if DEBUG else "❌ Error encountered")
