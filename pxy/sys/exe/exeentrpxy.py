@@ -11,7 +11,7 @@ from datetime import datetime, time as dt_time
 from colorama import Fore, init, Style
 
 # --- GLOBAL CONFIG ---
-DEBUG = False  # Set to True if you need to debug downstream binary errors
+DEBUG = True  # Set to True if you need to debug downstream binary errors
 COUNTERBUY = "NO" 
 COOL_DOWN_SECONDS = 35
 
