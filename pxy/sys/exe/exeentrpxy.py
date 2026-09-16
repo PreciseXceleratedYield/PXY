@@ -11,7 +11,6 @@ from colorama import Fore, init, Style
 # --- GLOBAL CONFIG ---
 DEBUG = False 
 COUNTERBUY = "NO" 
-COOL_DOWN_SECONDS = 35
 
 init(autoreset=True)
 
@@ -33,35 +32,6 @@ def dprint(msg, color=Fore.CYAN):
     if DEBUG:
         print(f"{Style.BRIGHT}{color}[DBUG] {msg[:35]}{Style.RESET_ALL}")
 
-def reset_daily_cooling():
-    ist = pytz.timezone("Asia/Kolkata")
-    now = datetime.now(ist)
-    if now.hour == 9 and now.minute == 15:
-        for side in ["ce", "pe"]:
-            f = f"exebal_cool_{side}.txt"
-            if os.path.exists(f):
-                try:
-                    os.remove(f)
-                    dprint(f"Reset: Clear {side}", Fore.YELLOW)
-                except: pass
-
-def is_side_cooling(side):
-    file_path = f"exebal_cool_{side.lower()}.txt"
-    if not os.path.exists(file_path):
-        return False
-    try:
-        with open(file_path, "r") as f:
-            last_ts = float(f.read().strip())
-            elapsed = time.time() - last_ts
-            if elapsed < COOL_DOWN_SECONDS:
-                rem = int(COOL_DOWN_SECONDS - elapsed)
-                dprint(f"{side} Cool: {rem}s left", Fore.WHITE)
-                return True
-            os.remove(file_path)
-            dprint(f"{side} Cool Expired", Fore.CYAN)
-            return False
-    except: return False
-
 dprint("IMPORTING...")
 try:
     from syspxy import get_all_data
@@ -76,7 +46,6 @@ except Exception as e:
 def main():
     dprint("===== START =====", Fore.GREEN)
     try:
-        reset_daily_cooling()
         IST = pytz.timezone("Asia/Kolkata")
         now = datetime.now(IST).time()
         dprint(f"TIME: {now}")
@@ -141,24 +110,22 @@ def main():
         if "BUY" in sig:
             dprint("BRANCH: CE")
             if is_flat or (ce_lots < max_ce):
-                if not is_side_cooling("CE"):
-                    print(f"{Fore.GREEN}{Style.BRIGHT}🟢 FRESH ENTRY: Firing command 'pxybuyce'...")
-                    try:
-                        os.system("pxybuyce")
-                    except Exception as e:
-                        print(f"{Fore.RED}⚠️ Failed to execute pxybuyce: {e}")
+                print(f"{Fore.GREEN}{Style.BRIGHT}🟢 FRESH ENTRY: Firing command 'pxybuyce'...")
+                try:
+                    os.system("pxybuyce")
+                except Exception as e:
+                    print(f"{Fore.RED}⚠️ Failed to execute pxybuyce: {e}")
             else:
                 dprint("CE limit hit", Fore.YELLOW)
 
         elif "SELL" in sig:
             dprint("BRANCH: PE")
             if is_flat or (pe_lots < max_pe):
-                if not is_side_cooling("PE"):
-                    print(f"{Fore.GREEN}{Style.BRIGHT}🟢 FRESH ENTRY: Firing command 'pxybuype'...")
-                    try:
-                        os.system("pxybuype")
-                    except Exception as e:
-                        print(f"{Fore.RED}⚠️ Failed to execute pxybuype: {e}")
+                print(f"{Fore.GREEN}{Style.BRIGHT}🟢 FRESH ENTRY: Firing command 'pxybuype'...")
+                try:
+                    os.system("pxybuype")
+                except Exception as e:
+                    print(f"{Fore.RED}⚠️ Failed to execute pxybuype: {e}")
             else:
                 dprint("PE limit hit", Fore.YELLOW)
 
@@ -169,3 +136,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
