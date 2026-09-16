@@ -177,8 +177,10 @@ body{
 }
 #optOverlay{flex-shrink:0;background:var(--bg2);border-top:1px solid var(--border2);}
 #optOverlay:empty{display:none;}
+#sigTable{flex-shrink:0;background:var(--bg2);border-top:1px solid var(--border2);}
+#sigTable:empty{display:none;}
 .opt-tbl{width:100%;table-layout:fixed;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:12.6px;color:var(--text);}
-.opt-tbl th{padding:2px 4px;color:var(--muted);font-weight:700;text-align:center;border-bottom:1px solid var(--border2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.opt-tbl th{padding:2px 4px;color:var(--muted);font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .opt-tbl td{padding:2px 4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .opt-tbl tr.opt-ce td:first-child{border-left:2px solid var(--bull);}
 .opt-tbl tr.opt-pe td:first-child{border-left:2px solid var(--bear);}
@@ -191,7 +193,7 @@ body{
 
 /* ── RISK BAR ── */
 #riskBar{
-    height:44px;flex-shrink:0;display:flex;align-items:center;
+    height:57px;flex-shrink:0;display:flex;align-items:center;
     padding:0 12px;gap:10px;background:var(--bg2);
     border-bottom:1px solid var(--border2);overflow:hidden;
 }
@@ -200,7 +202,7 @@ body{
 .rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:12px;white-space:nowrap;color:#ffffff;}
 .rsk-val.bull{color:var(--bull);}
 .rsk-val.bear{color:var(--bear);}
-.rsk-candle-wrap{flex:1;min-width:0;height:30px;position:relative;overflow:hidden;border-radius:5px;background:var(--bg3);border:1px solid var(--border);}
+.rsk-candle-wrap{flex:1;min-width:0;height:39px;position:relative;overflow:hidden;border-radius:5px;background:var(--bg3);border:1px solid var(--border);}
 #rskCanvas{position:absolute;inset:0;width:100%!important;height:100%!important;}
 
 /* ── TAB BAR ── */
@@ -380,16 +382,8 @@ body{
     </div>
 </div>
 
-<!-- PNL BAR — absolute bottom (with signal bar in middle) -->
-<div id="pnlBar" style="height:36px;flex-shrink:0;display:flex;align-items:stretch;background:var(--bg2);border-top:1px solid var(--border);">
-    <div class="sig-cell" style="min-width:6ch;"><span class="sc-lbl">💰</span><span class="sc-val" id="pnlRunning">—</span></div>
-    <div class="sig-cell" id="cellEntry" style="flex:0 1 3ch;max-width:3ch;"><span class="sc-lbl">🛫</span><span class="sc-val" id="hcEntry">—</span></div>
-    <div class="sig-cell" id="cellExit" style="flex:0 1 3ch;max-width:3ch;"><span class="sc-lbl">🛬</span><span class="sc-val" id="hcExit">—</span></div>
-    <div class="sig-cell" id="cellTrend" style="flex:0 1 3ch;max-width:3ch;"><span class="sc-lbl">🚀</span><span class="sc-val" id="hcTrend">—</span></div>
-    <div class="sig-cell" id="cellATR" style="flex:0 1 3ch;max-width:3ch;"><span class="sc-lbl">📐</span><span class="sc-val" id="hcATR">—</span></div>
-    <div class="sig-cell" id="cellDP" style="flex:2;"><span class="sc-lbl">⚡⚡</span><span class="sc-val" id="dpText">—</span></div>
-    <div class="sig-cell" style="min-width:6ch;"><span class="sc-lbl">✅</span><span class="sc-val" id="pnlBooked">—</span></div>
-</div>
+<!-- SIGNAL TABLE (Entry/Exit/Trend/ATR/Depth-Power) -->
+<div id="sigTable"></div>
 
 <!-- TAB BAR -->
 <div id="tabBar">
@@ -569,8 +563,8 @@ function cls(v){
 }
 function emojifyEntry(v){
     const s=String(v||'').toUpperCase();
-    if(s==='EXITCE')return'▲';
-    if(s==='EXITPE')return'▼';
+    if(s==='EXITCE')return'🔴';
+    if(s==='EXITPE')return'🟢';
     if(s.includes('BUY')||s.includes('BULL'))return'🟢';
     if(s.includes('SELL')||s.includes('BEAR'))return'🔴';
     if(s==='NONE')return'—';
@@ -679,28 +673,13 @@ $('reconnectBtn').addEventListener('click',()=>{term.clear();connect();});
 async function loadDash(){
     try{
         const d=await fetch('./webdashpxy.json?_='+Date.now()).then(r=>r.json());
-        const setV=(id,val,c)=>{
-            const el=$(id);if(!el)return;
-            el.textContent=val??'—';
-            if(c){el.className='sc-val';if(c!=='sc-val')el.classList.add(c);}
-        };
-        setV('hcEntry',emojifyEntry(d.entry??'NONE'),cls(d.entry||''));
-        setV('hcExit', emojifyExit(d.exit??'NONE'), cls(d.exit||''));
-        setV('hcTrend',emojifyTrend(d.supertrend),   cls(d.supertrend||''));
-        setV('hcATR',  `${d.atr??'—'}`, 'sc-val');
+        const entryV=emojifyEntry(d.entry??'NONE');
+        const exitV=emojifyExit(d.exit??'NONE');
+        const trendV=emojifyTrend(d.supertrend);
+        const atrV=`${d.atr??'—'}`;
 
-        ['cellEntry','cellExit','cellTrend','cellATR'].forEach(id=>{
-            const el=$(id);if(!el)return;
-            el.className='sig-cell';
-            const v=id==='cellEntry'?d.entry:id==='cellExit'?d.exit:id==='cellTrend'?d.supertrend:'';
-            const c=cls(v||'');
-            if(c==='bull')el.classList.add('bull-cell');
-            else if(c==='bear')el.classList.add('bear-cell');
-        });
-
-        // Depth / Power
-        const raw=d.candle_visual||'';
-        const cePow=d.ce_power||1, pePow=d.pe_power||1;
+        let dpV='—';
+        const raw=d.candle_visual||'',cePow=d.ce_power||1,pePow=d.pe_power||1;
         const re=/\u001b\[(\d+)m(\d+)\u001b\[0m/g;
         let m;const items=[];
         while((m=re.exec(raw))!==null)items.push({n:+m[2],bull:m[1]==='92'});
@@ -710,17 +689,16 @@ async function loadDash(){
             while(si>0&&items[si-1].bull===last.bull)si--;
             const depth=items.length-si;
             const power=last.bull?cePow:pePow;
-            const dpEl=$('dpText');
-            if(dpEl){
-                dpEl.textContent=`📊${depth} 🚦 ⚡${power}`;
-                dpEl.className='sc-val '+(last.bull?'bull':'bear');
-            }
-            const cellDP=$('cellDP');
-            if(cellDP){
-                cellDP.className='sig-cell';
-                cellDP.style.flex='2';
-                cellDP.classList.add(last.bull?'bull-cell':'bear-cell');
-            }
+            dpV=`📊${depth} 🚦 ⚡${power}`;
+        }
+
+        const sig=$('sigTable');
+        if(sig){
+            sig.innerHTML='<table class="opt-tbl"><thead><tr>'
+                +'<th>ENTRY</th><th>EXIT</th><th>TREND</th><th>ATR</th><th>DEPTH ⚡⚡ POWER</th>'
+                +'</tr></thead><tbody><tr>'
+                +`<td>${entryV}</td><td>${exitV}</td><td>${trendV}</td><td>${atrV}</td><td>${dpV}</td>`
+                +'</tr></tbody></table>';
         }
     }catch(e){}
 }
@@ -942,8 +920,7 @@ async function loadPos(){
     runningTotal=total;
     refreshRiskCandle();
     const lbl=$('posPnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
-    const r=$('pnlRunning');r.textContent=fmt(total);r.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
-    if(posPnlChanged){flashEl(lbl,posPnlUp?'flash-up':'flash-down');flashEl(r,posPnlUp?'flash-up':'flash-down');}
+    if(posPnlChanged){flashEl(lbl,posPnlUp?'flash-up':'flash-down');}
     prevPosPnl=total;
     const scroll=$('posScroll');
     scroll.querySelectorAll('.p-row').forEach(r=>r.remove());
@@ -1137,8 +1114,7 @@ async function loadTrades(){
     bookedTotal=total;
     refreshRiskCandle();
     const lbl=$('tradePnlLabel');lbl.textContent=fmt(total);lbl.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
-    const b=$('pnlBooked');b.textContent=fmt(total);b.style.color=total>=0?cssVar('--bull'):cssVar('--bear');
-    if(tradePnlChanged){flashEl(lbl,tradePnlUp?'flash-up':'flash-down');flashEl(b,tradePnlUp?'flash-up':'flash-down');}
+    if(tradePnlChanged){flashEl(lbl,tradePnlUp?'flash-up':'flash-down');}
     prevTradePnl=total;
     const scroll=$('tradeScroll');
     const trPrevScrollTop=scroll.scrollTop;
@@ -1374,14 +1350,14 @@ async function loadOptSummary(){
     let d=null;try{d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     d=d||{};
     const ov=$('optOverlay');
-    const cols=['LOT','INV','PNL','LGT','RUN','TGT','STS','DO'];
+    const cols=['LOT','INV','PNL','LGT','RUN','TGT'];
     const toK=n=>Math.round((n||0)/1000)+'k';
     const rnd=n=>Math.round(n||0);
-    const doIcon=s=>({hold:'✋',square_off:'⛔',fresh_buy:'🆕'}[String(s||'').toLowerCase()]??'⏳');
+    const doIcon=s=>({hold:'✋',square_off:'⛔',fresh_buy:'🆕'}[String(s||'').toLowerCase()]??'⏳'); // kept, unused for now
     const plainSign=n=>(Number(n||0)>=0?'+':'')+Math.round(n||0);
     const buildRow=(lots,pnl,inv,lgt,runPct,aligned,decision)=>[
         lots??'—', toK(inv), plainSign(pnl), rnd(lgt), rnd(runPct),
-        aligned?'99':'1.4', aligned?'✅':'❌', doIcon(decision)
+        aligned?'99':'1.4'
     ];
     const ceRow=buildRow(d.ce_lots,d.ce_pnl,d.ce_investment,d.ce_lgt,d.ce_run_pct,d.ce_aligned,d.ce_decision);
     const peRow=buildRow(d.pe_lots,d.pe_pnl,d.pe_investment,d.pe_lgt,d.pe_run_pct,d.pe_aligned,d.pe_decision);
