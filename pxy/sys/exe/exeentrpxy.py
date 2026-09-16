@@ -32,7 +32,6 @@ LOT_SIZE = 30 if t == "^NSEBANK" else 65 if t == "^NSEI" else None
 
 def dprint(msg, color=Fore.CYAN):
     if DEBUG:
-        # Wrap debug lines cleanly under 40 chars
         print(f"{Style.BRIGHT}{color}[DBUG] {msg[:30]}{Style.RESET_ALL}")
 
 def reset_daily_cooling():
@@ -75,7 +74,6 @@ try:
     from syspxy import get_all_data
     from execepepxy import get_target_quantities 
     from runclntpxy import get_session
-    from runfundpxy import get_available_funds
     from runpchkpxy import get_position_summary
     dprint("IMPORTS OK", Fore.GREEN)
 except Exception as e:
@@ -134,7 +132,7 @@ def main():
         
         dprint(f"CE: {ce_lots} | PE: {pe_lots}")
         
-        # Upfront Gate: CE PE Weight Check (Max 40 Chars)
+        # Upfront Gate: CE PE Weight Check
         if ce_lots >= 1 and pe_lots >= 1:
             print(f"{Fore.YELLOW}⚠️ CE|PE Weighted already,")
             print(f"{Fore.YELLOW}  handing to AVG")
@@ -178,14 +176,10 @@ def main():
             else:
                 dprint("PE limit hit", Fore.YELLOW)
 
-        funds = get_available_funds(client)
-        f_val = int(funds) if funds is not None else "N/A"
-
-        # Final Summary Panel (Formatted exactly to 40 characters wide)
+        # Final Summary Panel (Strictly 40 characters wide)
         print(f"{Fore.WHITE}=" * 40)
         print(f" 🎯 Sig  : {entry_signal[:27]}")
         print(f" 📦 Pos  : {pos_raw[:27]}")
-        print(f" 💰 Cash : {f_val}")
         print(f" 📌 Stat : {res.get('stat')}")
         print(f"{Fore.WHITE}=" * 40)
         dprint("===== END =====", Fore.GREEN)
@@ -195,4 +189,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
