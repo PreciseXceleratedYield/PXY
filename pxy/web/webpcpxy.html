@@ -560,8 +560,8 @@ function cls(v){
 }
 function emojifyEntry(v){
     const s=String(v||'').toUpperCase();
-    if(s==='EXITCE')return'▲';
-    if(s==='EXITPE')return'▼';
+    if(s==='EXITCE')return'▼';
+    if(s==='EXITPE')return'▲';
     if(s.includes('BUY')||s.includes('BULL'))return'🟢';
     if(s.includes('SELL')||s.includes('BEAR'))return'🔴';
     if(s==='NONE')return'—';
