@@ -10,7 +10,7 @@ from datetime import datetime, time as dt_time
 from colorama import Fore, init, Style
 
 # --- GLOBAL CONFIG ---
-DEBUG = True 
+DEBUG = False 
 COUNTERBUY = "NO" 
 COOL_DOWN_SECONDS = 35
 
@@ -62,12 +62,6 @@ def is_side_cooling(side):
             dprint(f"{side} Cool Expired", Fore.CYAN)
             return False
     except: return False
-
-def set_side_cooling(side):
-    file_path = f"exebal_cool_{side.lower()}.txt"
-    with open(file_path, "w") as f:
-        f.write(str(time.time()))
-    dprint(f"Cool Set: {side}", Fore.YELLOW)
 
 dprint("IMPORTING...")
 try:
@@ -145,16 +139,16 @@ def main():
         res = {"stat": "SKIPPED"}
         is_flat = (ce_lots == 0 and pe_lots == 0)
 
-        # 6. Routing Engine
+        # 6. Routing Engine (Fixed path routing logic)
         if "BUY" in sig:
             dprint("BRANCH: CE")
             if is_flat or (ce_lots < max_ce):
                 if not is_side_cooling("CE"):
                     dprint("Run pxybuyce", Fore.CYAN)
-                    s_res = subprocess.run("pxybuyce", shell=True, capture_output=True, text=True)
+                    # Fixed target path resolution to ensure direct execution
+                    s_res = subprocess.run(["./pxybuyce"], capture_output=True, text=True)
                     if s_res.returncode == 0:
                         res = {"stat": "OK"}
-                        set_side_cooling("CE")
                     else:
                         res = {"stat": "FAIL", "err": s_res.stderr}
                         dprint("Exec Error CE", Fore.RED)
@@ -166,10 +160,10 @@ def main():
             if is_flat or (pe_lots < max_pe):
                 if not is_side_cooling("PE"):
                     dprint("Run pxybuype", Fore.CYAN)
-                    s_res = subprocess.run("pxybuype", shell=True, capture_output=True, text=True)
+                    # Fixed target path resolution to ensure direct execution
+                    s_res = subprocess.run(["./pxybuype"], capture_output=True, text=True)
                     if s_res.returncode == 0:
                         res = {"stat": "OK"}
-                        set_side_cooling("PE")
                     else:
                         res = {"stat": "FAIL", "err": s_res.stderr}
                         dprint("Exec Error PE", Fore.RED)
@@ -189,3 +183,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
