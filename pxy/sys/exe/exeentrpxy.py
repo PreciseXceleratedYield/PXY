@@ -10,7 +10,7 @@ from datetime import datetime, time as dt_time
 from colorama import Fore, init, Style
 
 # --- GLOBAL CONFIG ---
-DEBUG = False 
+DEBUG = True  # 🌟 FORCED TRUE: Let's see the exact error traceback
 COUNTERBUY = "NO" 
 COOL_DOWN_SECONDS = 35
 
@@ -32,7 +32,7 @@ LOT_SIZE = 30 if t == "^NSEBANK" else 65 if t == "^NSEI" else None
 
 def dprint(msg, color=Fore.CYAN):
     if DEBUG:
-        print(f"{Style.BRIGHT}{color}[DBUG] {msg[:30]}{Style.RESET_ALL}")
+        print(f"{Style.BRIGHT}{color}[DBUG] {msg[:35]}{Style.RESET_ALL}")
 
 def reset_daily_cooling():
     ist = pytz.timezone("Asia/Kolkata")
@@ -71,7 +71,7 @@ try:
     from runpchkpxy import get_position_summary
     dprint("IMPORTS OK", Fore.GREEN)
 except Exception as e:
-    print(f"{Fore.RED}IMP ERR: {str(e)[:30]}"); sys.exit(1)
+    print(f"{Fore.RED}IMP ERR: {str(e)}"); traceback.print_exc(); sys.exit(1)
 
 
 def main():
@@ -139,9 +139,8 @@ def main():
         res = {"stat": "SKIPPED"}
         is_flat = (ce_lots == 0 and pe_lots == 0)
 
-        # 6. Routing Engine (Routes straight into the primary pxy root directory)
-        # HERE.parent.parent points straight up to /home/pxy/PXY/pxy/
-        pxy_root = HERE.parent.parent
+        # 6. Routing Engine (Using hardcoded parent absolute path to match your structure)
+        pxy_root = Path("/home/pxy/PXY/pxy")
 
         if "BUY" in sig:
             dprint("BRANCH: CE")
@@ -149,12 +148,14 @@ def main():
                 if not is_side_cooling("CE"):
                     dprint("Run pxybuyce", Fore.CYAN)
                     exe_path = str(pxy_root / "pxybuyce")
+                    dprint(f"Path Check: {exe_path}", Fore.WHITE)
+                    
                     s_res = subprocess.run([exe_path], capture_output=True, text=True)
                     if s_res.returncode == 0:
                         res = {"stat": "OK"}
                     else:
                         res = {"stat": "FAIL", "err": s_res.stderr}
-                        dprint("Exec Error CE", Fore.RED)
+                        dprint(f"Exec Err: {s_res.stderr[:25]}", Fore.RED)
             else:
                 dprint("CE limit hit", Fore.YELLOW)
 
@@ -164,12 +165,14 @@ def main():
                 if not is_side_cooling("PE"):
                     dprint("Run pxybuype", Fore.CYAN)
                     exe_path = str(pxy_root / "pxybuype")
+                    dprint(f"Path Check: {exe_path}", Fore.WHITE)
+                    
                     s_res = subprocess.run([exe_path], capture_output=True, text=True)
                     if s_res.returncode == 0:
                         res = {"stat": "OK"}
                     else:
                         res = {"stat": "FAIL", "err": s_res.stderr}
-                        dprint("Exec Error PE", Fore.RED)
+                        dprint(f"Exec Err: {s_res.stderr[:25]}", Fore.RED)
             else:
                 dprint("PE limit hit", Fore.YELLOW)
 
@@ -181,9 +184,12 @@ def main():
         print(f"{Fore.WHITE}=" * 40)
         dprint("===== END =====", Fore.GREEN)
     except Exception:
-        print(traceback.format_exc() if DEBUG else "❌ Error encountered")
+        # This will now print the exact line number and variable that threw the error
+        print(f"{Fore.RED}❌ CRITICAL SCRIPT FAULT:")
+        print(traceback.format_exc())
 
 
 if __name__ == "__main__":
     main()
+
 
