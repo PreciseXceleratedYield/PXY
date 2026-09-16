@@ -4,14 +4,12 @@ import time
 import pytz
 import traceback
 import re
-import subprocess
-import stat
 from pathlib import Path
 from datetime import datetime, time as dt_time
 from colorama import Fore, init, Style
 
 # --- GLOBAL CONFIG ---
-DEBUG = True  # Set to True if you need to debug downstream binary errors
+DEBUG = False 
 COUNTERBUY = "NO" 
 COOL_DOWN_SECONDS = 35
 
@@ -72,7 +70,7 @@ try:
     from runpchkpxy import get_position_summary
     dprint("IMPORTS OK", Fore.GREEN)
 except Exception as e:
-    print(f"{Fore.RED}IMP ERR: {str(e)}"); sys.exit(1)
+    print(f"{Fore.RED}IMP ERR: {str(e)[:30]}"); sys.exit(1)
 
 
 def main():
@@ -140,28 +138,18 @@ def main():
         res = {"stat": "SKIPPED"}
         is_flat = (ce_lots == 0 and pe_lots == 0)
 
-        # 6. Routing Engine (Corrected to verified lowercase directory structure)
-        pxy_root = Path("/home/pxy/pxy")
-
+        # 6. Routing Engine (Matching exact execution framework of your reference code)
         if "BUY" in sig:
             dprint("BRANCH: CE")
             if is_flat or (ce_lots < max_ce):
                 if not is_side_cooling("CE"):
-                    dprint("Run pxybuyce", Fore.CYAN)
-                    exe_path = str(pxy_root / "pxybuyce")
-                    
-                    # Dynamically fix execution rights if missing
+                    print(f"{Fore.GREEN}{Style.BRIGHT}🟢 FRESH ENTRY: Firing command 'pxybuyce'...")
                     try:
-                        st = os.stat(exe_path)
-                        os.chmod(exe_path, st.st_mode | stat.S_IEXEC)
-                    except: pass
-                    
-                    s_res = subprocess.run([exe_path], capture_output=True, text=True)
-                    if s_res.returncode == 0:
+                        os.system("pxybuyce")
                         res = {"stat": "OK"}
-                    else:
-                        res = {"stat": "FAIL", "err": s_res.stderr}
-                        dprint(f"Exec Err: {s_res.stderr[:25]}", Fore.RED)
+                    except Exception as e:
+                        res = {"stat": "FAIL"}
+                        print(f"{Fore.RED}⚠️ Failed to execute pxybuyce: {e}")
             else:
                 dprint("CE limit hit", Fore.YELLOW)
 
@@ -169,21 +157,13 @@ def main():
             dprint("BRANCH: PE")
             if is_flat or (pe_lots < max_pe):
                 if not is_side_cooling("PE"):
-                    dprint("Run pxybuype", Fore.CYAN)
-                    exe_path = str(pxy_root / "pxybuype")
-                    
-                    # Dynamically fix execution rights if missing
+                    print(f"{Fore.GREEN}{Style.BRIGHT}🟢 FRESH ENTRY: Firing command 'pxybuype'...")
                     try:
-                        st = os.stat(exe_path)
-                        os.chmod(exe_path, st.st_mode | stat.S_IEXEC)
-                    except: pass
-                    
-                    s_res = subprocess.run([exe_path], capture_output=True, text=True)
-                    if s_res.returncode == 0:
+                        os.system("pxybuype")
                         res = {"stat": "OK"}
-                    else:
-                        res = {"stat": "FAIL", "err": s_res.stderr}
-                        dprint(f"Exec Err: {s_res.stderr[:25]}", Fore.RED)
+                    except Exception as e:
+                        res = {"stat": "FAIL"}
+                        print(f"{Fore.RED}⚠️ Failed to execute pxybuype: {e}")
             else:
                 dprint("PE limit hit", Fore.YELLOW)
 
@@ -200,4 +180,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
