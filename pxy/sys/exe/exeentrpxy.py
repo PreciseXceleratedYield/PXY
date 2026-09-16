@@ -1,10 +1,10 @@
 import sys
-import asyncio
 import os
 import time
 import pytz
 import traceback
 import re
+import subprocess
 from pathlib import Path
 from datetime import datetime, time as dt_time
 from colorama import Fore, init, Style
@@ -22,7 +22,7 @@ PARENT = HERE.parent
 RUN_DIR = HERE / "run"
 for p in [HERE, RUN_DIR, PARENT]:
     if str(p) not in sys.path:
-        sys.path.append(str(p))
+        sys.path.insert(0, str(p))
 
 from syscnfgpxy import TICKER
 
@@ -30,12 +30,11 @@ from syscnfgpxy import TICKER
 t = TICKER.upper().strip()
 LOT_SIZE = 30 if t == "^NSEBANK" else 65 if t == "^NSEI" else None
 
-# --- DEBUG PRINT ---
 def dprint(msg, color=Fore.CYAN):
     if DEBUG:
-        print(f"{Style.BRIGHT}{color}[DEBUG] {msg}{Style.RESET_ALL}")
+        # Wrap debug lines cleanly under 40 chars
+        print(f"{Style.BRIGHT}{color}[DBUG] {msg[:30]}{Style.RESET_ALL}")
 
-# --- HELPER FUNCTIONS ---
 def reset_daily_cooling():
     ist = pytz.timezone("Asia/Kolkata")
     now = datetime.now(ist)
@@ -45,7 +44,7 @@ def reset_daily_cooling():
             if os.path.exists(f):
                 try:
                     os.remove(f)
-                    dprint(f"Daily Reset: Cleared {f}", Fore.YELLOW)
+                    dprint(f"Reset: Clear {side}", Fore.YELLOW)
                 except: pass
 
 def is_side_cooling(side):
@@ -57,10 +56,11 @@ def is_side_cooling(side):
             last_ts = float(f.read().strip())
             elapsed = time.time() - last_ts
             if elapsed < COOL_DOWN_SECONDS:
-                dprint(f"{side} is COOLING. {int(COOL_DOWN_SECONDS - elapsed)}s left.", Fore.WHITE)
+                rem = int(COOL_DOWN_SECONDS - elapsed)
+                dprint(f"{side} Cool: {rem}s left", Fore.WHITE)
                 return True
             os.remove(file_path)
-            dprint(f"{side} cooling expired. File deleted.", Fore.CYAN)
+            dprint(f"{side} Cool Expired", Fore.CYAN)
             return False
     except: return False
 
@@ -68,175 +68,131 @@ def set_side_cooling(side):
     file_path = f"exebal_cool_{side.lower()}.txt"
     with open(file_path, "w") as f:
         f.write(str(time.time()))
-    dprint(f"Cooling SET for {side}.", Fore.YELLOW)
+    dprint(f"Cool Set: {side}", Fore.YELLOW)
 
-# --- IMPORTS ---
-dprint("IMPORTING MODULES...")
+dprint("IMPORTING...")
 try:
     from syspxy import get_all_data
     from execepepxy import get_target_quantities 
     from runclntpxy import get_session
     from runfundpxy import get_available_funds
     from runpchkpxy import get_position_summary
-    from runsymbpxy import get_symbol
-    dprint("IMPORTS SUCCESS", Fore.GREEN)
+    dprint("IMPORTS OK", Fore.GREEN)
 except Exception as e:
-    print(f"{Fore.RED}IMPORT ERROR: {e}"); sys.exit(1)
-
-# --- Updated Tag Generator for Day Trading ---
-def generate_pxy_tag():
-    """Generates a pure timestamp tag: HHMMSS"""
-    ist = pytz.timezone("Asia/Kolkata")
-    return datetime.now(ist).strftime('%H%M%S')
-
-def execute_order(client, symbol, qty):
-    dprint(f"ENTER execute_order for {symbol}")
-    try:
-        # Generate the unique ID for this specific scalp
-        order_tag = generate_pxy_tag()
-        
-        params = {
-            "exchange_segment": "nse_fo",
-            "product": "NRML",
-            "price": "0",
-            "order_type": "MKT",
-            "quantity": str(qty),
-            "validity": "DAY",
-            "trading_symbol": symbol,
-            "transaction_type": "B",
-            "amo": "NO",
-            "tag": order_tag  # <--- NEW: Attaching the HHMMSS tag
-        }
-        
-        dprint(f"ORDER PARAMS: {params}", Fore.YELLOW)
-        res = client.place_order(**params)
-        
-        # Log the tag with the response for verification
-        print(f"{Fore.CYAN}        🚀 {symbol} | {order_tag}")
-        
-        return {"stat": "OK" if res and str(res).strip() else "FAIL", "raw": res}
-    except Exception as e:
-        dprint(f"ORDER ERROR: {e}", Fore.RED)
-        return {"stat": "FAIL", "err": str(e)}
+    print(f"{Fore.RED}IMP ERR: {str(e)[:30]}"); sys.exit(1)
 
 
-async def main():
-    dprint("===== MAIN START =====", Fore.GREEN)
+def main():
+    dprint("===== START =====", Fore.GREEN)
     try:
         reset_daily_cooling()
         IST = pytz.timezone("Asia/Kolkata")
         now = datetime.now(IST).time()
-        dprint(f"TIME CHECK: {now}")
+        dprint(f"TIME: {now}")
 
-        # 1. Check Market Timing First
-        if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15,11) <= now < dt_time(15, 50)):
-            print(f"{Fore.YELLOW}⏳ Market buffer time - skipped")
+        # 1. Market Timing Validation
+        if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 11) <= now < dt_time(15, 50)):
+            print(f"{Fore.YELLOW}⏳ Market buffer time - skip")
             return
 
-        # 2. Fetch Data and Check Signal Status
+        # 2. Central Entry Signal Verification
         data = get_all_data()
         entry_signal = str(data.get("entry", "")).upper().strip()
-        reversal = data.get("exit")
 
         if entry_signal in ["BULL", "BEAR", "NONE", "WAIT", ""]:
-            print(f"{Fore.MAGENTA}🛑  NO-ACTION signal({entry_signal if entry_signal else 'BLANK'})- BUY skipped")
+            print(f"{Fore.MAGENTA}🛑 No-Action ({entry_signal[:10]}) - skip")
             return
 
-        # --- SESSION INITIALIZATION (Only runs for actionable signals) ---
+        # Top-Level Condition: Force check for ATM/OTM keywords
+        if "ATM" not in entry_signal and "OTM" not in entry_signal:
+            print(f"{Fore.YELLOW}⏳ Skip {entry_signal[:10]}: No ATM/OTM")
+            return
+
+        # 3. Session Initialization
         client = get_session()
         if not client:
+            print(f"{Fore.RED}❌ Session failed")
             return
-
-        ltp = data.get("price")
-        from exeotmpxy import get_dynamic_otm_distance
-        OTM_DISTANCE = get_dynamic_otm_distance() 
-
-        exit_sig = str(reversal).upper().strip() if reversal else "NONE"
-        if not entry_signal: return
 
         sig = entry_signal.upper().strip()
         if sig == "STBUY": sig = "ATMBUY"
         elif sig == "STSELL": sig = "ATMSELL"
-        dprint(f"SIGNAL: {sig}")
-        # --- SURGICAL IMPORT RESTORATION FROM EXECEPEPXY ---
-        try:
-            from execepepxy import get_target_quantities
-        except Exception as imp_err:
-            print(f"{Fore.RED}CRITICAL: Failed to import get_target_quantities from execepepxy: {imp_err}")
-            return
-
-        # --- UPDATED POSITION BALANCING LOGIC (LOT BASED) ---
-        dprint("CHECKING POSITIONS FOR BALANCE...")
-        pos_raw = str(get_position_summary(client)).upper().strip() # Upstream format: "XCEYPE"
         
-        # Hard-anchored regex to match your upstream format exactly
+        dprint(f"SIG OK: {sig}")
+
+        # 4. Position Extraction
+        dprint("CHECKING POS...")
+        pos_raw = str(get_position_summary(client)).upper().strip() 
+        
         match = re.match(r'(\d+)CE(\d+)PE', pos_raw)
         if match:
             ce_lots = int(match.group(1))
             pe_lots = int(match.group(2))
         else:
-            dprint(f"⚠️ Upstream position layout error: '{pos_raw}'. Using fallback 0.", Fore.YELLOW)
+            dprint("Layout error, use 0", Fore.YELLOW)
             ce_lots, pe_lots = 0, 0
         
-        dprint(f"CURRENT -> CE LOTS: {ce_lots} | PE LOTS: {pe_lots}")
+        dprint(f"CE: {ce_lots} | PE: {pe_lots}")
         
-        # Fetch target limits directly as clean lot counts
-        max_allowed_ce_lots, max_allowed_pe_lots = get_target_quantities(supertrend_val, ce_lots, pe_lots, LOT_SIZE)
-        dprint(f"SUPERTREND: {supertrend_val} | MAX CE LOTS: {max_allowed_ce_lots} | MAX PE LOTS: {max_allowed_pe_lots}")
+        # Upfront Gate: CE PE Weight Check (Max 40 Chars)
+        if ce_lots >= 1 and pe_lots >= 1:
+            print(f"{Fore.YELLOW}⚠️ CE|PE Weighted already,")
+            print(f"{Fore.YELLOW}  handing to AVG")
+            return
 
-        # --- INTERCEPTING DISTANCE OFFSET LOGIC FOR STRIKES ---
-        if "ATM" in sig:
-            current_distance = 0
-        elif "OTM" in sig:
-            current_distance = OTM_DISTANCE
-        else:
-            current_distance = 0
+        # 5. Maximum Strategy Lot Allocation Check
+        max_ce, max_pe = get_target_quantities(ce_lots, pe_lots, LOT_SIZE)
+        dprint(f"MAX C:{max_ce} | P:{max_pe}")
 
-        dprint(f"ROUTING TO BUILDER -> SIGNAL: {sig} | DISTANCE ARGUMENT: {current_distance}")
+        res = {"stat": "SKIPPED"}
+        is_flat = (ce_lots == 0 and pe_lots == 0)
 
-        symbol, res = None, {"stat": "SKIPPED"}
-        
-        # ⚡ Surgical Independent Check: Directly true if flat setup
-        is_flat_bypass = (ce_lots == 0 and pe_lots == 0)
-
-        if sig in ["ATMBUY", "OTMBUY"]:
-            dprint("BRANCH: BALANCE CE")
-            # FIXED GATE: Skips limit restrictions instantly if flat, otherwise respects your exact original parameters
-            if is_flat_bypass or (ce_lots < max_allowed_ce_lots) or (ce_lots == 0 and pe_lots == 0 and max_allowed_ce_lots > 0):
+        # 6. Routing Engine
+        if "BUY" in sig:
+            dprint("BRANCH: CE")
+            if is_flat or (ce_lots < max_ce):
                 if not is_side_cooling("CE"):
-                    symbol = get_symbol(ltp, sig, current_distance)
-                    if symbol and symbol != "NA":
-                        res = execute_order(client, symbol, LOT_SIZE)
-                        if res["stat"] == "OK": set_side_cooling("CE")
+                    dprint("Run pxybuyce", Fore.CYAN)
+                    s_res = subprocess.run("pxybuyce", shell=True, capture_output=True, text=True)
+                    if s_res.returncode == 0:
+                        res = {"stat": "OK"}
+                        set_side_cooling("CE")
+                    else:
+                        res = {"stat": "FAIL", "err": s_res.stderr}
+                        dprint("Exec Error CE", Fore.RED)
             else:
-                dprint(f"SKIP: CE Lots ({ce_lots}) hit or exceeded strategy limit ({max_allowed_ce_lots})", Fore.YELLOW)
+                dprint("CE limit hit", Fore.YELLOW)
 
-        elif sig in ["ATMSELL", "OTMSELL"]:
-            dprint("BRANCH: BALANCE PE")
-            # FIXED GATE: Skips limit restrictions instantly if flat, otherwise respects your exact original parameters
-            if is_flat_bypass or (pe_lots < max_allowed_pe_lots) or (ce_lots == 0 and pe_lots == 0 and max_allowed_pe_lots > 0):
+        elif "SELL" in sig:
+            dprint("BRANCH: PE")
+            if is_flat or (pe_lots < max_pe):
                 if not is_side_cooling("PE"):
-                    symbol = get_symbol(ltp, sig, current_distance)
-                    if symbol and symbol != "NA":
-                        res = execute_order(client, symbol, LOT_SIZE)
-                        if res["stat"] == "OK": set_side_cooling("PE")
+                    dprint("Run pxybuype", Fore.CYAN)
+                    s_res = subprocess.run("pxybuype", shell=True, capture_output=True, text=True)
+                    if s_res.returncode == 0:
+                        res = {"stat": "OK"}
+                        set_side_cooling("PE")
+                    else:
+                        res = {"stat": "FAIL", "err": s_res.stderr}
+                        dprint("Exec Error PE", Fore.RED)
             else:
-                dprint(f"SKIP: PE Lots ({pe_lots}) hit or exceeded strategy limit ({max_allowed_pe_lots})", Fore.YELLOW)
+                dprint("PE limit hit", Fore.YELLOW)
 
         funds = get_available_funds(client)
+        f_val = int(funds) if funds is not None else "N/A"
 
-        print(f"""
- ============ BUY ACTION =============
-         🎯  Signal : {entry_signal}
-         📈  Trend  : {supertrend_val}
-         📦  Pos    : {pos_raw}
-         📌  Status : {res.get('stat')}
- =====================================
- """)
-        dprint("===== MAIN END =====", Fore.GREEN)
+        # Final Summary Panel (Formatted exactly to 40 characters wide)
+        print(f"{Fore.WHITE}=" * 40)
+        print(f" 🎯 Sig  : {entry_signal[:27]}")
+        print(f" 📦 Pos  : {pos_raw[:27]}")
+        print(f" 💰 Cash : {f_val}")
+        print(f" 📌 Stat : {res.get('stat')}")
+        print(f"{Fore.WHITE}=" * 40)
+        dprint("===== END =====", Fore.GREEN)
     except Exception:
-        print(traceback.format_exc() if DEBUG else "❌ Main error")
+        print(traceback.format_exc() if DEBUG else "❌ Error encountered")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
+
