@@ -139,14 +139,17 @@ def main():
         res = {"stat": "SKIPPED"}
         is_flat = (ce_lots == 0 and pe_lots == 0)
 
-        # 6. Routing Engine (Fixed path routing logic)
+        # 6. Routing Engine (Routes straight into the primary pxy root directory)
+        # HERE.parent.parent points straight up to /home/pxy/PXY/pxy/
+        pxy_root = HERE.parent.parent
+
         if "BUY" in sig:
             dprint("BRANCH: CE")
             if is_flat or (ce_lots < max_ce):
                 if not is_side_cooling("CE"):
                     dprint("Run pxybuyce", Fore.CYAN)
-                    # Fixed target path resolution to ensure direct execution
-                    s_res = subprocess.run(["./pxybuyce"], capture_output=True, text=True)
+                    exe_path = str(pxy_root / "pxybuyce")
+                    s_res = subprocess.run([exe_path], capture_output=True, text=True)
                     if s_res.returncode == 0:
                         res = {"stat": "OK"}
                     else:
@@ -160,8 +163,8 @@ def main():
             if is_flat or (pe_lots < max_pe):
                 if not is_side_cooling("PE"):
                     dprint("Run pxybuype", Fore.CYAN)
-                    # Fixed target path resolution to ensure direct execution
-                    s_res = subprocess.run(["./pxybuype"], capture_output=True, text=True)
+                    exe_path = str(pxy_root / "pxybuype")
+                    s_res = subprocess.run([exe_path], capture_output=True, text=True)
                     if s_res.returncode == 0:
                         res = {"stat": "OK"}
                     else:
