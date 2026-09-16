@@ -17,7 +17,7 @@ DEBUG_MODE = False
 CONFIG = {
     "ST1": {
         "PERIOD": 3.0,   # ATR Period synced to Pine Script (atrPeriod)
-        "FACTOR": 3.0    # Multiplier synced to Pine Script (multiplier)
+        "FACTOR": 1.4    # Multiplier synced to Pine Script (multiplier)
     }
 }
 # ==============================================================================
