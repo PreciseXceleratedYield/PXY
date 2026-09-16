@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 from colorama import Fore, init, Style
+from exeotmpxy import get_dynamic_otm_distance
 
 # --- CONFIG ---
 DEBUG = True  
@@ -104,8 +105,9 @@ def run_action(choice):
 
     data = get_all_data()
     ltp = data.get("price")
-    OTM_DISTANCE = 100
-
+    
+    OTM_DISTANCE = get_dynamic_otm_distance()  
+    
     symbol = get_symbol(ltp, sig, OTM_DISTANCE)
     res = {"stat": "SKIPPED"}
 
