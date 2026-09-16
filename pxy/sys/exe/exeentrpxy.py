@@ -151,10 +151,23 @@ async def main():
 
         try:
             supertrend_val = str(data.get("supertrend", "")).upper().strip()
-            OTM_DISTANCE = 100
+            
+            # --- DYNAMIC OTM DISTANCE BASED ON DAY OF THE WEEK ---
+            # 0=Mon (250), 1=Tue (200), 2=Wed (150), 3=Thu (100), 4=Fri (50)
+            current_day = datetime.today().weekday()
+            
+            # Map weekdays to your distances; default to 100 for weekends (Sat/Sun)
+            day_distance_map = {0: 250, 1: 200, 2: 150, 3: 100, 4: 50}
+            OTM_DISTANCE = day_distance_map.get(current_day, 100) 
+            
         except Exception: 
             supertrend_val = "NONE"
-            OTM_DISTANCE = 100
+            
+            # Keep the same dynamic fallback logic in the exception block
+            current_day = datetime.today().weekday()
+            day_distance_map = {0: 250, 1: 200, 2: 150, 3: 100, 4: 50}
+            OTM_DISTANCE = day_distance_map.get(current_day, 100)
+
 
         exit_sig = str(reversal).upper().strip() if reversal else "NONE"
         if not entry_signal: return
