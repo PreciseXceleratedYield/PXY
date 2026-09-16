@@ -40,10 +40,10 @@ def target_price(row):
 
         # 3️⃣ Symmetrical Binary Evaluation Matrices (Strictly Exclusive Mappings)
         if is_ce:
-            target_pct = 9 if derived_entry == "EXITCE" else 99
+            target_pct = 1.4 if derived_entry == "EXITCE" else 99
             
         elif is_pe:
-            target_pct = 9 if derived_entry == "EXITPE" else 99
+            target_pct = 1.4 if derived_entry == "EXITPE" else 99
 
         # 4️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
