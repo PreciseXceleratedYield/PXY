@@ -8,7 +8,7 @@ from syscnfgpxy import TIMEZONE
 # ==============================================================================
 # 🎛️ GLOBAL MASTER ENGINE SWITCH (Change here to swap logic instantly)
 # ==============================================================================
-ACTIVE_ENGINE = "TSMA"  # Options: "ST" (Supertrend) or "TSMA" (Mode 7 Linear Blend)
+ACTIVE_ENGINE = "TSMA"  # Options: "ST" (Supertrend) or "TSMA" (Pure 7-Period LinReg)
 # ==============================================================================
 
 # 🎯 IMPORT THE ORIGINAL ATR VALUE DIRECTLY FROM YOUR UNTOUCHED ENGINE
@@ -28,8 +28,8 @@ CONFIG = {
 }
 
 
-def _compute_mode7_tsma(df: pd.DataFrame) -> tuple:
-    """Computes the isolated 7-Linear Regression & Running Average Blend (Mode 7 variant).
+def _compute_pure_linreg_tsma(df: pd.DataFrame) -> tuple:
+    """Computes a pure 7-Period Time Series Linear Regression baseline.
     
     Returns identical line and mirror series to preserve framework compatibility.
     """
@@ -42,7 +42,7 @@ def _compute_mode7_tsma(df: pd.DataFrame) -> tuple:
     if length == 0:
         return pd.Series(dtype=float), pd.Series(dtype=float), pd.Series(dtype=float)
 
-    # Base target cross tracker engine
+    # Base transformation cross tracker engine
     m0 = np.where(close >= open_arr, (close + high) / 2.0, (close + low) / 2.0)
 
     window = 7
@@ -61,28 +61,19 @@ def _compute_mode7_tsma(df: pd.DataFrame) -> tuple:
         slopes = np.sum((windows - y_means) * x_dev, axis=1) / x_var
         intercepts = y_means.flatten() - slopes * x_mean
         
+        # Project the linear trend at current bar (offset 0)
         lr_current = intercepts + slopes * (window - 1)
         return np.concatenate([series[: window - 1], lr_current])
 
-    # 1. Compute Linear Regression Core
-    lr_c = rolling_linreg(close)
-
-    # 2. Compute Running Average Core (Cumulative Breakdown)
-    bar_count = np.arange(1, length + 1)
-    ra_c = np.cumsum(close) / bar_count
-
-    # 3. Blend components for the baseline signal
-    tsma_line = (lr_c + ra_c) / 2.0
+    # 📈 1. Compute Pure 7-Period Linear Regression Line
+    tsma_line = rolling_linreg(close)
 
     # 🎯 KEEP MIRROR AND LINE EXACTLY THE SAME IF USING TSMA MODE
     return pd.Series(tsma_line, index=df.index), pd.Series(tsma_line, index=df.index), pd.Series(m0, index=df.index)
 
 
 def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
-    """Helper to compute PXY Supertrend bands and the mirror line.
-    
-    Fixed assignment logic to handle clean float scalars instead of sequence arrays.
-    """
+    """Helper to compute PXY Supertrend bands and the mirror line."""
     high = df['High'].to_numpy()
     low = df['Low'].to_numpy()
     open_arr = df['Open'].to_numpy()
@@ -92,13 +83,9 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     if length == 0:
         return pd.Series(dtype=float), pd.Series(dtype=float), pd.Series(dtype=float)
 
-    # --- 1. BASE TRANSFORMATION (m0 used for ATR and Crossovers) ---
     m0 = np.where(close >= open_arr, (close + high) / 2.0, (close + low) / 2.0)
-
-    # --- 2. INTERMEDIATE ATR BOUNDARY ENGINE ---
-    src = (high + low) / 2.0  # hl2 native midpoint
+    src = (high + low) / 2.0  
     
-    # 🎯 RETRIEVE ATR DIRECTLY FROM THE INTERFACE MODULE AS REQUESTED
     atr = calculate_atr(df).to_numpy()
 
     basic_upper = src + (factor * atr)
@@ -108,9 +95,8 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     final_lower = np.zeros(length)
     supertrend = np.zeros(length)
     mirror_line = np.zeros(length)
-    st_trend = np.ones(length)  # 1 = BULL, -1 = BEAR
+    st_trend = np.ones(length)  
 
-    # Seed with the first element scalar float instead of the full array sequence
     anchor_price = float(src[0]) if length > 0 else 0.0
 
     for i in range(length):
@@ -126,7 +112,6 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
         prev_lower = final_lower[i - 1]
         prev_trend = st_trend[i - 1]
 
-        # --- ALIGNED BAND RETENTION LOGIC (Using src / hl2) ---
         if src[i] < prev_upper:
             final_upper[i] = min(basic_upper[i], prev_upper)
         else:
@@ -137,7 +122,6 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
         else:
             final_lower[i] = basic_lower[i]
 
-        # --- ALIGNED TREND SWITCH MATRIX (Crossover tracked by m0) ---
         if prev_trend == -1 and m0[i] > prev_upper:  
             current_trend = 1
             anchor_price = float(src[i])
@@ -151,7 +135,6 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
         stLine = final_lower[i] if current_trend == 1 else final_upper[i]
         supertrend[i] = stLine
 
-        # Compute Inverted Mirror Line
         st_distance_from_anchor = stLine - anchor_price
         mirror_line[i] = anchor_price - st_distance_from_anchor
 
@@ -163,11 +146,10 @@ def get_market_trend(df: pd.DataFrame) -> str:
     if df is None or df.empty or len(df) < 1:
         return 'SIDE'
 
-    # Route math engine dynamically depending on global switch
     if ACTIVE_ENGINE == "TSMA":
-        st_line, _, _ = _compute_mode7_tsma(df)
+        st_line, _, _ = _compute_pure_linreg_tsma(df)
         
-        # 🎯 DIRECTLY COMPARE LATEST PRICE WITH TSMA LINE FOR BULL/BEAR
+        # 🎯 DIRECTLY COMPARE LATEST PRICE WITH PURE LINREG TSMA LINE FOR BULL/BEAR
         close_curr = float(df['Close'].iloc[-1])
         tsma_curr = float(st_line.iloc[-1])
         
@@ -222,13 +204,12 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     else:
         df = df.tz_localize('UTC').tz_convert(tz_string)
 
-    # Route matrix generator switch cleanly based on global switch
     if ACTIVE_ENGINE == "TSMA":
-        st1_line, st1_mirror, _ = _compute_mode7_tsma(df)
+        st1_line, st1_mirror, _ = _compute_pure_linreg_tsma(df)
         tsma_arr = st1_line.to_numpy()
         close_arr = df['Close'].to_numpy()
         
-        # 🎯 VECTORIZED DIRECT CLOSE VS TSMA COMPARISON FOR MASTER MATRIX
+        # 🎯 VECTORIZED DIRECT CLOSE VS PURE LINREG TSMA COMPARISON FOR MASTER MATRIX
         classifier_conditions = [
             (close_arr > tsma_arr),
             (close_arr < tsma_arr)
@@ -257,14 +238,11 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['st_mirror'] = st1_mirror       
     df['ST_Trend'] = st_trend_series   
     
-    # ==========================================================================
-    # 🔗 LEGACY COMPATIBILITY ROUTING (Fixes sysdashpxy.py KeyError Exceptions)
-    # ==========================================================================
+    # Legacy routing
     df['ST'] = st1_line                
     df['st1_mirror'] = st1_mirror      
 
     return df
-
 
 
 def export_supertrend_json(
