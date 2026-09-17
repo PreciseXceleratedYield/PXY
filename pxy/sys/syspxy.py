@@ -42,7 +42,16 @@ def get_all_data():
         try:
             with open(fut_file_path, "r", encoding="utf-8") as f:
                 fut_data = json.load(f)
-                fut_price = fut_data.get("price")
+                fut_price = None
+                
+                # Check if JSON is a list of rolling records and pull the last item
+                if isinstance(fut_data, list) and len(fut_data) > 0:
+                    latest_record = fut_data[-1]
+                    if isinstance(latest_record, dict):
+                        fut_price = latest_record.get("price")
+                # Fallback to check if it's still a flat dictionary
+                elif isinstance(fut_data, dict):
+                    fut_price = fut_data.get("price")
                 
                 if fut_price is not None:
                     # Check if the FUT price is within ±200 of our base price
@@ -129,5 +138,4 @@ if __name__ == "__main__":
     data = get_all_data()
     for k, v in data.items():
         print(f"{k:18}: {v}")
-
 
