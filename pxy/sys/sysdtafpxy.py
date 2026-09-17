@@ -3,6 +3,8 @@ from syscnfgpxy import TICKER
 import numpy as np
 import pandas as pd
 import yfinance as yf
+import os
+import json
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -133,9 +135,50 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
             except Exception:
                 pass
 
+    # ==========================================================================
+    # 🩹 FALLBACK ENGINE: Bypasses everything and returns raw JSON fallback
+    # ==========================================================================
     if df.empty or len(df) < buffer_rows:
-        return pd.DataFrame()
+        print("Warning: yfinance data stream unavailable. Triggering direct raw nftfut.json fallback.")
+        
+        # Target the file in the exact same directory as this script
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        fut_file_path = os.path.join(current_dir, "nftfut.json")
+        fallback_price = 0.0
+        
+        if os.path.exists(fut_file_path) and os.path.getsize(fut_file_path) > 0:
+            try:
+                with open(fut_file_path, "r", encoding="utf-8") as f:
+                    fut_data = json.load(f)
+                    if isinstance(fut_data, list) and len(fut_data) > 0:
+                        fallback_price = float(fut_data[-1].get("price", 0.0))
+                    elif isinstance(fut_data, dict):
+                        fallback_price = float(fut_data.get("price", 0.0))
+            except Exception:
+                pass
+                
+        if fallback_price > 0:
+            current_time = pd.Timestamp.now(tz=TIMEZONE)
+            mock_data = {
+                'Open': [fallback_price] * target_rows,
+                'High': [fallback_price] * target_rows,
+                'Low': [fallback_price] * target_rows,
+                'Close': [fallback_price] * target_rows,
+                'Volume': [0.0] * target_rows
+            }
+            # Create a localized time index incrementing backwards
+            time_indices = [current_time - pd.Timedelta(minutes=i) for i in reversed(range(target_rows))]
+            fallback_df = pd.DataFrame(mock_data, index=time_indices)
+            
+            # 🔥 CRITICAL EXEMPTION: Return flat raw data instantly. Skip modes, trends, and transformations.
+            return fallback_df
+        else:
+            # Absolute recovery floor if even the JSON is unreadable or empty
+            return pd.DataFrame()
 
+    # ==========================================================================
+    # ⚡ STANDARD YAHOO PIPE (Applies Modes, Trends, and Transformations)
+    # ==========================================================================
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
 
@@ -144,9 +187,7 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     else:
         df = df.tz_convert(TIMEZONE)
 
-    # ==========================================================================
-    # ⚡ LOCAL IMPORT SHIELD: Prevents Circular Dependency Faults
-    # ==========================================================================
+    # LOCAL IMPORT SHIELD: Prevents Circular Dependency Faults
     from sysstrndpxy import get_market_trend
 
     # Step 1: Detect current structural matrix state (TREND vs SIDE)
