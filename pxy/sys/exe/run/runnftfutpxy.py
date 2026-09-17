@@ -177,14 +177,34 @@ def get_ltp(client, token: str, segment: str = "nse_fo") -> float:
 
 
 # ============================================================
-# WRITE PRICE TO JSON
+# WRITE PRICE TO JSON (MAINTAINING 50 ROLLING RECORDS)
 # ============================================================
 def save_price_to_json(price: float):
-    """Overwrites the JSON file with the latest price only."""
+    """Appends the latest price to a rolling list of up to 50 records."""
     try:
-        data = {"price": price}
+        records = []
+        
+        # Read existing records if file is present
+        if os.path.exists(JSON_OUTPUT_FILE) and os.path.getsize(JSON_OUTPUT_FILE) > 0:
+            with open(JSON_OUTPUT_FILE, "r", encoding="utf-8") as f:
+                existing_data = json.load(f)
+                if isinstance(existing_data, list):
+                    records = existing_data
+                elif isinstance(existing_data, dict) and "price" in existing_data:
+                    records = [existing_data]
+
+        # Append new record with structure matching original 'price' field mapping
+        records.append({
+            "timestamp": datetime.now().isoformat(),
+            "price": price
+        })
+
+        # Retain only the latest 50 records
+        records = records[-50:]
+
+        # Save back to output
         with open(JSON_OUTPUT_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4)
+            json.dump(records, f, indent=4)
     except Exception:
         pass
 
