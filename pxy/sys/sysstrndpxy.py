@@ -5,6 +5,12 @@ import numpy as np
 import pandas as pd
 from syscnfgpxy import TIMEZONE
 
+# ==============================================================================
+# 🎛️ GLOBAL MASTER ENGINE SWITCH (Change here to swap logic instantly)
+# ==============================================================================
+ACTIVE_ENGINE = "TSMA"  # Options: "ST" (Supertrend) or "TSMA" (Mode 7 Linear Blend)
+# ==============================================================================
+
 # 🎯 IMPORT THE ORIGINAL ATR VALUE DIRECTLY FROM YOUR UNTOUCHED ENGINE
 from syskatrpxy import calculate_atr
 
@@ -12,15 +18,64 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 DEBUG_MODE = False
 
 # ==============================================================================
-# 🎛️ MASTER CONFIGURATION LAYER (PXY Universal Framework Parameters)
+# 🛠️ FRAMEWORK PARAMETERS CONFIGURATION
 # ==============================================================================
 CONFIG = {
     "ST1": {
         "PERIOD": 1.0,   # ATR Period synced to Pine Script (atrPeriod)
-        "FACTOR": 0.4   # Multiplier synced to Pine Script (multiplier)
+        "FACTOR": 0.4    # Multiplier synced to Pine Script (multiplier)
     }
 }
-# ==============================================================================
+
+
+def _compute_mode7_tsma(df: pd.DataFrame) -> tuple:
+    """Computes the isolated 7-Linear Regression & Running Average Blend (Mode 7 variant).
+    
+    Returns identical line and mirror series to preserve framework compatibility.
+    """
+    high = df['High'].to_numpy()
+    low = df['Low'].to_numpy()
+    open_arr = df['Open'].to_numpy()
+    close = df['Close'].to_numpy()
+
+    length = len(df)
+    if length == 0:
+        return pd.Series(dtype=float), pd.Series(dtype=float), pd.Series(dtype=float)
+
+    # Base target cross tracker engine
+    m0 = np.where(close >= open_arr, (close + high) / 2.0, (close + low) / 2.0)
+
+    window = 7
+    x = np.arange(window)
+    x_mean = x.mean()
+    x_dev = x - x_mean
+    x_var = np.sum(x_dev**2)
+
+    def rolling_linreg(series):
+        if len(series) < window:
+            return series.copy()
+        
+        # Vectorized window generation
+        windows = np.lib.stride_tricks.sliding_window_view(series, window_shape=window)
+        y_means = windows.mean(axis=1, keepdims=True)
+        slopes = np.sum((windows - y_means) * x_dev, axis=1) / x_var
+        intercepts = y_means.flatten() - slopes * x_mean
+        
+        lr_current = intercepts + slopes * (window - 1)
+        return np.concatenate([series[: window - 1], lr_current])
+
+    # 1. Compute Linear Regression Core
+    lr_c = rolling_linreg(close)
+
+    # 2. Compute Running Average Core (Cumulative Breakdown)
+    bar_count = np.arange(1, length + 1)
+    ra_c = np.cumsum(close) / bar_count
+
+    # 3. Blend components for the baseline signal
+    tsma_line = (lr_c + ra_c) / 2.0
+
+    # 🎯 KEEP MIRROR AND LINE EXACTLY THE SAME IF USING TSMA MODE
+    return pd.Series(tsma_line, index=df.index), pd.Series(tsma_line, index=df.index), pd.Series(m0, index=df.index)
 
 
 def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
@@ -104,22 +159,34 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
 
 
 def get_market_trend(df: pd.DataFrame) -> str:
-    """
-    Evaluates raw data frame layouts via intermediate calculations.
-    Safe for upstream fetch scripts; does not look for pre-existing matrix columns.
-    """
+    """Evaluates raw data frame layouts via intermediate calculations."""
     if df is None or df.empty or len(df) < 2:
         return 'SIDE'
 
-    # Compute supertrend metrics dynamically on raw high/low/close metrics
-    st_line, mirror_line, m0_series = _compute_single_st(
-        df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
-    )
+    # Route math engine dynamically depending on global switch
+    if ACTIVE_ENGINE == "TSMA":
+        st_line, mirror_line, m0_series = _compute_mode7_tsma(df)
+    else:
+        st_line, mirror_line, m0_series = _compute_single_st(
+            df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
+        )
     
     m0_curr = float(m0_series.iloc[-1])
     st_curr = float(st_line.iloc[-1])
-    mirror_curr = float(mirror_line.iloc[-1])
     
+    # TSMA structural classifier fallback strategy
+    if ACTIVE_ENGINE == "TSMA":
+        m0_prev = float(m0_series.iloc[-2])
+        st_prev = float(st_line.iloc[-2])
+        if m0_curr > st_curr and m0_prev > st_prev:
+            return 'BULL'
+        elif m0_curr < st_curr and m0_prev < st_prev:
+            return 'BEAR'
+        else:
+            return 'SIDE'
+
+    # Native Supertrend Multi-band evaluation strategy
+    mirror_curr = float(mirror_line.iloc[-1])
     highest_line = max(st_curr, mirror_curr)
     lowest_line = min(st_curr, mirror_curr)
 
@@ -156,20 +223,35 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     else:
         df = df.tz_localize('UTC').tz_convert(tz_string)
 
-    st1_line, st1_mirror, m0_series = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
+    # Route matrix generator switch cleanly based on global switch
+    if ACTIVE_ENGINE == "TSMA":
+        st1_line, st1_mirror, m0_series = _compute_mode7_tsma(df)
+    else:
+        st1_line, st1_mirror, m0_series = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
 
     st_arr = st1_line.to_numpy()
     mirror_arr = st1_mirror.to_numpy()
     m0_arr = m0_series.to_numpy()
     
-    highest_arr = np.maximum(st_arr, mirror_arr)
-    lowest_arr = np.minimum(st_arr, mirror_arr)
-    
-    # Complete Three-State Vectorized Evaluation Engine
-    classifier_conditions = [
-        (m0_arr > highest_arr),
-        (m0_arr < lowest_arr)
-    ]
+    if ACTIVE_ENGINE == "TSMA":
+        # Multi-bar state confirmations rule logic for TSMA tracking shifts
+        m0_prev = np.roll(m0_arr, 1)
+        st_prev = np.roll(st_arr, 1)
+        m0_prev[0] = m0_arr[0]
+        st_prev[0] = st_arr[0]
+        
+        classifier_conditions = [
+            (m0_arr > st_arr) & (m0_prev > st_prev),
+            (m0_arr < st_arr) & (m0_prev < st_prev)
+        ]
+    else:
+        highest_arr = np.maximum(st_arr, mirror_arr)
+        lowest_arr = np.minimum(st_arr, mirror_arr)
+        classifier_conditions = [
+            (m0_arr > highest_arr),
+            (m0_arr < lowest_arr)
+        ]
+        
     classifier_choices = ['BULL', 'BEAR']
     st_trend_series = pd.Series(
         np.select(classifier_conditions, classifier_choices, default='SIDE'),
@@ -184,10 +266,11 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     # ==========================================================================
     # 🔗 LEGACY COMPATIBILITY ROUTING (Fixes sysdashpxy.py KeyError Exceptions)
     # ==========================================================================
-    df['ST'] = st1_line                # Explicitly mirrors st_line to pass dashboard checks
-    df['st1_mirror'] = st1_mirror      # Explicitly maps mirror to historical references
+    df['ST'] = st1_line                
+    df['st1_mirror'] = st1_mirror      
 
     return df
+
 
 
 def export_supertrend_json(
