@@ -160,42 +160,41 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
 
 def get_market_trend(df: pd.DataFrame) -> str:
     """Evaluates raw data frame layouts via intermediate calculations."""
-    if df is None or df.empty or len(df) < 2:
+    if df is None or df.empty or len(df) < 1:
         return 'SIDE'
 
     # Route math engine dynamically depending on global switch
     if ACTIVE_ENGINE == "TSMA":
-        st_line, mirror_line, m0_series = _compute_mode7_tsma(df)
+        st_line, _, _ = _compute_mode7_tsma(df)
+        
+        # 🎯 DIRECTLY COMPARE LATEST PRICE WITH TSMA LINE FOR BULL/BEAR
+        close_curr = float(df['Close'].iloc[-1])
+        tsma_curr = float(st_line.iloc[-1])
+        
+        if close_curr > tsma_curr:
+            return 'BULL'
+        elif close_curr < tsma_curr:
+            return 'BEAR'
+        else:
+            return 'SIDE'
+            
     else:
         st_line, mirror_line, m0_series = _compute_single_st(
             df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
         )
-    
-    m0_curr = float(m0_series.iloc[-1])
-    st_curr = float(st_line.iloc[-1])
-    
-    # TSMA structural classifier fallback strategy
-    if ACTIVE_ENGINE == "TSMA":
-        m0_prev = float(m0_series.iloc[-2])
-        st_prev = float(st_line.iloc[-2])
-        if m0_curr > st_curr and m0_prev > st_prev:
+        
+        m0_curr = float(m0_series.iloc[-1])
+        st_curr = float(st_line.iloc[-1])
+        mirror_curr = float(mirror_line.iloc[-1])
+        highest_line = max(st_curr, mirror_curr)
+        lowest_line = min(st_curr, mirror_curr)
+
+        if m0_curr > highest_line:
             return 'BULL'
-        elif m0_curr < st_curr and m0_prev < st_prev:
+        elif m0_curr < lowest_line:
             return 'BEAR'
         else:
             return 'SIDE'
-
-    # Native Supertrend Multi-band evaluation strategy
-    mirror_curr = float(mirror_line.iloc[-1])
-    highest_line = max(st_curr, mirror_curr)
-    lowest_line = min(st_curr, mirror_curr)
-
-    if m0_curr > highest_line:
-        return 'BULL'
-    elif m0_curr < lowest_line:
-        return 'BEAR'
-    else:
-        return 'SIDE'
 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
@@ -225,28 +224,23 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     # Route matrix generator switch cleanly based on global switch
     if ACTIVE_ENGINE == "TSMA":
-        st1_line, st1_mirror, m0_series = _compute_mode7_tsma(df)
-    else:
-        st1_line, st1_mirror, m0_series = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
-
-    st_arr = st1_line.to_numpy()
-    mirror_arr = st1_mirror.to_numpy()
-    m0_arr = m0_series.to_numpy()
-    
-    if ACTIVE_ENGINE == "TSMA":
-        # Multi-bar state confirmations rule logic for TSMA tracking shifts
-        m0_prev = np.roll(m0_arr, 1)
-        st_prev = np.roll(st_arr, 1)
-        m0_prev[0] = m0_arr[0]
-        st_prev[0] = st_arr[0]
+        st1_line, st1_mirror, _ = _compute_mode7_tsma(df)
+        tsma_arr = st1_line.to_numpy()
+        close_arr = df['Close'].to_numpy()
         
+        # 🎯 VECTORIZED DIRECT CLOSE VS TSMA COMPARISON FOR MASTER MATRIX
         classifier_conditions = [
-            (m0_arr > st_arr) & (m0_prev > st_prev),
-            (m0_arr < st_arr) & (m0_prev < st_prev)
+            (close_arr > tsma_arr),
+            (close_arr < tsma_arr)
         ]
     else:
+        st1_line, st1_mirror, m0_series = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
+        st_arr = st1_line.to_numpy()
+        mirror_arr = st1_mirror.to_numpy()
+        m0_arr = m0_series.to_numpy()
         highest_arr = np.maximum(st_arr, mirror_arr)
         lowest_arr = np.minimum(st_arr, mirror_arr)
+        
         classifier_conditions = [
             (m0_arr > highest_arr),
             (m0_arr < lowest_arr)
