@@ -22,7 +22,7 @@ def get_entry_signal(df=None, mode="MKT"):
     # =====================================================================
     # 🏎️ MODE: MKT (WITHOUT FILTER)
     # =====================================================================
-    if mode == "MKT":
+    if mode == "ST":
         # Global failure check for raw market signal
         if mkt_exit_dir not in ["BULL", "BEAR"]:
             return "NONE", "NONE"
