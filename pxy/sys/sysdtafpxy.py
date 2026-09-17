@@ -12,7 +12,7 @@ TIMEZONE = 'Asia/Kolkata'
 # 🔥 PIPELINE CONFIGURATION INTERFACE: Chained Sequential Combinations
 # You are completely free to pass ANY combination of digits 0 through 7 (e.g., "72", "27", "77", "572")
 # The engine executes each mathematical transformation step-by-step from left to right.
-SELECTED_MODE = "72"
+SELECTED_MODE = "77"
 
 
 def apply_ohlc_transformation(df, mode="1"):
