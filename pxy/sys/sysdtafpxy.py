@@ -12,7 +12,7 @@ TIMEZONE = 'Asia/Kolkata'
 # 🔥 PIPELINE CONFIGURATION INTERFACE: Chained Sequential Combinations
 # You are completely free to pass ANY combination of digits 0 through 7 (e.g., "72", "27", "77", "572")
 # The engine executes each mathematical transformation step-by-step from left to right.
-SELECTED_MODE = "77"
+SELECTED_MODE = "72"
 
 
 def apply_ohlc_transformation(df, mode="1"):
@@ -73,12 +73,9 @@ def apply_ohlc_transformation(df, mode="1"):
             def rolling_linreg(series):
                 if len(series) < window:
                     return series
-                # Slice array into rolling windows via numpy stride tricks
-                shape = (len(series) - window + 1, window)
-                strides = (series.strides, series.strides)
-                windows = np.lib.stride_tricks.as_strided(
-                    series, shape=shape, strides=strides
-                )
+                
+                # Safe, modern NumPy windowing tool avoiding stride-tuple interpretation errors
+                windows = np.lib.stride_tricks.sliding_window_view(series, window_shape=window)
 
                 # Vectorwise OLS calculation across the window matrix
                 y_means = windows.mean(axis=1, keepdims=True)
@@ -165,4 +162,3 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
 
     # Step 4: Safely extract execution target footprint
     return processed_df.tail(target_rows)
-
