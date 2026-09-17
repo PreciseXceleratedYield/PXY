@@ -39,14 +39,14 @@ def target_price(row):
         if is_ce:
             # Defensive target if native exit OR standard bearish entry triggers
             if derived_entry in ['EXITCE', 'OTMSELL']:
-                target_pct = atr_val
+                target_pct = atr_val /2
             else:
                 target_pct = 99.0
                 
         elif is_pe:
             # Defensive target if native exit OR standard bullish entry triggers
             if derived_entry in ['EXITPE', 'OTMBUY']:
-                target_pct = atr_val
+                target_pct = atr_val /2
             else:
                 target_pct = 99.0
             
