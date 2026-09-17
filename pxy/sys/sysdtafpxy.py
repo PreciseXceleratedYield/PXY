@@ -9,100 +9,101 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # Explicitly enforce Indian Standard Time zone mapping
 TIMEZONE = 'Asia/Kolkata'
 
-# 🔥 PIPELINE CONFIGURATION INTERFACE: Chained Sequential Combinations
-# You are completely free to pass ANY combination of digits 0 through 7 (e.g., "72", "27", "77", "572")
-# The engine executes each mathematical transformation step-by-step from left to right.
+# 🔥 INDEPENDENT MATRIX MODE INTERFACE: 
+# Format: "ST" -> First Digit = SIDE Mode, Second Digit = TREND Mode
+# "72" means: If market is SIDEWAYS use Mode 7. If market is TRENDING use Mode 2.
 SELECTED_MODE = "72"
 
 
-def apply_ohlc_transformation(df, mode="1"):
-    """Executes sequential, multi-stage mathematical transformations on the OHLC matrix."""
+def apply_ohlc_transformation(df, mode=1):
+    """Executes structural, isolated mathematical transformations based on explicit modes."""
     if df.empty:
         return df
 
     out = df.copy()
+    raw_o = df['Open'].to_numpy()
+    raw_h = df['High'].to_numpy()
+    raw_l = df['Low'].to_numpy()
+    raw_c = df['Close'].to_numpy()
 
-    # Deconstruct the mode string into individual sequential execution steps
-    steps = [int(d) for d in str(mode).strip()]
+    # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles
+    if mode == 0:
+        out['Open'] = raw_c
+        out['Close'] = np.where(
+            raw_c >= raw_o, (raw_c + raw_h) / 2.0, (raw_c + raw_l) / 2.0
+        )
+        return out
 
-    # Execute each mode sequentially in a pipeline architecture
-    for step in steps:
-        raw_o = out['Open'].to_numpy()
-        raw_h = out['High'].to_numpy()
-        raw_l = out['Low'].to_numpy()
-        raw_c = out['Close'].to_numpy()
+    # ⚡ Mode 1: Raw Candles
+    elif mode == 1:
+        return out
 
-        # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles
-        if step == 0:
-            out['Open'] = raw_c
-            out['Close'] = np.where(
-                raw_c >= raw_o, (raw_c + raw_h) / 2.0, (raw_c + raw_l) / 2.0
-            )
+    # ⚡ Mode 2: OC/2
+    elif mode == 2:
+        out['Close'] = (raw_o + raw_c) / 2.0
+        return out
 
-        # ⚡ Mode 1: Raw Candles (Pass-through)
-        elif step == 1:
-            continue
+    # ⚡ Mode 3: OCC/3
+    elif mode == 3:
+        out['Close'] = (raw_o + (2 * raw_c)) / 3.0
+        return out
 
-        # ⚡ Mode 2: OC/2 Smoothing Matrix
-        elif step == 2:
-            out['Close'] = (raw_o + raw_c) / 2.0
+    # ⚡ Mode 4: OCCC/4
+    elif mode == 4:
+        out['Close'] = (raw_o + (3 * raw_c)) / 4.0
+        return out
 
-        # ⚡ Mode 3: OCC/3 Weighted Matrix
-        elif step == 3:
-            out['Close'] = (raw_o + (2 * raw_c)) / 3.0
+    # ⚡ Mode 5: OHLCC/5
+    elif mode == 5:
+        out['Close'] = (raw_o + raw_h + raw_l + (2 * raw_c)) / 5.0
+        return out
 
-        # ⚡ Mode 4: OCCC/4 Weighted Matrix
-        elif step == 4:
-            out['Close'] = (raw_o + (3 * raw_c)) / 4.0
+    # ⚡ Mode 7: 7-Linear Regression & Running Average Blend (Pine Script Translation)
+    elif mode == 7:
+        n = len(df)
+        window = 7
 
-        # ⚡ Mode 5: OHLCC/5 Full-Range Matrix
-        elif step == 5:
-            out['Close'] = (raw_o + raw_h + raw_l + (2 * raw_c)) / 5.0
+        # --- 1. Vectorized 7-Period Time Series Linear Regression ---
+        x = np.arange(window)
+        x_mean = x.mean()
+        x_dev = x - x_mean
+        x_var = np.sum(x_dev**2)
 
-        # ⚡ Mode 7: 7-Period Linear Regression & Running Average Blend (Pine Script Translation)
-        elif step == 7:
-            n = len(df)
-            window = 7
+        def rolling_linreg(series):
+            if len(series) < window:
+                return series
+            
+            # Safe, modern NumPy windowing tool avoiding stride-tuple interpretation errors
+            windows = np.lib.stride_tricks.sliding_window_view(series, window_shape=window)
 
-            # --- 1. Vectorized 7-Period Time Series Linear Regression ---
-            x = np.arange(window)
-            x_mean = x.mean()
-            x_dev = x - x_mean
-            x_var = np.sum(x_dev**2)
+            # Vectorwise OLS calculation across the window matrix
+            y_means = windows.mean(axis=1, keepdims=True)
+            slopes = np.sum((windows - y_means) * x_dev, axis=1) / x_var
+            intercepts = y_means.flatten() - slopes * x_mean
 
-            def rolling_linreg(series):
-                if len(series) < window:
-                    return series
-                
-                # Safe, modern NumPy windowing tool avoiding stride-tuple interpretation errors
-                windows = np.lib.stride_tricks.sliding_window_view(series, window_shape=window)
+            # Project the linear trend at current bar (offset 0)
+            lr_current = intercepts + slopes * (window - 1)
+            return np.concatenate([series[: window - 1], lr_current])
 
-                # Vectorwise OLS calculation across the window matrix
-                y_means = windows.mean(axis=1, keepdims=True)
-                slopes = np.sum((windows - y_means) * x_dev, axis=1) / x_var
-                intercepts = y_means.flatten() - slopes * x_mean
+        lr_o = rolling_linreg(raw_o)
+        lr_h = rolling_linreg(raw_h)
+        lr_l = rolling_linreg(raw_l)
+        lr_c = rolling_linreg(raw_c)
 
-                # Project the linear trend at current bar (offset 0)
-                lr_current = intercepts + slopes * (window - 1)
-                return np.concatenate([series[: window - 1], lr_current])
+        # --- 2. Running Average (Cumulative Mean Breakdown) ---
+        bar_count = np.arange(1, n + 1)
+        ra_o = np.cumsum(raw_o) / bar_count
+        ra_h = np.cumsum(raw_h) / bar_count
+        ra_l = np.cumsum(raw_l) / bar_count
+        ra_c = np.cumsum(raw_c) / bar_count
 
-            lr_o = rolling_linreg(raw_o)
-            lr_h = rolling_linreg(raw_h)
-            lr_l = rolling_linreg(raw_l)
-            lr_c = rolling_linreg(raw_c)
+        # --- 3. Assign Balanced Mean Back to the Pipeline DataFrame ---
+        out['Open'] = (lr_o + ra_o) / 2.0
+        out['High'] = (lr_h + ra_h) / 2.0
+        out['Low'] = (lr_l + ra_l) / 2.0
+        out['Close'] = (lr_c + ra_c) / 2.0
 
-            # --- 2. Running Average (Cumulative Mean Breakdown) ---
-            bar_count = np.arange(1, n + 1)
-            ra_o = np.cumsum(raw_o) / bar_count
-            ra_h = np.cumsum(raw_h) / bar_count
-            ra_l = np.cumsum(raw_l) / bar_count
-            ra_c = np.cumsum(raw_c) / bar_count
-
-            # --- 3. Assign Balanced Mean Back to the Pipeline DataFrame ---
-            out['Open'] = (lr_o + ra_o) / 2.0
-            out['High'] = (lr_h + ra_h) / 2.0
-            out['Low'] = (lr_l + ra_l) / 2.0
-            out['Close'] = (lr_c + ra_c) / 2.0
+        return out
 
     return out
 
@@ -152,13 +153,21 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     market_state = get_market_trend(df)
     mode_str = str(SELECTED_MODE).strip()
 
-    # Step 2: Dynamic Universal Switch Engine (Inject Mode 0 protection if SIDE)
-    if market_state == 'SIDE':
-        if not mode_str.startswith("0"):
-            mode_str = "0" + mode_str
+    # Step 2: Independent Switch Selection Engine (PXY Universal Master Matrix)
+    if len(mode_str) == 2:
+        if market_state == 'SIDE':
+            dynamic_mode = int(mode_str[0])  # Use 1st digit for Sideways
+        else:
+            dynamic_mode = int(mode_str[1])  # Use 2nd digit for Trend breakouts
+    else:
+        # Fallback for standard single digits
+        try:
+            dynamic_mode = int(mode_str)
+        except ValueError:
+            dynamic_mode = 1  # Raw fallback protection if parsing fails
 
-    # Step 3: Run pipeline calculation over full history to lock cumulative formulas
-    processed_df = apply_ohlc_transformation(df, mode=mode_str)
+    # Step 3: Run transformation using the isolated runtime calculated mode
+    processed_df = apply_ohlc_transformation(df, mode=dynamic_mode)
 
     # Step 4: Safely extract execution target footprint
     return processed_df.tail(target_rows)
