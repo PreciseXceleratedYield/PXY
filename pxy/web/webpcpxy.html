@@ -141,6 +141,9 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 .opt-tbl{width:100%;table-layout:fixed;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:12.6px;color:var(--text);}
 .opt-tbl th{padding:2px 4px;color:var(--muted);font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .opt-tbl td{padding:2px 4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sig-tbl{width:100%;table-layout:fixed;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:9px;color:var(--text);}
+.sig-tbl th{padding:2px 4px;color:var(--muted);font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sig-tbl td{padding:2px 4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .opt-tbl tr.opt-ce td:first-child{border-left:2px solid var(--bull);}
 .opt-tbl tr.opt-pe td:first-child{border-left:2px solid var(--bear);}
 .grid-over{position:absolute;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:40px 40px;}
@@ -184,8 +187,8 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     padding:0 10px;gap:8px;background:var(--bg2);border-bottom:1px solid var(--border2);
 }
 .rsk-grp{display:flex;flex-direction:column;gap:1px;flex-shrink:0;}
-.rsk-lbl{font-size:7px;letter-spacing:0.10em;text-transform:uppercase;color:var(--text);white-space:nowrap;}
-.rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:12px;white-space:nowrap;color:var(--text);}
+.rsk-lbl{font-size:9px;letter-spacing:0.10em;text-transform:uppercase;color:var(--text);white-space:nowrap;}
+.rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:16px;white-space:nowrap;color:var(--text);}
 .rsk-val.bull{color:var(--bull);}
 .rsk-val.bear{color:var(--bear);}
 .rsk-candle-wrap{flex:1;min-width:0;height:39px;position:relative;overflow:hidden;border-radius:5px;background:var(--bg3);border:1px solid var(--border);}
@@ -651,7 +654,7 @@ async function loadDash(){
 
         const sig=$('sigTable');
         if(sig){
-            sig.innerHTML='<table class="opt-tbl"><thead><tr>'
+            sig.innerHTML='<table class="sig-tbl"><thead><tr>'
                 +'<th>ENTRY</th><th>EXIT</th><th>TREND</th><th>ATR</th><th>DEPTH ⚡⚡ POWER</th>'
                 +'</tr></thead><tbody><tr>'
                 +`<td>${entryV}</td><td>${exitV}</td><td>${trendV}</td><td>${atrV}</td><td>${dpV}</td>`
@@ -960,7 +963,7 @@ function drawRiskCandle(floor,net,peak){
 }
 function refreshRiskCandle(){
     const net=Math.round(runningTotal+bookedTotal);
-    document.title='₹'+fmt(net)+' · PXY® · '+location.hostname;
+    document.title='₹'+fmt(net)+' · '+location.hostname;
     drawRiskCandle(lastFloor,net,lastPeak);
 }
 new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($('riskBar'));
@@ -1159,8 +1162,14 @@ async function loadOptSummary(){
     const rnd=n=>Math.round(n||0);
     const doIcon=s=>({hold:'✋',square_off:'⛔',fresh_buy:'🆕'}[String(s||'').toLowerCase()]??'⏳'); // kept, unused for now
     const plainSign=n=>(Number(n||0)>=0?'+':'')+Math.round(n||0);
+    const runColor=(runPct,lgt)=>{
+        const r=Number(runPct||0),l=Number(lgt||0),tgt=1.4;
+        const dLgt=Math.abs(r-l),dTgt=Math.abs(r-tgt);
+        const color=dLgt<dTgt?'var(--bear)':'var(--bull)';
+        return `<span style="color:${color};">${rnd(r)}</span>`;
+    };
     const buildRow=(lots,pnl,inv,lgt,runPct,aligned,decision)=>[
-        lots??'—', toK(inv), plainSign(pnl), rnd(lgt), rnd(runPct),
+        lots??'—', toK(inv), plainSign(pnl), rnd(lgt), runColor(runPct,lgt),
         aligned?'99':'1.4'
     ];
     const ceRow=buildRow(d.ce_lots,d.ce_pnl,d.ce_investment,d.ce_lgt,d.ce_run_pct,d.ce_aligned,d.ce_decision);
