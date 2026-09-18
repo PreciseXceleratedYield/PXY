@@ -9,17 +9,22 @@ from syscnfgpxy import TICKER
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # Explicitly enforce Indian Standard Time zone mapping
-TIMEZONE = 'Asia/Kolkata' 
+TIMEZONE = 'Asia/Kolkata'
 
 # 🔥 INDEPENDENT MATRIX MODE INTERFACE:
 # Format: "ST" -> First Digit = SIDE Mode, Second Digit = TREND Mode
-SELECTED_MODE = "22" 
+# Set SELECTED_MODE to "8" (or use your string logic) to run the new Renko system.
+SELECTED_MODE = "88" 
 
-def apply_ohlc_transformation(df, mode=1):
-    """Executes structural, isolated mathematical transformations based on explicit modes."""
+def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
+    """Executes structural, isolated mathematical transformations based on explicit modes.
+    
+    Modes 0-7: Time-based mathematical variations (Heikin-Ashi, Linear Regression, etc.)
+    Mode 8: Dynamic Volatility-Adaptive Renko Bricks (Clamped between 5.0 and 10.0 points)
+    """
     if df.empty:
         return df
-        
+
     out = df.copy()
     raw_o = df['Open'].to_numpy()
     raw_h = df['High'].to_numpy()
@@ -30,9 +35,7 @@ def apply_ohlc_transformation(df, mode=1):
     if mode == 0:
         out['Open'] = raw_c
         out['Close'] = np.where(
-            raw_c >= raw_o, 
-            (raw_c + raw_h) / 2.0, 
-            (raw_c + raw_l) / 2.0
+            raw_c >= raw_o, (raw_c + raw_h) / 2.0, (raw_c + raw_l) / 2.0
         )
         return out
 
@@ -64,16 +67,11 @@ def apply_ohlc_transformation(df, mode=1):
     elif mode == 6:
         n = len(df)
         ha_c = (raw_o + raw_h + raw_l + raw_c) / 4.0
-        
-        # Fixed: Explicit copy to prevent mutating raw_o mid-loop
         ha_o = raw_o.copy()
-        
         for i in range(1, n):
             ha_o[i] = (ha_o[i-1] + ha_c[i-1]) / 2.0
-            
         ha_h = np.maximum(raw_h, np.maximum(ha_o, ha_c))
         ha_l = np.minimum(raw_l, np.minimum(ha_o, ha_c))
-        
         out['Open'] = ha_o
         out['High'] = ha_h
         out['Low'] = ha_l
@@ -86,12 +84,11 @@ def apply_ohlc_transformation(df, mode=1):
         window = 7
         if n < window:
             return out
-        
         x = np.arange(window)
         x_mean = x.mean()
         x_dev = x - x_mean
         x_var = np.sum(x_dev**2)
-        
+
         def rolling_linreg(series):
             windows = np.lib.stride_tricks.sliding_window_view(series, window_shape=window)
             y_means = windows.mean(axis=1, keepdims=True)
@@ -99,23 +96,91 @@ def apply_ohlc_transformation(df, mode=1):
             intercepts = y_means.flatten() - slopes * x_mean
             lr_current = intercepts + slopes * (window - 1)
             return np.concatenate([series[: window - 1], lr_current])
-            
+
         lr_o = rolling_linreg(raw_o)
         lr_h = rolling_linreg(raw_h)
         lr_l = rolling_linreg(raw_l)
         lr_c = rolling_linreg(raw_c)
-        
+
         bar_count = np.arange(1, n + 1)
         ra_o = np.cumsum(raw_o) / bar_count
         ra_h = np.cumsum(raw_h) / bar_count
         ra_l = np.cumsum(raw_l) / bar_count
         ra_c = np.cumsum(raw_c) / bar_count
-        
+
         out['Open'] = (lr_o + ra_o) / 2.0
         out['High'] = (lr_h + ra_h) / 2.0
         out['Low'] = (lr_l + ra_l) / 2.0
         out['Close'] = (lr_c + ra_c) / 2.0
         return out
+
+    # ⚡ Mode 8: Dynamic ATR Renko Bricks with Strict 5-10 Range Clamping
+    elif mode == 8:
+        n = len(df)
+        if n <= atr_period:
+            return out  # Not enough data to compute ATR
+            
+        # 1. Compute True Range (TR)
+        prev_close_shifted = np.roll(raw_c, 1)
+        prev_close_shifted[0] = raw_o[0]  # Prevent structural index boundaries tracking errors
+        
+        tr1 = raw_h - raw_l
+        tr2 = np.abs(raw_h - prev_close_shifted)
+        tr3 = np.abs(raw_l - prev_close_shifted)
+        true_range = np.maximum(tr1, np.maximum(tr2, tr3))
+        
+        # 2. Compute Wilder's ATR (Standard Terminal Smoothing Multiplier)
+        atr = np.zeros(n)
+        atr[atr_period] = np.mean(true_range[1:atr_period+1])
+        for i in range(atr_period + 1, n):
+            atr[i] = (atr[i-1] * (atr_period - 1) + true_range[i]) / atr_period
+            
+        # 🔒 Strictly clamp the dynamic brick size boundary between 5 and 10 points
+        renko_brick_size = np.clip(atr[-1], 5.0, 10.0)
+        
+        # Fallback guardrail for low liquidity or structural computational errors
+        if renko_brick_size <= 0 or np.isnan(renko_brick_size):
+            renko_brick_size = fixed_brick_size
+
+        # 3. Generate Structural Renko Brick Arrays
+        renko_ops = []
+        renko_cl_list = []
+        
+        # Anchor the baseline price block cleanly based on calculations
+        prev_close = np.floor(raw_c[0] / renko_brick_size) * renko_brick_size
+        
+        for price in raw_c:
+            gap = price - prev_close
+            if gap >= renko_brick_size:
+                bricks = int(gap // renko_brick_size)
+                for _ in range(bricks):
+                    next_close = prev_close + renko_brick_size
+                    renko_ops.append(prev_close)
+                    renko_cl_list.append(next_close)
+                    prev_close = next_close
+            elif gap <= -renko_brick_size:
+                bricks = int(abs(gap) // renko_brick_size)
+                for _ in range(bricks):
+                    next_close = prev_close - renko_brick_size
+                    renko_ops.append(prev_close)
+                    renko_cl_list.append(next_close)
+                    prev_close = next_close
+                    
+        if not renko_ops:
+            renko_ops.append(prev_close)
+            renko_cl_list.append(prev_close)
+
+        # 4. Construct Output Price Data Engine
+        renko_df = pd.DataFrame(index=df.index[:len(renko_ops)])
+        renko_df['Open'] = renko_ops
+        renko_df['Close'] = renko_cl_list
+        renko_df['High'] = np.maximum(renko_df['Open'], renko_df['Close'])
+        renko_df['Low'] = np.minimum(renko_df['Open'], renko_df['Close'])
+        
+        if 'Volume' in df.columns:
+            renko_df['Volume'] = df['Volume'].iloc[:len(renko_ops)].values
+            
+        return renko_df
 
     return out
 
