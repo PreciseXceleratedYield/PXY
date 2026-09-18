@@ -93,8 +93,8 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 }
 #colPositions{width:25%;transition:width 0.25s ease;overflow:hidden;position:relative;}
 #colPositions.collapsed{width:8px;}
-#colPositions.collapsed #posTop,#colPositions.collapsed #posBot{opacity:0;pointer-events:none;transition:opacity 0.15s ease;}
-#colPositions:not(.collapsed) #posTop,#colPositions:not(.collapsed) #posBot{opacity:1;transition:opacity 0.2s ease 0.08s;}
+#colPositions.collapsed #posTop,#colPositions.collapsed #posBot,#colPositions.collapsed #optOverlay{opacity:0;pointer-events:none;transition:opacity 0.15s ease;}
+#colPositions:not(.collapsed) #posTop,#colPositions:not(.collapsed) #posBot,#colPositions:not(.collapsed) #optOverlay{opacity:1;transition:opacity 0.2s ease 0.08s;}
 #colPositions.collapsed::after{
     content:'';position:absolute;right:0;top:0;bottom:0;width:3px;
     background:linear-gradient(180deg,var(--bull),var(--bear));opacity:0.7;
@@ -308,7 +308,6 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
                 <div id="momentumCanvasWrap"><canvas id="momentumCandle"></canvas></div>
             </div>
         </div>
-        <div id="optOverlay"></div>
 
         <!-- RISK BAR -->
         <div id="riskBar">
@@ -326,6 +325,8 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 
     <!-- COL 3: POSITIONS + TRADES -->
     <div class="col" id="colPositions">
+        <div id="optOverlay"></div>
+        <div id="posPane" style="flex:1;display:flex;flex-direction:column;min-height:0;">
         <div id="posTop">
             <div class="pane-hdr hdr-pos">
                 <span onclick="openPanelLink('positions')" style="cursor:pointer;">📍 Positions</span>
@@ -348,6 +349,7 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
                 </div>
             </div>
             <div id="tradeScroll"><div class="empty-msg" id="tradeEmpty">No trades</div></div>
+        </div>
         </div>
     </div>
 
@@ -1147,7 +1149,7 @@ async function loadOptSummary(){
     let d=null;try{d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     d=d||{};
     const ov=$('optOverlay');
-    const cols=['LOT','INV','LGT','RUN','DIR','PNL'];
+    const cols=['LOT','INV','LGT','RUN','PNL'];
     const toK=n=>Math.round((n||0)/1000)+'k';
     const rnd=n=>Math.round(n||0);
     const doIcon=s=>({hold:'✋',square_off:'⛔',fresh_buy:'🆕'}[String(s||'').toLowerCase()]??'⏳'); // kept, unused for now
@@ -1158,9 +1160,9 @@ async function loadOptSummary(){
         const color=dLgt<dTgt?'var(--bear)':'var(--bull)';
         return `<span style="color:${color};">${rnd(r)}</span>`;
     };
-    const dirIcon=aligned=>aligned?'🟢':'🔴';
+    const dirIcon=aligned=>aligned?'🟢':'🔴'; // kept, unused for now
     const buildRow=(lots,pnl,inv,lgt,runPct,aligned,decision)=>[
-        lots??'—', toK(inv), rnd(lgt), runColor(runPct,lgt), dirIcon(aligned), plainSign(pnl)
+        lots??'—', toK(inv), rnd(lgt), runColor(runPct,lgt), plainSign(pnl)
     ];
     const ceRow=buildRow(d.ce_lots,d.ce_pnl,d.ce_investment,d.ce_lgt,d.ce_run_pct,d.ce_aligned,d.ce_decision);
     const peRow=buildRow(d.pe_lots,d.pe_pnl,d.pe_investment,d.pe_lgt,d.pe_run_pct,d.pe_aligned,d.pe_decision);
