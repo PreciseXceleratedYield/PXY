@@ -14,7 +14,7 @@ TIMEZONE = 'Asia/Kolkata'
 # 🔥 INDEPENDENT MATRIX MODE INTERFACE: 
 # Format: "ST" -> First Digit = SIDE Mode, Second Digit = TREND Mode
 # "72" means: If market is SIDEWAYS use Mode 7. If market is TRENDING use Mode 2.
-SELECTED_MODE = "01"
+SELECTED_MODE = "00"
 
 
 def apply_ohlc_transformation(df, mode=1):
