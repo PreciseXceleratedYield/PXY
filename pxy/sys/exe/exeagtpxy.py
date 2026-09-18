@@ -16,33 +16,20 @@ logger = logging.getLogger("exeavgpxy.strategy")
 # -----------------------------------------------------------------------------
 # 📊 SECTION 1: SYSTEM A THRESHOLD PROCESSING & PLACEMENT LOGIC
 # -----------------------------------------------------------------------------
-# -----------------------------------------------------------------------------
-# 📊 SECTION 1: SYSTEM A THRESHOLD PROCESSING & PLACEMENT LOGIC
-# -----------------------------------------------------------------------------
 SYSTEM_A_BASE_THRESHOLD = 33.0
+SYSTEM_B_BASE_THRESHOLD = 11.0
 ABS_CAP = 77.0
 
 
 def getexeagtpxy(ce_invst_factor, pe_invst_factor):
     """Calculates investment-adjusted dynamic drawdown thresholds from capital weights."""
-    ce_base_invested = SYSTEM_A_BASE_THRESHOLD * (ce_invst_factor**3)
-    pe_base_invested = SYSTEM_A_BASE_THRESHOLD * (pe_invst_factor**3)
+    ce_base_invested = SYSTEM_A_BASE_THRESHOLD * ce_invst_factor * ce_invst_factor * ce_invst_factor
+    pe_base_invested = SYSTEM_A_BASE_THRESHOLD * pe_invst_factor * pe_invst_factor * pe_invst_factor
 
-    # 🔄 Mutual Exclusivity Logic
-    # If CE goes past 33, PE drops to 0
-    if ce_base_invested > SYSTEM_A_BASE_THRESHOLD:
-        pe_base_invested = 0.0
-    # If PE goes past 33, CE drops to 0
-    elif pe_base_invested > SYSTEM_A_BASE_THRESHOLD:
-        ce_base_invested = 0.0
+    ce_final_abs = (min(ce_base_invested, ABS_CAP) * -1.0) + SYSTEM_B_BASE_THRESHOLD
+    pe_final_abs = (min(pe_base_invested, ABS_CAP) * -1.0) + SYSTEM_B_BASE_THRESHOLD
 
-    # Apply the absolute caps
-    ce_final_abs = min(ce_base_invested, ABS_CAP)
-    pe_final_abs = min(pe_base_invested, ABS_CAP)
-
-    # Returns the pure negative thresholds (or 0.0 if suppressed)
-    return round(ce_final_abs * -1.0, 2), round(pe_final_abs * -1.0, 2)
-
+    return round(ce_final_abs , 2), round(pe_final_abs, 2)
 
 
 def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_val,
