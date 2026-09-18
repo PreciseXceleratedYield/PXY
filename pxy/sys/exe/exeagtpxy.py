@@ -16,7 +16,7 @@ logger = logging.getLogger("exeavgpxy.strategy")
 # -----------------------------------------------------------------------------
 # 📊 SECTION 1: SYSTEM A THRESHOLD PROCESSING & PLACEMENT LOGIC
 # -----------------------------------------------------------------------------
-SYSTEM_A_BASE_THRESHOLD = 25.0
+SYSTEM_A_BASE_THRESHOLD = 33.0
 ABS_CAP = 77.0
 
 
@@ -28,7 +28,7 @@ def getexeagtpxy(ce_invst_factor, pe_invst_factor):
     ce_final_abs = min(ce_base_invested, ABS_CAP)
     pe_final_abs = min(pe_base_invested, ABS_CAP)
 
-    return round(ce_final_abs * -1.0, 2), round(pe_final_abs * -1.0, 2)
+    return round((ce_final_abs * -1.0, 2)+11), round((pe_final_abs * -1.0, 2)+11)
 
 
 def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_val,
