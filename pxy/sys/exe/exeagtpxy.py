@@ -17,18 +17,21 @@ logger = logging.getLogger("exeavgpxy.strategy")
 # 📊 SECTION 1: SYSTEM A THRESHOLD PROCESSING & PLACEMENT LOGIC
 # -----------------------------------------------------------------------------
 SYSTEM_A_BASE_THRESHOLD = 33.0
+X_FACTOR = 11  # Fixed spelling and added snake_case for readability
 ABS_CAP = 77.0
-
 
 def getexeagtpxy(ce_invst_factor, pe_invst_factor):
     """Calculates investment-adjusted dynamic drawdown thresholds from capital weights."""
-    ce_base_invested = SYSTEM_A_BASE_THRESHOLD * ce_invst_factor * ce_invst_factor * ce_invst_factor
-    pe_base_invested = SYSTEM_A_BASE_THRESHOLD * pe_invst_factor * pe_invst_factor * pe_invst_factor
+    # Using ** 3 simplifies the multiplication
+    ce_base_invested = SYSTEM_A_BASE_THRESHOLD * (ce_invst_factor ** 3)
+    pe_base_invested = SYSTEM_A_BASE_THRESHOLD * (pe_invst_factor ** 3)
 
     ce_final_abs = min(ce_base_invested, ABS_CAP)
     pe_final_abs = min(pe_base_invested, ABS_CAP)
 
-    return round((ce_final_abs * -1.0, 2)+11), round((pe_final_abs * -1.0, 2)+11)
+    return round((ce_final_abs * -1.0) + X_FACTOR, 2), round((pe_final_abs * -1.0) + X_FACTOR, 2)
+
+
 
 
 def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_val,
