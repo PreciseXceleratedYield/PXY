@@ -59,7 +59,7 @@ def target_price(row, df=None):
             
             # 🔄 CORRECTED: Now using the exact mid-point average price calculation
             working_df['row_invested'] = working_df['qty'].apply(f) * (
-                (working_df['sell_prc'].apply(f) + working_df['sell_prc'].apply(f)) / 2.0
+                (working_df['buy_prc'].apply(f) + working_df['buy_prc'].apply(f)) / 2.0
             )
             
             ce_rows = working_df[working_df['side'] == 'CE']
