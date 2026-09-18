@@ -4,8 +4,8 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # Core Threshold System Variables
-SYSTEM_A_BASE_THRESHOLD = 10.0  # 🎯 Base threshold value
-ABS_CAP = 41.0                  # 🛑 UPDATED: Hard maximum allowed target ceiling
+SYSTEM_A_BASE_THRESHOLD = 1.4   # 🎯 Base threshold simplified to 1.4
+ABS_CAP = 41.0                  # 🛑 Hard maximum allowed target ceiling
 MIN_FLOOR = 1.4                 # 🛡️ Minimum allowed target threshold floor
 
 def f(x, d=0.0):
@@ -17,11 +17,11 @@ def f(x, d=0.0):
 
 def getexeagtpxy(ce_invst_factor, pe_invst_factor):
     """Calculates investment-adjusted dynamic drawdown thresholds from capital weights."""
-    # Cubic amplification curve calculation
-    ce_base_invested = SYSTEM_A_BASE_THRESHOLD * ce_invst_factor * ce_invst_factor * ce_invst_factor
-    pe_base_invested = SYSTEM_A_BASE_THRESHOLD * pe_invst_factor * pe_invst_factor * pe_invst_factor
+    # 🎯 Linear Multiplication Matrix (No cubing / no explosive curve adjustments)
+    ce_base_invested = SYSTEM_A_BASE_THRESHOLD * ce_invst_factor
+    pe_base_invested = SYSTEM_A_BASE_THRESHOLD * pe_invst_factor
 
-    # Apply ceiling safety guard (Now capped at 41.0 maximum)
+    # Apply ceiling safety guard (Capped at 41.0 maximum)
     ce_capped = min(ce_base_invested, ABS_CAP)
     pe_capped = min(pe_base_invested, ABS_CAP)
 
@@ -76,12 +76,12 @@ def target_price(row, df=None):
         # 4️⃣ Symmetrical Risk Matrices (Swapped Matrix Targets)
         if is_ce:
             if derived_entry in ['EXITCE', 'OTMSELL']:
-                target_pct = pe_tgt_threshold  # Clamped to a minimum floor of 1.4
+                target_pct = pe_tgt_threshold  
             else:
                 target_pct = 99.0
         elif is_pe:
             if derived_entry in ['EXITPE', 'OTMBUY']:
-                target_pct = ce_tgt_threshold  # Clamped to a minimum floor of 1.4
+                target_pct = ce_tgt_threshold  
             else:
                 target_pct = 99.0
             
