@@ -1,4 +1,3 @@
-
 from colorama import Fore, Style, init
 
 # Initialize colorama for clean, colored terminal output formatting
@@ -18,7 +17,7 @@ def f(x, d=0.0):
 
 def getexeagtpxy(ce_invst_factor, pe_invst_factor):
     """Calculates investment-adjusted dynamic drawdown thresholds from capital weights."""
-    # 🎯 Linear Multiplication Matrix (No cubing / no explosive curve adjustments)
+    # 🎯 Linear Multiplication Matrix (Smooth scaling)
     ce_base_invested = SYSTEM_A_BASE_THRESHOLD * ce_invst_factor
     pe_base_invested = SYSTEM_A_BASE_THRESHOLD * pe_invst_factor
 
@@ -57,7 +56,11 @@ def target_price(row, df=None):
         if df is not None and not df.empty:
             working_df = df.copy()
             working_df['side'] = working_df['symbol'].astype(str).str[-2:].str.upper()
-            working_df['row_invested'] = working_df['qty'].apply(f) * working_df['buy_prc'].apply(f)
+            
+            # 🔄 CORRECTED: Now using the exact mid-point average price calculation
+            working_df['row_invested'] = working_df['qty'].apply(f) * (
+                (working_df['buy_prc'].apply(f) + working_df['sell_prc'].apply(f)) / 2.0
+            )
             
             ce_rows = working_df[working_df['side'] == 'CE']
             pe_rows = working_df[working_df['side'] == 'PE']
@@ -93,5 +96,4 @@ def target_price(row, df=None):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
-
 
