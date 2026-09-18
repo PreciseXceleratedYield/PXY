@@ -9,80 +9,84 @@ from syscnfgpxy import TICKER
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # Explicitly enforce Indian Standard Time zone mapping
-TIMEZONE = 'Asia/Kolkata'
+TIMEZONE = 'Asia/Kolkata' 
 
 # 🔥 INDEPENDENT MATRIX MODE INTERFACE:
 # Format: "ST" -> First Digit = SIDE Mode, Second Digit = TREND Mode
-SELECTED_MODE = "77"
+SELECTED_MODE = "11" 
 
 def apply_ohlc_transformation(df, mode=1):
     """Executes structural, isolated mathematical transformations based on explicit modes."""
     if df.empty:
         return df
-    
+        
     out = df.copy()
     raw_o = df['Open'].to_numpy()
     raw_h = df['High'].to_numpy()
     raw_l = df['Low'].to_numpy()
     raw_c = df['Close'].to_numpy()
-    
+
     # ⚡ Mode 0: Hyper-Sensitive Modified Close Candles
     if mode == 0:
         out['Open'] = raw_c
         out['Close'] = np.where(
-            raw_c >= raw_o,
-            (raw_c + raw_h) / 2.0,
+            raw_c >= raw_o, 
+            (raw_c + raw_h) / 2.0, 
             (raw_c + raw_l) / 2.0
         )
         return out
-        
+
     # ⚡ Mode 1: Raw Candles
     elif mode == 1:
         return out
-        
+
     # ⚡ Mode 2: OC/2
     elif mode == 2:
         out['Close'] = (raw_o + raw_c) / 2.0
         return out
-        
+
     # ⚡ Mode 3: OCC/3
     elif mode == 3:
         out['Close'] = (raw_o + (2 * raw_c)) / 3.0
         return out
-        
+
     # ⚡ Mode 4: OCCC/4
     elif mode == 4:
         out['Close'] = (raw_o + (3 * raw_c)) / 4.0
         return out
-        
+
     # ⚡ Mode 5: OHLCC/5
     elif mode == 5:
         out['Close'] = (raw_o + raw_h + raw_l + (2 * raw_c)) / 5.0
         return out
-        
+
     # ⚡ Mode 6: True Heikin-Ashi Candles (Sequential Path Dependency)
     elif mode == 6:
         n = len(df)
         ha_c = (raw_o + raw_h + raw_l + raw_c) / 4.0
+        
         # Fixed: Explicit copy to prevent mutating raw_o mid-loop
         ha_o = raw_o.copy()
+        
         for i in range(1, n):
             ha_o[i] = (ha_o[i-1] + ha_c[i-1]) / 2.0
+            
         ha_h = np.maximum(raw_h, np.maximum(ha_o, ha_c))
         ha_l = np.minimum(raw_l, np.minimum(ha_o, ha_c))
+        
         out['Open'] = ha_o
         out['High'] = ha_h
         out['Low'] = ha_l
         out['Close'] = ha_c
         return out
-        
-    # ⚡ Mode 7: 7-Linear Regression & Running Average Blend + Mode 0 (Match-Body Outputs)
+
+    # ⚡ Mode 7: 7-Linear Regression & Running Average Blend (Pine Script Translation)
     elif mode == 7:
         n = len(df)
         window = 7
         if n < window:
             return out
-            
+        
         x = np.arange(window)
         x_mean = x.mean()
         x_dev = x - x_mean
@@ -92,8 +96,8 @@ def apply_ohlc_transformation(df, mode=1):
             windows = np.lib.stride_tricks.sliding_window_view(series, window_shape=window)
             y_means = windows.mean(axis=1, keepdims=True)
             slopes = np.sum((windows - y_means) * x_dev, axis=1) / x_var
-            intercept = y_means.flatten() - slopes * x_mean
-            lr_current = intercept + slopes * (window - 1)
+            intercepts = y_means.flatten() - slopes * x_mean
+            lr_current = intercepts + slopes * (window - 1)
             return np.concatenate([series[: window - 1], lr_current])
             
         lr_o = rolling_linreg(raw_o)
@@ -107,32 +111,13 @@ def apply_ohlc_transformation(df, mode=1):
         ra_l = np.cumsum(raw_l) / bar_count
         ra_c = np.cumsum(raw_c) / bar_count
         
-        # Intermediate Mode 7 values
-        m7_o = (lr_o + ra_o) / 2.0
-        m7_h = (lr_h + ra_h) / 2.0
-        m7_l = (lr_l + ra_l) / 2.0
-        m7_c = (lr_c + ra_c) / 2.0
-        
-        # Calculate final Open and Close targets
-        final_open = m7_c
-        final_close = np.where(
-            m7_c >= m7_o,
-            (m7_c + m7_h) / 2.0,
-            (m7_c + m7_l) / 2.0
-        )
-        
-        # Assign values to ensure full body layout maps correctly
-        out['Open'] = final_open
-        out['Close'] = final_close
-        
-        # Force High and Low to match the structural body bounds
-        out['High'] = np.maximum(final_open, final_close)
-        out['Low'] = np.minimum(final_open, final_close)
-        
+        out['Open'] = (lr_o + ra_o) / 2.0
+        out['High'] = (lr_h + ra_h) / 2.0
+        out['Low'] = (lr_l + ra_l) / 2.0
+        out['Close'] = (lr_c + ra_c) / 2.0
         return out
-        
-    return out
 
+    return out
 
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
     """Dynamic historical ingestion engine utilizing vectorized structural transformations"""
@@ -233,4 +218,3 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
 
     processed_df = apply_ohlc_transformation(df, mode=dynamic_mode)
     return processed_df.tail(target_rows)
-
