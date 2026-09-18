@@ -135,10 +135,9 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 #momentumCanvasWrap canvas{position:absolute;inset:0;width:100%!important;height:100%!important;}
 #chartBox{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse at 50% 80%,rgba(15,25,50,0.4) 0%,transparent 70%),var(--bg);}
 #optOverlay{flex-shrink:0;background:var(--bg2);border-top:1px solid var(--border2);}
-#sigTable{flex-shrink:0;background:var(--bg2);border-top:1px solid var(--border2);}
 #optOverlay:empty{display:none;}
 #sigTable:empty{display:none;}
-.opt-tbl{width:100%;table-layout:fixed;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:12.6px;color:var(--text);}
+.opt-tbl{width:100%;table-layout:fixed;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:25.2px;color:var(--text);}
 .opt-tbl th{padding:2px 4px;color:var(--muted);font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .opt-tbl td{padding:2px 4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .sig-tbl{width:100%;table-layout:fixed;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:9px;color:var(--text);}
@@ -218,7 +217,7 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
     <div class="hdr-l">
         <span class="logo" id="logoRefresh">PXY<sup>®</sup></span>
     </div>
-    <span id="brandHdr" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'Syne',sans-serif;font-weight:700;font-size:18px;letter-spacing:0.06em;white-space:nowrap;pointer-events:none;"><span style="color:var(--bull);">P</span><span style="color:var(--muted);">recise</span><span style="color:var(--bear);">X</span><span style="color:var(--muted);">celerated</span><span style="color:var(--bull);">Y</span><span style="color:var(--muted);">ield Pvt Ltd</span><sup style="color:var(--muted);">™</sup></span>
+    <div id="sigTable" style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);"></div>
     <div style="flex:1;"></div>
     <div class="hdr-r">
         <span id="clk" style="font-family:'DM Mono',monospace;font-size:11px;color:#fff;letter-spacing:0.04em;cursor:pointer;" title="Clients">—</span>
@@ -288,6 +287,9 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
         <div style="flex:1;min-height:0;display:flex;flex-direction:row;">
             <div id="chartBox" style="flex:1;">
                 <div class="grid-over"></div>
+                <div id="chartWatermark" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;z-index:0;overflow:hidden;">
+                    <span style="font-family:'Syne',sans-serif;font-weight:700;font-size:28px;letter-spacing:0.06em;white-space:nowrap;opacity:0.05;color:var(--text);">PreciseXceleratedYield Pvt Ltd<sup>™</sup></span>
+                </div>
                 <canvas id="priceChart"></canvas>
                 <!-- trade chart overlay -->
                 <div id="tradeChartOverlay">
@@ -307,9 +309,6 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
             </div>
         </div>
         <div id="optOverlay"></div>
-
-        <!-- SIGNAL TABLE (Entry/Exit/Trend/ATR/Depth-Power) -->
-        <div id="sigTable"></div>
 
         <!-- RISK BAR -->
         <div id="riskBar">
@@ -415,38 +414,29 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 <script>
 'use strict';
 const $=id=>document.getElementById(id);
+// Edit this line to show a friendly name in the browser tab instead of a raw IP.
+const HOST_LABEL=location.hostname||'PXY';
 
-// Terminal column: auto-hide (collapses to a thin edge strip; hover to reveal)
+// Side columns: exactly one of Terminal/Positions is visible alongside Chart at all times.
+// Default on load: Terminal + Chart. Hovering the other side swaps which one shows.
 // Placed here, right after $, and wrapped defensively so it always runs
 // regardless of whether WebSocket/xterm/Chart.js init later succeeds or throws.
 try{
     const tCol=document.getElementById('colTerminal');
+    const pCol=document.getElementById('colPositions');
+    if(tCol)tCol.classList.remove('collapsed');
+    if(pCol)pCol.classList.add('collapsed');
     if(tCol){
-        let tHideTimer=null;
-        tCol.classList.add('collapsed');
         tCol.addEventListener('mouseenter',()=>{
-            clearTimeout(tHideTimer);
             tCol.classList.remove('collapsed');
+            if(pCol)pCol.classList.add('collapsed');
             setTimeout(()=>{try{fit&&fit.fit();}catch(e){}},260);
         });
-        tCol.addEventListener('mouseleave',()=>{
-            tHideTimer=setTimeout(()=>tCol.classList.add('collapsed'),450);
-        });
     }
-}catch(e){}
-
-// Positions+Trades column: auto-hide (collapses to a thin edge strip; hover to reveal)
-try{
-    const pCol=document.getElementById('colPositions');
     if(pCol){
-        let pHideTimer=null;
-        pCol.classList.add('collapsed');
         pCol.addEventListener('mouseenter',()=>{
-            clearTimeout(pHideTimer);
             pCol.classList.remove('collapsed');
-        });
-        pCol.addEventListener('mouseleave',()=>{
-            pHideTimer=setTimeout(()=>pCol.classList.add('collapsed'),450);
+            if(tCol)tCol.classList.add('collapsed');
         });
     }
 }catch(e){}
@@ -562,8 +552,8 @@ function emojifyEntry(v){
 }
 function emojifyExit(v){
     const s=String(v||'').toUpperCase();
-    if(s.includes('BUY')||s.includes('BULL'))return'▲';
-    if(s.includes('SELL')||s.includes('BEAR'))return'▼';
+    if(s.includes('BUY')||s.includes('BULL'))return'🟢';
+    if(s.includes('SELL')||s.includes('BEAR'))return'🔴';
     if(s.includes('SIDE'))return'●';
     if(s==='NONE')return'—';
     return v;
@@ -963,7 +953,7 @@ function drawRiskCandle(floor,net,peak){
 }
 function refreshRiskCandle(){
     const net=Math.round(runningTotal+bookedTotal);
-    document.title='₹'+fmt(net)+' · '+location.hostname;
+    document.title='₹'+fmt(net)+' · '+HOST_LABEL;
     drawRiskCandle(lastFloor,net,lastPeak);
 }
 new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($('riskBar'));
@@ -1157,7 +1147,7 @@ async function loadOptSummary(){
     let d=null;try{d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     d=d||{};
     const ov=$('optOverlay');
-    const cols=['LOT','INV','PNL','LGT','RUN','TGT'];
+    const cols=['LOT','INV','LGT','RUN','DIR','PNL'];
     const toK=n=>Math.round((n||0)/1000)+'k';
     const rnd=n=>Math.round(n||0);
     const doIcon=s=>({hold:'✋',square_off:'⛔',fresh_buy:'🆕'}[String(s||'').toLowerCase()]??'⏳'); // kept, unused for now
@@ -1168,9 +1158,9 @@ async function loadOptSummary(){
         const color=dLgt<dTgt?'var(--bear)':'var(--bull)';
         return `<span style="color:${color};">${rnd(r)}</span>`;
     };
+    const dirIcon=aligned=>aligned?'🟢':'🔴';
     const buildRow=(lots,pnl,inv,lgt,runPct,aligned,decision)=>[
-        lots??'—', toK(inv), plainSign(pnl), rnd(lgt), runColor(runPct,lgt),
-        aligned?'99':'1.4'
+        lots??'—', toK(inv), rnd(lgt), runColor(runPct,lgt), dirIcon(aligned), plainSign(pnl)
     ];
     const ceRow=buildRow(d.ce_lots,d.ce_pnl,d.ce_investment,d.ce_lgt,d.ce_run_pct,d.ce_aligned,d.ce_decision);
     const peRow=buildRow(d.pe_lots,d.pe_pnl,d.pe_investment,d.pe_lgt,d.pe_run_pct,d.pe_aligned,d.pe_decision);
