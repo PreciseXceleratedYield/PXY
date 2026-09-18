@@ -76,7 +76,7 @@ def apply_ohlc_transformation(df, mode=1):
         out['Close'] = ha_c
         return out
         
-    # ⚡ Mode 7: 7-Linear Regression & Running Average Blend + Mode 0 Layer
+    # ⚡ Mode 7: 7-Linear Regression & Running Average Blend + Mode 0 (Match-Body Outputs)
     elif mode == 7:
         n = len(df)
         window = 7
@@ -113,15 +113,22 @@ def apply_ohlc_transformation(df, mode=1):
         m7_l = (lr_l + ra_l) / 2.0
         m7_c = (lr_c + ra_c) / 2.0
         
-        # Apply Mode 0 transformation rules directly on top of Mode 7 values
-        out['Open'] = m7_c
-        out['High'] = m7_h
-        out['Low'] = m7_l
-        out['Close'] = np.where(
+        # Calculate final Open and Close targets
+        final_open = m7_c
+        final_close = np.where(
             m7_c >= m7_o,
             (m7_c + m7_h) / 2.0,
             (m7_c + m7_l) / 2.0
         )
+        
+        # Assign values to ensure full body layout maps correctly
+        out['Open'] = final_open
+        out['Close'] = final_close
+        
+        # Force High and Low to match the structural body bounds
+        out['High'] = np.maximum(final_open, final_close)
+        out['Low'] = np.minimum(final_open, final_close)
+        
         return out
         
     return out
