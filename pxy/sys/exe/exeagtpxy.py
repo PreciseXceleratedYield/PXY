@@ -16,7 +16,7 @@ logger = logging.getLogger("exeavgpxy.strategy")
 # -----------------------------------------------------------------------------
 # 📊 SECTION 1: SYSTEM A THRESHOLD PROCESSING & PLACEMENT LOGIC
 # -----------------------------------------------------------------------------
-SYSTEM_A_BASE_THRESHOLD = 33.0
+SYSTEM_A_BASE_THRESHOLD = 22.0
 SYSTEM_B_BASE_THRESHOLD = 11.0
 ABS_CAP = 77.0
 
