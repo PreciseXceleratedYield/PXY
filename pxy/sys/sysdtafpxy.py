@@ -13,7 +13,7 @@ TIMEZONE = 'Asia/Kolkata'
 
 # 🔥 INDEPENDENT MATRIX MODE INTERFACE:
 # Format: "ST" -> First Digit = SIDE Mode, Second Digit = TREND Mode
-SELECTED_MODE = "66" 
+SELECTED_MODE = "00" 
 
 def apply_ohlc_transformation(df, mode=1):
     """Executes structural, isolated mathematical transformations based on explicit modes."""
