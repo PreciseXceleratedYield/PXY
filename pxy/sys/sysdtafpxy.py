@@ -14,7 +14,7 @@ TIMEZONE = 'Asia/Kolkata'
 # Format: "ST" -> First Digit = SIDE Mode, Second Digit = TREND Mode
 # "72" means: If market is SIDEWAYS use Mode 7. If market is TRENDING use Mode 2.
 # "66" would enforce Heikin-Ashi for both environments.
-SELECTED_MODE = "06" 
+SELECTED_MODE = "66" 
 
 def apply_ohlc_transformation(df, mode=1):
     """Executes structural, isolated mathematical transformations based on explicit modes."""
