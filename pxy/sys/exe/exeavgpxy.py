@@ -100,17 +100,13 @@ def handle_side_averaging(client, df):
     ce_aligned = is_aligned("CE", active_exit)
     pe_aligned = is_aligned("PE", active_exit)
 
-    # 🔄 STEP MOVE: Calculate loss values first to avoid runtime NameErrors
+    ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(ce_invst_factor, pe_invst_factor, ce_lots, pe_lots)
+
     if USE_OVERALL_LOSS:
         ce_lgt_val, pe_lgt_val = ce_overall_pnl_pct, pe_overall_pnl_pct
     else:
         ce_lgt_val = ce_rows.apply(get_loss, axis=1).max() if not ce_rows.empty else 0.0
         pe_lgt_val = pe_rows.apply(get_loss, axis=1).max() if not pe_rows.empty else 0.0
-
-    # ⚡ MODIFIED ENGINE: Passing loss parameters alongside investment factors and lots
-    ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(
-        ce_invst_factor, pe_invst_factor, ce_lgt_val, pe_lgt_val, ce_lots, pe_lots
-    )
 
     # System B Evaluation Engine
     b_result = run_target_engine(active_exit, ce_rows, pe_rows, ce_avg_profit, pe_avg_profit, ce_lots, pe_lots)
@@ -146,4 +142,3 @@ def handle_side_averaging(client, df):
         ce_lots=ce_lots, pe_lots=pe_lots,
         ce_aligned=ce_aligned, pe_aligned=pe_aligned,
     )
-
