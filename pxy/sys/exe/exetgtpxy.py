@@ -1,3 +1,4 @@
+
 from colorama import Fore, Style, init
 
 # Initialize colorama for clean, colored terminal output formatting
