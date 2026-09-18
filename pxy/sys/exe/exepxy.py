@@ -93,7 +93,7 @@ while True:
             safe_run(HERE / "exeentrpxy.py", timeout=45)    # 3️⃣ Entry generation script (Deploys new layout)
             safe_run(HERE / "exeenexpxy.py", timeout=45)    # 4️⃣ Balancing / Averaging Engine (Runs adjustments last)
                     
-            fancy_pause(7)  # 7-second pause between sub-iterations
+            fancy_pause(4)  # 7-second pause between sub-iterations
             
         loop_counter += 1
     else:
