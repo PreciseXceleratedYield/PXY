@@ -4,6 +4,7 @@ import warnings
 import numpy as np
 import pandas as pd
 import yfinance as yf
+from syscnfgpxy import TICKER
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -12,9 +13,7 @@ TIMEZONE = 'Asia/Kolkata'
 
 # 🔥 INDEPENDENT MATRIX MODE INTERFACE:
 # Format: "ST" -> First Digit = SIDE Mode, Second Digit = TREND Mode
-# "72" means: If market is SIDEWAYS use Mode 7. If market is TRENDING use Mode 2.
-# "66" would enforce Heikin-Ashi for both environments.
-SELECTED_MODE = "66" 
+SELECTED_MODE = "11" 
 
 def apply_ohlc_transformation(df, mode=1):
     """Executes structural, isolated mathematical transformations based on explicit modes."""
@@ -64,19 +63,14 @@ def apply_ohlc_transformation(df, mode=1):
     # ⚡ Mode 6: True Heikin-Ashi Candles (Sequential Path Dependency)
     elif mode == 6:
         n = len(df)
-        ha_o = np.zeros(n)
-        
-        # 1. HA Close calculation is fully vectorizable
         ha_c = (raw_o + raw_h + raw_l + raw_c) / 4.0
         
-        # 2. Seed the initial value
-        ha_o[0] = raw_o[0]
+        # Fixed: Explicit copy to prevent mutating raw_o mid-loop
+        ha_o = raw_o.copy()
         
-        # 3. Iterative calculation for sequential dependency
         for i in range(1, n):
             ha_o[i] = (ha_o[i-1] + ha_c[i-1]) / 2.0
             
-        # 4. Extract true boundaries relative to HA limits
         ha_h = np.maximum(raw_h, np.maximum(ha_o, ha_c))
         ha_l = np.minimum(raw_l, np.minimum(ha_o, ha_c))
         
@@ -90,23 +84,19 @@ def apply_ohlc_transformation(df, mode=1):
     elif mode == 7:
         n = len(df)
         window = 7
+        if n < window:
+            return out
         
-        # --- 1. Vectorized 7-Period Time Series Linear Regression ---
         x = np.arange(window)
         x_mean = x.mean()
         x_dev = x - x_mean
         x_var = np.sum(x_dev**2)
         
         def rolling_linreg(series):
-            if len(series) < window:
-                return series
-            # Safe, modern NumPy windowing tool avoiding stride-tuple interpretation errors
             windows = np.lib.stride_tricks.sliding_window_view(series, window_shape=window)
-            # Vectorwise OLS calculation across the window matrix
             y_means = windows.mean(axis=1, keepdims=True)
             slopes = np.sum((windows - y_means) * x_dev, axis=1) / x_var
             intercepts = y_means.flatten() - slopes * x_mean
-            # Project the linear trend at current bar (offset 0)
             lr_current = intercepts + slopes * (window - 1)
             return np.concatenate([series[: window - 1], lr_current])
             
@@ -115,14 +105,12 @@ def apply_ohlc_transformation(df, mode=1):
         lr_l = rolling_linreg(raw_l)
         lr_c = rolling_linreg(raw_c)
         
-        # --- 2. Running Average (Cumulative Mean Breakdown) ---
         bar_count = np.arange(1, n + 1)
         ra_o = np.cumsum(raw_o) / bar_count
         ra_h = np.cumsum(raw_h) / bar_count
         ra_l = np.cumsum(raw_l) / bar_count
         ra_c = np.cumsum(raw_c) / bar_count
         
-        # --- 3. Assign Balanced Mean Back to the Pipeline DataFrame ---
         out['Open'] = (lr_o + ra_o) / 2.0
         out['High'] = (lr_h + ra_h) / 2.0
         out['Low'] = (lr_l + ra_l) / 2.0
@@ -131,28 +119,28 @@ def apply_ohlc_transformation(df, mode=1):
 
     return out
 
-
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
     """Dynamic historical ingestion engine utilizing vectorized structural transformations"""
     ticker_obj = yf.Ticker(TICKER)
     df = pd.DataFrame()
     buffer_rows = target_rows + 5
 
+    # Try initial custom period if supplied
     if period is not None:
         try:
             df = ticker_obj.history(period=period, interval=interval)
         except Exception:
             pass
 
-    if df.empty:
-        for search_period in ["5d", "7d", "max"]:
+    # Loop with realistic 1-minute allowable lookup horizons (dropped problematic "max")
+    if df.empty or len(df) < buffer_rows:
+        for search_period in ["1d", "5d", "7d"]:
             try:
-                df = ticker_obj.history(period=search_period, interval=interval)
-                if not df.empty:
-                    df.dropna(
-                        subset=['Open', 'High', 'Low', 'Close'], inplace=True
-                    )
-                    if len(df) >= buffer_rows:
+                temp_df = ticker_obj.history(period=search_period, interval=interval)
+                if not temp_df.empty:
+                    temp_df = temp_df.dropna(subset=['Open', 'High', 'Low', 'Close'])
+                    if len(temp_df) >= buffer_rows:
+                        df = temp_df
                         break
             except Exception:
                 pass
@@ -163,7 +151,6 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     if df.empty or len(df) < buffer_rows:
         print("Warning: yfinance data stream unavailable. Triggering direct raw nftfut.json fallback.")
         
-        # Target the file in the exact same directory as this script
         current_dir = os.path.dirname(os.path.abspath(__file__))
         fut_file_path = os.path.join(current_dir, "nftfut.json")
         fallback_price = 0.0
@@ -172,10 +159,15 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
             try:
                 with open(fut_file_path, "r", encoding="utf-8") as f:
                     fut_data = json.load(f)
+                    # Adaptive dictionary check covering 'price', 'Close', or value indexing variants
                     if isinstance(fut_data, list) and len(fut_data) > 0:
-                        fallback_price = float(fut_data[-1].get("price", 0.0))
+                        target_node = fut_data[-1]
                     elif isinstance(fut_data, dict):
-                        fallback_price = float(fut_data.get("price", 0.0))
+                        target_node = fut_data
+                    else:
+                        target_node = {}
+                        
+                    fallback_price = float(target_node.get("price", target_node.get("Close", target_node.get("last_price", 0.0))))
             except Exception:
                 pass
                 
@@ -188,14 +180,12 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
                 'Close': [fallback_price] * target_rows,
                 'Volume': [0.0] * target_rows
             }
-            # Create a localized time index incrementing backwards
             time_indices = [current_time - pd.Timedelta(minutes=i) for i in reversed(range(target_rows))]
             fallback_df = pd.DataFrame(mock_data, index=time_indices)
-            
-            # 🔥 CRITICAL EXEMPTION: Return flat raw data instantly. Skip modes, trends, and transformations.
             return fallback_df
         else:
-            # Absolute recovery floor if even the JSON is unreadable or empty
+            # Absolute recovery floor if even the JSON fallback path yields nothing
+            print("Critical Fault: yfinance and local json storage pools exhausted.")
             return pd.DataFrame()
 
     # ==========================================================================
@@ -212,25 +202,20 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     # LOCAL IMPORT SHIELD: Prevents Circular Dependency Faults
     from sysstrndpxy import get_market_trend
 
-    # Step 1: Detect current structural matrix state (TREND vs SIDE)
     market_state = get_market_trend(df)
     mode_str = str(SELECTED_MODE).strip()
 
-    # Step 2: Independent Switch Selection Engine (PXY Universal Master Matrix)
     if len(mode_str) == 2:
         if market_state == 'SIDE':
             dynamic_mode = int(mode_str[0])  # Use 1st digit for Sideways
         else:
             dynamic_mode = int(mode_str[1])  # Use 2nd digit for Trend breakouts
     else:
-        # Fallback for standard single digits
         try:
             dynamic_mode = int(mode_str)
         except ValueError:
-            dynamic_mode = 1  # Raw fallback protection if parsing fails
+            dynamic_mode = 1
 
-    # Step 3: Run transformation using the isolated runtime calculated mode
     processed_df = apply_ohlc_transformation(df, mode=dynamic_mode)
-
-    # Step 4: Safely extract execution target footprint
     return processed_df.tail(target_rows)
+
