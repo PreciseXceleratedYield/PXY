@@ -1,27 +1,26 @@
+import json
+import os
 import warnings
-from syscnfgpxy import TICKER
 import numpy as np
 import pandas as pd
 import yfinance as yf
-import os
-import json
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # Explicitly enforce Indian Standard Time zone mapping
-TIMEZONE = 'Asia/Kolkata'
+TIMEZONE = 'Asia/Kolkata' 
 
-# 🔥 INDEPENDENT MATRIX MODE INTERFACE: 
+# 🔥 INDEPENDENT MATRIX MODE INTERFACE:
 # Format: "ST" -> First Digit = SIDE Mode, Second Digit = TREND Mode
 # "72" means: If market is SIDEWAYS use Mode 7. If market is TRENDING use Mode 2.
-SELECTED_MODE = "11"
-
+# "66" would enforce Heikin-Ashi for both environments.
+SELECTED_MODE = "11" 
 
 def apply_ohlc_transformation(df, mode=1):
     """Executes structural, isolated mathematical transformations based on explicit modes."""
     if df.empty:
         return df
-
+        
     out = df.copy()
     raw_o = df['Open'].to_numpy()
     raw_h = df['High'].to_numpy()
@@ -32,7 +31,9 @@ def apply_ohlc_transformation(df, mode=1):
     if mode == 0:
         out['Open'] = raw_c
         out['Close'] = np.where(
-            raw_c >= raw_o, (raw_c + raw_h) / 2.0, (raw_c + raw_l) / 2.0
+            raw_c >= raw_o, 
+            (raw_c + raw_h) / 2.0, 
+            (raw_c + raw_l) / 2.0
         )
         return out
 
@@ -60,51 +61,72 @@ def apply_ohlc_transformation(df, mode=1):
         out['Close'] = (raw_o + raw_h + raw_l + (2 * raw_c)) / 5.0
         return out
 
+    # ⚡ Mode 6: True Heikin-Ashi Candles (Sequential Path Dependency)
+    elif mode == 6:
+        n = len(df)
+        ha_o = np.zeros(n)
+        
+        # 1. HA Close calculation is fully vectorizable
+        ha_c = (raw_o + raw_h + raw_l + raw_c) / 4.0
+        
+        # 2. Seed the initial value
+        ha_o[0] = raw_o[0]
+        
+        # 3. Iterative calculation for sequential dependency
+        for i in range(1, n):
+            ha_o[i] = (ha_o[i-1] + ha_c[i-1]) / 2.0
+            
+        # 4. Extract true boundaries relative to HA limits
+        ha_h = np.maximum(raw_h, np.maximum(ha_o, ha_c))
+        ha_l = np.minimum(raw_l, np.minimum(ha_o, ha_c))
+        
+        out['Open'] = ha_o
+        out['High'] = ha_h
+        out['Low'] = ha_l
+        out['Close'] = ha_c
+        return out
+
     # ⚡ Mode 7: 7-Linear Regression & Running Average Blend (Pine Script Translation)
     elif mode == 7:
         n = len(df)
         window = 7
-
+        
         # --- 1. Vectorized 7-Period Time Series Linear Regression ---
         x = np.arange(window)
         x_mean = x.mean()
         x_dev = x - x_mean
         x_var = np.sum(x_dev**2)
-
+        
         def rolling_linreg(series):
             if len(series) < window:
                 return series
-            
             # Safe, modern NumPy windowing tool avoiding stride-tuple interpretation errors
             windows = np.lib.stride_tricks.sliding_window_view(series, window_shape=window)
-
             # Vectorwise OLS calculation across the window matrix
             y_means = windows.mean(axis=1, keepdims=True)
             slopes = np.sum((windows - y_means) * x_dev, axis=1) / x_var
             intercepts = y_means.flatten() - slopes * x_mean
-
             # Project the linear trend at current bar (offset 0)
             lr_current = intercepts + slopes * (window - 1)
             return np.concatenate([series[: window - 1], lr_current])
-
+            
         lr_o = rolling_linreg(raw_o)
         lr_h = rolling_linreg(raw_h)
         lr_l = rolling_linreg(raw_l)
         lr_c = rolling_linreg(raw_c)
-
+        
         # --- 2. Running Average (Cumulative Mean Breakdown) ---
         bar_count = np.arange(1, n + 1)
         ra_o = np.cumsum(raw_o) / bar_count
         ra_h = np.cumsum(raw_h) / bar_count
         ra_l = np.cumsum(raw_l) / bar_count
         ra_c = np.cumsum(raw_c) / bar_count
-
+        
         # --- 3. Assign Balanced Mean Back to the Pipeline DataFrame ---
         out['Open'] = (lr_o + ra_o) / 2.0
         out['High'] = (lr_h + ra_h) / 2.0
         out['Low'] = (lr_l + ra_l) / 2.0
         out['Close'] = (lr_c + ra_c) / 2.0
-
         return out
 
     return out
