@@ -9,27 +9,28 @@ cd "$HOME/pxy/sys/exe" || { echo "Directory ~/pxy/sys/exe not found"; exit 1; }
 # Optional: activate virtual environment if needed
 # source ~/pxy/env/bin/activate
 
-echo "Starting loop. Will run for 15 iterations. Press [CTRL+C] to stop early."
-echo "----------------------------------------"
-
 # Run a bounded loop exactly 15 times
 for i in {1..15}; do
-    echo "[$(date +%T)] Iteration $i/15 | Running control stack..."
+    # Sleep briefly to let the user read the iteration tracking if python cleared it previously
+    echo "========================================"
+    echo "🚀 BASH TRACKER: Starting Iteration $i of 15"
+    echo "========================================"
+    sleep 1
     
     # Run the main script with the exact bypass parameter matching Python
     python3 exepxy.py -pxymon
     
-    echo "[$(date +%T)] Iteration $i/15 finished."
+    # Python will clear the screen during execution. 
+    # Once Python exits a single run, Bash regains control here:
+    echo ""
+    echo "[$(date +%T)] ✅ Bash: Iteration $i/15 finished execution stack."
     
     # Skip the final wait on the last iteration
     if [ $i -lt 15 ]; then
-        echo "Waiting 10 seconds..."
-        echo "----------------------------------------"
+        echo "Waiting 10 seconds before next iteration..."
         sleep 10
     fi
 done
 
 echo "----------------------------------------"
-echo "✅ Finished all 15 iterations. Exiting now."
-
-
+echo "✅ Finished all 15 iterations. Shell loop exiting now."
