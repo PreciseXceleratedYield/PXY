@@ -18,6 +18,7 @@ while true; do
     
     # Run the Python script
     python3 sysdashpxy.py
+    python3 sysstrndpxy.py
     
     echo "[$(date +%T)] execution finished."
     echo "Waiting 10 seconds..."
