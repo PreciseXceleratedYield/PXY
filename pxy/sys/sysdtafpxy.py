@@ -20,7 +20,7 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
     """Executes structural, isolated mathematical transformations based on explicit modes.
     
     Modes 0-7: Time-based mathematical variations (Heikin-Ashi, Linear Regression, etc.)
-    Mode 8: Dynamic Volatility-Adaptive Renko Bricks (Clamped between 5.0 and 10.0 points)
+    Mode 8: Dynamic Volatility-Adaptive Renko Bricks (Clamped between 1.0 and 15.0 points)
     """
     if df.empty:
         return df
@@ -114,7 +114,7 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
         out['Close'] = (lr_c + ra_c) / 2.0
         return out
 
-    # ⚡ Mode 8: Dynamic ATR Renko Bricks divided by 14
+    # ⚡ Mode 8: Dynamic ATR Renko Bricks divided by 7 (Clamped 1 to 15)
     elif mode == 8:
         n = len(df)
         if n <= atr_period:
@@ -135,8 +135,11 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
         for i in range(atr_period + 1, n):
             atr[i] = (atr[i-1] * (atr_period - 1) + true_range[i]) / atr_period
 
-        # 🎯 Divide the latest ATR by 14 to determine the dynamic brick size
-        renko_brick_size = atr[-1] / 7.0
+        # 🎯 Divide the latest ATR by 7 to determine the dynamic brick size
+        calculated_size = atr[-1] / 7.0
+
+        # 🔒 Strictly clamp the dynamic brick size boundary between 1.0 and 15.0 points
+        renko_brick_size = np.clip(calculated_size, 1.0, 15.0)
 
         # Fallback guardrail for low liquidity or structural computational errors
         if renko_brick_size <= 0 or np.isnan(renko_brick_size):
