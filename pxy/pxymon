@@ -1,10 +1,10 @@
 #!/bin/bash
 # ------------------------------
-# Run sysdashpxy.py every 10 seconds
+# Run main control stack loop
 # ------------------------------
 
-# Go to sys folder (done once before the loop starts)
-cd "$HOME/pxy/sys" || { echo "Directory ~/pxy/sys not found"; exit 1; }
+# Go to your execution folder
+cd "$HOME/pxy/sys/exe" || { echo "Directory ~/pxy/sys/exe not found"; exit 1; }
 
 # Optional: activate virtual environment if needed
 # source ~/pxy/env/bin/activate
@@ -14,10 +14,10 @@ echo "----------------------------------------"
 
 # Infinite loop
 while true; do
-    echo "[$(date +%T)] Running sysdashpxy.py..."
+    echo "[$(date +%T)] Running control stack..."
     
-    # Run the Python script
-    python3 sysdashpxy.py
+    # Run the main script with the exact bypass parameter matching Python
+    python3 exepxy.py -pxymon
     
     echo "[$(date +%T)] execution finished."
     echo "Waiting 10 seconds..."
@@ -26,3 +26,4 @@ while true; do
     # Sleep for 10 seconds before the next iteration
     sleep 10
 done
+
