@@ -170,7 +170,7 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
             renko_ops.append(prev_close)
             renko_cl_list.append(prev_close)
 
-        # 4. Construct Output Price Data Engine (FIXED LENGTH INTERFACE)
+        # 4. Construct Output Price Data Engine (FIXED LENGTH INTERFACE WITH UNIQUE TIMESTAMPS)
         renko_df = pd.DataFrame()
         renko_df['Open'] = renko_ops
         renko_df['Close'] = renko_cl_list
@@ -186,9 +186,10 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
             # If Renko bricks outnumber the historical base data bars:
             extended_index = list(df.index)
             last_timestamp = df.index[-1]
-            # Pad out missing trailing structural blocks cleanly using standard ranges
-            for extra_idx in range(len(renko_ops) - len(df)):
-                extended_index.append(last_timestamp)
+            
+            # Pad out missing trailing structural blocks using unique +1 second increments
+            for extra_idx in range(1, len(renko_ops) - len(df) + 1):
+                extended_index.append(last_timestamp + pd.Timedelta(seconds=extra_idx))
             renko_df.index = extended_index
             
             if 'Volume' in df.columns:
@@ -199,6 +200,7 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
         return renko_df
 
     return out
+
 
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
     """Dynamic historical ingestion engine utilizing vectorized structural transformations"""
