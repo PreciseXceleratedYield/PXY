@@ -1,6 +1,6 @@
 #!/bin/bash
 # ------------------------------
-# Run main control stack loop
+# Run main control stack loop (15 Iterations Limit)
 # ------------------------------
 
 # Go to your execution folder
@@ -9,21 +9,27 @@ cd "$HOME/pxy/sys/exe" || { echo "Directory ~/pxy/sys/exe not found"; exit 1; }
 # Optional: activate virtual environment if needed
 # source ~/pxy/env/bin/activate
 
-echo "Starting loop. Press [CTRL+C] to stop."
+echo "Starting loop. Will run for 15 iterations. Press [CTRL+C] to stop early."
 echo "----------------------------------------"
 
-# Infinite loop
-while true; do
-    echo "[$(date +%T)] Running control stack..."
+# Run a bounded loop exactly 15 times
+for i in {1..15}; do
+    echo "[$(date +%T)] Iteration $i/15 | Running control stack..."
     
     # Run the main script with the exact bypass parameter matching Python
     python3 exepxy.py -pxymon
     
-    echo "[$(date +%T)] execution finished."
-    echo "Waiting 10 seconds..."
-    echo "----------------------------------------"
+    echo "[$(date +%T)] Iteration $i/15 finished."
     
-    # Sleep for 10 seconds before the next iteration
-    sleep 10
+    # Skip the final wait on the last iteration
+    if [ $i -lt 15 ]; then
+        echo "Waiting 10 seconds..."
+        echo "----------------------------------------"
+        sleep 10
+    fi
 done
+
+echo "----------------------------------------"
+echo "✅ Finished all 15 iterations. Exiting now."
+
 
