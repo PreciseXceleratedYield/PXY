@@ -114,42 +114,20 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
         out['Close'] = (lr_c + ra_c) / 2.0
         return out
 
-    # ⚡ Mode 8: Dynamic ATR Renko Bricks divided by 7 (Clamped 1 to 15)
+# ⚡ Mode 8: Fixed 5-Point Renko Bricks
     elif mode == 8:
         n = len(df)
-        if n <= atr_period:
-            return out # Not enough data to compute ATR
+        if n == 0:
+            return out # Return empty interface state if dataframe lacks sequence context
 
-        # 1. Compute True Range (TR)
-        prev_close_shifted = np.roll(raw_c, 1)
-        prev_close_shifted[0] = raw_o[0] # Prevent structural index boundaries tracking errors
-
-        tr1 = raw_h - raw_l
-        tr2 = np.abs(raw_h - prev_close_shifted)
-        tr3 = np.abs(raw_l - prev_close_shifted)
-        true_range = np.maximum(tr1, np.maximum(tr2, tr3))
-
-        # 2. Compute Wilder's ATR (Standard Terminal Smoothing Multiplier)
-        atr = np.zeros(n)
-        atr[atr_period] = np.mean(true_range[1:atr_period+1])
-        for i in range(atr_period + 1, n):
-            atr[i] = (atr[i-1] * (atr_period - 1) + true_range[i]) / atr_period
-
-        # 🎯 Divide the latest ATR by 7 to determine the dynamic brick size
-        calculated_size = atr[-1] / 7.0
-
-        # 🔒 Strictly clamp the dynamic brick size boundary between 1.0 and 15.0 points
-        renko_brick_size = np.clip(calculated_size, 1.0, 15.0)
-
-        # Fallback guardrail for low liquidity or structural computational errors
-        if renko_brick_size <= 0 or np.isnan(renko_brick_size):
-            renko_brick_size = fixed_brick_size
+        # 🔒 Hardcoded fix at exactly 5 points
+        renko_brick_size = 5.0
 
         # 3. Generate Structural Renko Brick Arrays
         renko_ops = []
         renko_cl_list = []
 
-        # Anchor the baseline price block cleanly based on calculations
+        # Anchor the baseline price block cleanly based on the first close value
         prev_close = np.floor(raw_c[0] / renko_brick_size) * renko_brick_size
 
         for price in raw_c:
@@ -206,6 +184,7 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
         return renko_df
 
     return out
+
 
 
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
