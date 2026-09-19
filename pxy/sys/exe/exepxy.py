@@ -6,7 +6,11 @@ import pytz
 from colorama import init, Fore, Style
 import sys
 from pathlib import Path
-import os  # ✅ Kept for screen clearing
+import os # ✅ Kept for screen clearing
+
+# ---------------- CONFIGURATION SWITCHES ----------------
+# Default behavior is original (False). True only if '-pxymon' is in command line arguments.
+BYPASS_TIME_RESTRICTIONS = "-pxymon" in sys.argv
 
 # ---------------- INIT ----------------
 init(autoreset=True)
@@ -52,12 +56,16 @@ def live_status(msg):
     print(f"{datetime.now(ist).strftime('%H:%M:%S')} {msg}", end="\r", flush=True)
 
 def in_market_hours():
+    if BYPASS_TIME_RESTRICTIONS:
+        return True
     now = datetime.now(ist)
     return (0 <= now.weekday() <= 4 and dt_time(9, 16) <= now.time() <= dt_time(15, 29))
 
 # ---------------- MAIN LOOP ----------------
-os.system('clear')  # ✅ Initial screen clear
+os.system('clear') # ✅ Initial screen clear
 print("\n🚀 INIT: main market loop starting now [SIMPLE MODE ONLY] 📡")
+if BYPASS_TIME_RESTRICTIONS:
+    print(f"{Fore.RED}⚠️ BYPASS ACTIVE: Time restrictions are ignored via '-pxymon'. Running loop mode indefinitely!{Style.RESET_ALL}\n")
 loop_counter = 1
 
 # Initial system check scripts
@@ -73,28 +81,25 @@ parent_scripts = [
 # Run parent scripts with the exception applied
 for s in parent_scripts:
     if s.name == "exernkopxy.py":
-        safe_run(s, timeout=None)  # Infinite exception
+        safe_run(s, timeout=None) # Infinite exception
     else:
-        safe_run(s, timeout=45)  # Standard limit
+        safe_run(s, timeout=45) # Standard limit
 
 while True:
-    os.system('clear')  # ✅ Clears Ubuntu screen at the start of every main loop iteration
-    
+    os.system('clear') # ✅ Clears Ubuntu screen at the start of every main loop iteration
     if in_market_hours():
         live_status("🚀 LOOP: waiting trigger 📊")
-        
         for sub_itr in range(1, 31):
-            os.system('clear')  # ✅ Clears screen before printing the loop iteration index
+            os.system('clear') # ✅ Clears screen before printing the loop iteration index
             print(f"📊 Loop#{loop_counter} Sub#{sub_itr} | Execution Stack Running...")
             
             # -------- REARRANGED RE-ORDERED CORE EXECUTION STACK --------
-            safe_run(HERE / "exernkopxy.py", timeout=None)  # 1️⃣ Infinite exception
+            safe_run(HERE / "exernkopxy.py", timeout=None) # 1️⃣ Infinite exception
             safe_run(HERE / "exeexitpxy.py", timeout=45)    # 2️⃣ Clean target exit evaluation (Locks profits first)
             safe_run(HERE / "exeentrpxy.py", timeout=45)    # 3️⃣ Entry generation script (Deploys new layout)
             safe_run(HERE / "exeenexpxy.py", timeout=45)    # 4️⃣ Balancing / Averaging Engine (Runs adjustments last)
-                    
-            fancy_pause(4)  # 7-second pause between sub-iterations
             
+            fancy_pause(4) # 7-second pause between sub-iterations
         loop_counter += 1
     else:
         print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
@@ -102,9 +107,8 @@ while True:
         fancy_pause(7)
         
         while not in_market_hours():
-            os.system('clear')  # ✅ Clears screen while waiting overnight so logs don't stack up
-            safe_run(HERE.parent / "syscprtpxy.py")  # Fixed: Duplicate entry removed here
-            print(" ⏳   WAIT : market opens at 09:16 IST  📡", end="\r")
+            os.system('clear') # ✅ Clears screen while waiting overnight so logs don't stack up
+            safe_run(HERE.parent / "syscprtpxy.py") # Fixed: Duplicate entry removed here
+            print(" ⏳ WAIT : market opens at 09:16 IST 📡", end="\r")
             time.sleep(60)
-
         print("\n🚀 MKT OPEN: resuming main loop now 📈")
