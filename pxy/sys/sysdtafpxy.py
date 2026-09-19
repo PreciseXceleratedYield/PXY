@@ -121,7 +121,7 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
             return out # Return empty interface state if dataframe lacks sequence context
 
         # 🔒 Hardcoded fix at exactly 5 points
-        renko_brick_size = 5.0
+        renko_brick_size = 2.5
 
         # 3. Generate Structural Renko Brick Arrays
         renko_ops = []
