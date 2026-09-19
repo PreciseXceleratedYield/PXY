@@ -170,16 +170,32 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
             renko_ops.append(prev_close)
             renko_cl_list.append(prev_close)
 
-        # 4. Construct Output Price Data Engine
-        renko_df = pd.DataFrame(index=df.index[:len(renko_ops)])
+        # 4. Construct Output Price Data Engine (FIXED LENGTH INTERFACE)
+        renko_df = pd.DataFrame()
         renko_df['Open'] = renko_ops
         renko_df['Close'] = renko_cl_list
         renko_df['High'] = np.maximum(renko_df['Open'], renko_df['Close'])
         renko_df['Low'] = np.minimum(renko_df['Open'], renko_df['Close'])
         
-        if 'Volume' in df.columns:
-            renko_df['Volume'] = df['Volume'].iloc[:len(renko_ops)].values
+        # Dynamically map tracking time indexes or fall back to linear integers safely
+        if len(renko_ops) <= len(df):
+            renko_df.index = df.index[:len(renko_ops)]
+            if 'Volume' in df.columns:
+                renko_df['Volume'] = df['Volume'].iloc[:len(renko_ops)].values
+        else:
+            # If Renko bricks outnumber the historical base data bars:
+            extended_index = list(df.index)
+            last_timestamp = df.index[-1]
+            # Pad out missing trailing structural blocks cleanly using standard ranges
+            for extra_idx in range(len(renko_ops) - len(df)):
+                extended_index.append(last_timestamp)
+            renko_df.index = extended_index
             
+            if 'Volume' in df.columns:
+                # Distribute historical volume across extra brick generation spaces evenly
+                base_vol = df['Volume'].to_numpy()
+                renko_df['Volume'] = np.concatenate([base_vol, np.zeros(len(renko_ops) - len(df))])
+
         return renko_df
 
     return out
