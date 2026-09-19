@@ -141,9 +141,9 @@ html,body{height:100vh;overflow:hidden;font-family:'DM Mono',monospace;backgroun
 .opt-tbl{width:100%;table-layout:fixed;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:25.2px;color:var(--text);}
 .opt-tbl th{padding:2px 4px;color:var(--muted);font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .opt-tbl td{padding:2px 4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sig-tbl{width:100%;table-layout:fixed;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:9px;color:var(--text);}
-.sig-tbl th{padding:2px 4px;color:var(--muted);font-weight:700;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.sig-tbl td{padding:2px 4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sig-tbl{width:100%;table-layout:auto;border-collapse:collapse;font-family:'DM Mono',monospace;font-size:17px;color:var(--text);}
+.sig-tbl th{padding:2px 3px;color:var(--muted);font-weight:700;text-align:center;white-space:nowrap;}
+.sig-tbl td{padding:2px 3px;text-align:center;white-space:nowrap;}
 .opt-tbl tr.opt-ce td:first-child{border-left:2px solid var(--bull);}
 .opt-tbl tr.opt-pe td:first-child{border-left:2px solid var(--bear);}
 .grid-over{position:absolute;inset:0;pointer-events:none;z-index:0;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:40px 40px;}
@@ -646,7 +646,7 @@ async function loadDash(){
         const sig=$('sigTable');
         if(sig){
             sig.innerHTML='<table class="sig-tbl"><thead><tr>'
-                +'<th>ENTRY</th><th>EXIT</th><th>TREND</th><th>ATR</th><th>DEPTH ⚡⚡ POWER</th>'
+                +'<th>ENT</th><th>EXT</th><th>TRD</th><th>ATR</th><th>DEPTH ⚡⚡ POWER</th>'
                 +'</tr></thead><tbody><tr>'
                 +`<td>${entryV}</td><td>${exitV}</td><td>${trendV}</td><td>${atrV}</td><td>${dpV}</td>`
                 +'</tr></tbody></table>';
