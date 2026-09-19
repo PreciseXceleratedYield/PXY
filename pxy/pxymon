@@ -1,36 +1,28 @@
 #!/bin/bash
 # ------------------------------
-# Run main control stack loop (15 Iterations Limit)
+# Run sysdashpxy.py every 10 seconds
 # ------------------------------
 
-# Go to your execution folder
-cd "$HOME/pxy/sys/exe" || { echo "Directory ~/pxy/sys/exe not found"; exit 1; }
+# Go to sys folder (done once before the loop starts)
+cd "$HOME/pxy/sys" || { echo "Directory ~/pxy/sys not found"; exit 1; }
 
 # Optional: activate virtual environment if needed
 # source ~/pxy/env/bin/activate
 
-# Run a bounded loop exactly 15 times
-for i in {1..15}; do
-    # Sleep briefly to let the user read the iteration tracking if python cleared it previously
-    echo "========================================"
-    echo "🚀 BASH TRACKER: Starting Iteration $i of 15"
-    echo "========================================"
-    sleep 1
-    
-    # Run the main script with the exact bypass parameter matching Python
-    python3 exepxy.py -pxymon
-    
-    # Python will clear the screen during execution. 
-    # Once Python exits a single run, Bash regains control here:
-    echo ""
-    echo "[$(date +%T)] ✅ Bash: Iteration $i/15 finished execution stack."
-    
-    # Skip the final wait on the last iteration
-    if [ $i -lt 15 ]; then
-        echo "Waiting 10 seconds before next iteration..."
-        sleep 10
-    fi
-done
-
+echo "Starting loop. Press [CTRL+C] to stop."
 echo "----------------------------------------"
-echo "✅ Finished all 15 iterations. Shell loop exiting now."
+
+# Infinite loop
+while true; do
+    echo "[$(date +%T)] Running sysdashpxy.py..."
+    
+    # Run the Python script
+    python3 sysdashpxy.py
+    
+    echo "[$(date +%T)] execution finished."
+    echo "Waiting 10 seconds..."
+    echo "----------------------------------------"
+    
+    # Sleep for 10 seconds before the next iteration
+    sleep 10
+done
