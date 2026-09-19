@@ -136,7 +136,7 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
             atr[i] = (atr[i-1] * (atr_period - 1) + true_range[i]) / atr_period
 
         # 🎯 Divide the latest ATR by 14 to determine the dynamic brick size
-        renko_brick_size = atr[-1] / 14.0
+        renko_brick_size = atr[-1] / 7.0
 
         # Fallback guardrail for low liquidity or structural computational errors
         if renko_brick_size <= 0 or np.isnan(renko_brick_size):
