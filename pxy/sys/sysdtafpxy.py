@@ -114,92 +114,95 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
         out['Close'] = (lr_c + ra_c) / 2.0
         return out
 
-    # ⚡ Mode 8: Dynamic ATR Renko Bricks with Strict 5-10 Range Clamping
-    elif mode == 8:
-        n = len(df)
-        if n <= atr_period:
-            return out  # Not enough data to compute ATR
-            
-        # 1. Compute True Range (TR)
-        prev_close_shifted = np.roll(raw_c, 1)
-        prev_close_shifted[0] = raw_o[0]  # Prevent structural index boundaries tracking errors
-        
-        tr1 = raw_h - raw_l
-        tr2 = np.abs(raw_h - prev_close_shifted)
-        tr3 = np.abs(raw_l - prev_close_shifted)
-        true_range = np.maximum(tr1, np.maximum(tr2, tr3))
-        
-        # 2. Compute Wilder's ATR (Standard Terminal Smoothing Multiplier)
-        atr = np.zeros(n)
-        atr[atr_period] = np.mean(true_range[1:atr_period+1])
-        for i in range(atr_period + 1, n):
-            atr[i] = (atr[i-1] * (atr_period - 1) + true_range[i]) / atr_period
-            
-        # 🔒 Strictly clamp the dynamic brick size boundary between 5 and 10 points
-        renko_brick_size = np.clip(atr[-1], 5.0, 10.0)
-        
-        # Fallback guardrail for low liquidity or structural computational errors
-        if renko_brick_size <= 0 or np.isnan(renko_brick_size):
-            renko_brick_size = fixed_brick_size
+        # ⚡ Mode 8: Dynamic ATR Renko Bricks divided by 14
+        elif mode == 8:
+            n = len(df)
+            if n <= atr_period:
+                return out # Not enough data to compute ATR
 
-        # 3. Generate Structural Renko Brick Arrays
-        renko_ops = []
-        renko_cl_list = []
-        
-        # Anchor the baseline price block cleanly based on calculations
-        prev_close = np.floor(raw_c[0] / renko_brick_size) * renko_brick_size
-        
-        for price in raw_c:
-            gap = price - prev_close
-            if gap >= renko_brick_size:
-                bricks = int(gap // renko_brick_size)
-                for _ in range(bricks):
-                    next_close = prev_close + renko_brick_size
-                    renko_ops.append(prev_close)
-                    renko_cl_list.append(next_close)
-                    prev_close = next_close
-            elif gap <= -renko_brick_size:
-                bricks = int(abs(gap) // renko_brick_size)
-                for _ in range(bricks):
-                    next_close = prev_close - renko_brick_size
-                    renko_ops.append(prev_close)
-                    renko_cl_list.append(next_close)
-                    prev_close = next_close
-                    
-        if not renko_ops:
-            renko_ops.append(prev_close)
-            renko_cl_list.append(prev_close)
+            # 1. Compute True Range (TR)
+            prev_close_shifted = np.roll(raw_c, 1)
+            prev_close_shifted[0] = raw_o[0] # Prevent structural index boundaries tracking errors
 
-        # 4. Construct Output Price Data Engine (FIXED LENGTH INTERFACE WITH UNIQUE TIMESTAMPS)
-        renko_df = pd.DataFrame()
-        renko_df['Open'] = renko_ops
-        renko_df['Close'] = renko_cl_list
-        renko_df['High'] = np.maximum(renko_df['Open'], renko_df['Close'])
-        renko_df['Low'] = np.minimum(renko_df['Open'], renko_df['Close'])
-        
-        # Dynamically map tracking time indexes or fall back to linear integers safely
-        if len(renko_ops) <= len(df):
-            renko_df.index = df.index[:len(renko_ops)]
-            if 'Volume' in df.columns:
-                renko_df['Volume'] = df['Volume'].iloc[:len(renko_ops)].values
-        else:
-            # If Renko bricks outnumber the historical base data bars:
-            extended_index = list(df.index)
-            last_timestamp = df.index[-1]
-            
-            # Pad out missing trailing structural blocks using unique +1 second increments
-            for extra_idx in range(1, len(renko_ops) - len(df) + 1):
-                extended_index.append(last_timestamp + pd.Timedelta(seconds=extra_idx))
-            renko_df.index = extended_index
-            
-            if 'Volume' in df.columns:
-                # Distribute historical volume across extra brick generation spaces evenly
-                base_vol = df['Volume'].to_numpy()
-                renko_df['Volume'] = np.concatenate([base_vol, np.zeros(len(renko_ops) - len(df))])
+            tr1 = raw_h - raw_l
+            tr2 = np.abs(raw_h - prev_close_shifted)
+            tr3 = np.abs(raw_l - prev_close_shifted)
+            true_range = np.maximum(tr1, np.maximum(tr2, tr3))
 
-        return renko_df
+            # 2. Compute Wilder's ATR (Standard Terminal Smoothing Multiplier)
+            atr = np.zeros(n)
+            atr[atr_period] = np.mean(true_range[1:atr_period+1])
+            for i in range(atr_period + 1, n):
+                atr[i] = (atr[i-1] * (atr_period - 1) + true_range[i]) / atr_period
 
-    return out
+            # 🎯 Divide the latest ATR by 14 to determine the dynamic brick size
+            renko_brick_size = atr[-1] / 14.0
+
+            # Fallback guardrail for low liquidity or structural computational errors
+            if renko_brick_size <= 0 or np.isnan(renko_brick_size):
+                renko_brick_size = fixed_brick_size
+
+            # 3. Generate Structural Renko Brick Arrays
+            renko_ops = []
+            renko_cl_list = []
+
+            # Anchor the baseline price block cleanly based on calculations
+            prev_close = np.floor(raw_c[0] / renko_brick_size) * renko_brick_size
+
+            for price in raw_c:
+                gap = price - prev_close
+                
+                if gap >= renko_brick_size:
+                    bricks = int(gap // renko_brick_size)
+                    for _ in range(bricks):
+                        next_close = prev_close + renko_brick_size
+                        renko_ops.append(prev_close)
+                        renko_cl_list.append(next_close)
+                        prev_close = next_close
+                        
+                elif gap <= -renko_brick_size:
+                    bricks = int(abs(gap) // renko_brick_size)
+                    for _ in range(bricks):
+                        next_close = prev_close - renko_brick_size
+                        renko_ops.append(prev_close)
+                        renko_cl_list.append(next_close)
+                        prev_close = next_close
+
+            if not renko_ops:
+                renko_ops.append(prev_close)
+                renko_cl_list.append(prev_close)
+
+            # 4. Construct Output Price Data Engine (FIXED LENGTH INTERFACE WITH UNIQUE TIMESTAMPS)
+            renko_df = pd.DataFrame()
+            renko_df['Open'] = renko_ops
+            renko_df['Close'] = renko_cl_list
+            renko_df['High'] = np.maximum(renko_df['Open'], renko_df['Close'])
+            renko_df['Low'] = np.minimum(renko_df['Open'], renko_df['Close'])
+
+            # Dynamically map tracking time indexes or fall back to linear integers safely
+            if len(renko_ops) <= len(df):
+                renko_df.index = df.index[:len(renko_ops)]
+                if 'Volume' in df.columns:
+                    renko_df['Volume'] = df['Volume'].iloc[:len(renko_ops)].values
+            else:
+                # If Renko bricks outnumber the historical base data bars:
+                extended_index = list(df.index)
+                last_timestamp = df.index[-1]
+                
+                # Pad out missing trailing structural blocks using unique +1 second increments for extra_idx in range(1, len(renko_ops) - len(df) + 1):
+                for extra_idx in range(1, len(renko_ops) - len(df) + 1):
+                    extended_index.append(last_timestamp + pd.Timedelta(seconds=extra_idx))
+                
+                renko_df.index = extended_index
+                
+                if 'Volume' in df.columns:
+                    # Distribute historical volume across extra brick generation spaces evenly
+                    base_vol = df['Volume'].to_numpy()
+                    renko_df['Volume'] = np.concatenate([base_vol, np.zeros(len(renko_ops) - len(df))])
+
+            return renko_df
+
+        return out
 
 
 def fetch_yf_data(period=None, interval="1m", target_rows=60):
