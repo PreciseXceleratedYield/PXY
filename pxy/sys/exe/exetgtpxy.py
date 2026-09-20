@@ -53,6 +53,10 @@ def target_price(row, df=None):
         ce_invst_factor = 1.0
         pe_invst_factor = 1.0
         
+        # Track raw totals to calculate balancing fractions in Section 4
+        ce_investment = 0.0
+        pe_investment = 0.0
+        
         if df is not None and not df.empty:
             working_df = df.copy()
             working_df['side'] = working_df['symbol'].astype(str).str[-2:].str.upper()
@@ -77,15 +81,27 @@ def target_price(row, df=None):
 
         target_pct = 0.0
         
-        # 4️⃣ Symmetrical Risk Matrices (Swapped Matrix Targets)
+        # 4️⃣ Symmetrical Risk Matrices (Smart Balancing: Heavier side target shrinks for quick exit)
         if is_ce:
             if derived_entry in ['EXITCE', 'OTMSELL']:
-                target_pct = pe_tgt_threshold  
+                if ce_investment >= pe_investment:
+                    # CE is heavier side: target shrinks towards 1.4% as it grows larger than PE
+                    opp_inv = pe_investment if pe_investment > 0 else 1.0
+                    target_pct = 1.4 + (1.4 * (opp_inv / ce_investment))
+                else:
+                    # CE is lesser side: locks into 99.0% run mode
+                    target_pct = 99.0
             else:
                 target_pct = 99.0
         elif is_pe:
             if derived_entry in ['EXITPE', 'OTMBUY']:
-                target_pct = ce_tgt_threshold  
+                if pe_investment > ce_investment:
+                    # PE is heavier side: target shrinks towards 1.4% as it grows larger than CE
+                    opp_inv = ce_investment if ce_investment > 0 else 1.0
+                    target_pct = 1.4 + (1.4 * (opp_inv / pe_investment))
+                else:
+                    # PE is lesser side: locks into 99.0% run mode
+                    target_pct = 99.0
             else:
                 target_pct = 99.0
             
@@ -96,4 +112,3 @@ def target_price(row, df=None):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
-
