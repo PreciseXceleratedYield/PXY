@@ -210,19 +210,19 @@ body{
 
 /* ── TAB BAR ── */
 #tabBar{
-    height:48px;flex-shrink:0;display:flex;align-items:stretch;
-    background:var(--bg2);border-top:1px solid var(--border2);
+    height:22px;flex-shrink:0;display:flex;align-items:stretch;
+    background:var(--bg2);border-top:1px solid var(--border);
 }
 .tab-btn{
-    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    gap:2px;border:none;background:transparent;color:var(--muted);
-    font-family:'DM Mono',monospace;font-size:9px;letter-spacing:0.08em;
+    flex:1;display:flex;flex-direction:row;align-items:center;justify-content:center;
+    gap:0;border:none;background:transparent;color:var(--muted);
+    font-family:'DM Mono',monospace;font-size:8px;letter-spacing:0.08em;
     text-transform:uppercase;cursor:pointer;transition:all 0.15s;
-    border-top:2px solid transparent;
+    border-top:1px solid transparent;
 }
 .tab-btn.active{color:var(--accent);border-top-color:var(--accent);box-shadow:inset 0 2px 8px -4px var(--accent);}
 .tab-btn:active{background:var(--bg3);}
-.tab-icon{font-size:14px;line-height:1;}
+.tab-icon{display:none;}
 
 /* actions menu */
 .amenu-btn{
