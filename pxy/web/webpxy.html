@@ -256,7 +256,7 @@ body{
     </div>
     <div style="flex:1;"></div>
     <div class="hdr-r">
-        <span id="clk" style="font-family:'DM Mono',monospace;font-size:18px;font-weight:800;color:#fff;letter-spacing:0.03em;white-space:nowrap;cursor:pointer;" title="Clients">—</span>
+        <span id="clk" style="font-family:'DM Mono',monospace;font-size:14.4px;font-weight:800;color:#fff;letter-spacing:0.03em;white-space:nowrap;cursor:pointer;" title="Clients">—</span>
     </div>
 </div>
 
@@ -1247,7 +1247,9 @@ function drawRiskCandle(floor,net,peak){
 }
 function refreshRiskCandle(){
     const net=Math.round(runningTotal+bookedTotal);
-    document.title='₹'+fmt(net)+' · PXY® · '+location.hostname;
+    const clkEl=$('clk');
+    const clientName=(clkEl&&clkEl.textContent&&clkEl.textContent!=='—')?clkEl.textContent:'PXY®';
+    document.title='₹'+fmt(net)+' · '+clientName;
     drawRiskCandle(lastFloor,net,lastPeak);
 }
 new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($('riskBar'));
