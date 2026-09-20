@@ -320,7 +320,11 @@ body{
     <!-- CHART -->
     <div class="tab-pane" id="paneChart">
         <div class="pane-hdr hdr-chart">
-            <span onclick="openPanelLink('chart')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📈 Chart</span>
+            <span style="display:flex;align-items:center;">
+                <span onclick="openPanelLink('chart')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📈 Chart</span>
+                <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--muted);margin:0 4px;">-</span>
+                <span id="chartPriceTag" style="font-family:'Syne',sans-serif;font-weight:800;font-size:11px;color:var(--text);">—</span>
+            </span>
             <span style="display:flex;gap:4px;">
                 <span onclick="setChartMode('candle')" id="chartModeCandle" style="font-size:8px;color:var(--accent);cursor:pointer;padding:1px 6px;border-radius:3px;border:1px solid var(--accent);">Candles</span>
                 <span onclick="setChartMode('line')" id="chartModeLine" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 6px;border-radius:3px;border:1px solid var(--border);">Line</span>
@@ -818,24 +822,29 @@ function drawChart(candles){
     lo-=pad;hi+=pad;
     const range=hi-lo||1;
 
-    const rightPad=40;
+    const rightPad=0;
     const plotW=W-rightPad;
     const cw=plotW/n;
     const bodyW=Math.max(2,cw*0.6);
     const toY=v=>H-((v-lo)/range)*H;
     const toX=i=>i*cw+cw/2;
 
-    // grid + price labels
+    // grid lines (no numeric axis labels — current price shown at top instead)
     ctx.strokeStyle=cssVar('--grid');ctx.lineWidth=1;
-    ctx.font="8px 'DM Mono',monospace";
-    ctx.fillStyle=cssVar('--muted');
-    ctx.textAlign='left';ctx.textBaseline='middle';
     const ticks=4;
     for(let t=0;t<=ticks;t++){
         const v=lo+(range*t/ticks);
         const y=toY(v);
         ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(plotW,y);ctx.stroke();
-        ctx.fillText(Math.round(v),plotW+4,y);
+    }
+
+    // live current-price tag, top-left of the chart
+    const lastClose=vis.at(-1)?.c;
+    const priceTag=$('chartPriceTag');
+    if(priceTag&&lastClose!=null){
+        const prevC=vis.length>1?vis[vis.length-2]?.c:null;
+        priceTag.textContent=Math.round(lastClose).toLocaleString('en-IN');
+        priceTag.style.color=(prevC==null||lastClose>=prevC)?cssVar('--bull'):cssVar('--bear');
     }
 
     // candles — flat matte bodies
