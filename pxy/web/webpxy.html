@@ -117,6 +117,15 @@ body{
     #panePositions{flex:0 0 24%;max-width:24%;}
     #paneChart{flex:1 1 auto;min-width:0;}
     #tabBar{display:none;}
+    /* Let the relocated PNL/options bars breathe inside their column */
+    #paneTerminal #pnlBar,#panePositions #optOverlay{
+        height:auto;flex-shrink:0;padding:14px 8px;
+    }
+    #paneTerminal #pnlBar .sc-lbl{font-size:9px;}
+    #paneTerminal #pnlBar .sc-val{font-size:15px;}
+    #paneTerminal #pnlBar .sig-cell{gap:4px;flex:1!important;max-width:none!important;min-width:0!important;}
+    #panePositions #optOverlay .opt-tbl{font-size:17px;width:100%!important;margin:0;table-layout:fixed;}
+    #panePositions #optOverlay .opt-tbl td{padding:8px 6px;width:25%;}
 }
 
 /* TERMINAL TAB */
@@ -1254,7 +1263,7 @@ function refreshRiskCandle(){
 }
 new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($('riskBar'));
 
-/* ── DESKTOP: relocate options summary table to top of Positions column ── */
+/* ── DESKTOP: relocate options summary table to bottom of Positions column ── */
 (function(){
     const ov=$('optOverlay');
     const riskBarEl=$('riskBar');
@@ -1263,7 +1272,7 @@ new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($(
     const mq=window.matchMedia('(min-width:900px)');
     function place(){
         if(mq.matches){
-            if(posPane.firstChild!==ov)posPane.insertBefore(ov,posPane.firstChild);
+            if(posPane.lastChild!==ov)posPane.appendChild(ov);
         }else{
             if(ov.nextSibling!==riskBarEl)riskBarEl.parentNode.insertBefore(ov,riskBarEl);
         }
@@ -1272,7 +1281,7 @@ new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($(
     mq.addEventListener('change',place);
 })();
 
-/* ── DESKTOP: relocate signal/PNL bar to top of Terminal column ── */
+/* ── DESKTOP: relocate signal/PNL bar to bottom of Terminal column ── */
 (function(){
     const pb=$('pnlBar');
     const tabBarEl=$('tabBar');
@@ -1282,7 +1291,7 @@ new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($(
     const mq=window.matchMedia('(min-width:900px)');
     function place(){
         if(mq.matches){
-            if(pb.nextSibling!==termBoxEl)termPane.insertBefore(pb,termBoxEl);
+            if(termPane.lastChild!==pb)termPane.appendChild(pb);
         }else{
             if(pb.nextSibling!==tabBarEl)tabBarEl.parentNode.insertBefore(pb,tabBarEl);
         }
