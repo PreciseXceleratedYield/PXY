@@ -1,10 +1,11 @@
+import pandas as pd
 from colorama import Fore, Style, init
 
 # Initialize colorama for clean, colored terminal output formatting
 init(autoreset=True)
 
 def f(x, d=0.0):
-    # Safely cast input to float, return default if casting fails or value <= 0.
+    """Safely casts input to float, returning a default value if casting fails or value <= 0."""
     try:
         val = float(x)
         return val if val > 0 else d
@@ -23,28 +24,26 @@ def target_price(row, df=None):
         if entry_prc <= 0:
             return 0.0
             
-        # 2️⃣ Context string extractors and numeric ATR extraction
+        # 2️⃣ Context string extractors
         symbol = str(row.get('symbol', 'unknown')).upper()
         derived_entry = str(row.get('entry', '')).upper().strip()
-        atr_val = f(row.get('atr'), d=1.4)  # Fallback to 1.4% preferred default if invalid/zero
         
         is_ce = 'CE' in symbol
         is_pe = 'PE' in symbol
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
             
-        # 🔄 Compute Live Exposure Valuation (LTP based via sell_prc)
+        # 🔄 Compute Live Exposure Valuation (LTP based via intentional sell_prc math)
         ce_investment = 0.0
         pe_investment = 0.0
         
         if df is not None and not df.empty:
             working_df = df.copy()
-            working_df['side'] = working_df['symbol'].astype(str).str[-2:].str.upper()
+            # Clean extraction of the option side
+            working_df['side'] = working_df['symbol'].astype(str).str.upper().str[-2:]
             
-            # Mid-point calculation using live valuation sell_prc (LTP)
-            working_df['row_invested'] = working_df['qty'].apply(f) * (
-                (working_df['sell_prc'].apply(f) + working_df['sell_prc'].apply(f)) / 2.0
-            )
+            # Optimized intentional calculation: quantity * sell_prc (LTP)
+            working_df['row_invested'] = working_df['qty'].apply(f) * working_df['sell_prc'].apply(f)
             
             ce_rows = working_df[working_df['side'] == 'CE']
             pe_rows = working_df[working_df['side'] == 'PE']
@@ -63,7 +62,7 @@ def target_price(row, df=None):
             # Defensive target if native exit OR standard bearish entry triggers
             if derived_entry in ['EXITCE', 'OTMSELL']:
                 # Pure Math: Auto-shrinks if CE live valuation is heavy; Auto-inflates if it is light!
-                target_pct = 1.4 + (1.4 * (pe_safe / ce_safe))
+                target_pct = 1.4 + (1.4 * (pe_safe / ce_safe) ** 3)
             else:
                 target_pct = 99.0
                 
@@ -71,7 +70,7 @@ def target_price(row, df=None):
             # Defensive target if native exit OR standard bullish entry triggers
             if derived_entry in ['EXITPE', 'OTMBUY']:
                 # Pure Math: Auto-shrinks if PE live valuation is heavy; Auto-inflates if it is light!
-                target_pct = 1.4 + (1.4 * (ce_safe / pe_safe))
+                target_pct = 1.4 + (1.4 * (ce_safe / pe_safe) ** 3)
             else:
                 target_pct = 99.0
             
@@ -82,4 +81,3 @@ def target_price(row, df=None):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
-
