@@ -3,57 +3,37 @@ from colorama import Fore, Style, init
 # Initialize colorama for clean, colored terminal output formatting
 init(autoreset=True)
 
-# Core Threshold System Variables
-SYSTEM_A_BASE_THRESHOLD = 1.4   # 🎯 Base threshold simplified to 1.4
-ABS_CAP = 41.0                  # 🛑 Hard maximum allowed target ceiling
-MIN_FLOOR = 1.4                 # 🛡️ Minimum allowed target threshold floor
-
 def f(x, d=0.0):
+    # Safely cast input to float, return default if casting fails or value <= 0.
     try:
         val = float(x)
         return val if val > 0 else d
     except (ValueError, TypeError):
         return d
 
-def getexeagtpxy(ce_invst_factor, pe_invst_factor):
-    """Calculates investment-adjusted dynamic drawdown thresholds from capital weights."""
-    # 🎯 Linear Multiplication Matrix (Smooth scaling)
-    ce_base_invested = SYSTEM_A_BASE_THRESHOLD * ce_invst_factor
-    pe_base_invested = SYSTEM_A_BASE_THRESHOLD * pe_invst_factor
-
-    # Apply ceiling safety guard (Capped at 41.0 maximum)
-    ce_capped = min(ce_base_invested, ABS_CAP)
-    pe_capped = min(pe_base_invested, ABS_CAP)
-
-    # Apply floor safety guard (Floor remains at 1.4 minimum)
-    ce_final_abs = max(ce_capped, MIN_FLOOR)
-    pe_final_abs = max(pe_capped, MIN_FLOOR)
-
-    # Returns strictly positive target numbers bounded between 1.4 and 41.0
-    return round(ce_final_abs, 2), round(pe_final_abs, 2)
-
 def target_price(row, df=None):
-    """Calculates individual option layer target price using exit status alignment."""
+    """Calculates individual option layer target price using exit status alignment.
+    
+    Protects positions by forcing an immediate ATR-based tight target when the router
+    issues either a native exit or an explicit opposite-direction signal.
+    """
     try:
         # 1️⃣ Entry data execution health check
         entry_prc = f(row.get('pxy_entry') or row.get('buy_prc'))
         if entry_prc <= 0:
             return 0.0
             
-        # 2️⃣ Context string extractors
+        # 2️⃣ Context string extractors and numeric ATR extraction
         symbol = str(row.get('symbol', 'unknown')).upper()
         derived_entry = str(row.get('entry', '')).upper().strip()
+        atr_val = f(row.get('atr'), d=1.4)  # Fallback to 1.4% preferred default if invalid/zero
         
         is_ce = 'CE' in symbol
         is_pe = 'PE' in symbol
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
-
-        # 3️⃣ ORIGINAL INTEGRATED MATRIX (No Reverse Factor)
-        ce_invst_factor = 1.0
-        pe_invst_factor = 1.0
-        
-        # Track raw totals to calculate balancing fractions in Section 4
+            
+        # 🔄 Compute Live Exposure Valuation (LTP based via sell_prc)
         ce_investment = 0.0
         pe_investment = 0.0
         
@@ -61,9 +41,9 @@ def target_price(row, df=None):
             working_df = df.copy()
             working_df['side'] = working_df['symbol'].astype(str).str[-2:].str.upper()
             
-            # 🔄 CORRECTED: Now using the exact mid-point average price calculation
+            # Mid-point calculation using live valuation sell_prc (LTP)
             working_df['row_invested'] = working_df['qty'].apply(f) * (
-                (working_df['buy_prc'].apply(f) + working_df['buy_prc'].apply(f)) / 2.0
+                (working_df['sell_prc'].apply(f) + working_df['sell_prc'].apply(f)) / 2.0
             )
             
             ce_rows = working_df[working_df['side'] == 'CE']
@@ -71,44 +51,35 @@ def target_price(row, df=None):
             
             ce_investment = float(ce_rows['row_invested'].sum()) if not ce_rows.empty else 0.0
             pe_investment = float(pe_rows['row_invested'].sum()) if not pe_rows.empty else 0.0
-            
-            if ce_investment > 0 and pe_investment > 0:
-                ce_invst_factor = ce_investment / pe_investment
-                pe_invst_factor = pe_investment / ce_investment
 
-        # Generate live dynamic positive target thresholds for this run (Guarded between 1.4 and 41.0)
-        ce_tgt_threshold, pe_tgt_threshold = getexeagtpxy(ce_invst_factor, pe_invst_factor)
+        # Safe zero-guards handle empty opposite positions cleanly
+        ce_safe = ce_investment if ce_investment > 0 else 1.0
+        pe_safe = pe_investment if pe_investment > 0 else 1.0
 
         target_pct = 0.0
         
-        # 4️⃣ Symmetrical Risk Matrices (Smart Balancing: Heavier side target shrinks for quick exit)
+        # 3️⃣ Symmetrical Risk Matrices (Isolating true opposite trend shifts with Balancing Math)
         if is_ce:
+            # Defensive target if native exit OR standard bearish entry triggers
             if derived_entry in ['EXITCE', 'OTMSELL']:
-                if ce_investment >= pe_investment:
-                    # CE is heavier side: target shrinks towards 1.4% as it grows larger than PE
-                    opp_inv = pe_investment if pe_investment > 0 else 1.0
-                    target_pct = 1.4 + (1.4 * (opp_inv / ce_investment))
-                else:
-                    # CE is lesser side: locks into 99.0% run mode
-                    target_pct = 99.0
+                # Pure Math: Auto-shrinks if CE live valuation is heavy; Auto-inflates if it is light!
+                target_pct = 1.4 + (1.4 * (pe_safe / ce_safe))
             else:
                 target_pct = 99.0
+                
         elif is_pe:
+            # Defensive target if native exit OR standard bullish entry triggers
             if derived_entry in ['EXITPE', 'OTMBUY']:
-                if pe_investment > ce_investment:
-                    # PE is heavier side: target shrinks towards 1.4% as it grows larger than CE
-                    opp_inv = ce_investment if ce_investment > 0 else 1.0
-                    target_pct = 1.4 + (1.4 * (opp_inv / pe_investment))
-                else:
-                    # PE is lesser side: locks into 99.0% run mode
-                    target_pct = 99.0
+                # Pure Math: Auto-shrinks if PE live valuation is heavy; Auto-inflates if it is light!
+                target_pct = 1.4 + (1.4 * (ce_safe / pe_safe))
             else:
                 target_pct = 99.0
             
-        # 5️⃣ Final mathematical target premium projection calculation
+        # 4️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
         return round(calculated_target, 2)
         
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
+
