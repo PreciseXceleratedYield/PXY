@@ -37,7 +37,10 @@ def print_telemetry_dashboard(p):
     for side in ("ce", "pe"):
         lots = p[f"{side}_lots"]
         lgt = int(round(p[f"{side}_lgt"]))
-        tgt_txt = "99" if p[f"{side}_aligned"] else "1.4+"
+        
+        # --- Updated to display the custom dynamic formula string ---
+        tgt_txt = "99" if p[f"{side}_aligned"] else f"{p[f'{side}_tgt']:.2f}"
+        
         pnl_val = int(round(p[f"{side}_pnl"]))
         run_pct_val = int(round(p[f"{side}_run_pct"]))
         decision = p[f"{side}_decision"].upper()
@@ -93,6 +96,11 @@ def handle_side_averaging(client, df):
     ce_invst_factor = ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
     pe_invst_factor = pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
 
+    # --- NEW: TARGET MATHEMATICAL CALCULATIONS (OPPOSITE FACTOR CUBED) ---
+    ce_tgt = 1.4 + (1.4 * (pe_invst_factor ** 3))
+    pe_tgt = 1.4 + (1.4 * (ce_invst_factor ** 3))
+    # ---------------------------------------------------------------------
+
     ce_pnl = float(ce_rows['row_pnl'].sum()) if not ce_rows.empty else 0.0
     pe_pnl = float(pe_rows['row_pnl'].sum()) if not pe_rows.empty else 0.0
 
@@ -119,6 +127,7 @@ def handle_side_averaging(client, df):
         "ce_lgt": ce_dynamic_threshold, "pe_lgt": pe_dynamic_threshold,
         "ce_run_pct": ce_lgt_val, "pe_run_pct": pe_lgt_val,
         "ce_aligned": ce_aligned, "pe_aligned": pe_aligned,
+        "ce_tgt": ce_tgt, "pe_tgt": pe_tgt,   # Dynamic targets integrated
         "ce_decision": ce_decision, "pe_decision": pe_decision,
     }
 
