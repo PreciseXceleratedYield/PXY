@@ -121,9 +121,12 @@ body{
     #paneTerminal #pnlBar,#panePositions #optOverlay{
         height:auto;flex-shrink:0;padding:14px 8px;
     }
-    #paneTerminal #pnlBar .sig-cell{gap:4px;flex:1!important;max-width:none!important;min-width:0!important;}
+    #paneTerminal #pnlBar .sig-cell{gap:4px;flex:1!important;max-width:none!important;min-width:0!important;align-items:flex-start;text-align:left;}
+    #paneTerminal #pnlBar .sig-cell:last-child{align-items:center;text-align:center;}
     #panePositions #optOverlay .opt-tbl{width:100%!important;margin:0;table-layout:fixed;}
-    #panePositions #optOverlay .opt-tbl td{padding:8px 6px;width:25%;}
+    #panePositions #optOverlay .opt-tbl td{padding:8px 6px;width:20%;text-align:left;}
+    #panePositions #optOverlay .opt-tbl td:nth-child(3){width:40%;}
+    #panePositions #optOverlay .opt-tbl td:last-child{text-align:center;}
 }
 
 /* TERMINAL TAB */
