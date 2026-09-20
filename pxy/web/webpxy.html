@@ -116,15 +116,13 @@ body{
     #paneTerminal{flex:0 0 28%;max-width:28%;}
     #panePositions{flex:0 0 24%;max-width:24%;}
     #paneChart{flex:1 1 auto;min-width:0;}
-    #tabBar{display:none;}
+    #tabBar{display:none!important;}
     /* Let the relocated PNL/options bars breathe inside their column */
     #paneTerminal #pnlBar,#panePositions #optOverlay{
         height:auto;flex-shrink:0;padding:14px 8px;
     }
-    #paneTerminal #pnlBar .sc-lbl{font-size:7.5px;}
-    #paneTerminal #pnlBar .sc-val{font-size:12.5px;}
     #paneTerminal #pnlBar .sig-cell{gap:4px;flex:1!important;max-width:none!important;min-width:0!important;}
-    #panePositions #optOverlay .opt-tbl{font-size:14.8px;width:100%!important;margin:0;table-layout:fixed;}
+    #panePositions #optOverlay .opt-tbl{width:100%!important;margin:0;table-layout:fixed;}
     #panePositions #optOverlay .opt-tbl td{padding:8px 6px;width:25%;}
 }
 
