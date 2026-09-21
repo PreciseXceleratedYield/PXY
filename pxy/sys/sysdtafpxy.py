@@ -14,7 +14,7 @@ TIMEZONE = 'Asia/Kolkata'
 # 🔥 INDEPENDENT MATRIX MODE INTERFACE:
 # Format: "ST" -> First Digit = SIDE Mode, Second Digit = TREND Mode
 # Set SELECTED_MODE to "8" (or use your string logic) to run the new Renko system.
-SELECTED_MODE = "88" 
+SELECTED_MODE = "00" 
 
 def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
     """Executes structural, isolated mathematical transformations based on explicit modes.
