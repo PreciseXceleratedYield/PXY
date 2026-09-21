@@ -117,9 +117,15 @@ body{
     #panePositions{flex:0 0 24%;max-width:24%;}
     #paneChart{flex:1 1 auto;min-width:0;}
     #tabBar{display:none!important;}
-    /* Let the relocated PNL/options bars breathe inside their column */
-    #paneTerminal #pnlBar,#panePositions #optOverlay{
+    /* Let the relocated PNL bar breathe inside its column */
+    #paneTerminal #pnlBar{
         height:auto!important;flex-shrink:0;padding:14px 8px;margin-top:auto;
+    }
+    /* Options table pinned flush to the true bottom edge of the Positions column */
+    #panePositions{position:relative;}
+    #panePositions #optOverlay{
+        position:absolute;left:0;right:0;bottom:0;
+        background:var(--bg2);padding:14px 8px;
     }
     #paneTerminal #pnlBar .sig-cell{gap:4px;flex:1!important;max-width:none!important;min-width:0!important;align-items:flex-start;text-align:left;}
     #paneTerminal #pnlBar .sig-cell:last-child{align-items:center;text-align:center;}
@@ -1289,6 +1295,24 @@ new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($(
     }
     place();
     mq.addEventListener('change',place);
+})();
+
+/* ── DESKTOP: reserve space so the pinned options table never covers the positions list ── */
+(function(){
+    const ov=$('optOverlay');
+    const posPaneEl=$('posPane');
+    if(!ov||!posPaneEl)return;
+    const mq=window.matchMedia('(min-width:900px)');
+    function sync(){
+        if(mq.matches){
+            posPaneEl.style.paddingBottom=ov.offsetHeight+'px';
+        }else{
+            posPaneEl.style.paddingBottom='';
+        }
+    }
+    new ResizeObserver(sync).observe(ov);
+    mq.addEventListener('change',sync);
+    sync();
 })();
 
 /* ── DESKTOP: relocate signal/PNL bar to bottom of Terminal column ── */
