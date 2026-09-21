@@ -62,17 +62,17 @@ def target_price(row, df=None):
             # Defensive target if native exit OR standard bearish entry triggers
             if derived_entry in ['EXITCE', 'OTMSELL']:
                 # Pure Math: Auto-shrinks if CE live valuation is heavy; Auto-inflates if it is light!
-                target_pct = 1.4 #+ (1.4 * (pe_safe / ce_safe) ** 3)
+                target_pct = 1.4
             else:
-                target_pct = 99.0
+                target_pct = 1.4 + (1.4 * (pe_safe / ce_safe) ** 3)
                 
         elif is_pe:
             # Defensive target if native exit OR standard bullish entry triggers
             if derived_entry in ['EXITPE', 'OTMBUY']:
                 # Pure Math: Auto-shrinks if PE live valuation is heavy; Auto-inflates if it is light!
-                target_pct = 1.4 #+ (1.4 * (ce_safe / pe_safe) ** 3)
+                target_pct = 1.4
             else:
-                target_pct = 99.0
+                target_pct = 1.4 + (1.4 * (ce_safe / pe_safe) ** 3)
             
         # 4️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
