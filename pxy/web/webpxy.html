@@ -928,7 +928,9 @@ function drawMomentumBar(candles){
     const W=rect.width,H=rect.height;
     ctx.clearRect(0,0,W,H);
     if(W<4||H<10)return;
-    const PADY=8,midX=W/2,bodyW=Math.max(5,W*0.20);
+
+    // Body width reduced to 80% (W * 0.45 -> W * 0.36, min 8 -> min 6.4)
+    const PADY=8,midX=W/2,bodyW=Math.max(6.4,W*0.36);
     const recent=candles.slice(-60);
     const all=recent.flatMap(c=>[c.c,c.st_line,c.mirror_line]).filter(v=>v!=null);
     const high=Math.max(...all),low=Math.min(...all),range=high-low||1;
@@ -944,14 +946,20 @@ function drawMomentumBar(candles){
     tg.addColorStop(0.92,cssVar('--track-mid'));tg.addColorStop(1,'rgba(0,0,0,0)');
     ctx.strokeStyle=tg;ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(midX,PADY);ctx.lineTo(midX,H-PADY);ctx.stroke();
+    
     // wick = the st_line <-> mirror_line channel at the current bar
     const chHigh=Math.max(last.st_line,last.mirror_line),chLow=Math.min(last.st_line,last.mirror_line);
     const wy1=toY(chLow),wy2=toY(chHigh);
-    ctx.strokeStyle=bodyColor;ctx.lineWidth=1.5;ctx.globalAlpha=0.45;
+    
+    // Vertical wick line thickness doubled (1.5 -> 3.0)
+    ctx.strokeStyle=bodyColor;ctx.lineWidth=3.0;ctx.globalAlpha=0.45;
     ctx.beginPath();ctx.moveTo(midX,wy1);ctx.lineTo(midX,wy2);ctx.stroke();
     ctx.globalAlpha=1;
-    const capW=Math.max(5,W*0.28);
+    
+    // Horizontal wick end caps doubled (W * 0.28 -> W * 0.56, min 5 -> min 10)
+    const capW=Math.max(10,W*0.56);
     [wy1,wy2].forEach(y=>{ctx.beginPath();ctx.moveTo(midX-capW/2,y);ctx.lineTo(midX+capW/2,y);ctx.stroke();});
+    
     // body = close <-> st_line (how far price has moved from the trend line, colored by trend state)
     const open=last.st_line,close=last.c;
     const by1=toY(Math.max(open,close)),by2=toY(Math.min(open,close)),bH=Math.max(by2-by1,4);
@@ -962,6 +970,7 @@ new ResizeObserver(()=>{
     if(lastCandles)drawChart(lastCandles);
     if(lastMoCandles)drawMomentumBar(lastMoCandles);
 }).observe($('chartBox'));
+
 
 /* ── POSITIONS ── */
 let runningTotal=0,bookedTotal=0;
