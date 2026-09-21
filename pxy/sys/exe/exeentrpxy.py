@@ -96,8 +96,7 @@ def main():
         
         # Upfront Gate: CE PE Weight Check
         if ce_lots >= 1 and pe_lots >= 1:
-            print(f"{Fore.YELLOW}⚠️  CE|PE Weighted already,")
-            print(f"{Fore.YELLOW}  handing to AVG")
+            print(f"{Fore.YELLOW}⚠️  CE|PE Weighted already,handing to AVG")
             return
 
         # 5. Maximum Strategy Lot Allocation Check
