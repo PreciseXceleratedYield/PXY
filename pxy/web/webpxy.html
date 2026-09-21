@@ -928,7 +928,7 @@ function drawMomentumBar(candles){
     const W=rect.width,H=rect.height;
     ctx.clearRect(0,0,W,H);
     if(W<4||H<10)return;
-    const PADY=8,midX=W/2,bodyW=Math.max(6.4,W*0.36);
+    const PADY=8,midX=W/2,bodyW=Math.max(5,W*0.20);
     const recent=candles.slice(-60);
     const all=recent.flatMap(c=>[c.c,c.st_line,c.mirror_line]).filter(v=>v!=null);
     const high=Math.max(...all),low=Math.min(...all),range=high-low||1;
