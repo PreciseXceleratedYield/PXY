@@ -1502,14 +1502,14 @@ async function loadOptSummary(){
     const rnd=n=>Math.round(n||0);
     const plainSign=n=>(Number(n||0)>=0?'+':'')+Math.round(n||0);
     const pad2=n=>{const r=Math.round(n||0);const a=Math.min(Math.abs(r),99);return (r<0?'-':'')+String(a).padStart(2,'0');};
-    const buildRow=(lots,pnl,inv,lgt,runPct,aligned,decision)=>{
-        const tgtNum=aligned?99:1.4;
+    const buildRow=(lots,pnl,inv,lgt,runPct,tgt,decision)=>{
+        const tgtNum=Number(tgt);
         const runColor=Number(runPct)<Number(lgt)?'var(--bear)':Number(runPct)>tgtNum?'var(--bull)':null;
         const row=[lots??'—', toK(inv), `(${pad2(lgt)})${pad2(runPct)}(${pad2(tgtNum)})`, plainSign(pnl)];
         return {row,runColor};
     };
-    const ceRes=buildRow(d.ce_lots,d.ce_pnl,d.ce_investment,d.ce_lgt,d.ce_run_pct,d.ce_aligned,d.ce_decision);
-    const peRes=buildRow(d.pe_lots,d.pe_pnl,d.pe_investment,d.pe_lgt,d.pe_run_pct,d.pe_aligned,d.pe_decision);
+    const ceRes=buildRow(d.ce_lots,d.ce_pnl,d.ce_investment,d.ce_lgt,d.ce_run_pct,d.ce_tgt,d.ce_decision);
+    const peRes=buildRow(d.pe_lots,d.pe_pnl,d.pe_investment,d.pe_lgt,d.pe_run_pct,d.pe_tgt,d.pe_decision);
     const ceRow=ceRes.row,peRow=peRes.row;
     let html='<div style="position:relative;padding:3px 0;">';
     html+=`<button id="optInfoBtn" style="position:absolute;top:1px;right:2px;z-index:2;background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;padding:1px 4px;line-height:1;">ⓘ</button>`;
