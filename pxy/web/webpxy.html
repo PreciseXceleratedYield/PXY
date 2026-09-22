@@ -215,42 +215,59 @@ body{
 }
 #chartBox canvas{position:absolute;inset:0;width:100%!important;height:100%!important;z-index:1;}
 
-/* GAME VIEW (toggled inside CHART tab) — one shared vertical court, CE top / PE bottom, net at zero */
+/* GAME VIEW (toggled inside CHART tab) — vertical court: LGT dead-lines top & bottom,
+   CE zone (top) and PE zone (bottom) each bounded by own LGT (outer) and TGT (inner),
+   with a neutral DMZ between the two TGT lines. Ball just animates between the players. */
 #gameCourt{
-    position:relative;width:140px;max-width:38vw;height:min(56vh,520px);
-    background:linear-gradient(180deg,var(--bull-dim),var(--bg3) 50%,var(--bear-dim));
-    border:1px solid var(--border2);border-radius:12px;overflow:visible;
+    position:relative;width:150px;max-width:40vw;height:min(58vh,540px);
+    background:linear-gradient(180deg,
+        var(--bull-dim) 0%, var(--bull-dim) 42%,
+        var(--bg3) 42%, var(--bg3) 58%,
+        var(--bear-dim) 58%, var(--bear-dim) 100%);
+    border:1px solid var(--border2);border-radius:10px;overflow:visible;
     box-shadow:inset 0 0 0 1px var(--border);
 }
-.gm-paddle{position:absolute;left:50%;transform:translateX(-50%);font-family:'Syne',sans-serif;font-weight:800;font-size:10px;letter-spacing:0.08em;color:var(--muted);white-space:nowrap;}
-.gm-paddle.gm-top{top:-20px;}
-.gm-paddle.gm-bottom{bottom:-20px;}
-.gm-net{position:absolute;left:-4px;right:-4px;top:50%;height:2px;background:rgba(255,255,255,0.16);transform:translateY(-50%);}
-.gm-net::after{content:'NET · 0';position:absolute;left:50%;top:-13px;transform:translateX(-50%);font-size:7px;color:var(--muted);white-space:nowrap;}
-.gm-line{position:absolute;left:0;right:0;height:0;border-top:1px dashed currentColor;opacity:0.7;}
-.gm-lbl{position:absolute;font-size:7.5px;font-weight:700;white-space:nowrap;transform:translateY(-50%);}
-.gm-lbl.gm-l{right:calc(100% + 8px);text-align:right;}
-.gm-lbl.gm-r{left:calc(100% + 8px);}
-.gm-ce{color:var(--bull);}
-.gm-pe{color:var(--bear);}
-.gm-ball-wrap{position:absolute;left:50%;transition:top 0.8s cubic-bezier(.4,0,.2,1);}
-.gm-ball{
-    position:relative;width:24px;height:24px;margin-left:-12px;border-radius:50%;
+.gm-dmz-lbl{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    font-size:7px;letter-spacing:0.14em;color:var(--muted);text-transform:uppercase;white-space:nowrap;
+}
+.gm-line{position:absolute;left:-2px;right:-2px;height:0;transform:translateY(-50%);}
+.gm-line.gm-lgt-line{border-top:2px solid var(--bear);opacity:0.9;}
+.gm-line.gm-tgt-line{border-top:1px dashed currentColor;opacity:0.8;}
+.gm-line.gm-ce-c{color:var(--bull);}
+.gm-line.gm-pe-c{color:var(--bear);}
+.gm-lbl{
+    position:absolute;left:50%;transform:translate(-50%,-50%);
+    font-size:7.5px;font-weight:700;white-space:nowrap;
+    background:var(--bg2);padding:0 5px;border-radius:3px;z-index:1;
+}
+.gm-lbl.gm-lgt-lbl{color:var(--bear);}
+.gm-lbl.gm-ce-c{color:var(--bull);}
+.gm-lbl.gm-pe-c{color:var(--bear);}
+
+.gm-player{
+    position:absolute;left:50%;width:28px;height:28px;margin-left:-14px;
+    transform:translateY(-50%);border-radius:50%;
     display:flex;align-items:center;justify-content:center;
     font-family:'Syne',sans-serif;font-weight:800;font-size:9px;color:#fff;
     box-shadow:0 0 0 3px var(--bg3),0 3px 10px rgba(0,0,0,0.5);
-    animation:gmPingPong 1.05s ease-in-out infinite;
+    transition:top 0.8s cubic-bezier(.4,0,.2,1);z-index:2;
 }
-.gm-ball-wrap.gm-pe .gm-ball{animation-delay:0.5s;}
-.gm-ball.bull{background:var(--bull);}
-.gm-ball.bear{background:var(--bear);}
-.gm-ball.gold{background:var(--gold);color:#181c26;}
-@keyframes gmPingPong{
-    0%,100%{transform:translateY(-6px) scale(1);}
-    50%{transform:translateY(6px) scale(0.92);}
+.gm-player.bull{background:var(--bull);}
+.gm-player.bear{background:var(--bear);}
+.gm-player.gold{background:var(--gold);color:#181c26;}
+.gm-player-val{
+    position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:8px;
+    font-size:8px;font-weight:700;color:var(--text);background:var(--bg2);
+    padding:1px 5px;border-radius:4px;white-space:nowrap;border:1px solid var(--border2);
 }
-.gm-ball-val{position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);font-size:8px;font-weight:700;color:var(--text);background:var(--bg2);padding:1px 5px;border-radius:4px;white-space:nowrap;border:1px solid var(--border2);}
-.gm-ball-wrap.gm-ce .gm-ball-val{left:auto;right:calc(100% + 8px);}
+.gm-ball{
+    position:absolute;left:50%;top:21%;width:11px;height:11px;margin-left:-5.5px;
+    transform:translateY(-50%);border-radius:50%;background:var(--gold);
+    box-shadow:0 0 7px rgba(240,180,41,0.85),0 0 0 2px var(--bg3);
+    transition:top 0.85s ease-in-out;z-index:3;
+}
+
 .gm-score{font-family:'Syne',sans-serif;font-weight:800;font-size:11px;padding:2px 9px;border-radius:8px;}
 .gm-score.win{color:var(--bull);background:var(--bull-dim);}
 .gm-score.out{color:var(--bear);background:var(--bear-dim);}
@@ -394,9 +411,8 @@ body{
             <div id="gameStatusLine" style="text-align:center;font-size:9px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;padding:10px 0 0;">live · updates every 3s</div>
             <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:16px;min-height:0;">
                 <div id="gameCourt">
-                    <div class="gm-paddle gm-top">🏓 CE</div>
-                    <div class="gm-net"></div>
-                    <div class="gm-paddle gm-bottom">🏓 PE</div>
+                    <div class="gm-dmz-lbl">DMZ</div>
+                    <div class="gm-ball" id="gameBall"></div>
                 </div>
             </div>
             <div style="display:flex;justify-content:center;gap:22px;padding:0 0 16px;flex-shrink:0;">
@@ -1567,45 +1583,62 @@ $('cfgSave').addEventListener('click',()=>{
 /* ── START ── */
 initTerm();connect();
 let optLegendOpen=false;
-function gmToPct(v,extent){
-    return Math.max(3,Math.min(97,50-(v/extent)*50));
+const GM_CE_END=42, GM_PE_START=58; // CE zone: 0%→42% (LGT→TGT). PE zone: 58%→100% (TGT→LGT). DMZ: 42%→58%.
+let gmBallEndpoints={ce:GM_CE_END/2,pe:GM_PE_START+(100-GM_PE_START)/2};
+let gmBallGoingTo='pe';
+function gmTickBall(){
+    const ball=$('gameBall');if(!ball)return;
+    if(gmBallGoingTo==='pe'){ball.style.top=gmBallEndpoints.pe+'%';gmBallGoingTo='ce';}
+    else{ball.style.top=gmBallEndpoints.ce+'%';gmBallGoingTo='pe';}
+}
+setInterval(gmTickBall,850);
+
+function gmFrac(run,lgt,tgt){
+    if(tgt<=lgt)return 0;
+    return Math.max(0,Math.min(1,(run-lgt)/(tgt-lgt)));
 }
 function renderGame(d){
     const court=$('gameCourt');
     if(!court)return;
-    court.querySelectorAll('.gm-line,.gm-lbl,.gm-ball-wrap').forEach(n=>n.remove());
+    court.querySelectorAll('.gm-line,.gm-lbl,.gm-player').forEach(n=>n.remove());
 
     const ceLgt=Number(d.ce_lgt)||0,ceTgt=Number(d.ce_tgt)||0,ceRun=Number(d.ce_run_pct)||0;
     const peLgt=Number(d.pe_lgt)||0,peTgt=Number(d.pe_tgt)||0,peRun=Number(d.pe_run_pct)||0;
-    const extent=Math.max(Math.abs(ceLgt),Math.abs(ceTgt),Math.abs(ceRun),Math.abs(peLgt),Math.abs(peTgt),Math.abs(peRun),3)*1.15;
 
-    const addLine=(val,colorCls,label,side)=>{
-        const top=gmToPct(val,extent);
+    const addLine=(topPct,cls,label)=>{
         const line=document.createElement('div');
-        line.className='gm-line '+colorCls;line.style.top=top+'%';
+        line.className='gm-line '+cls;line.style.top=topPct+'%';
         court.appendChild(line);
         const lbl=document.createElement('div');
-        lbl.className='gm-lbl '+colorCls+' '+(side==='l'?'gm-l':'gm-r');
-        lbl.style.top=top+'%';lbl.textContent=label+' '+val.toFixed(1);
+        lbl.className='gm-lbl '+cls;lbl.style.top=topPct+'%';
+        lbl.textContent=label;
         court.appendChild(lbl);
     };
-    addLine(ceTgt,'gm-ce','CE TGT','l');
-    addLine(ceLgt,'gm-ce','CE LGT','l');
-    addLine(peTgt,'gm-pe','PE TGT','r');
-    addLine(peLgt,'gm-pe','PE LGT','r');
+    addLine(0,'gm-lgt-line gm-lgt-lbl','⛔ CE LGT '+ceLgt.toFixed(1));
+    addLine(GM_CE_END,'gm-tgt-line gm-ce-c','🎯 CE TGT '+ceTgt.toFixed(1));
+    addLine(GM_PE_START,'gm-tgt-line gm-pe-c','🎯 PE TGT '+peTgt.toFixed(1));
+    addLine(100,'gm-lgt-line gm-lgt-lbl','⛔ PE LGT '+peLgt.toFixed(1));
 
-    const addBall=(val,lgt,tgt,label,side)=>{
-        const top=gmToPct(val,extent);
-        let cls='gold',state='IN PLAY';
-        if(val<=lgt){cls='bear';state='OUT';}else if(val>=tgt){cls='bull';state='WIN';}
-        const wrap=document.createElement('div');
-        wrap.className='gm-ball-wrap gm-'+side;wrap.style.top=top+'%';
-        wrap.innerHTML=`<div class="gm-ball ${cls}">${label}</div><div class="gm-ball-val">${val.toFixed(1)}</div>`;
-        court.appendChild(wrap);
-        return state;
-    };
-    const ceState=addBall(ceRun,ceLgt,ceTgt,'CE','ce');
-    const peState=addBall(peRun,peLgt,peTgt,'PE','pe');
+    const ceP=gmFrac(ceRun,ceLgt,ceTgt);
+    const peP=gmFrac(peRun,peLgt,peTgt);
+    const ceY=ceP*GM_CE_END;
+    const peY=100-peP*(100-GM_PE_START);
+    gmBallEndpoints={ce:ceY,pe:peY};
+
+    let ceState='IN PLAY',ceCls='gold';
+    if(ceRun<=ceLgt){ceState='OUT';ceCls='bear';}else if(ceRun>=ceTgt){ceState='WIN';ceCls='bull';}
+    let peState='IN PLAY',peCls='gold';
+    if(peRun<=peLgt){peState='OUT';peCls='bear';}else if(peRun>=peTgt){peState='WIN';peCls='bull';}
+
+    const cePlayer=document.createElement('div');
+    cePlayer.className='gm-player '+ceCls;cePlayer.style.top=ceY+'%';
+    cePlayer.innerHTML=`CE<span class="gm-player-val">${ceRun.toFixed(1)}</span>`;
+    court.appendChild(cePlayer);
+
+    const pePlayer=document.createElement('div');
+    pePlayer.className='gm-player '+peCls;pePlayer.style.top=peY+'%';
+    pePlayer.innerHTML=`PE<span class="gm-player-val">${peRun.toFixed(1)}</span>`;
+    court.appendChild(pePlayer);
 
     const setScore=(elId,state)=>{
         const el=$(elId);if(!el)return;
