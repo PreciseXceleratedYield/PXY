@@ -35,6 +35,17 @@ def check_trend_collapse_exit(df, client):
         )
         combined_depth = ce_depth + pe_depth
 
+        # 🎯 STRICT FALLBACK REPLACEMENT: Pull raw market state direction flag directly 
+        # (Supports native UP, DOWN, and SIDE values from your core snapshot row data)
+        global_exit = (
+            str(first_row.get("direction", "NONE")).upper().strip()
+        )
+
+        # 🛑 CRITICAL REGIME INTERCEPT BYPASS: If market is sideways, bypass panic liquidation checks.
+        # This keeps the portfolio active for standard grid-balancing and dynamic side averaging.
+        if global_exit == "SIDE":
+            return False
+
         # 🔍 STRICT HEDGING & HEAVY-SIDE ANALYSIS
         symbols_upper = (
             df["symbol"].astype(str).str.upper()
@@ -52,24 +63,19 @@ def check_trend_collapse_exit(df, client):
         ce_count = is_ce_mask.sum()
         pe_count = is_pe_mask.sum()
 
-        # Extract the uniform global exit signal from the first row
-        global_exit = (
-            str(first_row.get("exit", "NONE")).upper().strip()
-        )
-
-        # Evaluate heavier side criteria against the uniform global exit state
+        # 🎯 FALLBACK STRUCTURAL MAPPING: Evaluate heavier side criteria matching UP/DOWN keys
         side_condition_met = False
         if ce_count > pe_count:
-            # CE is heavier: Trigger exit if global state shifts to BEAR / SELL
-            if global_exit in ("SELL", "BEAR"):
+            # CE is heavier: Trigger exit if global state shifts to DOWN, BEAR, or SELL
+            if global_exit in ("DOWN", "BEAR", "SELL"):
                 side_condition_met = True
         elif pe_count > ce_count:
-            # PE is heavier: Trigger exit if global state shifts to BULL / BUY
-            if global_exit in ("BUY", "BULL"):
+            # PE is heavier: Trigger exit if global state shifts to UP, BULL, or BUY
+            if global_exit in ("UP", "BULL", "BUY"):
                 side_condition_met = True
         else:
-            # Even distribution: Trigger if the global exit matches EITHER hostile zone
-            if global_exit in ("SELL", "BEAR", "BUY", "BULL"):
+            # Even distribution: Trigger if the global flip matches either hostile zone
+            if global_exit in ("DOWN", "BEAR", "SELL", "UP", "BULL", "BUY"):
                 side_condition_met = True
 
         # 3️⃣ CRITICAL ACCELERATION MATCH WITH BIAS EXIT GATES
@@ -85,10 +91,10 @@ def check_trend_collapse_exit(df, client):
                 f"\n🚨 {Fore.YELLOW}{Style.BRIGHT}TREND COLLAPSE ALIGNED (PRE-AVERAGING)!{Style.RESET_ALL}"
             )
             print(
-                f"📊 Rows: {active_count} (CE: {ce_count} | PE: {pe_count}) | Global PNL: +{active_pnl_sum:.2f}"
+                f"📊 Rows: {active_count} (CE: {ce_count} | PE: {pe_count}) | Direction Status: {global_exit} | Global PNL: +{active_pnl_sum:.2f}"
             )
             print(
-                f"⚠️ Signal Matrix Confirmed: Global Exit ({global_exit}) matches heavier side risk profile."
+                f"⚠️ Signal Matrix Confirmed: Market State ({global_exit}) matches heavier side risk profile."
             )
 
             exe_path = os.path.join(
@@ -105,4 +111,3 @@ def check_trend_collapse_exit(df, client):
         print(f"⚠️ Error inside external trend collapse evaluation: {e}")
 
     return False
-
