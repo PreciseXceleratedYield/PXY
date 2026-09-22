@@ -9,7 +9,8 @@ import logging
 from datetime import datetime
 from colorama import Fore, Style
 
-from exeagtpxy import getexeagtpxy, is_aligned, execute_side_averaging_matrix
+from exeagtpxy import getexeagtpxy, is_aligned                 # Math stays in agt
+from exeamspxy import execute_side_averaging_matrix            # Execution goes to ams
 from exeaxgpxy import run_target_engine
 
 # SYNCHRONIZED TO CORE VARIABLES & GUARDS MODULAR LAYER (acg)
