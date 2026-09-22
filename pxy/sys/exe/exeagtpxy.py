@@ -5,7 +5,7 @@ Contains ONLY pure atomic trading mathematical equations and trend alignments.
 =============================================================================
 """
 
-SYSTEM_A_BASE_THRESHOLD = 5.5
+SYSTEM_A_BASE_THRESHOLD = 8.6
 SYSTEM_B_BASE_THRESHOLD = 1.4
 ABS_CAP = 77.0
 BASE_COUNTER_TARGET_PCT = 1.4
