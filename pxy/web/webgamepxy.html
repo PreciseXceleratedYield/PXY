@@ -16,7 +16,6 @@ canvas{display:block;width:100%;height:100%;}
     position:absolute;top:6px;left:0;right:0;text-align:center;pointer-events:none;
     font:700 10px 'DM Mono',monospace;color:#ffffff;letter-spacing:0.1em;text-transform:uppercase;
 }
-
 </style>
 </head>
 <body>
@@ -39,12 +38,13 @@ resize();
 const C={
     bull:'#26a69a',bear:'#ef5350',gold:'#f0b429',bg3:'#20242e',
     bullDim:'rgba(38,166,154,0.045)',bearDim:'rgba(239,83,80,0.045)',
-    white:'#ffffff'
+    white:'#ffffff',tennis:'#d4f429'
 };
 const ZONE_CE_END=0.42, ZONE_PE_START=0.58;
-const BAT_REACH=24;      // distance from body center to paddle tip
-const SLIDE_AMP=30;      // how far each player slides left/right
-const SLIDE_MS=640;      // tempo of the slide — quick, like a tough rally
+const RACKET_LOCAL={x:40,y:-4};   // racket head position in the player's local (unrotated) frame
+const BASE_SWING=0.35;            // nominal resting swing angle, used for targeting so the ball aims at the actual head
+const SLIDE_MS=640;               // tempo of the slide — quick, like a tough rally
+const SLIDE_MARGIN=58;            // keep the racket clear of the court edges
 
 /* ── live data ── */
 let data={ce_lgt:0,ce_tgt:0,ce_run_pct:0,ce_pnl:0,ce_lots:1,pe_lgt:0,pe_tgt:0,pe_run_pct:0,pe_pnl:0,pe_lots:1};
@@ -75,18 +75,19 @@ async function pollData(){
 pollData();
 setInterval(pollData,3000);
 
-/* ── rally (pure decorative animation, ball travels bat-to-bat) ── */
-let ballFrom='ce',ballProgress=0;
-const BALL_MS=950;
+/* ── rally (pure decorative animation, ball travels racket-to-racket with a bounce) ── */
+let ballFrom='ce',ballProgress=0,bounced=false;
+const BALL_MS=1200;
+const BOUNCE_AT=0.62;   // fraction of the flight where the ball touches down, on the receiver's side
 let trail=[];
 
-/* ── particle burst on contact ── */
+/* ── particle bursts (hit + ground bounce) ── */
 let particles=[];
-function spawnHit(x,y,color){
-    for(let i=0;i<18;i++){
+function spawnHit(x,y,color,count,spread){
+    for(let i=0;i<count;i++){
         const ang=Math.random()*Math.PI*2;
-        const spd=0.9+Math.random()*3.2;
-        particles.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:1,decay:0.022+Math.random()*0.02,size:1.5+Math.random()*2.5,color});
+        const spd=0.6+Math.random()*spread;
+        particles.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:1,decay:0.026+Math.random()*0.02,size:1.2+Math.random()*2.2,color});
     }
 }
 function updateParticles(dt){
@@ -103,21 +104,29 @@ function drawParticles(){
     ctx.globalAlpha=1;
 }
 
-/* ── screen shake on contact ── */
-let shakeMag=0;
-function triggerShake(m){shakeMag=Math.max(shakeMag,m);}
-
 function easeInOutQuad(t){return t<0.5?2*t*t:-1+(4-2*t)*t;}
+function easeOutQuad(t){return 1-(1-t)*(1-t);}
 function stateColor(state){return state==='win'?C.bull:state==='out'?C.bear:C.gold;}
+
+/* Player's horizontal position — a wide sweep across most of the court width. */
+function playerX(cx,w,phase){
+    const amp=w*0.30;
+    const x=cx+Math.sin(clock/SLIDE_MS+phase)*amp;
+    return Math.max(SLIDE_MARGIN,Math.min(w-SLIDE_MARGIN,x));
+}
 
 /* Both players are right-handed — but since CE faces down toward PE and PE faces up
    toward CE (they face each other across the net), a real right hand lands on
-   opposite screen-sides for each of them. mirror=-1 puts the paddle on screen-left,
-   mirror=+1 puts it on screen-right. */
-function playerSlideX(phase,clock){return Math.sin(clock/SLIDE_MS+phase)*SLIDE_AMP;}
-function batTip(cx,y,phase,clock,mirror){
-    const px=cx+playerSlideX(phase,clock);
-    return {x:px+mirror*BAT_REACH,y:y,px};
+   opposite screen-sides for each of them. mirror=-1 → racket on screen-left,
+   mirror=+1 → racket on screen-right. Racket head world position uses the same
+   rotation as the drawing code, so the ball actually aims at the head. */
+function racketHead(px,y,mirror){
+    const ang=mirror*BASE_SWING;
+    const lx=mirror*RACKET_LOCAL.x,ly=RACKET_LOCAL.y;
+    return {
+        x:px+lx*Math.cos(ang)-ly*Math.sin(ang),
+        y:y+lx*Math.sin(ang)+ly*Math.cos(ang)
+    };
 }
 
 let lastTs=null,clock=0;
@@ -135,33 +144,48 @@ function loop(ts){
     const ceY=ceCurFrac*h*ZONE_CE_END;
     const peY=h-peCurFrac*h*(1-ZONE_PE_START);
 
-    const ceBat=batTip(cx,ceY,0,clock,-1);
-    const peBat=batTip(cx,peY,Math.PI,clock,1);
+    const cePx=playerX(cx,w,0), pePx=playerX(cx,w,Math.PI);
+    const ceBat=racketHead(cePx,ceY,-1);
+    const peBat=racketHead(pePx,peY,1);
 
     ballProgress+=dt/BALL_MS;
     if(ballProgress>=1){
-        ballProgress=0;
+        ballProgress=0;bounced=false;
         const arrivalSide=ballFrom==='ce'?'pe':'ce';
         const arrivalBat=arrivalSide==='ce'?ceBat:peBat;
         const arrivalState=arrivalSide==='ce'?ceState:peState;
-        spawnHit(arrivalBat.x,arrivalBat.y,stateColor(arrivalState));
-        triggerShake(5);
+        spawnHit(arrivalBat.x,arrivalBat.y,stateColor(arrivalState),18,3.2);
         ballFrom=arrivalSide;
     }
 
     const fromBat=ballFrom==='ce'?ceBat:peBat;
     const toBat=ballFrom==='ce'?peBat:ceBat;
-    const t=easeInOutQuad(ballProgress);
-    const ballX=fromBat.x+(toBat.x-fromBat.x)*t;
-    const ballY=fromBat.y+(toBat.y-fromBat.y)*t;
+
+    // two-phase flight: racket → ground bounce (on the receiver's side) → receiver's racket
+    const bounceX=fromBat.x+(toBat.x-fromBat.x)*BOUNCE_AT;
+    const bounceY=fromBat.y+(toBat.y-fromBat.y)*BOUNCE_AT;
+
+    let ballX,ballY;
+    if(ballProgress<BOUNCE_AT){
+        const tA=easeOutQuad(ballProgress/BOUNCE_AT);
+        ballX=fromBat.x+(bounceX-fromBat.x)*tA;
+        ballY=fromBat.y+(bounceY-fromBat.y)*tA-Math.sin(tA*Math.PI)*38;
+    }else{
+        if(!bounced){
+            bounced=true;
+            spawnHit(bounceX,bounceY,'rgba(255,255,255,0.85)',8,2);
+        }
+        const tB=easeInOutQuad((ballProgress-BOUNCE_AT)/(1-BOUNCE_AT));
+        ballX=bounceX+(toBat.x-bounceX)*tB;
+        ballY=bounceY+(toBat.y-bounceY)*tB-Math.sin(tB*Math.PI)*18;
+    }
 
     trail.push({x:ballX,y:ballY});
     if(trail.length>14)trail.shift();
 
     updateParticles(dt);
-    shakeMag*=0.9;if(shakeMag<0.05)shakeMag=0;
 
-    draw(w,h,cx,ceY,peY,ceBat,peBat,ballX,ballY);
+    draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY);
     requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
@@ -169,9 +193,8 @@ requestAnimationFrame(loop);
 function fmtPct(v){return (v>=0?'+':'')+v.toFixed(1)+'%';}
 function fmtPnl(v){return (v>=0?'+':'')+Math.round(v);}
 
-function drawCharacter(cx,y,state,lots,label,mirror,phase,batProx,runPct,pnlVal,teamColor){
+function drawCharacter(px,y,state,lots,label,mirror,batProx,runPct,pnlVal,teamColor){
     const color=teamColor;
-    const px=cx+playerSlideX(phase,clock);
     ctx.save();
     ctx.translate(px,y);
 
@@ -182,12 +205,12 @@ function drawCharacter(cx,y,state,lots,label,mirror,phase,batProx,runPct,pnlVal,
     ctx.moveTo(5,10);ctx.lineTo(8,21);
     ctx.stroke();
 
-    // off-hand arm — white, opposite side from the paddle
+    // off-hand arm — white, opposite side from the racket
     ctx.beginPath();
     ctx.moveTo(mirror*-8,0);ctx.lineTo(mirror*-17,6);
     ctx.stroke();
 
-    // torso — team/state color
+    // torso — team color
     ctx.fillStyle=color;
     ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;
     ctx.beginPath();
@@ -201,21 +224,28 @@ function drawCharacter(cx,y,state,lots,label,mirror,phase,batProx,runPct,pnlVal,
     ctx.fillStyle=C.white;
     ctx.fill();
 
-    // paddle arm — white, right hand, mirrored per side; swings with proximity to the ball
-    const swingAngle=mirror*(0.35+batProx*0.85);
+    // racket — white, right hand, mirrored per side; swings with proximity to the ball
+    const swingAngle=mirror*(BASE_SWING+batProx*0.85);
     ctx.save();
     ctx.rotate(swingAngle);
     ctx.strokeStyle=C.white;ctx.lineWidth=3;
     ctx.beginPath();
     ctx.moveTo(mirror*8,0);ctx.lineTo(mirror*21,-2);
     ctx.stroke();
-    ctx.fillStyle=C.white;
+    ctx.lineWidth=2.5;
+    ctx.beginPath();
+    ctx.moveTo(mirror*21,-2);ctx.lineTo(mirror*(RACKET_LOCAL.x-11),RACKET_LOCAL.y+1);
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(mirror*RACKET_LOCAL.x,RACKET_LOCAL.y);
+    ctx.fillStyle='rgba(255,255,255,0.92)';
+    ctx.strokeStyle='#c8ccd4';ctx.lineWidth=1.5;
     ctx.shadowColor='rgba(0,0,0,0.35)';ctx.shadowBlur=3;
     ctx.beginPath();
-    const bx=mirror*19-(mirror<0?14:0);
-    if(ctx.roundRect)ctx.roundRect(bx,-8,14,12,4);else ctx.rect(bx,-8,14,12);
-    ctx.fill();
+    ctx.ellipse(0,0,9,13,0,0,Math.PI*2);
+    ctx.fill();ctx.stroke();
     ctx.shadowBlur=0;
+    ctx.restore();
     ctx.restore();
 
     ctx.restore();
@@ -234,11 +264,10 @@ function drawCharacter(cx,y,state,lots,label,mirror,phase,batProx,runPct,pnlVal,
     ctx.fillText(fmtPnl(pnlVal),px+34,y);
 }
 
-function draw(w,h,cx,ceY,peY,ceBat,peBat,ballX,ballY){
+function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY){
     ctx.clearRect(0,0,w,h);
 
     ctx.save();
-    if(shakeMag>0)ctx.translate((Math.random()-0.5)*shakeMag,(Math.random()-0.5)*shakeMag);
 
     ctx.fillStyle=C.bullDim;ctx.fillRect(0,0,w,h*ZONE_CE_END);
     ctx.fillStyle=C.bg3;ctx.fillRect(0,h*ZONE_CE_END,w,h*(ZONE_PE_START-ZONE_CE_END));
@@ -273,18 +302,18 @@ function draw(w,h,cx,ceY,peY,ceBat,peBat,ballX,ballY){
         const p=trail[i],tt=i/trail.length;
         ctx.globalAlpha=tt*0.45;
         ctx.beginPath();ctx.arc(p.x,p.y,6*tt,0,Math.PI*2);
-        ctx.fillStyle=C.gold;ctx.fill();
+        ctx.fillStyle=C.tennis;ctx.fill();
     }
     ctx.globalAlpha=1;
 
-    drawCharacter(cx,ceY,ceState,Math.max(1,Math.round(Number(data.ce_lots)||1)),'CE',-1,0,Math.max(0,ceProx),Number(data.ce_run_pct)||0,Number(data.ce_pnl)||0,C.bull);
-    drawCharacter(cx,peY,peState,Math.max(1,Math.round(Number(data.pe_lots)||1)),'PE',1,Math.PI,Math.max(0,peProx),Number(data.pe_run_pct)||0,Number(data.pe_pnl)||0,C.bear);
+    drawCharacter(cePx,ceY,ceState,Math.max(1,Math.round(Number(data.ce_lots)||1)),'CE',-1,Math.max(0,ceProx),Number(data.ce_run_pct)||0,Number(data.ce_pnl)||0,C.bull);
+    drawCharacter(pePx,peY,peState,Math.max(1,Math.round(Number(data.pe_lots)||1)),'PE',1,Math.max(0,peProx),Number(data.pe_run_pct)||0,Number(data.pe_pnl)||0,C.bear);
 
     // ball
     ctx.beginPath();
     ctx.arc(ballX,ballY,6,0,Math.PI*2);
-    ctx.fillStyle=C.gold;
-    ctx.shadowColor='rgba(240,180,41,0.85)';ctx.shadowBlur=9;
+    ctx.fillStyle=C.tennis;
+    ctx.shadowColor='rgba(212,244,41,0.85)';ctx.shadowBlur=9;
     ctx.fill();
     ctx.shadowBlur=0;
 
