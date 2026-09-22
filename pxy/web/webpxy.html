@@ -215,6 +215,47 @@ body{
 }
 #chartBox canvas{position:absolute;inset:0;width:100%!important;height:100%!important;z-index:1;}
 
+/* GAME VIEW (toggled inside CHART tab) — one shared vertical court, CE top / PE bottom, net at zero */
+#gameCourt{
+    position:relative;width:140px;max-width:38vw;height:min(56vh,520px);
+    background:linear-gradient(180deg,var(--bull-dim),var(--bg3) 50%,var(--bear-dim));
+    border:1px solid var(--border2);border-radius:12px;overflow:visible;
+    box-shadow:inset 0 0 0 1px var(--border);
+}
+.gm-paddle{position:absolute;left:50%;transform:translateX(-50%);font-family:'Syne',sans-serif;font-weight:800;font-size:10px;letter-spacing:0.08em;color:var(--muted);white-space:nowrap;}
+.gm-paddle.gm-top{top:-20px;}
+.gm-paddle.gm-bottom{bottom:-20px;}
+.gm-net{position:absolute;left:-4px;right:-4px;top:50%;height:2px;background:rgba(255,255,255,0.16);transform:translateY(-50%);}
+.gm-net::after{content:'NET · 0';position:absolute;left:50%;top:-13px;transform:translateX(-50%);font-size:7px;color:var(--muted);white-space:nowrap;}
+.gm-line{position:absolute;left:0;right:0;height:0;border-top:1px dashed currentColor;opacity:0.7;}
+.gm-lbl{position:absolute;font-size:7.5px;font-weight:700;white-space:nowrap;transform:translateY(-50%);}
+.gm-lbl.gm-l{right:calc(100% + 8px);text-align:right;}
+.gm-lbl.gm-r{left:calc(100% + 8px);}
+.gm-ce{color:var(--bull);}
+.gm-pe{color:var(--bear);}
+.gm-ball-wrap{position:absolute;left:50%;transition:top 0.8s cubic-bezier(.4,0,.2,1);}
+.gm-ball{
+    position:relative;width:24px;height:24px;margin-left:-12px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Syne',sans-serif;font-weight:800;font-size:9px;color:#fff;
+    box-shadow:0 0 0 3px var(--bg3),0 3px 10px rgba(0,0,0,0.5);
+    animation:gmPingPong 1.05s ease-in-out infinite;
+}
+.gm-ball-wrap.gm-pe .gm-ball{animation-delay:0.5s;}
+.gm-ball.bull{background:var(--bull);}
+.gm-ball.bear{background:var(--bear);}
+.gm-ball.gold{background:var(--gold);color:#181c26;}
+@keyframes gmPingPong{
+    0%,100%{transform:translateY(-6px) scale(1);}
+    50%{transform:translateY(6px) scale(0.92);}
+}
+.gm-ball-val{position:absolute;left:calc(100% + 8px);top:50%;transform:translateY(-50%);font-size:8px;font-weight:700;color:var(--text);background:var(--bg2);padding:1px 5px;border-radius:4px;white-space:nowrap;border:1px solid var(--border2);}
+.gm-ball-wrap.gm-ce .gm-ball-val{left:auto;right:calc(100% + 8px);}
+.gm-score{font-family:'Syne',sans-serif;font-weight:800;font-size:11px;padding:2px 9px;border-radius:8px;}
+.gm-score.win{color:var(--bull);background:var(--bull-dim);}
+.gm-score.out{color:var(--bear);background:var(--bear-dim);}
+.gm-score.play{color:var(--gold);background:rgba(240,180,41,0.12);}
+
 /* ── RISK BAR ── */
 #riskBar{
     height:44px;flex-shrink:0;display:flex;align-items:center;
@@ -331,9 +372,13 @@ body{
                 <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--muted);margin:0 4px;">-</span>
                 <span id="chartPriceTag" style="font-family:'Syne',sans-serif;font-weight:800;font-size:11px;color:var(--text);">—</span>
             </span>
-            <span style="display:flex;gap:4px;">
-                <span onclick="setChartMode('candle')" id="chartModeCandle" style="font-size:8px;color:var(--accent);cursor:pointer;padding:1px 6px;border-radius:3px;border:1px solid var(--accent);">Candles</span>
-                <span onclick="setChartMode('line')" id="chartModeLine" style="font-size:8px;color:var(--muted);cursor:pointer;padding:1px 6px;border-radius:3px;border:1px solid var(--border);">Line</span>
+        </div>
+        <div id="chartToolbar" style="flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px;padding:5px 10px;background:var(--bg2);border-bottom:1px solid var(--border);">
+            <span onclick="setChartView('chart')" id="viewBtnChart" style="font-size:9px;color:var(--accent);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--accent);white-space:nowrap;">📈 Chart</span>
+            <span onclick="setChartView('game')" id="viewBtnGame" style="font-size:9px;color:var(--muted);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;">🏓 Game</span>
+            <span id="candleLineToggle" style="display:flex;gap:4px;">
+                <span onclick="setChartMode('candle')" id="chartModeCandle" style="font-size:9px;color:var(--accent);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--accent);white-space:nowrap;">Candles</span>
+                <span onclick="setChartMode('line')" id="chartModeLine" style="font-size:9px;color:var(--muted);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;">Line</span>
             </span>
         </div>
         <div id="chartRow" style="flex:1;min-height:0;display:flex;flex-direction:row;">
@@ -343,6 +388,26 @@ body{
             </div>
             <div id="momentumBar">
                 <div id="momentumCanvasWrap"><canvas id="momentumCandle"></canvas></div>
+            </div>
+        </div>
+        <div id="gamePane" style="display:none;flex:1;min-height:0;flex-direction:column;overflow-y:auto;">
+            <div id="gameStatusLine" style="text-align:center;font-size:9px;color:var(--muted);letter-spacing:0.1em;text-transform:uppercase;padding:10px 0 0;">live · updates every 3s</div>
+            <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:16px;min-height:0;">
+                <div id="gameCourt">
+                    <div class="gm-paddle gm-top">🏓 CE</div>
+                    <div class="gm-net"></div>
+                    <div class="gm-paddle gm-bottom">🏓 PE</div>
+                </div>
+            </div>
+            <div style="display:flex;justify-content:center;gap:22px;padding:0 0 16px;flex-shrink:0;">
+                <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+                    <span style="font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">CE</span>
+                    <span class="gm-score play" id="gmCeScore">—</span>
+                </div>
+                <div style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+                    <span style="font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:var(--muted);">PE</span>
+                    <span class="gm-score play" id="gmPeScore">—</span>
+                </div>
             </div>
         </div>
     </div>
@@ -782,6 +847,20 @@ function setChartMode(mode){
     if(c){c.style.borderColor=mode==='candle'?cssVar('--accent'):cssVar('--border');c.style.color=mode==='candle'?cssVar('--accent'):cssVar('--muted');}
     if(l){l.style.borderColor=mode==='line'?cssVar('--accent'):cssVar('--border');l.style.color=mode==='line'?cssVar('--accent'):cssVar('--muted');}
     if(lastCandles)drawChart(lastCandles);
+}
+function setChartView(view){
+    const cRow=$('chartRow'),gPane=$('gamePane'),lToggle=$('candleLineToggle');
+    const vc=$('viewBtnChart'),vg=$('viewBtnGame');
+    if(view==='game'){
+        cRow.style.display='none';gPane.style.display='flex';lToggle.style.display='none';
+        vg.style.borderColor=cssVar('--accent');vg.style.color=cssVar('--accent');
+        vc.style.borderColor=cssVar('--border');vc.style.color=cssVar('--muted');
+    }else{
+        cRow.style.display='flex';gPane.style.display='none';lToggle.style.display='flex';
+        vc.style.borderColor=cssVar('--accent');vc.style.color=cssVar('--accent');
+        vg.style.borderColor=cssVar('--border');vg.style.color=cssVar('--muted');
+        if(lastCandles)setTimeout(()=>{drawChart(lastCandles);drawMomentumBar(lastMoCandles);},50);
+    }
 }
 async function loadChart(){
     try{
@@ -1488,9 +1567,58 @@ $('cfgSave').addEventListener('click',()=>{
 /* ── START ── */
 initTerm();connect();
 let optLegendOpen=false;
+function gmToPct(v,extent){
+    return Math.max(3,Math.min(97,50-(v/extent)*50));
+}
+function renderGame(d){
+    const court=$('gameCourt');
+    if(!court)return;
+    court.querySelectorAll('.gm-line,.gm-lbl,.gm-ball-wrap').forEach(n=>n.remove());
+
+    const ceLgt=Number(d.ce_lgt)||0,ceTgt=Number(d.ce_tgt)||0,ceRun=Number(d.ce_run_pct)||0;
+    const peLgt=Number(d.pe_lgt)||0,peTgt=Number(d.pe_tgt)||0,peRun=Number(d.pe_run_pct)||0;
+    const extent=Math.max(Math.abs(ceLgt),Math.abs(ceTgt),Math.abs(ceRun),Math.abs(peLgt),Math.abs(peTgt),Math.abs(peRun),3)*1.15;
+
+    const addLine=(val,colorCls,label,side)=>{
+        const top=gmToPct(val,extent);
+        const line=document.createElement('div');
+        line.className='gm-line '+colorCls;line.style.top=top+'%';
+        court.appendChild(line);
+        const lbl=document.createElement('div');
+        lbl.className='gm-lbl '+colorCls+' '+(side==='l'?'gm-l':'gm-r');
+        lbl.style.top=top+'%';lbl.textContent=label+' '+val.toFixed(1);
+        court.appendChild(lbl);
+    };
+    addLine(ceTgt,'gm-ce','CE TGT','l');
+    addLine(ceLgt,'gm-ce','CE LGT','l');
+    addLine(peTgt,'gm-pe','PE TGT','r');
+    addLine(peLgt,'gm-pe','PE LGT','r');
+
+    const addBall=(val,lgt,tgt,label,side)=>{
+        const top=gmToPct(val,extent);
+        let cls='gold',state='IN PLAY';
+        if(val<=lgt){cls='bear';state='OUT';}else if(val>=tgt){cls='bull';state='WIN';}
+        const wrap=document.createElement('div');
+        wrap.className='gm-ball-wrap gm-'+side;wrap.style.top=top+'%';
+        wrap.innerHTML=`<div class="gm-ball ${cls}">${label}</div><div class="gm-ball-val">${val.toFixed(1)}</div>`;
+        court.appendChild(wrap);
+        return state;
+    };
+    const ceState=addBall(ceRun,ceLgt,ceTgt,'CE','ce');
+    const peState=addBall(peRun,peLgt,peTgt,'PE','pe');
+
+    const setScore=(elId,state)=>{
+        const el=$(elId);if(!el)return;
+        el.textContent=state==='WIN'?'🏆 WIN':state==='OUT'?'⛔ OUT':'▶ IN PLAY';
+        el.className='gm-score '+(state==='WIN'?'win':state==='OUT'?'out':'play');
+    };
+    setScore('gmCeScore',ceState);
+    setScore('gmPeScore',peState);
+}
 async function loadOptSummary(){
     let d=null;try{d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     d=d||{};
+    renderGame(d);
     const ov=$('optOverlay');
     const colMeta=[
         {emoji:'📦🔢',label:'LOT',desc:'Lots traded'},
