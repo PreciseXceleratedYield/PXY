@@ -23,9 +23,9 @@ def get_entry_signal(df=None):
 
     # 🎯 CONVERT ENTRY: Map raw direction strings to your specific order placement keywords
     if mkt_entry_dir == "BULL":
-        mapped_entry = "ATMBUY"
+        mapped_entry = "OTMBUY"
     elif mkt_entry_dir == "BEAR":
-        mapped_entry = "ATMSELL"
+        mapped_entry = "OTMSELL"
     else:
         mapped_entry = mkt_entry_dir # Passes pass-through or NONE if unmapped
 
