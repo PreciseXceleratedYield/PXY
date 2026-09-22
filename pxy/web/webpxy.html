@@ -252,6 +252,12 @@ body{
     font-family:'Syne',sans-serif;font-weight:800;font-size:9px;color:#fff;
     box-shadow:0 0 0 3px var(--bg3),0 3px 10px rgba(0,0,0,0.5);
     transition:top 0.8s cubic-bezier(.4,0,.2,1);z-index:2;
+    animation:gmSway 1.15s ease-in-out infinite;
+}
+.gm-player.gm-pe{animation-delay:0.575s;}
+@keyframes gmSway{
+    0%,100%{transform:translateY(-50%) translateX(-9px) rotate(-10deg);}
+    50%{transform:translateY(-50%) translateX(9px) rotate(10deg);}
 }
 .gm-player.bull{background:var(--bull);}
 .gm-player.bear{background:var(--bear);}
@@ -1631,12 +1637,12 @@ function renderGame(d){
     if(peRun<=peLgt){peState='OUT';peCls='bear';}else if(peRun>=peTgt){peState='WIN';peCls='bull';}
 
     const cePlayer=document.createElement('div');
-    cePlayer.className='gm-player '+ceCls;cePlayer.style.top=ceY+'%';
+    cePlayer.className='gm-player gm-ce '+ceCls;cePlayer.style.top=ceY+'%';
     cePlayer.innerHTML=`CE<span class="gm-player-val">${ceRun.toFixed(1)}</span>`;
     court.appendChild(cePlayer);
 
     const pePlayer=document.createElement('div');
-    pePlayer.className='gm-player '+peCls;pePlayer.style.top=peY+'%';
+    pePlayer.className='gm-player gm-pe '+peCls;pePlayer.style.top=peY+'%';
     pePlayer.innerHTML=`PE<span class="gm-player-val">${peRun.toFixed(1)}</span>`;
     court.appendChild(pePlayer);
 
