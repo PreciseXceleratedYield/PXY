@@ -6,7 +6,7 @@
 <title>PXY® — Game</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;background:#181c26;overflow:hidden;}
@@ -14,25 +14,15 @@ html,body{height:100%;background:#181c26;overflow:hidden;}
 canvas{display:block;width:100%;height:100%;}
 #statusLine{
     position:absolute;top:6px;left:0;right:0;text-align:center;pointer-events:none;
-    font:8px 'DM Mono',monospace;color:#7d8aa0;letter-spacing:0.1em;text-transform:uppercase;
+    font:700 10px 'DM Mono',monospace;color:#ffffff;letter-spacing:0.1em;text-transform:uppercase;
 }
-#scoreRow{position:absolute;bottom:6px;left:0;right:0;display:flex;justify-content:center;gap:18px;pointer-events:none;}
-.score-card{display:flex;flex-direction:column;align-items:center;gap:2px;font-family:'DM Mono',monospace;}
-.score-lbl{font-size:8px;letter-spacing:0.1em;text-transform:uppercase;color:#7d8aa0;}
-.score-val{font-family:'Syne',sans-serif;font-weight:800;font-size:11px;padding:2px 9px;border-radius:8px;transition:background 0.3s,color 0.3s;}
-.score-val.win{color:#26a69a;background:rgba(38,166,154,0.15);}
-.score-val.out{color:#ef5350;background:rgba(239,83,80,0.15);}
-.score-val.play{color:#f0b429;background:rgba(240,180,41,0.15);}
+
 </style>
 </head>
 <body>
 <div id="wrap">
     <canvas id="cv"></canvas>
     <div id="statusLine">connecting…</div>
-    <div id="scoreRow">
-        <div class="score-card"><span class="score-lbl">CE</span><span class="score-val play" id="ceScore">—</span></div>
-        <div class="score-card"><span class="score-lbl">PE</span><span class="score-val play" id="peScore">—</span></div>
-    </div>
 </div>
 <script>
 const cv=document.getElementById('cv');
@@ -48,13 +38,16 @@ resize();
 
 const C={
     bull:'#26a69a',bear:'#ef5350',gold:'#f0b429',bg3:'#20242e',
-    bullDim:'rgba(38,166,154,0.16)',bearDim:'rgba(239,83,80,0.16)',
-    muted:'#7d8aa0',text:'#d5dae5',limb:'#3a3f4d',head:'#e8ebf0',paddle:'#eee'
+    bullDim:'rgba(38,166,154,0.045)',bearDim:'rgba(239,83,80,0.045)',
+    white:'#ffffff'
 };
 const ZONE_CE_END=0.42, ZONE_PE_START=0.58;
+const BAT_REACH=24;      // distance from body center to paddle tip
+const SLIDE_AMP=30;      // how far each player slides left/right
+const SLIDE_MS=640;      // tempo of the slide — quick, like a tough rally
 
 /* ── live data ── */
-let data={ce_lgt:0,ce_tgt:0,ce_run_pct:0,ce_lots:1,pe_lgt:0,pe_tgt:0,pe_run_pct:0,pe_lots:1};
+let data={ce_lgt:0,ce_tgt:0,ce_run_pct:0,ce_pnl:0,ce_lots:1,pe_lgt:0,pe_tgt:0,pe_run_pct:0,pe_pnl:0,pe_lots:1};
 let ceTargetFrac=0.15,peTargetFrac=0.15;
 let ceCurFrac=0.15,peCurFrac=0.15;
 let ceState='play',peState='play';
@@ -62,12 +55,6 @@ let ceState='play',peState='play';
 function frac(run,lgt,tgt){
     if(tgt<=lgt)return 0;
     return Math.max(0,Math.min(1,(run-lgt)/(tgt-lgt)));
-}
-function setScoreUI(id,state){
-    const el=document.getElementById(id);
-    if(!el)return;
-    el.textContent=state==='win'?'🏆 WIN':state==='out'?'⛔ OUT':'▶ IN PLAY';
-    el.className='score-val '+state;
 }
 async function pollData(){
     try{
@@ -77,19 +64,18 @@ async function pollData(){
     }catch(e){
         document.getElementById('statusLine').textContent='waiting for data…';
     }
+    // Player Y-position is driven purely by actual PnL % (run_pct) vs that side's own LGT/TGT.
     const ceLgt=Number(data.ce_lgt)||0,ceTgt=Number(data.ce_tgt)||0,ceRun=Number(data.ce_run_pct)||0;
     const peLgt=Number(data.pe_lgt)||0,peTgt=Number(data.pe_tgt)||0,peRun=Number(data.pe_run_pct)||0;
     ceTargetFrac=frac(ceRun,ceLgt,ceTgt);
     peTargetFrac=frac(peRun,peLgt,peTgt);
     ceState=ceRun<=ceLgt?'out':ceRun>=ceTgt?'win':'play';
     peState=peRun<=peLgt?'out':peRun>=peTgt?'win':'play';
-    setScoreUI('ceScore',ceState);
-    setScoreUI('peScore',peState);
 }
 pollData();
 setInterval(pollData,3000);
 
-/* ── rally (pure decorative animation — not tied to the data) ── */
+/* ── rally (pure decorative animation, ball travels bat-to-bat) ── */
 let ballFrom='ce',ballProgress=0;
 const BALL_MS=950;
 let trail=[];
@@ -100,29 +86,19 @@ function spawnHit(x,y,color){
     for(let i=0;i<18;i++){
         const ang=Math.random()*Math.PI*2;
         const spd=0.9+Math.random()*3.2;
-        particles.push({
-            x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,
-            life:1,decay:0.022+Math.random()*0.02,
-            size:1.5+Math.random()*2.5,color
-        });
+        particles.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:1,decay:0.022+Math.random()*0.02,size:1.5+Math.random()*2.5,color});
     }
 }
 function updateParticles(dt){
     const k=dt/16;
     particles=particles.filter(p=>p.life>0);
-    for(const p of particles){
-        p.x+=p.vx*k;p.y+=p.vy*k;
-        p.vy+=0.05*k;
-        p.life-=p.decay*k;
-    }
+    for(const p of particles){p.x+=p.vx*k;p.y+=p.vy*k;p.vy+=0.05*k;p.life-=p.decay*k;}
 }
 function drawParticles(){
     for(const p of particles){
         ctx.globalAlpha=Math.max(0,p.life);
-        ctx.beginPath();
-        ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
-        ctx.fillStyle=p.color;
-        ctx.fill();
+        ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+        ctx.fillStyle=p.color;ctx.fill();
     }
     ctx.globalAlpha=1;
 }
@@ -133,6 +109,16 @@ function triggerShake(m){shakeMag=Math.max(shakeMag,m);}
 
 function easeInOutQuad(t){return t<0.5?2*t*t:-1+(4-2*t)*t;}
 function stateColor(state){return state==='win'?C.bull:state==='out'?C.bear:C.gold;}
+
+/* Both players are right-handed — but since CE faces down toward PE and PE faces up
+   toward CE (they face each other across the net), a real right hand lands on
+   opposite screen-sides for each of them. mirror=-1 puts the paddle on screen-left,
+   mirror=+1 puts it on screen-right. */
+function playerSlideX(phase,clock){return Math.sin(clock/SLIDE_MS+phase)*SLIDE_AMP;}
+function batTip(cx,y,phase,clock,mirror){
+    const px=cx+playerSlideX(phase,clock);
+    return {x:px+mirror*BAT_REACH,y:y,px};
+}
 
 let lastTs=null,clock=0;
 function loop(ts){
@@ -149,22 +135,25 @@ function loop(ts){
     const ceY=ceCurFrac*h*ZONE_CE_END;
     const peY=h-peCurFrac*h*(1-ZONE_PE_START);
 
+    const ceBat=batTip(cx,ceY,0,clock,-1);
+    const peBat=batTip(cx,peY,Math.PI,clock,1);
+
     ballProgress+=dt/BALL_MS;
     if(ballProgress>=1){
         ballProgress=0;
         const arrivalSide=ballFrom==='ce'?'pe':'ce';
-        const arrivalY=arrivalSide==='ce'?ceY:peY;
+        const arrivalBat=arrivalSide==='ce'?ceBat:peBat;
         const arrivalState=arrivalSide==='ce'?ceState:peState;
-        spawnHit(cx,arrivalY,stateColor(arrivalState));
+        spawnHit(arrivalBat.x,arrivalBat.y,stateColor(arrivalState));
         triggerShake(5);
         ballFrom=arrivalSide;
     }
 
-    const fromY=ballFrom==='ce'?ceY:peY;
-    const toY=ballFrom==='ce'?peY:ceY;
+    const fromBat=ballFrom==='ce'?ceBat:peBat;
+    const toBat=ballFrom==='ce'?peBat:ceBat;
     const t=easeInOutQuad(ballProgress);
-    const ballY=fromY+(toY-fromY)*t;
-    const ballX=cx+Math.sin(ballProgress*Math.PI)*10;
+    const ballX=fromBat.x+(toBat.x-fromBat.x)*t;
+    const ballY=fromBat.y+(toBat.y-fromBat.y)*t;
 
     trail.push({x:ballX,y:ballY});
     if(trail.length>14)trail.shift();
@@ -172,31 +161,33 @@ function loop(ts){
     updateParticles(dt);
     shakeMag*=0.9;if(shakeMag<0.05)shakeMag=0;
 
-    draw(w,h,cx,ceY,peY,ballX,ballY);
+    draw(w,h,cx,ceY,peY,ceBat,peBat,ballX,ballY);
     requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
 
-function drawCharacter(x,y,state,lots,label,batAngle,idlePhase){
-    const color=stateColor(state);
-    const bob=Math.sin(clock/420+idlePhase)*2;
-    y+=bob;
-    ctx.save();
-    ctx.translate(x,y);
+function fmtPct(v){return (v>=0?'+':'')+v.toFixed(1)+'%';}
+function fmtPnl(v){return (v>=0?'+':'')+Math.round(v);}
 
-    // legs
-    ctx.strokeStyle=C.limb;ctx.lineWidth=3;ctx.lineCap='round';
+function drawCharacter(cx,y,state,lots,label,mirror,phase,batProx,runPct,pnlVal,teamColor){
+    const color=teamColor;
+    const px=cx+playerSlideX(phase,clock);
+    ctx.save();
+    ctx.translate(px,y);
+
+    // legs — white
+    ctx.strokeStyle=C.white;ctx.lineWidth=3;ctx.lineCap='round';
     ctx.beginPath();
     ctx.moveTo(-5,10);ctx.lineTo(-8,21);
     ctx.moveTo(5,10);ctx.lineTo(8,21);
     ctx.stroke();
 
-    // off-hand arm (static)
+    // off-hand arm — white, opposite side from the paddle
     ctx.beginPath();
-    ctx.moveTo(-8,0);ctx.lineTo(-17,6);
+    ctx.moveTo(mirror*-8,0);ctx.lineTo(mirror*-17,6);
     ctx.stroke();
 
-    // torso
+    // torso — team/state color
     ctx.fillStyle=color;
     ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;
     ctx.beginPath();
@@ -207,39 +198,47 @@ function drawCharacter(x,y,state,lots,label,batAngle,idlePhase){
     // head
     ctx.beginPath();
     ctx.arc(0,-13,7,0,Math.PI*2);
-    ctx.fillStyle=C.head;
+    ctx.fillStyle=C.white;
     ctx.fill();
 
-    // paddle arm (rotates with swing)
+    // paddle arm — white, right hand, mirrored per side; swings with proximity to the ball
+    const swingAngle=mirror*(0.35+batProx*0.85);
     ctx.save();
-    ctx.rotate(batAngle);
-    ctx.strokeStyle=C.limb;ctx.lineWidth=3;
+    ctx.rotate(swingAngle);
+    ctx.strokeStyle=C.white;ctx.lineWidth=3;
     ctx.beginPath();
-    ctx.moveTo(8,0);ctx.lineTo(21,-2);
+    ctx.moveTo(mirror*8,0);ctx.lineTo(mirror*21,-2);
     ctx.stroke();
-    ctx.fillStyle=C.paddle;
+    ctx.fillStyle=C.white;
     ctx.shadowColor='rgba(0,0,0,0.35)';ctx.shadowBlur=3;
     ctx.beginPath();
-    if(ctx.roundRect)ctx.roundRect(19,-8,14,12,4);else ctx.rect(19,-8,14,12);
+    const bx=mirror*19-(mirror<0?14:0);
+    if(ctx.roundRect)ctx.roundRect(bx,-8,14,12,4);else ctx.rect(bx,-8,14,12);
     ctx.fill();
     ctx.shadowBlur=0;
     ctx.restore();
 
     ctx.restore();
 
-    ctx.fillStyle=C.text;
-    ctx.font="800 8px 'Syne',sans-serif";
+    // team + lot count, below the player
+    ctx.fillStyle=C.white;
+    ctx.font="800 12px 'Syne',sans-serif";
     ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(label+' '+lots,x,y+30);
+    ctx.fillText(label+' '+lots,px,y+34);
+
+    // run % on the left, actual PnL number on the right
+    ctx.font="800 14px 'DM Mono',monospace";
+    ctx.textAlign='right';
+    ctx.fillText(fmtPct(runPct),px-34,y);
+    ctx.textAlign='left';
+    ctx.fillText(fmtPnl(pnlVal),px+34,y);
 }
 
-function draw(w,h,cx,ceY,peY,ballX,ballY){
+function draw(w,h,cx,ceY,peY,ceBat,peBat,ballX,ballY){
     ctx.clearRect(0,0,w,h);
 
     ctx.save();
-    if(shakeMag>0){
-        ctx.translate((Math.random()-0.5)*shakeMag,(Math.random()-0.5)*shakeMag);
-    }
+    if(shakeMag>0)ctx.translate((Math.random()-0.5)*shakeMag,(Math.random()-0.5)*shakeMag);
 
     ctx.fillStyle=C.bullDim;ctx.fillRect(0,0,w,h*ZONE_CE_END);
     ctx.fillStyle=C.bg3;ctx.fillRect(0,h*ZONE_CE_END,w,h*(ZONE_PE_START-ZONE_CE_END));
@@ -256,37 +255,30 @@ function draw(w,h,cx,ceY,peY,ballX,ballY){
     ctx.beginPath();ctx.moveTo(0,h*ZONE_PE_START);ctx.lineTo(w,h*ZONE_PE_START);ctx.stroke();
     ctx.setLineDash([]);
 
-    ctx.font="9px 'DM Mono',monospace";ctx.textBaseline='middle';ctx.textAlign='left';
-    ctx.fillStyle=C.muted;
-    ctx.fillText('⛔ CE LGT '+(Number(data.ce_lgt)||0).toFixed(1),8,11);
-    ctx.fillStyle=C.bull;
+    ctx.font="800 12px 'DM Mono',monospace";ctx.textBaseline='middle';ctx.textAlign='left';
+    ctx.fillStyle=C.white;
+    ctx.fillText('⛔ CE LGT '+(Number(data.ce_lgt)||0).toFixed(1),8,13);
     ctx.fillText('🎯 CE TGT '+(Number(data.ce_tgt)||0).toFixed(1),8,h*ZONE_CE_END);
-    ctx.fillStyle=C.bear;
     ctx.fillText('🎯 PE TGT '+(Number(data.pe_tgt)||0).toFixed(1),8,h*ZONE_PE_START);
-    ctx.fillStyle=C.muted;
-    ctx.fillText('⛔ PE LGT '+(Number(data.pe_lgt)||0).toFixed(1),8,h-11);
+    ctx.fillText('⛔ PE LGT '+(Number(data.pe_lgt)||0).toFixed(1),8,h-13);
     ctx.textAlign='center';
+    ctx.font="800 11px 'DM Mono',monospace";
     ctx.fillText('DMZ',w/2,h*(ZONE_CE_END+ZONE_PE_START)/2);
 
-    const ceProx=1-Math.min(1,Math.abs(ballY-ceY)/(h*0.18));
-    const peProx=1-Math.min(1,Math.abs(ballY-peY)/(h*0.18));
-    const ceBatAngle=0.35+ceProx*0.85;
-    const peBatAngle=-0.35-peProx*0.85;
+    const ceProx=1-Math.min(1,Math.hypot(ballX-ceBat.x,ballY-ceBat.y)/(h*0.18));
+    const peProx=1-Math.min(1,Math.hypot(ballX-peBat.x,ballY-peBat.y)/(h*0.18));
 
     // ball trail
     for(let i=0;i<trail.length;i++){
-        const p=trail[i];
-        const tt=i/trail.length;
+        const p=trail[i],tt=i/trail.length;
         ctx.globalAlpha=tt*0.45;
-        ctx.beginPath();
-        ctx.arc(p.x,p.y,6*tt,0,Math.PI*2);
-        ctx.fillStyle=C.gold;
-        ctx.fill();
+        ctx.beginPath();ctx.arc(p.x,p.y,6*tt,0,Math.PI*2);
+        ctx.fillStyle=C.gold;ctx.fill();
     }
     ctx.globalAlpha=1;
 
-    drawCharacter(cx,ceY,ceState,Math.max(1,Math.round(Number(data.ce_lots)||1)),'CE',ceBatAngle,0);
-    drawCharacter(cx,peY,peState,Math.max(1,Math.round(Number(data.pe_lots)||1)),'PE',peBatAngle,Math.PI);
+    drawCharacter(cx,ceY,ceState,Math.max(1,Math.round(Number(data.ce_lots)||1)),'CE',-1,0,Math.max(0,ceProx),Number(data.ce_run_pct)||0,Number(data.ce_pnl)||0,C.bull);
+    drawCharacter(cx,peY,peState,Math.max(1,Math.round(Number(data.pe_lots)||1)),'PE',1,Math.PI,Math.max(0,peProx),Number(data.pe_run_pct)||0,Number(data.pe_pnl)||0,C.bear);
 
     // ball
     ctx.beginPath();
@@ -297,7 +289,6 @@ function draw(w,h,cx,ceY,peY,ballX,ballY){
     ctx.shadowBlur=0;
 
     drawParticles();
-
     ctx.restore();
 }
 </script>
