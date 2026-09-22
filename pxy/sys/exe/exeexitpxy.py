@@ -1,7 +1,6 @@
 # # exeexitpxy.py
 import pandas as pd 
 import os 
-import sys
 import time 
 import pytz 
 import subprocess 
@@ -40,7 +39,7 @@ def place_exit_order(client, row):
         existing_tag = row.get('tag') 
         
         if existing_tag and str(existing_tag).lower() not in ['nan', 'none', '']: 
-            base_tag = str(existing_tag).split('_').strip()
+            base_tag = str(existing_tag).split('_')[0].strip()
         else: 
             IST = pytz.timezone("Asia/Kolkata")
             base_tag = datetime.now(IST).strftime('%H%M%S')
@@ -137,33 +136,7 @@ def run_snapshot():
         dump_idle_json("one")
         return 
         
-    # 🛑 TIME-BOUNDED TREND INTERCEPT (09:30 AM to 03:00 PM IST)
-    if dt_time(9, 30) <= now < dt_time(15, 0):
-        if 'exit' in df.columns and not df['exit'].isin(['BULL', 'BEAR']).all():
-            print(f"{Fore.CYAN}Trending, let AVG Engine manage ")
-            sys.exit(0)
-
     # 🎯 SURGICAL ADDITION: Intercept system state before target analysis fires
     if check_trend_collapse_exit(df, client): return
         
-    side_all_targets_hit = analyze_targets_and_sides(df)
-
-    # Proactive Core Execution Routing Logic Block (Pure Single Targets)
-    for idx, r in df.iterrows():
-        sym = str(r.get('symbol', ''))
-        ltp = float(r.get("sell_prc", 0))
-        tgt = float(r.get("pxy_tgt", 0))
-        pnl = float(r.get("pnl", 0))
-
-        debug_log(f"Global Enforced Single Exit Mode ({sym}). Mode: SINGLE TARGET.", Fore.GREEN)
-
-        # Pure Linear Target Evaluation Pool
-        if ltp >= tgt and pnl >= 140:
-            print(f"{Fore.GREEN}🎯 Target Hit & PnL Met ({sym}): LTP {ltp} >= TGT {tgt} | PnL {pnl} >= 140 [Execution Mode: ONE]")
-            verify_and_exit(client, r)
-
-    process_metrics_print_and_dump(df, side_all_targets_hit, "one")
-
-if __name__ == "__main__": 
-    run_snapshot()
-
+    side_all_targets_hit = analyze_targets_
