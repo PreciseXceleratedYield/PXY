@@ -1,78 +1,40 @@
-import pandas as pd
-from colorama import Fore, Style, init
-
-# Initialize colorama for clean, colored terminal output formatting
-init(autoreset=True)
-
-def f(x, d=0.0):
-    """Safely casts input to float, returning a default value if casting fails or value <= 0."""
+def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
+    """Calculates target price by isolating the explicit opposite trend threat."""
     try:
-        val = float(x)
-        return val if val > 0 else d
-    except (ValueError, TypeError):
-        return d
-
-def target_price(row, df=None):
-    """Calculates individual option layer target price using entry status alignment.
-    
-    Protects positions by forcing an immediate tight target when the router
-    issues an explicit opposite-direction entry signal.
-    """
-    try:
-        # 1️⃣ Entry data execution health check
+        # 1️⃣ Entry validation
         entry_prc = f(row.get('pxy_entry') or row.get('buy_prc'))
         if entry_prc <= 0:
             return 0.0
             
-        # 2️⃣ Context string extractors
-        symbol = str(row.get('symbol', 'unknown')).upper()
-        derived_entry = str(row.get('entry', '')).upper().strip()
+        # 2️⃣ Context extraction
+        symbol = str(row.get('symbol', 'UNKNOWN')).upper()
+        derived_exit = str(row.get('exit', '')).upper().strip()
         
         is_ce = 'CE' in symbol
         is_pe = 'PE' in symbol
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
-            
-        # 🔄 Compute Live Exposure Valuation (LTP based via intentional sell_prc math)
-        ce_investment = 0.0
-        pe_investment = 0.0
-        
-        if df is not None and not df.empty:
-            working_df = df.copy()
-            # Clean extraction of the option side
-            working_df['side'] = working_df['symbol'].astype(str).str.upper().str[-2:]
-            
-            # Optimized intentional calculation: quantity * sell_prc (LTP)
-            working_df['row_invested'] = working_df['qty'].apply(f) * working_df['sell_prc'].apply(f)
-            
-            ce_rows = working_df[working_df['side'] == 'CE']
-            pe_rows = working_df[working_df['side'] == 'PE']
-            
-            ce_investment = float(ce_rows['row_invested'].sum()) if not ce_rows.empty else 0.0
-            pe_investment = float(pe_rows['row_invested'].sum()) if not pe_rows.empty else 0.0
 
-        # Safe zero-guards handle empty opposite positions cleanly
+        # Safe zero-guards for ratio math
         ce_safe = ce_investment if ce_investment > 0 else 1.0
         pe_safe = pe_investment if pe_investment > 0 else 1.0
 
         target_pct = 0.0
         
-        # 3️⃣ Symmetrical Risk Matrices (Isolating true opposite trend shifts with Balancing Math)
+        # 3️⃣ Symmetrical Risk Matrix (Defensive floor on explicit opposite trend)
         if is_ce:
-            # Defensive target if an explicit opposite direction (OTMSELL) entry triggers
-            if derived_entry == 'OTMSELL':
+            if derived_exit == 'BEAR':
                 target_pct = 1.4
             else:
                 target_pct = 1.4 + (1.4 * (pe_safe / ce_safe) ** 3)
                 
         elif is_pe:
-            # Defensive target if an explicit opposite direction (OTMBUY) entry triggers
-            if derived_entry == 'OTMBUY':
+            if derived_exit == 'BULL':
                 target_pct = 1.4
             else:
                 target_pct = 1.4 + (1.4 * (ce_safe / pe_safe) ** 3)
             
-        # 4️⃣ Final mathematical target premium projection calculation
+        # 4️⃣ Final target math
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
         return round(calculated_target, 2)
         
