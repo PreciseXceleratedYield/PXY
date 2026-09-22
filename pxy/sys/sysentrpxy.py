@@ -6,7 +6,7 @@ from sysstrndpxy import calculate_supertrend
 def get_entry_signal(df=None):
     """
     Direct copy-and-override signal router.
-    - Entry Signal: Independent of SuperTrend. Maps BULL->OTMBUY and BEAR->OTMSELL.
+    - Entry Signal: Maps BULL/BEAR to OTM between 9:00 AM - 9:30 AM IST, and ATM after 9:30 AM IST.
     - Exit Signal: Copies raw market exit signal, overridden to SIDE only when ST is SIDE.
     """
     if df is None:
@@ -21,19 +21,30 @@ def get_entry_signal(df=None):
     mkt_entry_dir = str(mkt_entry_dir).upper().strip()
     mkt_exit_dir = str(mkt_exit_dir).upper().strip()
 
-    # 🎯 CONVERT ENTRY: Map raw direction strings to your specific order placement keywords
-    if mkt_entry_dir == "BULL":
-        mapped_entry = "ATMBUY"
-    elif mkt_entry_dir == "BEAR":
-        mapped_entry = "ATMSELL"
+    # ⏰ Check time condition (IST) based on the latest available row
+    latest_time = df.index[-1].time()
+    start_otm = pd.to_datetime("09:00").time()
+    end_otm = pd.to_datetime("09:30").time()
+
+    # Determine execution type based on the time window
+    if start_otm <= latest_time <= end_otm:
+        suffix = "OTM"
     else:
-        mapped_entry = mkt_entry_dir # Passes pass-through or NONE if unmapped
+        suffix = "ATM"
+
+    # 🎯 CONVERT ENTRY: Map raw direction strings using the time-based prefix
+    if mkt_entry_dir == "BULL":
+        mapped_entry = f"{suffix}BUY"
+    elif mkt_entry_dir == "BEAR":
+        mapped_entry = f"{suffix}SELL"
+    else:
+        mapped_entry = mkt_entry_dir
 
     # 2️⃣ Fetch SuperTrend regime to check ONLY for a sideways environment
     processed_st_df = calculate_supertrend(df.copy())
     if processed_st_df.empty:
         return mapped_entry, mkt_exit_dir
-        
+
     trend = str(processed_st_df["ST_Trend"].iloc[-1]).upper().strip()
 
     # 🛑 THE ONLY ST INFLUENCE: Override exit channel to SIDE if trend is flat
@@ -48,5 +59,5 @@ if __name__ == "__main__":
     df = fetch_yf_data()
     if df is not None and not df.empty:
         print("RUNNING RAW ENTRY PASS-THROUGH SIGNAL ROUTER MATRIX...")
-        entry_sig, exit_sig = get_entry_signal(df) 
+        entry_sig, exit_sig = get_entry_signal(df)
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry_sig} | EXIT_SIG: {exit_sig}")
