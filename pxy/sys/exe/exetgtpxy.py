@@ -72,14 +72,16 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
         
         # 3️⃣ Symmetrical Risk Matrix (Defensive floor on explicit opposite trend exit signal)
         if is_ce:
-            if derived_exit == 'SIDE':
+            # 🟢 FIX: Correct string membership evaluation for SIDE or BEAR states
+            if derived_exit in ('SIDE', 'BEAR'):
                 target_pct = 1.4
             else:
                 # Uses bounded 'atr' value (guaranteed to be >= 1.4)
                 target_pct = 1.4 + (atr * (pe_safe / ce_safe) ** 3)
                 
         elif is_pe:
-            if derived_exit == 'SIDE':
+            # 🟢 FIX: Correct string membership evaluation for SIDE or BULL states
+            if derived_exit in ('SIDE', 'BULL'):
                 target_pct = 1.4
             else:
                 # Uses bounded 'atr' value (guaranteed to be >= 1.4)
