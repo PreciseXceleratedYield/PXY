@@ -6,7 +6,7 @@ from sysstrndpxy import calculate_supertrend
 def get_entry_signal(df=None):
     """
     Direct copy-and-override signal router.
-    - Entry Signal: Completely independent of SuperTrend (pure raw pass-through).
+    - Entry Signal: Independent of SuperTrend. Maps BULL->OTMBUY and BEAR->OTMSELL.
     - Exit Signal: Copies raw market exit signal, overridden to SIDE only when ST is SIDE.
     """
     if df is None:
@@ -16,24 +16,32 @@ def get_entry_signal(df=None):
     if df is None or df.empty:
         return "NONE", "NONE"
 
-    # 1️⃣ Fetch base raw market signals (Entry is instantly independent)
+    # 1️⃣ Fetch base raw market signals
     mkt_entry_dir, mkt_exit_dir = get_signal(df)
     mkt_entry_dir = str(mkt_entry_dir).upper().strip()
     mkt_exit_dir = str(mkt_exit_dir).upper().strip()
 
+    # 🎯 CONVERT ENTRY: Map raw direction strings to your specific order placement keywords
+    if mkt_entry_dir == "BULL":
+        mapped_entry = "OTMBUY"
+    elif mkt_entry_dir == "BEAR":
+        mapped_entry = "OTMSELL"
+    else:
+        mapped_entry = mkt_entry_dir # Passes pass-through or NONE if unmapped
+
     # 2️⃣ Fetch SuperTrend regime to check ONLY for a sideways environment
     processed_st_df = calculate_supertrend(df.copy())
     if processed_st_df.empty:
-        return mkt_entry_dir, mkt_exit_dir
+        return mapped_entry, mkt_exit_dir
         
     trend = str(processed_st_df["ST_Trend"].iloc[-1]).upper().strip()
 
     # 🛑 THE ONLY ST INFLUENCE: Override exit channel to SIDE if trend is flat
     if trend == "SIDE":
-        return mkt_entry_dir, "SIDE"
+        return mapped_entry, "SIDE"
 
-    # 🎯 STANDARD PATH: Return the original raw market signals unchanged
-    return mkt_entry_dir, mkt_exit_dir
+    # 🎯 STANDARD PATH: Return mapped entry and raw market exit signal unchanged
+    return mapped_entry, mkt_exit_dir
 
 if __name__ == "__main__":
     from sysdtafpxy import fetch_yf_data
@@ -42,4 +50,3 @@ if __name__ == "__main__":
         print("RUNNING RAW ENTRY PASS-THROUGH SIGNAL ROUTER MATRIX...")
         entry_sig, exit_sig = get_entry_signal(df) 
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry_sig} | EXIT_SIG: {exit_sig}")
-
