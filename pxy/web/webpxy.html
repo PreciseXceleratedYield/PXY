@@ -116,7 +116,6 @@ body{
     #paneTerminal{flex:0 0 28%;max-width:28%;}
     #panePositions{flex:0 0 24%;max-width:24%;}
     #paneChart{flex:1 1 auto;min-width:0;}
-    #paneGame{flex:0 0 22%;max-width:22%;}
     #tabBar{display:none!important;}
     /* Let the relocated PNL bar breathe inside its column */
     #paneTerminal #pnlBar{
@@ -215,36 +214,6 @@ body{
     background-size:40px 40px;
 }
 #chartBox canvas{position:absolute;inset:0;width:100%!important;height:100%!important;z-index:1;}
-
-/* GAME TAB — table-tennis style court: LGT (deadline) ←— 0 (net) —→ TGT (target) */
-#gameBody{flex:1;min-height:0;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:22px;}
-.gv-row{display:flex;flex-direction:column;gap:8px;}
-.gv-head{display:flex;align-items:center;justify-content:space-between;font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
-.gv-head b{font-family:'Syne',sans-serif;font-weight:800;font-size:12px;letter-spacing:0;}
-.gv-head b.ce{color:var(--bull);}
-.gv-head b.pe{color:var(--bear);}
-.gv-status{font-size:9px;font-weight:700;padding:2px 8px;border-radius:8px;letter-spacing:0.06em;white-space:nowrap;}
-.gv-status.win{color:var(--bull);background:var(--bull-dim);}
-.gv-status.out{color:var(--bear);background:var(--bear-dim);}
-.gv-status.play{color:var(--gold);background:rgba(240,180,41,0.10);}
-.gv-track{position:relative;height:62px;margin:16px 4px 20px;border-radius:8px;
-    background:linear-gradient(90deg,var(--bear-dim),var(--bg3) 50%,var(--bull-dim));
-    border:1px solid var(--border2);overflow:visible;}
-.gv-net{position:absolute;top:0;bottom:0;left:50%;width:2px;background:var(--track-mid);transform:translateX(-50%);}
-.gv-net::after{content:'NET · 0';position:absolute;top:-13px;left:50%;transform:translateX(-50%);font-size:7px;color:var(--muted);white-space:nowrap;}
-.gv-line{position:absolute;top:6px;bottom:6px;border-left:1px dashed currentColor;opacity:0.7;transform:translateX(-50%);}
-.gv-line-lbl{position:absolute;bottom:-15px;transform:translateX(-50%);font-size:7.5px;font-weight:700;white-space:nowrap;}
-.gv-lgt{color:var(--bear);}
-.gv-tgt{color:var(--bull);}
-.gv-player{position:absolute;top:50%;width:22px;height:22px;border-radius:50%;transform:translate(-50%,-50%);
-    transition:left 0.6s cubic-bezier(.4,0,.2,1),background 0.3s;display:flex;align-items:center;justify-content:center;
-    font-family:'Syne',sans-serif;font-weight:800;font-size:8px;color:#fff;
-    box-shadow:0 0 0 3px var(--bg3),0 2px 6px rgba(0,0,0,0.4);z-index:2;}
-.gv-player.bull{background:var(--bull);}
-.gv-player.bear{background:var(--bear);}
-.gv-player.gold{background:var(--gold);color:#181c26;}
-.gv-player-val{position:absolute;top:-22px;transform:translateX(-50%);font-size:8px;font-weight:700;color:var(--text);
-    background:var(--bg2);padding:1px 5px;border-radius:4px;white-space:nowrap;transition:left 0.6s cubic-bezier(.4,0,.2,1);}
 
 /* ── RISK BAR ── */
 #riskBar{
@@ -421,14 +390,6 @@ body{
         </div>
     </div>
 
-    <!-- GAME -->
-    <div class="tab-pane" id="paneGame">
-        <div class="pane-hdr" style="border-left:3px solid var(--gold);background:var(--bg2);">
-            <span style="font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">🏓 Game</span>
-        </div>
-        <div id="gameBody"></div>
-    </div>
-
 </div>
 
 <!-- OPTIONS SUMMARY — persistent strip, visible on every tab -->
@@ -468,9 +429,6 @@ body{
     </button>
     <button class="tab-btn" data-tab="panePositions" id="tabPositions">
         <span class="tab-icon">📊</span>POSITIONS
-    </button>
-    <button class="tab-btn" data-tab="paneGame" id="tabGame">
-        <span class="tab-icon">🏓</span>GAME
     </button>
 </div>
 
@@ -712,7 +670,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 
 /* ── SWIPE UP/DOWN TO CYCLE TABS (circular) ── */
 (function(){
-    const tabOrder=['paneTerminal','paneChart','panePositions','paneGame'];
+    const tabOrder=['paneTerminal','paneChart','panePositions'];
     let sY=0,sX=0,sT=0;
     document.addEventListener('touchstart',e=>{
         if(e.touches.length!==1)return;
@@ -1530,42 +1488,9 @@ $('cfgSave').addEventListener('click',()=>{
 /* ── START ── */
 initTerm();connect();
 let optLegendOpen=false;
-function renderGameRow(label,lots,pnl,lgt,runPct,tgt,decision,side){
-    lgt=Number(lgt)||0;runPct=Number(runPct)||0;tgt=Number(tgt)||0;
-    const extent=Math.max(Math.abs(lgt),Math.abs(tgt),Math.abs(runPct),3)*1.25;
-    const pct=v=>Math.max(3,Math.min(97,50+(v/extent)*50));
-    const lgtPos=pct(lgt),tgtPos=pct(tgt),playerPos=pct(runPct);
-    let status='play',statusLbl=`▶ ${decision?decision.toUpperCase():'IN PLAY'}`;
-    if(runPct<=lgt){status='out';statusLbl='⛔ OUT';}
-    else if(runPct>=tgt){status='win';statusLbl='🏆 WIN';}
-    const playerClass=status==='out'?'bear':status==='win'?'bull':'gold';
-    return `
-    <div class="gv-row">
-        <div class="gv-head">
-            <span><b class="${side}">${label}</b> · ${lots??'—'} lot${lots===1?'':'s'} · ${(Number(pnl||0)>=0?'+':'')+Math.round(pnl||0)} P&amp;L</span>
-            <span class="gv-status ${status}">${statusLbl}</span>
-        </div>
-        <div class="gv-track">
-            <div class="gv-net"></div>
-            <div class="gv-line gv-lgt" style="left:${lgtPos}%;"></div>
-            <div class="gv-line-lbl gv-lgt" style="left:${lgtPos}%;">LGT ${lgt.toFixed(1)}</div>
-            <div class="gv-line gv-tgt" style="left:${tgtPos}%;"></div>
-            <div class="gv-line-lbl gv-tgt" style="left:${tgtPos}%;">TGT ${tgt.toFixed(1)}</div>
-            <div class="gv-player ${playerClass}" style="left:${playerPos}%;">${label}</div>
-            <div class="gv-player-val" style="left:${playerPos}%;">${runPct.toFixed(1)}</div>
-        </div>
-    </div>`;
-}
-function renderGame(d){
-    const gb=$('gameBody');
-    if(!gb)return;
-    gb.innerHTML=renderGameRow('CE',d.ce_lots,d.ce_pnl,d.ce_lgt,d.ce_run_pct,d.ce_tgt,d.ce_decision,'ce')
-              +renderGameRow('PE',d.pe_lots,d.pe_pnl,d.pe_lgt,d.pe_run_pct,d.pe_tgt,d.pe_decision,'pe');
-}
 async function loadOptSummary(){
     let d=null;try{d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     d=d||{};
-    renderGame(d);
     const ov=$('optOverlay');
     const colMeta=[
         {emoji:'📦🔢',label:'LOT',desc:'Lots traded'},
@@ -1577,14 +1502,14 @@ async function loadOptSummary(){
     const rnd=n=>Math.round(n||0);
     const plainSign=n=>(Number(n||0)>=0?'+':'')+Math.round(n||0);
     const pad2=n=>{const r=Math.round(n||0);const a=Math.min(Math.abs(r),99);return (r<0?'-':'')+String(a).padStart(2,'0');};
-    const buildRow=(lots,pnl,inv,lgt,runPct,tgt,decision)=>{
-        const tgtNum=Number(tgt);
+    const buildRow=(lots,pnl,inv,lgt,runPct,aligned,decision)=>{
+        const tgtNum=aligned?99:1.4;
         const runColor=Number(runPct)<Number(lgt)?'var(--bear)':Number(runPct)>tgtNum?'var(--bull)':null;
         const row=[lots??'—', toK(inv), `(${pad2(lgt)})${pad2(runPct)}(${pad2(tgtNum)})`, plainSign(pnl)];
         return {row,runColor};
     };
-    const ceRes=buildRow(d.ce_lots,d.ce_pnl,d.ce_investment,d.ce_lgt,d.ce_run_pct,d.ce_tgt,d.ce_decision);
-    const peRes=buildRow(d.pe_lots,d.pe_pnl,d.pe_investment,d.pe_lgt,d.pe_run_pct,d.pe_tgt,d.pe_decision);
+    const ceRes=buildRow(d.ce_lots,d.ce_pnl,d.ce_investment,d.ce_lgt,d.ce_run_pct,d.ce_aligned,d.ce_decision);
+    const peRes=buildRow(d.pe_lots,d.pe_pnl,d.pe_investment,d.pe_lgt,d.pe_run_pct,d.pe_aligned,d.pe_decision);
     const ceRow=ceRes.row,peRow=peRes.row;
     let html='<div style="position:relative;padding:3px 0;">';
     html+=`<button id="optInfoBtn" style="position:absolute;top:1px;right:2px;z-index:2;background:none;border:none;color:var(--muted);font-size:10px;cursor:pointer;padding:1px 4px;line-height:1;">ⓘ</button>`;
