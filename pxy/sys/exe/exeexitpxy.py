@@ -139,4 +139,23 @@ def run_snapshot():
     # 🎯 SURGICAL ADDITION: Intercept system state before target analysis fires
     if check_trend_collapse_exit(df, client): return
         
-    side_all_targets_hit = analyze_targets_
+    side_all_targets_hit = analyze_targets_and_sides(df)
+
+    # Proactive Core Execution Routing Logic Block (Pure Single Targets)
+    for idx, r in df.iterrows():
+        sym = str(r.get('symbol', ''))
+        ltp = float(r.get("sell_prc", 0))
+        tgt = float(r.get("pxy_tgt", 0))
+        pnl = float(r.get("pnl", 0))
+
+        debug_log(f"Global Enforced Single Exit Mode ({sym}). Mode: SINGLE TARGET.", Fore.GREEN)
+
+        # Pure Linear Target Evaluation Pool
+        if ltp >= tgt and pnl >= 140:
+            print(f"{Fore.GREEN}🎯 Target Hit & PnL Met ({sym}): LTP {ltp} >= TGT {tgt} | PnL {pnl} >= 140 [Execution Mode: ONE]")
+            verify_and_exit(client, r)
+
+    process_metrics_print_and_dump(df, side_all_targets_hit, "one")
+
+if __name__ == "__main__": 
+    run_snapshot()
