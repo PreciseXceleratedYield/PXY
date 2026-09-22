@@ -13,10 +13,10 @@ def f(x, d=0.0):
         return d
 
 def target_price(row, df=None):
-    """Calculates individual option layer target price using exit status alignment.
+    """Calculates individual option layer target price using entry status alignment.
     
-    Protects positions by forcing an immediate ATR-based tight target when the router
-    issues either a native exit or an explicit opposite-direction signal.
+    Protects positions by forcing an immediate tight target when the router
+    issues an explicit opposite-direction entry signal.
     """
     try:
         # 1️⃣ Entry data execution health check
@@ -59,17 +59,15 @@ def target_price(row, df=None):
         
         # 3️⃣ Symmetrical Risk Matrices (Isolating true opposite trend shifts with Balancing Math)
         if is_ce:
-            # Defensive target if native exit OR standard bearish entry triggers
-            if derived_entry in ['EXITCE', 'OTMSELL']:
-                # Pure Math: Auto-shrinks if CE live valuation is heavy; Auto-inflates if it is light!
+            # Defensive target if an explicit opposite direction (OTMSELL) entry triggers
+            if derived_entry == 'OTMSELL':
                 target_pct = 1.4
             else:
                 target_pct = 1.4 + (1.4 * (pe_safe / ce_safe) ** 3)
                 
         elif is_pe:
-            # Defensive target if native exit OR standard bullish entry triggers
-            if derived_entry in ['EXITPE', 'OTMBUY']:
-                # Pure Math: Auto-shrinks if PE live valuation is heavy; Auto-inflates if it is light!
+            # Defensive target if an explicit opposite direction (OTMBUY) entry triggers
+            if derived_entry == 'OTMBUY':
                 target_pct = 1.4
             else:
                 target_pct = 1.4 + (1.4 * (ce_safe / pe_safe) ** 3)
