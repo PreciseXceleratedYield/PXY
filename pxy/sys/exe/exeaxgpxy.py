@@ -1,15 +1,16 @@
-# =============================================================================
-# PIPELINE FIRING ENGINE: exeaxgpxy.py (axg)
-# TARGET RESOLUTION ARBITRATOR & SYSTEM-SHELL SCRIPTS TRIGGER PIPELINE
-# =============================================================================
+"""
+=============================================================================
+PIPELINE FIRING ENGINE: exeaxgpxy.py (axg)
+TARGET RESOLUTION ARBITRATOR & SYSTEM-SHELL SCRIPTS TRIGGER PIPELINE
+=============================================================================
+"""
 import os
 import logging
 from colorama import Fore, Style
-from exeagtpxy import decide
+from exeamspxy import decide  # 🎯 Pointed explicitly to the new executor file
 from exeacgpxy import safe_float, side_overall_pnl_pct, is_cooling, set_cooling
 
 logger = logging.getLogger("exeavgpxy.exeaxgpxy")
-
 
 def pxysqrce():
     print(f"{Fore.CYAN}{Style.BRIGHT}🚀 TARGET HIT: Firing shell script command 'pxysqrce'...")
@@ -47,7 +48,7 @@ def _fire(side, decision):
     if decision == "hold":
         return
 
-    cool_key = f"{side}_TGT"  # separate namespace from System A's "CE"/"PE" locks
+    cool_key = f"{side}_TGT"
     if is_cooling(cool_key):
         return
 
@@ -71,13 +72,14 @@ def run_target_engine(active_exit, ce_rows, pe_rows, ce_avg_profit, pe_avg_profi
     ce_net = side_overall_pnl_pct(ce_rows)
     pe_net = side_overall_pnl_pct(pe_rows)
 
+    # 🎯 Passing data frame allocations down directly to satisfy the routing matrix wrapper
     ce_decision, ce_aligned = decide(
         "CE", active_exit, ce_avg_profit, ce_points, ce_lots, ce_empty, pe_empty,
-        pe_net, pe_points, pe_lots
+        pe_net, pe_points, pe_lots, ce_rows, pe_rows
     )
     pe_decision, pe_aligned = decide(
         "PE", active_exit, pe_avg_profit, pe_points, pe_lots, pe_empty, ce_empty,
-        ce_net, ce_points, ce_lots
+        ce_net, ce_points, ce_lots, ce_rows, pe_rows
     )
 
     _fire("CE", ce_decision)
@@ -87,3 +89,4 @@ def run_target_engine(active_exit, ce_rows, pe_rows, ce_avg_profit, pe_avg_profi
         "CE": (ce_decision, ce_aligned, ce_points),
         "PE": (pe_decision, pe_aligned, pe_points),
     }
+
