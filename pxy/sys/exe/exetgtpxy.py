@@ -51,7 +51,7 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
             
         # 2️⃣ Context string extractors
         symbol = str(row.get('symbol', 'UNKNOWN')).upper()
-        derived_exit = str(row.get('exit', '')).upper().strip()
+        derived_exit = str(row.get('direction', '')).upper().strip()
         
         # Extract and safely cast atr to a float number
         raw_atr = f(row.get('atr', 0.0))
@@ -72,16 +72,16 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
         
         # 3️⃣ Symmetrical Risk Matrix (Defensive floor on explicit opposite trend exit signal)
         if is_ce:
-            # 🟢 FIX: Correct string membership evaluation for SIDE or BEAR states
-            if derived_exit in ('SIDE', 'BEAR'):
+            # Defensive floor on direct exit threat
+            if derived_exit == 'DOWN':
                 target_pct = 1.4
             else:
                 # Uses bounded 'atr' value (guaranteed to be >= 1.4)
                 target_pct = 1.4 + (atr * (pe_safe / ce_safe) ** 3)
                 
         elif is_pe:
-            # 🟢 FIX: Correct string membership evaluation for SIDE or BULL states
-            if derived_exit in ('SIDE', 'BULL'):
+            # Defensive floor on direct exit threat
+            if derived_exit == 'UP':
                 target_pct = 1.4
             else:
                 # Uses bounded 'atr' value (guaranteed to be >= 1.4)
@@ -94,3 +94,4 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
+
