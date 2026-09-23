@@ -15,6 +15,7 @@ DEBUG_MODE = False
 # 🎛️ MASTER CONFIGURATION LAYER (PXY Universal Framework Parameters)
 # ==============================================================================
 CONFIG = {
+    "VARIANT": "DUAL",  # 🔄 SWITCH HERE: "DUAL" or "SINGLE"
     "ST1": {
         "PERIOD": 3.0,   # ATR Period synced to Pine Script (atrPeriod)
         "FACTOR": 1.4    # Multiplier synced to Pine Script (multiplier)
@@ -104,7 +105,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     return pd.Series(supertrend, index=df.index), pd.Series(mirror_line, index=df.index), pd.Series(m0, index=df.index), pd.Series(st_trend, index=df.index)
 
 
-def get_market_trend(df: pd.DataFrame, variant: str = "DUAL") -> str:
+def get_market_trend(df: pd.DataFrame) -> str:
     """
     Evaluates raw data frame layouts via intermediate calculations.
     Safe for upstream fetch scripts; does not look for pre-existing matrix columns.
@@ -117,7 +118,8 @@ def get_market_trend(df: pd.DataFrame, variant: str = "DUAL") -> str:
         df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
     )
     
-    if variant.upper() == "SINGLE":
+    variant = CONFIG.get("VARIANT", "DUAL").upper()
+    if variant == "SINGLE":
         # Pure binary trend lookup (No SIDE state logic)
         last_trend = raw_trend_series.iloc[-1]
         return 'BULL' if last_trend == 1 else 'BEAR'
@@ -137,7 +139,7 @@ def get_market_trend(df: pd.DataFrame, variant: str = "DUAL") -> str:
         return 'SIDE'
 
 
-def calculate_supertrend(df: pd.DataFrame, variant: str = "DUAL") -> pd.DataFrame:
+def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     """Calculates Universal Supertrend Master Matrix and returns structural states."""
     if df.empty:
         from sysdtafpxy import fetch_yf_data
@@ -166,7 +168,8 @@ def calculate_supertrend(df: pd.DataFrame, variant: str = "DUAL") -> pd.DataFram
         df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
     )
 
-    if variant.upper() == "SINGLE":
+    variant = CONFIG.get("VARIANT", "DUAL").upper()
+    if variant == "SINGLE":
         # Pure binary state: Maps 1 to BULL, everything else (-1) to BEAR directly
         st_trend_series = np.where(raw_trend_series == 1, 'BULL', 'BEAR')
         st_trend_series = pd.Series(st_trend_series, index=df.index)
@@ -204,17 +207,18 @@ def calculate_supertrend(df: pd.DataFrame, variant: str = "DUAL") -> pd.DataFram
 
 
 def export_supertrend_json(
-    df: pd.DataFrame = None, output_file='../web/webchrtpxy.json', variant: str = "DUAL"
+    df: pd.DataFrame = None, output_file='../web/webchrtpxy.json'
 ):
     """Exports structured historical data: OHLC (for candles), st_line + trend
     (for coloring), and mirror_line."""
     if df is None or df.empty:
-        df = calculate_supertrend(pd.DataFrame(), variant=variant)
+        df = calculate_supertrend(pd.DataFrame())
     if df is None or df.empty:
         return None
 
     output = []
-    is_single = variant.upper() == "SINGLE"
+    variant = CONFIG.get("VARIANT", "DUAL").upper()
+    is_single = (variant == "SINGLE")
 
     for idx, row in df.iterrows():
         st_val = float(row['st_line']) if not pd.isna(row['st_line']) else 0.0
@@ -239,6 +243,7 @@ def export_supertrend_json(
         json.dump(output, f, indent=2)
 
     return output
+
 
 
 if __name__ == '__main__':
