@@ -32,8 +32,8 @@ def points_floor(lots):
 
 def getexeagtpxy(ce_invst_factor, pe_invst_factor, ce_lots, pe_lots):
     """Calculates investment-adjusted dynamic drawdown thresholds from capital weights."""
-    ce_base = SYSTEM_B_BASE_THRESHOLD + (SYSTEM_A_BASE_THRESHOLD * max(1, ce_lots)) * (ce_invst_factor ** 3)
-    pe_base = SYSTEM_B_BASE_THRESHOLD + (SYSTEM_A_BASE_THRESHOLD * max(1, pe_lots)) * (pe_invst_factor ** 3)
+    ce_base = (SYSTEM_B_BASE_THRESHOLD * max(1, ce_lots)) + (SYSTEM_A_BASE_THRESHOLD * max(1, ce_lots)) * (ce_invst_factor ** 3)
+    pe_base = (SYSTEM_B_BASE_THRESHOLD * max(1, pe_lots)) + (SYSTEM_A_BASE_THRESHOLD * max(1, pe_lots)) * (pe_invst_factor ** 3)
     return round((min(ce_base, ABS_CAP) * -1.0), 2), round((min(pe_base, ABS_CAP) * -1.0), 2)
 
 def calculate_dynamic_target(side, active_exit, ce_investment, pe_investment):
