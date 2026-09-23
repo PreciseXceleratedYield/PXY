@@ -96,6 +96,25 @@ async function pollData(){
 pollData();
 setInterval(pollData,3000);
 
+/* Same source and same classification the main app uses (loadDash / cls() in
+   webpxy.html): exit & atr live in webdashpxy.json, not webavgpxy.json. exit has
+   only 3 possible values: bull, bear, or side. */
+let dashExit=null,dashAtr=null;
+function classifySignal(v){
+    const s=String(v||'').toUpperCase();
+    if(s==='BULL')return'bull';
+    if(s==='BEAR')return'bear';
+    return 'side';
+}
+async function pollDash(){
+    try{
+        const d=await fetch('./webdashpxy.json?_='+Date.now()).then(r=>r.json());
+        if(d){dashExit=d.exit;dashAtr=d.atr;}
+    }catch(e){}
+}
+pollDash();
+setInterval(pollDash,3000);
+
 /* ── rally (pure decorative animation, ball travels racket-to-racket with a bounce) ── */
 let ballFrom='ce',ballProgress=0,bounced=false;
 let trail=[];
@@ -191,7 +210,9 @@ function loop(ts){
 
     const fromBat=ballFrom==='ce'?ceBat:peBat;
     const toBat=ballFrom==='ce'?peBat:ceBat;
-    const ballColor=ballFrom==='ce'?C.bull:C.bear; // green while CE (bull) sent it, red while PE (bear) sent it
+    // Ball color follows the exit signal's classification (bull/bear/side) — same source and rules as the main app.
+    const exitCls=classifySignal(dashExit);
+    const ballColor=exitCls==='bull'?C.bull:exitCls==='bear'?C.bear:C.tennis;
 
     // two-phase flight: racket → ground bounce (on the receiver's side) → receiver's racket
     const bounceX=fromBat.x+(toBat.x-fromBat.x)*BOUNCE_AT;
@@ -278,12 +299,18 @@ function drawCharacter(px,y,state,mirror,batProx,teamColor){
     ctx.ellipse(0,0,9,13,0,0,Math.PI*2);
     ctx.fill();ctx.stroke();
     ctx.shadowBlur=0;
-    // strings — netted head
+    // strings — netted head, black mesh + dot at each intersection so it actually reads
     ctx.save();
     ctx.beginPath();ctx.ellipse(0,0,9,13,0,0,Math.PI*2);ctx.clip();
-    ctx.strokeStyle='rgba(150,156,168,0.6)';ctx.lineWidth=0.6;
+    ctx.strokeStyle='rgba(20,20,24,0.85)';ctx.lineWidth=0.8;
     for(let sx=-8;sx<=8;sx+=4){ctx.beginPath();ctx.moveTo(sx,-13);ctx.lineTo(sx,13);ctx.stroke();}
     for(let sy=-12;sy<=12;sy+=4){ctx.beginPath();ctx.moveTo(-9,sy);ctx.lineTo(9,sy);ctx.stroke();}
+    ctx.fillStyle='rgba(15,15,18,0.9)';
+    for(let sx=-8;sx<=8;sx+=4){
+        for(let sy=-12;sy<=12;sy+=4){
+            ctx.beginPath();ctx.arc(sx,sy,0.9,0,Math.PI*2);ctx.fill();
+        }
+    }
     ctx.restore();
     ctx.restore();
     ctx.restore();
@@ -338,7 +365,7 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor){
 
     ctx.textAlign='center';
     ctx.font="800 11px 'DM Mono',monospace";
-    ctx.fillText('DMZ (ATR)',w/2,h*(ZONE_CE_END+ZONE_PE_START)/2);
+    ctx.fillText('DMZ (ATR '+(dashAtr??'—')+')',w/2,h*(ZONE_CE_END+ZONE_PE_START)/2);
 
     drawDmzInfo(w,h,'CE',Math.max(1,Math.round(Number(data.ce_lots)||1)),Number(data.ce_investment)||0,Number(data.ce_run_pct)||0,Number(data.ce_pnl)||0,0.24);
     drawDmzInfo(w,h,'PE',Math.max(1,Math.round(Number(data.pe_lots)||1)),Number(data.pe_investment)||0,Number(data.pe_run_pct)||0,Number(data.pe_pnl)||0,0.76);
