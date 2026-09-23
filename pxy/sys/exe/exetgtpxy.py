@@ -14,7 +14,7 @@ def f(x, d=0.0):
         return d
 
 def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
-    """Calculates CE and PE exposure globally ONCE to prevent O(N^2) row iteration lag.
+    """Calculates CE and PE exposure globally ONCE to prevent row iteration lag.
     
     Processes the entire DataFrame using fast, vectorized operations.
     """
@@ -41,7 +41,7 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
 def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
     """Calculates target price by isolating explicit opposite trend exit threats.
     
-    Accepts pre-computed global market exposures for highly optimized performance.
+    Perfectly safe and clean for low row counts (e.g., ~10 rows per calculation).
     """
     try:
         # 1️⃣ Entry data execution health check
@@ -49,14 +49,12 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
         if entry_prc <= 0:
             return 0.0
             
-        # 2️⃣ Context string extractors
+        # 2️⃣ Context parameter extractors
         symbol = str(row.get('symbol', 'UNKNOWN')).upper()
         derived_exit = str(row.get('direction', '')).upper().strip()
         
-        # Extract and safely cast atr to a float number
+        # Extract and safely cast atr (will scale safely even if identical across rows)
         raw_atr = f(row.get('atr', 0.0))
-        
-        # Enforce a strict minimum value of 1.4 for the ATR
         atr = max(raw_atr, 1.4)
 
         is_ce = 'CE' in symbol
@@ -70,21 +68,17 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
 
         target_pct = 0.0
         
-        # 3️⃣ Symmetrical Risk Matrix (Defensive floor on explicit opposite trend exit signal)
+        # 3️⃣ Symmetrical Risk Matrix (Calculated cleanly inline for each row context)
         if is_ce:
-            # Defensive floor on direct exit threat
             if derived_exit == 'DOWN':
                 target_pct = 1.4
             else:
-                # Uses bounded 'atr' value (guaranteed to be >= 1.4)
                 target_pct = 1.4 + (atr * (pe_safe / ce_safe) ** 3)
                 
         elif is_pe:
-            # Defensive floor on direct exit threat
             if derived_exit == 'UP':
                 target_pct = 1.4
             else:
-                # Uses bounded 'atr' value (guaranteed to be >= 1.4)
                 target_pct = 1.4 + (atr * (ce_safe / pe_safe) ** 3)
             
         # 4️⃣ Final mathematical target premium projection calculation
