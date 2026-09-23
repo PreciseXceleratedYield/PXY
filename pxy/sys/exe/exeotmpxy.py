@@ -13,6 +13,5 @@ def get_dynamic_otm_distance():
     current_day = datetime.now(ist).weekday()
     
     # 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, 4=Friday
-    day_distance_map = {0: 200, 1: 150, 2: 100, 3: 50, 4: 00}
-
+    day_distance_map = {0: 250, 1: 200, 2: 150, 3: 100, 4: 50}
     return day_distance_map.get(current_day, 100)
