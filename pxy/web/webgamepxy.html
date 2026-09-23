@@ -115,6 +115,26 @@ async function pollDash(){
 pollDash();
 setInterval(pollDash,3000);
 
+/* Momentum candle — same source/fields the main app's momentum bar uses
+   (webchrtpxy.json's last candle: close vs the st_line/mirror_line channel). */
+let momo=null;
+async function pollMomentum(){
+    try{
+        const data=await fetch('./webchrtpxy.json?_='+Date.now()).then(r=>r.json());
+        if(Array.isArray(data)&&data.length){
+            const last=data[data.length-1];
+            momo={
+                c:last.close??last.Close??last.price??null,
+                st:last.st_line??null,
+                mir:last.mirror_line??null,
+                trend:last.trend||'SIDE'
+            };
+        }
+    }catch(e){}
+}
+pollMomentum();
+setInterval(pollMomentum,3000);
+
 /* ── rally (pure decorative animation, ball travels racket-to-racket with a bounce) ── */
 let ballFrom='ce',ballProgress=0,bounced=false;
 let trail=[];
@@ -179,8 +199,9 @@ function loop(ts){
 
     const w=cv.clientWidth,h=cv.clientHeight;
     const cx=w/2;
-    const ceY=ceCurFrac*h*ZONE_CE_END;
-    const peY=h-peCurFrac*h*(1-ZONE_PE_START);
+    // PE now occupies the top zone, CE now occupies the bottom zone (swapped).
+    const peY=peCurFrac*h*ZONE_CE_END;
+    const ceY=h-ceCurFrac*h*(1-ZONE_PE_START);
 
     // The player waiting for the ball parks at center; only the side the ball is
     // actually heading toward moves out to intercept it — a real point, not two
@@ -195,8 +216,10 @@ function loop(ts){
     pePxCur=Math.max(SLIDE_MARGIN,Math.min(w-SLIDE_MARGIN,pePxCur));
     const cePx=cePxCur,pePx=pePxCur;
 
-    const ceBat=racketHead(cePx,ceY,-1);
-    const peBat=racketHead(pePx,peY,1);
+    // CE is now at the bottom, facing up toward PE → right hand lands screen-right (mirror=+1).
+    // PE is now at the top, facing down toward CE → right hand lands screen-left (mirror=-1).
+    const ceBat=racketHead(cePx,ceY,1);
+    const peBat=racketHead(pePx,peY,-1);
 
     ballProgress+=dt/BALL_MS;
     if(ballProgress>=1){
@@ -319,17 +342,52 @@ function drawCharacter(px,y,state,mirror,batProx,teamColor){
 }
 
 /* Fixed, stationary info block for each side — sits in the DMZ so it never moves
-   with the player and stays easy to read: lots+team+investment, run%, actual PnL. */
+   with the player and stays easy to read: lots+team+investment, run%, actual PnL.
+   Not bold — easier on the eye than the heavier labels around it. */
 function drawDmzInfo(w,h,label,lots,invVal,runPct,pnlVal,xFrac){
     const x=w*xFrac;
     const cy=h*(ZONE_CE_END+ZONE_PE_START)/2;
     ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillStyle=C.white;
-    ctx.font="800 12px 'Syne',sans-serif";
+    ctx.font="500 12px 'Syne',sans-serif";
     ctx.fillText(lots+' '+label+' '+fmtK(invVal),x,cy-16);
-    ctx.font="800 14px 'DM Mono',monospace";
+    ctx.font="500 14px 'DM Mono',monospace";
     ctx.fillText(fmtPct(runPct),x,cy);
     ctx.fillText(fmtPnl(pnlVal),x,cy+16);
+}
+
+/* Small momentum-candle widget (same source/logic as the main app's momentum bar:
+   webchrtpxy.json's last candle — close vs st_line/mirror_line channel, colored by
+   trend). Sits top-left, which is free now that PE's labels moved to top-right. */
+function drawMomentumWidget(w,h){
+    if(!momo||momo.c==null||momo.st==null||momo.mir==null)return;
+    const midX=26,topY=20,botY=96;
+    const trend=String(momo.trend||'SIDE').toUpperCase();
+    const bodyColor=trend==='BULL'?C.bull:trend==='BEAR'?C.bear:'#e5e7eb';
+    const vals=[momo.c,momo.st,momo.mir];
+    const hi=Math.max(...vals),lo=Math.min(...vals),range=(hi-lo)||1;
+    const toY=v=>botY-((v-lo)/range)*(botY-topY);
+
+    ctx.strokeStyle='rgba(255,255,255,0.18)';ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(midX,topY);ctx.lineTo(midX,botY);ctx.stroke();
+
+    const chHi=Math.max(momo.st,momo.mir),chLo=Math.min(momo.st,momo.mir);
+    const wy1=toY(chLo),wy2=toY(chHi);
+    ctx.strokeStyle=bodyColor;ctx.lineWidth=3;ctx.globalAlpha=0.45;
+    ctx.beginPath();ctx.moveTo(midX,wy1);ctx.lineTo(midX,wy2);ctx.stroke();
+    ctx.globalAlpha=1;
+    const capW=10;
+    [wy1,wy2].forEach(y=>{ctx.beginPath();ctx.moveTo(midX-capW/2,y);ctx.lineTo(midX+capW/2,y);ctx.stroke();});
+
+    const by1=toY(Math.max(momo.st,momo.c)),by2=toY(Math.min(momo.st,momo.c)),bH=Math.max(by2-by1,4);
+    ctx.fillStyle=bodyColor;
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(midX-7,by1,14,bH,3);else ctx.rect(midX-7,by1,14,bH);
+    ctx.fill();
+
+    ctx.font="700 8px 'DM Mono',monospace";ctx.fillStyle=C.white;
+    ctx.textAlign='center';ctx.textBaseline='top';
+    ctx.fillText('MOM',midX,botY+4);
 }
 
 function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor){
@@ -337,31 +395,33 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor){
 
     ctx.save();
 
-    ctx.fillStyle=C.bullDim;ctx.fillRect(0,0,w,h*ZONE_CE_END);
+    // PE now occupies the top zone (bear-tinted), CE now occupies the bottom zone (bull-tinted).
+    ctx.fillStyle=C.bearDim;ctx.fillRect(0,0,w,h*ZONE_CE_END);
     ctx.fillStyle=C.bg3;ctx.fillRect(0,h*ZONE_CE_END,w,h*(ZONE_PE_START-ZONE_CE_END));
-    ctx.fillStyle=C.bearDim;ctx.fillRect(0,h*ZONE_PE_START,w,h*(1-ZONE_PE_START));
+    ctx.fillStyle=C.bullDim;ctx.fillRect(0,h*ZONE_PE_START,w,h*(1-ZONE_PE_START));
 
     ctx.strokeStyle=C.bear;ctx.lineWidth=2;
     ctx.beginPath();ctx.moveTo(0,1);ctx.lineTo(w,1);ctx.stroke();
     ctx.beginPath();ctx.moveTo(0,h-1);ctx.lineTo(w,h-1);ctx.stroke();
 
     ctx.setLineDash([5,4]);ctx.lineWidth=1;
-    ctx.strokeStyle=C.bull;
-    ctx.beginPath();ctx.moveTo(0,h*ZONE_CE_END);ctx.lineTo(w,h*ZONE_CE_END);ctx.stroke();
     ctx.strokeStyle=C.bear;
+    ctx.beginPath();ctx.moveTo(0,h*ZONE_CE_END);ctx.lineTo(w,h*ZONE_CE_END);ctx.stroke();
+    ctx.strokeStyle=C.bull;
     ctx.beginPath();ctx.moveTo(0,h*ZONE_PE_START);ctx.lineTo(w,h*ZONE_PE_START);ctx.stroke();
     ctx.setLineDash([]);
 
-    // CE labels stay left; PE labels shift right — since CE's info block sits on the
-    // left of the DMZ and PE's sits on the right, this keeps each side's info together.
+    // CE labels stay left, now at the bottom (its new zone); PE labels stay right,
+    // now at the top (its new zone) — CE's info block is still on the left of the
+    // DMZ and PE's still on the right, so each side's info stays together.
     ctx.font="800 12px 'DM Mono',monospace";ctx.textBaseline='middle';
     ctx.fillStyle=C.white;
     ctx.textAlign='left';
-    ctx.fillText('⛔ CE LGT '+(Number(data.ce_lgt)||0).toFixed(1),8,13);
-    ctx.fillText('🎯 CE TGT '+(Number(data.ce_tgt)||0).toFixed(1),8,h*ZONE_CE_END);
+    ctx.fillText('⛔ CE LGT '+(Number(data.ce_lgt)||0).toFixed(1),8,h-13);
+    ctx.fillText('🎯 CE TGT '+(Number(data.ce_tgt)||0).toFixed(1),8,h*ZONE_PE_START);
     ctx.textAlign='right';
-    ctx.fillText('🎯 PE TGT '+(Number(data.pe_tgt)||0).toFixed(1),w-8,h*ZONE_PE_START);
-    ctx.fillText('⛔ PE LGT '+(Number(data.pe_lgt)||0).toFixed(1),w-8,h-13);
+    ctx.fillText('🎯 PE TGT '+(Number(data.pe_tgt)||0).toFixed(1),w-8,h*ZONE_CE_END);
+    ctx.fillText('⛔ PE LGT '+(Number(data.pe_lgt)||0).toFixed(1),w-8,13);
 
     ctx.textAlign='center';
     ctx.font="800 11px 'DM Mono',monospace";
@@ -369,6 +429,8 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor){
 
     drawDmzInfo(w,h,'CE',Math.max(1,Math.round(Number(data.ce_lots)||1)),Number(data.ce_investment)||0,Number(data.ce_run_pct)||0,Number(data.ce_pnl)||0,0.24);
     drawDmzInfo(w,h,'PE',Math.max(1,Math.round(Number(data.pe_lots)||1)),Number(data.pe_investment)||0,Number(data.pe_run_pct)||0,Number(data.pe_pnl)||0,0.76);
+
+    drawMomentumWidget(w,h);
 
     const ceProx=1-Math.min(1,Math.hypot(ballX-ceBat.x,ballY-ceBat.y)/(h*0.18));
     const peProx=1-Math.min(1,Math.hypot(ballX-peBat.x,ballY-peBat.y)/(h*0.18));
@@ -382,8 +444,9 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor){
     }
     ctx.globalAlpha=1;
 
-    drawCharacter(cePx,ceY,ceState,-1,Math.max(0,ceProx),C.bull);
-    drawCharacter(pePx,peY,peState,1,Math.max(0,peProx),C.bear);
+    // CE (bottom, faces up) → right hand screen-right. PE (top, faces down) → right hand screen-left.
+    drawCharacter(cePx,ceY,ceState,1,Math.max(0,ceProx),C.bull);
+    drawCharacter(pePx,peY,peState,-1,Math.max(0,peProx),C.bear);
 
     // ball
     ctx.beginPath();

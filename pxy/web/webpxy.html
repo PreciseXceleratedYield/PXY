@@ -49,12 +49,12 @@ body{
 #hdr{
     height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
     padding:0 12px;position:relative;
-    background:var(--bg2);
+    background:linear-gradient(180deg,#2a1712,#1c110c);
     border-bottom:1px solid var(--border2);
 }
 #hdr::after{
     content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;
-    background:var(--accent);opacity:0.5;
+    background:#a0522d;opacity:0.6;
 }
 .hdr-l,.hdr-r{display:flex;align-items:center;gap:8px;}
 .logo{
@@ -1062,7 +1062,13 @@ async function openTradeChart(t){
     const isCE=(t.Symbol||'').toUpperCase().endsWith('CE');
     const pnl=t.PNL||0;
     $('tradeChartLabel').textContent=`${shortSym(t.Symbol)} · #${t.Tag||'—'} · ${pnl>=0?'+':''}${Math.round(pnl).toLocaleString('en-IN')}`;
-    $('tradeChartOverlay').style.display='flex';
+    // Desktop: show the trade's chart in the actual Chart space instead of the small
+    // Positions-panel overlay. Mobile is unchanged (overlay stays inside Positions).
+    const overlay=$('tradeChartOverlay');
+    const isDesktop=window.matchMedia('(min-width:900px)').matches;
+    const targetParent=isDesktop?$('chartBox'):$('posTop');
+    if(overlay.parentElement!==targetParent)targetParent.appendChild(overlay);
+    overlay.style.display='flex';
 
     // load day candles
     try{
