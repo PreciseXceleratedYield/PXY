@@ -35,7 +35,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
 
     length = len(df)
     if length == 0:
-        return pd.Series(dtype=float), pd.Series(dtype=float), pd.Series(dtype=float)
+        return pd.Series(dtype=float), pd.Series(dtype=float), pd.Series(dtype=float), pd.Series(dtype=int)
 
     # --- 1. BASE TRANSFORMATION (m0 used for ATR and Crossovers) ---
     m0 = np.where(close >= open_arr, (close + high) / 2.0, (close + low) / 2.0)
@@ -101,10 +101,10 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
         st_distance_from_anchor = stLine - anchor_price
         mirror_line[i] = anchor_price - st_distance_from_anchor
 
-    return pd.Series(supertrend, index=df.index), pd.Series(mirror_line, index=df.index), pd.Series(m0, index=df.index)
+    return pd.Series(supertrend, index=df.index), pd.Series(mirror_line, index=df.index), pd.Series(m0, index=df.index), pd.Series(st_trend, index=df.index)
 
 
-def get_market_trend(df: pd.DataFrame) -> str:
+def get_market_trend(df: pd.DataFrame, variant: str = "DUAL") -> str:
     """
     Evaluates raw data frame layouts via intermediate calculations.
     Safe for upstream fetch scripts; does not look for pre-existing matrix columns.
@@ -113,10 +113,15 @@ def get_market_trend(df: pd.DataFrame) -> str:
         return 'SIDE'
 
     # Compute supertrend metrics dynamically on raw high/low/close metrics
-    st_line, mirror_line, m0_series = _compute_single_st(
+    st_line, mirror_line, m0_series, raw_trend_series = _compute_single_st(
         df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
     )
     
+    if variant.upper() == "SINGLE":
+        # Pure binary trend lookup (No SIDE state logic)
+        last_trend = raw_trend_series.iloc[-1]
+        return 'BULL' if last_trend == 1 else 'BEAR'
+        
     m0_curr = float(m0_series.iloc[-1])
     st_curr = float(st_line.iloc[-1])
     mirror_curr = float(mirror_line.iloc[-1])
@@ -132,7 +137,7 @@ def get_market_trend(df: pd.DataFrame) -> str:
         return 'SIDE'
 
 
-def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
+def calculate_supertrend(df: pd.DataFrame, variant: str = "DUAL") -> pd.DataFrame:
     """Calculates Universal Supertrend Master Matrix and returns structural states."""
     if df.empty:
         from sysdtafpxy import fetch_yf_data
@@ -157,25 +162,32 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     else:
         df = df.tz_localize('UTC').tz_convert(tz_string)
 
-    st1_line, st1_mirror, m0_series = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
-
-    st_arr = st1_line.to_numpy()
-    mirror_arr = st1_mirror.to_numpy()
-    m0_arr = m0_series.to_numpy()
-    
-    highest_arr = np.maximum(st_arr, mirror_arr)
-    lowest_arr = np.minimum(st_arr, mirror_arr)
-    
-    # Complete Three-State Vectorized Evaluation Engine
-    classifier_conditions = [
-        (m0_arr > highest_arr),
-        (m0_arr < lowest_arr)
-    ]
-    classifier_choices = ['BULL', 'BEAR']
-    st_trend_series = pd.Series(
-        np.select(classifier_conditions, classifier_choices, default='SIDE'),
-        index=df.index
+    st1_line, st1_mirror, m0_series, raw_trend_series = _compute_single_st(
+        df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
     )
+
+    if variant.upper() == "SINGLE":
+        # Pure binary state: Maps 1 to BULL, everything else (-1) to BEAR directly
+        st_trend_series = np.where(raw_trend_series == 1, 'BULL', 'BEAR')
+        st_trend_series = pd.Series(st_trend_series, index=df.index)
+    else:
+        st_arr = st1_line.to_numpy()
+        mirror_arr = st1_mirror.to_numpy()
+        m0_arr = m0_series.to_numpy()
+        
+        highest_arr = np.maximum(st_arr, mirror_arr)
+        lowest_arr = np.minimum(st_arr, mirror_arr)
+        
+        # Complete Three-State Vectorized Evaluation Engine (DUAL variant only)
+        classifier_conditions = [
+            (m0_arr > highest_arr),
+            (m0_arr < lowest_arr)
+        ]
+        classifier_choices = ['BULL', 'BEAR']
+        st_trend_series = pd.Series(
+            np.select(classifier_conditions, classifier_choices, default='SIDE'),
+            index=df.index
+        )
 
     # Map variables cleanly to dataframe matrices
     df['st_line'] = st1_line           
@@ -192,25 +204,31 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def export_supertrend_json(
-    df: pd.DataFrame = None, output_file='../web/webchrtpxy.json'
+    df: pd.DataFrame = None, output_file='../web/webchrtpxy.json', variant: str = "DUAL"
 ):
     """Exports structured historical data: OHLC (for candles), st_line + trend
-    (for coloring), and mirror_line (always neutral)."""
+    (for coloring), and mirror_line."""
     if df is None or df.empty:
-        df = calculate_supertrend(pd.DataFrame())
+        df = calculate_supertrend(pd.DataFrame(), variant=variant)
     if df is None or df.empty:
         return None
 
     output = []
+    is_single = variant.upper() == "SINGLE"
+
     for idx, row in df.iterrows():
+        st_val = float(row['st_line']) if not pd.isna(row['st_line']) else 0.0
+        # If SINGLE variant, copy the st_line value directly into mirror_line
+        mirror_val = st_val if is_single else (float(row['st_mirror']) if not pd.isna(row['st_mirror']) else 0.0)
+
         output.append({
             'time': int(idx.timestamp()),
             'open': float(row['Open']) if not pd.isna(row['Open']) else 0.0,
             'high': float(row['High']) if not pd.isna(row['High']) else 0.0,
             'low': float(row['Low']) if not pd.isna(row['Low']) else 0.0,
             'close': float(row['Close']),
-            'st_line': float(row['st_line']) if not pd.isna(row['st_line']) else 0.0,
-            'mirror_line': float(row['st_mirror']) if not pd.isna(row['st_mirror']) else 0.0,
+            'st_line': st_val,
+            'mirror_line': mirror_val,
             'trend': str(row.get('ST_Trend', 'SIDE')) if not pd.isna(row.get('ST_Trend', 'SIDE')) else 'SIDE'
         })
 
