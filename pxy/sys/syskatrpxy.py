@@ -14,7 +14,7 @@ init(autoreset=True)
 
 # 🎯 MULTI-MODE NUMERIC CONFIGURATION MATRIX
 # 1 = Static, 2 = Standard ATR (14), 3 = Dynamic
-ATR_MODE = 1
+ATR_MODE = 3
 ATR_STATIC_VALUE = 7
 TOTAL_WIDTH = 40
 
