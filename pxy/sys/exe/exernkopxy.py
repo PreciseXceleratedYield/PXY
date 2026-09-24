@@ -28,9 +28,16 @@ RENKO_STATE_FILE = os.path.abspath(os.path.join(current_dir, "../../web/webrinko
 SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(current_dir, "../../web/websqrpxy.json"))
 
 # RISK CONFIGURATION CONSTANTS
-TRAILING_DROP_LIMIT = 3000.0
 EMERGENCY_RETRY_SECONDS = 5.0
 LOOP_INTERVAL_SECONDS = 1.0
+
+# 🔄 SURGICAL INTERCEPTION: Bind old static variable to your custom helper file dynamically
+import exemeltpxy
+import sys
+sys.modules[__name__].__class__.TRAILING_DROP_LIMIT = property(
+    lambda self: exemeltpxy.get_dynamic_trailing_drop()
+)
+
 
 def safe_load_json_pnl(file_path):
     """Safely extracts cumulative metrics. Rejects data and returns 0.0 if the file timestamp belongs to a previous day. """
