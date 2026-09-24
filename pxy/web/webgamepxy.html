@@ -136,26 +136,6 @@ async function pollDash(){
 pollDash();
 setInterval(pollDash,3000);
 
-/* Momentum candle — same source/fields the main app's momentum bar uses
-   (webchrtpxy.json's last candle: close vs the st_line/mirror_line channel). */
-let momo=null;
-async function pollMomentum(){
-    try{
-        const data=await fetch('./webchrtpxy.json?_='+Date.now()).then(r=>r.json());
-        if(Array.isArray(data)&&data.length){
-            const last=data[data.length-1];
-            momo={
-                c:last.close??last.Close??last.price??null,
-                st:last.st_line??null,
-                mir:last.mirror_line??null,
-                trend:last.trend||'SIDE'
-            };
-        }
-    }catch(e){}
-}
-pollMomentum();
-setInterval(pollMomentum,3000);
-
 /* ── rally (pure decorative animation, ball travels racket-to-racket with a bounce) ── */
 let ballFrom='ce',ballProgress=0,bounced=false;
 let trail=[];
@@ -383,36 +363,6 @@ function drawDmzInfo(w,h,label,lots,invVal,runPct,pnlVal,xFrac){
 /* Small momentum-candle widget (same source/logic as the main app's momentum bar:
    webchrtpxy.json's last candle — close vs st_line/mirror_line channel, colored by
    trend). Sits top-left, which is free now that PE's labels moved to top-right. */
-function drawMomentumWidget(w,h){
-    if(!momo||momo.c==null||momo.st==null||momo.mir==null)return;
-    const midX=26,topY=20,botY=96;
-    const trend=String(momo.trend||'SIDE').toUpperCase();
-    const bodyColor=trend==='BULL'?C.bull:trend==='BEAR'?C.bear:'#e5e7eb';
-    const vals=[momo.c,momo.st,momo.mir];
-    const hi=Math.max(...vals),lo=Math.min(...vals),range=(hi-lo)||1;
-    const toY=v=>botY-((v-lo)/range)*(botY-topY);
-
-    ctx.strokeStyle='rgba(255,255,255,0.18)';ctx.lineWidth=1;
-    ctx.beginPath();ctx.moveTo(midX,topY);ctx.lineTo(midX,botY);ctx.stroke();
-
-    const chHi=Math.max(momo.st,momo.mir),chLo=Math.min(momo.st,momo.mir);
-    const wy1=toY(chLo),wy2=toY(chHi);
-    ctx.strokeStyle=bodyColor;ctx.lineWidth=3;ctx.globalAlpha=0.45;
-    ctx.beginPath();ctx.moveTo(midX,wy1);ctx.lineTo(midX,wy2);ctx.stroke();
-    ctx.globalAlpha=1;
-    const capW=10;
-    [wy1,wy2].forEach(y=>{ctx.beginPath();ctx.moveTo(midX-capW/2,y);ctx.lineTo(midX+capW/2,y);ctx.stroke();});
-
-    const by1=toY(Math.max(momo.st,momo.c)),by2=toY(Math.min(momo.st,momo.c)),bH=Math.max(by2-by1,4);
-    ctx.fillStyle=bodyColor;
-    ctx.beginPath();
-    if(ctx.roundRect)ctx.roundRect(midX-7,by1,14,bH,3);else ctx.rect(midX-7,by1,14,bH);
-    ctx.fill();
-
-    ctx.font="700 8px 'DM Mono',monospace";ctx.fillStyle=C.white;
-    ctx.textAlign='center';ctx.textBaseline='top';
-    ctx.fillText('MOM',midX,botY+4);
-}
 
 function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift){
     ctx.clearRect(0,0,w,h);
@@ -470,7 +420,6 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift){
     drawDmzInfo(w,h,'CE',Math.max(1,Math.round(Number(data.ce_lots)||1)),Number(data.ce_investment)||0,Number(data.ce_run_pct)||0,Number(data.ce_pnl)||0,0.24);
     drawDmzInfo(w,h,'PE',Math.max(1,Math.round(Number(data.pe_lots)||1)),Number(data.pe_investment)||0,Number(data.pe_run_pct)||0,Number(data.pe_pnl)||0,0.76);
 
-    drawMomentumWidget(w,h);
 
     const ceProx=1-Math.min(1,Math.hypot(ballX-ceBat.x,ballY-ceBat.y)/(h*0.18));
     const peProx=1-Math.min(1,Math.hypot(ballX-peBat.x,ballY-peBat.y)/(h*0.18));
