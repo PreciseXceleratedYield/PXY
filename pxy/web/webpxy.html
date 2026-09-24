@@ -49,12 +49,12 @@ body{
 #hdr{
     height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
     padding:0 12px;position:relative;
-    background:linear-gradient(180deg,#2a1712,#1c110c);
+    background:linear-gradient(180deg,#1d212c,#181c26);
     border-bottom:1px solid var(--border2);
 }
 #hdr::after{
     content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;
-    background:#a0522d;opacity:0.6;
+    background:var(--accent);opacity:0.5;
 }
 .hdr-l,.hdr-r{display:flex;align-items:center;gap:8px;}
 .logo{
@@ -347,13 +347,14 @@ body{
             <div id="chartBox" style="flex:1;">
                 <div class="grid-over"></div>
                 <canvas id="priceChart"></canvas>
+                <!-- GAME — overlays only the chart canvas area, never the momentum bar.
+                     Logic lives entirely in webgamepxy.html; iframe created lazily on first click. -->
+                <div id="gamePane" style="display:none;position:absolute;inset:0;z-index:5;background:var(--bg);"></div>
             </div>
             <div id="momentumBar">
                 <div id="momentumCanvasWrap"><canvas id="momentumCandle"></canvas></div>
             </div>
         </div>
-        <!-- GAME — logic lives entirely in webgamepxy.html; iframe is created lazily on first click -->
-        <div id="gamePane" style="display:none;flex:1;min-height:0;"></div>
     </div>
 
     <!-- POSITIONS + TRADES (40/60 split) -->
@@ -793,20 +794,21 @@ function setChartMode(mode){
     if(lastCandles)drawChart(lastCandles);
 }
 function setChartView(view){
-    const cRow=$('chartRow'),gPane=$('gamePane'),lToggle=$('candleLineToggle');
+    const gPane=$('gamePane'),lToggle=$('candleLineToggle');
     const vc=$('viewBtnChart'),vg=$('viewBtnGame');
     if(view==='game'){
-        cRow.style.display='none';gPane.style.display='flex';lToggle.style.display='none';
+        gPane.style.display='block';lToggle.style.display='none';
         vg.style.borderColor=cssVar('--accent');vg.style.color=cssVar('--accent');
         vc.style.borderColor=cssVar('--border');vc.style.color=cssVar('--muted');
         // lazy-load the game — only fetched/created on first click, keeps game logic in its own file
         if(!$('gameFrame')){
             const f=document.createElement('iframe');
             f.id='gameFrame';f.src='./webgamepxy.html';
+            f.style.cssText='width:100%;height:100%;border:0;display:block;';
             gPane.appendChild(f);
         }
     }else{
-        cRow.style.display='flex';gPane.style.display='none';lToggle.style.display='flex';
+        gPane.style.display='none';lToggle.style.display='flex';
         vc.style.borderColor=cssVar('--accent');vc.style.color=cssVar('--accent');
         vg.style.borderColor=cssVar('--border');vg.style.color=cssVar('--muted');
         if(lastCandles)setTimeout(()=>{drawChart(lastCandles);drawMomentumBar(lastMoCandles);},50);

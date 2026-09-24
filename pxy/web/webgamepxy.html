@@ -60,12 +60,26 @@ function applyVariant(idx){
     BALL_MS=v.ballMs;BOUNCE_AT=v.bounceAt;SLIDE_MS=v.slideMs;SLIDE_AMP=v.slideAmp;ARC_A=v.arcA;ARC_B=v.arcB;
     curVariant=idx;
 }
-applyVariant(0);
-setInterval(()=>{
-    let next=Math.floor(Math.random()*VARIANTS.length);
-    while(VARIANTS.length>1&&next===curVariant)next=Math.floor(Math.random()*VARIANTS.length);
-    applyVariant(next);
-},5000);
+applyVariant(3);
+
+/* Variant picked from real ATR (webdashpxy.json), not pure randomness: high ATR (relative
+   to what we've recently seen) → fast/aggressive style; low ATR → slow/defensive style;
+   mid-range → steady baseline. Falls back to a random pick until enough ATR samples exist. */
+let atrHistory=[];
+const POOL_HIGH=[0,2],POOL_MID=[3],POOL_LOW=[1,4];
+function pickVariant(){
+    let pool=null;
+    if(dashAtr!==null&&!isNaN(dashAtr)&&atrHistory.length>=3){
+        const lo=Math.min(...atrHistory),hi=Math.max(...atrHistory);
+        const frac=hi>lo?(dashAtr-lo)/(hi-lo):0.5;
+        pool=frac>=0.66?POOL_HIGH:frac<=0.33?POOL_LOW:POOL_MID;
+    }
+    if(!pool)pool=VARIANTS.map((_,i)=>i);
+    let choices=pool.filter(i=>i!==curVariant);
+    if(!choices.length)choices=pool;
+    return choices[Math.floor(Math.random()*choices.length)];
+}
+setInterval(()=>{applyVariant(pickVariant());},5000);
 
 /* ── live data ── */
 let data={ce_lgt:0,ce_tgt:0,ce_run_pct:0,ce_pnl:0,ce_lots:1,pe_lgt:0,pe_tgt:0,pe_run_pct:0,pe_pnl:0,pe_lots:1};
@@ -109,7 +123,14 @@ function classifySignal(v){
 async function pollDash(){
     try{
         const d=await fetch('./webdashpxy.json?_='+Date.now()).then(r=>r.json());
-        if(d){dashExit=d.exit;dashAtr=d.atr;}
+        if(d){
+            dashExit=d.exit;
+            dashAtr=Number(d.atr);
+            if(!isNaN(dashAtr)){
+                atrHistory.push(dashAtr);
+                if(atrHistory.length>20)atrHistory.shift();
+            }
+        }
     }catch(e){}
 }
 pollDash();
@@ -241,19 +262,21 @@ function loop(ts){
     const bounceX=fromBat.x+(toBat.x-fromBat.x)*BOUNCE_AT;
     const bounceY=fromBat.y+(toBat.y-fromBat.y)*BOUNCE_AT;
 
-    let ballX,ballY;
+    let ballX,ballY,ballLift;
     if(ballProgress<BOUNCE_AT){
         const tA=easeOutQuad(ballProgress/BOUNCE_AT);
+        ballLift=Math.sin(tA*Math.PI)*ARC_A;
         ballX=fromBat.x+(bounceX-fromBat.x)*tA;
-        ballY=fromBat.y+(bounceY-fromBat.y)*tA-Math.sin(tA*Math.PI)*ARC_A;
+        ballY=fromBat.y+(bounceY-fromBat.y)*tA-ballLift;
     }else{
         if(!bounced){
             bounced=true;
             spawnHit(bounceX,bounceY,'rgba(255,255,255,0.85)',8,2);
         }
         const tB=easeInOutQuad((ballProgress-BOUNCE_AT)/(1-BOUNCE_AT));
+        ballLift=Math.sin(tB*Math.PI)*ARC_B;
         ballX=bounceX+(toBat.x-bounceX)*tB;
-        ballY=bounceY+(toBat.y-bounceY)*tB-Math.sin(tB*Math.PI)*ARC_B;
+        ballY=bounceY+(toBat.y-bounceY)*tB-ballLift;
     }
 
     trail.push({x:ballX,y:ballY,color:ballColor});
@@ -261,7 +284,7 @@ function loop(ts){
 
     updateParticles(dt);
 
-    draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor);
+    draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift);
     requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
@@ -349,8 +372,9 @@ function drawDmzInfo(w,h,label,lots,invVal,runPct,pnlVal,xFrac){
     const cy=h*(ZONE_CE_END+ZONE_PE_START)/2;
     ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillStyle=C.white;
+    const team=Math.max(1,Math.min(6,lots));
     ctx.font="500 12px 'Syne',sans-serif";
-    ctx.fillText(lots+' '+label+' '+fmtK(invVal),x,cy-16);
+    ctx.fillText('🧍'.repeat(team)+' '+label+' '+fmtK(invVal),x,cy-16);
     ctx.font="500 14px 'DM Mono',monospace";
     ctx.fillText(fmtPct(runPct),x,cy);
     ctx.fillText(fmtPnl(pnlVal),x,cy+16);
@@ -390,7 +414,7 @@ function drawMomentumWidget(w,h){
     ctx.fillText('MOM',midX,botY+4);
 }
 
-function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor){
+function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift){
     ctx.clearRect(0,0,w,h);
 
     ctx.save();
@@ -423,9 +447,25 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor){
     ctx.fillText('🎯 PE TGT '+(Number(data.pe_tgt)||0).toFixed(1),w-8,h*ZONE_CE_END);
     ctx.fillText('⛔ PE LGT '+(Number(data.pe_lgt)||0).toFixed(1),w-8,13);
 
-    ctx.textAlign='center';
+    // net — a real line across the DMZ center with hash marks, not just a color band
+    const netY=h*(ZONE_CE_END+ZONE_PE_START)/2;
+    ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(0,netY);ctx.lineTo(w,netY);ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.22)';ctx.lineWidth=1;
+    for(let hx=6;hx<w;hx+=14){
+        ctx.beginPath();ctx.moveTo(hx,netY-4);ctx.lineTo(hx,netY+4);ctx.stroke();
+    }
+
+    ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.font="800 11px 'DM Mono',monospace";
-    ctx.fillText('DMZ (ATR '+(dashAtr??'—')+')',w/2,h*(ZONE_CE_END+ZONE_PE_START)/2);
+    const atrLabel='DMZ (ATR '+(dashAtr!==null&&!isNaN(dashAtr)?dashAtr:'—')+')';
+    const atrW=ctx.measureText(atrLabel).width;
+    ctx.fillStyle='rgba(24,28,38,0.85)';
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(w/2-atrW/2-6,netY-9,atrW+12,18,4);else ctx.rect(w/2-atrW/2-6,netY-9,atrW+12,18);
+    ctx.fill();
+    ctx.fillStyle=C.white;
+    ctx.fillText(atrLabel,w/2,netY);
 
     drawDmzInfo(w,h,'CE',Math.max(1,Math.round(Number(data.ce_lots)||1)),Number(data.ce_investment)||0,Number(data.ce_run_pct)||0,Number(data.ce_pnl)||0,0.24);
     drawDmzInfo(w,h,'PE',Math.max(1,Math.round(Number(data.pe_lots)||1)),Number(data.pe_investment)||0,Number(data.pe_run_pct)||0,Number(data.pe_pnl)||0,0.76);
@@ -447,6 +487,15 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor){
     // CE (bottom, faces up) → right hand screen-right. PE (top, faces down) → right hand screen-left.
     drawCharacter(cePx,ceY,ceState,1,Math.max(0,ceProx),C.bull);
     drawCharacter(pePx,peY,peState,-1,Math.max(0,peProx),C.bear);
+
+    // ground shadow — sits at the un-lifted baseline, shrinks and fades as the ball rises
+    const maxLift=Math.max(ARC_A,ARC_B,1);
+    const liftFrac=Math.max(0,Math.min(1,ballLift/maxLift));
+    const shadowRy=Math.max(1.5,3.5*(1-liftFrac*0.7));
+    ctx.beginPath();
+    ctx.ellipse(ballX,ballY+ballLift,shadowRy*2.2,shadowRy,0,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,'+(0.35*(1-liftFrac*0.5))+')';
+    ctx.fill();
 
     // ball
     ctx.beginPath();
