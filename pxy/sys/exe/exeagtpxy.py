@@ -24,7 +24,7 @@ def is_aligned(side, active_exit):
     """Core condition matching: CE aligns with BULL/SIDE, PE aligns with BEAR/SIDE."""
     a_exit = str(active_exit).upper().strip()
     s = side.upper()
-    return (s == "CE" and a_exit in {"BULL", "SIDE"}) or (s == "PE" and a_exit in {"BEAR", "SIDE"})
+    return (s == "CE" and a_exit in {"BULL"}) or (s == "PE" and a_exit in {"BEAR"})
 
 def points_floor(lots):
     """Structural points floor calculation matrix based on position scaling."""
