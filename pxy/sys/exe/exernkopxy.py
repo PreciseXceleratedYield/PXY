@@ -31,23 +31,13 @@ SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(current_dir, "../../web/websqr
 EMERGENCY_RETRY_SECONDS = 5.0
 LOOP_INTERVAL_SECONDS = 1.0
 
-# 🔄 ROBUST MODULE PROXY: Safe intercept that bypasses immutable module type restrictions
+# 🔄 SIMPLE DYNAMIC INTERCEPTOR (Native Python 3.7+ Module Hook)
 import exemeltpxy
-import sys
-from types import ModuleType
 
-class DynamicModuleProxy(ModuleType):
-    def __init__(self, original_module):
-        super().__init__(original_module.__name__)
-        self.__dict__.update(original_module.__dict__)
-        
-    @property
-    def TRAILING_DROP_LIMIT(self) -> float:
+def __getattr__(name):
+    if name == "TRAILING_DROP_LIMIT":
         return exemeltpxy.get_dynamic_trailing_drop()
-
-# Swap the standard module type out for our dynamic variant instantly
-sys.modules[__name__] = DynamicModuleProxy(sys.modules[__name__])
-
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
 
 def safe_load_json_pnl(file_path):
