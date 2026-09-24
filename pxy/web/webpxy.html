@@ -220,7 +220,7 @@ body{
 
 /* ── RISK BAR ── */
 #riskBar{
-    height:44px;flex-shrink:0;display:flex;align-items:center;
+    height:56px;flex-shrink:0;display:flex;align-items:center;
     padding:0 6px;gap:6px;background:var(--bg2);
     border-bottom:1px solid var(--border);overflow:hidden;
 }
@@ -229,7 +229,7 @@ body{
 .rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:12px;white-space:nowrap;color:#ffffff;}
 .rsk-val.bull{color:var(--bull);}
 .rsk-val.bear{color:var(--bear);}
-.rsk-candle-wrap{flex:1;min-width:0;height:30px;position:relative;overflow:hidden;}
+.rsk-candle-wrap{flex:1;min-width:0;height:42px;position:relative;overflow:hidden;}
 #rskCanvas{position:absolute;inset:0;width:100%!important;height:100%!important;}
 
 /* ── TAB BAR ── */
@@ -1270,7 +1270,7 @@ function drawRiskCandle(floor,net,peak){
     canvas.style.width=rect.width+'px';canvas.style.height=rect.height+'px';
     ctx.scale(dpr,dpr);
     const W=rect.width,H=rect.height;ctx.clearRect(0,0,W,H);
-    const PADX=12,midY=H/2,bodyH=Math.max(10,H*0.45);
+    const PADX=12,midY=H/2,bodyH=Math.max(14,H*0.64);
     const lo=-3000,hi=Math.max(peak,10),open=0,close=net,range=hi-lo||1;
     const toX=v=>Math.max(PADX,Math.min(W-PADX,((v-lo)/range)*(W-PADX*2)+PADX));
     const lowX=toX(lo),highX=toX(hi),openX=toX(open),closeX=toX(close);
@@ -1279,7 +1279,7 @@ function drawRiskCandle(floor,net,peak){
     const glowColor=isBull?'rgba(38,166,154,0.35)':'rgba(239,83,80,0.35)';
     ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(lowX,midY);ctx.lineTo(highX,midY);ctx.stroke();
-    ctx.lineWidth=2;ctx.globalAlpha=0.8;
+    ctx.lineWidth=3;ctx.globalAlpha=0.8;
     ctx.strokeStyle=cssVar('--bear');ctx.beginPath();ctx.moveTo(lowX,midY-bodyH/2);ctx.lineTo(lowX,midY+bodyH/2);ctx.stroke();
     ctx.strokeStyle=cssVar('--bull');ctx.beginPath();ctx.moveTo(highX,midY-bodyH/2);ctx.lineTo(highX,midY+bodyH/2);ctx.stroke();
     ctx.globalAlpha=1;
