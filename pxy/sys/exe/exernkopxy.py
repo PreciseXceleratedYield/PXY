@@ -31,13 +31,26 @@ SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(current_dir, "../../web/websqr
 EMERGENCY_RETRY_SECONDS = 5.0
 LOOP_INTERVAL_SECONDS = 1.0
 
-# 🔄 SIMPLE DYNAMIC INTERCEPTOR (Native Python 3.7+ Module Hook)
+# 🔄 SURGICAL PROXY: Declares the variable locally but pulls values dynamically
 import exemeltpxy
 
-def __getattr__(name):
-    if name == "TRAILING_DROP_LIMIT":
-        return exemeltpxy.get_dynamic_trailing_drop()
-    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+class DynamicFloatProxy:
+    def __float__(self): return float(exemeltpxy.get_dynamic_trailing_drop())
+    def __sub__(self, other): return float(self) - float(other)
+    def __rsub__(self, other): return float(other) - float(self)
+    def __lt__(self, other): return float(self) < float(other)
+    def __le__(self, other): return float(self) <= float(other)
+    def __gt__(self, other): return float(self) > float(other)
+    def __ge__(self, other): return float(self) >= float(other)
+    def __neg__(self): return -float(self)
+    def __truediv__(self, other): return float(self) / float(other)
+    def __str__(self): return str(float(self))
+    def __repr__(self): return str(float(self))
+    def __format__(self, format_spec): return format(float(self), format_spec)
+
+# This explicitly defines the name for the compiler so your downstream code doesn't crash
+TRAILING_DROP_LIMIT = DynamicFloatProxy()
+
 
 
 def safe_load_json_pnl(file_path):
