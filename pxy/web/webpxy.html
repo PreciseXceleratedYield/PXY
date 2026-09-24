@@ -425,6 +425,7 @@ body{
     <div class="sig-cell" id="cellExit" style="flex:0 1 3ch;max-width:3ch;"><span class="sc-lbl">🛬</span><span class="sc-val" id="hcExit">—</span></div>
     <div class="sig-cell" id="cellTrend" style="flex:0 1 3ch;max-width:3ch;"><span class="sc-lbl">🚀</span><span class="sc-val" id="hcTrend">—</span></div>
     <div class="sig-cell" id="cellATR" style="flex:0 1 3ch;max-width:3ch;"><span class="sc-lbl">📐</span><span class="sc-val" id="hcATR">—</span></div>
+    <div class="sig-cell" id="cellDirection" style="flex:0 1 4ch;max-width:4ch;"><span class="sc-lbl">🧭</span><span class="sc-val" id="hcDirection">—</span></div>
     <div class="sig-cell" id="cellDP" style="flex:2;"><span class="sc-lbl">⚡⚡</span><span class="sc-val" id="dpText">—</span></div>
     <div class="sig-cell" id="cellBooked" style="min-width:6ch;"><span class="sc-lbl">✅</span><span class="sc-val" id="pnlBooked">—</span></div>
 </div>
@@ -628,6 +629,13 @@ function emojifyTrend(v){
     if(s==='NONE')return'—';
     return v;
 }
+function emojifyDirection(v){
+    const s=String(v||'').toUpperCase();
+    if(s==='UP')return'🟢▲';
+    if(s==='DOWN')return'🔴▼';
+    if(s==='NONE'||!s)return'—';
+    return v;
+}
 function shortSym(s){
     if(!s)return'—';
     return s;
@@ -746,6 +754,7 @@ async function loadDash(){
         setV('hcExit', emojifyExit(d.exit??'NONE'), cls(d.exit||''));
         setV('hcTrend',emojifyTrend(d.supertrend),   cls(d.supertrend||''));
         setV('hcATR',  `${d.atr??'—'}`, 'sc-val');
+        setV('hcDirection', emojifyDirection(d.direction??'NONE'), cls(d.direction||''));
 
         ['cellEntry','cellExit','cellTrend','cellATR'].forEach(id=>{
             const el=$(id);if(!el)return;
@@ -1270,7 +1279,7 @@ function drawRiskCandle(floor,net,peak){
     canvas.style.width=rect.width+'px';canvas.style.height=rect.height+'px';
     ctx.scale(dpr,dpr);
     const W=rect.width,H=rect.height;ctx.clearRect(0,0,W,H);
-    const PADX=12,midY=H/2,bodyH=Math.max(14,H*0.64);
+    const PADX=12,midY=H/2,fz=15,bodyH=fz+12;
     const lo=-3000,hi=Math.max(peak,10),open=0,close=net,range=hi-lo||1;
     const toX=v=>Math.max(PADX,Math.min(W-PADX,((v-lo)/range)*(W-PADX*2)+PADX));
     const lowX=toX(lo),highX=toX(hi),openX=toX(open),closeX=toX(close);
@@ -1289,7 +1298,6 @@ function drawRiskCandle(floor,net,peak){
         ctx.setLineDash([]);
     }
     const netLabel='₹'+(net>=0?'+':'')+Math.round(net).toLocaleString('en-IN');
-    const fz=Math.round(Math.min(18,Math.max(13,H*0.4)));
     ctx.font=`800 ${fz}px 'Syne',sans-serif`;
     const textW=ctx.measureText(netLabel).width+14;
     let bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX);

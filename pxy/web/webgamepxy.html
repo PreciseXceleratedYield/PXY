@@ -370,14 +370,16 @@ function drawCharacter(px,y,state,mirror,batProx,teamColor){
    Not bold — easier on the eye than the heavier labels around it. */
 function drawDmzInfo(w,h,label,lots,invVal,runPct,pnlVal,xFrac){
     const x=w*xFrac;
-    const cy=h*(ZONE_CE_END+ZONE_PE_START)/2;
+    // shifted below the net line/ATR pill instead of straddling it — was landing
+    // right on the hash marks and hard to read.
+    const cy=h*(ZONE_CE_END+ZONE_PE_START)/2+20;
     ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillStyle=C.white;
     const team=Math.max(1,Math.min(6,lots));
     ctx.font="500 12px 'Syne',sans-serif";
-    ctx.fillText('🧍'.repeat(team)+' '+label+' '+fmtK(invVal),x,cy-16);
+    ctx.fillText('🧍'.repeat(team)+' '+label+' '+fmtK(invVal),x,cy-12);
     ctx.font="500 14px 'DM Mono',monospace";
-    ctx.fillText(fmtPct(runPct),x,cy);
+    ctx.fillText(fmtPct(runPct),x,cy+2);
     ctx.fillText(fmtPnl(pnlVal),x,cy+16);
 }
 
@@ -390,10 +392,8 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift){
 
     ctx.save();
 
-    // PE now occupies the top zone (bear-tinted), CE now occupies the bottom zone (bull-tinted).
-    ctx.fillStyle=C.bearDim;ctx.fillRect(0,0,w,h*ZONE_CE_END);
-    ctx.fillStyle=C.bg3;ctx.fillRect(0,h*ZONE_CE_END,w,h*(ZONE_PE_START-ZONE_CE_END));
-    ctx.fillStyle=C.bullDim;ctx.fillRect(0,h*ZONE_PE_START,w,h*(1-ZONE_PE_START));
+    // Uniform background — no red/green zone tint, matches the page's own dark background.
+    ctx.fillStyle='#181c26';ctx.fillRect(0,0,w,h);
 
     // LGT dead-lines sit with margin from the true edge — not at the extreme
     // top/bottom — matching where a player at the deadline actually stands.
