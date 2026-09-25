@@ -52,6 +52,7 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
         # 2️⃣ Context parameter extractors
         symbol = str(row.get('symbol', 'UNKNOWN')).upper()
         derived_exit = str(row.get('direction', '')).upper().strip()
+        derived_supr = str(row.get('supertrend', '')).upper().strip()
         
         # Extract and safely cast atr (will scale safely even if identical across rows)
         raw_atr = f(row.get('atr', 0.0))
@@ -70,13 +71,13 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
         
         # 3️⃣ Symmetrical Risk Matrix (Calculated cleanly inline for each row context)
         if is_ce:
-            if derived_exit == 'DOWN':
+            if derived_exit == 'DOWN' or derived_supr == 'BEAR':
                 target_pct = 1.4
             else:
                 target_pct = (atr/1.4) + (atr * (pe_safe / ce_safe) ** 3)
                 
         elif is_pe:
-            if derived_exit == 'UP':
+            if derived_exit == 'UP' or derived_supr == 'BULL':
                 target_pct = 1.4
             else:
                 target_pct = (atr/1.4) + (atr * (ce_safe / pe_safe) ** 3)
