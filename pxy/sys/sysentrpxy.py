@@ -31,9 +31,9 @@ def get_entry_signal(df=None):
         trend = str(processed_st_df["ST_Trend"].iloc[-1]).upper().strip()
 
     # 🎯 ENTRY FILTER LAYER: Convert directional market signals when ST is matching or SIDE
-    if mkt_entry_dir == "BULL" and trend in ["BULL", "SIDE"]:
+    if mkt_entry_dir == "BULL" and trend in ["BULL"]:
         mapped_entry = "OTMBUY"
-    elif mkt_entry_dir == "BEAR" and trend in ["BEAR", "SIDE"]:
+    elif mkt_entry_dir == "BEAR" and trend in ["BEAR"]:
         mapped_entry = "OTMSELL"
     else:
         mapped_entry = mkt_entry_dir
