@@ -86,7 +86,7 @@ body{
 /* ── SIGNAL BAR ── */
 .sig-cell{
     flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:0 2px;gap:1px;border-right:1px solid var(--border);
+    padding:0 6px;gap:1px;border-right:1px solid rgba(255,255,255,0.09);
     position:relative;min-width:0;
 }
 .sig-cell:last-child{border-right:none;}
@@ -127,8 +127,7 @@ body{
         position:absolute;left:0;right:0;bottom:0;
         background:var(--bg2);padding:14px 8px;
     }
-    #paneTerminal #pnlBar .sig-cell{gap:4px;flex:1!important;max-width:none!important;min-width:0!important;align-items:flex-start;text-align:left;}
-    #paneTerminal #pnlBar .sig-cell:last-child{align-items:center;text-align:center;}
+    #paneTerminal #pnlBar .sig-cell{gap:4px;flex:1!important;max-width:none!important;min-width:0!important;align-items:center;text-align:center;}
     #panePositions #optOverlay .opt-tbl{width:100%!important;margin:0;table-layout:fixed;}
     #panePositions #optOverlay .opt-tbl td{padding:8px 6px;width:20%;text-align:left;}
     #panePositions #optOverlay .opt-tbl td:nth-child(3){width:40%;}
@@ -172,10 +171,10 @@ body{
     border-bottom:1px solid var(--border);cursor:default;
     transition:background 0.25s,border-left-color 0.25s;
 }
-.p-row.bull-r{border-left:2px solid var(--bull);background:rgba(38,166,154,0.05);}
-.p-row.bear-r{border-left:2px solid var(--bear);background:rgba(239,83,80,0.05);}
-.t-row.bull-r{border-left:2px solid var(--bull);background:rgba(38,166,154,0.05);}
-.t-row.bear-r{border-left:2px solid var(--bear);background:rgba(239,83,80,0.05);}
+.p-row.bull-r{border-left:2px solid var(--bull);}
+.p-row.bear-r{border-left:2px solid var(--bear);}
+.t-row.bull-r{border-left:2px solid var(--bull);}
+.t-row.bear-r{border-left:2px solid var(--bear);}
 .p-sym,.t-sym{font-size:10px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .p-st{font-size:10px;color:#ffe135;font-weight:700;flex-shrink:0;white-space:nowrap;text-align:right;}
 .t-meta{font-size:8px;color:var(--muted);margin-top:1px;}
@@ -419,7 +418,7 @@ body{
 </div>
 
 <!-- PNL BAR — absolute bottom (with signal bar in middle) -->
-<div id="pnlBar" style="height:36px;flex-shrink:0;display:flex;align-items:stretch;background:var(--bg2);border-top:1px solid var(--border);">
+<div id="pnlBar" style="height:36px;flex-shrink:0;display:flex;align-items:stretch;background:var(--bg2);border-top:1px solid var(--border);padding:0 8px;">
     <div class="sig-cell" id="cellRunning" style="flex:1;min-width:0;"><span class="sc-lbl">💰</span><span class="sc-val" id="pnlRunning">—</span></div>
     <div class="sig-cell" id="cellEntry" style="flex:1;min-width:0;"><span class="sc-lbl">🛫</span><span class="sc-val" id="hcEntry">—</span></div>
     <div class="sig-cell" id="cellExit" style="flex:1;min-width:0;"><span class="sc-lbl">🛬</span><span class="sc-val" id="hcExit">—</span></div>
