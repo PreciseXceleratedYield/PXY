@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 from colorama import Fore, Style
 
+import exeagtpxy                                               # Pure math vault formulas
 from exeagtpxy import getexeagtpxy, is_aligned                 # Math functions stay in agt
 from exeamspxy import execute_side_averaging_matrix            # Execution handles via ams
 from exeaxgpxy import run_target_engine                        # Target engine bridge
@@ -39,9 +40,8 @@ def print_telemetry_dashboard(p):
         lots = p[f"{side}_lots"]
         lgt = int(round(p[f"{side}_lgt"]))
         
-        # 🎯 OPTIMIZED: Displays your true mathematical targets dynamically 
-        # Shows your cubed target equation when aligned, drops to 1.40 floor when non-aligned
-        tgt_txt = f"{p[f'{side}_tgt']:.2f}" if p[f"{side}_aligned"] else "1.40"
+        # ✅ VISUAL SYNC: Prints dynamic dynamic targets matching exact execution metrics
+        tgt_txt = f"{p[f'{side}_tgt']:.2f}" if p[f"{side}_aligned"] else f"{exeagtpxy.BASE_COUNTER_TARGET_PCT:.2f}"
         
         pnl_val = int(round(p[f"{side}_pnl"]))
         run_pct_val = int(round(p[f"{side}_run_pct"]))
@@ -98,16 +98,17 @@ def handle_side_averaging(client, df):
     ce_invst_factor = ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
     pe_invst_factor = pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
 
-    # Dynamic target mirroring formula for frontend telemetry consistency
-    ce_tgt = 1.4 + (1.4 * (pe_invst_factor ** 3))
-    pe_tgt = 1.4 + (1.4 * (ce_invst_factor ** 3))
-
     ce_pnl = float(ce_rows['row_pnl'].sum()) if not ce_rows.empty else 0.0
     pe_pnl = float(pe_rows['row_pnl'].sum()) if not pe_rows.empty else 0.0
 
+    # 🎯 STEP POSITIONS FIXED: Parse variable status first
     active_exit = str(working_df.iloc[-1].get("exit", "NONE")).upper().strip()
     ce_aligned = is_aligned("CE", active_exit)
     pe_aligned = is_aligned("PE", active_exit)
+
+    # ✅ DYN TARGETS COMPUTED ROUTED SAFELY AFTER DEFINITION
+    ce_tgt = exeagtpxy.calculate_dynamic_target('CE', active_exit, ce_investment, pe_investment)
+    pe_tgt = exeagtpxy.calculate_dynamic_target('PE', active_exit, ce_investment, pe_investment)
 
     ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(ce_invst_factor, pe_invst_factor, ce_lots, pe_lots)
 
