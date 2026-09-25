@@ -13,8 +13,8 @@ from syspwerpxy import get_ce_pe_power
 init(autoreset=True)
 
 # 🎯 MULTI-MODE NUMERIC CONFIGURATION MATRIX
-# 1 = Static, 2 = Standard ATR (14), 3 = Dynamic
-ATR_MODE = 3
+# 1 = Static, 2 = Standard ATR (4) capped at 10, 3 = Dynamic
+ATR_MODE = 2
 ATR_STATIC_VALUE = 7
 TOTAL_WIDTH = 40
 
@@ -29,11 +29,11 @@ def safe_int_convert(val, fallback=1) -> int:
     except (ValueError, TypeError):
         return fallback
 
-def calculate_true_14_atr(df: pd.DataFrame) -> float:
-    """Computes genuine standard 14-period Average True Range math."""
+def calculate_true_4_atr(df: pd.DataFrame) -> float:
+    """Computes genuine standard 4-period Average True Range math capped at a max of 10."""
     try:
-        if df is None or df.empty or len(df) < 15:
-            return 14.0
+        if df is None or df.empty or len(df) < 5:
+            return 4.0
         
         df_clean = df.copy()
         df_clean.columns = [c.lower() for c in df_clean.columns]
@@ -48,13 +48,17 @@ def calculate_true_14_atr(df: pd.DataFrame) -> float:
         
         tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
         
-        # Standard Wilders smoothing execution sequence over 14 intervals
-        atr_series = tr.ewm(alpha=1/14, adjust=False).mean()
+        # Standard Wilders smoothing execution sequence over 4 intervals
+        atr_series = tr.ewm(alpha=1/4, adjust=False).mean()
         val = atr_series.iloc[-1]
         
-        return float(val) if not np.isnan(val) else 14.0
+        if np.isnan(val):
+            return 4.0
+            
+        # Apply the max cap of 10
+        return min(float(val), 10.0)
     except Exception:
-        return 14.0
+        return 4.0
 
 def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int, ce_p: int = 1, pe_p: int = 1) -> int:
     try:
@@ -74,7 +78,7 @@ def calculate_atr(df: pd.DataFrame) -> pd.Series:
         if ATR_MODE == 1:
             val = float(ATR_STATIC_VALUE)
         elif ATR_MODE == 2:
-            val = calculate_true_14_atr(df)
+            val = calculate_true_4_atr(df)
         else:
             _, past_str, ce_d, pe_d = detect_pxy_flip_signal(df=df)
             _, ce_p, pe_p = get_ce_pe_power(df)
@@ -82,7 +86,7 @@ def calculate_atr(df: pd.DataFrame) -> pd.Series:
             
         return pd.Series(val, index=df.index) if df is not None and not df.empty else pd.Series([val])
     except Exception:
-        fb = 14.0 if ATR_MODE == 2 else (float(ATR_STATIC_VALUE) if ATR_MODE == 1 else 5.0)
+        fb = 4.0 if ATR_MODE == 2 else (float(ATR_STATIC_VALUE) if ATR_MODE == 1 else 5.0)
         return pd.Series(fb, index=df.index) if df is not None and not df.empty else pd.Series([fb])
 
 def calculate_dynamic_k(df: pd.DataFrame) -> int:
@@ -96,14 +100,14 @@ def calculate_dynamic_k(df: pd.DataFrame) -> int:
 if __name__ == "__main__":
     try:
         df = fetch_yf_data()
-        final_atr = 14
+        final_atr = 4
         final_k = 2
         
         if df is not None and not df.empty:
             if ATR_MODE == 1:
                 final_atr = int(ATR_STATIC_VALUE)
             elif ATR_MODE == 2:
-                final_atr = int(round(calculate_true_14_atr(df)))
+                final_atr = int(round(calculate_true_4_atr(df)))
             else:
                 _, past_depth_str, ce_depth, pe_depth = detect_pxy_flip_signal(df=df)
                 _, ce_power, pe_power = get_ce_pe_power(df)
@@ -117,8 +121,9 @@ if __name__ == "__main__":
         spc = " " * max(TOTAL_WIDTH - len(l_txt) - len(r_txt), 1)
         print(l_txt + spc + r_txt)
     except Exception:
-        default_atr = 14 if ATR_MODE == 2 else (ATR_STATIC_VALUE if ATR_MODE == 1 else 5)
+        default_atr = 4 if ATR_MODE == 2 else (ATR_STATIC_VALUE if ATR_MODE == 1 else 5)
         l_txt = f"ATR:{default_atr}"
         r_txt = "K:2"
         spc = " " * max(TOTAL_WIDTH - len(l_txt) - len(r_txt), 1)
         print(l_txt + spc + r_txt)
+
