@@ -368,24 +368,25 @@ function drawCharacter(px,y,state,mirror,batProx,teamColor){
 /* Fixed, stationary info block for each side — sits in the DMZ so it never moves
    with the player and stays easy to read: lots+team+investment, run%, actual PnL.
    Not bold — easier on the eye than the heavier labels around it. */
-function drawDmzInfo(w,h,label,lots,invVal,runPct,pnlVal,xFrac){
+function drawDmzInfo(w,h,label,lots,invVal,runPct,pnlVal,xFrac,netY){
     const x=w*xFrac;
-    // shifted below the net line/ATR pill instead of straddling it — was landing
-    // right on the hash marks and hard to read.
-    const cy=h*(ZONE_CE_END+ZONE_PE_START)/2+20;
+    const top=netY-16,mid=netY,bot=netY+16;
     ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillStyle=C.white;
     const team=Math.max(1,Math.min(6,lots));
     ctx.font="500 12px 'Syne',sans-serif";
-    ctx.fillText('🧍'.repeat(team)+' '+label+' '+fmtK(invVal),x,cy-12);
+    ctx.fillText('🧍'.repeat(team)+' '+label+' '+fmtK(invVal),x,top);
     ctx.font="500 14px 'DM Mono',monospace";
-    ctx.fillText(fmtPct(runPct),x,cy+2);
-    ctx.fillText(fmtPnl(pnlVal),x,cy+16);
+    // the run% line sits exactly on the net — punch a small hole behind it so the
+    // (very dim) net line doesn't visually cut through the number
+    const runTxt=fmtPct(runPct);
+    const runW=ctx.measureText(runTxt).width;
+    ctx.fillStyle='#181c26';
+    ctx.fillRect(x-runW/2-5,mid-8,runW+10,16);
+    ctx.fillStyle=C.white;
+    ctx.fillText(runTxt,x,mid);
+    ctx.fillText(fmtPnl(pnlVal),x,bot);
 }
-
-/* Small momentum-candle widget (same source/logic as the main app's momentum bar:
-   webchrtpxy.json's last candle — close vs st_line/mirror_line channel, colored by
-   trend). Sits top-left, which is free now that PE's labels moved to top-right. */
 
 function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift){
     ctx.clearRect(0,0,w,h);
@@ -409,22 +410,22 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift){
     ctx.setLineDash([]);
 
     // CE labels stay left, now at the bottom (its new zone); PE labels stay right,
-    // now at the top (its new zone) — CE's info block is still on the left of the
-    // DMZ and PE's still on the right, so each side's info stays together.
+    // now at the top (its new zone). Each shifted off its own dashed TGT line, into
+    // its own zone, instead of sitting exactly on top of the line.
     ctx.font="800 12px 'DM Mono',monospace";ctx.textBaseline='middle';
     ctx.fillStyle=C.white;
     ctx.textAlign='left';
     ctx.fillText('⛔ CE LGT '+(Number(data.ce_lgt)||0).toFixed(1),8,h-PLAYER_MARGIN-12);
-    ctx.fillText('🎯 CE TGT '+(Number(data.ce_tgt)||0).toFixed(1),8,h*ZONE_PE_START);
+    ctx.fillText('🎯 CE TGT '+(Number(data.ce_tgt)||0).toFixed(1),8,h*ZONE_PE_START+12);
     ctx.textAlign='right';
-    ctx.fillText('🎯 PE TGT '+(Number(data.pe_tgt)||0).toFixed(1),w-8,h*ZONE_CE_END);
+    ctx.fillText('🎯 PE TGT '+(Number(data.pe_tgt)||0).toFixed(1),w-8,h*ZONE_CE_END-12);
     ctx.fillText('⛔ PE LGT '+(Number(data.pe_lgt)||0).toFixed(1),w-8,PLAYER_MARGIN+12);
 
-    // net — a real line across the DMZ center with hash marks, not just a color band
+    // net — restored, but very dim; CE's numbers back on the left, PE's on the right.
     const netY=h*(ZONE_CE_END+ZONE_PE_START)/2;
-    ctx.strokeStyle='rgba(255,255,255,0.35)';ctx.lineWidth=1.5;
+    ctx.strokeStyle='rgba(255,255,255,0.14)';ctx.lineWidth=1.5;
     ctx.beginPath();ctx.moveTo(0,netY);ctx.lineTo(w,netY);ctx.stroke();
-    ctx.strokeStyle='rgba(255,255,255,0.22)';ctx.lineWidth=1;
+    ctx.strokeStyle='rgba(255,255,255,0.09)';ctx.lineWidth=1;
     for(let hx=6;hx<w;hx+=14){
         ctx.beginPath();ctx.moveTo(hx,netY-4);ctx.lineTo(hx,netY+4);ctx.stroke();
     }
@@ -433,15 +434,13 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift){
     ctx.font="800 11px 'DM Mono',monospace";
     const atrLabel='DMZ (ATR '+(dashAtr!==null&&!isNaN(dashAtr)?dashAtr:'—')+')';
     const atrW=ctx.measureText(atrLabel).width;
-    ctx.fillStyle='rgba(24,28,38,0.85)';
-    ctx.beginPath();
-    if(ctx.roundRect)ctx.roundRect(w/2-atrW/2-6,netY-9,atrW+12,18,4);else ctx.rect(w/2-atrW/2-6,netY-9,atrW+12,18);
-    ctx.fill();
+    ctx.fillStyle='#181c26';
+    ctx.fillRect(w/2-atrW/2-6,netY-9,atrW+12,18);
     ctx.fillStyle=C.white;
     ctx.fillText(atrLabel,w/2,netY);
 
-    drawDmzInfo(w,h,'CE',Math.max(1,Math.round(Number(data.ce_lots)||1)),Number(data.ce_investment)||0,Number(data.ce_run_pct)||0,Number(data.ce_pnl)||0,0.24);
-    drawDmzInfo(w,h,'PE',Math.max(1,Math.round(Number(data.pe_lots)||1)),Number(data.pe_investment)||0,Number(data.pe_run_pct)||0,Number(data.pe_pnl)||0,0.76);
+    drawDmzInfo(w,h,'CE',Math.max(1,Math.round(Number(data.ce_lots)||1)),Number(data.ce_investment)||0,Number(data.ce_run_pct)||0,Number(data.ce_pnl)||0,0.24,netY);
+    drawDmzInfo(w,h,'PE',Math.max(1,Math.round(Number(data.pe_lots)||1)),Number(data.pe_investment)||0,Number(data.pe_run_pct)||0,Number(data.pe_pnl)||0,0.76,netY);
 
 
     const ceProx=1-Math.min(1,Math.hypot(ballX-ceBat.x,ballY-ceBat.y)/(h*0.18));
