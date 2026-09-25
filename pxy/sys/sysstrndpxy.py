@@ -17,8 +17,8 @@ DEBUG_MODE = False
 CONFIG = {
     "VARIANT": "SINGLE",  # 🔄 SWITCH HERE: "DUAL" or "SINGLE"
     "ST1": {
-        "PERIOD": 1,   # ATR Period synced to Pine Script (atrPeriod)
-        "FACTOR": 1    # Multiplier synced to Pine Script (multiplier)
+        "PERIOD": 3.0,   # ATR Period synced to Pine Script (atrPeriod)
+        "FACTOR": 1.5    # Multiplier synced to Pine Script (multiplier)
     }
 }
 # ==============================================================================
@@ -45,8 +45,8 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     src = (high + low) / 2.0  # hl2 native midpoint
     
     # 🎯 RETRIEVE ATR DIRECTLY FROM THE INTERFACE MODULE AS REQUESTED
-    atr = calculate_atr(df).to_numpy()
-
+    #atr = calculate_atr(df).to_numpy()
+    atr = 7
 
     basic_upper = src + (factor * atr)
     basic_lower = src - (factor * atr)
