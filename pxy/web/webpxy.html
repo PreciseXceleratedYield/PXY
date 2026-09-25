@@ -425,7 +425,7 @@ body{
     <div class="sig-cell" id="cellTrend" style="flex:1;min-width:0;"><span class="sc-lbl">🚀</span><span class="sc-val" id="hcTrend">—</span></div>
     <div class="sig-cell" id="cellATR" style="flex:1;min-width:0;"><span class="sc-lbl">📐</span><span class="sc-val" id="hcATR">—</span></div>
     <div class="sig-cell" id="cellDirection" style="flex:1;min-width:0;"><span class="sc-lbl">🧭</span><span class="sc-val" id="hcDirection">—</span></div>
-    <div class="sig-cell" id="cellDP" style="flex:2.5;min-width:0;"><span class="sc-lbl">⚡⚡</span><span class="sc-val" id="dpText">—</span></div>
+    <div class="sig-cell" id="cellDP" style="flex:3.5;min-width:0;"><span class="sc-lbl">⚡⚡</span><span class="sc-val" id="dpText">—</span></div>
     <div class="sig-cell" id="cellBooked" style="flex:1;min-width:0;"><span class="sc-lbl">✅</span><span class="sc-val" id="pnlBooked">—</span></div>
 </div>
 
@@ -614,8 +614,8 @@ function emojifyEntry(v){
 }
 function emojifyExit(v){
     const s=String(v||'').toUpperCase();
-    if(s.includes('BUY')||s.includes('BULL'))return'▲';
-    if(s.includes('SELL')||s.includes('BEAR'))return'▼';
+    if(s.includes('BUY')||s.includes('BULL'))return'▲▲';
+    if(s.includes('SELL')||s.includes('BEAR'))return'▼▼';
     if(s.includes('SIDE'))return'●';
     if(s==='NONE')return'—';
     return v;
@@ -630,8 +630,8 @@ function emojifyTrend(v){
 }
 function emojifyDirection(v){
     const s=String(v||'').toUpperCase();
-    if(s==='UP')return'🟢▲';
-    if(s==='DOWN')return'🔴▼';
+    if(s==='UP')return'🍏';
+    if(s==='DOWN')return'🍎';
     if(s==='NONE'||!s)return'—';
     return v;
 }
@@ -784,7 +784,7 @@ async function loadDash(){
             const cellDP=$('cellDP');
             if(cellDP){
                 cellDP.className='sig-cell';
-                cellDP.style.flex='2.5';
+                cellDP.style.flex='3.5';
                 cellDP.classList.add(last.bull?'bull-cell':'bear-cell');
             }
         }
