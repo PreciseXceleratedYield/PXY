@@ -46,7 +46,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     
     # 🎯 RETRIEVE ATR DIRECTLY FROM THE INTERFACE MODULE AS REQUESTED
     #atr = calculate_atr(df).to_numpy()
-    atr = 7
+    atr = 5
 
     basic_upper = src + (factor * atr)
     basic_lower = src - (factor * atr)
