@@ -108,15 +108,28 @@ body{
 .tab-pane{position:absolute;inset:0;display:none;flex-direction:column;}
 .tab-pane.active{display:flex;}
 
+.pane-resizer{display:none;}
+
 /* ── DESKTOP: show all 3 panels side by side ── */
 @media (min-width:900px){
     #tabContent{display:flex;flex-direction:row;}
     .tab-pane{position:relative;inset:auto;display:flex!important;flex-direction:column;height:100%;border-right:1px solid var(--border);}
     .tab-pane:last-child{border-right:none;}
-    #paneTerminal{flex:0 0 28%;max-width:28%;}
+    #paneTerminal{flex:0 0 calc(28% + 2ch);max-width:calc(28% + 2ch);}
     #panePositions{flex:0 0 24%;max-width:24%;}
     #paneChart{flex:1 1 auto;min-width:0;}
     #tabBar{display:none!important;}
+    .pane-resizer{
+        display:block;flex:0 0 5px;width:5px;cursor:col-resize;
+        background:transparent;position:relative;z-index:2;
+    }
+    .pane-resizer::after{
+        content:'';position:absolute;top:0;bottom:0;left:2px;width:1px;
+        background:var(--border2);
+    }
+    .pane-resizer:hover::after,.pane-resizer.dragging::after{
+        left:0;width:5px;background:var(--accent);opacity:0.5;
+    }
     /* Let the relocated PNL bar breathe inside its column */
     #paneTerminal #pnlBar{
         height:auto!important;flex-shrink:0;padding:14px 8px;margin-top:auto;
@@ -325,6 +338,8 @@ body{
         <div id="termBox"></div>
     </div>
 
+    <div id="resizerTerminal" class="pane-resizer"></div>
+
     <!-- CHART -->
     <div class="tab-pane" id="paneChart">
         <div class="pane-hdr hdr-chart">
@@ -424,9 +439,9 @@ body{
     <div class="sig-cell" id="cellExit" style="flex:1;min-width:0;"><span class="sc-lbl">🛬</span><span class="sc-val" id="hcExit">—</span></div>
     <div class="sig-cell" id="cellTrend" style="flex:1;min-width:0;"><span class="sc-lbl">🚀</span><span class="sc-val" id="hcTrend">—</span></div>
     <div class="sig-cell" id="cellATR" style="flex:1;min-width:0;"><span class="sc-lbl">📐</span><span class="sc-val" id="hcATR">—</span></div>
-    <div class="sig-cell" id="cellDirection" style="flex:1;min-width:0;"><span class="sc-lbl">🧭</span><span class="sc-val" id="hcDirection">—</span></div>
     <div class="sig-cell" id="cellDP" style="flex:3.5;min-width:0;"><span class="sc-lbl">⚡⚡</span><span class="sc-val" id="dpText">—</span></div>
     <div class="sig-cell" id="cellBooked" style="flex:1;min-width:0;"><span class="sc-lbl">✅</span><span class="sc-val" id="pnlBooked">—</span></div>
+    <div class="sig-cell" id="cellDirection" style="flex:1;min-width:0;"><span class="sc-lbl">🧭</span><span class="sc-val" id="hcDirection">—</span></div>
 </div>
 
 <!-- TAB BAR -->
@@ -1528,6 +1543,36 @@ $('cfgSave').addEventListener('click',()=>{
     $('updPopup').style.display='flex';
     setTimeout(()=>$('updPwd').focus(),80);
 });
+
+/* ── Draggable Terminal/Chart divider (desktop only — resizer is hidden on mobile) ── */
+(function(){
+    const resizer=$('resizerTerminal'),term=$('paneTerminal'),container=$('tabContent');
+    if(!resizer||!term||!container)return;
+    const MIN_PCT=15,MAX_PCT=45;
+    const saved=localStorage.getItem('pxyTerminalWidthPct');
+    if(saved){term.style.flex='0 0 '+saved+'%';term.style.maxWidth=saved+'%';}
+    let dragging=false;
+    resizer.addEventListener('mousedown',e=>{
+        dragging=true;resizer.classList.add('dragging');
+        document.body.style.userSelect='none';
+        e.preventDefault();
+    });
+    window.addEventListener('mousemove',e=>{
+        if(!dragging)return;
+        const rect=container.getBoundingClientRect();
+        let pct=((e.clientX-rect.left)/rect.width)*100;
+        pct=Math.max(MIN_PCT,Math.min(MAX_PCT,pct));
+        term.style.flex='0 0 '+pct+'%';
+        term.style.maxWidth=pct+'%';
+    });
+    window.addEventListener('mouseup',()=>{
+        if(!dragging)return;
+        dragging=false;resizer.classList.remove('dragging');
+        document.body.style.userSelect='';
+        const pct=parseFloat(term.style.maxWidth);
+        if(!isNaN(pct))localStorage.setItem('pxyTerminalWidthPct',pct.toFixed(2));
+    });
+})();
 
 /* ── START ── */
 initTerm();connect();
