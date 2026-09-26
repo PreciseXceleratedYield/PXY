@@ -88,7 +88,7 @@ while True:
             print(f"📊 Loop#{loop_counter} Sub#{sub_itr} | Execution Stack Running...")
             
             # -------- REARRANGED RE-ORDERED CORE EXECUTION STACK --------
-            safe_run(HERE / "exernkopxy.py", timeout=None)  # 1️⃣ Infinite exception
+            safe_run(HERE / "exernkopxy.py", timeout=90)  # 1️⃣ Infinite exception
             safe_run(HERE / "exeexitpxy.py", timeout=45)    # 2️⃣ Clean target exit evaluation (Locks profits first)
             safe_run(HERE / "exeentrpxy.py", timeout=45)    # 3️⃣ Entry generation script (Deploys new layout)
             safe_run(HERE / "exeenexpxy.py", timeout=45)    # 4️⃣ Balancing / Averaging Engine (Runs adjustments last)
