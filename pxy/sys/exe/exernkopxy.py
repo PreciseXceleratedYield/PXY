@@ -1,7 +1,8 @@
+#!/usr/bin/env python3
+# exernkopxy.py (Part 1)
 import os
 import sys
 import json
-import time
 import subprocess
 import pytz
 from datetime import datetime
@@ -26,6 +27,7 @@ PNL_JSON_PATH = os.path.abspath(os.path.join(current_dir, "../../web/webpnlpxy.j
 POS_JSON_PATH = os.path.abspath(os.path.join(current_dir, "../../web/webpospxy.json"))
 RENKO_STATE_FILE = os.path.abspath(os.path.join(current_dir, "../../web/webrinkopxy.json"))
 SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(current_dir, "../../web/websqrpxy.json"))
+CHECK_STATE_FILE = os.path.abspath(os.path.join(current_dir, "../../web/webrnkchkpxy.json"))
 
 # RISK CONFIGURATION CONSTANTS
 EMERGENCY_RETRY_SECONDS = 5.0
@@ -50,7 +52,6 @@ class DynamicFloatProxy:
 
 # This explicitly defines the name for the compiler so your downstream code doesn't crash
 TRAILING_DROP_LIMIT = DynamicFloatProxy()
-
 
 
 def safe_load_json_pnl(file_path):
@@ -94,18 +95,43 @@ def safe_load_json_pnl(file_path):
             val = data.get("PNL") or data.get("pnl") or data.get("total_pnl") or 0.0
             return float(val)
         return 0.0
+    except (json.JSONDecodeError, PermissionError):
+        # 🛡️ FIX: Returns None to signal a file-access conflict frame skip
+        return None
     except Exception as e:
         print(f"{Fore.RED}⚠️ Critical Parse Error on {os.path.basename(file_path)}: {e}")
         return 0.0
 
+def load_check_state():
+    """Loads consecutive breach counter to maintain context across external supervisor loops."""
+    if not os.path.exists(CHECK_STATE_FILE):
+        return {"consecutive_breaches": 0}
+    try:
+        with open(CHECK_STATE_FILE, "r") as f:
+            return json.load(f)
+    except Exception:
+        return {"consecutive_breaches": 0}
+
+def save_check_state(counter):
+    """Saves consecutive breach status cleanly to disk."""
+    try:
+        payload = {
+            "consecutive_breaches": int(counter),
+            "updated_time": datetime.now().strftime('%H:%M:%S')
+        }
+        with open(CHECK_STATE_FILE, "w") as f:
+            json.dump(payload, f, indent=4)
+    except Exception:
+        pass
+
 def load_session_state():
     if not os.path.exists(RENKO_STATE_FILE):
-        return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": -TRAILING_DROP_LIMIT}
+        return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": -float(TRAILING_DROP_LIMIT)}
     try:
         with open(RENKO_STATE_FILE, "r") as f:
             return json.load(f)
     except Exception:
-        return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": -TRAILING_DROP_LIMIT}
+        return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": -float(TRAILING_DROP_LIMIT)}
 
 def save_session_state(peak_value, current_net, exit_line):
     try:
@@ -125,6 +151,7 @@ def save_session_state(peak_value, current_net, exit_line):
             json.dump(payload, f, indent=4)
     except Exception as e:
         print(f"{Fore.RED}⚠️ Web State Sync Error: {e}")
+# exernkopxy.py (Part 2)
 
 def verify_and_purge_stale_cache():
     """Instantly clears stale web files if their update dates don't match today's date."""
@@ -138,8 +165,8 @@ def verify_and_purge_stale_cache():
     if today_str not in last_update_time:
         print(f"\n⏰ {Fore.GREEN}{Style.BRIGHT}NEW TRADING DAY DETECTED! RUNNING INSTANT DATA PURGE...")
         
-        # Purge files including the new square-off tracker file for target_file_path in [PNL_JSON_PATH, POS_JSON_PATH, SQUAREOFF_LOG_FILE]:
-        for target_file_path in [PNL_JSON_PATH, POS_JSON_PATH, SQUAREOFF_LOG_FILE]:
+        # Purge files including the new square-off tracker file
+        for target_file_path in [PNL_JSON_PATH, POS_JSON_PATH, SQUAREOFF_LOG_FILE, CHECK_STATE_FILE]:
             if os.path.exists(target_file_path):
                 file_mod_timestamp = os.path.getmtime(target_file_path)
                 file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, IST).strftime("%Y-%m-%d")
@@ -147,17 +174,19 @@ def verify_and_purge_stale_cache():
                     print(f"⚠️ {Fore.YELLOW}STALE FILE DETECTED: {os.path.basename(target_file_path)} belongs to yesterday ({file_mod_date_str}).")
                     try:
                         with open(target_file_path, "w") as fw:
-                            json.dump([], fw)
+                            if "pxy.json" in target_file_path:
+                                json.dump([], fw)
+                            else:
+                                json.dump({"consecutive_breaches": 0}, fw)
                         print(f"🧹 {Fore.GREEN}Successfully purged stale data from {os.path.basename(target_file_path)}.")
                     except Exception as file_err:
                         print(f"{Fore.RED}❌ Error clearing stale file: {file_err}")
                         
         # Peak explicitly reset to 0.0 on morning purge
-        save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
+        save_session_state(0.0, 0.0, -float(TRAILING_DROP_LIMIT))
+        save_check_state(0)
         print(f"🧹 {Fore.CYAN}Cleaned up tracking cache file: {RENKO_STATE_FILE}\n")
 
-from datetime import datetime
-import pytz
 
 def write_squareoff_success_log():
     """Generates a tracking timestamp payload confirming positions are completely cleared in IST."""
@@ -177,23 +206,35 @@ def write_squareoff_success_log():
         print(f"💾 {Fore.GREEN}Success entry documented in: {os.path.basename(SQUAREOFF_LOG_FILE)}")
     except Exception as e:
         print(f"{Fore.RED}❌ Error writing square-off log: {e}")
+
+
 def start_trailing_engine():
-    """Monitors live data boundaries and executes targeted output grepping when limits are hit."""
+    """Monitors live data boundaries on a single-pass framework driven by an external pipeline."""
     verify_and_purge_stale_cache()
 
     initial_state = load_session_state()
     session_peak_pnl = float(initial_state.get("session_peak_pnl", 0.0))
     
+    check_state = load_check_state()
+    consecutive_breaches = int(check_state.get("consecutive_breaches", 0))
+    
     try:
         realised_pnl = safe_load_json_pnl(PNL_JSON_PATH)
         unrealised_pnl = safe_load_json_pnl(POS_JSON_PATH)
+        
+        # 🛡️ TRIPLE-CHECK GUARD A: Handle transient file lock clashes safely
+        if realised_pnl is None or unrealised_pnl is None:
+            save_check_state(0) # Clear temporary tracking steps
+            sys.exit(0) # Exit cleanly and let the supervisor loop check next cycle
+            
         current_net_pnl = realised_pnl + unrealised_pnl
         
         # Shift peak upwards dynamically if cumulative returns hit new records
         if current_net_pnl > session_peak_pnl:
             session_peak_pnl = current_net_pnl
             
-        active_exit_line = session_peak_pnl - TRAILING_DROP_LIMIT
+        float_drop_limit = float(TRAILING_DROP_LIMIT)
+        active_exit_line = session_peak_pnl - float_drop_limit
         save_session_state(session_peak_pnl, current_net_pnl, active_exit_line)
         
         sign_prefix = "+" if active_exit_line > 0 else ""
@@ -208,75 +249,30 @@ def start_trailing_engine():
             f"Peak@{Fore.WHITE}₹{session_peak_pnl:,.0f}{Style.RESET_ALL}"
         )
 
-        # -------- TRIGGER AND BREAK LOGIC TIMELINE --------
-        if current_net_pnl <= active_exit_line:
-            if EXECUTE_SQUARE_OFF:
-                print(f"\n🚨 {Fore.RED}{Style.BRIGHT}LOSS TRIGGER BREACHED! Entering live confirmation verification loop...")
-                script_path = os.path.join(current_dir, "exesqrpxy.py")
-                
-                # Dynamic Environment Fallback: Automatically falls back if environment maps path uniquely
-                python_executable = sys.executable if sys.executable else "python"
-                
-                no_active_positions_counter = 0
-                
-                # 🔄 RUN FOREVER LOGIC: Continuously validates positions drop to zero
-                while True:
-                    print(f"⚡ [{time.strftime('%H:%M:%S')}] {Fore.MAGENTA}Firing: {python_executable} exesqrpxy.py -all")
+        # -------- TRIPLE-CHECK GUARD B: THRESHOLD LOGIC INTERACTION TIMELINE --------
+        if current_net_pnl <= active_exit_line or current_net_pnl == 0.0:
+            consecutive_breaches += 1
+            save_check_state(consecutive_breaches)
+            print(f"⚠️ {Fore.YELLOW}THRESHOLD ALERT TRACKER: Breach Count at ({consecutive_breaches}/3)")
+            
+            if consecutive_breaches >= 3:
+                if EXECUTE_SQUARE_OFF:
+                    print(f"\n🚨 {Fore.RED}{Style.BRIGHT}TRIPLE BREACH CONFIRMED! Activating emergency kill script routing...")
+                    script_path = os.path.join(current_dir, "exesqrpxy.py")
+                    python_executable = sys.executable if sys.executable else "python"
                     
-                    if os.path.exists(script_path):
-                        try:
-                            # Run the process with the "-all" argument and capture text outputs
-                            process = subprocess.Popen(
-                                [python_executable, script_path, "-all"],
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT,
-                                text=True,
-                                bufsize=1
-                            )
-                            
-                            found_phrase_in_this_run = False
-                            
-                            # Stream live console outputs line-by-line
-                            for line in process.stdout:
-                                sys.stdout.write(line)
-                                sys.stdout.flush()
-                                
-                                # Grep target confirmation phrase
-                                if "No active positions to exit" in line:
-                                    found_phrase_in_this_run = True
-                            
-                            process.wait()
-                            
-                            # Increment or reset the confirmation safety counter
-                            if found_phrase_in_this_run:
-                                no_active_positions_counter += 1
-                                print(f"🎯 {Fore.CYAN}Grep Match Verified! Count: ({no_active_positions_counter}/3)")
-                            else:
-                                no_active_positions_counter = 0  # Broken chain reset
-                                
-                            # Exit loop and close engine cleanly when 3 consecutive confirmations match
-                            if no_active_positions_counter >= 3:
-                                print(f"\n✅ {Fore.GREEN}{Style.BRIGHT}TRIPLE MATCH CONFIRMED: No positions remain active.")
-                                write_squareoff_success_log()
-                                # Peak explicitly reset to 0.0 here upon final confirmed exit
-                                save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
-                                sys.exit(0)
-                                
-                        except Exception as proc_err:
-                            print(f"{Fore.RED}❌ Process routing engine error: {proc_err}")
-                            no_active_positions_counter = 0
-                    else:
-                        print(f"{Fore.RED}❌ Square-off script missing at: {script_path}")
+                    # Run the execution routine once. The external engine handles continuous stack loops.
+                    subprocess.run([python_executable, script_path, "-all"])
                     
-                    # Peak explicitly reset to 0.0 here during loop retry passes
-                    save_session_state(0.0, 0.0, -TRAILING_DROP_LIMIT)
-                    print(f"⏳ {Fore.YELLOW}Retry pass complete. Re-checking loop in {EMERGENCY_RETRY_SECONDS} seconds...\n")
-                    time.sleep(EMERGENCY_RETRY_SECONDS)
-            else:
-                print(f"\n⚠️ {Fore.YELLOW}{Style.BRIGHT}WARNING TARGET BREACHED: Threshold line {exit_display_str} violated!")
+                    # Wiping counters and active memory coordinates clear upon full verified exit execution
+                    write_squareoff_success_log()
+                    save_session_state(0.0, 0.0, -float_drop_limit)
+                    save_check_state(0)
                 sys.exit(0)
         else:
-            # ✅ BREAK ENGINE OUT: Safe condition verified. Return control to shell loop supervisor.
+            # Condition is completely healthy. Wipe iteration breach counter back to zero.
+            if consecutive_breaches > 0:
+                save_check_state(0)
             sys.exit(0)
 
     except Exception as e:
@@ -286,3 +282,4 @@ def start_trailing_engine():
 
 if __name__ == "__main__":
     start_trailing_engine()
+
