@@ -118,7 +118,6 @@ def target_price(row, df=None):
             return 0.0
             
         symbol = str(row.get('symbol', 'unknown')).upper()
-        derived_entry = str(row.get('entry', '')).upper().strip()
         
         is_ce = 'CE' in symbol
         is_pe = 'PE' in symbol
@@ -134,10 +133,16 @@ def target_price(row, df=None):
             pe_rows = working_df[working_df['side'] == 'PE']
             ce_inv, pe_inv = _get_investments(ce_rows, pe_rows)
 
-        if (is_ce and derived_entry in ['EXITCE', 'OTMSELL']) or (is_pe and derived_entry in ['EXITPE', 'OTMBUY']):
+        # ✅ DYNAMIC SIGNAL LOCK: Pulls the absolute single source of truth trend key from the dataframe
+        active_exit = str(df.iloc[-1].get("exit", "NONE")).upper().strip() if (df is not None and not df.empty) else ("BULL" if is_ce else "BEAR")
+        
+        # ✅ SURGICAL RE-ALIGNMENT USING ONLY ACTIVE_EXIT
+        if (is_ce and active_exit == 'BEAR') or (is_pe and active_exit == 'BULL'):
+            # Counter-Trend Side: Immediately locks to your flat 4.10% baseline floor
             target_pct = exeagtpxy.BASE_COUNTER_TARGET_PCT
         else:
-            target_pct = exeagtpxy.calculate_dynamic_target('CE' if is_ce else 'PE', 'BULL' if is_ce else 'BEAR', ce_inv, pe_inv)
+            # Trend-Aligned Side: Computes your precise dynamic cubed target equation
+            target_pct = exeagtpxy.calculate_dynamic_target('CE' if is_ce else 'PE', active_exit, ce_inv, pe_inv)
             
         return exeagtpxy.calculate_target_price_premium(entry_prc, target_pct)
     except Exception as e:
