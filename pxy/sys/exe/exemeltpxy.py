@@ -1,7 +1,7 @@
 import pytz
 from datetime import datetime
 
-INITIAL_TRAILING_DROP = 4600.0
+INITIAL_TRAILING_DROP = 5000
 MELT_RATE_PER_MINUTE = 10.0
 
 def get_dynamic_trailing_drop() -> float:
