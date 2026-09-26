@@ -80,11 +80,11 @@ def check_trend_collapse_exit(df, client):
 
         # 3️⃣ CRITICAL ACCELERATION MATCH WITH BIAS EXIT GATES
         if (
-            active_count > 2
-            and combined_depth < 3
-            and active_pnl_sum > (active_count * 500)
-            and has_both_sides
-            and side_condition_met
+            active_count >= 3                 # 📊 Catches your 2CE + 1PE footprint cleanly
+            and combined_depth < 3            # ⚡ Catches the exact peak momentum orderbook thinness
+            and active_pnl_sum >= 140         # 💰 Clear of 139 target floor with slippage protection margin
+            and has_both_sides                # 🔒 Validates that dual-hedged layers protect the account
+            and side_condition_met            # 🚥 Checks hostile signal mix / trend flip against your heavy leg
         ):
 
             print(
