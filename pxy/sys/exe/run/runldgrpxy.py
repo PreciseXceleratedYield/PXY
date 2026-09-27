@@ -108,16 +108,23 @@ def run_snapshot_report():
         return
 
     try:
-        # Fetch live data arrays directly from broker endpoints
-        margin_res = client.margin()
+        # Fetch live data arrays directly using your working methods
         pos_res = client.positions()
         ord_res = client.orders()
         
-        # Unpack arrays securely using Kotak Neo V2 format models
-        positions_list = pos_res.get("data", [])
-        orders_list = ord_res.get("data", [])
-        margin_data = margin_res.get("Margin", {})
-        raw_margin = margin_data.get("availableMargin", 0.0)
+        # Support both positions/limits endpoints if funds matches your setup
+        try:
+            margin_res = client.limits()
+        except AttributeError:
+            margin_res = client.margin()
+        
+        # Unpack arrays securely using your existing object structural paths
+        positions_list = pos_res.get("data", []) if isinstance(pos_res, dict) else []
+        orders_list = ord_res.get("data", []) if isinstance(ord_res, dict) else []
+        
+        # Extract margin safely
+        margin_data = margin_res.get("Margin", margin_res.get("data", {})) if isinstance(margin_res, dict) else {}
+        raw_margin = margin_data.get("availableMargin", margin_data.get("cfBal", 0.0))
     except Exception as e:
         print(pad_row(f"❌ API Failure: {str(e)}", W))
         return
@@ -140,7 +147,7 @@ def run_snapshot_report():
     active_orders = [o for o in orders_list if str(o.get("status", "")).upper() == "WORKING"]
     output_lines.append(pad_row(f"⏳ Ord Working: {len(active_orders)}", W))
     for ord in active_orders:
-        sym = str(ord.get("trdSym", "UNK"))[-7:]  # Keep strike context visible
+        sym = str(ord.get("trdSym", "UNK"))[-7:]
         side = "B" if "BUY" in str(ord.get("side", "")).upper() else "S"
         qty = abs(int(float(ord.get("qty", 0))))
         price = int(force_trailing_zero(ord.get("price", 0.0)))
@@ -150,14 +157,22 @@ def run_snapshot_report():
     output_lines.append("-" * W)
 
     # 3. Active Positions & PnL Processing
-    active_positions = [p for p in positions_list if int(float(p.get("net_qty", 0))) != 0]
+    active_positions = []
+    for p in positions_list:
+        net_qty = float(p.get("net_qty", 0))
+        if net_qty == 0:
+            buy = float(p.get("flBuyQty", 0))
+            sell = float(p.get("flSellQty", 0))
+            net_qty = buy - sell
+        if abs(net_qty) > 0:
+            active_positions.append((p, net_qty))
+
     output_lines.append(pad_row(f"📊 Live Open: {len(active_positions)}", W))
     
     total_unrealized_pnl = 0.0
-    for pos in active_positions:
+    for pos, qty in active_positions:
         sym = str(pos.get("trdSym", "UNK"))[-7:]
-        qty = int(float(pos.get("net_qty", 0)))
-        entry_prc = float(pos.get("buy_prc", 0.0))
+        entry_prc = float(pos.get("buy_prc", pos.get("flBuyPrc", 0.0)))
         ltp = float(pos.get("sell_prc", pos.get("ltp", 0.0)))
         
         raw_pnl = (ltp - entry_prc) * qty
@@ -165,7 +180,7 @@ def run_snapshot_report():
         total_unrealized_pnl += sanitized_pnl
         
         status_flag = "🟢" if sanitized_pnl >= 0 else "🔴"
-        output_lines.append(pad_row(f" {status_flag} {sym} [Q:{qty}]", W))
+        output_lines.append(pad_row(f" {status_flag} {sym} [Q:{int(qty)}]", W))
         
         pnl_str = f"₹{sanitized_pnl:,}"
         metrics = f"   E:{int(force_trailing_zero(entry_prc))}|L:{int(force_trailing_zero(ltp))}"
