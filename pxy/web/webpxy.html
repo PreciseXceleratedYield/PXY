@@ -86,7 +86,7 @@ body{
 /* ── SIGNAL BAR ── */
 .sig-cell{
     flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:0 6px;gap:1px;border-right:1px solid rgba(255,255,255,0.09);
+    padding:0 6px;gap:1px;border-right:1px solid rgba(255,255,255,0.16);
     position:relative;min-width:0;
 }
 .sig-cell:last-child{border-right:none;}
@@ -439,7 +439,7 @@ body{
     <div class="sig-cell" id="cellExit" style="flex:1;min-width:0;"><span class="sc-lbl">🛬</span><span class="sc-val" id="hcExit">—</span></div>
     <div class="sig-cell" id="cellDirection" style="flex:1;min-width:0;"><span class="sc-lbl">🧭</span><span class="sc-val" id="hcDirection">—</span></div>
     <div class="sig-cell" id="cellATR" style="flex:1;min-width:0;"><span class="sc-lbl">📐</span><span class="sc-val" id="hcATR">—</span></div>
-    <div class="sig-cell" id="cellDP" style="flex:3.5;min-width:0;"><span class="sc-lbl">⚡⚡</span><span class="sc-val" id="dpText">—</span></div>
+    <div class="sig-cell" id="cellDP" style="flex:4;min-width:0;"><span class="sc-lbl">⚡⚡</span><span class="sc-val" id="dpText">—</span></div>
     <div class="sig-cell" id="cellTrend" style="flex:1;min-width:0;"><span class="sc-lbl">🚀</span><span class="sc-val" id="hcTrend">—</span></div>
     <div class="sig-cell" id="cellBooked" style="flex:1;min-width:0;"><span class="sc-lbl">✅</span><span class="sc-val" id="pnlBooked">—</span></div>
 </div>
@@ -799,7 +799,7 @@ async function loadDash(){
             const cellDP=$('cellDP');
             if(cellDP){
                 cellDP.className='sig-cell';
-                cellDP.style.flex='3.5';
+                cellDP.style.flex='4';
                 cellDP.classList.add(last.bull?'bull-cell':'bear-cell');
             }
         }
