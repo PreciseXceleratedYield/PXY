@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PXY® Game">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#06080d">
+<title>PXY® — Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+:root,[data-theme="dark"]{
+    --bg:#181c26;--bg2:#181c26;--bg3:#20242e;
+    --border:rgba(255,255,255,0.025);--border2:rgba(255,255,255,0.045);
+    --text:#d5dae5;--muted:#7d8aa0;--accent:#3b82f6;
+    --bull:#26a69a;--bear:#ef5350;--gold:#f0b429;
+    --bull-dim:rgba(38,166,154,0.10);--bear-dim:rgba(239,83,80,0.10);
+    --grid:rgba(255,255,255,0.02);--track-mid:rgba(255,255,255,0.09);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{height:100%;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);}
+body{
+    height:100dvh;display:flex;flex-direction:column;
+    font-family:'DM Mono',monospace;background:var(--bg);color:var(--text);
+    overflow:hidden;overscroll-behavior:none;-webkit-tap-highlight-color:transparent;
+    font-variant-numeric:tabular-nums;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+*{scrollbar-width:thin;scrollbar-color:var(--bg3) transparent;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--bg3);border-radius:3px;border:1px solid var(--border2);}
+::-webkit-scrollbar-thumb:hover{background:var(--muted);}
+
+/* ── HEADER — identical to webpxy.html ── */
+#hdr{
+    height:44px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+    padding:0 12px;position:relative;
+    background:linear-gradient(180deg,#1d212c,#181c26);
+    border-bottom:1px solid var(--border2);
+}
+#hdr::after{
+    content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;
+    background:var(--accent);opacity:0.5;
+}
+.hdr-l,.hdr-r{display:flex;align-items:center;gap:8px;}
+.logo{
+    font-family:'Syne',sans-serif;font-weight:800;font-size:17px;user-select:none;
+    position:relative;padding-left:10px;color:var(--text);
+}
+.logo::before{
+    content:'';position:absolute;left:0;top:1px;bottom:1px;width:3px;
+    background:var(--accent);border-radius:2px;
+}
+.logo sup{font-size:0.5em;vertical-align:super;color:var(--gold);}
+
+/* ── GAME MID ── */
+#gameMid{flex:1;min-height:0;position:relative;background:#181c26;}
+canvas{display:block;width:100%;height:100%;}
+#statusLine{
+    position:absolute;top:6px;left:0;right:0;text-align:center;pointer-events:none;
+    font:700 10px 'DM Mono',monospace;color:#ffffff;letter-spacing:0.1em;text-transform:uppercase;
+}
+
+/* ── RISK BAR — identical to webpxy.html ── */
+#riskBar{
+    height:56px;flex-shrink:0;display:flex;align-items:center;
+    padding:0 6px;gap:6px;background:var(--bg2);
+    border-bottom:1px solid var(--border);overflow:hidden;
+}
+.rsk-grp{display:flex;flex-direction:column;gap:1px;flex-shrink:0;}
+.rsk-lbl{font-size:7px;letter-spacing:0.10em;text-transform:uppercase;color:#ffffff;white-space:nowrap;}
+.rsk-val{font-family:'Syne',sans-serif;font-weight:800;font-size:12px;white-space:nowrap;color:#ffffff;}
+.rsk-val.bull{color:var(--bull);}
+.rsk-val.bear{color:var(--bear);}
+.rsk-candle-wrap{flex:1;min-width:0;height:42px;position:relative;overflow:hidden;}
+#rskCanvas{position:absolute;inset:0;width:100%!important;height:100%!important;}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div id="hdr">
+    <div class="hdr-l">
+        <span class="logo">PXY<sup>®</sup></span>
+        <span id="brandHdr" style="font-family:'Syne',sans-serif;font-weight:700;font-size:9px;letter-spacing:0.06em;white-space:nowrap;"><span style="color:var(--bull);">P</span><span style="color:var(--muted);">recise</span><span style="color:var(--bear);">X</span><span style="color:var(--muted);">celerated</span><span style="color:var(--bull);">Y</span><span style="color:var(--muted);">ield Pvt Ltd</span><sup style="color:var(--muted);">™</sup></span>
+    </div>
+    <div style="flex:1;"></div>
+    <div class="hdr-r">
+        <span id="clk" style="font-family:'DM Mono',monospace;font-size:14.4px;font-weight:800;color:#fff;letter-spacing:0.03em;white-space:nowrap;" title="Host">—</span>
+    </div>
+</div>
+
+<!-- GAME -->
+<div id="gameMid">
+    <canvas id="cv"></canvas>
+    <div id="statusLine">connecting…</div>
+</div>
+
+<!-- RISK BAR -->
+<div id="riskBar">
+    <div class="rsk-grp">
+        <span class="rsk-lbl">⛔ Stop</span>
+        <span class="rsk-val" id="rskNet">—</span>
+    </div>
+    <div class="rsk-candle-wrap"><canvas id="rskCanvas"></canvas></div>
+    <div class="rsk-grp" style="align-items:flex-end;">
+        <span class="rsk-lbl">📈 Peak</span>
+        <span class="rsk-val" id="rskPeak">—</span>
+    </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+
+/* ── HOSTNAME — same as webpxy.html's header ── */
+async function loadHostname(){
+    try{
+        const d=await fetch('/hostname').then(r=>r.json());
+        const el=$('clk');
+        if(el)el.textContent=String(d.hostname||'—').split('.')[0].toUpperCase();
+    }catch(e){const el=$('clk');if(el)el.textContent='—';}
+}
+loadHostname();
+setInterval(loadHostname,30000);
+
+/* ══════════════════════════════════════════════════════════════
+   GAME — identical logic to webgamepxy.html
+   ══════════════════════════════════════════════════════════════ */
+
+const cv=document.getElementById('cv');
+const ctx=cv.getContext('2d');
+function resize(){
+    const dpr=window.devicePixelRatio||1;
+    cv.width=cv.clientWidth*dpr;
+    cv.height=cv.clientHeight*dpr;
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+window.addEventListener('resize',resize);
+resize();
+
+const C={
+    bull:'#26a69a',bear:'#ef5350',gold:'#f0b429',bg3:'#20242e',
+    bullDim:'rgba(38,166,154,0.045)',bearDim:'rgba(239,83,80,0.045)',
+    white:'#ffffff',tennis:'#d4f429'
+};
+const ZONE_CE_END=0.42, ZONE_PE_START=0.58;
+const PLAYER_MARGIN=46;    // keeps a player at the LGT extreme fully on-screen (sprite extends ~20-35px past its center)
+const DMZ_PUSH_MAX=0.55;   // how far into the DMZ a player who has cleared TGT can advance (fraction of DMZ height)
+const RACKET_LOCAL={x:40,y:-4};   // racket head position in the player's local (unrotated) frame
+const BASE_SWING=0.35;            // nominal resting swing angle, used for targeting so the ball aims at the actual head
+const SLIDE_MARGIN=58;            // keep the racket clear of the court edges
+
+/* ── 5 rally "styles" — parameters swap every 5s so the rally doesn't feel like
+   the same repeating loop. Chosen at random, never repeating the previous one. ── */
+const VARIANTS=[
+    {name:'fast-rally',      ballMs:850, bounceAt:0.56, slideMs:460, slideAmp:0.34, arcA:34, arcB:14},
+    {name:'long-lob',        ballMs:1500,bounceAt:0.70, slideMs:900, slideAmp:0.22, arcA:52, arcB:26},
+    {name:'power-smash',     ballMs:700, bounceAt:0.50, slideMs:380, slideAmp:0.36, arcA:24, arcB:10},
+    {name:'steady-baseline', ballMs:1100,bounceAt:0.60, slideMs:650, slideAmp:0.28, arcA:38, arcB:18},
+    {name:'defensive-rally', ballMs:1350,bounceAt:0.68, slideMs:800, slideAmp:0.24, arcA:46, arcB:22}
+];
+let BALL_MS,BOUNCE_AT,SLIDE_MS,SLIDE_AMP,ARC_A,ARC_B,curVariant=-1;
+function applyVariant(idx){
+    const v=VARIANTS[idx];
+    BALL_MS=v.ballMs;BOUNCE_AT=v.bounceAt;SLIDE_MS=v.slideMs;SLIDE_AMP=v.slideAmp;ARC_A=v.arcA;ARC_B=v.arcB;
+    curVariant=idx;
+}
+applyVariant(3);
+
+/* Variant picked from real ATR (webdashpxy.json), not pure randomness: high ATR (relative
+   to what we've recently seen) → fast/aggressive style; low ATR → slow/defensive style;
+   mid-range → steady baseline. Falls back to a random pick until enough ATR samples exist. */
+let atrHistory=[];
+const POOL_HIGH=[0,2],POOL_MID=[3],POOL_LOW=[1,4];
+function pickVariant(){
+    let pool=null;
+    if(dashAtr!==null&&!isNaN(dashAtr)&&atrHistory.length>=3){
+        const lo=Math.min(...atrHistory),hi=Math.max(...atrHistory);
+        const frac=hi>lo?(dashAtr-lo)/(hi-lo):0.5;
+        pool=frac>=0.66?POOL_HIGH:frac<=0.33?POOL_LOW:POOL_MID;
+    }
+    if(!pool)pool=VARIANTS.map((_,i)=>i);
+    let choices=pool.filter(i=>i!==curVariant);
+    if(!choices.length)choices=pool;
+    return choices[Math.floor(Math.random()*choices.length)];
+}
+setInterval(()=>{applyVariant(pickVariant());},5000);
+
+/* ── live data ── */
+let data={ce_lgt:0,ce_tgt:0,ce_run_pct:0,ce_pnl:0,ce_lots:1,pe_lgt:0,pe_tgt:0,pe_run_pct:0,pe_pnl:0,pe_lots:1};
+let ceTargetFrac=0.15,peTargetFrac=0.15;
+let ceCurFrac=0.15,peCurFrac=0.15;
+let ceOvershootTarget=0,peOvershootTarget=0;
+let ceOvershootCur=0,peOvershootCur=0;
+let ceState='play',peState='play';
+
+// Clamped 0..1 position within the player's own zone (0=at LGT, 1=at TGT).
+function frac(run,lgt,tgt){
+    if(tgt<=lgt)return 0;
+    return Math.max(0,Math.min(1,(run-lgt)/(tgt-lgt)));
+}
+// How far *past* TGT the player has run, as a 0..1 fraction — lets a winning player
+// push into the DMZ instead of just capping at the TGT line.
+function overshoot(run,lgt,tgt){
+    if(tgt<=lgt)return 0;
+    return Math.max(0,Math.min(1,(run-lgt)/(tgt-lgt)-1));
+}
+async function pollData(){
+    try{
+        const d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());
+        if(d)data=d;
+        document.getElementById('statusLine').textContent='live · updates every 3s';
+    }catch(e){
+        document.getElementById('statusLine').textContent='waiting for data…';
+    }
+    // Player Y-position is driven purely by actual PnL % (run_pct) vs that side's own LGT/TGT.
+    const ceLgt=Number(data.ce_lgt)||0,ceTgt=Number(data.ce_tgt)||0,ceRun=Number(data.ce_run_pct)||0;
+    const peLgt=Number(data.pe_lgt)||0,peTgt=Number(data.pe_tgt)||0,peRun=Number(data.pe_run_pct)||0;
+    ceTargetFrac=frac(ceRun,ceLgt,ceTgt);
+    peTargetFrac=frac(peRun,peLgt,peTgt);
+    ceOvershootTarget=overshoot(ceRun,ceLgt,ceTgt);
+    peOvershootTarget=overshoot(peRun,peLgt,peTgt);
+    ceState=ceRun<=ceLgt?'out':ceRun>=ceTgt?'win':'play';
+    peState=peRun<=peLgt?'out':peRun>=peTgt?'win':'play';
+}
+pollData();
+setInterval(pollData,3000);
+
+/* Same source and same classification the main app uses (loadDash / cls() in
+   webpxy.html): exit & atr live in webdashpxy.json, not webavgpxy.json. exit has
+   only 3 possible values: bull, bear, or side. */
+let dashExit=null,dashAtr=null;
+function classifySignal(v){
+    const s=String(v||'').toUpperCase();
+    if(s==='BULL')return'bull';
+    if(s==='BEAR')return'bear';
+    return 'side';
+}
+async function pollDash(){
+    try{
+        const d=await fetch('./webdashpxy.json?_='+Date.now()).then(r=>r.json());
+        if(d){
+            dashExit=d.exit;
+            dashAtr=Number(d.atr);
+            if(!isNaN(dashAtr)){
+                atrHistory.push(dashAtr);
+                if(atrHistory.length>20)atrHistory.shift();
+            }
+        }
+    }catch(e){}
+}
+pollDash();
+setInterval(pollDash,3000);
+
+/* ── rally (pure decorative animation, ball travels racket-to-racket with a bounce) ── */
+let ballFrom='ce',ballProgress=0,bounced=false;
+let trail=[];
+
+/* ── particle bursts (hit + ground bounce) ── */
+let particles=[];
+function spawnHit(x,y,color,count,spread){
+    for(let i=0;i<count;i++){
+        const ang=Math.random()*Math.PI*2;
+        const spd=0.6+Math.random()*spread;
+        particles.push({x,y,vx:Math.cos(ang)*spd,vy:Math.sin(ang)*spd,life:1,decay:0.026+Math.random()*0.02,size:1.2+Math.random()*2.2,color});
+    }
+}
+function updateParticles(dt){
+    const k=dt/16;
+    particles=particles.filter(p=>p.life>0);
+    for(const p of particles){p.x+=p.vx*k;p.y+=p.vy*k;p.vy+=0.05*k;p.life-=p.decay*k;}
+}
+function drawParticles(){
+    for(const p of particles){
+        ctx.globalAlpha=Math.max(0,p.life);
+        ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);
+        ctx.fillStyle=p.color;ctx.fill();
+    }
+    ctx.globalAlpha=1;
+}
+
+function easeInOutQuad(t){return t<0.5?2*t*t:-1+(4-2*t)*t;}
+function easeOutQuad(t){return 1-(1-t)*(1-t);}
+function stateColor(state){return state==='win'?C.bull:state==='out'?C.bear:C.gold;}
+
+/* Player's horizontal position — a wide sweep across most of the court width. */
+function playerX(cx,w,phase){
+    const amp=w*SLIDE_AMP;
+    const x=cx+Math.sin(clock/SLIDE_MS+phase)*amp;
+    return Math.max(SLIDE_MARGIN,Math.min(w-SLIDE_MARGIN,x));
+}
+
+/* Both players are right-handed — but since CE faces down toward PE and PE faces up
+   toward CE (they face each other across the net), a real right hand lands on
+   opposite screen-sides for each of them. mirror=-1 → racket on screen-left,
+   mirror=+1 → racket on screen-right. Racket head world position uses the same
+   rotation as the drawing code, so the ball actually aims at the head. */
+function racketHead(px,y,mirror){
+    const ang=mirror*BASE_SWING;
+    const lx=mirror*RACKET_LOCAL.x,ly=RACKET_LOCAL.y;
+    return {
+        x:px+lx*Math.cos(ang)-ly*Math.sin(ang),
+        y:y+lx*Math.sin(ang)+ly*Math.cos(ang)
+    };
+}
+
+let lastTs=null,clock=0,cePxCur=null,pePxCur=null;
+function loop(ts){
+    if(lastTs==null)lastTs=ts;
+    const dt=Math.min(50,ts-lastTs);
+    lastTs=ts;clock+=dt;
+
+    const tweenSpeed=0.032;
+    ceCurFrac+=(ceTargetFrac-ceCurFrac)*Math.min(1,dt*tweenSpeed);
+    peCurFrac+=(peTargetFrac-peCurFrac)*Math.min(1,dt*tweenSpeed);
+    ceOvershootCur+=(ceOvershootTarget-ceOvershootCur)*Math.min(1,dt*tweenSpeed);
+    peOvershootCur+=(peOvershootTarget-peOvershootCur)*Math.min(1,dt*tweenSpeed);
+
+    const w=cv.clientWidth,h=cv.clientHeight;
+    const cx=w/2;
+    // PE now occupies the top zone, CE now occupies the bottom zone (swapped).
+    // PLAYER_MARGIN keeps the LGT end from sitting exactly on the canvas edge — the
+    // character sprite extends ~20-35px past its center point (legs, label), so at
+    // the true edge (y=0 or y=h) it used to get clipped off-screen and "disappear".
+    // DMZ_PUSH lets a player who has cleared TGT keep advancing into the DMZ instead
+    // of just stopping dead at the TGT line.
+    const dmzH=h*(ZONE_PE_START-ZONE_CE_END);
+    const peY=PLAYER_MARGIN+peCurFrac*(h*ZONE_CE_END-PLAYER_MARGIN)+peOvershootCur*DMZ_PUSH_MAX*dmzH;
+    const ceY=(h-PLAYER_MARGIN)-ceCurFrac*((h-PLAYER_MARGIN)-h*ZONE_PE_START)-ceOvershootCur*DMZ_PUSH_MAX*dmzH;
+
+    // The player waiting for the ball parks at center; only the side the ball is
+    // actually heading toward moves out to intercept it — a real point, not two
+    // players perpetually shuffling regardless of play.
+    if(cePxCur==null){cePxCur=cx;pePxCur=cx;}
+    const ceReceiving=(ballFrom==='pe'),peReceiving=(ballFrom==='ce');
+    const ceDesired=ceReceiving?playerX(cx,w,0):cx;
+    const peDesired=peReceiving?playerX(cx,w,Math.PI):cx;
+    cePxCur+=(ceDesired-cePxCur)*0.06;
+    pePxCur+=(peDesired-pePxCur)*0.06;
+    cePxCur=Math.max(SLIDE_MARGIN,Math.min(w-SLIDE_MARGIN,cePxCur));
+    pePxCur=Math.max(SLIDE_MARGIN,Math.min(w-SLIDE_MARGIN,pePxCur));
+    const cePx=cePxCur,pePx=pePxCur;
+
+    // CE is now at the bottom, facing up toward PE → right hand lands screen-right (mirror=+1).
+    // PE is now at the top, facing down toward CE → right hand lands screen-left (mirror=-1).
+    const ceBat=racketHead(cePx,ceY,1);
+    const peBat=racketHead(pePx,peY,-1);
+
+    ballProgress+=dt/BALL_MS;
+    if(ballProgress>=1){
+        ballProgress=0;bounced=false;
+        const arrivalSide=ballFrom==='ce'?'pe':'ce';
+        const arrivalBat=arrivalSide==='ce'?ceBat:peBat;
+        const arrivalState=arrivalSide==='ce'?ceState:peState;
+        spawnHit(arrivalBat.x,arrivalBat.y,stateColor(arrivalState),18,3.2);
+        ballFrom=arrivalSide;
+    }
+
+    const fromBat=ballFrom==='ce'?ceBat:peBat;
+    const toBat=ballFrom==='ce'?peBat:ceBat;
+    // Ball color follows the exit signal's classification (bull/bear/side) — same source and rules as the main app.
+    const exitCls=classifySignal(dashExit);
+    const ballColor=exitCls==='bull'?C.bull:exitCls==='bear'?C.bear:C.tennis;
+
+    // two-phase flight: racket → ground bounce (on the receiver's side) → receiver's racket
+    const bounceX=fromBat.x+(toBat.x-fromBat.x)*BOUNCE_AT;
+    const bounceY=fromBat.y+(toBat.y-fromBat.y)*BOUNCE_AT;
+
+    let ballX,ballY,ballLift;
+    if(ballProgress<BOUNCE_AT){
+        const tA=easeOutQuad(ballProgress/BOUNCE_AT);
+        ballLift=Math.sin(tA*Math.PI)*ARC_A;
+        ballX=fromBat.x+(bounceX-fromBat.x)*tA;
+        ballY=fromBat.y+(bounceY-fromBat.y)*tA-ballLift;
+    }else{
+        if(!bounced){
+            bounced=true;
+            spawnHit(bounceX,bounceY,'rgba(255,255,255,0.85)',8,2);
+        }
+        const tB=easeInOutQuad((ballProgress-BOUNCE_AT)/(1-BOUNCE_AT));
+        ballLift=Math.sin(tB*Math.PI)*ARC_B;
+        ballX=bounceX+(toBat.x-bounceX)*tB;
+        ballY=bounceY+(toBat.y-bounceY)*tB-ballLift;
+    }
+
+    trail.push({x:ballX,y:ballY,color:ballColor});
+    if(trail.length>14)trail.shift();
+
+    updateParticles(dt);
+
+    draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift);
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+function fmtPct(v){return (v>=0?'+':'')+v.toFixed(1)+'%';}
+function fmtPnl(v){return (v>=0?'+':'')+Math.round(v);}
+function fmtK(v){return v>=1000?Math.round(v/1000)+'K':Math.round(v)+'';}
+
+function drawCharacter(px,y,state,mirror,batProx,teamColor){
+    const color=teamColor;
+    ctx.save();
+    ctx.translate(px,y);
+
+    // legs — white
+    ctx.strokeStyle=C.white;ctx.lineWidth=3;ctx.lineCap='round';
+    ctx.beginPath();
+    ctx.moveTo(-5,10);ctx.lineTo(-8,21);
+    ctx.moveTo(5,10);ctx.lineTo(8,21);
+    ctx.stroke();
+
+    // off-hand arm — white, opposite side from the racket
+    ctx.beginPath();
+    ctx.moveTo(mirror*-8,0);ctx.lineTo(mirror*-17,6);
+    ctx.stroke();
+
+    // torso — team color
+    ctx.fillStyle=color;
+    ctx.shadowColor='rgba(0,0,0,0.5)';ctx.shadowBlur=6;ctx.shadowOffsetY=2;
+    ctx.beginPath();
+    if(ctx.roundRect)ctx.roundRect(-8,-5,16,16,4);else ctx.rect(-8,-5,16,16);
+    ctx.fill();
+    ctx.shadowBlur=0;ctx.shadowOffsetY=0;
+
+    // head
+    ctx.beginPath();
+    ctx.arc(0,-13,7,0,Math.PI*2);
+    ctx.fillStyle=C.white;
+    ctx.fill();
+
+    // racket — white, right hand, mirrored per side; swings with proximity to the ball
+    const swingAngle=mirror*(BASE_SWING+batProx*0.85);
+    ctx.save();
+    ctx.rotate(swingAngle);
+    ctx.strokeStyle=C.white;ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.moveTo(mirror*8,0);ctx.lineTo(mirror*21,-2);
+    ctx.stroke();
+    ctx.lineWidth=2.5;
+    ctx.beginPath();
+    ctx.moveTo(mirror*21,-2);ctx.lineTo(mirror*(RACKET_LOCAL.x-11),RACKET_LOCAL.y+1);
+    ctx.stroke();
+    ctx.save();
+    ctx.translate(mirror*RACKET_LOCAL.x,RACKET_LOCAL.y);
+    ctx.fillStyle='rgba(255,255,255,0.92)';
+    ctx.strokeStyle='#c8ccd4';ctx.lineWidth=1.5;
+    ctx.shadowColor='rgba(0,0,0,0.35)';ctx.shadowBlur=3;
+    ctx.beginPath();
+    ctx.ellipse(0,0,9,13,0,0,Math.PI*2);
+    ctx.fill();ctx.stroke();
+    ctx.shadowBlur=0;
+    // strings — netted head, black mesh + dot at each intersection so it actually reads
+    ctx.save();
+    ctx.beginPath();ctx.ellipse(0,0,9,13,0,0,Math.PI*2);ctx.clip();
+    ctx.strokeStyle='rgba(20,20,24,0.85)';ctx.lineWidth=0.8;
+    for(let sx=-8;sx<=8;sx+=4){ctx.beginPath();ctx.moveTo(sx,-13);ctx.lineTo(sx,13);ctx.stroke();}
+    for(let sy=-12;sy<=12;sy+=4){ctx.beginPath();ctx.moveTo(-9,sy);ctx.lineTo(9,sy);ctx.stroke();}
+    ctx.fillStyle='rgba(15,15,18,0.9)';
+    for(let sx=-8;sx<=8;sx+=4){
+        for(let sy=-12;sy<=12;sy+=4){
+            ctx.beginPath();ctx.arc(sx,sy,0.9,0,Math.PI*2);ctx.fill();
+        }
+    }
+    ctx.restore();
+    ctx.restore();
+    ctx.restore();
+
+    ctx.restore();
+}
+
+/* Fixed, stationary info block for each side — sits in the DMZ so it never moves
+   with the player and stays easy to read: lots+team+investment, run%, actual PnL.
+   Not bold — easier on the eye than the heavier labels around it. */
+function drawDmzInfo(w,h,label,lots,invVal,runPct,pnlVal,xFrac,netY){
+    const x=w*xFrac;
+    const top=netY-16,mid=netY,bot=netY+16;
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle=C.white;
+    const team=Math.max(1,Math.min(6,lots));
+    ctx.font="500 12px 'Syne',sans-serif";
+    ctx.fillText('🧍'.repeat(team)+' '+label+' '+fmtK(invVal),x,top);
+    ctx.font="500 14px 'DM Mono',monospace";
+    // the run% line sits exactly on the net — punch a small hole behind it so the
+    // (very dim) net line doesn't visually cut through the number
+    const runTxt=fmtPct(runPct);
+    const runW=ctx.measureText(runTxt).width;
+    ctx.fillStyle='#181c26';
+    ctx.fillRect(x-runW/2-5,mid-8,runW+10,16);
+    ctx.fillStyle=C.white;
+    ctx.fillText(runTxt,x,mid);
+    ctx.fillText(fmtPnl(pnlVal),x,bot);
+}
+
+function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift){
+    ctx.clearRect(0,0,w,h);
+
+    ctx.save();
+
+    // Uniform background — no red/green zone tint, matches the page's own dark background.
+    ctx.fillStyle='#181c26';ctx.fillRect(0,0,w,h);
+
+    // LGT dead-lines sit with margin from the true edge — not at the extreme
+    // top/bottom — matching where a player at the deadline actually stands.
+    ctx.strokeStyle=C.bear;ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(0,PLAYER_MARGIN);ctx.lineTo(w,PLAYER_MARGIN);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(0,h-PLAYER_MARGIN);ctx.lineTo(w,h-PLAYER_MARGIN);ctx.stroke();
+
+    ctx.setLineDash([5,4]);ctx.lineWidth=1;
+    ctx.strokeStyle=C.bear;
+    ctx.beginPath();ctx.moveTo(0,h*ZONE_CE_END);ctx.lineTo(w,h*ZONE_CE_END);ctx.stroke();
+    ctx.strokeStyle=C.bull;
+    ctx.beginPath();ctx.moveTo(0,h*ZONE_PE_START);ctx.lineTo(w,h*ZONE_PE_START);ctx.stroke();
+    ctx.setLineDash([]);
+
+    // CE labels stay left, now at the bottom (its new zone); PE labels stay right,
+    // now at the top (its new zone). Each shifted off its own dashed TGT line, into
+    // its own zone, instead of sitting exactly on top of the line.
+    ctx.font="800 12px 'DM Mono',monospace";ctx.textBaseline='middle';
+    ctx.fillStyle=C.white;
+    ctx.textAlign='left';
+    ctx.fillText('⛔ CE LGT '+(Number(data.ce_lgt)||0).toFixed(1),8,h-PLAYER_MARGIN-12);
+    ctx.fillText('🎯 CE TGT '+(Number(data.ce_tgt)||0).toFixed(1),8,h*ZONE_PE_START+12);
+    ctx.textAlign='right';
+    ctx.fillText('🎯 PE TGT '+(Number(data.pe_tgt)||0).toFixed(1),w-8,h*ZONE_CE_END-12);
+    ctx.fillText('⛔ PE LGT '+(Number(data.pe_lgt)||0).toFixed(1),w-8,PLAYER_MARGIN+12);
+
+    // net — restored, but very dim; CE's numbers back on the left, PE's on the right.
+    const netY=h*(ZONE_CE_END+ZONE_PE_START)/2;
+    ctx.strokeStyle='rgba(255,255,255,0.14)';ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(0,netY);ctx.lineTo(w,netY);ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,0.09)';ctx.lineWidth=1;
+    for(let hx=6;hx<w;hx+=14){
+        ctx.beginPath();ctx.moveTo(hx,netY-4);ctx.lineTo(hx,netY+4);ctx.stroke();
+    }
+
+    ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.font="800 11px 'DM Mono',monospace";
+    const atrLabel='DMZ (ATR '+(dashAtr!==null&&!isNaN(dashAtr)?dashAtr:'—')+')';
+    const atrW=ctx.measureText(atrLabel).width;
+    ctx.fillStyle='#181c26';
+    ctx.fillRect(w/2-atrW/2-6,netY-9,atrW+12,18);
+    ctx.fillStyle=C.white;
+    ctx.fillText(atrLabel,w/2,netY);
+
+    drawDmzInfo(w,h,'CE',Math.max(1,Math.round(Number(data.ce_lots)||1)),Number(data.ce_investment)||0,Number(data.ce_run_pct)||0,Number(data.ce_pnl)||0,0.24,netY);
+    drawDmzInfo(w,h,'PE',Math.max(1,Math.round(Number(data.pe_lots)||1)),Number(data.pe_investment)||0,Number(data.pe_run_pct)||0,Number(data.pe_pnl)||0,0.76,netY);
+
+
+    const ceProx=1-Math.min(1,Math.hypot(ballX-ceBat.x,ballY-ceBat.y)/(h*0.18));
+    const peProx=1-Math.min(1,Math.hypot(ballX-peBat.x,ballY-peBat.y)/(h*0.18));
+
+    // ball trail
+    for(let i=0;i<trail.length;i++){
+        const p=trail[i],tt=i/trail.length;
+        ctx.globalAlpha=tt*0.45;
+        ctx.beginPath();ctx.arc(p.x,p.y,6*tt,0,Math.PI*2);
+        ctx.fillStyle=p.color||C.tennis;ctx.fill();
+    }
+    ctx.globalAlpha=1;
+
+    // CE (bottom, faces up) → right hand screen-right. PE (top, faces down) → right hand screen-left.
+    drawCharacter(cePx,ceY,ceState,1,Math.max(0,ceProx),C.bull);
+    drawCharacter(pePx,peY,peState,-1,Math.max(0,peProx),C.bear);
+
+    // ground shadow — sits at the un-lifted baseline, shrinks and fades as the ball rises
+    const maxLift=Math.max(ARC_A,ARC_B,1);
+    const liftFrac=Math.max(0,Math.min(1,ballLift/maxLift));
+    const shadowRy=Math.max(1.5,3.5*(1-liftFrac*0.7));
+    ctx.beginPath();
+    ctx.ellipse(ballX,ballY+ballLift,shadowRy*2.2,shadowRy,0,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,'+(0.35*(1-liftFrac*0.5))+')';
+    ctx.fill();
+
+    // ball
+    ctx.beginPath();
+    ctx.arc(ballX,ballY,6,0,Math.PI*2);
+    ctx.fillStyle=ballColor;
+    ctx.shadowColor=ballColor;ctx.shadowBlur=9;
+    ctx.fill();
+    ctx.shadowBlur=0;
+
+    drawParticles();
+    ctx.restore();
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   RISK BAR — same drawing logic as webpxy.html, adapted to the
+   data this standalone page already has on hand: net = ce_pnl+pe_pnl
+   from webavgpxy.json (no running/booked trade totals here), floor
+   and peak from webrinkopxy.json, same as the main app.
+   ══════════════════════════════════════════════════════════════ */
+async function loadRisk(){
+    let d={session_peak_pnl:0,active_exit_line:-3000};
+    try{d=await fetch('./webrinkopxy.json?_='+Date.now()).then(r=>r.json());}catch(e){}
+    const peak=Math.round(d.session_peak_pnl??0);
+    const net=Math.round((Number(data.ce_pnl)||0)+(Number(data.pe_pnl)||0));
+    const floor=Math.round(d.active_exit_line??-3000);
+    $('rskPeak').textContent='₹'+peak.toLocaleString('en-IN');
+    $('rskPeak').className='rsk-val '+(peak>=0?'bull':'bear');
+    $('rskNet').textContent='₹'+fmtK(floor);
+    $('rskNet').className='rsk-val bear';
+    drawRiskCandle(floor,net,peak);
+}
+let lastFloor=-3000,lastNet=0,lastPeak=10;
+function drawRiskCandle(floor,net,peak){
+    lastFloor=floor;lastNet=net;lastPeak=peak;
+    const canvas=$('rskCanvas');if(!canvas)return;
+    const rctx=canvas.getContext('2d'),dpr=window.devicePixelRatio||1;
+    const rect=canvas.parentElement.getBoundingClientRect();
+    canvas.width=rect.width*dpr;canvas.height=rect.height*dpr;
+    canvas.style.width=rect.width+'px';canvas.style.height=rect.height+'px';
+    rctx.scale(dpr,dpr);
+    const W=rect.width,H=rect.height;rctx.clearRect(0,0,W,H);
+    const PADX=12,midY=H/2,fz=15,bodyH=fz+12;
+    const lo=-3000,hi=Math.max(peak,10),open=0,close=net,range=hi-lo||1;
+    const toX=v=>Math.max(PADX,Math.min(W-PADX,((v-lo)/range)*(W-PADX*2)+PADX));
+    const lowX=toX(lo),highX=toX(hi),openX=toX(open),closeX=toX(close);
+    const isBull=close>=open;
+    const bodyColor=isBull?cssVar('--bull'):cssVar('--bear');
+    rctx.strokeStyle='rgba(255,255,255,0.15)';rctx.lineWidth=1;
+    rctx.beginPath();rctx.moveTo(lowX,midY);rctx.lineTo(highX,midY);rctx.stroke();
+    rctx.lineWidth=3;rctx.globalAlpha=0.8;
+    rctx.strokeStyle=cssVar('--bear');rctx.beginPath();rctx.moveTo(lowX,midY-bodyH/2);rctx.lineTo(lowX,midY+bodyH/2);rctx.stroke();
+    rctx.strokeStyle=cssVar('--bull');rctx.beginPath();rctx.moveTo(highX,midY-bodyH/2);rctx.lineTo(highX,midY+bodyH/2);rctx.stroke();
+    rctx.globalAlpha=1;
+    if(openX>PADX+2&&openX<W-PADX-2){
+        rctx.strokeStyle='rgba(255,255,255,0.25)';rctx.lineWidth=1;rctx.setLineDash([3,3]);
+        rctx.beginPath();rctx.moveTo(openX,midY-bodyH/2);rctx.lineTo(openX,midY+bodyH/2);rctx.stroke();
+        rctx.setLineDash([]);
+    }
+    const netLabel='₹'+(net>=0?'+':'')+Math.round(net).toLocaleString('en-IN');
+    rctx.font=`800 ${fz}px 'Syne',sans-serif`;
+    const textW=rctx.measureText(netLabel).width+14;
+    let bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX);
+    const midX=(bx1+bx2)/2;
+    let bW=Math.max(bx2-bx1,textW);
+    bx1=midX-bW/2;bx2=midX+bW/2;
+    if(bx1<PADX){bx2+=PADX-bx1;bx1=PADX;}
+    if(bx2>W-PADX){bx1-=bx2-(W-PADX);bx2=W-PADX;}
+    bx1=Math.max(PADX,bx1);bW=bx2-bx1;
+    rctx.fillStyle=bodyColor;
+    rctx.beginPath();rctx.roundRect(bx1,midY-bodyH/2,bW,bodyH,4);rctx.fill();
+    rctx.fillStyle=isBull?'#06160d':'#ffffff';
+    rctx.textAlign='center';rctx.textBaseline='middle';
+    rctx.fillText(netLabel,(bx1+bx2)/2,midY);
+    const danger=net<=lo+Math.abs(lo)*0.15;
+    $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5)':'';
+}
+loadRisk();
+setInterval(loadRisk,3000);
+new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($('riskBar'));
+</script>
+</body>
+</html>
