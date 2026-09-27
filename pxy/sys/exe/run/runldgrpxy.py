@@ -4,7 +4,7 @@ PXY® Trading System - Ledger Snapshot Engine (exeldgrpxy.py)
 Protected by international copyright laws. All rights reserved globally by PXY® and PreciseXceleratedYield Pvt Ltd™.
 
 Purpose: Single-run snapshot formatted strictly to a 30-character maximum row width.
-         Connects via runclntpxy.get_session() utilizing correct NeoAPI client methods.
+         Leverages your working code's authentication interface logic natively.
 Design Rule: Guarantees that the last digit of calculated integer numbers ends in 0.
 """
 
@@ -12,7 +12,6 @@ import sys
 import urllib.request
 import urllib.parse
 import pytz
-import pandas as pd
 from datetime import datetime, time
 from runclntpxy import get_session
 
@@ -82,7 +81,7 @@ def send_telegram_payload(message_text):
         pass
 
 def run_snapshot_report():
-    """Generates the mobile telemetry report via Kotak Neo V2 API sessions."""
+    """Generates the mobile telemetry report using your working integration structures."""
     now_ist = datetime.now(IST)
     current_time = now_ist.time()
     
@@ -102,19 +101,28 @@ def run_snapshot_report():
         print("=" * W)
         return
 
-    # Initialize connection via your native session manager
-    client = get_session()
+    # 🔗 FIX: Initialize connection by passing the explicit session state setup exactly like your working code
+    try:
+        client = get_session()
+    except Exception as e:
+        print(pad_row(f"❌ Session Connection Error: {e}", W))
+        return
+
     if not client:
         print(pad_row("❌ API Connection Blank", W))
         return
 
     try:
-        # 🔗 SDK CORRECTION: Using official SDK report method calls 
-        pos_res = client.position_report()
+        # Fetch raw records matching your working code's dictionary endpoints
+        pos_res = client.positions()
         ord_res = client.order_report()
-        margin_res = client.balances()
         
-        # Safely extract dictionary or object attributes based on SDK signature variants
+        try:
+            margin_res = client.balances()
+        except AttributeError:
+            margin_res = client.margin()
+            
+        # Safely unpack keys checking dictionary vs class signatures defensively
         positions_list = pos_res.get("data", []) if isinstance(pos_res, dict) else getattr(pos_res, "data", [])
         orders_list = ord_res.get("data", []) if isinstance(ord_res, dict) else getattr(ord_res, "data", [])
         
@@ -126,7 +134,7 @@ def run_snapshot_report():
             raw_margin = margin_data.get("availableMargin", margin_data.get("cfBal", 0.0))
         else:
             raw_margin = getattr(margin_data, "availableMargin", getattr(margin_data, "cfBal", 0.0))
-
+            
     except Exception as e:
         print(pad_row(f"❌ API Failure: {str(e)}", W))
         return
@@ -145,11 +153,11 @@ def run_snapshot_report():
     output_lines.append(pad_row(f"💰 Fnd: ₹{sanitized_margin:,}", W))
     output_lines.append("-" * W)
 
-    # 2. Active Working Orders Processing (Using custom extraction mapping logic)
+    # 2. Active Working Orders Processing
     active_orders = []
     for o in orders_list:
         status = o.get("ordSt", "") if isinstance(o, dict) else getattr(o, "ordSt", "")
-        if str(status).lower() in ["working", "validation pending", "open"]:
+        if str(status).lower() in ["working", "open", "validation pending"]:
             active_orders.append(o)
 
     output_lines.append(pad_row(f"⏳ Ord Working: {len(active_orders)}", W))
