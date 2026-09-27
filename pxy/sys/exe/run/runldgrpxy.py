@@ -4,7 +4,7 @@ PXY® Trading System - Ledger Snapshot Engine (exeldgrpxy.py)
 Protected by international copyright laws. All rights reserved globally by PXY® and PreciseXceleratedYield Pvt Ltd™.
 
 Purpose: Single-run snapshot formatted strictly to a 30-character maximum row width.
-         Connects via runclntpxy.get_session() utilizing exact working SDK report methods.
+         Connects via runclntpxy.get_session() utilizing correct NeoAPI client methods.
 Design Rule: Guarantees that the last digit of calculated integer numbers ends in 0.
 """
 
@@ -20,7 +20,7 @@ from runclntpxy import get_session
 TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_PLACEHOLDER"
 TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID_PLACEHOLDER"
 
-IST = pytz.timezone("asia/kolkata")
+IST = pytz.timezone("Asia/Kolkata")
 W = 30  # Strict 30-character width tracking layout
 
 def emoji_len(text):
@@ -109,24 +109,23 @@ def run_snapshot_report():
         return
 
     try:
-        # 🔗 MATCH DESIGN: Directly calling your proven dictionary methods
-        pos_res = client.positions()
+        # 🔗 SDK CORRECTION: Using official SDK report method calls 
+        pos_res = client.position_report()
         ord_res = client.order_report()
+        margin_res = client.balances()
         
-        try:
-            margin_res = client.balances()
-        except AttributeError:
-            margin_res = client.margin()
+        # Safely extract dictionary or object attributes based on SDK signature variants
+        positions_list = pos_res.get("data", []) if isinstance(pos_res, dict) else getattr(pos_res, "data", [])
+        orders_list = ord_res.get("data", []) if isinstance(ord_res, dict) else getattr(ord_res, "data", [])
         
-        # Unpack data matching dictionary formats securely
-        positions_list = pos_res.get("data", []) if isinstance(pos_res, dict) else []
-        orders_list = ord_res.get("data", []) if isinstance(ord_res, dict) else []
-        
-        # Extract dynamic margin from balance envelope signatures
-        margin_data = margin_res.get("data", margin_res) if isinstance(margin_res, dict) else {}
+        margin_data = margin_res.get("data", margin_res) if isinstance(margin_res, dict) else getattr(margin_res, "data", margin_res)
         if isinstance(margin_data, list) and len(margin_data) > 0:
             margin_data = margin_data[0]
-        raw_margin = margin_data.get("availableMargin", margin_data.get("cfBal", 0.0))
+            
+        if isinstance(margin_data, dict):
+            raw_margin = margin_data.get("availableMargin", margin_data.get("cfBal", 0.0))
+        else:
+            raw_margin = getattr(margin_data, "availableMargin", getattr(margin_data, "cfBal", 0.0))
 
     except Exception as e:
         print(pad_row(f"❌ API Failure: {str(e)}", W))
@@ -146,14 +145,26 @@ def run_snapshot_report():
     output_lines.append(pad_row(f"💰 Fnd: ₹{sanitized_margin:,}", W))
     output_lines.append("-" * W)
 
-    # 2. Active Working Orders Processing (Using ordSt mapping)
-    active_orders = [o for o in orders_list if str(o.get("ordSt", "")).lower() == "working"]
+    # 2. Active Working Orders Processing (Using custom extraction mapping logic)
+    active_orders = []
+    for o in orders_list:
+        status = o.get("ordSt", "") if isinstance(o, dict) else getattr(o, "ordSt", "")
+        if str(status).lower() in ["working", "validation pending", "open"]:
+            active_orders.append(o)
+
     output_lines.append(pad_row(f"⏳ Ord Working: {len(active_orders)}", W))
     for ord in active_orders:
-        sym = str(ord.get("trdSym", "UNK"))[-7:]
-        side = "B" if "B" in str(ord.get("trnsTp", "")).upper() else "S"
-        qty = abs(int(float(ord.get("fldQty", ord.get("qty", 0)))))
-        price = int(force_trailing_zero(ord.get("price", ord.get("avgPrc", 0.0))))
+        sym_raw = ord.get("trdSym", "UNK") if isinstance(ord, dict) else getattr(ord, "trdSym", "UNK")
+        sym = str(sym_raw)[-7:]
+        
+        side_raw = ord.get("trnsTp", "") if isinstance(ord, dict) else getattr(ord, "trnsTp", "")
+        side = "B" if "B" in str(side_raw).upper() else "S"
+        
+        qty_raw = ord.get("fldQty", ord.get("qty", 0)) if isinstance(ord, dict) else getattr(ord, "fldQty", getattr(ord, "qty", 0))
+        qty = abs(int(float(qty_raw)))
+        
+        prc_raw = ord.get("price", ord.get("avgPrc", 0.0)) if isinstance(ord, dict) else getattr(ord, "price", getattr(ord, "avgPrc", 0.0))
+        price = int(force_trailing_zero(prc_raw))
         
         line = f" 📝 {side}|{sym}|Q:{qty}|P:₹{price}"
         output_lines.append(pad_row(line, W))
@@ -162,11 +173,14 @@ def run_snapshot_report():
     # 3. Active Positions & PnL Processing
     active_positions = []
     for p in positions_list:
-        net_qty = float(p.get("net_qty", 0))
+        net_qty_raw = p.get("net_qty", 0) if isinstance(p, dict) else getattr(p, "net_qty", 0)
+        net_qty = float(net_qty_raw)
+        
         if net_qty == 0:
-            buy = float(p.get("flBuyQty", 0))
-            sell = float(p.get("flSellQty", 0))
-            net_qty = buy - sell
+            buy_qty = p.get("flBuyQty", 0) if isinstance(p, dict) else getattr(p, "flBuyQty", 0)
+            sell_qty = p.get("flSellQty", 0) if isinstance(p, dict) else getattr(p, "flSellQty", 0)
+            net_qty = float(buy_qty) - float(sell_qty)
+            
         if abs(net_qty) > 0:
             active_positions.append((p, net_qty))
 
@@ -174,9 +188,14 @@ def run_snapshot_report():
     
     total_unrealized_pnl = 0.0
     for pos, qty in active_positions:
-        sym = str(pos.get("trdSym", "UNK"))[-7:]
-        entry_prc = float(pos.get("buy_prc", pos.get("flBuyPrc", 0.0)))
-        ltp = float(pos.get("sell_prc", pos.get("ltp", 0.0)))
+        sym_raw = pos.get("trdSym", "UNK") if isinstance(pos, dict) else getattr(pos, "trdSym", "UNK")
+        sym = str(sym_raw)[-7:]
+        
+        buy_prc_raw = pos.get("buy_prc", pos.get("flBuyPrc", 0.0)) if isinstance(pos, dict) else getattr(pos, "buy_prc", getattr(pos, "flBuyPrc", 0.0))
+        entry_prc = float(buy_prc_raw)
+        
+        ltp_raw = pos.get("sell_prc", pos.get("ltp", 0.0)) if isinstance(pos, dict) else getattr(pos, "sell_prc", getattr(pos, "ltp", 0.0))
+        ltp = float(ltp_raw)
         
         raw_pnl = (ltp - entry_prc) * qty
         sanitized_pnl = int(force_trailing_zero(raw_pnl))
@@ -212,3 +231,4 @@ def run_snapshot_report():
 
 if __name__ == "__main__":
     run_snapshot_report()
+
