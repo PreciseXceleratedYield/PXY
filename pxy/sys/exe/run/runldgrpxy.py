@@ -4,7 +4,7 @@ PXY® Trading System - Ledger Snapshot Engine (exeldgrpxy.py)
 Protected by international copyright laws. All rights reserved globally by PXY® and PreciseXceleratedYield Pvt Ltd™.
 
 Purpose: Single-run snapshot formatted strictly to a 30-character maximum row width.
-         Connects via runclntpxy.get_session() using real broker endpoints.
+         Connects via runclntpxy.get_session() utilizing exact working SDK report methods.
 Design Rule: Guarantees that the last digit of calculated integer numbers ends in 0.
 """
 
@@ -12,6 +12,7 @@ import sys
 import urllib.request
 import urllib.parse
 import pytz
+import pandas as pd
 from datetime import datetime, time
 from runclntpxy import get_session
 
@@ -108,23 +109,25 @@ def run_snapshot_report():
         return
 
     try:
-        # Fetch live data arrays directly using your working methods
+        # 🔗 MATCH DESIGN: Directly calling your proven dictionary methods
         pos_res = client.positions()
-        ord_res = client.orders()
+        ord_res = client.order_report()
         
-        # Support both positions/limits endpoints if funds matches your setup
         try:
-            margin_res = client.limits()
+            margin_res = client.balances()
         except AttributeError:
             margin_res = client.margin()
         
-        # Unpack arrays securely using your existing object structural paths
+        # Unpack data matching dictionary formats securely
         positions_list = pos_res.get("data", []) if isinstance(pos_res, dict) else []
         orders_list = ord_res.get("data", []) if isinstance(ord_res, dict) else []
         
-        # Extract margin safely
-        margin_data = margin_res.get("Margin", margin_res.get("data", {})) if isinstance(margin_res, dict) else {}
+        # Extract dynamic margin from balance envelope signatures
+        margin_data = margin_res.get("data", margin_res) if isinstance(margin_res, dict) else {}
+        if isinstance(margin_data, list) and len(margin_data) > 0:
+            margin_data = margin_data[0]
         raw_margin = margin_data.get("availableMargin", margin_data.get("cfBal", 0.0))
+
     except Exception as e:
         print(pad_row(f"❌ API Failure: {str(e)}", W))
         return
@@ -143,14 +146,14 @@ def run_snapshot_report():
     output_lines.append(pad_row(f"💰 Fnd: ₹{sanitized_margin:,}", W))
     output_lines.append("-" * W)
 
-    # 2. Active Working Orders Processing
-    active_orders = [o for o in orders_list if str(o.get("status", "")).upper() == "WORKING"]
+    # 2. Active Working Orders Processing (Using ordSt mapping)
+    active_orders = [o for o in orders_list if str(o.get("ordSt", "")).lower() == "working"]
     output_lines.append(pad_row(f"⏳ Ord Working: {len(active_orders)}", W))
     for ord in active_orders:
         sym = str(ord.get("trdSym", "UNK"))[-7:]
-        side = "B" if "BUY" in str(ord.get("side", "")).upper() else "S"
-        qty = abs(int(float(ord.get("qty", 0))))
-        price = int(force_trailing_zero(ord.get("price", 0.0)))
+        side = "B" if "B" in str(ord.get("trnsTp", "")).upper() else "S"
+        qty = abs(int(float(ord.get("fldQty", ord.get("qty", 0)))))
+        price = int(force_trailing_zero(ord.get("price", ord.get("avgPrc", 0.0))))
         
         line = f" 📝 {side}|{sym}|Q:{qty}|P:₹{price}"
         output_lines.append(pad_row(line, W))
