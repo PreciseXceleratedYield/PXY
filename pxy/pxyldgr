@@ -1,0 +1,19 @@
+#!/bin/bash
+# ------------------------------------------------------------------------------
+# PXY® Trading System - Ledger Orchestrator Engine (pxyldgr)
+# Protected by international copyright laws. All rights reserved globally.
+# ------------------------------------------------------------------------------
+
+# Go to exe folder safely
+cd "$HOME/pxy/sys/exe/run" || { echo "❌ Directory ~/pxy/sys/exe/run not found"; exit 1; }
+
+# Activate virtual environment to load your python dependencies cleanly
+if [ -f "$HOME/env/bin/activate" ]; then
+    source "$HOME/env/bin/activate"
+fi
+
+# Run the exact target Python ledger script you specified
+python3 runldgrpxy.py
+
+# Print clean structural completion response to screen
+echo "runldgrpxy.py execution finished."
