@@ -4,7 +4,7 @@ PXY® Trading System - Ledger Snapshot Engine (exeldgrpxy.py)
 Protected by international copyright laws. All rights reserved globally by PXY® and PreciseXceleratedYield Pvt Ltd™.
 
 Purpose: Single-run snapshot formatted strictly to a 30-character maximum row width.
-         Leverages your working code's authentication interface logic natively.
+         Connects via runclntpxy.get_session() matching your working script connections.
 Design Rule: Guarantees that the last digit of calculated integer numbers ends in 0.
 """
 
@@ -81,7 +81,7 @@ def send_telegram_payload(message_text):
         pass
 
 def run_snapshot_report():
-    """Generates the mobile telemetry report using your working integration structures."""
+    """Generates the mobile telemetry report via Kotak Neo V2 API sessions."""
     now_ist = datetime.now(IST)
     current_time = now_ist.time()
     
@@ -101,31 +101,36 @@ def run_snapshot_report():
         print("=" * W)
         return
 
-    # 🔗 FIX: Initialize connection by passing the explicit session state setup exactly like your working code
-    try:
-        client = get_session()
-    except Exception as e:
-        print(pad_row(f"❌ Session Connection Error: {e}", W))
-        return
-
+    # Initialize connection via your native session manager
+    client = get_session()
     if not client:
         print(pad_row("❌ API Connection Blank", W))
         return
 
     try:
-        # Fetch raw records matching your working code's dictionary endpoints
-        pos_res = client.positions()
-        ord_res = client.order_report()
+        # 🔗 DEFENSIVE FETCHING LAYERS: Safely tries both SDK variants to stop 'NeoAPI' attribute errors
         
+        # 1. Fetch Positions Safely
+        pos_res = client.positions()
+        positions_list = pos_res.get("data", []) if isinstance(pos_res, dict) else getattr(pos_res, "data", [])
+        
+        # 2. Fetch Orders Safely (Tries order_report first, then falls back to orders method)
+        try:
+            ord_res = client.order_report()
+            orders_list = ord_res.get("data", []) if isinstance(ord_res, dict) else getattr(ord_res, "data", [])
+        except AttributeError:
+            ord_res = client.orders()
+            orders_list = ord_res.get("data", []) if isinstance(ord_res, dict) else getattr(ord_res, "data", [])
+
+        # 3. Fetch Limits/Balances Safely
         try:
             margin_res = client.balances()
         except AttributeError:
-            margin_res = client.margin()
-            
-        # Safely unpack keys checking dictionary vs class signatures defensively
-        positions_list = pos_res.get("data", []) if isinstance(pos_res, dict) else getattr(pos_res, "data", [])
-        orders_list = ord_res.get("data", []) if isinstance(ord_res, dict) else getattr(ord_res, "data", [])
-        
+            try:
+                margin_res = client.limits()
+            except AttributeError:
+                margin_res = client.margin()
+
         margin_data = margin_res.get("data", margin_res) if isinstance(margin_res, dict) else getattr(margin_res, "data", margin_res)
         if isinstance(margin_data, list) and len(margin_data) > 0:
             margin_data = margin_data[0]
@@ -134,7 +139,7 @@ def run_snapshot_report():
             raw_margin = margin_data.get("availableMargin", margin_data.get("cfBal", 0.0))
         else:
             raw_margin = getattr(margin_data, "availableMargin", getattr(margin_data, "cfBal", 0.0))
-            
+
     except Exception as e:
         print(pad_row(f"❌ API Failure: {str(e)}", W))
         return
@@ -156,7 +161,7 @@ def run_snapshot_report():
     # 2. Active Working Orders Processing
     active_orders = []
     for o in orders_list:
-        status = o.get("ordSt", "") if isinstance(o, dict) else getattr(o, "ordSt", "")
+        status = o.get("ordSt", o.get("status", "")) if isinstance(o, dict) else getattr(o, "ordSt", getattr(o, "status", ""))
         if str(status).lower() in ["working", "open", "validation pending"]:
             active_orders.append(o)
 
@@ -165,7 +170,7 @@ def run_snapshot_report():
         sym_raw = ord.get("trdSym", "UNK") if isinstance(ord, dict) else getattr(ord, "trdSym", "UNK")
         sym = str(sym_raw)[-7:]
         
-        side_raw = ord.get("trnsTp", "") if isinstance(ord, dict) else getattr(ord, "trnsTp", "")
+        side_raw = ord.get("trnsTp", ord.get("side", "")) if isinstance(ord, dict) else getattr(ord, "trnsTp", getattr(ord, "side", ""))
         side = "B" if "B" in str(side_raw).upper() else "S"
         
         qty_raw = ord.get("fldQty", ord.get("qty", 0)) if isinstance(ord, dict) else getattr(ord, "fldQty", getattr(ord, "qty", 0))
@@ -239,4 +244,5 @@ def run_snapshot_report():
 
 if __name__ == "__main__":
     run_snapshot_report()
+
 
