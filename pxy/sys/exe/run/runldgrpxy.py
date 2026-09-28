@@ -1,26 +1,6 @@
-#!/usr/bin/env python3
-"""
-PXY® Trading System - Ledger Snapshot Engine (exeldgrpxy.py)
-Protected by international copyright laws. All rights reserved globally by PXY® and PreciseXceleratedYield Pvt Ltd™.
-
-Purpose: Single-run snapshot formatted strictly to a 30-character maximum row width.
-         Connects via runclntpxy.get_session() matching your working script connections.
-Design Rule: Guarantees that the last digit of calculated integer numbers ends in 0.
-"""
-
-import sys
-import urllib.request
-import urllib.parse
-import pytz
-from datetime import datetime, time
-from runclntpxy import get_session
-
-# 📬 Telegram API Endpoint Configuration (Placeholders)
-TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_PLACEHOLDER"
-TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID_PLACEHOLDER"
-
-IST = pytz.timezone("Asia/Kolkata")
-W = 30  # Strict 30-character width tracking layout
+# ==============================================================================
+# 🛠️ PART 1: UTILITY LAYER (Layout Calculations, Math Formatting & Padding)
+# ==============================================================================
 
 def emoji_len(text):
     """Calculates the true layout width by counting emojis as 2 characters."""
@@ -51,6 +31,8 @@ def pad_row(text, width=30):
 def force_trailing_zero(value):
     """Enforces the strict rule that the final digit of the integer part must be 0."""
     try:
+        if value is None:
+            return 0.0
         val_int = int(round(float(value)))
         remainder = val_int % 10
         if remainder >= 5:
@@ -80,6 +62,34 @@ def send_telegram_payload(message_text):
     except Exception:
         pass
 
+# ==============================================================================
+# 🚀 PART 2: CORE ENGINE LAYER (API Fetching, Data Processing & Output Generation)
+# ==============================================================================
+
+#!/usr/bin/env python3
+"""
+PXY® Trading System - Ledger Snapshot Engine (exeldgrpxy.py)
+Protected by international copyright laws. All rights reserved globally by PXY® and PreciseXceleratedYield Pvt Ltd™.
+
+Purpose: Single-run snapshot formatted strictly to a 30-character maximum row width.
+         Connects via runclntpxy.get_session() matching your working script connections.
+Design Rule: Guarantees that the last digit of calculated integer numbers ends in 0.
+"""
+
+import sys
+import urllib.request
+import urllib.parse
+import pytz
+from datetime import datetime, time
+from runclntpxy import get_session
+
+# ⚙️ CONFIGURATION & ENVIRONMENTAL SETTINGS
+TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_PLACEHOLDER"
+TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID_PLACEHOLDER"
+
+IST = pytz.timezone("Asia/Kolkata")
+W = 30  # Strict 30-character width tracking layout
+
 def run_snapshot_report():
     """Generates the mobile telemetry report via Kotak Neo V2 API sessions."""
     now_ist = datetime.now(IST)
@@ -101,26 +111,27 @@ def run_snapshot_report():
         print("=" * W)
         return
 
-    # Initialize connection via your native session manager
     client = get_session()
     if not client:
         print(pad_row("❌ API Connection Blank", W))
         return
 
     try:
-        # 🔗 DEFENSIVE FETCHING LAYERS: Safely tries both SDK variants to stop 'NeoAPI' attribute errors
-        
         # 1. Fetch Positions Safely
         pos_res = client.positions()
         positions_list = pos_res.get("data", []) if isinstance(pos_res, dict) else getattr(pos_res, "data", [])
+        if positions_list is None:
+            positions_list = []
         
-        # 2. Fetch Orders Safely (Tries order_report first, then falls back to orders method)
+        # 2. Fetch Orders Safely
         try:
             ord_res = client.order_report()
             orders_list = ord_res.get("data", []) if isinstance(ord_res, dict) else getattr(ord_res, "data", [])
         except AttributeError:
             ord_res = client.orders()
             orders_list = ord_res.get("data", []) if isinstance(ord_res, dict) else getattr(ord_res, "data", [])
+        if orders_list is None:
+            orders_list = []
 
         # 3. Fetch Limits/Balances Safely
         try:
@@ -133,7 +144,7 @@ def run_snapshot_report():
 
         margin_data = margin_res.get("data", margin_res) if isinstance(margin_res, dict) else getattr(margin_res, "data", margin_res)
         if isinstance(margin_data, list) and len(margin_data) > 0:
-            margin_data = margin_data[0]
+            margin_data = margin_data
             
         if isinstance(margin_data, dict):
             raw_margin = margin_data.get("availableMargin", margin_data.get("cfBal", 0.0))
@@ -161,6 +172,8 @@ def run_snapshot_report():
     # 2. Active Working Orders Processing
     active_orders = []
     for o in orders_list:
+        if not o:
+            continue
         status = o.get("ordSt", o.get("status", "")) if isinstance(o, dict) else getattr(o, "ordSt", getattr(o, "status", ""))
         if str(status).lower() in ["working", "open", "validation pending"]:
             active_orders.append(o)
@@ -174,7 +187,10 @@ def run_snapshot_report():
         side = "B" if "B" in str(side_raw).upper() else "S"
         
         qty_raw = ord.get("fldQty", ord.get("qty", 0)) if isinstance(ord, dict) else getattr(ord, "fldQty", getattr(ord, "qty", 0))
-        qty = abs(int(float(qty_raw)))
+        try:
+            qty = abs(int(float(qty_raw)))
+        except (ValueError, TypeError):
+            qty = 0
         
         prc_raw = ord.get("price", ord.get("avgPrc", 0.0)) if isinstance(ord, dict) else getattr(ord, "price", getattr(ord, "avgPrc", 0.0))
         price = int(force_trailing_zero(prc_raw))
@@ -186,13 +202,21 @@ def run_snapshot_report():
     # 3. Active Positions & PnL Processing
     active_positions = []
     for p in positions_list:
-        net_qty_raw = p.get("net_qty", 0) if isinstance(p, dict) else getattr(p, "net_qty", 0)
-        net_qty = float(net_qty_raw)
+        if not p:
+            continue
+        net_qty_raw = p.get("net_qty", p.get("netQty", 0)) if isinstance(p, dict) else getattr(p, "net_qty", getattr(p, "netQty", 0))
+        try:
+            net_qty = float(net_qty_raw)
+        except (ValueError, TypeError):
+            net_qty = 0.0
         
         if net_qty == 0:
-            buy_qty = p.get("flBuyQty", 0) if isinstance(p, dict) else getattr(p, "flBuyQty", 0)
-            sell_qty = p.get("flSellQty", 0) if isinstance(p, dict) else getattr(p, "flSellQty", 0)
-            net_qty = float(buy_qty) - float(sell_qty)
+            buy_qty = p.get("flBuyQty", p.get("buyQty", 0)) if isinstance(p, dict) else getattr(p, "flBuyQty", getattr(p, "buyQty", 0))
+            sell_qty = p.get("flSellQty", p.get("sellQty", 0)) if isinstance(p, dict) else getattr(p, "flSellQty", getattr(p, "sellQty", 0))
+            try:
+                net_qty = float(buy_qty) - float(sell_qty)
+            except (ValueError, TypeError):
+                net_qty = 0.0
             
         if abs(net_qty) > 0:
             active_positions.append((p, net_qty))
@@ -204,11 +228,17 @@ def run_snapshot_report():
         sym_raw = pos.get("trdSym", "UNK") if isinstance(pos, dict) else getattr(pos, "trdSym", "UNK")
         sym = str(sym_raw)[-7:]
         
-        buy_prc_raw = pos.get("buy_prc", pos.get("flBuyPrc", 0.0)) if isinstance(pos, dict) else getattr(pos, "buy_prc", getattr(pos, "flBuyPrc", 0.0))
-        entry_prc = float(buy_prc_raw)
+        buy_prc_raw = pos.get("buy_prc", pos.get("flBuyPrc", pos.get("buyAvgPrc", 0.0))) if isinstance(pos, dict) else getattr(pos, "buy_prc", getattr(pos, "flBuyPrc", getattr(pos, "buyAvgPrc", 0.0)))
+        try:
+            entry_prc = float(buy_prc_raw)
+        except (ValueError, TypeError):
+            entry_prc = 0.0
         
-        ltp_raw = pos.get("sell_prc", pos.get("ltp", 0.0)) if isinstance(pos, dict) else getattr(pos, "sell_prc", getattr(pos, "ltp", 0.0))
-        ltp = float(ltp_raw)
+        ltp_raw = pos.get("sell_prc", pos.get("ltp", pos.get("lastPrice", 0.0))) if isinstance(pos, dict) else getattr(pos, "sell_prc", getattr(pos, "ltp", getattr(pos, "lastPrice", 0.0)))
+        try:
+            ltp = float(ltp_raw)
+        except (ValueError, TypeError):
+            ltp = 0.0
         
         raw_pnl = (ltp - entry_prc) * qty
         sanitized_pnl = int(force_trailing_zero(raw_pnl))
@@ -216,7 +246,6 @@ def run_snapshot_report():
         
         status_flag = "🟢" if sanitized_pnl >= 0 else "🔴"
         output_lines.append(pad_row(f" {status_flag} {sym} [Q:{int(qty)}]", W))
-        
         pnl_str = f"₹{sanitized_pnl:,}"
         metrics = f"   E:{int(force_trailing_zero(entry_prc))}|L:{int(force_trailing_zero(ltp))}"
         
@@ -244,5 +273,4 @@ def run_snapshot_report():
 
 if __name__ == "__main__":
     run_snapshot_report()
-
 
