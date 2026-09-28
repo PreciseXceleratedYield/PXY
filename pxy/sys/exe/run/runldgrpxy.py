@@ -39,7 +39,7 @@ def pad_row(text, width=30):
     return text + (" " * (width - curr_len))
 
 def force_trailing_zero(value, context_tag="MATH"):
-    """Enforces trailing zero logic and prints input/output changes to log."""
+    """Enforces the rule that the final digit of the integer part must be 0."""
     try:
         if value is None:
             return 0.0
@@ -90,11 +90,12 @@ from runclntpxy import get_session
 TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_PLACEHOLDER"
 TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID_PLACEHOLDER"
 
+# Enforce explicit local reporting zones matching broker constraints
 IST = pytz.timezone("Asia/Kolkata")
 W = 30  # Strict 30-character width tracking layout
 
 def run_snapshot_report():
-    """Generates ledger snapshot separating open tracking from fully realized positions."""
+    """Generates ledger snapshot using derived formulas from Kotak Neo payload structures."""
     now_ist = datetime.now(IST)
     current_time = now_ist.time()
     
@@ -147,7 +148,6 @@ def run_snapshot_report():
     for method_name in ["balances", "limits", "margin"]:
         try:
             margin_res = getattr(client, method_name)()
-            debug_log("API_RESPONSE_MARGIN", f"Raw bounds payload via {method_name}:", margin_res)
             break
         except AttributeError:
             continue
@@ -155,24 +155,23 @@ def run_snapshot_report():
             continue
 
     if margin_res is not None:
-        # Avoid forcing list[0] slice conversion if the broker returns an explicit root map dictionary
         margin_data = margin_res.get("data", margin_res) if isinstance(margin_res, dict) else getattr(margin_res, "data", margin_res)
+        
+        # If the API returns a list of dictionary segments, look at the first node
         if isinstance(margin_data, list) and len(margin_data) > 0:
             margin_data = margin_data[0]
             
         if isinstance(margin_data, dict):
-            # Intercept broad key variations present across Kotak SDK patches
-            raw_margin = margin_data.get("availableMargin", 
-                         margin_data.get("cfBal", 
-                         margin_data.get("netBal", 
-                         margin_data.get("grosResLmt", 
-                         margin_data.get("marUpdAmt", 0.0)))))
+            # Prioritise 'Net' as proven by the direct debug dump payload trace
+            raw_margin = margin_data.get("Net", 
+                         margin_data.get("net", 
+                         margin_data.get("availableMargin", 
+                         margin_data.get("cfBal", 0.0))))
         else:
-            raw_margin = getattr(margin_data, "availableMargin", 
-                         getattr(margin_data, "cfBal", 
-                         getattr(margin_data, "netBal", 
-                         getattr(margin_data, "grosResLmt", 
-                         getattr(margin_data, "marUpdAmt", 0.0)))))
+            raw_margin = getattr(margin_data, "Net", 
+                         getattr(margin_data, "net", 
+                         getattr(margin_data, "availableMargin", 
+                         getattr(margin_data, "cfBal", 0.0))))
 
     output_lines = []
     output_lines.append("=" * W)
