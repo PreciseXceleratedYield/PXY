@@ -110,7 +110,13 @@ def handle_side_averaging(client, df):
     ce_tgt = exeagtpxy.calculate_dynamic_target('CE', active_exit, ce_investment, pe_investment)
     pe_tgt = exeagtpxy.calculate_dynamic_target('PE', active_exit, ce_investment, pe_investment)
 
-    ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(ce_invst_factor, pe_invst_factor, ce_lots, pe_lots)
+    # Extract forces from the row solely to compute the dynamic LGT thresholds
+    ce_force_val = float(working_df['ce_force'].iloc[-1]) if 'ce_force' in working_df.columns else 1.2
+    pe_force_val = float(working_df['pe_force'].iloc[-1]) if 'pe_force' in working_df.columns else 1.2
+
+    ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(
+        ce_invst_factor, pe_invst_factor, ce_lots, pe_lots, ce_force_val, pe_force_val
+    )
 
     if USE_OVERALL_LOSS:
         ce_lgt_val, pe_lgt_val = ce_overall_pnl_pct, pe_overall_pnl_pct
