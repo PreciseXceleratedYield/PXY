@@ -53,7 +53,7 @@ def get_bos_bar(df):
         if df is None or len(df) < 42:
             if df is not None:
                 if not hasattr(df, 'attrs'): df.attrs = {}
-                df.attrs['bos_numeric_value'] = "NONE"
+                df.attrs['bos_numeric_value'] = "BEAR"
                 df.attrs['relative_position_pct'] = "0.0%"
             return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
             
@@ -94,44 +94,36 @@ def get_bos_bar(df):
         
         # Default operational state configurations
         signal = "NONE"
-        bos_label = "NONE"
+        
+        # Assign basic BULL/BEAR state strictly based on 50% split threshold
+        bos_label = "BULL" if relative_position >= 0.50 else "BEAR"
         
         # Trigger BUY Sequence (Upper wall breakout)
         if c_42 > h_42 and (was_inside or prev_was_breakout):
             signal = "BREAKUP"
             if relative_position >= 0.50:
-                bos_label = f"{c_42:.2f}_BULL_UP"
                 if is_mrb and c_42 > o_live:
                     print_fixed_width_alert("BREAKUP: STRONG UPPER BREAKOUT!", ["🚀", "🔥"], Fore.GREEN)
                 else:
                     print_fixed_width_alert("BREAKUP: UPPER HALF STRENGTH!", ["🚀"], Fore.GREEN)
             else:
-                bos_label = f"{c_42:.2f}_BEAR_UP"
                 print_fixed_width_alert("BREAKUP: WEAK BREAKOUT WALL!", ["⚠️"], Fore.YELLOW)
                 
         # Trigger SELL Sequence (Lower wall breakdown)
         elif c_42 < l_42 and (was_inside or prev_was_breakdown):
             signal = "BREAKDOWN"
             if relative_position < 0.50:
-                bos_label = f"{c_42:.2f}_BEAR_DOWN"
                 if is_mrb and c_42 < o_live:
                     print_fixed_width_alert("BREAKDOWN: STRONG LOWER BREAKDOWN!", ["🔴", "🔥"], Fore.RED)
                 else:
                     print_fixed_width_alert("BREAKDOWN: LOWER HALF WEAKNESS!", ["🔴"], Fore.RED)
             else:
-                bos_label = f"{c_42:.2f}_BULL_DOWN"
                 print_fixed_width_alert("BREAKDOWN: WEAK BREAKDOWN WALL!", ["⚠️"], Fore.YELLOW)
-        else:
-            # Inside the walls: calculate standard directional context based on the live candle's close position
-            if relative_position >= 0.50:
-                bos_label = f"{c_42:.2f}_BULL"
-            else:
-                bos_label = f"{c_42:.2f}_BEAR"
         
         # Build the visual bar representation
         visual_bar = build_candle_bar(o_42, h_render, l_render, c_42)
         
-        # 📊 UPDATE DATAFRAME ATTRIBUTES WITH STABILIZED COMBINED STRINGS
+        # 📊 UPDATE DATAFRAME ATTRIBUTES WITH STRICT "BULL" OR "BEAR" LABEL
         if not hasattr(df, 'attrs'):
             df.attrs = {}
         df.attrs['bos_numeric_value'] = bos_label
@@ -140,10 +132,9 @@ def get_bos_bar(df):
         return visual_bar, signal
         
     except Exception:
-        # Fallback to keep downstream processes moving instead of causing an unhandled crash
         if df is not None:
             if not hasattr(df, 'attrs'): df.attrs = {}
-            df.attrs['bos_numeric_value'] = "NONE"
+            df.attrs['bos_numeric_value'] = "BEAR"
             df.attrs['relative_position_pct'] = "0.0%"
         return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
 
@@ -151,7 +142,6 @@ def get_bos_bar(df):
 if __name__ == "__main__":
     print(f"\n{Style.BRIGHT}--- RUNNING SELF TEST MATRIX FOR SYSBBOSPXY.PY ---")
     
-    # 1. Generate normal mock data range (41 candles resting around a baseline index of 100)
     np.random.seed(42)
     history_count = 41
     
@@ -167,11 +157,9 @@ if __name__ == "__main__":
         'Close': list(closes)
     }
     
-    # Target absolute maximum high / low metrics found in historic 41 candles
     max_h41 = max(mock_data['High'])
     min_l41 = min(mock_data['Low'])
     
-    # 2. Test scenarios for the 42nd live candle input frame
     scenarios = [
         {"name": "Inside Walls (Bullish Candle Edge)", "O": 100.0, "H": 103.0, "L": 99.0, "C": 102.5},
         {"name": "Inside Walls (Bearish Candle Edge)", "O": 101.0, "H": 102.0, "L": 97.0, "C": 97.5},
@@ -180,21 +168,16 @@ if __name__ == "__main__":
     ]
     
     for case in scenarios:
-        # Build independent temporary DataFrames representing current time slice
         df_test = pd.DataFrame(mock_data)
-        
-        # Append the specific scenario live running candle raw data frame entry
         live_row = pd.DataFrame([{"Open": case["O"], "High": case["H"], "Low": case["L"], "Close": case["C"]}])
         df_test = pd.concat([df_test, live_row], ignore_index=True)
         
         print(f"\n{Fore.CYAN}{Style.BRIGHT}[Scenario]: {case['name']}")
         
-        # Run calculation parameters
         bar, sig = get_bos_bar(df_test)
         val = df_test.attrs.get('bos_numeric_value', 'NONE')
         pct = df_test.attrs.get('relative_position_pct', '0.0%')
         
-        # Display extracted main console terminal printing values
         print(f"bos_bar           : {bar}")
         print(f"signal            : {sig}")
         print(f"bos_val (attrs)   : {val}")
