@@ -3,6 +3,7 @@
 import os
 import sys
 import json
+import time
 import subprocess
 import pytz
 from datetime import datetime
@@ -32,6 +33,11 @@ CHECK_STATE_FILE = os.path.abspath(os.path.join(current_dir, "../../web/webrnkch
 # RISK CONFIGURATION CONSTANTS
 EMERGENCY_RETRY_SECONDS = 5.0
 LOOP_INTERVAL_SECONDS = 1.0
+
+# ✅ RESET GUARD: how long to wait for the broker to show zero open positions
+# after the square-off fires, before deciding the reset must be withheld.
+FLAT_CONFIRM_TIMEOUT_SECONDS = 10.0
+FLAT_CONFIRM_POLL_SECONDS = 2.0
 
 # 🔄 SURGICAL PROXY: Declares the variable locally but pulls values dynamically
 import exemeltpxy
@@ -208,6 +214,66 @@ def write_squareoff_success_log():
         print(f"{Fore.RED}❌ Error writing square-off log: {e}")
 
 
+# ✅ RESET GUARD ---------------------------------------------------------------
+def _num(v):
+    """Broker quantities may arrive as strings ("65", "1,300", ""). Raises on garbage
+    so the caller fails safe (reset withheld) instead of guessing."""
+    return float(str(v).replace(",", "").strip() or 0)
+
+
+def _flat_from_response(res):
+    """True  = broker positively shows zero open positions (any symbol, long or short)
+       False = at least one open position
+       None  = cannot tell (unexpected response) -> caller must NOT treat as flat"""
+    if not isinstance(res, dict):
+        return None
+
+    data = res.get("data")
+    if isinstance(data, list):
+        for pos in data:
+            net_qty = _num(pos.get("net_qty", 0))
+            if net_qty == 0:
+                net_qty = _num(pos.get("flBuyQty", 0)) - _num(pos.get("flSellQty", 0))
+            if abs(net_qty) > 0:
+                return False
+        return True
+
+    # No "data" list at all: only flat if the broker explicitly says there is no data.
+    msg = str(res.get("errMsg", "") or res.get("message", "")).lower()
+    if "no data" in msg:
+        return True
+    return None
+
+
+def broker_positions_flat():
+    """Reset guard. Returns True ONLY when the broker itself confirms zero open positions.
+    Polls for a short window because market-order fills take a moment after the square-off
+    fires. Any doubt (no session, API error, odd response, timeout) returns False so the
+    reset is withheld."""
+    try:
+        from runclntpxy import get_session
+        client = get_session()
+        if not client:
+            print(f"{Fore.RED}⚠️ Reset guard: no broker session, cannot confirm flat.")
+            return False
+
+        deadline = time.time() + FLAT_CONFIRM_TIMEOUT_SECONDS
+        while True:
+            res = client.positions()
+            flat = _flat_from_response(res)
+            if flat is True:
+                return True
+            if flat is None:
+                print(f"{Fore.YELLOW}⚠️ Reset guard: unexpected positions() response: {str(res)[:150]}")
+            if time.time() >= deadline:
+                return False
+            time.sleep(FLAT_CONFIRM_POLL_SECONDS)
+    except Exception as e:
+        print(f"{Fore.RED}⚠️ Reset guard error, treating as NOT flat: {e}")
+        return False
+# -----------------------------------------------------------------------------
+
+
 def start_trailing_engine():
     """Monitors live data boundaries on a single-pass framework driven by an external pipeline."""
     verify_and_purge_stale_cache()
@@ -264,10 +330,16 @@ def start_trailing_engine():
                     # Run the execution routine once. The external engine handles continuous stack loops.
                     subprocess.run([python_executable, script_path, "-all"])
                     
-                    # Wiping counters and active memory coordinates clear upon full verified exit execution
-                    write_squareoff_success_log()
-                    save_session_state(0.0, 0.0, -float_drop_limit)
-                    save_check_state(0)
+                    # ✅ RESET GUARD: reset ONLY when the broker confirms no open positions.
+                    # If anything is still open (or flat cannot be confirmed) the counter stays
+                    # at 3+, so the square-off is re-fired on the next cycle and the engine
+                    # keeps seeing the positions (no reset stamp = no hidden fills).
+                    if broker_positions_flat():
+                        write_squareoff_success_log()
+                        save_session_state(0.0, 0.0, -float_drop_limit)
+                        save_check_state(0)
+                    else:
+                        print(f"⏳ {Fore.YELLOW}RESET WITHHELD: broker still shows open positions (or flat could not be confirmed). Retrying next cycle.")
                 sys.exit(0)
         else:
             # Condition is completely healthy. Wipe iteration breach counter back to zero.
@@ -282,4 +354,3 @@ def start_trailing_engine():
 
 if __name__ == "__main__":
     start_trailing_engine()
-
