@@ -17,6 +17,7 @@ from syscseqpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
 from syssadxpxy import calculate_adx
+from syssmapxy import get_sma          # ✅ SMA Tool Imported
 
 # ✅ KEEP CONSOLE ALIGNMENT
 TOTAL_WIDTH = 42
@@ -48,7 +49,6 @@ def get_full_snapshot():
     result["candle_visual"] = get_candle_visual(df=master_df)
 
     # ===== CLOSE MOMENTUM DATA ENGINE =====
-    # Pulls 100% frozen, non-fluctuating historical candle arrays (iloc[:-1])
     pxy_close, pxy_open, pxy_color, history_df = get_pxy_data(df=master_df)
     result["ha_close"] = pxy_close
     result["ha_open"] = pxy_open
@@ -56,14 +56,11 @@ def get_full_snapshot():
 
     # ===== FLIP & TREND STREAK SIGNAL =====
     signal, past_depth, ce_depth, pe_depth = detect_pxy_flip_signal(df=master_df)
-    
-    # Secure fallback loop checks using true Close and Open columns 
     if signal is None or signal == "NA":
         if not history_df.empty:
             signal = "BULL" if history_df['Close'].iloc[-1] > history_df['Open'].iloc[-1] else "BEAR"
         else:
             signal = "NONE"
-        
     result["hkin_signal"] = signal
     result["hkin_past_depth"] = past_depth
     result["hkin_ce_depth"] = ce_depth
@@ -92,7 +89,6 @@ def get_full_snapshot():
 
     # ===== SUPERTREND PROFILES =====
     processed_st_df = calculate_supertrend(master_df.copy())
-    # Fixed alignment gap: iloc[-1] targets the exact same closed window bar 
     trend = processed_st_df['ST_Trend'].iloc[-1] if not processed_st_df.empty else "NONE"
     line_val = safe_int(processed_st_df['ST'].iloc[-1] if not processed_st_df.empty else 0)
     result["supertrend"] = trend
@@ -114,9 +110,13 @@ def get_full_snapshot():
     result["day_candle"] = get_day_candle_bar(master_df)
 
     # ===== BREAKOUT STRUCTURE (BOS) MATRIX =====
-    bos_bar, bos_val = get_bos_bar(master_df)
+    bos_bar, _ = get_bos_bar(master_df)
     result["bos_bar"] = bos_bar if bos_bar else "NONE"
-    result["bos_val"] = bos_val if bos_val else "NONE"
+    
+    # Calculate SMA 50 status (BULL/BEAR)
+    sma_data = get_sma(master_df, period=50)
+    result["sma"] = sma_data.get("status", "NA") # 🔄 RENAMED: Key is now 'sma'
+    
     return result
 
 # ================= PRINT DASHBOARD =================
@@ -132,10 +132,8 @@ def print_dashboard(data):
     sig, pst = data["hkin_signal"], data["hkin_past_depth"]
     ce_d, pe_d = data["hkin_ce_depth"], data["hkin_pe_depth"]
     h_col = Fore.LIGHTGREEN_EX if sig in ["BUY","BULL"] else Fore.LIGHTRED_EX if sig in ["SELL","BEAR"] else Fore.YELLOW
-    
     s1 = TOTAL_WIDTH - len(f"Hkin:{sig}") - len(f"Past:{pst}")
     print(Fore.WHITE + "Hkin:" + h_col + sig + " " * max(1, s1) + Fore.WHITE + "Past:" + h_col + str(pst))
-    
     s2 = TOTAL_WIDTH - len(f"CE:{ce_d}") - len(f"PE:{pe_d}")
     print(Fore.WHITE + "CE:" + Fore.LIGHTGREEN_EX + str(ce_d) + " " * max(1, s2) + Fore.WHITE + "PE:" + Fore.LIGHTRED_EX + str(pe_d))
 
@@ -164,7 +162,6 @@ def print_dashboard(data):
     elif trnd == "UP": st_c = Fore.LIGHTGREEN_EX
     elif trnd == "DOWN": st_c = Fore.LIGHTRED_EX
     else: st_c = Fore.YELLOW
-
     s_st = TOTAL_WIDTH - len(f"Super:{trnd}") - len(f"LINE:{line}")
     print(Fore.WHITE + "Super:" + st_c + trnd + " " * max(1, s_st) + Fore.WHITE + "LINE:" + Fore.CYAN + str(line))
 
@@ -181,8 +178,14 @@ def print_dashboard(data):
     s_e = TOTAL_WIDTH - len(f"Entry:{ent}") - len(f"Signal:{ext}")
     print(Fore.WHITE + "Entry:" + e_color + ent + " " * max(1, s_e) + Fore.WHITE + "Signal:" + e_color + ext)
 
-    # 9. BOS BOUNDARY PRINT MATRIX
+    # 9. BOS BOUNDARY PRINT MATRIX & SURGICAL SMA ALIGNMENT LINE
     print(data["bos_bar"])
+    
+    # 🔄 RENAMED: Reading and printing from the 'sma' data key
+    sma_status = data.get("sma", "NA")
+    sma_color = Fore.LIGHTGREEN_EX if sma_status == "BULL" else Fore.LIGHTRED_EX if sma_status == "BEAR" else Fore.YELLOW
+    s_sma = TOTAL_WIDTH - len("SMA:") - len(sma_status)
+    print(Fore.WHITE + "SMA:" + " " * max(1, s_sma) + sma_color + sma_status)
 
 # ================= MAIN RUNNER ENGINE =================
 if __name__ == "__main__":
