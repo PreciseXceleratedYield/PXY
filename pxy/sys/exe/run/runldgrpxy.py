@@ -57,7 +57,6 @@ def force_trailing_zero(value, context_tag="MATH"):
 def send_telegram_payload(message_text, bot_token, chat_id):
     """Dispatches the formatted layout message to your Telegram channel."""
     if "PLACEHOLDER" in bot_token or "PLACEHOLDER" in chat_id:
-        debug_log("TELEGRAM", "Skipping broadcast: Configuration placeholders detected.")
         return
 
     url = f"https://telegram.org{bot_token}/sendMessage"
@@ -72,10 +71,9 @@ def send_telegram_payload(message_text, bot_token, chat_id):
         data = urllib.parse.urlencode(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data)
         with urllib.request.urlopen(req, timeout=5) as response:
-            debug_log("TELEGRAM", f"Message broadcasted. Status code: {response.status}")
-    except Exception as e:
-        debug_log("TELEGRAM_ERR", f"Failed transmission: {str(e)}")
-
+            pass
+    except Exception:
+        pass
 
 # ==============================================================================
 # 🚀 PART 2 OF 2: CORE ENGINE LAYER (API Fetching, Data Processing & Execution)
@@ -96,7 +94,7 @@ IST = pytz.timezone("Asia/Kolkata")
 W = 30  # Strict 30-character width tracking layout
 
 def run_snapshot_report():
-    """Generates ledger snapshot using derived formulas from Kotak Neo payload structures."""
+    """Generates ledger snapshot separating open tracking from fully realized positions."""
     now_ist = datetime.now(IST)
     current_time = now_ist.time()
     
@@ -105,7 +103,6 @@ def run_snapshot_report():
     
     # 🕒 Strict Time Restriction Gate (9:15 AM to 3:45 PM IST)
     if start_market <= current_time <= end_market:
-        debug_log("GATE", "Report requested during market hours. Blocking execution.")
         print("=" * W)
         print(pad_row("🛰️ PXY MONITOR LIVE ENGINE 🟢", W))
         print("=" * W)
@@ -117,7 +114,6 @@ def run_snapshot_report():
         print("=" * W)
         return
 
-    debug_log("SESSION", "Connecting via runclntpxy session manager...")
     client = get_session()
     if not client:
         print(pad_row("❌ API Connection Blank", W))
@@ -127,7 +123,6 @@ def run_snapshot_report():
     orders_list = []
     raw_margin = 0.0
 
-    # 1. Fetch Live Positions
     try:
         pos_res = client.positions()
         positions_list = pos_res.get("data", []) if isinstance(pos_res, dict) else getattr(pos_res, "data", [])
@@ -136,7 +131,6 @@ def run_snapshot_report():
     if positions_list is None:
         positions_list = []
 
-    # 2. Fetch Live Orders
     try:
         try:
             ord_res = client.order_report()
@@ -148,26 +142,37 @@ def run_snapshot_report():
     if orders_list is None:
         orders_list = []
 
-    # 3. Fetch Live Limits/Balances
+    # Safe Balance Parser Strategy
     margin_res = None
     for method_name in ["balances", "limits", "margin"]:
         try:
             margin_res = getattr(client, method_name)()
+            debug_log("API_RESPONSE_MARGIN", f"Raw bounds payload via {method_name}:", margin_res)
             break
         except AttributeError:
             continue
-        except Exception as e:
-            debug_log("API_EXCEP_MARGIN", f"Failed parsing during {method_name}.", str(e))
+        except Exception:
+            continue
 
     if margin_res is not None:
+        # Avoid forcing list[0] slice conversion if the broker returns an explicit root map dictionary
         margin_data = margin_res.get("data", margin_res) if isinstance(margin_res, dict) else getattr(margin_res, "data", margin_res)
         if isinstance(margin_data, list) and len(margin_data) > 0:
             margin_data = margin_data[0]
             
         if isinstance(margin_data, dict):
-            raw_margin = margin_data.get("availableMargin", margin_data.get("cfBal", margin_data.get("margin", 0.0)))
+            # Intercept broad key variations present across Kotak SDK patches
+            raw_margin = margin_data.get("availableMargin", 
+                         margin_data.get("cfBal", 
+                         margin_data.get("netBal", 
+                         margin_data.get("grosResLmt", 
+                         margin_data.get("marUpdAmt", 0.0)))))
         else:
-            raw_margin = getattr(margin_data, "availableMargin", getattr(margin_data, "cfBal", getattr(margin_data, "margin", 0.0)))
+            raw_margin = getattr(margin_data, "availableMargin", 
+                         getattr(margin_data, "cfBal", 
+                         getattr(margin_data, "netBal", 
+                         getattr(margin_data, "grosResLmt", 
+                         getattr(margin_data, "marUpdAmt", 0.0)))))
 
     output_lines = []
     output_lines.append("=" * W)
@@ -196,47 +201,61 @@ def run_snapshot_report():
         output_lines.append(pad_row(f" 📝 {side}|{sym}|Q:{qty}|P:₹{price}", W))
     output_lines.append("-" * W)
 
-    # 3. Active Positions & PnL Processing (Derived from buyAmt, sellAmt, flBuyQty, flSellQty)
-    output_lines.append(pad_row(f"📊 Live Open: {len(positions_list)}", W))
-    total_unrealized_pnl = 0.0
+    # 3. Open vs Realized Position Processing
+    open_positions = []
+    closed_positions = []
+    total_pnl = 0.0
     
     for pos in positions_list:
-        sym = str(pos.get("trdSym", "UNK") if isinstance(pos, dict) else getattr(pos, "trdSym", "UNK"))[-7:]
-        
-        # Ingest raw amounts and executed volumes
         buy_amt = float(pos.get("buyAmt", 0.0))
         sell_amt = float(pos.get("sellAmt", 0.0))
         fl_buy_qty = float(pos.get("flBuyQty", 0.0))
         fl_sell_qty = float(pos.get("flSellQty", 0.0))
         
-        # Calculate derived net tracking numbers
         net_qty = fl_buy_qty - fl_sell_qty
-        
-        # Derive structural averages dynamically to protect math layers
-        avg_buy_prc = (buy_amt / fl_buy_qty) if fl_buy_qty > 0 else 0.0
-        avg_sell_prc = (sell_amt / fl_sell_qty) if fl_sell_qty > 0 else 0.0
-        
-        # For completely squared off intra-day open logs, net PnL is directly sell minus buy value
         pos_pnl = sell_amt - buy_amt
-        total_unrealized_pnl += pos_pnl
+        total_pnl += pos_pnl
         
-        sanitized_pnl = int(force_trailing_zero(pos_pnl, "POS_PNL"))
+        if net_qty == 0:
+            closed_positions.append((pos, fl_buy_qty, pos_pnl))
+        else:
+            open_positions.append((pos, net_qty, pos_pnl))
+            
+    # Print Live Open Rows (if any exist)
+    output_lines.append(pad_row(f"📊 Live Open: {len(open_positions)}", W))
+    for pos, qty, pnl in open_positions:
+        sym = str(pos.get("trdSym", "UNK"))[-7:]
+        sanitized_pnl = int(force_trailing_zero(pnl, "OPEN_PNL"))
+        status_flag = "🟢" if sanitized_pnl >= 0 else "🔴"
+        output_lines.append(pad_row(f" {status_flag} {sym} [Q:{int(qty)}]", W))
+
+    if open_positions:
+        output_lines.append("-" * W)
+
+    # Print Realized Rows
+    output_lines.append(pad_row(f"🏆 Realized Positions: {len(closed_positions)}", W))
+    for pos, qty, pnl in closed_positions:
+        sym = str(pos.get("trdSym", "UNK"))[-7:]
+        fl_buy_qty = float(pos.get("flBuyQty", 0.0))
+        fl_sell_qty = float(pos.get("flSellQty", 0.0))
+        
+        avg_buy = (float(pos.get("buyAmt", 0.0)) / fl_buy_qty) if fl_buy_qty > 0 else 0.0
+        avg_sell = (float(pos.get("sellAmt", 0.0)) / fl_sell_qty) if fl_sell_qty > 0 else 0.0
+        
+        sanitized_pnl = int(force_trailing_zero(pnl, "CLOSED_PNL"))
         status_flag = "🟢" if sanitized_pnl >= 0 else "🔴"
         
-        # Display absolute total volume executed for safety tracking
-        display_qty = int(fl_buy_qty if fl_buy_qty > 0 else fl_sell_qty)
-        output_lines.append(pad_row(f" {status_flag} {sym} [Q:{display_qty}]", W))
-        
+        output_lines.append(pad_row(f" {status_flag} {sym} [Q:{int(qty)}]", W))
         pnl_str = f"₹{sanitized_pnl:,}"
-        metrics = f"   B:{int(force_trailing_zero(avg_buy_prc))}|S:{int(force_trailing_zero(avg_sell_prc))}"
+        metrics = f"   B:{int(force_trailing_zero(avg_buy))}|S:{int(force_trailing_zero(avg_sell))}"
         
         space_needed = W - emoji_len(metrics) - emoji_len(pnl_str)
         output_lines.append(f"{metrics}{' ' * space_needed}{pnl_str}" if space_needed > 0 else pad_row(f"{metrics} P:{pnl_str}", W))
-            
+        
     output_lines.append("-" * W)
     
     # 4. Total Consolidated PnL Processing
-    final_pnl = int(force_trailing_zero(total_unrealized_pnl, "FINAL_SUM"))
+    final_pnl = int(force_trailing_zero(total_pnl, "FINAL_SUM"))
     pnl_val = f"₹{final_pnl:,}"
     sum_space = W - emoji_len("🏆 Net PnL:") - emoji_len(pnl_val)
     output_lines.append(f"🏆 Net PnL:{' ' * max(1, sum_space)}{pnl_val}")
@@ -247,9 +266,4 @@ def run_snapshot_report():
     send_telegram_payload(f"```text\n{full_message_payload}\n```", TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
 
 if __name__ == "__main__":
-    try:
-        run_snapshot_report()
-    except Exception as fatal_error:
-        debug_log("FATAL_CRASH", "Engine crash trace tracking:")
-        traceback.print_exc(file=sys.stderr)
-
+    run_snapshot_report()
