@@ -3,14 +3,14 @@ from syscnfgpxy import TICKER
 from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
 
-def get_entry_signal(df=None):
+def get_entry_signal(df=None, use_st_filter=False):
     """
     Direct copy-and-override signal router matching market execution to OTM strategies.
-    - Entry Signal: Maps to OTMBUY/OTMSELL if market is BULL/BEAR and ST is matching or SIDE.
-    - Exit Signal: Copied directly from Entry status:
-        * OTMBUY   -> BULL
-        * OTMSELL  -> BEAR
-        * All other instances -> NONE
+    
+    Parameters:
+    - use_st_filter (bool): 
+        * False (Default): No-Filter Mode. Every BULL/BEAR directly becomes OTMBUY/OTMSELL.
+        * True: Strict Filter Mode. SuperTrend alignment is strictly enforced.
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -23,22 +23,32 @@ def get_entry_signal(df=None):
     mkt_entry_dir, _ = get_signal(df)  # Raw market exit signal completely ignored
     mkt_entry_dir = str(mkt_entry_dir).upper().strip()
 
-    # 2️⃣ Fetch SuperTrend regime to check entry filtering criteria
+    # 2️⃣ Fetch SuperTrend regime
     processed_st_df = calculate_supertrend(df.copy())
     if processed_st_df.empty:
         trend = "NONE"
     else:
         trend = str(processed_st_df["ST_Trend"].iloc[-1]).upper().strip()
 
-    # 🎯 ENTRY FILTER LAYER: Convert directional market signals when ST is matching or SIDE
-    if mkt_entry_dir == "BULL" and trend in ["BULL"]:
-        mapped_entry = "OTMBUY"
-    elif mkt_entry_dir == "BEAR" and trend in ["BEAR"]:
-        mapped_entry = "OTMSELL"
+    # 🎯 ENTRY LAYER (Switch Logic)
+    if use_st_filter:
+        # Strict Filtering: Check trend alignment
+        if mkt_entry_dir == "BULL" and trend == "BULL":
+            mapped_entry = "OTMBUY"
+        elif mkt_entry_dir == "BEAR" and trend == "BEAR":
+            mapped_entry = "OTMSELL"
+        else:
+            mapped_entry = "NONE"  # Block mismatched trends
     else:
-        mapped_entry = mkt_entry_dir
+        # No Filter Mode: Direct upgrade pass-through mapping
+        if mkt_entry_dir == "BULL":
+            mapped_entry = "OTMBUY"
+        elif mkt_entry_dir == "BEAR":
+            mapped_entry = "OTMSELL"
+        else:
+            mapped_entry = "NONE"
 
-    # 🎯 EXIT FILTER LAYER: Mirrored directly from entry logic states
+    # 🎯 EXIT LAYER: Decoupled and clean mapping based strictly on mapped_entry status
     if mapped_entry == "OTMBUY":
         mapped_exit = "BULL"
     elif mapped_entry == "OTMSELL":
@@ -52,7 +62,8 @@ if __name__ == "__main__":
     from sysdtafpxy import fetch_yf_data
     df = fetch_yf_data()
     if df is not None and not df.empty:
-        print("RUNNING RAW ENTRY PASS-THROUGH SIGNAL ROUTER MATRIX...")
+        print("RUNNING ENTRY PASSTHROUGH SIGNAL ROUTER DECOUPLED MATRIX...")
+        # Runs in No-Filter Mode by default
         entry_sig, exit_sig = get_entry_signal(df)
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry_sig} | EXIT_SIG: {exit_sig}")
 
