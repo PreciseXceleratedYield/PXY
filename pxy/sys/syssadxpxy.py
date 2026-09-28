@@ -15,8 +15,8 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
     1.0 = Maximum Velocity/Growth (Premium expansion primed)
     1.5 = Absolute Stagnation/Contraction (Premium decay zone)
     """
-    # Baseline validation floor: requires minimum structural rows to compute
-    if df is None or df.empty or len(df) < 15:
+    # 🎯 UPDATED: Baseline validation floor now requires minimum 43 rows to compute lookback depth
+    if df is None or df.empty or len(df) < 43:
         return 1.5, 1.5
 
     high = df['High'].to_numpy()
@@ -49,7 +49,8 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
             minus_dm[i] = down_move
 
     # 3. Apply standard rolling calculations for smoothed baseline trends
-    period = 14
+    # 🎯 UPDATED: Tracking lookback window shifted to a 42-candle architecture framework
+    period = 42
     if length <= period:
         return 1.5, 1.5
 
@@ -60,7 +61,7 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
     # Prevent ZeroDivision errors over flatline candles
     tr_sum = np.where(tr_sum == 0, 0.0001, tr_sum)
 
-    # Derive raw directional indicators (+DI and -DI)
+    # Derive raw directional indicators (+DI and -DI) over the 42-candle window
     di_plus = (plus_dm_sum / tr_sum) * 100
     di_minus = (minus_dm_sum / tr_sum) * 100
 
@@ -88,4 +89,3 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
     pe_force = compute_scaled_force(curr_pe, prior_pe, sensitivity=0.20)
 
     return ce_force, pe_force
-
