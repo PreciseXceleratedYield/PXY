@@ -49,7 +49,12 @@ def build_candle_bar(o, h, l, c, width=WIDTH):
 
 def get_bos_bar(df):
     try:
+        # Initial safety gate for insufficient history lengths
         if df is None or len(df) < 42:
+            if df is not None:
+                if not hasattr(df, 'attrs'): df.attrs = {}
+                df.attrs['bos_numeric_value'] = "BEAR"
+                df.attrs['relative_position_pct'] = "0.0%"
             return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
             
         # 1. Isolate the previous 41 candles to lock true historic walls
@@ -57,23 +62,14 @@ def get_bos_bar(df):
         h_42 = float(historic_window['High'].max())
         l_42 = float(historic_window['Low'].min())
         
-        # Capture separate live running candle values for real-time intersection testing
+        # Capture separate live running candle values and strictly cast to float
         live_candle = df.iloc[-1]
         o_live = float(live_candle['Open'])
         h_live = float(live_candle['High'])
         l_live = float(live_candle['Low'])
         c_42 = float(live_candle['Close'])
         
-        # --- TIME STAMP EXTRACTION MATRIX FOR MORNING RECOGNITION (09:15 to 10:10) ---
-        target_time = df.index[-1]
-        t_hour = target_time.hour
-        t_min = target_time.minute
-        
-        # Exact 09:15 to 10:10 exchange morning session bracket gate
-        is_morning_session = (t_hour == 9 and t_min >= 15) or (t_hour == 10 and t_min <= 10)
-        # -------------------------------------------------------------
-
-        # --- LIVE RUNNING & IMMEDIATE CLOSED CANDLE FILTER ---
+        # --- LIVE RUNNING & IMMEDIATE CLOSED CANDLE BREAKOUT FILTER ---
         prev_candle = df.iloc[-2]
         prev_close = float(prev_candle['Close'])
         
@@ -87,58 +83,104 @@ def get_bos_bar(df):
         live_body = abs(c_42 - o_live)
         is_mrb = (live_body / live_range) >= 0.95 if live_range > 0 else False
         
-        # 2. Synchronize visual rendering inputs to absorb complete 42-period bounds smoothly
+        # Synchronize visual rendering inputs
         h_render = max(h_42, h_live)
         l_render = min(l_42, l_live)
         o_42 = (h_render + l_render) / 2.0
         
-        # ⚡ LIVE RUNNING & IMMEDIATE CLOSED CANDLE SIGNAL ENGINE
+        # ⚡ 50/50 LIVE CANDLE STRENGTH CALCULATION (Internal candle metric)
+        live_candle_range = h_live - l_live if (h_live - l_live) > 0 else 1e-9
+        relative_position = (c_42 - l_live) / live_candle_range
+        
+        # Default operational state configurations
         signal = "NONE"
         
-        # Trigger BUY Sequences
-        if c_42 > h_42 and (was_inside or prev_was_breakout):
-            if is_morning_session:
-                signal = "MBUY"
-                if is_mrb and c_42 > o_live:
-                    print_fixed_width_alert("MBUY: STRONG AM BREAKOUT!", ["🌅", "🚀", "🔥"], Fore.GREEN)
-                else:
-                    print_fixed_width_alert("MBUY: AM OPEN BREAKOUT!", ["🌅", "🚀"], Fore.GREEN)
-            else:
-                signal = "NBUY"
-                if is_mrb and c_42 > o_live:
-                    print_fixed_width_alert("NBUY: STRONG UP TREND NOW!", ["🚀", "🔥"], Fore.GREEN)
-                else:
-                    print_fixed_width_alert("NBUY: BREAKOUT UPPER WALL!", ["🚀"], Fore.GREEN)
-                
-        # Trigger SELL Sequences
-        elif c_42 < l_42 and (was_inside or prev_was_breakdown):
-            if is_morning_session:
-                signal = "MSELL"
-                if is_mrb and c_42 < o_live:
-                    print_fixed_width_alert("MSELL: STRONG AM BREAKDOWN!", ["🌅", "🔴", "🔥"], Fore.RED)
-                else:
-                    print_fixed_width_alert("MSELL: AM OPEN BREAKDOWN!", ["🌅", "🔴"], Fore.RED)
-            else:
-                signal = "NSELL"
-                if is_mrb and c_42 < o_live:
-                    print_fixed_width_alert("NSELL: STRONG DOWN TREND!", ["🔴", "🔥"], Fore.RED)
-                else:
-                    print_fixed_width_alert("NSELL: BREAKDOWN LOWER WALL", ["🔴"], Fore.RED)
+        # Assign basic BULL/BEAR state strictly based on 50% split threshold (Always Bull or Bear)
+        bos_label = "BULL" if relative_position >= 0.50 else "BEAR"
         
-        # Build the visual bar using corrected midpoint open parameters
+        # Trigger BUY Sequence (Upper wall breakout)
+        if c_42 > h_42 and (was_inside or prev_was_breakout):
+            signal = "BREAKUP"
+            if relative_position >= 0.50:
+                if is_mrb and c_42 > o_live:
+                    print_fixed_width_alert("BREAKUP: STRONG UPPER BREAKOUT!", ["🚀", "🔥"], Fore.GREEN)
+                else:
+                    print_fixed_width_alert("BREAKUP: UPPER HALF STRENGTH!", ["🚀"], Fore.GREEN)
+            else:
+                print_fixed_width_alert("BREAKUP: WEAK BREAKOUT WALL!", ["⚠️"], Fore.YELLOW)
+                
+        # Trigger SELL Sequence (Lower wall breakdown)
+        elif c_42 < l_42 and (was_inside or prev_was_breakdown):
+            signal = "BREAKDOWN"
+            if relative_position < 0.50:
+                if is_mrb and c_42 < o_live:
+                    print_fixed_width_alert("BREAKDOWN: STRONG LOWER BREAKDOWN!", ["🔴", "🔥"], Fore.RED)
+                else:
+                    print_fixed_width_alert("BREAKDOWN: LOWER HALF WEAKNESS!", ["🔴"], Fore.RED)
+            else:
+                print_fixed_width_alert("BREAKDOWN: WEAK BREAKDOWN WALL!", ["⚠️"], Fore.YELLOW)
+        
+        # Build the visual bar representation
         visual_bar = build_candle_bar(o_42, h_render, l_render, c_42)
         
-        # 3. Calculate 42-Period Simple Moving Average on full slice Close Prices
-        full_window = df.iloc[-42:]
-        sma_42 = float(full_window['Close'].mean())
-        
-        # 4. Pure 50/50 split midpoint engine calculation
-        bos_value = (sma_42 + c_42) / 2.0
+        # 📊 UPDATE DATAFRAME ATTRIBUTES WITH STRICT "BULL" OR "BEAR" LABEL
         if not hasattr(df, 'attrs'):
             df.attrs = {}
-        df.attrs['bos_numeric_value'] = f"{bos_value:.2f}"
+        df.attrs['bos_numeric_value'] = bos_label
+        df.attrs['relative_position_pct'] = f"{relative_position*100:.1f}%"
         
         return visual_bar, signal
         
     except Exception:
+        if df is not None:
+            if not hasattr(df, 'attrs'): df.attrs = {}
+            df.attrs['bos_numeric_value'] = "BEAR"
+            df.attrs['relative_position_pct'] = "0.0%"
         return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
+
+# 🛠️ INTERNAL DEVELOPMENT TEST LOOP
+if __name__ == "__main__":
+    print(f"\n{Style.BRIGHT}--- RUNNING SELF TEST MATRIX FOR SYSBBOSPXY.PY ---")
+    
+    np.random.seed(42)
+    history_count = 41
+    
+    opens = np.random.uniform(98, 102, history_count)
+    closes = np.random.uniform(98, 102, history_count)
+    highs = np.maximum(opens, closes) + np.random.uniform(0, 1.5, history_count)
+    lows = np.minimum(opens, closes) - np.random.uniform(0, 1.5, history_count)
+    
+    mock_data = {
+        'Open': list(opens),
+        'High': list(highs),
+        'Low': list(lows),
+        'Close': list(closes)
+    }
+    
+    max_h41 = max(mock_data['High'])
+    min_l41 = min(mock_data['Low'])
+    
+    scenarios = [
+        {"name": "Inside Walls (Bullish Candle Edge)", "O": 100.0, "H": 103.0, "L": 99.0, "C": 102.5},
+        {"name": "Inside Walls (Bearish Candle Edge)", "O": 101.0, "H": 102.0, "L": 97.0, "C": 97.5},
+        {"name": "Upper Breakout - Strong Closing",  "O": max_h41 - 0.5, "H": max_h41 + 4.0, "L": max_h41 - 1.0, "C": max_h41 + 3.5},
+        {"name": "Lower Breakdown - Strong Closing", "O": min_l41 + 0.5, "H": min_l41 + 1.0, "L": min_l41 - 4.0, "C": min_l41 - 3.8}
+    ]
+    
+    for case in scenarios:
+        df_test = pd.DataFrame(mock_data)
+        live_row = pd.DataFrame([{"Open": case["O"], "High": case["H"], "Low": case["L"], "Close": case["C"]}])
+        df_test = pd.concat([df_test, live_row], ignore_index=True)
+        
+        print(f"\n{Fore.CYAN}{Style.BRIGHT}[Scenario]: {case['name']}")
+        
+        bar, sig = get_bos_bar(df_test)
+        val = df_test.attrs.get('bos_numeric_value', 'NONE')
+        pct = df_test.attrs.get('relative_position_pct', '0.0%')
+        
+        print(f"bos_bar           : {bar}")
+        print(f"signal            : {sig}")
+        print(f"bos_val (attrs)   : {val}")
+        print(f"candle_strength   : {pct}")
+        print("-" * 50)
+
