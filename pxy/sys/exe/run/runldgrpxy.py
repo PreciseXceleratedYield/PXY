@@ -76,6 +76,7 @@ def send_telegram_payload(message_text, bot_token, chat_id):
     except Exception as e:
         debug_log("TELEGRAM_ERR", f"Failed transmission: {str(e)}")
 
+
 # ==============================================================================
 # 🚀 PART 2 OF 2: CORE ENGINE LAYER (API Fetching, Data Processing & Execution)
 # ==============================================================================
@@ -95,7 +96,7 @@ IST = pytz.timezone("Asia/Kolkata")
 W = 30  # Strict 30-character width tracking layout
 
 def run_snapshot_report():
-    """Generates report with deep payload interception to identify keys returning 0."""
+    """Generates ledger snapshot using derived formulas from Kotak Neo payload structures."""
     now_ist = datetime.now(IST)
     current_time = now_ist.time()
     
@@ -129,7 +130,6 @@ def run_snapshot_report():
     # 1. Fetch Live Positions
     try:
         pos_res = client.positions()
-        debug_log("API_RESPONSE_POSITIONS", "Live positions raw layout:", pos_res)
         positions_list = pos_res.get("data", []) if isinstance(pos_res, dict) else getattr(pos_res, "data", [])
     except Exception as e:
         debug_log("API_EXCEP_POSITIONS", "Positions extraction broken down.", str(e))
@@ -142,7 +142,6 @@ def run_snapshot_report():
             ord_res = client.order_report()
         except AttributeError:
             ord_res = client.orders()
-        debug_log("API_RESPONSE_ORDERS", "Live orders raw layout:", ord_res)
         orders_list = ord_res.get("data", []) if isinstance(ord_res, dict) else getattr(ord_res, "data", [])
     except Exception as e:
         debug_log("API_EXCEP_ORDERS", "Orders extraction broken down.", str(e))
@@ -154,7 +153,6 @@ def run_snapshot_report():
     for method_name in ["balances", "limits", "margin"]:
         try:
             margin_res = getattr(client, method_name)()
-            debug_log("API_RESPONSE_MARGIN", f"Live margin matched via {method_name}:", margin_res)
             break
         except AttributeError:
             continue
@@ -171,8 +169,6 @@ def run_snapshot_report():
         else:
             raw_margin = getattr(margin_data, "availableMargin", getattr(margin_data, "cfBal", getattr(margin_data, "margin", 0.0)))
 
-    debug_log("PARSED_MARGIN", f"Extracted raw margin numeric value: {raw_margin}")
-
     output_lines = []
     output_lines.append("=" * W)
     output_lines.append(pad_row(f"🚀 PXY | {now_ist.strftime('%d-%b %H:%M')}", W))
@@ -185,9 +181,8 @@ def run_snapshot_report():
 
     # 2. Active Working Orders Processing
     active_orders = []
-    for idx, o in enumerate(orders_list):
+    for o in orders_list:
         status = o.get("ordSt", o.get("status", "")) if isinstance(o, dict) else getattr(o, "ordSt", getattr(o, "status", ""))
-        debug_log("ORDER_PARSER", f"Order index [{idx}] status field check: '{status}'")
         if str(status).lower() in ["working", "open", "validation pending"]:
             active_orders.append(o)
 
@@ -196,34 +191,44 @@ def run_snapshot_report():
         sym = str(ord.get("trdSym", "UNK") if isinstance(ord, dict) else getattr(ord, "trdSym", "UNK"))[-7:]
         side_raw = ord.get("trnsTp", ord.get("side", "")) if isinstance(ord, dict) else getattr(ord, "trnsTp", getattr(ord, "side", ""))
         side = "B" if "B" in str(side_raw).upper() else "S"
-        qty = abs(int(float(ord.get("fldQty", ord.get("qty", 0)) if isinstance(ord, dict) else getattr(ord, "fldQty", getattr(ord, "qty", 0)))))
-        price = int(force_trailing_zero(ord.get("price", ord.get("avgPrc", 0.0)) if isinstance(ord, dict) else getattr(ord, "price", getattr(ord, "avgPrc", 0.0)), "ORD_PRICE"))
+        qty = abs(int(float(ord.get("qty", 0) if isinstance(ord, dict) else getattr(ord, "qty", 0))))
+        price = int(force_trailing_zero(ord.get("avgPrc", ord.get("prc", 0.0)) if isinstance(ord, dict) else getattr(ord, "avgPrc", getattr(ord, "prc", 0.0)), "ORD_PRICE"))
         output_lines.append(pad_row(f" 📝 {side}|{sym}|Q:{qty}|P:₹{price}", W))
     output_lines.append("-" * W)
 
-    # 3. Active Positions & PnL Processing
-    active_positions = []
-    for idx, p in enumerate(positions_list):
-        net_qty = float(p.get("net_qty", p.get("netQty", p.get("flBuyQty", 0))) if isinstance(p, dict) else getattr(p, "net_qty", 0))
-        debug_log("POS_PARSER", f"Position index [{idx}] quantity parsing: {net_qty}")
-        if abs(net_qty) > 0:
-            active_positions.append((p, net_qty))
-
-    output_lines.append(pad_row(f"📊 Live Open: {len(active_positions)}", W))
+    # 3. Active Positions & PnL Processing (Derived from buyAmt, sellAmt, flBuyQty, flSellQty)
+    output_lines.append(pad_row(f"📊 Live Open: {len(positions_list)}", W))
     total_unrealized_pnl = 0.0
-    for pos, qty in active_positions:
+    
+    for pos in positions_list:
         sym = str(pos.get("trdSym", "UNK") if isinstance(pos, dict) else getattr(pos, "trdSym", "UNK"))[-7:]
-        buy_prc = float(pos.get("buy_prc", pos.get("flBuyPrc", pos.get("buyAvgPrc", 0.0))) if isinstance(pos, dict) else getattr(pos, "buy_prc", 0.0))
-        ltp = float(pos.get("sell_prc", pos.get("ltp", pos.get("lastPrice", 0.0))) if isinstance(pos, dict) else getattr(pos, "ltp", 0.0))
         
-        raw_pnl = (ltp - buy_prc) * qty
-        sanitized_pnl = int(force_trailing_zero(raw_pnl, "POS_PNL"))
-        total_unrealized_pnl += sanitized_pnl
+        # Ingest raw amounts and executed volumes
+        buy_amt = float(pos.get("buyAmt", 0.0))
+        sell_amt = float(pos.get("sellAmt", 0.0))
+        fl_buy_qty = float(pos.get("flBuyQty", 0.0))
+        fl_sell_qty = float(pos.get("flSellQty", 0.0))
         
+        # Calculate derived net tracking numbers
+        net_qty = fl_buy_qty - fl_sell_qty
+        
+        # Derive structural averages dynamically to protect math layers
+        avg_buy_prc = (buy_amt / fl_buy_qty) if fl_buy_qty > 0 else 0.0
+        avg_sell_prc = (sell_amt / fl_sell_qty) if fl_sell_qty > 0 else 0.0
+        
+        # For completely squared off intra-day open logs, net PnL is directly sell minus buy value
+        pos_pnl = sell_amt - buy_amt
+        total_unrealized_pnl += pos_pnl
+        
+        sanitized_pnl = int(force_trailing_zero(pos_pnl, "POS_PNL"))
         status_flag = "🟢" if sanitized_pnl >= 0 else "🔴"
-        output_lines.append(pad_row(f" {status_flag} {sym} [Q:{int(qty)}]", W))
+        
+        # Display absolute total volume executed for safety tracking
+        display_qty = int(fl_buy_qty if fl_buy_qty > 0 else fl_sell_qty)
+        output_lines.append(pad_row(f" {status_flag} {sym} [Q:{display_qty}]", W))
+        
         pnl_str = f"₹{sanitized_pnl:,}"
-        metrics = f"   E:{int(force_trailing_zero(buy_prc))}|L:{int(force_trailing_zero(ltp))}"
+        metrics = f"   B:{int(force_trailing_zero(avg_buy_prc))}|S:{int(force_trailing_zero(avg_sell_prc))}"
         
         space_needed = W - emoji_len(metrics) - emoji_len(pnl_str)
         output_lines.append(f"{metrics}{' ' * space_needed}{pnl_str}" if space_needed > 0 else pad_row(f"{metrics} P:{pnl_str}", W))
