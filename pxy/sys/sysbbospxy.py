@@ -57,23 +57,14 @@ def get_bos_bar(df):
         h_42 = float(historic_window['High'].max())
         l_42 = float(historic_window['Low'].min())
         
-        # Capture separate live running candle values for real-time intersection testing
+        # Capture separate live running candle values
         live_candle = df.iloc[-1]
         o_live = float(live_candle['Open'])
         h_live = float(live_candle['High'])
         l_live = float(live_candle['Low'])
         c_42 = float(live_candle['Close'])
         
-        # --- TIME STAMP EXTRACTION MATRIX FOR MORNING RECOGNITION (09:15 to 10:10) ---
-        target_time = df.index[-1]
-        t_hour = target_time.hour
-        t_min = target_time.minute
-        
-        # Exact 09:15 to 10:10 exchange morning session bracket gate
-        is_morning_session = (t_hour == 9 and t_min >= 15) or (t_hour == 10 and t_min <= 10)
-        # -------------------------------------------------------------
-
-        # --- LIVE RUNNING & IMMEDIATE CLOSED CANDLE FILTER ---
+        # --- LIVE RUNNING & IMMEDIATE CLOSED CANDLE BREAKOUT FILTER ---
         prev_candle = df.iloc[-2]
         prev_close = float(prev_candle['Close'])
         
@@ -87,56 +78,49 @@ def get_bos_bar(df):
         live_body = abs(c_42 - o_live)
         is_mrb = (live_body / live_range) >= 0.95 if live_range > 0 else False
         
-        # 2. Synchronize visual rendering inputs to absorb complete 42-period bounds smoothly
+        # Synchronize visual rendering inputs
         h_render = max(h_42, h_live)
         l_render = min(l_42, l_live)
         o_42 = (h_render + l_render) / 2.0
         
-        # ⚡ LIVE RUNNING & IMMEDIATE CLOSED CANDLE SIGNAL ENGINE
+        # ⚡ 50/50 STRENGTH CALCULATION FOR BREAKOUT ASSESSMENT
+        total_range = h_42 - l_42
+        if total_range == 0:
+            total_range = 1e-9
+        relative_position = (c_42 - l_42) / total_range
+        
+        # Default state
         signal = "NONE"
         
-        # Trigger BUY Sequences
+        # Trigger BUY Sequence (Upper wall breakout)
         if c_42 > h_42 and (was_inside or prev_was_breakout):
-            if is_morning_session:
-                signal = "MBUY"
+            signal = "BREAKUP"
+            if relative_position >= 0.50:
                 if is_mrb and c_42 > o_live:
-                    print_fixed_width_alert("MBUY: STRONG AM BREAKOUT!", ["🌅", "🚀", "🔥"], Fore.GREEN)
+                    print_fixed_width_alert("BREAKUP: STRONG UPPER BREAKOUT!", ["🚀", "🔥"], Fore.GREEN)
                 else:
-                    print_fixed_width_alert("MBUY: AM OPEN BREAKOUT!", ["🌅", "🚀"], Fore.GREEN)
+                    print_fixed_width_alert("BREAKUP: UPPER HALF STRENGTH!", ["🚀"], Fore.GREEN)
             else:
-                signal = "NBUY"
-                if is_mrb and c_42 > o_live:
-                    print_fixed_width_alert("NBUY: STRONG UP TREND NOW!", ["🚀", "🔥"], Fore.GREEN)
-                else:
-                    print_fixed_width_alert("NBUY: BREAKOUT UPPER WALL!", ["🚀"], Fore.GREEN)
+                print_fixed_width_alert("BREAKUP: WEAK BREAKOUT WALL!", ["⚠️"], Fore.YELLOW)
                 
-        # Trigger SELL Sequences
+        # Trigger SELL Sequence (Lower wall breakdown)
         elif c_42 < l_42 and (was_inside or prev_was_breakdown):
-            if is_morning_session:
-                signal = "MSELL"
+            signal = "BREAKDOWN"
+            if relative_position < 0.50:
                 if is_mrb and c_42 < o_live:
-                    print_fixed_width_alert("MSELL: STRONG AM BREAKDOWN!", ["🌅", "🔴", "🔥"], Fore.RED)
+                    print_fixed_width_alert("BREAKDOWN: STRONG LOWER BREAKDOWN!", ["🔴", "🔥"], Fore.RED)
                 else:
-                    print_fixed_width_alert("MSELL: AM OPEN BREAKDOWN!", ["🌅", "🔴"], Fore.RED)
+                    print_fixed_width_alert("BREAKDOWN: LOWER HALF WEAKNESS!", ["🔴"], Fore.RED)
             else:
-                signal = "NSELL"
-                if is_mrb and c_42 < o_live:
-                    print_fixed_width_alert("NSELL: STRONG DOWN TREND!", ["🔴", "🔥"], Fore.RED)
-                else:
-                    print_fixed_width_alert("NSELL: BREAKDOWN LOWER WALL", ["🔴"], Fore.RED)
+                print_fixed_width_alert("BREAKDOWN: WEAK BREAKDOWN WALL!", ["⚠️"], Fore.YELLOW)
         
-        # Build the visual bar using corrected midpoint open parameters
+        # Build the visual bar
         visual_bar = build_candle_bar(o_42, h_render, l_render, c_42)
         
-        # 3. Calculate 42-Period Simple Moving Average on full slice Close Prices
-        full_window = df.iloc[-42:]
-        sma_42 = float(full_window['Close'].mean())
-        
-        # 4. Pure 50/50 split midpoint engine calculation
-        bos_value = (sma_42 + c_42) / 2.0
         if not hasattr(df, 'attrs'):
             df.attrs = {}
-        df.attrs['bos_numeric_value'] = f"{bos_value:.2f}"
+        df.attrs['bos_numeric_value'] = f"{c_42:.2f}"
+        df.attrs['relative_position_pct'] = f"{relative_position*100:.1f}%"
         
         return visual_bar, signal
         
