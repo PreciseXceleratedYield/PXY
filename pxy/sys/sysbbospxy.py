@@ -49,10 +49,12 @@ def build_candle_bar(o, h, l, c, width=WIDTH):
 
 def get_bos_bar(df):
     try:
+        # Initial safety gate for insufficient history lengths
         if df is None or len(df) < 42:
             if df is not None:
                 if not hasattr(df, 'attrs'): df.attrs = {}
                 df.attrs['bos_numeric_value'] = "NONE"
+                df.attrs['relative_position_pct'] = "0.0%"
             return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
             
         # 1. Isolate the previous 41 candles to lock true historic walls
@@ -60,7 +62,7 @@ def get_bos_bar(df):
         h_42 = float(historic_window['High'].max())
         l_42 = float(historic_window['Low'].min())
         
-        # Capture separate live running candle values
+        # Capture separate live running candle values and strictly cast to float
         live_candle = df.iloc[-1]
         o_live = float(live_candle['Open'])
         h_live = float(live_candle['High'])
@@ -90,7 +92,7 @@ def get_bos_bar(df):
         live_candle_range = h_live - l_live if (h_live - l_live) > 0 else 1e-9
         relative_position = (c_42 - l_live) / live_candle_range
         
-        # Default states
+        # Default operational state configurations
         signal = "NONE"
         bos_label = "NONE"
         
@@ -120,16 +122,16 @@ def get_bos_bar(df):
                 bos_label = f"{c_42:.2f}_BULL_DOWN"
                 print_fixed_width_alert("BREAKDOWN: WEAK BREAKDOWN WALL!", ["⚠️"], Fore.YELLOW)
         else:
-            # Inside the walls: calculate standard directional context
+            # Inside the walls: calculate standard directional context based on the live candle's close position
             if relative_position >= 0.50:
                 bos_label = f"{c_42:.2f}_BULL"
             else:
                 bos_label = f"{c_42:.2f}_BEAR"
         
-        # Build the visual bar
+        # Build the visual bar representation
         visual_bar = build_candle_bar(o_42, h_render, l_render, c_42)
         
-        # 📊 UPDATE DATAFRAME ATTRIBUTES WITH COMBINED STRINGS
+        # 📊 UPDATE DATAFRAME ATTRIBUTES WITH STABILIZED COMBINED STRINGS
         if not hasattr(df, 'attrs'):
             df.attrs = {}
         df.attrs['bos_numeric_value'] = bos_label
@@ -138,7 +140,9 @@ def get_bos_bar(df):
         return visual_bar, signal
         
     except Exception:
+        # Fallback to keep downstream processes moving instead of causing an unhandled crash
         if df is not None:
             if not hasattr(df, 'attrs'): df.attrs = {}
             df.attrs['bos_numeric_value'] = "NONE"
+            df.attrs['relative_position_pct'] = "0.0%"
         return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
