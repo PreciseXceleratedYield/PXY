@@ -17,8 +17,8 @@ DEBUG_MODE = False
 CONFIG = {
     "VARIANT": "SINGLE",  # 🔄 SWITCH HERE: "DUAL" or "SINGLE"
     "ST1": {
-        "PERIOD": 1,   # ATR Period synced to Pine Script (atrPeriod)
-        "FACTOR": 1    # Multiplier synced to Pine Script (multiplier)
+        "PERIOD": 3,   # ATR Period synced to Pine Script (atrPeriod)
+        "FACTOR": 1.4    # Multiplier synced to Pine Script (multiplier)
     }
 }
 # ==============================================================================
