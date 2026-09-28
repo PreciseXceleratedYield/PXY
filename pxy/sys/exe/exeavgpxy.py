@@ -113,7 +113,7 @@ def handle_side_averaging(client, df):
     # Extract forces from the row solely to compute the dynamic LGT thresholds
     ce_force_val = float(working_df['ce_force'].iloc[-1]) if 'ce_force' in working_df.columns else 1.2
     pe_force_val = float(working_df['pe_force'].iloc[-1]) if 'pe_force' in working_df.columns else 1.2
-    print(Fore.YELLOW + f"🧪 [TEST FORCE] CE_FORCE: {ce_force_val:.2f} | PE_FORCE: {pe_force_val:.2f}")
+    #print(Fore.YELLOW + f"🧪 [TEST FORCE] CE_FORCE: {ce_force_val:.2f} | PE_FORCE: {pe_force_val:.2f}")
     ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(
         ce_invst_factor, pe_invst_factor, ce_lots, pe_lots, ce_force_val, pe_force_val
     )
