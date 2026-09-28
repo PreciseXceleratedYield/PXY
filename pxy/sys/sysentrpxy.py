@@ -3,14 +3,14 @@ from syscnfgpxy import TICKER
 from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
 
-def get_entry_signal(df=None, use_st_filter=False):
+# 🎛️ GLOBAL CONFIGURATION SWITCHES
+USE_ST_FILTER = True  # False = No-Filter Mode (Default) | True = Strict ST Filtering Mode
+
+
+def get_entry_signal(df=None):
     """
     Direct copy-and-override signal router matching market execution to OTM strategies.
-    
-    Parameters:
-    - use_st_filter (bool): 
-        * False (Default): No-Filter Mode. Every BULL/BEAR directly becomes OTMBUY/OTMSELL.
-        * True: Strict Filter Mode. SuperTrend alignment is strictly enforced.
+    Uses the global USE_ST_FILTER switch.
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -30,8 +30,8 @@ def get_entry_signal(df=None, use_st_filter=False):
     else:
         trend = str(processed_st_df["ST_Trend"].iloc[-1]).upper().strip()
 
-    # 🎯 ENTRY LAYER (Switch Logic)
-    if use_st_filter:
+    # 🎯 ENTRY LAYER (Using global switch)
+    if USE_ST_FILTER:
         # Strict Filtering: Check trend alignment
         if mkt_entry_dir == "BULL" and trend == "BULL":
             mapped_entry = "OTMBUY"
@@ -58,12 +58,12 @@ def get_entry_signal(df=None, use_st_filter=False):
 
     return mapped_entry, mapped_exit
 
+
 if __name__ == "__main__":
     from sysdtafpxy import fetch_yf_data
     df = fetch_yf_data()
     if df is not None and not df.empty:
-        print("RUNNING ENTRY PASSTHROUGH SIGNAL ROUTER DECOUPLED MATRIX...")
-        # Runs in No-Filter Mode by default
+        print(f"RUNNING MATRIX (USE_ST_FILTER = {USE_ST_FILTER})...")
         entry_sig, exit_sig = get_entry_signal(df)
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry_sig} | EXIT_SIG: {exit_sig}")
 
