@@ -146,3 +146,58 @@ def get_bos_bar(df):
             df.attrs['bos_numeric_value'] = "NONE"
             df.attrs['relative_position_pct'] = "0.0%"
         return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
+
+# 🛠️ INTERNAL DEVELOPMENT TEST LOOP
+if __name__ == "__main__":
+    print(f"\n{Style.BRIGHT}--- RUNNING SELF TEST MATRIX FOR SYSBBOSPXY.PY ---")
+    
+    # 1. Generate normal mock data range (41 candles resting around a baseline index of 100)
+    np.random.seed(42)
+    history_count = 41
+    
+    opens = np.random.uniform(98, 102, history_count)
+    closes = np.random.uniform(98, 102, history_count)
+    highs = np.maximum(opens, closes) + np.random.uniform(0, 1.5, history_count)
+    lows = np.minimum(opens, closes) - np.random.uniform(0, 1.5, history_count)
+    
+    mock_data = {
+        'Open': list(opens),
+        'High': list(highs),
+        'Low': list(lows),
+        'Close': list(closes)
+    }
+    
+    # Target absolute maximum high / low metrics found in historic 41 candles
+    max_h41 = max(mock_data['High'])
+    min_l41 = min(mock_data['Low'])
+    
+    # 2. Test scenarios for the 42nd live candle input frame
+    scenarios = [
+        {"name": "Inside Walls (Bullish Candle Edge)", "O": 100.0, "H": 103.0, "L": 99.0, "C": 102.5},
+        {"name": "Inside Walls (Bearish Candle Edge)", "O": 101.0, "H": 102.0, "L": 97.0, "C": 97.5},
+        {"name": "Upper Breakout - Strong Closing",  "O": max_h41 - 0.5, "H": max_h41 + 4.0, "L": max_h41 - 1.0, "C": max_h41 + 3.5},
+        {"name": "Lower Breakdown - Strong Closing", "O": min_l41 + 0.5, "H": min_l41 + 1.0, "L": min_l41 - 4.0, "C": min_l41 - 3.8}
+    ]
+    
+    for case in scenarios:
+        # Build independent temporary DataFrames representing current time slice
+        df_test = pd.DataFrame(mock_data)
+        
+        # Append the specific scenario live running candle raw data frame entry
+        live_row = pd.DataFrame([{"Open": case["O"], "High": case["H"], "Low": case["L"], "Close": case["C"]}])
+        df_test = pd.concat([df_test, live_row], ignore_index=True)
+        
+        print(f"\n{Fore.CYAN}{Style.BRIGHT}[Scenario]: {case['name']}")
+        
+        # Run calculation parameters
+        bar, sig = get_bos_bar(df_test)
+        val = df_test.attrs.get('bos_numeric_value', 'NONE')
+        pct = df_test.attrs.get('relative_position_pct', '0.0%')
+        
+        # Display extracted main console terminal printing values
+        print(f"bos_bar           : {bar}")
+        print(f"signal            : {sig}")
+        print(f"bos_val (attrs)   : {val}")
+        print(f"candle_strength   : {pct}")
+        print("-" * 50)
+
