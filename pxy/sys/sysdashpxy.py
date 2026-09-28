@@ -116,8 +116,7 @@ def get_full_snapshot():
     # ===== BREAKOUT STRUCTURE (BOS) MATRIX =====
     bos_bar, bos_val = get_bos_bar(master_df)
     result["bos_bar"] = bos_bar if bos_bar else "NONE"
-    # Strictly pull the continuous "BULL" / "BEAR" label from the df attrs dictionary
-    result["bos_val"] = master_df.attrs.get('bos_numeric_value', 'BEAR')
+    result["bos_val"] = bos_val if bos_val else "NONE"
     return result
 
 # ================= PRINT DASHBOARD =================
