@@ -1,69 +1,91 @@
-# ==================================================
-# sysadxpxy.py (FIXED SURGICAL FORCE)
-# ==================================================
+# syssadxpxy.py
+import numpy as np
 import pandas as pd
+import warnings
 
-def calculate_adx(df: pd.DataFrame, period=14):
-    if df is None or len(df) < period * 2:
-        return 1.0, 1.0  # Base point values
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
-    high, low, close = df['High'], df['Low'], df['Close']
-    prev_close = close.shift(1)
+def calculate_adx(df: pd.DataFrame) -> tuple:
+    """
+    Surgically computes pure directional indicator acceleration vectors.
+    Allows BOTH CE and PE forces to grow simultaneously on volatile candles.
+    
+    Returns (ce_force, pe_force) mapped onto a dynamic range between 1.0 and 1.5.
+    
+    1.0 = Maximum Velocity/Growth (Premium expansion primed)
+    1.5 = Absolute Stagnation/Contraction (Premium decay zone)
+    """
+    # Baseline validation floor: requires minimum structural rows to compute
+    if df is None or df.empty or len(df) < 15:
+        return 1.5, 1.5
 
-    # --- TRUE RANGE ---
-    tr = pd.concat([high - low, (high - prev_close).abs(), (low - prev_close).abs()], axis=1).max(axis=1)
+    high = df['High'].to_numpy()
+    low = df['Low'].to_numpy()
+    close = df['Close'].to_numpy()
+    length = len(df)
 
-    # --- DIRECTIONAL MOVEMENT ---
-    up_move = high.diff()
-    down_move = -low.diff()
-    plus_dm = up_move.where((up_move > down_move) & (up_move > 0), 0.0)
-    minus_dm = down_move.where((down_move > up_move) & (down_move > 0), 0.0)
+    # 1. Allocate computational matrices for Directional Movement (DM) and True Range (TR)
+    plus_dm = np.zeros(length)
+    minus_dm = np.zeros(length)
+    tr = np.zeros(length)
 
-    # --- SMOOTHING ---
-    atr = tr.ewm(alpha=1/period, adjust=False).mean().replace(0, 1e-10)
-    plus_dm_smooth = plus_dm.ewm(alpha=1/period, adjust=False).mean()
-    minus_dm_smooth = minus_dm.ewm(alpha=1/period, adjust=False).mean()
+    # 2. Vectorized loop to calculate clean daily raw changes
+    for i in range(1, length):
+        tr[i] = max(
+            high[i] - low[i], 
+            abs(high[i] - close[i-1]), 
+            abs(low[i] - close[i-1])
+        )
+        
+        up_move = high[i] - high[i-1]
+        down_move = low[i-1] - low[i]
+        
+        # 🔓 SIMULTANEOUS INDEPENDENT ACCUMULATION:
+        # Both sides can grow on the same candle (e.g. wide outside candles)
+        if up_move > 0:
+            plus_dm[i] = up_move
+            
+        if down_move > 0:
+            minus_dm[i] = down_move
 
-    # --- DI & ADX ---
-    plus_di = 100 * (plus_dm_smooth / atr)
-    minus_di = 100 * (minus_dm_smooth / atr)
-    denom = (plus_di + minus_di).replace(0, 1e-10)
-    dx = (plus_di - minus_di).abs() / denom * 100
-    adx = dx.ewm(alpha=1/period, adjust=False).mean()
+    # 3. Apply standard rolling calculations for smoothed baseline trends
+    period = 14
+    if length <= period:
+        return 1.5, 1.5
 
-    last_adx = adx.iloc[-1]
-    prev_adx = adx.iloc[-2] if len(adx) > 1 else last_adx
-    last_plus_di = plus_di.iloc[-1]
-    last_minus_di = minus_di.iloc[-1]
+    tr_sum = pd.Series(tr).rolling(window=period).sum().to_numpy()
+    plus_dm_sum = pd.Series(plus_dm).rolling(window=period).sum().to_numpy()
+    minus_dm_sum = pd.Series(minus_dm).rolling(window=period).sum().to_numpy()
 
-    if pd.isna(last_adx):
-        return 1.0, 1.0
+    # Prevent ZeroDivision errors over flatline candles
+    tr_sum = np.where(tr_sum == 0, 0.0001, tr_sum)
 
-    # --- FORCE ENGINE ---
-    ce_val = 1.0
-    pe_val = 1.0
-    di_diff = last_plus_di - last_minus_di
-    accelerating = (last_adx - prev_adx) > 0.1 # Lowered threshold for sensitivity
-    strong_trend = last_adx > 20
+    # Derive raw directional indicators (+DI and -DI)
+    di_plus = (plus_dm_sum / tr_sum) * 100
+    di_minus = (minus_dm_sum / tr_sum) * 100
 
-    if accelerating and strong_trend:
-        boost = 1 + max(0, (last_adx - 20) / 50)
-        if di_diff > 3:
-            ce_val = min(boost, 1.99) # Ceiling check
-        elif di_diff < -3:
-            pe_val = min(boost, 1.99)
+    # 4. 🎯 NORMALIZED SPECTRAL SPREAD CALCULATOR (1.0 TO 1.5 RANGE)
+    curr_ce, prior_ce = di_plus[-1], di_plus[-2]
+    curr_pe, prior_pe = di_minus[-1], di_minus[-2]
 
-    # --- SURGICAL ADJUSTMENT (Value * 100 - 100) ---
-    # Moved OUTSIDE the if-block so it always processes
-    ce_force = round((ce_val * 100) - 100, 1)
-    pe_force = round((pe_val * 100) - 100, 1)
+    def compute_scaled_force(current_val: float, prior_val: float, sensitivity: float = 0.20) -> float:
+        if prior_val == 0:
+            return 1.5
+            
+        # Calculate strict rate of change across sequential indicator values
+        growth_rate = (current_val - prior_val) / prior_val
+        
+        # Immediate collapse to max decay if growth is flat or negative
+        if growth_rate <= 0:
+            return 1.5
+            
+        # Map the float sequence perfectly between 1.0 and 1.5 based on 20% sensitivity threshold
+        scaled_val = 1.5 - (min(growth_rate / sensitivity, 1.0) * 0.5)
+        return round(float(scaled_val), 2)
 
-    # Ensure minimum 1.0 point if neutral
-    ce_force = max(1.0, ce_force)
-    pe_force = max(1.0, pe_force)
+    # Generate isolated tracking values for Call (CE) and Put (PE) vectors
+    ce_force = compute_scaled_force(curr_ce, prior_ce, sensitivity=0.20)
+    pe_force = compute_scaled_force(curr_pe, prior_pe, sensitivity=0.20)
 
     return ce_force, pe_force
-
-if __name__ == "__main__":
-    print("ADX FORCE MODULE LOADED OK")
 
