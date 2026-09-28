@@ -9,8 +9,8 @@ init(autoreset=True)
 
 from sysdtafpxy import fetch_yf_data
 
-def get_sma(df: pd.DataFrame, period: int = 42) -> dict:
-    """Standard Fixed 42-SMA Trend System. Generates binary direction states (NORTH/SOUTH) based on SMA relative position."""
+def get_sma(df: pd.DataFrame, period: int = 50) -> dict:
+    """Standard Fixed 50-SMA Trend System. Generates binary direction states (BULL/BEAR) based on SMA relative position."""
     if df is None or df.empty or len(df) < period:
         return {"value": 0.0, "status": "NA", "period": period}
     df = df.copy()
@@ -22,8 +22,8 @@ def get_sma(df: pd.DataFrame, period: int = 42) -> dict:
     latest_sma = sma_arr[-1]
     if np.isnan(latest_sma):
         return {"value": 0.0, "status": "NA", "period": period}
-    # Strict binary mapping based on current location relative to SMA
-    status = "NORTH" if latest_close >= latest_sma else "SOUTH"
+    # Strict binary mapping based on current location relative to SMA 50
+    status = "BULL" if latest_close >= latest_sma else "BEAR"
     return {
         "value": float(latest_sma),
         "status": status,
@@ -33,27 +33,27 @@ def get_sma(df: pd.DataFrame, period: int = 42) -> dict:
 
 def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
     """
-    Constructs a custom 42-period trend-tracking candle.
-    O = Actual Open price from 42 candles ago (SMA delinked)
-    H = Highest price point across the LAST 42 candles
-    L = Lowest price point across the LAST 42 candles
+    Constructs a custom 50-period trend-tracking candle.
+    O = Actual Open price from 50 candles ago (SMA delinked)
+    H = Highest price point across the LAST 50 candles
+    L = Lowest price point across the LAST 50 candles
     C = Current Live / Close price
     """
-    if df is None or df.empty or len(df) < 42:
+    if df is None or df.empty or len(df) < 50:
         print("Invalid data. Cannot dump single candle JSON.")
         return
-    # 1. Grab the last 42 rows to find the absolute range boundaries
-    window_42 = df.iloc[-42:]
+    # 1. Grab the last 50 rows to find the absolute range boundaries
+    window_50 = df.iloc[-50:]
     # 2. Extract values (Delinking O from SMA)
-    open_price = window_42['Open'].iloc[0]  # Open price 42 candles ago
-    highest_price = window_42['High'].max()
-    lowest_price = window_42['Low'].min()
-    current_close = window_42['Close'].iloc[-1]
+    open_price = window_50['Open'].iloc[0]  # Open price 50 candles ago
+    highest_price = window_50['High'].max()
+    lowest_price = window_50['Low'].min()
+    current_close = window_50['Close'].iloc[-1]
     # Construct the tracking candle dictionary
     candle_data = [{
-        'O': float(open_price),     # Actual open 42 periods ago
-        'H': float(highest_price),  # Highest price point in 42 candles
-        'L': float(lowest_price),   # Lowest price point in 42 candles
+        'O': float(open_price),     # Actual open 50 periods ago
+        'H': float(highest_price),  # Highest price point in 50 candles
+        'L': float(lowest_price),   # Lowest price point in 50 candles
         'C': float(current_close)   # Live price is close
     }]
     # Build absolute paths for sibling folder 'web'
@@ -71,13 +71,13 @@ def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
 if __name__ == "__main__":
     df = fetch_yf_data()
     if df is not None and not df.empty:
-        result = get_sma(df, period=42)
-        if result["status"] == "NORTH":
+        result = get_sma(df, period=50)
+        if result["status"] == "BULL":
             color = Fore.GREEN + Style.BRIGHT
-            output = "🟢 PRICE MOVING NORTH 🟢".center(40)
-        elif result["status"] == "SOUTH":
+            output = "🟢 PRICE MOVING BULL 🟢".center(40)
+        elif result["status"] == "BEAR":
             color = Fore.RED + Style.BRIGHT
-            output = "🔴 PRICE MOVING SOUTH 🔴".center(40)
+            output = "🔴 PRICE MOVING BEAR 🔴".center(40)
         else:
             color = Fore.WHITE
             output = "PRICE DIRECTION UNKNOWN".center(40)
@@ -85,3 +85,4 @@ if __name__ == "__main__":
         # Dump the custom window row to the 'web' folder
         if "df_with_sma" in result:
             dump_ohlc_json(result["df_with_sma"], target_folder_name="web")
+
