@@ -50,6 +50,9 @@ def build_candle_bar(o, h, l, c, width=WIDTH):
 def get_bos_bar(df):
     try:
         if df is None or len(df) < 42:
+            if df is not None:
+                if not hasattr(df, 'attrs'): df.attrs = {}
+                df.attrs['bos_numeric_value'] = "NONE"
             return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
             
         # 1. Isolate the previous 41 candles to lock true historic walls
@@ -83,48 +86,59 @@ def get_bos_bar(df):
         l_render = min(l_42, l_live)
         o_42 = (h_render + l_render) / 2.0
         
-        # ⚡ 50/50 STRENGTH CALCULATION FOR BREAKOUT ASSESSMENT
-        total_range = h_42 - l_42
-        if total_range == 0:
-            total_range = 1e-9
-        relative_position = (c_42 - l_42) / total_range
+        # ⚡ 50/50 LIVE CANDLE STRENGTH CALCULATION (Internal candle metric)
+        live_candle_range = h_live - l_live if (h_live - l_live) > 0 else 1e-9
+        relative_position = (c_42 - l_live) / live_candle_range
         
-        # Default state
+        # Default states
         signal = "NONE"
+        bos_label = "NONE"
         
         # Trigger BUY Sequence (Upper wall breakout)
         if c_42 > h_42 and (was_inside or prev_was_breakout):
             signal = "BREAKUP"
             if relative_position >= 0.50:
+                bos_label = f"{c_42:.2f}_BULL_UP"
                 if is_mrb and c_42 > o_live:
                     print_fixed_width_alert("BREAKUP: STRONG UPPER BREAKOUT!", ["🚀", "🔥"], Fore.GREEN)
                 else:
                     print_fixed_width_alert("BREAKUP: UPPER HALF STRENGTH!", ["🚀"], Fore.GREEN)
             else:
+                bos_label = f"{c_42:.2f}_BEAR_UP"
                 print_fixed_width_alert("BREAKUP: WEAK BREAKOUT WALL!", ["⚠️"], Fore.YELLOW)
                 
         # Trigger SELL Sequence (Lower wall breakdown)
         elif c_42 < l_42 and (was_inside or prev_was_breakdown):
             signal = "BREAKDOWN"
             if relative_position < 0.50:
+                bos_label = f"{c_42:.2f}_BEAR_DOWN"
                 if is_mrb and c_42 < o_live:
                     print_fixed_width_alert("BREAKDOWN: STRONG LOWER BREAKDOWN!", ["🔴", "🔥"], Fore.RED)
                 else:
                     print_fixed_width_alert("BREAKDOWN: LOWER HALF WEAKNESS!", ["🔴"], Fore.RED)
             else:
+                bos_label = f"{c_42:.2f}_BULL_DOWN"
                 print_fixed_width_alert("BREAKDOWN: WEAK BREAKDOWN WALL!", ["⚠️"], Fore.YELLOW)
+        else:
+            # Inside the walls: calculate standard directional context
+            if relative_position >= 0.50:
+                bos_label = f"{c_42:.2f}_BULL"
+            else:
+                bos_label = f"{c_42:.2f}_BEAR"
         
         # Build the visual bar
         visual_bar = build_candle_bar(o_42, h_render, l_render, c_42)
         
+        # 📊 UPDATE DATAFRAME ATTRIBUTES WITH COMBINED STRINGS
         if not hasattr(df, 'attrs'):
             df.attrs = {}
-        df.attrs['bos_numeric_value'] = f"{c_42:.2f}"
+        df.attrs['bos_numeric_value'] = bos_label
         df.attrs['relative_position_pct'] = f"{relative_position*100:.1f}%"
         
         return visual_bar, signal
         
     except Exception:
+        if df is not None:
+            if not hasattr(df, 'attrs'): df.attrs = {}
+            df.attrs['bos_numeric_value'] = "NONE"
         return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
-
-
