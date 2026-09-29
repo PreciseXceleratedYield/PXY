@@ -71,13 +71,13 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
         
         # 3️⃣ Symmetrical Risk Matrix (Calculated cleanly inline for each row context)
         if is_ce:
-            if derived_exit == 'DOWN' or derived_supr == 'BEAR':
+            if derived_exit == 'DOWN' or derived_supr == 'BEAR' or derived_supr == 'SIDE':
                 target_pct = 1.4
             else:
                 target_pct = atr * atr 
                 
         elif is_pe:
-            if derived_exit == 'UP' or derived_supr == 'BULL':
+            if derived_exit == 'UP' or derived_supr == 'BULL' or derived_supr == 'SIDE':
                 target_pct = 1.4
             else:
                 target_pct = atr * atr 
@@ -89,4 +89,3 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
-
