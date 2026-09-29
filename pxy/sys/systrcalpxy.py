@@ -28,7 +28,8 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     mirror_line = np.zeros(length)
     st_trend = np.ones(length)  
 
-    anchor_price = float(src) if length > 0 else 0.0
+    # 🛠️ FIXED: Extract the first scalar element instead of trying to cast the entire array
+    anchor_price = float(src[0]) if length > 0 else 0.0
 
     for i in range(length):
         if i == 0:
@@ -121,3 +122,4 @@ def _compute_combo_force(df: pd.DataFrame, st_period: int, st_factor: float, sma
     st_trend_series = np.where(close > comb_average_line, 'BULL', np.where(close < comb_average_line, 'BEAR', 'SIDE'))
     
     return pd.Series(comb_average_line, index=df.index), pd.Series(st_trend_series, index=df.index)
+
