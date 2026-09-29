@@ -18,7 +18,7 @@ CONFIG = {
     "VARIANT": "DUAL",  # 🔄 SWITCH HERE: "DUAL" or "SINGLE"
     "ST1": {
         "PERIOD": 3,   # ATR Period synced to Pine Script (atrPeriod)
-        "FACTOR": 1.4    # Multiplier synced to Pine Script (multiplier)
+        "FACTOR": 3    # Multiplier synced to Pine Script (multiplier)
     }
 }
 # ==============================================================================
