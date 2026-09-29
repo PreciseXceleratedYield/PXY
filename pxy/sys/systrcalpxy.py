@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 
 # 🎛️ GLOBAL ATR CONFIGURATION SWITCH
-FIXED_ATR_VALUE = 5 #None  # Set to None for dynamic calculation | Set to float (e.g., 15.0) to lock absolute boundary size
+FIXED_ATR_VALUE = 2.5 #None  # Set to None for dynamic calculation | Set to float (e.g., 15.0) to lock absolute boundary size
 
 
 def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
