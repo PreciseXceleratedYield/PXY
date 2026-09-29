@@ -77,9 +77,9 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
     # 4. Final conditional flipping assignment
     if latest_close > average_line:       # Price is ABOVE the combined line
         ce_force = 1.0
-        pe_force = 2.4
+        pe_force = 2.0
     elif latest_close < average_line:     # Price is BELOW the combined line
-        ce_force = 2.4
+        ce_force = 2.0
         pe_force = 1.0
     else:                                 # Price is EXACTLY EQUAL to the line
         ce_force = 1.0
