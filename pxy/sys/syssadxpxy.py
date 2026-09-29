@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # syssadxpxy.py
 import numpy as np
 import pandas as pd
@@ -5,9 +6,39 @@ import warnings
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+# 🎛️ HARD-CODED OPERATIONAL LOGIC SWITCH
+# Set True  -> Uses 50-period Time Series Moving Average (TSMA)
+# Set False -> Uses 50-period Simple Moving Average (SMA)
+USE_TSMA = True  
+
+def _calculate_tsma_50_line(close_series: pd.Series) -> np.ndarray:
+    """
+    Vectorized 50-period Time Series Moving Average (TSMA) engine.
+    Applies linear regression curve fitting over a rolling 50-window slice.
+    Formula: TSMA = 3 * WMA(50) - 2 * SMA(50)
+    """
+    length = len(close_series)
+    if length < 50:
+        return close_series.rolling(window=length, min_periods=1).mean().to_numpy()
+
+    # 1. Standard 50 SMA Component
+    sma = close_series.rolling(window=50).mean()
+
+    # 2. Linear Weighted Moving Average (WMA) 50 Component
+    weights = np.arange(1, 51)
+    wma = close_series.rolling(window=50).apply(
+        lambda x: np.dot(x, weights) / weights.sum(), 
+        raw=True
+    )
+
+    # 3. TSMA Endpoint Curve Fitting Intersection
+    tsma = (3 * wma) - (2 * sma)
+    return tsma.to_numpy()
+
 def calculate_adx(df: pd.DataFrame) -> tuple:
     """
-    Surgically averages 50 SMA and Supertrend (10, 3) lines to derive system forces.
+    Surgically averages a 50-period moving line (SMA or TSMA) with Supertrend (10, 3) 
+    to derive clean system baseline forces.
     
     Returns (ce_force, pe_force) based on price position relative to the averaged line:
     - Price > Average Line (BULL): ce_force = 1.0, pe_force = 1.2
@@ -22,9 +53,15 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
     close = df['Close'].to_numpy()
     length = len(df)
 
-    # 1. Compute 50 Simple Moving Average (SMA) Line
-    sma_50 = df['Close'].rolling(window=50).mean().to_numpy()
-    latest_sma = sma_50[-1]
+    # 1. Hard-Coded Switch Logic Resolution
+    if USE_TSMA:
+        # High-performance rolling TSMA 50 engine calculation path
+        moving_line = _calculate_tsma_50_line(df['Close'])
+    else:
+        # Standard fallback to original Simple Moving Average path
+        moving_line = df['Close'].rolling(window=50).mean().to_numpy()
+        
+    latest_moving_val = moving_line[-1]
 
     # 2. Compute Supertrend (10, 3) Line
     tr = np.zeros(length)
@@ -66,23 +103,24 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
 
     latest_supertrend = supertrend[-1]
 
-    if np.isnan(latest_sma) or np.isnan(latest_supertrend):
+    if np.isnan(latest_moving_val) or np.isnan(latest_supertrend):
         return 1.1, 1.1
 
     # 3. Combine and average indicator paths
-    average_line = (latest_sma + latest_supertrend) / 2
+    average_line = (latest_moving_val + latest_supertrend) / 2
     latest_close = close[-1]
 
-    # 4. Final conditional flipping assignment matching 1.0 and 1.2 forces
+    # 4. Final conditional flipping assignment matching forces 
     if latest_close > average_line:       
         ce_force = 1.0
-        pe_force = 1.0
+        pe_force = 1.2
     elif latest_close < average_line:     
-        ce_force = 1.0
+        ce_force = 1.2
         pe_force = 1.0
     else:                                 
         ce_force = 1.0
         pe_force = 1.0
 
     return ce_force, pe_force
+
 
