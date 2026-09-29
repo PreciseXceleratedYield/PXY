@@ -10,13 +10,12 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
     Surgically averages 50 SMA and Supertrend (10, 3) lines to derive system forces.
     
     Returns (ce_force, pe_force) based on price position relative to the averaged line:
-    - Price > Average Line:  ce_force = 1.0, pe_force = 1.4
-    - Price < Average Line:  ce_force = 1.4, pe_force = 1.0
-    - Price == Average Line: ce_force = 1.0, pe_force = 1.0
+    - Price > Average Line (BULL): ce_force = 1.0, pe_force = 1.2
+    - Price < Average Line (BEAR): ce_force = 1.2, pe_force = 1.0
+    - Price == Average Line (SIDE): ce_force = 1.0, pe_force = 1.0
     """
-    # Strict fallback check: Requires minimum 50 rows to initialize 50 SMA
     if df is None or df.empty or len(df) < 50:
-        return 1.5, 1.5
+        return 1.1, 1.1
 
     high = df['High'].to_numpy()
     low = df['Low'].to_numpy()
@@ -37,7 +36,6 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
             abs(low[i] - close[i-1])
         )
     
-    # 10-period standard ATR
     atr = pd.Series(tr).rolling(window=10).mean().to_numpy()
 
     hl2 = (high + low) / 2
@@ -47,9 +45,11 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
     final_upper = np.copy(upperband)
     final_lower = np.copy(lowerband)
     supertrend = np.zeros(length)
-    trend = np.ones(length)  # 1 = Up trend, -1 = Down trend
+    trend = np.ones(length)
 
-    # Strict loop to track trailing stop bands (TradingView/PineScript Standard)
+    supertrend[0] = final_upper[0]
+    trend[0] = -1
+
     for i in range(1, length):
         if close[i] > final_upper[i-1]:
             trend[i] = 1
@@ -66,22 +66,21 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
 
     latest_supertrend = supertrend[-1]
 
-    # Verification fallback check if indicators fail or generate NaNs
     if np.isnan(latest_sma) or np.isnan(latest_supertrend):
-        return 1.5, 1.5
+        return 1.1, 1.1
 
     # 3. Combine and average indicator paths
     average_line = (latest_sma + latest_supertrend) / 2
     latest_close = close[-1]
 
-    # 4. Final conditional flipping assignment
-    if latest_close > average_line:       # Price is ABOVE the combined line
+    # 4. Final conditional flipping assignment matching 1.0 and 1.2 forces
+    if latest_close > average_line:       
         ce_force = 1.0
-        pe_force = 2.0
-    elif latest_close < average_line:     # Price is BELOW the combined line
-        ce_force = 2.0
+        pe_force = 1.2
+    elif latest_close < average_line:     
+        ce_force = 1.2
         pe_force = 1.0
-    else:                                 # Price is EXACTLY EQUAL to the line
+    else:                                 
         ce_force = 1.0
         pe_force = 1.0
 
