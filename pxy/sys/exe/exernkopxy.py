@@ -316,7 +316,7 @@ def start_trailing_engine():
         )
 
         # -------- TRIPLE-CHECK GUARD B: THRESHOLD LOGIC INTERACTION TIMELINE --------
-        if current_net_pnl <= active_exit_line or current_net_pnl == 0.0:
+        if current_net_pnl <= active_exit_line:
             consecutive_breaches += 1
             save_check_state(consecutive_breaches)
             print(f"⚠️ {Fore.YELLOW}THRESHOLD ALERT TRACKER: Breach Count at ({consecutive_breaches}/3)")
