@@ -29,7 +29,7 @@ DEBUG_MODE = False
 # 🎛️ MASTER CONFIGURATION LAYER (PXY Universal Framework Parameters)
 # ==============================================================================
 CONFIG = {
-    "VARIANT": "COMBO_FORCE",  # 🔄 OPTIONS: "DUAL", "SINGLE", "SMA50", or "COMBO_FORCE"
+    "VARIANT": "SMA50",  # 🔄 OPTIONS: "DUAL", "SINGLE", "SMA50", or "COMBO_FORCE"
     "ST1": {
         "PERIOD": 3,   
         "FACTOR": 1.4    
