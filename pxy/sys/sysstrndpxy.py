@@ -15,10 +15,10 @@ DEBUG_MODE = False
 # 🎛️ MASTER CONFIGURATION LAYER (PXY Universal Framework Parameters)
 # ==============================================================================
 CONFIG = {
-    "VARIANT": "DUAL",  # 🔄 SWITCH HERE: "DUAL" or "SINGLE"
+    "VARIANT": "SINGLE",  # 🔄 SWITCH HERE: "DUAL" or "SINGLE"
     "ST1": {
         "PERIOD": 3,   # ATR Period synced to Pine Script (atrPeriod)
-        "FACTOR": 3    # Multiplier synced to Pine Script (multiplier)
+        "FACTOR": 1.4    # Multiplier synced to Pine Script (multiplier)
     }
 }
 # ==============================================================================
