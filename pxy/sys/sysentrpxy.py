@@ -39,9 +39,9 @@ def get_entry_signal(df=None):
             mapped_entry = "OTMSELL"
         else:  # trend is "SIDE", "NONE", etc. -> Fall back to mktpxy signal
             if mkt_entry_dir == "BULL":
-                mapped_entry = "OTMBUY"
+                mapped_entry = "NONE"
             elif mkt_entry_dir == "BEAR":
-                mapped_entry = "OTMSELL"
+                mapped_entry = "NONE"
             else:
                 mapped_entry = "NONE"
     else:
