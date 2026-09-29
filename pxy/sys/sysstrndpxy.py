@@ -15,10 +15,13 @@ DEBUG_MODE = False
 # 🎛️ MASTER CONFIGURATION LAYER (PXY Universal Framework Parameters)
 # ==============================================================================
 CONFIG = {
-    "VARIANT": "SINGLE",  # 🔄 SWITCH HERE: "DUAL" or "SINGLE"
+    "VARIANT": "SMA50",  # 🔄 SWITCH HERE: "DUAL", "SINGLE", or "SMA50"
     "ST1": {
         "PERIOD": 3,   # ATR Period synced to Pine Script (atrPeriod)
         "FACTOR": 1.4    # Multiplier synced to Pine Script (multiplier)
+    },
+    "SMA": {
+        "PERIOD": 50   # Lookback period for the SMA variant
     }
 }
 # ==============================================================================
@@ -45,7 +48,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     src = (high + low) / 2.0  # hl2 native midpoint
     
     # 🎯 RETRIEVE ATR DIRECTLY FROM THE INTERFACE MODULE AS REQUESTED
-    atr = 5 #calculate_atr(df).to_numpy()
+    atr = calculate_atr(df).to_numpy()
 
     basic_upper = src + (factor * atr)
     basic_lower = src - (factor * atr)
@@ -112,12 +115,20 @@ def get_market_trend(df: pd.DataFrame) -> str:
     if df is None or df.empty or len(df) < 2:
         return 'SIDE'
 
+    variant = CONFIG.get("VARIANT", "DUAL").upper()
+    
+    if variant == "SMA50":
+        sma_period = CONFIG["SMA"]["PERIOD"]
+        sma_series = df['Close'].rolling(window=sma_period, min_periods=1).mean()
+        last_close = float(df['Close'].iloc[-1])
+        last_sma = float(sma_series.iloc[-1])
+        return 'BULL' if last_close >= last_sma else 'BEAR'
+
     # Compute supertrend metrics dynamically on raw high/low/close metrics
     st_line, mirror_line, m0_series, raw_trend_series = _compute_single_st(
         df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
     )
     
-    variant = CONFIG.get("VARIANT", "DUAL").upper()
     if variant == "SINGLE":
         # Pure binary trend lookup (No SIDE state logic)
         last_trend = raw_trend_series.iloc[-1]
@@ -163,33 +174,43 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     else:
         df = df.tz_localize('UTC').tz_convert(tz_string)
 
-    st1_line, st1_mirror, m0_series, raw_trend_series = _compute_single_st(
-        df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
-    )
-
     variant = CONFIG.get("VARIANT", "DUAL").upper()
-    if variant == "SINGLE":
-        # Pure binary state: Maps 1 to BULL, everything else (-1) to BEAR directly
-        st_trend_series = np.where(raw_trend_series == 1, 'BULL', 'BEAR')
+
+    if variant == "SMA50":
+        sma_period = CONFIG["SMA"]["PERIOD"]
+        sma_series = df['Close'].rolling(window=sma_period, min_periods=1).mean()
+        st_trend_series = np.where(df['Close'] >= sma_series, 'BULL', 'BEAR')
+        
+        st1_line = sma_series
+        st1_mirror = sma_series  # Mirroring line matches line to avoid split rendering issues
         st_trend_series = pd.Series(st_trend_series, index=df.index)
     else:
-        st_arr = st1_line.to_numpy()
-        mirror_arr = st1_mirror.to_numpy()
-        m0_arr = m0_series.to_numpy()
-        
-        highest_arr = np.maximum(st_arr, mirror_arr)
-        lowest_arr = np.minimum(st_arr, mirror_arr)
-        
-        # Complete Three-State Vectorized Evaluation Engine (DUAL variant only)
-        classifier_conditions = [
-            (m0_arr > highest_arr),
-            (m0_arr < lowest_arr)
-        ]
-        classifier_choices = ['BULL', 'BEAR']
-        st_trend_series = pd.Series(
-            np.select(classifier_conditions, classifier_choices, default='SIDE'),
-            index=df.index
+        st1_line, st1_mirror, m0_series, raw_trend_series = _compute_single_st(
+            df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
         )
+
+        if variant == "SINGLE":
+            # Pure binary state: Maps 1 to BULL, everything else (-1) to BEAR directly
+            st_trend_series = np.where(raw_trend_series == 1, 'BULL', 'BEAR')
+            st_trend_series = pd.Series(st_trend_series, index=df.index)
+        else:
+            st_arr = st1_line.to_numpy()
+            mirror_arr = st1_mirror.to_numpy()
+            m0_arr = m0_series.to_numpy()
+            
+            highest_arr = np.maximum(st_arr, mirror_arr)
+            lowest_arr = np.minimum(st_arr, mirror_arr)
+            
+            # Complete Three-State Vectorized Evaluation Engine (DUAL variant only)
+            classifier_conditions = [
+                (m0_arr > highest_arr),
+                (m0_arr < lowest_arr)
+            ]
+            classifier_choices = ['BULL', 'BEAR']
+            st_trend_series = pd.Series(
+                np.select(classifier_conditions, classifier_choices, default='SIDE'),
+                index=df.index
+            )
 
     # Map variables cleanly to dataframe matrices
     df['st_line'] = st1_line           
@@ -217,12 +238,12 @@ def export_supertrend_json(
 
     output = []
     variant = CONFIG.get("VARIANT", "DUAL").upper()
-    is_single = (variant == "SINGLE")
+    # Mirror matching applied to SINGLE and SMA50 variants
+    is_single_or_sma = variant in ("SINGLE", "SMA50")
 
     for idx, row in df.iterrows():
         st_val = float(row['st_line']) if not pd.isna(row['st_line']) else 0.0
-        # If SINGLE variant, copy the st_line value directly into mirror_line
-        mirror_val = st_val if is_single else (float(row['st_mirror']) if not pd.isna(row['st_mirror']) else 0.0)
+        mirror_val = st_val if is_single_or_sma else (float(row['st_mirror']) if not pd.isna(row['st_mirror']) else 0.0)
 
         output.append({
             'time': int(idx.timestamp()),
@@ -242,8 +263,6 @@ def export_supertrend_json(
         json.dump(output, f, indent=2)
 
     return output
-
-
 
 if __name__ == '__main__':
     from sysdtafpxy import fetch_yf_data
