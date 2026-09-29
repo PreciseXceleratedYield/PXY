@@ -5,6 +5,7 @@ import pandas as pd
 from datetime import datetime 
 from runclntpxy import get_session 
 from runltpspxy import get_mid_price 
+from runrnwnpxy import calculate_runners_and_winners_pnl
 
 # 🔍 STRATEGIC FOOTPRINT: Resolved relative to run/ directory pathing
 SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/websqrpxy.json"))
@@ -227,7 +228,8 @@ def process_lilo_orders(client):
         total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0 
         _print_summary(total_unrealized, total_realized) 
         dump_to_json(closed_df) 
-        dump_livpos_to_json(open_positions) 
+        dump_livpos_to_json(open_positions)
+        calculate_runners_and_winners_pnl(open_df, closed_df)
         return open_df, closed_df 
     except Exception as e: 
         print(f"[TAG MATCH ERROR]: {e}") 
