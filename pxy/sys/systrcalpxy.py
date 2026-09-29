@@ -2,6 +2,10 @@
 import numpy as np
 import pandas as pd
 
+# 🎛️ GLOBAL ATR CONFIGURATION SWITCH
+FIXED_ATR_VALUE = 5 #None  # Set to None for dynamic calculation | Set to float (e.g., 15.0) to lock absolute boundary size
+
+
 def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     """Helper to compute PXY Supertrend bands and the mirror line."""
     high = df['High'].to_numpy()
@@ -16,8 +20,12 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     m0 = np.where(close >= open_arr, (close + high) / 2.0, (close + low) / 2.0)
     src = (high + low) / 2.0  
     
-    from syskatrpxy import calculate_atr
-    atr = calculate_atr(df).to_numpy()
+    # 🎯 ATR SELECTOR SWITCH
+    if FIXED_ATR_VALUE is not None:
+        atr = np.full(length, float(FIXED_ATR_VALUE))
+    else:
+        from syskatrpxy import calculate_atr
+        atr = calculate_atr(df).to_numpy()
 
     basic_upper = src + (factor * atr)
     basic_lower = src - (factor * atr)
@@ -122,4 +130,5 @@ def _compute_combo_force(df: pd.DataFrame, st_period: int, st_factor: float, sma
     st_trend_series = np.where(close > comb_average_line, 'BULL', np.where(close < comb_average_line, 'BEAR', 'SIDE'))
     
     return pd.Series(comb_average_line, index=df.index), pd.Series(st_trend_series, index=df.index)
+
 
