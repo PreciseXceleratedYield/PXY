@@ -11,7 +11,7 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 REBUY_ENABLED = True
-MAX_LAYERS = 3
+MAX_LAYERS = 5
 COOL_DOWN_SECONDS = 30
 
 PANEL_WIDTH = 42
