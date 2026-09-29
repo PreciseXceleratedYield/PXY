@@ -1,12 +1,26 @@
+# sysstrndpxy.py
 import json
 import os
+import sys
 import warnings
 import numpy as np
 import pandas as pd
 from syscnfgpxy import TIMEZONE
 
-# 🎯 IMPORT THE ORIGINAL ATR VALUE DIRECTLY FROM YOUR UNTOUCHED ENGINE
-from syskatrpxy import calculate_atr
+# 🛡️ DEFENSIVE IMPORTS ROUTING MATH DIRECTLY TO THE CALCULATION ENGINE
+try:
+    from systrcalpxy import _compute_single_st, _compute_combo_force, _compute_sma_trend
+except ImportError as e:
+    print(f"🚨 CRITICAL CRASH PREVENTED: Cannot locate 'systrcalpxy.py'.", file=sys.stderr)
+    print("Applying fallback passives.", file=sys.stderr)
+    
+    def _compute_single_st(df, period, factor):
+        zeros = pd.Series(0.0, index=df.index)
+        return zeros, zeros, zeros, pd.Series(-1, index=df.index)
+    def _compute_sma_trend(df, period):
+        return pd.Series(0.0, index=df.index), pd.Series("SIDE", index=df.index)
+    def _compute_combo_force(df, st_period, st_factor, sma_period):
+        return pd.Series(0.0, index=df.index), pd.Series("SIDE", index=df.index)
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 DEBUG_MODE = False
@@ -15,138 +29,57 @@ DEBUG_MODE = False
 # 🎛️ MASTER CONFIGURATION LAYER (PXY Universal Framework Parameters)
 # ==============================================================================
 CONFIG = {
-    "VARIANT": "SMA50",  # 🔄 SWITCH HERE: "DUAL", "SINGLE", or "SMA50"
+    "VARIANT": "COMBO_FORCE",  # 🔄 OPTIONS: "DUAL", "SINGLE", "SMA50", or "COMBO_FORCE"
     "ST1": {
-        "PERIOD": 3,   # ATR Period synced to Pine Script (atrPeriod)
-        "FACTOR": 1.4    # Multiplier synced to Pine Script (multiplier)
+        "PERIOD": 3,   
+        "FACTOR": 1.4    
     },
     "SMA": {
-        "PERIOD": 50   # Lookback period for the SMA variant
+        "PERIOD": 50   
+    },
+    "COMBO": {
+        "ST_PERIOD": 10,   # 🎯 CONFIGURE COMBO SUPERTREND PERIOD HERE
+        "ST_FACTOR": 3.0,  # 🎯 CONFIGURE COMBO SUPERTREND MULTIPLIER HERE
+        "SMA_PERIOD": 50   # 🎯 CONFIGURE COMBO SMA PERIOD HERE
     }
 }
 # ==============================================================================
 
 
-def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
-    """Helper to compute PXY Supertrend bands and the mirror line.
-    
-    Fixed assignment logic to handle clean float scalars instead of sequence arrays.
-    """
-    high = df['High'].to_numpy()
-    low = df['Low'].to_numpy()
-    open_arr = df['Open'].to_numpy()
-    close = df['Close'].to_numpy()
-
-    length = len(df)
-    if length == 0:
-        return pd.Series(dtype=float), pd.Series(dtype=float), pd.Series(dtype=float), pd.Series(dtype=int)
-
-    # --- 1. BASE TRANSFORMATION (m0 used for ATR and Crossovers) ---
-    m0 = np.where(close >= open_arr, (close + high) / 2.0, (close + low) / 2.0)
-
-    # --- 2. INTERMEDIATE ATR BOUNDARY ENGINE ---
-    src = (high + low) / 2.0  # hl2 native midpoint
-    
-    # 🎯 RETRIEVE ATR DIRECTLY FROM THE INTERFACE MODULE AS REQUESTED
-    atr = calculate_atr(df).to_numpy()
-
-    basic_upper = src + (factor * atr)
-    basic_lower = src - (factor * atr)
-
-    final_upper = np.zeros(length)
-    final_lower = np.zeros(length)
-    supertrend = np.zeros(length)
-    mirror_line = np.zeros(length)
-    st_trend = np.ones(length)  # 1 = BULL, -1 = BEAR
-
-    # Seed with the first element scalar float instead of the full array sequence
-    anchor_price = float(src[0]) if length > 0 else 0.0
-
-    for i in range(length):
-        if i == 0:
-            final_upper[i] = basic_upper[i]
-            final_lower[i] = basic_lower[i]
-            supertrend[i] = final_upper[i]
-            st_trend[i] = -1 
-            mirror_line[i] = anchor_price - (supertrend[i] - anchor_price)
-            continue
-
-        prev_upper = final_upper[i - 1]
-        prev_lower = final_lower[i - 1]
-        prev_trend = st_trend[i - 1]
-
-        # --- ALIGNED BAND RETENTION LOGIC (Using src / hl2) ---
-        if src[i] < prev_upper:
-            final_upper[i] = min(basic_upper[i], prev_upper)
-        else:
-            final_upper[i] = basic_upper[i]
-
-        if src[i] > prev_lower:
-            final_lower[i] = max(basic_lower[i], prev_lower)
-        else:
-            final_lower[i] = basic_lower[i]
-
-        # --- ALIGNED TREND SWITCH MATRIX (Crossover tracked by m0) ---
-        if prev_trend == -1 and m0[i] > prev_upper:  
-            current_trend = 1
-            anchor_price = float(src[i])
-        elif prev_trend == 1 and m0[i] < prev_lower:  
-            current_trend = -1
-            anchor_price = float(src[i])
-        else:
-            current_trend = prev_trend
-
-        st_trend[i] = current_trend
-        stLine = final_lower[i] if current_trend == 1 else final_upper[i]
-        supertrend[i] = stLine
-
-        # Compute Inverted Mirror Line
-        st_distance_from_anchor = stLine - anchor_price
-        mirror_line[i] = anchor_price - st_distance_from_anchor
-
-    return pd.Series(supertrend, index=df.index), pd.Series(mirror_line, index=df.index), pd.Series(m0, index=df.index), pd.Series(st_trend, index=df.index)
-
-
 def get_market_trend(df: pd.DataFrame) -> str:
-    """
-    Evaluates raw data frame layouts via intermediate calculations.
-    Safe for upstream fetch scripts; does not look for pre-existing matrix columns.
-    """
+    """Evaluates raw data frame layouts via intermediate calculations handles."""
     if df is None or df.empty or len(df) < 2:
         return 'SIDE'
 
     variant = CONFIG.get("VARIANT", "DUAL").upper()
     
-    if variant == "SMA50":
-        sma_period = CONFIG["SMA"]["PERIOD"]
-        sma_series = df['Close'].rolling(window=sma_period, min_periods=1).mean()
-        last_close = float(df['Close'].iloc[-1])
-        last_sma = float(sma_series.iloc[-1])
-        return 'BULL' if last_close >= last_sma else 'BEAR'
+    if variant == "COMBO_FORCE":
+        min_required = max(CONFIG["COMBO"]["ST_PERIOD"], CONFIG["COMBO"]["SMA_PERIOD"])
+        if len(df) < min_required:
+            return 'SIDE'
+        _, trend_series = _compute_combo_force(
+            df, 
+            st_period=CONFIG["COMBO"]["ST_PERIOD"], 
+            st_factor=CONFIG["COMBO"]["ST_FACTOR"], 
+            sma_period=CONFIG["COMBO"]["SMA_PERIOD"]
+        )
+        return str(trend_series.iloc[-1])
 
-    # Compute supertrend metrics dynamically on raw high/low/close metrics
+    if variant == "SMA50":
+        _, trend_series = _compute_sma_trend(df, CONFIG["SMA"]["PERIOD"])
+        return str(trend_series.iloc[-1])
+
     st_line, mirror_line, m0_series, raw_trend_series = _compute_single_st(
         df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
     )
-    
     if variant == "SINGLE":
-        # Pure binary trend lookup (No SIDE state logic)
-        last_trend = raw_trend_series.iloc[-1]
-        return 'BULL' if last_trend == 1 else 'BEAR'
+        return 'BULL' if raw_trend_series.iloc[-1] == 1 else 'BEAR'
         
-    m0_curr = float(m0_series.iloc[-1])
-    st_curr = float(st_line.iloc[-1])
-    mirror_curr = float(mirror_line.iloc[-1])
-    
-    highest_line = max(st_curr, mirror_curr)
-    lowest_line = min(st_curr, mirror_curr)
-
-    if m0_curr > highest_line:
-        return 'BULL'
-    elif m0_curr < lowest_line:
-        return 'BEAR'
-    else:
-        return 'SIDE'
+    m0_curr, st_curr, mirror_curr = float(m0_series.iloc[-1]), float(st_line.iloc[-1]), float(mirror_line.iloc[-1])
+    highest_line, lowest_line = max(st_curr, mirror_curr), min(st_curr, mirror_curr)
+    if m0_curr > highest_line: return 'BULL'
+    elif m0_curr < lowest_line: return 'BEAR'
+    return 'SIDE'
 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
@@ -155,11 +88,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         from sysdtafpxy import fetch_yf_data
         try:
             raw_df = fetch_yf_data(period='3d', interval='1m')
-            if raw_df is not None and not raw_df.empty:
-                df = raw_df.copy()
-        except Exception as e:
-            if DEBUG_MODE:
-                print(f'Warning: Shared pipeline download fallback active | {e}')
+            if raw_df is not None and not raw_df.empty: df = raw_df.copy()
+        except Exception:
             df = df.copy()
 
     if df.empty:
@@ -169,68 +99,49 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         df.index = pd.to_datetime(df.index)
         
     tz_string = str(TIMEZONE)
-    if df.index.tz is not None:
-        df = df.tz_convert(tz_string)
-    else:
-        df = df.tz_localize('UTC').tz_convert(tz_string)
+    df = df.tz_convert(tz_string) if df.index.tz is not None else df.tz_localize('UTC').tz_convert(tz_string)
 
     variant = CONFIG.get("VARIANT", "DUAL").upper()
 
-    if variant == "SMA50":
-        sma_period = CONFIG["SMA"]["PERIOD"]
-        sma_series = df['Close'].rolling(window=sma_period, min_periods=1).mean()
-        st_trend_series = np.where(df['Close'] >= sma_series, 'BULL', 'BEAR')
-        
-        st1_line = sma_series
-        st1_mirror = sma_series  # Mirroring line matches line to avoid split rendering issues
-        st_trend_series = pd.Series(st_trend_series, index=df.index)
-    else:
-        st1_line, st1_mirror, m0_series, raw_trend_series = _compute_single_st(
-            df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
-        )
-
-        if variant == "SINGLE":
-            # Pure binary state: Maps 1 to BULL, everything else (-1) to BEAR directly
-            st_trend_series = np.where(raw_trend_series == 1, 'BULL', 'BEAR')
-            st_trend_series = pd.Series(st_trend_series, index=df.index)
+    if variant == "COMBO_FORCE":
+        min_required = max(CONFIG["COMBO"]["ST_PERIOD"], CONFIG["COMBO"]["SMA_PERIOD"])
+        if len(df) < min_required:
+            st1_line = pd.Series(df['Close'], index=df.index)
+            st1_mirror = st1_line
+            st_trend_series = pd.Series("SIDE", index=df.index)
         else:
-            st_arr = st1_line.to_numpy()
-            mirror_arr = st1_mirror.to_numpy()
-            m0_arr = m0_series.to_numpy()
-            
-            highest_arr = np.maximum(st_arr, mirror_arr)
-            lowest_arr = np.minimum(st_arr, mirror_arr)
-            
-            # Complete Three-State Vectorized Evaluation Engine (DUAL variant only)
-            classifier_conditions = [
-                (m0_arr > highest_arr),
-                (m0_arr < lowest_arr)
-            ]
-            classifier_choices = ['BULL', 'BEAR']
-            st_trend_series = pd.Series(
-                np.select(classifier_conditions, classifier_choices, default='SIDE'),
-                index=df.index
+            st1_line, st_trend_series = _compute_combo_force(
+                df, 
+                st_period=CONFIG["COMBO"]["ST_PERIOD"], 
+                st_factor=CONFIG["COMBO"]["ST_FACTOR"], 
+                sma_period=CONFIG["COMBO"]["SMA_PERIOD"]
             )
+            st1_mirror = st1_line
+            
+    elif variant == "SMA50":
+        st1_line, st_trend_series = _compute_sma_trend(df, CONFIG["SMA"]["PERIOD"])
+        st1_mirror = st1_line
+    else:
+        st1_line, st1_mirror, m0_series, raw_trend_series = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
+        if variant == "SINGLE":
+            st_trend_series = pd.Series(np.where(raw_trend_series == 1, 'BULL', 'BEAR'), index=df.index)
+        else:
+            st_arr, mirror_arr, m0_arr = st1_line.to_numpy(), st1_mirror.to_numpy(), m0_series.to_numpy()
+            highest_arr, lowest_arr = np.maximum(st_arr, mirror_arr), np.minimum(st_arr, mirror_arr)
+            st_trend_series = pd.Series(np.select([m0_arr > highest_arr, m0_arr < lowest_arr], ['BULL', 'BEAR'], default='SIDE'), index=df.index)
 
-    # Map variables cleanly to dataframe matrices
+    # Clean legacy dashboard field overrides to prevent exceptions
     df['st_line'] = st1_line           
     df['st_mirror'] = st1_mirror       
     df['ST_Trend'] = st_trend_series   
-    
-    # ==========================================================================
-    # 🔗 LEGACY COMPATIBILITY ROUTING (Fixes sysdashpxy.py KeyError Exceptions)
-    # ==========================================================================
-    df['ST'] = st1_line                # Explicitly mirrors st_line to pass dashboard checks
-    df['st1_mirror'] = st1_mirror      # Explicitly maps mirror to historical references
+    df['ST'] = st1_line                
+    df['st1_mirror'] = st1_mirror      
 
     return df
 
 
-def export_supertrend_json(
-    df: pd.DataFrame = None, output_file='../web/webchrtpxy.json'
-):
-    """Exports structured historical data: OHLC (for candles), st_line + trend
-    (for coloring), and mirror_line."""
+def export_supertrend_json(df: pd.DataFrame = None, output_file='../web/webchrtpxy.json'):
+    """Exports structured historical data for chart visualizations."""
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
     if df is None or df.empty:
@@ -238,12 +149,11 @@ def export_supertrend_json(
 
     output = []
     variant = CONFIG.get("VARIANT", "DUAL").upper()
-    # Mirror matching applied to SINGLE and SMA50 variants
-    is_single_or_sma = variant in ("SINGLE", "SMA50")
+    is_single_or_flat = variant in ("SINGLE", "SMA50", "COMBO_FORCE")
 
     for idx, row in df.iterrows():
         st_val = float(row['st_line']) if not pd.isna(row['st_line']) else 0.0
-        mirror_val = st_val if is_single_or_sma else (float(row['st_mirror']) if not pd.isna(row['st_mirror']) else 0.0)
+        mirror_val = st_val if is_single_or_flat else (float(row['st_mirror']) if not pd.isna(row['st_mirror']) else 0.0)
 
         output.append({
             'time': int(idx.timestamp()),
@@ -264,6 +174,7 @@ def export_supertrend_json(
 
     return output
 
+
 if __name__ == '__main__':
     from sysdtafpxy import fetch_yf_data
     print('--- STARTING LIVE PXY UNIFIED EXCLUSIVE MATRIX ENGINE ---')
@@ -277,7 +188,7 @@ if __name__ == '__main__':
         print(f"Timestamp : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"Price Line (Close): {float(processed_df.at[target_index, 'Close']):.2f}")
         print(
-            f"ST1 Line ({CONFIG['ST1']['PERIOD']},{CONFIG['ST1']['FACTOR']}): {float(processed_df.at[target_index, 'st_line']):.2f} | "
+            f"ST1 Line (Combo Avg Line): {float(processed_df.at[target_index, 'st_line']):.2f} | "
             f"Mirror Line Tracker: {float(processed_df.at[target_index, 'st_mirror']):.2f}"
         )
         print(f"Current Market Trend State : {current_trend}")
@@ -285,3 +196,4 @@ if __name__ == '__main__':
         export_supertrend_json(processed_df)
     else:
         print('CRITICAL: Upstream data empty.')
+
