@@ -102,6 +102,10 @@ def decide(side, active_exit, avg_profit_pct, points_profit, lots,
 
     # 🟡 SCENARIO 2: This side is EMPTY (Fresh Entry Gateway)
     if side_rows_empty and not other_side_rows_empty:
+        # 🛑 TREND ENFORCEMENT FILTER: Prevent fresh entry if side violates macro trend direction
+        if not aligned:
+            return "hold", aligned
+
         other_side = "PE" if side == "CE" else "CE"
         if can_exit(other_side, active_exit, other_side_profit_pct, other_side_points, other_side_lots, ce_rows, pe_rows):
             return "hold", aligned
@@ -148,3 +152,4 @@ def target_price(row, df=None):
     except Exception as e:
         print(f"{Fore.RED}Error in target_price executor wrapper: {e}{Style.RESET_ALL}")
         return 0.0
+
