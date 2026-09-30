@@ -149,6 +149,7 @@ def broker_positions_flat(client):
         return False
     except Exception:
         return False
+
 # exeexacpxy.py (Part 2)
 
 def pipe_master_execution_ledger():
@@ -164,9 +165,9 @@ def pipe_master_execution_ledger():
         print(f"{Fore.RED}❌ Failed to establish broker session client.")
         return
 
-    # Load baseline state metrics securely from your unified json cache
+    # 🔄 LOAD THE RECORD: Read the absolute highest high-water mark saved on your disk
     state = load_session_state()
-    winners_peak_brick = float(state.get("session_peak_pnl", 0.0))
+    winners_peak_brick_from_disk = float(state.get("session_peak_pnl", 0.0))
     pnl_offset = float(state.get("pnl_offset", 0.0))
     
     check_state = load_check_state()
@@ -195,17 +196,14 @@ def pipe_master_execution_ledger():
     total_raw_pnl = float(df_open["PNL"].sum() + df_closed["PNL"].sum())
     current_game_pnl = total_raw_pnl - pnl_offset
     
-    # 📈 IRONCLAD HIGH-WATER MARK GUARD
+    # 📈 CALCULATE LIVE BRICKS FOR THIS TICK ONLY
     completed_bricks = int(current_game_pnl // BRICK_SIZE)
     calculated_live_peak = float(completed_bricks * BRICK_SIZE)
     
-    # ONLY adjust the peak upward if the calculated live peak beats your saved history
-    if calculated_live_peak > winners_peak_brick:
-        winners_peak_brick = calculated_live_peak
-        consecutive_breaches = 0
-    else:
-        # 🔒 FORCE peak to stay completely frozen at its historical high-water mark
-        winners_peak_brick = max(winners_peak_brick, 0.0)
+    # 🔒 IRONCLAD HIGH-WATER MARK RESOLUTION
+    # Compare the new calculated live peak against the historical record loaded from disk memory.
+    # It takes the absolute maximum of both values, making a peak reduction mathematically impossible!
+    winners_peak_brick = max(calculated_live_peak, winners_peak_brick_from_disk)
 
     # 📊 DYNAMIC EXIT RECALCULATION: Anchored purely to your permanently frozen peak
     active_trailing_exit = winners_peak_brick - TRAILING_DROP_GAP
@@ -259,8 +257,9 @@ def pipe_master_execution_ledger():
             consecutive_breaches = 0
             save_check_state(0)
             
-    # Sync final values to clear legacy default fallbacks permanently
+    # Sync final values securely back to disk cache
     save_session_state(winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset)
 
 if __name__ == "__main__":
     pipe_master_execution_ledger()
+
