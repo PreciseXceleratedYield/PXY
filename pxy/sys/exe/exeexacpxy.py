@@ -8,8 +8,8 @@ import subprocess
 import pytz
 import pandas as pd
 from datetime import datetime
-from colorama import Fore, Style, init
 from pathlib import Path
+from colorama import Fore, Style, init
 
 # Initialize colorama for clean terminal output alignment
 init(autoreset=True)
@@ -25,7 +25,6 @@ if run_dir not in sys.path:
     sys.path.append(run_dir)
 
 # 🎯 USER-INDEPENDENT WORKSPACE PATH RESOLUTION
-# This dynamically finds the correct home folder directory root on your server environment
 HOME_DIR = str(Path.home())
 
 PNL_JSON_PATH = os.path.abspath(os.path.join(HOME_DIR, "pxy/web/webpnlpxy.json"))
@@ -196,17 +195,21 @@ def pipe_master_execution_ledger():
     total_raw_pnl = float(df_open["PNL"].sum() + df_closed["PNL"].sum())
     current_game_pnl = total_raw_pnl - pnl_offset
     
-    # 📈 DYNAMIC HEIGHT LOCK: Peak bricks stack dynamically upward in solid multiples of 140
-    if current_game_pnl > winners_peak_brick:
-        completed_bricks = int(current_game_pnl // BRICK_SIZE)
-        new_peak = float(completed_bricks * BRICK_SIZE)
-        if new_peak > winners_peak_brick:
-            winners_peak_brick = new_peak
-            consecutive_breaches = 0
-
-    # 📊 DYNAMIC EXIT RECALCULATION: Shifts up dynamically matching your max peak bricks
-    active_trailing_exit = winners_peak_brick - TRAILING_DROP_GAP
+    # 📈 IRONCLAD HIGH-WATER MARK GUARD
+    completed_bricks = int(current_game_pnl // BRICK_SIZE)
+    calculated_live_peak = float(completed_bricks * BRICK_SIZE)
     
+    # ONLY adjust the peak upward if the calculated live peak beats your saved history
+    if calculated_live_peak > winners_peak_brick:
+        winners_peak_brick = calculated_live_peak
+        consecutive_breaches = 0
+    else:
+        # 🔒 FORCE peak to stay completely frozen at its historical high-water mark
+        winners_peak_brick = max(winners_peak_brick, 0.0)
+
+    # 📊 DYNAMIC EXIT RECALCULATION: Anchored purely to your permanently frozen peak
+    active_trailing_exit = winners_peak_brick - TRAILING_DROP_GAP
+
     is_breached = False
     if current_game_pnl <= INITIAL_LOSS_FLOOR:
         is_breached = True
