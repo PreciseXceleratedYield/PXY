@@ -67,7 +67,6 @@ parent_scripts = [
     HERE.parent / "sysdashpxy.py",
     HERE / "exeexacpxy.py",
     HERE / "exeentrpxy.py",
-    HERE / "exernkopxy.py",
     HERE / "exeexitpxy.py"
 ]
 
