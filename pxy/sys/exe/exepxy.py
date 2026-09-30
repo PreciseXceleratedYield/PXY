@@ -65,14 +65,14 @@ parent_scripts = [
     HERE.parent / "systdaypxy.py",
     HERE.parent / "sysvixpxy.py",
     HERE.parent / "sysdashpxy.py",
-    HERE / "exeexacpxy.py",
     HERE / "exeentrpxy.py",
+    HERE / "exeexacpxy.py",
     HERE / "exeexitpxy.py"
 ]
 
 # Run parent scripts with the exception applied
 for s in parent_scripts:
-    if s.name == "exernkopxy.py":
+    if s.name == "exeexacpxy.py":
         safe_run(s, timeout=None)  # Infinite exception
     else:
         safe_run(s, timeout=45)  # Standard limit
