@@ -62,8 +62,9 @@ def save_check_state(counter):
 
 def load_session_state():
     """Loads session state parameters cleanly matching your downstream web JSON schemas."""
+    default_state = {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": -1400.0, "pnl_offset": 0.0}
     if not os.path.exists(RENKO_STATE_FILE):
-        return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": -1400.0, "pnl_offset": 0.0}
+        return default_state
     try:
         with open(RENKO_STATE_FILE, "r") as f:
             d = json.load(f)
@@ -71,10 +72,10 @@ def load_session_state():
                 "session_peak_pnl": float(d.get("session_peak_pnl", 0.0)),
                 "current_net_pnl": float(d.get("current_net_pnl", 0.0)),
                 "active_exit_line": float(d.get("active_exit_line", -1400.0)),
-                "pnl_offset": float(d.get("pnl_offset", 0.0))  # Embedded offset key
+                "pnl_offset": float(d.get("pnl_offset", 0.0))
             }
     except Exception:
-        return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": -1400.0, "pnl_offset": 0.0}
+        return default_state
 
 def save_session_state(peak_value, current_net, exit_line, pnl_offset_val):
     """Writes values back using exact legacy keys to keep downstream charts intact."""
@@ -87,7 +88,7 @@ def save_session_state(peak_value, current_net, exit_line, pnl_offset_val):
             "session_peak_pnl": float(peak_value),
             "current_net_pnl": float(current_net),
             "active_exit_line": float(exit_line),
-            "pnl_offset": float(pnl_offset_val),  # Handled inline inside the same file map
+            "pnl_offset": float(pnl_offset_val),  
             "updated_timestamp": now_ist.strftime('%Y-%m-%d %H:%M:%S')
         }
         with open(RENKO_STATE_FILE, "w") as f:
@@ -101,15 +102,7 @@ def verify_and_purge_stale_cache():
     now_ist = datetime.now(IST)
     today_str = now_ist.strftime("%Y-%m-%d")
     
-    if os.path.exists(RENKO_STATE_FILE):
-        try:
-            with open(RENKO_STATE_FILE, "r") as f:
-                state = json.load(f)
-        except Exception:
-            state = {}
-    else:
-        state = {}
-        
+    state = load_session_state()
     last_update_time = state.get("updated_timestamp", "")
     
     if today_str not in last_update_time:
@@ -200,6 +193,7 @@ def pipe_master_execution_ledger():
     total_raw_pnl = float(df_open["PNL"].sum() + df_closed["PNL"].sum())
     current_game_pnl = total_raw_pnl - pnl_offset
     
+    # 📈 DYNAMIC HEIGHT LOCK: Peak bricks stack dynamically upward in solid multiples of 140
     if current_game_pnl > winners_peak_brick:
         completed_bricks = int(current_game_pnl // BRICK_SIZE)
         new_peak = float(completed_bricks * BRICK_SIZE)
@@ -207,6 +201,7 @@ def pipe_master_execution_ledger():
             winners_peak_brick = new_peak
             consecutive_breaches = 0
 
+    # 📊 DYNAMIC EXIT RECALCULATION: Shifts up dynamically matching your max peak bricks
     active_trailing_exit = winners_peak_brick - TRAILING_DROP_GAP
     
     is_breached = False
@@ -241,13 +236,13 @@ def pipe_master_execution_ledger():
             sys.stdout.write(f"\n{Fore.RED}{Style.BRIGHT} !! CRITICAL TRADING BREACH DETECTED !! {Style.RESET_ALL}\n")
             sys.stdout.flush()
             
-            # sit directly next to exesqrpxy.py in parent dir level
             script_path = os.path.join(current_dir, "exesqrpxy.py")
             python_executable = sys.executable if sys.executable else "python"
             subprocess.run([python_executable, script_path, "-all"])
             
+            # 🔄 AUTOMATED SELF-HEALING RESTART MATRIX
             if broker_positions_flat(client):
-                print(f"🧹 {Fore.GREEN}Broker flat verified! Storing offset at ₹{total_raw_pnl:,.0f} and restarting engine...")
+                print(f"🧹 {Fore.GREEN}Broker flat verified! Locking offset at ₹{total_raw_pnl:,.0f} and restarting engine...")
                 pnl_offset = total_raw_pnl  
                 winners_peak_brick = 0.0    
                 consecutive_breaches = 0    
@@ -258,8 +253,10 @@ def pipe_master_execution_ledger():
             consecutive_breaches = 0
             save_check_state(0)
             
+    # Sync final values to clear legacy default fallbacks permanently
     save_session_state(winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset)
 
 if __name__ == "__main__":
     pipe_master_execution_ledger()
+
 
