@@ -149,12 +149,16 @@ def broker_positions_flat(client):
         return False
     except Exception:
         return False
-
 # exeexacpxy.py (Part 2)
 
 def pipe_master_execution_ledger():
     """Performs passes through LILO arrays, trailing peak bricks inside memory arrays."""
-    # 🎯 Takeover daily purges cleanly on script execution startup
+    # 🔒 1️⃣ ISOLATION BUFFER LAYER: Read historical record high BEFORE background cache purges run
+    state_before_purge = load_session_state()
+    historical_peak_record = float(state_before_purge.get("session_peak_pnl", 0.0))
+    pnl_offset = float(state_before_purge.get("pnl_offset", 0.0))
+
+    # Run the dynamic intra-day morning date rollover manager
     verify_and_purge_stale_cache()
 
     from run.runclntpxy import get_session
@@ -165,15 +169,11 @@ def pipe_master_execution_ledger():
         print(f"{Fore.RED}❌ Failed to establish broker session client.")
         return
 
-    # 🔄 LOAD THE RECORD: Read the absolute highest high-water mark saved on your disk
-    state = load_session_state()
-    winners_peak_brick_from_disk = float(state.get("session_peak_pnl", 0.0))
-    pnl_offset = float(state.get("pnl_offset", 0.0))
-    
+    # Reload baseline context data fields safely
     check_state = load_check_state()
     consecutive_breaches = int(check_state.get("consecutive_breaches", 0))
 
-    # 1. Pull transaction frames straight from your original runlilopxy file 
+    # Pull transaction frames straight from your original runlilopxy file 
     open_df, closed_df = runlilopxy.process_lilo_orders(client)
     
     df_open = open_df.copy() if (open_df is not None and not open_df.empty) else pd.DataFrame(columns=["Buy_Prc", "Sell_Prc", "PNL"])
@@ -200,10 +200,11 @@ def pipe_master_execution_ledger():
     completed_bricks = int(current_game_pnl // BRICK_SIZE)
     calculated_live_peak = float(completed_bricks * BRICK_SIZE)
     
-    # 🔒 IRONCLAD HIGH-WATER MARK RESOLUTION
-    # Compare the new calculated live peak against the historical record loaded from disk memory.
-    # It takes the absolute maximum of both values, making a peak reduction mathematically impossible!
-    winners_peak_brick = max(calculated_live_peak, winners_peak_brick_from_disk)
+    # 🔒 UNBREAKABLE TRACKING MATRIX LAYER
+    # Core mathematical high-water mark protection comparison filter.
+    # Evaluates live tick values against record peak values extracted before clear filters,
+    # making a peak variable reduction completely impossible when live PnL drops.
+    winners_peak_brick = max(calculated_live_peak, historical_peak_record)
 
     # 📊 DYNAMIC EXIT RECALCULATION: Anchored purely to your permanently frozen peak
     active_trailing_exit = winners_peak_brick - TRAILING_DROP_GAP
@@ -257,7 +258,7 @@ def pipe_master_execution_ledger():
             consecutive_breaches = 0
             save_check_state(0)
             
-    # Sync final values securely back to disk cache
+    # Sync final values securely back to disk cache file systems
     save_session_state(winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset)
 
 if __name__ == "__main__":
