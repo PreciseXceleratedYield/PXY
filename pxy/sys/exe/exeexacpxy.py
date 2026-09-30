@@ -9,6 +9,7 @@ import pytz
 import pandas as pd
 from datetime import datetime
 from colorama import Fore, Style, init
+from pathlib import Path
 
 # Initialize colorama for clean terminal output alignment
 init(autoreset=True)
@@ -17,20 +18,20 @@ init(autoreset=True)
 current_dir = os.path.dirname(os.path.abspath(__file__)) # This is pxy/sys/exe/
 run_dir = os.path.join(current_dir, "run")
 
-# Inject paths to system paths so python locates local companion imports smoothly
+# Inject subfolder paths to system paths so python resolves your runlilopxy imports cleanly
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 if run_dir not in sys.path:
     sys.path.append(run_dir)
 
-# 🎯 DEEP PATH RESOLUTION MAPPING: Climbs up 3 levels from pxy/sys/exe/ straight into pxy/web/
+# 🎯 USER-INDEPENDENT WORKSPACE PATH RESOLUTION
+# This dynamically finds the correct home folder directory root on your server environment
+HOME_DIR = str(Path.home())
 
-# 🎯 FULLY ALIGNED PATHS: Pointing exactly to your active lowercase environment
-PNL_JSON_PATH = "/home/pxy/pxy/web/webpnlpxy.json"
-POS_JSON_PATH = "/home/pxy/pxy/web/webpospxy.json"
-RENKO_STATE_FILE = "/home/pxy/pxy/web/webrinkopxy.json"
-CHECK_STATE_FILE = "/home/pxy/pxy/web/webrnkchkpxy.json"
-
+PNL_JSON_PATH = os.path.abspath(os.path.join(HOME_DIR, "pxy/web/webpnlpxy.json"))
+POS_JSON_PATH = os.path.abspath(os.path.join(HOME_DIR, "pxy/web/webpospxy.json"))
+RENKO_STATE_FILE = os.path.abspath(os.path.join(HOME_DIR, "pxy/web/webrinkopxy.json"))
+CHECK_STATE_FILE = os.path.abspath(os.path.join(HOME_DIR, "pxy/web/webrnkchkpxy.json"))
 
 # STRATEGIC FIXATION CONSTANTS
 BRICK_SIZE = 140.0           # Fixed outperformance box step size
@@ -111,7 +112,7 @@ def verify_and_purge_stale_cache():
     if today_str not in last_update_time:
         print(f"\n⏰ {Fore.GREEN}{Style.BRIGHT}NEW DAY DETECTED! RUNNING INTRA-DAY WEB JSON CACHE PURGE...")
         
-        SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(current_dir, "../../../web/websqrpxy.json"))
+        SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(HOME_DIR, "pxy/web/websqrpxy.json"))
         for target_file_path in [PNL_JSON_PATH, POS_JSON_PATH, SQUAREOFF_LOG_FILE, CHECK_STATE_FILE]:
             if os.path.exists(target_file_path):
                 file_mod_timestamp = os.path.getmtime(target_file_path)
@@ -149,8 +150,6 @@ def broker_positions_flat(client):
         return False
     except Exception:
         return False
-
-
 # exeexacpxy.py (Part 2)
 
 def pipe_master_execution_ledger():
@@ -240,7 +239,6 @@ def pipe_master_execution_ledger():
             sys.stdout.write(f"\n{Fore.RED}{Style.BRIGHT} !! CRITICAL TRADING BREACH DETECTED !! {Style.RESET_ALL}\n")
             sys.stdout.flush()
             
-            # Since this script runs inside sys/exe/, exesqrpxy.py is located right next to it in the same directory
             script_path = os.path.join(current_dir, "exesqrpxy.py")
             python_executable = sys.executable if sys.executable else "python"
             subprocess.run([python_executable, script_path, "-all"])
@@ -263,4 +261,3 @@ def pipe_master_execution_ledger():
 
 if __name__ == "__main__":
     pipe_master_execution_ledger()
-
