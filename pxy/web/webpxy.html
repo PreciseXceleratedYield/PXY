@@ -844,8 +844,7 @@ async function loadChart(){
         const candles=data.map(d=>({
             o:d.open??d.o??null, h:d.high??d.h??null, l:d.low??d.l??null,
             c:d.close??d.Close??d.price??null,
-            st_line:d.st_line??null, mirror_line:d.mirror_line??null, trend:d.trend||null,
-            sma50:d.sma50??d.sma_50??d.SMA50??null
+            st_line:d.st_line??null, mirror_line:d.mirror_line??null, trend:d.trend||null
         }));
         lastCandles=candles;
         drawChart(candles);
@@ -877,7 +876,6 @@ function drawChart(candles){
         if(c.h!=null)hi=Math.max(hi,c.h);
         if(c.st_line!=null){lo=Math.min(lo,c.st_line);hi=Math.max(hi,c.st_line);}
         if(c.mirror_line!=null){lo=Math.min(lo,c.mirror_line);hi=Math.max(hi,c.mirror_line);}
-        if(c.sma50!=null){lo=Math.min(lo,c.sma50);hi=Math.max(hi,c.sma50);}
     });
     if(!isFinite(lo)||!isFinite(hi))return;
     const pad=(hi-lo)*0.08||1;
@@ -968,21 +966,6 @@ function drawChart(candles){
         if(!mStarted){ctx.moveTo(x,y);mStarted=true;}else ctx.lineTo(x,y);
     });
     ctx.stroke();
-
-    // SMA50 — gold, dashed, so it's visually distinct from st_line/mirror_line
-    if(vis.some(c=>c.sma50!=null)){
-        ctx.setLineDash([4,3]);
-        ctx.strokeStyle=cssVar('--gold');ctx.lineWidth=1.3;
-        ctx.beginPath();
-        let sStarted=false;
-        vis.forEach((c,i)=>{
-            if(c.sma50==null)return;
-            const x=toX(i),y=toY(c.sma50);
-            if(!sStarted){ctx.moveTo(x,y);sStarted=true;}else ctx.lineTo(x,y);
-        });
-        ctx.stroke();
-        ctx.setLineDash([]);
-    }
 }
 function drawMomentumBar(candles){
     if(!candles||!candles.length)return;
@@ -1289,11 +1272,11 @@ async function loadTrades(){
 
 /* ── RISK BAR ── */
 async function loadRisk(){
-    let d={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-3000,pnl_offset:0};
+    let d={session_peak_pnl:0,active_exit_line:-3000};
     try{d=await fetch('./webrinkopxy.json?_='+Date.now()).then(r=>r.json());}catch{}
     const peak=Math.round(d.session_peak_pnl??0);
+    const net=Math.round(runningTotal+bookedTotal);
     const floor=Math.round(d.active_exit_line??-3000);
-    const net=Math.round((d.current_net_pnl??0)+(d.pnl_offset??0));
     $('rskPeak').textContent='₹'+peak.toLocaleString('en-IN');
     $('rskPeak').className='rsk-val '+(peak>=0?'bull':'bear');
     $('rskNet').textContent='₹'+fmtK(floor);
@@ -1311,11 +1294,7 @@ function drawRiskCandle(floor,net,peak){
     ctx.scale(dpr,dpr);
     const W=rect.width,H=rect.height;ctx.clearRect(0,0,W,H);
     const PADX=12,midY=H/2,fz=15,bodyH=fz+12;
-    // lo/open = the actual exit line (was hardcoded to -3000, which ignored `floor`
-    // entirely — broke as soon as the exit line became a positive trailing value
-    // rather than a fixed negative stop). Body now visualizes cushion above the
-    // exit line: green while net is still above it, red once net has crossed it.
-    const lo=Math.min(floor,net),hi=Math.max(peak,net,lo+10),open=floor,close=net,range=hi-lo||1;
+    const lo=-3000,hi=Math.max(peak,10),open=0,close=net,range=hi-lo||1;
     const toX=v=>Math.max(PADX,Math.min(W-PADX,((v-lo)/range)*(W-PADX*2)+PADX));
     const lowX=toX(lo),highX=toX(hi),openX=toX(open),closeX=toX(close);
     const isBull=close>=open;
@@ -1347,17 +1326,15 @@ function drawRiskCandle(floor,net,peak){
     ctx.fillStyle=isBull?'#06160d':'#ffffff';
     ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText(netLabel,(bx1+bx2)/2,midY);
-    const danger=net<=lo+range*0.15;
+    const danger=net<=lo+Math.abs(lo)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5)':'';
 }
 function refreshRiskCandle(){
-    // net now comes from webrinkopxy.json (current_net_pnl + pnl_offset) via loadRisk,
-    // not from positions/trades totals — this just redraws with the last known value
-    // when positions/trades tick, rather than recomputing net itself.
+    const net=Math.round(runningTotal+bookedTotal);
     const clkEl=$('clk');
     const clientName=(clkEl&&clkEl.textContent&&clkEl.textContent!=='—')?clkEl.textContent:'PXY®';
-    document.title='₹'+fmt(lastNet)+' · '+clientName;
-    drawRiskCandle(lastFloor,lastNet,lastPeak);
+    document.title='₹'+fmt(net)+' · '+clientName;
+    drawRiskCandle(lastFloor,net,lastPeak);
 }
 new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($('riskBar'));
 
