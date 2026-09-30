@@ -8,7 +8,7 @@ Contains ONLY pure atomic trading mathematical equations and trend alignments.
 SYSTEM_A_BASE_THRESHOLD = 8.2
 SYSTEM_B_BASE_THRESHOLD = 1.4
 ABS_CAP = 77.0
-BASE_COUNTER_TARGET_PCT = 4.1
+BASE_COUNTER_TARGET_PCT = 8.2
 FLOOR_BASE_POINTS = 140
 FLOOR_STEP_POINTS = 100
 
