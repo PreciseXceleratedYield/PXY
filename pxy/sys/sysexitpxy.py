@@ -3,7 +3,6 @@ import os
 import pandas as pd
 from syscnfgpxy import PARAMS  # Only TICKER will be used
 from colorama import Fore, Style, init
-from sysstrndpxy import calculate_supertrend
 
 # Initialize Colorama
 init(autoreset=True)
@@ -50,13 +49,6 @@ def detect_raw_direction(df: pd.DataFrame) -> tuple:
     if df is None or len(df) < 2:
         return (None, "NONE")
 
-    # 1️⃣ Process SuperTrend Regime
-    processed_st_df = calculate_supertrend(df.copy())
-    if processed_st_df.empty:
-        trend = "NONE"
-    else:
-        trend = str(processed_st_df["ST_Trend"].iloc[-1]).upper().strip()
-
     # Extract the last two rows (C1 and C0)
     c1_row = df.iloc[-2]  # Previous completed candle
     c0_row = df.iloc[-1]  # Current running candle
@@ -65,19 +57,13 @@ def detect_raw_direction(df: pd.DataFrame) -> tuple:
     c1_close = c1_row['Close']
     c0_close = c0_row['Close']  # Running current price
 
-    # 2️⃣ Cascade Filtering Rules: ST overrides unless it is SIDE/NONE
-    if trend == "BULL":
+    # Evaluate dynamic direction state
+    if c0_close > c1_close:
         direction = "UP"
-    elif trend == "BEAR":
+    elif c0_close < c1_close:
         direction = "DOWN"
     else:
-        # Evaluate dynamic direction state (Fallback to original code behavior)
-        if c0_close > c1_close:
-            direction = "UP"
-        elif c0_close < c1_close:
-            direction = "DOWN"
-        else:
-            direction = "NONE"
+        direction = "NONE"
 
     return (c0_close, direction)
 
@@ -113,5 +99,3 @@ if __name__ == "__main__":
 
     # Print final line
     print(left_text_colored + spacing + right_text_colored)
-
-
