@@ -242,7 +242,17 @@ body{
 .rsk-val.bull{color:var(--bull);}
 .rsk-val.bear{color:var(--bear);}
 .rsk-candle-wrap{flex:1;min-width:0;height:42px;position:relative;overflow:hidden;}
-#rskCanvas{position:absolute;inset:0;width:100%!important;height:100%!important;}
+#rskCanvas{position:absolute;inset:0;width:100%!important;height:100%!important;cursor:pointer;}
+.rsk-candle-wrap.hl{outline:1px solid var(--accent);outline-offset:-1px;border-radius:5px;box-shadow:0 0 10px rgba(255,255,255,0.18);}
+#rskInfo{display:none;position:absolute;left:6px;right:6px;bottom:100%;margin-bottom:4px;z-index:60;
+    background:var(--bg3,#1c1f26);border:1px solid var(--accent);border-radius:6px;padding:6px 10px;
+    font-family:'DM Mono',monospace;font-size:10px;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.5);}
+#rskInfo.show{display:block;}
+#rskInfo .ri-row{display:flex;justify-content:space-between;gap:12px;padding:1px 0;}
+#rskInfo .ri-k{color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:8px;align-self:center;}
+#rskInfo .ri-v{font-family:'Syne',sans-serif;font-weight:800;font-size:12px;}
+#rskInfo .ri-v.bull{color:var(--bull);} #rskInfo .ri-v.bear{color:var(--bear);}
+#riskBar{position:relative;overflow:visible;}
 
 /* ── TAB BAR ── */
 #tabBar{
@@ -425,7 +435,8 @@ body{
         <span class="rsk-lbl">⛔ Stop</span>
         <span class="rsk-val" id="rskNet">—</span>
     </div>
-    <div class="rsk-candle-wrap"><canvas id="rskCanvas"></canvas></div>
+    <div class="rsk-candle-wrap" id="rskWrap"><canvas id="rskCanvas"></canvas></div>
+    <div id="rskInfo"></div>
     <div class="rsk-grp" style="align-items:flex-end;">
         <span class="rsk-lbl">📈 Peak</span>
         <span class="rsk-val" id="rskPeak">—</span>
@@ -1271,18 +1282,46 @@ async function loadTrades(){
 }
 
 /* ── RISK BAR ── */
+let riskData={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-3000,pnl_offset:0,updated_timestamp:''};
 async function loadRisk(){
-    let d={session_peak_pnl:0,active_exit_line:-3000};
-    try{d=await fetch('./webrinkopxy.json?_='+Date.now()).then(r=>r.json());}catch{}
-    const peak=Math.round(d.session_peak_pnl??0);
-    const net=Math.round(runningTotal+bookedTotal);
-    const floor=Math.round(d.active_exit_line??-3000);
+    try{riskData=await fetch('./webrinkopxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    const peak=Math.round(riskData.session_peak_pnl??0);
+    const net=Math.round(riskData.current_net_pnl??0);
+    const floor=Math.round(riskData.active_exit_line??-3000);
     $('rskPeak').textContent='₹'+peak.toLocaleString('en-IN');
     $('rskPeak').className='rsk-val '+(peak>=0?'bull':'bear');
     $('rskNet').textContent='₹'+fmtK(floor);
     $('rskNet').className='rsk-val bear';
     drawRiskCandle(floor,net,peak);
+    renderRiskInfo();
+    const clkEl=$('clk');
+    const clientName=(clkEl&&clkEl.textContent&&clkEl.textContent!=='—')?clkEl.textContent:'PXY®';
+    document.title='₹'+fmt(net)+' · '+clientName;
 }
+/* click candle -> highlight + info (all values read from webrinkopxy.json) */
+function renderRiskInfo(){
+    const el=$('rskInfo');if(!el)return;
+    const d=riskData,f=v=>'₹'+(v>=0?'':'-')+Math.abs(Math.round(v||0)).toLocaleString('en-IN');
+    const cls=v=>(v>=0?'bull':'bear');
+    const row=(k,v,c)=>`<div class="ri-row"><span class="ri-k">${k}</span><span class="ri-v ${c||''}">${v}</span></div>`;
+    el.innerHTML=row('Current Net',f(d.current_net_pnl),cls(d.current_net_pnl))
+        +row('Session Peak',f(d.session_peak_pnl),cls(d.session_peak_pnl))
+        +row('Exit Line',f(d.active_exit_line),'bear')
+        +row('PnL Offset',f(d.pnl_offset),cls(d.pnl_offset))
+        +row('Updated',`<span style="font-size:10px;font-weight:600;">${d.updated_timestamp||'—'}</span>`);
+}
+(function(){
+    const wrap=$('rskWrap'),info=$('rskInfo');if(!wrap||!info)return;
+    wrap.addEventListener('click',e=>{
+        e.stopPropagation();
+        const on=!info.classList.contains('show');
+        renderRiskInfo();
+        info.classList.toggle('show',on);wrap.classList.toggle('hl',on);
+    });
+    document.addEventListener('click',e=>{
+        if(!info.contains(e.target)){info.classList.remove('show');wrap.classList.remove('hl');}
+    });
+})();
 let lastFloor=-3000,lastNet=0,lastPeak=10;
 function drawRiskCandle(floor,net,peak){
     lastFloor=floor;lastNet=net;lastPeak=peak;
@@ -1294,7 +1333,7 @@ function drawRiskCandle(floor,net,peak){
     ctx.scale(dpr,dpr);
     const W=rect.width,H=rect.height;ctx.clearRect(0,0,W,H);
     const PADX=12,midY=H/2,fz=15,bodyH=fz+12;
-    const lo=-3000,hi=Math.max(peak,10),open=0,close=net,range=hi-lo||1;
+    const lo=Math.min(floor,net),hi=Math.max(peak,net,10),open=0,close=net,range=hi-lo||1;
     const toX=v=>Math.max(PADX,Math.min(W-PADX,((v-lo)/range)*(W-PADX*2)+PADX));
     const lowX=toX(lo),highX=toX(hi),openX=toX(open),closeX=toX(close);
     const isBull=close>=open;
@@ -1326,15 +1365,11 @@ function drawRiskCandle(floor,net,peak){
     ctx.fillStyle=isBull?'#06160d':'#ffffff';
     ctx.textAlign='center';ctx.textBaseline='middle';
     ctx.fillText(netLabel,(bx1+bx2)/2,midY);
-    const danger=net<=lo+Math.abs(lo)*0.15;
+    const danger=net<=floor+Math.abs(floor)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5)':'';
 }
-function refreshRiskCandle(){
-    const net=Math.round(runningTotal+bookedTotal);
-    const clkEl=$('clk');
-    const clientName=(clkEl&&clkEl.textContent&&clkEl.textContent!=='—')?clkEl.textContent:'PXY®';
-    document.title='₹'+fmt(net)+' · '+clientName;
-    drawRiskCandle(lastFloor,net,lastPeak);
+function refreshRiskCandle(){ /* net/peak/floor come only from webrinkopxy.json (loadRisk) */
+    drawRiskCandle(lastFloor,lastNet,lastPeak);
 }
 new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($('riskBar'));
 
