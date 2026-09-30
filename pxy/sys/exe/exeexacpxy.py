@@ -35,22 +35,20 @@ CHECK_STATE_FILE = os.path.abspath(os.path.join(HOME_DIR, "pxy/web/webrnkchkpxy.
 # STRATEGIC FIXATION CONSTANTS
 BRICK_SIZE = 140.0           # Fixed outperformance box step size
 INITIAL_LOSS_FLOOR = -1400.0   # Symmetrical base absolute loss limit threshold
-TRAILING_DROP_GAP = 1400.0   # Strict trailing trigger gap from peak milestone (Peak - 1400)
 
 # ✅ RESET GUARD VERIFICATION TIMEOUTS
 FLAT_CONFIRM_TIMEOUT_SECONDS = 10.0
 FLAT_CONFIRM_POLL_SECONDS = 2.0
 
 def load_check_state():
-    """Loads consecutive breach counter safely from disk."""
+    """Loads consecutive breach counter safely from disk without risking zero fallbacks on read locks."""
     if not os.path.exists(CHECK_STATE_FILE):
         return {"consecutive_breaches": 0}
     try:
         with open(CHECK_STATE_FILE, "r") as f:
             return json.load(f)
     except Exception:
-        # If the file is locked or half-written, raise to retry; don't wipe counters!
-        raise
+        raise # 🔒 Retain historical record data on lock collision frames
 
 def save_check_state(counter):
     """Saves consecutive breach status cleanly using an ATOMIC OS REPLACE write operation."""
@@ -62,14 +60,14 @@ def save_check_state(counter):
         tmp_file = CHECK_STATE_FILE + ".tmp"
         with open(tmp_file, "w") as f:
             json.dump(payload, f, indent=4)
-        os.replace(tmp_file, CHECK_STATE_FILE) # 🔒 ATOMIC: Zero chance of mid-write reading corruption
+        os.replace(tmp_file, CHECK_STATE_FILE)
     except Exception as e:
         print(f"⚠️ Error atomizing check state write loop: {e}")
 
 def load_session_state():
     """Loads session state parameters cleanly. Distinguishes missing files from corruption blocks."""
     if not os.path.exists(RENKO_STATE_FILE):
-        return None # 🆕 Returning None guarantees a clean morning initialization sequence
+        return None
     try:
         with open(RENKO_STATE_FILE, "r") as f:
             d = json.load(f)
@@ -78,10 +76,10 @@ def load_session_state():
                 "current_net_pnl": float(d.get("current_net_pnl", 0.0)),
                 "active_exit_line": float(d.get("active_exit_line", -1400.0)),
                 "pnl_offset": float(d.get("pnl_offset", 0.0)),
-                "updated_timestamp": d.get("updated_timestamp", "") # 🎯 FIXED: Timestamp returned!
+                "updated_timestamp": d.get("updated_timestamp", "") # 🎯 Fixed: Timestamp tracking retained
             }
     except Exception:
-        raise # 🔒 CRITICAL: Raise the error to force a loop skip instead of wiping your values!
+        raise # 🔒 Force loop execution frame skip instead of writing corrupt zeros
 
 def save_session_state(peak_value, current_net, exit_line, pnl_offset_val):
     """Writes values back atomizing files to prevent dashboard cross-reading collisions."""
@@ -100,7 +98,7 @@ def save_session_state(peak_value, current_net, exit_line, pnl_offset_val):
         tmp_file = RENKO_STATE_FILE + ".tmp"
         with open(tmp_file, "w") as f:
             json.dump(payload, f, indent=4)
-        os.replace(tmp_file, RENKO_STATE_FILE) # 🔒 ATOMIC: Replaces file instantly in one single frame step
+        os.replace(tmp_file, RENKO_STATE_FILE)
     except Exception as e:
         print(f"{Fore.RED}⚠️ Downstream Web State Sync Error: {e}")
 
@@ -110,10 +108,8 @@ def verify_and_purge_stale_cache(state_on_disk):
     now_ist = datetime.now(IST)
     today_str = now_ist.strftime("%Y-%m-%d")
     
-    # Resolve the timestamp out of the disk state payload safely
     last_update_time = state_on_disk.get("updated_timestamp", "") if state_on_disk else ""
     
-    # 🎯 PURGE ONCE DAILY DETECTED CONFLICT FILTER WINDOW
     if today_str not in last_update_time:
         print(f"\n⏰ {Fore.GREEN}{Style.BRIGHT}NEW DAY DETECTED! RUNNING INTRA-DAY WEB JSON CACHE PURGE...")
         
@@ -156,7 +152,6 @@ def broker_positions_flat(client):
     except Exception:
         return False
 
-
 # exeexacpxy.py (Part 2)
 
 def pipe_master_execution_ledger():
@@ -183,10 +178,10 @@ def pipe_master_execution_ledger():
         print(f"⚠️ {Fore.YELLOW}File lock or read collision frame encountered: {read_err}. Skipping this tick frame...")
         return
 
-    # 3️⃣ PURGE CONFLICT SEQUENCE TIMING: Executes exactly once daily before tracking high extraction passes
+    # 3️⃣ PURGE ONCE DAILY TIMING WINDOW: Trigger cache clear safely before tracking high updates run
     verify_and_purge_stale_cache(state_on_disk)
 
-    # 4️⃣ STATE PARSING LAYER: Initialize metrics or treat missing file context as clean morning slate
+    # 4️⃣ STATE INITIALIZATION PARSER: Fallback to morning baseline structures dynamically
     if state_on_disk is None:
         historical_peak_record = 0.0
         pnl_offset = 0.0
@@ -199,11 +194,11 @@ def pipe_master_execution_ledger():
     df_open = open_df.copy()
     df_closed = closed_df.copy()
 
-    # Force normalize all column headers to strictly uppercase to prevent any __getitem__ crashes
+    # Normalize column text tokens straight to absolute uppercase mapping frames
     df_open.columns = [str(c).upper() for c in df_open.columns]
     df_closed.columns = [str(c).upper() for c in df_closed.columns]
 
-    # Structural re-indexing cushion filling missing structural keys with 0.0 baseline indicators
+    # Schema re-index structural grid padding checks preventing KeyErrors on clean closed vectors
     for df_target in [df_open, df_closed]:
         for req_col in ["BUY_PRC", "SELL_PRC", "PNL"]:
             if req_col not in df_target.columns:
@@ -226,18 +221,29 @@ def pipe_master_execution_ledger():
     total_raw_pnl = float(df_open["PNL"].sum() + df_closed["PNL"].sum())
     current_game_pnl = total_raw_pnl - pnl_offset
     
-    # 📈 CALCULATE LIVE BRICKS FOR THIS TICK ONLY
+    # High-water brick calculation mapping step boundaries
     completed_bricks = int(current_game_pnl // BRICK_SIZE)
     calculated_live_peak = float(completed_bricks * BRICK_SIZE)
     
-    # 🔒 UNBREAKABLE TRACKING MATRIX LAYER
-    # Core mathematical high-water mark protection comparison filter.
-    # Evaluates live tick values against record peak values extracted from disk memory,
-    # making a peak variable reduction completely impossible when live PnL drops.
+    # 🔒 UNBREAKABLE MAXIMUM PEAK LOCK
     winners_peak_brick = max(calculated_live_peak, historical_peak_record)
 
-    # 📊 DYNAMIC EXIT RECALCULATION: Anchored purely to your permanently frozen peak
-    active_trailing_exit = winners_peak_brick - TRAILING_DROP_GAP
+    # 📈 LIVE ROW EXPOSURE RISK DECAY ENGINE
+    active_row_count = len(df_open)
+    extra_rows = max(0, active_row_count - 1)
+    
+    # Base let-go is 50%, tightening down by 5% for every single extra row loaded inside open_df
+    let_go_percentage = max(0.0, 0.50 - (extra_rows * 0.05))
+    dynamic_drop_gap = winners_peak_brick * let_go_percentage
+    
+    # Symmetrical Volatility Cushion: Ensure the drop gap distance never drops below 1.5 bricks (₹210)
+    final_drop_gap = max(210.0, dynamic_drop_gap)
+
+    # 📊 DYNAMIC EXIT RECALCULATION: Anchored to peak minus your adaptive volume risk decay
+    if winners_peak_brick > 0:
+        active_trailing_exit = winners_peak_brick - final_drop_gap
+    else:
+        active_trailing_exit = INITIAL_LOSS_FLOOR
 
     is_breached = False
     if current_game_pnl <= INITIAL_LOSS_FLOOR:
@@ -246,12 +252,10 @@ def pipe_master_execution_ledger():
         if current_game_pnl <= active_trailing_exit:
             is_breached = True
 
-    # 4. DYNAMIC 40-CHARACTER RADAR TELEMETRY DISPLAY LAYER
-    # 4. SURGICAL PERFECTLY BALANCED CENTER AXIS TELEMETRY BLOCK
+    # 4. SURGICAL BALANCED CENTER AXIS TELEMETRY (Los/Win Top | Centered Stp | PnL/Pek Bottom)
     print(f"\nLos: {fmt_losers:<13} | {fmt_winners:>13}: Win")
-    print(f"               Stp | {int(active_trailing_exit):<13}")
+    print(f"               Stp: | {int(active_trailing_exit):<13}")
     print(f"PnL: {int(current_game_pnl):<13} | {int(winners_peak_brick):>13}: Pek\n")
-
 
     # 5. One-Time Active Symmetrical Flattening Action Mechanics
     if is_breached:
@@ -273,7 +277,7 @@ def pipe_master_execution_ledger():
                 pnl_offset = total_raw_pnl  
                 winners_peak_brick = 0.0    
                 consecutive_breaches = 0    
-                active_trailing_exit = -1400.0
+                active_trailing_exit = INITIAL_LOSS_FLOOR
                 save_check_state(0)
     else:
         if consecutive_breaches > 0:
