@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# exeexacpxy.py
+# exeexacpxy.py (Part 1)
 import os
 import json
 import sys
@@ -13,18 +13,21 @@ from colorama import Fore, Style, init
 # Initialize colorama for clean terminal output alignment
 init(autoreset=True)
 
-# 🔍 STRATEGIC FOOTPRINT: Explicit path isolation handling for parent directory structure
+# 🔍 STRATEGIC FOOTPRINT: Path isolation handling matching your parent root structure
 current_dir = os.path.dirname(os.path.abspath(__file__))
 run_dir = os.path.join(current_dir, "run")
 
-# Inject paths to system arrays so python locates local companion imports smoothly
+# Inject subfolder paths to system paths so python resolves your runlilopxy imports cleanly
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 if run_dir not in sys.path:
     sys.path.append(run_dir)
 
-# Dedicated web data tracking state path
-STATE_FILE_PATH = os.path.abspath(os.path.join(current_dir, "web/webrnwnstatepxy.json"))
+# 🎯 LEGACY DOWNSTREAM COMPATIBILITY CACHE FILE TARGETS (NO NEW JSONS CREATED)
+PNL_JSON_PATH = os.path.abspath(os.path.join(current_dir, "web/webpnlpxy.json"))
+POS_JSON_PATH = os.path.abspath(os.path.join(current_dir, "web/webpospxy.json"))
+RENKO_STATE_FILE = os.path.abspath(os.path.join(current_dir, "web/webrinkopxy.json"))
+CHECK_STATE_FILE = os.path.abspath(os.path.join(current_dir, "web/webrnkchkpxy.json"))
 
 # STRATEGIC FIXATION CONSTANTS
 BRICK_SIZE = 140.0           # Fixed outperformance box step size
@@ -35,41 +38,104 @@ TRAILING_DROP_GAP = 1400.0   # Strict trailing trigger gap from peak milestone (
 FLAT_CONFIRM_TIMEOUT_SECONDS = 10.0
 FLAT_CONFIRM_POLL_SECONDS = 2.0
 
-def _load_tracker_state():
-    """Extracts internal operational metrics and rolling mid-day offsets from the state cache."""
-    default_state = {"winners_peak_brick": 0.0, "consecutive_breaches": 0, "pnl_offset": 0.0, "last_date": ""}
-    if not os.path.exists(STATE_FILE_PATH):
-        return default_state
+def load_check_state():
+    """Loads consecutive breach counter from the legacy downstream schema file."""
+    if not os.path.exists(CHECK_STATE_FILE):
+        return {"consecutive_breaches": 0}
     try:
-        with open(STATE_FILE_PATH, "r") as f:
-            d = json.load(f)
-            return {
-                "winners_peak_brick": float(d.get("winners_peak_brick", 0.0)),
-                "consecutive_breaches": int(d.get("consecutive_breaches", 0)),
-                "pnl_offset": float(d.get("pnl_offset", 0.0)),
-                "last_date": str(d.get("last_date", ""))
-            }
+        with open(CHECK_STATE_FILE, "r") as f:
+            return json.load(f)
     except Exception:
-        return default_state
+        return {"consecutive_breaches": 0}
 
-def _save_tracker_state(peak_brick, breach_count, pnl_offset, today_str):
-    """Saves updated metric states cleanly back to disk cache."""
+def save_check_state(counter):
+    """Saves consecutive breach status cleanly using your downstream schema layout."""
     try:
-        os.makedirs(os.path.dirname(STATE_FILE_PATH), exist_ok=True)
         payload = {
-            "winners_peak_brick": float(peak_brick),
-            "consecutive_breaches": int(breach_count),
-            "pnl_offset": float(pnl_offset),
-            "last_date": str(today_str),
+            "consecutive_breaches": int(counter),
             "updated_time": datetime.now().strftime('%H:%M:%S')
         }
-        with open(STATE_FILE_PATH, "w") as f:
+        with open(CHECK_STATE_FILE, "w") as f:
             json.dump(payload, f, indent=4)
     except Exception:
         pass
 
+def load_session_state():
+    """Loads session state parameters cleanly matching your downstream web JSON schemas."""
+    if not os.path.exists(RENKO_STATE_FILE):
+        return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": -1400.0, "pnl_offset": 0.0}
+    try:
+        with open(RENKO_STATE_FILE, "r") as f:
+            d = json.load(f)
+            return {
+                "session_peak_pnl": float(d.get("session_peak_pnl", 0.0)),
+                "current_net_pnl": float(d.get("current_net_pnl", 0.0)),
+                "active_exit_line": float(d.get("active_exit_line", -1400.0)),
+                "pnl_offset": float(d.get("pnl_offset", 0.0))  # Embedded offset key
+            }
+    except Exception:
+        return {"session_peak_pnl": 0.0, "current_net_pnl": 0.0, "active_exit_line": -1400.0, "pnl_offset": 0.0}
+
+def save_session_state(peak_value, current_net, exit_line, pnl_offset_val):
+    """Writes values back using exact legacy keys to keep downstream charts intact."""
+    try:
+        os.makedirs(os.path.dirname(RENKO_STATE_FILE), exist_ok=True)
+        ist_tz = pytz.timezone('Asia/Kolkata')
+        now_ist = datetime.now(ist_tz)
+        
+        payload = {
+            "session_peak_pnl": float(peak_value),
+            "current_net_pnl": float(current_net),
+            "active_exit_line": float(exit_line),
+            "pnl_offset": float(pnl_offset_val),  # Handled inline inside the same file map
+            "updated_timestamp": now_ist.strftime('%Y-%m-%d %H:%M:%S')
+        }
+        with open(RENKO_STATE_FILE, "w") as f:
+            json.dump(payload, f, indent=4)
+    except Exception as e:
+        print(f"{Fore.RED}⚠️ Downstream Web State Sync Error: {e}")
+
+def verify_and_purge_stale_cache():
+    """Instant daily cache purges executing seamlessly on morning date transition markers."""
+    IST = pytz.timezone("Asia/Kolkata")
+    now_ist = datetime.now(IST)
+    today_str = now_ist.strftime("%Y-%m-%d")
+    
+    if os.path.exists(RENKO_STATE_FILE):
+        try:
+            with open(RENKO_STATE_FILE, "r") as f:
+                state = json.load(f)
+        except Exception:
+            state = {}
+    else:
+        state = {}
+        
+    last_update_time = state.get("updated_timestamp", "")
+    
+    if today_str not in last_update_time:
+        print(f"\n⏰ {Fore.GREEN}{Style.BRIGHT}NEW DAY DETECTED! RUNNING INTRA-DAY WEB JSON CACHE PURGE...")
+        
+        SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(current_dir, "web/websqrpxy.json"))
+        for target_file_path in [PNL_JSON_PATH, POS_JSON_PATH, SQUAREOFF_LOG_FILE, CHECK_STATE_FILE]:
+            if os.path.exists(target_file_path):
+                file_mod_timestamp = os.path.getmtime(target_file_path)
+                file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, IST).strftime("%Y-%m-%d")
+                if file_mod_date_str != today_str:
+                    try:
+                        with open(target_file_path, "w") as fw:
+                            if "pxy.json" in target_file_path:
+                                json.dump([], fw)
+                            else:
+                                json.dump({"consecutive_breaches": 0}, fw)
+                    except Exception:
+                        pass
+                        
+        save_session_state(0.0, 0.0, -1400.0, 0.0)
+        save_check_state(0)
+        print(f"🧹 {Fore.CYAN}Successfully synchronized cache state date boundaries.\n")
+
 def broker_positions_flat(client):
-    """Reset guard verification loop querying live open legs directly from the broker session."""
+    """Querying open legs directly from the broker session to protect active game transitions."""
     try:
         def _num(v): return float(str(v).replace(",", "").strip() or 0)
         res = client.positions()
@@ -88,9 +154,13 @@ def broker_positions_flat(client):
     except Exception:
         return False
 
+# exeexacpxy.py (Part 2)
+
 def pipe_master_execution_ledger():
-    """Main execution loop routing data processing through original lilo variables."""
-    # 🔄 DIRECTORY MAPPING: Imports session handler from run folder and targets runlilopxy
+    """Performs passes through LILO arrays, trailing peak bricks inside memory arrays."""
+    # 🎯 Takeover daily purges cleanly on script execution startup
+    verify_and_purge_stale_cache()
+
     from run.runclntpxy import get_session
     from run import runlilopxy  
     
@@ -99,21 +169,15 @@ def pipe_master_execution_ledger():
         print(f"{Fore.RED}❌ Failed to establish broker session client.")
         return
 
-    # Dynamic Rolling Cache State Initialization with Strict Date Filter
-    ist_tz = pytz.timezone('Asia/Kolkata')
-    today_str = datetime.now(ist_tz).strftime('%Y-%m-%d')
+    # Load baseline state metrics securely from your unified json cache
+    state = load_session_state()
+    winners_peak_brick = float(state.get("session_peak_pnl", 0.0))
+    pnl_offset = float(state.get("pnl_offset", 0.0))
     
-    state = _load_tracker_state()
-    if state["last_date"] != today_str:
-        state["winners_peak_brick"] = 0.0
-        state["consecutive_breaches"] = 0
-        state["pnl_offset"] = 0.0
+    check_state = load_check_state()
+    consecutive_breaches = int(check_state.get("consecutive_breaches", 0))
 
-    winners_peak_brick = state["winners_peak_brick"]
-    consecutive_breaches = state["consecutive_breaches"]
-    pnl_offset = state["pnl_offset"]
-
-    # 1. Execute untouched original process function to grab live DataFrames from runlilopxy
+    # 1. Pull transaction frames straight from your original runlilopxy file 
     open_df, closed_df = runlilopxy.process_lilo_orders(client)
     
     df_open = open_df.copy() if (open_df is not None and not open_df.empty) else pd.DataFrame(columns=["Buy_Prc", "Sell_Prc", "PNL"])
@@ -132,7 +196,7 @@ def pipe_master_execution_ledger():
     fmt_losers = force_zero_ending(raw_losers_pnl)
     fmt_winners = force_zero_ending(raw_winners_pnl)
     
-    # 3. Process Game Progress Mathematics
+    # 3. Process Game Progress Mathematics relative to active offsets
     total_raw_pnl = float(df_open["PNL"].sum() + df_closed["PNL"].sum())
     current_game_pnl = total_raw_pnl - pnl_offset
     
@@ -143,11 +207,12 @@ def pipe_master_execution_ledger():
             winners_peak_brick = new_peak
             consecutive_breaches = 0
 
+    active_trailing_exit = winners_peak_brick - TRAILING_DROP_GAP
+    
     is_breached = False
     if current_game_pnl <= INITIAL_LOSS_FLOOR:
         is_breached = True
     elif winners_peak_brick > 0:
-        active_trailing_exit = winners_peak_brick - TRAILING_DROP_GAP
         if current_game_pnl <= active_trailing_exit:
             is_breached = True
 
@@ -169,24 +234,32 @@ def pipe_master_execution_ledger():
     # 5. One-Time Active Symmetrical Flattening Action Mechanics
     if is_breached:
         consecutive_breaches += 1
+        save_check_state(consecutive_breaches)
+        save_session_state(winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset)
+        
         if consecutive_breaches >= 3:
             sys.stdout.write(f"\n{Fore.RED}{Style.BRIGHT} !! CRITICAL TRADING BREACH DETECTED !! {Style.RESET_ALL}\n")
             sys.stdout.flush()
             
-            # Since this file sits in the root parent directory, it maps directly to exesqrpxy.py in the same folder level
+            # sit directly next to exesqrpxy.py in parent dir level
             script_path = os.path.join(current_dir, "exesqrpxy.py")
             python_executable = sys.executable if sys.executable else "python"
             subprocess.run([python_executable, script_path, "-all"])
             
             if broker_positions_flat(client):
+                print(f"🧹 {Fore.GREEN}Broker flat verified! Storing offset at ₹{total_raw_pnl:,.0f} and restarting engine...")
                 pnl_offset = total_raw_pnl  
                 winners_peak_brick = 0.0    
                 consecutive_breaches = 0    
+                active_trailing_exit = -1400.0
+                save_check_state(0)
     else:
         if consecutive_breaches > 0:
             consecutive_breaches = 0
+            save_check_state(0)
             
-    _save_tracker_state(winners_peak_brick, consecutive_breaches, pnl_offset, today_str)
+    save_session_state(winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset)
 
 if __name__ == "__main__":
     pipe_master_execution_ledger()
+
