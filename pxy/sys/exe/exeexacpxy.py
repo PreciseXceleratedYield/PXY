@@ -149,7 +149,8 @@ def broker_positions_flat(client):
         return False
     except Exception:
         return False
-# exeexacpxy.py (Part 2)
+
+
 # exeexacpxy.py (Part 2)
 
 def pipe_master_execution_ledger():
@@ -165,10 +166,9 @@ def pipe_master_execution_ledger():
     # 1. Pull transaction frames straight from your original runlilopxy file 
     open_df, closed_df = runlilopxy.process_lilo_orders(client)
     
-    # 🚨 DATA-GUARD FENCE: If BOTH dataframes are completely empty, it means the broker API
-    # skipped a frame or returned no trades. EXIT IMMEDIATELY and do NOT overwrite the JSON files!
+    # 🚨 DATA-GUARD FENCE: Protects memory tracking parameters from post-market empty sets
     if (open_df is None or open_df.empty) and (closed_df is None or closed_df.empty):
-        print(f"ℹ️ {Fore.YELLOW}Broker frame skipped or empty dataset. Retaining current disk memory states...")
+        print(f"ℹ️ {Fore.YELLOW}No active market data found. Retaining current web cache parameters...")
         return
 
     # 🔒 2️⃣ ISOLATION BUFFER LAYER: Read historical record high AFTER confirming data exists
@@ -183,12 +183,24 @@ def pipe_master_execution_ledger():
     check_state = load_check_state()
     consecutive_breaches = int(check_state.get("consecutive_breaches", 0))
 
+    # 🔄 CASE-INSENSITIVE SCHEMA RE-INDEX COATING LAYER
+    # Surgically unifies varying lowercase/uppercase column outputs from the transaction ledger
     df_open = open_df.copy()
     df_closed = closed_df.copy()
-    
-    # 2. Strict Mathematical Winner Filtering Layers
-    win_open = df_open[df_open["Buy_Prc"] < df_open["Sell_Prc"]] if not df_open.empty else df_open
-    win_closed = df_closed[df_closed["Buy_Prc"] < df_closed["Sell_Prc"]] if not df_closed.empty else df_closed
+
+    # Force normalize all column headers to strictly uppercase to prevent any __getitem__ crashes
+    df_open.columns = [str(c).upper() for c in df_open.columns]
+    df_closed.columns = [str(c).upper() for c in df_closed.columns]
+
+    # Structural re-indexing cushion filling missing structural keys with 0.0 baseline indicators
+    for df_target in [df_open, df_closed]:
+        for req_col in ["BUY_PRC", "SELL_PRC", "PNL"]:
+            if req_col not in df_target.columns:
+                df_target[req_col] = 0.0
+
+    # 2. Strict Mathematical Winner Filtering Layers (Now completely case-armored)
+    win_open = df_open[df_open["BUY_PRC"] < df_open["SELL_PRC"]] if not df_open.empty else df_open
+    win_closed = df_closed[df_closed["BUY_PRC"] < df_closed["SELL_PRC"]] if not df_closed.empty else df_closed
     
     raw_winners_pnl = float(win_open["PNL"].sum() + win_closed["PNL"].sum())
     raw_losers_pnl = float((df_open["PNL"].sum() + df_closed["PNL"].sum()) - raw_winners_pnl)
@@ -267,4 +279,3 @@ def pipe_master_execution_ledger():
 
 if __name__ == "__main__":
     pipe_master_execution_ledger()
-
