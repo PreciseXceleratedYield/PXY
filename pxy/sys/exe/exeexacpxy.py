@@ -247,19 +247,11 @@ def pipe_master_execution_ledger():
             is_breached = True
 
     # 4. DYNAMIC 40-CHARACTER RADAR TELEMETRY DISPLAY LAYER
-    line_border = "+" + "-" * 38 + "+"
-    hdr_txt     = f"|{'— LIVE TELEMETRY RADAR —':^38}|"
-    pnl_txt     = f"| Game PnL : {int(current_game_pnl):<6} | Peak : {int(winners_peak_brick):<6} |"
-    mkt_txt     = f"| Losers   : {fmt_losers:<6} | Winners: {fmt_winners:<6} |"
-    candle_txt  = f"|{'harjantalcandle':^38}|"
-    
-    print(f"\n{Fore.CYAN}{line_border}")
-    print(f"{Fore.CYAN}{hdr_txt}")
-    print(f"{Fore.CYAN}{line_border}")
-    print(f"{Fore.WHITE}{pnl_txt}")
-    print(f"{Fore.WHITE}{mkt_txt}")
-    print(f"{Fore.YELLOW}{Style.BRIGHT}{candle_txt}")
-    print(f"{Fore.CYAN}{line_border}\n")
+    # 4. SURGICAL PERFECTLY BALANCED CENTER AXIS TELEMETRY BLOCK
+    print(f"\nLos: {fmt_losers:<13} | {fmt_winners:>13}: Win")
+    print(f"               Stp: | {int(active_trailing_exit):<13}")
+    print(f"PnL: {int(current_game_pnl):<13} | {int(winners_peak_brick):>13}: Pek\n")
+
 
     # 5. One-Time Active Symmetrical Flattening Action Mechanics
     if is_breached:
