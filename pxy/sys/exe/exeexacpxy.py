@@ -249,7 +249,7 @@ def pipe_master_execution_ledger():
     # 4. DYNAMIC 40-CHARACTER RADAR TELEMETRY DISPLAY LAYER
     # 4. SURGICAL PERFECTLY BALANCED CENTER AXIS TELEMETRY BLOCK
     print(f"\nLos: {fmt_losers:<13} | {fmt_winners:>13}: Win")
-    print(f"               Stp: | {int(active_trailing_exit):<13}")
+    print(f"               Stp | {int(active_trailing_exit):<13}")
     print(f"PnL: {int(current_game_pnl):<13} | {int(winners_peak_brick):>13}: Pek\n")
 
 
