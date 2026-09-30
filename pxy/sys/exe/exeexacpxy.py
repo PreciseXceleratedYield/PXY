@@ -150,17 +150,10 @@ def broker_positions_flat(client):
     except Exception:
         return False
 # exeexacpxy.py (Part 2)
+# exeexacpxy.py (Part 2)
 
 def pipe_master_execution_ledger():
     """Performs passes through LILO arrays, trailing peak bricks inside memory arrays."""
-    # 🔒 1️⃣ ISOLATION BUFFER LAYER: Read historical record high BEFORE background cache purges run
-    state_before_purge = load_session_state()
-    historical_peak_record = float(state_before_purge.get("session_peak_pnl", 0.0))
-    pnl_offset = float(state_before_purge.get("pnl_offset", 0.0))
-
-    # Run the dynamic intra-day morning date rollover manager
-    verify_and_purge_stale_cache()
-
     from run.runclntpxy import get_session
     from run import runlilopxy  
     
@@ -169,15 +162,29 @@ def pipe_master_execution_ledger():
         print(f"{Fore.RED}❌ Failed to establish broker session client.")
         return
 
+    # 1. Pull transaction frames straight from your original runlilopxy file 
+    open_df, closed_df = runlilopxy.process_lilo_orders(client)
+    
+    # 🚨 DATA-GUARD FENCE: If BOTH dataframes are completely empty, it means the broker API
+    # skipped a frame or returned no trades. EXIT IMMEDIATELY and do NOT overwrite the JSON files!
+    if (open_df is None or open_df.empty) and (closed_df is None or closed_df.empty):
+        print(f"ℹ️ {Fore.YELLOW}Broker frame skipped or empty dataset. Retaining current disk memory states...")
+        return
+
+    # 🔒 2️⃣ ISOLATION BUFFER LAYER: Read historical record high AFTER confirming data exists
+    state_before_purge = load_session_state()
+    historical_peak_record = float(state_before_purge.get("session_peak_pnl", 0.0))
+    pnl_offset = float(state_before_purge.get("pnl_offset", 0.0))
+
+    # Run the dynamic intra-day morning date rollover manager safely
+    verify_and_purge_stale_cache()
+
     # Reload baseline context data fields safely
     check_state = load_check_state()
     consecutive_breaches = int(check_state.get("consecutive_breaches", 0))
 
-    # Pull transaction frames straight from your original runlilopxy file 
-    open_df, closed_df = runlilopxy.process_lilo_orders(client)
-    
-    df_open = open_df.copy() if (open_df is not None and not open_df.empty) else pd.DataFrame(columns=["Buy_Prc", "Sell_Prc", "PNL"])
-    df_closed = closed_df.copy() if (closed_df is not None and not closed_df.empty) else pd.DataFrame(columns=["Buy_Prc", "Sell_Prc", "PNL"])
+    df_open = open_df.copy()
+    df_closed = closed_df.copy()
     
     # 2. Strict Mathematical Winner Filtering Layers
     win_open = df_open[df_open["Buy_Prc"] < df_open["Sell_Prc"]] if not df_open.empty else df_open
@@ -201,9 +208,6 @@ def pipe_master_execution_ledger():
     calculated_live_peak = float(completed_bricks * BRICK_SIZE)
     
     # 🔒 UNBREAKABLE TRACKING MATRIX LAYER
-    # Core mathematical high-water mark protection comparison filter.
-    # Evaluates live tick values against record peak values extracted before clear filters,
-    # making a peak variable reduction completely impossible when live PnL drops.
     winners_peak_brick = max(calculated_live_peak, historical_peak_record)
 
     # 📊 DYNAMIC EXIT RECALCULATION: Anchored purely to your permanently frozen peak
