@@ -455,18 +455,8 @@ body{
     <div class="sig-cell" id="cellBooked" style="flex:1;min-width:0;"><span class="sc-lbl">✅</span><span class="sc-val" id="pnlBooked">—</span></div>
 </div>
 
-<!-- TAB BAR -->
-<div id="tabBar">
-    <button class="tab-btn active" data-tab="paneTerminal" id="tabTerminal">
-        <span class="tab-icon">🖥️</span>TERMINAL
-    </button>
-    <button class="tab-btn" data-tab="paneChart" id="tabChart">
-        <span class="tab-icon">📈</span>CHART
-    </button>
-    <button class="tab-btn" data-tab="panePositions" id="tabPositions">
-        <span class="tab-icon">📊</span>POSITIONS
-    </button>
-</div>
+<!-- swipe up/down switches tabs on mobile (no tab buttons) -->
+<div id="tabBar" style="display:none"></div>
 
 <!-- ACTIONS MENU -->
 <div id="actionsMenu" style="display:none;position:fixed;top:44px;left:0;z-index:9998;width:240px;background:var(--bg2);border:1px solid var(--border2);border-radius:0 0 12px 0;padding:10px 8px;flex-direction:column;gap:6px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
@@ -700,16 +690,11 @@ function sortTrd(col){
 /* ── TABS ── */
 function switchTab(tabId){
     document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
-    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     $(tabId).classList.add('active');
-    document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
     // fit terminal if switching to it
     if(tabId==='paneTerminal'&&fit){setTimeout(()=>fit.fit(),50);if(term)term.clear();connect();}
     if(tabId==='paneChart'&&lastCandles)setTimeout(()=>{drawChart(lastCandles);drawMomentumBar(lastMoCandles);},50);
 }
-document.querySelectorAll('.tab-btn').forEach(btn=>{
-    btn.addEventListener('click',()=>switchTab(btn.dataset.tab));
-});
 
 /* ── SWIPE UP/DOWN TO CYCLE TABS (circular) ── */
 (function(){
@@ -1288,9 +1273,9 @@ async function loadRisk(){
     const peak=Math.round(riskData.session_peak_pnl??0);
     const net=Math.round(riskData.current_net_pnl??0);
     const floor=Math.round(riskData.active_exit_line??-3000);
-    $('rskPeak').textContent='₹'+peak.toLocaleString('en-IN');
+    $('rskPeak').textContent='₹'+peak;
     $('rskPeak').className='rsk-val '+(peak>=0?'bull':'bear');
-    $('rskNet').textContent='₹'+fmtK(floor);
+    $('rskNet').textContent='₹'+floor;
     $('rskNet').className='rsk-val bear';
     drawRiskCandle(floor,net,peak);
     renderRiskInfo();
@@ -1301,7 +1286,7 @@ async function loadRisk(){
 /* click candle -> highlight + info (all values read from webrinkopxy.json) */
 function renderRiskInfo(){
     const el=$('rskInfo');if(!el)return;
-    const d=riskData,f=v=>'₹'+(v>=0?'':'-')+Math.abs(Math.round(v||0)).toLocaleString('en-IN');
+    const d=riskData,f=v=>'₹'+(v>=0?'':'-')+Math.abs(Math.round(v||0));
     const cls=v=>(v>=0?'bull':'bear');
     const row=(k,v,c)=>`<div class="ri-row"><span class="ri-k">${k}</span><span class="ri-v ${c||''}">${v}</span></div>`;
     el.innerHTML=row('Current Net',f(d.current_net_pnl),cls(d.current_net_pnl))
@@ -1350,7 +1335,7 @@ function drawRiskCandle(floor,net,peak){
         ctx.beginPath();ctx.moveTo(openX,midY-bodyH/2);ctx.lineTo(openX,midY+bodyH/2);ctx.stroke();
         ctx.setLineDash([]);
     }
-    const netLabel='₹'+(net>=0?'+':'')+Math.round(net).toLocaleString('en-IN');
+    const netLabel='₹'+(net>=0?'+':'')+Math.round(net);
     ctx.font=`800 ${fz}px 'Syne',sans-serif`;
     const textW=ctx.measureText(netLabel).width+14;
     let bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX);
