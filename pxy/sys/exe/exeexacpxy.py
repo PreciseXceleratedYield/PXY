@@ -24,10 +24,13 @@ if run_dir not in sys.path:
     sys.path.append(run_dir)
 
 # 🎯 DEEP PATH RESOLUTION MAPPING: Climbs up 3 levels from pxy/sys/exe/ straight into pxy/web/
-PNL_JSON_PATH = os.path.abspath(os.path.join(current_dir, "../../../web/webpnlpxy.json"))
-POS_JSON_PATH = os.path.abspath(os.path.join(current_dir, "../../../web/webpospxy.json"))
-RENKO_STATE_FILE = os.path.abspath(os.path.join(current_dir, "../../../web/webrinkopxy.json"))
-CHECK_STATE_FILE = os.path.abspath(os.path.join(current_dir, "../../../web/webrnkchkpxy.json"))
+
+# 🎯 FULLY ALIGNED PATHS: Pointing exactly to your active lowercase environment
+PNL_JSON_PATH = "/home/pxy/pxy/web/webpnlpxy.json"
+POS_JSON_PATH = "/home/pxy/pxy/web/webpospxy.json"
+RENKO_STATE_FILE = "/home/pxy/pxy/web/webrinkopxy.json"
+CHECK_STATE_FILE = "/home/pxy/pxy/web/webrnkchkpxy.json"
+
 
 # STRATEGIC FIXATION CONSTANTS
 BRICK_SIZE = 140.0           # Fixed outperformance box step size
