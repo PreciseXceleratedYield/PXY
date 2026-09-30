@@ -7,6 +7,11 @@ import subprocess
 import pandas as pd
 from colorama import Fore, Style
 
+# 🎛️ HARD-CODED OPERATIONAL LOGIC SWITCH
+# Set "YES" -> Executes live emergency portfolio square-off via exesqrpxy.py
+# Set "NO"  -> Passive monitoring mode. Alerts print on console, but no orders are fired.
+ACTION = "NO"
+
 
 def check_trend_collapse_exit(df, client):
     """🎯 EXTERNAL MODULE: Monitors portfolio state and triggers global exit before side averaging."""
@@ -97,15 +102,22 @@ def check_trend_collapse_exit(df, client):
                 f"⚠️ Signal Matrix Confirmed: Market State ({global_exit}) matches heavier side risk profile."
             )
 
-            exe_path = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "exesqrpxy.py"
-            )
-            if os.path.exists(exe_path):
-                print(
-                    f"{Fore.RED}🚀 Executing Master Square-Off Engine via Risk Management module (exerskmgtpxy.py)...{Style.RESET_ALL}\n"
+            # 🛠️ SURGICAL LOGIC SWITCH EVALUATION
+            if str(ACTION).upper().strip() == "YES":
+                exe_path = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)), "exesqrpxy.py"
                 )
-                subprocess.run(["python3", exe_path, "-all"], check=True)
-                return True  # Signal that a global square-off occurred
+                if os.path.exists(exe_path):
+                    print(
+                        f"{Fore.RED}🚀 Executing Master Square-Off Engine via Risk Management module (exerskmgtpxy.py)...{Style.RESET_ALL}\n"
+                    )
+                    subprocess.run(["python3", exe_path, "-all"], check=True)
+                    return True  # Signal that a global square-off occurred
+            else:
+                # Passive Mode Notification output to terminal console screen
+                print(
+                    f"ℹ️ {Fore.BLUE}{Style.BRIGHT}[PASSIVE ALERT] Execution Switch ACTION=NO. Portfolio liquidation bypassed.{Style.RESET_ALL}\n"
+                )
 
     except Exception as e:
         print(f"⚠️ Error inside external trend collapse evaluation: {e}")
