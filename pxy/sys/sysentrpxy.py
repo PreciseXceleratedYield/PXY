@@ -5,10 +5,13 @@ from sysstrndpxy import calculate_supertrend
 
 def get_entry_signal(df=None):
     """
-    Revised structural router:
-    - ENTRY: Triggers only on defined ST trends (ST BULL + MKT BEAR -> OTMBUY | ST BEAR + MKT BULL -> OTMSELL). 
-             No action taken during SIDE trends.
-    - EXIT:  ST Dominates when BULL or BEAR. If ST goes SIDE, control shifts to MKT signals.
+    Updated routing matrix:
+    - ENTRY: 
+      - ST BULL/BEAR: Contrarian (ST BULL + MKT BEAR -> OTMBUY | ST BEAR + MKT BULL -> OTMSELL)
+      - ST SIDE: Pure MKT Copy (MKT BULL -> OTMBUY | MKT BEAR -> OTMSELL)
+    - EXIT: 
+      - ST BULL/BEAR: Pure ST Copy
+      - ST SIDE: Pure MKT Copy
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -27,21 +30,29 @@ def get_entry_signal(df=None):
     else:
         trend = str(processed_st_df["ST_Trend"].iloc[-1]).upper().strip()
 
-    # 🎯 NEW ENTRY LAYER (Strict structural conditions, no action on SIDE)
+    # 🎯 UPDATED ENTRY LAYER (Contrarian in trend, Pure MKT copy in SIDE)
     if trend == "BULL" and mkt_exit_dir == "BEAR":
         mapped_entry = "OTMBUY"
     elif trend == "BEAR" and mkt_exit_dir == "BULL":
         mapped_entry = "OTMSELL"
+    elif trend == "SIDE":
+        # Purely copies MKT signal during sideways markets
+        if mkt_exit_dir == "BULL":
+            mapped_entry = "OTMBUY"
+        elif mkt_exit_dir == "BEAR":
+            mapped_entry = "OTMSELL"
+        else:
+            mapped_entry = "NONE"
     else:
         mapped_entry = "NONE"
 
-    # 🔒 RE-LOCKED EXIT LAYER (ST Dominates, MKT wakes up on SIDE)
+    # 🔒 LOCKED EXIT LAYER (ST Copy in trend, Pure MKT copy in SIDE)
     if trend == "BULL":
         mapped_exit = "BULL"
     elif trend == "BEAR":
         mapped_exit = "BEAR"
     elif trend == "SIDE":
-        # Control turned over strictly to MKT signals when sideways
+        # Purely copies MKT signal during sideways markets
         if mkt_exit_dir == "BULL":
             mapped_exit = "BULL"
         elif mkt_exit_dir == "BEAR":
@@ -58,9 +69,7 @@ if __name__ == "__main__":
     from sysdtafpxy import fetch_yf_data
     df = fetch_yf_data()
     if df is not None and not df.empty:
-        print("RUNNING REVISED MATRIX (ENTRY ON TREND ONLY | EXIT SHIFTS ON SIDE)...")
+        print("RUNNING MATRIX (ENTRY AND EXIT COPY MKT ON SIDE)...")
         entry_sig, exit_sig = get_entry_signal(df)
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry_sig} | EXIT_SIG: {exit_sig}")
-
-
 
