@@ -5,13 +5,13 @@ from sysstrndpxy import calculate_supertrend
 
 def get_entry_signal(df=None):
     """
-    Updated routing matrix:
+    Finalized System Router Matrix:
     - ENTRY: 
       - ST BULL/BEAR: Contrarian (ST BULL + MKT BEAR -> OTMBUY | ST BEAR + MKT BULL -> OTMSELL)
       - ST SIDE: Pure MKT Copy (MKT BULL -> OTMBUY | MKT BEAR -> OTMSELL)
     - EXIT: 
-      - ST BULL/BEAR: Pure ST Copy
-      - ST SIDE: Pure MKT Copy
+      - ST BULL/BEAR: Pure ST Copy (BULL -> BULL | BEAR -> BEAR)
+      - ST SIDE: Pure MKT Copy (MKT BULL -> BULL | MKT BEAR -> BEAR)
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -30,13 +30,12 @@ def get_entry_signal(df=None):
     else:
         trend = str(processed_st_df["ST_Trend"].iloc[-1]).upper().strip()
 
-    # 🎯 UPDATED ENTRY LAYER (Contrarian in trend, Pure MKT copy in SIDE)
+    # 🎯 ENTRY LAYER (Contrarian in trend, Pure MKT copy in SIDE)
     if trend == "BULL" and mkt_exit_dir == "BEAR":
         mapped_entry = "OTMBUY"
     elif trend == "BEAR" and mkt_exit_dir == "BULL":
         mapped_entry = "OTMSELL"
     elif trend == "SIDE":
-        # Purely copies MKT signal during sideways markets
         if mkt_exit_dir == "BULL":
             mapped_entry = "OTMBUY"
         elif mkt_exit_dir == "BEAR":
@@ -52,7 +51,6 @@ def get_entry_signal(df=None):
     elif trend == "BEAR":
         mapped_exit = "BEAR"
     elif trend == "SIDE":
-        # Purely copies MKT signal during sideways markets
         if mkt_exit_dir == "BULL":
             mapped_exit = "BULL"
         elif mkt_exit_dir == "BEAR":
