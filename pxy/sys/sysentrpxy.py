@@ -4,7 +4,7 @@ from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
 
 # 🎛️ GLOBAL CONFIGURATION SWITCHES
-USE_ST_FILTER = True  # False = No-Filter Mode (Default) | True = Regime Filtering Mode
+USE_ST_FILTER = False  # False = No-Filter Mode (Default) | True = Regime Filtering Mode
 
 
 def get_entry_signal(df=None):
