@@ -437,9 +437,8 @@ def _run_tick():
                    current_game_pnl <= active_trailing_exit)
 
     # 6. Telemetry
-    print(f"\nLos: {fmt_losers:<13} | {fmt_winners:>13}: Win")
-    print(f"               Stp | {int(active_trailing_exit):<13}")
-    print(f"PnL: {int(current_game_pnl):<13} | {int(winners_peak_brick):>13}: Pek\n")
+    print(f"PnL {int(current_game_pnl)} | Pek {int(winners_peak_brick)} | Stp {int(active_trailing_exit)} | "
+          f"Los {fmt_losers} | Win {fmt_winners}")
 
     # 7. Breach handling
     if is_breached:
