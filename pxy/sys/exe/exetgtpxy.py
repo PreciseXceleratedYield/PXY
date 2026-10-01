@@ -74,13 +74,13 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
             if derived_exit == 'DOWN' or derived_supr == 'BEAR' or derived_supr == 'SIDE':
                 target_pct = 1.4
             else:
-                target_pct = atr * atr 
+                target_pct = atr
                 
         elif is_pe:
             if derived_exit == 'UP' or derived_supr == 'BULL' or derived_supr == 'SIDE':
                 target_pct = 1.4
             else:
-                target_pct = atr * atr 
+                target_pct = atr
             
         # 4️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
