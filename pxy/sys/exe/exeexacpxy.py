@@ -47,9 +47,9 @@ IST = pytz.timezone("Asia/Kolkata")
 # ---------------------------------------------------------------------------
 BRICK_SIZE = 140.0
 INITIAL_LOSS_FLOOR = -1400.0
-LET_GO_BASE = 0.50           # base give-back of peak
-LET_GO_STEP = 0.05           # tighten per extra open row
-MIN_DROP_GAP = 210.0         # 1.5 bricks
+TRAILING_DROP_GAP = 1400.0   # stop = peak - 1400 when exactly 1 open row
+TIGHTEN_PER_EXTRA_ROW = 0.05 # each extra open row pulls the stop 5% of 1400 (70) closer to peak
+MIN_DROP_GAP = 210.0         # stop never closer than 1.5 bricks to the peak
 BREACH_TICKS_REQUIRED = 3
 
 # ---------------------------------------------------------------------------
@@ -425,18 +425,16 @@ def _run_tick():
     # Peak only moves up within a game
     winners_peak_brick = max(calculated_live_peak, historical_peak_record)
 
+    # Stop = peak - gap. 1 open row -> gap 1400. Every extra open row tightens the gap
+    # by 5% of 1400 (70). When rows drop, the gap widens back, up to peak - 1400.
     extra_rows = max(0, totals["open_rows"] - 1)
-    let_go_percentage = max(0.0, LET_GO_BASE - extra_rows * LET_GO_STEP)
-    final_drop_gap = max(MIN_DROP_GAP, winners_peak_brick * let_go_percentage)
+    drop_gap = TRAILING_DROP_GAP * (1.0 - extra_rows * TIGHTEN_PER_EXTRA_ROW)
+    drop_gap = min(TRAILING_DROP_GAP, max(MIN_DROP_GAP, drop_gap))
 
-    if winners_peak_brick > 0:
-        active_trailing_exit = winners_peak_brick - final_drop_gap
-    else:
-        active_trailing_exit = INITIAL_LOSS_FLOOR
+    active_trailing_exit = winners_peak_brick - drop_gap
 
-    is_breached = current_game_pnl <= INITIAL_LOSS_FLOOR
-    if not is_breached and winners_peak_brick > 0:
-        is_breached = current_game_pnl <= active_trailing_exit
+    is_breached = (current_game_pnl <= INITIAL_LOSS_FLOOR or
+                   current_game_pnl <= active_trailing_exit)
 
     # 6. Telemetry
     print(f"\nLos: {fmt_losers:<13} | {fmt_winners:>13}: Win")
