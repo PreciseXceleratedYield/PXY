@@ -359,6 +359,15 @@ def pipe_master_execution_ledger():
 
 
 def _run_tick():
+    # 0. Once-a-day stale override runs FIRST, before any broker call or data guard.
+    #    It only fires when the state file is missing or dated before today, so an
+    #    empty/failed tick later in the day can never trigger it.
+    try:
+        if state_is_stale(load_session_state()):
+            purge_stale_cache()
+    except Exception as e:
+        print(f"{Fore.YELLOW}⚠️ Stale check skipped (state unreadable): {e}")
+
     # 1. Broker + ledger. Any failure skips the tick without touching state.
     try:
         from run.runclntpxy import get_session
