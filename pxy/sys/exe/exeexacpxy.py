@@ -46,7 +46,7 @@ IST = pytz.timezone("Asia/Kolkata")
 # STRATEGY CONSTANTS (unchanged logic)
 # ---------------------------------------------------------------------------
 BRICK_SIZE = 140.0
-INITIAL_LOSS_FLOOR = -1400.0
+INITIAL_LOSS_FLOOR = -750.0
 TRAILING_DROP_GAP = 1400.0   # stop = peak - 1400 when exactly 1 open row
 TIGHTEN_PER_EXTRA_ROW = 0.05 # each extra open row pulls the stop 5% of 1400 (70) closer to peak
 MIN_DROP_GAP = 210.0         # stop never closer than 1.5 bricks to the peak
