@@ -71,13 +71,13 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
         
         # 3️⃣ Symmetrical Risk Matrix (Calculated cleanly inline for each row context)
         if is_ce:
-            if derived_supr == 'BEAR':
+            if derived_supr == 'SIDE':
                 target_pct = 1.4
             else:
                 target_pct = atr * atr 
                 
         elif is_pe:
-            if derived_supr == 'BULL':
+            if derived_supr == 'SIDE':
                 target_pct = 1.4
             else:
                 target_pct = atr * atr 
