@@ -33,9 +33,9 @@ def get_entry_signal(df=None):
     # 🎯 ENTRY LAYER (Using global switch)
     if USE_ST_FILTER:
         # Cascade Logic: If ST is definitive, use ST. If ST is sideways/none, fall back to mktpxy.
-        if trend == "BULL" #and mkt_entry_dir == "BULL":
+        if trend == "BULL": #and mkt_entry_dir == "BULL":
             mapped_entry = "OTMBUY"
-        elif trend == "BEAR" #and mkt_entry_dir == "BEAR":
+        elif trend == "BEAR": #and mkt_entry_dir == "BEAR":
             mapped_entry = "OTMSELL"
         else:  # trend is "SIDE", "NONE", etc. -> Fall back to mktpxy signal
             if mkt_entry_dir == "BULL":
