@@ -31,8 +31,8 @@ DEBUG_MODE = False
 CONFIG = {
     "VARIANT": "DUAL",  # 🔄 OPTIONS: "DUAL", "SINGLE", "SMA50", or "COMBO_FORCE"
     "ST1": {
-        "PERIOD": 2,   
-        "FACTOR": 2   
+        "PERIOD": 1.4,   
+        "FACTOR": 1.4   
     },
     "SMA": {
         "PERIOD": 50   
