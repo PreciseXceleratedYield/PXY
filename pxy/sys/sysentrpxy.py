@@ -5,9 +5,10 @@ from sysstrndpxy import calculate_supertrend
 
 def get_entry_signal(df=None):
     """
-    Decoupled signal router:
-    - ENTRY LAYER: Dynamic contrarian rules combining ST and MKT proxy.
-    - EXIT LAYER: Locked independent rules (ST BULL -> BULL, ST BEAR -> BEAR, ST SIDE -> NONE).
+    Revised structural router:
+    - ENTRY: Triggers only on defined ST trends (ST BULL + MKT BEAR -> OTMBUY | ST BEAR + MKT BULL -> OTMSELL). 
+             No action taken during SIDE trends.
+    - EXIT:  ST Dominates when BULL or BEAR. If ST goes SIDE, control shifts to MKT signals.
     """
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -26,21 +27,27 @@ def get_entry_signal(df=None):
     else:
         trend = str(processed_st_df["ST_Trend"].iloc[-1]).upper().strip()
 
-    # 🎯 ENTRY LAYER (Contrarian filters)
-    if trend in ["BULL", "SIDE"] and mkt_exit_dir == "BEAR":
+    # 🎯 NEW ENTRY LAYER (Strict structural conditions, no action on SIDE)
+    if trend == "BULL" and mkt_exit_dir == "BEAR":
         mapped_entry = "OTMBUY"
-    elif trend in ["BEAR", "SIDE"] and mkt_exit_dir == "BULL":
+    elif trend == "BEAR" and mkt_exit_dir == "BULL":
         mapped_entry = "OTMSELL"
     else:
         mapped_entry = "NONE"
 
-    # 🔒 LOCKED EXIT LAYER (Independent of entry rules)
+    # 🔒 RE-LOCKED EXIT LAYER (ST Dominates, MKT wakes up on SIDE)
     if trend == "BULL":
         mapped_exit = "BULL"
     elif trend == "BEAR":
         mapped_exit = "BEAR"
     elif trend == "SIDE":
-        mapped_exit = "NONE"       # Forced to NONE during sideways trends
+        # Control turned over strictly to MKT signals when sideways
+        if mkt_exit_dir == "BULL":
+            mapped_exit = "BULL"
+        elif mkt_exit_dir == "BEAR":
+            mapped_exit = "BEAR"
+        else:
+            mapped_exit = "NONE"
     else:
         mapped_exit = "NONE"
 
@@ -51,7 +58,7 @@ if __name__ == "__main__":
     from sysdtafpxy import fetch_yf_data
     df = fetch_yf_data()
     if df is not None and not df.empty:
-        print("RUNNING MATRIX (EXIT ON SIDE = NONE)...")
+        print("RUNNING REVISED MATRIX (ENTRY ON TREND ONLY | EXIT SHIFTS ON SIDE)...")
         entry_sig, exit_sig = get_entry_signal(df)
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry_sig} | EXIT_SIG: {exit_sig}")
 
