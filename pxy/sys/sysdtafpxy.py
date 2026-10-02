@@ -220,7 +220,7 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
         print("Warning: yfinance data stream unavailable. Triggering direct raw nftfut.json fallback.")
         
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        fut_file_path = os.path.join(current_dir, "nftfut.json")
+        fut_file_path = os.path.join(current_dir, "exe", "run", "nftfut.json")
         fallback_price = 0.0
         
         if os.path.exists(fut_file_path) and os.path.getsize(fut_file_path) > 0:
