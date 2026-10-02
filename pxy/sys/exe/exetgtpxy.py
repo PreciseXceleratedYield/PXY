@@ -2,11 +2,16 @@
 import pandas as pd
 import re
 from colorama import Fore, Style, init
+from syscnfgpxy import (
+    EXETGTPXY_ATR_FLOOR,
+    EXETGTPXY_EXIT_KEY_COLUMN,
+    EXETGTPXY_TGT_PCT_NOT_ALIGNED,
+)
 
 # ==================== CONFIG (this file's settings) ====================
-EXIT_KEY_COLUMN = "exit"       # market column holding the BULL / BEAR key (keep same as in execbuypxy.py)
-ATR_FLOOR = 1.4                # atr = max(atr, ATR_FLOOR)
-TGT_PCT_NOT_ALIGNED = 1.4      # target % for a leg NOT aligned with the key. CE is aligned ONLY on BULL, PE ONLY on BEAR
+EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
+ATR_FLOOR = EXETGTPXY_ATR_FLOOR
+TGT_PCT_NOT_ALIGNED = EXETGTPXY_TGT_PCT_NOT_ALIGNED
                                # (same rule as is_aligned in exeagtpxy.py); SIDE / NONE / unknown = not aligned
 # =======================================================================
 

@@ -2,15 +2,15 @@
 import os
 import json
 import pandas as pd
-import pytz
 from datetime import datetime
 from colorama import Fore, Style
+from syscnfgpxy import SYSCNFGPXY_TIMEZONE
 
 # ==================== CONFIG (this file's settings) ====================
 WEB_ACT_JSON_REL = "../../web/webactpxy.json"   # dashboard JSON path, relative to this file
 # =======================================================================
 
-IST = pytz.timezone("Asia/Kolkata")
+IST = SYSCNFGPXY_TIMEZONE
 
 def _write_json_atomic(path, payload):
     """Writes JSON via a temp file + rename so readers never see a half-written file."""

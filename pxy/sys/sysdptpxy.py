@@ -2,10 +2,11 @@
 import pandas as pd
 from colorama import init
 from sysdthapxy import get_pxy_data
+from syscnfgpxy import SYSDPTPXY_LAST_N
 
 init(autoreset=True)
 
-def detect_pxy_flip_signal(df=None, last_n=21):
+def detect_pxy_flip_signal(df=None, last_n=SYSDPTPXY_LAST_N):
     """Detects signal depth boundaries using the true outputs processed by Script 1."""
     if last_n <= 0:
         return "NA", 1, 1, 1
@@ -79,4 +80,3 @@ def detect_pxy_flip_signal(df=None, last_n=21):
     past_depth_str = f"CE{past_depth_val}" if prev_color == "green" else f"PE{past_depth_val}" if prev_color == "red" else "NA"
 
     return signal, past_depth_str, ce_depth, pe_depth
-

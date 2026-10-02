@@ -3,7 +3,14 @@ import warnings
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from syscnfgpxy import TICKER, OHLC_MODE, TIMEZONE
+from syscnfgpxy import (
+    SYSCNFGPXY_TICKER as TICKER,
+    SYSCNFGPXY_TIMEZONE as TIMEZONE,
+    SYSPLCHRTPXY_FETCH_INTERVAL,
+    SYSPLCHRTPXY_OHLC_MODE,
+    SYSPLCHRTPXY_SMA_WINDOW,
+    SYSPLCHRTPXY_TARGET_ROWS,
+)
 
 # Silence future warning constraints completely
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -33,7 +40,7 @@ def get_momentum_ohlc(c):
         c1[1:] = c[:-1]
     return c1, c, c1, c
 
-def get_3sma_oc2_ohlc(df, window=4):
+def get_3sma_oc2_ohlc(df, window=SYSPLCHRTPXY_SMA_WINDOW):
     """Generates dynamic SMA OC/2 Pine chart calculation candles (Mode 6)"""
     sma_o = df['Open'].rolling(window=window, min_periods=1).mean().to_numpy()
     sma_c = df['Close'].rolling(window=window, min_periods=1).mean().to_numpy()
@@ -56,7 +63,7 @@ def get_3sma_oc2_ohlc(df, window=4):
     return ha_o, ha_h, ha_l, ha_c
 
 
-def apply_ohlc_transformation(df, mode=1):
+def apply_ohlc_transformation(df, mode=SYSPLCHRTPXY_OHLC_MODE):
     """Transforms raw arrays into distinct, complete structural OHLC formats"""
     if df.empty: return df
     o = df['Open'].to_numpy()
@@ -85,7 +92,11 @@ def apply_ohlc_transformation(df, mode=1):
         print(f"SYSTEM_WARNING | Mode {mode} unrecognized. Defaulting to Raw OHLC.")
     return df
 
-def fetch_yf_data(period=None, interval="1m", target_rows=60):
+def fetch_yf_data(
+    period=None,
+    interval=SYSPLCHRTPXY_FETCH_INTERVAL,
+    target_rows=SYSPLCHRTPXY_TARGET_ROWS,
+):
     """DYNAMIC HISTORICAL SLICE RETRIEVAL ENGINE WITH SIGNATURE BACKWARD-COMPATIBILITY"""
     ticker_obj = yf.Ticker(TICKER)
     df = pd.DataFrame()
@@ -124,7 +135,7 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
     # Isolate exactly the final 60 rows for execution calculations
     df = df.tail(target_rows).copy()
     
-    processed_df = apply_ohlc_transformation(df, mode=OHLC_MODE)
+    processed_df = apply_ohlc_transformation(df, mode=SYSPLCHRTPXY_OHLC_MODE)
     return processed_df
 
 def get_latest_data():
@@ -133,7 +144,7 @@ def get_latest_data():
 
 if __name__ == "__main__":
     print(f"=== PROCESSING RUNNING | ENGINE TARGET TICKER: {TICKER} ===")
-    print(f"=== CURRENTLY ENFORCED DATA TRANSFORMATION MODE: {OHLC_MODE} ===")
+    print(f"=== CURRENTLY ENFORCED DATA TRANSFORMATION MODE: {SYSPLCHRTPXY_OHLC_MODE} ===")
     output_df = fetch_yf_data()
     if not output_df.empty:
         print(f"ENGINE_RUN_SUCCESS | Collected Rows Count: {len(output_df)}")

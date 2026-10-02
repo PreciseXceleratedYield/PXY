@@ -15,31 +15,37 @@ import os
 import shutil
 import json
 import time
-import pytz
 import subprocess
 import pandas as pd
-from datetime import datetime, time as dt_time
+from datetime import datetime
 from colorama import Fore, Style
+from syscnfgpxy import (
+    EXECBUYPXY_ACTION,
+    EXECBUYPXY_CUTOFF,
+    EXECBUYPXY_EXIT_KEY_COLUMN,
+    EXECBUYPXY_LOCK_KEEP_SECS,
+    EXECBUYPXY_LOCK_SECS,
+    EXECBUYPXY_MAX_PER_DAY,
+    EXECBUYPXY_SCRIPTS,
+    SYSCNFGPXY_TIMEZONE,
+)
 
 # ==================== CONFIG (this file's settings) ====================
-CBUY_ACTION = "YES"            # "YES" = run the counter-buy script; "NO" = passive, only prints what it would do
-CBUY_LOCK_SECS = 6             # briefly suppress duplicate launches while the background order starts
-CBUY_CUTOFF = dt_time(15, 10)  # no counter-buy from 15:10, before square-off starts
-EXIT_KEY_COLUMN = "exit"       # market column holding the BULL / BEAR exit key (keep same as in exetgtpxy.py)
-CBUY_SCRIPTS = {               # held side -> executable that buys the opposite (protective) leg
-    "CE": "pxybuype",
-    "PE": "pxybuyce",
-}
+CBUY_ACTION = EXECBUYPXY_ACTION
+CBUY_LOCK_SECS = EXECBUYPXY_LOCK_SECS
+CBUY_CUTOFF = EXECBUYPXY_CUTOFF
+EXIT_KEY_COLUMN = EXECBUYPXY_EXIT_KEY_COLUMN
+CBUY_SCRIPTS = EXECBUYPXY_SCRIPTS
 CBUY_LOCK_FILE_NAME = ".cbuy_lock.json"
-CBUY_MAX_PER_DAY = 6           # hard cap on counter-buy launches per IST day (0 = off). A buy that keeps failing cannot loop forever.
+CBUY_MAX_PER_DAY = EXECBUYPXY_MAX_PER_DAY
 CBUY_COUNT_FILE_NAME = ".cbuy_count.json"
-CBUY_LOCK_KEEP_SECS = 600      # lock entries older than max(this, 2 * CBUY_LOCK_SECS) are pruned
+CBUY_LOCK_KEEP_SECS = EXECBUYPXY_LOCK_KEEP_SECS
 DEBUG_MODE = True              # verbose counter-buy decisions (turn off after Monday)
 # =======================================================================
 
 _LOCK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), CBUY_LOCK_FILE_NAME)
 _COUNT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), CBUY_COUNT_FILE_NAME)
-_IST = pytz.timezone("Asia/Kolkata")
+_IST = SYSCNFGPXY_TIMEZONE
 _cap_warned = False
 
 
@@ -158,8 +164,7 @@ def check_counter_leg(remaining_df):
 
         script_name = CBUY_SCRIPTS[held]
 
-        IST = pytz.timezone("Asia/Kolkata")
-        if datetime.now(IST).time() >= CBUY_CUTOFF:
+        if datetime.now(_IST).time() >= CBUY_CUTOFF:
             debug_log(f"Counter check: past {CBUY_CUTOFF}; not firing {script_name}.")
             return None
 

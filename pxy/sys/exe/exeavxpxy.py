@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 from colorama import Fore, Style
 
+from syscnfgpxy import EXEAVXPXY_USE_OVERALL_LOSS
 from exeagtpxy import getexeagtpxy, is_aligned                 # Math functions stay in agt
 from exetgtpxy import target_price                             # Read-only target telemetry; exits stay in exit pipe
 from exeamspxy import execute_side_averaging_matrix            # Execution handles via ams
@@ -37,7 +38,7 @@ def _side_target_pct(rows):
 
 
 # Averaging monitors the aggregate (blended) loss of each side
-USE_OVERALL_LOSS = True
+USE_OVERALL_LOSS = EXEAVXPXY_USE_OVERALL_LOSS
 
 # Telemetry JSON for the web app: anchored to this file (same web/ folder as exeexppxy), never to the working directory
 WEB_AVG_JSON_REL = "../../web/webavgpxy.json"

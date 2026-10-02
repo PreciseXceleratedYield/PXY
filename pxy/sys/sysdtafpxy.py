@@ -4,19 +4,32 @@ import warnings
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from syscnfgpxy import TICKER
+from syscnfgpxy import (
+    SYSCNFGPXY_TICKER as TICKER,
+    SYSDTAFPXY_DEFAULT_INTERVAL,
+    SYSDTAFPXY_DEFAULT_TARGET_ROWS,
+    SYSDTAFPXY_FIXED_BRICK_SIZE,
+    SYSDTAFPXY_FORCE_NIFTY_FUT,
+    SYSDTAFPXY_SELECTED_MODE,
+    SYSDTAFPXY_TIMEZONE,
+    SYSDTAFPXY_TRANSFORM_ATR_PERIOD,
+)
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # Explicitly enforce Indian Standard Time zone mapping
-TIMEZONE = 'Asia/Kolkata'
+TIMEZONE = SYSDTAFPXY_TIMEZONE
 
 # 🔥 INDEPENDENT MATRIX MODE INTERFACE:
 # Format: "ST" -> First Digit = SIDE Mode, Second Digit = TREND Mode
 # Set SELECTED_MODE to "8" (or use your string logic) to run the new Renko system.
-SELECTED_MODE = "00" 
+SELECTED_MODE = SYSDTAFPXY_SELECTED_MODE
+FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 
-def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
+def apply_ohlc_transformation(
+    df, mode=1, atr_period=SYSDTAFPXY_TRANSFORM_ATR_PERIOD,
+    fixed_brick_size=SYSDTAFPXY_FIXED_BRICK_SIZE,
+):
     """Executes structural, isolated mathematical transformations based on explicit modes.
     
     Modes 0-7: Time-based mathematical variations (Heikin-Ashi, Linear Regression, etc.)
@@ -187,37 +200,46 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
 
 
 
-def fetch_yf_data(period=None, interval="1m", target_rows=60):
+def fetch_yf_data(
+    period=None,
+    interval=SYSDTAFPXY_DEFAULT_INTERVAL,
+    target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
+):
     """Dynamic historical ingestion engine utilizing vectorized structural transformations"""
-    ticker_obj = yf.Ticker(TICKER)
     df = pd.DataFrame()
     buffer_rows = target_rows + 5
 
-    # Try initial custom period if supplied
-    if period is not None:
-        try:
-            df = ticker_obj.history(period=period, interval=interval)
-        except Exception:
-            pass
+    if not FORCE_NIFTY_FUT:
+        ticker_obj = yf.Ticker(TICKER)
 
-    # Loop with realistic 1-minute allowable lookup horizons (dropped problematic "max")
-    if df.empty or len(df) < buffer_rows:
-        for search_period in ["1d", "5d", "7d"]:
+        # Try initial custom period if supplied
+        if period is not None:
             try:
-                temp_df = ticker_obj.history(period=search_period, interval=interval)
-                if not temp_df.empty:
-                    temp_df = temp_df.dropna(subset=['Open', 'High', 'Low', 'Close'])
-                    if len(temp_df) >= buffer_rows:
-                        df = temp_df
-                        break
+                df = ticker_obj.history(period=period, interval=interval)
             except Exception:
                 pass
+
+        # Loop with realistic 1-minute allowable lookup horizons (dropped problematic "max")
+        if df.empty or len(df) < buffer_rows:
+            for search_period in ["1d", "5d", "7d"]:
+                try:
+                    temp_df = ticker_obj.history(period=search_period, interval=interval)
+                    if not temp_df.empty:
+                        temp_df = temp_df.dropna(subset=['Open', 'High', 'Low', 'Close'])
+                        if len(temp_df) >= buffer_rows:
+                            df = temp_df
+                            break
+                except Exception:
+                    pass
 
     # ==========================================================================
     # 🩹 FALLBACK ENGINE: Bypasses everything and returns raw JSON fallback
     # ==========================================================================
     if df.empty or len(df) < buffer_rows:
-        print("Warning: yfinance data stream unavailable. Triggering direct raw nftfut.json fallback.")
+        if FORCE_NIFTY_FUT:
+            print("Forced source: using local nftfut.json fallback.")
+        else:
+            print("Warning: yfinance data stream unavailable. Triggering direct raw nftfut.json fallback.")
         
         current_dir = os.path.dirname(os.path.abspath(__file__))
         fut_file_path = os.path.join(current_dir, "exe", "run", "nftfut.json")
@@ -253,8 +275,10 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
             fallback_df.attrs["data_fallback"] = True
             return fallback_df
         else:
-            # Absolute recovery floor if even the JSON fallback path yields nothing
-            print("Critical Fault: yfinance and local json storage pools exhausted.")
+            if FORCE_NIFTY_FUT:
+                print("Critical Fault: local nftfut.json fallback unavailable.")
+            else:
+                print("Critical Fault: yfinance and local json storage pools exhausted.")
             return pd.DataFrame()
 
     # ==========================================================================

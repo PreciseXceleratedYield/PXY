@@ -4,29 +4,28 @@
 # =============================================================================
 import os
 import time
-import pytz
-from datetime import datetime, time as dt_time
+from datetime import datetime
 from colorama import Fore, Style, init
+from syscnfgpxy import (
+    EXEACGPXY_COOL_DOWN_SECONDS as COOL_DOWN_SECONDS,
+    EXEACGPXY_MARKET_END as MARKET_END,
+    EXEACGPXY_MARKET_START as MARKET_START,
+    EXEACGPXY_MAX_LAYERS as MAX_LAYERS,
+    EXEACGPXY_REBUY_ENABLED as REBUY_ENABLED,
+    SYSCNFGPXY_TIMEZONE,
+)
 
 init(autoreset=True)
-
-REBUY_ENABLED = True
-MAX_LAYERS = 5
-COOL_DOWN_SECONDS = 30
 
 PANEL_WIDTH = 42
 SCALE_WIDTH = 40
 
-IST = pytz.timezone("Asia/Kolkata")
+IST = SYSCNFGPXY_TIMEZONE
 _COOL_DIR = os.path.dirname(os.path.abspath(__file__))   # cooldown tokens live next to this file, not in the CWD
 
 
 def _cool_path(side):
     return os.path.join(_COOL_DIR, f"exebal_cool_{side.lower()}.txt")
-MARKET_START = dt_time(9, 17)
-MARKET_END = dt_time(15, 10)
-
-
 def safe_float(val, fallback=0.0):
     """Prevents runtime float conversion crashes from NaN, None, or empty strings."""
     if val is None:

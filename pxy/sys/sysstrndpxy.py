@@ -5,7 +5,16 @@ import sys
 import warnings
 import numpy as np
 import pandas as pd
-from syscnfgpxy import TIMEZONE
+from syscnfgpxy import (
+    SYSCNFGPXY_TIMEZONE as TIMEZONE,
+    SYSSTRNDPXY_COMBO_SMA_PERIOD,
+    SYSSTRNDPXY_COMBO_ST_FACTOR,
+    SYSSTRNDPXY_COMBO_ST_PERIOD,
+    SYSSTRNDPXY_SMA_PERIOD,
+    SYSSTRNDPXY_ST1_FACTOR,
+    SYSSTRNDPXY_ST1_PERIOD,
+    SYSSTRNDPXY_VARIANT,
+)
 
 # 🛡️ DEFENSIVE IMPORTS ROUTING MATH DIRECTLY TO THE CALCULATION ENGINE
 try:
@@ -27,49 +36,31 @@ DEBUG_MODE = False
 # ==============================================================================
 # 🎛️ MASTER CONFIGURATION LAYER (PXY Universal Framework Parameters)
 # ==============================================================================
-CONFIG = {
-    "VARIANT": "DUAL",  # 🔄 OPTIONS: "DUAL", "SINGLE", "SMA50", or "COMBO_FORCE"
-    "ST1": {
-        "PERIOD": 1.4,   
-        "FACTOR": 1.4   
-    },
-    "SMA": {
-        "PERIOD": 50   
-    },
-    "COMBO": {
-        "ST_PERIOD": 10,   # 🎯 CONFIGURE COMBO SUPERTREND PERIOD HERE
-        "ST_FACTOR": 3.0,  # 🎯 CONFIGURE COMBO SUPERTREND MULTIPLIER HERE
-        "SMA_PERIOD": 50   # 🎯 CONFIGURE COMBO SMA PERIOD HERE
-    }
-}
-# ==============================================================================
-
-
 def get_market_trend(df: pd.DataFrame) -> str:
     """Evaluates raw data frame layouts via intermediate calculations handles."""
     if df is None or df.empty or len(df) < 2:
         return 'SIDE'
 
-    variant = CONFIG.get("VARIANT", "DUAL").upper()
+    variant = SYSSTRNDPXY_VARIANT.upper()
     
     if variant == "COMBO_FORCE":
-        min_required = max(CONFIG["COMBO"]["ST_PERIOD"], CONFIG["COMBO"]["SMA_PERIOD"])
+        min_required = max(SYSSTRNDPXY_COMBO_ST_PERIOD, SYSSTRNDPXY_COMBO_SMA_PERIOD)
         if len(df) < min_required:
             return 'SIDE'
         _, trend_series = _compute_combo_force(
             df, 
-            st_period=CONFIG["COMBO"]["ST_PERIOD"], 
-            st_factor=CONFIG["COMBO"]["ST_FACTOR"], 
-            sma_period=CONFIG["COMBO"]["SMA_PERIOD"]
+            st_period=SYSSTRNDPXY_COMBO_ST_PERIOD,
+            st_factor=SYSSTRNDPXY_COMBO_ST_FACTOR,
+            sma_period=SYSSTRNDPXY_COMBO_SMA_PERIOD,
         )
         return str(trend_series.iloc[-1])
 
     if variant == "SMA50":
-        _, trend_series = _compute_sma_trend(df, CONFIG["SMA"]["PERIOD"])
+        _, trend_series = _compute_sma_trend(df, SYSSTRNDPXY_SMA_PERIOD)
         return str(trend_series.iloc[-1])
 
     st_line, mirror_line, m0_series, raw_trend_series = _compute_single_st(
-        df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"]
+        df, period=SYSSTRNDPXY_ST1_PERIOD, factor=SYSSTRNDPXY_ST1_FACTOR
     )
     if variant == "SINGLE":
         return 'BULL' if raw_trend_series.iloc[-1] == 1 else 'BEAR'
@@ -100,10 +91,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     tz_string = str(TIMEZONE)
     df = df.tz_convert(tz_string) if df.index.tz is not None else df.tz_localize('UTC').tz_convert(tz_string)
 
-    variant = CONFIG.get("VARIANT", "DUAL").upper()
+    variant = SYSSTRNDPXY_VARIANT.upper()
 
     if variant == "COMBO_FORCE":
-        min_required = max(CONFIG["COMBO"]["ST_PERIOD"], CONFIG["COMBO"]["SMA_PERIOD"])
+        min_required = max(SYSSTRNDPXY_COMBO_ST_PERIOD, SYSSTRNDPXY_COMBO_SMA_PERIOD)
         if len(df) < min_required:
             st1_line = pd.Series(df['Close'], index=df.index)
             st1_mirror = st1_line
@@ -111,17 +102,19 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else:
             st1_line, st_trend_series = _compute_combo_force(
                 df, 
-                st_period=CONFIG["COMBO"]["ST_PERIOD"], 
-                st_factor=CONFIG["COMBO"]["ST_FACTOR"], 
-                sma_period=CONFIG["COMBO"]["SMA_PERIOD"]
+                st_period=SYSSTRNDPXY_COMBO_ST_PERIOD,
+                st_factor=SYSSTRNDPXY_COMBO_ST_FACTOR,
+                sma_period=SYSSTRNDPXY_COMBO_SMA_PERIOD,
             )
             st1_mirror = st1_line
             
     elif variant == "SMA50":
-        st1_line, st_trend_series = _compute_sma_trend(df, CONFIG["SMA"]["PERIOD"])
+        st1_line, st_trend_series = _compute_sma_trend(df, SYSSTRNDPXY_SMA_PERIOD)
         st1_mirror = st1_line
     else:
-        st1_line, st1_mirror, m0_series, raw_trend_series = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
+        st1_line, st1_mirror, m0_series, raw_trend_series = _compute_single_st(
+            df, period=SYSSTRNDPXY_ST1_PERIOD, factor=SYSSTRNDPXY_ST1_FACTOR
+        )
         if variant == "SINGLE":
             st_trend_series = pd.Series(np.where(raw_trend_series == 1, 'BULL', 'BEAR'), index=df.index)
         else:
@@ -147,7 +140,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file='../web/webchrtp
         return None
 
     output = []
-    variant = CONFIG.get("VARIANT", "DUAL").upper()
+    variant = SYSSTRNDPXY_VARIANT.upper()
     is_single_or_flat = variant in ("SINGLE", "SMA50", "COMBO_FORCE")
 
     for idx, row in df.iterrows():
@@ -195,4 +188,3 @@ if __name__ == '__main__':
         export_supertrend_json(processed_df)
     else:
         print('CRITICAL: Upstream data empty.')
-
