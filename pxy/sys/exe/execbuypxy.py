@@ -23,8 +23,7 @@ from colorama import Fore, Style
 
 # ==================== CONFIG (this file's settings) ====================
 CBUY_ACTION = "YES"            # "YES" = run the counter-buy script; "NO" = passive, only prints what it would do
-CBUY_LOCK_SECS = 30            # do not re-fire the same counter-buy script within this many seconds (0 = off).
-                               # The script is fire-and-forget (login + order takes time), so keep this >= 30.
+CBUY_LOCK_SECS = 6             # briefly suppress duplicate launches while the background order starts
 CBUY_CUTOFF = dt_time(15, 10)  # no counter-buy from 15:10, before square-off starts
 EXIT_KEY_COLUMN = "exit"       # market column holding the BULL / BEAR exit key (keep same as in exetgtpxy.py)
 CBUY_SCRIPTS = {               # held side -> executable that buys the opposite (protective) leg

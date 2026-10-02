@@ -10,6 +10,7 @@ from datetime import datetime
 from colorama import Fore, Style
 
 from exeagtpxy import getexeagtpxy, is_aligned                 # Math functions stay in agt
+from exetgtpxy import target_price                             # Read-only target telemetry; exits stay in exit pipe
 from exeamspxy import execute_side_averaging_matrix            # Execution handles via ams
 
 # SYNCHRONIZED TO CORE VARIABLES & GUARDS MODULAR LAYER (acg)
@@ -21,6 +22,19 @@ from run.runpchkpxy import get_position_summary
 from run.runexlckpxy import ledger_busy                        # stand down while the ledger lock is held
 
 logger = logging.getLogger("exeavxpxy")
+
+
+def _side_target_pct(rows):
+    """Reports the existing per-lot exit target as a side-level percentage."""
+    if rows.empty:
+        return 0.0
+    row = rows.iloc[-1]
+    entry = safe_float(row.get("pxy_entry") or row.get("buy_prc"))
+    if entry <= 0:
+        return 0.0
+    target = target_price(row)
+    return max(0.0, ((target - entry) / entry) * 100.0)
+
 
 # Averaging monitors the aggregate (blended) loss of each side
 USE_OVERALL_LOSS = True
@@ -122,6 +136,9 @@ def handle_side_averaging(client, df):
         ce_lgt_val = ce_rows.apply(get_loss, axis=1).max() if not ce_rows.empty else 0.0
         pe_lgt_val = pe_rows.apply(get_loss, axis=1).max() if not pe_rows.empty else 0.0
 
+    ce_tgt = _side_target_pct(ce_rows)
+    pe_tgt = _side_target_pct(pe_rows)
+
     p_packet = {
         "ce_lots": ce_lots, "pe_lots": pe_lots,
         "ce_pnl": ce_pnl, "pe_pnl": pe_pnl,
@@ -129,9 +146,8 @@ def handle_side_averaging(client, df):
         "ce_lgt": ce_dynamic_threshold, "pe_lgt": pe_dynamic_threshold,
         "ce_run_pct": ce_lgt_val, "pe_run_pct": pe_lgt_val,
         "ce_aligned": ce_aligned, "pe_aligned": pe_aligned,
-        # Kept so the web app's JSON structure is unchanged. Side-wide targets/decisions no longer
-        # exist (exits are per-lot in the exit pipe), so these are fixed neutral values.
-        "ce_tgt": 0.0, "pe_tgt": 0.0,
+        # Informational targets only; exit orders remain exclusively in the exit pipe.
+        "ce_tgt": ce_tgt, "pe_tgt": pe_tgt,
         "ce_decision": "hold", "pe_decision": "hold",
     }
 
