@@ -74,6 +74,7 @@ body{
 .sc-val.bull{color:var(--bull);}
 .sc-val.bear{color:var(--bear);}
 .sc-val.dim{color:var(--muted);}
+.sc-val.neutral{color:#fff;}
 
 /* ── TAB CONTENT ── */
 #tabContent{flex:1;min-height:0;position:relative;overflow:hidden;}
@@ -368,20 +369,21 @@ function cls(v){
     const s=String(v||'').toUpperCase();
     if(['BULL','UP','BUY','CE','POSITIVE'].some(k=>s.includes(k)))return'bull';
     if(['BEAR','DOWN','SELL','PE','NEGATIVE'].some(k=>s.includes(k)))return'bear';
+    if(s==='NONE')return'neutral';
     return'dim';
 }
 function emojify(v){
     const s=String(v||'').toUpperCase();
     if(s.includes('BUY')||s.includes('BULL'))return'🟢';
     if(s.includes('SELL')||s.includes('BEAR'))return'🔴';
-    if(s==='NONE')return'—';
+    if(s==='NONE')return'⚪';
     return v;
 }
 function shortSym(s){
     if(!s)return'—';
     return s;
 }
-function lotSz(s){return(s||'').includes('BANKNIFTY')?30:65;}
+function lotSz(s){return 65;}
 
 /* ── SORT STATE ── */
 let psCol='pnl',psAsc=false;

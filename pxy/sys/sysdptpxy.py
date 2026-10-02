@@ -7,6 +7,9 @@ init(autoreset=True)
 
 def detect_pxy_flip_signal(df=None, last_n=21):
     """Detects signal depth boundaries using the true outputs processed by Script 1."""
+    if last_n <= 0:
+        return "NA", 1, 1, 1
+
     output = get_pxy_data(df=df)
     
     if output is None or output[3].empty:
@@ -38,6 +41,8 @@ def detect_pxy_flip_signal(df=None, last_n=21):
         else:
             break
     current_depth = max(current_depth, 1)
+    if current_depth == last_n:
+        return "NA", 1, 1, 1
 
     # Historical Prior Streak Depth Tracking
     current_streak_start = len(colors) - current_depth
@@ -74,5 +79,4 @@ def detect_pxy_flip_signal(df=None, last_n=21):
     past_depth_str = f"CE{past_depth_val}" if prev_color == "green" else f"PE{past_depth_val}" if prev_color == "red" else "NA"
 
     return signal, past_depth_str, ce_depth, pe_depth
-
 

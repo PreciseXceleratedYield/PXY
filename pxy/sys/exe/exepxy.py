@@ -19,7 +19,7 @@ sys.path.insert(0, str(RUN_DIR))
 sys.path.insert(0, str(HERE))
 
 # ---------------- HELPER FUNCTIONS ----------------
-def run_script(script_path, timeout=45):
+def run_script(script_path, timeout=None):
     if not Path(script_path).exists():
         print(f"⚠️ SKIP: script not found -> {script_path}")
         print("━" * 42)
@@ -35,7 +35,7 @@ def run_script(script_path, timeout=45):
         print(f"❌ RUN ERR: unexpected failure -> {script_path} ⚠️")
     print("━" * 42)
 
-def safe_run(script_path, timeout=45):
+def safe_run(script_path, timeout=None):
     try:
         run_script(script_path, timeout=timeout)
     except Exception:
@@ -62,20 +62,14 @@ loop_counter = 1
 
 # Initial system check scripts
 parent_scripts = [
-    HERE.parent / "systdaypxy.py",
-    HERE.parent / "sysvixpxy.py",
     HERE.parent / "sysdashpxy.py",
     HERE / "exeentrpxy.py",
-    HERE / "exeexacpxy.py",
     HERE / "exeexitpxy.py"
 ]
 
-# Run parent scripts with the exception applied
+# Run initial system check scripts
 for s in parent_scripts:
-    if s.name == "exeexacpxy.py":
-        safe_run(s, timeout=None)  # Infinite exception
-    else:
-        safe_run(s, timeout=45)  # Standard limit
+    safe_run(s)
 
 while True:
     os.system('clear')  # ✅ Clears Ubuntu screen at the start of every main loop iteration
@@ -88,17 +82,16 @@ while True:
             print(f"📊 Loop#{loop_counter} Sub#{sub_itr} | Execution Stack Running...")
             
             # -------- REARRANGED RE-ORDERED CORE EXECUTION STACK --------
-            safe_run(HERE / "exeexacpxy.py", timeout=90)  # 1️⃣ Infinite exception
-            safe_run(HERE / "exeexitpxy.py", timeout=45)    # 2️⃣ Clean target exit evaluation (Locks profits first)
-            safe_run(HERE / "exeentrpxy.py", timeout=45)    # 3️⃣ Entry generation script (Deploys new layout)
-            safe_run(HERE / "exeenexpxy.py", timeout=45)    # 4️⃣ Balancing / Averaging Engine (Runs adjustments last)
+            safe_run(HERE / "exeexitpxy.py", timeout=60)    # 1️⃣ Clean target exit evaluation (Locks profits first)
+            safe_run(HERE / "exeentrpxy.py", timeout=60)    # 2️⃣ Entry generation script (Deploys new layout)
+            safe_run(HERE / "exeavgpxy.py", timeout=60)    # 3️⃣ Balancing / Averaging Engine (Runs adjustments last)
                     
             fancy_pause(4)  # 7-second pause between sub-iterations
             
         loop_counter += 1
     else:
         print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
-        safe_run(HERE.parent / "sysslefpxy.py", timeout=45)
+        safe_run(HERE.parent / "sysslefpxy.py")
         fancy_pause(7)
         
         while not in_market_hours():

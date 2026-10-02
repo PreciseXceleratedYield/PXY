@@ -8,7 +8,7 @@ import logging
 from colorama import Fore, init
 
 init(autoreset=True)
-logger = logging.getLogger("exeavgpxy.strategy")
+logger = logging.getLogger("exeavxpxy.strategy")
 
 from exeacgpxy import (
     MAX_LAYERS, safe_float, generate_pxy_tag, is_cooling, set_cooling,
@@ -41,7 +41,7 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
     """Executes network orders for System A when pullback boundaries are breached."""
     
     # 🟢 CALL OPTION (CE) SIDE LAYER GATEWAY
-    if ce_aligned and not ce_rows.empty and not is_cooling("CE") and len(ce_rows) < (MAX_LAYERS + 1):
+    if ce_aligned and not ce_rows.empty and not is_cooling("CE") and len(ce_rows) < MAX_LAYERS:
         ce_last_row = _newest_row(ce_rows)
         ce_symbol = ce_last_row['symbol']
         ce_qty = abs(int(safe_float(ce_last_row.get('qty', 0.0))))
@@ -66,7 +66,7 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
                 logger.error(f"CE Native placement tracking error: {e}", exc_info=True)
 
     # 🔴 PUT OPTION (PE) SIDE LAYER GATEWAY
-    if pe_aligned and not pe_rows.empty and not is_cooling("PE") and len(pe_rows) < (MAX_LAYERS + 1):
+    if pe_aligned and not pe_rows.empty and not is_cooling("PE") and len(pe_rows) < MAX_LAYERS:
         pe_last_row = _newest_row(pe_rows)
         pe_symbol = pe_last_row['symbol']
         pe_qty = abs(int(safe_float(pe_last_row.get('qty', 0.0))))

@@ -68,7 +68,7 @@ def dynamic_entry(row):
                 
             # Track worst trade independently for CE and PE if type is identified
             if opt_type and decay_amount > 0.05 and elapsed_mins > _worst_trades[opt_type]["elapsed_mins"]:
-                clean_symbol = re.sub(r'^(NIFTY|BANKNIFTY)26', '', symbol)
+                clean_symbol = re.sub(r'^NIFTY26', '', symbol)
                 _worst_trades[opt_type]["elapsed_mins"] = elapsed_mins
                 _worst_trades[opt_type]["message"] = (
                     f"WORST {opt_type} | {clean_symbol} | "

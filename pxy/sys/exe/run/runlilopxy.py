@@ -1,6 +1,7 @@
 #runlilopxy.py
 import os 
 import json 
+import math
 import pytz 
 import pandas as pd 
 from datetime import datetime 
@@ -137,7 +138,27 @@ def _fetch_live_price(client, token_id, ex_seg):
     return live_val if live_val and live_val > 0 else 0.0
 
 
-def _reconcile_open_with_broker(client, open_positions):
+def position_net_quantity(position):
+    """Return Kotak's net quantity, including both carry-forward and intraday trades."""
+    fields = ("cfBuyQty", "cfSellQty", "flBuyQty", "flSellQty")
+    def parse(value):
+        quantity = float(str(value or 0).replace(",", "").strip())
+        if not math.isfinite(quantity):
+            raise ValueError(f"Invalid position quantity: {value}")
+        return quantity
+
+    if position.get("net_qty") is not None:
+        net_qty = parse(position["net_qty"])
+        if net_qty != 0 or not any(position.get(field) is not None for field in fields):
+            return net_qty
+    if not any(position.get(field) is not None for field in fields):
+        raise ValueError("Position row has no recognized quantity fields.")
+    return sum(parse(position.get(field, 0)) for field in ("cfBuyQty", "flBuyQty")) - sum(
+        parse(position.get(field, 0)) for field in ("cfSellQty", "flSellQty")
+    )
+
+
+def _reconcile_open_with_broker(client, open_positions, strict=False):
     """Trims the tag-matched open lots to what the broker really holds, BEFORE the risk ledger sees them.
     A lot closed outside tag matching (manual sell, untagged square-off) would otherwise stay 'open':
     it would be marked at live price, inflate open_rows (tighter trailing stop) and drift game P&L.
@@ -148,27 +169,33 @@ def _reconcile_open_with_broker(client, open_positions):
     try:
         res = client.positions()
     except Exception as e:
+        if strict:
+            raise RuntimeError(f"Broker positions call failed during reconciliation: {e}") from e
         print(f"⚠️ Ledger reconcile skipped (positions call failed: {e}).")
         return open_positions
 
-    if not isinstance(res, dict) or not isinstance(res.get("data"), list):
-        msg = str((res or {}).get("errMsg", "") or (res or {}).get("message", "")).lower() if isinstance(res, dict) else ""
-        if "no data" in msg:
-            print("🧾 Ledger reconcile: broker is flat; open lots cleared.")
-            return []
+    if (
+        not isinstance(res, dict)
+        or str(res.get("stat", "")).strip().lower() != "ok"
+        or str(res.get("stCode", "")).strip() != "200"
+        or not isinstance(res.get("data"), list)
+    ):
+        if strict:
+            raise RuntimeError(f"Invalid Kotak positions response during reconciliation: {res!r}")
         print("⚠️ Ledger reconcile skipped (broker positions unavailable this cycle).")
         return open_positions
-
-    def _num(v):
-        try:
-            return float(str(v).replace(",", "").strip() or 0)
-        except (ValueError, TypeError):
-            return 0.0
 
     net = {}
     for pos in res["data"]:
         sym = str(pos.get("trdSym", "")).strip()
-        net[sym] = net.get(sym, 0.0) + _num(pos.get("flBuyQty", 0)) - _num(pos.get("flSellQty", 0))
+        try:
+            quantity = position_net_quantity(pos)
+        except (TypeError, ValueError):
+            if strict:
+                raise
+            print(f"⚠️ Ledger reconcile skipped (invalid quantity for {sym or 'unknown symbol'}).")
+            return open_positions
+        net[sym] = net.get(sym, 0.0) + quantity
 
     by_symbol = {}
     for p in open_positions:
@@ -196,7 +223,7 @@ def _reconcile_open_with_broker(client, open_positions):
     return kept
 
 
-def process_lilo_orders(client): 
+def process_lilo_orders(client, strict=False):
     try: 
         # MASTER RISK LEDGER hook 1: once-a-day stale web-cache override (runs before any data guard)
         try:
@@ -209,13 +236,21 @@ def process_lilo_orders(client):
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
             
-        res = client.order_report() 
-        if not res or "data" not in res: 
+        res = client.order_report()
+        if (
+            not isinstance(res, dict)
+            or str(res.get("stat", "")).strip().lower() != "ok"
+            or str(res.get("stCode", "")).strip() != "200"
+            or not isinstance(res.get("data"), list)
+        ):
+            if strict:
+                raise RuntimeError(f"Invalid Kotak order report response: {res!r}")
+            print(f"⚠️ Invalid Kotak order report response: {res!r}")
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
             
         df = pd.DataFrame(res["data"]) 
-        df = df[df["ordSt"].isin(["complete", "traded"])].copy() 
+        df = df[df["ordSt"].astype(str).str.lower().isin(["complete", "traded"])].copy()
         if df.empty: 
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
@@ -295,7 +330,7 @@ def process_lilo_orders(client):
                         "PNL": int((live_val - b["prc"]) * b["qty"]) 
                     }) 
 
-        open_positions = _reconcile_open_with_broker(client, open_positions)
+        open_positions = _reconcile_open_with_broker(client, open_positions, strict=strict)
         open_df = pd.DataFrame(open_positions) 
         closed_df = pd.DataFrame(closed_matches) 
 
@@ -313,7 +348,9 @@ def process_lilo_orders(client):
         dump_to_json(closed_df) 
         dump_livpos_to_json(open_positions) 
         return open_df, closed_df 
-    except Exception as e: 
+    except Exception as e:
+        if strict:
+            raise
         print(f"[TAG MATCH ERROR]: {e}") 
         _print_summary(0, 0) 
         return pd.DataFrame(), pd.DataFrame() 

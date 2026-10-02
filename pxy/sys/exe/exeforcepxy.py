@@ -25,7 +25,7 @@ from syscnfgpxy import TICKER
 
 # --- LOT SIZE LOGIC ---
 t = TICKER.upper().strip()
-LOT_SIZE = 30 if t == "^NSEBANK" else 65 if t == "^NSEI" else None
+LOT_SIZE = 65 if t == "^NSEI" else None
 
 # --- DEBUG PRINT ---
 def dprint(msg, color=Fore.CYAN):

@@ -1,6 +1,7 @@
 # exeomspxy.py
 import os
 import sys
+import math
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -38,7 +39,7 @@ except Exception as e:
 
 # IMPORT LOCAL MODULES
 try:
-    from runlilopxy import process_lilo_orders, get_session
+    from runlilopxy import process_lilo_orders, get_session, position_net_quantity
     from runltpspxy import get_mid_price
 except ImportError as e:
     print(f"❌ Critical Import Error: {e}")
@@ -66,7 +67,15 @@ except Exception as e:
 # ---------------- MAIN FUNCTION ----------------
 
 def get_combined_data(map_active_with_market=True, add_calcs=True):
-    combined = {"market_snapshot": pd.DataFrame(), "active_orders": pd.DataFrame()}
+    combined = {
+        "market_snapshot": pd.DataFrame(),
+        "active_orders": pd.DataFrame(),
+        "market_snapshot_available": False,
+    }
+    if not process_lilo_orders or not get_session:
+        print("❌ OMS unavailable: order-ledger or session dependency failed to load.")
+        combined["error"] = True
+        return combined
 
     # --- 1. MKT SNAPSHOT ---
     market_df = pd.DataFrame()
@@ -75,6 +84,18 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
             market_data = syspxy.get_all_data()
             market_df = pd.DataFrame([market_data])
             print_market_dashboard(market_df)
+            if isinstance(market_data, dict):
+                exit_signal = str(market_data.get("exit", "")).upper().strip()
+                try:
+                    atr = float(market_data.get("atr"))
+                    combined["market_snapshot_available"] = (
+                        market_data.get("market_data_available") is True
+                        and exit_signal in {"BULL", "BEAR", "SIDE", "NONE"}
+                        and math.isfinite(atr)
+                        and atr > 0
+                    )
+                except (TypeError, ValueError):
+                    pass
         except Exception as e:
             print(f"⚠️ Market snapshot error: {e}")
             market_df = pd.DataFrame()
@@ -87,38 +108,39 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     if process_lilo_orders and get_session:
         try:
             client = get_session()
-            if client:
-                # A. Get unmatched orders from stateless LILO engine
-                active_df, _ = process_lilo_orders(client)
-                
-                if not active_df.empty:
-                    # B. CRITICAL FIX: Standardize casing BEFORE filtering or accessing 'symbol'
-                    active_df.columns = [c.lower() for c in active_df.columns]
-                    
-                    # C. SAFETY SYNC: Filter by Real Broker Positions
-                    pos_res = client.positions()
-                    if pos_res and "data" in pos_res:
-                        pos_df = pd.DataFrame(pos_res["data"])
-                        
-                        if pos_df.empty:
-                            # Broker shows nothing held: the table must be empty (never act on stale LILO rows)
-                            active_df = active_df.iloc[0:0].copy()
-                        else:
-                            # Calculate net holdings (Buy - Sell)
-                            # Only symbols with a positive net balance should be on the dashboard
-                            real_holdings = pos_df[
-                                (pos_df['flBuyQty'].astype(float) - pos_df['flSellQty'].astype(float)) > 0
-                            ]['trdSym'].tolist()
+            if not client:
+                raise RuntimeError("Broker session unavailable; active positions are unverified.")
 
-                            # Filter strategy orders to match actual broker holdings
-                            active_df = active_df[active_df['symbol'].isin(real_holdings)].copy()
+            # A. Get unmatched orders from stateless LILO engine
+            active_df, _ = process_lilo_orders(client, strict=True)
+
+            if not active_df.empty:
+                # B. Standardize casing before filtering or accessing symbol.
+                active_df.columns = [c.lower() for c in active_df.columns]
+
+                # C. Keep only symbols with verified positive broker holdings.
+                pos_res = client.positions()
+                if (
+                    isinstance(pos_res, dict)
+                    and str(pos_res.get("stat", "")).strip().lower() == "ok"
+                    and str(pos_res.get("stCode", "")).strip() == "200"
+                    and isinstance(pos_res.get("data"), list)
+                ):
+                    pos_df = pd.DataFrame(pos_res["data"])
+
+                    if pos_df.empty:
+                        active_df = active_df.iloc[0:0].copy()
                     else:
-                        print("⚠️ Safety sync skipped: broker positions unavailable this cycle.")
-                        combined["positions_unverified"] = True  # exeexitpxy skips the counter-buy this cycle
-                    
-                    # D. Final Column Cleaning (Tag cleanup)
-                    if not active_df.empty:
-                        active_df['tag'] = active_df['tag'].astype(str).str.split('.').str[0].replace('nan', '').str.strip()
+                        real_holdings = pos_df[
+                            pos_df.apply(position_net_quantity, axis=1) > 0
+                        ]["trdSym"].tolist()
+                        active_df = active_df[active_df["symbol"].isin(real_holdings)].copy()
+                else:
+                    raise RuntimeError(f"Invalid Kotak positions response: {pos_res!r}")
+
+            # D. Final Column Cleaning (Tag cleanup).
+            if not active_df.empty:
+                active_df["tag"] = active_df["tag"].astype(str).str.split(".").str[0].replace("nan", "").str.strip()
                         
         except Exception as e:
             print(f"OMS DATA ERROR: {e}")

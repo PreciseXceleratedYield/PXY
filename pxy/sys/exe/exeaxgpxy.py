@@ -10,7 +10,7 @@ from colorama import Fore, Style
 from exeamspxy import decide  # 🎯 Pointed explicitly to the new executor file
 from exeacgpxy import safe_float, side_overall_pnl_pct, is_cooling, set_cooling
 
-logger = logging.getLogger("exeavgpxy.exeaxgpxy")
+logger = logging.getLogger("exeavxpxy.exeaxgpxy")
 
 def pxysqrce():
     print(f"{Fore.CYAN}{Style.BRIGHT}🚀 TARGET HIT: Firing shell script command 'pxysqrce'...")
@@ -89,4 +89,3 @@ def run_target_engine(active_exit, ce_rows, pe_rows, ce_avg_profit, pe_avg_profi
         "CE": (ce_decision, ce_aligned, ce_points),
         "PE": (pe_decision, pe_aligned, pe_points),
     }
-

@@ -161,6 +161,7 @@ body{
 .sc-val.bear{color:var(--bear);}
 .sc-val.gold{color:#ffffff;}
 .sc-val.dim {color:var(--lbl-grey);}
+.sc-val.neutral{color:#fff;}
 
 .sig-cell.dp-cell{flex:2;padding:0 4px;}
 
@@ -658,14 +659,14 @@ function cls(v){
     const s=String(v||'').toUpperCase();
     if(['BULL','UP','BUY','CE','POSITIVE'].some(k=>s.includes(k)))return'bull';
     if(['BEAR','DOWN','SELL','PE','NEGATIVE'].some(k=>s.includes(k)))return'bear';
-    if(s==='NONE')return'dim';
+    if(s==='NONE')return'neutral';
     return'gold';
 }
 function emojify(v){
     const s=String(v||'').toUpperCase();
     if(s.includes('BUY')||s.includes('BULL'))return'🟢';
     if(s.includes('SELL')||s.includes('BEAR'))return'🔴';
-    if(s==='NONE')return'—';
+    if(s==='NONE')return'⚪';
     return v;
 }
 function setVal(id,val,c){
@@ -679,7 +680,7 @@ function shortSym(s){
     if(m)return`${m[1]} ${m[2]} ${m[4]} ${m[3]==='C'?'CE':'PE'}`;
     return s.length>18?s.slice(0,16)+'…':s;
 }
-function lotSz(s){return(s||'').includes('BANKNIFTY')?30:65;}
+function lotSz(s){return 65;}
 
 /* ══════════════════════════════════════
    MOMENTUM CANDLE BAR — horizontal, exact copy from webpxy.html
@@ -778,8 +779,8 @@ async function loadDash(){
     try{
         const d=await fetch('./webdashpxy.json?_='+Date.now()).then(r=>r.json());
 
-        setVal('hcEntry', emojify(d.entry??'NONE'), d.entry&&d.entry!=='NONE'?cls(d.entry):'dim');
-        setVal('hcExit',  emojify(d.exit??'NONE'),  d.exit&&d.exit!=='NONE'?cls(d.exit):'dim');
+        setVal('hcEntry', emojify(d.entry??'NONE'), d.entry?cls(d.entry):'dim');
+        setVal('hcExit',  emojify(d.exit??'NONE'),  d.exit?cls(d.exit):'dim');
         setVal('hcATR',   `${d.atr??'—'} / ${d.katr??'—'}`, 'gold');
         setVal('hcTrend', emojify(d.supertrend), cls(d.supertrend));
 

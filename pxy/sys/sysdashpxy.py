@@ -44,6 +44,8 @@ def get_full_snapshot():
     master_df = fetch_yf_data()
     if master_df is None or master_df.empty:
         return None
+
+    result["market_data_available"] = not master_df.attrs.get("data_fallback", False)
         
     # Enforce strict single source of truth across downstream layout components
     result["candle_visual"] = get_candle_visual(df=master_df)

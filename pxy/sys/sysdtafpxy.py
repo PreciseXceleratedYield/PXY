@@ -250,6 +250,7 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
             }
             time_indices = [current_time - pd.Timedelta(minutes=i) for i in reversed(range(target_rows))]
             fallback_df = pd.DataFrame(mock_data, index=time_indices)
+            fallback_df.attrs["data_fallback"] = True
             return fallback_df
         else:
             # Absolute recovery floor if even the JSON fallback path yields nothing
@@ -285,4 +286,6 @@ def fetch_yf_data(period=None, interval="1m", target_rows=60):
             dynamic_mode = 1
 
     processed_df = apply_ohlc_transformation(df, mode=dynamic_mode)
-    return processed_df.tail(target_rows)
+    processed_df = processed_df.tail(target_rows)
+    processed_df.attrs["data_fallback"] = False
+    return processed_df

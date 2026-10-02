@@ -75,6 +75,9 @@ def exit_all_positions():
         return 
         
     data = get_combined_data() 
+    if data.get("error"):
+        print(f"{Fore.RED}⚠️ OMS data unavailable; square-off skipped to avoid treating an API failure as flat.")
+        return
     active_df = data.get("active_orders", pd.DataFrame()) 
     market_df = data.get("market_snapshot", pd.DataFrame()) 
     

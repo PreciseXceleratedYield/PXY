@@ -59,8 +59,7 @@ def run_independent_engine():
             target_web_directory = os.path.join(parent_directory, "web")
             os.makedirs(target_web_directory, exist_ok=True)
             
-            base_name = os.path.splitext(os.path.basename(__file__))[0] if '__file__' in locals() else "webdaypxy"
-            target_export_path = os.path.join(target_web_directory, f"{base_name}.json")
+            target_export_path = os.path.join(target_web_directory, "webdaypxy.json")
             
             # 🟢 STEP 5: DUMP ENTIRE RAW COMPONENT DATA MATRIX
             raw_data.to_json(target_export_path, date_format='iso', orient='split')
@@ -79,4 +78,3 @@ def run_independent_engine():
 
 if __name__ == "__main__":
     run_independent_engine()
-
