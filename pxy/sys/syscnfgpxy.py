@@ -156,7 +156,9 @@ RUNEXACPXY_VIEW_ONLY_ENV = "PXY_VIEW_ONLY"
 # strategy configuration migration.
 TICKER = SYSCNFGPXY_TICKER
 TIMEZONE = SYSCNFGPXY_TIMEZONE
-PARAMS = {"ticker": SYSCNFGPXY_TICKER}
+PARAMS = {
+    "ticker": SYSCNFGPXY_TICKER,  # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
+}
 
 # ---------------- SYSTEM SELF TEST ----------------
 if __name__ == "__main__":
