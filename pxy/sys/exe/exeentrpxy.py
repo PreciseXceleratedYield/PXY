@@ -52,10 +52,11 @@ def main():
 
         # 2. Central Entry Signal Verification
         data = get_all_data()
-        entry_signal = str(data.get("entry", "")).upper().strip()
+        entry_signal = data.get("entry")
 
-        if entry_signal not in ("BUY", "SELL"):
-            print(f"{Fore.YELLOW}⏳ Skip {entry_signal[:10]}: Invalid entry signal")
+        if not isinstance(entry_signal, str) or entry_signal not in ("BUY", "SELL"):
+            rejected_signal = str(entry_signal)[:10]
+            print(f"{Fore.YELLOW}⏳ Skip {rejected_signal}: Invalid entry signal")
             return
 
         # 3. Session Initialization
