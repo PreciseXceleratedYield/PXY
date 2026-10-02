@@ -3,8 +3,23 @@ import pandas as pd
 import re
 from colorama import Fore, Style, init
 
+# ==================== CONFIG (this file's settings) ====================
+EXIT_KEY_COLUMN = "exit"       # market column holding the BULL / BEAR key (keep same as in execbuypxy.py)
+ATR_FLOOR = 1.4                # atr = max(atr, ATR_FLOOR)
+TGT_PCT_NOT_ALIGNED = 1.4      # target % for a leg NOT aligned with the key. CE is aligned ONLY on BULL, PE ONLY on BEAR
+                               # (same rule as is_aligned in exeagtpxy.py); SIDE / NONE / unknown = not aligned
+# =======================================================================
+
 # Initialize colorama for clean, colored terminal output formatting
 init(autoreset=True)
+
+_warned = set()
+
+def _warn_once(key, msg):
+    """Prints a warning only the first time it occurs in this process."""
+    if key not in _warned:
+        _warned.add(key)
+        print(f"{Fore.YELLOW}⚠️ target_price: {msg}{Style.RESET_ALL}")
 
 def f(x, d=0.0):
     """Safely casts input to float, returning a default value if casting fails or value <= 0."""
@@ -31,8 +46,8 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     invested = qtys * prices
     
     # Precise substring flags instead of brittle character slicing
-    is_ce = symbols.str.contains('CE', regex=False)
-    is_pe = symbols.str.contains('PE', regex=False)
+    is_ce = symbols.str.strip().str.endswith('CE')
+    is_pe = symbols.str.strip().str.endswith('PE')
     
     ce_total = float(invested[is_ce].sum())
     pe_total = float(invested[is_pe].sum())
@@ -51,16 +66,19 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
             return 0.0
             
         # 2️⃣ Context parameter extractors
-        symbol = str(row.get('symbol', 'UNKNOWN')).upper()
-        derived_exit = str(row.get('direction', '')).upper().strip()
-        derived_supr = str(row.get('supertrend', '')).upper().strip()
+        symbol = str(row.get('symbol', 'UNKNOWN')).upper().strip()
+        derived_supr = str(row.get(EXIT_KEY_COLUMN, '')).upper().strip()
         
         # Extract and safely cast atr (will scale safely even if identical across rows)
         raw_atr = f(row.get('atr', 0.0))
-        atr = max(raw_atr, 1.4)
+        if raw_atr <= 0:
+            _warn_once("atr", f"'atr' missing or <= 0 in row (check market column names/case); using {ATR_FLOOR} floor.")
+        if derived_supr not in ("BULL", "BEAR", "SIDE", "NONE"):
+            _warn_once("supertrend", f"unrecognised exit value '{derived_supr}' (expected BULL/BEAR/SIDE/NONE).")
+        atr = max(raw_atr, ATR_FLOOR)
 
-        is_ce = 'CE' in symbol
-        is_pe = 'PE' in symbol
+        is_ce = symbol.endswith('CE')
+        is_pe = symbol.endswith('PE')
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
 
@@ -72,14 +90,14 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
         
         # 3️⃣ Symmetrical Risk Matrix (Calculated cleanly inline for each row context)
         if is_ce:
-            if derived_supr == 'BEAR' or derived_supr == 'SIDE':
-                target_pct = 1.4
+            if derived_supr != 'BULL':
+                target_pct = TGT_PCT_NOT_ALIGNED
             else:
                 target_pct = atr * atr
                 
         elif is_pe:
-            if derived_supr == 'BULL' or derived_supr == 'SIDE':
-                target_pct = 1.4
+            if derived_supr != 'BEAR':
+                target_pct = TGT_PCT_NOT_ALIGNED
             else:
                 target_pct = atr * atr
             

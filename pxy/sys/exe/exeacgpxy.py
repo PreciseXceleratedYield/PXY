@@ -18,6 +18,11 @@ PANEL_WIDTH = 42
 SCALE_WIDTH = 40
 
 IST = pytz.timezone("Asia/Kolkata")
+_COOL_DIR = os.path.dirname(os.path.abspath(__file__))   # cooldown tokens live next to this file, not in the CWD
+
+
+def _cool_path(side):
+    return os.path.join(_COOL_DIR, f"exebal_cool_{side.lower()}.txt")
 MARKET_START = dt_time(9, 17)
 MARKET_END = dt_time(15, 11)
 
@@ -48,7 +53,7 @@ def generate_pxy_tag():
 
 def set_cooling(side):
     """Creates a local file token lock to execute defensive cooling down tracks."""
-    file_path = f"exebal_cool_{side.lower()}.txt"
+    file_path = _cool_path(side)
     try:
         with open(file_path, "w") as f:
             f.write(str(time.time()))
@@ -58,7 +63,7 @@ def set_cooling(side):
 
 def is_cooling(side):
     """Verifies filesystem locks to prevent duplicate rapid order executions."""
-    file_path = f"exebal_cool_{side.lower()}.txt"
+    file_path = _cool_path(side)
     if not os.path.exists(file_path):
         return False
     try:

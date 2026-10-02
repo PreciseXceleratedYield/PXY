@@ -1,6 +1,6 @@
 # =============================================================================
 # MAIN CONTROLLER MODULE: exeavgpxy.py (avg)
-# MASTER TELEMETRY ORCHESTRATOR & AGGREGATION LOOP
+# AVERAGING ORCHESTRATOR & TELEMETRY (no exits, no fresh buys)
 # =============================================================================
 import re
 import os
@@ -9,47 +9,53 @@ import logging
 from datetime import datetime
 from colorama import Fore, Style
 
-import exeagtpxy                                               # Pure math vault formulas
 from exeagtpxy import getexeagtpxy, is_aligned                 # Math functions stay in agt
 from exeamspxy import execute_side_averaging_matrix            # Execution handles via ams
-from exeaxgpxy import run_target_engine                        # Target engine bridge
 
 # SYNCHRONIZED TO CORE VARIABLES & GUARDS MODULAR LAYER (acg)
 from exeacgpxy import (
-    REBUY_ENABLED, MAX_LAYERS, IST, MARKET_START, MARKET_END,
+    REBUY_ENABLED, IST, MARKET_START, MARKET_END,
     safe_float, get_loss, side_overall_pnl_pct
 )
 from run.runpchkpxy import get_position_summary
+from run.runexlckpxy import ledger_busy                        # stand down while the ledger lock is held
 
 logger = logging.getLogger("exeavgpxy")
 
-# System A & B unified to monitor aggregate bulk position metrics
+# Averaging monitors the aggregate (blended) loss of each side
 USE_OVERALL_LOSS = True
+
+# Telemetry JSON for the web app: anchored to this file (same web/ folder as exeexppxy), never to the working directory
+WEB_AVG_JSON_REL = "../../web/webavgpxy.json"
+
+
+def _force_value(df, col, default=1.2):
+    """Last value of a force column; a missing, None or NaN value falls back to the default."""
+    if col not in df.columns:
+        return default
+    v = safe_float(df[col].iloc[-1], default)
+    return default if v != v else v
 
 
 def print_telemetry_dashboard(p):
-    """Streamlined dashboard: RUN column cleanly arranged between LGT and TGT."""
+    """Streamlined dashboard: RUN = blended P&L% of the side, LGT = averaging trigger."""
     if not p:
         return
     P_WIDTH = 36
     print("\n" + Fore.CYAN + "=" * P_WIDTH)
-    print(Fore.CYAN + " OPT  LOT   LGT   RUN   TGT      PNL")
+    print(Fore.CYAN + " OPT  LOT   LGT   RUN      PNL")
     print(Fore.CYAN + "-" * P_WIDTH)
 
     for side in ("ce", "pe"):
         lots = p[f"{side}_lots"]
         lgt = int(round(p[f"{side}_lgt"]))
-        
-        # ✅ VISUAL SYNC: Prints dynamic dynamic targets matching exact execution metrics
-        tgt_txt = f"{p[f'{side}_tgt']:.2f}" if p[f"{side}_aligned"] else f"{exeagtpxy.BASE_COUNTER_TARGET_PCT:.2f}"
-        
+
         pnl_val = int(round(p[f"{side}_pnl"]))
         run_pct_val = int(round(p[f"{side}_run_pct"]))
-        decision = p[f"{side}_decision"].upper()
 
-        pnl_color = (Fore.CYAN + Style.BRIGHT) if decision == "SQUARE_OFF" else (Fore.GREEN if pnl_val >= 0 else Fore.RED)
+        pnl_color = Fore.GREEN if pnl_val >= 0 else Fore.RED
 
-        print(Fore.WHITE + f"{side.upper():>4} {lots:>4} {lgt:>5} {run_pct_val:>5} {tgt_txt:>5} "
+        print(Fore.WHITE + f"{side.upper():>4} {lots:>4} {lgt:>5} {run_pct_val:>5} "
               + pnl_color + f"{pnl_val:>8}" + Style.RESET_ALL)
 
     print(Fore.CYAN + "-" * P_WIDTH)
@@ -65,7 +71,7 @@ def print_telemetry_dashboard(p):
 
 
 def handle_side_averaging(client, df):
-    """Runs System A (averaging) and System B (target/exit/fresh-entry) each cycle."""
+    """Runs System A (averaging) each cycle. Exits and counter-buys live in the exit pipe."""
     if df is None or df.empty:
         return
     now = datetime.now(IST).time()
@@ -74,9 +80,7 @@ def handle_side_averaging(client, df):
 
     working_df = df.copy()
     working_df['side'] = working_df['symbol'].astype(str).str[-2:].str.upper()
-    working_df['row_invested'] = working_df['qty'].apply(safe_float) * (
-        (working_df['sell_prc'].apply(safe_float) + working_df['sell_prc'].apply(safe_float)) / 2.0
-    )
+    working_df['row_invested'] = working_df['qty'].apply(safe_float) * working_df['sell_prc'].apply(safe_float)
     working_df['row_pnl'] = working_df['pnl'].apply(safe_float) if 'pnl' in working_df.columns else 0.0
 
     pos_raw = str(get_position_summary(client)).upper().replace(" ", "").strip()
@@ -90,8 +94,6 @@ def handle_side_averaging(client, df):
 
     ce_overall_pnl_pct = side_overall_pnl_pct(ce_rows)
     pe_overall_pnl_pct = side_overall_pnl_pct(pe_rows)
-    ce_avg_profit = ce_overall_pnl_pct if ce_overall_pnl_pct > 0 else 0.0
-    pe_avg_profit = pe_overall_pnl_pct if pe_overall_pnl_pct > 0 else 0.0
 
     ce_investment = float(ce_rows['row_invested'].sum()) if not ce_rows.empty else 0.0
     pe_investment = float(pe_rows['row_invested'].sum()) if not pe_rows.empty else 0.0
@@ -106,13 +108,9 @@ def handle_side_averaging(client, df):
     ce_aligned = is_aligned("CE", active_exit)
     pe_aligned = is_aligned("PE", active_exit)
 
-    # ✅ DYN TARGETS COMPUTED ROUTED SAFELY AFTER DEFINITION
-    ce_tgt = exeagtpxy.calculate_dynamic_target('CE', active_exit, ce_investment, pe_investment)
-    pe_tgt = exeagtpxy.calculate_dynamic_target('PE', active_exit, ce_investment, pe_investment)
-
     # Extract forces from the row solely to compute the dynamic LGT thresholds
-    ce_force_val = float(working_df['ce_force'].iloc[-1]) if 'ce_force' in working_df.columns else 1.2
-    pe_force_val = float(working_df['pe_force'].iloc[-1]) if 'pe_force' in working_df.columns else 1.2
+    ce_force_val = _force_value(working_df, 'ce_force')
+    pe_force_val = _force_value(working_df, 'pe_force')
     #print(Fore.YELLOW + f"🧪 [TEST FORCE] CE_FORCE: {ce_force_val:.2f} | PE_FORCE: {pe_force_val:.2f}")
     ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(
         ce_invst_factor, pe_invst_factor, ce_lots, pe_lots, ce_force_val, pe_force_val
@@ -124,10 +122,6 @@ def handle_side_averaging(client, df):
         ce_lgt_val = ce_rows.apply(get_loss, axis=1).max() if not ce_rows.empty else 0.0
         pe_lgt_val = pe_rows.apply(get_loss, axis=1).max() if not pe_rows.empty else 0.0
 
-    # System B Evaluation Engine Flow
-    b_result = run_target_engine(active_exit, ce_rows, pe_rows, ce_avg_profit, pe_avg_profit, ce_lots, pe_lots)
-    ce_decision, pe_decision = b_result["CE"][0], b_result["PE"][0]
-
     p_packet = {
         "ce_lots": ce_lots, "pe_lots": pe_lots,
         "ce_pnl": ce_pnl, "pe_pnl": pe_pnl,
@@ -135,21 +129,28 @@ def handle_side_averaging(client, df):
         "ce_lgt": ce_dynamic_threshold, "pe_lgt": pe_dynamic_threshold,
         "ce_run_pct": ce_lgt_val, "pe_run_pct": pe_lgt_val,
         "ce_aligned": ce_aligned, "pe_aligned": pe_aligned,
-        "ce_tgt": ce_tgt, "pe_tgt": pe_tgt,   
-        "ce_decision": ce_decision, "pe_decision": pe_decision,
+        # Kept so the web app's JSON structure is unchanged. Side-wide targets/decisions no longer
+        # exist (exits are per-lot in the exit pipe), so these are fixed neutral values.
+        "ce_tgt": 0.0, "pe_tgt": 0.0,
+        "ce_decision": "hold", "pe_decision": "hold",
     }
 
     print_telemetry_dashboard(p_packet)
 
     try:
-        output_path = "../web/webavgpxy.json"
-        dir_name = os.path.dirname(output_path)
-        if dir_name and not os.path.exists(dir_name):
-            os.makedirs(dir_name, exist_ok=True)
-        with open(output_path, "w") as f:
+        output_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), WEB_AVG_JSON_REL))
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        tmp_path = output_path + ".tmp"
+        with open(tmp_path, "w") as f:
             json.dump(p_packet, f, indent=2)
+        os.replace(tmp_path, output_path)
     except Exception as json_err:
         logger.error(f"Failed to dump telemetry payload to json: {json_err}")
+
+    # Another process holds the ledger lock (a tick or a liquidation is running): place nothing this cycle
+    if ledger_busy():
+        print(f"{Fore.YELLOW}⚠️ Ledger lock held (tick or liquidation running); averaging skipped.")
+        return
 
     # System A Placement Engine Flow
     execute_side_averaging_matrix(

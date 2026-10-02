@@ -1,55 +1,47 @@
 """
 =============================================================================
 STRATEGY MATH ENGINE LAYER: exeagtpxy.py (agt)
-Contains ONLY pure atomic trading mathematical equations and trend alignments.
+Contains ONLY the averaging (System A) threshold math and trend alignment.
 =============================================================================
 """
 
 SYSTEM_A_BASE_THRESHOLD = 8.2
 SYSTEM_B_BASE_THRESHOLD = 1.4
 ABS_CAP = 77.0
-BASE_COUNTER_TARGET_PCT = 88
-FLOOR_BASE_POINTS = 140
-FLOOR_STEP_POINTS = 100
-
-def f(x, d=0.0):
-    """Safely casts input to float, returning a default value if casting fails or value <= 0."""
-    try:
-        val = float(x)
-        return val if val > 0 else d
-    except (ValueError, TypeError):
-        return d
 
 def is_aligned(side, active_exit):
-    """Core condition matching: CE aligns with BULL/SIDE, PE aligns with BEAR/SIDE."""
+    """Core condition matching: CE aligns ONLY with BULL, PE aligns ONLY with BEAR.
+    SIDE / NONE / anything else is not aligned (averaging stays off)."""
     a_exit = str(active_exit).upper().strip()
     s = side.upper()
     return (s == "CE" and a_exit in {"BULL"}) or (s == "PE" and a_exit in {"BEAR"})
 
-def points_floor(lots):
-    """Structural points floor calculation matrix based on position scaling."""
-    return 0 if lots <= 0 else FLOOR_BASE_POINTS + FLOOR_STEP_POINTS * (lots - 1)
+FORCE_DEFAULT = 1.2   # same default exeavgpxy uses when a force value is missing
+
+
+def _clean_force(v):
+    """A force that is missing, NaN, non-numeric or negative falls back to FORCE_DEFAULT.
+    A negative force would flip the threshold positive and make averaging fire every cooldown."""
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return FORCE_DEFAULT
+    if v != v or v < 0:
+        return FORCE_DEFAULT
+    return v
+
+
+def _threshold(invst_factor, lots, force):
+    base = (SYSTEM_B_BASE_THRESHOLD * max(1, lots)) + \
+           (SYSTEM_A_BASE_THRESHOLD * max(1, lots)) * (max(0.0, invst_factor) ** 3) * force
+    # always a negative number, never tighter than the B base and never deeper than ABS_CAP
+    base = min(max(base, SYSTEM_B_BASE_THRESHOLD), ABS_CAP)
+    return round(base * -1.0, 2)
+
 
 def getexeagtpxy(ce_invst_factor, pe_invst_factor, ce_lots, pe_lots, ce_force, pe_force):
-    """Calculates investment-adjusted dynamic drawdown thresholds from capital weights and ADX force vectors."""
-    # 🎯 INTEGRATED: ce_force scales the dynamic segment of the base threshold matrix
-    ce_base = (SYSTEM_B_BASE_THRESHOLD * max(1, ce_lots)) + (SYSTEM_A_BASE_THRESHOLD * max(1, ce_lots)) * (ce_invst_factor ** 3) * (ce_force)
-    
-    # 🎯 INTEGRATED: pe_force scales the dynamic segment of the base threshold matrix
-    pe_base = (SYSTEM_B_BASE_THRESHOLD * max(1, pe_lots)) + (SYSTEM_A_BASE_THRESHOLD * max(1, pe_lots)) * (pe_invst_factor ** 3) * (pe_force)
-    
-    return round((min(ce_base, ABS_CAP) * -1.0), 2), round((min(pe_base, ABS_CAP) * -1.0), 2)
-
-def calculate_dynamic_target(side, active_exit, ce_investment, pe_investment):
-    """Calculates target_pct based on trend alignment rules and capital weights."""
-    if not is_aligned(side, active_exit):
-        return BASE_COUNTER_TARGET_PCT
-    ce_safe = ce_investment if ce_investment > 0 else 1.0
-    pe_safe = pe_investment if pe_investment > 0 else 1.0
-    factor = pe_safe / ce_safe if side.upper() == "CE" else ce_safe / pe_safe
-    return BASE_COUNTER_TARGET_PCT + (BASE_COUNTER_TARGET_PCT * (factor ** 3))
-
-def calculate_target_price_premium(entry_prc, target_pct):
-    """Final mathematical target premium projection calculation."""
-    return round(entry_prc * (1.0 + (target_pct / 100.0)), 2)
-
+    """Calculates investment-adjusted dynamic drawdown thresholds from capital weights and ADX force vectors.
+    Always returns two negative thresholds in [-ABS_CAP, -SYSTEM_B_BASE_THRESHOLD]."""
+    ce_thr = _threshold(ce_invst_factor, ce_lots, _clean_force(ce_force))
+    pe_thr = _threshold(pe_invst_factor, pe_lots, _clean_force(pe_force))
+    return ce_thr, pe_thr

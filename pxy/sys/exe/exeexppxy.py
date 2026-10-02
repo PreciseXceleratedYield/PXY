@@ -6,7 +6,24 @@ import pytz
 from datetime import datetime
 from colorama import Fore, Style
 
+# ==================== CONFIG (this file's settings) ====================
+WEB_ACT_JSON_REL = "../../web/webactpxy.json"   # dashboard JSON path, relative to this file
+# =======================================================================
+
 IST = pytz.timezone("Asia/Kolkata")
+
+def _write_json_atomic(path, payload):
+    """Writes JSON via a temp file + rename so readers never see a half-written file."""
+    tmp = path + ".tmp"
+    with open(tmp, 'w') as fh:
+        json.dump(payload, fh, indent=4)
+    os.replace(tmp, path)
+
+def _opt_side(symbol):
+    """'CE' / 'PE' from the symbol suffix, else None."""
+    s = str(symbol).upper().strip()
+    return "CE" if s.endswith("CE") else "PE" if s.endswith("PE") else None
+
 
 def analyze_targets_and_sides(df):
     """
@@ -22,13 +39,13 @@ def analyze_targets_and_sides(df):
         ltp = float(r.get("sell_prc", 0))
         tgt = float(r.get("pxy_tgt", 0))
         
-        if "CE" in sym:
+        if _opt_side(sym) == "CE":
             has_ce_positions = True
-            if ltp < tgt:
+            if tgt <= 0 or ltp < tgt:
                 side_all_targets_hit["CE"] = False 
-        elif "PE" in sym:
+        elif _opt_side(sym) == "PE":
             has_pe_positions = True
-            if ltp < tgt:
+            if tgt <= 0 or ltp < tgt:
                 side_all_targets_hit["PE"] = False 
 
     if not has_ce_positions: side_all_targets_hit["CE"] = False
@@ -53,10 +70,10 @@ def process_metrics_print_and_dump(df, side_all_targets_hit, exit_mode):
         
         padding = " " * max(0, 20 - len(sym))
         
-        if "CE" in sym:
+        if _opt_side(raw_sym) == "CE":
             sym_display = sym.replace("CE", f"{Fore.GREEN}CE{Fore.RESET}") + padding
             side_type = "CE"
-        elif "PE" in sym:
+        elif _opt_side(raw_sym) == "PE":
             sym_display = sym.replace("PE", f"{Fore.RED}PE{Fore.RESET}") + padding
             side_type = "PE"
         else:
@@ -79,7 +96,7 @@ def process_metrics_print_and_dump(df, side_all_targets_hit, exit_mode):
             tgt_pct = max(0, min(99, tgt_pct)) 
             color, dot = (Fore.GREEN, "🟢") if entry_pct > 0 else (Fore.RED, "🔴") if entry_pct < 0 else (Fore.WHITE, "⚪") 
             st_display = f"{color}%{abs(entry_pct):02d}{dot}{Fore.RESET} {tgt_pct:02d}%" 
-            is_target_hit = (ltp >= tgt)
+            is_target_hit = (tgt > 0 and ltp >= tgt)
 
         pnl_val = int(r.get('pnl', 0)) 
         p_col = Fore.GREEN if pnl_val > 0 else Fore.RED if pnl_val < 0 else Fore.WHITE 
@@ -102,24 +119,22 @@ def process_metrics_print_and_dump(df, side_all_targets_hit, exit_mode):
     # Relative path JSON Export
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        json_path = os.path.join(current_dir, "../../web/webactpxy.json")
+        json_path = os.path.join(current_dir, WEB_ACT_JSON_REL)
         
         output_payload = {
             "refreshed": timestamp_str,
             "exit_mode_active": exit_mode,
             "positions": web_dump_data
         }
-        with open(json_path, 'w') as f:
-            json.dump(output_payload, f, indent=4)
-    except:
-        pass
+        _write_json_atomic(json_path, output_payload)
+    except Exception as e:
+        print(f"{Fore.RED}⚠️ webactpxy.json write failed: {e}")
 
 def dump_idle_json(exit_mode):
     """Outputs empty structure payload when systems are idling."""
     try:
         current_dir = os.path.dirname(os.path.abspath(__file__))
-        json_path = os.path.join(current_dir, "../../web/webactpxy.json")
-        with open(json_path, 'w') as f:
-            json.dump({"refreshed": datetime.now(IST).strftime('%H:%M:%S'), "exit_mode_active": exit_mode, "positions": []}, f, indent=4)
-    except:
-        pass
+        json_path = os.path.join(current_dir, WEB_ACT_JSON_REL)
+        _write_json_atomic(json_path, {"refreshed": datetime.now(IST).strftime('%H:%M:%S'), "exit_mode_active": exit_mode, "positions": []})
+    except Exception as e:
+        print(f"{Fore.RED}⚠️ webactpxy.json idle write failed: {e}")

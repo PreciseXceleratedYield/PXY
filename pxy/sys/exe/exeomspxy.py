@@ -1,4 +1,5 @@
 # exeomspxy.py
+import os
 import sys
 from pathlib import Path
 import pandas as pd
@@ -31,7 +32,8 @@ if syspxy_path:
 
 try:
     import syspxy
-except:
+except Exception as e:
+    print(f"⚠️ syspxy not loaded ({e}); market snapshot disabled.")
     syspxy = None
 
 # IMPORT LOCAL MODULES
@@ -45,17 +47,20 @@ except ImportError as e:
 # EXTERNAL CALCS
 try:
     from exedynpxy import dynamic_entry as pxy_dyn
-except:
+except Exception as e:
+    print(f"⚠️ exedynpxy not loaded ({e}); using buy_prc as entry.")
     pxy_dyn = lambda row: row.get("buy_prc", 0)
 
 try:
     from exetgtpxy import target_price as pxy_tgt_calc
-except:
+except Exception as e:
+    print(f"⚠️ exetgtpxy not loaded ({e}); targets will be 0.")
     pxy_tgt_calc = lambda row: 0
 
 try:
     from exeslpxy import stop_loss as pxy_sl_calc
-except:
+except Exception as e:
+    print(f"⚠️ exeslpxy not loaded ({e}); stop loss will be 0.")
     pxy_sl_calc = lambda row: 0
 
 # ---------------- MAIN FUNCTION ----------------
@@ -70,7 +75,8 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
             market_data = syspxy.get_all_data()
             market_df = pd.DataFrame([market_data])
             print_market_dashboard(market_df)
-        except:
+        except Exception as e:
+            print(f"⚠️ Market snapshot error: {e}")
             market_df = pd.DataFrame()
     combined["market_snapshot"] = market_df
 
@@ -94,7 +100,10 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
                     if pos_res and "data" in pos_res:
                         pos_df = pd.DataFrame(pos_res["data"])
                         
-                        if not pos_df.empty:
+                        if pos_df.empty:
+                            # Broker shows nothing held: the table must be empty (never act on stale LILO rows)
+                            active_df = active_df.iloc[0:0].copy()
+                        else:
                             # Calculate net holdings (Buy - Sell)
                             # Only symbols with a positive net balance should be on the dashboard
                             real_holdings = pos_df[
@@ -103,6 +112,9 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
 
                             # Filter strategy orders to match actual broker holdings
                             active_df = active_df[active_df['symbol'].isin(real_holdings)].copy()
+                    else:
+                        print("⚠️ Safety sync skipped: broker positions unavailable this cycle.")
+                        combined["positions_unverified"] = True  # exeexitpxy skips the counter-buy this cycle
                     
                     # D. Final Column Cleaning (Tag cleanup)
                     if not active_df.empty:
@@ -111,6 +123,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
         except Exception as e:
             print(f"OMS DATA ERROR: {e}")
             active_df = pd.DataFrame()
+            combined["error"] = True
 
     if active_df.empty:
         return combined
@@ -149,6 +162,9 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
 
     # --- 4. MKT SYNC ---
     if map_active_with_market and not market_df.empty:
+        _clash = [c for c in market_df.columns if c in ("symbol", "qty", "tag", "pnl", "buy_prc", "sell_prc")]
+        if _clash:
+            print(f"⚠️ Market columns overwrite order columns: {_clash}")
         for col in market_df.columns:
             active_df[col] = market_df[col].iloc[-1]
 
@@ -162,6 +178,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     return combined
 
 if __name__ == "__main__":
+    os.environ["PXY_VIEW_ONLY"] = "1"   # viewing run: must not advance the ledger breach count
     # 1. Fetch data through your existing combined function
     data = get_combined_data()
     
@@ -187,7 +204,8 @@ if __name__ == "__main__":
         _, closed_df = process_lilo_orders(client)
         
         if not closed_df.empty:
-            print(f"\n{'TODAY\'S CLOSED POSITIONS (INACTIVE)':^80}")
+            closed_title = "TODAY'S CLOSED POSITIONS (INACTIVE)"
+            print(f"\n{closed_title:^80}")
             print("-" * 80)
             # Match the column names returned by runlilopxy.py
             c_cols = ["Symbol", "Tag", "Qty", "Buy_Prc", "Sell_Prc", "PNL"]
