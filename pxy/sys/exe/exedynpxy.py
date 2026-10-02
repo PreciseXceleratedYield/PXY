@@ -1,16 +1,20 @@
 # sys/exe/dynentrypxy.py
 from datetime import datetime
-import pytz
 import re
 import pandas as pd
+from syscnfgpxy import (
+    EXEDYNPXY_DECAY_RATE_PER_MIN,
+    EXEDYNPXY_PNL_THRESHOLD,
+    SYSCNFGPXY_TIMEZONE,
+)
 
-IST = pytz.timezone("Asia/Kolkata")
+IST = SYSCNFGPXY_TIMEZONE
 
 # ==================================================
 # 🔧 REVISED CONFIG: COMPRESSION DETECTOR TIME DECAY
 # ==================================================
-DECAY_RATE_PER_MIN = 0.0001  # 0.05% decay per minute (0.05 / 100)
-PNL_THRESHOLD = 0.0
+DECAY_RATE_PER_MIN = EXEDYNPXY_DECAY_RATE_PER_MIN
+PNL_THRESHOLD = EXEDYNPXY_PNL_THRESHOLD
 
 # Tracks the single worst/oldest trade separately for CE and PE (using minutes)
 _worst_trades = {

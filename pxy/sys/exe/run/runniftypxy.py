@@ -2,20 +2,21 @@ import sys
 from pathlib import Path
 from datetime import datetime, date, timedelta
 
-# ---------------- CONFIG ----------------
-# Adjusted to 50 to allow valid Nifty 50-point step intervals while locking the last digit to 0
-STRIKE_STEP = 50
+SYS_DIR = Path(__file__).resolve().parents[2]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
 
-# DAILY ATM BUFFER (you can change daily without touching logic)
-ATM_BUFFER = 0  
+from syscnfgpxy import (
+    RUNNIFTYPXY_ATM_BUFFER,
+    RUNNIFTYPXY_HOLIDAYS,
+    RUNNIFTYPXY_STRIKE_STEP,
+)
 
-# HOLIDAYS
+STRIKE_STEP = RUNNIFTYPXY_STRIKE_STEP
+ATM_BUFFER = RUNNIFTYPXY_ATM_BUFFER
 HOLIDAYS = [
-    "26-Jan-2026", "06-Mar-2026", "20-Mar-2026", "31-Mar-2026",
-    "03-Apr-2026", "14-Apr-2026", "01-May-2026", "15-Aug-2026",
-    "02-Oct-2026", "21-Oct-2026", "06-Nov-2026", "24-Nov-2026", "25-Dec-2026"
+    datetime.strptime(h, "%d-%b-%Y").date() for h in RUNNIFTYPXY_HOLIDAYS
 ]
-HOLIDAYS = [datetime.strptime(h, "%d-%b-%Y").date() for h in HOLIDAYS]
 
 # ---------------- HELPERS ----------------
 

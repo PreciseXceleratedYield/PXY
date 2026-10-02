@@ -4,10 +4,28 @@ import os
 import json 
 import sys
 import time 
-import pytz 
 import subprocess 
-from datetime import datetime, time as dt_time 
+from datetime import datetime
 from colorama import init, Fore, Style 
+from syscnfgpxy import (
+    EXEEXITPXY_EXIT_LOCK_KEEP_SECS,
+    EXEEXITPXY_EXIT_LOCK_SECS,
+    EXEEXITPXY_ORDER_AMO,
+    EXEEXITPXY_ORDER_EXCHANGE_SEGMENT,
+    EXEEXITPXY_ORDER_PRICE,
+    EXEEXITPXY_ORDER_PRODUCT,
+    EXEEXITPXY_ORDER_TYPE,
+    EXEEXITPXY_ORDER_VALIDITY,
+    EXEEXITPXY_PNL_EXIT_MIN,
+    EXEEXITPXY_SQUAREOFF_SCRIPT,
+    EXEEXITPXY_SQUAREOFF_TIMEOUT_SECS,
+    EXEEXITPXY_SQOFF_ALL_START,
+    EXEEXITPXY_SQOFF_END,
+    EXEEXITPXY_SQOFF_MIN_GAP_SECS,
+    EXEEXITPXY_SQOFF_START,
+    EXEEXITPXY_SYSDUMP_SCRIPT,
+    SYSCNFGPXY_TIMEZONE,
+)
 
 from exeomspxy import get_combined_data 
 from runclntpxy import get_session 
@@ -28,27 +46,27 @@ init(autoreset=True)
 
 # ==================== CONFIG (this file's settings) ====================
 DEBUG_MODE = True             # prints the order payload and the raw broker response (turn off after Monday)
-PNL_EXIT_MIN = 140            # absolute PnL required alongside the target hit
-EXIT_LOCK_SECS = 5            # block a repeat sell for the same lot (symbol+tag+buy_time) for this long (0 = off)
+PNL_EXIT_MIN = EXEEXITPXY_PNL_EXIT_MIN
+EXIT_LOCK_SECS = EXEEXITPXY_EXIT_LOCK_SECS
 EXIT_LOCK_FILE_NAME = ".exit_lock.json"
-EXIT_LOCK_KEEP_SECS = 600     # lock entries older than this are pruned from the lock file
+EXIT_LOCK_KEEP_SECS = EXEEXITPXY_EXIT_LOCK_KEEP_SECS
 
 # Square-off windows; all new buys stop at 15:10 before square-off begins.
-SQUAREOFF_SCRIPT = "exesqrpxy.py"
-SQOFF_START = dt_time(15, 11)      # from here: run square-off script (without -all)
-SQOFF_ALL_START = dt_time(15, 14)  # from here: run square-off script with -all
-SQOFF_END = dt_time(15, 50)        # from here: no square-off call
-SQUAREOFF_TIMEOUT_SECS = 120   # a hung square-off script must not freeze the pipe
-SQOFF_MIN_GAP_SECS = 20        # do not relaunch the same square-off call more often than this
-SYSDUMP_SCRIPT = "sysddmppxy.py"   # launched (one folder up) after an exit order is placed
+SQUAREOFF_SCRIPT = EXEEXITPXY_SQUAREOFF_SCRIPT
+SQOFF_START = EXEEXITPXY_SQOFF_START
+SQOFF_ALL_START = EXEEXITPXY_SQOFF_ALL_START
+SQOFF_END = EXEEXITPXY_SQOFF_END
+SQUAREOFF_TIMEOUT_SECS = EXEEXITPXY_SQUAREOFF_TIMEOUT_SECS
+SQOFF_MIN_GAP_SECS = EXEEXITPXY_SQOFF_MIN_GAP_SECS
+SYSDUMP_SCRIPT = EXEEXITPXY_SYSDUMP_SCRIPT
 
 # Exit order parameters (transaction_type "S" stays in the code: this file only ever sells)
-ORDER_EXCHANGE_SEGMENT = "nse_fo"
-ORDER_PRODUCT = "NRML"
-ORDER_PRICE = "0"
-ORDER_TYPE = "MKT"
-ORDER_VALIDITY = "DAY"
-ORDER_AMO = "NO"
+ORDER_EXCHANGE_SEGMENT = EXEEXITPXY_ORDER_EXCHANGE_SEGMENT
+ORDER_PRODUCT = EXEEXITPXY_ORDER_PRODUCT
+ORDER_PRICE = EXEEXITPXY_ORDER_PRICE
+ORDER_TYPE = EXEEXITPXY_ORDER_TYPE
+ORDER_VALIDITY = EXEEXITPXY_ORDER_VALIDITY
+ORDER_AMO = EXEEXITPXY_ORDER_AMO
 # =======================================================================
 
 _LOCK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), EXIT_LOCK_FILE_NAME)
@@ -106,8 +124,7 @@ def debug_log(msg, color=Fore.BLUE):
 
 def get_sell_suffix():
     """Generates an explicit sell suffix code with millisecond resolution"""
-    IST = pytz.timezone("Asia/Kolkata")
-    ms = datetime.now(IST).strftime('%f')[:-3]
+    ms = datetime.now(SYSCNFGPXY_TIMEZONE).strftime('%f')[:-3]
     return f"_S{ms}" 
 
 def _order_accepted(response):
@@ -127,8 +144,7 @@ def place_exit_order(client, row):
         if existing_tag and str(existing_tag).lower() not in ['nan', 'none', '']: 
             base_tag = str(existing_tag).split('_')[0].strip()
         else: 
-            IST = pytz.timezone("Asia/Kolkata")
-            base_tag = datetime.now(IST).strftime('%H%M%S')
+            base_tag = datetime.now(SYSCNFGPXY_TIMEZONE).strftime('%H%M%S')
             
         final_tag = f"{base_tag}{get_sell_suffix()}"
             
@@ -206,8 +222,7 @@ def verify_and_exit(client, row):
         print(f"{Fore.RED}❌ Safety Check Crash: {e}")
 
 def run_snapshot():
-    IST = pytz.timezone("Asia/Kolkata")
-    now = datetime.now(IST).time()
+    now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
     
     # Base path to the script
     exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), SQUAREOFF_SCRIPT)

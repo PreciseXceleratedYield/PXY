@@ -3,14 +3,29 @@
 #
 # MASTER RISK LEDGER, part 3 of 6: the maths only. No file IO, no broker calls.
 # Renko trailing stop + hard loss floor on "game P&L". Split out of runexacpxy.py (pure move).
+import sys
+from pathlib import Path
+
 import pandas as pd
 
+SYS_DIR = Path(__file__).resolve().parents[2]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+
+from syscnfgpxy import (
+    RUNEXMTPXY_BRICK_SIZE,
+    RUNEXMTPXY_INITIAL_LOSS_FLOOR,
+    RUNEXMTPXY_PEAK_GAP_FLOOR_PCT,
+    RUNEXMTPXY_TIGHTEN_PER_EXTRA_ROW,
+    RUNEXMTPXY_TRAILING_DROP_GAP,
+)
+
 # ==================== CONFIG (this file's settings) ====================
-BRICK_SIZE = 50.0               # Renko brick, in rupees of game P&L
-INITIAL_LOSS_FLOOR = -950.0     # hard stop on game P&L
-TRAILING_DROP_GAP = 1400.0      # starting gap: stop = peak - gap (0 bricks banked)
-PEAK_GAP_FLOOR_PCT = 0.5        # the gap never shrinks below 50% of the peak
-TIGHTEN_PER_EXTRA_ROW = 0.05    # each open row beyond the first pulls the stop 5% closer
+BRICK_SIZE = RUNEXMTPXY_BRICK_SIZE
+INITIAL_LOSS_FLOOR = RUNEXMTPXY_INITIAL_LOSS_FLOOR
+TRAILING_DROP_GAP = RUNEXMTPXY_TRAILING_DROP_GAP
+PEAK_GAP_FLOOR_PCT = RUNEXMTPXY_PEAK_GAP_FLOOR_PCT
+TIGHTEN_PER_EXTRA_ROW = RUNEXMTPXY_TIGHTEN_PER_EXTRA_ROW
 # =======================================================================
 
 

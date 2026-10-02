@@ -1,14 +1,15 @@
 import numpy as np
 import pandas as pd
+from syscnfgpxy import (
+    SYSDTSTPXY_ST1_FACTOR,
+    SYSDTSTPXY_ST1_PERIOD,
+    SYSDTSTPXY_ST2_FACTOR,
+    SYSDTSTPXY_ST2_PERIOD,
+)
 
 # ==============================================================================
 # 🎛️ MASTER CONFIGURATION LAYER
 # ==============================================================================
-CONFIG = {
-    "ST1": {"PERIOD": 3.0, "FACTOR": 1.4},
-    "ST2": {"PERIOD": 3.0, "FACTOR": 1.4}
-}
-
 def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     """Computes basic Supertrend bands and its exact absolute inverse mirror line."""
     high = df['High'].to_numpy()
@@ -95,7 +96,9 @@ def get_market_trend(df: pd.DataFrame) -> str:
     if df is None or df.empty or len(df) < 2:
         return 'SIDE'
 
-    st1_line, st1_mirror = _compute_single_st(df, period=CONFIG["ST1"]["PERIOD"], factor=CONFIG["ST1"]["FACTOR"])
+    st1_line, st1_mirror = _compute_single_st(
+        df, period=SYSDTSTPXY_ST1_PERIOD, factor=SYSDTSTPXY_ST1_FACTOR
+    )
     
     close_curr = float(df['Close'].iloc[-1])
     st_curr = float(st1_line[-1])

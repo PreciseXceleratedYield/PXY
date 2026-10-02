@@ -4,20 +4,32 @@ import warnings
 import numpy as np
 import pandas as pd
 import yfinance as yf
-from syscnfgpxy import TICKER
+from syscnfgpxy import (
+    SYSCNFGPXY_TICKER as TICKER,
+    SYSDTAFPXY_DEFAULT_INTERVAL,
+    SYSDTAFPXY_DEFAULT_TARGET_ROWS,
+    SYSDTAFPXY_FIXED_BRICK_SIZE,
+    SYSDTAFPXY_FORCE_NIFTY_FUT,
+    SYSDTAFPXY_SELECTED_MODE,
+    SYSDTAFPXY_TIMEZONE,
+    SYSDTAFPXY_TRANSFORM_ATR_PERIOD,
+)
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # Explicitly enforce Indian Standard Time zone mapping
-TIMEZONE = 'Asia/Kolkata'
+TIMEZONE = SYSDTAFPXY_TIMEZONE
 
 # 🔥 INDEPENDENT MATRIX MODE INTERFACE:
 # Format: "ST" -> First Digit = SIDE Mode, Second Digit = TREND Mode
 # Set SELECTED_MODE to "8" (or use your string logic) to run the new Renko system.
-SELECTED_MODE = "00" 
-FORCE_NIFTY_FUT = False  # True: skip Yahoo and use the local nftfut.json price fallback
+SELECTED_MODE = SYSDTAFPXY_SELECTED_MODE
+FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 
-def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
+def apply_ohlc_transformation(
+    df, mode=1, atr_period=SYSDTAFPXY_TRANSFORM_ATR_PERIOD,
+    fixed_brick_size=SYSDTAFPXY_FIXED_BRICK_SIZE,
+):
     """Executes structural, isolated mathematical transformations based on explicit modes.
     
     Modes 0-7: Time-based mathematical variations (Heikin-Ashi, Linear Regression, etc.)
@@ -188,7 +200,11 @@ def apply_ohlc_transformation(df, mode=1, atr_period=14, fixed_brick_size=2.0):
 
 
 
-def fetch_yf_data(period=None, interval="1m", target_rows=60):
+def fetch_yf_data(
+    period=None,
+    interval=SYSDTAFPXY_DEFAULT_INTERVAL,
+    target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
+):
     """Dynamic historical ingestion engine utilizing vectorized structural transformations"""
     df = pd.DataFrame()
     buffer_rows = target_rows + 5

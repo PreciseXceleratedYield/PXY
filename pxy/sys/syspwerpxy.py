@@ -2,13 +2,13 @@
 import math
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
+from syscnfgpxy import SYSPWERPXY_LOOKBACK_PERIOD
 from colorama import Fore, Style, init
 
 # Initialize Colorama
 init(autoreset=True)
 
 # -------------------- Hardcoded constants --------------------
-LOOKBACK_PERIOD = 5
 TOTAL_WIDTH = 42
 
 # -------------------- CE/PE Power Calculation --------------------
@@ -39,7 +39,9 @@ def get_ce_pe_power(df=None):
     df['abs_move'] = df['move'].abs()
 
     # 2. Average the absolute moves of the last 3 CLOSED candles (excluding current running one)
-    avg_closed_move_3 = df['abs_move'].shift(1).rolling(window=LOOKBACK_PERIOD, min_periods=1).mean()
+    avg_closed_move_3 = df['abs_move'].shift(1).rolling(
+        window=SYSPWERPXY_LOOKBACK_PERIOD, min_periods=1
+    ).mean()
 
     # 3. Track the current running candle's net move
     last_move = float(df['move'].iloc[-1])
@@ -94,4 +96,3 @@ if __name__ == "__main__":
 
     # Print single line
     print(left_text_colored + spacing + right_text_colored)
-

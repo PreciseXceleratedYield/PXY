@@ -12,15 +12,23 @@ from runclntpxy import get_session
 import pandas as pd 
 from exeomspxy import get_combined_data 
 from colorama import Fore, Style, init 
-import pytz 
-from datetime import datetime, time as dt_time 
+from datetime import datetime
+from syscnfgpxy import (
+    EXEEXITPXY_ORDER_AMO,
+    EXEEXITPXY_ORDER_EXCHANGE_SEGMENT,
+    EXEEXITPXY_ORDER_PRICE,
+    EXEEXITPXY_ORDER_PRODUCT,
+    EXEEXITPXY_ORDER_TYPE,
+    EXEEXITPXY_ORDER_VALIDITY,
+    EXESQRPXY_EXIT_ALL_AFTER,
+    SYSCNFGPXY_TIMEZONE,
+)
 
 init(autoreset=True) 
 
 def get_sell_suffix():
     """Generates an explicit sell suffix code with millisecond resolution to ensure unique IDs"""
-    IST = pytz.timezone("Asia/Kolkata")
-    ms = datetime.now(IST).strftime('%f')[:-3]
+    ms = datetime.now(SYSCNFGPXY_TIMEZONE).strftime('%f')[:-3]
     return f"_S{ms}"
 
 def place_exit_order(client, row): 
@@ -35,22 +43,21 @@ def place_exit_order(client, row):
             # Strip away any old suffix tokens if present
             base_tag = str(existing_tag).split('_')[0].strip()
         else: 
-            IST = pytz.timezone("Asia/Kolkata")
-            base_tag = datetime.now(IST).strftime('%H%M%S')
+            base_tag = datetime.now(SYSCNFGPXY_TIMEZONE).strftime('%H%M%S')
             
         # FIX: Structure final tag with explicit sell suffix code matching your LILO engine
         final_tag = f"{base_tag}{get_sell_suffix()}"
             
         params = { 
-            "exchange_segment": "nse_fo", 
-            "product": "NRML", 
-            "price": "0", 
-            "order_type": "MKT", 
+            "exchange_segment": EXEEXITPXY_ORDER_EXCHANGE_SEGMENT,
+            "product": EXEEXITPXY_ORDER_PRODUCT,
+            "price": EXEEXITPXY_ORDER_PRICE,
+            "order_type": EXEEXITPXY_ORDER_TYPE,
             "quantity": str(abs(int(qty))), 
-            "validity": "DAY", 
+            "validity": EXEEXITPXY_ORDER_VALIDITY,
             "trading_symbol": str(symbol), 
             "transaction_type": "S", 
-            "amo": "NO", 
+            "amo": EXEEXITPXY_ORDER_AMO,
             "tag": final_tag 
         } 
         
@@ -67,8 +74,7 @@ def place_exit_order(client, row):
         return None 
 
 def exit_all_positions(): 
-    IST = pytz.timezone("Asia/Kolkata") 
-    now = datetime.now(IST).time() 
+    now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
     client = get_session() 
     if not client: 
         print(f"{Fore.RED}❌ Session not initialized. Exiting...") 
@@ -100,7 +106,7 @@ def exit_all_positions():
         return 
         
     direction = market_df["direction"].iloc[-1] if not market_df.empty and "direction" in market_df.columns else None 
-    exit_all_after = dt_time(15, 25) # 3:25 PM 
+    exit_all_after = EXESQRPXY_EXIT_ALL_AFTER
     
     # FIX FOR VM FREEZE: Track if any single trade actually fires an order response
     any_order_placed = False

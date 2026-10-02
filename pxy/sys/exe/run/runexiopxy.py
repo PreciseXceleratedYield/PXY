@@ -12,9 +12,16 @@
 import os
 import json
 import time
-import pytz
+import sys
+from pathlib import Path
 from datetime import datetime
 from colorama import Fore
+
+SYS_DIR = Path(__file__).resolve().parents[2]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+
+from syscnfgpxy import SYSCNFGPXY_TIMEZONE
 
 # ==================== CONFIG (this file's settings) ====================
 READ_RETRIES = 3
@@ -49,7 +56,7 @@ META_FILE = os.path.join(WEB_DIR, META_FILE_NAME)
 # Files that hold a JSON list and are cleared once per day
 DAILY_LIST_FILES = [PNL_JSON_PATH, POS_JSON_PATH, SQUAREOFF_LOG_FILE]
 
-IST = pytz.timezone("Asia/Kolkata")
+IST = SYSCNFGPXY_TIMEZONE
 
 
 # ---------------------------------------------------------------------------

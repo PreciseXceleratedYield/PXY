@@ -4,7 +4,13 @@ import re
 import pandas as pd
 import numpy as np
 from sysdtafpxy import fetch_yf_data
-from syscnfgpxy import PARAMS
+from syscnfgpxy import (
+    SYSKATRPXY_ATR_MODE,
+    SYSKATRPXY_ATR_STATIC_VALUE,
+    SYSKATRPXY_TRUE_ATR_MAX,
+    SYSKATRPXY_TRUE_ATR_MIN_ROWS,
+    SYSKATRPXY_TRUE_ATR_PERIOD,
+)
 from colorama import Fore, Style, init
 
 from sysdptpxy import detect_pxy_flip_signal
@@ -14,8 +20,6 @@ init(autoreset=True)
 
 # 🎯 MULTI-MODE NUMERIC CONFIGURATION MATRIX
 # 1 = Static, 2 = Standard ATR (4) capped at 10, 3 = Dynamic
-ATR_MODE = 3
-ATR_STATIC_VALUE = 7
 TOTAL_WIDTH = 40
 
 def safe_int_convert(val, fallback=1) -> int:
@@ -32,7 +36,7 @@ def safe_int_convert(val, fallback=1) -> int:
 def calculate_true_4_atr(df: pd.DataFrame) -> float:
     """Computes genuine standard 4-period Average True Range math capped at a max of 10."""
     try:
-        if df is None or df.empty or len(df) < 5:
+        if df is None or df.empty or len(df) < SYSKATRPXY_TRUE_ATR_MIN_ROWS:
             return 4.0
         
         df_clean = df.copy()
@@ -49,14 +53,14 @@ def calculate_true_4_atr(df: pd.DataFrame) -> float:
         tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
         
         # Standard Wilders smoothing execution sequence over 4 intervals
-        atr_series = tr.ewm(alpha=1/4, adjust=False).mean()
+        atr_series = tr.ewm(alpha=1/SYSKATRPXY_TRUE_ATR_PERIOD, adjust=False).mean()
         val = atr_series.iloc[-1]
         
         if np.isnan(val):
             return 4.0
             
         # Apply the max cap of 10
-        return min(float(val), 10.0)
+        return min(float(val), SYSKATRPXY_TRUE_ATR_MAX)
     except Exception:
         return 4.0
 
@@ -75,9 +79,9 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int, ce_p: int = 
 # --- BACKWARD COMPATIBILITY LINKERS FOR OUTSIDE POOLS ---
 def calculate_atr(df: pd.DataFrame) -> pd.Series:
     try:
-        if ATR_MODE == 1:
-            val = float(ATR_STATIC_VALUE)
-        elif ATR_MODE == 2:
+        if SYSKATRPXY_ATR_MODE == 1:
+            val = float(SYSKATRPXY_ATR_STATIC_VALUE)
+        elif SYSKATRPXY_ATR_MODE == 2:
             val = calculate_true_4_atr(df)
         else:
             _, past_str, ce_d, pe_d = detect_pxy_flip_signal(df=df)
@@ -86,7 +90,11 @@ def calculate_atr(df: pd.DataFrame) -> pd.Series:
             
         return pd.Series(val, index=df.index) if df is not None and not df.empty else pd.Series([val])
     except Exception:
-        fb = 4.0 if ATR_MODE == 2 else (float(ATR_STATIC_VALUE) if ATR_MODE == 1 else 5.0)
+        fb = (
+            float(SYSKATRPXY_TRUE_ATR_PERIOD)
+            if SYSKATRPXY_ATR_MODE == 2
+            else (float(SYSKATRPXY_ATR_STATIC_VALUE) if SYSKATRPXY_ATR_MODE == 1 else 5.0)
+        )
         return pd.Series(fb, index=df.index) if df is not None and not df.empty else pd.Series([fb])
 
 def calculate_dynamic_k(df: pd.DataFrame) -> int:
@@ -104,9 +112,9 @@ if __name__ == "__main__":
         final_k = 2
         
         if df is not None and not df.empty:
-            if ATR_MODE == 1:
-                final_atr = int(ATR_STATIC_VALUE)
-            elif ATR_MODE == 2:
+            if SYSKATRPXY_ATR_MODE == 1:
+                final_atr = int(SYSKATRPXY_ATR_STATIC_VALUE)
+            elif SYSKATRPXY_ATR_MODE == 2:
                 final_atr = int(round(calculate_true_4_atr(df)))
             else:
                 _, past_depth_str, ce_depth, pe_depth = detect_pxy_flip_signal(df=df)
@@ -121,9 +129,12 @@ if __name__ == "__main__":
         spc = " " * max(TOTAL_WIDTH - len(l_txt) - len(r_txt), 1)
         print(l_txt + spc + r_txt)
     except Exception:
-        default_atr = 4 if ATR_MODE == 2 else (ATR_STATIC_VALUE if ATR_MODE == 1 else 5)
+        default_atr = (
+            SYSKATRPXY_TRUE_ATR_PERIOD
+            if SYSKATRPXY_ATR_MODE == 2
+            else (SYSKATRPXY_ATR_STATIC_VALUE if SYSKATRPXY_ATR_MODE == 1 else 5)
+        )
         l_txt = f"ATR:{default_atr}"
         r_txt = "K:2"
         spc = " " * max(TOTAL_WIDTH - len(l_txt) - len(r_txt), 1)
         print(l_txt + spc + r_txt)
-

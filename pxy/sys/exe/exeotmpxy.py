@@ -1,6 +1,10 @@
 # exeotmpxy.py
-import pytz
 from datetime import datetime
+from syscnfgpxy import (
+    EXEOTMPXY_DEFAULT_DISTANCE,
+    EXEOTMPXY_DISTANCE_BY_WEEKDAY,
+    SYSCNFGPXY_TIMEZONE,
+)
 
 def get_dynamic_otm_distance():
     """
@@ -9,9 +13,8 @@ def get_dynamic_otm_distance():
     Sat/Sun default to 100.
     """
     # Force timezone validation to prevent errors on overseas servers (e.g., VPS)
-    ist = pytz.timezone("Asia/Kolkata")
+    ist = SYSCNFGPXY_TIMEZONE
     current_day = datetime.now(ist).weekday()
-    
-    # 0=Monday, 1=Tuesday, 2=Wednesday, 3=Thursday, 4=Friday
-    day_distance_map = {0: 250, 1: 200, 2: 150, 3: 100, 4: 50}
-    return day_distance_map.get(current_day, 100)
+    return EXEOTMPXY_DISTANCE_BY_WEEKDAY.get(
+        current_day, EXEOTMPXY_DEFAULT_DISTANCE
+    )

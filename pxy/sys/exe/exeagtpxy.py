@@ -5,9 +5,16 @@ Contains ONLY the averaging (System A) threshold math and trend alignment.
 =============================================================================
 """
 
-SYSTEM_A_BASE_THRESHOLD = 8.2
-SYSTEM_B_BASE_THRESHOLD = 1.4
-ABS_CAP = 77.0
+from syscnfgpxy import (
+    EXEAGTPXY_ABS_CAP,
+    EXEAGTPXY_FORCE_DEFAULT,
+    EXEAGTPXY_SYSTEM_A_BASE_THRESHOLD,
+    EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
+)
+
+SYSTEM_A_BASE_THRESHOLD = EXEAGTPXY_SYSTEM_A_BASE_THRESHOLD
+SYSTEM_B_BASE_THRESHOLD = EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD
+ABS_CAP = EXEAGTPXY_ABS_CAP
 
 def is_aligned(side, active_exit):
     """Core condition matching: CE aligns ONLY with BULL, PE aligns ONLY with BEAR.
@@ -16,7 +23,7 @@ def is_aligned(side, active_exit):
     s = side.upper()
     return (s == "CE" and a_exit in {"BULL"}) or (s == "PE" and a_exit in {"BEAR"})
 
-FORCE_DEFAULT = 1.2   # same default exeavxpxy uses when a force value is missing
+FORCE_DEFAULT = EXEAGTPXY_FORCE_DEFAULT
 
 
 def _clean_force(v):

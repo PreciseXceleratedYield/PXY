@@ -15,8 +15,20 @@
 import os
 import sys
 import time
+from pathlib import Path
 from colorama import Fore, Style, init
 
+SYS_DIR = Path(__file__).resolve().parents[2]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+
+from syscnfgpxy import (
+    RUNEXACPXY_BREACH_TICKS_REQUIRED,
+    RUNEXACPXY_LEDGER_BASIS_GUARD,
+    RUNEXACPXY_RISK_ACTION,
+    RUNEXACPXY_TICK_MIN_GAP_SECONDS,
+    RUNEXACPXY_VIEW_ONLY_ENV,
+)
 from runexiopxy import now_ist, today_ist, RENKO_STATE_FILE, WEB_DIR, SQUAREOFF_SCRIPT_PATH  # noqa: F401
 from runexmtpxy import (
     INITIAL_LOSS_FLOOR, compute_totals, compute_stop, force_zero_ending, _both_empty,
@@ -31,11 +43,11 @@ from runexlqdpxy import liquidate_and_exit, run_squareoff, wait_until_flat  # no
 init(autoreset=True)
 
 # ==================== CONFIG (this file's settings) ====================
-RISK_ACTION = "YES"             # "YES" = square off + sys.exit on a confirmed breach; "NO" = passive (prints and saves state only)
-BREACH_TICKS_REQUIRED = 3       # consecutive breached ticks before liquidation
-TICK_MIN_GAP_SECONDS = 10       # one tick per cycle: calls closer together than this are skipped (the exit pipe and the avg pipe both load the ledger every cycle)
-LEDGER_BASIS_GUARD = True       # if runlilopxy's FILTER_TIME changed since the last tick (ledger restarted after a square-off), start a fresh game instead of subtracting an old offset
-VIEW_ONLY_ENV = "PXY_VIEW_ONLY" # set to "1" by manual/viewing runs: they must never advance the breach count
+RISK_ACTION = RUNEXACPXY_RISK_ACTION
+BREACH_TICKS_REQUIRED = RUNEXACPXY_BREACH_TICKS_REQUIRED
+TICK_MIN_GAP_SECONDS = RUNEXACPXY_TICK_MIN_GAP_SECONDS
+LEDGER_BASIS_GUARD = RUNEXACPXY_LEDGER_BASIS_GUARD
+VIEW_ONLY_ENV = RUNEXACPXY_VIEW_ONLY_ENV
 DEBUG_MODE = True               # verbose skip/guard messages (turn off after Monday)
 # =======================================================================
 

@@ -1,11 +1,17 @@
 import sys
 import os
-import pytz
 import traceback
 import re
 from pathlib import Path
-from datetime import datetime, time as dt_time
+from datetime import datetime
 from colorama import Fore, init, Style
+from syscnfgpxy import (
+    EXEENTRPXY_ENTRY_CUTOFF,
+    EXEENTRPXY_PREOPEN_END,
+    EXEENTRPXY_PREOPEN_START,
+    EXEENTRPXY_SQUAREOFF_END,
+    SYSCNFGPXY_TIMEZONE,
+)
 
 # --- GLOBAL CONFIG ---
 DEBUG = False
@@ -39,13 +45,12 @@ except Exception as e:
 def main():
     dprint("===== START =====", Fore.GREEN)
     try:
-        ist = pytz.timezone("Asia/Kolkata")
-        now = datetime.now(ist).time()
+        now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
         dprint(f"TIME: {now}")
 
         # 1. Market Timing Validation
-        if (dt_time(9, 14) <= now < dt_time(9, 16)) or (
-            dt_time(15, 10) <= now < dt_time(15, 50)
+        if (EXEENTRPXY_PREOPEN_START <= now < EXEENTRPXY_PREOPEN_END) or (
+            EXEENTRPXY_ENTRY_CUTOFF <= now < EXEENTRPXY_SQUAREOFF_END
         ):
             print(f"{Fore.YELLOW}⏳ Market buffer time - skip")
             return
