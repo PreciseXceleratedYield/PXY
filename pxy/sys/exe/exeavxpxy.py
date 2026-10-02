@@ -75,7 +75,7 @@ def handle_side_averaging(client, df):
     if df is None or df.empty:
         return
     now = datetime.now(IST).time()
-    if not REBUY_ENABLED or not (MARKET_START <= now <= MARKET_END):
+    if not REBUY_ENABLED or not (MARKET_START <= now < MARKET_END):
         return
 
     working_df = df.copy()

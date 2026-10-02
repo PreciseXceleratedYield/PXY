@@ -45,7 +45,7 @@ def main():
 
         # 1. Market Timing Validation
         if (dt_time(9, 14) <= now < dt_time(9, 16)) or (
-            dt_time(15, 11) <= now < dt_time(15, 50)
+            dt_time(15, 10) <= now < dt_time(15, 50)
         ):
             print(f"{Fore.YELLOW}⏳ Market buffer time - skip")
             return

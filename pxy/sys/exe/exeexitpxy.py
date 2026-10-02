@@ -33,10 +33,10 @@ EXIT_LOCK_SECS = 5            # block a repeat sell for the same lot (symbol+tag
 EXIT_LOCK_FILE_NAME = ".exit_lock.json"
 EXIT_LOCK_KEEP_SECS = 600     # lock entries older than this are pruned from the lock file
 
-# Square-off windows (keep CBUY_CUTOFF in execbuypxy.py equal to SQOFF_START)
+# Square-off windows; all new buys stop at 15:10 before square-off begins.
 SQUAREOFF_SCRIPT = "exesqrpxy.py"
-SQOFF_START = dt_time(15, 14)      # from here: run square-off script (without -all)
-SQOFF_ALL_START = dt_time(15, 15)  # from here: run square-off script with -all
+SQOFF_START = dt_time(15, 11)      # from here: run square-off script (without -all)
+SQOFF_ALL_START = dt_time(15, 14)  # from here: run square-off script with -all
 SQOFF_END = dt_time(15, 50)        # from here: no square-off call
 SQUAREOFF_TIMEOUT_SECS = 120   # a hung square-off script must not freeze the pipe
 SQOFF_MIN_GAP_SECS = 20        # do not relaunch the same square-off call more often than this
@@ -214,9 +214,9 @@ def run_snapshot():
     
     if os.path.exists(exe_path):
         sq_args, sq_key = None, None
-        if SQOFF_START <= now < SQOFF_ALL_START:       # 15:14 up to 15:15: without -all
+        if SQOFF_START <= now < SQOFF_ALL_START:       # 15:11 up to 15:14: without -all
             sq_args, sq_key = [], "SQOFF|first"
-        elif SQOFF_ALL_START <= now < SQOFF_END:       # 15:15 up to 15:50: with -all
+        elif SQOFF_ALL_START <= now < SQOFF_END:       # 15:14 up to 15:50: with -all
             sq_args, sq_key = ["-all"], "SQOFF|all"
         if sq_args is not None:
             if ledger_busy():

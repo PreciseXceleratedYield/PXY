@@ -24,7 +24,7 @@ _COOL_DIR = os.path.dirname(os.path.abspath(__file__))   # cooldown tokens live 
 def _cool_path(side):
     return os.path.join(_COOL_DIR, f"exebal_cool_{side.lower()}.txt")
 MARKET_START = dt_time(9, 17)
-MARKET_END = dt_time(15, 11)
+MARKET_END = dt_time(15, 10)
 
 
 def safe_float(val, fallback=0.0):
