@@ -83,8 +83,128 @@ def dump_livpos_to_json(open_positions):
     except Exception as e: 
         print(f"Error dumping livpos to JSON: {e}") 
 
+def _fetch_live_price(client, token_id, ex_seg):
+    """5-tier fallback pricing hierarchy. Returns 0.0 when every tier fails."""
+    live_val = 0.0
+
+    try:
+        live_val = get_mid_price(client, token_id, ex_seg)
+    except Exception:
+        pass
+
+    if live_val <= 0:
+        try:
+            t_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
+            v2_q = client.quotes(instrument_tokens=t_payload, quote_type="ltp")
+            if isinstance(v2_q, dict):
+                data_chunk = v2_q.get("data") or v2_q.get("message") or v2_q
+                if isinstance(data_chunk, list) and len(data_chunk) > 0:
+                    live_val = float(data_chunk[0].get("ltp") or data_chunk[0].get("lastTradedPrice") or 0)
+                elif isinstance(data_chunk, dict):
+                    live_val = float(data_chunk.get("ltp") or data_chunk.get("lastTradedPrice") or 0)
+            elif isinstance(v2_q, list) and len(v2_q) > 0:
+                live_val = float(v2_q[0].get("ltp") or v2_q[0].get("lastTradedPrice") or 0)
+        except Exception:
+            pass
+
+    if live_val <= 0:
+        try:
+            scr_res = client.search_scrip(exchangeSegment=ex_seg, instrumentToken=str(token_id))
+            if isinstance(scr_res, list) and len(scr_res) > 0:
+                live_val = float(scr_res[0].get("ltp") or scr_res[0].get("lastPrice") or 0)
+            elif isinstance(scr_res, dict):
+                live_val = float(scr_res.get("ltp") or scr_res.get("lastPrice") or 0)
+        except Exception:
+            pass
+
+    if live_val <= 0 and hasattr(client, 'rest_client'):
+        try:
+            h_params = {"Sid": client.configuration.edit_sid, "Auth": client.configuration.edit_token, "Content-Type": "application/x-www-form-urlencoded"}
+            b_params = {"tokens": f"{ex_seg}|{token_id}", "quoteType": "ltp"}
+            URL = client.configuration.get_url_details("view_quotes")
+            resp = client.rest_client.request(url=URL, method='POST', headers=h_params, body=b_params)
+            if resp and hasattr(resp, 'json'):
+                js_out = resp.json()
+                if isinstance(js_out, dict) and "data" in js_out:
+                    items = js_out["data"]
+                    if isinstance(items, list) and len(items) > 0:
+                        live_val = float(items[0].get("ltp") or items[0].get("lastTradedPrice") or 0)
+                    elif isinstance(items, dict):
+                        live_val = float(items.get("ltp") or items.get("lastTradedPrice") or 0)
+        except Exception:
+            pass
+
+    return live_val if live_val and live_val > 0 else 0.0
+
+
+def _reconcile_open_with_broker(client, open_positions):
+    """Trims the tag-matched open lots to what the broker really holds, BEFORE the risk ledger sees them.
+    A lot closed outside tag matching (manual sell, untagged square-off) would otherwise stay 'open':
+    it would be marked at live price, inflate open_rows (tighter trailing stop) and drift game P&L.
+    Symbols with net <= 0 are dropped; when the broker holds less than the open lots add up to,
+    the newest lots are kept. If broker positions are unavailable the lots are returned unchanged."""
+    if not open_positions:
+        return open_positions
+    try:
+        res = client.positions()
+    except Exception as e:
+        print(f"⚠️ Ledger reconcile skipped (positions call failed: {e}).")
+        return open_positions
+
+    if not isinstance(res, dict) or not isinstance(res.get("data"), list):
+        msg = str((res or {}).get("errMsg", "") or (res or {}).get("message", "")).lower() if isinstance(res, dict) else ""
+        if "no data" in msg:
+            print("🧾 Ledger reconcile: broker is flat; open lots cleared.")
+            return []
+        print("⚠️ Ledger reconcile skipped (broker positions unavailable this cycle).")
+        return open_positions
+
+    def _num(v):
+        try:
+            return float(str(v).replace(",", "").strip() or 0)
+        except (ValueError, TypeError):
+            return 0.0
+
+    net = {}
+    for pos in res["data"]:
+        sym = str(pos.get("trdSym", "")).strip()
+        net[sym] = net.get(sym, 0.0) + _num(pos.get("flBuyQty", 0)) - _num(pos.get("flSellQty", 0))
+
+    by_symbol = {}
+    for p in open_positions:
+        by_symbol.setdefault(p["Symbol"], []).append(p)
+
+    kept = []
+    for sym, lots in by_symbol.items():
+        remaining = net.get(str(sym).strip(), 0.0)
+        if remaining <= 0:
+            print(f"🧾 Ledger reconcile: {sym} not held at broker; {len(lots)} stale open lot(s) dropped.")
+            continue
+        try:
+            ordered = sorted(lots, key=lambda x: x["Buy_Time"], reverse=True)   # newest first
+        except Exception:
+            ordered = list(reversed(lots))
+        for lot in ordered:
+            if remaining <= 0:
+                break
+            q = min(float(lot["Qty"]), remaining)
+            fixed = dict(lot)
+            fixed["Qty"] = q
+            fixed["PNL"] = int((fixed["Sell_Prc"] - fixed["Buy_Prc"]) * q)
+            kept.append(fixed)
+            remaining -= q
+    return kept
+
+
 def process_lilo_orders(client): 
     try: 
+        # MASTER RISK LEDGER hook 1: once-a-day stale web-cache override (runs before any data guard)
+        try:
+            import runexacpxy
+            runexacpxy.daily_purge_check()
+        except Exception as _risk_err:
+            print(f"⚠️ Master risk ledger (daily purge) error: {_risk_err}")
+
         if not client: 
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
@@ -155,60 +275,13 @@ def process_lilo_orders(client):
                     }) 
                     b["qty"] -= mqty 
 
-            # SURGICAL FIX: Implemented 5-Tier Fallback Pricing Hierarchy
+            # One live-price lookup per symbol (not per lot); every lot of a symbol shares the quote
+            symbol_live = None
             for b in buys: 
                 if b["qty"] > 0: 
-                    live_val = 0.0
-                    
-                    try:
-                        live_val = get_mid_price(client, token_id, ex_seg)
-                    except:
-                        pass
-                    
-                    if live_val <= 0:
-                        try:
-                            t_payload = [{"instrument_token": str(token_id), "exchange_segment": str(ex_seg)}]
-                            v2_q = client.quotes(instrument_tokens=t_payload, quote_type="ltp")
-                            if isinstance(v2_q, dict):
-                                data_chunk = v2_q.get("data") or v2_q.get("message") or v2_q
-                                if isinstance(data_chunk, list) and len(data_chunk) > 0:
-                                    live_val = float(data_chunk[0].get("ltp") or data_chunk[0].get("lastTradedPrice") or 0)
-                                elif isinstance(data_chunk, dict):
-                                    live_val = float(data_chunk.get("ltp") or data_chunk.get("lastTradedPrice") or 0)
-                            elif isinstance(v2_q, list) and len(v2_q) > 0:
-                                live_val = float(v2_q[0].get("ltp") or v2_q[0].get("lastTradedPrice") or 0)
-                        except:
-                            pass
-
-                    if live_val <= 0:
-                        try:
-                            scr_res = client.search_scrip(exchangeSegment=ex_seg, instrumentToken=str(token_id))
-                            if isinstance(scr_res, list) and len(scr_res) > 0:
-                                live_val = float(scr_res[0].get("ltp") or scr_res[0].get("lastPrice") or 0)
-                            elif isinstance(scr_res, dict):
-                                live_val = float(scr_res.get("ltp") or scr_res.get("lastPrice") or 0)
-                        except:
-                            pass
-
-                    if live_val <= 0 and hasattr(client, 'rest_client'):
-                        try:
-                            h_params = {"Sid": client.configuration.edit_sid, "Auth": client.configuration.edit_token, "Content-Type": "application/x-www-form-urlencoded"}
-                            b_params = {"tokens": f"{ex_seg}|{token_id}", "quoteType": "ltp"}
-                            URL = client.configuration.get_url_details("view_quotes")
-                            resp = client.rest_client.request(url=URL, method='POST', headers=h_params, body=b_params)
-                            if resp and hasattr(resp, 'json'):
-                                js_out = resp.json()
-                                if isinstance(js_out, dict) and "data" in js_out:
-                                    items = js_out["data"]
-                                    if isinstance(items, list) and len(items) > 0:
-                                        live_val = float(items[0].get("ltp") or items[0].get("lastTradedPrice") or 0)
-                                    elif isinstance(items, dict):
-                                        live_val = float(items.get("ltp") or items.get("lastTradedPrice") or 0)
-                        except:
-                            pass
-
-                    if live_val <= 0:
-                        live_val = b["prc"]
+                    if symbol_live is None:
+                        symbol_live = _fetch_live_price(client, token_id, ex_seg)
+                    live_val = symbol_live if symbol_live > 0 else b["prc"]
 
                     open_positions.append({ 
                         "Symbol": symbol, 
@@ -222,8 +295,18 @@ def process_lilo_orders(client):
                         "PNL": int((live_val - b["prc"]) * b["qty"]) 
                     }) 
 
+        open_positions = _reconcile_open_with_broker(client, open_positions)
         open_df = pd.DataFrame(open_positions) 
         closed_df = pd.DataFrame(closed_matches) 
+
+        # MASTER RISK LEDGER hook 2: evaluated before the data is handed to any pipeline.
+        # SystemExit (confirmed breach) is deliberately NOT caught; every other error only prints.
+        try:
+            import runexacpxy
+            runexacpxy.execute_master_risk_ledger(client, open_df, closed_df)
+        except Exception as _risk_err:
+            print(f"⚠️ Master risk ledger error (ledger still returned): {_risk_err}")
+
         total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0 
         total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0 
         _print_summary(total_unrealized, total_realized) 
@@ -244,5 +327,6 @@ def _print_summary(total_unrealized, total_realized):
     print(f"\n     🏃‍♂️ 🔸  {unreal_str}  🔸  🏃‍♂️   🥅  {color}{real_str}{Style.RESET_ALL}  🥅\n") 
 
 if __name__ == "__main__": 
+    os.environ["PXY_VIEW_ONLY"] = "1"   # viewing run: must not advance the ledger breach count
     client = get_session() 
     process_lilo_orders(client)
