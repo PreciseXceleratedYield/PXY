@@ -14,7 +14,7 @@ import pytz
 
 # ---------------- LOCAL SYSTEM CONFIGURATION ----------------
 PARAMS = {
-    "ticker": "BTC-USD",          # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
+    "ticker": "^NSEI",          # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
 }
 
 # ---------------- CONSTANTS DERIVED FROM CONFIG ----------------
