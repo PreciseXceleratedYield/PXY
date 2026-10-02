@@ -11,16 +11,15 @@ from syscnfgpxy import TIMEZONE
 try:
     from systrcalpxy import _compute_single_st, _compute_combo_force, _compute_sma_trend
 except ImportError as e:
-    print(f"🚨 CRITICAL CRASH PREVENTED: Cannot locate 'systrcalpxy.py'.", file=sys.stderr)
-    print("Applying fallback passives.", file=sys.stderr)
-    
-    def _compute_single_st(df, period, factor):
-        zeros = pd.Series(0.0, index=df.index)
-        return zeros, zeros, zeros, pd.Series(-1, index=df.index)
-    def _compute_sma_trend(df, period):
-        return pd.Series(0.0, index=df.index), pd.Series("SIDE", index=df.index)
-    def _compute_combo_force(df, st_period, st_factor, sma_period):
-        return pd.Series(0.0, index=df.index), pd.Series("SIDE", index=df.index)
+    # No fake trend: zeros would read as SIDE and live trading would carry on copying the candle.
+    # Every call now raises, and sysentrpxy turns that into NONE/NONE (no entry, no exit key).
+    print(f"🚨 CRITICAL: Cannot locate 'systrcalpxy.py' ({e}). Trend engine disabled.", file=sys.stderr)
+    _IMPORT_ERR = str(e)
+
+    def _engine_down(*args, **kwargs):
+        raise RuntimeError(f"systrcalpxy unavailable ({_IMPORT_ERR}); refusing to fake a trend.")
+
+    _compute_single_st = _compute_sma_trend = _compute_combo_force = _engine_down
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 DEBUG_MODE = False

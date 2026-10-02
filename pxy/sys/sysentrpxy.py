@@ -24,11 +24,15 @@ def get_entry_signal(df=None):
     mkt_dir, _ = get_signal(df)
     mkt_exit_dir = str(mkt_dir).upper().strip()
 
-    processed_st_df = calculate_supertrend(df.copy())
-    if processed_st_df.empty:
-        trend = "NONE"
-    else:
-        trend = str(processed_st_df["ST_Trend"].iloc[-1]).upper().strip()
+    try:
+        processed_st_df = calculate_supertrend(df.copy())
+        if processed_st_df is None or processed_st_df.empty:
+            trend = "NONE"
+        else:
+            trend = str(processed_st_df["ST_Trend"].iloc[-1]).upper().strip()
+    except Exception as e:
+        print(f"⚠️ Trend engine failed ({e}); signals forced to NONE.")
+        return "NONE", "NONE"
 
     # 🎯 ENTRY LAYER (Contrarian in trend, Pure MKT copy in SIDE)
     if trend == "BULL" and mkt_exit_dir == "BEAR":
