@@ -7,8 +7,8 @@ def get_entry_signal(df=None):
     """
     Finalized System Router Matrix:
     - ENTRY: 
-      - ST BULL/BEAR: Contrarian (ST BULL + MKT BEAR -> OTMBUY | ST BEAR + MKT BULL -> OTMSELL)
-      - ST SIDE: Pure MKT Copy (MKT BULL -> OTMBUY | MKT BEAR -> OTMSELL)
+      - ST BULL/BEAR: Contrarian (ST BULL + MKT BEAR -> BUY | ST BEAR + MKT BULL -> SELL)
+      - ST SIDE: Pure MKT Copy (MKT BULL -> BUY | MKT BEAR -> SELL)
     - EXIT: 
       - ST BULL/BEAR: Pure ST Copy (BULL -> BULL | BEAR -> BEAR)
       - ST SIDE: Pure MKT Copy (MKT BULL -> BULL | MKT BEAR -> BEAR)
@@ -36,14 +36,14 @@ def get_entry_signal(df=None):
 
     # 🎯 ENTRY LAYER (Contrarian in trend, Pure MKT copy in SIDE)
     if trend == "BULL" and mkt_exit_dir == "BEAR":
-        mapped_entry = "OTMBUY"
+        mapped_entry = "BUY"
     elif trend == "BEAR" and mkt_exit_dir == "BULL":
-        mapped_entry = "OTMSELL"
+        mapped_entry = "SELL"
     elif trend == "SIDE":
         if mkt_exit_dir == "BULL":
-            mapped_entry = "OTMBUY"
+            mapped_entry = "BUY"
         elif mkt_exit_dir == "BEAR":
-            mapped_entry = "OTMSELL"
+            mapped_entry = "SELL"
         else:
             mapped_entry = "NONE"
     else:
@@ -74,4 +74,3 @@ if __name__ == "__main__":
         print("RUNNING MATRIX (ENTRY AND EXIT COPY MKT ON SIDE)...")
         entry_sig, exit_sig = get_entry_signal(df)
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry_sig} | EXIT_SIG: {exit_sig}")
-

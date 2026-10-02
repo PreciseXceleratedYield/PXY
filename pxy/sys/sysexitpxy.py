@@ -19,8 +19,8 @@ def load_cached_data() -> pd.DataFrame:
         script_directory = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
         parent_directory = os.path.dirname(script_directory)
         
-        # Target the parallel 'web' sibling directory where sysddmppxy.py dumps JSON
-        json_path = os.path.join(parent_directory, "web", "sysddmppxy.json")
+        # Read the daily candle cache shared with the web charts.
+        json_path = os.path.join(parent_directory, "web", "webdaypxy.json")
         
         if not os.path.exists(json_path):
             return None

@@ -101,6 +101,7 @@ body{
 .sc-val.bull{color:var(--bull);}
 .sc-val.bear{color:var(--bear);}
 .sc-val.dim{color:var(--muted);}
+.sc-val.neutral{color:#fff;}
 .sc-val.side{color:#facc15;}
 
 /* ── TAB CONTENT ── */
@@ -619,13 +620,14 @@ function cls(v){
     if(['BULL','UP','BUY','CE','POSITIVE'].some(k=>s.includes(k)))return'bull';
     if(['BEAR','DOWN','SELL','PE','NEGATIVE'].some(k=>s.includes(k)))return'bear';
     if(s.includes('SIDE'))return'side';
+    if(s==='NONE')return'neutral';
     return'dim';
 }
 function emojifyEntry(v){
     const s=String(v||'').toUpperCase();
     if(s.includes('BUY')||s.includes('BULL'))return'🟢';
     if(s.includes('SELL')||s.includes('BEAR'))return'🔴';
-    if(s==='NONE')return'—';
+    if(s==='NONE')return'⚪';
     return v;
 }
 function emojifyExit(v){
@@ -633,7 +635,7 @@ function emojifyExit(v){
     if(s.includes('BUY')||s.includes('BULL'))return'▲▲';
     if(s.includes('SELL')||s.includes('BEAR'))return'▼▼';
     if(s.includes('SIDE'))return'●';
-    if(s==='NONE')return'—';
+    if(s==='NONE')return'⚪';
     return v;
 }
 function emojifyTrend(v){
@@ -641,21 +643,22 @@ function emojifyTrend(v){
     if(s.includes('BUY')||s.includes('BULL'))return'🟩';
     if(s.includes('SELL')||s.includes('BEAR'))return'🟥';
     if(s.includes('SIDE'))return'🟨';
-    if(s==='NONE')return'—';
+    if(s==='NONE')return'⚪';
     return v;
 }
 function emojifyDirection(v){
     const s=String(v||'').toUpperCase();
     if(s==='UP')return'🍏';
     if(s==='DOWN')return'🍎';
-    if(s==='NONE'||!s)return'—';
+    if(s==='NONE')return'⚪';
+    if(!s)return'—';
     return v;
 }
 function shortSym(s){
     if(!s)return'—';
     return s;
 }
-function lotSz(s){return(s||'').includes('BANKNIFTY')?30:65;}
+function lotSz(s){return 65;}
 
 /* ── SORT STATE ── */
 let psCol='pnl',psAsc=false;

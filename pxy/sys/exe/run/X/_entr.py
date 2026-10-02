@@ -74,7 +74,7 @@ def get_global_position_summary(client):
             if net_qty == 0: net_qty = float(pos.get("flBuyQty", 0)) - float(pos.get("flSellQty", 0))
             if abs(net_qty) > 0:
                 symbol = str(pos.get("trdSym", "")).upper()
-                if not symbol.endswith("CE") or "NIFTY" not in symbol or "BANKNIFTY" in symbol: continue
+                if not symbol.startswith("NIFTY") or not symbol.endswith("CE"): continue
                 if net_qty > 0: gl += int(abs(net_qty) / LOT_SIZE)
                 elif net_qty < 0: gs += int(abs(net_qty) / LOT_SIZE)
     except: pass
@@ -159,4 +159,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-

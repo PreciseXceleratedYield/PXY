@@ -360,7 +360,7 @@ function drawMomentum(stVals,closes){
 /* ── POSITIONS ── */
 function fmt(n){return(n>=0?'+':'')+Math.round(n).toLocaleString('en-IN');}
 function shortSym(s){if(!s)return'—';const m=s.match(/([A-Z]+)\d{2}([A-Z]{3})\d{2}(C|P)(\d+)/i);if(m)return`${m[1]} ${m[2]} ${m[4]} ${m[3]==='C'?'CE':'PE'}`;return s.length>18?s.slice(0,16)+'…':s;}
-function lotSize(s){return(s||'').includes('BANKNIFTY')?30:65;}
+function lotSize(s){return 65;}
 
 async function loadPos(){
     let data=[];

@@ -9,7 +9,6 @@ from colorama import Fore, init, Style
 
 # --- GLOBAL CONFIG ---
 DEBUG = False
-COUNTERBUY = "NO"
 
 init(autoreset=True)
 
@@ -55,12 +54,8 @@ def main():
         data = get_all_data()
         entry_signal = str(data.get("entry", "")).upper().strip()
 
-        if entry_signal in ["BULL", "BEAR", "NONE", "WAIT", ""]:
-            print(f"{Fore.MAGENTA}🛑 No-Action ({entry_signal[:10]}) - skip")
-            return
-
-        if "ATM" not in entry_signal and "OTM" not in entry_signal:
-            print(f"{Fore.YELLOW}⏳ Skip {entry_signal[:10]}: No ATM/OTM")
+        if entry_signal not in ("BUY", "SELL"):
+            print(f"{Fore.YELLOW}⏳ Skip {entry_signal[:10]}: Invalid entry signal")
             return
 
         # 3. Session Initialization
@@ -69,13 +64,7 @@ def main():
             print(f"{Fore.RED}❌ Session failed; entry skipped.")
             return
 
-        sig = entry_signal
-        if sig == "STBUY":
-            sig = "ATMBUY"
-        elif sig == "STSELL":
-            sig = "ATMSELL"
-
-        dprint(f"SIG OK: {sig}")
+        dprint(f"SIG OK: {entry_signal}")
 
         # 4. Position Check — proceed only on a confirmed flat result
         dprint("CHECKING POS...")
@@ -102,7 +91,7 @@ def main():
             return
 
         # 5. Route a signal only after pchk confirms both sides are flat
-        if "BUY" in sig:
+        if entry_signal == "BUY":
             print(
                 f"{Fore.GREEN}{Style.BRIGHT}"
                 "🟢 FRESH ENTRY: Firing command 'pxybuyce'..."
@@ -111,7 +100,7 @@ def main():
             if result != 0:
                 print(f"{Fore.RED}⚠️ pxybuyce exited with status {result}.")
 
-        elif "SELL" in sig:
+        elif entry_signal == "SELL":
             print(
                 f"{Fore.GREEN}{Style.BRIGHT}"
                 "🟢 FRESH ENTRY: Firing command 'pxybuype'..."

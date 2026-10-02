@@ -103,6 +103,7 @@ def get_all_data():
 
         "entry": core.get("entry"),
         "exit": core.get("exit"),
+        "market_data_available": core.get("market_data_available", False),
 
         # ===== NEW =====
         "candle_visual": core.get("candle_visual", ""),
@@ -138,4 +139,3 @@ if __name__ == "__main__":
     data = get_all_data()
     for k, v in data.items():
         print(f"{k:18}: {v}")
-

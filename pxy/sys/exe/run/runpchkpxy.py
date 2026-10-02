@@ -81,12 +81,9 @@ def get_position_summary(client=None):
             if not symbol:
                 raise ValueError("Active position row has no trading symbol.")
 
-            if "BANKNIFTY" in symbol:
-                lot_size = 30
-            elif "NIFTY" in symbol:
-                lot_size = 65
-            else:
+            if not symbol.startswith("NIFTY"):
                 continue
+            lot_size = 65
 
             lots = max(1, math.ceil(abs(net_qty) / lot_size))
 

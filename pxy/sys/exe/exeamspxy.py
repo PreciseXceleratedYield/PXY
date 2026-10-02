@@ -8,7 +8,7 @@ import logging
 from colorama import Fore, init
 
 init(autoreset=True)
-logger = logging.getLogger("exeavgpxy.strategy")
+logger = logging.getLogger("exeavxpxy.strategy")
 
 from exeacgpxy import (
     MAX_LAYERS, safe_float, generate_pxy_tag, is_cooling, set_cooling,

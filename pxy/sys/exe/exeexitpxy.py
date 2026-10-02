@@ -12,6 +12,7 @@ from colorama import init, Fore, Style
 from exeomspxy import get_combined_data 
 from runclntpxy import get_session 
 from runexlckpxy import ledger_busy      # stand the counter-buy down while the ledger lock is held
+from runlilopxy import position_net_quantity
 
 # IMPORT SYSTEM CO-PROCESSOR 
 from exeexppxy import analyze_targets_and_sides, process_metrics_print_and_dump, dump_idle_json
@@ -109,6 +110,15 @@ def get_sell_suffix():
     ms = datetime.now(IST).strftime('%f')[:-3]
     return f"_S{ms}" 
 
+def _order_accepted(response):
+    """Accept only the successful response shape documented by the Kotak Neo SDK."""
+    if not isinstance(response, dict):
+        return False
+    return (
+        str(response.get("stat", "")).strip().lower() == "ok"
+        and str(response.get("stCode", "")).strip() == "200"
+    )
+
 def place_exit_order(client, row): 
     """Triggers Sell order by appending an explicit _S{ms} suffix to the entry tag.""" 
     try: 
@@ -139,24 +149,20 @@ def place_exit_order(client, row):
         order_response = client.place_order(**params) 
         debug_log(f"Broker Raw API Response: {order_response}", Fore.GREEN) 
         
-        if isinstance(order_response, dict):
-            stat_str = str(order_response.get('stat', '')).lower()
-            err_msg = str(order_response.get('errMsg', '')).lower()
-            if "failed" in stat_str or "error" in err_msg or "error" in stat_str:
-                print(f"{Fore.RED}❌ BROKER CORE REJECTED ORDER: {err_msg} | {stat_str}")
-                return None
-        
-        if order_response: 
-            print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ ORDER PLACED ON EXCHANGE: {params['trading_symbol']} | TAG: {final_tag}") 
-            try:
-                parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                script_path = os.path.join(parent_dir, SYSDUMP_SCRIPT)
-                if os.path.exists(script_path):
-                    subprocess.Popen([sys.executable or "python3", script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                else:
-                    print(f"{Fore.RED}❌ Script not found at {script_path}")
-            except Exception as script_err:
-                print(f"{Fore.RED}❌ Error launching script: {script_err}")
+        if not _order_accepted(order_response):
+            print(f"{Fore.RED}❌ Broker did not confirm exit order acceptance: {order_response!r}")
+            return None
+
+        print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ ORDER ACCEPTED BY BROKER: {params['trading_symbol']} | TAG: {final_tag}")
+        try:
+            parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            script_path = os.path.join(parent_dir, SYSDUMP_SCRIPT)
+            if os.path.exists(script_path):
+                subprocess.Popen([sys.executable or "python3", script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            else:
+                print(f"{Fore.RED}❌ Script not found at {script_path}")
+        except Exception as script_err:
+            print(f"{Fore.RED}❌ Error launching script: {script_err}")
         return order_response 
         
     except Exception as e: 
@@ -167,7 +173,12 @@ def verify_and_exit(client, row):
     try: 
         symbol = str(row.get('symbol', '')) 
         pos_res = client.positions() 
-        if not pos_res or "data" not in pos_res: 
+        if (
+            not isinstance(pos_res, dict)
+            or str(pos_res.get("stat", "")).strip().lower() != "ok"
+            or str(pos_res.get("stCode", "")).strip() != "200"
+            or not isinstance(pos_res.get("data"), list)
+        ):
             print(f"{Fore.RED}⚠️ Safety Block: Could not verify positions.") 
             return 
             
@@ -179,9 +190,7 @@ def verify_and_exit(client, row):
         pos_df = pd.DataFrame(pos_res["data"]) 
         match = pos_df[pos_df['trdSym'] == symbol].copy()
         if not match.empty: 
-            for c in ("flBuyQty", "flSellQty"):
-                match[c] = pd.to_numeric(match[c], errors="coerce").fillna(0)
-            net_qty = int(match['flBuyQty'].sum() - match['flSellQty'].sum()) 
+            net_qty = int(sum(position_net_quantity(pos) for pos in match.to_dict("records")))
             if net_qty > 0: 
                 row = row.copy()
                 row['qty'] = min(net_qty, abs(int(float(row.get('qty', 0)))))
@@ -244,23 +253,26 @@ def run_snapshot():
 
     # Proactive Core Execution Routing Logic Block (Pure Single Targets)
     exited_keys = set()
-    for idx, r in df.iterrows():
-        # One bad row must not stop the remaining rows from being evaluated
-        try:
-            sym = str(r.get('symbol', ''))
-            ltp = float(r.get("sell_prc", 0))
-            tgt = float(r.get("pxy_tgt", 0))
-            pnl = float(r.get("pnl", 0))
+    if not data.get("market_snapshot_available"):
+        print(f"{Fore.YELLOW}⚠️ Market snapshot unavailable; target exits skipped this cycle.")
+    else:
+        for idx, r in df.iterrows():
+            # One bad row must not stop the remaining rows from being evaluated
+            try:
+                sym = str(r.get('symbol', ''))
+                ltp = float(r.get("sell_prc", 0))
+                tgt = float(r.get("pxy_tgt", 0))
+                pnl = float(r.get("pnl", 0))
 
-            debug_log(f"Global Enforced Single Exit Mode ({sym}). Mode: SINGLE TARGET.", Fore.GREEN)
+                debug_log(f"Global Enforced Single Exit Mode ({sym}). Mode: SINGLE TARGET.", Fore.GREEN)
 
-            # Pure Linear Target Evaluation Pool
-            if tgt > 0 and ltp > 0 and ltp >= tgt and pnl >= PNL_EXIT_MIN:
-                print(f"{Fore.GREEN}🎯 Target Hit & PnL Met ({sym}): LTP {ltp} >= TGT {tgt} | PnL {pnl} >= {PNL_EXIT_MIN} [Execution Mode: ONE]")
-                if verify_and_exit(client, r):
-                    exited_keys.add(_lock_key(r))
-        except Exception as e:
-            print(f"{Fore.RED}❌ Row evaluation error ({r.get('symbol', '?')}): {e}")
+                # Pure Linear Target Evaluation Pool
+                if tgt > 0 and ltp > 0 and ltp >= tgt and pnl >= PNL_EXIT_MIN:
+                    print(f"{Fore.GREEN}🎯 Target Hit & PnL Met ({sym}): LTP {ltp} >= TGT {tgt} | PnL {pnl} >= {PNL_EXIT_MIN} [Execution Mode: ONE]")
+                    if verify_and_exit(client, r):
+                        exited_keys.add(_lock_key(r))
+            except Exception as e:
+                print(f"{Fore.RED}❌ Row evaluation error ({r.get('symbol', '?')}): {e}")
 
     # Counter-leg check on whatever is still held after the target exits
     # (rows exited this cycle, or with an exit still in flight, are not counted as held)
@@ -270,7 +282,9 @@ def run_snapshot():
         for _, r in df.iterrows():
             k = _lock_key(r)
             held_mask.append(k not in exited_keys and not _recent(locks, k, EXIT_LOCK_SECS))
-        if data.get("positions_unverified"):
+        if not data.get("market_snapshot_available"):
+            print(f"{Fore.YELLOW}⚠️ Market snapshot unavailable; counter-buy skipped this cycle.")
+        elif data.get("positions_unverified"):
             print(f"{Fore.YELLOW}⚠️ Broker positions not verified this cycle; counter-buy skipped.")
         elif ledger_busy():
             print(f"{Fore.YELLOW}⚠️ Ledger lock held (tick or liquidation running); counter-buy skipped.")

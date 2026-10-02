@@ -16,7 +16,7 @@
 
 ## Project Overview
 
-**PXY** is an algorithmic options trading platform designed for Indian stock market indices (Nifty 50, Nifty Bank).
+**PXY** is an algorithmic options trading platform designed for the Nifty 50 index.
 
 ### Key Features
 - **Automated Signal Generation**: Real-time market analysis with BULL/BEAR/NONE classification
@@ -27,7 +27,6 @@
 
 ### Supported Assets
 - Nifty 50 (`^NSEI`)
-- Nifty Bank (`^NSEBANK`)
 - Bitcoin (`BTC-USD`)
 - Gold Futures (`GC=F`)
 - Forex pairs (`GBPUSD=X`, etc.)
@@ -109,7 +108,8 @@ pxy/
 │   │   ├── exepxy.py     # Main execution loop
 │   │   ├── exeentrpxy.py # Entry handler
 │   │   ├── exeexitpxy.py # Exit handler
-│   │   ├── exeavgpxy.py  # Position averaging
+│   │   ├── exeavgpxy.py  # Averaging pipeline runner
+│   │   ├── exeavxpxy.py  # Position averaging controller
 │   │   ├── exernkopxy.py # Option ranking
 │   │   └── run/          # Broker-specific runners
 │   │       ├── runclntpxy.py    # Session management
@@ -220,7 +220,6 @@ PARAMS = {
 ### Supported Tickers
 ```python
 "^NSEI"          # Nifty 50 Index (Primary)
-"^NSEBANK"       # Nifty Bank Index
 "BTC-USD"        # Bitcoin/USD
 "GC=F"           # Gold Futures
 "GBPUSD=X"       # GBP/USD Forex

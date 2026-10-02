@@ -16,7 +16,7 @@ def is_aligned(side, active_exit):
     s = side.upper()
     return (s == "CE" and a_exit in {"BULL"}) or (s == "PE" and a_exit in {"BEAR"})
 
-FORCE_DEFAULT = 1.2   # same default exeavgpxy uses when a force value is missing
+FORCE_DEFAULT = 1.2   # same default exeavxpxy uses when a force value is missing
 
 
 def _clean_force(v):

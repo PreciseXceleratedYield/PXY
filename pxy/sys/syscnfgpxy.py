@@ -14,7 +14,7 @@ import pytz
 
 # ---------------- LOCAL SYSTEM CONFIGURATION ----------------
 PARAMS = {
-    "ticker": "^NSEI",          # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
+    "ticker": "^NSEI",          # Nifty 50 index
 }
 
 # ---------------- CONSTANTS DERIVED FROM CONFIG ----------------
