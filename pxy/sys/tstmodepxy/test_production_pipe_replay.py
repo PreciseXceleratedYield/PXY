@@ -15,6 +15,14 @@ from tstmodepxy.replay_adapter import ProductionPipeReplay
 
 
 class ProductionPipeReplayTests(unittest.TestCase):
+    def test_production_pipe_sources_do_not_import_backtest_adapters(self):
+        production_exe = SYS_DIR / "exe"
+        for source in production_exe.glob("*.py"):
+            contents = source.read_text(encoding="utf-8")
+            with self.subTest(source=source.name):
+                self.assertNotIn("replay_adapter", contents)
+                self.assertNotIn("SimulatedBroker", contents)
+
     def test_entry_averaging_and_scheduled_squareoff_are_simulated(self):
         timezone = pytz.timezone("Asia/Kolkata")
         broker = SimulatedBroker()
