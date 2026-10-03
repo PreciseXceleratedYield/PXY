@@ -1,7 +1,10 @@
 #!/bin/bash
 
-# Navigate to the execution directory
-cd "$HOME/pxy/sys/exe/run" || { echo "Error: Directory ~/pxy/sys/exe/run not found"; exit 1; }
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/sys/exe/run" || {
+    echo "Error: Futures runner directory not found under $SCRIPT_DIR"
+    exit 1
+}
 
 # Optional: Activate virtual environment if needed
 # source "$HOME/pxy/env/bin/activate"

@@ -1,7 +1,9 @@
 # syspxy.py
 import json
+import math
 import os
 import subprocess
+from pathlib import Path
 from datetime import datetime
 from sysdashpxy import get_full_snapshot
 from systdaypxy import get_market_snapshot  # Keep your original 'systdaypxy'
@@ -12,13 +14,46 @@ from sysmodepxy import dispatch_mode
 # Import the clean json exporter from your streamlined trend engine
 from sysstrndpxy import export_supertrend_json
 
+
+def _get_production_nftfut_price():
+    fut_file_path = Path(__file__).resolve().parent / "exe" / "run" / "nftfut.json"
+    if not fut_file_path.exists():
+        print(f"Warning: {fut_file_path} not found. Using fallback price calculation.")
+        return None
+    try:
+        with fut_file_path.open("r", encoding="utf-8") as f:
+            fut_data = json.load(f)
+        if isinstance(fut_data, list):
+            target = fut_data[-1] if fut_data else {}
+        elif isinstance(fut_data, dict):
+            target = fut_data
+        else:
+            target = {}
+        if not isinstance(target, dict):
+            target = {}
+        price = float(
+            target.get("price", target.get("Close", target.get("last_price", 0)))
+        )
+        if not math.isfinite(price) or price <= 0:
+            print(f"Warning: {fut_file_path} contains no valid positive futures price.")
+            return None
+        return price
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
+        print(f"Warning: Failed to read or parse {fut_file_path}: {error}")
+        return None
+
+
 def get_all_data():
     # -------- RUN THE SCRIPT GLOBALLY FIRST --------
     def run_production_futures_sidecar():
+        sidecar_path = Path(__file__).resolve().parent.parent / "pxyfut"
+        if not sidecar_path.is_file():
+            print(f"Warning: Futures sidecar {sidecar_path} not found.")
+            return
         try:
-            subprocess.run(["pxyfut"], check=True)
-        except (subprocess.CalledProcessError, FileNotFoundError) as e:
-            print(f"Warning: Could not execute 'pxyfut' command: {e}")
+            subprocess.run(["bash", str(sidecar_path)], check=True)
+        except (subprocess.CalledProcessError, OSError) as error:
+            print(f"Warning: Could not execute futures sidecar {sidecar_path}: {error}")
 
     dispatch_mode("run_futures_sidecar", run_production_futures_sidecar)
 
@@ -37,35 +72,29 @@ def get_all_data():
     sentiment_text = expand_sentiment(sentiment_flag) if sentiment_flag else None
 
     # -------- DYNAMIC PRICE LOGIC (FUT AVERAGE OR FALLBACK) --------
-    base_price = core.get("price", 0)
-    final_price = base_price + 50  # Keep your original blind +50 as the default fallback
+    try:
+        base_price = float(core.get("price", 0) or 0)
+    except (TypeError, ValueError):
+        base_price = 0.0
+    if not math.isfinite(base_price):
+        base_price = 0.0
+    final_price = base_price + 50
     
-    fut_file_path = os.path.expanduser("~/pxy/sys/exe/run/nftfut.json")
-    if os.path.exists(fut_file_path):
+    fut_price = dispatch_mode("get_nftfut_price", _get_production_nftfut_price)
+    if fut_price is not None:
         try:
-            with open(fut_file_path, "r", encoding="utf-8") as f:
-                fut_data = json.load(f)
-                fut_price = None
-                
-                # Check if JSON is a list of rolling records and pull the last item
-                if isinstance(fut_data, list) and len(fut_data) > 0:
-                    latest_record = fut_data[-1]
-                    if isinstance(latest_record, dict):
-                        fut_price = latest_record.get("price")
-                # Fallback to check if it's still a flat dictionary
-                elif isinstance(fut_data, dict):
-                    fut_price = fut_data.get("price")
-                
-                if fut_price is not None:
-                    # Check if the FUT price is within ±200 of our base price
-                    if abs(base_price - fut_price) <= 200:
-                        final_price = (base_price + fut_price) / 2
-                    else:
-                        print(f"Warning: FUT price ({fut_price}) outside ±200 range of base ({base_price}). Using fallback.")
-        except Exception as e:
-            print(f"Warning: Failed to read or parse nftfut.json: {e}")
-    else:
-        print(f"Warning: {fut_file_path} not found. Using fallback price calculation.")
+            base_price = float(base_price)
+            fut_price = float(fut_price)
+            if math.isfinite(base_price) and math.isfinite(fut_price):
+                if abs(base_price - fut_price) <= 200:
+                    final_price = (base_price + fut_price) / 2
+                else:
+                    print(
+                        f"Warning: FUT price ({fut_price}) outside ±200 range "
+                        f"of base ({base_price}). Using fallback."
+                    )
+        except (TypeError, ValueError):
+            print("Warning: Invalid base or futures price. Using fallback.")
 
     # -------- COMBINE --------
     data = {

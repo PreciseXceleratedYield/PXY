@@ -5,6 +5,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import pytz
+from syscnfgpxy import RUNNIFTYPXY_HOLIDAYS
 from sysdecisionpxy import counter_leg_script
 from tstmodepxy.pipescenarios import (
     SCENARIOS,
@@ -241,14 +242,18 @@ def run_futures_sidecar():
     return None
 
 
+def get_nftfut_price():
+    return None
+
+
 def is_market_hours():
     now = datetime.now(pytz.timezone("Asia/Kolkata"))
-    return not _tst_engine_window_open(now)
+    return not _tst_engine_window_open(now, RUNNIFTYPXY_HOLIDAYS)
 
 
 def engine_window_open():
     now = datetime.now(pytz.timezone("Asia/Kolkata"))
-    return _tst_engine_window_open(now)
+    return _tst_engine_window_open(now, RUNNIFTYPXY_HOLIDAYS)
 
 
 def run_startup_checks():

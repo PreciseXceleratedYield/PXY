@@ -10,7 +10,7 @@ init(autoreset=True)
 # --- PATH CONFIGURATION ---
 HERE = Path(__file__).resolve().parent
 REGISTRY_FILE = HERE / "tknregistry.json"
-JSON_OUTPUT_FILE = HERE / "nftfut.json"
+JSON_OUTPUT_FILE = HERE / "nftopt.json"
 
 if str(HERE.parent) not in sys.path:
     sys.path.append(str(HERE.parent))
@@ -131,4 +131,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

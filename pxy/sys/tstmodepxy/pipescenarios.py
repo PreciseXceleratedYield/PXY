@@ -1,6 +1,6 @@
 """Expected, deterministic pipe decisions for the ten TST minute scenarios."""
 
-from datetime import time
+from datetime import datetime, time, timedelta, timezone
 
 from sysdecisionpxy import (
     averaging_order_response_accepted,
@@ -24,15 +24,6 @@ from sysdecisionpxy import (
     parse_position_summary,
     valid_exit_positions_response,
 )
-
-
-def engine_window_open(now):
-    """TST engine is permitted only outside weekday market hours (09:16-15:30 IST)."""
-    market_open = (
-        now.weekday() < 5
-        and time(9, 16) <= now.time().replace(tzinfo=None) < time(15, 30)
-    )
-    return not market_open
 
 
 SCENARIOS = (
@@ -109,12 +100,28 @@ SCENARIOS = (
 )
 
 
+def is_actual_market_hours(now=None, market_holidays=()):
+    ist = timezone(timedelta(hours=5, minutes=30))
+    now = now or datetime.now(ist)
+    if now.tzinfo is not None:
+        now = now.astimezone(ist)
+    return (
+        now.weekday() < 5
+        and now.strftime("%d-%b-%Y") not in set(market_holidays)
+        and time(9, 15) <= now.time().replace(tzinfo=None) < time(15, 30)
+    )
+
+
+def engine_window_open(now, market_holidays=()):
+    return not is_actual_market_hours(now, market_holidays)
+
+
 def evaluate_scenario(scenario):
     signal, ce_lots, pe_lots, expected_entry = scenario["entry"]
     actual_entry = entry_order_command(signal, ce_lots, pe_lots)
 
     target, price, pnl, minimum_pnl, expected_exit = scenario["target"]
-    actual_exit = target_exit_ready(target, price, pnl, minimum_pnl)
+    actual_exit = target_exit_allowed(True, target, price, pnl, minimum_pnl)
 
     exit_state, positions, expected_counter = scenario["counter"]
     actual_counter = counter_leg_script(
@@ -231,11 +238,69 @@ def evaluate_pipe_gate_matrix():
         ("averaging broker error response", lambda: averaging_order_response_accepted({"errMsg": "order error"}), False),
         ("averaging empty order response", lambda: averaging_order_response_accepted(None), False),
     )
+    failures = []
     for name, check, expected in cases:
-        actual = check()
-        if actual != expected:
-            raise AssertionError(f"{name}: expected {expected!r}, got {actual!r}")
+        try:
+            actual = check()
+            if actual != expected:
+                failures.append(
+                    f"{name}: expected {expected!r}, got {actual!r}"
+                )
+        except Exception as error:
+            failures.append(f"{name}: raised {error!r}")
+    if failures:
+        raise AssertionError("; ".join(failures))
     return len(cases)
+
+
+def run_tst_suite():
+    """Run ten isolated pipe scenarios, print a final summary, and return success."""
+    failures = []
+    print("TST PIPE CHECK: starting 10 scenarios; broker and orders are disabled.")
+    for index, scenario in enumerate(SCENARIOS, start=1):
+        try:
+            result = evaluate_scenario(scenario)
+            print(
+                f"ITERATION {index}/10 PASS — {scenario['name']} | "
+                f"entry={result['entry'] or 'none'}, "
+                f"target_exit={result['target_exit']}, "
+                f"counter={result['counter_leg'] or 'none'}, "
+                f"averaging={result['averaging']}"
+            )
+        except Exception as error:
+            failures.append(f"scenario {index}: {error}")
+            print(f"ITERATION {index}/10 FAIL — {scenario['name']}: {error}")
+
+    gate_count = 0
+    try:
+        gate_count = evaluate_pipe_gate_matrix()
+        print(f"PIPE GATES PASS — {gate_count} production gate checks")
+    except Exception as error:
+        failures.append(f"pipe gate checks: {error}")
+        print(f"PIPE GATES FAIL — {error}")
+
+    successful_scenarios = len(SCENARIOS) - sum(
+        failure.startswith("scenario ") for failure in failures
+    )
+    passed = not failures
+    print(
+        f"TST FINAL RESULT: {'PASS' if passed else 'FAIL'} — "
+        f"{successful_scenarios}/{len(SCENARIOS)} scenarios passed; "
+        f"{gate_count} pipe gate checks passed; {len(failures)} failure(s)."
+    )
+    for failure in failures:
+        print(f"TST FAILURE: {failure}")
+    print("TST PIPE CHECK: complete; exiting.")
+    return passed
+
+
+def run_tst_entrypoint(market_holidays=(), now=None, suite_runner=None):
+    """Run the offline suite only when the exchange is outside regular hours."""
+    if is_actual_market_hours(now, market_holidays):
+        print("TST BLOCKED: market hours are active (09:15-15:30 IST). No tests were run.")
+        return None
+    runner = run_tst_suite if suite_runner is None else suite_runner
+    return runner()
 
 
 def selected_scenario_index(minute):

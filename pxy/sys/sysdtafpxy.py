@@ -1,4 +1,5 @@
 import json
+import math
 import os
 import warnings
 import numpy as np
@@ -217,8 +218,8 @@ def _fetch_yf_data_production(
         if period is not None:
             try:
                 df = ticker_obj.history(period=period, interval=interval)
-            except Exception:
-                pass
+            except Exception as error:
+                print(f"Warning: Yahoo Finance history request failed for {period}: {error}")
 
         # Loop with realistic 1-minute allowable lookup horizons (dropped problematic "max")
         if df.empty or len(df) < buffer_rows:
@@ -250,17 +251,25 @@ def _fetch_yf_data_production(
             try:
                 with open(fut_file_path, "r", encoding="utf-8") as f:
                     fut_data = json.load(f)
-                    # Adaptive dictionary check covering 'price', 'Close', or value indexing variants
                     if isinstance(fut_data, list) and len(fut_data) > 0:
                         target_node = fut_data[-1]
                     elif isinstance(fut_data, dict):
                         target_node = fut_data
                     else:
                         target_node = {}
-                        
-                    fallback_price = float(target_node.get("price", target_node.get("Close", target_node.get("last_price", 0.0))))
-            except Exception:
-                pass
+                    if not isinstance(target_node, dict):
+                        target_node = {}
+                    fallback_price = float(
+                        target_node.get(
+                            "price",
+                            target_node.get("Close", target_node.get("last_price", 0.0)),
+                        )
+                    )
+                    if not math.isfinite(fallback_price) or fallback_price <= 0:
+                        fallback_price = 0.0
+                        print(f"Warning: {fut_file_path} has no valid positive futures price.")
+            except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
+                print(f"Warning: Could not read futures fallback {fut_file_path}: {error}")
                 
         if fallback_price > 0:
             current_time = pd.Timestamp.now(tz=TIMEZONE)

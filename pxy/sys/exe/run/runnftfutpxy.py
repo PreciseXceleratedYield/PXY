@@ -3,13 +3,15 @@ from datetime import datetime, timedelta
 import json
 import csv
 import os
+from pathlib import Path
 
 # ============================================================
 # CONFIG
 # ============================================================
 EXCHANGE_SEGMENT = "nse_fo"
-CSV_FILE = "nifty_fut.csv"
-JSON_OUTPUT_FILE = "nftfut.json"
+HERE = Path(__file__).resolve().parent
+CSV_FILE = HERE / "nifty_fut.csv"
+JSON_OUTPUT_FILE = HERE / "nftfut.json"
 
 
 # ============================================================
@@ -102,7 +104,7 @@ def search_nifty_future(client, expiry):
 def save_futures_csv(row):
     fields = ["symbol", "token", "expiry", "lot_size"]
     try:
-        with open(CSV_FILE, "w", newline="", encoding="utf-8") as f:
+        with CSV_FILE.open("w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(f, fieldnames=fields)
             writer.writeheader()
             writer.writerow({
@@ -111,22 +113,23 @@ def save_futures_csv(row):
                 "expiry": row.get("pExpiryDate"),
                 "lot_size": row.get("lLotSize")
             })
-    except Exception:
-        pass
+    except OSError as error:
+        print(f"Warning: Could not update futures registry {CSV_FILE}: {error}")
 
 
 # ============================================================
 # READ TOKEN CSV
 # ============================================================
 def read_futures_csv():
-    if not os.path.exists(CSV_FILE):
+    if not CSV_FILE.exists():
         return None
     try:
-        with open(CSV_FILE, "r", newline="", encoding="utf-8") as f:
+        with CSV_FILE.open("r", newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             row = next(reader, None)
             return row if row else None
-    except Exception:
+    except OSError as error:
+        print(f"Warning: Could not read futures registry {CSV_FILE}: {error}")
         return None
 
 
@@ -185,8 +188,8 @@ def save_price_to_json(price: float):
         records = []
         
         # Read existing records if file is present
-        if os.path.exists(JSON_OUTPUT_FILE) and os.path.getsize(JSON_OUTPUT_FILE) > 0:
-            with open(JSON_OUTPUT_FILE, "r", encoding="utf-8") as f:
+        if JSON_OUTPUT_FILE.exists() and JSON_OUTPUT_FILE.stat().st_size > 0:
+            with JSON_OUTPUT_FILE.open("r", encoding="utf-8") as f:
                 existing_data = json.load(f)
                 if isinstance(existing_data, list):
                     records = existing_data
@@ -203,10 +206,12 @@ def save_price_to_json(price: float):
         records = records[-50:]
 
         # Save back to output
-        with open(JSON_OUTPUT_FILE, "w", encoding="utf-8") as f:
+        temporary_file = JSON_OUTPUT_FILE.with_suffix(".json.tmp")
+        with temporary_file.open("w", encoding="utf-8") as f:
             json.dump(records, f, indent=4)
-    except Exception:
-        pass
+        os.replace(temporary_file, JSON_OUTPUT_FILE)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
+        print(f"Warning: Could not update futures prices {JSON_OUTPUT_FILE}: {error}")
 
 
 # ============================================================
