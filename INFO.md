@@ -504,24 +504,39 @@ Set `RUNMODE` to `"TST"` to select the isolated providers in
 `pxy/sys/tstmodepxy/`. Test-only mock data and position scenarios live there; the
 production implementations remain separate and are selected by the single
 `sysmodepxy.py` dispatch boundary. TST disables broker sessions and Yahoo Finance
-requests in the production launcher. The ten-scenario offline test runner is
-separate from `exepxy.py`: run `./pxytst` from the `pxy/` directory. It prints
-the ten iteration results and a final PASS/FAIL summary, then exits. It refuses
-to run during weekday market hours (09:15-15:30 IST) and respects the configured
-market holidays. It never changes `RUNMODE` or calls the production launcher.
+requests in the production launcher. The `pxytst` command is separate from
+`exepxy.py`: it runs a walk-forward replay of the latest completed NIFTY
+session, refuses to run during weekday market hours (09:15-15:30 IST), writes
+CSV ledgers, and exits. It respects configured market holidays and never
+changes `RUNMODE` or calls the production launcher.
 
 The default is `RUNMODE = "PRD"` for the scheduled production engine. Set
 `RUNMODE = "TST"` only when deliberately running the engine with isolated mock
-providers. The standalone `pxytst` suite is independent of this switch and does
-not start the production launcher.
-The mock position scenario advances by the last digit of the current IST minute:
-`:01` selects scenario 1 through `:09` selecting scenario 9, and `:00` selects
-scenario 10. Each case checks entry, target exit, counter-leg, and averaging
-decisions. The TST runner also checks 68 production decision-gate cases for
-entry validation, target exits, position verification, counter-buy eligibility,
-and averaging using simulated responses; it never submits an order. Run the
-suite with `./pxytst` or its unit tests with
+providers. The standalone `pxytst` walk-forward replay is independent of this
+switch and does not start the production launcher.
+The separate TST mock provider can generate ten mock position shapes, selected
+by minute, for manually inspecting the simulated engine. These are not what
+`pxytst` runs. Focused unit tests cover the production decision gates and the
+walk-forward simulation without submitting orders; run them with
 `python3 -m unittest discover -s pxy/sys/tstmodepxy -p 'test_*.py'`.
+
+### One-session strategy replay
+
+Run `python3 sysbtstpxy.py` from `pxy/sys/`. The separate simulator fetches
+recent one-minute NIFTY data for indicator warmup, selects the latest completed
+session, and replays each bar from 09:16 IST through the configured production
+square-off. It uses the production OHLC transformation, entry/exit signal
+router, and shared entry validation/order-command gates. It never calls the
+broker or starts the production engine. It writes both a simulated trade ledger
+and a bar-by-bar decision CSV under `~/pxy-backtest-results/`.
+
+Without historical option premiums, fills and P&L use NIFTY spot movement as a
+one-unit CE/PE direction proxy. Signals from a completed candle fill at the
+next candle open to avoid same-close lookahead. Opposite-signal exits are only
+a proxy for the premium-dependent production exit targets; averaging, counter
+orders, broker behavior, costs, and slippage are not represented. This replay
+is useful for reviewing strategy signals, not a full historical
+options-performance test.
 
 ---
 
