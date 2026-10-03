@@ -20,6 +20,13 @@ for path in (RUN_DIR, HERE, SYS_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
+from syscnfgpxy import RUNMODE
+
+if __name__ == "__main__" and RUNMODE == "SIM":
+    from syssimpxy import main as run_simulation
+
+    raise SystemExit(run_simulation())
+
 from sysmodepxy import dispatch_mode
 
 # ---------------- HELPER FUNCTIONS ----------------

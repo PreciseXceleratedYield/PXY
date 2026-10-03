@@ -5,6 +5,7 @@ import time
 import subprocess
 from datetime import datetime, time as dt_time
 import pytz
+from syscnfgpxy import RUNMODE
 from sysmodepxy import dispatch_mode
 
 # ---------------- EXEC SCRIPT ----------------
@@ -60,6 +61,11 @@ def is_market_hours():
 # ---------------- SUPERVISOR LOOP ----------------
 def start_loop():
     """Main loop to supervise execution"""
+    if RUNMODE == "SIM":
+        from syssimpxy import main as run_simulation
+
+        return run_simulation()
+
     if dispatch_mode("run_startup_checks", lambda: True):
         run_execprt()
     else:
