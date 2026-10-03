@@ -98,40 +98,70 @@ def fetch_backtest_data(
 
 
 MOCK_SCENARIOS = (
-    ("No positions", (), ()),
-    ("Open CE winner", (("NIFTY26JUN25000CE", "TST-CE-WIN", 1, 100.0, 112.0),), ()),
-    ("Open PE loser", (("NIFTY26JUN25000PE", "TST-PE-LOSS", 1, 105.0, 91.0),), ()),
-    ("Closed CE winner", (), (("NIFTY26JUN25000CE", "TST-CLOSED-WIN", 1, 100.0, 118.0),)),
-    ("Closed PE loser", (), (("NIFTY26JUN25000PE", "TST-CLOSED-LOSS", 1, 110.0, 94.0),)),
     (
-        "Open CE and PE",
+        "01: single CE winner",
+        (("NIFTY26OCT25000CE", "TST-ENTRY-01", 1, 100.0, 118.0),),
+        (),
+    ),
+    (
+        "02: single PE loser",
+        (("NIFTY26OCT25000PE", "TST-ENTRY-02", 1, 125.0, 103.0),),
+        (),
+    ),
+    (
+        "03: CE break-even",
+        (("NIFTY26OCT25100CE", "TST-ENTRY-03", 2, 95.0, 95.0),),
+        (),
+    ),
+    (
+        "04: multi-quantity PE winner",
+        (("NIFTY26OCT25100PE", "TST-ENTRY-04", 3, 82.0, 101.0),),
+        (),
+    ),
+    (
+        "05: balanced CE and PE",
         (
-            ("NIFTY26JUN25000CE", "TST-MIX-CE", 1, 100.0, 108.0),
-            ("NIFTY26JUN25000PE", "TST-MIX-PE", 1, 100.0, 96.0),
+            ("NIFTY26OCT25000CE", "TST-ENTRY-05-CE", 1, 100.0, 108.0),
+            ("NIFTY26OCT25000PE", "TST-ENTRY-05-PE", 1, 100.0, 91.0),
         ),
         (),
     ),
     (
-        "Layered CE positions",
+        "06: layered CE entries",
         (
-            ("NIFTY26JUN25000CE", "TST-LAYER-1", 1, 98.0, 105.0),
-            ("NIFTY26JUN25100CE", "TST-LAYER-2", 2, 104.0, 105.0),
+            ("NIFTY26OCT25000CE", "TST-ENTRY-06-A", 1, 98.0, 111.0),
+            ("NIFTY26OCT25100CE", "TST-ENTRY-06-B", 2, 105.0, 99.0),
         ),
         (),
     ),
-    ("Break-even close", (), (("NIFTY26JUN25000CE", "TST-BREAKEVEN", 1, 100.0, 100.0),)),
     (
-        "Mixed closed results",
-        (),
+        "07: multiple PE losing lots",
         (
-            ("NIFTY26JUN25000CE", "TST-CLOSED-UP", 2, 100.0, 120.0),
-            ("NIFTY26JUN25000PE", "TST-CLOSED-DOWN", 1, 110.0, 90.0),
+            ("NIFTY26OCT24900PE", "TST-ENTRY-07-A", 1, 92.0, 73.0),
+            ("NIFTY26OCT24800PE", "TST-ENTRY-07-B", 2, 110.0, 88.0),
+        ),
+        (),
+    ),
+    (
+        "08: open PE plus closed CE",
+        (("NIFTY26OCT25000PE", "TST-ENTRY-08-OPEN", 1, 100.0, 107.0),),
+        (("NIFTY26OCT25000CE", "TST-ENTRY-08-CLOSED", 1, 95.0, 113.0),),
+    ),
+    (
+        "09: open CE plus mixed closes",
+        (("NIFTY26OCT25100CE", "TST-ENTRY-09-OPEN", 2, 103.0, 97.0),),
+        (
+            ("NIFTY26OCT25000CE", "TST-ENTRY-09-UP", 2, 80.0, 98.0),
+            ("NIFTY26OCT25000PE", "TST-ENTRY-09-DOWN", 1, 115.0, 89.0),
         ),
     ),
     (
-        "Open and closed trades",
-        (("NIFTY26JUN25000PE", "TST-ACTIVE", 1, 100.0, 107.0),),
-        (("NIFTY26JUN25000CE", "TST-REALIZED", 1, 95.0, 103.0),),
+        "10: repeated-symbol entries and close",
+        (
+            ("NIFTY26OCT25000CE", "TST-ENTRY-10-A", 1, 100.0, 116.0),
+            ("NIFTY26OCT25000CE", "TST-ENTRY-10-B", 2, 109.0, 96.0),
+        ),
+        (("NIFTY26OCT25000PE", "TST-ENTRY-10-CLOSED", 1, 87.0, 102.0),),
     ),
 )
 
@@ -148,6 +178,7 @@ def process_lilo_orders(client=None, strict=False, timezone="Asia/Kolkata"):
         buy_time = now.replace(second=0, microsecond=0) - pd.Timedelta(minutes=offset)
         return {
             "Symbol": symbol,
+            "Scenario": name,
             "Qty": qty,
             "Tag": tag,
             "tok": f"TST-{symbol[-2:]}",
@@ -159,7 +190,7 @@ def process_lilo_orders(client=None, strict=False, timezone="Asia/Kolkata"):
         }
 
     columns = [
-        "Symbol", "Qty", "Tag", "tok", "Buy_Time", "Buy_Prc",
+        "Scenario", "Symbol", "Qty", "Tag", "tok", "Buy_Time", "Buy_Prc",
         "Exit_Time", "Sell_Prc", "PNL",
     ]
     open_df = pd.DataFrame(
@@ -171,6 +202,12 @@ def process_lilo_orders(client=None, strict=False, timezone="Asia/Kolkata"):
         columns=columns,
     )
     print(f"TST MODE: scenario {scenario_index + 1}/10 — {name} (minute {now.minute:02d}).")
+    if not open_df.empty:
+        print("Mock active entry rows:")
+        print(open_df[["Scenario", "Symbol", "Tag", "Qty", "Buy_Prc", "Sell_Prc", "PNL"]].to_string(index=False))
+    if not closed_df.empty:
+        print("Mock closed entry rows:")
+        print(closed_df[["Scenario", "Symbol", "Tag", "Qty", "Buy_Prc", "Sell_Prc", "PNL"]].to_string(index=False))
     unrealized = open_df["PNL"].sum() if not open_df.empty else 0
     realized = closed_df["PNL"].sum() if not closed_df.empty else 0
     color = "\033[92m" if realized >= 0 else "\033[91m"
