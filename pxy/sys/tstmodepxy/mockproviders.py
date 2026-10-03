@@ -97,7 +97,7 @@ def run_independent_engine():
     web_dir.mkdir(parents=True, exist_ok=True)
     frame = generate_mock_ohlc(390, "1m", "Asia/Kolkata")
     frame.to_json(web_dir / "webdaypxy.json", date_format="iso", orient="split")
-    print(f"TST MODE: wrote {len(frame)} mock candles.")
+    print(f"CHK MODE: wrote {len(frame)} mock candles.")
     return frame
 
 
@@ -112,68 +112,68 @@ def fetch_backtest_data(
 MOCK_SCENARIOS = (
     (
         "01: single CE winner",
-        (("NIFTY26OCT25000CE", "TST-ENTRY-01", 1, 100.0, 118.0),),
+        (("NIFTY26OCT25000CE", "CHK-ENTRY-01", 1, 100.0, 118.0),),
         (),
     ),
     (
         "02: single PE loser",
-        (("NIFTY26OCT25000PE", "TST-ENTRY-02", 1, 125.0, 103.0),),
+        (("NIFTY26OCT25000PE", "CHK-ENTRY-02", 1, 125.0, 103.0),),
         (),
     ),
     (
         "03: CE break-even",
-        (("NIFTY26OCT25100CE", "TST-ENTRY-03", 2, 95.0, 95.0),),
+        (("NIFTY26OCT25100CE", "CHK-ENTRY-03", 2, 95.0, 95.0),),
         (),
     ),
     (
         "04: multi-quantity PE winner",
-        (("NIFTY26OCT25100PE", "TST-ENTRY-04", 3, 82.0, 101.0),),
+        (("NIFTY26OCT25100PE", "CHK-ENTRY-04", 3, 82.0, 101.0),),
         (),
     ),
     (
         "05: balanced CE and PE",
         (
-            ("NIFTY26OCT25000CE", "TST-ENTRY-05-CE", 1, 100.0, 108.0),
-            ("NIFTY26OCT25000PE", "TST-ENTRY-05-PE", 1, 100.0, 91.0),
+            ("NIFTY26OCT25000CE", "CHK-ENTRY-05-CE", 1, 100.0, 108.0),
+            ("NIFTY26OCT25000PE", "CHK-ENTRY-05-PE", 1, 100.0, 91.0),
         ),
         (),
     ),
     (
         "06: layered CE entries",
         (
-            ("NIFTY26OCT25000CE", "TST-ENTRY-06-A", 1, 98.0, 111.0),
-            ("NIFTY26OCT25100CE", "TST-ENTRY-06-B", 2, 105.0, 99.0),
+            ("NIFTY26OCT25000CE", "CHK-ENTRY-06-A", 1, 98.0, 111.0),
+            ("NIFTY26OCT25100CE", "CHK-ENTRY-06-B", 2, 105.0, 99.0),
         ),
         (),
     ),
     (
         "07: multiple PE losing lots",
         (
-            ("NIFTY26OCT24900PE", "TST-ENTRY-07-A", 1, 92.0, 73.0),
-            ("NIFTY26OCT24800PE", "TST-ENTRY-07-B", 2, 110.0, 88.0),
+            ("NIFTY26OCT24900PE", "CHK-ENTRY-07-A", 1, 92.0, 73.0),
+            ("NIFTY26OCT24800PE", "CHK-ENTRY-07-B", 2, 110.0, 88.0),
         ),
         (),
     ),
     (
         "08: open PE plus closed CE",
-        (("NIFTY26OCT25000PE", "TST-ENTRY-08-OPEN", 1, 100.0, 107.0),),
-        (("NIFTY26OCT25000CE", "TST-ENTRY-08-CLOSED", 1, 95.0, 113.0),),
+        (("NIFTY26OCT25000PE", "CHK-ENTRY-08-OPEN", 1, 100.0, 107.0),),
+        (("NIFTY26OCT25000CE", "CHK-ENTRY-08-CLOSED", 1, 95.0, 113.0),),
     ),
     (
         "09: open CE plus mixed closes",
-        (("NIFTY26OCT25100CE", "TST-ENTRY-09-OPEN", 2, 103.0, 97.0),),
+        (("NIFTY26OCT25100CE", "CHK-ENTRY-09-OPEN", 2, 103.0, 97.0),),
         (
-            ("NIFTY26OCT25000CE", "TST-ENTRY-09-UP", 2, 80.0, 98.0),
-            ("NIFTY26OCT25000PE", "TST-ENTRY-09-DOWN", 1, 115.0, 89.0),
+            ("NIFTY26OCT25000CE", "CHK-ENTRY-09-UP", 2, 80.0, 98.0),
+            ("NIFTY26OCT25000PE", "CHK-ENTRY-09-DOWN", 1, 115.0, 89.0),
         ),
     ),
     (
         "10: repeated-symbol entries and close",
         (
-            ("NIFTY26OCT25000CE", "TST-ENTRY-10-A", 1, 100.0, 116.0),
-            ("NIFTY26OCT25000CE", "TST-ENTRY-10-B", 2, 109.0, 96.0),
+            ("NIFTY26OCT25000CE", "CHK-ENTRY-10-A", 1, 100.0, 116.0),
+            ("NIFTY26OCT25000CE", "CHK-ENTRY-10-B", 2, 109.0, 96.0),
         ),
-        (("NIFTY26OCT25000PE", "TST-ENTRY-10-CLOSED", 1, 87.0, 102.0),),
+        (("NIFTY26OCT25000PE", "CHK-ENTRY-10-CLOSED", 1, 87.0, 102.0),),
     ),
 )
 
@@ -191,7 +191,7 @@ def process_lilo_orders(client=None, strict=False, timezone="Asia/Kolkata"):
             "Scenario": name,
             "Qty": qty,
             "Tag": tag,
-            "tok": f"TST-{symbol[-2:]}",
+            "tok": f"CHK-{symbol[-2:]}",
             "Buy_Time": buy_time,
             "Buy_Prc": buy_price,
             "Exit_Time": buy_time + pd.Timedelta(minutes=1) if is_closed else "OPEN",
@@ -211,7 +211,7 @@ def process_lilo_orders(client=None, strict=False, timezone="Asia/Kolkata"):
         [make_record(spec, index + 3, True) for index, spec in enumerate(closed_specs)],
         columns=columns,
     )
-    print(f"TST MODE: scenario {scenario_index + 1}/10 — {name} (minute {now.minute:02d}).")
+    print(f"CHK MODE: scenario {scenario_index + 1}/10 — {name} (minute {now.minute:02d}).")
     if not open_df.empty:
         print("Mock active entry rows:")
         print(open_df[["Scenario", "Symbol", "Tag", "Qty", "Buy_Prc", "Sell_Prc", "PNL"]].to_string(index=False))
@@ -233,12 +233,12 @@ def get_mock_active_orders():
 
 
 def get_session():
-    print("TST MODE: broker session disabled.")
+    print("CHK MODE: broker session disabled.")
     return None
 
 
 def run_futures_sidecar():
-    print("TST MODE: futures sidecar disabled.")
+    print("CHK MODE: futures sidecar disabled.")
     return None
 
 
@@ -277,13 +277,13 @@ def allow_squareoff():
 
 
 def verify_and_exit(client, row):
-    print(f"TST MODE: simulated exit check for {row.get('symbol', '')}; no order sent.")
+    print(f"CHK MODE: simulated exit check for {row.get('symbol', '')}; no order sent.")
     return None
 
 
 def run_counter_leg(remaining_df=None):
     if remaining_df is None or remaining_df.empty:
-        print("TST MODE: counter-leg scenario has no held rows.")
+        print("CHK MODE: counter-leg scenario has no held rows.")
         return False
     state = str(remaining_df.iloc[0].get("exit", "NONE")).upper().strip()
     script_name = counter_leg_script(
@@ -292,9 +292,9 @@ def run_counter_leg(remaining_df=None):
         {"CE": "pxybuype", "PE": "pxybuyce"},
     )
     if script_name:
-        print(f"TST MODE: counter-leg decision would run {script_name}; no order sent.")
+        print(f"CHK MODE: counter-leg decision would run {script_name}; no order sent.")
         return True
-    print("TST MODE: counter-leg decision is no action; no order sent.")
+    print("CHK MODE: counter-leg decision is no action; no order sent.")
     return False
 
 
@@ -305,10 +305,10 @@ def skip_live_averaging():
     result = evaluate_scenario(scenario)
     checked_gates = evaluate_pipe_gate_matrix()
     print(
-        f"TST PIPE SCENARIO {index + 1}/10: PASS — {scenario['name']} | "
+        f"CHK PIPE SCENARIO {index + 1}/10: PASS — {scenario['name']} | "
         f"entry={result['entry'] or 'none'}, target_exit={result['target_exit']}, "
         f"counter={result['counter_leg'] or 'none'}, averaging={result['averaging']} | "
         f"{checked_gates} production pipe gate checks passed"
     )
-    print("TST MODE: decision checks only; no orders sent.")
+    print("CHK MODE: decision checks only; no orders sent.")
     return True

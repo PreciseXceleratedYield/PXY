@@ -231,7 +231,7 @@ def _verify_and_exit_production(client, row):
 
 def run_snapshot():
     if not dispatch_mode("engine_window_open", lambda: True):
-        print(f"{Fore.YELLOW}TST engine paused during market hours; exit pipe not run.")
+        print(f"{Fore.YELLOW}CHK engine paused during market hours; exit pipe not run.")
         return
 
     now = datetime.now(SYSCNFGPXY_TIMEZONE).time()

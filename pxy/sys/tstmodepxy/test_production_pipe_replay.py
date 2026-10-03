@@ -9,6 +9,7 @@ if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 
 import pytz
+from unittest.mock import patch
 
 from tstmodepxy.broker_sim import SimulatedBroker
 from tstmodepxy.replay_adapter import ProductionPipeReplay
@@ -54,7 +55,9 @@ class ProductionPipeReplayTests(unittest.TestCase):
             runtime_log = root / "pipes.log"
             state_dir = root / "state"
             runtime_log.write_text("pipe replay log\n", encoding="utf-8")
-            with ProductionPipeReplay(SYS_DIR, broker, state_dir) as engine:
+            with patch("sysmodepxy.RUNMODE", "SIM"), ProductionPipeReplay(
+                SYS_DIR, broker, state_dir
+            ) as engine:
                 engine.run_tick(
                     snapshot,
                     timezone.localize(datetime(2025, 1, 6, 9, 17)),

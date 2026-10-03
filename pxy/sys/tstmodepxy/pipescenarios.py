@@ -1,4 +1,4 @@
-"""Expected, deterministic pipe decisions for the ten TST minute scenarios."""
+"""Expected, deterministic pipe decisions for the ten CHK minute scenarios."""
 
 from datetime import time
 

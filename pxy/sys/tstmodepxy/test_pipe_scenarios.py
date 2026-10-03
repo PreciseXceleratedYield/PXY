@@ -17,7 +17,7 @@ class PipeScenarioTests(unittest.TestCase):
     def test_all_production_pipe_gates_match_expected_results(self):
         self.assertGreaterEqual(evaluate_pipe_gate_matrix(), 40)
 
-    def test_tst_engine_is_blocked_only_during_weekday_market_hours(self):
+    def test_chk_engine_is_blocked_only_during_weekday_market_hours(self):
         from datetime import datetime, timezone
 
         cases = (

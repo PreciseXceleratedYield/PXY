@@ -79,7 +79,7 @@ if dispatch_mode("run_startup_checks", lambda: True):
     for s in parent_scripts:
         safe_run(s)
 else:
-    print("TST MODE: engine startup checks paused during market hours.")
+    print("CHK MODE: engine startup checks paused during market hours.")
 
 while True:
     os.system('clear')  # ✅ Clears Ubuntu screen at the start of every main loop iteration
@@ -104,7 +104,7 @@ while True:
             print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
             safe_run(HERE.parent / "sysslefpxy.py")
         else:
-            print("\nTST MODE: engine paused during market hours.")
+            print("\nCHK MODE: engine paused during market hours.")
         fancy_pause(7)
         
         while not in_market_hours():
@@ -113,7 +113,7 @@ while True:
                 safe_run(HERE.parent / "syscprtpxy.py")
                 print(" ⏳   WAIT : market opens at 09:16 IST  📡", end="\r")
             else:
-                print(" ⏳   TST waits until market close  📡", end="\r")
+                print(" ⏳   CHK waits until market close  📡", end="\r")
             time.sleep(60)
 
         print("\n🚀 MKT OPEN: resuming main loop now 📈")

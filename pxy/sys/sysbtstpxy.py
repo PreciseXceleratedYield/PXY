@@ -1,6 +1,6 @@
-"""Explicit command-line entry point for the isolated point-proxy backtest."""
+"""Compatibility entry point for the standalone SIM replay command."""
 
-from tstmodepxy.backtest import main
+from syssimpxy import main
 
 
 if __name__ == "__main__":

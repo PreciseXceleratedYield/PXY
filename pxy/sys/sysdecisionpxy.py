@@ -1,4 +1,4 @@
-"""Pure pipe decisions shared by production execution and TST scenario checks."""
+"""Pure pipe decisions shared by production execution and CHK scenario checks."""
 
 import math
 import re

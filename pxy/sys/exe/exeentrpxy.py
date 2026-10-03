@@ -53,7 +53,7 @@ except Exception as e:
 def main():
     dprint("===== START =====", Fore.GREEN)
     if not dispatch_mode("engine_window_open", lambda: True):
-        print(f"{Fore.YELLOW}TST engine paused during market hours; entry pipe not run.")
+        print(f"{Fore.YELLOW}CHK engine paused during market hours; entry pipe not run.")
         return
     try:
         now = datetime.now(SYSCNFGPXY_TIMEZONE).time()

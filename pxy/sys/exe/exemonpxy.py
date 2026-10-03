@@ -24,7 +24,7 @@ sys.path.insert(0, str(HERE))
 from sysmodepxy import dispatch_mode
 
 if not dispatch_mode("legacy_engine_enabled", lambda: True):
-    print("TST MODE: legacy monitor disabled; use the active test-mode engine.")
+    print("CHK MODE: legacy monitor disabled; use the active check-mode engine.")
     sys.exit(0)
 
 # ---------------- IMPORT POSITION CHECK ----------------

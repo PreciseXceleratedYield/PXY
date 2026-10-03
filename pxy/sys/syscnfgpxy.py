@@ -23,9 +23,9 @@ import pytz
 # -----------------------------------------------------------------------------
 SYSCNFGPXY_TICKER = "^NSEI"
 SYSCNFGPXY_TIMEZONE = pytz.timezone("Asia/Kolkata")
-RUNMODE = "PRD"  # Selects the PRD services or the isolated TST providers.
-if RUNMODE not in {"PRD", "TST"}:
-    raise ValueError("RUNMODE must be either 'PRD' or 'TST'.")
+RUNMODE = "PRD"  # PRD: live engine, CHK: mock engine, SIM: standalone replay only.
+if RUNMODE not in {"PRD", "CHK", "SIM"}:
+    raise ValueError("RUNMODE must be one of 'PRD', 'CHK', or 'SIM'.")
 
 SYSDTAFPXY_TIMEZONE = "Asia/Kolkata"
 SYSDTAFPXY_SELECTED_MODE = "00"

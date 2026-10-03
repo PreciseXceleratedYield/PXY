@@ -28,6 +28,7 @@ from .broker_sim import SimulatedBroker
 from .replay_adapter import ProductionPipeReplay
 from syscnfgpxy import (
     EXEEXITPXY_SQOFF_ALL_START,
+    RUNMODE,
     RUNNIFTYPXY_HOLIDAYS,
     SYSCNFGPXY_TICKER,
     SYSCNFGPXY_TIMEZONE,
@@ -160,7 +161,7 @@ def write_csv(path, rows, fieldnames):
 
 def write_session_csvs(output_dir, session_date, trades, decisions):
     run_stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    prefix = f"nifty-point-replay-{session_date}-{run_stamp}"
+    prefix = f"nifty-sim-replay-{session_date}-{run_stamp}"
     trade_path = output_dir / f"{prefix}-trades.csv"
     decision_path = output_dir / f"{prefix}-bars.csv"
     trade_fields = (
@@ -188,7 +189,7 @@ def print_report(
     hit_rate = 100 * winners / len(trades) if trades else 0.0
 
     print("=" * 72)
-    print("PXY ONE-SESSION NIFTY POINT-PROXY REPLAY")
+    print("PXY SIM ONE-SESSION NIFTY POINT-PROXY REPLAY")
     print("=" * 72)
     print(f"Instrument: {SYSCNFGPXY_TICKER} | Session: {session_date}")
     print(
@@ -221,6 +222,10 @@ def print_report(
 
 
 def run_backtest(output_dir=None):
+    if RUNMODE != "SIM":
+        raise RuntimeError(
+            f"Walk-forward replay requires RUNMODE='SIM'; current RUNMODE={RUNMODE!r}."
+        )
     if is_actual_market_hours(holidays=RUNNIFTYPXY_HOLIDAYS):
         raise RuntimeError(
             "Walk-forward replay is disabled during weekday market hours "
@@ -235,7 +240,7 @@ def run_backtest(output_dir=None):
         history, required_final_time=MARKET_CLOSE
     )
     bars = calculate_strategy_signals(history, session_date)
-    output_dir = output_dir or Path.home() / "pxy-backtest-results"
+    output_dir = output_dir or Path.home() / "pxy-sim-results"
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     runtime_log = output_dir / (
@@ -325,14 +330,14 @@ def main(argv=None):
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=Path.home() / "pxy-backtest-results",
-        help="Directory for CSV ledgers (default: ~/pxy-backtest-results).",
+        default=Path.home() / "pxy-sim-results",
+        help="Directory for CSV ledgers (default: ~/pxy-sim-results).",
     )
     args = parser.parse_args(argv)
     try:
         run_backtest(args.output_dir)
     except (RuntimeError, ValueError, OSError) as error:
-        print(f"BACKTEST ERROR: {error}", file=sys.stderr)
+        print(f"SIM ERROR: {error}", file=sys.stderr)
         return 1
     return 0
 
