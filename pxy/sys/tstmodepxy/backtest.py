@@ -38,6 +38,25 @@ from syscnfgpxy import (
 from sysdtafpxy import transform_market_data
 
 DATA_SESSION_OPEN = time(9, 15)
+OHLC_COLUMNS = {"Open", "High", "Low", "Close"}
+
+
+def _normalize_history_columns(frame):
+    """Flatten Yahoo columns using the level that actually contains OHLC names."""
+    if not isinstance(frame.columns, pd.MultiIndex):
+        return frame
+
+    levels = [
+        [str(column) for column in frame.columns.get_level_values(level)]
+        for level in range(frame.columns.nlevels)
+    ]
+    selected = max(
+        levels,
+        key=lambda columns: len(OHLC_COLUMNS.intersection(columns)),
+    )
+    frame = frame.copy()
+    frame.columns = selected
+    return frame.loc[:, ~frame.columns.duplicated(keep="first")]
 
 
 def fetch_recent_index_history():
@@ -53,8 +72,7 @@ def fetch_recent_index_history():
             f"Yahoo Finance returned no 1-minute history for {SYSCNFGPXY_TICKER}."
         )
 
-    if isinstance(frame.columns, pd.MultiIndex):
-        frame.columns = frame.columns.get_level_values(0)
+    frame = _normalize_history_columns(frame)
     missing = {"Open", "High", "Low", "Close"} - set(frame.columns)
     if missing:
         raise RuntimeError(f"Historical data is missing columns: {sorted(missing)}")

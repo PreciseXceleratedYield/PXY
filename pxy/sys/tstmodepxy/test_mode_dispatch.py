@@ -86,6 +86,24 @@ class ModeDispatchTests(unittest.TestCase):
         self.assertEqual(len(bars), 1)
         dashboard.get_full_snapshot.assert_called_once_with()
 
+    def test_yahoo_history_columns_normalize_both_multiindex_orders(self):
+        import tstmodepxy.backtest as backtest
+
+        expected = ["Open", "High", "Low", "Close"]
+        for columns in (
+            pd.MultiIndex.from_product(
+                [expected, ["^NSEI"]], names=["Price", "Ticker"]
+            ),
+            pd.MultiIndex.from_product(
+                [["^NSEI"], expected], names=["Ticker", "Price"]
+            ),
+        ):
+            with self.subTest(columns=columns.names):
+                frame = pd.DataFrame([[1.0, 2.0, 0.5, 1.5]], columns=columns)
+                normalized = backtest._normalize_history_columns(frame)
+                self.assertEqual(list(normalized.columns), expected)
+                self.assertIsInstance(normalized["Close"], pd.Series)
+
 
 if __name__ == "__main__":
     unittest.main()
