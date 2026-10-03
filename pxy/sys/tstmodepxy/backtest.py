@@ -2,6 +2,7 @@
 
 import argparse
 import csv
+from contextlib import redirect_stdout
 import importlib
 import io
 import os
