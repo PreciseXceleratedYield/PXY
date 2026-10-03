@@ -6,7 +6,7 @@ from exeomspxy import get_combined_data
 from runclntpxy import get_session
 from exeavxpxy import handle_side_averaging
 from exeexppxy import dump_idle_json
-from syscnfgpxy import RUNMODE
+from sysmodepxy import dispatch_mode
 
 init(autoreset=True)
 
@@ -19,8 +19,7 @@ EXIT_MODE = "one"
 def run_snapshot():
     data = get_combined_data()
     df = data.get("active_orders", pd.DataFrame())
-    if RUNMODE == "TST":
-        print(f"{Fore.CYAN}TST MODE: averaging pipe received {len(df)} mock position(s); no orders sent.")
+    if dispatch_mode("skip_live_averaging", lambda: False):
         return
 
     client = get_session()

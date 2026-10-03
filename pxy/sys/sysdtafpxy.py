@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from syscnfgpxy import (
-    RUNMODE,
     SYSCNFGPXY_TICKER as TICKER,
     SYSDTAFPXY_DEFAULT_INTERVAL,
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
@@ -15,7 +14,7 @@ from syscnfgpxy import (
     SYSDTAFPXY_TIMEZONE,
     SYSDTAFPXY_TRANSFORM_ATR_PERIOD,
 )
-from sysmockpxy import generate_mock_ohlc
+from sysmodepxy import dispatch_mode
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -202,19 +201,12 @@ def apply_ohlc_transformation(
 
 
 
-def fetch_yf_data(
+def _fetch_yf_data_production(
     period=None,
     interval=SYSDTAFPXY_DEFAULT_INTERVAL,
     target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
 ):
     """Dynamic historical ingestion engine utilizing vectorized structural transformations"""
-    if RUNMODE == "TST":
-        return generate_mock_ohlc(
-            target_rows=target_rows,
-            interval=interval,
-            timezone=TIMEZONE,
-        )
-
     df = pd.DataFrame()
     buffer_rows = target_rows + 5
 
@@ -322,3 +314,18 @@ def fetch_yf_data(
     processed_df = processed_df.tail(target_rows)
     processed_df.attrs["data_fallback"] = False
     return processed_df
+
+
+def fetch_yf_data(
+    period=None,
+    interval=SYSDTAFPXY_DEFAULT_INTERVAL,
+    target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
+):
+    return dispatch_mode(
+        "fetch_yf_data",
+        _fetch_yf_data_production,
+        period=period,
+        interval=interval,
+        target_rows=target_rows,
+        test_kwargs={"timezone": TIMEZONE},
+    )

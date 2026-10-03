@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from _sgnl import _pad_line_to_42  # Shared 42-character width constraint engine
+from sysmodepxy import dispatch_mode
 
 # =====================================================================
 # SYSTEM CORE FLAGS & CONFIGURATION
@@ -97,9 +98,13 @@ def live_status(msg):
     combined = f"📡 {t_stamp} | {msg}"
     print(_pad_line_to_42(combined, Fore.WHITE, Style.RESET_ALL), end="\r", flush=True)
 
-def in_market_hours():
+def _in_market_hours_production():
     now = datetime.now(ist)
     return (0 <= now.weekday() <= 4 and dt_time(9, 16) <= now.time() <= dt_time(15, 29))
+
+
+def in_market_hours():
+    return dispatch_mode("is_market_hours", _in_market_hours_production)
 
 # =====================================================================
 # CENTRAL WORKER DAEMON INTERFACE

@@ -7,7 +7,8 @@ import pandas as pd
 from datetime import datetime 
 from runclntpxy import get_session 
 from runltpspxy import get_mid_price 
-from syscnfgpxy import RUNMODE, SYSCNFGPXY_TIMEZONE
+from syscnfgpxy import SYSCNFGPXY_TIMEZONE
+from sysmodepxy import dispatch_mode
 
 # 🔍 STRATEGIC FOOTPRINT: Resolved relative to run/ directory pathing
 SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/websqrpxy.json"))
@@ -49,91 +50,6 @@ def resolve_dynamic_filter_time():
 # ⏱️ SURGICAL TIMELINE FILTER INITIALIZATION
 FILTER_TIME = resolve_dynamic_filter_time()
 MATCH_MODE = "TAG"
-
-MOCK_SCENARIOS = (
-    ("No positions", (), ()),
-    ("Open CE winner", (("NIFTY26JUN25000CE", "TST-CE-WIN", 1, 100.0, 112.0),), ()),
-    ("Open PE loser", (("NIFTY26JUN25000PE", "TST-PE-LOSS", 1, 105.0, 91.0),), ()),
-    ("Closed CE winner", (), (("NIFTY26JUN25000CE", "TST-CLOSED-WIN", 1, 100.0, 118.0),)),
-    ("Closed PE loser", (), (("NIFTY26JUN25000PE", "TST-CLOSED-LOSS", 1, 110.0, 94.0),)),
-    (
-        "Open CE and PE",
-        (
-            ("NIFTY26JUN25000CE", "TST-MIX-CE", 1, 100.0, 108.0),
-            ("NIFTY26JUN25000PE", "TST-MIX-PE", 1, 100.0, 96.0),
-        ),
-        (),
-    ),
-    (
-        "Layered CE positions",
-        (
-            ("NIFTY26JUN25000CE", "TST-LAYER-1", 1, 98.0, 105.0),
-            ("NIFTY26JUN25100CE", "TST-LAYER-2", 2, 104.0, 105.0),
-        ),
-        (),
-    ),
-    ("Break-even close", (), (("NIFTY26JUN25000CE", "TST-BREAKEVEN", 1, 100.0, 100.0),)),
-    (
-        "Mixed closed results",
-        (),
-        (
-            ("NIFTY26JUN25000CE", "TST-CLOSED-UP", 2, 100.0, 120.0),
-            ("NIFTY26JUN25000PE", "TST-CLOSED-DOWN", 1, 110.0, 90.0),
-        ),
-    ),
-    (
-        "Open and closed trades",
-        (("NIFTY26JUN25000PE", "TST-ACTIVE", 1, 100.0, 107.0),),
-        (("NIFTY26JUN25000CE", "TST-REALIZED", 1, 95.0, 103.0),),
-    ),
-)
-
-
-def _build_mock_lilo_scenario():
-    """Select one of ten pipeline fixtures using the current IST minute's last digit."""
-    now = datetime.now(SYSCNFGPXY_TIMEZONE)
-    scenario_index = (now.minute % 10) - 1
-    if scenario_index < 0:
-        scenario_index = 9
-    name, open_specs, closed_specs = MOCK_SCENARIOS[scenario_index]
-
-    def make_record(spec, offset, is_closed):
-        symbol, tag, qty, buy_price, sell_price = spec
-        buy_time = now.replace(second=0, microsecond=0) - pd.Timedelta(minutes=offset)
-        exit_time = (
-            buy_time + pd.Timedelta(minutes=1)
-            if is_closed
-            else "OPEN"
-        )
-        return {
-            "Symbol": symbol,
-            "Qty": qty,
-            "Tag": tag,
-            "tok": f"TST-{symbol[-2:]}",
-            "Buy_Time": buy_time,
-            "Buy_Prc": buy_price,
-            "Exit_Time": exit_time,
-            "Sell_Prc": sell_price,
-            "PNL": int((sell_price - buy_price) * qty),
-        }
-
-    open_rows = [make_record(spec, i + 1, False) for i, spec in enumerate(open_specs)]
-    closed_rows = [make_record(spec, i + 3, True) for i, spec in enumerate(closed_specs)]
-    open_df = pd.DataFrame(open_rows, columns=[
-        "Symbol", "Qty", "Tag", "tok", "Buy_Time", "Buy_Prc",
-        "Exit_Time", "Sell_Prc", "PNL",
-    ])
-    closed_df = pd.DataFrame(closed_rows, columns=open_df.columns)
-    print(
-        f"TST MODE: scenario {scenario_index + 1}/10 — {name} "
-        f"(minute {now.minute:02d})."
-    )
-    _print_summary(
-        open_df["PNL"].sum() if not open_df.empty else 0,
-        closed_df["PNL"].sum() if not closed_df.empty else 0,
-    )
-    return open_df, closed_df
-
 
 def dump_to_json(closed_df): 
     """Writes closed trade realizations to webpnlpxy.json."""
@@ -309,10 +225,7 @@ def _reconcile_open_with_broker(client, open_positions, strict=False):
     return kept
 
 
-def process_lilo_orders(client, strict=False):
-    if RUNMODE == "TST":
-        return _build_mock_lilo_scenario()
-
+def _process_lilo_orders_production(client, strict=False):
     try: 
         # MASTER RISK LEDGER hook 1: once-a-day stale web-cache override (runs before any data guard)
         try:
@@ -324,7 +237,6 @@ def process_lilo_orders(client, strict=False):
         if not client: 
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
-            
         res = client.order_report()
         if (
             not isinstance(res, dict)
@@ -444,6 +356,17 @@ def process_lilo_orders(client, strict=False):
         _print_summary(0, 0) 
         return pd.DataFrame(), pd.DataFrame() 
 
+
+def process_lilo_orders(client, strict=False):
+    return dispatch_mode(
+        "process_lilo_orders",
+        _process_lilo_orders_production,
+        client=client,
+        strict=strict,
+        test_kwargs={"timezone": SYSCNFGPXY_TIMEZONE},
+    )
+
+
 def _print_summary(total_unrealized, total_realized): 
     from colorama import Fore, Style, init 
     init(autoreset=True) 
@@ -454,5 +377,5 @@ def _print_summary(total_unrealized, total_realized):
 
 if __name__ == "__main__": 
     os.environ["PXY_VIEW_ONLY"] = "1"   # viewing run: must not advance the ledger breach count
-    client = None if RUNMODE == "TST" else get_session()
+    client = get_session()
     process_lilo_orders(client)

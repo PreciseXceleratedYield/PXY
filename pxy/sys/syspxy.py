@@ -6,19 +6,21 @@ from datetime import datetime
 from sysdashpxy import get_full_snapshot
 from systdaypxy import get_market_snapshot  # Keep your original 'systdaypxy'
 from sysvixpxy import get_market_context, expand_vix, expand_sentiment
-from syscnfgpxy import RUNMODE, TICKER
+from syscnfgpxy import TICKER
+from sysmodepxy import dispatch_mode
 
 # Import the clean json exporter from your streamlined trend engine
 from sysstrndpxy import export_supertrend_json
 
 def get_all_data():
     # -------- RUN THE SCRIPT GLOBALLY FIRST --------
-    if RUNMODE != "TST":
+    def run_production_futures_sidecar():
         try:
-            # Runs 'pxyfut' as a general terminal command from anywhere
             subprocess.run(["pxyfut"], check=True)
         except (subprocess.CalledProcessError, FileNotFoundError) as e:
             print(f"Warning: Could not execute 'pxyfut' command: {e}")
+
+    dispatch_mode("run_futures_sidecar", run_production_futures_sidecar)
 
     # -------- RUN TREND CHART GENERATION SECOND --------
     export_supertrend_json()

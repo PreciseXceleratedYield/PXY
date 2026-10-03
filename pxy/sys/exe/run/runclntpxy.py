@@ -5,17 +5,13 @@ SYS_DIR = Path(__file__).resolve().parents[2]
 if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 
-from syscnfgpxy import RUNMODE
+from sysmodepxy import dispatch_mode
 
-def get_session():
+def _get_production_session():
     """
     Initializes and authenticates the Kotak Neo v2 Client.
     Using positional arguments to avoid keyword naming conflicts.
     """
-    if RUNMODE == "TST":
-        print("TST MODE: broker session disabled.")
-        return None
-
     try:
         import pyotp
         import runscrtpxy
@@ -48,6 +44,10 @@ def get_session():
         print(f"Authentication Failed: {e}")
         # Hint: If it still fails, check if MOBILE_NUMBER in runscrtpxy.py has '+91'
         return None
+
+
+def get_session():
+    return dispatch_mode("get_session", _get_production_session)
 
 if __name__ == "__main__":
     # Test the session

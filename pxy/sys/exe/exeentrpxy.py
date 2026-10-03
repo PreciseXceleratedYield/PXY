@@ -10,7 +10,6 @@ from syscnfgpxy import (
     EXEENTRPXY_PREOPEN_END,
     EXEENTRPXY_PREOPEN_START,
     EXEENTRPXY_SQUAREOFF_END,
-    RUNMODE,
     SYSCNFGPXY_TIMEZONE,
 )
 
@@ -36,6 +35,7 @@ try:
     from syspxy import get_all_data
     from runclntpxy import get_session
     from runpchkpxy import get_position_summary
+    from sysmodepxy import dispatch_mode
 
     dprint("IMPORTS OK", Fore.GREEN)
 except Exception as e:
@@ -50,10 +50,11 @@ def main():
         dprint(f"TIME: {now}")
 
         # 1. Market Timing Validation
-        if RUNMODE != "TST" and (
+        is_blackout = lambda now: (
             (EXEENTRPXY_PREOPEN_START <= now < EXEENTRPXY_PREOPEN_END)
             or (EXEENTRPXY_ENTRY_CUTOFF <= now < EXEENTRPXY_SQUAREOFF_END)
-        ):
+        )
+        if dispatch_mode("is_entry_blackout", is_blackout, now):
             print(f"{Fore.YELLOW}⏳ Market buffer time - skip")
             return
 

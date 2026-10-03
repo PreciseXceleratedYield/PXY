@@ -13,7 +13,7 @@ from pathlib import Path
 SYS_DIR = Path(__file__).resolve().parents[3]
 if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
-from syscnfgpxy import RUNMODE
+from sysmodepxy import dispatch_mode
 
 init(autoreset=True)
 
@@ -48,14 +48,16 @@ MARKET_CLOSE = dt_time(15, 25)
 def now_ist():
     return datetime.now(IST)
 
-def is_market_hours():
+def _is_market_hours_production():
     """Evaluates strict operational timing parameters (Mon-Fri)."""
-    if RUNMODE == "TST":
-        return True
     now_dt = now_ist()
     t = now_dt.time()
     wd = now_dt.weekday()
     return 0 <= wd <= 4 and MARKET_OPEN <= t < MARKET_CLOSE
+
+
+def is_market_hours():
+    return dispatch_mode("is_market_hours", _is_market_hours_production)
 
 # =====================================================================
 # 3. LIVE SUPERVISOR GUARD DAEMON

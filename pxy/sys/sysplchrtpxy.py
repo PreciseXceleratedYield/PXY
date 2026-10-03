@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from syscnfgpxy import (
-    RUNMODE,
     SYSCNFGPXY_TICKER as TICKER,
     SYSCNFGPXY_TIMEZONE as TIMEZONE,
     SYSPLCHRTPXY_FETCH_INTERVAL,
@@ -12,7 +11,7 @@ from syscnfgpxy import (
     SYSPLCHRTPXY_SMA_WINDOW,
     SYSPLCHRTPXY_TARGET_ROWS,
 )
-from sysmockpxy import generate_mock_ohlc
+from sysmodepxy import dispatch_mode
 
 # Silence future warning constraints completely
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -94,20 +93,12 @@ def apply_ohlc_transformation(df, mode=SYSPLCHRTPXY_OHLC_MODE):
         print(f"SYSTEM_WARNING | Mode {mode} unrecognized. Defaulting to Raw OHLC.")
     return df
 
-def fetch_yf_data(
+def _fetch_yf_data_production(
     period=None,
     interval=SYSPLCHRTPXY_FETCH_INTERVAL,
     target_rows=SYSPLCHRTPXY_TARGET_ROWS,
 ):
     """DYNAMIC HISTORICAL SLICE RETRIEVAL ENGINE WITH SIGNATURE BACKWARD-COMPATIBILITY"""
-    if RUNMODE == "TST":
-        mock_df = generate_mock_ohlc(
-            target_rows=target_rows,
-            interval=interval,
-            timezone=TIMEZONE,
-        )
-        return apply_ohlc_transformation(mock_df, mode=SYSPLCHRTPXY_OHLC_MODE)
-
     ticker_obj = yf.Ticker(TICKER)
     df = pd.DataFrame()
     
@@ -147,6 +138,25 @@ def fetch_yf_data(
     
     processed_df = apply_ohlc_transformation(df, mode=SYSPLCHRTPXY_OHLC_MODE)
     return processed_df
+
+def fetch_yf_data(
+    period=None,
+    interval=SYSPLCHRTPXY_FETCH_INTERVAL,
+    target_rows=SYSPLCHRTPXY_TARGET_ROWS,
+):
+    return dispatch_mode(
+        "fetch_chart_data",
+        _fetch_yf_data_production,
+        period=period,
+        interval=interval,
+        target_rows=target_rows,
+        test_kwargs={
+            "timezone": TIMEZONE,
+            "transform": lambda frame: apply_ohlc_transformation(
+                frame, mode=SYSPLCHRTPXY_OHLC_MODE
+            ),
+        },
+    )
 
 def get_latest_data():
     """Returns the most recent live completed row using active config files parameters"""

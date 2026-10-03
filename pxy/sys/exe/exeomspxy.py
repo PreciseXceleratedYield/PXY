@@ -31,7 +31,7 @@ for parent in HERE.parents:
 if syspxy_path:
     sys.path.insert(0, str(syspxy_path))
 
-from syscnfgpxy import RUNMODE
+from sysmodepxy import dispatch_mode
 
 try:
     import syspxy
@@ -107,16 +107,9 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     active_df = pd.DataFrame()
     client = None
 
-    if RUNMODE == "TST" and process_lilo_orders:
-        try:
-            active_df, closed_df = process_lilo_orders(None, strict=True)
-            combined["closed_orders"] = closed_df
-            if not active_df.empty:
-                active_df.columns = [str(c).lower() for c in active_df.columns]
-        except Exception as e:
-            print(f"TST OMS DATA ERROR: {e}")
-            active_df = pd.DataFrame()
-            combined["error"] = True
+    mock_active_df = dispatch_mode("get_mock_active_orders", lambda: None)
+    if mock_active_df is not None:
+        active_df = mock_active_df
     elif process_lilo_orders and get_session:
         try:
             client = get_session()

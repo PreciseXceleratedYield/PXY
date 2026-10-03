@@ -500,12 +500,14 @@ def get_full_snapshot() -> dict:
 }
 ```
 
-Set `RUNMODE` to `"TST"` to run with randomly generated market candles and synthetic
-open/closed position scenarios. Broker sessions and live Yahoo Finance requests are
-disabled, and the execution loop ignores market hours. The mock position scenario
-advances by the last digit of the current IST minute: `:01` selects scenario 1,
-`:02` selects scenario 2, through `:09` selecting scenario 9 and `:00` selecting
-scenario 10. Restore `"PRD"` before using live services.
+Set `RUNMODE` to `"TST"` to select the isolated providers in
+`pxy/sys/tstmodepxy/`. Test-only mock data and position scenarios live there; the
+production implementations remain separate and are selected by the single
+`sysmodepxy.py` dispatch boundary. TST disables broker sessions and Yahoo Finance
+requests and ignores market hours. The mock position scenario advances by the last
+digit of the current IST minute: `:01` selects scenario 1, `:02` selects scenario 2,
+through `:09` selecting scenario 9 and `:00` selecting scenario 10. Set `RUNMODE`
+back to `"PRD"` before using live services.
 
 ---
 
