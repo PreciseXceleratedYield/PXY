@@ -19,7 +19,7 @@ EXIT_MODE = "one"
 
 def run_snapshot():
     if not dispatch_mode("engine_window_open", lambda: True):
-        print(f"{Fore.YELLOW}TST engine paused during market hours; averaging pipe not run.")
+        print(f"{Fore.YELLOW}CHK engine paused during market hours; averaging pipe not run.")
         return
 
     data = get_combined_data()

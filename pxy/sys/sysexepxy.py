@@ -63,7 +63,7 @@ def start_loop():
     if dispatch_mode("run_startup_checks", lambda: True):
         run_execprt()
     else:
-        print("TST MODE: startup task paused during market hours.")
+        print("CHK MODE: startup task paused during market hours.")
     was_open = False
     off_done = False
 
@@ -96,7 +96,7 @@ def start_loop():
                     subprocess.run([sys.executable, EXE_FILE])
                     off_done = True
             else:
-                print("TST MODE: whole engine paused during market hours.")
+                print("CHK MODE: whole engine paused during market hours.")
         else:
             print("❌ EXE ERR: exepxy.py file not found ⚠️")
 

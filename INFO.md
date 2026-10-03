@@ -203,7 +203,7 @@ python3 pxy/sys/exe/exepxy.py
 ### Main Configuration File: `syscnfgpxy.py`
 
 ```python
-RUNMODE = "PRD"  # Selects production providers in the engine
+RUNMODE = "PRD"  # PRD: live, CHK: mock checks, SIM: historical replay
 
 PARAMS = {
     "ticker": "^NSEI",      # Trading instrument
@@ -500,28 +500,60 @@ def get_full_snapshot() -> dict:
 }
 ```
 
-Set `RUNMODE` to `"TST"` to select the isolated providers in
-`pxy/sys/tstmodepxy/`. Test-only mock data and position scenarios live there; the
-production implementations remain separate and are selected by the single
-`sysmodepxy.py` dispatch boundary. TST disables broker sessions and Yahoo Finance
-requests in the production launcher. The ten-scenario offline test runner is
-separate from `exepxy.py`: run `./pxytst` from the `pxy/` directory. It prints
-the ten iteration results and a final PASS/FAIL summary, then exits. It refuses
-to run during weekday market hours (09:15-15:30 IST) and respects the configured
-market holidays. It never changes `RUNMODE` or calls the production launcher.
+The system has three execution modes:
+
+| Execution | Start | Market data | Broker/orders |
+| --- | --- | --- | --- |
+| **PRD** | Scheduled `exepxy.py` engine; `RUNMODE = "PRD"` | Live production sources | Real broker |
+| **CHK** | Deliberately start the engine with `RUNMODE = "CHK"` | Isolated mock providers | No live broker or live orders |
+| **SIM** | Explicit `pxysim` / `python3 syssimpxy.py` command with `RUNMODE = "SIM"` | Yahoo historical candles | In-memory simulated broker |
+
+`RUNMODE` accepts only `PRD`, `CHK`, or `SIM`. PRD and CHK use the scheduled
+engine, selecting their providers at the existing mode boundaries. CHK
+providers are isolated from live services. SIM is standalone-only: the
+production scheduler rejects it instead of falling through to live providers;
+the `pxysim` command runs the historical replay against production dashboard
+and pipe functions with replay-only adapters scoped to that process.
 
 The default is `RUNMODE = "PRD"` for the scheduled production engine. Set
-`RUNMODE = "TST"` only when deliberately running the engine with isolated mock
-providers. The standalone `pxytst` suite is independent of this switch and does
-not start the production launcher.
-The mock position scenario advances by the last digit of the current IST minute:
-`:01` selects scenario 1 through `:09` selecting scenario 9, and `:00` selects
-scenario 10. Each case checks entry, target exit, counter-leg, and averaging
-decisions. The TST runner also checks 68 production decision-gate cases for
-entry validation, target exits, position verification, counter-buy eligibility,
-and averaging using simulated responses; it never submits an order. Run the
-suite with `./pxytst` or its unit tests with
+`RUNMODE = "CHK"` only when deliberately running the mock-provider engine.
+CHK blocks the engine during weekday market hours and disables live broker
+sessions and Yahoo requests. Its minute-selected mock position shapes are
+available for inspecting the simulated engine.
+
+To run SIM, set `RUNMODE = "SIM"` and call `pxysim` (or `python3 syssimpxy.py`
+from `pxy/sys/`). The SIM replay refuses to run during weekday market hours
+(09:15-15:30 IST) and configured market holidays, writes CSV ledgers and a
+production-pipe runtime log, then exits. The legacy `pxytst` and
+`sysbtstpxy.py` entry points remain aliases for `pxysim`. Focused unit tests
+cover production decision gates and the isolated replay; run them with
 `python3 -m unittest discover -s pxy/sys/tstmodepxy -p 'test_*.py'`.
+
+### SIM one-session strategy replay
+
+Run `pxysim` from the `pxy/` directory (or `python3 syssimpxy.py` from
+`pxy/sys/`). The isolated simulator fetches
+recent one-minute NIFTY data for indicator warmup, selects the latest completed
+session, and evaluates the production dashboard and exit, entry, averaging,
+counter-leg, and square-off pipes in their normal order for each bar. It uses
+an in-memory Kotak-shaped broker; live sessions, real order calls, subprocess
+launches, and production state-file writes are blocked or redirected. Console
+output is saved alongside the simulated trade ledger and bar-by-bar decision
+CSV under `~/pxy-sim-results/`.
+
+Replay-only adapters are isolated under `pxy/sys/tstmodepxy/`; production pipe
+modules do not import the backtest runner or simulated broker. The replay binds
+the production pipes' data, broker, clock, process, and state boundaries to
+these adapters for the duration of the run, then restores them. The adapter is
+activated only by the standalone backtest command; it is not part of the PRD
+scheduler or launch path.
+
+Signals from a completed candle are acted on at the next candle open. Since
+historical option premiums are not loaded, the simulator uses clearly labelled
+synthetic CE/PE premium and position proxies derived from NIFTY spot movement.
+The results are not historical option P&L and do not include transaction
+costs, slippage, or real broker/OMS behavior. The replay refuses to run during
+weekday market hours (09:15-15:30 IST) and on configured exchange holidays.
 
 ---
 

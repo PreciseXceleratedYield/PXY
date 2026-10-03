@@ -201,6 +201,25 @@ def apply_ohlc_transformation(
     return out
 
 
+def transform_market_data(df):
+    """Apply the configured production OHLC transformation to available history."""
+    if df is None or df.empty:
+        return df
+
+    from sysstrndpxy import get_market_trend
+
+    market_state = get_market_trend(df)
+    mode_str = str(SELECTED_MODE).strip()
+    if len(mode_str) == 2:
+        dynamic_mode = int(mode_str[0] if market_state == "SIDE" else mode_str[1])
+    else:
+        try:
+            dynamic_mode = int(mode_str)
+        except ValueError:
+            dynamic_mode = 1
+    return apply_ohlc_transformation(df, mode=dynamic_mode)
+
+
 
 def _fetch_yf_data_production(
     period=None,
@@ -302,24 +321,7 @@ def _fetch_yf_data_production(
     else:
         df = df.tz_convert(TIMEZONE)
 
-    # LOCAL IMPORT SHIELD: Prevents Circular Dependency Faults
-    from sysstrndpxy import get_market_trend
-
-    market_state = get_market_trend(df)
-    mode_str = str(SELECTED_MODE).strip()
-
-    if len(mode_str) == 2:
-        if market_state == 'SIDE':
-            dynamic_mode = int(mode_str[0])  # Use 1st digit for Sideways
-        else:
-            dynamic_mode = int(mode_str[1])  # Use 2nd digit for Trend breakouts
-    else:
-        try:
-            dynamic_mode = int(mode_str)
-        except ValueError:
-            dynamic_mode = 1
-
-    processed_df = apply_ohlc_transformation(df, mode=dynamic_mode)
+    processed_df = transform_market_data(df)
     processed_df = processed_df.tail(target_rows)
     processed_df.attrs["data_fallback"] = False
     return processed_df

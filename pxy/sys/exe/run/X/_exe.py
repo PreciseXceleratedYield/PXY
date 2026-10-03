@@ -65,7 +65,7 @@ def is_market_hours():
 def start_loop():
     """Monitors trading states and acts as a shield wrapper for _sys.py."""
     if not dispatch_mode("legacy_engine_enabled", lambda: True):
-        print("TST MODE: legacy engine disabled; use the active test-mode engine.")
+        print("CHK MODE: legacy engine disabled; use the active check-mode engine.")
         return
 
     EXE_FILE = "_sys.py"
@@ -118,7 +118,7 @@ def start_loop():
                 subprocess.run([sys.executable, EXE_FILE])
                 off_done = True
         else:
-            print("TST MODE: legacy engine paused during market hours.")
+            print("CHK MODE: legacy engine paused during market hours.")
 
         was_open = mkt
         time.sleep(max(0, 1 - (time.time() - t0)))
