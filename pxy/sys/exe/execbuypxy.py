@@ -29,6 +29,8 @@ from syscnfgpxy import (
     EXECBUYPXY_SCRIPTS,
     SYSCNFGPXY_TIMEZONE,
 )
+from sysdecisionpxy import counter_leg_script
+from sysdecisionpxy import counter_leg_permission_status
 
 # ==================== CONFIG (this file's settings) ====================
 CBUY_ACTION = EXECBUYPXY_ACTION
@@ -145,43 +147,49 @@ def check_counter_leg(remaining_df):
             return None
 
         state = str(remaining_df.iloc[0].get(EXIT_KEY_COLUMN, "NONE")).upper().strip()
-        if state not in ("BULL", "BEAR"):
-            debug_log(f"Counter check: exit key '{state}' is not BULL/BEAR; skipping.")
+        records = remaining_df[["symbol", "qty"]].to_dict("records")
+        script_name = counter_leg_script(state, records, CBUY_SCRIPTS)
+        if script_name is None:
+            debug_log(f"Counter check: state {state} | positions do not match a counter-leg rule.")
             return None
 
-        symbols = remaining_df["symbol"].astype(str).str.upper().str.strip()
-        qty = pd.to_numeric(remaining_df["qty"], errors="coerce").fillna(0)
-        has_ce = bool((symbols.str.endswith("CE") & (qty > 0)).any())
-        has_pe = bool((symbols.str.endswith("PE") & (qty > 0)).any())
+        held = "CE" if state == "BEAR" else "PE"
+        counter = "PE" if held == "CE" else "CE"
 
-        if state == "BEAR" and has_ce and not has_pe:
-            held, counter = "CE", "PE"
-        elif state == "BULL" and has_pe and not has_ce:
-            held, counter = "PE", "CE"
-        else:
-            debug_log(f"Counter check: state {state} | CE rows: {has_ce} | PE rows: {has_pe} -> no action.")
-            return None
+        now = datetime.now(_IST).time()
+        lock_key = f"CBUY|{script_name}"
+        locked = _recent(_load_locks(), lock_key, CBUY_LOCK_SECS)
+        launches_today = (
+            _fires_today()
+            if CBUY_MAX_PER_DAY > 0 and now < CBUY_CUTOFF and not locked
+            else 0
+        )
+        permission = counter_leg_permission_status(
+            now,
+            CBUY_CUTOFF,
+            locked,
+            launches_today,
+            CBUY_MAX_PER_DAY,
+            str(CBUY_ACTION).upper().strip() == "YES",
+        )
 
-        script_name = CBUY_SCRIPTS[held]
-
-        if datetime.now(_IST).time() >= CBUY_CUTOFF:
+        if permission == "cutoff":
             debug_log(f"Counter check: past {CBUY_CUTOFF}; not firing {script_name}.")
             return None
 
-        lock_key = f"CBUY|{script_name}"
-        if _recent(_load_locks(), lock_key, CBUY_LOCK_SECS):
+        if permission == "locked":
             debug_log(f"Counter check: {script_name} already fired within {CBUY_LOCK_SECS}s.")
             return None
 
         global _cap_warned
-        if CBUY_MAX_PER_DAY > 0 and _fires_today() >= CBUY_MAX_PER_DAY:
+        if permission == "daily_limit":
             if not _cap_warned:
                 _cap_warned = True
                 print(f"{Fore.RED}🛑 Counter-buy daily cap reached ({CBUY_MAX_PER_DAY} launches); not firing {script_name}.")
             return None
 
         print(f"{Fore.YELLOW}⚠️ Hostile state ({state}): remaining {held} rows with NO {counter} leg.")
-        if str(CBUY_ACTION).upper().strip() != "YES":
+        if permission == "passive":
             print(f"{Fore.BLUE}{Style.BRIGHT}ℹ️ [PASSIVE ALERT] CBUY_ACTION=NO. Would fire {script_name}.")
             return None
 

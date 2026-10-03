@@ -10,6 +10,7 @@ from datetime import datetime
 from colorama import Fore, Style
 
 from syscnfgpxy import EXEAVXPXY_USE_OVERALL_LOSS
+from sysdecisionpxy import averaging_placement_allowed, averaging_window_enabled
 from exeagtpxy import getexeagtpxy, is_aligned                 # Math functions stay in agt
 from exetgtpxy import target_price                             # Read-only target telemetry; exits stay in exit pipe
 from exeamspxy import execute_side_averaging_matrix            # Execution handles via ams
@@ -90,7 +91,7 @@ def handle_side_averaging(client, df):
     if df is None or df.empty:
         return
     now = datetime.now(IST).time()
-    if not REBUY_ENABLED or not (MARKET_START <= now < MARKET_END):
+    if not averaging_window_enabled(REBUY_ENABLED, now, MARKET_START, MARKET_END):
         return
 
     working_df = df.copy()
@@ -165,7 +166,8 @@ def handle_side_averaging(client, df):
         logger.error(f"Failed to dump telemetry payload to json: {json_err}")
 
     # Another process holds the ledger lock (a tick or a liquidation is running): place nothing this cycle
-    if ledger_busy():
+    is_ledger_busy = ledger_busy()
+    if not averaging_placement_allowed(is_ledger_busy):
         print(f"{Fore.YELLOW}⚠️ Ledger lock held (tick or liquidation running); averaging skipped.")
         return
 

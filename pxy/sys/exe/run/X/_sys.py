@@ -104,12 +104,16 @@ def _in_market_hours_production():
 
 
 def in_market_hours():
-    return dispatch_mode("is_market_hours", _in_market_hours_production)
+    return dispatch_mode("engine_window_open", _in_market_hours_production)
 
 # =====================================================================
 # CENTRAL WORKER DAEMON INTERFACE
 # =====================================================================
 def start_daemon():
+    if not dispatch_mode("legacy_engine_enabled", lambda: True):
+        print("TST MODE: legacy engine disabled; use the active test-mode engine.")
+        return
+
     border = "==========================================" # 42 chars
     print(f"\n{_pad_line_to_42('📡 INIT: Master Core Automation Loop', Fore.GREEN + Style.BRIGHT, Style.RESET_ALL)}")
     print(_pad_line_to_42(border, Fore.GREEN, Style.RESET_ALL))
@@ -161,7 +165,7 @@ def start_daemon():
 
                 fancy_pause(LOOP_INTERVAL)
                 loop_counter += 1
-        else:
+        elif dispatch_mode("run_closed_market_tasks", lambda: True):
             clear_printed = False
             while not in_market_hours():
                 if not clear_printed:
@@ -170,6 +174,9 @@ def start_daemon():
                 print(_pad_line_to_42("⏳ STANDBY: Awaiting 09:16 Market Clock", Fore.BLUE, Style.RESET_ALL), end="\r", flush=True)
                 time.sleep(10)
             print(f"\n{_pad_line_to_42('📈 MARKET OPEN: Resuming loop arrays', Fore.GREEN, Style.RESET_ALL)}")
+        else:
+            print("TST MODE: legacy engine paused during market hours.")
+            time.sleep(10)
 
 if __name__ == "__main__":
     try:

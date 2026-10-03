@@ -61,7 +61,7 @@ def _in_market_hours_production():
 
 
 def in_market_hours():
-    return dispatch_mode("is_market_hours", _in_market_hours_production)
+    return dispatch_mode("engine_window_open", _in_market_hours_production)
 
 # ---------------- MAIN LOOP ----------------
 os.system('clear')  # ✅ Initial screen clear
@@ -75,9 +75,11 @@ parent_scripts = [
     HERE / "exeexitpxy.py"
 ]
 
-# Run initial system check scripts
-for s in parent_scripts:
-    safe_run(s)
+if dispatch_mode("run_startup_checks", lambda: True):
+    for s in parent_scripts:
+        safe_run(s)
+else:
+    print("TST MODE: engine startup checks paused during market hours.")
 
 while True:
     os.system('clear')  # ✅ Clears Ubuntu screen at the start of every main loop iteration
@@ -98,14 +100,20 @@ while True:
             
         loop_counter += 1
     else:
-        print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
-        safe_run(HERE.parent / "sysslefpxy.py")
+        if dispatch_mode("run_closed_market_tasks", lambda: True):
+            print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
+            safe_run(HERE.parent / "sysslefpxy.py")
+        else:
+            print("\nTST MODE: engine paused during market hours.")
         fancy_pause(7)
         
         while not in_market_hours():
             os.system('clear')  # ✅ Clears screen while waiting overnight so logs don't stack up
-            safe_run(HERE.parent / "syscprtpxy.py")  # Fixed: Duplicate entry removed here
-            print(" ⏳   WAIT : market opens at 09:16 IST  📡", end="\r")
+            if dispatch_mode("run_closed_market_tasks", lambda: True):
+                safe_run(HERE.parent / "syscprtpxy.py")
+                print(" ⏳   WAIT : market opens at 09:16 IST  📡", end="\r")
+            else:
+                print(" ⏳   TST waits until market close  📡", end="\r")
             time.sleep(60)
 
         print("\n🚀 MKT OPEN: resuming main loop now 📈")

@@ -1,7 +1,18 @@
 """Synthetic providers selected only through sysmodepxy."""
 
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
+import pytz
+from sysdecisionpxy import counter_leg_script
+from tstmodepxy.pipescenarios import (
+    SCENARIOS,
+    engine_window_open as _tst_engine_window_open,
+    evaluate_pipe_gate_matrix,
+    evaluate_scenario,
+    selected_scenario_index,
+)
 
 
 def generate_mock_ohlc(
@@ -98,49 +109,77 @@ def fetch_backtest_data(
 
 
 MOCK_SCENARIOS = (
-    ("No positions", (), ()),
-    ("Open CE winner", (("NIFTY26JUN25000CE", "TST-CE-WIN", 1, 100.0, 112.0),), ()),
-    ("Open PE loser", (("NIFTY26JUN25000PE", "TST-PE-LOSS", 1, 105.0, 91.0),), ()),
-    ("Closed CE winner", (), (("NIFTY26JUN25000CE", "TST-CLOSED-WIN", 1, 100.0, 118.0),)),
-    ("Closed PE loser", (), (("NIFTY26JUN25000PE", "TST-CLOSED-LOSS", 1, 110.0, 94.0),)),
     (
-        "Open CE and PE",
+        "01: single CE winner",
+        (("NIFTY26OCT25000CE", "TST-ENTRY-01", 1, 100.0, 118.0),),
+        (),
+    ),
+    (
+        "02: single PE loser",
+        (("NIFTY26OCT25000PE", "TST-ENTRY-02", 1, 125.0, 103.0),),
+        (),
+    ),
+    (
+        "03: CE break-even",
+        (("NIFTY26OCT25100CE", "TST-ENTRY-03", 2, 95.0, 95.0),),
+        (),
+    ),
+    (
+        "04: multi-quantity PE winner",
+        (("NIFTY26OCT25100PE", "TST-ENTRY-04", 3, 82.0, 101.0),),
+        (),
+    ),
+    (
+        "05: balanced CE and PE",
         (
-            ("NIFTY26JUN25000CE", "TST-MIX-CE", 1, 100.0, 108.0),
-            ("NIFTY26JUN25000PE", "TST-MIX-PE", 1, 100.0, 96.0),
+            ("NIFTY26OCT25000CE", "TST-ENTRY-05-CE", 1, 100.0, 108.0),
+            ("NIFTY26OCT25000PE", "TST-ENTRY-05-PE", 1, 100.0, 91.0),
         ),
         (),
     ),
     (
-        "Layered CE positions",
+        "06: layered CE entries",
         (
-            ("NIFTY26JUN25000CE", "TST-LAYER-1", 1, 98.0, 105.0),
-            ("NIFTY26JUN25100CE", "TST-LAYER-2", 2, 104.0, 105.0),
+            ("NIFTY26OCT25000CE", "TST-ENTRY-06-A", 1, 98.0, 111.0),
+            ("NIFTY26OCT25100CE", "TST-ENTRY-06-B", 2, 105.0, 99.0),
         ),
         (),
     ),
-    ("Break-even close", (), (("NIFTY26JUN25000CE", "TST-BREAKEVEN", 1, 100.0, 100.0),)),
     (
-        "Mixed closed results",
-        (),
+        "07: multiple PE losing lots",
         (
-            ("NIFTY26JUN25000CE", "TST-CLOSED-UP", 2, 100.0, 120.0),
-            ("NIFTY26JUN25000PE", "TST-CLOSED-DOWN", 1, 110.0, 90.0),
+            ("NIFTY26OCT24900PE", "TST-ENTRY-07-A", 1, 92.0, 73.0),
+            ("NIFTY26OCT24800PE", "TST-ENTRY-07-B", 2, 110.0, 88.0),
+        ),
+        (),
+    ),
+    (
+        "08: open PE plus closed CE",
+        (("NIFTY26OCT25000PE", "TST-ENTRY-08-OPEN", 1, 100.0, 107.0),),
+        (("NIFTY26OCT25000CE", "TST-ENTRY-08-CLOSED", 1, 95.0, 113.0),),
+    ),
+    (
+        "09: open CE plus mixed closes",
+        (("NIFTY26OCT25100CE", "TST-ENTRY-09-OPEN", 2, 103.0, 97.0),),
+        (
+            ("NIFTY26OCT25000CE", "TST-ENTRY-09-UP", 2, 80.0, 98.0),
+            ("NIFTY26OCT25000PE", "TST-ENTRY-09-DOWN", 1, 115.0, 89.0),
         ),
     ),
     (
-        "Open and closed trades",
-        (("NIFTY26JUN25000PE", "TST-ACTIVE", 1, 100.0, 107.0),),
-        (("NIFTY26JUN25000CE", "TST-REALIZED", 1, 95.0, 103.0),),
+        "10: repeated-symbol entries and close",
+        (
+            ("NIFTY26OCT25000CE", "TST-ENTRY-10-A", 1, 100.0, 116.0),
+            ("NIFTY26OCT25000CE", "TST-ENTRY-10-B", 2, 109.0, 96.0),
+        ),
+        (("NIFTY26OCT25000PE", "TST-ENTRY-10-CLOSED", 1, 87.0, 102.0),),
     ),
 )
 
 
 def process_lilo_orders(client=None, strict=False, timezone="Asia/Kolkata"):
     now = pd.Timestamp.now(tz=timezone).to_pydatetime()
-    scenario_index = (now.minute % 10) - 1
-    if scenario_index < 0:
-        scenario_index = 9
+    scenario_index = selected_scenario_index(now.minute)
     name, open_specs, closed_specs = MOCK_SCENARIOS[scenario_index]
 
     def make_record(spec, offset, is_closed):
@@ -148,6 +187,7 @@ def process_lilo_orders(client=None, strict=False, timezone="Asia/Kolkata"):
         buy_time = now.replace(second=0, microsecond=0) - pd.Timedelta(minutes=offset)
         return {
             "Symbol": symbol,
+            "Scenario": name,
             "Qty": qty,
             "Tag": tag,
             "tok": f"TST-{symbol[-2:]}",
@@ -159,7 +199,7 @@ def process_lilo_orders(client=None, strict=False, timezone="Asia/Kolkata"):
         }
 
     columns = [
-        "Symbol", "Qty", "Tag", "tok", "Buy_Time", "Buy_Prc",
+        "Scenario", "Symbol", "Qty", "Tag", "tok", "Buy_Time", "Buy_Prc",
         "Exit_Time", "Sell_Prc", "PNL",
     ]
     open_df = pd.DataFrame(
@@ -171,6 +211,12 @@ def process_lilo_orders(client=None, strict=False, timezone="Asia/Kolkata"):
         columns=columns,
     )
     print(f"TST MODE: scenario {scenario_index + 1}/10 — {name} (minute {now.minute:02d}).")
+    if not open_df.empty:
+        print("Mock active entry rows:")
+        print(open_df[["Scenario", "Symbol", "Tag", "Qty", "Buy_Prc", "Sell_Prc", "PNL"]].to_string(index=False))
+    if not closed_df.empty:
+        print("Mock closed entry rows:")
+        print(closed_df[["Scenario", "Symbol", "Tag", "Qty", "Buy_Prc", "Sell_Prc", "PNL"]].to_string(index=False))
     unrealized = open_df["PNL"].sum() if not open_df.empty else 0
     realized = closed_df["PNL"].sum() if not closed_df.empty else 0
     color = "\033[92m" if realized >= 0 else "\033[91m"
@@ -196,7 +242,25 @@ def run_futures_sidecar():
 
 
 def is_market_hours():
-    return True
+    now = datetime.now(pytz.timezone("Asia/Kolkata"))
+    return not _tst_engine_window_open(now)
+
+
+def engine_window_open():
+    now = datetime.now(pytz.timezone("Asia/Kolkata"))
+    return _tst_engine_window_open(now)
+
+
+def run_startup_checks():
+    return engine_window_open()
+
+
+def run_closed_market_tasks():
+    return False
+
+
+def legacy_engine_enabled():
+    return False
 
 
 def is_entry_blackout(now):
@@ -213,10 +277,33 @@ def verify_and_exit(client, row):
 
 
 def run_counter_leg(remaining_df=None):
-    print("TST MODE: counter-leg check skipped; no order sent.")
+    if remaining_df is None or remaining_df.empty:
+        print("TST MODE: counter-leg scenario has no held rows.")
+        return False
+    state = str(remaining_df.iloc[0].get("exit", "NONE")).upper().strip()
+    script_name = counter_leg_script(
+        state,
+        remaining_df[["symbol", "qty"]].to_dict("records"),
+        {"CE": "pxybuype", "PE": "pxybuyce"},
+    )
+    if script_name:
+        print(f"TST MODE: counter-leg decision would run {script_name}; no order sent.")
+        return True
+    print("TST MODE: counter-leg decision is no action; no order sent.")
     return False
 
 
 def skip_live_averaging():
-    print("TST MODE: averaging pipeline uses mock positions; no orders sent.")
+    now = pd.Timestamp.now(tz="Asia/Kolkata").to_pydatetime()
+    index = selected_scenario_index(now.minute)
+    scenario = SCENARIOS[index]
+    result = evaluate_scenario(scenario)
+    checked_gates = evaluate_pipe_gate_matrix()
+    print(
+        f"TST PIPE SCENARIO {index + 1}/10: PASS — {scenario['name']} | "
+        f"entry={result['entry'] or 'none'}, target_exit={result['target_exit']}, "
+        f"counter={result['counter_leg'] or 'none'}, averaging={result['averaging']} | "
+        f"{checked_gates} production pipe gate checks passed"
+    )
+    print("TST MODE: decision checks only; no orders sent.")
     return True

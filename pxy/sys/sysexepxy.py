@@ -55,12 +55,15 @@ def _is_market_hours_production():
 
 
 def is_market_hours():
-    return dispatch_mode("is_market_hours", _is_market_hours_production)
+    return dispatch_mode("engine_window_open", _is_market_hours_production)
 
 # ---------------- SUPERVISOR LOOP ----------------
 def start_loop():
     """Main loop to supervise execution"""
-    run_execprt()   # run execprt once at start
+    if dispatch_mode("run_startup_checks", lambda: True):
+        run_execprt()
+    else:
+        print("TST MODE: startup task paused during market hours.")
     was_open = False
     off_done = False
 
@@ -73,25 +76,27 @@ def start_loop():
 
         # ---- MARKET OPEN ----
         if mkt and not was_open:
-            send_telegram("Bot started (market open)")
-            print("🚀 MKT OPEN: bot started, ready trade 📡")
+            send_telegram("Bot started (engine window open)")
+            print("🚀 ENGINE WINDOW OPEN: bot started 📡")
             off_done = False
 
         # ---- MARKET CLOSE ----
         if not mkt and was_open:
-            send_telegram("Bot stopped (market close)")
-            print("🛑 MKT CLOSE: bot stopped, session end 🔒")
+            send_telegram("Bot paused (engine window closed)")
+            print("🛑 ENGINE WINDOW CLOSED: bot paused 🔒")
             off_done = False
 
         # ---- RUN MAIN SCRIPT ----
         if os.path.exists(EXE_FILE):
             if mkt:
                 subprocess.run([sys.executable, EXE_FILE])
-            else:
+            elif dispatch_mode("run_closed_market_tasks", lambda: True):
                 if not off_done:
                     print("🌙 OFF MKT: one run executed, idle now 💤")
                     subprocess.run([sys.executable, EXE_FILE])
                     off_done = True
+            else:
+                print("TST MODE: whole engine paused during market hours.")
         else:
             print("❌ EXE ERR: exepxy.py file not found ⚠️")
 

@@ -504,9 +504,16 @@ Set `RUNMODE` to `"TST"` to select the isolated providers in
 `pxy/sys/tstmodepxy/`. Test-only mock data and position scenarios live there; the
 production implementations remain separate and are selected by the single
 `sysmodepxy.py` dispatch boundary. TST disables broker sessions and Yahoo Finance
-requests and ignores market hours. The mock position scenario advances by the last
-digit of the current IST minute: `:01` selects scenario 1, `:02` selects scenario 2,
-through `:09` selecting scenario 9 and `:00` selecting scenario 10. Set `RUNMODE`
+requests. The engine is permitted only outside weekday market hours (09:16-15:29
+IST); startup, cleanup, and direct entry/exit/averaging calls are gated as well.
+The mock position scenario advances by the last digit of the current IST minute:
+`:01` selects scenario 1 through `:09` selecting scenario 9, and `:00` selects
+scenario 10. Each case checks entry, target exit, counter-leg, and averaging
+decisions. The TST runner also checks the production gate conditions for entry
+validation, target exits, position verification, counter-buy eligibility, and
+averaging. These checks use simulated responses and never submit an order. Run
+the checks with
+`python -m unittest discover -s pxy/sys/tstmodepxy -p 'test_*.py'`. Set `RUNMODE`
 back to `"PRD"` before using live services.
 
 ---

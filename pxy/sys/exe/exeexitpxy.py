@@ -6,7 +6,13 @@ import sys
 import time 
 import subprocess 
 from datetime import datetime
+from pathlib import Path
 from colorama import init, Fore, Style 
+
+SYS_DIR = Path(__file__).resolve().parent.parent
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+
 from syscnfgpxy import (
     EXEEXITPXY_EXIT_LOCK_KEEP_SECS,
     EXEEXITPXY_EXIT_LOCK_SECS,
@@ -27,6 +33,15 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
 )
 from sysmodepxy import dispatch_mode
+from sysdecisionpxy import (
+    counter_leg_allowed,
+    exit_order_response_accepted,
+    exit_lock_recent,
+    exit_quantity_to_sell,
+    matching_exit_net_quantity,
+    target_exit_allowed,
+    valid_exit_positions_response,
+)
 
 from exeomspxy import get_combined_data 
 from runclntpxy import get_session 
@@ -88,12 +103,7 @@ def _load_locks():
 
 def _recent(data, key, secs):
     """True if `key` was recorded within `secs` seconds. Never raises."""
-    if secs <= 0:
-        return False
-    try:
-        return (time.time() - float(data.get(key, 0))) < secs
-    except Exception:
-        return False
+    return exit_lock_recent(data, key, secs, time.time())
 
 def _mark_lock(key):
     """Records `key` with the current time; prunes stale entries. Never raises."""
@@ -130,12 +140,7 @@ def get_sell_suffix():
 
 def _order_accepted(response):
     """Accept only the successful response shape documented by the Kotak Neo SDK."""
-    if not isinstance(response, dict):
-        return False
-    return (
-        str(response.get("stat", "")).strip().lower() == "ok"
-        and str(response.get("stCode", "")).strip() == "200"
-    )
+    return exit_order_response_accepted(response)
 
 def place_exit_order(client, row): 
     """Triggers Sell order by appending an explicit _S{ms} suffix to the entry tag.""" 
@@ -194,12 +199,7 @@ def _verify_and_exit_production(client, row):
     try:
         symbol = str(row.get('symbol', '')) 
         pos_res = client.positions() 
-        if (
-            not isinstance(pos_res, dict)
-            or str(pos_res.get("stat", "")).strip().lower() != "ok"
-            or str(pos_res.get("stCode", "")).strip() != "200"
-            or not isinstance(pos_res.get("data"), list)
-        ):
+        if not valid_exit_positions_response(pos_res):
             print(f"{Fore.RED}⚠️ Safety Block: Could not verify positions.") 
             return 
             
@@ -208,13 +208,16 @@ def _verify_and_exit_production(client, row):
             print(f"{Fore.YELLOW}🚫 Blocked: exit already sent for [{symbol}] within {EXIT_LOCK_SECS}s.")
             return
 
-        pos_df = pd.DataFrame(pos_res["data"]) 
-        match = pos_df[pos_df['trdSym'] == symbol].copy()
-        if not match.empty: 
-            net_qty = int(sum(position_net_quantity(pos) for pos in match.to_dict("records")))
+        net_qty = matching_exit_net_quantity(
+            pos_res["data"], symbol, position_net_quantity
+        )
+        if net_qty is not None:
             if net_qty > 0: 
                 row = row.copy()
-                row['qty'] = min(net_qty, abs(int(float(row.get('qty', 0)))))
+                row['qty'] = exit_quantity_to_sell(net_qty, row.get('qty', 0))
+                if row["qty"] <= 0:
+                    print(f"{Fore.YELLOW}🚫 Blocked: requested exit quantity is not positive.")
+                    return
                 resp = place_exit_order(client, row)
                 if resp:
                     _mark_exited(key)
@@ -227,6 +230,10 @@ def _verify_and_exit_production(client, row):
         print(f"{Fore.RED}❌ Safety Check Crash: {e}")
 
 def run_snapshot():
+    if not dispatch_mode("engine_window_open", lambda: True):
+        print(f"{Fore.YELLOW}TST engine paused during market hours; exit pipe not run.")
+        return
+
     now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
     
     # Base path to the script
@@ -287,7 +294,13 @@ def run_snapshot():
                 debug_log(f"Global Enforced Single Exit Mode ({sym}). Mode: SINGLE TARGET.", Fore.GREEN)
 
                 # Pure Linear Target Evaluation Pool
-                if tgt > 0 and ltp > 0 and ltp >= tgt and pnl >= PNL_EXIT_MIN:
+                if target_exit_allowed(
+                    data.get("market_snapshot_available"),
+                    tgt,
+                    ltp,
+                    pnl,
+                    PNL_EXIT_MIN,
+                ):
                     print(f"{Fore.GREEN}🎯 Target Hit & PnL Met ({sym}): LTP {ltp} >= TGT {tgt} | PnL {pnl} >= {PNL_EXIT_MIN} [Execution Mode: ONE]")
                     if verify_and_exit(client, r):
                         exited_keys.add(_lock_key(r))
@@ -302,13 +315,18 @@ def run_snapshot():
         for _, r in df.iterrows():
             k = _lock_key(r)
             held_mask.append(k not in exited_keys and not _recent(locks, k, EXIT_LOCK_SECS))
+        is_ledger_busy = ledger_busy()
         if not data.get("market_snapshot_available"):
             print(f"{Fore.YELLOW}⚠️ Market snapshot unavailable; counter-buy skipped this cycle.")
         elif data.get("positions_unverified"):
             print(f"{Fore.YELLOW}⚠️ Broker positions not verified this cycle; counter-buy skipped.")
-        elif ledger_busy():
+        elif is_ledger_busy:
             print(f"{Fore.YELLOW}⚠️ Ledger lock held (tick or liquidation running); counter-buy skipped.")
-        else:
+        elif counter_leg_allowed(
+            data.get("market_snapshot_available"),
+            data.get("positions_unverified"),
+            is_ledger_busy,
+        ):
             dispatch_mode(
                 "run_counter_leg",
                 lambda remaining_df: check_counter_leg(remaining_df),
