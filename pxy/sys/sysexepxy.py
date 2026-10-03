@@ -5,6 +5,7 @@ import time
 import subprocess
 from datetime import datetime, time as dt_time
 import pytz
+from sysmodepxy import dispatch_mode
 
 # ---------------- EXEC SCRIPT ----------------
 def run_execprt():
@@ -45,12 +46,16 @@ def now_ist():
     """Return current IST datetime"""
     return datetime.now(IST)
 
-def is_market_hours():
+def _is_market_hours_production():
     """Check if current time is within market hours"""
     now_dt = now_ist()
     t = now_dt.time()
     wd = now_dt.weekday()
     return 0 <= wd <= 4 and MARKET_OPEN <= t < MARKET_CLOSE
+
+
+def is_market_hours():
+    return dispatch_mode("is_market_hours", _is_market_hours_production)
 
 # ---------------- SUPERVISOR LOOP ----------------
 def start_loop():

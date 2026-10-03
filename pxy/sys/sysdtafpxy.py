@@ -14,6 +14,7 @@ from syscnfgpxy import (
     SYSDTAFPXY_TIMEZONE,
     SYSDTAFPXY_TRANSFORM_ATR_PERIOD,
 )
+from sysmodepxy import dispatch_mode
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -200,7 +201,7 @@ def apply_ohlc_transformation(
 
 
 
-def fetch_yf_data(
+def _fetch_yf_data_production(
     period=None,
     interval=SYSDTAFPXY_DEFAULT_INTERVAL,
     target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
@@ -313,3 +314,18 @@ def fetch_yf_data(
     processed_df = processed_df.tail(target_rows)
     processed_df.attrs["data_fallback"] = False
     return processed_df
+
+
+def fetch_yf_data(
+    period=None,
+    interval=SYSDTAFPXY_DEFAULT_INTERVAL,
+    target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
+):
+    return dispatch_mode(
+        "fetch_yf_data",
+        _fetch_yf_data_production,
+        period=period,
+        interval=interval,
+        target_rows=target_rows,
+        test_kwargs={"timezone": TIMEZONE},
+    )

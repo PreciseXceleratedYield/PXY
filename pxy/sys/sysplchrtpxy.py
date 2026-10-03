@@ -11,6 +11,7 @@ from syscnfgpxy import (
     SYSPLCHRTPXY_SMA_WINDOW,
     SYSPLCHRTPXY_TARGET_ROWS,
 )
+from sysmodepxy import dispatch_mode
 
 # Silence future warning constraints completely
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -92,7 +93,7 @@ def apply_ohlc_transformation(df, mode=SYSPLCHRTPXY_OHLC_MODE):
         print(f"SYSTEM_WARNING | Mode {mode} unrecognized. Defaulting to Raw OHLC.")
     return df
 
-def fetch_yf_data(
+def _fetch_yf_data_production(
     period=None,
     interval=SYSPLCHRTPXY_FETCH_INTERVAL,
     target_rows=SYSPLCHRTPXY_TARGET_ROWS,
@@ -137,6 +138,25 @@ def fetch_yf_data(
     
     processed_df = apply_ohlc_transformation(df, mode=SYSPLCHRTPXY_OHLC_MODE)
     return processed_df
+
+def fetch_yf_data(
+    period=None,
+    interval=SYSPLCHRTPXY_FETCH_INTERVAL,
+    target_rows=SYSPLCHRTPXY_TARGET_ROWS,
+):
+    return dispatch_mode(
+        "fetch_chart_data",
+        _fetch_yf_data_production,
+        period=period,
+        interval=interval,
+        target_rows=target_rows,
+        test_kwargs={
+            "timezone": TIMEZONE,
+            "transform": lambda frame: apply_ohlc_transformation(
+                frame, mode=SYSPLCHRTPXY_OHLC_MODE
+            ),
+        },
+    )
 
 def get_latest_data():
     """Returns the most recent live completed row using active config files parameters"""

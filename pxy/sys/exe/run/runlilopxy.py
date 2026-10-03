@@ -7,6 +7,8 @@ import pandas as pd
 from datetime import datetime 
 from runclntpxy import get_session 
 from runltpspxy import get_mid_price 
+from syscnfgpxy import SYSCNFGPXY_TIMEZONE
+from sysmodepxy import dispatch_mode
 
 # 🔍 STRATEGIC FOOTPRINT: Resolved relative to run/ directory pathing
 SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/websqrpxy.json"))
@@ -223,7 +225,7 @@ def _reconcile_open_with_broker(client, open_positions, strict=False):
     return kept
 
 
-def process_lilo_orders(client, strict=False):
+def _process_lilo_orders_production(client, strict=False):
     try: 
         # MASTER RISK LEDGER hook 1: once-a-day stale web-cache override (runs before any data guard)
         try:
@@ -235,7 +237,6 @@ def process_lilo_orders(client, strict=False):
         if not client: 
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
-            
         res = client.order_report()
         if (
             not isinstance(res, dict)
@@ -355,6 +356,17 @@ def process_lilo_orders(client, strict=False):
         _print_summary(0, 0) 
         return pd.DataFrame(), pd.DataFrame() 
 
+
+def process_lilo_orders(client, strict=False):
+    return dispatch_mode(
+        "process_lilo_orders",
+        _process_lilo_orders_production,
+        client=client,
+        strict=strict,
+        test_kwargs={"timezone": SYSCNFGPXY_TIMEZONE},
+    )
+
+
 def _print_summary(total_unrealized, total_realized): 
     from colorama import Fore, Style, init 
     init(autoreset=True) 
@@ -365,5 +377,5 @@ def _print_summary(total_unrealized, total_realized):
 
 if __name__ == "__main__": 
     os.environ["PXY_VIEW_ONLY"] = "1"   # viewing run: must not advance the ledger breach count
-    client = get_session() 
+    client = get_session()
     process_lilo_orders(client)

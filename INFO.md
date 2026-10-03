@@ -203,6 +203,8 @@ python3 pxy/sys/exe/exepxy.py
 ### Main Configuration File: `syscnfgpxy.py`
 
 ```python
+RUNMODE = "PRD"  # "TST" uses synthetic data and disables live broker access
+
 PARAMS = {
     "ticker": "^NSEI",      # Trading instrument
     "ohlc_mode": 1          # OHLC calculation mode (0-5)
@@ -497,6 +499,15 @@ def get_full_snapshot() -> dict:
     "global_sentiment": "POSITIVE"
 }
 ```
+
+Set `RUNMODE` to `"TST"` to select the isolated providers in
+`pxy/sys/tstmodepxy/`. Test-only mock data and position scenarios live there; the
+production implementations remain separate and are selected by the single
+`sysmodepxy.py` dispatch boundary. TST disables broker sessions and Yahoo Finance
+requests and ignores market hours. The mock position scenario advances by the last
+digit of the current IST minute: `:01` selects scenario 1, `:02` selects scenario 2,
+through `:09` selecting scenario 9 and `:00` selecting scenario 10. Set `RUNMODE`
+back to `"PRD"` before using live services.
 
 ---
 

@@ -26,6 +26,7 @@ from syscnfgpxy import (
     EXEEXITPXY_SYSDUMP_SCRIPT,
     SYSCNFGPXY_TIMEZONE,
 )
+from sysmodepxy import dispatch_mode
 
 from exeomspxy import get_combined_data 
 from runclntpxy import get_session 
@@ -186,7 +187,11 @@ def place_exit_order(client, row):
         return None 
 
 def verify_and_exit(client, row): 
-    try: 
+    return dispatch_mode("verify_and_exit", lambda client, row: _verify_and_exit_production(client, row), client, row)
+
+
+def _verify_and_exit_production(client, row):
+    try:
         symbol = str(row.get('symbol', '')) 
         pos_res = client.positions() 
         if (
@@ -227,7 +232,7 @@ def run_snapshot():
     # Base path to the script
     exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), SQUAREOFF_SCRIPT)
     
-    if os.path.exists(exe_path):
+    if dispatch_mode("allow_squareoff", lambda: True) and os.path.exists(exe_path):
         sq_args, sq_key = None, None
         if SQOFF_START <= now < SQOFF_ALL_START:       # 15:11 up to 15:14: without -all
             sq_args, sq_key = [], "SQOFF|first"
@@ -304,7 +309,11 @@ def run_snapshot():
         elif ledger_busy():
             print(f"{Fore.YELLOW}⚠️ Ledger lock held (tick or liquidation running); counter-buy skipped.")
         else:
-            check_counter_leg(df[held_mask])
+            dispatch_mode(
+                "run_counter_leg",
+                lambda remaining_df: check_counter_leg(remaining_df),
+                df[held_mask],
+            )
     except Exception as e:
         print(f"{Fore.RED}❌ Counter-leg hook error: {e}")
 

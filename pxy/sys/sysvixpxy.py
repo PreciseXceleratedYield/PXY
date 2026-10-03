@@ -2,6 +2,7 @@
 
 import yfinance as yf
 from colorama import Fore, Style, init
+from sysmodepxy import dispatch_mode
 
 init(autoreset=True)
 
@@ -11,7 +12,10 @@ init(autoreset=True)
 # ----------------------------
 def get_vix_flag():
     try:
-        df = yf.Ticker("^INDIAVIX").history(period="1d", interval="5m")
+        def get_production_vix():
+            return yf.Ticker("^INDIAVIX").history(period="1d", interval="5m")
+
+        df = dispatch_mode("get_vix_data", get_production_vix)
         if df.empty:
             return "X"
         vix = df["Close"].iloc[-1]
@@ -33,24 +37,26 @@ def get_vix_flag():
 # ----------------------------
 def get_global_sentiment():
     try:
-        indices = ["^GSPC", "^IXIC", "^N225"]
-        score = 0
+        def get_production_sentiment():
+            indices = ["^GSPC", "^IXIC", "^N225"]
+            score = 0
 
-        for symbol in indices:
-            df = yf.Ticker(symbol).history(period="1d")
-            if df.empty:
-                continue
-            if df["Close"].iloc[-1] > df["Open"].iloc[-1]:
-                score += 1
-            else:
-                score -= 1
+            for symbol in indices:
+                df = yf.Ticker(symbol).history(period="1d")
+                if df.empty:
+                    continue
+                if df["Close"].iloc[-1] > df["Open"].iloc[-1]:
+                    score += 1
+                else:
+                    score -= 1
 
-        if score >= 2:
-            return "B"  # Positive
-        elif score <= -2:
-            return "S"  # Negative
-        else:
-            return "M"  # Sideways
+            if score >= 2:
+                return "B"
+            if score <= -2:
+                return "S"
+            return "M"
+
+        return dispatch_mode("get_global_sentiment", get_production_sentiment)
 
     except:
         return "X"

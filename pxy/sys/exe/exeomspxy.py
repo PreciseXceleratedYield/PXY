@@ -31,6 +31,8 @@ for parent in HERE.parents:
 if syspxy_path:
     sys.path.insert(0, str(syspxy_path))
 
+from sysmodepxy import dispatch_mode
+
 try:
     import syspxy
 except Exception as e:
@@ -105,7 +107,10 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     active_df = pd.DataFrame()
     client = None
 
-    if process_lilo_orders and get_session:
+    mock_active_df = dispatch_mode("get_mock_active_orders", lambda: None)
+    if mock_active_df is not None:
+        active_df = mock_active_df
+    elif process_lilo_orders and get_session:
         try:
             client = get_session()
             if not client:

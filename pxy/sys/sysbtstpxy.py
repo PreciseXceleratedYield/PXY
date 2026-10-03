@@ -7,6 +7,7 @@ from datetime import datetime, time as dt_time
 import pytz
 from colorama import Fore, Style, init
 from pathlib import Path
+from sysmodepxy import dispatch_mode
 
 init(autoreset=True)
 
@@ -28,8 +29,17 @@ def run_production_points_backtest():
     print(f" 🏆 PXY® ENGINE MOVEMENT BACKTEST RUNNER (ZERO-MATH) 🏆 ")
     print(f"{Fore.YELLOW}========================================================")
     
-    ticker_obj = yf.Ticker(TICKER)
-    df_raw = ticker_obj.history(period="5d", interval="1m")
+    def fetch_production_backtest_data(**_kwargs):
+        ticker_obj = yf.Ticker(TICKER)
+        return ticker_obj.history(period="5d", interval="1m")
+
+    df_raw = dispatch_mode(
+        "fetch_backtest_data",
+        fetch_production_backtest_data,
+        target_rows=5 * 390,
+        interval="1m",
+        timezone=TIMEZONE,
+    )
     
     if df_raw.empty:
         print(f"{Fore.RED}❌ CRITICAL ERROR: Failed to extract history matrices.")

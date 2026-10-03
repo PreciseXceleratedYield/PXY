@@ -1,13 +1,22 @@
-import pyotp
-import runscrtpxy
-from neo_api_client import NeoAPI
+import sys
+from pathlib import Path
 
-def get_session():
+SYS_DIR = Path(__file__).resolve().parents[2]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+
+from sysmodepxy import dispatch_mode
+
+def _get_production_session():
     """
     Initializes and authenticates the Kotak Neo v2 Client.
     Using positional arguments to avoid keyword naming conflicts.
     """
     try:
+        import pyotp
+        import runscrtpxy
+        from neo_api_client import NeoAPI
+
         # 1. Initialize with Consumer Key (API Token)
         client = NeoAPI(
             consumer_key=runscrtpxy.CONSUMER_KEY,
@@ -35,6 +44,10 @@ def get_session():
         print(f"Authentication Failed: {e}")
         # Hint: If it still fails, check if MOBILE_NUMBER in runscrtpxy.py has '+91'
         return None
+
+
+def get_session():
+    return dispatch_mode("get_session", _get_production_session)
 
 if __name__ == "__main__":
     # Test the session

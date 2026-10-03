@@ -6,6 +6,7 @@ from exeomspxy import get_combined_data
 from runclntpxy import get_session
 from exeavxpxy import handle_side_averaging
 from exeexppxy import dump_idle_json
+from sysmodepxy import dispatch_mode
 
 init(autoreset=True)
 
@@ -18,6 +19,9 @@ EXIT_MODE = "one"
 def run_snapshot():
     data = get_combined_data()
     df = data.get("active_orders", pd.DataFrame())
+    if dispatch_mode("skip_live_averaging", lambda: False):
+        return
+
     client = get_session()
     if data.get("error"):
         print(f"{Fore.RED}⚠️ Data error this cycle (see OMS DATA ERROR above). Skipping averaging; dashboard left untouched.")

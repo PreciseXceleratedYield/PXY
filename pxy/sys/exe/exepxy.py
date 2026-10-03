@@ -15,8 +15,12 @@ ist = pytz.timezone("Asia/Kolkata")
 # ---------------- PATH SETUP ----------------
 HERE = Path(__file__).resolve().parent
 RUN_DIR = HERE / "run"
-sys.path.insert(0, str(RUN_DIR))
-sys.path.insert(0, str(HERE))
+SYS_DIR = HERE.parent
+for path in (RUN_DIR, HERE, SYS_DIR):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+
+from sysmodepxy import dispatch_mode
 
 # ---------------- HELPER FUNCTIONS ----------------
 def run_script(script_path, timeout=None):
@@ -51,9 +55,13 @@ def fancy_pause(seconds=7):
 def live_status(msg):
     print(f"{datetime.now(ist).strftime('%H:%M:%S')} {msg}", end="\r", flush=True)
 
-def in_market_hours():
+def _in_market_hours_production():
     now = datetime.now(ist)
     return (0 <= now.weekday() <= 4 and dt_time(9, 16) <= now.time() <= dt_time(15, 29))
+
+
+def in_market_hours():
+    return dispatch_mode("is_market_hours", _in_market_hours_production)
 
 # ---------------- MAIN LOOP ----------------
 os.system('clear')  # ✅ Initial screen clear

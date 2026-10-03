@@ -4,6 +4,8 @@ from colorama import Fore, Style, init, deinit
 from syscnfgpxy import TICKER
 import pytz
 from datetime import datetime, timedelta, time
+from syscnfgpxy import SYSCNFGPXY_TIMEZONE
+from sysmodepxy import dispatch_mode
 
 init(autoreset=True)
 
@@ -59,7 +61,7 @@ def print_candle(o, h, l, c):
 
 
 # ---------------- MARKET SNAPSHOT ----------------
-def get_last_two_trading_days(TICKER, lookback_days=14):
+def _get_last_two_trading_days_production(TICKER, lookback_days=14):
     IST = pytz.timezone("Asia/Kolkata")
     today = datetime.now(IST).date()
 
@@ -71,6 +73,16 @@ def get_last_two_trading_days(TICKER, lookback_days=14):
         return None, None
 
     return df.iloc[-1], df.iloc[-2]
+
+
+def get_last_two_trading_days(TICKER, lookback_days=14):
+    return dispatch_mode(
+        "get_last_two_trading_days",
+        _get_last_two_trading_days_production,
+        TICKER,
+        lookback_days,
+        test_kwargs={"timezone": SYSCNFGPXY_TIMEZONE},
+    )
 
 
 def get_market_snapshot(TICKER):
@@ -132,7 +144,11 @@ def get_market_snapshot(TICKER):
     breakout = "NA"
 
     try:
-        df_1m = yf.Ticker(TICKER).history(period="1d", interval="1m")
+        df_1m = dispatch_mode(
+            "get_intraday_data",
+            lambda: yf.Ticker(TICKER).history(period="1d", interval="1m"),
+            test_kwargs={"ticker": TICKER, "timezone": SYSCNFGPXY_TIMEZONE},
+        )
         if not df_1m.empty:
             df_1m = df_1m.tz_localize(None)
             morning_df = df_1m.between_time("09:15", "09:30")

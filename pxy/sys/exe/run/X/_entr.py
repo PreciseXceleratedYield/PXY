@@ -6,6 +6,7 @@ from datetime import datetime, date, timedelta, time as dt_time
 import pytz
 from colorama import Fore, init, Style
 from _sgnl import _pad_line_to_42  
+from sysmodepxy import dispatch_mode
 
 TICKER = "^NSEI"  
 LOT_SIZE = 65     
@@ -101,7 +102,12 @@ def execute_order(client, symbol, qty, txn_type):
 async def trade_cycle():
     IST = pytz.timezone("Asia/Kolkata")
     now = datetime.now(IST).time()
-    if (dt_time(9, 14) <= now < dt_time(9, 16)) or (dt_time(15, 19) <= now < dt_time(15, 31)): return
+    is_blackout = lambda now: (
+        (dt_time(9, 14) <= now < dt_time(9, 16))
+        or (dt_time(15, 19) <= now < dt_time(15, 31))
+    )
+    if dispatch_mode("is_entry_blackout", is_blackout, now):
+        return
 
     from _sgnl import get_all_data
     from _clnt import get_session

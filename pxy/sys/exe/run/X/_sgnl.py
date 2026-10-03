@@ -1,12 +1,19 @@
 # _sgnl.py
 import os
+import sys
 import warnings
 import json
+from pathlib import Path
 from datetime import datetime
 import pytz
 import numpy as np
 import pandas as pd
 import yfinance as yf
+
+SYS_DIR = Path(__file__).resolve().parents[3]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+from sysmodepxy import dispatch_mode
 
 # Silence formatting warnings completely
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -219,8 +226,13 @@ def export_chart_json(df, lookback=42):
 def get_all_data():
     """ Fetches recent ticker bars, computes transformations, updates outputs, and provides operational summaries. """
     try:
-        # Download recent minute bars via public yfinance endpoint API
-        raw_df = yf.download(tickers=TICKER, period="2d", interval="1m", progress=False)
+        raw_df = dispatch_mode(
+            "fetch_yf_data",
+            lambda **_: yf.download(tickers=TICKER, period="2d", interval="1m", progress=False),
+            target_rows=60,
+            interval="1m",
+            timezone=TIMEZONE,
+        )
         if raw_df.empty:
             return {"entry": "NONE", "price": 0.0}
 
