@@ -530,10 +530,12 @@ cover production decision gates, mode routing, and the isolated replay; run them
 
 With `RUNMODE = "SIM"`, start the usual engine; alternatively, run `pxysim`
 from the `pxy/` directory (or `python3 syssimpxy.py` from `pxy/sys/`). The
-isolated simulator fetches
-recent one-minute NIFTY data for indicator warmup, selects the latest completed
-session, and evaluates the production dashboard and exit, entry, averaging,
-counter-leg, and square-off pipes in their normal order for each bar. It uses
+isolated simulator fetches recent one-minute NIFTY data for indicator warmup.
+If it cannot find a completed session in the recent history, it checks prior
+weekdays one by one and uses the first complete session found, within Yahoo's
+seven-day 1-minute data limit. It then evaluates the production dashboard and
+exit, entry, averaging, counter-leg, and square-off pipes in their normal order
+for each bar. It uses
 an in-memory Kotak-shaped broker; live sessions, real order calls, subprocess
 launches, and production state-file writes are blocked or redirected. Console
 output is saved alongside the simulated trade ledger and bar-by-bar decision

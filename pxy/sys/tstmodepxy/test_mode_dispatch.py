@@ -5,7 +5,6 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pandas as pd
-from unittest.mock import patch
 
 SYS_DIR = Path(__file__).resolve().parents[1]
 if str(SYS_DIR) not in sys.path:
@@ -103,6 +102,48 @@ class ModeDispatchTests(unittest.TestCase):
                 normalized = backtest._normalize_history_columns(frame)
                 self.assertEqual(list(normalized.columns), expected)
                 self.assertIsInstance(normalized["Close"], pd.Series)
+
+    def test_history_fetch_walks_back_until_a_complete_session_is_found(self):
+        import tstmodepxy.backtest as backtest
+
+        empty = pd.DataFrame(columns=["Open", "High", "Low", "Close"])
+        old_session = pd.DataFrame(
+            {
+                "Open": [100.0, 101.0],
+                "High": [101.0, 102.0],
+                "Low": [99.0, 100.0],
+                "Close": [100.5, 101.5],
+            },
+            index=pd.DatetimeIndex(
+                [datetime(2025, 1, 6, 9, 15), datetime(2025, 1, 6, 15, 29)]
+            ),
+        )
+        ticker = Mock()
+        ticker.history.side_effect = [empty, empty, empty, empty, old_session]
+        with patch.object(backtest.yf, "Ticker", return_value=ticker), patch.object(
+            backtest, "_today_ist", return_value=date(2025, 1, 9)
+        ):
+            history = backtest.fetch_recent_index_history()
+
+        self.assertEqual(history.index.date[-1], date(2025, 1, 6))
+        self.assertEqual(ticker.history.call_count, 5)
+        self.assertEqual(ticker.history.call_args_list[-1].kwargs["start"], "2025-01-06")
+
+    def test_history_fetch_reports_when_no_complete_day_exists_in_window(self):
+        import tstmodepxy.backtest as backtest
+
+        ticker = Mock()
+        ticker.history.return_value = pd.DataFrame(
+            columns=["Open", "High", "Low", "Close"]
+        )
+        with patch.object(backtest.yf, "Ticker", return_value=ticker), patch.object(
+            backtest, "_today_ist", return_value=date(2025, 1, 6)
+        ):
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "within Yahoo's 7-day intraday-history window",
+            ):
+                backtest.fetch_recent_index_history()
 
 
 if __name__ == "__main__":

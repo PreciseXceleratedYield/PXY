@@ -8,7 +8,7 @@ import io
 import os
 import sys
 import tempfile
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -39,6 +39,7 @@ from sysdtafpxy import transform_market_data
 
 DATA_SESSION_OPEN = time(9, 15)
 OHLC_COLUMNS = {"Open", "High", "Low", "Close"}
+MAX_INTRADAY_LOOKBACK_DAYS = 7
 
 
 def _normalize_history_columns(frame):
@@ -59,19 +60,9 @@ def _normalize_history_columns(frame):
     return frame.loc[:, ~frame.columns.duplicated(keep="first")]
 
 
-def fetch_recent_index_history():
-    """Fetch recent 1-minute history; extra sessions provide indicator warmup."""
-    frame = yf.Ticker(SYSCNFGPXY_TICKER).history(
-        period="7d",
-        interval="1m",
-        auto_adjust=False,
-        actions=False,
-    )
+def _prepare_index_history(frame):
     if frame is None or frame.empty:
-        raise RuntimeError(
-            f"Yahoo Finance returned no 1-minute history for {SYSCNFGPXY_TICKER}."
-        )
-
+        return pd.DataFrame(columns=["Open", "High", "Low", "Close"])
     frame = _normalize_history_columns(frame)
     missing = {"Open", "High", "Low", "Close"} - set(frame.columns)
     if missing:
@@ -92,9 +83,77 @@ def fetch_recent_index_history():
         & (session_times <= MARKET_CLOSE)
         & (frame.index.weekday < 5)
     ]
-    if frame.empty:
-        raise RuntimeError("Yahoo Finance returned no weekday market-session candles.")
     return frame
+
+
+def _has_completed_session(history):
+    if history is None or history.empty:
+        return False
+    return any(
+        session.index[-1].time().replace(tzinfo=None) >= MARKET_CLOSE
+        for _, session in history.groupby(history.index.date)
+    )
+
+
+def _today_ist():
+    return pd.Timestamp.now(tz=SYSCNFGPXY_TIMEZONE).date()
+
+
+def fetch_recent_index_history():
+    """Fetch warmup history, walking back by day until a complete session is found."""
+    ticker = yf.Ticker(SYSCNFGPXY_TICKER)
+    failures = []
+    try:
+        frame = _prepare_index_history(
+            ticker.history(
+                period=f"{MAX_INTRADAY_LOOKBACK_DAYS}d",
+                interval="1m",
+                auto_adjust=False,
+                actions=False,
+            )
+        )
+    except Exception as error:
+        frame = pd.DataFrame(columns=["Open", "High", "Low", "Close"])
+        failures.append(f"recent-history request: {error}")
+
+    if _has_completed_session(frame):
+        return frame
+
+    searched_dates = []
+    today = _today_ist()
+    holidays = set(RUNNIFTYPXY_HOLIDAYS)
+    for day_offset in range(MAX_INTRADAY_LOOKBACK_DAYS):
+        session_day = today - timedelta(days=day_offset)
+        if session_day.weekday() >= 5 or session_day.strftime("%d-%b-%Y") in holidays:
+            continue
+        searched_dates.append(session_day.isoformat())
+        try:
+            daily = _prepare_index_history(
+                ticker.history(
+                    start=session_day.isoformat(),
+                    end=(session_day + timedelta(days=1)).isoformat(),
+                    interval="1m",
+                    auto_adjust=False,
+                    actions=False,
+                )
+            )
+        except Exception as error:
+            failures.append(f"{session_day.isoformat()}: {error}")
+            continue
+
+        if not daily.empty:
+            frame = pd.concat([frame, daily]).sort_index()
+            frame = frame.loc[~frame.index.duplicated(keep="last")]
+        if _has_completed_session(frame):
+            return frame
+
+    detail = f" Searched dates: {', '.join(searched_dates) or 'none'}."
+    if failures:
+        detail += f" Request errors: {'; '.join(failures)}"
+    raise RuntimeError(
+        f"Could not find a completed 1-minute NIFTY session within Yahoo's "
+        f"{MAX_INTRADAY_LOOKBACK_DAYS}-day intraday-history window.{detail}"
+    )
 
 
 def latest_completed_session(history, required_final_time=FORCE_EXIT_TIME):
