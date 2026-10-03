@@ -500,24 +500,34 @@ def get_full_snapshot() -> dict:
 }
 ```
 
-Set `RUNMODE` to `"TST"` to select the isolated providers in
-`pxy/sys/tstmodepxy/`. Test-only mock data and position scenarios live there; the
-production implementations remain separate and are selected by the single
-`sysmodepxy.py` dispatch boundary. TST disables broker sessions and Yahoo Finance
-requests in the production launcher. The `pxytst` command is separate from
-`exepxy.py`: it runs a walk-forward replay of the latest completed NIFTY
-session, refuses to run during weekday market hours (09:15-15:30 IST), writes
-CSV ledgers and a production-pipe runtime log, and exits. It respects configured
-market holidays and never changes `RUNMODE` or calls the production launcher.
+The system has three ways to execute the strategy, but `RUNMODE` deliberately
+selects only PRD or TST. BACKTEST is a separate command, not a production-engine
+mode:
+
+| Execution | Start | Market data | Broker/orders |
+| --- | --- | --- | --- |
+| **PRD** | Scheduled `exepxy.py` engine; `RUNMODE = "PRD"` | Live production sources | Real broker |
+| **TST** | Deliberately start the engine with `RUNMODE = "TST"` | Isolated mock providers | No live broker or live orders |
+| **BACKTEST** | Explicit `pxytst` / `python3 sysbtstpxy.py` command | Yahoo historical candles | In-memory simulated broker |
+
+PRD and TST select their data and broker-related providers at the existing mode
+boundaries; TST providers are isolated from live services. BACKTEST uses the
+production dashboard and pipe functions with replay-only adapters scoped to
+its own process.
 
 The default is `RUNMODE = "PRD"` for the scheduled production engine. Set
-`RUNMODE = "TST"` only when deliberately running the engine with isolated mock
-providers. The standalone `pxytst` walk-forward replay is independent of this
-switch and does not start the production launcher.
-The separate TST mock provider can generate ten mock position shapes, selected
-by minute, for manually inspecting the simulated engine. These are not what
-`pxytst` runs. Focused unit tests cover the production decision gates and the
-walk-forward simulation without submitting orders; run them with
+`RUNMODE = "TST"` only when deliberately running its isolated mock-provider
+engine. TST blocks the engine during weekday market hours and disables live
+broker sessions and Yahoo requests. Its minute-selected mock position shapes
+are available for inspecting the simulated engine; they are distinct from the
+historical walk-forward replay.
+
+BACKTEST does not change `RUNMODE`, call the production launcher, or run from
+the PRD scheduler. The `pxytst` command explicitly runs a walk-forward replay of
+the latest completed NIFTY session, refuses to run during weekday market hours
+(09:15-15:30 IST) and configured market holidays, writes CSV ledgers and a
+production-pipe runtime log, then exits. Focused unit tests cover production
+decision gates and the isolated replay; run them with
 `python3 -m unittest discover -s pxy/sys/tstmodepxy -p 'test_*.py'`.
 
 ### One-session strategy replay
