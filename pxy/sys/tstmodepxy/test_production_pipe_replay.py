@@ -23,6 +23,18 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 self.assertNotIn("replay_adapter", contents)
                 self.assertNotIn("SimulatedBroker", contents)
 
+    def test_adapter_restores_process_hooks_after_exit(self):
+        system_call = __import__("os").system
+        process_run = __import__("subprocess").run
+        with tempfile.TemporaryDirectory(prefix="pxy-adapter-scope-test-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, SimulatedBroker(), Path(temp) / "state"
+            ):
+                self.assertIsNot(__import__("os").system, system_call)
+                self.assertIsNot(__import__("subprocess").run, process_run)
+        self.assertIs(__import__("os").system, system_call)
+        self.assertIs(__import__("subprocess").run, process_run)
+
     def test_entry_averaging_and_scheduled_squareoff_are_simulated(self):
         timezone = pytz.timezone("Asia/Kolkata")
         broker = SimulatedBroker()
