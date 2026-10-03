@@ -203,7 +203,7 @@ python3 pxy/sys/exe/exepxy.py
 ### Main Configuration File: `syscnfgpxy.py`
 
 ```python
-RUNMODE = "TST"  # Selects isolated, non-broker providers in the engine
+RUNMODE = "PRD"  # Selects production providers in the engine
 
 PARAMS = {
     "ticker": "^NSEI",      # Trading instrument
@@ -510,8 +510,10 @@ the ten iteration results and a final PASS/FAIL summary, then exits. It refuses
 to run during weekday market hours (09:15-15:30 IST) and respects the configured
 market holidays. It never changes `RUNMODE` or calls the production launcher.
 
-For live operation, set `RUNMODE = "PRD"` explicitly. Do not rely on `pxytst` as
-a production launcher.
+The default is `RUNMODE = "PRD"` for the scheduled production engine. Set
+`RUNMODE = "TST"` only when deliberately running the engine with isolated mock
+providers. The standalone `pxytst` suite is independent of this switch and does
+not start the production launcher.
 The mock position scenario advances by the last digit of the current IST minute:
 `:01` selects scenario 1 through `:09` selecting scenario 9, and `:00` selects
 scenario 10. Each case checks entry, target exit, counter-leg, and averaging

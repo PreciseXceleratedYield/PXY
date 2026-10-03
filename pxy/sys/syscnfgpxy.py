@@ -23,7 +23,7 @@ import pytz
 # -----------------------------------------------------------------------------
 SYSCNFGPXY_TICKER = "^NSEI"
 SYSCNFGPXY_TIMEZONE = pytz.timezone("Asia/Kolkata")
-RUNMODE = "TST"  # Selects the PRD services or the isolated TST providers.
+RUNMODE = "PRD"  # Selects the PRD services or the isolated TST providers.
 if RUNMODE not in {"PRD", "TST"}:
     raise ValueError("RUNMODE must be either 'PRD' or 'TST'.")
 
