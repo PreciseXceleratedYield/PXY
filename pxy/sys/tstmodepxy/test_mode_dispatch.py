@@ -8,6 +8,7 @@ if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 
 import sysmodepxy
+import sysexepxy
 from tstmodepxy.backtest import run_backtest
 
 
@@ -28,10 +29,18 @@ class ModeDispatchTests(unittest.TestCase):
 
     def test_sim_dispatch_fails_closed_in_production_engine_path(self):
         with patch.object(sysmodepxy, "RUNMODE", "SIM"):
-            with self.assertRaisesRegex(RuntimeError, "standalone-only"):
+            with self.assertRaisesRegex(RuntimeError, "cannot dispatch engine providers"):
                 sysmodepxy.dispatch_mode(
                     "unused_provider", lambda: self.fail("live provider must not run")
                 )
+
+    def test_normal_supervisor_routes_sim_to_replay_and_exits(self):
+        with patch.object(sysexepxy, "RUNMODE", "SIM"), patch.object(
+            sysexepxy, "dispatch_mode",
+            side_effect=AssertionError("SIM must not enter engine dispatch"),
+        ), patch("syssimpxy.main", return_value=0) as run_simulation:
+            self.assertEqual(sysexepxy.start_loop(), 0)
+        run_simulation.assert_called_once_with()
 
     def test_walk_forward_requires_sim_before_fetching_market_data(self):
         import tstmodepxy.backtest as backtest
@@ -41,6 +50,18 @@ class ModeDispatchTests(unittest.TestCase):
             side_effect=AssertionError("history must not be fetched"),
         ):
             with self.assertRaisesRegex(RuntimeError, "requires RUNMODE='SIM'"):
+                run_backtest()
+
+    def test_walk_forward_refuses_market_hours_before_fetching_data(self):
+        import tstmodepxy.backtest as backtest
+
+        with patch.object(backtest, "RUNMODE", "SIM"), patch.object(
+            backtest, "is_actual_market_hours", return_value=True
+        ), patch.object(
+            backtest, "fetch_recent_index_history",
+            side_effect=AssertionError("history must not be fetched"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "disabled during weekday market hours"):
                 run_backtest()
 
 

@@ -504,35 +504,33 @@ The system has three execution modes:
 
 | Execution | Start | Market data | Broker/orders |
 | --- | --- | --- | --- |
-| **PRD** | Scheduled `exepxy.py` engine; `RUNMODE = "PRD"` | Live production sources | Real broker |
-| **CHK** | Deliberately start the engine with `RUNMODE = "CHK"` | Isolated mock providers | No live broker or live orders |
-| **SIM** | Explicit `pxysim` / `python3 syssimpxy.py` command with `RUNMODE = "SIM"` | Yahoo historical candles | In-memory simulated broker |
+| **PRD** | Start the usual `exepxy.py` engine with `RUNMODE = "PRD"` | Live production sources | Real broker |
+| **CHK** | Start the usual engine with `RUNMODE = "CHK"` | Isolated mock providers | No live broker or live orders |
+| **SIM** | Start the usual engine with `RUNMODE = "SIM"` | Yahoo historical candles | In-memory simulated broker |
 
-`RUNMODE` accepts only `PRD`, `CHK`, or `SIM`. PRD and CHK use the scheduled
-engine, selecting their providers at the existing mode boundaries. CHK
-providers are isolated from live services. SIM is standalone-only: the
-production scheduler rejects it instead of falling through to live providers;
-the `pxysim` command runs the historical replay against production dashboard
-and pipe functions with replay-only adapters scoped to that process.
+`RUNMODE` accepts only `PRD`, `CHK`, or `SIM`. The ordinary engine entry points
+select behavior from this setting: PRD uses production providers, CHK uses
+isolated mocks, and SIM routes directly into the standalone historical replay.
+SIM never falls through to live provider dispatch. No extra command is needed
+to select CHK or SIM; edit `RUNMODE` in `syscnfgpxy.py` and start the engine
+normally.
 
-The default is `RUNMODE = "PRD"` for the scheduled production engine. Set
-`RUNMODE = "CHK"` only when deliberately running the mock-provider engine.
-CHK blocks the engine during weekday market hours and disables live broker
-sessions and Yahoo requests. Its minute-selected mock position shapes are
-available for inspecting the simulated engine.
+The default is `RUNMODE = "PRD"`. CHK and SIM both refuse to run during weekday
+market hours; CHK also disables live broker sessions and Yahoo requests. CHK's
+minute-selected mock position shapes are available for inspecting the mock
+engine.
 
-To run SIM, set `RUNMODE = "SIM"` and call `pxysim` (or `python3 syssimpxy.py`
-from `pxy/sys/`). The SIM replay refuses to run during weekday market hours
-(09:15-15:30 IST) and configured market holidays, writes CSV ledgers and a
-production-pipe runtime log, then exits. The legacy `pxytst` and
-`sysbtstpxy.py` entry points remain aliases for `pxysim`. Focused unit tests
-cover production decision gates and the isolated replay; run them with
+SIM refuses to run during weekday market hours (09:15-15:30 IST) and configured
+market holidays, writes CSV ledgers and a production-pipe runtime log, then
+exits. `pxysim` remains an optional direct launcher for SIM. Focused unit tests
+cover production decision gates, mode routing, and the isolated replay; run them with
 `python3 -m unittest discover -s pxy/sys/tstmodepxy -p 'test_*.py'`.
 
 ### SIM one-session strategy replay
 
-Run `pxysim` from the `pxy/` directory (or `python3 syssimpxy.py` from
-`pxy/sys/`). The isolated simulator fetches
+With `RUNMODE = "SIM"`, start the usual engine; alternatively, run `pxysim`
+from the `pxy/` directory (or `python3 syssimpxy.py` from `pxy/sys/`). The
+isolated simulator fetches
 recent one-minute NIFTY data for indicator warmup, selects the latest completed
 session, and evaluates the production dashboard and exit, entry, averaging,
 counter-leg, and square-off pipes in their normal order for each bar. It uses

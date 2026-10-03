@@ -1,4 +1,4 @@
-"""Single PRD/CHK provider selection boundary; SIM is standalone-only."""
+"""Single PRD/CHK provider selection boundary; SIM uses the replay runner."""
 
 from syscnfgpxy import RUNMODE
 
@@ -8,8 +8,8 @@ def dispatch_mode(provider_name, production_provider, *args, **kwargs):
     test_kwargs = kwargs.pop("test_kwargs", {})
     if RUNMODE == "SIM":
         raise RuntimeError(
-            "RUNMODE=SIM is standalone-only. Start the pxysim replay command; "
-            "the production engine cannot run in SIM mode."
+            "RUNMODE=SIM cannot dispatch engine providers. Start the normal "
+            "engine entry point to route into the isolated SIM replay."
         )
     if RUNMODE == "CHK":
         from tstmodepxy import mockproviders
