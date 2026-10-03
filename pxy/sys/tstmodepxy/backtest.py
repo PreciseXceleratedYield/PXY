@@ -7,10 +7,8 @@ import io
 import os
 import sys
 import tempfile
-from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from datetime import datetime, time
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import pandas as pd
@@ -27,6 +25,7 @@ from .pointbacktest import (
     is_actual_market_hours,
 )
 from .broker_sim import SimulatedBroker
+from .replay_adapter import ProductionPipeReplay
 from syscnfgpxy import (
     EXEEXITPXY_SQOFF_ALL_START,
     RUNNIFTYPXY_HOLIDAYS,
@@ -104,10 +103,6 @@ def calculate_strategy_signals(history, session_date):
     ]
     for index in target_indexes:
         available = history.iloc[: index + 1]
-        current_day = available.index[-1].date()
-        intraday_history = available[available.index.date == current_day]
-        if len(intraday_history) >= SYSDTAFPXY_DEFAULT_TARGET_ROWS + 5:
-            available = intraday_history
         transformed = transform_market_data(available).tail(
             SYSDTAFPXY_DEFAULT_TARGET_ROWS
         )
@@ -140,205 +135,6 @@ def calculate_strategy_signals(history, session_date):
     if not records:
         raise RuntimeError(f"No replay bars found for completed session {session_date}.")
     return records
-
-
-def run_production_pipes(snapshot, timestamp, spot, broker, state_dir, runtime_log):
-    """Execute the real production exit, entry, then averaging pipe functions.
-
-    All dependencies with external effects are bound to an in-memory broker,
-    injected historical snapshot, or temporary runtime state.
-    """
-    exe_dir = SYS_DIR / "exe"
-    run_dir = exe_dir / "run"
-    for path in (exe_dir, run_dir):
-        if str(path) not in sys.path:
-            sys.path.insert(0, str(path))
-
-    exists = os.path.exists
-    squareoff_log = (SYS_DIR.parent / "web" / "websqrpxy.json").resolve()
-
-    def exists_without_production_squareoff_state(path):
-        try:
-            if Path(path).resolve() == squareoff_log:
-                return False
-        except (TypeError, OSError):
-            pass
-        return exists(path)
-
-    with patch("os.path.exists", exists_without_production_squareoff_state):
-        entry_pipe = importlib.import_module("exeentrpxy")
-        exit_pipe = importlib.import_module("exeexitpxy")
-        avg_pipe = importlib.import_module("exeavgpxy")
-        oms = importlib.import_module("exeomspxy")
-        lilo = importlib.import_module("runlilopxy")
-    avg_controller = importlib.import_module("exeavxpxy")
-    averaging_orders = importlib.import_module("exeamspxy")
-    counter_pipe = importlib.import_module("execbuypxy")
-    squareoff_pipe = importlib.import_module("exesqrpxy")
-    dynamic_entry = importlib.import_module("exedynpxy")
-
-    class ReplayClock(datetime):
-        @classmethod
-        def now(cls, tz=None):
-            current = (
-                timestamp.to_pydatetime()
-                if hasattr(timestamp, "to_pydatetime")
-                else timestamp
-            )
-            if tz is None:
-                return current.replace(tzinfo=None)
-            if current.tzinfo is None:
-                return current.replace(tzinfo=tz)
-            return current.astimezone(tz)
-
-    def simulated_shell(command):
-        name = Path(str(command).strip().split()[0]).name
-        if name == "pxybuyce":
-            broker.place_order(
-                trading_symbol="NIFTY-WF-CE",
-                transaction_type="B",
-                quantity=broker.quantity,
-                tag=broker.next_tag("WF"),
-            )
-        elif name == "pxybuype":
-            broker.place_order(
-                trading_symbol="NIFTY-WF-PE",
-                transaction_type="B",
-                quantity=broker.quantity,
-                tag=broker.next_tag("WF"),
-            )
-        else:
-            raise RuntimeError(f"Unexpected production shell command blocked: {command}")
-        return 0
-
-    def simulated_popen(command, *args, **kwargs):
-        command_path = Path(command[0]).name if isinstance(command, (list, tuple)) else ""
-        if command_path == "pxybuyce":
-            broker.place_order(
-                trading_symbol="NIFTY-WF-CE",
-                transaction_type="B",
-                quantity=broker.quantity,
-                tag=broker.next_tag("CB"),
-            )
-        elif command_path == "pxybuype":
-            broker.place_order(
-                trading_symbol="NIFTY-WF-PE",
-                transaction_type="B",
-                quantity=broker.quantity,
-                tag=broker.next_tag("CB"),
-            )
-        elif isinstance(command, (list, tuple)) and any(
-            Path(str(part)).name == "sysddmppxy.py" for part in command
-        ):
-            pass
-        else:
-            raise RuntimeError(f"Unexpected production process launch blocked: {command}")
-        return SimpleNamespace(pid=0, returncode=0)
-
-    def simulated_squareoff(command, *args, **kwargs):
-        if not isinstance(command, (list, tuple)) or not any(
-            str(part).endswith("exesqrpxy.py") for part in command
-        ):
-            raise RuntimeError(f"Unexpected production subprocess blocked: {command}")
-        all_args = [
-            str(part) for part in command[1:]
-            if not str(part).endswith("exesqrpxy.py")
-        ]
-        with patch.object(squareoff_pipe, "get_session", return_value=broker), \
-             patch.object(squareoff_pipe, "get_combined_data", oms.get_combined_data), \
-             patch.object(squareoff_pipe, "datetime", ReplayClock), \
-             patch.object(squareoff_pipe, "subprocess") as squareoff_subprocess, \
-             patch.object(squareoff_pipe.sys, "argv", ["exesqrpxy.py", *all_args]):
-            squareoff_subprocess.Popen.return_value = SimpleNamespace(pid=0)
-            squareoff_pipe.exit_all_positions()
-        return SimpleNamespace(returncode=0)
-
-    output = io.StringIO()
-
-    def real_get_all_data():
-        return snapshot
-
-    def production_dispatch(_name, provider, *args, **kwargs):
-        kwargs.pop("test_kwargs", None)
-        return provider(*args, **kwargs)
-
-    broker.set_market(timestamp, spot)
-    state_dir.mkdir(parents=True, exist_ok=True)
-    temporary_daily_purge = SimpleNamespace(
-        daily_purge_check=lambda: None,
-        execute_master_risk_ledger=lambda *args, **kwargs: None,
-    )
-    patchers = [
-        patch.object(entry_pipe, "get_all_data", real_get_all_data),
-        patch.object(entry_pipe, "get_session", return_value=broker),
-        patch.object(
-            entry_pipe,
-            "get_position_summary",
-            lambda _client: broker.position_summary(),
-        ),
-        patch.object(entry_pipe, "dispatch_mode", production_dispatch),
-        patch.object(entry_pipe.os, "system", simulated_shell),
-        patch.object(entry_pipe, "datetime", ReplayClock),
-        patch.object(exit_pipe, "get_combined_data", oms.get_combined_data),
-        patch.object(exit_pipe, "get_session", return_value=broker),
-        patch.object(exit_pipe, "dispatch_mode", production_dispatch),
-        patch.object(exit_pipe, "ledger_busy", return_value=False),
-        patch.object(exit_pipe, "datetime", ReplayClock),
-        patch.object(exit_pipe, "_load_locks", return_value={}),
-        patch.object(exit_pipe, "_mark_lock", lambda _key: None),
-        patch.object(exit_pipe, "process_metrics_print_and_dump", lambda *args: None),
-        patch.object(exit_pipe, "dump_idle_json", lambda *args: None),
-        patch.object(avg_pipe, "get_combined_data", oms.get_combined_data),
-        patch.object(avg_pipe, "get_session", return_value=broker),
-        patch.object(avg_pipe, "dispatch_mode", production_dispatch),
-        patch.object(avg_pipe, "dump_idle_json", lambda *args: None),
-        patch.object(oms, "dispatch_mode", production_dispatch),
-        patch.object(oms.syspxy, "get_all_data", real_get_all_data),
-        patch.object(oms, "print_market_dashboard", lambda _market_df: None),
-        patch.object(oms, "get_session", return_value=broker),
-        patch.object(lilo, "dispatch_mode", production_dispatch),
-        patch.object(lilo, "dump_to_json", lambda _df: None),
-        patch.object(lilo, "dump_livpos_to_json", lambda _rows: None),
-        patch.object(avg_controller, "datetime", ReplayClock),
-        patch.object(avg_controller, "ledger_busy", return_value=False),
-        patch.object(
-            avg_controller,
-            "get_position_summary",
-            lambda _client: broker.position_summary(),
-        ),
-        patch.object(
-            avg_controller,
-            "WEB_AVG_JSON_REL",
-            str(state_dir / "webavgpxy.json"),
-        ),
-        patch.object(dynamic_entry, "datetime", ReplayClock),
-        patch.object(averaging_orders, "is_cooling", lambda _side: False),
-        patch.object(averaging_orders, "set_cooling", lambda _side: None),
-        patch.object(averaging_orders, "generate_pxy_tag", broker.next_tag),
-        patch.object(counter_pipe, "_find_script", lambda name: name),
-        patch.object(counter_pipe, "_is_executable", lambda _path: True),
-        patch.object(counter_pipe, "_load_locks", return_value={}),
-        patch.object(counter_pipe, "_mark_lock", lambda _key: None),
-        patch.object(counter_pipe, "_fires_today", return_value=0),
-        patch.object(counter_pipe, "_count_fire", lambda: None),
-        patch.object(counter_pipe, "datetime", ReplayClock),
-        patch.object(squareoff_pipe, "datetime", ReplayClock),
-        patch("subprocess.Popen", simulated_popen),
-        patch("subprocess.run", simulated_squareoff),
-        patch.dict(sys.modules, {"runexacpxy": temporary_daily_purge}),
-    ]
-    with redirect_stdout(output), redirect_stderr(output):
-        with ExitStack() as stack:
-            for patcher in patchers:
-                stack.enter_context(patcher)
-            exit_pipe.run_snapshot()
-            entry_pipe.main()
-            avg_pipe.run_snapshot()
-    logged = output.getvalue()
-    if logged:
-        with runtime_log.open("a", encoding="utf-8") as stream:
-            stream.write(f"\n===== {timestamp} =====\n{logged}")
-    return logged
 
 
 def write_csv(path, rows, fieldnames):
@@ -453,48 +249,48 @@ def run_backtest(output_dir=None):
     broker = SimulatedBroker()
     decisions = []
     with tempfile.TemporaryDirectory(prefix="pxy-walk-forward-") as temporary_state:
-        state_dir = Path(temporary_state)
-        for bar in bars:
-            timestamp = bar["next_timestamp"]
-            fill_spot = bar["next_open"]
-            if timestamp is None or fill_spot is None:
-                continue
-            execution_time = timestamp.time().replace(tzinfo=None)
-            if not MARKET_OPEN <= execution_time <= MARKET_CLOSE:
-                continue
-            before = broker.position_summary()
-            first_new_order = len(broker.orders)
-            if bar["snapshot_log"]:
-                with runtime_log.open("a", encoding="utf-8") as stream:
-                    stream.write(
-                        f"\n===== PRODUCTION DASHBOARD {bar['timestamp']} =====\n"
-                        f"{bar['snapshot_log']}"
-                    )
-            pipe_output = run_production_pipes(
-                bar["snapshot"],
-                timestamp,
-                float(fill_spot),
-                broker,
-                state_dir,
-                runtime_log,
-            )
-            current_orders = broker.orders[first_new_order:]
-            after = broker.position_summary()
-            decisions.append(
-                {
-                    "timestamp": bar["timestamp"],
-                    "execution_timestamp": timestamp,
-                    "spot": bar["spot"],
-                    "execution_spot": float(fill_spot),
-                    "entry_signal": bar["entry"],
-                    "exit_signal": bar["exit"],
-                    "position_before": before,
-                    "position_after": after,
-                    "orders_created": len(current_orders),
-                    "order_tags": "|".join(order["GuiOrdId"] for order in current_orders),
-                    "pipe_output": f"{bar['snapshot_log']}{pipe_output}",
-                }
-            )
+        with ProductionPipeReplay(SYS_DIR, broker, Path(temporary_state)) as engine:
+            for bar in bars:
+                timestamp = bar["next_timestamp"]
+                fill_spot = bar["next_open"]
+                if timestamp is None or fill_spot is None:
+                    continue
+                execution_time = timestamp.time().replace(tzinfo=None)
+                if not MARKET_OPEN <= execution_time <= MARKET_CLOSE:
+                    continue
+                before = broker.position_summary()
+                first_new_order = len(broker.orders)
+                if bar["snapshot_log"]:
+                    with runtime_log.open("a", encoding="utf-8") as stream:
+                        stream.write(
+                            f"\n===== PRODUCTION DASHBOARD {bar['timestamp']} =====\n"
+                            f"{bar['snapshot_log']}"
+                        )
+                pipe_output = engine.run_tick(
+                    bar["snapshot"],
+                    timestamp,
+                    float(fill_spot),
+                    runtime_log,
+                )
+                current_orders = broker.orders[first_new_order:]
+                after = broker.position_summary()
+                decisions.append(
+                    {
+                        "timestamp": bar["timestamp"],
+                        "execution_timestamp": timestamp,
+                        "spot": bar["spot"],
+                        "execution_spot": float(fill_spot),
+                        "entry_signal": bar["entry"],
+                        "exit_signal": bar["exit"],
+                        "position_before": before,
+                        "position_after": after,
+                        "orders_created": len(current_orders),
+                        "order_tags": "|".join(
+                            order["GuiOrdId"] for order in current_orders
+                        ),
+                        "pipe_output": f"{bar['snapshot_log']}{pipe_output}",
+                    }
+                )
     trades = [
         {
             "side": trade["side"],

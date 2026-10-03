@@ -531,6 +531,11 @@ launches, and production state-file writes are blocked or redirected. Console
 output is saved alongside the simulated trade ledger and bar-by-bar decision
 CSV under `~/pxy-backtest-results/`.
 
+Replay-only adapters are isolated under `pxy/sys/tstmodepxy/`; production pipe
+modules do not import the backtest runner or simulated broker. The replay binds
+the production pipes' data, broker, clock, process, and state boundaries to
+these adapters for the duration of the run, then restores them.
+
 Signals from a completed candle are acted on at the next candle open. Since
 historical option premiums are not loaded, the simulator uses clearly labelled
 synthetic CE/PE premium and position proxies derived from NIFTY spot movement.

@@ -10,8 +10,8 @@ if str(SYS_DIR) not in sys.path:
 
 import pytz
 
-from tstmodepxy.backtest import run_production_pipes
 from tstmodepxy.broker_sim import SimulatedBroker
+from tstmodepxy.replay_adapter import ProductionPipeReplay
 
 
 class ProductionPipeReplayTests(unittest.TestCase):
@@ -33,59 +33,53 @@ class ProductionPipeReplayTests(unittest.TestCase):
             root = Path(temp)
             runtime_log = root / "pipes.log"
             state_dir = root / "state"
-            run_production_pipes(
-                snapshot,
-                timezone.localize(datetime(2025, 1, 6, 9, 17)),
-                22000,
-                broker,
-                state_dir,
-                runtime_log,
-            )
-            self.assertEqual([order["trnsTp"] for order in broker.orders], ["B"])
+            runtime_log.write_text("pipe replay log\n", encoding="utf-8")
+            with ProductionPipeReplay(SYS_DIR, broker, state_dir) as engine:
+                engine.run_tick(
+                    snapshot,
+                    timezone.localize(datetime(2025, 1, 6, 9, 17)),
+                    22000,
+                    runtime_log,
+                )
+                self.assertEqual([order["trnsTp"] for order in broker.orders], ["B"])
 
-            snapshot["entry"] = "NONE"
-            run_production_pipes(
-                snapshot,
-                timezone.localize(datetime(2025, 1, 6, 9, 18)),
-                21902,
-                broker,
-                state_dir,
-                runtime_log,
-            )
-            self.assertEqual([order["trnsTp"] for order in broker.orders], ["B", "B"])
+                snapshot["entry"] = "NONE"
+                engine.run_tick(
+                    snapshot,
+                    timezone.localize(datetime(2025, 1, 6, 9, 18)),
+                    21902,
+                    runtime_log,
+                )
+                self.assertEqual([order["trnsTp"] for order in broker.orders], ["B", "B"])
 
-            snapshot["exit"] = "BEAR"
-            run_production_pipes(
-                snapshot,
-                timezone.localize(datetime(2025, 1, 6, 9, 19)),
-                21902,
-                broker,
-                state_dir,
-                runtime_log,
-            )
-            self.assertEqual(
-                [(order["trnsTp"], order["trdSym"]) for order in broker.orders],
-                [
-                    ("B", "NIFTY-WF-CE"),
-                    ("B", "NIFTY-WF-CE"),
-                    ("S", "NIFTY-WF-CE"),
-                    ("B", "NIFTY-WF-PE"),
-                ],
-            )
+                snapshot["exit"] = "BEAR"
+                engine.run_tick(
+                    snapshot,
+                    timezone.localize(datetime(2025, 1, 6, 9, 19)),
+                    21902,
+                    runtime_log,
+                )
+                self.assertEqual(
+                    [(order["trnsTp"], order["trdSym"]) for order in broker.orders],
+                    [
+                        ("B", "NIFTY-WF-CE"),
+                        ("B", "NIFTY-WF-CE"),
+                        ("S", "NIFTY-WF-CE"),
+                        ("B", "NIFTY-WF-PE"),
+                    ],
+                )
 
-            run_production_pipes(
-                snapshot,
-                timezone.localize(datetime(2025, 1, 6, 15, 14)),
-                21900,
-                broker,
-                state_dir,
-                runtime_log,
-            )
-            self.assertIn("CE Averaged", runtime_log.read_text(encoding="utf-8"))
-            log_text = runtime_log.read_text(encoding="utf-8")
-            self.assertIn("FIRED COUNTER-BUY: pxybuype", log_text)
-            self.assertIn("ORDER ACCEPTED BY BROKER", log_text)
-            self.assertTrue(runtime_log.stat().st_size > 0)
+                engine.run_tick(
+                    snapshot,
+                    timezone.localize(datetime(2025, 1, 6, 15, 14)),
+                    21900,
+                    runtime_log,
+                )
+                self.assertIn("CE Averaged", runtime_log.read_text(encoding="utf-8"))
+                log_text = runtime_log.read_text(encoding="utf-8")
+                self.assertIn("FIRED COUNTER-BUY: pxybuype", log_text)
+                self.assertIn("ORDER ACCEPTED BY BROKER", log_text)
+                self.assertTrue(runtime_log.stat().st_size > 0)
 
         self.assertEqual(
             [order["trnsTp"] for order in broker.orders],
