@@ -10,6 +10,7 @@ from syscnfgpxy import (
     EXEENTRPXY_PREOPEN_END,
     EXEENTRPXY_PREOPEN_START,
     EXEENTRPXY_SQUAREOFF_END,
+    RUNMODE,
     SYSCNFGPXY_TIMEZONE,
 )
 
@@ -49,8 +50,9 @@ def main():
         dprint(f"TIME: {now}")
 
         # 1. Market Timing Validation
-        if (EXEENTRPXY_PREOPEN_START <= now < EXEENTRPXY_PREOPEN_END) or (
-            EXEENTRPXY_ENTRY_CUTOFF <= now < EXEENTRPXY_SQUAREOFF_END
+        if RUNMODE != "TST" and (
+            (EXEENTRPXY_PREOPEN_START <= now < EXEENTRPXY_PREOPEN_END)
+            or (EXEENTRPXY_ENTRY_CUTOFF <= now < EXEENTRPXY_SQUAREOFF_END)
         ):
             print(f"{Fore.YELLOW}⏳ Market buffer time - skip")
             return

@@ -5,6 +5,7 @@ import time
 import subprocess
 from datetime import datetime, time as dt_time
 import pytz
+from syscnfgpxy import RUNMODE
 
 # ---------------- EXEC SCRIPT ----------------
 def run_execprt():
@@ -47,6 +48,8 @@ def now_ist():
 
 def is_market_hours():
     """Check if current time is within market hours"""
+    if RUNMODE == "TST":
+        return True
     now_dt = now_ist()
     t = now_dt.time()
     wd = now_dt.weekday()

@@ -23,6 +23,9 @@ import pytz
 # -----------------------------------------------------------------------------
 SYSCNFGPXY_TICKER = "^NSEI"
 SYSCNFGPXY_TIMEZONE = pytz.timezone("Asia/Kolkata")
+RUNMODE = "PRD"  # "PRD" uses live services; "TST" uses synthetic data and disables broker access.
+if RUNMODE not in {"PRD", "TST"}:
+    raise ValueError("RUNMODE must be either 'PRD' or 'TST'.")
 
 SYSDTAFPXY_TIMEZONE = "Asia/Kolkata"
 SYSDTAFPXY_SELECTED_MODE = "00"

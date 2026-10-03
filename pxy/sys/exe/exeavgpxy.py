@@ -6,6 +6,7 @@ from exeomspxy import get_combined_data
 from runclntpxy import get_session
 from exeavxpxy import handle_side_averaging
 from exeexppxy import dump_idle_json
+from syscnfgpxy import RUNMODE
 
 init(autoreset=True)
 
@@ -18,6 +19,10 @@ EXIT_MODE = "one"
 def run_snapshot():
     data = get_combined_data()
     df = data.get("active_orders", pd.DataFrame())
+    if RUNMODE == "TST":
+        print(f"{Fore.CYAN}TST MODE: averaging pipe received {len(df)} mock position(s); no orders sent.")
+        return
+
     client = get_session()
     if data.get("error"):
         print(f"{Fore.RED}⚠️ Data error this cycle (see OMS DATA ERROR above). Skipping averaging; dashboard left untouched.")

@@ -8,6 +8,12 @@ from datetime import datetime, time as dt_time
 import pytz
 from colorama import init, Fore, Style
 from _sgnl import _pad_line_to_42  # Shared 42-character width constraint engine
+from pathlib import Path
+
+SYS_DIR = Path(__file__).resolve().parents[3]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+from syscnfgpxy import RUNMODE
 
 init(autoreset=True)
 
@@ -44,6 +50,8 @@ def now_ist():
 
 def is_market_hours():
     """Evaluates strict operational timing parameters (Mon-Fri)."""
+    if RUNMODE == "TST":
+        return True
     now_dt = now_ist()
     t = now_dt.time()
     wd = now_dt.weekday()

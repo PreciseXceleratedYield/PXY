@@ -203,6 +203,8 @@ python3 pxy/sys/exe/exepxy.py
 ### Main Configuration File: `syscnfgpxy.py`
 
 ```python
+RUNMODE = "PRD"  # "TST" uses synthetic data and disables live broker access
+
 PARAMS = {
     "ticker": "^NSEI",      # Trading instrument
     "ohlc_mode": 1          # OHLC calculation mode (0-5)
@@ -497,6 +499,13 @@ def get_full_snapshot() -> dict:
     "global_sentiment": "POSITIVE"
 }
 ```
+
+Set `RUNMODE` to `"TST"` to run with randomly generated market candles and synthetic
+open/closed position scenarios. Broker sessions and live Yahoo Finance requests are
+disabled, and the execution loop ignores market hours. The mock position scenario
+advances by the last digit of the current IST minute: `:01` selects scenario 1,
+`:02` selects scenario 2, through `:09` selecting scenario 9 and `:00` selecting
+scenario 10. Restore `"PRD"` before using live services.
 
 ---
 

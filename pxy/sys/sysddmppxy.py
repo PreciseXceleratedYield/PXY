@@ -6,6 +6,8 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from syscnfgpxy import RUNMODE, SYSCNFGPXY_TIMEZONE
+from sysmockpxy import generate_mock_ohlc
 
 # Silence future warning constraints completely
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -29,18 +31,24 @@ def run_independent_engine():
     start_date_str = today.strftime("%Y-%m-%d")
     end_date_str = (today + timedelta(days=1)).strftime("%Y-%m-%d")
     
-    ticker_obj = yf.Ticker(TICKER)
     interval = "1m"
 
     try:
-        # Fast point-in-time lookup block
-        raw_data = ticker_obj.history(start=start_date_str, end=end_date_str, interval=interval)
-        
-        # 🟢 STEP 2: FALLBACK MECHANISM — Pull latest session if today is empty
-        if raw_data.empty:
-            print("📋 Today's data empty (Weekend/Holiday/Pre-Market). Fetching latest available session...")
-            # period="1d" automatically forces yfinance to locate the single most recent active day
-            raw_data = ticker_obj.history(period="1d", interval=interval)
+        if RUNMODE == "TST":
+            raw_data = generate_mock_ohlc(
+                target_rows=390,
+                interval=interval,
+                timezone=SYSCNFGPXY_TIMEZONE,
+            )
+        else:
+            ticker_obj = yf.Ticker(TICKER)
+            # Fast point-in-time lookup block
+            raw_data = ticker_obj.history(start=start_date_str, end=end_date_str, interval=interval)
+
+            # 🟢 STEP 2: FALLBACK MECHANISM — Pull latest session if today is empty
+            if raw_data.empty:
+                print("📋 Today's data empty (Weekend/Holiday/Pre-Market). Fetching latest available session...")
+                raw_data = ticker_obj.history(period="1d", interval=interval)
 
         if not raw_data.empty:
             # 🟢 STEP 3: FORCE 100% UNIFORM IST TIMESTAMPS

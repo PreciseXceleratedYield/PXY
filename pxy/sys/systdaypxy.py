@@ -4,6 +4,8 @@ from colorama import Fore, Style, init, deinit
 from syscnfgpxy import TICKER
 import pytz
 from datetime import datetime, timedelta, time
+from syscnfgpxy import RUNMODE, SYSCNFGPXY_TIMEZONE
+from sysmockpxy import generate_mock_ohlc
 
 init(autoreset=True)
 
@@ -60,6 +62,14 @@ def print_candle(o, h, l, c):
 
 # ---------------- MARKET SNAPSHOT ----------------
 def get_last_two_trading_days(TICKER, lookback_days=14):
+    if RUNMODE == "TST":
+        mock_days = generate_mock_ohlc(
+            target_rows=2,
+            interval="1d",
+            timezone=SYSCNFGPXY_TIMEZONE,
+        )
+        return mock_days.iloc[-1], mock_days.iloc[-2]
+
     IST = pytz.timezone("Asia/Kolkata")
     today = datetime.now(IST).date()
 
@@ -132,7 +142,14 @@ def get_market_snapshot(TICKER):
     breakout = "NA"
 
     try:
-        df_1m = yf.Ticker(TICKER).history(period="1d", interval="1m")
+        if RUNMODE == "TST":
+            df_1m = generate_mock_ohlc(
+                target_rows=390,
+                interval="1m",
+                timezone=SYSCNFGPXY_TIMEZONE,
+            )
+        else:
+            df_1m = yf.Ticker(TICKER).history(period="1d", interval="1m")
         if not df_1m.empty:
             df_1m = df_1m.tz_localize(None)
             morning_df = df_1m.between_time("09:15", "09:30")

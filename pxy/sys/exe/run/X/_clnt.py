@@ -2,9 +2,20 @@
 import pyotp
 import _scrt
 from neo_api_client import NeoAPI
+import sys
+from pathlib import Path
+
+SYS_DIR = Path(__file__).resolve().parents[3]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+from syscnfgpxy import RUNMODE
 
 def get_session():
     """Initializes and authenticates the Kotak Neo v2 Client."""
+    if RUNMODE == "TST":
+        print("TST MODE: broker session disabled.")
+        return None
+
     try:
         # 1. Connect using values directly from your flat _scrt.py config file
         client = NeoAPI(
@@ -34,4 +45,3 @@ if __name__ == "__main__":
         print("Fetching account limits:\n", session.limits())
     else:
         print("Session Failed ❌")
-

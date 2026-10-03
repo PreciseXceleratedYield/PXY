@@ -17,6 +17,7 @@ HERE = Path(__file__).resolve().parent
 RUN_DIR = HERE / "run"
 sys.path.insert(0, str(RUN_DIR))
 sys.path.insert(0, str(HERE))
+from syscnfgpxy import RUNMODE
 
 # ---------------- HELPER FUNCTIONS ----------------
 def run_script(script_path, timeout=None):
@@ -52,6 +53,8 @@ def live_status(msg):
     print(f"{datetime.now(ist).strftime('%H:%M:%S')} {msg}", end="\r", flush=True)
 
 def in_market_hours():
+    if RUNMODE == "TST":
+        return True
     now = datetime.now(ist)
     return (0 <= now.weekday() <= 4 and dt_time(9, 16) <= now.time() <= dt_time(15, 29))
 

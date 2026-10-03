@@ -2,6 +2,7 @@
 
 import yfinance as yf
 from colorama import Fore, Style, init
+from syscnfgpxy import RUNMODE
 
 init(autoreset=True)
 
@@ -11,6 +12,8 @@ init(autoreset=True)
 # ----------------------------
 def get_vix_flag():
     try:
+        if RUNMODE == "TST":
+            return "G"
         df = yf.Ticker("^INDIAVIX").history(period="1d", interval="5m")
         if df.empty:
             return "X"
@@ -33,6 +36,8 @@ def get_vix_flag():
 # ----------------------------
 def get_global_sentiment():
     try:
+        if RUNMODE == "TST":
+            return "M"
         indices = ["^GSPC", "^IXIC", "^N225"]
         score = 0
 

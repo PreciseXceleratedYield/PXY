@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from syscnfgpxy import (
+    RUNMODE,
     SYSCNFGPXY_TICKER as TICKER,
     SYSDTAFPXY_DEFAULT_INTERVAL,
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
@@ -14,6 +15,7 @@ from syscnfgpxy import (
     SYSDTAFPXY_TIMEZONE,
     SYSDTAFPXY_TRANSFORM_ATR_PERIOD,
 )
+from sysmockpxy import generate_mock_ohlc
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -206,6 +208,13 @@ def fetch_yf_data(
     target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
 ):
     """Dynamic historical ingestion engine utilizing vectorized structural transformations"""
+    if RUNMODE == "TST":
+        return generate_mock_ohlc(
+            target_rows=target_rows,
+            interval=interval,
+            timezone=TIMEZONE,
+        )
+
     df = pd.DataFrame()
     buffer_rows = target_rows + 5
 

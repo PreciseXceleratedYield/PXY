@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import yfinance as yf
 from syscnfgpxy import (
+    RUNMODE,
     SYSCNFGPXY_TICKER as TICKER,
     SYSCNFGPXY_TIMEZONE as TIMEZONE,
     SYSPLCHRTPXY_FETCH_INTERVAL,
@@ -11,6 +12,7 @@ from syscnfgpxy import (
     SYSPLCHRTPXY_SMA_WINDOW,
     SYSPLCHRTPXY_TARGET_ROWS,
 )
+from sysmockpxy import generate_mock_ohlc
 
 # Silence future warning constraints completely
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -98,6 +100,14 @@ def fetch_yf_data(
     target_rows=SYSPLCHRTPXY_TARGET_ROWS,
 ):
     """DYNAMIC HISTORICAL SLICE RETRIEVAL ENGINE WITH SIGNATURE BACKWARD-COMPATIBILITY"""
+    if RUNMODE == "TST":
+        mock_df = generate_mock_ohlc(
+            target_rows=target_rows,
+            interval=interval,
+            timezone=TIMEZONE,
+        )
+        return apply_ohlc_transformation(mock_df, mode=SYSPLCHRTPXY_OHLC_MODE)
+
     ticker_obj = yf.Ticker(TICKER)
     df = pd.DataFrame()
     

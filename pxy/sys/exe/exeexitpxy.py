@@ -24,6 +24,7 @@ from syscnfgpxy import (
     EXEEXITPXY_SQOFF_MIN_GAP_SECS,
     EXEEXITPXY_SQOFF_START,
     EXEEXITPXY_SYSDUMP_SCRIPT,
+    RUNMODE,
     SYSCNFGPXY_TIMEZONE,
 )
 
@@ -186,7 +187,11 @@ def place_exit_order(client, row):
         return None 
 
 def verify_and_exit(client, row): 
-    try: 
+    if RUNMODE == "TST":
+        print(f"{Fore.CYAN}TST MODE: simulated exit check for {row.get('symbol', '')}; no order sent.")
+        return None
+
+    try:
         symbol = str(row.get('symbol', '')) 
         pos_res = client.positions() 
         if (
@@ -227,7 +232,7 @@ def run_snapshot():
     # Base path to the script
     exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), SQUAREOFF_SCRIPT)
     
-    if os.path.exists(exe_path):
+    if RUNMODE != "TST" and os.path.exists(exe_path):
         sq_args, sq_key = None, None
         if SQOFF_START <= now < SQOFF_ALL_START:       # 15:11 up to 15:14: without -all
             sq_args, sq_key = [], "SQOFF|first"
@@ -303,6 +308,8 @@ def run_snapshot():
             print(f"{Fore.YELLOW}⚠️ Broker positions not verified this cycle; counter-buy skipped.")
         elif ledger_busy():
             print(f"{Fore.YELLOW}⚠️ Ledger lock held (tick or liquidation running); counter-buy skipped.")
+        elif RUNMODE == "TST":
+            print(f"{Fore.CYAN}TST MODE: counter-leg check skipped; no order sent.")
         else:
             check_counter_leg(df[held_mask])
     except Exception as e:
