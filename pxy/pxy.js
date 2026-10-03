@@ -193,6 +193,7 @@ wss.on('connection', (ws) => {
     console.log('[WS] client connected. total clients:', wss.clients.size); 
     
     let isProcessing = false; 
+    let hasReportedEngineUnavailable = false;
 
     const interval = setInterval(() => { 
         if (ws.readyState !== WebSocket.OPEN) {
@@ -214,11 +215,14 @@ wss.on('connection', (ws) => {
 
             if (err) { 
                 if (IS_DEBUG) console.log('[DEBUG] tmux has-session query rejected. Engine offline.');
-                if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(`[SYSTEM STATUS] tmux session "${TMUX_SESSION_NAME}" not found. Start it with: tmux new -s ${TMUX_SESSION_NAME}`);
+                if (ws.readyState === WebSocket.OPEN && !hasReportedEngineUnavailable) {
+                    ws.send(`[SYSTEM STATUS] Engine console session "${TMUX_SESSION_NAME}" is unavailable. Start the engine from the management menu.`);
+                    hasReportedEngineUnavailable = true;
                 }
                 return; 
             } 
+
+            hasReportedEngineUnavailable = false;
             
             if (!stdout) return; 
             
