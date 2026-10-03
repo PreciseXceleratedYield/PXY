@@ -11,6 +11,9 @@ from tstmodepxy.pipescenarios import (
     engine_window_open,
     evaluate_pipe_gate_matrix,
     evaluate_scenario,
+    is_actual_market_hours,
+    run_tst_entrypoint,
+    run_tst_suite,
     selected_scenario_index,
 )
 
@@ -32,15 +35,56 @@ class PipeScenarioTests(unittest.TestCase):
                 self.assertEqual(selected_scenario_index(minute), expected)
 
     def test_tst_engine_is_blocked_only_during_weekday_market_hours(self):
-        from datetime import datetime
+        from datetime import datetime, timezone
 
         cases = (
-            (datetime(2025, 1, 6, 9, 15), True),
-            (datetime(2025, 1, 6, 9, 16), False),
+            (datetime(2025, 1, 6, 9, 14), True),
+            (datetime(2025, 1, 6, 9, 15), False),
             (datetime(2025, 1, 6, 15, 29), False),
             (datetime(2025, 1, 6, 15, 30), True),
             (datetime(2025, 1, 4, 12, 0), True),
+            (datetime(2025, 1, 6, 3, 45, tzinfo=timezone.utc), False),
+            (datetime(2025, 1, 6, 10, 0, tzinfo=timezone.utc), True),
         )
         for current_time, expected in cases:
             with self.subTest(current_time=current_time):
                 self.assertEqual(engine_window_open(current_time), expected)
+
+        self.assertFalse(
+            is_actual_market_hours(
+                datetime(2026, 1, 26, 10, 0),
+                ("26-Jan-2026",),
+            )
+        )
+
+    def test_test_entrypoint_refuses_actual_market_hours(self):
+        from datetime import datetime
+
+        ran = []
+        result = run_tst_entrypoint(
+            now=datetime(2025, 1, 6, 10, 0),
+            suite_runner=lambda: ran.append(True),
+        )
+        self.assertIsNone(result)
+        self.assertEqual(ran, [])
+
+    def test_test_entrypoint_allows_holidays_and_after_hours(self):
+        from datetime import datetime
+
+        ran = []
+        self.assertFalse(
+            is_actual_market_hours(
+                datetime(2026, 1, 26, 10, 0),
+                ("26-Jan-2026",),
+            )
+        )
+        result = run_tst_entrypoint(
+            market_holidays=("26-Jan-2026",),
+            now=datetime(2026, 1, 26, 10, 0),
+            suite_runner=lambda: ran.append(True) or True,
+        )
+        self.assertTrue(result)
+        self.assertEqual(ran, [True])
+
+    def test_tst_suite_runs_ten_cases_and_returns_success(self):
+        self.assertTrue(run_tst_suite())

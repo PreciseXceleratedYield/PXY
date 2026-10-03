@@ -203,7 +203,7 @@ python3 pxy/sys/exe/exepxy.py
 ### Main Configuration File: `syscnfgpxy.py`
 
 ```python
-RUNMODE = "PRD"  # "TST" uses synthetic data and disables live broker access
+RUNMODE = "TST"  # Selects isolated, non-broker providers in the engine
 
 PARAMS = {
     "ticker": "^NSEI",      # Trading instrument
@@ -504,17 +504,22 @@ Set `RUNMODE` to `"TST"` to select the isolated providers in
 `pxy/sys/tstmodepxy/`. Test-only mock data and position scenarios live there; the
 production implementations remain separate and are selected by the single
 `sysmodepxy.py` dispatch boundary. TST disables broker sessions and Yahoo Finance
-requests. The engine is permitted only outside weekday market hours (09:16-15:29
-IST); startup, cleanup, and direct entry/exit/averaging calls are gated as well.
+requests in the production launcher. The ten-scenario offline test runner is
+separate from `exepxy.py`: run `./pxytst` from the `pxy/` directory. It prints
+the ten iteration results and a final PASS/FAIL summary, then exits. It refuses
+to run during weekday market hours (09:15-15:30 IST) and respects the configured
+market holidays. It never changes `RUNMODE` or calls the production launcher.
+
+For live operation, set `RUNMODE = "PRD"` explicitly. Do not rely on `pxytst` as
+a production launcher.
 The mock position scenario advances by the last digit of the current IST minute:
 `:01` selects scenario 1 through `:09` selecting scenario 9, and `:00` selects
 scenario 10. Each case checks entry, target exit, counter-leg, and averaging
-decisions. The TST runner also checks the production gate conditions for entry
-validation, target exits, position verification, counter-buy eligibility, and
-averaging. These checks use simulated responses and never submit an order. Run
-the checks with
-`python -m unittest discover -s pxy/sys/tstmodepxy -p 'test_*.py'`. Set `RUNMODE`
-back to `"PRD"` before using live services.
+decisions. The TST runner also checks 68 production decision-gate cases for
+entry validation, target exits, position verification, counter-buy eligibility,
+and averaging using simulated responses; it never submits an order. Run the
+suite with `./pxytst` or its unit tests with
+`python3 -m unittest discover -s pxy/sys/tstmodepxy -p 'test_*.py'`.
 
 ---
 
