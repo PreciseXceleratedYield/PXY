@@ -236,11 +236,22 @@ while true; do
                     echo "   >>> PRESS [ENTER] TO RETURN TO MENU <<< "
                     draw_border
                     
-                    # Captures the last 30 lines, preserves colors (-e), joins wrapped lines (-J)
-                    tmux capture-pane -pt pxy-engine -S -30 -e -J
+                    # Resolve a pane target explicitly; capture-pane does not accept
+                    # every tmux session target as a pane target.
+                    PANE_ID=$(tmux list-panes -t pxy-engine -F '#{pane_id}' 2>/dev/null | head -n 1)
+                    if [ -n "$PANE_ID" ] && tmux capture-pane -pt "$PANE_ID" -S -30 -e -J; then
+                        if pgrep -f "[s]ysexepxy.py" >/dev/null 2>&1; then
+                            ENGINE_STATUS="RUNNING"
+                        else
+                            ENGINE_STATUS="NOT RUNNING"
+                        fi
+                    else
+                        echo "[X] Unable to capture the engine console pane."
+                        ENGINE_STATUS="PANE UNAVAILABLE"
+                    fi
                     
                     draw_border
-                    echo "Engine Status: RUNNING SUCCESSFULLY"
+                    echo "Engine Status: $ENGINE_STATUS"
                     
                     # Refreshes the screen every 0.5 seconds. If you press ENTER, it breaks the loop.
                     read -t 0.5 -r -N 1 INPUT
