@@ -1,6 +1,10 @@
 import sys
 import unittest
+from datetime import date, datetime
 from pathlib import Path
+from unittest.mock import Mock, patch
+
+import pandas as pd
 from unittest.mock import patch
 
 SYS_DIR = Path(__file__).resolve().parents[1]
@@ -63,6 +67,24 @@ class ModeDispatchTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(RuntimeError, "disabled during weekday market hours"):
                 run_backtest()
+
+    def test_strategy_signal_capture_redirects_dashboard_output(self):
+        import tstmodepxy.backtest as backtest
+
+        history = pd.DataFrame(
+            {"Open": [100.0], "High": [101.0], "Low": [99.0], "Close": [100.5]},
+            index=pd.DatetimeIndex([datetime(2025, 1, 6, 9, 16)]),
+        )
+        dashboard = Mock()
+        dashboard.get_full_snapshot.return_value = {"entry": "NONE", "exit": "NONE"}
+        dashboard.fetch_yf_data = Mock()
+        with patch.object(backtest.importlib, "import_module", return_value=dashboard), patch.object(
+            backtest, "transform_market_data", return_value=history
+        ):
+            bars = backtest.calculate_strategy_signals(history, date(2025, 1, 6))
+
+        self.assertEqual(len(bars), 1)
+        dashboard.get_full_snapshot.assert_called_once_with()
 
 
 if __name__ == "__main__":
