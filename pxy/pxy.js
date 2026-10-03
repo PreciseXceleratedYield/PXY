@@ -206,7 +206,7 @@ wss.on('connection', (ws) => {
 
         // Pulls up to 500 lines directly out of active tmux terminal pane memory
         // -e preserves color/attribute escape sequences, -J joins wrapped lines
-        const captureCmd = `tmux has-session -t ${TMUX_SESSION_NAME} 2>/dev/null && tmux capture-pane -pt ${TMUX_SESSION_NAME} -S -500 -e -J`;
+        const captureCmd = `pane_id=$(tmux list-panes -t ${TMUX_SESSION_NAME} -F '#{pane_id}' 2>/dev/null | head -n 1) && [ -n "$pane_id" ] && tmux capture-pane -pt "$pane_id" -S -500 -e -J`;
         
         if (IS_DEBUG) console.log('[DEBUG] WebSocket polling tmux screen buffer memory...');
 
