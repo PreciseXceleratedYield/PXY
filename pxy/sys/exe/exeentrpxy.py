@@ -5,13 +5,6 @@ import re
 from pathlib import Path
 from datetime import datetime
 from colorama import Fore, init, Style
-from syscnfgpxy import (
-    EXEENTRPXY_ENTRY_CUTOFF,
-    EXEENTRPXY_PREOPEN_END,
-    EXEENTRPXY_PREOPEN_START,
-    EXEENTRPXY_SQUAREOFF_END,
-    SYSCNFGPXY_TIMEZONE,
-)
 
 # --- GLOBAL CONFIG ---
 DEBUG = False
@@ -25,6 +18,14 @@ RUN_DIR = HERE / "run"
 for p in [HERE, RUN_DIR, PARENT]:
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
+
+from syscnfgpxy import (
+    EXEENTRPXY_ENTRY_CUTOFF,
+    EXEENTRPXY_PREOPEN_END,
+    EXEENTRPXY_PREOPEN_START,
+    EXEENTRPXY_SQUAREOFF_END,
+    SYSCNFGPXY_TIMEZONE,
+)
 
 def dprint(msg, color=Fore.CYAN):
     if DEBUG:

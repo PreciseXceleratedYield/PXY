@@ -6,7 +6,13 @@ import sys
 import time 
 import subprocess 
 from datetime import datetime
+from pathlib import Path
 from colorama import init, Fore, Style 
+
+SYS_DIR = Path(__file__).resolve().parent.parent
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+
 from syscnfgpxy import (
     EXEEXITPXY_EXIT_LOCK_KEEP_SECS,
     EXEEXITPXY_EXIT_LOCK_SECS,
