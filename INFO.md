@@ -507,8 +507,8 @@ production implementations remain separate and are selected by the single
 requests in the production launcher. The `pxytst` command is separate from
 `exepxy.py`: it runs a walk-forward replay of the latest completed NIFTY
 session, refuses to run during weekday market hours (09:15-15:30 IST), writes
-CSV ledgers, and exits. It respects configured market holidays and never
-changes `RUNMODE` or calls the production launcher.
+CSV ledgers and a production-pipe runtime log, and exits. It respects configured
+market holidays and never changes `RUNMODE` or calls the production launcher.
 
 The default is `RUNMODE = "PRD"` for the scheduled production engine. Set
 `RUNMODE = "TST"` only when deliberately running the engine with isolated mock
@@ -522,21 +522,21 @@ walk-forward simulation without submitting orders; run them with
 
 ### One-session strategy replay
 
-Run `python3 sysbtstpxy.py` from `pxy/sys/`. The separate simulator fetches
+Run `python3 sysbtstpxy.py` from `pxy/sys/`. The isolated simulator fetches
 recent one-minute NIFTY data for indicator warmup, selects the latest completed
-session, and replays each bar from 09:16 IST through the configured production
-square-off. It uses the production OHLC transformation, entry/exit signal
-router, and shared entry validation/order-command gates. It never calls the
-broker or starts the production engine. It writes both a simulated trade ledger
-and a bar-by-bar decision CSV under `~/pxy-backtest-results/`.
+session, and evaluates the production dashboard and exit, entry, averaging,
+counter-leg, and square-off pipes in their normal order for each bar. It uses
+an in-memory Kotak-shaped broker; live sessions, real order calls, subprocess
+launches, and production state-file writes are blocked or redirected. Console
+output is saved alongside the simulated trade ledger and bar-by-bar decision
+CSV under `~/pxy-backtest-results/`.
 
-Without historical option premiums, fills and P&L use NIFTY spot movement as a
-one-unit CE/PE direction proxy. Signals from a completed candle fill at the
-next candle open to avoid same-close lookahead. Opposite-signal exits are only
-a proxy for the premium-dependent production exit targets; averaging, counter
-orders, broker behavior, costs, and slippage are not represented. This replay
-is useful for reviewing strategy signals, not a full historical
-options-performance test.
+Signals from a completed candle are acted on at the next candle open. Since
+historical option premiums are not loaded, the simulator uses clearly labelled
+synthetic CE/PE premium and position proxies derived from NIFTY spot movement.
+The results are not historical option P&L and do not include transaction
+costs, slippage, or real broker/OMS behavior. The replay refuses to run during
+weekday market hours (09:15-15:30 IST) and on configured exchange holidays.
 
 ---
 

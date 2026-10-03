@@ -1,0 +1,92 @@
+import unittest
+from datetime import datetime
+from pathlib import Path
+import sys
+import tempfile
+
+SYS_DIR = Path(__file__).resolve().parents[1]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+
+from tstmodepxy.broker_sim import SimulatedBroker
+from tstmodepxy.backtest import write_session_csvs
+
+
+class SimulatedBrokerTests(unittest.TestCase):
+    def setUp(self):
+        self.broker = SimulatedBroker()
+        self.broker.set_market(datetime(2025, 1, 6, 9, 17), 22000)
+
+    def place(self, side, option, tag, quantity=75):
+        return self.broker.place_order(
+            trading_symbol=f"NIFTY-WF-{option}",
+            transaction_type=side,
+            quantity=quantity,
+            tag=tag,
+        )
+
+    def test_buy_quote_sell_and_trade_ledger_are_simulated(self):
+        buy = self.place("B", "CE", "WF0000001")
+        self.assertEqual(buy["stat"], "Ok")
+        self.assertEqual(self.broker.position_summary(), "75CE0PE")
+
+        self.broker.set_market(datetime(2025, 1, 6, 9, 18), 22012)
+        quote = self.broker.quotes(
+            [{"instrument_token": "SIM-CE"}], quote_type="depth"
+        )[0]
+        self.assertEqual(quote["last_price"], 112.0)
+        self.assertEqual(
+            self.place("S", "CE", "WF0000001_S001")["stat"],
+            "Ok",
+        )
+
+        self.assertEqual(self.broker.position_summary(), "0CE0PE")
+        self.assertEqual(len(self.broker.order_report()["data"]), 2)
+        trade = self.broker.trades()[0]
+        self.assertEqual(trade["side"], "CE")
+        self.assertEqual(trade["index_points_per_unit"], 12)
+        self.assertEqual(trade["quantity"], 75)
+
+    def test_put_premium_and_points_move_opposite_to_spot(self):
+        self.place("B", "PE", "WF0000002")
+        self.broker.set_market(datetime(2025, 1, 6, 9, 18), 21990)
+        quote = self.broker.quotes(
+            [{"instrument_token": "SIM-PE"}], quote_type="depth"
+        )[0]
+        self.assertEqual(quote["last_price"], 110.0)
+        self.place("S", "PE", "WF0000002_S002")
+        self.assertEqual(self.broker.trades()[0]["index_points_per_unit"], 10)
+
+    def test_rejects_invalid_orders_and_oversells(self):
+        self.assertEqual(self.place("B", "CE", "WF0000003", 0)["stat"], "Not_Ok")
+        self.assertEqual(
+            self.place("S", "CE", "WF0000003_S003")["stat"],
+            "Not_Ok",
+        )
+        self.assertEqual(self.place("B", "XX", "WF0000004")["stat"], "Not_Ok")
+
+    def test_csv_writer_accepts_pipe_trade_and_bar_records(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-csv-test-") as temp:
+            trade_path, bars_path = write_session_csvs(
+                Path(temp),
+                "2025-01-06",
+                [{
+                    "side": "CE", "entry_time": "09:17", "exit_time": "09:18",
+                    "entry_spot": 100, "exit_spot": 101, "points": 1,
+                    "exit_reason": "production_pipe", "quantity": 75,
+                    "simulated_option_entry": 100, "simulated_option_exit": 101,
+                }],
+                [{
+                    "timestamp": "09:16", "execution_timestamp": "09:17",
+                    "spot": 100, "execution_spot": 101, "entry_signal": "BUY",
+                    "exit_signal": "BULL", "position_before": "0CE0PE",
+                    "position_after": "75CE0PE", "orders_created": 1,
+                    "order_tags": "WF0000001",
+                }],
+            )
+            self.assertIn("simulated_option_entry", trade_path.read_text())
+            self.assertIn("execution_timestamp", bars_path.read_text())
+
+
+if __name__ == "__main__":
+    unittest.main()
