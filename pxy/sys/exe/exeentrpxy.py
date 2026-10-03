@@ -1,7 +1,6 @@
 import sys
 import os
 import traceback
-import re
 from pathlib import Path
 from datetime import datetime
 from colorama import Fore, init, Style
@@ -37,7 +36,13 @@ try:
     from runclntpxy import get_session
     from runpchkpxy import get_position_summary
     from sysmodepxy import dispatch_mode
-    from sysdecisionpxy import entry_order_command
+    from sysdecisionpxy import (
+        entry_blackout,
+        entry_order_command,
+        entry_session_available,
+        entry_signal_valid,
+        parse_position_summary,
+    )
 
     dprint("IMPORTS OK", Fore.GREEN)
 except Exception as e:
@@ -55,9 +60,12 @@ def main():
         dprint(f"TIME: {now}")
 
         # 1. Market Timing Validation
-        is_blackout = lambda now: (
-            (EXEENTRPXY_PREOPEN_START <= now < EXEENTRPXY_PREOPEN_END)
-            or (EXEENTRPXY_ENTRY_CUTOFF <= now < EXEENTRPXY_SQUAREOFF_END)
+        is_blackout = lambda now: entry_blackout(
+            now,
+            EXEENTRPXY_PREOPEN_START,
+            EXEENTRPXY_PREOPEN_END,
+            EXEENTRPXY_ENTRY_CUTOFF,
+            EXEENTRPXY_SQUAREOFF_END,
         )
         if dispatch_mode("is_entry_blackout", is_blackout, now):
             print(f"{Fore.YELLOW}⏳ Market buffer time - skip")
@@ -67,14 +75,14 @@ def main():
         data = get_all_data()
         entry_signal = data.get("entry")
 
-        if not isinstance(entry_signal, str) or entry_signal not in ("BUY", "SELL"):
+        if not entry_signal_valid(entry_signal):
             rejected_signal = str(entry_signal)[:10]
             print(f"{Fore.YELLOW}⏳ Skip {rejected_signal}: Invalid entry signal")
             return
 
         # 3. Session Initialization
         client = get_session()
-        if not client:
+        if not entry_session_available(client):
             print(f"{Fore.RED}❌ Session failed; entry skipped.")
             return
 
@@ -88,13 +96,12 @@ def main():
             print(f"{Fore.YELLOW}⚠️ Position check failed; skipping this entry run.")
             return
 
-        match = re.fullmatch(r"(\d+)CE(\d+)PE", pos_raw.upper().strip())
-        if not match:
+        position_lots = parse_position_summary(pos_raw)
+        if position_lots is None:
             print(f"{Fore.YELLOW}⚠️ Invalid position result; skipping this entry run.")
             return
 
-        ce_lots = int(match.group(1))
-        pe_lots = int(match.group(2))
+        ce_lots, pe_lots = position_lots
         dprint(f"CE: {ce_lots} | PE: {pe_lots}")
 
         command = entry_order_command(entry_signal, ce_lots, pe_lots)

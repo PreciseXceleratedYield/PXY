@@ -30,6 +30,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
 )
 from sysdecisionpxy import counter_leg_script
+from sysdecisionpxy import counter_leg_permission_status
 
 # ==================== CONFIG (this file's settings) ====================
 CBUY_ACTION = EXECBUYPXY_ACTION
@@ -155,24 +156,40 @@ def check_counter_leg(remaining_df):
         held = "CE" if state == "BEAR" else "PE"
         counter = "PE" if held == "CE" else "CE"
 
-        if datetime.now(_IST).time() >= CBUY_CUTOFF:
+        now = datetime.now(_IST).time()
+        lock_key = f"CBUY|{script_name}"
+        locked = _recent(_load_locks(), lock_key, CBUY_LOCK_SECS)
+        launches_today = (
+            _fires_today()
+            if CBUY_MAX_PER_DAY > 0 and now < CBUY_CUTOFF and not locked
+            else 0
+        )
+        permission = counter_leg_permission_status(
+            now,
+            CBUY_CUTOFF,
+            locked,
+            launches_today,
+            CBUY_MAX_PER_DAY,
+            str(CBUY_ACTION).upper().strip() == "YES",
+        )
+
+        if permission == "cutoff":
             debug_log(f"Counter check: past {CBUY_CUTOFF}; not firing {script_name}.")
             return None
 
-        lock_key = f"CBUY|{script_name}"
-        if _recent(_load_locks(), lock_key, CBUY_LOCK_SECS):
+        if permission == "locked":
             debug_log(f"Counter check: {script_name} already fired within {CBUY_LOCK_SECS}s.")
             return None
 
         global _cap_warned
-        if CBUY_MAX_PER_DAY > 0 and _fires_today() >= CBUY_MAX_PER_DAY:
+        if permission == "daily_limit":
             if not _cap_warned:
                 _cap_warned = True
                 print(f"{Fore.RED}🛑 Counter-buy daily cap reached ({CBUY_MAX_PER_DAY} launches); not firing {script_name}.")
             return None
 
         print(f"{Fore.YELLOW}⚠️ Hostile state ({state}): remaining {held} rows with NO {counter} leg.")
-        if str(CBUY_ACTION).upper().strip() != "YES":
+        if permission == "passive":
             print(f"{Fore.BLUE}{Style.BRIGHT}ℹ️ [PASSIVE ALERT] CBUY_ACTION=NO. Would fire {script_name}.")
             return None
 

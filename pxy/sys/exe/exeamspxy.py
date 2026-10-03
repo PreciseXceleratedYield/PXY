@@ -15,6 +15,7 @@ from exeacgpxy import (
     print_pxy_trigger_dashboard
 )
 from sysdecisionpxy import averaging_trigger_sides
+from sysdecisionpxy import averaging_order_response_accepted
 
 def _newest_row(rows):
     """Newest lot by buy_time; falls back to the old behaviour if the column is unusable."""
@@ -28,12 +29,7 @@ def _newest_row(rows):
 
 def _order_ok(resp):
     """Same rule as exeexitpxy: a falsy reply or a broker error/failed reply is NOT a success."""
-    if isinstance(resp, dict):
-        stat = str(resp.get('stat', '')).lower()
-        err = str(resp.get('errMsg', '')).lower()
-        if "failed" in stat or "error" in err or "error" in stat:
-            return False
-    return bool(resp)
+    return averaging_order_response_accepted(resp)
 
 
 def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_val,

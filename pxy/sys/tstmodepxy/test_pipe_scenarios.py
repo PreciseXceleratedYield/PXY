@@ -9,6 +9,7 @@ if str(SYS_DIR) not in sys.path:
 from tstmodepxy.pipescenarios import (
     SCENARIOS,
     engine_window_open,
+    evaluate_pipe_gate_matrix,
     evaluate_scenario,
     selected_scenario_index,
 )
@@ -20,6 +21,9 @@ class PipeScenarioTests(unittest.TestCase):
         for index, scenario in enumerate(SCENARIOS):
             with self.subTest(scenario=index + 1, name=scenario["name"]):
                 evaluate_scenario(scenario)
+
+    def test_all_production_pipe_gates_match_expected_results(self):
+        self.assertGreaterEqual(evaluate_pipe_gate_matrix(), 40)
 
     def test_minute_last_digit_selects_expected_scenario(self):
         for minute in range(60):

@@ -509,7 +509,10 @@ IST); startup, cleanup, and direct entry/exit/averaging calls are gated as well.
 The mock position scenario advances by the last digit of the current IST minute:
 `:01` selects scenario 1 through `:09` selecting scenario 9, and `:00` selects
 scenario 10. Each case checks entry, target exit, counter-leg, and averaging
-decisions. Run all ten checks with
+decisions. The TST runner also checks the production gate conditions for entry
+validation, target exits, position verification, counter-buy eligibility, and
+averaging. These checks use simulated responses and never submit an order. Run
+the checks with
 `python -m unittest discover -s pxy/sys/tstmodepxy -p 'test_*.py'`. Set `RUNMODE`
 back to `"PRD"` before using live services.
 

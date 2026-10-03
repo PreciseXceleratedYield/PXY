@@ -3,10 +3,26 @@
 from datetime import time
 
 from sysdecisionpxy import (
+    averaging_order_response_accepted,
+    averaging_placement_allowed,
+    averaging_snapshot_status,
     averaging_trigger_sides,
+    averaging_window_enabled,
     counter_leg_script,
+    counter_leg_allowed,
+    counter_leg_permission_status,
+    entry_blackout,
     entry_order_command,
+    entry_session_available,
+    entry_signal_valid,
+    exit_quantity_to_sell,
+    exit_lock_recent,
+    exit_order_response_accepted,
+    matching_exit_net_quantity,
+    target_exit_allowed,
     target_exit_ready,
+    parse_position_summary,
+    valid_exit_positions_response,
 )
 
 
@@ -142,6 +158,84 @@ def evaluate_scenario(scenario):
             f"{scenario['name']}: expected {expected!r}, got {actual!r}"
         )
     return actual
+
+
+def evaluate_pipe_gate_matrix():
+    cases = (
+        ("entry BUY signal", lambda: entry_signal_valid("BUY"), True),
+        ("entry SELL signal", lambda: entry_signal_valid("SELL"), True),
+        ("entry invalid signal", lambda: entry_signal_valid("HOLD"), False),
+        ("entry missing signal", lambda: entry_signal_valid(None), False),
+        ("entry before preopen blackout", lambda: entry_blackout(time(9, 13), time(9, 14), time(9, 16), time(15, 10), time(15, 50)), False),
+        ("entry preopen blackout", lambda: entry_blackout(time(9, 15), time(9, 14), time(9, 16), time(15, 10), time(15, 50)), True),
+        ("entry cutoff boundary", lambda: entry_blackout(time(15, 10), time(9, 14), time(9, 16), time(15, 10), time(15, 50)), True),
+        ("entry after cutoff window", lambda: entry_blackout(time(15, 50), time(9, 14), time(9, 16), time(15, 10), time(15, 50)), False),
+        ("entry missing session", lambda: entry_session_available(None), False),
+        ("entry session available", lambda: entry_session_available(object()), True),
+        ("entry valid position summary", lambda: parse_position_summary("1CE2PE"), (1, 2)),
+        ("entry formatted position summary", lambda: parse_position_summary(" 0ce0pe "), (0, 0)),
+        ("entry malformed position summary", lambda: parse_position_summary("unknown"), None),
+        ("entry non-string position summary", lambda: parse_position_summary(None), None),
+        ("entry BUY flat", lambda: entry_order_command("BUY", 0, 0), "pxybuyce"),
+        ("entry SELL flat", lambda: entry_order_command("SELL", 0, 0), "pxybuype"),
+        ("entry occupied CE", lambda: entry_order_command("BUY", 1, 0), None),
+        ("entry occupied PE", lambda: entry_order_command("SELL", 0, 1), None),
+        ("exit target, price and PnL pass", lambda: target_exit_ready(100, 100, 150, 150), True),
+        ("exit target disabled", lambda: target_exit_ready(0, 100, 500, 150), False),
+        ("exit invalid price", lambda: target_exit_ready(100, 0, 500, 150), False),
+        ("exit price below target", lambda: target_exit_ready(100, 99, 500, 150), False),
+        ("exit PnL below minimum", lambda: target_exit_ready(100, 110, 149, 150), False),
+        ("exit non-finite price", lambda: target_exit_ready(100, float("nan"), 500, 150), False),
+        ("exit malformed value", lambda: target_exit_ready(100, "bad", 500, 150), False),
+        ("exit snapshot missing", lambda: target_exit_allowed(False, 100, 110, 500, 150), False),
+        ("exit snapshot available", lambda: target_exit_allowed(True, 100, 110, 500, 150), True),
+        ("exit invalid positions response", lambda: valid_exit_positions_response(None), False),
+        ("exit unsuccessful positions response", lambda: valid_exit_positions_response({"stat": "Not_Ok", "stCode": "200", "data": []}), False),
+        ("exit bad response code", lambda: valid_exit_positions_response({"stat": "Ok", "stCode": "500", "data": []}), False),
+        ("exit missing response data", lambda: valid_exit_positions_response({"stat": "Ok", "stCode": "200"}), False),
+        ("exit valid positions response", lambda: valid_exit_positions_response({"stat": "Ok", "stCode": "200", "data": []}), True),
+        ("exit accepted order response", lambda: exit_order_response_accepted({"stat": "Ok", "stCode": "200"}), True),
+        ("exit rejected order response", lambda: exit_order_response_accepted({"stat": "Ok", "stCode": "500"}), False),
+        ("exit malformed order response", lambda: exit_order_response_accepted("accepted"), False),
+        ("exit positions symbol not found", lambda: matching_exit_net_quantity([], "NIFTYCE", lambda row: row["net_qty"]), None),
+        ("exit matching positive broker net", lambda: matching_exit_net_quantity([{"trdSym": "NIFTYCE", "net_qty": 3}], "NIFTYCE", lambda row: row["net_qty"]), 3),
+        ("exit matching nonpositive broker net", lambda: matching_exit_net_quantity([{"trdSym": "NIFTYCE", "net_qty": -1}], "NIFTYCE", lambda row: row["net_qty"]), -1),
+        ("exit requested qty capped to broker net", lambda: exit_quantity_to_sell(2, 5), 2),
+        ("exit requested qty respected", lambda: exit_quantity_to_sell(5, 2), 2),
+        ("exit zero broker net", lambda: exit_quantity_to_sell(0, 2), 0),
+        ("exit invalid requested qty", lambda: exit_quantity_to_sell(2, "bad"), 0),
+        ("exit recent lock", lambda: exit_lock_recent({"order": 95}, "order", 10, 100), True),
+        ("exit expired lock", lambda: exit_lock_recent({"order": 80}, "order", 10, 100), False),
+        ("exit disabled lock", lambda: exit_lock_recent({"order": 99}, "order", 0, 100), False),
+        ("counter-buy missing market data", lambda: counter_leg_allowed(False, False, False), False),
+        ("counter-buy unverified positions", lambda: counter_leg_allowed(True, True, False), False),
+        ("counter-buy ledger locked", lambda: counter_leg_allowed(True, False, True), False),
+        ("counter-buy all gates pass", lambda: counter_leg_allowed(True, False, False), True),
+        ("counter-buy cutoff", lambda: counter_leg_permission_status(time(15, 10), time(15, 10), False, 0, 6, True), "cutoff"),
+        ("counter-buy recent duplicate lock", lambda: counter_leg_permission_status(time(14), time(15, 10), True, 0, 6, True), "locked"),
+        ("counter-buy daily limit", lambda: counter_leg_permission_status(time(14), time(15, 10), False, 6, 6, True), "daily_limit"),
+        ("counter-buy passive action", lambda: counter_leg_permission_status(time(14), time(15, 10), False, 0, 6, False), "passive"),
+        ("counter-buy launch permitted", lambda: counter_leg_permission_status(time(14), time(15, 10), False, 0, 6, True), "allowed"),
+        ("averaging data error", lambda: averaging_snapshot_status(True, False, True), "error"),
+        ("averaging positions unverified", lambda: averaging_snapshot_status(False, True, True), "positions_unverified"),
+        ("averaging no active rows", lambda: averaging_snapshot_status(False, False, False), "empty"),
+        ("averaging snapshot ready", lambda: averaging_snapshot_status(False, False, True), "ready"),
+        ("averaging rebuy disabled", lambda: averaging_window_enabled(False, time(10), time(9, 17), time(15, 10)), False),
+        ("averaging before window", lambda: averaging_window_enabled(True, time(9, 16), time(9, 17), time(15, 10)), False),
+        ("averaging window opens", lambda: averaging_window_enabled(True, time(9, 17), time(9, 17), time(15, 10)), True),
+        ("averaging window closes", lambda: averaging_window_enabled(True, time(15, 10), time(9, 17), time(15, 10)), False),
+        ("averaging ledger lock", lambda: averaging_placement_allowed(True), False),
+        ("averaging ledger clear", lambda: averaging_placement_allowed(False), True),
+        ("averaging accepted order response", lambda: averaging_order_response_accepted({"stat": "Ok"}), True),
+        ("averaging rejected order response", lambda: averaging_order_response_accepted({"stat": "failed"}), False),
+        ("averaging broker error response", lambda: averaging_order_response_accepted({"errMsg": "order error"}), False),
+        ("averaging empty order response", lambda: averaging_order_response_accepted(None), False),
+    )
+    for name, check, expected in cases:
+        actual = check()
+        if actual != expected:
+            raise AssertionError(f"{name}: expected {expected!r}, got {actual!r}")
+    return len(cases)
 
 
 def selected_scenario_index(minute):

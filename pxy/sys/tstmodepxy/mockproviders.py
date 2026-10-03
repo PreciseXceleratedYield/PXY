@@ -9,6 +9,7 @@ from sysdecisionpxy import counter_leg_script
 from tstmodepxy.pipescenarios import (
     SCENARIOS,
     engine_window_open as _tst_engine_window_open,
+    evaluate_pipe_gate_matrix,
     evaluate_scenario,
     selected_scenario_index,
 )
@@ -297,10 +298,12 @@ def skip_live_averaging():
     index = selected_scenario_index(now.minute)
     scenario = SCENARIOS[index]
     result = evaluate_scenario(scenario)
+    checked_gates = evaluate_pipe_gate_matrix()
     print(
         f"TST PIPE SCENARIO {index + 1}/10: PASS — {scenario['name']} | "
         f"entry={result['entry'] or 'none'}, target_exit={result['target_exit']}, "
-        f"counter={result['counter_leg'] or 'none'}, averaging={result['averaging']}"
+        f"counter={result['counter_leg'] or 'none'}, averaging={result['averaging']} | "
+        f"{checked_gates} production pipe gate checks passed"
     )
     print("TST MODE: decision checks only; no orders sent.")
     return True
