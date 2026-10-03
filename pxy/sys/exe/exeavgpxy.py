@@ -17,6 +17,10 @@ DEBUG_MODE = False
 EXIT_MODE = "one"
 
 def run_snapshot():
+    if not dispatch_mode("engine_window_open", lambda: True):
+        print(f"{Fore.YELLOW}TST engine paused during market hours; averaging pipe not run.")
+        return
+
     data = get_combined_data()
     df = data.get("active_orders", pd.DataFrame())
     if dispatch_mode("skip_live_averaging", lambda: False):

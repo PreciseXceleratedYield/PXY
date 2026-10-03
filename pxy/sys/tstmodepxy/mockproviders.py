@@ -1,7 +1,17 @@
 """Synthetic providers selected only through sysmodepxy."""
 
+from datetime import datetime
+
 import numpy as np
 import pandas as pd
+import pytz
+from sysdecisionpxy import counter_leg_script
+from tstmodepxy.pipescenarios import (
+    SCENARIOS,
+    engine_window_open as _tst_engine_window_open,
+    evaluate_scenario,
+    selected_scenario_index,
+)
 
 
 def generate_mock_ohlc(
@@ -168,9 +178,7 @@ MOCK_SCENARIOS = (
 
 def process_lilo_orders(client=None, strict=False, timezone="Asia/Kolkata"):
     now = pd.Timestamp.now(tz=timezone).to_pydatetime()
-    scenario_index = (now.minute % 10) - 1
-    if scenario_index < 0:
-        scenario_index = 9
+    scenario_index = selected_scenario_index(now.minute)
     name, open_specs, closed_specs = MOCK_SCENARIOS[scenario_index]
 
     def make_record(spec, offset, is_closed):
@@ -233,7 +241,25 @@ def run_futures_sidecar():
 
 
 def is_market_hours():
-    return True
+    now = datetime.now(pytz.timezone("Asia/Kolkata"))
+    return not _tst_engine_window_open(now)
+
+
+def engine_window_open():
+    now = datetime.now(pytz.timezone("Asia/Kolkata"))
+    return _tst_engine_window_open(now)
+
+
+def run_startup_checks():
+    return engine_window_open()
+
+
+def run_closed_market_tasks():
+    return False
+
+
+def legacy_engine_enabled():
+    return False
 
 
 def is_entry_blackout(now):
@@ -250,10 +276,31 @@ def verify_and_exit(client, row):
 
 
 def run_counter_leg(remaining_df=None):
-    print("TST MODE: counter-leg check skipped; no order sent.")
+    if remaining_df is None or remaining_df.empty:
+        print("TST MODE: counter-leg scenario has no held rows.")
+        return False
+    state = str(remaining_df.iloc[0].get("exit", "NONE")).upper().strip()
+    script_name = counter_leg_script(
+        state,
+        remaining_df[["symbol", "qty"]].to_dict("records"),
+        {"CE": "pxybuype", "PE": "pxybuyce"},
+    )
+    if script_name:
+        print(f"TST MODE: counter-leg decision would run {script_name}; no order sent.")
+        return True
+    print("TST MODE: counter-leg decision is no action; no order sent.")
     return False
 
 
 def skip_live_averaging():
-    print("TST MODE: averaging pipeline uses mock positions; no orders sent.")
+    now = pd.Timestamp.now(tz="Asia/Kolkata").to_pydatetime()
+    index = selected_scenario_index(now.minute)
+    scenario = SCENARIOS[index]
+    result = evaluate_scenario(scenario)
+    print(
+        f"TST PIPE SCENARIO {index + 1}/10: PASS — {scenario['name']} | "
+        f"entry={result['entry'] or 'none'}, target_exit={result['target_exit']}, "
+        f"counter={result['counter_leg'] or 'none'}, averaging={result['averaging']}"
+    )
+    print("TST MODE: decision checks only; no orders sent.")
     return True

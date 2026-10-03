@@ -29,6 +29,7 @@ from syscnfgpxy import (
     EXECBUYPXY_SCRIPTS,
     SYSCNFGPXY_TIMEZONE,
 )
+from sysdecisionpxy import counter_leg_script
 
 # ==================== CONFIG (this file's settings) ====================
 CBUY_ACTION = EXECBUYPXY_ACTION
@@ -145,24 +146,14 @@ def check_counter_leg(remaining_df):
             return None
 
         state = str(remaining_df.iloc[0].get(EXIT_KEY_COLUMN, "NONE")).upper().strip()
-        if state not in ("BULL", "BEAR"):
-            debug_log(f"Counter check: exit key '{state}' is not BULL/BEAR; skipping.")
+        records = remaining_df[["symbol", "qty"]].to_dict("records")
+        script_name = counter_leg_script(state, records, CBUY_SCRIPTS)
+        if script_name is None:
+            debug_log(f"Counter check: state {state} | positions do not match a counter-leg rule.")
             return None
 
-        symbols = remaining_df["symbol"].astype(str).str.upper().str.strip()
-        qty = pd.to_numeric(remaining_df["qty"], errors="coerce").fillna(0)
-        has_ce = bool((symbols.str.endswith("CE") & (qty > 0)).any())
-        has_pe = bool((symbols.str.endswith("PE") & (qty > 0)).any())
-
-        if state == "BEAR" and has_ce and not has_pe:
-            held, counter = "CE", "PE"
-        elif state == "BULL" and has_pe and not has_ce:
-            held, counter = "PE", "CE"
-        else:
-            debug_log(f"Counter check: state {state} | CE rows: {has_ce} | PE rows: {has_pe} -> no action.")
-            return None
-
-        script_name = CBUY_SCRIPTS[held]
+        held = "CE" if state == "BEAR" else "PE"
+        counter = "PE" if held == "CE" else "CE"
 
         if datetime.now(_IST).time() >= CBUY_CUTOFF:
             debug_log(f"Counter check: past {CBUY_CUTOFF}; not firing {script_name}.")

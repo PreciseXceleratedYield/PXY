@@ -57,13 +57,17 @@ def _is_market_hours_production():
 
 
 def is_market_hours():
-    return dispatch_mode("is_market_hours", _is_market_hours_production)
+    return dispatch_mode("engine_window_open", _is_market_hours_production)
 
 # =====================================================================
 # 3. LIVE SUPERVISOR GUARD DAEMON
 # =====================================================================
 def start_loop():
     """Monitors trading states and acts as a shield wrapper for _sys.py."""
+    if not dispatch_mode("legacy_engine_enabled", lambda: True):
+        print("TST MODE: legacy engine disabled; use the active test-mode engine.")
+        return
+
     EXE_FILE = "_sys.py"
     border = "==========================================" # 42 chars
 
@@ -108,11 +112,13 @@ def start_loop():
         # ---- TARGET SUBPROCESS MANAGEMENT GATE ----
         if mkt:
             subprocess.run([sys.executable, EXE_FILE])
-        else:
+        elif dispatch_mode("run_closed_market_tasks", lambda: True):
             if not off_done:
                 print(_pad_line_to_42("🌙 OFF MKT: Maintenance session run 💤", Fore.BLUE, Style.RESET_ALL))
                 subprocess.run([sys.executable, EXE_FILE])
                 off_done = True
+        else:
+            print("TST MODE: legacy engine paused during market hours.")
 
         was_open = mkt
         time.sleep(max(0, 1 - (time.time() - t0)))

@@ -37,6 +37,7 @@ try:
     from runclntpxy import get_session
     from runpchkpxy import get_position_summary
     from sysmodepxy import dispatch_mode
+    from sysdecisionpxy import entry_order_command
 
     dprint("IMPORTS OK", Fore.GREEN)
 except Exception as e:
@@ -46,6 +47,9 @@ except Exception as e:
 
 def main():
     dprint("===== START =====", Fore.GREEN)
+    if not dispatch_mode("engine_window_open", lambda: True):
+        print(f"{Fore.YELLOW}TST engine paused during market hours; entry pipe not run.")
+        return
     try:
         now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
         dprint(f"TIME: {now}")
@@ -93,7 +97,8 @@ def main():
         pe_lots = int(match.group(2))
         dprint(f"CE: {ce_lots} | PE: {pe_lots}")
 
-        if ce_lots != 0 or pe_lots != 0:
+        command = entry_order_command(entry_signal, ce_lots, pe_lots)
+        if command is None:
             print(
                 f"{Fore.YELLOW}⚠️ Position open (CE:{ce_lots}, PE:{pe_lots}); "
                 "entry skipped."
@@ -101,23 +106,13 @@ def main():
             return
 
         # 5. Route a signal only after pchk confirms both sides are flat
-        if entry_signal == "BUY":
-            print(
-                f"{Fore.GREEN}{Style.BRIGHT}"
-                "🟢 FRESH ENTRY: Firing command 'pxybuyce'..."
-            )
-            result = os.system("pxybuyce")
-            if result != 0:
-                print(f"{Fore.RED}⚠️ pxybuyce exited with status {result}.")
-
-        elif entry_signal == "SELL":
-            print(
-                f"{Fore.GREEN}{Style.BRIGHT}"
-                "🟢 FRESH ENTRY: Firing command 'pxybuype'..."
-            )
-            result = os.system("pxybuype")
-            if result != 0:
-                print(f"{Fore.RED}⚠️ pxybuype exited with status {result}.")
+        print(
+            f"{Fore.GREEN}{Style.BRIGHT}"
+            f"🟢 FRESH ENTRY: Firing command '{command}'..."
+        )
+        result = os.system(command)
+        if result != 0:
+            print(f"{Fore.RED}⚠️ {command} exited with status {result}.")
 
         dprint("===== END =====", Fore.GREEN)
 

@@ -33,6 +33,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
 )
 from sysmodepxy import dispatch_mode
+from sysdecisionpxy import target_exit_ready
 
 from exeomspxy import get_combined_data 
 from runclntpxy import get_session 
@@ -233,6 +234,10 @@ def _verify_and_exit_production(client, row):
         print(f"{Fore.RED}❌ Safety Check Crash: {e}")
 
 def run_snapshot():
+    if not dispatch_mode("engine_window_open", lambda: True):
+        print(f"{Fore.YELLOW}TST engine paused during market hours; exit pipe not run.")
+        return
+
     now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
     
     # Base path to the script
@@ -293,7 +298,7 @@ def run_snapshot():
                 debug_log(f"Global Enforced Single Exit Mode ({sym}). Mode: SINGLE TARGET.", Fore.GREEN)
 
                 # Pure Linear Target Evaluation Pool
-                if tgt > 0 and ltp > 0 and ltp >= tgt and pnl >= PNL_EXIT_MIN:
+                if target_exit_ready(tgt, ltp, pnl, PNL_EXIT_MIN):
                     print(f"{Fore.GREEN}🎯 Target Hit & PnL Met ({sym}): LTP {ltp} >= TGT {tgt} | PnL {pnl} >= {PNL_EXIT_MIN} [Execution Mode: ONE]")
                     if verify_and_exit(client, r):
                         exited_keys.add(_lock_key(r))
