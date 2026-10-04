@@ -118,18 +118,14 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
         
         if is_ce:
             # CE is current side
-            # For TGT: use current/opposite (INVERTED from LGT)
-            # Heavy side (high CE investment) → HIGH factor → exits FAST ✓
-            inverse_factor = ce_safe / pe_safe
+            # For TGT: use opposite/own (light side asks for more target %)
+            inverse_factor = pe_safe / ce_safe
             is_aligned = (derived_supr == 'BULL')
-            count_factor = (ce_count + 1) / (pe_count + 1)
         else:
             # PE is current side
-            # For TGT: use current/opposite (INVERTED from LGT)
-            # Heavy side (high PE investment) → HIGH factor → exits FAST ✓
-            inverse_factor = pe_safe / ce_safe
+            # For TGT: use opposite/own (light side asks for more target %)
+            inverse_factor = ce_safe / pe_safe
             is_aligned = (derived_supr == 'BEAR')
-            count_factor = (pe_count + 1) / (ce_count + 1)
         
         # 4️⃣ Apply target formula (simple: no weighting, only investment factor)
         if is_aligned:
