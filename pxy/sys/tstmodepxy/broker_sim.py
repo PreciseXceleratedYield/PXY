@@ -1,6 +1,8 @@
-"""In-memory broker adapter for running production pipes without live orders."""
+"""Simulated broker adapter with an optional CSV-persisted order ledger."""
 
+import csv
 from datetime import datetime
+from pathlib import Path
 
 
 class SimulatedBroker:
@@ -9,11 +11,19 @@ class SimulatedBroker:
     quantity = 75
     premium_base = 100.0
 
-    def __init__(self):
+    def __init__(self, orders_csv=None):
         self.orders = []
         self.current_spot = 0.0
         self.current_time = None
         self._tag_counter = 0
+        self.orders_csv = Path(orders_csv) if orders_csv is not None else None
+        if self.orders_csv is not None and self.orders_csv.exists():
+            with self.orders_csv.open(newline="", encoding="utf-8") as stream:
+                for row in csv.DictReader(stream):
+                    row["fldQty"] = int(row["fldQty"])
+                    row["avgPrc"] = float(row["avgPrc"])
+                    row["entry_spot"] = float(row["entry_spot"])
+                    self.orders.append(row)
 
     def set_market(self, timestamp, spot):
         self.current_time = timestamp
@@ -94,6 +104,16 @@ class SimulatedBroker:
             "trnsTp": transaction,
             "entry_spot": self.current_spot,
         }
+        if self.orders_csv is not None:
+            self.orders_csv.parent.mkdir(parents=True, exist_ok=True)
+            write_header = (
+                not self.orders_csv.exists() or self.orders_csv.stat().st_size == 0
+            )
+            with self.orders_csv.open("a", newline="", encoding="utf-8") as stream:
+                writer = csv.DictWriter(stream, fieldnames=order.keys())
+                if write_header:
+                    writer.writeheader()
+                writer.writerow(order)
         self.orders.append(order)
         return {"stat": "Ok", "stCode": "200", "data": {"orderId": tag}}
 

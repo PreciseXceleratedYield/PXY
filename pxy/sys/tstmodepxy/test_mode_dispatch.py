@@ -55,16 +55,14 @@ class ModeDispatchTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "requires RUNMODE='SIM'"):
                 run_backtest()
 
-    def test_walk_forward_refuses_market_hours_before_fetching_data(self):
+    def test_sim_replay_does_not_gate_history_fetch_on_wall_clock(self):
         import tstmodepxy.backtest as backtest
 
         with patch.object(backtest, "RUNMODE", "SIM"), patch.object(
-            backtest, "is_actual_market_hours", return_value=True
-        ), patch.object(
             backtest, "fetch_recent_index_history",
             side_effect=AssertionError("history must not be fetched"),
         ):
-            with self.assertRaisesRegex(RuntimeError, "disabled during weekday market hours"):
+            with self.assertRaisesRegex(AssertionError, "history must not be fetched"):
                 run_backtest()
 
     def test_strategy_signal_capture_redirects_dashboard_output(self):

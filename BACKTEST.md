@@ -5,7 +5,7 @@
 ### Run Backtest (Replay Mode)
 ```bash
 export RUNMODE=SIM
-python run_backtest.py
+python run_backtest.py --records 100
 ```
 
 Or use the shell script:
@@ -23,6 +23,13 @@ python validate_backtest.py
 - **RUNMODE=SIM**: Historical replay/backtest mode (isolated, no live broker)
 - **RUNMODE=CHK**: Mock/check mode (uses test providers)
 - **RUNMODE=PRD**: Production mode (live engine, live broker integration)
+- SIM selects the latest recent Yahoo Finance session with enough 1-minute candles,
+  builds each production snapshot using only candles available up to that record,
+  and runs one production pipe cycle per record (100 by default).
+- SIM orders are simulated and written to a CSV ledger; no live broker orders are sent.
+- `--records N` changes the number of sequential candle/cycle pairs.
+- Simulated fills use each candle's close and synthetic CE/PE premium proxies. They
+  are not historical options P&L and exclude transaction costs and slippage.
 
 ## Project Structure
 
@@ -54,7 +61,7 @@ If you get "Engine console session unavailable":
 
 ## Next Steps
 
-1. Pull the `fix/backtest-runtime` branch
-2. Run: `python run_backtest.py`
+1. Update the repository to the latest `main`
+2. Run: `python run_backtest.py --records 100`
 3. Check results in `~/pxy-sim-results/`
 4. Share the output

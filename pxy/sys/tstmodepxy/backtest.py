@@ -20,10 +20,8 @@ if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 
 from .pointbacktest import (
-    FORCE_EXIT_TIME,
     MARKET_CLOSE,
     MARKET_OPEN,
-    is_actual_market_hours,
 )
 from .broker_sim import SimulatedBroker
 from .replay_adapter import ProductionPipeReplay
@@ -156,30 +154,34 @@ def fetch_recent_index_history():
     )
 
 
-def latest_completed_session(history, required_final_time=FORCE_EXIT_TIME):
-    """Select the newest session with data through the configured square-off time."""
+def latest_session_with_records(history, record_limit=100):
+    """Select the newest trading session with enough candles for a replay."""
     available_sessions = []
     for session_date, frame in history.groupby(history.index.date):
-        if frame.index[-1].time().replace(tzinfo=None) >= required_final_time:
+        session_bars = frame[
+            (frame.index.time >= MARKET_OPEN)
+            & (frame.index.time <= MARKET_CLOSE)
+        ]
+        if len(session_bars) >= record_limit:
             available_sessions.append(session_date)
     if not available_sessions:
         raise RuntimeError(
-            "No completed NIFTY session found in Yahoo's recent 1-minute history."
+            f"No recent NIFTY session contains {record_limit} replay candles."
         )
     return max(available_sessions)
 
 
-def calculate_strategy_signals(history, session_date):
-    """Run the production dashboard snapshot over each historical close."""
+def calculate_strategy_signals(history, session_date, record_limit=100):
+    """Build production snapshots for the first N candles of a session."""
     sys.path.insert(0, str(SYS_DIR / "exe"))
     dashboard = importlib.import_module("sysdashpxy")
     records = []
     target_indexes = [
         index for index, timestamp in enumerate(history.index)
         if timestamp.date() == session_date
-        and timestamp.time().replace(tzinfo=None) >= DATA_SESSION_OPEN
+        and timestamp.time().replace(tzinfo=None) >= MARKET_OPEN
         and timestamp.time().replace(tzinfo=None) <= MARKET_CLOSE
-    ]
+    ][:record_limit]
     for index in target_indexes:
         available = history.iloc[: index + 1]
         transformed = transform_market_data(available).tail(
@@ -194,11 +196,6 @@ def calculate_strategy_signals(history, session_date):
             raise RuntimeError(
                 f"Production dashboard returned no snapshot at {history.index[index]}."
             )
-        next_timestamp = None
-        next_open = None
-        if index + 1 < len(history) and history.index[index + 1].date() == session_date:
-            next_timestamp = history.index[index + 1]
-            next_open = float(history["Open"].iloc[index + 1])
         records.append(
             {
                 "timestamp": history.index[index],
@@ -207,8 +204,6 @@ def calculate_strategy_signals(history, session_date):
                 "exit": snapshot.get("exit", "NONE"),
                 "snapshot": snapshot,
                 "snapshot_log": output.getvalue(),
-                "next_timestamp": next_timestamp,
-                "next_open": next_open,
             }
         )
     if not records:
@@ -258,7 +253,8 @@ def write_session_csvs(output_dir, session_date, trades, decisions):
 
 
 def print_report(
-    history, session_date, trades, decisions, trade_path, decision_path, runtime_log
+    history, session_date, trades, decisions, trade_path, decision_path,
+    orders_path, runtime_log,
 ):
     points = [trade["points"] for trade in trades]
     total_points = sum(points)
@@ -267,17 +263,17 @@ def print_report(
     hit_rate = 100 * winners / len(trades) if trades else 0.0
 
     print("=" * 72)
-    print("PXY SIM ONE-SESSION NIFTY POINT-PROXY REPLAY")
+    print("PXY SIM PRODUCTION-CYCLE REPLAY")
     print("=" * 72)
     print(f"Instrument: {SYSCNFGPXY_TICKER} | Session: {session_date}")
     print(
-        f"Source: Yahoo Finance 1-minute candles | Replayed bars: {len(decisions)} | "
-        f"Loaded history bars: {len(history)}"
+        f"Source: Yahoo Finance 1-minute candles | Data records/cycles: "
+        f"{len(decisions)} | Warmup history bars: {len(history)}"
     )
     print(
         "Production dashboard, exit, entry, averaging, counter-leg, and square-off "
-        "pipe code runs against an in-memory simulated broker. Orders are filled "
-        "at the following candle open using CE/PE spot-point/premium proxies."
+        "pipe code runs against a simulated broker with a CSV order ledger. Orders are filled "
+        "at each candle close using CE/PE spot-point/premium proxies."
     )
     print(
         "Option premiums are synthetic directional proxies, not historical option "
@@ -295,52 +291,44 @@ def print_report(
     print(f"Net directional index points (one virtual unit): {total_points:+.2f}")
     print(f"CSV trade ledger: {trade_path}")
     print(f"CSV bar-by-bar decisions: {decision_path}")
+    print(f"CSV simulated broker orders: {orders_path}")
     print(f"Production pipe runtime log: {runtime_log}")
     print("=" * 72)
 
 
-def run_backtest(output_dir=None):
+def run_backtest(output_dir=None, record_limit=100):
     if RUNMODE != "SIM":
         raise RuntimeError(
             f"Walk-forward replay requires RUNMODE='SIM'; current RUNMODE={RUNMODE!r}."
         )
-    if is_actual_market_hours(holidays=RUNNIFTYPXY_HOLIDAYS):
-        raise RuntimeError(
-            "Walk-forward replay is disabled during weekday market hours "
-            "(09:15-15:30 IST)."
-        )
+    if record_limit <= 0:
+        raise ValueError("record_limit must be a positive integer.")
     history = fetch_recent_index_history()
     holiday_dates = set(RUNNIFTYPXY_HOLIDAYS)
     history = history[
         ~history.index.strftime("%d-%b-%Y").isin(holiday_dates)
     ]
-    session_date = latest_completed_session(
-        history, required_final_time=MARKET_CLOSE
-    )
-    bars = calculate_strategy_signals(history, session_date)
+    session_date = latest_session_with_records(history, record_limit)
+    bars = calculate_strategy_signals(history, session_date, record_limit)
     output_dir = output_dir or Path.home() / "pxy-sim-results"
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     runtime_log = output_dir / (
         f"nifty-pipe-replay-{session_date}-{datetime.now():%Y%m%d-%H%M%S}.log"
     )
+    orders_path = output_dir / (
+        f"nifty-sim-replay-{session_date}-{datetime.now():%Y%m%d-%H%M%S}-orders.csv"
+    )
     with runtime_log.open("w", encoding="utf-8") as stream:
         stream.write(
             "Production pipe output for simulated replay. "
             "No live broker session or external order process is permitted.\n"
         )
-    broker = SimulatedBroker()
+    broker = SimulatedBroker(orders_csv=orders_path)
     decisions = []
     with tempfile.TemporaryDirectory(prefix="pxy-walk-forward-") as temporary_state:
         with ProductionPipeReplay(SYS_DIR, broker, Path(temporary_state)) as engine:
             for bar in bars:
-                timestamp = bar["next_timestamp"]
-                fill_spot = bar["next_open"]
-                if timestamp is None or fill_spot is None:
-                    continue
-                execution_time = timestamp.time().replace(tzinfo=None)
-                if not MARKET_OPEN <= execution_time <= MARKET_CLOSE:
-                    continue
                 before = broker.position_summary()
                 first_new_order = len(broker.orders)
                 if bar["snapshot_log"]:
@@ -351,8 +339,8 @@ def run_backtest(output_dir=None):
                         )
                 pipe_output = engine.run_tick(
                     bar["snapshot"],
-                    timestamp,
-                    float(fill_spot),
+                    bar["timestamp"],
+                    bar["spot"],
                     runtime_log,
                 )
                 current_orders = broker.orders[first_new_order:]
@@ -360,9 +348,9 @@ def run_backtest(output_dir=None):
                 decisions.append(
                     {
                         "timestamp": bar["timestamp"],
-                        "execution_timestamp": timestamp,
+                        "execution_timestamp": bar["timestamp"],
                         "spot": bar["spot"],
-                        "execution_spot": float(fill_spot),
+                        "execution_spot": bar["spot"],
                         "entry_signal": bar["entry"],
                         "exit_signal": bar["exit"],
                         "position_before": before,
@@ -393,7 +381,8 @@ def run_backtest(output_dir=None):
         output_dir, session_date, trades, decisions
     )
     print_report(
-        history, session_date, trades, decisions, trade_path, decision_path, runtime_log
+        history, session_date, trades, decisions, trade_path, decision_path,
+        orders_path, runtime_log,
     )
     return trades, decisions
 
@@ -401,9 +390,15 @@ def run_backtest(output_dir=None):
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description=(
-            "Replay the latest completed NIFTY 1-minute session using production "
-            "signals and simulated index-point fills; no broker orders are sent."
+            "Replay the first N candles from the latest eligible NIFTY 1-minute "
+            "session through production pipes and a CSV-backed simulated broker."
         )
+    )
+    parser.add_argument(
+        "--records",
+        type=int,
+        default=100,
+        help="Number of consecutive Yahoo candles and production cycles (default: 100).",
     )
     parser.add_argument(
         "--output-dir",
@@ -413,7 +408,7 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
     try:
-        run_backtest(args.output_dir)
+        run_backtest(args.output_dir, record_limit=args.records)
     except (RuntimeError, ValueError, OSError) as error:
         print(f"SIM ERROR: {error}", file=sys.stderr)
         return 1

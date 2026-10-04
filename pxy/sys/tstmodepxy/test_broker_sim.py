@@ -1,3 +1,4 @@
+import csv
 import unittest
 from datetime import datetime
 from pathlib import Path
@@ -64,6 +65,26 @@ class SimulatedBrokerTests(unittest.TestCase):
             "Not_Ok",
         )
         self.assertEqual(self.place("B", "XX", "WF0000004")["stat"], "Not_Ok")
+
+    def test_csv_backed_broker_records_each_simulated_fill(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-broker-csv-test-") as temp:
+            orders_path = Path(temp) / "orders.csv"
+            broker = SimulatedBroker(orders_csv=orders_path)
+            broker.set_market(datetime(2025, 1, 6, 9, 17), 22000)
+            broker.place_order(
+                trading_symbol="NIFTY-WF-CE",
+                transaction_type="B",
+                quantity=75,
+                tag="WF0000001",
+            )
+
+            with orders_path.open(newline="", encoding="utf-8") as stream:
+                rows = list(csv.DictReader(stream))
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0]["trdSym"], "NIFTY-WF-CE")
+            self.assertEqual(rows[0]["entry_spot"], "22000.0")
+            restored = SimulatedBroker(orders_csv=orders_path)
+            self.assertEqual(restored.position_summary(), "75CE0PE")
 
     def test_csv_writer_accepts_pipe_trade_and_bar_records(self):
         with tempfile.TemporaryDirectory(prefix="pxy-csv-test-") as temp:
