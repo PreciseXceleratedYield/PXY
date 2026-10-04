@@ -27,13 +27,15 @@ logger = logging.getLogger("exeavxpxy")
 
 
 def _lgt_loss_threshold(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
-    """Calculates LGT (averaging trigger) loss threshold using investment & count factors.
+    """Calculates LGT (averaging trigger) loss threshold with weighted factors.
     
-    Formula: loss_threshold = -ATR × (1 + inverse_factor) × (own_count + 1) / (opposite_count + 1)
+    Formula: loss_threshold = -ATR × (1 + inverse_factor)² × (own_count + 1) / (opposite_count + 1)
     
-    Combines two dimensions:
-      1. Investment factor: investment imbalance (heavy side harder)
-      2. Count factor: layer count imbalance (more layers harder)
+    Weighted dimensions:
+      1. Investment factor: SQUARED (quadratic = dominant)
+      2. Count factor: LINEAR (1x = secondary)
+    
+    Investment imbalance is FAR MORE IMPORTANT than layer count.
     
     Where inverse_factor = current_investment / opposite_investment
     (defaults to 1.0 if opposite = 0)
@@ -41,8 +43,8 @@ def _lgt_loss_threshold(atr, ce_investment, pe_investment, ce_count, pe_count, i
     Returns NEGATIVE because loss values are negative.
     
     Example with CE=1000 (light, 1 layer), PE=2000 (heavy, 3 layers):
-      CE: inv=0.5, count_factor=2/4=0.5 → threshold = -7.5 × 0.5 = -3.75 (easy)
-      PE: inv=2.0, count_factor=4/2=2.0 → threshold = -15.0 × 2.0 = -30.0 (hard)
+      CE: inv²=(0.5)²=0.25, count=0.5 → threshold = -6.25 (very easy)
+      PE: inv²=(2.0)²=4.0, count=2.0 → threshold = -40.0 (very hard)
     """
     if atr <= 0:
         return 0.0
@@ -57,7 +59,7 @@ def _lgt_loss_threshold(atr, ce_investment, pe_investment, ce_count, pe_count, i
         inverse_factor = pe_safe / ce_safe
         count_factor = (pe_count + 1) / (ce_count + 1)
     
-    loss_threshold = -atr * (1.0 + inverse_factor) * count_factor
+    loss_threshold = -atr * ((1.0 + inverse_factor) ** 2) * count_factor
     return round(loss_threshold, 2)
 
 
