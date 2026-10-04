@@ -3,6 +3,7 @@ import pandas as pd
 import re
 from colorama import Fore, Style, init
 from syscnfgpxy import (
+    EXEAGTPXY_ABS_CAP,
     EXETGTPXY_ATR_FLOOR,
     EXETGTPXY_EXIT_KEY_COLUMN,
     EXETGTPXY_TGT_PCT_NOT_ALIGNED,
@@ -12,6 +13,7 @@ from syscnfgpxy import (
 EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
 ATR_FLOOR = EXETGTPXY_ATR_FLOOR
 TGT_PCT_NOT_ALIGNED = EXETGTPXY_TGT_PCT_NOT_ALIGNED
+COUNTER_SIGNAL_MAX_BALANCE = EXEAGTPXY_ABS_CAP
                                # (same rule as is_aligned in exeagtpxy.py); SIDE / NONE / unknown = not aligned
 # =======================================================================
 
@@ -95,15 +97,15 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
             calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
             return round(calculated_target, 2)
 
-        # Exposure-aware balancing: when the book is imbalanced, the heavier side is
-        # cleared with the base 1.4% floor while the lighter side keeps a reserve floor
-        # above 1.4% so it is not dumped prematurely.
+        # Counter-signal balancing: the max both-side cap is 77%, but only used when a
+        # valid imbalance-driven counter signal is active. This keeps the heavy side
+        # from carrying too much exposure while the lighter side is kept above the floor.
         total_investment = max(ce_investment + pe_investment, 1.0)
         imbalance_ratio = abs(ce_investment - pe_investment) / total_investment
 
-        def _reserve_floor_for(side_name: str) -> float:
+        def _counter_floor_for(side_name: str) -> float:
             reserve = TGT_PCT_NOT_ALIGNED * (1.0 + imbalance_ratio * 4.0)
-            return max(TGT_PCT_NOT_ALIGNED, min(atr, reserve))
+            return max(TGT_PCT_NOT_ALIGNED, min(COUNTER_SIGNAL_MAX_BALANCE, reserve))
 
         target_pct = 0.0
         if is_ce:
@@ -112,16 +114,16 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
             elif ce_investment >= pe_investment:
                 target_pct = TGT_PCT_NOT_ALIGNED
             else:
-                target_pct = _reserve_floor_for("CE")
+                target_pct = _counter_floor_for("CE")
         elif is_pe:
             if derived_supr != 'BEAR':
                 target_pct = TGT_PCT_NOT_ALIGNED
             elif pe_investment >= ce_investment:
                 target_pct = TGT_PCT_NOT_ALIGNED
             else:
-                target_pct = _reserve_floor_for("PE")
+                target_pct = _counter_floor_for("PE")
 
-        target_pct = max(TGT_PCT_NOT_ALIGNED, min(target_pct, atr))
+        target_pct = max(TGT_PCT_NOT_ALIGNED, min(target_pct, min(atr, COUNTER_SIGNAL_MAX_BALANCE)))
 
         # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
