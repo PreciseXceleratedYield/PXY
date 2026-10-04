@@ -1,5 +1,12 @@
 # exeotmpxy.py
+import sys
 from datetime import datetime
+from pathlib import Path
+
+SYS_DIR = Path(__file__).resolve().parents[1]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+
 from syscnfgpxy import (
     EXEOTMPXY_DEFAULT_DISTANCE,
     EXEOTMPXY_DISTANCE_BY_WEEKDAY,
