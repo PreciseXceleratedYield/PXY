@@ -66,12 +66,14 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     return ce_total, pe_total
 
 def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
-    """Calculates target price with weighted-floor balancer for imbalanced portfolios.
+    """Calculates target price using investment-factor-scaled ATR.
     
-    Implements asymmetric floor strategy:
-    - Heavier side: aggressive 1.4% floor for fast counter-exit
-    - Lighter side: protected reserve floor (2.8%) to preserve capital
-    - All values clamped to [1.4, min(ATR, 77)] guardrail
+    Formula:
+      NOT aligned: target_pct = max(ATR × inverse_factor, 1.4%)
+      ALIGNED:     target_pct = 77%
+    
+    Where inverse_factor = opposite_investment / current_investment
+    (defaults to 1.0 if opposite = 0, creating lighter-side penalty)
     
     Args:
         row: dict with 'pxy_entry'/'buy_prc', 'symbol', 'exit', 'atr'
@@ -106,53 +108,31 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
 
-        # Detect imbalance: which side is heavier?
+        # 3️⃣ Calculate investment factor (opposite / current)
         ce_safe = ce_investment if ce_investment > 0 else 1.0
         pe_safe = pe_investment if pe_investment > 0 else 1.0
         
-        total_investment = ce_safe + pe_safe
-        ce_ratio = ce_safe / total_investment if total_investment > 0 else 0.5
-        pe_ratio = pe_safe / total_investment if total_investment > 0 else 0.5
-        
-        imbalance_threshold = 0.6  # If one side > 60%, it's "heavy"
-        is_ce_heavier = ce_ratio > imbalance_threshold
-        is_pe_heavier = pe_ratio > imbalance_threshold
-        
-        target_pct = 0.0
-        
-        # 3️⃣ Asymmetric Floor Logic (Heavier vs Lighter Side)
         if is_ce:
-            if derived_supr != 'BULL':
-                # Unaligned: use configured floor
-                target_pct = TGT_PCT_NOT_ALIGNED
-            else:
-                # Aligned BULL signal on CE
-                if is_ce_heavier:
-                    # CE is heavy: use aggressive 1.4% floor for fast exit
-                    target_pct = max(atr_scaled, ATR_FLOOR)
-                else:
-                    # CE is light: use protected reserve floor (2.8%)
-                    target_pct = max(atr_scaled, RESERVE_FLOOR_LIGHTER)
-                    
-        elif is_pe:
-            if derived_supr != 'BEAR':
-                # Unaligned: use configured floor
-                target_pct = TGT_PCT_NOT_ALIGNED
-            else:
-                # Aligned BEAR signal on PE
-                if is_pe_heavier:
-                    # PE is heavy: use aggressive 1.4% floor for fast exit
-                    target_pct = max(atr_scaled, ATR_FLOOR)
-                else:
-                    # PE is light: use protected reserve floor (2.8%)
-                    target_pct = max(atr_scaled, RESERVE_FLOOR_LIGHTER)
+            # CE is current side
+            inverse_factor = pe_safe / ce_safe
+            is_aligned = (derived_supr == 'BULL')
+        else:
+            # PE is current side
+            inverse_factor = ce_safe / pe_safe
+            is_aligned = (derived_supr == 'BEAR')
         
-        # 4️⃣ Apply Guardrail: clamp to [1.4, min(ATR, 77)]
-        lower_bound = ATR_FLOOR
-        upper_bound = min(atr_scaled, MAX_TARGET_CAP)
-        target_pct_clamped = max(lower_bound, min(target_pct, upper_bound))
+        # 4️⃣ Apply target formula
+        if is_aligned:
+            # Aligned: use max cap
+            target_pct = MAX_TARGET_CAP
+        else:
+            # Not aligned: scale ATR by inverse factor with 1.4% floor
+            target_pct = max(atr_scaled * inverse_factor, ATR_FLOOR)
         
-        # 5️⃣ Final mathematical target premium projection calculation
+        # 5️⃣ Final clamping to [1.4, 77]
+        target_pct_clamped = max(ATR_FLOOR, min(target_pct, MAX_TARGET_CAP))
+        
+        # 6️⃣ Calculate target price
         calculated_target = entry_prc * (1.0 + (target_pct_clamped / 100.0))
         return round(calculated_target, 2)
         

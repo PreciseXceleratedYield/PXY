@@ -9,9 +9,9 @@ import logging
 from datetime import datetime
 from colorama import Fore, Style
 
-from syscnfgpxy import EXEAVXPXY_USE_OVERALL_LOSS
+from syscnfgpxy import EXEAVXPXY_USE_OVERALL_LOSS, EXELGTPXY_BASE_LOSS
 from sysdecisionpxy import averaging_placement_allowed, averaging_window_enabled
-from exeagtpxy import getexeagtpxy, is_aligned                 # Math functions stay in agt
+from exeagtpxy import is_aligned                 # Only alignment check; no more getexeagtpxy
 from exetgtpxy import target_price                             # Read-only target telemetry; exits stay in exit pipe
 from exeamspxy import execute_side_averaging_matrix            # Execution handles via ams
 
@@ -24,6 +24,33 @@ from run.runpchkpxy import get_position_summary
 from run.runexlckpxy import ledger_busy                        # stand down while the ledger lock is held
 
 logger = logging.getLogger("exeavxpxy")
+
+
+def _lgt_loss_threshold(atr, ce_investment, pe_investment, is_ce):
+    """Calculates LGT (averaging trigger) loss threshold using investment factor.
+    
+    Formula: loss_threshold = ATR × (1 + inverse_factor)
+    
+    Where inverse_factor = opposite_investment / current_investment
+    (defaults to 1.0 if opposite = 0)
+    
+    Result:
+      Heavy side (low inverse_factor): HIGH threshold (hard to average)
+      Light side (high inverse_factor): LOW threshold (easy to average)
+    """
+    if atr <= 0:
+        return 0.0
+    
+    ce_safe = ce_investment if ce_investment > 0 else 1.0
+    pe_safe = pe_investment if pe_investment > 0 else 1.0
+    
+    if is_ce:
+        inverse_factor = pe_safe / ce_safe
+    else:
+        inverse_factor = ce_safe / pe_safe
+    
+    loss_threshold = atr * (1.0 + inverse_factor)
+    return round(loss_threshold, 2)
 
 
 def _side_target_pct(rows):
@@ -124,13 +151,12 @@ def handle_side_averaging(client, df):
     ce_aligned = is_aligned("CE", active_exit)
     pe_aligned = is_aligned("PE", active_exit)
 
-    # Extract forces from the row solely to compute the dynamic LGT thresholds
-    ce_force_val = _force_value(working_df, 'ce_force')
-    pe_force_val = _force_value(working_df, 'pe_force')
-    #print(Fore.YELLOW + f"🧪 [TEST FORCE] CE_FORCE: {ce_force_val:.2f} | PE_FORCE: {pe_force_val:.2f}")
-    ce_dynamic_threshold, pe_dynamic_threshold = getexeagtpxy(
-        ce_invst_factor, pe_invst_factor, ce_lots, pe_lots, ce_force_val, pe_force_val
-    )
+    # Calculate LGT (averaging triggers) using investment-factor formula
+    ce_atr = safe_float(working_df.iloc[-1].get("atr"), 5.0)
+    pe_atr = ce_atr  # Both use same ATR from current bar
+    
+    ce_dynamic_threshold = _lgt_loss_threshold(ce_atr, ce_investment, pe_investment, is_ce=True)
+    pe_dynamic_threshold = _lgt_loss_threshold(pe_atr, ce_investment, pe_investment, is_ce=False)
 
     if USE_OVERALL_LOSS:
         ce_lgt_val, pe_lgt_val = ce_overall_pnl_pct, pe_overall_pnl_pct
