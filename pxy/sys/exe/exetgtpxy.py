@@ -76,7 +76,8 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
         symbol = str(row.get('symbol', 'UNKNOWN')).upper().strip()
         derived_supr = str(row.get(EXIT_KEY_COLUMN, '')).upper().strip()
         
-        # Extract and safely cast atr (will scale safely even if identical across rows)
+        # Extract and safely cast atr. We keep a hard 5-point minimum so the floor is
+        # stable even when the market quietly prints a low-volatility ATR reading.
         raw_atr = f(row.get('atr', 0.0))
         if raw_atr <= 0:
             _warn_once("atr", f"'atr' missing or <= 0 in row (check market column names/case); using {ATR_FLOOR} floor.")

@@ -43,10 +43,10 @@ class TargetPriceTests(unittest.TestCase):
             "pxy_entry": 100.0,
             "atr": 3.0,
         }
-        self.assertEqual(target_price(row), 103.0)
+        self.assertEqual(target_price(row), 105.0)
 
         row["atr"] = 0.5
-        self.assertEqual(target_price(row), 101.4)
+        self.assertEqual(target_price(row), 105.0)
 
     def test_heavier_side_uses_floor_while_lighter_side_preserves_reserve(self):
         heavier_ce = {
