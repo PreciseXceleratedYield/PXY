@@ -87,29 +87,40 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
 
-        # Safe zero-guards handle empty opposite positions cleanly
-        ce_safe = ce_investment if ce_investment > 0 else 1.0
-        pe_safe = pe_investment if pe_investment > 0 else 1.0
+        # When no investment imbalance is supplied, preserve the original behaviour:
+        # aligned rows use the ATR value, unaligned rows stay at the configured floor.
+        if ce_investment <= 0 and pe_investment <= 0:
+            target_pct = atr if ((is_ce and derived_supr == 'BULL') or (is_pe and derived_supr == 'BEAR')) else TGT_PCT_NOT_ALIGNED
+            target_pct = max(TGT_PCT_NOT_ALIGNED, min(target_pct, atr))
+            calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
+            return round(calculated_target, 2)
+
+        # Exposure-aware balancing: when the book is imbalanced, the heavier side is
+        # cleared with the base 1.4% floor while the lighter side keeps a reserve floor
+        # above 1.4% so it is not dumped prematurely.
+        total_investment = max(ce_investment + pe_investment, 1.0)
+        imbalance_ratio = abs(ce_investment - pe_investment) / total_investment
+
+        def _reserve_floor_for(side_name: str) -> float:
+            reserve = TGT_PCT_NOT_ALIGNED * (1.0 + imbalance_ratio * 4.0)
+            return max(TGT_PCT_NOT_ALIGNED, min(atr, reserve))
 
         target_pct = 0.0
-        
-        # 3️⃣ Symmetrical Risk Matrix (Calculated cleanly inline for each row context)
         if is_ce:
             if derived_supr != 'BULL':
                 target_pct = TGT_PCT_NOT_ALIGNED
+            elif ce_investment >= pe_investment:
+                target_pct = TGT_PCT_NOT_ALIGNED
             else:
-                target_pct = atr
-                
+                target_pct = _reserve_floor_for("CE")
         elif is_pe:
             if derived_supr != 'BEAR':
                 target_pct = TGT_PCT_NOT_ALIGNED
+            elif pe_investment >= ce_investment:
+                target_pct = TGT_PCT_NOT_ALIGNED
             else:
-                target_pct = atr
-            
-        # 4️⃣ Keep target premium between the configured floor and ATR-based ceiling.
-        # This preserves the intended alignment rules while preventing drift beyond the
-        # allowed band when the raw target value is calculated from a side mismatch or a
-        # larger-than-ATR market move.
+                target_pct = _reserve_floor_for("PE")
+
         target_pct = max(TGT_PCT_NOT_ALIGNED, min(target_pct, atr))
 
         # 5️⃣ Final mathematical target premium projection calculation
