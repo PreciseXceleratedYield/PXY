@@ -204,19 +204,32 @@ while true; do
                 echo "[-] Web dashboard already running."
             fi
 
-            echo "Initializing Trading Engine..."
-            if ! tmux has-session -t pxy-engine 2>/dev/null && ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
-                # Restrict terminal history memory strictly to 500 lines
-                tmux new-session -d -s pxy-engine "bash -c 'tmux set-option history-limit 500; cd /home/pxy/pxy/sys; if [ -f \"\$HOME/env/bin/activate\" ]; then source \"\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; python3 sysexepxy.py'"
-                
-                sleep 1
-                if tmux has-session -t pxy-engine 2>/dev/null; then
-                    echo "[✔] Python engine running successfully inside tmux session 'pxy-engine'."
+            RUNMODE=$(cd /home/pxy/pxy/sys && python3 -c 'import syscnfgpxy; print(syscnfgpxy.RUNMODE)' 2>/dev/null)
+            if [ -z "$RUNMODE" ]; then
+                echo "[X] Could not read RUNMODE from syscnfgpxy.py; engine was not started."
+            elif [ "$RUNMODE" = "PRD" ]; then
+                echo "Initializing Production Trading Engine..."
+                if ! tmux has-session -t pxy-engine 2>/dev/null && ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
+                    # Restrict terminal history memory strictly to 500 lines
+                    tmux new-session -d -s pxy-engine "bash -c 'tmux set-option history-limit 500; cd /home/pxy/pxy/sys; if [ -f \"\$HOME/env/bin/activate\" ]; then source \"\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; python3 sysexepxy.py'"
+
+                    sleep 1
+                    if tmux has-session -t pxy-engine 2>/dev/null; then
+                        echo "[✔] Python engine running successfully inside tmux session 'pxy-engine'."
+                    else
+                        echo "[X] Production engine failed to boot! Check tmux manually."
+                    fi
                 else
-                    echo "[X] Engine failed to boot! Check tmux manually."
+                    echo "[-] Python engine is already running."
                 fi
+            elif [ "$RUNMODE" = "CHK" ]; then
+                echo "[i] RUNMODE=CHK: production engine was not started."
+                echo "    Run 'pxychk' to execute isolated checks."
+            elif [ "$RUNMODE" = "SIM" ]; then
+                echo "[i] RUNMODE=SIM: production engine was not started."
+                echo "    Run 'pxysim' to replay historical candles."
             else
-                echo "[-] Python engine is already running."
+                echo "[X] Unsupported RUNMODE='$RUNMODE'; engine was not started."
             fi
             echo ""
             read -p "Press [Enter] to return..."

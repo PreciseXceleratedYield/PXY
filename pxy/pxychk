@@ -1,0 +1,10 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/sys" || exit 1
+
+if [ -f "$HOME/env/bin/activate" ]; then
+    source "$HOME/env/bin/activate"
+fi
+
+exec python3 -m unittest discover -s tstmodepxy -p 'test_*.py' -v "$@"

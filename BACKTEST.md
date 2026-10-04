@@ -26,9 +26,13 @@ python validate_backtest.py
 - The normal engine entry points (`sysexepxy.py` and `exe/exepxy.py`) only start
   when `RUNMODE=PRD`; SIM and CHK are refused with instructions for their
   dedicated runners.
+- The management menu's **Start** action starts the web dashboard, then reports
+  the configured mode. It only launches the trading engine in PRD mode.
 - Start SIM directly with `python3 syssimpxy.py --records 100` (or
   `python3 sysbtstpxy.py --records 100`). Run CHK validation separately with
   `python3 -m unittest discover -s tstmodepxy -v` from `pxy/sys`.
+- From the `pxy/` directory, use `pxychk` for checks and `pxysim --records 100`
+  for the replay.
 - SIM selects the latest recent Yahoo Finance session with enough 1-minute candles,
   builds each production snapshot using only candles available up to that record,
   and runs one production pipe cycle per record (100 by default).

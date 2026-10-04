@@ -505,38 +505,35 @@ The system has three execution modes:
 | Execution | Start | Market data | Broker/orders |
 | --- | --- | --- | --- |
 | **PRD** | Start the usual `exepxy.py` engine with `RUNMODE = "PRD"` | Live production sources | Real broker |
-| **CHK** | Start the usual engine with `RUNMODE = "CHK"` | Isolated mock providers | No live broker or live orders |
-| **SIM** | Start the usual engine with `RUNMODE = "SIM"` | Yahoo historical candles | In-memory simulated broker |
+| **CHK** | Run `pxychk` | Isolated check/test suite | No live broker or live orders |
+| **SIM** | Run `pxysim --records 100` | Yahoo historical candles | CSV-backed simulated broker |
 
 `RUNMODE` accepts only `PRD`, `CHK`, or `SIM`. The ordinary engine entry points
-select behavior from this setting: PRD uses production providers, CHK uses
-isolated mocks, and SIM routes directly into the standalone historical replay.
-SIM never falls through to live provider dispatch. No extra command is needed
-to select CHK or SIM; edit `RUNMODE` in `syscnfgpxy.py` and start the engine
-normally.
+start only with `RUNMODE = "PRD"`; they refuse CHK and SIM and print the
+dedicated command to run. In the management menu, **Start** launches the web
+dashboard, then reports the configured mode without trying to boot a production
+engine in CHK or SIM.
 
-The default is `RUNMODE = "PRD"`. CHK and SIM both refuse to run during weekday
-market hours; CHK also disables live broker sessions and Yahoo requests. CHK's
-minute-selected mock position shapes are available for inspecting the mock
-engine.
+Set `RUNMODE = "CHK"` or `RUNMODE = "SIM"` in `syscnfgpxy.py` before running the
+matching standalone command. `pxychk` runs the isolated Python checks. `pxysim`
+performs the historical candle replay; SIM never falls through to live provider
+dispatch or submits live orders.
 
-SIM refuses to run during weekday market hours (09:15-15:30 IST) and configured
-market holidays, writes CSV ledgers and a production-pipe runtime log, then
-exits. `pxysim` remains an optional direct launcher for SIM. Focused unit tests
-cover production decision gates, mode routing, and the isolated replay; run them with
-`python3 -m unittest discover -s pxy/sys/tstmodepxy -p 'test_*.py'`.
+Focused unit tests cover production decision gates, mode routing, and the
+isolated replay. They can also be run from `pxy/sys` with
+`python3 -m unittest discover -s tstmodepxy -p 'test_*.py'`.
 
 ### SIM one-session strategy replay
 
-With `RUNMODE = "SIM"`, start the usual engine; alternatively, run `pxysim`
-from the `pxy/` directory (or `python3 syssimpxy.py` from `pxy/sys/`). The
+With `RUNMODE = "SIM"`, run `pxysim --records 100` from the `pxy/` directory
+(or `python3 syssimpxy.py --records 100` from `pxy/sys/`). The
 isolated simulator fetches recent one-minute NIFTY data for indicator warmup.
 If it cannot find a completed session in the recent history, it checks prior
 weekdays one by one and uses the first complete session found, within Yahoo's
 seven-day 1-minute data limit. It then evaluates the production dashboard and
 exit, entry, averaging, counter-leg, and square-off pipes in their normal order
 for each bar. It uses
-an in-memory Kotak-shaped broker; live sessions, real order calls, subprocess
+a CSV-backed simulated Kotak-shaped broker; live sessions, real order calls, subprocess
 launches, and production state-file writes are blocked or redirected. Console
 output is saved alongside the simulated trade ledger and bar-by-bar decision
 CSV under `~/pxy-sim-results/`.
