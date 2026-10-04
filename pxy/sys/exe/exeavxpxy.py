@@ -26,25 +26,23 @@ from run.runexlckpxy import ledger_busy                        # stand down whil
 logger = logging.getLogger("exeavxpxy")
 
 
-def _lgt_loss_threshold(atr, ce_investment, pe_investment, is_ce):
-    """Calculates LGT (averaging trigger) loss threshold using investment factor.
+def _lgt_loss_threshold(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
+    """Calculates LGT (averaging trigger) loss threshold using investment & count factors.
     
-    Formula: loss_threshold = -ATR × (1 + inverse_factor)
+    Formula: loss_threshold = -ATR × (1 + inverse_factor) × (own_count + 1) / (opposite_count + 1)
     
-    Linear scaling: balanced mirror logic (heavy hard, light easy).
+    Combines two dimensions:
+      1. Investment factor: investment imbalance (heavy side harder)
+      2. Count factor: layer count imbalance (more layers harder)
     
     Where inverse_factor = current_investment / opposite_investment
     (defaults to 1.0 if opposite = 0)
     
     Returns NEGATIVE because loss values are negative.
     
-    Result:
-      Heavy side (low inverse_factor): MORE NEGATIVE (hard to average)
-      Light side (high inverse_factor): LESS NEGATIVE (easy to average)
-      
-    Example with CE=1000 (light), PE=2000 (heavy):
-      CE: inverse = 1000/2000 = 0.5 → threshold = -7.5 (easy)
-      PE: inverse = 2000/1000 = 2.0 → threshold = -15.0 (hard)
+    Example with CE=1000 (light, 1 layer), PE=2000 (heavy, 3 layers):
+      CE: inv=0.5, count_factor=2/4=0.5 → threshold = -7.5 × 0.5 = -3.75 (easy)
+      PE: inv=2.0, count_factor=4/2=2.0 → threshold = -15.0 × 2.0 = -30.0 (hard)
     """
     if atr <= 0:
         return 0.0
@@ -54,10 +52,12 @@ def _lgt_loss_threshold(atr, ce_investment, pe_investment, is_ce):
     
     if is_ce:
         inverse_factor = ce_safe / pe_safe
+        count_factor = (ce_count + 1) / (pe_count + 1)
     else:
         inverse_factor = pe_safe / ce_safe
+        count_factor = (pe_count + 1) / (ce_count + 1)
     
-    loss_threshold = -atr * (1.0 + inverse_factor)
+    loss_threshold = -atr * (1.0 + inverse_factor) * count_factor
     return round(loss_threshold, 2)
 
 
@@ -159,12 +159,16 @@ def handle_side_averaging(client, df):
     ce_aligned = is_aligned("CE", active_exit)
     pe_aligned = is_aligned("PE", active_exit)
 
-    # Calculate LGT (averaging triggers) using investment-factor formula
+    # Calculate LGT (averaging triggers) using investment-factor formula + count factor
     ce_atr = safe_float(working_df.iloc[-1].get("atr"), 5.0)
     pe_atr = ce_atr  # Both use same ATR from current bar
     
-    ce_dynamic_threshold = _lgt_loss_threshold(ce_atr, ce_investment, pe_investment, is_ce=True)
-    pe_dynamic_threshold = _lgt_loss_threshold(pe_atr, ce_investment, pe_investment, is_ce=False)
+    ce_dynamic_threshold = _lgt_loss_threshold(
+        ce_atr, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=True
+    )
+    pe_dynamic_threshold = _lgt_loss_threshold(
+        pe_atr, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=False
+    )
 
     if USE_OVERALL_LOSS:
         ce_lgt_val, pe_lgt_val = ce_overall_pnl_pct, pe_overall_pnl_pct
