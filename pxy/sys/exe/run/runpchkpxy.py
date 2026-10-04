@@ -48,6 +48,17 @@ def get_position_summary(client=None):
             print("❌ Position check skipped: invalid broker response.")
             return None
 
+        status = str(pos_res.get("stat", "")).strip().casefold()
+        error_message = str(pos_res.get("errMsg", "")).strip().casefold()
+        if (
+            status in {"not_ok", "not ok"}
+            and error_message == "no data"
+            and pos_res.get("data") is None
+            and not pos_res.get("error")
+        ):
+            print("No open positions reported by broker.")
+            return "0CE0PE"
+
         if pos_res.get("errMsg") or pos_res.get("error"):
             print(f"❌ Position check failed: {pos_res.get('errMsg') or pos_res.get('error')}")
             return None
