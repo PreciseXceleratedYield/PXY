@@ -193,7 +193,9 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
         if _clash:
             print(f"⚠️ Market columns overwrite order columns: {_clash}")
         for col in market_df.columns:
-            active_df[col] = market_df[col].iloc[-1]
+            value = market_df[col].iloc[-1]
+            if pd.api.types.is_scalar(value):
+                active_df[col] = value
 
     # --- 5. THE PXY OMS CALCULATION CHAIN ---
     if add_calcs:
