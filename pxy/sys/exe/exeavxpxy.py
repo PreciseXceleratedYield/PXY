@@ -29,14 +29,20 @@ logger = logging.getLogger("exeavxpxy")
 def _lgt_loss_threshold(atr, ce_investment, pe_investment, is_ce):
     """Calculates LGT (averaging trigger) loss threshold using investment factor.
     
-    Formula: loss_threshold = ATR × (1 + inverse_factor)
+    Formula: loss_threshold = -ATR × (1 + inverse_factor)
     
     Where inverse_factor = opposite_investment / current_investment
     (defaults to 1.0 if opposite = 0)
     
+    Returns NEGATIVE because loss values are negative.
+    
     Result:
-      Heavy side (low inverse_factor): HIGH threshold (hard to average)
-      Light side (high inverse_factor): LOW threshold (easy to average)
+      Heavy side (low inverse_factor): MORE NEGATIVE (hard to average)
+      Light side (high inverse_factor): LESS NEGATIVE (easy to average)
+      
+    Example:
+      ce_loss = -10%, ce_threshold = -5.2%
+      -10 <= -5.2 → TRUE (loss exceeds threshold, average now)
     """
     if atr <= 0:
         return 0.0
@@ -49,7 +55,7 @@ def _lgt_loss_threshold(atr, ce_investment, pe_investment, is_ce):
     else:
         inverse_factor = ce_safe / pe_safe
     
-    loss_threshold = atr * (1.0 + inverse_factor)
+    loss_threshold = -atr * (1.0 + inverse_factor)  # NEGATIVE!
     return round(loss_threshold, 2)
 
 
