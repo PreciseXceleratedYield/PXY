@@ -4,7 +4,7 @@ sudo apt update && sudo apt install sshpass -y
 # Target server credentials
 REMOTE_USER="pxy"
 REMOTE_PASS="Pxy@tatlako00"
-BHANU_IP="52.140.126.163"
+BHANU_IP="20.219.143.148"
 
 # Direct SSH Connection
 sshpass -p "$REMOTE_PASS" ssh -o StrictHostKeyChecking=no "$REMOTE_USER@$BHANU_IP"

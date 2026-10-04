@@ -26,5 +26,5 @@
     "service_worker": "background.js"
   },
   "permissions": ["tabs", "sidePanel"],
-  "host_permissions": ["http://52.140.126.163/*"] 
+  "host_permissions": ["http://20.219.143.148/*"]
 }
