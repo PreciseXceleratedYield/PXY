@@ -189,10 +189,23 @@ while true; do
         u)
             echo ""
             draw_border
-            echo "       RUNNING FOREGROUND UPDATE        "
+            echo "    100% FULL SYNC: CODE + CACHE CLEAR     "
             draw_border
+            echo "Step 1: Fetching latest from GitHub..."
+            cd /home/pxy/pxy && git fetch origin
+            echo ""
+            echo "Step 2: Hard reset to match origin/main..."
+            git reset --hard origin/main
+            echo ""
+            echo "Step 3: Clearing all Python cache..."
+            find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null
+            find . -type f -name "*.pyc" -delete 2>/dev/null
+            find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null
+            echo ""
+            echo "Step 4: Running pxyupdate (if defined)..."
             pxyupdate
             draw_border
+            echo "[✔] 100% SYNC COMPLETE - Code fully updated!"
             read -p "Press [Enter] to return..."
             ;;
         s)
