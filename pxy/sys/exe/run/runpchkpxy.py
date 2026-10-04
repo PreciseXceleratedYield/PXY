@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 import math
+import os
+import traceback
 
+DEBUG = os.environ.get("RUNPCHK_DEBUG") == "1"
 
 def get_position_summary(client=None):
     """
@@ -24,6 +27,22 @@ def get_position_summary(client=None):
 
     try:
         pos_res = client.positions()
+        if DEBUG:
+            if isinstance(pos_res, dict):
+                positions = pos_res.get("data")
+                row_count = len(positions) if isinstance(positions, list) else "n/a"
+                print(
+                    "[Position debug] response keys="
+                    f"{sorted(pos_res.keys())}, stat={pos_res.get('stat')!r}, "
+                    f"errMsg={pos_res.get('errMsg')!r}, "
+                    f"error={pos_res.get('error')!r}, "
+                    f"data_type={type(positions).__name__}, rows={row_count}"
+                )
+            else:
+                print(
+                    "[Position debug] response type="
+                    f"{type(pos_res).__name__}"
+                )
 
         if not isinstance(pos_res, dict):
             print("❌ Position check skipped: invalid broker response.")
@@ -98,6 +117,8 @@ def get_position_summary(client=None):
 
     except Exception as e:
         print(f"❌ Position check failed: {e}")
+        if DEBUG:
+            traceback.print_exc()
         return None
 
 
