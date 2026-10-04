@@ -6,8 +6,6 @@ from syscnfgpxy import (
     EXETGTPXY_ATR_FLOOR,
     EXETGTPXY_ATR_MIN,
     EXETGTPXY_EXIT_KEY_COLUMN,
-    EXETGTPXY_TGT_PCT_NOT_ALIGNED,
-    EXETGTPXY_RESERVE_FLOOR_LIGHTER,
     EXETGTPXY_MAX_TARGET_CAP,
 )
 
@@ -15,8 +13,6 @@ from syscnfgpxy import (
 EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
 ATR_FLOOR = EXETGTPXY_ATR_FLOOR
 ATR_MIN = EXETGTPXY_ATR_MIN
-TGT_PCT_NOT_ALIGNED = EXETGTPXY_TGT_PCT_NOT_ALIGNED
-RESERVE_FLOOR_LIGHTER = EXETGTPXY_RESERVE_FLOOR_LIGHTER
 MAX_TARGET_CAP = EXETGTPXY_MAX_TARGET_CAP
                                # (same rule as is_aligned in exeagtpxy.py); SIDE / NONE / unknown = not aligned
 # =======================================================================
