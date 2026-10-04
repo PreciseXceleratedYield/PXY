@@ -62,20 +62,24 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     return ce_total, pe_total
 
 def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce_count: int = 0, pe_count: int = 0):
-    """Calculates target price using investment-factor-scaled ATR with weighted factors.
+    """Calculates target price with INVERTED count factor to reduce exposure.
     
     Formula (NOT aligned):
-      target_pct = max(ATR × (1 + inverse_factor)² × count_factor, 1.4%)
+      target_pct = max(ATR × (opposite/own) × (opposite_count+1)/(own_count+1), 1.4%)
     
     Formula (ALIGNED):
       target_pct = 77%
     
-    TGT INVERSE LOGIC (opposite of LGT):
-      - Heavy side (high investment): inverse_factor HIGH → exits FAST (high %)
-      - Light side (low investment): inverse_factor LOW → exits SLOW (low %)
+    TGT LOGIC (reduce exposure):
+      - Heavy side (high own investment): LOW target% → exits FAST
+      - Many layers (high own_count): LOW target% → exits FAST (reduce exposure)
+      
+      - Light side (low own investment): HIGH target% → exits SLOW
+      - Few layers (low own_count): HIGH target% → exits SLOW
     
-    Where inverse_factor = opposite_investment / current_investment
-    (defaults to 1.0 if opposite = 0)
+    Example: CE=2000 (heavy, 5 layers), PE=1000 (light, 1 layer)
+      CE: inv=0.5, count=1/6 → target ≈ 0.42% (very fast exit)
+      PE: inv=2.0, count=5/2 → target ≈ 25% (slow exit)
     
     Args:
         row: dict with 'pxy_entry'/'buy_prc', 'symbol', 'exit', 'atr'
@@ -127,13 +131,18 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             inverse_factor = ce_safe / pe_safe
             is_aligned = (derived_supr == 'BEAR')
         
-        # 4️⃣ Apply target formula (simple: investment factor only)
+        # 4️⃣ Apply target formula with INVERTED count factor (reduce exposure)
         if is_aligned:
             # Aligned: use max cap
             target_pct = MAX_TARGET_CAP
         else:
-            # Not aligned: scale ATR by inverse factor with 1.4% floor
-            target_pct = max(atr_scaled * inverse_factor, ATR_FLOOR)
+            # Not aligned: scale by inverse_factor × inverted count_factor
+            # More own layers → easier exit (lower target %)
+            if is_ce:
+                count_factor = (pe_count + 1) / (ce_count + 1)  # INVERTED: opposite/own
+            else:
+                count_factor = (ce_count + 1) / (pe_count + 1)  # INVERTED: opposite/own
+            target_pct = max(atr_scaled * inverse_factor * count_factor, ATR_FLOOR)
         
         # 5️⃣ Final clamping to [1.4, 77]
         target_pct_clamped = max(ATR_FLOOR, min(target_pct, MAX_TARGET_CAP))
