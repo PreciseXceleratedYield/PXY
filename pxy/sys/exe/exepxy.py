@@ -21,11 +21,11 @@ for path in (RUN_DIR, HERE, SYS_DIR):
         sys.path.insert(0, str(path))
 
 from syscnfgpxy import RUNMODE
+from sysmodepxy import normal_start_message
 
-if __name__ == "__main__" and RUNMODE == "SIM":
-    from syssimpxy import main as run_simulation
-
-    raise SystemExit(run_simulation())
+if RUNMODE != "PRD":
+    print(normal_start_message(RUNMODE), file=sys.stderr)
+    raise SystemExit(2)
 
 from sysmodepxy import dispatch_mode
 

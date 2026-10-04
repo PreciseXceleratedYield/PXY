@@ -23,6 +23,12 @@ python validate_backtest.py
 - **RUNMODE=SIM**: Historical replay/backtest mode (isolated, no live broker)
 - **RUNMODE=CHK**: Mock/check mode (uses test providers)
 - **RUNMODE=PRD**: Production mode (live engine, live broker integration)
+- The normal engine entry points (`sysexepxy.py` and `exe/exepxy.py`) only start
+  when `RUNMODE=PRD`; SIM and CHK are refused with instructions for their
+  dedicated runners.
+- Start SIM directly with `python3 syssimpxy.py --records 100` (or
+  `python3 sysbtstpxy.py --records 100`). Run CHK validation separately with
+  `python3 -m unittest discover -s tstmodepxy -v` from `pxy/sys`.
 - SIM selects the latest recent Yahoo Finance session with enough 1-minute candles,
   builds each production snapshot using only candles available up to that record,
   and runs one production pipe cycle per record (100 by default).

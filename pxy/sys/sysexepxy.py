@@ -6,7 +6,7 @@ import subprocess
 from datetime import datetime, time as dt_time
 import pytz
 from syscnfgpxy import RUNMODE
-from sysmodepxy import dispatch_mode
+from sysmodepxy import dispatch_mode, normal_start_message
 
 # ---------------- EXEC SCRIPT ----------------
 def run_execprt():
@@ -61,15 +61,12 @@ def is_market_hours():
 # ---------------- SUPERVISOR LOOP ----------------
 def start_loop():
     """Main loop to supervise execution"""
-    if RUNMODE == "SIM":
-        from syssimpxy import main as run_simulation
-
-        return run_simulation()
+    if RUNMODE != "PRD":
+        print(normal_start_message(RUNMODE), file=sys.stderr)
+        return 2
 
     if dispatch_mode("run_startup_checks", lambda: True):
         run_execprt()
-    else:
-        print("CHK MODE: startup task paused during market hours.")
     was_open = False
     off_done = False
 

@@ -32,18 +32,31 @@ class ModeDispatchTests(unittest.TestCase):
 
     def test_sim_dispatch_fails_closed_in_production_engine_path(self):
         with patch.object(sysmodepxy, "RUNMODE", "SIM"):
-            with self.assertRaisesRegex(RuntimeError, "cannot dispatch engine providers"):
+            with self.assertRaisesRegex(RuntimeError, "syssimpxy.py --records 100"):
                 sysmodepxy.dispatch_mode(
                     "unused_provider", lambda: self.fail("live provider must not run")
                 )
 
-    def test_normal_supervisor_routes_sim_to_replay_and_exits(self):
-        with patch.object(sysexepxy, "RUNMODE", "SIM"), patch.object(
-            sysexepxy, "dispatch_mode",
-            side_effect=AssertionError("SIM must not enter engine dispatch"),
-        ), patch("syssimpxy.main", return_value=0) as run_simulation:
-            self.assertEqual(sysexepxy.start_loop(), 0)
-        run_simulation.assert_called_once_with()
+    def test_nonproduction_start_messages_name_dedicated_commands(self):
+        self.assertIn("syssimpxy.py --records 100", sysmodepxy.normal_start_message("SIM"))
+        self.assertIn("unittest discover", sysmodepxy.normal_start_message("CHK"))
+
+    def test_normal_supervisor_refuses_nonproduction_modes_with_instructions(self):
+        for mode, command in (
+            ("SIM", "syssimpxy.py --records 100"),
+            ("CHK", "unittest discover"),
+        ):
+            with self.subTest(mode=mode), patch.object(
+                sysexepxy, "RUNMODE", mode
+            ), patch.object(
+                sysexepxy, "dispatch_mode",
+                side_effect=AssertionError("non-production mode must be rejected"),
+            ), patch("builtins.print") as print_message:
+                self.assertEqual(sysexepxy.start_loop(), 2)
+                self.assertIn(
+                    command,
+                    print_message.call_args.args[0],
+                )
 
     def test_walk_forward_requires_sim_before_fetching_market_data(self):
         import tstmodepxy.backtest as backtest
