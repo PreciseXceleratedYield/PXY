@@ -154,8 +154,8 @@ def fetch_recent_index_history():
     )
 
 
-def latest_session_with_records(history, record_limit=100):
-    """Select a random trading session with enough candles for a replay."""
+def latest_session_with_records(history, record_limit=None):
+    """Select a random trading session with all candles for a full day replay."""
     import random
     available_sessions = []
     for session_date, frame in history.groupby(history.index.date):
@@ -163,17 +163,17 @@ def latest_session_with_records(history, record_limit=100):
             (frame.index.time >= MARKET_OPEN)
             & (frame.index.time <= MARKET_CLOSE)
         ]
-        if len(session_bars) >= record_limit:
+        if len(session_bars) > 0:  # At least one candle
             available_sessions.append(session_date)
     if not available_sessions:
         raise RuntimeError(
-            f"No recent NIFTY session contains {record_limit} replay candles."
+            f"No recent NIFTY session found for full-day replay."
         )
     return random.choice(available_sessions)
 
 
-def calculate_strategy_signals(history, session_date, record_limit=100):
-    """Build production snapshots for the first N candles of a session."""
+def calculate_strategy_signals(history, session_date, record_limit=None):
+    """Build production snapshots for ALL candles of a full trading session."""
     sys.path.insert(0, str(SYS_DIR / "exe"))
     dashboard = importlib.import_module("sysdashpxy")
     records = []
@@ -182,7 +182,10 @@ def calculate_strategy_signals(history, session_date, record_limit=100):
         if timestamp.date() == session_date
         and timestamp.time().replace(tzinfo=None) >= MARKET_OPEN
         and timestamp.time().replace(tzinfo=None) <= MARKET_CLOSE
-    ][:record_limit]
+    ]
+    # Use all candles if record_limit is None
+    if record_limit is not None:
+        target_indexes = target_indexes[:record_limit]
     for index in target_indexes:
         available = history.iloc[: index + 1]
         transformed = transform_market_data(available).tail(
@@ -297,13 +300,13 @@ def print_report(
     print("=" * 72)
 
 
-def run_backtest(output_dir=None, record_limit=100):
+def run_backtest(output_dir=None, record_limit=None):
     if RUNMODE != "SIM":
         raise RuntimeError(
             f"Walk-forward replay requires RUNMODE='SIM'; current RUNMODE={RUNMODE!r}."
         )
-    if record_limit <= 0:
-        raise ValueError("record_limit must be a positive integer.")
+    if record_limit is not None and record_limit <= 0:
+        raise ValueError("record_limit must be a positive integer or None for all candles.")
     history = fetch_recent_index_history()
     holiday_dates = set(RUNNIFTYPXY_HOLIDAYS)
     history = history[
@@ -391,15 +394,15 @@ def run_backtest(output_dir=None, record_limit=100):
 def main(argv=None):
     parser = argparse.ArgumentParser(
         description=(
-            "Replay the first N candles from the latest eligible NIFTY 1-minute "
+            "Replay ALL candles from the latest eligible NIFTY 1-minute "
             "session through production pipes and a CSV-backed simulated broker."
         )
     )
     parser.add_argument(
         "--records",
         type=int,
-        default=100,
-        help="Number of consecutive Yahoo candles and production cycles (default: 100).",
+        default=None,
+        help="Number of consecutive Yahoo candles and production cycles (default: None = all candles).",
     )
     parser.add_argument(
         "--output-dir",
