@@ -8,6 +8,65 @@ import pytz
 from syscnfgpxy import RUNMODE
 from sysmodepxy import dispatch_mode
 
+# Override RUNMODE from environment if set
+RUNTIME_MODE = os.environ.get("RUNMODE", RUNMODE)
+
+# ================================================================================
+# STRICT MODE ENFORCEMENT - REFUSE TO START IF NOT PRD
+# ================================================================================
+def validate_startup_mode():
+    """Validate that startup is PRD mode. Refuse CHK/SIM with helpful message."""
+    if RUNTIME_MODE == "SIM":
+        print("\n" + "="*80)
+        print("❌ ENGINE STARTUP BLOCKED: RUNMODE=SIM (Simulation/Backtest Mode)")
+        print("="*80)
+        print("\nTo run historical backtest/replay:")
+        print("  export RUNMODE=SIM")
+        print("  python sysexepxy.py")
+        print("\nOr use the direct backtest entry point:")
+        print("  python run_backtest.py")
+        print("="*80 + "\n")
+        return False
+    
+    if RUNTIME_MODE == "CHK":
+        print("\n" + "="*80)
+        print("❌ ENGINE STARTUP BLOCKED: RUNMODE=CHK (Check/Mock Mode)")
+        print("="*80)
+        print("\nCheck mode is for testing only. To run in check mode:")
+        print("  export RUNMODE=CHK")
+        print("  python sysexepxy.py")
+        print("\nFor production (live engine), use:")
+        print("  export RUNMODE=PRD  (or leave unset)")
+        print("  python sysexepxy.py")
+        print("="*80 + "\n")
+        return False
+    
+    if RUNTIME_MODE != "PRD":
+        print("\n" + "="*80)
+        print(f"❌ ENGINE STARTUP BLOCKED: Unknown RUNMODE={RUNTIME_MODE!r}")
+        print("="*80)
+        print("\nValid modes are:")
+        print("  PRD - Production/Live Engine (default)")
+        print("  CHK - Check/Mock Mode (testing only)")
+        print("  SIM - Simulation/Backtest Mode")
+        print("\nSet mode with:")
+        print("  export RUNMODE=PRD")
+        print("  python sysexepxy.py")
+        print("="*80 + "\n")
+        return False
+    
+    return True
+
+# ================================================================================
+# MAIN ENGINE STARTUP
+# ================================================================================
+
+# Validate mode before proceeding
+if not validate_startup_mode():
+    sys.exit(1)
+
+# If we reach here, RUNTIME_MODE == "PRD" - safe to continue
+
 # ---------------- EXEC SCRIPT ----------------
 def run_execprt():
     """Run execprtpxy.py once at startup"""
@@ -61,11 +120,7 @@ def is_market_hours():
 # ---------------- SUPERVISOR LOOP ----------------
 def start_loop():
     """Main loop to supervise execution"""
-    if RUNMODE == "SIM":
-        from syssimpxy import main as run_simulation
-
-        return run_simulation()
-
+    # PRD mode: normal supervised loop with market hour restrictions
     if dispatch_mode("run_startup_checks", lambda: True):
         run_execprt()
     else:
