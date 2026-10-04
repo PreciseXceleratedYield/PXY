@@ -61,20 +61,28 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     
     return ce_total, pe_total
 
-def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
-    """Calculates target price using investment-factor-scaled ATR.
+def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce_count: int = 0, pe_count: int = 0):
+    """Calculates target price using investment-factor-scaled ATR with weighted factors.
     
-    Formula:
-      NOT aligned: target_pct = max(ATR × inverse_factor, 1.4%)
-      ALIGNED:     target_pct = 77%
+    Formula (NOT aligned):
+      target_pct = max(ATR × (1 + inverse_factor)² × count_factor, 1.4%)
+    
+    Formula (ALIGNED):
+      target_pct = 77%
+    
+    TGT INVERSE LOGIC (opposite of LGT):
+      - Heavy side (high investment): inverse_factor HIGH → exits FAST (high %)
+      - Light side (low investment): inverse_factor LOW → exits SLOW (low %)
     
     Where inverse_factor = opposite_investment / current_investment
-    (defaults to 1.0 if opposite = 0, creating lighter-side penalty)
+    (defaults to 1.0 if opposite = 0)
     
     Args:
         row: dict with 'pxy_entry'/'buy_prc', 'symbol', 'exit', 'atr'
         ce_investment: CE side investment (USD/token)
         pe_investment: PE side investment (USD/token)
+        ce_count: CE side layer count
+        pe_count: PE side layer count
     
     Returns:
         float: Target price rounded to 2 decimals
@@ -104,20 +112,24 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
 
-        # 3️⃣ Calculate investment factor (opposite / current)
+        # 3️⃣ Calculate investment factor
         ce_safe = ce_investment if ce_investment > 0 else 1.0
         pe_safe = pe_investment if pe_investment > 0 else 1.0
         
         if is_ce:
             # CE is current side
-            inverse_factor = pe_safe / ce_safe
+            # For TGT: use opposite/current (opposite of LGT logic)
+            inverse_factor = pe_safe / ce_safe  # opposite/current
             is_aligned = (derived_supr == 'BULL')
+            count_factor = (ce_count + 1) / (pe_count + 1)
         else:
             # PE is current side
-            inverse_factor = ce_safe / pe_safe
+            # For TGT: use opposite/current (opposite of LGT logic)
+            inverse_factor = ce_safe / pe_safe  # opposite/current
             is_aligned = (derived_supr == 'BEAR')
+            count_factor = (pe_count + 1) / (ce_count + 1)
         
-        # 4️⃣ Apply target formula
+        # 4️⃣ Apply target formula (simple: no weighting, only investment factor)
         if is_aligned:
             # Aligned: use max cap
             target_pct = MAX_TARGET_CAP

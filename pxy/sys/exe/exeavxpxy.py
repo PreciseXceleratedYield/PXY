@@ -63,7 +63,7 @@ def _lgt_loss_threshold(atr, ce_investment, pe_investment, ce_count, pe_count, i
     return round(loss_threshold, 2)
 
 
-def _side_target_pct(rows):
+def _side_target_pct(rows, ce_investment=0, pe_investment=0, ce_count=0, pe_count=0, is_ce=True):
     """Reports the existing per-lot exit target as a side-level percentage."""
     if rows.empty:
         return 0.0
@@ -71,7 +71,7 @@ def _side_target_pct(rows):
     entry = safe_float(row.get("pxy_entry") or row.get("buy_prc"))
     if entry <= 0:
         return 0.0
-    target = target_price(row)
+    target = target_price(row, ce_investment, pe_investment, ce_count, pe_count)
     return max(0.0, ((target - entry) / entry) * 100.0)
 
 
@@ -178,8 +178,8 @@ def handle_side_averaging(client, df):
         ce_lgt_val = ce_rows.apply(get_loss, axis=1).max() if not ce_rows.empty else 0.0
         pe_lgt_val = pe_rows.apply(get_loss, axis=1).max() if not pe_rows.empty else 0.0
 
-    ce_tgt = _side_target_pct(ce_rows)
-    pe_tgt = _side_target_pct(pe_rows)
+    ce_tgt = _side_target_pct(ce_rows, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=True)
+    pe_tgt = _side_target_pct(pe_rows, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=False)
 
     p_packet = {
         "ce_lots": ce_lots, "pe_lots": pe_lots,
