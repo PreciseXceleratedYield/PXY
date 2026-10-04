@@ -36,6 +36,18 @@ class TargetPriceTests(unittest.TestCase):
         }
         self.assertEqual(target_price(row), 101.4)
 
+    def test_target_pct_is_clamped_between_floor_and_atr(self):
+        row = {
+            "symbol": "NIFTY26OCT25000CE",
+            "exit": "BULL",
+            "pxy_entry": 100.0,
+            "atr": 3.0,
+        }
+        self.assertEqual(target_price(row), 103.0)
+
+        row["atr"] = 0.5
+        self.assertEqual(target_price(row), 101.4)
+
 
 if __name__ == "__main__":
     unittest.main()

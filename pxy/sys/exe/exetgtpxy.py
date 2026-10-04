@@ -106,7 +106,13 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0):
             else:
                 target_pct = atr
             
-        # 4️⃣ Final mathematical target premium projection calculation
+        # 4️⃣ Keep target premium between the configured floor and ATR-based ceiling.
+        # This preserves the intended alignment rules while preventing drift beyond the
+        # allowed band when the raw target value is calculated from a side mismatch or a
+        # larger-than-ATR market move.
+        target_pct = max(TGT_PCT_NOT_ALIGNED, min(target_pct, atr))
+
+        # 5️⃣ Final mathematical target premium projection calculation
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
         return round(calculated_target, 2)
         
