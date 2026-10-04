@@ -155,7 +155,8 @@ def fetch_recent_index_history():
 
 
 def latest_session_with_records(history, record_limit=100):
-    """Select the newest trading session with enough candles for a replay."""
+    """Select a random trading session with enough candles for a replay."""
+    import random
     available_sessions = []
     for session_date, frame in history.groupby(history.index.date):
         session_bars = frame[
@@ -168,7 +169,7 @@ def latest_session_with_records(history, record_limit=100):
         raise RuntimeError(
             f"No recent NIFTY session contains {record_limit} replay candles."
         )
-    return max(available_sessions)
+    return random.choice(available_sessions)
 
 
 def calculate_strategy_signals(history, session_date, record_limit=100):
