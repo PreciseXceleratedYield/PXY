@@ -1,4 +1,19 @@
 #!/bin/bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-exec python3 "$SCRIPT_DIR/sys/syssimpxy.py" "$@"
+REPO_DIR="$HOME/pxy"
+
+if [ ! -f "$REPO_DIR/sys/syssimpxy.py" ]; then
+    REPO_DIR="$SCRIPT_DIR"
+fi
+
+if [ ! -f "$REPO_DIR/sys/syssimpxy.py" ]; then
+    echo "[X] Could not locate sys/syssimpxy.py under $REPO_DIR." >&2
+    exit 1
+fi
+
+if [ -f "$HOME/env/bin/activate" ]; then
+    source "$HOME/env/bin/activate"
+fi
+
+exec python3 "$REPO_DIR/sys/syssimpxy.py" "$@"

@@ -1,7 +1,18 @@
 #!/bin/bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/sys" || exit 1
+REPO_DIR="$HOME/pxy"
+
+if [ ! -d "$REPO_DIR/sys/tstmodepxy" ]; then
+    REPO_DIR="$SCRIPT_DIR"
+fi
+
+if [ ! -d "$REPO_DIR/sys/tstmodepxy" ]; then
+    echo "[X] Could not locate sys/tstmodepxy under $REPO_DIR." >&2
+    exit 1
+fi
+
+cd "$REPO_DIR/sys" || exit 1
 
 if [ -f "$HOME/env/bin/activate" ]; then
     source "$HOME/env/bin/activate"
