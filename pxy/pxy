@@ -288,9 +288,13 @@ while true; do
             ;;
         b)
             echo ""
-            echo "Starting historical SIM replay..."
+            echo "Syncing latest code and clearing cache..."
+            cd /home/pxy/pxy && git fetch origin && git reset --hard origin/main && find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null
+            echo "[✔] Code synced, cache cleared."
+            echo ""
+            echo "Starting historical SIM replay with FULL DAY candles..."
             if [ -x "$HOME/pxy/pxysim" ]; then
-                if "$HOME/pxy/pxysim" --records 100; then
+                if "$HOME/pxy/pxysim"; then
                     echo "[✔] SIM replay completed."
                 else
                     echo "[X] SIM replay failed with exit code $?."
