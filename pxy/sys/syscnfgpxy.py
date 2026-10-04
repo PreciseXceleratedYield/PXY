@@ -10,6 +10,7 @@ Mode 5: Master Ensemble Average of Modes 0, 1, 2, 3, and 4 (Divided by 5)
 """
 
 
+import os
 from datetime import time as dt_time
 
 import pytz
@@ -23,7 +24,9 @@ import pytz
 # -----------------------------------------------------------------------------
 SYSCNFGPXY_TICKER = "^NSEI"
 SYSCNFGPXY_TIMEZONE = pytz.timezone("Asia/Kolkata")
-RUNMODE = "PRD"  # PRD: live engine, CHK: mock engine, SIM: historical replay.
+RUNMODE = os.environ.get(
+    "RUNMODE", "PRD"
+)  # PRD: live engine, CHK: mock engine, SIM: historical replay.
 if RUNMODE not in {"PRD", "CHK", "SIM"}:
     raise ValueError("RUNMODE must be one of 'PRD', 'CHK', or 'SIM'.")
 

@@ -508,16 +508,17 @@ The system has three execution modes:
 | **CHK** | Run `pxychk` | Isolated check/test suite | No live broker or live orders |
 | **SIM** | Run `pxysim --records 100` | Yahoo historical candles | CSV-backed simulated broker |
 
-`RUNMODE` accepts only `PRD`, `CHK`, or `SIM`. The ordinary engine entry points
-start only with `RUNMODE = "PRD"`; they refuse CHK and SIM and print the
-dedicated command to run. In the management menu, **Start** launches the web
-dashboard, then reports the configured mode without trying to boot a production
-engine in CHK or SIM.
+`RUNMODE` accepts only `PRD`, `CHK`, or `SIM`; its checked-in default is `PRD`.
+The ordinary engine entry points start only in PRD; they refuse CHK and SIM and
+print the dedicated command to run. In the management menu, **Start** launches
+the web dashboard, then reports the configured mode without trying to boot a
+production engine in CHK or SIM.
 
-Set `RUNMODE = "CHK"` or `RUNMODE = "SIM"` in `syscnfgpxy.py` before running the
-matching standalone command. `pxychk` runs the isolated Python checks. `pxysim`
-performs the historical candle replay; SIM never falls through to live provider
-dispatch or submits live orders.
+The `pxychk` and `pxysim` launchers set `RUNMODE=CHK` and `RUNMODE=SIM` only for
+the process they start; no config edit or persistent shell export is needed.
+For direct Python commands, prefix the command with `RUNMODE=CHK` or
+`RUNMODE=SIM`. SIM never falls through to live provider dispatch or submits live
+orders.
 
 Focused unit tests cover production decision gates, mode routing, and the
 isolated replay. They can also be run from `pxy/sys` with
@@ -525,9 +526,9 @@ isolated replay. They can also be run from `pxy/sys` with
 
 ### SIM one-session strategy replay
 
-With `RUNMODE = "SIM"`, run `pxysim --records 100` from the `pxy/` directory
-(or `python3 syssimpxy.py --records 100` from `pxy/sys/`). The
-isolated simulator fetches recent one-minute NIFTY data for indicator warmup.
+Run `pxysim --records 100` from the `pxy/` directory (or
+`RUNMODE=SIM python3 syssimpxy.py --records 100` from `pxy/sys/`). The isolated
+simulator fetches recent one-minute NIFTY data for indicator warmup.
 If it cannot find a completed session in the recent history, it checks prior
 weekdays one by one and uses the first complete session found, within Yahoo's
 seven-day 1-minute data limit. It then evaluates the production dashboard and

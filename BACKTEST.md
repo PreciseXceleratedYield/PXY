@@ -4,13 +4,12 @@
 
 ### Run Backtest (Replay Mode)
 ```bash
-export RUNMODE=SIM
-python run_backtest.py --records 100
+./pxysim --records 100
 ```
 
-Or use the shell script:
+Run CHK validation with:
 ```bash
-bash run_backtest.sh
+./pxychk
 ```
 
 ### Validate Tests
@@ -28,11 +27,9 @@ python validate_backtest.py
   dedicated runners.
 - The management menu's **Start** action starts the web dashboard, then reports
   the configured mode. It only launches the trading engine in PRD mode.
-- Start SIM directly with `python3 syssimpxy.py --records 100` (or
-  `python3 sysbtstpxy.py --records 100`). Run CHK validation separately with
-  `python3 -m unittest discover -s tstmodepxy -v` from `pxy/sys`.
-- From the `pxy/` directory, use `pxychk` for checks and `pxysim --records 100`
-  for the replay.
+- From the `pxy/` directory, `pxysim` sets RUNMODE=SIM for the replay and
+  `pxychk` sets RUNMODE=CHK for isolated checks. Neither changes the PRD default.
+- For direct Python commands, prefix them with `RUNMODE=SIM` or `RUNMODE=CHK`.
 - SIM selects the latest recent Yahoo Finance session with enough 1-minute candles,
   builds each production snapshot using only candles available up to that record,
   and runs one production pipe cycle per record (100 by default).
@@ -58,7 +55,8 @@ pxy/
 
 - This is a **custom simulation/backtest system**, not a standard pytest project
 - The engine console ("pxy-engine" session) is for live mode only
-- Backtest runs in isolation; use `RUNMODE=SIM` explicitly
+- Backtest runs in isolation; use `pxysim` (or explicitly set `RUNMODE=SIM` for
+  direct Python commands).
 - Results are written to `~/pxy-sim-results/` by default
 
 ## Troubleshooting
@@ -66,7 +64,7 @@ pxy/
 If you get "Engine console session unavailable":
 - That's the **live engine UI**, not the backtest
 - Use the **backtest entry point** instead
-- Ensure `RUNMODE=SIM` is set
+- Run `pxysim`, or set `RUNMODE=SIM` when invoking Python directly.
 - Check sys path resolution
 
 ## Next Steps
