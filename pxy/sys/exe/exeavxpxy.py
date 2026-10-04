@@ -31,6 +31,8 @@ def _lgt_loss_threshold(atr, ce_investment, pe_investment, is_ce):
     
     Formula: loss_threshold = -ATR × (1 + inverse_factor)
     
+    Linear scaling: balanced mirror logic (heavy hard, light easy).
+    
     Where inverse_factor = current_investment / opposite_investment
     (defaults to 1.0 if opposite = 0)
     
@@ -55,7 +57,7 @@ def _lgt_loss_threshold(atr, ce_investment, pe_investment, is_ce):
     else:
         inverse_factor = pe_safe / ce_safe
     
-    loss_threshold = -atr * (1.0 + inverse_factor)  # NEGATIVE!
+    loss_threshold = -atr * (1.0 + inverse_factor)
     return round(loss_threshold, 2)
 
 
