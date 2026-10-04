@@ -127,7 +127,7 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             inverse_factor = ce_safe / pe_safe
             is_aligned = (derived_supr == 'BEAR')
         
-        # 4️⃣ Apply target formula (simple: no weighting, only investment factor)
+        # 4️⃣ Apply target formula (simple: investment factor only)
         if is_aligned:
             # Aligned: use max cap
             target_pct = MAX_TARGET_CAP
