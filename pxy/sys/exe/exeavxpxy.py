@@ -31,7 +31,7 @@ def _lgt_loss_threshold(atr, ce_investment, pe_investment, is_ce):
     
     Formula: loss_threshold = -ATR × (1 + inverse_factor)
     
-    Where inverse_factor = opposite_investment / current_investment
+    Where inverse_factor = current_investment / opposite_investment
     (defaults to 1.0 if opposite = 0)
     
     Returns NEGATIVE because loss values are negative.
@@ -40,9 +40,9 @@ def _lgt_loss_threshold(atr, ce_investment, pe_investment, is_ce):
       Heavy side (low inverse_factor): MORE NEGATIVE (hard to average)
       Light side (high inverse_factor): LESS NEGATIVE (easy to average)
       
-    Example:
-      ce_loss = -10%, ce_threshold = -5.2%
-      -10 <= -5.2 → TRUE (loss exceeds threshold, average now)
+    Example with CE=1000 (light), PE=2000 (heavy):
+      CE: inverse = 1000/2000 = 0.5 → threshold = -7.5 (easy)
+      PE: inverse = 2000/1000 = 2.0 → threshold = -15.0 (hard)
     """
     if atr <= 0:
         return 0.0
@@ -51,9 +51,9 @@ def _lgt_loss_threshold(atr, ce_investment, pe_investment, is_ce):
     pe_safe = pe_investment if pe_investment > 0 else 1.0
     
     if is_ce:
-        inverse_factor = pe_safe / ce_safe
-    else:
         inverse_factor = ce_safe / pe_safe
+    else:
+        inverse_factor = pe_safe / ce_safe
     
     loss_threshold = -atr * (1.0 + inverse_factor)  # NEGATIVE!
     return round(loss_threshold, 2)
