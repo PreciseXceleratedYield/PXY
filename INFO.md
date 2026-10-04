@@ -99,7 +99,6 @@ pxy/
 │   ├── sysentrpxy.py     # Entry signal routing
 │   ├── sysexitpxy.py     # Exit signal handling
 │   ├── sysdashpxy.py     # Dashboard data
-│   ├── sysvixpxy.py      # VIX/sentiment analysis
 │   ├── syscnfgpxy.py     # Configuration
 │   ├── sysdtafpxy.py     # Data fetching (Yahoo Finance)
 │   ├── sysrigpxy.py      # Risk management
@@ -494,9 +493,7 @@ def get_full_snapshot() -> dict:
     "entry": "ATMBUY",
     "exit": "BULL",
     "ce_power": 1.2,
-    "pe_power": 0.9,
-    "vix_flag": "NORMAL",
-    "global_sentiment": "POSITIVE"
+    "pe_power": 0.9
 }
 ```
 

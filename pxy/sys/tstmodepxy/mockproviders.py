@@ -72,23 +72,6 @@ def fetch_chart_data(
     return transform(frame) if transform else frame
 
 
-def get_last_two_trading_days(ticker, lookback_days=14, timezone="Asia/Kolkata"):
-    rows = generate_mock_ohlc(2, "1d", timezone)
-    return rows.iloc[-1], rows.iloc[-2]
-
-
-def get_intraday_data(ticker, timezone="Asia/Kolkata"):
-    return generate_mock_ohlc(390, "1m", timezone)
-
-
-def get_vix_data():
-    return generate_mock_ohlc(1, "5m", base_price=13.5)[["Open", "High", "Low", "Close"]]
-
-
-def get_global_sentiment():
-    return "M"
-
-
 def run_independent_engine():
     from pathlib import Path
 

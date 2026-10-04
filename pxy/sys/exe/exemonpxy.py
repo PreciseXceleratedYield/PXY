@@ -98,8 +98,6 @@ loop_counter = 1
 
 # Initial system check scripts
 parent_scripts = [
-    HERE.parent / "systdaypxy.py",
-    HERE.parent / "sysvixpxy.py",
     HERE.parent / "sysdashpxy.py",
     HERE / "exeentrpxy.py",
     HERE / "exeexitpxy.py"

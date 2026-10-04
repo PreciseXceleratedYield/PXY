@@ -6,9 +6,6 @@ import subprocess
 from pathlib import Path
 from datetime import datetime
 from sysdashpxy import get_full_snapshot
-from systdaypxy import get_market_snapshot  # Keep your original 'systdaypxy'
-from sysvixpxy import get_market_context, expand_vix, expand_sentiment
-from syscnfgpxy import TICKER
 from sysmodepxy import dispatch_mode
 
 # Import the clean json exporter from your streamlined trend engine
@@ -63,14 +60,6 @@ def get_all_data():
     # -------- CORE --------
     core = get_full_snapshot() or {}
 
-    # -------- DASH --------
-    dash = get_market_snapshot(TICKER) or {}
-
-    # -------- VIX --------
-    vix_flag, sentiment_flag = get_market_context() or (None, None)
-    vix_text = expand_vix(vix_flag) if vix_flag else None
-    sentiment_text = expand_sentiment(sentiment_flag) if sentiment_flag else None
-
     # -------- DYNAMIC PRICE LOGIC (FUT AVERAGE OR FALLBACK) --------
     try:
         base_price = float(core.get("price", 0) or 0)
@@ -100,17 +89,6 @@ def get_all_data():
     data = {
         # ===== SYSTEM TIMING =====
         "timestamp": datetime.now().isoformat(),
-
-        # ===== DASH =====
-        "bias": dash.get("bias"),
-        "o_change": dash.get("o_change"),
-        "m_change": dash.get("m_change"),
-
-        # RENAMED FIELDS
-        "TO": dash.get("open"),
-        "high": dash.get("high"),
-        "low": dash.get("low"),
-        "YC": dash.get("prev_close"),
 
         # ===== CORE =====
         "hkin_signal": core.get("hkin_signal", "NONE"),
@@ -142,12 +120,6 @@ def get_all_data():
         "bos_bar": core.get("bos_bar", "NONE"),
         "bos_val": core.get("bos_val", "0%"),
         "day_candle": core.get("day_candle", ""),
-
-        # ===== VIX =====
-        "vix_flag": vix_flag,
-        "vix_mode": vix_text,
-        "global_flag": sentiment_flag,
-        "global_sentiment": sentiment_text
     }
 
     # -------- 📁 TARGET: pxy/web DIRECTORY --------

@@ -1,8 +1,6 @@
 # exepomspxy.py
 from colorama import Fore, Style, init
 import re
-import subprocess
-import sys
 
 init(autoreset=True)
 ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
@@ -40,9 +38,6 @@ def print_market_dashboard(market_df):
         return
 
     snapshot = market_df.iloc[0].to_dict()
-
-    # ===== DAY CONTEXT =====
-    subprocess.run([sys.executable, "systdaypxy.py"])
 
     metrics = [
         ("📏  ATR", "atr"),
@@ -106,5 +101,4 @@ def print_market_dashboard(market_df):
     # ===== BOS & VISUAL =====
     print(snapshot.get("bos_bar", "NONE"))
     print(snapshot.get("candle_visual", ""))
-
 
