@@ -7,11 +7,7 @@ from syscnfgpxy import (
 )
 
 def get_dynamic_otm_distance():
-    """
-    Returns OTM distance based on current Indian Standard Time (IST) weekday:
-    Mon = 250, Tue = 200, Wed = 150, Thu = 100, Fri = 50. 
-    Sat/Sun default to 100.
-    """
+    """Return the configured fixed 100-point OTM distance for every weekday."""
     # Force timezone validation to prevent errors on overseas servers (e.g., VPS)
     ist = SYSCNFGPXY_TIMEZONE
     current_day = datetime.now(ist).weekday()
