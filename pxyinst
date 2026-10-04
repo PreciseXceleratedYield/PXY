@@ -81,7 +81,7 @@ if [ "$modified_successfully" = true ]; then
         echo "Exiting script."
         exit 0
     fi
-    git clone git@github.com:PreciseXceleratedYield/PXY.git
+    git clone git@github.com:homekcbpcc/PXY.git
     if [ $? -eq 0 ]; then
         echo -e "\e[32mCloned pxy repository successfully\e[0m"
         ((success_count++))
