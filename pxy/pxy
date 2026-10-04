@@ -141,9 +141,11 @@ while true; do
     echo "v) 🔭 View   - Attach Engine Tmux"
     echo "e) 🛒 Enter  - Trading Operations"
     echo "t) 🧪 Test   - Run Python Scripts"
+    echo "b) 📊 SIM    - Replay Historical Data"
+    echo "c) ✅ CHK    - Run Isolated Checks"
     echo "x) ❌ Exit   - Close Dashboard"
     draw_border
-    read -p "Select option [k-x]: " OPTION
+    read -p "Select option: " OPTION
     
     OPTION=$(echo "$OPTION" | tr '[:upper:]' '[:lower:]')
 
@@ -283,6 +285,36 @@ while true; do
             ;;
         t)
             show_test_menu
+            ;;
+        b)
+            echo ""
+            echo "Starting historical SIM replay..."
+            if [ -x "$HOME/pxy/pxysim" ]; then
+                if "$HOME/pxy/pxysim" --records 100; then
+                    echo "[✔] SIM replay completed."
+                else
+                    echo "[X] SIM replay failed with exit code $?."
+                fi
+            else
+                echo "[X] Could not find executable $HOME/pxy/pxysim."
+            fi
+            echo ""
+            read -p "Press [Enter] to return..."
+            ;;
+        c)
+            echo ""
+            echo "Running isolated CHK suite..."
+            if [ -x "$HOME/pxy/pxychk" ]; then
+                if "$HOME/pxy/pxychk"; then
+                    echo "[✔] CHK suite completed."
+                else
+                    echo "[X] CHK suite failed with exit code $?."
+                fi
+            else
+                echo "[X] Could not find executable $HOME/pxy/pxychk."
+            fi
+            echo ""
+            read -p "Press [Enter] to return..."
             ;;
         x)
             echo ""
