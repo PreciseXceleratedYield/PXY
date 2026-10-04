@@ -1,14 +1,24 @@
 #!/bin/bash
+set -e
+
+REPO_DIR="$HOME/pxy"
+
+if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "[X] Repository not found at $REPO_DIR."
+    exit 1
+fi
+
 echo " ******** get updates *******"
 echo
-# Fetch latest updates from git
-git fetch --all
+# Always update the intended checkout, regardless of the caller's directory.
+git -C "$REPO_DIR" fetch origin main
 echo
 
 echo " ****** reset software ******"
 echo
-# Reset local changes to match remote main branch
-git reset --hard origin/main
+# Reset local changes to match the remote main branch.
+git -C "$REPO_DIR" reset --hard origin/main
+echo "Updated checkout to $(git -C "$REPO_DIR" rev-parse --short HEAD)."
 echo
 
 echo " ****** sync binaries *******"
@@ -17,7 +27,7 @@ echo
 mkdir -p "$HOME/.local/bin"
 
 # Loop through files in the directory
-for file in "$HOME/pxy"/*; do
+for file in "$REPO_DIR"/*; do
     # Ensure it is a valid file, not a directory
     if [ -f "$file" ]; then
         filename=$(basename "$file")
