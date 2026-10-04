@@ -23,7 +23,7 @@ import pytz
 # -----------------------------------------------------------------------------
 SYSCNFGPXY_TICKER = "^NSEI"
 SYSCNFGPXY_TIMEZONE = pytz.timezone("Asia/Kolkata")
-RUNMODE = "SIM"  # PRD: live engine, CHK: mock engine, SIM: historical replay.
+RUNMODE = "PRD"  # PRD: live engine, CHK: mock engine, SIM: historical replay.
 if RUNMODE not in {"PRD", "CHK", "SIM"}:
     raise ValueError("RUNMODE must be one of 'PRD', 'CHK', or 'SIM'.")
 
