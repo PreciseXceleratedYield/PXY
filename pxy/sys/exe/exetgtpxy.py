@@ -116,9 +116,9 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
 
-        # 3️⃣ Calculate investment factor
-        ce_safe = ce_investment if ce_investment > 0 else 1.0
-        pe_safe = pe_investment if pe_investment > 0 else 1.0
+        # 3️⃣ Calculate investment factor (ensure min 1.0 to avoid zero division)
+        ce_safe = max(ce_investment, 1.0)
+        pe_safe = max(pe_investment, 1.0)
         
         if is_ce:
             # CE is current side

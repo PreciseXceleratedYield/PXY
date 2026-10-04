@@ -49,8 +49,8 @@ def _lgt_loss_threshold(atr, ce_investment, pe_investment, ce_count, pe_count, i
     if atr <= 0:
         return 0.0
     
-    ce_safe = ce_investment if ce_investment > 0 else 1.0
-    pe_safe = pe_investment if pe_investment > 0 else 1.0
+    ce_safe = max(ce_investment, 1.0)
+    pe_safe = max(pe_investment, 1.0)
     
     if is_ce:
         inverse_factor = ce_safe / pe_safe
