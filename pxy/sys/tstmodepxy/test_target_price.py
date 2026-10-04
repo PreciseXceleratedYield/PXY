@@ -1,0 +1,41 @@
+import sys
+import unittest
+from pathlib import Path
+
+SYS_DIR = Path(__file__).resolve().parents[1]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+EXE_DIR = SYS_DIR / "exe"
+if str(EXE_DIR) not in sys.path:
+    sys.path.insert(0, str(EXE_DIR))
+
+from exetgtpxy import target_price
+
+
+class TargetPriceTests(unittest.TestCase):
+    def test_aligned_targets_use_one_atr_percent_for_each_option_side(self):
+        cases = (
+            ({"symbol": "NIFTY26OCT25000CE", "exit": "BULL"}, 105.0),
+            ({"symbol": "NIFTY26OCT25000PE", "exit": "BEAR"}, 105.0),
+        )
+        for market, expected in cases:
+            with self.subTest(symbol=market["symbol"]):
+                row = {
+                    **market,
+                    "pxy_entry": 100.0,
+                    "atr": 5.0,
+                }
+                self.assertEqual(target_price(row), expected)
+
+    def test_unaligned_targets_keep_configured_percentage(self):
+        row = {
+            "symbol": "NIFTY26OCT25000CE",
+            "exit": "SIDE",
+            "pxy_entry": 100.0,
+            "atr": 5.0,
+        }
+        self.assertEqual(target_price(row), 101.4)
+
+
+if __name__ == "__main__":
+    unittest.main()
