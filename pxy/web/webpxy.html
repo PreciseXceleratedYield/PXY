@@ -1345,7 +1345,7 @@ function drawRiskCandle(floor,net,peak){
     ctx.fillStyle=bodyColor;
     ctx.beginPath();ctx.roundRect(bx1,midY-bodyH/2,bW,bodyH,4);ctx.fill();
     /* candle border = sign of (running + booked); body fill = sign of net */
-    ctx.strokeStyle=sumVal>=0?cssVar('--bull'):cssVar('--bear');ctx.lineWidth=3;
+    ctx.strokeStyle=sumVal>=0?cssVar('--bull'):cssVar('--bear');ctx.lineWidth=6;
     ctx.stroke();
     ctx.fillStyle=isBull?'#06160d':'#ffffff';
     ctx.textAlign='center';ctx.textBaseline='middle';
