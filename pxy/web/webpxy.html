@@ -1352,9 +1352,6 @@ function drawRiskCandle(floor,net,peak){
     ctx.fillText(netLabel,(bx1+bx2)/2,midY);
     const danger=net<=floor+Math.abs(floor)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5)':'';
-    /* tint the risk bar by sign of (running + booked): green if >=0, red if negative */
-    const tint=sumVal>=0?'rgba(38,166,154,0.14)':'rgba(239,83,80,0.14)';
-    $('riskBar').style.backgroundImage='linear-gradient('+tint+','+tint+')';
 }
 function refreshRiskCandle(){ /* net/peak/floor come only from webrinkopxy.json (loadRisk) */
     drawRiskCandle(lastFloor,lastNet,lastPeak);
