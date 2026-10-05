@@ -1332,7 +1332,14 @@ function drawRiskCandle(floor,net,peak){
         ctx.setLineDash([]);
     }
     const sumVal=runningTotal+bookedTotal;
-    const netLabel='₹'+(net>=0?'+':'')+Math.round(net)+' / '+fmt(sumVal);
+    /* outer (border) colour = sign of running+booked; inner (body) colour = sign of net.
+       Both values are ALWAYS printed. When colours contradict, the (running+booked) part is
+       printed in the outer colour (e.g. green text on a red candle = overall profit, small loss now). */
+    const outerBull=sumVal>=0;
+    const contradict=(outerBull!==isBull);
+    const netPart='₹'+(net>=0?'+':'')+Math.round(net)+' / ';   /* present running net P&L */
+    const sumPart=fmt(sumVal);                                  /* overall account P&L (running+booked) */
+    const netLabel=netPart+sumPart;
     ctx.font=`800 ${fz}px 'Syne',sans-serif`;
     const textW=ctx.measureText(netLabel).width+14;
     let bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX);
@@ -1347,9 +1354,13 @@ function drawRiskCandle(floor,net,peak){
     /* candle border = sign of (running + booked); body fill = sign of net */
     ctx.strokeStyle=sumVal>=0?cssVar('--bull'):cssVar('--bear');ctx.lineWidth=6;
     ctx.stroke();
-    ctx.fillStyle=isBull?'#06160d':'#ffffff';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(netLabel,(bx1+bx2)/2,midY);
+    const baseTxt=isBull?'#06160d':'#ffffff';
+    const sumTxt=contradict?(outerBull?cssVar('--bull'):cssVar('--bear')):baseTxt;
+    const wNet=ctx.measureText(netPart).width,wSum=ctx.measureText(sumPart).width;
+    const tx=(bx1+bx2)/2-(wNet+wSum)/2;
+    ctx.textAlign='left';ctx.textBaseline='middle';
+    ctx.fillStyle=baseTxt;ctx.fillText(netPart,tx,midY);
+    ctx.fillStyle=sumTxt;ctx.fillText(sumPart,tx+wNet,midY);
     const danger=net<=floor+Math.abs(floor)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5)':'';
 }
