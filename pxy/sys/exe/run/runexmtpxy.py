@@ -85,11 +85,11 @@ def compute_stop(current_game_pnl, historical_peak):
     winners_peak_brick = max(calculated_live_peak, historical_peak)
 
     # DYNAMIC LOSS FLOOR: As peak grows, allow deeper losses (more forgiving)
-    # Peak grows by 50 (1 brick) → Floor relaxes by 100 (2x multiplier)
+    # Peak grows by 50 (1 brick) → Floor relaxes by 50 (1x multiplier)
     # Peak 0 → Floor -2000
-    # Peak 200 → Floor -2000 + (200×2) = -1600
-    # Peak 500 → Floor -2000 + (500×2) = -1000
-    dynamic_loss_floor = INITIAL_LOSS_FLOOR + (winners_peak_brick * 2.0)
+    # Peak 500 → Floor -2000 + 500 = -1500
+    # Peak 2000 → Floor -2000 + 2000 = 0
+    dynamic_loss_floor = INITIAL_LOSS_FLOOR + winners_peak_brick
 
     # Trailing stop: peak - constant gap (independent of open rows)
     drop_gap = TRAILING_DROP_GAP
