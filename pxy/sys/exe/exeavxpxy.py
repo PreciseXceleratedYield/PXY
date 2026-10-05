@@ -26,25 +26,24 @@ from run.runexlckpxy import ledger_busy                        # stand down whil
 logger = logging.getLogger("exeavxpxy")
 
 
-def _lgt_loss_threshold(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
-    """Calculates LGT (averaging trigger) loss threshold with weighted factors.
+def _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
+    """Unified LGT/TGT calculation core - mirror logic with quadratic investment + linear count.
     
-    Formula: loss_threshold = -ATR × (1 + inverse_factor)² × (own_count + 1) / (opposite_count + 1)
+    Used by both averaging (LGT, negated) and targeting (TGT, positive + extra ATR).
     
-    Weighted dimensions:
-      1. Investment factor: SQUARED (quadratic = dominant)
-      2. Count factor: LINEAR (1x = secondary)
+    Formula: ATR × (1 + inverse_factor)² × (own_count + 1) / (opposite_count + 1)
     
-    Investment imbalance is FAR MORE IMPORTANT than layer count.
+    Where:
+      - inverse_factor = own_investment / opposite_investment (min 1.0 to avoid zero division)
+      - Count factor uses same formula as investment dimension but linear (1x)
     
-    Where inverse_factor = current_investment / opposite_investment
-    (defaults to 1.0 if opposite = 0)
+    Returns POSITIVE. Sign handling is done by caller:
+      - LGT: negate this value for loss threshold
+      - TGT: use positive + add extra ATR for exit target
     
-    Returns NEGATIVE because loss values are negative.
-    
-    Example with CE=1000 (light, 1 layer), PE=2000 (heavy, 3 layers):
-      CE: inv²=(0.5)²=0.25, count=0.5 → threshold = -6.25 (very easy)
-      PE: inv²=(2.0)²=4.0, count=2.0 → threshold = -40.0 (very hard)
+    Example with CE=1000, PE=2000, CE_count=1, PE_count=3:
+      CE: (1+0.5)² × 2/4 = 1.5625 × 0.5 = 0.78 factor
+      PE: (1+2.0)² × 4/2 = 9.0 × 2.0 = 18.0 factor
     """
     if atr <= 0:
         return 0.0
@@ -59,8 +58,23 @@ def _lgt_loss_threshold(atr, ce_investment, pe_investment, ce_count, pe_count, i
         inverse_factor = pe_safe / ce_safe
         count_factor = (pe_count + 1) / (ce_count + 1)
     
-    loss_threshold = -atr * ((1.0 + inverse_factor) ** 2) * count_factor
-    return round(loss_threshold, 2)
+    base_factor = atr * ((1.0 + inverse_factor) ** 2) * count_factor
+    return round(base_factor, 2)
+
+
+def _lgt_loss_threshold(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
+    """Calculates LGT (averaging trigger) loss threshold with weighted factors.
+    
+    Formula: loss_threshold = -_lgt_tgt_base_factor(...)
+    
+    Returns NEGATIVE because loss values are negative.
+    
+    Example with CE=1000 (light, 1 layer), PE=2000 (heavy, 3 layers):
+      CE: base=0.78 → threshold = -0.78 (very easy to average)
+      PE: base=18.0 → threshold = -18.0 (very hard to average)
+    """
+    base = _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce)
+    return -base
 
 
 def _side_target_pct(rows, ce_investment=0, pe_investment=0, ce_count=0, pe_count=0, is_ce=True):
