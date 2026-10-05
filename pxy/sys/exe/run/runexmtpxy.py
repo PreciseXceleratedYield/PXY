@@ -67,15 +67,13 @@ def force_zero_ending(val):
 def compute_stop(current_game_pnl, historical_peak):
     """Returns (winners_peak_brick, active_trailing_exit, is_breached).
     
-    DYNAMIC LOSS FLOOR:
-    - Base floor: -2000
-    - For every 50 points of peak growth, relax floor by 100
-    - Formula: dynamic_floor = -2000 + (peak / 50 × 100) = -2000 + (peak × 2)
-    - Example: Peak 200 → Floor = -2000 + 400 = -1600 (more forgiving as you profit)
+    UNIFIED FLOOR & EXIT:
+    Both track peak directly - no base loss penalty, no trailing gap.
+    - Peak 0 → Floor 0, Exit 0
+    - Peak 500 → Floor 500, Exit 500
+    - Peak 2000 → Floor 2000, Exit 2000 (profit target reached)
     
-    TRAILING STOP:
-    - Simple: peak - constant gap (1400)
-    - No row-based adjustments
+    PEAK CEILING: Exit when peak reaches 2000 (same as exit threshold)
     """
     # Negative game P&L must not floor downward into a false negative brick.
     completed_bricks = int(current_game_pnl // BRICK_SIZE) if current_game_pnl >= 0 else 0
@@ -84,18 +82,11 @@ def compute_stop(current_game_pnl, historical_peak):
     # Peak only moves up within a game
     winners_peak_brick = max(calculated_live_peak, historical_peak)
 
-    # DYNAMIC LOSS FLOOR: As peak grows, allow deeper losses (more forgiving)
-    # Peak grows by 50 (1 brick) → Floor relaxes by 50 (1x multiplier)
-    # Peak 0 → Floor -2000
-    # Peak 500 → Floor -2000 + 500 = -1500
-    # Peak 2000 → Floor -2000 + 2000 = 0
-    dynamic_loss_floor = INITIAL_LOSS_FLOOR + winners_peak_brick
-
-    # Trailing stop: peak - constant gap (independent of open rows)
-    drop_gap = TRAILING_DROP_GAP
-    active_trailing_exit = winners_peak_brick - drop_gap
+    # UNIFIED FLOOR & EXIT: Both equal peak
+    dynamic_loss_floor = winners_peak_brick
+    active_trailing_exit = winners_peak_brick
     
-    # PEAK CEILING: Exit when peak reaches configured ceiling (default 1000, changeable to 2000 etc)
+    # PEAK CEILING: Exit when peak reaches 2000
     peak_ceiling_breached = (winners_peak_brick >= PEAK_CEILING)
     
     is_breached = (current_game_pnl <= dynamic_loss_floor or
