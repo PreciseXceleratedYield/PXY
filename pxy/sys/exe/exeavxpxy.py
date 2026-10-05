@@ -11,72 +11,18 @@ from colorama import Fore, Style
 
 from syscnfgpxy import EXEAVXPXY_USE_OVERALL_LOSS, EXELGTPXY_BASE_LOSS
 from sysdecisionpxy import averaging_placement_allowed, averaging_window_enabled
-from exeagtpxy import is_aligned                 # Only alignment check; no more getexeagtpxy
-from exetgtpxy import target_price                             # Read-only target telemetry; exits stay in exit pipe
-from exeamspxy import execute_side_averaging_matrix            # Execution handles via ams
+from exeagtpxy import is_aligned
+from exeltgtpxy import calculate_lgt, target_price              # Import from central hub
+from exeamspxy import execute_side_averaging_matrix
 
-# SYNCHRONIZED TO CORE VARIABLES & GUARDS MODULAR LAYER (acg)
 from exeacgpxy import (
     REBUY_ENABLED, IST, MARKET_START, MARKET_END,
     safe_float, get_loss, side_overall_pnl_pct
 )
 from run.runpchkpxy import get_position_summary
-from run.runexlckpxy import ledger_busy                        # stand down while the ledger lock is held
+from run.runexlckpxy import ledger_busy
 
 logger = logging.getLogger("exeavxpxy")
-
-
-def _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
-    """Unified LGT/TGT calculation core - mirror logic with quadratic investment + linear count.
-    
-    Used by both averaging (LGT, negated) and targeting (TGT, positive + extra ATR).
-    
-    Formula: ATR × (1 + inverse_factor)² × (own_count + 1) / (opposite_count + 1)
-    
-    Where:
-      - inverse_factor = own_investment / opposite_investment (min 1.0 to avoid zero division)
-      - Count factor uses same formula as investment dimension but linear (1x)
-    
-    Returns POSITIVE. Sign handling is done by caller:
-      - LGT: negate this value for loss threshold
-      - TGT: use positive + add extra ATR for exit target
-    
-    Example with CE=1000, PE=2000, CE_count=1, PE_count=3:
-      CE: (1+0.5)² × 2/4 = 1.5625 × 0.5 = 0.78 factor
-      PE: (1+2.0)² × 4/2 = 9.0 × 2.0 = 18.0 factor
-    """
-    if atr <= 0:
-        return 0.0
-    
-    ce_safe = max(ce_investment, 1.0)
-    pe_safe = max(pe_investment, 1.0)
-    
-    if is_ce:
-        # CE side: use ratio only if both sides have investment; else neutral (1.0)
-        inverse_factor = 1.0 if (ce_investment <= 0 or pe_investment <= 0) else (ce_safe / pe_safe)
-        count_factor = (ce_count + 1) / (pe_count + 1)
-    else:
-        # PE side: use ratio only if both sides have investment; else neutral (1.0)
-        inverse_factor = 1.0 if (pe_investment <= 0 or ce_investment <= 0) else (pe_safe / ce_safe)
-        count_factor = (pe_count + 1) / (ce_count + 1)
-    
-    base_factor = atr * ((1.0 + inverse_factor) ** 2) * count_factor
-    return round(base_factor, 2)
-
-
-def _lgt_loss_threshold(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
-    """Calculates LGT (averaging trigger) loss threshold with weighted factors.
-    
-    Formula: loss_threshold = -_lgt_tgt_base_factor(...)
-    
-    Returns NEGATIVE because loss values are negative.
-    
-    Example with CE=1000 (light, 1 layer), PE=2000 (heavy, 3 layers):
-      CE: base=0.78 → threshold = -0.78 (very easy to average)
-      PE: base=18.0 → threshold = -18.0 (very hard to average)
-    """
-    base = _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce)
-    return -base
 
 
 def _side_target_pct(rows, ce_investment=0, pe_investment=0, ce_count=0, pe_count=0, is_ce=True):
@@ -181,10 +127,10 @@ def handle_side_averaging(client, df):
     ce_atr = safe_float(working_df.iloc[-1].get("atr"), 5.0)
     pe_atr = ce_atr  # Both use same ATR from current bar
     
-    ce_dynamic_threshold = _lgt_loss_threshold(
+    ce_dynamic_threshold = calculate_lgt(
         ce_atr, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=True
     )
-    pe_dynamic_threshold = _lgt_loss_threshold(
+    pe_dynamic_threshold = calculate_lgt(
         pe_atr, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=False
     )
 

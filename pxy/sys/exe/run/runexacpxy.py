@@ -168,7 +168,7 @@ def _tick(client, open_df, closed_df):
 
     current_game_pnl = total_raw_pnl - pnl_offset
     winners_peak_brick, active_trailing_exit, is_breached = compute_stop(
-        current_game_pnl, historical_peak_record, totals["open_rows"])
+        current_game_pnl, historical_peak_record)
 
     # 6. Telemetry (3-line format)
     print(f"PnL {int(current_game_pnl)} | Pek {int(winners_peak_brick)} | Stp {int(active_trailing_exit)}")

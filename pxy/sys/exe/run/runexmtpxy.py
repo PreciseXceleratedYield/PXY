@@ -16,8 +16,6 @@ from syscnfgpxy import (
     RUNEXMTPXY_BRICK_SIZE,
     RUNEXMTPXY_INITIAL_LOSS_FLOOR,
     RUNEXMTPXY_PEAK_CEILING,
-    RUNEXMTPXY_PEAK_GAP_FLOOR_PCT,
-    RUNEXMTPXY_TIGHTEN_PER_EXTRA_ROW,
     RUNEXMTPXY_TRAILING_DROP_GAP,
 )
 
@@ -26,8 +24,6 @@ BRICK_SIZE = RUNEXMTPXY_BRICK_SIZE
 INITIAL_LOSS_FLOOR = RUNEXMTPXY_INITIAL_LOSS_FLOOR
 PEAK_CEILING = RUNEXMTPXY_PEAK_CEILING
 TRAILING_DROP_GAP = RUNEXMTPXY_TRAILING_DROP_GAP
-PEAK_GAP_FLOOR_PCT = RUNEXMTPXY_PEAK_GAP_FLOOR_PCT
-TIGHTEN_PER_EXTRA_ROW = RUNEXMTPXY_TIGHTEN_PER_EXTRA_ROW
 # =======================================================================
 
 
@@ -68,14 +64,19 @@ def force_zero_ending(val):
     return int(round(val / 10.0) * 10)
 
 
-def compute_stop(current_game_pnl, historical_peak, open_rows):
+def compute_stop(current_game_pnl, historical_peak):
     """Returns (winners_peak_brick, active_trailing_exit, is_breached).
     
-    DYNAMIC LOSS FLOOR:
-    - Base floor: -2000
-    - For every 50 points of peak growth, relax floor by 100
-    - Formula: dynamic_floor = -2000 + (peak / 50 × 100) = -2000 + (peak × 2)
-    - Example: Peak 200 → Floor = -2000 + 400 = -1600 (more forgiving as you profit)
+    UNIFIED STOP (floor & exit are same):
+    - Starts at -2000
+    - For every point peak grows, stop improves by 2 points (2x multiplier)
+    - Formula: stop = -2000 + (peak × 2)
+    
+    Examples:
+    - Peak 0 → stop -2000
+    - Peak 100 → stop -1800
+    - Peak 1000 → stop 0
+    - Peak 2000 → stop 2000 (profit target reached)
     """
     # Negative game P&L must not floor downward into a false negative brick.
     completed_bricks = int(current_game_pnl // BRICK_SIZE) if current_game_pnl >= 0 else 0
@@ -84,34 +85,12 @@ def compute_stop(current_game_pnl, historical_peak, open_rows):
     # Peak only moves up within a game
     winners_peak_brick = max(calculated_live_peak, historical_peak)
 
-    # DYNAMIC LOSS FLOOR: As peak grows, allow deeper losses (more forgiving)
-    # Peak grows by 50 (1 brick) → Floor relaxes by 100 (2x multiplier)
-    # Peak 0 → Floor -2000
-    # Peak 200 → Floor -2000 + (200×2) = -1600
-    # Peak 500 → Floor -2000 + (500×2) = -1000
-    dynamic_loss_floor = INITIAL_LOSS_FLOOR + (winners_peak_brick * 2.0)
-
-    # Stop = peak - gap. The gap starts at TRAILING_DROP_GAP and shrinks per banked brick by
-    # BRICK_SIZE x (open rows - 1): 1 row -> no shrink, 2 rows -> 50 per brick, 3 rows -> 100 ...
-    # The shrink is floored at PEAK_GAP_FLOOR_PCT of the peak.
-    stop_climb_multiplier = max(1, open_rows)
-    bricks_banked = winners_peak_brick / BRICK_SIZE if BRICK_SIZE > 0 else 0.0
-    shrink_per_brick = BRICK_SIZE * (stop_climb_multiplier - 1)
-    shrinking_gap = TRAILING_DROP_GAP - (bricks_banked * shrink_per_brick)
-    peak_floor_gap = winners_peak_brick * PEAK_GAP_FLOOR_PCT
-    base_gap = min(TRAILING_DROP_GAP, max(peak_floor_gap, shrinking_gap))
-
-    # Every extra open row tightens the gap a further 5%; when rows drop, the gap widens back out.
-    extra_rows = max(0, open_rows - 1)
-    drop_gap = base_gap * (1.0 - extra_rows * TIGHTEN_PER_EXTRA_ROW)
-    drop_gap = min(base_gap, max(peak_floor_gap, drop_gap))
-
-    active_trailing_exit = winners_peak_brick - drop_gap
+    # UNIFIED STOP: Both floor and exit threshold
+    unified_stop = INITIAL_LOSS_FLOOR + (winners_peak_brick * 2.0)
     
-    # PEAK CEILING: Exit when peak reaches configured ceiling (default 1000, changeable to 2000 etc)
+    # PEAK CEILING: Exit when peak reaches 2000
     peak_ceiling_breached = (winners_peak_brick >= PEAK_CEILING)
     
-    is_breached = (current_game_pnl <= dynamic_loss_floor or
-                   current_game_pnl <= active_trailing_exit or
+    is_breached = (current_game_pnl <= unified_stop or
                    peak_ceiling_breached)
-    return winners_peak_brick, active_trailing_exit, is_breached
+    return winners_peak_brick, unified_stop, is_breached

@@ -20,10 +20,8 @@ MAX_TARGET_CAP = EXETGTPXY_MAX_TARGET_CAP
 TGT_MODE = EXETGTPXY_MODE  # "DYNAMIC" or "STATIC"
 STATIC_ALIGNED_PCT = EXETGTPXY_STATIC_ALIGNED
 STATIC_NOT_ALIGNED_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
-                               # (same rule as is_aligned in exeagtpxy.py); SIDE / NONE / unknown = not aligned
 # =======================================================================
 
-# Initialize colorama for clean, colored terminal output formatting
 init(autoreset=True)
 
 _warned = set()
@@ -32,7 +30,56 @@ def _warn_once(key, msg):
     """Prints a warning only the first time it occurs in this process."""
     if key not in _warned:
         _warned.add(key)
-        print(f"{Fore.YELLOW}⚠️ target_price: {msg}{Style.RESET_ALL}")
+        print(f"{Fore.YELLOW}⚠️ {msg}{Style.RESET_ALL}")
+
+
+# ===== CORE FORMULA HUB (Single source of truth) =====
+
+def _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
+    """Unified LGT/TGT calculation core - mirror logic with quadratic investment + linear count.
+    
+    Used by both averaging (LGT, negated) and targeting (TGT, positive + extra ATR).
+    
+    Formula: ATR × (1 + inverse_factor)² × (own_count + 1) / (opposite_count + 1)
+    
+    Returns POSITIVE. Sign handling is done by caller.
+    """
+    if atr <= 0:
+        return 0.0
+    
+    ce_safe = max(ce_investment, 1.0)
+    pe_safe = max(pe_investment, 1.0)
+    
+    if is_ce:
+        inverse_factor = 1.0 if (ce_investment <= 0 or pe_investment <= 0) else (ce_safe / pe_safe)
+        count_factor = (ce_count + 1) / (pe_count + 1)
+    else:
+        inverse_factor = 1.0 if (pe_investment <= 0 or ce_investment <= 0) else (pe_safe / ce_safe)
+        count_factor = (pe_count + 1) / (ce_count + 1)
+    
+    base_factor = atr * ((1.0 + inverse_factor) ** 2) * count_factor
+    return round(base_factor, 2)
+
+
+def calculate_lgt(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
+    """Calculates LGT (averaging trigger) loss threshold. Returns NEGATIVE."""
+    base = _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce)
+    return -base
+
+
+def calculate_tgt(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce, is_aligned):
+    """Calculates TGT (exit target) percentage.
+    
+    Aligned: Returns calculated opposite_base_factor + ATR
+    Not aligned: Returns fixed 1.4%
+    """
+    if is_aligned:
+        opposite_is_ce = not is_ce
+        base = _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, opposite_is_ce)
+        return base + atr
+    else:
+        return 1.4
+
 
 def f(x, d=0.0):
     """Safely casts input to float, returning a default value if casting fails or value <= 0."""
@@ -140,17 +187,10 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             else:
                 target_pct = STATIC_NOT_ALIGNED_PCT  # 1.4%
         else:
-            # Dynamic mode (default): Unified mirror logic
+            # Dynamic mode (default): Use central calculate_tgt helper
+            target_pct = calculate_tgt(atr_scaled, ce_investment, pe_investment, ce_count, pe_count, is_ce, is_aligned)
             if is_aligned:
-                target_pct = MAX_TARGET_CAP  # 77%
-            else:
-                # Not aligned: use mirrored LGT formula with positive sign + extra ATR
-                from exeavxpxy import _lgt_tgt_base_factor
-                
-                base_factor = _lgt_tgt_base_factor(atr_scaled, ce_investment, pe_investment, ce_count, pe_count, is_ce)
-                # Mirror formula: TGT = base_factor (positive) + extra ATR for generosity
-                target_pct = base_factor + atr_scaled
-                target_pct = max(target_pct, ATR_FLOOR)
+                target_pct = MAX_TARGET_CAP  # 77% for aligned
         
         # 4️⃣ Final clamping to [1.4, 99] or [1.4, 77] depending on mode
         max_cap = STATIC_ALIGNED_PCT if TGT_MODE == "STATIC" else MAX_TARGET_CAP
