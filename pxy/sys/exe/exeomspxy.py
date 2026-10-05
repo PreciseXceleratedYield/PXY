@@ -55,9 +55,9 @@ except Exception as e:
     pxy_dyn = lambda row: row.get("buy_prc", 0)
 
 try:
-    from exetgtpxy import target_price as pxy_tgt_calc
+    from exeltgtpxy import target_price as pxy_tgt_calc
 except Exception as e:
-    print(f"⚠️ exetgtpxy not loaded ({e}); targets will be 0.")
+    print(f"⚠️ exeltgtpxy not loaded ({e}); targets will be 0.")
     pxy_tgt_calc = lambda row: 0
 
 try:
