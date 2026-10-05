@@ -15,6 +15,7 @@ if str(SYS_DIR) not in sys.path:
 from syscnfgpxy import (
     RUNEXMTPXY_BRICK_SIZE,
     RUNEXMTPXY_INITIAL_LOSS_FLOOR,
+    RUNEXMTPXY_PEAK_CEILING,
     RUNEXMTPXY_PEAK_GAP_FLOOR_PCT,
     RUNEXMTPXY_TIGHTEN_PER_EXTRA_ROW,
     RUNEXMTPXY_TRAILING_DROP_GAP,
@@ -23,6 +24,7 @@ from syscnfgpxy import (
 # ==================== CONFIG (this file's settings) ====================
 BRICK_SIZE = RUNEXMTPXY_BRICK_SIZE
 INITIAL_LOSS_FLOOR = RUNEXMTPXY_INITIAL_LOSS_FLOOR
+PEAK_CEILING = RUNEXMTPXY_PEAK_CEILING
 TRAILING_DROP_GAP = RUNEXMTPXY_TRAILING_DROP_GAP
 PEAK_GAP_FLOOR_PCT = RUNEXMTPXY_PEAK_GAP_FLOOR_PCT
 TIGHTEN_PER_EXTRA_ROW = RUNEXMTPXY_TIGHTEN_PER_EXTRA_ROW
@@ -106,8 +108,8 @@ def compute_stop(current_game_pnl, historical_peak, open_rows):
 
     active_trailing_exit = winners_peak_brick - drop_gap
     
-    # PEAK CEILING: Exit when peak reaches 1000 (profit target)
-    peak_ceiling_breached = (winners_peak_brick >= 1000.0)
+    # PEAK CEILING: Exit when peak reaches configured ceiling (default 1000, changeable to 2000 etc)
+    peak_ceiling_breached = (winners_peak_brick >= PEAK_CEILING)
     
     is_breached = (current_game_pnl <= dynamic_loss_floor or
                    current_game_pnl <= active_trailing_exit or
