@@ -1338,9 +1338,11 @@ function drawRiskCandle(floor,net,peak){
         ctx.beginPath();ctx.moveTo(openX,midY-bodyH/2);ctx.lineTo(openX,midY+bodyH/2);ctx.stroke();
         ctx.setLineDash([]);
     }
-    const netLabel='₹'+(net>=0?'+':'')+Math.round(net)+' / '+fmt(runningTotal+bookedTotal);
+    const netLabel='₹'+(net>=0?'+':'')+Math.round(net)+' / ';
+    const sumVal=runningTotal+bookedTotal,sumLabel=fmt(sumVal);
     ctx.font=`800 ${fz}px 'Syne',sans-serif`;
-    const textW=ctx.measureText(netLabel).width+14;
+    const w1=ctx.measureText(netLabel).width,w2=ctx.measureText(sumLabel).width;
+    const textW=w1+w2+8+14;
     let bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX);
     const midX=(bx1+bx2)/2;
     let bW=Math.max(bx2-bx1,textW);
@@ -1351,8 +1353,14 @@ function drawRiskCandle(floor,net,peak){
     ctx.fillStyle=bodyColor;
     ctx.beginPath();ctx.roundRect(bx1,midY-bodyH/2,bW,bodyH,4);ctx.fill();
     ctx.fillStyle=isBull?'#06160d':'#ffffff';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(netLabel,(bx1+bx2)/2,midY);
+    ctx.textAlign='left';ctx.textBaseline='middle';
+    const tx=(bx1+bx2)/2-(w1+w2+8)/2;
+    ctx.fillText(netLabel,tx,midY);
+    /* running+booked: coloured by its own sign, on a dark chip so it stays readable on the candle body */
+    ctx.fillStyle='rgba(0,0,0,0.65)';
+    ctx.beginPath();ctx.roundRect(tx+w1,midY-fz/2-3,w2+8,fz+6,3);ctx.fill();
+    ctx.fillStyle=sumVal>=0?cssVar('--bull'):cssVar('--bear');
+    ctx.fillText(sumLabel,tx+w1+4,midY);
     const danger=net<=floor+Math.abs(floor)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5)':'';
 }
