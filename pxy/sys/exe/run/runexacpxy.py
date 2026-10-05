@@ -174,7 +174,7 @@ def _tick(client, open_df, closed_df):
     print(f"PnL {int(current_game_pnl)} | Pek {int(winners_peak_brick)} | Stp {int(active_trailing_exit)}")
     print(f"Los {fmt_losers} | Win {fmt_winners}")
     acpnl = totals["losers"] + totals["winners"]
-    print(f"└─ ACPNL {int(acpnl)}")
+    print(f"└─ ACPNL {int(acpnl)}".rjust(40))
 
     # 7. Breach handling
     if is_breached:
