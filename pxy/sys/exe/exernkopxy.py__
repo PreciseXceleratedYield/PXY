@@ -207,8 +207,8 @@ def start_trailing_engine():
         if current_net_pnl > session_peak_pnl:
             session_peak_pnl = current_net_pnl
             
-        float_drop_limit = float(TRAILING_DROP_LIMIT)
-        active_exit_line = session_peak_pnl - float_drop_limit
+        # NEW FORMULA: stop = -2000 + (peak × 2)
+        active_exit_line = -2000.0 + (session_peak_pnl * 2.0)
         save_session_state(session_peak_pnl, current_net_pnl, active_exit_line)
         
         sign_prefix = "+" if active_exit_line > 0 else ""
