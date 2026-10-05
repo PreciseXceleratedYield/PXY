@@ -1332,22 +1332,22 @@ function drawRiskCandle(floor,net,peak){
         ctx.setLineDash([]);
     }
     /* ── values ──
-       outer ring colour = sign of (running+booked)  → overall account gain/loss
-       inner body colour = sign of net               → present running P&L
-       Both values are always shown; the overall value sits in a dark chip in the ring colour,
-       so it stays readable even when ring and body contradict (e.g. green ring/red body). */
+       candle body colour  = sign of (running+booked) → overall account gain/loss (primary signal)
+       ring + net chip     = sign of net              → present running P&L (secondary cue, contrast colour)
+       Both values are always shown. */
     const sumVal=runningTotal+bookedTotal;
-    const outerBull=sumVal>=0;
-    const outerColor=outerBull?cssVar('--bull'):cssVar('--bear');
+    const overallBull=sumVal>=0;
+    const overallColor=overallBull?cssVar('--bull'):cssVar('--bear');
+    const netColor=isBull?cssVar('--bull'):cssVar('--bear');
     const netTxt='₹'+(net>=0?'+':'')+Math.round(net);
     const sumTxt=fmt(sumVal);
     const mainFont=`800 ${fz}px 'Syne',sans-serif`,chipFont=`800 ${fz-1}px 'Syne',sans-serif`;
-    ctx.font=mainFont;const wNet=ctx.measureText(netTxt).width;
-    ctx.font=chipFont;const wSum=ctx.measureText(sumTxt).width;
-    const CHIP_PAD=7,GAP=9,chipW=wSum+CHIP_PAD*2,chipH=bodyH-8;
-    const contentW=wNet+GAP+chipW;
+    ctx.font=chipFont;const wNet=ctx.measureText(netTxt).width;
+    ctx.font=mainFont;const wSum=ctx.measureText(sumTxt).width;
+    const CHIP_PAD=7,GAP=9,chipW=wNet+CHIP_PAD*2,chipH=bodyH-8;
+    const contentW=chipW+GAP+wSum;
     const textW=contentW+20;
-    /* ── body geometry ── */
+    /* ── body geometry (extent still open→net) ── */
     let bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX);
     const midX=(bx1+bx2)/2;
     let bW=Math.max(bx2-bx1,textW);
@@ -1356,30 +1356,30 @@ function drawRiskCandle(floor,net,peak){
     if(bx2>W-PADX){bx1-=bx2-(W-PADX);bx2=W-PADX;}
     bx1=Math.max(PADX,bx1);bW=bx2-bx1;
     const by=midY-bodyH/2;
-    /* outer ring (overall P&L) */
+    /* ring = net colour */
     ctx.save();
-    ctx.shadowColor=outerColor;ctx.shadowBlur=7;
-    ctx.strokeStyle=outerColor;ctx.lineWidth=2.5;
+    ctx.shadowColor=netColor;ctx.shadowBlur=7;
+    ctx.strokeStyle=netColor;ctx.lineWidth=2.5;
     ctx.beginPath();ctx.roundRect(bx1-4,by-4,bW+8,bodyH+8,9);ctx.stroke();
     ctx.restore();
-    /* inner body (net P&L) with soft top highlight */
-    ctx.fillStyle=bodyColor;
+    /* body = overall colour with soft top highlight */
+    ctx.fillStyle=overallColor;
     ctx.beginPath();ctx.roundRect(bx1,by,bW,bodyH,6);ctx.fill();
     const hl=ctx.createLinearGradient(0,by,0,by+bodyH);
     hl.addColorStop(0,'rgba(255,255,255,0.18)');hl.addColorStop(0.55,'rgba(255,255,255,0)');hl.addColorStop(1,'rgba(0,0,0,0.12)');
     ctx.fillStyle=hl;
     ctx.beginPath();ctx.roundRect(bx1,by,bW,bodyH,6);ctx.fill();
-    /* labels: net (left)  |  overall chip (right) */
+    /* labels: net chip (left, net colour)  |  overall (right, on body) */
     const sx=(bx1+bx2)/2-contentW/2;
-    ctx.textBaseline='middle';ctx.textAlign='left';
-    ctx.font=mainFont;ctx.fillStyle=isBull?'#06160d':'#ffffff';
-    ctx.fillText(netTxt,sx,midY+0.5);
-    const cx=sx+wNet+GAP,cy=midY-chipH/2;
+    ctx.textBaseline='middle';
+    const cx=sx,cy=midY-chipH/2;
     ctx.fillStyle='rgba(8,12,18,0.92)';
     ctx.beginPath();ctx.roundRect(cx,cy,chipW,chipH,5);ctx.fill();
-    ctx.strokeStyle=outerColor;ctx.globalAlpha=0.55;ctx.lineWidth=1;ctx.stroke();ctx.globalAlpha=1;
-    ctx.font=chipFont;ctx.textAlign='center';ctx.fillStyle=outerColor;
-    ctx.fillText(sumTxt,cx+chipW/2,midY+0.5);
+    ctx.strokeStyle=netColor;ctx.globalAlpha=0.55;ctx.lineWidth=1;ctx.stroke();ctx.globalAlpha=1;
+    ctx.font=chipFont;ctx.textAlign='center';ctx.fillStyle=netColor;
+    ctx.fillText(netTxt,cx+chipW/2,midY+0.5);
+    ctx.font=mainFont;ctx.textAlign='left';ctx.fillStyle=overallBull?'#06160d':'#ffffff';
+    ctx.fillText(sumTxt,sx+chipW+GAP,midY+0.5);
     const danger=net<=floor+Math.abs(floor)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5)':'';
 }
