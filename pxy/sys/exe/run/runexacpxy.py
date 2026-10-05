@@ -173,6 +173,8 @@ def _tick(client, open_df, closed_df):
     # 6. Telemetry
     print(f"PnL {int(current_game_pnl)} | Pek {int(winners_peak_brick)} | Stp {int(active_trailing_exit)} | "
           f"Los {fmt_losers} | Win {fmt_winners}")
+    acpnl = totals["losers"] + totals["winners"]
+    print(f"     └─ ACPNL {int(acpnl)} (Los+Win)")
 
     # 7. Breach handling
     if is_breached:
