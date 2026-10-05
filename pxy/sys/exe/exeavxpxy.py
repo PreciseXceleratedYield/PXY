@@ -52,10 +52,12 @@ def _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, 
     pe_safe = max(pe_investment, 1.0)
     
     if is_ce:
-        inverse_factor = ce_safe / pe_safe
+        # CE side: use ratio only if both sides have investment; else neutral (1.0)
+        inverse_factor = 1.0 if (ce_investment <= 0 or pe_investment <= 0) else (ce_safe / pe_safe)
         count_factor = (ce_count + 1) / (pe_count + 1)
     else:
-        inverse_factor = pe_safe / ce_safe
+        # PE side: use ratio only if both sides have investment; else neutral (1.0)
+        inverse_factor = 1.0 if (pe_investment <= 0 or ce_investment <= 0) else (pe_safe / ce_safe)
         count_factor = (pe_count + 1) / (ce_count + 1)
     
     base_factor = atr * ((1.0 + inverse_factor) ** 2) * count_factor
