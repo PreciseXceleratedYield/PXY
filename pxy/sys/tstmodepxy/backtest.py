@@ -382,7 +382,12 @@ def run_backtest(output_dir=None, record_limit=None):
             "quantity": trade["quantity"],
             "simulated_option_entry": trade["simulated_option_entry"],
             "simulated_option_exit": trade["simulated_option_exit"],
-            "tgt_hit": trade["simulated_option_exit"] >= trade["simulated_option_entry"],
+            # CE = BUY (exit > entry is profit)
+            # PE = SELL (entry > exit is profit)
+            "tgt_hit": (
+                (trade["side"] == "CE" and trade["simulated_option_exit"] >= trade["simulated_option_entry"])
+                or (trade["side"] == "PE" and trade["simulated_option_exit"] <= trade["simulated_option_entry"])
+            ),
         }
         for trade in broker.trades()
     ]
