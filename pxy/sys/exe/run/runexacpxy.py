@@ -170,11 +170,11 @@ def _tick(client, open_df, closed_df):
     winners_peak_brick, active_trailing_exit, is_breached = compute_stop(
         current_game_pnl, historical_peak_record, totals["open_rows"])
 
-    # 6. Telemetry
-    print(f"PnL {int(current_game_pnl)} | Pek {int(winners_peak_brick)} | Stp {int(active_trailing_exit)} | "
-          f"Los {fmt_losers} | Win {fmt_winners}")
+    # 6. Telemetry (3-line format)
+    print(f"PnL {int(current_game_pnl)} | Pek {int(winners_peak_brick)} | Stp {int(active_trailing_exit)}")
+    print(f"Los {fmt_losers} | Win {fmt_winners}")
     acpnl = totals["losers"] + totals["winners"]
-    print(f"     └─ ACPNL {int(acpnl)} (Los+Win)")
+    print(f"└─ ACPNL {int(acpnl)}")
 
     # 7. Breach handling
     if is_breached:
