@@ -194,6 +194,12 @@ def handle_side_averaging(client, df):
         ce_lgt_val = ce_rows.apply(get_loss, axis=1).max() if not ce_rows.empty else 0.0
         pe_lgt_val = pe_rows.apply(get_loss, axis=1).max() if not pe_rows.empty else 0.0
 
+    # Adjust LGT based on exit key: if opposite side is signaled, halve this side's LGT (easier averaging)
+    if active_exit == "BEAR":
+        pe_lgt_val = pe_lgt_val / 2.0  # Exit CE → easier PE averaging
+    elif active_exit == "BULL":
+        ce_lgt_val = ce_lgt_val / 2.0  # Exit PE → easier CE averaging
+
     ce_tgt = _side_target_pct(ce_rows, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=True)
     pe_tgt = _side_target_pct(pe_rows, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=False)
 
