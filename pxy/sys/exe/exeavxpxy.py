@@ -188,9 +188,16 @@ def handle_side_averaging(client, df):
         pe_atr, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=False
     )
 
-    # ALWAYS use 1/2 threshold for averaging (tighter trigger)
-    ce_dynamic_threshold = ce_dynamic_threshold / 2.0
-    pe_dynamic_threshold = pe_dynamic_threshold / 2.0
+    # Prepare thresholds: full and half variants
+    # Conditions in sysdecisionpxy.py will use appropriate variant based on alignment
+    ce_threshold_full = ce_dynamic_threshold
+    ce_threshold_half = ce_dynamic_threshold / 2.0
+    pe_threshold_full = pe_dynamic_threshold
+    pe_threshold_half = pe_dynamic_threshold / 2.0
+
+    # Use half threshold if aligned, full if not (for display)
+    ce_dynamic_threshold = ce_threshold_half if ce_aligned else ce_threshold_full
+    pe_dynamic_threshold = pe_threshold_half if pe_aligned else pe_threshold_full
 
     if USE_OVERALL_LOSS:
         ce_lgt_val, pe_lgt_val = ce_overall_pnl_pct, pe_overall_pnl_pct
@@ -198,9 +205,9 @@ def handle_side_averaging(client, df):
         ce_lgt_val = ce_rows.apply(get_loss, axis=1).max() if not ce_rows.empty else 0.0
         pe_lgt_val = pe_rows.apply(get_loss, axis=1).max() if not pe_rows.empty else 0.0
 
-    # Also halve display values to match threshold
-    ce_lgt_val = ce_lgt_val / 2.0
-    pe_lgt_val = pe_lgt_val / 2.0
+    # Also adjust display values to match thresholds
+    ce_lgt_val = ce_lgt_val / 2.0 if ce_aligned else ce_lgt_val
+    pe_lgt_val = pe_lgt_val / 2.0 if pe_aligned else pe_lgt_val
 
     ce_tgt = _side_target_pct(ce_rows, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=True)
     pe_tgt = _side_target_pct(pe_rows, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=False)
