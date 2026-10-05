@@ -90,7 +90,7 @@ def _refresh_total(client, fallback_total):
     return fallback_total
 
 
-def liquidate_and_exit(client, total_raw_pnl):
+def liquidate_and_exit(client, total_raw_pnl, risk_control_activated=False):
     """Confirmed breach: square off, wait for flat, lock the offset, reset the engine. Always ends the
     process with sys.exit(...). Flat is decided by the broker, not by the script's exit code."""
     run_squareoff()
@@ -100,7 +100,13 @@ def liquidate_and_exit(client, total_raw_pnl):
         print(f"🧹 {Fore.GREEN}Broker flat verified! Locking offset at ₹{new_total:,.0f} and restarting engine...")
         pnl_offset = new_total
         save_check_state(0)
-        save_session_state(0.0, 0.0, INITIAL_LOSS_FLOOR, pnl_offset)
+        save_session_state(
+            0.0,
+            0.0,
+            INITIAL_LOSS_FLOOR,
+            pnl_offset,
+            risk_control_activated=risk_control_activated,
+        )
         sys.exit("Master Circuit Breaker Triggered.")
 
     print(f"{Fore.RED}⚠️ Broker not flat after {FLAT_CONFIRM_TIMEOUT_SECONDS:.0f}s. "

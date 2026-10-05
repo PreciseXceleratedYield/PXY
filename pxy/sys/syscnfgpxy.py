@@ -162,6 +162,7 @@ RUNEXACPXY_BREACH_TICKS_REQUIRED = 3
 RUNEXACPXY_TICK_MIN_GAP_SECONDS = 10
 RUNEXACPXY_LEDGER_BASIS_GUARD = True
 RUNEXACPXY_VIEW_ONLY_ENV = "PXY_VIEW_ONLY"
+CNTRLRSKBAR = "NO"  # "YES" takes a fresh risk-ledger baseline at 13:15 IST.
 
 # Backwards-compatible shared names used by existing modules outside this
 # strategy configuration migration.
