@@ -130,7 +130,7 @@ EXECBUYPXY_SCRIPTS = {
     "CE": "pxybuype",
     "PE": "pxybuyce",
 }
-EXECBUYPXY_MAX_PER_DAY = 6
+EXECBUYPXY_MAX_PER_DAY = 0  # Unlimited counter-buy when opposite side empty
 EXECBUYPXY_LOCK_KEEP_SECS = 600
 
 EXEEXITPXY_PNL_EXIT_MIN = 140
