@@ -7,6 +7,9 @@ from syscnfgpxy import (
     EXETGTPXY_ATR_MIN,
     EXETGTPXY_EXIT_KEY_COLUMN,
     EXETGTPXY_MAX_TARGET_CAP,
+    EXETGTPXY_MODE,
+    EXETGTPXY_STATIC_ALIGNED,
+    EXETGTPXY_TGT_PCT_NOT_ALIGNED,
 )
 
 # ==================== CONFIG (this file's settings) ====================
@@ -14,6 +17,9 @@ EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
 ATR_FLOOR = EXETGTPXY_ATR_FLOOR
 ATR_MIN = EXETGTPXY_ATR_MIN
 MAX_TARGET_CAP = EXETGTPXY_MAX_TARGET_CAP
+TGT_MODE = EXETGTPXY_MODE  # "DYNAMIC" or "STATIC"
+STATIC_ALIGNED_PCT = EXETGTPXY_STATIC_ALIGNED
+STATIC_NOT_ALIGNED_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
                                # (same rule as is_aligned in exeagtpxy.py); SIDE / NONE / unknown = not aligned
 # =======================================================================
 
@@ -62,26 +68,32 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     return ce_total, pe_total
 
 def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce_count: int = 0, pe_count: int = 0):
-    """Calculates target price using UNIFIED MIRROR LOGIC with LGT.
+    """Calculates target price with switchable TGT mode.
     
+    MODE: DYNAMIC (Unified Mirror Logic with LGT)
+    ================================================
     Formula (NOT aligned):
       target_pct% = _lgt_tgt_base_factor(...) + ATR
     
     Formula (ALIGNED):
       target_pct% = 77%
     
-    MIRROR LOGIC EXPLANATION:
+    MIRROR LOGIC:
       - CE_LGT uses base_factor negated (for averaging difficulty)
       - PE_TGT uses same base_factor positive + extra ATR (for exit ease) ← MIRROR!
       
-      - This creates perfect symmetry:
-        Heavy CE  → hard LGT (-base) but light PE gets easy TGT (+base+ATR) ✓
-        Light CE  → easy LGT (-small) but heavy PE gets hard TGT (+large+ATR) ✓
-    
     Example: CE=2000 (heavy, 5 layers), PE=1000 (light, 1 layer)
       base_factor ≈ 18.0
       CE_LGT = -18.0 (hard to average)
       PE_TGT = +18.0 + 5.0 = +23.0% (generous exit)
+    
+    MODE: STATIC (Fixed Percentages)
+    ================================
+    Formula (ALIGNED):
+      target_pct% = 99%
+    
+    Formula (NOT aligned):
+      target_pct% = 1.4%
     
     Args:
         row: dict with 'pxy_entry'/'buy_prc', 'symbol', 'exit', 'atr'
@@ -120,22 +132,29 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
 
         is_aligned = (derived_supr == 'BULL' and is_ce) or (derived_supr == 'BEAR' and is_pe)
         
-        # 3️⃣ Apply target formula using UNIFIED mirror logic
-        if is_aligned:
-            # Aligned: use max cap
-            target_pct = MAX_TARGET_CAP
+        # 3️⃣ Apply target formula based on mode
+        if TGT_MODE == "STATIC":
+            # Static mode: Fixed percentages
+            if is_aligned:
+                target_pct = STATIC_ALIGNED_PCT  # 99%
+            else:
+                target_pct = STATIC_NOT_ALIGNED_PCT  # 1.4%
         else:
-            # Not aligned: use mirrored LGT formula with positive sign + extra ATR
-            # Import here to avoid circular dependency
-            from exeavxpxy import _lgt_tgt_base_factor
-            
-            base_factor = _lgt_tgt_base_factor(atr_scaled, ce_investment, pe_investment, ce_count, pe_count, is_ce)
-            # Mirror formula: TGT = base_factor (positive) + extra ATR for generosity
-            target_pct = base_factor + atr_scaled
-            target_pct = max(target_pct, ATR_FLOOR)
+            # Dynamic mode (default): Unified mirror logic
+            if is_aligned:
+                target_pct = MAX_TARGET_CAP  # 77%
+            else:
+                # Not aligned: use mirrored LGT formula with positive sign + extra ATR
+                from exeavxpxy import _lgt_tgt_base_factor
+                
+                base_factor = _lgt_tgt_base_factor(atr_scaled, ce_investment, pe_investment, ce_count, pe_count, is_ce)
+                # Mirror formula: TGT = base_factor (positive) + extra ATR for generosity
+                target_pct = base_factor + atr_scaled
+                target_pct = max(target_pct, ATR_FLOOR)
         
-        # 4️⃣ Final clamping to [1.4, 77]
-        target_pct_clamped = max(ATR_FLOOR, min(target_pct, MAX_TARGET_CAP))
+        # 4️⃣ Final clamping to [1.4, 99] or [1.4, 77] depending on mode
+        max_cap = STATIC_ALIGNED_PCT if TGT_MODE == "STATIC" else MAX_TARGET_CAP
+        target_pct_clamped = max(ATR_FLOOR, min(target_pct, max_cap))
         
         # 5️⃣ Calculate target price
         calculated_target = entry_prc * (1.0 + (target_pct_clamped / 100.0))
