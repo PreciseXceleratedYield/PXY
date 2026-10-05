@@ -67,13 +67,27 @@ def force_zero_ending(val):
 
 
 def compute_stop(current_game_pnl, historical_peak, open_rows):
-    """Returns (winners_peak_brick, active_trailing_exit, is_breached)."""
+    """Returns (winners_peak_brick, active_trailing_exit, is_breached).
+    
+    DYNAMIC LOSS FLOOR:
+    - Base floor: -2000
+    - For every 50 points of peak growth, relax floor by 100
+    - Formula: dynamic_floor = -2000 + (peak / 50 × 100) = -2000 + (peak × 2)
+    - Example: Peak 200 → Floor = -2000 + 400 = -1600 (more forgiving as you profit)
+    """
     # Negative game P&L must not floor downward into a false negative brick.
     completed_bricks = int(current_game_pnl // BRICK_SIZE) if current_game_pnl >= 0 else 0
     calculated_live_peak = float(completed_bricks * BRICK_SIZE)
 
     # Peak only moves up within a game
     winners_peak_brick = max(calculated_live_peak, historical_peak)
+
+    # DYNAMIC LOSS FLOOR: As peak grows, allow deeper losses (more forgiving)
+    # Peak grows by 50 (1 brick) → Floor relaxes by 100 (2x multiplier)
+    # Peak 0 → Floor -2000
+    # Peak 200 → Floor -2000 + (200×2) = -1600
+    # Peak 500 → Floor -2000 + (500×2) = -1000
+    dynamic_loss_floor = INITIAL_LOSS_FLOOR + (winners_peak_brick * 2.0)
 
     # Stop = peak - gap. The gap starts at TRAILING_DROP_GAP and shrinks per banked brick by
     # BRICK_SIZE x (open rows - 1): 1 row -> no shrink, 2 rows -> 50 per brick, 3 rows -> 100 ...
@@ -91,6 +105,6 @@ def compute_stop(current_game_pnl, historical_peak, open_rows):
     drop_gap = min(base_gap, max(peak_floor_gap, drop_gap))
 
     active_trailing_exit = winners_peak_brick - drop_gap
-    is_breached = (current_game_pnl <= INITIAL_LOSS_FLOOR or
+    is_breached = (current_game_pnl <= dynamic_loss_floor or
                    current_game_pnl <= active_trailing_exit)
     return winners_peak_brick, active_trailing_exit, is_breached
