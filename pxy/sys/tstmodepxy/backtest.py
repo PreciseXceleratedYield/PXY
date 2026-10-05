@@ -244,7 +244,7 @@ def write_session_csvs(output_dir, session_date, trades, decisions):
     trade_fields = (
         "side", "entry_time", "exit_time", "entry_spot", "exit_spot",
         "points", "exit_reason", "quantity", "simulated_option_entry",
-        "simulated_option_exit",
+        "simulated_option_exit", "tgt_hit",
     )
     decision_fields = (
         "timestamp", "execution_timestamp", "spot", "execution_spot",
@@ -260,11 +260,15 @@ def print_report(
     history, session_date, trades, decisions, trade_path, decision_path,
     orders_path, runtime_log,
 ):
+    # Win = TGT HIT (option exit premium >= entry premium)
+    # Loss = TGT NOT HIT (option exit premium < entry premium)
+    tgt_hits = sum(1 for trade in trades if trade["tgt_hit"])
+    tgt_misses = sum(1 for trade in trades if not trade["tgt_hit"])
+    tgt_rate = 100 * tgt_hits / len(trades) if trades else 0.0
+
+    # Also track directional P&L for reference
     points = [trade["points"] for trade in trades]
     total_points = sum(points)
-    winners = sum(value > 0 for value in points)
-    losers = sum(value < 0 for value in points)
-    hit_rate = 100 * winners / len(trades) if trades else 0.0
 
     print("=" * 72)
     print("PXY SIM PRODUCTION-CYCLE REPLAY")
@@ -289,10 +293,10 @@ def print_report(
     )
     print("-" * 72)
     print(
-        f"Trades: {len(trades)} | Wins: {winners} | Losses: {losers} | "
-        f"Hit rate: {hit_rate:.1f}%"
+        f"Trades: {len(trades)} | TGT Hits: {tgt_hits} | TGT Misses: {tgt_misses} | "
+        f"TGT Hit Rate: {tgt_rate:.1f}%"
     )
-    print(f"Net directional index points (one virtual unit): {total_points:+.2f}")
+    print(f"Directional index points (one virtual unit): {total_points:+.2f}")
     print(f"CSV trade ledger: {trade_path}")
     print(f"CSV bar-by-bar decisions: {decision_path}")
     print(f"CSV simulated broker orders: {orders_path}")
@@ -378,6 +382,7 @@ def run_backtest(output_dir=None, record_limit=None):
             "quantity": trade["quantity"],
             "simulated_option_entry": trade["simulated_option_entry"],
             "simulated_option_exit": trade["simulated_option_exit"],
+            "tgt_hit": trade["simulated_option_exit"] >= trade["simulated_option_entry"],
         }
         for trade in broker.trades()
     ]
