@@ -48,7 +48,7 @@ BREACH_TICKS_REQUIRED = RUNEXACPXY_BREACH_TICKS_REQUIRED
 TICK_MIN_GAP_SECONDS = RUNEXACPXY_TICK_MIN_GAP_SECONDS
 LEDGER_BASIS_GUARD = RUNEXACPXY_LEDGER_BASIS_GUARD
 VIEW_ONLY_ENV = RUNEXACPXY_VIEW_ONLY_ENV
-DEBUG_MODE = True               # verbose skip/guard messages (turn off after Monday)
+DEBUG_MODE = False               # verbose skip/guard messages (turn off after Monday)
 # =======================================================================
 
 # Re-entrancy guard: the post-square-off ledger refresh calls process_lilo_orders again,

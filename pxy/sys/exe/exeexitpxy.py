@@ -61,7 +61,7 @@ except ImportError as _buy_err:
 init(autoreset=True) 
 
 # ==================== CONFIG (this file's settings) ====================
-DEBUG_MODE = True             # prints the order payload and the raw broker response (turn off after Monday)
+DEBUG_MODE = False            # prints the order payload and the raw broker response (turn off after Monday)
 PNL_EXIT_MIN = EXEEXITPXY_PNL_EXIT_MIN
 EXIT_LOCK_SECS = EXEEXITPXY_EXIT_LOCK_SECS
 EXIT_LOCK_FILE_NAME = ".exit_lock.json"

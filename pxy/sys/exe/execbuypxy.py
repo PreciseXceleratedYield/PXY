@@ -42,7 +42,7 @@ CBUY_LOCK_FILE_NAME = ".cbuy_lock.json"
 CBUY_MAX_PER_DAY = EXECBUYPXY_MAX_PER_DAY
 CBUY_COUNT_FILE_NAME = ".cbuy_count.json"
 CBUY_LOCK_KEEP_SECS = EXECBUYPXY_LOCK_KEEP_SECS
-DEBUG_MODE = True              # verbose counter-buy decisions (turn off after Monday)
+DEBUG_MODE = False             # verbose counter-buy decisions (turn off after Monday)
 # =======================================================================
 
 _LOCK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), CBUY_LOCK_FILE_NAME)
