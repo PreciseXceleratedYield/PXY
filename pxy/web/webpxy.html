@@ -1323,8 +1323,8 @@ function drawRiskCandle(floor,net,peak){
     ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(lowX,midY);ctx.lineTo(highX,midY);ctx.stroke();
     ctx.lineWidth=3;ctx.lineCap='round';ctx.globalAlpha=0.8;
-    ctx.strokeStyle=cssVar('--bear');ctx.beginPath();ctx.moveTo(lowX,midY-bodyH/2-4);ctx.lineTo(lowX,midY+bodyH/2+4);ctx.stroke();
-    ctx.strokeStyle=cssVar('--bull');ctx.beginPath();ctx.moveTo(highX,midY-bodyH/2-4);ctx.lineTo(highX,midY+bodyH/2+4);ctx.stroke();
+    ctx.strokeStyle=cssVar('--bear');ctx.beginPath();ctx.moveTo(lowX,midY-bodyH/2);ctx.lineTo(lowX,midY+bodyH/2);ctx.stroke();
+    ctx.strokeStyle=cssVar('--bull');ctx.beginPath();ctx.moveTo(highX,midY-bodyH/2);ctx.lineTo(highX,midY+bodyH/2);ctx.stroke();
     ctx.globalAlpha=1;ctx.lineCap='butt';
     if(openX>PADX+2&&openX<W-PADX-2){
         ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
@@ -1333,7 +1333,7 @@ function drawRiskCandle(floor,net,peak){
     }
     /* ── values ──
        candle body colour  = sign of (running+booked) → overall account gain/loss (primary signal)
-       ring + net chip     = sign of net              → present running P&L (secondary cue, contrast colour)
+       net chip            = sign of net              → present running P&L (secondary cue, contrast colour)
        Both values are always shown. */
     const sumVal=runningTotal+bookedTotal;
     const overallBull=sumVal>=0;
@@ -1356,12 +1356,6 @@ function drawRiskCandle(floor,net,peak){
     if(bx2>W-PADX){bx1-=bx2-(W-PADX);bx2=W-PADX;}
     bx1=Math.max(PADX,bx1);bW=bx2-bx1;
     const by=midY-bodyH/2;
-    /* ring = net colour */
-    ctx.save();
-    ctx.shadowColor=netColor;ctx.shadowBlur=7;
-    ctx.strokeStyle=netColor;ctx.lineWidth=2.5;
-    ctx.beginPath();ctx.roundRect(bx1-4,by-4,bW+8,bodyH+8,9);ctx.stroke();
-    ctx.restore();
     /* body = overall colour with soft top highlight */
     ctx.fillStyle=overallColor;
     ctx.beginPath();ctx.roundRect(bx1,by,bW,bodyH,6);ctx.fill();
