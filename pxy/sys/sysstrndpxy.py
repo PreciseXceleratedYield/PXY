@@ -31,7 +31,6 @@ except ImportError as e:
     _compute_single_st = _compute_sma_trend = _compute_combo_force = _engine_down
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
-DEBUG_MODE = False
 
 # ==============================================================================
 # 🎛️ MASTER CONFIGURATION LAYER (PXY Universal Framework Parameters)

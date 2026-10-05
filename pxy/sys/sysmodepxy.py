@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from syscnfgpxy import RUNMODE
+from syscnfgpxy import SYSMODEPXY_RUN_MODE as RUNMODE
 
 SYS_DIR = Path(__file__).resolve().parent
 

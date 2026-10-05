@@ -11,13 +11,15 @@ import subprocess
 from colorama import Fore, Style
 
 from runexiopxy import SQUAREOFF_SCRIPT_PATH
+from syscnfgpxy import (
+    RUNEXLQDPXY_FLAT_CONFIRM_POLL_SECONDS as FLAT_CONFIRM_POLL_SECONDS,
+    RUNEXLQDPXY_FLAT_CONFIRM_TIMEOUT_SECONDS as FLAT_CONFIRM_TIMEOUT_SECONDS,
+    RUNEXLQDPXY_SQUAREOFF_TIMEOUT_SECONDS as SQUAREOFF_TIMEOUT_SECONDS,
+)
 from runexmtpxy import INITIAL_LOSS_FLOOR, compute_totals, _both_empty
 from runexstpxy import save_check_state, save_session_state, _find_runlilo_module
 
 # ==================== CONFIG (this file's settings) ====================
-FLAT_CONFIRM_TIMEOUT_SECONDS = 10.0   # how long to poll the broker for "flat" after square-off
-FLAT_CONFIRM_POLL_SECONDS = 2.0
-SQUAREOFF_TIMEOUT_SECONDS = 120
 # =======================================================================
 
 

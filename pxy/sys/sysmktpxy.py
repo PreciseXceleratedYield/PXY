@@ -1,9 +1,8 @@
 # sysmktpxy.py
 import pandas as pd
 import numpy as np
+from syscnfgpxy import SYSMKTPXY_DEBUG_ENABLED
 from sysdtafpxy import fetch_yf_data
-
-DEBUG = True
 
 def get_pxy_data(df):
     """
@@ -79,13 +78,13 @@ def get_signal(df=None):
         else:
             execution_state = "NONE"
 
-        if DEBUG:
+        if SYSMKTPXY_DEBUG_ENABLED:
             _print_console_bar(c1, c0, execution_state)
             
         return execution_state, execution_state
 
     except Exception as e:
-        if DEBUG:
+        if SYSMKTPXY_DEBUG_ENABLED:
             # Error string capped cleanly to avoid terminal distortion wrapping
             err_msg = str(e)[:25]
             print(f"Engine Err: {err_msg:<25}")

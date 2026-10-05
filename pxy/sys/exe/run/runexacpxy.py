@@ -23,8 +23,9 @@ if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 
 from syscnfgpxy import (
-    CNTRLRSKBAR,
+    RUNEXACPXY_CNTRLRSKBAR,
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
+    RUNEXACPXY_DEBUG_ENABLED,
     RUNEXACPXY_LEDGER_BASIS_GUARD,
     RUNEXACPXY_RISK_ACTION,
     RUNEXACPXY_TICK_MIN_GAP_SECONDS,
@@ -46,12 +47,13 @@ init(autoreset=True)
 
 # ==================== CONFIG (this file's settings) ====================
 RISK_ACTION = RUNEXACPXY_RISK_ACTION
-RISK_CANDLE_CONTROL_ENABLED = str(CNTRLRSKBAR).upper().strip() == "YES"
+RISK_CANDLE_CONTROL_ENABLED = (
+    str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() == "YES"
+)
 BREACH_TICKS_REQUIRED = RUNEXACPXY_BREACH_TICKS_REQUIRED
 TICK_MIN_GAP_SECONDS = RUNEXACPXY_TICK_MIN_GAP_SECONDS
 LEDGER_BASIS_GUARD = RUNEXACPXY_LEDGER_BASIS_GUARD
 VIEW_ONLY_ENV = RUNEXACPXY_VIEW_ONLY_ENV
-DEBUG_MODE = False               # verbose skip/guard messages (turn off after Monday)
 # =======================================================================
 
 # Re-entrancy guard: the post-square-off ledger refresh calls process_lilo_orders again,
@@ -60,7 +62,7 @@ _IN_LEDGER = False
 
 
 def debug_log(msg, color=Fore.BLUE):
-    if DEBUG_MODE:
+    if RUNEXACPXY_DEBUG_ENABLED:
         print(f"{color}[DEBUG] {msg}{Style.RESET_ALL}")
 
 

@@ -21,12 +21,13 @@ SYS_DIR = Path(__file__).resolve().parents[2]
 if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 
-from syscnfgpxy import SYSCNFGPXY_TIMEZONE
+from syscnfgpxy import (
+    RUNEXIOPXY_READ_RETRIES,
+    RUNEXIOPXY_READ_RETRY_DELAY,
+    SYSCNFGPXY_TIMEZONE,
+)
 
 # ==================== CONFIG (this file's settings) ====================
-READ_RETRIES = 3
-READ_RETRY_DELAY = 0.3
-
 SQUAREOFF_SCRIPT_NAME = "exesqrpxy.py"        # one folder up from this file
 RENKO_STATE_FILE_NAME = "webrinkopxy.json"    # three folders up, in web/
 CHECK_STATE_FILE_NAME = "webrnkchkpxy.json"
@@ -96,7 +97,7 @@ def _atomic_write_json(path, payload, retries=2):
 def _read_json_retry(path):
     """Read JSON, retrying briefly. FileNotFoundError is raised immediately."""
     last_err = None
-    for attempt in range(READ_RETRIES):
+    for attempt in range(RUNEXIOPXY_READ_RETRIES):
         try:
             with open(path, "r") as f:
                 return json.load(f)
@@ -104,6 +105,6 @@ def _read_json_retry(path):
             raise
         except Exception as e:
             last_err = e
-            if attempt < READ_RETRIES - 1:
-                time.sleep(READ_RETRY_DELAY)
+            if attempt < RUNEXIOPXY_READ_RETRIES - 1:
+                time.sleep(RUNEXIOPXY_READ_RETRY_DELAY)
     raise last_err

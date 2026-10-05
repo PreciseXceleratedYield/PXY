@@ -3,9 +3,14 @@ import os
 import sys
 import time
 import subprocess
-from datetime import datetime, time as dt_time
-import pytz
-from syscnfgpxy import RUNMODE
+from datetime import datetime
+from syscnfgpxy import (
+    SYSEXEPXY_MARKET_CLOSE,
+    SYSEXEPXY_MARKET_OPEN,
+    SYSEXEPXY_SUPERVISOR_INTERVAL_SECONDS,
+    SYSMODEPXY_RUN_MODE as RUNMODE,
+    SYSCNFGPXY_TIMEZONE,
+)
 from sysmodepxy import dispatch_mode, normal_start_message
 
 # ---------------- EXEC SCRIPT ----------------
@@ -39,9 +44,7 @@ def send_telegram(msg):
         print("📡 TG ERR: message send failed ⚠️")
 
 # ---------------- IST TIMEZONE ----------------
-IST = pytz.timezone("Asia/Kolkata")
-MARKET_OPEN  = dt_time(9, 16)
-MARKET_CLOSE = dt_time(15, 45)
+IST = SYSCNFGPXY_TIMEZONE
 
 def now_ist():
     """Return current IST datetime"""
@@ -52,7 +55,10 @@ def _is_market_hours_production():
     now_dt = now_ist()
     t = now_dt.time()
     wd = now_dt.weekday()
-    return 0 <= wd <= 4 and MARKET_OPEN <= t < MARKET_CLOSE
+    return (
+        0 <= wd <= 4
+        and SYSEXEPXY_MARKET_OPEN <= t < SYSEXEPXY_MARKET_CLOSE
+    )
 
 
 def is_market_hours():
@@ -104,7 +110,12 @@ def start_loop():
             print("❌ EXE ERR: exepxy.py file not found ⚠️")
 
         was_open = mkt
-        time.sleep(max(0, 1 - (time.time() - t0)))  # ~1s loop
+        time.sleep(
+            max(
+                0,
+                SYSEXEPXY_SUPERVISOR_INTERVAL_SECONDS - (time.time() - t0),
+            )
+        )
 
 # ---------------- ENTRY POINT ----------------
 if __name__ == "__main__":

@@ -1,15 +1,11 @@
 import sys
 import asyncio
 import os
-import pytz
 import subprocess
 from pathlib import Path
 from datetime import datetime
 from colorama import Fore, init, Style
 from exeotmpxy import get_dynamic_otm_distance
-
-# --- CONFIG ---
-DEBUG = True  
 
 init(autoreset=True)
 
@@ -21,15 +17,27 @@ for p in [HERE, RUN_DIR, PARENT]:
     if str(p) not in sys.path:
         sys.path.append(str(p))
 
-from syscnfgpxy import TICKER
+from syscnfgpxy import (
+    EXEFORCEPXY_DEBUG_ENABLED,
+    EXEFORCEPXY_NIFTY_LOT_SIZE,
+    EXEFORCEPXY_ORDER_AMO,
+    EXEFORCEPXY_ORDER_EXCHANGE_SEGMENT,
+    EXEFORCEPXY_ORDER_PRICE,
+    EXEFORCEPXY_ORDER_PRODUCT,
+    EXEFORCEPXY_ORDER_TRANSACTION_TYPE,
+    EXEFORCEPXY_ORDER_TYPE,
+    EXEFORCEPXY_ORDER_VALIDITY,
+    SYSCNFGPXY_TICKER,
+    SYSCNFGPXY_TIMEZONE,
+)
 
 # --- LOT SIZE LOGIC ---
-t = TICKER.upper().strip()
-LOT_SIZE = 65 if t == "^NSEI" else None
+t = SYSCNFGPXY_TICKER.upper().strip()
+LOT_SIZE = EXEFORCEPXY_NIFTY_LOT_SIZE if t == "^NSEI" else None
 
 # --- DEBUG PRINT ---
 def dprint(msg, color=Fore.CYAN):
-    if DEBUG:
+    if EXEFORCEPXY_DEBUG_ENABLED:
         print(f"{Style.BRIGHT}{color}[FORCE DEBUG] {msg}{Style.RESET_ALL}")
 
 # --- SYSTEM IMPORTS ---
@@ -45,22 +53,21 @@ except Exception as e:
 
 def generate_pxy_tag():
     """Generates pure timestamp tag: HHMMSS"""
-    ist = pytz.timezone("Asia/Kolkata")
-    return datetime.now(ist).strftime('%H%M%S')
+    return datetime.now(SYSCNFGPXY_TIMEZONE).strftime('%H%M%S')
 
 def execute_order(client, symbol, qty):
     try:
         order_tag = generate_pxy_tag()
         params = {
-            "exchange_segment": "nse_fo",
-            "product": "NRML",
-            "price": "0",
-            "order_type": "MKT",
+            "exchange_segment": EXEFORCEPXY_ORDER_EXCHANGE_SEGMENT,
+            "product": EXEFORCEPXY_ORDER_PRODUCT,
+            "price": EXEFORCEPXY_ORDER_PRICE,
+            "order_type": EXEFORCEPXY_ORDER_TYPE,
             "quantity": str(qty),
-            "validity": "DAY",
+            "validity": EXEFORCEPXY_ORDER_VALIDITY,
             "trading_symbol": symbol,
-            "transaction_type": "B",
-            "amo": "NO",
+            "transaction_type": EXEFORCEPXY_ORDER_TRANSACTION_TYPE,
+            "amo": EXEFORCEPXY_ORDER_AMO,
             "tag": order_tag
         }
         res = client.place_order(**params)

@@ -27,7 +27,7 @@ from .broker_sim import SimulatedBroker
 from .replay_adapter import ProductionPipeReplay
 from syscnfgpxy import (
     EXEEXITPXY_SQOFF_ALL_START,
-    RUNMODE,
+    SYSMODEPXY_RUN_MODE as RUNMODE,
     RUNNIFTYPXY_HOLIDAYS,
     SYSCNFGPXY_TICKER,
     SYSCNFGPXY_TIMEZONE,
