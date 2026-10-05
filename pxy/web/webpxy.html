@@ -1322,26 +1322,32 @@ function drawRiskCandle(floor,net,peak){
     const glowColor=isBull?'rgba(38,166,154,0.35)':'rgba(239,83,80,0.35)';
     ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(lowX,midY);ctx.lineTo(highX,midY);ctx.stroke();
-    ctx.lineWidth=3;ctx.globalAlpha=0.8;
-    ctx.strokeStyle=cssVar('--bear');ctx.beginPath();ctx.moveTo(lowX,midY-bodyH/2);ctx.lineTo(lowX,midY+bodyH/2);ctx.stroke();
-    ctx.strokeStyle=cssVar('--bull');ctx.beginPath();ctx.moveTo(highX,midY-bodyH/2);ctx.lineTo(highX,midY+bodyH/2);ctx.stroke();
-    ctx.globalAlpha=1;
+    ctx.lineWidth=3;ctx.lineCap='round';ctx.globalAlpha=0.8;
+    ctx.strokeStyle=cssVar('--bear');ctx.beginPath();ctx.moveTo(lowX,midY-bodyH/2-4);ctx.lineTo(lowX,midY+bodyH/2+4);ctx.stroke();
+    ctx.strokeStyle=cssVar('--bull');ctx.beginPath();ctx.moveTo(highX,midY-bodyH/2-4);ctx.lineTo(highX,midY+bodyH/2+4);ctx.stroke();
+    ctx.globalAlpha=1;ctx.lineCap='butt';
     if(openX>PADX+2&&openX<W-PADX-2){
         ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=1;ctx.setLineDash([3,3]);
         ctx.beginPath();ctx.moveTo(openX,midY-bodyH/2);ctx.lineTo(openX,midY+bodyH/2);ctx.stroke();
         ctx.setLineDash([]);
     }
+    /* ── values ──
+       outer ring colour = sign of (running+booked)  → overall account gain/loss
+       inner body colour = sign of net               → present running P&L
+       Both values are always shown; the overall value sits in a dark chip in the ring colour,
+       so it stays readable even when ring and body contradict (e.g. green ring/red body). */
     const sumVal=runningTotal+bookedTotal;
-    /* outer (border) colour = sign of running+booked; inner (body) colour = sign of net.
-       Both values are ALWAYS printed. When colours contradict, the (running+booked) part is
-       printed in the outer colour (e.g. green text on a red candle = overall profit, small loss now). */
     const outerBull=sumVal>=0;
-    const contradict=(outerBull!==isBull);
-    const netPart='₹'+(net>=0?'+':'')+Math.round(net)+' / ';   /* present running net P&L */
-    const sumPart=fmt(sumVal);                                  /* overall account P&L (running+booked) */
-    const netLabel=netPart+sumPart;
-    ctx.font=`800 ${fz}px 'Syne',sans-serif`;
-    const textW=ctx.measureText(netLabel).width+14;
+    const outerColor=outerBull?cssVar('--bull'):cssVar('--bear');
+    const netTxt='₹'+(net>=0?'+':'')+Math.round(net);
+    const sumTxt=fmt(sumVal);
+    const mainFont=`800 ${fz}px 'Syne',sans-serif`,chipFont=`800 ${fz-1}px 'Syne',sans-serif`;
+    ctx.font=mainFont;const wNet=ctx.measureText(netTxt).width;
+    ctx.font=chipFont;const wSum=ctx.measureText(sumTxt).width;
+    const CHIP_PAD=7,GAP=9,chipW=wSum+CHIP_PAD*2,chipH=bodyH-8;
+    const contentW=wNet+GAP+chipW;
+    const textW=contentW+20;
+    /* ── body geometry ── */
     let bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX);
     const midX=(bx1+bx2)/2;
     let bW=Math.max(bx2-bx1,textW);
@@ -1349,18 +1355,31 @@ function drawRiskCandle(floor,net,peak){
     if(bx1<PADX){bx2+=PADX-bx1;bx1=PADX;}
     if(bx2>W-PADX){bx1-=bx2-(W-PADX);bx2=W-PADX;}
     bx1=Math.max(PADX,bx1);bW=bx2-bx1;
+    const by=midY-bodyH/2;
+    /* outer ring (overall P&L) */
+    ctx.save();
+    ctx.shadowColor=outerColor;ctx.shadowBlur=7;
+    ctx.strokeStyle=outerColor;ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.roundRect(bx1-4,by-4,bW+8,bodyH+8,9);ctx.stroke();
+    ctx.restore();
+    /* inner body (net P&L) with soft top highlight */
     ctx.fillStyle=bodyColor;
-    ctx.beginPath();ctx.roundRect(bx1,midY-bodyH/2,bW,bodyH,4);ctx.fill();
-    /* candle border = sign of (running + booked); body fill = sign of net */
-    ctx.strokeStyle=sumVal>=0?cssVar('--bull'):cssVar('--bear');ctx.lineWidth=6;
-    ctx.stroke();
-    const baseTxt=isBull?'#06160d':'#ffffff';
-    const sumTxt=contradict?(outerBull?cssVar('--bull'):cssVar('--bear')):baseTxt;
-    const wNet=ctx.measureText(netPart).width,wSum=ctx.measureText(sumPart).width;
-    const tx=(bx1+bx2)/2-(wNet+wSum)/2;
-    ctx.textAlign='left';ctx.textBaseline='middle';
-    ctx.fillStyle=baseTxt;ctx.fillText(netPart,tx,midY);
-    ctx.fillStyle=sumTxt;ctx.fillText(sumPart,tx+wNet,midY);
+    ctx.beginPath();ctx.roundRect(bx1,by,bW,bodyH,6);ctx.fill();
+    const hl=ctx.createLinearGradient(0,by,0,by+bodyH);
+    hl.addColorStop(0,'rgba(255,255,255,0.18)');hl.addColorStop(0.55,'rgba(255,255,255,0)');hl.addColorStop(1,'rgba(0,0,0,0.12)');
+    ctx.fillStyle=hl;
+    ctx.beginPath();ctx.roundRect(bx1,by,bW,bodyH,6);ctx.fill();
+    /* labels: net (left)  |  overall chip (right) */
+    const sx=(bx1+bx2)/2-contentW/2;
+    ctx.textBaseline='middle';ctx.textAlign='left';
+    ctx.font=mainFont;ctx.fillStyle=isBull?'#06160d':'#ffffff';
+    ctx.fillText(netTxt,sx,midY+0.5);
+    const cx=sx+wNet+GAP,cy=midY-chipH/2;
+    ctx.fillStyle='rgba(8,12,18,0.92)';
+    ctx.beginPath();ctx.roundRect(cx,cy,chipW,chipH,5);ctx.fill();
+    ctx.strokeStyle=outerColor;ctx.globalAlpha=0.55;ctx.lineWidth=1;ctx.stroke();ctx.globalAlpha=1;
+    ctx.font=chipFont;ctx.textAlign='center';ctx.fillStyle=outerColor;
+    ctx.fillText(sumTxt,cx+chipW/2,midY+0.5);
     const danger=net<=floor+Math.abs(floor)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5)':'';
 }
