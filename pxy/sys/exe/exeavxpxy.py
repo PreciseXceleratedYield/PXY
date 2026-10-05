@@ -188,26 +188,19 @@ def handle_side_averaging(client, df):
         pe_atr, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=False
     )
 
-    # Prepare thresholds: full and half variants
-    # Conditions in sysdecisionpxy.py will use appropriate variant based on alignment
-    ce_threshold_full = ce_dynamic_threshold
-    ce_threshold_half = ce_dynamic_threshold / 2.0
-    pe_threshold_full = pe_dynamic_threshold
-    pe_threshold_half = pe_dynamic_threshold / 2.0
+    # Store full threshold for display; conditions will use half/full based on alignment
+    ce_threshold_display = ce_dynamic_threshold
+    pe_threshold_display = pe_dynamic_threshold
 
-    # Use half threshold if aligned, full if not (for display)
-    ce_dynamic_threshold = ce_threshold_half if ce_aligned else ce_threshold_full
-    pe_dynamic_threshold = pe_threshold_half if pe_aligned else pe_threshold_full
+    # Prepare triggering thresholds: half if aligned, full if not
+    ce_threshold_trigger = ce_dynamic_threshold / 2.0 if ce_aligned else ce_dynamic_threshold
+    pe_threshold_trigger = pe_dynamic_threshold / 2.0 if pe_aligned else pe_dynamic_threshold
 
     if USE_OVERALL_LOSS:
         ce_lgt_val, pe_lgt_val = ce_overall_pnl_pct, pe_overall_pnl_pct
     else:
         ce_lgt_val = ce_rows.apply(get_loss, axis=1).max() if not ce_rows.empty else 0.0
         pe_lgt_val = pe_rows.apply(get_loss, axis=1).max() if not pe_rows.empty else 0.0
-
-    # Also adjust display values to match thresholds
-    ce_lgt_val = ce_lgt_val / 2.0 if ce_aligned else ce_lgt_val
-    pe_lgt_val = pe_lgt_val / 2.0 if pe_aligned else pe_lgt_val
 
     ce_tgt = _side_target_pct(ce_rows, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=True)
     pe_tgt = _side_target_pct(pe_rows, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=False)
@@ -216,7 +209,7 @@ def handle_side_averaging(client, df):
         "ce_lots": ce_lots, "pe_lots": pe_lots,
         "ce_pnl": ce_pnl, "pe_pnl": pe_pnl,
         "ce_investment": ce_investment, "pe_investment": pe_investment,
-        "ce_lgt": ce_dynamic_threshold, "pe_lgt": pe_dynamic_threshold,
+        "ce_lgt": ce_threshold_display, "pe_lgt": pe_threshold_display,
         "ce_run_pct": ce_lgt_val, "pe_run_pct": pe_lgt_val,
         "ce_aligned": ce_aligned, "pe_aligned": pe_aligned,
         # Informational targets only; exit orders remain exclusively in the exit pipe.
@@ -246,7 +239,7 @@ def handle_side_averaging(client, df):
     execute_side_averaging_matrix(
         client=client, ce_rows=ce_rows, pe_rows=pe_rows,
         ce_lgt_val=ce_lgt_val, pe_lgt_val=pe_lgt_val,
-        ce_dynamic_threshold=ce_dynamic_threshold, pe_dynamic_threshold=pe_dynamic_threshold,
+        ce_dynamic_threshold=ce_threshold_trigger, pe_dynamic_threshold=pe_threshold_trigger,
         ce_lots=ce_lots, pe_lots=pe_lots,
         ce_aligned=ce_aligned, pe_aligned=pe_aligned,
     )
