@@ -159,11 +159,7 @@ def check_counter_leg(remaining_df):
         now = datetime.now(_IST).time()
         lock_key = f"CBUY|{script_name}"
         locked = _recent(_load_locks(), lock_key, CBUY_LOCK_SECS)
-        launches_today = (
-            _fires_today()
-            if CBUY_MAX_PER_DAY > 0 and now < CBUY_CUTOFF and not locked
-            else 0
-        )
+        launches_today = 0  # Counter-buy has NO daily limit (always fire when opposite leg empty)
         permission = counter_leg_permission_status(
             now,
             CBUY_CUTOFF,
