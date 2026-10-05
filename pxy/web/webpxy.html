@@ -1338,7 +1338,7 @@ function drawRiskCandle(floor,net,peak){
         ctx.beginPath();ctx.moveTo(openX,midY-bodyH/2);ctx.lineTo(openX,midY+bodyH/2);ctx.stroke();
         ctx.setLineDash([]);
     }
-    const netLabel='₹'+(net>=0?'+':'')+Math.round(net);
+    const netLabel='₹'+(net>=0?'+':'')+Math.round(net)+' / '+fmt(runningTotal+bookedTotal);
     ctx.font=`800 ${fz}px 'Syne',sans-serif`;
     const textW=ctx.measureText(netLabel).width+14;
     let bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX);
@@ -1416,26 +1416,13 @@ new ResizeObserver(()=>{drawRiskCandle(lastFloor,lastNet,lastPeak);}).observe($(
     mq.addEventListener('change',place);
 })();
 
-/* ── DESKTOP: Running/Booked PNL hidden (already visible in Positions/Trades) ── */
+/* ── Running/Booked PNL hidden on desktop and mobile (values print on the risk candle) ── */
 (function(){
     const runCell=$('cellRunning');
     const bookCell=$('cellBooked');
-    const pb=$('pnlBar');
-    if(!runCell||!bookCell||!pb)return;
-    const mq=window.matchMedia('(min-width:900px)');
-    function place(){
-        if(mq.matches){
-            runCell.style.display='none';
-            bookCell.style.display='none';
-        }else{
-            if(pb.firstChild!==runCell)pb.insertBefore(runCell,pb.firstChild);
-            if(bookCell.parentNode!==pb||bookCell.nextSibling!==null)pb.appendChild(bookCell);
-            runCell.style.cssText='min-width:6ch;';
-            bookCell.style.cssText='min-width:6ch;';
-        }
-    }
-    place();
-    mq.addEventListener('change',place);
+    if(!runCell||!bookCell)return;
+    runCell.style.display='none';
+    bookCell.style.display='none';
 })();
 
 /* ── ACTIONS MENU ── */
