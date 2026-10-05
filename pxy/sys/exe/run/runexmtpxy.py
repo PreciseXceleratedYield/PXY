@@ -105,6 +105,11 @@ def compute_stop(current_game_pnl, historical_peak, open_rows):
     drop_gap = min(base_gap, max(peak_floor_gap, drop_gap))
 
     active_trailing_exit = winners_peak_brick - drop_gap
+    
+    # PEAK CEILING: Exit when peak reaches 1000 (profit target)
+    peak_ceiling_breached = (winners_peak_brick >= 1000.0)
+    
     is_breached = (current_game_pnl <= dynamic_loss_floor or
-                   current_game_pnl <= active_trailing_exit)
+                   current_game_pnl <= active_trailing_exit or
+                   peak_ceiling_breached)
     return winners_peak_brick, active_trailing_exit, is_breached
