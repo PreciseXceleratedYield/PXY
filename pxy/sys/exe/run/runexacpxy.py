@@ -174,7 +174,8 @@ def _tick(client, open_df, closed_df):
     print(f"PnL {int(current_game_pnl)} | Pek {int(winners_peak_brick)} | Stp {int(active_trailing_exit)}")
     print(f"Los {fmt_losers} | Win {fmt_winners}")
     acpnl = totals["losers"] + totals["winners"]
-    print(f"└─ ACPNL {int(acpnl)}".rjust(40))
+    acpnl_label_color = Fore.GREEN if acpnl >= 0 else Fore.RED
+    print(f"{acpnl_label_color}└─ ACPNL{Style.RESET_ALL} {int(acpnl)}".rjust(50))
 
     # 7. Breach handling
     if is_breached:
