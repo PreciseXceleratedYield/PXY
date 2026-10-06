@@ -44,42 +44,16 @@ canvas{display:block;width:100%;height:100%;}
     color:#fff;font:700 10px 'DM Mono',monospace;letter-spacing:.08em;cursor:pointer;
 }
 #cfgClose:hover{background:#344154;}
-/* IGNITE dialog */
-#igniteModal{
-    position:absolute;inset:0;z-index:10;display:none;align-items:center;justify-content:center;padding:16px;
-    background:rgba(8,10,16,.72);
+#gameMenuStatus{
+    position:absolute;left:10px;right:10px;bottom:calc(68px + env(safe-area-inset-bottom,0px));z-index:4;display:none;padding:10px 32px 10px 10px;
+    background:rgba(24,28,38,.94);border:1px solid rgba(255,255,255,.18);border-radius:8px;
+    color:#fff;font:11px 'DM Mono',monospace;text-align:center;white-space:pre-wrap;
 }
-#igniteModal.open{display:flex;}
-.ig-card{
-    position:relative;width:100%;max-width:340px;padding:18px 16px 14px;
-    background:#1d222d;border:1px solid rgba(255,255,255,.18);border-radius:12px;
-    box-shadow:0 16px 40px rgba(0,0,0,.5);color:#fff;font:11px 'DM Mono',monospace;
+#gameMenuStatusClose{
+    position:absolute;top:4px;right:4px;width:24px;height:24px;border:0;border-radius:6px;
+    background:transparent;color:#fff;font:400 18px/1 'DM Mono',monospace;cursor:pointer;
 }
-.ig-card h2{font:800 13px 'Syne',sans-serif;letter-spacing:.06em;margin:0 28px 8px 0;}
-.ig-card p{color:#aab2c0;line-height:1.5;margin-bottom:10px;}
-.ig-x{
-    position:absolute;top:8px;right:8px;width:28px;height:28px;border:0;border-radius:7px;
-    background:#252d3a;color:#fff;font:400 18px/1 'DM Mono',monospace;cursor:pointer;
-}
-.ig-x:hover{background:#344154;}
-#ignitePwd{
-    width:100%;padding:10px 12px;border:1px solid rgba(255,255,255,.18);border-radius:7px;
-    background:#14171f;color:#fff;font:12px 'DM Mono',monospace;outline:none;margin-bottom:10px;
-}
-#ignitePwd:focus{border-color:#f0b429;}
-#igniteOut{
-    display:none;max-height:140px;overflow:auto;margin-bottom:10px;padding:8px 10px;border-radius:7px;
-    background:#14171f;color:#fff;white-space:pre-wrap;word-break:break-word;
-}
-.ig-actions{display:flex;gap:8px;justify-content:flex-end;}
-.ig-actions button{
-    padding:9px 14px;border:0;border-radius:7px;background:#252d3a;color:#fff;
-    font:700 11px 'DM Mono',monospace;letter-spacing:.06em;cursor:pointer;
-}
-.ig-actions button:hover{background:#344154;}
-.ig-actions button.primary{background:#f0b429;color:#14171f;}
-.ig-actions button.primary:hover{background:#ffc94a;}
-.ig-actions button:disabled{opacity:.55;cursor:default;}
+#gameMenuStatusClose:hover{background:rgba(255,255,255,.14);}
 </style>
 </head>
 <body>
@@ -95,19 +69,7 @@ canvas{display:block;width:100%;height:100%;}
         <iframe id="cfgFrame" title="PXYCONFIG"></iframe>
         <button id="cfgClose" type="button">← GAME</button>
     </div>
-    <div id="igniteModal" role="dialog" aria-modal="true" aria-labelledby="igniteTitle">
-        <div class="ig-card">
-            <button id="igniteClose" class="ig-x" type="button" aria-label="Close">×</button>
-            <h2 id="igniteTitle">🔥 PXYIGNITE</h2>
-            <p id="igniteDesc">This starts the ledger script. Enter the PXY action password to continue.</p>
-            <input id="ignitePwd" type="password" autocomplete="current-password" placeholder="Action password">
-            <pre id="igniteOut" role="status" aria-live="polite"></pre>
-            <div class="ig-actions">
-                <button id="igniteCancel" type="button">Close</button>
-                <button id="igniteRun" class="primary" type="button">Run</button>
-            </div>
-        </div>
-    </div>
+    <div id="gameMenuStatus" role="status" aria-live="polite"><span id="gameMenuStatusText"></span><button id="gameMenuStatusClose" type="button" aria-label="Close">×</button></div>
 </div>
 <script>
 const gameMenuToggle=document.getElementById('gameMenuToggle');
@@ -150,31 +112,18 @@ document.getElementById('gameConfig').addEventListener('click',()=>{
     cfgOverlay.classList.add('open');
     clearInterval(cfgTimer);cfgTimer=setInterval(checkConfigFrame,120);
 });
-/* IGNITE dialog (with close button) */
-const igniteModal=document.getElementById('igniteModal');
-const ignitePwd=document.getElementById('ignitePwd');
-const igniteOut=document.getElementById('igniteOut');
-const igniteRun=document.getElementById('igniteRun');
-const igniteDesc=document.getElementById('igniteDesc');
-function openIgnite(){
+const gameMenuStatus=document.getElementById('gameMenuStatus');
+const gameMenuStatusText=document.getElementById('gameMenuStatusText');
+document.getElementById('gameMenuStatusClose').addEventListener('click',()=>{
+    gameMenuStatus.style.display='none';
+});
+document.getElementById('gameIgnite').addEventListener('click',async()=>{
     closeMenu();
-    ignitePwd.value='';ignitePwd.style.display='';
-    igniteOut.style.display='none';igniteOut.textContent='';
-    igniteDesc.style.display='';
-    igniteRun.disabled=false;igniteRun.textContent='Run';
-    igniteModal.classList.add('open');
-    setTimeout(()=>ignitePwd.focus(),30);
-}
-function closeIgnite(){
-    igniteModal.classList.remove('open');
-    ignitePwd.value='';
-}
-async function runIgnite(){
-    const pwd=ignitePwd.value;
-    if(!pwd){ignitePwd.focus();return;}
-    igniteRun.disabled=true;
-    igniteOut.style.display='block';
-    igniteOut.textContent='Starting PXYIGNITE…';
+    if(!window.confirm('Run PXYIGNITE now? This starts the ledger script.'))return;
+    const pwd=window.prompt('Enter PXY action password:');
+    if(!pwd)return;
+    gameMenuStatus.style.display='block';
+    gameMenuStatusText.textContent='Starting PXYIGNITE…';
     try{
         const response=await fetch('/run/pxyldgr',{
             method:'POST',
@@ -183,22 +132,13 @@ async function runIgnite(){
         });
         const result=await response.json();
         if(!response.ok||!result.ok)throw new Error(result.error||`Request failed (${response.status})`);
-        igniteOut.textContent=(result.output||'PXYIGNITE completed.').trim();
-        if(result.error)igniteOut.textContent+=`\n${result.error}`;
-        ignitePwd.value='';
+        gameMenuStatusText.textContent=(result.output||'PXYIGNITE completed.').trim();
+        if(result.error)gameMenuStatusText.textContent+=`\n${result.error}`;
     }catch(error){
-        igniteOut.textContent=`PXYIGNITE failed: ${error.message}`;
+        gameMenuStatusText.textContent=`PXYIGNITE failed: ${error.message}`;
     }
-    igniteRun.disabled=false;
-    igniteRun.textContent='Run again';
-}
-document.getElementById('gameIgnite').addEventListener('click',openIgnite);
-document.getElementById('igniteClose').addEventListener('click',closeIgnite);
-document.getElementById('igniteCancel').addEventListener('click',closeIgnite);
-igniteRun.addEventListener('click',runIgnite);
-ignitePwd.addEventListener('keydown',(e)=>{if(e.key==='Enter')runIgnite();});
-igniteModal.addEventListener('click',(e)=>{if(e.target===igniteModal)closeIgnite();});
-document.addEventListener('keydown',(e)=>{if(e.key==='Escape'){closeIgnite();closeMenu();}});
+});
+document.addEventListener('keydown',(e)=>{if(e.key==='Escape'){closeMenu();}});
 document.addEventListener('click',(event)=>{
     if(!gameMenu.contains(event.target)&&!gameMenuToggle.contains(event.target))closeMenu();
 });
