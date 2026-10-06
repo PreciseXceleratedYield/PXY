@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 from colorama import Fore, Style, init
 from syscnfgpxy import (
-    EXEACGPXY_COOL_DOWN_SECONDS as COOL_DOWN_SECONDS,
+    SYSCNFGPXY_ACTION_COOLDOWN_SECONDS as COOL_DOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
 )
 

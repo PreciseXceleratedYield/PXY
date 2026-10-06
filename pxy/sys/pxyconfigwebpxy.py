@@ -24,6 +24,7 @@ ENUMS = {
     + tuple(f"{side}{trend}" for side in range(9) for trend in range(9)),
     "SYSSTRNDPXY_VARIANT": ("DUAL", "SINGLE", "SMA50", "COMBO_FORCE"),
     "EXETGTPXY_MODE": ("DYNAMIC", "STATIC"),
+    "EXEOTMPXY_STRIKE_MODE": ("ATM", "OTMFIX", "OTMDYN"),
     "RUNEXACPXY_RISK_ACTION": ("YES", "NO"),
     "RUNEXACPXY_CNTRLRSKBAR": ("YES", "NO"),
     "EXECBUYPXY_ACTION": ("YES", "NO"),
@@ -33,6 +34,11 @@ CHOICES = {
     "SYSPLCHRTPXY_FETCH_INTERVAL": ("1m", "2m", "5m", "15m", "30m", "60m", "1h", "1d"),
     "SYSPLCHRTPXY_OHLC_MODE": (1, 2, 3, 4, 5, 6),
     "SYSKATRPXY_ATR_MODE": (1, 2, 3),
+}
+OPTIONAL_DEFAULTS = {
+    "EXEOTMPXY_STRIKE_MODE": "ATM",
+    "EXEOTMPXY_FIXED_DISTANCE": 100,
+    "EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES": (200, 150, 100, 50, 0),
 }
 HIDDEN_PARTS = ("SECRET", "TOKEN", "PASSWORD", "API_KEY")
 SIGNED_PARTS = ("PNL", "LOSS", "FLOOR", "THRESHOLD")
@@ -121,6 +127,17 @@ def _metadata(source):
             "kind": kind,
             "value": display,
             "editable": editable,
+            "options": list(ENUMS.get(name, CHOICES.get(name, ()))),
+        })
+    for name, value in OPTIONAL_DEFAULTS.items():
+        if name in assignments:
+            continue
+        values.append({
+            "key": name,
+            "owner": name.split("_", 1)[0],
+            "kind": _kind(value),
+            "value": value,
+            "editable": True,
             "options": list(ENUMS.get(name, CHOICES.get(name, ()))),
         })
     return values, assignments
@@ -256,9 +273,16 @@ def _write_locked(updates):
     original = CONFIG_PATH.read_text(encoding="utf-8")
     _, assignments = _metadata(original)
     edits = []
+    additions = []
     for name, value in updates.items():
         entry = assignments.get(name)
-        if entry is None or not entry["editable"]:
+        if entry is None:
+            if name not in OPTIONAL_DEFAULTS:
+                raise ValueError(f"{name} is not an editable runtime setting")
+            replacement = _encode_value(name, value, OPTIONAL_DEFAULTS[name])
+            additions.append(f"{name} = {replacement}")
+            continue
+        if not entry["editable"]:
             raise ValueError(f"{name} is not an editable runtime setting")
         current = _safe_literal(entry["value_node"])
         replacement = _encode_value(name, value, current)
@@ -270,6 +294,8 @@ def _write_locked(updates):
     updated = original
     for start, end, replacement in sorted(edits, reverse=True):
         updated = updated[:start] + replacement + updated[end:]
+    if additions:
+        updated = updated.rstrip() + "\n\n" + "\n".join(additions) + "\n"
 
     ast.parse(updated, filename=str(CONFIG_PATH))
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)

@@ -16,11 +16,15 @@ from sysmodepxy import dispatch_mode
 # =====================================================================
 SIMPLE_MODE = True  # Strict operational switch: sequential execution
 DEBUG_MODE = False
-LOOP_INTERVAL = 7   # 7-second cooldown pause matching timeout
 
 init(autoreset=True)
 ist = pytz.timezone("Asia/Kolkata")
 HERE = Path(__file__).resolve().parent
+SYS_DIR = HERE.parents[2]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+from syscnfgpxy import SYSCNFGPXY_ACTION_COOLDOWN_SECONDS
+LOOP_INTERVAL = SYSCNFGPXY_ACTION_COOLDOWN_SECONDS
 
 # --- INTEGRATED POSITION SUMMARY READ ENGINE (FLAT IMPORT) ---
 from _entr import get_global_position_summary

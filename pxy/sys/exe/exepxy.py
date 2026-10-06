@@ -23,10 +23,9 @@ from syscnfgpxy import (
     EXEPXYPXY_IDLE_POLL_SECONDS,
     EXEPXYPXY_MARKET_CLOSE,
     EXEPXYPXY_MARKET_OPEN,
-    EXEPXYPXY_PAUSE_TICK_SECONDS,
     EXEPXYPXY_PIPE_TIMEOUT_SECONDS,
     EXEPXYPXY_SUB_ITERATIONS,
-    EXEPXYPXY_SUB_ITERATION_PAUSE_SECONDS,
+    SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
     SYSMODEPXY_RUN_MODE as RUNMODE,
 )
@@ -66,7 +65,7 @@ def safe_run(script_path, timeout=None):
 def fancy_pause(seconds=EXEPXYPXY_IDLE_PAUSE_SECONDS):
     for i in range(seconds, 0, -1):
         print(f"⏳ Pause active... {Fore.YELLOW}{i}{Style.RESET_ALL}s", end="\r", flush=True)
-        time.sleep(EXEPXYPXY_PAUSE_TICK_SECONDS)
+        time.sleep(1)
     print("✅ Resume execution now ")
 
 def live_status(msg):
@@ -122,7 +121,7 @@ while True:
                 HERE / "exeavgpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS
             )
                     
-            fancy_pause(EXEPXYPXY_SUB_ITERATION_PAUSE_SECONDS)
+            fancy_pause(SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
             
         loop_counter += 1
     else:

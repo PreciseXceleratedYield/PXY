@@ -1,5 +1,6 @@
 import unittest
 import sys
+from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
@@ -7,13 +8,22 @@ import pandas as pd
 
 SYS_DIR = Path(__file__).resolve().parents[1]
 EXE_DIR = SYS_DIR / "exe"
+RUN_DIR = EXE_DIR / "run"
 if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 if str(EXE_DIR) not in sys.path:
     sys.path.insert(0, str(EXE_DIR))
+if str(RUN_DIR) not in sys.path:
+    sys.path.insert(0, str(RUN_DIR))
 
 import exeltgtpxy
+import exeotmpxy
+import exeacgpxy
+import execbuypxy
+import exeexitpxy
+import runniftypxy
 from syscnfgpxy import (
+    SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
     SYSDTAFPXY_FIXED_BRICK_SIZE,
 )
@@ -22,6 +32,12 @@ import syskatrpxy
 
 
 class ConfigurationWiringTests(unittest.TestCase):
+    def test_action_cooldowns_share_the_central_seven_second_setting(self):
+        self.assertEqual(SYSCNFGPXY_ACTION_COOLDOWN_SECONDS, 7)
+        self.assertEqual(exeacgpxy.COOL_DOWN_SECONDS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
+        self.assertEqual(execbuypxy.CBUY_LOCK_SECS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
+        self.assertEqual(exeexitpxy.EXIT_LOCK_SECS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
+
     def test_dynamic_non_aligned_target_uses_configured_percentage(self):
         with patch.object(exeltgtpxy, "STATIC_NOT_ALIGNED_PCT", 2.3):
             target = exeltgtpxy.calculate_tgt(
@@ -63,6 +79,42 @@ class ConfigurationWiringTests(unittest.TestCase):
         from sysdtafpxy import TIMEZONE
 
         self.assertEqual(TIMEZONE, str(SYSCNFGPXY_TIMEZONE))
+
+    def test_atm_mode_overrides_otm_buy_request_and_supplied_distance(self):
+        with (
+            patch.object(exeotmpxy.syscnfgpxy, "EXEOTMPXY_STRIKE_MODE", "ATM"),
+            patch.object(runniftypxy, "get_target_tuesday", return_value=date(2026, 10, 13)),
+        ):
+            symbol = runniftypxy.get_symbol(23456, "OTMBUY", 200)
+
+        self.assertTrue(symbol.endswith("23450CE"))
+
+    def test_fixed_and_dynamic_modes_control_ce_and_pe_strikes(self):
+        with (
+            patch.object(exeotmpxy.syscnfgpxy, "EXEOTMPXY_STRIKE_MODE", "OTMFIX"),
+            patch.object(exeotmpxy.syscnfgpxy, "EXEOTMPXY_FIXED_DISTANCE", 100),
+            patch.object(runniftypxy, "get_target_tuesday", return_value=date(2026, 10, 13)),
+        ):
+            fixed_ce = runniftypxy.get_symbol(23456, "OTMBUY", 999)
+            fixed_pe = runniftypxy.get_symbol(23456, "OTMSELL", 999)
+
+        self.assertTrue(fixed_ce.endswith("23550CE"))
+        self.assertTrue(fixed_pe.endswith("23350PE"))
+
+        distances = []
+        with patch.object(exeotmpxy.syscnfgpxy, "EXEOTMPXY_STRIKE_MODE", "OTMDYN"):
+            for day in range(5):
+                distances.append(
+                    exeotmpxy.get_dynamic_otm_distance(
+                        date(2026, 10, 5) + timedelta(days=day)
+                    )
+                )
+        self.assertEqual(distances, [200, 150, 100, 50, 0])
+
+    def test_dynamic_strike_mode_rejects_weekends(self):
+        with patch.object(exeotmpxy.syscnfgpxy, "EXEOTMPXY_STRIKE_MODE", "OTMDYN"):
+            with self.assertRaises(ValueError):
+                exeotmpxy.get_dynamic_otm_distance(date(2026, 10, 4))
 
     def test_atr_depth_floor_and_true_atr_fallback_are_configurable(self):
         with (
