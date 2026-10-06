@@ -17,8 +17,8 @@ def get_ce_pe_power(df=None):
         df = fetch_yf_data(period="2d", interval="1m")
         
     """
-    Calculate CE/PE power based on last move compared against the 
-    average absolute move of the last 3 closed candles.
+    Calculate CE/PE power against the average move over the configured
+    closed-candle lookback window.
     Returns:
         direction (str): 'Up', 'Down', 'Flat'
         CEPower (int): 1-9
@@ -38,7 +38,7 @@ def get_ce_pe_power(df=None):
     df['move'] = df['Close'] - df['Close'].shift(1)
     df['abs_move'] = df['move'].abs()
 
-    # 2. Average the absolute moves of the last 3 CLOSED candles (excluding current running one)
+    # 2. Average closed-candle absolute moves, excluding the current running one.
     avg_closed_move_3 = df['abs_move'].shift(1).rolling(
         window=SYSPWERPXY_LOOKBACK_PERIOD, min_periods=1
     ).mean()

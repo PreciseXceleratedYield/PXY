@@ -3,8 +3,8 @@ import pandas as pd
 import re
 from colorama import Fore, Style, init
 from syscnfgpxy import (
-    EXETGTPXY_ATR_FLOOR,
-    EXETGTPXY_ATR_MIN,
+    EXETGTPXY_MIN_TARGET_PCT,
+    EXETGTPXY_MIN_ATR_VALUE,
     EXETGTPXY_EXIT_KEY_COLUMN,
     EXETGTPXY_MAX_TARGET_CAP,
     EXETGTPXY_MODE,
@@ -14,8 +14,8 @@ from syscnfgpxy import (
 
 # ==================== CONFIG (this file's settings) ====================
 EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
-ATR_FLOOR = EXETGTPXY_ATR_FLOOR
-ATR_MIN = EXETGTPXY_ATR_MIN
+MIN_TARGET_PCT = EXETGTPXY_MIN_TARGET_PCT
+MIN_ATR_VALUE = EXETGTPXY_MIN_ATR_VALUE
 MAX_TARGET_CAP = EXETGTPXY_MAX_TARGET_CAP
 TGT_MODE = EXETGTPXY_MODE  # "DYNAMIC" or "STATIC"
 STATIC_ALIGNED_PCT = EXETGTPXY_STATIC_ALIGNED
@@ -165,12 +165,15 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
         # Extract and safely cast atr with guardrail
         raw_atr = f(row.get('atr', 0.0))
         if raw_atr <= 0:
-            _warn_once("atr", f"'atr' missing or <= 0 in row; using {ATR_FLOOR} floor.")
+            _warn_once(
+                "atr",
+                f"'atr' missing or <= 0 in row; applying {MIN_ATR_VALUE} minimum ATR.",
+            )
         if derived_supr not in ("BULL", "BEAR", "SIDE", "NONE"):
             _warn_once("supertrend", f"unrecognised exit value '{derived_supr}' (expected BULL/BEAR/SIDE/NONE).")
         
         # Apply ATR minimum guardrail
-        atr_scaled = max(raw_atr, ATR_MIN)
+        atr_scaled = max(raw_atr, MIN_ATR_VALUE)
 
         is_ce = symbol.endswith('CE')
         is_pe = symbol.endswith('PE')
@@ -194,7 +197,7 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
         
         # 4️⃣ Final clamping to [1.4, 99] or [1.4, 77] depending on mode
         max_cap = STATIC_ALIGNED_PCT if TGT_MODE == "STATIC" else MAX_TARGET_CAP
-        target_pct_clamped = max(ATR_FLOOR, min(target_pct, max_cap))
+        target_pct_clamped = max(MIN_TARGET_PCT, min(target_pct, max_cap))
         
         # 5️⃣ Calculate target price
         calculated_target = entry_prc * (1.0 + (target_pct_clamped / 100.0))

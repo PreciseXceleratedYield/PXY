@@ -22,8 +22,10 @@ if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 
 from syscnfgpxy import (
-    RUNEXIOPXY_READ_RETRIES,
+    RUNEXIOPXY_READ_ATTEMPTS,
     RUNEXIOPXY_READ_RETRY_DELAY,
+    RUNEXIOPXY_WRITE_RETRIES,
+    RUNEXIOPXY_WRITE_RETRY_DELAY_SECONDS,
     SYSCNFGPXY_TIMEZONE,
 )
 
@@ -74,11 +76,16 @@ def today_ist():
 # ---------------------------------------------------------------------------
 # SAFE FILE IO
 # ---------------------------------------------------------------------------
-def _atomic_write_json(path, payload, retries=2):
+def _atomic_write_json(
+    path,
+    payload,
+    retries=RUNEXIOPXY_WRITE_RETRIES,
+    retry_delay=RUNEXIOPXY_WRITE_RETRY_DELAY_SECONDS,
+):
     """Write to a temp file, fsync, then os.replace. Readers never see a half file."""
     tmp = path + ".tmp"
     last_err = None
-    for _ in range(retries + 1):
+    for attempt in range(retries + 1):
         try:
             os.makedirs(os.path.dirname(path), exist_ok=True)
             with open(tmp, "w") as f:
@@ -89,7 +96,8 @@ def _atomic_write_json(path, payload, retries=2):
             return True
         except Exception as e:
             last_err = e
-            time.sleep(0.2)
+            if attempt < retries:
+                time.sleep(retry_delay)
     print(f"{Fore.RED}⚠️ Write failed for {os.path.basename(path)}: {last_err}")
     return False
 
@@ -97,7 +105,7 @@ def _atomic_write_json(path, payload, retries=2):
 def _read_json_retry(path):
     """Read JSON, retrying briefly. FileNotFoundError is raised immediately."""
     last_err = None
-    for attempt in range(RUNEXIOPXY_READ_RETRIES):
+    for attempt in range(RUNEXIOPXY_READ_ATTEMPTS):
         try:
             with open(path, "r") as f:
                 return json.load(f)
@@ -105,6 +113,6 @@ def _read_json_retry(path):
             raise
         except Exception as e:
             last_err = e
-            if attempt < RUNEXIOPXY_READ_RETRIES - 1:
+            if attempt < RUNEXIOPXY_READ_ATTEMPTS - 1:
                 time.sleep(RUNEXIOPXY_READ_RETRY_DELAY)
     raise last_err

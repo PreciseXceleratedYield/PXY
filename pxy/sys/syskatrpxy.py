@@ -7,7 +7,9 @@ from sysdtafpxy import fetch_yf_data
 from syscnfgpxy import (
     SYSKATRPXY_ATR_MODE,
     SYSKATRPXY_ATR_STATIC_VALUE,
+    SYSKATRPXY_DEPTH_ATR_MINIMUM,
     SYSKATRPXY_TRUE_ATR_MAX,
+    SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE,
     SYSKATRPXY_TRUE_ATR_MIN_ROWS,
     SYSKATRPXY_TRUE_ATR_PERIOD,
 )
@@ -19,7 +21,7 @@ from syspwerpxy import get_ce_pe_power
 init(autoreset=True)
 
 # 🎯 MULTI-MODE NUMERIC CONFIGURATION MATRIX
-# 1 = Static, 2 = Standard ATR (4) capped at 10, 3 = Dynamic
+# 1 = Static, 2 = Wilder-smoothed ATR, 3 = Dynamic depth/power.
 TOTAL_WIDTH = 40
 
 def safe_int_convert(val, fallback=1) -> int:
@@ -33,11 +35,11 @@ def safe_int_convert(val, fallback=1) -> int:
     except (ValueError, TypeError):
         return fallback
 
-def calculate_true_4_atr(df: pd.DataFrame) -> float:
-    """Computes genuine standard 4-period Average True Range math capped at a max of 10."""
+def calculate_true_atr(df: pd.DataFrame) -> float:
+    """Compute Wilder-smoothed ATR using configured period, cap, and fallback."""
     try:
         if df is None or df.empty or len(df) < SYSKATRPXY_TRUE_ATR_MIN_ROWS:
-            return 4.0
+            return SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE
         
         df_clean = df.copy()
         df_clean.columns = [c.lower() for c in df_clean.columns]
@@ -57,12 +59,12 @@ def calculate_true_4_atr(df: pd.DataFrame) -> float:
         val = atr_series.iloc[-1]
         
         if np.isnan(val):
-            return 4.0
+            return SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE
             
-        # Apply the max cap of 10
+        # Apply the configured upper cap.
         return min(float(val), SYSKATRPXY_TRUE_ATR_MAX)
     except Exception:
-        return 4.0
+        return SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE
 
 def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int, ce_p: int = 1, pe_p: int = 1) -> int:
     try:
@@ -72,9 +74,17 @@ def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int, ce_p: int = 
         p_power = safe_int_convert(pe_p)
         
         raw_sum = c_depth + p_depth + c_power + p_power
-        return int(raw_sum) if raw_sum >= 5 else 5
+        return max(int(raw_sum), SYSKATRPXY_DEPTH_ATR_MINIMUM)
     except Exception:
-        return 5
+        return SYSKATRPXY_DEPTH_ATR_MINIMUM
+
+
+def _configured_atr_fallback() -> float:
+    if SYSKATRPXY_ATR_MODE == 1:
+        return float(SYSKATRPXY_ATR_STATIC_VALUE)
+    if SYSKATRPXY_ATR_MODE == 2:
+        return SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE
+    return float(SYSKATRPXY_DEPTH_ATR_MINIMUM)
 
 # --- BACKWARD COMPATIBILITY LINKERS FOR OUTSIDE POOLS ---
 def calculate_atr(df: pd.DataFrame) -> pd.Series:
@@ -82,7 +92,7 @@ def calculate_atr(df: pd.DataFrame) -> pd.Series:
         if SYSKATRPXY_ATR_MODE == 1:
             val = float(SYSKATRPXY_ATR_STATIC_VALUE)
         elif SYSKATRPXY_ATR_MODE == 2:
-            val = calculate_true_4_atr(df)
+            val = calculate_true_atr(df)
         else:
             _, past_str, ce_d, pe_d = detect_pxy_flip_signal(df=df)
             _, ce_p, pe_p = get_ce_pe_power(df)
@@ -90,11 +100,7 @@ def calculate_atr(df: pd.DataFrame) -> pd.Series:
             
         return pd.Series(val, index=df.index) if df is not None and not df.empty else pd.Series([val])
     except Exception:
-        fb = (
-            float(SYSKATRPXY_TRUE_ATR_PERIOD)
-            if SYSKATRPXY_ATR_MODE == 2
-            else (float(SYSKATRPXY_ATR_STATIC_VALUE) if SYSKATRPXY_ATR_MODE == 1 else 5.0)
-        )
+        fb = _configured_atr_fallback()
         return pd.Series(fb, index=df.index) if df is not None and not df.empty else pd.Series([fb])
 
 def calculate_dynamic_k(df: pd.DataFrame) -> int:
@@ -108,14 +114,14 @@ def calculate_dynamic_k(df: pd.DataFrame) -> int:
 if __name__ == "__main__":
     try:
         df = fetch_yf_data()
-        final_atr = 4
+        final_atr = _configured_atr_fallback()
         final_k = 2
         
         if df is not None and not df.empty:
             if SYSKATRPXY_ATR_MODE == 1:
                 final_atr = int(SYSKATRPXY_ATR_STATIC_VALUE)
             elif SYSKATRPXY_ATR_MODE == 2:
-                final_atr = int(round(calculate_true_4_atr(df)))
+                final_atr = int(round(calculate_true_atr(df)))
             else:
                 _, past_depth_str, ce_depth, pe_depth = detect_pxy_flip_signal(df=df)
                 _, ce_power, pe_power = get_ce_pe_power(df)
@@ -129,11 +135,7 @@ if __name__ == "__main__":
         spc = " " * max(TOTAL_WIDTH - len(l_txt) - len(r_txt), 1)
         print(l_txt + spc + r_txt)
     except Exception:
-        default_atr = (
-            SYSKATRPXY_TRUE_ATR_PERIOD
-            if SYSKATRPXY_ATR_MODE == 2
-            else (SYSKATRPXY_ATR_STATIC_VALUE if SYSKATRPXY_ATR_MODE == 1 else 5)
-        )
+        default_atr = _configured_atr_fallback()
         l_txt = f"ATR:{default_atr}"
         r_txt = "K:2"
         spc = " " * max(TOTAL_WIDTH - len(l_txt) - len(r_txt), 1)
