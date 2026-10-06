@@ -119,7 +119,8 @@ app.get('/', (req, res) => {
 
 /* ========================= RUN SCRIPT WITH PYTHON ENV ACTIVATED ========================= */ 
 const ALLOWED_SCRIPTS = [ 
-    'pxyupdate', 'pxysqrall', 'pxybuyce', 'pxybuype', 'pxysqrce', 'pxysqrpe' 
+    'pxyupdate', 'pxysqrall', 'pxybuyce', 'pxybuype', 'pxysqrce', 'pxysqrpe',
+    'pxyldgr'
 ]; 
 const SCRIPT_DIR = '/home/pxy/pxy'; 
 
