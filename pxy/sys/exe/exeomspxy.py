@@ -7,12 +7,10 @@ import pandas as pd
 import numpy as np
 from colorama import Fore, Style
 from exepomspxy import print_market_dashboard
-
-# --- GLOBAL DEBUG SWITCH ---
-DEBUG = False
+from syscnfgpxy import EXEOMSPXY_DEBUG_ENABLED
 
 def dprint(msg):
-    if DEBUG:
+    if EXEOMSPXY_DEBUG_ENABLED:
         print(f"[DEBUG] {msg}")
 
 # ---------------- PATH SETUP ----------------

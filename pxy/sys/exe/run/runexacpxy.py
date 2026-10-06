@@ -23,7 +23,10 @@ if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 
 from syscnfgpxy import (
+    RUNEXACPXY_CNTRLRSKBAR,
+    RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
+    RUNEXACPXY_DEBUG_ENABLED,
     RUNEXACPXY_LEDGER_BASIS_GUARD,
     RUNEXACPXY_RISK_ACTION,
     RUNEXACPXY_TICK_MIN_GAP_SECONDS,
@@ -32,6 +35,7 @@ from syscnfgpxy import (
 from runexiopxy import now_ist, today_ist, RENKO_STATE_FILE, WEB_DIR, SQUAREOFF_SCRIPT_PATH  # noqa: F401
 from runexmtpxy import (
     INITIAL_LOSS_FLOOR, compute_totals, compute_stop, force_zero_ending, _both_empty,
+    midday_risk_activation_due,
 )
 from runexstpxy import (
     load_check_state, save_check_state, load_session_state, save_session_state,
@@ -44,11 +48,13 @@ init(autoreset=True)
 
 # ==================== CONFIG (this file's settings) ====================
 RISK_ACTION = RUNEXACPXY_RISK_ACTION
+RISK_CANDLE_CONTROL_ENABLED = (
+    str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() == "YES"
+)
 BREACH_TICKS_REQUIRED = RUNEXACPXY_BREACH_TICKS_REQUIRED
 TICK_MIN_GAP_SECONDS = RUNEXACPXY_TICK_MIN_GAP_SECONDS
 LEDGER_BASIS_GUARD = RUNEXACPXY_LEDGER_BASIS_GUARD
 VIEW_ONLY_ENV = RUNEXACPXY_VIEW_ONLY_ENV
-DEBUG_MODE = False               # verbose skip/guard messages (turn off after Monday)
 # =======================================================================
 
 # Re-entrancy guard: the post-square-off ledger refresh calls process_lilo_orders again,
@@ -57,7 +63,7 @@ _IN_LEDGER = False
 
 
 def debug_log(msg, color=Fore.BLUE):
-    if DEBUG_MODE:
+    if RUNEXACPXY_DEBUG_ENABLED:
         print(f"{color}[DEBUG] {msg}{Style.RESET_ALL}")
 
 
@@ -125,15 +131,18 @@ def _tick(client, open_df, closed_df):
         return
 
     # 2. Once-a-day override (backup for hook 1). Only a missing file or an earlier date counts as stale.
-    if state_is_stale(state_on_disk):
+    session_state_is_stale = state_is_stale(state_on_disk)
+    if session_state_is_stale:
         purge_stale_cache()
         historical_peak_record = 0.0
         pnl_offset = 0.0
         consecutive_breaches = 0
+        risk_control_activated = False
     else:
         historical_peak_record = state_on_disk["session_peak_pnl"]
         pnl_offset = state_on_disk["pnl_offset"]
         consecutive_breaches = check_state_on_disk["consecutive_breaches"]
+        risk_control_activated = state_on_disk["risk_control_activated"]
 
     # 3. One tick per cycle: the exit pipe and the avg pipe both load the ledger every cycle.
     meta = load_meta()
@@ -154,6 +163,7 @@ def _tick(client, open_df, closed_df):
             historical_peak_record = 0.0
             pnl_offset = 0.0
             consecutive_breaches = 0
+            risk_control_activated = False
             save_check_state(0)
             save_session_state(0.0, 0.0, INITIAL_LOSS_FLOOR, 0.0)
         meta["ledger_basis"] = current_basis
@@ -165,6 +175,19 @@ def _tick(client, open_df, closed_df):
     total_raw_pnl = totals["total"]
     fmt_losers = force_zero_ending(totals["losers"])
     fmt_winners = force_zero_ending(totals["winners"])
+
+    if midday_risk_activation_due(
+        RISK_CANDLE_CONTROL_ENABLED,
+        risk_control_activated,
+        now_ist().time(),
+        RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
+    ):
+        pnl_offset = total_raw_pnl
+        historical_peak_record = 0.0
+        consecutive_breaches = 0
+        risk_control_activated = True
+        save_check_state(0)
+        print(f"⏱️ {Fore.CYAN}Risk candle activated at 13:15 IST with a fresh P&L baseline.")
 
     current_game_pnl = total_raw_pnl - pnl_offset
     winners_peak_brick, active_trailing_exit, is_breached = compute_stop(
@@ -178,10 +201,14 @@ def _tick(client, open_df, closed_df):
     print(f"{acpnl_label_color}└─ ACPNL{Style.RESET_ALL} {int(acpnl)}".rjust(50))
 
     # 7. Breach handling
-    if is_breached:
+    risk_exit_enabled = not RISK_CANDLE_CONTROL_ENABLED or risk_control_activated
+    if is_breached and risk_exit_enabled:
         consecutive_breaches += 1
         save_check_state(consecutive_breaches)
-        save_session_state(winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset)
+        save_session_state(
+            winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset,
+            risk_control_activated=risk_control_activated,
+        )
 
         if consecutive_breaches >= BREACH_TICKS_REQUIRED:
             sys.stdout.write(f"\n{Fore.RED}{Style.BRIGHT} !! CRITICAL TRADING BREACH DETECTED !! {Style.RESET_ALL}\n")
@@ -190,11 +217,17 @@ def _tick(client, open_df, closed_df):
             if str(RISK_ACTION).upper().strip() != "YES":
                 print(f"{Fore.BLUE}{Style.BRIGHT}ℹ️ [PASSIVE ALERT] RISK_ACTION=NO. Would square off everything now.")
             else:
-                liquidate_and_exit(client, total_raw_pnl)     # always ends with sys.exit(...)
+                liquidate_and_exit(
+                    client, total_raw_pnl,
+                    risk_control_activated=risk_control_activated,
+                )     # always ends with sys.exit(...)
     else:
         if consecutive_breaches > 0:
             consecutive_breaches = 0
             save_check_state(0)
 
     # 8. Final sync (always carries today's timestamp)
-    save_session_state(winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset)
+    save_session_state(
+        winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset,
+        risk_control_activated=risk_control_activated,
+    )

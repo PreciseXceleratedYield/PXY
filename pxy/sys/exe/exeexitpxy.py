@@ -14,12 +14,14 @@ if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 
 from syscnfgpxy import (
+    EXEEXITPXY_DEBUG_ENABLED as DEBUG_MODE,
     EXEEXITPXY_EXIT_LOCK_KEEP_SECS,
     EXEEXITPXY_EXIT_LOCK_SECS,
     EXEEXITPXY_ORDER_AMO,
     EXEEXITPXY_ORDER_EXCHANGE_SEGMENT,
     EXEEXITPXY_ORDER_PRICE,
     EXEEXITPXY_ORDER_PRODUCT,
+    EXEEXITPXY_ORDER_TRANSACTION_TYPE,
     EXEEXITPXY_ORDER_TYPE,
     EXEEXITPXY_ORDER_VALIDITY,
     EXEEXITPXY_PNL_EXIT_MIN,
@@ -61,7 +63,6 @@ except ImportError as _buy_err:
 init(autoreset=True) 
 
 # ==================== CONFIG (this file's settings) ====================
-DEBUG_MODE = False            # prints the order payload and the raw broker response (turn off after Monday)
 PNL_EXIT_MIN = EXEEXITPXY_PNL_EXIT_MIN
 EXIT_LOCK_SECS = EXEEXITPXY_EXIT_LOCK_SECS
 EXIT_LOCK_FILE_NAME = ".exit_lock.json"
@@ -76,12 +77,13 @@ SQUAREOFF_TIMEOUT_SECS = EXEEXITPXY_SQUAREOFF_TIMEOUT_SECS
 SQOFF_MIN_GAP_SECS = EXEEXITPXY_SQOFF_MIN_GAP_SECS
 SYSDUMP_SCRIPT = EXEEXITPXY_SYSDUMP_SCRIPT
 
-# Exit order parameters (transaction_type "S" stays in the code: this file only ever sells)
+# Exit order parameters (this pipe only submits sell orders)
 ORDER_EXCHANGE_SEGMENT = EXEEXITPXY_ORDER_EXCHANGE_SEGMENT
 ORDER_PRODUCT = EXEEXITPXY_ORDER_PRODUCT
 ORDER_PRICE = EXEEXITPXY_ORDER_PRICE
 ORDER_TYPE = EXEEXITPXY_ORDER_TYPE
 ORDER_VALIDITY = EXEEXITPXY_ORDER_VALIDITY
+ORDER_TRANSACTION_TYPE = EXEEXITPXY_ORDER_TRANSACTION_TYPE
 ORDER_AMO = EXEEXITPXY_ORDER_AMO
 # =======================================================================
 
@@ -162,7 +164,7 @@ def place_exit_order(client, row):
             "quantity": str(abs(int(row.get('qty', 0)))), 
             "validity": ORDER_VALIDITY, 
             "trading_symbol": str(row.get('symbol', '')), 
-            "transaction_type": "S", 
+            "transaction_type": ORDER_TRANSACTION_TYPE,
             "amo": ORDER_AMO, 
             "tag": final_tag 
         } 

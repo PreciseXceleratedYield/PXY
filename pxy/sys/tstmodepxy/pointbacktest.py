@@ -1,29 +1,33 @@
 """Pure point-based replay logic for the strategy's directional signals."""
 
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime
 import math
 
+from syscnfgpxy import (
+    SYSCNFGPXY_TIMEZONE,
+    TSTPOINTBTPXY_ENTRY_CUTOFF as ENTRY_CUTOFF,
+    TSTPOINTBTPXY_FORCE_EXIT_TIME as FORCE_EXIT_TIME,
+    TSTPOINTBTPXY_MARKET_CLOSE as MARKET_CLOSE,
+    TSTPOINTBTPXY_MARKET_OPEN as MARKET_OPEN,
+    TSTPOINTBTPXY_PREOPEN_END as PREOPEN_END,
+    TSTPOINTBTPXY_PREOPEN_START as PREOPEN_START,
+    TSTPOINTBTPXY_SQUAREOFF_END as SQUAREOFF_END,
+    TSTPOINTBTPXY_TRADING_DAY_END as TRADING_DAY_END,
+    TSTPOINTBTPXY_TRADING_DAY_START as TRADING_DAY_START,
+)
 from sysdecisionpxy import entry_blackout, entry_order_command, entry_signal_valid
 
 
-MARKET_OPEN = time(9, 16)
-MARKET_CLOSE = time(15, 29)
-PREOPEN_START = time(9, 14)
-PREOPEN_END = time(9, 16)
-ENTRY_CUTOFF = time(15, 10)
-SQUAREOFF_END = time(15, 50)
-FORCE_EXIT_TIME = time(15, 14)
-IST = timezone(timedelta(hours=5, minutes=30))
-
-
 def is_actual_market_hours(now=None, holidays=()):
-    now = now or datetime.now(IST)
+    now = now or datetime.now(SYSCNFGPXY_TIMEZONE)
     if now.tzinfo is not None:
-        now = now.astimezone(IST)
+        now = now.astimezone(SYSCNFGPXY_TIMEZONE)
     return (
         now.weekday() < 5
         and now.strftime("%d-%b-%Y") not in set(holidays)
-        and time(9, 15) <= now.time().replace(tzinfo=None) < time(15, 30)
+        and TRADING_DAY_START
+        <= now.time().replace(tzinfo=None)
+        < TRADING_DAY_END
     )
 
 

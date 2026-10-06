@@ -1,6 +1,6 @@
 """Explicit standalone entry point for historical SIM mode."""
 
-from syscnfgpxy import RUNMODE
+from syscnfgpxy import SYSMODEPXY_RUN_MODE as RUNMODE
 
 
 def main(argv=None):

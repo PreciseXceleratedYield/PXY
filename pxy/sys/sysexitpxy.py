@@ -1,7 +1,6 @@
 #sysexitpxy.py
 import os
 import pandas as pd
-from syscnfgpxy import PARAMS  # Only TICKER will be used
 from colorama import Fore, Style, init
 
 # Initialize Colorama

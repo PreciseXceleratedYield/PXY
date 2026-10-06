@@ -6,6 +6,16 @@ from pathlib import Path
 from datetime import datetime
 import pandas as pd
 from colorama import Fore, Style, init
+from syscnfgpxy import (
+    EXEEXITPXY_ORDER_AMO,
+    EXEEXITPXY_ORDER_EXCHANGE_SEGMENT,
+    EXEEXITPXY_ORDER_PRICE,
+    EXEEXITPXY_ORDER_PRODUCT,
+    EXEEXITPXY_ORDER_TRANSACTION_TYPE,
+    EXEEXITPXY_ORDER_TYPE,
+    EXEEXITPXY_ORDER_VALIDITY,
+    SYSCNFGPXY_TIMEZONE,
+)
 
 # --- DYNAMIC PATH SCANNING ---
 HERE = Path(__file__).resolve().parent
@@ -73,18 +83,21 @@ def square_off_entire_type(client, active_df, target_type):
                 continue
             
             tag = row.get('tag')
-            base_tag = str(tag).split('_')[0].strip() if tag and str(tag).lower() not in ['nan', 'none', ''] else datetime.now().strftime('%H%M%S')
+            if tag and str(tag).lower() not in ['nan', 'none', '']:
+                base_tag = str(tag).split('_')[0].strip()
+            else:
+                base_tag = datetime.now(SYSCNFGPXY_TIMEZONE).strftime('%H%M%S')
             
             params = {
-                "exchange_segment": "nse_fo",
-                "product": "NRML",
-                "price": "0",
-                "order_type": "MKT",
+                "exchange_segment": EXEEXITPXY_ORDER_EXCHANGE_SEGMENT,
+                "product": EXEEXITPXY_ORDER_PRODUCT,
+                "price": EXEEXITPXY_ORDER_PRICE,
+                "order_type": EXEEXITPXY_ORDER_TYPE,
                 "quantity": str(abs(qty)),
-                "validity": "DAY",
+                "validity": EXEEXITPXY_ORDER_VALIDITY,
                 "trading_symbol": str(symbol),
-                "transaction_type": "S",
-                "amo": "NO",
+                "transaction_type": EXEEXITPXY_ORDER_TRANSACTION_TYPE,
+                "amo": EXEEXITPXY_ORDER_AMO,
                 "tag": f"{base_tag}{pms.get_sell_suffix()}"
             }
             print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ EXIT -> {target_type}: {symbol} | Qty: {qty} | PnL: {row.get('pnl')}")

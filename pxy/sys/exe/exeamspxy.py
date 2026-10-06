@@ -10,8 +10,18 @@ from colorama import Fore, init
 init(autoreset=True)
 logger = logging.getLogger("exeavxpxy.strategy")
 
+from syscnfgpxy import (
+    EXEAMSPXY_MAX_LAYERS as MAX_LAYERS,
+    EXEAMSPXY_ORDER_AMO,
+    EXEAMSPXY_ORDER_EXCHANGE_SEGMENT,
+    EXEAMSPXY_ORDER_PRICE,
+    EXEAMSPXY_ORDER_PRODUCT,
+    EXEAMSPXY_ORDER_TRANSACTION_TYPE,
+    EXEAMSPXY_ORDER_TYPE,
+    EXEAMSPXY_ORDER_VALIDITY,
+)
 from exeacgpxy import (
-    MAX_LAYERS, safe_float, generate_pxy_tag, is_cooling, set_cooling,
+    safe_float, generate_pxy_tag, is_cooling, set_cooling,
     print_pxy_trigger_dashboard
 )
 from sysdecisionpxy import averaging_trigger_sides
@@ -61,9 +71,15 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
             new_tag = generate_pxy_tag()
             print_pxy_trigger_dashboard("CE", ce_symbol, ce_lgt_val, ce_dynamic_threshold, new_tag, ce_lots, pe_lots, "AUTO")
             params = {
-                "exchange_segment": "nse_fo", "product": "NRML", "price": "0", "order_type": "MKT",
-                "quantity": str(ce_qty), "trading_symbol": str(ce_symbol), "transaction_type": "B",
-                "validity": "DAY", "amo": "NO", "tag": new_tag
+                "exchange_segment": EXEAMSPXY_ORDER_EXCHANGE_SEGMENT,
+                "product": EXEAMSPXY_ORDER_PRODUCT,
+                "price": EXEAMSPXY_ORDER_PRICE,
+                "order_type": EXEAMSPXY_ORDER_TYPE,
+                "quantity": str(ce_qty), "trading_symbol": str(ce_symbol),
+                "transaction_type": EXEAMSPXY_ORDER_TRANSACTION_TYPE,
+                "validity": EXEAMSPXY_ORDER_VALIDITY,
+                "amo": EXEAMSPXY_ORDER_AMO,
+                "tag": new_tag
             }
             set_cooling("CE")      # stays BEFORE the send: a duplicate buy is worse than a 30 s wait
             resp = client.place_order(**params)
@@ -85,9 +101,15 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
             new_tag = generate_pxy_tag()
             print_pxy_trigger_dashboard("PE", pe_symbol, pe_lgt_val, pe_dynamic_threshold, new_tag, ce_lots, pe_lots, "AUTO")
             params = {
-                "exchange_segment": "nse_fo", "product": "NRML", "price": "0", "order_type": "MKT",
-                "quantity": str(pe_qty), "trading_symbol": str(pe_symbol), "transaction_type": "B",
-                "validity": "DAY", "amo": "NO", "tag": new_tag
+                "exchange_segment": EXEAMSPXY_ORDER_EXCHANGE_SEGMENT,
+                "product": EXEAMSPXY_ORDER_PRODUCT,
+                "price": EXEAMSPXY_ORDER_PRICE,
+                "order_type": EXEAMSPXY_ORDER_TYPE,
+                "quantity": str(pe_qty), "trading_symbol": str(pe_symbol),
+                "transaction_type": EXEAMSPXY_ORDER_TRANSACTION_TYPE,
+                "validity": EXEAMSPXY_ORDER_VALIDITY,
+                "amo": EXEAMSPXY_ORDER_AMO,
+                "tag": new_tag
             }
             set_cooling("PE")      # stays BEFORE the send: a duplicate buy is worse than a 30 s wait
             resp = client.place_order(**params)

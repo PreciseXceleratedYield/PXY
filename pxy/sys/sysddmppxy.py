@@ -6,7 +6,11 @@ import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from syscnfgpxy import SYSCNFGPXY_TIMEZONE
+from syscnfgpxy import (
+    SYSCNFGPXY_TICKER,
+    SYSCNFGPXY_TIMEZONE,
+    SYSDTAFPXY_DEFAULT_INTERVAL,
+)
 from sysmodepxy import dispatch_mode
 
 # Silence future warning constraints completely
@@ -15,26 +19,23 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # ===============================================================================
 # 🛠️ INTERNAL SINGLE SOURCE OF TRUTH (SELF-SUSTAINED GLOBALS)
 # ===============================================================================
-TICKER = "^NSEI"           # Nifty 50 Index default
-TIMEZONE = "Asia/Kolkata"  # Indian Standard Time (IST)
-
 def _run_independent_engine_production():
     """
     Main self-sustained engine process block.
     Dumps exactly 1 day of 1m data using strict today logic with an
     automatic fallback to the most recent historical session available.
     """
-    tz_ist = ZoneInfo(TIMEZONE)
+    tz_ist = ZoneInfo(str(SYSCNFGPXY_TIMEZONE))
     today = datetime.now(tz_ist)
     
     # 🟢 STEP 1: Attempt strict date-bracket lookup for today's session
     start_date_str = today.strftime("%Y-%m-%d")
     end_date_str = (today + timedelta(days=1)).strftime("%Y-%m-%d")
     
-    interval = "1m"
+    interval = SYSDTAFPXY_DEFAULT_INTERVAL
 
     try:
-        ticker_obj = yf.Ticker(TICKER)
+        ticker_obj = yf.Ticker(SYSCNFGPXY_TICKER)
         # Fast point-in-time lookup block
         raw_data = ticker_obj.history(start=start_date_str, end=end_date_str, interval=interval)
 
@@ -48,9 +49,9 @@ def _run_independent_engine_production():
             if not isinstance(raw_data.index, pd.DatetimeIndex):
                 raw_data.index = pd.to_datetime(raw_data.index)
             if raw_data.index.tz is None:
-                raw_data = raw_data.tz_localize('UTC').tz_convert(TIMEZONE)
+                raw_data = raw_data.tz_localize('UTC').tz_convert(SYSCNFGPXY_TIMEZONE)
             else:
-                raw_data = raw_data.tz_convert(TIMEZONE)
+                raw_data = raw_data.tz_convert(SYSCNFGPXY_TIMEZONE)
 
             # 🟢 STEP 4: RESOLVE PRODUCTION DUMP DIRECTORIES (UPDATED TO PARENT'S OTHER CHILD 'WEB' DIR)
             script_directory = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()

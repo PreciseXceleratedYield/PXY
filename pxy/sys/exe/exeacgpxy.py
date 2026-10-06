@@ -8,10 +8,6 @@ from datetime import datetime
 from colorama import Fore, Style, init
 from syscnfgpxy import (
     EXEACGPXY_COOL_DOWN_SECONDS as COOL_DOWN_SECONDS,
-    EXEACGPXY_MARKET_END as MARKET_END,
-    EXEACGPXY_MARKET_START as MARKET_START,
-    EXEACGPXY_MAX_LAYERS as MAX_LAYERS,
-    EXEACGPXY_REBUY_ENABLED as REBUY_ENABLED,
     SYSCNFGPXY_TIMEZONE,
 )
 

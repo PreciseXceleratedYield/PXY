@@ -18,6 +18,7 @@ from syscnfgpxy import (
     EXEEXITPXY_ORDER_EXCHANGE_SEGMENT,
     EXEEXITPXY_ORDER_PRICE,
     EXEEXITPXY_ORDER_PRODUCT,
+    EXEEXITPXY_ORDER_TRANSACTION_TYPE,
     EXEEXITPXY_ORDER_TYPE,
     EXEEXITPXY_ORDER_VALIDITY,
     EXESQRPXY_EXIT_ALL_AFTER,
@@ -56,7 +57,7 @@ def place_exit_order(client, row):
             "quantity": str(abs(int(qty))), 
             "validity": EXEEXITPXY_ORDER_VALIDITY,
             "trading_symbol": str(symbol), 
-            "transaction_type": "S", 
+            "transaction_type": EXEEXITPXY_ORDER_TRANSACTION_TYPE,
             "amo": EXEEXITPXY_ORDER_AMO,
             "tag": final_tag 
         } 

@@ -22,6 +22,7 @@ from colorama import Fore, Style
 from syscnfgpxy import (
     EXECBUYPXY_ACTION,
     EXECBUYPXY_CUTOFF,
+    EXECBUYPXY_DEBUG_ENABLED,
     EXECBUYPXY_EXIT_KEY_COLUMN,
     EXECBUYPXY_LOCK_KEEP_SECS,
     EXECBUYPXY_LOCK_SECS,
@@ -42,7 +43,6 @@ CBUY_LOCK_FILE_NAME = ".cbuy_lock.json"
 CBUY_MAX_PER_DAY = EXECBUYPXY_MAX_PER_DAY
 CBUY_COUNT_FILE_NAME = ".cbuy_count.json"
 CBUY_LOCK_KEEP_SECS = EXECBUYPXY_LOCK_KEEP_SECS
-DEBUG_MODE = False             # verbose counter-buy decisions (turn off after Monday)
 # =======================================================================
 
 _LOCK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), CBUY_LOCK_FILE_NAME)
@@ -52,7 +52,7 @@ _cap_warned = False
 
 
 def debug_log(msg, color=Fore.BLUE):
-    if DEBUG_MODE:
+    if EXECBUYPXY_DEBUG_ENABLED:
         print(f"{color}[DEBUG] {msg}{Style.RESET_ALL}")
 
 

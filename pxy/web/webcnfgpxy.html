@@ -1,0 +1,344 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111722">
+  <title>PXY Runtime Configuration</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #111722;
+      color: #e4eaf4;
+      --panel: #192231;
+      --field: #101722;
+      --line: #2b3749;
+      --muted: #9ba9bc;
+      --blue: #68a5ff;
+      --red: #ff817e;
+      --green: #62d2a2;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; }
+    header {
+      position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between;
+      align-items: center; gap: 16px; padding: 14px max(18px, calc((100vw - 1180px) / 2));
+      background: rgba(17, 23, 34, .96); border-bottom: 1px solid var(--line);
+    }
+    h1 { margin: 0; font-size: 18px; }
+    h2 { font-size: 15px; margin: 0 0 10px; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    main { width: min(1180px, calc(100% - 32px)); margin: 24px auto 60px; }
+    .intro, .panel, details.group { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+    .intro, .panel { padding: 18px; margin-bottom: 16px; }
+    .intro p, .hint { color: var(--muted); line-height: 1.55; }
+    .intro p { margin: 8px 0; }
+    .alert { border-left: 3px solid #f0b429; padding-left: 12px; }
+    .auth { display: flex; gap: 8px; max-width: 520px; }
+    input, select, textarea, button {
+      font: inherit; color: inherit; border: 1px solid var(--line); border-radius: 7px;
+      background: var(--field); padding: 9px 11px;
+    }
+    input, select, textarea { width: 100%; }
+    input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--blue); }
+    textarea { min-height: 88px; resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; }
+    button { cursor: pointer; font-weight: 650; }
+    button.primary { color: #07111f; background: var(--blue); border-color: var(--blue); }
+    button:disabled { opacity: .45; cursor: not-allowed; }
+    .toolbar { display: flex; gap: 10px; align-items: center; margin: 14px 0; }
+    .toolbar input { flex: 1; }
+    #status { min-height: 22px; color: var(--muted); }
+    #status.error { color: var(--red); }
+    #status.success { color: var(--green); }
+    #settings { display: grid; gap: 12px; }
+    details.group { overflow: hidden; }
+    details.group > summary { padding: 14px 16px; cursor: pointer; color: var(--blue); font-weight: 700; }
+    .group-body { border-top: 1px solid var(--line); }
+    .setting {
+      display: grid; grid-template-columns: minmax(220px, 1fr) minmax(230px, 1.2fr);
+      gap: 14px; padding: 13px 16px; border-bottom: 1px solid var(--line);
+    }
+    .setting:last-child { border-bottom: 0; }
+    .setting-name { font: 600 12px ui-monospace, monospace; overflow-wrap: anywhere; }
+    .setting-kind { display: block; color: var(--muted); font-size: 11px; margin-top: 4px; }
+    .readonly { color: var(--muted); font: 12px ui-monospace, monospace; overflow-wrap: anywhere; }
+    .check-row { display: flex; align-items: center; gap: 8px; }
+    .subselects { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .subselects label { color: var(--muted); font-size: 11px; }
+    @media (max-width: 650px) {
+      header { padding: 12px 16px; }
+      main { width: min(100% - 20px, 1180px); margin-top: 12px; }
+      .setting { grid-template-columns: 1fr; gap: 8px; padding: 12px; }
+      .auth { flex-direction: column; }
+      .toolbar { flex-wrap: wrap; }
+      .toolbar input { flex-basis: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>PXY Runtime Configuration</h1>
+    <a href="/web/webpxy.html">← Back to dashboard</a>
+  </header>
+  <main>
+    <section class="intro">
+      <h2>Manage <code>syscnfgpxy.py</code></h2>
+      <p>Edit only declared runtime settings. Choice fields use validated dropdowns; computed settings are shown read-only.</p>
+      <p class="alert">Settings are written to the central Python config with a timestamped backup. Invalid settings are rejected before replacement. Running engine processes keep their already-loaded values; restart the engine deliberately to apply changes.</p>
+      <p><a href="/sys/CONFIGURATION.md" target="_blank" rel="noopener">Read configuration ownership, dependencies, and behavior documentation</a></p>
+    </section>
+
+    <section class="panel" id="authPanel">
+      <h2>Unlock configuration editor</h2>
+      <p class="hint">Access requires the server-side <code>PXY_CONFIG_PASSWORD</code> environment variable. The password is held only in this page's memory.</p>
+      <div class="auth">
+        <input id="password" type="password" autocomplete="current-password" placeholder="PXY config password">
+        <button class="primary" id="unlock">Unlock and load</button>
+      </div>
+      <div id="authStatus" class="hint" role="status" aria-live="polite"></div>
+    </section>
+
+    <section id="editor" hidden>
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Filter by setting or owner">
+        <button id="reload">Reload</button>
+        <button class="primary" id="save" disabled>Save changes</button>
+      </div>
+      <div id="status" role="status" aria-live="polite"></div>
+      <div id="settings"></div>
+    </section>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const state = { password: "", settings: [], controls: new Map() };
+
+    function status(message, kind = "") {
+      $("status").textContent = message;
+      $("status").className = kind;
+    }
+
+    async function requestConfig(method = "GET", body) {
+      const response = await fetch("/api/pxy-config", {
+        method,
+        headers: {
+          "x-pxy-config-password": state.password,
+          ...(body ? { "Content-Type": "application/json" } : {})
+        },
+        ...(body ? { body: JSON.stringify(body) } : {})
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.error || `Request failed (${response.status})`);
+      return result;
+    }
+
+    function updateSaveButton() {
+      $("save").disabled = state.controls.size === 0;
+      $("save").textContent = state.controls.size ? `Save ${state.controls.size} change${state.controls.size === 1 ? "" : "s"}` : "Save changes";
+    }
+
+    function setEdited(key, value, original) {
+      if (JSON.stringify(value) === JSON.stringify(original)) state.controls.delete(key);
+      else state.controls.set(key, value);
+      updateSaveButton();
+    }
+
+    function makeSelect(options, selected, onChange) {
+      const select = document.createElement("select");
+      options.forEach((option) => {
+        const item = document.createElement("option");
+        item.value = String(option);
+        item.textContent = String(option);
+        select.append(item);
+      });
+      select.value = String(selected);
+      select.addEventListener("change", () => onChange(select.value));
+      return select;
+    }
+
+    function editorFor(setting) {
+      const key = setting.key;
+      const changed = (value) => setEdited(key, value, setting.value);
+      if (setting.options.length) {
+        const select = makeSelect(setting.options, setting.value, (value) => {
+          changed(typeof setting.value === "number" ? Number(value) : value);
+        });
+        if (key === "SYSDTAFPXY_SELECTED_MODE") {
+          [...select.options].forEach((option) => {
+            option.textContent = option.value.length === 1
+              ? `Single mode ${option.value}`
+              : `Side ${option.value[0]} / trend ${option.value[1]}`;
+          });
+        }
+        return select;
+      }
+      if (setting.kind === "boolean") {
+        const wrap = document.createElement("label");
+        wrap.className = "check-row";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = Boolean(setting.value);
+        checkbox.addEventListener("change", () => changed(checkbox.checked));
+        wrap.append(checkbox, document.createTextNode(checkbox.checked ? "Enabled" : "Disabled"));
+        checkbox.addEventListener("change", () => { wrap.lastChild.textContent = checkbox.checked ? "Enabled" : "Disabled"; });
+        return wrap;
+      }
+      if (setting.kind === "json") {
+        const textarea = document.createElement("textarea");
+        textarea.value = JSON.stringify(setting.value, null, 2);
+        textarea.addEventListener("change", () => {
+          try {
+            changed(JSON.parse(textarea.value));
+            textarea.setCustomValidity("");
+          } catch {
+            state.controls.delete(key);
+            updateSaveButton();
+            textarea.setCustomValidity("Enter valid JSON.");
+            textarea.reportValidity();
+          }
+        });
+        return textarea;
+      }
+      const input = document.createElement("input");
+      input.type = setting.kind === "time" ? "time" : setting.kind === "integer" || setting.kind === "number" ? "number" : "text";
+      if (setting.kind === "integer") {
+        input.step = "1";
+        input.min = setting.key.includes("FLOOR") || setting.key.includes("THRESHOLD") ? "-1000000000" : "0";
+        input.required = true;
+      } else if (setting.kind === "number") {
+        input.step = "any";
+        input.min = setting.key.includes("FLOOR") || setting.key.includes("THRESHOLD") ? "-1000000000" : "0";
+        input.required = true;
+      }
+      input.value = setting.kind === "time" ? String(setting.value).slice(0, 8) : String(setting.value);
+      input.addEventListener("change", () => {
+        if (!input.reportValidity()) {
+          state.controls.delete(key);
+          updateSaveButton();
+          return;
+        }
+        if (setting.kind === "integer") changed(Number.parseInt(input.value, 10));
+        else if (setting.kind === "number") changed(Number(input.value));
+        else changed(input.value);
+      });
+      return input;
+    }
+
+    function renderSettings(settings) {
+      state.settings = settings;
+      state.controls.clear();
+      $("save").disabled = true;
+      $("save").textContent = "Save changes";
+      $("settings").replaceChildren();
+      const groups = new Map();
+      settings.forEach((setting) => {
+        if (!groups.has(setting.owner)) groups.set(setting.owner, []);
+        groups.get(setting.owner).push(setting);
+      });
+
+      groups.forEach((entries, owner) => {
+        const group = document.createElement("details");
+        group.className = "group";
+        group.open = true;
+        const summary = document.createElement("summary");
+        summary.textContent = `${owner} · ${entries.length} setting${entries.length === 1 ? "" : "s"}`;
+        const body = document.createElement("div");
+        body.className = "group-body";
+        entries.forEach((setting) => {
+          const row = document.createElement("div");
+          row.className = "setting";
+          row.dataset.search = `${setting.key} ${setting.owner}`.toLowerCase();
+          const identity = document.createElement("div");
+          const name = document.createElement("div");
+          name.className = "setting-name";
+          name.textContent = setting.key;
+          const type = document.createElement("span");
+          type.className = "setting-kind";
+          type.textContent = setting.editable ? setting.kind : "read-only · derived or unsupported";
+          identity.append(name, type);
+          row.append(identity);
+          if (setting.editable) {
+            row.append(editorFor(setting));
+          } else {
+            const value = document.createElement("div");
+            value.className = "readonly";
+            value.textContent = typeof setting.value === "string" ? setting.value : JSON.stringify(setting.value);
+            row.append(value);
+          }
+          body.append(row);
+        });
+        group.append(summary, body);
+        $("settings").append(group);
+      });
+    }
+
+    async function loadConfig() {
+      status("Loading central runtime settings…");
+      $("authStatus").textContent = "Loading configuration…";
+      $("unlock").disabled = true;
+      try {
+        const result = await requestConfig();
+        renderSettings(result.settings);
+        $("authPanel").hidden = true;
+        $("editor").hidden = false;
+        $("password").value = "";
+        $("authStatus").textContent = "";
+        status(`${result.settings.length} declared settings loaded.`, "success");
+        return true;
+      } catch (error) {
+        state.password = "";
+        $("editor").hidden = true;
+        $("authPanel").hidden = false;
+        $("authStatus").textContent = error.message;
+        $("password").value = "";
+        $("password").focus();
+        return false;
+      } finally {
+        $("unlock").disabled = false;
+      }
+    }
+
+    $("unlock").addEventListener("click", () => {
+      state.password = $("password").value;
+      loadConfig();
+    });
+    $("password").addEventListener("keydown", (event) => {
+      if (event.key === "Enter") $("unlock").click();
+    });
+    $("reload").addEventListener("click", () => {
+      if (!state.controls.size || window.confirm("Discard unsaved changes and reload settings?")) loadConfig();
+    });
+    $("search").addEventListener("input", () => {
+      const needle = $("search").value.trim().toLowerCase();
+      document.querySelectorAll(".setting").forEach((row) => {
+        row.hidden = needle !== "" && !row.dataset.search.includes(needle);
+      });
+      document.querySelectorAll("details.group").forEach((group) => {
+        const visible = [...group.querySelectorAll(".setting")].some((row) => !row.hidden);
+        group.hidden = !visible;
+      });
+    });
+    $("save").addEventListener("click", async () => {
+      const count = state.controls.size;
+      const preview = [...state.controls].slice(0, 12)
+        .map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join("\n");
+      const remaining = count > 12 ? `\n…and ${count - 12} more` : "";
+      if (!count || !window.confirm(`Review ${count} change${count === 1 ? "" : "s"} for syscnfgpxy.py:\n\n${preview}${remaining}\n\nA timestamped backup will be created. The running engine will not be restarted.`)) return;
+      $("save").disabled = true;
+      status("Validating settings and preparing an atomic save…");
+      try {
+        const result = await requestConfig("POST", { updates: Object.fromEntries(state.controls) });
+        state.controls.clear();
+        const loaded = await loadConfig();
+        if (loaded) status(`Saved ${result.updated.length} setting${result.updated.length === 1 ? "" : "s"}. Backup: ${result.backup}. Restart the engine deliberately to apply.`, "success");
+      } catch (error) {
+        status(error.message, "error");
+      } finally {
+        $("save").disabled = state.controls.size === 0;
+      }
+    });
+  </script>
+</body>
+</html>

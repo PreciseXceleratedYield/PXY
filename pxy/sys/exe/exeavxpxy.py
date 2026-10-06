@@ -9,14 +9,20 @@ import logging
 from datetime import datetime
 from colorama import Fore, Style
 
-from syscnfgpxy import EXEAVXPXY_USE_OVERALL_LOSS, EXELGTPXY_BASE_LOSS
+from syscnfgpxy import (
+    EXEAVXPXY_MARKET_END as MARKET_END,
+    EXEAVXPXY_MARKET_START as MARKET_START,
+    EXEAVXPXY_REBUY_ENABLED as REBUY_ENABLED,
+    EXEAVXPXY_DEFAULT_ATR,
+    EXEAVXPXY_USE_OVERALL_LOSS,
+)
 from sysdecisionpxy import averaging_placement_allowed, averaging_window_enabled
 from exeagtpxy import is_aligned
 from exeltgtpxy import calculate_lgt, target_price              # Import from central hub
 from exeamspxy import execute_side_averaging_matrix
 
 from exeacgpxy import (
-    REBUY_ENABLED, IST, MARKET_START, MARKET_END,
+    IST,
     safe_float, get_loss, side_overall_pnl_pct
 )
 from run.runpchkpxy import get_position_summary
@@ -42,14 +48,6 @@ USE_OVERALL_LOSS = EXEAVXPXY_USE_OVERALL_LOSS
 
 # Telemetry JSON for the web app: anchored to this file (same web/ folder as exeexppxy), never to the working directory
 WEB_AVG_JSON_REL = "../../web/webavgpxy.json"
-
-
-def _force_value(df, col, default=1.2):
-    """Last value of a force column; a missing, None or NaN value falls back to the default."""
-    if col not in df.columns:
-        return default
-    v = safe_float(df[col].iloc[-1], default)
-    return default if v != v else v
 
 
 def print_telemetry_dashboard(p):
@@ -124,7 +122,7 @@ def handle_side_averaging(client, df):
     pe_aligned = is_aligned("PE", active_exit)
 
     # Calculate LGT (averaging triggers) using investment-factor formula + count factor
-    ce_atr = safe_float(working_df.iloc[-1].get("atr"), 5.0)
+    ce_atr = safe_float(working_df.iloc[-1].get("atr"), EXEAVXPXY_DEFAULT_ATR)
     pe_atr = ce_atr  # Both use same ATR from current bar
     
     ce_dynamic_threshold = calculate_lgt(

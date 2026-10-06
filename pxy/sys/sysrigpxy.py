@@ -7,9 +7,7 @@ import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 from sysdtafpxy import fetch_yf_data
-from syscnfgpxy import TIMEZONE
-
-DEBUG_MODE = False
+from syscnfgpxy import SYSCNFGPXY_TIMEZONE, SYSRIGPXY_DEBUG_ENABLED
 
 def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 13) -> pd.DataFrame:
     """
@@ -23,7 +21,7 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 13) -> p
             if raw_df is not None and not raw_df.empty:
                 df = raw_df.copy()
     except Exception as e:
-        if DEBUG_MODE:
+        if SYSRIGPXY_DEBUG_ENABLED:
             print(f"Warning: Shared pipeline download fallback active | {e}")
             
     df = df.copy()
@@ -41,7 +39,7 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 13) -> p
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
 
-    tz_string = str(TIMEZONE)
+    tz_string = str(SYSCNFGPXY_TIMEZONE)
     if df.index.tz is None:
         df = df.tz_localize('UTC').tz_convert(tz_string)
     else:
@@ -100,6 +98,4 @@ def calculate_linear_regression_channel(df: pd.DataFrame, length: int = 13) -> p
 
 if __name__ == "__main__":
     calculate_linear_regression_channel(pd.DataFrame())
-
-
 

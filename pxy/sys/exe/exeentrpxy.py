@@ -5,9 +5,6 @@ from pathlib import Path
 from datetime import datetime
 from colorama import Fore, init, Style
 
-# --- GLOBAL CONFIG ---
-DEBUG = False
-
 init(autoreset=True)
 
 # --- PATH SETUP ---
@@ -19,6 +16,7 @@ for p in [HERE, RUN_DIR, PARENT]:
         sys.path.insert(0, str(p))
 
 from syscnfgpxy import (
+    EXEENTRPXY_DEBUG_ENABLED,
     EXEENTRPXY_ENTRY_CUTOFF,
     EXEENTRPXY_PREOPEN_END,
     EXEENTRPXY_PREOPEN_START,
@@ -27,7 +25,7 @@ from syscnfgpxy import (
 )
 
 def dprint(msg, color=Fore.CYAN):
-    if DEBUG:
+    if EXEENTRPXY_DEBUG_ENABLED:
         print(f"{Style.BRIGHT}{color}[DBUG] {msg[:35]}{Style.RESET_ALL}")
 
 dprint("IMPORTING...")
@@ -124,7 +122,11 @@ def main():
         dprint("===== END =====", Fore.GREEN)
 
     except Exception:
-        print(traceback.format_exc() if DEBUG else "❌ Error encountered; entry skipped.")
+        print(
+            traceback.format_exc()
+            if EXEENTRPXY_DEBUG_ENABLED
+            else "❌ Error encountered; entry skipped."
+        )
 
 
 if __name__ == "__main__":

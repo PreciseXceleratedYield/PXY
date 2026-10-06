@@ -7,20 +7,19 @@ import pandas as pd
 import yfinance as yf
 from syscnfgpxy import (
     SYSCNFGPXY_TICKER as TICKER,
+    SYSCNFGPXY_TIMEZONE,
     SYSDTAFPXY_DEFAULT_INTERVAL,
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     SYSDTAFPXY_FIXED_BRICK_SIZE,
     SYSDTAFPXY_FORCE_NIFTY_FUT,
     SYSDTAFPXY_SELECTED_MODE,
-    SYSDTAFPXY_TIMEZONE,
-    SYSDTAFPXY_TRANSFORM_ATR_PERIOD,
 )
 from sysmodepxy import dispatch_mode
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 # Explicitly enforce Indian Standard Time zone mapping
-TIMEZONE = SYSDTAFPXY_TIMEZONE
+TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
 
 # 🔥 INDEPENDENT MATRIX MODE INTERFACE:
 # Format: "ST" -> First Digit = SIDE Mode, Second Digit = TREND Mode
@@ -29,13 +28,12 @@ SELECTED_MODE = SYSDTAFPXY_SELECTED_MODE
 FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 
 def apply_ohlc_transformation(
-    df, mode=1, atr_period=SYSDTAFPXY_TRANSFORM_ATR_PERIOD,
-    fixed_brick_size=SYSDTAFPXY_FIXED_BRICK_SIZE,
+    df, mode=1, fixed_brick_size=SYSDTAFPXY_FIXED_BRICK_SIZE,
 ):
     """Executes structural, isolated mathematical transformations based on explicit modes.
 
     Modes 0-7: Time-based mathematical variations (Heikin-Ashi, Linear Regression, etc.)
-    Mode 8: Dynamic Volatility-Adaptive Renko Bricks (Clamped between 1.0 and 15.0 points)
+    Mode 8: Fixed-size Renko bricks using the configured point size.
     """
     if df.empty:
         return df
@@ -129,14 +127,15 @@ def apply_ohlc_transformation(
         out['Close'] = (lr_c + ra_c) / 2.0
         return out
 
-# ⚡ Mode 8: Fixed 5-Point Renko Bricks
+# ⚡ Mode 8: Fixed-Size Renko Bricks
     elif mode == 8:
         n = len(df)
         if n == 0:
             return out # Return empty interface state if dataframe lacks sequence context
 
-        # 🔒 Hardcoded fix at exactly 5 points
-        renko_brick_size = 2.5
+        if fixed_brick_size <= 0:
+            raise ValueError("fixed_brick_size must be greater than zero.")
+        renko_brick_size = fixed_brick_size
 
         # 3. Generate Structural Renko Brick Arrays
         renko_ops = []

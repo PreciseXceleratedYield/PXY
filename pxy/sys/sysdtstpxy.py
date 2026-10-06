@@ -3,8 +3,6 @@ import pandas as pd
 from syscnfgpxy import (
     SYSDTSTPXY_ST1_FACTOR,
     SYSDTSTPXY_ST1_PERIOD,
-    SYSDTSTPXY_ST2_FACTOR,
-    SYSDTSTPXY_ST2_PERIOD,
 )
 
 # ==============================================================================

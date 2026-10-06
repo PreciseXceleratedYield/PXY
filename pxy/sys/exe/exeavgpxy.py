@@ -8,14 +8,9 @@ from exeavxpxy import handle_side_averaging
 from exeexppxy import dump_idle_json
 from sysmodepxy import dispatch_mode
 from sysdecisionpxy import averaging_snapshot_status
+from syscnfgpxy import EXEAVGPXY_IDLE_EXIT_MODE as EXIT_MODE
 
 init(autoreset=True)
-
-DEBUG_MODE = False
-
-# Label written to webactpxy.json as "exit_mode_active" when the avg controller writes the idle dashboard.
-# Keep equal to the value the exit pipe writes ("one"). It has no other effect here.
-EXIT_MODE = "one"
 
 def run_snapshot():
     if not dispatch_mode("engine_window_open", lambda: True):

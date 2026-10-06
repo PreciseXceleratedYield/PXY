@@ -2,9 +2,10 @@ const express = require('express');
 const http = require('http'); 
 const WebSocket = require('ws'); 
 const { exec } = require('child_process'); 
+const { execFile } = require('child_process');
+const crypto = require('crypto');
 const path = require('path'); 
 const os = require('os'); 
-const fs = require('fs'); 
 
 // Dynamic execution environment tracing flag
 const IS_DEBUG = process.argv.includes('--debug');
@@ -25,6 +26,18 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 /* ========================= STATIC ROOT & PARSING ========================= */ 
+app.use((req, res, next) => {
+    let requestedPath;
+    try {
+        requestedPath = path.posix.normalize(`/${decodeURIComponent(req.path)}`).toLowerCase();
+    } catch {
+        return res.sendStatus(400);
+    }
+    if (/^\/sys\/(?:syscnfgpxy\.py(?:\.|$)|pxyconfigwebpxy\.py$)/.test(requestedPath)) {
+        return res.sendStatus(404);
+    }
+    return next();
+});
 app.use(express.static(__dirname)); 
 app.use(express.json()); 
 
@@ -33,99 +46,65 @@ app.get('/hostname', (req, res) => {
     res.json({ hostname: os.hostname() }); 
 }); 
 
-/* ========================= PXYCONFIG — READ/SAVE runscrtpxy.py ========================= */
-const CONFIG_FILE_PATH   = path.resolve(__dirname, 'sys/exe/run/runscrtpxy.py');
-const TEMPLATE_FILE_PATH = path.resolve(__dirname, 'sys/exe/run/runpxy.py');
-const CONFIG_FIELDS = [
-    'CONSUMER_KEY', 'CONSUMER_SECRET', 'MOBILE_NUMBER',
-    'UCC', 'MPIN', 'TOTP_SECRET_KEY', 'ENVIRONMENT'
-];
+/* ========================= PXYCONFIG — syscnfgpxy.py ========================= */
+const PXY_CONFIG_TOOL = path.resolve(__dirname, 'sys/pxyconfigwebpxy.py');
+const PXY_CONFIG_PASSWORD = process.env.PXY_CONFIG_PASSWORD || '';
 
-function extractFields(content) {
-    const values = {};
-    CONFIG_FIELDS.forEach(key => {
-        const re = new RegExp(`^${key}\\s*=\\s*["']([^"']*)["']`, 'm');
-        const match = content.match(re);
-        values[key] = match ? match[1] : '';
-    });
-    return values;
-}
-
-app.get('/pxyconfig-read', (req, res) => {
-    if (IS_DEBUG) console.log(`[DEBUG] Reading config profile from: ${CONFIG_FILE_PATH}`);
-    fs.readFile(CONFIG_FILE_PATH, 'utf8', (err, content) => {
-        if (!err) {
-            return res.json({ ok: true, values: extractFields(content), path: CONFIG_FILE_PATH });
-        }
-        if (err.code !== 'ENOENT') {
-            return res.json({ ok: false, error: `Cannot read config: ${err.message}` });
-        }
-        if (IS_DEBUG) console.log('[DEBUG] Config missing. Cascading down to fallback template...');
-        fs.readFile(TEMPLATE_FILE_PATH, 'utf8', (tErr, tContent) => {
-            if (tErr) {
-                const values = {};
-                CONFIG_FIELDS.forEach(key => { values[key] = ''; });
-                return res.json({ ok: true, values, path: CONFIG_FILE_PATH, notFound: true, noTemplate: true });
-            }
-            res.json({ ok: true, values: extractFields(tContent), path: CONFIG_FILE_PATH, notFound: true });
-        });
-    });
+app.use('/api/pxy-config', (req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    return next();
 });
 
-app.post('/pxyconfig-save', (req, res) => {
-    const pwd = (req.body.pwd || '').trim();
-    if (!pwd) {
-        return res.status(400).json({ ok: false, error: 'Password required' });
-    }
-    const updates = req.body.values || {};
-
-    if (IS_DEBUG) console.log('[DEBUG] Intercepted incoming config update package.');
-
-    fs.readFile(CONFIG_FILE_PATH, 'utf8', (err, content) => {
-        const isMissing = err && err.code === 'ENOENT';
-        if (err && !isMissing) {
-            return res.json({ ok: false, error: `Cannot read config: ${err.message}` });
-        }
-
-        const proceedWithBase = (base) => {
-            let updated = base;
-            CONFIG_FIELDS.forEach(key => {
-                if (Object.prototype.hasOwnProperty.call(updates, key)) {
-                    const val = String(updates[key] ?? '').replace(/"/g, '\\"');
-                    const re = new RegExp(`^(${key}\\s*=\\s*)["'][^"']*["']`, 'm');
-                    if (re.test(updated)) {
-                        updated = updated.replace(re, `$1"${val}"`);
-                    } else {
-                        updated += `\n${key} = "${val}"\n`;
-                    }
-                }
-            });
-
-            fs.mkdir(path.dirname(CONFIG_FILE_PATH), { recursive: true }, (mkdirErr) => {
-                if (mkdirErr) {
-                    return res.json({ ok: false, error: `Cannot create directory: ${mkdirErr.message}` });
-                }
-                fs.writeFile(CONFIG_FILE_PATH, updated, 'utf8', (writeErr) => {
-                    if (writeErr) {
-                        return res.json({ ok: false, error: `Cannot write config: ${writeErr.message}` });
-                    }
-                    console.log(`[PXYCONFIG] config file ${isMissing ? 'created from template' : 'updated'} by request`);
-                    res.json({ ok: true, created: isMissing });
-                });
-            });
-        };
-
-        if (!isMissing) {
-            return proceedWithBase(content);
-        }
-
-        fs.readFile(TEMPLATE_FILE_PATH, 'utf8', (tErr, tContent) => {
-            const base = tErr
-                ? '# Kotak Neo API Credentials\n# Auto-created by PXYCONFIG editor\n'
-                : tContent;
-            proceedWithBase(base);
+function authorizePxyConfig(req, res, next) {
+    if (!PXY_CONFIG_PASSWORD) {
+        return res.status(503).json({
+            ok: false,
+            error: 'PXY_CONFIG_PASSWORD is not configured; config access is disabled.'
         });
-    });
+    }
+    const supplied = Buffer.from(req.get('x-pxy-config-password') || '');
+    const expected = Buffer.from(PXY_CONFIG_PASSWORD);
+    if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) {
+        return res.status(401).json({ ok: false, error: 'Invalid configuration password.' });
+    }
+    return next();
+}
+
+function runPxyConfigTool(action, input, res) {
+    const python = process.env.PXY_CONFIG_PYTHON || 'python3';
+    const child = execFile(
+        python,
+        [PXY_CONFIG_TOOL, action],
+        { cwd: __dirname, timeout: 15000, maxBuffer: 1024 * 1024 },
+        (error, stdout, stderr) => {
+            let result;
+            try {
+                result = JSON.parse(stdout);
+            } catch (parseError) {
+                console.error('[PXYCONFIG] helper returned invalid output:', stderr || parseError.message);
+                return res.status(500).json({ ok: false, error: 'Configuration helper failed.' });
+            }
+            if (error && result.ok) {
+                console.error('[PXYCONFIG] helper process failed:', stderr || error.message);
+                return res.status(500).json({ ok: false, error: 'Configuration helper failed.' });
+            }
+            return res.status(result.ok ? 200 : 400).json(result);
+        }
+    );
+    if (input !== undefined) {
+        child.stdin.end(JSON.stringify(input));
+    }
+}
+
+app.get('/api/pxy-config', authorizePxyConfig, (req, res) => {
+    runPxyConfigTool('read', undefined, res);
+});
+
+app.post('/api/pxy-config', authorizePxyConfig, (req, res) => {
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+        return res.status(400).json({ ok: false, error: 'A JSON object is required.' });
+    }
+    runPxyConfigTool('write', req.body, res);
 });
 
 /* ========================= EXPLICIT JSON ROUTE ========================= */ 

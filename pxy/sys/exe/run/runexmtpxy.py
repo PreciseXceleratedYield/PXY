@@ -16,15 +16,25 @@ from syscnfgpxy import (
     RUNEXMTPXY_BRICK_SIZE,
     RUNEXMTPXY_INITIAL_LOSS_FLOOR,
     RUNEXMTPXY_PEAK_CEILING,
-    RUNEXMTPXY_TRAILING_DROP_GAP,
+    RUNEXMTPXY_PEAK_MULTIPLIER,
 )
 
 # ==================== CONFIG (this file's settings) ====================
 BRICK_SIZE = RUNEXMTPXY_BRICK_SIZE
 INITIAL_LOSS_FLOOR = RUNEXMTPXY_INITIAL_LOSS_FLOOR
 PEAK_CEILING = RUNEXMTPXY_PEAK_CEILING
-TRAILING_DROP_GAP = RUNEXMTPXY_TRAILING_DROP_GAP
+PEAK_MULTIPLIER = RUNEXMTPXY_PEAK_MULTIPLIER
 # =======================================================================
+
+
+def midday_risk_activation_due(control_enabled, activated, current_time, activation_time):
+    """Check whether enabled risk control reached its configured activation time."""
+    return bool(
+        control_enabled
+        and not activated
+        and activation_time is not None
+        and current_time >= activation_time
+    )
 
 
 def _prep_frame(df):
@@ -86,7 +96,7 @@ def compute_stop(current_game_pnl, historical_peak):
     winners_peak_brick = max(calculated_live_peak, historical_peak)
 
     # UNIFIED STOP: Both floor and exit threshold
-    unified_stop = INITIAL_LOSS_FLOOR + (winners_peak_brick * 2.0)
+    unified_stop = INITIAL_LOSS_FLOOR + (winners_peak_brick * PEAK_MULTIPLIER)
     
     # PEAK CEILING: Exit when peak reaches 2000
     peak_ceiling_breached = (winners_peak_brick >= PEAK_CEILING)

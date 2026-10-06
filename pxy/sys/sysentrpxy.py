@@ -1,5 +1,4 @@
 import pandas as pd
-from syscnfgpxy import TICKER
 from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
 
@@ -95,4 +94,3 @@ if __name__ == "__main__":
         print("RUNNING MATRIX (MODE: MKT)...")
         entry_sig_mkt, exit_sig_mkt = get_entry_signal(df, mode="MKT")
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry_sig_mkt} | EXIT_SIG: {exit_sig_mkt}")
-

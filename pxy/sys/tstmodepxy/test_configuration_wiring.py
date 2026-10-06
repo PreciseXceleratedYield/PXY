@@ -1,0 +1,80 @@
+import unittest
+import sys
+from pathlib import Path
+from unittest.mock import patch
+
+import pandas as pd
+
+SYS_DIR = Path(__file__).resolve().parents[1]
+EXE_DIR = SYS_DIR / "exe"
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+if str(EXE_DIR) not in sys.path:
+    sys.path.insert(0, str(EXE_DIR))
+
+import exeltgtpxy
+from syscnfgpxy import (
+    SYSCNFGPXY_TIMEZONE,
+    SYSDTAFPXY_FIXED_BRICK_SIZE,
+)
+from sysdtafpxy import apply_ohlc_transformation
+import syskatrpxy
+
+
+class ConfigurationWiringTests(unittest.TestCase):
+    def test_dynamic_non_aligned_target_uses_configured_percentage(self):
+        with patch.object(exeltgtpxy, "STATIC_NOT_ALIGNED_PCT", 2.3):
+            target = exeltgtpxy.calculate_tgt(
+                5.0, 100.0, 100.0, 1, 1, True, False
+            )
+
+        self.assertEqual(target, 2.3)
+
+    def test_renko_uses_configured_brick_size_by_default(self):
+        frame = pd.DataFrame(
+            {
+                "Open": [100.0, 105.0],
+                "High": [100.0, 105.0],
+                "Low": [100.0, 105.0],
+                "Close": [100.0, 105.0],
+            }
+        )
+        result = apply_ohlc_transformation(frame, mode=8)
+
+        self.assertEqual(SYSDTAFPXY_FIXED_BRICK_SIZE, 2.5)
+        self.assertEqual(result["Close"].tolist(), [102.5, 105.0])
+
+    def test_renko_respects_per_call_brick_size(self):
+        frame = pd.DataFrame(
+            {
+                "Open": [100.0, 105.0],
+                "High": [100.0, 105.0],
+                "Low": [100.0, 105.0],
+                "Close": [100.0, 105.0],
+            }
+        )
+        result = apply_ohlc_transformation(
+            frame, mode=8, fixed_brick_size=5.0
+        )
+
+        self.assertEqual(result["Close"].tolist(), [105.0])
+
+    def test_data_timezone_uses_shared_setting(self):
+        from sysdtafpxy import TIMEZONE
+
+        self.assertEqual(TIMEZONE, str(SYSCNFGPXY_TIMEZONE))
+
+    def test_atr_depth_floor_and_true_atr_fallback_are_configurable(self):
+        with (
+            patch.object(syskatrpxy, "SYSKATRPXY_DEPTH_ATR_MINIMUM", 8),
+            patch.object(syskatrpxy, "SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE", 7.0),
+        ):
+            depth_floor = syskatrpxy.scale_atr_value_from_depth("", 0, 0, 0, 0)
+            true_atr_fallback = syskatrpxy.calculate_true_atr(pd.DataFrame())
+
+        self.assertEqual(depth_floor, 8)
+        self.assertEqual(true_atr_fallback, 7.0)
+
+
+if __name__ == "__main__":
+    unittest.main()

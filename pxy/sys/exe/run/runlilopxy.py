@@ -2,27 +2,29 @@
 import os 
 import json 
 import math
-import pytz 
 import pandas as pd 
 from datetime import datetime 
 from runclntpxy import get_session 
 from runltpspxy import get_mid_price 
-from syscnfgpxy import SYSCNFGPXY_TIMEZONE
+from syscnfgpxy import (
+    RUNLILOPXY_DEFAULT_FILTER_TIME as DEFAULT_FILTER_TIME,
+    SYSCNFGPXY_TIMEZONE,
+)
 from sysmodepxy import dispatch_mode
 
 # 🔍 STRATEGIC FOOTPRINT: Resolved relative to run/ directory pathing
 SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/websqrpxy.json"))
-DEFAULT_FILTER_TIME = "09:16:00"
 def resolve_dynamic_filter_time():
     """Reads risk engine cache to fetch post-reset fresh start time if triggered today."""
     try:
-        IST = pytz.timezone("Asia/Kolkata")
-        now_ist = datetime.now(IST)
+        now_ist = datetime.now(SYSCNFGPXY_TIMEZONE)
         today_str = now_ist.strftime("%Y-%m-%d")
         
         if os.path.exists(SQUAREOFF_LOG_FILE):
             file_mod_timestamp = os.path.getmtime(SQUAREOFF_LOG_FILE)
-            file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, IST).strftime("%Y-%m-%d")
+            file_mod_date_str = datetime.fromtimestamp(
+                file_mod_timestamp, SYSCNFGPXY_TIMEZONE
+            ).strftime("%Y-%m-%d")
             
             if file_mod_date_str == today_str:
                 with open(SQUAREOFF_LOG_FILE, "r") as f:
@@ -49,7 +51,6 @@ def resolve_dynamic_filter_time():
 
 # ⏱️ SURGICAL TIMELINE FILTER INITIALIZATION
 FILTER_TIME = resolve_dynamic_filter_time()
-MATCH_MODE = "TAG"
 
 def dump_to_json(closed_df): 
     """Writes closed trade realizations to webpnlpxy.json."""

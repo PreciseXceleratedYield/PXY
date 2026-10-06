@@ -1,47 +1,53 @@
-# syscnfgpxy.py
-"""
-Executes exactly 6 structural, isolated OHLC mathematical transformations:
-Mode 0: Hyper-Sensitive Modified Close Candles (Green Close=(High+Close)/2, Red Close=(Low+Close)/2)
-Mode 1: Raw Candles
-Mode 2: Mid-Body (OC/2) Pure Math Candles
-Mode 3: Full Range (OHLC/4) Pure Math Candles
-Mode 4: Standard Heikin-Ashi Candles
-Mode 5: Master Ensemble Average of Modes 0, 1, 2, 3, and 4 (Divided by 5)
-"""
+"""Central runtime configuration.
 
-
+Keep tunable runtime values grouped by subsystem and prefixed with their owner
+module's name. See CONFIGURATION.md for the layout and conditional settings.
+"""
 import os
 from datetime import time as dt_time
 
 import pytz
 
-# ---------------- LOCAL SYSTEM CONFIGURATION ----------------
-# -----------------------------------------------------------------------------
-# Shared strategy and execution configuration.
-# Name each value after its owning module: <MODULE>_<PARAMETER>.
-# Keep credentials, presentation-only values, and file-system paths out of this
-# module; credentials belong in the existing secret/environment configuration.
-# -----------------------------------------------------------------------------
+# System-wide defaults and execution mode.
 SYSCNFGPXY_TICKER = "^NSEI"
 SYSCNFGPXY_TIMEZONE = pytz.timezone("Asia/Kolkata")
-RUNMODE = os.environ.get(
+SYSMODEPXY_RUN_MODE = os.environ.get(
     "RUNMODE", "PRD"
 )  # PRD: live engine, CHK: mock engine, SIM: historical replay.
-if RUNMODE not in {"PRD", "CHK", "SIM"}:
+if SYSMODEPXY_RUN_MODE not in {"PRD", "CHK", "SIM"}:
     raise ValueError("RUNMODE must be one of 'PRD', 'CHK', or 'SIM'.")
 
-SYSDTAFPXY_TIMEZONE = "Asia/Kolkata"
+# Engine launchers and scheduling.
+SYSEXEPXY_MARKET_OPEN = dt_time(9, 16)
+SYSEXEPXY_MARKET_CLOSE = dt_time(15, 45)
+SYSEXEPXY_SUPERVISOR_INTERVAL_SECONDS = 1
+EXEPXYPXY_MARKET_OPEN = dt_time(9, 16)
+EXEPXYPXY_MARKET_CLOSE = dt_time(15, 29)
+EXEPXYPXY_PAUSE_TICK_SECONDS = 1
+EXEPXYPXY_PIPE_TIMEOUT_SECONDS = 60
+EXEPXYPXY_SUB_ITERATIONS = 30
+EXEPXYPXY_SUB_ITERATION_PAUSE_SECONDS = 4
+EXEPXYPXY_IDLE_PAUSE_SECONDS = 7
+EXEPXYPXY_IDLE_POLL_SECONDS = 60
+
+# Data ingestion, chart generation, and signal calculation.
 SYSDTAFPXY_SELECTED_MODE = "00"
 SYSDTAFPXY_FORCE_NIFTY_FUT = False
 SYSDTAFPXY_DEFAULT_INTERVAL = "1m"
 SYSDTAFPXY_DEFAULT_TARGET_ROWS = 60
-SYSDTAFPXY_TRANSFORM_ATR_PERIOD = 14
-SYSDTAFPXY_FIXED_BRICK_SIZE = 2.0
+SYSDTAFPXY_FIXED_BRICK_SIZE = 2.5
+if (
+    not 1 <= len(SYSDTAFPXY_SELECTED_MODE) <= 2
+    or any(char not in "012345678" for char in SYSDTAFPXY_SELECTED_MODE)
+):
+    raise ValueError("SYSDTAFPXY_SELECTED_MODE must contain one or two digits from 0 to 8.")
 
 SYSPLCHRTPXY_OHLC_MODE = 1
 SYSPLCHRTPXY_SMA_WINDOW = 4
 SYSPLCHRTPXY_FETCH_INTERVAL = "1m"
 SYSPLCHRTPXY_TARGET_ROWS = 60
+if SYSPLCHRTPXY_OHLC_MODE not in {1, 2, 3, 4, 5, 6}:
+    raise ValueError("SYSPLCHRTPXY_OHLC_MODE must be between 1 and 6.")
 
 SYSSTRNDPXY_VARIANT = "DUAL"
 SYSSTRNDPXY_ST1_PERIOD = 1.4
@@ -50,59 +56,94 @@ SYSSTRNDPXY_SMA_PERIOD = 50
 SYSSTRNDPXY_COMBO_ST_PERIOD = 10
 SYSSTRNDPXY_COMBO_ST_FACTOR = 3.0
 SYSSTRNDPXY_COMBO_SMA_PERIOD = 50
+if SYSSTRNDPXY_VARIANT not in {"DUAL", "SINGLE", "SMA50", "COMBO_FORCE"}:
+    raise ValueError("SYSSTRNDPXY_VARIANT must be DUAL, SINGLE, SMA50, or COMBO_FORCE.")
 
 SYSDTSTPXY_ST1_PERIOD = 3.0
 SYSDTSTPXY_ST1_FACTOR = 1.4
-SYSDTSTPXY_ST2_PERIOD = 3.0
-SYSDTSTPXY_ST2_FACTOR = 1.4
 
 SYSSADXPXY_USE_TSMA = True
 SYSSADXPXY_MA_PERIOD = 50
 SYSSADXPXY_SUPERTREND_PERIOD = 10
 SYSSADXPXY_SUPERTREND_FACTOR = 3.0
+SYSSADXPXY_FORCE_BASE = 1.0
+SYSSADXPXY_FORCE_BOOST = 1.2
+SYSSADXPXY_FORCE_NEUTRAL = 1.1
+SYSMKTPXY_DEBUG_ENABLED = True
+SYSRIGPXY_DEBUG_ENABLED = False
 
 SYSKATRPXY_ATR_MODE = 3
+if SYSKATRPXY_ATR_MODE not in {1, 2, 3}:
+    raise ValueError("SYSKATRPXY_ATR_MODE must be 1 (static), 2 (true ATR), or 3 (dynamic).")
 SYSKATRPXY_ATR_STATIC_VALUE = 7
 SYSKATRPXY_TRUE_ATR_PERIOD = 4
 SYSKATRPXY_TRUE_ATR_MAX = 10.0
 SYSKATRPXY_TRUE_ATR_MIN_ROWS = 5
+SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE = 4.0
+SYSKATRPXY_DEPTH_ATR_MINIMUM = 5
 
 SYSPWERPXY_LOOKBACK_PERIOD = 5
 SYSDPTPXY_LAST_N = 21
 
+# Entry signal interpretation and averaging.
 EXEAGTPXY_SYSTEM_A_BASE_THRESHOLD = 8.2
 EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD = 1.4
 EXEAGTPXY_ABS_CAP = 77.0
 EXEAGTPXY_FORCE_DEFAULT = 1.2
 
-EXEACGPXY_REBUY_ENABLED = True
-EXEACGPXY_MAX_LAYERS = 5
 EXEACGPXY_COOL_DOWN_SECONDS = 30
-EXEACGPXY_MARKET_START = dt_time(9, 17)
-EXEACGPXY_MARKET_END = dt_time(15, 10)
 
+EXEAMSPXY_MAX_LAYERS = 5
+EXEAMSPXY_ORDER_EXCHANGE_SEGMENT = "nse_fo"
+EXEAMSPXY_ORDER_PRODUCT = "NRML"
+EXEAMSPXY_ORDER_PRICE = "0"
+EXEAMSPXY_ORDER_TYPE = "MKT"
+EXEAMSPXY_ORDER_VALIDITY = "DAY"
+EXEAMSPXY_ORDER_TRANSACTION_TYPE = "B"
+EXEAMSPXY_ORDER_AMO = "NO"
+
+# Entry pipeline.
+EXEENTRPXY_DEBUG_ENABLED = False
+EXEENTRPXY_PREOPEN_START = dt_time(9, 14)
+EXEENTRPXY_PREOPEN_END = dt_time(9, 16)
+EXEENTRPXY_ENTRY_CUTOFF = dt_time(15, 10)
+EXEENTRPXY_SQUAREOFF_END = dt_time(15, 50)
+
+# Manual force-order command.
+EXEFORCEPXY_DEBUG_ENABLED = True
+EXEFORCEPXY_NIFTY_LOT_SIZE = 65
+EXEFORCEPXY_ORDER_EXCHANGE_SEGMENT = "nse_fo"
+EXEFORCEPXY_ORDER_PRODUCT = "NRML"
+EXEFORCEPXY_ORDER_PRICE = "0"
+EXEFORCEPXY_ORDER_TYPE = "MKT"
+EXEFORCEPXY_ORDER_VALIDITY = "DAY"
+EXEFORCEPXY_ORDER_TRANSACTION_TYPE = "B"
+EXEFORCEPXY_ORDER_AMO = "NO"
+
+# Averaging and order-data pipelines.
 EXEAVXPXY_USE_OVERALL_LOSS = True
+EXEAVXPXY_REBUY_ENABLED = True
+EXEAVXPXY_MARKET_START = dt_time(9, 17)
+EXEAVXPXY_MARKET_END = dt_time(15, 10)
+EXEAVXPXY_DEFAULT_ATR = 5.0
+EXEAVGPXY_IDLE_EXIT_MODE = "one"
+EXEOMSPXY_DEBUG_ENABLED = False
 
+# Target, loss, and dynamic target calculations.
 EXETGTPXY_EXIT_KEY_COLUMN = "exit"
-EXETGTPXY_ATR_FLOOR = 1.4
-EXETGTPXY_ATR_MIN = 5.0
+EXETGTPXY_MIN_TARGET_PCT = 1.4
+EXETGTPXY_MIN_ATR_VALUE = 5.0
 EXETGTPXY_TGT_PCT_NOT_ALIGNED = 1.4
 EXETGTPXY_MAX_TARGET_CAP = 77.0
 EXETGTPXY_MODE = "DYNAMIC"  # "DYNAMIC" (mirrored LGT) or "STATIC" (aligned=99%, not_aligned=1.4%)
+if EXETGTPXY_MODE not in {"DYNAMIC", "STATIC"}:
+    raise ValueError("EXETGTPXY_MODE must be DYNAMIC or STATIC.")
 EXETGTPXY_STATIC_ALIGNED = 99.0  # Used only when MODE="STATIC"
-
-EXELGTPXY_BASE_LOSS = 1.0  # 1×ATR base loss threshold
 
 EXEDYNPXY_DECAY_RATE_PER_MIN = 0.0001
 EXEDYNPXY_PNL_THRESHOLD = 0.0
 
-EXEOTMPXY_DISTANCE_BY_WEEKDAY = {
-    0: 100,
-    1: 100,
-    2: 100,
-    3: 100,
-    4: 100,
-}
+# Option-symbol selection.
 EXEOTMPXY_DEFAULT_DISTANCE = 100
 
 RUNNIFTYPXY_STRIKE_STEP = 50
@@ -114,15 +155,12 @@ RUNNIFTYPXY_HOLIDAYS = (
     "25-Dec-2026",
 )
 
-EXEENTRPXY_PREOPEN_START = dt_time(9, 14)
-EXEENTRPXY_PREOPEN_END = dt_time(9, 16)
-EXEENTRPXY_ENTRY_CUTOFF = dt_time(15, 10)
-EXEENTRPXY_SQUAREOFF_END = dt_time(15, 50)
-
+# Stop-loss, counter-leg, regular exit, and square-off behavior.
 EXESLPXY_FIXED_SL_BUFFER = 10.0
 EXESLPXY_MIN_PRICE = 2.0
 
 EXECBUYPXY_ACTION = "YES"
+EXECBUYPXY_DEBUG_ENABLED = False
 EXECBUYPXY_LOCK_SECS = 6
 EXECBUYPXY_CUTOFF = dt_time(15, 10)
 EXECBUYPXY_EXIT_KEY_COLUMN = "exit"
@@ -134,6 +172,7 @@ EXECBUYPXY_MAX_PER_DAY = 0  # Unlimited counter-buy when opposite side empty
 EXECBUYPXY_LOCK_KEEP_SECS = 600
 
 EXEEXITPXY_PNL_EXIT_MIN = 140
+EXEEXITPXY_DEBUG_ENABLED = False
 EXEEXITPXY_EXIT_LOCK_SECS = 5
 EXEEXITPXY_EXIT_LOCK_KEEP_SECS = 600
 EXEEXITPXY_SQUAREOFF_SCRIPT = "exesqrpxy.py"
@@ -148,28 +187,57 @@ EXEEXITPXY_ORDER_PRODUCT = "NRML"
 EXEEXITPXY_ORDER_PRICE = "0"
 EXEEXITPXY_ORDER_TYPE = "MKT"
 EXEEXITPXY_ORDER_VALIDITY = "DAY"
+EXEEXITPXY_ORDER_TRANSACTION_TYPE = "S"
 EXEEXITPXY_ORDER_AMO = "NO"
 
 EXESQRPXY_EXIT_ALL_AFTER = dt_time(15, 25)
 
+# Portfolio risk ledger. Keep related thresholds together; the control switch
+# gates the activation-time setting below.
 RUNEXMTPXY_BRICK_SIZE = 50.0
 RUNEXMTPXY_INITIAL_LOSS_FLOOR = -2000.0
 RUNEXMTPXY_PEAK_CEILING = 2000.0
-RUNEXMTPXY_TRAILING_DROP_GAP = 2000.0
+RUNEXMTPXY_PEAK_MULTIPLIER = 2.0  # Stop = initial floor + peak × multiplier.
+
+RUNEXIOPXY_READ_ATTEMPTS = 3
+RUNEXIOPXY_READ_RETRY_DELAY = 0.3
+RUNEXIOPXY_WRITE_RETRIES = 2
+RUNEXIOPXY_WRITE_RETRY_DELAY_SECONDS = 0.2
 
 RUNEXACPXY_RISK_ACTION = "YES"
+if RUNEXACPXY_RISK_ACTION not in {"YES", "NO"}:
+    raise ValueError("RUNEXACPXY_RISK_ACTION must be YES or NO.")
 RUNEXACPXY_BREACH_TICKS_REQUIRED = 3
 RUNEXACPXY_TICK_MIN_GAP_SECONDS = 10
 RUNEXACPXY_LEDGER_BASIS_GUARD = True
 RUNEXACPXY_VIEW_ONLY_ENV = "PXY_VIEW_ONLY"
+RUNEXACPXY_CNTRLRSKBAR = "NO"  # NO: current behavior; YES: fresh 13:15 IST baseline.
+if RUNEXACPXY_CNTRLRSKBAR not in {"YES", "NO"}:
+    raise ValueError("RUNEXACPXY_CNTRLRSKBAR must be 'YES' or 'NO'.")
+RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME = (
+    dt_time(13, 15) if RUNEXACPXY_CNTRLRSKBAR == "YES" else None
+)
 
-# Backwards-compatible shared names used by existing modules outside this
-# strategy configuration migration.
-TICKER = SYSCNFGPXY_TICKER
-TIMEZONE = SYSCNFGPXY_TIMEZONE
-PARAMS = {
-    "ticker": SYSCNFGPXY_TICKER,  # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
-}
+RUNEXACPXY_DEBUG_ENABLED = False
+
+# Risk-ledger liquidation support and order-ledger filtering.
+RUNEXLQDPXY_FLAT_CONFIRM_TIMEOUT_SECONDS = 10.0
+RUNEXLQDPXY_FLAT_CONFIRM_POLL_SECONDS = 2.0
+RUNEXLQDPXY_SQUAREOFF_TIMEOUT_SECONDS = 120
+
+RUNLILOPXY_DEFAULT_FILTER_TIME = "09:16:00"
+
+# Point-based test replay uses production session gates by default, with its
+# own owner-prefixed settings so replay policy is explicit and independently tunable.
+TSTPOINTBTPXY_MARKET_OPEN = dt_time(9, 16)
+TSTPOINTBTPXY_MARKET_CLOSE = dt_time(15, 29)
+TSTPOINTBTPXY_PREOPEN_START = dt_time(9, 14)
+TSTPOINTBTPXY_PREOPEN_END = dt_time(9, 16)
+TSTPOINTBTPXY_ENTRY_CUTOFF = dt_time(15, 10)
+TSTPOINTBTPXY_SQUAREOFF_END = dt_time(15, 50)
+TSTPOINTBTPXY_FORCE_EXIT_TIME = dt_time(15, 14)
+TSTPOINTBTPXY_TRADING_DAY_START = dt_time(9, 15)
+TSTPOINTBTPXY_TRADING_DAY_END = dt_time(15, 30)
 
 # ---------------- SYSTEM SELF TEST ----------------
 if __name__ == "__main__":

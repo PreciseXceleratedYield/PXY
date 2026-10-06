@@ -9,13 +9,15 @@ if str(GRANDPARENT) not in sys.path:
     sys.path.append(str(GRANDPARENT))
 
 # Now that sys.path is updated, we can import from syscnfgpxy
-from syscnfgpxy import TICKER 
+from syscnfgpxy import SYSCNFGPXY_TICKER
 
 # --- NIFTY SYMBOL BUILDER ---
 from runniftypxy import get_symbol as nifty_symbol_builder
 
 # ---------------- DISPATCHER ----------------
 def get_symbol(price, side, otm_distance):
-    if str(TICKER).upper().strip() != "^NSEI":
-        raise ValueError(f"Only the Nifty 50 ticker is supported: {TICKER}")
+    if str(SYSCNFGPXY_TICKER).upper().strip() != "^NSEI":
+        raise ValueError(
+            f"Only the Nifty 50 ticker is supported: {SYSCNFGPXY_TICKER}"
+        )
     return nifty_symbol_builder(price, side, otm_distance)
