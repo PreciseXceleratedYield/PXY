@@ -351,6 +351,9 @@ body{
 
     <!-- CHART -->
     <div class="tab-pane" id="paneChart">
+        <div class="pane-hdr hdr-chart">
+            <span onclick="openPanelLink('chart')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">📈 Chart</span>
+        </div>
         <div id="chartToolbar" style="flex-shrink:0;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:6px;padding:5px 10px;background:var(--bg2);border-bottom:1px solid var(--border);">
             <span onclick="setChartView('chart')" id="viewBtnChart" style="font-size:9px;color:var(--accent);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--accent);white-space:nowrap;">📈 Chart</span>
             <span onclick="setChartView('game')" id="viewBtnGame" style="font-size:9px;color:var(--muted);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;">🏓 Game</span>
