@@ -18,6 +18,9 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 - `RUNMODE` is the intentional environment override for
   `SYSMODEPXY_RUN_MODE`; the production menu reads the resolved value from
   `syscnfgpxy.py`. Shell scripts select deployment mode, not strategy knobs.
+- `SYSCNFGPXY_ACTION_COOLDOWN_SECONDS` is the single shared cooldown for
+  averaging, counter-buy, exit de-duplication, and the production engine's
+  between-cycle pause. Its current value is 7 seconds.
 - A local module alias that directly references a config value is only an
   implementation alias, not a competing override. Function arguments such as
   `fetch_yf_data(period=..., interval=...)` are intentional per-call overrides
@@ -64,6 +67,17 @@ replacement. A unique timestamped `.bak` copy is created before each replace;
 concurrent edits are serialized. Saving does not restart the engine, and
 already-running processes continue using imported values until deliberately
 restarted.
+
+## Option strike selection
+
+`EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
+builder for every buying script. It currently defaults to `ATM`, which ignores
+caller OTM flags and distances and uses a zero-point offset. `OTMFIX` applies
+`EXEOTMPXY_FIXED_DISTANCE` (currently 100 NIFTY points). `OTMDYN` selects a
+weekday offset from `EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES`, ordered Monday to
+Friday (currently 200, 150, 100, 50, 0 points). Dynamic selection fails closed
+on weekends when no weekday distance is defined. The symbol builder rounds the
+result to the configured strike step.
 
 ## Web server file access
 

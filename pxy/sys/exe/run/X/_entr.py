@@ -2,23 +2,22 @@ import sys
 import os
 import json
 import asyncio
-from datetime import datetime, date, timedelta, time as dt_time
+from datetime import datetime, time as dt_time
+from pathlib import Path
 import pytz
 from colorama import Fore, init, Style
 from _sgnl import _pad_line_to_42  
 from sysmodepxy import dispatch_mode
 
+RUN_DIR = Path(__file__).resolve().parents[1]
+if str(RUN_DIR) not in sys.path:
+    sys.path.insert(0, str(RUN_DIR))
+from runniftypxy import get_symbol as build_nifty_symbol
+
 TICKER = "^NSEI"  
 LOT_SIZE = 65     
 MAX_QTY = 65      
 STATE_FILE = "trades.json"
-
-HOLIDAYS = [
-    "26-Jan-2026", "06-Mar-2026", "20-Mar-2026", "31-Mar-2026",
-    "03-Apr-2026", "14-Apr-2026", "01-May-2026", "15-Aug-2026",
-    "02-Oct-2026", "21-Oct-2026", "06-Nov-2026", "24-Nov-2026", "25-Dec-2026"
-]
-HOLIDAYS = [datetime.strptime(h, "%d-%b-%Y").date() for h in HOLIDAYS]
 
 init(autoreset=True)
 
@@ -43,26 +42,12 @@ def broadcast_signal_to_ledger(current_signal):
     except Exception as e:
         print(f"⚠️ Signal Sync Error: {str(e)[:20]}")
 
-def get_target_tuesday():
-    today = date.today()
-    days_until_tue = (1 - today.weekday() + 7) % 7
-    if today.weekday() <= 1: days_until_tue += 7
-    target_tue = today + timedelta(days=days_until_tue)
-    while target_tue in HOLIDAYS: target_tue -= timedelta(days=1)
-    return target_tue
-
-def get_nifty_symbol(strike):
+def get_nifty_symbol(price):
     try:
-        if not strike or strike == 0: return "NA"
-        opt_type = "CE"
-        expiry = get_target_tuesday()
-        yy = str(expiry.year)[-2:]
-        if (expiry + timedelta(days=7)).month != expiry.month:
-            return f"NIFTY{yy}{expiry.strftime('%b').upper()}{int(strike)}{opt_type}"
-        else:
-            m_map = {10: "O", 11: "N", 12: "D"}
-            return f"NIFTY{yy}{m_map.get(expiry.month, str(expiry.month))}{expiry.day:02d}{int(strike)}{opt_type}"
-    except: return "NA"
+        return build_nifty_symbol(price, "OTMBUY")
+    except Exception as error:
+        print(f"⚠️ Strike resolution failed: {error}")
+        return "NA"
 
 def get_global_position_summary(client):
     gl, gs = 0, 0
@@ -143,16 +128,17 @@ async def trade_cycle():
 
     # Trigger entries only if no matching running direction exists
     if normalized_signal == "BUY" and global_longs == 0:
-        target_strike = round(ltp / 100) * 100
-        symbol = get_nifty_symbol(target_strike)
+        symbol = get_nifty_symbol(ltp)
+        if symbol == "NA":
+            return
         execute_order(client, symbol, LOT_SIZE, "B")
     elif normalized_signal == "BUY":
         print(_pad_line_to_42("🔒 HOLD | BULL ACTIVE | NO ADD", "\033[93m", "\033[0m"))
 
     elif normalized_signal == "SELL" and global_shorts == 0:
-        base_100 = round(ltp / 100) * 100
-        target_strike = base_100 - 50 if abs(ltp - (base_100 - 50)) < abs(ltp - (base_100 + 50)) else base_100 + 50
-        symbol = get_nifty_symbol(target_strike)
+        symbol = get_nifty_symbol(ltp)
+        if symbol == "NA":
+            return
         execute_order(client, symbol, LOT_SIZE, "S")
     elif normalized_signal == "SELL":
         print(_pad_line_to_42("🔒 HOLD | BEAR ACTIVE | NO ADD", "\033[93m", "\033[0m"))

@@ -3,9 +3,13 @@ from pathlib import Path
 from datetime import datetime, date, timedelta
 
 SYS_DIR = Path(__file__).resolve().parents[2]
+EXE_DIR = SYS_DIR / "exe"
 if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
+if str(EXE_DIR) not in sys.path:
+    sys.path.insert(0, str(EXE_DIR))
 
+from exeotmpxy import get_dynamic_otm_distance, get_strike_mode
 from syscnfgpxy import (
     RUNNIFTYPXY_ATM_BUFFER,
     RUNNIFTYPXY_HOLIDAYS,
@@ -46,9 +50,11 @@ def round_to_strike(price):
 
 # ---------------- MAIN ----------------
 
-def get_symbol(price, side, otm_distance):
+def get_symbol(price, side, otm_distance=None):
     """
-    Signal-driven symbol builder:
+    Build an option symbol using the centrally configured strike mode.
+    `otm_distance` remains accepted for compatibility but cannot override config.
+
     - Math is accumulated directly first (Price + Buffer ± Weekday Distance)
     - Enforces valid exchange tracking by rounding to the nearest 50 step at the end.
     """
@@ -66,16 +72,21 @@ def get_symbol(price, side, otm_distance):
         else:
             return "NA"
 
+        # The central mode overrides caller-supplied OTM flags/distances so no
+        # buying script can bypass the configured strike policy.
+        strike_mode = get_strike_mode()
+        distance = get_dynamic_otm_distance()
+
         # ---------------- STRIKE RESOLUTION ----------------
         # 1. Establish the raw baseline price plus your daily buffer
         raw_base = float(price) + float(ATM_BUFFER)
 
-        # 2. Add or subtract the weekday distance offset first in pure float arithmetic
-        if "OTM" in side:
+        # 2. Apply the centrally configured fixed/dynamic offset.
+        if strike_mode != "ATM":
             if opt_type == "CE":
-                raw_strike = raw_base + float(otm_distance)
+                raw_strike = raw_base + float(distance)
             else:
-                raw_strike = raw_base - float(otm_distance)
+                raw_strike = raw_base - float(distance)
         else:
             raw_strike = raw_base
 
