@@ -251,9 +251,23 @@ def _process_lilo_orders_production(client, strict=False):
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
             
-        df = pd.DataFrame(res["data"]) 
+        df = pd.DataFrame(res["data"])
+        if df.empty:
+            print("ℹ️ No order rows returned; LILO has nothing to process.")
+            _print_summary(0, 0)
+            return pd.DataFrame(), pd.DataFrame()
+
+        if "ordSt" not in df.columns:
+            message = "Kotak order report is missing the required 'ordSt' field."
+            if strict:
+                raise RuntimeError(message)
+            print(f"⚠️ {message}")
+            _print_summary(0, 0)
+            return pd.DataFrame(), pd.DataFrame()
+
         df = df[df["ordSt"].astype(str).str.lower().isin(["complete", "traded"])].copy()
         if df.empty: 
+            print("ℹ️ No completed orders returned; LILO has nothing to process.")
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
             

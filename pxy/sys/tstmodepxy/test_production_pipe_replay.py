@@ -39,6 +39,26 @@ class ProductionPipeReplayTests(unittest.TestCase):
         self.assertIs(__import__("os").system, system_call)
         self.assertIs(__import__("subprocess").run, process_run)
 
+    def test_lilo_handles_empty_broker_order_report_as_idle(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-lilo-empty-orders-") as temp:
+            broker = SimulatedBroker()
+            with ProductionPipeReplay(
+                SYS_DIR, broker, Path(temp) / "state"
+            ) as engine:
+                with patch.object(
+                    broker,
+                    "order_report",
+                    return_value={"stat": "Ok", "stCode": "200", "data": []},
+                ), redirect_stdout(StringIO()) as output:
+                    open_df, closed_df = engine.lilo._process_lilo_orders_production(
+                        broker, strict=True
+                    )
+
+            self.assertTrue(open_df.empty)
+            self.assertTrue(closed_df.empty)
+            self.assertIn("No order rows returned", output.getvalue())
+            self.assertNotIn("TAG MATCH ERROR", output.getvalue())
+
     def test_entry_pipe_scenarios_are_driven_by_market_snapshot_rows(self):
         scenarios = pd.DataFrame(
             [
