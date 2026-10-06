@@ -39,6 +39,26 @@ class ConfigEditorTests(unittest.TestCase):
         self.assertEqual(by_name["TOKEN_VALUE"]["value"], "[redacted]")
         self.assertFalse(by_name["DERIVED_VALUE"]["editable"])
 
+    def test_new_strike_settings_are_visible_and_can_be_added_to_older_config(self):
+        settings, _ = config_editor._metadata(self.original)
+        by_name = {setting["key"]: setting for setting in settings}
+        self.assertEqual(by_name["EXEOTMPXY_STRIKE_MODE"]["value"], "ATM")
+        self.assertEqual(by_name["EXEOTMPXY_STRIKE_MODE"]["options"], ["ATM", "OTMFIX", "OTMDYN"])
+        result = config_editor._write({
+            "EXEOTMPXY_STRIKE_MODE": "OTMDYN",
+            "EXEOTMPXY_FIXED_DISTANCE": 100,
+            "EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES": [200, 150, 100, 50, 0],
+        })
+        self.assertEqual(result["updated"], [
+            "EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES",
+            "EXEOTMPXY_FIXED_DISTANCE",
+            "EXEOTMPXY_STRIKE_MODE",
+        ])
+        source = self.config_path.read_text(encoding="utf-8")
+        self.assertIn("EXEOTMPXY_STRIKE_MODE = 'OTMDYN'", source)
+        self.assertIn("EXEOTMPXY_FIXED_DISTANCE = 100", source)
+        self.assertIn("EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES = (200, 150, 100, 50, 0)", source)
+
     def test_write_validates_creates_backup_and_preserves_file_mode(self):
         self.config_path.chmod(0o640)
         result = config_editor._write({
