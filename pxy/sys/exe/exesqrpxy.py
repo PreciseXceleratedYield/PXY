@@ -2,10 +2,14 @@
 import sys 
 import os 
 import subprocess
+from pathlib import Path
 
-# Add the 'run' subfolder of the current script to Python path 
+# Add the system and run directories before importing local modules.
 current_dir = os.path.dirname(os.path.abspath(__file__)) 
 run_dir = os.path.join(current_dir, "run") 
+sys_dir = str(Path(__file__).resolve().parent.parent)
+if sys_dir not in sys.path:
+    sys.path.insert(0, sys_dir)
 sys.path.append(run_dir) 
 
 from runclntpxy import get_session 

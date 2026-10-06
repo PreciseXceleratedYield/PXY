@@ -219,7 +219,11 @@ while true; do
                 echo "[-] Web dashboard already running."
             fi
 
-            RUNMODE=$(cd /home/pxy/pxy/sys && python3 -c 'import syscnfgpxy; print(syscnfgpxy.SYSMODEPXY_RUN_MODE)' 2>/dev/null)
+            PYTHON_BIN=python3
+            if [ -x "$HOME/env/bin/python" ]; then
+                PYTHON_BIN="$HOME/env/bin/python"
+            fi
+            RUNMODE=$(cd /home/pxy/pxy/sys && "$PYTHON_BIN" -c 'import syscnfgpxy; print(syscnfgpxy.SYSMODEPXY_RUN_MODE)')
             if [ -z "$RUNMODE" ]; then
                 echo "[X] Could not read RUNMODE from syscnfgpxy.py; engine was not started."
             elif [ "$RUNMODE" = "PRD" ]; then

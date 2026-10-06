@@ -1,4 +1,11 @@
 # AVERAGING PIPELINE RUNNER: exeavgpxy.py
+import sys
+from pathlib import Path
+
+SYS_DIR = Path(__file__).resolve().parent.parent
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+
 import pandas as pd
 from colorama import init, Fore
 
