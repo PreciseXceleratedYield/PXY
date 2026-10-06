@@ -31,7 +31,7 @@ def generate_mock_ohlc(
         periods=target_rows,
         freq=pd.Timedelta(interval),
     )
-    rng = np.random.default_rng()
+    rng = np.random.default_rng(0)
     close = base_price + rng.normal(0, 35) + np.cumsum(
         rng.normal(0, 4, size=target_rows)
     )
@@ -161,9 +161,18 @@ MOCK_SCENARIOS = (
 )
 
 
-def process_lilo_orders(client=None, strict=False, timezone="Asia/Kolkata"):
+def process_lilo_orders(
+    client=None, strict=False, timezone="Asia/Kolkata", scenario_index=None
+):
     now = pd.Timestamp.now(tz=timezone).to_pydatetime()
-    scenario_index = selected_scenario_index(now.minute)
+    if scenario_index is None:
+        scenario_index = selected_scenario_index(now.minute)
+    if (
+        not isinstance(scenario_index, int)
+        or isinstance(scenario_index, bool)
+        or not 0 <= scenario_index < len(MOCK_SCENARIOS)
+    ):
+        raise ValueError(f"scenario_index must be between 0 and {len(MOCK_SCENARIOS) - 1}")
     name, open_specs, closed_specs = MOCK_SCENARIOS[scenario_index]
 
     def make_record(spec, offset, is_closed):
@@ -282,16 +291,23 @@ def run_counter_leg(remaining_df=None):
 
 
 def skip_live_averaging():
-    now = pd.Timestamp.now(tz="Asia/Kolkata").to_pydatetime()
-    index = selected_scenario_index(now.minute)
-    scenario = SCENARIOS[index]
-    result = evaluate_scenario(scenario)
+    results = [
+        (scenario, evaluate_scenario(scenario))
+        for scenario in SCENARIOS
+    ]
     checked_gates = evaluate_pipe_gate_matrix()
+    scenarios = [
+        f"{scenario['name']}: entry={result['entry'] or 'none'}, "
+        f"target_exit={result['target_exit']}, "
+        f"counter={result['counter_leg'] or 'none'}, "
+        f"averaging={result['averaging']}"
+        for scenario, result in results
+    ]
     print(
-        f"CHK PIPE SCENARIO {index + 1}/10: PASS — {scenario['name']} | "
-        f"entry={result['entry'] or 'none'}, target_exit={result['target_exit']}, "
-        f"counter={result['counter_leg'] or 'none'}, averaging={result['averaging']} | "
+        f"CHK PIPE SCENARIOS {len(results)}/{len(SCENARIOS)}: PASS | "
         f"{checked_gates} production pipe gate checks passed"
     )
+    for scenario in scenarios:
+        print(f"  {scenario}")
     print("CHK MODE: decision checks only; no orders sent.")
     return True

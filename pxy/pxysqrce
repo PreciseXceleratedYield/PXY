@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # ------------------------------
 # Run exesqrpxy.py from ~/pxy/sys/exe
 # ------------------------------

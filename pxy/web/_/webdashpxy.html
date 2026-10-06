@@ -859,7 +859,7 @@ let chart, lastSt = null, lastCloses = null;
 async function load() {
     let data;
     try {
-        const res = await fetch('./webchrtpxy.json');
+        const res = await fetch('/api/web-data/webchrtpxy');
         data = await res.json();
     } catch {
         data = generateDemoData();
@@ -1077,7 +1077,7 @@ function drawMomentumBar(stVals, closes) {
 async function loadPnl() {
     let trades = [];
     try {
-        const res = await fetch('./webpnlpxy.json?_=' + Date.now());
+        const res = await fetch('/api/web-data/webpnlpxy?_=' + Date.now());
         trades = await res.json();
     } catch { trades = []; }
 
@@ -1099,50 +1099,6 @@ document.addEventListener('keydown', e => {
     if (e.key === 'Escape') menu.classList.remove('open');
 });
 /* ══════════════════════════════════════
-   BACKGROUND MUSIC
-══════════════════════════════════════ */
-(function () {
-
-    const audio = document.getElementById('bgMusic');
-
-    if (!audio) return;
-
-    audio.volume = 0.35;
-
-    async function playMusic() {
-
-        try {
-
-            await audio.play();
-
-            console.log('🎵 PXY Music Started');
-
-        } catch (err) {
-
-            // Mobile browsers require user interaction
-            const unlock = async () => {
-
-                try {
-
-                    await audio.play();
-
-                    console.log('🎵 Music Unlocked');
-
-                    document.removeEventListener('click', unlock);
-                    document.removeEventListener('touchstart', unlock);
-
-                } catch (e) {}
-            };
-
-            document.addEventListener('click', unlock);
-            document.addEventListener('touchstart', unlock);
-        }
-    }
-
-    window.addEventListener('load', playMusic);
-
-})();
-/* ══════════════════════════════════════
    START
 ══════════════════════════════════════ */
 load();
@@ -1150,8 +1106,5 @@ loadPnl();
 setInterval(load,    3000);
 setInterval(loadPnl, 5000);
 </script>
-<audio id="bgMusic" preload="auto" loop playsinline>
-    <source src="pxy.mp3" type="audio/mpeg">
-</audio>
 </body>
 </html>

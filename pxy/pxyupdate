@@ -8,6 +8,26 @@ if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     exit 1
 fi
 
+CONFIG_FILE="$REPO_DIR/sys/syscnfgpxy.py"
+CONFIG_BACKUP=""
+if [ -f "$CONFIG_FILE" ]; then
+    CONFIG_BACKUP="$(mktemp "$REPO_DIR/sys/.syscnfgpxy.py.XXXXXX")"
+    if ! cp -p "$CONFIG_FILE" "$CONFIG_BACKUP"; then
+        rm -f "$CONFIG_BACKUP"
+        echo "[X] Could not back up $CONFIG_FILE." >&2
+        exit 1
+    fi
+fi
+
+restore_config() {
+    if [ -n "$CONFIG_BACKUP" ] && [ -f "$CONFIG_BACKUP" ]; then
+        cp -p "$CONFIG_BACKUP" "$CONFIG_FILE"
+        rm -f "$CONFIG_BACKUP"
+    fi
+}
+trap restore_config EXIT
+trap 'exit 1' HUP INT TERM
+
 echo " ******** get updates *******"
 echo
 # Always update the intended checkout, regardless of the caller's directory.
@@ -18,6 +38,10 @@ echo " ****** reset software ******"
 echo
 # Reset local changes to match the remote main branch.
 git -C "$REPO_DIR" reset --hard origin/main
+if [ -n "$CONFIG_BACKUP" ]; then
+    mv -f "$CONFIG_BACKUP" "$CONFIG_FILE"
+    CONFIG_BACKUP=""
+fi
 echo "Updated checkout to $(git -C "$REPO_DIR" rev-parse --short HEAD)."
 echo
 

@@ -15,6 +15,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server }); 
 
 const PORT = process.env.PORT || 80; 
+const WEB_DIR = path.resolve(__dirname, 'web');
 
 /* ========================= GLOBAL ERROR HANDLING ========================= */
 process.on('uncaughtException', (err) => {
@@ -25,20 +26,19 @@ process.on('unhandledRejection', (reason, promise) => {
     console.error('[CRITICAL] Unhandled Rejection at:', promise, 'reason:', reason);
 });
 
-/* ========================= STATIC ROOT & PARSING ========================= */ 
-app.use((req, res, next) => {
-    let requestedPath;
-    try {
-        requestedPath = path.posix.normalize(`/${decodeURIComponent(req.path)}`).toLowerCase();
-    } catch {
-        return res.sendStatus(400);
-    }
-    if (/^\/sys\/(?:syscnfgpxy\.py(?:\.|$)|pxyconfigwebpxy\.py$)/.test(requestedPath)) {
+/* ========================= WEB FILES & PARSING ========================= */
+app.use('/web', (req, res, next) => {
+    if (path.extname(req.path).toLowerCase() !== '.html') {
         return res.sendStatus(404);
     }
     return next();
-});
-app.use(express.static(__dirname)); 
+}, express.static(WEB_DIR, {
+    index: false,
+    dotfiles: 'deny',
+    setHeaders(res) {
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+    }
+}));
 app.use(express.json()); 
 
 /* ========================= HOSTNAME ROUTE ========================= */ 
@@ -107,15 +107,31 @@ app.post('/api/pxy-config', authorizePxyConfig, (req, res) => {
     runPxyConfigTool('write', req.body, res);
 });
 
-/* ========================= EXPLICIT JSON ROUTE ========================= */ 
-app.get('/pxy.json', (req, res) => { 
-    res.sendFile(path.join(__dirname, 'pxy.json')); 
-}); 
-
 /* ========================= MAIN PAGE ========================= */ 
 app.get('/', (req, res) => { 
-    res.sendFile(path.join(__dirname, 'pxy.html')); 
+    res.redirect(302, '/web/webpxy.html');
 }); 
+app.get('/pxy.html', (req, res) => {
+    res.redirect(302, '/web/webpxy.html');
+});
+
+/* ========================= DASHBOARD DATA API ========================= */
+const WEB_DATA_FILES = new Set([
+    'webactpxy', 'webavgpxy', 'webchrtpxy', 'webdashpxy', 'webdaypxy',
+    'webpnlpxy', 'webpospxy', 'webrinkopxy'
+]);
+app.get('/api/web-data/:name', (req, res) => {
+    const name = req.params.name;
+    if (!WEB_DATA_FILES.has(name)) {
+        return res.sendStatus(404);
+    }
+    res.set('Cache-Control', 'no-store');
+    return res.sendFile(path.join(WEB_DIR, `${name}.json`), (error) => {
+        if (error && !res.headersSent) {
+            res.status(error.statusCode || 500).json({ ok: false, error: 'Dashboard data is unavailable.' });
+        }
+    });
+});
 
 /* ========================= RUN SCRIPT WITH PYTHON ENV ACTIVATED ========================= */ 
 const ALLOWED_SCRIPTS = [ 
@@ -123,18 +139,25 @@ const ALLOWED_SCRIPTS = [
     'pxyldgr'
 ]; 
 const SCRIPT_DIR = '/home/pxy/pxy'; 
+const ACTION_PASSWORD = '1';
+
+function hasValidActionPassword(value) {
+    const supplied = Buffer.from(value, 'utf8');
+    const expected = Buffer.from(ACTION_PASSWORD, 'utf8');
+    return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
+}
 
 app.post('/run/:script', (req, res) => { 
-    const script = req.params.script.trim(); 
-    const pwd = (req.body.pwd || '').trim(); 
+    const script = req.params.script.trim();
+    const pwd = typeof req.body?.pwd === 'string' ? req.body.pwd.trim() : '';
     
     console.log(`[RUN] script="${script}" allowed=${ALLOWED_SCRIPTS.includes(script)}`); 
     
     if (!ALLOWED_SCRIPTS.includes(script)) {
         return res.status(403).json({ ok: false, error: `Script "${script}" is not allowed` }); 
     } 
-    if (!pwd) { 
-        return res.status(400).json({ ok: false, error: 'Password required' }); 
+    if (!hasValidActionPassword(pwd)) {
+        return res.status(401).json({ ok: false, error: 'Invalid action password.' });
     } 
     
     const runAsUser = process.env.USER === 'root' ? 'sudo -u pxy ' : '';
