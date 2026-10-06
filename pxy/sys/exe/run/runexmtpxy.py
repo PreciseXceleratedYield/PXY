@@ -4,7 +4,6 @@
 # MASTER RISK LEDGER, part 3 of 6: the maths only. No file IO, no broker calls.
 # Renko trailing stop + hard loss floor on "game P&L". Split out of runexacpxy.py (pure move).
 import sys
-from datetime import time as dt_time
 from pathlib import Path
 
 import pandas as pd
@@ -25,16 +24,16 @@ BRICK_SIZE = RUNEXMTPXY_BRICK_SIZE
 INITIAL_LOSS_FLOOR = RUNEXMTPXY_INITIAL_LOSS_FLOOR
 PEAK_CEILING = RUNEXMTPXY_PEAK_CEILING
 TRAILING_DROP_GAP = RUNEXMTPXY_TRAILING_DROP_GAP
-MIDDAY_RISK_ACTIVATION_TIME = dt_time(13, 15)
 # =======================================================================
 
 
-def midday_risk_activation_due(control_enabled, activated, current_time):
-    """Check whether the enabled risk control should snapshot its 13:15 IST baseline."""
+def midday_risk_activation_due(control_enabled, activated, current_time, activation_time):
+    """Check whether enabled risk control reached its configured activation time."""
     return bool(
         control_enabled
         and not activated
-        and current_time >= MIDDAY_RISK_ACTIVATION_TIME
+        and activation_time is not None
+        and current_time >= activation_time
     )
 
 

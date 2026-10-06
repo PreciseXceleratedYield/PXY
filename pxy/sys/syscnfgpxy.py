@@ -1,16 +1,14 @@
-"""Central runtime configuration, grouped and prefixed by owning script."""
+"""Central runtime configuration.
+
+Keep tunable runtime values grouped by subsystem and prefixed with their owner
+module's name. See CONFIGURATION.md for the layout and conditional settings.
+"""
 import os
 from datetime import time as dt_time
 
 import pytz
 
-# ---------------- LOCAL SYSTEM CONFIGURATION ----------------
-# -----------------------------------------------------------------------------
-# Shared strategy and execution configuration.
-# Name each value after its owning module: <MODULE>_<PARAMETER>.
-# Keep credentials, presentation-only values, and file-system paths out of this
-# module; credentials belong in the existing secret/environment configuration.
-# -----------------------------------------------------------------------------
+# System-wide defaults and execution mode.
 SYSCNFGPXY_TICKER = "^NSEI"
 SYSCNFGPXY_TIMEZONE = pytz.timezone("Asia/Kolkata")
 SYSMODEPXY_RUN_MODE = os.environ.get(
@@ -19,7 +17,7 @@ SYSMODEPXY_RUN_MODE = os.environ.get(
 if SYSMODEPXY_RUN_MODE not in {"PRD", "CHK", "SIM"}:
     raise ValueError("RUNMODE must be one of 'PRD', 'CHK', or 'SIM'.")
 
-# Launchers and production engine scheduling.
+# Engine launchers and scheduling.
 SYSEXEPXY_MARKET_OPEN = dt_time(9, 16)
 SYSEXEPXY_MARKET_CLOSE = dt_time(15, 45)
 SYSEXEPXY_SUPERVISOR_INTERVAL_SECONDS = 1
@@ -32,7 +30,7 @@ EXEPXYPXY_SUB_ITERATION_PAUSE_SECONDS = 4
 EXEPXYPXY_IDLE_PAUSE_SECONDS = 7
 EXEPXYPXY_IDLE_POLL_SECONDS = 60
 
-# Market data and signal processing.
+# Data ingestion, chart generation, and signal calculation.
 SYSDTAFPXY_TIMEZONE = "Asia/Kolkata"
 SYSDTAFPXY_SELECTED_MODE = "00"
 SYSDTAFPXY_FORCE_NIFTY_FUT = False
@@ -75,6 +73,7 @@ SYSKATRPXY_TRUE_ATR_MIN_ROWS = 5
 SYSPWERPXY_LOOKBACK_PERIOD = 5
 SYSDPTPXY_LAST_N = 21
 
+# Entry signal interpretation and averaging.
 EXEAGTPXY_SYSTEM_A_BASE_THRESHOLD = 8.2
 EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD = 1.4
 EXEAGTPXY_ABS_CAP = 77.0
@@ -86,14 +85,14 @@ EXEACGPXY_COOL_DOWN_SECONDS = 30
 EXEACGPXY_MARKET_START = dt_time(9, 17)
 EXEACGPXY_MARKET_END = dt_time(15, 10)
 
-# Entry pipeline settings.
+# Entry pipeline.
 EXEENTRPXY_DEBUG_ENABLED = False
 EXEENTRPXY_PREOPEN_START = dt_time(9, 14)
 EXEENTRPXY_PREOPEN_END = dt_time(9, 16)
 EXEENTRPXY_ENTRY_CUTOFF = dt_time(15, 10)
 EXEENTRPXY_SQUAREOFF_END = dt_time(15, 50)
 
-# Manual force-order command settings.
+# Manual force-order command.
 EXEFORCEPXY_DEBUG_ENABLED = True
 EXEFORCEPXY_NIFTY_LOT_SIZE = 65
 EXEFORCEPXY_ORDER_EXCHANGE_SEGMENT = "nse_fo"
@@ -104,11 +103,12 @@ EXEFORCEPXY_ORDER_VALIDITY = "DAY"
 EXEFORCEPXY_ORDER_TRANSACTION_TYPE = "B"
 EXEFORCEPXY_ORDER_AMO = "NO"
 
-# Averaging and order data pipeline settings.
+# Averaging and order-data pipelines.
 EXEAVXPXY_USE_OVERALL_LOSS = True
 EXEAVGPXY_IDLE_EXIT_MODE = "one"
 EXEOMSPXY_DEBUG_ENABLED = False
 
+# Target, loss, and dynamic target calculations.
 EXETGTPXY_EXIT_KEY_COLUMN = "exit"
 EXETGTPXY_ATR_FLOOR = 1.4
 EXETGTPXY_ATR_MIN = 5.0
@@ -122,6 +122,7 @@ EXELGTPXY_BASE_LOSS = 1.0  # 1×ATR base loss threshold
 EXEDYNPXY_DECAY_RATE_PER_MIN = 0.0001
 EXEDYNPXY_PNL_THRESHOLD = 0.0
 
+# Option-symbol selection.
 EXEOTMPXY_DISTANCE_BY_WEEKDAY = {
     0: 100,
     1: 100,
@@ -140,6 +141,7 @@ RUNNIFTYPXY_HOLIDAYS = (
     "25-Dec-2026",
 )
 
+# Stop-loss, counter-leg, regular exit, and square-off behavior.
 EXESLPXY_FIXED_SL_BUFFER = 10.0
 EXESLPXY_MIN_PRICE = 2.0
 
@@ -176,7 +178,8 @@ EXEEXITPXY_ORDER_AMO = "NO"
 
 EXESQRPXY_EXIT_ALL_AFTER = dt_time(15, 25)
 
-# Risk-ledger runtime settings.
+# Portfolio risk ledger. Keep related thresholds together; the control switch
+# gates the activation-time setting below.
 RUNEXMTPXY_BRICK_SIZE = 50.0
 RUNEXMTPXY_INITIAL_LOSS_FLOOR = -2000.0
 RUNEXMTPXY_PEAK_CEILING = 2000.0
@@ -190,10 +193,16 @@ RUNEXACPXY_BREACH_TICKS_REQUIRED = 3
 RUNEXACPXY_TICK_MIN_GAP_SECONDS = 10
 RUNEXACPXY_LEDGER_BASIS_GUARD = True
 RUNEXACPXY_VIEW_ONLY_ENV = "PXY_VIEW_ONLY"
-RUNEXACPXY_CNTRLRSKBAR = "NO"  # "YES" snapshots a fresh risk baseline at 13:15 IST.
+RUNEXACPXY_CNTRLRSKBAR = "NO"  # NO: current behavior; YES: fresh 13:15 IST baseline.
+if RUNEXACPXY_CNTRLRSKBAR not in {"YES", "NO"}:
+    raise ValueError("RUNEXACPXY_CNTRLRSKBAR must be 'YES' or 'NO'.")
+RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME = (
+    dt_time(13, 15) if RUNEXACPXY_CNTRLRSKBAR == "YES" else None
+)
 
 RUNEXACPXY_DEBUG_ENABLED = False
 
+# Risk-ledger liquidation support and order-ledger filtering.
 RUNEXLQDPXY_FLAT_CONFIRM_TIMEOUT_SECONDS = 10.0
 RUNEXLQDPXY_FLAT_CONFIRM_POLL_SECONDS = 2.0
 RUNEXLQDPXY_SQUAREOFF_TIMEOUT_SECONDS = 120

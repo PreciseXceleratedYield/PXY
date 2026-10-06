@@ -24,6 +24,7 @@ if str(SYS_DIR) not in sys.path:
 
 from syscnfgpxy import (
     RUNEXACPXY_CNTRLRSKBAR,
+    RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
     RUNEXACPXY_DEBUG_ENABLED,
     RUNEXACPXY_LEDGER_BASIS_GUARD,
@@ -176,7 +177,10 @@ def _tick(client, open_df, closed_df):
     fmt_winners = force_zero_ending(totals["winners"])
 
     if midday_risk_activation_due(
-        RISK_CANDLE_CONTROL_ENABLED, risk_control_activated, now_ist().time()
+        RISK_CANDLE_CONTROL_ENABLED,
+        risk_control_activated,
+        now_ist().time(),
+        RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
     ):
         pnl_offset = total_raw_pnl
         historical_peak_record = 0.0

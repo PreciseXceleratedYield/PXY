@@ -19,13 +19,27 @@ import runexstpxy
 
 class MiddayRiskControlTests(unittest.TestCase):
     def test_yes_activates_at_or_after_1315_ist(self):
-        self.assertFalse(midday_risk_activation_due(True, False, time(13, 14, 59)))
-        self.assertTrue(midday_risk_activation_due(True, False, time(13, 15)))
-        self.assertTrue(midday_risk_activation_due(True, False, time(13, 16)))
+        activation_time = time(13, 15)
+        self.assertFalse(
+            midday_risk_activation_due(True, False, time(13, 14, 59), activation_time)
+        )
+        self.assertTrue(
+            midday_risk_activation_due(True, False, time(13, 15), activation_time)
+        )
+        self.assertTrue(
+            midday_risk_activation_due(True, False, time(13, 16), activation_time)
+        )
 
     def test_no_and_already_activated_do_not_take_a_new_baseline(self):
-        self.assertFalse(midday_risk_activation_due(False, False, time(14, 0)))
-        self.assertFalse(midday_risk_activation_due(True, True, time(14, 0)))
+        self.assertFalse(
+            midday_risk_activation_due(False, False, time(14, 0), None)
+        )
+        self.assertFalse(
+            midday_risk_activation_due(True, False, time(14, 0), None)
+        )
+        self.assertFalse(
+            midday_risk_activation_due(True, True, time(14, 0), time(13, 15))
+        )
 
     def test_activation_state_persists_across_ledger_restarts(self):
         with tempfile.TemporaryDirectory(prefix="pxy-risk-state-test-") as temp:
