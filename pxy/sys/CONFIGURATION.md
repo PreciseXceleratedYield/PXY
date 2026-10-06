@@ -97,14 +97,16 @@ network boundary.
 Keep a feature's switch before dependent settings. When disabled, dependent
 settings should resolve to `None` rather than retain an active schedule.
 
-- `RUNEXACPXY_CNTRLRSKBAR = "NO"` preserves current risk-ledger behavior.
-- Set it to `"YES"` to activate a fresh risk baseline at 13:15 IST.
+- `RUNEXACPXY_CNTRLRSKBAR = "YES"` activates a fresh risk baseline at 13:15 IST.
+- Before 13:15 IST, the ledger displays telemetry only; risk exits and breach
+  progression are suppressed. After activation, regular risk rules apply to
+  P&L changes from the fresh baseline.
+- Set it to `"NO"` to disable the timed baseline and preserve immediate risk
+  actions from the start of the session.
 - `RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME` is derived from the switch: `None`
   for `"NO"` and 13:15 for `"YES"`.
-- Before activation, the ledger continues calculating and displaying values,
-  but suppresses risk exits and breach progression. At activation it snapshots
-  current portfolio P&L, resets peak/breach tracking, then applies the regular
-  risk rules to changes from that baseline.
+- At activation the ledger snapshots current portfolio P&L and resets
+  peak/breach tracking.
 
 ## Other conditional settings
 
