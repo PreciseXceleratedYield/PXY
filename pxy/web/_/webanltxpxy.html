@@ -472,8 +472,8 @@ let candles = [], trades = [], btChart = null, activeTrade = null;
 /* ── LOAD ── */
 async function load() {
     const [cr, pr] = await Promise.allSettled([
-        fetch('./webdaypxy.json?_=' + Date.now()),
-        fetch('./webpnlpxy.json?_='        + Date.now())
+        fetch('/api/web-data/webdaypxy?_=' + Date.now()),
+        fetch('/api/web-data/webpnlpxy?_='        + Date.now())
     ]);
     if (cr.status === 'fulfilled' && cr.value.ok) candles = parseSplit(await cr.value.json());
     if (pr.status === 'fulfilled' && pr.value.ok) trades  = await pr.value.json();

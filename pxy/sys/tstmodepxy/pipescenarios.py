@@ -82,7 +82,7 @@ SCENARIOS = (
         "entry": ("NONE", 0, 0, None),
         "target": (0, 100, 500, 150, False),
         "counter": ("BULL", ({"symbol": "NIFTYPE", "qty": 1},), "pxybuyce"),
-        "average": (False, False, 0, 1, False, False, 0, -9, -2, -2, 5, {"CE": False, "PE": False}),
+        "average": (False, False, 0, 1, False, False, 0, -9, -2, -2, 5, {"CE": False, "PE": True}),
     },
     {
         "name": "BUY flat target, PE averaging at loss threshold",

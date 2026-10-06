@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 # ------------------------------------------------------------------------------
 # PXY® Trading System - Ledger Orchestrator Engine (pxyldgr)
 # Protected by international copyright laws. All rights reserved globally.

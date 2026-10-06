@@ -169,7 +169,7 @@ function overshoot(run,lgt,tgt){
 }
 async function pollData(){
     try{
-        const d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());
+        const d=await fetch('/api/web-data/webavgpxy?_='+Date.now()).then(r=>r.json());
         if(d)data=d;
         document.getElementById('statusLine').textContent='live · updates every 3s';
     }catch(e){
@@ -200,7 +200,7 @@ function classifySignal(v){
 }
 async function pollDash(){
     try{
-        const d=await fetch('./webdashpxy.json?_='+Date.now()).then(r=>r.json());
+        const d=await fetch('/api/web-data/webdashpxy?_='+Date.now()).then(r=>r.json());
         if(d){
             dashExit=d.exit;
             dashAtr=Number(d.atr);

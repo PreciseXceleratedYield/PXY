@@ -8,8 +8,6 @@
 <meta name="apple-mobile-web-app-title" content="PXY®">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#06080d">
-<link rel="manifest" href="/web/manifest.json">
-<link rel="apple-touch-icon" href="/web/icons/pxy192.png">
 <title>PXY®</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -729,7 +727,7 @@ if(reconnectBtn)reconnectBtn.addEventListener('click',()=>{term.clear();connect(
 /* ── SIGNAL DASH ── */
 async function loadDash(){
     try{
-        const d=await fetch('./webdashpxy.json?_='+Date.now()).then(r=>r.json());
+        const d=await fetch('/api/web-data/webdashpxy?_='+Date.now()).then(r=>r.json());
         const setV=(id,val,c)=>{
             const el=$(id);if(!el)return;
             el.textContent=val??'—';
@@ -810,7 +808,7 @@ function setChartView(view){
 }
 async function loadChart(){
     try{
-        const data=await fetch('./webchrtpxy.json?_='+Date.now()).then(r=>r.json());
+        const data=await fetch('/api/web-data/webchrtpxy?_='+Date.now()).then(r=>r.json());
         if(!Array.isArray(data)||!data.length)return;
         const candles=data.map(d=>({
             o:d.open??d.o??null, h:d.high??d.h??null, l:d.low??d.l??null,
@@ -994,7 +992,7 @@ let prevPosPnl=null,prevTradePnl=null;
 function flashEl(el,cls){if(!el)return;el.classList.remove('flash-up','flash-down');void el.offsetWidth;el.classList.add(cls);}
 async function loadPos(){
     let data={positions:[]};
-    try{data=await fetch('./webactpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    try{data=await fetch('/api/web-data/webactpxy?_='+Date.now()).then(r=>r.json());}catch{}
     const open=data.positions||[];
     const total=open.reduce((s,d)=>s+(d.pnl||0),0);
     const posPnlChanged=prevPosPnl!==null&&total!==prevPosPnl;
@@ -1068,7 +1066,7 @@ async function openTradeChart(t){
 
     // load day candles
     try{
-        const data=await fetch('./webdaypxy.json?_='+Date.now()).then(r=>r.json());
+        const data=await fetch('/api/web-data/webdaypxy?_='+Date.now()).then(r=>r.json());
         if(Array.isArray(data)){
             tradeCandles=data.map(r=>({t:r.time||r.timestamp||null,c:r.Close??r.close,st:r.st??null}));
         }else if(data.columns){
@@ -1196,7 +1194,7 @@ new ResizeObserver(()=>{
 /* ── TRADES — wire click ── */
 async function loadTrades(){
     let data=[];
-    try{data=await fetch('./webpnlpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    try{data=await fetch('/api/web-data/webpnlpxy?_='+Date.now()).then(r=>r.json());}catch{}
     const total=data.reduce((s,d)=>s+(d.PNL||0),0);
     const tradePnlChanged=prevTradePnl!==null&&total!==prevTradePnl;
     const tradePnlUp=tradePnlChanged&&total>prevTradePnl;
@@ -1244,7 +1242,7 @@ async function loadTrades(){
 /* ── RISK BAR ── */
 let riskData={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-3000,pnl_offset:0,updated_timestamp:''};
 async function loadRisk(){
-    try{riskData=await fetch('./webrinkopxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    try{riskData=await fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json());}catch{}
     const peak=Math.round(riskData.session_peak_pnl??0);
     const net=Math.round(riskData.current_net_pnl??0);
     const floor=Math.round(riskData.active_exit_line??-3000);
@@ -1447,14 +1445,6 @@ document.querySelectorAll('.amenu-btn').forEach(btn=>{
 function cancelUpdate(){$('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;}
 function confirmUpdate(){
     const pwd=$('updPwd').value.trim();if(!pwd||!pendingScript)return;
-    if(pwd!=='1'){
-        const inp=$('updPwd');
-        inp.style.borderColor=cssVar('--bear');inp.value='';inp.placeholder='wrong password';
-        setTimeout(()=>{inp.style.borderColor='var(--border2)';inp.placeholder='password';},1000);
-        inp.focus();
-        return;
-    }
-
     const script=pendingScript;$('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;
     const orig=logo.innerHTML;logo.innerHTML='⏳';
     fetch(`/run/${script}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pwd})})
@@ -1503,7 +1493,7 @@ function confirmUpdate(){
 initTerm();connect();
 let optLegendOpen=false;
 async function loadOptSummary(){
-    let d=null;try{d=await fetch('./webavgpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    let d=null;try{d=await fetch('/api/web-data/webavgpxy?_='+Date.now()).then(r=>r.json());}catch{}
     d=d||{};
     const ov=$('optOverlay');
     const colMeta=[
@@ -1551,9 +1541,6 @@ loadDash();loadChart();loadPos();loadTrades();loadRisk();loadOptSummary();
 setInterval(loadDash,3000);setInterval(loadChart,3000);
 setInterval(loadPos,3000);setInterval(loadTrades,5000);setInterval(loadRisk,4000);setInterval(loadOptSummary,3000);
 
-if('serviceWorker' in navigator){
-    navigator.serviceWorker.register('/web/sw.js').catch(()=>{});
-}
 </script>
 </body>
 </html>
