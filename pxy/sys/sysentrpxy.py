@@ -2,7 +2,7 @@ import pandas as pd
 from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
 
-def get_entry_signal(df=None, mode="MKT"):
+def get_entry_signal(df=None, mode="ST"):
     """
     System Router Matrix with Mode Switch:
     
