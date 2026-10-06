@@ -29,11 +29,3 @@ The following implementation changes are merged into `main`:
 **Merged pull requests:** #1 (configuration editor), #2 (game-page actions),
 #3 (web protections), #4 (strike policy and cooldown), and #5 (13:15 risk-bar
 control). The risk-bar setting update is included in `dd795f08`.
-
-## Discussed, not implemented
-
-SQLite migration of local runtime files, durable order-intent tracking,
-cross-cycle ambiguous-order reconciliation, a unified execution coordinator,
-event replay, and expanded operational health telemetry were discussed as
-possible future work. No implementation from those discussions was retained
-or merged. In particular, no automatic cancel/retry mechanism was added.
