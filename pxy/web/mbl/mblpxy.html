@@ -325,7 +325,7 @@ body{
     <button class="amenu-btn ce"     data-script="pxysqrce">⛔ SQUARE OFF CE<span class="amenu-sub">Close all call positions</span></button>
     <button class="amenu-btn pe"     data-script="pxybuype">✅ BUY PE<span class="amenu-sub">Force buy put option</span></button>
     <button class="amenu-btn pe"     data-script="pxysqrpe">⛔ SQUARE OFF PE<span class="amenu-sub">Close all put positions</span></button>
-    <button class="amenu-btn config" data-script="pxyconfig">⚙️ PXYCONFIG<span class="amenu-sub">Open config on GitHub</span></button>
+    <button class="amenu-btn config" data-script="pxyconfig">⚙️ PXYCONFIG<span class="amenu-sub">Configure runtime settings</span></button>
     <button class="amenu-btn update" data-script="pxyupdate">🔄 PXYUPDATE<span class="amenu-sub">Pull latest & reset</span></button>
     <button id="amenuClose" style="margin-top:4px;padding:7px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;width:100%;">✕ Close</button>
 </div>
@@ -908,7 +908,7 @@ document.addEventListener('click',e=>{if(!amenu.contains(e.target)&&e.target!==l
 document.querySelectorAll('.amenu-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
         const script=btn.dataset.script;
-        if(script==='pxyconfig'){window.open('https://github.com/kcbpcc/V1L58/tree/main','_blank');amenu.style.display='none';return;}
+        if(script==='pxyconfig'){window.location.href='/web/webcnfgpxy.html';amenu.style.display='none';return;}
         pendingScript=script;amenu.style.display='none';
         $('updTitle').textContent='▶ '+script;$('updPwd').value='';
         $('updPopup').style.display='flex';setTimeout(()=>$('updPwd').focus(),80);

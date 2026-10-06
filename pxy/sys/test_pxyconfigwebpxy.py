@@ -1,0 +1,91 @@
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+import pxyconfigwebpxy as config_editor
+
+
+class ConfigEditorTests(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.config_path = Path(self.temp_dir.name) / "syscnfgpxy.py"
+        self.original = (
+            "from datetime import time as dt_time\n"
+            "FLAG = True\n"
+            "RUNNIFTYPXY_STRIKE_STEP = 2\n"
+            "CLOCK = dt_time(9, 0)\n"
+            "SYSDTAFPXY_SELECTED_MODE = '00'\n"
+            "RUNEXMTPXY_INITIAL_LOSS_FLOOR = -1000\n"
+            "HOLIDAYS = ('one', 'two')\n"
+            "SCRIPTS = {'CE': 'buy', 'PE': 'sell'}\n"
+            "TOKEN_VALUE = 'must stay hidden'\n"
+            "DERIVED_VALUE = RUNNIFTYPXY_STRIKE_STEP * 2\n"
+            "if RUNEXMTPXY_INITIAL_LOSS_FLOOR < -2000:\n"
+            "    raise ValueError('loss floor is out of range')\n"
+        )
+        self.config_path.write_text(self.original, encoding="utf-8")
+        self.config_patch = patch.object(config_editor, "CONFIG_PATH", self.config_path)
+        self.config_patch.start()
+
+    def tearDown(self):
+        self.config_patch.stop()
+        self.temp_dir.cleanup()
+
+    def test_read_marks_derived_and_sensitive_values_read_only(self):
+        settings, _ = config_editor._metadata(self.original)
+        by_name = {setting["key"]: setting for setting in settings}
+        self.assertFalse(by_name["TOKEN_VALUE"]["editable"])
+        self.assertEqual(by_name["TOKEN_VALUE"]["value"], "[redacted]")
+        self.assertFalse(by_name["DERIVED_VALUE"]["editable"])
+
+    def test_write_validates_creates_backup_and_preserves_file_mode(self):
+        self.config_path.chmod(0o640)
+        result = config_editor._write({
+            "FLAG": False,
+            "RUNNIFTYPXY_STRIKE_STEP": 4,
+            "CLOCK": "10:15:30",
+            "SYSDTAFPXY_SELECTED_MODE": "8",
+        })
+        self.assertEqual(result["updated"], ["CLOCK", "FLAG", "RUNNIFTYPXY_STRIKE_STEP", "SYSDTAFPXY_SELECTED_MODE"])
+        backup = self.config_path.with_name(result["backup"])
+        self.assertEqual(backup.read_text(encoding="utf-8"), self.original)
+        self.assertEqual(self.config_path.stat().st_mode & 0o777, 0o640)
+        source = self.config_path.read_text(encoding="utf-8")
+        self.assertIn("FLAG = False", source)
+        self.assertIn("RUNNIFTYPXY_STRIKE_STEP = 4", source)
+        self.assertIn("CLOCK = dt_time(10, 15, 30, 0)", source)
+        self.assertIn("SYSDTAFPXY_SELECTED_MODE = '8'", source)
+
+    def test_invalid_types_choices_and_bounds_leave_config_untouched(self):
+        for updates in (
+            {"FLAG": "false"},
+            {"RUNNIFTYPXY_STRIKE_STEP": -1},
+            {"SYSDTAFPXY_SELECTED_MODE": "99"},
+            {"UNKNOWN": 1},
+        ):
+            with self.subTest(updates=updates):
+                with self.assertRaises(ValueError):
+                    config_editor._write(updates)
+                self.assertEqual(self.config_path.read_text(encoding="utf-8"), self.original)
+
+    def test_invalid_candidate_does_not_replace_config(self):
+        with self.assertRaisesRegex(ValueError, "loss floor is out of range"):
+            config_editor._write({"RUNEXMTPXY_INITIAL_LOSS_FLOOR": -3000})
+        self.assertEqual(self.config_path.read_text(encoding="utf-8"), self.original)
+        self.assertEqual(list(self.config_path.parent.glob(".syscnfgpxy.*.tmp")), [])
+
+    def test_structured_values_keep_their_shape_and_types(self):
+        for value in (["one"], ["one", 2], {"CE": "buy"}):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    config_editor._write({"HOLIDAYS": value} if isinstance(value, list) else {"SCRIPTS": value})
+                self.assertEqual(self.config_path.read_text(encoding="utf-8"), self.original)
+        config_editor._write({"HOLIDAYS": ["three", "four"], "SCRIPTS": {"CE": "call", "PE": "put"}})
+        text = self.config_path.read_text(encoding="utf-8")
+        self.assertIn("HOLIDAYS = ('three', 'four')", text)
+        self.assertIn("'CE': 'call'", text)
+
+
+if __name__ == "__main__":
+    unittest.main()

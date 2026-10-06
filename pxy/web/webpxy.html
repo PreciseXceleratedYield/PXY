@@ -460,31 +460,10 @@ body{
     <button class="amenu-btn ce"     data-script="pxysqrce">⛔ SQUARE OFF CE<span class="amenu-sub">Close all call positions</span></button>
     <button class="amenu-btn pe"     data-script="pxybuype">✅ BUY PE<span class="amenu-sub">Force buy put option</span></button>
     <button class="amenu-btn pe"     data-script="pxysqrpe">⛔ SQUARE OFF PE<span class="amenu-sub">Close all put positions</span></button>
-    <button class="amenu-btn config" data-script="pxyconfig">⚙️ PXYCONFIG<span class="amenu-sub">Edit broker credentials</span></button>
+    <button class="amenu-btn config" data-script="pxyconfig">⚙️ PXYCONFIG<span class="amenu-sub">Configure runtime settings</span></button>
     <button class="amenu-btn update" data-script="pxyupdate">🔄 PXYUPDATE<span class="amenu-sub">Pull latest & reset</span></button>
     <button id="amenuClose" style="margin-top:4px;padding:7px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;width:100%;">✕ Close</button>
 </div>
-
-<!-- ══ PXYCONFIG EDITOR MODAL ══ -->
-<div id="cfgModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.65);align-items:center;justify-content:center;">
-    <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:20px;width:min(92vw,340px);max-height:80vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;box-shadow:0 2px 10px rgba(0,0,0,0.35);">
-        <div style="font-family:'Syne',sans-serif;font-weight:800;font-size:14px;letter-spacing:0.06em;text-align:center;">⚙️ PXYCONFIG</div>
-        <div id="cfgStatus" style="font-size:10px;color:var(--muted);text-align:center;">loading...</div>
-        <div id="cfgFields" style="display:flex;flex-direction:column;gap:8px;"></div>
-        <div style="display:flex;gap:10px;margin-top:4px;">
-            <button id="cfgCancel" style="flex:1;padding:9px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;cursor:pointer;">Cancel</button>
-            <button id="cfgSave" style="flex:1;padding:9px;border-radius:7px;border:1px solid var(--accent);background:rgba(59,130,246,0.12);color:var(--accent);font-family:'Syne',sans-serif;font-weight:700;font-size:13px;cursor:pointer;">Save</button>
-        </div>
-    </div>
-</div>
-<style>
-.cfg-field{display:flex;flex-direction:column;gap:3px;}
-.cfg-label{font-size:9px;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);}
-.cfg-row{display:flex;gap:6px;align-items:center;}
-.cfg-input{flex:1;padding:8px 10px;border-radius:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-family:'DM Mono',monospace;font-size:12px;outline:none;}
-.cfg-toggle{flex-shrink:0;cursor:pointer;font-size:13px;padding:4px 6px;color:var(--muted);}
-.cfg-toggle:hover{color:var(--accent);}
-</style>
 
 <!-- PWD POPUP -->
 <div id="updPopup" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);align-items:center;justify-content:center;">
@@ -1457,11 +1436,7 @@ document.querySelectorAll('.amenu-btn').forEach(btn=>{
         const script=btn.dataset.script;
         if(script==='pxyconfig'){
             amenu.style.display='none';
-            pendingScript='__pxyconfig_view__';
-            $('updTitle').textContent='▶ View PXYCONFIG';
-            $('updPwd').value='';
-            $('updPopup').style.display='flex';
-            setTimeout(()=>$('updPwd').focus(),80);
+            window.location.href='/web/webcnfgpxy.html';
             return;
         }
         pendingScript=script;amenu.style.display='none';
@@ -1480,33 +1455,6 @@ function confirmUpdate(){
         return;
     }
 
-    // special path: viewing pxyconfig — password required just to open it
-    if(pendingScript==='__pxyconfig_view__'){
-        $('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;
-        openConfigModal();
-        return;
-    }
-
-    // special path: saving pxyconfig fields
-    if(pendingScript==='__pxyconfig_save__'){
-        $('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;
-        const values={};
-        CFG_FIELDS.forEach(f=>{values[f.key]=$('cfgInput_'+f.key).value;});
-        $('cfgStatus').textContent='saving...';
-        fetch('/pxyconfig-save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pwd,values})})
-        .then(r=>r.json())
-        .then(d=>{
-            if(d.ok){
-                $('cfgStatus').textContent='✓ saved';
-                setTimeout(()=>{$('cfgModal').style.display='none';},900);
-            }else{
-                $('cfgStatus').textContent='✗ '+(d.error||'save failed');
-            }
-        })
-        .catch(e=>{$('cfgStatus').textContent='✗ '+e.message;});
-        return;
-    }
-
     const script=pendingScript;$('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;
     const orig=logo.innerHTML;logo.innerHTML='⏳';
     fetch(`/run/${script}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pwd})})
@@ -1520,60 +1468,6 @@ function confirmUpdate(){
     .catch(e=>{logo.innerHTML='✗';setTimeout(()=>{logo.innerHTML=orig;},2500);
         $('aoLabel').textContent=`✗ ${script}`;$('aoText').textContent=e.message;$('actionOutput').style.display='block';});
 }
-
-/* ── PXYCONFIG EDITOR ── */
-const CFG_FIELDS=[
-    {key:'CONSUMER_KEY',    label:'Consumer Key',   masked:true},
-    {key:'CONSUMER_SECRET', label:'Consumer Secret',masked:true},
-    {key:'MOBILE_NUMBER',   label:'Mobile Number',  masked:false},
-    {key:'UCC',             label:'UCC',            masked:false},
-    {key:'MPIN',            label:'MPIN',           masked:true},
-    {key:'TOTP_SECRET_KEY', label:'TOTP Secret Key',masked:true},
-    {key:'ENVIRONMENT',     label:'Environment',    masked:false}
-];
-function buildConfigFields(values){
-    const box=$('cfgFields');
-    box.innerHTML='';
-    CFG_FIELDS.forEach(f=>{
-        const wrap=document.createElement('div');
-        wrap.className='cfg-field';
-        const val=(values&&values[f.key])||'';
-        wrap.innerHTML=`
-            <span class="cfg-label">${f.label}</span>
-            <div class="cfg-row">
-                <input class="cfg-input" id="cfgInput_${f.key}" type="${f.masked?'password':'text'}" value="${val.replace(/"/g,'&quot;')}">
-                ${f.masked?`<span class="cfg-toggle" data-key="${f.key}">👁</span>`:''}
-            </div>`;
-        box.appendChild(wrap);
-    });
-    box.querySelectorAll('.cfg-toggle').forEach(t=>{
-        t.addEventListener('click',()=>{
-            const inp=$('cfgInput_'+t.dataset.key);
-            inp.type=inp.type==='password'?'text':'password';
-        });
-    });
-}
-function openConfigModal(){
-    $('cfgModal').style.display='flex';
-    $('cfgStatus').textContent='loading...';
-    $('cfgFields').innerHTML='';
-    fetch('/pxyconfig-read').then(r=>r.json()).then(d=>{
-        if(d.ok){
-            buildConfigFields(d.values);
-            $('cfgStatus').textContent='';
-        }else{
-            $('cfgStatus').textContent='✗ '+(d.error||'read failed');
-        }
-    }).catch(e=>{$('cfgStatus').textContent='✗ '+e.message;});
-}
-$('cfgCancel').addEventListener('click',()=>{$('cfgModal').style.display='none';});
-$('cfgSave').addEventListener('click',()=>{
-    pendingScript='__pxyconfig_save__';
-    $('updTitle').textContent='▶ Save PXYCONFIG';
-    $('updPwd').value='';
-    $('updPopup').style.display='flex';
-    setTimeout(()=>$('updPwd').focus(),80);
-});
 
 /* ── Draggable Terminal/Chart divider (desktop only — resizer is hidden on mobile) ── */
 (function(){
