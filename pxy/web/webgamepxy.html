@@ -17,57 +17,127 @@ canvas{display:block;width:100%;height:100%;}
     font:700 10px 'DM Mono',monospace;color:#ffffff;letter-spacing:0.1em;text-transform:uppercase;
 }
 #gameMenuToggle{
-    position:absolute;top:18px;right:14px;z-index:5;width:42px;height:42px;border:1px solid rgba(255,255,255,.22);
-    border-radius:10px;background:rgba(24,28,38,.88);color:#fff;font:700 20px 'DM Mono',monospace;cursor:pointer;
+    position:absolute;bottom:calc(14px + env(safe-area-inset-bottom,0px));right:14px;z-index:5;width:42px;height:42px;
+    display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.22);
+    border-radius:10px;background:rgba(24,28,38,.88);color:#fff;cursor:pointer;
 }
+#gameMenuToggle:hover{background:rgba(37,45,58,.95);}
 #gameMenu{
-    position:absolute;top:68px;right:14px;z-index:5;display:none;min-width:190px;padding:8px;
+    position:absolute;bottom:calc(64px + env(safe-area-inset-bottom,0px));right:14px;z-index:5;display:none;min-width:190px;padding:8px;
     background:rgba(24,28,38,.96);border:1px solid rgba(255,255,255,.18);border-radius:10px;
     box-shadow:0 10px 30px rgba(0,0,0,.35);
 }
 #gameMenu.open{display:grid;gap:6px;}
 #gameMenu button{
+    display:flex;align-items:center;gap:8px;
     width:100%;padding:11px 12px;border:0;border-radius:7px;background:#252d3a;color:#fff;
     text-align:left;font:700 11px 'DM Mono',monospace;letter-spacing:.06em;cursor:pointer;
 }
 #gameMenu button:hover{background:#344154;}
-#gameMenuStatus{
-    position:absolute;left:10px;right:10px;bottom:12px;z-index:4;display:none;padding:10px;
-    background:rgba(24,28,38,.94);border:1px solid rgba(255,255,255,.18);border-radius:8px;
-    color:#fff;font:11px 'DM Mono',monospace;text-align:center;white-space:pre-wrap;
+/* IGNITE dialog */
+#igniteModal{
+    position:absolute;inset:0;z-index:10;display:none;align-items:center;justify-content:center;padding:16px;
+    background:rgba(8,10,16,.72);
 }
+#igniteModal.open{display:flex;}
+.ig-card{
+    position:relative;width:100%;max-width:340px;padding:18px 16px 14px;
+    background:#1d222d;border:1px solid rgba(255,255,255,.18);border-radius:12px;
+    box-shadow:0 16px 40px rgba(0,0,0,.5);color:#fff;font:11px 'DM Mono',monospace;
+}
+.ig-card h2{font:800 13px 'Syne',sans-serif;letter-spacing:.06em;margin:0 28px 8px 0;}
+.ig-card p{color:#aab2c0;line-height:1.5;margin-bottom:10px;}
+.ig-x{
+    position:absolute;top:8px;right:8px;width:28px;height:28px;border:0;border-radius:7px;
+    background:#252d3a;color:#fff;font:400 18px/1 'DM Mono',monospace;cursor:pointer;
+}
+.ig-x:hover{background:#344154;}
+#ignitePwd{
+    width:100%;padding:10px 12px;border:1px solid rgba(255,255,255,.18);border-radius:7px;
+    background:#14171f;color:#fff;font:12px 'DM Mono',monospace;outline:none;margin-bottom:10px;
+}
+#ignitePwd:focus{border-color:#f0b429;}
+#igniteOut{
+    display:none;max-height:140px;overflow:auto;margin-bottom:10px;padding:8px 10px;border-radius:7px;
+    background:#14171f;color:#fff;white-space:pre-wrap;word-break:break-word;
+}
+.ig-actions{display:flex;gap:8px;justify-content:flex-end;}
+.ig-actions button{
+    padding:9px 14px;border:0;border-radius:7px;background:#252d3a;color:#fff;
+    font:700 11px 'DM Mono',monospace;letter-spacing:.06em;cursor:pointer;
+}
+.ig-actions button:hover{background:#344154;}
+.ig-actions button.primary{background:#f0b429;color:#14171f;}
+.ig-actions button.primary:hover{background:#ffc94a;}
+.ig-actions button:disabled{opacity:.55;cursor:default;}
 </style>
 </head>
 <body>
 <div id="wrap">
     <canvas id="cv"></canvas>
     <div id="statusLine">connecting…</div>
-    <button id="gameMenuToggle" type="button" aria-label="Open PXY menu" aria-expanded="false">☰</button>
+    <button id="gameMenuToggle" type="button" aria-label="Open PXY menu" aria-expanded="false"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg></button>
     <nav id="gameMenu" aria-label="PXY actions">
-        <button id="gameConfig" type="button">⚙ PXYCONFIG</button>
-        <button id="gameIgnite" type="button">🔥 PXYIGNITE</button>
+        <button id="gameConfig" type="button"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span>PXYCONFIG</span></button>
+        <button id="gameIgnite" type="button"><span aria-hidden="true">🔥</span><span>PXYIGNITE</span></button>
     </nav>
-    <div id="gameMenuStatus" role="status" aria-live="polite"></div>
+    <div id="igniteModal" role="dialog" aria-modal="true" aria-labelledby="igniteTitle">
+        <div class="ig-card">
+            <button id="igniteClose" class="ig-x" type="button" aria-label="Close">×</button>
+            <h2 id="igniteTitle">🔥 PXYIGNITE</h2>
+            <p id="igniteDesc">This starts the ledger script. Enter the PXY action password to continue.</p>
+            <input id="ignitePwd" type="password" autocomplete="current-password" placeholder="Action password">
+            <pre id="igniteOut" role="status" aria-live="polite"></pre>
+            <div class="ig-actions">
+                <button id="igniteCancel" type="button">Close</button>
+                <button id="igniteRun" class="primary" type="button">Run</button>
+            </div>
+        </div>
+    </div>
 </div>
 <script>
 const gameMenuToggle=document.getElementById('gameMenuToggle');
 const gameMenu=document.getElementById('gameMenu');
-const gameMenuStatus=document.getElementById('gameMenuStatus');
+function closeMenu(){
+    gameMenu.classList.remove('open');
+    gameMenuToggle.setAttribute('aria-expanded','false');
+}
 gameMenuToggle.addEventListener('click',()=>{
     const open=gameMenu.classList.toggle('open');
     gameMenuToggle.setAttribute('aria-expanded',String(open));
 });
+/* CONFIG — remember this page so the config page's "Back to dashboard" returns HERE (the game page),
+   not to the main dashboard. Passed both as ?return= and via sessionStorage. */
 document.getElementById('gameConfig').addEventListener('click',()=>{
-    window.location.href='/web/webcnfgpxy.html';
+    const back=window.location.pathname+window.location.search;
+    try{sessionStorage.setItem('pxyReturnTo',back);}catch(e){}
+    window.location.href='/web/webcnfgpxy.html?return='+encodeURIComponent(back);
 });
-document.getElementById('gameIgnite').addEventListener('click',async()=>{
-    gameMenu.classList.remove('open');
-    gameMenuToggle.setAttribute('aria-expanded','false');
-    if(!window.confirm('Run PXYIGNITE now? This starts the ledger script.'))return;
-    const pwd=window.prompt('Enter PXY action password:');
-    if(!pwd)return;
-    gameMenuStatus.style.display='block';
-    gameMenuStatus.textContent='Starting PXYIGNITE…';
+/* IGNITE dialog (with close button) */
+const igniteModal=document.getElementById('igniteModal');
+const ignitePwd=document.getElementById('ignitePwd');
+const igniteOut=document.getElementById('igniteOut');
+const igniteRun=document.getElementById('igniteRun');
+const igniteDesc=document.getElementById('igniteDesc');
+function openIgnite(){
+    closeMenu();
+    ignitePwd.value='';ignitePwd.style.display='';
+    igniteOut.style.display='none';igniteOut.textContent='';
+    igniteDesc.style.display='';
+    igniteRun.disabled=false;igniteRun.textContent='Run';
+    igniteModal.classList.add('open');
+    setTimeout(()=>ignitePwd.focus(),30);
+}
+function closeIgnite(){
+    igniteModal.classList.remove('open');
+    ignitePwd.value='';
+}
+async function runIgnite(){
+    const pwd=ignitePwd.value;
+    if(!pwd){ignitePwd.focus();return;}
+    igniteRun.disabled=true;
+    igniteOut.style.display='block';
+    igniteOut.textContent='Starting PXYIGNITE…';
     try{
         const response=await fetch('/run/pxyldgr',{
             method:'POST',
@@ -76,17 +146,24 @@ document.getElementById('gameIgnite').addEventListener('click',async()=>{
         });
         const result=await response.json();
         if(!response.ok||!result.ok)throw new Error(result.error||`Request failed (${response.status})`);
-        gameMenuStatus.textContent=(result.output||'PXYIGNITE completed.').trim();
-        if(result.error)gameMenuStatus.textContent+=`\n${result.error}`;
+        igniteOut.textContent=(result.output||'PXYIGNITE completed.').trim();
+        if(result.error)igniteOut.textContent+=`\n${result.error}`;
+        ignitePwd.value='';
     }catch(error){
-        gameMenuStatus.textContent=`PXYIGNITE failed: ${error.message}`;
+        igniteOut.textContent=`PXYIGNITE failed: ${error.message}`;
     }
-});
+    igniteRun.disabled=false;
+    igniteRun.textContent='Run again';
+}
+document.getElementById('gameIgnite').addEventListener('click',openIgnite);
+document.getElementById('igniteClose').addEventListener('click',closeIgnite);
+document.getElementById('igniteCancel').addEventListener('click',closeIgnite);
+igniteRun.addEventListener('click',runIgnite);
+ignitePwd.addEventListener('keydown',(e)=>{if(e.key==='Enter')runIgnite();});
+igniteModal.addEventListener('click',(e)=>{if(e.target===igniteModal)closeIgnite();});
+document.addEventListener('keydown',(e)=>{if(e.key==='Escape'){closeIgnite();closeMenu();}});
 document.addEventListener('click',(event)=>{
-    if(!gameMenu.contains(event.target)&&event.target!==gameMenuToggle){
-        gameMenu.classList.remove('open');
-        gameMenuToggle.setAttribute('aria-expanded','false');
-    }
+    if(!gameMenu.contains(event.target)&&!gameMenuToggle.contains(event.target))closeMenu();
 });
 
 const cv=document.getElementById('cv');
