@@ -3,6 +3,11 @@ import os
 import sys
 import math
 from pathlib import Path
+
+SYS_DIR = Path(__file__).resolve().parent.parent
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
+
 import pandas as pd
 import numpy as np
 from colorama import Fore, Style
