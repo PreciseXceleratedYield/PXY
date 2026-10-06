@@ -18,6 +18,7 @@ from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
 from syssadxpxy import calculate_adx
 from syssmapxy import get_sma          # ✅ SMA Tool Imported
+from syscnfgpxy import SYSENTRPXY_SIGNAL_MODE
 
 # ✅ KEEP CONSOLE ALIGNMENT
 TOTAL_WIDTH = 42
@@ -104,7 +105,7 @@ def get_full_snapshot():
     result["pe_power"] = safe_int(pe)
 
     # ===== ENTRY ENGINE ROUTING =====
-    entry, exit = get_entry_signal(master_df)
+    entry, exit = get_entry_signal(master_df, mode=SYSENTRPXY_SIGNAL_MODE)
     result["entry"] = entry
     result["exit"] = exit
 
