@@ -20,7 +20,6 @@ import time
 CONFIG_PATH = Path(__file__).with_name("syscnfgpxy.py")
 ENUMS = {
     "SYSMODEPXY_RUN_MODE": ("PRD", "CHK", "SIM"),
-    "SYSENTRPXY_SIGNAL_MODE": ("ST", "MKT"),
     "SYSDTAFPXY_SELECTED_MODE": tuple(str(mode) for mode in range(9))
     + tuple(f"{side}{trend}" for side in range(9) for trend in range(9)),
     "SYSSTRNDPXY_VARIANT": ("DUAL", "SINGLE", "SMA50", "COMBO_FORCE"),

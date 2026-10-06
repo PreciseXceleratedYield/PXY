@@ -23,12 +23,9 @@ import execbuypxy
 import exeexitpxy
 import exeforcepxy
 import runniftypxy
-import sysdashpxy
-import sysentrpxy
 from syscnfgpxy import (
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
-    SYSENTRPXY_SIGNAL_MODE,
     SYSDTAFPXY_FIXED_BRICK_SIZE,
     EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
     EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
@@ -39,59 +36,6 @@ import syskatrpxy
 
 
 class ConfigurationWiringTests(unittest.TestCase):
-    def test_mkt_signal_mode_does_not_calculate_supertrend(self):
-        frame = pd.DataFrame({"Close": [1.0]})
-        with (
-            patch.object(sysentrpxy, "get_signal", return_value=("BEAR", None)),
-            patch.object(
-                sysentrpxy,
-                "calculate_supertrend",
-                side_effect=AssertionError("Supertrend must be bypassed in MKT mode"),
-            ),
-        ):
-            signals = sysentrpxy.get_entry_signal(frame, mode="MKT")
-
-        self.assertEqual(signals, ("SELL", "BEAR"))
-
-    def test_live_snapshot_passes_configured_signal_mode_to_entry_router(self):
-        frame = pd.DataFrame({"Open": [1.0], "Close": [1.0]})
-        with (
-            patch.object(sysdashpxy, "SYSENTRPXY_SIGNAL_MODE", "MKT"),
-            patch.object(sysdashpxy, "fetch_yf_data", return_value=frame),
-            patch.object(sysdashpxy, "get_candle_visual", return_value=""),
-            patch.object(
-                sysdashpxy,
-                "get_pxy_data",
-                return_value=("close", "open", "color", pd.DataFrame()),
-            ),
-            patch.object(
-                sysdashpxy,
-                "detect_pxy_flip_signal",
-                return_value=("BULL", 0, 1, 1),
-            ),
-            patch.object(sysdashpxy, "calculate_adx", return_value=(1.0, 1.0)),
-            patch.object(sysdashpxy, "calculate_atr", return_value=pd.Series([1.0])),
-            patch.object(sysdashpxy, "calculate_dynamic_k", return_value=1),
-            patch.object(sysdashpxy, "detect_raw_direction", return_value=(1, "BULL")),
-            patch.object(
-                sysdashpxy,
-                "calculate_supertrend",
-                return_value=pd.DataFrame({"ST_Trend": ["BULL"], "ST": [1]}),
-            ),
-            patch.object(sysdashpxy, "get_ce_pe_power", return_value=(1, 1, 1)),
-            patch.object(
-                sysdashpxy, "get_entry_signal", return_value=("BUY", "BULL")
-            ) as get_entry_signal,
-            patch.object(sysdashpxy, "get_day_candle_bar", return_value=""),
-            patch.object(sysdashpxy, "get_bos_bar", return_value=("NONE", None)),
-            patch.object(sysdashpxy, "get_sma", return_value={"status": "NA"}),
-        ):
-            snapshot = sysdashpxy.get_full_snapshot()
-
-        get_entry_signal.assert_called_once_with(frame, mode="MKT")
-        self.assertEqual(snapshot["entry"], "BUY")
-        self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "ST")
-
     def test_forced_buy_passes_configured_otm_distance_to_symbol_builder(self):
         with (
             patch.object(exeforcepxy, "get_session", return_value=object()),

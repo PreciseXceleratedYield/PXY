@@ -34,7 +34,7 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 | Area (owner prefixes) | Responsibility |
 | --- | --- |
 | `SYSCNFGPXY`, `SYSMODEPXY`, `SYSEXEPXY`, `EXEPXYPXY` | Shared defaults, run-mode validation, supervisor and engine scheduling |
-| `SYSDTAFPXY`, `SYSPLCHRTPXY`, `SYSSTRNDPXY`, `SYSDTSTPXY`, `SYSSADXPXY`, `SYSMKTPXY`, `SYSRIGPXY`, `SYSKATRPXY`, `SYSPWERPXY`, `SYSDPTPXY`, `SYSENTRPXY` | Data acquisition, signal routing, and indicator parameters, including the directional force factors |
+| `SYSDTAFPXY`, `SYSPLCHRTPXY`, `SYSSTRNDPXY`, `SYSDTSTPXY`, `SYSSADXPXY`, `SYSMKTPXY`, `SYSRIGPXY`, `SYSKATRPXY`, `SYSPWERPXY`, `SYSDPTPXY` | Data acquisition and signal/indicator parameters, including the directional force factors |
 | `EXEAGTPXY`, `EXEACGPXY`, `EXEAMSPXY`, `EXEAVXPXY`, `EXEAVGPXY`, `EXEENTRPXY` | Entry thresholds, averaging window/limits, average-order payload, and entry pipeline |
 | `EXEFORCEPXY`, `EXESLPXY`, `EXECBUYPXY`, `EXEEXITPXY`, `EXESQRPXY`, `EXEOMSPXY`, `EXEDYNPXY`, `EXETGTPXY`, `EXEOTMPXY` | Force/stop/counter orders, exit and square-off behavior, targets, and symbol selection |
 | `RUNNIFTYPXY`, `RUNEXMTPXY`, `RUNEXACPXY`, `RUNEXIOPXY`, `RUNEXLQDPXY`, `RUNLILOPXY` | Symbol selection, risk-ledger mathematics/actions/state/liquidation, and order-ledger filtering |
@@ -78,22 +78,6 @@ weekday offset from `EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES`, ordered Monday to
 Friday (currently 200, 150, 100, 50, 0 points). Dynamic selection fails closed
 on weekends when no weekday distance is defined. The symbol builder rounds the
 result to the configured strike step.
-
-## Entry signal strategy
-
-Set `SYSENTRPXY_SIGNAL_MODE` in `syscnfgpxy.py` to choose whether the live
-entry and exit signals use Supertrend:
-
-- `"ST"` (default) uses the ST-based routing rules in `sysentrpxy.py`.
-- `"MKT"` uses the market-direction signal directly and bypasses Supertrend
-  when selecting the live entry and exit signals.
-
-This is a **signal-strategy switch**, not an order type. The separate order
-settings such as `EXEFORCEPXY_ORDER_TYPE`, `EXEAMSPXY_ORDER_TYPE`, and
-`EXEEXITPXY_ORDER_TYPE` control broker order execution (`"MKT"` means market
-order there) and do not enable or disable Supertrend. The setting is also
-available in the PXYCONFIG editor. Restart the engine after changing it;
-running processes keep the imported value until restarted.
 
 ## Web server file access
 
