@@ -48,7 +48,7 @@ app.get('/hostname', (req, res) => {
 
 /* ========================= PXYCONFIG — syscnfgpxy.py ========================= */
 const PXY_CONFIG_TOOL = path.resolve(__dirname, 'sys/pxyconfigwebpxy.py');
-const PXY_CONFIG_PASSWORD = process.env.PXY_CONFIG_PASSWORD || '';
+const ACTION_PASSWORD = '1';
 
 app.use('/api/pxy-config', (req, res, next) => {
     res.set('Cache-Control', 'no-store');
@@ -56,16 +56,10 @@ app.use('/api/pxy-config', (req, res, next) => {
 });
 
 function authorizePxyConfig(req, res, next) {
-    if (!PXY_CONFIG_PASSWORD) {
-        return res.status(503).json({
-            ok: false,
-            error: 'PXY_CONFIG_PASSWORD is not configured; config access is disabled.'
-        });
-    }
     const supplied = Buffer.from(req.get('x-pxy-config-password') || '');
-    const expected = Buffer.from(PXY_CONFIG_PASSWORD);
+    const expected = Buffer.from(ACTION_PASSWORD);
     if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) {
-        return res.status(401).json({ ok: false, error: 'Invalid configuration password.' });
+        return res.status(401).json({ ok: false, error: 'Invalid configuration key.' });
     }
     return next();
 }
@@ -140,7 +134,6 @@ const ALLOWED_SCRIPTS = [
 ]; 
 const SCRIPT_DIR = path.resolve(__dirname);
 const PXY_HOME = process.env.PXY_HOME || '/home/pxy';
-const ACTION_PASSWORD = '1';
 
 function shellQuote(value) {
     return `'${String(value).replace(/'/g, "'\\''")}'`;

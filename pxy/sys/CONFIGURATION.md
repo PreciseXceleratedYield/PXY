@@ -47,17 +47,16 @@ hierarchy rather than duplicating every default in a second editable list.
 ## Web configuration editor
 
 Open **PXYCONFIG** from the desktop or mobile dashboard to use
-`/web/webcnfgpxy.html`. Access is disabled unless the server process is started
-with a dedicated `PXY_CONFIG_PASSWORD` environment variable; set it in the
-service's protected environment/secrets configuration, not in source code or
-the browser. `PXY_CONFIG_PYTHON` may select the Python executable if the host
-does not provide `python3` on `PATH`.
+`/web/webcnfgpxy.html`. Enter the existing PXY action key to unlock the editor.
+This key is intentionally simple and shared with the dashboard action routes;
+it is a convenience gate, not strong authentication. Keep the web server behind
+a trusted network boundary and HTTPS. `PXY_CONFIG_PYTHON` may select the Python
+executable if the host does not provide `python3` on `PATH`.
 
-The editor sends that password only in the `x-pxy-config-password` header to
-the authenticated `/api/pxy-config` routes. It keeps the password in page
-memory only and fails closed when the server setting is absent. The server
-compares credentials with a timing-safe comparison, does not expose the
-central config or its backups as static files, and disables API caching.
+The editor sends the key only in the `x-pxy-config-password` header to the
+authenticated `/api/pxy-config` routes. It keeps the key in page memory only.
+The server compares credentials with a timing-safe comparison, does not expose
+the central config or its backups as static files, and disables API caching.
 
 Only top-level literal settings can be edited. Derived expressions and
 unsupported values are read-only; secrets are redacted. Enumerated modes, intervals, and yes/no switches are constrained to known
