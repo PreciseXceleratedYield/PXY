@@ -12,6 +12,21 @@ Run CHK validation with:
 ./pxychk
 ```
 
+CHK runs the full deterministic `test_*.py` suite in `sys/tstmodepxy`; it does
+not launch the production engine. The suite checks shared pipe gates and runs
+scenario dataframes through the production entry, exit, and averaging pipes
+using the simulated broker. Scenarios include flat/occupied CE and PE entries,
+invalid signals, target hit and unavailable-market-data exits, hostile signals
+with one or both legs held, CE/PE averaging losses, profitable positions,
+layer limits, cooldowns, square-off flattening, and a sequential engine-tick
+replay. It also verifies all ten fixed decision scenarios and their
+open/closed order-ledger dataframe shapes. No live broker session or order is
+used.
+
+This is broad regression coverage of named cases, not exhaustive enumeration
+of every possible input value or external-service failure. Update the scenario
+dataframes and expected outcomes when changing a production pipe's behavior.
+
 ### Validate Tests
 ```bash
 python validate_backtest.py

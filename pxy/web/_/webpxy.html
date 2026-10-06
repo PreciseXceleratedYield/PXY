@@ -777,7 +777,7 @@ function drawMomentumBar(stVals, closes) {
 /* ── SIGNAL DASH ── */
 async function loadDash(){
     try{
-        const d=await fetch('./webdashpxy.json?_='+Date.now()).then(r=>r.json());
+        const d=await fetch('/api/web-data/webdashpxy?_='+Date.now()).then(r=>r.json());
 
         setVal('hcEntry', emojify(d.entry??'NONE'), d.entry?cls(d.entry):'dim');
         setVal('hcExit',  emojify(d.exit??'NONE'),  d.exit?cls(d.exit):'dim');
@@ -843,7 +843,7 @@ let chartSliceStart=0; // index into chartCandles where chart display starts
 
 async function loadChart(){
     try{
-        const data=await fetch('./webchrtpxy.json?_='+Date.now()).then(r=>r.json());
+        const data=await fetch('/api/web-data/webchrtpxy?_='+Date.now()).then(r=>r.json());
         chartCandles=Array.isArray(data)?data:[];
         const closes=chartCandles.map(d=>d.close||d.Close);
         const st=chartCandles.map(d=>d.st);
@@ -908,7 +908,7 @@ function sortPos(col){psCol===col?psAsc=!psAsc:(psCol=col,psAsc=false);loadPos()
 
 async function loadPos(){
     let data=[];
-    try{data=await fetch('./webpospxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    try{data=await fetch('/api/web-data/webpospxy?_='+Date.now()).then(r=>r.json());}catch{}
     const open=data.filter(d=>(d.STATUS||'OPEN')==='OPEN');
     const total=open.reduce((s,d)=>s+(d.PNL||0),0);
     const bull=total>=0;
@@ -945,7 +945,7 @@ function sortTrd(col){trCol===col?trAsc=!trAsc:(trCol=col,trAsc=false);loadTrade
 let lastTradesData=[];
 async function loadTrades(){
     let data=[];
-    try{data=await fetch('./webpnlpxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    try{data=await fetch('/api/web-data/webpnlpxy?_='+Date.now()).then(r=>r.json());}catch{}
     lastTradesData=data;
     const total=data.reduce((s,d)=>s+(d.PNL||0),0);
     const bull=total>=0;
@@ -997,7 +997,7 @@ function initTerminal(){
 /* ── RISK BAR ── */
 async function loadRisk(){
     let d={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-3000};
-    try{d=await fetch('./webrinkopxy.json?_='+Date.now()).then(r=>r.json());}catch{}
+    try{d=await fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json());}catch{}
     const peak  = d.session_peak_pnl??0;
     const net   = d.current_net_pnl??0;
     const floor = d.active_exit_line??-3000;
@@ -1223,7 +1223,7 @@ function selectTrade(t){
 
 async function loadDayChart(){
     try{
-        const data=await fetch('./webdaypxy.json?_='+Date.now()).then(r=>r.json());
+        const data=await fetch('/api/web-data/webdaypxy?_='+Date.now()).then(r=>r.json());
         // parse same way as backtest parseSplit
         let candles=[];
         if(Array.isArray(data)){

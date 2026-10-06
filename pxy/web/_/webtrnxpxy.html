@@ -581,7 +581,7 @@ let sortDir    = -1; // -1 = desc
 /* ── LOAD ── */
 async function load() {
     try {
-        const res = await fetch('./webpnlpxy.json?_=' + Date.now());
+        const res = await fetch('/api/web-data/webpnlpxy?_=' + Date.now());
         allTrades = await res.json();
     } catch {
         allTrades = [];

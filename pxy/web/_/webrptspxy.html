@@ -461,7 +461,7 @@ let speed     = 1800;
 /* ── LOAD ── */
 async function load() {
     try {
-        const res = await fetch('./webpnlpxy.json?_=' + Date.now());
+        const res = await fetch('/api/web-data/webpnlpxy?_=' + Date.now());
         trades = await res.json();
     } catch { trades = []; }
 

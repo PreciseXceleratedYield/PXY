@@ -65,6 +65,19 @@ concurrent edits are serialized. Saving does not restart the engine, and
 already-running processes continue using imported values until deliberately
 restarted.
 
+## Web server file access
+
+The HTTP server serves static `.html` files only from `web/`; files elsewhere
+in the checkout and non-HTML files under `web/` are not static routes. Dashboard
+JSON is read through an explicit allowlist at `/api/web-data/:name` so existing
+views continue to work without exposing the underlying checkout paths.
+
+Trading actions at `/run/:script` are checked server-side against the current
+action password (`1`) after the script name passes its allowlist. This password
+is intentionally simple at the user's direction and is not suitable as a
+standalone internet-facing control. Put the service behind HTTPS and a trusted
+network boundary.
+
 ## Conditional configuration: portfolio risk candle
 
 Keep a feature's switch before dependent settings. When disabled, dependent
