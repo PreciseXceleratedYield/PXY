@@ -1,24 +1,21 @@
 #!/bin/bash
 set -e
-# These launchers are copied to ~/.local/bin by pxyupdate, so their own
-# location is not necessarily inside the checkout.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-ENGINE_DIR="${PXY_ENGINE_DIR:-}"
-if [ -z "$ENGINE_DIR" ]; then
-    for candidate in \
-        "$HOME/PXY/pxy/sys/exe" \
-        "$HOME/pxy/sys/exe" \
-        "$SCRIPT_DIR/sys/exe"
-    do
-        if [ -f "$candidate/exeforcepxy.py" ]; then
-            ENGINE_DIR="$candidate"
-            break
-        fi
-    done
+if [ -f "$SCRIPT_DIR/pxyresolve" ]; then
+    source "$SCRIPT_DIR/pxyresolve"
+elif [ -f "$HOME/.local/bin/pxyresolve" ]; then
+    source "$HOME/.local/bin/pxyresolve"
+else
+    echo "[X] PXY path helper not found." >&2
+    exit 1
 fi
-
-if [ -z "$ENGINE_DIR" ] || [ ! -f "$ENGINE_DIR/exeforcepxy.py" ]; then
-    echo "Engine script not found. Set PXY_ENGINE_DIR to the directory containing exeforcepxy.py." >&2
+PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
+    echo "[X] Could not locate the PXY application directory." >&2
+    exit 1
+}
+ENGINE_DIR="$PXY_APP_DIR/sys/exe"
+if [ ! -f "$ENGINE_DIR/exeforcepxy.py" ]; then
+    echo "Engine script not found: $ENGINE_DIR/exeforcepxy.py" >&2
     exit 1
 fi
 

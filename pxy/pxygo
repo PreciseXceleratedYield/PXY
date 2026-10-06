@@ -1,1 +1,19 @@
-cd /home/pxy/pxy/sys && source /home/pxy/env/bin/activate && exec bash
+#!/bin/bash
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/pxyresolve" ]; then
+    source "$SCRIPT_DIR/pxyresolve"
+elif [ -f "$HOME/.local/bin/pxyresolve" ]; then
+    source "$HOME/.local/bin/pxyresolve"
+else
+    echo "[X] PXY path helper not found." >&2
+    exit 1
+fi
+PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
+    echo "[X] Could not locate the PXY application directory." >&2
+    exit 1
+}
+cd "$PXY_APP_DIR/sys" || exit 1
+if [ -f "$HOME/env/bin/activate" ]; then
+    source "$HOME/env/bin/activate"
+fi
+exec bash

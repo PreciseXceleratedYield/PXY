@@ -517,6 +517,12 @@ For direct Python commands, prefix the command with `RUNMODE=CHK` or
 `RUNMODE=SIM`. SIM never falls through to live provider dispatch or submits live
 orders.
 
+Installed shell commands resolve the application directory from `PXY_APP_DIR`,
+then `$HOME/PXY/pxy` or `$HOME/pxy`; `pxyupdate` installs the shared resolver
+alongside the commands in `$HOME/.local/bin`. The dashboard's script actions
+run from the directory containing `pxy.js`, so shell, Python, and web entry
+points target the same checkout.
+
 Focused unit tests cover production decision gates, mode routing, and the
 isolated replay. They can also be run from `pxy/sys` with
 `python3 -m unittest discover -s tstmodepxy -p 'test_*.py'`.

@@ -1,0 +1,20 @@
+pxy_resolve_app_dir() {
+    local script_dir="${1:-}"
+    local candidate
+
+    for candidate in \
+        "${PXY_APP_DIR:-}" \
+        "$HOME/PXY/pxy" \
+        "$HOME/pxy" \
+        "$script_dir"
+    do
+        if [ -n "$candidate" ] \
+            && [ -f "$candidate/sys/syscnfgpxy.py" ] \
+            && [ -f "$candidate/pxy.js" ]; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done
+
+    return 1
+}

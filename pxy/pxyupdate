@@ -1,7 +1,37 @@
 #!/bin/bash
 set -e
 
-REPO_DIR="$HOME/pxy"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/pxyresolve" ]; then
+    source "$SCRIPT_DIR/pxyresolve"
+elif [ -f "$HOME/.local/bin/pxyresolve" ]; then
+    source "$HOME/.local/bin/pxyresolve"
+else
+    pxy_resolve_app_dir() {
+        local script_dir="${1:-}"
+        local candidate
+
+        for candidate in \
+            "${PXY_APP_DIR:-}" \
+            "$HOME/PXY/pxy" \
+            "$HOME/pxy" \
+            "$script_dir"
+        do
+            if [ -n "$candidate" ] \
+                && [ -f "$candidate/sys/syscnfgpxy.py" ] \
+                && [ -f "$candidate/pxy.js" ]; then
+                printf '%s\n' "$candidate"
+                return 0
+            fi
+        done
+
+        return 1
+    }
+fi
+REPO_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
+    echo "[X] Could not locate the PXY application directory." >&2
+    exit 1
+}
 
 if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "[X] Repository not found at $REPO_DIR."

@@ -2,7 +2,20 @@
 # ========================================
 # ENVIRONMENT CONFIGURATION
 # ========================================
-cd /home/pxy/pxy/sys || exit 1
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/pxyresolve" ]; then
+    source "$SCRIPT_DIR/pxyresolve"
+elif [ -f "$HOME/.local/bin/pxyresolve" ]; then
+    source "$HOME/.local/bin/pxyresolve"
+else
+    echo "[X] PXY path helper not found." >&2
+    exit 1
+fi
+PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
+    echo "[X] Could not locate the PXY application directory." >&2
+    exit 1
+}
+cd "$PXY_APP_DIR/sys" || exit 1
 
 if [ -f "$HOME/env/bin/activate" ]; then
     source "$HOME/env/bin/activate"
@@ -192,7 +205,7 @@ while true; do
             echo "    100% FULL SYNC: CODE + CACHE CLEAR     "
             draw_border
             echo "Step 1: Fetching latest from GitHub..."
-            cd /home/pxy/pxy && git fetch origin
+            git -C "$PXY_APP_DIR" fetch origin
             echo ""
             echo "Step 2: Hard reset to match origin/main..."
             git reset --hard origin/main
@@ -211,9 +224,9 @@ while true; do
         s)
             echo ""
             echo "Initializing Node Server..."
-            if ! tmux has-session -t pxy-web 2>/dev/null && ! pgrep -f "/home/pxy/pxy/pxy.js" >/dev/null 2>&1; then
+            if ! tmux has-session -t pxy-web 2>/dev/null && ! pgrep -f "$PXY_APP_DIR/pxy.js" >/dev/null 2>&1; then
                 # Restrict terminal history memory strictly to 500 lines
-                tmux new-session -d -s pxy-web "bash -c 'tmux set-option history-limit 500; cd /home/pxy/pxy && node pxy.js'"
+                tmux new-session -d -s pxy-web "bash -c 'tmux set-option history-limit 500; cd \"$PXY_APP_DIR\" && node pxy.js'"
                 echo "[✔] Web dashboard started in background (tmux)."
             else
                 echo "[-] Web dashboard already running."
@@ -223,14 +236,14 @@ while true; do
             if [ -x "$HOME/env/bin/python" ]; then
                 PYTHON_BIN="$HOME/env/bin/python"
             fi
-            RUNMODE=$(cd /home/pxy/pxy/sys && "$PYTHON_BIN" -c 'import syscnfgpxy; print(syscnfgpxy.SYSMODEPXY_RUN_MODE)')
+            RUNMODE=$(cd "$PXY_APP_DIR/sys" && "$PYTHON_BIN" -c 'import syscnfgpxy; print(syscnfgpxy.SYSMODEPXY_RUN_MODE)')
             if [ -z "$RUNMODE" ]; then
                 echo "[X] Could not read RUNMODE from syscnfgpxy.py; engine was not started."
             elif [ "$RUNMODE" = "PRD" ]; then
                 echo "Initializing Production Trading Engine..."
                 if ! tmux has-session -t pxy-engine 2>/dev/null && ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
                     # Restrict terminal history memory strictly to 500 lines
-                    tmux new-session -d -s pxy-engine "bash -c 'tmux set-option history-limit 500; cd /home/pxy/pxy/sys; if [ -f \"\$HOME/env/bin/activate\" ]; then source \"\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; python3 sysexepxy.py'"
+                    tmux new-session -d -s pxy-engine "bash -c 'tmux set-option history-limit 500; cd \"$PXY_APP_DIR/sys\"; if [ -f \"\$HOME/env/bin/activate\" ]; then source \"\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; python3 sysexepxy.py'"
 
                     sleep 1
                     if tmux has-session -t pxy-engine 2>/dev/null; then
@@ -306,18 +319,18 @@ while true; do
         b)
             echo ""
             echo "Syncing latest code and clearing cache..."
-            cd /home/pxy/pxy && git fetch origin && git reset --hard origin/main && find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null
+            git -C "$PXY_APP_DIR" fetch origin && git -C "$PXY_APP_DIR" reset --hard origin/main && find "$PXY_APP_DIR" -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null
             echo "[✔] Code synced, cache cleared."
             echo ""
             echo "Starting historical SIM replay with FULL DAY candles..."
-            if [ -x "$HOME/pxy/pxysim" ]; then
-                if "$HOME/pxy/pxysim"; then
+            if [ -x "$HOME/.local/bin/pxysim" ]; then
+                if "$HOME/.local/bin/pxysim"; then
                     echo "[✔] SIM replay completed."
                 else
                     echo "[X] SIM replay failed with exit code $?."
                 fi
             else
-                echo "[X] Could not find executable $HOME/pxy/pxysim."
+                echo "[X] Could not find executable $HOME/.local/bin/pxysim."
             fi
             echo ""
             read -p "Press [Enter] to return..."
@@ -325,14 +338,14 @@ while true; do
         c)
             echo ""
             echo "Running isolated CHK suite..."
-            if [ -x "$HOME/pxy/pxychk" ]; then
-                if "$HOME/pxy/pxychk"; then
+            if [ -x "$HOME/.local/bin/pxychk" ]; then
+                if "$HOME/.local/bin/pxychk"; then
                     echo "[✔] CHK suite completed."
                 else
                     echo "[X] CHK suite failed with exit code $?."
                 fi
             else
-                echo "[X] Could not find executable $HOME/pxy/pxychk."
+                echo "[X] Could not find executable $HOME/.local/bin/pxychk."
             fi
             echo ""
             read -p "Press [Enter] to return..."

@@ -5,8 +5,20 @@ set -e
 # Protected by international copyright laws. All rights reserved globally.
 # ------------------------------------------------------------------------------
 
-# Go to exe folder safely
-cd "$HOME/pxy/sys/exe/run" || { echo "❌ Directory ~/pxy/sys/exe/run not found"; exit 1; }
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/pxyresolve" ]; then
+    source "$SCRIPT_DIR/pxyresolve"
+elif [ -f "$HOME/.local/bin/pxyresolve" ]; then
+    source "$HOME/.local/bin/pxyresolve"
+else
+    echo "[X] PXY path helper not found." >&2
+    exit 1
+fi
+PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
+    echo "[X] Could not locate the PXY application directory." >&2
+    exit 1
+}
+cd "$PXY_APP_DIR/sys/exe/run" || { echo "❌ Ledger runner directory not found"; exit 1; }
 
 # Activate virtual environment to load your python dependencies cleanly
 if [ -f "$HOME/env/bin/activate" ]; then

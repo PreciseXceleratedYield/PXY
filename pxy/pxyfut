@@ -1,13 +1,25 @@
 #!/bin/bash
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/sys/exe/run" || {
-    echo "Error: Futures runner directory not found under $SCRIPT_DIR"
+if [ -f "$SCRIPT_DIR/pxyresolve" ]; then
+    source "$SCRIPT_DIR/pxyresolve"
+elif [ -f "$HOME/.local/bin/pxyresolve" ]; then
+    source "$HOME/.local/bin/pxyresolve"
+else
+    echo "[X] PXY path helper not found." >&2
+    exit 1
+fi
+PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
+    echo "[X] Could not locate the PXY application directory." >&2
+    exit 1
+}
+cd "$PXY_APP_DIR/sys/exe/run" || {
+    echo "Error: Futures runner directory not found under $PXY_APP_DIR"
     exit 1
 }
 
 # Optional: Activate virtual environment if needed
-# source "$HOME/pxy/env/bin/activate"
+# source "$HOME/env/bin/activate"
 
 # Run the Python script
 python3 runnftfutpxy.py

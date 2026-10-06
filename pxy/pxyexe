@@ -1,16 +1,26 @@
 #!/bin/bash
-# ------------------------------
-# Run exepxy.py from ~/pxy/sys/exe
-# ------------------------------
+set -e
 
-# Go to exe folder
-cd "$HOME/pxy/sys" || { echo "Directory ~/pxy/sys/exe not found"; exit 1; }
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/pxyresolve" ]; then
+    source "$SCRIPT_DIR/pxyresolve"
+elif [ -f "$HOME/.local/bin/pxyresolve" ]; then
+    source "$HOME/.local/bin/pxyresolve"
+else
+    echo "[X] PXY path helper not found." >&2
+    exit 1
+fi
+PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
+    echo "[X] Could not locate the PXY application directory." >&2
+    exit 1
+}
+cd "$PXY_APP_DIR/sys"
 
 # Optional: activate virtual environment if needed
 #source ~/pxy/env/bin/activate
 
 # Run the Python script
-python3 sysexepxy.py
+exec python3 sysexepxy.py
 
 # Optional: print completion
 echo "exepxy.py execution finished."

@@ -3,16 +3,18 @@
 export RUNMODE=CHK
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_DIR="$HOME/pxy"
-
-if [ ! -d "$REPO_DIR/sys/tstmodepxy" ]; then
-    REPO_DIR="$SCRIPT_DIR"
-fi
-
-if [ ! -d "$REPO_DIR/sys/tstmodepxy" ]; then
-    echo "[X] Could not locate sys/tstmodepxy under $REPO_DIR." >&2
+if [ -f "$SCRIPT_DIR/pxyresolve" ]; then
+    source "$SCRIPT_DIR/pxyresolve"
+elif [ -f "$HOME/.local/bin/pxyresolve" ]; then
+    source "$HOME/.local/bin/pxyresolve"
+else
+    echo "[X] PXY path helper not found." >&2
     exit 1
 fi
+REPO_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
+    echo "[X] Could not locate the PXY application directory." >&2
+    exit 1
+}
 
 cd "$REPO_DIR/sys" || exit 1
 

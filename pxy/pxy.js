@@ -138,8 +138,13 @@ const ALLOWED_SCRIPTS = [
     'pxyupdate', 'pxysqrall', 'pxybuyce', 'pxybuype', 'pxysqrce', 'pxysqrpe',
     'pxyldgr'
 ]; 
-const SCRIPT_DIR = '/home/pxy/pxy'; 
+const SCRIPT_DIR = path.resolve(__dirname);
+const PXY_HOME = process.env.PXY_HOME || '/home/pxy';
 const ACTION_PASSWORD = '1';
+
+function shellQuote(value) {
+    return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
 
 function hasValidActionPassword(value) {
     const supplied = Buffer.from(value, 'utf8');
@@ -161,7 +166,8 @@ app.post('/run/:script', (req, res) => {
     } 
     
     const runAsUser = process.env.USER === 'root' ? 'sudo -u pxy ' : '';
-    const cmd = `${runAsUser}bash --login -c "cd /home/pxy/pxy && [ -f ~/env/bin/activate ] && source ~/env/bin/activate; export PATH=/home/pxy/pxy:\\$PATH; ${script}"`; 
+    const scriptCommand = `cd ${shellQuote(SCRIPT_DIR)} && if [ -f "$HOME/env/bin/activate" ]; then source "$HOME/env/bin/activate"; fi; export PATH=${shellQuote(SCRIPT_DIR)}:"$PATH"; exec ${script}`;
+    const cmd = `${runAsUser}bash --login -c ${shellQuote(scriptCommand)}`;
     
     if (IS_DEBUG) console.log(`[DEBUG] Executing system call command: ${cmd}`);
 
@@ -169,11 +175,11 @@ app.post('/run/:script', (req, res) => {
         timeout: 30000, 
         cwd: SCRIPT_DIR, 
         env: { 
-            PATH: '/home/pxy/env/bin:/home/pxy/pxy:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/pxy/.local/bin',
-            HOME: '/home/pxy', 
+            PATH: `${PXY_HOME}/env/bin:${SCRIPT_DIR}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PXY_HOME}/.local/bin`,
+            HOME: PXY_HOME,
             USER: 'pxy', 
             LOGNAME: 'pxy',
-            VIRTUAL_ENV: '/home/pxy/env'
+            VIRTUAL_ENV: `${PXY_HOME}/env`
         } 
     }, (err, stdout, stderr) => { 
         console.log(`[RUN] ok=${!err} out="${stdout}" err="${stderr}"`); 
