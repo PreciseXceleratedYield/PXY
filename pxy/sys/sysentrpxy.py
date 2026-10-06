@@ -1,5 +1,4 @@
 import pandas as pd
-from syscnfgpxy import SYSCNFGPXY_TICKER
 from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
 

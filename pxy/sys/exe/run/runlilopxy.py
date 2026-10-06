@@ -8,7 +8,6 @@ from runclntpxy import get_session
 from runltpspxy import get_mid_price 
 from syscnfgpxy import (
     RUNLILOPXY_DEFAULT_FILTER_TIME as DEFAULT_FILTER_TIME,
-    RUNLILOPXY_MATCH_MODE as MATCH_MODE,
     SYSCNFGPXY_TIMEZONE,
 )
 from sysmodepxy import dispatch_mode
@@ -23,7 +22,9 @@ def resolve_dynamic_filter_time():
         
         if os.path.exists(SQUAREOFF_LOG_FILE):
             file_mod_timestamp = os.path.getmtime(SQUAREOFF_LOG_FILE)
-            file_mod_date_str = datetime.fromtimestamp(file_mod_timestamp, IST).strftime("%Y-%m-%d")
+            file_mod_date_str = datetime.fromtimestamp(
+                file_mod_timestamp, SYSCNFGPXY_TIMEZONE
+            ).strftime("%Y-%m-%d")
             
             if file_mod_date_str == today_str:
                 with open(SQUAREOFF_LOG_FILE, "r") as f:

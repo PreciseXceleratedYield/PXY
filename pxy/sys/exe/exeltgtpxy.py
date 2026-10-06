@@ -78,7 +78,7 @@ def calculate_tgt(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce, 
         base = _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, opposite_is_ce)
         return base + atr
     else:
-        return 1.4
+        return STATIC_NOT_ALIGNED_PCT
 
 
 def f(x, d=0.0):

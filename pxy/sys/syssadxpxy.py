@@ -8,11 +8,14 @@ from syscnfgpxy import (
     SYSSADXPXY_SUPERTREND_FACTOR,
     SYSSADXPXY_SUPERTREND_PERIOD,
     SYSSADXPXY_USE_TSMA,
+    SYSSADXPXY_FORCE_BASE,
+    SYSSADXPXY_FORCE_BOOST,
+    SYSSADXPXY_FORCE_NEUTRAL,
 )
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
-# 🎛️ HARD-CODED OPERATIONAL LOGIC SWITCH
+# 🎛️ CONFIGURED OPERATIONAL LOGIC SWITCH
 # Set True  -> Uses 50-period Time Series Moving Average (TSMA)
 # Set False -> Uses 50-period Simple Moving Average (SMA)
 USE_TSMA = SYSSADXPXY_USE_TSMA
@@ -52,7 +55,7 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
     - Price == Average Line (SIDE): ce_force = 1.0, pe_force = 1.0
     """
     if df is None or df.empty or len(df) < SYSSADXPXY_MA_PERIOD:
-        return 1.1, 1.1
+        return SYSSADXPXY_FORCE_NEUTRAL, SYSSADXPXY_FORCE_NEUTRAL
 
     high = df['High'].to_numpy()
     low = df['Low'].to_numpy()
@@ -110,7 +113,7 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
     latest_supertrend = supertrend[-1]
 
     if np.isnan(latest_moving_val) or np.isnan(latest_supertrend):
-        return 1.1, 1.1
+        return SYSSADXPXY_FORCE_NEUTRAL, SYSSADXPXY_FORCE_NEUTRAL
 
     # 3. Combine and average indicator paths
     average_line = (latest_moving_val + latest_supertrend) / 2
@@ -118,13 +121,13 @@ def calculate_adx(df: pd.DataFrame) -> tuple:
 
     # 4. Final conditional flipping assignment matching forces 
     if latest_close > average_line:       
-        ce_force = 1.0
-        pe_force = 1.2
+        ce_force = SYSSADXPXY_FORCE_BASE
+        pe_force = SYSSADXPXY_FORCE_BOOST
     elif latest_close < average_line:     
-        ce_force = 1.2
-        pe_force = 1.0
+        ce_force = SYSSADXPXY_FORCE_BOOST
+        pe_force = SYSSADXPXY_FORCE_BASE
     else:                                 
-        ce_force = 1.0
-        pe_force = 1.0
+        ce_force = SYSSADXPXY_FORCE_BASE
+        pe_force = SYSSADXPXY_FORCE_BASE
 
     return ce_force, pe_force
