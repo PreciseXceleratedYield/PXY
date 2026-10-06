@@ -1,10 +1,28 @@
 #!/bin/bash
 set -e
-# Resolve the engine directory from this launcher so the repository can live
-# under either ~/pxy or ~/PXY (or another checkout path).
+# These launchers are copied to ~/.local/bin by pxyupdate, so their own
+# location is not necessarily inside the checkout.
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ENGINE_DIR="${PXY_ENGINE_DIR:-}"
+if [ -z "$ENGINE_DIR" ]; then
+    for candidate in \
+        "$HOME/PXY/pxy/sys/exe" \
+        "$HOME/pxy/sys/exe" \
+        "$SCRIPT_DIR/sys/exe"
+    do
+        if [ -f "$candidate/exeforcepxy.py" ]; then
+            ENGINE_DIR="$candidate"
+            break
+        fi
+    done
+fi
 
-cd "$SCRIPT_DIR/sys/exe" || { echo "Engine directory not found: $SCRIPT_DIR/sys/exe"; exit 1; }
+if [ -z "$ENGINE_DIR" ] || [ ! -f "$ENGINE_DIR/exeforcepxy.py" ]; then
+    echo "Engine script not found. Set PXY_ENGINE_DIR to the directory containing exeforcepxy.py." >&2
+    exit 1
+fi
+
+cd "$ENGINE_DIR" || { echo "Could not enter engine directory: $ENGINE_DIR" >&2; exit 1; }
 
 # Optional: activate virtual environment if needed
 #source ~/pxy/env/bin/activate
