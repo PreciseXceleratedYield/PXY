@@ -27,8 +27,11 @@ from syscnfgpxy import (
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
     SYSDTAFPXY_FIXED_BRICK_SIZE,
+    EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
+    EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
 )
 from sysdtafpxy import apply_ohlc_transformation
+from sysdecisionpxy import scale_lgt_threshold
 import syskatrpxy
 
 
@@ -59,6 +62,54 @@ class ConfigurationWiringTests(unittest.TestCase):
             )
 
         self.assertEqual(target, 2.3)
+
+    def test_dynamic_target_price_uses_calculated_aligned_target_and_non_aligned_floor(self):
+        aligned = {
+            "pxy_entry": 1000,
+            "symbol": "NIFTYCE",
+            "exit": "BULL",
+            "atr": 5,
+        }
+        not_aligned = {**aligned, "exit": "BEAR"}
+
+        with (
+            patch.object(exeltgtpxy, "TGT_MODE", "DYNAMIC"),
+            patch.object(exeltgtpxy, "MIN_ATR_VALUE", 5.0),
+            patch.object(exeltgtpxy, "MIN_TARGET_PCT", 1.4),
+            patch.object(exeltgtpxy, "MAX_TARGET_CAP", 77.0),
+            patch.object(exeltgtpxy, "STATIC_NOT_ALIGNED_PCT", 1.4),
+        ):
+            aligned_target = exeltgtpxy.target_price(
+                aligned, ce_investment=100, pe_investment=200
+            )
+            not_aligned_target = exeltgtpxy.target_price(
+                not_aligned, ce_investment=100, pe_investment=200
+            )
+
+        self.assertEqual(aligned_target, 1500.0)
+        self.assertEqual(not_aligned_target, 1014.0)
+
+    def test_lgt_alignment_multipliers_match_requested_policy(self):
+        self.assertEqual(EXEAVXPXY_ALIGNED_LGT_MULTIPLIER, 1.0)
+        self.assertEqual(EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER, 2.0)
+        self.assertEqual(
+            scale_lgt_threshold(
+                -10.0,
+                True,
+                EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
+                EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
+            ),
+            -10.0,
+        )
+        self.assertEqual(
+            scale_lgt_threshold(
+                -10.0,
+                False,
+                EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
+                EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
+            ),
+            -20.0,
+        )
 
     def test_renko_uses_configured_brick_size_by_default(self):
         frame = pd.DataFrame(

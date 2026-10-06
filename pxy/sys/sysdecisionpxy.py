@@ -154,6 +154,11 @@ def averaging_placement_allowed(ledger_is_busy):
     return not ledger_is_busy
 
 
+def scale_lgt_threshold(threshold, is_aligned, aligned_multiplier, not_aligned_multiplier):
+    multiplier = aligned_multiplier if is_aligned else not_aligned_multiplier
+    return threshold * multiplier
+
+
 def counter_leg_script(exit_state, positions, scripts):
     """Return the counter-leg script for a hostile one-sided position, else None."""
     state = str(exit_state).upper().strip()

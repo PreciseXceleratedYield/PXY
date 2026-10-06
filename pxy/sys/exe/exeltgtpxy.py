@@ -119,11 +119,11 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
     
     MODE: DYNAMIC (Unified Mirror Logic with LGT)
     ================================================
-    Formula (NOT aligned):
-      target_pct% = _lgt_tgt_base_factor(...) + ATR
-    
     Formula (ALIGNED):
-      target_pct% = 77%
+      target_pct% = calculated opposite_base_factor + ATR, capped at 77%
+
+    Formula (NOT aligned):
+      target_pct% = configured fixed percentage (normally 1.4%)
     
     MIRROR LOGIC:
       - CE_LGT uses base_factor negated (for averaging difficulty)
@@ -132,7 +132,7 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
     Example: CE=2000 (heavy, 5 layers), PE=1000 (light, 1 layer)
       base_factor ≈ 18.0
       CE_LGT = -18.0 (hard to average)
-      PE_TGT = +18.0 + 5.0 = +23.0% (generous exit)
+      PE_TGT = +18.0 + 5.0 = +23.0% (before the 77% cap)
     
     MODE: STATIC (Fixed Percentages)
     ================================
@@ -192,8 +192,6 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
         else:
             # Dynamic mode (default): Use central calculate_tgt helper
             target_pct = calculate_tgt(atr_scaled, ce_investment, pe_investment, ce_count, pe_count, is_ce, is_aligned)
-            if is_aligned:
-                target_pct = MAX_TARGET_CAP  # 77% for aligned
         
         # 4️⃣ Final clamping to [1.4, 99] or [1.4, 77] depending on mode
         max_cap = STATIC_ALIGNED_PCT if TGT_MODE == "STATIC" else MAX_TARGET_CAP

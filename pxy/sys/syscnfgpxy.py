@@ -123,6 +123,18 @@ EXEAVXPXY_REBUY_ENABLED = True
 EXEAVXPXY_MARKET_START = dt_time(9, 17)
 EXEAVXPXY_MARKET_END = dt_time(15, 10)
 EXEAVXPXY_DEFAULT_ATR = 5.0
+EXEAVXPXY_ALIGNED_LGT_MULTIPLIER = 1.0
+EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER = 2.0
+if any(
+    isinstance(multiplier, bool)
+    or not isinstance(multiplier, (int, float))
+    or multiplier <= 0
+    for multiplier in (
+        EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
+        EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
+    )
+):
+    raise ValueError("LGT multipliers must be positive numbers.")
 EXEAVGPXY_IDLE_EXIT_MODE = "one"
 EXEOMSPXY_DEBUG_ENABLED = False
 

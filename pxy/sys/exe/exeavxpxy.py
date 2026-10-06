@@ -15,8 +15,14 @@ from syscnfgpxy import (
     EXEAVXPXY_REBUY_ENABLED as REBUY_ENABLED,
     EXEAVXPXY_DEFAULT_ATR,
     EXEAVXPXY_USE_OVERALL_LOSS,
+    EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
+    EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
 )
-from sysdecisionpxy import averaging_placement_allowed, averaging_window_enabled
+from sysdecisionpxy import (
+    averaging_placement_allowed,
+    averaging_window_enabled,
+    scale_lgt_threshold,
+)
 from exeagtpxy import is_aligned
 from exeltgtpxy import calculate_lgt, target_price              # Import from central hub
 from exeamspxy import execute_side_averaging_matrix
@@ -132,24 +138,25 @@ def handle_side_averaging(client, df):
         pe_atr, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=False
     )
 
-    # Apply alignment-based scaling: ALIGNED=1/2, NOT ALIGNED=FULL
-    # This same value used for both display and triggering (always in sync)
-    if ce_aligned:
-        ce_dynamic_threshold = ce_dynamic_threshold / 2.0
-    if pe_aligned:
-        pe_dynamic_threshold = pe_dynamic_threshold / 2.0
+    # Use the same alignment-based threshold for display and triggering.
+    ce_dynamic_threshold = scale_lgt_threshold(
+        ce_dynamic_threshold,
+        ce_aligned,
+        EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
+        EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
+    )
+    pe_dynamic_threshold = scale_lgt_threshold(
+        pe_dynamic_threshold,
+        pe_aligned,
+        EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
+        EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
+    )
 
     if USE_OVERALL_LOSS:
         ce_lgt_val, pe_lgt_val = ce_overall_pnl_pct, pe_overall_pnl_pct
     else:
         ce_lgt_val = ce_rows.apply(get_loss, axis=1).max() if not ce_rows.empty else 0.0
         pe_lgt_val = pe_rows.apply(get_loss, axis=1).max() if not pe_rows.empty else 0.0
-
-    # Also scale display values to match trading threshold
-    if ce_aligned:
-        ce_lgt_val = ce_lgt_val / 2.0
-    if pe_aligned:
-        pe_lgt_val = pe_lgt_val / 2.0
 
     ce_tgt = _side_target_pct(ce_rows, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=True)
     pe_tgt = _side_target_pct(pe_rows, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=False)
