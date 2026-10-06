@@ -1,11 +1,10 @@
 #!/bin/bash
 set -e
-# ------------------------------
-# Run exepxy.py from ~/pxy/sys/exe
-# ------------------------------
+# Resolve the engine directory from this launcher so the repository can live
+# under either ~/pxy or ~/PXY (or another checkout path).
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
-# Go to exe folder
-cd "$HOME/pxy/sys/exe" || { echo "Directory ~/pxy/sys/exe not found"; exit 1; }
+cd "$SCRIPT_DIR/sys/exe" || { echo "Engine directory not found: $SCRIPT_DIR/sys/exe"; exit 1; }
 
 # Optional: activate virtual environment if needed
 #source ~/pxy/env/bin/activate

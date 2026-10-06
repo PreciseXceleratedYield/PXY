@@ -201,7 +201,7 @@ def check_counter_leg(remaining_df):
         # lock + count BEFORE the launch: a duplicate buy is worse than a short wait
         _mark_lock(lock_key)
         _count_fire()
-        subprocess.Popen([path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen([path])
         print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ FIRED COUNTER-BUY: {script_name}")
         return script_name
     except Exception as e:
