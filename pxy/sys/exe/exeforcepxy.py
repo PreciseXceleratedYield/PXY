@@ -45,6 +45,7 @@ try:
     from runclntpxy import get_session
     from runfundpxy import get_available_funds
     from runsymbpxy import get_symbol
+    from exeotmpxy import get_dynamic_otm_distance
     dprint("SYSTEM IMPORTS SUCCESSFUL", Fore.GREEN)
 except Exception as e:
     print(f"{Fore.RED}IMPORT ERROR: {e}")
@@ -112,7 +113,7 @@ def run_action(choice):
     data = get_all_data()
     ltp = data.get("price")
     
-    symbol = get_symbol(ltp, sig)
+    symbol = get_symbol(ltp, sig, get_dynamic_otm_distance())
     res = {"stat": "SKIPPED"}
 
     if symbol and symbol != "NA":

@@ -21,6 +21,7 @@ import exeotmpxy
 import exeacgpxy
 import execbuypxy
 import exeexitpxy
+import exeforcepxy
 import runniftypxy
 from syscnfgpxy import (
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
@@ -32,6 +33,19 @@ import syskatrpxy
 
 
 class ConfigurationWiringTests(unittest.TestCase):
+    def test_forced_buy_passes_configured_otm_distance_to_symbol_builder(self):
+        with (
+            patch.object(exeforcepxy, "get_session", return_value=object()),
+            patch.object(exeforcepxy, "get_all_data", return_value={"price": 23456}),
+            patch.object(exeforcepxy, "get_dynamic_otm_distance", return_value=100),
+            patch.object(exeforcepxy, "get_symbol", return_value="NIFTY26O23550PE") as get_symbol,
+            patch.object(exeforcepxy, "execute_order", return_value={"stat": "OK"}),
+            patch.object(exeforcepxy, "get_available_funds", return_value=100000),
+        ):
+            exeforcepxy.run_action("2")
+
+        get_symbol.assert_called_once_with(23456, "OTMSELL", 100)
+
     def test_action_cooldowns_share_the_central_seven_second_setting(self):
         self.assertEqual(SYSCNFGPXY_ACTION_COOLDOWN_SECONDS, 7)
         self.assertEqual(exeacgpxy.COOL_DOWN_SECONDS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
