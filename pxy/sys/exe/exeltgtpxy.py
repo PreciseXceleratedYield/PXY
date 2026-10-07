@@ -182,16 +182,18 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
 
         is_aligned = (derived_supr == 'BULL' and is_ce) or (derived_supr == 'BEAR' and is_pe)
         
-        # 3️⃣ Apply target formula based on mode
-        if TGT_MODE == "STATIC":
-            # Static mode: Fixed percentages
+        # 3️⃣ Apply target formula based on trend status and execution mode
+        if derived_supr == 'SIDE':
+            target_pct = STATIC_NOT_ALIGNED_PCT  # Flat 1.4% for both CE and PE in SIDE trend
+        elif TGT_MODE == "STATIC":
             if is_aligned:
                 target_pct = STATIC_ALIGNED_PCT  # 99%
             else:
                 target_pct = STATIC_NOT_ALIGNED_PCT  # 1.4%
         else:
-            # Dynamic mode (default): Use central calculate_tgt helper
+            # Dynamic mode (default): Central calculate_tgt helper
             target_pct = calculate_tgt(atr_scaled, ce_investment, pe_investment, ce_count, pe_count, is_ce, is_aligned)
+
         
         # 4️⃣ Final clamping to [1.4, 99] or [1.4, 77] depending on mode
         max_cap = STATIC_ALIGNED_PCT if TGT_MODE == "STATIC" else MAX_TARGET_CAP
