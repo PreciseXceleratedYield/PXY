@@ -1,6 +1,9 @@
-import unittest
+import re
 import sys
+import unittest
+from contextlib import redirect_stdout
 from datetime import date, timedelta
+from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
 
@@ -22,6 +25,8 @@ import exeacgpxy
 import execbuypxy
 import exeexitpxy
 import exeforcepxy
+import exeavxpxy
+import exeentrpxy
 import runniftypxy
 from syscnfgpxy import (
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
@@ -36,6 +41,44 @@ import syskatrpxy
 
 
 class ConfigurationWiringTests(unittest.TestCase):
+    def test_average_dashboard_displays_target_after_run(self):
+        with redirect_stdout(StringIO()) as output:
+            exeavxpxy.print_telemetry_dashboard({
+                "ce_lots": 1, "ce_lgt": -10, "ce_run_pct": 2,
+                "ce_tgt": 15, "ce_pnl": 183,
+                "pe_lots": 1, "pe_lgt": -39, "pe_run_pct": -7,
+                "pe_tgt": 22, "pe_pnl": -677,
+                "ce_investment": 1000, "pe_investment": 1200,
+            })
+
+        lines = [
+            re.sub(r"\x1b\[[0-9;]*m", "", line)
+            for line in output.getvalue().splitlines()
+        ]
+        self.assertTrue(any("RUN  TGT%" in line for line in lines))
+        ce_row = next(line for line in lines if line.strip().startswith("CE"))
+        self.assertEqual(ce_row.split(), ["CE", "1", "-10", "2", "15", "183"])
+
+    def test_open_position_entry_message_ends_with_skipped(self):
+        def dispatch(name, provider, *args, **kwargs):
+            if name == "engine_window_open":
+                return True
+            if name == "is_entry_blackout":
+                return False
+            return provider(*args, **kwargs)
+
+        with (
+            patch.object(exeentrpxy, "dispatch_mode", side_effect=dispatch),
+            patch.object(exeentrpxy, "get_all_data", return_value={"entry": "BUY"}),
+            patch.object(exeentrpxy, "get_session", return_value=object()),
+            patch.object(exeentrpxy, "get_position_summary", return_value="1CE1PE"),
+            redirect_stdout(StringIO()) as output,
+        ):
+            exeentrpxy.main()
+
+        self.assertIn("Position open (CE:1, PE:1); skipped", output.getvalue())
+        self.assertNotIn("entry skipped", output.getvalue())
+
     def test_forced_buy_passes_configured_otm_distance_to_symbol_builder(self):
         with (
             patch.object(exeforcepxy, "get_session", return_value=object()),

@@ -62,7 +62,7 @@ def print_telemetry_dashboard(p):
         return
     P_WIDTH = 36
     print("\n" + Fore.CYAN + "=" * P_WIDTH)
-    print(Fore.CYAN + " OPT  LOT   LGT   RUN      PNL")
+    print(Fore.CYAN + " OPT  LOT   LGT   RUN  TGT%      PNL")
     print(Fore.CYAN + "-" * P_WIDTH)
 
     for side in ("ce", "pe"):
@@ -71,10 +71,12 @@ def print_telemetry_dashboard(p):
 
         pnl_val = int(round(p[f"{side}_pnl"]))
         run_pct_val = int(round(p[f"{side}_run_pct"]))
+        tgt_pct_val = int(round(p[f"{side}_tgt"]))
 
         pnl_color = Fore.GREEN if pnl_val >= 0 else Fore.RED
 
         print(Fore.WHITE + f"{side.upper():>4} {lots:>4} {lgt:>5} {run_pct_val:>5} "
+              f"{tgt_pct_val:>5} "
               + pnl_color + f"{pnl_val:>8}" + Style.RESET_ALL)
 
     print(Fore.CYAN + "-" * P_WIDTH)

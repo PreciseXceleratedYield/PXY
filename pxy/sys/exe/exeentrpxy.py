@@ -106,7 +106,7 @@ def main():
         if command is None:
             print(
                 f"{Fore.YELLOW}⚠️ Position open (CE:{ce_lots}, PE:{pe_lots}); "
-                "entry skipped."
+                "skipped"
             )
             return
 
