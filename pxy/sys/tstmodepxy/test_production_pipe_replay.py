@@ -186,6 +186,52 @@ class ProductionPipeReplayTests(unittest.TestCase):
             self.assertIn("No order rows returned", output.getvalue())
             self.assertNotIn("TAG MATCH ERROR", output.getvalue())
 
+    def test_lilo_treats_kotak_no_data_response_as_idle(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-lilo-no-data-") as temp:
+            broker = SimulatedBroker()
+            no_data_response = {
+                "stCode": 5203,
+                "errMsg": "No Data",
+                "desc": "data not found",
+                "stat": "Not_Ok",
+            }
+            with ProductionPipeReplay(
+                SYS_DIR, broker, Path(temp) / "state"
+            ) as engine:
+                with patch.object(
+                    broker, "order_report", return_value=no_data_response
+                ), redirect_stdout(StringIO()) as output:
+                    open_df, closed_df = engine.lilo._process_lilo_orders_production(
+                        broker, strict=True
+                    )
+
+            self.assertTrue(open_df.empty)
+            self.assertTrue(closed_df.empty)
+            self.assertIn("order report has no data", output.getvalue())
+            self.assertNotIn("Invalid Kotak order report response", output.getvalue())
+            self.assertNotIn("TAG MATCH ERROR", output.getvalue())
+
+    def test_lilo_still_rejects_other_unsuccessful_order_report_responses(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-lilo-invalid-orders-") as temp:
+            broker = SimulatedBroker()
+            invalid_response = {
+                "stCode": 5203,
+                "errMsg": "Session expired",
+                "desc": "data not found",
+                "stat": "Not_Ok",
+            }
+            with ProductionPipeReplay(
+                SYS_DIR, broker, Path(temp) / "state"
+            ) as engine, patch.object(
+                broker, "order_report", return_value=invalid_response
+            ):
+                with self.assertRaisesRegex(
+                    RuntimeError, "Invalid Kotak order report response"
+                ):
+                    engine.lilo._process_lilo_orders_production(
+                        broker, strict=True
+                    )
+
     def test_entry_pipe_scenarios_are_driven_by_market_snapshot_rows(self):
         scenarios = pd.DataFrame(
             [

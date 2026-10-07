@@ -226,6 +226,15 @@ def _reconcile_open_with_broker(client, open_positions, strict=False):
     return kept
 
 
+def _is_no_data_order_report_response(response):
+    return (
+        isinstance(response, dict)
+        and str(response.get("stat", "")).strip().lower() in {"not_ok", "not ok"}
+        and str(response.get("stCode", "")).strip() == "5203"
+        and str(response.get("errMsg", "")).strip().lower() == "no data"
+    )
+
+
 def _process_lilo_orders_production(client, strict=False):
     try: 
         # MASTER RISK LEDGER hook 1: once-a-day stale web-cache override (runs before any data guard)
@@ -239,6 +248,10 @@ def _process_lilo_orders_production(client, strict=False):
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
         res = client.order_report()
+        if _is_no_data_order_report_response(res):
+            print("ℹ️ Kotak order report has no data; LILO has nothing to process.")
+            _print_summary(0, 0)
+            return pd.DataFrame(), pd.DataFrame()
         if (
             not isinstance(res, dict)
             or str(res.get("stat", "")).strip().lower() != "ok"
