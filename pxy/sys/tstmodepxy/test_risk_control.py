@@ -14,10 +14,18 @@ if str(RUN_DIR) not in sys.path:
     sys.path.insert(0, str(RUN_DIR))
 
 from runexmtpxy import compute_stop, midday_risk_activation_due
+from syscnfgpxy import (
+    RUNEXACPXY_CNTRLRSKBAR,
+    RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
+)
 import runexstpxy
 
 
 class MiddayRiskControlTests(unittest.TestCase):
+    def test_default_risk_control_has_no_midday_activation_dependency(self):
+        self.assertEqual(RUNEXACPXY_CNTRLRSKBAR, "NO")
+        self.assertIsNone(RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME)
+
     def test_fixed_loss_and_target_thresholds_scale_by_active_row_count(self):
         self.assertEqual(compute_stop(-400, 0, active_count=5), (0.0, -400.0, True))
         self.assertEqual(compute_stop(-399, 0, active_count=5), (0.0, -400.0, False))

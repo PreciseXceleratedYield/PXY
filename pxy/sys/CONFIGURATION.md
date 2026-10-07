@@ -96,15 +96,14 @@ network boundary.
 Keep a feature's switch before dependent settings. When disabled, dependent
 settings should resolve to `None` rather than retain an active schedule.
 
-- `RUNEXACPXY_CNTRLRSKBAR = "YES"` activates a fresh risk baseline at 13:15 IST.
-- Before 13:15 IST, the ledger displays telemetry only; risk exits and breach
-  progression are suppressed. After activation, regular risk rules apply to
-  P&L changes from the fresh baseline.
-- Set it to `"NO"` to disable the timed baseline and preserve immediate risk
-  actions from the start of the session.
+- The default `RUNEXACPXY_CNTRLRSKBAR = "NO"` keeps risk exits and breach
+  progression active throughout the trading session, without a 13:15
+  dependency.
+- Set it to `"YES"` only if you want risk actions held until 13:15 IST, when a
+  fresh P&L baseline is taken.
 - `RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME` is derived from the switch: `None`
   for `"NO"` and 13:15 for `"YES"`.
-- At activation the ledger snapshots current portfolio P&L and resets
+- At timed activation the ledger snapshots current portfolio P&L and resets
   peak/breach tracking.
 - On every ledger tick, the fixed loss exit (−₹2,000) and profit target
   (+₹2,000) are each divided by the number of active open order-tag rows (CE

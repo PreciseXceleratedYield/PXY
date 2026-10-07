@@ -220,7 +220,7 @@ RUNEXACPXY_BREACH_TICKS_REQUIRED = 3
 RUNEXACPXY_TICK_MIN_GAP_SECONDS = 10
 RUNEXACPXY_LEDGER_BASIS_GUARD = True
 RUNEXACPXY_VIEW_ONLY_ENV = "PXY_VIEW_ONLY"
-RUNEXACPXY_CNTRLRSKBAR = "YES"  # Display-only before 13:15 IST; risk actions start after baseline activation.
+RUNEXACPXY_CNTRLRSKBAR = "NO"  # Risk exits are active throughout the session; set YES for 13:15 activation.
 if RUNEXACPXY_CNTRLRSKBAR not in {"YES", "NO"}:
     raise ValueError("RUNEXACPXY_CNTRLRSKBAR must be 'YES' or 'NO'.")
 RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME = (
