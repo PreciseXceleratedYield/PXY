@@ -3,6 +3,7 @@
 #
 # MASTER RISK LEDGER, part 3 of 6: the maths only. No file IO, no broker calls.
 # Renko trailing stop + hard loss floor on "game P&L". Split out of runexacpxy.py (pure move).
+import math
 import sys
 from pathlib import Path
 
@@ -17,7 +18,6 @@ from syscnfgpxy import (
     RUNEXMTPXY_INITIAL_LOSS_FLOOR,
     RUNEXMTPXY_PEAK_CEILING,
     RUNEXMTPXY_PEAK_MULTIPLIER,
-    RUNEXACPXY_RISK_MODE,
     RUNEXACPXY_STOP_SQUAREOFF_ENABLED,
     RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
 )
@@ -27,7 +27,6 @@ BRICK_SIZE = RUNEXMTPXY_BRICK_SIZE
 INITIAL_LOSS_FLOOR = RUNEXMTPXY_INITIAL_LOSS_FLOOR
 PEAK_CEILING = RUNEXMTPXY_PEAK_CEILING
 PEAK_MULTIPLIER = RUNEXMTPXY_PEAK_MULTIPLIER
-RISK_MODE = RUNEXACPXY_RISK_MODE
 STOP_SQUAREOFF_ENABLED = RUNEXACPXY_STOP_SQUAREOFF_ENABLED
 TARGET_SQUAREOFF_ENABLED = RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
 # =======================================================================
@@ -65,15 +64,6 @@ def compute_totals(open_df, closed_df):
 
     win_open = df_open[df_open["BUY_PRC"] < df_open["SELL_PRC"]]
     win_closed = df_closed[df_closed["BUY_PRC"] < df_closed["SELL_PRC"]]
-    symbols = (
-        df_open.get("SYMBOL", pd.Series("", index=df_open.index))
-        .astype(str)
-        .str.upper()
-    )
-    ce_rows = int(symbols.str.endswith("CE").sum())
-    pe_rows = int(symbols.str.endswith("PE").sum())
-    imbalance_factor = abs(ce_rows - pe_rows) + 1
-
     total = float(df_open["PNL"].sum() + df_closed["PNL"].sum())
     winners = float(win_open["PNL"].sum() + win_closed["PNL"].sum())
     return {
@@ -81,25 +71,46 @@ def compute_totals(open_df, closed_df):
         "winners": winners,
         "losers": total - winners,
         "open_rows": len(df_open),
-        "ce_rows": ce_rows,
-        "pe_rows": pe_rows,
-        "imbalance_factor": imbalance_factor,
     }
+
+
+def large_invested_side_aligned(open_df, direction):
+    """Return whether the higher-invested option side matches market direction."""
+    df = pd.DataFrame() if open_df is None else open_df.copy()
+    df.columns = [str(column).upper() for column in df.columns]
+    if not {"SYMBOL", "QTY", "SELL_PRC"}.issubset(df.columns):
+        return False
+
+    symbols = df["SYMBOL"].astype(str).str.upper().str.strip()
+    quantities = pd.to_numeric(df["QTY"], errors="coerce").fillna(0.0)
+    prices = pd.to_numeric(df["SELL_PRC"], errors="coerce").fillna(0.0)
+    investments = quantities * prices
+    ce_investment = float(investments[symbols.str.endswith("CE")].sum())
+    pe_investment = float(investments[symbols.str.endswith("PE")].sum())
+    if (
+        not math.isfinite(ce_investment)
+        or not math.isfinite(pe_investment)
+        or max(ce_investment, pe_investment) <= 0
+        or ce_investment == pe_investment
+    ):
+        return False
+
+    signal = str(direction).upper().strip()
+    return (
+        ce_investment > pe_investment and signal == "UP"
+    ) or (
+        pe_investment > ce_investment and signal == "DOWN"
+    )
 
 
 def force_zero_ending(val):
     return int(round(val / 10.0) * 10)
 
 
-def compute_stop(current_game_pnl, historical_peak, imbalance_factor=1):
-    """Returns the peak, displayed stop line, and whether an enabled exit hit.
-
-    PEAK preserves the original peak-following stop and peak-ceiling exit.
-    STATIC multiplies the loss floor and divides the target ceiling by the
-    absolute CE/PE row-count difference plus one.
-    """
+def compute_stop(current_game_pnl, historical_peak):
+    """Return peak, displayed PEAK stop line, and whether an enabled exit hit."""
     winners_peak_brick, stop_line, stop_breached, target_breached = (
-        compute_stop_conditions(current_game_pnl, historical_peak, imbalance_factor)
+        compute_stop_conditions(current_game_pnl, historical_peak)
     )
     return (
         winners_peak_brick,
@@ -116,24 +127,15 @@ def risk_squareoff_due(stop_breached, target_breached):
     )
 
 
-def compute_stop_conditions(current_game_pnl, historical_peak, imbalance_factor=1):
+def compute_stop_conditions(current_game_pnl, historical_peak):
     """Return peak, displayed stop line, and independent stop/target breach flags."""
     # Negative game P&L must not floor downward into a false negative brick.
     completed_bricks = int(current_game_pnl // BRICK_SIZE) if current_game_pnl >= 0 else 0
     calculated_live_peak = float(completed_bricks * BRICK_SIZE)
 
-    # Track the same peak in both modes; PEAK mode uses it for the trailing stop.
+    # Track the peak for the trailing stop.
     winners_peak_brick = max(calculated_live_peak, historical_peak)
-
-    if RISK_MODE == "PEAK":
-        unified_stop = INITIAL_LOSS_FLOOR + (winners_peak_brick * PEAK_MULTIPLIER)
-        stop_breached = current_game_pnl <= unified_stop
-        target_breached = winners_peak_brick >= PEAK_CEILING
-        return winners_peak_brick, unified_stop, stop_breached, target_breached
-
-    factor = max(float(imbalance_factor), 1.0)
-    loss_exit = INITIAL_LOSS_FLOOR * factor
-    target_exit = PEAK_CEILING / factor
-    stop_breached = current_game_pnl <= loss_exit
-    target_breached = current_game_pnl >= target_exit
-    return winners_peak_brick, loss_exit, stop_breached, target_breached
+    unified_stop = INITIAL_LOSS_FLOOR + (winners_peak_brick * PEAK_MULTIPLIER)
+    stop_breached = current_game_pnl <= unified_stop
+    target_breached = winners_peak_brick >= PEAK_CEILING
+    return winners_peak_brick, unified_stop, stop_breached, target_breached

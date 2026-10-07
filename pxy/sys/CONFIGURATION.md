@@ -83,6 +83,12 @@ Friday (currently 200, 150, 100, 50, 0 points). Dynamic selection fails closed
 on weekends when no weekday distance is defined. The symbol builder rounds the
 result to the configured strike step.
 
+`EXECBUYPXY_ENTRY_KEY_COLUMN` selects the signal used by the counter-buy/re-buy
+check; it defaults to `"entry"` and consumes `BUY`/`SELL` entry signals. A
+`BUY` signal with only PE held can trigger the CE counter-leg, while a `SELL`
+signal with only CE held can trigger the PE counter-leg. BULL/BEAR exit signals
+do not trigger this rule.
+
 ## Web server file access
 
 The HTTP server serves static `.html` files only from `web/`; files elsewhere
@@ -101,33 +107,26 @@ network boundary.
 Keep a feature's switch before dependent settings. When disabled, dependent
 settings should resolve to `None` rather than retain an active schedule.
 
-- `RUNEXACPXY_RISK_MODE` selects between `"PEAK"` and `"STATIC"`; the default is
-  `"STATIC"`. `"PEAK"` restores the original stop formula
-  `−₹2,000 + (session peak × 2)` and exits when the peak reaches ₹2,000.
-  `"STATIC"` uses the absolute difference between open CE and PE order-tag row
-  counts plus one as its scaling factor. The loss exit (−₹2,000) is multiplied
-  by that factor and the profit target (+₹2,000) is divided by it.
-- Activation timing follows the risk mode: `"STATIC"` is active throughout the
-  session with no 13:15 dependency, while `"PEAK"` preserves the original
-  13:15 IST activation and fresh-baseline behavior.
-- `RUNEXACPXY_CNTRLRSKBAR` and
-  `RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME` are derived from the selected risk
-  mode: `"NO"`/`None` for `"STATIC"` and `"YES"`/13:15 for `"PEAK"`.
+- Risk-bar behavior uses the PEAK model only. Its stop line is
+  `−₹2,000 + (session peak × 2)`, and its target threshold is reached when the
+  session peak reaches ₹2,000. There is no STATIC mode or CE/PE order-count
+  scaling.
+- `RUNEXACPXY_CNTRLRSKBAR` enables the risk candle (`"YES"` by default), and
+  `RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME` sets its activation time (13:15 IST).
 - At timed activation the ledger snapshots current portfolio P&L and resets
   peak/breach tracking.
-- Risk behavior has three switches: `RUNEXACPXY_RISK_MODE` (`"STATIC"` or
-  `"PEAK"`), `RUNEXACPXY_STOP_SQUAREOFF_ENABLED`, and
-  `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED`. Stop square-off defaults to `False`:
-  crossing the displayed stop threshold warns but does not square off. Target
-  square-off defaults to `True` and remains active. Each threshold switch
-  independently controls only its corresponding square-off.
-- In `"STATIC"` mode, the absolute CE/PE count difference plus one is
-  recalculated every ledger tick. Equal side counts use factor 1; a difference
-  of one (including 2:1 or 0:1) uses factor 2. In `"PEAK"` mode, the original
-  peak-based stop and unscaled peak-ceiling exit are used.
-- The CHK suite exercises both risk modes, and SIM replays apply the selected
-  mode to the simulated broker, including the configured breach confirmation
-  count. These paths never send live orders.
+- `RUNEXACPXY_STOP_SQUAREOFF_ENABLED` defaults to `False`, so crossing the stop
+  threshold warns but does not square off. `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED`
+  defaults to `True`, so a peak reaching the target threshold can square off
+  after the configured breach confirmation count.
+- Target square-off is suppressed while the higher-invested open option side
+  matches the current valid direction (`CE`/`UP` or `PE`/`DOWN`), taken from
+  the market snapshot's `direction` key.
+  Investment is open quantity × current sell price; ties and unavailable
+  directions do not suppress the target. When suppressed, the ledger reports
+  that the direction is on our side and target square-off is skipped.
+- The CHK suite exercises PEAK risk behavior, and SIM replays apply it to the
+  simulated broker. These paths never send live orders.
 
 ## Other conditional settings
 

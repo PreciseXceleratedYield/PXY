@@ -235,7 +235,7 @@ def _is_no_data_order_report_response(response):
     )
 
 
-def _process_lilo_orders_production(client, strict=False):
+def _process_lilo_orders_production(client, strict=False, risk_direction=None):
     try: 
         # MASTER RISK LEDGER hook 1: once-a-day stale web-cache override (runs before any data guard)
         try:
@@ -367,7 +367,9 @@ def _process_lilo_orders_production(client, strict=False):
         # SystemExit (confirmed breach) is deliberately NOT caught; every other error only prints.
         try:
             import runexacpxy
-            runexacpxy.execute_master_risk_ledger(client, open_df, closed_df)
+            runexacpxy.execute_master_risk_ledger(
+                client, open_df, closed_df, direction=risk_direction
+            )
         except Exception as _risk_err:
             print(f"⚠️ Master risk ledger error (ledger still returned): {_risk_err}")
 
@@ -385,12 +387,13 @@ def _process_lilo_orders_production(client, strict=False):
         return pd.DataFrame(), pd.DataFrame() 
 
 
-def process_lilo_orders(client, strict=False):
+def process_lilo_orders(client, strict=False, risk_direction=None):
     return dispatch_mode(
         "process_lilo_orders",
         _process_lilo_orders_production,
         client=client,
         strict=strict,
+        risk_direction=risk_direction,
         test_kwargs={"timezone": SYSCNFGPXY_TIMEZONE},
     )
 

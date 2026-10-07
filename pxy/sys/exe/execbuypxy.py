@@ -4,13 +4,13 @@
 # Called from exeexitpxy.py after the target exits. Receives the rows that are STILL held
 # (rows just exited, or with an exit already in flight, are removed by the caller).
 #
-#   CE rows held + exit key BEAR + no PE row  -> run pxybuype  (buys the PE leg)
-#   PE rows held + exit key BULL + no CE row  -> run pxybuyce  (buys the CE leg)
+#   CE rows held + entry key SELL + no PE row -> run pxybuype  (buys the PE leg)
+#   PE rows held + entry key BUY + no CE row  -> run pxybuyce  (buys the CE leg)
 #
 # pxybuype / pxybuyce are executable shell scripts (no extension); they are run directly,
 # not through python3.
 #
-# Anything else (including an exit key that is not BULL/BEAR) -> no action.
+# Anything else (including BULL/BEAR exit signals) -> no action.
 import os
 import shutil
 import json
@@ -23,7 +23,7 @@ from syscnfgpxy import (
     EXECBUYPXY_ACTION,
     EXECBUYPXY_CUTOFF,
     EXECBUYPXY_DEBUG_ENABLED,
-    EXECBUYPXY_EXIT_KEY_COLUMN,
+    EXECBUYPXY_ENTRY_KEY_COLUMN,
     EXECBUYPXY_LOCK_KEEP_SECS,
     EXECBUYPXY_MAX_PER_DAY,
     EXECBUYPXY_SCRIPTS,
@@ -37,7 +37,7 @@ from sysdecisionpxy import counter_leg_permission_status
 CBUY_ACTION = EXECBUYPXY_ACTION
 CBUY_LOCK_SECS = SYSCNFGPXY_ACTION_COOLDOWN_SECONDS
 CBUY_CUTOFF = EXECBUYPXY_CUTOFF
-EXIT_KEY_COLUMN = EXECBUYPXY_EXIT_KEY_COLUMN
+ENTRY_KEY_COLUMN = EXECBUYPXY_ENTRY_KEY_COLUMN
 CBUY_SCRIPTS = EXECBUYPXY_SCRIPTS
 CBUY_LOCK_FILE_NAME = ".cbuy_lock.json"
 CBUY_MAX_PER_DAY = EXECBUYPXY_MAX_PER_DAY
@@ -146,14 +146,14 @@ def check_counter_leg(remaining_df):
             debug_log("Counter check: no rows remaining after exits.")
             return None
 
-        state = str(remaining_df.iloc[0].get(EXIT_KEY_COLUMN, "NONE")).upper().strip()
+        signal = str(remaining_df.iloc[0].get(ENTRY_KEY_COLUMN, "NONE")).upper().strip()
         records = remaining_df[["symbol", "qty"]].to_dict("records")
-        script_name = counter_leg_script(state, records, CBUY_SCRIPTS)
+        script_name = counter_leg_script(signal, records, CBUY_SCRIPTS)
         if script_name is None:
-            debug_log(f"Counter check: state {state} | positions do not match a counter-leg rule.")
+            debug_log(f"Counter check: entry signal {signal} | positions do not match a counter-leg rule.")
             return None
 
-        held = "CE" if state == "BEAR" else "PE"
+        held = "PE" if signal == "BUY" else "CE"
         counter = "PE" if held == "CE" else "CE"
 
         now = datetime.now(_IST).time()
@@ -184,7 +184,7 @@ def check_counter_leg(remaining_df):
                 print(f"{Fore.RED}🛑 Counter-buy daily cap reached ({CBUY_MAX_PER_DAY} launches); not firing {script_name}.")
             return None
 
-        print(f"{Fore.YELLOW}⚠️ Hostile state ({state}): remaining {held} rows with NO {counter} leg.")
+        print(f"{Fore.YELLOW}⚠️ Entry signal ({signal}): remaining {held} rows with NO {counter} leg.")
         if permission == "passive":
             print(f"{Fore.BLUE}{Style.BRIGHT}ℹ️ [PASSIVE ALERT] CBUY_ACTION=NO. Would fire {script_name}.")
             return None

@@ -15,6 +15,7 @@ if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 
 from tstmodepxy.broker_sim import SimulatedBroker
+from tstmodepxy import replay_adapter
 from tstmodepxy.replay_adapter import ProductionPipeReplay
 
 
@@ -39,7 +40,49 @@ class ProductionPipeReplayTests(unittest.TestCase):
         self.assertIs(__import__("os").system, system_call)
         self.assertIs(__import__("subprocess").run, process_run)
 
-    def test_sim_replay_applies_configured_static_risk_target(self):
+    def test_oms_passes_only_current_directional_signal_to_risk_ledger(self):
+        for snapshot, expected_signal in (
+            (
+                {
+                    "direction": "UP", "exit": "BULL",
+                    "market_data_available": True, "atr": 10,
+                },
+                "UP",
+            ),
+            (
+                {
+                    "direction": "UP", "exit": "BULL",
+                    "market_data_available": False, "atr": 10,
+                },
+                None,
+            ),
+            (
+                {
+                    "direction": "NONE", "exit": "BULL",
+                    "market_data_available": True, "atr": 10,
+                },
+                None,
+            ),
+        ):
+            with self.subTest(snapshot=snapshot):
+                with tempfile.TemporaryDirectory(prefix="pxy-risk-signal-wire-") as temp:
+                    broker = SimulatedBroker()
+                    with ProductionPipeReplay(
+                        SYS_DIR, broker, Path(temp) / "state"
+                    ) as engine, patch.object(
+                        engine.oms,
+                        "process_lilo_orders",
+                        return_value=(pd.DataFrame(), pd.DataFrame()),
+                    ) as process_orders:
+                        engine.snapshot = snapshot
+                        engine.oms.get_combined_data()
+
+                    self.assertEqual(
+                        process_orders.call_args.kwargs["risk_direction"],
+                        expected_signal,
+                    )
+
+    def test_sim_replay_applies_peak_risk_target_without_signal(self):
         with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-target-") as temp:
             broker = SimulatedBroker()
             broker.set_market(
@@ -65,18 +108,62 @@ class ProductionPipeReplayTests(unittest.TestCase):
             closed_df = pd.DataFrame()
             with ProductionPipeReplay(
                 SYS_DIR, broker, Path(temp) / "state"
-            ) as engine:
+            ) as engine, patch.object(
+                replay_adapter, "RUNEXACPXY_CNTRLRSKBAR", "NO"
+            ):
                 engine.timestamp = broker.current_time
-                with patch.object(engine.risk_math, "RISK_MODE", "STATIC"):
-                    for minute in range(3):
-                        engine.timestamp = broker.current_time.replace(
-                            minute=minute,
-                        )
-                        engine._execute_risk_ledger(broker, open_df, closed_df)
+                for minute in range(3):
+                    engine.timestamp = broker.current_time.replace(minute=minute)
+                    engine._execute_risk_ledger(broker, open_df, closed_df)
 
             self.assertTrue(engine.risk_exit_fired)
             self.assertEqual(broker.position_summary(), "0CE0PE")
             self.assertEqual(engine.risk_pnl_offset, 2000)
+
+    def test_sim_replay_suppresses_target_when_heavier_side_matches_signal(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-aligned-target-") as temp:
+            broker = SimulatedBroker()
+            broker.set_market(
+                pytz.timezone("Asia/Kolkata").localize(datetime(2025, 1, 6, 10, 0)),
+                22000,
+            )
+            broker.place_order(
+                trading_symbol="NIFTY-WF-CE",
+                transaction_type="B",
+                quantity=75,
+                tag="SIM-ALIGNED",
+            )
+            open_df = pd.DataFrame(
+                [{
+                    "Symbol": "NIFTY-WF-CE",
+                    "Qty": 75,
+                    "Tag": "SIM-ALIGNED",
+                    "BUY_PRC": 100,
+                    "SELL_PRC": 126.67,
+                    "PNL": 2000,
+                }]
+            )
+            with (
+                patch.object(replay_adapter, "RUNEXACPXY_CNTRLRSKBAR", "NO"),
+                ProductionPipeReplay(SYS_DIR, broker, Path(temp) / "state") as engine,
+            ):
+                for minute in range(3):
+                    engine.timestamp = broker.current_time.replace(minute=minute)
+                    engine._execute_risk_ledger(
+                        broker, open_df, pd.DataFrame(), direction="UP"
+                    )
+
+                self.assertFalse(engine.risk_exit_fired)
+                self.assertEqual(broker.position_summary(), "75CE0PE")
+
+                for minute in range(3, 6):
+                    engine.timestamp = broker.current_time.replace(minute=minute)
+                    engine._execute_risk_ledger(
+                        broker, open_df, pd.DataFrame(), direction="DOWN"
+                    )
+
+            self.assertTrue(engine.risk_exit_fired)
+            self.assertEqual(broker.position_summary(), "0CE0PE")
 
     def test_sim_replay_counts_breach_only_once_per_bar_timestamp(self):
         with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-tick-") as temp:
@@ -103,7 +190,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
             )
             with ProductionPipeReplay(
                 SYS_DIR, broker, Path(temp) / "state"
-            ) as engine, patch.object(engine.risk_math, "RISK_MODE", "STATIC"):
+            ) as engine, patch.object(replay_adapter, "RUNEXACPXY_CNTRLRSKBAR", "NO"):
                 engine.timestamp = broker.current_time
                 for _ in range(3):
                     engine._execute_risk_ledger(broker, open_df, pd.DataFrame())
@@ -179,7 +266,6 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 }]
             )
             with (
-                patch.object(replay_adapter, "RUNEXACPXY_RISK_MODE", "PEAK"),
                 patch.object(replay_adapter, "RUNEXACPXY_CNTRLRSKBAR", "YES"),
                 patch.object(
                     replay_adapter,
@@ -187,7 +273,6 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     time(13, 15),
                 ),
                 ProductionPipeReplay(SYS_DIR, broker, Path(temp) / "state") as engine,
-                patch.object(engine.risk_math, "RISK_MODE", "PEAK"),
             ):
                 engine._execute_risk_ledger(broker, open_df, pd.DataFrame())
                 self.assertEqual(engine.risk_breach_ticks, 0)
@@ -335,6 +420,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 "held": ("CE",),
                 "available": True,
                 "exit": "SIDE",
+                "entry": "NONE",
                 "sell_price": 120.0,
                 "target": 110.0,
                 "expected": [("B", "NIFTY-WF-CE"), ("S", "NIFTY-WF-CE")],
@@ -345,6 +431,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 "held": ("CE",),
                 "available": False,
                 "exit": "SIDE",
+                "entry": "NONE",
                 "sell_price": 120.0,
                 "target": 110.0,
                 "expected": [("B", "NIFTY-WF-CE")],
@@ -355,6 +442,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 "held": ("CE",),
                 "available": True,
                 "exit": "SIDE",
+                "entry": "NONE",
                 "sell_price": 120.0,
                 "target": 110.0,
                 "expected": [("B", "NIFTY-WF-CE")],
@@ -365,6 +453,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 "held": ("CE",),
                 "available": True,
                 "exit": "BEAR",
+                "entry": "SELL",
                 "sell_price": 100.0,
                 "target": 110.0,
                 "expected": [("B", "NIFTY-WF-CE"), ("B", "NIFTY-WF-PE")],
@@ -374,6 +463,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 "held": ("CE", "PE"),
                 "available": True,
                 "exit": "BEAR",
+                "entry": "SELL",
                 "sell_price": 100.0,
                 "target": 110.0,
                 "expected": [
@@ -411,6 +501,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                             "sell_prc": scenario["sell_price"],
                             "pnl": 200.0 if scenario["sell_price"] >= 110 else 0.0,
                             "pxy_tgt": scenario["target"],
+                            "entry": scenario["entry"],
                             "exit": scenario["exit"],
                             "atr": 5.0,
                         }
@@ -597,8 +688,8 @@ class ProductionPipeReplayTests(unittest.TestCase):
         snapshots = pd.DataFrame(
             [
                 {"timestamp": datetime(2025, 1, 6, 10, 0), "spot": 22000.0, "entry": "BUY", "exit": "BULL"},
-                {"timestamp": datetime(2025, 1, 6, 10, 1), "spot": 22001.0, "entry": "NONE", "exit": "BEAR"},
-                {"timestamp": datetime(2025, 1, 6, 10, 2), "spot": 22002.0, "entry": "NONE", "exit": "BEAR"},
+                {"timestamp": datetime(2025, 1, 6, 10, 1), "spot": 22001.0, "entry": "SELL", "exit": "BEAR"},
+                {"timestamp": datetime(2025, 1, 6, 10, 2), "spot": 22002.0, "entry": "SELL", "exit": "BEAR"},
             ]
         )
         broker = SimulatedBroker()
@@ -624,6 +715,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                                 "sell_prc": 100.0,
                                 "pnl": 0.0,
                                 "pxy_tgt": 110.0,
+                                "entry": market_row["entry"],
                                 "exit": market_row["exit"],
                                 "atr": 5.0,
                             }
@@ -640,6 +732,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                                 "sell_prc": 100.0,
                                 "pnl": 0.0,
                                 "pxy_tgt": 110.0,
+                                "entry": market_row["entry"],
                                 "exit": market_row["exit"],
                                 "atr": 5.0,
                             }

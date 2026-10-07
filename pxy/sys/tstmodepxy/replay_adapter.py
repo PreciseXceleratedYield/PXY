@@ -16,7 +16,6 @@ from syscnfgpxy import (
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
     RUNEXACPXY_CNTRLRSKBAR,
     RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
-    RUNEXACPXY_RISK_MODE,
     RUNEXACPXY_STOP_SQUAREOFF_ENABLED,
     RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
 )
@@ -67,7 +66,7 @@ class ProductionPipeReplay:
         self.squareoff_pipe = importlib.import_module("exesqrpxy")
         self.dynamic_entry = importlib.import_module("exedynpxy")
         self.risk_math = importlib.import_module("runexmtpxy")
-        self.risk_control_activated = RUNEXACPXY_RISK_MODE != "PEAK"
+        self.risk_control_activated = False
         self.risk_pnl_offset = 0.0
         self.risk_peak = 0.0
         self.risk_breach_ticks = 0
@@ -233,7 +232,7 @@ class ProductionPipeReplay:
             tag=self.broker.next_tag(prefix),
         )
 
-    def _execute_risk_ledger(self, client, open_df, closed_df):
+    def _execute_risk_ledger(self, client, open_df, closed_df, direction=None):
         if (
             (open_df is None or open_df.empty)
             and (closed_df is None or closed_df.empty)
@@ -250,8 +249,7 @@ class ProductionPipeReplay:
         self.risk_last_counted_timestamp = now
         current_time = now.timetz().replace(tzinfo=None)
         if self.risk_math.midday_risk_activation_due(
-            RUNEXACPXY_RISK_MODE == "PEAK"
-            and str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() == "YES",
+            str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() == "YES",
             self.risk_control_activated,
             current_time,
             RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
@@ -270,18 +268,19 @@ class ProductionPipeReplay:
         ) = self.risk_math.compute_stop_conditions(
             game_pnl,
             self.risk_peak,
-            totals["imbalance_factor"],
+        )
+        target_squareoff_suppressed = (
+            target_breached
+            and self.risk_math.large_invested_side_aligned(open_df, direction)
         )
         breached = (
             RUNEXACPXY_STOP_SQUAREOFF_ENABLED and stop_breached
         ) or (
-            RUNEXACPXY_TARGET_SQUAREOFF_ENABLED and target_breached
+            RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
+            and target_breached
+            and not target_squareoff_suppressed
         )
-        target_line = (
-            self.risk_math.PEAK_CEILING
-            if RUNEXACPXY_RISK_MODE == "PEAK"
-            else self.risk_math.PEAK_CEILING / totals["imbalance_factor"]
-        )
+        target_line = self.risk_math.PEAK_CEILING
         risk_enabled = (
             not RUNEXACPXY_CNTRLRSKBAR
             or str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() != "YES"
@@ -312,7 +311,7 @@ class ProductionPipeReplay:
         self.risk_peak = 0.0
         self.risk_breach_ticks = 0
         print(
-            f"SIM RISK EXIT ({RUNEXACPXY_RISK_MODE}): "
+            f"SIM RISK EXIT (PEAK): "
             f"PnL {game_pnl:.0f}, stop {stop_line:.0f}, target {target_line:.0f}; "
             f"closed {len(open_df)} active rows."
         )

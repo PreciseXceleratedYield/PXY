@@ -5,7 +5,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import pytz
-from syscnfgpxy import RUNNIFTYPXY_HOLIDAYS
+from syscnfgpxy import EXECBUYPXY_ENTRY_KEY_COLUMN, RUNNIFTYPXY_HOLIDAYS
 from sysdecisionpxy import counter_leg_script
 from tstmodepxy.pipescenarios import (
     SCENARIOS,
@@ -162,7 +162,8 @@ MOCK_SCENARIOS = (
 
 
 def process_lilo_orders(
-    client=None, strict=False, timezone="Asia/Kolkata", scenario_index=None
+    client=None, strict=False, timezone="Asia/Kolkata", scenario_index=None,
+    risk_direction=None,
 ):
     now = pd.Timestamp.now(tz=timezone).to_pydatetime()
     if scenario_index is None:
@@ -277,9 +278,11 @@ def run_counter_leg(remaining_df=None):
     if remaining_df is None or remaining_df.empty:
         print("CHK MODE: counter-leg scenario has no held rows.")
         return False
-    state = str(remaining_df.iloc[0].get("exit", "NONE")).upper().strip()
+    signal = str(
+        remaining_df.iloc[0].get(EXECBUYPXY_ENTRY_KEY_COLUMN, "NONE")
+    ).upper().strip()
     script_name = counter_leg_script(
-        state,
+        signal,
         remaining_df[["symbol", "qty"]].to_dict("records"),
         {"CE": "pxybuype", "PE": "pxybuyce"},
     )

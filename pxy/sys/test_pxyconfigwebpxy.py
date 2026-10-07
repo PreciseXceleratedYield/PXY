@@ -19,19 +19,15 @@ class ConfigEditorTests(unittest.TestCase):
             "CLOCK = dt_time(9, 0)\n"
             "SYSDTAFPXY_SELECTED_MODE = '00'\n"
             "RUNEXMTPXY_INITIAL_LOSS_FLOOR = -1000\n"
-            "RUNEXACPXY_RISK_MODE = 'STATIC'\n"
             "RUNEXACPXY_STOP_SQUAREOFF_ENABLED = False\n"
             "RUNEXACPXY_TARGET_SQUAREOFF_ENABLED = True\n"
             "HOLIDAYS = ('one', 'two')\n"
             "SCRIPTS = {'CE': 'buy', 'PE': 'sell'}\n"
             "TOKEN_VALUE = 'must stay hidden'\n"
             "DERIVED_VALUE = RUNNIFTYPXY_STRIKE_STEP * 2\n"
-            "def _risk_candle_activation_settings(risk_mode):\n"
-            "    if risk_mode == 'PEAK':\n"
-            "        return 'YES', dt_time(13, 15)\n"
-            "    return 'NO', None\n"
-            "RUNEXACPXY_CNTRLRSKBAR, RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME = (\n"
-            "    _risk_candle_activation_settings(RUNEXACPXY_RISK_MODE)\n"
+            "RUNEXACPXY_CNTRLRSKBAR = 'YES'\n"
+            "RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME = (\n"
+            "    dt_time(13, 15) if RUNEXACPXY_CNTRLRSKBAR == 'YES' else None\n"
             ")\n"
             "if RUNEXMTPXY_INITIAL_LOSS_FLOOR < -2000:\n"
             "    raise ValueError('loss floor is out of range')\n"
@@ -71,37 +67,26 @@ class ConfigEditorTests(unittest.TestCase):
         self.assertIn("EXEOTMPXY_FIXED_DISTANCE = 100", source)
         self.assertIn("EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES = (200, 150, 100, 50, 0)", source)
 
-    def test_risk_mode_is_selectable_and_saved_through_config_editor(self):
+    def test_risk_mode_is_removed_from_config_editor(self):
         settings, _ = config_editor._metadata(self.original)
-        risk_mode = next(
-            setting for setting in settings
-            if setting["key"] == "RUNEXACPXY_RISK_MODE"
+        self.assertNotIn(
+            "RUNEXACPXY_RISK_MODE",
+            {setting["key"] for setting in settings},
         )
-        self.assertEqual(risk_mode["value"], "STATIC")
-        self.assertEqual(risk_mode["options"], ["PEAK", "STATIC"])
-
-        for mode, activation, activation_time in (
-            ("PEAK", "YES", "13:15:00"),
-            ("STATIC", "NO", None),
-        ):
-            config_editor._write({"RUNEXACPXY_RISK_MODE": mode})
-            runtime_config = runpy.run_path(str(self.config_path))
-            self.assertEqual(runtime_config["RUNEXACPXY_RISK_MODE"], mode)
-            self.assertEqual(runtime_config["RUNEXACPXY_CNTRLRSKBAR"], activation)
-            actual_time = runtime_config["RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME"]
-            self.assertEqual(
-                actual_time.isoformat() if actual_time else None,
-                activation_time,
-            )
-
-        with self.assertRaisesRegex(ValueError, "listed choices"):
-            config_editor._write({"RUNEXACPXY_RISK_MODE": "UNKNOWN"})
+        runtime_config = runpy.run_path(str(self.config_path))
+        self.assertEqual(runtime_config["RUNEXACPXY_CNTRLRSKBAR"], "YES")
+        self.assertEqual(
+            runtime_config["RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME"].isoformat(),
+            "13:15:00",
+        )
+        config_editor._write({"RUNEXACPXY_CNTRLRSKBAR": "NO"})
+        runtime_config = runpy.run_path(str(self.config_path))
+        self.assertIsNone(runtime_config["RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME"])
 
     def test_risk_mode_and_stop_target_actions_are_the_only_risk_switches(self):
         settings, _ = config_editor._metadata(self.original)
         by_name = {setting["key"]: setting for setting in settings}
 
-        self.assertEqual(by_name["RUNEXACPXY_RISK_MODE"]["options"], ["PEAK", "STATIC"])
         self.assertFalse(by_name["RUNEXACPXY_STOP_SQUAREOFF_ENABLED"]["value"])
         self.assertTrue(by_name["RUNEXACPXY_TARGET_SQUAREOFF_ENABLED"]["value"])
         self.assertEqual(
@@ -109,13 +94,11 @@ class ConfigEditorTests(unittest.TestCase):
                 name for name in by_name
                 if name.startswith("RUNEXACPXY_")
                 and (
-                    name.endswith("_RISK_MODE")
-                    or name.endswith("_STOP_SQUAREOFF_ENABLED")
+                    name.endswith("_STOP_SQUAREOFF_ENABLED")
                     or name.endswith("_TARGET_SQUAREOFF_ENABLED")
                 )
             },
             {
-                "RUNEXACPXY_RISK_MODE",
                 "RUNEXACPXY_STOP_SQUAREOFF_ENABLED",
                 "RUNEXACPXY_TARGET_SQUAREOFF_ENABLED",
             },

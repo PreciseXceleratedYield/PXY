@@ -25,7 +25,6 @@ if str(SYS_DIR) not in sys.path:
 from syscnfgpxy import (
     RUNEXACPXY_CNTRLRSKBAR,
     RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
-    RUNEXACPXY_RISK_MODE,
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
     RUNEXACPXY_DEBUG_ENABLED,
     RUNEXACPXY_LEDGER_BASIS_GUARD,
@@ -38,6 +37,7 @@ from runexiopxy import now_ist, today_ist, RENKO_STATE_FILE, WEB_DIR, SQUAREOFF_
 from runexmtpxy import (
     INITIAL_LOSS_FLOOR, PEAK_CEILING, compute_totals,
     compute_stop_conditions, force_zero_ending, _both_empty, risk_squareoff_due,
+    large_invested_side_aligned,
     midday_risk_activation_due,
 )
 from runexstpxy import (
@@ -92,7 +92,7 @@ def daily_purge_check():
 # ---------------------------------------------------------------------------
 # HOOK 2: the master ledger
 # ---------------------------------------------------------------------------
-def execute_master_risk_ledger(client, open_df, closed_df):
+def execute_master_risk_ledger(client, open_df, closed_df, direction=None):
     """Defensive gatekeeper. Returns normally when there is nothing to do or the tick was skipped.
     On a confirmed breach: square-off, flat check, state reset, then sys.exit(...)."""
     global _IN_LEDGER
@@ -112,7 +112,7 @@ def execute_master_risk_ledger(client, open_df, closed_df):
 
     _IN_LEDGER = True
     try:
-        _tick(client, open_df, closed_df)
+        _tick(client, open_df, closed_df, direction)
     except SystemExit:
         raise
     except Exception as e:
@@ -122,7 +122,7 @@ def execute_master_risk_ledger(client, open_df, closed_df):
         _release_lock(lock_handle)
 
 
-def _tick(client, open_df, closed_df):
+def _tick(client, open_df, closed_df, direction=None):
     # 1. Read state. A corrupt/locked file skips the tick rather than writing zeros.
     try:
         state_on_disk = load_session_state()
@@ -198,13 +198,14 @@ def _tick(client, open_df, closed_df):
         stop_breached,
         target_breached,
     ) = compute_stop_conditions(
-        current_game_pnl, historical_peak_record, totals["imbalance_factor"])
-    is_breached = risk_squareoff_due(stop_breached, target_breached)
-    active_target_exit = (
-        PEAK_CEILING
-        if RUNEXACPXY_RISK_MODE == "PEAK"
-        else PEAK_CEILING / totals["imbalance_factor"]
+        current_game_pnl, historical_peak_record)
+    target_squareoff_suppressed = (
+        target_breached and large_invested_side_aligned(open_df, direction)
     )
+    is_breached = risk_squareoff_due(
+        stop_breached, target_breached and not target_squareoff_suppressed
+    )
+    active_target_exit = PEAK_CEILING
     risk_exit_enabled = not RISK_CANDLE_CONTROL_ENABLED or risk_control_activated
 
     # 6. Telemetry (3-line format)
@@ -218,9 +219,14 @@ def _tick(client, open_df, closed_df):
         print(f"{Fore.YELLOW}⚠️ STOP THRESHOLD REACHED at {int(active_trailing_exit)}; {stop_action}.")
     if risk_exit_enabled and target_breached:
         target_action = (
-            "square-off enabled"
-            if RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
-            else "warning only; no target square-off"
+            f"GOING GOOD: SIGNAL {direction} IS ON OUR SIDE; "
+            "target square-off suppressed"
+            if target_squareoff_suppressed and RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
+            else (
+                "square-off enabled"
+                if RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
+                else "warning only; no target square-off"
+            )
         )
         print(
             f"{Fore.YELLOW}⚠️ TARGET THRESHOLD REACHED at "

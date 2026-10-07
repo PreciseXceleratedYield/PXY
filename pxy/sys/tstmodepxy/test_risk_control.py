@@ -15,25 +15,27 @@ RUN_DIR = SYS_DIR / "exe" / "run"
 if str(RUN_DIR) not in sys.path:
     sys.path.insert(0, str(RUN_DIR))
 
-from runexmtpxy import compute_stop, compute_totals, midday_risk_activation_due
+from runexmtpxy import (
+    compute_stop,
+    compute_totals,
+    large_invested_side_aligned,
+    midday_risk_activation_due,
+)
 from syscnfgpxy import (
     RUNEXACPXY_CNTRLRSKBAR,
     RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
-    RUNEXACPXY_RISK_MODE,
     RUNEXACPXY_STOP_SQUAREOFF_ENABLED,
     RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
-    _risk_candle_activation_settings,
 )
 import runexstpxy
 
 
 class MiddayRiskControlTests(unittest.TestCase):
-    def test_default_risk_control_has_no_midday_activation_dependency(self):
-        self.assertEqual(RUNEXACPXY_CNTRLRSKBAR, "NO")
-        self.assertIsNone(RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME)
-        self.assertEqual(RUNEXACPXY_RISK_MODE, "STATIC")
+    def test_peak_risk_control_activates_at_1315(self):
+        self.assertEqual(RUNEXACPXY_CNTRLRSKBAR, "YES")
+        self.assertEqual(RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME, time(13, 15))
 
-    def test_stop_squareoff_is_disabled_but_static_target_still_triggers(self):
+    def test_stop_squareoff_is_disabled_but_peak_target_still_triggers(self):
         self.assertFalse(RUNEXACPXY_STOP_SQUAREOFF_ENABLED)
         self.assertTrue(RUNEXACPXY_TARGET_SQUAREOFF_ENABLED)
         self.assertFalse(compute_stop(-2000, 0)[2])
@@ -45,95 +47,45 @@ class MiddayRiskControlTests(unittest.TestCase):
         with patch("runexmtpxy.TARGET_SQUAREOFF_ENABLED", False):
             self.assertFalse(compute_stop(2000, 0)[2])
 
-    def test_peak_mode_uses_original_midday_activation_gate(self):
-        self.assertEqual(
-            _risk_candle_activation_settings("PEAK"),
-            ("YES", time(13, 15)),
-        )
-        self.assertEqual(
-            _risk_candle_activation_settings("STATIC"),
-            ("NO", None),
-        )
-
-    def test_static_risk_uses_side_imbalance_factor_for_loss_and_target(self):
-        with (
-            patch("runexmtpxy.STOP_SQUAREOFF_ENABLED", True),
-            patch("runexmtpxy.TARGET_SQUAREOFF_ENABLED", False),
-        ):
-            self.assertEqual(compute_stop(-3999, 0, imbalance_factor=2), (0.0, -4000.0, False))
-            self.assertEqual(compute_stop(-4000, 0, imbalance_factor=2), (0.0, -4000.0, True))
-            self.assertEqual(compute_stop(350, 0, imbalance_factor=2), (350.0, -4000.0, False))
-            self.assertEqual(compute_stop(1000, 0, imbalance_factor=2), (1000.0, -4000.0, False))
-
-    def test_risk_factor_is_count_difference_plus_one(self):
-        balanced = compute_totals(
-            pd.DataFrame([{"Symbol": "NIFTY-CE"}, {"Symbol": "NIFTY-PE"}]),
-            pd.DataFrame(),
-        )
-        two_to_one = compute_totals(
-            pd.DataFrame([
-                {"Symbol": "NIFTY-CE"},
-                {"Symbol": "NIFTY-CE"},
-                {"Symbol": "NIFTY-PE"},
-            ]),
-            pd.DataFrame(),
-        )
-        zero_to_one = compute_totals(
-            pd.DataFrame([{"Symbol": "NIFTY-PE"}]),
-            pd.DataFrame(),
-        )
-        three_to_one = compute_totals(
-            pd.DataFrame([
-                {"Symbol": "NIFTY-CE"},
-                {"Symbol": "NIFTY-CE"},
-                {"Symbol": "NIFTY-CE"},
-                {"Symbol": "NIFTY-PE"},
-            ]),
-            pd.DataFrame(),
-        )
-
-        self.assertEqual((balanced["ce_rows"], balanced["pe_rows"]), (1, 1))
-        self.assertEqual(balanced["imbalance_factor"], 1)
-        self.assertEqual((two_to_one["ce_rows"], two_to_one["pe_rows"]), (2, 1))
-        self.assertEqual(two_to_one["imbalance_factor"], 2)
-        self.assertEqual((zero_to_one["ce_rows"], zero_to_one["pe_rows"]), (0, 1))
-        self.assertEqual(zero_to_one["imbalance_factor"], 2)
-        self.assertEqual((three_to_one["ce_rows"], three_to_one["pe_rows"]), (3, 1))
-        self.assertEqual(three_to_one["imbalance_factor"], 3)
-
-    def test_peak_does_not_change_static_thresholds(self):
+    def test_peak_trailing_stop_uses_historical_peak(self):
         with patch("runexmtpxy.TARGET_SQUAREOFF_ENABLED", True):
-            one_row = compute_stop(1200, 1500, imbalance_factor=1)
-            five_rows = compute_stop(1200, 1500, imbalance_factor=5)
+            peak_state = compute_stop(1200, 1500)
 
-        self.assertEqual(one_row, (1500.0, -2000.0, False))
-        self.assertEqual(five_rows, (1500.0, -10000.0, True))
+        self.assertEqual(peak_state, (1500.0, 1000.0, False))
 
     def test_positive_target_is_based_on_current_pnl_not_peak(self):
-        self.assertEqual(compute_stop(399, 0, imbalance_factor=2), (350.0, -4000.0, False))
-        self.assertEqual(compute_stop(400, 0, imbalance_factor=2), (400.0, -4000.0, False))
+        self.assertEqual(compute_stop(399, 0), (350.0, -1300.0, False))
+        self.assertEqual(compute_stop(400, 0), (400.0, -1200.0, False))
 
-    def test_default_and_zero_factor_preserve_unscaled_thresholds(self):
+    def test_peak_stop_uses_unscaled_loss_floor(self):
         self.assertEqual(compute_stop(-2000, 0), (-0.0, -2000.0, False))
-        self.assertEqual(
-            compute_stop(-2000, 0, imbalance_factor=0),
-            (-0.0, -2000.0, False),
-        )
 
-    def test_peak_mode_restores_original_peak_trailing_stop(self):
+    def test_peak_trailing_stop_and_target(self):
         from runexmtpxy import PEAK_CEILING
 
-        with patch("runexmtpxy.RISK_MODE", "PEAK"):
-            self.assertEqual(compute_stop(-1799, 100), (100.0, -1800.0, False))
-            self.assertEqual(compute_stop(-1800, 100), (100.0, -1800.0, False))
-            self.assertEqual(compute_stop(PEAK_CEILING, 0), (PEAK_CEILING, 2000.0, True))
+        self.assertEqual(compute_stop(-1799, 100), (100.0, -1800.0, False))
+        self.assertEqual(compute_stop(-1800, 100), (100.0, -1800.0, False))
+        self.assertEqual(compute_stop(PEAK_CEILING, 0), (PEAK_CEILING, 2000.0, True))
 
         with (
-            patch("runexmtpxy.RISK_MODE", "PEAK"),
             patch("runexmtpxy.STOP_SQUAREOFF_ENABLED", True),
             patch("runexmtpxy.TARGET_SQUAREOFF_ENABLED", False),
         ):
             self.assertTrue(compute_stop(-1800, 100)[2])
+
+    def test_target_suppression_requires_higher_invested_side_to_match_signal(self):
+        ce_heavy = pd.DataFrame([
+            {"Symbol": "NIFTY-CE", "Qty": 75, "SELL_PRC": 100},
+            {"Symbol": "NIFTY-PE", "Qty": 75, "SELL_PRC": 50},
+        ])
+        pe_heavy = ce_heavy.assign(SELL_PRC=[50, 100])
+        balanced = ce_heavy.assign(SELL_PRC=[100, 100])
+
+        self.assertTrue(large_invested_side_aligned(ce_heavy, "UP"))
+        self.assertFalse(large_invested_side_aligned(ce_heavy, "DOWN"))
+        self.assertTrue(large_invested_side_aligned(pe_heavy, "DOWN"))
+        self.assertFalse(large_invested_side_aligned(balanced, "UP"))
+        self.assertFalse(large_invested_side_aligned(ce_heavy, "NONE"))
 
     def test_yes_activates_at_or_after_1315_ist(self):
         activation_time = time(13, 15)

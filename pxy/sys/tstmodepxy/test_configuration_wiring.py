@@ -35,6 +35,7 @@ from syscnfgpxy import (
     SYSDTAFPXY_FIXED_BRICK_SIZE,
     SYSENTRPXY_SIGNAL_MODE,
     EXEAMSPXY_MAX_INVESTMENT,
+    EXECBUYPXY_ENTRY_KEY_COLUMN,
 )
 from sysdtafpxy import apply_ohlc_transformation
 from sysdecisionpxy import averaging_trigger_sides
@@ -134,6 +135,10 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(exeacgpxy.COOL_DOWN_SECONDS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
         self.assertEqual(execbuypxy.CBUY_LOCK_SECS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
         self.assertEqual(exeexitpxy.EXIT_LOCK_SECS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
+
+    def test_counter_buy_uses_entry_signal_key(self):
+        self.assertEqual(EXECBUYPXY_ENTRY_KEY_COLUMN, "entry")
+        self.assertEqual(execbuypxy.ENTRY_KEY_COLUMN, "entry")
 
     def test_tgt_uses_single_positive_aligned_and_non_aligned_targets(self):
         self.assertEqual(exeltgtpxy.calculate_tgt(True), 77.0)

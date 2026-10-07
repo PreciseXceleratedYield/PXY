@@ -154,10 +154,10 @@ def averaging_placement_allowed(ledger_is_busy):
     return not ledger_is_busy
 
 
-def counter_leg_script(exit_state, positions, scripts):
-    """Return the counter-leg script for a hostile one-sided position, else None."""
-    state = str(exit_state).upper().strip()
-    if state not in {"BULL", "BEAR"}:
+def counter_leg_script(entry_signal, positions, scripts):
+    """Return the counter-leg script when entry signal opposes a one-sided position."""
+    signal = str(entry_signal).upper().strip()
+    if signal not in {"BUY", "SELL"}:
         return None
 
     has_ce = has_pe = False
@@ -172,9 +172,9 @@ def counter_leg_script(exit_state, positions, scripts):
         has_ce = has_ce or symbol.endswith("CE")
         has_pe = has_pe or symbol.endswith("PE")
 
-    if state == "BEAR" and has_ce and not has_pe:
+    if signal == "SELL" and has_ce and not has_pe:
         return scripts["CE"]
-    if state == "BULL" and has_pe and not has_ce:
+    if signal == "BUY" and has_pe and not has_ce:
         return scripts["PE"]
     return None
 
