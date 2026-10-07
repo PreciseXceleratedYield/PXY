@@ -22,7 +22,6 @@ ENUMS = {
     "SYSMODEPXY_RUN_MODE": ("PRD", "CHK", "SIM"),
     "SYSDTAFPXY_SELECTED_MODE": tuple(str(mode) for mode in range(9))
     + tuple(f"{side}{trend}" for side in range(9) for trend in range(9)),
-    "SYSSTRNDPXY_VARIANT": ("DUAL", "SINGLE", "SMA50", "COMBO_FORCE"),
     "EXEOTMPXY_STRIKE_MODE": ("ATM", "OTMFIX", "OTMDYN"),
     "RUNEXACPXY_CNTRLRSKBAR": ("YES", "NO"),
     "EXECBUYPXY_ACTION": ("YES", "NO"),

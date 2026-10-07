@@ -39,6 +39,9 @@ class ConfigEditorTests(unittest.TestCase):
         self.config_patch.stop()
         self.temp_dir.cleanup()
 
+    def test_supertrend_variant_is_not_a_configurable_setting(self):
+        self.assertNotIn("SYSSTRNDPXY_VARIANT", config_editor.ENUMS)
+
     def test_read_marks_derived_and_sensitive_values_read_only(self):
         settings, _ = config_editor._metadata(self.original)
         by_name = {setting["key"]: setting for setting in settings}

@@ -21,6 +21,10 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 - `SYSCNFGPXY_ACTION_COOLDOWN_SECONDS` is the single shared cooldown for
   averaging, counter-buy, exit de-duplication, and the production engine's
   between-cycle pause. Its current value is 7 seconds.
+- Supertrend always uses the DUAL calculation. Its only parameters are
+  `SYSSTRNDPXY_ST1_ATR_VALUE` (default `5`) and `SYSSTRNDPXY_ST1_FACTOR`
+  (default `1.4`); no ATR period or variant selector is used. This is
+  independent of the dashboard's dynamic ATR calculation.
 - `EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS` makes the signal router return
   `NONE` for both entry and exit signals for 120 seconds after a square-off
   order is accepted; the risk-ledger liquidation path starts the same
@@ -148,9 +152,8 @@ settings should resolve to `None` rather than retain an active schedule.
 - `SYSKATRPXY_ATR_STATIC_VALUE` is used for `ATR_MODE=1`; the true-ATR period,
   cap, minimum-row requirement, and fallback apply to mode 2; the depth floor
   applies to dynamic mode 3.
-- `SYSSTRNDPXY_COMBO_*` values apply only to variant `COMBO_FORCE`, while
-  `SYSSTRNDPXY_SMA_PERIOD` applies only to `SMA50`. ST1 values feed the
-  remaining single/dual variants.
+- `SYSSTRNDPXY_ST1_ATR_VALUE` and `SYSSTRNDPXY_ST1_FACTOR` are the only
+  Supertrend calculation settings; the production trend engine is always DUAL.
 - `SYSPLCHRTPXY_*` are consumed by the separate chart generator, not the
   production signal path. `SYSDTSTPXY_*` and `SYSRIGPXY_*` belong to standalone
   modules with no caller in the production launch graph.

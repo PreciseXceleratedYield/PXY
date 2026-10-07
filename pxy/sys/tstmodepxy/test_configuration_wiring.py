@@ -32,6 +32,8 @@ import runniftypxy
 from syscnfgpxy import (
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
+    SYSSTRNDPXY_ST1_ATR_VALUE,
+    SYSSTRNDPXY_ST1_FACTOR,
     SYSDTAFPXY_FIXED_BRICK_SIZE,
     EXEAMSPXY_MAX_INVESTMENT,
     EXECBUYPXY_ENTRY_KEY_COLUMN,
@@ -43,6 +45,7 @@ from sysdecisionpxy import (
     entry_signal_valid,
 )
 import syskatrpxy
+from systrcalpxy import _compute_single_st
 
 
 class ConfigurationWiringTests(unittest.TestCase):
@@ -52,6 +55,26 @@ class ConfigurationWiringTests(unittest.TestCase):
 
     def tearDown(self):
         self.cooldown_patch.stop()
+
+    def test_supertrend_variants_use_fixed_atr_value_five(self):
+        index = pd.date_range("2026-10-07", periods=3, freq="min")
+        frame = pd.DataFrame(
+            {
+                "Open": [99.0, 100.0, 101.0],
+                "High": [101.0, 102.0, 103.0],
+                "Low": [98.0, 99.0, 100.0],
+                "Close": [100.0, 101.0, 102.0],
+            },
+            index=index,
+        )
+        atr = SYSSTRNDPXY_ST1_ATR_VALUE
+        factor = SYSSTRNDPXY_ST1_FACTOR
+        self.assertEqual(atr, 5.0)
+        self.assertEqual(factor, 1.4)
+
+        single_line, _, _, _ = _compute_single_st(frame, factor=factor, atr_value=atr)
+        first_hl2 = (frame["High"].iloc[0] + frame["Low"].iloc[0]) / 2
+        self.assertEqual(single_line.iloc[0], first_hl2 + factor * atr)
 
     def test_entry_and_exit_follow_directional_supertrend(self):
         frame = pd.DataFrame({"Close": [1]})
