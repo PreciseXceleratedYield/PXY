@@ -20,6 +20,8 @@ class ConfigEditorTests(unittest.TestCase):
             "SYSDTAFPXY_SELECTED_MODE = '00'\n"
             "RUNEXMTPXY_INITIAL_LOSS_FLOOR = -1000\n"
             "RUNEXACPXY_RISK_MODE = 'STATIC'\n"
+            "RUNEXACPXY_STOP_SQUAREOFF_ENABLED = False\n"
+            "RUNEXACPXY_TARGET_SQUAREOFF_ENABLED = True\n"
             "HOLIDAYS = ('one', 'two')\n"
             "SCRIPTS = {'CE': 'buy', 'PE': 'sell'}\n"
             "TOKEN_VALUE = 'must stay hidden'\n"
@@ -94,6 +96,39 @@ class ConfigEditorTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "listed choices"):
             config_editor._write({"RUNEXACPXY_RISK_MODE": "UNKNOWN"})
+
+    def test_risk_mode_and_stop_target_actions_are_the_only_risk_switches(self):
+        settings, _ = config_editor._metadata(self.original)
+        by_name = {setting["key"]: setting for setting in settings}
+
+        self.assertEqual(by_name["RUNEXACPXY_RISK_MODE"]["options"], ["PEAK", "STATIC"])
+        self.assertFalse(by_name["RUNEXACPXY_STOP_SQUAREOFF_ENABLED"]["value"])
+        self.assertTrue(by_name["RUNEXACPXY_TARGET_SQUAREOFF_ENABLED"]["value"])
+        self.assertEqual(
+            {
+                name for name in by_name
+                if name.startswith("RUNEXACPXY_")
+                and (
+                    name.endswith("_RISK_MODE")
+                    or name.endswith("_STOP_SQUAREOFF_ENABLED")
+                    or name.endswith("_TARGET_SQUAREOFF_ENABLED")
+                )
+            },
+            {
+                "RUNEXACPXY_RISK_MODE",
+                "RUNEXACPXY_STOP_SQUAREOFF_ENABLED",
+                "RUNEXACPXY_TARGET_SQUAREOFF_ENABLED",
+            },
+        )
+        self.assertNotIn("RUNEXACPXY_RISK_ACTION", by_name)
+
+        config_editor._write({
+            "RUNEXACPXY_STOP_SQUAREOFF_ENABLED": True,
+            "RUNEXACPXY_TARGET_SQUAREOFF_ENABLED": False,
+        })
+        runtime_config = runpy.run_path(str(self.config_path))
+        self.assertTrue(runtime_config["RUNEXACPXY_STOP_SQUAREOFF_ENABLED"])
+        self.assertFalse(runtime_config["RUNEXACPXY_TARGET_SQUAREOFF_ENABLED"])
 
     def test_tgt_variant_is_not_exposed(self):
         settings, _ = config_editor._metadata(self.original)

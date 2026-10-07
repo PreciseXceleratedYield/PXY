@@ -16,8 +16,9 @@ from syscnfgpxy import (
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
     RUNEXACPXY_CNTRLRSKBAR,
     RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
-    RUNEXACPXY_RISK_ACTION,
     RUNEXACPXY_RISK_MODE,
+    RUNEXACPXY_STOP_SQUAREOFF_ENABLED,
+    RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
 )
 
 
@@ -261,10 +262,20 @@ class ProductionPipeReplay:
             self.risk_control_activated = True
 
         game_pnl = raw_pnl - self.risk_pnl_offset
-        self.risk_peak, stop_line, breached = self.risk_math.compute_stop(
+        (
+            self.risk_peak,
+            stop_line,
+            stop_breached,
+            target_breached,
+        ) = self.risk_math.compute_stop_conditions(
             game_pnl,
             self.risk_peak,
             totals["imbalance_factor"],
+        )
+        breached = (
+            RUNEXACPXY_STOP_SQUAREOFF_ENABLED and stop_breached
+        ) or (
+            RUNEXACPXY_TARGET_SQUAREOFF_ENABLED and target_breached
         )
         target_line = (
             self.risk_math.PEAK_CEILING
@@ -285,14 +296,6 @@ class ProductionPipeReplay:
         self.risk_breach_ticks += 1
         if self.risk_breach_ticks < RUNEXACPXY_BREACH_TICKS_REQUIRED:
             return
-        if str(RUNEXACPXY_RISK_ACTION).upper().strip() != "YES":
-            print(
-                f"SIM PASSIVE RISK ALERT ({RUNEXACPXY_RISK_MODE}): "
-                f"PnL {game_pnl:.0f}, stop {stop_line:.0f}, target {target_line:.0f}; "
-                "RISK_ACTION=NO, positions remain open."
-            )
-            return
-
         for index, row in enumerate(open_df.to_dict("records"), start=1):
             result = client.place_order(
                 trading_symbol=row["Symbol"],

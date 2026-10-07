@@ -29,13 +29,15 @@ from syscnfgpxy import (
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
     RUNEXACPXY_DEBUG_ENABLED,
     RUNEXACPXY_LEDGER_BASIS_GUARD,
-    RUNEXACPXY_RISK_ACTION,
+    RUNEXACPXY_STOP_SQUAREOFF_ENABLED,
+    RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
     RUNEXACPXY_TICK_MIN_GAP_SECONDS,
     RUNEXACPXY_VIEW_ONLY_ENV,
 )
 from runexiopxy import now_ist, today_ist, RENKO_STATE_FILE, WEB_DIR, SQUAREOFF_SCRIPT_PATH  # noqa: F401
 from runexmtpxy import (
-    INITIAL_LOSS_FLOOR, PEAK_CEILING, compute_totals, compute_stop, force_zero_ending, _both_empty,
+    INITIAL_LOSS_FLOOR, PEAK_CEILING, compute_totals,
+    compute_stop_conditions, force_zero_ending, _both_empty, risk_squareoff_due,
     midday_risk_activation_due,
 )
 from runexstpxy import (
@@ -48,7 +50,6 @@ from runexlqdpxy import liquidate_and_exit, run_squareoff, wait_until_flat  # no
 init(autoreset=True)
 
 # ==================== CONFIG (this file's settings) ====================
-RISK_ACTION = RUNEXACPXY_RISK_ACTION
 RISK_CANDLE_CONTROL_ENABLED = (
     str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() == "YES"
 )
@@ -191,23 +192,46 @@ def _tick(client, open_df, closed_df):
         print(f"⏱️ {Fore.CYAN}Risk candle activated at 13:15 IST with a fresh P&L baseline.")
 
     current_game_pnl = total_raw_pnl - pnl_offset
-    winners_peak_brick, active_trailing_exit, is_breached = compute_stop(
+    (
+        winners_peak_brick,
+        active_trailing_exit,
+        stop_breached,
+        target_breached,
+    ) = compute_stop_conditions(
         current_game_pnl, historical_peak_record, totals["imbalance_factor"])
+    is_breached = risk_squareoff_due(stop_breached, target_breached)
     active_target_exit = (
         PEAK_CEILING
         if RUNEXACPXY_RISK_MODE == "PEAK"
         else PEAK_CEILING / totals["imbalance_factor"]
     )
+    risk_exit_enabled = not RISK_CANDLE_CONTROL_ENABLED or risk_control_activated
 
     # 6. Telemetry (3-line format)
     print(f"PnL {int(current_game_pnl)} | Pek {int(winners_peak_brick)} | Stp {int(active_trailing_exit)}")
+    if risk_exit_enabled and stop_breached:
+        stop_action = (
+            "square-off enabled"
+            if RUNEXACPXY_STOP_SQUAREOFF_ENABLED
+            else "warning only; no stop square-off"
+        )
+        print(f"{Fore.YELLOW}⚠️ STOP THRESHOLD REACHED at {int(active_trailing_exit)}; {stop_action}.")
+    if risk_exit_enabled and target_breached:
+        target_action = (
+            "square-off enabled"
+            if RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
+            else "warning only; no target square-off"
+        )
+        print(
+            f"{Fore.YELLOW}⚠️ TARGET THRESHOLD REACHED at "
+            f"{int(active_target_exit)}; {target_action}."
+        )
     print(f"Los {fmt_losers} | Win {fmt_winners}")
     acpnl = totals["losers"] + totals["winners"]
     acpnl_label_color = Fore.GREEN if acpnl >= 0 else Fore.RED
     print(f"{acpnl_label_color}└─ ACPNL{Style.RESET_ALL} {int(acpnl)}".rjust(50))
 
     # 7. Breach handling
-    risk_exit_enabled = not RISK_CANDLE_CONTROL_ENABLED or risk_control_activated
     if is_breached and risk_exit_enabled:
         consecutive_breaches += 1
         save_check_state(consecutive_breaches)
@@ -221,13 +245,10 @@ def _tick(client, open_df, closed_df):
             sys.stdout.write(f"\n{Fore.RED}{Style.BRIGHT} !! CRITICAL TRADING BREACH DETECTED !! {Style.RESET_ALL}\n")
             sys.stdout.flush()
 
-            if str(RISK_ACTION).upper().strip() != "YES":
-                print(f"{Fore.BLUE}{Style.BRIGHT}ℹ️ [PASSIVE ALERT] RISK_ACTION=NO. Would square off everything now.")
-            else:
-                liquidate_and_exit(
-                    client, total_raw_pnl,
-                    risk_control_activated=risk_control_activated,
-                )     # always ends with sys.exit(...)
+            liquidate_and_exit(
+                client, total_raw_pnl,
+                risk_control_activated=risk_control_activated,
+            )     # always ends with sys.exit(...)
     else:
         if consecutive_breaches > 0:
             consecutive_breaches = 0

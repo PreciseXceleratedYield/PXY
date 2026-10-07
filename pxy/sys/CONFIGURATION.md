@@ -115,6 +115,12 @@ settings should resolve to `None` rather than retain an active schedule.
   mode: `"NO"`/`None` for `"STATIC"` and `"YES"`/13:15 for `"PEAK"`.
 - At timed activation the ledger snapshots current portfolio P&L and resets
   peak/breach tracking.
+- Risk behavior has three switches: `RUNEXACPXY_RISK_MODE` (`"STATIC"` or
+  `"PEAK"`), `RUNEXACPXY_STOP_SQUAREOFF_ENABLED`, and
+  `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED`. Stop square-off defaults to `False`:
+  crossing the displayed stop threshold warns but does not square off. Target
+  square-off defaults to `True` and remains active. Each threshold switch
+  independently controls only its corresponding square-off.
 - In `"STATIC"` mode, the absolute CE/PE count difference plus one is
   recalculated every ledger tick. Equal side counts use factor 1; a difference
   of one (including 2:1 or 0:1) uses factor 2. In `"PEAK"` mode, the original

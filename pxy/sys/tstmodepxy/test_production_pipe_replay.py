@@ -117,6 +117,41 @@ class ProductionPipeReplayTests(unittest.TestCase):
             self.assertTrue(engine.risk_exit_fired)
             self.assertEqual(broker.position_summary(), "0CE0PE")
 
+    def test_sim_replay_stop_threshold_warns_without_squareoff_by_default(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-stop-warning-") as temp:
+            broker = SimulatedBroker()
+            broker.set_market(
+                pytz.timezone("Asia/Kolkata").localize(datetime(2025, 1, 6, 10, 0)),
+                22000,
+            )
+            broker.place_order(
+                trading_symbol="NIFTY-WF-CE",
+                transaction_type="B",
+                quantity=75,
+                tag="SIM-STOP",
+            )
+            open_df = pd.DataFrame(
+                [{
+                    "Symbol": "NIFTY-WF-CE",
+                    "Qty": 75,
+                    "Tag": "SIM-STOP",
+                    "BUY_PRC": 100,
+                    "SELL_PRC": 73.33,
+                    "PNL": -2000,
+                }]
+            )
+            with ProductionPipeReplay(
+                SYS_DIR, broker, Path(temp) / "state"
+            ) as engine, redirect_stdout(StringIO()):
+                engine.timestamp = broker.current_time
+                for minute in range(3):
+                    engine.timestamp = broker.current_time.replace(minute=minute)
+                    engine._execute_risk_ledger(broker, open_df, pd.DataFrame())
+
+            self.assertFalse(engine.risk_exit_fired)
+            self.assertEqual(broker.position_summary(), "75CE0PE")
+            self.assertEqual(engine.risk_breach_ticks, 0)
+
     def test_sim_peak_mode_holds_risk_until_original_activation_time(self):
         from datetime import time
         from tstmodepxy import replay_adapter

@@ -18,6 +18,8 @@ from syscnfgpxy import (
     RUNEXMTPXY_PEAK_CEILING,
     RUNEXMTPXY_PEAK_MULTIPLIER,
     RUNEXACPXY_RISK_MODE,
+    RUNEXACPXY_STOP_SQUAREOFF_ENABLED,
+    RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
 )
 
 # ==================== CONFIG (this file's settings) ====================
@@ -26,6 +28,8 @@ INITIAL_LOSS_FLOOR = RUNEXMTPXY_INITIAL_LOSS_FLOOR
 PEAK_CEILING = RUNEXMTPXY_PEAK_CEILING
 PEAK_MULTIPLIER = RUNEXMTPXY_PEAK_MULTIPLIER
 RISK_MODE = RUNEXACPXY_RISK_MODE
+STOP_SQUAREOFF_ENABLED = RUNEXACPXY_STOP_SQUAREOFF_ENABLED
+TARGET_SQUAREOFF_ENABLED = RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
 # =======================================================================
 
 
@@ -88,12 +92,32 @@ def force_zero_ending(val):
 
 
 def compute_stop(current_game_pnl, historical_peak, imbalance_factor=1):
-    """Returns (winners_peak_brick, active_trailing_exit, is_breached).
+    """Returns the peak, displayed stop line, and whether an enabled exit hit.
 
     PEAK preserves the original peak-following stop and peak-ceiling exit.
     STATIC multiplies the loss floor and divides the target ceiling by the
     absolute CE/PE row-count difference plus one.
     """
+    winners_peak_brick, stop_line, stop_breached, target_breached = (
+        compute_stop_conditions(current_game_pnl, historical_peak, imbalance_factor)
+    )
+    return (
+        winners_peak_brick,
+        stop_line,
+        risk_squareoff_due(stop_breached, target_breached),
+    )
+
+
+def risk_squareoff_due(stop_breached, target_breached):
+    """Return whether either enabled risk threshold should square off."""
+    return bool(
+        (STOP_SQUAREOFF_ENABLED and stop_breached)
+        or (TARGET_SQUAREOFF_ENABLED and target_breached)
+    )
+
+
+def compute_stop_conditions(current_game_pnl, historical_peak, imbalance_factor=1):
+    """Return peak, displayed stop line, and independent stop/target breach flags."""
     # Negative game P&L must not floor downward into a false negative brick.
     completed_bricks = int(current_game_pnl // BRICK_SIZE) if current_game_pnl >= 0 else 0
     calculated_live_peak = float(completed_bricks * BRICK_SIZE)
@@ -103,14 +127,13 @@ def compute_stop(current_game_pnl, historical_peak, imbalance_factor=1):
 
     if RISK_MODE == "PEAK":
         unified_stop = INITIAL_LOSS_FLOOR + (winners_peak_brick * PEAK_MULTIPLIER)
-        is_breached = (
-            current_game_pnl <= unified_stop
-            or winners_peak_brick >= PEAK_CEILING
-        )
-        return winners_peak_brick, unified_stop, is_breached
+        stop_breached = current_game_pnl <= unified_stop
+        target_breached = winners_peak_brick >= PEAK_CEILING
+        return winners_peak_brick, unified_stop, stop_breached, target_breached
 
     factor = max(float(imbalance_factor), 1.0)
     loss_exit = INITIAL_LOSS_FLOOR * factor
     target_exit = PEAK_CEILING / factor
-    is_breached = current_game_pnl <= loss_exit or current_game_pnl >= target_exit
-    return winners_peak_brick, loss_exit, is_breached
+    stop_breached = current_game_pnl <= loss_exit
+    target_breached = current_game_pnl >= target_exit
+    return winners_peak_brick, loss_exit, stop_breached, target_breached
