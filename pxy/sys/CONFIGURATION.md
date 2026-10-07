@@ -138,10 +138,12 @@ settings should resolve to `None` rather than retain an active schedule.
   has no usable ATR. The averaging window switch and start/end bounds apply
   only to averaging placement, not to entry/exit pipes.
 - LGT compares the current side loss with a negative ATR/investment/count
-  threshold. `EXEAVXPXY_ALIGNED_LGT_MULTIPLIER` (default `1`) applies to
+  threshold. `EXEAVXPXY_ALIGNED_LGT_MULTIPLIER` (default `0.5`) applies to
   aligned sides; `EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER` (default `2`) applies
-  to non-aligned sides. The dashboard displays the same scaled threshold used
-  for placement; the current RUN loss remains unscaled.
+  to non-aligned sides. Since the threshold is negative, aligned sides use half
+  its magnitude while non-aligned sides use twice its magnitude. The dashboard
+  displays the same scaled threshold used for placement; the current RUN loss
+  remains unscaled.
 - In `EXETGTPXY_MODE="DYNAMIC"`, aligned targets use the calculated mirrored
   LGT base plus ATR, subject to `EXETGTPXY_MAX_TARGET_CAP`. Non-aligned targets
   use `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Static target values

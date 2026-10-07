@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+import runpy
 from unittest.mock import patch
 
 import pxyconfigwebpxy as config_editor
@@ -22,6 +23,13 @@ class ConfigEditorTests(unittest.TestCase):
             "SCRIPTS = {'CE': 'buy', 'PE': 'sell'}\n"
             "TOKEN_VALUE = 'must stay hidden'\n"
             "DERIVED_VALUE = RUNNIFTYPXY_STRIKE_STEP * 2\n"
+            "def _risk_candle_activation_settings(risk_mode):\n"
+            "    if risk_mode == 'PEAK':\n"
+            "        return 'YES', dt_time(13, 15)\n"
+            "    return 'NO', None\n"
+            "RUNEXACPXY_CNTRLRSKBAR, RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME = (\n"
+            "    _risk_candle_activation_settings(RUNEXACPXY_RISK_MODE)\n"
+            ")\n"
             "if RUNEXMTPXY_INITIAL_LOSS_FLOOR < -2000:\n"
             "    raise ValueError('loss floor is out of range')\n"
         )
@@ -69,8 +77,19 @@ class ConfigEditorTests(unittest.TestCase):
         self.assertEqual(risk_mode["value"], "STATIC")
         self.assertEqual(risk_mode["options"], ["PEAK", "STATIC"])
 
-        config_editor._write({"RUNEXACPXY_RISK_MODE": "PEAK"})
-        self.assertIn("RUNEXACPXY_RISK_MODE = 'PEAK'", self.config_path.read_text())
+        for mode, activation, activation_time in (
+            ("PEAK", "YES", "13:15:00"),
+            ("STATIC", "NO", None),
+        ):
+            config_editor._write({"RUNEXACPXY_RISK_MODE": mode})
+            runtime_config = runpy.run_path(str(self.config_path))
+            self.assertEqual(runtime_config["RUNEXACPXY_RISK_MODE"], mode)
+            self.assertEqual(runtime_config["RUNEXACPXY_CNTRLRSKBAR"], activation)
+            actual_time = runtime_config["RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME"]
+            self.assertEqual(
+                actual_time.isoformat() if actual_time else None,
+                activation_time,
+            )
 
         with self.assertRaisesRegex(ValueError, "listed choices"):
             config_editor._write({"RUNEXACPXY_RISK_MODE": "UNKNOWN"})

@@ -86,7 +86,7 @@
     <section class="intro">
       <h2>Manage <code>syscnfgpxy.py</code></h2>
       <p>Edit only declared runtime settings. Choice fields use validated dropdowns; computed settings are shown read-only.</p>
-      <p class="alert">Settings are written to the central Python config with a timestamped backup. Invalid settings are rejected before replacement. Running engine processes keep their already-loaded values; restart the engine deliberately to apply changes.</p>
+      <p class="alert">Settings are written to the central Python config with a timestamped backup. Invalid settings are rejected before replacement. Changing RUNEXACPXY_RISK_MODE saves the selected mode and its derived activation settings, but does not change a running engine; restart the engine deliberately to apply them.</p>
     </section>
 
     <section class="panel" id="authPanel">
@@ -324,7 +324,7 @@
       const preview = [...state.controls].slice(0, 12)
         .map(([key, value]) => `${key}: ${JSON.stringify(value)}`).join("\n");
       const remaining = count > 12 ? `\n…and ${count - 12} more` : "";
-      if (!count || !window.confirm(`Review ${count} change${count === 1 ? "" : "s"} for syscnfgpxy.py:\n\n${preview}${remaining}\n\nA timestamped backup will be created. The running engine will not be restarted.`)) return;
+      if (!count || !window.confirm(`Review ${count} change${count === 1 ? "" : "s"} for syscnfgpxy.py:\n\n${preview}${remaining}\n\nA timestamped backup will be created. These values will be loaded by the engine only after it is restarted; the running engine will not change modes.`)) return;
       $("save").disabled = true;
       status("Validating settings and preparing an atomic save…");
       try {

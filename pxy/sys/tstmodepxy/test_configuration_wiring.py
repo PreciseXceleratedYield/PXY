@@ -90,7 +90,7 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(not_aligned_target, 1014.0)
 
     def test_lgt_alignment_multipliers_match_requested_policy(self):
-        self.assertEqual(EXEAVXPXY_ALIGNED_LGT_MULTIPLIER, 1.0)
+        self.assertEqual(EXEAVXPXY_ALIGNED_LGT_MULTIPLIER, 0.5)
         self.assertEqual(EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER, 2.0)
         self.assertEqual(
             scale_lgt_threshold(
@@ -99,7 +99,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                 EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
                 EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
             ),
-            -10.0,
+            -5.0,
         )
         self.assertEqual(
             scale_lgt_threshold(
