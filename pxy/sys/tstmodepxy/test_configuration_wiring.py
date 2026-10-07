@@ -170,6 +170,52 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(aligned_target, 1500.0)
         self.assertEqual(not_aligned_target, 1014.0)
 
+    def test_more_invested_side_uses_fixed_target_regardless_of_alignment_or_mode(self):
+        ce_aligned = {
+            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL", "atr": 5,
+        }
+        pe_aligned = {
+            "pxy_entry": 1000, "symbol": "NIFTYPE", "exit": "BEAR", "atr": 5,
+        }
+        with (
+            patch.object(exeltgtpxy, "TGT_MODE", "DYNAMIC"),
+            patch.object(exeltgtpxy, "MIN_ATR_VALUE", 5.0),
+            patch.object(exeltgtpxy, "MIN_TARGET_PCT", 1.4),
+            patch.object(exeltgtpxy, "MAX_TARGET_CAP", 77.0),
+            patch.object(exeltgtpxy, "STATIC_NOT_ALIGNED_PCT", 1.4),
+        ):
+            ce_more_dynamic = exeltgtpxy.target_price(
+                ce_aligned, ce_investment=200, pe_investment=100
+            )
+            pe_more_dynamic = exeltgtpxy.target_price(
+                pe_aligned, ce_investment=100, pe_investment=200
+            )
+            pe_less_dynamic = exeltgtpxy.target_price(
+                pe_aligned, ce_investment=200, pe_investment=100
+            )
+
+        self.assertEqual(ce_more_dynamic, 1014.0)
+        self.assertEqual(pe_more_dynamic, 1014.0)
+        self.assertGreater(pe_less_dynamic, 1014.0)
+
+        with (
+            patch.object(exeltgtpxy, "TGT_MODE", "STATIC"),
+            patch.object(exeltgtpxy, "MIN_ATR_VALUE", 5.0),
+            patch.object(exeltgtpxy, "MIN_TARGET_PCT", 1.4),
+            patch.object(exeltgtpxy, "MAX_TARGET_CAP", 77.0),
+            patch.object(exeltgtpxy, "STATIC_NOT_ALIGNED_PCT", 1.4),
+            patch.object(exeltgtpxy, "STATIC_ALIGNED_PCT", 99.0),
+        ):
+            ce_more_static = exeltgtpxy.target_price(
+                ce_aligned, ce_investment=200, pe_investment=100
+            )
+            equal_aligned_static = exeltgtpxy.target_price(
+                ce_aligned, ce_investment=100, pe_investment=100
+            )
+
+        self.assertEqual(ce_more_static, 1014.0)
+        self.assertEqual(equal_aligned_static, 1990.0)
+
     def test_lgt_alignment_multipliers_match_requested_policy(self):
         self.assertEqual(EXEAVXPXY_ALIGNED_LGT_MULTIPLIER, 0.5)
         self.assertEqual(EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER, 2.0)

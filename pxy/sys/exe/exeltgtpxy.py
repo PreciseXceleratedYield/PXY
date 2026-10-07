@@ -181,9 +181,17 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             return round(entry_prc, 2)
 
         is_aligned = (derived_supr == 'BULL' and is_ce) or (derived_supr == 'BEAR' and is_pe)
+        ce_investment = f(ce_investment)
+        pe_investment = f(pe_investment)
+        is_more_invested = (
+            ce_investment > pe_investment if is_ce
+            else pe_investment > ce_investment
+        )
         
         # 3️⃣ Apply target formula based on trend status and execution mode
-        if derived_supr == 'SIDE':
+        if is_more_invested:
+            target_pct = STATIC_NOT_ALIGNED_PCT
+        elif derived_supr == 'SIDE':
             target_pct = STATIC_NOT_ALIGNED_PCT  # Flat 1.4% for both CE and PE in SIDE trend
         elif TGT_MODE == "STATIC":
             if is_aligned:
