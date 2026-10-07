@@ -35,8 +35,9 @@ from syscnfgpxy import (
 )
 from runexiopxy import now_ist, today_ist, RENKO_STATE_FILE, WEB_DIR, SQUAREOFF_SCRIPT_PATH  # noqa: F401
 from runexmtpxy import (
-    INITIAL_LOSS_FLOOR, PEAK_CEILING, compute_totals,
+    INITIAL_LOSS_FLOOR, compute_totals,
     compute_stop_conditions, force_zero_ending, _both_empty, risk_squareoff_due,
+    target_ceiling,
     large_invested_side_aligned,
     midday_risk_activation_due,
 )
@@ -198,14 +199,14 @@ def _tick(client, open_df, closed_df, direction=None):
         stop_breached,
         target_breached,
     ) = compute_stop_conditions(
-        current_game_pnl, historical_peak_record)
+        current_game_pnl, historical_peak_record, len(open_df) if open_df is not None else 0)
     target_squareoff_suppressed = (
         target_breached and large_invested_side_aligned(open_df, direction)
     )
     is_breached = risk_squareoff_due(
         stop_breached, target_breached and not target_squareoff_suppressed
     )
-    active_target_exit = PEAK_CEILING
+    active_target_exit = target_ceiling(len(open_df) if open_df is not None else 0)
     risk_exit_enabled = not RISK_CANDLE_CONTROL_ENABLED or risk_control_activated
 
     # 6. Telemetry (3-line format)

@@ -157,15 +157,17 @@ settings should resolve to `None` rather than retain an active schedule.
 - `SYSPLCHRTPXY_*` are consumed by the separate chart generator, not the
   production signal path. `SYSDTSTPXY_*` and `SYSRIGPXY_*` belong to standalone
   modules with no caller in the production launch graph.
-- TGT reads both `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and
-  `EXETGTPXY_SUPERTREND_KEY_COLUMN` (`supertrend`), regardless of the
-  `SYSENTRPXY_SIGNAL_MODE` router. Unless Supertrend is `SIDE`, a side receives
-  `EXETGTPXY_ALIGNED_PCT` (default `77%`) when `exit` aligns (`CE` with `BULL`,
-  or `PE` with `BEAR`); a non-aligned exit gets
-  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Supertrend `SIDE` overrides
-  the exit signal and forces the flat `1.4%` target for both option sides.
-  TGT no longer depends on ATR, investment ratio, layer count, or a
-  DYNAMIC/STATIC mode.
+- TGT uses `EXETGTPXY_MODE` (`RGLR` or `DIREX`, default `DIREX`) together with
+  `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and
+  `EXETGTPXY_SUPERTREND_KEY_COLUMN` (`supertrend`). In `RGLR`, all positions
+  use `exit` for alignment. In `DIREX`, the heavier open side uses market
+  `direction` (`CE` with `UP`, `PE` with `DOWN`), while the lighter side still
+  uses `exit`; ties or unavailable directions fall back to `exit`. Exposure is
+  open quantity × current sell price. Unless Supertrend is `SIDE`, aligned
+  positions receive `EXETGTPXY_ALIGNED_PCT` (default `77%`) and non-aligned
+  positions receive `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Supertrend
+  `SIDE` forces the `1.4%` target for both sides. Investment exposure selects
+  the heavier side only; it does not scale the target percentage.
 - The averaging window switch and start/end bounds apply only to averaging
   placement, not to entry/exit pipes.
 - Averaging uses one policy with no layer-count mode: the projected side
@@ -211,6 +213,9 @@ settings should resolve to `None` rather than retain an active schedule.
   bypassing it with a literal.
 - The regular exit and square-off order paths both use the centrally configured
   sell transaction type; square-off no longer embeds a separate `"S"` literal.
+- The portfolio risk target is `RUNEXMTPXY_TARGET_PER_ACTIVE_RUNG` (default
+  `1000`) multiplied by the number of active open ledger rows, with a minimum
+  effective count of one. The risk stop calculation is unchanged.
 - Older/alternate engines and account-specific utilities are not implicitly
   made active by centralizing production settings. Their local constants remain
   isolated until those entry paths are deliberately adopted or retired.

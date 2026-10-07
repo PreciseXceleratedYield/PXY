@@ -284,6 +284,38 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(exeltgtpxy.target_price(neutral_supertrend_ignores_bull_exit), 1014.0)
         self.assertEqual(exeltgtpxy.target_price(neutral_supertrend_ignores_bear_exit), 1014.0)
 
+    def test_direx_uses_direction_for_heavier_side_and_exit_for_lighter_side(self):
+        ce_heavy = {
+            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BEAR",
+            "direction": "UP", "supertrend": "BULL",
+        }
+        pe_light = {
+            "pxy_entry": 1000, "symbol": "NIFTYPE", "exit": "BEAR",
+            "direction": "UP", "supertrend": "BEAR",
+        }
+        ce_light = {**ce_heavy, "direction": "DOWN"}
+        pe_heavy = {**pe_light, "exit": "BULL", "direction": "DOWN"}
+        ce_heavy_direction_flip = {**ce_heavy, "exit": "BULL", "direction": "DOWN"}
+        pe_heavy_direction_flip = {**pe_light, "direction": "UP"}
+
+        self.assertEqual(exeltgtpxy.target_price(ce_heavy, 2000, 1000), 1770.0)
+        self.assertEqual(exeltgtpxy.target_price(pe_light, 2000, 1000), 1770.0)
+        self.assertEqual(exeltgtpxy.target_price(ce_light, 1000, 2000), 1014.0)
+        self.assertEqual(exeltgtpxy.target_price(pe_heavy, 1000, 2000), 1770.0)
+        self.assertEqual(exeltgtpxy.target_price(ce_heavy_direction_flip, 2000, 1000), 1014.0)
+        self.assertEqual(exeltgtpxy.target_price(pe_heavy_direction_flip, 1000, 2000), 1014.0)
+
+        with patch.object(exeltgtpxy, "TARGET_MODE", "RGLR"):
+            self.assertEqual(exeltgtpxy.target_price(ce_heavy, 2000, 1000), 1014.0)
+
+    def test_direx_ties_and_unavailable_direction_fall_back_to_exit(self):
+        row = {
+            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL",
+            "direction": "SIDE", "supertrend": "BULL",
+        }
+        self.assertEqual(exeltgtpxy.target_price(row, 1000, 1000), 1770.0)
+        self.assertEqual(exeltgtpxy.target_price(row, 2000, 1000), 1770.0)
+
     def test_lgt_uses_base_fourteen_piecewise_investment_ratio(self):
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -0.88)
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 2000.0, is_ce=True), -3.5)

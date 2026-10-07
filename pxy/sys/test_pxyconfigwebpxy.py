@@ -16,6 +16,7 @@ class ConfigEditorTests(unittest.TestCase):
             "FLAG = True\n"
             "RUNNIFTYPXY_STRIKE_STEP = 2\n"
             "CLOCK = dt_time(9, 0)\n"
+            "EXETGTPXY_MODE = 'DIREX'\n"
             "SYSDTAFPXY_SELECTED_MODE = '00'\n"
             "RUNEXMTPXY_INITIAL_LOSS_FLOOR = -1000\n"
             "RUNEXACPXY_STOP_SQUAREOFF_ENABLED = False\n"
@@ -115,9 +116,14 @@ class ConfigEditorTests(unittest.TestCase):
         self.assertTrue(runtime_config["RUNEXACPXY_STOP_SQUAREOFF_ENABLED"])
         self.assertFalse(runtime_config["RUNEXACPXY_TARGET_SQUAREOFF_ENABLED"])
 
-    def test_tgt_variant_is_not_exposed(self):
+    def test_tgt_mode_is_exposed_with_supported_choices(self):
         settings, _ = config_editor._metadata(self.original)
-        self.assertNotIn("EXETGTPXY_VARIANT", {setting["key"] for setting in settings})
+        by_name = {setting["key"]: setting for setting in settings}
+        self.assertNotIn("EXETGTPXY_VARIANT", by_name)
+        self.assertEqual(by_name["EXETGTPXY_MODE"]["value"], "DIREX")
+        self.assertEqual(by_name["EXETGTPXY_MODE"]["options"], ["RGLR", "DIREX"])
+        config_editor._write({"EXETGTPXY_MODE": "RGLR"})
+        self.assertIn("EXETGTPXY_MODE = 'RGLR'", self.config_path.read_text(encoding="utf-8"))
 
     def test_signal_router_mode_is_not_exposed(self):
         settings, _ = config_editor._metadata(self.original)

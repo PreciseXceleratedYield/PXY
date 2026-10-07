@@ -269,6 +269,7 @@ class ProductionPipeReplay:
         ) = self.risk_math.compute_stop_conditions(
             game_pnl,
             self.risk_peak,
+            len(open_df) if open_df is not None else 0,
         )
         target_squareoff_suppressed = (
             target_breached
@@ -281,7 +282,9 @@ class ProductionPipeReplay:
             and target_breached
             and not target_squareoff_suppressed
         )
-        target_line = self.risk_math.PEAK_CEILING
+        target_line = self.risk_math.target_ceiling(
+            len(open_df) if open_df is not None else 0
+        )
         risk_enabled = (
             not RUNEXACPXY_CNTRLRSKBAR
             or str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() != "YES"

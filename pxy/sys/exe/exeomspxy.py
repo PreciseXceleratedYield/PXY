@@ -58,10 +58,11 @@ except Exception as e:
     pxy_dyn = lambda row: row.get("buy_prc", 0)
 
 try:
-    from exeltgtpxy import target_price as pxy_tgt_calc
+    from exeltgtpxy import compute_market_exposure, target_price as pxy_tgt_calc
 except Exception as e:
     print(f"⚠️ exeltgtpxy not loaded ({e}); targets will be 0.")
-    pxy_tgt_calc = lambda row: 0
+    compute_market_exposure = lambda frame: (0.0, 0.0)
+    pxy_tgt_calc = lambda row, *_args: 0
 
 try:
     from exeslpxy import stop_loss as pxy_sl_calc
@@ -212,7 +213,11 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     # --- 5. THE PXY OMS CALCULATION CHAIN ---
     if add_calcs:
         active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
-        active_df["pxy_tgt"] = active_df.apply(pxy_tgt_calc, axis=1)
+        ce_investment, pe_investment = compute_market_exposure(active_df)
+        active_df["pxy_tgt"] = active_df.apply(
+            lambda row: pxy_tgt_calc(row, ce_investment, pe_investment),
+            axis=1,
+        )
         active_df["pxy_sl"] = active_df.apply(pxy_sl_calc, axis=1)
 
     combined["active_orders"] = active_df

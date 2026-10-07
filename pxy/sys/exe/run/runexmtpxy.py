@@ -16,8 +16,8 @@ if str(SYS_DIR) not in sys.path:
 from syscnfgpxy import (
     RUNEXMTPXY_BRICK_SIZE,
     RUNEXMTPXY_INITIAL_LOSS_FLOOR,
-    RUNEXMTPXY_PEAK_CEILING,
     RUNEXMTPXY_PEAK_MULTIPLIER,
+    RUNEXMTPXY_TARGET_PER_ACTIVE_RUNG,
     RUNEXACPXY_STOP_SQUAREOFF_ENABLED,
     RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
 )
@@ -25,7 +25,8 @@ from syscnfgpxy import (
 # ==================== CONFIG (this file's settings) ====================
 BRICK_SIZE = RUNEXMTPXY_BRICK_SIZE
 INITIAL_LOSS_FLOOR = RUNEXMTPXY_INITIAL_LOSS_FLOOR
-PEAK_CEILING = RUNEXMTPXY_PEAK_CEILING
+TARGET_PER_ACTIVE_RUNG = RUNEXMTPXY_TARGET_PER_ACTIVE_RUNG
+PEAK_CEILING = TARGET_PER_ACTIVE_RUNG * 2
 PEAK_MULTIPLIER = RUNEXMTPXY_PEAK_MULTIPLIER
 STOP_SQUAREOFF_ENABLED = RUNEXACPXY_STOP_SQUAREOFF_ENABLED
 TARGET_SQUAREOFF_ENABLED = RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
@@ -127,7 +128,12 @@ def risk_squareoff_due(stop_breached, target_breached):
     )
 
 
-def compute_stop_conditions(current_game_pnl, historical_peak):
+def target_ceiling(active_count):
+    """Scale the portfolio profit target by the number of active open rungs."""
+    return TARGET_PER_ACTIVE_RUNG * max(1, int(active_count or 0))
+
+
+def compute_stop_conditions(current_game_pnl, historical_peak, active_count=2):
     """Return peak, displayed stop line, and independent stop/target breach flags."""
     # Negative game P&L must not floor downward into a false negative brick.
     completed_bricks = int(current_game_pnl // BRICK_SIZE) if current_game_pnl >= 0 else 0
@@ -137,5 +143,5 @@ def compute_stop_conditions(current_game_pnl, historical_peak):
     winners_peak_brick = max(calculated_live_peak, historical_peak)
     unified_stop = INITIAL_LOSS_FLOOR + (winners_peak_brick * PEAK_MULTIPLIER)
     stop_breached = current_game_pnl <= unified_stop
-    target_breached = winners_peak_brick >= PEAK_CEILING
+    target_breached = winners_peak_brick >= target_ceiling(active_count)
     return winners_peak_brick, unified_stop, stop_breached, target_breached

@@ -17,9 +17,11 @@ if str(RUN_DIR) not in sys.path:
 
 from runexmtpxy import (
     compute_stop,
+    compute_stop_conditions,
     compute_totals,
     large_invested_side_aligned,
     midday_risk_activation_due,
+    target_ceiling,
 )
 from syscnfgpxy import (
     RUNEXACPXY_CNTRLRSKBAR,
@@ -72,6 +74,23 @@ class MiddayRiskControlTests(unittest.TestCase):
             patch("runexmtpxy.TARGET_SQUAREOFF_ENABLED", False),
         ):
             self.assertTrue(compute_stop(-1800, 100)[2])
+
+    def test_risk_target_scales_by_active_open_rung_count(self):
+        self.assertEqual(target_ceiling(1), 1000.0)
+        self.assertEqual(target_ceiling(2), 2000.0)
+        self.assertEqual(target_ceiling(3), 3000.0)
+        self.assertEqual(target_ceiling(0), 1000.0)
+
+        self.assertFalse(compute_stop_conditions(1000, 0, active_count=2)[3])
+        self.assertTrue(compute_stop_conditions(1000, 0, active_count=1)[3])
+        self.assertTrue(compute_stop_conditions(3000, 0, active_count=3)[3])
+        self.assertEqual(
+            {
+                compute_stop_conditions(0, 0, active_count=count)[1]
+                for count in (1, 2, 3)
+            },
+            {-2000.0},
+        )
 
     def test_target_suppression_requires_higher_invested_side_to_match_signal(self):
         ce_heavy = pd.DataFrame([
