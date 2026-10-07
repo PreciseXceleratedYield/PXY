@@ -68,7 +68,7 @@ def compute_totals(open_df, closed_df):
     )
     ce_rows = int(symbols.str.endswith("CE").sum())
     pe_rows = int(symbols.str.endswith("PE").sum())
-    imbalance_factor = max(abs(ce_rows - pe_rows), 1)
+    imbalance_factor = abs(ce_rows - pe_rows) + 1
 
     total = float(df_open["PNL"].sum() + df_closed["PNL"].sum())
     winners = float(win_open["PNL"].sum() + win_closed["PNL"].sum())
@@ -92,7 +92,7 @@ def compute_stop(current_game_pnl, historical_peak, imbalance_factor=1):
 
     PEAK preserves the original peak-following stop and peak-ceiling exit.
     STATIC multiplies the loss floor and divides the target ceiling by the
-    absolute difference between active CE and PE open rows, defaulting to one.
+    absolute CE/PE row-count difference plus one.
     """
     # Negative game P&L must not floor downward into a false negative brick.
     completed_bricks = int(current_game_pnl // BRICK_SIZE) if current_game_pnl >= 0 else 0
@@ -109,7 +109,7 @@ def compute_stop(current_game_pnl, historical_peak, imbalance_factor=1):
         )
         return winners_peak_brick, unified_stop, is_breached
 
-    factor = max(int(imbalance_factor), 1)
+    factor = max(float(imbalance_factor), 1.0)
     loss_exit = INITIAL_LOSS_FLOOR * factor
     target_exit = PEAK_CEILING / factor
     is_breached = current_game_pnl <= loss_exit or current_game_pnl >= target_exit

@@ -47,12 +47,24 @@ class MiddayRiskControlTests(unittest.TestCase):
         self.assertEqual(compute_stop(350, 0, imbalance_factor=2), (350.0, -4000.0, False))
         self.assertEqual(compute_stop(1000, 0, imbalance_factor=2), (1000.0, -4000.0, True))
 
-    def test_risk_factor_is_absolute_ce_pe_row_difference_with_equal_sides_unscaled(self):
+    def test_risk_factor_is_count_difference_plus_one(self):
         balanced = compute_totals(
             pd.DataFrame([{"Symbol": "NIFTY-CE"}, {"Symbol": "NIFTY-PE"}]),
             pd.DataFrame(),
         )
-        imbalanced = compute_totals(
+        two_to_one = compute_totals(
+            pd.DataFrame([
+                {"Symbol": "NIFTY-CE"},
+                {"Symbol": "NIFTY-CE"},
+                {"Symbol": "NIFTY-PE"},
+            ]),
+            pd.DataFrame(),
+        )
+        zero_to_one = compute_totals(
+            pd.DataFrame([{"Symbol": "NIFTY-PE"}]),
+            pd.DataFrame(),
+        )
+        three_to_one = compute_totals(
             pd.DataFrame([
                 {"Symbol": "NIFTY-CE"},
                 {"Symbol": "NIFTY-CE"},
@@ -64,8 +76,12 @@ class MiddayRiskControlTests(unittest.TestCase):
 
         self.assertEqual((balanced["ce_rows"], balanced["pe_rows"]), (1, 1))
         self.assertEqual(balanced["imbalance_factor"], 1)
-        self.assertEqual((imbalanced["ce_rows"], imbalanced["pe_rows"]), (3, 1))
-        self.assertEqual(imbalanced["imbalance_factor"], 2)
+        self.assertEqual((two_to_one["ce_rows"], two_to_one["pe_rows"]), (2, 1))
+        self.assertEqual(two_to_one["imbalance_factor"], 2)
+        self.assertEqual((zero_to_one["ce_rows"], zero_to_one["pe_rows"]), (0, 1))
+        self.assertEqual(zero_to_one["imbalance_factor"], 2)
+        self.assertEqual((three_to_one["ce_rows"], three_to_one["pe_rows"]), (3, 1))
+        self.assertEqual(three_to_one["imbalance_factor"], 3)
 
     def test_peak_does_not_change_static_thresholds(self):
         one_row = compute_stop(1200, 1500, imbalance_factor=1)

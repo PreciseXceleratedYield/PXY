@@ -100,8 +100,8 @@ settings should resolve to `None` rather than retain an active schedule.
   `"STATIC"`. `"PEAK"` restores the original stop formula
   `−₹2,000 + (session peak × 2)` and exits when the peak reaches ₹2,000.
   `"STATIC"` uses the absolute difference between open CE and PE order-tag row
-  counts as its scaling factor (minimum 1). The loss exit (−₹2,000) is
-  multiplied by that factor and the profit target (+₹2,000) is divided by it.
+  counts plus one as its scaling factor. The loss exit (−₹2,000) is multiplied
+  by that factor and the profit target (+₹2,000) is divided by it.
 - Activation timing follows the risk mode: `"STATIC"` is active throughout the
   session with no 13:15 dependency, while `"PEAK"` preserves the original
   13:15 IST activation and fresh-baseline behavior.
@@ -110,10 +110,10 @@ settings should resolve to `None` rather than retain an active schedule.
   mode: `"NO"`/`None` for `"STATIC"` and `"YES"`/13:15 for `"PEAK"`.
 - At timed activation the ledger snapshots current portfolio P&L and resets
   peak/breach tracking.
-- In `"STATIC"` mode, the CE/PE count difference is recalculated every ledger
-  tick. Equal side counts (including no active rows) use factor 1 and leave
-  thresholds unchanged. In `"PEAK"` mode, the original peak-based stop and
-  unscaled peak-ceiling exit are used.
+- In `"STATIC"` mode, the absolute CE/PE count difference plus one is
+  recalculated every ledger tick. Equal side counts use factor 1; a difference
+  of one (including 2:1 or 0:1) uses factor 2. In `"PEAK"` mode, the original
+  peak-based stop and unscaled peak-ceiling exit are used.
 - The CHK suite exercises both risk modes, and SIM replays apply the selected
   mode to the simulated broker, including the configured breach confirmation
   count. These paths never send live orders.
