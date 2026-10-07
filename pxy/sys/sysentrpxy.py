@@ -1,49 +1,47 @@
+from datetime import datetime
+
 import pandas as pd
-from sysmktpxy import get_signal
+from syscnfgpxy import (
+    SYSCNFGPXY_TIMEZONE,
+    SYSENTRPXY_DIRECTION_ONLY_END,
+    SYSENTRPXY_DIRECTION_ONLY_START,
+)
+from sysmktpxy import get_signal as get_market_signal
+from sysexitpxy import detect_raw_direction
 from sysstrndpxy import calculate_supertrend
-from syscnfgpxy import SYSENTRPXY_SIGNAL_MODE
 
 
-def get_entry_signal(df=None, mode=SYSENTRPXY_SIGNAL_MODE):
+def get_entry_signal(df=None, current_time=None):
+    """Return entry and exit signals using the morning direction-only window.
+
+    From 09:00 until 09:30 IST, both signals follow market direction. Afterwards,
+    entry follows Supertrend and a SIDE Supertrend exit falls back to direction.
     """
-    System Router Matrix with Mode Switch:
-    
-    MODE: "STS" (default)
-    - ENTRY: 
-      - ST BULL/BEAR: Contrarian (ST BULL + MKT BEAR -> BUY | ST BEAR + MKT BULL -> SELL)
-      - ST SIDE: Pure MKT Copy (MKT BULL -> BUY | MKT BEAR -> SELL)
-    - EXIT: 
-      - ST BULL/BEAR: Pure ST Copy (BULL -> BULL | BEAR -> BEAR)
-      - ST SIDE: Pure MKT Copy (MKT BULL -> BULL | MKT BEAR -> BEAR)
-      
-    MODE: "MKT"
-    - ENTRY & EXIT: Pure MKT copy, completely bypassing Supertrend.
-    """
-    normalized_mode = str(mode).upper().strip()
-    if normalized_mode not in {"STS", "MKT"}:
-        raise ValueError("mode must be 'STS' or 'MKT'")
-
     if df is None:
         from sysdtafpxy import fetch_yf_data
         df = fetch_yf_data()
-        
+
     if df is None or df.empty:
         return "NONE", "NONE"
 
-    # 1️⃣ Fetch base raw signals
-    mkt_dir, _ = get_signal(df)
-    mkt_exit_dir = str(mkt_dir).upper().strip()
+    if current_time is None:
+        current_time = datetime.now(SYSCNFGPXY_TIMEZONE).time()
+    elif isinstance(current_time, datetime):
+        if current_time.tzinfo is not None:
+            current_time = current_time.astimezone(SYSCNFGPXY_TIMEZONE)
+        current_time = current_time.time()
+    elif getattr(current_time, "tzinfo", None) is not None:
+        current_time = current_time.replace(tzinfo=None)
 
-    # 2️⃣ Handle "MKT" Mode (No ST influence)
-    if normalized_mode == "MKT":
-        if mkt_exit_dir == "BULL":
+    if SYSENTRPXY_DIRECTION_ONLY_START <= current_time < SYSENTRPXY_DIRECTION_ONLY_END:
+        _, market_direction = detect_raw_direction(df)
+        market_direction = str(market_direction).upper().strip()
+        if market_direction == "UP":
             return "BUY", "BULL"
-        elif mkt_exit_dir == "BEAR":
+        if market_direction == "DOWN":
             return "SELL", "BEAR"
-        else:
-            return "NONE", "NONE"
+        return "NONE", "NONE"
 
-    # 3️⃣ Fetch Supertrend for "STS" Mode
     try:
         processed_st_df = calculate_supertrend(df.copy())
         if processed_st_df is None or processed_st_df.empty:
@@ -54,49 +52,25 @@ def get_entry_signal(df=None, mode=SYSENTRPXY_SIGNAL_MODE):
         print(f"⚠️ Trend engine failed ({e}); signals forced to NONE.")
         return "NONE", "NONE"
 
-    # 🎯 ENTRY LAYER (ST Mode - Contrarian in trend, Pure MKT copy in SIDE)
-    if trend == "BULL" and mkt_exit_dir == "BEAR":
-        mapped_entry = "BUY"
-    elif trend == "BEAR" and mkt_exit_dir == "BULL":
-        mapped_entry = "SELL"
-    elif trend == "SIDE":
-        if mkt_exit_dir == "BULL":
-            mapped_entry = "BUY"
-        elif mkt_exit_dir == "BEAR":
-            mapped_entry = "SELL"
-        else:
-            mapped_entry = "NONE"
-    else:
-        mapped_entry = "NONE"
-
-    # 🔒 LOCKED EXIT LAYER (ST Mode - ST Copy in trend, Pure MKT copy in SIDE)
     if trend == "BULL":
-        mapped_exit = "BULL"
-    elif trend == "BEAR":
-        mapped_exit = "BEAR"
-    elif trend == "SIDE":
-        if mkt_exit_dir == "BULL":
-            mapped_exit = "BULL"
-        elif mkt_exit_dir == "BEAR":
-            mapped_exit = "BEAR"
-        else:
-            mapped_exit = "NONE"
-    else:
-        mapped_exit = "NONE"
-
-    return mapped_entry, mapped_exit
+        return "BUY", "BULL"
+    if trend == "BEAR":
+        return "SELL", "BEAR"
+    if trend == "SIDE":
+        _, market_signal = get_market_signal(df)
+        market_signal = str(market_signal).upper().strip()
+        if market_signal == "BULL":
+            return "SIDE", "BULL"
+        if market_signal == "BEAR":
+            return "SIDE", "BEAR"
+        return "SIDE", "NONE"
+    return "NONE", "NONE"
 
 
 if __name__ == "__main__":
     from sysdtafpxy import fetch_yf_data
+
     df = fetch_yf_data()
     if df is not None and not df.empty:
-        # Example 1: Running with default ST logic
-        print("RUNNING MATRIX (MODE: STS)...")
-        entry_sig, exit_sig = get_entry_signal(df, mode="STS")
-        print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry_sig} | EXIT_SIG: {exit_sig}\n")
-        
-        # Example 2: Running with pure Market logic
-        print("RUNNING MATRIX (MODE: MKT)...")
-        entry_sig_mkt, exit_sig_mkt = get_entry_signal(df, mode="MKT")
-        print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry_sig_mkt} | EXIT_SIG: {exit_sig_mkt}")
+        entry_sig, exit_sig = get_entry_signal(df)
+        print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry_sig} | EXIT_SIG: {exit_sig}")

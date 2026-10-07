@@ -2,7 +2,7 @@ import re
 import sys
 import unittest
 from contextlib import redirect_stdout
-from datetime import date, timedelta
+from datetime import date, time, timedelta
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -33,37 +33,24 @@ from syscnfgpxy import (
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
     SYSDTAFPXY_FIXED_BRICK_SIZE,
-    SYSENTRPXY_SIGNAL_MODE,
     EXEAMSPXY_MAX_INVESTMENT,
     EXECBUYPXY_ENTRY_KEY_COLUMN,
 )
 from sysdtafpxy import apply_ohlc_transformation
-from sysdecisionpxy import averaging_trigger_sides
+from sysdecisionpxy import (
+    averaging_trigger_sides,
+    entry_order_command,
+    entry_signal_valid,
+)
 import syskatrpxy
 
 
 class ConfigurationWiringTests(unittest.TestCase):
-    def test_entry_router_defaults_to_configured_sts_mode(self):
-        self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "STS")
-        self.assertEqual(sysentrpxy.get_entry_signal.__defaults__[-1], "STS")
-
-    def test_mkt_entry_router_bypasses_supertrend(self):
+    def test_entry_and_exit_follow_directional_supertrend(self):
         frame = pd.DataFrame({"Close": [1]})
         with (
-            patch.object(sysentrpxy, "get_signal", return_value=("BEAR", None)),
-            patch.object(sysentrpxy, "calculate_supertrend") as supertrend,
-        ):
-            self.assertEqual(
-                sysentrpxy.get_entry_signal(frame, mode="MKT"),
-                ("SELL", "BEAR"),
-            )
-
-        supertrend.assert_not_called()
-
-    def test_sts_entry_router_uses_supertrend_matrix(self):
-        frame = pd.DataFrame({"Close": [1]})
-        with (
-            patch.object(sysentrpxy, "get_signal", return_value=("BEAR", None)),
+            patch.object(sysentrpxy, "detect_raw_direction") as direction,
+            patch.object(sysentrpxy, "get_market_signal") as market,
             patch.object(
                 sysentrpxy,
                 "calculate_supertrend",
@@ -71,13 +58,104 @@ class ConfigurationWiringTests(unittest.TestCase):
             ),
         ):
             self.assertEqual(
-                sysentrpxy.get_entry_signal(frame, mode="STS"),
+                sysentrpxy.get_entry_signal(frame, current_time=time(9, 30)),
                 ("BUY", "BULL"),
             )
+        direction.assert_not_called()
+        market.assert_not_called()
 
-    def test_entry_router_rejects_old_or_unknown_mode_names(self):
-        with self.assertRaisesRegex(ValueError, "STS.*MKT"):
-            sysentrpxy.get_entry_signal(pd.DataFrame({"Close": [1]}), mode="ST")
+    def test_bear_supertrend_returns_sell_and_bear_even_when_market_is_bull(self):
+        frame = pd.DataFrame({"Close": [1]})
+        with (
+            patch.object(sysentrpxy, "detect_raw_direction") as direction,
+            patch.object(sysentrpxy, "get_market_signal") as market,
+            patch.object(
+                sysentrpxy,
+                "calculate_supertrend",
+                return_value=pd.DataFrame({"ST_Trend": ["BEAR"]}),
+            ),
+        ):
+            self.assertEqual(
+                sysentrpxy.get_entry_signal(frame, current_time=time(9, 31)),
+                ("SELL", "BEAR"),
+            )
+        direction.assert_not_called()
+        market.assert_not_called()
+
+    def test_side_supertrend_keeps_side_entry_and_uses_market_exit(self):
+        frame = pd.DataFrame({"Close": [1]})
+        with (
+            patch.object(sysentrpxy, "get_market_signal", return_value=("NONE", "BEAR")),
+            patch.object(
+                sysentrpxy,
+                "calculate_supertrend",
+                return_value=pd.DataFrame({"ST_Trend": ["SIDE"]}),
+            ),
+        ):
+            self.assertEqual(
+                sysentrpxy.get_entry_signal(frame, current_time=time(9, 31)),
+                ("SIDE", "BEAR"),
+            )
+
+    def test_side_supertrend_never_returns_side_exit_without_market_direction(self):
+        frame = pd.DataFrame({"Close": [1]})
+        with (
+            patch.object(sysentrpxy, "get_market_signal", return_value=("NONE", "NONE")),
+            patch.object(
+                sysentrpxy,
+                "calculate_supertrend",
+                return_value=pd.DataFrame({"ST_Trend": ["SIDE"]}),
+            ),
+        ):
+            self.assertEqual(
+                sysentrpxy.get_entry_signal(frame, current_time=time(9, 31)),
+                ("SIDE", "NONE"),
+            )
+
+    def test_market_direction_is_used_only_before_0930(self):
+        frame = pd.DataFrame({"Close": [1]})
+        with (
+            patch.object(
+                sysentrpxy, "detect_raw_direction", return_value=(1, "UP")
+            ) as direction,
+            patch.object(sysentrpxy, "calculate_supertrend") as supertrend,
+        ):
+            self.assertEqual(
+                sysentrpxy.get_entry_signal(frame, current_time=time(9, 29, 59)),
+                ("BUY", "BULL"),
+            )
+        direction.assert_called_once_with(frame)
+        supertrend.assert_not_called()
+
+    def test_morning_window_uses_direction_for_entry_and_exit_without_supertrend(self):
+        frame = pd.DataFrame({"Close": [1]})
+        for current_time, direction, expected in (
+            (time(9, 0), "UP", ("BUY", "BULL")),
+            (time(9, 29, 59), "DOWN", ("SELL", "BEAR")),
+            (time(9, 29), "NONE", ("NONE", "NONE")),
+        ):
+            with (
+                self.subTest(current_time=current_time),
+                patch.object(
+                    sysentrpxy,
+                    "detect_raw_direction",
+                    return_value=(1, direction),
+                ),
+                patch.object(sysentrpxy, "calculate_supertrend") as supertrend,
+            ):
+                self.assertEqual(
+                    sysentrpxy.get_entry_signal(frame, current_time=current_time),
+                    expected,
+                )
+                supertrend.assert_not_called()
+
+    def test_entry_router_has_no_selectable_mode(self):
+        self.assertEqual(sysentrpxy.get_entry_signal.__defaults__, (None, None))
+        self.assertFalse(
+            hasattr(__import__("syscnfgpxy"), "SYSENTRPXY_SIGNAL_MODE")
+        )
+        self.assertFalse(entry_signal_valid("SIDE"))
+        self.assertIsNone(entry_order_command("SIDE", 0, 0))
 
     def test_average_dashboard_displays_target_after_run(self):
         with redirect_stdout(StringIO()) as output:

@@ -14,7 +14,6 @@ class ConfigEditorTests(unittest.TestCase):
         self.original = (
             "from datetime import time as dt_time\n"
             "FLAG = True\n"
-            "SYSENTRPXY_SIGNAL_MODE = 'MKT'\n"
             "RUNNIFTYPXY_STRIKE_STEP = 2\n"
             "CLOCK = dt_time(9, 0)\n"
             "SYSDTAFPXY_SELECTED_MODE = '00'\n"
@@ -117,21 +116,12 @@ class ConfigEditorTests(unittest.TestCase):
         settings, _ = config_editor._metadata(self.original)
         self.assertNotIn("EXETGTPXY_VARIANT", {setting["key"] for setting in settings})
 
-    def test_signal_router_mode_is_selectable_and_saved(self):
+    def test_signal_router_mode_is_not_exposed(self):
         settings, _ = config_editor._metadata(self.original)
-        signal_mode = next(
-            setting for setting in settings
-            if setting["key"] == "SYSENTRPXY_SIGNAL_MODE"
+        self.assertNotIn(
+            "SYSENTRPXY_SIGNAL_MODE",
+            {setting["key"] for setting in settings},
         )
-        self.assertEqual(signal_mode["value"], "MKT")
-        self.assertEqual(signal_mode["options"], ["MKT", "STS"])
-
-        config_editor._write({"SYSENTRPXY_SIGNAL_MODE": "MKT"})
-        self.assertIn("SYSENTRPXY_SIGNAL_MODE = 'MKT'", self.config_path.read_text())
-        config_editor._write({"SYSENTRPXY_SIGNAL_MODE": "STS"})
-
-        with self.assertRaisesRegex(ValueError, "listed choices"):
-            config_editor._write({"SYSENTRPXY_SIGNAL_MODE": "ST"})
 
     def test_write_validates_creates_backup_and_preserves_file_mode(self):
         self.config_path.chmod(0o640)
