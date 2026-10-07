@@ -106,6 +106,10 @@ settings should resolve to `None` rather than retain an active schedule.
   for `"NO"` and 13:15 for `"YES"`.
 - At activation the ledger snapshots current portfolio P&L and resets
   peak/breach tracking.
+- On every ledger tick, the fixed loss exit (−₹2,000) and profit target
+  (+₹2,000) are each divided by the number of active open order-tag rows (CE
+  and PE rows both count). The peak is telemetry only and does not affect either
+  threshold. With no active rows, the divisor is 1.
 
 ## Other conditional settings
 

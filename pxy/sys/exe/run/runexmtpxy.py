@@ -74,33 +74,21 @@ def force_zero_ending(val):
     return int(round(val / 10.0) * 10)
 
 
-def compute_stop(current_game_pnl, historical_peak):
+def compute_stop(current_game_pnl, historical_peak, active_count=1):
     """Returns (winners_peak_brick, active_trailing_exit, is_breached).
-    
-    UNIFIED STOP (floor & exit are same):
-    - Starts at -2000
-    - For every point peak grows, stop improves by 2 points (2x multiplier)
-    - Formula: stop = -2000 + (peak × 2)
-    
-    Examples:
-    - Peak 0 → stop -2000
-    - Peak 100 → stop -1800
-    - Peak 1000 → stop 0
-    - Peak 2000 → stop 2000 (profit target reached)
+
+    The fixed loss and profit-target thresholds are divided by the active
+    open order-row count. Peak is retained for telemetry only.
     """
     # Negative game P&L must not floor downward into a false negative brick.
     completed_bricks = int(current_game_pnl // BRICK_SIZE) if current_game_pnl >= 0 else 0
     calculated_live_peak = float(completed_bricks * BRICK_SIZE)
 
-    # Peak only moves up within a game
+    # Peak remains tracked for display, but does not move either exit threshold.
     winners_peak_brick = max(calculated_live_peak, historical_peak)
 
-    # UNIFIED STOP: Both floor and exit threshold
-    unified_stop = INITIAL_LOSS_FLOOR + (winners_peak_brick * PEAK_MULTIPLIER)
-    
-    # PEAK CEILING: Exit when peak reaches 2000
-    peak_ceiling_breached = (winners_peak_brick >= PEAK_CEILING)
-    
-    is_breached = (current_game_pnl <= unified_stop or
-                   peak_ceiling_breached)
-    return winners_peak_brick, unified_stop, is_breached
+    threshold_divisor = max(int(active_count), 1)
+    loss_exit = INITIAL_LOSS_FLOOR / threshold_divisor
+    target_exit = PEAK_CEILING / threshold_divisor
+    is_breached = current_game_pnl <= loss_exit or current_game_pnl >= target_exit
+    return winners_peak_brick, loss_exit, is_breached

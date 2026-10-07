@@ -12,7 +12,7 @@ from runexiopxy import (
     RENKO_STATE_FILE, CHECK_STATE_FILE, META_FILE, DAILY_LIST_FILES, IST,
     now_ist, today_ist, _atomic_write_json, _read_json_retry,
 )
-from runexmtpxy import INITIAL_LOSS_FLOOR
+from runexmtpxy import INITIAL_LOSS_FLOOR, PEAK_CEILING
 
 
 # ---------------------------------------------------------------------------
@@ -63,6 +63,7 @@ def load_session_state():
         "session_peak_pnl": float(d.get("session_peak_pnl", 0.0)),
         "current_net_pnl": float(d.get("current_net_pnl", 0.0)),
         "active_exit_line": float(d.get("active_exit_line", INITIAL_LOSS_FLOOR)),
+        "active_target_line": float(d.get("active_target_line", PEAK_CEILING)),
         "pnl_offset": float(d.get("pnl_offset", 0.0)),
         "risk_control_activated": bool(d.get("risk_control_activated", False)),
         "updated_timestamp": str(d.get("updated_timestamp", "") or ""),
@@ -70,12 +71,14 @@ def load_session_state():
 
 
 def save_session_state(
-    peak_value, current_net, exit_line, pnl_offset_val, risk_control_activated=False
+    peak_value, current_net, exit_line, pnl_offset_val, risk_control_activated=False,
+    target_exit_line=PEAK_CEILING,
 ):
     return _atomic_write_json(RENKO_STATE_FILE, {
         "session_peak_pnl": float(peak_value),
         "current_net_pnl": float(current_net),
         "active_exit_line": float(exit_line),
+        "active_target_line": float(target_exit_line),
         "pnl_offset": float(pnl_offset_val),
         "risk_control_activated": bool(risk_control_activated),
         "updated_timestamp": now_ist().strftime("%Y-%m-%d %H:%M:%S"),

@@ -34,7 +34,7 @@ from syscnfgpxy import (
 )
 from runexiopxy import now_ist, today_ist, RENKO_STATE_FILE, WEB_DIR, SQUAREOFF_SCRIPT_PATH  # noqa: F401
 from runexmtpxy import (
-    INITIAL_LOSS_FLOOR, compute_totals, compute_stop, force_zero_ending, _both_empty,
+    INITIAL_LOSS_FLOOR, PEAK_CEILING, compute_totals, compute_stop, force_zero_ending, _both_empty,
     midday_risk_activation_due,
 )
 from runexstpxy import (
@@ -191,7 +191,8 @@ def _tick(client, open_df, closed_df):
 
     current_game_pnl = total_raw_pnl - pnl_offset
     winners_peak_brick, active_trailing_exit, is_breached = compute_stop(
-        current_game_pnl, historical_peak_record)
+        current_game_pnl, historical_peak_record, totals["open_rows"])
+    active_target_exit = PEAK_CEILING / max(totals["open_rows"], 1)
 
     # 6. Telemetry (3-line format)
     print(f"PnL {int(current_game_pnl)} | Pek {int(winners_peak_brick)} | Stp {int(active_trailing_exit)}")
@@ -208,6 +209,7 @@ def _tick(client, open_df, closed_df):
         save_session_state(
             winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset,
             risk_control_activated=risk_control_activated,
+            target_exit_line=active_target_exit,
         )
 
         if consecutive_breaches >= BREACH_TICKS_REQUIRED:
@@ -230,4 +232,5 @@ def _tick(client, open_df, closed_df):
     save_session_state(
         winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset,
         risk_control_activated=risk_control_activated,
+        target_exit_line=active_target_exit,
     )

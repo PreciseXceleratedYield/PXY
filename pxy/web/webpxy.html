@@ -477,8 +477,8 @@ body{
     <div class="rsk-candle-wrap" id="rskWrap"><canvas id="rskCanvas"></canvas></div>
     <div id="rskInfo"></div>
     <div class="rsk-grp" style="align-items:flex-end;">
-        <span class="rsk-lbl">📈 Peak</span>
-        <span class="rsk-val" id="rskPeak">—</span>
+        <span class="rsk-lbl">🎯 Target</span>
+        <span class="rsk-val bull" id="rskTarget">—</span>
     </div>
 </div>
 
@@ -1315,14 +1315,14 @@ async function loadTrades(){
 }
 
 /* ── RISK BAR ── */
-let riskData={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-3000,pnl_offset:0,updated_timestamp:''};
+let riskData={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-2000,active_target_line:2000,pnl_offset:0,updated_timestamp:''};
 async function loadRisk(){
     try{riskData=await fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json());}catch{}
     const peak=Math.round(riskData.session_peak_pnl??0);
     const net=Math.round(riskData.current_net_pnl??0);
-    const floor=Math.round(riskData.active_exit_line??-3000);
-    $('rskPeak').textContent='₹'+peak;
-    $('rskPeak').className='rsk-val '+(peak>=0?'bull':'bear');
+    const floor=Math.round(riskData.active_exit_line??-2000);
+    const target=Math.round(riskData.active_target_line??2000);
+    $('rskTarget').textContent='₹'+target;
     $('rskNet').textContent='₹'+floor;
     $('rskNet').className='rsk-val bear';
     drawRiskCandle(floor,net,peak);
@@ -1340,6 +1340,7 @@ function renderRiskInfo(){
     el.innerHTML=row('Current Net',f(d.current_net_pnl),cls(d.current_net_pnl))
         +row('Session Peak',f(d.session_peak_pnl),cls(d.session_peak_pnl))
         +row('Exit Line',f(d.active_exit_line),'bear')
+        +row('Target',f(d.active_target_line),'bull')
         +row('PnL Offset',f(d.pnl_offset),cls(d.pnl_offset))
         +row('Updated',`<span style="font-size:10px;font-weight:600;">${d.updated_timestamp||'—'}</span>`);
 }

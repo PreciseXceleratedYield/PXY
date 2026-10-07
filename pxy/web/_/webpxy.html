@@ -520,8 +520,8 @@ body{
         <canvas id="rskCanvas"></canvas>
     </div>
     <div class="rsk-group rsk-peak">
-        <span class="rsk-lbl">📈 Peak</span>
-        <span class="rsk-val" id="rskPeak">—</span>
+        <span class="rsk-lbl">🎯 Target</span>
+        <span class="rsk-val bull" id="rskTarget">—</span>
     </div>
 </div>
 
@@ -996,15 +996,15 @@ function initTerminal(){
 
 /* ── RISK BAR ── */
 async function loadRisk(){
-    let d={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-3000};
+    let d={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-2000,active_target_line:2000};
     try{d=await fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json());}catch{}
     const peak  = d.session_peak_pnl??0;
     const net   = d.current_net_pnl??0;
-    const floor = d.active_exit_line??-3000;
+    const floor = d.active_exit_line??-2000;
+    const target = d.active_target_line??2000;
 
     const fmtR = n=>(n>=0?'+':'')+Math.round(n).toLocaleString('en-IN');
-    $('rskPeak').textContent = '₹'+Math.round(peak).toLocaleString('en-IN');
-    $('rskPeak').className   = 'rsk-val '+(peak>=0?'bull':'bear');
+    $('rskTarget').textContent = '₹'+Math.round(target).toLocaleString('en-IN');
     $('rskNet').textContent  = '₹'+Math.round(floor).toLocaleString('en-IN');
     $('rskNet').className    = 'rsk-val bear';
 
