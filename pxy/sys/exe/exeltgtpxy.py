@@ -131,7 +131,7 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             (is_ce and ce_investment > pe_investment)
             or (is_pe and pe_investment > ce_investment)
         )
-        if TARGET_MODE == "DIREX" and is_heavier and direction in {"UP", "DOWN"}:
+        if TARGET_MODE == "DIRGT" and is_heavier and direction in {"UP", "DOWN"}:
             signal = "BULL" if direction == "UP" else "BEAR"
 
         is_aligned = supertrend != "SIDE" and (

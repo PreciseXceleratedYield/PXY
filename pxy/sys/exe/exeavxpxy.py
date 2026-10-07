@@ -36,11 +36,11 @@ logger = logging.getLogger("exeavxpxy")
 
 
 def averaging_alignment_signals(exit_signal, direction, ce_investment, pe_investment):
-    """Use direction for the lighter side's averaging gate in DIREX mode."""
+    """Use direction for the lighter side's averaging gate in DIRGT mode."""
     ce_aligned = is_aligned("CE", exit_signal)
     pe_aligned = is_aligned("PE", exit_signal)
     signal = str(direction).upper().strip()
-    if EXETGTPXY_MODE == "DIREX" and signal in {"UP", "DOWN"}:
+    if EXETGTPXY_MODE == "DIRGT" and signal in {"UP", "DOWN"}:
         if ce_investment < pe_investment:
             ce_aligned = is_aligned("CE", "BULL" if signal == "UP" else "BEAR")
         elif pe_investment < ce_investment:

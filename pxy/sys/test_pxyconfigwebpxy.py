@@ -16,7 +16,7 @@ class ConfigEditorTests(unittest.TestCase):
             "FLAG = True\n"
             "RUNNIFTYPXY_STRIKE_STEP = 2\n"
             "CLOCK = dt_time(9, 0)\n"
-            "EXETGTPXY_MODE = 'DIREX'\n"
+            "EXETGTPXY_MODE = 'DIRGT'\n"
             "SYSDTAFPXY_SELECTED_MODE = '00'\n"
             "RUNEXMTPXY_INITIAL_LOSS_FLOOR = -1000\n"
             "RUNEXACPXY_STOP_SQUAREOFF_ENABLED = False\n"
@@ -120,8 +120,8 @@ class ConfigEditorTests(unittest.TestCase):
         settings, _ = config_editor._metadata(self.original)
         by_name = {setting["key"]: setting for setting in settings}
         self.assertNotIn("EXETGTPXY_VARIANT", by_name)
-        self.assertEqual(by_name["EXETGTPXY_MODE"]["value"], "DIREX")
-        self.assertEqual(by_name["EXETGTPXY_MODE"]["options"], ["RGLR", "DIREX"])
+        self.assertEqual(by_name["EXETGTPXY_MODE"]["value"], "DIRGT")
+        self.assertEqual(by_name["EXETGTPXY_MODE"]["options"], ["RGLR", "DIRGT"])
         config_editor._write({"EXETGTPXY_MODE": "RGLR"})
         self.assertIn("EXETGTPXY_MODE = 'RGLR'", self.config_path.read_text(encoding="utf-8"))
 

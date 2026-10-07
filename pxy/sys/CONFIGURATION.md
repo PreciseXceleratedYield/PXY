@@ -157,17 +157,17 @@ settings should resolve to `None` rather than retain an active schedule.
 - `SYSPLCHRTPXY_*` are consumed by the separate chart generator, not the
   production signal path. `SYSDTSTPXY_*` and `SYSRIGPXY_*` belong to standalone
   modules with no caller in the production launch graph.
-- TGT uses `EXETGTPXY_MODE` (`RGLR` or `DIREX`, default `DIREX`) together with
+- TGT uses `EXETGTPXY_MODE` (`RGLR` or `DIRGT`, default `DIRGT`) together with
   `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and
   `EXETGTPXY_SUPERTREND_KEY_COLUMN` (`supertrend`). In `RGLR`, all positions
-  use `exit` for alignment. In `DIREX`, the heavier open side uses market
+  use `exit` for alignment. In `DIRGT`, the heavier open side uses market
   `direction` (`CE` with `UP`, `PE` with `DOWN`), while the lighter side still
   uses `exit`; ties or unavailable directions fall back to `exit`. Exposure is
   open quantity × current sell price. Unless Supertrend is `SIDE`, aligned
   positions receive `EXETGTPXY_ALIGNED_PCT` (default `77%`) and non-aligned
   positions receive `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Supertrend
   `SIDE` forces the `1.4%` target for both sides. Investment exposure selects
-  the heavier side only; it does not scale the target percentage. In `DIREX`
+  the heavier side only; it does not scale the target percentage. In `DIRGT`
   mode, averaging eligibility also uses `direction` for the lighter side;
   the heavier side and `RGLR` mode retain the existing `exit`-based averaging
   alignment.
