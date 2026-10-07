@@ -167,7 +167,10 @@ settings should resolve to `None` rather than retain an active schedule.
   positions receive `EXETGTPXY_ALIGNED_PCT` (default `77%`) and non-aligned
   positions receive `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Supertrend
   `SIDE` forces the `1.4%` target for both sides. Investment exposure selects
-  the heavier side only; it does not scale the target percentage.
+  the heavier side only; it does not scale the target percentage. In `DIREX`
+  mode, averaging eligibility also uses `direction` for the lighter side;
+  the heavier side and `RGLR` mode retain the existing `exit`-based averaging
+  alignment.
 - The averaging window switch and start/end bounds apply only to averaging
   placement, not to entry/exit pipes.
 - Averaging uses one policy with no layer-count mode: the projected side

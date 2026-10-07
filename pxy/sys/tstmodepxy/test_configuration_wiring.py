@@ -316,6 +316,26 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(exeltgtpxy.target_price(row, 1000, 1000), 1770.0)
         self.assertEqual(exeltgtpxy.target_price(row, 2000, 1000), 1770.0)
 
+    def test_direx_averaging_uses_direction_for_the_lighter_side(self):
+        ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
+            "BULL", "UP", ce_investment=1000, pe_investment=2000
+        )
+        self.assertTrue(ce_aligned)
+        self.assertFalse(pe_aligned)
+
+        ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
+            "BEAR", "DOWN", ce_investment=2000, pe_investment=1000
+        )
+        self.assertFalse(ce_aligned)
+        self.assertTrue(pe_aligned)
+
+        with patch.object(exeavxpxy, "EXETGTPXY_MODE", "RGLR"):
+            ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
+                "BEAR", "UP", ce_investment=1000, pe_investment=2000
+            )
+        self.assertFalse(ce_aligned)
+        self.assertTrue(pe_aligned)
+
     def test_lgt_uses_base_fourteen_piecewise_investment_ratio(self):
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -0.88)
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 2000.0, is_ce=True), -3.5)

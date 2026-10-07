@@ -15,6 +15,7 @@ from syscnfgpxy import (
     EXEAVXPXY_MARKET_START as MARKET_START,
     EXEAVXPXY_REBUY_ENABLED as REBUY_ENABLED,
     EXEAVXPXY_USE_OVERALL_LOSS,
+    EXETGTPXY_MODE,
 )
 from sysdecisionpxy import (
     averaging_placement_allowed,
@@ -32,6 +33,19 @@ from run.runpchkpxy import get_position_summary
 from run.runexlckpxy import ledger_busy
 
 logger = logging.getLogger("exeavxpxy")
+
+
+def averaging_alignment_signals(exit_signal, direction, ce_investment, pe_investment):
+    """Use direction for the lighter side's averaging gate in DIREX mode."""
+    ce_aligned = is_aligned("CE", exit_signal)
+    pe_aligned = is_aligned("PE", exit_signal)
+    signal = str(direction).upper().strip()
+    if EXETGTPXY_MODE == "DIREX" and signal in {"UP", "DOWN"}:
+        if ce_investment < pe_investment:
+            ce_aligned = is_aligned("CE", "BULL" if signal == "UP" else "BEAR")
+        elif pe_investment < ce_investment:
+            pe_aligned = is_aligned("PE", "BULL" if signal == "UP" else "BEAR")
+    return ce_aligned, pe_aligned
 
 
 def _side_target_pct(rows, ce_investment=0, pe_investment=0, ce_count=0, pe_count=0, is_ce=True):
@@ -121,8 +135,10 @@ def handle_side_averaging(client, df):
 
     # 🎯 STEP POSITIONS FIXED: Parse variable status first
     active_exit = str(working_df.iloc[-1].get("exit", "NONE")).upper().strip()
-    ce_aligned = is_aligned("CE", active_exit)
-    pe_aligned = is_aligned("PE", active_exit)
+    active_direction = str(working_df.iloc[-1].get("direction", "NONE")).upper().strip()
+    ce_aligned, pe_aligned = averaging_alignment_signals(
+        active_exit, active_direction, ce_investment, pe_investment
+    )
 
     ce_dynamic_threshold = calculate_lgt(
         ce_investment,
