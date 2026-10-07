@@ -101,13 +101,12 @@ settings should resolve to `None` rather than retain an active schedule.
   `−₹2,000 + (session peak × 2)` and exits when the peak reaches ₹2,000.
   `"STATIC"` uses a fixed loss exit (−₹2,000) and profit target (+₹2,000),
   each divided by active open order-tag row count.
-- The default `RUNEXACPXY_CNTRLRSKBAR = "NO"` keeps risk exits and breach
-  progression active throughout the trading session, without a 13:15
-  dependency.
-- Set it to `"YES"` only if you want risk actions held until 13:15 IST, when a
-  fresh P&L baseline is taken.
-- `RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME` is derived from the switch: `None`
-  for `"NO"` and 13:15 for `"YES"`.
+- Activation timing follows the risk mode: `"STATIC"` is active throughout the
+  session with no 13:15 dependency, while `"PEAK"` preserves the original
+  13:15 IST activation and fresh-baseline behavior.
+- `RUNEXACPXY_CNTRLRSKBAR` and
+  `RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME` are derived from the selected risk
+  mode: `"NO"`/`None` for `"STATIC"` and `"YES"`/13:15 for `"PEAK"`.
 - At timed activation the ledger snapshots current portfolio P&L and resets
   peak/breach tracking.
 - In `"STATIC"` mode, the active-row divisor is recalculated every ledger tick;

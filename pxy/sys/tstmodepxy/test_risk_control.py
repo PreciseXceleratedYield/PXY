@@ -18,6 +18,7 @@ from syscnfgpxy import (
     RUNEXACPXY_CNTRLRSKBAR,
     RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
     RUNEXACPXY_RISK_MODE,
+    _risk_candle_activation_settings,
 )
 import runexstpxy
 
@@ -27,6 +28,16 @@ class MiddayRiskControlTests(unittest.TestCase):
         self.assertEqual(RUNEXACPXY_CNTRLRSKBAR, "NO")
         self.assertIsNone(RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME)
         self.assertEqual(RUNEXACPXY_RISK_MODE, "STATIC")
+
+    def test_peak_mode_uses_original_midday_activation_gate(self):
+        self.assertEqual(
+            _risk_candle_activation_settings("PEAK"),
+            ("YES", time(13, 15)),
+        )
+        self.assertEqual(
+            _risk_candle_activation_settings("STATIC"),
+            ("NO", None),
+        )
 
     def test_fixed_loss_and_target_thresholds_scale_by_active_row_count(self):
         self.assertEqual(compute_stop(-400, 0, active_count=5), (0.0, -400.0, True))
