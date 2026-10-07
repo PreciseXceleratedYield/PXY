@@ -96,6 +96,11 @@ network boundary.
 Keep a feature's switch before dependent settings. When disabled, dependent
 settings should resolve to `None` rather than retain an active schedule.
 
+- `RUNEXACPXY_RISK_MODE` selects between `"PEAK"` and `"STATIC"`; the default is
+  `"STATIC"`. `"PEAK"` restores the original stop formula
+  `−₹2,000 + (session peak × 2)` and exits when the peak reaches ₹2,000.
+  `"STATIC"` uses a fixed loss exit (−₹2,000) and profit target (+₹2,000),
+  each divided by active open order-tag row count.
 - The default `RUNEXACPXY_CNTRLRSKBAR = "NO"` keeps risk exits and breach
   progression active throughout the trading session, without a 13:15
   dependency.
@@ -105,10 +110,9 @@ settings should resolve to `None` rather than retain an active schedule.
   for `"NO"` and 13:15 for `"YES"`.
 - At timed activation the ledger snapshots current portfolio P&L and resets
   peak/breach tracking.
-- On every ledger tick, the fixed loss exit (−₹2,000) and profit target
-  (+₹2,000) are each divided by the number of active open order-tag rows (CE
-  and PE rows both count). The peak is telemetry only and does not affect either
-  threshold. With no active rows, the divisor is 1.
+- In `"STATIC"` mode, the active-row divisor is recalculated every ledger tick;
+  CE and PE rows both count. With no active rows, the divisor is 1. In `"PEAK"`
+  mode, the original peak-based stop and unscaled peak-ceiling exit are used.
 
 ## Other conditional settings
 

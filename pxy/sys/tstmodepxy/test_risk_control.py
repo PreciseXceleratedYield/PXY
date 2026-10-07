@@ -17,6 +17,7 @@ from runexmtpxy import compute_stop, midday_risk_activation_due
 from syscnfgpxy import (
     RUNEXACPXY_CNTRLRSKBAR,
     RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
+    RUNEXACPXY_RISK_MODE,
 )
 import runexstpxy
 
@@ -25,6 +26,7 @@ class MiddayRiskControlTests(unittest.TestCase):
     def test_default_risk_control_has_no_midday_activation_dependency(self):
         self.assertEqual(RUNEXACPXY_CNTRLRSKBAR, "NO")
         self.assertIsNone(RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME)
+        self.assertEqual(RUNEXACPXY_RISK_MODE, "STATIC")
 
     def test_fixed_loss_and_target_thresholds_scale_by_active_row_count(self):
         self.assertEqual(compute_stop(-400, 0, active_count=5), (0.0, -400.0, True))
@@ -49,6 +51,14 @@ class MiddayRiskControlTests(unittest.TestCase):
             compute_stop(-2000, 0, active_count=0),
             compute_stop(-2000, 0, active_count=1),
         )
+
+    def test_peak_mode_restores_original_peak_trailing_stop(self):
+        from runexmtpxy import PEAK_CEILING
+
+        with patch("runexmtpxy.RISK_MODE", "PEAK"):
+            self.assertEqual(compute_stop(-1799, 100), (100.0, -1800.0, False))
+            self.assertEqual(compute_stop(-1800, 100), (100.0, -1800.0, True))
+            self.assertEqual(compute_stop(PEAK_CEILING, 0), (PEAK_CEILING, 2000.0, True))
 
     def test_yes_activates_at_or_after_1315_ist(self):
         activation_time = time(13, 15)

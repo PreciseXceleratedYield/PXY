@@ -25,6 +25,7 @@ if str(SYS_DIR) not in sys.path:
 from syscnfgpxy import (
     RUNEXACPXY_CNTRLRSKBAR,
     RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
+    RUNEXACPXY_RISK_MODE,
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
     RUNEXACPXY_DEBUG_ENABLED,
     RUNEXACPXY_LEDGER_BASIS_GUARD,
@@ -192,7 +193,11 @@ def _tick(client, open_df, closed_df):
     current_game_pnl = total_raw_pnl - pnl_offset
     winners_peak_brick, active_trailing_exit, is_breached = compute_stop(
         current_game_pnl, historical_peak_record, totals["open_rows"])
-    active_target_exit = PEAK_CEILING / max(totals["open_rows"], 1)
+    active_target_exit = (
+        PEAK_CEILING
+        if RUNEXACPXY_RISK_MODE == "PEAK"
+        else PEAK_CEILING / max(totals["open_rows"], 1)
+    )
 
     # 6. Telemetry (3-line format)
     print(f"PnL {int(current_game_pnl)} | Pek {int(winners_peak_brick)} | Stp {int(active_trailing_exit)}")
