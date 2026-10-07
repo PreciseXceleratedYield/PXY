@@ -1,28 +1,20 @@
 
 import math
-import sys
 
 import pandas as pd
 import re
 from colorama import Fore, Style, init
 from syscnfgpxy import (
-    EXETGTPXY_MIN_TARGET_PCT,
-    EXETGTPXY_MIN_ATR_VALUE,
+    EXEAMSPXY_MAX_LGT_LOSS,
+    EXETGTPXY_ALIGNED_PCT,
     EXETGTPXY_EXIT_KEY_COLUMN,
-    EXETGTPXY_MAX_TARGET_CAP,
-    EXETGTPXY_MODE,
-    EXETGTPXY_STATIC_ALIGNED,
     EXETGTPXY_TGT_PCT_NOT_ALIGNED,
 )
 
 # ==================== CONFIG (this file's settings) ====================
 EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
-MIN_TARGET_PCT = EXETGTPXY_MIN_TARGET_PCT
-MIN_ATR_VALUE = EXETGTPXY_MIN_ATR_VALUE
-MAX_TARGET_CAP = EXETGTPXY_MAX_TARGET_CAP
-TGT_MODE = EXETGTPXY_MODE  # "DYNAMIC" or "STATIC"
-STATIC_ALIGNED_PCT = EXETGTPXY_STATIC_ALIGNED
-STATIC_NOT_ALIGNED_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
+ALIGNED_TARGET_PCT = EXETGTPXY_ALIGNED_PCT
+NOT_ALIGNED_TARGET_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
 # =======================================================================
 
 init(autoreset=True)
@@ -34,32 +26,6 @@ def _warn_once(key, msg):
     if key not in _warned:
         _warned.add(key)
         print(f"{Fore.YELLOW}⚠️ {msg}{Style.RESET_ALL}")
-
-
-# ===== TARGET FORMULA CORE =====
-
-def _target_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
-    """Calculate the existing count-sensitive target base.
-
-    Formula: ATR × (1 + inverse_factor)² × (own_count + 1) / (opposite_count + 1)
-    
-    Returns a positive value for target calculation.
-    """
-    if atr <= 0:
-        return 0.0
-    
-    ce_safe = max(ce_investment, 1.0)
-    pe_safe = max(pe_investment, 1.0)
-    
-    if is_ce:
-        inverse_factor = 1.0 if (ce_investment <= 0 or pe_investment <= 0) else (ce_safe / pe_safe)
-        count_factor = (ce_count + 1) / (pe_count + 1)
-    else:
-        inverse_factor = 1.0 if (pe_investment <= 0 or ce_investment <= 0) else (pe_safe / ce_safe)
-        count_factor = (pe_count + 1) / (ce_count + 1)
-    
-    base_factor = atr * ((1.0 + inverse_factor) ** 2) * count_factor
-    return round(base_factor, 2)
 
 
 def calculate_lgt(ce_investment, pe_investment, is_ce):
@@ -76,30 +42,19 @@ def calculate_lgt(ce_investment, pe_investment, is_ce):
         factor = ratio**2
     else:
         exponent = ratio * math.log(ratio)
-        max_factor = sys.float_info.max / 14.0
+        max_factor = EXEAMSPXY_MAX_LGT_LOSS / 14.0
         factor = (
             math.exp(exponent)
             if exponent < math.log(max_factor)
             else max_factor
         )
-    magnitude = 14.0 * factor
-    return -round(magnitude, 2)
+    magnitude = min(round(14.0 * factor, 2), EXEAMSPXY_MAX_LGT_LOSS)
+    return -magnitude
 
 
-def calculate_tgt(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce, is_aligned):
-    """Calculates TGT (exit target) percentage.
-    
-    Aligned: Returns calculated opposite_base_factor + ATR
-    Not aligned: Returns fixed 1.4%
-    """
-    if is_aligned:
-        opposite_is_ce = not is_ce
-        base = _target_base_factor(
-            atr, ce_investment, pe_investment, ce_count, pe_count, opposite_is_ce
-        )
-        return base + atr
-    else:
-        return STATIC_NOT_ALIGNED_PCT
+def calculate_tgt(is_aligned):
+    """Return the single-mode positive target for the side's trend alignment."""
+    return ALIGNED_TARGET_PCT if is_aligned else NOT_ALIGNED_TARGET_PCT
 
 
 def f(x, d=0.0):
@@ -136,39 +91,10 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     return ce_total, pe_total
 
 def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce_count: int = 0, pe_count: int = 0):
-    """Calculates target price with switchable TGT mode.
-    
-    MODE: DYNAMIC (Unified Mirror Logic with LGT)
-    ================================================
-    Formula (ALIGNED):
-      target_pct% = calculated opposite_base_factor + ATR, capped at 77%
+    """Calculate target price using the single aligned/non-aligned TGT policy.
 
-    Formula (NOT aligned):
-      target_pct% = configured fixed percentage (normally 1.4%)
-    
-    MIRROR LOGIC:
-      - CE_LGT uses base_factor negated (for averaging difficulty)
-      - PE_TGT uses same base_factor positive + extra ATR (for exit ease) ← MIRROR!
-      
-    Example: CE=2000 (heavy, 5 layers), PE=1000 (light, 1 layer)
-      base_factor ≈ 18.0
-      CE_LGT = -18.0 (hard to average)
-      PE_TGT = +18.0 + 5.0 = +23.0% (before the 77% cap)
-    
-    MODE: STATIC (Fixed Percentages)
-    ================================
-    Formula (ALIGNED):
-      target_pct% = 99%
-    
-    Formula (NOT aligned):
-      target_pct% = 1.4%
-    
     Args:
-        row: dict with 'pxy_entry'/'buy_prc', 'symbol', 'exit', 'atr'
-        ce_investment: CE side investment (USD/token)
-        pe_investment: PE side investment (USD/token)
-        ce_count: CE side layer count
-        pe_count: PE side layer count
+        row: dict with 'pxy_entry'/'buy_prc', 'symbol', and 'exit'
     
     Returns:
         float: Target price rounded to 2 decimals
@@ -183,18 +109,8 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
         symbol = str(row.get('symbol', 'UNKNOWN')).upper().strip()
         derived_supr = str(row.get(EXIT_KEY_COLUMN, '')).upper().strip()
         
-        # Extract and safely cast atr with guardrail
-        raw_atr = f(row.get('atr', 0.0))
-        if raw_atr <= 0:
-            _warn_once(
-                "atr",
-                f"'atr' missing or <= 0 in row; applying {MIN_ATR_VALUE} minimum ATR.",
-            )
         if derived_supr not in ("BULL", "BEAR", "SIDE", "NONE"):
             _warn_once("supertrend", f"unrecognised exit value '{derived_supr}' (expected BULL/BEAR/SIDE/NONE).")
-        
-        # Apply ATR minimum guardrail
-        atr_scaled = max(raw_atr, MIN_ATR_VALUE)
 
         is_ce = symbol.endswith('CE')
         is_pe = symbol.endswith('PE')
@@ -202,26 +118,13 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             return round(entry_prc, 2)
 
         is_aligned = (derived_supr == 'BULL' and is_ce) or (derived_supr == 'BEAR' and is_pe)
-        ce_investment = f(ce_investment)
-        pe_investment = f(pe_investment)
-        # 3️⃣ Apply target formula based on trend status and execution mode
-        if derived_supr == 'SIDE':
-            target_pct = STATIC_NOT_ALIGNED_PCT  # Flat 1.4% for both CE and PE in SIDE trend
-        elif TGT_MODE == "STATIC":
-            if is_aligned:
-                target_pct = STATIC_ALIGNED_PCT  # 99%
-            else:
-                target_pct = STATIC_NOT_ALIGNED_PCT  # 1.4%
-        else:
-            # Dynamic mode (default): Central calculate_tgt helper
-            target_pct = calculate_tgt(atr_scaled, ce_investment, pe_investment, ce_count, pe_count, is_ce, is_aligned)
-
+        target_pct = calculate_tgt(is_aligned)
+        target_pct_clamped = max(
+            NOT_ALIGNED_TARGET_PCT,
+            min(target_pct, ALIGNED_TARGET_PCT),
+        )
         
-        # 4️⃣ Final clamping to [1.4, 99] or [1.4, 77] depending on mode
-        max_cap = STATIC_ALIGNED_PCT if TGT_MODE == "STATIC" else MAX_TARGET_CAP
-        target_pct_clamped = max(MIN_TARGET_PCT, min(target_pct, max_cap))
-        
-        # 5️⃣ Calculate target price
+        # Calculate the positive target price.
         calculated_target = entry_prc * (1.0 + (target_pct_clamped / 100.0))
         return round(calculated_target, 2)
         

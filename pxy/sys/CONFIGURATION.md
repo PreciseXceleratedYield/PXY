@@ -143,30 +143,31 @@ settings should resolve to `None` rather than retain an active schedule.
 - `SYSPLCHRTPXY_*` are consumed by the separate chart generator, not the
   production signal path. `SYSDTSTPXY_*` and `SYSRIGPXY_*` belong to standalone
   modules with no caller in the production launch graph.
-- `EXETGTPXY_STATIC_ALIGNED` applies only in `MODE=STATIC`. In both target
-  modes, `MIN_ATR_VALUE` is an input ATR floor and `MIN_TARGET_PCT` is the
-  final minimum percentage; these are distinct units and controls.
+- TGT has one positive-percentage policy: aligned sides target
+  `EXETGTPXY_ALIGNED_PCT` (default `77%`); non-aligned sides target
+  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). A neutral `SIDE`
+  Supertrend state is non-aligned, so either option side uses `1.4%`
+  regardless of directional signal. TGT no longer depends on ATR, investment
+  ratio, layer count, or a DYNAMIC/STATIC mode.
 - The averaging window switch and start/end bounds apply only to averaging
   placement, not to entry/exit pipes.
 - Averaging uses one policy with no layer-count mode: the projected side
   investment (`sum(qty × sell_prc)` plus the next lot at its current
   `sell_prc`) must not exceed `EXEAMSPXY_MAX_INVESTMENT` (default `25000`).
+  The absolute LGT loss threshold is capped at `EXEAMSPXY_MAX_LGT_LOSS`
+  (default `77`), so it cannot become more negative than `-77`.
   The opposite side must have open positions and negative overall P&L, and
   only the signal-aligned side may average. The averaging side must also be
   losing at or beyond its LGT threshold; no alignment multiplier is applied.
 - LGT is calculated from positive investment values, then negated:
   `r = own investment / opposite investment`;
   `magnitude = 14 × r²` when `r < 1`, otherwise `14 × r^r`;
-  `LGT = -round(magnitude, 2)`. If either side has no positive investment,
-  `r` defaults to `1`. This formula is owned by averaging; `TGT` keeps its
-  existing calculation, including its count factor.
-- TGT follows its original alignment-based behavior: `DYNAMIC` uses the
-  aligned mirrored LGT base plus ATR, capped by `EXETGTPXY_MAX_TARGET_CAP`;
-  `STATIC` uses `99%` when aligned and `1.4%` when not aligned.
+  `LGT = -min(round(magnitude, 2), EXEAMSPXY_MAX_LGT_LOSS)`.
+  If either side has no positive investment, `r` defaults to `1`.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.
-- The target mode, signal variant, ATR mode, chart transformation mode, run
+- The signal variant, ATR mode, chart transformation mode, run
   mode, and risk action are validated at configuration import so unsupported
   values fail visibly rather than silently selecting a fallback branch.
 

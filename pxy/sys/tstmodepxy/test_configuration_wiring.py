@@ -135,84 +135,33 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(execbuypxy.CBUY_LOCK_SECS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
         self.assertEqual(exeexitpxy.EXIT_LOCK_SECS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
 
-    def test_dynamic_non_aligned_target_uses_configured_percentage(self):
-        with patch.object(exeltgtpxy, "STATIC_NOT_ALIGNED_PCT", 2.3):
-            target = exeltgtpxy.calculate_tgt(
-                5.0, 100.0, 100.0, 1, 1, True, False
-            )
+    def test_tgt_uses_single_positive_aligned_and_non_aligned_targets(self):
+        self.assertEqual(exeltgtpxy.calculate_tgt(True), 77.0)
+        self.assertEqual(exeltgtpxy.calculate_tgt(False), 1.4)
 
-        self.assertEqual(target, 2.3)
-
-    def test_dynamic_target_price_uses_calculated_aligned_target_and_non_aligned_floor(self):
-        aligned = {
-            "pxy_entry": 1000,
-            "symbol": "NIFTYCE",
-            "exit": "BULL",
-            "atr": 5,
+        aligned_ce = {
+            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL", "atr": 500,
         }
-        not_aligned = {**aligned, "exit": "BEAR"}
-
-        with (
-            patch.object(exeltgtpxy, "TGT_MODE", "DYNAMIC"),
-            patch.object(exeltgtpxy, "MIN_ATR_VALUE", 5.0),
-            patch.object(exeltgtpxy, "MIN_TARGET_PCT", 1.4),
-            patch.object(exeltgtpxy, "MAX_TARGET_CAP", 77.0),
-            patch.object(exeltgtpxy, "STATIC_NOT_ALIGNED_PCT", 1.4),
-        ):
-            aligned_target = exeltgtpxy.target_price(
-                aligned, ce_investment=100, pe_investment=200
-            )
-            not_aligned_target = exeltgtpxy.target_price(
-                not_aligned, ce_investment=100, pe_investment=200
-            )
-
-        self.assertEqual(aligned_target, 1500.0)
-        self.assertEqual(not_aligned_target, 1014.0)
-
-    def test_target_uses_original_alignment_rules(self):
-        aligned = {
-            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL", "atr": 5,
+        aligned_pe = {
+            "pxy_entry": 1000, "symbol": "NIFTYPE", "exit": "BEAR", "atr": 0,
         }
-        with (
-            patch.object(exeltgtpxy, "TGT_MODE", "DYNAMIC"),
-            patch.object(exeltgtpxy, "MIN_ATR_VALUE", 5.0),
-            patch.object(exeltgtpxy, "MIN_TARGET_PCT", 1.4),
-            patch.object(exeltgtpxy, "MAX_TARGET_CAP", 77.0),
-        ):
-            target = exeltgtpxy.target_price(
-                aligned, ce_investment=200, pe_investment=100
-            )
+        non_aligned_ce = {**aligned_ce, "exit": "BEAR"}
+        side_ce = {**aligned_ce, "exit": "SIDE"}
+        side_pe = {**aligned_pe, "exit": "SIDE"}
 
-        self.assertEqual(target, 1162.5)
-
-    def test_static_target_uses_alignment_not_investment_imbalance(self):
-        aligned = {
-            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL", "atr": 5,
-        }
-        not_aligned = {**aligned, "exit": "BEAR"}
-        with (
-            patch.object(exeltgtpxy, "TGT_MODE", "STATIC"),
-            patch.object(exeltgtpxy, "MIN_TARGET_PCT", 1.4),
-            patch.object(exeltgtpxy, "STATIC_NOT_ALIGNED_PCT", 1.4),
-            patch.object(exeltgtpxy, "STATIC_ALIGNED_PCT", 99.0),
-        ):
-            aligned_target = exeltgtpxy.target_price(
-                aligned, ce_investment=200, pe_investment=100
-            )
-            not_aligned_target = exeltgtpxy.target_price(
-                not_aligned, ce_investment=200, pe_investment=100
-            )
-
-        self.assertEqual(aligned_target, 1990.0)
-        self.assertEqual(not_aligned_target, 1014.0)
+        self.assertEqual(exeltgtpxy.target_price(aligned_ce), 1770.0)
+        self.assertEqual(exeltgtpxy.target_price(aligned_pe), 1770.0)
+        self.assertEqual(exeltgtpxy.target_price(non_aligned_ce), 1014.0)
+        self.assertEqual(exeltgtpxy.target_price(side_ce), 1014.0)
+        self.assertEqual(exeltgtpxy.target_price(side_pe), 1014.0)
 
     def test_lgt_uses_base_fourteen_piecewise_investment_ratio(self):
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -0.88)
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 2000.0, is_ce=True), -3.5)
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True), -14.0)
         self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 1000.0, is_ce=True), -56.0)
-        self.assertEqual(exeltgtpxy.calculate_lgt(3000.0, 1000.0, is_ce=True), -378.0)
-        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=False), -3584.0)
+        self.assertEqual(exeltgtpxy.calculate_lgt(3000.0, 1000.0, is_ce=True), -77.0)
+        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=False), -77.0)
 
     def test_averaging_requires_both_losing_sides_and_only_aligned_side_triggers(self):
         shared = {
