@@ -25,6 +25,7 @@ ENUMS = {
     + tuple(f"{side}{trend}" for side in range(9) for trend in range(9)),
     "SYSSTRNDPXY_VARIANT": ("DUAL", "SINGLE", "SMA50", "COMBO_FORCE"),
     "EXETGTPXY_MODE": ("DYNAMIC", "STATIC"),
+    "EXETGTPXY_VARIANT": ("HEX", "ORG"),
     "EXEOTMPXY_STRIKE_MODE": ("ATM", "OTMFIX", "OTMDYN"),
     "RUNEXACPXY_RISK_ACTION": ("YES", "NO"),
     "RUNEXACPXY_RISK_MODE": ("PEAK", "STATIC"),

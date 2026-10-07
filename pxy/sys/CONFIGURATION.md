@@ -150,13 +150,15 @@ settings should resolve to `None` rather than retain an active schedule.
   its magnitude while non-aligned sides use twice its magnitude. The dashboard
   displays the same scaled threshold used for placement; the current RUN loss
   remains unscaled.
-- The more-invested side always uses `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default
-  `1.4%`) as its target, regardless of alignment or target mode. If investments
-  are equal, normal alignment rules apply.
-- In `EXETGTPXY_MODE="DYNAMIC"`, aligned targets on the less-invested or equal
-  side use the calculated mirrored LGT base plus ATR, subject to
-  `EXETGTPXY_MAX_TARGET_CAP`; non-aligned targets use the configured `1.4%`.
-  Static aligned target values apply only when neither side is more invested.
+- `EXETGTPXY_VARIANT` selects the target policy and defaults to `HEX`.
+  `HEX` compares total CE and PE investment (not open-row counts) and ignores
+  signal alignment when the totals differ: the higher-invested side targets
+  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`), and the lower-invested
+  side targets `EXETGTPXY_STATIC_ALIGNED` (default `99%`).
+  Equal investment falls back to the original alignment-based rules.
+  `ORG` restores the original alignment-based behavior for both `DYNAMIC`
+  (aligned mirrored LGT base plus ATR, capped by `EXETGTPXY_MAX_TARGET_CAP`)
+  and `STATIC` (aligned `99%`, non-aligned `1.4%`) target modes.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.

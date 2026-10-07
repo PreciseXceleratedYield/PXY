@@ -19,6 +19,7 @@ class ConfigEditorTests(unittest.TestCase):
             "CLOCK = dt_time(9, 0)\n"
             "SYSDTAFPXY_SELECTED_MODE = '00'\n"
             "RUNEXMTPXY_INITIAL_LOSS_FLOOR = -1000\n"
+            "EXETGTPXY_VARIANT = 'HEX'\n"
             "RUNEXACPXY_RISK_MODE = 'STATIC'\n"
             "HOLIDAYS = ('one', 'two')\n"
             "SCRIPTS = {'CE': 'buy', 'PE': 'sell'}\n"
@@ -94,6 +95,21 @@ class ConfigEditorTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "listed choices"):
             config_editor._write({"RUNEXACPXY_RISK_MODE": "UNKNOWN"})
+
+    def test_tgt_variant_is_selectable_and_saved(self):
+        settings, _ = config_editor._metadata(self.original)
+        variant = next(
+            setting for setting in settings
+            if setting["key"] == "EXETGTPXY_VARIANT"
+        )
+        self.assertEqual(variant["value"], "HEX")
+        self.assertEqual(variant["options"], ["HEX", "ORG"])
+
+        config_editor._write({"EXETGTPXY_VARIANT": "ORG"})
+        self.assertIn("EXETGTPXY_VARIANT = 'ORG'", self.config_path.read_text())
+
+        with self.assertRaisesRegex(ValueError, "listed choices"):
+            config_editor._write({"EXETGTPXY_VARIANT": "UNKNOWN"})
 
     def test_signal_router_mode_is_selectable_and_saved(self):
         settings, _ = config_editor._metadata(self.original)
