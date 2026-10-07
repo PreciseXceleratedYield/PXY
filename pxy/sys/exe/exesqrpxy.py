@@ -28,6 +28,8 @@ from syscnfgpxy import (
     EXESQRPXY_EXIT_ALL_AFTER,
     SYSCNFGPXY_TIMEZONE,
 )
+from execoolpxy import start_cooldown
+from sysdecisionpxy import exit_order_response_accepted
 
 init(autoreset=True) 
 
@@ -72,6 +74,9 @@ def place_exit_order(client, row):
         order_response = client.place_order(**params) 
         
         # FIX FOR VM FREEZE: Background launcher process loop removed from here entirely!
+        if not exit_order_response_accepted(order_response):
+            print(f"{Fore.RED}❌ Broker did not confirm square-off order acceptance: {order_response!r}")
+            return None
         return order_response
 
     except Exception as e: 
@@ -140,6 +145,7 @@ def exit_all_positions():
     # --- FIX FOR VM FREEZE: SURGICAL BACKGROUND LAUNCHER OUTSIDE THE LOOP ---
     # Fires EXACTLY ONCE to update your data matrices safely without crashing the storage
     if any_order_placed:
+        start_cooldown()
         try:
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             script_path = os.path.join(parent_dir, "sysddmppxy.py")

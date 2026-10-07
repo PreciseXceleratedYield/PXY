@@ -46,6 +46,13 @@ import syskatrpxy
 
 
 class ConfigurationWiringTests(unittest.TestCase):
+    def setUp(self):
+        self.cooldown_patch = patch.object(sysentrpxy, "cooldown_remaining", return_value=0)
+        self.cooldown_patch.start()
+
+    def tearDown(self):
+        self.cooldown_patch.stop()
+
     def test_entry_and_exit_follow_directional_supertrend(self):
         frame = pd.DataFrame({"Close": [1]})
         with (

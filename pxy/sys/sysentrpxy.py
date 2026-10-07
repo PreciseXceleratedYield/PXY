@@ -1,4 +1,6 @@
 from datetime import datetime
+from pathlib import Path
+import sys
 
 import pandas as pd
 from syscnfgpxy import (
@@ -10,6 +12,12 @@ from sysmktpxy import get_signal as get_market_signal
 from sysexitpxy import detect_raw_direction
 from sysstrndpxy import calculate_supertrend
 
+EXE_DIR = Path(__file__).resolve().parent / "exe"
+if str(EXE_DIR) not in sys.path:
+    sys.path.insert(0, str(EXE_DIR))
+
+from execoolpxy import cooldown_remaining
+
 
 def get_entry_signal(df=None, current_time=None):
     """Return entry and exit signals using the morning direction-only window.
@@ -17,6 +25,10 @@ def get_entry_signal(df=None, current_time=None):
     From 09:00 until 09:30 IST, both signals follow market direction. Afterwards,
     entry follows Supertrend and a SIDE Supertrend exit falls back to direction.
     """
+    if cooldown_remaining() > 0:
+        print("⏳ POST-SQUARE-OFF COOLDOWN: entry and exit signals forced to NONE.")
+        return "NONE", "NONE"
+
     if df is None:
         from sysdtafpxy import fetch_yf_data
         df = fetch_yf_data()

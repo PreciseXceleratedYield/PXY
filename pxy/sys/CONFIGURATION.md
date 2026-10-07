@@ -21,6 +21,10 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 - `SYSCNFGPXY_ACTION_COOLDOWN_SECONDS` is the single shared cooldown for
   averaging, counter-buy, exit de-duplication, and the production engine's
   between-cycle pause. Its current value is 7 seconds.
+- `EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS` makes the signal router return
+  `NONE` for both entry and exit signals for 120 seconds after a square-off
+  order is accepted; the risk-ledger liquidation path starts the same
+  cooldown again once the broker confirms it is flat.
 - A local module alias that directly references a config value is only an
   implementation alias, not a competing override. Function arguments such as
   `fetch_yf_data(period=..., interval=...)` are intentional per-call overrides

@@ -210,6 +210,7 @@ class ProductionPipeReplay:
             patch.object(self.counter_pipe, "_count_fire", lambda: None),
             patch.object(self.counter_pipe, "datetime", ReplayClock),
             patch.object(self.squareoff_pipe, "datetime", ReplayClock),
+            patch.object(self.squareoff_pipe, "start_cooldown", lambda: None),
             patch("subprocess.Popen", simulated_popen),
             patch("subprocess.run", simulated_squareoff),
             patch.dict(sys.modules, {"runexacpxy": temporary_daily_purge}),

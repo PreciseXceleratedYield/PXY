@@ -673,6 +673,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                         },
                     ),
                     patch.object(engine.squareoff_pipe, "datetime", engine.ReplayClock),
+                    patch.object(engine.squareoff_pipe, "start_cooldown", lambda: None),
                     patch.object(engine.squareoff_pipe.sys, "argv", ["exesqrpxy.py", "-all"]),
                     redirect_stdout(StringIO()),
                 ):

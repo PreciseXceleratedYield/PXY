@@ -211,12 +211,10 @@ def _tick(client, open_df, closed_df, direction=None):
     # 6. Telemetry (3-line format)
     print(f"PnL {int(current_game_pnl)} | Pek {int(winners_peak_brick)} | Stp {int(active_trailing_exit)}")
     if risk_exit_enabled and stop_breached:
-        stop_action = (
-            "square-off enabled"
-            if RUNEXACPXY_STOP_SQUAREOFF_ENABLED
-            else "warning only; no stop square-off"
-        )
-        print(f"{Fore.YELLOW}⚠️ STOP THRESHOLD REACHED at {int(active_trailing_exit)}; {stop_action}.")
+        if RUNEXACPXY_STOP_SQUAREOFF_ENABLED:
+            print(f"{Fore.YELLOW}ALERT: STOP REACHED at {int(active_trailing_exit)} : SQUARE-OFF ENABLED")
+        else:
+            print("ALERT: STOP REACHED : NO ACTION")
     if risk_exit_enabled and target_breached:
         target_action = (
             f"GOING GOOD: SIGNAL {direction} IS ON OUR SIDE; "

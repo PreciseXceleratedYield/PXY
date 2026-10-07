@@ -185,6 +185,7 @@ EXEEXITPXY_ORDER_TRANSACTION_TYPE = "S"
 EXEEXITPXY_ORDER_AMO = "NO"
 
 EXESQRPXY_EXIT_ALL_AFTER = dt_time(15, 25)
+EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS = 120
 
 # Portfolio risk ledger. Keep related thresholds together; the control switch
 # gates the activation-time setting below.

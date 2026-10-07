@@ -18,6 +18,7 @@ from syscnfgpxy import (
 )
 from runexmtpxy import INITIAL_LOSS_FLOOR, compute_totals, _both_empty
 from runexstpxy import save_check_state, save_session_state, _find_runlilo_module
+from execoolpxy import start_cooldown
 
 # ==================== CONFIG (this file's settings) ====================
 # =======================================================================
@@ -98,6 +99,7 @@ def liquidate_and_exit(client, total_raw_pnl, risk_control_activated=False):
     run_squareoff()
 
     if wait_until_flat(client):
+        start_cooldown()
         new_total = _refresh_total(client, total_raw_pnl)
         print(f"🧹 {Fore.GREEN}Broker flat verified! Locking offset at ₹{new_total:,.0f} and restarting engine...")
         pnl_offset = new_total
