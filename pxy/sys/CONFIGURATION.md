@@ -112,6 +112,9 @@ settings should resolve to `None` rather than retain an active schedule.
 - In `"STATIC"` mode, the active-row divisor is recalculated every ledger tick;
   CE and PE rows both count. With no active rows, the divisor is 1. In `"PEAK"`
   mode, the original peak-based stop and unscaled peak-ceiling exit are used.
+- The CHK suite exercises both risk modes, and SIM replays apply the selected
+  mode to the simulated broker, including the configured breach confirmation
+  count. These paths never send live orders.
 
 ## Other conditional settings
 

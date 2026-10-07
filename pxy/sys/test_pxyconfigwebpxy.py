@@ -17,6 +17,7 @@ class ConfigEditorTests(unittest.TestCase):
             "CLOCK = dt_time(9, 0)\n"
             "SYSDTAFPXY_SELECTED_MODE = '00'\n"
             "RUNEXMTPXY_INITIAL_LOSS_FLOOR = -1000\n"
+            "RUNEXACPXY_RISK_MODE = 'STATIC'\n"
             "HOLIDAYS = ('one', 'two')\n"
             "SCRIPTS = {'CE': 'buy', 'PE': 'sell'}\n"
             "TOKEN_VALUE = 'must stay hidden'\n"
@@ -58,6 +59,21 @@ class ConfigEditorTests(unittest.TestCase):
         self.assertIn("EXEOTMPXY_STRIKE_MODE = 'OTMDYN'", source)
         self.assertIn("EXEOTMPXY_FIXED_DISTANCE = 100", source)
         self.assertIn("EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES = (200, 150, 100, 50, 0)", source)
+
+    def test_risk_mode_is_selectable_and_saved_through_config_editor(self):
+        settings, _ = config_editor._metadata(self.original)
+        risk_mode = next(
+            setting for setting in settings
+            if setting["key"] == "RUNEXACPXY_RISK_MODE"
+        )
+        self.assertEqual(risk_mode["value"], "STATIC")
+        self.assertEqual(risk_mode["options"], ["PEAK", "STATIC"])
+
+        config_editor._write({"RUNEXACPXY_RISK_MODE": "PEAK"})
+        self.assertIn("RUNEXACPXY_RISK_MODE = 'PEAK'", self.config_path.read_text())
+
+        with self.assertRaisesRegex(ValueError, "listed choices"):
+            config_editor._write({"RUNEXACPXY_RISK_MODE": "UNKNOWN"})
 
     def test_write_validates_creates_backup_and_preserves_file_mode(self):
         self.config_path.chmod(0o640)

@@ -10,6 +10,16 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pandas as pd
+
+from syscnfgpxy import (
+    RUNEXACPXY_BREACH_TICKS_REQUIRED,
+    RUNEXACPXY_CNTRLRSKBAR,
+    RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
+    RUNEXACPXY_RISK_ACTION,
+    RUNEXACPXY_RISK_MODE,
+)
+
 
 class ProductionPipeReplay:
     """Bind production pipe dependencies to historical data and a simulated broker.
@@ -55,6 +65,13 @@ class ProductionPipeReplay:
         self.counter_pipe = importlib.import_module("execbuypxy")
         self.squareoff_pipe = importlib.import_module("exesqrpxy")
         self.dynamic_entry = importlib.import_module("exedynpxy")
+        self.risk_math = importlib.import_module("runexmtpxy")
+        self.risk_control_activated = RUNEXACPXY_RISK_MODE != "PEAK"
+        self.risk_pnl_offset = 0.0
+        self.risk_peak = 0.0
+        self.risk_breach_ticks = 0
+        self.risk_exit_fired = False
+        self.risk_last_counted_timestamp = None
 
         class ReplayClock(datetime):
             @classmethod
@@ -135,7 +152,7 @@ class ProductionPipeReplay:
 
         temporary_daily_purge = SimpleNamespace(
             daily_purge_check=lambda: None,
-            execute_master_risk_ledger=lambda *args, **kwargs: None,
+            execute_master_risk_ledger=self._execute_risk_ledger,
         )
         self.state_dir.mkdir(parents=True, exist_ok=True)
         patchers = [
@@ -215,6 +232,88 @@ class ProductionPipeReplay:
             tag=self.broker.next_tag(prefix),
         )
 
+    def _execute_risk_ledger(self, client, open_df, closed_df):
+        if (
+            (open_df is None or open_df.empty)
+            and (closed_df is None or closed_df.empty)
+        ):
+            return
+
+        totals = self.risk_math.compute_totals(open_df, closed_df)
+        raw_pnl = totals["total"]
+        now = self.timestamp
+        if hasattr(now, "to_pydatetime"):
+            now = now.to_pydatetime()
+        if now == self.risk_last_counted_timestamp:
+            return
+        self.risk_last_counted_timestamp = now
+        current_time = now.timetz().replace(tzinfo=None)
+        if self.risk_math.midday_risk_activation_due(
+            RUNEXACPXY_RISK_MODE == "PEAK"
+            and str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() == "YES",
+            self.risk_control_activated,
+            current_time,
+            RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
+        ):
+            self.risk_pnl_offset = raw_pnl
+            self.risk_peak = 0.0
+            self.risk_breach_ticks = 0
+            self.risk_control_activated = True
+
+        game_pnl = raw_pnl - self.risk_pnl_offset
+        self.risk_peak, stop_line, breached = self.risk_math.compute_stop(
+            game_pnl,
+            self.risk_peak,
+            totals["open_rows"],
+        )
+        target_line = (
+            self.risk_math.PEAK_CEILING
+            if RUNEXACPXY_RISK_MODE == "PEAK"
+            else self.risk_math.PEAK_CEILING / max(totals["open_rows"], 1)
+        )
+        risk_enabled = (
+            not RUNEXACPXY_CNTRLRSKBAR
+            or str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() != "YES"
+            or self.risk_control_activated
+        )
+        if not risk_enabled:
+            return
+
+        if not breached:
+            self.risk_breach_ticks = 0
+            return
+        self.risk_breach_ticks += 1
+        if self.risk_breach_ticks < RUNEXACPXY_BREACH_TICKS_REQUIRED:
+            return
+        if str(RUNEXACPXY_RISK_ACTION).upper().strip() != "YES":
+            print(
+                f"SIM PASSIVE RISK ALERT ({RUNEXACPXY_RISK_MODE}): "
+                f"PnL {game_pnl:.0f}, stop {stop_line:.0f}, target {target_line:.0f}; "
+                "RISK_ACTION=NO, positions remain open."
+            )
+            return
+
+        for index, row in enumerate(open_df.to_dict("records"), start=1):
+            result = client.place_order(
+                trading_symbol=row["Symbol"],
+                transaction_type="S",
+                quantity=row["Qty"],
+                tag=f"{row['Tag']}_S_RISK{index:03d}",
+            )
+            if str(result.get("stat", "")).lower() != "ok":
+                raise RuntimeError(
+                    f"SIM risk exit failed for {row['Symbol']} tag {row['Tag']}: {result!r}"
+                )
+        self.risk_exit_fired = True
+        self.risk_pnl_offset = raw_pnl
+        self.risk_peak = 0.0
+        self.risk_breach_ticks = 0
+        print(
+            f"SIM RISK EXIT ({RUNEXACPXY_RISK_MODE}): "
+            f"PnL {game_pnl:.0f}, stop {stop_line:.0f}, target {target_line:.0f}; "
+            f"closed {len(open_df)} active rows."
+        )
+
     def __enter__(self):
         return self
 
@@ -225,12 +324,15 @@ class ProductionPipeReplay:
         self.timestamp = timestamp
         self.snapshot = snapshot
         self.broker.set_market(timestamp, spot)
+        self.risk_exit_fired = False
         output = io.StringIO()
         self.output = output
         with redirect_stdout(output), redirect_stderr(output):
             self.exit_pipe.run_snapshot()
-            self.entry_pipe.main()
-            self.avg_pipe.run_snapshot()
+            if not self.risk_exit_fired:
+                self.entry_pipe.main()
+            if not self.risk_exit_fired:
+                self.avg_pipe.run_snapshot()
         logged = output.getvalue()
         if logged:
             with Path(runtime_log).open("a", encoding="utf-8") as stream:
