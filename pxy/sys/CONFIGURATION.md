@@ -69,6 +69,11 @@ restarted.
 
 ## Option strike selection
 
+`SYSENTRPXY_SIGNAL_MODE` selects the entry/exit signal router: `MKT` (default)
+copies market direction without Supertrend, while `STS` uses the
+Supertrend-aware matrix. This is independent of `SYSDTAFPXY_SELECTED_MODE`,
+which selects the OHLC data transformation supplied to the signal calculations.
+
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
 builder for every buying script. It currently defaults to `ATM`, which ignores
 caller OTM flags and distances and uses a zero-point offset. `OTMFIX` applies

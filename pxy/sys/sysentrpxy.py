@@ -1,12 +1,14 @@
 import pandas as pd
 from sysmktpxy import get_signal
 from sysstrndpxy import calculate_supertrend
+from syscnfgpxy import SYSENTRPXY_SIGNAL_MODE
 
-def get_entry_signal(df=None, mode="ST"):
+
+def get_entry_signal(df=None, mode=SYSENTRPXY_SIGNAL_MODE):
     """
     System Router Matrix with Mode Switch:
     
-    MODE: "MKT" (Default)
+    MODE: "STS" (default)
     - ENTRY: 
       - ST BULL/BEAR: Contrarian (ST BULL + MKT BEAR -> BUY | ST BEAR + MKT BULL -> SELL)
       - ST SIDE: Pure MKT Copy (MKT BULL -> BUY | MKT BEAR -> SELL)
@@ -17,6 +19,10 @@ def get_entry_signal(df=None, mode="ST"):
     MODE: "MKT"
     - ENTRY & EXIT: Pure MKT copy, completely bypassing Supertrend.
     """
+    normalized_mode = str(mode).upper().strip()
+    if normalized_mode not in {"STS", "MKT"}:
+        raise ValueError("mode must be 'STS' or 'MKT'")
+
     if df is None:
         from sysdtafpxy import fetch_yf_data
         df = fetch_yf_data()
@@ -29,7 +35,7 @@ def get_entry_signal(df=None, mode="ST"):
     mkt_exit_dir = str(mkt_dir).upper().strip()
 
     # 2️⃣ Handle "MKT" Mode (No ST influence)
-    if str(mode).upper().strip() == "MKT":
+    if normalized_mode == "MKT":
         if mkt_exit_dir == "BULL":
             return "BUY", "BULL"
         elif mkt_exit_dir == "BEAR":
@@ -37,7 +43,7 @@ def get_entry_signal(df=None, mode="ST"):
         else:
             return "NONE", "NONE"
 
-    # 3️⃣ Fetch Supertrend for "ST" Mode
+    # 3️⃣ Fetch Supertrend for "STS" Mode
     try:
         processed_st_df = calculate_supertrend(df.copy())
         if processed_st_df is None or processed_st_df.empty:
@@ -86,8 +92,8 @@ if __name__ == "__main__":
     df = fetch_yf_data()
     if df is not None and not df.empty:
         # Example 1: Running with default ST logic
-        print("RUNNING MATRIX (MODE: ST)...")
-        entry_sig, exit_sig = get_entry_signal(df, mode="ST")
+        print("RUNNING MATRIX (MODE: STS)...")
+        entry_sig, exit_sig = get_entry_signal(df, mode="STS")
         print(f"ROUTER SIGNALS >> ENTRY_SIG: {entry_sig} | EXIT_SIG: {exit_sig}\n")
         
         # Example 2: Running with pure Market logic

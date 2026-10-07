@@ -27,11 +27,13 @@ import exeexitpxy
 import exeforcepxy
 import exeavxpxy
 import exeentrpxy
+import sysentrpxy
 import runniftypxy
 from syscnfgpxy import (
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
     SYSDTAFPXY_FIXED_BRICK_SIZE,
+    SYSENTRPXY_SIGNAL_MODE,
     EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
     EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
 )
@@ -41,6 +43,42 @@ import syskatrpxy
 
 
 class ConfigurationWiringTests(unittest.TestCase):
+    def test_entry_router_defaults_to_configured_mkt_mode(self):
+        self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "MKT")
+        self.assertEqual(sysentrpxy.get_entry_signal.__defaults__[-1], "MKT")
+
+    def test_mkt_entry_router_bypasses_supertrend(self):
+        frame = pd.DataFrame({"Close": [1]})
+        with (
+            patch.object(sysentrpxy, "get_signal", return_value=("BEAR", None)),
+            patch.object(sysentrpxy, "calculate_supertrend") as supertrend,
+        ):
+            self.assertEqual(
+                sysentrpxy.get_entry_signal(frame, mode="MKT"),
+                ("SELL", "BEAR"),
+            )
+
+        supertrend.assert_not_called()
+
+    def test_sts_entry_router_uses_supertrend_matrix(self):
+        frame = pd.DataFrame({"Close": [1]})
+        with (
+            patch.object(sysentrpxy, "get_signal", return_value=("BEAR", None)),
+            patch.object(
+                sysentrpxy,
+                "calculate_supertrend",
+                return_value=pd.DataFrame({"ST_Trend": ["BULL"]}),
+            ),
+        ):
+            self.assertEqual(
+                sysentrpxy.get_entry_signal(frame, mode="STS"),
+                ("BUY", "BULL"),
+            )
+
+    def test_entry_router_rejects_old_or_unknown_mode_names(self):
+        with self.assertRaisesRegex(ValueError, "STS.*MKT"):
+            sysentrpxy.get_entry_signal(pd.DataFrame({"Close": [1]}), mode="ST")
+
     def test_average_dashboard_displays_target_after_run(self):
         with redirect_stdout(StringIO()) as output:
             exeavxpxy.print_telemetry_dashboard({
