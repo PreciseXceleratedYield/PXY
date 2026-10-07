@@ -34,11 +34,9 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSDTAFPXY_FIXED_BRICK_SIZE,
     SYSENTRPXY_SIGNAL_MODE,
-    EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
-    EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
+    EXEAMSPXY_MAX_INVESTMENT,
 )
 from sysdtafpxy import apply_ohlc_transformation
-from sysdecisionpxy import scale_lgt_threshold
 from sysdecisionpxy import averaging_trigger_sides
 import syskatrpxy
 
@@ -208,51 +206,51 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(aligned_target, 1990.0)
         self.assertEqual(not_aligned_target, 1014.0)
 
-    def test_lgt_alignment_multipliers_match_requested_policy(self):
-        self.assertEqual(EXEAVXPXY_ALIGNED_LGT_MULTIPLIER, 0.5)
-        self.assertEqual(EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER, 2.0)
-        self.assertEqual(
-            scale_lgt_threshold(
-                -10.0,
-                True,
-                EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
-                EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
-            ),
-            -5.0,
-        )
-        self.assertEqual(
-            scale_lgt_threshold(
-                -10.0,
-                False,
-                EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
-                EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
-            ),
-            -20.0,
-        )
+    def test_lgt_uses_base_fourteen_piecewise_investment_ratio(self):
+        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -0.88)
+        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 2000.0, is_ce=True), -3.5)
+        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True), -14.0)
+        self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 1000.0, is_ce=True), -56.0)
+        self.assertEqual(exeltgtpxy.calculate_lgt(3000.0, 1000.0, is_ce=True), -378.0)
+        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=False), -3584.0)
 
-    def test_averaging_is_blocked_when_opposite_side_has_less_investment(self):
+    def test_averaging_requires_both_losing_sides_and_only_aligned_side_triggers(self):
         shared = {
-            "ce_aligned": False, "pe_aligned": False,
-            "ce_rows": 1, "pe_rows": 1,
-            "ce_cooling": False, "pe_cooling": False,
-            "ce_loss": -10, "pe_loss": -10,
-            "ce_threshold": -5, "pe_threshold": -5,
-            "max_layers": 5,
+            "ce_aligned": True,
+            "pe_aligned": False,
+            "ce_rows": 8,
+            "pe_rows": 8,
+            "ce_investment": 2000,
+            "pe_investment": 4000,
+            "ce_cooling": False,
+            "pe_cooling": False,
+            "ce_loss": -10,
+            "pe_loss": -20,
+            "ce_threshold": -5,
+            "pe_threshold": -5,
+            "max_investment": EXEAMSPXY_MAX_INVESTMENT,
+            "ce_next_investment": 1000,
+            "pe_next_investment": 1000,
         }
 
-        ce_heavier = averaging_trigger_sides(
-            **shared, ce_investment=2000, pe_investment=1000
+        self.assertEqual(averaging_trigger_sides(**shared), {"CE": True, "PE": False})
+
+        no_opposite_loss = averaging_trigger_sides(**{**shared, "pe_loss": 0})
+        no_opposite_position = averaging_trigger_sides(**{**shared, "pe_rows": 0})
+        aligned_pe = averaging_trigger_sides(
+            **{**shared, "ce_aligned": False, "pe_aligned": True}
         )
-        pe_heavier = averaging_trigger_sides(
-            **shared, ce_investment=1000, pe_investment=2000
-        )
-        equal_investment = averaging_trigger_sides(
-            **shared, ce_investment=1000, pe_investment=1000
+        over_value_cap = averaging_trigger_sides(
+            **{**shared, "ce_investment": 24500, "ce_next_investment": 1000}
         )
 
-        self.assertEqual(ce_heavier, {"CE": False, "PE": True})
-        self.assertEqual(pe_heavier, {"CE": True, "PE": False})
-        self.assertEqual(equal_investment, {"CE": True, "PE": True})
+        self.assertEqual(no_opposite_loss, {"CE": False, "PE": False})
+        self.assertEqual(no_opposite_position, {"CE": False, "PE": False})
+        self.assertEqual(aligned_pe, {"CE": False, "PE": True})
+        self.assertEqual(over_value_cap, {"CE": False, "PE": False})
+
+    def test_value_cap_is_fixed_at_twenty_five_thousand_without_layer_mode(self):
+        self.assertEqual(EXEAMSPXY_MAX_INVESTMENT, 25000.0)
 
     def test_renko_uses_configured_brick_size_by_default(self):
         frame = pd.DataFrame(

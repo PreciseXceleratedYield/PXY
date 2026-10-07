@@ -146,20 +146,20 @@ settings should resolve to `None` rather than retain an active schedule.
 - `EXETGTPXY_STATIC_ALIGNED` applies only in `MODE=STATIC`. In both target
   modes, `MIN_ATR_VALUE` is an input ATR floor and `MIN_TARGET_PCT` is the
   final minimum percentage; these are distinct units and controls.
-- `EXEAVXPXY_DEFAULT_ATR` is only the averaging fallback when the current row
-  has no usable ATR. The averaging window switch and start/end bounds apply
-  only to averaging placement, not to entry/exit pipes.
-- Averaging is blocked on a side when that side's total investment exceeds the
-  opposite side's total investment (`sum(qty × sell_prc)`). The lighter or
-  equally invested side still follows the existing LGT, loss, layer, and
-  cooldown gates.
-- LGT compares the current side loss with a negative ATR/investment/count
-  threshold. `EXEAVXPXY_ALIGNED_LGT_MULTIPLIER` (default `0.5`) applies to
-  aligned sides; `EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER` (default `2`) applies
-  to non-aligned sides. Since the threshold is negative, aligned sides use half
-  its magnitude while non-aligned sides use twice its magnitude. The dashboard
-  displays the same scaled threshold used for placement; the current RUN loss
-  remains unscaled.
+- The averaging window switch and start/end bounds apply only to averaging
+  placement, not to entry/exit pipes.
+- Averaging uses one policy with no layer-count mode: the projected side
+  investment (`sum(qty × sell_prc)` plus the next lot at its current
+  `sell_prc`) must not exceed `EXEAMSPXY_MAX_INVESTMENT` (default `25000`).
+  The opposite side must have open positions and negative overall P&L, and
+  only the signal-aligned side may average. The averaging side must also be
+  losing at or beyond its LGT threshold; no alignment multiplier is applied.
+- LGT is calculated from positive investment values, then negated:
+  `r = own investment / opposite investment`;
+  `magnitude = 14 × r²` when `r < 1`, otherwise `14 × r^r`;
+  `LGT = -round(magnitude, 2)`. If either side has no positive investment,
+  `r` defaults to `1`. This formula is owned by averaging; `TGT` keeps its
+  existing calculation, including its count factor.
 - TGT follows its original alignment-based behavior: `DYNAMIC` uses the
   aligned mirrored LGT base plus ATR, capped by `EXETGTPXY_MAX_TARGET_CAP`;
   `STATIC` uses `99%` when aligned and `1.4%` when not aligned.

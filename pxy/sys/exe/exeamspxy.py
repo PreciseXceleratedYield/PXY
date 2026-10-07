@@ -11,7 +11,7 @@ init(autoreset=True)
 logger = logging.getLogger("exeavxpxy.strategy")
 
 from syscnfgpxy import (
-    EXEAMSPXY_MAX_LAYERS as MAX_LAYERS,
+    EXEAMSPXY_MAX_INVESTMENT,
     EXEAMSPXY_ORDER_AMO,
     EXEAMSPXY_ORDER_EXCHANGE_SEGMENT,
     EXEAMSPXY_ORDER_PRICE,
@@ -44,8 +44,21 @@ def _order_ok(resp):
 
 def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_val,
                                   ce_dynamic_threshold, pe_dynamic_threshold, ce_lots, pe_lots,
-                                  ce_aligned, pe_aligned, ce_investment, pe_investment):
+                                  ce_aligned, pe_aligned, ce_investment, pe_investment,
+                                  max_investment=EXEAMSPXY_MAX_INVESTMENT):
     """Executes network orders for System A when pullback boundaries are breached."""
+    ce_last_row = _newest_row(ce_rows) if not ce_rows.empty else None
+    pe_last_row = _newest_row(pe_rows) if not pe_rows.empty else None
+    ce_next_investment = (
+        abs(int(safe_float(ce_last_row.get("qty", 0.0))))
+        * max(0.0, safe_float(ce_last_row.get("sell_prc", 0.0)))
+        if ce_last_row is not None else 0.0
+    )
+    pe_next_investment = (
+        abs(int(safe_float(pe_last_row.get("qty", 0.0))))
+        * max(0.0, safe_float(pe_last_row.get("sell_prc", 0.0)))
+        if pe_last_row is not None else 0.0
+    )
     triggers = averaging_trigger_sides(
         ce_aligned=ce_aligned,
         pe_aligned=pe_aligned,
@@ -59,18 +72,22 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
         pe_loss=pe_lgt_val,
         ce_threshold=ce_dynamic_threshold,
         pe_threshold=pe_dynamic_threshold,
-        max_layers=MAX_LAYERS,
+        max_investment=max_investment,
+        ce_next_investment=ce_next_investment,
+        pe_next_investment=pe_next_investment,
     )
 
     # 🟢 CALL OPTION (CE) SIDE LAYER GATEWAY
-    if ce_rows.shape[0] > 0 and ce_investment > pe_investment:
+    if (
+        ce_rows.shape[0] > 0
+        and ce_investment + ce_next_investment > max_investment
+    ):
         logger.info(
-            "CE averaging blocked: opposite PE investment %.2f is below CE investment %.2f.",
-            pe_investment,
-            ce_investment,
+            "CE averaging blocked: projected investment %.2f exceeds value cap %.2f.",
+            ce_investment + ce_next_investment,
+            max_investment,
         )
     if triggers["CE"]:
-        ce_last_row = _newest_row(ce_rows)
         ce_symbol = ce_last_row['symbol']
         ce_qty = abs(int(safe_float(ce_last_row.get('qty', 0.0))))
 
@@ -99,14 +116,16 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
             logger.error(f"CE Native placement tracking error: {e}", exc_info=True)
 
     # 🔴 PUT OPTION (PE) SIDE LAYER GATEWAY
-    if pe_rows.shape[0] > 0 and pe_investment > ce_investment:
+    if (
+        pe_rows.shape[0] > 0
+        and pe_investment + pe_next_investment > max_investment
+    ):
         logger.info(
-            "PE averaging blocked: opposite CE investment %.2f is below PE investment %.2f.",
-            ce_investment,
-            pe_investment,
+            "PE averaging blocked: projected investment %.2f exceeds value cap %.2f.",
+            pe_investment + pe_next_investment,
+            max_investment,
         )
     if triggers["PE"]:
-        pe_last_row = _newest_row(pe_rows)
         pe_symbol = pe_last_row['symbol']
         pe_qty = abs(int(safe_float(pe_last_row.get('qty', 0.0))))
 

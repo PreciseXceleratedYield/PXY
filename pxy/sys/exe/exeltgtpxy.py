@@ -1,4 +1,7 @@
 
+import math
+import sys
+
 import pandas as pd
 import re
 from colorama import Fore, Style, init
@@ -33,16 +36,14 @@ def _warn_once(key, msg):
         print(f"{Fore.YELLOW}⚠️ {msg}{Style.RESET_ALL}")
 
 
-# ===== CORE FORMULA HUB (Single source of truth) =====
+# ===== TARGET FORMULA CORE =====
 
-def _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
-    """Unified LGT/TGT calculation core - mirror logic with quadratic investment + linear count.
-    
-    Used by both averaging (LGT, negated) and targeting (TGT, positive + extra ATR).
-    
+def _target_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
+    """Calculate the existing count-sensitive target base.
+
     Formula: ATR × (1 + inverse_factor)² × (own_count + 1) / (opposite_count + 1)
     
-    Returns POSITIVE. Sign handling is done by caller.
+    Returns a positive value for target calculation.
     """
     if atr <= 0:
         return 0.0
@@ -61,10 +62,28 @@ def _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, 
     return round(base_factor, 2)
 
 
-def calculate_lgt(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce):
-    """Calculates LGT (averaging trigger) loss threshold. Returns NEGATIVE."""
-    base = _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce)
-    return -base
+def calculate_lgt(ce_investment, pe_investment, is_ce):
+    """Calculate the negative LGT threshold from the side investment ratio."""
+    own_investment, opposite_investment = (
+        (ce_investment, pe_investment) if is_ce else (pe_investment, ce_investment)
+    )
+    ratio = (
+        own_investment / opposite_investment
+        if own_investment > 0 and opposite_investment > 0
+        else 1.0
+    )
+    if ratio < 1.0:
+        factor = ratio**2
+    else:
+        exponent = ratio * math.log(ratio)
+        max_factor = sys.float_info.max / 14.0
+        factor = (
+            math.exp(exponent)
+            if exponent < math.log(max_factor)
+            else max_factor
+        )
+    magnitude = 14.0 * factor
+    return -round(magnitude, 2)
 
 
 def calculate_tgt(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce, is_aligned):
@@ -75,7 +94,9 @@ def calculate_tgt(atr, ce_investment, pe_investment, ce_count, pe_count, is_ce, 
     """
     if is_aligned:
         opposite_is_ce = not is_ce
-        base = _lgt_tgt_base_factor(atr, ce_investment, pe_investment, ce_count, pe_count, opposite_is_ce)
+        base = _target_base_factor(
+            atr, ce_investment, pe_investment, ce_count, pe_count, opposite_is_ce
+        )
         return base + atr
     else:
         return STATIC_NOT_ALIGNED_PCT

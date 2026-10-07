@@ -29,74 +29,74 @@ from .pointbacktest import is_actual_market_hours
 
 SCENARIOS = (
     {
-        "name": "BUY flat, CE target, BEAR counter, CE average",
+        "name": "CE aligned but opposite side absent blocks average",
         "entry": ("BUY", 0, 0, "pxybuyce"),
         "target": (110, 120, 180, 150, True),
         "counter": ("BEAR", ({"symbol": "NIFTYCE", "qty": 1},), "pxybuype"),
-        "average": (True, False, 1, 0, False, False, -3, 0, -2, -2, 5, {"CE": True, "PE": False}),
+        "average": (True, False, 1, 0, False, False, -3, 0, -2, -2, 25000, {"CE": False, "PE": False}),
     },
     {
-        "name": "SELL flat, PE counter and average, target miss",
+        "name": "PE aligned but opposite side absent blocks average",
         "entry": ("SELL", 0, 0, "pxybuype"),
         "target": (110, 109, 200, 150, False),
         "counter": ("BULL", ({"symbol": "NIFTYPE", "qty": 2},), "pxybuyce"),
-        "average": (False, True, 0, 1, False, False, 0, -4, -2, -2, 5, {"CE": False, "PE": True}),
+        "average": (False, True, 0, 1, False, False, 0, -4, -2, -2, 25000, {"CE": False, "PE": False}),
     },
     {
         "name": "occupied CE blocks fresh BUY, averaging cooldown",
         "entry": ("BUY", 1, 0, None),
         "target": (100, 120, 149, 150, False),
         "counter": ("SIDE", ({"symbol": "NIFTYCE", "qty": 1},), None),
-        "average": (True, True, 1, 1, True, False, -5, -5, -2, -2, 5, {"CE": False, "PE": True}),
+        "average": (False, True, 1, 1, True, False, -5, -5, -2, -2, 25000, {"CE": False, "PE": True}),
     },
     {
         "name": "invalid HOLD, target boundary, balanced legs",
         "entry": ("HOLD", 0, 0, None),
         "target": (100, 100, 150, 150, True),
         "counter": ("BEAR", ({"symbol": "NIFTYCE", "qty": 1}, {"symbol": "NIFTYPE", "qty": 1}), None),
-        "average": (True, True, 1, 1, False, False, -2, -2, -2, -2, 5, {"CE": True, "PE": True}),
+        "average": (True, False, 1, 1, False, False, -2, -2, -2, -2, 25000, {"CE": True, "PE": False}),
     },
     {
-        "name": "BUY flat, target miss, PE counter, both averages",
+        "name": "BUY flat, target miss, only aligned CE averages",
         "entry": ("BUY", 0, 0, "pxybuyce"),
         "target": (101, 100, 200, 150, False),
         "counter": ("BULL", ({"symbol": "NIFTYPE", "qty": 1},), "pxybuyce"),
-        "average": (True, True, 2, 3, False, False, -3, -4, -2, -2, 5, {"CE": True, "PE": True}),
+        "average": (True, False, 2, 3, False, False, -3, -4, -2, -2, 25000, {"CE": True, "PE": False}),
     },
     {
-        "name": "open PE blocks SELL, PE at max layers",
+        "name": "PE cannot average without CE position",
         "entry": ("SELL", 0, 2, None),
         "target": (100, 110, 149, 150, False),
         "counter": ("BEAR", ({"symbol": "NIFTYPE", "qty": 2},), None),
-        "average": (False, True, 0, 5, False, False, 0, -8, -2, -2, 5, {"CE": False, "PE": False}),
+        "average": (False, True, 0, 5, False, False, 0, -8, -2, -2, 25000, {"CE": False, "PE": False}),
     },
     {
-        "name": "zero-quantity leg ignored; CE max layers",
+        "name": "CE cannot average without PE position",
         "entry": ("BUY", 0, 0, "pxybuyce"),
         "target": (120, 121, 500, 150, True),
         "counter": ("BEAR", ({"symbol": "NIFTYCE", "qty": 0},), None),
-        "average": (True, False, 5, 0, False, False, -8, 0, -2, -2, 5, {"CE": False, "PE": False}),
+        "average": (True, False, 5, 0, False, False, -8, 0, -2, -2, 25000, {"CE": False, "PE": False}),
     },
     {
-        "name": "NONE signal, BULL PE counter, unaligned average",
+        "name": "unaligned PE cannot average",
         "entry": ("NONE", 0, 0, None),
         "target": (0, 100, 500, 150, False),
         "counter": ("BULL", ({"symbol": "NIFTYPE", "qty": 1},), "pxybuyce"),
-        "average": (False, False, 0, 1, False, False, 0, -9, -2, -2, 5, {"CE": False, "PE": True}),
+        "average": (False, False, 1, 1, False, False, -9, -9, -2, -2, 25000, {"CE": False, "PE": False}),
     },
     {
-        "name": "BUY flat target, PE averaging at loss threshold",
+        "name": "unaligned sides cannot average despite both sides losing",
         "entry": ("BUY", 0, 0, "pxybuyce"),
         "target": (100, 100, 150, 150, True),
         "counter": ("BULL", ({"symbol": "NIFTYCE", "qty": 1},), None),
-        "average": (False, True, 0, 2, False, False, 0, -2, -2, -2, 5, {"CE": False, "PE": True}),
+        "average": (False, False, 1, 2, False, False, -2, -2, -2, -2, 25000, {"CE": False, "PE": False}),
     },
     {
         "name": "SELL flat, BULL PE counter, cooldown blocks averaging",
         "entry": ("SELL", 0, 0, "pxybuype"),
         "target": (110, 112, 151, 150, True),
         "counter": ("BULL", ({"symbol": "NIFTYPE", "qty": 1},), "pxybuyce"),
-        "average": (True, True, 1, 1, True, True, -8, -8, -2, -2, 5, {"CE": False, "PE": False}),
+        "average": (True, False, 1, 1, True, False, -8, -8, -2, -2, 25000, {"CE": False, "PE": False}),
     },
 )
 
@@ -121,7 +121,7 @@ def evaluate_scenario(scenario):
 
     (
         ce_aligned, pe_aligned, ce_rows, pe_rows, ce_cooling, pe_cooling,
-        ce_loss, pe_loss, ce_threshold, pe_threshold, max_layers, expected_average,
+        ce_loss, pe_loss, ce_threshold, pe_threshold, max_investment, expected_average,
     ) = scenario["average"]
     actual_average = averaging_trigger_sides(
         ce_aligned=ce_aligned,
@@ -134,7 +134,7 @@ def evaluate_scenario(scenario):
         pe_loss=pe_loss,
         ce_threshold=ce_threshold,
         pe_threshold=pe_threshold,
-        max_layers=max_layers,
+        max_investment=max_investment,
     )
 
     actual = {

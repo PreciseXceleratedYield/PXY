@@ -10,18 +10,15 @@ from datetime import datetime
 from colorama import Fore, Style
 
 from syscnfgpxy import (
+    EXEAMSPXY_MAX_INVESTMENT,
     EXEAVXPXY_MARKET_END as MARKET_END,
     EXEAVXPXY_MARKET_START as MARKET_START,
     EXEAVXPXY_REBUY_ENABLED as REBUY_ENABLED,
-    EXEAVXPXY_DEFAULT_ATR,
     EXEAVXPXY_USE_OVERALL_LOSS,
-    EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
-    EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
 )
 from sysdecisionpxy import (
     averaging_placement_allowed,
     averaging_window_enabled,
-    scale_lgt_threshold,
 )
 from exeagtpxy import is_aligned
 from exeltgtpxy import calculate_lgt, target_price              # Import from central hub
@@ -118,8 +115,6 @@ def handle_side_averaging(client, df):
 
     ce_investment = float(ce_rows['row_invested'].sum()) if not ce_rows.empty else 0.0
     pe_investment = float(pe_rows['row_invested'].sum()) if not pe_rows.empty else 0.0
-    ce_invst_factor = ce_investment / pe_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
-    pe_invst_factor = pe_investment / ce_investment if (ce_investment > 0 and pe_investment > 0) else 1.0
 
     ce_pnl = float(ce_rows['row_pnl'].sum()) if not ce_rows.empty else 0.0
     pe_pnl = float(pe_rows['row_pnl'].sum()) if not pe_rows.empty else 0.0
@@ -129,29 +124,15 @@ def handle_side_averaging(client, df):
     ce_aligned = is_aligned("CE", active_exit)
     pe_aligned = is_aligned("PE", active_exit)
 
-    # Calculate LGT (averaging triggers) using investment-factor formula + count factor
-    ce_atr = safe_float(working_df.iloc[-1].get("atr"), EXEAVXPXY_DEFAULT_ATR)
-    pe_atr = ce_atr  # Both use same ATR from current bar
-    
     ce_dynamic_threshold = calculate_lgt(
-        ce_atr, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=True
+        ce_investment,
+        pe_investment,
+        is_ce=True,
     )
     pe_dynamic_threshold = calculate_lgt(
-        pe_atr, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=False
-    )
-
-    # Use the same alignment-based threshold for display and triggering.
-    ce_dynamic_threshold = scale_lgt_threshold(
-        ce_dynamic_threshold,
-        ce_aligned,
-        EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
-        EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
-    )
-    pe_dynamic_threshold = scale_lgt_threshold(
-        pe_dynamic_threshold,
-        pe_aligned,
-        EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
-        EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
+        ce_investment,
+        pe_investment,
+        is_ce=False,
     )
 
     if USE_OVERALL_LOSS:
@@ -201,4 +182,5 @@ def handle_side_averaging(client, df):
         ce_lots=ce_lots, pe_lots=pe_lots,
         ce_aligned=ce_aligned, pe_aligned=pe_aligned,
         ce_investment=ce_investment, pe_investment=pe_investment,
+        max_investment=EXEAMSPXY_MAX_INVESTMENT,
     )

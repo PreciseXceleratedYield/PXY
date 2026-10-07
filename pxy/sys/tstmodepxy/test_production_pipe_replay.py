@@ -450,11 +450,11 @@ class ProductionPipeReplayTests(unittest.TestCase):
     def test_averaging_pipe_scenarios_consume_loss_and_position_dataframes(self):
         scenarios = pd.DataFrame(
             [
-                {"name": "CE loss triggers average", "side": "CE", "sell_price": 90.0, "max_layers": 5, "cooling": False, "expected": 2},
-                {"name": "PE loss triggers average", "side": "PE", "sell_price": 90.0, "max_layers": 5, "cooling": False, "expected": 2},
-                {"name": "profit does not average", "side": "CE", "sell_price": 105.0, "max_layers": 5, "cooling": False, "expected": 1},
-                {"name": "maximum layers blocks average", "side": "CE", "sell_price": 90.0, "max_layers": 1, "cooling": False, "expected": 1},
-                {"name": "cooldown blocks average", "side": "PE", "sell_price": 90.0, "max_layers": 5, "cooling": True, "expected": 1},
+                {"name": "aligned CE loss averages with losing PE open", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
+                {"name": "aligned PE loss averages with losing CE open", "side": "PE", "sell_price": 90.0, "signal": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
+                {"name": "profitable CE does not average", "side": "CE", "sell_price": 105.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": False},
+                {"name": "missing opposite position blocks averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": None, "expected_average": False},
+                {"name": "profitable opposite side blocks averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 110.0, "expected_average": False},
             ]
         )
         timezone = pytz.timezone("Asia/Kolkata")
@@ -484,12 +484,13 @@ class ProductionPipeReplayTests(unittest.TestCase):
                             "pxy_entry": 100.0,
                             "sell_prc": scenario["sell_price"],
                             "pnl": (scenario["sell_price"] - 100.0) * 75,
-                            "exit": "SIDE",
+                            "exit": scenario["signal"],
                             "atr": 5.0,
                         }
                     ]
                 )
-                if scenario["expected"] == 2:
+                has_opposite = pd.notna(scenario["opposite_sell_price"])
+                if has_opposite:
                     opposite_side = "PE" if scenario["side"] == "CE" else "CE"
                     opposite_symbol = f"NIFTY-WF-{opposite_side}"
                     broker.place_order(
@@ -510,9 +511,9 @@ class ProductionPipeReplayTests(unittest.TestCase):
                                         "buy_time": timestamp,
                                         "buy_prc": 100.0,
                                         "pxy_entry": 100.0,
-                                        "sell_prc": 110.0,
-                                        "pnl": 750.0,
-                                        "exit": "SIDE",
+                                        "sell_prc": scenario["opposite_sell_price"],
+                                        "pnl": (scenario["opposite_sell_price"] - 100.0) * 75,
+                                        "exit": scenario["signal"],
                                         "atr": 5.0,
                                     }
                                 ]
@@ -527,7 +528,6 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     engine.timestamp = timestamp
                     with (
                         patch.object(engine.avg_controller, "calculate_lgt", return_value=-5.0),
-                        patch.object(engine.averaging_orders, "MAX_LAYERS", scenario["max_layers"]),
                         patch.object(
                             engine.averaging_orders,
                             "is_cooling",
@@ -537,9 +537,11 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     ):
                         engine.avg_controller.handle_side_averaging(broker, active_orders)
 
-                expected_order_count = scenario["expected"] + int(scenario["expected"] == 2)
+                expected_order_count = 1 + int(has_opposite) + int(
+                    scenario["expected_average"]
+                )
                 self.assertEqual(len(broker.orders), expected_order_count)
-                if scenario["expected"] == 2:
+                if scenario["expected_average"]:
                     self.assertEqual(broker.orders[-1]["trdSym"], symbol)
 
     def test_squareoff_pipe_flattens_the_supplied_positions_dataframe(self):

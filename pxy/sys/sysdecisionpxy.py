@@ -154,11 +154,6 @@ def averaging_placement_allowed(ledger_is_busy):
     return not ledger_is_busy
 
 
-def scale_lgt_threshold(threshold, is_aligned, aligned_multiplier, not_aligned_multiplier):
-    multiplier = aligned_multiplier if is_aligned else not_aligned_multiplier
-    return threshold * multiplier
-
-
 def counter_leg_script(exit_state, positions, scripts):
     """Return the counter-leg script for a hostile one-sided position, else None."""
     state = str(exit_state).upper().strip()
@@ -198,29 +193,31 @@ def averaging_trigger_sides(
     pe_loss,
     ce_threshold,
     pe_threshold,
-    max_layers,
+    max_investment,
+    ce_next_investment=0.0,
+    pe_next_investment=0.0,
 ):
     """Return CE/PE averaging decisions using the placement pipe's exact gates.
-    
-    Average ONLY when in LOSS (not when profitable).
-    Trigger when loss exceeds the dynamic threshold.
-    Do not average the side with greater total investment than its opposite.
     """
+    both_sides_open_and_losing = (
+        ce_rows > 0 and pe_rows > 0 and ce_loss < 0 and pe_loss < 0
+    )
+    ce_within_cap = ce_investment + ce_next_investment <= max_investment
+    pe_within_cap = pe_investment + pe_next_investment <= max_investment
+
     return {
         "CE": bool(
-            ce_rows > 0
+            both_sides_open_and_losing
+            and ce_aligned
             and not ce_cooling
-            and ce_investment <= pe_investment
-            and ce_rows < max_layers
-            and ce_loss < 0  # ONLY when in LOSS
-            and ce_loss <= ce_threshold  # Loss exceeds threshold
+            and ce_within_cap
+            and ce_loss <= ce_threshold
         ),
         "PE": bool(
-            pe_rows > 0
+            both_sides_open_and_losing
+            and pe_aligned
             and not pe_cooling
-            and pe_investment <= ce_investment
-            and pe_rows < max_layers
-            and pe_loss < 0  # ONLY when in LOSS
-            and pe_loss <= pe_threshold  # Loss exceeds threshold
+            and pe_within_cap
+            and pe_loss <= pe_threshold
         ),
     }
