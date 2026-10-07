@@ -39,22 +39,22 @@ class MiddayRiskControlTests(unittest.TestCase):
             ("NO", None),
         )
 
-    def test_fixed_loss_and_target_thresholds_scale_by_active_row_count(self):
-        self.assertEqual(compute_stop(-400, 0, active_count=5), (0.0, -400.0, True))
-        self.assertEqual(compute_stop(-399, 0, active_count=5), (0.0, -400.0, False))
-        self.assertEqual(compute_stop(350, 0, active_count=5), (350.0, -400.0, False))
-        self.assertEqual(compute_stop(400, 0, active_count=5), (400.0, -400.0, True))
+    def test_fixed_loss_multiplies_and_target_divides_by_active_row_count(self):
+        self.assertEqual(compute_stop(-9999, 0, active_count=5), (0.0, -10000.0, False))
+        self.assertEqual(compute_stop(-10000, 0, active_count=5), (0.0, -10000.0, True))
+        self.assertEqual(compute_stop(350, 0, active_count=5), (350.0, -10000.0, False))
+        self.assertEqual(compute_stop(400, 0, active_count=5), (400.0, -10000.0, True))
 
     def test_peak_does_not_change_fixed_loss_or_target_thresholds(self):
         one_row = compute_stop(1200, 1500, active_count=1)
         five_rows = compute_stop(1200, 1500, active_count=5)
 
         self.assertEqual(one_row, (1500.0, -2000.0, False))
-        self.assertEqual(five_rows, (1500.0, -400.0, True))
+        self.assertEqual(five_rows, (1500.0, -10000.0, True))
 
     def test_positive_target_is_based_on_current_pnl_not_peak(self):
-        self.assertEqual(compute_stop(399, 0, active_count=5), (350.0, -400.0, False))
-        self.assertEqual(compute_stop(400, 0, active_count=5), (400.0, -400.0, True))
+        self.assertEqual(compute_stop(399, 0, active_count=5), (350.0, -10000.0, False))
+        self.assertEqual(compute_stop(400, 0, active_count=5), (400.0, -10000.0, True))
 
     def test_default_and_zero_active_rows_preserve_unscaled_thresholds(self):
         self.assertEqual(compute_stop(-2000, 0), (-0.0, -2000.0, True))

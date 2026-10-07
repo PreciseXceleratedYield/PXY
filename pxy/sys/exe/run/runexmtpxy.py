@@ -80,7 +80,8 @@ def compute_stop(current_game_pnl, historical_peak, active_count=1):
     """Returns (winners_peak_brick, active_trailing_exit, is_breached).
 
     PEAK preserves the original peak-following stop and peak-ceiling exit.
-    STATIC uses fixed loss/target thresholds scaled by active open rows.
+    STATIC multiplies the loss floor and divides the target ceiling by active
+    open rows.
     """
     # Negative game P&L must not floor downward into a false negative brick.
     completed_bricks = int(current_game_pnl // BRICK_SIZE) if current_game_pnl >= 0 else 0
@@ -97,8 +98,8 @@ def compute_stop(current_game_pnl, historical_peak, active_count=1):
         )
         return winners_peak_brick, unified_stop, is_breached
 
-    threshold_divisor = max(int(active_count), 1)
-    loss_exit = INITIAL_LOSS_FLOOR / threshold_divisor
-    target_exit = PEAK_CEILING / threshold_divisor
+    active_rows = max(int(active_count), 1)
+    loss_exit = INITIAL_LOSS_FLOOR * active_rows
+    target_exit = PEAK_CEILING / active_rows
     is_breached = current_game_pnl <= loss_exit or current_game_pnl >= target_exit
     return winners_peak_brick, loss_exit, is_breached

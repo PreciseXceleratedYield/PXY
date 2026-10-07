@@ -99,8 +99,8 @@ settings should resolve to `None` rather than retain an active schedule.
 - `RUNEXACPXY_RISK_MODE` selects between `"PEAK"` and `"STATIC"`; the default is
   `"STATIC"`. `"PEAK"` restores the original stop formula
   `−₹2,000 + (session peak × 2)` and exits when the peak reaches ₹2,000.
-  `"STATIC"` uses a fixed loss exit (−₹2,000) and profit target (+₹2,000),
-  each divided by active open order-tag row count.
+  `"STATIC"` multiplies the fixed loss exit (−₹2,000) by active open order-tag
+  row count and divides the profit target (+₹2,000) by that count.
 - Activation timing follows the risk mode: `"STATIC"` is active throughout the
   session with no 13:15 dependency, while `"PEAK"` preserves the original
   13:15 IST activation and fresh-baseline behavior.
@@ -109,9 +109,10 @@ settings should resolve to `None` rather than retain an active schedule.
   mode: `"NO"`/`None` for `"STATIC"` and `"YES"`/13:15 for `"PEAK"`.
 - At timed activation the ledger snapshots current portfolio P&L and resets
   peak/breach tracking.
-- In `"STATIC"` mode, the active-row divisor is recalculated every ledger tick;
-  CE and PE rows both count. With no active rows, the divisor is 1. In `"PEAK"`
-  mode, the original peak-based stop and unscaled peak-ceiling exit are used.
+- In `"STATIC"` mode, the active-row count is recalculated every ledger tick;
+  CE and PE rows both count. With no active rows, the count defaults to 1. In
+  `"PEAK"` mode, the original peak-based stop and unscaled peak-ceiling exit
+  are used.
 - The CHK suite exercises both risk modes, and SIM replays apply the selected
   mode to the simulated broker, including the configured breach confirmation
   count. These paths never send live orders.
