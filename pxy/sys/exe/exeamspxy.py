@@ -44,13 +44,15 @@ def _order_ok(resp):
 
 def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_val,
                                   ce_dynamic_threshold, pe_dynamic_threshold, ce_lots, pe_lots,
-                                  ce_aligned, pe_aligned):
+                                  ce_aligned, pe_aligned, ce_investment, pe_investment):
     """Executes network orders for System A when pullback boundaries are breached."""
     triggers = averaging_trigger_sides(
         ce_aligned=ce_aligned,
         pe_aligned=pe_aligned,
         ce_rows=len(ce_rows),
         pe_rows=len(pe_rows),
+        ce_investment=ce_investment,
+        pe_investment=pe_investment,
         ce_cooling=is_cooling("CE"),
         pe_cooling=is_cooling("PE"),
         ce_loss=ce_lgt_val,
@@ -61,6 +63,12 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
     )
 
     # 🟢 CALL OPTION (CE) SIDE LAYER GATEWAY
+    if ce_rows.shape[0] > 0 and ce_investment > pe_investment:
+        logger.info(
+            "CE averaging blocked: opposite PE investment %.2f is below CE investment %.2f.",
+            pe_investment,
+            ce_investment,
+        )
     if triggers["CE"]:
         ce_last_row = _newest_row(ce_rows)
         ce_symbol = ce_last_row['symbol']
@@ -91,6 +99,12 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
             logger.error(f"CE Native placement tracking error: {e}", exc_info=True)
 
     # 🔴 PUT OPTION (PE) SIDE LAYER GATEWAY
+    if pe_rows.shape[0] > 0 and pe_investment > ce_investment:
+        logger.info(
+            "PE averaging blocked: opposite CE investment %.2f is below PE investment %.2f.",
+            ce_investment,
+            pe_investment,
+        )
     if triggers["PE"]:
         pe_last_row = _newest_row(pe_rows)
         pe_symbol = pe_last_row['symbol']

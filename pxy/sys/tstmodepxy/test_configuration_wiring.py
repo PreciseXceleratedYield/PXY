@@ -39,6 +39,7 @@ from syscnfgpxy import (
 )
 from sysdtafpxy import apply_ohlc_transformation
 from sysdecisionpxy import scale_lgt_threshold
+from sysdecisionpxy import averaging_trigger_sides
 import syskatrpxy
 
 
@@ -228,6 +229,30 @@ class ConfigurationWiringTests(unittest.TestCase):
             ),
             -20.0,
         )
+
+    def test_averaging_is_blocked_when_opposite_side_has_less_investment(self):
+        shared = {
+            "ce_aligned": False, "pe_aligned": False,
+            "ce_rows": 1, "pe_rows": 1,
+            "ce_cooling": False, "pe_cooling": False,
+            "ce_loss": -10, "pe_loss": -10,
+            "ce_threshold": -5, "pe_threshold": -5,
+            "max_layers": 5,
+        }
+
+        ce_heavier = averaging_trigger_sides(
+            **shared, ce_investment=2000, pe_investment=1000
+        )
+        pe_heavier = averaging_trigger_sides(
+            **shared, ce_investment=1000, pe_investment=2000
+        )
+        equal_investment = averaging_trigger_sides(
+            **shared, ce_investment=1000, pe_investment=1000
+        )
+
+        self.assertEqual(ce_heavier, {"CE": False, "PE": True})
+        self.assertEqual(pe_heavier, {"CE": True, "PE": False})
+        self.assertEqual(equal_investment, {"CE": True, "PE": True})
 
     def test_renko_uses_configured_brick_size_by_default(self):
         frame = pd.DataFrame(

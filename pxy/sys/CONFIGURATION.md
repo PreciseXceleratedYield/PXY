@@ -143,6 +143,10 @@ settings should resolve to `None` rather than retain an active schedule.
 - `EXEAVXPXY_DEFAULT_ATR` is only the averaging fallback when the current row
   has no usable ATR. The averaging window switch and start/end bounds apply
   only to averaging placement, not to entry/exit pipes.
+- Averaging is blocked on a side when that side's total investment exceeds the
+  opposite side's total investment (`sum(qty × sell_prc)`). The lighter or
+  equally invested side still follows the existing LGT, loss, layer, and
+  cooldown gates.
 - LGT compares the current side loss with a negative ATR/investment/count
   threshold. `EXEAVXPXY_ALIGNED_LGT_MULTIPLIER` (default `0.5`) applies to
   aligned sides; `EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER` (default `2`) applies

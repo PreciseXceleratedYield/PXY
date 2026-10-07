@@ -190,6 +190,8 @@ def averaging_trigger_sides(
     pe_aligned,
     ce_rows,
     pe_rows,
+    ce_investment=0.0,
+    pe_investment=0.0,
     ce_cooling,
     pe_cooling,
     ce_loss,
@@ -202,12 +204,13 @@ def averaging_trigger_sides(
     
     Average ONLY when in LOSS (not when profitable).
     Trigger when loss exceeds the dynamic threshold.
-    Always average if threshold is hit (alignment only affects threshold tightness via exeavxpxy.py).
+    Do not average the side with greater total investment than its opposite.
     """
     return {
         "CE": bool(
             ce_rows > 0
             and not ce_cooling
+            and ce_investment <= pe_investment
             and ce_rows < max_layers
             and ce_loss < 0  # ONLY when in LOSS
             and ce_loss <= ce_threshold  # Loss exceeds threshold
@@ -215,6 +218,7 @@ def averaging_trigger_sides(
         "PE": bool(
             pe_rows > 0
             and not pe_cooling
+            and pe_investment <= ce_investment
             and pe_rows < max_layers
             and pe_loss < 0  # ONLY when in LOSS
             and pe_loss <= pe_threshold  # Loss exceeds threshold

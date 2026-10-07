@@ -200,4 +200,5 @@ def handle_side_averaging(client, df):
         ce_dynamic_threshold=ce_dynamic_threshold, pe_dynamic_threshold=pe_dynamic_threshold,
         ce_lots=ce_lots, pe_lots=pe_lots,
         ce_aligned=ce_aligned, pe_aligned=pe_aligned,
+        ce_investment=ce_investment, pe_investment=pe_investment,
     )

@@ -454,6 +454,37 @@ class ProductionPipeReplayTests(unittest.TestCase):
                         }
                     ]
                 )
+                if scenario["expected"] == 2:
+                    opposite_side = "PE" if scenario["side"] == "CE" else "CE"
+                    opposite_symbol = f"NIFTY-WF-{opposite_side}"
+                    broker.place_order(
+                        trading_symbol=opposite_symbol,
+                        transaction_type="B",
+                        quantity=75,
+                        tag="CHK-AVERAGE-OPPOSITE",
+                    )
+                    active_orders = pd.concat(
+                        [
+                            active_orders,
+                            pd.DataFrame(
+                                [
+                                    {
+                                        "symbol": opposite_symbol,
+                                        "qty": 75,
+                                        "tag": "CHK-AVERAGE-OPPOSITE",
+                                        "buy_time": timestamp,
+                                        "buy_prc": 100.0,
+                                        "pxy_entry": 100.0,
+                                        "sell_prc": 110.0,
+                                        "pnl": 750.0,
+                                        "exit": "SIDE",
+                                        "atr": 5.0,
+                                    }
+                                ]
+                            ),
+                        ],
+                        ignore_index=True,
+                    )
 
                 with ProductionPipeReplay(
                     SYS_DIR, broker, Path(temp) / "state"
@@ -471,7 +502,8 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     ):
                         engine.avg_controller.handle_side_averaging(broker, active_orders)
 
-                self.assertEqual(len(broker.orders), scenario["expected"])
+                expected_order_count = scenario["expected"] + int(scenario["expected"] == 2)
+                self.assertEqual(len(broker.orders), expected_order_count)
                 if scenario["expected"] == 2:
                     self.assertEqual(broker.orders[-1]["trdSym"], symbol)
 
