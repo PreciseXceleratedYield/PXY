@@ -34,7 +34,6 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSDTAFPXY_FIXED_BRICK_SIZE,
     SYSENTRPXY_SIGNAL_MODE,
-    EXETGTPXY_VARIANT,
     EXEAVXPXY_ALIGNED_LGT_MULTIPLIER,
     EXEAVXPXY_NOT_ALIGNED_LGT_MULTIPLIER,
 )
@@ -44,13 +43,9 @@ import syskatrpxy
 
 
 class ConfigurationWiringTests(unittest.TestCase):
-    def test_hex_is_default_target_variant(self):
-        self.assertEqual(EXETGTPXY_VARIANT, "HEX")
-        self.assertEqual(exeltgtpxy.TGT_VARIANT, "HEX")
-
-    def test_entry_router_defaults_to_configured_mkt_mode(self):
-        self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "MKT")
-        self.assertEqual(sysentrpxy.get_entry_signal.__defaults__[-1], "MKT")
+    def test_entry_router_defaults_to_configured_sts_mode(self):
+        self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "STS")
+        self.assertEqual(sysentrpxy.get_entry_signal.__defaults__[-1], "STS")
 
     def test_mkt_entry_router_bypasses_supertrend(self):
         frame = pd.DataFrame({"Close": [1]})
@@ -160,7 +155,6 @@ class ConfigurationWiringTests(unittest.TestCase):
 
         with (
             patch.object(exeltgtpxy, "TGT_MODE", "DYNAMIC"),
-            patch.object(exeltgtpxy, "TGT_VARIANT", "ORG"),
             patch.object(exeltgtpxy, "MIN_ATR_VALUE", 5.0),
             patch.object(exeltgtpxy, "MIN_TARGET_PCT", 1.4),
             patch.object(exeltgtpxy, "MAX_TARGET_CAP", 77.0),
@@ -176,101 +170,11 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(aligned_target, 1500.0)
         self.assertEqual(not_aligned_target, 1014.0)
 
-    def test_more_invested_side_uses_fixed_target_regardless_of_alignment_or_mode(self):
-        ce_aligned = {
-            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL", "atr": 5,
-        }
-        pe_aligned = {
-            "pxy_entry": 1000, "symbol": "NIFTYPE", "exit": "BEAR", "atr": 5,
-        }
-        with (
-            patch.object(exeltgtpxy, "TGT_MODE", "DYNAMIC"),
-            patch.object(exeltgtpxy, "TGT_VARIANT", "HEX"),
-            patch.object(exeltgtpxy, "MIN_ATR_VALUE", 5.0),
-            patch.object(exeltgtpxy, "MIN_TARGET_PCT", 1.4),
-            patch.object(exeltgtpxy, "MAX_TARGET_CAP", 77.0),
-            patch.object(exeltgtpxy, "STATIC_NOT_ALIGNED_PCT", 1.4),
-        ):
-            ce_more_dynamic = exeltgtpxy.target_price(
-                ce_aligned, ce_investment=200, pe_investment=100
-            )
-            pe_more_dynamic = exeltgtpxy.target_price(
-                pe_aligned, ce_investment=100, pe_investment=200
-            )
-            pe_less_dynamic = exeltgtpxy.target_price(
-                pe_aligned, ce_investment=200, pe_investment=100
-            )
-
-        self.assertEqual(ce_more_dynamic, 1014.0)
-        self.assertEqual(pe_more_dynamic, 1014.0)
-        self.assertGreater(pe_less_dynamic, 1014.0)
-
-        with (
-            patch.object(exeltgtpxy, "TGT_MODE", "STATIC"),
-            patch.object(exeltgtpxy, "TGT_VARIANT", "HEX"),
-            patch.object(exeltgtpxy, "MIN_ATR_VALUE", 5.0),
-            patch.object(exeltgtpxy, "MIN_TARGET_PCT", 1.4),
-            patch.object(exeltgtpxy, "MAX_TARGET_CAP", 77.0),
-            patch.object(exeltgtpxy, "STATIC_NOT_ALIGNED_PCT", 1.4),
-            patch.object(exeltgtpxy, "STATIC_ALIGNED_PCT", 99.0),
-        ):
-            ce_more_static = exeltgtpxy.target_price(
-                ce_aligned, ce_investment=200, pe_investment=100
-            )
-            equal_aligned_static = exeltgtpxy.target_price(
-                ce_aligned, ce_investment=100, pe_investment=100
-            )
-
-        self.assertEqual(ce_more_static, 1014.0)
-        self.assertEqual(equal_aligned_static, 1990.0)
-
-    def test_hex_variant_ignores_signal_for_imbalanced_investments(self):
-        ce_aligned = {
-            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL", "atr": 5,
-        }
-        ce_not_aligned = {**ce_aligned, "exit": "BEAR"}
-        pe_aligned = {
-            "pxy_entry": 1000, "symbol": "NIFTYPE", "exit": "BEAR", "atr": 5,
-        }
-        with (
-            patch.object(exeltgtpxy, "TGT_VARIANT", "HEX"),
-            patch.object(exeltgtpxy, "TGT_MODE", "DYNAMIC"),
-            patch.object(exeltgtpxy, "MIN_ATR_VALUE", 5.0),
-            patch.object(exeltgtpxy, "MIN_TARGET_PCT", 1.4),
-            patch.object(exeltgtpxy, "MAX_TARGET_CAP", 77.0),
-            patch.object(exeltgtpxy, "STATIC_NOT_ALIGNED_PCT", 1.4),
-            patch.object(exeltgtpxy, "STATIC_ALIGNED_PCT", 99.0),
-        ):
-            ce_heavy_aligned = exeltgtpxy.target_price(
-                ce_aligned, ce_investment=200, pe_investment=100,
-                ce_count=1, pe_count=5,
-            )
-            ce_heavy_not_aligned = exeltgtpxy.target_price(
-                ce_not_aligned, ce_investment=200, pe_investment=100,
-                ce_count=1, pe_count=5,
-            )
-            pe_light_aligned = exeltgtpxy.target_price(
-                pe_aligned, ce_investment=200, pe_investment=100,
-                ce_count=1, pe_count=5,
-            )
-
-        self.assertEqual(ce_heavy_aligned, 1014.0)
-        self.assertEqual(ce_heavy_not_aligned, 1014.0)
-        self.assertEqual(pe_light_aligned, 1990.0)
-
-        with patch.object(exeltgtpxy, "TGT_VARIANT", "HEX"):
-            pe_heavy_by_investment = exeltgtpxy.target_price(
-                pe_aligned, ce_investment=100, pe_investment=200,
-                ce_count=5, pe_count=1,
-            )
-        self.assertEqual(pe_heavy_by_investment, 1014.0)
-
-    def test_org_variant_preserves_original_alignment_target_rules(self):
+    def test_target_uses_original_alignment_rules(self):
         aligned = {
             "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL", "atr": 5,
         }
         with (
-            patch.object(exeltgtpxy, "TGT_VARIANT", "ORG"),
             patch.object(exeltgtpxy, "TGT_MODE", "DYNAMIC"),
             patch.object(exeltgtpxy, "MIN_ATR_VALUE", 5.0),
             patch.object(exeltgtpxy, "MIN_TARGET_PCT", 1.4),
@@ -281,6 +185,27 @@ class ConfigurationWiringTests(unittest.TestCase):
             )
 
         self.assertEqual(target, 1162.5)
+
+    def test_static_target_uses_alignment_not_investment_imbalance(self):
+        aligned = {
+            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL", "atr": 5,
+        }
+        not_aligned = {**aligned, "exit": "BEAR"}
+        with (
+            patch.object(exeltgtpxy, "TGT_MODE", "STATIC"),
+            patch.object(exeltgtpxy, "MIN_TARGET_PCT", 1.4),
+            patch.object(exeltgtpxy, "STATIC_NOT_ALIGNED_PCT", 1.4),
+            patch.object(exeltgtpxy, "STATIC_ALIGNED_PCT", 99.0),
+        ):
+            aligned_target = exeltgtpxy.target_price(
+                aligned, ce_investment=200, pe_investment=100
+            )
+            not_aligned_target = exeltgtpxy.target_price(
+                not_aligned, ce_investment=200, pe_investment=100
+            )
+
+        self.assertEqual(aligned_target, 1990.0)
+        self.assertEqual(not_aligned_target, 1014.0)
 
     def test_lgt_alignment_multipliers_match_requested_policy(self):
         self.assertEqual(EXEAVXPXY_ALIGNED_LGT_MULTIPLIER, 0.5)

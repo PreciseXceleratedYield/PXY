@@ -10,7 +10,6 @@ from syscnfgpxy import (
     EXETGTPXY_MODE,
     EXETGTPXY_STATIC_ALIGNED,
     EXETGTPXY_TGT_PCT_NOT_ALIGNED,
-    EXETGTPXY_VARIANT,
 )
 
 # ==================== CONFIG (this file's settings) ====================
@@ -19,7 +18,6 @@ MIN_TARGET_PCT = EXETGTPXY_MIN_TARGET_PCT
 MIN_ATR_VALUE = EXETGTPXY_MIN_ATR_VALUE
 MAX_TARGET_CAP = EXETGTPXY_MAX_TARGET_CAP
 TGT_MODE = EXETGTPXY_MODE  # "DYNAMIC" or "STATIC"
-TGT_VARIANT = EXETGTPXY_VARIANT  # "ORG" or "HEX"
 STATIC_ALIGNED_PCT = EXETGTPXY_STATIC_ALIGNED
 STATIC_NOT_ALIGNED_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
 # =======================================================================
@@ -185,19 +183,8 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
         is_aligned = (derived_supr == 'BULL' and is_ce) or (derived_supr == 'BEAR' and is_pe)
         ce_investment = f(ce_investment)
         pe_investment = f(pe_investment)
-        is_more_invested = (
-            ce_investment > pe_investment if is_ce
-            else pe_investment > ce_investment
-        )
-        
         # 3️⃣ Apply target formula based on trend status and execution mode
-        if TGT_VARIANT == "HEX" and ce_investment != pe_investment:
-            target_pct = (
-                STATIC_NOT_ALIGNED_PCT
-                if is_more_invested
-                else STATIC_ALIGNED_PCT
-            )
-        elif derived_supr == 'SIDE':
+        if derived_supr == 'SIDE':
             target_pct = STATIC_NOT_ALIGNED_PCT  # Flat 1.4% for both CE and PE in SIDE trend
         elif TGT_MODE == "STATIC":
             if is_aligned:
@@ -210,11 +197,7 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
 
         
         # 4️⃣ Final clamping to [1.4, 99] or [1.4, 77] depending on mode
-        max_cap = (
-            STATIC_ALIGNED_PCT
-            if TGT_MODE == "STATIC" or TGT_VARIANT == "HEX"
-            else MAX_TARGET_CAP
-        )
+        max_cap = STATIC_ALIGNED_PCT if TGT_MODE == "STATIC" else MAX_TARGET_CAP
         target_pct_clamped = max(MIN_TARGET_PCT, min(target_pct, max_cap))
         
         # 5️⃣ Calculate target price

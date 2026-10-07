@@ -69,10 +69,10 @@ restarted.
 
 ## Option strike selection
 
-`SYSENTRPXY_SIGNAL_MODE` selects the entry/exit signal router: `MKT` (default)
-copies market direction without Supertrend, while `STS` uses the
-Supertrend-aware matrix. This is independent of `SYSDTAFPXY_SELECTED_MODE`,
-which selects the OHLC data transformation supplied to the signal calculations.
+`SYSENTRPXY_SIGNAL_MODE` selects the entry/exit signal router: `STS` (default)
+uses the Supertrend-aware matrix, while `MKT` copies market direction without
+Supertrend. This is independent of `SYSDTAFPXY_SELECTED_MODE`, which selects
+the OHLC data transformation supplied to the signal calculations.
 
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
 builder for every buying script. It currently defaults to `ATM`, which ignores
@@ -150,15 +150,9 @@ settings should resolve to `None` rather than retain an active schedule.
   its magnitude while non-aligned sides use twice its magnitude. The dashboard
   displays the same scaled threshold used for placement; the current RUN loss
   remains unscaled.
-- `EXETGTPXY_VARIANT` selects the target policy and defaults to `HEX`.
-  `HEX` compares total CE and PE investment (not open-row counts) and ignores
-  signal alignment when the totals differ: the higher-invested side targets
-  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`), and the lower-invested
-  side targets `EXETGTPXY_STATIC_ALIGNED` (default `99%`).
-  Equal investment falls back to the original alignment-based rules.
-  `ORG` restores the original alignment-based behavior for both `DYNAMIC`
-  (aligned mirrored LGT base plus ATR, capped by `EXETGTPXY_MAX_TARGET_CAP`)
-  and `STATIC` (aligned `99%`, non-aligned `1.4%`) target modes.
+- TGT follows its original alignment-based behavior: `DYNAMIC` uses the
+  aligned mirrored LGT base plus ATR, capped by `EXETGTPXY_MAX_TARGET_CAP`;
+  `STATIC` uses `99%` when aligned and `1.4%` when not aligned.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.
