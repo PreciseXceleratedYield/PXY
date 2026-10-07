@@ -145,20 +145,36 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(exeltgtpxy.calculate_tgt(False), 1.4)
 
         aligned_ce = {
-            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL", "atr": 500,
+            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL",
+            "supertrend": "BULL", "atr": 500,
         }
         aligned_pe = {
-            "pxy_entry": 1000, "symbol": "NIFTYPE", "exit": "BEAR", "atr": 0,
+            "pxy_entry": 1000, "symbol": "NIFTYPE", "exit": "BEAR",
+            "supertrend": "BEAR", "atr": 0,
         }
         non_aligned_ce = {**aligned_ce, "exit": "BEAR"}
         side_ce = {**aligned_ce, "exit": "SIDE"}
         side_pe = {**aligned_pe, "exit": "SIDE"}
+        supertrend_side_with_directional_exit = {
+            **aligned_ce, "supertrend": "SIDE",
+        }
+        router_signals_disagree = {**aligned_ce, "exit": "BEAR"}
+        neutral_supertrend_ignores_bull_exit = {
+            **aligned_ce, "supertrend": "SIDE",
+        }
+        neutral_supertrend_ignores_bear_exit = {
+            **aligned_pe, "supertrend": "SIDE",
+        }
 
         self.assertEqual(exeltgtpxy.target_price(aligned_ce), 1770.0)
         self.assertEqual(exeltgtpxy.target_price(aligned_pe), 1770.0)
         self.assertEqual(exeltgtpxy.target_price(non_aligned_ce), 1014.0)
         self.assertEqual(exeltgtpxy.target_price(side_ce), 1014.0)
         self.assertEqual(exeltgtpxy.target_price(side_pe), 1014.0)
+        self.assertEqual(exeltgtpxy.target_price(supertrend_side_with_directional_exit), 1014.0)
+        self.assertEqual(exeltgtpxy.target_price(router_signals_disagree), 1014.0)
+        self.assertEqual(exeltgtpxy.target_price(neutral_supertrend_ignores_bull_exit), 1014.0)
+        self.assertEqual(exeltgtpxy.target_price(neutral_supertrend_ignores_bear_exit), 1014.0)
 
     def test_lgt_uses_base_fourteen_piecewise_investment_ratio(self):
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -0.88)

@@ -142,12 +142,15 @@ settings should resolve to `None` rather than retain an active schedule.
 - `SYSPLCHRTPXY_*` are consumed by the separate chart generator, not the
   production signal path. `SYSDTSTPXY_*` and `SYSRIGPXY_*` belong to standalone
   modules with no caller in the production launch graph.
-- TGT has one positive-percentage policy: aligned sides target
-  `EXETGTPXY_ALIGNED_PCT` (default `77%`); non-aligned sides target
-  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). A neutral `SIDE`
-  Supertrend state is non-aligned, so either option side uses `1.4%`
-  regardless of directional signal. TGT no longer depends on ATR, investment
-  ratio, layer count, or a DYNAMIC/STATIC mode.
+- TGT reads both `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and
+  `EXETGTPXY_SUPERTREND_KEY_COLUMN` (`supertrend`), regardless of the
+  `SYSENTRPXY_SIGNAL_MODE` router. Unless Supertrend is `SIDE`, a side receives
+  `EXETGTPXY_ALIGNED_PCT` (default `77%`) when `exit` aligns (`CE` with `BULL`,
+  or `PE` with `BEAR`); a non-aligned exit gets
+  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Supertrend `SIDE` overrides
+  the exit signal and forces the flat `1.4%` target for both option sides.
+  TGT no longer depends on ATR, investment ratio, layer count, or a
+  DYNAMIC/STATIC mode.
 - The averaging window switch and start/end bounds apply only to averaging
   placement, not to entry/exit pipes.
 - Averaging uses one policy with no layer-count mode: the projected side
