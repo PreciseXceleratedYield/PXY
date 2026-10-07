@@ -62,7 +62,7 @@ def print_telemetry_dashboard(p):
         return
     P_WIDTH = 36
     print("\n" + Fore.CYAN + "=" * P_WIDTH)
-    print(Fore.CYAN + " OPT  LOT   LGT   RUN  TGT%      PNL")
+    print(Fore.CYAN + " OPT  LOT   LGT   RUN  TGT      PNL")
     print(Fore.CYAN + "-" * P_WIDTH)
 
     for side in ("ce", "pe"):

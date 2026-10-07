@@ -192,11 +192,11 @@ def _tick(client, open_df, closed_df):
 
     current_game_pnl = total_raw_pnl - pnl_offset
     winners_peak_brick, active_trailing_exit, is_breached = compute_stop(
-        current_game_pnl, historical_peak_record, totals["open_rows"])
+        current_game_pnl, historical_peak_record, totals["imbalance_factor"])
     active_target_exit = (
         PEAK_CEILING
         if RUNEXACPXY_RISK_MODE == "PEAK"
-        else PEAK_CEILING / max(totals["open_rows"], 1)
+        else PEAK_CEILING / totals["imbalance_factor"]
     )
 
     # 6. Telemetry (3-line format)

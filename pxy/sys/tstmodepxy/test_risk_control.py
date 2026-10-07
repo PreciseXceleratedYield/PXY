@@ -5,6 +5,8 @@ from datetime import time
 from pathlib import Path
 from unittest.mock import patch
 
+import pandas as pd
+
 SYS_DIR = Path(__file__).resolve().parents[1]
 if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
@@ -13,7 +15,7 @@ RUN_DIR = SYS_DIR / "exe" / "run"
 if str(RUN_DIR) not in sys.path:
     sys.path.insert(0, str(RUN_DIR))
 
-from runexmtpxy import compute_stop, midday_risk_activation_due
+from runexmtpxy import compute_stop, compute_totals, midday_risk_activation_due
 from syscnfgpxy import (
     RUNEXACPXY_CNTRLRSKBAR,
     RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
@@ -39,28 +41,48 @@ class MiddayRiskControlTests(unittest.TestCase):
             ("NO", None),
         )
 
-    def test_fixed_loss_multiplies_and_target_divides_by_active_row_count(self):
-        self.assertEqual(compute_stop(-9999, 0, active_count=5), (0.0, -10000.0, False))
-        self.assertEqual(compute_stop(-10000, 0, active_count=5), (0.0, -10000.0, True))
-        self.assertEqual(compute_stop(350, 0, active_count=5), (350.0, -10000.0, False))
-        self.assertEqual(compute_stop(400, 0, active_count=5), (400.0, -10000.0, True))
+    def test_static_risk_uses_side_imbalance_factor_for_loss_and_target(self):
+        self.assertEqual(compute_stop(-3999, 0, imbalance_factor=2), (0.0, -4000.0, False))
+        self.assertEqual(compute_stop(-4000, 0, imbalance_factor=2), (0.0, -4000.0, True))
+        self.assertEqual(compute_stop(350, 0, imbalance_factor=2), (350.0, -4000.0, False))
+        self.assertEqual(compute_stop(1000, 0, imbalance_factor=2), (1000.0, -4000.0, True))
 
-    def test_peak_does_not_change_fixed_loss_or_target_thresholds(self):
-        one_row = compute_stop(1200, 1500, active_count=1)
-        five_rows = compute_stop(1200, 1500, active_count=5)
+    def test_risk_factor_is_absolute_ce_pe_row_difference_with_equal_sides_unscaled(self):
+        balanced = compute_totals(
+            pd.DataFrame([{"Symbol": "NIFTY-CE"}, {"Symbol": "NIFTY-PE"}]),
+            pd.DataFrame(),
+        )
+        imbalanced = compute_totals(
+            pd.DataFrame([
+                {"Symbol": "NIFTY-CE"},
+                {"Symbol": "NIFTY-CE"},
+                {"Symbol": "NIFTY-CE"},
+                {"Symbol": "NIFTY-PE"},
+            ]),
+            pd.DataFrame(),
+        )
+
+        self.assertEqual((balanced["ce_rows"], balanced["pe_rows"]), (1, 1))
+        self.assertEqual(balanced["imbalance_factor"], 1)
+        self.assertEqual((imbalanced["ce_rows"], imbalanced["pe_rows"]), (3, 1))
+        self.assertEqual(imbalanced["imbalance_factor"], 2)
+
+    def test_peak_does_not_change_static_thresholds(self):
+        one_row = compute_stop(1200, 1500, imbalance_factor=1)
+        five_rows = compute_stop(1200, 1500, imbalance_factor=5)
 
         self.assertEqual(one_row, (1500.0, -2000.0, False))
         self.assertEqual(five_rows, (1500.0, -10000.0, True))
 
     def test_positive_target_is_based_on_current_pnl_not_peak(self):
-        self.assertEqual(compute_stop(399, 0, active_count=5), (350.0, -10000.0, False))
-        self.assertEqual(compute_stop(400, 0, active_count=5), (400.0, -10000.0, True))
+        self.assertEqual(compute_stop(399, 0, imbalance_factor=2), (350.0, -4000.0, False))
+        self.assertEqual(compute_stop(400, 0, imbalance_factor=2), (400.0, -4000.0, False))
 
-    def test_default_and_zero_active_rows_preserve_unscaled_thresholds(self):
+    def test_default_and_zero_factor_preserve_unscaled_thresholds(self):
         self.assertEqual(compute_stop(-2000, 0), (-0.0, -2000.0, True))
         self.assertEqual(
-            compute_stop(-2000, 0, active_count=0),
-            compute_stop(-2000, 0, active_count=1),
+            compute_stop(-2000, 0, imbalance_factor=0),
+            compute_stop(-2000, 0, imbalance_factor=1),
         )
 
     def test_peak_mode_restores_original_peak_trailing_stop(self):

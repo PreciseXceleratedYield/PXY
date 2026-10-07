@@ -61,6 +61,14 @@ def compute_totals(open_df, closed_df):
 
     win_open = df_open[df_open["BUY_PRC"] < df_open["SELL_PRC"]]
     win_closed = df_closed[df_closed["BUY_PRC"] < df_closed["SELL_PRC"]]
+    symbols = (
+        df_open.get("SYMBOL", pd.Series("", index=df_open.index))
+        .astype(str)
+        .str.upper()
+    )
+    ce_rows = int(symbols.str.endswith("CE").sum())
+    pe_rows = int(symbols.str.endswith("PE").sum())
+    imbalance_factor = max(abs(ce_rows - pe_rows), 1)
 
     total = float(df_open["PNL"].sum() + df_closed["PNL"].sum())
     winners = float(win_open["PNL"].sum() + win_closed["PNL"].sum())
@@ -69,6 +77,9 @@ def compute_totals(open_df, closed_df):
         "winners": winners,
         "losers": total - winners,
         "open_rows": len(df_open),
+        "ce_rows": ce_rows,
+        "pe_rows": pe_rows,
+        "imbalance_factor": imbalance_factor,
     }
 
 
@@ -76,12 +87,12 @@ def force_zero_ending(val):
     return int(round(val / 10.0) * 10)
 
 
-def compute_stop(current_game_pnl, historical_peak, active_count=1):
+def compute_stop(current_game_pnl, historical_peak, imbalance_factor=1):
     """Returns (winners_peak_brick, active_trailing_exit, is_breached).
 
     PEAK preserves the original peak-following stop and peak-ceiling exit.
-    STATIC multiplies the loss floor and divides the target ceiling by active
-    open rows.
+    STATIC multiplies the loss floor and divides the target ceiling by the
+    absolute difference between active CE and PE open rows, defaulting to one.
     """
     # Negative game P&L must not floor downward into a false negative brick.
     completed_bricks = int(current_game_pnl // BRICK_SIZE) if current_game_pnl >= 0 else 0
@@ -98,8 +109,8 @@ def compute_stop(current_game_pnl, historical_peak, active_count=1):
         )
         return winners_peak_brick, unified_stop, is_breached
 
-    active_rows = max(int(active_count), 1)
-    loss_exit = INITIAL_LOSS_FLOOR * active_rows
-    target_exit = PEAK_CEILING / active_rows
+    factor = max(int(imbalance_factor), 1)
+    loss_exit = INITIAL_LOSS_FLOOR * factor
+    target_exit = PEAK_CEILING / factor
     is_breached = current_game_pnl <= loss_exit or current_game_pnl >= target_exit
     return winners_peak_brick, loss_exit, is_breached

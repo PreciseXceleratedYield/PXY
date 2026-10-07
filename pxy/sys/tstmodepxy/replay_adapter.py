@@ -264,12 +264,12 @@ class ProductionPipeReplay:
         self.risk_peak, stop_line, breached = self.risk_math.compute_stop(
             game_pnl,
             self.risk_peak,
-            totals["open_rows"],
+            totals["imbalance_factor"],
         )
         target_line = (
             self.risk_math.PEAK_CEILING
             if RUNEXACPXY_RISK_MODE == "PEAK"
-            else self.risk_math.PEAK_CEILING / max(totals["open_rows"], 1)
+            else self.risk_math.PEAK_CEILING / totals["imbalance_factor"]
         )
         risk_enabled = (
             not RUNEXACPXY_CNTRLRSKBAR

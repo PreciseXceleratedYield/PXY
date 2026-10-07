@@ -55,7 +55,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             re.sub(r"\x1b\[[0-9;]*m", "", line)
             for line in output.getvalue().splitlines()
         ]
-        self.assertTrue(any("RUN  TGT%" in line for line in lines))
+        self.assertTrue(any("RUN  TGT" in line for line in lines))
         ce_row = next(line for line in lines if line.strip().startswith("CE"))
         self.assertEqual(ce_row.split(), ["CE", "1", "-10", "2", "15", "183"])
 
