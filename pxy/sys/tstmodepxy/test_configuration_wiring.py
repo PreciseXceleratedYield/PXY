@@ -381,9 +381,9 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertFalse(ce_aligned)
         self.assertTrue(pe_aligned)
 
-    def test_lgt_uses_base_twenty_and_reduces_lesser_side_by_three(self):
+    def test_lgt_uses_base_twenty_and_reduces_lesser_side_by_two_point_eight(self):
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -1.4)
-        self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 4000.0, is_ce=True), -2.0)
+        self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 4000.0, is_ce=True), -2.2)
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True), -20.0)
         self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 1000.0, is_ce=True), -77.0)
         self.assertEqual(exeltgtpxy.calculate_lgt(3000.0, 1000.0, is_ce=True), -77.0)

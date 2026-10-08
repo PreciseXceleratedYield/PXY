@@ -47,7 +47,7 @@ def calculate_lgt(ce_investment, pe_investment, is_ce):
         factor = ratio**2
         magnitude = max(
             EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
-            round(20.0 * factor - 3.0, 2),
+            round(20.0 * factor - 2.8, 2),
         )
     else:
         exponent = ratio * math.log(ratio)
