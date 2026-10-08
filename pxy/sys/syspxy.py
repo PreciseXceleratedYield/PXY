@@ -58,7 +58,7 @@ def get_all_data():
     core = get_full_snapshot() or {}
 
     # -------- RUN TREND CHART GENERATION FROM THE SAME SNAPSHOT --------
-    export_supertrend_json(core.get("df"))
+    export_supertrend_json(core.get("chart_df", core.get("df")))
 
     # -------- DYNAMIC PRICE LOGIC (FUT AVERAGE OR FALLBACK) --------
     try:

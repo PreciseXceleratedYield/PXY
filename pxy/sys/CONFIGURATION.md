@@ -25,6 +25,13 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   `SYSSTRNDPXY_ST1_ATR_VALUE` (default `5`) and `SYSSTRNDPXY_ST1_FACTOR`
   (default `1.4`); no ATR period or variant selector is used. This is
   independent of the dashboard's dynamic ATR calculation.
+- `SYSSMAPXY_VARIANT` selects the production 50-period average used by
+  `syssmapxy.get_sma()` and defaults to `TSMA`, the rolling linear-regression
+  endpoint; `SMA` preserves the simple-moving-average behavior. The web chart
+  provides its own SMA/TSMA selector and defaults to TSMA. Chart history fetches
+  `SYSSTRNDPXY_CHART_TARGET_ROWS` (110) candles so its 60 visible bars include
+  the 50-bar warm-up required for complete moving-average lines; signal
+  calculations continue using `SYSDTAFPXY_DEFAULT_TARGET_ROWS` (60).
 - `EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS` makes the signal router return
   `NONE` for both entry and exit signals for 120 seconds after a square-off
   order is accepted; the risk-ledger liquidation path starts the same
@@ -42,7 +49,7 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 | Area (owner prefixes) | Responsibility |
 | --- | --- |
 | `SYSCNFGPXY`, `SYSMODEPXY`, `SYSEXEPXY`, `EXEPXYPXY` | Shared defaults, run-mode validation, supervisor and engine scheduling |
-| `SYSDTAFPXY`, `SYSPLCHRTPXY`, `SYSSTRNDPXY`, `SYSDTSTPXY`, `SYSSADXPXY`, `SYSMKTPXY`, `SYSRIGPXY`, `SYSKATRPXY`, `SYSPWERPXY`, `SYSDPTPXY` | Data acquisition and signal/indicator parameters, including the directional force factors |
+| `SYSDTAFPXY`, `SYSPLCHRTPXY`, `SYSSTRNDPXY`, `SYSSMAPXY`, `SYSDTSTPXY`, `SYSSADXPXY`, `SYSMKTPXY`, `SYSRIGPXY`, `SYSKATRPXY`, `SYSPWERPXY`, `SYSDPTPXY` | Data acquisition and signal/indicator parameters, including the directional force factors |
 | `EXEAGTPXY`, `EXEACGPXY`, `EXEAMSPXY`, `EXEAVXPXY`, `EXEAVGPXY`, `EXEENTRPXY` | Entry thresholds, averaging window/limits, average-order payload, and entry pipeline |
 | `EXEFORCEPXY`, `EXESLPXY`, `EXECBUYPXY`, `EXEEXITPXY`, `EXESQRPXY`, `EXEOMSPXY`, `EXEDYNPXY`, `EXETGTPXY`, `EXEOTMPXY` | Force/stop/counter orders, exit and square-off behavior, targets, and symbol selection |
 | `RUNNIFTYPXY`, `RUNEXMTPXY`, `RUNEXACPXY`, `RUNEXIOPXY`, `RUNEXLQDPXY`, `RUNLILOPXY` | Symbol selection, risk-ledger mathematics/actions/state/liquidation, and order-ledger filtering |
@@ -172,12 +179,13 @@ settings should resolve to `None` rather than retain an active schedule.
   the heavier side only; it does not scale the target percentage. In `DIRGT`
   mode, averaging eligibility also uses `direction` for the lighter side;
   the heavier side and `RGLR` mode retain the existing `exit`-based averaging
-  alignment. Independently, averaging CE is allowed only when the SMA-50 status
-  is `BULL` (north, price at/above SMA-50), and PE only when it is `BEAR`
-  (south, price below SMA-50); missing/unknown SMA status blocks both sides.
-  The SMA status is passed through `syspxy.get_all_data()` from the core
-  snapshot's `sma` field. The trend chart JSON also carries the rolling SMA-50
-  as `sma50` for the web chart. For counter-buy in `DIRGT`, `UP` can immediately trigger the
+  alignment. Independently, averaging CE is allowed only when the selected
+  50-period moving-average status is `BULL` (north, price at/above the
+  average), and PE only when it is `BEAR` (south, price below it);
+  missing/unknown status blocks both sides. The status is passed through
+  `syspxy.get_all_data()` from the core snapshot's legacy `sma` field. The
+  trend chart JSON carries both rolling variants as `sma50` and `tsma50`.
+  For counter-buy in `DIRGT`, `UP` can immediately trigger the
   missing CE leg when CE has no open rows and PE has more than one; `DOWN`
   can similarly trigger the missing PE leg when PE has no open rows and CE
   has more than one. Otherwise the existing entry-signal counter-buy rule

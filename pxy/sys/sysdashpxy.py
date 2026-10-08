@@ -6,6 +6,7 @@ init(autoreset=True)
 
 # ---- Pure Production Naming Alignment Imports ----
 from sysdtafpxy import fetch_yf_data
+from syscnfgpxy import SYSDTAFPXY_DEFAULT_TARGET_ROWS, SYSSTRNDPXY_CHART_TARGET_ROWS
 from sysdthapxy import get_pxy_data
 from sysdptpxy import detect_pxy_flip_signal
 from syskatrpxy import calculate_atr, calculate_dynamic_k
@@ -41,10 +42,11 @@ def run_pyc_file():
 # ================= CORE SNAPSHOT FUNCTION =================
 def get_full_snapshot():
     result = {}
-    master_df = fetch_yf_data()
-    if master_df is None or master_df.empty:
+    chart_source_df = fetch_yf_data(target_rows=SYSSTRNDPXY_CHART_TARGET_ROWS)
+    if chart_source_df is None or chart_source_df.empty:
         return None
 
+    master_df = chart_source_df.tail(SYSDTAFPXY_DEFAULT_TARGET_ROWS).copy()
     result["market_data_available"] = not master_df.attrs.get("data_fallback", False)
         
     # Enforce strict single source of truth across downstream layout components
@@ -91,11 +93,13 @@ def get_full_snapshot():
 
     # ===== SUPERTREND PROFILES =====
     processed_st_df = calculate_supertrend(master_df.copy())
+    chart_df = calculate_supertrend(chart_source_df.copy())
     trend = processed_st_df['ST_Trend'].iloc[-1] if not processed_st_df.empty else "NONE"
     line_val = safe_int(processed_st_df['ST'].iloc[-1] if not processed_st_df.empty else 0)
     result["supertrend"] = trend
     result["super_line"] = line_val
     result["df"] = processed_st_df
+    result["chart_df"] = chart_df
 
     # ===== DIRECTIONAL POWER MATRIX =====
     direction_power, ce, pe = get_ce_pe_power(df=master_df)
