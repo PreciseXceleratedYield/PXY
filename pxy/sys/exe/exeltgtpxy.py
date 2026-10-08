@@ -6,6 +6,7 @@ import re
 from colorama import Fore, Style, init
 from syscnfgpxy import (
     EXEAMSPXY_MAX_LGT_LOSS,
+    EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
     EXETGTPXY_ALIGNED_PCT,
     EXETGTPXY_EXIT_KEY_COLUMN,
     EXETGTPXY_MODE,
@@ -44,15 +45,19 @@ def calculate_lgt(ce_investment, pe_investment, is_ce):
     )
     if ratio < 1.0:
         factor = ratio**2
+        magnitude = max(
+            EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
+            round(20.0 * factor - 3.0, 2),
+        )
     else:
         exponent = ratio * math.log(ratio)
-        max_factor = EXEAMSPXY_MAX_LGT_LOSS / 14.0
+        max_factor = EXEAMSPXY_MAX_LGT_LOSS / 20.0
         factor = (
             math.exp(exponent)
             if exponent < math.log(max_factor)
             else max_factor
         )
-    magnitude = min(round(14.0 * factor, 2), EXEAMSPXY_MAX_LGT_LOSS)
+        magnitude = min(round(20.0 * factor, 2), EXEAMSPXY_MAX_LGT_LOSS)
     return -magnitude
 
 

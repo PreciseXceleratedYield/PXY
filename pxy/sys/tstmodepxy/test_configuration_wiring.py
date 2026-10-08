@@ -381,11 +381,11 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertFalse(ce_aligned)
         self.assertTrue(pe_aligned)
 
-    def test_lgt_uses_base_fourteen_piecewise_investment_ratio(self):
-        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -0.88)
-        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 2000.0, is_ce=True), -3.5)
-        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True), -14.0)
-        self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 1000.0, is_ce=True), -56.0)
+    def test_lgt_uses_base_twenty_and_reduces_lesser_side_by_three(self):
+        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -1.4)
+        self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 4000.0, is_ce=True), -2.0)
+        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True), -20.0)
+        self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 1000.0, is_ce=True), -77.0)
         self.assertEqual(exeltgtpxy.calculate_lgt(3000.0, 1000.0, is_ce=True), -77.0)
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=False), -77.0)
 

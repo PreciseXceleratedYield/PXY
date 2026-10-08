@@ -187,7 +187,8 @@ settings should resolve to `None` rather than retain an active schedule.
   losing at or beyond its LGT threshold; no alignment multiplier is applied.
 - LGT is calculated from positive investment values, then negated:
   `r = own investment / opposite investment`;
-  `magnitude = 14 × r²` when `r < 1`, otherwise `14 × r^r`;
+  `magnitude = max(1.4, round(20 × r² − 3, 2))` when `r < 1`, otherwise
+  `20 × r^r`;
   `LGT = -min(round(magnitude, 2), EXEAMSPXY_MAX_LGT_LOSS)`.
   If either side has no positive investment, `r` defaults to `1`.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
