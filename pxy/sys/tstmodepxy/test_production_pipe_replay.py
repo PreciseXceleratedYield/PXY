@@ -543,9 +543,9 @@ class ProductionPipeReplayTests(unittest.TestCase):
             [
                 {"name": "aligned CE loss averages with losing PE open", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
                 {"name": "aligned PE loss averages with losing CE open", "side": "PE", "sell_price": 90.0, "signal": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
-                {"name": "counter-trend CE below doubled loss threshold", "side": "CE", "sell_price": 95.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": False},
-                {"name": "counter-trend CE reaches doubled loss threshold", "side": "CE", "sell_price": 89.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
-                {"name": "counter-trend PE below doubled loss threshold", "side": "PE", "sell_price": 95.0, "signal": "BEAR", "sma": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": False},
+                {"name": "CE averages at LGT regardless of bearish average", "side": "CE", "sell_price": 95.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
+                {"name": "CE averaging remains eligible beyond LGT", "side": "CE", "sell_price": 89.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
+                {"name": "PE averages at LGT regardless of bullish average", "side": "PE", "sell_price": 95.0, "signal": "BEAR", "sma": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
                 {"name": "profitable CE does not average", "side": "CE", "sell_price": 105.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": False},
                 {"name": "missing opposite position blocks averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": None, "expected_average": False},
                 {"name": "profitable opposite side blocks averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 110.0, "expected_average": False},

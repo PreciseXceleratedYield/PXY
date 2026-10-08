@@ -98,7 +98,7 @@ restarted.
 
 `SYSENTRPXY_SIGNAL_MODE` selects the entry and exit signal source. `MKT` uses
 raw market direction all session (`UP` → `BUY`/`BULL`, `DOWN` →
-`SELL`/`BEAR`); neutral direction returns `NONE` for both. `MKT` is the default.
+`SELL`/`BEAR`); neutral direction returns `NONE` for both.
 `STS`
 preserves the current Supertrend policy: from `SYSENTRPXY_DIRECTION_ONLY_START`
 (09:00 IST) until `SYSENTRPXY_DIRECTION_ONLY_END` (09:30 IST), both signals
@@ -119,11 +119,10 @@ Friday (currently 200, 150, 100, 50, 0 points). Dynamic selection fails closed
 on weekends when no weekday distance is defined. The symbol builder rounds the
 result to the configured strike step.
 
-`EXECBUYPXY_ENTRY_KEY_COLUMN` selects the signal used by the counter-buy/re-buy
-check; it defaults to `"entry"` and consumes `BUY`/`SELL` entry signals. A
-`BUY` signal with only PE held can trigger the CE counter-leg, while a `SELL`
-signal with only CE held can trigger the PE counter-leg. BULL/BEAR exit signals
-do not trigger this rule.
+The counter-buy/re-buy check consumes `BULL`/`BEAR` exit signals only.
+A `BULL` exit with only PE held can trigger the CE counter-leg, while a `BEAR`
+exit with only CE held can trigger the PE counter-leg. Entry signals and market
+direction do not affect counter-buy decisions.
 
 ## Web server file access
 
@@ -177,43 +176,21 @@ settings should resolve to `None` rather than retain an active schedule.
 - `SYSPLCHRTPXY_*` are consumed by the separate chart generator, not the
   production signal path. `SYSDTSTPXY_*` and `SYSRIGPXY_*` belong to standalone
   modules with no caller in the production launch graph.
-- TGT uses `EXETGTPXY_MODE` (`RGLR` or `DIRGT`, default `DIRGT`) together with
-  `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and
-  `EXETGTPXY_SUPERTREND_KEY_COLUMN` (`supertrend`). In `RGLR`, all positions
-  use `exit` for alignment. In `DIRGT`, the heavier open side uses market
-  `direction` (`CE` with `UP`, `PE` with `DOWN`), while the lighter side still
-  uses `exit`; ties or unavailable directions fall back to `exit`. Exposure is
-  open quantity × current sell price. Unless Supertrend is `SIDE`, aligned
-  positions receive `EXETGTPXY_ALIGNED_PCT` (default `77%`) and non-aligned
-  positions receive `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Supertrend
-  `SIDE` forces the `1.4%` target except for the lighter side in `DIRGT`, which
-  continues to select its target from `exit`. Investment exposure selects
-  the heavier side only; it does not scale the target percentage. In `DIRGT`
-  mode, averaging eligibility also uses `direction` for the lighter side;
-  the heavier side and `RGLR` mode retain the existing `exit`-based averaging
-  alignment. The selected 50-period moving average no longer blocks a
-  counter-trend side outright: CE averages against a `BEAR` average and PE
-  against a `BULL` average only after reaching
-  `EXEAVXPXY_COUNTER_TREND_LOSS_MULTIPLIER` (default `2`) times the normal
-  dynamic LGT loss threshold. The normal LGT threshold remains capped by
-  `EXEAMSPXY_MAX_LGT_LOSS`; the multiplier is applied after that cap. Unknown
-  moving-average status still blocks averaging. The status is passed through
-  `syspxy.get_all_data()` from the core snapshot's legacy `sma` field, which
-  reports the selected variant (TSMA by default). The trend chart JSON carries
-  both rolling variants as `sma50` and `tsma50`.
-  For counter-buy in `DIRGT`, `UP` can immediately trigger the
-  missing CE leg when CE has no open rows and PE has more than one; `DOWN`
-  can similarly trigger the missing PE leg when PE has no open rows and CE
-  has more than one. Otherwise the existing entry-signal counter-buy rule
-  applies.
+- TGT uses only `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and the option side for
+  alignment; direction, investment balance, Supertrend, and moving-average
+  values do not affect the target. Aligned positions receive
+  `EXETGTPXY_ALIGNED_PCT` (default `77%`) and non-aligned positions receive
+  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Averaging alignment also
+  uses only `exit`; TSMA/SMA has no effect on averaging eligibility or LGT.
+  The trend chart independently carries both moving-average variants as
+  `sma50` and `tsma50`.
 - The averaging window switch and start/end bounds apply only to averaging
   placement, not to entry/exit pipes.
 - Averaging uses one policy with no layer-count mode: the projected side
   investment (`sum(qty × sell_prc)` plus the next lot at its current
   `sell_prc`) must not exceed `EXEAMSPXY_MAX_INVESTMENT` (default `25000`).
   The normal LGT loss threshold is capped at `EXEAMSPXY_MAX_LGT_LOSS`
-  (default `77`), so it cannot become more negative than `-77`; a counter-trend
-  threshold may reach `-154` after the default 2× multiplier.
+  (default `77`), so it cannot become more negative than `-77`.
   The opposite side must have open positions and negative overall P&L, and
   only the signal-aligned side may average. The averaging side must also be
   losing at or beyond its applicable LGT threshold.

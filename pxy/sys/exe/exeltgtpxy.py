@@ -9,15 +9,11 @@ from syscnfgpxy import (
     EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
     EXETGTPXY_ALIGNED_PCT,
     EXETGTPXY_EXIT_KEY_COLUMN,
-    EXETGTPXY_MODE,
-    EXETGTPXY_SUPERTREND_KEY_COLUMN,
     EXETGTPXY_TGT_PCT_NOT_ALIGNED,
 )
 
 # ==================== CONFIG (this file's settings) ====================
 EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
-TARGET_MODE = EXETGTPXY_MODE
-SUPERTREND_KEY_COLUMN = EXETGTPXY_SUPERTREND_KEY_COLUMN
 ALIGNED_TARGET_PCT = EXETGTPXY_ALIGNED_PCT
 NOT_ALIGNED_TARGET_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
 # =======================================================================
@@ -100,11 +96,11 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     return ce_total, pe_total
 
 def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce_count: int = 0, pe_count: int = 0):
-    """Calculate target from the configured signal mode, with a neutral override.
+    """Calculate the target using only the configured exit signal and option side.
 
     Args:
-        row: dict with entry, symbol, exit, direction, and supertrend fields.
-        ce_investment/pe_investment: current qty × sell-price exposure per side.
+        row: dict containing entry, symbol, and exit. Extra exposure arguments are
+        accepted for compatibility but do not affect the target.
     
     Returns:
         float: Target price rounded to 2 decimals
@@ -118,40 +114,17 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
         # 2️⃣ Context parameter extractors
         symbol = str(row.get('symbol', 'UNKNOWN')).upper().strip()
         exit_signal = str(row.get(EXIT_KEY_COLUMN, '')).upper().strip()
-        direction = str(row.get('direction', '')).upper().strip()
-        supertrend = str(row.get(SUPERTREND_KEY_COLUMN, '')).upper().strip()
-
         if exit_signal not in ("BULL", "BEAR", "SIDE", "NONE"):
             _warn_once("exit", f"unrecognised exit value '{exit_signal}' (expected BULL/BEAR/SIDE/NONE).")
-        if supertrend not in ("BULL", "BEAR", "SIDE", "NONE"):
-            _warn_once("supertrend", f"unrecognised supertrend value '{supertrend}' (expected BULL/BEAR/SIDE/NONE).")
 
         is_ce = symbol.endswith('CE')
         is_pe = symbol.endswith('PE')
         if not is_ce and not is_pe:
             return round(entry_prc, 2)
 
-        signal = exit_signal
-        is_heavier = (
-            (is_ce and ce_investment > pe_investment)
-            or (is_pe and pe_investment > ce_investment)
-        )
-        is_lighter = (
-            (is_ce and ce_investment < pe_investment)
-            or (is_pe and pe_investment < ce_investment)
-        )
-        if TARGET_MODE == "DIRGT" and is_heavier and direction in {"UP", "DOWN"}:
-            signal = "BULL" if direction == "UP" else "BEAR"
-
-        apply_supertrend_side_override = not (
-            TARGET_MODE == "DIRGT" and is_lighter
-        )
         is_aligned = (
-            (supertrend != "SIDE" or not apply_supertrend_side_override)
-            and (
-                (signal == "BULL" and is_ce)
-                or (signal == "BEAR" and is_pe)
-            )
+            (exit_signal == "BULL" and is_ce)
+            or (exit_signal == "BEAR" and is_pe)
         )
         target_pct = calculate_tgt(is_aligned)
         target_pct_clamped = max(

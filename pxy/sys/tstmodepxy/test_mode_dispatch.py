@@ -78,6 +78,24 @@ class ModeDispatchTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "history must not be fetched"):
                 run_backtest()
 
+    def test_backtest_chooses_latest_session_instead_of_a_random_one(self):
+        import tstmodepxy.backtest as backtest
+
+        history = pd.DataFrame(
+            {"Close": [100.0, 101.0, 102.0]},
+            index=pd.DatetimeIndex(
+                [
+                    datetime(2025, 1, 6, 9, 16),
+                    datetime(2025, 1, 7, 15, 29),
+                    datetime(2025, 1, 8, 15, 29),
+                ]
+            ),
+        )
+        self.assertEqual(
+            backtest.latest_session_with_records(history),
+            date(2025, 1, 8),
+        )
+
     def test_strategy_signal_capture_redirects_dashboard_output(self):
         import tstmodepxy.backtest as backtest
 

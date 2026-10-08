@@ -156,21 +156,23 @@ def fetch_recent_index_history():
 
 
 def latest_session_with_records(history, record_limit=None):
-    """Select a random trading session with all candles for a full day replay."""
-    import random
+    """Select the latest available session for a reproducible day replay."""
     available_sessions = []
     for session_date, frame in history.groupby(history.index.date):
         session_bars = frame[
             (frame.index.time >= MARKET_OPEN)
             & (frame.index.time <= MARKET_CLOSE)
         ]
-        if len(session_bars) > 0:  # At least one candle
+        if (
+            len(session_bars) > 0
+            and session_bars.index[-1].time().replace(tzinfo=None) >= MARKET_CLOSE
+        ):
             available_sessions.append(session_date)
     if not available_sessions:
         raise RuntimeError(
-            f"No recent NIFTY session found for full-day replay."
+            "No completed recent NIFTY session found for full-day replay."
         )
-    return random.choice(available_sessions)
+    return max(available_sessions)
 
 
 def calculate_strategy_signals(history, session_date, record_limit=None):
