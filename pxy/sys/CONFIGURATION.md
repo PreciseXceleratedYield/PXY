@@ -179,12 +179,16 @@ settings should resolve to `None` rather than retain an active schedule.
   the heavier side only; it does not scale the target percentage. In `DIRGT`
   mode, averaging eligibility also uses `direction` for the lighter side;
   the heavier side and `RGLR` mode retain the existing `exit`-based averaging
-  alignment. Independently, averaging CE is allowed only when the selected
-  50-period moving-average status is `BULL` (north, price at/above the
-  average), and PE only when it is `BEAR` (south, price below it);
-  missing/unknown status blocks both sides. The status is passed through
-  `syspxy.get_all_data()` from the core snapshot's legacy `sma` field. The
-  trend chart JSON carries both rolling variants as `sma50` and `tsma50`.
+  alignment. The selected 50-period moving average no longer blocks a
+  counter-trend side outright: CE averages against a `BEAR` average and PE
+  against a `BULL` average only after reaching
+  `EXEAVXPXY_COUNTER_TREND_LOSS_MULTIPLIER` (default `2`) times the normal
+  dynamic LGT loss threshold. The normal LGT threshold remains capped by
+  `EXEAMSPXY_MAX_LGT_LOSS`; the multiplier is applied after that cap. Unknown
+  moving-average status still blocks averaging. The status is passed through
+  `syspxy.get_all_data()` from the core snapshot's legacy `sma` field, which
+  reports the selected variant (TSMA by default). The trend chart JSON carries
+  both rolling variants as `sma50` and `tsma50`.
   For counter-buy in `DIRGT`, `UP` can immediately trigger the
   missing CE leg when CE has no open rows and PE has more than one; `DOWN`
   can similarly trigger the missing PE leg when PE has no open rows and CE
@@ -195,11 +199,12 @@ settings should resolve to `None` rather than retain an active schedule.
 - Averaging uses one policy with no layer-count mode: the projected side
   investment (`sum(qty × sell_prc)` plus the next lot at its current
   `sell_prc`) must not exceed `EXEAMSPXY_MAX_INVESTMENT` (default `25000`).
-  The absolute LGT loss threshold is capped at `EXEAMSPXY_MAX_LGT_LOSS`
-  (default `77`), so it cannot become more negative than `-77`.
+  The normal LGT loss threshold is capped at `EXEAMSPXY_MAX_LGT_LOSS`
+  (default `77`), so it cannot become more negative than `-77`; a counter-trend
+  threshold may reach `-154` after the default 2× multiplier.
   The opposite side must have open positions and negative overall P&L, and
   only the signal-aligned side may average. The averaging side must also be
-  losing at or beyond its LGT threshold; no alignment multiplier is applied.
+  losing at or beyond its applicable LGT threshold.
 - LGT is calculated from positive investment values, then negated:
   `r = own investment / opposite investment`;
   `magnitude = max(1.4, round(20 × r² − 2.8, 2))` when `r < 1`, otherwise

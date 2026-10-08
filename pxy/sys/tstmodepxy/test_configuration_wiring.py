@@ -41,6 +41,7 @@ from syscnfgpxy import (
     SYSDTAFPXY_FIXED_BRICK_SIZE,
     SYSSMAPXY_VARIANT,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
+    EXEAVXPXY_COUNTER_TREND_LOSS_MULTIPLIER,
     EXEAMSPXY_MAX_INVESTMENT,
     EXECBUYPXY_ENTRY_KEY_COLUMN,
 )
@@ -598,18 +599,36 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertFalse(ce_aligned)
         self.assertTrue(pe_aligned)
 
-    def test_sma50_gates_averaging_to_ce_north_and_pe_south(self):
+    def test_tsma_counter_trend_allows_averaging_with_doubled_loss_threshold(self):
         ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
-            "BULL", "UP", 1000, 1000, sma_status="BULL"
+            "BULL", "UP", 1000, 1000, sma_status="BEAR"
         )
         self.assertTrue(ce_aligned)
         self.assertFalse(pe_aligned)
 
         ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
-            "BEAR", "DOWN", 1000, 1000, sma_status="BEAR"
+            "BEAR", "DOWN", 1000, 1000, sma_status="BULL"
         )
         self.assertFalse(ce_aligned)
         self.assertTrue(pe_aligned)
+
+        self.assertEqual(EXEAVXPXY_COUNTER_TREND_LOSS_MULTIPLIER, 2.0)
+        self.assertEqual(
+            exeavxpxy.counter_trend_averaging_thresholds(-5.0, -7.0, "BEAR"),
+            (-10.0, -7.0),
+        )
+        self.assertEqual(
+            exeavxpxy.counter_trend_averaging_thresholds(-5.0, -7.0, "BULL"),
+            (-5.0, -14.0),
+        )
+        self.assertEqual(
+            exeavxpxy.counter_trend_averaging_thresholds(-5.0, -7.0, "NA"),
+            (-5.0, -7.0),
+        )
+        self.assertEqual(
+            exeavxpxy.counter_trend_averaging_thresholds(-77.0, -20.0, "BEAR"),
+            (-154.0, -20.0),
+        )
 
         for unknown in ("NA", "NONE", ""):
             with self.subTest(sma_status=unknown):

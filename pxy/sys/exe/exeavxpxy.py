@@ -14,6 +14,7 @@ from syscnfgpxy import (
     EXEAVXPXY_MARKET_END as MARKET_END,
     EXEAVXPXY_MARKET_START as MARKET_START,
     EXEAVXPXY_REBUY_ENABLED as REBUY_ENABLED,
+    EXEAVXPXY_COUNTER_TREND_LOSS_MULTIPLIER,
     EXEAVXPXY_USE_OVERALL_LOSS,
     EXETGTPXY_MODE,
 )
@@ -38,7 +39,11 @@ logger = logging.getLogger("exeavxpxy")
 def averaging_alignment_signals(
     exit_signal, direction, ce_investment, pe_investment, sma_status="NA"
 ):
-    """Combine signal alignment with the SMA-50 side gate for averaging."""
+    """Combine signal alignment with valid moving-average data for averaging."""
+    moving_average = str(sma_status).upper().strip()
+    if moving_average not in {"BULL", "BEAR"}:
+        return False, False
+
     ce_aligned = is_aligned("CE", exit_signal)
     pe_aligned = is_aligned("PE", exit_signal)
     signal = str(direction).upper().strip()
@@ -47,10 +52,22 @@ def averaging_alignment_signals(
             ce_aligned = is_aligned("CE", "BULL" if signal == "UP" else "BEAR")
         elif pe_investment < ce_investment:
             pe_aligned = is_aligned("PE", "BULL" if signal == "UP" else "BEAR")
-    sma = str(sma_status).upper().strip()
-    ce_aligned = ce_aligned and sma == "BULL"
-    pe_aligned = pe_aligned and sma == "BEAR"
     return ce_aligned, pe_aligned
+
+
+def counter_trend_averaging_thresholds(
+    ce_threshold,
+    pe_threshold,
+    moving_average_status,
+    multiplier=EXEAVXPXY_COUNTER_TREND_LOSS_MULTIPLIER,
+):
+    """Require a deeper loss before averaging against the selected 50-period average."""
+    moving_average = str(moving_average_status).upper().strip()
+    if moving_average == "BEAR":
+        ce_threshold *= multiplier
+    elif moving_average == "BULL":
+        pe_threshold *= multiplier
+    return ce_threshold, pe_threshold
 
 
 def _side_target_pct(rows, ce_investment=0, pe_investment=0, ce_count=0, pe_count=0, is_ce=True):
@@ -155,6 +172,11 @@ def handle_side_averaging(client, df):
         ce_investment,
         pe_investment,
         is_ce=False,
+    )
+    ce_dynamic_threshold, pe_dynamic_threshold = counter_trend_averaging_thresholds(
+        ce_dynamic_threshold,
+        pe_dynamic_threshold,
+        active_sma,
     )
 
     if USE_OVERALL_LOSS:
