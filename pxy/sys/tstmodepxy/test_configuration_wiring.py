@@ -41,6 +41,7 @@ from syscnfgpxy import (
 from sysdtafpxy import apply_ohlc_transformation
 from sysdecisionpxy import (
     averaging_trigger_sides,
+    counter_leg_script,
     entry_order_command,
     entry_signal_valid,
 )
@@ -247,6 +248,40 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_counter_buy_uses_entry_signal_key(self):
         self.assertEqual(EXECBUYPXY_ENTRY_KEY_COLUMN, "entry")
         self.assertEqual(execbuypxy.ENTRY_KEY_COLUMN, "entry")
+
+    def test_dirgt_counter_buy_uses_direction_when_heavy_side_has_multiple_rows(self):
+        scripts = {"CE": "pxybuype", "PE": "pxybuyce"}
+        pe_positions = [
+            {"symbol": "NIFTY-1PE", "qty": 75},
+            {"symbol": "NIFTY-2PE", "qty": 75},
+        ]
+        ce_positions = [
+            {"symbol": "NIFTY-1CE", "qty": 75},
+            {"symbol": "NIFTY-2CE", "qty": 75},
+        ]
+
+        self.assertEqual(
+            counter_leg_script(
+                "SELL", pe_positions, scripts, direction="UP", mode="DIRGT"
+            ),
+            "pxybuyce",
+        )
+        self.assertEqual(
+            counter_leg_script(
+                "NONE", ce_positions, scripts, direction="DOWN", mode="DIRGT"
+            ),
+            "pxybuype",
+        )
+        self.assertIsNone(
+            counter_leg_script(
+                "NONE", pe_positions[:1], scripts, direction="UP", mode="DIRGT"
+            )
+        )
+        self.assertIsNone(
+            counter_leg_script(
+                "NONE", pe_positions, scripts, direction="UP", mode="RGLR"
+            )
+        )
 
     def test_tgt_uses_single_positive_aligned_and_non_aligned_targets(self):
         self.assertEqual(exeltgtpxy.calculate_tgt(True), 77.0)

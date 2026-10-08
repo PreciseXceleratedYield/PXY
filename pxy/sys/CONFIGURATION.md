@@ -170,7 +170,11 @@ settings should resolve to `None` rather than retain an active schedule.
   the heavier side only; it does not scale the target percentage. In `DIRGT`
   mode, averaging eligibility also uses `direction` for the lighter side;
   the heavier side and `RGLR` mode retain the existing `exit`-based averaging
-  alignment.
+  alignment. For counter-buy in `DIRGT`, `UP` can immediately trigger the
+  missing CE leg when CE has no open rows and PE has more than one; `DOWN`
+  can similarly trigger the missing PE leg when PE has no open rows and CE
+  has more than one. Otherwise the existing entry-signal counter-buy rule
+  applies.
 - The averaging window switch and start/end bounds apply only to averaging
   placement, not to entry/exit pipes.
 - Averaging uses one policy with no layer-count mode: the projected side

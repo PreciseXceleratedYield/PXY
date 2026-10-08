@@ -154,13 +154,9 @@ def averaging_placement_allowed(ledger_is_busy):
     return not ledger_is_busy
 
 
-def counter_leg_script(entry_signal, positions, scripts):
-    """Return the counter-leg script when entry signal opposes a one-sided position."""
-    signal = str(entry_signal).upper().strip()
-    if signal not in {"BUY", "SELL"}:
-        return None
-
-    has_ce = has_pe = False
+def counter_leg_script(entry_signal, positions, scripts, direction=None, mode="RGLR"):
+    """Return a counter-leg script for legacy entry or qualifying DIRGT direction."""
+    position_counts = {"CE": 0, "PE": 0}
     for position in positions:
         symbol = str(position.get("symbol", "")).upper().strip()
         try:
@@ -169,8 +165,32 @@ def counter_leg_script(entry_signal, positions, scripts):
             continue
         if not math.isfinite(quantity) or quantity <= 0:
             continue
-        has_ce = has_ce or symbol.endswith("CE")
-        has_pe = has_pe or symbol.endswith("PE")
+        if symbol.endswith("CE"):
+            position_counts["CE"] += 1
+        elif symbol.endswith("PE"):
+            position_counts["PE"] += 1
+
+    signal = str(entry_signal).upper().strip()
+    market_direction = str(direction or "").upper().strip()
+    if str(mode).upper().strip() == "DIRGT":
+        if (
+            market_direction == "UP"
+            and position_counts["CE"] == 0
+            and position_counts["PE"] > 1
+        ):
+            signal = "BUY"
+        elif (
+            market_direction == "DOWN"
+            and position_counts["PE"] == 0
+            and position_counts["CE"] > 1
+        ):
+            signal = "SELL"
+
+    if signal not in {"BUY", "SELL"}:
+        return None
+
+    has_ce = position_counts["CE"] > 0
+    has_pe = position_counts["PE"] > 0
 
     if signal == "SELL" and has_ce and not has_pe:
         return scripts["CE"]

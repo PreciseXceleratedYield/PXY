@@ -27,6 +27,7 @@ from syscnfgpxy import (
     EXECBUYPXY_LOCK_KEEP_SECS,
     EXECBUYPXY_MAX_PER_DAY,
     EXECBUYPXY_SCRIPTS,
+    EXETGTPXY_MODE,
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
 )
@@ -148,7 +149,14 @@ def check_counter_leg(remaining_df):
 
         signal = str(remaining_df.iloc[0].get(ENTRY_KEY_COLUMN, "NONE")).upper().strip()
         records = remaining_df[["symbol", "qty"]].to_dict("records")
-        script_name = counter_leg_script(signal, records, CBUY_SCRIPTS)
+        direction = str(remaining_df.iloc[0].get("direction", "NONE")).upper().strip()
+        script_name = counter_leg_script(
+            signal,
+            records,
+            CBUY_SCRIPTS,
+            direction=direction,
+            mode=EXETGTPXY_MODE,
+        )
         if script_name is None:
             debug_log(f"Counter check: entry signal {signal} | positions do not match a counter-leg rule.")
             return None
