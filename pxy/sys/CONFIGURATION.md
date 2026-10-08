@@ -77,18 +77,19 @@ restarted.
 
 ## Option strike selection
 
-From `SYSENTRPXY_DIRECTION_ONLY_START` (09:00 IST) until
-`SYSENTRPXY_DIRECTION_ONLY_END` (09:30 IST), entry and exit signals use market
-`direction` only (`UP` → `BUY`/`BULL`, `DOWN` → `SELL`/`BEAR`); a neutral
-direction returns `NONE` for both. At 09:30 IST the single Supertrend-led
-policy takes over: entry follows Supertrend directly (`BULL` → `BUY`,
-`BEAR` → `SELL`, `SIDE` → `SIDE`). Exit is `BULL` for Supertrend BULL and
-`BEAR` for Supertrend BEAR; when Supertrend is SIDE, exit falls back to
-`sysmktpxy.get_signal()` (`BULL`/`BEAR`), otherwise `NONE`. The raw `direction`
-field is used only in the morning window. Exit never returns `SIDE`. The `SIDE`
-entry is not a valid fresh-order command. The signal path
-has no selectable STS/MKT mode. `SYSDTAFPXY_SELECTED_MODE` independently
-selects the OHLC data transformation supplied to signal calculations.
+`SYSENTRPXY_SIGNAL_MODE` selects the entry and exit signal source. `MKT` uses
+raw market direction all session (`UP` → `BUY`/`BULL`, `DOWN` →
+`SELL`/`BEAR`); neutral direction returns `NONE` for both. `MKT` is the default.
+`STS`
+preserves the current Supertrend policy: from `SYSENTRPXY_DIRECTION_ONLY_START`
+(09:00 IST) until `SYSENTRPXY_DIRECTION_ONLY_END` (09:30 IST), both signals
+follow market direction. Afterwards entry follows Supertrend directly (`BULL`
+→ `BUY`, `BEAR` → `SELL`, `SIDE` → `SIDE`). Exit is `BULL` for Supertrend BULL
+and `BEAR` for Supertrend BEAR; when Supertrend is SIDE, exit falls back to
+`sysmktpxy.get_signal()` (`BULL`/`BEAR`), otherwise `NONE`. Exit never returns
+`SIDE`; a `SIDE` entry is not a valid fresh-order command.
+`SYSDTAFPXY_SELECTED_MODE` independently selects the OHLC data transformation
+supplied to signal calculations.
 
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
 builder for every buying script. It currently defaults to `ATM`, which ignores

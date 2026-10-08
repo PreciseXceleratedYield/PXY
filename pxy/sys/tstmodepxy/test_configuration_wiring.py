@@ -80,6 +80,7 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_entry_and_exit_follow_directional_supertrend(self):
         frame = pd.DataFrame({"Close": [1]})
         with (
+            patch.object(sysentrpxy, "SYSENTRPXY_SIGNAL_MODE", "STS"),
             patch.object(sysentrpxy, "detect_raw_direction") as direction,
             patch.object(sysentrpxy, "get_market_signal") as market,
             patch.object(
@@ -98,6 +99,7 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_bear_supertrend_returns_sell_and_bear_even_when_market_is_bull(self):
         frame = pd.DataFrame({"Close": [1]})
         with (
+            patch.object(sysentrpxy, "SYSENTRPXY_SIGNAL_MODE", "STS"),
             patch.object(sysentrpxy, "detect_raw_direction") as direction,
             patch.object(sysentrpxy, "get_market_signal") as market,
             patch.object(
@@ -116,6 +118,7 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_side_supertrend_keeps_side_entry_and_uses_market_exit(self):
         frame = pd.DataFrame({"Close": [1]})
         with (
+            patch.object(sysentrpxy, "SYSENTRPXY_SIGNAL_MODE", "STS"),
             patch.object(sysentrpxy, "get_market_signal", return_value=("NONE", "BEAR")),
             patch.object(
                 sysentrpxy,
@@ -131,6 +134,7 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_side_supertrend_never_returns_side_exit_without_market_direction(self):
         frame = pd.DataFrame({"Close": [1]})
         with (
+            patch.object(sysentrpxy, "SYSENTRPXY_SIGNAL_MODE", "STS"),
             patch.object(sysentrpxy, "get_market_signal", return_value=("NONE", "NONE")),
             patch.object(
                 sysentrpxy,
@@ -146,6 +150,7 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_market_direction_is_used_only_before_0930(self):
         frame = pd.DataFrame({"Close": [1]})
         with (
+            patch.object(sysentrpxy, "SYSENTRPXY_SIGNAL_MODE", "STS"),
             patch.object(
                 sysentrpxy, "detect_raw_direction", return_value=(1, "UP")
             ) as direction,
@@ -169,6 +174,11 @@ class ConfigurationWiringTests(unittest.TestCase):
                 self.subTest(current_time=current_time),
                 patch.object(
                     sysentrpxy,
+                    "SYSENTRPXY_SIGNAL_MODE",
+                    "STS",
+                ),
+                patch.object(
+                    sysentrpxy,
                     "detect_raw_direction",
                     return_value=(1, direction),
                 ),
@@ -180,11 +190,28 @@ class ConfigurationWiringTests(unittest.TestCase):
                 )
                 supertrend.assert_not_called()
 
-    def test_entry_router_has_no_selectable_mode(self):
+    def test_mkt_mode_uses_market_direction_for_both_signals_all_session(self):
+        frame = pd.DataFrame({"Close": [1]})
+        with (
+            patch.object(sysentrpxy, "SYSENTRPXY_SIGNAL_MODE", "MKT"),
+            patch.object(
+                sysentrpxy, "detect_raw_direction", return_value=(123, "DOWN")
+            ) as direction,
+            patch.object(sysentrpxy, "calculate_supertrend") as supertrend,
+        ):
+            self.assertEqual(
+                sysentrpxy.get_entry_signal(frame, current_time=time(12, 0)),
+                ("SELL", "BEAR"),
+            )
+        direction.assert_called_once_with(frame)
+        supertrend.assert_not_called()
+
+    def test_entry_router_has_selectable_mkt_sts_mode(self):
+        from syscnfgpxy import SYSENTRPXY_SIGNAL_MODE
+
+        self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "MKT")
         self.assertEqual(sysentrpxy.get_entry_signal.__defaults__, (None, None))
-        self.assertFalse(
-            hasattr(__import__("syscnfgpxy"), "SYSENTRPXY_SIGNAL_MODE")
-        )
+        self.assertIn("SYSENTRPXY_SIGNAL_MODE", __import__("pxyconfigwebpxy").ENUMS)
         self.assertFalse(entry_signal_valid("SIDE"))
         self.assertIsNone(entry_order_command("SIDE", 0, 0))
 

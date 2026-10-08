@@ -54,10 +54,14 @@ class EngineCooldownTests(unittest.TestCase):
             detect_raw_direction.assert_not_called()
 
     def test_signal_router_uses_normal_signal_after_cooldown(self):
-        with patch.object(sysentrpxy, "cooldown_remaining", return_value=0), patch.object(
-            sysentrpxy,
-            "calculate_supertrend",
-            return_value=pd.DataFrame({"ST_Trend": ["BULL"]}),
+        with (
+            patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
+            patch.object(sysentrpxy, "SYSENTRPXY_SIGNAL_MODE", "STS"),
+            patch.object(
+                sysentrpxy,
+                "calculate_supertrend",
+                return_value=pd.DataFrame({"ST_Trend": ["BULL"]}),
+            ),
         ):
             self.assertEqual(
                 sysentrpxy.get_entry_signal(

@@ -16,6 +16,7 @@ class ConfigEditorTests(unittest.TestCase):
             "FLAG = True\n"
             "RUNNIFTYPXY_STRIKE_STEP = 2\n"
             "CLOCK = dt_time(9, 0)\n"
+            "SYSENTRPXY_SIGNAL_MODE = 'MKT'\n"
             "EXETGTPXY_MODE = 'DIRGT'\n"
             "SYSDTAFPXY_SELECTED_MODE = '00'\n"
             "RUNEXMTPXY_INITIAL_LOSS_FLOOR = -1000\n"
@@ -127,10 +128,9 @@ class ConfigEditorTests(unittest.TestCase):
 
     def test_signal_router_mode_is_not_exposed(self):
         settings, _ = config_editor._metadata(self.original)
-        self.assertNotIn(
-            "SYSENTRPXY_SIGNAL_MODE",
-            {setting["key"] for setting in settings},
-        )
+        by_name = {setting["key"]: setting for setting in settings}
+        self.assertEqual(by_name["SYSENTRPXY_SIGNAL_MODE"]["value"], "MKT")
+        self.assertEqual(by_name["SYSENTRPXY_SIGNAL_MODE"]["options"], ["MKT", "STS"])
 
     def test_write_validates_creates_backup_and_preserves_file_mode(self):
         self.config_path.chmod(0o640)
