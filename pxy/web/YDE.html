@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>YDE — Your Digital Employee</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F6; --surface:#FFFFFF; --ink:#0F1B3D; --muted:#55627F; --line:#D5DBE7;
+  --brand:#2F54EB; --brand-ink:#FFFFFF; --signal:#E8A21B; --signal-bg:#FFF4DB; --ok:#16875A;
+  --deep:#0F1B3D; --deep-ink:#EEF1F6;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0B1226; --surface:#121B36; --ink:#E9EDF7; --muted:#9AA7C4; --line:#24305A;
+    --brand:#6C8BFF; --brand-ink:#0B1226; --signal:#F2B33D; --signal-bg:#2A2310; --ok:#4CC38A;
+    --deep:#070C1B; --deep-ink:#E9EDF7;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0B1226; --surface:#121B36; --ink:#E9EDF7; --muted:#9AA7C4; --line:#24305A;
+  --brand:#6C8BFF; --brand-ink:#0B1226; --signal:#F2B33D; --signal-bg:#2A2310; --ok:#4CC38A;
+  --deep:#070C1B; --deep-ink:#E9EDF7;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 17px/1.6 "Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+h1,h2,h3{font-family:"Bricolage Grotesque","Instrument Sans",system-ui,sans-serif;margin:0;letter-spacing:-.02em;line-height:1.05}
+p{margin:0}
+.wrap{max-width:1080px;margin:0 auto;padding:0 24px}
+section{padding:96px 0}
+.lede{font-size:clamp(18px,2.2vw,21px);color:var(--muted);max-width:56ch}
+
+/* top */
+.mark{display:flex;align-items:center;gap:12px;padding:28px 0 0;font:800 28px "Bricolage Grotesque",sans-serif;letter-spacing:-.02em}
+.mark .logo{flex:none}
+.mark i{width:28px;height:28px;border-radius:8px;background:var(--brand);display:grid;place-items:center;color:var(--brand-ink);font-style:normal;font-size:15px}
+
+/* hero */
+.hero{padding:72px 0 96px}
+.hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}
+h1{font-size:clamp(46px,7.4vw,92px);font-weight:800}
+.hero .lede{margin-top:28px}
+.stance{margin-top:36px;display:flex;flex-wrap:wrap;gap:10px}
+.stance span{border:1.5px solid var(--line);border-radius:999px;padding:6px 16px;font-size:15px;color:var(--muted);background:var(--surface)}
+
+/* vision */
+.vision{margin:0;padding:8px 0 8px 28px;border-left:5px solid var(--brand);font:700 clamp(22px,2.6vw,30px)/1.3 "Bricolage Grotesque",sans-serif;letter-spacing:-.01em}
+
+/* dark band */
+.band{background:var(--deep);color:var(--deep-ink)}
+.band .lede{color:#A9B5D3}
+.band h2{font-size:clamp(34px,5vw,60px);max-width:16ch}
+.ladder{margin-top:56px;display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1px solid #2A3869}
+.ladder div{padding:28px 24px 8px 0}
+.ladder div+div{padding-left:24px;border-left:1px solid #2A3869}
+.ladder h3{font-size:22px;margin-bottom:10px;font-weight:700}
+.ladder p{color:#A9B5D3;font-size:16px}
+.ladder .you h3{color:var(--signal)}
+.ladder .you p{color:var(--deep-ink)}
+
+/* job description */
+h2{font-size:clamp(34px,5vw,60px);font-weight:800}
+.jd-head{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:end;margin-bottom:48px}
+.jd{background:var(--surface);border:1px solid var(--line);border-radius:20px;display:grid;grid-template-columns:repeat(3,1fr)}
+.jd div{padding:28px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+.jd div:nth-child(3n){border-right:0}
+.jd div:nth-last-child(-n+3){border-bottom:0}
+.jd h3{font-size:20px;font-weight:700;margin-bottom:6px}
+.jd p{color:var(--muted);font-size:15.5px;line-height:1.5}
+.jd .sup{background:var(--signal-bg)}
+.jd .sup h3{color:var(--ink)}
+
+/* at work */
+.ex-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:48px}
+.ex{background:var(--surface);border:1px solid var(--line);border-radius:20px;overflow:hidden}
+.ex-head{display:flex;gap:14px;align-items:center;padding:20px 22px;border-bottom:1px solid var(--line)}
+.ex-head .av{width:48px;height:48px;border-radius:14px;background:var(--deep);color:var(--deep-ink);display:grid;place-items:center;font:800 17px "Bricolage Grotesque",sans-serif;flex:none}
+.ex-head b{display:block;font:700 18px "Bricolage Grotesque",sans-serif}
+.ex-head small{color:var(--muted);font-size:14px}
+.ex ul{list-style:none;margin:0;padding:8px 22px 20px}
+.ex li{display:grid;grid-template-columns:54px 1fr;gap:12px;padding:12px 0;border-bottom:1px dashed var(--line);font-size:15px;line-height:1.45}
+.ex li:last-child{border-bottom:0}
+.ex time{color:var(--muted);font-variant-numeric:tabular-nums;font-size:14px}
+.ex li.esc{background:var(--signal-bg);border:1.5px solid var(--signal);border-radius:12px;padding:12px;margin:8px 0}
+.ex li.esc time{color:var(--signal);font-weight:600}
+
+/* workforce */
+.work-grid{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start}
+.tiers{display:grid;gap:14px}
+.tier{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:22px 24px}
+.tier h3{font-size:20px;margin-bottom:4px}
+.tier p{color:var(--muted);font-size:15.5px;line-height:1.5}
+.tier.human{border:2px solid var(--signal)}
+.tier.dm{border-left:6px solid var(--brand)}
+.tier.de{margin-left:36px}
+.depts{margin-top:44px;display:flex;flex-wrap:wrap;gap:10px}
+.depts span{font:600 18px "Bricolage Grotesque",sans-serif;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 18px}
+
+/* hiring */
+.hire ol{list-style:none;margin:48px 0 0;padding:0;display:grid;grid-template-columns:repeat(6,1fr);gap:14px;counter-reset:s}
+.hire li{counter-increment:s;border-top:3px solid var(--brand);padding-top:16px;font:700 20px/1.2 "Bricolage Grotesque",sans-serif}
+.hire li::before{content:counter(s);display:block;color:var(--muted);font:500 15px "Instrument Sans",sans-serif;margin-bottom:8px}
+.hire li:last-child{border-color:var(--ok)}
+
+/* lease */
+.lease-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:48px}
+.lease-grid div{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px}
+.lease-grid h3{font-size:22px;margin-bottom:8px;font-weight:700}
+.lease-grid p{color:var(--muted);font-size:16px;line-height:1.5}
+.lease-grid .core{background:var(--deep);border-color:var(--deep);color:var(--deep-ink)}
+.lease-grid .core p{color:#A9B5D3}
+.lease-grid .core h3{color:var(--signal)}
+
+/* close */
+.close{background:var(--brand);color:var(--brand-ink);text-align:left;padding:110px 0 80px}
+.close h2{font-size:clamp(40px,7vw,88px);max-width:14ch}
+.close .four{margin-top:40px;display:grid;grid-template-columns:repeat(4,1fr);gap:24px;font:700 clamp(18px,2vw,24px)/1.25 "Bricolage Grotesque",sans-serif}
+.close .four div{border-top:2px solid currentColor;padding-top:14px;opacity:.95}
+.close footer{margin-top:90px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;font-size:15px;opacity:.85}
+
+@media (max-width:900px){
+  .lease-grid{grid-template-columns:1fr}
+  .ex-grid{grid-template-columns:1fr}
+  section{padding:72px 0}
+  .hero-grid,.jd-head,.work-grid{grid-template-columns:1fr;gap:36px}
+  .ladder{grid-template-columns:1fr 1fr}
+  .ladder div:nth-child(3){padding-left:0;border-left:0}
+  .ladder div:nth-child(n+3){border-top:1px solid #2A3869;margin-top:20px;padding-top:28px}
+  .jd{grid-template-columns:1fr 1fr}
+  .jd div,.jd div:nth-child(3n){border-right:1px solid var(--line)}
+  .jd div:nth-child(2n){border-right:0}
+  .jd div:nth-last-child(-n+3){border-bottom:1px solid var(--line)}
+  .jd div:last-child{border-bottom:0;grid-column:1/-1;border-right:0}
+  .hire ol{grid-template-columns:repeat(3,1fr);gap:28px 14px}
+  .close .four{grid-template-columns:1fr 1fr}
+}
+@media (max-width:560px){
+  body{font-size:16px}
+  .wrap{padding:0 20px}
+  .ladder{grid-template-columns:1fr}
+  .ladder div,.ladder div+div,.ladder div:nth-child(n+3){padding:22px 0 8px;border-left:0;border-top:1px solid #2A3869;margin-top:0}
+  .jd{grid-template-columns:1fr}
+  .jd div,.jd div:nth-child(2n),.jd div:nth-child(3n){border-right:0;border-bottom:1px solid var(--line)}
+  .hire ol{grid-template-columns:1fr 1fr}
+  .tier.de{margin-left:16px}
+}
+</style>
+</head>
+<body>
+
+<header class="wrap">
+  <div class="mark"><svg class="logo" viewBox="0 0 48 48" width="40" height="40" role="img" aria-label="YDE logo" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M24 27L12 11" stroke="var(--brand)" stroke-width="6"/><path d="M24 27L36 11" stroke="var(--signal)" stroke-width="6"/><path d="M24 27V41" stroke="var(--ink)" stroke-width="6"/><circle cx="12" cy="9" r="5" fill="var(--brand)"/><circle cx="36" cy="9" r="5" fill="var(--signal)"/></svg><span>YDE</span></div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <h1>Hire a digital employee.</h1>
+      <p class="lede">YDE — Your Digital Employee — gives every enterprise digital intelligence that performs real work, with real responsibility, under human supervision. Leased on consumption, so you pay for the work done.</p>
+      <div class="stance">
+        <span>Not a chatbot</span><span>Not an assistant</span><span>Not a script</span><span>An employee</span>
+      </div>
+    </div>
+
+    <blockquote class="vision">Every enterprise should be able to employ digital intelligence to perform real work, with real responsibility, under human supervision.</blockquote>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Assistance is not the destination.</h2>
+    <p class="lede" style="margin-top:24px">For decades enterprises invested in software to help people do their jobs. The next step is to give the work itself to someone who can own it.</p>
+    <div class="ladder">
+      <div><h3>Software</h3><p>Waits for people to operate it.</p></div>
+      <div><h3>Automation</h3><p>Follows predefined instructions.</p></div>
+      <div><h3>AI assistants</h3><p>Respond when someone asks a question.</p></div>
+      <div class="you"><h3>YDE</h3><p>Observes, understands, acts, documents, and escalates when human judgment is needed.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="jd-head">
+      <h2>A digital employee has a job.</h2>
+      <p class="lede">A human joins an organization with a role. A digital employee should be no different. Each YDE is defined the way a good manager defines a hire.</p>
+    </div>
+    <div class="jd">
+      <div><h3>Role</h3><p>What job does it perform?</p></div>
+      <div><h3>Responsibilities</h3><p>What is it accountable for?</p></div>
+      <div><h3>Knowledge</h3><p>What does it know about the organization and its domain?</p></div>
+      <div><h3>Skills</h3><p>What can it understand and perform?</p></div>
+      <div><h3>Tools</h3><p>Which systems and applications can it use?</p></div>
+      <div><h3>Authority</h3><p>What decisions can it make independently?</p></div>
+      <div><h3>Memory</h3><p>What does it learn and retain from its work?</p></div>
+      <div><h3>Objectives</h3><p>What outcomes is it expected to achieve?</p></div>
+      <div class="sup"><h3>Supervision</h3><p>When should it involve a human?</p></div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <h2 style="max-width:18ch">Digital employees at work.</h2>
+    <p class="lede" style="margin-top:24px">Two roles, one platform. Each does the work inside its authority and hands the rest to a human.</p>
+    <div class="ex-grid">
+      <div class="ex">
+        <div class="ex-head"><div class="av">AP</div><div><b>Accounts Payable Specialist</b><small>Finance</small></div></div>
+        <ul>
+          <li><time>08:02</time><span>Read 41 new supplier invoices from the finance inbox.</span></li>
+          <li><time>08:09</time><span>Matched 38 to purchase orders and goods receipts.</span></li>
+          <li><time>08:14</time><span>Queued 38 payments inside its approval limit.</span></li>
+          <li class="esc"><time>08:21</time><span><b>Escalated to the Finance Manager:</b> one invoice exceeds its authority and needs a human decision.</span></li>
+          <li><time>08:22</time><span>Logged every action and moved to the next batch.</span></li>
+        </ul>
+      </div>
+      <div class="ex">
+        <div class="ex-head"><div class="av">SB</div><div><b>SAP Basis Administrator</b><small>IT Operations</small></div></div>
+        <ul>
+          <li><time>02:10</time><span>Detected slow response times on production and traced them to a long-running job.</span></li>
+          <li><time>02:14</time><span>Checked the runbook, found rescheduling within its authority, and moved the job off-peak.</span></li>
+          <li><time>02:31</time><span>Imported 3 approved transports into the quality system and confirmed they ran clean.</span></li>
+          <li class="esc"><time>02:40</time><span><b>Escalated to the Basis Lead:</b> a production transport needs change approval before it can go in.</span></li>
+          <li><time>02:41</time><span>Documented the incident and kept monitoring.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap work-grid">
+    <div>
+      <h2>One team. Human and digital.</h2>
+      <p class="lede" style="margin-top:24px">Humans provide leadership, judgment, creativity, relationships and accountability. Digital employees provide continuous execution, scale, speed, consistency and specialized expertise.</p>
+      <p class="lede" style="margin-top:16px"><b style="color:var(--ink)">The human remains in control. The digital employee performs the work.</b></p>
+    </div>
+    <div class="tiers">
+      <div class="tier human"><h3>Human supervisor</h3><p>Sets direction, decides what exceeds authority, stays accountable.</p></div>
+      <div class="tier dm de"><h3>Digital Manager</h3><p>Coordinates several specialized digital employees.</p></div>
+      <div class="tier de"><h3>Digital Employees</h3><p>Ask each other for information, hand off work, and collaborate on a process.</p></div>
+    </div>
+  </div>
+  <div class="wrap">
+    <div class="depts" aria-label="Departments">
+      <span>IT</span><span>Finance</span><span>HR</span><span>Sales</span><span>Customer Service</span><span>Operations</span><span>Procurement</span><span>Engineering</span><span>Compliance</span><span>Research</span><span>Marketing</span><span>Administration</span>
+    </div>
+    <p class="lede" style="margin-top:28px">One platform, any industry, any department. Each employee specializes in a role. Together they form a new organizational layer: the Digital Workforce.</p>
+  </div>
+</section>
+
+<section class="hire" style="padding-top:0">
+  <div class="wrap">
+    <h2 style="max-width:18ch">As natural as hiring.</h2>
+    <p class="lede" style="margin-top:24px">YDE aims to make deploying a digital employee as simple as bringing on a person.</p>
+    <ol>
+      <li>Define the role</li>
+      <li>Give it knowledge and tools</li>
+      <li>Set responsibilities and authority</li>
+      <li>Connect it to the enterprise</li>
+      <li>Supervise its work</li>
+      <li>Measure performance, then let it get to work</li>
+    </ol>
+  </div>
+</section>
+
+<section style="padding-top:0">
+  <div class="wrap">
+    <h2 style="max-width:20ch">Lease a digital employee. Pay for the work it does.</h2>
+    <p class="lede" style="margin-top:24px">YDE does not sell software licenses or ask you to build your own. We lease digital employees to enterprises, and you pay on consumption.</p>
+    <div class="lease-grid">
+      <div class="core"><h3>Leased</h3><p>Each digital employee arrives with its role, skills and tools. No build project, no hiring cycle.</p></div>
+      <div class="core"><h3>Pay on consumption</h3><p>Cost follows the work actually performed, so spend rises and falls with your business.</p></div>
+      <div class="core"><h3>Start small, scale out</h3><p>Begin with one role in one department, then add employees as the value shows.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="close">
+  <div class="wrap">
+    <h2>Digital employees doing meaningful work.</h2>
+    <div class="four">
+      <div>The employee that never sleeps.</div>
+      <div>The employee that scales.</div>
+      <div>The employee that knows its role.</div>
+      <div>The employee that works for you.</div>
+    </div>
+    <footer><span><b>YDE</b> · Your Digital Employee</span><span>A PXY Group Company</span></footer>
+  </div>
+</section>
+</main>
+
+</body>
+</html>
