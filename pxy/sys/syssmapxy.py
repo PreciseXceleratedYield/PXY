@@ -3,31 +3,63 @@ import numpy as np
 import warnings
 import os
 from colorama import Fore, Style, init
+from syscnfgpxy import SYSSMAPXY_VARIANT
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 init(autoreset=True)
 
 from sysdtafpxy import fetch_yf_data
 
-def get_sma(df: pd.DataFrame, period: int = 50) -> dict:
-    """Standard Fixed 50-SMA Trend System. Generates binary direction states (BULL/BEAR) based on SMA relative position."""
+def calculate_moving_average(
+    close: pd.Series, period: int = 50, variant: str = SYSSMAPXY_VARIANT
+) -> pd.Series:
+    """Calculate a simple moving average or linear-regression endpoint TSMA."""
+    variant = str(variant).upper()
+    if variant not in {"SMA", "TSMA"}:
+        raise ValueError("variant must be SMA or TSMA.")
+    if period < 1:
+        raise ValueError("period must be a positive integer.")
+    if variant == "SMA" or period == 1:
+        return close.rolling(window=period).mean()
+
+    x = np.arange(period, dtype=float)
+    x_deviations = x - x.mean()
+    variance_x = np.dot(x_deviations, x_deviations)
+
+    def regression_endpoint(values):
+        mean = values.mean()
+        slope = np.dot(values - mean, x_deviations) / variance_x
+        return mean + slope * x_deviations[-1]
+
+    return close.rolling(window=period).apply(regression_endpoint, raw=True)
+
+
+def get_sma(
+    df: pd.DataFrame, period: int = 50, variant: str = SYSSMAPXY_VARIANT
+) -> dict:
+    """Return the selected 50-period moving-average value and price-side status."""
+    variant = str(variant).upper()
+    if variant not in {"SMA", "TSMA"}:
+        raise ValueError("variant must be SMA or TSMA.")
     if df is None or df.empty or len(df) < period:
-        return {"value": 0.0, "status": "NA", "period": period}
+        return {"value": 0.0, "status": "NA", "period": period, "variant": variant}
     df = df.copy()
-    df['SMA'] = df['Close'].rolling(window=period).mean()
+    column = "SMA" if variant == "SMA" else "TSMA"
+    df[column] = calculate_moving_average(df["Close"], period=period, variant=variant)
     close_arr = df['Close'].to_numpy()
-    sma_arr = df['SMA'].to_numpy()
+    sma_arr = df[column].to_numpy()
     # Extract latest valid calculations
     latest_close = close_arr[-1]
     latest_sma = sma_arr[-1]
     if np.isnan(latest_sma):
-        return {"value": 0.0, "status": "NA", "period": period}
+        return {"value": 0.0, "status": "NA", "period": period, "variant": variant}
     # Strict binary mapping based on current location relative to SMA 50
     status = "BULL" if latest_close >= latest_sma else "BEAR"
     return {
         "value": float(latest_sma),
         "status": status,
         "period": period,
+        "variant": variant,
         "df_with_sma": df # Return df to pass to json exporter
     }
 
@@ -85,4 +117,3 @@ if __name__ == "__main__":
         # Dump the custom window row to the 'web' folder
         if "df_with_sma" in result:
             dump_ohlc_json(result["df_with_sma"], target_folder_name="web")
-

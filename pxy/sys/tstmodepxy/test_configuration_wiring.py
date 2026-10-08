@@ -28,6 +28,7 @@ import exeexitpxy
 import exeforcepxy
 import exeavxpxy
 import exeentrpxy
+import sysdashpxy
 import sysentrpxy
 import syspxy
 import sysstrndpxy
@@ -38,11 +39,13 @@ from syscnfgpxy import (
     SYSSTRNDPXY_ST1_ATR_VALUE,
     SYSSTRNDPXY_ST1_FACTOR,
     SYSDTAFPXY_FIXED_BRICK_SIZE,
+    SYSSMAPXY_VARIANT,
+    SYSSTRNDPXY_CHART_TARGET_ROWS,
     EXEAMSPXY_MAX_INVESTMENT,
     EXECBUYPXY_ENTRY_KEY_COLUMN,
 )
 from sysdtafpxy import apply_ohlc_transformation
-from syssmapxy import get_sma
+from syssmapxy import calculate_moving_average, get_sma
 from sysdecisionpxy import (
     averaging_trigger_sides,
     counter_leg_script,
@@ -83,19 +86,24 @@ class ConfigurationWiringTests(unittest.TestCase):
 
     def test_syspxy_snapshot_passes_through_sma_status(self):
         snapshot_df = pd.DataFrame({"Close": [100.0]})
+        chart_df = pd.DataFrame({"Close": [100.0] * SYSSTRNDPXY_CHART_TARGET_ROWS})
         with (
             patch.object(syspxy, "dispatch_mode", return_value=None),
             patch.object(syspxy, "export_supertrend_json") as export_chart,
             patch.object(
                 syspxy,
                 "get_full_snapshot",
-                return_value={"sma": "BEAR", "df": snapshot_df},
+                return_value={
+                    "sma": "BEAR",
+                    "df": snapshot_df,
+                    "chart_df": chart_df,
+                },
             ),
             patch.object(syspxy.os, "makedirs"),
             patch("builtins.open", mock_open()),
         ):
             self.assertEqual(syspxy.get_all_data()["sma"], "BEAR")
-        export_chart.assert_called_once_with(snapshot_df)
+        export_chart.assert_called_once_with(chart_df)
 
     def test_supertrend_chart_json_includes_rolling_sma50(self):
         index = pd.date_range("2026-10-07", periods=52, freq="min")
@@ -118,13 +126,122 @@ class ConfigurationWiringTests(unittest.TestCase):
 
         self.assertIsNone(exported[0]["sma50"])
         self.assertEqual(exported[-1]["sma50"], 27.5)
+        self.assertEqual(exported[-1]["tsma50"], 52.0)
+
+    def test_chart_ma_series_are_full_across_the_visible_60_bars(self):
+        closes = [
+            float(value)
+            for value in range(1, SYSSTRNDPXY_CHART_TARGET_ROWS + 1)
+        ]
+        frame = pd.DataFrame(
+            {
+                "Open": closes,
+                "High": [value + 1 for value in closes],
+                "Low": [value - 1 for value in closes],
+                "Close": closes,
+            },
+            index=pd.date_range(
+                "2026-10-07", periods=SYSSTRNDPXY_CHART_TARGET_ROWS, freq="min"
+            ),
+        )
+
+        processed = sysstrndpxy.calculate_supertrend(frame)
+
+        self.assertEqual(processed["sma_50"].tail(60).notna().sum(), 60)
+        self.assertEqual(processed["tsma_50"].tail(60).notna().sum(), 60)
+
+    def test_chart_history_covers_the_visible_50_period_average_window(self):
+        index = pd.date_range(
+            "2026-10-07", periods=SYSSTRNDPXY_CHART_TARGET_ROWS, freq="min"
+        )
+        closes = [
+            float(value)
+            for value in range(1, SYSSTRNDPXY_CHART_TARGET_ROWS + 1)
+        ]
+        frame = pd.DataFrame(
+            {
+                "Open": closes,
+                "High": [value + 1 for value in closes],
+                "Low": [value - 1 for value in closes],
+                "Close": closes,
+            },
+            index=index,
+        )
+
+        def add_trend_columns(source):
+            output = source.copy()
+            output["st_line"] = output["Close"]
+            output["st_mirror"] = output["Close"]
+            output["ST_Trend"] = "BULL"
+            output["ST"] = output["Close"]
+            return output
+
+        with (
+            patch.object(sysdashpxy, "fetch_yf_data", return_value=frame) as fetch,
+            patch.object(sysdashpxy, "get_candle_visual", return_value=""),
+            patch.object(
+                sysdashpxy,
+                "get_pxy_data",
+                return_value=(0, 0, "", frame),
+            ),
+            patch.object(
+                sysdashpxy,
+                "detect_pxy_flip_signal",
+                return_value=("BULL", 0, 0, 0),
+            ),
+            patch.object(sysdashpxy, "calculate_adx", return_value=(1.0, 1.0)),
+            patch.object(sysdashpxy, "calculate_atr", return_value=pd.Series([1.0])),
+            patch.object(sysdashpxy, "calculate_dynamic_k", return_value=1),
+            patch.object(sysdashpxy, "detect_raw_direction", return_value=(110, "UP")),
+            patch.object(
+                sysdashpxy,
+                "calculate_supertrend",
+                side_effect=add_trend_columns,
+            ),
+            patch.object(sysdashpxy, "get_ce_pe_power", return_value=(1, 1, 1)),
+            patch.object(sysdashpxy, "get_entry_signal", return_value=("BUY", "BULL")),
+            patch.object(sysdashpxy, "get_day_candle_bar", return_value=""),
+            patch.object(sysdashpxy, "get_bos_bar", return_value=("NONE", None)),
+            patch.object(
+                sysdashpxy,
+                "get_sma",
+                return_value={"status": "BULL"},
+            ),
+        ):
+            snapshot = sysdashpxy.get_full_snapshot()
+
+        fetch.assert_called_once_with(target_rows=SYSSTRNDPXY_CHART_TARGET_ROWS)
+        self.assertEqual(len(snapshot["df"]), 60)
+        self.assertEqual(len(snapshot["chart_df"]), SYSSTRNDPXY_CHART_TARGET_ROWS)
+
+    def test_sysmapxy_defaults_to_tsma_and_keeps_sma_selectable(self):
+        closes = pd.Series([float(value) for value in range(1, 61)])
+
+        self.assertEqual(SYSSMAPXY_VARIANT, "TSMA")
+        self.assertEqual(
+            __import__("pxyconfigwebpxy").ENUMS["SYSSMAPXY_VARIANT"],
+            ("SMA", "TSMA"),
+        )
+        self.assertEqual(
+            calculate_moving_average(closes, period=50, variant="TSMA").iloc[-1],
+            60.0,
+        )
+        self.assertEqual(
+            calculate_moving_average(closes, period=50, variant="SMA").iloc[-1],
+            35.5,
+        )
+        self.assertEqual(get_sma(pd.DataFrame({"Close": closes}))["variant"], "TSMA")
+        self.assertEqual(
+            get_sma(pd.DataFrame({"Close": closes}), variant="SMA")["value"],
+            35.5,
+        )
 
     def test_sma_status_is_relative_to_50_period_simple_moving_average(self):
         above = pd.DataFrame({"Close": [100.0] * 49 + [101.0]})
         below = pd.DataFrame({"Close": [100.0] * 49 + [99.0]})
 
-        self.assertEqual(get_sma(above, period=50)["status"], "BULL")
-        self.assertEqual(get_sma(below, period=50)["status"], "BEAR")
+        self.assertEqual(get_sma(above, period=50, variant="SMA")["status"], "BULL")
+        self.assertEqual(get_sma(below, period=50, variant="SMA")["status"], "BEAR")
 
     def test_entry_and_exit_follow_directional_supertrend(self):
         frame = pd.DataFrame({"Close": [1]})

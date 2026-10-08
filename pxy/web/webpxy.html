@@ -404,6 +404,11 @@ body{
             <span id="candleLineToggle" style="display:flex;gap:4px;">
                 <span onclick="setChartMode('candle')" id="chartModeCandle" style="font-size:9px;color:var(--accent);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--accent);white-space:nowrap;">Candles</span>
                 <span onclick="setChartMode('line')" id="chartModeLine" style="font-size:9px;color:var(--muted);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;">Line</span>
+                <label for="chartMaVariant" style="font-size:9px;color:var(--muted);white-space:nowrap;">MA</label>
+                <select id="chartMaVariant" aria-label="Moving average variant" onchange="setChartMaVariant(this.value)" style="font-size:9px;padding:2px 4px;border:1px solid var(--border);border-radius:3px;background:var(--bg3);color:var(--text);">
+                    <option value="TSMA" selected>TSMA 50</option>
+                    <option value="SMA">SMA 50</option>
+                </select>
             </span>
         </div>
         <div id="chartRow" style="flex:1;min-height:0;display:flex;flex-direction:row;">
@@ -851,11 +856,16 @@ async function loadDash(){
 /* ── CHART ── */
 let lastCandles=null,lastMoCandles=null;
 let chartMode='candle';
+let chartMaVariant='TSMA';
 function setChartMode(mode){
     chartMode=mode;
     const c=$('chartModeCandle'),l=$('chartModeLine');
     if(c){c.style.borderColor=mode==='candle'?cssVar('--accent'):cssVar('--border');c.style.color=mode==='candle'?cssVar('--accent'):cssVar('--muted');}
     if(l){l.style.borderColor=mode==='line'?cssVar('--accent'):cssVar('--border');l.style.color=mode==='line'?cssVar('--accent'):cssVar('--muted');}
+    if(lastCandles)drawChart(lastCandles);
+}
+function setChartMaVariant(variant){
+    chartMaVariant=variant==='SMA'?'SMA':'TSMA';
     if(lastCandles)drawChart(lastCandles);
 }
 function setChartView(view){
@@ -887,7 +897,7 @@ async function loadChart(){
             o:d.open??d.o??null, h:d.high??d.h??null, l:d.low??d.l??null,
             c:d.close??d.Close??d.price??null,
             st_line:d.st_line??null, mirror_line:d.mirror_line??null,
-            sma50:d.sma50??null, trend:d.trend||null
+            sma50:d.sma50??null, tsma50:d.tsma50??null, trend:d.trend||null
         }));
         lastCandles=candles;
         drawChart(candles);
@@ -919,7 +929,8 @@ function drawChart(candles){
         if(c.h!=null)hi=Math.max(hi,c.h);
         if(c.st_line!=null){lo=Math.min(lo,c.st_line);hi=Math.max(hi,c.st_line);}
         if(c.mirror_line!=null){lo=Math.min(lo,c.mirror_line);hi=Math.max(hi,c.mirror_line);}
-        if(c.sma50!=null){lo=Math.min(lo,c.sma50);hi=Math.max(hi,c.sma50);}
+        const movingAverage=chartMaVariant==='SMA'?c.sma50:c.tsma50;
+        if(movingAverage!=null){lo=Math.min(lo,movingAverage);hi=Math.max(hi,movingAverage);}
     });
     if(!isFinite(lo)||!isFinite(hi))return;
     const pad=(hi-lo)*0.08||1;
@@ -1011,16 +1022,17 @@ function drawChart(candles){
     });
     ctx.stroke();
 
-    // SMA-50 — thin dashed line
+    // Selected 50-period moving average — thin dashed line
     ctx.strokeStyle=cssVar('--cjs-sma');ctx.lineWidth=1.2;ctx.setLineDash([4,3]);
     ctx.beginPath();
-    let smaStarted=false;
+    let maStarted=false;
     for(let i=1;i<n;i++){
-        const prev=vis[i-1].sma50,current=vis[i].sma50;
+        const prev=chartMaVariant==='SMA'?vis[i-1].sma50:vis[i-1].tsma50;
+        const current=chartMaVariant==='SMA'?vis[i].sma50:vis[i].tsma50;
         if(prev==null||current==null)continue;
-        if(!smaStarted){
+        if(!maStarted){
             ctx.moveTo(toX(i-1),toY(prev));
-            smaStarted=true;
+            maStarted=true;
         }
         ctx.lineTo(toX(i),toY(current));
     }

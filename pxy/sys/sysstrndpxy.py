@@ -10,6 +10,7 @@ from syscnfgpxy import (
     SYSSTRNDPXY_ST1_ATR_VALUE,
     SYSSTRNDPXY_ST1_FACTOR,
 )
+from syssmapxy import calculate_moving_average
 
 # 🛡️ DEFENSIVE IMPORTS ROUTING MATH DIRECTLY TO THE CALCULATION ENGINE
 try:
@@ -91,7 +92,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['ST_Trend'] = st_trend_series   
     df['ST'] = st1_line                
     df['st1_mirror'] = st1_mirror      
-    df['sma_50'] = df['Close'].rolling(window=50).mean()
+    df['sma_50'] = calculate_moving_average(df['Close'], period=50, variant="SMA")
+    df['tsma_50'] = calculate_moving_average(df['Close'], period=50, variant="TSMA")
 
     return df
 
@@ -108,6 +110,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file='../web/webchrtp
         st_val = float(row['st_line']) if not pd.isna(row['st_line']) else 0.0
         mirror_val = float(row['st_mirror']) if not pd.isna(row['st_mirror']) else 0.0
         sma_val = float(row['sma_50']) if not pd.isna(row.get('sma_50')) else None
+        tsma_val = float(row['tsma_50']) if not pd.isna(row.get('tsma_50')) else None
 
         output.append({
             'time': int(idx.timestamp()),
@@ -118,6 +121,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file='../web/webchrtp
             'st_line': st_val,
             'mirror_line': mirror_val,
             'sma50': sma_val,
+            'tsma50': tsma_val,
             'trend': str(row.get('ST_Trend', 'SIDE')) if not pd.isna(row.get('ST_Trend', 'SIDE')) else 'SIDE'
         })
 
