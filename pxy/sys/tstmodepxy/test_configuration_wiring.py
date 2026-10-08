@@ -1,5 +1,6 @@
 import re
 import sys
+import tempfile
 import unittest
 from contextlib import redirect_stdout
 from datetime import date, time, timedelta
@@ -29,6 +30,7 @@ import exeavxpxy
 import exeentrpxy
 import sysentrpxy
 import syspxy
+import sysstrndpxy
 import runniftypxy
 from syscnfgpxy import (
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
@@ -80,14 +82,42 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(single_line.iloc[0], first_hl2 + factor * atr)
 
     def test_syspxy_snapshot_passes_through_sma_status(self):
+        snapshot_df = pd.DataFrame({"Close": [100.0]})
         with (
             patch.object(syspxy, "dispatch_mode", return_value=None),
-            patch.object(syspxy, "export_supertrend_json"),
-            patch.object(syspxy, "get_full_snapshot", return_value={"sma": "BEAR"}),
+            patch.object(syspxy, "export_supertrend_json") as export_chart,
+            patch.object(
+                syspxy,
+                "get_full_snapshot",
+                return_value={"sma": "BEAR", "df": snapshot_df},
+            ),
             patch.object(syspxy.os, "makedirs"),
             patch("builtins.open", mock_open()),
         ):
             self.assertEqual(syspxy.get_all_data()["sma"], "BEAR")
+        export_chart.assert_called_once_with(snapshot_df)
+
+    def test_supertrend_chart_json_includes_rolling_sma50(self):
+        index = pd.date_range("2026-10-07", periods=52, freq="min")
+        closes = [float(value) for value in range(1, 53)]
+        frame = pd.DataFrame(
+            {
+                "Open": closes,
+                "High": [value + 1 for value in closes],
+                "Low": [value - 1 for value in closes],
+                "Close": closes,
+            },
+            index=index,
+        )
+        with tempfile.TemporaryDirectory(prefix="pxy-sma-chart-") as temp:
+            output_file = Path(temp) / "webchrtpxy.json"
+            exported = sysstrndpxy.export_supertrend_json(
+                sysstrndpxy.calculate_supertrend(frame), str(output_file)
+            )
+            self.assertTrue(output_file.exists())
+
+        self.assertIsNone(exported[0]["sma50"])
+        self.assertEqual(exported[-1]["sma50"], 27.5)
 
     def test_sma_status_is_relative_to_50_period_simple_moving_average(self):
         above = pd.DataFrame({"Close": [100.0] * 49 + [101.0]})

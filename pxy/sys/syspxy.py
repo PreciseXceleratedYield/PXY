@@ -54,11 +54,11 @@ def get_all_data():
 
     dispatch_mode("run_futures_sidecar", run_production_futures_sidecar)
 
-    # -------- RUN TREND CHART GENERATION SECOND --------
-    export_supertrend_json()
-
     # -------- CORE --------
     core = get_full_snapshot() or {}
+
+    # -------- RUN TREND CHART GENERATION FROM THE SAME SNAPSHOT --------
+    export_supertrend_json(core.get("df"))
 
     # -------- DYNAMIC PRICE LOGIC (FUT AVERAGE OR FALLBACK) --------
     try:

@@ -886,7 +886,8 @@ async function loadChart(){
         const candles=data.map(d=>({
             o:d.open??d.o??null, h:d.high??d.h??null, l:d.low??d.l??null,
             c:d.close??d.Close??d.price??null,
-            st_line:d.st_line??null, mirror_line:d.mirror_line??null, trend:d.trend||null
+            st_line:d.st_line??null, mirror_line:d.mirror_line??null,
+            sma50:d.sma50??null, trend:d.trend||null
         }));
         lastCandles=candles;
         drawChart(candles);
@@ -918,6 +919,7 @@ function drawChart(candles){
         if(c.h!=null)hi=Math.max(hi,c.h);
         if(c.st_line!=null){lo=Math.min(lo,c.st_line);hi=Math.max(hi,c.st_line);}
         if(c.mirror_line!=null){lo=Math.min(lo,c.mirror_line);hi=Math.max(hi,c.mirror_line);}
+        if(c.sma50!=null){lo=Math.min(lo,c.sma50);hi=Math.max(hi,c.sma50);}
     });
     if(!isFinite(lo)||!isFinite(hi))return;
     const pad=(hi-lo)*0.08||1;
@@ -1008,6 +1010,22 @@ function drawChart(candles){
         if(!mStarted){ctx.moveTo(x,y);mStarted=true;}else ctx.lineTo(x,y);
     });
     ctx.stroke();
+
+    // SMA-50 — thin dashed line
+    ctx.strokeStyle=cssVar('--cjs-sma');ctx.lineWidth=1.2;ctx.setLineDash([4,3]);
+    ctx.beginPath();
+    let smaStarted=false;
+    for(let i=1;i<n;i++){
+        const prev=vis[i-1].sma50,current=vis[i].sma50;
+        if(prev==null||current==null)continue;
+        if(!smaStarted){
+            ctx.moveTo(toX(i-1),toY(prev));
+            smaStarted=true;
+        }
+        ctx.lineTo(toX(i),toY(current));
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
 }
 function drawMomentumBar(candles){
     if(!candles||!candles.length)return;

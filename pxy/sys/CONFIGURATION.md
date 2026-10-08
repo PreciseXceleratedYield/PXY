@@ -176,7 +176,8 @@ settings should resolve to `None` rather than retain an active schedule.
   is `BULL` (north, price at/above SMA-50), and PE only when it is `BEAR`
   (south, price below SMA-50); missing/unknown SMA status blocks both sides.
   The SMA status is passed through `syspxy.get_all_data()` from the core
-  snapshot's `sma` field. For counter-buy in `DIRGT`, `UP` can immediately trigger the
+  snapshot's `sma` field. The trend chart JSON also carries the rolling SMA-50
+  as `sma50` for the web chart. For counter-buy in `DIRGT`, `UP` can immediately trigger the
   missing CE leg when CE has no open rows and PE has more than one; `DOWN`
   can similarly trigger the missing PE leg when PE has no open rows and CE
   has more than one. Otherwise the existing entry-signal counter-buy rule
