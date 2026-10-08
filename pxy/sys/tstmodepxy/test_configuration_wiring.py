@@ -35,6 +35,17 @@ import sysstrndpxy
 import runniftypxy
 from syscnfgpxy import (
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
+    SYSCNFGPXY_EXCHANGE_OPEN,
+    SYSCNFGPXY_PREOPEN_START,
+    SYSCNFGPXY_MARKET_OPEN,
+    SYSCNFGPXY_ENGINE_CLOSE,
+    SYSCNFGPXY_TRADING_PIPE_CLOSE,
+    SYSCNFGPXY_TRADING_DAY_END,
+    SYSCNFGPXY_AVERAGING_START,
+    SYSCNFGPXY_ENTRY_CUTOFF,
+    SYSCNFGPXY_SQUAREOFF_START,
+    SYSCNFGPXY_SQUAREOFF_ALL_START,
+    SYSCNFGPXY_SQUAREOFF_END,
     SYSCNFGPXY_TIMEZONE,
     SYSSTRNDPXY_ST1_ATR_VALUE,
     SYSSTRNDPXY_ST1_FACTOR,
@@ -64,6 +75,41 @@ class ConfigurationWiringTests(unittest.TestCase):
 
     def tearDown(self):
         self.cooldown_patch.stop()
+
+    def test_market_hour_aliases_share_the_canonical_schedule(self):
+        import syscnfgpxy
+
+        self.assertEqual(syscnfgpxy.SYSEXEPXY_MARKET_OPEN, SYSCNFGPXY_MARKET_OPEN)
+        self.assertEqual(syscnfgpxy.SYSEXEPXY_MARKET_CLOSE, SYSCNFGPXY_ENGINE_CLOSE)
+        self.assertEqual(syscnfgpxy.EXEPXYPXY_MARKET_OPEN, SYSCNFGPXY_MARKET_OPEN)
+        self.assertEqual(
+            syscnfgpxy.EXEPXYPXY_MARKET_CLOSE, SYSCNFGPXY_TRADING_PIPE_CLOSE
+        )
+        self.assertEqual(syscnfgpxy.EXEENTRPXY_PREOPEN_START, SYSCNFGPXY_PREOPEN_START)
+        self.assertEqual(syscnfgpxy.EXEENTRPXY_PREOPEN_END, SYSCNFGPXY_MARKET_OPEN)
+        self.assertEqual(syscnfgpxy.EXEENTRPXY_ENTRY_CUTOFF, SYSCNFGPXY_ENTRY_CUTOFF)
+        self.assertEqual(syscnfgpxy.EXEENTRPXY_SQUAREOFF_END, SYSCNFGPXY_SQUAREOFF_END)
+        self.assertEqual(syscnfgpxy.EXEAVXPXY_MARKET_START, SYSCNFGPXY_AVERAGING_START)
+        self.assertEqual(syscnfgpxy.EXEAVXPXY_MARKET_END, SYSCNFGPXY_ENTRY_CUTOFF)
+        self.assertEqual(syscnfgpxy.EXECBUYPXY_CUTOFF, SYSCNFGPXY_ENTRY_CUTOFF)
+        self.assertEqual(syscnfgpxy.EXEEXITPXY_SQOFF_START, SYSCNFGPXY_SQUAREOFF_START)
+        self.assertEqual(
+            syscnfgpxy.EXEEXITPXY_SQOFF_ALL_START, SYSCNFGPXY_SQUAREOFF_ALL_START
+        )
+        self.assertEqual(syscnfgpxy.EXEEXITPXY_SQOFF_END, SYSCNFGPXY_SQUAREOFF_END)
+        self.assertEqual(
+            syscnfgpxy.TSTPOINTBTPXY_TRADING_DAY_START, SYSCNFGPXY_EXCHANGE_OPEN
+        )
+        self.assertEqual(
+            syscnfgpxy.TSTPOINTBTPXY_TRADING_DAY_END, SYSCNFGPXY_TRADING_DAY_END
+        )
+        self.assertEqual(syscnfgpxy.TSTPOINTBTPXY_MARKET_OPEN, SYSCNFGPXY_MARKET_OPEN)
+        self.assertEqual(
+            syscnfgpxy.TSTPOINTBTPXY_MARKET_CLOSE, SYSCNFGPXY_TRADING_PIPE_CLOSE
+        )
+        self.assertEqual(
+            syscnfgpxy.TSTPOINTBTPXY_FORCE_EXIT_TIME, SYSCNFGPXY_SQUAREOFF_ALL_START
+        )
 
     def test_supertrend_variants_use_fixed_atr_value_five(self):
         index = pd.date_range("2026-10-07", periods=3, freq="min")

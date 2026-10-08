@@ -12,15 +12,27 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 - Name tunables `<OWNER_MODULE>_<PARAMETER>` using the consuming module's
   filename without `.py`; e.g. `RUNEXACPXY_BREACH_TICKS_REQUIRED` belongs to
   `exe/run/runexacpxy.py`.
-- Use `SYSCNFGPXY_` only for genuinely shared values such as ticker and
-  timezone. Data ingestion derives its pandas/Yahoo timezone string from the
-  shared timezone; do not add a second independent timezone setting.
+- Use `SYSCNFGPXY_` for genuinely shared values such as ticker, timezone, and
+  the common exchange/engine schedule. Data ingestion derives its pandas/Yahoo
+  timezone string from the shared timezone; do not add a second independent
+  timezone setting.
 - `RUNMODE` is the intentional environment override for
   `SYSMODEPXY_RUN_MODE`; the production menu reads the resolved value from
   `syscnfgpxy.py`. Shell scripts select deployment mode, not strategy knobs.
 - `SYSCNFGPXY_ACTION_COOLDOWN_SECONDS` is the single shared cooldown for
   averaging, counter-buy, exit de-duplication, and the production engine's
   between-cycle pause. Its current value is 7 seconds.
+- Shared market times are declared once as `SYSCNFGPXY_*` in
+  `syscnfgpxy.py`; subsystem-prefixed names remain compatibility aliases.
+  The schedule distinguishes the 09:15 exchange open, 09:16 engine start,
+  09:17 averaging start, 15:10 entry/averaging cutoff, the 15:11/15:14
+  square-off stages, and distinct engine, pipe, replay, and final-square-off
+  close times. Change those shared values rather than editing duplicate
+  per-subsystem times. The 09:00–09:30 directional-signal window and the
+  09:15–10:10 morning BOS classification are separate strategy windows.
+  The standalone 15:25 square-off trigger is also intentionally separate from
+  the staged exit schedule. Legacy `exe/run/X` scripts and pipe-scenario test
+  fixtures retain their own values; they do not drive the production schedule.
 - Supertrend always uses the DUAL calculation. Its only parameters are
   `SYSSTRNDPXY_ST1_ATR_VALUE` (default `5`) and `SYSSTRNDPXY_ST1_FACTOR`
   (default `1.4`); no ATR period or variant selector is used. This is
@@ -48,8 +60,8 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 
 | Area (owner prefixes) | Responsibility |
 | --- | --- |
-| `SYSCNFGPXY`, `SYSMODEPXY`, `SYSEXEPXY`, `EXEPXYPXY` | Shared defaults, run-mode validation, supervisor and engine scheduling |
-| `SYSDTAFPXY`, `SYSPLCHRTPXY`, `SYSSTRNDPXY`, `SYSSMAPXY`, `SYSDTSTPXY`, `SYSSADXPXY`, `SYSMKTPXY`, `SYSRIGPXY`, `SYSKATRPXY`, `SYSPWERPXY`, `SYSDPTPXY` | Data acquisition and signal/indicator parameters, including the directional force factors |
+| `SYSCNFGPXY`, `SYSMODEPXY`, `SYSEXEPXY`, `EXEPXYPXY` | Shared defaults and market schedule, run-mode validation, supervisor and engine scheduling |
+| `SYSDTAFPXY`, `SYSPLCHRTPXY`, `SYSSTRNDPXY`, `SYSSMAPXY`, `SYSDTSTPXY`, `SYSSADXPXY`, `SYSBBOSPXY`, `SYSMKTPXY`, `SYSRIGPXY`, `SYSKATRPXY`, `SYSPWERPXY`, `SYSDPTPXY` | Data acquisition and signal/indicator parameters, including breakout session recognition and directional force factors |
 | `EXEAGTPXY`, `EXEACGPXY`, `EXEAMSPXY`, `EXEAVXPXY`, `EXEAVGPXY`, `EXEENTRPXY` | Entry thresholds, averaging window/limits, average-order payload, and entry pipeline |
 | `EXEFORCEPXY`, `EXESLPXY`, `EXECBUYPXY`, `EXEEXITPXY`, `EXESQRPXY`, `EXEOMSPXY`, `EXEDYNPXY`, `EXETGTPXY`, `EXEOTMPXY` | Force/stop/counter orders, exit and square-off behavior, targets, and symbol selection |
 | `RUNNIFTYPXY`, `RUNEXMTPXY`, `RUNEXACPXY`, `RUNEXIOPXY`, `RUNEXLQDPXY`, `RUNLILOPXY` | Symbol selection, risk-ledger mathematics/actions/state/liquidation, and order-ledger filtering |

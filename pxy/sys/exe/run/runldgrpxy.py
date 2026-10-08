@@ -83,7 +83,8 @@ def send_telegram_payload(message_text, bot_token, chat_id):
 import sys
 import pytz
 import traceback
-from datetime import datetime, time
+from datetime import datetime
+from syscnfgpxy import SYSCNFGPXY_ENGINE_CLOSE, SYSCNFGPXY_EXCHANGE_OPEN
 from runclntpxy import get_session
 
 # ⚙️ CONFIGURATION & ENVIRONMENTAL SETTINGS
@@ -99,10 +100,10 @@ def run_snapshot_report():
     now_ist = datetime.now(IST)
     current_time = now_ist.time()
     
-    start_market = time(9, 15)
-    end_market = time(15, 45)
+    start_market = SYSCNFGPXY_EXCHANGE_OPEN
+    end_market = SYSCNFGPXY_ENGINE_CLOSE
     
-    # 🕒 Strict Time Restriction Gate (9:15 AM to 3:45 PM IST)
+    # Keep the manual-start restriction aligned with the shared session schedule.
     if start_market <= current_time <= end_market:
         print("=" * W)
         print(pad_row("🛰️ PXY MONITOR LIVE ENGINE 🟢", W))

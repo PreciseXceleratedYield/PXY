@@ -1,22 +1,10 @@
-import pytz
-from datetime import datetime, time
-
 # Change this line in execepepxy.py
 def get_target_quantities(supertrend, ce_lots, pe_lots, lot_size=None):
     """
-    Calculates target lot limits by independently tracking live Indian Standard Time (IST).
+    Calculates target lot limits from the strict one-lot safety ceiling.
     """
     MODE = "STRICT_NN" #"TREND" 
-    
-    # 1. Fetch live time independently forced to Indian Standard Time (IST)
-    ist_tz = pytz.timezone('Asia/Kolkata')
-    current_time_ist = datetime.now(ist_tz).time()
-        
-    # 2. Independent Guard Limit evaluation based purely on IST
-    if time(9, 15) <= current_time_ist <= time(9, 30):
-        HARD_MAX_LIMIT_LOTS = 1
-    else:
-        HARD_MAX_LIMIT_LOTS = 1
+    HARD_MAX_LIMIT_LOTS = 1
 
     # Route A: Absolute Continuous N:N Balance 
     if MODE == "STRICT_NN":
