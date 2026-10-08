@@ -2,6 +2,8 @@
 from colorama import Fore, Style, init
 import pandas as pd
 import numpy as np
+from datetime import time
+from syscnfgpxy import SYSCNFGPXY_EXCHANGE_OPEN, SYSBBOSPXY_MORNING_SESSION_END
 
 init(autoreset=True)
 WIDTH = 42
@@ -64,13 +66,12 @@ def get_bos_bar(df):
         l_live = float(live_candle['Low'])
         c_42 = float(live_candle['Close'])
         
-        # --- TIME STAMP EXTRACTION MATRIX FOR MORNING RECOGNITION (09:15 to 10:10) ---
+        # --- TIME STAMP EXTRACTION MATRIX FOR MORNING RECOGNITION ---
         target_time = df.index[-1]
-        t_hour = target_time.hour
-        t_min = target_time.minute
-        
-        # Exact 09:15 to 10:10 exchange morning session bracket gate
-        is_morning_session = (t_hour == 9 and t_min >= 15) or (t_hour == 10 and t_min <= 10)
+        session_time = time(target_time.hour, target_time.minute)
+        is_morning_session = (
+            SYSCNFGPXY_EXCHANGE_OPEN <= session_time <= SYSBBOSPXY_MORNING_SESSION_END
+        )
         # -------------------------------------------------------------
 
         # --- LIVE RUNNING & IMMEDIATE CLOSED CANDLE FILTER ---

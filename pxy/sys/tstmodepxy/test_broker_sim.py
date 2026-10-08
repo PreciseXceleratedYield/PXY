@@ -10,7 +10,7 @@ if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 
 from tstmodepxy.broker_sim import SimulatedBroker
-from tstmodepxy.backtest import write_session_csvs
+from tstmodepxy.backtest import score_spot_points, write_session_csvs
 
 
 class SimulatedBrokerTests(unittest.TestCase):
@@ -58,6 +58,13 @@ class SimulatedBrokerTests(unittest.TestCase):
         self.place("S", "PE", "WF0000002_S002")
         self.assertEqual(self.broker.trades()[0]["index_points_per_unit"], 10)
 
+    def test_spot_point_score_is_directional_and_quantity_weighted(self):
+        self.assertEqual(score_spot_points("CE", 22000, 22050, 75), 3750)
+        self.assertEqual(score_spot_points("PE", 22050, 22000, 75), 3750)
+        self.assertEqual(score_spot_points("CE", 22050, 22000, 75), -3750)
+        with self.assertRaisesRegex(ValueError, "side must be CE or PE"):
+            score_spot_points("XX", 22000, 22050, 75)
+
     def test_rejects_invalid_orders_and_oversells(self):
         self.assertEqual(self.place("B", "CE", "WF0000003", 0)["stat"], "Not_Ok")
         self.assertEqual(
@@ -92,10 +99,11 @@ class SimulatedBrokerTests(unittest.TestCase):
                 Path(temp),
                 "2025-01-06",
                 [{
-                    "side": "CE", "entry_time": "09:17", "exit_time": "09:18",
+                    "session": "2025-01-06", "side": "CE",
+                    "entry_time": "09:17", "exit_time": "09:18",
                     "entry_spot": 100, "exit_spot": 101, "points": 1,
-                    "exit_reason": "production_pipe", "quantity": 75,
-                    "simulated_option_entry": 100, "simulated_option_exit": 101,
+                    "spot_points_per_unit": 1,
+                    "exit_reason": "target_exit", "quantity": 1,
                 }],
                 [{
                     "timestamp": "09:16", "execution_timestamp": "09:17",
@@ -105,7 +113,8 @@ class SimulatedBrokerTests(unittest.TestCase):
                     "order_tags": "WF0000001",
                 }],
             )
-            self.assertIn("simulated_option_entry", trade_path.read_text())
+            self.assertIn("spot_points_per_unit", trade_path.read_text())
+            self.assertNotIn("simulated_option_entry", trade_path.read_text())
             self.assertIn("execution_timestamp", bars_path.read_text())
 
 

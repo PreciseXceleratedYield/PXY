@@ -12,15 +12,27 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 - Name tunables `<OWNER_MODULE>_<PARAMETER>` using the consuming module's
   filename without `.py`; e.g. `RUNEXACPXY_BREACH_TICKS_REQUIRED` belongs to
   `exe/run/runexacpxy.py`.
-- Use `SYSCNFGPXY_` only for genuinely shared values such as ticker and
-  timezone. Data ingestion derives its pandas/Yahoo timezone string from the
-  shared timezone; do not add a second independent timezone setting.
+- Use `SYSCNFGPXY_` for genuinely shared values such as ticker, timezone, and
+  the common exchange/engine schedule. Data ingestion derives its pandas/Yahoo
+  timezone string from the shared timezone; do not add a second independent
+  timezone setting.
 - `RUNMODE` is the intentional environment override for
   `SYSMODEPXY_RUN_MODE`; the production menu reads the resolved value from
   `syscnfgpxy.py`. Shell scripts select deployment mode, not strategy knobs.
 - `SYSCNFGPXY_ACTION_COOLDOWN_SECONDS` is the single shared cooldown for
   averaging, counter-buy, exit de-duplication, and the production engine's
   between-cycle pause. Its current value is 7 seconds.
+- Shared market times are declared once as `SYSCNFGPXY_*` in
+  `syscnfgpxy.py`; subsystem-prefixed names remain compatibility aliases.
+  The schedule distinguishes the 09:15 exchange open, 09:16 engine start,
+  09:17 averaging start, 15:10 entry/averaging cutoff, the 15:11/15:14
+  square-off stages, and distinct engine, pipe, replay, and final-square-off
+  close times. Change those shared values rather than editing duplicate
+  per-subsystem times. The 09:00–09:30 directional-signal window and the
+  09:15–10:10 morning BOS classification are separate strategy windows.
+  The standalone 15:25 square-off trigger is also intentionally separate from
+  the staged exit schedule. Legacy `exe/run/X` scripts and pipe-scenario test
+  fixtures retain their own values; they do not drive the production schedule.
 - Supertrend always uses the DUAL calculation. Its only parameters are
   `SYSSTRNDPXY_ST1_ATR_VALUE` (default `5`) and `SYSSTRNDPXY_ST1_FACTOR`
   (default `1.4`); no ATR period or variant selector is used. This is
@@ -48,8 +60,8 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 
 | Area (owner prefixes) | Responsibility |
 | --- | --- |
-| `SYSCNFGPXY`, `SYSMODEPXY`, `SYSEXEPXY`, `EXEPXYPXY` | Shared defaults, run-mode validation, supervisor and engine scheduling |
-| `SYSDTAFPXY`, `SYSPLCHRTPXY`, `SYSSTRNDPXY`, `SYSSMAPXY`, `SYSDTSTPXY`, `SYSSADXPXY`, `SYSMKTPXY`, `SYSRIGPXY`, `SYSKATRPXY`, `SYSPWERPXY`, `SYSDPTPXY` | Data acquisition and signal/indicator parameters, including the directional force factors |
+| `SYSCNFGPXY`, `SYSMODEPXY`, `SYSEXEPXY`, `EXEPXYPXY` | Shared defaults and market schedule, run-mode validation, supervisor and engine scheduling |
+| `SYSDTAFPXY`, `SYSPLCHRTPXY`, `SYSSTRNDPXY`, `SYSSMAPXY`, `SYSDTSTPXY`, `SYSSADXPXY`, `SYSBBOSPXY`, `SYSMKTPXY`, `SYSRIGPXY`, `SYSKATRPXY`, `SYSPWERPXY`, `SYSDPTPXY` | Data acquisition and signal/indicator parameters, including breakout session recognition and directional force factors |
 | `EXEAGTPXY`, `EXEACGPXY`, `EXEAMSPXY`, `EXEAVXPXY`, `EXEAVGPXY`, `EXEENTRPXY` | Entry thresholds, averaging window/limits, average-order payload, and entry pipeline |
 | `EXEFORCEPXY`, `EXESLPXY`, `EXECBUYPXY`, `EXEEXITPXY`, `EXESQRPXY`, `EXEOMSPXY`, `EXEDYNPXY`, `EXETGTPXY`, `EXEOTMPXY` | Force/stop/counter orders, exit and square-off behavior, targets, and symbol selection |
 | `RUNNIFTYPXY`, `RUNEXMTPXY`, `RUNEXACPXY`, `RUNEXIOPXY`, `RUNEXLQDPXY`, `RUNLILOPXY` | Symbol selection, risk-ledger mathematics/actions/state/liquidation, and order-ledger filtering |
@@ -86,7 +98,7 @@ restarted.
 
 `SYSENTRPXY_SIGNAL_MODE` selects the entry and exit signal source. `MKT` uses
 raw market direction all session (`UP` → `BUY`/`BULL`, `DOWN` →
-`SELL`/`BEAR`); neutral direction returns `NONE` for both. `MKT` is the default.
+`SELL`/`BEAR`); neutral direction returns `NONE` for both.
 `STS`
 preserves the current Supertrend policy: from `SYSENTRPXY_DIRECTION_ONLY_START`
 (09:00 IST) until `SYSENTRPXY_DIRECTION_ONLY_END` (09:30 IST), both signals
@@ -96,7 +108,9 @@ and `BEAR` for Supertrend BEAR; when Supertrend is SIDE, exit falls back to
 `sysmktpxy.get_signal()` (`BULL`/`BEAR`), otherwise `NONE`. Exit never returns
 `SIDE`; a `SIDE` entry is not a valid fresh-order command.
 `SYSDTAFPXY_SELECTED_MODE` independently selects the OHLC data transformation
-supplied to signal calculations.
+supplied to signal calculations. The current configuration uses mode `2`
+(OC/2) and `SYSENTRPXY_SIGNAL_MODE = "MKT"`, so entry and exit use mirrored
+raw market direction signals throughout the session.
 
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
 builder for every buying script. It currently defaults to `ATM`, which ignores
@@ -107,11 +121,10 @@ Friday (currently 200, 150, 100, 50, 0 points). Dynamic selection fails closed
 on weekends when no weekday distance is defined. The symbol builder rounds the
 result to the configured strike step.
 
-`EXECBUYPXY_ENTRY_KEY_COLUMN` selects the signal used by the counter-buy/re-buy
-check; it defaults to `"entry"` and consumes `BUY`/`SELL` entry signals. A
-`BUY` signal with only PE held can trigger the CE counter-leg, while a `SELL`
-signal with only CE held can trigger the PE counter-leg. BULL/BEAR exit signals
-do not trigger this rule.
+The counter-buy/re-buy check consumes `BULL`/`BEAR` exit signals only.
+A `BULL` exit with only PE held can trigger the CE counter-leg, while a `BEAR`
+exit with only CE held can trigger the PE counter-leg. Entry signals and market
+direction do not affect counter-buy decisions.
 
 ## Web server file access
 
@@ -149,8 +162,29 @@ settings should resolve to `None` rather than retain an active schedule.
   Investment is open quantity × current sell price; ties and unavailable
   directions do not suppress the target. When suppressed, the ledger reports
   that the direction is on our side and target square-off is skipped.
-- The CHK suite exercises PEAK risk behavior, and SIM replays apply it to the
-  simulated broker. These paths never send live orders.
+- The CHK suite exercises PEAK risk behavior. The manual
+  `tstmodepxy/backtest.py` historical replay explicitly disables the portfolio
+  risk bar so it cannot flatten test positions during an LGT comparison.
+  Neither path sends live orders.
+
+## Manual LGT replay
+
+Run `RUNMODE=SIM python3 syssimpxy.py` to replay the latest seven
+completed sessions from one-minute index candles (or fewer if less history is
+available), with the preceding session used for indicator warm-up. Use
+`--sessions N` to select a different number of sessions, `--records N` for a
+short diagnostic replay, or `--lgt-constant 8` to test a fixed `-8%` LGT
+threshold instead of the configured formula.
+
+The replay leaves entry, signal, target, averaging, counter-buy, and scheduled
+square-off pipes unchanged while disabling only the portfolio risk bar. The
+production premium-target gate is exercised with the simulator's spot-linked
+premium proxy, but results are scored exclusively as signed index spot movement
+times each filled lot's quantity: CE uses `(exit spot − entry spot) × quantity`,
+PE uses `(entry spot − exit spot) × quantity`. Each averaged lot is scored from
+its own entry spot and quantity. Remaining positions must be closed by the
+configured scheduled square-off or the replay reports an error. This is a
+spot-point strategy comparison, not historical option P&L.
 
 ## Other conditional settings
 
@@ -165,51 +199,28 @@ settings should resolve to `None` rather than retain an active schedule.
 - `SYSPLCHRTPXY_*` are consumed by the separate chart generator, not the
   production signal path. `SYSDTSTPXY_*` and `SYSRIGPXY_*` belong to standalone
   modules with no caller in the production launch graph.
-- TGT uses `EXETGTPXY_MODE` (`RGLR` or `DIRGT`, default `DIRGT`) together with
-  `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and
-  `EXETGTPXY_SUPERTREND_KEY_COLUMN` (`supertrend`). In `RGLR`, all positions
-  use `exit` for alignment. In `DIRGT`, the heavier open side uses market
-  `direction` (`CE` with `UP`, `PE` with `DOWN`), while the lighter side still
-  uses `exit`; ties or unavailable directions fall back to `exit`. Exposure is
-  open quantity × current sell price. Unless Supertrend is `SIDE`, aligned
-  positions receive `EXETGTPXY_ALIGNED_PCT` (default `77%`) and non-aligned
-  positions receive `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Supertrend
-  `SIDE` forces the `1.4%` target except for the lighter side in `DIRGT`, which
-  continues to select its target from `exit`. Investment exposure selects
-  the heavier side only; it does not scale the target percentage. In `DIRGT`
-  mode, averaging eligibility also uses `direction` for the lighter side;
-  the heavier side and `RGLR` mode retain the existing `exit`-based averaging
-  alignment. The selected 50-period moving average no longer blocks a
-  counter-trend side outright: CE averages against a `BEAR` average and PE
-  against a `BULL` average only after reaching
-  `EXEAVXPXY_COUNTER_TREND_LOSS_MULTIPLIER` (default `2`) times the normal
-  dynamic LGT loss threshold. The normal LGT threshold remains capped by
-  `EXEAMSPXY_MAX_LGT_LOSS`; the multiplier is applied after that cap. Unknown
-  moving-average status still blocks averaging. The status is passed through
-  `syspxy.get_all_data()` from the core snapshot's legacy `sma` field, which
-  reports the selected variant (TSMA by default). The trend chart JSON carries
-  both rolling variants as `sma50` and `tsma50`.
-  For counter-buy in `DIRGT`, `UP` can immediately trigger the
-  missing CE leg when CE has no open rows and PE has more than one; `DOWN`
-  can similarly trigger the missing PE leg when PE has no open rows and CE
-  has more than one. Otherwise the existing entry-signal counter-buy rule
-  applies.
+- TGT uses only `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and the option side for
+  alignment; direction, investment balance, Supertrend, and moving-average
+  values do not affect the target. Aligned positions receive
+  `EXETGTPXY_ALIGNED_PCT` (default `77%`) and non-aligned positions receive
+  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Averaging alignment also
+  uses only `exit`; TSMA/SMA has no effect on averaging eligibility or LGT.
+  The trend chart independently carries both moving-average variants as
+  `sma50` and `tsma50`.
 - The averaging window switch and start/end bounds apply only to averaging
   placement, not to entry/exit pipes.
 - Averaging uses one policy with no layer-count mode: the projected side
   investment (`sum(qty × sell_prc)` plus the next lot at its current
   `sell_prc`) must not exceed `EXEAMSPXY_MAX_INVESTMENT` (default `25000`).
   The normal LGT loss threshold is capped at `EXEAMSPXY_MAX_LGT_LOSS`
-  (default `77`), so it cannot become more negative than `-77`; a counter-trend
-  threshold may reach `-154` after the default 2× multiplier.
+  (default `77`), so it cannot become more negative than `-77`.
   The opposite side must have open positions and negative overall P&L, and
   only the signal-aligned side may average. The averaging side must also be
   losing at or beyond its applicable LGT threshold.
 - LGT is calculated from positive investment values, then negated:
   `r = own investment / opposite investment`;
-  `magnitude = max(1.4, round(20 × r² − 2.8, 2))` when `r < 1`, otherwise
-  `20 × r^r`;
-  `LGT = -min(round(magnitude, 2), EXEAMSPXY_MAX_LGT_LOSS)`.
+  `magnitude = max(1.4, round(50 × r, 2))`;
+  `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)`.
   If either side has no positive investment, `r` defaults to `1`.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial

@@ -5,7 +5,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import pytz
-from syscnfgpxy import EXECBUYPXY_ENTRY_KEY_COLUMN, EXETGTPXY_MODE, RUNNIFTYPXY_HOLIDAYS
+from syscnfgpxy import RUNNIFTYPXY_HOLIDAYS
 from sysdecisionpxy import counter_leg_script
 from tstmodepxy.pipescenarios import (
     SCENARIOS,
@@ -279,15 +279,12 @@ def run_counter_leg(remaining_df=None):
         print("CHK MODE: counter-leg scenario has no held rows.")
         return False
     signal = str(
-        remaining_df.iloc[0].get(EXECBUYPXY_ENTRY_KEY_COLUMN, "NONE")
+        remaining_df.iloc[0].get("exit", "NONE")
     ).upper().strip()
-    direction = str(remaining_df.iloc[0].get("direction", "NONE")).upper().strip()
     script_name = counter_leg_script(
         signal,
         remaining_df[["symbol", "qty"]].to_dict("records"),
         {"CE": "pxybuype", "PE": "pxybuyce"},
-        direction=direction,
-        mode=EXETGTPXY_MODE,
     )
     if script_name:
         print(f"CHK MODE: counter-leg decision would run {script_name}; no order sent.")

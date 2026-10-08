@@ -17,7 +17,6 @@ class ConfigEditorTests(unittest.TestCase):
             "RUNNIFTYPXY_STRIKE_STEP = 2\n"
             "CLOCK = dt_time(9, 0)\n"
             "SYSENTRPXY_SIGNAL_MODE = 'MKT'\n"
-            "EXETGTPXY_MODE = 'DIRGT'\n"
             "SYSDTAFPXY_SELECTED_MODE = '00'\n"
             "RUNEXMTPXY_INITIAL_LOSS_FLOOR = -1000\n"
             "RUNEXACPXY_STOP_SQUAREOFF_ENABLED = False\n"
@@ -117,14 +116,11 @@ class ConfigEditorTests(unittest.TestCase):
         self.assertTrue(runtime_config["RUNEXACPXY_STOP_SQUAREOFF_ENABLED"])
         self.assertFalse(runtime_config["RUNEXACPXY_TARGET_SQUAREOFF_ENABLED"])
 
-    def test_tgt_mode_is_exposed_with_supported_choices(self):
+    def test_tgt_has_no_direction_or_supertrend_mode_setting(self):
         settings, _ = config_editor._metadata(self.original)
         by_name = {setting["key"]: setting for setting in settings}
-        self.assertNotIn("EXETGTPXY_VARIANT", by_name)
-        self.assertEqual(by_name["EXETGTPXY_MODE"]["value"], "DIRGT")
-        self.assertEqual(by_name["EXETGTPXY_MODE"]["options"], ["RGLR", "DIRGT"])
-        config_editor._write({"EXETGTPXY_MODE": "RGLR"})
-        self.assertIn("EXETGTPXY_MODE = 'RGLR'", self.config_path.read_text(encoding="utf-8"))
+        self.assertNotIn("EXETGTPXY_MODE", by_name)
+        self.assertNotIn("EXETGTPXY_SUPERTREND_KEY_COLUMN", by_name)
 
     def test_signal_router_mode_is_not_exposed(self):
         settings, _ = config_editor._metadata(self.original)

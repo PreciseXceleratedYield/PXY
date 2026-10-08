@@ -35,15 +35,24 @@ import sysstrndpxy
 import runniftypxy
 from syscnfgpxy import (
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
+    SYSCNFGPXY_EXCHANGE_OPEN,
+    SYSCNFGPXY_PREOPEN_START,
+    SYSCNFGPXY_MARKET_OPEN,
+    SYSCNFGPXY_ENGINE_CLOSE,
+    SYSCNFGPXY_TRADING_PIPE_CLOSE,
+    SYSCNFGPXY_TRADING_DAY_END,
+    SYSCNFGPXY_AVERAGING_START,
+    SYSCNFGPXY_ENTRY_CUTOFF,
+    SYSCNFGPXY_SQUAREOFF_START,
+    SYSCNFGPXY_SQUAREOFF_ALL_START,
+    SYSCNFGPXY_SQUAREOFF_END,
     SYSCNFGPXY_TIMEZONE,
     SYSSTRNDPXY_ST1_ATR_VALUE,
     SYSSTRNDPXY_ST1_FACTOR,
     SYSDTAFPXY_FIXED_BRICK_SIZE,
     SYSSMAPXY_VARIANT,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
-    EXEAVXPXY_COUNTER_TREND_LOSS_MULTIPLIER,
     EXEAMSPXY_MAX_INVESTMENT,
-    EXECBUYPXY_ENTRY_KEY_COLUMN,
 )
 from sysdtafpxy import apply_ohlc_transformation
 from syssmapxy import calculate_moving_average, get_sma
@@ -64,6 +73,41 @@ class ConfigurationWiringTests(unittest.TestCase):
 
     def tearDown(self):
         self.cooldown_patch.stop()
+
+    def test_market_hour_aliases_share_the_canonical_schedule(self):
+        import syscnfgpxy
+
+        self.assertEqual(syscnfgpxy.SYSEXEPXY_MARKET_OPEN, SYSCNFGPXY_MARKET_OPEN)
+        self.assertEqual(syscnfgpxy.SYSEXEPXY_MARKET_CLOSE, SYSCNFGPXY_ENGINE_CLOSE)
+        self.assertEqual(syscnfgpxy.EXEPXYPXY_MARKET_OPEN, SYSCNFGPXY_MARKET_OPEN)
+        self.assertEqual(
+            syscnfgpxy.EXEPXYPXY_MARKET_CLOSE, SYSCNFGPXY_TRADING_PIPE_CLOSE
+        )
+        self.assertEqual(syscnfgpxy.EXEENTRPXY_PREOPEN_START, SYSCNFGPXY_PREOPEN_START)
+        self.assertEqual(syscnfgpxy.EXEENTRPXY_PREOPEN_END, SYSCNFGPXY_MARKET_OPEN)
+        self.assertEqual(syscnfgpxy.EXEENTRPXY_ENTRY_CUTOFF, SYSCNFGPXY_ENTRY_CUTOFF)
+        self.assertEqual(syscnfgpxy.EXEENTRPXY_SQUAREOFF_END, SYSCNFGPXY_SQUAREOFF_END)
+        self.assertEqual(syscnfgpxy.EXEAVXPXY_MARKET_START, SYSCNFGPXY_AVERAGING_START)
+        self.assertEqual(syscnfgpxy.EXEAVXPXY_MARKET_END, SYSCNFGPXY_ENTRY_CUTOFF)
+        self.assertEqual(syscnfgpxy.EXECBUYPXY_CUTOFF, SYSCNFGPXY_ENTRY_CUTOFF)
+        self.assertEqual(syscnfgpxy.EXEEXITPXY_SQOFF_START, SYSCNFGPXY_SQUAREOFF_START)
+        self.assertEqual(
+            syscnfgpxy.EXEEXITPXY_SQOFF_ALL_START, SYSCNFGPXY_SQUAREOFF_ALL_START
+        )
+        self.assertEqual(syscnfgpxy.EXEEXITPXY_SQOFF_END, SYSCNFGPXY_SQUAREOFF_END)
+        self.assertEqual(
+            syscnfgpxy.TSTPOINTBTPXY_TRADING_DAY_START, SYSCNFGPXY_EXCHANGE_OPEN
+        )
+        self.assertEqual(
+            syscnfgpxy.TSTPOINTBTPXY_TRADING_DAY_END, SYSCNFGPXY_TRADING_DAY_END
+        )
+        self.assertEqual(syscnfgpxy.TSTPOINTBTPXY_MARKET_OPEN, SYSCNFGPXY_MARKET_OPEN)
+        self.assertEqual(
+            syscnfgpxy.TSTPOINTBTPXY_MARKET_CLOSE, SYSCNFGPXY_TRADING_PIPE_CLOSE
+        )
+        self.assertEqual(
+            syscnfgpxy.TSTPOINTBTPXY_FORCE_EXIT_TIME, SYSCNFGPXY_SQUAREOFF_ALL_START
+        )
 
     def test_supertrend_variants_use_fixed_atr_value_five(self):
         index = pd.date_range("2026-10-07", periods=3, freq="min")
@@ -374,9 +418,10 @@ class ConfigurationWiringTests(unittest.TestCase):
         supertrend.assert_not_called()
 
     def test_entry_router_has_selectable_mkt_sts_mode(self):
-        from syscnfgpxy import SYSENTRPXY_SIGNAL_MODE
+        from syscnfgpxy import SYSENTRPXY_SIGNAL_MODE, SYSDTAFPXY_SELECTED_MODE
 
         self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "MKT")
+        self.assertEqual(SYSDTAFPXY_SELECTED_MODE, "2")
         self.assertEqual(sysentrpxy.get_entry_signal.__defaults__, (None, None))
         self.assertIn("SYSENTRPXY_SIGNAL_MODE", __import__("pxyconfigwebpxy").ENUMS)
         self.assertFalse(entry_signal_valid("SIDE"))
@@ -439,11 +484,11 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(execbuypxy.CBUY_LOCK_SECS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
         self.assertEqual(exeexitpxy.EXIT_LOCK_SECS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
 
-    def test_counter_buy_uses_entry_signal_key(self):
-        self.assertEqual(EXECBUYPXY_ENTRY_KEY_COLUMN, "entry")
-        self.assertEqual(execbuypxy.ENTRY_KEY_COLUMN, "entry")
+    def test_counter_buy_uses_exit_signal_only(self):
+        import syscnfgpxy
 
-    def test_dirgt_counter_buy_uses_direction_when_heavy_side_has_multiple_rows(self):
+        self.assertFalse(hasattr(syscnfgpxy, "EXECBUYPXY_ENTRY_KEY_COLUMN"))
+        self.assertEqual(execbuypxy.EXIT_KEY_COLUMN, "exit")
         scripts = {"CE": "pxybuype", "PE": "pxybuyce"}
         pe_positions = [
             {"symbol": "NIFTY-1PE", "qty": 75},
@@ -455,197 +500,53 @@ class ConfigurationWiringTests(unittest.TestCase):
         ]
 
         self.assertEqual(
-            counter_leg_script(
-                "SELL", pe_positions, scripts, direction="UP", mode="DIRGT"
-            ),
+            counter_leg_script("BULL", pe_positions, scripts),
             "pxybuyce",
         )
         self.assertEqual(
-            counter_leg_script(
-                "NONE", ce_positions, scripts, direction="DOWN", mode="DIRGT"
-            ),
+            counter_leg_script("BEAR", ce_positions, scripts),
             "pxybuype",
         )
         self.assertIsNone(
-            counter_leg_script(
-                "NONE", pe_positions[:1], scripts, direction="UP", mode="DIRGT"
-            )
+            counter_leg_script("NONE", pe_positions, scripts)
         )
         self.assertIsNone(
-            counter_leg_script(
-                "NONE", pe_positions, scripts, direction="UP", mode="RGLR"
-            )
+            counter_leg_script("BUY", pe_positions, scripts)
         )
         self.assertIsNone(
-            counter_leg_script(
-                "BUY", pe_positions, scripts, direction="DOWN", mode="DIRGT"
-            )
-        )
-        self.assertIsNone(
-            counter_leg_script(
-                "BUY", pe_positions, scripts, direction="NONE", mode="DIRGT"
-            )
+            counter_leg_script("SELL", pe_positions, scripts)
         )
 
-    def test_tgt_uses_single_positive_aligned_and_non_aligned_targets(self):
+    def test_tgt_uses_exit_key_and_option_side_only(self):
         self.assertEqual(exeltgtpxy.calculate_tgt(True), 77.0)
         self.assertEqual(exeltgtpxy.calculate_tgt(False), 1.4)
-
-        aligned_ce = {
-            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL",
-            "supertrend": "BULL", "atr": 500,
-        }
-        aligned_pe = {
-            "pxy_entry": 1000, "symbol": "NIFTYPE", "exit": "BEAR",
-            "supertrend": "BEAR", "atr": 0,
-        }
-        non_aligned_ce = {**aligned_ce, "exit": "BEAR"}
-        side_ce = {**aligned_ce, "exit": "SIDE"}
-        side_pe = {**aligned_pe, "exit": "SIDE"}
-        supertrend_side_with_directional_exit = {
-            **aligned_ce, "supertrend": "SIDE",
-        }
-        router_signals_disagree = {**aligned_ce, "exit": "BEAR"}
-        neutral_supertrend_ignores_bull_exit = {
-            **aligned_ce, "supertrend": "SIDE",
-        }
-        neutral_supertrend_ignores_bear_exit = {
-            **aligned_pe, "supertrend": "SIDE",
-        }
-
-        self.assertEqual(exeltgtpxy.target_price(aligned_ce), 1770.0)
-        self.assertEqual(exeltgtpxy.target_price(aligned_pe), 1770.0)
-        self.assertEqual(exeltgtpxy.target_price(non_aligned_ce), 1014.0)
-        self.assertEqual(exeltgtpxy.target_price(side_ce), 1014.0)
-        self.assertEqual(exeltgtpxy.target_price(side_pe), 1014.0)
-        self.assertEqual(exeltgtpxy.target_price(supertrend_side_with_directional_exit), 1014.0)
-        self.assertEqual(exeltgtpxy.target_price(router_signals_disagree), 1014.0)
-        self.assertEqual(exeltgtpxy.target_price(neutral_supertrend_ignores_bull_exit), 1014.0)
-        self.assertEqual(exeltgtpxy.target_price(neutral_supertrend_ignores_bear_exit), 1014.0)
-
-    def test_direx_uses_direction_for_heavier_side_and_exit_for_lighter_side(self):
-        ce_heavy = {
-            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BEAR",
-            "direction": "UP", "supertrend": "BULL",
-        }
-        pe_light = {
-            "pxy_entry": 1000, "symbol": "NIFTYPE", "exit": "BEAR",
-            "direction": "UP", "supertrend": "BEAR",
-        }
-        ce_light = {**ce_heavy, "direction": "DOWN"}
-        pe_heavy = {**pe_light, "exit": "BULL", "direction": "DOWN"}
-        ce_heavy_direction_flip = {**ce_heavy, "exit": "BULL", "direction": "DOWN"}
-        pe_heavy_direction_flip = {**pe_light, "direction": "UP"}
-
-        self.assertEqual(exeltgtpxy.target_price(ce_heavy, 2000, 1000), 1770.0)
-        self.assertEqual(exeltgtpxy.target_price(pe_light, 2000, 1000), 1770.0)
-        self.assertEqual(exeltgtpxy.target_price(ce_light, 1000, 2000), 1014.0)
-        self.assertEqual(exeltgtpxy.target_price(pe_heavy, 1000, 2000), 1770.0)
-        self.assertEqual(exeltgtpxy.target_price(ce_heavy_direction_flip, 2000, 1000), 1014.0)
-        self.assertEqual(exeltgtpxy.target_price(pe_heavy_direction_flip, 1000, 2000), 1014.0)
-
-        with patch.object(exeltgtpxy, "TARGET_MODE", "RGLR"):
-            self.assertEqual(exeltgtpxy.target_price(ce_heavy, 2000, 1000), 1014.0)
-
-    def test_direx_ties_and_unavailable_direction_fall_back_to_exit(self):
-        row = {
-            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL",
-            "direction": "SIDE", "supertrend": "BULL",
-        }
-        self.assertEqual(exeltgtpxy.target_price(row, 1000, 1000), 1770.0)
-        self.assertEqual(exeltgtpxy.target_price(row, 2000, 1000), 1770.0)
-
-    def test_dirgt_lighter_side_uses_exit_when_supertrend_is_side(self):
-        aligned_lighter_ce = {
+        ce = {
             "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL",
             "direction": "DOWN", "supertrend": "SIDE",
         }
-        nonaligned_lighter_pe = {
-            "pxy_entry": 1000, "symbol": "NIFTYPE", "exit": "BULL",
+        pe = {
+            "pxy_entry": 1000, "symbol": "NIFTYPE", "exit": "BEAR",
             "direction": "UP", "supertrend": "SIDE",
         }
-        heavier_ce = {**aligned_lighter_ce, "direction": "SIDE"}
+        self.assertEqual(exeltgtpxy.target_price(ce, 1000, 5000), 1770.0)
+        self.assertEqual(exeltgtpxy.target_price(pe, 5000, 1000), 1770.0)
+        self.assertEqual(exeltgtpxy.target_price({**ce, "exit": "BEAR"}), 1014.0)
+        self.assertEqual(exeltgtpxy.target_price({**pe, "exit": "BULL"}), 1014.0)
+        self.assertEqual(exeltgtpxy.target_price({**ce, "exit": "SIDE"}), 1014.0)
 
-        self.assertEqual(
-            exeltgtpxy.target_price(aligned_lighter_ce, 1000, 2000),
-            1770.0,
-        )
-        self.assertEqual(
-            exeltgtpxy.target_price(nonaligned_lighter_pe, 2000, 1000),
-            1014.0,
-        )
-        self.assertEqual(exeltgtpxy.target_price(heavier_ce, 2000, 1000), 1014.0)
+    def test_averaging_alignment_uses_exit_signal_only(self):
+        self.assertEqual(exeavxpxy.averaging_alignment_signals("BULL"), (True, False))
+        self.assertEqual(exeavxpxy.averaging_alignment_signals("BEAR"), (False, True))
+        self.assertEqual(exeavxpxy.averaging_alignment_signals("SIDE"), (False, False))
 
-    def test_direx_averaging_uses_direction_for_the_lighter_side(self):
-        ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
-            "BULL", "UP", ce_investment=1000, pe_investment=2000,
-            sma_status="BULL",
-        )
-        self.assertTrue(ce_aligned)
-        self.assertFalse(pe_aligned)
-
-        ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
-            "BEAR", "DOWN", ce_investment=2000, pe_investment=1000,
-            sma_status="BEAR",
-        )
-        self.assertFalse(ce_aligned)
-        self.assertTrue(pe_aligned)
-
-        with patch.object(exeavxpxy, "EXETGTPXY_MODE", "RGLR"):
-            ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
-                "BEAR", "UP", ce_investment=1000, pe_investment=2000,
-                sma_status="BEAR",
-            )
-        self.assertFalse(ce_aligned)
-        self.assertTrue(pe_aligned)
-
-    def test_tsma_counter_trend_allows_averaging_with_doubled_loss_threshold(self):
-        ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
-            "BULL", "UP", 1000, 1000, sma_status="BEAR"
-        )
-        self.assertTrue(ce_aligned)
-        self.assertFalse(pe_aligned)
-
-        ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
-            "BEAR", "DOWN", 1000, 1000, sma_status="BULL"
-        )
-        self.assertFalse(ce_aligned)
-        self.assertTrue(pe_aligned)
-
-        self.assertEqual(EXEAVXPXY_COUNTER_TREND_LOSS_MULTIPLIER, 2.0)
-        self.assertEqual(
-            exeavxpxy.counter_trend_averaging_thresholds(-5.0, -7.0, "BEAR"),
-            (-10.0, -7.0),
-        )
-        self.assertEqual(
-            exeavxpxy.counter_trend_averaging_thresholds(-5.0, -7.0, "BULL"),
-            (-5.0, -14.0),
-        )
-        self.assertEqual(
-            exeavxpxy.counter_trend_averaging_thresholds(-5.0, -7.0, "NA"),
-            (-5.0, -7.0),
-        )
-        self.assertEqual(
-            exeavxpxy.counter_trend_averaging_thresholds(-77.0, -20.0, "BEAR"),
-            (-154.0, -20.0),
-        )
-
-        for unknown in ("NA", "NONE", ""):
-            with self.subTest(sma_status=unknown):
-                self.assertEqual(
-                    exeavxpxy.averaging_alignment_signals(
-                        "BULL", "UP", 1000, 1000, sma_status=unknown
-                    ),
-                    (False, False),
-                )
-
-    def test_lgt_uses_base_twenty_and_reduces_lesser_side_by_two_point_eight(self):
-        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -1.4)
-        self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 4000.0, is_ce=True), -2.2)
-        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True), -20.0)
+    def test_lgt_scales_base_fifty_by_investment_ratio(self):
+        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -12.5)
+        self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 4000.0, is_ce=True), -25.0)
+        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True), -50.0)
         self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 1000.0, is_ce=True), -77.0)
         self.assertEqual(exeltgtpxy.calculate_lgt(3000.0, 1000.0, is_ce=True), -77.0)
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=False), -77.0)
+        self.assertEqual(exeltgtpxy.calculate_lgt(0.0, 4000.0, is_ce=True), -50.0)
 
     def test_averaging_requires_both_losing_sides_and_only_aligned_side_triggers(self):
         shared = {

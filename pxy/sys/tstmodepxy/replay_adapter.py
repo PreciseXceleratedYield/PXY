@@ -28,7 +28,7 @@ class ProductionPipeReplay:
     scoped to this adapter's lifetime and never written into production modules.
     """
 
-    def __init__(self, sys_dir, broker, state_dir):
+    def __init__(self, sys_dir, broker, state_dir, *, risk_bar_enabled=True):
         self.sys_dir = Path(sys_dir)
         self.broker = broker
         self.state_dir = Path(state_dir)
@@ -72,6 +72,7 @@ class ProductionPipeReplay:
         self.risk_breach_ticks = 0
         self.risk_exit_fired = False
         self.risk_last_counted_timestamp = None
+        self.risk_bar_enabled = risk_bar_enabled
 
         class ReplayClock(datetime):
             @classmethod
@@ -150,9 +151,14 @@ class ProductionPipeReplay:
                 self.squareoff_pipe.exit_all_positions()
             return SimpleNamespace(returncode=0)
 
+        risk_ledger_hook = (
+            self._execute_risk_ledger
+            if self.risk_bar_enabled
+            else lambda *args, **kwargs: None
+        )
         temporary_daily_purge = SimpleNamespace(
             daily_purge_check=lambda: None,
-            execute_master_risk_ledger=self._execute_risk_ledger,
+            execute_master_risk_ledger=risk_ledger_hook,
         )
         self.state_dir.mkdir(parents=True, exist_ok=True)
         patchers = [

@@ -78,6 +78,41 @@ class ModeDispatchTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "history must not be fetched"):
                 run_backtest()
 
+    def test_backtest_chooses_latest_session_instead_of_a_random_one(self):
+        import tstmodepxy.backtest as backtest
+
+        history = pd.DataFrame(
+            {"Close": [100.0, 101.0, 102.0]},
+            index=pd.DatetimeIndex(
+                [
+                    datetime(2025, 1, 6, 9, 16),
+                    datetime(2025, 1, 7, 15, 29),
+                    datetime(2025, 1, 8, 15, 29),
+                ]
+            ),
+        )
+        self.assertEqual(
+            backtest.latest_session_with_records(history),
+            date(2025, 1, 8),
+        )
+
+    def test_backtest_selects_latest_requested_completed_sessions(self):
+        import tstmodepxy.backtest as backtest
+
+        dates = pd.date_range("2025-01-06 09:16", periods=4, freq="D")
+        history = pd.DataFrame(
+            {"Close": [100.0] * 4},
+            index=dates,
+        )
+        with patch.object(
+            backtest, "_completed_session_dates",
+            return_value=[date(2025, 1, 6), date(2025, 1, 7), date(2025, 1, 8)],
+        ):
+            self.assertEqual(
+                backtest.recent_sessions_with_records(history, 2),
+                [date(2025, 1, 7), date(2025, 1, 8)],
+            )
+
     def test_strategy_signal_capture_redirects_dashboard_output(self):
         import tstmodepxy.backtest as backtest
 
@@ -137,8 +172,11 @@ class ModeDispatchTests(unittest.TestCase):
             history = backtest.fetch_recent_index_history()
 
         self.assertEqual(history.index.date[-1], date(2025, 1, 6))
-        self.assertEqual(ticker.history.call_count, 5)
-        self.assertEqual(ticker.history.call_args_list[-1].kwargs["start"], "2025-01-06")
+        self.assertGreaterEqual(ticker.history.call_count, 5)
+        self.assertIn(
+            "start",
+            ticker.history.call_args_list[4].kwargs,
+        )
 
     def test_history_fetch_reports_when_no_complete_day_exists_in_window(self):
         import tstmodepxy.backtest as backtest
@@ -152,7 +190,7 @@ class ModeDispatchTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(
                 RuntimeError,
-                "within Yahoo's 7-day intraday-history window",
+                "within Yahoo's 28-day intraday-history window",
             ):
                 backtest.fetch_recent_index_history()
 

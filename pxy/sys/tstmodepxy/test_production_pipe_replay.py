@@ -20,6 +20,32 @@ from tstmodepxy.replay_adapter import ProductionPipeReplay
 
 
 class ProductionPipeReplayTests(unittest.TestCase):
+    def test_replay_can_disable_risk_bar_without_changing_default(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-risk-disabled-replay-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR,
+                SimulatedBroker(),
+                Path(temp) / "state",
+                risk_bar_enabled=False,
+            ) as engine:
+                self.assertFalse(engine.risk_bar_enabled)
+                self.assertIsNone(
+                    sys.modules["runexacpxy"].execute_master_risk_ledger(
+                        None, pd.DataFrame([{"PNL": -100000}]), pd.DataFrame()
+                    )
+                )
+                self.assertFalse(engine.risk_exit_fired)
+                self.assertIsNone(engine.risk_last_counted_timestamp)
+
+        with tempfile.TemporaryDirectory(prefix="pxy-risk-enabled-replay-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, SimulatedBroker(), Path(temp) / "state"
+            ) as engine:
+                self.assertTrue(engine.risk_bar_enabled)
+                self.assertIsNotNone(
+                    sys.modules["runexacpxy"].execute_master_risk_ledger
+                )
+
     def test_production_pipe_sources_do_not_import_backtest_adapters(self):
         production_exe = SYS_DIR / "exe"
         for source in production_exe.glob("*.py"):
@@ -543,9 +569,9 @@ class ProductionPipeReplayTests(unittest.TestCase):
             [
                 {"name": "aligned CE loss averages with losing PE open", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
                 {"name": "aligned PE loss averages with losing CE open", "side": "PE", "sell_price": 90.0, "signal": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
-                {"name": "counter-trend CE below doubled loss threshold", "side": "CE", "sell_price": 95.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": False},
-                {"name": "counter-trend CE reaches doubled loss threshold", "side": "CE", "sell_price": 89.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
-                {"name": "counter-trend PE below doubled loss threshold", "side": "PE", "sell_price": 95.0, "signal": "BEAR", "sma": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": False},
+                {"name": "CE averages at LGT regardless of bearish average", "side": "CE", "sell_price": 95.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
+                {"name": "CE averaging remains eligible beyond LGT", "side": "CE", "sell_price": 89.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
+                {"name": "PE averages at LGT regardless of bullish average", "side": "PE", "sell_price": 95.0, "signal": "BEAR", "sma": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
                 {"name": "profitable CE does not average", "side": "CE", "sell_price": 105.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": False},
                 {"name": "missing opposite position blocks averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": None, "expected_average": False},
                 {"name": "profitable opposite side blocks averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 110.0, "expected_average": False},
