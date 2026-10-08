@@ -40,8 +40,18 @@ section{padding:96px 0}
 .mark .logo{flex:none}
 .mark i{width:28px;height:28px;border-radius:8px;background:var(--brand);display:grid;place-items:center;color:var(--brand-ink);font-style:normal;font-size:15px}
 
+/* brand header */
+.brand{background:var(--deep);color:var(--deep-ink);padding:16px 0}
+.brand-in{display:flex;align-items:center;gap:16px}
+.brand .logo{flex:none}
+.brand-name{display:flex;flex-direction:column;line-height:1}
+.wm{font:800 36px "Bricolage Grotesque",sans-serif;letter-spacing:.04em}
+.tag{margin-top:6px;font-size:14px;color:#A9B5D3;letter-spacing:.02em}
+.brand-note{margin:0 0 0 auto;padding-left:20px;border-left:1px solid #2A3869;font-size:14px;color:#A9B5D3;max-width:20ch;line-height:1.35}
+@media (max-width:720px){.brand-note{display:none}.wm{font-size:30px}}
+
 /* hero */
-.hero{padding:72px 0 96px}
+.hero{padding:64px 0 96px}
 .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}
 h1{font-size:clamp(46px,7.4vw,92px);font-weight:800}
 .hero .lede{margin-top:28px}
@@ -153,9 +163,7 @@ h2{font-size:clamp(34px,5vw,60px);font-weight:800}
 </head>
 <body>
 
-<header class="wrap">
-  <div class="mark"><svg class="logo" viewBox="0 0 48 48" width="40" height="40" role="img" aria-label="YDE logo" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M24 27L12 11" stroke="var(--brand)" stroke-width="6"/><path d="M24 27L36 11" stroke="var(--signal)" stroke-width="6"/><path d="M24 27V41" stroke="var(--ink)" stroke-width="6"/><circle cx="12" cy="9" r="5" fill="var(--brand)"/><circle cx="36" cy="9" r="5" fill="var(--signal)"/></svg><span>YDE</span></div>
-</header>
+<header class="brand"><div class="wrap brand-in"><svg class="logo" viewBox="0 0 56 64" width="48" height="55" role="img" aria-label="YDE logo" fill="none" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="52" height="60" rx="15" fill="#F4F6FB"/><rect x="20" y="8" width="16" height="5" rx="2.5" fill="#0F1B3D"/><path d="M28 38L17 24" stroke="#3A5BFF" stroke-width="5.5"/><path d="M28 38L39 24" stroke="#F2B33D" stroke-width="5.5"/><path d="M28 38V52" stroke="#0F1B3D" stroke-width="5.5"/><circle cx="17" cy="22" r="4.8" fill="#3A5BFF"/><circle cx="39" cy="22" r="4.8" fill="#F2B33D"/></svg><div class="brand-name"><span class="wm">YDE</span><span class="tag">Your Digital Employee</span></div><p class="brand-note">Digital employees, leased on consumption</p></div></header>
 
 <main>
 <section class="hero">
@@ -291,7 +299,7 @@ h2{font-size:clamp(34px,5vw,60px);font-weight:800}
       <div>The employee that knows its role.</div>
       <div>The employee that works for you.</div>
     </div>
-    <footer><span><b>YDE</b> · Your Digital Employee</span><span>A PXY Group Company</span></footer>
+    <footer><span><b>YDE</b> · Your Digital Employee</span></footer>
   </div>
 </section>
 </main>
