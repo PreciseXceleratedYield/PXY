@@ -418,9 +418,10 @@ class ConfigurationWiringTests(unittest.TestCase):
         supertrend.assert_not_called()
 
     def test_entry_router_has_selectable_mkt_sts_mode(self):
-        from syscnfgpxy import SYSENTRPXY_SIGNAL_MODE
+        from syscnfgpxy import SYSENTRPXY_SIGNAL_MODE, SYSDTAFPXY_SELECTED_MODE
 
-        self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "STS")
+        self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "MKT")
+        self.assertEqual(SYSDTAFPXY_SELECTED_MODE, "2")
         self.assertEqual(sysentrpxy.get_entry_signal.__defaults__, (None, None))
         self.assertIn("SYSENTRPXY_SIGNAL_MODE", __import__("pxyconfigwebpxy").ENUMS)
         self.assertFalse(entry_signal_valid("SIDE"))
@@ -538,13 +539,14 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(exeavxpxy.averaging_alignment_signals("BEAR"), (False, True))
         self.assertEqual(exeavxpxy.averaging_alignment_signals("SIDE"), (False, False))
 
-    def test_lgt_uses_base_twenty_and_reduces_lesser_side_by_two_point_eight(self):
-        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -1.4)
-        self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 4000.0, is_ce=True), -2.2)
-        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True), -20.0)
+    def test_lgt_scales_base_fifty_by_investment_ratio(self):
+        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -12.5)
+        self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 4000.0, is_ce=True), -25.0)
+        self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True), -50.0)
         self.assertEqual(exeltgtpxy.calculate_lgt(2000.0, 1000.0, is_ce=True), -77.0)
         self.assertEqual(exeltgtpxy.calculate_lgt(3000.0, 1000.0, is_ce=True), -77.0)
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=False), -77.0)
+        self.assertEqual(exeltgtpxy.calculate_lgt(0.0, 4000.0, is_ce=True), -50.0)
 
     def test_averaging_requires_both_losing_sides_and_only_aligned_side_triggers(self):
         shared = {

@@ -1,4 +1,4 @@
-"""One-session NIFTY candle replay using production signals and safe proxies."""
+"""Multi-session NIFTY replay using production pipes and spot-point scoring."""
 
 import argparse
 import csv
@@ -18,6 +18,11 @@ import yfinance as yf
 SYS_DIR = Path(__file__).resolve().parent.parent
 if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
+EXE_DIR = SYS_DIR / "exe"
+if str(EXE_DIR) not in sys.path:
+    sys.path.insert(0, str(EXE_DIR))
+
+from exeltgtpxy import calculate_lgt as production_lgt
 
 from .pointbacktest import (
     MARKET_CLOSE,
@@ -27,6 +32,7 @@ from .broker_sim import SimulatedBroker
 from .replay_adapter import ProductionPipeReplay
 from syscnfgpxy import (
     EXEEXITPXY_SQOFF_ALL_START,
+    EXEEXITPXY_SQOFF_START,
     SYSMODEPXY_RUN_MODE as RUNMODE,
     RUNNIFTYPXY_HOLIDAYS,
     SYSCNFGPXY_TICKER,
@@ -38,7 +44,8 @@ from sysdtafpxy import transform_market_data
 
 DATA_SESSION_OPEN = TSTPOINTBTPXY_TRADING_DAY_START
 OHLC_COLUMNS = {"Open", "High", "Low", "Close"}
-MAX_INTRADAY_LOOKBACK_DAYS = 7
+MAX_INTRADAY_LOOKBACK_DAYS = 28
+DEFAULT_SESSION_COUNT = 7
 
 
 def _normalize_history_columns(frame):
@@ -85,27 +92,37 @@ def _prepare_index_history(frame):
     return frame
 
 
-def _has_completed_session(history):
-    if history is None or history.empty:
-        return False
-    return any(
-        session.index[-1].time().replace(tzinfo=None) >= MARKET_CLOSE
-        for _, session in history.groupby(history.index.date)
-    )
-
-
 def _today_ist():
     return pd.Timestamp.now(tz=SYSCNFGPXY_TIMEZONE).date()
 
 
-def fetch_recent_index_history():
-    """Fetch warmup history, walking back by day until a complete session is found."""
+def _completed_session_dates(history):
+    if history is None or history.empty:
+        return []
+    completed = []
+    for session_date, session in history.groupby(history.index.date):
+        market_bars = session[
+            (session.index.time >= MARKET_OPEN)
+            & (session.index.time <= MARKET_CLOSE)
+        ]
+        if (
+            not market_bars.empty
+            and market_bars.index[-1].time().replace(tzinfo=None) >= MARKET_CLOSE
+        ):
+            completed.append(session_date)
+    return sorted(completed)
+
+
+def fetch_recent_index_history(session_count=DEFAULT_SESSION_COUNT):
+    """Fetch enough one-minute history for N complete sessions plus warm-up."""
+    if session_count < 1:
+        raise ValueError("session_count must be a positive integer.")
     ticker = yf.Ticker(SYSCNFGPXY_TICKER)
     failures = []
     try:
         frame = _prepare_index_history(
             ticker.history(
-                period=f"{MAX_INTRADAY_LOOKBACK_DAYS}d",
+                period="7d",
                 interval="1m",
                 auto_adjust=False,
                 actions=False,
@@ -115,15 +132,24 @@ def fetch_recent_index_history():
         frame = pd.DataFrame(columns=["Open", "High", "Low", "Close"])
         failures.append(f"recent-history request: {error}")
 
-    if _has_completed_session(frame):
-        return frame
-
     searched_dates = []
     today = _today_ist()
     holidays = set(RUNNIFTYPXY_HOLIDAYS)
+    required_sessions = session_count + 1
     for day_offset in range(MAX_INTRADAY_LOOKBACK_DAYS):
+        complete_dates = [
+            session_date
+            for session_date in _completed_session_dates(frame)
+            if session_date.strftime("%d-%b-%Y") not in holidays
+        ]
+        if len(complete_dates) >= required_sessions:
+            break
         session_day = today - timedelta(days=day_offset)
-        if session_day.weekday() >= 5 or session_day.strftime("%d-%b-%Y") in holidays:
+        if (
+            session_day.weekday() >= 5
+            or session_day.strftime("%d-%b-%Y") in holidays
+            or session_day in complete_dates
+        ):
             continue
         searched_dates.append(session_day.isoformat())
         try:
@@ -143,36 +169,47 @@ def fetch_recent_index_history():
         if not daily.empty:
             frame = pd.concat([frame, daily]).sort_index()
             frame = frame.loc[~frame.index.duplicated(keep="last")]
-        if _has_completed_session(frame):
-            return frame
+
+    completed = _completed_session_dates(frame)
+    if completed:
+        return frame
 
     detail = f" Searched dates: {', '.join(searched_dates) or 'none'}."
     if failures:
         detail += f" Request errors: {'; '.join(failures)}"
     raise RuntimeError(
-        f"Could not find a completed 1-minute NIFTY session within Yahoo's "
+        f"Could not find any completed 1-minute NIFTY session within Yahoo's "
         f"{MAX_INTRADAY_LOOKBACK_DAYS}-day intraday-history window.{detail}"
     )
 
 
 def latest_session_with_records(history, record_limit=None):
-    """Select the latest available session for a reproducible day replay."""
-    available_sessions = []
-    for session_date, frame in history.groupby(history.index.date):
-        session_bars = frame[
-            (frame.index.time >= MARKET_OPEN)
-            & (frame.index.time <= MARKET_CLOSE)
-        ]
-        if (
-            len(session_bars) > 0
-            and session_bars.index[-1].time().replace(tzinfo=None) >= MARKET_CLOSE
-        ):
-            available_sessions.append(session_date)
+    """Select the latest completed session for callers that need one day."""
+    available_sessions = _completed_session_dates(history)
     if not available_sessions:
         raise RuntimeError(
             "No completed recent NIFTY session found for full-day replay."
         )
     return max(available_sessions)
+
+
+def recent_sessions_with_records(history, session_count=DEFAULT_SESSION_COUNT):
+    """Select up to N latest completed sessions, oldest first."""
+    if session_count < 1:
+        raise ValueError("session_count must be a positive integer.")
+    available_sessions = _completed_session_dates(history)
+    if not available_sessions:
+        raise RuntimeError("No completed recent NIFTY sessions found for replay.")
+    return available_sessions[-session_count:]
+
+
+def score_spot_points(side, entry_spot, exit_spot, quantity):
+    """Return signed spot points multiplied by filled quantity."""
+    side = str(side).upper().strip()
+    if side not in {"CE", "PE"}:
+        raise ValueError("side must be CE or PE.")
+    direction = 1.0 if side == "CE" else -1.0
+    return (float(exit_spot) - float(entry_spot)) * direction * int(quantity)
 
 
 def calculate_strategy_signals(history, session_date, record_limit=None):
@@ -245,9 +282,8 @@ def write_session_csvs(output_dir, session_date, trades, decisions):
     trade_path = output_dir / f"{prefix}-trades.csv"
     decision_path = output_dir / f"{prefix}-bars.csv"
     trade_fields = (
-        "side", "entry_time", "exit_time", "entry_spot", "exit_spot",
-        "points", "exit_reason", "quantity", "simulated_option_entry",
-        "simulated_option_exit", "tgt_hit",
+        "session", "side", "entry_time", "exit_time", "entry_spot", "exit_spot",
+        "spot_points_per_unit", "quantity", "points", "exit_reason",
     )
     decision_fields = (
         "timestamp", "execution_timestamp", "spot", "execution_spot",
@@ -260,46 +296,54 @@ def write_session_csvs(output_dir, session_date, trades, decisions):
 
 
 def print_report(
-    history, session_date, trades, decisions, trade_path, decision_path,
-    orders_path, runtime_log,
+    history, session_dates, trades, decisions, trade_path, decision_path,
+    orders_path, runtime_log, incomplete_positions=(),
 ):
-    # Win = TGT HIT (option exit premium >= entry premium)
-    # Loss = TGT NOT HIT (option exit premium < entry premium)
-    tgt_hits = sum(1 for trade in trades if trade["tgt_hit"])
-    tgt_misses = sum(1 for trade in trades if not trade["tgt_hit"])
-    tgt_rate = 100 * tgt_hits / len(trades) if trades else 0.0
-
-    # Also track directional P&L for reference
-    points = [trade["points"] for trade in trades]
-    total_points = sum(points)
+    total_points = sum(trade["points"] for trade in trades)
+    target_exits = sum(trade["exit_reason"] == "target_exit" for trade in trades)
+    squareoff_exits = sum(
+        trade["exit_reason"] == "scheduled_squareoff" for trade in trades
+    )
 
     print("=" * 72)
     print("PXY SIM PRODUCTION-CYCLE REPLAY")
     print("=" * 72)
-    print(f"Instrument: {SYSCNFGPXY_TICKER} | Session: {session_date}")
+    session_label = (
+        str(session_dates[0])
+        if len(session_dates) == 1
+        else f"{session_dates[0]} through {session_dates[-1]}"
+    )
+    print(f"Instrument: {SYSCNFGPXY_TICKER} | Sessions: {session_label}")
     print(
         f"Source: Yahoo Finance 1-minute candles | Data records/cycles: "
         f"{len(decisions)} | Warmup history bars: {len(history)}"
     )
     print(
         "Production dashboard, exit, entry, averaging, counter-leg, and square-off "
-        "pipe code runs against a simulated broker with a CSV order ledger. Orders are filled "
-        "at each candle close using CE/PE spot-point/premium proxies."
+        "pipe code runs against a simulated broker. Portfolio risk-bar exits are "
+        "disabled; remaining positions are expected to close at scheduled square-off."
     )
     print(
-        "Option premiums are synthetic directional proxies, not historical option "
-        "quotes. Results are not real option P&L; costs and slippage are excluded."
+        "Score is signed NIFTY spot movement × filled quantity (CE gains on UP; "
+        "PE gains on DOWN). Synthetic spot-linked premiums are used only to exercise "
+        "the unchanged premium-target trigger; they are not used in the score."
     )
     print(
-        f"Entries start at {MARKET_OPEN:%H:%M} IST; simulated square-off begins "
-        f"at {EXEEXITPXY_SQOFF_ALL_START:%H:%M} IST."
+        f"Entries start at {MARKET_OPEN:%H:%M} IST; staged square-off starts "
+        f"at {EXEEXITPXY_SQOFF_START:%H:%M} IST and all-leg square-off at "
+        f"{EXEEXITPXY_SQOFF_ALL_START:%H:%M} IST."
     )
     print("-" * 72)
     print(
-        f"Trades: {len(trades)} | TGT Hits: {tgt_hits} | TGT Misses: {tgt_misses} | "
-        f"TGT Hit Rate: {tgt_rate:.1f}%"
+        f"Closed lots: {len(trades)} | Target exits: {target_exits} | "
+        f"Scheduled square-off exits: {squareoff_exits}"
     )
-    print(f"Directional index points (one virtual unit): {total_points:+.2f}")
+    print(f"Quantity-weighted spot points: {total_points:+.2f}")
+    if incomplete_positions:
+        print(
+            "Diagnostic replay ended before square-off; open positions excluded "
+            f"from the score: {incomplete_positions}"
+        )
     print(f"CSV trade ledger: {trade_path}")
     print(f"CSV bar-by-bar decisions: {decision_path}")
     print(f"CSV simulated broker orders: {orders_path}")
@@ -307,101 +351,167 @@ def print_report(
     print("=" * 72)
 
 
-def run_backtest(output_dir=None, record_limit=None):
+def run_backtest(
+    output_dir=None,
+    record_limit=None,
+    session_count=DEFAULT_SESSION_COUNT,
+    lgt_calculator=None,
+):
     if RUNMODE != "SIM":
         raise RuntimeError(
             f"Walk-forward replay requires RUNMODE='SIM'; current RUNMODE={RUNMODE!r}."
         )
     if record_limit is not None and record_limit <= 0:
         raise ValueError("record_limit must be a positive integer or None for all candles.")
-    history = fetch_recent_index_history()
+    if session_count <= 0:
+        raise ValueError("session_count must be a positive integer.")
+    history = fetch_recent_index_history(session_count)
     holiday_dates = set(RUNNIFTYPXY_HOLIDAYS)
     history = history[
         ~history.index.strftime("%d-%b-%Y").isin(holiday_dates)
     ]
-    session_date = latest_session_with_records(history, record_limit)
-    bars = calculate_strategy_signals(history, session_date, record_limit)
+    available_dates = _completed_session_dates(history)
+    if len(available_dates) < 2:
+        raise RuntimeError(
+            "At least two completed one-minute sessions are required: one "
+            "for indicator warm-up and one for replay."
+        )
+    session_dates = recent_sessions_with_records(
+        history, min(session_count, len(available_dates) - 1)
+    )
+    first_session = session_dates[0]
+    warmup_dates = _completed_session_dates(history)
+    warmup_date = max(
+        (day for day in warmup_dates if day < first_session),
+        default=None,
+    )
+    if warmup_date is None:
+        raise RuntimeError(
+            "No completed one-minute session is available before the first "
+            "selected session for indicator warm-up."
+        )
+    bars_by_session = {
+        session_date: calculate_strategy_signals(
+            history, session_date, record_limit
+        )
+        for session_date in session_dates
+    }
     output_dir = output_dir or Path.home() / "pxy-sim-results"
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    session_label = f"{session_dates[0]}-{session_dates[-1]}"
     runtime_log = output_dir / (
-        f"nifty-pipe-replay-{session_date}-{datetime.now():%Y%m%d-%H%M%S}.log"
+        f"nifty-pipe-replay-{session_label}-{datetime.now():%Y%m%d-%H%M%S}.log"
     )
     orders_path = output_dir / (
-        f"nifty-sim-replay-{session_date}-{datetime.now():%Y%m%d-%H%M%S}-orders.csv"
+        f"nifty-sim-replay-{session_label}-{datetime.now():%Y%m%d-%H%M%S}-orders.csv"
     )
     with runtime_log.open("w", encoding="utf-8") as stream:
         stream.write(
             "Production pipe output for simulated replay. "
-            "No live broker session or external order process is permitted.\n"
+            "No live broker session or external order process is permitted. "
+            "Portfolio risk bar is disabled.\n"
         )
-    broker = SimulatedBroker(orders_csv=orders_path)
+    selected_lgt = lgt_calculator or production_lgt
+    all_trades = []
+    all_simulated_orders = []
+    incomplete_positions = []
     decisions = []
-    with tempfile.TemporaryDirectory(prefix="pxy-walk-forward-") as temporary_state:
-        with ProductionPipeReplay(SYS_DIR, broker, Path(temporary_state)) as engine:
-            for bar in bars:
-                before = broker.position_summary()
-                first_new_order = len(broker.orders)
-                if bar["snapshot_log"]:
-                    with runtime_log.open("a", encoding="utf-8") as stream:
-                        stream.write(
-                            f"\n===== PRODUCTION DASHBOARD {bar['timestamp']} =====\n"
-                            f"{bar['snapshot_log']}"
-                        )
-                pipe_output = engine.run_tick(
-                    bar["snapshot"],
-                    bar["timestamp"],
-                    bar["spot"],
-                    runtime_log,
+    for session_date in session_dates:
+        broker = SimulatedBroker()
+        with tempfile.TemporaryDirectory(prefix="pxy-walk-forward-") as temporary_state:
+            with ProductionPipeReplay(
+                SYS_DIR,
+                broker,
+                Path(temporary_state),
+                risk_bar_enabled=False,
+            ) as engine:
+                engine.avg_controller.calculate_lgt = selected_lgt
+                for bar in bars_by_session[session_date]:
+                    before = broker.position_summary()
+                    first_new_order = len(broker.orders)
+                    if bar["snapshot_log"]:
+                        with runtime_log.open("a", encoding="utf-8") as stream:
+                            stream.write(
+                                f"\n===== PRODUCTION DASHBOARD {bar['timestamp']} =====\n"
+                                f"{bar['snapshot_log']}"
+                            )
+                    pipe_output = engine.run_tick(
+                        bar["snapshot"],
+                        bar["timestamp"],
+                        bar["spot"],
+                        runtime_log,
+                    )
+                    current_orders = broker.orders[first_new_order:]
+                    after = broker.position_summary()
+                    decisions.append(
+                        {
+                            "timestamp": bar["timestamp"],
+                            "execution_timestamp": bar["timestamp"],
+                            "spot": bar["spot"],
+                            "execution_spot": bar["spot"],
+                            "entry_signal": bar["entry"],
+                            "exit_signal": bar["exit"],
+                            "position_before": before,
+                            "position_after": after,
+                            "orders_created": len(current_orders),
+                            "order_tags": "|".join(
+                                order["GuiOrdId"] for order in current_orders
+                            ),
+                            "pipe_output": f"{bar['snapshot_log']}{pipe_output}",
+                        }
+                    )
+            remaining = broker.position_summary()
+            if remaining != "0CE0PE" and record_limit is None:
+                raise RuntimeError(
+                    f"Scheduled square-off did not flatten simulated positions "
+                    f"for {session_date}: {remaining}."
                 )
-                current_orders = broker.orders[first_new_order:]
-                after = broker.position_summary()
-                decisions.append(
-                    {
-                        "timestamp": bar["timestamp"],
-                        "execution_timestamp": bar["timestamp"],
-                        "spot": bar["spot"],
-                        "execution_spot": bar["spot"],
-                        "entry_signal": bar["entry"],
-                        "exit_signal": bar["exit"],
-                        "position_before": before,
-                        "position_after": after,
-                        "orders_created": len(current_orders),
-                        "order_tags": "|".join(
-                            order["GuiOrdId"] for order in current_orders
-                        ),
-                        "pipe_output": f"{bar['snapshot_log']}{pipe_output}",
-                    }
-                )
-    trades = [
-        {
-            "side": trade["side"],
-            "entry_time": trade["entry_time"],
-            "exit_time": trade["exit_time"],
-            "entry_spot": trade["entry_spot"],
-            "exit_spot": trade["exit_spot"],
-            "points": trade["index_points_per_unit"],
-            "exit_reason": trade["exit_reason"],
-            "quantity": trade["quantity"],
-            "simulated_option_entry": trade["simulated_option_entry"],
-            "simulated_option_exit": trade["simulated_option_exit"],
-            # CE = BUY (exit > entry is profit)
-            # PE = SELL (entry > exit is profit)
-            "tgt_hit": (
-                (trade["side"] == "CE" and trade["simulated_option_exit"] >= trade["simulated_option_entry"])
-                or (trade["side"] == "PE" and trade["simulated_option_exit"] <= trade["simulated_option_entry"])
-            ),
-        }
-        for trade in broker.trades()
-    ]
+            if remaining != "0CE0PE":
+                incomplete_positions.append(f"{session_date}: {remaining}")
+        all_simulated_orders.extend(broker.orders)
+        for trade in broker.trades():
+            exit_clock = datetime.fromisoformat(trade["exit_time"]).time()
+            exit_reason = (
+                "scheduled_squareoff"
+                if exit_clock >= EXEEXITPXY_SQOFF_START
+                else "target_exit"
+            )
+            points_per_unit = score_spot_points(
+                trade["side"],
+                trade["entry_spot"],
+                trade["exit_spot"],
+                1,
+            )
+            all_trades.append(
+                {
+                    "session": str(session_date),
+                    "side": trade["side"],
+                    "entry_time": trade["entry_time"],
+                    "exit_time": trade["exit_time"],
+                    "entry_spot": trade["entry_spot"],
+                    "exit_spot": trade["exit_spot"],
+                    "spot_points_per_unit": points_per_unit,
+                    "quantity": trade["quantity"],
+                    "points": points_per_unit * trade["quantity"],
+                    "exit_reason": exit_reason,
+                }
+            )
+
+    if all_simulated_orders:
+        write_csv(
+            orders_path,
+            all_simulated_orders,
+            tuple(all_simulated_orders[0].keys()),
+        )
     trade_path, decision_path = write_session_csvs(
-        output_dir, session_date, trades, decisions
+        output_dir, session_label, all_trades, decisions
     )
     print_report(
-        history, session_date, trades, decisions, trade_path, decision_path,
-        orders_path, runtime_log,
+        history, session_dates, all_trades, decisions, trade_path, decision_path,
+        orders_path, runtime_log, incomplete_positions,
     )
-    return trades, decisions
+    return all_trades, decisions
 
 
 def main(argv=None):
@@ -423,9 +533,38 @@ def main(argv=None):
         default=Path.home() / "pxy-sim-results",
         help="Directory for CSV ledgers (default: ~/pxy-sim-results).",
     )
+    parser.add_argument(
+        "--sessions",
+        type=int,
+        default=None,
+        help=f"Latest completed 1-minute sessions to replay (default: {DEFAULT_SESSION_COUNT}; "
+        "one session by default when --records is specified).",
+    )
+    parser.add_argument(
+        "--lgt-constant",
+        type=float,
+        default=None,
+        help="Manually test a constant loss threshold percentage, e.g. 8 for -8%%.",
+    )
     args = parser.parse_args(argv)
     try:
-        run_backtest(args.output_dir, record_limit=args.records)
+        if args.lgt_constant is not None and not 0 < args.lgt_constant <= 77:
+            raise ValueError("--lgt-constant must be greater than 0 and at most 77.")
+        lgt_calculator = (
+            None
+            if args.lgt_constant is None
+            else lambda _ce, _pe, is_ce: -args.lgt_constant
+        )
+        run_backtest(
+            args.output_dir,
+            record_limit=args.records,
+            session_count=(
+                args.sessions
+                if args.sessions is not None
+                else (1 if args.records is not None else DEFAULT_SESSION_COUNT)
+            ),
+            lgt_calculator=lgt_calculator,
+        )
     except (RuntimeError, ValueError, OSError) as error:
         print(f"SIM ERROR: {error}", file=sys.stderr)
         return 1

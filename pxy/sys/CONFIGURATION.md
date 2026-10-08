@@ -108,7 +108,9 @@ and `BEAR` for Supertrend BEAR; when Supertrend is SIDE, exit falls back to
 `sysmktpxy.get_signal()` (`BULL`/`BEAR`), otherwise `NONE`. Exit never returns
 `SIDE`; a `SIDE` entry is not a valid fresh-order command.
 `SYSDTAFPXY_SELECTED_MODE` independently selects the OHLC data transformation
-supplied to signal calculations.
+supplied to signal calculations. The current configuration uses mode `2`
+(OC/2) and `SYSENTRPXY_SIGNAL_MODE = "MKT"`, so entry and exit use mirrored
+raw market direction signals throughout the session.
 
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
 builder for every buying script. It currently defaults to `ATM`, which ignores
@@ -160,8 +162,29 @@ settings should resolve to `None` rather than retain an active schedule.
   Investment is open quantity × current sell price; ties and unavailable
   directions do not suppress the target. When suppressed, the ledger reports
   that the direction is on our side and target square-off is skipped.
-- The CHK suite exercises PEAK risk behavior, and SIM replays apply it to the
-  simulated broker. These paths never send live orders.
+- The CHK suite exercises PEAK risk behavior. The manual
+  `tstmodepxy/backtest.py` historical replay explicitly disables the portfolio
+  risk bar so it cannot flatten test positions during an LGT comparison.
+  Neither path sends live orders.
+
+## Manual LGT replay
+
+Run `RUNMODE=SIM python3 syssimpxy.py` to replay the latest seven
+completed sessions from one-minute index candles (or fewer if less history is
+available), with the preceding session used for indicator warm-up. Use
+`--sessions N` to select a different number of sessions, `--records N` for a
+short diagnostic replay, or `--lgt-constant 8` to test a fixed `-8%` LGT
+threshold instead of the configured formula.
+
+The replay leaves entry, signal, target, averaging, counter-buy, and scheduled
+square-off pipes unchanged while disabling only the portfolio risk bar. The
+production premium-target gate is exercised with the simulator's spot-linked
+premium proxy, but results are scored exclusively as signed index spot movement
+times each filled lot's quantity: CE uses `(exit spot − entry spot) × quantity`,
+PE uses `(entry spot − exit spot) × quantity`. Each averaged lot is scored from
+its own entry spot and quantity. Remaining positions must be closed by the
+configured scheduled square-off or the replay reports an error. This is a
+spot-point strategy comparison, not historical option P&L.
 
 ## Other conditional settings
 
@@ -196,9 +219,8 @@ settings should resolve to `None` rather than retain an active schedule.
   losing at or beyond its applicable LGT threshold.
 - LGT is calculated from positive investment values, then negated:
   `r = own investment / opposite investment`;
-  `magnitude = max(1.4, round(20 × r² − 2.8, 2))` when `r < 1`, otherwise
-  `20 × r^r`;
-  `LGT = -min(round(magnitude, 2), EXEAMSPXY_MAX_LGT_LOSS)`.
+  `magnitude = max(1.4, round(50 × r, 2))`;
+  `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)`.
   If either side has no positive investment, `r` defaults to `1`.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial

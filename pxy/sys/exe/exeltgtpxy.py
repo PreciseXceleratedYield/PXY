@@ -1,6 +1,4 @@
 
-import math
-
 import pandas as pd
 import re
 from colorama import Fore, Style, init
@@ -21,6 +19,7 @@ NOT_ALIGNED_TARGET_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
 init(autoreset=True)
 
 _warned = set()
+BASE_LGT_LOSS = 50.0
 
 def _warn_once(key, msg):
     """Prints a warning only the first time it occurs in this process."""
@@ -30,7 +29,7 @@ def _warn_once(key, msg):
 
 
 def calculate_lgt(ce_investment, pe_investment, is_ce):
-    """Calculate the negative LGT threshold from the side investment ratio."""
+    """Scale the LGT loss threshold by the side investment ratio."""
     own_investment, opposite_investment = (
         (ce_investment, pe_investment) if is_ce else (pe_investment, ce_investment)
     )
@@ -39,22 +38,11 @@ def calculate_lgt(ce_investment, pe_investment, is_ce):
         if own_investment > 0 and opposite_investment > 0
         else 1.0
     )
-    if ratio < 1.0:
-        factor = ratio**2
-        magnitude = max(
-            EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
-            round(20.0 * factor - 2.8, 2),
-        )
-    else:
-        exponent = ratio * math.log(ratio)
-        max_factor = EXEAMSPXY_MAX_LGT_LOSS / 20.0
-        factor = (
-            math.exp(exponent)
-            if exponent < math.log(max_factor)
-            else max_factor
-        )
-        magnitude = min(round(20.0 * factor, 2), EXEAMSPXY_MAX_LGT_LOSS)
-    return -magnitude
+    magnitude = max(
+        EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
+        round(BASE_LGT_LOSS * ratio, 2),
+    )
+    return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
 
 
 def calculate_tgt(is_aligned):

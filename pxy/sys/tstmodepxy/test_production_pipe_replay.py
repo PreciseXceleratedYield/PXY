@@ -20,6 +20,32 @@ from tstmodepxy.replay_adapter import ProductionPipeReplay
 
 
 class ProductionPipeReplayTests(unittest.TestCase):
+    def test_replay_can_disable_risk_bar_without_changing_default(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-risk-disabled-replay-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR,
+                SimulatedBroker(),
+                Path(temp) / "state",
+                risk_bar_enabled=False,
+            ) as engine:
+                self.assertFalse(engine.risk_bar_enabled)
+                self.assertIsNone(
+                    sys.modules["runexacpxy"].execute_master_risk_ledger(
+                        None, pd.DataFrame([{"PNL": -100000}]), pd.DataFrame()
+                    )
+                )
+                self.assertFalse(engine.risk_exit_fired)
+                self.assertIsNone(engine.risk_last_counted_timestamp)
+
+        with tempfile.TemporaryDirectory(prefix="pxy-risk-enabled-replay-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, SimulatedBroker(), Path(temp) / "state"
+            ) as engine:
+                self.assertTrue(engine.risk_bar_enabled)
+                self.assertIsNotNone(
+                    sys.modules["runexacpxy"].execute_master_risk_ledger
+                )
+
     def test_production_pipe_sources_do_not_import_backtest_adapters(self):
         production_exe = SYS_DIR / "exe"
         for source in production_exe.glob("*.py"):
