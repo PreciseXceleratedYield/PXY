@@ -172,7 +172,11 @@ settings should resolve to `None` rather than retain an active schedule.
   the heavier side only; it does not scale the target percentage. In `DIRGT`
   mode, averaging eligibility also uses `direction` for the lighter side;
   the heavier side and `RGLR` mode retain the existing `exit`-based averaging
-  alignment. For counter-buy in `DIRGT`, `UP` can immediately trigger the
+  alignment. Independently, averaging CE is allowed only when the SMA-50 status
+  is `BULL` (north, price at/above SMA-50), and PE only when it is `BEAR`
+  (south, price below SMA-50); missing/unknown SMA status blocks both sides.
+  The SMA status is passed through `syspxy.get_all_data()` from the core
+  snapshot's `sma` field. For counter-buy in `DIRGT`, `UP` can immediately trigger the
   missing CE leg when CE has no open rows and PE has more than one; `DOWN`
   can similarly trigger the missing PE leg when PE has no open rows and CE
   has more than one. Otherwise the existing entry-signal counter-buy rule

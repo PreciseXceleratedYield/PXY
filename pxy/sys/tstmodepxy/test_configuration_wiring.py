@@ -5,7 +5,7 @@ from contextlib import redirect_stdout
 from datetime import date, time, timedelta
 from io import StringIO
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import mock_open, patch
 
 import pandas as pd
 
@@ -28,6 +28,7 @@ import exeforcepxy
 import exeavxpxy
 import exeentrpxy
 import sysentrpxy
+import syspxy
 import runniftypxy
 from syscnfgpxy import (
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
@@ -39,6 +40,7 @@ from syscnfgpxy import (
     EXECBUYPXY_ENTRY_KEY_COLUMN,
 )
 from sysdtafpxy import apply_ohlc_transformation
+from syssmapxy import get_sma
 from sysdecisionpxy import (
     averaging_trigger_sides,
     counter_leg_script,
@@ -76,6 +78,23 @@ class ConfigurationWiringTests(unittest.TestCase):
         single_line, _, _, _ = _compute_single_st(frame, factor=factor, atr_value=atr)
         first_hl2 = (frame["High"].iloc[0] + frame["Low"].iloc[0]) / 2
         self.assertEqual(single_line.iloc[0], first_hl2 + factor * atr)
+
+    def test_syspxy_snapshot_passes_through_sma_status(self):
+        with (
+            patch.object(syspxy, "dispatch_mode", return_value=None),
+            patch.object(syspxy, "export_supertrend_json"),
+            patch.object(syspxy, "get_full_snapshot", return_value={"sma": "BEAR"}),
+            patch.object(syspxy.os, "makedirs"),
+            patch("builtins.open", mock_open()),
+        ):
+            self.assertEqual(syspxy.get_all_data()["sma"], "BEAR")
+
+    def test_sma_status_is_relative_to_50_period_simple_moving_average(self):
+        above = pd.DataFrame({"Close": [100.0] * 49 + [101.0]})
+        below = pd.DataFrame({"Close": [100.0] * 49 + [99.0]})
+
+        self.assertEqual(get_sma(above, period=50)["status"], "BULL")
+        self.assertEqual(get_sma(below, period=50)["status"], "BEAR")
 
     def test_entry_and_exit_follow_directional_supertrend(self):
         frame = pd.DataFrame({"Close": [1]})
@@ -411,23 +430,48 @@ class ConfigurationWiringTests(unittest.TestCase):
 
     def test_direx_averaging_uses_direction_for_the_lighter_side(self):
         ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
-            "BULL", "UP", ce_investment=1000, pe_investment=2000
+            "BULL", "UP", ce_investment=1000, pe_investment=2000,
+            sma_status="BULL",
         )
         self.assertTrue(ce_aligned)
         self.assertFalse(pe_aligned)
 
         ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
-            "BEAR", "DOWN", ce_investment=2000, pe_investment=1000
+            "BEAR", "DOWN", ce_investment=2000, pe_investment=1000,
+            sma_status="BEAR",
         )
         self.assertFalse(ce_aligned)
         self.assertTrue(pe_aligned)
 
         with patch.object(exeavxpxy, "EXETGTPXY_MODE", "RGLR"):
             ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
-                "BEAR", "UP", ce_investment=1000, pe_investment=2000
+                "BEAR", "UP", ce_investment=1000, pe_investment=2000,
+                sma_status="BEAR",
             )
         self.assertFalse(ce_aligned)
         self.assertTrue(pe_aligned)
+
+    def test_sma50_gates_averaging_to_ce_north_and_pe_south(self):
+        ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
+            "BULL", "UP", 1000, 1000, sma_status="BULL"
+        )
+        self.assertTrue(ce_aligned)
+        self.assertFalse(pe_aligned)
+
+        ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
+            "BEAR", "DOWN", 1000, 1000, sma_status="BEAR"
+        )
+        self.assertFalse(ce_aligned)
+        self.assertTrue(pe_aligned)
+
+        for unknown in ("NA", "NONE", ""):
+            with self.subTest(sma_status=unknown):
+                self.assertEqual(
+                    exeavxpxy.averaging_alignment_signals(
+                        "BULL", "UP", 1000, 1000, sma_status=unknown
+                    ),
+                    (False, False),
+                )
 
     def test_lgt_uses_base_twenty_and_reduces_lesser_side_by_two_point_eight(self):
         self.assertEqual(exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True), -1.4)

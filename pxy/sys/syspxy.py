@@ -103,6 +103,7 @@ def get_all_data():
 
         "supertrend": core.get("supertrend"),
         "super_line": core.get("super_line"),
+        "sma": core.get("sma", "NA"),
 
         "ce_power": core.get("ce_power"),
         "pe_power": core.get("pe_power"),

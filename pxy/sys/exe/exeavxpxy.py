@@ -35,8 +35,10 @@ from run.runexlckpxy import ledger_busy
 logger = logging.getLogger("exeavxpxy")
 
 
-def averaging_alignment_signals(exit_signal, direction, ce_investment, pe_investment):
-    """Use direction for the lighter side's averaging gate in DIRGT mode."""
+def averaging_alignment_signals(
+    exit_signal, direction, ce_investment, pe_investment, sma_status="NA"
+):
+    """Combine signal alignment with the SMA-50 side gate for averaging."""
     ce_aligned = is_aligned("CE", exit_signal)
     pe_aligned = is_aligned("PE", exit_signal)
     signal = str(direction).upper().strip()
@@ -45,6 +47,9 @@ def averaging_alignment_signals(exit_signal, direction, ce_investment, pe_invest
             ce_aligned = is_aligned("CE", "BULL" if signal == "UP" else "BEAR")
         elif pe_investment < ce_investment:
             pe_aligned = is_aligned("PE", "BULL" if signal == "UP" else "BEAR")
+    sma = str(sma_status).upper().strip()
+    ce_aligned = ce_aligned and sma == "BULL"
+    pe_aligned = pe_aligned and sma == "BEAR"
     return ce_aligned, pe_aligned
 
 
@@ -136,8 +141,9 @@ def handle_side_averaging(client, df):
     # 🎯 STEP POSITIONS FIXED: Parse variable status first
     active_exit = str(working_df.iloc[-1].get("exit", "NONE")).upper().strip()
     active_direction = str(working_df.iloc[-1].get("direction", "NONE")).upper().strip()
+    active_sma = str(working_df.iloc[-1].get("sma", "NA")).upper().strip()
     ce_aligned, pe_aligned = averaging_alignment_signals(
-        active_exit, active_direction, ce_investment, pe_investment
+        active_exit, active_direction, ce_investment, pe_investment, active_sma
     )
 
     ce_dynamic_threshold = calculate_lgt(

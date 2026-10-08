@@ -543,6 +543,8 @@ class ProductionPipeReplayTests(unittest.TestCase):
             [
                 {"name": "aligned CE loss averages with losing PE open", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
                 {"name": "aligned PE loss averages with losing CE open", "side": "PE", "sell_price": 90.0, "signal": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
+                {"name": "SMA south blocks CE averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": False},
+                {"name": "SMA north blocks PE averaging", "side": "PE", "sell_price": 90.0, "signal": "BEAR", "sma": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": False},
                 {"name": "profitable CE does not average", "side": "CE", "sell_price": 105.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": False},
                 {"name": "missing opposite position blocks averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": None, "expected_average": False},
                 {"name": "profitable opposite side blocks averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 110.0, "expected_average": False},
@@ -551,6 +553,9 @@ class ProductionPipeReplayTests(unittest.TestCase):
         timezone = pytz.timezone("Asia/Kolkata")
 
         for scenario in scenarios.to_dict("records"):
+            sma_status = scenario.get("sma")
+            if pd.isna(sma_status):
+                sma_status = "BULL" if scenario["side"] == "CE" else "BEAR"
             with self.subTest(scenario=scenario["name"]), tempfile.TemporaryDirectory(
                 prefix="pxy-average-scenario-"
             ) as temp:
@@ -576,6 +581,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                             "sell_prc": scenario["sell_price"],
                             "pnl": (scenario["sell_price"] - 100.0) * 75,
                             "exit": scenario["signal"],
+                            "sma": sma_status,
                             "atr": 5.0,
                         }
                     ]
@@ -605,6 +611,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                                         "sell_prc": scenario["opposite_sell_price"],
                                         "pnl": (scenario["opposite_sell_price"] - 100.0) * 75,
                                         "exit": scenario["signal"],
+                                        "sma": sma_status,
                                         "atr": 5.0,
                                     }
                                 ]
