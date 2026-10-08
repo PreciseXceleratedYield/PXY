@@ -282,6 +282,16 @@ class ConfigurationWiringTests(unittest.TestCase):
                 "NONE", pe_positions, scripts, direction="UP", mode="RGLR"
             )
         )
+        self.assertIsNone(
+            counter_leg_script(
+                "BUY", pe_positions, scripts, direction="DOWN", mode="DIRGT"
+            )
+        )
+        self.assertIsNone(
+            counter_leg_script(
+                "BUY", pe_positions, scripts, direction="NONE", mode="DIRGT"
+            )
+        )
 
     def test_tgt_uses_single_positive_aligned_and_non_aligned_targets(self):
         self.assertEqual(exeltgtpxy.calculate_tgt(True), 77.0)

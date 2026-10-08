@@ -173,18 +173,18 @@ def counter_leg_script(entry_signal, positions, scripts, direction=None, mode="R
     signal = str(entry_signal).upper().strip()
     market_direction = str(direction or "").upper().strip()
     if str(mode).upper().strip() == "DIRGT":
-        if (
-            market_direction == "UP"
-            and position_counts["CE"] == 0
-            and position_counts["PE"] > 1
-        ):
-            signal = "BUY"
-        elif (
-            market_direction == "DOWN"
-            and position_counts["PE"] == 0
-            and position_counts["CE"] > 1
-        ):
-            signal = "SELL"
+        missing_ce_with_multiple_pe = (
+            position_counts["CE"] == 0 and position_counts["PE"] > 1
+        )
+        missing_pe_with_multiple_ce = (
+            position_counts["PE"] == 0 and position_counts["CE"] > 1
+        )
+        if missing_ce_with_multiple_pe or missing_pe_with_multiple_ce:
+            signal = (
+                "BUY" if missing_ce_with_multiple_pe and market_direction == "UP"
+                else "SELL" if missing_pe_with_multiple_ce and market_direction == "DOWN"
+                else "NONE"
+            )
 
     if signal not in {"BUY", "SELL"}:
         return None
