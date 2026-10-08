@@ -166,7 +166,8 @@ settings should resolve to `None` rather than retain an active schedule.
   open quantity × current sell price. Unless Supertrend is `SIDE`, aligned
   positions receive `EXETGTPXY_ALIGNED_PCT` (default `77%`) and non-aligned
   positions receive `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Supertrend
-  `SIDE` forces the `1.4%` target for both sides. Investment exposure selects
+  `SIDE` forces the `1.4%` target except for the lighter side in `DIRGT`, which
+  continues to select its target from `exit`. Investment exposure selects
   the heavier side only; it does not scale the target percentage. In `DIRGT`
   mode, averaging eligibility also uses `direction` for the lighter side;
   the heavier side and `RGLR` mode retain the existing `exit`-based averaging

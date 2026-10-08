@@ -136,12 +136,22 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             (is_ce and ce_investment > pe_investment)
             or (is_pe and pe_investment > ce_investment)
         )
+        is_lighter = (
+            (is_ce and ce_investment < pe_investment)
+            or (is_pe and pe_investment < ce_investment)
+        )
         if TARGET_MODE == "DIRGT" and is_heavier and direction in {"UP", "DOWN"}:
             signal = "BULL" if direction == "UP" else "BEAR"
 
-        is_aligned = supertrend != "SIDE" and (
-            (signal == "BULL" and is_ce)
-            or (signal == "BEAR" and is_pe)
+        apply_supertrend_side_override = not (
+            TARGET_MODE == "DIRGT" and is_lighter
+        )
+        is_aligned = (
+            (supertrend != "SIDE" or not apply_supertrend_side_override)
+            and (
+                (signal == "BULL" and is_ce)
+                or (signal == "BEAR" and is_pe)
+            )
         )
         target_pct = calculate_tgt(is_aligned)
         target_pct_clamped = max(

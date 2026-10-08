@@ -361,6 +361,27 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(exeltgtpxy.target_price(row, 1000, 1000), 1770.0)
         self.assertEqual(exeltgtpxy.target_price(row, 2000, 1000), 1770.0)
 
+    def test_dirgt_lighter_side_uses_exit_when_supertrend_is_side(self):
+        aligned_lighter_ce = {
+            "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL",
+            "direction": "DOWN", "supertrend": "SIDE",
+        }
+        nonaligned_lighter_pe = {
+            "pxy_entry": 1000, "symbol": "NIFTYPE", "exit": "BULL",
+            "direction": "UP", "supertrend": "SIDE",
+        }
+        heavier_ce = {**aligned_lighter_ce, "direction": "SIDE"}
+
+        self.assertEqual(
+            exeltgtpxy.target_price(aligned_lighter_ce, 1000, 2000),
+            1770.0,
+        )
+        self.assertEqual(
+            exeltgtpxy.target_price(nonaligned_lighter_pe, 2000, 1000),
+            1014.0,
+        )
+        self.assertEqual(exeltgtpxy.target_price(heavier_ce, 2000, 1000), 1014.0)
+
     def test_direx_averaging_uses_direction_for_the_lighter_side(self):
         ce_aligned, pe_aligned = exeavxpxy.averaging_alignment_signals(
             "BULL", "UP", ce_investment=1000, pe_investment=2000
