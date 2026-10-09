@@ -207,6 +207,21 @@ settings should resolve to `None` rather than retain an active schedule.
   risk bar so it cannot flatten test positions during an LGT comparison.
   Neither path sends live orders.
 
+## Combined CHK + SIM validation
+
+From the `pxy` console, choose `c) CHK+SIM` to select from the five most recent
+completed NIFTY trading sessions (weekends and configured holidays are skipped).
+The selected date is replayed only after the full CHK test suite passes. CHK
+checks the production-cycle gates and pipe decisions; SIM runs the selected
+session through the production dashboard, exit, entry, averaging, counter-leg,
+and square-off pipes against a simulated broker. Neither stage sends live
+orders.
+
+Run `pxychk` directly to execute CHK only, or `pxychk --combined` to use the
+date-selection flow. The SIM runner also accepts
+`RUNMODE=SIM python3 syssimpxy.py --session-date YYYY-MM-DD` to replay one exact
+completed session.
+
 ## Manual LGT replay
 
 Run `RUNMODE=SIM python3 syssimpxy.py` to replay the latest seven

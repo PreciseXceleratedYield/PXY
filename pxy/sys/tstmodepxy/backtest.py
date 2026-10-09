@@ -356,6 +356,7 @@ def run_backtest(
     record_limit=None,
     session_count=DEFAULT_SESSION_COUNT,
     lgt_calculator=None,
+    session_date=None,
 ):
     if RUNMODE != "SIM":
         raise RuntimeError(
@@ -376,9 +377,17 @@ def run_backtest(
             "At least two completed one-minute sessions are required: one "
             "for indicator warm-up and one for replay."
         )
-    session_dates = recent_sessions_with_records(
-        history, min(session_count, len(available_dates) - 1)
-    )
+    if session_date is None:
+        session_dates = recent_sessions_with_records(
+            history, min(session_count, len(available_dates) - 1)
+        )
+    else:
+        if session_date not in available_dates:
+            raise ValueError(
+                f"Selected session {session_date} is not an available completed "
+                "trading session."
+            )
+        session_dates = [session_date]
     first_session = session_dates[0]
     warmup_dates = _completed_session_dates(history)
     warmup_date = max(
@@ -541,6 +550,12 @@ def main(argv=None):
         "one session by default when --records is specified).",
     )
     parser.add_argument(
+        "--session-date",
+        type=lambda value: datetime.strptime(value, "%Y-%m-%d").date(),
+        default=None,
+        help="Replay one exact completed trading session (YYYY-MM-DD).",
+    )
+    parser.add_argument(
         "--lgt-constant",
         type=float,
         default=None,
@@ -564,6 +579,7 @@ def main(argv=None):
                 else (1 if args.records is not None else DEFAULT_SESSION_COUNT)
             ),
             lgt_calculator=lgt_calculator,
+            session_date=args.session_date,
         )
     except (RuntimeError, ValueError, OSError) as error:
         print(f"SIM ERROR: {error}", file=sys.stderr)

@@ -34,8 +34,9 @@ from sysmodepxy import normal_start_message
 ist = SYSCNFGPXY_TIMEZONE
 
 if RUNMODE != "PRD":
-    print(normal_start_message(RUNMODE), file=sys.stderr)
-    raise SystemExit(2)
+    _normal_start_error = normal_start_message(RUNMODE)
+else:
+    _normal_start_error = None
 
 from sysmodepxy import dispatch_mode
 
@@ -82,63 +83,65 @@ def _in_market_hours_production():
 def in_market_hours():
     return dispatch_mode("engine_window_open", _in_market_hours_production)
 
-# ---------------- MAIN LOOP ----------------
-os.system('clear')  # ✅ Initial screen clear
-print("\n🚀 INIT: main market loop starting now [SIMPLE MODE ONLY] 📡")
-loop_counter = 1
+def run_market_cycle():
+    """Run one production iteration of the exit, entry, and averaging pipes."""
+    safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+    safe_run(HERE / "exeentrpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+    safe_run(HERE / "exeavgpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+    fancy_pause(SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
 
-# Initial system check scripts
-parent_scripts = [
-    HERE.parent / "sysdashpxy.py",
-    HERE / "exeentrpxy.py",
-    HERE / "exeexitpxy.py"
-]
 
-if dispatch_mode("run_startup_checks", lambda: True):
-    for s in parent_scripts:
-        safe_run(s)
-else:
-    print("CHK MODE: engine startup checks paused during market hours.")
+def main():
+    if _normal_start_error is not None:
+        print(_normal_start_error, file=sys.stderr)
+        return 2
 
-while True:
-    os.system('clear')  # ✅ Clears Ubuntu screen at the start of every main loop iteration
-    
-    if in_market_hours():
-        live_status("🚀 LOOP: waiting trigger 📊")
-        
-        for sub_itr in range(1, EXEPXYPXY_SUB_ITERATIONS + 1):
-            os.system('clear')  # ✅ Clears screen before printing the loop iteration index
-            print(f"📊 Loop#{loop_counter} Sub#{sub_itr} | Execution Stack Running...")
-            
-            # -------- REARRANGED RE-ORDERED CORE EXECUTION STACK --------
-            safe_run(
-                HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS
-            )
-            safe_run(
-                HERE / "exeentrpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS
-            )
-            safe_run(
-                HERE / "exeavgpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS
-            )
-                    
-            fancy_pause(SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
-            
-        loop_counter += 1
+    os.system("clear")
+    print("\n🚀 INIT: main market loop starting now [SIMPLE MODE ONLY] 📡")
+    loop_counter = 1
+
+    parent_scripts = [
+        HERE.parent / "sysdashpxy.py",
+        HERE / "exeentrpxy.py",
+        HERE / "exeexitpxy.py",
+    ]
+    if dispatch_mode("run_startup_checks", lambda: True):
+        for script in parent_scripts:
+            safe_run(script)
     else:
-        if dispatch_mode("run_closed_market_tasks", lambda: True):
-            print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
-            safe_run(HERE.parent / "sysslefpxy.py")
-        else:
-            print("\nCHK MODE: engine paused during market hours.")
-        fancy_pause(EXEPXYPXY_IDLE_PAUSE_SECONDS)
-        
-        while not in_market_hours():
-            os.system('clear')  # ✅ Clears screen while waiting overnight so logs don't stack up
-            if dispatch_mode("run_closed_market_tasks", lambda: True):
-                safe_run(HERE.parent / "syscprtpxy.py")
-                print(" ⏳   WAIT : market opens at 09:16 IST  📡", end="\r")
-            else:
-                print(" ⏳   CHK waits until market close  📡", end="\r")
-            time.sleep(EXEPXYPXY_IDLE_POLL_SECONDS)
+        print("CHK MODE: engine startup checks paused during market hours.")
 
-        print("\n🚀 MKT OPEN: resuming main loop now 📈")
+    while True:
+        os.system("clear")
+        if in_market_hours():
+            live_status("🚀 LOOP: waiting trigger 📊")
+            for sub_itr in range(1, EXEPXYPXY_SUB_ITERATIONS + 1):
+                os.system("clear")
+                print(
+                    f"📊 Loop#{loop_counter} Sub#{sub_itr} | "
+                    "Execution Stack Running..."
+                )
+                run_market_cycle()
+            loop_counter += 1
+        else:
+            if dispatch_mode("run_closed_market_tasks", lambda: True):
+                print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
+                safe_run(HERE.parent / "sysslefpxy.py")
+            else:
+                print("\nCHK MODE: engine paused during market hours.")
+            fancy_pause(EXEPXYPXY_IDLE_PAUSE_SECONDS)
+
+            while not in_market_hours():
+                os.system("clear")
+                if dispatch_mode("run_closed_market_tasks", lambda: True):
+                    safe_run(HERE.parent / "syscprtpxy.py")
+                    print(" ⏳   WAIT : market opens at 09:16 IST  📡", end="\r")
+                else:
+                    print(" ⏳   CHK waits until market close  📡", end="\r")
+                time.sleep(EXEPXYPXY_IDLE_POLL_SECONDS)
+
+            print("\n🚀 MKT OPEN: resuming main loop now 📈")
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
