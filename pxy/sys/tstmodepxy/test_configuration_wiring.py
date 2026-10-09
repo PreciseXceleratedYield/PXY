@@ -421,7 +421,10 @@ class ConfigurationWiringTests(unittest.TestCase):
         supertrend.assert_not_called()
 
     def test_market_signal_uses_three_close_v_shapes(self):
-        with patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False):
+        with (
+            patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False),
+            patch.object(sysdthapxy, "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE", "YES"),
+        ):
             self.assertEqual(
                 sysmktpxy.get_signal(pd.DataFrame({"Close": [10.0, 8.0, 9.0]})),
                 ("BUY", "BULL"),
@@ -446,7 +449,10 @@ class ConfigurationWiringTests(unittest.TestCase):
                     )
 
     def test_market_signal_requires_three_closes(self):
-        with patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False):
+        with (
+            patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False),
+            patch.object(sysdthapxy, "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE", "YES"),
+        ):
             self.assertEqual(
                 sysmktpxy.get_signal(pd.DataFrame({"Close": [10.0, 8.0]})),
                 ("NONE", "NONE"),
@@ -473,6 +479,7 @@ class ConfigurationWiringTests(unittest.TestCase):
         frame = pd.DataFrame({"Close": [10.0, 8.0, 9.0]})
         with (
             patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False),
+            patch.object(sysdthapxy, "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE", "YES"),
             patch.object(
                 sysmktpxy,
                 "get_signal_depth_analysis",
@@ -490,11 +497,15 @@ class ConfigurationWiringTests(unittest.TestCase):
             (10.0, 9.0, 8.0): ("BEAR", ("NONE", "BEAR")),
             (8.0, 9.0, 9.0): ("NONE", ("NONE", "NONE")),
         }
-        with patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False):
+        with (
+            patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False),
+            patch.object(sysdthapxy, "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE", "YES"),
+        ):
             for closes, (expected_signal, expected_pair) in expected_signals.items():
                 with self.subTest(closes=closes):
                     analysis = sysdthapxy.get_signal_depth_analysis(
-                        pd.DataFrame({"Close": closes})
+                        pd.DataFrame({"Close": closes}),
+                        include_running=True,
                     )
                     self.assertEqual(analysis["signal"], expected_signal)
                     self.assertNotIn("entry", analysis)
@@ -535,7 +546,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             }
         )
         _, _, ce_depth, pe_depth = sysdptpxy.detect_pxy_flip_signal(df=frame)
-        self.assertEqual(ce_depth, len(closes) - 1)
+        self.assertEqual(ce_depth, len(closes) - 2)
         self.assertEqual(pe_depth, 1)
 
     def test_market_signal_and_depth_share_flat_and_running_candle_rules(self):
@@ -622,7 +633,7 @@ class ConfigurationWiringTests(unittest.TestCase):
 
         self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "MKT")
         self.assertEqual(SYSDTAFPXY_SELECTED_MODE, "6")
-        self.assertEqual(SYSDTHAPXY_INCLUDE_RUNNING_CANDLE, "YES")
+        self.assertEqual(SYSDTHAPXY_INCLUDE_RUNNING_CANDLE, "NO")
         self.assertEqual(SYSMKTPXY_INCLUDE_RUNNING_CANDLE, SYSDTHAPXY_INCLUDE_RUNNING_CANDLE)
         self.assertEqual(
             __import__("pxyconfigwebpxy").ENUMS["SYSDTHAPXY_INCLUDE_RUNNING_CANDLE"],

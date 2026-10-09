@@ -124,9 +124,9 @@ depth result. Flat closes break directional streaks and cannot create a
 bullish or bearish depth. Current streak depth
 continues past `SYSDPTPXY_LAST_N`; that setting only limits the previous-streak
 lookback used for the past-depth label. `SYSDTHAPXY_INCLUDE_RUNNING_CANDLE`
-controls whether the last returned candle is included (`YES`, default) or
-excluded (`NO`). The same selected candles drive both MKT signals and DPT
-depths.
+controls whether the last returned candle is included (`YES`) or excluded
+(`NO`, default). The current default uses closed candles only; the same selected
+candles drive both MKT signals and DPT depths.
 
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
 builder for every buying script. It currently defaults to `ATM`, which ignores
