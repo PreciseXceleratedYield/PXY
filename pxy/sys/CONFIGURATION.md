@@ -192,10 +192,10 @@ settings should resolve to `None` rather than retain an active schedule.
   `RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME` sets its activation time (13:15 IST).
 - At timed activation the ledger snapshots current portfolio P&L and resets
   peak/breach tracking.
-- `RUNEXACPXY_STOP_SQUAREOFF_ENABLED` defaults to `False`, so crossing the stop
-  threshold warns but does not square off. `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED`
-  defaults to `True`, so a peak reaching the target threshold can square off
-  after the configured breach confirmation count.
+- `RUNEXACPXY_STOP_SQUAREOFF_ENABLED` and
+  `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED` both default to `False`. The risk bar
+  continues calculating and reporting stop/target thresholds, but neither
+  threshold triggers a square-off action.
 - Target square-off is suppressed while the higher-invested open option side
   matches the current valid direction (`CE`/`UP` or `PE`/`DOWN`), taken from
   the market snapshot's `direction` key.
@@ -238,12 +238,13 @@ spot-point strategy comparison, not historical option P&L.
   modules with no caller in the production launch graph.
 - TGT uses only `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and the option side for
   alignment; direction, investment balance, Supertrend, and moving-average
-  values do not affect the target. Aligned positions receive
-  `EXETGTPXY_ALIGNED_PCT` (default `77%`) and non-aligned positions receive
-  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Averaging alignment also
-  uses only `exit`; TSMA/SMA has no effect on averaging eligibility or LGT.
-  The trend chart independently carries both moving-average variants as
-  `sma50` and `tsma50`.
+  values do not affect target alignment. Aligned positions use
+  `max(ATR + 1.4 × matching option-side depth, ATR × matching option-side power)`
+  as the target percentage; non-aligned positions receive
+  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). The percentage applies to
+  the option entry premium. Averaging alignment also uses only `exit`; TSMA/SMA
+  has no effect on averaging eligibility or LGT. The trend chart independently
+  carries both moving-average variants as `sma50` and `tsma50`.
 - The averaging window switch and start/end bounds apply only to averaging
   placement, not to entry/exit pipes.
 - Averaging uses one policy with no layer-count mode: the projected side

@@ -108,7 +108,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                         expected_signal,
                     )
 
-    def test_sim_replay_applies_peak_risk_target_without_signal(self):
+    def test_sim_replay_does_not_square_off_on_peak_target_when_actions_disabled(self):
         with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-target-") as temp:
             broker = SimulatedBroker()
             broker.set_market(
@@ -142,11 +142,11 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     engine.timestamp = broker.current_time.replace(minute=minute)
                     engine._execute_risk_ledger(broker, open_df, closed_df)
 
-            self.assertTrue(engine.risk_exit_fired)
-            self.assertEqual(broker.position_summary(), "0CE0PE")
-            self.assertEqual(engine.risk_pnl_offset, 2000)
+            self.assertFalse(engine.risk_exit_fired)
+            self.assertEqual(broker.position_summary(), "75CE0PE")
+            self.assertEqual(engine.risk_pnl_offset, 0.0)
 
-    def test_sim_replay_suppresses_target_when_heavier_side_matches_signal(self):
+    def test_sim_replay_keeps_positions_on_target_with_actions_disabled(self):
         with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-aligned-target-") as temp:
             broker = SimulatedBroker()
             broker.set_market(
@@ -188,10 +188,10 @@ class ProductionPipeReplayTests(unittest.TestCase):
                         broker, open_df, pd.DataFrame(), direction="DOWN"
                     )
 
-            self.assertTrue(engine.risk_exit_fired)
-            self.assertEqual(broker.position_summary(), "0CE0PE")
+            self.assertFalse(engine.risk_exit_fired)
+            self.assertEqual(broker.position_summary(), "75CE0PE")
 
-    def test_sim_replay_counts_breach_only_once_per_bar_timestamp(self):
+    def test_sim_replay_does_not_count_breaches_for_disabled_actions(self):
         with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-tick-") as temp:
             broker = SimulatedBroker()
             broker.set_market(
@@ -220,15 +220,15 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 engine.timestamp = broker.current_time
                 for _ in range(3):
                     engine._execute_risk_ledger(broker, open_df, pd.DataFrame())
-                self.assertEqual(engine.risk_breach_ticks, 1)
+                self.assertEqual(engine.risk_breach_ticks, 0)
                 self.assertFalse(engine.risk_exit_fired)
 
                 for minute in (1, 2):
                     engine.timestamp = broker.current_time.replace(minute=minute)
                     engine._execute_risk_ledger(broker, open_df, pd.DataFrame())
 
-            self.assertTrue(engine.risk_exit_fired)
-            self.assertEqual(broker.position_summary(), "0CE0PE")
+            self.assertFalse(engine.risk_exit_fired)
+            self.assertEqual(broker.position_summary(), "75CE0PE")
 
     def test_sim_replay_stop_threshold_warns_without_squareoff_by_default(self):
         with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-stop-warning-") as temp:

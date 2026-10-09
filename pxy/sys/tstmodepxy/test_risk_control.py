@@ -37,17 +37,19 @@ class MiddayRiskControlTests(unittest.TestCase):
         self.assertEqual(RUNEXACPXY_CNTRLRSKBAR, "YES")
         self.assertEqual(RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME, time(13, 15))
 
-    def test_stop_squareoff_is_disabled_but_peak_target_still_triggers(self):
+    def test_risk_thresholds_remain_monitored_but_squareoff_actions_are_disabled(self):
         self.assertFalse(RUNEXACPXY_STOP_SQUAREOFF_ENABLED)
-        self.assertTrue(RUNEXACPXY_TARGET_SQUAREOFF_ENABLED)
+        self.assertFalse(RUNEXACPXY_TARGET_SQUAREOFF_ENABLED)
         self.assertFalse(compute_stop(-2000, 0)[2])
-        self.assertTrue(compute_stop(2000, 0)[2])
+        self.assertFalse(compute_stop(2000, 0)[2])
+        self.assertTrue(compute_stop_conditions(-2000, 0)[2])
+        self.assertTrue(compute_stop_conditions(2000, 0)[3])
 
         with patch("runexmtpxy.STOP_SQUAREOFF_ENABLED", True):
             self.assertTrue(compute_stop(-2000, 0)[2])
 
-        with patch("runexmtpxy.TARGET_SQUAREOFF_ENABLED", False):
-            self.assertFalse(compute_stop(2000, 0)[2])
+        with patch("runexmtpxy.TARGET_SQUAREOFF_ENABLED", True):
+            self.assertTrue(compute_stop(2000, 0)[2])
 
     def test_peak_trailing_stop_uses_historical_peak(self):
         with patch("runexmtpxy.TARGET_SQUAREOFF_ENABLED", True):
@@ -67,13 +69,17 @@ class MiddayRiskControlTests(unittest.TestCase):
 
         self.assertEqual(compute_stop(-1799, 100), (100.0, -1800.0, False))
         self.assertEqual(compute_stop(-1800, 100), (100.0, -1800.0, False))
-        self.assertEqual(compute_stop(PEAK_CEILING, 0), (PEAK_CEILING, 2000.0, True))
+        self.assertEqual(compute_stop(PEAK_CEILING, 0), (PEAK_CEILING, 2000.0, False))
+        self.assertTrue(compute_stop_conditions(PEAK_CEILING, 0)[3])
 
         with (
             patch("runexmtpxy.STOP_SQUAREOFF_ENABLED", True),
             patch("runexmtpxy.TARGET_SQUAREOFF_ENABLED", False),
         ):
             self.assertTrue(compute_stop(-1800, 100)[2])
+
+        with patch("runexmtpxy.TARGET_SQUAREOFF_ENABLED", True):
+            self.assertTrue(compute_stop(PEAK_CEILING, 0)[2])
 
     def test_risk_target_scales_by_active_open_rung_count(self):
         self.assertEqual(target_ceiling(1), 1000.0)

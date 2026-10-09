@@ -1,18 +1,17 @@
 
+import math
 import pandas as pd
 import re
 from colorama import Fore, Style, init
 from syscnfgpxy import (
     EXEAMSPXY_MAX_LGT_LOSS,
     EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
-    EXETGTPXY_ALIGNED_PCT,
     EXETGTPXY_EXIT_KEY_COLUMN,
     EXETGTPXY_TGT_PCT_NOT_ALIGNED,
 )
 
 # ==================== CONFIG (this file's settings) ====================
 EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
-ALIGNED_TARGET_PCT = EXETGTPXY_ALIGNED_PCT
 NOT_ALIGNED_TARGET_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
 # =======================================================================
 
@@ -45,9 +44,27 @@ def calculate_lgt(ce_investment, pe_investment, is_ce):
     return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
 
 
-def calculate_tgt(is_aligned):
-    """Return the single-mode positive target for the side's trend alignment."""
-    return ALIGNED_TARGET_PCT if is_aligned else NOT_ALIGNED_TARGET_PCT
+def calculate_tgt(is_aligned, atr=None, side_power=None, side_depth=None):
+    """Return max(ATR + 1.4 × depth, ATR × power) when aligned."""
+    if not is_aligned:
+        return NOT_ALIGNED_TARGET_PCT
+
+    try:
+        atr_value, power_value, depth_value = (
+            float(atr),
+            float(side_power),
+            float(side_depth),
+        )
+    except (TypeError, ValueError):
+        raise ValueError("Aligned target requires ATR, side power, and side depth.")
+    if (
+        not all(math.isfinite(value) for value in (atr_value, power_value, depth_value))
+        or atr_value <= 0
+        or power_value <= 0
+        or depth_value <= 0
+    ):
+        raise ValueError("Aligned target inputs must be finite positive values.")
+    return max(atr_value + (NOT_ALIGNED_TARGET_PCT * depth_value), atr_value * power_value)
 
 
 def f(x, d=0.0):
@@ -114,14 +131,17 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             (exit_signal == "BULL" and is_ce)
             or (exit_signal == "BEAR" and is_pe)
         )
-        target_pct = calculate_tgt(is_aligned)
-        target_pct_clamped = max(
-            NOT_ALIGNED_TARGET_PCT,
-            min(target_pct, ALIGNED_TARGET_PCT),
+        side_power = row.get("ce_power" if is_ce else "pe_power")
+        side_depth = row.get("hkin_ce_depth" if is_ce else "hkin_pe_depth")
+        target_pct = calculate_tgt(
+            is_aligned,
+            atr=row.get("atr"),
+            side_power=side_power,
+            side_depth=side_depth,
         )
         
         # Calculate the positive target price.
-        calculated_target = entry_prc * (1.0 + (target_pct_clamped / 100.0))
+        calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
         return round(calculated_target, 2)
         
     except Exception as e:
