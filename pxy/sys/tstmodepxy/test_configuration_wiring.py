@@ -434,11 +434,11 @@ class ConfigurationWiringTests(unittest.TestCase):
         ):
             self.assertEqual(
                 sysmktpxy.get_signal(pd.DataFrame({"Close": [10.0, 8.0, 9.0]})),
-                ("BUY", "BULL"),
+                ("NONE", "BULL"),
             )
             self.assertEqual(
                 sysmktpxy.get_signal(pd.DataFrame({"Close": [8.0, 10.0, 9.0]})),
-                ("SELL", "BEAR"),
+                ("NONE", "BEAR"),
             )
             self.assertEqual(
                 sysmktpxy.get_signal(pd.DataFrame({"Close": [8.0, 9.0, 10.0]})),
@@ -471,12 +471,12 @@ class ConfigurationWiringTests(unittest.TestCase):
             patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False),
             patch.object(sysdthapxy, "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE", "YES"),
         ):
-            self.assertEqual(sysmktpxy.get_signal(frame), ("SELL", "BEAR"))
+            self.assertEqual(sysmktpxy.get_signal(frame), ("NONE", "BEAR"))
         with (
             patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False),
             patch.object(sysdthapxy, "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE", "NO"),
         ):
-            self.assertEqual(sysmktpxy.get_signal(frame), ("BUY", "BULL"))
+            self.assertEqual(sysmktpxy.get_signal(frame), ("NONE", "BULL"))
             self.assertEqual(
                 sysmktpxy.get_signal(frame.iloc[:3]),
                 ("NONE", "NONE"),
@@ -493,13 +493,13 @@ class ConfigurationWiringTests(unittest.TestCase):
                 wraps=sysdthapxy.get_signal_depth_analysis,
             ) as analysis,
         ):
-            self.assertEqual(sysmktpxy.get_signal(frame), ("BUY", "BULL"))
+            self.assertEqual(sysmktpxy.get_signal(frame), ("NONE", "BULL"))
         analysis.assert_called_once_with(frame)
 
     def test_dtha_returns_one_pattern_signal_and_mkt_splits_it(self):
         expected_signals = {
-            (10.0, 8.0, 9.0): ("BUY", ("BUY", "BULL")),
-            (8.0, 10.0, 9.0): ("SELL", ("SELL", "BEAR")),
+            (10.0, 8.0, 9.0): ("BUY", ("NONE", "BULL")),
+            (8.0, 10.0, 9.0): ("SELL", ("NONE", "BEAR")),
             (8.0, 9.0, 10.0): ("BULL", ("NONE", "BULL")),
             (10.0, 9.0, 8.0): ("BEAR", ("NONE", "BEAR")),
             (8.0, 9.0, 9.0): ("NONE", ("NONE", "NONE")),
@@ -541,6 +541,27 @@ class ConfigurationWiringTests(unittest.TestCase):
             output["pxy_direction"].tolist(),
             ["UNKNOWN", "DOWN", "FLAT", "UP"],
         )
+
+    def test_mkt_entries_trigger_only_above_two_current_directional_bars(self):
+        cases = (
+            ([10.0, 9.0, 8.0], ("NONE", "BEAR")),
+            ([10.0, 9.0, 8.0, 7.0], ("BUY", "BEAR")),
+            ([10.0, 9.0, 8.0, 7.0, 6.0], ("BUY", "BEAR")),
+            ([10.0, 11.0, 12.0], ("NONE", "BULL")),
+            ([10.0, 11.0, 12.0, 13.0], ("SELL", "BULL")),
+            ([10.0, 11.0, 12.0, 13.0, 14.0], ("SELL", "BULL")),
+            ([10.0, 9.0, 10.0, 9.0], ("NONE", "BEAR")),
+        )
+        with (
+            patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False),
+            patch.object(sysdthapxy, "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE", "YES"),
+        ):
+            for closes, expected in cases:
+                with self.subTest(closes=closes):
+                    self.assertEqual(
+                        sysmktpxy.get_signal(pd.DataFrame({"Close": closes})),
+                        expected,
+                    )
 
     def test_candle_visual_obeys_shared_running_candle_setting(self):
         colors = pd.Series(["green", "red"])
@@ -603,10 +624,11 @@ class ConfigurationWiringTests(unittest.TestCase):
                     include_running,
                 ),
             ):
-                expected = sysmktpxy.get_signal(frame)
                 signal, _, ce_depth, pe_depth = sysdptpxy.detect_pxy_flip_signal(frame)
-                expected_display_signal = expected[0] if expected[0] != "NONE" else expected[1]
-                self.assertEqual(signal, expected_display_signal)
+                self.assertEqual(signal, sysdthapxy.get_signal_depth_analysis(
+                    frame,
+                    include_running=include_running == "YES",
+                )["signal"])
                 self.assertEqual((ce_depth, pe_depth), (1, 1))
 
     def test_depth_uses_same_three_candle_window_as_market_signal(self):
@@ -622,7 +644,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False),
             patch.object(sysdthapxy, "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE", "NO"),
         ):
-            self.assertEqual(sysmktpxy.get_signal(frame), ("BUY", "BULL"))
+            self.assertEqual(sysmktpxy.get_signal(frame), ("NONE", "BULL"))
             signal, _, ce_depth, pe_depth = sysdptpxy.detect_pxy_flip_signal(frame)
         self.assertEqual(signal, "BUY")
         self.assertEqual((ce_depth, pe_depth), (1, 1))
@@ -638,8 +660,8 @@ class ConfigurationWiringTests(unittest.TestCase):
             }
         )
         expected = {
-            "YES": (("SELL", "BEAR"), "SELL", 1, 1),
-            "NO": (("BUY", "BULL"), "BUY", 1, 1),
+            "YES": (("NONE", "BEAR"), "SELL", 1, 1),
+            "NO": (("NONE", "BULL"), "BUY", 1, 1),
         }
         for include_running, (market, depth_signal, ce_depth, pe_depth) in expected.items():
             with (
@@ -862,7 +884,7 @@ class ConfigurationWiringTests(unittest.TestCase):
         )
 
         self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "MKT")
-        self.assertEqual(SYSDTAFPXY_SELECTED_MODE, "6")
+        self.assertEqual(SYSDTAFPXY_SELECTED_MODE, "0")
         self.assertEqual(SYSDTHAPXY_INCLUDE_RUNNING_CANDLE, "YES")
         self.assertEqual(
             __import__("pxyconfigwebpxy").ENUMS["SYSDTHAPXY_INCLUDE_RUNNING_CANDLE"],

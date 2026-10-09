@@ -57,24 +57,30 @@ def _print_console_bar(c1, c0, execution_state):
 
 def get_signal(df=None):
     """
-    Classify three-close reversals and directional continuations.
+    Derive MKT entries from directional depth and exits from close patterns.
 
-    V reversals return BUY/BULL or SELL/BEAR. Three strictly rising or falling
-    closes return exit-only BULL/BEAR.
+    A PE depth greater than two triggers BUY; a CE depth greater than two
+    triggers SELL. Exit state continues to reflect the close-pattern direction.
     """
     if df is None:
         df = fetch_yf_data()
         
     try:
         analysis = get_signal_depth_analysis(df)
-        signal = analysis["signal"]
-        signals = {
-            "BUY": ("BUY", "BULL"),
-            "SELL": ("SELL", "BEAR"),
-            "BULL": ("NONE", "BULL"),
-            "BEAR": ("NONE", "BEAR"),
-        }.get(signal, ("NONE", "NONE"))
-        execution_state = signals[1]
+        if analysis["pe_depth"] > 2:
+            entry_signal = "BUY"
+        elif analysis["ce_depth"] > 2:
+            entry_signal = "SELL"
+        else:
+            entry_signal = "NONE"
+        exit_signal = {
+            "BUY": "BULL",
+            "SELL": "BEAR",
+            "BULL": "BULL",
+            "BEAR": "BEAR",
+        }.get(analysis["signal"], "NONE")
+        signals = (entry_signal, exit_signal)
+        execution_state = exit_signal
 
         if SYSMKTPXY_DEBUG_ENABLED and analysis["previous_close"] is not None:
             c1 = analysis["previous_close"]

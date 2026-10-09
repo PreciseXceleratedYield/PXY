@@ -110,30 +110,28 @@ and `BEAR` for Supertrend BEAR; when Supertrend is SIDE, exit falls back to
 `SIDE`; a `SIDE` entry is not a valid fresh-order command.
 `SYSDTAFPXY_SELECTED_MODE` independently selects the OHLC data transformation
 supplied to signal calculations. Mode `6` applies sequential Heikin-Ashi candles.
-The current configuration uses mode `6` and `SYSENTRPXY_SIGNAL_MODE = "MKT"`.
-MKT examines the last three transformed closes. A strict V
-(`C[-3] > C[-2] < C[-1]`) emits `BUY`/`BULL`; an inverted V
-(`C[-3] < C[-2] > C[-1]`) emits `SELL`/`BEAR`. Three strictly rising closes
-emit exit-only `BULL` (`NONE`/`BULL`), and three strictly falling closes emit
-exit-only `BEAR` (`NONE`/`BEAR`). All other patterns, including equal adjacent
-closes, emit `NONE`/`NONE`. `sysdthapxy` supplies the shared close-to-close
+The current configuration uses mode `0` and `SYSENTRPXY_SIGNAL_MODE = "MKT"`.
+MKT entries are based on the current consecutive transformed-close direction
+depth: `PE` depth greater than `2` emits `BUY`, `CE` depth greater than `2`
+emits `SELL`, and depths of `2` or less emit `NONE`. These entries do not
+require a reversal pattern. The exit remains based on the last two close-to-
+close moves: V reversals map to `BULL`/`BEAR`, as do bullish/bearish
+continuations; all other patterns, including equal adjacent closes, emit
+`NONE`. `sysdthapxy` supplies the shared close-to-close
 direction series (`UP`, `DOWN`, or `FLAT`) and returns one pattern signal
 (`BUY`, `SELL`, `BULL`, `BEAR`, or `NONE`) alongside CE/PE streak depths.
-`sysmktpxy` maps reversal signals `BUY` and `SELL` to matching entry signals,
-with exit labels `BULL` and `BEAR`. Continuation signals `BULL` and `BEAR`
-remain exit-only; they do not trigger a fresh entry.
+`sysmktpxy` uses those depths for entries and the DTHA pattern for the exit
+label. Flat closes break directional streaks and cannot create a bullish or
+bearish depth.
 `sysdptpxy` delegates dashboard/depth calculation to that same DTHA signal and
-depth result. Flat closes break directional streaks and cannot create a
-bullish or bearish depth. Current streak depth
-continues past `SYSDPTPXY_LAST_N`; that setting only limits the previous-streak
+depth result. Current streak depth continues past `SYSDPTPXY_LAST_N`; that
+setting only limits the previous-streak
 lookback used for the past-depth label. `SYSDTHAPXY_INCLUDE_RUNNING_CANDLE`
 controls whether the last returned candle is included (`YES`) or excluded
 (`NO`). It defaults to `YES`, so MKT signals, DPT depths, and the dashboard's
 candle-color depth stream all include the latest running candle and share the
-same candle window. In MKT mode,
-`sysentrpxy` forwards `sysmktpxy`'s entry/exit pair unchanged: reversal entries
-are `BUY`/`SELL`, with their matching exit labels `BULL`/`BEAR`; continuation
-signals are exit-only.
+same candle window. In MKT mode, `sysentrpxy` forwards `sysmktpxy`'s
+depth-triggered entry and pattern-based exit pair unchanged.
 `PASTRSK` enables (`YES`) or disables (`NO`) the depth-triggered reversal
 square-off; it defaults to `YES`. When enabled, outside the scheduled square-off
 window, a MKT `BUY` with past depth `PE7` or greater independently triggers a
