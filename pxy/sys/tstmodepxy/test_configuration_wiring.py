@@ -33,6 +33,7 @@ import sysentrpxy
 import sysmktpxy
 import sysdptpxy
 import sysdthapxy
+import syscseqpxy
 import syspxy
 import sysstrndpxy
 import runniftypxy
@@ -539,6 +540,33 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(
             output["pxy_direction"].tolist(),
             ["UNKNOWN", "DOWN", "FLAT", "UP"],
+        )
+
+    def test_candle_visual_obeys_shared_running_candle_setting(self):
+        colors = pd.Series(["green", "red"])
+        with (
+            patch.object(
+                syscseqpxy,
+                "get_pxy_data",
+                return_value=(None, None, colors, None),
+            ),
+            patch.object(syscseqpxy, "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE", "NO"),
+        ):
+            confirmed_visual = syscseqpxy.get_candle_visual()
+        self.assertEqual(confirmed_visual, "\033[92m1\033[0m")
+
+        with (
+            patch.object(
+                syscseqpxy,
+                "get_pxy_data",
+                return_value=(None, None, colors, None),
+            ),
+            patch.object(syscseqpxy, "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE", "YES"),
+        ):
+            running_visual = syscseqpxy.get_candle_visual()
+        self.assertEqual(
+            running_visual,
+            "\033[92m1\033[0m\033[91m1\033[0m",
         )
 
     def test_depth_keeps_growing_after_configured_lookback(self):

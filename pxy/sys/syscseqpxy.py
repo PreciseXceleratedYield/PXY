@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from syscnfgpxy import SYSDTHAPXY_INCLUDE_RUNNING_CANDLE
 from sysdthapxy import get_pxy_data
 
 GREEN = "\033[92m"
@@ -27,6 +28,11 @@ def get_candle_visual(df=None, last_n=100):
     if pxy_color_series.empty:
         return ""
         
+    if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE == "NO":
+        pxy_color_series = pxy_color_series.iloc[:-1]
+    if pxy_color_series.empty:
+        return ""
+
     # Grab a larger history buffer to calculate streaks accurately from their start
     raw_colors = pxy_color_series.iloc[-last_n:]
     

@@ -127,7 +127,8 @@ continues past `SYSDPTPXY_LAST_N`; that setting only limits the previous-streak
 lookback used for the past-depth label. `SYSDTHAPXY_INCLUDE_RUNNING_CANDLE`
 controls whether the last returned candle is included (`YES`) or excluded
 (`NO`, the default), so MKT signals and DPT depths both use closed candles and
-share the same candle window. In MKT mode,
+the dashboard's candle-color depth stream excludes the latest returned candle
+as well. All three share the same candle window. In MKT mode,
 `sysentrpxy` forwards `sysmktpxy`'s entry/exit pair unchanged: reversal entries
 are `BUY`/`SELL`, with their matching exit labels `BULL`/`BEAR`; continuation
 signals are exit-only.
