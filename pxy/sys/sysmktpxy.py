@@ -60,7 +60,7 @@ def get_signal(df=None):
     Classify three-close reversals and directional continuations.
 
     V reversals return BUY/BULL or SELL/BEAR. Three strictly rising or falling
-    closes return exit-only BULL/BEAR.
+    closes return BUY/BULL or SELL/BEAR, respectively.
     """
     if df is None:
         df = fetch_yf_data()
@@ -71,8 +71,8 @@ def get_signal(df=None):
         signals = {
             "BUY": ("BUY", "BULL"),
             "SELL": ("SELL", "BEAR"),
-            "BULL": ("NONE", "BULL"),
-            "BEAR": ("NONE", "BEAR"),
+            "BULL": ("BUY", "BULL"),
+            "BEAR": ("SELL", "BEAR"),
         }.get(signal, ("NONE", "NONE"))
         execution_state = signals[1]
 

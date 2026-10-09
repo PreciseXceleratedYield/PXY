@@ -441,11 +441,11 @@ class ConfigurationWiringTests(unittest.TestCase):
             )
             self.assertEqual(
                 sysmktpxy.get_signal(pd.DataFrame({"Close": [8.0, 9.0, 10.0]})),
-                ("NONE", "BULL"),
+                ("BUY", "BULL"),
             )
             self.assertEqual(
                 sysmktpxy.get_signal(pd.DataFrame({"Close": [10.0, 9.0, 8.0]})),
-                ("NONE", "BEAR"),
+                ("SELL", "BEAR"),
             )
             for closes in ([8.0, 9.0, 9.0], [9.0, 9.0, 10.0], [9.0, 9.0, 9.0]):
                 with self.subTest(closes=closes):
@@ -499,8 +499,8 @@ class ConfigurationWiringTests(unittest.TestCase):
         expected_signals = {
             (10.0, 8.0, 9.0): ("BUY", ("BUY", "BULL")),
             (8.0, 10.0, 9.0): ("SELL", ("SELL", "BEAR")),
-            (8.0, 9.0, 10.0): ("BULL", ("NONE", "BULL")),
-            (10.0, 9.0, 8.0): ("BEAR", ("NONE", "BEAR")),
+            (8.0, 9.0, 10.0): ("BULL", ("BUY", "BULL")),
+            (10.0, 9.0, 8.0): ("BEAR", ("SELL", "BEAR")),
             (8.0, 9.0, 9.0): ("NONE", ("NONE", "NONE")),
         }
         with (
@@ -551,7 +551,8 @@ class ConfigurationWiringTests(unittest.TestCase):
                 "Close": closes,
             }
         )
-        _, _, ce_depth, pe_depth = sysdptpxy.detect_pxy_flip_signal(df=frame)
+        with patch.object(sysdthapxy, "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE", "NO"):
+            _, _, ce_depth, pe_depth = sysdptpxy.detect_pxy_flip_signal(df=frame)
         self.assertEqual(ce_depth, len(closes) - 2)
         self.assertEqual(pe_depth, 1)
 
@@ -777,13 +778,11 @@ class ConfigurationWiringTests(unittest.TestCase):
             SYSENTRPXY_SIGNAL_MODE,
             SYSDTAFPXY_SELECTED_MODE,
             SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
-            SYSMKTPXY_INCLUDE_RUNNING_CANDLE,
         )
 
         self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "MKT")
         self.assertEqual(SYSDTAFPXY_SELECTED_MODE, "6")
         self.assertEqual(SYSDTHAPXY_INCLUDE_RUNNING_CANDLE, "NO")
-        self.assertEqual(SYSMKTPXY_INCLUDE_RUNNING_CANDLE, SYSDTHAPXY_INCLUDE_RUNNING_CANDLE)
         self.assertEqual(
             __import__("pxyconfigwebpxy").ENUMS["SYSDTHAPXY_INCLUDE_RUNNING_CANDLE"],
             ("YES", "NO"),
