@@ -160,10 +160,11 @@ Friday (currently 200, 150, 100, 50, 0 points). Dynamic selection fails closed
 on weekends when no weekday distance is defined. The symbol builder rounds the
 result to the configured strike step.
 
-Counter-buy/re-buy eligibility does not depend on market or entry/exit signals.
-When exactly one option side is held, a verified blended running loss greater
-than 1.4% on that side triggers the opposite counter-leg. Holding both sides,
-or unavailable/invalid position pricing, skips the counter-buy.
+Counter-buy/re-buy uses the exit signal after `exeexitpxy` removes rows exited
+or locked this cycle. With only CE held, BEAR triggers the PE counter-leg; with
+only PE held, BULL triggers the CE counter-leg. Other exit signals and holding
+both sides trigger no counter-buy. The exit pipe also requires an available
+market snapshot, verified broker positions, and an idle ledger.
 
 ## Web server file access
 

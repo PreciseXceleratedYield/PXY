@@ -475,14 +475,14 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 "invalid_positions": True,
             },
             {
-                "name": "target not reached; hostile CE signal",
+                "name": "target not reached; BEAR exit signal adds PE counter-leg",
                 "held": ("CE",),
                 "available": True,
                 "exit": "BEAR",
                 "entry": "SELL",
                 "sell_price": 100.0,
                 "target": 110.0,
-                "expected": [("B", "NIFTY-WF-CE")],
+                "expected": [("B", "NIFTY-WF-CE"), ("B", "NIFTY-WF-PE")],
             },
             {
                 "name": "both legs held; no counter-buy",
@@ -511,7 +511,6 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     ("B", "NIFTY-WF-CE"),
                     ("B", "NIFTY-WF-PE"),
                     ("S", "NIFTY-WF-PE"),
-                    ("B", "NIFTY-WF-PE"),
                 ],
             },
             {
@@ -528,7 +527,6 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     ("B", "NIFTY-WF-CE"),
                     ("B", "NIFTY-WF-PE"),
                     ("S", "NIFTY-WF-CE"),
-                    ("B", "NIFTY-WF-CE"),
                 ],
             },
         ])
@@ -836,7 +834,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                             runtime_log,
                         )
 
-                    expected_positions = ("75CE0PE", "75CE0PE", "75CE0PE")[index]
+                    expected_positions = ("75CE0PE", "75CE75PE", "75CE75PE")[index]
                     self.assertEqual(broker.position_summary(), expected_positions)
 
             self.assertIn("CHK production-pipe scenario replay", runtime_log.read_text(encoding="utf-8"))

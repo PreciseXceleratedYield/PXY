@@ -10,11 +10,10 @@
 # pxybuype / pxybuyce are executable shell scripts (no extension); they are run directly,
 # not through python3.
 #
-# Exactly one held side and a sufficient verified loss are required.
+# Exactly one held side and an opposing exit signal are required.
 import os
 import shutil
 import json
-import math
 import time
 import subprocess
 import pandas as pd
@@ -25,14 +24,12 @@ from syscnfgpxy import (
     EXECBUYPXY_CUTOFF,
     EXECBUYPXY_DEBUG_ENABLED,
     EXECBUYPXY_LOCK_KEEP_SECS,
-    EXECBUYPXY_LOSS_TRIGGER_PCT,
     EXECBUYPXY_MAX_PER_DAY,
     EXECBUYPXY_SCRIPTS,
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
 )
-from sysdecisionpxy import counter_leg_side
-from sysdecisionpxy import counter_leg_permission_status
+from sysdecisionpxy import counter_leg_permission_status, counter_leg_script
 
 # ==================== CONFIG (this file's settings) ====================
 CBUY_ACTION = EXECBUYPXY_ACTION
@@ -43,7 +40,7 @@ CBUY_LOCK_FILE_NAME = ".cbuy_lock.json"
 CBUY_MAX_PER_DAY = EXECBUYPXY_MAX_PER_DAY
 CBUY_COUNT_FILE_NAME = ".cbuy_count.json"
 CBUY_LOCK_KEEP_SECS = EXECBUYPXY_LOCK_KEEP_SECS
-CBUY_LOSS_TRIGGER_PCT = EXECBUYPXY_LOSS_TRIGGER_PCT
+EXIT_KEY_COLUMN = "exit"
 # =======================================================================
 
 _LOCK_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), CBUY_LOCK_FILE_NAME)
@@ -138,36 +135,6 @@ def _count_fire():
         pass
 
 
-def existing_side_loss_pct(remaining_df, side):
-    """Return blended running P&L% for a held option side, or None if unverifiable."""
-    if remaining_df is None or remaining_df.empty or "symbol" not in remaining_df.columns:
-        return None
-    side_rows = remaining_df[
-        remaining_df["symbol"].astype(str).str.upper().str.endswith(side, na=False)
-    ]
-    required = {"qty", "buy_prc", "sell_prc"}
-    if side_rows.empty or not required.issubset(side_rows.columns):
-        return None
-
-    values = side_rows[["qty", "buy_prc", "sell_prc"]].apply(
-        pd.to_numeric, errors="coerce"
-    )
-    if any(not math.isfinite(float(value)) for value in values.to_numpy().ravel()):
-        return None
-    if (
-        (values["qty"] <= 0).any()
-        or (values["buy_prc"] <= 0).any()
-        or (values["sell_prc"] <= 0).any()
-    ):
-        return None
-
-    invested = (values["qty"] * values["buy_prc"]).sum()
-    if invested <= 0:
-        return None
-    current_value = (values["qty"] * values["sell_prc"]).sum()
-    return round((current_value - invested) / invested * 100, 10)
-
-
 # ---------------- main entry ----------------
 def check_counter_leg(remaining_df):
     """remaining_df: rows still held after this cycle's target exits.
@@ -177,29 +144,18 @@ def check_counter_leg(remaining_df):
             debug_log("Counter check: no rows remaining after exits.")
             return None
 
+        signal = str(remaining_df.iloc[0].get(EXIT_KEY_COLUMN, "NONE")).upper().strip()
         records = remaining_df[["symbol", "qty"]].to_dict("records")
-        held = counter_leg_side(records)
-        if held is None:
-            debug_log("Counter check: positions do not identify exactly one held option side.")
+        script_name = counter_leg_script(signal, records, CBUY_SCRIPTS)
+        if script_name is None:
+            debug_log(
+                f"Counter check: exit signal {signal} does not oppose exactly "
+                "one held option side."
+            )
             return None
 
-        script_name = CBUY_SCRIPTS[held]
+        held = "PE" if signal == "BULL" else "CE"
         counter = "PE" if held == "CE" else "CE"
-        loss_pct = existing_side_loss_pct(remaining_df, held)
-        if loss_pct is None:
-            print(
-                f"{Fore.YELLOW}⚠️ Counter-buy skipped: {held} running loss "
-                "could not be verified."
-            )
-            return None
-        if loss_pct >= -CBUY_LOSS_TRIGGER_PCT:
-            print(
-                f"{Fore.YELLOW}⚠️ Counter-buy skipped: {held} running P&L is "
-                f"{loss_pct:.2f}%; its loss must be greater than "
-                f"-{CBUY_LOSS_TRIGGER_PCT:.2f}%."
-            )
-            return None
-
         now = datetime.now(_IST).time()
         lock_key = f"CBUY|{script_name}"
         locked = _recent(_load_locks(), lock_key, CBUY_LOCK_SECS)
@@ -228,7 +184,7 @@ def check_counter_leg(remaining_df):
                 print(f"{Fore.RED}🛑 Counter-buy daily cap reached ({CBUY_MAX_PER_DAY} launches); not firing {script_name}.")
             return None
 
-        print(f"{Fore.YELLOW}⚠️ {held} running loss reached the counter-buy threshold; no {counter} leg is held.")
+        print(f"{Fore.YELLOW}⚠️ Exit signal ({signal}): remaining {held} rows with NO {counter} leg.")
         if permission == "passive":
             print(f"{Fore.BLUE}{Style.BRIGHT}ℹ️ [PASSIVE ALERT] CBUY_ACTION=NO. Would fire {script_name}.")
             return None

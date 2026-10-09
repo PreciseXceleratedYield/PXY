@@ -180,10 +180,15 @@ def counter_leg_side(positions):
     return None
 
 
-def counter_leg_script(positions, scripts):
-    """Return the opposite-leg script for a single held option side."""
+def counter_leg_script(exit_signal, positions, scripts):
+    """Return the opposite-leg script when the exit signal opposes held exposure."""
     side = counter_leg_side(positions)
-    return scripts[side] if side is not None else None
+    signal = str(exit_signal).upper().strip()
+    if side == "CE" and signal == "BEAR":
+        return scripts["CE"]
+    if side == "PE" and signal == "BULL":
+        return scripts["PE"]
+    return None
 
 
 def averaging_trigger_sides(

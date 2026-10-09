@@ -1036,11 +1036,10 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(exeexitpxy.SQOFF_MIN_GAP_SECS, 6)
         self.assertEqual(syscnfgpxy.EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS, 6)
 
-    def test_counter_buy_routes_from_held_side_not_market_signal(self):
+    def test_counter_buy_routes_from_exit_signal_and_held_side(self):
         import syscnfgpxy
 
         self.assertFalse(hasattr(syscnfgpxy, "EXECBUYPXY_ENTRY_KEY_COLUMN"))
-        self.assertEqual(execbuypxy.CBUY_LOSS_TRIGGER_PCT, 1.4)
         scripts = {"CE": "pxybuype", "PE": "pxybuyce"}
         pe_positions = [
             {"symbol": "NIFTY-1PE", "qty": 75},
@@ -1052,55 +1051,21 @@ class ConfigurationWiringTests(unittest.TestCase):
         ]
 
         self.assertEqual(
-            counter_leg_script(pe_positions, scripts),
+            counter_leg_script("BULL", pe_positions, scripts),
             "pxybuyce",
         )
         self.assertEqual(
-            counter_leg_script(ce_positions, scripts),
+            counter_leg_script("BEAR", ce_positions, scripts),
             "pxybuype",
         )
         self.assertIsNone(
-            counter_leg_script(pe_positions + ce_positions, scripts)
+            counter_leg_script("BULL", pe_positions + ce_positions, scripts)
         )
+        self.assertIsNone(counter_leg_script("BEAR", pe_positions, scripts))
+        self.assertIsNone(counter_leg_script("BULL", ce_positions, scripts))
+        self.assertIsNone(counter_leg_script("SIDE", pe_positions, scripts))
 
-    def test_counter_buy_requires_at_least_1_4_percent_existing_side_loss(self):
-        cases = (
-            (100.0, 98.61, -1.39),
-            (100.0, 98.6, -1.4),
-            (100.0, 98.59, -1.41),
-            (100.0, 97.0, -3.0),
-        )
-        for entry, current, expected in cases:
-            with self.subTest(current=current):
-                rows = pd.DataFrame(
-                    [{"symbol": "NIFTY-1PE", "qty": 75,
-                      "buy_prc": entry, "sell_prc": current}]
-                )
-                self.assertEqual(
-                    execbuypxy.existing_side_loss_pct(rows, "PE"),
-                    expected,
-                )
-
-        invalid_rows = pd.DataFrame(
-            [{"symbol": "NIFTY-1PE", "qty": 75, "buy_prc": 100}]
-        )
-        self.assertIsNone(execbuypxy.existing_side_loss_pct(invalid_rows, "PE"))
-        self.assertIsNone(execbuypxy.existing_side_loss_pct(pd.DataFrame(), "PE"))
-
-    def test_counter_buy_loss_is_blended_by_invested_value(self):
-        rows = pd.DataFrame(
-            [
-                {"symbol": "NIFTY-1PE", "qty": 75, "buy_prc": 100,
-                 "sell_prc": 98},
-                {"symbol": "NIFTY-2PE", "qty": 75, "buy_prc": 200,
-                 "sell_prc": 196},
-                {"symbol": "NIFTY-3CE", "qty": 75, "buy_prc": 100,
-                 "sell_prc": 50},
-            ]
-        )
-        self.assertEqual(execbuypxy.existing_side_loss_pct(rows, "PE"), -2.0)
-
-    def test_counter_buy_dispatch_requires_loss_strictly_greater_than_threshold(self):
+    def test_counter_buy_dispatch_uses_exit_signal_without_loss_gate(self):
         with (
             patch.object(execbuypxy, "_load_locks", return_value={}),
             patch.object(
@@ -1114,31 +1079,25 @@ class ConfigurationWiringTests(unittest.TestCase):
             patch.object(execbuypxy, "_count_fire") as count_fire,
             patch.object(execbuypxy.subprocess, "Popen") as popen,
         ):
-            below_threshold = pd.DataFrame(
+            pe_hold_bull_exit = pd.DataFrame(
                 [{
                     "symbol": "NIFTY-1PE", "qty": 75,
-                    "buy_prc": 100, "sell_prc": 98.61,
+                    "exit": "BULL",
                 }]
             )
-            self.assertIsNone(execbuypxy.check_counter_leg(below_threshold))
-            popen.assert_not_called()
-
-            exactly_at_threshold = below_threshold.copy()
-            exactly_at_threshold.loc[0, "sell_prc"] = 98.6
-            self.assertIsNone(
-                execbuypxy.check_counter_leg(exactly_at_threshold)
-            )
-            popen.assert_not_called()
-
-            beyond_threshold = below_threshold.copy()
-            beyond_threshold.loc[0, "sell_prc"] = 98.59
             self.assertEqual(
-                execbuypxy.check_counter_leg(beyond_threshold),
+                execbuypxy.check_counter_leg(pe_hold_bull_exit),
                 "pxybuyce",
             )
             popen.assert_called_once_with(["/tmp/pxybuyce"])
             mark_lock.assert_called_once()
             count_fire.assert_called_once()
+
+            no_matching_exit = pd.DataFrame(
+                [{"symbol": "NIFTY-1PE", "qty": 75, "exit": "BEAR"}]
+            )
+            self.assertIsNone(execbuypxy.check_counter_leg(no_matching_exit))
+            popen.assert_called_once()
 
     def test_tgt_uses_exit_key_and_option_side_only(self):
         self.assertEqual(exeltgtpxy.calculate_tgt(True), 77.0)

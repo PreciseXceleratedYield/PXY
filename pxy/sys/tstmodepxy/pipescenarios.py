@@ -112,8 +112,9 @@ def evaluate_scenario(scenario):
     target, price, pnl, minimum_pnl, expected_exit = scenario["target"]
     actual_exit = target_exit_allowed(True, target, price, pnl, minimum_pnl)
 
-    _exit_state, positions, expected_counter = scenario["counter"]
+    exit_signal, positions, expected_counter = scenario["counter"]
     actual_counter = counter_leg_script(
+        exit_signal,
         positions,
         {"CE": "pxybuype", "PE": "pxybuyce"},
     )
