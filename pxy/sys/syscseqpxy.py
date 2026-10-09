@@ -4,6 +4,7 @@ from sysdthapxy import get_pxy_data
 
 GREEN = "\033[92m"
 RED = "\033[91m"
+FLAT = "\033[93m"
 RESET = "\033[0m"
 
 def get_candle_visual(df=None, last_n=100):
@@ -43,7 +44,11 @@ def get_candle_visual(df=None, last_n=100):
             
         # Convert streak to string to get its individual layout digits
         streak_str = str(current_streak)
-        color_code = GREEN if color_string == "green" else RED
+        color_code = {
+            "green": GREEN,
+            "red": RED,
+            "flat": FLAT,
+        }.get(color_string, RESET)
         
         # When a streak hits double digits (e.g. 10), we split '1' and '0' 
         # across two bars to match your exact pattern timeline layout.

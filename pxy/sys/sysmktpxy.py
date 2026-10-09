@@ -1,11 +1,6 @@
 # sysmktpxy.py
-import pandas as pd
-import numpy as np
-from syscnfgpxy import (
-    SYSMKTPXY_DEBUG_ENABLED,
-    SYSMKTPXY_INCLUDE_RUNNING_CANDLE,
-)
-from sysdthapxy import get_close_direction_series
+from syscnfgpxy import SYSMKTPXY_DEBUG_ENABLED
+from sysdthapxy import get_signal_depth_analysis
 from sysdtafpxy import fetch_yf_data
 
 def get_pxy_data(df):
@@ -70,37 +65,14 @@ def get_signal(df=None):
     if df is None:
         df = fetch_yf_data()
         
-    if df is None or "Close" not in df.columns:
-        return "NONE", "NONE"
-
-    include_running = SYSMKTPXY_INCLUDE_RUNNING_CANDLE == "YES"
-    required_rows = 3 if include_running else 4
-    if len(df) < required_rows:
-        return "NONE", "NONE"
-
     try:
-        signal_closes = df["Close"].iloc[-3:] if include_running else df["Close"].iloc[-4:-1]
-        c2, c1, c0 = (float(value) for value in signal_closes)
-        directions = get_close_direction_series(signal_closes).iloc[1:].tolist()
-        first_move, second_move = directions
+        analysis = get_signal_depth_analysis(df)
+        signals = analysis["entry"], analysis["exit"]
+        execution_state = analysis["exit"]
 
-        if first_move == "DOWN" and second_move == "UP":
-            signals = ("BUY", "BULL")
-            execution_state = "BULL"
-        elif first_move == "UP" and second_move == "DOWN":
-            signals = ("SELL", "BEAR")
-            execution_state = "BEAR"
-        elif first_move == "UP" and second_move == "UP":
-            signals = ("NONE", "BULL")
-            execution_state = "BULL"
-        elif first_move == "DOWN" and second_move == "DOWN":
-            signals = ("NONE", "BEAR")
-            execution_state = "BEAR"
-        else:
-            signals = ("NONE", "NONE")
-            execution_state = "NONE"
-
-        if SYSMKTPXY_DEBUG_ENABLED:
+        if SYSMKTPXY_DEBUG_ENABLED and analysis["previous_close"] is not None:
+            c1 = analysis["previous_close"]
+            c0 = analysis["current_close"]
             _print_console_bar(c1, c0, execution_state)
             
         return signals

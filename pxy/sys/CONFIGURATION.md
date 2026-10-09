@@ -61,7 +61,7 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 | Area (owner prefixes) | Responsibility |
 | --- | --- |
 | `SYSCNFGPXY`, `SYSMODEPXY`, `SYSEXEPXY`, `EXEPXYPXY` | Shared defaults and market schedule, run-mode validation, supervisor and engine scheduling |
-| `SYSDTAFPXY`, `SYSPLCHRTPXY`, `SYSSTRNDPXY`, `SYSSMAPXY`, `SYSDTSTPXY`, `SYSSADXPXY`, `SYSBBOSPXY`, `SYSMKTPXY`, `SYSRIGPXY`, `SYSKATRPXY`, `SYSPWERPXY`, `SYSDPTPXY` | Data acquisition and signal/indicator parameters, including breakout session recognition and directional force factors |
+| `SYSDTAFPXY`, `SYSPLCHRTPXY`, `SYSSTRNDPXY`, `SYSSMAPXY`, `SYSDTHAPXY`, `SYSDTSTPXY`, `SYSSADXPXY`, `SYSBBOSPXY`, `SYSMKTPXY`, `SYSRIGPXY`, `SYSKATRPXY`, `SYSPWERPXY`, `SYSDPTPXY` | Data acquisition and signal/indicator parameters, including breakout session recognition and directional force factors |
 | `EXEAGTPXY`, `EXEACGPXY`, `EXEAMSPXY`, `EXEAVXPXY`, `EXEAVGPXY`, `EXEENTRPXY` | Entry thresholds, averaging window/limits, average-order payload, and entry pipeline |
 | `EXEFORCEPXY`, `EXESLPXY`, `EXECBUYPXY`, `EXEEXITPXY`, `EXESQRPXY`, `EXEOMSPXY`, `EXEDYNPXY`, `EXETGTPXY`, `EXEOTMPXY` | Force/stop/counter orders, exit and square-off behavior, targets, and symbol selection |
 | `RUNNIFTYPXY`, `RUNEXMTPXY`, `RUNEXACPXY`, `RUNEXIOPXY`, `RUNEXLQDPXY`, `RUNLILOPXY` | Symbol selection, risk-ledger mathematics/actions/state/liquidation, and order-ledger filtering |
@@ -115,13 +115,16 @@ MKT examines the last three transformed closes. A strict V
 emit exit-only `BULL` (`NONE`/`BULL`), and three strictly falling closes emit
 exit-only `BEAR` (`NONE`/`BEAR`). All other patterns, including equal adjacent
 closes, emit `NONE` for both signals. `sysdthapxy` supplies the shared
-close-to-close direction series (`UP`, `DOWN`, or `FLAT`); `sysmktpxy` maps the
-last two directions to these signals while retaining its existing display and
-other helpers. Depth counts the full current color streak, so it does not reset
-when that streak reaches `SYSDPTPXY_LAST_N`.
-`SYSMKTPXY_INCLUDE_RUNNING_CANDLE` controls whether the last returned candle is
-treated as forming and included (`YES`, default), or excluded while the three
-preceding candles are checked (`NO`).
+close-to-close direction series (`UP`, `DOWN`, or `FLAT`) and is the single
+owner of the entry/exit classifier and CE/PE streak depths. `sysmktpxy` retains
+its display and delegates signal calculation to DTHA; `sysdptpxy` delegates
+dashboard/depth calculation to that same result. Flat closes break directional
+streaks and cannot create a bullish or bearish depth. Current streak depth
+continues past `SYSDPTPXY_LAST_N`; that setting only limits the previous-streak
+lookback used for the past-depth label. `SYSDTHAPXY_INCLUDE_RUNNING_CANDLE`
+controls whether the last returned candle is included (`YES`, default) or
+excluded (`NO`). The same selected candles drive both MKT signals and DPT
+depths.
 
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
 builder for every buying script. It currently defaults to `ATM`, which ignores

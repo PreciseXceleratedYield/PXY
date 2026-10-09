@@ -53,18 +53,13 @@ def get_full_snapshot():
     result["candle_visual"] = get_candle_visual(df=master_df)
 
     # ===== CLOSE MOMENTUM DATA ENGINE =====
-    pxy_close, pxy_open, pxy_color, history_df = get_pxy_data(df=master_df)
+    pxy_close, pxy_open, pxy_color, _ = get_pxy_data(df=master_df)
     result["ha_close"] = pxy_close
     result["ha_open"] = pxy_open
     result["ha_color"] = pxy_color
 
     # ===== FLIP & TREND STREAK SIGNAL =====
     signal, past_depth, ce_depth, pe_depth = detect_pxy_flip_signal(df=master_df)
-    if signal is None or signal == "NA":
-        if not history_df.empty:
-            signal = "BULL" if history_df['Close'].iloc[-1] > history_df['Open'].iloc[-1] else "BEAR"
-        else:
-            signal = "NONE"
     result["hkin_signal"] = signal
     result["hkin_past_depth"] = past_depth
     result["hkin_ce_depth"] = ce_depth
