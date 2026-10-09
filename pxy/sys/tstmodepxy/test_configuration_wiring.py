@@ -665,6 +665,53 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(PASTRSK, "YES")
         self.assertEqual(__import__("pxyconfigwebpxy").ENUMS["PASTRSK"], ("YES", "NO"))
 
+    def test_depth_squareoff_uses_side_command_and_only_returns_unlocked_side_lots(self):
+        active_orders = pd.DataFrame(
+            [
+                {
+                    "symbol": "NIFTY-WF-CE",
+                    "tag": "CE1",
+                    "buy_time": "2025-01-06 09:59:00",
+                    "entry": "BUY",
+                    "hkin_past_depth": "PE7",
+                    "hkin_signal_time": "2025-01-06 10:00:00",
+                },
+                {
+                    "symbol": "NIFTY-WF-PE",
+                    "tag": "PE1",
+                    "buy_time": "2025-01-06 09:59:00",
+                    "entry": "BUY",
+                    "hkin_past_depth": "PE7",
+                    "hkin_signal_time": "2025-01-06 10:00:00",
+                },
+            ]
+        )
+        with (
+            patch.object(exeexitpxy, "PASTRSK", "YES"),
+            patch.object(exeexitpxy, "ledger_busy", return_value=False),
+            patch.object(exeexitpxy, "_recently_exited", return_value=False),
+            patch.object(exeexitpxy, "_mark_lock") as mark_lock,
+            patch.object(exeexitpxy.subprocess, "run") as run_command,
+        ):
+            exited_keys = exeexitpxy.run_depth_squareoff(
+                client=None,
+                active_df=active_orders,
+                market_data_available=True,
+            )
+
+        self.assertEqual(
+            exited_keys,
+            {"NIFTY-WF-PE|PE1|2025-01-06 09:59:00"},
+        )
+        run_command.assert_called_once_with(
+            ["pxysqrpe"],
+            check=True,
+            timeout=exeexitpxy.SQUAREOFF_TIMEOUT_SECS,
+        )
+        mark_lock.assert_called_once_with(
+            "DEPTH_EXIT|PE|2025-01-06 10:00:00"
+        )
+
     def test_entry_router_has_selectable_mkt_sts_mode(self):
         from syscnfgpxy import (
             SYSENTRPXY_SIGNAL_MODE,

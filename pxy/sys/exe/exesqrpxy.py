@@ -99,6 +99,7 @@ def exit_all_positions():
     
     # --- DYNAMIC CLI FILTER BYPASS & PANIC SWITCH ---
     force_all_bypass = False
+    force_side_bypass = False
     if len(sys.argv) > 1 and not active_df.empty:
         target_param = sys.argv[1].lower().strip()
         if target_param == "-all":
@@ -107,9 +108,11 @@ def exit_all_positions():
         elif target_param == "-ce":
             print(f"{Fore.YELLOW}⚠️ CLI BYPASS: Filtering ONLY CE positions for immediate square-off.")
             active_df = active_df[active_df["symbol"].str.contains("CE", na=False)]
+            force_side_bypass = True
         elif target_param == "-pe":
             print(f"{Fore.YELLOW}⚠️ CLI BYPASS: Filtering ONLY PE positions for immediate square-off.")
             active_df = active_df[active_df["symbol"].str.contains("PE", na=False)]
+            force_side_bypass = True
             
     if active_df.empty: 
         print(f"{Fore.YELLOW}No active positions to exit.{Fore.RESET}") 
@@ -126,6 +129,11 @@ def exit_all_positions():
         qty = row.get("qty", 0) 
         if not symbol or qty == 0: 
             continue 
+
+        if force_side_bypass:
+            if place_exit_order(client, row):
+                any_order_placed = True
+            continue
             
         # If the manual panic flag is active or it is past 3:25 PM, flatten immediately
         if force_all_bypass or now >= exit_all_after: 

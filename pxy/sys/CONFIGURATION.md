@@ -133,7 +133,9 @@ window, a MKT `BUY` with past depth `PE7` or greater independently triggers a
 verified PE-side close; a MKT `SELL` with `CE7` or greater triggers a verified
 CE-side close. `EXEEXITPXY_DEPTH_EXIT_THRESHOLD` defaults to `6`, and the
 trigger is strictly greater than that threshold. This rule is independent of
-LGT/P&L and is deduplicated by signal candle.
+LGT/P&L and is deduplicated by signal candle. It invokes the reusable
+`pxysqrpe`/`pxysqrce` command for the selected side, leaving broker order
+placement and tagging to those existing commands.
 
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
 builder for every buying script. It currently defaults to `ATM`, which ignores

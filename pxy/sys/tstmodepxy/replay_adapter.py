@@ -124,16 +124,21 @@ class ProductionPipeReplay:
             return SimpleNamespace(pid=0, returncode=0)
 
         def simulated_squareoff(command, *args, **kwargs):
-            if not isinstance(command, (list, tuple)) or not any(
+            command = list(command) if isinstance(command, (list, tuple)) else [command]
+            command_name = Path(str(command[0])).name
+            if command_name in {"pxysqrce", "pxysqrpe"}:
+                all_args = ["-ce" if command_name == "pxysqrce" else "-pe"]
+            elif command_name == "exesqrpxy.py" or any(
                 str(part).endswith("exesqrpxy.py") for part in command
             ):
+                all_args = [
+                    str(part) for part in command[1:]
+                    if not str(part).endswith("exesqrpxy.py")
+                ]
+            else:
                 raise RuntimeError(
                     f"Unexpected production subprocess blocked: {command}"
                 )
-            all_args = [
-                str(part) for part in command[1:]
-                if not str(part).endswith("exesqrpxy.py")
-            ]
             with patch.object(
                 self.squareoff_pipe, "get_session", return_value=self.broker
             ), patch.object(
@@ -148,8 +153,8 @@ class ProductionPipeReplay:
                 ["exesqrpxy.py", *all_args],
             ):
                 squareoff_subprocess.Popen.return_value = SimpleNamespace(pid=0)
-                self.squareoff_pipe.exit_all_positions()
-            return SimpleNamespace(returncode=0)
+                success = self.squareoff_pipe.exit_all_positions()
+            return SimpleNamespace(returncode=0 if success is not False else 1)
 
         risk_ledger_hook = (
             self._execute_risk_ledger

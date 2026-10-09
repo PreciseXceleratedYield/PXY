@@ -154,7 +154,7 @@ def depth_squareoff_side(entry_signal, past_depth, threshold=EXEEXITPXY_DEPTH_EX
 
 def run_depth_squareoff(client, active_df, market_data_available,
                         positions_unverified=False):
-    """Close only the losing-direction side after a confirmed deep reversal."""
+    """Invoke the shared side-squareoff command after a confirmed deep reversal."""
     if PASTRSK != "YES":
         return set()
     if active_df is None or active_df.empty or not market_data_available:
@@ -185,21 +185,35 @@ def run_depth_squareoff(client, active_df, market_data_available,
         f"{Fore.YELLOW}⚠️ Deep reversal: {snapshot.get('entry')} with "
         f"{snapshot.get('hkin_past_depth')} past depth; squaring off {side}."
     )
-    exited_keys = set()
-    order_accepted = False
-    for _, row in active_df.iterrows():
-        symbol = str(row.get("symbol", "")).upper()
-        if not symbol.endswith(side):
-            continue
-        key = _lock_key(row)
-        if _recently_exited(key):
-            continue
-        if verify_and_exit(client, row):
-            exited_keys.add(key)
-            order_accepted = True
+    target_rows = active_df[
+        active_df["symbol"].astype(str).str.upper().str.endswith(side, na=False)
+    ]
+    exited_keys = {
+        _lock_key(row)
+        for _, row in target_rows.iterrows()
+        if not _recently_exited(_lock_key(row))
+    }
+    if not exited_keys:
+        return set()
 
-    if order_accepted:
-        _mark_lock(signal_key)
+    command = "pxysqrpe" if side == "PE" else "pxysqrce"
+    try:
+        subprocess.run(
+            [command],
+            check=True,
+            timeout=SQUAREOFF_TIMEOUT_SECS,
+        )
+    except subprocess.TimeoutExpired:
+        print(f"{Fore.RED}❌ {command} timed out after {SQUAREOFF_TIMEOUT_SECS}s.")
+        return set()
+    except subprocess.CalledProcessError as error:
+        print(f"{Fore.RED}❌ {command} failed with exit code {error.returncode}.")
+        return set()
+    except OSError as error:
+        print(f"{Fore.RED}❌ Could not run {command}: {error}")
+        return set()
+
+    _mark_lock(signal_key)
     return exited_keys
 
 
