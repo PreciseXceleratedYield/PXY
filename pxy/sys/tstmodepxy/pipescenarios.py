@@ -46,7 +46,7 @@ SCENARIOS = (
         "name": "occupied CE blocks fresh BUY, averaging cooldown",
         "entry": ("BUY", 1, 0, None),
         "target": (100, 120, 149, 150, False),
-        "counter": ("BULL", ({"symbol": "NIFTYCE", "qty": 1},), None),
+        "counter": ("BULL", ({"symbol": "NIFTYCE", "qty": 1},), "pxybuype"),
         "average": (False, True, 1, 1, True, False, -5, -5, -2, -2, 25000, {"CE": False, "PE": True}),
     },
     {
@@ -67,7 +67,7 @@ SCENARIOS = (
         "name": "PE cannot average without CE position",
         "entry": ("SELL", 0, 2, None),
         "target": (100, 110, 149, 150, False),
-        "counter": ("BEAR", ({"symbol": "NIFTYPE", "qty": 2},), None),
+        "counter": ("BEAR", ({"symbol": "NIFTYPE", "qty": 2},), "pxybuyce"),
         "average": (False, True, 0, 5, False, False, 0, -8, -2, -2, 25000, {"CE": False, "PE": False}),
     },
     {
@@ -88,7 +88,7 @@ SCENARIOS = (
         "name": "unaligned sides cannot average despite both sides losing",
         "entry": ("BUY", 0, 0, "pxybuyce"),
         "target": (100, 100, 150, 150, True),
-        "counter": ("BUY", ({"symbol": "NIFTYCE", "qty": 1},), None),
+        "counter": ("BUY", ({"symbol": "NIFTYCE", "qty": 1},), "pxybuype"),
         "average": (False, False, 1, 2, False, False, -2, -2, -2, -2, 25000, {"CE": False, "PE": False}),
     },
     {
@@ -112,9 +112,8 @@ def evaluate_scenario(scenario):
     target, price, pnl, minimum_pnl, expected_exit = scenario["target"]
     actual_exit = target_exit_allowed(True, target, price, pnl, minimum_pnl)
 
-    exit_state, positions, expected_counter = scenario["counter"]
+    _exit_state, positions, expected_counter = scenario["counter"]
     actual_counter = counter_leg_script(
-        exit_state,
         positions,
         {"CE": "pxybuype", "PE": "pxybuyce"},
     )

@@ -6,7 +6,8 @@ import numpy as np
 import pandas as pd
 import pytz
 from syscnfgpxy import RUNNIFTYPXY_HOLIDAYS
-from sysdecisionpxy import counter_leg_script
+from execbuypxy import CBUY_LOSS_TRIGGER_PCT, existing_side_loss_pct
+from sysdecisionpxy import counter_leg_script, counter_leg_side
 from tstmodepxy.pipescenarios import (
     SCENARIOS,
     engine_window_open as _tst_engine_window_open,
@@ -278,15 +279,22 @@ def run_counter_leg(remaining_df=None):
     if remaining_df is None or remaining_df.empty:
         print("CHK MODE: counter-leg scenario has no held rows.")
         return False
-    signal = str(
-        remaining_df.iloc[0].get("exit", "NONE")
-    ).upper().strip()
+    positions = remaining_df[["symbol", "qty"]].to_dict("records")
+    held_side = counter_leg_side(positions)
+    if held_side is None:
+        print("CHK MODE: counter-leg decision is no action; no order sent.")
+        return False
+
+    loss_pct = existing_side_loss_pct(remaining_df, held_side)
+    if loss_pct is None or loss_pct > -CBUY_LOSS_TRIGGER_PCT:
+        print("CHK MODE: counter-buy loss threshold is not met; no order sent.")
+        return False
+
     script_name = counter_leg_script(
-        signal,
-        remaining_df[["symbol", "qty"]].to_dict("records"),
+        positions,
         {"CE": "pxybuype", "PE": "pxybuyce"},
     )
-    if script_name:
+    if script_name is not None:
         print(f"CHK MODE: counter-leg decision would run {script_name}; no order sent.")
         return True
     print("CHK MODE: counter-leg decision is no action; no order sent.")

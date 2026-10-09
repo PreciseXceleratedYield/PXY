@@ -154,8 +154,8 @@ def averaging_placement_allowed(ledger_is_busy):
     return not ledger_is_busy
 
 
-def counter_leg_script(exit_signal, positions, scripts):
-    """Return a counter-leg script only when the exit signal opposes held exposure."""
+def counter_leg_side(positions):
+    """Return the one held option side that can be countered, if unambiguous."""
     position_counts = {"CE": 0, "PE": 0}
     for position in positions:
         symbol = str(position.get("symbol", "")).upper().strip()
@@ -170,19 +170,20 @@ def counter_leg_script(exit_signal, positions, scripts):
         elif symbol.endswith("PE"):
             position_counts["PE"] += 1
 
-    signal = str(exit_signal).upper().strip()
-
-    if signal not in {"BULL", "BEAR"}:
-        return None
-
     has_ce = position_counts["CE"] > 0
     has_pe = position_counts["PE"] > 0
 
-    if signal == "BEAR" and has_ce and not has_pe:
-        return scripts["CE"]
-    if signal == "BULL" and has_pe and not has_ce:
-        return scripts["PE"]
+    if has_ce and not has_pe:
+        return "CE"
+    if has_pe and not has_ce:
+        return "PE"
     return None
+
+
+def counter_leg_script(positions, scripts):
+    """Return the opposite-leg script for a single held option side."""
+    side = counter_leg_side(positions)
+    return scripts[side] if side is not None else None
 
 
 def averaging_trigger_sides(
