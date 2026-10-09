@@ -17,7 +17,6 @@ class ConfigEditorTests(unittest.TestCase):
             "FLAG = True\n"
             "RUNNIFTYPXY_STRIKE_STEP = 2\n"
             "CLOCK = dt_time(9, 0)\n"
-            "SYSENTRPXY_SIGNAL_MODE = 'MKT'\n"
             "SYSDTAFPXY_SELECTED_MODE = '1'\n"
             "RUNEXMTPXY_INITIAL_LOSS_FLOOR = -1000\n"
             "RUNEXACPXY_STOP_SQUAREOFF_ENABLED = False\n"
@@ -123,11 +122,10 @@ class ConfigEditorTests(unittest.TestCase):
         self.assertNotIn("EXETGTPXY_MODE", by_name)
         self.assertNotIn("EXETGTPXY_SUPERTREND_KEY_COLUMN", by_name)
 
-    def test_signal_router_mode_is_not_exposed(self):
+    def test_signal_router_mode_is_removed(self):
         settings, _ = config_editor._metadata(self.original)
         by_name = {setting["key"]: setting for setting in settings}
-        self.assertEqual(by_name["SYSENTRPXY_SIGNAL_MODE"]["value"], "MKT")
-        self.assertEqual(by_name["SYSENTRPXY_SIGNAL_MODE"]["options"], ["MKT", "STS"])
+        self.assertNotIn("SYSENTRPXY_SIGNAL_MODE", by_name)
 
     def test_write_validates_creates_backup_and_preserves_file_mode(self):
         self.config_path.chmod(0o640)
@@ -150,11 +148,11 @@ class ConfigEditorTests(unittest.TestCase):
         cache_path = Path(py_compile.compile(str(self.config_path), doraise=True))
         self.assertTrue(cache_path.exists())
 
-        config_editor._write({"SYSENTRPXY_SIGNAL_MODE": "STS"})
+        config_editor._write({"FLAG": False})
 
         self.assertFalse(cache_path.exists())
         self.assertIn(
-            "SYSENTRPXY_SIGNAL_MODE = 'STS'",
+            "FLAG = False",
             self.config_path.read_text(encoding="utf-8"),
         )
 

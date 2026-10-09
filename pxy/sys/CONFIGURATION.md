@@ -29,15 +29,20 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   09:17 averaging start, 15:10 entry/averaging cutoff, the 15:11/15:14
   square-off stages, and distinct engine, pipe, replay, and final-square-off
   close times. Change those shared values rather than editing duplicate
-  per-subsystem times. The 09:00–09:30 directional-signal window and the
-  09:15–10:10 morning BOS classification are separate strategy windows.
+  per-subsystem times. The 09:15–10:10 morning BOS classification is its own
+  strategy window.
   The standalone 15:25 square-off trigger is also intentionally separate from
   the staged exit schedule. Legacy `exe/run/X` scripts and pipe-scenario test
   fixtures retain their own values; they do not drive the production schedule.
-- Supertrend always uses the DUAL calculation. Its only parameters are
-  `SYSSTRNDPXY_ST1_ATR_VALUE` (default `5`) and `SYSSTRNDPXY_ST1_FACTOR`
-  (default `1.4`); no ATR period or variant selector is used. This is
-  independent of the dashboard's dynamic ATR calculation.
+- Supertrend always uses the DUAL calculation with a Wilder-smoothed true-range
+  ATR using period `SYSSTRNDPXY_ST1_ATR_PERIOD` (default `10`) and factor
+  `SYSSTRNDPXY_ST1_FACTOR` (default `3`). This is independent of SKATR's
+  session-based true-range ATR.
+- SKATR true-range ATR (mode 2) starts accumulating at 09:16 IST each session:
+  the 09:16 candle uses high minus low only, excluding the 09:15 close gap.
+  Each following value is the expanding mean through candle 14, and subsequent
+  values use a rolling 14-candle mean. The session window resets daily; earlier
+  candles use the configured fallback.
 - `SYSSMAPXY_VARIANT` selects the production 50-period average used by
   `syssmapxy.get_sma()` and defaults to `TSMA`, the rolling linear-regression
   endpoint; `SMA` preserves the simple-moving-average behavior. The web chart
@@ -98,33 +103,28 @@ values until deliberately restarted.
 
 ## Option strike selection
 
-`SYSENTRPXY_SIGNAL_MODE` selects the entry and exit signal source. `MKT` uses
-`sysmktpxy`'s three-close reversal pattern all session.
-`STS`
-preserves the current Supertrend policy: from `SYSENTRPXY_DIRECTION_ONLY_START`
-(09:00 IST) until `SYSENTRPXY_DIRECTION_ONLY_END` (09:30 IST), both signals
-follow market direction. Afterwards entry follows Supertrend directly (`BULL`
-→ `BUY`, `BEAR` → `SELL`, `SIDE` → `SIDE`). Exit is `BULL` for Supertrend BULL
-and `BEAR` for Supertrend BEAR; when Supertrend is SIDE, exit falls back to
-`sysmktpxy.get_signal()` (`BULL`/`BEAR`), otherwise `NONE`. Exit never returns
-`SIDE`; a `SIDE` entry is not a valid fresh-order command.
+`sysentrpxy` always uses Supertrend: BULL maps to entry BUY and exit BULL;
+BEAR maps to entry SELL and exit BEAR. For BULL, BUY requires MKT BEAR and
+price from `st_line` through `st_line + 1.5 × st_atr`; for BEAR, SELL requires
+MKT BULL and price from `st_line - 1.5 × st_atr` through `st_line`. These are
+the nearest 25% zones of the theoretical ±6 ATR ranges around the active
+Supertrend line; otherwise entry is NONE. When Supertrend is SIDE, entry is
+BUY when the close is in the lower 25% of the range between `st_line` and
+`st_mirror` and MKT is BEAR; SELL when it is in the upper 25% and MKT is BULL.
+Otherwise the entry is NONE. SIDE exits continue to use
+`sysmktpxy.get_signal()` (BULL/BEAR, or NONE).
 `sysdtafpxy` supports mode 1 only. In the live Yahoo data path it averages each
 OHLC field of every candle with the latest NIFTY futures price from
 `exe/run/nftfut.json`; it cannot emit live signals when that price is unavailable.
-Historical replay without a futures quote keeps the supplied OHLC values. The
-current configuration uses `SYSENTRPXY_SIGNAL_MODE = "MKT"`.
-MKT entries are based on the current consecutive transformed-close direction
-depth: `PE` depth greater than `2` emits `BUY`, `CE` depth greater than `2`
-emits `SELL`, and depths of `2` or less emit `NONE`. These entries do not
-require a reversal pattern. The exit remains based on the last two close-to-
-close moves: V reversals map to `BULL`/`BEAR`, as do bullish/bearish
-continuations; all other patterns, including equal adjacent closes, emit
-`NONE`. `sysdthapxy` supplies the shared close-to-close
-direction series (`UP`, `DOWN`, or `FLAT`) and returns one pattern signal
-(`BUY`, `SELL`, `BULL`, `BEAR`, or `NONE`) alongside CE/PE streak depths.
-`sysmktpxy` uses those depths for entries and the DTHA pattern for the exit
-label. Flat closes break directional streaks and cannot create a bullish or
-bearish depth.
+Historical replay without a futures quote keeps the supplied OHLC values.
+MKT returns one directional signal from `sysdthapxy`: down-then-up and two
+consecutive rising moves emit `BULL`; up-then-down and two consecutive falling
+moves emit `BEAR`. Other patterns, including equal adjacent closes, emit
+`NONE`. `sysmktpxy.get_signal()` returns only `BULL`, `BEAR`, or `NONE` and
+retains its console monitor output. Directional depth remains available for the
+dashboard and risk analysis. DTHA also supplies the shared close-to-close
+direction series (`UP`, `DOWN`, or `FLAT`) and CE/PE streak depths. Flat closes
+break directional streaks.
 `sysdptpxy` delegates dashboard/depth calculation to that same DTHA signal and
 depth result. Current streak depth continues past `SYSDPTPXY_LAST_N`; that
 setting only limits the previous-streak
@@ -132,12 +132,11 @@ lookback used for the past-depth label. `SYSDTHAPXY_INCLUDE_RUNNING_CANDLE`
 controls whether the last returned candle is included (`YES`) or excluded
 (`NO`). It defaults to `YES`, so MKT signals, DPT depths, and the dashboard's
 candle-color depth stream all include the latest running candle and share the
-same candle window. In MKT mode, `sysentrpxy` forwards `sysmktpxy`'s
-depth-triggered entry and pattern-based exit pair unchanged.
+same candle window.
 `PASTRSK` enables (`YES`) or disables (`NO`) the depth-triggered reversal
 square-off; it defaults to `YES`. When enabled, outside the scheduled square-off
-window, a MKT `BUY` with past depth `PE7` or greater independently triggers a
-verified PE-side close; a MKT `SELL` with `CE7` or greater triggers a verified
+window, a `BUY` entry with past depth `PE7` or greater independently triggers a
+verified PE-side close; a `SELL` entry with `CE7` or greater triggers a verified
 CE-side close. `EXEEXITPXY_DEPTH_EXIT_THRESHOLD` defaults to `6`, and the
 trigger is strictly greater than that threshold. This rule is independent of
 LGT and is deduplicated by signal candle. The selected side must also have a
@@ -229,8 +228,8 @@ spot-point strategy comparison, not historical option P&L.
 - `SYSKATRPXY_ATR_STATIC_VALUE` is used for `ATR_MODE=1`; the true-ATR period,
   cap, minimum-row requirement, and fallback apply to mode 2; the depth floor
   applies to dynamic mode 3.
-- `SYSSTRNDPXY_ST1_ATR_VALUE` and `SYSSTRNDPXY_ST1_FACTOR` are the only
-  Supertrend calculation settings; the production trend engine is always DUAL.
+- `SYSSTRNDPXY_ST1_ATR_PERIOD` and `SYSSTRNDPXY_ST1_FACTOR` configure the
+  production DUAL Supertrend true-range ATR.
 - `SYSPLCHRTPXY_*` are consumed by the separate chart generator, not the
   production signal path. `SYSDTSTPXY_*` and `SYSRIGPXY_*` belong to standalone
   modules with no caller in the production launch graph.

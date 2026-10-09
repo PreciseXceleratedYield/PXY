@@ -57,48 +57,33 @@ def _print_console_bar(c1, c0, execution_state):
 
 def get_signal(df=None):
     """
-    Derive MKT entries from directional depth and exits from close patterns.
+    Return DTHA's single close-pattern signal.
 
-    A PE depth greater than two triggers BUY; a CE depth greater than two
-    triggers SELL. Exit state continues to reflect the close-pattern direction.
+    Directional depth remains available to dashboard and risk analysis; this
+    function only calculates and displays the DTHA signal.
     """
     if df is None:
         df = fetch_yf_data()
         
     try:
         analysis = get_signal_depth_analysis(df)
-        if analysis["pe_depth"] > 2:
-            entry_signal = "BUY"
-        elif analysis["ce_depth"] > 2:
-            entry_signal = "SELL"
-        else:
-            entry_signal = "NONE"
-        exit_signal = {
-            "BUY": "BULL",
-            "SELL": "BEAR",
-            "BULL": "BULL",
-            "BEAR": "BEAR",
-        }.get(analysis["signal"], "NONE")
-        signals = (entry_signal, exit_signal)
-        execution_state = exit_signal
+        signal = analysis["signal"]
 
         if SYSMKTPXY_DEBUG_ENABLED and analysis["previous_close"] is not None:
             c1 = analysis["previous_close"]
             c0 = analysis["current_close"]
-            _print_console_bar(c1, c0, execution_state)
+            _print_console_bar(c1, c0, signal)
             
-        return signals
+        return signal
 
     except Exception as e:
         if SYSMKTPXY_DEBUG_ENABLED:
             # Error string capped cleanly to avoid terminal distortion wrapping
             err_msg = str(e)[:25]
             print(f"Engine Err: {err_msg:<25}")
-        return "NONE", "NONE"
+        return "NONE"
 
 if __name__ == "__main__":
     df = fetch_yf_data()
     if df is not None and not df.empty:
-        entry, ex = get_signal(df)
-        # Production output script signals formatted layout block
-        print(f"OUT >> ENTRY: {entry:<4} | EXIT: {ex:<4}")
+        print(f"OUT >> SIGNAL: {get_signal(df)}")

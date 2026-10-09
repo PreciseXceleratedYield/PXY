@@ -60,9 +60,9 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
     if len(closes) >= 3:
         first_move, second_move = directions[-2:]
         if first_move == "DOWN" and second_move == "UP":
-            signal = "BUY"
+            signal = "BULL"
         elif first_move == "UP" and second_move == "DOWN":
-            signal = "SELL"
+            signal = "BEAR"
         elif first_move == "UP" and second_move == "UP":
             signal = "BULL"
         elif first_move == "DOWN" and second_move == "DOWN":

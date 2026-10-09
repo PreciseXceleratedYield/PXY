@@ -1,7 +1,6 @@
 import sys
 import tempfile
 import unittest
-from datetime import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -43,7 +42,6 @@ class EngineCooldownTests(unittest.TestCase):
                 patch.object(execoolpxy, "WEB_DIR", Path(temp)),
                 patch.object(sysentrpxy, "cooldown_remaining", side_effect=execoolpxy.cooldown_remaining),
                 patch.object(sysentrpxy, "calculate_supertrend") as calculate_supertrend,
-                patch.object(sysentrpxy, "detect_raw_direction") as detect_raw_direction,
             ):
                 execoolpxy.start_cooldown()
                 self.assertEqual(
@@ -51,22 +49,25 @@ class EngineCooldownTests(unittest.TestCase):
                     ("NONE", "NONE"),
                 )
             calculate_supertrend.assert_not_called()
-            detect_raw_direction.assert_not_called()
 
-    def test_signal_router_uses_normal_signal_after_cooldown(self):
+    def test_signal_router_uses_supertrend_after_cooldown(self):
         with (
             patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
-            patch.object(sysentrpxy, "SYSENTRPXY_SIGNAL_MODE", "STS"),
             patch.object(
                 sysentrpxy,
                 "calculate_supertrend",
-                return_value=pd.DataFrame({"ST_Trend": ["BULL"]}),
+                return_value=pd.DataFrame({
+                    "ST_Trend": ["BULL"],
+                    "Close": [100.5],
+                    "st_line": [100.0],
+                    "st_atr": [1.0],
+                }),
             ),
+            patch.object(sysentrpxy, "get_market_signal", return_value="BEAR"),
         ):
             self.assertEqual(
                 sysentrpxy.get_entry_signal(
-                    pd.DataFrame({"Close": [1]}),
-                    current_time=time(10, 0),
+                    pd.DataFrame({"Close": [100.5]}),
                 ),
                 ("BUY", "BULL"),
             )

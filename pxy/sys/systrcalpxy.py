@@ -2,10 +2,29 @@ import numpy as np
 import pandas as pd
 
 
+def _calculate_wilder_atr(df: pd.DataFrame, period: int) -> pd.Series:
+    high = df["High"].to_numpy()
+    low = df["Low"].to_numpy()
+    close = df["Close"].to_numpy()
+    previous_close = np.roll(close, 1)
+    previous_close[0] = np.nan
+    true_range = np.maximum.reduce(
+        (
+            high - low,
+            np.abs(high - previous_close),
+            np.abs(low - previous_close),
+        )
+    )
+    true_range[0] = high[0] - low[0]
+    return pd.Series(true_range, index=df.index).ewm(
+        alpha=1 / period, adjust=False
+    ).mean()
+
+
 def _compute_single_st(
-    df: pd.DataFrame, factor: float, atr_value: float
+    df: pd.DataFrame, factor: float, atr_period: int
 ) -> tuple:
-    """Helper to compute PXY Supertrend bands and the mirror line."""
+    """Compute Supertrend bands using Wilder-smoothed true range."""
     high = df["High"].to_numpy()
     low = df["Low"].to_numpy()
     open_arr = df["Open"].to_numpy()
@@ -23,7 +42,7 @@ def _compute_single_st(
     m0 = np.where(close >= open_arr, (close + high) / 2.0, (close + low) / 2.0)
     src = (high + low) / 2.0
 
-    atr = np.full(length, atr_value)
+    atr = _calculate_wilder_atr(df, atr_period).to_numpy()
 
     basic_upper = src + (factor * atr)
     basic_lower = src - (factor * atr)
@@ -81,4 +100,3 @@ def _compute_single_st(
         pd.Series(m0, index=df.index),
         pd.Series(st_trend, index=df.index),
     )
-

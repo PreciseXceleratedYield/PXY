@@ -7,14 +7,14 @@ import numpy as np
 import pandas as pd
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE as TIMEZONE,
-    SYSSTRNDPXY_ST1_ATR_VALUE,
+    SYSSTRNDPXY_ST1_ATR_PERIOD,
     SYSSTRNDPXY_ST1_FACTOR,
 )
 from syssmapxy import calculate_moving_average
 
 # 🛡️ DEFENSIVE IMPORTS ROUTING MATH DIRECTLY TO THE CALCULATION ENGINE
 try:
-    from systrcalpxy import _compute_single_st
+    from systrcalpxy import _calculate_wilder_atr, _compute_single_st
 except ImportError as e:
     # No fake trend: zeros would read as SIDE and live trading would carry on copying the candle.
     # Every call now raises, and sysentrpxy turns that into NONE/NONE (no entry, no exit key).
@@ -25,6 +25,7 @@ except ImportError as e:
         raise RuntimeError(f"systrcalpxy unavailable ({_IMPORT_ERR}); refusing to fake a trend.")
 
     _compute_single_st = _engine_down
+    _calculate_wilder_atr = _engine_down
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -39,7 +40,7 @@ def get_market_trend(df: pd.DataFrame) -> str:
     st_line, mirror_line, m0_series, raw_trend_series = _compute_single_st(
         df,
         factor=SYSSTRNDPXY_ST1_FACTOR,
-        atr_value=SYSSTRNDPXY_ST1_ATR_VALUE,
+        atr_period=SYSSTRNDPXY_ST1_ATR_PERIOD,
     )
     m0_curr, st_curr, mirror_curr = float(m0_series.iloc[-1]), float(st_line.iloc[-1]), float(mirror_line.iloc[-1])
     highest_line, lowest_line = max(st_curr, mirror_curr), min(st_curr, mirror_curr)
@@ -70,8 +71,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     st1_line, st1_mirror, m0_series, _ = _compute_single_st(
         df,
         factor=SYSSTRNDPXY_ST1_FACTOR,
-        atr_value=SYSSTRNDPXY_ST1_ATR_VALUE,
+        atr_period=SYSSTRNDPXY_ST1_ATR_PERIOD,
     )
+    st_atr = _calculate_wilder_atr(df, SYSSTRNDPXY_ST1_ATR_PERIOD)
     st_arr = st1_line.to_numpy()
     mirror_arr = st1_mirror.to_numpy()
     m0_arr = m0_series.to_numpy()
@@ -89,6 +91,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     # Clean legacy dashboard field overrides to prevent exceptions
     df['st_line'] = st1_line           
     df['st_mirror'] = st1_mirror       
+    df['m0_line'] = m0_series
+    df['st_atr'] = st_atr
     df['ST_Trend'] = st_trend_series   
     df['ST'] = st1_line                
     df['st1_mirror'] = st1_mirror      

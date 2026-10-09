@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 from sysdtafpxy import fetch_yf_data
 from syscnfgpxy import (
+    SYSCNFGPXY_TIMEZONE,
     SYSKATRPXY_ATR_MODE,
     SYSKATRPXY_ATR_STATIC_VALUE,
     SYSKATRPXY_DEPTH_ATR_MINIMUM,
@@ -20,8 +21,7 @@ from syspwerpxy import get_ce_pe_power
 
 init(autoreset=True)
 
-# 🎯 MULTI-MODE NUMERIC CONFIGURATION MATRIX
-# 1 = Static, 2 = Wilder-smoothed ATR, 3 = Dynamic depth/power.
+# ATR modes: 1 = static, 2 = session true-range ATR, 3 = dynamic depth/power.
 TOTAL_WIDTH = 40
 
 def safe_int_convert(val, fallback=1) -> int:
@@ -35,15 +35,28 @@ def safe_int_convert(val, fallback=1) -> int:
     except (ValueError, TypeError):
         return fallback
 
-def calculate_true_atr(df: pd.DataFrame) -> float:
-    """Compute Wilder-smoothed ATR using configured period, cap, and fallback."""
+def calculate_true_atr_series(df: pd.DataFrame) -> pd.Series:
+    """Return a per-candle session ATR, expanding to 14 bars then rolling."""
     try:
-        if df is None or df.empty or len(df) < SYSKATRPXY_TRUE_ATR_MIN_ROWS:
-            return SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE
+        if df is None or df.empty:
+            return pd.Series(dtype=float, name="atr")
         
         df_clean = df.copy()
         df_clean.columns = [c.lower() for c in df_clean.columns]
-        
+
+        if not isinstance(df_clean.index, pd.DatetimeIndex):
+            timestamps = pd.to_datetime(df_clean.index)
+            if timestamps.tz is None:
+                timestamps = timestamps.tz_localize("UTC")
+            local_timestamps = timestamps.tz_convert(str(SYSCNFGPXY_TIMEZONE))
+            df_clean.index = local_timestamps
+        elif df_clean.index.tz is None:
+            df_clean.index = df_clean.index.tz_localize("UTC").tz_convert(
+                str(SYSCNFGPXY_TIMEZONE)
+            )
+        else:
+            df_clean.index = df_clean.index.tz_convert(str(SYSCNFGPXY_TIMEZONE))
+
         high = df_clean['high']
         low = df_clean['low']
         close_prev = df_clean['close'].shift(1)
@@ -53,18 +66,45 @@ def calculate_true_atr(df: pd.DataFrame) -> float:
         tr3 = (low - close_prev).abs()
         
         tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
-        
-        # Standard Wilders smoothing execution sequence over 4 intervals
-        atr_series = tr.ewm(alpha=1/SYSKATRPXY_TRUE_ATR_PERIOD, adjust=False).mean()
-        val = atr_series.iloc[-1]
-        
-        if np.isnan(val):
-            return SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE
-            
-        # Apply the configured upper cap.
-        return min(float(val), SYSKATRPXY_TRUE_ATR_MAX)
+
+        atr_values = np.full(len(df_clean), SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE)
+        local_dates = df_clean.index.date
+        session_start = pd.Timestamp("09:16").time()
+        for session in pd.unique(local_dates):
+            positions = np.flatnonzero(
+                (local_dates == session)
+                & (df_clean.index.time >= session_start)
+            )
+            if len(positions) < SYSKATRPXY_TRUE_ATR_MIN_ROWS:
+                continue
+            session_tr = tr.iloc[positions]
+            if df_clean.index[positions[0]].time() == session_start:
+                session_tr.iloc[0] = tr1.iloc[positions[0]]
+            session_atr = session_tr.rolling(
+                window=SYSKATRPXY_TRUE_ATR_PERIOD,
+                min_periods=1,
+            ).mean()
+            capped = session_atr.clip(upper=SYSKATRPXY_TRUE_ATR_MAX)
+            atr_values[positions] = capped.fillna(
+                SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE
+            ).to_numpy()
+        return pd.Series(atr_values, index=df.index, name="atr")
     except Exception:
+        if df is None or df.empty:
+            return pd.Series(dtype=float, name="atr")
+        return pd.Series(
+            SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE,
+            index=df.index,
+            name="atr",
+        )
+
+
+def calculate_true_atr(df: pd.DataFrame) -> float:
+    """Return the latest value from the session-based true-range ATR series."""
+    atr_series = calculate_true_atr_series(df)
+    if atr_series.empty:
         return SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE
+    return float(atr_series.iloc[-1])
 
 def scale_atr_value_from_depth(past_str: str, ce_d: int, pe_d: int, ce_p: int = 1, pe_p: int = 1) -> int:
     try:
@@ -92,7 +132,9 @@ def calculate_atr(df: pd.DataFrame) -> pd.Series:
         if SYSKATRPXY_ATR_MODE == 1:
             val = float(SYSKATRPXY_ATR_STATIC_VALUE)
         elif SYSKATRPXY_ATR_MODE == 2:
-            val = calculate_true_atr(df)
+            if df is None or df.empty:
+                return pd.Series([calculate_true_atr(df)])
+            return calculate_true_atr_series(df)
         else:
             _, past_str, ce_d, pe_d = detect_pxy_flip_signal(df=df)
             _, ce_p, pe_p = get_ce_pe_power(df)
