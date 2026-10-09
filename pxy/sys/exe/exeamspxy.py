@@ -106,7 +106,7 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
                 "amo": EXEAMSPXY_ORDER_AMO,
                 "tag": new_tag
             }
-            set_cooling("CE")      # stays BEFORE the send: a duplicate buy is worse than a 30 s wait
+            set_cooling("CE")      # stays BEFORE the send to prevent a duplicate buy
             resp = client.place_order(**params)
             if _order_ok(resp):
                 print(f"{Fore.GREEN}✅ SUCCESS: CE Averaged. Tag: {new_tag}")
@@ -144,7 +144,7 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
                 "amo": EXEAMSPXY_ORDER_AMO,
                 "tag": new_tag
             }
-            set_cooling("PE")      # stays BEFORE the send: a duplicate buy is worse than a 30 s wait
+            set_cooling("PE")      # stays BEFORE the send to prevent a duplicate buy
             resp = client.place_order(**params)
             if _order_ok(resp):
                 print(f"{Fore.GREEN}✅ SUCCESS: PE Averaged. Tag: {new_tag}")

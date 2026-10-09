@@ -31,8 +31,8 @@ class EngineCooldownTests(unittest.TestCase):
                     execoolpxy.cooldown_remaining(now=1000),
                     EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS,
                 )
-                self.assertEqual(execoolpxy.cooldown_remaining(now=1119), 1)
-                self.assertEqual(execoolpxy.cooldown_remaining(now=1120), 0)
+                self.assertEqual(execoolpxy.cooldown_remaining(now=1005), 1)
+                self.assertEqual(execoolpxy.cooldown_remaining(now=1006), 0)
 
     def test_signal_router_returns_none_during_cooldown(self):
         with tempfile.TemporaryDirectory(prefix="pxy-signal-cooldown-") as temp:

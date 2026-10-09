@@ -691,7 +691,7 @@ class ConfigurationWiringTests(unittest.TestCase):
 
         from syscnfgpxy import PASTRSK
 
-        self.assertEqual(PASTRSK, "NO")
+        self.assertEqual(PASTRSK, "YES")
         self.assertEqual(__import__("pxyconfigwebpxy").ENUMS["PASTRSK"], ("YES", "NO"))
 
     def test_depth_squareoff_uses_side_command_and_only_returns_unlocked_side_lots(self):
@@ -801,6 +801,59 @@ class ConfigurationWiringTests(unittest.TestCase):
             )
         )
 
+    def test_pastrsk_checks_ce_loss_independently_of_pe_loss(self):
+        active_orders = pd.DataFrame(
+            [
+                {
+                    "symbol": "NIFTY-WF-CE",
+                    "qty": 75,
+                    "buy_prc": 100.0,
+                    "sell_prc": 80.0,
+                    "tag": "CE1",
+                    "buy_time": "2025-01-06 09:59:00",
+                    "entry": "SELL",
+                    "hkin_past_depth": "CE7",
+                    "hkin_signal_time": "2025-01-06 10:00:00",
+                },
+                {
+                    "symbol": "NIFTY-WF-PE",
+                    "qty": 75,
+                    "buy_prc": 100.0,
+                    "sell_prc": 95.0,
+                    "tag": "PE1",
+                    "buy_time": "2025-01-06 09:59:00",
+                    "entry": "SELL",
+                    "hkin_past_depth": "CE7",
+                    "hkin_signal_time": "2025-01-06 10:00:00",
+                },
+            ]
+        )
+        self.assertEqual(exeexitpxy.depth_exit_side_loss_pct(active_orders, "CE"), -20.0)
+        self.assertEqual(exeexitpxy.depth_exit_side_loss_pct(active_orders, "PE"), -5.0)
+
+        with (
+            patch.object(exeexitpxy, "PASTRSK", "YES"),
+            patch.object(exeexitpxy, "ledger_busy", return_value=False),
+            patch.object(exeexitpxy, "_recently_exited", return_value=False),
+            patch.object(exeexitpxy, "_mark_lock"),
+            patch.object(exeexitpxy.subprocess, "run") as run_command,
+        ):
+            exited_keys = exeexitpxy.run_depth_squareoff(
+                client=None,
+                active_df=active_orders,
+                market_data_available=True,
+            )
+
+        self.assertEqual(
+            exited_keys,
+            {"NIFTY-WF-CE|CE1|2025-01-06 09:59:00"},
+        )
+        run_command.assert_called_once_with(
+            ["pxysqrce"],
+            check=True,
+            timeout=exeexitpxy.SQUAREOFF_TIMEOUT_SECS,
+        )
+
     def test_entry_router_has_selectable_mkt_sts_mode(self):
         from syscnfgpxy import (
             SYSENTRPXY_SIGNAL_MODE,
@@ -871,11 +924,16 @@ class ConfigurationWiringTests(unittest.TestCase):
 
         get_symbol.assert_called_once_with(23456, "OTMSELL", 100)
 
-    def test_action_cooldowns_share_the_central_seven_second_setting(self):
-        self.assertEqual(SYSCNFGPXY_ACTION_COOLDOWN_SECONDS, 7)
+    def test_action_cooldowns_share_the_central_six_second_setting(self):
+        import syscnfgpxy
+
+        self.assertEqual(SYSCNFGPXY_ACTION_COOLDOWN_SECONDS, 6)
         self.assertEqual(exeacgpxy.COOL_DOWN_SECONDS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
         self.assertEqual(execbuypxy.CBUY_LOCK_SECS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
         self.assertEqual(exeexitpxy.EXIT_LOCK_SECS, SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
+        self.assertEqual(syscnfgpxy.EXEPXYPXY_IDLE_PAUSE_SECONDS, 6)
+        self.assertEqual(exeexitpxy.SQOFF_MIN_GAP_SECS, 6)
+        self.assertEqual(syscnfgpxy.EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS, 6)
 
     def test_counter_buy_uses_exit_signal_only(self):
         import syscnfgpxy

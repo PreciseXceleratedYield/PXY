@@ -868,6 +868,13 @@ function setChartMaVariant(variant){
     chartMaVariant=variant==='SMA'?'SMA':'TSMA';
     if(lastCandles)drawChart(lastCandles);
 }
+function candleDirection(close, reference){
+    if(close==null||reference==null)return 0;
+    return close>reference?1:close<reference?-1:0;
+}
+function directionColor(direction){
+    return direction>0?cssVar('--bull'):direction<0?cssVar('--bear'):cssVar('--neutral-body');
+}
 function setChartView(view){
     const gPane=$('gamePane'),lToggle=$('candleLineToggle');
     const vc=$('viewBtnChart'),vg=$('viewBtnGame');
@@ -959,7 +966,7 @@ function drawChart(candles){
     if(priceTag&&lastClose!=null){
         const prevC=vis.length>1?vis[vis.length-2]?.c:null;
         priceTag.textContent=Math.round(lastClose).toLocaleString('en-IN');
-        priceTag.style.color=(prevC==null||lastClose>=prevC)?cssVar('--bull'):cssVar('--bear');
+        priceTag.style.color=directionColor(candleDirection(lastClose,prevC));
     }
 
     // candles — flat matte bodies
@@ -977,8 +984,7 @@ function drawChart(candles){
         if(c.o==null||c.h==null||c.l==null||c.c==null)return;
         const x=toX(i);
         const prevClose=i>0?vis[i-1].c:(candles[startIdx-1]?.c??c.o);
-        const isBull=prevClose!=null?c.c>=prevClose:c.c>=c.o;
-        const color=isBull?cssVar('--bull'):cssVar('--bear');
+        const color=directionColor(candleDirection(c.c,prevClose));
 
         ctx.strokeStyle=cssVar('--wick');ctx.lineWidth=1;
         ctx.beginPath();

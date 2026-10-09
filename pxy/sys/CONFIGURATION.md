@@ -21,7 +21,8 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   `syscnfgpxy.py`. Shell scripts select deployment mode, not strategy knobs.
 - `SYSCNFGPXY_ACTION_COOLDOWN_SECONDS` is the single shared cooldown for
   averaging, counter-buy, exit de-duplication, and the production engine's
-  between-cycle pause. Its current value is 7 seconds.
+  between-cycle pause. Its current value is 6 seconds. The idle engine pause,
+  square-off launch gap, and post-square-off signal cooldown are also 6 seconds.
 - Shared market times are declared once as `SYSCNFGPXY_*` in
   `syscnfgpxy.py`; subsystem-prefixed names remain compatibility aliases.
   The schedule distinguishes the 09:15 exchange open, 09:16 engine start,
@@ -45,7 +46,7 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   the 50-bar warm-up required for complete moving-average lines; signal
   calculations continue using `SYSDTAFPXY_DEFAULT_TARGET_ROWS` (60).
 - `EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS` makes the signal router return
-  `NONE` for both entry and exit signals for 120 seconds after a square-off
+  `NONE` for both entry and exit signals for 6 seconds after a square-off
   order is accepted; the risk-ledger liquidation path starts the same
   cooldown again once the broker confirms it is flat.
 - A local module alias that directly references a config value is only an
@@ -133,7 +134,7 @@ same candle window. In MKT mode,
 are `BUY`/`SELL`, with their matching exit labels `BULL`/`BEAR`; continuation
 signals are exit-only.
 `PASTRSK` enables (`YES`) or disables (`NO`) the depth-triggered reversal
-square-off; it defaults to `NO`. When enabled, outside the scheduled square-off
+square-off; it defaults to `YES`. When enabled, outside the scheduled square-off
 window, a MKT `BUY` with past depth `PE7` or greater independently triggers a
 verified PE-side close; a MKT `SELL` with `CE7` or greater triggers a verified
 CE-side close. `EXEEXITPXY_DEPTH_EXIT_THRESHOLD` defaults to `6`, and the
@@ -142,7 +143,9 @@ LGT and is deduplicated by signal candle. The selected side must also have a
 blended unrealized loss strictly greater than
 `EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT` (default `14%`), calculated from its
 current option value versus its entry cost; missing or invalid P&L data blocks
-the exit. It invokes the reusable
+the exit. The check is side-specific: a PE exit checks PE lots, and a CE exit
+checks CE lots; both sides do not need to cross the loss threshold together.
+It invokes the reusable
 `pxysqrpe`/`pxysqrce` command for the selected side, leaving broker order
 placement and tagging to those existing commands.
 
