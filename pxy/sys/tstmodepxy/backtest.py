@@ -320,8 +320,7 @@ def print_report(
     )
     print(
         "Production dashboard, exit, entry, averaging, counter-leg, and square-off "
-        "pipe code runs against a simulated broker. Portfolio risk-bar exits are "
-        "disabled; remaining positions are expected to close at scheduled square-off."
+        "pipe code runs against a simulated broker, including the cycle risk target."
     )
     print(
         "Score is signed NIFTY spot movement × filled quantity (CE gains on UP; "
@@ -419,7 +418,7 @@ def run_backtest(
         stream.write(
             "Production pipe output for simulated replay. "
             "No live broker session or external order process is permitted. "
-            "Portfolio risk bar is disabled.\n"
+            "Cycle risk target is enabled.\n"
         )
     selected_lgt = lgt_calculator or production_lgt
     all_trades = []
@@ -433,7 +432,7 @@ def run_backtest(
                 SYS_DIR,
                 broker,
                 Path(temporary_state),
-                risk_bar_enabled=False,
+                risk_bar_enabled=True,
             ) as engine:
                 engine.avg_controller.calculate_lgt = selected_lgt
                 for bar in bars_by_session[session_date]:

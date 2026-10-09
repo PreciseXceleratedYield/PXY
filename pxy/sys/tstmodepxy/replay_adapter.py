@@ -15,8 +15,7 @@ import pandas as pd
 from syscnfgpxy import (
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
     RUNEXACPXY_CNTRLRSKBAR,
-    RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
-    RUNEXACPXY_STOP_SQUAREOFF_ENABLED,
+    RUNEXACPXY_CYCLE_TARGET_PCT,
     RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
 )
 
@@ -73,6 +72,8 @@ class ProductionPipeReplay:
         self.risk_exit_fired = False
         self.risk_last_counted_timestamp = None
         self.risk_bar_enabled = risk_bar_enabled
+        self.risk_cycle_started_at = None
+        self.risk_cycle_tags = set()
 
         class ReplayClock(datetime):
             @classmethod
@@ -244,90 +245,79 @@ class ProductionPipeReplay:
             tag=self.broker.next_tag(prefix),
         )
 
-    def _execute_risk_ledger(self, client, open_df, closed_df, direction=None):
-        if (
-            (open_df is None or open_df.empty)
-            and (closed_df is None or closed_df.empty)
-        ):
+    def _execute_risk_ledger(self, client, open_df, closed_df, exit_signal=None):
+        if not self.risk_bar_enabled:
             return
 
-        totals = self.risk_math.compute_totals(open_df, closed_df)
-        raw_pnl = totals["total"]
         now = self.timestamp
         if hasattr(now, "to_pydatetime"):
             now = now.to_pydatetime()
         if now == self.risk_last_counted_timestamp:
             return
         self.risk_last_counted_timestamp = now
-        current_time = now.timetz().replace(tzinfo=None)
-        if self.risk_math.midday_risk_activation_due(
-            str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() == "YES",
-            self.risk_control_activated,
-            current_time,
-            RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
+
+        open_tags = self.risk_math.cycle_ledger_tags(open_df)
+        if not open_tags:
+            self.risk_cycle_started_at = None
+            self.risk_cycle_tags.clear()
+            self.risk_breach_ticks = 0
+            return
+
+        if (
+            self.risk_cycle_started_at is None
+            or not self.risk_cycle_tags
         ):
-            self.risk_pnl_offset = raw_pnl
-            self.risk_peak = 0.0
+            self.risk_cycle_started_at = self.risk_math.cycle_start_time(open_df)
+            if self.risk_cycle_started_at is None:
+                raise RuntimeError(
+                    "SIM risk cycle cannot start without an active lot buy timestamp."
+                )
+            self.risk_cycle_tags = set(open_tags)
             self.risk_breach_ticks = 0
-            self.risk_control_activated = True
+        else:
+            self.risk_cycle_tags.update(open_tags)
 
-        game_pnl = raw_pnl - self.risk_pnl_offset
-        (
-            self.risk_peak,
-            stop_line,
-            stop_breached,
-            target_breached,
-        ) = self.risk_math.compute_stop_conditions(
-            game_pnl,
-            self.risk_peak,
-            len(open_df) if open_df is not None else 0,
+        metrics = self.risk_math.cycle_risk_metrics(
+            open_df,
+            closed_df,
+            self.risk_cycle_tags,
+            exit_signal,
+            RUNEXACPXY_CYCLE_TARGET_PCT,
         )
-        target_squareoff_suppressed = (
-            target_breached
-            and self.risk_math.large_invested_side_aligned(open_df, direction)
-        )
-        breached = (
-            RUNEXACPXY_STOP_SQUAREOFF_ENABLED and stop_breached
-        ) or (
-            RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
-            and target_breached
-            and not target_squareoff_suppressed
-        )
-        target_line = self.risk_math.target_ceiling(
-            len(open_df) if open_df is not None else 0
-        )
-        risk_enabled = (
-            not RUNEXACPXY_CNTRLRSKBAR
-            or str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() != "YES"
-            or self.risk_control_activated
-        )
-        if not risk_enabled:
-            return
-
-        if not breached:
+        if not (
+            str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() == "YES"
+            and RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
+        ):
             self.risk_breach_ticks = 0
             return
+        if not metrics["target_reached"]:
+            self.risk_breach_ticks = 0
+            return
+
         self.risk_breach_ticks += 1
         if self.risk_breach_ticks < RUNEXACPXY_BREACH_TICKS_REQUIRED:
             return
-        for index, row in enumerate(open_df.to_dict("records"), start=1):
+        risk_open_df = open_df.copy()
+        risk_open_df.columns = [str(column).upper() for column in risk_open_df.columns]
+        for index, row in enumerate(risk_open_df.to_dict("records"), start=1):
             result = client.place_order(
-                trading_symbol=row["Symbol"],
+                trading_symbol=row["SYMBOL"],
                 transaction_type="S",
-                quantity=row["Qty"],
-                tag=f"{row['Tag']}_S_RISK{index:03d}",
+                quantity=row["QTY"],
+                tag=f"{row['TAG']}_S_RISK{index:03d}",
             )
             if str(result.get("stat", "")).lower() != "ok":
                 raise RuntimeError(
-                    f"SIM risk exit failed for {row['Symbol']} tag {row['Tag']}: {result!r}"
+                    f"SIM risk exit failed for {row['SYMBOL']} tag {row['TAG']}: {result!r}"
                 )
         self.risk_exit_fired = True
-        self.risk_pnl_offset = raw_pnl
-        self.risk_peak = 0.0
         self.risk_breach_ticks = 0
+        self.risk_cycle_started_at = None
+        self.risk_cycle_tags.clear()
         print(
-            f"SIM RISK EXIT (PEAK): "
-            f"PnL {game_pnl:.0f}, stop {stop_line:.0f}, target {target_line:.0f}; "
+            f"SIM CYCLE TARGET EXIT: cycle PnL {metrics['cycle_pnl']:.2f}, "
+            f"paid {metrics['premium_paid']:.2f}, "
+            f"target {metrics['target']:.2f}; "
             f"closed {len(open_df)} active rows."
         )
 

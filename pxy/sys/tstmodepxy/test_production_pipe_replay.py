@@ -66,14 +66,14 @@ class ProductionPipeReplayTests(unittest.TestCase):
         self.assertIs(__import__("os").system, system_call)
         self.assertIs(__import__("subprocess").run, process_run)
 
-    def test_oms_passes_only_current_directional_signal_to_risk_ledger(self):
+    def test_oms_passes_current_exit_signal_to_risk_ledger(self):
         for snapshot, expected_signal in (
             (
                 {
                     "direction": "UP", "exit": "BULL",
                     "market_data_available": True, "atr": 10,
                 },
-                "UP",
+                "BULL",
             ),
             (
                 {
@@ -87,7 +87,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     "direction": "NONE", "exit": "BULL",
                     "market_data_available": True, "atr": 10,
                 },
-                None,
+                "BULL",
             ),
         ):
             with self.subTest(snapshot=snapshot):
@@ -104,213 +104,113 @@ class ProductionPipeReplayTests(unittest.TestCase):
                         engine.oms.get_combined_data()
 
                     self.assertEqual(
-                        process_orders.call_args.kwargs["risk_direction"],
+                        process_orders.call_args.kwargs["risk_exit_signal"],
                         expected_signal,
                     )
 
-    def test_sim_replay_does_not_square_off_on_peak_target_when_actions_disabled(self):
+    def test_sim_risk_target_waits_while_heavy_side_aligns_with_exit(self):
+        timestamp = pytz.timezone("Asia/Kolkata").localize(
+            datetime(2025, 1, 6, 10, 0)
+        )
+        broker = SimulatedBroker()
+        broker.set_market(timestamp, 22000)
+        broker.place_order(
+            trading_symbol="NIFTY-WF-CE",
+            transaction_type="B",
+            quantity=75,
+            tag="SIM-ALIGNED",
+        )
+        open_df = pd.DataFrame([{
+            "SYMBOL": "NIFTY-WF-CE",
+            "QTY": 75,
+            "TAG": "SIM-ALIGNED",
+            "BUY_PRC": 100,
+            "SELL_PRC": 126.67,
+            "PNL": 2000,
+            "BUY_TIME": timestamp,
+        }])
+        with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-aligned-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, broker, Path(temp) / "state"
+            ) as engine:
+                for minute in range(3):
+                    engine.timestamp = timestamp.replace(minute=minute)
+                    engine._execute_risk_ledger(
+                        broker, open_df, pd.DataFrame(), exit_signal="BULL"
+                    )
+
+            self.assertFalse(engine.risk_exit_fired)
+            self.assertEqual(broker.position_summary(), "75CE0PE")
+            self.assertEqual(engine.risk_breach_ticks, 0)
+
+    def test_sim_risk_target_exits_after_confirmation_when_heavy_side_is_unaligned(self):
+        timestamp = pytz.timezone("Asia/Kolkata").localize(
+            datetime(2025, 1, 6, 10, 0)
+        )
+        broker = SimulatedBroker()
+        broker.set_market(timestamp, 22000)
+        broker.place_order(
+            trading_symbol="NIFTY-WF-CE",
+            transaction_type="B",
+            quantity=75,
+            tag="SIM-TARGET",
+        )
+        open_df = pd.DataFrame([{
+            "SYMBOL": "NIFTY-WF-CE",
+            "QTY": 75,
+            "TAG": "SIM-TARGET",
+            "BUY_PRC": 100,
+            "SELL_PRC": 126.67,
+            "PNL": 2000,
+            "BUY_TIME": timestamp,
+        }])
         with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-target-") as temp:
-            broker = SimulatedBroker()
-            broker.set_market(
-                pytz.timezone("Asia/Kolkata").localize(datetime(2025, 1, 6, 10, 0)),
-                22000,
-            )
-            broker.place_order(
-                trading_symbol="NIFTY-WF-CE",
-                transaction_type="B",
-                quantity=75,
-                tag="SIM-SEED",
-            )
-            open_df = pd.DataFrame(
-                [{
-                    "Symbol": "NIFTY-WF-CE",
-                    "Qty": 75,
-                    "Tag": "SIM-SEED",
-                    "BUY_PRC": 100,
-                    "SELL_PRC": 126.67,
-                    "PNL": 2000,
-                }]
-            )
-            closed_df = pd.DataFrame()
             with ProductionPipeReplay(
                 SYS_DIR, broker, Path(temp) / "state"
-            ) as engine, patch.object(
-                replay_adapter, "RUNEXACPXY_CNTRLRSKBAR", "NO"
-            ):
-                engine.timestamp = broker.current_time
+            ) as engine:
                 for minute in range(3):
-                    engine.timestamp = broker.current_time.replace(minute=minute)
-                    engine._execute_risk_ledger(broker, open_df, closed_df)
-
-            self.assertFalse(engine.risk_exit_fired)
-            self.assertEqual(broker.position_summary(), "75CE0PE")
-            self.assertEqual(engine.risk_pnl_offset, 0.0)
-
-    def test_sim_replay_keeps_positions_on_target_with_actions_disabled(self):
-        with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-aligned-target-") as temp:
-            broker = SimulatedBroker()
-            broker.set_market(
-                pytz.timezone("Asia/Kolkata").localize(datetime(2025, 1, 6, 10, 0)),
-                22000,
-            )
-            broker.place_order(
-                trading_symbol="NIFTY-WF-CE",
-                transaction_type="B",
-                quantity=75,
-                tag="SIM-ALIGNED",
-            )
-            open_df = pd.DataFrame(
-                [{
-                    "Symbol": "NIFTY-WF-CE",
-                    "Qty": 75,
-                    "Tag": "SIM-ALIGNED",
-                    "BUY_PRC": 100,
-                    "SELL_PRC": 126.67,
-                    "PNL": 2000,
-                }]
-            )
-            with (
-                patch.object(replay_adapter, "RUNEXACPXY_CNTRLRSKBAR", "NO"),
-                ProductionPipeReplay(SYS_DIR, broker, Path(temp) / "state") as engine,
-            ):
-                for minute in range(3):
-                    engine.timestamp = broker.current_time.replace(minute=minute)
+                    engine.timestamp = timestamp.replace(minute=minute)
                     engine._execute_risk_ledger(
-                        broker, open_df, pd.DataFrame(), direction="UP"
+                        broker, open_df, pd.DataFrame(), exit_signal="BEAR"
                     )
 
-                self.assertFalse(engine.risk_exit_fired)
-                self.assertEqual(broker.position_summary(), "75CE0PE")
+            self.assertTrue(engine.risk_exit_fired)
+            self.assertEqual(broker.position_summary(), "0CE0PE")
 
-                for minute in range(3, 6):
-                    engine.timestamp = broker.current_time.replace(minute=minute)
+    def test_sim_risk_target_does_not_create_a_loss_stop(self):
+        timestamp = pytz.timezone("Asia/Kolkata").localize(
+            datetime(2025, 1, 6, 10, 0)
+        )
+        broker = SimulatedBroker()
+        broker.set_market(timestamp, 22000)
+        broker.place_order(
+            trading_symbol="NIFTY-WF-CE",
+            transaction_type="B",
+            quantity=75,
+            tag="SIM-LOSS",
+        )
+        open_df = pd.DataFrame([{
+            "SYMBOL": "NIFTY-WF-CE",
+            "QTY": 75,
+            "TAG": "SIM-LOSS",
+            "BUY_PRC": 100,
+            "SELL_PRC": 60,
+            "PNL": -3000,
+            "BUY_TIME": timestamp,
+        }])
+        with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-loss-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, broker, Path(temp) / "state"
+            ) as engine:
+                for minute in range(3):
+                    engine.timestamp = timestamp.replace(minute=minute)
                     engine._execute_risk_ledger(
-                        broker, open_df, pd.DataFrame(), direction="DOWN"
+                        broker, open_df, pd.DataFrame(), exit_signal="BEAR"
                     )
 
             self.assertFalse(engine.risk_exit_fired)
             self.assertEqual(broker.position_summary(), "75CE0PE")
-
-    def test_sim_replay_does_not_count_breaches_for_disabled_actions(self):
-        with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-tick-") as temp:
-            broker = SimulatedBroker()
-            broker.set_market(
-                pytz.timezone("Asia/Kolkata").localize(datetime(2025, 1, 6, 10, 0)),
-                22000,
-            )
-            broker.place_order(
-                trading_symbol="NIFTY-WF-CE",
-                transaction_type="B",
-                quantity=75,
-                tag="SIM-SEED",
-            )
-            open_df = pd.DataFrame(
-                [{
-                    "Symbol": "NIFTY-WF-CE",
-                    "Qty": 75,
-                    "Tag": "SIM-SEED",
-                    "BUY_PRC": 100,
-                    "SELL_PRC": 126.67,
-                    "PNL": 2000,
-                }]
-            )
-            with ProductionPipeReplay(
-                SYS_DIR, broker, Path(temp) / "state"
-            ) as engine, patch.object(replay_adapter, "RUNEXACPXY_CNTRLRSKBAR", "NO"):
-                engine.timestamp = broker.current_time
-                for _ in range(3):
-                    engine._execute_risk_ledger(broker, open_df, pd.DataFrame())
-                self.assertEqual(engine.risk_breach_ticks, 0)
-                self.assertFalse(engine.risk_exit_fired)
-
-                for minute in (1, 2):
-                    engine.timestamp = broker.current_time.replace(minute=minute)
-                    engine._execute_risk_ledger(broker, open_df, pd.DataFrame())
-
-            self.assertFalse(engine.risk_exit_fired)
-            self.assertEqual(broker.position_summary(), "75CE0PE")
-
-    def test_sim_replay_stop_threshold_warns_without_squareoff_by_default(self):
-        with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-stop-warning-") as temp:
-            broker = SimulatedBroker()
-            broker.set_market(
-                pytz.timezone("Asia/Kolkata").localize(datetime(2025, 1, 6, 10, 0)),
-                22000,
-            )
-            broker.place_order(
-                trading_symbol="NIFTY-WF-CE",
-                transaction_type="B",
-                quantity=75,
-                tag="SIM-STOP",
-            )
-            open_df = pd.DataFrame(
-                [{
-                    "Symbol": "NIFTY-WF-CE",
-                    "Qty": 75,
-                    "Tag": "SIM-STOP",
-                    "BUY_PRC": 100,
-                    "SELL_PRC": 73.33,
-                    "PNL": -2000,
-                }]
-            )
-            with ProductionPipeReplay(
-                SYS_DIR, broker, Path(temp) / "state"
-            ) as engine, redirect_stdout(StringIO()):
-                engine.timestamp = broker.current_time
-                for minute in range(3):
-                    engine.timestamp = broker.current_time.replace(minute=minute)
-                    engine._execute_risk_ledger(broker, open_df, pd.DataFrame())
-
-            self.assertFalse(engine.risk_exit_fired)
-            self.assertEqual(broker.position_summary(), "75CE0PE")
             self.assertEqual(engine.risk_breach_ticks, 0)
-
-    def test_sim_peak_mode_holds_risk_until_original_activation_time(self):
-        from datetime import time
-        from tstmodepxy import replay_adapter
-
-        with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-peak-") as temp:
-            broker = SimulatedBroker()
-            timestamp = pytz.timezone("Asia/Kolkata").localize(
-                datetime(2025, 1, 6, 10, 0)
-            )
-            broker.set_market(timestamp, 22000)
-            broker.place_order(
-                trading_symbol="NIFTY-WF-CE",
-                transaction_type="B",
-                quantity=75,
-                tag="SIM-SEED",
-            )
-            open_df = pd.DataFrame(
-                [{
-                    "Symbol": "NIFTY-WF-CE",
-                    "Qty": 75,
-                    "Tag": "SIM-SEED",
-                    "BUY_PRC": 100,
-                    "SELL_PRC": 126.67,
-                    "PNL": 2000,
-                }]
-            )
-            with (
-                patch.object(replay_adapter, "RUNEXACPXY_CNTRLRSKBAR", "YES"),
-                patch.object(
-                    replay_adapter,
-                    "RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME",
-                    time(13, 15),
-                ),
-                ProductionPipeReplay(SYS_DIR, broker, Path(temp) / "state") as engine,
-            ):
-                engine._execute_risk_ledger(broker, open_df, pd.DataFrame())
-                self.assertEqual(engine.risk_breach_ticks, 0)
-                self.assertEqual(broker.position_summary(), "75CE0PE")
-
-                engine.timestamp = timestamp.replace(hour=13, minute=15)
-                engine._execute_risk_ledger(broker, open_df, pd.DataFrame())
-
-            self.assertTrue(engine.risk_control_activated)
-            self.assertEqual(engine.risk_pnl_offset, 2000)
-            self.assertEqual(engine.risk_breach_ticks, 0)
-            self.assertEqual(broker.position_summary(), "75CE0PE")
 
     def test_lilo_handles_empty_broker_order_report_as_idle(self):
         with tempfile.TemporaryDirectory(prefix="pxy-lilo-empty-orders-") as temp:

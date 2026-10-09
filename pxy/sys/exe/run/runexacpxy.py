@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # runexacpxy.py   (lives in ~/pxy/sys/exe/run/)
 #
-# MASTER RISK LEDGER orchestrator: Renko trailing stop + hard loss floor.
+# MASTER RISK LEDGER orchestrator: cycle premium-profit target.
 # Called from runlilopxy.process_lilo_orders (two hooks, see README_risk.md):
 #   1) runexacpxy.daily_purge_check()                             top of process_lilo_orders
 #   2) runexacpxy.execute_master_risk_ledger(client, open_df, closed_df)   after open_df / closed_df exist
 #
-# On a confirmed breach it squares off everything (exesqrpxy.py -all), waits until the broker is flat,
-# locks the final loss into pnl_offset, resets the engine and ends the process with sys.exit(...).
+# On a confirmed target it squares off everything, waits until the broker is flat,
+# resets risk state and ends the process with sys.exit(...).
 #
 # Same maths and web JSON files as exeexacpxy.py. Do NOT keep exeexacpxy.py scheduled as well.
 #
@@ -24,11 +24,10 @@ if str(SYS_DIR) not in sys.path:
 
 from syscnfgpxy import (
     RUNEXACPXY_CNTRLRSKBAR,
-    RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
+    RUNEXACPXY_CYCLE_TARGET_PCT,
     RUNEXACPXY_DEBUG_ENABLED,
     RUNEXACPXY_LEDGER_BASIS_GUARD,
-    RUNEXACPXY_STOP_SQUAREOFF_ENABLED,
     RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
     RUNEXACPXY_TICK_MIN_GAP_SECONDS,
     RUNEXACPXY_VIEW_ONLY_ENV,
@@ -36,10 +35,7 @@ from syscnfgpxy import (
 from runexiopxy import now_ist, today_ist, RENKO_STATE_FILE, WEB_DIR, SQUAREOFF_SCRIPT_PATH  # noqa: F401
 from runexmtpxy import (
     INITIAL_LOSS_FLOOR, compute_totals,
-    compute_stop_conditions, force_zero_ending, _both_empty, risk_squareoff_due,
-    target_ceiling,
-    large_invested_side_aligned,
-    midday_risk_activation_due,
+    cycle_ledger_tags, cycle_risk_metrics, cycle_start_time,
 )
 from runexstpxy import (
     load_check_state, save_check_state, load_session_state, save_session_state,
@@ -93,7 +89,7 @@ def daily_purge_check():
 # ---------------------------------------------------------------------------
 # HOOK 2: the master ledger
 # ---------------------------------------------------------------------------
-def execute_master_risk_ledger(client, open_df, closed_df, direction=None):
+def execute_master_risk_ledger(client, open_df, closed_df, exit_signal=None):
     """Defensive gatekeeper. Returns normally when there is nothing to do or the tick was skipped.
     On a confirmed breach: square-off, flat check, state reset, then sys.exit(...)."""
     global _IN_LEDGER
@@ -102,10 +98,6 @@ def execute_master_risk_ledger(client, open_df, closed_df, direction=None):
     if os.environ.get(VIEW_ONLY_ENV) == "1":
         debug_log("Ledger guard: view-only run; no tick counted.")
         return
-    if _both_empty(open_df, closed_df):
-        debug_log("Ledger guard: no ledger data; state untouched.")
-        return
-
     can_run, lock_handle = _acquire_lock()
     if not can_run:
         debug_log("Ledger guard: another tick is running; skipping.")
@@ -113,7 +105,7 @@ def execute_master_risk_ledger(client, open_df, closed_df, direction=None):
 
     _IN_LEDGER = True
     try:
-        _tick(client, open_df, closed_df, direction)
+        _tick(client, open_df, closed_df, exit_signal)
     except SystemExit:
         raise
     except Exception as e:
@@ -123,7 +115,7 @@ def execute_master_risk_ledger(client, open_df, closed_df, direction=None):
         _release_lock(lock_handle)
 
 
-def _tick(client, open_df, closed_df, direction=None):
+def _tick(client, open_df, closed_df, exit_signal=None):
     # 1. Read state. A corrupt/locked file skips the tick rather than writing zeros.
     try:
         state_on_disk = load_session_state()
@@ -137,15 +129,9 @@ def _tick(client, open_df, closed_df, direction=None):
     session_state_is_stale = state_is_stale(state_on_disk)
     if session_state_is_stale:
         purge_stale_cache()
-        historical_peak_record = 0.0
-        pnl_offset = 0.0
         consecutive_breaches = 0
-        risk_control_activated = False
     else:
-        historical_peak_record = state_on_disk["session_peak_pnl"]
-        pnl_offset = state_on_disk["pnl_offset"]
         consecutive_breaches = check_state_on_disk["consecutive_breaches"]
-        risk_control_activated = state_on_disk["risk_control_activated"]
 
     # 3. One tick per cycle: the exit pipe and the avg pipe both load the ledger every cycle.
     meta = load_meta()
@@ -155,113 +141,131 @@ def _tick(client, open_df, closed_df, direction=None):
                   f"(< {TICK_MIN_GAP_SECONDS}s).")
         return
 
-    # 4. Ledger basis: if runlilopxy now starts its ledger later (FILTER_TIME moved after a square-off),
-    #    the old offset belongs to a bigger ledger, so start a fresh game.
+    # 4. Keep the cycle ledger independent of LILO's display/filter basis.
     current_basis = _current_filter_time()
     if LEDGER_BASIS_GUARD and current_basis is not None:
         stored_basis = meta.get("ledger_basis")
         if stored_basis is not None and stored_basis != current_basis:
-            print(f"🔄 {Fore.CYAN}Ledger start changed ({stored_basis} -> {current_basis}). "
-                  f"Starting a fresh game (offset, peak and breach count reset).")
-            historical_peak_record = 0.0
-            pnl_offset = 0.0
-            consecutive_breaches = 0
-            risk_control_activated = False
-            save_check_state(0)
-            save_session_state(0.0, 0.0, INITIAL_LOSS_FLOOR, 0.0)
+            print(
+                f"🔄 {Fore.CYAN}Ledger start changed ({stored_basis} -> "
+                f"{current_basis}); preserving the active risk cycle."
+            )
         meta["ledger_basis"] = current_basis
+
+    # The portfolio must be completely flat before a cycle is reset.
+    open_tags = cycle_ledger_tags(open_df)
+    if not open_tags:
+        meta["risk_cycle_started_at"] = None
+        meta["risk_cycle_tags"] = []
+        meta["last_tick_epoch"] = now_epoch
+        save_meta(meta)
+        if consecutive_breaches:
+            save_check_state(0)
+        save_session_state(0.0, 0.0, INITIAL_LOSS_FLOOR, 0.0)
+        return
+
+    previous_tags = {
+        str(tag) for tag in meta.get("risk_cycle_tags", [])
+    }
+    cycle_started_at = meta.get("risk_cycle_started_at")
+    if not cycle_started_at or not previous_tags:
+        cycle_started_at = cycle_start_time(open_df)
+        if cycle_started_at is None:
+            print(
+                f"{Fore.YELLOW}⚠️ Risk cycle cannot start: active orders have "
+                "no valid buy timestamp; risk check skipped."
+            )
+            return
+        cycle_tags = open_tags
+        consecutive_breaches = 0
+        save_check_state(0)
+        print(
+            f"🛡️ {Fore.CYAN}Risk cycle started at {cycle_started_at}; "
+            "baseline continues until the full book is flat."
+        )
+    else:
+        cycle_tags = previous_tags | open_tags
+
+    meta["risk_cycle_started_at"] = cycle_started_at
+    meta["risk_cycle_tags"] = sorted(cycle_tags)
     meta["last_tick_epoch"] = now_epoch
     save_meta(meta)
 
-    # 5. Mathematics
     totals = compute_totals(open_df, closed_df)
     total_raw_pnl = totals["total"]
-    fmt_losers = force_zero_ending(totals["losers"])
-    fmt_winners = force_zero_ending(totals["winners"])
-
-    if midday_risk_activation_due(
-        RISK_CANDLE_CONTROL_ENABLED,
-        risk_control_activated,
-        now_ist().time(),
-        RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
-    ):
-        pnl_offset = total_raw_pnl
-        historical_peak_record = 0.0
-        consecutive_breaches = 0
-        risk_control_activated = True
-        save_check_state(0)
-        print(f"⏱️ {Fore.CYAN}Risk candle activated at 13:15 IST with a fresh P&L baseline.")
-
-    current_game_pnl = total_raw_pnl - pnl_offset
-    (
-        winners_peak_brick,
-        active_trailing_exit,
-        stop_breached,
-        target_breached,
-    ) = compute_stop_conditions(
-        current_game_pnl, historical_peak_record, len(open_df) if open_df is not None else 0)
-    target_squareoff_suppressed = (
-        target_breached and large_invested_side_aligned(open_df, direction)
+    metrics = cycle_risk_metrics(
+        open_df,
+        closed_df,
+        cycle_tags,
+        exit_signal,
+        RUNEXACPXY_CYCLE_TARGET_PCT,
     )
-    is_breached = risk_squareoff_due(
-        stop_breached, target_breached and not target_squareoff_suppressed
+    risk_enabled = (
+        RISK_CANDLE_CONTROL_ENABLED
+        and RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
     )
-    active_target_exit = target_ceiling(len(open_df) if open_df is not None else 0)
-    risk_exit_enabled = not RISK_CANDLE_CONTROL_ENABLED or risk_control_activated
-
-    # 6. Telemetry (3-line format)
-    print(f"PnL {int(current_game_pnl)} | Pek {int(winners_peak_brick)} | Stp {int(active_trailing_exit)}")
-    if risk_exit_enabled and stop_breached:
-        if RUNEXACPXY_STOP_SQUAREOFF_ENABLED:
-            print(f"{Fore.YELLOW}ALERT: STOP REACHED at {int(active_trailing_exit)} : SQUARE-OFF ENABLED")
-        else:
-            print("ALERT: STOP REACHED : NO ACTION")
-    if risk_exit_enabled and target_breached:
-        target_action = (
-            f"GOING GOOD: SIGNAL {direction} IS ON OUR SIDE; "
-            "target square-off suppressed"
-            if target_squareoff_suppressed and RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
-            else (
-                "square-off enabled"
-                if RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
-                else "warning only; no target square-off"
-            )
-        )
-        print(
-            f"{Fore.YELLOW}⚠️ TARGET THRESHOLD REACHED at "
-            f"{int(active_target_exit)}; {target_action}."
-        )
-    print(f"Los {fmt_losers} | Win {fmt_winners}")
-    acpnl = totals["losers"] + totals["winners"]
-    acpnl_label_color = Fore.GREEN if acpnl >= 0 else Fore.RED
-    print(f"{acpnl_label_color}└─ ACPNL{Style.RESET_ALL} {int(acpnl)}".rjust(50))
-
-    # 7. Breach handling
-    if is_breached and risk_exit_enabled:
-        consecutive_breaches += 1
-        save_check_state(consecutive_breaches)
-        save_session_state(
-            winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset,
-            risk_control_activated=risk_control_activated,
-            target_exit_line=active_target_exit,
-        )
-
-        if consecutive_breaches >= BREACH_TICKS_REQUIRED:
-            sys.stdout.write(f"\n{Fore.RED}{Style.BRIGHT} !! CRITICAL TRADING BREACH DETECTED !! {Style.RESET_ALL}\n")
-            sys.stdout.flush()
-
-            liquidate_and_exit(
-                client, total_raw_pnl,
-                risk_control_activated=risk_control_activated,
-            )     # always ends with sys.exit(...)
+    print(
+        f"🛡️ CYCLE PNL ₹{metrics['cycle_pnl']:.0f} / "
+        f"PAID ₹{metrics['premium_paid']:.0f} | "
+        f"TARGET {RUNEXACPXY_CYCLE_TARGET_PCT:.1f}% "
+        f"(₹{metrics['target']:.0f}) | "
+        f"OPEN CE/PE {metrics['ce_qty']:.0f}/{metrics['pe_qty']:.0f} | "
+        f"HEAVY {metrics['heavy_side'] or 'NONE'} | EXIT {exit_signal or 'NONE'}"
+    )
+    if metrics["heavy_side_aligned"]:
+        print("🛡️ Heavy invested side agrees with exit signal; cycle remains active.")
     else:
-        if consecutive_breaches > 0:
+        print("🛡️ Heavy side is not aligned; cycle profit target can square off the book.")
+
+    if not risk_enabled:
+        if consecutive_breaches:
+            save_check_state(0)
+        save_session_state(
+            0.0,
+            metrics["cycle_pnl"],
+            metrics["target"],
+            0.0,
+            risk_control_activated=False,
+        )
+        return
+
+    if not metrics["target_reached"]:
+        if consecutive_breaches:
             consecutive_breaches = 0
             save_check_state(0)
+        save_session_state(
+            0.0,
+            metrics["cycle_pnl"],
+            metrics["target"],
+            0.0,
+            risk_control_activated=True,
+        )
+        return
 
-    # 8. Final sync (always carries today's timestamp)
+    consecutive_breaches += 1
+    save_check_state(consecutive_breaches)
     save_session_state(
-        winners_peak_brick, current_game_pnl, active_trailing_exit, pnl_offset,
-        risk_control_activated=risk_control_activated,
-        target_exit_line=active_target_exit,
+        0.0,
+        metrics["cycle_pnl"],
+        metrics["target"],
+        0.0,
+        risk_control_activated=True,
+    )
+    print(
+        f"{Fore.YELLOW}⚠️ Cycle profit target reached while heavy side is unaligned "
+        f"({RUNEXACPXY_CYCLE_TARGET_PCT:.1f}%) "
+        f"(confirmation {consecutive_breaches}/{BREACH_TICKS_REQUIRED})."
+    )
+    if consecutive_breaches < BREACH_TICKS_REQUIRED:
+        return
+
+    sys.stdout.write(
+        f"\n{Fore.RED}{Style.BRIGHT} !! CYCLE PROFIT TARGET REACHED !! "
+        f"{Style.RESET_ALL}\n"
+    )
+    sys.stdout.flush()
+    liquidate_and_exit(
+        client,
+        total_raw_pnl,
+        risk_control_activated=True,
     )

@@ -85,7 +85,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
 
     # --- 1. MKT SNAPSHOT ---
     market_df = pd.DataFrame()
-    risk_direction = None
+    risk_exit_signal = None
     if syspxy:
         try:
             market_data = syspxy.get_all_data()
@@ -93,12 +93,11 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
             print_market_dashboard(market_df)
             if isinstance(market_data, dict):
                 exit_signal = str(market_data.get("exit", "")).upper().strip()
-                direction = str(market_data.get("direction", "")).upper().strip()
                 if (
                     market_data.get("market_data_available") is True
-                    and direction in {"UP", "DOWN"}
+                    and exit_signal in {"BULL", "BEAR", "SIDE", "NONE"}
                 ):
-                    risk_direction = direction
+                    risk_exit_signal = exit_signal
                 try:
                     atr = float(market_data.get("atr"))
                     combined["market_snapshot_available"] = (
@@ -129,7 +128,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
 
             # A. Get unmatched orders from stateless LILO engine
             active_df, _ = process_lilo_orders(
-                client, strict=True, risk_direction=risk_direction
+                client, strict=True, risk_exit_signal=risk_exit_signal
             )
 
             if not active_df.empty:
