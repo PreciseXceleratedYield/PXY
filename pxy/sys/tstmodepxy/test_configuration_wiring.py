@@ -441,11 +441,11 @@ class ConfigurationWiringTests(unittest.TestCase):
             )
             self.assertEqual(
                 sysmktpxy.get_signal(pd.DataFrame({"Close": [8.0, 9.0, 10.0]})),
-                ("BUY", "BULL"),
+                ("NONE", "BULL"),
             )
             self.assertEqual(
                 sysmktpxy.get_signal(pd.DataFrame({"Close": [10.0, 9.0, 8.0]})),
-                ("SELL", "BEAR"),
+                ("NONE", "BEAR"),
             )
             for closes in ([8.0, 9.0, 9.0], [9.0, 9.0, 10.0], [9.0, 9.0, 9.0]):
                 with self.subTest(closes=closes):
@@ -499,8 +499,8 @@ class ConfigurationWiringTests(unittest.TestCase):
         expected_signals = {
             (10.0, 8.0, 9.0): ("BUY", ("BUY", "BULL")),
             (8.0, 10.0, 9.0): ("SELL", ("SELL", "BEAR")),
-            (8.0, 9.0, 10.0): ("BULL", ("BUY", "BULL")),
-            (10.0, 9.0, 8.0): ("BEAR", ("SELL", "BEAR")),
+            (8.0, 9.0, 10.0): ("BULL", ("NONE", "BULL")),
+            (10.0, 9.0, 8.0): ("BEAR", ("NONE", "BEAR")),
             (8.0, 9.0, 9.0): ("NONE", ("NONE", "NONE")),
         }
         with (

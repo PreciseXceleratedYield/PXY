@@ -112,14 +112,14 @@ The current configuration uses mode `6` and `SYSENTRPXY_SIGNAL_MODE = "MKT"`.
 MKT examines the last three transformed closes. A strict V
 (`C[-3] > C[-2] < C[-1]`) emits `BUY`/`BULL`; an inverted V
 (`C[-3] < C[-2] > C[-1]`) emits `SELL`/`BEAR`. Three strictly rising closes
-emit `BULL` (entry `BUY`, exit `BULL`), and three strictly falling closes emit
-`BEAR` (entry `SELL`, exit `BEAR`). All other patterns, including equal adjacent
+emit exit-only `BULL` (`NONE`/`BULL`), and three strictly falling closes emit
+exit-only `BEAR` (`NONE`/`BEAR`). All other patterns, including equal adjacent
 closes, emit `NONE`/`NONE`. `sysdthapxy` supplies the shared close-to-close
 direction series (`UP`, `DOWN`, or `FLAT`) and returns one pattern signal
 (`BUY`, `SELL`, `BULL`, `BEAR`, or `NONE`) alongside CE/PE streak depths.
-`sysmktpxy` maps each bullish pattern (`BUY` or `BULL`) to entry `BUY`/exit
-`BULL`, and each bearish pattern (`SELL` or `BEAR`) to entry `SELL`/exit
-`BEAR`; it retains its display helpers.
+`sysmktpxy` maps reversal signals `BUY` and `SELL` to matching entry signals,
+with exit labels `BULL` and `BEAR`. Continuation signals `BULL` and `BEAR`
+remain exit-only; they do not trigger a fresh entry.
 `sysdptpxy` delegates dashboard/depth calculation to that same DTHA signal and
 depth result. Flat closes break directional streaks and cannot create a
 bullish or bearish depth. Current streak depth
@@ -129,7 +129,8 @@ controls whether the last returned candle is included (`YES`) or excluded
 (`NO`, the default), so MKT signals and DPT depths both use closed candles and
 share the same candle window. In MKT mode,
 `sysentrpxy` forwards `sysmktpxy`'s entry/exit pair unchanged: reversal entries
-are `BUY`/`SELL`, with their matching exit labels `BULL`/`BEAR`.
+are `BUY`/`SELL`, with their matching exit labels `BULL`/`BEAR`; continuation
+signals are exit-only.
 `PASTRSK` enables (`YES`) or disables (`NO`) the depth-triggered reversal
 square-off; it defaults to `YES`. When enabled, outside the scheduled square-off
 window, a MKT `BUY` with past depth `PE7` or greater independently triggers a
