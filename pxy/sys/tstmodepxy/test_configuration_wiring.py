@@ -234,8 +234,14 @@ class ConfigurationWiringTests(unittest.TestCase):
             ),
             patch.object(
                 sysdashpxy,
-                "detect_pxy_flip_signal",
-                return_value=("BULL", 0, 0, 0),
+                "get_signal_depth_analysis",
+                return_value={
+                    "signal": "BULL",
+                    "past_depth": "NA",
+                    "ce_depth": 1,
+                    "pe_depth": 1,
+                    "signal_candle_time": "2025-01-06 10:00:00",
+                },
             ),
             patch.object(sysdashpxy, "calculate_adx", return_value=(1.0, 1.0)),
             patch.object(sysdashpxy, "calculate_atr", return_value=pd.Series([1.0])),
@@ -622,6 +628,15 @@ class ConfigurationWiringTests(unittest.TestCase):
                 )
                 self.assertEqual(signal, depth_signal)
                 self.assertEqual((actual_ce_depth, actual_pe_depth), (ce_depth, pe_depth))
+
+    def test_depth_squareoff_requires_opposite_side_and_depth_above_six(self):
+        self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "PE6"), None)
+        self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "PE7"), "PE")
+        self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "CE7"), None)
+        self.assertEqual(exeexitpxy.depth_squareoff_side("SELL", "CE7"), "CE")
+        self.assertEqual(exeexitpxy.depth_squareoff_side("SELL", "PE7"), None)
+        self.assertEqual(exeexitpxy.depth_squareoff_side("SELL", "CE6"), None)
+        self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "PE-7"), None)
 
     def test_entry_router_has_selectable_mkt_sts_mode(self):
         from syscnfgpxy import (

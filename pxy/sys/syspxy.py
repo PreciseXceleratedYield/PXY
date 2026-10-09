@@ -95,6 +95,7 @@ def get_all_data():
         "hkin_past_depth": core.get("hkin_past_depth", 0),
         "hkin_ce_depth": core.get("hkin_ce_depth", 1),
         "hkin_pe_depth": core.get("hkin_pe_depth", 1),
+        "hkin_signal_time": core.get("hkin_signal_time"),
 
         "atr": core.get("atr"),
         "katr": core.get("katr"),

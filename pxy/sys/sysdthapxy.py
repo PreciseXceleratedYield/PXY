@@ -101,6 +101,7 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
     pe_depth = current_depth if current_direction == "DOWN" else 1
     previous_close = float(closes.iloc[-2]) if len(closes) >= 2 else None
     current_close = float(closes.iloc[-1]) if len(closes) >= 1 else None
+    signal_candle_time = str(closes.index[-1]) if len(closes) else None
 
     return {
         "signal": signal,
@@ -109,6 +110,7 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
         "pe_depth": pe_depth,
         "previous_close": previous_close,
         "current_close": current_close,
+        "signal_candle_time": signal_candle_time,
     }
 
 

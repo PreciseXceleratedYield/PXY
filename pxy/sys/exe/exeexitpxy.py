@@ -4,6 +4,7 @@ import os
 import json 
 import sys
 import time 
+import re
 import subprocess 
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +17,7 @@ if str(SYS_DIR) not in sys.path:
 from syscnfgpxy import (
     EXEEXITPXY_DEBUG_ENABLED as DEBUG_MODE,
     EXEEXITPXY_EXIT_LOCK_KEEP_SECS,
+    EXEEXITPXY_DEPTH_EXIT_THRESHOLD,
     EXEEXITPXY_ORDER_AMO,
     EXEEXITPXY_ORDER_EXCHANGE_SEGMENT,
     EXEEXITPXY_ORDER_PRICE,
@@ -130,6 +132,73 @@ def _mark_exited(key):
     if EXIT_LOCK_SECS <= 0:
         return
     _mark_lock(key)
+
+
+def depth_squareoff_side(entry_signal, past_depth, threshold=EXEEXITPXY_DEPTH_EXIT_THRESHOLD):
+    """Return the opposing option side to square off for a deep reversal."""
+    signal = str(entry_signal).upper().strip()
+    parsed_depth = re.fullmatch(r"(CE|PE)(\d+)", str(past_depth).upper().strip())
+    if not parsed_depth:
+        return None
+
+    depth_side, depth_value = parsed_depth.groups()
+    if int(depth_value) <= threshold:
+        return None
+    if signal == "BUY" and depth_side == "PE":
+        return "PE"
+    if signal == "SELL" and depth_side == "CE":
+        return "CE"
+    return None
+
+
+def run_depth_squareoff(client, active_df, market_data_available,
+                        positions_unverified=False):
+    """Close only the losing-direction side after a confirmed deep reversal."""
+    if active_df is None or active_df.empty or not market_data_available:
+        return set()
+    if positions_unverified or ledger_busy():
+        print(f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: positions unavailable or ledger busy.")
+        return set()
+
+    snapshot = active_df.iloc[0]
+    side = depth_squareoff_side(
+        snapshot.get("entry"),
+        snapshot.get("hkin_past_depth"),
+    )
+    if side is None:
+        return set()
+
+    signal_time = str(snapshot.get("hkin_signal_time", "")).strip()
+    if not signal_time or signal_time.lower() in {"none", "nan"}:
+        print(f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: signal candle time unavailable.")
+        return set()
+
+    signal_key = f"DEPTH_EXIT|{side}|{signal_time}"
+    if _recent(_load_locks(), signal_key, EXIT_LOCK_KEEP_SECS):
+        debug_log(f"Depth exit {signal_key} already sent; skipping duplicate.")
+        return set()
+
+    print(
+        f"{Fore.YELLOW}⚠️ Deep reversal: {snapshot.get('entry')} with "
+        f"{snapshot.get('hkin_past_depth')} past depth; squaring off {side}."
+    )
+    exited_keys = set()
+    order_accepted = False
+    for _, row in active_df.iterrows():
+        symbol = str(row.get("symbol", "")).upper()
+        if not symbol.endswith(side):
+            continue
+        key = _lock_key(row)
+        if _recently_exited(key):
+            continue
+        if verify_and_exit(client, row):
+            exited_keys.add(key)
+            order_accepted = True
+
+    if order_accepted:
+        _mark_lock(signal_key)
+    return exited_keys
+
 
 def debug_log(msg, color=Fore.BLUE): 
     if DEBUG_MODE: 
@@ -272,6 +341,15 @@ def run_snapshot():
         print(f"{Fore.YELLOW}No active orders. System idling...") 
         dump_idle_json("one")
         return 
+
+    depth_exited_keys = set()
+    if not SQOFF_START <= now < SQOFF_END:
+        depth_exited_keys = run_depth_squareoff(
+            client,
+            df,
+            data.get("market_snapshot_available"),
+            data.get("positions_unverified", False),
+        )
         
     # Display-only analysis: a failure here must never block the exit loop below
     try:
@@ -281,13 +359,15 @@ def run_snapshot():
         side_all_targets_hit = {"CE": False, "PE": False}
 
     # Proactive Core Execution Routing Logic Block (Pure Single Targets)
-    exited_keys = set()
+    exited_keys = set(depth_exited_keys)
     if not data.get("market_snapshot_available"):
         print(f"{Fore.YELLOW}⚠️ Market snapshot unavailable; target exits skipped this cycle.")
     else:
         for idx, r in df.iterrows():
             # One bad row must not stop the remaining rows from being evaluated
             try:
+                if _lock_key(r) in exited_keys:
+                    continue
                 sym = str(r.get('symbol', ''))
                 ltp = float(r.get("sell_prc", 0))
                 tgt = float(r.get("pxy_tgt", 0))

@@ -7,8 +7,7 @@ init(autoreset=True)
 # ---- Pure Production Naming Alignment Imports ----
 from sysdtafpxy import fetch_yf_data
 from syscnfgpxy import SYSDTAFPXY_DEFAULT_TARGET_ROWS, SYSSTRNDPXY_CHART_TARGET_ROWS
-from sysdthapxy import get_pxy_data
-from sysdptpxy import detect_pxy_flip_signal
+from sysdthapxy import get_pxy_data, get_signal_depth_analysis
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
 from sysstrndpxy import calculate_supertrend
@@ -59,11 +58,12 @@ def get_full_snapshot():
     result["ha_color"] = pxy_color
 
     # ===== FLIP & TREND STREAK SIGNAL =====
-    signal, past_depth, ce_depth, pe_depth = detect_pxy_flip_signal(df=master_df)
-    result["hkin_signal"] = signal
-    result["hkin_past_depth"] = past_depth
-    result["hkin_ce_depth"] = ce_depth
-    result["hkin_pe_depth"] = pe_depth
+    signal_depth = get_signal_depth_analysis(df=master_df)
+    result["hkin_signal"] = signal_depth["signal"]
+    result["hkin_past_depth"] = signal_depth["past_depth"]
+    result["hkin_ce_depth"] = signal_depth["ce_depth"]
+    result["hkin_pe_depth"] = signal_depth["pe_depth"]
+    result["hkin_signal_time"] = signal_depth["signal_candle_time"]
 
     # ===== FORCE (ADX MATRIX) =====
     force_result = calculate_adx(master_df)

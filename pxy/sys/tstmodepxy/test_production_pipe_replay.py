@@ -497,6 +497,38 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     ("B", "NIFTY-WF-PE"),
                 ],
             },
+            {
+                "name": "deep BUY reversal closes PE despite sub-target loss",
+                "held": ("CE", "PE"),
+                "available": True,
+                "exit": "BULL",
+                "entry": "BUY",
+                "past_depth": "PE7",
+                "signal_time": "2025-01-06 09:59:00+05:30",
+                "sell_price": 80.0,
+                "target": 110.0,
+                "expected": [
+                    ("B", "NIFTY-WF-CE"),
+                    ("B", "NIFTY-WF-PE"),
+                    ("S", "NIFTY-WF-PE"),
+                ],
+            },
+            {
+                "name": "deep SELL reversal closes CE despite sub-target loss",
+                "held": ("CE", "PE"),
+                "available": True,
+                "exit": "BEAR",
+                "entry": "SELL",
+                "past_depth": "CE7",
+                "signal_time": "2025-01-06 10:00:00+05:30",
+                "sell_price": 80.0,
+                "target": 110.0,
+                "expected": [
+                    ("B", "NIFTY-WF-CE"),
+                    ("B", "NIFTY-WF-PE"),
+                    ("S", "NIFTY-WF-CE"),
+                ],
+            },
         ])
         timezone = pytz.timezone("Asia/Kolkata")
 
@@ -529,6 +561,8 @@ class ProductionPipeReplayTests(unittest.TestCase):
                             "pxy_tgt": scenario["target"],
                             "entry": scenario["entry"],
                             "exit": scenario["exit"],
+                            "hkin_past_depth": scenario.get("past_depth", "NA"),
+                            "hkin_signal_time": scenario.get("signal_time", timestamp.isoformat()),
                             "atr": 5.0,
                         }
                     )
