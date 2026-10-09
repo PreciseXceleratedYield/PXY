@@ -164,13 +164,6 @@
         const select = makeSelect(setting.options, setting.value, (value) => {
           changed(typeof setting.value === "number" ? Number(value) : value);
         });
-        if (key === "SYSDTAFPXY_SELECTED_MODE") {
-          [...select.options].forEach((option) => {
-            option.textContent = option.value.length === 1
-              ? `Single mode ${option.value}`
-              : `Side ${option.value[0]} / trend ${option.value[1]}`;
-          });
-        }
         return select;
       }
       if (setting.kind === "boolean") {

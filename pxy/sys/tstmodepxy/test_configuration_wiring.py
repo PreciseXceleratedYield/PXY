@@ -53,7 +53,6 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSSTRNDPXY_ST1_ATR_VALUE,
     SYSSTRNDPXY_ST1_FACTOR,
-    SYSDTAFPXY_FIXED_BRICK_SIZE,
     SYSSMAPXY_VARIANT,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
     EXEAMSPXY_MAX_INVESTMENT,
@@ -879,12 +878,10 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_entry_router_has_selectable_mkt_sts_mode(self):
         from syscnfgpxy import (
             SYSENTRPXY_SIGNAL_MODE,
-            SYSDTAFPXY_SELECTED_MODE,
             SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
         )
 
         self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "MKT")
-        self.assertEqual(SYSDTAFPXY_SELECTED_MODE, "0")
         self.assertEqual(SYSDTHAPXY_INCLUDE_RUNNING_CANDLE, "YES")
         self.assertEqual(
             __import__("pxyconfigwebpxy").ENUMS["SYSDTHAPXY_INCLUDE_RUNNING_CANDLE"],
@@ -1130,51 +1127,53 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_value_cap_is_fixed_at_twenty_five_thousand_without_layer_mode(self):
         self.assertEqual(EXEAMSPXY_MAX_INVESTMENT, 25000.0)
 
-    def test_renko_uses_configured_brick_size_by_default(self):
+    def test_dtaf_mode_one_averages_each_ohlc_value_with_futures_price(self):
         frame = pd.DataFrame(
             {
                 "Open": [100.0, 105.0],
-                "High": [100.0, 105.0],
-                "Low": [100.0, 105.0],
-                "Close": [100.0, 105.0],
+                "High": [102.0, 107.0],
+                "Low": [98.0, 103.0],
+                "Close": [101.0, 106.0],
             }
         )
-        result = apply_ohlc_transformation(frame, mode=8)
+        result = apply_ohlc_transformation(frame, mode=1, futures_price=200.0)
 
-        self.assertEqual(SYSDTAFPXY_FIXED_BRICK_SIZE, 2.5)
-        self.assertEqual(result["Close"].tolist(), [102.5, 105.0])
+        expected = pd.DataFrame(
+            {
+                "Open": [150.0, 152.5],
+                "High": [151.0, 153.5],
+                "Low": [149.0, 151.5],
+                "Close": [150.5, 153.0],
+            }
+        )
+        pd.testing.assert_frame_equal(result, expected)
+        self.assertIsNot(result, frame)
 
-    def test_heikin_ashi_mode_transforms_ohlc_sequentially(self):
+    def test_dtaf_without_futures_price_keeps_ohlc_values(self):
         frame = pd.DataFrame(
             {
-                "Open": [10.0, 12.0],
-                "High": [14.0, 16.0],
-                "Low": [8.0, 10.0],
-                "Close": [12.0, 14.0],
+                "Open": [100.0],
+                "High": [102.0],
+                "Low": [98.0],
+                "Close": [101.0],
             }
         )
+        pd.testing.assert_frame_equal(
+            apply_ohlc_transformation(frame, mode=1), frame
+        )
 
-        result = apply_ohlc_transformation(frame, mode=6)
-
-        self.assertEqual(result["Close"].tolist(), [11.0, 13.0])
-        self.assertEqual(result["Open"].tolist(), [10.0, 10.5])
-        self.assertEqual(result["High"].tolist(), [14.0, 16.0])
-        self.assertEqual(result["Low"].tolist(), [8.0, 10.0])
-
-    def test_renko_respects_per_call_brick_size(self):
+    def test_dtaf_rejects_modes_other_than_one(self):
         frame = pd.DataFrame(
             {
-                "Open": [100.0, 105.0],
-                "High": [100.0, 105.0],
-                "Low": [100.0, 105.0],
-                "Close": [100.0, 105.0],
+                "Open": [100.0],
+                "High": [102.0],
+                "Low": [98.0],
+                "Close": [101.0],
             }
         )
-        result = apply_ohlc_transformation(
-            frame, mode=8, fixed_brick_size=5.0
-        )
 
-        self.assertEqual(result["Close"].tolist(), [105.0])
+        with self.assertRaisesRegex(ValueError, "only supports mode 1"):
+            apply_ohlc_transformation(frame, mode=8)
 
     def test_data_timezone_uses_shared_setting(self):
         from sysdtafpxy import TIMEZONE

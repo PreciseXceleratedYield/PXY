@@ -18,7 +18,7 @@ class ConfigEditorTests(unittest.TestCase):
             "RUNNIFTYPXY_STRIKE_STEP = 2\n"
             "CLOCK = dt_time(9, 0)\n"
             "SYSENTRPXY_SIGNAL_MODE = 'MKT'\n"
-            "SYSDTAFPXY_SELECTED_MODE = '00'\n"
+            "SYSDTAFPXY_SELECTED_MODE = '1'\n"
             "RUNEXMTPXY_INITIAL_LOSS_FLOOR = -1000\n"
             "RUNEXACPXY_STOP_SQUAREOFF_ENABLED = False\n"
             "RUNEXACPXY_TARGET_SQUAREOFF_ENABLED = True\n"
@@ -135,9 +135,8 @@ class ConfigEditorTests(unittest.TestCase):
             "FLAG": False,
             "RUNNIFTYPXY_STRIKE_STEP": 4,
             "CLOCK": "10:15:30",
-            "SYSDTAFPXY_SELECTED_MODE": "8",
         })
-        self.assertEqual(result["updated"], ["CLOCK", "FLAG", "RUNNIFTYPXY_STRIKE_STEP", "SYSDTAFPXY_SELECTED_MODE"])
+        self.assertEqual(result["updated"], ["CLOCK", "FLAG", "RUNNIFTYPXY_STRIKE_STEP"])
         backup = self.config_path.with_name(result["backup"])
         self.assertEqual(backup.read_text(encoding="utf-8"), self.original)
         self.assertEqual(self.config_path.stat().st_mode & 0o777, 0o640)
@@ -145,17 +144,17 @@ class ConfigEditorTests(unittest.TestCase):
         self.assertIn("FLAG = False", source)
         self.assertIn("RUNNIFTYPXY_STRIKE_STEP = 4", source)
         self.assertIn("CLOCK = dt_time(10, 15, 30, 0)", source)
-        self.assertIn("SYSDTAFPXY_SELECTED_MODE = '8'", source)
+        self.assertIn("SYSDTAFPXY_SELECTED_MODE = '1'", source)
 
     def test_write_invalidates_compiled_config_cache(self):
         cache_path = Path(py_compile.compile(str(self.config_path), doraise=True))
         self.assertTrue(cache_path.exists())
 
-        config_editor._write({"SYSDTAFPXY_SELECTED_MODE": "01"})
+        config_editor._write({"SYSENTRPXY_SIGNAL_MODE": "STS"})
 
         self.assertFalse(cache_path.exists())
         self.assertIn(
-            "SYSDTAFPXY_SELECTED_MODE = '01'",
+            "SYSENTRPXY_SIGNAL_MODE = 'STS'",
             self.config_path.read_text(encoding="utf-8"),
         )
 
@@ -163,7 +162,7 @@ class ConfigEditorTests(unittest.TestCase):
         for updates in (
             {"FLAG": "false"},
             {"RUNNIFTYPXY_STRIKE_STEP": -1},
-            {"SYSDTAFPXY_SELECTED_MODE": "99"},
+            {"SYSDTAFPXY_SELECTED_MODE": "8"},
             {"UNKNOWN": 1},
         ):
             with self.subTest(updates=updates):

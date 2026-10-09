@@ -108,9 +108,11 @@ follow market direction. Afterwards entry follows Supertrend directly (`BULL`
 and `BEAR` for Supertrend BEAR; when Supertrend is SIDE, exit falls back to
 `sysmktpxy.get_signal()` (`BULL`/`BEAR`), otherwise `NONE`. Exit never returns
 `SIDE`; a `SIDE` entry is not a valid fresh-order command.
-`SYSDTAFPXY_SELECTED_MODE` independently selects the OHLC data transformation
-supplied to signal calculations. Mode `6` applies sequential Heikin-Ashi candles.
-The current configuration uses mode `0` and `SYSENTRPXY_SIGNAL_MODE = "MKT"`.
+`sysdtafpxy` supports mode 1 only. In the live Yahoo data path it averages each
+OHLC field of every candle with the latest NIFTY futures price from
+`exe/run/nftfut.json`; it cannot emit live signals when that price is unavailable.
+Historical replay without a futures quote keeps the supplied OHLC values. The
+current configuration uses `SYSENTRPXY_SIGNAL_MODE = "MKT"`.
 MKT entries are based on the current consecutive transformed-close direction
 depth: `PE` depth greater than `2` emits `BUY`, `CE` depth greater than `2`
 emits `SELL`, and depths of `2` or less emit `NONE`. These entries do not
@@ -224,9 +226,6 @@ spot-point strategy comparison, not historical option P&L.
 
 ## Other conditional settings
 
-- `SYSDTAFPXY_FIXED_BRICK_SIZE` is used only when `SYSDTAFPXY_SELECTED_MODE`
-  selects transform mode 8. Its default preserves the prior 2.5-point brick
-  size; setting it to a non-positive value is rejected.
 - `SYSKATRPXY_ATR_STATIC_VALUE` is used for `ATR_MODE=1`; the true-ATR period,
   cap, minimum-row requirement, and fallback apply to mode 2; the depth floor
   applies to dynamic mode 3.
@@ -280,8 +279,8 @@ spot-point strategy comparison, not historical option P&L.
   peak rule is now explicitly configured as `RUNEXMTPXY_PEAK_MULTIPLIER`.
 - Removed the redundant data-timezone setting (now derived from the shared
   timezone), an unused transform ATR argument, and the weekday OTM map whose
-  entries all had the same distance. The active Renko path now uses the
-  configured brick size instead of its hard-coded 2.5 value.
+  entries all had the same distance. DTAF now supports only mode 1; the former
+  Renko transformation and its brick-size setting are removed.
 - Averaging-order payload values, retry timing, ATR fallbacks/floors, signal
   force values, and point-replay session times are wired to the consuming
   modules. Dynamic non-aligned TGT reads its configured percentage rather than

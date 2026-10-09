@@ -8,7 +8,6 @@ import json
 import math
 import os
 from pathlib import Path
-import re
 import runpy
 import shutil
 import stat
@@ -20,8 +19,7 @@ import time
 CONFIG_PATH = Path(__file__).with_name("syscnfgpxy.py")
 ENUMS = {
     "SYSMODEPXY_RUN_MODE": ("PRD", "CHK", "SIM"),
-    "SYSDTAFPXY_SELECTED_MODE": tuple(str(mode) for mode in range(9))
-    + tuple(f"{side}{trend}" for side in range(9) for trend in range(9)),
+    "SYSDTAFPXY_SELECTED_MODE": ("1",),
     "EXEOTMPXY_STRIKE_MODE": ("ATM", "OTMFIX", "OTMDYN"),
     "SYSENTRPXY_SIGNAL_MODE": ("MKT", "STS"),
     "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE": ("YES", "NO"),
@@ -167,8 +165,8 @@ def _encode_value(name, value, current):
             raise ValueError(f"{name} must be text")
         if len(value) > 4096:
             raise ValueError(f"{name} is too long")
-        if name.endswith("_SELECTED_MODE") and not re.fullmatch(r"[0-8]{1,2}", value):
-            raise ValueError(f"{name} must contain one or two digits from 0 to 8")
+        if name == "SYSDTAFPXY_SELECTED_MODE" and value != "1":
+            raise ValueError(f"{name} only supports mode 1")
         return repr(value)
     if isinstance(current, datetime.time):
         if not isinstance(value, str):
