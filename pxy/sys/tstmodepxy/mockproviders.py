@@ -163,7 +163,7 @@ MOCK_SCENARIOS = (
 
 def process_lilo_orders(
     client=None, strict=False, timezone="Asia/Kolkata", scenario_index=None,
-    risk_direction=None,
+    risk_exit_signal=None,
 ):
     now = pd.Timestamp.now(tz=timezone).to_pydatetime()
     if scenario_index is None:

@@ -95,16 +95,27 @@ def load_meta():
             return {
                 "last_tick_epoch": float(d.get("last_tick_epoch", 0.0) or 0.0),
                 "ledger_basis": d.get("ledger_basis"),
+                "risk_cycle_started_at": d.get("risk_cycle_started_at"),
+                "risk_cycle_tags": d.get("risk_cycle_tags", []),
             }
     except Exception:
         pass
-    return {"last_tick_epoch": 0.0, "ledger_basis": None}
+    return {
+        "last_tick_epoch": 0.0,
+        "ledger_basis": None,
+        "risk_cycle_started_at": None,
+        "risk_cycle_tags": [],
+    }
 
 
 def save_meta(meta):
     return _atomic_write_json(META_FILE, {
         "last_tick_epoch": float(meta.get("last_tick_epoch", 0.0)),
         "ledger_basis": meta.get("ledger_basis"),
+        "risk_cycle_started_at": meta.get("risk_cycle_started_at"),
+        "risk_cycle_tags": sorted(
+            {str(tag) for tag in meta.get("risk_cycle_tags", [])}
+        ),
     })
 
 
@@ -160,5 +171,10 @@ def purge_stale_cache():
     # Writing today's timestamp here is what stops the purge from running again today.
     save_session_state(0.0, 0.0, INITIAL_LOSS_FLOOR, 0.0)
     save_check_state(0)
-    save_meta({"last_tick_epoch": 0.0, "ledger_basis": _current_filter_time()})
+    previous_meta = load_meta()
+    save_meta({
+        **previous_meta,
+        "last_tick_epoch": 0.0,
+        "ledger_basis": _current_filter_time() or previous_meta.get("ledger_basis"),
+    })
     print(f"🧹 {Fore.CYAN}Stale cache overridden. Baseline written for {today}.\n")

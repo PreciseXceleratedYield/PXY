@@ -179,33 +179,28 @@ is intentionally simple at the user's direction and is not suitable as a
 standalone internet-facing control. Put the service behind HTTPS and a trusted
 network boundary.
 
-## Conditional configuration: portfolio risk candle
+## Portfolio risk cycle
 
-Keep a feature's switch before dependent settings. When disabled, dependent
-settings should resolve to `None` rather than retain an active schedule.
-
-- Risk-bar behavior uses the PEAK model only. Its stop line is
-  `−₹2,000 + (session peak × 2)`, and its target threshold is reached when the
-  session peak reaches ₹2,000. There is no STATIC mode or CE/PE order-count
-  scaling.
-- `RUNEXACPXY_CNTRLRSKBAR` enables the risk candle (`"YES"` by default), and
-  `RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME` sets its activation time (13:15 IST).
-- At timed activation the ledger snapshots current portfolio P&L and resets
-  peak/breach tracking.
-- `RUNEXACPXY_STOP_SQUAREOFF_ENABLED` and
-  `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED` both default to `False`. The risk bar
-  continues calculating and reporting stop/target thresholds, but neither
-  threshold triggers a square-off action.
-- Target square-off is suppressed while the higher-invested open option side
-  matches the current valid direction (`CE`/`UP` or `PE`/`DOWN`), taken from
-  the market snapshot's `direction` key.
-  Investment is open quantity × current sell price; ties and unavailable
-  directions do not suppress the target. When suppressed, the ledger reports
-  that the direction is on our side and target square-off is skipped.
-- The CHK suite exercises PEAK risk behavior. The manual
-  `tstmodepxy/backtest.py` historical replay explicitly disables the portfolio
-  risk bar so it cannot flatten test positions during an LGT comparison.
-  Neither path sends live orders.
+- `RUNEXACPXY_CNTRLRSKBAR` enables the cycle risk target (`"YES"` by default).
+  The cycle begins with the first active fill after a flat book and tracks all
+  tagged active and closed rows until the entire book is flat; closing one leg
+  does not reset the cycle.
+- Cycle P&L combines realized and unrealized row P&L. The target is
+  `RUNEXACPXY_CYCLE_TARGET_PCT` (2.8% by default) of all option premium paid
+  across the cycle (`quantity × buy price` for each cycle row).
+- There is no risk-bar stop-loss. `RUNEXACPXY_STOP_SQUAREOFF_ENABLED` defaults
+  to `False`; `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED` defaults to `True`.
+- When cycle P&L reaches its target, the risk bar stays silent while the
+  higher-invested open option side agrees with the current `exit` signal
+  (CE/BULL or PE/BEAR); the normal ATR-based option targets continue to run.
+  If the target is met while the heavier side is not aligned, the risk bar
+  squares off all active positions after the configured three consecutive
+  checks. The investment comparison uses open quantity × current sell price;
+  a tie does not count as aligned.
+- CHK exercises the target calculations and simulated square-off path.
+  `tstmodepxy/backtest.py` enables the same risk cycle during historical replay.
+  SIM uses synthetic spot-linked option premiums and never sends live orders;
+  its performance score remains a spot-point proxy, not historical options P&L.
 
 ## Check
 
@@ -230,9 +225,9 @@ available), with the preceding session used for indicator warm-up. Use
 short diagnostic replay, or `--lgt-constant 8` to test a fixed `-8%` LGT
 threshold instead of the configured formula.
 
-The replay leaves entry, signal, target, averaging, counter-buy, and scheduled
-square-off pipes unchanged while disabling only the portfolio risk bar. The
-production premium-target gate is exercised with the simulator's spot-linked
+The replay leaves entry, signal, ATR target, averaging, counter-buy, and
+scheduled square-off pipes unchanged while exercising the portfolio risk
+cycle. The production premium-target gate is exercised with the simulator's spot-linked
 premium proxy, but results are scored exclusively as signed index spot movement
 times each filled lot's quantity: CE uses `(exit spot − entry spot) × quantity`,
 PE uses `(entry spot − exit spot) × quantity`. Each averaged lot is scored from
@@ -304,9 +299,8 @@ spot-point strategy comparison, not historical option P&L.
   bypassing it with a literal.
 - The regular exit and square-off order paths both use the centrally configured
   sell transaction type; square-off no longer embeds a separate `"S"` literal.
-- The portfolio risk target is `RUNEXMTPXY_TARGET_PER_ACTIVE_RUNG` (default
-  `1000`) multiplied by the number of active open ledger rows, with a minimum
-  effective count of one. The risk stop calculation is unchanged.
+- Legacy portfolio PEAK formulas remain available for their mathematical CHK
+  coverage; production cycle liquidation uses the cycle premium target above.
 - Older/alternate engines and account-specific utilities are not implicitly
   made active by centralizing production settings. Their local constants remain
   isolated until those entry paths are deliberately adopted or retired.

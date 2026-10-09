@@ -1,7 +1,6 @@
 import sys
 import tempfile
 import unittest
-from datetime import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -14,34 +13,151 @@ if str(SYS_DIR) not in sys.path:
 RUN_DIR = SYS_DIR / "exe" / "run"
 if str(RUN_DIR) not in sys.path:
     sys.path.insert(0, str(RUN_DIR))
+EXE_DIR = SYS_DIR / "exe"
+if str(EXE_DIR) not in sys.path:
+    sys.path.insert(0, str(EXE_DIR))
 
 from runexmtpxy import (
+    cycle_risk_metrics,
     compute_stop,
     compute_stop_conditions,
     compute_totals,
     large_invested_side_aligned,
-    midday_risk_activation_due,
     target_ceiling,
 )
 from syscnfgpxy import (
     RUNEXACPXY_CNTRLRSKBAR,
-    RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME,
     RUNEXACPXY_STOP_SQUAREOFF_ENABLED,
     RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
 )
 import runexstpxy
+import runexacpxy
 
 
-class MiddayRiskControlTests(unittest.TestCase):
-    def test_peak_risk_control_activates_at_1315(self):
+class CycleRiskControlTests(unittest.TestCase):
+    def test_cycle_target_uses_realized_and_unrealized_pnl_and_all_cycle_premium(self):
+        open_df = pd.DataFrame([
+            {
+                "TAG": "CYCLE-PE",
+                "SYMBOL": "NIFTY-PE",
+                "QTY": 75,
+                "BUY_PRC": 100,
+                "SELL_PRC": 140,
+                "PNL": 3000,
+            }
+        ])
+        closed_df = pd.DataFrame([
+            {
+                "TAG": "CYCLE-CE",
+                "SYMBOL": "NIFTY-CE",
+                "QTY": 75,
+                "BUY_PRC": 100,
+                "SELL_PRC": 110,
+                "PNL": 750,
+            }
+        ])
+
+        metrics = cycle_risk_metrics(
+            open_df, closed_df, {"CYCLE-CE", "CYCLE-PE"}, "BULL", 2.8
+        )
+
+        self.assertEqual(metrics["cycle_pnl"], 3750)
+        self.assertEqual(metrics["premium_paid"], 15000)
+        self.assertEqual(metrics["target"], 420)
+        self.assertEqual(metrics["heavy_side"], "PE")
+        self.assertTrue(metrics["target_reached"])
+
+    def test_cycle_target_is_suppressed_when_heavy_side_aligns_and_has_no_loss_stop(self):
+        open_df = pd.DataFrame([
+            {
+                "TAG": "CYCLE-CE",
+                "SYMBOL": "NIFTY-CE",
+                "QTY": 75,
+                "BUY_PRC": 100,
+                "SELL_PRC": 140,
+                "PNL": 3000,
+            }
+        ])
+        aligned = cycle_risk_metrics(
+            open_df, pd.DataFrame(), {"CYCLE-CE"}, "BULL", 2.8
+        )
+        losing = open_df.assign(SELL_PRC=60, PNL=-3000)
+        unaligned_loss = cycle_risk_metrics(
+            losing, pd.DataFrame(), {"CYCLE-CE"}, "BEAR", 2.8
+        )
+
+        self.assertTrue(aligned["heavy_side_aligned"])
+        self.assertFalse(aligned["target_reached"])
+        self.assertEqual(unaligned_loss["cycle_pnl"], -3000)
+        self.assertFalse(unaligned_loss["target_reached"])
+
+    def test_production_ledger_liquidates_a_profitable_unaligned_cycle(self):
+        buy_time = pd.Timestamp("2025-01-06 10:00:00", tz="Asia/Kolkata")
+        open_df = pd.DataFrame([{
+            "Symbol": "NIFTY-PE",
+            "Qty": 75,
+            "Tag": "CYCLE-PE",
+            "Buy_Time": buy_time,
+            "Buy_Prc": 100,
+            "Sell_Prc": 140,
+            "PNL": 3000,
+        }])
+        closed_df = pd.DataFrame([{
+            "Symbol": "NIFTY-CE",
+            "Qty": 75,
+            "Tag": "CYCLE-CE",
+            "Buy_Time": buy_time,
+            "Buy_Prc": 100,
+            "Sell_Prc": 110,
+            "PNL": 750,
+        }])
+        with (
+            patch.object(runexacpxy, "load_session_state", return_value={}),
+            patch.object(runexacpxy, "state_is_stale", return_value=False),
+            patch.object(
+                runexacpxy,
+                "load_check_state",
+                return_value={"consecutive_breaches": 0},
+            ),
+            patch.object(
+                runexacpxy,
+                "load_meta",
+                return_value={
+                    "last_tick_epoch": 0.0,
+                    "ledger_basis": None,
+                    "risk_cycle_started_at": buy_time.isoformat(sep=" "),
+                    "risk_cycle_tags": ["CYCLE-CE"],
+                },
+            ),
+            patch.object(runexacpxy, "save_meta") as save_meta,
+            patch.object(runexacpxy, "save_check_state"),
+            patch.object(runexacpxy, "save_session_state"),
+            patch.object(runexacpxy, "_current_filter_time", return_value=None),
+            patch.object(runexacpxy, "TICK_MIN_GAP_SECONDS", 0),
+            patch.object(runexacpxy, "BREACH_TICKS_REQUIRED", 1),
+            patch.object(runexacpxy, "liquidate_and_exit") as liquidate,
+            patch.object(runexacpxy, "time") as risk_clock,
+        ):
+            risk_clock.time.return_value = 1_000_000
+            runexacpxy._tick(object(), open_df, closed_df, "BULL")
+
+        saved_meta = save_meta.call_args.args[0]
+        self.assertEqual(
+            set(saved_meta["risk_cycle_tags"]),
+            {"CYCLE-CE", "CYCLE-PE"},
+        )
+        liquidate.assert_called_once()
+        self.assertEqual(liquidate.call_args.args[1], 3750)
+        self.assertTrue(liquidate.call_args.kwargs["risk_control_activated"])
+
+    def test_cycle_risk_control_is_enabled(self):
         self.assertEqual(RUNEXACPXY_CNTRLRSKBAR, "YES")
-        self.assertEqual(RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME, time(13, 15))
 
-    def test_risk_thresholds_remain_monitored_but_squareoff_actions_are_disabled(self):
+    def test_only_profit_target_squareoff_is_enabled(self):
         self.assertFalse(RUNEXACPXY_STOP_SQUAREOFF_ENABLED)
-        self.assertFalse(RUNEXACPXY_TARGET_SQUAREOFF_ENABLED)
+        self.assertTrue(RUNEXACPXY_TARGET_SQUAREOFF_ENABLED)
         self.assertFalse(compute_stop(-2000, 0)[2])
-        self.assertFalse(compute_stop(2000, 0)[2])
+        self.assertTrue(compute_stop(2000, 0)[2])
         self.assertTrue(compute_stop_conditions(-2000, 0)[2])
         self.assertTrue(compute_stop_conditions(2000, 0)[3])
 
@@ -69,7 +185,7 @@ class MiddayRiskControlTests(unittest.TestCase):
 
         self.assertEqual(compute_stop(-1799, 100), (100.0, -1800.0, False))
         self.assertEqual(compute_stop(-1800, 100), (100.0, -1800.0, False))
-        self.assertEqual(compute_stop(PEAK_CEILING, 0), (PEAK_CEILING, 2000.0, False))
+        self.assertEqual(compute_stop(PEAK_CEILING, 0), (PEAK_CEILING, 2000.0, True))
         self.assertTrue(compute_stop_conditions(PEAK_CEILING, 0)[3])
 
         with (
@@ -112,30 +228,7 @@ class MiddayRiskControlTests(unittest.TestCase):
         self.assertFalse(large_invested_side_aligned(balanced, "UP"))
         self.assertFalse(large_invested_side_aligned(ce_heavy, "NONE"))
 
-    def test_yes_activates_at_or_after_1315_ist(self):
-        activation_time = time(13, 15)
-        self.assertFalse(
-            midday_risk_activation_due(True, False, time(13, 14, 59), activation_time)
-        )
-        self.assertTrue(
-            midday_risk_activation_due(True, False, time(13, 15), activation_time)
-        )
-        self.assertTrue(
-            midday_risk_activation_due(True, False, time(13, 16), activation_time)
-        )
-
-    def test_no_and_already_activated_do_not_take_a_new_baseline(self):
-        self.assertFalse(
-            midday_risk_activation_due(False, False, time(14, 0), None)
-        )
-        self.assertFalse(
-            midday_risk_activation_due(True, False, time(14, 0), None)
-        )
-        self.assertFalse(
-            midday_risk_activation_due(True, True, time(14, 0), time(13, 15))
-        )
-
-    def test_activation_state_persists_across_ledger_restarts(self):
+    def test_risk_state_persists_across_ledger_restarts(self):
         with tempfile.TemporaryDirectory(prefix="pxy-risk-state-test-") as temp:
             state_path = Path(temp) / "risk.json"
             with patch.object(runexstpxy, "RENKO_STATE_FILE", str(state_path)):

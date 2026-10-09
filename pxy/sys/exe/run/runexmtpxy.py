@@ -18,6 +18,7 @@ from syscnfgpxy import (
     RUNEXMTPXY_INITIAL_LOSS_FLOOR,
     RUNEXMTPXY_PEAK_MULTIPLIER,
     RUNEXMTPXY_TARGET_PER_ACTIVE_RUNG,
+    RUNEXACPXY_CYCLE_TARGET_PCT,
     RUNEXACPXY_STOP_SQUAREOFF_ENABLED,
     RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
 )
@@ -33,14 +34,7 @@ TARGET_SQUAREOFF_ENABLED = RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
 # =======================================================================
 
 
-def midday_risk_activation_due(control_enabled, activated, current_time, activation_time):
-    """Check whether enabled risk control reached its configured activation time."""
-    return bool(
-        control_enabled
-        and not activated
-        and activation_time is not None
-        and current_time >= activation_time
-    )
+
 
 
 def _prep_frame(df):
@@ -102,6 +96,111 @@ def large_invested_side_aligned(open_df, direction):
     ) or (
         pe_investment > ce_investment and signal == "DOWN"
     )
+
+
+def cycle_ledger_tags(frame, start_time=None):
+    """Return order tags represented by rows at or after a cycle start."""
+    df = pd.DataFrame() if frame is None else frame.copy()
+    df.columns = [str(column).upper() for column in df.columns]
+    if "TAG" not in df.columns:
+        return set()
+    if start_time is not None and "BUY_TIME" in df.columns:
+        timestamps = pd.to_datetime(df["BUY_TIME"], errors="coerce")
+        start = pd.Timestamp(start_time)
+        df = df.loc[timestamps >= start]
+    return {
+        str(tag).strip()
+        for tag in df["TAG"]
+        if str(tag).strip().lower() not in {"", "nan", "none", "null"}
+    }
+
+
+def cycle_start_time(open_df):
+    """Return the earliest active lot entry timestamp for a new cycle."""
+    df = pd.DataFrame() if open_df is None else open_df.copy()
+    df.columns = [str(column).upper() for column in df.columns]
+    if "BUY_TIME" not in df.columns or df.empty:
+        return None
+    timestamps = pd.to_datetime(df["BUY_TIME"], errors="coerce").dropna()
+    if timestamps.empty:
+        return None
+    return min(timestamps).isoformat(sep=" ")
+
+
+def cycle_risk_metrics(
+    open_df,
+    closed_df,
+    cycle_tags,
+    exit_signal,
+    target_pct=RUNEXACPXY_CYCLE_TARGET_PCT,
+):
+    """Measure realized plus unrealized cycle P&L against its premium target."""
+    open_positions = pd.DataFrame() if open_df is None else open_df.copy()
+    open_positions.columns = [str(column).upper() for column in open_positions.columns]
+    closed_positions = pd.DataFrame() if closed_df is None else closed_df.copy()
+    closed_positions.columns = [str(column).upper() for column in closed_positions.columns]
+    tags = {str(tag).strip() for tag in cycle_tags}
+
+    cycle_rows = []
+    for frame in (open_positions, closed_positions):
+        if frame.empty or "TAG" not in frame.columns:
+            continue
+        cycle_rows.append(frame[frame["TAG"].astype(str).str.strip().isin(tags)])
+    rows = pd.concat(cycle_rows, ignore_index=True) if cycle_rows else pd.DataFrame()
+    if rows.empty:
+        cycle_pnl = 0.0
+        premium_paid = 0.0
+    else:
+        quantities = pd.to_numeric(
+            rows["QTY"] if "QTY" in rows else pd.Series(0, index=rows.index),
+            errors="coerce",
+        ).fillna(0).abs()
+        buy_prices = pd.to_numeric(
+            rows["BUY_PRC"] if "BUY_PRC" in rows else pd.Series(0, index=rows.index),
+            errors="coerce",
+        ).fillna(0)
+        pnl = pd.to_numeric(
+            rows["PNL"] if "PNL" in rows else pd.Series(0, index=rows.index),
+            errors="coerce",
+        ).fillna(0)
+        cycle_pnl = float(pnl.sum())
+        premium_paid = float((quantities * buy_prices).sum())
+
+    ce_qty = pe_qty = ce_investment = pe_investment = 0.0
+    if not open_positions.empty and {"SYMBOL", "QTY", "SELL_PRC"}.issubset(open_positions.columns):
+        symbols = open_positions["SYMBOL"].astype(str).str.upper().str.strip()
+        quantities = pd.to_numeric(open_positions["QTY"], errors="coerce").fillna(0).clip(lower=0)
+        prices = pd.to_numeric(open_positions["SELL_PRC"], errors="coerce").fillna(0).clip(lower=0)
+        ce_mask = symbols.str.endswith("CE")
+        pe_mask = symbols.str.endswith("PE")
+        ce_qty = float(quantities[ce_mask].sum())
+        pe_qty = float(quantities[pe_mask].sum())
+        ce_investment = float((quantities[ce_mask] * prices[ce_mask]).sum())
+        pe_investment = float((quantities[pe_mask] * prices[pe_mask]).sum())
+
+    heavy_side = None
+    if ce_investment != pe_investment:
+        heavy_side = "CE" if ce_investment > pe_investment else "PE"
+    signal = str(exit_signal).upper().strip()
+    heavy_side_aligned = (
+        (heavy_side == "CE" and signal == "BULL")
+        or (heavy_side == "PE" and signal == "BEAR")
+    )
+    target = premium_paid * float(target_pct) / 100.0
+    target_reached = bool(premium_paid > 0 and cycle_pnl >= target and not heavy_side_aligned)
+    return {
+        "cycle_pnl": cycle_pnl,
+        "premium_paid": premium_paid,
+        "target": target,
+        "ce_qty": ce_qty,
+        "pe_qty": pe_qty,
+        "ce_investment": ce_investment,
+        "pe_investment": pe_investment,
+        "heavy_side": heavy_side,
+        "heavy_side_aligned": heavy_side_aligned,
+        "both_sides_open": ce_qty > 0 and pe_qty > 0,
+        "target_reached": target_reached,
+    }
 
 
 def force_zero_ending(val):
