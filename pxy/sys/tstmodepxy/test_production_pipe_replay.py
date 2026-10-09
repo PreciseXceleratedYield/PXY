@@ -586,6 +586,8 @@ class ProductionPipeReplayTests(unittest.TestCase):
                         else patch.object(broker, "positions", wraps=broker.positions)
                     )
                     with positions_patch, patch.object(
+                            engine.exit_pipe, "PASTRSK", "YES"
+                        ), patch.object(
                             engine.exit_pipe,
                             "get_combined_data",
                             return_value={

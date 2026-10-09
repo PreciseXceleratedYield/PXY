@@ -691,7 +691,7 @@ class ConfigurationWiringTests(unittest.TestCase):
 
         from syscnfgpxy import PASTRSK
 
-        self.assertEqual(PASTRSK, "YES")
+        self.assertEqual(PASTRSK, "NO")
         self.assertEqual(__import__("pxyconfigwebpxy").ENUMS["PASTRSK"], ("YES", "NO"))
 
     def test_depth_squareoff_uses_side_command_and_only_returns_unlocked_side_lots(self):
@@ -810,7 +810,7 @@ class ConfigurationWiringTests(unittest.TestCase):
 
         self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "MKT")
         self.assertEqual(SYSDTAFPXY_SELECTED_MODE, "6")
-        self.assertEqual(SYSDTHAPXY_INCLUDE_RUNNING_CANDLE, "NO")
+        self.assertEqual(SYSDTHAPXY_INCLUDE_RUNNING_CANDLE, "YES")
         self.assertEqual(
             __import__("pxyconfigwebpxy").ENUMS["SYSDTHAPXY_INCLUDE_RUNNING_CANDLE"],
             ("YES", "NO"),

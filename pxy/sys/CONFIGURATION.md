@@ -126,14 +126,14 @@ bullish or bearish depth. Current streak depth
 continues past `SYSDPTPXY_LAST_N`; that setting only limits the previous-streak
 lookback used for the past-depth label. `SYSDTHAPXY_INCLUDE_RUNNING_CANDLE`
 controls whether the last returned candle is included (`YES`) or excluded
-(`NO`, the default), so MKT signals and DPT depths both use closed candles and
-the dashboard's candle-color depth stream excludes the latest returned candle
-as well. All three share the same candle window. In MKT mode,
+(`NO`). It defaults to `YES`, so MKT signals, DPT depths, and the dashboard's
+candle-color depth stream all include the latest running candle and share the
+same candle window. In MKT mode,
 `sysentrpxy` forwards `sysmktpxy`'s entry/exit pair unchanged: reversal entries
 are `BUY`/`SELL`, with their matching exit labels `BULL`/`BEAR`; continuation
 signals are exit-only.
 `PASTRSK` enables (`YES`) or disables (`NO`) the depth-triggered reversal
-square-off; it defaults to `YES`. When enabled, outside the scheduled square-off
+square-off; it defaults to `NO`. When enabled, outside the scheduled square-off
 window, a MKT `BUY` with past depth `PE7` or greater independently triggers a
 verified PE-side close; a MKT `SELL` with `CE7` or greater triggers a verified
 CE-side close. `EXEEXITPXY_DEPTH_EXIT_THRESHOLD` defaults to `6`, and the
