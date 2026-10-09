@@ -3,6 +3,22 @@ import pandas as pd
 import numpy as np
 from sysdtafpxy import fetch_yf_data
 
+
+def get_close_direction_series(closes):
+    """Return each close's direction relative to the preceding close."""
+    close_series = pd.to_numeric(pd.Series(closes), errors="coerce")
+    changes = close_series.diff()
+    return pd.Series(
+        np.select(
+            [changes > 0, changes < 0, changes == 0],
+            ["UP", "DOWN", "FLAT"],
+            default="UNKNOWN",
+        ),
+        index=close_series.index,
+        name="pxy_direction",
+    )
+
+
 def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
     """
     Processes raw market OHLC candles.
@@ -39,6 +55,7 @@ def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
     custom_df['High'] = df['High'].values
     custom_df['Low'] = df['Low'].values
     custom_df['Close'] = df['Close'].values
+    custom_df["pxy_direction"] = get_close_direction_series(custom_df["Close"])
 
     # ==================================================
     # 🎨 COLOR PROCESSING (RUNNING CLOSE VS PREVIOUS CLOSE)
@@ -62,4 +79,3 @@ def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
     pxy_color_series = final_df['pxy_color'].copy()
     
     return pxy_close, pxy_open, pxy_color_series, final_df
-

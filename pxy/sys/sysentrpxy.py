@@ -23,8 +23,8 @@ from execoolpxy import cooldown_remaining
 def get_entry_signal(df=None, current_time=None):
     """Return entry and exit signals from the configured MKT or STS policy.
 
-    MKT follows raw market direction all session. STS preserves the morning
-    direction-only window and the existing Supertrend-led policy afterwards.
+    MKT uses the three-close reversal pattern all session. STS preserves the
+    morning direction-only window and Supertrend-led policy afterwards.
     """
     if cooldown_remaining() > 0:
         print("⏳ POST-SQUARE-OFF COOLDOWN: entry and exit signals forced to NONE.")
@@ -38,13 +38,7 @@ def get_entry_signal(df=None, current_time=None):
         return "NONE", "NONE"
 
     if SYSENTRPXY_SIGNAL_MODE == "MKT":
-        _, market_direction = detect_raw_direction(df)
-        market_direction = str(market_direction).upper().strip()
-        if market_direction == "UP":
-            return "BUY", "BULL"
-        if market_direction == "DOWN":
-            return "SELL", "BEAR"
-        return "NONE", "NONE"
+        return get_market_signal(df)
 
     if current_time is None:
         current_time = datetime.now(SYSCNFGPXY_TIMEZONE).time()

@@ -97,8 +97,7 @@ restarted.
 ## Option strike selection
 
 `SYSENTRPXY_SIGNAL_MODE` selects the entry and exit signal source. `MKT` uses
-raw market direction all session (`UP` → `BUY`/`BULL`, `DOWN` →
-`SELL`/`BEAR`); neutral direction returns `NONE` for both.
+`sysmktpxy`'s three-close reversal pattern all session.
 `STS`
 preserves the current Supertrend policy: from `SYSENTRPXY_DIRECTION_ONLY_START`
 (09:00 IST) until `SYSENTRPXY_DIRECTION_ONLY_END` (09:30 IST), both signals
@@ -108,9 +107,21 @@ and `BEAR` for Supertrend BEAR; when Supertrend is SIDE, exit falls back to
 `sysmktpxy.get_signal()` (`BULL`/`BEAR`), otherwise `NONE`. Exit never returns
 `SIDE`; a `SIDE` entry is not a valid fresh-order command.
 `SYSDTAFPXY_SELECTED_MODE` independently selects the OHLC data transformation
-supplied to signal calculations. The current configuration uses mode `2`
-(OC/2) and `SYSENTRPXY_SIGNAL_MODE = "MKT"`, so entry and exit use mirrored
-raw market direction signals throughout the session.
+supplied to signal calculations. Mode `6` applies sequential Heikin-Ashi candles.
+The current configuration uses mode `6` and `SYSENTRPXY_SIGNAL_MODE = "MKT"`.
+MKT examines the last three transformed closes. A strict V
+(`C[-3] > C[-2] < C[-1]`) emits `BUY`/`BULL`; an inverted V
+(`C[-3] < C[-2] > C[-1]`) emits `SELL`/`BEAR`. Three strictly rising closes
+emit exit-only `BULL` (`NONE`/`BULL`), and three strictly falling closes emit
+exit-only `BEAR` (`NONE`/`BEAR`). All other patterns, including equal adjacent
+closes, emit `NONE` for both signals. `sysdthapxy` supplies the shared
+close-to-close direction series (`UP`, `DOWN`, or `FLAT`); `sysmktpxy` maps the
+last two directions to these signals while retaining its existing display and
+other helpers. Depth counts the full current color streak, so it does not reset
+when that streak reaches `SYSDPTPXY_LAST_N`.
+`SYSMKTPXY_INCLUDE_RUNNING_CANDLE` controls whether the last returned candle is
+treated as forming and included (`YES`, default), or excluded while the three
+preceding candles are checked (`NO`).
 
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
 builder for every buying script. It currently defaults to `ATM`, which ignores

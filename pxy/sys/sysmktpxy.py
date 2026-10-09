@@ -1,13 +1,16 @@
 # sysmktpxy.py
 import pandas as pd
 import numpy as np
-from syscnfgpxy import SYSMKTPXY_DEBUG_ENABLED
+from syscnfgpxy import (
+    SYSMKTPXY_DEBUG_ENABLED,
+    SYSMKTPXY_INCLUDE_RUNNING_CANDLE,
+)
+from sysdthapxy import get_close_direction_series
 from sysdtafpxy import fetch_yf_data
 
 def get_pxy_data(df):
     """
-    Processes normal market OHLC candle values.
-    Returns the current running close and the previous candle's static close.
+    Return the previous and current closes from the supplied candle frame.
     """
     df = df.copy()
     raw_close = df['Close'].values
@@ -59,29 +62,48 @@ def _print_console_bar(c1, c0, execution_state):
 
 def get_signal(df=None):
     """
-    Evaluates the current live running candle's internal direction.
-    Returns: (entry_signal, exit_signal)
+    Classify three-close reversals and directional continuations.
+
+    V reversals return BUY/BULL or SELL/BEAR. Three strictly rising or falling
+    closes return exit-only BULL/BEAR.
     """
     if df is None:
         df = fetch_yf_data()
         
-    if df is None or df.empty:
+    if df is None or "Close" not in df.columns:
+        return "NONE", "NONE"
+
+    include_running = SYSMKTPXY_INCLUDE_RUNNING_CANDLE == "YES"
+    required_rows = 3 if include_running else 4
+    if len(df) < required_rows:
         return "NONE", "NONE"
 
     try:
-        c1, c0 = get_pxy_data(df)
+        signal_closes = df["Close"].iloc[-3:] if include_running else df["Close"].iloc[-4:-1]
+        c2, c1, c0 = (float(value) for value in signal_closes)
+        directions = get_close_direction_series(signal_closes).iloc[1:].tolist()
+        first_move, second_move = directions
 
-        if c0 > c1:
+        if first_move == "DOWN" and second_move == "UP":
+            signals = ("BUY", "BULL")
             execution_state = "BULL"
-        elif c0 < c1:
+        elif first_move == "UP" and second_move == "DOWN":
+            signals = ("SELL", "BEAR")
+            execution_state = "BEAR"
+        elif first_move == "UP" and second_move == "UP":
+            signals = ("NONE", "BULL")
+            execution_state = "BULL"
+        elif first_move == "DOWN" and second_move == "DOWN":
+            signals = ("NONE", "BEAR")
             execution_state = "BEAR"
         else:
+            signals = ("NONE", "NONE")
             execution_state = "NONE"
 
         if SYSMKTPXY_DEBUG_ENABLED:
             _print_console_bar(c1, c0, execution_state)
             
-        return execution_state, execution_state
+        return signals
 
     except Exception as e:
         if SYSMKTPXY_DEBUG_ENABLED:

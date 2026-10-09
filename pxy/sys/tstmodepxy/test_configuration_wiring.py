@@ -30,6 +30,9 @@ import exeavxpxy
 import exeentrpxy
 import sysdashpxy
 import sysentrpxy
+import sysmktpxy
+import sysdptpxy
+import sysdthapxy
 import syspxy
 import sysstrndpxy
 import runniftypxy
@@ -401,27 +404,132 @@ class ConfigurationWiringTests(unittest.TestCase):
                 )
                 supertrend.assert_not_called()
 
-    def test_mkt_mode_uses_market_direction_for_both_signals_all_session(self):
+    def test_mkt_mode_routes_through_market_signal_all_session(self):
         frame = pd.DataFrame({"Close": [1]})
         with (
             patch.object(sysentrpxy, "SYSENTRPXY_SIGNAL_MODE", "MKT"),
             patch.object(
-                sysentrpxy, "detect_raw_direction", return_value=(123, "DOWN")
-            ) as direction,
+                sysentrpxy, "get_market_signal", return_value=("SELL", "BEAR")
+            ) as market,
             patch.object(sysentrpxy, "calculate_supertrend") as supertrend,
         ):
             self.assertEqual(
                 sysentrpxy.get_entry_signal(frame, current_time=time(12, 0)),
                 ("SELL", "BEAR"),
             )
-        direction.assert_called_once_with(frame)
+        market.assert_called_once_with(frame)
         supertrend.assert_not_called()
 
+    def test_market_signal_uses_three_close_v_shapes(self):
+        with patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False):
+            self.assertEqual(
+                sysmktpxy.get_signal(pd.DataFrame({"Close": [10.0, 8.0, 9.0]})),
+                ("BUY", "BULL"),
+            )
+            self.assertEqual(
+                sysmktpxy.get_signal(pd.DataFrame({"Close": [8.0, 10.0, 9.0]})),
+                ("SELL", "BEAR"),
+            )
+            self.assertEqual(
+                sysmktpxy.get_signal(pd.DataFrame({"Close": [8.0, 9.0, 10.0]})),
+                ("NONE", "BULL"),
+            )
+            self.assertEqual(
+                sysmktpxy.get_signal(pd.DataFrame({"Close": [10.0, 9.0, 8.0]})),
+                ("NONE", "BEAR"),
+            )
+            for closes in ([8.0, 9.0, 9.0], [9.0, 9.0, 10.0], [9.0, 9.0, 9.0]):
+                with self.subTest(closes=closes):
+                    self.assertEqual(
+                        sysmktpxy.get_signal(pd.DataFrame({"Close": closes})),
+                        ("NONE", "NONE"),
+                    )
+
+    def test_market_signal_requires_three_closes(self):
+        with patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False):
+            self.assertEqual(
+                sysmktpxy.get_signal(pd.DataFrame({"Close": [10.0, 8.0]})),
+                ("NONE", "NONE"),
+            )
+
+    def test_market_signal_can_exclude_running_candle(self):
+        frame = pd.DataFrame({"Close": [10.0, 8.0, 9.0, 7.0]})
+        with (
+            patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False),
+            patch.object(sysmktpxy, "SYSMKTPXY_INCLUDE_RUNNING_CANDLE", "YES"),
+        ):
+            self.assertEqual(sysmktpxy.get_signal(frame), ("SELL", "BEAR"))
+        with (
+            patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False),
+            patch.object(sysmktpxy, "SYSMKTPXY_INCLUDE_RUNNING_CANDLE", "NO"),
+        ):
+            self.assertEqual(sysmktpxy.get_signal(frame), ("BUY", "BULL"))
+            self.assertEqual(
+                sysmktpxy.get_signal(frame.iloc[:3]),
+                ("NONE", "NONE"),
+            )
+
+    def test_market_signal_consumes_dtha_close_direction(self):
+        frame = pd.DataFrame({"Close": [10.0, 8.0, 9.0]})
+        with (
+            patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False),
+            patch.object(
+                sysmktpxy,
+                "get_close_direction_series",
+                wraps=sysdthapxy.get_close_direction_series,
+            ) as directions,
+        ):
+            self.assertEqual(sysmktpxy.get_signal(frame), ("BUY", "BULL"))
+        directions.assert_called_once()
+
+    def test_dtha_exposes_direction_without_changing_candle_colors(self):
+        frame = pd.DataFrame(
+            {
+                "Open": [9.0, 9.0, 9.0, 9.0],
+                "High": [11.0, 11.0, 11.0, 11.0],
+                "Low": [8.0, 8.0, 8.0, 8.0],
+                "Close": [10.0, 9.0, 9.0, 10.0],
+            }
+        )
+        _, _, colors, output = sysdthapxy.get_pxy_data(df=frame)
+        self.assertEqual(
+            sysdthapxy.get_close_direction_series(frame["Close"]).tolist(),
+            ["UNKNOWN", "DOWN", "FLAT", "UP"],
+        )
+        self.assertEqual(colors.tolist(), ["green", "red", "green", "green"])
+        self.assertEqual(
+            output["pxy_direction"].tolist(),
+            ["UNKNOWN", "DOWN", "FLAT", "UP"],
+        )
+
+    def test_depth_keeps_growing_after_configured_lookback(self):
+        closes = [float(value) for value in range(100, 126)]
+        frame = pd.DataFrame(
+            {
+                "Open": [value - 1 for value in closes],
+                "High": [value + 1 for value in closes],
+                "Low": [value - 2 for value in closes],
+                "Close": closes,
+            }
+        )
+        _, _, ce_depth, pe_depth = sysdptpxy.detect_pxy_flip_signal(df=frame)
+        self.assertEqual(ce_depth, len(closes))
+        self.assertEqual(pe_depth, 1)
+
     def test_entry_router_has_selectable_mkt_sts_mode(self):
-        from syscnfgpxy import SYSENTRPXY_SIGNAL_MODE, SYSDTAFPXY_SELECTED_MODE
+        from syscnfgpxy import (
+            SYSENTRPXY_SIGNAL_MODE,
+            SYSDTAFPXY_SELECTED_MODE,
+            SYSMKTPXY_INCLUDE_RUNNING_CANDLE,
+        )
 
         self.assertEqual(SYSENTRPXY_SIGNAL_MODE, "MKT")
-        self.assertEqual(SYSDTAFPXY_SELECTED_MODE, "2")
+        self.assertEqual(SYSDTAFPXY_SELECTED_MODE, "6")
+        self.assertEqual(SYSMKTPXY_INCLUDE_RUNNING_CANDLE, "YES")
+        self.assertEqual(
+            __import__("pxyconfigwebpxy").ENUMS["SYSMKTPXY_INCLUDE_RUNNING_CANDLE"],
+            ("YES", "NO"),
+        )
         self.assertEqual(sysentrpxy.get_entry_signal.__defaults__, (None, None))
         self.assertIn("SYSENTRPXY_SIGNAL_MODE", __import__("pxyconfigwebpxy").ENUMS)
         self.assertFalse(entry_signal_valid("SIDE"))
@@ -599,6 +707,23 @@ class ConfigurationWiringTests(unittest.TestCase):
 
         self.assertEqual(SYSDTAFPXY_FIXED_BRICK_SIZE, 2.5)
         self.assertEqual(result["Close"].tolist(), [102.5, 105.0])
+
+    def test_heikin_ashi_mode_transforms_ohlc_sequentially(self):
+        frame = pd.DataFrame(
+            {
+                "Open": [10.0, 12.0],
+                "High": [14.0, 16.0],
+                "Low": [8.0, 10.0],
+                "Close": [12.0, 14.0],
+            }
+        )
+
+        result = apply_ohlc_transformation(frame, mode=6)
+
+        self.assertEqual(result["Close"].tolist(), [11.0, 13.0])
+        self.assertEqual(result["Open"].tolist(), [10.0, 10.5])
+        self.assertEqual(result["High"].tolist(), [14.0, 16.0])
+        self.assertEqual(result["Low"].tolist(), [8.0, 10.0])
 
     def test_renko_respects_per_call_brick_size(self):
         frame = pd.DataFrame(

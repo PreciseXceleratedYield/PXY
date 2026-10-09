@@ -31,19 +31,16 @@ def detect_pxy_flip_signal(df=None, last_n=SYSDPTPXY_LAST_N):
     # ==================================================
     # ⚡ PRODUCTION DEPTH ANALYSIS STREAKS
     # ==================================================
-    colors_n = colors[-last_n:]
-    current_color = colors_n[-1]
+    current_color = colors[-1]
     
     # Current Streak Depth Tracking
     current_depth = 0
-    for c in reversed(colors_n):
+    for c in reversed(colors):
         if c == current_color:
             current_depth += 1
         else:
             break
     current_depth = max(current_depth, 1)
-    if current_depth == last_n:
-        return "NA", 1, 1, 1
 
     # Historical Prior Streak Depth Tracking
     current_streak_start = len(colors) - current_depth
@@ -51,7 +48,8 @@ def detect_pxy_flip_signal(df=None, last_n=SYSDPTPXY_LAST_N):
     
     past_depth_val = 0
     if current_streak_start > 0:
-        for i in reversed(range(current_streak_start)):
+        prior_scan_start = max(0, current_streak_start - last_n)
+        for i in reversed(range(prior_scan_start, current_streak_start)):
             if colors[i] == prev_color:
                 past_depth_val += 1
             else:
