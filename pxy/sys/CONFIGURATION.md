@@ -105,9 +105,11 @@ values until deliberately restarted.
 
 `sysentrpxy` always uses Supertrend: BULL maps to entry BUY and exit BULL;
 BEAR maps to entry SELL and exit BEAR. For BULL, BUY requires MKT BEAR and
-price from `st_line` through `st_line + 1.5 × st_atr`; for BEAR, SELL requires
-MKT BULL and price from `st_line - 1.5 × st_atr` through `st_line`. These are
-the nearest 25% zones of the theoretical ±6 ATR ranges around the active
+price from `st_line` through `st_line + (SYSSTRNDPXY_ST1_FACTOR / 2) × st_atr`;
+for BEAR, SELL requires MKT BULL and price from
+`st_line - (SYSSTRNDPXY_ST1_FACTOR / 2) × st_atr` through `st_line`. With the
+default factor 3, this is 1.5 ATR in either direction. These are the nearest
+25% zones of the theoretical ±(2 × factor) ATR ranges around the active
 Supertrend line; otherwise entry is NONE. When Supertrend is SIDE, entry is
 BUY when the close is in the lower 25% of the range between `st_line` and
 `st_mirror` and MKT is BEAR; SELL when it is in the upper 25% and MKT is BULL.

@@ -396,6 +396,24 @@ class ConfigurationWiringTests(unittest.TestCase):
                     ("NONE", trend),
                 )
 
+    def test_countertrend_zone_width_tracks_half_supertrend_factor(self):
+        frame = pd.DataFrame({"Close": [102.0]})
+        with (
+            patch.object(sysentrpxy, "SYSSTRNDPXY_ST1_FACTOR", 4.0),
+            patch.object(sysentrpxy, "get_market_signal", return_value="BEAR"),
+            patch.object(
+                sysentrpxy,
+                "calculate_supertrend",
+                return_value=pd.DataFrame({
+                    "ST_Trend": ["BULL"],
+                    "Close": [102.0],
+                    "st_line": [100.0],
+                    "st_atr": [1.0],
+                }),
+            ),
+        ):
+            self.assertEqual(sysentrpxy.get_entry_signal(frame), ("BUY", "BULL"))
+
     def test_side_supertrend_returns_none_entry_and_mkt_exit(self):
         frame = pd.DataFrame({"Close": [1]})
         with (

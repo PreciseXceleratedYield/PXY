@@ -3,6 +3,7 @@ import math
 import sys
 
 import pandas as pd
+from syscnfgpxy import SYSSTRNDPXY_ST1_FACTOR
 from sysmktpxy import get_signal as get_market_signal
 from sysstrndpxy import calculate_supertrend
 
@@ -105,7 +106,7 @@ def _countertrend_entry(
     if not all(math.isfinite(value) for value in (price, st_line, atr)) or atr <= 0:
         return "NONE"
 
-    zone_width = 1.5 * atr
+    zone_width = (SYSSTRNDPXY_ST1_FACTOR / 2.0) * atr
     if trend == "BULL" and st_line <= price <= st_line + zone_width:
         return signal
     if trend == "BEAR" and st_line - zone_width <= price <= st_line:
