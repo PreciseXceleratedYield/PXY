@@ -155,7 +155,7 @@ while true; do
     echo "e) 🛒 Enter  - Trading Operations"
     echo "t) 🧪 Test   - Run Python Scripts"
     echo "b) 📊 SIM    - Replay Historical Data"
-    echo "c) ✅ CHK+SIM - Pick a day and validate"
+    echo "c) ✅ Check  - CHK suite + selected-day SIM"
     echo "x) ❌ Exit   - Close Dashboard"
     draw_border
     read -p "Select option: " OPTION
@@ -337,11 +337,11 @@ while true; do
             ;;
         c)
             echo ""
-            echo "Run CHK, then replay one selected trading day."
-            if bash "$PXY_APP_DIR/pxychk" --combined; then
-                echo "[✔] Combined CHK + SIM completed."
+            echo "Running checks, then replaying the selected trading day."
+            if bash "$PXY_APP_DIR/pxychk"; then
+                echo "[✔] Check completed."
             else
-                echo "[X] Combined CHK + SIM failed with exit code $?."
+                echo "[X] Check failed with exit code $?."
             fi
             echo ""
             read -p "Press [Enter] to return..."

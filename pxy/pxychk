@@ -22,8 +22,4 @@ if [ -f "$HOME/env/bin/activate" ]; then
     source "$HOME/env/bin/activate"
 fi
 
-if [ "${1:-}" = "--combined" ]; then
-    exec python3 -m tstmodepxy.checksim
-fi
-
-exec python3 -m unittest discover -s tstmodepxy -p 'test_*.py' -v "$@"
+exec python3 -m tstmodepxy.checksim "$@"
