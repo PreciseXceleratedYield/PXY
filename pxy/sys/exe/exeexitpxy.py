@@ -1,11 +1,12 @@
 # # exeexitpxy.py
-import pandas as pd 
-import os 
-import json 
+import json
+import math
+import os
 import sys
-import time 
+import time
 import re
-import subprocess 
+import subprocess
+import pandas as pd
 from datetime import datetime
 from pathlib import Path
 from colorama import init, Fore, Style 
@@ -18,6 +19,7 @@ from syscnfgpxy import (
     EXEEXITPXY_DEBUG_ENABLED as DEBUG_MODE,
     EXEEXITPXY_EXIT_LOCK_KEEP_SECS,
     EXEEXITPXY_DEPTH_EXIT_THRESHOLD,
+    EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT,
     EXEEXITPXY_ORDER_AMO,
     EXEEXITPXY_ORDER_EXCHANGE_SEGMENT,
     EXEEXITPXY_ORDER_PRICE,
@@ -152,6 +154,33 @@ def depth_squareoff_side(entry_signal, past_depth, threshold=EXEEXITPXY_DEPTH_EX
     return None
 
 
+def depth_exit_side_loss_pct(active_df, side):
+    """Return the selected side's blended running P&L percentage, or None if invalid."""
+    if active_df is None or active_df.empty or "symbol" not in active_df.columns:
+        return None
+    side_rows = active_df[
+        active_df["symbol"].astype(str).str.upper().str.endswith(side, na=False)
+    ]
+    if side_rows.empty or not {"qty", "buy_prc", "sell_prc"}.issubset(
+        side_rows.columns
+    ):
+        return None
+
+    values = side_rows[["qty", "buy_prc", "sell_prc"]].apply(
+        pd.to_numeric, errors="coerce"
+    )
+    if any(not math.isfinite(float(value)) for value in values.to_numpy().ravel()):
+        return None
+    if (values["qty"] <= 0).any() or (values["buy_prc"] <= 0).any():
+        return None
+
+    invested = (values["qty"] * values["buy_prc"]).sum()
+    if invested <= 0:
+        return None
+    current_value = (values["qty"] * values["sell_prc"]).sum()
+    return round((current_value - invested) / invested * 100, 10)
+
+
 def run_depth_squareoff(client, active_df, market_data_available,
                         positions_unverified=False):
     """Invoke the shared side-squareoff command after a confirmed deep reversal."""
@@ -176,6 +205,21 @@ def run_depth_squareoff(client, active_df, market_data_available,
         print(f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: signal candle time unavailable.")
         return set()
 
+    side_loss_pct = depth_exit_side_loss_pct(active_df, side)
+    if side_loss_pct is None:
+        print(
+            f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: "
+            f"{side} running P&L could not be verified."
+        )
+        return set()
+    if side_loss_pct >= -EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT:
+        print(
+            f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: {side} running loss "
+            f"is {side_loss_pct:.2f}%; it must exceed "
+            f"{EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT:.2f}%."
+        )
+        return set()
+
     signal_key = f"DEPTH_EXIT|{side}|{signal_time}"
     if _recent(_load_locks(), signal_key, EXIT_LOCK_KEEP_SECS):
         debug_log(f"Depth exit {signal_key} already sent; skipping duplicate.")
@@ -183,7 +227,8 @@ def run_depth_squareoff(client, active_df, market_data_available,
 
     print(
         f"{Fore.YELLOW}⚠️ Deep reversal: {snapshot.get('entry')} with "
-        f"{snapshot.get('hkin_past_depth')} past depth; squaring off {side}."
+        f"{snapshot.get('hkin_past_depth')} past depth and {side_loss_pct:.2f}% "
+        f"running loss; squaring off {side}."
     )
     target_rows = active_df[
         active_df["symbol"].astype(str).str.upper().str.endswith(side, na=False)

@@ -680,6 +680,9 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "symbol": "NIFTY-WF-PE",
                     "tag": "PE1",
                     "buy_time": "2025-01-06 09:59:00",
+                    "qty": 75,
+                    "buy_prc": 100.0,
+                    "sell_prc": 80.0,
                     "entry": "BUY",
                     "hkin_past_depth": "PE7",
                     "hkin_signal_time": "2025-01-06 10:00:00",
@@ -710,6 +713,63 @@ class ConfigurationWiringTests(unittest.TestCase):
         )
         mark_lock.assert_called_once_with(
             "DEPTH_EXIT|PE|2025-01-06 10:00:00"
+        )
+
+    def test_pastrsk_loss_filter_requires_more_than_fourteen_percent(self):
+        active_orders = pd.DataFrame(
+            [
+                {
+                    "symbol": "NIFTY-WF-PE",
+                    "qty": 75,
+                    "buy_prc": 100.0,
+                    "sell_prc": 86.0,
+                    "tag": "PE1",
+                    "buy_time": "2025-01-06 09:59:00",
+                    "entry": "BUY",
+                    "hkin_past_depth": "PE7",
+                    "hkin_signal_time": "2025-01-06 10:00:00",
+                }
+            ]
+        )
+        self.assertEqual(exeexitpxy.depth_exit_side_loss_pct(active_orders, "PE"), -14.0)
+
+        with (
+            patch.object(exeexitpxy, "PASTRSK", "YES"),
+            patch.object(exeexitpxy, "ledger_busy", return_value=False),
+            patch.object(exeexitpxy, "_recently_exited", return_value=False),
+            patch.object(exeexitpxy, "_mark_lock"),
+            patch.object(exeexitpxy.subprocess, "run") as run_command,
+        ):
+            self.assertEqual(
+                exeexitpxy.run_depth_squareoff(
+                    client=None,
+                    active_df=active_orders,
+                    market_data_available=True,
+                ),
+                set(),
+            )
+            run_command.assert_not_called()
+
+            active_orders.loc[0, "sell_prc"] = 85.99
+            self.assertLess(exeexitpxy.depth_exit_side_loss_pct(active_orders, "PE"), -14.0)
+            self.assertEqual(
+                exeexitpxy.run_depth_squareoff(
+                    client=None,
+                    active_df=active_orders,
+                    market_data_available=True,
+                ),
+                {"NIFTY-WF-PE|PE1|2025-01-06 09:59:00"},
+            )
+            run_command.assert_called_once_with(
+                ["pxysqrpe"],
+                check=True,
+                timeout=exeexitpxy.SQUAREOFF_TIMEOUT_SECS,
+            )
+
+        self.assertIsNone(
+            exeexitpxy.depth_exit_side_loss_pct(
+                active_orders.drop(columns=["sell_prc"]), "PE"
+            )
         )
 
     def test_entry_router_has_selectable_mkt_sts_mode(self):
