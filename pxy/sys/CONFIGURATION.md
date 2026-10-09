@@ -91,9 +91,10 @@ unsupported values are read-only; secrets are redacted. Enumerated modes, interv
 choices. Numeric writes are bounded, structured values retain their shape,
 and the candidate file is parsed and executed for validation before an atomic
 replacement. A unique timestamped `.bak` copy is created before each replace;
-concurrent edits are serialized. Saving does not restart the engine, and
-already-running processes continue using imported values until deliberately
-restarted.
+concurrent edits are serialized, and compiled config caches are invalidated so
+rapid same-size edits are not masked by stale Python bytecode. Saving does not
+restart the engine, and already-running processes continue using imported
+values until deliberately restarted.
 
 ## Option strike selection
 

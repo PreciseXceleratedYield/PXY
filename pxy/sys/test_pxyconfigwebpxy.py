@@ -1,3 +1,4 @@
+import py_compile
 import tempfile
 import unittest
 from pathlib import Path
@@ -145,6 +146,18 @@ class ConfigEditorTests(unittest.TestCase):
         self.assertIn("RUNNIFTYPXY_STRIKE_STEP = 4", source)
         self.assertIn("CLOCK = dt_time(10, 15, 30, 0)", source)
         self.assertIn("SYSDTAFPXY_SELECTED_MODE = '8'", source)
+
+    def test_write_invalidates_compiled_config_cache(self):
+        cache_path = Path(py_compile.compile(str(self.config_path), doraise=True))
+        self.assertTrue(cache_path.exists())
+
+        config_editor._write({"SYSDTAFPXY_SELECTED_MODE": "01"})
+
+        self.assertFalse(cache_path.exists())
+        self.assertIn(
+            "SYSDTAFPXY_SELECTED_MODE = '01'",
+            self.config_path.read_text(encoding="utf-8"),
+        )
 
     def test_invalid_types_choices_and_bounds_leave_config_untouched(self):
         for updates in (

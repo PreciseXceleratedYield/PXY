@@ -268,6 +268,15 @@ def _write(updates):
             fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
 
 
+def _invalidate_config_bytecode():
+    """Remove compiled config caches that can survive same-size rapid edits."""
+    cache_dir = CONFIG_PATH.parent / "__pycache__"
+    if cache_dir.exists():
+        for cache_path in cache_dir.glob(f"{CONFIG_PATH.stem}.*.pyc"):
+            cache_path.unlink()
+    CONFIG_PATH.with_suffix(".pyc").unlink(missing_ok=True)
+
+
 def _write_locked(updates):
     if not isinstance(updates, dict) or not updates:
         raise ValueError("Provide at least one setting to update")
@@ -311,6 +320,7 @@ def _write_locked(updates):
         runpy.run_path(temp_name, run_name="__pxy_config_validation__")
         shutil.copy2(CONFIG_PATH, backup_name)
         os.replace(temp_name, CONFIG_PATH)
+        _invalidate_config_bytecode()
         directory_fd = os.open(CONFIG_PATH.parent, os.O_RDONLY)
         try:
             os.fsync(directory_fd)
