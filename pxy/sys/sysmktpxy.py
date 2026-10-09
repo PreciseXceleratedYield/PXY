@@ -67,8 +67,14 @@ def get_signal(df=None):
         
     try:
         analysis = get_signal_depth_analysis(df)
-        signals = analysis["entry"], analysis["exit"]
-        execution_state = analysis["exit"]
+        signal = analysis["signal"]
+        signals = {
+            "BUY": ("BUY", "BULL"),
+            "SELL": ("SELL", "BEAR"),
+            "BULL": ("NONE", "BULL"),
+            "BEAR": ("NONE", "BEAR"),
+        }.get(signal, ("NONE", "NONE"))
+        execution_state = signals[1]
 
         if SYSMKTPXY_DEBUG_ENABLED and analysis["previous_close"] is not None:
             c1 = analysis["previous_close"]

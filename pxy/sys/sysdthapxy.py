@@ -26,8 +26,6 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
         include_running = SYSDTHAPXY_INCLUDE_RUNNING_CANDLE == "YES"
     if last_n <= 0:
         return {
-            "entry": "NONE",
-            "exit": "NONE",
             "signal": "NONE",
             "past_depth": "NA",
             "ce_depth": 1,
@@ -40,8 +38,6 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
         df = fetch_yf_data()
     if df is None or df.empty or "Close" not in df.columns:
         return {
-            "entry": "NONE",
-            "exit": "NONE",
             "signal": "NONE",
             "past_depth": "NA",
             "ce_depth": 1,
@@ -59,18 +55,18 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
         else evaluated_directions.iloc[:-1]
     ).tolist()
     closes = evaluated_closes
-    entry, exit_signal = "NONE", "NONE"
+    signal = "NONE"
 
     if len(closes) >= 3:
         first_move, second_move = directions[-2:]
         if first_move == "DOWN" and second_move == "UP":
-            entry, exit_signal = "BUY", "BULL"
+            signal = "BUY"
         elif first_move == "UP" and second_move == "DOWN":
-            entry, exit_signal = "SELL", "BEAR"
+            signal = "SELL"
         elif first_move == "UP" and second_move == "UP":
-            exit_signal = "BULL"
+            signal = "BULL"
         elif first_move == "DOWN" and second_move == "DOWN":
-            exit_signal = "BEAR"
+            signal = "BEAR"
 
     current_direction = directions[-1] if directions else "UNKNOWN"
     current_depth = 0
@@ -103,13 +99,10 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
 
     ce_depth = current_depth if current_direction == "UP" else 1
     pe_depth = current_depth if current_direction == "DOWN" else 1
-    signal = entry if entry != "NONE" else exit_signal
     previous_close = float(closes.iloc[-2]) if len(closes) >= 2 else None
     current_close = float(closes.iloc[-1]) if len(closes) >= 1 else None
 
     return {
-        "entry": entry,
-        "exit": exit_signal,
         "signal": signal,
         "past_depth": past_depth_label,
         "ce_depth": ce_depth,

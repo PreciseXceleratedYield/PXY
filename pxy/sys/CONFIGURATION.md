@@ -114,12 +114,14 @@ MKT examines the last three transformed closes. A strict V
 (`C[-3] < C[-2] > C[-1]`) emits `SELL`/`BEAR`. Three strictly rising closes
 emit exit-only `BULL` (`NONE`/`BULL`), and three strictly falling closes emit
 exit-only `BEAR` (`NONE`/`BEAR`). All other patterns, including equal adjacent
-closes, emit `NONE` for both signals. `sysdthapxy` supplies the shared
-close-to-close direction series (`UP`, `DOWN`, or `FLAT`) and is the single
-owner of the entry/exit classifier and CE/PE streak depths. `sysmktpxy` retains
-its display and delegates signal calculation to DTHA; `sysdptpxy` delegates
-dashboard/depth calculation to that same result. Flat closes break directional
-streaks and cannot create a bullish or bearish depth. Current streak depth
+closes, emit `NONE`. `sysdthapxy` supplies the shared close-to-close direction
+series (`UP`, `DOWN`, or `FLAT`) and returns one pattern signal (`BUY`, `SELL`,
+`BULL`, `BEAR`, or `NONE`) alongside CE/PE streak depths. `sysmktpxy` maps
+`BUY` to entry `BUY`/exit `BULL`, `SELL` to `SELL`/`BEAR`, `BULL` to `NONE`/
+`BULL`, and `BEAR` to `NONE`/`BEAR`; it retains its display helpers.
+`sysdptpxy` delegates dashboard/depth calculation to that same DTHA signal and
+depth result. Flat closes break directional streaks and cannot create a
+bullish or bearish depth. Current streak depth
 continues past `SYSDPTPXY_LAST_N`; that setting only limits the previous-streak
 lookback used for the past-depth label. `SYSDTHAPXY_INCLUDE_RUNNING_CANDLE`
 controls whether the last returned candle is included (`YES`, default) or

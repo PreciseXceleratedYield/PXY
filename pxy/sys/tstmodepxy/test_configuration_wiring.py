@@ -482,6 +482,28 @@ class ConfigurationWiringTests(unittest.TestCase):
             self.assertEqual(sysmktpxy.get_signal(frame), ("BUY", "BULL"))
         analysis.assert_called_once_with(frame)
 
+    def test_dtha_returns_one_pattern_signal_and_mkt_splits_it(self):
+        expected_signals = {
+            (10.0, 8.0, 9.0): ("BUY", ("BUY", "BULL")),
+            (8.0, 10.0, 9.0): ("SELL", ("SELL", "BEAR")),
+            (8.0, 9.0, 10.0): ("BULL", ("NONE", "BULL")),
+            (10.0, 9.0, 8.0): ("BEAR", ("NONE", "BEAR")),
+            (8.0, 9.0, 9.0): ("NONE", ("NONE", "NONE")),
+        }
+        with patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False):
+            for closes, (expected_signal, expected_pair) in expected_signals.items():
+                with self.subTest(closes=closes):
+                    analysis = sysdthapxy.get_signal_depth_analysis(
+                        pd.DataFrame({"Close": closes})
+                    )
+                    self.assertEqual(analysis["signal"], expected_signal)
+                    self.assertNotIn("entry", analysis)
+                    self.assertNotIn("exit", analysis)
+                    self.assertEqual(
+                        sysmktpxy.get_signal(pd.DataFrame({"Close": closes})),
+                        expected_pair,
+                    )
+
     def test_dtha_exposes_direction_and_marks_flat_bars_neutrally(self):
         frame = pd.DataFrame(
             {
