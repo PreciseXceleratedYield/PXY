@@ -127,11 +127,13 @@ lookback used for the past-depth label. `SYSDTHAPXY_INCLUDE_RUNNING_CANDLE`
 controls whether the last returned candle is included (`YES`) or excluded
 (`NO`, default). The current default uses closed candles only; the same selected
 candles drive both MKT signals and DPT depths.
-`EXEEXITPXY_DEPTH_EXIT_THRESHOLD` defaults to `6`. Outside the scheduled
-square-off window, a MKT `BUY` with past depth `PE7` or greater independently
-triggers a verified PE-side close; a MKT `SELL` with `CE7` or greater triggers
-a verified CE-side close. This is strictly greater than the threshold, is
-independent of LGT/P&L, and is deduplicated by signal candle.
+`PASTRSK` enables (`YES`) or disables (`NO`) the depth-triggered reversal
+square-off; it defaults to `YES`. When enabled, outside the scheduled square-off
+window, a MKT `BUY` with past depth `PE7` or greater independently triggers a
+verified PE-side close; a MKT `SELL` with `CE7` or greater triggers a verified
+CE-side close. `EXEEXITPXY_DEPTH_EXIT_THRESHOLD` defaults to `6`, and the
+trigger is strictly greater than that threshold. This rule is independent of
+LGT/P&L and is deduplicated by signal candle.
 
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
 builder for every buying script. It currently defaults to `ATM`, which ignores

@@ -638,6 +638,33 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(exeexitpxy.depth_squareoff_side("SELL", "CE6"), None)
         self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "PE-7"), None)
 
+    def test_pastrsk_switch_gates_depth_squareoff(self):
+        active_orders = pd.DataFrame(
+            [
+                {
+                    "symbol": "NIFTY-WF-PE",
+                    "qty": 75,
+                    "entry": "BUY",
+                    "hkin_past_depth": "PE7",
+                    "hkin_signal_time": "2025-01-06 10:00:00",
+                }
+            ]
+        )
+        with patch.object(exeexitpxy, "PASTRSK", "NO"):
+            self.assertEqual(
+                exeexitpxy.run_depth_squareoff(
+                    client=None,
+                    active_df=active_orders,
+                    market_data_available=True,
+                ),
+                set(),
+            )
+
+        from syscnfgpxy import PASTRSK
+
+        self.assertEqual(PASTRSK, "YES")
+        self.assertEqual(__import__("pxyconfigwebpxy").ENUMS["PASTRSK"], ("YES", "NO"))
+
     def test_entry_router_has_selectable_mkt_sts_mode(self):
         from syscnfgpxy import (
             SYSENTRPXY_SIGNAL_MODE,

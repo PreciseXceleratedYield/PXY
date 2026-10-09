@@ -35,6 +35,7 @@ from syscnfgpxy import (
     EXEEXITPXY_SYSDUMP_SCRIPT,
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
+    PASTRSK,
 )
 from sysmodepxy import dispatch_mode
 from sysdecisionpxy import (
@@ -154,6 +155,8 @@ def depth_squareoff_side(entry_signal, past_depth, threshold=EXEEXITPXY_DEPTH_EX
 def run_depth_squareoff(client, active_df, market_data_available,
                         positions_unverified=False):
     """Close only the losing-direction side after a confirmed deep reversal."""
+    if PASTRSK != "YES":
+        return set()
     if active_df is None or active_df.empty or not market_data_available:
         return set()
     if positions_unverified or ledger_busy():
