@@ -18,7 +18,9 @@ class SimulatedBrokerTests(unittest.TestCase):
         self.broker = SimulatedBroker()
         self.broker.set_market(datetime(2025, 1, 6, 9, 17), 22000)
 
-    def place(self, side, option, tag, quantity=65):
+    def place(self, side, option, tag, quantity=None):
+        if quantity is None:
+            quantity = self.broker.quantity
         return self.broker.place_order(
             trading_symbol=f"NIFTY-WF-{option}",
             transaction_type=side,
@@ -31,7 +33,7 @@ class SimulatedBrokerTests(unittest.TestCase):
         self.assertEqual(buy["stat"], "Ok")
         self.assertEqual(buy["data"]["orderId"], "WF0000001")
         self.assertEqual(self.broker.orders[-1]["avgPrc"], 22000)
-        self.assertEqual(self.broker.position_summary(), "65CE0PE")
+        self.assertEqual(self.broker.position_summary(), "1CE0PE")
 
         self.broker.set_market(datetime(2025, 1, 6, 9, 18), 22012)
         quote = self.broker.quotes(
@@ -49,7 +51,7 @@ class SimulatedBrokerTests(unittest.TestCase):
         trade = self.broker.trades()[0]
         self.assertEqual(trade["side"], "CE")
         self.assertEqual(trade["index_points_per_unit"], 12)
-        self.assertEqual(trade["quantity"], 65)
+        self.assertEqual(trade["quantity"], 1)
 
     def test_put_fill_and_quote_use_raw_index_spot(self):
         self.place("B", "PE", "WF0000002")
@@ -85,7 +87,7 @@ class SimulatedBrokerTests(unittest.TestCase):
             broker.place_order(
                 trading_symbol="NIFTY-WF-CE",
                 transaction_type="B",
-                quantity=65,
+                quantity=broker.quantity,
                 tag="WF0000001",
             )
 
@@ -96,7 +98,7 @@ class SimulatedBrokerTests(unittest.TestCase):
             self.assertEqual(rows[0]["entry_spot"], "22000.0")
             self.assertEqual(rows[0]["avgPrc"], "22000.0")
             restored = SimulatedBroker(orders_csv=orders_path)
-            self.assertEqual(restored.position_summary(), "65CE0PE")
+            self.assertEqual(restored.position_summary(), "1CE0PE")
 
     def test_csv_writer_accepts_pipe_trade_and_bar_records(self):
         with tempfile.TemporaryDirectory(prefix="pxy-csv-test-") as temp:
@@ -114,7 +116,7 @@ class SimulatedBrokerTests(unittest.TestCase):
                     "timestamp": "09:16", "execution_timestamp": "09:17",
                     "spot": 100, "execution_spot": 101, "entry_signal": "BUY",
                     "exit_signal": "BULL", "position_before": "0CE0PE",
-                    "position_after": "65CE0PE", "orders_created": 1,
+                    "position_after": "1CE0PE", "orders_created": 1,
                     "order_tags": "WF0000001",
                 }],
             )

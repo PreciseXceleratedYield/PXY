@@ -128,9 +128,21 @@ class ProductionPipeReplay:
                 )
             ):
                 return False
+            scaled_minimum_pnl = (
+                minimum_pnl * self.broker.quantity
+                / self.broker.reference_quantity
+            )
             if target < 0:
-                return abs(target) > 0 and price <= abs(target) and pnl >= minimum_pnl
-            return target > 0 and price >= target and pnl >= minimum_pnl
+                return (
+                    abs(target) > 0
+                    and price <= abs(target)
+                    and pnl >= scaled_minimum_pnl
+                )
+            return (
+                target > 0
+                and price >= target
+                and pnl >= scaled_minimum_pnl
+            )
 
         self.stack.enter_context(
             patch.object(self.oms, "pxy_tgt_calc", spot_target_price)

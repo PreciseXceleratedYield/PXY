@@ -203,9 +203,13 @@ network boundary.
 - CHK exercises the target calculations and simulated square-off path.
   `tstmodepxy/backtest.py` enables the same risk cycle during historical replay.
   SIM never sends live orders, uses index spot as every simulated fill and
-  mark, and simulates one 65-unit lot per order. Production single-exit and
+  mark, and simulates one index unit per lot regardless of the index's actual
+  derivatives contract size. Production single-exit and
   cycle-risk percentages are each divided by 200 before applying them to the
-  spot-based target and quantity-weighted entry-spot notional. CE targets
+  spot-based target and quantity-weighted entry-spot notional. The production
+  minimum P&L exit gate is scaled by SIM quantity relative to the prior
+  65-unit SIM lot, preserving the per-lot exit threshold when SIM uses one
+  index unit. CE targets
   require an upward move and PE targets a downward move. SIM results are
   index-point results, not historical option P&L.
 
@@ -236,7 +240,7 @@ The replay keeps production signals, target selection, averaging, counter-buy,
 risk confirmation, and scheduled square-off flow. With one option side open,
 the aligned single-exit target uses the ATR/power/depth calculation. With both
 CE and PE sides open, aligned targets use 77%; unaligned targets remain 1.4%.
-SIM uses only index spot prices and a fixed quantity of 65 per lot; it divides
+SIM uses only index spot prices and a fixed quantity of 1 per lot; it divides
 these production target percentages and the cycle-risk percentage by 200
 before applying them to spot and quantity-weighted entry-spot notional. CE
 targets require spot to rise; PE targets require spot to fall. P&L is signed
