@@ -29,7 +29,7 @@ from .pointbacktest import (
     MARKET_OPEN,
 )
 from .broker_sim import SimulatedBroker
-from .replay_adapter import ProductionPipeReplay
+from .replay_adapter import ProductionPipeReplay, SIM_PERCENT_SCALE
 from syscnfgpxy import (
     EXEEXITPXY_SQOFF_ALL_START,
     EXEEXITPXY_SQOFF_START,
@@ -46,8 +46,6 @@ DATA_SESSION_OPEN = TSTPOINTBTPXY_TRADING_DAY_START
 OHLC_COLUMNS = {"Open", "High", "Low", "Close"}
 MAX_INTRADAY_LOOKBACK_DAYS = 28
 DEFAULT_SESSION_COUNT = 7
-
-
 def _normalize_history_columns(frame):
     """Flatten Yahoo columns using the level that actually contains OHLC names."""
     if not isinstance(frame.columns, pd.MultiIndex):
@@ -212,10 +210,79 @@ def score_spot_points(side, entry_spot, exit_spot, quantity):
     return (float(exit_spot) - float(entry_spot)) * direction * int(quantity)
 
 
-def calculate_strategy_signals(history, session_date, record_limit=None):
+def scale_sim_lgt_calculator(calculator):
+    """Scale a production percentage-based averaging threshold for spot SIM."""
+    def calculate(*args, **kwargs):
+        return calculator(*args, **kwargs) / SIM_PERCENT_SCALE
+
+    return calculate
+
+
+def calculate_heikin_ashi(history):
+    """Return standard Heikin-Ashi OHLC candles for an OHLC history frame."""
+    required = {"Open", "High", "Low", "Close"}
+    missing = required - set(history.columns)
+    if missing:
+        raise ValueError(f"Heikin-Ashi input is missing columns: {sorted(missing)}")
+    if history.empty:
+        return history.loc[:, ["Open", "High", "Low", "Close"]].copy()
+
+    source = history.loc[:, ["Open", "High", "Low", "Close"]].astype(float)
+    ha_close = source[["Open", "High", "Low", "Close"]].mean(axis=1)
+    ha_open = pd.Series(index=source.index, dtype=float)
+    ha_open.iloc[0] = (source["Open"].iloc[0] + source["Close"].iloc[0]) / 2.0
+    for index in range(1, len(source)):
+        ha_open.iloc[index] = (
+            ha_open.iloc[index - 1] + ha_close.iloc[index - 1]
+        ) / 2.0
+
+    return pd.DataFrame(
+        {
+            "Open": ha_open,
+            "High": pd.concat([source["High"], ha_open, ha_close], axis=1).max(axis=1),
+            "Low": pd.concat([source["Low"], ha_open, ha_close], axis=1).min(axis=1),
+            "Close": ha_close,
+        },
+        index=source.index,
+    )
+
+
+def heikin_ashi_entry_exit_signals(ha_history):
+    """Emit entries on HA color switches and exits from the current HA state."""
+    entries = []
+    exits = []
+    previous_state = "NONE"
+    for ha_open, ha_close in zip(ha_history["Open"], ha_history["Close"]):
+        if ha_close > ha_open:
+            state = "BULL"
+        elif ha_close < ha_open:
+            state = "BEAR"
+        else:
+            state = previous_state
+
+        if state == "BULL" and previous_state != "BULL":
+            entry = "BUY"
+        elif state == "BEAR" and previous_state != "BEAR":
+            entry = "SELL"
+        else:
+            entry = "NONE"
+        entries.append(entry)
+        exits.append(state)
+        previous_state = state
+    return entries, exits
+
+
+def calculate_strategy_signals(
+    history, session_date, record_limit=None, heikin_ashi=False
+):
     """Build production snapshots for ALL candles of a full trading session."""
     sys.path.insert(0, str(SYS_DIR / "exe"))
     dashboard = importlib.import_module("sysdashpxy")
+    signal_history = calculate_heikin_ashi(history) if heikin_ashi else history
+    if heikin_ashi:
+        ha_entries, ha_exits = heikin_ashi_entry_exit_signals(signal_history)
+    else:
+        ha_entries = ha_exits = None
     records = []
     target_indexes = [
         index for index, timestamp in enumerate(history.index)
@@ -227,7 +294,7 @@ def calculate_strategy_signals(history, session_date, record_limit=None):
     if record_limit is not None:
         target_indexes = target_indexes[:record_limit]
     for index in target_indexes:
-        available = history.iloc[: index + 1]
+        available = signal_history.iloc[: index + 1]
         transformed = transform_market_data(available).tail(
             SYSDTAFPXY_DEFAULT_TARGET_ROWS
         )
@@ -240,12 +307,19 @@ def calculate_strategy_signals(history, session_date, record_limit=None):
             raise RuntimeError(
                 f"Production dashboard returned no snapshot at {history.index[index]}."
             )
+        entry_signal = snapshot.get("entry", "NONE")
+        exit_signal = snapshot.get("exit", "NONE")
+        if heikin_ashi:
+            entry_signal = ha_entries[index]
+            exit_signal = ha_exits[index]
+            snapshot["entry"] = entry_signal
+            snapshot["exit"] = exit_signal
         records.append(
             {
                 "timestamp": history.index[index],
                 "spot": float(history["Close"].iloc[index]),
-                "entry": snapshot.get("entry", "NONE"),
-                "exit": snapshot.get("exit", "NONE"),
+                "entry": entry_signal,
+                "exit": exit_signal,
                 "snapshot": snapshot,
                 "snapshot_log": output.getvalue(),
             }
@@ -295,9 +369,57 @@ def write_session_csvs(output_dir, session_date, trades, decisions):
     return trade_path, decision_path
 
 
+def _book_reason(trade, entry_orders, entry_decision, exit_log):
+    entry_log = entry_decision.get("pipe_output", "") if entry_decision else ""
+    entry_signal = entry_decision.get("entry_signal", "NONE") if entry_decision else "NONE"
+    exit_signal = entry_decision.get("exit_signal", "NONE") if entry_decision else "NONE"
+    entry_text = entry_log.lower()
+    if "fresh entry" in entry_text:
+        entry_reason = f"Fresh-entry {entry_signal} signal was accepted while flat."
+    elif "counter-buy" in entry_text:
+        entry_reason = f"Counter-leg triggered by {exit_signal} exit signal."
+    elif "averaged" in entry_text or "averaging" in entry_text:
+        entry_reason = "Averaging loss threshold and placement gates passed."
+    elif any(
+        str(order.get("GuiOrdId", "")).startswith("CB")
+        for order in entry_orders
+    ):
+        entry_reason = f"Counter-leg triggered by {exit_signal} exit signal."
+    else:
+        entry_reason = f"Production entry pipe accepted {entry_signal}."
+
+    exit_time = datetime.fromisoformat(trade["exit_time"])
+    if trade["exit_reason"] == "risk_bar" or "SIM CYCLE POINT TARGET EXIT" in exit_log:
+        exit_reason = "Cycle-risk target was reached and its confirmation gate passed."
+    elif exit_time.time() >= EXEEXITPXY_SQOFF_START:
+        exit_reason = "Scheduled square-off closed the remaining position."
+    elif "Target Hit & PnL Met" in exit_log:
+        exit_reason = "Production target and minimum-P&L gates both passed."
+    elif "Deep reversal:" in exit_log:
+        exit_reason = "Deep-reversal signal and scaled loss gate triggered the exit."
+    else:
+        exit_reason = f"Production exit pipe closed the position on exit state {exit_signal}."
+    return f"{entry_reason} {exit_reason}"
+
+
+def print_book_table(book_number, trade, entry_orders, entry_decision, exit_log):
+    entry_time = datetime.fromisoformat(trade["entry_time"]).strftime("%H:%M")
+    exit_time = datetime.fromisoformat(trade["exit_time"]).strftime("%H:%M")
+    points = float(trade["index_points_per_unit"]) * int(trade["quantity"])
+    action = (
+        f"Book {book_number}: BUY {trade['side']} @ {entry_time} "
+        f"({float(trade['entry_spot']):.2f}) → SELL @ {exit_time} "
+        f"({float(trade['exit_spot']):.2f}); {points:+.2f} pts"
+    )
+    why = _book_reason(trade, entry_orders, entry_decision, exit_log)
+    print("| Action | Why action |")
+    print("|---|---|")
+    print(f"| {action} | {why} |", flush=True)
+
+
 def print_report(
     history, session_dates, trades, decisions, trade_path, decision_path,
-    orders_path, runtime_log, incomplete_positions=(),
+    orders_path, runtime_log, incomplete_positions=(), heikin_ashi=False,
 ):
     total_points = sum(trade["points"] for trade in trades)
     production_exits = sum(
@@ -326,8 +448,14 @@ def print_report(
         "pipe code runs against a simulated broker, including the cycle risk target."
     )
     print(
+        "Signal source: Heikin-Ashi color switches and current candle state."
+        if heikin_ashi
+        else "Signal source: production entry and exit logic."
+    )
+    print(
         "SIM fills, target checks, cycle risk, and P&L all use index spot prices. "
-        "Target and cycle percentages are divided by 200; each simulated lot is "
+        "Production target, averaging, cycle-risk, and deep-reversal percentages "
+        "are divided by 200; each simulated lot is "
         "one unit for index-point results. "
         "CE gains when spot rises; PE gains when spot falls."
     )
@@ -361,6 +489,7 @@ def run_backtest(
     session_count=DEFAULT_SESSION_COUNT,
     lgt_calculator=None,
     session_date=None,
+    heikin_ashi=False,
 ):
     if RUNMODE != "SIM":
         raise RuntimeError(
@@ -405,7 +534,7 @@ def run_backtest(
         )
     bars_by_session = {
         session_date: calculate_strategy_signals(
-            history, session_date, record_limit
+            history, session_date, record_limit, heikin_ashi=heikin_ashi
         )
         for session_date in session_dates
     }
@@ -430,6 +559,9 @@ def run_backtest(
     all_simulated_orders = []
     incomplete_positions = []
     decisions = []
+    interactive_books = sys.stdin.isatty()
+    stopped_early = False
+    book_number = 0
     for session_date in session_dates:
         broker = SimulatedBroker()
         with tempfile.TemporaryDirectory(prefix="pxy-walk-forward-") as temporary_state:
@@ -439,10 +571,13 @@ def run_backtest(
                 Path(temporary_state),
                 risk_bar_enabled=True,
             ) as engine:
-                engine.avg_controller.calculate_lgt = selected_lgt
+                engine.avg_controller.calculate_lgt = scale_sim_lgt_calculator(
+                    selected_lgt
+                )
                 for bar in bars_by_session[session_date]:
                     before = broker.position_summary()
                     first_new_order = len(broker.orders)
+                    open_trade_count = len(broker.trades())
                     if bar["snapshot_log"]:
                         with runtime_log.open("a", encoding="utf-8") as stream:
                             stream.write(
@@ -456,6 +591,44 @@ def run_backtest(
                         runtime_log,
                     )
                     current_orders = broker.orders[first_new_order:]
+                    newly_closed_trades = broker.trades()[open_trade_count:]
+                    for trade in newly_closed_trades:
+                        book_number += 1
+                        trade_tag = trade["tag"]
+                        entry_orders = [
+                            order for order in broker.orders
+                            if order["GuiOrdId"] == trade_tag
+                            and order["trnsTp"] == "B"
+                        ]
+                        entry_decision = next(
+                            (
+                                decision for decision in reversed(decisions)
+                                if decision["timestamp"].strftime("%Y-%m-%d %H:%M:%S")
+                                == trade["entry_time"]
+                            ),
+                            None,
+                        )
+                        if entry_decision is None:
+                            entry_decision = {
+                                "entry_signal": bar["entry"],
+                                "exit_signal": bar["exit"],
+                                "pipe_output": pipe_output,
+                            }
+                        print_book_table(
+                            book_number,
+                            trade,
+                            entry_orders,
+                            entry_decision,
+                            f"{bar['snapshot_log']}{pipe_output}",
+                        )
+                        if interactive_books:
+                            try:
+                                command = input().strip().lower()
+                            except (EOFError, KeyboardInterrupt):
+                                command = "q"
+                            if command == "q":
+                                stopped_early = True
+                                break
                     after = broker.position_summary()
                     decisions.append(
                         {
@@ -474,8 +647,10 @@ def run_backtest(
                             "pipe_output": f"{bar['snapshot_log']}{pipe_output}",
                         }
                     )
+                    if stopped_early:
+                        break
             remaining = broker.position_summary()
-            if remaining != "0CE0PE" and record_limit is None:
+            if remaining != "0CE0PE" and record_limit is None and not stopped_early:
                 raise RuntimeError(
                     f"Scheduled square-off did not flatten simulated positions "
                     f"for {session_date}: {remaining}."
@@ -511,6 +686,8 @@ def run_backtest(
                     "exit_reason": exit_reason,
                 }
             )
+        if stopped_early:
+            break
 
     if all_simulated_orders:
         write_csv(
@@ -521,10 +698,11 @@ def run_backtest(
     trade_path, decision_path = write_session_csvs(
         output_dir, session_label, all_trades, decisions
     )
-    print_report(
-        history, session_dates, all_trades, decisions, trade_path, decision_path,
-        orders_path, runtime_log, incomplete_positions,
-    )
+    if not interactive_books:
+        print_report(
+            history, session_dates, all_trades, decisions, trade_path, decision_path,
+            orders_path, runtime_log, incomplete_positions, heikin_ashi=heikin_ashi,
+        )
     return all_trades, decisions
 
 
@@ -561,6 +739,14 @@ def main(argv=None):
         help="Replay one exact completed trading session (YYYY-MM-DD).",
     )
     parser.add_argument(
+        "--heikin-ashi",
+        action="store_true",
+        help=(
+            "Use HA bullish/bearish switches for BUY/SELL entries and the "
+            "current HA state for BULL/BEAR exits."
+        ),
+    )
+    parser.add_argument(
         "--lgt-constant",
         type=float,
         default=None,
@@ -585,6 +771,7 @@ def main(argv=None):
             ),
             lgt_calculator=lgt_calculator,
             session_date=args.session_date,
+            heikin_ashi=args.heikin_ashi,
         )
     except (RuntimeError, ValueError, OSError) as error:
         print(f"SIM ERROR: {error}", file=sys.stderr)

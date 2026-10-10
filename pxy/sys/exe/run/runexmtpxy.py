@@ -203,6 +203,50 @@ def cycle_risk_metrics(
     }
 
 
+def cycle_closed_book_snapshot(closed_df, cycle_tags, cycle_started_at):
+    if closed_df is None or closed_df.empty:
+        return None
+    rows = closed_df.copy()
+    rows.columns = [str(column).upper() for column in rows.columns]
+    if "TAG" not in rows:
+        return None
+    rows = rows[rows["TAG"].astype(str).str.strip().isin(cycle_tags)]
+    if rows.empty:
+        return None
+
+    pnl = pd.to_numeric(
+        rows["PNL"] if "PNL" in rows else pd.Series(0, index=rows.index),
+        errors="coerce",
+    ).fillna(0)
+
+    def number(value):
+        parsed = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+        return 0.0 if pd.isna(parsed) else float(parsed)
+
+    def text(value):
+        return "" if pd.isna(value) else str(value)
+
+    positions = []
+    for _, row in rows.iterrows():
+        positions.append({
+            "symbol": text(row.get("SYMBOL", "")),
+            "tag": text(row.get("TAG", "")),
+            "qty": number(row.get("QTY", 0)),
+            "pnl": number(row.get("PNL", 0)),
+            "exit_time": text(row.get("EXIT_TIME", "")),
+        })
+    return {
+        "cycle_started_at": str(cycle_started_at or ""),
+        "closed_at": max(
+            (position["exit_time"] for position in positions),
+            default="",
+        ),
+        "closed_positions": len(positions),
+        "realized_pnl": float(pnl.sum()),
+        "positions": positions,
+    }
+
+
 def force_zero_ending(val):
     return int(round(val / 10.0) * 10)
 

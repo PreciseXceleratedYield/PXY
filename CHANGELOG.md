@@ -7,11 +7,9 @@ The following implementation changes are merged into `main`:
 - **Runtime configuration:** centralized and audited production settings,
   validated configuration values, documented ownership and conditional
   settings, and wired previously hard-coded runtime values to their settings.
-- **Midday risk candle:** added the configurable timed-baseline behavior. It is
-  enabled by default with `RUNEXACPXY_CNTRLRSKBAR = "YES"`: telemetry remains
-  visible before 13:15 IST, risk exits and breach progression are suppressed
-  until the first ledger tick at or after 13:15 takes a fresh P&L baseline,
-  then regular risk rules apply relative to that baseline.
+- **Risk candle:** the 2.8% premium-based target is profit-only and waits when
+  the heavy invested side aligns with the exit signal. The candle displays
+  symmetric profit/loss target values; the loss side is informational only.
 - **PXYCONFIG editor:** added a protected web editor for supported runtime
   configuration values, including validation, redaction of sensitive values,
   atomic writes, and serialized edits.
@@ -27,5 +25,5 @@ The following implementation changes are merged into `main`:
   active engine cycle cooldowns on the central 7-second setting.
 
 **Merged pull requests:** #1 (configuration editor), #2 (game-page actions),
-#3 (web protections), #4 (strike policy and cooldown), and #5 (13:15 risk-bar
-control). The risk-bar setting update is included in `dd795f08`.
+#3 (web protections), #4 (strike policy and cooldown), and #5 (risk-bar
+control).

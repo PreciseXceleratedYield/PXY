@@ -476,7 +476,7 @@ body{
 <!-- RISK BAR — just above bottom -->
 <div id="riskBar">
     <div class="rsk-grp">
-        <span class="rsk-lbl">⛔ Stop</span>
+        <span class="rsk-lbl">⬇ Loss Target</span>
         <span class="rsk-val" id="rskNet">—</span>
     </div>
     <div class="rsk-candle-wrap" id="rskWrap"><canvas id="rskCanvas"></canvas></div>
@@ -1351,7 +1351,7 @@ async function loadTrades(){
 }
 
 /* ── RISK BAR ── */
-let riskData={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-2000,active_target_line:2000,pnl_offset:0,updated_timestamp:''};
+let riskData={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-2000,active_target_line:2000,pnl_offset:0,booked_profit:0,closed_book_count:0,last_closed_snapshot:null,updated_timestamp:''};
 async function loadRisk(){
     try{riskData=await fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json());}catch{}
     const peak=Math.round(riskData.session_peak_pnl??0);
@@ -1372,13 +1372,17 @@ function renderRiskInfo(){
     const el=$('rskInfo');if(!el)return;
     const d=riskData,f=v=>'₹'+(v>=0?'':'-')+Math.abs(Math.round(v||0));
     const cls=v=>(v>=0?'bull':'bear');
+    const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const row=(k,v,c)=>`<div class="ri-row"><span class="ri-k">${k}</span><span class="ri-v ${c||''}">${v}</span></div>`;
-    el.innerHTML=row('Current Net',f(d.current_net_pnl),cls(d.current_net_pnl))
-        +row('Session Peak',f(d.session_peak_pnl),cls(d.session_peak_pnl))
-        +row('Exit Line',f(d.active_exit_line),'bear')
-        +row('Target',f(d.active_target_line),'bull')
-        +row('PnL Offset',f(d.pnl_offset),cls(d.pnl_offset))
-        +row('Updated',`<span style="font-size:10px;font-weight:600;">${d.updated_timestamp||'—'}</span>`);
+    const last=d.last_closed_snapshot;
+    const snapshot=last
+        ? `${f(last.realized_pnl)} · ${Number(last.closed_positions)||0} positions · ${esc(last.closed_at||'—')}`
+        : '—';
+    el.innerHTML=row('Current book',f(d.current_net_pnl),cls(d.current_net_pnl))
+        +row('Booked profit',f(d.booked_profit),cls(d.booked_profit))
+        +row('Booked books',String(Number(d.closed_book_count)||0))
+        +row('Last closed snapshot',snapshot)
+        +row('Updated',`<span style="font-size:10px;font-weight:600;">${esc(d.updated_timestamp||'—')}</span>`);
 }
 (function(){
     const wrap=$('rskWrap'),info=$('rskInfo');if(!wrap||!info)return;
@@ -1420,16 +1424,14 @@ function drawRiskCandle(floor,net,peak){
         ctx.beginPath();ctx.moveTo(openX,midY-bodyH/2);ctx.lineTo(openX,midY+bodyH/2);ctx.stroke();
         ctx.setLineDash([]);
     }
-    /* ── values ──
-       candle body colour  = sign of (running+booked) → overall account gain/loss (primary signal)
-       net chip            = sign of net              → present running P&L (secondary cue, contrast colour)
-       Both values are always shown. */
-    const sumVal=runningTotal+bookedTotal;
+    /* The chip is the current book; the body is cumulative closed-book profit. */
+    const sumVal=Number(riskData.booked_profit??bookedTotal)||0;
+    const bookCount=Number(riskData.closed_book_count)||0;
     const overallBull=sumVal>=0;
     const overallColor=overallBull?cssVar('--bull'):cssVar('--bear');
     const netColor=isBull?cssVar('--bull'):cssVar('--bear');
     const netTxt='₹'+(net>=0?'+':'')+Math.round(net);
-    const sumTxt=fmt(sumVal);
+    const sumTxt=`${fmt(sumVal)} · ${bookCount} books`;
     const mainFont=`800 ${fz}px 'Syne',sans-serif`,chipFont=`800 ${fz-1}px 'Syne',sans-serif`;
     ctx.font=chipFont;const wNet=ctx.measureText(netTxt).width;
     ctx.font=mainFont;const wSum=ctx.measureText(sumTxt).width;

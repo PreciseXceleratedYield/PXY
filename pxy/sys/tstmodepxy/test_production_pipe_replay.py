@@ -151,6 +151,53 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 )
                 self.assertEqual(open_df.loc[0, "PNL"], 750)
 
+    def test_sim_percentage_gates_use_scaled_directional_spot_returns(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-spot-percent-test-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, SimulatedBroker(), Path(temp) / "state"
+            ) as engine:
+                self.assertEqual(
+                    engine.exit_pipe.EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT,
+                    14.0 / 200.0,
+                )
+                rows = pd.DataFrame(
+                    [
+                        {
+                            "symbol": "NIFTY-WF-CE",
+                            "qty": 1,
+                            "buy_prc": 22500,
+                            "sell_prc": 22475,
+                        },
+                        {
+                            "symbol": "NIFTY-WF-PE",
+                            "qty": 1,
+                            "buy_prc": 22500,
+                            "sell_prc": 22525,
+                        },
+                    ]
+                )
+
+                ce_rows = rows[rows["symbol"].str.endswith("CE")]
+                pe_rows = rows[rows["symbol"].str.endswith("PE")]
+                self.assertAlmostEqual(
+                    engine.avg_controller.side_overall_pnl_pct(ce_rows),
+                    -25 / 22500 * 100,
+                )
+                self.assertAlmostEqual(
+                    engine.avg_controller.side_overall_pnl_pct(pe_rows),
+                    -25 / 22500 * 100,
+                )
+                self.assertAlmostEqual(
+                    engine.exit_pipe.depth_exit_side_loss_pct(rows, "PE"),
+                    -25 / 22500 * 100,
+                )
+
+                favorable_pe = pe_rows.assign(sell_prc=22475)
+                self.assertAlmostEqual(
+                    engine.avg_controller.side_overall_pnl_pct(favorable_pe),
+                    25 / 22500 * 100,
+                )
+
     def test_replay_can_disable_risk_bar_without_changing_default(self):
         with tempfile.TemporaryDirectory(prefix="pxy-risk-disabled-replay-") as temp:
             with ProductionPipeReplay(
@@ -614,6 +661,12 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 for side in scenario["held"]:
                     symbol = f"NIFTY-WF-{side}"
                     tag = f"CHK-{side}"
+                    spot_mark = (
+                        scenario["sell_price"]
+                        if side == "CE"
+                        else 200.0 - scenario["sell_price"]
+                    )
+                    direction = 1 if side == "CE" else -1
                     broker.place_order(
                         trading_symbol=symbol,
                         transaction_type="B",
@@ -627,8 +680,8 @@ class ProductionPipeReplayTests(unittest.TestCase):
                             "tag": tag,
                             "buy_time": timestamp,
                             "buy_prc": 100.0,
-                            "sell_prc": scenario["sell_price"],
-                            "pnl": 200.0 if scenario["sell_price"] >= 110 else 0.0,
+                            "sell_prc": spot_mark,
+                            "pnl": (spot_mark - 100.0) * direction * 75,
                             "pxy_tgt": scenario["target"],
                             "entry": scenario["entry"],
                             "exit": scenario["exit"],
@@ -697,6 +750,12 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 timestamp = timezone.localize(datetime(2025, 1, 6, 10, 0))
                 broker.set_market(timestamp, 22000)
                 symbol = f"NIFTY-WF-{scenario['side']}"
+                spot_mark = (
+                    scenario["sell_price"]
+                    if scenario["side"] == "CE"
+                    else 200.0 - scenario["sell_price"]
+                )
+                direction = 1 if scenario["side"] == "CE" else -1
                 broker.place_order(
                     trading_symbol=symbol,
                     transaction_type="B",
@@ -712,8 +771,8 @@ class ProductionPipeReplayTests(unittest.TestCase):
                             "buy_time": timestamp,
                             "buy_prc": 100.0,
                             "pxy_entry": 100.0,
-                            "sell_prc": scenario["sell_price"],
-                            "pnl": (scenario["sell_price"] - 100.0) * 75,
+                            "sell_prc": spot_mark,
+                            "pnl": (spot_mark - 100.0) * direction * 75,
                             "exit": scenario["signal"],
                             "sma": sma_status,
                             "atr": 5.0,
@@ -724,6 +783,12 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 if has_opposite:
                     opposite_side = "PE" if scenario["side"] == "CE" else "CE"
                     opposite_symbol = f"NIFTY-WF-{opposite_side}"
+                    opposite_mark = (
+                        scenario["opposite_sell_price"]
+                        if opposite_side == "CE"
+                        else 200.0 - scenario["opposite_sell_price"]
+                    )
+                    opposite_direction = 1 if opposite_side == "CE" else -1
                     broker.place_order(
                         trading_symbol=opposite_symbol,
                         transaction_type="B",
@@ -742,8 +807,8 @@ class ProductionPipeReplayTests(unittest.TestCase):
                                         "buy_time": timestamp,
                                         "buy_prc": 100.0,
                                         "pxy_entry": 100.0,
-                                        "sell_prc": scenario["opposite_sell_price"],
-                                        "pnl": (scenario["opposite_sell_price"] - 100.0) * 75,
+                                        "sell_prc": opposite_mark,
+                                        "pnl": (opposite_mark - 100.0) * opposite_direction * 75,
                                         "exit": scenario["signal"],
                                         "sma": sma_status,
                                         "atr": 5.0,

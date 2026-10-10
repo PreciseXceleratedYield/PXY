@@ -67,12 +67,17 @@ def load_session_state():
         "pnl_offset": float(d.get("pnl_offset", 0.0)),
         "risk_control_activated": bool(d.get("risk_control_activated", False)),
         "updated_timestamp": str(d.get("updated_timestamp", "") or ""),
+        "booked_profit": float(d.get("booked_profit", 0.0)),
+        "closed_book_count": max(0, int(d.get("closed_book_count", 0))),
+        "last_closed_snapshot": d.get("last_closed_snapshot"),
+        "last_closed_cycle_id": str(d.get("last_closed_cycle_id", "") or ""),
     }
 
 
 def save_session_state(
     peak_value, current_net, exit_line, pnl_offset_val, risk_control_activated=False,
-    target_exit_line=PEAK_CEILING,
+    target_exit_line=PEAK_CEILING, booked_profit=0.0, closed_book_count=0,
+    last_closed_snapshot=None, last_closed_cycle_id="",
 ):
     return _atomic_write_json(RENKO_STATE_FILE, {
         "session_peak_pnl": float(peak_value),
@@ -82,6 +87,10 @@ def save_session_state(
         "pnl_offset": float(pnl_offset_val),
         "risk_control_activated": bool(risk_control_activated),
         "updated_timestamp": now_ist().strftime("%Y-%m-%d %H:%M:%S"),
+        "booked_profit": float(booked_profit),
+        "closed_book_count": max(0, int(closed_book_count)),
+        "last_closed_snapshot": last_closed_snapshot,
+        "last_closed_cycle_id": str(last_closed_cycle_id or ""),
     })
 
 

@@ -188,6 +188,11 @@ network boundary.
 - Cycle P&L combines realized and unrealized row P&L. The target is
   `RUNEXACPXY_CYCLE_TARGET_PCT` (2.8% by default) of all option premium paid
   across the cycle (`quantity × buy price` for each cycle row).
+- The risk bar shows that active cycle as the current book, alongside cumulative
+  realized profit and the count of completed books. Its click-through includes
+  the last closed-book snapshot and update time. The displayed loss target is
+  the negative mirror of the profit target; it is informational and never
+  causes a loss-side square-off. There is no timed midday reset.
 - There is no risk-bar stop-loss. `RUNEXACPXY_STOP_SQUAREOFF_ENABLED` defaults
   to `False`; `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED` defaults to `True`.
 - When cycle P&L reaches its target, the risk bar stays silent while the
@@ -204,14 +209,14 @@ network boundary.
   `tstmodepxy/backtest.py` enables the same risk cycle during historical replay.
   SIM never sends live orders, uses index spot as every simulated fill and
   mark, and simulates one index unit per lot regardless of the index's actual
-  derivatives contract size. Production single-exit and
-  cycle-risk percentages are each divided by 200 before applying them to the
-  spot-based target and quantity-weighted entry-spot notional. The production
-  minimum P&L exit gate is scaled by SIM quantity relative to the prior
-  65-unit SIM lot, preserving the per-lot exit threshold when SIM uses one
-  index unit. CE targets
-  require an upward move and PE targets a downward move. SIM results are
-  index-point results, not historical option P&L.
+  derivatives contract size. Production single-exit, averaging, cycle-risk,
+  and deep-reversal loss percentages are each divided by 200 before comparing
+  them with direction-aware spot returns or applying them to spot notional.
+  The production minimum P&L exit gate is scaled by SIM quantity relative to
+  the prior 65-unit SIM lot, preserving the per-lot exit threshold when SIM
+  uses one index unit. CE targets require an upward move and PE targets a
+  downward move. SIM results are index-point results, not historical option
+  P&L.
 
 ## Check
 
@@ -234,19 +239,26 @@ completed sessions from one-minute index candles (or fewer if less history is
 available), with the preceding session used for indicator warm-up. Use
 `--sessions N` to select a different number of sessions, `--records N` for a
 short diagnostic replay, or `--lgt-constant 8` to test a fixed `-8%` LGT
-threshold instead of the configured formula.
+threshold instead of the configured formula. Add `--heikin-ashi` to generate
+BUY/SELL only when HA candle color switches; the current HA direction supplies
+the BULL/BEAR exit state. Production execution pipes and spot-based fills stay
+the same. In an interactive terminal (including a remote-host terminal), SIM
+prints a two-column Action / Why action table when each book closes and waits
+for Enter before advancing to the next book; type `q` to stop. Non-interactive
+runs do not wait for input.
 
 The replay keeps production signals, target selection, averaging, counter-buy,
 risk confirmation, and scheduled square-off flow. With one option side open,
 the aligned single-exit target uses the ATR/power/depth calculation. With both
 CE and PE sides open, aligned targets use 77%; unaligned targets remain 1.4%.
 SIM uses only index spot prices and a fixed quantity of 1 per lot; it divides
-these production target percentages and the cycle-risk percentage by 200
-before applying them to spot and quantity-weighted entry-spot notional. CE
-targets require spot to rise; PE targets require spot to fall. P&L is signed
-index movement times quantity for each lot. Remaining positions must be
-closed by scheduled square-off or the replay reports an error. This is a
-spot-point strategy comparison, not historical option P&L.
+production target percentages, averaging LGT thresholds, cycle-risk targets,
+and deep-reversal loss thresholds by 200 before applying them to spot returns
+or quantity-weighted entry-spot notional. CE targets require spot to rise; PE
+targets require spot to fall. P&L is signed index movement times quantity for
+each lot. Remaining positions must be closed by scheduled square-off or the
+replay reports an error. This is a spot-point strategy comparison, not
+historical option P&L.
 
 ## Other conditional settings
 

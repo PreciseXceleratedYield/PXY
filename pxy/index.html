@@ -69,7 +69,7 @@ canvas{display:block;width:100%;height:100%;}
 #riskBar{
     height:56px;flex-shrink:0;display:flex;align-items:center;
     padding:0 6px;gap:6px;background:var(--bg2);
-    border-bottom:1px solid var(--border);overflow:hidden;
+    border-bottom:1px solid var(--border);overflow:visible;position:relative;cursor:pointer;
 }
 .rsk-grp{display:flex;flex-direction:column;gap:1px;flex-shrink:0;}
 .rsk-lbl{font-size:7px;letter-spacing:0.10em;text-transform:uppercase;color:#ffffff;white-space:nowrap;}
@@ -78,6 +78,14 @@ canvas{display:block;width:100%;height:100%;}
 .rsk-val.bear{color:var(--bear);}
 .rsk-candle-wrap{flex:1;min-width:0;height:42px;position:relative;overflow:hidden;}
 #rskCanvas{position:absolute;inset:0;width:100%!important;height:100%!important;}
+#rskInfo{display:none;position:absolute;left:6px;right:6px;bottom:100%;margin-bottom:4px;z-index:60;
+    background:var(--bg3,#1c1f26);border:1px solid var(--accent);border-radius:6px;padding:6px 10px;
+    font-family:'DM Mono',monospace;font-size:10px;color:var(--strong);box-shadow:var(--shadow-tip);}
+#rskInfo.show{display:block;}
+#rskInfo .ri-row{display:flex;justify-content:space-between;gap:12px;padding:1px 0;}
+#rskInfo .ri-k{color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-size:8px;align-self:center;}
+#rskInfo .ri-v{font-family:'Syne',sans-serif;font-weight:800;font-size:12px;}
+#rskInfo .ri-v.bull{color:var(--bull);} #rskInfo .ri-v.bear{color:var(--bear);}
 </style>
 </head>
 <body>
@@ -103,10 +111,11 @@ canvas{display:block;width:100%;height:100%;}
 <!-- RISK BAR -->
 <div id="riskBar">
     <div class="rsk-grp">
-        <span class="rsk-lbl">⛔ Stop</span>
+        <span class="rsk-lbl">⬇ Loss Target</span>
         <span class="rsk-val" id="rskNet">—</span>
     </div>
     <div class="rsk-candle-wrap"><canvas id="rskCanvas"></canvas></div>
+    <div id="rskInfo"></div>
     <div class="rsk-grp" style="align-items:flex-end;">
         <span class="rsk-lbl">🎯 Target</span>
         <span class="rsk-val bull" id="rskTarget">—</span>
@@ -590,23 +599,43 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift){
 
 
 /* ══════════════════════════════════════════════════════════════
-   RISK BAR — same drawing logic as webpxy.html, adapted to the
-   data this standalone page already has on hand: net = ce_pnl+pe_pnl
-   from webavgpxy.json (no running/booked trade totals here), floor
-   and peak from webrinkopxy.json, same as the main app.
+   RISK BAR — current book and booked-book totals come from the
+   same state written for the main dashboard.
    ══════════════════════════════════════════════════════════════ */
+let riskData={};
 async function loadRisk(){
     let d={session_peak_pnl:0,active_exit_line:-2000,active_target_line:2000};
     try{d=await fetch('./webrinkopxy.json?_='+Date.now()).then(r=>r.json());}catch(e){}
+    riskData=d;
     const peak=Math.round(d.session_peak_pnl??0);
-    const net=Math.round((Number(data.ce_pnl)||0)+(Number(data.pe_pnl)||0));
+    const net=Math.round(Number(d.current_net_pnl)||0);
     const floor=Math.round(d.active_exit_line??-2000);
     const target=Math.round(d.active_target_line??2000);
     $('rskTarget').textContent='₹'+target.toLocaleString('en-IN');
     $('rskNet').textContent='₹'+fmtK(floor);
     $('rskNet').className='rsk-val bear';
     drawRiskCandle(floor,net,peak);
+    renderRiskInfo();
 }
+function renderRiskInfo(){
+    const d=riskData,last=d.last_closed_snapshot;
+    const money=v=>'₹'+Math.round(Number(v)||0).toLocaleString('en-IN');
+    const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const row=(k,v,c='')=>`<div class="ri-row"><span class="ri-k">${k}</span><span class="ri-v ${c}">${v}</span></div>`;
+    const snapshot=last?`${money(last.realized_pnl)} · ${Number(last.closed_positions)||0} positions · ${esc(last.closed_at||'—')}`:'—';
+    $('rskInfo').innerHTML=row('Current book',money(d.current_net_pnl),Number(d.current_net_pnl)>=0?'bull':'bear')
+        +row('Booked profit',money(d.booked_profit),Number(d.booked_profit)>=0?'bull':'bear')
+        +row('Booked books',String(Number(d.closed_book_count)||0))
+        +row('Last closed snapshot',snapshot)
+        +row('Updated',esc(d.updated_timestamp||'—'));
+}
+$('riskBar').addEventListener('click',e=>{
+    if(e.target.closest('#rskInfo'))return;
+    $('rskInfo').classList.toggle('show');
+});
+document.addEventListener('click',e=>{
+    if(!$('riskBar').contains(e.target))$('rskInfo').classList.remove('show');
+});
 let lastFloor=-3000,lastNet=0,lastPeak=10;
 function drawRiskCandle(floor,net,peak){
     lastFloor=floor;lastNet=net;lastPeak=peak;
@@ -634,7 +663,9 @@ function drawRiskCandle(floor,net,peak){
         rctx.beginPath();rctx.moveTo(openX,midY-bodyH/2);rctx.lineTo(openX,midY+bodyH/2);rctx.stroke();
         rctx.setLineDash([]);
     }
-    const netLabel='₹'+(net>=0?'+':'')+Math.round(net).toLocaleString('en-IN');
+    const booked=Math.round(Number(riskData.booked_profit)||0);
+    const books=Number(riskData.closed_book_count)||0;
+    const netLabel=`₹${net>=0?'+':''}${Math.round(net).toLocaleString('en-IN')} / ₹${booked.toLocaleString('en-IN')} (${books})`;
     rctx.font=`800 ${fz}px 'Syne',sans-serif`;
     const textW=rctx.measureText(netLabel).width+14;
     let bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX);
