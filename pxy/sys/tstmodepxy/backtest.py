@@ -581,6 +581,26 @@ def print_report(
         f"Scheduled square-off exits: {squareoff_exits}"
     )
     print(f"Closed-trade spot points: {total_points:+.2f}")
+    if len(session_dates) > 1:
+        points_by_session = {
+            session: sum(
+                float(trade["points"])
+                for trade in trades
+                if str(trade["session"]) == str(session)
+            )
+            for session in session_dates
+        }
+        print("Daily spot points and cumulative total:")
+        print("| Session date | Daily points | Cumulative points |")
+        print("|---|---:|---:|")
+        cumulative_points = 0.0
+        for session in session_dates:
+            daily_points = points_by_session[session]
+            cumulative_points += daily_points
+            print(
+                f"| {session} | {daily_points:+.2f} | "
+                f"{cumulative_points:+.2f} |"
+            )
     if incomplete_positions:
         print(
             "Diagnostic replay ended before square-off; open positions excluded "
@@ -916,7 +936,7 @@ def main(argv=None):
             and sys.stdin.isatty()
         )
         if should_choose_session:
-            replay_history = fetch_recent_index_history(session_count=5)
+            replay_history = fetch_recent_index_history(session_count=7)
             holidays = set(RUNNIFTYPXY_HOLIDAYS)
             available_sessions = [
                 session
@@ -929,15 +949,19 @@ def main(argv=None):
             print("\nChoose a completed NIFTY trading session for SIM:")
             for index, session in enumerate(sessions, start=1):
                 print(f"{index}) {session.isoformat()}")
+            print("6) Run the latest 7 available completed trading days")
             print("q) Cancel")
-            choice = input("Select a session [1-5, q]: ").strip().lower()
+            choice = input("Select a session or 7-day run [1-6, q]: ").strip().lower()
             if choice == "q":
                 print("SIM cancelled.")
                 return 0
-            selected_session = choose_replay_session(replay_history, choice)
-            if selected_session is None:
-                raise ValueError("Invalid SIM session selection.")
-            args.session_date = selected_session
+            if choice == "6":
+                args.sessions = 7
+            else:
+                selected_session = choose_replay_session(replay_history, choice)
+                if selected_session is None:
+                    raise ValueError("Invalid SIM session selection.")
+                args.session_date = selected_session
         book_by_book = args.book_by_book
         if (
             sys.stdin.isatty()
