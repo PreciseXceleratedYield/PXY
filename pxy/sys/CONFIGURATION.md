@@ -223,16 +223,14 @@ network boundary.
 
 ## Check
 
-From the `pxy` console, choose `c)` to open the CHK/SIM options: enter `c` to run
-only the CHK test suite, or `b` to run only a SIM replay. SIM then asks you to
-choose from the five most recent completed NIFTY trading sessions (weekends and
-configured holidays are skipped). CHK checks the production-cycle gates and
-pipe decisions; SIM runs the selected session through the production dashboard,
-exit, entry, averaging, counter-leg, and square-off pipes against a simulated
-broker. Neither operation sends live orders, and SIM no longer requires CHK to
-run first.
+From the `pxy` console, choose `b)` to run a SIM replay directly, or `c)` to run
+the CHK + SIM suite. The suite asks you to choose from the five most recent
+completed NIFTY trading sessions (weekends and configured holidays are skipped),
+runs CHK first, then replays the selected session through the production
+dashboard, exit, entry, averaging, counter-leg, and square-off pipes against a
+simulated broker if CHK passes. Neither option sends live orders.
 
-Run `pxychk` directly to open the same CHK/SIM options. The SIM runner also accepts
+Run `pxychk` directly to start the same CHK + SIM suite. The SIM runner also accepts
 `RUNMODE=SIM python3 syssimpxy.py --session-date YYYY-MM-DD` to replay one exact
 completed session.
 
