@@ -26,6 +26,7 @@ used.
 This is broad regression coverage of named cases, not exhaustive enumeration
 of every possible input value or external-service failure. Update the scenario
 dataframes and expected outcomes when changing a production pipe's behavior.
+CHK is a separate action from SIM; running `pxychk` does not start a replay.
 
 ### Validate Tests
 ```bash
