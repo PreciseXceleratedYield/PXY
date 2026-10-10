@@ -8,7 +8,8 @@ from pathlib import Path
 class SimulatedBroker:
     """Minimal broker adapter that fills and marks CE/PE trades at index spot."""
 
-    quantity = 65
+    quantity = 1
+    reference_quantity = 65
 
     def __init__(self, orders_csv=None):
         self.orders = []

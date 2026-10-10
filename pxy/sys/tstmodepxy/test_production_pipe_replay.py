@@ -103,12 +103,17 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 )
                 self.assertTrue(
                     engine.exit_pipe.target_exit_allowed(
-                        True, ce_target, 22084.7, 150, 140
+                        True, ce_target, 22084.7, 140 / 65, 140
+                    )
+                )
+                self.assertFalse(
+                    engine.exit_pipe.target_exit_allowed(
+                        True, ce_target, 22084.7, 2.14, 140
                     )
                 )
                 self.assertTrue(
                     engine.exit_pipe.target_exit_allowed(
-                        True, pe_target, 21915.3, 150, 140
+                        True, pe_target, 21915.3, 140 / 65, 140
                     )
                 )
                 self.assertFalse(
@@ -902,7 +907,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                             runtime_log,
                         )
 
-                    expected_positions = ("65CE0PE", "65CE65PE", "65CE65PE")[index]
+                    expected_positions = ("1CE0PE", "1CE1PE", "1CE1PE")[index]
                     self.assertEqual(broker.position_summary(), expected_positions)
 
             self.assertIn("CHK production-pipe scenario replay", runtime_log.read_text(encoding="utf-8"))

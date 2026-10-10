@@ -327,7 +327,8 @@ def print_report(
     )
     print(
         "SIM fills, target checks, cycle risk, and P&L all use index spot prices. "
-        "Target and cycle percentages are divided by 200; one lot is 65 units. "
+        "Target and cycle percentages are divided by 200; each simulated lot is "
+        "one unit for index-point results. "
         "CE gains when spot rises; PE gains when spot falls."
     )
     print(
