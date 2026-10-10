@@ -34,7 +34,11 @@ class ProductionPipeReplayTests(unittest.TestCase):
                         "atr": 10,
                         "ce_power": 2,
                         "hkin_ce_depth": 3,
-                    }
+                    },
+                    0,
+                    0,
+                    1,
+                    1,
                 )
                 pe_target = engine.oms.pxy_tgt_calc(
                     {
@@ -45,7 +49,11 @@ class ProductionPipeReplayTests(unittest.TestCase):
                         "atr": 10,
                         "pe_power": 2,
                         "hkin_pe_depth": 3,
-                    }
+                    },
+                    0,
+                    0,
+                    1,
+                    1,
                 )
                 ce_baseline_target = engine.oms.pxy_tgt_calc(
                     {
@@ -56,7 +64,11 @@ class ProductionPipeReplayTests(unittest.TestCase):
                         "atr": 10,
                         "ce_power": 2,
                         "hkin_ce_depth": 3,
-                    }
+                    },
+                    0,
+                    0,
+                    1,
+                    1,
                 )
                 pe_baseline_target = engine.oms.pxy_tgt_calc(
                     {
@@ -70,18 +82,33 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     }
                 )
 
-                self.assertEqual(ce_target, 22022)
-                self.assertEqual(pe_target, -21978)
+                self.assertEqual(ce_target, 22084.7)
+                self.assertEqual(pe_target, -21915.3)
                 self.assertEqual(ce_baseline_target, 22001.54)
                 self.assertEqual(pe_baseline_target, -21998.46)
+                self.assertEqual(
+                    engine.oms.pxy_tgt_calc(
+                        {
+                            "symbol": "NIFTY-WF-CE",
+                            "buy_prc": 22000,
+                            "pxy_entry": 22000,
+                            "exit": "BEAR",
+                        },
+                        0,
+                        0,
+                        1,
+                        1,
+                    ),
+                    22001.54,
+                )
                 self.assertTrue(
                     engine.exit_pipe.target_exit_allowed(
-                        True, ce_target, 22022, 150, 140
+                        True, ce_target, 22084.7, 150, 140
                     )
                 )
                 self.assertTrue(
                     engine.exit_pipe.target_exit_allowed(
-                        True, pe_target, 21978, 150, 140
+                        True, pe_target, 21915.3, 150, 140
                     )
                 )
                 self.assertFalse(

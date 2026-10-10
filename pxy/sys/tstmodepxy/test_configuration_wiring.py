@@ -1099,10 +1099,16 @@ class ConfigurationWiringTests(unittest.TestCase):
             self.assertIsNone(execbuypxy.check_counter_leg(no_matching_exit))
             popen.assert_called_once()
 
-    def test_aligned_tgt_uses_maximum_of_atr_depth_and_atr_power(self):
+    def test_single_side_target_uses_atr_and_two_side_target_uses_77_percent(self):
         self.assertEqual(exeltgtpxy.calculate_tgt(True, 10, 2, 3), 20.0)
         self.assertEqual(exeltgtpxy.calculate_tgt(True, 5, 3, 4), 15.0)
         self.assertEqual(exeltgtpxy.calculate_tgt(False), 1.4)
+        self.assertEqual(
+            exeltgtpxy.calculate_tgt(True, both_sides_open=True), 77.0
+        )
+        self.assertEqual(
+            exeltgtpxy.calculate_tgt(False, both_sides_open=True), 1.4
+        )
         ce = {
             "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL",
             "direction": "DOWN", "supertrend": "SIDE", "atr": 10,
@@ -1115,7 +1121,21 @@ class ConfigurationWiringTests(unittest.TestCase):
         }
         self.assertEqual(exeltgtpxy.target_price(ce, 1000, 5000), 1200.0)
         self.assertEqual(exeltgtpxy.target_price(pe, 5000, 1000), 1240.0)
+        self.assertEqual(
+            exeltgtpxy.target_price(ce, 1000, 5000, ce_count=1, pe_count=1),
+            1770.0,
+        )
+        self.assertEqual(
+            exeltgtpxy.target_price(pe, 5000, 1000, ce_count=1, pe_count=1),
+            1770.0,
+        )
         self.assertEqual(exeltgtpxy.target_price({**ce, "exit": "BEAR"}), 1014.0)
+        self.assertEqual(
+            exeltgtpxy.target_price(
+                {**ce, "exit": "BEAR"}, 1000, 5000, ce_count=1, pe_count=1
+            ),
+            1014.0,
+        )
         self.assertEqual(exeltgtpxy.target_price({**pe, "exit": "BULL"}), 1014.0)
         self.assertEqual(exeltgtpxy.target_price({**ce, "exit": "SIDE"}), 1014.0)
 
