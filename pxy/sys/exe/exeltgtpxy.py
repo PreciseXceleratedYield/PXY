@@ -13,6 +13,7 @@ from syscnfgpxy import (
 # ==================== CONFIG (this file's settings) ====================
 EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
 NOT_ALIGNED_TARGET_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
+BOTH_SIDES_ALIGNED_TARGET_PCT = 77.0
 # =======================================================================
 
 init(autoreset=True)
@@ -50,10 +51,14 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price):
     return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
 
 
-def calculate_tgt(is_aligned, atr=None, side_power=None, side_depth=None):
-    """Return max(ATR + 1.4 × depth, ATR × power) when aligned."""
+def calculate_tgt(
+    is_aligned, atr=None, side_power=None, side_depth=None, both_sides_open=False
+):
+    """Return the aligned ATR target or the configured percentage target."""
     if not is_aligned:
         return NOT_ALIGNED_TARGET_PCT
+    if both_sides_open:
+        return BOTH_SIDES_ALIGNED_TARGET_PCT
 
     try:
         atr_value, power_value, depth_value = (
@@ -107,11 +112,12 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     return ce_total, pe_total
 
 def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce_count: int = 0, pe_count: int = 0):
-    """Calculate the target using only the configured exit signal and option side.
+    """Calculate the target from exit alignment and the open side counts.
 
     Args:
-        row: dict containing entry, symbol, and exit. Extra exposure arguments are
-        accepted for compatibility but do not affect the target.
+        row: dict containing entry, symbol, exit, and ATR target inputs.
+        ce_investment/pe_investment: accepted for call compatibility.
+        ce_count/pe_count: open call and put counts.
     
     Returns:
         float: Target price rounded to 2 decimals
@@ -137,6 +143,7 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             (exit_signal == "BULL" and is_ce)
             or (exit_signal == "BEAR" and is_pe)
         )
+        both_sides_open = ce_count > 0 and pe_count > 0
         side_power = row.get("ce_power" if is_ce else "pe_power")
         side_depth = row.get("hkin_ce_depth" if is_ce else "hkin_pe_depth")
         target_pct = calculate_tgt(
@@ -144,6 +151,7 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             atr=row.get("atr"),
             side_power=side_power,
             side_depth=side_depth,
+            both_sides_open=both_sides_open,
         )
         
         # Calculate the positive target price.

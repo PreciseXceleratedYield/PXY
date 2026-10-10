@@ -214,7 +214,9 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
         active_df["pxy_entry"] = active_df.apply(pxy_dyn, axis=1)
         ce_investment, pe_investment = compute_market_exposure(active_df)
         active_df["pxy_tgt"] = active_df.apply(
-            lambda row: pxy_tgt_calc(row, ce_investment, pe_investment),
+            lambda row: pxy_tgt_calc(
+                row, ce_investment, pe_investment, ce_count, pe_count
+            ),
             axis=1,
         )
         active_df["pxy_sl"] = active_df.apply(pxy_sl_calc, axis=1)

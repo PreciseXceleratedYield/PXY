@@ -232,16 +232,17 @@ available), with the preceding session used for indicator warm-up. Use
 short diagnostic replay, or `--lgt-constant 8` to test a fixed `-8%` LGT
 threshold instead of the configured formula.
 
-The replay keeps production signals, ATR target calculation, averaging,
-counter-buy, risk confirmation, and scheduled square-off flow. SIM uses only
-index spot prices and a fixed quantity of 65 per lot. To translate production
-percentages to the SIM spot basis, both the single-exit target percentage
-(including the 1.4% unaligned baseline) and cycle-risk percentage are divided
-by 200. CE targets require spot to rise; PE targets require spot to fall. P&L
-is signed index movement times quantity for each lot; cycle risk uses
-quantity-weighted entry-spot notional with the scaled 2.8% target. Remaining
-positions must be closed by scheduled square-off or the replay reports an
-error. This is a spot-point strategy comparison, not historical option P&L.
+The replay keeps production signals, target selection, averaging, counter-buy,
+risk confirmation, and scheduled square-off flow. With one option side open,
+the aligned single-exit target uses the ATR/power/depth calculation. With both
+CE and PE sides open, aligned targets use 77%; unaligned targets remain 1.4%.
+SIM uses only index spot prices and a fixed quantity of 65 per lot; it divides
+these production target percentages and the cycle-risk percentage by 200
+before applying them to spot and quantity-weighted entry-spot notional. CE
+targets require spot to rise; PE targets require spot to fall. P&L is signed
+index movement times quantity for each lot. Remaining positions must be
+closed by scheduled square-off or the replay reports an error. This is a
+spot-point strategy comparison, not historical option P&L.
 
 ## Other conditional settings
 
