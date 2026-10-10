@@ -26,9 +26,6 @@ class ConfigEditorTests(unittest.TestCase):
             "TOKEN_VALUE = 'must stay hidden'\n"
             "DERIVED_VALUE = RUNNIFTYPXY_STRIKE_STEP * 2\n"
             "RUNEXACPXY_CNTRLRSKBAR = 'YES'\n"
-            "RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME = (\n"
-            "    dt_time(13, 15) if RUNEXACPXY_CNTRLRSKBAR == 'YES' else None\n"
-            ")\n"
             "if RUNEXMTPXY_INITIAL_LOSS_FLOOR < -2000:\n"
             "    raise ValueError('loss floor is out of range')\n"
         )
@@ -70,7 +67,7 @@ class ConfigEditorTests(unittest.TestCase):
         self.assertIn("EXEOTMPXY_FIXED_DISTANCE = 100", source)
         self.assertIn("EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES = (200, 150, 100, 50, 0)", source)
 
-    def test_risk_mode_is_removed_from_config_editor(self):
+    def test_risk_config_has_no_timed_activation(self):
         settings, _ = config_editor._metadata(self.original)
         self.assertNotIn(
             "RUNEXACPXY_RISK_MODE",
@@ -78,13 +75,10 @@ class ConfigEditorTests(unittest.TestCase):
         )
         runtime_config = runpy.run_path(str(self.config_path))
         self.assertEqual(runtime_config["RUNEXACPXY_CNTRLRSKBAR"], "YES")
-        self.assertEqual(
-            runtime_config["RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME"].isoformat(),
-            "13:15:00",
-        )
+        self.assertNotIn("RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME", runtime_config)
         config_editor._write({"RUNEXACPXY_CNTRLRSKBAR": "NO"})
         runtime_config = runpy.run_path(str(self.config_path))
-        self.assertIsNone(runtime_config["RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME"])
+        self.assertNotIn("RUNEXACPXY_CNTRLRSKBAR_ACTIVATION_TIME", runtime_config)
 
     def test_risk_mode_and_stop_target_actions_are_the_only_risk_switches(self):
         settings, _ = config_editor._metadata(self.original)

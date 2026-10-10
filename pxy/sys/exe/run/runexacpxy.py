@@ -34,8 +34,9 @@ from syscnfgpxy import (
 )
 from runexiopxy import now_ist, today_ist, RENKO_STATE_FILE, WEB_DIR, SQUAREOFF_SCRIPT_PATH  # noqa: F401
 from runexmtpxy import (
-    INITIAL_LOSS_FLOOR, compute_totals,
-    cycle_ledger_tags, cycle_risk_metrics, cycle_start_time,
+    PEAK_CEILING, compute_totals,
+    cycle_closed_book_snapshot, cycle_ledger_tags, cycle_risk_metrics,
+    cycle_start_time,
 )
 from runexstpxy import (
     load_check_state, save_check_state, load_session_state, save_session_state,
@@ -135,6 +136,23 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         consecutive_breaches = check_state_on_disk["consecutive_breaches"]
         pnl_offset = state_on_disk.get("pnl_offset", 0.0)
 
+    booked_profit = (
+        0.0 if session_state_is_stale
+        else float(state_on_disk.get("booked_profit", 0.0))
+    )
+    closed_book_count = (
+        0 if session_state_is_stale
+        else int(state_on_disk.get("closed_book_count", 0))
+    )
+    last_closed_snapshot = (
+        None if session_state_is_stale
+        else state_on_disk.get("last_closed_snapshot")
+    )
+    last_closed_cycle_id = (
+        "" if session_state_is_stale
+        else state_on_disk.get("last_closed_cycle_id", "")
+    )
+
     # 3. One tick per cycle: the exit pipe and the avg pipe both load the ledger every cycle.
     meta = load_meta()
     now_epoch = time.time()
@@ -157,13 +175,47 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     # The portfolio must be completely flat before a cycle is reset.
     open_tags = cycle_ledger_tags(open_df)
     if not open_tags:
+        previous_tags = {
+            str(tag) for tag in meta.get("risk_cycle_tags", [])
+        }
+        previous_start = meta.get("risk_cycle_started_at")
+        cycle_id = (
+            f"{previous_start}|{'|'.join(sorted(previous_tags))}"
+            if previous_start and previous_tags else ""
+        )
+        if cycle_id and cycle_id != last_closed_cycle_id:
+            snapshot = cycle_closed_book_snapshot(
+                closed_df, previous_tags, previous_start
+            )
+            if snapshot is not None:
+                booked_profit += snapshot["realized_pnl"]
+                closed_book_count += 1
+                last_closed_snapshot = snapshot
+                last_closed_cycle_id = cycle_id
+
+        target_line = abs(float(
+            state_on_disk.get("active_target_line", PEAK_CEILING)
+            if not session_state_is_stale else PEAK_CEILING
+        ))
+        state_saved = save_session_state(
+            0.0,
+            0.0,
+            -target_line,
+            pnl_offset,
+            target_exit_line=target_line,
+            booked_profit=booked_profit,
+            closed_book_count=closed_book_count,
+            last_closed_snapshot=last_closed_snapshot,
+            last_closed_cycle_id=last_closed_cycle_id,
+        )
+        if not state_saved:
+            return
         meta["risk_cycle_started_at"] = None
         meta["risk_cycle_tags"] = []
         meta["last_tick_epoch"] = now_epoch
         save_meta(meta)
         if consecutive_breaches:
             save_check_state(0)
-        save_session_state(0.0, 0.0, INITIAL_LOSS_FLOOR, pnl_offset)
         return
 
     previous_tags = {
@@ -225,9 +277,14 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         save_session_state(
             0.0,
             metrics["cycle_pnl"],
-            metrics["target"],
+            -metrics["target"],
             pnl_offset,
             risk_control_activated=False,
+            target_exit_line=metrics["target"],
+            booked_profit=booked_profit,
+            closed_book_count=closed_book_count,
+            last_closed_snapshot=last_closed_snapshot,
+            last_closed_cycle_id=last_closed_cycle_id,
         )
         return
 
@@ -238,9 +295,14 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         save_session_state(
             0.0,
             metrics["cycle_pnl"],
-            metrics["target"],
+            -metrics["target"],
             pnl_offset,
             risk_control_activated=True,
+            target_exit_line=metrics["target"],
+            booked_profit=booked_profit,
+            closed_book_count=closed_book_count,
+            last_closed_snapshot=last_closed_snapshot,
+            last_closed_cycle_id=last_closed_cycle_id,
         )
         return
 
@@ -249,9 +311,14 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     save_session_state(
         0.0,
         metrics["cycle_pnl"],
-        metrics["target"],
+        -metrics["target"],
         pnl_offset,
         risk_control_activated=True,
+        target_exit_line=metrics["target"],
+        booked_profit=booked_profit,
+        closed_book_count=closed_book_count,
+        last_closed_snapshot=last_closed_snapshot,
+        last_closed_cycle_id=last_closed_cycle_id,
     )
     print(
         f"{Fore.YELLOW}⚠️ Cycle profit target reached while heavy side is unaligned "
@@ -270,4 +337,13 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         client,
         total_raw_pnl,
         risk_control_activated=True,
+        risk_state={
+            "active_target_line": metrics["target"],
+            "booked_profit": booked_profit,
+            "closed_book_count": closed_book_count,
+            "last_closed_snapshot": last_closed_snapshot,
+            "last_closed_cycle_id": last_closed_cycle_id,
+            "cycle_tags": sorted(cycle_tags),
+            "cycle_started_at": cycle_started_at,
+        },
     )

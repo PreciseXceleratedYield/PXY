@@ -1,6 +1,8 @@
 import sys
 import unittest
+from contextlib import redirect_stdout
 from datetime import date, datetime
+from io import StringIO
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -12,10 +14,57 @@ if str(SYS_DIR) not in sys.path:
 
 import sysmodepxy
 import sysexepxy
-from tstmodepxy.backtest import run_backtest
+from tstmodepxy.backtest import (
+    calculate_heikin_ashi,
+    heikin_ashi_entry_exit_signals,
+    print_book_table,
+    run_backtest,
+    scale_sim_lgt_calculator,
+)
 
 
 class ModeDispatchTests(unittest.TestCase):
+    def test_book_report_prints_only_action_and_reason_columns(self):
+        trade = {
+            "tag": "WF0000001",
+            "side": "CE",
+            "entry_time": "2025-01-06 09:19:00",
+            "exit_time": "2025-01-06 09:20:00",
+            "entry_spot": 22000.0,
+            "exit_spot": 22020.0,
+            "index_points_per_unit": 20.0,
+            "quantity": 1,
+            "exit_reason": "production_exit",
+        }
+        output = StringIO()
+        with redirect_stdout(output):
+            print_book_table(
+                1,
+                trade,
+                [{"GuiOrdId": "WF0000001"}],
+                {
+                    "entry_signal": "BUY",
+                    "exit_signal": "BULL",
+                    "pipe_output": "FRESH ENTRY",
+                },
+                "Target Hit & PnL Met",
+            )
+
+        lines = output.getvalue().strip().splitlines()
+        self.assertEqual(lines[0], "| Action | Why action |")
+        self.assertEqual(lines[1], "|---|---|")
+        self.assertIn("Book 1: BUY CE", lines[2])
+        self.assertIn("Fresh-entry BUY signal", lines[2])
+        self.assertIn("Production target and minimum-P&L gates both passed", lines[2])
+        self.assertTrue(all(line.count("|") == 3 for line in lines))
+
+    def test_sim_scales_production_averaging_threshold_by_200(self):
+        production_lgt = Mock(return_value=-22.5)
+        sim_lgt = scale_sim_lgt_calculator(production_lgt)
+
+        self.assertEqual(sim_lgt(0, 0, True, index_price=22500), -0.1125)
+        production_lgt.assert_called_once_with(0, 0, True, index_price=22500)
+
     def test_prd_dispatch_uses_production_provider(self):
         with patch.object(sysmodepxy, "RUNMODE", "PRD"):
             result = sysmodepxy.dispatch_mode(
@@ -130,6 +179,68 @@ class ModeDispatchTests(unittest.TestCase):
 
         self.assertEqual(len(bars), 1)
         dashboard.get_full_snapshot.assert_called_once_with()
+
+    def test_heikin_ashi_entries_only_fire_on_color_switches(self):
+        import tstmodepxy.backtest as backtest
+
+        history = pd.DataFrame(
+            {
+                "Open": [10, 6, 12, 14, 12],
+                "High": [10, 12, 14, 14, 12],
+                "Low": [5, 6, 11, 4, 12],
+                "Close": [6, 12, 14, 4, 12],
+            }
+        )
+        ha = calculate_heikin_ashi(history)
+        entries, exits = heikin_ashi_entry_exit_signals(ha)
+
+        self.assertEqual(entries, ["SELL", "BUY", "NONE", "SELL", "BUY"])
+        self.assertEqual(exits, ["BEAR", "BULL", "BULL", "BEAR", "BULL"])
+        self.assertAlmostEqual(ha["Open"].iloc[1], 7.875)
+
+    def test_heikin_ashi_doji_keeps_state_without_repeating_entry(self):
+        from tstmodepxy.backtest import heikin_ashi_entry_exit_signals
+
+        ha = pd.DataFrame(
+            {"Open": [2, 1, 3], "Close": [1, 1, 4]}
+        )
+        entries, exits = heikin_ashi_entry_exit_signals(ha)
+        self.assertEqual(entries, ["SELL", "NONE", "BUY"])
+        self.assertEqual(exits, ["BEAR", "BEAR", "BULL"])
+
+    def test_ha_signal_path_overrides_entry_exit_but_keeps_real_spot(self):
+        import tstmodepxy.backtest as backtest
+
+        timestamp = pd.date_range("2025-01-06 09:16", periods=2, freq="min")
+        history = pd.DataFrame(
+            {
+                "Open": [10, 6],
+                "High": [10, 12],
+                "Low": [5, 6],
+                "Close": [6, 12],
+            },
+            index=timestamp,
+        )
+        dashboard = Mock()
+        dashboard.get_full_snapshot.return_value = {
+            "entry": "NONE", "exit": "NONE"
+        }
+        with patch.object(
+            backtest.importlib, "import_module", return_value=dashboard
+        ), patch.object(
+            backtest, "transform_market_data", side_effect=lambda frame: frame
+        ):
+            bars = backtest.calculate_strategy_signals(
+                history, date(2025, 1, 6), heikin_ashi=True
+            )
+
+        self.assertEqual(
+            [(bar["entry"], bar["exit"]) for bar in bars],
+            [("SELL", "BEAR"), ("BUY", "BULL")],
+        )
+        self.assertEqual([bar["spot"] for bar in bars], [6.0, 12.0])
+        self.assertEqual(bars[-1]["snapshot"]["entry"], "BUY")
+        self.assertEqual(bars[-1]["snapshot"]["exit"], "BULL")
 
     def test_yahoo_history_columns_normalize_both_multiindex_orders(self):
         import tstmodepxy.backtest as backtest

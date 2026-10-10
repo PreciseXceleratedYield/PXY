@@ -14,12 +14,37 @@ from unittest.mock import patch
 import pandas as pd
 
 from syscnfgpxy import (
+    EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT,
     EXETGTPXY_TGT_PCT_NOT_ALIGNED,
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
     RUNEXACPXY_CNTRLRSKBAR,
     RUNEXACPXY_CYCLE_TARGET_PCT,
     RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
 )
+
+SIM_PERCENT_SCALE = 200.0
+
+
+def _spot_pnl_pct(rows):
+    """Calculate direction-aware spot P&L% for the replay's CE/PE rows."""
+    if rows is None or rows.empty:
+        return 0.0
+    columns = {str(column).lower(): column for column in rows.columns}
+    if not {"symbol", "qty", "buy_prc", "sell_prc"}.issubset(columns):
+        return 0.0
+
+    quantities = pd.to_numeric(rows[columns["qty"]], errors="coerce").fillna(0).abs()
+    buy_prices = pd.to_numeric(rows[columns["buy_prc"]], errors="coerce").fillna(0)
+    sell_prices = pd.to_numeric(rows[columns["sell_prc"]], errors="coerce").fillna(0)
+    symbols = rows[columns["symbol"]].astype(str).str.upper().str.strip()
+    invested = quantities * buy_prices
+    total_invested = float(invested.sum())
+    if total_invested <= 0:
+        return 0.0
+
+    point_pnl = (sell_prices - buy_prices) * quantities
+    signed_pnl = point_pnl.where(~symbols.str.endswith("PE"), -point_pnl)
+    return float(signed_pnl.sum() / total_invested * 100.0)
 
 
 class ProductionPipeReplay:
@@ -99,11 +124,11 @@ class ProductionPipeReplay:
                 (exit_signal == "BULL" and option_side == "CE")
                 or (exit_signal == "BEAR" and option_side == "PE")
             )
-            target_pct /= 200.0
+            target_pct /= SIM_PERCENT_SCALE
             target_distance = entry_price * (
                 target_pct
                 if aligned
-                else EXETGTPXY_TGT_PCT_NOT_ALIGNED / 200.0
+                else EXETGTPXY_TGT_PCT_NOT_ALIGNED / SIM_PERCENT_SCALE
             ) / 100.0
             if option_side == "CE":
                 return round(entry_price + target_distance, 2)
@@ -150,6 +175,32 @@ class ProductionPipeReplay:
         self.stack.enter_context(
             patch.object(
                 self.exit_pipe, "target_exit_allowed", spot_target_exit_allowed
+            )
+        )
+        self.stack.enter_context(
+            patch.object(
+                self.exit_pipe,
+                "EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT",
+                EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT / SIM_PERCENT_SCALE,
+            )
+        )
+
+        def spot_depth_exit_side_loss_pct(active_df, side):
+            if active_df is None or active_df.empty or "symbol" not in active_df:
+                return None
+            symbols = active_df["symbol"].astype(str).str.upper().str.strip()
+            side_rows = active_df[symbols.str.endswith(str(side).upper())]
+            if side_rows.empty or not {
+                "qty", "buy_prc", "sell_prc"
+            }.issubset({str(column).lower() for column in side_rows.columns}):
+                return None
+            return _spot_pnl_pct(side_rows)
+
+        self.stack.enter_context(
+            patch.object(
+                self.exit_pipe,
+                "depth_exit_side_loss_pct",
+                spot_depth_exit_side_loss_pct,
             )
         )
 
@@ -273,6 +324,12 @@ class ProductionPipeReplay:
             patch.object(self.lilo, "dump_livpos_to_json", lambda _rows: None),
             patch.object(self.avg_controller, "datetime", ReplayClock),
             patch.object(self.avg_controller, "ledger_busy", return_value=False),
+            patch.object(self.avg_controller, "side_overall_pnl_pct", _spot_pnl_pct),
+            patch.object(
+                self.avg_controller,
+                "get_loss",
+                lambda row: _spot_pnl_pct(pd.DataFrame([row])),
+            ),
             patch.object(
                 self.avg_controller,
                 "get_position_summary",
@@ -380,7 +437,7 @@ class ProductionPipeReplay:
             closed_df,
             self.risk_cycle_tags,
             exit_signal,
-            RUNEXACPXY_CYCLE_TARGET_PCT / 200.0,
+            RUNEXACPXY_CYCLE_TARGET_PCT / SIM_PERCENT_SCALE,
         )
         if not (
             str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() == "YES"

@@ -32,6 +32,7 @@ from syscnfgpxy import (
 )
 import runexstpxy
 import runexacpxy
+import runexlqdpxy
 
 
 class CycleRiskControlTests(unittest.TestCase):
@@ -167,6 +168,8 @@ class CycleRiskControlTests(unittest.TestCase):
         self.assertEqual(liquidate.call_args.args[1], 3750)
         self.assertTrue(liquidate.call_args.kwargs["risk_control_activated"])
         self.assertEqual(save_state.call_args.args[3], 1200.0)
+        self.assertEqual(save_state.call_args.args[2], -420.0)
+        self.assertEqual(save_state.call_args.kwargs["target_exit_line"], 420.0)
         self.assertEqual(
             [call.args[0] for call in saved_checks.call_args_list],
             [1, 2],
@@ -177,7 +180,12 @@ class CycleRiskControlTests(unittest.TestCase):
             patch.object(
                 runexacpxy,
                 "load_session_state",
-                return_value={"pnl_offset": 4321.0},
+                return_value={
+                    "pnl_offset": 4321.0,
+                    "booked_profit": 1200.0,
+                    "closed_book_count": 2,
+                    "last_closed_snapshot": {"realized_pnl": 500.0},
+                },
             ),
             patch.object(
                 runexacpxy,
@@ -202,12 +210,32 @@ class CycleRiskControlTests(unittest.TestCase):
             patch.object(runexacpxy, "time") as risk_clock,
         ):
             risk_clock.time.return_value = 1_000_000
-            runexacpxy._tick(object(), pd.DataFrame(), pd.DataFrame())
+            runexacpxy._tick(
+                object(),
+                pd.DataFrame(),
+                pd.DataFrame([{
+                    "Tag": "CYCLE-CE",
+                    "Symbol": "NIFTY-CE",
+                    "Qty": 75,
+                    "PNL": 450,
+                    "Exit_Time": pd.Timestamp("2025-01-06 10:05:00"),
+                }]),
+            )
 
         saved_meta = save_meta.call_args.args[0]
         self.assertIsNone(saved_meta["risk_cycle_started_at"])
         self.assertEqual(saved_meta["risk_cycle_tags"], [])
         self.assertEqual(save_state.call_args.args[3], 4321.0)
+        self.assertEqual(save_state.call_args.kwargs["booked_profit"], 1650.0)
+        self.assertEqual(save_state.call_args.kwargs["closed_book_count"], 3)
+        self.assertEqual(
+            save_state.call_args.kwargs["last_closed_snapshot"]["realized_pnl"],
+            450.0,
+        )
+        self.assertEqual(
+            save_state.call_args.kwargs["last_closed_cycle_id"],
+            "2025-01-06 10:00:00|CYCLE-CE",
+        )
 
     def test_cycle_risk_control_is_enabled(self):
         self.assertEqual(RUNEXACPXY_CNTRLRSKBAR, "YES")
@@ -294,12 +322,60 @@ class CycleRiskControlTests(unittest.TestCase):
                 runexstpxy.save_session_state(
                     0.0, 0.0, -2000.0, 1250.0, risk_control_activated=True,
                     target_exit_line=400.0,
+                    booked_profit=575.0,
+                    closed_book_count=3,
+                    last_closed_snapshot={"realized_pnl": 125.0},
+                    last_closed_cycle_id="cycle-1",
                 )
                 state = runexstpxy.load_session_state()
 
         self.assertTrue(state["risk_control_activated"])
         self.assertEqual(state["pnl_offset"], 1250.0)
         self.assertEqual(state["active_target_line"], 400.0)
+        self.assertEqual(state["booked_profit"], 575.0)
+        self.assertEqual(state["closed_book_count"], 3)
+        self.assertEqual(state["last_closed_snapshot"], {"realized_pnl": 125.0})
+        self.assertEqual(state["last_closed_cycle_id"], "cycle-1")
+
+    def test_risk_liquidation_books_the_final_closed_cycle(self):
+        closed_df = pd.DataFrame([{
+            "Tag": "CYCLE-CE",
+            "Symbol": "NIFTY-CE",
+            "Qty": 75,
+            "PNL": 500,
+            "Exit_Time": pd.Timestamp("2025-01-06 10:05:00"),
+        }])
+        risk_state = {
+            "active_target_line": 420.0,
+            "booked_profit": 100.0,
+            "closed_book_count": 1,
+            "cycle_tags": ["CYCLE-CE"],
+            "cycle_started_at": "2025-01-06 10:00:00",
+        }
+        with (
+            patch.object(runexlqdpxy, "run_squareoff"),
+            patch.object(runexlqdpxy, "wait_until_flat", return_value=True),
+            patch.object(runexlqdpxy, "start_cooldown"),
+            patch.object(
+                runexlqdpxy, "_refresh_total", return_value=(1500.0, closed_df)
+            ),
+            patch.object(runexlqdpxy, "save_check_state"),
+            patch.object(runexlqdpxy, "save_session_state") as save_state,
+            patch.object(runexlqdpxy.sys, "exit", side_effect=SystemExit),
+        ):
+            with self.assertRaises(SystemExit):
+                runexlqdpxy.liquidate_and_exit(
+                    object(), 1000.0, risk_control_activated=True,
+                    risk_state=risk_state,
+                )
+
+        self.assertEqual(save_state.call_args.kwargs["booked_profit"], 600.0)
+        self.assertEqual(save_state.call_args.kwargs["closed_book_count"], 2)
+        self.assertEqual(
+            save_state.call_args.kwargs["last_closed_snapshot"]["realized_pnl"],
+            500.0,
+        )
+        self.assertEqual(save_state.call_args.kwargs["target_exit_line"], 420.0)
 
 
 if __name__ == "__main__":

@@ -16,8 +16,12 @@ from syscnfgpxy import (
     RUNEXLQDPXY_FLAT_CONFIRM_TIMEOUT_SECONDS as FLAT_CONFIRM_TIMEOUT_SECONDS,
     RUNEXLQDPXY_SQUAREOFF_TIMEOUT_SECONDS as SQUAREOFF_TIMEOUT_SECONDS,
 )
-from runexmtpxy import INITIAL_LOSS_FLOOR, compute_totals, _both_empty
-from runexstpxy import save_check_state, save_session_state, _find_runlilo_module
+from runexmtpxy import (
+    PEAK_CEILING, compute_totals, cycle_closed_book_snapshot, _both_empty,
+)
+from runexstpxy import (
+    save_check_state, save_session_state, _find_runlilo_module,
+)
 from execoolpxy import start_cooldown
 
 # ==================== CONFIG (this file's settings) ====================
@@ -83,33 +87,61 @@ def _refresh_total(client, fallback_total):
             import runlilopxy as mod
         o2, c2 = mod.process_lilo_orders(client)     # re-entrancy guard makes the hooks return at once
         if not _both_empty(o2, c2):
-            return compute_totals(o2, c2)["total"]
+            return compute_totals(o2, c2)["total"], c2
     except SystemExit:
         raise
     except Exception as e:
         print(f"{Fore.YELLOW}⚠️ Post-flat ledger refresh failed ({e}); using pre-flat total.")
-        return fallback_total
+        return fallback_total, None
     print(f"{Fore.YELLOW}⚠️ Post-flat ledger came back empty; using pre-flat total.")
-    return fallback_total
+    return fallback_total, None
 
 
-def liquidate_and_exit(client, total_raw_pnl, risk_control_activated=False):
+def liquidate_and_exit(
+    client, total_raw_pnl, risk_control_activated=False, risk_state=None
+):
     """Confirmed breach: square off, wait for flat, lock the offset, reset the engine. Always ends the
     process with sys.exit(...). Flat is decided by the broker, not by the script's exit code."""
     run_squareoff()
 
     if wait_until_flat(client):
         start_cooldown()
-        new_total = _refresh_total(client, total_raw_pnl)
+        new_total, closed_df = _refresh_total(client, total_raw_pnl)
         print(f"🧹 {Fore.GREEN}Broker flat verified! Locking offset at ₹{new_total:,.0f} and restarting engine...")
         pnl_offset = new_total
+        state = dict(risk_state or {})
+        cycle_tags = {str(tag) for tag in state.get("cycle_tags", [])}
+        cycle_started_at = state.get("cycle_started_at")
+        cycle_id = (
+            f"{cycle_started_at}|{'|'.join(sorted(cycle_tags))}"
+            if cycle_started_at and cycle_tags else ""
+        )
+        snapshot = cycle_closed_book_snapshot(
+            closed_df, cycle_tags, cycle_started_at
+        )
+        if snapshot is not None and cycle_id != state.get("last_closed_cycle_id"):
+            state["booked_profit"] = (
+                float(state.get("booked_profit", 0.0))
+                + snapshot["realized_pnl"]
+            )
+            state["closed_book_count"] = (
+                int(state.get("closed_book_count", 0)) + 1
+            )
+            state["last_closed_snapshot"] = snapshot
+            state["last_closed_cycle_id"] = cycle_id
+        target_line = abs(float(state.get("active_target_line", PEAK_CEILING)))
         save_check_state(0)
         save_session_state(
             0.0,
             0.0,
-            INITIAL_LOSS_FLOOR,
+            -target_line,
             pnl_offset,
             risk_control_activated=risk_control_activated,
+            target_exit_line=target_line,
+            booked_profit=state.get("booked_profit", 0.0),
+            closed_book_count=state.get("closed_book_count", 0),
+            last_closed_snapshot=state.get("last_closed_snapshot"),
+            last_closed_cycle_id=state.get("last_closed_cycle_id", ""),
         )
         sys.exit("Master Circuit Breaker Triggered.")
 
