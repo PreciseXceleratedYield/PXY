@@ -2,7 +2,7 @@ import sys
 import tempfile
 import unittest
 from contextlib import redirect_stdout
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import StringIO
 from pathlib import Path
 from unittest.mock import patch
@@ -20,6 +20,30 @@ from tstmodepxy.replay_adapter import ProductionPipeReplay
 
 
 class ProductionPipeReplayTests(unittest.TestCase):
+    def test_sim_scales_production_dynamic_entry_decay_by_200(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-entry-decay-test-") as temp:
+            timestamp = pytz.timezone("Asia/Kolkata").localize(
+                datetime(2025, 1, 6, 10, 0)
+            )
+            with ProductionPipeReplay(
+                SYS_DIR, SimulatedBroker(), Path(temp) / "state"
+            ) as engine:
+                engine.timestamp = timestamp
+                decay_rate = replay_adapter.EXEDYNPXY_DECAY_RATE_PER_MIN / 200.0
+                self.assertEqual(engine.dynamic_entry.DECAY_RATE_PER_MIN, decay_rate)
+                dynamic_entry = engine.dynamic_entry.dynamic_entry(
+                    {
+                        "buy_prc": 1000,
+                        "buy_time": timestamp - timedelta(minutes=10),
+                        "pnl": 0,
+                        "symbol": "NIFTY-WF-CE",
+                    }
+                )
+                self.assertEqual(
+                    dynamic_entry,
+                    round(1000 * (1 - 10 * decay_rate), 2),
+                )
+
     def test_sim_uses_atr_points_when_aligned_and_uses_baseline_spot_pct_otherwise(self):
         with tempfile.TemporaryDirectory(prefix="pxy-spot-target-test-") as temp:
             with ProductionPipeReplay(

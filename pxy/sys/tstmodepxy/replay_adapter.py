@@ -14,6 +14,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from syscnfgpxy import (
+    EXEDYNPXY_DECAY_RATE_PER_MIN,
     EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT,
     EXETGTPXY_TGT_PCT_NOT_ALIGNED,
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
@@ -341,6 +342,11 @@ class ProductionPipeReplay:
                 str(self.state_dir / "webavgpxy.json"),
             ),
             patch.object(self.dynamic_entry, "datetime", ReplayClock),
+            patch.object(
+                self.dynamic_entry,
+                "DECAY_RATE_PER_MIN",
+                EXEDYNPXY_DECAY_RATE_PER_MIN / SIM_PERCENT_SCALE,
+            ),
             patch.object(self.averaging_orders, "is_cooling", lambda _side: False),
             patch.object(self.averaging_orders, "set_cooling", lambda _side: None),
             patch.object(self.averaging_orders, "generate_pxy_tag", broker.next_tag),
