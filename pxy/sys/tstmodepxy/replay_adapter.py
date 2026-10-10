@@ -24,6 +24,7 @@ from syscnfgpxy import (
 )
 
 SIM_PERCENT_SCALE = 200.0
+SIM_AVERAGING_MAX_INVESTMENT = 250000.0
 
 
 def _spot_pnl_pct(rows):
@@ -183,6 +184,13 @@ class ProductionPipeReplay:
                 self.exit_pipe,
                 "EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT",
                 EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT / SIM_PERCENT_SCALE,
+            )
+        )
+        self.stack.enter_context(
+            patch.object(
+                self.avg_controller,
+                "EXEAMSPXY_MAX_INVESTMENT",
+                SIM_AVERAGING_MAX_INVESTMENT,
             )
         )
 

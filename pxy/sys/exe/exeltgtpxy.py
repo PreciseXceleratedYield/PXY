@@ -27,8 +27,8 @@ def _warn_once(key, msg):
         print(f"{Fore.YELLOW}⚠️ {msg}{Style.RESET_ALL}")
 
 
-def calculate_lgt(ce_investment, pe_investment, is_ce, index_price):
-    """Scale the LGT loss threshold by the side investment ratio."""
+def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, own_count=1):
+    """Calculate the capped LGT percentage from investment ratio and lot count."""
     try:
         index_price = float(index_price)
     except (TypeError, ValueError) as error:
@@ -44,10 +44,22 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price):
         if own_investment > 0 and opposite_investment > 0
         else 1.0
     )
-    magnitude = max(
-        EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
-        round((index_price / 1000.0) * ratio, 2),
-    )
+    own_lots = max(0, int(own_count))
+    if own_lots == 0:
+        magnitude = EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD
+    else:
+        max_ratio_before_cap = math.log(
+            EXEAMSPXY_MAX_LGT_LOSS / own_lots, 50.0
+        )
+        powered_lgt = (
+            EXEAMSPXY_MAX_LGT_LOSS
+            if ratio >= max_ratio_before_cap
+            else (50.0 ** ratio) * own_lots
+        )
+        magnitude = max(
+            EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
+            round(powered_lgt, 2),
+        )
     return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
 
 
