@@ -369,7 +369,7 @@ def write_session_csvs(output_dir, session_date, trades, decisions):
     return trade_path, decision_path
 
 
-def _book_reason(trade, entry_orders, entry_decision, exit_log):
+def _book_entry_reason(entry_orders, entry_decision):
     entry_log = entry_decision.get("pipe_output", "") if entry_decision else ""
     entry_signal = entry_decision.get("entry_signal", "NONE") if entry_decision else "NONE"
     exit_signal = entry_decision.get("exit_signal", "NONE") if entry_decision else "NONE"
@@ -387,7 +387,11 @@ def _book_reason(trade, entry_orders, entry_decision, exit_log):
         entry_reason = f"Counter-leg triggered by {exit_signal} exit signal."
     else:
         entry_reason = f"Production entry pipe accepted {entry_signal}."
+    return entry_reason
 
+
+def _book_exit_reason(trade, entry_decision, exit_log):
+    exit_signal = entry_decision.get("exit_signal", "NONE") if entry_decision else "NONE"
     exit_time = datetime.fromisoformat(trade["exit_time"])
     if trade["exit_reason"] == "risk_bar" or "SIM CYCLE POINT TARGET EXIT" in exit_log:
         exit_reason = "Cycle-risk target was reached and its confirmation gate passed."
@@ -399,32 +403,59 @@ def _book_reason(trade, entry_orders, entry_decision, exit_log):
         exit_reason = "Deep-reversal signal and scaled loss gate triggered the exit."
     else:
         exit_reason = f"Production exit pipe closed the position on exit state {exit_signal}."
-    return f"{entry_reason} {exit_reason}"
+    return exit_reason
 
 
 def print_book_table(book_number, book_legs):
-    actions = []
-    reasons = []
+    journal = []
     total_points = 0.0
     for trade, entry_orders, entry_decision, exit_log in book_legs:
-        entry_time = datetime.fromisoformat(trade["entry_time"]).strftime("%H:%M")
-        exit_time = datetime.fromisoformat(trade["exit_time"]).strftime("%H:%M")
+        entry_timestamp = datetime.fromisoformat(trade["entry_time"])
+        exit_timestamp = datetime.fromisoformat(trade["exit_time"])
         points = float(trade["index_points_per_unit"]) * int(trade["quantity"])
         total_points += points
-        actions.append(
-            f"BUY {trade['side']} @ {entry_time} "
-            f"({float(trade['entry_spot']):.2f}) → SELL @ {exit_time} "
-            f"({float(trade['exit_spot']):.2f}); {points:+.2f} pts"
+        entry_reason = _book_entry_reason(entry_orders, entry_decision)
+        exit_reason = _book_exit_reason(trade, entry_decision, exit_log)
+        journal.append(
+            (
+                entry_timestamp,
+                f"BUY {trade['side']} @ {float(trade['entry_spot']):.2f}",
+                entry_reason,
+                "entry",
+            )
         )
-        reasons.append(_book_reason(trade, entry_orders, entry_decision, exit_log))
-    action = (
-        f"Book {book_number}: " + "; ".join(actions)
-        + f"; Total: {total_points:+.2f} pts"
+        journal.append(
+            (
+                exit_timestamp,
+                f"SELL {trade['side']} @ {float(trade['exit_spot']):.2f}; {points:+.2f} pts",
+                exit_reason,
+                "exit",
+            )
+        )
+    journal.sort(key=lambda event: event[0])
+
+    print(f"Book {book_number} — flat-to-flat cycle")
+    print("| Time (IST) | Journal | Why action |")
+    print("|---|---|---|")
+    first_entry = True
+    last_exit_index = max(
+        index for index, event in enumerate(journal) if event[3] == "exit"
     )
-    why = " ".join(dict.fromkeys(reasons))
-    print("| Action | Why action |")
-    print("|---|---|")
-    print(f"| {action} | {why} |", flush=True)
+    for index, (timestamp, action, reason, event_type) in enumerate(journal):
+        if event_type == "entry" and first_entry:
+            action = f"Book {book_number} starts: {action}"
+            first_entry = False
+        if index == last_exit_index:
+            action = f"{action}; book flat"
+        print(
+            f"| {timestamp:%H:%M:%S} | {action} | {reason} |",
+            flush=True,
+        )
+    print(
+        f"| — | Book {book_number} total: {total_points:+.2f} pts | "
+        "Portfolio flat; next book can start. |",
+        flush=True,
+    )
 
 
 class SimBookCycle:
