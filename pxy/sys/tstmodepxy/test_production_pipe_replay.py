@@ -20,6 +20,105 @@ from tstmodepxy.replay_adapter import ProductionPipeReplay
 
 
 class ProductionPipeReplayTests(unittest.TestCase):
+    def test_sim_uses_atr_points_when_aligned_and_uses_baseline_spot_pct_otherwise(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-spot-target-test-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, SimulatedBroker(), Path(temp) / "state"
+            ) as engine:
+                ce_target = engine.oms.pxy_tgt_calc(
+                    {
+                        "symbol": "NIFTY-WF-CE",
+                        "buy_prc": 22000,
+                        "pxy_entry": 22000,
+                        "exit": "BULL",
+                        "atr": 10,
+                        "ce_power": 2,
+                        "hkin_ce_depth": 3,
+                    }
+                )
+                pe_target = engine.oms.pxy_tgt_calc(
+                    {
+                        "symbol": "NIFTY-WF-PE",
+                        "buy_prc": 22000,
+                        "pxy_entry": 22000,
+                        "exit": "BEAR",
+                        "atr": 10,
+                        "pe_power": 2,
+                        "hkin_pe_depth": 3,
+                    }
+                )
+                ce_baseline_target = engine.oms.pxy_tgt_calc(
+                    {
+                        "symbol": "NIFTY-WF-CE",
+                        "buy_prc": 22000,
+                        "pxy_entry": 22000,
+                        "exit": "BEAR",
+                        "atr": 10,
+                        "ce_power": 2,
+                        "hkin_ce_depth": 3,
+                    }
+                )
+                pe_baseline_target = engine.oms.pxy_tgt_calc(
+                    {
+                        "symbol": "NIFTY-WF-PE",
+                        "buy_prc": 22000,
+                        "pxy_entry": 22000,
+                        "exit": "BULL",
+                        "atr": 10,
+                        "pe_power": 2,
+                        "hkin_pe_depth": 3,
+                    }
+                )
+
+                self.assertEqual(ce_target, 22022)
+                self.assertEqual(pe_target, -21978)
+                self.assertEqual(ce_baseline_target, 22001.54)
+                self.assertEqual(pe_baseline_target, -21998.46)
+                self.assertTrue(
+                    engine.exit_pipe.target_exit_allowed(
+                        True, ce_target, 22022, 150, 140
+                    )
+                )
+                self.assertTrue(
+                    engine.exit_pipe.target_exit_allowed(
+                        True, pe_target, 21978, 150, 140
+                    )
+                )
+                self.assertFalse(
+                    engine.exit_pipe.target_exit_allowed(
+                        True, pe_target, 22000, 0, 140
+                    )
+                )
+
+    def test_sim_ledger_signs_put_pnl_against_spot_movement(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-spot-pnl-test-") as temp:
+            timestamp = pytz.timezone("Asia/Kolkata").localize(
+                datetime(2025, 1, 6, 10, 0)
+            )
+            with ProductionPipeReplay(
+                SYS_DIR,
+                SimulatedBroker(),
+                Path(temp) / "state",
+            ) as engine:
+                engine.timestamp = timestamp
+                open_df = pd.DataFrame(
+                    [
+                        {
+                            "SYMBOL": "NIFTY-WF-PE",
+                            "QTY": 75,
+                            "TAG": "SIM-PE",
+                            "BUY_TIME": timestamp,
+                            "BUY_PRC": 22000,
+                            "SELL_PRC": 21990,
+                            "PNL": -750,
+                        }
+                    ]
+                )
+                engine._execute_risk_ledger(
+                    None, open_df, pd.DataFrame(), exit_signal="BEAR"
+                )
+                self.assertEqual(open_df.loc[0, "PNL"], 750)
+
     def test_replay_can_disable_risk_bar_without_changing_default(self):
         with tempfile.TemporaryDirectory(prefix="pxy-risk-disabled-replay-") as temp:
             with ProductionPipeReplay(
@@ -176,6 +275,43 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     if minute == 0:
                         self.assertFalse(engine.risk_exit_fired)
                         self.assertEqual(broker.position_summary(), "75CE0PE")
+
+            self.assertTrue(engine.risk_exit_fired)
+            self.assertEqual(broker.position_summary(), "0CE0PE")
+
+    def test_spot_cycle_risk_bar_uses_quantity_weighted_entry_spot_notional(self):
+        timestamp = pytz.timezone("Asia/Kolkata").localize(
+            datetime(2025, 1, 6, 10, 0)
+        )
+        broker = SimulatedBroker()
+        broker.set_market(timestamp, 22000)
+        broker.place_order(
+            trading_symbol="NIFTY-WF-CE",
+            transaction_type="B",
+            quantity=65,
+            tag="SIM-SPOT-RISK",
+        )
+        open_df = pd.DataFrame([{
+            "SYMBOL": "NIFTY-WF-CE",
+            "QTY": 65,
+            "TAG": "SIM-SPOT-RISK",
+            "BUY_PRC": 22000,
+            "SELL_PRC": 22616,
+            "PNL": 0,
+            "BUY_TIME": timestamp,
+        }])
+        with tempfile.TemporaryDirectory(prefix="pxy-spot-risk-notional-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, broker, Path(temp) / "state"
+            ) as engine:
+                for minute in range(2):
+                    engine.timestamp = timestamp.replace(minute=minute)
+                    engine._execute_risk_ledger(
+                        broker, open_df, pd.DataFrame(), exit_signal="BEAR"
+                    )
+                    if minute == 0:
+                        self.assertFalse(engine.risk_exit_fired)
+                        self.assertEqual(broker.position_summary(), "65CE0PE")
 
             self.assertTrue(engine.risk_exit_fired)
             self.assertEqual(broker.position_summary(), "0CE0PE")
@@ -599,7 +735,9 @@ class ProductionPipeReplayTests(unittest.TestCase):
                         ),
                         redirect_stdout(StringIO()),
                     ):
-                        engine.avg_controller.handle_side_averaging(broker, active_orders)
+                        engine.avg_controller.handle_side_averaging(
+                            broker, active_orders, index_price=22000
+                        )
 
                 expected_order_count = 1 + int(has_opposite) + int(
                     scenario["expected_average"]
@@ -737,7 +875,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                             runtime_log,
                         )
 
-                    expected_positions = ("75CE0PE", "75CE75PE", "75CE75PE")[index]
+                    expected_positions = ("65CE0PE", "65CE65PE", "65CE65PE")[index]
                     self.assertEqual(broker.position_summary(), expected_positions)
 
             self.assertIn("CHK production-pipe scenario replay", runtime_log.read_text(encoding="utf-8"))

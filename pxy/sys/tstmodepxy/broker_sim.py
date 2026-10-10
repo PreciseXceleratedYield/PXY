@@ -6,10 +6,9 @@ from pathlib import Path
 
 
 class SimulatedBroker:
-    """Minimal Kotak-shaped client backed only by in-memory simulated orders."""
+    """Minimal broker adapter that fills and marks CE/PE trades at index spot."""
 
-    quantity = 75
-    premium_base = 100.0
+    quantity = 65
 
     def __init__(self, orders_csv=None):
         self.orders = []
@@ -55,22 +54,6 @@ class SimulatedBroker:
             if order.get("remaining", order["fldQty"]) > 0
         ]
 
-    def _premium(self, symbol):
-        open_orders = self._open_orders(symbol)
-        if not open_orders:
-            return self.premium_base
-        total_qty = sum(order.get("remaining", order["fldQty"]) for order in open_orders)
-        if total_qty <= 0:
-            return self.premium_base
-        avg_entry_spot = sum(
-            order["entry_spot"] * order.get("remaining", order["fldQty"])
-            for order in open_orders
-        ) / total_qty
-        delta = self.current_spot - avg_entry_spot
-        if symbol.endswith("PE"):
-            delta = -delta
-        return max(2.0, self.premium_base + delta)
-
     def place_order(self, **params):
         symbol = str(params.get("trading_symbol", "")).upper().strip()
         transaction = str(params.get("transaction_type", "")).upper().strip()
@@ -95,7 +78,7 @@ class SimulatedBroker:
         order = {
             "ordSt": "complete",
             "fldQty": quantity,
-            "avgPrc": round(self._premium(symbol), 2),
+            "avgPrc": self.current_spot,
             "ordDtTm": timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             "GuiOrdId": tag,
             "trdSym": symbol,
@@ -139,17 +122,15 @@ class SimulatedBroker:
 
     def quotes(self, instrument_tokens, quote_type="ltp"):
         quotes = []
-        for instrument in instrument_tokens:
-            token = str(instrument.get("instrument_token", ""))
-            symbol = "NIFTY-WF-CE" if token == "SIM-CE" else "NIFTY-WF-PE"
-            premium = round(self._premium(symbol), 2)
+        for _instrument in instrument_tokens:
+            spot = self.current_spot
             quotes.append(
                 {
-                    "last_price": premium,
-                    "ltp": premium,
+                    "last_price": spot,
+                    "ltp": spot,
                     "depth": {
-                        "buy": [{"price": max(0.05, premium - 0.05)}],
-                        "sell": [{"price": premium + 0.05}],
+                        "buy": [{"price": spot}],
+                        "sell": [{"price": spot}],
                     },
                 }
             )
@@ -162,7 +143,7 @@ class SimulatedBroker:
         return f"{ce}CE{pe}PE"
 
     def trades(self):
-        """Return completed virtual trades paired by tag, without premium P&L."""
+        """Return completed virtual trades paired by tag using index-spot fills."""
         def base_tag(tag):
             return str(tag).split("_S", 1)[0].split("_", 1)[0]
 
@@ -188,11 +169,13 @@ class SimulatedBroker:
                     "exit_time": sell["ordDtTm"],
                     "entry_spot": buy["entry_spot"],
                     "exit_spot": sell["entry_spot"],
-                    "simulated_option_entry": buy["avgPrc"],
-                    "simulated_option_exit": sell["avgPrc"],
                     "quantity": min(buy["fldQty"], sell["fldQty"]),
                     "index_points_per_unit": index_points,
-                    "exit_reason": "production_pipe",
+                    "exit_reason": (
+                        "risk_bar"
+                        if "_S_RISK" in sell["GuiOrdId"]
+                        else "production_exit"
+                    ),
                 }
             )
         return trades

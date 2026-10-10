@@ -93,7 +93,7 @@ def print_telemetry_dashboard(p):
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
 
 
-def handle_side_averaging(client, df):
+def handle_side_averaging(client, df, index_price):
     """Runs System A (averaging) each cycle. Exits and counter-buys live in the exit pipe."""
     if df is None or df.empty:
         return
@@ -132,11 +132,13 @@ def handle_side_averaging(client, df):
         ce_investment,
         pe_investment,
         is_ce=True,
+        index_price=index_price,
     )
     pe_dynamic_threshold = calculate_lgt(
         ce_investment,
         pe_investment,
         is_ce=False,
+        index_price=index_price,
     )
     if USE_OVERALL_LOSS:
         ce_lgt_val, pe_lgt_val = ce_overall_pnl_pct, pe_overall_pnl_pct

@@ -2,6 +2,7 @@
 
 import importlib
 import io
+import math
 import os
 import sys
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
@@ -13,6 +14,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from syscnfgpxy import (
+    EXETGTPXY_TGT_PCT_NOT_ALIGNED,
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
     RUNEXACPXY_CNTRLRSKBAR,
     RUNEXACPXY_CYCLE_TARGET_PCT,
@@ -64,6 +66,7 @@ class ProductionPipeReplay:
         self.counter_pipe = importlib.import_module("execbuypxy")
         self.squareoff_pipe = importlib.import_module("exesqrpxy")
         self.dynamic_entry = importlib.import_module("exedynpxy")
+        self.target_math = importlib.import_module("exeltgtpxy")
         self.risk_math = importlib.import_module("runexmtpxy")
         self.risk_control_activated = False
         self.risk_pnl_offset = 0.0
@@ -74,6 +77,69 @@ class ProductionPipeReplay:
         self.risk_bar_enabled = risk_bar_enabled
         self.risk_cycle_started_at = None
         self.risk_cycle_tags = set()
+
+        def spot_target_price(
+            row, ce_investment=0, pe_investment=0, ce_count=0, pe_count=0
+        ):
+            try:
+                entry_price = float(row.get("pxy_entry") or row.get("buy_prc") or 0)
+            except (TypeError, ValueError):
+                return 0.0
+            if entry_price <= 0:
+                return 0.0
+            option_side = str(row.get("symbol", "")).upper().strip()[-2:]
+            production_target = self.target_math.target_price(
+                row, ce_investment, pe_investment, ce_count, pe_count
+            )
+            if production_target <= 0:
+                return 0.0
+            target_pct = (production_target / entry_price - 1.0) * 100.0
+            exit_signal = str(row.get("exit", "")).upper().strip()
+            aligned = (
+                (exit_signal == "BULL" and option_side == "CE")
+                or (exit_signal == "BEAR" and option_side == "PE")
+            )
+            target_pct /= 200.0
+            target_distance = entry_price * (
+                target_pct
+                if aligned
+                else EXETGTPXY_TGT_PCT_NOT_ALIGNED / 200.0
+            ) / 100.0
+            if option_side == "CE":
+                return round(entry_price + target_distance, 2)
+            if option_side == "PE":
+                return -round(entry_price - target_distance, 2)
+            return 0.0
+
+        def spot_target_exit_allowed(
+            market_snapshot_available, target, price, pnl, minimum_pnl
+        ):
+            try:
+                target, price, pnl, minimum_pnl = map(
+                    float, (target, price, pnl, minimum_pnl)
+                )
+            except (TypeError, ValueError, OverflowError):
+                return False
+            if (
+                not market_snapshot_available
+                or not all(
+                    math.isfinite(value)
+                    for value in (target, price, pnl, minimum_pnl)
+                )
+            ):
+                return False
+            if target < 0:
+                return abs(target) > 0 and price <= abs(target) and pnl >= minimum_pnl
+            return target > 0 and price >= target and pnl >= minimum_pnl
+
+        self.stack.enter_context(
+            patch.object(self.oms, "pxy_tgt_calc", spot_target_price)
+        )
+        self.stack.enter_context(
+            patch.object(
+                self.exit_pipe, "target_exit_allowed", spot_target_exit_allowed
+            )
+        )
 
         class ReplayClock(datetime):
             @classmethod
@@ -157,14 +223,9 @@ class ProductionPipeReplay:
                 success = self.squareoff_pipe.exit_all_positions()
             return SimpleNamespace(returncode=0 if success is not False else 1)
 
-        risk_ledger_hook = (
-            self._execute_risk_ledger
-            if self.risk_bar_enabled
-            else lambda *args, **kwargs: None
-        )
         temporary_daily_purge = SimpleNamespace(
             daily_purge_check=lambda: None,
-            execute_master_risk_ledger=risk_ledger_hook,
+            execute_master_risk_ledger=self._execute_risk_ledger,
         )
         self.state_dir.mkdir(parents=True, exist_ok=True)
         patchers = [
@@ -246,6 +307,31 @@ class ProductionPipeReplay:
         )
 
     def _execute_risk_ledger(self, client, open_df, closed_df, exit_signal=None):
+        for frame in (open_df, closed_df):
+            if frame is None or frame.empty:
+                continue
+            columns = {str(column).upper(): column for column in frame.columns}
+            required = {"SYMBOL", "QTY", "BUY_PRC", "SELL_PRC", "PNL"}
+            if not required.issubset(columns):
+                if not self.risk_bar_enabled:
+                    continue
+                raise RuntimeError(
+                    "SIM spot ledger is missing required order-price/P&L columns."
+                )
+            symbols = frame[columns["SYMBOL"]].astype(str).str.upper().str.strip()
+            quantities = pd.to_numeric(
+                frame[columns["QTY"]], errors="coerce"
+            ).fillna(0).abs()
+            buy_prices = pd.to_numeric(
+                frame[columns["BUY_PRC"]], errors="coerce"
+            ).fillna(0)
+            sell_prices = pd.to_numeric(
+                frame[columns["SELL_PRC"]], errors="coerce"
+            ).fillna(0)
+            point_pnl = (sell_prices - buy_prices) * quantities
+            is_pe = symbols.str.endswith("PE")
+            frame[columns["PNL"]] = point_pnl.where(~is_pe, -point_pnl).astype(float)
+
         if not self.risk_bar_enabled:
             return
 
@@ -282,7 +368,7 @@ class ProductionPipeReplay:
             closed_df,
             self.risk_cycle_tags,
             exit_signal,
-            RUNEXACPXY_CYCLE_TARGET_PCT,
+            RUNEXACPXY_CYCLE_TARGET_PCT / 200.0,
         )
         if not (
             str(RUNEXACPXY_CNTRLRSKBAR).upper().strip() == "YES"
@@ -315,8 +401,8 @@ class ProductionPipeReplay:
         self.risk_cycle_started_at = None
         self.risk_cycle_tags.clear()
         print(
-            f"SIM CYCLE TARGET EXIT: cycle PnL {metrics['cycle_pnl']:.2f}, "
-            f"paid {metrics['premium_paid']:.2f}, "
+            f"SIM CYCLE POINT TARGET EXIT: point PnL {metrics['cycle_pnl']:.2f}, "
+            f"spot notional {metrics['premium_paid']:.2f}, "
             f"target {metrics['target']:.2f}; "
             f"closed {len(open_df)} active rows."
         )

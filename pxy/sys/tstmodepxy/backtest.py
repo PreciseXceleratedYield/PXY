@@ -300,7 +300,10 @@ def print_report(
     orders_path, runtime_log, incomplete_positions=(),
 ):
     total_points = sum(trade["points"] for trade in trades)
-    target_exits = sum(trade["exit_reason"] == "target_exit" for trade in trades)
+    production_exits = sum(
+        trade["exit_reason"] == "production_exit" for trade in trades
+    )
+    risk_bar_exits = sum(trade["exit_reason"] == "risk_bar" for trade in trades)
     squareoff_exits = sum(
         trade["exit_reason"] == "scheduled_squareoff" for trade in trades
     )
@@ -323,9 +326,9 @@ def print_report(
         "pipe code runs against a simulated broker, including the cycle risk target."
     )
     print(
-        "Score is signed NIFTY spot movement × filled quantity (CE gains on UP; "
-        "PE gains on DOWN). Synthetic spot-linked premiums are used only to exercise "
-        "the unchanged premium-target trigger; they are not used in the score."
+        "SIM fills, target checks, cycle risk, and P&L all use index spot prices. "
+        "Target and cycle percentages are divided by 200; one lot is 65 units. "
+        "CE gains when spot rises; PE gains when spot falls."
     )
     print(
         f"Entries start at {MARKET_OPEN:%H:%M} IST; staged square-off starts "
@@ -334,7 +337,8 @@ def print_report(
     )
     print("-" * 72)
     print(
-        f"Closed lots: {len(trades)} | Target exits: {target_exits} | "
+        f"Closed lots: {len(trades)} | Production exits: {production_exits} | "
+        f"Risk-bar exits: {risk_bar_exits} | "
         f"Scheduled square-off exits: {squareoff_exits}"
     )
     print(f"Quantity-weighted spot points: {total_points:+.2f}")
@@ -480,11 +484,12 @@ def run_backtest(
         all_simulated_orders.extend(broker.orders)
         for trade in broker.trades():
             exit_clock = datetime.fromisoformat(trade["exit_time"]).time()
-            exit_reason = (
-                "scheduled_squareoff"
-                if exit_clock >= EXEEXITPXY_SQOFF_START
-                else "target_exit"
-            )
+            exit_reason = trade["exit_reason"]
+            if (
+                exit_reason != "risk_bar"
+                and exit_clock >= EXEEXITPXY_SQOFF_START
+            ):
+                exit_reason = "scheduled_squareoff"
             points_per_unit = score_spot_points(
                 trade["side"],
                 trade["entry_spot"],

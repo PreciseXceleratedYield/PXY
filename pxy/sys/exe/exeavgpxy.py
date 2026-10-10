@@ -1,4 +1,5 @@
 # AVERAGING PIPELINE RUNNER: exeavgpxy.py
+import math
 import sys
 from pathlib import Path
 
@@ -45,8 +46,30 @@ def run_snapshot():
         dump_idle_json(EXIT_MODE)
         return
 
+    market_snapshot = data.get("market_snapshot")
+    if (
+        not isinstance(market_snapshot, pd.DataFrame)
+        or market_snapshot.empty
+        or "price" not in market_snapshot.columns
+    ):
+        print(
+            f"{Fore.RED}⚠️ Index price unavailable; averaging skipped because "
+            "the dynamic LGT threshold cannot be calculated."
+        )
+        return
+    try:
+        index_price = float(market_snapshot["price"].iloc[-1])
+    except (TypeError, ValueError, OverflowError):
+        index_price = 0.0
+    if not math.isfinite(index_price) or index_price <= 0:
+        print(
+            f"{Fore.RED}⚠️ Invalid index price; averaging skipped because "
+            "the dynamic LGT threshold cannot be calculated."
+        )
+        return
+
     client = get_session()
-    handle_side_averaging(client, df)
+    handle_side_averaging(client, df, index_price)
 
 if __name__ == "__main__":
     run_snapshot()
