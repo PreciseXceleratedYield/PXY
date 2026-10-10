@@ -155,7 +155,7 @@ while true; do
     echo "e) 🛒 Enter  - Trading Operations"
     echo "t) 🧪 Test   - Run Python Scripts"
     echo "b) 📊 SIM    - Replay Historical Data"
-    echo "c) 🧪 CHK / SIM Options"
+    echo "c) ✅ CHK + SIM Suite"
     echo "x) ❌ Exit   - Close Dashboard"
     draw_border
     read -p "Select option: " OPTION
@@ -337,11 +337,11 @@ while true; do
             ;;
         c)
             echo ""
-            echo "Opening CHK/SIM options."
+            echo "Running CHK + SIM Suite."
             if bash "$PXY_APP_DIR/pxychk"; then
-                echo "[✔] CHK/SIM operation completed."
+                echo "[✔] CHK + SIM Suite completed."
             else
-                echo "[X] CHK/SIM operation failed with exit code $?."
+                echo "[X] CHK + SIM Suite failed with exit code $?."
             fi
             echo ""
             read -p "Press [Enter] to return..."
