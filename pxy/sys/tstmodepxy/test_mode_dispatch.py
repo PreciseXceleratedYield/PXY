@@ -16,6 +16,7 @@ import sysmodepxy
 import sysexepxy
 from tstmodepxy.backtest import (
     SimBookCycle,
+    choose_replay_session,
     calculate_heikin_ashi,
     heikin_ashi_entry_exit_signals,
     print_book_table,
@@ -25,6 +26,61 @@ from tstmodepxy.backtest import (
 
 
 class ModeDispatchTests(unittest.TestCase):
+    def test_interactive_sim_menu_runs_the_selected_date(self):
+        import tstmodepxy.backtest as backtest
+
+        dates = pd.bdate_range("2025-01-06", periods=6)
+        index = pd.DatetimeIndex(
+            [pd.Timestamp(day).replace(hour=15, minute=29) for day in dates]
+        )
+        history = pd.DataFrame(
+            {
+                "Open": [1.0] * len(index),
+                "High": [1.0] * len(index),
+                "Low": [1.0] * len(index),
+                "Close": [1.0] * len(index),
+            },
+            index=index,
+        )
+        with (
+            patch.object(backtest, "RUNNIFTYPXY_HOLIDAYS", []),
+            patch.object(backtest, "fetch_recent_index_history", return_value=history),
+            patch.object(backtest.sys, "stdin", Mock(isatty=Mock(return_value=True))),
+            patch("builtins.input", return_value="2"),
+            patch.object(backtest, "run_backtest") as replay,
+            redirect_stdout(StringIO()),
+        ):
+            self.assertEqual(backtest.main([]), 0)
+
+        self.assertEqual(replay.call_args.kwargs["session_date"], date(2025, 1, 10))
+        self.assertIs(replay.call_args.kwargs["history"], history)
+
+    def test_sim_session_menu_selection_uses_newest_completed_dates(self):
+        import tstmodepxy.backtest as backtest
+
+        index = pd.DatetimeIndex(
+            [
+                "2025-01-06 15:29",
+                "2025-01-07 15:29",
+                "2025-01-08 15:29",
+                "2025-01-09 15:29",
+                "2025-01-10 15:29",
+            ]
+        )
+        history = pd.DataFrame({"Close": [1] * len(index)}, index=index)
+
+        with patch.object(backtest, "RUNNIFTYPXY_HOLIDAYS", []):
+            self.assertEqual(
+                choose_replay_session(history, "1"),
+                date(2025, 1, 10),
+            )
+            self.assertEqual(
+                choose_replay_session(history, "5"),
+                date(2025, 1, 6),
+            )
+            self.assertIsNone(choose_replay_session(history, "q"))
+            self.assertIsNone(choose_replay_session(history, "6"))
+
     def test_sim_book_is_reportable_only_after_whole_portfolio_returns_flat(self):
         book = SimBookCycle()
         pe_trade = {"side": "PE"}
@@ -84,16 +140,53 @@ class ModeDispatchTests(unittest.TestCase):
         self.assertEqual(lines[0], "Book 1 — flat-to-flat cycle")
         self.assertEqual(lines[1], "| Time (IST) | Journal | Why action |")
         self.assertEqual(lines[2], "|---|---|---|")
-        self.assertIn("| 09:19:00 | Book 1 starts: BUY PE", lines[3])
-        self.assertIn("| 09:20:00 | BUY CE", lines[4])
-        self.assertIn("| 09:27:00 | SELL CE", lines[5])
-        self.assertIn("Counter-leg triggered by BULL", lines[4])
+        self.assertIn(
+            "| 09:19:00 | FRESH ENTRY (SELL): Started Book 1 with BUY PE",
+            lines[3],
+        )
+        self.assertIn("| 09:20:00 | COUNTER (BULL): BUY CE", lines[4])
+        self.assertIn("| 09:27:00 | TARGET: SELL CE", lines[5])
+        self.assertIn("Counter-leg followed the BULL signal.", lines[4])
         self.assertIn("Production target and minimum-P&L gates both passed", lines[5])
-        self.assertIn("| 09:32:00 | SELL PE", lines[6])
+        self.assertIn("| 09:32:00 | TARGET: SELL PE", lines[6])
         self.assertIn("book flat", lines[6])
-        self.assertIn("Fresh-entry SELL signal", lines[3])
+        self.assertIn("Fresh entry accepted while the portfolio was flat.", lines[3])
         self.assertIn("Book 1 total: +15.70 pts", lines[7])
         self.assertTrue(all(line.count("|") == 4 for line in lines[2:]))
+
+    def test_sim_journal_classifies_avg_risk_and_peakdip_signals(self):
+        from tstmodepxy.backtest import _book_entry_signal, _book_exit_signal
+
+        self.assertEqual(
+            _book_entry_signal([], {
+                "entry_signal": "NONE",
+                "exit_signal": "BEAR",
+                "pipe_output": "PE Averaged successfully",
+            }),
+            ("AVG", "BEAR"),
+        )
+        self.assertEqual(
+            _book_exit_signal(
+                {
+                    "exit_time": "2025-01-06 10:00:00",
+                    "exit_reason": "risk_bar",
+                },
+                {"exit_signal": "BULL"},
+                "",
+            )[0],
+            "RISK",
+        )
+        self.assertEqual(
+            _book_exit_signal(
+                {
+                    "exit_time": "2025-01-06 10:00:00",
+                    "exit_reason": "production_exit",
+                },
+                {"exit_signal": "BEAR"},
+                "Deep reversal: BUY with PE7 past depth",
+            )[0],
+            "PEAKDIP",
+        )
 
     def test_sim_scales_production_averaging_threshold_by_200(self):
         production_lgt = Mock(return_value=-22.5)

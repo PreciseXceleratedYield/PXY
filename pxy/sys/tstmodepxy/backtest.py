@@ -201,6 +201,20 @@ def recent_sessions_with_records(history, session_count=DEFAULT_SESSION_COUNT):
     return available_sessions[-session_count:]
 
 
+def choose_replay_session(history, choice, session_limit=5):
+    holidays = set(RUNNIFTYPXY_HOLIDAYS)
+    sessions = [
+        session
+        for session in _completed_session_dates(history)
+        if session.strftime("%d-%b-%Y") not in holidays
+    ]
+    newest_first = list(reversed(sessions[-session_limit:]))
+    if not str(choice).isdigit():
+        return None
+    index = int(choice) - 1
+    return newest_first[index] if 0 <= index < len(newest_first) else None
+
+
 def score_spot_points(side, entry_spot, exit_spot, quantity):
     """Return signed spot points multiplied by filled quantity."""
     side = str(side).upper().strip()
@@ -369,41 +383,50 @@ def write_session_csvs(output_dir, session_date, trades, decisions):
     return trade_path, decision_path
 
 
-def _book_entry_reason(entry_orders, entry_decision):
+def _book_entry_signal(entry_orders, entry_decision):
     entry_log = entry_decision.get("pipe_output", "") if entry_decision else ""
     entry_signal = entry_decision.get("entry_signal", "NONE") if entry_decision else "NONE"
-    exit_signal = entry_decision.get("exit_signal", "NONE") if entry_decision else "NONE"
     entry_text = entry_log.lower()
     if "fresh entry" in entry_text:
-        entry_reason = f"Fresh-entry {entry_signal} signal was accepted while flat."
+        signal_type = "FRESH ENTRY"
+        signal = entry_signal
     elif "counter-buy" in entry_text:
-        entry_reason = f"Counter-leg triggered by {exit_signal} exit signal."
+        signal_type = "COUNTER"
+        signal = entry_decision.get("exit_signal", "NONE")
     elif "averaged" in entry_text or "averaging" in entry_text:
-        entry_reason = "Averaging loss threshold and placement gates passed."
+        signal_type = "AVG"
+        signal = entry_decision.get("exit_signal", "NONE")
     elif any(
         str(order.get("GuiOrdId", "")).startswith("CB")
         for order in entry_orders
     ):
-        entry_reason = f"Counter-leg triggered by {exit_signal} exit signal."
+        signal_type = "COUNTER"
+        signal = entry_decision.get("exit_signal", "NONE")
     else:
-        entry_reason = f"Production entry pipe accepted {entry_signal}."
-    return entry_reason
+        signal_type = "ENTRY"
+        signal = entry_signal
+    return signal_type, str(signal).upper().strip()
 
 
-def _book_exit_reason(trade, entry_decision, exit_log):
+def _book_exit_signal(trade, entry_decision, exit_log):
     exit_signal = entry_decision.get("exit_signal", "NONE") if entry_decision else "NONE"
     exit_time = datetime.fromisoformat(trade["exit_time"])
     if trade["exit_reason"] == "risk_bar" or "SIM CYCLE POINT TARGET EXIT" in exit_log:
-        exit_reason = "Cycle-risk target was reached and its confirmation gate passed."
-    elif exit_time.time() >= EXEEXITPXY_SQOFF_START:
-        exit_reason = "Scheduled square-off closed the remaining position."
-    elif "Target Hit & PnL Met" in exit_log:
-        exit_reason = "Production target and minimum-P&L gates both passed."
+        signal_type = "RISK"
+        reason = "Cycle-risk target and confirmation gate passed."
     elif "Deep reversal:" in exit_log:
-        exit_reason = "Deep-reversal signal and scaled loss gate triggered the exit."
+        signal_type = "PEAKDIP"
+        reason = "Deep-reversal signal and scaled loss gate triggered the exit."
+    elif "Target Hit & PnL Met" in exit_log:
+        signal_type = "TARGET"
+        reason = "Production target and minimum-P&L gates both passed."
+    elif exit_time.time() >= EXEEXITPXY_SQOFF_START:
+        signal_type = "SQUAREOFF"
+        reason = "Scheduled square-off closed the remaining position."
     else:
-        exit_reason = f"Production exit pipe closed the position on exit state {exit_signal}."
-    return exit_reason
+        signal_type = "EXIT"
+        reason = f"Production exit pipe closed the position on {exit_signal} state."
+    return signal_type, reason
 
 
 def print_book_table(book_number, book_legs):
@@ -414,20 +437,38 @@ def print_book_table(book_number, book_legs):
         exit_timestamp = datetime.fromisoformat(trade["exit_time"])
         points = float(trade["index_points_per_unit"]) * int(trade["quantity"])
         total_points += points
-        entry_reason = _book_entry_reason(entry_orders, entry_decision)
-        exit_reason = _book_exit_reason(trade, entry_decision, exit_log)
+        entry_type, entry_signal = _book_entry_signal(
+            entry_orders, entry_decision
+        )
+        exit_type, exit_reason = _book_exit_signal(
+            trade, entry_decision, exit_log
+        )
         journal.append(
             (
                 entry_timestamp,
+                f"{entry_type} ({entry_signal}): "
                 f"BUY {trade['side']} @ {float(trade['entry_spot']):.2f}",
-                entry_reason,
+                (
+                    "Fresh entry accepted while the portfolio was flat."
+                    if entry_type == "FRESH ENTRY"
+                    else (
+                        f"Counter-leg followed the {entry_signal} signal."
+                        if entry_type == "COUNTER"
+                        else (
+                            "Averaging threshold and placement gates passed."
+                            if entry_type == "AVG"
+                            else "Production entry pipe accepted the signal."
+                        )
+                    )
+                ),
                 "entry",
             )
         )
         journal.append(
             (
                 exit_timestamp,
-                f"SELL {trade['side']} @ {float(trade['exit_spot']):.2f}; {points:+.2f} pts",
+                f"{exit_type}: SELL {trade['side']} @ "
+                f"{float(trade['exit_spot']):.2f}; {points:+.2f} pts",
                 exit_reason,
                 "exit",
             )
@@ -443,7 +484,9 @@ def print_book_table(book_number, book_legs):
     )
     for index, (timestamp, action, reason, event_type) in enumerate(journal):
         if event_type == "entry" and first_entry:
-            action = f"Book {book_number} starts: {action}"
+            action = action.replace(
+                ": ", f": Started Book {book_number} with ", 1
+            )
             first_entry = False
         if index == last_exit_index:
             action = f"{action}; book flat"
@@ -557,6 +600,7 @@ def run_backtest(
     lgt_calculator=None,
     session_date=None,
     heikin_ashi=False,
+    history=None,
 ):
     if RUNMODE != "SIM":
         raise RuntimeError(
@@ -566,7 +610,8 @@ def run_backtest(
         raise ValueError("record_limit must be a positive integer or None for all candles.")
     if session_count <= 0:
         raise ValueError("session_count must be a positive integer.")
-    history = fetch_recent_index_history(session_count)
+    if history is None:
+        history = fetch_recent_index_history(session_count)
     holiday_dates = set(RUNNIFTYPXY_HOLIDAYS)
     history = history[
         ~history.index.strftime("%d-%b-%Y").isin(holiday_dates)
@@ -842,6 +887,36 @@ def main(argv=None):
             if args.lgt_constant is None
             else lambda _ce, _pe, is_ce: -args.lgt_constant
         )
+        replay_history = None
+        should_choose_session = (
+            args.session_date is None
+            and args.sessions is None
+            and args.records is None
+            and sys.stdin.isatty()
+        )
+        if should_choose_session:
+            replay_history = fetch_recent_index_history(session_count=5)
+            holidays = set(RUNNIFTYPXY_HOLIDAYS)
+            available_sessions = [
+                session
+                for session in _completed_session_dates(replay_history)
+                if session.strftime("%d-%b-%Y") not in holidays
+            ]
+            sessions = list(reversed(available_sessions[-5:]))
+            if not sessions:
+                raise RuntimeError("No completed NIFTY sessions are available to select.")
+            print("\nChoose a completed NIFTY trading session for SIM:")
+            for index, session in enumerate(sessions, start=1):
+                print(f"{index}) {session.isoformat()}")
+            print("q) Cancel")
+            choice = input("Select a session [1-5, q]: ").strip().lower()
+            if choice == "q":
+                print("SIM cancelled.")
+                return 0
+            selected_session = choose_replay_session(replay_history, choice)
+            if selected_session is None:
+                raise ValueError("Invalid SIM session selection.")
+            args.session_date = selected_session
         run_backtest(
             args.output_dir,
             record_limit=args.records,
@@ -853,6 +928,7 @@ def main(argv=None):
             lgt_calculator=lgt_calculator,
             session_date=args.session_date,
             heikin_ashi=args.heikin_ashi,
+            history=replay_history,
         )
     except (RuntimeError, ValueError, OSError) as error:
         print(f"SIM ERROR: {error}", file=sys.stderr)

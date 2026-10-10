@@ -46,9 +46,10 @@ python validate_backtest.py
 - From the `pxy/` directory, `pxysim` sets RUNMODE=SIM for the replay and
   `pxychk` sets RUNMODE=CHK for isolated checks. Neither changes the PRD default.
 - For direct Python commands, prefix them with `RUNMODE=SIM` or `RUNMODE=CHK`.
-- SIM selects the latest recent Yahoo Finance session with enough 1-minute candles,
-  builds each production snapshot using only candles available up to that record,
-  and runs one production pipe cycle per record (100 by default).
+- Interactive SIM displays a menu of the five most recent completed NIFTY
+  session dates and replays the selected day. Non-interactive SIM can select
+  an exact date with `--session-date` or replay multiple sessions with
+  `--sessions`.
 - SIM orders are simulated and written to a CSV ledger; no live broker orders are sent.
 - `--records N` changes the number of sequential candle/cycle pairs.
 - Simulated fills use each candle's close and synthetic CE/PE premium proxies. They
