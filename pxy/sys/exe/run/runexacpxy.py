@@ -130,8 +130,10 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     if session_state_is_stale:
         purge_stale_cache()
         consecutive_breaches = 0
+        pnl_offset = 0.0
     else:
         consecutive_breaches = check_state_on_disk["consecutive_breaches"]
+        pnl_offset = state_on_disk.get("pnl_offset", 0.0)
 
     # 3. One tick per cycle: the exit pipe and the avg pipe both load the ledger every cycle.
     meta = load_meta()
@@ -161,7 +163,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         save_meta(meta)
         if consecutive_breaches:
             save_check_state(0)
-        save_session_state(0.0, 0.0, INITIAL_LOSS_FLOOR, 0.0)
+        save_session_state(0.0, 0.0, INITIAL_LOSS_FLOOR, pnl_offset)
         return
 
     previous_tags = {
@@ -224,7 +226,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             0.0,
             metrics["cycle_pnl"],
             metrics["target"],
-            0.0,
+            pnl_offset,
             risk_control_activated=False,
         )
         return
@@ -237,7 +239,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             0.0,
             metrics["cycle_pnl"],
             metrics["target"],
-            0.0,
+            pnl_offset,
             risk_control_activated=True,
         )
         return
@@ -248,7 +250,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         0.0,
         metrics["cycle_pnl"],
         metrics["target"],
-        0.0,
+        pnl_offset,
         risk_control_activated=True,
     )
     print(
