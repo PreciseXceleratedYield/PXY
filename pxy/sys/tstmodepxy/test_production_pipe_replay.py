@@ -168,11 +168,14 @@ class ProductionPipeReplayTests(unittest.TestCase):
             with ProductionPipeReplay(
                 SYS_DIR, broker, Path(temp) / "state"
             ) as engine:
-                for minute in range(3):
+                for minute in range(2):
                     engine.timestamp = timestamp.replace(minute=minute)
                     engine._execute_risk_ledger(
                         broker, open_df, pd.DataFrame(), exit_signal="BEAR"
                     )
+                    if minute == 0:
+                        self.assertFalse(engine.risk_exit_fired)
+                        self.assertEqual(broker.position_summary(), "75CE0PE")
 
             self.assertTrue(engine.risk_exit_fired)
             self.assertEqual(broker.position_summary(), "0CE0PE")

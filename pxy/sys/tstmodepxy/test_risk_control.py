@@ -121,28 +121,41 @@ class CycleRiskControlTests(unittest.TestCase):
             patch.object(
                 runexacpxy,
                 "load_check_state",
-                return_value={"consecutive_breaches": 0},
+                side_effect=[
+                    {"consecutive_breaches": 0},
+                    {"consecutive_breaches": 1},
+                ],
             ),
             patch.object(
                 runexacpxy,
                 "load_meta",
-                return_value={
-                    "last_tick_epoch": 0.0,
-                    "ledger_basis": None,
-                    "risk_cycle_started_at": buy_time.isoformat(sep=" "),
-                    "risk_cycle_tags": ["CYCLE-CE"],
-                },
+                side_effect=[
+                    {
+                        "last_tick_epoch": 0.0,
+                        "ledger_basis": None,
+                        "risk_cycle_started_at": buy_time.isoformat(sep=" "),
+                        "risk_cycle_tags": ["CYCLE-CE"],
+                    },
+                    {
+                        "last_tick_epoch": 1_000_000.0,
+                        "ledger_basis": None,
+                        "risk_cycle_started_at": buy_time.isoformat(sep=" "),
+                        "risk_cycle_tags": ["CYCLE-CE", "CYCLE-PE"],
+                    },
+                ],
             ),
             patch.object(runexacpxy, "save_meta") as save_meta,
-            patch.object(runexacpxy, "save_check_state"),
+            patch.object(runexacpxy, "save_check_state") as saved_checks,
             patch.object(runexacpxy, "save_session_state") as save_state,
             patch.object(runexacpxy, "_current_filter_time", return_value=None),
-            patch.object(runexacpxy, "TICK_MIN_GAP_SECONDS", 0),
-            patch.object(runexacpxy, "BREACH_TICKS_REQUIRED", 1),
+            patch.object(runexacpxy, "TICK_MIN_GAP_SECONDS", 10),
+            patch.object(runexacpxy, "BREACH_TICKS_REQUIRED", 2),
             patch.object(runexacpxy, "liquidate_and_exit") as liquidate,
             patch.object(runexacpxy, "time") as risk_clock,
         ):
-            risk_clock.time.return_value = 1_000_000
+            risk_clock.time.side_effect = [1_000_000, 1_000_011]
+            runexacpxy._tick(object(), open_df, closed_df, "BULL")
+            liquidate.assert_not_called()
             runexacpxy._tick(object(), open_df, closed_df, "BULL")
 
         saved_meta = save_meta.call_args.args[0]
@@ -154,6 +167,10 @@ class CycleRiskControlTests(unittest.TestCase):
         self.assertEqual(liquidate.call_args.args[1], 3750)
         self.assertTrue(liquidate.call_args.kwargs["risk_control_activated"])
         self.assertEqual(save_state.call_args.args[3], 1200.0)
+        self.assertEqual(
+            [call.args[0] for call in saved_checks.call_args_list],
+            [1, 2],
+        )
 
     def test_flat_book_resets_cycle_but_preserves_accumulated_pnl_offset(self):
         with (

@@ -194,8 +194,11 @@ network boundary.
   higher-invested open option side agrees with the current `exit` signal
   (CE/BULL or PE/BEAR); the normal ATR-based option targets continue to run.
   If the target is met while the heavier side is not aligned, the risk bar
-  squares off all active positions after the configured three consecutive
-  checks. The investment comparison uses open quantity × current sell price;
+  saves the first qualifying check and squares off all active positions if the
+  same target-and-alignment condition is still true on the next check (two
+  consecutive checks, at least 10 seconds apart). The check counter is stored
+  persistently so the engine can resume the confirmation after a restart. The
+  investment comparison uses open quantity × current sell price;
   a tie does not count as aligned.
 - CHK exercises the target calculations and simulated square-off path.
   `tstmodepxy/backtest.py` enables the same risk cycle during historical replay.
