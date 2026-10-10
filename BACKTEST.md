@@ -50,6 +50,10 @@ python validate_backtest.py
   session dates and replays the selected day. Non-interactive SIM can select
   an exact date with `--session-date` or replay multiple sessions with
   `--sessions`.
+- Interactive SIM also lets you pause after each completed book or run without
+  pauses and print each book journal at the end. Both modes finish with the
+  total spot points gained. Use `--book-by-book` or `--all-books` to select the
+  behavior from a command line.
 - SIM orders are simulated and written to a CSV ledger; no live broker orders are sent.
 - `--records N` changes the number of sequential candle/cycle pairs.
 - Simulated fills use each candle's close and synthetic CE/PE premium proxies. They

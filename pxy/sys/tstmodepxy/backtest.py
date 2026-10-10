@@ -580,7 +580,7 @@ def print_report(
         f"Risk-bar exits: {risk_bar_exits} | "
         f"Scheduled square-off exits: {squareoff_exits}"
     )
-    print(f"Quantity-weighted spot points: {total_points:+.2f}")
+    print(f"Closed-trade spot points: {total_points:+.2f}")
     if incomplete_positions:
         print(
             "Diagnostic replay ended before square-off; open positions excluded "
@@ -591,6 +591,7 @@ def print_report(
     print(f"CSV simulated broker orders: {orders_path}")
     print(f"Production pipe runtime log: {runtime_log}")
     print("=" * 72)
+    print(f"TOTAL SPOT POINTS GAINED: {total_points:+.2f}")
 
 
 def run_backtest(
@@ -601,6 +602,7 @@ def run_backtest(
     session_date=None,
     heikin_ashi=False,
     history=None,
+    book_by_book=False,
 ):
     if RUNMODE != "SIM":
         raise RuntimeError(
@@ -671,9 +673,9 @@ def run_backtest(
     all_simulated_orders = []
     incomplete_positions = []
     decisions = []
-    interactive_books = sys.stdin.isatty()
     stopped_early = False
     book_number = 0
+    completed_books = []
     for session_date in session_dates:
         broker = SimulatedBroker()
         book_cycle = SimBookCycle()
@@ -765,14 +767,20 @@ def run_backtest(
                     if completed_book is not None:
                         if completed_book:
                             book_number += 1
-                            print_book_table(book_number, completed_book)
-                            if interactive_books:
+                            if book_by_book:
+                                print_book_table(book_number, completed_book)
                                 try:
-                                    command = input().strip().lower()
+                                    command = input(
+                                        "Press Enter for the next book, or q to stop: "
+                                    ).strip().lower()
                                 except (EOFError, KeyboardInterrupt):
                                     command = "q"
                                 if command == "q":
                                     stopped_early = True
+                            else:
+                                completed_books.append(
+                                    (book_number, completed_book)
+                                )
                     if stopped_early:
                         break
             remaining = broker.position_summary()
@@ -824,11 +832,13 @@ def run_backtest(
     trade_path, decision_path = write_session_csvs(
         output_dir, session_label, all_trades, decisions
     )
-    if not interactive_books:
-        print_report(
-            history, session_dates, all_trades, decisions, trade_path, decision_path,
-            orders_path, runtime_log, incomplete_positions, heikin_ashi=heikin_ashi,
-        )
+    if not book_by_book:
+        for completed_number, legs in completed_books:
+            print_book_table(completed_number, legs)
+    print_report(
+        history, session_dates, all_trades, decisions, trade_path, decision_path,
+        orders_path, runtime_log, incomplete_positions, heikin_ashi=heikin_ashi,
+    )
     return all_trades, decisions
 
 
@@ -863,6 +873,17 @@ def main(argv=None):
         type=lambda value: datetime.strptime(value, "%Y-%m-%d").date(),
         default=None,
         help="Replay one exact completed trading session (YYYY-MM-DD).",
+    )
+    book_mode = parser.add_mutually_exclusive_group()
+    book_mode.add_argument(
+        "--book-by-book",
+        action="store_true",
+        help="Pause after each completed book and wait before continuing.",
+    )
+    book_mode.add_argument(
+        "--all-books",
+        action="store_true",
+        help="Run without pauses and print completed books at the end.",
     )
     parser.add_argument(
         "--heikin-ashi",
@@ -917,6 +938,23 @@ def main(argv=None):
             if selected_session is None:
                 raise ValueError("Invalid SIM session selection.")
             args.session_date = selected_session
+        book_by_book = args.book_by_book
+        if (
+            sys.stdin.isatty()
+            and not args.book_by_book
+            and not args.all_books
+        ):
+            print("\nChoose SIM replay style:")
+            print("1) Book by book — pause after each completed book")
+            print("2) Run all — print each book at the end, no pauses")
+            print("q) Cancel")
+            style_choice = input("Select replay style [1-2, q]: ").strip().lower()
+            if style_choice == "q":
+                print("SIM cancelled.")
+                return 0
+            if style_choice not in {"1", "2"}:
+                raise ValueError("Invalid SIM replay style selection.")
+            book_by_book = style_choice == "1"
         run_backtest(
             args.output_dir,
             record_limit=args.records,
@@ -929,6 +967,7 @@ def main(argv=None):
             session_date=args.session_date,
             heikin_ashi=args.heikin_ashi,
             history=replay_history,
+            book_by_book=book_by_book,
         )
     except (RuntimeError, ValueError, OSError) as error:
         print(f"SIM ERROR: {error}", file=sys.stderr)
