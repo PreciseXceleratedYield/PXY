@@ -1006,13 +1006,13 @@ function initTerminal(){
 /* ── RISK BAR ── */
 let riskData={};
 async function loadRisk(){
-    let d={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-2000,active_target_line:2000};
+    let d={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-1000,active_target_line:1000};
     try{d=await fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json());}catch{}
     riskData=d;
     const peak  = d.session_peak_pnl??0;
     const net   = d.current_net_pnl??0;
-    const floor = d.active_exit_line??-2000;
-    const target = d.active_target_line??2000;
+    const floor = d.active_exit_line??-1000;
+    const target = d.active_target_line??1000;
 
     const fmtR = n=>(n>=0?'+':'')+Math.round(n).toLocaleString('en-IN');
     $('rskTarget').textContent = '₹'+Math.round(target).toLocaleString('en-IN');

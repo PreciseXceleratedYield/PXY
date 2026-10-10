@@ -34,7 +34,7 @@ from syscnfgpxy import (
 )
 from runexiopxy import now_ist, today_ist, RENKO_STATE_FILE, WEB_DIR, SQUAREOFF_SCRIPT_PATH  # noqa: F401
 from runexmtpxy import (
-    PEAK_CEILING, compute_totals,
+    INITIAL_RISK_BAR_TARGET, compute_totals,
     cycle_closed_book_snapshot, cycle_ledger_tags, cycle_risk_metrics,
     cycle_start_time,
 )
@@ -193,10 +193,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
                 last_closed_snapshot = snapshot
                 last_closed_cycle_id = cycle_id
 
-        target_line = abs(float(
-            state_on_disk.get("active_target_line", PEAK_CEILING)
-            if not session_state_is_stale else PEAK_CEILING
-        ))
+        target_line = INITIAL_RISK_BAR_TARGET
         state_saved = save_session_state(
             0.0,
             0.0,
@@ -254,6 +251,14 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         exit_signal,
         RUNEXACPXY_CYCLE_TARGET_PCT,
     )
+    risk_target = (
+        metrics["target"] if metrics["both_sides_open"]
+        else INITIAL_RISK_BAR_TARGET
+    )
+    target_label = (
+        f"{RUNEXACPXY_CYCLE_TARGET_PCT:.1f}%"
+        if metrics["both_sides_open"] else "INITIAL"
+    )
     risk_enabled = (
         RISK_CANDLE_CONTROL_ENABLED
         and RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
@@ -261,12 +266,17 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     print(
         f"🛡️ CYCLE PNL ₹{metrics['cycle_pnl']:.0f} / "
         f"PAID ₹{metrics['premium_paid']:.0f} | "
-        f"TARGET {RUNEXACPXY_CYCLE_TARGET_PCT:.1f}% "
-        f"(₹{metrics['target']:.0f}) | "
+        f"TARGET {target_label} "
+        f"(₹{risk_target:.0f}) | "
         f"OPEN CE/PE {metrics['ce_qty']:.0f}/{metrics['pe_qty']:.0f} | "
         f"HEAVY {metrics['heavy_side'] or 'NONE'} | EXIT {exit_signal or 'NONE'}"
     )
-    if metrics["heavy_side_aligned"]:
+    if not metrics["both_sides_open"]:
+        print(
+            "🛡️ Waiting for both CE and PE sides; the initial ±₹1,000 lines "
+            "are display-only."
+        )
+    elif metrics["heavy_side_aligned"]:
         print("🛡️ Heavy invested side agrees with exit signal; cycle remains active.")
     else:
         print("🛡️ Heavy side is not aligned; cycle profit target can square off the book.")
@@ -277,10 +287,10 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         save_session_state(
             0.0,
             metrics["cycle_pnl"],
-            -metrics["target"],
+            -risk_target,
             pnl_offset,
             risk_control_activated=False,
-            target_exit_line=metrics["target"],
+            target_exit_line=risk_target,
             booked_profit=booked_profit,
             closed_book_count=closed_book_count,
             last_closed_snapshot=last_closed_snapshot,
@@ -295,10 +305,10 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         save_session_state(
             0.0,
             metrics["cycle_pnl"],
-            -metrics["target"],
+            -risk_target,
             pnl_offset,
             risk_control_activated=True,
-            target_exit_line=metrics["target"],
+            target_exit_line=risk_target,
             booked_profit=booked_profit,
             closed_book_count=closed_book_count,
             last_closed_snapshot=last_closed_snapshot,
@@ -311,10 +321,10 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     save_session_state(
         0.0,
         metrics["cycle_pnl"],
-        -metrics["target"],
+        -risk_target,
         pnl_offset,
         risk_control_activated=True,
-        target_exit_line=metrics["target"],
+        target_exit_line=risk_target,
         booked_profit=booked_profit,
         closed_book_count=closed_book_count,
         last_closed_snapshot=last_closed_snapshot,
@@ -338,7 +348,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         total_raw_pnl,
         risk_control_activated=True,
         risk_state={
-            "active_target_line": metrics["target"],
+            "active_target_line": risk_target,
             "booked_profit": booked_profit,
             "closed_book_count": closed_book_count,
             "last_closed_snapshot": last_closed_snapshot,

@@ -604,13 +604,13 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift){
    ══════════════════════════════════════════════════════════════ */
 let riskData={};
 async function loadRisk(){
-    let d={session_peak_pnl:0,active_exit_line:-2000,active_target_line:2000};
+    let d={session_peak_pnl:0,active_exit_line:-1000,active_target_line:1000};
     try{d=await fetch('./webrinkopxy.json?_='+Date.now()).then(r=>r.json());}catch(e){}
     riskData=d;
     const peak=Math.round(d.session_peak_pnl??0);
     const net=Math.round(Number(d.current_net_pnl)||0);
-    const floor=Math.round(d.active_exit_line??-2000);
-    const target=Math.round(d.active_target_line??2000);
+    const floor=Math.round(d.active_exit_line??-1000);
+    const target=Math.round(d.active_target_line??1000);
     $('rskTarget').textContent='₹'+target.toLocaleString('en-IN');
     $('rskNet').textContent='₹'+fmtK(floor);
     $('rskNet').className='rsk-val bear';

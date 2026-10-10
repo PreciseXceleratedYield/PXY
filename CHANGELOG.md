@@ -7,9 +7,10 @@ The following implementation changes are merged into `main`:
 - **Runtime configuration:** centralized and audited production settings,
   validated configuration values, documented ownership and conditional
   settings, and wired previously hard-coded runtime values to their settings.
-- **Risk candle:** the 2.8% premium-based target is profit-only and waits when
-  the heavy invested side aligns with the exit signal. The candle displays
-  symmetric profit/loss target values; the loss side is informational only.
+- **Risk candle:** the initial symmetric ₹1,000 lines are display-only. The
+  2.8% premium-based profit target activates only when both CE and PE are open
+  and waits while the heavy invested side aligns with the exit signal. Loss
+  lines remain informational; losses never trigger risk square-off.
 - **PXYCONFIG editor:** added a protected web editor for supported runtime
   configuration values, including validation, redaction of sensitive values,
   atomic writes, and serialized edits.

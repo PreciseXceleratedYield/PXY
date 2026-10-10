@@ -333,6 +333,12 @@ class ProductionPipeReplayTests(unittest.TestCase):
             quantity=75,
             tag="SIM-TARGET",
         )
+        broker.place_order(
+            trading_symbol="NIFTY-WF-PE",
+            transaction_type="B",
+            quantity=75,
+            tag="SIM-TARGET-PE",
+        )
         open_df = pd.DataFrame([{
             "SYMBOL": "NIFTY-WF-CE",
             "QTY": 75,
@@ -340,6 +346,14 @@ class ProductionPipeReplayTests(unittest.TestCase):
             "BUY_PRC": 100,
             "SELL_PRC": 126.67,
             "PNL": 2000,
+            "BUY_TIME": timestamp,
+        }, {
+            "SYMBOL": "NIFTY-WF-PE",
+            "QTY": 75,
+            "TAG": "SIM-TARGET-PE",
+            "BUY_PRC": 100,
+            "SELL_PRC": 100,
+            "PNL": 0,
             "BUY_TIME": timestamp,
         }])
         with tempfile.TemporaryDirectory(prefix="pxy-sim-risk-target-") as temp:
@@ -353,7 +367,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     )
                     if minute == 0:
                         self.assertFalse(engine.risk_exit_fired)
-                        self.assertEqual(broker.position_summary(), "75CE0PE")
+                        self.assertEqual(broker.position_summary(), "75CE75PE")
 
             self.assertTrue(engine.risk_exit_fired)
             self.assertEqual(broker.position_summary(), "0CE0PE")
@@ -370,12 +384,26 @@ class ProductionPipeReplayTests(unittest.TestCase):
             quantity=65,
             tag="SIM-SPOT-RISK",
         )
+        broker.place_order(
+            trading_symbol="NIFTY-WF-PE",
+            transaction_type="B",
+            quantity=65,
+            tag="SIM-SPOT-RISK-PE",
+        )
         open_df = pd.DataFrame([{
             "SYMBOL": "NIFTY-WF-CE",
             "QTY": 65,
             "TAG": "SIM-SPOT-RISK",
             "BUY_PRC": 22000,
             "SELL_PRC": 22616,
+            "PNL": 0,
+            "BUY_TIME": timestamp,
+        }, {
+            "SYMBOL": "NIFTY-WF-PE",
+            "QTY": 65,
+            "TAG": "SIM-SPOT-RISK-PE",
+            "BUY_PRC": 22000,
+            "SELL_PRC": 22000,
             "PNL": 0,
             "BUY_TIME": timestamp,
         }])
@@ -390,7 +418,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     )
                     if minute == 0:
                         self.assertFalse(engine.risk_exit_fired)
-                        self.assertEqual(broker.position_summary(), "65CE0PE")
+                        self.assertEqual(broker.position_summary(), "65CE65PE")
 
             self.assertTrue(engine.risk_exit_fired)
             self.assertEqual(broker.position_summary(), "0CE0PE")
