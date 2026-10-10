@@ -28,6 +28,7 @@ BRICK_SIZE = RUNEXMTPXY_BRICK_SIZE
 INITIAL_LOSS_FLOOR = RUNEXMTPXY_INITIAL_LOSS_FLOOR
 TARGET_PER_ACTIVE_RUNG = RUNEXMTPXY_TARGET_PER_ACTIVE_RUNG
 PEAK_CEILING = TARGET_PER_ACTIVE_RUNG * 2
+INITIAL_RISK_BAR_TARGET = 1000.0
 PEAK_MULTIPLIER = RUNEXMTPXY_PEAK_MULTIPLIER
 STOP_SQUAREOFF_ENABLED = RUNEXACPXY_STOP_SQUAREOFF_ENABLED
 TARGET_SQUAREOFF_ENABLED = RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
@@ -187,7 +188,13 @@ def cycle_risk_metrics(
         or (heavy_side == "PE" and signal == "BEAR")
     )
     target = premium_paid * float(target_pct) / 100.0
-    target_reached = bool(premium_paid > 0 and cycle_pnl >= target and not heavy_side_aligned)
+    target_reached = bool(
+        ce_qty > 0
+        and pe_qty > 0
+        and premium_paid > 0
+        and cycle_pnl >= target
+        and not heavy_side_aligned
+    )
     return {
         "cycle_pnl": cycle_pnl,
         "premium_paid": premium_paid,

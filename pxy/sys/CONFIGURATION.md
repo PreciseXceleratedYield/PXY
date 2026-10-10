@@ -185,16 +185,19 @@ network boundary.
   The cycle begins with the first active fill after a flat book and tracks all
   tagged active and closed rows until the entire book is flat; closing one leg
   does not reset the cycle.
-- Cycle P&L combines realized and unrealized row P&L. The target is
-  `RUNEXACPXY_CYCLE_TARGET_PCT` (2.8% by default) of all option premium paid
-  across the cycle (`quantity × buy price` for each cycle row).
+- Before both CE and PE sides are open, the bar displays symmetric ₹1,000
+  initial lines for reference and does not activate the cycle target. Once both
+  sides are open, cycle P&L combines realized and unrealized row P&L and the
+  target becomes `RUNEXACPXY_CYCLE_TARGET_PCT` (2.8% by default) of all option
+  premium paid across the cycle (`quantity × buy price` for each cycle row).
 - The risk bar shows that active cycle as the current book, alongside cumulative
   realized profit and the count of completed books. Its click-through includes
   the last closed-book snapshot and update time. The displayed loss target is
   the negative mirror of the profit target; it is informational and never
   causes a loss-side square-off. There is no timed midday reset.
-- There is no risk-bar stop-loss. `RUNEXACPXY_STOP_SQUAREOFF_ENABLED` defaults
-  to `False`; `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED` defaults to `True`.
+- The negative initial line is display-only; there is no loss-side square-off.
+  `RUNEXACPXY_STOP_SQUAREOFF_ENABLED` defaults to `False`;
+  `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED` defaults to `True`.
 - When cycle P&L reaches its target, the risk bar stays silent while the
   higher-invested open option side agrees with the current `exit` signal
   (CE/BULL or PE/BEAR); the normal ATR-based option targets continue to run.

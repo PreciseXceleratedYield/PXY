@@ -855,10 +855,10 @@ async function loadTrades(){
 /* ── RISK BAR ── */
 let riskData={};
 async function loadRisk(){
-    let d={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-2000,active_target_line:2000};
+    let d={session_peak_pnl:0,current_net_pnl:0,active_exit_line:-1000,active_target_line:1000};
     try{d=await fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json());}catch{}
     riskData=d;
-    const peak=d.session_peak_pnl??0,net=d.current_net_pnl??0,floor=d.active_exit_line??-2000,target=d.active_target_line??2000;
+    const peak=d.session_peak_pnl??0,net=d.current_net_pnl??0,floor=d.active_exit_line??-1000,target=d.active_target_line??1000;
     $('rskTarget').textContent='₹'+Math.round(target).toLocaleString('en-IN');
     $('rskNet').textContent='₹'+Math.round(floor).toLocaleString('en-IN');
     $('rskNet').className='rsk-val bear';

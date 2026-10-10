@@ -17,7 +17,8 @@ from syscnfgpxy import (
     RUNEXLQDPXY_SQUAREOFF_TIMEOUT_SECONDS as SQUAREOFF_TIMEOUT_SECONDS,
 )
 from runexmtpxy import (
-    PEAK_CEILING, compute_totals, cycle_closed_book_snapshot, _both_empty,
+    INITIAL_RISK_BAR_TARGET, compute_totals, cycle_closed_book_snapshot,
+    _both_empty,
 )
 from runexstpxy import (
     save_check_state, save_session_state, _find_runlilo_module,
@@ -129,7 +130,7 @@ def liquidate_and_exit(
             )
             state["last_closed_snapshot"] = snapshot
             state["last_closed_cycle_id"] = cycle_id
-        target_line = abs(float(state.get("active_target_line", PEAK_CEILING)))
+        target_line = INITIAL_RISK_BAR_TARGET
         save_check_state(0)
         save_session_state(
             0.0,

@@ -45,7 +45,15 @@ class CycleRiskControlTests(unittest.TestCase):
                 "BUY_PRC": 100,
                 "SELL_PRC": 140,
                 "PNL": 3000,
-            }
+            },
+            {
+                "TAG": "CYCLE-CE",
+                "SYMBOL": "NIFTY-CE",
+                "QTY": 75,
+                "BUY_PRC": 100,
+                "SELL_PRC": 100,
+                "PNL": 0,
+            },
         ])
         closed_df = pd.DataFrame([
             {
@@ -63,10 +71,28 @@ class CycleRiskControlTests(unittest.TestCase):
         )
 
         self.assertEqual(metrics["cycle_pnl"], 3750)
-        self.assertEqual(metrics["premium_paid"], 15000)
-        self.assertEqual(metrics["target"], 420)
+        self.assertEqual(metrics["premium_paid"], 22500)
+        self.assertAlmostEqual(metrics["target"], 630)
         self.assertEqual(metrics["heavy_side"], "PE")
+        self.assertTrue(metrics["both_sides_open"])
         self.assertTrue(metrics["target_reached"])
+
+    def test_cycle_target_waits_for_both_sides_to_open(self):
+        one_sided = pd.DataFrame([{
+            "TAG": "CYCLE-PE",
+            "SYMBOL": "NIFTY-PE",
+            "QTY": 75,
+            "BUY_PRC": 100,
+            "SELL_PRC": 140,
+            "PNL": 3000,
+        }])
+        metrics = cycle_risk_metrics(
+            one_sided, pd.DataFrame(), {"CYCLE-PE"}, "BULL", 2.8
+        )
+
+        self.assertFalse(metrics["both_sides_open"])
+        self.assertEqual(metrics["target"], 210)
+        self.assertFalse(metrics["target_reached"])
 
     def test_cycle_target_is_suppressed_when_heavy_side_aligns_and_has_no_loss_stop(self):
         open_df = pd.DataFrame([
@@ -102,6 +128,14 @@ class CycleRiskControlTests(unittest.TestCase):
             "Buy_Prc": 100,
             "Sell_Prc": 140,
             "PNL": 3000,
+        }, {
+            "Symbol": "NIFTY-CE",
+            "Qty": 75,
+            "Tag": "CYCLE-CE",
+            "Buy_Time": buy_time,
+            "Buy_Prc": 100,
+            "Sell_Prc": 100,
+            "PNL": 0,
         }])
         closed_df = pd.DataFrame([{
             "Symbol": "NIFTY-CE",
@@ -168,8 +202,8 @@ class CycleRiskControlTests(unittest.TestCase):
         self.assertEqual(liquidate.call_args.args[1], 3750)
         self.assertTrue(liquidate.call_args.kwargs["risk_control_activated"])
         self.assertEqual(save_state.call_args.args[3], 1200.0)
-        self.assertEqual(save_state.call_args.args[2], -420.0)
-        self.assertEqual(save_state.call_args.kwargs["target_exit_line"], 420.0)
+        self.assertAlmostEqual(save_state.call_args.args[2], -630.0)
+        self.assertAlmostEqual(save_state.call_args.kwargs["target_exit_line"], 630.0)
         self.assertEqual(
             [call.args[0] for call in saved_checks.call_args_list],
             [1, 2],
@@ -337,6 +371,51 @@ class CycleRiskControlTests(unittest.TestCase):
         self.assertEqual(state["last_closed_snapshot"], {"realized_pnl": 125.0})
         self.assertEqual(state["last_closed_cycle_id"], "cycle-1")
 
+    def test_one_sided_book_displays_symmetric_initial_thousand_target(self):
+        buy_time = pd.Timestamp("2025-01-06 10:00:00", tz="Asia/Kolkata")
+        open_df = pd.DataFrame([{
+            "Symbol": "NIFTY-PE",
+            "Qty": 75,
+            "Tag": "CYCLE-PE",
+            "Buy_Time": buy_time,
+            "Buy_Prc": 100,
+            "Sell_Prc": 140,
+            "PNL": 3000,
+        }])
+        with (
+            patch.object(
+                runexacpxy,
+                "load_session_state",
+                return_value={"pnl_offset": 0.0},
+            ),
+            patch.object(
+                runexacpxy,
+                "load_check_state",
+                return_value={"consecutive_breaches": 0},
+            ),
+            patch.object(
+                runexacpxy,
+                "load_meta",
+                return_value={
+                    "last_tick_epoch": 0.0,
+                    "ledger_basis": None,
+                    "risk_cycle_started_at": buy_time.isoformat(sep=" "),
+                    "risk_cycle_tags": ["CYCLE-PE"],
+                },
+            ),
+            patch.object(runexacpxy, "save_meta"),
+            patch.object(runexacpxy, "save_session_state") as save_state,
+            patch.object(runexacpxy, "state_is_stale", return_value=False),
+            patch.object(runexacpxy, "_current_filter_time", return_value=None),
+            patch.object(runexacpxy, "TICK_MIN_GAP_SECONDS", 0),
+            patch.object(runexacpxy, "time") as risk_clock,
+        ):
+            risk_clock.time.return_value = 1_000_000
+            runexacpxy._tick(object(), open_df, pd.DataFrame(), "BULL")
+
+        self.assertEqual(save_state.call_args.args[2], -1000.0)
+        self.assertEqual(save_state.call_args.kwargs["target_exit_line"], 1000.0)
+
     def test_risk_liquidation_books_the_final_closed_cycle(self):
         closed_df = pd.DataFrame([{
             "Tag": "CYCLE-CE",
@@ -375,7 +454,7 @@ class CycleRiskControlTests(unittest.TestCase):
             save_state.call_args.kwargs["last_closed_snapshot"]["realized_pnl"],
             500.0,
         )
-        self.assertEqual(save_state.call_args.kwargs["target_exit_line"], 420.0)
+        self.assertEqual(save_state.call_args.kwargs["target_exit_line"], 1000.0)
 
 
 if __name__ == "__main__":
