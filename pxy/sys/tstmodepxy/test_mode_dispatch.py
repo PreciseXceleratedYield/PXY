@@ -15,6 +15,7 @@ if str(SYS_DIR) not in sys.path:
 import sysmodepxy
 import sysexepxy
 from tstmodepxy.backtest import (
+    SimBookCycle,
     calculate_heikin_ashi,
     heikin_ashi_entry_exit_signals,
     print_book_table,
@@ -24,37 +25,69 @@ from tstmodepxy.backtest import (
 
 
 class ModeDispatchTests(unittest.TestCase):
+    def test_sim_book_is_reportable_only_after_whole_portfolio_returns_flat(self):
+        book = SimBookCycle()
+        pe_trade = {"side": "PE"}
+        ce_trade = {"side": "CE"}
+
+        self.assertIsNone(book.record_tick("0CE0PE", "0CE1PE", [], True))
+        self.assertIsNone(book.record_tick("0CE1PE", "1CE1PE", [], True))
+        self.assertIsNone(book.record_tick("1CE1PE", "1CE0PE", [pe_trade], False))
+
+        completed = book.record_tick("1CE0PE", "0CE0PE", [ce_trade], False)
+        self.assertEqual(completed, [pe_trade, ce_trade])
+        self.assertIsNone(book.record_tick("0CE0PE", "0CE0PE", [], False))
+
     def test_book_report_prints_only_action_and_reason_columns(self):
         trade = {
             "tag": "WF0000001",
-            "side": "CE",
+            "side": "PE",
             "entry_time": "2025-01-06 09:19:00",
-            "exit_time": "2025-01-06 09:20:00",
-            "entry_spot": 22000.0,
-            "exit_spot": 22020.0,
-            "index_points_per_unit": 20.0,
+            "exit_time": "2025-01-06 09:32:00",
+            "entry_spot": 22702.70,
+            "exit_spot": 22698.75,
+            "index_points_per_unit": 3.95,
             "quantity": 1,
             "exit_reason": "production_exit",
+        }
+        counter_leg = {
+            **trade,
+            "tag": "WF0000002",
+            "side": "CE",
+            "entry_time": "2025-01-06 09:20:00",
+            "exit_time": "2025-01-06 09:27:00",
+            "entry_spot": 22720.35,
+            "exit_spot": 22732.10,
+            "index_points_per_unit": 11.75,
+        }
+        fresh_entry = {
+            "entry_signal": "SELL",
+            "exit_signal": "BEAR",
+            "pipe_output": "FRESH ENTRY",
+        }
+        counter_entry = {
+            "entry_signal": "NONE",
+            "exit_signal": "BULL",
+            "pipe_output": "COUNTER-BUY",
         }
         output = StringIO()
         with redirect_stdout(output):
             print_book_table(
                 1,
-                trade,
-                [{"GuiOrdId": "WF0000001"}],
-                {
-                    "entry_signal": "BUY",
-                    "exit_signal": "BULL",
-                    "pipe_output": "FRESH ENTRY",
-                },
-                "Target Hit & PnL Met",
+                [
+                    (trade, [{"GuiOrdId": "WF0000001"}], fresh_entry, "Target Hit & PnL Met"),
+                    (counter_leg, [{"GuiOrdId": "WF0000002"}], counter_entry, "Target Hit & PnL Met"),
+                ],
             )
 
         lines = output.getvalue().strip().splitlines()
         self.assertEqual(lines[0], "| Action | Why action |")
         self.assertEqual(lines[1], "|---|---|")
-        self.assertIn("Book 1: BUY CE", lines[2])
-        self.assertIn("Fresh-entry BUY signal", lines[2])
+        self.assertIn("Book 1: BUY PE", lines[2])
+        self.assertIn("BUY CE", lines[2])
+        self.assertIn("Total: +15.70 pts", lines[2])
+        self.assertIn("Fresh-entry SELL signal", lines[2])
+        self.assertIn("Counter-leg triggered by BULL", lines[2])
         self.assertIn("Production target and minimum-P&L gates both passed", lines[2])
         self.assertTrue(all(line.count("|") == 3 for line in lines))
 
