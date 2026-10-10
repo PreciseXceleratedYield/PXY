@@ -47,8 +47,10 @@ python validate_backtest.py
   `pxychk` sets RUNMODE=CHK for isolated checks. Neither changes the PRD default.
 - For direct Python commands, prefix them with `RUNMODE=SIM` or `RUNMODE=CHK`.
 - Interactive SIM displays a menu of the five most recent completed NIFTY
-  session dates and replays the selected day. Non-interactive SIM can select
-  an exact date with `--session-date` or replay multiple sessions with
+  session dates and replays the selected day, or offers an option to replay
+  the latest seven available completed sessions. Multi-session reports include
+  daily spot points and a running cumulative total. Non-interactive SIM can
+  select an exact date with `--session-date` or replay multiple sessions with
   `--sessions`.
 - Interactive SIM also lets you pause after each completed book or run without
   pauses and print each book journal at the end. Both modes finish with the

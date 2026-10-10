@@ -46,6 +46,29 @@ class ModeDispatchTests(unittest.TestCase):
             "TOTAL SPOT POINTS GAINED: +15.70",
         )
 
+    def test_sim_multi_day_report_shows_daily_and_cumulative_points(self):
+        output = StringIO()
+        with redirect_stdout(output):
+            print_report(
+                pd.DataFrame(),
+                [date(2025, 1, 9), date(2025, 1, 10)],
+                [
+                    {"session": "2025-01-09", "points": 12.5, "exit_reason": "production_exit"},
+                    {"session": "2025-01-10", "points": -2.0, "exit_reason": "production_exit"},
+                ],
+                [],
+                "trades.csv",
+                "decisions.csv",
+                "orders.csv",
+                "runtime.log",
+            )
+
+        lines = output.getvalue().splitlines()
+        self.assertIn("| Session date | Daily points | Cumulative points |", lines)
+        self.assertIn("| 2025-01-09 | +12.50 | +12.50 |", lines)
+        self.assertIn("| 2025-01-10 | -2.00 | +10.50 |", lines)
+        self.assertEqual(lines[-1], "TOTAL SPOT POINTS GAINED: +10.50")
+
     def test_interactive_sim_menu_runs_the_selected_date(self):
         import tstmodepxy.backtest as backtest
 
@@ -75,6 +98,37 @@ class ModeDispatchTests(unittest.TestCase):
         self.assertEqual(replay.call_args.kwargs["session_date"], date(2025, 1, 10))
         self.assertIs(replay.call_args.kwargs["history"], history)
         self.assertFalse(replay.call_args.kwargs["book_by_book"])
+
+    def test_interactive_sim_menu_can_select_latest_seven_sessions(self):
+        import tstmodepxy.backtest as backtest
+
+        dates = pd.bdate_range("2025-01-06", periods=9)
+        index = pd.DatetimeIndex(
+            [pd.Timestamp(day).replace(hour=15, minute=29) for day in dates]
+        )
+        history = pd.DataFrame(
+            {
+                "Open": [1.0] * len(index),
+                "High": [1.0] * len(index),
+                "Low": [1.0] * len(index),
+                "Close": [1.0] * len(index),
+            },
+            index=index,
+        )
+        with (
+            patch.object(backtest, "RUNNIFTYPXY_HOLIDAYS", []),
+            patch.object(backtest, "fetch_recent_index_history", return_value=history),
+            patch.object(backtest.sys, "stdin", Mock(isatty=Mock(return_value=True))),
+            patch("builtins.input", side_effect=["6", "2"]),
+            patch.object(backtest, "run_backtest") as replay,
+            redirect_stdout(StringIO()) as output,
+        ):
+            self.assertEqual(backtest.main([]), 0)
+
+        self.assertIsNone(replay.call_args.kwargs["session_date"])
+        self.assertEqual(replay.call_args.kwargs["session_count"], 7)
+        self.assertIs(replay.call_args.kwargs["history"], history)
+        self.assertIn("Run the latest 7 available", output.getvalue())
 
     def test_interactive_sim_can_choose_pause_between_books(self):
         import tstmodepxy.backtest as backtest
