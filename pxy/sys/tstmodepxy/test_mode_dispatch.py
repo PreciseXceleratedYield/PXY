@@ -38,7 +38,7 @@ class ModeDispatchTests(unittest.TestCase):
         self.assertEqual(completed, [pe_trade, ce_trade])
         self.assertIsNone(book.record_tick("0CE0PE", "0CE0PE", [], False))
 
-    def test_book_report_prints_only_action_and_reason_columns(self):
+    def test_book_report_prints_flat_to_flat_chronological_ist_journal(self):
         trade = {
             "tag": "WF0000001",
             "side": "PE",
@@ -81,15 +81,19 @@ class ModeDispatchTests(unittest.TestCase):
             )
 
         lines = output.getvalue().strip().splitlines()
-        self.assertEqual(lines[0], "| Action | Why action |")
-        self.assertEqual(lines[1], "|---|---|")
-        self.assertIn("Book 1: BUY PE", lines[2])
-        self.assertIn("BUY CE", lines[2])
-        self.assertIn("Total: +15.70 pts", lines[2])
-        self.assertIn("Fresh-entry SELL signal", lines[2])
-        self.assertIn("Counter-leg triggered by BULL", lines[2])
-        self.assertIn("Production target and minimum-P&L gates both passed", lines[2])
-        self.assertTrue(all(line.count("|") == 3 for line in lines))
+        self.assertEqual(lines[0], "Book 1 — flat-to-flat cycle")
+        self.assertEqual(lines[1], "| Time (IST) | Journal | Why action |")
+        self.assertEqual(lines[2], "|---|---|---|")
+        self.assertIn("| 09:19:00 | Book 1 starts: BUY PE", lines[3])
+        self.assertIn("| 09:20:00 | BUY CE", lines[4])
+        self.assertIn("| 09:27:00 | SELL CE", lines[5])
+        self.assertIn("Counter-leg triggered by BULL", lines[4])
+        self.assertIn("Production target and minimum-P&L gates both passed", lines[5])
+        self.assertIn("| 09:32:00 | SELL PE", lines[6])
+        self.assertIn("book flat", lines[6])
+        self.assertIn("Fresh-entry SELL signal", lines[3])
+        self.assertIn("Book 1 total: +15.70 pts", lines[7])
+        self.assertTrue(all(line.count("|") == 4 for line in lines[2:]))
 
     def test_sim_scales_production_averaging_threshold_by_200(self):
         production_lgt = Mock(return_value=-22.5)
