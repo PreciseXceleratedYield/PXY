@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pandas as pd
 import pytz
+from syscnfgpxy import EXEAMSPXY_MAX_INVESTMENT
 
 SYS_DIR = Path(__file__).resolve().parents[1]
 if str(SYS_DIR) not in sys.path:
@@ -221,6 +222,17 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     engine.avg_controller.side_overall_pnl_pct(favorable_pe),
                     25 / 22500 * 100,
                 )
+
+    def test_sim_averaging_cap_is_250000_without_changing_production_config(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-spot-average-cap-test-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, SimulatedBroker(), Path(temp) / "state"
+            ) as engine:
+                self.assertEqual(
+                    engine.avg_controller.EXEAMSPXY_MAX_INVESTMENT,
+                    replay_adapter.SIM_AVERAGING_MAX_INVESTMENT,
+                )
+                self.assertEqual(EXEAMSPXY_MAX_INVESTMENT, 25000.0)
 
     def test_replay_can_disable_risk_bar_without_changing_default(self):
         with tempfile.TemporaryDirectory(prefix="pxy-risk-disabled-replay-") as temp:

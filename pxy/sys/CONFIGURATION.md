@@ -215,6 +215,9 @@ network boundary.
   derivatives contract size. Production single-exit, averaging, cycle-risk,
   and deep-reversal loss percentages are each divided by 200 before comparing
   them with direction-aware spot returns or applying them to spot notional.
+  To keep the investment-cap gate meaningful with spot-priced simulated lots,
+  SIM uses a `250000` averaging cap; production retains its configured
+  `25000` cap.
   The production minimum P&L exit gate is scaled by SIM quantity relative to
   the prior 65-unit SIM lot, preserving the per-lot exit threshold when SIM
   uses one index unit. CE targets require an upward move and PE targets a
@@ -292,13 +295,14 @@ historical option P&L.
   The opposite side must have open positions and negative overall P&L, and
   only the signal-aligned side may average. The averaging side must also be
   losing at or beyond its applicable LGT threshold.
-- LGT is calculated from positive investment values, then negated:
+- LGT is calculated from the own/opposite investment factor and the own-side
+  open lot count, then negated:
   `r = own investment / opposite investment`;
-  `magnitude = max(1.4, round((index price / 1000) × r, 2))`;
+  `magnitude = max(1.4, round(50^r × own lot count, 2))`;
   `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)`.
-  The index price comes from the current `syspxy` market snapshot. If either
-  side has no positive investment, `r` defaults to `1`; if the index price is
-  missing or invalid, averaging is skipped.
+  If either side has no positive investment, `r` defaults to `1`; if the
+  opposite side has no positive lots, the own-side LGT uses the 1.4% floor.
+  The own lot count comes from the verified broker position summary.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.
