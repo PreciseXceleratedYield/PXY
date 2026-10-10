@@ -1,6 +1,5 @@
 import sys
 import unittest
-from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
@@ -12,79 +11,18 @@ from tstmodepxy import checksim
 
 
 class CheckSimTests(unittest.TestCase):
-    def test_select_session_uses_one_based_menu_choices(self):
-        sessions = [
-            date(2026, 10, 9),
-            date(2026, 10, 8),
-            date(2026, 10, 7),
-        ]
-        self.assertEqual(checksim.select_session(sessions, "1"), sessions[0])
-        self.assertEqual(checksim.select_session(sessions, "3"), sessions[2])
-        self.assertIsNone(checksim.select_session(sessions, "0"))
-        self.assertIsNone(checksim.select_session(sessions, "4"))
-        self.assertIsNone(checksim.select_session(sessions, "q"))
+    def test_chk_runner_invokes_only_isolated_test_suite(self):
+        with patch.object(checksim, "_run_stage", return_value=0) as run_stage:
+            self.assertEqual(checksim.main(), 0)
 
-    def test_session_labels_describe_trading_session_order(self):
-        self.assertEqual(
-            checksim.session_label(date(2026, 10, 9), 0, date(2026, 10, 9)),
-            "Today",
-        )
-        self.assertEqual(
-            checksim.session_label(date(2026, 10, 8), 1, date(2026, 10, 9)),
-            "Previous trading session",
-        )
-        self.assertEqual(
-            checksim.session_label(date(2026, 10, 6), 3, date(2026, 10, 9)),
-            "3 trading sessions earlier",
-        )
+        run_stage.assert_called_once()
+        label, command, run_mode = run_stage.call_args.args
+        self.assertEqual(label, "CHK test suite")
+        self.assertEqual(command[1:4], ["-m", "unittest", "discover"])
+        self.assertEqual(run_mode, "CHK")
 
-    def test_failed_chk_skips_sim_for_selected_session(self):
-        with patch.object(
-            checksim, "fetch_recent_index_history", return_value=object()
-        ), patch.object(
-            checksim,
-            "_completed_session_dates",
-            return_value=[
-                date(2026, 10, 8),
-                date(2026, 10, 9),
-            ],
-        ), patch.object(
-            checksim, "input", return_value="1", create=True
-        ), patch.object(checksim, "_run_stage", return_value=1) as run_stage:
+    def test_chk_runner_returns_test_failure_without_starting_sim(self):
+        with patch.object(checksim, "_run_stage", return_value=1) as run_stage:
             self.assertEqual(checksim.main(), 1)
 
-        self.assertEqual(run_stage.call_count, 1)
-        self.assertEqual(run_stage.call_args.args[0], "CHK test suite")
-
-    def test_successful_chk_runs_sim_for_selected_exact_session(self):
-        with patch.object(
-            checksim, "fetch_recent_index_history", return_value=object()
-        ), patch.object(
-            checksim,
-            "_completed_session_dates",
-            return_value=[
-                date(2026, 10, 8),
-                date(2026, 10, 9),
-            ],
-        ), patch.object(
-            checksim, "input", return_value="2", create=True
-        ), patch.object(checksim, "_run_stage", return_value=0) as run_stage:
-            self.assertEqual(checksim.main(), 0)
-
-        self.assertEqual(run_stage.call_count, 2)
-        simulation = run_stage.call_args_list[1]
-        self.assertEqual(simulation.args[0], "SIM replay for 2026-10-08")
-        self.assertEqual(simulation.args[1][-2:], ["--session-date", "2026-10-08"])
-
-    def test_cancel_session_does_not_run_a_stage(self):
-        with patch.object(
-            checksim, "fetch_recent_index_history", return_value=object()
-        ), patch.object(
-            checksim,
-            "_completed_session_dates",
-            return_value=[date(2026, 10, 9)],
-        ), patch.object(checksim, "input", return_value="q", create=True), patch.object(
-            checksim, "_run_stage"
-        ) as run_stage:
-            self.assertEqual(checksim.main(), 0)
-        run_stage.assert_not_called()
+        run_stage.assert_called_once()
