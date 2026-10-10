@@ -227,6 +227,8 @@ From the `pxy` console, choose `b)` to open the SIM session-date menu and select
 one of the five most recent completed trading days, or `c)` to run the isolated
 CHK test suite. These are separate actions: CHK does not start SIM. Neither
 option sends live orders.
+SIM then lets you choose to review books one at a time or run the replay without
+pauses and show each book at the end. Both options print total spot points gained.
 
 Run `pxychk` directly to run only the CHK test suite. The SIM runner also accepts
 `RUNMODE=SIM python3 syssimpxy.py --session-date YYYY-MM-DD` to replay one exact

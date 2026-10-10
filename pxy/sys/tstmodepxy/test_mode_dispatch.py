@@ -20,12 +20,32 @@ from tstmodepxy.backtest import (
     calculate_heikin_ashi,
     heikin_ashi_entry_exit_signals,
     print_book_table,
+    print_report,
     run_backtest,
     scale_sim_lgt_calculator,
 )
 
 
 class ModeDispatchTests(unittest.TestCase):
+    def test_sim_final_report_ends_with_total_spot_points_gained(self):
+        output = StringIO()
+        with redirect_stdout(output):
+            print_report(
+                pd.DataFrame(),
+                [date(2025, 1, 10)],
+                [{"points": 15.7, "exit_reason": "production_exit"}],
+                [],
+                "trades.csv",
+                "decisions.csv",
+                "orders.csv",
+                "runtime.log",
+            )
+
+        self.assertEqual(
+            output.getvalue().strip().splitlines()[-1],
+            "TOTAL SPOT POINTS GAINED: +15.70",
+        )
+
     def test_interactive_sim_menu_runs_the_selected_date(self):
         import tstmodepxy.backtest as backtest
 
@@ -46,7 +66,7 @@ class ModeDispatchTests(unittest.TestCase):
             patch.object(backtest, "RUNNIFTYPXY_HOLIDAYS", []),
             patch.object(backtest, "fetch_recent_index_history", return_value=history),
             patch.object(backtest.sys, "stdin", Mock(isatty=Mock(return_value=True))),
-            patch("builtins.input", return_value="2"),
+            patch("builtins.input", side_effect=["2", "2"]),
             patch.object(backtest, "run_backtest") as replay,
             redirect_stdout(StringIO()),
         ):
@@ -54,6 +74,38 @@ class ModeDispatchTests(unittest.TestCase):
 
         self.assertEqual(replay.call_args.kwargs["session_date"], date(2025, 1, 10))
         self.assertIs(replay.call_args.kwargs["history"], history)
+        self.assertFalse(replay.call_args.kwargs["book_by_book"])
+
+    def test_interactive_sim_can_choose_pause_between_books(self):
+        import tstmodepxy.backtest as backtest
+
+        with (
+            patch.object(backtest, "RUNMODE", "SIM"),
+            patch.object(backtest.sys, "stdin", Mock(isatty=Mock(return_value=True))),
+            patch("builtins.input", return_value="1"),
+            patch.object(backtest, "run_backtest") as replay,
+            redirect_stdout(StringIO()),
+        ):
+            self.assertEqual(backtest.main(["--session-date", "2025-01-10"]), 0)
+
+        self.assertTrue(replay.call_args.kwargs["book_by_book"])
+
+    def test_all_books_flag_skips_replay_style_prompt(self):
+        import tstmodepxy.backtest as backtest
+
+        with (
+            patch.object(backtest, "RUNMODE", "SIM"),
+            patch.object(backtest.sys, "stdin", Mock(isatty=Mock(return_value=True))),
+            patch("builtins.input", side_effect=AssertionError("unexpected prompt")),
+            patch.object(backtest, "run_backtest") as replay,
+            redirect_stdout(StringIO()),
+        ):
+            self.assertEqual(
+                backtest.main(["--session-date", "2025-01-10", "--all-books"]),
+                0,
+            )
+
+        self.assertFalse(replay.call_args.kwargs["book_by_book"])
 
     def test_sim_session_menu_selection_uses_newest_completed_dates(self):
         import tstmodepxy.backtest as backtest
