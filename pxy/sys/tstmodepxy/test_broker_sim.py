@@ -18,7 +18,7 @@ class SimulatedBrokerTests(unittest.TestCase):
         self.broker = SimulatedBroker()
         self.broker.set_market(datetime(2025, 1, 6, 9, 17), 22000)
 
-    def place(self, side, option, tag, quantity=75):
+    def place(self, side, option, tag, quantity=65):
         return self.broker.place_order(
             trading_symbol=f"NIFTY-WF-{option}",
             transaction_type=side,
@@ -26,36 +26,40 @@ class SimulatedBrokerTests(unittest.TestCase):
             tag=tag,
         )
 
-    def test_buy_quote_sell_and_trade_ledger_are_simulated(self):
+    def test_buy_quote_sell_and_trade_ledger_use_index_spot(self):
         buy = self.place("B", "CE", "WF0000001")
         self.assertEqual(buy["stat"], "Ok")
-        self.assertEqual(self.broker.position_summary(), "75CE0PE")
+        self.assertEqual(buy["data"]["orderId"], "WF0000001")
+        self.assertEqual(self.broker.orders[-1]["avgPrc"], 22000)
+        self.assertEqual(self.broker.position_summary(), "65CE0PE")
 
         self.broker.set_market(datetime(2025, 1, 6, 9, 18), 22012)
         quote = self.broker.quotes(
             [{"instrument_token": "SIM-CE"}], quote_type="depth"
         )[0]
-        self.assertEqual(quote["last_price"], 112.0)
+        self.assertEqual(quote["last_price"], 22012)
         self.assertEqual(
             self.place("S", "CE", "WF0000001_S001")["stat"],
             "Ok",
         )
+        self.assertEqual(self.broker.orders[-1]["avgPrc"], 22012)
 
         self.assertEqual(self.broker.position_summary(), "0CE0PE")
         self.assertEqual(len(self.broker.order_report()["data"]), 2)
         trade = self.broker.trades()[0]
         self.assertEqual(trade["side"], "CE")
         self.assertEqual(trade["index_points_per_unit"], 12)
-        self.assertEqual(trade["quantity"], 75)
+        self.assertEqual(trade["quantity"], 65)
 
-    def test_put_premium_and_points_move_opposite_to_spot(self):
+    def test_put_fill_and_quote_use_raw_index_spot(self):
         self.place("B", "PE", "WF0000002")
         self.broker.set_market(datetime(2025, 1, 6, 9, 18), 21990)
         quote = self.broker.quotes(
             [{"instrument_token": "SIM-PE"}], quote_type="depth"
         )[0]
-        self.assertEqual(quote["last_price"], 110.0)
+        self.assertEqual(quote["last_price"], 21990)
         self.place("S", "PE", "WF0000002_S002")
+        self.assertEqual(self.broker.orders[-1]["avgPrc"], 21990)
         self.assertEqual(self.broker.trades()[0]["index_points_per_unit"], 10)
 
     def test_spot_point_score_is_directional_and_quantity_weighted(self):
@@ -81,7 +85,7 @@ class SimulatedBrokerTests(unittest.TestCase):
             broker.place_order(
                 trading_symbol="NIFTY-WF-CE",
                 transaction_type="B",
-                quantity=75,
+                quantity=65,
                 tag="WF0000001",
             )
 
@@ -90,8 +94,9 @@ class SimulatedBrokerTests(unittest.TestCase):
             self.assertEqual(len(rows), 1)
             self.assertEqual(rows[0]["trdSym"], "NIFTY-WF-CE")
             self.assertEqual(rows[0]["entry_spot"], "22000.0")
+            self.assertEqual(rows[0]["avgPrc"], "22000.0")
             restored = SimulatedBroker(orders_csv=orders_path)
-            self.assertEqual(restored.position_summary(), "75CE0PE")
+            self.assertEqual(restored.position_summary(), "65CE0PE")
 
     def test_csv_writer_accepts_pipe_trade_and_bar_records(self):
         with tempfile.TemporaryDirectory(prefix="pxy-csv-test-") as temp:
@@ -109,7 +114,7 @@ class SimulatedBrokerTests(unittest.TestCase):
                     "timestamp": "09:16", "execution_timestamp": "09:17",
                     "spot": 100, "execution_spot": 101, "entry_signal": "BUY",
                     "exit_signal": "BULL", "position_before": "0CE0PE",
-                    "position_after": "75CE0PE", "orders_created": 1,
+                    "position_after": "65CE0PE", "orders_created": 1,
                     "order_tags": "WF0000001",
                 }],
             )

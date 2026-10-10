@@ -18,7 +18,6 @@ NOT_ALIGNED_TARGET_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
 init(autoreset=True)
 
 _warned = set()
-BASE_LGT_LOSS = 50.0
 
 def _warn_once(key, msg):
     """Prints a warning only the first time it occurs in this process."""
@@ -27,8 +26,15 @@ def _warn_once(key, msg):
         print(f"{Fore.YELLOW}⚠️ {msg}{Style.RESET_ALL}")
 
 
-def calculate_lgt(ce_investment, pe_investment, is_ce):
+def calculate_lgt(ce_investment, pe_investment, is_ce, index_price):
     """Scale the LGT loss threshold by the side investment ratio."""
+    try:
+        index_price = float(index_price)
+    except (TypeError, ValueError) as error:
+        raise ValueError("index_price must be a finite positive number.") from error
+    if not math.isfinite(index_price) or index_price <= 0:
+        raise ValueError("index_price must be a finite positive number.")
+
     own_investment, opposite_investment = (
         (ce_investment, pe_investment) if is_ce else (pe_investment, ce_investment)
     )
@@ -39,7 +45,7 @@ def calculate_lgt(ce_investment, pe_investment, is_ce):
     )
     magnitude = max(
         EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
-        round(BASE_LGT_LOSS * ratio, 2),
+        round((index_price / 1000.0) * ratio, 2),
     )
     return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
 

@@ -202,8 +202,12 @@ network boundary.
   a tie does not count as aligned.
 - CHK exercises the target calculations and simulated square-off path.
   `tstmodepxy/backtest.py` enables the same risk cycle during historical replay.
-  SIM uses synthetic spot-linked option premiums and never sends live orders;
-  its performance score remains a spot-point proxy, not historical options P&L.
+  SIM never sends live orders, uses index spot as every simulated fill and
+  mark, and simulates one 65-unit lot per order. Production single-exit and
+  cycle-risk percentages are each divided by 200 before applying them to the
+  spot-based target and quantity-weighted entry-spot notional. CE targets
+  require an upward move and PE targets a downward move. SIM results are
+  index-point results, not historical option P&L.
 
 ## Check
 
@@ -228,15 +232,16 @@ available), with the preceding session used for indicator warm-up. Use
 short diagnostic replay, or `--lgt-constant 8` to test a fixed `-8%` LGT
 threshold instead of the configured formula.
 
-The replay leaves entry, signal, ATR target, averaging, counter-buy, and
-scheduled square-off pipes unchanged while exercising the portfolio risk
-cycle. The production premium-target gate is exercised with the simulator's spot-linked
-premium proxy, but results are scored exclusively as signed index spot movement
-times each filled lot's quantity: CE uses `(exit spot − entry spot) × quantity`,
-PE uses `(entry spot − exit spot) × quantity`. Each averaged lot is scored from
-its own entry spot and quantity. Remaining positions must be closed by the
-configured scheduled square-off or the replay reports an error. This is a
-spot-point strategy comparison, not historical option P&L.
+The replay keeps production signals, ATR target calculation, averaging,
+counter-buy, risk confirmation, and scheduled square-off flow. SIM uses only
+index spot prices and a fixed quantity of 65 per lot. To translate production
+percentages to the SIM spot basis, both the single-exit target percentage
+(including the 1.4% unaligned baseline) and cycle-risk percentage are divided
+by 200. CE targets require spot to rise; PE targets require spot to fall. P&L
+is signed index movement times quantity for each lot; cycle risk uses
+quantity-weighted entry-spot notional with the scaled 2.8% target. Remaining
+positions must be closed by scheduled square-off or the replay reports an
+error. This is a spot-point strategy comparison, not historical option P&L.
 
 ## Other conditional settings
 
@@ -269,9 +274,11 @@ spot-point strategy comparison, not historical option P&L.
   losing at or beyond its applicable LGT threshold.
 - LGT is calculated from positive investment values, then negated:
   `r = own investment / opposite investment`;
-  `magnitude = max(1.4, round(50 × r, 2))`;
+  `magnitude = max(1.4, round((index price / 1000) × r, 2))`;
   `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)`.
-  If either side has no positive investment, `r` defaults to `1`.
+  The index price comes from the current `syspxy` market snapshot. If either
+  side has no positive investment, `r` defaults to `1`; if the index price is
+  missing or invalid, averaging is skipped.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.
