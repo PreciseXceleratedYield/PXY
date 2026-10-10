@@ -172,9 +172,10 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             )
         meta["ledger_basis"] = current_basis
 
-    # The portfolio must be completely flat before a cycle is reset.
+    # The portfolio must be completely flat before a book is closed or reset.
     open_tags = cycle_ledger_tags(open_df)
-    if not open_tags:
+    portfolio_is_flat = open_df is None or open_df.empty
+    if portfolio_is_flat:
         previous_tags = {
             str(tag) for tag in meta.get("risk_cycle_tags", [])
         }
@@ -213,6 +214,18 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         save_meta(meta)
         if consecutive_breaches:
             save_check_state(0)
+        return
+
+    open_columns = {str(column).upper(): column for column in open_df.columns}
+    tag_column = open_columns.get("TAG")
+    if tag_column is None or any(
+        str(tag).strip().lower() in {"", "nan", "none", "null"}
+        for tag in open_df[tag_column]
+    ):
+        print(
+            f"{Fore.YELLOW}⚠️ Active positions do not all have valid order tags; "
+            "keeping the book open and skipping cycle accounting."
+        )
         return
 
     previous_tags = {

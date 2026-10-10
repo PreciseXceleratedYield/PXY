@@ -271,6 +271,165 @@ class CycleRiskControlTests(unittest.TestCase):
             "2025-01-06 10:00:00|CYCLE-CE",
         )
 
+    def test_production_book_stays_open_across_leg_close_and_new_leg(self):
+        started_at = "2025-01-06 10:00:00"
+        meta_states = [
+            {
+                "last_tick_epoch": 0.0,
+                "ledger_basis": None,
+                "risk_cycle_started_at": None,
+                "risk_cycle_tags": [],
+            },
+            {
+                "last_tick_epoch": 0.0,
+                "ledger_basis": None,
+                "risk_cycle_started_at": started_at,
+                "risk_cycle_tags": ["BOOK-CE", "BOOK-PE"],
+            },
+            {
+                "last_tick_epoch": 0.0,
+                "ledger_basis": None,
+                "risk_cycle_started_at": started_at,
+                "risk_cycle_tags": ["BOOK-CE", "BOOK-PE"],
+            },
+            {
+                "last_tick_epoch": 0.0,
+                "ledger_basis": None,
+                "risk_cycle_started_at": started_at,
+                "risk_cycle_tags": ["BOOK-CE", "BOOK-PE"],
+            },
+        ]
+        open_pe = pd.DataFrame([{
+            "Tag": "BOOK-PE",
+            "Symbol": "NIFTY-PE",
+            "Qty": 75,
+            "Buy_Time": pd.Timestamp(started_at),
+            "Buy_Prc": 100,
+            "Sell_Prc": 110,
+            "PNL": 750,
+        }])
+        open_ce = pd.DataFrame([{
+            "Tag": "BOOK-CE",
+            "Symbol": "NIFTY-CE",
+            "Qty": 75,
+            "Buy_Time": pd.Timestamp("2025-01-06 10:05:00"),
+            "Buy_Prc": 100,
+            "Sell_Prc": 105,
+            "PNL": 375,
+        }])
+        both_open = pd.concat([open_pe, open_ce], ignore_index=True)
+        closed = pd.DataFrame([
+            {
+                "Tag": "BOOK-PE",
+                "Symbol": "NIFTY-PE",
+                "Qty": 75,
+                "Buy_Prc": 100,
+                "Sell_Prc": 110,
+                "PNL": 750,
+                "Exit_Time": pd.Timestamp("2025-01-06 10:05:00"),
+            },
+            {
+                "Tag": "BOOK-CE",
+                "Symbol": "NIFTY-CE",
+                "Qty": 75,
+                "Buy_Prc": 100,
+                "Sell_Prc": 106,
+                "PNL": 450,
+                "Exit_Time": pd.Timestamp("2025-01-06 10:10:00"),
+            },
+        ])
+        with (
+            patch.object(
+                runexacpxy,
+                "load_session_state",
+                return_value={"pnl_offset": 0.0},
+            ),
+            patch.object(
+                runexacpxy,
+                "load_check_state",
+                return_value={"consecutive_breaches": 0},
+            ),
+            patch.object(runexacpxy, "load_meta", side_effect=meta_states),
+            patch.object(runexacpxy, "save_meta") as save_meta,
+            patch.object(runexacpxy, "save_check_state"),
+            patch.object(runexacpxy, "save_session_state") as save_state,
+            patch.object(runexacpxy, "state_is_stale", return_value=False),
+            patch.object(runexacpxy, "_current_filter_time", return_value=None),
+            patch.object(runexacpxy, "RISK_CANDLE_CONTROL_ENABLED", False),
+            patch.object(runexacpxy, "TICK_MIN_GAP_SECONDS", 0),
+            patch.object(runexacpxy, "time") as risk_clock,
+        ):
+            risk_clock.time.side_effect = [
+                1_000_000,
+                1_000_001,
+                1_000_002,
+                1_000_003,
+            ]
+            runexacpxy._tick(object(), open_pe, pd.DataFrame())
+            runexacpxy._tick(object(), both_open, pd.DataFrame())
+            runexacpxy._tick(object(), open_ce, closed.iloc[:1])
+            runexacpxy._tick(object(), pd.DataFrame(), closed)
+
+        self.assertEqual(save_meta.call_count, 4)
+        self.assertEqual(
+            set(save_meta.call_args_list[1].args[0]["risk_cycle_tags"]),
+            {"BOOK-CE", "BOOK-PE"},
+        )
+        self.assertEqual(
+            set(save_meta.call_args_list[2].args[0]["risk_cycle_tags"]),
+            {"BOOK-CE", "BOOK-PE"},
+        )
+        self.assertEqual(save_meta.call_args_list[3].args[0]["risk_cycle_tags"], [])
+        self.assertEqual(save_state.call_args.kwargs["closed_book_count"], 1)
+        self.assertEqual(save_state.call_args.kwargs["booked_profit"], 1200.0)
+        self.assertEqual(
+            save_state.call_args.kwargs["last_closed_snapshot"]["closed_positions"],
+            2,
+        )
+
+    def test_active_untagged_position_does_not_reset_production_book(self):
+        open_position = pd.DataFrame([{
+            "Symbol": "NIFTY-CE",
+            "Qty": 75,
+            "Buy_Time": pd.Timestamp("2025-01-06 10:00:00"),
+            "Buy_Prc": 100,
+            "Sell_Prc": 110,
+            "PNL": 750,
+        }])
+        with (
+            patch.object(
+                runexacpxy,
+                "load_session_state",
+                return_value={"pnl_offset": 0.0},
+            ),
+            patch.object(
+                runexacpxy,
+                "load_check_state",
+                return_value={"consecutive_breaches": 0},
+            ),
+            patch.object(
+                runexacpxy,
+                "load_meta",
+                return_value={
+                    "last_tick_epoch": 0.0,
+                    "ledger_basis": None,
+                    "risk_cycle_started_at": "2025-01-06 10:00:00",
+                    "risk_cycle_tags": ["BOOK-CE"],
+                },
+            ),
+            patch.object(runexacpxy, "save_meta") as save_meta,
+            patch.object(runexacpxy, "save_session_state") as save_state,
+            patch.object(runexacpxy, "state_is_stale", return_value=False),
+            patch.object(runexacpxy, "_current_filter_time", return_value=None),
+            patch.object(runexacpxy, "TICK_MIN_GAP_SECONDS", 0),
+            patch.object(runexacpxy, "time") as risk_clock,
+        ):
+            risk_clock.time.return_value = 1_000_000
+            runexacpxy._tick(object(), open_position, pd.DataFrame())
+
+        save_meta.assert_not_called()
+        save_state.assert_not_called()
+
     def test_cycle_risk_control_is_enabled(self):
         self.assertEqual(RUNEXACPXY_CNTRLRSKBAR, "YES")
 

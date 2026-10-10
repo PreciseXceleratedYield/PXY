@@ -402,19 +402,55 @@ def _book_reason(trade, entry_orders, entry_decision, exit_log):
     return f"{entry_reason} {exit_reason}"
 
 
-def print_book_table(book_number, trade, entry_orders, entry_decision, exit_log):
-    entry_time = datetime.fromisoformat(trade["entry_time"]).strftime("%H:%M")
-    exit_time = datetime.fromisoformat(trade["exit_time"]).strftime("%H:%M")
-    points = float(trade["index_points_per_unit"]) * int(trade["quantity"])
+def print_book_table(book_number, book_legs):
+    actions = []
+    reasons = []
+    total_points = 0.0
+    for trade, entry_orders, entry_decision, exit_log in book_legs:
+        entry_time = datetime.fromisoformat(trade["entry_time"]).strftime("%H:%M")
+        exit_time = datetime.fromisoformat(trade["exit_time"]).strftime("%H:%M")
+        points = float(trade["index_points_per_unit"]) * int(trade["quantity"])
+        total_points += points
+        actions.append(
+            f"BUY {trade['side']} @ {entry_time} "
+            f"({float(trade['entry_spot']):.2f}) → SELL @ {exit_time} "
+            f"({float(trade['exit_spot']):.2f}); {points:+.2f} pts"
+        )
+        reasons.append(_book_reason(trade, entry_orders, entry_decision, exit_log))
     action = (
-        f"Book {book_number}: BUY {trade['side']} @ {entry_time} "
-        f"({float(trade['entry_spot']):.2f}) → SELL @ {exit_time} "
-        f"({float(trade['exit_spot']):.2f}); {points:+.2f} pts"
+        f"Book {book_number}: " + "; ".join(actions)
+        + f"; Total: {total_points:+.2f} pts"
     )
-    why = _book_reason(trade, entry_orders, entry_decision, exit_log)
+    why = " ".join(dict.fromkeys(reasons))
     print("| Action | Why action |")
     print("|---|---|")
     print(f"| {action} | {why} |", flush=True)
+
+
+class SimBookCycle:
+    """Collect completed SIM legs until the whole simulated portfolio is flat."""
+
+    def __init__(self):
+        self.is_open = False
+        self.legs = []
+
+    def record_tick(self, position_before, position_after, new_legs, has_new_entry):
+        flat = "0CE0PE"
+        if not self.is_open and (
+            position_before != flat
+            or position_after != flat
+            or new_legs
+            or has_new_entry
+        ):
+            self.is_open = True
+        if self.is_open:
+            self.legs.extend(new_legs)
+        if self.is_open and position_after == flat:
+            completed = self.legs
+            self.is_open = False
+            self.legs = []
+            return completed
+        return None
 
 
 def print_report(
@@ -564,6 +600,7 @@ def run_backtest(
     book_number = 0
     for session_date in session_dates:
         broker = SimulatedBroker()
+        book_cycle = SimBookCycle()
         with tempfile.TemporaryDirectory(prefix="pxy-walk-forward-") as temporary_state:
             with ProductionPipeReplay(
                 SYS_DIR,
@@ -592,8 +629,9 @@ def run_backtest(
                     )
                     current_orders = broker.orders[first_new_order:]
                     newly_closed_trades = broker.trades()[open_trade_count:]
+                    after = broker.position_summary()
+                    new_book_legs = []
                     for trade in newly_closed_trades:
-                        book_number += 1
                         trade_tag = trade["tag"]
                         entry_orders = [
                             order for order in broker.orders
@@ -614,22 +652,14 @@ def run_backtest(
                                 "exit_signal": bar["exit"],
                                 "pipe_output": pipe_output,
                             }
-                        print_book_table(
-                            book_number,
-                            trade,
-                            entry_orders,
-                            entry_decision,
-                            f"{bar['snapshot_log']}{pipe_output}",
+                        new_book_legs.append(
+                            (
+                                trade,
+                                entry_orders,
+                                entry_decision,
+                                f"{bar['snapshot_log']}{pipe_output}",
+                            )
                         )
-                        if interactive_books:
-                            try:
-                                command = input().strip().lower()
-                            except (EOFError, KeyboardInterrupt):
-                                command = "q"
-                            if command == "q":
-                                stopped_early = True
-                                break
-                    after = broker.position_summary()
                     decisions.append(
                         {
                             "timestamp": bar["timestamp"],
@@ -647,6 +677,26 @@ def run_backtest(
                             "pipe_output": f"{bar['snapshot_log']}{pipe_output}",
                         }
                     )
+                    completed_book = book_cycle.record_tick(
+                        before,
+                        after,
+                        new_book_legs,
+                        any(
+                            order["trnsTp"] == "B"
+                            for order in current_orders
+                        ),
+                    )
+                    if completed_book is not None:
+                        if completed_book:
+                            book_number += 1
+                            print_book_table(book_number, completed_book)
+                            if interactive_books:
+                                try:
+                                    command = input().strip().lower()
+                                except (EOFError, KeyboardInterrupt):
+                                    command = "q"
+                                if command == "q":
+                                    stopped_early = True
                     if stopped_early:
                         break
             remaining = broker.position_summary()
