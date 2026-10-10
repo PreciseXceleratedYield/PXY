@@ -665,9 +665,14 @@ function drawRiskCandle(floor,net,peak){
     }
     const booked=Math.round(Number(riskData.booked_profit)||0);
     const books=Number(riskData.closed_book_count)||0;
-    const netLabel=`₹${net>=0?'+':''}${Math.round(net).toLocaleString('en-IN')} / ₹${booked.toLocaleString('en-IN')} (${books})`;
+    const netLabel=`₹${net>=0?'+':''}${Math.round(net).toLocaleString('en-IN')} / ₹${booked.toLocaleString('en-IN')}`;
     rctx.font=`800 ${fz}px 'Syne',sans-serif`;
-    const textW=rctx.measureText(netLabel).width+14;
+    const labelW=rctx.measureText(netLabel).width;
+    const countFont=`700 ${Math.max(8,Math.round(fz*0.62))}px 'Syne',sans-serif`;
+    rctx.font=countFont;
+    const countW=rctx.measureText(String(books)).width;
+    rctx.font=`800 ${fz}px 'Syne',sans-serif`;
+    const textW=labelW+countW+14;
     let bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX);
     const midX=(bx1+bx2)/2;
     let bW=Math.max(bx2-bx1,textW);
@@ -678,8 +683,10 @@ function drawRiskCandle(floor,net,peak){
     rctx.fillStyle=bodyColor;
     rctx.beginPath();rctx.roundRect(bx1,midY-bodyH/2,bW,bodyH,4);rctx.fill();
     rctx.fillStyle=isBull?'#06160d':'#ffffff';
-    rctx.textAlign='center';rctx.textBaseline='middle';
-    rctx.fillText(netLabel,(bx1+bx2)/2,midY);
+    rctx.textAlign='left';rctx.textBaseline='middle';
+    const labelX=(bx1+bx2)/2-(labelW+countW+2)/2;
+    rctx.fillText(netLabel,labelX,midY);
+    rctx.font=countFont;rctx.fillText(String(books),labelX+labelW+2,midY-fz*0.24);
     const danger=net<=lo+Math.abs(lo)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5)':'';
 }

@@ -1431,12 +1431,14 @@ function drawRiskCandle(floor,net,peak){
     const overallColor=overallBull?cssVar('--bull'):cssVar('--bear');
     const netColor=isBull?cssVar('--bull'):cssVar('--bear');
     const netTxt='₹'+(net>=0?'+':'')+Math.round(net);
-    const sumTxt=`${fmt(sumVal)} · ${bookCount} books`;
+    const sumTxt=fmt(sumVal);
     const mainFont=`800 ${fz}px 'Syne',sans-serif`,chipFont=`800 ${fz-1}px 'Syne',sans-serif`;
     ctx.font=chipFont;const wNet=ctx.measureText(netTxt).width;
     ctx.font=mainFont;const wSum=ctx.measureText(sumTxt).width;
+    const countFont=`700 ${Math.max(8,Math.round(fz*0.62))}px 'Syne',sans-serif`;
+    ctx.font=countFont;const wCount=ctx.measureText(String(bookCount)).width;
     const CHIP_PAD=7,GAP=9,chipW=wNet+CHIP_PAD*2,chipH=bodyH-8;
-    const contentW=chipW+GAP+wSum;
+    const contentW=chipW+GAP+wSum+2+wCount;
     const textW=contentW+20;
     /* ── body geometry (extent still open→net) ── */
     let bx1=Math.min(openX,closeX),bx2=Math.max(openX,closeX);
@@ -1465,6 +1467,7 @@ function drawRiskCandle(floor,net,peak){
     ctx.fillText(netTxt,cx+chipW/2,midY+0.5);
     ctx.font=mainFont;ctx.textAlign='left';ctx.fillStyle=overallBull?cssVar('--on-bull'):cssVar('--on-bear');
     ctx.fillText(sumTxt,sx+chipW+GAP,midY+0.5);
+    ctx.font=countFont;ctx.fillText(String(bookCount),sx+chipW+GAP+wSum+2,midY-fz*0.24);
     const danger=net<=floor+Math.abs(floor)*0.15;
     $('riskBar').style.boxShadow=danger?'0 0 0 1px rgba(239,83,80,0.5)':'';
 }

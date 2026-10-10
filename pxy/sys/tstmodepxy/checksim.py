@@ -1,4 +1,4 @@
-"""Run the CHK suite followed by SIM for one selected recent trading session."""
+"""Choose a standalone CHK suite or a SIM replay for a recent session."""
 
 import os
 import subprocess
@@ -45,6 +45,34 @@ def _run_stage(label, command, run_mode):
 
 
 def main():
+    print("\nChoose a run:")
+    print("c) CHK only")
+    print("b) SIM replay")
+    print("q) Cancel")
+    action = input("Select action [c/b, q]: ").strip().lower()
+    if action == "q":
+        print("CHK/SIM cancelled.")
+        return 0
+    if action == "c":
+        return _run_stage(
+            "CHK test suite",
+            [
+                sys.executable,
+                "-m",
+                "unittest",
+                "discover",
+                "-s",
+                "tstmodepxy",
+                "-p",
+                "test_*.py",
+                "-v",
+            ],
+            "CHK",
+        )
+    if action != "b":
+        print("Invalid action selection.", file=sys.stderr)
+        return 2
+
     try:
         history = fetch_recent_index_history(session_count=MAX_SESSION_CHOICES)
     except (RuntimeError, ValueError) as error:
@@ -63,7 +91,7 @@ def main():
 
     today = datetime.now(SYSCNFGPXY_TIMEZONE).date()
 
-    print("\nChoose a completed NIFTY trading session for CHK + SIM:")
+    print("\nChoose a completed NIFTY trading session for SIM:")
     newest_first = list(reversed(sessions))
     for index, session in enumerate(newest_first):
         print(
@@ -73,31 +101,12 @@ def main():
     print("q) Cancel")
     choice = input("Select a session [1-5, q]: ").strip().lower()
     if choice == "q":
-        print("CHK + SIM cancelled.")
+        print("SIM cancelled.")
         return 0
     selected = select_session(newest_first, choice)
     if selected is None:
         print("Invalid session selection.", file=sys.stderr)
         return 2
-
-    check_status = _run_stage(
-        "CHK test suite",
-        [
-            sys.executable,
-            "-m",
-            "unittest",
-            "discover",
-            "-s",
-            "tstmodepxy",
-            "-p",
-            "test_*.py",
-            "-v",
-        ],
-        "CHK",
-    )
-    if check_status:
-        print("SIM skipped because CHK did not pass.")
-        return check_status
 
     return _run_stage(
         f"SIM replay for {selected.isoformat()}",

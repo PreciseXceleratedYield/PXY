@@ -1102,10 +1102,15 @@ function drawRiskCandle(floor, net, peak){
     // body: current book / cumulative closed-book profit
     const booked=Math.round(Number(riskData.booked_profit)||0);
     const books=Number(riskData.closed_book_count)||0;
-    const netLabel=`${net>=0?'+':''}${Math.round(net).toLocaleString('en-IN')} / ₹${booked.toLocaleString('en-IN')} (${books})`;
+    const netLabel=`${net>=0?'+':''}${Math.round(net).toLocaleString('en-IN')} / ₹${booked.toLocaleString('en-IN')}`;
     const fontSize = Math.round(Math.min(14, Math.max(10, H*0.28)));
     ctx.font = `800 ${fontSize}px 'Syne',sans-serif`;
-    const textW=ctx.measureText(netLabel).width+14;
+    const labelW=ctx.measureText(netLabel).width;
+    const countFont=`700 ${Math.max(8,Math.round(fontSize*0.62))}px 'Syne',sans-serif`;
+    ctx.font=countFont;
+    const countW=ctx.measureText(String(books)).width;
+    ctx.font = `800 ${fontSize}px 'Syne',sans-serif`;
+    const textW=labelW+countW+14;
     let bx1 = Math.min(openX, closeX);
     let bx2 = Math.max(openX, closeX);
     const midX=(bx1+bx2)/2;
@@ -1127,10 +1132,12 @@ function drawRiskCandle(floor, net, peak){
 
     // net label centred on candle body — contrast-aware color
     ctx.fillStyle = isBull ? '#06160d' : '#ffffff'; // dark navy on green, white on red
-    ctx.textAlign = 'center';
+    ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    const labelX = (bx1 + bx2) / 2;
+    const labelX = (bx1 + bx2) / 2-(labelW+countW+2)/2;
     ctx.fillText(netLabel, labelX, midY);
+    ctx.font=countFont;
+    ctx.fillText(String(books),labelX+labelW+2,midY-fontSize*0.24);
 
     // danger glow
     const danger = net <= lo + Math.abs(lo)*0.15;
