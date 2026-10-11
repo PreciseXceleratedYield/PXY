@@ -1099,12 +1099,18 @@ class ConfigurationWiringTests(unittest.TestCase):
             self.assertIsNone(execbuypxy.check_counter_leg(no_matching_exit))
             popen.assert_called_once()
 
-    def test_single_side_target_uses_atr_and_two_side_target_uses_77_percent(self):
+    def test_heavy_aligned_target_uses_atr_when_both_sides_are_open(self):
         self.assertEqual(exeltgtpxy.calculate_tgt(True, 10, 2, 3), 20.0)
         self.assertEqual(exeltgtpxy.calculate_tgt(True, 5, 3, 4), 15.0)
         self.assertEqual(exeltgtpxy.calculate_tgt(False), 1.4)
         self.assertEqual(
             exeltgtpxy.calculate_tgt(True, both_sides_open=True), 77.0
+        )
+        self.assertEqual(
+            exeltgtpxy.calculate_tgt(
+                True, 10, 2, 3, both_sides_open=True, heavy_side=True
+            ),
+            20.0,
         )
         self.assertEqual(
             exeltgtpxy.calculate_tgt(False, both_sides_open=True), 1.4
@@ -1129,6 +1135,18 @@ class ConfigurationWiringTests(unittest.TestCase):
             exeltgtpxy.target_price(pe, 5000, 1000, ce_count=1, pe_count=1),
             1770.0,
         )
+        self.assertEqual(
+            exeltgtpxy.target_price(ce, 5000, 1000, ce_count=1, pe_count=1),
+            1200.0,
+        )
+        self.assertEqual(
+            exeltgtpxy.target_price(pe, 1000, 5000, ce_count=1, pe_count=1),
+            1240.0,
+        )
+        self.assertEqual(
+            exeltgtpxy.target_price(ce, 1000, 1000, ce_count=1, pe_count=1),
+            1770.0,
+        )
         self.assertEqual(exeltgtpxy.target_price({**ce, "exit": "BEAR"}), 1014.0)
         self.assertEqual(
             exeltgtpxy.target_price(
@@ -1144,14 +1162,14 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(exeavxpxy.averaging_alignment_signals("BEAR"), (False, True))
         self.assertEqual(exeavxpxy.averaging_alignment_signals("SIDE"), (False, False))
 
-    def test_lgt_uses_powered_investment_ratio_and_own_lot_count(self):
+    def test_lgt_adds_powered_investment_ratio_and_own_lot_count_terms(self):
         self.assertEqual(
             exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True, index_price=25000),
-            -2.66,
+            -27.24,
         )
         self.assertEqual(
             exeltgtpxy.calculate_lgt(2000.0, 4000.0, is_ce=True, index_price=25000),
-            -7.07,
+            -30.0,
         )
         self.assertEqual(
             exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True, index_price=25000),
@@ -1171,11 +1189,17 @@ class ConfigurationWiringTests(unittest.TestCase):
         )
         self.assertEqual(
             exeltgtpxy.calculate_lgt(4000.0, 1000.0, is_ce=False, index_price=25000),
-            -2.66,
+            -27.24,
         )
         self.assertEqual(
             exeltgtpxy.calculate_lgt(0.0, 4000.0, is_ce=True, index_price=25000),
             -50.0,
+        )
+        self.assertEqual(
+            exeltgtpxy.calculate_lgt(
+                1000.0, 4000.0, is_ce=True, index_price=25000, own_count=1
+            ),
+            -27.24,
         )
         self.assertEqual(
             exeltgtpxy.calculate_lgt(

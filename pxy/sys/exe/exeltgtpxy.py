@@ -47,29 +47,33 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, own_count=1)
     own_lots = max(0, int(own_count))
     if own_lots == 0:
         magnitude = EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD
+    elif own_lots >= 2:
+        magnitude = EXEAMSPXY_MAX_LGT_LOSS
     else:
         max_ratio_before_cap = math.log(
-            EXEAMSPXY_MAX_LGT_LOSS / own_lots, 50.0
+            EXEAMSPXY_MAX_LGT_LOSS - (25.0 ** own_lots), 25.0
         )
-        powered_lgt = (
+        magnitude = (
             EXEAMSPXY_MAX_LGT_LOSS
             if ratio >= max_ratio_before_cap
-            else (50.0 ** ratio) * own_lots
+            else round((25.0 ** ratio) + (25.0 ** own_lots), 2)
         )
-        magnitude = max(
-            EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
-            round(powered_lgt, 2),
-        )
+        magnitude = max(EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD, magnitude)
     return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
 
 
 def calculate_tgt(
-    is_aligned, atr=None, side_power=None, side_depth=None, both_sides_open=False
+    is_aligned,
+    atr=None,
+    side_power=None,
+    side_depth=None,
+    both_sides_open=False,
+    heavy_side=False,
 ):
-    """Return the aligned ATR target or the configured percentage target."""
+    """Return ATR for an aligned heavy side, otherwise the applicable fixed target."""
     if not is_aligned:
         return NOT_ALIGNED_TARGET_PCT
-    if both_sides_open:
+    if both_sides_open and not heavy_side:
         return BOTH_SIDES_ALIGNED_TARGET_PCT
 
     try:
@@ -156,6 +160,11 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             or (exit_signal == "BEAR" and is_pe)
         )
         both_sides_open = ce_count > 0 and pe_count > 0
+        heavy_side = (
+            ce_investment > pe_investment
+            if is_ce
+            else pe_investment > ce_investment
+        )
         side_power = row.get("ce_power" if is_ce else "pe_power")
         side_depth = row.get("hkin_ce_depth" if is_ce else "hkin_pe_depth")
         target_pct = calculate_tgt(
@@ -164,6 +173,7 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             side_power=side_power,
             side_depth=side_depth,
             both_sides_open=both_sides_open,
+            heavy_side=heavy_side,
         )
         
         # Calculate the positive target price.
