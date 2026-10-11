@@ -198,12 +198,10 @@ network boundary.
   example, three active rows use 2.8% / 3; closed rows remain in cycle P&L and
   premium-paid totals but are not included in the active-row divisor.
 - The risk bar shows that active cycle as the current book, alongside cumulative
-  realized profit and the count of completed books. The risk candle is yellow
-  across desktop, mobile, and legacy dashboards; profit/loss indicators retain
-  their directional colors. Its click-through includes the last closed-book
-  snapshot and update time. The displayed loss target is the negative mirror
-  of the profit target; it is informational and never causes a loss-side
-  square-off. There is no timed midday reset.
+  realized profit and the count of completed books. Its click-through includes
+  the last closed-book snapshot and update time. The displayed loss target is
+  the negative mirror of the profit target; it is informational and never
+  causes a loss-side square-off. There is no timed midday reset.
 - The negative initial line is display-only; there is no loss-side square-off.
   `RUNEXACPXY_STOP_SQUAREOFF_ENABLED` defaults to `False`;
   `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED` defaults to `True`.
