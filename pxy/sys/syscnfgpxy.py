@@ -156,7 +156,7 @@ EXEDYNPXY_DECAY_RATE_PER_MIN = 0.0001
 EXEDYNPXY_PNL_THRESHOLD = 0.0
 
 # Option-symbol selection.
-EXEOTMPXY_STRIKE_MODE = "ATM"  # "ATM", "OTMFIX", or "OTMDYN"; applies to every option buy.
+EXEOTMPXY_STRIKE_MODE = "OTMDYN"  # "ATM", "OTMFIX", or "OTMDYN"; applies to every option buy.
 EXEOTMPXY_FIXED_DISTANCE = 100
 EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES = (200, 150, 100, 50, 0)  # Monday through Friday.
 

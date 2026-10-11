@@ -50,7 +50,7 @@ class ConfigEditorTests(unittest.TestCase):
     def test_new_strike_settings_are_visible_and_can_be_added_to_older_config(self):
         settings, _ = config_editor._metadata(self.original)
         by_name = {setting["key"]: setting for setting in settings}
-        self.assertEqual(by_name["EXEOTMPXY_STRIKE_MODE"]["value"], "ATM")
+        self.assertEqual(by_name["EXEOTMPXY_STRIKE_MODE"]["value"], "OTMDYN")
         self.assertEqual(by_name["EXEOTMPXY_STRIKE_MODE"]["options"], ["ATM", "OTMFIX", "OTMDYN"])
         result = config_editor._write({
             "EXEOTMPXY_STRIKE_MODE": "OTMDYN",
