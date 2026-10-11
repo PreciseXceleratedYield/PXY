@@ -804,6 +804,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             [
                 {
                     "symbol": "NIFTY-WF-CE",
+                    "qty": 75,
                     "tag": "CE1",
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "BUY",
@@ -849,14 +850,25 @@ class ConfigurationWiringTests(unittest.TestCase):
             "DEPTH_EXIT|PE|2025-01-06 10:00:00"
         )
 
-    def test_pastrsk_loss_filter_requires_more_than_fourteen_percent(self):
+    def test_pastrsk_loss_filter_requires_more_than_seven_percent(self):
         active_orders = pd.DataFrame(
             [
+                {
+                    "symbol": "NIFTY-WF-CE",
+                    "qty": 75,
+                    "buy_prc": 100.0,
+                    "sell_prc": 100.0,
+                    "tag": "CE1",
+                    "buy_time": "2025-01-06 09:58:00",
+                    "entry": "BUY",
+                    "hkin_past_depth": "PE7",
+                    "hkin_signal_time": "2025-01-06 10:00:00",
+                },
                 {
                     "symbol": "NIFTY-WF-PE",
                     "qty": 75,
                     "buy_prc": 100.0,
-                    "sell_prc": 86.0,
+                    "sell_prc": 93.0,
                     "tag": "PE1",
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "BUY",
@@ -865,7 +877,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                 }
             ]
         )
-        self.assertEqual(exeexitpxy.depth_exit_side_loss_pct(active_orders, "PE"), -14.0)
+        self.assertEqual(exeexitpxy.depth_exit_side_loss_pct(active_orders, "PE"), -7.0)
 
         with (
             patch.object(exeexitpxy, "PASTRSK", "YES"),
@@ -884,8 +896,8 @@ class ConfigurationWiringTests(unittest.TestCase):
             )
             run_command.assert_not_called()
 
-            active_orders.loc[0, "sell_prc"] = 85.99
-            self.assertLess(exeexitpxy.depth_exit_side_loss_pct(active_orders, "PE"), -14.0)
+            active_orders.loc[1, "sell_prc"] = 92.99
+            self.assertLess(exeexitpxy.depth_exit_side_loss_pct(active_orders, "PE"), -7.0)
             self.assertEqual(
                 exeexitpxy.run_depth_squareoff(
                     client=None,
@@ -905,6 +917,72 @@ class ConfigurationWiringTests(unittest.TestCase):
                 active_orders.drop(columns=["sell_prc"]), "PE"
             )
         )
+
+    def test_deep_reversal_requires_both_option_legs_open(self):
+        pe_only = pd.DataFrame(
+            [
+                {
+                    "symbol": "NIFTY-WF-PE",
+                    "qty": 75,
+                    "buy_prc": 100.0,
+                    "sell_prc": 80.0,
+                    "tag": "PE1",
+                    "buy_time": "2025-01-06 09:59:00",
+                    "entry": "BUY",
+                    "hkin_past_depth": "PE7",
+                    "hkin_signal_time": "2025-01-06 10:00:00",
+                }
+            ]
+        )
+        with (
+            patch.object(exeexitpxy, "PASTRSK", "YES"),
+            patch.object(exeexitpxy, "ledger_busy", return_value=False),
+            patch.object(exeexitpxy.subprocess, "run") as run_command,
+        ):
+            self.assertEqual(
+                exeexitpxy.run_depth_squareoff(
+                    client=None,
+                    active_df=pe_only,
+                    market_data_available=True,
+                ),
+                set(),
+            )
+            run_command.assert_not_called()
+
+            both_legs = pd.concat(
+                [
+                    pe_only,
+                    pd.DataFrame(
+                        [
+                            {
+                                "symbol": "NIFTY-WF-CE",
+                                "qty": 75,
+                                "buy_prc": 100.0,
+                                "sell_prc": 100.0,
+                                "tag": "CE1",
+                                "buy_time": "2025-01-06 09:58:00",
+                                "entry": "BUY",
+                                "hkin_past_depth": "PE7",
+                                "hkin_signal_time": "2025-01-06 10:00:00",
+                            }
+                        ]
+                    ),
+                ],
+                ignore_index=True,
+            )
+            with (
+                patch.object(exeexitpxy, "_recently_exited", return_value=False),
+                patch.object(exeexitpxy, "_mark_lock"),
+            ):
+                self.assertEqual(
+                    exeexitpxy.run_depth_squareoff(
+                        client=None,
+                        active_df=both_legs,
+                        market_data_available=True,
+                    ),
+                    {"NIFTY-WF-PE|PE1|2025-01-06 09:59:00"},
+                )
+            run_command.assert_called_once()
 
     def test_pastrsk_checks_ce_loss_independently_of_pe_loss(self):
         active_orders = pd.DataFrame(
@@ -1274,13 +1352,13 @@ class ConfigurationWiringTests(unittest.TestCase):
                 "Open": [150.0, 152.5],
                 "High": [151.0, 153.5],
                 "Low": [149.0, 151.5],
-                "Close": [150.5, 153.0],
+                "Close": [150.25, 152.75],
             }
         )
         pd.testing.assert_frame_equal(result, expected)
         self.assertIsNot(result, frame)
 
-    def test_dtaf_without_futures_price_keeps_ohlc_values(self):
+    def test_dtaf_without_futures_price_midpoints_close_only(self):
         frame = pd.DataFrame(
             {
                 "Open": [100.0],
@@ -1289,9 +1367,9 @@ class ConfigurationWiringTests(unittest.TestCase):
                 "Close": [101.0],
             }
         )
-        pd.testing.assert_frame_equal(
-            apply_ohlc_transformation(frame, mode=1), frame
-        )
+        expected = frame.copy()
+        expected["Close"] = [100.5]
+        pd.testing.assert_frame_equal(apply_ohlc_transformation(frame, mode=1), expected)
 
     def test_dtaf_rejects_modes_other_than_one(self):
         frame = pd.DataFrame(

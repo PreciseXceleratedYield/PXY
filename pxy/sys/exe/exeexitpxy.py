@@ -192,6 +192,23 @@ def run_depth_squareoff(client, active_df, market_data_available,
         print(f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: positions unavailable or ledger busy.")
         return set()
 
+    if not {"symbol", "qty"}.issubset(active_df.columns):
+        print(
+            f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: "
+            "active CE/PE positions could not be verified."
+        )
+        return set()
+    symbols = active_df["symbol"].astype(str).str.upper().str.strip()
+    quantities = pd.to_numeric(active_df["qty"], errors="coerce").fillna(0)
+    ce_open = bool((symbols.str.endswith("CE") & quantities.gt(0)).any())
+    pe_open = bool((symbols.str.endswith("PE") & quantities.gt(0)).any())
+    if not (ce_open and pe_open):
+        print(
+            f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: "
+            "both CE and PE positions must be open for a deep-reversal exit."
+        )
+        return set()
+
     snapshot = active_df.iloc[0]
     side = depth_squareoff_side(
         snapshot.get("entry"),
