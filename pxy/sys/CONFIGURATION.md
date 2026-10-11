@@ -118,7 +118,10 @@ Otherwise the entry is NONE. SIDE exits continue to use
 `sysdtafpxy` supports mode 1 only. In the live Yahoo data path it averages each
 OHLC field of every candle with the latest NIFTY futures price from
 `exe/run/nftfut.json`; it cannot emit live signals when that price is unavailable.
-Historical replay without a futures quote keeps the supplied OHLC values.
+After that blend, it replaces only `Close` with the midpoint of the adjusted
+`Open` and `Close`; `Open`, `High`, and `Low` remain futures-averaged. Without a
+futures quote, historical OHLC is used directly before applying the same
+close-midpoint adjustment.
 MKT returns one directional signal from `sysdthapxy`: down-then-up and two
 consecutive rising moves emit `BULL`; up-then-down and two consecutive falling
 moves emit `BEAR`. Other patterns, including equal adjacent closes, emit
@@ -139,11 +142,12 @@ same candle window.
 square-off; it defaults to `YES`. When enabled, outside the scheduled square-off
 window, a `BUY` entry with past depth `PE7` or greater independently triggers a
 verified PE-side close; a `SELL` entry with `CE7` or greater triggers a verified
-CE-side close. `EXEEXITPXY_DEPTH_EXIT_THRESHOLD` defaults to `6`, and the
-trigger is strictly greater than that threshold. This rule is independent of
-LGT and is deduplicated by signal candle. The selected side must also have a
+CE-side close. Both CE and PE positions must be open for either deep-reversal
+exit to run. `EXEEXITPXY_DEPTH_EXIT_THRESHOLD` defaults to `6`, and the trigger
+is strictly greater than that threshold. This rule is independent of LGT and
+is deduplicated by signal candle. The selected side must also have a
 blended unrealized loss strictly greater than
-`EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT` (default `14%`), calculated from its
+`EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT` (default `7%`), calculated from its
 current option value versus its entry cost; missing or invalid P&L data blocks
 the exit. The check is side-specific: a PE exit checks PE lots, and a CE exit
 checks CE lots; both sides do not need to cross the loss threshold together.

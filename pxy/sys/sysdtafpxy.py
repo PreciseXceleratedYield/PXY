@@ -28,21 +28,21 @@ def apply_ohlc_transformation(df, mode=1, futures_price=None):
         return df
 
     out = df.copy()
-    if futures_price is None:
-        return out
-    try:
-        futures_price = float(futures_price)
-    except (TypeError, ValueError) as error:
-        raise ValueError("futures_price must be a finite positive number.") from error
-    if not math.isfinite(futures_price) or futures_price <= 0:
-        raise ValueError("futures_price must be a finite positive number.")
-    for column in ("Open", "High", "Low", "Close"):
-        out[column] = (out[column] + futures_price) / 2.0
+    if futures_price is not None:
+        try:
+            futures_price = float(futures_price)
+        except (TypeError, ValueError) as error:
+            raise ValueError("futures_price must be a finite positive number.") from error
+        if not math.isfinite(futures_price) or futures_price <= 0:
+            raise ValueError("futures_price must be a finite positive number.")
+        for column in ("Open", "High", "Low", "Close"):
+            out[column] = (out[column] + futures_price) / 2.0
+    out["Close"] = (out["Open"] + out["Close"]) / 2.0
     return out
 
 
 def transform_market_data(df, futures_price=None):
-    """Transform OHLC history using the supplied live futures price, if any."""
+    """Blend OHLC with futures when supplied, then midpoint each close with open."""
     if df is None or df.empty:
         return df
 

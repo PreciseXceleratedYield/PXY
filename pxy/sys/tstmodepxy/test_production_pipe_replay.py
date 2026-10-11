@@ -183,7 +183,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
             ) as engine:
                 self.assertEqual(
                     engine.exit_pipe.EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT,
-                    14.0 / 200.0,
+                    7.0 / 200.0,
                 )
                 rows = pd.DataFrame(
                     [
