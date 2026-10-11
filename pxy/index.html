@@ -650,8 +650,7 @@ function drawRiskCandle(floor,net,peak){
     const lo=-3000,hi=Math.max(peak,10),open=0,close=net,range=hi-lo||1;
     const toX=v=>Math.max(PADX,Math.min(W-PADX,((v-lo)/range)*(W-PADX*2)+PADX));
     const lowX=toX(lo),highX=toX(hi),openX=toX(open),closeX=toX(close);
-    const isBull=close>=open;
-    const bodyColor=isBull?cssVar('--bull'):cssVar('--bear');
+    const bodyColor='#facc15';
     rctx.strokeStyle='rgba(255,255,255,0.15)';rctx.lineWidth=1;
     rctx.beginPath();rctx.moveTo(lowX,midY);rctx.lineTo(highX,midY);rctx.stroke();
     rctx.lineWidth=3;rctx.globalAlpha=0.8;
@@ -682,7 +681,7 @@ function drawRiskCandle(floor,net,peak){
     bx1=Math.max(PADX,bx1);bW=bx2-bx1;
     rctx.fillStyle=bodyColor;
     rctx.beginPath();rctx.roundRect(bx1,midY-bodyH/2,bW,bodyH,4);rctx.fill();
-    rctx.fillStyle=isBull?'#06160d':'#ffffff';
+    rctx.fillStyle='#1f2937';
     rctx.textAlign='left';rctx.textBaseline='middle';
     const labelX=(bx1+bx2)/2-(labelW+countW+2)/2;
     rctx.fillText(netLabel,labelX,midY);

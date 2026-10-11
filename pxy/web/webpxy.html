@@ -1411,8 +1411,6 @@ function drawRiskCandle(floor,net,peak){
     const toX=v=>Math.max(PADX,Math.min(W-PADX,((v-lo)/range)*(W-PADX*2)+PADX));
     const lowX=toX(lo),highX=toX(hi),openX=toX(open),closeX=toX(close);
     const isBull=close>=open;
-    const bodyColor=isBull?cssVar('--bull'):cssVar('--bear');
-    const glowColor=isBull?cssVar('--glow-bull'):cssVar('--glow-bear');
     ctx.strokeStyle=cssVar('--rk-grid');ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(lowX,midY);ctx.lineTo(highX,midY);ctx.stroke();
     ctx.lineWidth=3;ctx.lineCap='round';ctx.globalAlpha=0.8;
@@ -1427,8 +1425,7 @@ function drawRiskCandle(floor,net,peak){
     /* The chip is the current book; the body is cumulative closed-book profit. */
     const sumVal=Number(riskData.booked_profit??bookedTotal)||0;
     const bookCount=Number(riskData.closed_book_count)||0;
-    const overallBull=sumVal>=0;
-    const overallColor=overallBull?cssVar('--bull'):cssVar('--bear');
+    const overallColor='#facc15';
     const netColor=isBull?cssVar('--bull'):cssVar('--bear');
     const netTxt='₹'+(net>=0?'+':'')+Math.round(net);
     const sumTxt=fmt(sumVal);
@@ -1465,7 +1462,7 @@ function drawRiskCandle(floor,net,peak){
     ctx.strokeStyle=netColor;ctx.globalAlpha=0.55;ctx.lineWidth=1;ctx.stroke();ctx.globalAlpha=1;
     ctx.font=chipFont;ctx.textAlign='center';ctx.fillStyle=netColor;
     ctx.fillText(netTxt,cx+chipW/2,midY+0.5);
-    ctx.font=mainFont;ctx.textAlign='left';ctx.fillStyle=overallBull?cssVar('--on-bull'):cssVar('--on-bear');
+    ctx.font=mainFont;ctx.textAlign='left';ctx.fillStyle='#1f2937';
     ctx.fillText(sumTxt,sx+chipW+GAP,midY+0.5);
     ctx.font=countFont;ctx.fillText(String(bookCount),sx+chipW+GAP+wSum+2,midY-fz*0.24);
     const danger=net<=floor+Math.abs(floor)*0.15;
