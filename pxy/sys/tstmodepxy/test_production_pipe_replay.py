@@ -322,7 +322,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                         expected_signal,
                     )
 
-    def test_sim_risk_target_waits_while_heavy_side_aligns_with_exit(self):
+    def test_sim_risk_target_still_waits_until_both_sides_are_open(self):
         timestamp = pytz.timezone("Asia/Kolkata").localize(
             datetime(2025, 1, 6, 10, 0)
         )

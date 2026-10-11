@@ -232,71 +232,10 @@ def scale_sim_lgt_calculator(calculator):
     return calculate
 
 
-def calculate_heikin_ashi(history):
-    """Return standard Heikin-Ashi OHLC candles for an OHLC history frame."""
-    required = {"Open", "High", "Low", "Close"}
-    missing = required - set(history.columns)
-    if missing:
-        raise ValueError(f"Heikin-Ashi input is missing columns: {sorted(missing)}")
-    if history.empty:
-        return history.loc[:, ["Open", "High", "Low", "Close"]].copy()
-
-    source = history.loc[:, ["Open", "High", "Low", "Close"]].astype(float)
-    ha_close = source[["Open", "High", "Low", "Close"]].mean(axis=1)
-    ha_open = pd.Series(index=source.index, dtype=float)
-    ha_open.iloc[0] = (source["Open"].iloc[0] + source["Close"].iloc[0]) / 2.0
-    for index in range(1, len(source)):
-        ha_open.iloc[index] = (
-            ha_open.iloc[index - 1] + ha_close.iloc[index - 1]
-        ) / 2.0
-
-    return pd.DataFrame(
-        {
-            "Open": ha_open,
-            "High": pd.concat([source["High"], ha_open, ha_close], axis=1).max(axis=1),
-            "Low": pd.concat([source["Low"], ha_open, ha_close], axis=1).min(axis=1),
-            "Close": ha_close,
-        },
-        index=source.index,
-    )
-
-
-def heikin_ashi_entry_exit_signals(ha_history):
-    """Emit entries on HA color switches and exits from the current HA state."""
-    entries = []
-    exits = []
-    previous_state = "NONE"
-    for ha_open, ha_close in zip(ha_history["Open"], ha_history["Close"]):
-        if ha_close > ha_open:
-            state = "BULL"
-        elif ha_close < ha_open:
-            state = "BEAR"
-        else:
-            state = previous_state
-
-        if state == "BULL" and previous_state != "BULL":
-            entry = "BUY"
-        elif state == "BEAR" and previous_state != "BEAR":
-            entry = "SELL"
-        else:
-            entry = "NONE"
-        entries.append(entry)
-        exits.append(state)
-        previous_state = state
-    return entries, exits
-
-
-def calculate_strategy_signals(
-    history, session_date, record_limit=None, heikin_ashi=False
-):
+def calculate_strategy_signals(history, session_date, record_limit=None):
     """Build production snapshots for ALL candles of a full trading session."""
     sys.path.insert(0, str(SYS_DIR / "exe"))
     dashboard = importlib.import_module("sysdashpxy")
-    signal_history = calculate_heikin_ashi(history) if heikin_ashi else history
-    if heikin_ashi:
-        ha_entries, ha_exits = heikin_ashi_entry_exit_signals(signal_history)
-    else:
-        ha_entries = ha_exits = None
     records = []
     target_indexes = [
         index for index, timestamp in enumerate(history.index)
@@ -308,7 +247,7 @@ def calculate_strategy_signals(
     if record_limit is not None:
         target_indexes = target_indexes[:record_limit]
     for index in target_indexes:
-        available = signal_history.iloc[: index + 1]
+        available = history.iloc[: index + 1]
         transformed = transform_market_data(available).tail(
             SYSDTAFPXY_DEFAULT_TARGET_ROWS
         )
@@ -323,11 +262,6 @@ def calculate_strategy_signals(
             )
         entry_signal = snapshot.get("entry", "NONE")
         exit_signal = snapshot.get("exit", "NONE")
-        if heikin_ashi:
-            entry_signal = ha_entries[index]
-            exit_signal = ha_exits[index]
-            snapshot["entry"] = entry_signal
-            snapshot["exit"] = exit_signal
         records.append(
             {
                 "timestamp": history.index[index],
@@ -529,7 +463,7 @@ class SimBookCycle:
 
 def print_report(
     history, session_dates, trades, decisions, trade_path, decision_path,
-    orders_path, runtime_log, incomplete_positions=(), heikin_ashi=False,
+    orders_path, runtime_log, incomplete_positions=(),
 ):
     total_points = sum(trade["points"] for trade in trades)
     production_exits = sum(
@@ -557,11 +491,7 @@ def print_report(
         "Production dashboard, exit, entry, averaging, counter-leg, and square-off "
         "pipe code runs against a simulated broker, including the cycle risk target."
     )
-    print(
-        "Signal source: Heikin-Ashi color switches and current candle state."
-        if heikin_ashi
-        else "Signal source: production entry and exit logic."
-    )
+    print("Signal source: production entry and exit logic.")
     print(
         "SIM fills, target checks, cycle risk, and P&L all use index spot prices. "
         "Production target, averaging, cycle-risk, and deep-reversal percentages "
@@ -580,8 +510,9 @@ def print_report(
         f"Risk-bar exits: {risk_bar_exits} | "
         f"Scheduled square-off exits: {squareoff_exits}"
     )
-    print(f"Closed-trade spot points: {total_points:+.2f}")
-    if len(session_dates) > 1:
+    if len(session_dates) == 1:
+        print(f"Closed-trade spot points: {total_points:+.2f}")
+    else:
         points_by_session = {
             session: sum(
                 float(trade["points"])
@@ -590,17 +521,12 @@ def print_report(
             )
             for session in session_dates
         }
-        print("Daily spot points and cumulative total:")
-        print("| Session date | Daily points | Cumulative points |")
-        print("|---|---:|---:|")
-        cumulative_points = 0.0
+        print("Daily spot points:")
+        print("| Session date | Daily points |")
+        print("|---|---:|")
         for session in session_dates:
             daily_points = points_by_session[session]
-            cumulative_points += daily_points
-            print(
-                f"| {session} | {daily_points:+.2f} | "
-                f"{cumulative_points:+.2f} |"
-            )
+            print(f"| {session} | {daily_points:+.2f} |")
     if incomplete_positions:
         print(
             "Diagnostic replay ended before square-off; open positions excluded "
@@ -611,7 +537,8 @@ def print_report(
     print(f"CSV simulated broker orders: {orders_path}")
     print(f"Production pipe runtime log: {runtime_log}")
     print("=" * 72)
-    print(f"TOTAL SPOT POINTS GAINED: {total_points:+.2f}")
+    if len(session_dates) == 1:
+        print(f"TOTAL SPOT POINTS GAINED: {total_points:+.2f}")
 
 
 def run_backtest(
@@ -620,7 +547,6 @@ def run_backtest(
     session_count=DEFAULT_SESSION_COUNT,
     lgt_calculator=None,
     session_date=None,
-    heikin_ashi=False,
     history=None,
     book_by_book=False,
 ):
@@ -668,7 +594,7 @@ def run_backtest(
         )
     bars_by_session = {
         session_date: calculate_strategy_signals(
-            history, session_date, record_limit, heikin_ashi=heikin_ashi
+            history, session_date, record_limit
         )
         for session_date in session_dates
     }
@@ -857,7 +783,7 @@ def run_backtest(
             print_book_table(completed_number, legs)
     print_report(
         history, session_dates, all_trades, decisions, trade_path, decision_path,
-        orders_path, runtime_log, incomplete_positions, heikin_ashi=heikin_ashi,
+        orders_path, runtime_log, incomplete_positions,
     )
     return all_trades, decisions
 
@@ -904,14 +830,6 @@ def main(argv=None):
         "--all-books",
         action="store_true",
         help="Run without pauses and print completed books at the end.",
-    )
-    parser.add_argument(
-        "--heikin-ashi",
-        action="store_true",
-        help=(
-            "Use HA bullish/bearish switches for BUY/SELL entries and the "
-            "current HA state for BULL/BEAR exits."
-        ),
     )
     parser.add_argument(
         "--lgt-constant",
@@ -989,7 +907,6 @@ def main(argv=None):
             ),
             lgt_calculator=lgt_calculator,
             session_date=args.session_date,
-            heikin_ashi=args.heikin_ashi,
             history=replay_history,
             book_by_book=book_by_book,
         )

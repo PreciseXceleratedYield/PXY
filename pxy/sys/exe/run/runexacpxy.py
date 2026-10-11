@@ -269,7 +269,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         else INITIAL_RISK_BAR_TARGET
     )
     target_label = (
-        f"{RUNEXACPXY_CYCLE_TARGET_PCT:.1f}%"
+        f"{metrics['target_pct']:.2f}% ({RUNEXACPXY_CYCLE_TARGET_PCT:.1f}% / "
+        f"{metrics['active_count']})"
         if metrics["both_sides_open"] else "INITIAL"
     )
     risk_enabled = (
@@ -345,7 +346,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     )
     print(
         f"{Fore.YELLOW}⚠️ Cycle profit target reached while heavy side is unaligned "
-        f"({RUNEXACPXY_CYCLE_TARGET_PCT:.1f}%) "
+        f"({metrics['target_pct']:.2f}% = "
+        f"{RUNEXACPXY_CYCLE_TARGET_PCT:.1f}% / {metrics['active_count']}) "
         f"(confirmation {consecutive_breaches}/{BREACH_TICKS_REQUIRED})."
     )
     if consecutive_breaches < BREACH_TICKS_REQUIRED:

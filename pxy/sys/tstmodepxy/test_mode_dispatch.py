@@ -17,8 +17,6 @@ import sysexepxy
 from tstmodepxy.backtest import (
     SimBookCycle,
     choose_replay_session,
-    calculate_heikin_ashi,
-    heikin_ashi_entry_exit_signals,
     print_book_table,
     print_report,
     run_backtest,
@@ -46,7 +44,7 @@ class ModeDispatchTests(unittest.TestCase):
             "TOTAL SPOT POINTS GAINED: +15.70",
         )
 
-    def test_sim_multi_day_report_shows_daily_and_cumulative_points(self):
+    def test_sim_multi_day_report_shows_separate_daily_points(self):
         output = StringIO()
         with redirect_stdout(output):
             print_report(
@@ -64,10 +62,11 @@ class ModeDispatchTests(unittest.TestCase):
             )
 
         lines = output.getvalue().splitlines()
-        self.assertIn("| Session date | Daily points | Cumulative points |", lines)
-        self.assertIn("| 2025-01-09 | +12.50 | +12.50 |", lines)
-        self.assertIn("| 2025-01-10 | -2.00 | +10.50 |", lines)
-        self.assertEqual(lines[-1], "TOTAL SPOT POINTS GAINED: +10.50")
+        self.assertIn("| Session date | Daily points |", lines)
+        self.assertIn("| 2025-01-09 | +12.50 |", lines)
+        self.assertIn("| 2025-01-10 | -2.00 |", lines)
+        self.assertFalse(any("Cumulative" in line for line in lines))
+        self.assertFalse(any("TOTAL SPOT POINTS GAINED" in line for line in lines))
 
     def test_interactive_sim_menu_runs_the_selected_date(self):
         import tstmodepxy.backtest as backtest
@@ -415,68 +414,6 @@ class ModeDispatchTests(unittest.TestCase):
 
         self.assertEqual(len(bars), 1)
         dashboard.get_full_snapshot.assert_called_once_with()
-
-    def test_heikin_ashi_entries_only_fire_on_color_switches(self):
-        import tstmodepxy.backtest as backtest
-
-        history = pd.DataFrame(
-            {
-                "Open": [10, 6, 12, 14, 12],
-                "High": [10, 12, 14, 14, 12],
-                "Low": [5, 6, 11, 4, 12],
-                "Close": [6, 12, 14, 4, 12],
-            }
-        )
-        ha = calculate_heikin_ashi(history)
-        entries, exits = heikin_ashi_entry_exit_signals(ha)
-
-        self.assertEqual(entries, ["SELL", "BUY", "NONE", "SELL", "BUY"])
-        self.assertEqual(exits, ["BEAR", "BULL", "BULL", "BEAR", "BULL"])
-        self.assertAlmostEqual(ha["Open"].iloc[1], 7.875)
-
-    def test_heikin_ashi_doji_keeps_state_without_repeating_entry(self):
-        from tstmodepxy.backtest import heikin_ashi_entry_exit_signals
-
-        ha = pd.DataFrame(
-            {"Open": [2, 1, 3], "Close": [1, 1, 4]}
-        )
-        entries, exits = heikin_ashi_entry_exit_signals(ha)
-        self.assertEqual(entries, ["SELL", "NONE", "BUY"])
-        self.assertEqual(exits, ["BEAR", "BEAR", "BULL"])
-
-    def test_ha_signal_path_overrides_entry_exit_but_keeps_real_spot(self):
-        import tstmodepxy.backtest as backtest
-
-        timestamp = pd.date_range("2025-01-06 09:16", periods=2, freq="min")
-        history = pd.DataFrame(
-            {
-                "Open": [10, 6],
-                "High": [10, 12],
-                "Low": [5, 6],
-                "Close": [6, 12],
-            },
-            index=timestamp,
-        )
-        dashboard = Mock()
-        dashboard.get_full_snapshot.return_value = {
-            "entry": "NONE", "exit": "NONE"
-        }
-        with patch.object(
-            backtest.importlib, "import_module", return_value=dashboard
-        ), patch.object(
-            backtest, "transform_market_data", side_effect=lambda frame: frame
-        ):
-            bars = backtest.calculate_strategy_signals(
-                history, date(2025, 1, 6), heikin_ashi=True
-            )
-
-        self.assertEqual(
-            [(bar["entry"], bar["exit"]) for bar in bars],
-            [("SELL", "BEAR"), ("BUY", "BULL")],
-        )
-        self.assertEqual([bar["spot"] for bar in bars], [6.0, 12.0])
-        self.assertEqual(bars[-1]["snapshot"]["entry"], "BUY")
-        self.assertEqual(bars[-1]["snapshot"]["exit"], "BULL")
 
     def test_yahoo_history_columns_normalize_both_multiindex_orders(self):
         import tstmodepxy.backtest as backtest

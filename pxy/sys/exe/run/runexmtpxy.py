@@ -148,6 +148,15 @@ def cycle_risk_metrics(
             continue
         cycle_rows.append(frame[frame["TAG"].astype(str).str.strip().isin(tags)])
     rows = pd.concat(cycle_rows, ignore_index=True) if cycle_rows else pd.DataFrame()
+    if (
+        not open_positions.empty
+        and "TAG" in open_positions.columns
+    ):
+        active_cycle_rows = open_positions[
+            open_positions["TAG"].astype(str).str.strip().isin(tags)
+        ].copy()
+    else:
+        active_cycle_rows = open_positions.iloc[0:0].copy()
     if rows.empty:
         cycle_pnl = 0.0
         premium_paid = 0.0
@@ -167,11 +176,22 @@ def cycle_risk_metrics(
         cycle_pnl = float(pnl.sum())
         premium_paid = float((quantities * buy_prices).sum())
 
+    active_quantities = pd.to_numeric(
+        active_cycle_rows["QTY"]
+        if "QTY" in active_cycle_rows
+        else pd.Series(0, index=active_cycle_rows.index),
+        errors="coerce",
+    ).fillna(0)
+    active_count = int((active_quantities > 0).sum())
+    effective_target_pct = (
+        float(target_pct) / active_count if active_count else float(target_pct)
+    )
+
     ce_qty = pe_qty = ce_investment = pe_investment = 0.0
-    if not open_positions.empty and {"SYMBOL", "QTY", "SELL_PRC"}.issubset(open_positions.columns):
-        symbols = open_positions["SYMBOL"].astype(str).str.upper().str.strip()
-        quantities = pd.to_numeric(open_positions["QTY"], errors="coerce").fillna(0).clip(lower=0)
-        prices = pd.to_numeric(open_positions["SELL_PRC"], errors="coerce").fillna(0).clip(lower=0)
+    if not active_cycle_rows.empty and {"SYMBOL", "QTY", "SELL_PRC"}.issubset(active_cycle_rows.columns):
+        symbols = active_cycle_rows["SYMBOL"].astype(str).str.upper().str.strip()
+        quantities = pd.to_numeric(active_cycle_rows["QTY"], errors="coerce").fillna(0).clip(lower=0)
+        prices = pd.to_numeric(active_cycle_rows["SELL_PRC"], errors="coerce").fillna(0).clip(lower=0)
         ce_mask = symbols.str.endswith("CE")
         pe_mask = symbols.str.endswith("PE")
         ce_qty = float(quantities[ce_mask].sum())
@@ -187,7 +207,7 @@ def cycle_risk_metrics(
         (heavy_side == "CE" and signal == "BULL")
         or (heavy_side == "PE" and signal == "BEAR")
     )
-    target = premium_paid * float(target_pct) / 100.0
+    target = premium_paid * effective_target_pct / 100.0
     target_reached = bool(
         ce_qty > 0
         and pe_qty > 0
@@ -199,6 +219,8 @@ def cycle_risk_metrics(
         "cycle_pnl": cycle_pnl,
         "premium_paid": premium_paid,
         "target": target,
+        "target_pct": effective_target_pct,
+        "active_count": active_count,
         "ce_qty": ce_qty,
         "pe_qty": pe_qty,
         "ce_investment": ce_investment,

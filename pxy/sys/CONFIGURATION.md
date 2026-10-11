@@ -188,8 +188,11 @@ network boundary.
 - Before both CE and PE sides are open, the bar displays symmetric ₹1,000
   initial lines for reference and does not activate the cycle target. Once both
   sides are open, cycle P&L combines realized and unrealized row P&L and the
-  target becomes `RUNEXACPXY_CYCLE_TARGET_PCT` (2.8% by default) of all option
-  premium paid across the cycle (`quantity × buy price` for each cycle row).
+  target becomes `RUNEXACPXY_CYCLE_TARGET_PCT` (2.8% by default) divided by
+  the number of currently open cycle order rows, applied to all option premium
+  paid across the cycle (`quantity × buy price` for each cycle row). For
+  example, three active rows use 2.8% / 3; closed rows remain in cycle P&L and
+  premium-paid totals but are not included in the active-row divisor.
 - The risk bar shows that active cycle as the current book, alongside cumulative
   realized profit and the count of completed books. Its click-through includes
   the last closed-book snapshot and update time. The displayed loss target is
@@ -198,16 +201,14 @@ network boundary.
 - The negative initial line is display-only; there is no loss-side square-off.
   `RUNEXACPXY_STOP_SQUAREOFF_ENABLED` defaults to `False`;
   `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED` defaults to `True`.
-- When cycle P&L reaches its target, the risk bar stays silent while the
-  higher-invested open option side agrees with the current `exit` signal
-  (CE/BULL or PE/BEAR); the normal ATR-based option targets continue to run.
-  If the target is met while the heavier side is not aligned, the risk bar
-  saves the first qualifying check and squares off all active positions if the
-  same target-and-alignment condition is still true on the next check (two
+- When cycle P&L reaches its target, the risk bar waits while the higher-
+  invested open option side agrees with the current `exit` signal (CE/BULL or
+  PE/BEAR). If the target is met while the heavier side is misaligned, it saves
+  the first qualifying check and squares off all active positions if the same
+  target-and-misalignment condition is still true on the next check (two
   consecutive checks, at least 10 seconds apart). The check counter is stored
-  persistently so the engine can resume the confirmation after a restart. The
-  investment comparison uses open quantity × current sell price;
-  a tie does not count as aligned.
+  persistently so the engine can resume the confirmation after a restart. A tie
+  does not count as aligned.
 - CHK exercises the target calculations and simulated square-off path.
   `tstmodepxy/backtest.py` enables the same risk cycle during historical replay.
   SIM never sends live orders, uses index spot as every simulated fill and
@@ -245,18 +246,18 @@ completed sessions from one-minute index candles (or fewer if less history is
 available), with the preceding session used for indicator warm-up. Use
 `--sessions N` to select a different number of sessions, `--records N` for a
 short diagnostic replay, or `--lgt-constant 8` to test a fixed `-8%` LGT
-threshold instead of the configured formula. Add `--heikin-ashi` to generate
-BUY/SELL only when HA candle color switches; the current HA direction supplies
-the BULL/BEAR exit state. Production execution pipes and spot-based fills stay
-the same. In an interactive terminal (including a remote-host terminal), SIM
-prints a two-column Action / Why action table when each book closes and waits
-for Enter before advancing to the next book; type `q` to stop. Non-interactive
-runs do not wait for input.
+threshold instead of the configured formula. SIM uses the production entry
+and exit signal path. In an interactive terminal (including a remote-host
+terminal), SIM prints a two-column Action / Why action table when each book
+closes and waits for Enter before advancing to the next book; type `q` to stop.
+Non-interactive runs do not wait for input.
 
 The replay keeps production signals, target selection, averaging, counter-buy,
 risk confirmation, and scheduled square-off flow. With one option side open,
 the aligned single-exit target uses the ATR/power/depth calculation. With both
-CE and PE sides open, aligned targets use 77%; unaligned targets remain 1.4%.
+CE and PE sides open, the heavier invested aligned side uses the ATR-based
+target; the lighter aligned side retains the 77% target. Equal exposure retains
+the 77% target on both aligned sides. Unaligned targets remain 1.4%.
 SIM uses only index spot prices and a fixed quantity of 1 per lot; it divides
 production target percentages, averaging LGT thresholds, cycle-risk targets,
 and deep-reversal loss thresholds by 200 before applying them to spot returns
@@ -298,11 +299,12 @@ historical option P&L.
 - LGT is calculated from the own/opposite investment factor and the own-side
   open lot count, then negated:
   `r = own investment / opposite investment`;
-  `magnitude = max(1.4, round(50^r × own lot count, 2))`;
-  `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)`.
-  If either side has no positive investment, `r` defaults to `1`; if the
-  opposite side has no positive lots, the own-side LGT uses the 1.4% floor.
-  The own lot count comes from the verified broker position summary.
+  `magnitude = max(1.4, round(25^r + 25^n, 2))`, where `n` is the own-side
+  open lot count; `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)`.
+  If either side has no positive investment, `r` defaults to `1`. With zero
+  own-side lots, the LGT uses the 1.4% floor; two or more own-side lots reach
+  the 77% cap. The own lot count comes from the verified broker position
+  summary.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.

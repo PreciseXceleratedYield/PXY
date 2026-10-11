@@ -72,7 +72,9 @@ class CycleRiskControlTests(unittest.TestCase):
 
         self.assertEqual(metrics["cycle_pnl"], 3750)
         self.assertEqual(metrics["premium_paid"], 22500)
-        self.assertAlmostEqual(metrics["target"], 630)
+        self.assertEqual(metrics["active_count"], 2)
+        self.assertAlmostEqual(metrics["target_pct"], 1.4)
+        self.assertAlmostEqual(metrics["target"], 315)
         self.assertEqual(metrics["heavy_side"], "PE")
         self.assertTrue(metrics["both_sides_open"])
         self.assertTrue(metrics["target_reached"])
@@ -91,10 +93,12 @@ class CycleRiskControlTests(unittest.TestCase):
         )
 
         self.assertFalse(metrics["both_sides_open"])
+        self.assertEqual(metrics["active_count"], 1)
+        self.assertAlmostEqual(metrics["target_pct"], 2.8)
         self.assertEqual(metrics["target"], 210)
         self.assertFalse(metrics["target_reached"])
 
-    def test_cycle_target_is_suppressed_when_heavy_side_aligns_and_has_no_loss_stop(self):
+    def test_cycle_target_waits_when_heavy_side_aligns_and_has_no_loss_stop(self):
         open_df = pd.DataFrame([
             {
                 "TAG": "CYCLE-CE",
@@ -103,19 +107,29 @@ class CycleRiskControlTests(unittest.TestCase):
                 "BUY_PRC": 100,
                 "SELL_PRC": 140,
                 "PNL": 3000,
+            },
+            {
+                "TAG": "CYCLE-PE",
+                "SYMBOL": "NIFTY-PE",
+                "QTY": 75,
+                "BUY_PRC": 100,
+                "SELL_PRC": 100,
+                "PNL": 0,
             }
         ])
         aligned = cycle_risk_metrics(
-            open_df, pd.DataFrame(), {"CYCLE-CE"}, "BULL", 2.8
+            open_df, pd.DataFrame(), {"CYCLE-CE", "CYCLE-PE"}, "BULL", 2.8
         )
         losing = open_df.assign(SELL_PRC=60, PNL=-3000)
         unaligned_loss = cycle_risk_metrics(
-            losing, pd.DataFrame(), {"CYCLE-CE"}, "BEAR", 2.8
+            losing, pd.DataFrame(), {"CYCLE-CE", "CYCLE-PE"}, "BEAR", 2.8
         )
 
         self.assertTrue(aligned["heavy_side_aligned"])
+        self.assertEqual(aligned["active_count"], 2)
+        self.assertAlmostEqual(aligned["target_pct"], 1.4)
         self.assertFalse(aligned["target_reached"])
-        self.assertEqual(unaligned_loss["cycle_pnl"], -3000)
+        self.assertEqual(unaligned_loss["cycle_pnl"], -6000)
         self.assertFalse(unaligned_loss["target_reached"])
 
     def test_production_ledger_liquidates_a_profitable_unaligned_cycle(self):
@@ -202,8 +216,8 @@ class CycleRiskControlTests(unittest.TestCase):
         self.assertEqual(liquidate.call_args.args[1], 3750)
         self.assertTrue(liquidate.call_args.kwargs["risk_control_activated"])
         self.assertEqual(save_state.call_args.args[3], 1200.0)
-        self.assertAlmostEqual(save_state.call_args.args[2], -630.0)
-        self.assertAlmostEqual(save_state.call_args.kwargs["target_exit_line"], 630.0)
+        self.assertAlmostEqual(save_state.call_args.args[2], -315.0)
+        self.assertAlmostEqual(save_state.call_args.kwargs["target_exit_line"], 315.0)
         self.assertEqual(
             [call.args[0] for call in saved_checks.call_args_list],
             [1, 2],
