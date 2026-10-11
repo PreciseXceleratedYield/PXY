@@ -5,6 +5,7 @@ import re
 from colorama import Fore, Style, init
 from syscnfgpxy import (
     EXEAMSPXY_MAX_LGT_LOSS,
+    EXEAMSPXY_LGT_SCALE,
     EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
     EXETGTPXY_EXIT_KEY_COLUMN,
     EXETGTPXY_TGT_PCT_NOT_ALIGNED,
@@ -59,7 +60,7 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, own_count=1)
             else round((25.0 ** ratio) + (25.0 ** own_lots), 2)
         )
         magnitude = max(EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD, magnitude)
-    return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
+    return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS) * EXEAMSPXY_LGT_SCALE
 
 
 def calculate_tgt(
