@@ -35,7 +35,7 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   the staged exit schedule. Legacy `exe/run/X` scripts and pipe-scenario test
   fixtures retain their own values; they do not drive the production schedule.
 - Supertrend always uses the DUAL calculation with a Wilder-smoothed true-range
-  ATR using period `SYSSTRNDPXY_ST1_ATR_PERIOD` (default `14`) and factor
+  ATR using period `SYSSTRNDPXY_ST1_ATR_PERIOD` (default `3`) and factor
   `SYSSTRNDPXY_ST1_FACTOR` (default `3`). This is independent of SKATR's
   session-based true-range ATR.
 - SKATR true-range ATR (mode 2) starts accumulating at 09:16 IST each session:
@@ -309,7 +309,7 @@ historical option P&L.
   actual own-side open lot count, then negated:
   `r = own investment / opposite investment`, clamped to `[0.1, 10]`;
   `n = 1 + actual own-side open lot count`;
-  `magnitude = max(1.4, round(25 × r + 25 × n, 2))`;
+  `magnitude = max(1.4, round(33 × n × r, 2))`;
   `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS) ×
   EXEAMSPXY_LGT_SCALE`. If either side has no positive investment, or an input
   is non-finite, the fallback is `r = 1, n = 1`. Zero actual own-side lots
