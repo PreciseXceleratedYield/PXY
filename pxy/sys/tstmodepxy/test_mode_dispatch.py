@@ -85,7 +85,7 @@ class ModeDispatchTests(unittest.TestCase):
             index=index,
         )
         with (
-            patch.object(backtest, "RUNNIFTYPXY_HOLIDAYS", []),
+            patch.object(backtest, "get_nse_fo_holidays", return_value=frozenset()),
             patch.object(backtest, "fetch_recent_index_history", return_value=history),
             patch.object(backtest.sys, "stdin", Mock(isatty=Mock(return_value=True))),
             patch("builtins.input", side_effect=["2", "2"]),
@@ -115,7 +115,7 @@ class ModeDispatchTests(unittest.TestCase):
             index=index,
         )
         with (
-            patch.object(backtest, "RUNNIFTYPXY_HOLIDAYS", []),
+            patch.object(backtest, "get_nse_fo_holidays", return_value=frozenset()),
             patch.object(backtest, "fetch_recent_index_history", return_value=history),
             patch.object(backtest.sys, "stdin", Mock(isatty=Mock(return_value=True))),
             patch("builtins.input", side_effect=["6", "2"]),
@@ -174,7 +174,7 @@ class ModeDispatchTests(unittest.TestCase):
         )
         history = pd.DataFrame({"Close": [1] * len(index)}, index=index)
 
-        with patch.object(backtest, "RUNNIFTYPXY_HOLIDAYS", []):
+        with patch.object(backtest, "get_nse_fo_holidays", return_value=frozenset()):
             self.assertEqual(
                 choose_replay_session(history, "1"),
                 date(2025, 1, 10),

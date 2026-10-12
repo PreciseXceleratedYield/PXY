@@ -23,6 +23,11 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   averaging, counter-buy, exit de-duplication, and the production engine's
   between-cycle pause. Its current value is 6 seconds. The idle engine pause,
   square-off launch gap, and post-square-off signal cooldown are also 6 seconds.
+- NIFTY option expiry adjustment and market-session holiday checks use NSE's
+  live F&O holiday calendar. `nseholidayspxy.py` refreshes it once per day and
+  caches the last successful response at `~/.pxy/cache/nse_fo_holidays.json`.
+  If the daily refresh fails, it warns and uses the last cached calendar; if no
+  cache exists yet, calendar lookup fails explicitly rather than assuming dates.
 - Shared market times are declared once as `SYSCNFGPXY_*` in
   `syscnfgpxy.py`; subsystem-prefixed names remain compatibility aliases.
   The schedule distinguishes the 09:15 exchange open, 09:16 engine start,

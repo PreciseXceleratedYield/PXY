@@ -30,11 +30,11 @@ from .pointbacktest import (
 )
 from .broker_sim import SimulatedBroker
 from .replay_adapter import ProductionPipeReplay, SIM_PERCENT_SCALE
+from nseholidayspxy import get_nse_fo_holidays
 from syscnfgpxy import (
     EXEEXITPXY_SQOFF_ALL_START,
     EXEEXITPXY_SQOFF_START,
     SYSMODEPXY_RUN_MODE as RUNMODE,
-    RUNNIFTYPXY_HOLIDAYS,
     SYSCNFGPXY_TICKER,
     SYSCNFGPXY_TIMEZONE,
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
@@ -132,7 +132,7 @@ def fetch_recent_index_history(session_count=DEFAULT_SESSION_COUNT):
 
     searched_dates = []
     today = _today_ist()
-    holidays = set(RUNNIFTYPXY_HOLIDAYS)
+    holidays = _holiday_strings()
     required_sessions = session_count + 1
     for day_offset in range(MAX_INTRADAY_LOOKBACK_DAYS):
         complete_dates = [
@@ -202,7 +202,7 @@ def recent_sessions_with_records(history, session_count=DEFAULT_SESSION_COUNT):
 
 
 def choose_replay_session(history, choice, session_limit=5):
-    holidays = set(RUNNIFTYPXY_HOLIDAYS)
+    holidays = _holiday_strings()
     sessions = [
         session
         for session in _completed_session_dates(history)
@@ -222,6 +222,10 @@ def score_spot_points(side, entry_spot, exit_spot, quantity):
         raise ValueError("side must be CE or PE.")
     direction = 1.0 if side == "CE" else -1.0
     return (float(exit_spot) - float(entry_spot)) * direction * int(quantity)
+
+
+def _holiday_strings():
+    return {day.strftime("%d-%b-%Y") for day in get_nse_fo_holidays()}
 
 
 def scale_sim_lgt_calculator(calculator):
@@ -560,7 +564,7 @@ def run_backtest(
         raise ValueError("session_count must be a positive integer.")
     if history is None:
         history = fetch_recent_index_history(session_count)
-    holiday_dates = set(RUNNIFTYPXY_HOLIDAYS)
+    holiday_dates = _holiday_strings()
     history = history[
         ~history.index.strftime("%d-%b-%Y").isin(holiday_dates)
     ]
@@ -855,7 +859,7 @@ def main(argv=None):
         )
         if should_choose_session:
             replay_history = fetch_recent_index_history(session_count=7)
-            holidays = set(RUNNIFTYPXY_HOLIDAYS)
+            holidays = _holiday_strings()
             available_sessions = [
                 session
                 for session in _completed_session_dates(replay_history)
