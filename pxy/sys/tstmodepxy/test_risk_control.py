@@ -36,6 +36,12 @@ import runexlqdpxy
 
 
 class CycleRiskControlTests(unittest.TestCase):
+    def test_open_book_status_is_one_fixed_width_target_line(self):
+        status = runexacpxy.format_book_status(3, 303)
+
+        self.assertEqual(len(status), 40)
+        self.assertEqual(status.rstrip(), "BOOK3 OPEN - WAIT TARGET RS 303")
+
     def test_cycle_target_uses_realized_and_unrealized_pnl_and_all_cycle_premium(self):
         open_df = pd.DataFrame([
             {

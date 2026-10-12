@@ -208,7 +208,6 @@ def _reconcile_open_with_broker(client, open_positions, strict=False):
     for sym, lots in by_symbol.items():
         remaining = net.get(str(sym).strip(), 0.0)
         if remaining <= 0:
-            print(f"🧾 Ledger reconcile: {sym} not held at broker; {len(lots)} stale open lot(s) dropped.")
             continue
         try:
             ordered = sorted(lots, key=lambda x: x["Buy_Time"], reverse=True)   # newest first

@@ -268,32 +268,11 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         metrics["target"] if metrics["both_sides_open"]
         else INITIAL_RISK_BAR_TARGET
     )
-    target_label = (
-        f"{metrics['target_pct']:.2f}% ({RUNEXACPXY_CYCLE_TARGET_PCT:.1f}% / "
-        f"{metrics['active_count']})"
-        if metrics["both_sides_open"] else "INITIAL"
-    )
     risk_enabled = (
         RISK_CANDLE_CONTROL_ENABLED
         and RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
     )
-    print(
-        f"🛡️ CYCLE PNL ₹{metrics['cycle_pnl']:.0f} / "
-        f"PAID ₹{metrics['premium_paid']:.0f} | "
-        f"TARGET {target_label} "
-        f"(₹{risk_target:.0f}) | "
-        f"OPEN CE/PE {metrics['ce_qty']:.0f}/{metrics['pe_qty']:.0f} | "
-        f"HEAVY {metrics['heavy_side'] or 'NONE'} | EXIT {exit_signal or 'NONE'}"
-    )
-    if not metrics["both_sides_open"]:
-        print(
-            "🛡️ Waiting for both CE and PE sides; the initial ±₹1,000 lines "
-            "are display-only."
-        )
-    elif metrics["heavy_side_aligned"]:
-        print("🛡️ Heavy invested side agrees with exit signal; cycle remains active.")
-    else:
-        print("🛡️ Heavy side is not aligned; cycle profit target can square off the book.")
+    print(format_book_status(closed_book_count + 1, risk_target))
 
     if not risk_enabled:
         if consecutive_breaches:
@@ -372,3 +351,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             "cycle_started_at": cycle_started_at,
         },
     )
+
+
+def format_book_status(book_number, target):
+    """Return the single fixed-width status line for the currently open book."""
+    return f"BOOK{book_number} OPEN - WAIT TARGET RS {target:.0f}"[:40].ljust(40)
