@@ -35,7 +35,7 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   the staged exit schedule. Legacy `exe/run/X` scripts and pipe-scenario test
   fixtures retain their own values; they do not drive the production schedule.
 - Supertrend always uses the DUAL calculation with a Wilder-smoothed true-range
-  ATR using period `SYSSTRNDPXY_ST1_ATR_PERIOD` (default `3`) and factor
+  ATR using period `SYSSTRNDPXY_ST1_ATR_PERIOD` (default `14`) and factor
   `SYSSTRNDPXY_ST1_FACTOR` (default `3`). This is independent of SKATR's
   session-based true-range ATR.
 - SKATR true-range ATR (mode 2) starts accumulating at 09:16 IST each session:
