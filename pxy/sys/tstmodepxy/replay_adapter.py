@@ -509,7 +509,36 @@ class ProductionPipeReplay:
             if not self.risk_exit_fired:
                 self.entry_pipe.main()
             if not self.risk_exit_fired:
-                self.avg_pipe.run_snapshot()
+                evaluate_average_triggers = (
+                    self.averaging_orders.averaging_trigger_sides
+                )
+                averaged_sides = set()
+
+                def one_average_side_per_candle(*args, **kwargs):
+                    triggers = evaluate_average_triggers(*args, **kwargs)
+                    for side in averaged_sides:
+                        triggers[side] = False
+                    if triggers["CE"]:
+                        triggers["PE"] = False
+                    return triggers
+
+                with patch.object(
+                    self.averaging_orders,
+                    "averaging_trigger_sides",
+                    side_effect=one_average_side_per_candle,
+                ):
+                    for _ in ("CE", "PE"):
+                        order_count_before = len(self.broker.orders)
+                        self.avg_pipe.run_snapshot()
+                        new_orders = self.broker.orders[order_count_before:]
+                        average_buys = [
+                            order for order in new_orders
+                            if order["trnsTp"] == "B"
+                            and order["trdSym"].endswith(("CE", "PE"))
+                        ]
+                        if not average_buys:
+                            break
+                        averaged_sides.add(average_buys[0]["trdSym"][-2:])
         logged = output.getvalue()
         if logged:
             with Path(runtime_log).open("a", encoding="utf-8") as stream:

@@ -574,6 +574,62 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 ],
             )
 
+    def test_sim_reconciles_before_each_averaging_order(self):
+        timezone = pytz.timezone("Asia/Kolkata")
+        timestamp = timezone.localize(datetime(2025, 1, 6, 10, 0))
+        broker = SimulatedBroker()
+        positions_before_average = []
+        trigger_arguments = {
+            "ce_aligned": True,
+            "pe_aligned": True,
+            "ce_rows": 1,
+            "pe_rows": 1,
+            "ce_cooling": False,
+            "pe_cooling": False,
+            "ce_loss": -2,
+            "pe_loss": -2,
+            "ce_threshold": -1,
+            "pe_threshold": -1,
+            "max_investment": 1000,
+        }
+
+        with tempfile.TemporaryDirectory(prefix="pxy-reconcile-each-average-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, broker, Path(temp) / "state"
+            ) as engine:
+                def simulated_averaging_pass():
+                    positions_before_average.append(broker.position_summary())
+                    triggers = engine.averaging_orders.averaging_trigger_sides(
+                        **trigger_arguments
+                    )
+                    for side in ("CE", "PE"):
+                        if triggers[side]:
+                            broker.place_order(
+                                trading_symbol=f"NIFTY-WF-{side}",
+                                transaction_type="B",
+                                quantity=broker.quantity,
+                                tag=broker.next_tag(),
+                            )
+
+                with (
+                    patch.object(engine.exit_pipe, "run_snapshot"),
+                    patch.object(engine.entry_pipe, "main"),
+                    patch.object(
+                        engine.avg_pipe,
+                        "run_snapshot",
+                        side_effect=simulated_averaging_pass,
+                    ),
+                ):
+                    engine.run_tick({}, timestamp, 22000, Path(temp) / "runtime.log")
+
+            self.assertEqual(
+                positions_before_average,
+                ["0CE0PE", "1CE0PE"],
+            )
+            self.assertEqual(len(broker.orders), 2)
+            self.assertEqual(broker.orders[0]["trdSym"], "NIFTY-WF-CE")
+            self.assertEqual(broker.orders[1]["trdSym"], "NIFTY-WF-PE")
+
     def test_sim_rebuilds_open_ledger_from_prior_candle_order(self):
         timezone = pytz.timezone("Asia/Kolkata")
         timestamp = timezone.localize(datetime(2025, 1, 6, 10, 0))
