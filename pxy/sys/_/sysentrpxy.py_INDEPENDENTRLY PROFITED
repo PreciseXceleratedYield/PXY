@@ -4,7 +4,7 @@ import numpy as np
 import pytz
 from datetime import datetime, time as dt_time
 
-VERBOSE = True
+VERBOSE = False
 
 def get_entry_signal(df=None):
     try:
@@ -82,5 +82,4 @@ def get_entry_signal(df=None):
     except Exception as e:
         if VERBOSE: print(f"[CRITICAL] {e}")
         return "NONE", "NONE"
-
 

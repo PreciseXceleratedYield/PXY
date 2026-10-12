@@ -22,7 +22,7 @@ except Exception:
 from syscnfgpxy import TIMEZONE, TICKER
 
 # Global Config 
-DEBUG_MODE = True 
+DEBUG_MODE = False
 MA_TYPE = "TSMA"  
 CHECK_CONFIRMED_ONLY = False  # ⚡ False = Process and trade the LIVE running candle (Index -1)
 
@@ -488,5 +488,4 @@ if __name__ == "__main__":
         print("==================================================\n")
     else:
         print("\n❌ Error: Critical Data Failure. Market streaming matrix failed to process.")
-
 

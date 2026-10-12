@@ -5,12 +5,12 @@
 import sys
 from datetime import datetime
 
-def debug_log(section, msg, data=None):
-    """Streams live data structure dumps directly to stderr without breaking text layout."""
+def error_log(section, msg, data=None):
+    """Reports ledger extraction and conversion failures to stderr."""
     ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-    print(f"[DEBUG][{ts}][{section}] {msg}", file=sys.stderr)
+    print(f"[ERROR][{ts}][{section}] {msg}", file=sys.stderr)
     if data is not None:
-        print(f"[RAW_PAYLOAD] {repr(data)}\n", file=sys.stderr)
+        print(f"[ERROR_DETAILS] {repr(data)}\n", file=sys.stderr)
 
 def emoji_len(text):
     """Calculates the true layout width by counting emojis as 2 characters."""
@@ -51,7 +51,7 @@ def force_trailing_zero(value, context_tag="MATH"):
             val_int -= remainder
         return float(val_int)
     except (ValueError, TypeError) as e:
-        debug_log(f"{context_tag}_ERR", f"Failed conversion on raw value: {value} ({str(e)})")
+        error_log(f"{context_tag}_ERR", f"Failed conversion on raw value: {value} ({str(e)})")
         return 0.0
 
 def send_telegram_payload(message_text, bot_token, chat_id):
@@ -129,7 +129,7 @@ def run_snapshot_report():
         pos_res = client.positions()
         positions_list = pos_res.get("data", []) if isinstance(pos_res, dict) else getattr(pos_res, "data", [])
     except Exception as e:
-        debug_log("API_EXCEP_POSITIONS", "Positions extraction broken down.", str(e))
+        error_log("API_EXCEP_POSITIONS", "Positions extraction failed.", str(e))
     if positions_list is None:
         positions_list = []
 
@@ -140,7 +140,7 @@ def run_snapshot_report():
             ord_res = client.orders()
         orders_list = ord_res.get("data", []) if isinstance(ord_res, dict) else getattr(ord_res, "data", [])
     except Exception as e:
-        debug_log("API_EXCEP_ORDERS", "Orders extraction broken down.", str(e))
+        error_log("API_EXCEP_ORDERS", "Orders extraction failed.", str(e))
     if orders_list is None:
         orders_list = []
 

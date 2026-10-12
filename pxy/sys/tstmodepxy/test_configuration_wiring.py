@@ -79,6 +79,18 @@ class ConfigurationWiringTests(unittest.TestCase):
     def tearDown(self):
         self.cooldown_patch.stop()
 
+    def test_debug_flags_are_disabled_by_default(self):
+        import syscnfgpxy
+
+        debug_flags = [
+            name for name in vars(syscnfgpxy)
+            if name.endswith("_DEBUG_ENABLED")
+        ]
+        self.assertTrue(debug_flags)
+        for name in debug_flags:
+            with self.subTest(flag=name):
+                self.assertFalse(getattr(syscnfgpxy, name))
+
     def test_market_hour_aliases_share_the_canonical_schedule(self):
         import syscnfgpxy
 
@@ -114,7 +126,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             syscnfgpxy.TSTPOINTBTPXY_FORCE_EXIT_TIME, SYSCNFGPXY_SQUAREOFF_ALL_START
         )
 
-    def test_supertrend_uses_fixed_five_point_atr_and_configured_factor(self):
+    def test_supertrend_uses_fixed_1_4_point_atr_and_configured_factor(self):
         index = pd.date_range("2026-10-07", periods=3, freq="min")
         frame = pd.DataFrame(
             {
@@ -127,7 +139,7 @@ class ConfigurationWiringTests(unittest.TestCase):
         )
         atr_value = SYSSTRNDPXY_ST1_ATR_VALUE
         factor = SYSSTRNDPXY_ST1_FACTOR
-        self.assertEqual(atr_value, 5.0)
+        self.assertEqual(atr_value, 1.4)
         self.assertEqual(factor, 1.4)
 
         single_line, _, _, _ = _compute_single_st(
@@ -139,14 +151,14 @@ class ConfigurationWiringTests(unittest.TestCase):
             first_hl2 + factor * atr_value,
         )
         processed = sysstrndpxy.calculate_supertrend(frame.copy())
-        self.assertEqual(processed["st_atr"].tolist(), [5.0, 5.0, 5.0])
+        self.assertEqual(processed["st_atr"].tolist(), [1.4, 1.4, 1.4])
 
-    def test_supertrend_uses_five_point_atr_with_legacy_config(self):
+    def test_supertrend_uses_1_4_point_atr_with_legacy_config(self):
         legacy_config = SimpleNamespace()
         with redirect_stdout(StringIO()) as output:
             atr_value = sysstrndpxy._configured_st_atr_value(legacy_config)
 
-        self.assertEqual(atr_value, 5.0)
+        self.assertEqual(atr_value, 1.4)
         self.assertIn("Legacy syscnfgpxy.py is missing", output.getvalue())
 
     def test_syspxy_snapshot_passes_through_sma_status(self):
@@ -1034,7 +1046,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             result = exeforcepxy.execute_order(client, "NIFTY26O23550CE", 65)
 
         self.assertEqual(result, {"stat": "OK", "raw": response})
-        self.assertIn("Broker order response:", output.getvalue())
+        self.assertNotIn("Broker order response:", output.getvalue())
         self.assertIn("BROKER ACCEPTED FORCED ORDER", output.getvalue())
         self.assertNotIn("DID NOT CONFIRM", output.getvalue())
 

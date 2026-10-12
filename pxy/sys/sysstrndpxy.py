@@ -15,10 +15,10 @@ TIMEZONE = syscnfgpxy.SYSCNFGPXY_TIMEZONE
 def _configured_st_atr_value(config):
     value = getattr(config, "SYSSTRNDPXY_ST1_ATR_VALUE", None)
     if value is None:
-        value = 5.0
+        value = 1.4
         print(
             "⚠️ Legacy syscnfgpxy.py is missing SYSSTRNDPXY_ST1_ATR_VALUE; "
-            "using the fixed 5-point Supertrend ATR."
+            "using the fixed 1.4-point Supertrend ATR."
         )
     return value
 
