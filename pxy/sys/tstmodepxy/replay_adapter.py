@@ -497,6 +497,7 @@ class ProductionPipeReplay:
         return self.stack.__exit__(exc_type, exc_value, traceback)
 
     def run_tick(self, snapshot, timestamp, spot, runtime_log):
+        """Run the full production pipe sequence once; each pipe reads fresh positions."""
         self.timestamp = timestamp
         self.snapshot = snapshot
         self.broker.set_market(timestamp, spot)

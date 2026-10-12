@@ -514,6 +514,98 @@ class ProductionPipeReplayTests(unittest.TestCase):
             self.assertIn("No order rows returned", output.getvalue())
             self.assertNotIn("TAG MATCH ERROR", output.getvalue())
 
+    def test_sim_runs_full_pipe_sequence_and_rechecks_positions_between_pipes(self):
+        timezone = pytz.timezone("Asia/Kolkata")
+        timestamp = timezone.localize(datetime(2025, 1, 6, 10, 0))
+        broker = SimulatedBroker()
+        broker.set_market(timestamp, 22000)
+        broker.place_order(
+            trading_symbol="NIFTY-WF-CE",
+            transaction_type="B",
+            quantity=broker.quantity,
+            tag="SIM-EXISTING-CE",
+        )
+        snapshots = []
+
+        with tempfile.TemporaryDirectory(prefix="pxy-one-action-per-bar-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, broker, Path(temp) / "state"
+            ) as engine:
+                def exit_pipe():
+                    snapshots.append(("exit", broker.position_summary()))
+                    broker.place_order(
+                        trading_symbol="NIFTY-WF-CE",
+                        transaction_type="S",
+                        quantity=broker.quantity,
+                        tag="SIM-EXISTING-CE_S_TARGET",
+                    )
+
+                def entry_pipe():
+                    snapshots.append(("entry", broker.position_summary()))
+                    broker.place_order(
+                        trading_symbol="NIFTY-WF-PE",
+                        transaction_type="B",
+                        quantity=broker.quantity,
+                        tag="SIM-FRESH-PE",
+                    )
+
+                def averaging_pipe():
+                    snapshots.append(("average", broker.position_summary()))
+
+                with (
+                    patch.object(
+                        engine.exit_pipe, "run_snapshot", side_effect=exit_pipe
+                    ),
+                    patch.object(
+                        engine.entry_pipe, "main", side_effect=entry_pipe
+                    ),
+                    patch.object(
+                        engine.avg_pipe, "run_snapshot", side_effect=averaging_pipe
+                    ),
+                ):
+                    engine.run_tick({}, timestamp, 22000, Path(temp) / "runtime.log")
+
+            self.assertEqual(
+                snapshots,
+                [
+                    ("exit", "1CE0PE"),
+                    ("entry", "0CE0PE"),
+                    ("average", "0CE1PE"),
+                ],
+            )
+
+    def test_sim_rebuilds_open_ledger_from_prior_candle_order(self):
+        timezone = pytz.timezone("Asia/Kolkata")
+        timestamp = timezone.localize(datetime(2025, 1, 6, 10, 0))
+        broker = SimulatedBroker()
+        broker.set_market(timestamp, 22000)
+        broker.place_order(
+            trading_symbol="NIFTY-WF-CE",
+            transaction_type="B",
+            quantity=broker.quantity,
+            tag="SIM-PRIOR-CANDLE-AVG",
+        )
+
+        with tempfile.TemporaryDirectory(prefix="pxy-reconcile-after-action-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, broker, Path(temp) / "state"
+            ) as engine, patch.object(
+                engine.lilo, "dump_to_json", lambda _df: None
+            ), patch.object(
+                engine.lilo, "dump_livpos_to_json", lambda _rows: None
+            ), patch(
+                "runexacpxy.execute_master_risk_ledger", lambda *args, **kwargs: None
+            ):
+                open_positions, _closed_positions = (
+                    engine.lilo._process_lilo_orders_production(
+                        broker, strict=True
+                    )
+                )
+
+        self.assertEqual(len(open_positions), 1)
+        self.assertEqual(open_positions.iloc[0]["tag"], "SIM-PRIOR-CANDLE-AVG")
+        self.assertEqual(open_positions.iloc[0]["Qty"], broker.quantity)
+
     def test_lilo_assigns_book_ids_to_flat_to_flat_order_cycles(self):
         with tempfile.TemporaryDirectory(prefix="pxy-lilo-book-ids-") as temp:
             with ProductionPipeReplay(
