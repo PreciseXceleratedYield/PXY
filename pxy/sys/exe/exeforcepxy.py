@@ -29,6 +29,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TICKER,
     SYSCNFGPXY_TIMEZONE,
 )
+from sysdecisionpxy import exit_order_response_accepted
 
 # --- LOT SIZE LOGIC ---
 t = SYSCNFGPXY_TICKER.upper().strip()
@@ -71,7 +72,17 @@ def execute_order(client, symbol, qty):
             "tag": order_tag
         }
         res = client.place_order(**params)
-        print(f"{Fore.GREEN}🚀 FORCED ORDER PLACED | SYMBOL: {symbol} | TAG: {order_tag}")
+        dprint(f"Broker order response: {res!r}", Fore.GREEN)
+        if not exit_order_response_accepted(res):
+            print(
+                f"{Fore.RED}❌ BROKER DID NOT CONFIRM ORDER ACCEPTANCE "
+                f"| SYMBOL: {symbol} | TAG: {order_tag} | RESPONSE: {res!r}"
+            )
+            return {"stat": "FAIL", "raw": res}
+        print(
+            f"{Fore.GREEN}🚀 BROKER ACCEPTED FORCED ORDER "
+            f"| SYMBOL: {symbol} | TAG: {order_tag}"
+        )
         return {"stat": "OK", "raw": res}
     except Exception as e:
         print(f"{Fore.RED}❌ EXECUTION ERROR: {e}")
