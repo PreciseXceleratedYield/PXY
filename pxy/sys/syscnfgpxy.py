@@ -55,6 +55,13 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 
 # Data ingestion, chart generation, and signal calculation.
 SYSDTAFPXY_FORCE_NIFTY_FUT = False
+SYSDTAFPXY_SELECTED_MODE = 0
+if (
+    isinstance(SYSDTAFPXY_SELECTED_MODE, bool)
+    or not isinstance(SYSDTAFPXY_SELECTED_MODE, int)
+    or SYSDTAFPXY_SELECTED_MODE not in {0, 1, 2}
+):
+    raise ValueError("SYSDTAFPXY_SELECTED_MODE must be 0, 1, or 2.")
 SYSDTAFPXY_DEFAULT_INTERVAL = "1m"
 SYSDTAFPXY_DEFAULT_TARGET_ROWS = 60
 SYSSMAPXY_VARIANT = "TSMA"

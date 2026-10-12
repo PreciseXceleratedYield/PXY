@@ -114,13 +114,13 @@ maps to entry NONE. When Supertrend is BULL or BEAR, that trend is the exit
 signal. When Supertrend is SIDE, the exit signal follows
 `sysmktpxy.get_signal()` (BULL/BEAR, or NONE). Entry no longer applies a
 separate MKT countertrend or Supertrend ATR/band-zone filter.
-`sysdtafpxy` supports mode 1 only. In the live Yahoo data path it averages each
-OHLC field of every candle with the latest NIFTY futures price from
-`exe/run/nftfut.json`; it cannot emit live signals when that price is unavailable.
-After that blend, it replaces only `Close` with the midpoint of the adjusted
-`Open` and `Close`; `Open`, `High`, and `Low` remain futures-averaged. Without a
-futures quote, historical OHLC is used directly before applying the same
-close-midpoint adjustment.
+`SYSDTAFPXY_SELECTED_MODE` selects the DTAF candle transform (default `0`):
+mode `0` uses modified-close candles, mode `1` keeps raw candles, and mode `2`
+sets `Close` to the `Open`/`Close` midpoint. In every mode, the live Yahoo OHLC
+fields are first averaged with the latest NIFTY futures price from
+`exe/run/nftfut.json`; live signals are unavailable when that quote is
+missing. Without a futures quote, the selected candle transform operates on the
+historical OHLC values directly.
 MKT returns one directional signal from `sysdthapxy`: down-then-up and two
 consecutive rising moves emit `BULL`; up-then-down and two consecutive falling
 moves emit `BEAR`. Other patterns, including equal adjacent closes, emit
@@ -337,8 +337,8 @@ historical option P&L.
   peak rule is now explicitly configured as `RUNEXMTPXY_PEAK_MULTIPLIER`.
 - Removed the redundant data-timezone setting (now derived from the shared
   timezone), an unused transform ATR argument, and the weekday OTM map whose
-  entries all had the same distance. DTAF now supports only mode 1; the former
-  Renko transformation and its brick-size setting are removed.
+  entries all had the same distance. DTAF supports only modes 0, 1, and 2; the
+  former Renko transformation and its brick-size setting are removed.
 - Averaging-order payload values, retry timing, ATR fallbacks/floors, signal
   force values, and point-replay session times are wired to the consuming
   modules. Dynamic non-aligned TGT reads its configured percentage rather than

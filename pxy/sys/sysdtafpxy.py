@@ -2,6 +2,7 @@ import json
 import math
 import os
 import warnings
+import numpy as np
 import pandas as pd
 import yfinance as yf
 from syscnfgpxy import (
@@ -10,6 +11,7 @@ from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_INTERVAL,
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     SYSDTAFPXY_FORCE_NIFTY_FUT,
+    SYSDTAFPXY_SELECTED_MODE,
 )
 from sysmodepxy import dispatch_mode
 
@@ -20,10 +22,12 @@ TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
 
 FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 
-def apply_ohlc_transformation(df, mode=1, futures_price=None):
-    """Average each OHLC field with the latest futures price when supplied."""
-    if mode != 1:
-        raise ValueError("DTAF only supports mode 1 (NIFTY futures-averaged OHLC).")
+def apply_ohlc_transformation(
+    df, mode=SYSDTAFPXY_SELECTED_MODE, futures_price=None
+):
+    """Blend OHLC with futures, then apply mode 0, 1, or 2."""
+    if isinstance(mode, bool) or not isinstance(mode, int) or mode not in (0, 1, 2):
+        raise ValueError("DTAF mode must be 0, 1, or 2.")
     if df.empty:
         return df
 
@@ -37,16 +41,34 @@ def apply_ohlc_transformation(df, mode=1, futures_price=None):
             raise ValueError("futures_price must be a finite positive number.")
         for column in ("Open", "High", "Low", "Close"):
             out[column] = (out[column] + futures_price) / 2.0
-    out["Close"] = (out["Open"] + out["Close"]) / 2.0
+
+    raw_o = out["Open"].to_numpy()
+    raw_h = out["High"].to_numpy()
+    raw_l = out["Low"].to_numpy()
+    raw_c = out["Close"].to_numpy()
+
+    if mode == 0:
+        out["Open"] = raw_c
+        out["Close"] = np.where(
+            raw_c >= raw_o,
+            (raw_c + raw_h) / 2.0,
+            (raw_c + raw_l) / 2.0,
+        )
+    elif mode == 2:
+        out["Close"] = (raw_o + raw_c) / 2.0
     return out
 
 
-def transform_market_data(df, futures_price=None):
-    """Blend OHLC with futures when supplied, then midpoint each close with open."""
+def transform_market_data(
+    df, futures_price=None, mode=SYSDTAFPXY_SELECTED_MODE
+):
+    """Blend futures into each OHLC field, then apply the selected DTAF mode."""
     if df is None or df.empty:
         return df
 
-    return apply_ohlc_transformation(df, futures_price=futures_price)
+    return apply_ohlc_transformation(
+        df, mode=mode, futures_price=futures_price
+    )
 
 
 def _read_nifty_futures_price():
@@ -90,7 +112,7 @@ def _fetch_yf_data_production(
     interval=SYSDTAFPXY_DEFAULT_INTERVAL,
     target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
 ):
-    """Fetch OHLC data and average it with the latest NIFTY futures price."""
+    """Fetch OHLC data, blend futures, and apply the configured DTAF mode."""
     df = pd.DataFrame()
     buffer_rows = target_rows + 5
 
@@ -163,7 +185,11 @@ def _fetch_yf_data_production(
     else:
         df = df.tz_convert(TIMEZONE)
 
-    processed_df = transform_market_data(df, futures_price=futures_price)
+    processed_df = transform_market_data(
+        df,
+        futures_price=futures_price,
+        mode=SYSDTAFPXY_SELECTED_MODE,
+    )
     processed_df = processed_df.tail(target_rows)
     processed_df.attrs["data_fallback"] = False
     return processed_df

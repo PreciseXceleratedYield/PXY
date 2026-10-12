@@ -1305,29 +1305,7 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_value_cap_is_fixed_at_twenty_five_thousand_without_layer_mode(self):
         self.assertEqual(EXEAMSPXY_MAX_INVESTMENT, 25000.0)
 
-    def test_dtaf_mode_one_averages_each_ohlc_value_with_futures_price(self):
-        frame = pd.DataFrame(
-            {
-                "Open": [100.0, 105.0],
-                "High": [102.0, 107.0],
-                "Low": [98.0, 103.0],
-                "Close": [101.0, 106.0],
-            }
-        )
-        result = apply_ohlc_transformation(frame, mode=1, futures_price=200.0)
-
-        expected = pd.DataFrame(
-            {
-                "Open": [150.0, 152.5],
-                "High": [151.0, 153.5],
-                "Low": [149.0, 151.5],
-                "Close": [150.25, 152.75],
-            }
-        )
-        pd.testing.assert_frame_equal(result, expected)
-        self.assertIsNot(result, frame)
-
-    def test_dtaf_without_futures_price_midpoints_close_only(self):
+    def test_dtaf_modes_blend_all_ohlc_fields_with_futures_before_transforming(self):
         frame = pd.DataFrame(
             {
                 "Open": [100.0],
@@ -1336,11 +1314,50 @@ class ConfigurationWiringTests(unittest.TestCase):
                 "Close": [101.0],
             }
         )
-        expected = frame.copy()
-        expected["Close"] = [100.5]
-        pd.testing.assert_frame_equal(apply_ohlc_transformation(frame, mode=1), expected)
+        raw = apply_ohlc_transformation(frame, mode=1, futures_price=200.0)
+        modified = apply_ohlc_transformation(
+            frame, mode=0, futures_price=200.0
+        )
+        oc_half = apply_ohlc_transformation(
+            frame, mode=2, futures_price=200.0
+        )
 
-    def test_dtaf_rejects_modes_other_than_one(self):
+        expected_raw = pd.DataFrame(
+            {
+                "Open": [150.0],
+                "High": [151.0],
+                "Low": [149.0],
+                "Close": [150.5],
+            }
+        )
+        expected_modified = expected_raw.copy()
+        expected_modified["Open"] = [150.5]
+        expected_modified["Close"] = [150.75]
+        expected_oc_half = expected_raw.copy()
+        expected_oc_half["Close"] = [150.25]
+
+        pd.testing.assert_frame_equal(raw, expected_raw)
+        pd.testing.assert_frame_equal(modified, expected_modified)
+        pd.testing.assert_frame_equal(oc_half, expected_oc_half)
+        self.assertIsNot(raw, frame)
+
+    def test_dtaf_mode_one_without_futures_keeps_raw_candles(self):
+        frame = pd.DataFrame(
+            {
+                "Open": [100.0],
+                "High": [102.0],
+                "Low": [98.0],
+                "Close": [101.0],
+            }
+        )
+        pd.testing.assert_frame_equal(
+            apply_ohlc_transformation(frame, mode=1), frame
+        )
+
+    def test_dtaf_defaults_to_mode_zero_and_rejects_other_modes(self):
+        import syscnfgpxy
+
+        self.assertEqual(syscnfgpxy.SYSDTAFPXY_SELECTED_MODE, 0)
         frame = pd.DataFrame(
             {
                 "Open": [100.0],
@@ -1350,7 +1367,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             }
         )
 
-        with self.assertRaisesRegex(ValueError, "only supports mode 1"):
+        with self.assertRaisesRegex(ValueError, "must be 0, 1, or 2"):
             apply_ohlc_transformation(frame, mode=8)
 
     def test_data_timezone_uses_shared_setting(self):

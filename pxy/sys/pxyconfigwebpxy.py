@@ -19,7 +19,6 @@ import time
 CONFIG_PATH = Path(__file__).with_name("syscnfgpxy.py")
 ENUMS = {
     "SYSMODEPXY_RUN_MODE": ("PRD", "CHK", "SIM"),
-    "SYSDTAFPXY_SELECTED_MODE": ("1",),
     "EXEOTMPXY_STRIKE_MODE": ("ATM", "OTMFIX", "OTMDYN"),
     "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE": ("YES", "NO"),
     "PASTRSK": ("YES", "NO"),
@@ -29,6 +28,7 @@ ENUMS = {
 }
 CHOICES = {
     "SYSDTAFPXY_DEFAULT_INTERVAL": ("1m", "2m", "5m", "15m", "30m", "60m", "1h", "1d"),
+    "SYSDTAFPXY_SELECTED_MODE": (0, 1, 2),
     "SYSPLCHRTPXY_FETCH_INTERVAL": ("1m", "2m", "5m", "15m", "30m", "60m", "1h", "1d"),
     "SYSPLCHRTPXY_OHLC_MODE": (1, 2, 3, 4, 5, 6),
     "SYSKATRPXY_ATR_MODE": (1, 2, 3),
@@ -164,8 +164,6 @@ def _encode_value(name, value, current):
             raise ValueError(f"{name} must be text")
         if len(value) > 4096:
             raise ValueError(f"{name} is too long")
-        if name == "SYSDTAFPXY_SELECTED_MODE" and value != "1":
-            raise ValueError(f"{name} only supports mode 1")
         return repr(value)
     if isinstance(current, datetime.time):
         if not isinstance(value, str):

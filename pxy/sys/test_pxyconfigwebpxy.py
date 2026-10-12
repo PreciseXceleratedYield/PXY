@@ -17,7 +17,7 @@ class ConfigEditorTests(unittest.TestCase):
             "FLAG = True\n"
             "RUNNIFTYPXY_STRIKE_STEP = 2\n"
             "CLOCK = dt_time(9, 0)\n"
-            "SYSDTAFPXY_SELECTED_MODE = '1'\n"
+            "SYSDTAFPXY_SELECTED_MODE = 0\n"
             "RUNEXMTPXY_INITIAL_LOSS_FLOOR = -1000\n"
             "RUNEXACPXY_STOP_SQUAREOFF_ENABLED = False\n"
             "RUNEXACPXY_TARGET_SQUAREOFF_ENABLED = True\n"
@@ -39,6 +39,21 @@ class ConfigEditorTests(unittest.TestCase):
 
     def test_supertrend_variant_is_not_a_configurable_setting(self):
         self.assertNotIn("SYSSTRNDPXY_VARIANT", config_editor.ENUMS)
+
+    def test_dtaf_modes_are_configurable_with_mode_zero_default(self):
+        settings, _ = config_editor._metadata(self.original)
+        mode = next(
+            item for item in settings
+            if item["key"] == "SYSDTAFPXY_SELECTED_MODE"
+        )
+        self.assertEqual(mode["value"], 0)
+        self.assertEqual(mode["options"], [0, 1, 2])
+
+        config_editor._write({"SYSDTAFPXY_SELECTED_MODE": 2})
+        self.assertIn(
+            "SYSDTAFPXY_SELECTED_MODE = 2",
+            self.config_path.read_text(encoding="utf-8"),
+        )
 
     def test_read_marks_derived_and_sensitive_values_read_only(self):
         settings, _ = config_editor._metadata(self.original)
@@ -136,7 +151,7 @@ class ConfigEditorTests(unittest.TestCase):
         self.assertIn("FLAG = False", source)
         self.assertIn("RUNNIFTYPXY_STRIKE_STEP = 4", source)
         self.assertIn("CLOCK = dt_time(10, 15, 30, 0)", source)
-        self.assertIn("SYSDTAFPXY_SELECTED_MODE = '1'", source)
+        self.assertIn("SYSDTAFPXY_SELECTED_MODE = 0", source)
 
     def test_write_invalidates_compiled_config_cache(self):
         cache_path = Path(py_compile.compile(str(self.config_path), doraise=True))
@@ -154,7 +169,7 @@ class ConfigEditorTests(unittest.TestCase):
         for updates in (
             {"FLAG": "false"},
             {"RUNNIFTYPXY_STRIKE_STEP": -1},
-            {"SYSDTAFPXY_SELECTED_MODE": "8"},
+            {"SYSDTAFPXY_SELECTED_MODE": 3},
             {"UNKNOWN": 1},
         ):
             with self.subTest(updates=updates):
