@@ -41,35 +41,29 @@ class EngineCooldownTests(unittest.TestCase):
                 patch.object(execoolpxy, "COOLDOWN_FILE", marker),
                 patch.object(execoolpxy, "WEB_DIR", Path(temp)),
                 patch.object(sysentrpxy, "cooldown_remaining", side_effect=execoolpxy.cooldown_remaining),
-                patch.object(sysentrpxy, "calculate_supertrend") as calculate_supertrend,
+                patch.object(sysentrpxy, "get_market_signal") as market_signal,
             ):
                 execoolpxy.start_cooldown()
                 self.assertEqual(
                     sysentrpxy.get_entry_signal(frame),
                     ("NONE", "NONE"),
                 )
-            calculate_supertrend.assert_not_called()
+            market_signal.assert_not_called()
 
-    def test_signal_router_uses_supertrend_after_cooldown(self):
+    def test_signal_router_uses_mkt_after_cooldown(self):
         with (
             patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
             patch.object(
                 sysentrpxy,
-                "calculate_supertrend",
-                return_value=pd.DataFrame({
-                    "ST_Trend": ["BULL"],
-                    "Close": [100.5],
-                    "st_line": [100.0],
-                    "st_atr": [1.0],
-                }),
+                "get_market_signal",
+                return_value="BEAR",
             ),
-            patch.object(sysentrpxy, "get_market_signal", return_value="BEAR"),
         ):
             self.assertEqual(
                 sysentrpxy.get_entry_signal(
                     pd.DataFrame({"Close": [100.5]}),
                 ),
-                ("BUY", "BULL"),
+                ("SELL", "BEAR"),
             )
 
 

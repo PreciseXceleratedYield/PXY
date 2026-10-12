@@ -326,76 +326,31 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(get_sma(above, period=50, variant="SMA")["status"], "BULL")
         self.assertEqual(get_sma(below, period=50, variant="SMA")["status"], "BEAR")
 
-    def test_bull_exit_maps_to_buy_entry_without_market_filter(self):
+    def test_mkt_bull_and_bear_map_directly_to_binary_entries(self):
         frame = pd.DataFrame({"Close": [100.5]})
-        with (
-            patch.object(sysentrpxy, "get_market_signal") as market,
-            patch.object(
-                sysentrpxy,
-                "calculate_supertrend",
-                return_value=pd.DataFrame({"ST_Trend": ["BULL"]}),
-            ),
+        for mkt_signal, expected in (
+            ("BULL", ("BUY", "BULL")),
+            ("BEAR", ("SELL", "BEAR")),
         ):
-            self.assertEqual(sysentrpxy.get_entry_signal(frame), ("BUY", "BULL"))
-        market.assert_not_called()
-
-    def test_bear_exit_maps_to_sell_entry_without_market_filter(self):
-        frame = pd.DataFrame({"Close": [99.5]})
-        with (
-            patch.object(sysentrpxy, "get_market_signal") as market,
-            patch.object(
-                sysentrpxy,
-                "calculate_supertrend",
-                return_value=pd.DataFrame({"ST_Trend": ["BEAR"]}),
-            ),
-        ):
-            self.assertEqual(sysentrpxy.get_entry_signal(frame), ("SELL", "BEAR"))
-        market.assert_not_called()
-
-    def test_side_exit_maps_market_direction_to_entry(self):
-        cases = (("BULL", ("BUY", "BULL")), ("BEAR", ("SELL", "BEAR")))
-        for market_signal, expected in cases:
-            frame = pd.DataFrame({"Close": [1]})
             with (
-                self.subTest(market_signal=market_signal),
+                self.subTest(mkt_signal=mkt_signal),
                 patch.object(
-                    sysentrpxy,
-                    "get_market_signal",
-                    return_value=market_signal,
+                    sysentrpxy, "get_market_signal", return_value=mkt_signal
                 ) as market,
-                patch.object(
-                    sysentrpxy,
-                    "calculate_supertrend",
-                    return_value=pd.DataFrame({"ST_Trend": ["SIDE"]}),
-                ),
             ):
                 self.assertEqual(sysentrpxy.get_entry_signal(frame), expected)
             market.assert_called_once_with(frame)
 
-    def test_side_without_directional_exit_has_no_entry(self):
-        frame = pd.DataFrame({"Close": [1]})
-        with (
-            patch.object(sysentrpxy, "get_market_signal", return_value="NONE"),
-            patch.object(
-                sysentrpxy,
-                "calculate_supertrend",
-                return_value=pd.DataFrame({"ST_Trend": ["SIDE"]}),
-            ),
-        ):
-            self.assertEqual(sysentrpxy.get_entry_signal(frame), ("NONE", "NONE"))
-
-    def test_invalid_supertrend_state_returns_none(self):
-        frame = pd.DataFrame({"Close": [1]})
-        with (
-            patch.object(sysentrpxy, "get_market_signal") as market,
-            patch.object(
-                sysentrpxy,
-                "calculate_supertrend",
-                return_value=pd.DataFrame({"ST_Trend": ["UNKNOWN"]}),
-            ),
-        ):
-            self.assertEqual(sysentrpxy.get_entry_signal(frame), ("NONE", "NONE"))
-        market.assert_not_called()
+    def test_nondirectional_mkt_signal_has_no_entry(self):
+        for mkt_signal in ("NONE", "SIDE", "UNKNOWN", None):
+            with (
+                self.subTest(mkt_signal=mkt_signal),
+                patch.object(sysentrpxy, "get_market_signal", return_value=mkt_signal),
+            ):
+                self.assertEqual(
+                    sysentrpxy.get_entry_signal(pd.DataFrame({"Close": [1]})),
+                    ("NONE", "NONE"),
+                )
 
     def test_market_signal_returns_only_bull_bear_or_none(self):
         with (
