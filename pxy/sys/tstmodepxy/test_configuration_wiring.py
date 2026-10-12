@@ -1199,7 +1199,7 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(exeavxpxy.averaging_alignment_signals("BEAR"), (False, True))
         self.assertEqual(exeavxpxy.averaging_alignment_signals("SIDE"), (False, False))
 
-    def test_lgt_uses_clamped_ratio_times_offset_lot_count(self):
+    def test_lgt_uses_clamped_ratio_times_actual_lot_count_with_minimum_one(self):
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True, index_price=25000),
             -9.075,
@@ -1236,13 +1236,13 @@ class ConfigurationWiringTests(unittest.TestCase):
             exeltgtpxy.calculate_lgt(
                 1000.0, 4000.0, is_ce=True, index_price=25000, own_count=1
             ),
-            -18.15,
+            -9.075,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1000.0, 1000.0, is_ce=True, index_price=25000, own_count=2
             ),
-            -84.7,
+            -72.6,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(

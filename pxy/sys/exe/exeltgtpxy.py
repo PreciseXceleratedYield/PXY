@@ -63,7 +63,7 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, own_count=0)
         if not ratio_is_valid or not lot_count_is_valid:
             ratio, own_lots = 1.0, 1
         else:
-            own_lots = max(1, int(own_count_value) + 1)
+            own_lots = max(1, int(own_count_value))
     magnitude = max(
         EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
         round(33.0 * own_lots * ratio, 2),
