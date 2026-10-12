@@ -16,6 +16,12 @@ const wss = new WebSocket.Server({ server });
 
 const PORT = process.env.PORT || 80; 
 const WEB_DIR = path.resolve(__dirname, 'web');
+const WEB_STATIC_ASSETS = new Set([
+    '/pxy-theme.css',
+    '/pxy-theme.js',
+    '/mbl/manifest.json',
+    '/mbl/sw.js'
+]);
 
 /* ========================= GLOBAL ERROR HANDLING ========================= */
 process.on('uncaughtException', (err) => {
@@ -28,7 +34,10 @@ process.on('unhandledRejection', (reason, promise) => {
 
 /* ========================= WEB FILES & PARSING ========================= */
 app.use('/web', (req, res, next) => {
-    if (path.extname(req.path).toLowerCase() !== '.html') {
+    if (
+        path.extname(req.path).toLowerCase() !== '.html'
+        && !WEB_STATIC_ASSETS.has(req.path)
+    ) {
         return res.sendStatus(404);
     }
     return next();
