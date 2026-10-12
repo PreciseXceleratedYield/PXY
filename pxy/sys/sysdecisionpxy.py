@@ -195,6 +195,8 @@ def averaging_trigger_sides(
     *,
     ce_aligned,
     pe_aligned,
+    ce_opposite_signal=False,
+    pe_opposite_signal=False,
     ce_rows,
     pe_rows,
     ce_investment=0.0,
@@ -220,14 +222,14 @@ def averaging_trigger_sides(
     return {
         "CE": bool(
             both_sides_open_and_losing
-            and ce_aligned
+            and (ce_aligned or ce_opposite_signal)
             and not ce_cooling
             and ce_within_cap
             and ce_loss <= ce_threshold
         ),
         "PE": bool(
             both_sides_open_and_losing
-            and pe_aligned
+            and (pe_aligned or pe_opposite_signal)
             and not pe_cooling
             and pe_within_cap
             and pe_loss <= pe_threshold

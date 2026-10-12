@@ -791,14 +791,14 @@ class ProductionPipeReplayTests(unittest.TestCase):
     def test_averaging_pipe_scenarios_consume_loss_and_position_dataframes(self):
         scenarios = pd.DataFrame(
             [
-                {"name": "aligned CE loss averages with losing PE open", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
-                {"name": "aligned PE loss averages with losing CE open", "side": "PE", "sell_price": 90.0, "signal": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
-                {"name": "CE averages at LGT regardless of bearish average", "side": "CE", "sell_price": 95.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
-                {"name": "CE averaging remains eligible beyond LGT", "side": "CE", "sell_price": 89.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
-                {"name": "PE averages at LGT regardless of bullish average", "side": "PE", "sell_price": 95.0, "signal": "BEAR", "sma": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True},
-                {"name": "profitable CE does not average", "side": "CE", "sell_price": 105.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": False},
-                {"name": "missing opposite position blocks averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": None, "expected_average": False},
-                {"name": "profitable opposite side blocks averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 110.0, "expected_average": False},
+                {"name": "aligned CE loss averages with losing PE open", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True, "expected_opposite_average": True},
+                {"name": "aligned PE loss averages with losing CE open", "side": "PE", "sell_price": 90.0, "signal": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True, "expected_opposite_average": True},
+                {"name": "CE averages at LGT regardless of bearish average", "side": "CE", "sell_price": 95.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True, "expected_opposite_average": True},
+                {"name": "CE averaging remains eligible beyond LGT", "side": "CE", "sell_price": 89.0, "signal": "BULL", "sma": "BEAR", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True, "expected_opposite_average": True},
+                {"name": "PE averages at LGT regardless of bullish average", "side": "PE", "sell_price": 95.0, "signal": "BEAR", "sma": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": True, "expected_opposite_average": True},
+                {"name": "profitable CE does not average", "side": "CE", "sell_price": 105.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 90.0, "expected_average": False, "expected_opposite_average": False},
+                {"name": "missing opposite position blocks averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": None, "expected_average": False, "expected_opposite_average": False},
+                {"name": "profitable opposite side blocks averaging", "side": "CE", "sell_price": 90.0, "signal": "BULL", "cooling": False, "opposite_sell_price": 110.0, "expected_average": False, "expected_opposite_average": False},
             ]
         )
         timezone = pytz.timezone("Asia/Kolkata")
@@ -900,12 +900,20 @@ class ProductionPipeReplayTests(unittest.TestCase):
                             broker, active_orders, index_price=22000
                         )
 
-                expected_order_count = 1 + int(has_opposite) + int(
-                    scenario["expected_average"]
+                expected_order_count = (
+                    1 + int(has_opposite)
+                    + int(scenario["expected_average"])
+                    + int(scenario["expected_opposite_average"])
                 )
                 self.assertEqual(len(broker.orders), expected_order_count)
+                averaged_symbols = {
+                    order["trdSym"]
+                    for order in broker.orders[1 + int(has_opposite):]
+                }
                 if scenario["expected_average"]:
-                    self.assertEqual(broker.orders[-1]["trdSym"], symbol)
+                    self.assertIn(symbol, averaged_symbols)
+                if scenario["expected_opposite_average"]:
+                    self.assertIn(opposite_symbol, averaged_symbols)
 
     def test_squareoff_pipe_flattens_the_supplied_positions_dataframe(self):
         timezone = pytz.timezone("Asia/Kolkata")

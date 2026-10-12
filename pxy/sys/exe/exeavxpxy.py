@@ -127,6 +127,8 @@ def handle_side_averaging(client, df, index_price):
     # 🎯 STEP POSITIONS FIXED: Parse variable status first
     active_exit = str(working_df.iloc[-1].get("exit", "NONE")).upper().strip()
     ce_aligned, pe_aligned = averaging_alignment_signals(active_exit)
+    ce_opposite_signal = active_exit in {"BULL", "BEAR"} and not ce_aligned
+    pe_opposite_signal = active_exit in {"BULL", "BEAR"} and not pe_aligned
 
     ce_dynamic_threshold = calculate_lgt(
         ce_investment,
@@ -142,6 +144,10 @@ def handle_side_averaging(client, df, index_price):
         index_price=index_price,
         own_count=pe_lots,
     )
+    if ce_opposite_signal:
+        ce_dynamic_threshold *= 2
+    if pe_opposite_signal:
+        pe_dynamic_threshold *= 2
     if USE_OVERALL_LOSS:
         ce_lgt_val, pe_lgt_val = ce_overall_pnl_pct, pe_overall_pnl_pct
     else:
@@ -188,6 +194,8 @@ def handle_side_averaging(client, df, index_price):
         ce_dynamic_threshold=ce_dynamic_threshold, pe_dynamic_threshold=pe_dynamic_threshold,
         ce_lots=ce_lots, pe_lots=pe_lots,
         ce_aligned=ce_aligned, pe_aligned=pe_aligned,
+        ce_opposite_signal=ce_opposite_signal,
+        pe_opposite_signal=pe_opposite_signal,
         ce_investment=ce_investment, pe_investment=pe_investment,
         max_investment=EXEAMSPXY_MAX_INVESTMENT,
     )

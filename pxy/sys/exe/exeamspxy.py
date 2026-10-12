@@ -45,6 +45,7 @@ def _order_ok(resp):
 def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_val,
                                   ce_dynamic_threshold, pe_dynamic_threshold, ce_lots, pe_lots,
                                   ce_aligned, pe_aligned, ce_investment, pe_investment,
+                                  ce_opposite_signal=False, pe_opposite_signal=False,
                                   max_investment=EXEAMSPXY_MAX_INVESTMENT):
     """Executes network orders for System A when pullback boundaries are breached."""
     ce_last_row = _newest_row(ce_rows) if not ce_rows.empty else None
@@ -62,6 +63,8 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
     triggers = averaging_trigger_sides(
         ce_aligned=ce_aligned,
         pe_aligned=pe_aligned,
+        ce_opposite_signal=ce_opposite_signal,
+        pe_opposite_signal=pe_opposite_signal,
         ce_rows=len(ce_rows),
         pe_rows=len(pe_rows),
         ce_investment=ce_investment,

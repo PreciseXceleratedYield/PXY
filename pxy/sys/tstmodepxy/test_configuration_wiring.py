@@ -1261,6 +1261,13 @@ class ConfigurationWiringTests(unittest.TestCase):
 
         self.assertEqual(averaging_trigger_sides(**shared), {"CE": True, "PE": False})
 
+        opposite_before_double_lgt = averaging_trigger_sides(
+            **{**shared, "pe_opposite_signal": True, "pe_threshold": -10, "pe_loss": -9.99}
+        )
+        opposite_at_double_lgt = averaging_trigger_sides(
+            **{**shared, "pe_opposite_signal": True, "pe_threshold": -10, "pe_loss": -10}
+        )
+
         no_opposite_loss = averaging_trigger_sides(**{**shared, "pe_loss": 0})
         no_opposite_position = averaging_trigger_sides(**{**shared, "pe_rows": 0})
         aligned_pe = averaging_trigger_sides(
@@ -1270,6 +1277,8 @@ class ConfigurationWiringTests(unittest.TestCase):
             **{**shared, "ce_investment": 24500, "ce_next_investment": 1000}
         )
 
+        self.assertEqual(opposite_before_double_lgt, {"CE": True, "PE": False})
+        self.assertEqual(opposite_at_double_lgt, {"CE": True, "PE": True})
         self.assertEqual(no_opposite_loss, {"CE": False, "PE": False})
         self.assertEqual(no_opposite_position, {"CE": False, "PE": False})
         self.assertEqual(aligned_pe, {"CE": False, "PE": True})
