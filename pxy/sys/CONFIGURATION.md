@@ -108,18 +108,12 @@ values until deliberately restarted.
 
 ## Option strike selection
 
-`sysentrpxy` always uses Supertrend: BULL maps to entry BUY and exit BULL;
-BEAR maps to entry SELL and exit BEAR. For BULL, BUY requires MKT BEAR and
-price from `st_line` through `st_line + (SYSSTRNDPXY_ST1_FACTOR / 2) × st_atr`;
-for BEAR, SELL requires MKT BULL and price from
-`st_line - (SYSSTRNDPXY_ST1_FACTOR / 2) × st_atr` through `st_line`. With the
-default factor 1.4, this is 0.7 ATR in either direction. These are the nearest
-25% zones of the theoretical ±(2 × factor) ATR ranges around the active
-Supertrend line; otherwise entry is NONE. When Supertrend is SIDE, entry is
-BUY when the close is in the lower 25% of the range between `st_line` and
-`st_mirror` and MKT is BEAR; SELL when it is in the upper 25% and MKT is BULL.
-Otherwise the entry is NONE. SIDE exits continue to use
-`sysmktpxy.get_signal()` (BULL/BEAR, or NONE).
+`sysentrpxy` derives the entry signal directly from the exit signal:
+exit BULL maps to entry BUY, exit BEAR maps to entry SELL, and exit SIDE/NONE
+maps to entry NONE. When Supertrend is BULL or BEAR, that trend is the exit
+signal. When Supertrend is SIDE, the exit signal follows
+`sysmktpxy.get_signal()` (BULL/BEAR, or NONE). Entry no longer applies a
+separate MKT countertrend or Supertrend ATR/band-zone filter.
 `sysdtafpxy` supports mode 1 only. In the live Yahoo data path it averages each
 OHLC field of every candle with the latest NIFTY futures price from
 `exe/run/nftfut.json`; it cannot emit live signals when that price is unavailable.
