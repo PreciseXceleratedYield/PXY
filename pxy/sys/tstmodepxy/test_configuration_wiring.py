@@ -6,7 +6,7 @@ from contextlib import redirect_stdout
 from datetime import date, timedelta
 from io import StringIO
 from pathlib import Path
-from unittest.mock import mock_open, patch
+from unittest.mock import Mock, mock_open, patch
 
 import pandas as pd
 
@@ -1103,6 +1103,31 @@ class ConfigurationWiringTests(unittest.TestCase):
             exeforcepxy.run_action("2")
 
         get_symbol.assert_called_once_with(23456, "OTMSELL", 100)
+
+    def test_force_order_reports_accepted_broker_response(self):
+        response = {"stat": "Ok", "stCode": "200", "data": {"orderId": "123"}}
+        client = Mock()
+        client.place_order.return_value = response
+
+        with redirect_stdout(StringIO()) as output:
+            result = exeforcepxy.execute_order(client, "NIFTY26O23550CE", 65)
+
+        self.assertEqual(result, {"stat": "OK", "raw": response})
+        self.assertIn("Broker order response:", output.getvalue())
+        self.assertIn("BROKER ACCEPTED FORCED ORDER", output.getvalue())
+        self.assertNotIn("DID NOT CONFIRM", output.getvalue())
+
+    def test_force_order_does_not_label_rejected_response_as_success(self):
+        response = {"stat": "Not_Ok", "errMsg": "order rejected"}
+        client = Mock()
+        client.place_order.return_value = response
+
+        with redirect_stdout(StringIO()) as output:
+            result = exeforcepxy.execute_order(client, "NIFTY26O23550CE", 65)
+
+        self.assertEqual(result, {"stat": "FAIL", "raw": response})
+        self.assertIn("DID NOT CONFIRM ORDER ACCEPTANCE", output.getvalue())
+        self.assertNotIn("BROKER ACCEPTED FORCED ORDER", output.getvalue())
 
     def test_action_cooldowns_share_the_central_six_second_setting(self):
         import syscnfgpxy
