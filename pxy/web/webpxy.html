@@ -90,7 +90,10 @@ body{
 #hdr::after{
     content:'';position:absolute;left:0;right:0;bottom:-1px;height:1px;
     background:var(--accent);opacity:0.5;
+    transition:background 0.3s;
 }
+#hdr.exit-bull::after{background:color-mix(in srgb,var(--bull) 24%,var(--border2));}
+#hdr.exit-bear::after{background:color-mix(in srgb,var(--bear) 24%,var(--border2));}
 .hdr-l,.hdr-r{display:flex;align-items:center;gap:8px;}
 .logo{
     font-family:'Syne',sans-serif;font-weight:800;font-size:17px;cursor:pointer;user-select:none;
@@ -821,6 +824,11 @@ async function loadDash(){
         setV('hcTrend',emojifyTrend(d.supertrend),   cls(d.supertrend||''));
         setV('hcATR',  `${d.atr??'—'}`, 'sc-val');
         setV('hcDirection', emojifyDirection(d.direction??'NONE'), cls(d.direction||''));
+
+        const exitKey=String(d.exit??'').trim().toUpperCase();
+        const header=$('hdr');
+        header.classList.toggle('exit-bull',exitKey==='BULL');
+        header.classList.toggle('exit-bear',exitKey==='BEAR');
 
         ['cellEntry','cellExit','cellTrend','cellATR'].forEach(id=>{
             const el=$(id);if(!el)return;
