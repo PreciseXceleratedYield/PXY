@@ -3,6 +3,7 @@
 Keep tunable runtime values grouped by subsystem and prefixed with their owner
 module's name. See CONFIGURATION.md for the layout and conditional settings.
 """
+import math
 import os
 from datetime import time as dt_time
 
@@ -71,7 +72,7 @@ SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "YES"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
     raise ValueError("SYSDTHAPXY_INCLUDE_RUNNING_CANDLE must be YES or NO.")
 
-SYSSTRNDPXY_ST1_ATR_PERIOD = 10
+SYSSTRNDPXY_ST1_ATR_PERIOD = 14
 SYSSTRNDPXY_ST1_FACTOR = 3.0
 
 SYSDTSTPXY_ST1_PERIOD = 3.0
@@ -111,6 +112,9 @@ EXEAGTPXY_FORCE_DEFAULT = 1.2
 
 EXEAMSPXY_MAX_INVESTMENT = 25000.0
 EXEAMSPXY_MAX_LGT_LOSS = 77.0
+EXEAMSPXY_LGT_SCALE = 1.1
+if not math.isfinite(EXEAMSPXY_LGT_SCALE) or EXEAMSPXY_LGT_SCALE <= 0:
+    raise ValueError("EXEAMSPXY_LGT_SCALE must be a finite positive number.")
 EXEAMSPXY_ORDER_EXCHANGE_SEGMENT = "nse_fo"
 EXEAMSPXY_ORDER_PRODUCT = "NRML"
 EXEAMSPXY_ORDER_PRICE = "0"
@@ -153,7 +157,7 @@ EXEDYNPXY_DECAY_RATE_PER_MIN = 0.0001
 EXEDYNPXY_PNL_THRESHOLD = 0.0
 
 # Option-symbol selection.
-EXEOTMPXY_STRIKE_MODE = "ATM"  # "ATM", "OTMFIX", or "OTMDYN"; applies to every option buy.
+EXEOTMPXY_STRIKE_MODE = "OTMDYN"  # "ATM", "OTMFIX", or "OTMDYN"; applies to every option buy.
 EXEOTMPXY_FIXED_DISTANCE = 100
 EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES = (200, 150, 100, 50, 0)  # Monday through Friday.
 

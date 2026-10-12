@@ -35,7 +35,7 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   the staged exit schedule. Legacy `exe/run/X` scripts and pipe-scenario test
   fixtures retain their own values; they do not drive the production schedule.
 - Supertrend always uses the DUAL calculation with a Wilder-smoothed true-range
-  ATR using period `SYSSTRNDPXY_ST1_ATR_PERIOD` (default `10`) and factor
+  ATR using period `SYSSTRNDPXY_ST1_ATR_PERIOD` (default `14`) and factor
   `SYSSTRNDPXY_ST1_FACTOR` (default `3`). This is independent of SKATR's
   session-based true-range ATR.
 - SKATR true-range ATR (mode 2) starts accumulating at 09:16 IST each session:
@@ -156,13 +156,16 @@ It invokes the reusable
 placement and tagging to those existing commands.
 
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
-builder for every buying script. It currently defaults to `ATM`, which ignores
-caller OTM flags and distances and uses a zero-point offset. `OTMFIX` applies
-`EXEOTMPXY_FIXED_DISTANCE` (currently 100 NIFTY points). `OTMDYN` selects a
+builder for every buying script. It defaults to `OTMDYN`, which selects a
 weekday offset from `EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES`, ordered Monday to
-Friday (currently 200, 150, 100, 50, 0 points). Dynamic selection fails closed
-on weekends when no weekday distance is defined. The symbol builder rounds the
-result to the configured strike step.
+Friday (currently 200, 150, 100, 50, 0 NIFTY points). Call strikes are set above
+spot by the selected offset and put strikes below spot; both are then rounded
+to the configured 50-point strike step. Thus the current policy is 200 points
+OTM on Monday, 150 on Tuesday, 100 on Wednesday, 50 on Thursday, and ATM on
+Friday. Dynamic selection fails closed on weekends when no weekday distance is
+defined. `ATM` uses a zero-point offset, while `OTMFIX` applies the fixed
+`EXEOTMPXY_FIXED_DISTANCE` (currently 100 NIFTY points). Caller OTM flags and
+distances do not override the central mode.
 
 Counter-buy/re-buy uses the exit signal after `exeexitpxy` removes rows exited
 or locked this cycle. With only CE held, BEAR triggers the PE counter-leg; with
@@ -295,20 +298,24 @@ historical option P&L.
 - Averaging uses one policy with no layer-count mode: the projected side
   investment (`sum(qty × sell_prc)` plus the next lot at its current
   `sell_prc`) must not exceed `EXEAMSPXY_MAX_INVESTMENT` (default `25000`).
-  The normal LGT loss threshold is capped at `EXEAMSPXY_MAX_LGT_LOSS`
-  (default `77`), so it cannot become more negative than `-77`.
+  The calculated LGT magnitude is capped at `EXEAMSPXY_MAX_LGT_LOSS`
+  (default `77`), then multiplied by `EXEAMSPXY_LGT_SCALE` (default `1.1`).
+  Since the multiplier is applied after the base cap, the final LGT can reach
+  `-84.7`.
   The opposite side must have open positions and negative overall P&L, and
   only the signal-aligned side may average. The averaging side must also be
   losing at or beyond its applicable LGT threshold.
-- LGT is calculated from the own/opposite investment factor and the own-side
-  open lot count, then negated:
-  `r = own investment / opposite investment`;
-  `magnitude = max(1.4, round(25^r + 25^n, 2))`, where `n` is the own-side
-  open lot count; `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)`.
-  If either side has no positive investment, `r` defaults to `1`. With zero
-  own-side lots, the LGT uses the 1.4% floor; two or more own-side lots reach
-  the 77% cap. The own lot count comes from the verified broker position
-  summary.
+- LGT is calculated from the own/opposite investment factor and one plus the
+  actual own-side open lot count, then negated:
+  `r = own investment / opposite investment`, clamped to `[0.1, 10]`;
+  `n = 1 + actual own-side open lot count`;
+  `magnitude = max(1.4, round(25 × r + 25 × n, 2))`;
+  `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS) ×
+  EXEAMSPXY_LGT_SCALE`. If either side has no positive investment, or an input
+  is non-finite, the fallback is `r = 1, n = 1`. Zero actual own-side lots
+  yield `n = 1`; one actual own-side lot yields `n = 2`; two or more lots reach
+  the 77% base cap before scaling. The own lot count comes from the verified
+  broker position summary.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.
