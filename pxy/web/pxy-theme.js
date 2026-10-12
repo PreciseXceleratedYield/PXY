@@ -1,6 +1,8 @@
 (() => {
     const root = document.documentElement;
     const paperTheme = root.dataset.paperTheme || 'light';
+    const themePreferenceVersion = 'pxyThemePaperDefault';
+
     function updateThemeColor(mode) {
         const themeColor = document.querySelector('meta[name="theme-color"]');
         if (themeColor) {
@@ -26,6 +28,10 @@
     }
 
     try {
+        if (localStorage.getItem(themePreferenceVersion) !== '1') {
+            localStorage.setItem('pxyTheme', 'paper');
+            localStorage.setItem(themePreferenceVersion, '1');
+        }
         setTheme(localStorage.getItem('pxyTheme') === 'dark' ? 'dark' : 'paper');
     } catch (error) {
         setTheme('paper');
