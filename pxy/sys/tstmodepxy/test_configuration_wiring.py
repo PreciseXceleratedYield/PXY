@@ -125,11 +125,11 @@ class ConfigurationWiringTests(unittest.TestCase):
         )
         atr_period = SYSSTRNDPXY_ST1_ATR_PERIOD
         factor = SYSSTRNDPXY_ST1_FACTOR
-        self.assertEqual(atr_period, 3)
+        self.assertEqual(atr_period, 14)
         self.assertEqual(factor, 3.0)
 
         atr_series = _calculate_wilder_atr(frame, atr_period)
-        expected_atr = [3.0, 4.0, 11.0 / 3.0]
+        expected_atr = [3.0, 3.0 + 3.0 / 14, (3.0 + 3.0 / 14) * 13 / 14 + 3.0 / 14]
         for actual, expected in zip(atr_series, expected_atr):
             self.assertAlmostEqual(actual, expected)
 
