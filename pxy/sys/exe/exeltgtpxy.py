@@ -64,18 +64,10 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, own_count=0)
             ratio, own_lots = 1.0, 1
         else:
             own_lots = max(1, int(own_count_value) + 1)
-    if own_lots >= 2:
-        magnitude = EXEAMSPXY_MAX_LGT_LOSS
-    else:
-        max_ratio_before_cap = math.log(
-            EXEAMSPXY_MAX_LGT_LOSS - (25.0 ** own_lots), 25.0
-        )
-        magnitude = (
-            EXEAMSPXY_MAX_LGT_LOSS
-            if ratio >= max_ratio_before_cap
-            else round((25.0 ** ratio) + (25.0 ** own_lots), 2)
-        )
-        magnitude = max(EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD, magnitude)
+    magnitude = max(
+        EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
+        round((25.0 * ratio) + (25.0 * own_lots), 2),
+    )
     return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS) * EXEAMSPXY_LGT_SCALE
 
 

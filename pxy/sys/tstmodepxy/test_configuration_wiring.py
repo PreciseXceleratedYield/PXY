@@ -1241,88 +1241,88 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(exeavxpxy.averaging_alignment_signals("BEAR"), (False, True))
         self.assertEqual(exeavxpxy.averaging_alignment_signals("SIDE"), (False, False))
 
-    def test_lgt_scales_powered_investment_ratio_and_own_lot_count_result_by_half(self):
-        self.assertEqual(
+    def test_lgt_uses_clamped_multiplicative_ratio_and_offset_lot_count(self):
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True, index_price=25000),
-            -13.62,
+            -34.375,
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(2000.0, 4000.0, is_ce=True, index_price=25000),
-            -15.0,
+            -41.25,
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True, index_price=25000),
-            -25.0,
+            -55.0,
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(2000.0, 1000.0, is_ce=True, index_price=25000),
-            -38.5,
+            -82.5,
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(3000.0, 1000.0, is_ce=True, index_price=25000),
-            -38.5,
+            -84.7,
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(4000.0, 1000.0, is_ce=True, index_price=25000),
-            -38.5,
+            -84.7,
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(4000.0, 1000.0, is_ce=False, index_price=25000),
-            -13.62,
+            -34.375,
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(0.0, 4000.0, is_ce=True, index_price=25000),
-            -25.0,
+            -55.0,
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1000.0, 4000.0, is_ce=True, index_price=25000, own_count=1
             ),
-            -38.5,
+            -61.875,
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1000.0, 1000.0, is_ce=True, index_price=25000, own_count=2
             ),
-            -38.5,
+            -84.7,
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1000.0, 1000.0, is_ce=True, index_price=25000, own_count=0
             ),
-            -25.0,
+            -55.0,
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1.0, 10.0, is_ce=True, index_price=25000, own_count=0
             ),
-            -13.19,
+            -30.25,
         )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 100.0, 1.0, is_ce=True, index_price=25000, own_count=0
             ),
-            -38.5,
+            -84.7,
         )
         for invalid_investment in (0.0, float("inf"), float("-inf"), float("nan")):
-            self.assertEqual(
+            self.assertAlmostEqual(
                 exeltgtpxy.calculate_lgt(
                     2000.0, invalid_investment, is_ce=True, index_price=25000,
                     own_count=0,
                 ),
-                -25.0,
+                -55.0,
             )
         for invalid_lot_count in (float("inf"), float("-inf"), float("nan")):
-            self.assertEqual(
+            self.assertAlmostEqual(
                 exeltgtpxy.calculate_lgt(
                     1000.0, 4000.0, is_ce=True, index_price=25000,
                     own_count=invalid_lot_count,
                 ),
-                -25.0,
+                -55.0,
             )
-        self.assertEqual(
+        self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True, index_price=1000),
-            -25.0,
+            -55.0,
         )
         with self.assertRaises(ValueError):
             exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True, index_price=0)

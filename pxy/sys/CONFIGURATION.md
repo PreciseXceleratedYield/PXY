@@ -299,8 +299,9 @@ historical option P&L.
   investment (`sum(qty × sell_prc)` plus the next lot at its current
   `sell_prc`) must not exceed `EXEAMSPXY_MAX_INVESTMENT` (default `25000`).
   The calculated LGT magnitude is capped at `EXEAMSPXY_MAX_LGT_LOSS`
-  (default `77`), then scaled by `EXEAMSPXY_LGT_SCALE` (default `0.5`), so
-  the returned threshold cannot become more negative than `-38.5`.
+  (default `77`), then multiplied by `EXEAMSPXY_LGT_SCALE` (default `1.1`).
+  Since the multiplier is applied after the base cap, the final LGT can reach
+  `-84.7`.
   The opposite side must have open positions and negative overall P&L, and
   only the signal-aligned side may average. The averaging side must also be
   losing at or beyond its applicable LGT threshold.
@@ -308,12 +309,13 @@ historical option P&L.
   actual own-side open lot count, then negated:
   `r = own investment / opposite investment`, clamped to `[0.1, 10]`;
   `n = 1 + actual own-side open lot count`;
-  `magnitude = max(1.4, round(25^r + 25^n, 2))`;
+  `magnitude = max(1.4, round(25 × r + 25 × n, 2))`;
   `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS) ×
   EXEAMSPXY_LGT_SCALE`. If either side has no positive investment, or an input
   is non-finite, the fallback is `r = 1, n = 1`. Zero actual own-side lots
-  yield `n = 1`; one or more actual own-side lots reach the 77% base cap before
-  scaling. The own lot count comes from the verified broker position summary.
+  yield `n = 1`; one actual own-side lot yields `n = 2`; two or more lots reach
+  the 77% base cap before scaling. The own lot count comes from the verified
+  broker position summary.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.

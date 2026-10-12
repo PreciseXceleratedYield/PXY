@@ -3,6 +3,7 @@
 Keep tunable runtime values grouped by subsystem and prefixed with their owner
 module's name. See CONFIGURATION.md for the layout and conditional settings.
 """
+import math
 import os
 from datetime import time as dt_time
 
@@ -111,9 +112,9 @@ EXEAGTPXY_FORCE_DEFAULT = 1.2
 
 EXEAMSPXY_MAX_INVESTMENT = 25000.0
 EXEAMSPXY_MAX_LGT_LOSS = 77.0
-EXEAMSPXY_LGT_SCALE = 0.5
-if not 0 < EXEAMSPXY_LGT_SCALE <= 1:
-    raise ValueError("EXEAMSPXY_LGT_SCALE must be greater than 0 and at most 1.")
+EXEAMSPXY_LGT_SCALE = 1.1
+if not math.isfinite(EXEAMSPXY_LGT_SCALE) or EXEAMSPXY_LGT_SCALE <= 0:
+    raise ValueError("EXEAMSPXY_LGT_SCALE must be a finite positive number.")
 EXEAMSPXY_ORDER_EXCHANGE_SEGMENT = "nse_fo"
 EXEAMSPXY_ORDER_PRODUCT = "NRML"
 EXEAMSPXY_ORDER_PRICE = "0"
