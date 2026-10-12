@@ -514,55 +514,6 @@ class ProductionPipeReplayTests(unittest.TestCase):
             self.assertIn("No order rows returned", output.getvalue())
             self.assertNotIn("TAG MATCH ERROR", output.getvalue())
 
-    def test_averaging_skips_when_broker_position_is_ahead_of_order_ledger(self):
-        timestamp = pytz.timezone("Asia/Kolkata").localize(
-            datetime(2025, 1, 6, 10, 0)
-        )
-        broker = SimulatedBroker()
-        broker.set_market(timestamp, 22000)
-        broker.place_order(
-            trading_symbol="NIFTY-WF-CE",
-            transaction_type="B",
-            quantity=broker.quantity,
-            tag="SIM-AVERAGE-LEDGER",
-        )
-        broker_order_count = len(broker.orders)
-        broker_positions = {
-            "stat": "Ok",
-            "stCode": "200",
-            "data": [{
-                "trdSym": "NIFTY-WF-CE",
-                "net_qty": broker.quantity * 2,
-            }],
-        }
-
-        with tempfile.TemporaryDirectory(prefix="pxy-avg-stale-ledger-") as temp:
-            with (
-                ProductionPipeReplay(
-                    SYS_DIR, broker, Path(temp) / "state"
-                ) as engine,
-                patch.object(
-                    broker, "positions", return_value=broker_positions
-                ),
-                patch.object(
-                    engine.oms.syspxy,
-                    "get_all_data",
-                    return_value={
-                        "price": 22000,
-                        "exit": "BULL",
-                        "market_data_available": True,
-                        "atr": 10,
-                    },
-                ),
-                redirect_stdout(StringIO()) as output,
-            ):
-                engine.timestamp = timestamp
-                engine.avg_pipe.run_snapshot()
-
-        self.assertEqual(len(broker.orders), broker_order_count)
-        self.assertIn("Data error this cycle", output.getvalue())
-        self.assertIn("exceeds the order ledger", output.getvalue())
-
     def test_lilo_assigns_book_ids_to_flat_to_flat_order_cycles(self):
         with tempfile.TemporaryDirectory(prefix="pxy-lilo-book-ids-") as temp:
             with ProductionPipeReplay(

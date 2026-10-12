@@ -201,8 +201,7 @@ def _reconcile_open_with_broker(client, open_positions, strict=False):
     A lot closed outside tag matching (manual sell, untagged square-off) would otherwise stay 'open':
     it would be marked at live price, inflate open_rows (tighter trailing stop) and drift game P&L.
     Symbols with net <= 0 are dropped; when the broker holds less than the open lots add up to,
-    the newest lots are kept. In strict mode, broker holdings above the tagged ledger are rejected
-    so trading cannot use a stale snapshot while the order report catches up."""
+    the newest lots are kept. If broker positions are unavailable the lots are returned unchanged."""
     if not open_positions:
         return open_positions
     try:
@@ -239,20 +238,6 @@ def _reconcile_open_with_broker(client, open_positions, strict=False):
     by_symbol = {}
     for p in open_positions:
         by_symbol.setdefault(p["Symbol"], []).append(p)
-
-    if strict:
-        ledger_qty = {
-            str(sym).strip(): sum(float(lot["Qty"]) for lot in lots)
-            for sym, lots in by_symbol.items()
-        }
-        for sym, broker_qty in net.items():
-            if broker_qty > ledger_qty.get(str(sym).strip(), 0.0) + 1e-9:
-                raise RuntimeError(
-                    f"Broker position for {sym} exceeds the order ledger "
-                    f"(broker={broker_qty:g}, ledger="
-                    f"{ledger_qty.get(str(sym).strip(), 0.0):g}); "
-                    "skipping trading until the order report catches up."
-                )
 
     kept = []
     for sym, lots in by_symbol.items():
