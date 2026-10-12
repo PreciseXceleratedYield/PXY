@@ -52,15 +52,15 @@ def resolve_dynamic_filter_time():
 # ⏱️ SURGICAL TIMELINE FILTER INITIALIZATION
 FILTER_TIME = resolve_dynamic_filter_time()
 
-def dump_to_json(closed_df): 
-    """Writes closed trade realizations to webpnlpxy.json."""
+def dump_to_json(trades_df):
+    """Writes closed and open trade lots to webpnlpxy.json."""
     try: 
         file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/webpnlpxy.json"))
         os.makedirs(os.path.dirname(file_path), exist_ok=True) 
-        if closed_df.empty: 
-            data = [] 
-        else: 
-            records = closed_df.copy() 
+        if trades_df.empty:
+            data = []
+        else:
+            records = trades_df.copy()
             for col in records.columns: 
                 if pd.api.types.is_datetime64_any_dtype(records[col]): 
                     records[col] = records[col].dt.strftime('%Y-%m-%d %H:%M:%S') 
@@ -69,6 +69,41 @@ def dump_to_json(closed_df):
             json.dump(data, f, indent=4) 
     except Exception as e: 
         print(f"Error dumping to JSON: {e}") 
+
+
+def _assign_book_ids(orders_df):
+    """Label orders by flat-to-flat portfolio cycle in report chronology."""
+    ordered = orders_df.sort_values("dt", kind="stable")
+    positions = {}
+    active_book = None
+    next_book = 0
+    book_ids = {}
+
+    for index, order in ordered.iterrows():
+        side = str(order.get("trnsTp", "")).strip().upper()
+        quantity = abs(float(order.get("qty", 0) or 0))
+        if side not in {"B", "S"} or quantity <= 0:
+            continue
+
+        if active_book is None:
+            next_book += 1
+            active_book = next_book
+
+        book_ids[index] = active_book
+        symbol = str(order.get("trdSym", "")).strip()
+        direction = 1 if side == "B" else -1
+        positions[symbol] = positions.get(symbol, 0.0) + direction * quantity
+        positions = {
+            key: value for key, value in positions.items()
+            if abs(value) > 1e-9
+        }
+        if not positions:
+            active_book = None
+
+    result = orders_df.copy()
+    result["Book_ID"] = pd.Series(book_ids, dtype="Int64")
+    return result
+
 
 def dump_livpos_to_json(open_positions): 
     """Writes active positions metrics to webpospxy.json."""
@@ -304,7 +339,8 @@ def _process_lilo_orders_production(client, strict=False, risk_exit_signal=None)
                 t_str = t_str.split('_')[0].strip()
             return t_str if t_str.lower() not in ["nan", "none", "null", ""] else "" 
             
-        df["tag"] = df.apply(get_safe_tag, axis=1) 
+        df["tag"] = df.apply(get_safe_tag, axis=1)
+        df = _assign_book_ids(df)
         closed_matches = [] 
         open_positions = []
         for symbol, group in df.groupby("trdSym"): 
@@ -328,6 +364,7 @@ def _process_lilo_orders_production(client, strict=False, risk_exit_signal=None)
                     closed_matches.append({ 
                         "Symbol": symbol, 
                         "Qty": mqty, 
+                        "Book_ID": b.get("Book_ID"),
                         "Tag": b["tag"], 
                         "tok": token_id, 
                         "Buy_Time": b["dt"], 
@@ -349,6 +386,7 @@ def _process_lilo_orders_production(client, strict=False, risk_exit_signal=None)
                     open_positions.append({ 
                         "Symbol": symbol, 
                         "Qty": b["qty"], 
+                        "Book_ID": b.get("Book_ID"),
                         "tok": token_id, 
                         "tag": b["tag"], 
                         "Buy_Time": b["dt"], 
@@ -375,7 +413,19 @@ def _process_lilo_orders_production(client, strict=False, risk_exit_signal=None)
         total_unrealized = int(open_df["PNL"].sum()) if not open_df.empty else 0 
         total_realized = int(closed_df["PNL"].sum()) if not closed_df.empty else 0 
         _print_summary(total_unrealized, total_realized) 
-        dump_to_json(closed_df) 
+        web_trades = []
+        if not closed_df.empty:
+            closed_rows = closed_df.copy()
+            closed_rows["Status"] = "CLOSED"
+            web_trades.append(closed_rows)
+        if not open_df.empty:
+            open_rows = open_df.copy()
+            open_rows["Status"] = "OPEN"
+            web_trades.append(open_rows)
+        dump_to_json(
+            pd.concat(web_trades, ignore_index=True)
+            if web_trades else pd.DataFrame()
+        )
         dump_livpos_to_json(open_positions) 
         return open_df, closed_df 
     except Exception as e:

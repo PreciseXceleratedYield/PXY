@@ -514,6 +514,31 @@ class ProductionPipeReplayTests(unittest.TestCase):
             self.assertIn("No order rows returned", output.getvalue())
             self.assertNotIn("TAG MATCH ERROR", output.getvalue())
 
+    def test_lilo_assigns_book_ids_to_flat_to_flat_order_cycles(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-lilo-book-ids-") as temp:
+            with ProductionPipeReplay(
+                SYS_DIR, SimulatedBroker(), Path(temp) / "state"
+            ) as engine:
+                orders = pd.DataFrame(
+                    [
+                        {"dt": "2025-01-06 10:00:00", "trdSym": "CE", "trnsTp": "B", "qty": 50},
+                        {"dt": "2025-01-06 10:01:00", "trdSym": "PE", "trnsTp": "B", "qty": 75},
+                        {"dt": "2025-01-06 10:02:00", "trdSym": "CE", "trnsTp": "B", "qty": 25},
+                        {"dt": "2025-01-06 10:03:00", "trdSym": "CE", "trnsTp": "S", "qty": 75},
+                        {"dt": "2025-01-06 10:04:00", "trdSym": "PE", "trnsTp": "S", "qty": 75},
+                        {"dt": "2025-01-06 10:05:00", "trdSym": "CE", "trnsTp": "B", "qty": 65},
+                        {"dt": "2025-01-06 10:06:00", "trdSym": "CE", "trnsTp": "S", "qty": 65},
+                    ],
+                    index=[10, 20, 30, 40, 50, 60, 70],
+                )
+
+                labelled = engine.lilo._assign_book_ids(orders)
+
+            self.assertEqual(
+                labelled["Book_ID"].tolist(),
+                [1, 1, 1, 1, 1, 2, 2],
+            )
+
     def test_lilo_treats_kotak_no_data_response_as_idle(self):
         with tempfile.TemporaryDirectory(prefix="pxy-lilo-no-data-") as temp:
             broker = SimulatedBroker()

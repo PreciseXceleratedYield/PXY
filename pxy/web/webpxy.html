@@ -240,6 +240,18 @@ body{
     border-bottom:1px solid var(--border);cursor:default;
     transition:background 0.25s,border-left-color 0.25s;
 }
+.t-book-row{
+    display:grid;grid-template-columns:auto 1fr auto;
+    align-items:center;gap:6px;padding:9px 10px;
+    border-bottom:1px solid var(--border);cursor:pointer;
+    transition:background 0.25s;
+}
+.t-book-row:hover{background:var(--bg3);}
+.t-book-details{border-bottom:1px solid var(--border);}
+.t-book-details .t-row{padding-left:20px;}
+.t-book-toggle{font-size:9px;color:var(--accent);width:12px;}
+.t-book-name{font-size:10px;font-weight:700;}
+.t-book-meta{font-size:8px;color:var(--muted);margin-top:2px;}
 .p-row.bull-r{border-left:2px solid var(--bull);}
 .p-row.bear-r{border-left:2px solid var(--bear);}
 .t-row.bull-r{border-left:2px solid var(--bull);}
@@ -723,6 +735,7 @@ function lotSz(s){return 65;}
 /* ── SORT STATE ── */
 let psCol='pnl',psAsc=false;
 let trCol='time',trAsc=false;
+const expandedTradeBooks=new Set();
 const PANEL_LINKS={terminal:'#',chart:'#',positions:'#',trades:'#'};
 function openPanelLink(key){window.location.href=PANEL_LINKS[key];}
 
@@ -1327,7 +1340,7 @@ new ResizeObserver(()=>{
 async function loadTrades(){
     let data=[];
     try{data=await fetch('/api/web-data/webpnlpxy?_='+Date.now()).then(r=>r.json());}catch{}
-    const total=data.reduce((s,d)=>s+(d.PNL||0),0);
+    const total=data.reduce((s,d)=>s+(String(d.Status||'CLOSED').toUpperCase()==='OPEN'?0:Number(d.PNL)||0),0);
     const tradePnlChanged=prevTradePnl!==null&&total!==prevTradePnl;
     const tradePnlUp=tradePnlChanged&&total>prevTradePnl;
     bookedTotal=total;
@@ -1338,35 +1351,85 @@ async function loadTrades(){
     prevTradePnl=total;
     const scroll=$('tradeScroll');
     const trPrevScrollTop=scroll.scrollTop;
-    scroll.querySelectorAll('.t-row').forEach(r=>r.remove());
+    scroll.querySelectorAll('.t-row,.t-book-row,.t-book-details').forEach(r=>r.remove());
     if(!data.length){$('tradeEmpty').style.display='block';return;}
     $('tradeEmpty').style.display='none';
-    data.sort((a,b)=>{
+    const books=new Map();
+    data.forEach((t,index)=>{
+        const hasBookId=t.Book_ID!==null&&t.Book_ID!==undefined&&t.Book_ID!=='';
+        const id=hasBookId?String(t.Book_ID):'';
+        const key=hasBookId?'book-'+id:'unassigned-'+index;
+        if(!books.has(key))books.set(key,{key,id,legacy:!hasBookId,trades:[],pnl:0,open:false,sortTime:0,firstTag:String(t.Tag||'')});
+        const book=books.get(key);
+        book.trades.push(t);
+        book.pnl+=Number(t.PNL)||0;
+        book.open=book.open||String(t.Status||'CLOSED').toUpperCase()==='OPEN';
+        const time=Date.parse(t.Exit_Time==='OPEN'?t.Buy_Time:t.Exit_Time||t.Buy_Time||'');
+        if(Number.isFinite(time))book.sortTime=Math.max(book.sortTime,time);
+    });
+    const bookList=[...books.values()];
+    bookList.sort((a,b)=>{
         let v;
-        if(trCol==='pnl')v=(a.PNL||0)-(b.PNL||0);
-        else if(trCol==='time')v=String(a.Exit_Time||'').localeCompare(String(b.Exit_Time||''));
-        else{const ta=parseFloat(a.Tag),tb=parseFloat(b.Tag);v=(!isNaN(ta)&&!isNaN(tb))?ta-tb:String(a.Tag||'').localeCompare(String(b.Tag||''));}
+        if(trCol==='pnl')v=a.pnl-b.pnl;
+        else if(trCol==='time')v=a.sortTime-b.sortTime;
+        else{
+            const ta=parseFloat(a.id),tb=parseFloat(b.id);
+            v=(!a.legacy&&!b.legacy)?ta-tb:a.firstTag.localeCompare(b.firstTag);
+        }
         return trAsc?v:-v;
     });
-    data.forEach(t=>{
-        const pnl=t.PNL||0,pb=pnl>=0;
-        const entry=String(t.Buy_Time||'').slice(11,16);
-        const exit=String(t.Exit_Time||'').slice(11,16);
-        const row=document.createElement('div');row.className=`t-row ${pb?'bull-r':'bear-r'}`;
-        row.dataset.tag=String(t.Tag||'');
-        row.style.cursor='pointer';
-        row.innerHTML=`<span class="t-tag">#${t.Tag||'—'}</span>
-            <div><div class="t-sym">${shortSym(t.Symbol)}</div>
-                 <div class="t-meta">${entry}→${exit}·Qty ${t.Qty??'—'}</div></div>
+    bookList.forEach(book=>{
+        const pnl=book.pnl,pb=pnl>=0;
+        const name=book.legacy?'Unassigned trade':'Book '+book.id;
+        const details=document.createElement('div');
+        details.className='t-book-details';
+        details.style.display=expandedTradeBooks.has(book.key)?'block':'none';
+        const summary=document.createElement('div');
+        summary.className='t-book-row';
+        summary.setAttribute('role','button');
+        summary.setAttribute('tabindex','0');
+        summary.setAttribute('aria-expanded',String(expandedTradeBooks.has(book.key)));
+        summary.innerHTML=`<span class="t-book-toggle">${expandedTradeBooks.has(book.key)?'▾':'▸'}</span>
+            <div><div class="t-book-name">${name} · ${book.open?'OPEN':'CLOSED'}</div>
+                 <div class="t-book-meta">${book.trades.length} trade${book.trades.length===1?'':'s'}${book.open?' · active position':''}</div></div>
             <span class="t-pnl ${pb?'bull':'bear'}">${fmt(pnl)}</span>`;
-        row.addEventListener('click',()=>{
-            document.querySelectorAll('.t-row').forEach(r=>{
-                r.classList.toggle('active',r===row);
-                r.classList.toggle('dimmed',r!==row);
-            });
-            openTradeChart(t);
+        const toggle=()=>{
+            const expanded=details.style.display==='none';
+            details.style.display=expanded?'block':'none';
+            if(expanded)expandedTradeBooks.add(book.key);else expandedTradeBooks.delete(book.key);
+            summary.setAttribute('aria-expanded',String(expanded));
+            summary.querySelector('.t-book-toggle').textContent=expanded?'▾':'▸';
+        };
+        summary.addEventListener('click',toggle);
+        summary.addEventListener('keydown',event=>{
+            if(event.key==='Enter'||event.key===' '){event.preventDefault();toggle();}
         });
-        scroll.appendChild(row);
+        book.trades.sort((a,b)=>String(a.Buy_Time||'').localeCompare(String(b.Buy_Time||'')));
+        book.trades.forEach(t=>{
+            const pnl=Number(t.PNL)||0,pb=pnl>=0;
+            const entry=String(t.Buy_Time||'').slice(11,16);
+            const exit=String(t.Exit_Time||'OPEN').slice(11,16);
+            const status=String(t.Status||'CLOSED').toUpperCase();
+            const row=document.createElement('div');row.className=`t-row ${pb?'bull-r':'bear-r'}`;
+            row.dataset.tag=String(t.Tag||'');
+            row.style.cursor=status==='OPEN'?'default':'pointer';
+            const tag=document.createElement('span');tag.className='t-tag';tag.textContent='#'+(t.Tag||'—');
+            const description=document.createElement('div');
+            description.innerHTML='<div class="t-sym"></div><div class="t-meta"></div>';
+            description.querySelector('.t-sym').textContent=shortSym(t.Symbol);
+            description.querySelector('.t-meta').textContent=`${entry}→${status==='OPEN'?'OPEN':exit} · Qty ${t.Qty??'—'}`;
+            const pnlNode=document.createElement('span');pnlNode.className=`t-pnl ${pb?'bull':'bear'}`;pnlNode.textContent=fmt(pnl);
+            row.append(tag,description,pnlNode);
+            if(status!=='OPEN')row.addEventListener('click',()=>{
+                document.querySelectorAll('.t-row').forEach(r=>{
+                    r.classList.toggle('active',r===row);
+                    r.classList.toggle('dimmed',r!==row);
+                });
+                openTradeChart(t);
+            });
+            details.appendChild(row);
+        });
+        scroll.append(summary,details);
     });
     scroll.scrollTop=trPrevScrollTop;
 }
