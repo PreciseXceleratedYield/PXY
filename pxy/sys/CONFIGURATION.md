@@ -39,10 +39,10 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   The standalone 15:25 square-off trigger is also intentionally separate from
   the staged exit schedule. Legacy `exe/run/X` scripts and pipe-scenario test
   fixtures retain their own values; they do not drive the production schedule.
-- Supertrend always uses the DUAL calculation with a Wilder-smoothed true-range
-  ATR using period `SYSSTRNDPXY_ST1_ATR_PERIOD` (default `3`) and factor
-  `SYSSTRNDPXY_ST1_FACTOR` (default `1.4`). This is independent of SKATR's
-  session-based true-range ATR.
+- Supertrend always uses the DUAL calculation with a fixed ATR of
+  `SYSSTRNDPXY_ST1_ATR_VALUE` (default `5` NIFTY points) and factor
+  `SYSSTRNDPXY_ST1_FACTOR` (default `1.4`). Both Supertrend bands use this fixed
+  ATR distance; it is independent of SKATR's session-based true-range ATR.
 - SKATR true-range ATR (mode 2) starts accumulating at 09:16 IST each session:
   the 09:16 candle uses high minus low only, excluding the 09:15 close gap.
   Each following value is the expanding mean through candle 14, and subsequent
@@ -278,8 +278,8 @@ historical option P&L.
 - `SYSKATRPXY_ATR_STATIC_VALUE` is used for `ATR_MODE=1`; the true-ATR period,
   cap, minimum-row requirement, and fallback apply to mode 2; the depth floor
   applies to dynamic mode 3.
-- `SYSSTRNDPXY_ST1_ATR_PERIOD` and `SYSSTRNDPXY_ST1_FACTOR` configure the
-  production DUAL Supertrend true-range ATR.
+- `SYSSTRNDPXY_ST1_ATR_VALUE` and `SYSSTRNDPXY_ST1_FACTOR` configure the
+  production DUAL Supertrend fixed ATR and multiplier.
 - `SYSPLCHRTPXY_*` are consumed by the separate chart generator, not the
   production signal path. `SYSDTSTPXY_*` and `SYSRIGPXY_*` belong to standalone
   modules with no caller in the production launch graph.

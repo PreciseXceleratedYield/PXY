@@ -52,7 +52,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_SQUAREOFF_ALL_START,
     SYSCNFGPXY_SQUAREOFF_END,
     SYSCNFGPXY_TIMEZONE,
-    SYSSTRNDPXY_ST1_ATR_PERIOD,
+    SYSSTRNDPXY_ST1_ATR_VALUE,
     SYSSTRNDPXY_ST1_FACTOR,
     SYSSMAPXY_VARIANT,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
@@ -67,7 +67,7 @@ from sysdecisionpxy import (
     entry_signal_valid,
 )
 import syskatrpxy
-from systrcalpxy import _calculate_wilder_atr, _compute_single_st
+from systrcalpxy import _compute_single_st
 
 
 class ConfigurationWiringTests(unittest.TestCase):
@@ -113,7 +113,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             syscnfgpxy.TSTPOINTBTPXY_FORCE_EXIT_TIME, SYSCNFGPXY_SQUAREOFF_ALL_START
         )
 
-    def test_supertrend_uses_wilder_true_range_atr(self):
+    def test_supertrend_uses_fixed_five_point_atr_and_configured_factor(self):
         index = pd.date_range("2026-10-07", periods=3, freq="min")
         frame = pd.DataFrame(
             {
@@ -124,24 +124,21 @@ class ConfigurationWiringTests(unittest.TestCase):
             },
             index=index,
         )
-        atr_period = SYSSTRNDPXY_ST1_ATR_PERIOD
+        atr_value = SYSSTRNDPXY_ST1_ATR_VALUE
         factor = SYSSTRNDPXY_ST1_FACTOR
-        self.assertEqual(atr_period, 3)
+        self.assertEqual(atr_value, 5.0)
         self.assertEqual(factor, 1.4)
 
-        atr_series = _calculate_wilder_atr(frame, atr_period)
-        expected_atr = [3.0, 4.0, 11.0 / 3.0]
-        for actual, expected in zip(atr_series, expected_atr):
-            self.assertAlmostEqual(actual, expected)
-
         single_line, _, _, _ = _compute_single_st(
-            frame, factor=factor, atr_period=atr_period
+            frame, factor=factor, atr_value=atr_value
         )
         first_hl2 = (frame["High"].iloc[0] + frame["Low"].iloc[0]) / 2
         self.assertEqual(
             single_line.iloc[0],
-            first_hl2 + factor * atr_series.iloc[0],
+            first_hl2 + factor * atr_value,
         )
+        processed = sysstrndpxy.calculate_supertrend(frame.copy())
+        self.assertEqual(processed["st_atr"].tolist(), [5.0, 5.0, 5.0])
 
     def test_syspxy_snapshot_passes_through_sma_status(self):
         snapshot_df = pd.DataFrame({"Close": [100.0]})
