@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from types import SimpleNamespace
 from contextlib import redirect_stdout
-from datetime import date, timedelta
+from datetime import date, datetime, time as dt_time, timedelta
 from io import StringIO
 from pathlib import Path
 from unittest.mock import Mock, mock_open, patch
@@ -48,6 +48,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TRADING_PIPE_CLOSE,
     SYSCNFGPXY_TRADING_DAY_END,
     SYSCNFGPXY_AVERAGING_START,
+    SYSCNFGPXY_NEW_BOOK_CUTOFF,
     SYSCNFGPXY_ENTRY_CUTOFF,
     SYSCNFGPXY_SQUAREOFF_START,
     SYSCNFGPXY_SQUAREOFF_ALL_START,
@@ -337,9 +338,26 @@ class ConfigurationWiringTests(unittest.TestCase):
                 patch.object(
                     sysentrpxy, "get_market_signal", return_value=mkt_signal
                 ) as market,
+                patch.object(sysentrpxy, "datetime") as clock,
             ):
+                clock.now.return_value = datetime(2026, 10, 12, 13, 0)
                 self.assertEqual(sysentrpxy.get_entry_signal(frame), expected)
             market.assert_called_once_with(frame)
+
+    def test_new_book_entries_stop_at_two_pm_ist_without_changing_exit(self):
+        self.assertEqual(SYSCNFGPXY_NEW_BOOK_CUTOFF, dt_time(14, 0))
+        self.assertEqual(
+            sysentrpxy._entry_signal_for_exit("BULL", now=dt_time(13, 59, 59)),
+            ("BUY", "BULL"),
+        )
+        self.assertEqual(
+            sysentrpxy._entry_signal_for_exit("BULL", now=dt_time(14, 0)),
+            ("NONE", "BULL"),
+        )
+        self.assertEqual(
+            sysentrpxy._entry_signal_for_exit("BEAR", now=dt_time(14, 1)),
+            ("NONE", "BEAR"),
+        )
 
     def test_nondirectional_mkt_signal_has_no_entry(self):
         for mkt_signal in ("NONE", "SIDE", "UNKNOWN", None):

@@ -1,6 +1,7 @@
 import sys
 import tempfile
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 
@@ -58,7 +59,9 @@ class EngineCooldownTests(unittest.TestCase):
                 "get_market_signal",
                 return_value="BEAR",
             ),
+            patch.object(sysentrpxy, "datetime") as clock,
         ):
+            clock.now.return_value = datetime(2026, 10, 12, 13, 0)
             self.assertEqual(
                 sysentrpxy.get_entry_signal(
                     pd.DataFrame({"Close": [100.5]}),
