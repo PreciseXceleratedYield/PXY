@@ -25,6 +25,7 @@ from syscnfgpxy import (
     EXEEXITPXY_ORDER_TRANSACTION_TYPE,
     EXEEXITPXY_ORDER_TYPE,
     EXEEXITPXY_ORDER_VALIDITY,
+    EXEEXITPXY_DEBUG_ENABLED,
     EXESQRPXY_EXIT_ALL_AFTER,
     SYSCNFGPXY_TIMEZONE,
 )
@@ -32,6 +33,11 @@ from execoolpxy import start_cooldown
 from sysdecisionpxy import exit_order_response_accepted
 
 init(autoreset=True) 
+
+def dprint(message):
+    if EXEEXITPXY_DEBUG_ENABLED:
+        print(f"{Fore.CYAN}[SQUARE-OFF DEBUG] {message}{Style.RESET_ALL}")
+
 
 def get_sell_suffix():
     """Generates an explicit sell suffix code with millisecond resolution to ensure unique IDs"""
@@ -68,13 +74,19 @@ def place_exit_order(client, row):
             "tag": final_tag 
         } 
         
+        dprint(
+            f"Submitting sell: symbol={symbol!r}, quantity={params['quantity']}, "
+            f"exchange={params['exchange_segment']}, product={params['product']}, "
+            f"type={params['order_type']}, validity={params['validity']}, "
+            f"amo={params['amo']}, tag={final_tag}"
+        )
         print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ EXITING POSITION: {symbol} Qty: {qty} | TAG: {final_tag}") 
         
-        # FIX: Defined order_response properly first
         order_response = client.place_order(**params) 
+        accepted = exit_order_response_accepted(order_response)
+        dprint(f"Broker response: {order_response!r}; accepted={accepted}")
         
-        # FIX FOR VM FREEZE: Background launcher process loop removed from here entirely!
-        if not exit_order_response_accepted(order_response):
+        if not accepted:
             print(f"{Fore.RED}❌ Broker did not confirm square-off order acceptance: {order_response!r}")
             return None
         return order_response
@@ -85,13 +97,23 @@ def place_exit_order(client, row):
 
 def exit_all_positions(): 
     now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
+    dprint(f"Starting square-all; args={sys.argv[1:]!r}, local_time={now}")
     client = get_session() 
     if not client: 
+        dprint("Stopped: broker session is unavailable.")
         print(f"{Fore.RED}❌ Session not initialized. Exiting...") 
         return 
+    dprint(f"Broker session initialized: {type(client).__name__}")
         
     data = get_combined_data() 
+    dprint(
+        "OMS snapshot: "
+        f"error={data.get('error', False)}, "
+        f"active_rows={len(data.get('active_orders', pd.DataFrame()))}, "
+        f"market_rows={len(data.get('market_snapshot', pd.DataFrame()))}"
+    )
     if data.get("error"):
+        dprint("Stopped: OMS reported an error; positions cannot be treated as flat.")
         print(f"{Fore.RED}⚠️ OMS data unavailable; square-off skipped to avoid treating an API failure as flat.")
         return
     active_df = data.get("active_orders", pd.DataFrame()) 
@@ -103,18 +125,22 @@ def exit_all_positions():
     if len(sys.argv) > 1 and not active_df.empty:
         target_param = sys.argv[1].lower().strip()
         if target_param == "-all":
+            dprint("CLI -all selected; bypassing trend and scheduled-time filters.")
             print(f"{Fore.RED}{Style.BRIGHT}🚨 PANIC BYPASS: Nilling out ALL active positions immediately!")
             force_all_bypass = True
         elif target_param == "-ce":
+            dprint("CLI -ce selected; selecting CE positions only.")
             print(f"{Fore.YELLOW}⚠️ CLI BYPASS: Filtering ONLY CE positions for immediate square-off.")
             active_df = active_df[active_df["symbol"].str.contains("CE", na=False)]
             force_side_bypass = True
         elif target_param == "-pe":
+            dprint("CLI -pe selected; selecting PE positions only.")
             print(f"{Fore.YELLOW}⚠️ CLI BYPASS: Filtering ONLY PE positions for immediate square-off.")
             active_df = active_df[active_df["symbol"].str.contains("PE", na=False)]
             force_side_bypass = True
             
     if active_df.empty: 
+        dprint("No active rows remain after OMS retrieval and CLI filtering.")
         print(f"{Fore.YELLOW}No active positions to exit.{Fore.RESET}") 
         return 
         
@@ -128,6 +154,7 @@ def exit_all_positions():
         symbol = row.get("symbol") 
         qty = row.get("qty", 0) 
         if not symbol or qty == 0: 
+            dprint(f"Skipping invalid position row: symbol={symbol!r}, quantity={qty!r}")
             continue 
 
         if force_side_bypass:
@@ -148,11 +175,13 @@ def exit_all_positions():
                 if place_exit_order(client, row):
                     any_order_placed = True
             else: 
+                dprint(f"Trend filter held position: symbol={symbol}, direction={direction}")
                 print(f"{Fore.CYAN}Holding {symbol} | Direction: {direction}") 
                 
     # --- FIX FOR VM FREEZE: SURGICAL BACKGROUND LAUNCHER OUTSIDE THE LOOP ---
     # Fires EXACTLY ONCE to update your data matrices safely without crashing the storage
     if any_order_placed:
+        dprint("At least one square-off order was accepted; starting cooldown and ledger refresh.")
         start_cooldown()
         try:
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -164,6 +193,7 @@ def exit_all_positions():
         except Exception as script_err:
             print(f"{Fore.RED}❌ Error launching script: {script_err}")
             
+    dprint(f"Square-all loop completed; any_order_accepted={any_order_placed}")
     print(f"{Fore.GREEN}{Style.BRIGHT}✅ Exit attempt completed.") 
 
 if __name__ == "__main__": 

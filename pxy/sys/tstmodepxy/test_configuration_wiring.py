@@ -25,6 +25,7 @@ import exeotmpxy
 import exeacgpxy
 import execbuypxy
 import exeexitpxy
+import exesqrpxy
 import exeforcepxy
 import exeavxpxy
 import exeentrpxy
@@ -970,6 +971,53 @@ class ConfigurationWiringTests(unittest.TestCase):
             exeforcepxy.run_action("2")
 
         get_symbol.assert_called_once_with(23456, "OTMSELL", 100)
+
+    def test_square_all_debug_reports_unavailable_oms_and_skips_orders(self):
+        client = Mock()
+        data = {
+            "error": True,
+            "active_orders": pd.DataFrame(),
+            "market_snapshot": pd.DataFrame(),
+        }
+        with (
+            patch.object(exesqrpxy, "EXEEXITPXY_DEBUG_ENABLED", True),
+            patch.object(exesqrpxy, "get_session", return_value=client),
+            patch.object(exesqrpxy, "get_combined_data", return_value=data),
+            patch.object(exesqrpxy.sys, "argv", ["exesqrpxy.py", "-all"]),
+            redirect_stdout(StringIO()) as output,
+        ):
+            exesqrpxy.exit_all_positions()
+
+        client.place_order.assert_not_called()
+        self.assertIn("OMS snapshot: error=True", output.getvalue())
+        self.assertIn("OMS reported an error", output.getvalue())
+
+    def test_square_all_debug_reports_broker_rejection(self):
+        client = Mock()
+        client.place_order.return_value = {
+            "stat": "Not_Ok",
+            "stCode": 1007,
+            "errMsg": "please provide valid symbol",
+        }
+        data = {
+            "error": False,
+            "active_orders": pd.DataFrame(
+                [{"symbol": "NIFTY26O1922350PE", "qty": 65, "tag": "test"}]
+            ),
+            "market_snapshot": pd.DataFrame(),
+        }
+        with (
+            patch.object(exesqrpxy, "EXEEXITPXY_DEBUG_ENABLED", True),
+            patch.object(exesqrpxy, "get_session", return_value=client),
+            patch.object(exesqrpxy, "get_combined_data", return_value=data),
+            patch.object(exesqrpxy.sys, "argv", ["exesqrpxy.py", "-all"]),
+            redirect_stdout(StringIO()) as output,
+        ):
+            exesqrpxy.exit_all_positions()
+
+        self.assertIn("Submitting sell:", output.getvalue())
+        self.assertIn("please provide valid symbol", output.getvalue())
+        self.assertIn("any_order_accepted=False", output.getvalue())
 
     def test_force_order_reports_accepted_broker_response(self):
         response = {"stat": "Ok", "stCode": "200", "data": {"orderId": "123"}}
