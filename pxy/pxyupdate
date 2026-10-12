@@ -32,11 +32,190 @@ REPO_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
     echo "[X] Could not locate the PXY application directory." >&2
     exit 1
 }
+SYS_DIR="$REPO_DIR/sys"
+ENGINE_WAS_RUNNING=0
+ENGINE_STOPPED=0
 
 if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "[X] Repository not found at $REPO_DIR."
     exit 1
 fi
+
+engine_pids() {
+    python3 - "$SYS_DIR" <<'PY'
+import os
+import sys
+
+target_dir = os.path.realpath(sys.argv[1])
+processes = {}
+roots = []
+try:
+    entries = os.scandir("/proc")
+except OSError:
+    raise SystemExit(0)
+
+with entries:
+    for entry in entries:
+        if not entry.name.isdigit():
+            continue
+        pid = entry.name
+        try:
+            with open(f"/proc/{pid}/cmdline", "rb") as cmdline:
+                args = [arg.decode(errors="replace") for arg in cmdline.read().split(b"\0") if arg]
+            with open(f"/proc/{pid}/stat", "r", encoding="ascii") as stat_file:
+                stat = stat_file.read()
+            processes[pid] = stat[stat.rfind(")") + 2 :].split()[1]
+            if (
+                os.path.realpath(f"/proc/{pid}/cwd") == target_dir
+                and len(args) > 1
+                and os.path.basename(args[0]).startswith("python")
+                and os.path.basename(args[1]) == "sysexepxy.py"
+            ):
+                roots.append(pid)
+        except (FileNotFoundError, PermissionError, ProcessLookupError, OSError, IndexError):
+            continue
+
+selected = set(roots)
+while True:
+    descendants = {pid for pid, parent in processes.items() if parent in selected}
+    new_descendants = descendants - selected
+    if not new_descendants:
+        break
+    selected.update(new_descendants)
+
+def depth(pid):
+    count = 0
+    parent = processes.get(pid)
+    while parent in selected:
+        count += 1
+        parent = processes.get(parent)
+    return count
+
+for pid in sorted(selected, key=lambda value: (depth(value), int(value)), reverse=True):
+    print(pid)
+PY
+}
+
+start_engine() {
+    local python_bin="python3"
+    local run_mode
+
+    if [ -x "$HOME/env/bin/python" ]; then
+        python_bin="$HOME/env/bin/python"
+    fi
+    run_mode="$(cd "$SYS_DIR" && "$python_bin" -c \
+        'import syscnfgpxy; print(syscnfgpxy.SYSMODEPXY_RUN_MODE)')" || {
+        echo "[X] Could not read RUNMODE; engine was not restarted." >&2
+        return 1
+    }
+
+    if [ "$run_mode" != "PRD" ]; then
+        echo "[i] RUNMODE=$run_mode; production engine remains stopped."
+        return 0
+    fi
+
+    if [ -n "$(engine_pids)" ]; then
+        echo "[X] A PXY engine process is still running; refusing duplicate start." >&2
+        return 1
+    fi
+
+    if ! command -v tmux >/dev/null 2>&1; then
+        echo "[X] tmux is unavailable; engine was not restarted." >&2
+        return 1
+    fi
+
+    if tmux has-session -t pxy-engine 2>/dev/null; then
+        echo "[X] Existing pxy-engine tmux session remains; refusing duplicate start." >&2
+        return 1
+    fi
+
+    tmux new-session -d -s pxy-engine \
+        "bash -c 'cd \"$SYS_DIR\" || exit 1; if [ -f \"\$HOME/env/bin/activate\" ]; then source \"\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; exec python3 sysexepxy.py'" || {
+        echo "[X] Could not start production engine in tmux." >&2
+        return 1
+    }
+
+    sleep 1
+    if tmux has-session -t pxy-engine 2>/dev/null; then
+        echo "[✔] Production engine restarted in tmux session 'pxy-engine'."
+    else
+        echo "[X] Production engine failed to stay running; inspect tmux logs." >&2
+        return 1
+    fi
+}
+
+stop_engine() {
+    local pid
+    local pids
+    local attempt
+    local remaining
+    local tmux_session=0
+
+    if command -v tmux >/dev/null 2>&1 && tmux has-session -t pxy-engine 2>/dev/null; then
+        ENGINE_WAS_RUNNING=1
+        tmux_session=1
+    fi
+
+    pids="$(engine_pids)"
+    if [ -n "$pids" ]; then
+        ENGINE_WAS_RUNNING=1
+        echo "Stopping PXY engine process tree: $pids"
+        while IFS= read -r pid; do
+            [ -n "$pid" ] && kill -TERM "$pid" 2>/dev/null || true
+        done <<< "$pids"
+
+        for attempt in 1 2 3 4 5; do
+            remaining=0
+            while IFS= read -r pid; do
+                if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                    remaining=1
+                    break
+                fi
+            done <<< "$pids"
+            [ "$remaining" -eq 0 ] && break
+            sleep 1
+        done
+
+        if [ "$remaining" -eq 1 ]; then
+            echo "Force-stopping remaining PXY engine process(es)."
+            while IFS= read -r pid; do
+                if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                    kill -KILL "$pid" 2>/dev/null || true
+                fi
+            done <<< "$pids"
+        fi
+    fi
+
+    if [ "$tmux_session" -eq 1 ]; then
+        echo "Stopping pxy-engine tmux session..."
+        tmux kill-session -t pxy-engine
+    fi
+
+    if [ "$ENGINE_WAS_RUNNING" -eq 1 ]; then
+        ENGINE_STOPPED=1
+        if [ -n "$(engine_pids)" ]; then
+            echo "[X] Could not stop every PXY engine process; update aborted." >&2
+            return 1
+        fi
+    fi
+    if [ "$ENGINE_WAS_RUNNING" -eq 0 ]; then
+        echo "PXY engine was not running; it will remain stopped after update."
+    fi
+}
+
+on_exit() {
+    local status=$?
+    trap - EXIT
+    if [ "$ENGINE_STOPPED" -eq 1 ] && [ "$ENGINE_WAS_RUNNING" -eq 1 ]; then
+        echo "Update did not complete; attempting to restart the previously running engine." >&2
+        start_engine || true
+    fi
+    if [ -n "$CONFIG_BACKUP" ] && [ -f "$CONFIG_BACKUP" ]; then
+        cp -p "$CONFIG_BACKUP" "$CONFIG_FILE" 2>/dev/null || true
+        rm -f "$CONFIG_BACKUP"
+    fi
+    exit "$status"
+}
 
 CONFIG_FILE="$REPO_DIR/sys/syscnfgpxy.py"
 CONFIG_BACKUP=""
@@ -49,13 +228,7 @@ if [ -f "$CONFIG_FILE" ]; then
     fi
 fi
 
-restore_config() {
-    if [ -n "$CONFIG_BACKUP" ] && [ -f "$CONFIG_BACKUP" ]; then
-        cp -p "$CONFIG_BACKUP" "$CONFIG_FILE"
-        rm -f "$CONFIG_BACKUP"
-    fi
-}
-trap restore_config EXIT
+trap on_exit EXIT
 trap 'exit 1' HUP INT TERM
 
 echo " ******** get updates *******"
@@ -64,15 +237,26 @@ echo
 git -C "$REPO_DIR" fetch origin main
 echo
 
+echo " ****** stop production engine ******"
+echo
+stop_engine
+echo
+
 echo " ****** reset software ******"
 echo
 # Reset local changes to match the remote main branch.
 git -C "$REPO_DIR" reset --hard origin/main
 if [ -n "$CONFIG_BACKUP" ]; then
-    mv -f "$CONFIG_BACKUP" "$CONFIG_FILE"
-    CONFIG_BACKUP=""
+    cp -p "$CONFIG_BACKUP" "$CONFIG_FILE"
 fi
 echo "Updated checkout to $(git -C "$REPO_DIR" rev-parse --short HEAD)."
+echo
+
+echo " ****** clear Python caches ******"
+echo
+find "$REPO_DIR" -type d -name __pycache__ -prune -exec rm -rf {} +
+find "$REPO_DIR" -type f -name "*.pyc" -delete
+find "$REPO_DIR" -type d -name ".pytest_cache" -prune -exec rm -rf {} +
 echo
 
 echo " ****** sync binaries *******"
@@ -95,5 +279,14 @@ for file in "$REPO_DIR"/*; do
     fi
 done
 echo
+
+if [ "$ENGINE_WAS_RUNNING" -eq 1 ]; then
+    echo " ****** restart production engine ******"
+    echo
+    start_engine
+    ENGINE_STOPPED=0
+    echo
+fi
+
 echo " ***** update completed *****"
 echo ""

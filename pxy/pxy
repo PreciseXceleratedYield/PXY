@@ -202,23 +202,15 @@ while true; do
         u)
             echo ""
             draw_border
-            echo "    100% FULL SYNC: CODE + CACHE CLEAR     "
+            echo "       UPDATE CODE + RESTART ENGINE        "
             draw_border
-            echo "Step 1: Fetching latest from GitHub..."
-            git -C "$PXY_APP_DIR" fetch origin
-            echo ""
-            echo "Step 2: Hard reset to match origin/main..."
-            git reset --hard origin/main
-            echo ""
-            echo "Step 3: Clearing all Python cache..."
-            find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null
-            find . -type f -name "*.pyc" -delete 2>/dev/null
-            find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null
-            echo ""
-            echo "Step 4: Running pxyupdate (if defined)..."
-            pxyupdate
-            draw_border
-            echo "[✔] 100% SYNC COMPLETE - Code fully updated!"
+            if bash "$PXY_APP_DIR/pxyupdate"; then
+               draw_border
+               echo "[✔] Update complete."
+            else
+               draw_border
+               echo "[X] Update failed; see the error above."
+            fi
             read -p "Press [Enter] to return..."
             ;;
         s)
@@ -318,19 +310,21 @@ while true; do
             ;;
         b)
             echo ""
-            echo "Syncing latest code and clearing cache..."
-            git -C "$PXY_APP_DIR" fetch origin && git -C "$PXY_APP_DIR" reset --hard origin/main && find "$PXY_APP_DIR" -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null
-            echo "[✔] Code synced, cache cleared."
-            echo ""
-            echo "Starting historical SIM replay with FULL DAY candles..."
-            if [ -x "$HOME/.local/bin/pxysim" ]; then
-                if "$HOME/.local/bin/pxysim"; then
-                    echo "[✔] SIM replay completed."
-                else
-                    echo "[X] SIM replay failed with exit code $?."
-                fi
+            echo "Updating code before historical SIM replay..."
+            if bash "$PXY_APP_DIR/pxyupdate"; then
+               echo ""
+               echo "Starting historical SIM replay with FULL DAY candles..."
+               if [ -x "$HOME/.local/bin/pxysim" ]; then
+                   if "$HOME/.local/bin/pxysim"; then
+                       echo "[✔] SIM replay completed."
+                   else
+                       echo "[X] SIM replay failed with exit code $?."
+                   fi
+               else
+                   echo "[X] Could not find executable $HOME/.local/bin/pxysim."
+               fi
             else
-                echo "[X] Could not find executable $HOME/.local/bin/pxysim."
+               echo "[X] Update failed; SIM replay was not started."
             fi
             echo ""
             read -p "Press [Enter] to return..."
