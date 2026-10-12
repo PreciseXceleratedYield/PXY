@@ -35,8 +35,8 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   the staged exit schedule. Legacy `exe/run/X` scripts and pipe-scenario test
   fixtures retain their own values; they do not drive the production schedule.
 - Supertrend always uses the DUAL calculation with a Wilder-smoothed true-range
-  ATR using period `SYSSTRNDPXY_ST1_ATR_PERIOD` (default `14`) and factor
-  `SYSSTRNDPXY_ST1_FACTOR` (default `3`). This is independent of SKATR's
+  ATR using period `SYSSTRNDPXY_ST1_ATR_PERIOD` (default `3`) and factor
+  `SYSSTRNDPXY_ST1_FACTOR` (default `1.4`). This is independent of SKATR's
   session-based true-range ATR.
 - SKATR true-range ATR (mode 2) starts accumulating at 09:16 IST each session:
   the 09:16 candle uses high minus low only, excluding the 09:15 close gap.
@@ -108,7 +108,7 @@ BEAR maps to entry SELL and exit BEAR. For BULL, BUY requires MKT BEAR and
 price from `st_line` through `st_line + (SYSSTRNDPXY_ST1_FACTOR / 2) × st_atr`;
 for BEAR, SELL requires MKT BULL and price from
 `st_line - (SYSSTRNDPXY_ST1_FACTOR / 2) × st_atr` through `st_line`. With the
-default factor 3, this is 1.5 ATR in either direction. These are the nearest
+default factor 1.4, this is 0.7 ATR in either direction. These are the nearest
 25% zones of the theoretical ±(2 × factor) ATR ranges around the active
 Supertrend line; otherwise entry is NONE. When Supertrend is SIDE, entry is
 BUY when the close is in the lower 25% of the range between `st_line` and
