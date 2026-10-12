@@ -415,6 +415,35 @@ class ModeDispatchTests(unittest.TestCase):
         self.assertEqual(len(bars), 1)
         dashboard.get_full_snapshot.assert_called_once_with()
 
+    def test_strategy_signals_apply_new_book_cutoff_at_each_historical_candle(self):
+        import tstmodepxy.backtest as backtest
+
+        history = pd.DataFrame(
+            {
+                "Open": [100.0, 100.0],
+                "High": [101.0, 101.0],
+                "Low": [99.0, 99.0],
+                "Close": [100.5, 100.5],
+            },
+            index=pd.DatetimeIndex(
+                [datetime(2025, 1, 6, 13, 59), datetime(2025, 1, 6, 14, 0)]
+            ),
+        )
+        dashboard = Mock()
+
+        def historical_snapshot():
+            entry, exit_signal = backtest.sysentrpxy._entry_signal_for_exit("BULL")
+            return {"entry": entry, "exit": exit_signal}
+
+        dashboard.get_full_snapshot.side_effect = historical_snapshot
+        with patch.object(backtest.importlib, "import_module", return_value=dashboard), patch.object(
+            backtest, "transform_market_data", return_value=history
+        ):
+            bars = backtest.calculate_strategy_signals(history, date(2025, 1, 6))
+
+        self.assertEqual([bar["entry"] for bar in bars], ["BUY", "NONE"])
+        self.assertEqual([bar["exit"] for bar in bars], ["BULL", "BULL"])
+
     def test_yahoo_history_columns_normalize_both_multiindex_orders(self):
         import tstmodepxy.backtest as backtest
 

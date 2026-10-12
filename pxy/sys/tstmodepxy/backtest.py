@@ -40,6 +40,7 @@ from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     TSTPOINTBTPXY_TRADING_DAY_START,
 )
+import sysentrpxy
 from sysdtafpxy import transform_market_data
 
 DATA_SESSION_OPEN = TSTPOINTBTPXY_TRADING_DAY_START
@@ -257,9 +258,18 @@ def calculate_strategy_signals(history, session_date, record_limit=None):
         )
         transformed.attrs["data_fallback"] = False
         output = io.StringIO()
-        with patch.object(dashboard, "fetch_yf_data", return_value=transformed):
-            with redirect_stdout(output):
-                snapshot = dashboard.get_full_snapshot()
+        historical_time = history.index[index].time().replace(tzinfo=None)
+        production_entry_router = sysentrpxy._entry_signal_for_exit
+        with patch.object(
+            sysentrpxy,
+            "_entry_signal_for_exit",
+            side_effect=lambda exit_signal: production_entry_router(
+                exit_signal, now=historical_time
+            ),
+        ):
+            with patch.object(dashboard, "fetch_yf_data", return_value=transformed):
+                with redirect_stdout(output):
+                    snapshot = dashboard.get_full_snapshot()
         if not snapshot:
             raise RuntimeError(
                 f"Production dashboard returned no snapshot at {history.index[index]}."
