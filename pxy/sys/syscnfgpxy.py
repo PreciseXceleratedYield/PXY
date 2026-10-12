@@ -163,12 +163,6 @@ EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES = (200, 150, 100, 50, 0)  # Monday through F
 
 RUNNIFTYPXY_STRIKE_STEP = 50
 RUNNIFTYPXY_ATM_BUFFER = 0
-RUNNIFTYPXY_HOLIDAYS = (
-    "26-Jan-2026", "06-Mar-2026", "20-Mar-2026", "31-Mar-2026",
-    "03-Apr-2026", "14-Apr-2026", "01-May-2026", "15-Aug-2026",
-    "02-Oct-2026", "21-Oct-2026", "06-Nov-2026", "24-Nov-2026",
-    "25-Dec-2026",
-)
 
 # Stop-loss, counter-leg, regular exit, and square-off behavior.
 EXESLPXY_FIXED_SL_BUFFER = 10.0

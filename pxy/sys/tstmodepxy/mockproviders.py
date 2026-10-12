@@ -5,7 +5,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import pytz
-from syscnfgpxy import RUNNIFTYPXY_HOLIDAYS
+from nseholidayspxy import get_nse_fo_holidays
 from sysdecisionpxy import counter_leg_script
 from tstmodepxy.pipescenarios import (
     SCENARIOS,
@@ -241,12 +241,14 @@ def get_nftfut_price():
 
 def is_market_hours():
     now = datetime.now(pytz.timezone("Asia/Kolkata"))
-    return not _tst_engine_window_open(now, RUNNIFTYPXY_HOLIDAYS)
+    holidays = (day.strftime("%d-%b-%Y") for day in get_nse_fo_holidays())
+    return not _tst_engine_window_open(now, holidays)
 
 
 def engine_window_open():
     now = datetime.now(pytz.timezone("Asia/Kolkata"))
-    return _tst_engine_window_open(now, RUNNIFTYPXY_HOLIDAYS)
+    holidays = (day.strftime("%d-%b-%Y") for day in get_nse_fo_holidays())
+    return _tst_engine_window_open(now, holidays)
 
 
 def run_startup_checks():

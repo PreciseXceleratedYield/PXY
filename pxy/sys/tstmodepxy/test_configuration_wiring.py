@@ -1452,6 +1452,22 @@ class ConfigurationWiringTests(unittest.TestCase):
 
         self.assertTrue(symbol.endswith("23450CE"))
 
+    def test_nse_holiday_adjusts_weekly_expiry_to_previous_trading_day(self):
+        with (
+            patch.object(runniftypxy, "date") as mock_date,
+            patch.object(
+                runniftypxy,
+                "get_nse_fo_holidays",
+                return_value=frozenset({date(2026, 10, 20)}),
+            ),
+            patch.object(runniftypxy, "get_strike_mode", return_value="ATM"),
+            patch.object(runniftypxy, "get_dynamic_otm_distance", return_value=0),
+        ):
+            mock_date.today.return_value = date(2026, 10, 12)
+            symbol = runniftypxy.get_symbol(22350, "OTMSELL")
+
+        self.assertEqual(symbol, "NIFTY26O1922350PE")
+
     def test_fixed_and_dynamic_modes_control_ce_and_pe_strikes(self):
         with (
             patch.object(exeotmpxy.syscnfgpxy, "EXEOTMPXY_STRIKE_MODE", "OTMFIX"),
