@@ -2,6 +2,7 @@ import re
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from contextlib import redirect_stdout
 from datetime import date, timedelta
 from io import StringIO
@@ -139,6 +140,14 @@ class ConfigurationWiringTests(unittest.TestCase):
         )
         processed = sysstrndpxy.calculate_supertrend(frame.copy())
         self.assertEqual(processed["st_atr"].tolist(), [5.0, 5.0, 5.0])
+
+    def test_supertrend_uses_five_point_atr_with_legacy_config(self):
+        legacy_config = SimpleNamespace()
+        with redirect_stdout(StringIO()) as output:
+            atr_value = sysstrndpxy._configured_st_atr_value(legacy_config)
+
+        self.assertEqual(atr_value, 5.0)
+        self.assertIn("Legacy syscnfgpxy.py is missing", output.getvalue())
 
     def test_syspxy_snapshot_passes_through_sma_status(self):
         snapshot_df = pd.DataFrame({"Close": [100.0]})

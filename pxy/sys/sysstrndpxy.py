@@ -5,12 +5,26 @@ import sys
 import warnings
 import numpy as np
 import pandas as pd
-from syscnfgpxy import (
-    SYSCNFGPXY_TIMEZONE as TIMEZONE,
-    SYSSTRNDPXY_ST1_ATR_VALUE,
-    SYSSTRNDPXY_ST1_FACTOR,
-)
+
+import syscnfgpxy
 from syssmapxy import calculate_moving_average
+
+TIMEZONE = syscnfgpxy.SYSCNFGPXY_TIMEZONE
+
+
+def _configured_st_atr_value(config):
+    value = getattr(config, "SYSSTRNDPXY_ST1_ATR_VALUE", None)
+    if value is None:
+        value = 5.0
+        print(
+            "⚠️ Legacy syscnfgpxy.py is missing SYSSTRNDPXY_ST1_ATR_VALUE; "
+            "using the fixed 5-point Supertrend ATR."
+        )
+    return value
+
+
+SYSSTRNDPXY_ST1_ATR_VALUE = _configured_st_atr_value(syscnfgpxy)
+SYSSTRNDPXY_ST1_FACTOR = syscnfgpxy.SYSSTRNDPXY_ST1_FACTOR
 
 # 🛡️ DEFENSIVE IMPORTS ROUTING MATH DIRECTLY TO THE CALCULATION ENGINE
 try:
