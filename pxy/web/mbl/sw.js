@@ -1,5 +1,10 @@
-const CACHE = 'pxy-mbl-v1';
-const ASSETS = ['/web/mbl/mblpxy.html', '/web/mbl/manifest.json'];
+const CACHE = 'pxy-mbl-v2';
+const ASSETS = [
+  '/web/mbl/mblpxy.html',
+  '/web/mbl/manifest.json',
+  '/web/pxy-theme.css',
+  '/web/pxy-theme.js'
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
