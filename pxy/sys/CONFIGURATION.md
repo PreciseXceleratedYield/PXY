@@ -304,15 +304,16 @@ historical option P&L.
   The opposite side must have open positions and negative overall P&L, and
   only the signal-aligned side may average. The averaging side must also be
   losing at or beyond its applicable LGT threshold.
-- LGT is calculated from the own/opposite investment factor and the own-side
-  open lot count, then negated:
-  `r = own investment / opposite investment`;
-  `magnitude = max(1.4, round(25^r + 25^n, 2))`, where `n` is the own-side
-  open lot count; `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS) ×
-  EXEAMSPXY_LGT_SCALE`. If either side has no positive investment, `r`
-  defaults to `1`. With zero own-side lots, the base formula uses the 1.4%
-  floor; two or more own-side lots reach the 77% base cap before scaling. The
-  own lot count comes from the verified broker position summary.
+- LGT is calculated from the own/opposite investment factor and one plus the
+  actual own-side open lot count, then negated:
+  `r = own investment / opposite investment`, clamped to `[0.1, 10]`;
+  `n = 1 + actual own-side open lot count`;
+  `magnitude = max(1.4, round(25^r + 25^n, 2))`;
+  `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS) ×
+  EXEAMSPXY_LGT_SCALE`. If either side has no positive investment, or an input
+  is non-finite, the fallback is `r = 1, n = 1`. Zero actual own-side lots
+  yield `n = 1`; one or more actual own-side lots reach the 77% base cap before
+  scaling. The own lot count comes from the verified broker position summary.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.

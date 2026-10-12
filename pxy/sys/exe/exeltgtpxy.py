@@ -28,7 +28,7 @@ def _warn_once(key, msg):
         print(f"{Fore.YELLOW}⚠️ {msg}{Style.RESET_ALL}")
 
 
-def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, own_count=1):
+def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, own_count=0):
     """Calculate the capped LGT percentage from investment ratio and lot count."""
     try:
         index_price = float(index_price)
@@ -40,15 +40,31 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, own_count=1)
     own_investment, opposite_investment = (
         (ce_investment, pe_investment) if is_ce else (pe_investment, ce_investment)
     )
-    ratio = (
-        own_investment / opposite_investment
-        if own_investment > 0 and opposite_investment > 0
-        else 1.0
-    )
-    own_lots = max(0, int(own_count))
-    if own_lots == 0:
-        magnitude = EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD
-    elif own_lots >= 2:
+    try:
+        own_investment = float(own_investment)
+        opposite_investment = float(opposite_investment)
+        own_count_value = float(own_count)
+    except (TypeError, ValueError, OverflowError):
+        ratio, own_lots = 1.0, 1
+    else:
+        ratio_is_valid = (
+            math.isfinite(own_investment)
+            and math.isfinite(opposite_investment)
+            and own_investment > 0
+            and opposite_investment > 0
+        )
+        if ratio_is_valid:
+            ratio = own_investment / opposite_investment
+            ratio_is_valid = math.isfinite(ratio)
+            if ratio_is_valid:
+                ratio = min(10.0, max(0.1, ratio))
+
+        lot_count_is_valid = math.isfinite(own_count_value)
+        if not ratio_is_valid or not lot_count_is_valid:
+            ratio, own_lots = 1.0, 1
+        else:
+            own_lots = max(1, int(own_count_value) + 1)
+    if own_lots >= 2:
         magnitude = EXEAMSPXY_MAX_LGT_LOSS
     else:
         max_ratio_before_cap = math.log(

@@ -1278,7 +1278,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             exeltgtpxy.calculate_lgt(
                 1000.0, 4000.0, is_ce=True, index_price=25000, own_count=1
             ),
-            -13.62,
+            -38.5,
         )
         self.assertEqual(
             exeltgtpxy.calculate_lgt(
@@ -1290,8 +1290,36 @@ class ConfigurationWiringTests(unittest.TestCase):
             exeltgtpxy.calculate_lgt(
                 1000.0, 1000.0, is_ce=True, index_price=25000, own_count=0
             ),
-            -0.7,
+            -25.0,
         )
+        self.assertEqual(
+            exeltgtpxy.calculate_lgt(
+                1.0, 10.0, is_ce=True, index_price=25000, own_count=0
+            ),
+            -13.19,
+        )
+        self.assertEqual(
+            exeltgtpxy.calculate_lgt(
+                100.0, 1.0, is_ce=True, index_price=25000, own_count=0
+            ),
+            -38.5,
+        )
+        for invalid_investment in (0.0, float("inf"), float("-inf"), float("nan")):
+            self.assertEqual(
+                exeltgtpxy.calculate_lgt(
+                    2000.0, invalid_investment, is_ce=True, index_price=25000,
+                    own_count=0,
+                ),
+                -25.0,
+            )
+        for invalid_lot_count in (float("inf"), float("-inf"), float("nan")):
+            self.assertEqual(
+                exeltgtpxy.calculate_lgt(
+                    1000.0, 4000.0, is_ce=True, index_price=25000,
+                    own_count=invalid_lot_count,
+                ),
+                -25.0,
+            )
         self.assertEqual(
             exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True, index_price=1000),
             -25.0,
