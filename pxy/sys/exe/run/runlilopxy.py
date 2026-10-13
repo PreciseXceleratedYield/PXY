@@ -52,6 +52,12 @@ def resolve_dynamic_filter_time():
 # ⏱️ SURGICAL TIMELINE FILTER INITIALIZATION
 FILTER_TIME = resolve_dynamic_filter_time()
 
+def _json_default(value):
+    if isinstance(value, (pd.Timestamp, datetime)):
+        return value.strftime('%Y-%m-%d %H:%M:%S')
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+
 def dump_to_json(trades_df):
     """Writes closed and open trade lots to webpnlpxy.json."""
     try: 
@@ -66,7 +72,7 @@ def dump_to_json(trades_df):
                     records[col] = records[col].dt.strftime('%Y-%m-%d %H:%M:%S') 
             data = records.to_dict(orient='records') 
         with open(file_path, "w") as f: 
-            json.dump(data, f, indent=4) 
+            json.dump(data, f, indent=4, default=_json_default)
     except Exception as e: 
         print(f"Error dumping to JSON: {e}") 
 
