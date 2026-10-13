@@ -89,8 +89,8 @@ def get_full_snapshot():
     # ===== SUPERTREND PROFILES =====
     processed_st_df = calculate_supertrend(master_df.copy())
     chart_df = calculate_supertrend(chart_source_df.copy())
-    trend = processed_st_df['ST_Trend'].iloc[-1] if not processed_st_df.empty else "NONE"
-    line_val = safe_int(processed_st_df['ST'].iloc[-1] if not processed_st_df.empty else 0)
+    trend = chart_df['ST_Trend'].iloc[-1] if not chart_df.empty else "NONE"
+    line_val = safe_int(chart_df['ST'].iloc[-1] if not chart_df.empty else 0)
     result["supertrend"] = trend
     result["super_line"] = line_val
     result["df"] = processed_st_df
@@ -103,7 +103,10 @@ def get_full_snapshot():
     result["pe_power"] = safe_int(pe)
 
     # ===== ENTRY ENGINE ROUTING =====
-    entry, exit = get_entry_signal(master_df)
+    entry, exit = get_entry_signal(
+        master_df,
+        processed_supertrend=chart_df,
+    )
     result["entry"] = entry
     result["exit"] = exit
 

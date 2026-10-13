@@ -266,7 +266,11 @@ class ConfigurationWiringTests(unittest.TestCase):
                 side_effect=add_trend_columns,
             ),
             patch.object(sysdashpxy, "get_ce_pe_power", return_value=(1, 1, 1)),
-            patch.object(sysdashpxy, "get_entry_signal", return_value=("BUY", "BULL")),
+            patch.object(
+                sysdashpxy,
+                "get_entry_signal",
+                return_value=("BUY", "BULL"),
+            ) as get_entry,
             patch.object(sysdashpxy, "get_day_candle_bar", return_value=""),
             patch.object(sysdashpxy, "get_bos_bar", return_value=("NONE", None)),
             patch.object(
@@ -280,6 +284,13 @@ class ConfigurationWiringTests(unittest.TestCase):
         fetch.assert_called_once_with(target_rows=SYSSTRNDPXY_CHART_TARGET_ROWS)
         self.assertEqual(len(snapshot["df"]), 60)
         self.assertEqual(len(snapshot["chart_df"]), SYSSTRNDPXY_CHART_TARGET_ROWS)
+        self.assertEqual(snapshot["supertrend"], snapshot["chart_df"]["ST_Trend"].iloc[-1])
+        self.assertEqual(snapshot["super_line"], snapshot["chart_df"]["ST"].iloc[-1])
+        get_entry.assert_called_once()
+        pd.testing.assert_frame_equal(
+            get_entry.call_args.kwargs["processed_supertrend"],
+            snapshot["chart_df"],
+        )
 
     def test_sysmapxy_defaults_to_tsma_and_keeps_sma_selectable(self):
         closes = pd.Series([float(value) for value in range(1, 61)])
@@ -410,13 +421,43 @@ class ConfigurationWiringTests(unittest.TestCase):
             self.assertEqual(sysentrpxy.get_entry_signal(frame), ("SELL", "BEAR"))
             st.assert_not_called()
             market.assert_called_once_with(frame)
-
             market.reset_mock()
             clock.now.return_value = datetime(2026, 10, 12, 10, 0)
             self.assertEqual(sysentrpxy.get_entry_signal(frame), ("BUY", "BULL"))
             self.assertEqual(st.call_count, 1)
             pd.testing.assert_frame_equal(st.call_args.args[0], frame)
             market.assert_called_once_with(frame)
+
+    def test_st_entry_uses_chart_supertrend_but_market_confirmation_frame(self):
+        market_frame = pd.DataFrame({"Close": [100.0]})
+        chart_supertrend = pd.DataFrame({
+            "ST_Trend": ["BEAR"],
+            "Close": [100.0],
+            "st_line": [101.0],
+            "st_atr": [2.0],
+        })
+        with (
+            patch.object(sysentrpxy, "SYSENTRPXY_VARIANT", "ST"),
+            patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
+            patch.object(
+                sysentrpxy,
+                "get_market_signal",
+                return_value="BULL",
+            ) as market,
+            patch.object(sysentrpxy, "calculate_supertrend") as calculate_st,
+            patch.object(sysentrpxy, "datetime") as clock,
+        ):
+            clock.now.return_value = datetime(2026, 10, 12, 11, 0)
+            self.assertEqual(
+                sysentrpxy.get_entry_signal(
+                    market_frame,
+                    processed_supertrend=chart_supertrend,
+                ),
+                ("SELL", "BEAR"),
+            )
+
+        calculate_st.assert_not_called()
+        market.assert_called_once_with(market_frame)
 
     def test_mkt_selection_remains_mkt_after_ten(self):
         frame = pd.DataFrame({"Close": [101.0]})

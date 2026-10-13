@@ -50,16 +50,19 @@ def _finite_row_values(row, columns):
     return values if all(math.isfinite(value) for value in values) else None
 
 
-def _supertrend_entry_signal(df, now=None):
+def _supertrend_entry_signal(df, now=None, processed_supertrend=None):
     """Use countertrend market confirmation with configured Supertrend ATR zones."""
     if df is None or df.empty:
         return "NONE", "NONE"
 
-    try:
-        processed = calculate_supertrend(df.copy())
-    except Exception as error:
-        print(f"⚠️ Trend engine failed ({error}); signals forced to NONE.")
-        return "NONE", "NONE"
+    if processed_supertrend is None:
+        try:
+            processed = calculate_supertrend(df.copy())
+        except Exception as error:
+            print(f"⚠️ Trend engine failed ({error}); signals forced to NONE.")
+            return "NONE", "NONE"
+    else:
+        processed = processed_supertrend
     if processed is None or processed.empty or "ST_Trend" not in processed:
         return "NONE", "NONE"
 
@@ -110,7 +113,7 @@ def _supertrend_entry_signal(df, now=None):
     return _apply_new_book_cutoff(entry_signal, market_signal, now)
 
 
-def get_entry_signal(df=None):
+def get_entry_signal(df=None, *, processed_supertrend=None):
     """Use MKT through 10:00 IST, then apply the configured entry variant."""
     if cooldown_remaining() > 0:
         print("⏳ POST-SQUARE-OFF COOLDOWN: entry and exit signals forced to NONE.")
@@ -122,7 +125,9 @@ def get_entry_signal(df=None):
             from sysdtafpxy import fetch_yf_data
 
             df = fetch_yf_data()
-        return _supertrend_entry_signal(df, now=now)
+        return _supertrend_entry_signal(
+            df, now=now, processed_supertrend=processed_supertrend
+        )
 
     exit_signal = str(get_market_signal(df)).upper().strip()
     if exit_signal not in {"BULL", "BEAR"}:

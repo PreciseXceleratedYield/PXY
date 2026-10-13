@@ -54,6 +54,7 @@ class EngineCooldownTests(unittest.TestCase):
     def test_signal_router_uses_mkt_after_cooldown(self):
         with (
             patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
+            patch.object(sysentrpxy, "SYSENTRPXY_VARIANT", "MKT"),
             patch.object(
                 sysentrpxy,
                 "get_market_signal",

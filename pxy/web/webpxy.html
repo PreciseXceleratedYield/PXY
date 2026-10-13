@@ -1451,7 +1451,11 @@ async function loadTrades(){
         summary.addEventListener('keydown',event=>{
             if(event.key==='Enter'||event.key===' '){event.preventDefault();toggle();}
         });
-        book.trades.sort((a,b)=>String(a.Buy_Time||'').localeCompare(String(b.Buy_Time||'')));
+        const tradeActivityTime=t=>{
+            const exit=Date.parse(t.Exit_Time||'');
+            return Number.isFinite(exit)?exit:(Date.parse(t.Buy_Time||'')||0);
+        };
+        book.trades.sort((a,b)=>tradeActivityTime(b)-tradeActivityTime(a));
         book.trades.forEach(t=>{
             const pnl=Number(t.PNL)||0,pb=pnl>=0;
             const entry=String(t.Buy_Time||'').slice(11,16);
