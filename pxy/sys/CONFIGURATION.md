@@ -321,11 +321,11 @@ historical option P&L.
   own-side open lot count, then negated:
   `r = own investment / opposite investment`, clamped to `[0.1, 10]`;
   `n = max(1, actual own-side open lot count)`;
-  `magnitude = max(1.4, round(50 × n × r, 2))`;
+  `magnitude = max(1.4, round(10 × n × r, 2))`;
   `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS) ×
   EXEAMSPXY_LGT_SCALE`. If either side has no positive investment, or an input
   is non-finite, the fallback is `r = 1, n = 1`. Zero actual own-side lots
-  use `n = 1`; at an equal investment ratio, two or more own-side lots reach
+  use `n = 1`; at an equal investment ratio, eight or more own-side lots reach
   the 77% base cap before scaling. The own lot count comes from the verified
   broker position summary.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
