@@ -1,3 +1,4 @@
+import importlib
 import sys
 import tempfile
 import unittest
@@ -686,6 +687,47 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 labelled["Book_ID"].tolist(),
                 [1, 1, 1, 1, 1, 2, 2],
             )
+
+    def test_lilo_trade_json_keeps_books_and_handles_pandas_values(self):
+        with tempfile.TemporaryDirectory(prefix="pxy-lilo-trade-json-") as temp:
+            run_dir = str(SYS_DIR / "exe" / "run")
+            added_run_dir = run_dir not in sys.path
+            if added_run_dir:
+                sys.path.insert(0, run_dir)
+            try:
+                lilo_module = importlib.import_module("runlilopxy")
+            finally:
+                if added_run_dir:
+                    sys.path.remove(run_dir)
+            dump_to_json = lilo_module.dump_to_json
+            with ProductionPipeReplay(
+                SYS_DIR, SimulatedBroker(), Path(temp) / "state"
+            ) as engine:
+                module = engine.lilo
+                fake_module_path = Path(temp) / "sys" / "exe" / "run" / "runlilopxy.py"
+                fake_module_path.parent.mkdir(parents=True)
+                with patch.object(module, "__file__", str(fake_module_path)):
+                    trades = pd.DataFrame(
+                        {
+                            "Book_ID": pd.Series([1, pd.NA], dtype="Int64"),
+                            "Symbol": ["NIFTYCE", "NIFTYPE"],
+                            "Buy_Time": [
+                                pd.Timestamp("2025-01-06 10:00:00"),
+                                pd.Timestamp("2025-01-06 10:01:00"),
+                            ],
+                            "Status": ["CLOSED", "OPEN"],
+                            "PNL": [100, -25],
+                        }
+                    )
+                    dump_to_json(trades)
+
+                output_path = Path(temp) / "web" / "webpnlpxy.json"
+                self.assertTrue(output_path.exists())
+                saved_trades = pd.read_json(output_path, orient="records")
+                self.assertEqual(len(saved_trades), 2)
+                self.assertEqual(saved_trades["Book_ID"].iloc[0], 1)
+                self.assertEqual(saved_trades["Status"].tolist(), ["CLOSED", "OPEN"])
+                self.assertIn("2025-01-06", str(saved_trades["Buy_Time"].iloc[0]))
 
     def test_lilo_treats_kotak_no_data_response_as_idle(self):
         with tempfile.TemporaryDirectory(prefix="pxy-lilo-no-data-") as temp:

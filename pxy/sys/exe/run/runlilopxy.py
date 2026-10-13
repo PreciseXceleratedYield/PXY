@@ -2,6 +2,8 @@
 import os 
 import json 
 import math
+import stat
+import tempfile
 import pandas as pd 
 from datetime import datetime 
 from runclntpxy import get_session 
@@ -52,28 +54,37 @@ def resolve_dynamic_filter_time():
 # ⏱️ SURGICAL TIMELINE FILTER INITIALIZATION
 FILTER_TIME = resolve_dynamic_filter_time()
 
-def _json_default(value):
-    if isinstance(value, (pd.Timestamp, datetime)):
-        return value.strftime('%Y-%m-%d %H:%M:%S')
-    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
-
 
 def dump_to_json(trades_df):
     """Writes closed and open trade lots to webpnlpxy.json."""
+    temp_path = None
     try: 
         file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/webpnlpxy.json"))
-        os.makedirs(os.path.dirname(file_path), exist_ok=True) 
+        directory = os.path.dirname(file_path)
+        os.makedirs(directory, exist_ok=True)
         if trades_df.empty:
-            data = []
+            payload = "[]"
         else:
             records = trades_df.copy()
             for col in records.columns: 
                 if pd.api.types.is_datetime64_any_dtype(records[col]): 
                     records[col] = records[col].dt.strftime('%Y-%m-%d %H:%M:%S') 
-            data = records.to_dict(orient='records') 
-        with open(file_path, "w") as f: 
-            json.dump(data, f, indent=4, default=_json_default)
+            payload = records.to_json(
+                orient='records', date_format='iso', date_unit='s'
+            )
+        fd, temp_path = tempfile.mkstemp(dir=directory, prefix=".webpnlpxy.")
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(payload)
+        mode = (
+            stat.S_IMODE(os.stat(file_path).st_mode)
+            if os.path.exists(file_path)
+            else 0o644
+        )
+        os.chmod(temp_path, mode)
+        os.replace(temp_path, file_path)
     except Exception as e: 
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
         print(f"Error dumping to JSON: {e}") 
 
 
