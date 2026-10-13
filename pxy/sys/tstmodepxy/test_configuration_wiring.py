@@ -375,7 +375,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             ("MKT", "ST"),
         )
 
-    def test_entry_supertrend_uses_period_14_factor_2_and_true_atr_14(self):
+    def test_entry_supertrend_uses_period_14_factor_1_and_true_atr_14(self):
         from syscnfgpxy import (
             SYSDTSTPXY_ST1_FACTOR,
             SYSDTSTPXY_ST1_PERIOD,
@@ -383,7 +383,7 @@ class ConfigurationWiringTests(unittest.TestCase):
         )
 
         self.assertEqual(SYSDTSTPXY_ST1_PERIOD, 14)
-        self.assertEqual(SYSDTSTPXY_ST1_FACTOR, 2)
+        self.assertEqual(SYSDTSTPXY_ST1_FACTOR, 1)
         self.assertEqual(SYSKATRPXY_TRUE_ATR_PERIOD, 14)
 
         index = pd.date_range("2026-10-07", periods=20, freq="min")

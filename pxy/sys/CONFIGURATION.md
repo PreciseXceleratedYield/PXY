@@ -41,7 +41,7 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   fixtures retain their own values; they do not drive the production schedule.
 - The chart and ST entry router share the same Supertrend implementation and
   settings: `SYSDTSTPXY_ST1_PERIOD` (default `14`) and
-  `SYSDTSTPXY_ST1_FACTOR` (default `2`). ST entry uses the chart's already
+  `SYSDTSTPXY_ST1_FACTOR` (default `1`). ST entry uses the chart's already
   calculated Supertrend series and candle window, so its displayed trend and
   line match the values used for ST entry routing. The Supertrend's
   Wilder-style true range ATR is distinct from SKATR's session-based
