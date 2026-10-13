@@ -1338,8 +1338,11 @@ new ResizeObserver(()=>{
 
 /* ── TRADES — wire click ── */
 async function loadTrades(){
-    let data=[];
-    try{data=await fetch('/api/web-data/webpnlpxy?_='+Date.now()).then(r=>r.json());}catch{}
+    let data=[],bookState={};
+    [data,bookState]=await Promise.all([
+        fetch('/api/web-data/webpnlpxy?_='+Date.now()).then(r=>r.json()).catch(()=>[]),
+        fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json()).catch(()=>({}))
+    ]);
     const total=data.reduce((s,d)=>s+(String(d.Status||'CLOSED').toUpperCase()==='OPEN'?0:Number(d.PNL)||0),0);
     const tradePnlChanged=prevTradePnl!==null&&total!==prevTradePnl;
     const tradePnlUp=tradePnlChanged&&total>prevTradePnl;
@@ -1354,12 +1357,56 @@ async function loadTrades(){
     scroll.querySelectorAll('.t-row,.t-book-row,.t-book-details').forEach(r=>r.remove());
     if(!data.length){$('tradeEmpty').style.display='block';return;}
     $('tradeEmpty').style.display='none';
+    let riskBooks=Array.isArray(bookState.closed_books)?bookState.closed_books:[];
+    if(!riskBooks.length&&bookState.last_closed_snapshot){
+        riskBooks=[{
+            ...bookState.last_closed_snapshot,
+            book_id:bookState.closed_book_count,
+            cycle_tags:bookState.last_closed_snapshot.cycle_tags
+                ||(bookState.last_closed_snapshot.positions||[]).map(p=>p.tag)
+        }];
+    }
+    riskBooks=riskBooks.map(book=>({
+        ...book,
+        id:book.book_id,
+        active:false,
+        tags:new Set((book.cycle_tags||[]).map(tag=>String(tag).trim()))
+    }));
+    if(bookState.active_book_id!==null&&bookState.active_book_id!==undefined){
+        riskBooks.push({
+            id:bookState.active_book_id,
+            active:true,
+            cycle_started_at:bookState.active_book_started_at,
+            closed_at:'',
+            tags:new Set((bookState.active_book_tags||[]).map(tag=>String(tag).trim()))
+        });
+    }
+    const riskBookForTrade=t=>{
+        const tag=String(t.Tag||'').trim();
+        const entered=Date.parse(t.Buy_Time||'');
+        const tagged=riskBooks.filter(book=>book.tags.has(tag));
+        if(!Number.isFinite(entered))return tagged.length===1?tagged[0]:undefined;
+        return tagged
+            .filter(book=>{
+                const start=Date.parse(book.cycle_started_at||'');
+                const end=Date.parse(book.closed_at||'');
+                return (!Number.isFinite(start)||entered>=start)
+                    &&(!Number.isFinite(end)||entered<=end);
+            })
+            .sort((a,b)=>(Date.parse(b.cycle_started_at||'')||0)
+                -(Date.parse(a.cycle_started_at||'')||0))[0];
+    };
     const books=new Map();
     data.forEach((t,index)=>{
+        const riskBook=riskBookForTrade(t);
+        const hasRiskBook=riskBook!==undefined;
         const hasBookId=t.Book_ID!==null&&t.Book_ID!==undefined&&t.Book_ID!=='';
-        const id=hasBookId?String(t.Book_ID):'';
-        const key=hasBookId?'book-'+id:'unassigned-'+index;
-        if(!books.has(key))books.set(key,{key,id,legacy:!hasBookId,trades:[],pnl:0,open:false,sortTime:0,firstTag:String(t.Tag||'')});
+        const id=hasRiskBook?String(riskBook.id):hasBookId?String(t.Book_ID):'';
+        const key=hasRiskBook?'risk-book-'+id:hasBookId?'book-'+id:'unassigned-'+index;
+        if(!books.has(key))books.set(key,{
+            key,id,legacy:!hasRiskBook&&!hasBookId,risk:hasRiskBook,
+            trades:[],pnl:0,open:false,sortTime:0,firstTag:String(t.Tag||'')
+        });
         const book=books.get(key);
         book.trades.push(t);
         book.pnl+=Number(t.PNL)||0;

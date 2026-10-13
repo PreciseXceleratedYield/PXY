@@ -128,108 +128,6 @@ def cycle_start_time(open_df):
     return min(timestamps).isoformat(sep=" ")
 
 
-def trade_book_summary(open_df, closed_df):
-    """Summarize completed and active books using the dashboard's Book_IDs."""
-    open_positions = pd.DataFrame() if open_df is None else open_df.copy()
-    closed_positions = pd.DataFrame() if closed_df is None else closed_df.copy()
-    open_positions.columns = [str(column).upper() for column in open_positions.columns]
-    closed_positions.columns = [str(column).upper() for column in closed_positions.columns]
-
-    if (
-        (not open_positions.empty and "BOOK_ID" not in open_positions)
-        or (not closed_positions.empty and "BOOK_ID" not in closed_positions)
-    ):
-        return None
-
-    def normalized_id(value):
-        if pd.isna(value):
-            return None
-        if isinstance(value, (int, float)) and float(value).is_integer():
-            return str(int(value))
-        value = str(value).strip()
-        return None if value.lower() in {"", "nan", "none", "null"} else value
-
-    def display_id(book_id):
-        return int(book_id) if book_id.isdigit() else book_id
-
-    open_ids = set()
-    if "BOOK_ID" in open_positions:
-        open_ids = {
-            book_id for book_id in open_positions["BOOK_ID"].map(normalized_id)
-            if book_id is not None
-        }
-
-    if "BOOK_ID" in closed_positions:
-        closed_positions["_BOOK_ID"] = closed_positions["BOOK_ID"].map(normalized_id)
-        complete_ids = {
-            book_id for book_id in closed_positions["_BOOK_ID"]
-            if book_id is not None and book_id not in open_ids
-        }
-        complete_rows = closed_positions[
-            closed_positions["_BOOK_ID"].isin(complete_ids)
-        ].copy()
-    else:
-        complete_ids = set()
-        complete_rows = pd.DataFrame()
-
-    def sort_key(book_id):
-        return (0, int(book_id)) if book_id.isdigit() else (1, book_id)
-
-    sorted_complete_ids = sorted(complete_ids, key=sort_key)
-    completed_pnl = pd.to_numeric(
-        complete_rows["PNL"] if "PNL" in complete_rows else pd.Series(dtype=float),
-        errors="coerce",
-    ).fillna(0)
-    last_snapshot = None
-    if sorted_complete_ids:
-        last_id = sorted_complete_ids[-1]
-        rows = complete_rows[complete_rows["_BOOK_ID"] == last_id]
-
-        def text(value):
-            return "" if pd.isna(value) else str(value)
-
-        def number(value):
-            parsed = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
-            return 0.0 if pd.isna(parsed) else float(parsed)
-
-        positions = [
-            {
-                "symbol": text(row.get("SYMBOL", "")),
-                "tag": text(row.get("TAG", "")),
-                "qty": number(row.get("QTY", 0)),
-                "pnl": number(row.get("PNL", 0)),
-                "exit_time": text(row.get("EXIT_TIME", "")),
-            }
-            for _, row in rows.iterrows()
-        ]
-        last_snapshot = {
-            "book_id": display_id(last_id),
-            "cycle_started_at": min(
-                (text(value) for value in rows.get("BUY_TIME", [])),
-                default="",
-            ),
-            "closed_at": max(
-                (position["exit_time"] for position in positions),
-                default="",
-            ),
-            "closed_positions": len(positions),
-            "realized_pnl": float(pd.to_numeric(
-                rows["PNL"] if "PNL" in rows else pd.Series(dtype=float),
-                errors="coerce",
-            ).fillna(0).sum()),
-            "positions": positions,
-        }
-
-    current_ids = sorted(open_ids, key=sort_key)
-    return {
-        "booked_profit": float(completed_pnl.sum()),
-        "closed_book_count": len(complete_ids),
-        "last_closed_snapshot": last_snapshot,
-        "last_closed_cycle_id": sorted_complete_ids[-1] if sorted_complete_ids else "",
-        "active_book_id": display_id(current_ids[-1]) if current_ids else None,
-    }
-
-
 def cycle_risk_metrics(
     open_df,
     closed_df,
@@ -364,10 +262,12 @@ def cycle_closed_book_snapshot(closed_df, cycle_tags, cycle_started_at):
             "tag": text(row.get("TAG", "")),
             "qty": number(row.get("QTY", 0)),
             "pnl": number(row.get("PNL", 0)),
+            "buy_time": text(row.get("BUY_TIME", "")),
             "exit_time": text(row.get("EXIT_TIME", "")),
         })
     return {
         "cycle_started_at": str(cycle_started_at or ""),
+        "cycle_tags": sorted(str(tag) for tag in cycle_tags),
         "closed_at": max(
             (position["exit_time"] for position in positions),
             default="",

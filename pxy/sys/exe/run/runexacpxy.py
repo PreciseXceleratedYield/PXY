@@ -36,7 +36,7 @@ from runexiopxy import now_ist, today_ist, RENKO_STATE_FILE, WEB_DIR, SQUAREOFF_
 from runexmtpxy import (
     INITIAL_RISK_BAR_TARGET, compute_totals,
     cycle_closed_book_snapshot, cycle_ledger_tags, cycle_risk_metrics,
-    cycle_start_time, trade_book_summary,
+    cycle_start_time,
 )
 from runexstpxy import (
     load_check_state, save_check_state, load_session_state, save_session_state,
@@ -152,13 +152,22 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         "" if session_state_is_stale
         else state_on_disk.get("last_closed_cycle_id", "")
     )
-    book_summary = trade_book_summary(open_df, closed_df)
-    if book_summary is not None:
-        booked_profit = book_summary["booked_profit"]
-        closed_book_count = book_summary["closed_book_count"]
-        last_closed_snapshot = book_summary["last_closed_snapshot"]
-        last_closed_cycle_id = book_summary["last_closed_cycle_id"]
-
+    closed_books = (
+        [] if session_state_is_stale
+        else list(state_on_disk.get("closed_books", []))
+    )
+    if not closed_books and last_closed_snapshot and closed_book_count:
+        legacy_snapshot = dict(last_closed_snapshot)
+        legacy_snapshot.setdefault("book_id", closed_book_count)
+        legacy_snapshot.setdefault(
+            "cycle_tags",
+            sorted({
+                str(position.get("tag", "")).strip()
+                for position in legacy_snapshot.get("positions", [])
+                if str(position.get("tag", "")).strip()
+            }),
+        )
+        closed_books.append(legacy_snapshot)
     # 3. One tick per cycle: the exit pipe and the avg pipe both load the ledger every cycle.
     meta = load_meta()
     now_epoch = time.time()
@@ -190,13 +199,15 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             f"{previous_start}|{'|'.join(sorted(previous_tags))}"
             if previous_start and previous_tags else ""
         )
-        if book_summary is None and cycle_id and cycle_id != last_closed_cycle_id:
+        if cycle_id and cycle_id != last_closed_cycle_id:
             snapshot = cycle_closed_book_snapshot(
                 closed_df, previous_tags, previous_start
             )
             if snapshot is not None:
                 booked_profit += snapshot["realized_pnl"]
                 closed_book_count += 1
+                snapshot["book_id"] = closed_book_count
+                closed_books.append(snapshot)
                 last_closed_snapshot = snapshot
                 last_closed_cycle_id = cycle_id
 
@@ -211,6 +222,10 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             closed_book_count=closed_book_count,
             last_closed_snapshot=last_closed_snapshot,
             last_closed_cycle_id=last_closed_cycle_id,
+            closed_books=closed_books,
+            active_book_id=None,
+            active_book_tags=[],
+            active_book_started_at=None,
         )
         if not state_saved:
             return
@@ -278,12 +293,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         RISK_CANDLE_CONTROL_ENABLED
         and RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
     )
-    active_book_number = (
-        book_summary["active_book_id"]
-        if book_summary is not None and book_summary["active_book_id"] is not None
-        else closed_book_count + 1
-    )
-    print(format_book_status(active_book_number, risk_target))
+    active_book_id = closed_book_count + 1
+    print(format_book_status(active_book_id, risk_target))
 
     if not risk_enabled:
         if consecutive_breaches:
@@ -299,6 +310,10 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             closed_book_count=closed_book_count,
             last_closed_snapshot=last_closed_snapshot,
             last_closed_cycle_id=last_closed_cycle_id,
+            closed_books=closed_books,
+            active_book_id=active_book_id,
+            active_book_tags=sorted(cycle_tags),
+            active_book_started_at=cycle_started_at,
         )
         return
 
@@ -317,6 +332,10 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             closed_book_count=closed_book_count,
             last_closed_snapshot=last_closed_snapshot,
             last_closed_cycle_id=last_closed_cycle_id,
+            closed_books=closed_books,
+            active_book_id=active_book_id,
+            active_book_tags=sorted(cycle_tags),
+            active_book_started_at=cycle_started_at,
         )
         return
 
@@ -333,6 +352,10 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         closed_book_count=closed_book_count,
         last_closed_snapshot=last_closed_snapshot,
         last_closed_cycle_id=last_closed_cycle_id,
+        closed_books=closed_books,
+        active_book_id=active_book_id,
+        active_book_tags=sorted(cycle_tags),
+        active_book_started_at=cycle_started_at,
     )
     print(
         f"{Fore.YELLOW}⚠️ Cycle profit target reached while heavy side is unaligned "
@@ -358,6 +381,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             "closed_book_count": closed_book_count,
             "last_closed_snapshot": last_closed_snapshot,
             "last_closed_cycle_id": last_closed_cycle_id,
+            "closed_books": closed_books,
             "cycle_tags": sorted(cycle_tags),
             "cycle_started_at": cycle_started_at,
         },

@@ -204,14 +204,16 @@ network boundary.
   paid across the cycle (`quantity × buy price` for each cycle row). For
   example, three active rows use 2.8% / 3; closed rows remain in cycle P&L and
   premium-paid totals but are not included in the active-row divisor.
-- The Trades panel and risk bar use LILO's flat-to-flat `Book_ID`s. The active
-  ID is the current book; a book is counted as closed only when no open trade
-  row retains that ID. Booked profit and closed-book count are summarized from
-  those same completed IDs, so partially closed active books are not counted
-  early. This summary follows the same order-report time filter as the Trades
-  panel. The risk bar click-through includes the last closed-book snapshot and
-  update time. The displayed loss target is informational and never causes a
-  loss-side square-off. There is no timed midday reset.
+- The risk ledger's tag-based cycle is authoritative for booked profit and
+  closed-book count; a cycle closes only when the full portfolio is flat.
+  Closed-cycle snapshots and the active cycle's tags/start time are persisted
+  in the risk state. The Trades panel uses those tags and time bounds to group
+  underlying LILO trade rows into the same risk book, even when LILO assigned
+  multiple `Book_ID`s. Rows without a matching risk-cycle snapshot retain their
+  LILO `Book_ID` grouping. The risk bar click-through includes the last
+  closed-book snapshot and update time. The displayed loss target is
+  informational and never causes a loss-side square-off. There is no timed
+  midday reset.
 - The negative initial line is display-only; there is no loss-side square-off.
   `RUNEXACPXY_STOP_SQUAREOFF_ENABLED` defaults to `False`;
   `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED` defaults to `True`.

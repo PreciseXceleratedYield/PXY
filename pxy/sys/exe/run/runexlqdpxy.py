@@ -18,7 +18,7 @@ from syscnfgpxy import (
 )
 from runexmtpxy import (
     INITIAL_RISK_BAR_TARGET, compute_totals, cycle_closed_book_snapshot,
-    trade_book_summary, _both_empty,
+    _both_empty,
 )
 from runexstpxy import (
     save_check_state, save_session_state, _find_runlilo_module,
@@ -117,26 +117,24 @@ def liquidate_and_exit(
             f"{cycle_started_at}|{'|'.join(sorted(cycle_tags))}"
             if cycle_started_at and cycle_tags else ""
         )
-        book_summary = trade_book_summary(None, closed_df)
-        if book_summary is not None:
-            state["booked_profit"] = book_summary["booked_profit"]
-            state["closed_book_count"] = book_summary["closed_book_count"]
-            state["last_closed_snapshot"] = book_summary["last_closed_snapshot"]
-            state["last_closed_cycle_id"] = book_summary["last_closed_cycle_id"]
-        else:
-            snapshot = cycle_closed_book_snapshot(
-                closed_df, cycle_tags, cycle_started_at
+        snapshot = cycle_closed_book_snapshot(
+            closed_df, cycle_tags, cycle_started_at
+        )
+        if snapshot is not None and cycle_id != state.get("last_closed_cycle_id"):
+            state["booked_profit"] = (
+                float(state.get("booked_profit", 0.0))
+                + snapshot["realized_pnl"]
             )
-            if snapshot is not None and cycle_id != state.get("last_closed_cycle_id"):
-                state["booked_profit"] = (
-                    float(state.get("booked_profit", 0.0))
-                    + snapshot["realized_pnl"]
-                )
-                state["closed_book_count"] = (
-                    int(state.get("closed_book_count", 0)) + 1
-                )
-                state["last_closed_snapshot"] = snapshot
-                state["last_closed_cycle_id"] = cycle_id
+            state["closed_book_count"] = (
+                int(state.get("closed_book_count", 0)) + 1
+            )
+            snapshot["book_id"] = state["closed_book_count"]
+            state["last_closed_snapshot"] = snapshot
+            state["last_closed_cycle_id"] = cycle_id
+            state["closed_books"] = [
+                *state.get("closed_books", []),
+                snapshot,
+            ]
         target_line = INITIAL_RISK_BAR_TARGET
         save_check_state(0)
         save_session_state(
@@ -150,6 +148,10 @@ def liquidate_and_exit(
             closed_book_count=state.get("closed_book_count", 0),
             last_closed_snapshot=state.get("last_closed_snapshot"),
             last_closed_cycle_id=state.get("last_closed_cycle_id", ""),
+            closed_books=state.get("closed_books", []),
+            active_book_id=None,
+            active_book_tags=[],
+            active_book_started_at=None,
         )
         sys.exit("Master Circuit Breaker Triggered.")
 

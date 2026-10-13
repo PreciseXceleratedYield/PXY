@@ -71,13 +71,18 @@ def load_session_state():
         "closed_book_count": max(0, int(d.get("closed_book_count", 0))),
         "last_closed_snapshot": d.get("last_closed_snapshot"),
         "last_closed_cycle_id": str(d.get("last_closed_cycle_id", "") or ""),
+        "closed_books": d.get("closed_books", []),
+        "active_book_id": d.get("active_book_id"),
+        "active_book_tags": d.get("active_book_tags", []),
+        "active_book_started_at": d.get("active_book_started_at"),
     }
 
 
 def save_session_state(
     peak_value, current_net, exit_line, pnl_offset_val, risk_control_activated=False,
     target_exit_line=INITIAL_RISK_BAR_TARGET, booked_profit=0.0, closed_book_count=0,
-    last_closed_snapshot=None, last_closed_cycle_id="",
+    last_closed_snapshot=None, last_closed_cycle_id="", closed_books=None,
+    active_book_id=None, active_book_tags=None, active_book_started_at=None,
 ):
     return _atomic_write_json(RENKO_STATE_FILE, {
         "session_peak_pnl": float(peak_value),
@@ -91,6 +96,10 @@ def save_session_state(
         "closed_book_count": max(0, int(closed_book_count)),
         "last_closed_snapshot": last_closed_snapshot,
         "last_closed_cycle_id": str(last_closed_cycle_id or ""),
+        "closed_books": list(closed_books or []),
+        "active_book_id": active_book_id,
+        "active_book_tags": list(active_book_tags or []),
+        "active_book_started_at": active_book_started_at,
     })
 
 
