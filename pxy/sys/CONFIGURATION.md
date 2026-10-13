@@ -311,9 +311,9 @@ historical option P&L.
   investment (`sum(qty × sell_prc)` plus the next lot at its current
   `sell_prc`) must not exceed `EXEAMSPXY_MAX_INVESTMENT` (default `25000`).
   The calculated LGT magnitude is capped at `EXEAMSPXY_MAX_LGT_LOSS`
-  (default `77`), then multiplied by `EXEAMSPXY_LGT_SCALE` (default `1.1`).
+  (default `77`), then multiplied by `EXEAMSPXY_LGT_SCALE` (default `5`).
   Since the multiplier is applied after the base cap, the final LGT can reach
-  `-84.7`.
+  `-385`.
   The opposite side must have open positions and negative overall P&L, and
   only the signal-aligned side may average. The averaging side must also be
   losing at or beyond its applicable LGT threshold.

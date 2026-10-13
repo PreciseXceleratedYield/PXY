@@ -1372,65 +1372,65 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_lgt_uses_clamped_ratio_times_actual_lot_count_with_minimum_one(self):
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True, index_price=25000),
-            -13.75,
+            -62.5,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(2000.0, 4000.0, is_ce=True, index_price=25000),
-            -27.5,
+            -125.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True, index_price=25000),
-            -55.0,
+            -250.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(2000.0, 1000.0, is_ce=True, index_price=25000),
-            -84.7,
+            -385.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(3000.0, 1000.0, is_ce=True, index_price=25000),
-            -84.7,
+            -385.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(4000.0, 1000.0, is_ce=True, index_price=25000),
-            -84.7,
+            -385.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(4000.0, 1000.0, is_ce=False, index_price=25000),
-            -13.75,
+            -62.5,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(0.0, 4000.0, is_ce=True, index_price=25000),
-            -55.0,
+            -250.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1000.0, 4000.0, is_ce=True, index_price=25000, own_count=1
             ),
-            -13.75,
+            -62.5,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1000.0, 1000.0, is_ce=True, index_price=25000, own_count=2
             ),
-            -84.7,
+            -385.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1000.0, 1000.0, is_ce=True, index_price=25000, own_count=0
             ),
-            -55.0,
+            -250.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1.0, 10.0, is_ce=True, index_price=25000, own_count=0
             ),
-            -5.5,
+            -25.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 100.0, 1.0, is_ce=True, index_price=25000, own_count=0
             ),
-            -84.7,
+            -385.0,
         )
         for invalid_investment in (0.0, float("inf"), float("-inf"), float("nan")):
             self.assertAlmostEqual(
@@ -1438,7 +1438,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     2000.0, invalid_investment, is_ce=True, index_price=25000,
                     own_count=0,
                 ),
-                -55.0,
+                -250.0,
             )
         for invalid_lot_count in (float("inf"), float("-inf"), float("nan")):
             self.assertAlmostEqual(
@@ -1446,11 +1446,11 @@ class ConfigurationWiringTests(unittest.TestCase):
                     1000.0, 4000.0, is_ce=True, index_price=25000,
                     own_count=invalid_lot_count,
                 ),
-                -55.0,
+                -250.0,
             )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True, index_price=1000),
-            -55.0,
+            -250.0,
         )
         with self.assertRaises(ValueError):
             exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True, index_price=0)
