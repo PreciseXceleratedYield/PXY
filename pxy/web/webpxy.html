@@ -247,6 +247,7 @@ body{
     transition:background 0.25s;
 }
 .t-book-row:hover{background:var(--bg3);}
+.t-book-row.closed,.t-row.closed{filter:grayscale(1);opacity:.55;}
 .t-book-details{border-bottom:1px solid var(--border);}
 .t-book-details .t-row{padding-left:20px;}
 .t-book-toggle{font-size:9px;color:var(--accent);width:12px;}
@@ -1432,7 +1433,7 @@ async function loadTrades(){
         details.className='t-book-details';
         details.style.display=expandedTradeBooks.has(book.key)?'block':'none';
         const summary=document.createElement('div');
-        summary.className='t-book-row';
+        summary.className=`t-book-row${book.open?'':' closed'}`;
         summary.setAttribute('role','button');
         summary.setAttribute('tabindex','0');
         summary.setAttribute('aria-expanded',String(expandedTradeBooks.has(book.key)));
@@ -1471,7 +1472,8 @@ async function loadTrades(){
             const entry=String(t.Buy_Time||'').slice(11,16);
             const exit=String(t.Exit_Time||'OPEN').slice(11,16);
             const status=String(t.Status||'CLOSED').toUpperCase();
-            const row=document.createElement('div');row.className=`t-row ${pb?'bull-r':'bear-r'}`;
+            const row=document.createElement('div');
+            row.className=`t-row ${pb?'bull-r':'bear-r'}${status==='OPEN'?'':' closed'}`;
             row.dataset.tag=String(t.Tag||'');
             row.style.cursor=status==='OPEN'?'default':'pointer';
             const tag=document.createElement('span');tag.className='t-tag';tag.textContent='#'+(t.Tag||'—');
