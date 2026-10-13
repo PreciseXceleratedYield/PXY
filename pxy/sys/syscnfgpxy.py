@@ -91,8 +91,8 @@ if SYSSTRNDPXY_ST1_ATR_VALUE <= 0:
     raise ValueError("SYSSTRNDPXY_ST1_ATR_VALUE must be greater than zero.")
 SYSSTRNDPXY_ST1_FACTOR = 1.4
 
-SYSDTSTPXY_ST1_PERIOD = 3.0
-SYSDTSTPXY_ST1_FACTOR = 1.4
+SYSDTSTPXY_ST1_PERIOD = 14
+SYSDTSTPXY_ST1_FACTOR = 3
 
 # BOS morning recognition ends at 10:10; its opening boundary uses the shared
 # exchange open above.
