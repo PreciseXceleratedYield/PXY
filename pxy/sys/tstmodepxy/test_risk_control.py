@@ -23,6 +23,7 @@ from runexmtpxy import (
     compute_stop_conditions,
     compute_totals,
     large_invested_side_aligned,
+    trade_book_summary,
     target_ceiling,
 )
 from syscnfgpxy import (
@@ -41,6 +42,60 @@ class CycleRiskControlTests(unittest.TestCase):
 
         self.assertEqual(len(status), 40)
         self.assertEqual(status.rstrip(), "BOOK3 OPEN - WAIT TARGET RS 303")
+
+    def test_trade_book_summary_matches_completed_book_ids_and_excludes_active_book(self):
+        open_df = pd.DataFrame([{
+            "Book_ID": 2,
+            "Tag": "BOOK2-PE",
+            "Symbol": "NIFTY-PE",
+            "Qty": 75,
+            "PNL": -200,
+            "Buy_Time": "2025-01-06 10:10:00",
+        }])
+        closed_df = pd.DataFrame([
+            {
+                "Book_ID": 1,
+                "Tag": "BOOK1-CE",
+                "Symbol": "NIFTY-CE",
+                "Qty": 75,
+                "PNL": 100,
+                "Buy_Time": "2025-01-06 10:00:00",
+                "Exit_Time": "2025-01-06 10:05:00",
+            },
+            {
+                "Book_ID": 1,
+                "Tag": "BOOK1-PE",
+                "Symbol": "NIFTY-PE",
+                "Qty": 75,
+                "PNL": -25,
+                "Buy_Time": "2025-01-06 10:01:00",
+                "Exit_Time": "2025-01-06 10:06:00",
+            },
+            {
+                "Book_ID": 2,
+                "Tag": "BOOK2-CE",
+                "Symbol": "NIFTY-CE",
+                "Qty": 75,
+                "PNL": 30,
+                "Buy_Time": "2025-01-06 10:10:00",
+                "Exit_Time": "2025-01-06 10:12:00",
+            },
+        ])
+
+        summary = trade_book_summary(open_df, closed_df)
+
+        self.assertEqual(summary["closed_book_count"], 1)
+        self.assertEqual(summary["booked_profit"], 75.0)
+        self.assertEqual(summary["active_book_id"], 2)
+        self.assertEqual(
+            runexacpxy.format_book_status(summary["active_book_id"], 1000).rstrip(),
+            "BOOK2 OPEN - WAIT TARGET RS 1000",
+        )
+        self.assertEqual(summary["last_closed_snapshot"]["book_id"], 1)
+        self.assertEqual(
+            summary["last_closed_snapshot"]["closed_positions"],
+            2,
+        )
 
     def test_cycle_target_uses_realized_and_unrealized_pnl_and_all_cycle_premium(self):
         open_df = pd.DataFrame([
@@ -165,6 +220,7 @@ class CycleRiskControlTests(unittest.TestCase):
             "Buy_Prc": 100,
             "Sell_Prc": 110,
             "PNL": 750,
+            "Book_ID": 1,
         }])
         with (
             patch.object(
@@ -327,6 +383,7 @@ class CycleRiskControlTests(unittest.TestCase):
             "Buy_Prc": 100,
             "Sell_Prc": 110,
             "PNL": 750,
+            "Book_ID": 1,
         }])
         open_ce = pd.DataFrame([{
             "Tag": "BOOK-CE",
@@ -336,6 +393,7 @@ class CycleRiskControlTests(unittest.TestCase):
             "Buy_Prc": 100,
             "Sell_Prc": 105,
             "PNL": 375,
+            "Book_ID": 1,
         }])
         both_open = pd.concat([open_pe, open_ce], ignore_index=True)
         closed = pd.DataFrame([
@@ -346,6 +404,7 @@ class CycleRiskControlTests(unittest.TestCase):
                 "Buy_Prc": 100,
                 "Sell_Prc": 110,
                 "PNL": 750,
+                "Book_ID": 1,
                 "Exit_Time": pd.Timestamp("2025-01-06 10:05:00"),
             },
             {
@@ -355,6 +414,7 @@ class CycleRiskControlTests(unittest.TestCase):
                 "Buy_Prc": 100,
                 "Sell_Prc": 106,
                 "PNL": 450,
+                "Book_ID": 1,
                 "Exit_Time": pd.Timestamp("2025-01-06 10:10:00"),
             },
         ])
@@ -362,7 +422,11 @@ class CycleRiskControlTests(unittest.TestCase):
             patch.object(
                 runexacpxy,
                 "load_session_state",
-                return_value={"pnl_offset": 0.0},
+                return_value={
+                    "pnl_offset": 0.0,
+                    "booked_profit": 9999.0,
+                    "closed_book_count": 9,
+                },
             ),
             patch.object(
                 runexacpxy,
@@ -402,6 +466,10 @@ class CycleRiskControlTests(unittest.TestCase):
         self.assertEqual(save_meta.call_args_list[3].args[0]["risk_cycle_tags"], [])
         self.assertEqual(save_state.call_args.kwargs["closed_book_count"], 1)
         self.assertEqual(save_state.call_args.kwargs["booked_profit"], 1200.0)
+        self.assertEqual(
+            save_state.call_args.kwargs["last_closed_snapshot"]["book_id"],
+            1,
+        )
         self.assertEqual(
             save_state.call_args.kwargs["last_closed_snapshot"]["closed_positions"],
             2,

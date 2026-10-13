@@ -36,7 +36,7 @@ from runexiopxy import now_ist, today_ist, RENKO_STATE_FILE, WEB_DIR, SQUAREOFF_
 from runexmtpxy import (
     INITIAL_RISK_BAR_TARGET, compute_totals,
     cycle_closed_book_snapshot, cycle_ledger_tags, cycle_risk_metrics,
-    cycle_start_time,
+    cycle_start_time, trade_book_summary,
 )
 from runexstpxy import (
     load_check_state, save_check_state, load_session_state, save_session_state,
@@ -152,6 +152,12 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         "" if session_state_is_stale
         else state_on_disk.get("last_closed_cycle_id", "")
     )
+    book_summary = trade_book_summary(open_df, closed_df)
+    if book_summary is not None:
+        booked_profit = book_summary["booked_profit"]
+        closed_book_count = book_summary["closed_book_count"]
+        last_closed_snapshot = book_summary["last_closed_snapshot"]
+        last_closed_cycle_id = book_summary["last_closed_cycle_id"]
 
     # 3. One tick per cycle: the exit pipe and the avg pipe both load the ledger every cycle.
     meta = load_meta()
@@ -184,7 +190,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             f"{previous_start}|{'|'.join(sorted(previous_tags))}"
             if previous_start and previous_tags else ""
         )
-        if cycle_id and cycle_id != last_closed_cycle_id:
+        if book_summary is None and cycle_id and cycle_id != last_closed_cycle_id:
             snapshot = cycle_closed_book_snapshot(
                 closed_df, previous_tags, previous_start
             )
@@ -272,7 +278,12 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         RISK_CANDLE_CONTROL_ENABLED
         and RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
     )
-    print(format_book_status(closed_book_count + 1, risk_target))
+    active_book_number = (
+        book_summary["active_book_id"]
+        if book_summary is not None and book_summary["active_book_id"] is not None
+        else closed_book_count + 1
+    )
+    print(format_book_status(active_book_number, risk_target))
 
     if not risk_enabled:
         if consecutive_breaches:

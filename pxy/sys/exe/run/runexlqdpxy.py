@@ -18,7 +18,7 @@ from syscnfgpxy import (
 )
 from runexmtpxy import (
     INITIAL_RISK_BAR_TARGET, compute_totals, cycle_closed_book_snapshot,
-    _both_empty,
+    trade_book_summary, _both_empty,
 )
 from runexstpxy import (
     save_check_state, save_session_state, _find_runlilo_module,
@@ -117,19 +117,26 @@ def liquidate_and_exit(
             f"{cycle_started_at}|{'|'.join(sorted(cycle_tags))}"
             if cycle_started_at and cycle_tags else ""
         )
-        snapshot = cycle_closed_book_snapshot(
-            closed_df, cycle_tags, cycle_started_at
-        )
-        if snapshot is not None and cycle_id != state.get("last_closed_cycle_id"):
-            state["booked_profit"] = (
-                float(state.get("booked_profit", 0.0))
-                + snapshot["realized_pnl"]
+        book_summary = trade_book_summary(None, closed_df)
+        if book_summary is not None:
+            state["booked_profit"] = book_summary["booked_profit"]
+            state["closed_book_count"] = book_summary["closed_book_count"]
+            state["last_closed_snapshot"] = book_summary["last_closed_snapshot"]
+            state["last_closed_cycle_id"] = book_summary["last_closed_cycle_id"]
+        else:
+            snapshot = cycle_closed_book_snapshot(
+                closed_df, cycle_tags, cycle_started_at
             )
-            state["closed_book_count"] = (
-                int(state.get("closed_book_count", 0)) + 1
-            )
-            state["last_closed_snapshot"] = snapshot
-            state["last_closed_cycle_id"] = cycle_id
+            if snapshot is not None and cycle_id != state.get("last_closed_cycle_id"):
+                state["booked_profit"] = (
+                    float(state.get("booked_profit", 0.0))
+                    + snapshot["realized_pnl"]
+                )
+                state["closed_book_count"] = (
+                    int(state.get("closed_book_count", 0)) + 1
+                )
+                state["last_closed_snapshot"] = snapshot
+                state["last_closed_cycle_id"] = cycle_id
         target_line = INITIAL_RISK_BAR_TARGET
         save_check_state(0)
         save_session_state(
