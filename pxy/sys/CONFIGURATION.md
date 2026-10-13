@@ -110,9 +110,10 @@ values until deliberately restarted.
 
 `SYSENTRPXY_VARIANT` selects the `sysentrpxy` signal router. `MKT` (default)
 maps MKT exit BULL to entry BUY and BEAR to SELL; nondirectional MKT signals
-produce no entry. `ST` uses Supertrend direction as the exit signal when trend
-is BULL or BEAR and enables the historical MKT countertrend pullback entry
-filter.
+produce no entry. When `ST` is selected, MKT is used through 09:59:59 IST;
+the ST router starts at 10:00 IST. ST uses Supertrend direction as the exit
+signal when trend is BULL or BEAR and enables the historical MKT countertrend
+pullback entry filter.
 In `ST`, entries require an opposing MKT signal and a close within half an ST
 factor times fixed ST ATR of the ST line. When Supertrend is SIDE, entries are
 allowed only in the outer quarter of the mirrored ST band and in the opposing

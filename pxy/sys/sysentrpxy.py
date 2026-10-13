@@ -8,6 +8,7 @@ import pandas as pd
 from sysmktpxy import get_signal as get_market_signal
 from syscnfgpxy import (
     SYSENTRPXY_VARIANT,
+    SYSENTRPXY_ST_START,
     SYSCNFGPXY_NEW_BOOK_CUTOFF,
     SYSCNFGPXY_TIMEZONE,
     SYSSTRNDPXY_ST1_FACTOR,
@@ -111,22 +112,23 @@ def _supertrend_entry_signal(df, now=None):
 
 
 def get_entry_signal(df=None):
-    """Route entries through the configured MKT or Supertrend variant."""
+    """Use MKT through 10:00 IST, then apply the configured entry variant."""
     if cooldown_remaining() > 0:
         print("⏳ POST-SQUARE-OFF COOLDOWN: entry and exit signals forced to NONE.")
         return "NONE", "NONE"
 
-    if SYSENTRPXY_VARIANT == "ST":
+    now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
+    if SYSENTRPXY_VARIANT == "ST" and now >= SYSENTRPXY_ST_START:
         if df is None:
             from sysdtafpxy import fetch_yf_data
 
             df = fetch_yf_data()
-        return _supertrend_entry_signal(df)
+        return _supertrend_entry_signal(df, now=now)
 
     exit_signal = str(get_market_signal(df)).upper().strip()
     if exit_signal not in {"BULL", "BEAR"}:
         exit_signal = "NONE"
-    return _entry_signal_for_exit(exit_signal)
+    return _entry_signal_for_exit(exit_signal, now=now)
 
 
 if __name__ == "__main__":
