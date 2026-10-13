@@ -38,6 +38,7 @@ import sysdthapxy
 import syscseqpxy
 import syspxy
 import sysstrndpxy
+import sysdtstpxy
 import runniftypxy
 from syscnfgpxy import (
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
@@ -335,6 +336,7 @@ class ConfigurationWiringTests(unittest.TestCase):
         ):
             with (
                 self.subTest(mkt_signal=mkt_signal),
+                patch.object(sysentrpxy, "SYSENTRPXY_VARIANT", "MKT"),
                 patch.object(
                     sysentrpxy, "get_market_signal", return_value=mkt_signal
                 ) as market,
@@ -370,15 +372,41 @@ class ConfigurationWiringTests(unittest.TestCase):
                     ("NONE", "NONE"),
                 )
 
-    def test_entry_variant_config_defaults_to_mkt_and_offers_st(self):
+    def test_entry_variant_config_defaults_to_st_and_offers_mkt(self):
         from syscnfgpxy import SYSENTRPXY_ST_START, SYSENTRPXY_VARIANT
 
-        self.assertEqual(SYSENTRPXY_VARIANT, "MKT")
+        self.assertEqual(SYSENTRPXY_VARIANT, "ST")
         self.assertEqual(SYSENTRPXY_ST_START, dt_time(10, 0))
         self.assertEqual(
             __import__("pxyconfigwebpxy").ENUMS["SYSENTRPXY_VARIANT"],
             ("MKT", "ST"),
         )
+
+    def test_entry_supertrend_uses_period_14_factor_3_and_true_atr_14(self):
+        from syscnfgpxy import (
+            SYSDTSTPXY_ST1_FACTOR,
+            SYSDTSTPXY_ST1_PERIOD,
+            SYSKATRPXY_TRUE_ATR_PERIOD,
+        )
+
+        self.assertEqual(SYSDTSTPXY_ST1_PERIOD, 14)
+        self.assertEqual(SYSDTSTPXY_ST1_FACTOR, 3)
+        self.assertEqual(SYSKATRPXY_TRUE_ATR_PERIOD, 14)
+
+        index = pd.date_range("2026-10-07", periods=20, freq="min")
+        frame = pd.DataFrame(
+            {
+                "Open": [100.0 + i for i in range(20)],
+                "High": [102.0 + i for i in range(20)],
+                "Low": [99.0 + i for i in range(20)],
+                "Close": [101.0 + i for i in range(20)],
+            },
+            index=index,
+        )
+        processed = sysdtstpxy.calculate_supertrend(frame)
+        self.assertEqual(len(processed), len(frame))
+        self.assertEqual(processed["st_atr"].iloc[0], 3.0)
+        self.assertIn(processed["ST_Trend"].iloc[-1], {"BULL", "BEAR", "SIDE"})
 
     def test_st_selection_uses_mkt_before_ten_and_starts_at_ten(self):
         frame = pd.DataFrame({"Close": [101.0]})
@@ -483,6 +511,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                 "Close": [price],
                 "st_line": [0.0],
                 "st_mirror": [10.0],
+                "st_atr": [2.0],
             })
             with (
                 self.subTest(market_signal=market_signal, price=price),

@@ -16,7 +16,7 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
 
     tr1 = high - low
     # FIX: Properly shift the close array to capture historical gaps
-    close_shifted = df['Close'].shift(1).to_numpy()
+    close_shifted = df['Close'].shift(1).to_numpy(copy=True)
     if len(close_shifted) > 0:
         close_shifted[0] = close[0]
 
@@ -111,3 +111,46 @@ def get_market_trend(df: pd.DataFrame) -> str:
         return 'BEAR'
     else:
         return 'SIDE'
+
+
+def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
+    """Add the configured period/factor Supertrend fields used by entry routing."""
+    if df is None or df.empty:
+        return pd.DataFrame() if df is None else df.copy()
+
+    result = df.copy()
+    high = pd.to_numeric(result["High"], errors="coerce")
+    low = pd.to_numeric(result["Low"], errors="coerce")
+    close = pd.to_numeric(result["Close"], errors="coerce")
+    close_shifted = close.shift(1)
+    if not close_shifted.empty:
+        close_shifted.iloc[0] = close.iloc[0]
+    true_range = pd.concat(
+        [
+            high - low,
+            (high - close_shifted).abs(),
+            (low - close_shifted).abs(),
+        ],
+        axis=1,
+    ).max(axis=1)
+    atr = true_range.ewm(
+        alpha=1 / SYSDTSTPXY_ST1_PERIOD, adjust=False
+    ).mean()
+
+    st_line, mirror_line = _compute_single_st(
+        result,
+        period=SYSDTSTPXY_ST1_PERIOD,
+        factor=SYSDTSTPXY_ST1_FACTOR,
+    )
+    result["st_line"] = pd.Series(st_line, index=result.index)
+    result["st_mirror"] = pd.Series(mirror_line, index=result.index)
+    result["st_atr"] = atr
+    result["ST_Trend"] = np.select(
+        [
+            close > np.maximum(result["st_line"], result["st_mirror"]),
+            close < np.minimum(result["st_line"], result["st_mirror"]),
+        ],
+        ["BULL", "BEAR"],
+        default="SIDE",
+    )
+    return result

@@ -12,7 +12,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_NEW_BOOK_CUTOFF,
     SYSCNFGPXY_TIMEZONE,
 )
-from sysstrndpxy import calculate_supertrend
+from sysdtstpxy import calculate_supertrend
 
 EXE_DIR = Path(__file__).resolve().parent / "exe"
 if str(EXE_DIR) not in sys.path:
@@ -51,7 +51,7 @@ def _finite_row_values(row, columns):
 
 
 def _supertrend_entry_signal(df, now=None):
-    """Apply unified ATR-based entry rules completely independent of market sentiment."""
+    """Use countertrend market confirmation with configured Supertrend ATR zones."""
     if df is None or df.empty:
         return "NONE", "NONE"
 
@@ -67,6 +67,9 @@ def _supertrend_entry_signal(df, now=None):
     if trend not in {"BULL", "BEAR", "SIDE"}:
         return "NONE", "NONE"
 
+    market_signal = str(get_market_signal(df)).upper().strip()
+    if market_signal not in {"BULL", "BEAR"}:
+        market_signal = "NONE"
     latest = processed.iloc[-1]
     entry_signal = "NONE"
 
@@ -77,9 +80,17 @@ def _supertrend_entry_signal(df, now=None):
             if values is not None:
                 price, st_line, atr = values
                 if atr > 0:
-                    if trend == "BULL" and st_line <= price <= st_line + atr:
+                    if (
+                        trend == "BULL"
+                        and market_signal == "BEAR"
+                        and st_line <= price <= st_line + atr
+                    ):
                         entry_signal = "BUY"
-                    elif trend == "BEAR" and st_line - atr <= price <= st_line:
+                    elif (
+                        trend == "BEAR"
+                        and market_signal == "BULL"
+                        and st_line - atr <= price <= st_line
+                    ):
                         entry_signal = "SELL"
         return _apply_new_book_cutoff(entry_signal, trend, now)
 
@@ -90,14 +101,13 @@ def _supertrend_entry_signal(df, now=None):
             price, st_line, mirror, atr = values
             if atr > 0:
                 upper_band, lower_band = max(st_line, mirror), min(st_line, mirror)
-                
-                if price <= (lower_band + atr):
+                if market_signal == "BEAR" and price <= (lower_band + atr):
                     entry_signal = "BUY"
-                elif price >= (upper_band - atr):
+                elif market_signal == "BULL" and price >= (upper_band - atr):
                     entry_signal = "SELL"
                     
     exit_signal = "NONE"  
-    return _apply_new_book_cutoff(entry_signal, exit_signal, now)
+    return _apply_new_book_cutoff(entry_signal, market_signal, now)
 
 
 def get_entry_signal(df=None):
