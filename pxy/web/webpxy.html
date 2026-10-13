@@ -1417,6 +1417,7 @@ async function loadTrades(){
     });
     const bookList=[...books.values()];
     bookList.sort((a,b)=>{
+        if(a.open!==b.open)return a.open?-1:1;
         let v;
         if(trCol==='pnl')v=a.pnl-b.pnl;
         else if(trCol==='time')v=a.sortTime-b.sortTime;
