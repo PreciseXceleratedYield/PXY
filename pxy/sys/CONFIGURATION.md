@@ -259,7 +259,10 @@ pauses and show each book at the end. Both options print total spot points gaine
 
 Run `pxychk` directly to run only the CHK test suite. The SIM runner also accepts
 `RUNMODE=SIM python3 syssimpxy.py --session-date YYYY-MM-DD` to replay one exact
-completed session.
+completed session. CHK checks the shared production decision gates and invokes
+the production averaging controller against temporary mock positions; any
+resulting orders are captured by a simulated client and never sent to a broker.
+The suite also runs production-pipe replay tests using the SIM broker adapter.
 
 ## Manual LGT replay
 

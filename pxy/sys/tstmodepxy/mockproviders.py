@@ -1,6 +1,11 @@
 """Synthetic providers selected only through sysmodepxy."""
 
 from datetime import datetime
+import math
+import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 import pandas as pd
@@ -14,6 +19,11 @@ from tstmodepxy.pipescenarios import (
     evaluate_scenario,
     selected_scenario_index,
 )
+
+_SYS_DIR = Path(__file__).resolve().parents[1]
+for _path in (_SYS_DIR, _SYS_DIR / "exe", _SYS_DIR / "exe" / "run"):
+    if str(_path) not in sys.path:
+        sys.path.insert(0, str(_path))
 
 
 def generate_mock_ohlc(
@@ -294,7 +304,99 @@ def run_counter_leg(remaining_df=None):
     return False
 
 
-def skip_live_averaging():
+def run_check_averaging(df=None, market_snapshot=None):
+    """Run the production averaging controller with temporary, simulated I/O."""
+    if df is not None:
+        if df.empty:
+            print("CHK MODE: no active rows for production averaging check.")
+            return True
+
+        try:
+            index_price = float(market_snapshot["price"].iloc[-1])
+        except (KeyError, IndexError, TypeError, ValueError, AttributeError):
+            index_price = 0.0
+        if not math.isfinite(index_price) or index_price <= 0:
+            print("CHK MODE: valid index price unavailable; averaging check skipped.")
+            return True
+
+        class CheckBroker:
+            def __init__(self, positions):
+                self._positions = positions
+                self.orders = []
+
+            def positions(self):
+                return {
+                    "stat": "Ok",
+                    "stCode": "200",
+                    "data": self._positions,
+                }
+
+            def place_order(self, **params):
+                self.orders.append(dict(params))
+                print(
+                    "CHK MODE: production averaging decision would place "
+                    f"{params.get('trading_symbol')}; simulated order only."
+                )
+                return {"stat": "Ok", "stCode": "200", "data": {"orderId": "CHK"}}
+
+        position_quantities = {}
+        for row in df.to_dict("records"):
+            symbol = str(row.get("symbol", "")).upper().strip()
+            try:
+                quantity = abs(int(float(row.get("qty", 0))))
+            except (TypeError, ValueError, OverflowError):
+                quantity = 0
+            if symbol.endswith(("CE", "PE")) and quantity:
+                position_quantities[symbol] = (
+                    position_quantities.get(symbol, 0) + quantity
+                )
+        broker_positions = [
+            {
+                "trdSym": symbol,
+                "net_qty": quantity,
+            }
+            for symbol, quantity in position_quantities.items()
+        ]
+        client = CheckBroker(broker_positions)
+
+        from exeavxpxy import handle_side_averaging
+        import exeavxpxy
+        import exeamspxy
+
+        with tempfile.TemporaryDirectory(prefix="pxy-chk-averaging-") as temp:
+            fixed_now = datetime.now(pytz.timezone("Asia/Kolkata")).replace(
+                hour=10, minute=0, second=0, microsecond=0
+            )
+
+            class CheckClock(datetime):
+                @classmethod
+                def now(cls, tz=None):
+                    return fixed_now if tz is None else fixed_now.astimezone(tz)
+
+            with (
+                patch.object(exeavxpxy, "datetime", CheckClock),
+                patch.object(exeavxpxy, "ledger_busy", return_value=False),
+                patch.object(
+                    exeavxpxy,
+                    "WEB_AVG_JSON_REL",
+                    str(Path(temp) / "webavgpxy.json"),
+                ),
+                patch.object(exeamspxy, "is_cooling", return_value=False),
+                patch.object(exeamspxy, "set_cooling", lambda _side: None),
+                patch.object(
+                    exeamspxy,
+                    "generate_pxy_tag",
+                    lambda: f"CHK-AVG-{len(client.orders) + 1}",
+                ),
+            ):
+                print("CHK MODE: running production averaging decision path.")
+                handle_side_averaging(client, df.copy(), index_price)
+                print(
+                    f"CHK MODE: production averaging check complete; "
+                    f"{len(client.orders)} simulated order(s), none sent to broker."
+                )
+        return True
+
     results = [
         (scenario, evaluate_scenario(scenario))
         for scenario in SCENARIOS

@@ -27,9 +27,6 @@ def run_snapshot():
 
     data = get_combined_data()
     df = data.get("active_orders", pd.DataFrame())
-    if dispatch_mode("skip_live_averaging", lambda: False):
-        return
-
     status = averaging_snapshot_status(
         data.get("error"),
         data.get("positions_unverified"),
@@ -66,6 +63,14 @@ def run_snapshot():
             f"{Fore.RED}⚠️ Invalid index price; averaging skipped because "
             "the dynamic LGT threshold cannot be calculated."
         )
+        return
+
+    if dispatch_mode(
+        "run_check_averaging",
+        lambda **_kwargs: False,
+        df=df,
+        market_snapshot=market_snapshot,
+    ):
         return
 
     client = get_session()

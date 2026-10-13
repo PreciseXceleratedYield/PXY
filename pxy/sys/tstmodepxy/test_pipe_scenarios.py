@@ -4,6 +4,8 @@ from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
 
+import pandas as pd
+
 SYS_DIR = Path(__file__).resolve().parents[1]
 if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
@@ -50,11 +52,54 @@ class PipeScenarioTests(unittest.TestCase):
     def test_chk_mock_gate_runs_every_scenario_not_minute_selected(self):
         output = StringIO()
         with redirect_stdout(output):
-            self.assertTrue(mockproviders.skip_live_averaging())
+            self.assertTrue(mockproviders.run_check_averaging())
         result = output.getvalue()
         self.assertIn("CHK PIPE SCENARIOS 10/10: PASS", result)
         for scenario in SCENARIOS:
             self.assertIn(scenario["name"], result)
+
+    def test_chk_averaging_runs_production_controller_with_safe_orders(self):
+        frame = pd.DataFrame([
+            {
+                "symbol": "NIFTY26OCT25000CE",
+                "qty": 65,
+                "buy_prc": 100.0,
+                "sell_prc": 30.0,
+                "pnl": -4550.0,
+                "exit": "BULL",
+                "atr": 5.0,
+                "ce_power": 1.0,
+                "pe_power": 1.0,
+                "hkin_ce_depth": 1,
+                "hkin_pe_depth": 1,
+            },
+            {
+                "symbol": "NIFTY26OCT25000PE",
+                "qty": 65,
+                "buy_prc": 100.0,
+                "sell_prc": 90.0,
+                "pnl": -650.0,
+                "exit": "BULL",
+                "atr": 5.0,
+                "ce_power": 1.0,
+                "pe_power": 1.0,
+                "hkin_ce_depth": 1,
+                "hkin_pe_depth": 1,
+            },
+        ])
+        market_snapshot = pd.DataFrame([{"price": 22500.0}])
+        output = StringIO()
+        with redirect_stdout(output):
+            self.assertTrue(
+                mockproviders.run_check_averaging(frame, market_snapshot)
+            )
+
+        self.assertIn(
+            "running production averaging decision path",
+            output.getvalue(),
+        )
+        self.assertIn("production averaging decision would place", output.getvalue())
+        self.assertIn("1 simulated order(s), none sent to broker", output.getvalue())
 
     def test_chk_engine_is_blocked_only_during_weekday_market_hours(self):
         from datetime import datetime, timezone
