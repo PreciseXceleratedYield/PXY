@@ -1442,8 +1442,18 @@ async function loadTrades(){
             <span class="t-pnl ${pb?'bull':'bear'}">${fmt(pnl)}</span>`;
         const toggle=()=>{
             const expanded=details.style.display==='none';
-            details.style.display=expanded?'block':'none';
-            if(expanded)expandedTradeBooks.add(book.key);else expandedTradeBooks.delete(book.key);
+            expandedTradeBooks.clear();
+            scroll.querySelectorAll('.t-book-details').forEach(item=>{
+                item.style.display='none';
+            });
+            scroll.querySelectorAll('.t-book-row').forEach(item=>{
+                item.setAttribute('aria-expanded','false');
+                item.querySelector('.t-book-toggle').textContent='▸';
+            });
+            if(expanded){
+                expandedTradeBooks.add(book.key);
+                details.style.display='block';
+            }
             summary.setAttribute('aria-expanded',String(expanded));
             summary.querySelector('.t-book-toggle').textContent=expanded?'▾':'▸';
         };
