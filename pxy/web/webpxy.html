@@ -247,7 +247,13 @@ body{
     transition:background 0.25s;
 }
 .t-book-row:hover{background:var(--bg3);}
-.t-book-row.closed,.t-row.closed{filter:grayscale(1);opacity:.55;}
+.t-book-row.closed .t-book-toggle,
+.t-book-row.closed .t-book-name,
+.t-book-row.closed .t-book-meta,
+.t-row.closed .t-tag,
+.t-row.closed .t-sym,
+.t-row.closed .t-meta{color:var(--muted);}
+.t-row.closed.bull-r,.t-row.closed.bear-r{border-left-color:var(--muted);}
 .t-book-details{border-bottom:1px solid var(--border);}
 .t-book-details .t-row{padding-left:20px;}
 .t-book-toggle{font-size:9px;color:var(--accent);width:12px;}
