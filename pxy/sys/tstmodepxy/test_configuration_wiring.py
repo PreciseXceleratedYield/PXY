@@ -55,8 +55,6 @@ from syscnfgpxy import (
     SYSCNFGPXY_SQUAREOFF_ALL_START,
     SYSCNFGPXY_SQUAREOFF_END,
     SYSCNFGPXY_TIMEZONE,
-    SYSSTRNDPXY_ST1_ATR_VALUE,
-    SYSSTRNDPXY_ST1_FACTOR,
     SYSSMAPXY_VARIANT,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
     EXEAMSPXY_MAX_INVESTMENT,
@@ -128,40 +126,24 @@ class ConfigurationWiringTests(unittest.TestCase):
             syscnfgpxy.TSTPOINTBTPXY_FORCE_EXIT_TIME, SYSCNFGPXY_SQUAREOFF_ALL_START
         )
 
-    def test_supertrend_uses_fixed_1_4_point_atr_and_configured_factor(self):
-        index = pd.date_range("2026-10-07", periods=3, freq="min")
+    def test_chart_supertrend_matches_configured_entry_calculation(self):
+        index = pd.date_range("2026-10-07", periods=20, freq="min")
         frame = pd.DataFrame(
             {
-                "Open": [99.0, 100.0, 101.0],
-                "High": [101.0, 105.0, 103.0],
-                "Low": [98.0, 99.0, 100.0],
-                "Close": [100.0, 101.0, 102.0],
+                "Open": [100.0 + i for i in range(20)],
+                "High": [102.0 + i for i in range(20)],
+                "Low": [99.0 + i for i in range(20)],
+                "Close": [101.0 + i for i in range(20)],
             },
             index=index,
         )
-        atr_value = SYSSTRNDPXY_ST1_ATR_VALUE
-        factor = SYSSTRNDPXY_ST1_FACTOR
-        self.assertEqual(atr_value, 1.4)
-        self.assertEqual(factor, 1.4)
-
-        single_line, _, _, _ = _compute_single_st(
-            frame, factor=factor, atr_value=atr_value
-        )
-        first_hl2 = (frame["High"].iloc[0] + frame["Low"].iloc[0]) / 2
-        self.assertEqual(
-            single_line.iloc[0],
-            first_hl2 + factor * atr_value,
-        )
         processed = sysstrndpxy.calculate_supertrend(frame.copy())
-        self.assertEqual(processed["st_atr"].tolist(), [1.4, 1.4, 1.4])
-
-    def test_supertrend_uses_1_4_point_atr_with_legacy_config(self):
-        legacy_config = SimpleNamespace()
-        with redirect_stdout(StringIO()) as output:
-            atr_value = sysstrndpxy._configured_st_atr_value(legacy_config)
-
-        self.assertEqual(atr_value, 1.4)
-        self.assertIn("Legacy syscnfgpxy.py is missing", output.getvalue())
+        entry_processed = sysdtstpxy.calculate_supertrend(frame.copy())
+        for column in ("st_line", "st_mirror", "st_atr", "ST_Trend"):
+            self.assertEqual(
+                processed[column].tolist(),
+                entry_processed[column].tolist(),
+            )
 
     def test_syspxy_snapshot_passes_through_sma_status(self):
         snapshot_df = pd.DataFrame({"Close": [100.0]})

@@ -1,44 +1,15 @@
 # sysstrndpxy.py
 import json
 import os
-import sys
 import warnings
-import numpy as np
 import pandas as pd
 
 import syscnfgpxy
 from syssmapxy import calculate_moving_average
+from sysdtstpxy import calculate_supertrend as calculate_entry_supertrend
+from sysdtstpxy import get_market_trend as get_entry_market_trend
 
 TIMEZONE = syscnfgpxy.SYSCNFGPXY_TIMEZONE
-
-
-def _configured_st_atr_value(config):
-    value = getattr(config, "SYSSTRNDPXY_ST1_ATR_VALUE", None)
-    if value is None:
-        value = 1.4
-        print(
-            "⚠️ Legacy syscnfgpxy.py is missing SYSSTRNDPXY_ST1_ATR_VALUE; "
-            "using the fixed 1.4-point Supertrend ATR."
-        )
-    return value
-
-
-SYSSTRNDPXY_ST1_ATR_VALUE = _configured_st_atr_value(syscnfgpxy)
-SYSSTRNDPXY_ST1_FACTOR = syscnfgpxy.SYSSTRNDPXY_ST1_FACTOR
-
-# 🛡️ DEFENSIVE IMPORTS ROUTING MATH DIRECTLY TO THE CALCULATION ENGINE
-try:
-    from systrcalpxy import _compute_single_st
-except ImportError as e:
-    # No fake trend: zeros would read as SIDE and live trading would carry on copying the candle.
-    # Every call now raises, and sysentrpxy turns that into NONE/NONE (no entry, no exit key).
-    print(f"🚨 CRITICAL: Cannot locate 'systrcalpxy.py' ({e}). Trend engine disabled.", file=sys.stderr)
-    _IMPORT_ERR = str(e)
-
-    def _engine_down(*args, **kwargs):
-        raise RuntimeError(f"systrcalpxy unavailable ({_IMPORT_ERR}); refusing to fake a trend.")
-
-    _compute_single_st = _engine_down
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
@@ -46,24 +17,16 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # 🎛️ MASTER CONFIGURATION LAYER (PXY Universal Framework Parameters)
 # ==============================================================================
 def get_market_trend(df: pd.DataFrame) -> str:
-    """Evaluates raw data frame layouts via intermediate calculations handles."""
+    """Return the same configured Supertrend classification used for entry."""
     if df is None or df.empty or len(df) < 2:
         return 'SIDE'
-
-    st_line, mirror_line, m0_series, raw_trend_series = _compute_single_st(
-        df,
-        factor=SYSSTRNDPXY_ST1_FACTOR,
-        atr_value=SYSSTRNDPXY_ST1_ATR_VALUE,
-    )
-    m0_curr, st_curr, mirror_curr = float(m0_series.iloc[-1]), float(st_line.iloc[-1]), float(mirror_line.iloc[-1])
-    highest_line, lowest_line = max(st_curr, mirror_curr), min(st_curr, mirror_curr)
-    if m0_curr > highest_line: return 'BULL'
-    elif m0_curr < lowest_line: return 'BEAR'
-    return 'SIDE'
+    return get_entry_market_trend(df)
 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """Calculates Universal Supertrend Master Matrix and returns structural states."""
+    """Calculate chart Supertrend with the exact settings and math used for entries."""
+    if df is None:
+        return pd.DataFrame()
     if df.empty:
         from sysdtafpxy import fetch_yf_data
         try:
@@ -81,34 +44,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     tz_string = str(TIMEZONE)
     df = df.tz_convert(tz_string) if df.index.tz is not None else df.tz_localize('UTC').tz_convert(tz_string)
 
-    st1_line, st1_mirror, m0_series, _ = _compute_single_st(
-        df,
-        factor=SYSSTRNDPXY_ST1_FACTOR,
-        atr_value=SYSSTRNDPXY_ST1_ATR_VALUE,
-    )
-    st_atr = pd.Series(SYSSTRNDPXY_ST1_ATR_VALUE, index=df.index, dtype=float)
-    st_arr = st1_line.to_numpy()
-    mirror_arr = st1_mirror.to_numpy()
-    m0_arr = m0_series.to_numpy()
-    highest_arr = np.maximum(st_arr, mirror_arr)
-    lowest_arr = np.minimum(st_arr, mirror_arr)
-    st_trend_series = pd.Series(
-        np.select(
-            [m0_arr > highest_arr, m0_arr < lowest_arr],
-            ["BULL", "BEAR"],
-            default="SIDE",
-        ),
-        index=df.index,
-    )
+    df = calculate_entry_supertrend(df)
 
-    # Clean legacy dashboard field overrides to prevent exceptions
-    df['st_line'] = st1_line           
-    df['st_mirror'] = st1_mirror       
-    df['m0_line'] = m0_series
-    df['st_atr'] = st_atr
-    df['ST_Trend'] = st_trend_series   
-    df['ST'] = st1_line                
-    df['st1_mirror'] = st1_mirror      
+    df['ST'] = df['st_line']
+    df['st1_mirror'] = df['st_mirror']
     df['sma_50'] = calculate_moving_average(df['Close'], period=50, variant="SMA")
     df['tsma_50'] = calculate_moving_average(df['Close'], period=50, variant="TSMA")
 

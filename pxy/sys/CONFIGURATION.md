@@ -39,10 +39,10 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   The standalone 15:25 square-off trigger is also intentionally separate from
   the staged exit schedule. Legacy `exe/run/X` scripts and pipe-scenario test
   fixtures retain their own values; they do not drive the production schedule.
-- Supertrend always uses the DUAL calculation with a fixed ATR of
-  `SYSSTRNDPXY_ST1_ATR_VALUE` (default `5` NIFTY points) and factor
-  `SYSSTRNDPXY_ST1_FACTOR` (default `1.4`). Both Supertrend bands use this fixed
-  ATR distance; it is independent of SKATR's session-based true-range ATR.
+- The chart and ST entry router share the same Supertrend implementation and
+  settings: `SYSDTSTPXY_ST1_PERIOD` (default `14`) and
+  `SYSDTSTPXY_ST1_FACTOR` (default `3`). The Supertrend's Wilder-style true
+  range ATR is distinct from SKATR's session-based true-range ATR.
 - SKATR true-range ATR (mode 2) starts accumulating at 09:16 IST each session:
   the 09:16 candle uses high minus low only, excluding the 09:15 close gap.
   Each following value is the expanding mean through candle 14, and subsequent
@@ -114,8 +114,8 @@ produce no entry. When `ST` is selected, MKT is used through 09:59:59 IST;
 the ST router starts at 10:00 IST. ST uses Supertrend direction as the exit
 signal when trend is BULL or BEAR and enables the historical MKT countertrend
 pullback entry filter.
-In `ST`, entries require an opposing MKT signal and a close within half an ST
-factor times fixed ST ATR of the ST line. When Supertrend is SIDE, entries are
+In `ST`, entries require an opposing MKT signal and a close within one ATR of
+the ST line. When Supertrend is SIDE, entries are
 allowed only in the outer quarter of the mirrored ST band and in the opposing
 MKT direction; the exit signal follows MKT. Both variants respect the shared
 new-book cutoff and post-square-off cooldown.
@@ -283,11 +283,8 @@ historical option P&L.
 - `SYSKATRPXY_ATR_STATIC_VALUE` is used for `ATR_MODE=1`; the true-ATR period,
   cap, minimum-row requirement, and fallback apply to mode 2; the depth floor
   applies to dynamic mode 3.
-- `SYSSTRNDPXY_ST1_ATR_VALUE` and `SYSSTRNDPXY_ST1_FACTOR` configure the
-  production DUAL Supertrend fixed ATR and multiplier.
-- `SYSPLCHRTPXY_*` are consumed by the separate chart generator, not the
-  production signal path. `SYSDTSTPXY_*` and `SYSRIGPXY_*` belong to standalone
-  modules with no caller in the production launch graph.
+- `SYSPLCHRTPXY_*` are consumed by the separate chart generator. `SYSRIGPXY_*`
+  belong to standalone modules with no caller in the production launch graph.
 - TGT uses only `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and the option side for
   alignment; direction, investment balance, Supertrend, and moving-average
   values do not affect target alignment. Aligned positions use
