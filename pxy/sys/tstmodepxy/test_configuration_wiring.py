@@ -2,7 +2,6 @@ import re
 import sys
 import tempfile
 import unittest
-from types import SimpleNamespace
 from contextlib import redirect_stdout
 from datetime import date, datetime, time as dt_time, timedelta
 from io import StringIO
@@ -54,7 +53,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_SQUAREOFF_ALL_START,
     SYSCNFGPXY_SQUAREOFF_END,
     SYSCNFGPXY_TIMEZONE,
-    SYSSTRNDPXY_ST1_ATR_VALUE,
+    SYSSTRNDPXY_ST1_PERIOD,
     SYSSTRNDPXY_ST1_FACTOR,
     SYSSMAPXY_VARIANT,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
@@ -127,40 +126,33 @@ class ConfigurationWiringTests(unittest.TestCase):
             syscnfgpxy.TSTPOINTBTPXY_FORCE_EXIT_TIME, SYSCNFGPXY_SQUAREOFF_ALL_START
         )
 
-    def test_supertrend_uses_fixed_1_4_point_atr_and_configured_factor(self):
-        index = pd.date_range("2026-10-07", periods=3, freq="min")
+    def test_supertrend_uses_wilder_atr_14_and_factor_3(self):
+        index = pd.date_range("2026-10-07", periods=16, freq="min")
         frame = pd.DataFrame(
             {
-                "Open": [99.0, 100.0, 101.0],
-                "High": [101.0, 105.0, 103.0],
-                "Low": [98.0, 99.0, 100.0],
-                "Close": [100.0, 101.0, 102.0],
+                "Open": [100.0] * 16,
+                "High": [101.0] * 16,
+                "Low": [99.0] * 16,
+                "Close": [100.0] * 16,
             },
             index=index,
         )
-        atr_value = SYSSTRNDPXY_ST1_ATR_VALUE
+        atr_period = SYSSTRNDPXY_ST1_PERIOD
         factor = SYSSTRNDPXY_ST1_FACTOR
-        self.assertEqual(atr_value, 1.4)
-        self.assertEqual(factor, 1.4)
+        self.assertEqual(atr_period, 14)
+        self.assertEqual(factor, 3.0)
 
         single_line, _, _, _ = _compute_single_st(
-            frame, factor=factor, atr_value=atr_value
+            frame, factor=factor, atr_period=atr_period
         )
         first_hl2 = (frame["High"].iloc[0] + frame["Low"].iloc[0]) / 2
         self.assertEqual(
-            single_line.iloc[0],
-            first_hl2 + factor * atr_value,
+            single_line.iloc[atr_period - 1],
+            first_hl2 + factor * 2.0,
         )
         processed = sysstrndpxy.calculate_supertrend(frame.copy())
-        self.assertEqual(processed["st_atr"].tolist(), [1.4, 1.4, 1.4])
-
-    def test_supertrend_uses_1_4_point_atr_with_legacy_config(self):
-        legacy_config = SimpleNamespace()
-        with redirect_stdout(StringIO()) as output:
-            atr_value = sysstrndpxy._configured_st_atr_value(legacy_config)
-
-        self.assertEqual(atr_value, 1.4)
-        self.assertIn("Legacy syscnfgpxy.py is missing", output.getvalue())
+        self.assertTrue(processed["st_atr"].iloc[:13].isna().all())
+        self.assertEqual(processed["st_atr"].iloc[13:].tolist(), [2.0, 2.0, 2.0])
 
     def test_syspxy_snapshot_passes_through_sma_status(self):
         snapshot_df = pd.DataFrame({"Close": [100.0]})
@@ -442,9 +434,9 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_st_variant_rejects_out_of_zone_and_same_direction_market(self):
         frame = pd.DataFrame({"Close": [101.0]})
         cases = (
-            ("BULL", "BEAR", 102.101, "BUY"),
+            ("BULL", "BEAR", 103.001, "BUY"),
             ("BULL", "BULL", 100.5, "BUY"),
-            ("BEAR", "BULL", 97.899, "SELL"),
+            ("BEAR", "BULL", 96.999, "SELL"),
             ("BEAR", "BEAR", 99.5, "SELL"),
         )
         for trend, market_signal, price, _candidate in cases:
@@ -1583,19 +1575,19 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(depth_floor, 8)
         self.assertEqual(true_atr_fallback, 7.0)
 
-    def test_true_atr_expands_from_first_0916_candle_then_rolls_14(self):
+    def test_true_atr_uses_standard_wilder_period_14(self):
         index = pd.date_range(
             "2026-10-07 09:15",
             periods=16,
             freq="min",
             tz="Asia/Kolkata",
         )
-        candle_ranges = [200.0] + [float(value) for value in range(1, 16)]
+        candle_ranges = [float(value) for value in range(1, 17)]
         frame = pd.DataFrame(
             {
-                "High": [100.0 + value / 2 for value in candle_ranges],
-                "Low": [100.0 - value / 2 for value in candle_ranges],
-                "Close": [0.0] + [100.0] * (len(index) - 1),
+                "High": [value / 2 for value in candle_ranges],
+                "Low": [-value / 2 for value in candle_ranges],
+                "Close": [0.0] * len(index),
             },
             index=index,
         )
@@ -1603,33 +1595,36 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(syskatrpxy.SYSKATRPXY_TRUE_ATR_PERIOD, 14)
         atr_series = syskatrpxy.calculate_atr(frame)
         self.assertEqual(atr_series.iloc[0], syskatrpxy.SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE)
-        self.assertEqual(atr_series.iloc[1], 1.0)
-        self.assertEqual(atr_series.iloc[2], 1.5)
-        self.assertEqual(syskatrpxy.calculate_true_atr(frame.iloc[:2]), 1.0)
-        self.assertEqual(syskatrpxy.calculate_true_atr(frame.iloc[:3]), 1.5)
-        self.assertEqual(syskatrpxy.calculate_true_atr(frame.iloc[:15]), 7.5)
-        self.assertEqual(syskatrpxy.calculate_true_atr(frame), 8.5)
+        self.assertEqual(
+            atr_series.iloc[12],
+            syskatrpxy.SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE,
+        )
+        self.assertEqual(atr_series.iloc[13], 7.5)
+        self.assertAlmostEqual(atr_series.iloc[14], (7.5 * 13 + 15) / 14)
+        self.assertAlmostEqual(
+            atr_series.iloc[15],
+            (atr_series.iloc[14] * 13 + 16) / 14,
+        )
 
-    def test_true_atr_resets_at_each_session_open(self):
+    def test_true_atr_carries_wilder_state_across_sessions(self):
         index = pd.DatetimeIndex(
             [
-                "2026-10-06 09:16",
-                "2026-10-06 09:17",
-                "2026-10-07 09:15",
+                "2026-10-06 15:29",
                 "2026-10-07 09:16",
             ],
             tz="Asia/Kolkata",
         )
         frame = pd.DataFrame(
             {
-                "High": [150.0, 150.0, 100.0, 101.0],
-                "Low": [50.0, 50.0, 100.0, 99.0],
-                "Close": [100.0, 100.0, 100.0, 100.0],
+                "High": [101.0, 111.0],
+                "Low": [99.0, 109.0],
+                "Close": [100.0, 110.0],
             },
             index=index,
         )
 
-        self.assertEqual(syskatrpxy.calculate_true_atr(frame), 2.0)
+        with patch.object(syskatrpxy, "SYSKATRPXY_TRUE_ATR_PERIOD", 2):
+            self.assertEqual(syskatrpxy.calculate_true_atr(frame), 6.5)
 
 
 if __name__ == "__main__":

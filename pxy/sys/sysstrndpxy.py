@@ -7,23 +7,12 @@ import numpy as np
 import pandas as pd
 
 import syscnfgpxy
+from systrcalpxy import _compute_single_st, calculate_wilder_atr
 from syssmapxy import calculate_moving_average
 
 TIMEZONE = syscnfgpxy.SYSCNFGPXY_TIMEZONE
 
-
-def _configured_st_atr_value(config):
-    value = getattr(config, "SYSSTRNDPXY_ST1_ATR_VALUE", None)
-    if value is None:
-        value = 1.4
-        print(
-            "⚠️ Legacy syscnfgpxy.py is missing SYSSTRNDPXY_ST1_ATR_VALUE; "
-            "using the fixed 1.4-point Supertrend ATR."
-        )
-    return value
-
-
-SYSSTRNDPXY_ST1_ATR_VALUE = _configured_st_atr_value(syscnfgpxy)
+SYSSTRNDPXY_ST1_PERIOD = syscnfgpxy.SYSSTRNDPXY_ST1_PERIOD
 SYSSTRNDPXY_ST1_FACTOR = syscnfgpxy.SYSSTRNDPXY_ST1_FACTOR
 
 # 🛡️ DEFENSIVE IMPORTS ROUTING MATH DIRECTLY TO THE CALCULATION ENGINE
@@ -53,7 +42,7 @@ def get_market_trend(df: pd.DataFrame) -> str:
     st_line, mirror_line, m0_series, raw_trend_series = _compute_single_st(
         df,
         factor=SYSSTRNDPXY_ST1_FACTOR,
-        atr_value=SYSSTRNDPXY_ST1_ATR_VALUE,
+        atr_period=SYSSTRNDPXY_ST1_PERIOD,
     )
     m0_curr, st_curr, mirror_curr = float(m0_series.iloc[-1]), float(st_line.iloc[-1]), float(mirror_line.iloc[-1])
     highest_line, lowest_line = max(st_curr, mirror_curr), min(st_curr, mirror_curr)
@@ -84,9 +73,9 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     st1_line, st1_mirror, m0_series, _ = _compute_single_st(
         df,
         factor=SYSSTRNDPXY_ST1_FACTOR,
-        atr_value=SYSSTRNDPXY_ST1_ATR_VALUE,
+        atr_period=SYSSTRNDPXY_ST1_PERIOD,
     )
-    st_atr = pd.Series(SYSSTRNDPXY_ST1_ATR_VALUE, index=df.index, dtype=float)
+    st_atr = calculate_wilder_atr(df, SYSSTRNDPXY_ST1_PERIOD)
     st_arr = st1_line.to_numpy()
     mirror_arr = st1_mirror.to_numpy()
     m0_arr = m0_series.to_numpy()

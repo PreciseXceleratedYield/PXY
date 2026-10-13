@@ -39,15 +39,15 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
   The standalone 15:25 square-off trigger is also intentionally separate from
   the staged exit schedule. Legacy `exe/run/X` scripts and pipe-scenario test
   fixtures retain their own values; they do not drive the production schedule.
-- Supertrend always uses the DUAL calculation with a fixed ATR of
-  `SYSSTRNDPXY_ST1_ATR_VALUE` (default `5` NIFTY points) and factor
-  `SYSSTRNDPXY_ST1_FACTOR` (default `1.4`). Both Supertrend bands use this fixed
-  ATR distance; it is independent of SKATR's session-based true-range ATR.
-- SKATR true-range ATR (mode 2) starts accumulating at 09:16 IST each session:
-  the 09:16 candle uses high minus low only, excluding the 09:15 close gap.
-  Each following value is the expanding mean through candle 14, and subsequent
-  values use a rolling 14-candle mean. The session window resets daily; earlier
-  candles use the configured fallback.
+- Supertrend uses the DUAL calculation with standard Wilder ATR period
+  `SYSSTRNDPXY_ST1_PERIOD` (14) and factor `SYSSTRNDPXY_ST1_FACTOR` (3.0).
+  The initial ATR is seeded with a 14-true-range simple mean; later values use
+  Wilder smoothing.
+- SKATR true ATR mode 2 uses the same standard Wilder ATR calculation with
+  `SYSKATRPXY_TRUE_ATR_PERIOD` (14). The initial value is seeded with a
+  14-true-range simple mean and later values use Wilder smoothing across the
+  candle series. Before the 14-value seed is available it uses
+  `SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE`.
 - `SYSSMAPXY_VARIANT` selects the production 50-period average used by
   `syssmapxy.get_sma()` and defaults to `TSMA`, the rolling linear-regression
   endpoint; `SMA` preserves the simple-moving-average behavior. The web chart
@@ -115,7 +115,7 @@ the ST router starts at 10:00 IST. ST uses Supertrend direction as the exit
 signal when trend is BULL or BEAR and enables the historical MKT countertrend
 pullback entry filter.
 In `ST`, entries require an opposing MKT signal and a close within half an ST
-factor times fixed ST ATR of the ST line. When Supertrend is SIDE, entries are
+factor times the current ST ATR of the ST line. When Supertrend is SIDE, entries are
 allowed only in the outer quarter of the mirrored ST band and in the opposing
 MKT direction; the exit signal follows MKT. Both variants respect the shared
 new-book cutoff and post-square-off cooldown.
@@ -280,11 +280,11 @@ historical option P&L.
 
 ## Other conditional settings
 
-- `SYSKATRPXY_ATR_STATIC_VALUE` is used for `ATR_MODE=1`; the true-ATR period,
-  cap, minimum-row requirement, and fallback apply to mode 2; the depth floor
-  applies to dynamic mode 3.
-- `SYSSTRNDPXY_ST1_ATR_VALUE` and `SYSSTRNDPXY_ST1_FACTOR` configure the
-  production DUAL Supertrend fixed ATR and multiplier.
+- `SYSKATRPXY_ATR_STATIC_VALUE` is used for `ATR_MODE=1`; the true-ATR period
+  and warm-up fallback apply to mode 2; the depth floor applies to dynamic
+  mode 3.
+- `SYSSTRNDPXY_ST1_PERIOD` and `SYSSTRNDPXY_ST1_FACTOR` configure the
+  production DUAL Supertrend ATR period and multiplier.
 - `SYSPLCHRTPXY_*` are consumed by the separate chart generator, not the
   production signal path. `SYSDTSTPXY_*` and `SYSRIGPXY_*` belong to standalone
   modules with no caller in the production launch graph.
