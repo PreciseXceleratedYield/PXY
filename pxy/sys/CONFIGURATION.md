@@ -317,15 +317,15 @@ historical option P&L.
   The opposite side must have open positions and negative overall P&L, and
   only the signal-aligned side may average. The averaging side must also be
   losing at or beyond its applicable LGT threshold.
-- LGT is calculated from the own/opposite investment factor and one plus the
-  actual own-side open lot count, then negated:
+- LGT is calculated from the own/opposite investment factor and the actual
+  own-side open lot count, then negated:
   `r = own investment / opposite investment`, clamped to `[0.1, 10]`;
-  `n = 1 + actual own-side open lot count`;
-  `magnitude = max(1.4, round(33 × n × r, 2))`;
+  `n = max(1, actual own-side open lot count)`;
+  `magnitude = max(1.4, round(50 × n × r, 2))`;
   `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS) ×
   EXEAMSPXY_LGT_SCALE`. If either side has no positive investment, or an input
   is non-finite, the fallback is `r = 1, n = 1`. Zero actual own-side lots
-  yield `n = 1`; one actual own-side lot yields `n = 2`; two or more lots reach
+  use `n = 1`; at an equal investment ratio, two or more own-side lots reach
   the 77% base cap before scaling. The own lot count comes from the verified
   broker position summary.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
