@@ -11,7 +11,6 @@ from syscnfgpxy import (
     SYSENTRPXY_ST_START,
     SYSCNFGPXY_NEW_BOOK_CUTOFF,
     SYSCNFGPXY_TIMEZONE,
-    SYSSTRNDPXY_ST1_FACTOR,
 )
 from sysstrndpxy import calculate_supertrend
 
@@ -52,7 +51,7 @@ def _finite_row_values(row, columns):
 
 
 def _supertrend_entry_signal(df, now=None):
-    """Apply the historical ST/MKT countertrend pullback entry rules."""
+    """Apply unified ATR-based entry rules completely independent of market sentiment."""
     if df is None or df.empty:
         return "NONE", "NONE"
 
@@ -68,46 +67,36 @@ def _supertrend_entry_signal(df, now=None):
     if trend not in {"BULL", "BEAR", "SIDE"}:
         return "NONE", "NONE"
 
-    market_signal = str(get_market_signal(df)).upper().strip()
-    if market_signal not in {"BULL", "BEAR"}:
-        market_signal = "NONE"
-
     latest = processed.iloc[-1]
     entry_signal = "NONE"
+
+    # --- TRENDING STRATEGY (1.0 * ATR Corridor Boundaries) ---
     if trend in {"BULL", "BEAR"}:
         if {"Close", "st_line", "st_atr"}.issubset(processed.columns):
             values = _finite_row_values(latest, ("Close", "st_line", "st_atr"))
-            if values is not None and values[2] > 0:
+            if values is not None:
                 price, st_line, atr = values
-                zone_width = (SYSSTRNDPXY_ST1_FACTOR / 2.0) * atr
-                if (
-                    trend == "BULL"
-                    and market_signal == "BEAR"
-                    and st_line <= price <= st_line + zone_width
-                ):
-                    entry_signal = "BUY"
-                elif (
-                    trend == "BEAR"
-                    and market_signal == "BULL"
-                    and st_line - zone_width <= price <= st_line
-                ):
-                    entry_signal = "SELL"
+                if atr > 0:
+                    if trend == "BULL" and st_line <= price <= st_line + atr:
+                        entry_signal = "BUY"
+                    elif trend == "BEAR" and st_line - atr <= price <= st_line:
+                        entry_signal = "SELL"
         return _apply_new_book_cutoff(entry_signal, trend, now)
 
-    if {"Close", "st_line", "st_mirror"}.issubset(processed.columns):
-        values = _finite_row_values(latest, ("Close", "st_line", "st_mirror"))
+    # --- SIDEWAYS STRATEGY (Edge-Based ATR Envelopes) ---
+    if {"Close", "st_line", "st_mirror", "st_atr"}.issubset(processed.columns):
+        values = _finite_row_values(latest, ("Close", "st_line", "st_mirror", "st_atr"))
         if values is not None:
-            price, st_line, mirror = values
-            upper_band, lower_band = max(st_line, mirror), min(st_line, mirror)
-            band_width = upper_band - lower_band
-            if band_width > 0:
-                lower_quarter = lower_band + band_width * 0.25
-                upper_quarter = upper_band - band_width * 0.25
-                if price <= lower_quarter and market_signal == "BEAR":
+            price, st_line, mirror, atr = values
+            if atr > 0:
+                upper_band, lower_band = max(st_line, mirror), min(st_line, mirror)
+                
+                if price <= (lower_band + atr):
                     entry_signal = "BUY"
-                elif price >= upper_quarter and market_signal == "BULL":
+                elif price >= (upper_band - atr):
                     entry_signal = "SELL"
-    exit_signal = market_signal if market_signal in {"BULL", "BEAR"} else "NONE"
+                    
+    exit_signal = "NONE"  
     return _apply_new_book_cutoff(entry_signal, exit_signal, now)
 
 
