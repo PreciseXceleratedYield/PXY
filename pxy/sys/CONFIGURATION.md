@@ -108,12 +108,16 @@ values until deliberately restarted.
 
 ## Option strike selection
 
-`sysentrpxy` derives the entry signal directly from the exit signal:
-exit BULL maps to entry BUY, exit BEAR maps to entry SELL, and exit SIDE/NONE
-maps to entry NONE. When Supertrend is BULL or BEAR, that trend is the exit
-signal. When Supertrend is SIDE, the exit signal follows
-`sysmktpxy.get_signal()` (BULL/BEAR, or NONE). Entry no longer applies a
-separate MKT countertrend or Supertrend ATR/band-zone filter.
+`SYSENTRPXY_VARIANT` selects the `sysentrpxy` signal router. `MKT` (default)
+maps MKT exit BULL to entry BUY and BEAR to SELL; nondirectional MKT signals
+produce no entry. `ST` uses Supertrend direction as the exit signal when trend
+is BULL or BEAR and enables the historical MKT countertrend pullback entry
+filter.
+In `ST`, entries require an opposing MKT signal and a close within half an ST
+factor times fixed ST ATR of the ST line. When Supertrend is SIDE, entries are
+allowed only in the outer quarter of the mirrored ST band and in the opposing
+MKT direction; the exit signal follows MKT. Both variants respect the shared
+new-book cutoff and post-square-off cooldown.
 `SYSDTAFPXY_SELECTED_MODE` selects the DTAF candle transform (default `0`):
 mode `0` uses modified-close candles, mode `1` keeps raw candles, and mode `2`
 sets `Close` to the `Open`/`Close` midpoint. In every mode, the live Yahoo OHLC

@@ -53,6 +53,11 @@ EXEPXYPXY_IDLE_PAUSE_SECONDS = 6
 EXEPXYPXY_IDLE_POLL_SECONDS = 60
 SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 
+# Entry signal router.
+SYSENTRPXY_VARIANT = "MKT"
+if SYSENTRPXY_VARIANT not in {"MKT", "ST"}:
+    raise ValueError("SYSENTRPXY_VARIANT must be MKT or ST.")
+
 # Data ingestion, chart generation, and signal calculation.
 SYSDTAFPXY_FORCE_NIFTY_FUT = False
 SYSDTAFPXY_SELECTED_MODE = 0

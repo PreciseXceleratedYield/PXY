@@ -370,6 +370,109 @@ class ConfigurationWiringTests(unittest.TestCase):
                     ("NONE", "NONE"),
                 )
 
+    def test_entry_variant_config_defaults_to_mkt_and_offers_st(self):
+        from syscnfgpxy import SYSENTRPXY_VARIANT
+
+        self.assertEqual(SYSENTRPXY_VARIANT, "MKT")
+        self.assertEqual(
+            __import__("pxyconfigwebpxy").ENUMS["SYSENTRPXY_VARIANT"],
+            ("MKT", "ST"),
+        )
+
+    def test_st_variant_uses_countertrend_supertrend_atr_zone(self):
+        frame = pd.DataFrame({"Close": [101.0]})
+        processed = pd.DataFrame({
+            "ST_Trend": ["BULL"],
+            "Close": [101.0],
+            "st_line": [100.0],
+            "st_atr": [2.0],
+        })
+        with (
+            patch.object(sysentrpxy, "SYSENTRPXY_VARIANT", "ST"),
+            patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
+            patch.object(sysentrpxy, "get_market_signal", return_value="BEAR"),
+            patch.object(sysentrpxy, "calculate_supertrend", return_value=processed),
+            patch.object(sysentrpxy, "datetime") as clock,
+        ):
+            clock.now.return_value = datetime(2026, 10, 12, 13, 0)
+            self.assertEqual(sysentrpxy.get_entry_signal(frame), ("BUY", "BULL"))
+
+    def test_st_variant_rejects_out_of_zone_and_same_direction_market(self):
+        frame = pd.DataFrame({"Close": [101.0]})
+        cases = (
+            ("BULL", "BEAR", 102.101, "BUY"),
+            ("BULL", "BULL", 100.5, "BUY"),
+            ("BEAR", "BULL", 97.899, "SELL"),
+            ("BEAR", "BEAR", 99.5, "SELL"),
+        )
+        for trend, market_signal, price, _candidate in cases:
+            processed = pd.DataFrame({
+                "ST_Trend": [trend],
+                "Close": [price],
+                "st_line": [100.0],
+                "st_atr": [2.0],
+            })
+            with (
+                self.subTest(trend=trend, market_signal=market_signal, price=price),
+                patch.object(sysentrpxy, "SYSENTRPXY_VARIANT", "ST"),
+                patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
+                patch.object(
+                    sysentrpxy, "get_market_signal", return_value=market_signal
+                ),
+                patch.object(sysentrpxy, "calculate_supertrend", return_value=processed),
+                patch.object(sysentrpxy, "datetime") as clock,
+            ):
+                clock.now.return_value = datetime(2026, 10, 12, 13, 0)
+                self.assertEqual(
+                    sysentrpxy.get_entry_signal(frame),
+                    ("NONE", trend),
+                )
+
+    def test_st_variant_side_entries_use_outer_mirrored_band_quarters(self):
+        frame = pd.DataFrame({"Close": [0.0]})
+        for market_signal, price, expected in (
+            ("BEAR", 2.0, ("BUY", "BEAR")),
+            ("BULL", 8.0, ("SELL", "BULL")),
+            ("BEAR", 5.0, ("NONE", "BEAR")),
+            ("BULL", 5.0, ("NONE", "BULL")),
+        ):
+            processed = pd.DataFrame({
+                "ST_Trend": ["SIDE"],
+                "Close": [price],
+                "st_line": [0.0],
+                "st_mirror": [10.0],
+            })
+            with (
+                self.subTest(market_signal=market_signal, price=price),
+                patch.object(sysentrpxy, "SYSENTRPXY_VARIANT", "ST"),
+                patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
+                patch.object(
+                    sysentrpxy, "get_market_signal", return_value=market_signal
+                ),
+                patch.object(sysentrpxy, "calculate_supertrend", return_value=processed),
+                patch.object(sysentrpxy, "datetime") as clock,
+            ):
+                clock.now.return_value = datetime(2026, 10, 12, 13, 0)
+                self.assertEqual(sysentrpxy.get_entry_signal(frame), expected)
+
+    def test_st_variant_keeps_exit_but_applies_new_book_cutoff(self):
+        frame = pd.DataFrame({"Close": [101.0]})
+        processed = pd.DataFrame({
+            "ST_Trend": ["BULL"],
+            "Close": [101.0],
+            "st_line": [100.0],
+            "st_atr": [1.4],
+        })
+        with (
+            patch.object(sysentrpxy, "SYSENTRPXY_VARIANT", "ST"),
+            patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
+            patch.object(sysentrpxy, "get_market_signal", return_value="BEAR"),
+            patch.object(sysentrpxy, "calculate_supertrend", return_value=processed),
+            patch.object(sysentrpxy, "datetime") as clock,
+        ):
+            clock.now.return_value = datetime(2026, 10, 12, 14, 0)
+            self.assertEqual(sysentrpxy.get_entry_signal(frame), ("NONE", "BULL"))
+
     def test_market_signal_returns_only_bull_bear_or_none(self):
         with (
             patch.object(sysmktpxy, "SYSMKTPXY_DEBUG_ENABLED", False),
