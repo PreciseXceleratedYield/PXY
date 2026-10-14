@@ -12,15 +12,16 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 **SIMPLE-DEFAULT** is the name for the current production configuration
 combination; it is a documentation label, not a separate runtime selector.
 
-- **Entry router:** `MKT`. A `BULL` signal maps to a `BUY` entry and a `BEAR`
-  signal maps to a `SELL` entry. New books are blocked at the 14:00 cutoff;
-  exit signals continue to be evaluated.
+- **Entry router:** `ST`. MKT routes entries through 09:59:59 IST; the ST
+  router starts at 10:00 IST using Supertrend period 14, factor 1. Mode 0
+  remains the strategy/data candle transform. New books are blocked at the
+  14:00 cutoff; exit signals continue to be evaluated.
 - **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 0` (modified-close).
   The separate chart display transform remains
   `SYSPLCHRTPXY_OHLC_MODE = 1` (raw OHLC).
 - **Option strikes:** `EXEOTMPXY_STRIKE_MODE = "ATM"` for option buys.
-- **Supertrend reference settings:** period 14, factor 1. These remain
-  configured but are not the active entry router while `MKT` is selected.
+- **Supertrend settings:** period 14, factor 1, used by the active ST entry
+  router from 10:00 IST onward.
 - **LGT:** base calculation multiplier 10, base loss cap 77, and configurable
   scale `EXEAMSPXY_LGT_SCALE = 7`. The resulting LGT is
   `-min(max(1.4, round(10 × own_lots × ratio, 2)), 77) × 7`, where ratio is
@@ -134,7 +135,7 @@ values until deliberately restarted.
 
 ## Option strike selection
 
-`SYSENTRPXY_VARIANT` selects the `sysentrpxy` signal router. `MKT` (default)
+`SYSENTRPXY_VARIANT` selects the `sysentrpxy` signal router. `MKT`
 maps MKT exit BULL to entry BUY and BEAR to SELL; nondirectional MKT signals
 produce no entry. When `ST` is selected, MKT is used through 09:59:59 IST;
 the ST router starts at 10:00 IST. ST uses Supertrend direction as the exit
