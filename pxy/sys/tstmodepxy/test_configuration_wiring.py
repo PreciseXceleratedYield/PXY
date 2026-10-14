@@ -1618,10 +1618,10 @@ class ConfigurationWiringTests(unittest.TestCase):
             apply_ohlc_transformation(frame, mode=1), frame
         )
 
-    def test_dtaf_defaults_to_mode_zero_and_rejects_other_modes(self):
+    def test_dtaf_defaults_to_mode_one_and_rejects_other_modes(self):
         import syscnfgpxy
 
-        self.assertEqual(syscnfgpxy.SYSDTAFPXY_SELECTED_MODE, 0)
+        self.assertEqual(syscnfgpxy.SYSDTAFPXY_SELECTED_MODE, 1)
         self.assertEqual(syscnfgpxy.EXEAMSPXY_LGT_SCALE, 7.0)
         frame = pd.DataFrame(
             {
