@@ -1574,6 +1574,7 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(TIMEZONE, str(SYSCNFGPXY_TIMEZONE))
 
     def test_atm_mode_overrides_otm_buy_request_and_supplied_distance(self):
+        self.assertEqual(exeotmpxy.syscnfgpxy.EXEOTMPXY_STRIKE_MODE, "ATM")
         with (
             patch.object(exeotmpxy.syscnfgpxy, "EXEOTMPXY_STRIKE_MODE", "ATM"),
             patch.object(runniftypxy, "get_target_tuesday", return_value=date(2026, 10, 13)),

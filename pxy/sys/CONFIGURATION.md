@@ -169,14 +169,13 @@ It invokes the reusable
 placement and tagging to those existing commands.
 
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
-builder for every buying script. It defaults to `OTMDYN`, which selects a
-weekday offset from `EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES`, ordered Monday to
-Friday (currently 200, 150, 100, 50, 0 NIFTY points). Call strikes are set above
-spot by the selected offset and put strikes below spot; both are then rounded
-to the configured 50-point strike step. Thus the current policy is 200 points
-OTM on Monday, 150 on Tuesday, 100 on Wednesday, 50 on Thursday, and ATM on
-Friday. Dynamic selection fails closed on weekends when no weekday distance is
-defined. `ATM` uses a zero-point offset, while `OTMFIX` applies the fixed
+builder for every buying script. It defaults to `ATM`, which uses a zero-point
+offset. `OTMDYN` selects a weekday offset from
+`EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES`, ordered Monday to Friday (currently
+200, 150, 100, 50, 0 NIFTY points). Call strikes are set above spot by the
+selected offset and put strikes below spot; both are then rounded to the
+configured 50-point strike step. Dynamic selection fails closed on weekends
+when no weekday distance is defined. `OTMFIX` applies the fixed
 `EXEOTMPXY_FIXED_DISTANCE` (currently 100 NIFTY points). Caller OTM flags and
 distances do not override the central mode.
 
