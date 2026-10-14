@@ -64,7 +64,7 @@ html[data-theme="light"] {
 html[data-theme="dark"] {
     color-scheme: dark;
     --bg: #181c26;
-    --bg2: #20242e;
+    --bg2: var(--bg);
     --bg3: #292e3a;
     --border: rgba(255, 255, 255, 0.06);
     --border2: rgba(255, 255, 255, 0.13);
@@ -111,7 +111,7 @@ html[data-theme="dark"] {
     --chip-bg: rgba(8, 12, 18, 0.92);
     --hl-top: rgba(255, 255, 255, 0.18);
     --hl-bot: rgba(0, 0, 0, 0.12);
-    --panel: #20242e;
+    --panel: var(--bg);
     --field: #181c26;
     --line: rgba(255, 255, 255, 0.13);
     --blue: #3b82f6;
