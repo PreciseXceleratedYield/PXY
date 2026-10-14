@@ -15,9 +15,9 @@ combination; it is a documentation label, not a separate runtime selector.
 - **Entry router:** `MKT`. A `BULL` signal maps to a `BUY` entry and a `BEAR`
   signal maps to a `SELL` entry. New books are blocked at the 14:00 cutoff;
   exit signals continue to be evaluated.
-- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 2` (OC/2), setting
-  `Close` to the midpoint of `Open` and `Close`. The separate chart display
-  transform remains `SYSPLCHRTPXY_OHLC_MODE = 1` (raw OHLC).
+- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 0` (modified-close).
+  The separate chart display transform remains
+  `SYSPLCHRTPXY_OHLC_MODE = 1` (raw OHLC).
 - **Option strikes:** `EXEOTMPXY_STRIKE_MODE = "ATM"` for option buys.
 - **Supertrend reference settings:** period 14, factor 1. These remain
   configured but are not the active entry router while `MKT` is selected.
@@ -149,10 +149,12 @@ allowed only in the outer quarter of the mirrored ST band and in the opposing
 MKT direction; the exit signal follows MKT. Both variants respect the shared
 new-book cutoff and post-square-off cooldown.
 `SYSDTAFPXY_SELECTED_MODE` selects the DTAF strategy/data candle transform
-(default `2`, OC/2):
-mode `0` uses modified-close candles, mode `1` keeps raw candles, and mode `2`
-sets `Close` to the `Open`/`Close` midpoint while retaining the other OHLC
-fields. The separate chart candle transform is controlled by
+(default `0`, modified-close):
+mode `0` sets `Open` to the raw `Close` and sets `Close` to the midpoint
+between raw `Close` and `High` on an up candle or raw `Close` and `Low` on a
+down candle; mode `1` keeps raw candles, and mode `2` sets `Close` to the
+`Open`/`Close` midpoint while retaining the other OHLC fields. The separate
+chart candle transform is controlled by
 `SYSPLCHRTPXY_OHLC_MODE`. In every DTAF mode, the live Yahoo OHLC fields are
 first averaged with the latest NIFTY futures price from
 `exe/run/nftfut.json`; live signals are unavailable when that quote is

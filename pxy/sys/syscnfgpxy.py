@@ -61,7 +61,7 @@ SYSENTRPXY_ST_START = dt_time(10, 0)
 
 # Data ingestion, chart generation, and signal calculation.
 SYSDTAFPXY_FORCE_NIFTY_FUT = False
-SYSDTAFPXY_SELECTED_MODE = 2
+SYSDTAFPXY_SELECTED_MODE = 0
 if (
     isinstance(SYSDTAFPXY_SELECTED_MODE, bool)
     or not isinstance(SYSDTAFPXY_SELECTED_MODE, int)
