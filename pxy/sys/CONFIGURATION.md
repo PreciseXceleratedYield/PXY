@@ -15,7 +15,7 @@ combination; it is a documentation label, not a separate runtime selector.
 - **Entry router:** `MKT`. A `BULL` signal maps to a `BUY` entry and a `BEAR`
   signal maps to a `SELL` entry. New books are blocked at the 14:00 cutoff;
   exit signals continue to be evaluated.
-- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 1` (raw OHLC).
+- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 2` (OC/2).
   The separate chart display transform remains
   `SYSPLCHRTPXY_OHLC_MODE = 1` (raw OHLC).
 - **Option strikes:** `EXEOTMPXY_STRIKE_MODE = "ATM"` for option buys.
@@ -149,7 +149,7 @@ allowed only in the outer quarter of the mirrored ST band and in the opposing
 MKT direction; the exit signal follows MKT. Both variants respect the shared
 new-book cutoff and post-square-off cooldown.
 `SYSDTAFPXY_SELECTED_MODE` selects the DTAF strategy/data candle transform
-(default `1`, raw OHLC):
+(default `2`, OC/2):
 mode `0` sets `Open` to the raw `Close` and sets `Close` to the midpoint
 between raw `Close` and `High` on an up candle or raw `Close` and `Low` on a
 down candle; mode `1` keeps raw candles, and mode `2` sets `Close` to the
