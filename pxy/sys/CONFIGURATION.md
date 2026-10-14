@@ -177,8 +177,11 @@ same candle window.
 `PASTRSK` enables (`YES`) or disables (`NO`) the depth-triggered reversal
 square-off; it defaults to `YES`. When enabled, outside the scheduled square-off
 window, a `BUY` entry with past depth `PE7` or greater independently triggers a
-verified PE-side close; a `SELL` entry with `CE7` or greater triggers a verified
-CE-side close. Both CE and PE positions must be open for either deep-reversal
+verified PE-side close only on the first candle of the new CE streak
+(`hkin_ce_depth = 1`); a `SELL` entry with `CE7` or greater triggers a verified
+CE-side close only on the first candle of the new PE streak
+(`hkin_pe_depth = 1`). Later candles in that new streak (depth 2 or more) do
+not trigger. Both CE and PE positions must be open for either deep-reversal
 exit to run. `EXEEXITPXY_DEPTH_EXIT_THRESHOLD` defaults to `6`, and the trigger
 is strictly greater than that threshold. This rule is independent of LGT and
 is deduplicated by signal candle. The selected side must also have a

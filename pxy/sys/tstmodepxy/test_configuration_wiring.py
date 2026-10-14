@@ -866,6 +866,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "BUY",
                     "hkin_past_depth": "PE7",
+                    "hkin_ce_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 },
                 {
@@ -877,6 +878,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "sell_prc": 80.0,
                     "entry": "BUY",
                     "hkin_past_depth": "PE7",
+                    "hkin_ce_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 },
             ]
@@ -919,6 +921,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "buy_time": "2025-01-06 09:58:00",
                     "entry": "BUY",
                     "hkin_past_depth": "PE7",
+                    "hkin_ce_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 },
                 {
@@ -930,6 +933,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "BUY",
                     "hkin_past_depth": "PE7",
+                    "hkin_ce_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 }
             ]
@@ -975,6 +979,65 @@ class ConfigurationWiringTests(unittest.TestCase):
             )
         )
 
+    def test_pastrsk_only_triggers_at_first_opposite_streak_depth(self):
+        active_orders = pd.DataFrame(
+            [
+                {
+                    "symbol": "NIFTY-WF-CE",
+                    "qty": 75,
+                    "buy_prc": 100.0,
+                    "sell_prc": 100.0,
+                    "tag": "CE1",
+                    "entry": "BUY",
+                    "hkin_past_depth": "PE7",
+                    "hkin_ce_depth": 2,
+                    "hkin_signal_time": "2025-01-06 10:00:00",
+                },
+                {
+                    "symbol": "NIFTY-WF-PE",
+                    "qty": 75,
+                    "buy_prc": 100.0,
+                    "sell_prc": 80.0,
+                    "tag": "PE1",
+                    "entry": "BUY",
+                    "hkin_past_depth": "PE7",
+                    "hkin_ce_depth": 2,
+                    "hkin_signal_time": "2025-01-06 10:00:00",
+                },
+            ]
+        )
+        with (
+            patch.object(exeexitpxy, "PASTRSK", "YES"),
+            patch.object(exeexitpxy, "ledger_busy", return_value=False),
+            patch.object(exeexitpxy, "_recently_exited", return_value=False),
+            patch.object(exeexitpxy, "_mark_lock"),
+            patch.object(exeexitpxy.subprocess, "run") as run_command,
+        ):
+            self.assertEqual(
+                exeexitpxy.run_depth_squareoff(
+                    client=None,
+                    active_df=active_orders,
+                    market_data_available=True,
+                ),
+                set(),
+            )
+            run_command.assert_not_called()
+
+            active_orders["hkin_ce_depth"] = 1
+            self.assertEqual(
+                exeexitpxy.run_depth_squareoff(
+                    client=None,
+                    active_df=active_orders,
+                    market_data_available=True,
+                ),
+                {"NIFTY-WF-PE|PE1|"},
+            )
+            run_command.assert_called_once_with(
+                ["pxysqrpe"],
+                check=True,
+                timeout=exeexitpxy.SQUAREOFF_TIMEOUT_SECS,
+            )
+
     def test_deep_reversal_requires_both_option_legs_open(self):
         pe_only = pd.DataFrame(
             [
@@ -987,6 +1050,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "BUY",
                     "hkin_past_depth": "PE7",
+                    "hkin_ce_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 }
             ]
@@ -1020,6 +1084,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                                 "buy_time": "2025-01-06 09:58:00",
                                 "entry": "BUY",
                                 "hkin_past_depth": "PE7",
+                                "hkin_ce_depth": 1,
                                 "hkin_signal_time": "2025-01-06 10:00:00",
                             }
                         ]
@@ -1053,6 +1118,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "SELL",
                     "hkin_past_depth": "CE7",
+                    "hkin_pe_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 },
                 {
@@ -1064,6 +1130,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "SELL",
                     "hkin_past_depth": "CE7",
+                    "hkin_pe_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 },
             ]

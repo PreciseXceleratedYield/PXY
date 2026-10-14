@@ -926,6 +926,22 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     ("S", "NIFTY-WF-CE"),
                 ],
             },
+            {
+                "name": "deep BUY reversal does not close PE after reversal streak advances",
+                "held": ("CE", "PE"),
+                "available": True,
+                "exit": "BULL",
+                "entry": "BUY",
+                "past_depth": "PE7",
+                "ce_depth": 2,
+                "signal_time": "2025-01-06 10:01:00+05:30",
+                "sell_price": 80.0,
+                "target": 110.0,
+                "expected": [
+                    ("B", "NIFTY-WF-CE"),
+                    ("B", "NIFTY-WF-PE"),
+                ],
+            },
         ])
         timezone = pytz.timezone("Asia/Kolkata")
 
@@ -937,6 +953,10 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 timestamp = timezone.localize(datetime(2025, 1, 6, 10, 0))
                 broker.set_market(timestamp, 22000)
                 order_rows = []
+                ce_depth = scenario.get("ce_depth", 1)
+                pe_depth = scenario.get("pe_depth", 1)
+                ce_depth = 1 if pd.isna(ce_depth) else ce_depth
+                pe_depth = 1 if pd.isna(pe_depth) else pe_depth
                 for side in scenario["held"]:
                     symbol = f"NIFTY-WF-{side}"
                     tag = f"CHK-{side}"
@@ -965,6 +985,8 @@ class ProductionPipeReplayTests(unittest.TestCase):
                             "entry": scenario["entry"],
                             "exit": scenario["exit"],
                             "hkin_past_depth": scenario.get("past_depth", "NA"),
+                            "hkin_ce_depth": ce_depth,
+                            "hkin_pe_depth": pe_depth,
                             "hkin_signal_time": scenario.get("signal_time", timestamp.isoformat()),
                             "atr": 5.0,
                         }

@@ -217,6 +217,20 @@ def run_depth_squareoff(client, active_df, market_data_available,
     if side is None:
         return set()
 
+    current_depth_column = "hkin_ce_depth" if side == "PE" else "hkin_pe_depth"
+    try:
+        current_depth = float(
+            pd.to_numeric(snapshot.get(current_depth_column), errors="coerce")
+        )
+    except (TypeError, ValueError, OverflowError):
+        current_depth = math.nan
+    if not math.isfinite(current_depth) or current_depth != 1:
+        print(
+            f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: "
+            f"new reversal streak depth must be 1, got {snapshot.get(current_depth_column)!r}."
+        )
+        return set()
+
     signal_time = str(snapshot.get("hkin_signal_time", "")).strip()
     if not signal_time or signal_time.lower() in {"none", "nan"}:
         print(f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: signal candle time unavailable.")
