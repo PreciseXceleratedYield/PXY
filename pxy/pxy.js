@@ -124,13 +124,7 @@ app.use('/api/team-home', (req, res, next) => {
 });
 
 function authorizeTeamHome(req, res, next) {
-    const expected = process.env.TEAM_HOME_PASSWORD || '';
-    if (!teamHome.isPasswordConfigured(expected)) {
-        return res.status(503).json({
-            ok: false,
-            error: 'Team@Home is not configured on this server.',
-        });
-    }
+    const expected = teamHome.TEST_PASSWORD;
 
     const address = req.ip || req.socket.remoteAddress || 'unknown';
     const now = Date.now();

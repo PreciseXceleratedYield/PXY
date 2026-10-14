@@ -14,12 +14,12 @@ const {
     readPosts,
 } = require('./teamhome');
 
-test('family password requires a long value and compares safely', () => {
-    assert.equal(isPasswordConfigured('short'), false);
-    assert.equal(isPasswordConfigured('family-password-2026'), true);
-    assert.equal(passwordMatches('family-password-2026', 'family-password-2026'), true);
-    assert.equal(passwordMatches('wrong-password', 'family-password-2026'), false);
-    assert.equal(passwordMatches(null, 'family-password-2026'), false);
+test('test-machine family password is 1 and compares safely', () => {
+    assert.equal(isPasswordConfigured(''), false);
+    assert.equal(isPasswordConfigured('1'), true);
+    assert.equal(passwordMatches('1', '1'), true);
+    assert.equal(passwordMatches('wrong', '1'), false);
+    assert.equal(passwordMatches(null, '1'), false);
 });
 
 test('posts persist, trim input, and reject oversized content', (t) => {

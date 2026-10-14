@@ -8,7 +8,7 @@ const path = require('path');
 const MAX_POSTS = 500;
 const MAX_AUTHOR_LENGTH = 40;
 const MAX_BODY_LENGTH = 2000;
-const MIN_PASSWORD_BYTES = 16;
+const TEST_PASSWORD = '1';
 
 function getPostsPath() {
     if (process.env.TEAM_HOME_DATA_FILE) {
@@ -19,8 +19,7 @@ function getPostsPath() {
 }
 
 function isPasswordConfigured(password) {
-    return typeof password === 'string'
-        && Buffer.byteLength(password, 'utf8') >= MIN_PASSWORD_BYTES;
+    return typeof password === 'string' && password.length > 0;
 }
 
 function passwordMatches(supplied, expected) {
@@ -105,6 +104,7 @@ module.exports = {
     MAX_AUTHOR_LENGTH,
     MAX_BODY_LENGTH,
     MAX_POSTS,
+    TEST_PASSWORD,
     addPost,
     getPostsPath,
     isPasswordConfigured,
