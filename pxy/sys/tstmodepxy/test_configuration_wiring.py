@@ -428,6 +428,26 @@ class ConfigurationWiringTests(unittest.TestCase):
             pd.testing.assert_frame_equal(st.call_args.args[0], frame)
             market.assert_not_called()
 
+    def test_st_router_accepts_historical_replay_time(self):
+        frame = pd.DataFrame({"Close": [101.0]})
+        processed = pd.DataFrame({
+            "ST_Trend": ["BULL"],
+            "Close": [101.0],
+            "st_line": [100.0],
+            "st_atr": [2.0],
+        })
+        with (
+            patch.object(sysentrpxy, "SYSENTRPXY_VARIANT", "ST"),
+            patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
+            patch.object(sysentrpxy, "get_market_signal") as market,
+            patch.object(sysentrpxy, "calculate_supertrend", return_value=processed),
+        ):
+            self.assertEqual(
+                sysentrpxy.get_entry_signal(frame, now=dt_time(10, 1)),
+                ("BUY", "BULL"),
+            )
+            market.assert_not_called()
+
     def test_trending_st_entry_uses_chart_supertrend_without_market_confirmation(self):
         market_frame = pd.DataFrame({"Close": [100.0]})
         chart_supertrend = pd.DataFrame({

@@ -259,12 +259,12 @@ def calculate_strategy_signals(history, session_date, record_limit=None):
         transformed.attrs["data_fallback"] = False
         output = io.StringIO()
         historical_time = history.index[index].time().replace(tzinfo=None)
-        production_entry_router = sysentrpxy._entry_signal_for_exit
+        production_entry_router = sysentrpxy.get_entry_signal
         with patch.object(
-            sysentrpxy,
-            "_entry_signal_for_exit",
-            side_effect=lambda exit_signal: production_entry_router(
-                exit_signal, now=historical_time
+            dashboard,
+            "get_entry_signal",
+            side_effect=lambda *args, **kwargs: production_entry_router(
+                *args, **kwargs, now=historical_time
             ),
         ):
             with patch.object(dashboard, "fetch_yf_data", return_value=transformed):

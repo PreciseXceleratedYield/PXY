@@ -310,11 +310,9 @@ closes and waits for Enter before advancing to the next book; type `q` to stop.
 Non-interactive runs do not wait for input.
 
 The replay keeps production signals, target selection, averaging, counter-buy,
-risk confirmation, and scheduled square-off flow. With one option side open,
-the aligned single-exit target uses the ATR/power/depth calculation. With both
-CE and PE sides open, the heavier invested aligned side uses the ATR-based
-target; the lighter aligned side retains the 77% target. Equal exposure retains
-the 77% target on both aligned sides. Unaligned targets remain 1.4%.
+risk confirmation, and scheduled square-off flow, evaluating time-based entry
+routing at each historical candle's timestamp. All exit-aligned positions use
+the fixed 77% target; unaligned targets remain 1.4%.
 SIM uses only index spot prices and a fixed quantity of 1 per lot; it divides
 production target percentages, averaging LGT thresholds, cycle-risk targets,
 and deep-reversal loss thresholds by 200 before applying them to spot returns

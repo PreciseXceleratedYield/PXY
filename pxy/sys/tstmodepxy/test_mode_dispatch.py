@@ -432,12 +432,15 @@ class ModeDispatchTests(unittest.TestCase):
         dashboard = Mock()
 
         def historical_snapshot():
-            entry, exit_signal = backtest.sysentrpxy._entry_signal_for_exit("BULL")
+            entry, exit_signal = dashboard.get_entry_signal(history)
             return {"entry": entry, "exit": exit_signal}
 
         dashboard.get_full_snapshot.side_effect = historical_snapshot
-        with patch.object(backtest.importlib, "import_module", return_value=dashboard), patch.object(
-            backtest, "transform_market_data", return_value=history
+        with (
+            patch.object(backtest.importlib, "import_module", return_value=dashboard),
+            patch.object(backtest, "transform_market_data", return_value=history),
+            patch.object(backtest.sysentrpxy, "SYSENTRPXY_VARIANT", "MKT"),
+            patch.object(backtest.sysentrpxy, "get_market_signal", return_value="BULL"),
         ):
             bars = backtest.calculate_strategy_signals(history, date(2025, 1, 6))
 

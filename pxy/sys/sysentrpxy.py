@@ -113,13 +113,14 @@ def _supertrend_entry_signal(df, now=None, processed_supertrend=None):
     return _apply_new_book_cutoff(entry_signal, market_signal, now)
 
 
-def get_entry_signal(df=None, *, processed_supertrend=None):
+def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     """Use MKT through 10:00 IST, then apply the configured entry variant."""
     if cooldown_remaining() > 0:
         print("⏳ POST-SQUARE-OFF COOLDOWN: entry and exit signals forced to NONE.")
         return "NONE", "NONE"
 
-    now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
+    if now is None:
+        now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
     if SYSENTRPXY_VARIANT == "ST" and now >= SYSENTRPXY_ST_START:
         if df is None:
             from sysdtafpxy import fetch_yf_data
