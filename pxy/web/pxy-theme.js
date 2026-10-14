@@ -6,7 +6,7 @@
     function updateThemeColor(mode) {
         const themeColor = document.querySelector('meta[name="theme-color"]');
         if (themeColor) {
-            themeColor.content = mode === 'dark' ? '#181c26' : '#f1ece2';
+            themeColor.content = mode === 'dark' ? '#1b2029' : '#f1ece2';
         }
     }
 

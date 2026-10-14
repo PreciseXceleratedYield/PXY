@@ -20,24 +20,26 @@
 <link rel="stylesheet" href="/web/pxy-theme.css">
 <style>
 :root,[data-theme="dark"]{
-    --bg:#181c26;--bg2:#181c26;--bg3:#20242e;
-    --border:rgba(255,255,255,0.025);--border2:rgba(255,255,255,0.045);
-    --text:#d5dae5;--muted:#7d8aa0;--accent:#3b82f6;
-    --bull:#26a69a;--bear:#ef5350;--gold:#f0b429;
-    --bull-dim:rgba(38,166,154,0.10);--bear-dim:rgba(239,83,80,0.10);
-    --grid:rgba(255,255,255,0.02);--track-mid:rgba(255,255,255,0.09);
-    --strong:#ffffff;--hdr-bg:linear-gradient(180deg,#1d212c,#181c26);--sep:rgba(255,255,255,0.16);
+    --bg:#1b2029;--bg2:#1b2029;--bg3:#282f39;
+    --border:rgba(255,255,255,0.055);--border2:rgba(255,255,255,0.11);
+    --text:#cbd2dc;--muted:#8c97a8;--accent:#82a7d3;
+    --bull:#63ad99;--bear:#d47f7c;--gold:#d4b878;
+    --bull-dim:rgba(99,173,153,0.11);--bear-dim:rgba(212,127,124,0.11);
+    --grid:rgba(255,255,255,0.025);--track-mid:rgba(255,255,255,0.07);
+    --strong:#e7ebf0;--hdr-bg:linear-gradient(180deg,#202630,#1b2029);--sep:rgba(255,255,255,0.11);
     --item-bg:var(--item-bg);--item-bg-h:var(--item-bg-h);
-    --warn:#ffe135;--side:#facc15;--sqr:#ff6b6b;--overlay:rgba(0,0,0,0.6);
-    --shadow:var(--shadow);--shadow-tip:0 4px 14px rgba(0,0,0,.5);--hl-glow:rgba(255,255,255,0.18);
-    --flash-up:rgba(38,166,154,0.35);--flash-down:rgba(239,83,80,0.35);
-    --glow-bull:rgba(38,166,154,0.35);--glow-bear:rgba(239,83,80,0.35);--glow-neutral:rgba(229,231,235,0.3);
-    --neutral-body:#e5e7eb;--wick:rgba(255,255,255,0.5);--mirror:rgba(255,255,255,0.55);
-    --trend-neutral:rgba(255,255,255,0.85);--line-soft:rgba(200,200,205,0.55);
-    --cjs-line:rgba(255,255,255,0.75);--cjs-fill:rgba(255,255,255,0.06);--cjs-sma:rgba(202,138,4,0.65);
-    --rk-grid:rgba(255,255,255,0.15);--rk-dash:rgba(255,255,255,0.25);
-    --on-bull:#06160d;--on-bear:#ffffff;--chip-bg:rgba(8,12,18,0.92);
-    --hl-top:rgba(255,255,255,0.18);--hl-bot:rgba(0,0,0,0.12);
+    --warn:#d8c27f;--side:#d8c27f;--sqr:#d47f7c;--overlay:rgba(0,0,0,0.52);
+    --shadow:var(--shadow);--shadow-tip:0 4px 14px rgba(0,0,0,.38);--hl-glow:rgba(130,167,211,0.13);
+    --flash-up:rgba(99,173,153,0.18);--flash-down:rgba(212,127,124,0.18);
+    --glow-bull:rgba(99,173,153,0.22);--glow-bear:rgba(212,127,124,0.22);--glow-neutral:rgba(203,210,220,0.17);
+    --neutral-body:#aab2be;--wick:rgba(255,255,255,0.34);--mirror:rgba(255,255,255,0.38);
+    --trend-neutral:rgba(231,235,240,0.68);--line-soft:rgba(203,210,220,0.38);
+    --cjs-line:rgba(231,235,240,0.62);--cjs-fill:rgba(255,255,255,0.045);--cjs-sma:rgba(212,184,120,0.72);
+    --rk-grid:rgba(255,255,255,0.11);--rk-dash:rgba(255,255,255,0.18);
+    --on-bull:#14231f;--on-bear:#2d1c1c;--chip-bg:rgba(17,21,28,0.94);
+    --hl-top:rgba(255,255,255,0.12);--hl-bot:rgba(0,0,0,0.09);
+    --field:#202630;--line:rgba(255,255,255,0.11);--blue:#82a7d3;--red:#d47f7c;--green:#63ad99;
+    --row-hover:rgba(255,255,255,0.025);--chart-grid:rgba(255,255,255,0.035);--chart-tick:#8c97a8;
 }
 /* COMFORT — soft warm paper, low glare, no pure white/black, every text ≥ 4.5:1, bull/bear = teal vs brick (colour-blind safe) */
 [data-theme="comfort"]{
@@ -590,7 +592,7 @@ function applyTheme(mode,save){
     const root=document.documentElement;
     root.setAttribute('data-theme',mode);
     const m=document.querySelector('meta[name="theme-color"]');
-    if(m)m.setAttribute('content',mode==='comfort'?'#f1ece2':'#181c26');
+    if(m)m.setAttribute('content',mode==='comfort'?'#f1ece2':'#1b2029');
     if(save){try{localStorage.setItem('pxyTheme',mode);}catch(e){}}
     if(typeof term!=='undefined'&&term){
         try{term.options.theme=termTheme();}catch(e){try{term.setOption('theme',termTheme());}catch(e2){}}
@@ -817,7 +819,7 @@ let term,fit,ws;
 function termTheme(){
     return document.documentElement.getAttribute('data-theme')==='comfort'
         ?{background:'#00000000',foreground:'#44505e',green:'#16705c',red:'#a63e32',yellow:'#7a5600',cyan:'#0f6f82',brightBlack:'#7a8794'}
-        :{background:'#00000000',foreground:'#8899bb',green:'#22c55e',red:'#ef4444',yellow:'#f59e0b',cyan:'#22d3ee',brightBlack:'#374151'};
+        :{background:'#00000000',foreground:'#aeb9ca',green:'#63ad99',red:'#d47f7c',yellow:'#d4b878',cyan:'#82a7d3',brightBlack:'#737f91'};
 }
 function initTerm(){
     term=new Terminal({
