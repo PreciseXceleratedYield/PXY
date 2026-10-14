@@ -1392,9 +1392,9 @@ class ConfigurationWiringTests(unittest.TestCase):
             self.assertIsNone(execbuypxy.check_counter_leg(no_matching_exit))
             popen.assert_called_once()
 
-    def test_heavy_aligned_target_uses_atr_when_both_sides_are_open(self):
-        self.assertEqual(exeltgtpxy.calculate_tgt(True, 10, 2, 3), 20.0)
-        self.assertEqual(exeltgtpxy.calculate_tgt(True, 5, 3, 4), 15.0)
+    def test_all_aligned_targets_are_fixed_at_77_percent(self):
+        self.assertEqual(exeltgtpxy.calculate_tgt(True, 10, 2, 3), 77.0)
+        self.assertEqual(exeltgtpxy.calculate_tgt(True, 5, 3, 4), 77.0)
         self.assertEqual(exeltgtpxy.calculate_tgt(False), 1.4)
         self.assertEqual(
             exeltgtpxy.calculate_tgt(True, both_sides_open=True), 77.0
@@ -1403,7 +1403,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             exeltgtpxy.calculate_tgt(
                 True, 10, 2, 3, both_sides_open=True, heavy_side=True
             ),
-            20.0,
+            77.0,
         )
         self.assertEqual(
             exeltgtpxy.calculate_tgt(False, both_sides_open=True), 1.4
@@ -1418,8 +1418,8 @@ class ConfigurationWiringTests(unittest.TestCase):
             "direction": "UP", "supertrend": "SIDE", "atr": 8,
             "pe_power": 3, "hkin_pe_depth": 4,
         }
-        self.assertEqual(exeltgtpxy.target_price(ce, 1000, 5000), 1200.0)
-        self.assertEqual(exeltgtpxy.target_price(pe, 5000, 1000), 1240.0)
+        self.assertEqual(exeltgtpxy.target_price(ce, 1000, 5000), 1770.0)
+        self.assertEqual(exeltgtpxy.target_price(pe, 5000, 1000), 1770.0)
         self.assertEqual(
             exeltgtpxy.target_price(ce, 1000, 5000, ce_count=1, pe_count=1),
             1770.0,
@@ -1430,11 +1430,11 @@ class ConfigurationWiringTests(unittest.TestCase):
         )
         self.assertEqual(
             exeltgtpxy.target_price(ce, 5000, 1000, ce_count=1, pe_count=1),
-            1200.0,
+            1770.0,
         )
         self.assertEqual(
             exeltgtpxy.target_price(pe, 1000, 5000, ce_count=1, pe_count=1),
-            1240.0,
+            1770.0,
         )
         self.assertEqual(
             exeltgtpxy.target_price(ce, 1000, 1000, ce_count=1, pe_count=1),

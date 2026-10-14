@@ -332,10 +332,9 @@ historical option P&L.
 - `SYSPLCHRTPXY_*` are consumed by the separate chart generator. `SYSRIGPXY_*`
   belong to standalone modules with no caller in the production launch graph.
 - TGT uses only `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and the option side for
-  alignment; direction, investment balance, Supertrend, and moving-average
-  values do not affect target alignment. Aligned positions use
-  `max(ATR + 1.4 × matching option-side depth, ATR × matching option-side power)`
-  as the target percentage; non-aligned positions receive
+  alignment; direction, investment balance, ATR, Supertrend, and moving-average
+  values do not affect target alignment. Every aligned position uses a fixed
+  `77%` target; non-aligned positions receive
   `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). The percentage applies to
   the option entry premium. Averaging alignment also uses only `exit`; TSMA/SMA
   has no effect on averaging eligibility or LGT. The trend chart independently

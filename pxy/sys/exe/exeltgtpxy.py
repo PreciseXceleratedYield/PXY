@@ -73,28 +73,8 @@ def calculate_tgt(
     both_sides_open=False,
     heavy_side=False,
 ):
-    """Return ATR for an aligned heavy side, otherwise the applicable fixed target."""
-    if not is_aligned:
-        return NOT_ALIGNED_TARGET_PCT
-    if both_sides_open and not heavy_side:
-        return BOTH_SIDES_ALIGNED_TARGET_PCT
-
-    try:
-        atr_value, power_value, depth_value = (
-            float(atr),
-            float(side_power),
-            float(side_depth),
-        )
-    except (TypeError, ValueError):
-        raise ValueError("Aligned target requires ATR, side power, and side depth.")
-    if (
-        not all(math.isfinite(value) for value in (atr_value, power_value, depth_value))
-        or atr_value <= 0
-        or power_value <= 0
-        or depth_value <= 0
-    ):
-        raise ValueError("Aligned target inputs must be finite positive values.")
-    return max(atr_value + (NOT_ALIGNED_TARGET_PCT * depth_value), atr_value * power_value)
+    """Return a fixed 77% aligned target, otherwise the non-aligned target."""
+    return BOTH_SIDES_ALIGNED_TARGET_PCT if is_aligned else NOT_ALIGNED_TARGET_PCT
 
 
 def f(x, d=0.0):
