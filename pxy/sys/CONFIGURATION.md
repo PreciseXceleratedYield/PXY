@@ -7,6 +7,28 @@ production launch path is `pxy/pxy` → `sysexepxy.py` → `exe/exepxy.py`; the
 shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 `RUNMODE=SIM` in their environments.
 
+## SIMPLE-DEFAULT strategy reference
+
+**SIMPLE-DEFAULT** is the name for the current production configuration
+combination; it is a documentation label, not a separate runtime selector.
+
+- **Entry router:** `MKT`. A `BULL` signal maps to a `BUY` entry and a `BEAR`
+  signal maps to a `SELL` entry. New books are blocked at the 14:00 cutoff;
+  exit signals continue to be evaluated.
+- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 2` (OC/2), setting
+  `Close` to the midpoint of `Open` and `Close`. The separate chart display
+  transform remains `SYSPLCHRTPXY_OHLC_MODE = 1` (raw OHLC).
+- **Option strikes:** `EXEOTMPXY_STRIKE_MODE = "ATM"` for option buys.
+- **Supertrend reference settings:** period 14, factor 1. These remain
+  configured but are not the active entry router while `MKT` is selected.
+- **LGT:** base calculation multiplier 10, base loss cap 77, and configurable
+  scale `EXEAMSPXY_LGT_SCALE = 7`. The resulting LGT is
+  `-min(max(1.4, round(10 × own_lots × ratio, 2)), 77) × 7`, where ratio is
+  own-side investment divided by opposite-side investment and clamped to
+  `[0.1, 10]`. The maximum scaled LGT magnitude is 539.
+- **SIM/CHK:** exercise production decision logic with simulated or mock
+  broker/order I/O; neither mode sends live orders.
+
 ## Ownership and precedence
 
 - Name tunables `<OWNER_MODULE>_<PARAMETER>` using the consuming module's
