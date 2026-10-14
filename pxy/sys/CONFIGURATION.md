@@ -22,11 +22,10 @@ combination; it is a documentation label, not a separate runtime selector.
 - **Option strikes:** `EXEOTMPXY_STRIKE_MODE = "ATM"` for option buys.
 - **Supertrend settings:** period 14, factor 1, used by the active ST entry
   router from 10:00 IST onward.
-- **LGT:** base calculation multiplier 10, base loss cap 77, and configurable
-  scale `EXEAMSPXY_LGT_SCALE = 7`. The resulting LGT is
-  `-min(max(1.4, round(10 × own_lots × ratio, 2)), 77) × 7`, where ratio is
-  own-side investment divided by opposite-side investment and clamped to
-  `[0.1, 10]`. The maximum scaled LGT magnitude is 539.
+- **LGT:** `magnitude = max(1.4, round(66 × ratio, 2))`,
+  `LGT = -min(magnitude, 77)`, where ratio is own-side investment divided by
+  opposite-side investment and clamped to `[0.1, 10]`. Invalid or non-positive
+  investment data uses `ratio = 1`. The maximum LGT magnitude is 77.
 - **SIM/CHK:** exercise production decision logic with simulated or mock
   broker/order I/O; neither mode sends live orders.
 
@@ -347,23 +346,15 @@ historical option P&L.
   investment (`sum(qty × sell_prc)` plus the next lot at its current
   `sell_prc`) must not exceed `EXEAMSPXY_MAX_INVESTMENT` (default `25000`).
   The calculated LGT magnitude is capped at `EXEAMSPXY_MAX_LGT_LOSS`
-  (default `77`), then multiplied by `EXEAMSPXY_LGT_SCALE` (default `7`).
-  Since the multiplier is applied after the base cap, the final LGT can reach
-  `-539`.
+  (default `77`).
   The opposite side must have open positions and negative overall P&L, and
   only the signal-aligned side may average. The averaging side must also be
   losing at or beyond its applicable LGT threshold.
-- LGT is calculated from the own/opposite investment factor and the actual
-  own-side open lot count, then negated:
+- LGT is calculated from the own/opposite investment ratio, then negated:
   `r = own investment / opposite investment`, clamped to `[0.1, 10]`;
-  `n = max(1, actual own-side open lot count)`;
-  `magnitude = max(1.4, round(10 × n × r, 2))`;
-  `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS) ×
-  EXEAMSPXY_LGT_SCALE`. If either side has no positive investment, or an input
-  is non-finite, the fallback is `r = 1, n = 1`. Zero actual own-side lots
-  use `n = 1`; at an equal investment ratio, eight or more own-side lots reach
-  the 77% base cap before scaling. The own lot count comes from the verified
-  broker position summary.
+  `magnitude = max(1.4, round(66 × r, 2))`;
+  `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)`. If either side has no
+  positive investment, or an input is non-finite, the fallback is `r = 1`.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.

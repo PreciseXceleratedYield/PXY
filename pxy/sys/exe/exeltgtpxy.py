@@ -5,7 +5,6 @@ import re
 from colorama import Fore, Style, init
 from syscnfgpxy import (
     EXEAMSPXY_MAX_LGT_LOSS,
-    EXEAMSPXY_LGT_SCALE,
     EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
     EXETGTPXY_EXIT_KEY_COLUMN,
     EXETGTPXY_TGT_PCT_NOT_ALIGNED,
@@ -28,8 +27,8 @@ def _warn_once(key, msg):
         print(f"{Fore.YELLOW}⚠️ {msg}{Style.RESET_ALL}")
 
 
-def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, own_count=0):
-    """Calculate the capped LGT percentage from investment ratio and lot count."""
+def calculate_lgt(ce_investment, pe_investment, is_ce, index_price):
+    """Calculate the capped LGT percentage from the relative investments."""
     try:
         index_price = float(index_price)
     except (TypeError, ValueError) as error:
@@ -43,9 +42,8 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, own_count=0)
     try:
         own_investment = float(own_investment)
         opposite_investment = float(opposite_investment)
-        own_count_value = float(own_count)
     except (TypeError, ValueError, OverflowError):
-        ratio, own_lots = 1.0, 1
+        ratio = 1.0
     else:
         ratio_is_valid = (
             math.isfinite(own_investment)
@@ -58,17 +56,13 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, own_count=0)
             ratio_is_valid = math.isfinite(ratio)
             if ratio_is_valid:
                 ratio = min(10.0, max(0.1, ratio))
-
-        lot_count_is_valid = math.isfinite(own_count_value)
-        if not ratio_is_valid or not lot_count_is_valid:
-            ratio, own_lots = 1.0, 1
-        else:
-            own_lots = max(1, int(own_count_value))
+        if not ratio_is_valid:
+            ratio = 1.0
     magnitude = max(
         EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
-        round(10.0 * own_lots * ratio, 2),
+        round(66.0 * ratio, 2),
     )
-    return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS) * EXEAMSPXY_LGT_SCALE
+    return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
 
 
 def calculate_tgt(

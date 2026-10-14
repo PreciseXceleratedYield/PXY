@@ -135,19 +135,13 @@ def handle_side_averaging(client, df, index_price):
         pe_investment,
         is_ce=True,
         index_price=index_price,
-        own_count=ce_lots,
     )
     pe_dynamic_threshold = calculate_lgt(
         ce_investment,
         pe_investment,
         is_ce=False,
         index_price=index_price,
-        own_count=pe_lots,
     )
-    if ce_opposite_signal:
-        ce_dynamic_threshold *= 2
-    if pe_opposite_signal:
-        pe_dynamic_threshold *= 2
     if USE_OVERALL_LOSS:
         ce_lgt_val, pe_lgt_val = ce_overall_pnl_pct, pe_overall_pnl_pct
     else:
