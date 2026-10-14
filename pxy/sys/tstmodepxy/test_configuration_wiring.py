@@ -1372,65 +1372,65 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_lgt_uses_clamped_ratio_times_actual_lot_count_with_minimum_one(self):
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(1000.0, 4000.0, is_ce=True, index_price=25000),
-            -12.5,
+            -17.5,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(2000.0, 4000.0, is_ce=True, index_price=25000),
-            -25.0,
+            -35.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True, index_price=25000),
-            -50.0,
+            -70.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(2000.0, 1000.0, is_ce=True, index_price=25000),
-            -100.0,
+            -140.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(3000.0, 1000.0, is_ce=True, index_price=25000),
-            -150.0,
+            -210.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(4000.0, 1000.0, is_ce=True, index_price=25000),
-            -200.0,
+            -280.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(4000.0, 1000.0, is_ce=False, index_price=25000),
-            -12.5,
+            -17.5,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(0.0, 4000.0, is_ce=True, index_price=25000),
-            -50.0,
+            -70.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1000.0, 4000.0, is_ce=True, index_price=25000, own_count=1
             ),
-            -12.5,
+            -17.5,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1000.0, 1000.0, is_ce=True, index_price=25000, own_count=2
             ),
-            -100.0,
+            -140.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1000.0, 1000.0, is_ce=True, index_price=25000, own_count=0
             ),
-            -50.0,
+            -70.0,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 1.0, 10.0, is_ce=True, index_price=25000, own_count=0
             ),
-            -7.0,
+            -9.8,
         )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(
                 100.0, 1.0, is_ce=True, index_price=25000, own_count=0
             ),
-            -385.0,
+            -539.0,
         )
         for invalid_investment in (0.0, float("inf"), float("-inf"), float("nan")):
             self.assertAlmostEqual(
@@ -1438,7 +1438,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     2000.0, invalid_investment, is_ce=True, index_price=25000,
                     own_count=0,
                 ),
-                -50.0,
+                -70.0,
             )
         for invalid_lot_count in (float("inf"), float("-inf"), float("nan")):
             self.assertAlmostEqual(
@@ -1446,11 +1446,11 @@ class ConfigurationWiringTests(unittest.TestCase):
                     1000.0, 4000.0, is_ce=True, index_price=25000,
                     own_count=invalid_lot_count,
                 ),
-                -50.0,
+                -70.0,
             )
         self.assertAlmostEqual(
             exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True, index_price=1000),
-            -50.0,
+            -70.0,
         )
         with self.assertRaises(ValueError):
             exeltgtpxy.calculate_lgt(1000.0, 1000.0, is_ce=True, index_price=0)
@@ -1551,10 +1551,11 @@ class ConfigurationWiringTests(unittest.TestCase):
             apply_ohlc_transformation(frame, mode=1), frame
         )
 
-    def test_dtaf_defaults_to_mode_zero_and_rejects_other_modes(self):
+    def test_dtaf_defaults_to_oc2_mode_and_rejects_other_modes(self):
         import syscnfgpxy
 
-        self.assertEqual(syscnfgpxy.SYSDTAFPXY_SELECTED_MODE, 0)
+        self.assertEqual(syscnfgpxy.SYSDTAFPXY_SELECTED_MODE, 2)
+        self.assertEqual(syscnfgpxy.EXEAMSPXY_LGT_SCALE, 7.0)
         frame = pd.DataFrame(
             {
                 "Open": [100.0],

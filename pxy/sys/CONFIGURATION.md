@@ -125,10 +125,13 @@ the ST line. When Supertrend is SIDE, entries are
 allowed only in the outer quarter of the mirrored ST band and in the opposing
 MKT direction; the exit signal follows MKT. Both variants respect the shared
 new-book cutoff and post-square-off cooldown.
-`SYSDTAFPXY_SELECTED_MODE` selects the DTAF candle transform (default `0`):
+`SYSDTAFPXY_SELECTED_MODE` selects the DTAF strategy/data candle transform
+(default `2`, OC/2):
 mode `0` uses modified-close candles, mode `1` keeps raw candles, and mode `2`
-sets `Close` to the `Open`/`Close` midpoint. In every mode, the live Yahoo OHLC
-fields are first averaged with the latest NIFTY futures price from
+sets `Close` to the `Open`/`Close` midpoint while retaining the other OHLC
+fields. The separate chart candle transform is controlled by
+`SYSPLCHRTPXY_OHLC_MODE`. In every DTAF mode, the live Yahoo OHLC fields are
+first averaged with the latest NIFTY futures price from
 `exe/run/nftfut.json`; live signals are unavailable when that quote is
 missing. Without a futures quote, the selected candle transform operates on the
 historical OHLC values directly.
@@ -314,9 +317,9 @@ historical option P&L.
   investment (`sum(qty × sell_prc)` plus the next lot at its current
   `sell_prc`) must not exceed `EXEAMSPXY_MAX_INVESTMENT` (default `25000`).
   The calculated LGT magnitude is capped at `EXEAMSPXY_MAX_LGT_LOSS`
-  (default `77`), then multiplied by `EXEAMSPXY_LGT_SCALE` (default `5`).
+  (default `77`), then multiplied by `EXEAMSPXY_LGT_SCALE` (default `7`).
   Since the multiplier is applied after the base cap, the final LGT can reach
-  `-385`.
+  `-539`.
   The opposite side must have open positions and negative overall P&L, and
   only the signal-aligned side may average. The averaging side must also be
   losing at or beyond its applicable LGT threshold.

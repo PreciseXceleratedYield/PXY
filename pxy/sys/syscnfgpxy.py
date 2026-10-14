@@ -61,7 +61,7 @@ SYSENTRPXY_ST_START = dt_time(10, 0)
 
 # Data ingestion, chart generation, and signal calculation.
 SYSDTAFPXY_FORCE_NIFTY_FUT = False
-SYSDTAFPXY_SELECTED_MODE = 0
+SYSDTAFPXY_SELECTED_MODE = 2
 if (
     isinstance(SYSDTAFPXY_SELECTED_MODE, bool)
     or not isinstance(SYSDTAFPXY_SELECTED_MODE, int)
@@ -123,7 +123,7 @@ EXEAGTPXY_FORCE_DEFAULT = 1.2
 
 EXEAMSPXY_MAX_INVESTMENT = 25000.0
 EXEAMSPXY_MAX_LGT_LOSS = 77.0
-EXEAMSPXY_LGT_SCALE = 5.0
+EXEAMSPXY_LGT_SCALE = 7.0
 if not math.isfinite(EXEAMSPXY_LGT_SCALE) or EXEAMSPXY_LGT_SCALE <= 0:
     raise ValueError("EXEAMSPXY_LGT_SCALE must be a finite positive number.")
 EXEAMSPXY_ORDER_EXCHANGE_SEGMENT = "nse_fo"
