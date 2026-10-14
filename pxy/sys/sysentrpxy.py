@@ -51,7 +51,7 @@ def _finite_row_values(row, columns):
 
 
 def _supertrend_entry_signal(df, now=None, processed_supertrend=None):
-    """Use countertrend market confirmation with configured Supertrend ATR zones."""
+    """Use Supertrend trend and half-ATR zones to route ST entries."""
     if df is None or df.empty:
         return "NONE", "NONE"
 
@@ -70,9 +70,6 @@ def _supertrend_entry_signal(df, now=None, processed_supertrend=None):
     if trend not in {"BULL", "BEAR", "SIDE"}:
         return "NONE", "NONE"
 
-    market_signal = str(get_market_signal(df)).upper().strip()
-    if market_signal not in {"BULL", "BEAR"}:
-        market_signal = "NONE"
     latest = processed.iloc[-1]
     entry_signal = "NONE"
 
@@ -86,19 +83,20 @@ def _supertrend_entry_signal(df, now=None, processed_supertrend=None):
                     entry_atr = atr / 2.0
                     if (
                         trend == "BULL"
-                        and market_signal == "BEAR"
                         and st_line <= price <= st_line + entry_atr
                     ):
                         entry_signal = "BUY"
                     elif (
                         trend == "BEAR"
-                        and market_signal == "BULL"
                         and st_line - entry_atr <= price <= st_line
                     ):
                         entry_signal = "SELL"
         return _apply_new_book_cutoff(entry_signal, trend, now)
 
     # --- SIDEWAYS STRATEGY (Edge-Based ATR Envelopes) ---
+    market_signal = str(get_market_signal(df)).upper().strip()
+    if market_signal not in {"BULL", "BEAR"}:
+        market_signal = "NONE"
     if {"Close", "st_line", "st_mirror", "st_atr"}.issubset(processed.columns):
         values = _finite_row_values(latest, ("Close", "st_line", "st_mirror", "st_atr"))
         if values is not None:
@@ -106,9 +104,9 @@ def _supertrend_entry_signal(df, now=None, processed_supertrend=None):
             if atr > 0:
                 upper_band, lower_band = max(st_line, mirror), min(st_line, mirror)
                 entry_atr = atr / 2.0
-                if market_signal == "BEAR" and price <= (lower_band + entry_atr):
+                if price <= (lower_band + entry_atr):
                     entry_signal = "BUY"
-                elif market_signal == "BULL" and price >= (upper_band - entry_atr):
+                elif price >= (upper_band - entry_atr):
                     entry_signal = "SELL"
                     
     exit_signal = "NONE"  

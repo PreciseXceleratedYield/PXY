@@ -426,9 +426,9 @@ class ConfigurationWiringTests(unittest.TestCase):
             self.assertEqual(sysentrpxy.get_entry_signal(frame), ("BUY", "BULL"))
             self.assertEqual(st.call_count, 1)
             pd.testing.assert_frame_equal(st.call_args.args[0], frame)
-            market.assert_called_once_with(frame)
+            market.assert_not_called()
 
-    def test_st_entry_uses_chart_supertrend_but_market_confirmation_frame(self):
+    def test_trending_st_entry_uses_chart_supertrend_without_market_confirmation(self):
         market_frame = pd.DataFrame({"Close": [100.0]})
         chart_supertrend = pd.DataFrame({
             "ST_Trend": ["BEAR"],
@@ -457,7 +457,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             )
 
         calculate_st.assert_not_called()
-        market.assert_called_once_with(market_frame)
+        market.assert_not_called()
 
     def test_mkt_selection_remains_mkt_after_ten(self):
         frame = pd.DataFrame({"Close": [101.0]})
@@ -472,7 +472,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             self.assertEqual(sysentrpxy.get_entry_signal(frame), ("BUY", "BULL"))
             st.assert_not_called()
 
-    def test_st_variant_uses_half_atr_countertrend_supertrend_zone(self):
+    def test_st_variant_uses_half_atr_supertrend_zone_without_mkt_confirmation(self):
         frame = pd.DataFrame({"Close": [101.0]})
         processed = pd.DataFrame({
             "ST_Trend": ["BULL"],
@@ -483,24 +483,25 @@ class ConfigurationWiringTests(unittest.TestCase):
         with (
             patch.object(sysentrpxy, "SYSENTRPXY_VARIANT", "ST"),
             patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
-            patch.object(sysentrpxy, "get_market_signal", return_value="BEAR"),
+            patch.object(sysentrpxy, "get_market_signal", return_value="BULL") as market,
             patch.object(sysentrpxy, "calculate_supertrend", return_value=processed),
             patch.object(sysentrpxy, "datetime") as clock,
         ):
             clock.now.return_value = datetime(2026, 10, 12, 13, 0)
             self.assertEqual(sysentrpxy.get_entry_signal(frame), ("BUY", "BULL"))
+            market.assert_not_called()
 
-    def test_st_variant_rejects_out_of_zone_and_same_direction_market(self):
+    def test_st_variant_rejects_out_of_zone_regardless_of_market_signal(self):
         frame = pd.DataFrame({"Close": [101.0]})
         cases = (
-            ("BULL", "BEAR", 101.001, "BUY"),
-            ("BULL", "BEAR", 102.101, "BUY"),
-            ("BULL", "BULL", 100.5, "BUY"),
-            ("BEAR", "BULL", 98.999, "SELL"),
-            ("BEAR", "BULL", 97.899, "SELL"),
-            ("BEAR", "BEAR", 99.5, "SELL"),
+            ("BULL", "NONE", 101.001),
+            ("BULL", "BULL", 102.101),
+            ("BULL", "BEAR", 99.5),
+            ("BEAR", "NONE", 98.999),
+            ("BEAR", "BEAR", 97.899),
+            ("BEAR", "BULL", 100.5),
         )
-        for trend, market_signal, price, _candidate in cases:
+        for trend, market_signal, price in cases:
             processed = pd.DataFrame({
                 "ST_Trend": [trend],
                 "Close": [price],
@@ -526,10 +527,12 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_st_variant_side_entries_use_outer_mirrored_band_quarters(self):
         frame = pd.DataFrame({"Close": [0.0]})
         for market_signal, price, expected in (
-            ("BEAR", 1.0, ("BUY", "BEAR")),
-            ("BULL", 9.0, ("SELL", "BULL")),
-            ("BEAR", 1.001, ("NONE", "BEAR")),
-            ("BULL", 8.999, ("NONE", "BULL")),
+            ("NONE", 1.0, ("BUY", "NONE")),
+            ("BULL", 1.0, ("BUY", "BULL")),
+            ("BEAR", 9.0, ("SELL", "BEAR")),
+            ("NONE", 9.0, ("SELL", "NONE")),
+            ("BULL", 1.001, ("NONE", "BULL")),
+            ("BEAR", 8.999, ("NONE", "BEAR")),
             ("BEAR", 5.0, ("NONE", "BEAR")),
             ("BULL", 5.0, ("NONE", "BULL")),
         ):

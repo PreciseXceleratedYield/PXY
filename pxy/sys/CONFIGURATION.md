@@ -139,17 +139,15 @@ values until deliberately restarted.
 maps MKT exit BULL to entry BUY and BEAR to SELL; nondirectional MKT signals
 produce no entry. When `ST` is selected, MKT is used through 09:59:59 IST;
 the ST router starts at 10:00 IST. ST uses Supertrend direction as the exit
-signal when trend is BULL or BEAR and enables the historical MKT countertrend
-pullback entry filter.
+signal when trend is BULL or BEAR.
 The ST line, trend, and ATR used for entry are read from the same calculated
-series shown on the chart; MKT confirmation continues to use the regular
-60-candle market frame.
-In `ST`, entries require an opposing MKT signal and a close within half an ATR
-of the ST line: from the line to `ST + ATR/2` in BULL, or from `ST - ATR/2` to
-the line in BEAR. When Supertrend is SIDE, entries are allowed only within
-half an ATR of the outer mirrored-band edges and in the opposing MKT
-direction; the exit signal follows MKT. Both variants respect the shared
-new-book cutoff and post-square-off cooldown.
+series shown on the chart. In `ST`, a close within half an ATR of the ST line
+is sufficient for entry: from the line to `ST + ATR/2` in BULL, or from
+`ST - ATR/2` to the line in BEAR; MKT confirmation does not gate these entries.
+When Supertrend is SIDE, entries are allowed within half an ATR of either outer
+mirrored-band edge, with the lower edge mapping to BUY and upper edge to SELL.
+MKT continues to supply the SIDE-trend exit signal. Both variants respect the
+shared new-book cutoff and post-square-off cooldown.
 `SYSDTAFPXY_SELECTED_MODE` selects the DTAF strategy/data candle transform
 (default `0`, modified-close):
 mode `0` sets `Open` to the raw `Close` and sets `Close` to the midpoint
