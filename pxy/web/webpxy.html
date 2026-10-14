@@ -94,8 +94,8 @@ body{
     background:var(--accent);opacity:0.5;
     transition:background 0.3s;
 }
-#hdr.exit-bull{background:var(--bull);}
-#hdr.exit-bear{background:var(--bear);}
+#hdr.exit-bull{background:var(--hero-bull,var(--bull));}
+#hdr.exit-bear{background:var(--hero-bear,var(--bear));}
 #hdr.exit-bull .logo,
 #hdr.exit-bear .logo,
 #hdr.exit-bull #brandHdr,
@@ -103,7 +103,9 @@ body{
 #hdr.exit-bull #brandHdr span,
 #hdr.exit-bear #brandHdr span,
 #hdr.exit-bull #clk,
-#hdr.exit-bear #clk{color:var(--bg)!important;}
+#hdr.exit-bear #clk,
+#hdr.exit-bull .logo sup,
+#hdr.exit-bear .logo sup{color:var(--hero-text,var(--on-bull,#fff))!important;}
 .hdr-l,.hdr-r{display:flex;align-items:center;gap:8px;}
 .logo{
     font-family:'Syne',sans-serif;font-weight:800;font-size:17px;cursor:pointer;user-select:none;

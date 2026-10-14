@@ -59,6 +59,9 @@ html[data-theme="light"] {
     --rk-dash: rgba(48, 39, 29, 0.30) !important;
     --on-bull: #f1eadb !important;
     --on-bear: #f1eadb !important;
+    --hero-bull: #356348 !important;
+    --hero-bear: #91483d !important;
+    --hero-text: #f1eadb !important;
 }
 
 html[data-theme="dark"] {
@@ -108,6 +111,9 @@ html[data-theme="dark"] {
     --rk-dash: rgba(255, 255, 255, 0.18);
     --on-bull: #14231f;
     --on-bear: #2d1c1c;
+    --hero-bull: #3c6158;
+    --hero-bear: #76504e;
+    --hero-text: #f0f1ec;
     --chip-bg: rgba(17, 21, 28, 0.94);
     --hl-top: rgba(255, 255, 255, 0.12);
     --hl-bot: rgba(0, 0, 0, 0.09);
