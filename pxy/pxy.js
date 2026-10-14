@@ -4,6 +4,7 @@ const WebSocket = require('ws');
 const { exec } = require('child_process'); 
 const { execFile } = require('child_process');
 const crypto = require('crypto');
+const teamHome = require('./teamhome');
 const path = require('path'); 
 const os = require('os'); 
 
@@ -110,12 +111,105 @@ app.post('/api/pxy-config', authorizePxyConfig, (req, res) => {
     runPxyConfigTool('write', req.body, res);
 });
 
+/* ========================= PRIVATE TEAM@HOME POSTS ========================= */
+const teamHomeAttempts = new Map();
+const TEAM_HOME_MAX_ATTEMPTS = 5;
+const TEAM_HOME_LOCK_MS = 15 * 60 * 1000;
+const TEAM_HOME_MAX_TRACKED_IPS = 1024;
+
+app.use('/api/team-home', (req, res, next) => {
+    res.set('Cache-Control', 'no-store');
+    res.set('X-Content-Type-Options', 'nosniff');
+    return next();
+});
+
+function authorizeTeamHome(req, res, next) {
+    const expected = process.env.TEAM_HOME_PASSWORD || '';
+    if (!teamHome.isPasswordConfigured(expected)) {
+        return res.status(503).json({
+            ok: false,
+            error: 'Team@Home is not configured on this server.',
+        });
+    }
+
+    const address = req.ip || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const attempts = teamHomeAttempts.get(address);
+    if (attempts && attempts.blockedUntil > now) {
+        return res.status(429).json({
+            ok: false,
+            error: 'Too many incorrect passwords. Try again later.',
+        });
+    }
+
+    if (teamHome.passwordMatches(req.get('x-team-home-password'), expected)) {
+        teamHomeAttempts.delete(address);
+        return next();
+    }
+
+    if (teamHomeAttempts.size >= TEAM_HOME_MAX_TRACKED_IPS) {
+        teamHomeAttempts.delete(teamHomeAttempts.keys().next().value);
+    }
+    const current = attempts && attempts.blockedUntil > 0 && attempts.blockedUntil <= now
+        ? { count: 0, blockedUntil: 0 }
+        : (attempts || { count: 0, blockedUntil: 0 });
+    current.count += 1;
+    if (current.count >= TEAM_HOME_MAX_ATTEMPTS) {
+        current.blockedUntil = now + TEAM_HOME_LOCK_MS;
+    }
+    teamHomeAttempts.set(address, current);
+
+    return res.status(current.blockedUntil > now ? 429 : 401).json({
+        ok: false,
+        error: current.blockedUntil > now
+            ? 'Too many incorrect passwords. Try again later.'
+            : 'Incorrect family password.',
+    });
+}
+
+app.get('/api/team-home/posts', authorizeTeamHome, (req, res) => {
+    try {
+        return res.json({ ok: true, posts: teamHome.readPosts() });
+    } catch (error) {
+        console.error('[TEAM@HOME] Could not read posts:', error.message);
+        return res.status(500).json({ ok: false, error: 'Family posts are unavailable.' });
+    }
+});
+
+app.post('/api/team-home/posts', authorizeTeamHome, (req, res) => {
+    const author = typeof req.body?.author === 'string' ? req.body.author.trim() : '';
+    const body = typeof req.body?.body === 'string' ? req.body.body.trim() : '';
+    if (!author || author.length > teamHome.MAX_AUTHOR_LENGTH) {
+        return res.status(400).json({
+            ok: false,
+            error: `Name must be between 1 and ${teamHome.MAX_AUTHOR_LENGTH} characters.`,
+        });
+    }
+    if (!body || body.length > teamHome.MAX_BODY_LENGTH) {
+        return res.status(400).json({
+            ok: false,
+            error: `Post must be between 1 and ${teamHome.MAX_BODY_LENGTH} characters.`,
+        });
+    }
+
+    try {
+        const post = teamHome.addPost({ author, body });
+        return res.status(201).json({ ok: true, post });
+    } catch (error) {
+        console.error('[TEAM@HOME] Could not save post:', error.message);
+        return res.status(500).json({ ok: false, error: 'Family post could not be saved.' });
+    }
+});
+
 /* ========================= MAIN PAGE ========================= */ 
 app.get('/', (req, res) => { 
     res.redirect(302, '/web/webpxy.html');
 }); 
 app.get('/pxy.html', (req, res) => {
     res.redirect(302, '/web/webpxy.html');
+});
+app.get('/team-at-home', (req, res) => {
+    res.redirect(302, '/web/teamathome.html');
 });
 
 /* ========================= DASHBOARD DATA API ========================= */
