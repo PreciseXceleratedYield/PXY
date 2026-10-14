@@ -435,9 +435,23 @@ body{
             <span id="candleLineToggle" style="display:flex;gap:4px;">
                 <span onclick="setChartMode('candle')" id="chartModeCandle" style="font-size:9px;color:var(--accent);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--accent);white-space:nowrap;">Candles</span>
                 <span onclick="setChartMode('line')" id="chartModeLine" style="font-size:9px;color:var(--muted);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;">Line</span>
-                <span aria-label="Chart moving averages" style="display:flex;align-items:center;gap:7px;font-size:8px;white-space:nowrap;">
-                    <span style="color:var(--cjs-sma);">━ SMA 50</span>
-                    <span style="color:var(--accent);">┄ TSMA 50</span>
+                <span id="chartLineOptions" aria-label="Chart line visibility" style="display:flex;align-items:center;gap:7px;font-size:8px;white-space:nowrap;">
+                    <label style="display:flex;align-items:center;gap:3px;color:var(--cjs-sma);cursor:pointer;">
+                        <input class="chart-line-toggle" type="checkbox" data-chart-line="sma50" checked aria-label="Show SMA 50" style="width:12px;height:12px;margin:0;accent-color:var(--cjs-sma);">
+                        SMA 50
+                    </label>
+                    <label style="display:flex;align-items:center;gap:3px;color:var(--accent);cursor:pointer;">
+                        <input class="chart-line-toggle" type="checkbox" data-chart-line="tsma50" checked aria-label="Show TSMA 50" style="width:12px;height:12px;margin:0;accent-color:var(--accent);">
+                        TSMA 50
+                    </label>
+                    <label style="display:flex;align-items:center;gap:3px;color:var(--bull);cursor:pointer;">
+                        <input class="chart-line-toggle" type="checkbox" data-chart-line="stLine" checked aria-label="Show Supertrend line" style="width:12px;height:12px;margin:0;accent-color:var(--bull);">
+                        ST
+                    </label>
+                    <label style="display:flex;align-items:center;gap:3px;color:var(--muted);cursor:pointer;">
+                        <input class="chart-line-toggle" type="checkbox" data-chart-line="mirrorLine" checked aria-label="Show mirror line" style="width:12px;height:12px;margin:0;accent-color:var(--muted);">
+                        Mirror
+                    </label>
                 </span>
             </span>
         </div>
@@ -896,6 +910,29 @@ async function loadDash(){
 /* ── CHART ── */
 let lastCandles=null,lastMoCandles=null;
 let chartMode='candle';
+const CHART_LINE_STORAGE_KEY='pxyChartLineVisibility';
+const chartLineDefaults={sma50:true,tsma50:true,stLine:true,mirrorLine:true};
+let chartLineVisibility={...chartLineDefaults};
+try{
+    const saved=JSON.parse(localStorage.getItem(CHART_LINE_STORAGE_KEY)||'null');
+    if(saved&&typeof saved==='object'&&!Array.isArray(saved)){
+        for(const key of Object.keys(chartLineDefaults)){
+            if(typeof saved[key]==='boolean')chartLineVisibility[key]=saved[key];
+        }
+    }
+}catch(error){}
+document.querySelectorAll('.chart-line-toggle').forEach(toggle=>{
+    const key=toggle.dataset.chartLine;
+    if(!Object.prototype.hasOwnProperty.call(chartLineDefaults,key))return;
+    toggle.checked=chartLineVisibility[key];
+    toggle.addEventListener('change',()=>{
+        chartLineVisibility[key]=toggle.checked;
+        try{
+            localStorage.setItem(CHART_LINE_STORAGE_KEY,JSON.stringify(chartLineVisibility));
+        }catch(error){}
+        if(lastCandles)drawChart(lastCandles);
+    });
+});
 function setChartMode(mode){
     chartMode=mode;
     const c=$('chartModeCandle'),l=$('chartModeLine');
@@ -969,10 +1006,10 @@ function drawChart(candles){
     vis.forEach(c=>{
         if(c.l!=null)lo=Math.min(lo,c.l);
         if(c.h!=null)hi=Math.max(hi,c.h);
-        if(c.st_line!=null){lo=Math.min(lo,c.st_line);hi=Math.max(hi,c.st_line);}
-        if(c.mirror_line!=null){lo=Math.min(lo,c.mirror_line);hi=Math.max(hi,c.mirror_line);}
-        if(c.sma50!=null){lo=Math.min(lo,c.sma50);hi=Math.max(hi,c.sma50);}
-        if(c.tsma50!=null){lo=Math.min(lo,c.tsma50);hi=Math.max(hi,c.tsma50);}
+        if(chartLineVisibility.stLine&&c.st_line!=null){lo=Math.min(lo,c.st_line);hi=Math.max(hi,c.st_line);}
+        if(chartLineVisibility.mirrorLine&&c.mirror_line!=null){lo=Math.min(lo,c.mirror_line);hi=Math.max(hi,c.mirror_line);}
+        if(chartLineVisibility.sma50&&c.sma50!=null){lo=Math.min(lo,c.sma50);hi=Math.max(hi,c.sma50);}
+        if(chartLineVisibility.tsma50&&c.tsma50!=null){lo=Math.min(lo,c.tsma50);hi=Math.max(hi,c.tsma50);}
     });
     if(!isFinite(lo)||!isFinite(hi))return;
     const pad=(hi-lo)*0.08||1;
@@ -1040,28 +1077,32 @@ function drawChart(candles){
     }
 
     // ST_LINE — colored per-segment by trend (BULL/BEAR/SIDE)
-    ctx.lineWidth=1.6;
-    for(let i=1;i<n;i++){
-        const c0=vis[i-1],c1=vis[i];
-        if(c0.st_line==null||c1.st_line==null)continue;
-        const trend=String(c1.trend||c0.trend||'SIDE').toUpperCase();
-        ctx.strokeStyle=trend==='BULL'?cssVar('--bull'):trend==='BEAR'?cssVar('--bear'):cssVar('--trend-neutral');
-        ctx.beginPath();
-        ctx.moveTo(toX(i-1),toY(c0.st_line));
-        ctx.lineTo(toX(i),toY(c1.st_line));
-        ctx.stroke();
+    if(chartLineVisibility.stLine){
+        ctx.lineWidth=1.6;
+        for(let i=1;i<n;i++){
+            const c0=vis[i-1],c1=vis[i];
+            if(c0.st_line==null||c1.st_line==null)continue;
+            const trend=String(c1.trend||c0.trend||'SIDE').toUpperCase();
+            ctx.strokeStyle=trend==='BULL'?cssVar('--bull'):trend==='BEAR'?cssVar('--bear'):cssVar('--trend-neutral');
+            ctx.beginPath();
+            ctx.moveTo(toX(i-1),toY(c0.st_line));
+            ctx.lineTo(toX(i),toY(c1.st_line));
+            ctx.stroke();
+        }
     }
 
     // MIRROR_LINE — always neutral white
-    ctx.strokeStyle=cssVar('--mirror');ctx.lineWidth=1;
-    ctx.beginPath();
-    let mStarted=false;
-    vis.forEach((c,i)=>{
-        if(c.mirror_line==null)return;
-        const x=toX(i),y=toY(c.mirror_line);
-        if(!mStarted){ctx.moveTo(x,y);mStarted=true;}else ctx.lineTo(x,y);
-    });
-    ctx.stroke();
+    if(chartLineVisibility.mirrorLine){
+        ctx.strokeStyle=cssVar('--mirror');ctx.lineWidth=1;
+        ctx.beginPath();
+        let mStarted=false;
+        vis.forEach((c,i)=>{
+            if(c.mirror_line==null){mStarted=false;return;}
+            const x=toX(i),y=toY(c.mirror_line);
+            if(!mStarted){ctx.moveTo(x,y);mStarted=true;}else ctx.lineTo(x,y);
+        });
+        ctx.stroke();
+    }
 
     // Draw both 50-period averages with distinct colors and line patterns.
     function drawMovingAverage(key,color,dash){
@@ -1085,8 +1126,8 @@ function drawChart(candles){
         }
         ctx.stroke();
     }
-    drawMovingAverage('sma50','--cjs-sma',[]);
-    drawMovingAverage('tsma50','--accent',[4,3]);
+    if(chartLineVisibility.sma50)drawMovingAverage('sma50','--cjs-sma',[]);
+    if(chartLineVisibility.tsma50)drawMovingAverage('tsma50','--accent',[4,3]);
     ctx.setLineDash([]);
 }
 function drawMomentumBar(candles){
