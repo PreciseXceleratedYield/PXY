@@ -37,6 +37,7 @@ from syscnfgpxy import (
     EXEEXITPXY_SYSDUMP_SCRIPT,
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
+    SYSDTAFPXY_SELECTED_MODE,
     PASTRSK,
 )
 from sysmodepxy import dispatch_mode
@@ -154,6 +155,13 @@ def depth_squareoff_side(entry_signal, past_depth, threshold=EXEEXITPXY_DEPTH_EX
     return None
 
 
+def depth_exit_threshold():
+    """Use a five-candle past-depth trigger for modified-close mode only."""
+    if SYSDTAFPXY_SELECTED_MODE == 0:
+        return 4
+    return EXEEXITPXY_DEPTH_EXIT_THRESHOLD
+
+
 def depth_exit_side_loss_pct(active_df, side):
     """Return the selected side's blended running P&L percentage, or None if invalid."""
     if active_df is None or active_df.empty or "symbol" not in active_df.columns:
@@ -213,6 +221,7 @@ def run_depth_squareoff(client, active_df, market_data_available,
     side = depth_squareoff_side(
         snapshot.get("entry"),
         snapshot.get("hkin_past_depth"),
+        threshold=depth_exit_threshold(),
     )
     if side is None:
         return set()

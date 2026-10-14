@@ -829,6 +829,18 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(exeexitpxy.depth_squareoff_side("SELL", "CE6"), None)
         self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "PE-7"), None)
 
+    def test_mode_zero_depth_exit_threshold_is_five_and_other_modes_keep_seven(self):
+        with patch.object(exeexitpxy, "SYSDTAFPXY_SELECTED_MODE", 0):
+            self.assertEqual(exeexitpxy.depth_exit_threshold(), 4)
+        for mode in (1, 2):
+            with self.subTest(mode=mode), patch.object(
+                exeexitpxy, "SYSDTAFPXY_SELECTED_MODE", mode
+            ):
+                self.assertEqual(
+                    exeexitpxy.depth_exit_threshold(),
+                    exeexitpxy.EXEEXITPXY_DEPTH_EXIT_THRESHOLD,
+                )
+
     def test_pastrsk_switch_gates_depth_squareoff(self):
         active_orders = pd.DataFrame(
             [
@@ -865,7 +877,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "tag": "CE1",
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "BUY",
-                    "hkin_past_depth": "PE7",
+                    "hkin_past_depth": "PE5",
                     "hkin_ce_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 },
@@ -877,7 +889,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "buy_prc": 100.0,
                     "sell_prc": 80.0,
                     "entry": "BUY",
-                    "hkin_past_depth": "PE7",
+                    "hkin_past_depth": "PE5",
                     "hkin_ce_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 },
