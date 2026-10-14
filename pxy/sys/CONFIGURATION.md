@@ -76,10 +76,11 @@ combination; it is a documentation label, not a separate runtime selector.
 - `SYSSMAPXY_VARIANT` selects the production 50-period average used by
   `syssmapxy.get_sma()` and defaults to `TSMA`, the rolling linear-regression
   endpoint; `SMA` preserves the simple-moving-average behavior. The web chart
-  provides its own SMA/TSMA selector and defaults to TSMA. Chart history fetches
-  `SYSSTRNDPXY_CHART_TARGET_ROWS` (110) candles so its 60 visible bars include
-  the 50-bar warm-up required for complete moving-average lines; signal
-  calculations continue using `SYSDTAFPXY_DEFAULT_TARGET_ROWS` (60).
+  displays both 50-period averages together: SMA as a solid gold line and TSMA
+  as a dashed accent line. Chart history fetches `SYSSTRNDPXY_CHART_TARGET_ROWS`
+  (110) candles so its 60 visible bars include the 50-bar warm-up required for
+  complete moving-average lines; signal calculations continue using
+  `SYSDTAFPXY_DEFAULT_TARGET_ROWS` (60).
 - `EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS` makes the signal router return
   `NONE` for both entry and exit signals for 6 seconds after a square-off
   order is accepted; the risk-ledger liquidation path starts the same
