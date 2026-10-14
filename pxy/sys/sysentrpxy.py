@@ -76,23 +76,24 @@ def _supertrend_entry_signal(df, now=None, processed_supertrend=None):
     latest = processed.iloc[-1]
     entry_signal = "NONE"
 
-    # --- TRENDING STRATEGY (1.0 * ATR Corridor Boundaries) ---
+    # --- TRENDING STRATEGY (0.5 * ATR Corridor Boundaries) ---
     if trend in {"BULL", "BEAR"}:
         if {"Close", "st_line", "st_atr"}.issubset(processed.columns):
             values = _finite_row_values(latest, ("Close", "st_line", "st_atr"))
             if values is not None:
                 price, st_line, atr = values
                 if atr > 0:
+                    entry_atr = atr / 2.0
                     if (
                         trend == "BULL"
                         and market_signal == "BEAR"
-                        and st_line <= price <= st_line + atr
+                        and st_line <= price <= st_line + entry_atr
                     ):
                         entry_signal = "BUY"
                     elif (
                         trend == "BEAR"
                         and market_signal == "BULL"
-                        and st_line - atr <= price <= st_line
+                        and st_line - entry_atr <= price <= st_line
                     ):
                         entry_signal = "SELL"
         return _apply_new_book_cutoff(entry_signal, trend, now)
@@ -104,9 +105,10 @@ def _supertrend_entry_signal(df, now=None, processed_supertrend=None):
             price, st_line, mirror, atr = values
             if atr > 0:
                 upper_band, lower_band = max(st_line, mirror), min(st_line, mirror)
-                if market_signal == "BEAR" and price <= (lower_band + atr):
+                entry_atr = atr / 2.0
+                if market_signal == "BEAR" and price <= (lower_band + entry_atr):
                     entry_signal = "BUY"
-                elif market_signal == "BULL" and price >= (upper_band - atr):
+                elif market_signal == "BULL" and price >= (upper_band - entry_atr):
                     entry_signal = "SELL"
                     
     exit_signal = "NONE"  

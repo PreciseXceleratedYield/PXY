@@ -144,10 +144,11 @@ pullback entry filter.
 The ST line, trend, and ATR used for entry are read from the same calculated
 series shown on the chart; MKT confirmation continues to use the regular
 60-candle market frame.
-In `ST`, entries require an opposing MKT signal and a close within one ATR of
-the ST line. When Supertrend is SIDE, entries are
-allowed only in the outer quarter of the mirrored ST band and in the opposing
-MKT direction; the exit signal follows MKT. Both variants respect the shared
+In `ST`, entries require an opposing MKT signal and a close within half an ATR
+of the ST line: from the line to `ST + ATR/2` in BULL, or from `ST - ATR/2` to
+the line in BEAR. When Supertrend is SIDE, entries are allowed only within
+half an ATR of the outer mirrored-band edges and in the opposing MKT
+direction; the exit signal follows MKT. Both variants respect the shared
 new-book cutoff and post-square-off cooldown.
 `SYSDTAFPXY_SELECTED_MODE` selects the DTAF strategy/data candle transform
 (default `0`, modified-close):
