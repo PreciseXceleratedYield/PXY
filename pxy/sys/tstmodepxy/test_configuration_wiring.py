@@ -365,10 +365,10 @@ class ConfigurationWiringTests(unittest.TestCase):
                     ("NONE", "NONE"),
                 )
 
-    def test_entry_variant_config_defaults_to_st_and_offers_mkt(self):
+    def test_entry_variant_config_defaults_to_mkt_and_offers_st(self):
         from syscnfgpxy import SYSENTRPXY_ST_START, SYSENTRPXY_VARIANT
 
-        self.assertEqual(SYSENTRPXY_VARIANT, "ST")
+        self.assertEqual(SYSENTRPXY_VARIANT, "MKT")
         self.assertEqual(SYSENTRPXY_ST_START, dt_time(10, 0))
         self.assertEqual(
             __import__("pxyconfigwebpxy").ENUMS["SYSENTRPXY_VARIANT"],
