@@ -321,7 +321,7 @@ class ConfigurationWiringTests(unittest.TestCase):
         self.assertEqual(get_sma(above, period=50, variant="SMA")["status"], "BULL")
         self.assertEqual(get_sma(below, period=50, variant="SMA")["status"], "BEAR")
 
-    def test_mkt_bull_and_bear_map_directly_to_binary_entries(self):
+    def test_mkt_bull_and_bear_map_directly_to_binary_entries_before_ten(self):
         frame = pd.DataFrame({"Close": [100.5]})
         for mkt_signal, expected in (
             ("BULL", ("BUY", "BULL")),
@@ -335,7 +335,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                 ) as market,
                 patch.object(sysentrpxy, "datetime") as clock,
             ):
-                clock.now.return_value = datetime(2026, 10, 12, 13, 0)
+                clock.now.return_value = datetime(2026, 10, 12, 9, 59)
                 self.assertEqual(sysentrpxy.get_entry_signal(frame), expected)
             market.assert_called_once_with(frame)
 
@@ -365,10 +365,10 @@ class ConfigurationWiringTests(unittest.TestCase):
                     ("NONE", "NONE"),
                 )
 
-    def test_entry_variant_config_defaults_to_st_and_starts_at_ten(self):
+    def test_entry_variant_config_defaults_to_mkt_with_post_ten_filter(self):
         from syscnfgpxy import SYSENTRPXY_ST_START, SYSENTRPXY_VARIANT
 
-        self.assertEqual(SYSENTRPXY_VARIANT, "ST")
+        self.assertEqual(SYSENTRPXY_VARIANT, "MKT")
         self.assertEqual(SYSENTRPXY_ST_START, dt_time(10, 0))
         self.assertEqual(
             __import__("pxyconfigwebpxy").ENUMS["SYSENTRPXY_VARIANT"],
@@ -479,18 +479,47 @@ class ConfigurationWiringTests(unittest.TestCase):
         calculate_st.assert_not_called()
         market.assert_not_called()
 
-    def test_mkt_selection_remains_mkt_after_ten(self):
+    def test_mkt_post_ten_entry_requires_opposite_depth_and_first_reversal_candle(self):
         frame = pd.DataFrame({"Close": [101.0]})
+        cases = (
+            ("BULL", {"past_depth": "PE3", "ce_depth": 1, "pe_depth": 1}, ("BUY", "BULL")),
+            ("BULL", {"past_depth": "PE5", "ce_depth": 2, "pe_depth": 1}, ("NONE", "BULL")),
+            ("BULL", {"past_depth": "PE2", "ce_depth": 1, "pe_depth": 1}, ("NONE", "BULL")),
+            ("BULL", {"past_depth": "CE4", "ce_depth": 1, "pe_depth": 1}, ("NONE", "BULL")),
+            ("BEAR", {"past_depth": "CE3", "ce_depth": 1, "pe_depth": 1}, ("SELL", "BEAR")),
+            ("BEAR", {"past_depth": "CE5", "ce_depth": 1, "pe_depth": 2}, ("NONE", "BEAR")),
+            ("BEAR", {"past_depth": "CE2", "ce_depth": 1, "pe_depth": 1}, ("NONE", "BEAR")),
+            ("BEAR", {"past_depth": "PE4", "ce_depth": 1, "pe_depth": 1}, ("NONE", "BEAR")),
+            ("NONE", {"past_depth": "PE4", "ce_depth": 1, "pe_depth": 1}, ("NONE", "NONE")),
+        )
+        for market_signal, depth, expected in cases:
+            with (
+                self.subTest(market_signal=market_signal, depth=depth),
+                patch.object(sysentrpxy, "SYSENTRPXY_VARIANT", "MKT"),
+                patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
+                patch.object(sysentrpxy, "get_market_signal", return_value=market_signal),
+                patch.object(sysentrpxy, "get_signal_depth_analysis", return_value=depth),
+                patch.object(sysentrpxy, "calculate_supertrend") as st,
+            ):
+                self.assertEqual(
+                    sysentrpxy.get_entry_signal(frame, now=dt_time(10, 30)),
+                    expected,
+                )
+                st.assert_not_called()
+
+    def test_mkt_post_ten_entry_filter_respects_new_book_cutoff(self):
+        frame = pd.DataFrame({"Close": [101.0]})
+        depth = {"past_depth": "PE3", "ce_depth": 1, "pe_depth": 1}
         with (
             patch.object(sysentrpxy, "SYSENTRPXY_VARIANT", "MKT"),
             patch.object(sysentrpxy, "cooldown_remaining", return_value=0),
             patch.object(sysentrpxy, "get_market_signal", return_value="BULL"),
-            patch.object(sysentrpxy, "calculate_supertrend") as st,
-            patch.object(sysentrpxy, "datetime") as clock,
+            patch.object(sysentrpxy, "get_signal_depth_analysis", return_value=depth),
         ):
-            clock.now.return_value = datetime(2026, 10, 12, 10, 30)
-            self.assertEqual(sysentrpxy.get_entry_signal(frame), ("BUY", "BULL"))
-            st.assert_not_called()
+            self.assertEqual(
+                sysentrpxy.get_entry_signal(frame, now=dt_time(14, 0)),
+                ("NONE", "BULL"),
+            )
 
     def test_st_variant_uses_half_atr_supertrend_zone_without_mkt_confirmation(self):
         frame = pd.DataFrame({"Close": [101.0]})

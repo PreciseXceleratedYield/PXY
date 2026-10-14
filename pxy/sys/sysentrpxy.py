@@ -1,6 +1,7 @@
 from datetime import datetime
 import math
 from pathlib import Path
+import re
 import sys
 
 import pandas as pd
@@ -13,6 +14,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
 )
 from sysdtstpxy import calculate_supertrend
+from sysdthapxy import get_signal_depth_analysis
 
 EXE_DIR = Path(__file__).resolve().parent / "exe"
 if str(EXE_DIR) not in sys.path:
@@ -28,6 +30,40 @@ def _entry_signal_for_exit(exit_signal, now=None):
         return "NONE", "NONE"
     entry_signal = {"BULL": "BUY", "BEAR": "SELL"}[normalized_exit]
     return _apply_new_book_cutoff(entry_signal, normalized_exit, now)
+
+
+def _mkt_depth_entry_signal(market_signal, df, now):
+    """Require a three-candle opposite run and first candle of the MKT reversal."""
+    analysis = get_signal_depth_analysis(df=df)
+    past_depth = re.fullmatch(
+        r"(CE|PE)(\d+)", str(analysis.get("past_depth", "")).upper().strip()
+    )
+    try:
+        ce_depth = float(pd.to_numeric(analysis.get("ce_depth"), errors="coerce"))
+        pe_depth = float(pd.to_numeric(analysis.get("pe_depth"), errors="coerce"))
+    except (TypeError, ValueError, OverflowError):
+        return "NONE", market_signal
+
+    entry_signal = "NONE"
+    if (
+        market_signal == "BULL"
+        and past_depth
+        and past_depth.group(1) == "PE"
+        and int(past_depth.group(2)) >= 3
+        and math.isfinite(ce_depth)
+        and ce_depth == 1
+    ):
+        entry_signal = "BUY"
+    elif (
+        market_signal == "BEAR"
+        and past_depth
+        and past_depth.group(1) == "CE"
+        and int(past_depth.group(2)) >= 3
+        and math.isfinite(pe_depth)
+        and pe_depth == 1
+    ):
+        entry_signal = "SELL"
+    return _apply_new_book_cutoff(entry_signal, market_signal, now)
 
 
 def _apply_new_book_cutoff(entry_signal, exit_signal, now=None):
@@ -114,7 +150,7 @@ def _supertrend_entry_signal(df, now=None, processed_supertrend=None):
 
 
 def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
-    """Use MKT through 10:00 IST, then apply the configured entry variant."""
+    """Route entries through MKT, with depth confirmation after 10:00 IST."""
     if cooldown_remaining() > 0:
         print("⏳ POST-SQUARE-OFF COOLDOWN: entry and exit signals forced to NONE.")
         return "NONE", "NONE"
@@ -130,9 +166,20 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
             df, now=now, processed_supertrend=processed_supertrend
         )
 
+    if (
+        SYSENTRPXY_VARIANT == "MKT"
+        and now >= SYSENTRPXY_ST_START
+        and df is None
+    ):
+        from sysdtafpxy import fetch_yf_data
+
+        df = fetch_yf_data()
+
     exit_signal = str(get_market_signal(df)).upper().strip()
     if exit_signal not in {"BULL", "BEAR"}:
         exit_signal = "NONE"
+    if SYSENTRPXY_VARIANT == "MKT" and now >= SYSENTRPXY_ST_START:
+        return _mkt_depth_entry_signal(exit_signal, df, now)
     return _entry_signal_for_exit(exit_signal, now=now)
 
 

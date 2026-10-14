@@ -441,6 +441,11 @@ class ModeDispatchTests(unittest.TestCase):
             patch.object(backtest, "transform_market_data", return_value=history),
             patch.object(backtest.sysentrpxy, "SYSENTRPXY_VARIANT", "MKT"),
             patch.object(backtest.sysentrpxy, "get_market_signal", return_value="BULL"),
+            patch.object(
+                backtest.sysentrpxy,
+                "get_signal_depth_analysis",
+                return_value={"past_depth": "PE3", "ce_depth": 1, "pe_depth": 1},
+            ),
         ):
             bars = backtest.calculate_strategy_signals(history, date(2025, 1, 6))
 
