@@ -868,6 +868,20 @@ class ConfigurationWiringTests(unittest.TestCase):
                     exeexitpxy.EXEEXITPXY_DEPTH_EXIT_THRESHOLD,
                 )
 
+    def test_mode_three_depth_exit_threshold_tracks_signal_candle_mode(self):
+        with patch.object(exeexitpxy, "SYSDTAFPXY_SELECTED_MODE", 3):
+            self.assertEqual(
+                exeexitpxy.depth_exit_threshold("2025-01-06 09:59:00"), 4
+            )
+            self.assertEqual(
+                exeexitpxy.depth_exit_threshold("2025-01-06 10:00:00"),
+                exeexitpxy.EXEEXITPXY_DEPTH_EXIT_THRESHOLD,
+            )
+            self.assertEqual(
+                exeexitpxy.depth_exit_threshold("2025-01-06 14:00:00"),
+                exeexitpxy.EXEEXITPXY_DEPTH_EXIT_THRESHOLD,
+            )
+
     def test_pastrsk_switch_gates_depth_squareoff(self):
         active_orders = pd.DataFrame(
             [
@@ -906,7 +920,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "entry": "BUY",
                     "hkin_past_depth": "PE5",
                     "hkin_ce_depth": 1,
-                    "hkin_signal_time": "2025-01-06 10:00:00",
+                    "hkin_signal_time": "2025-01-06 09:59:00",
                 },
                 {
                     "symbol": "NIFTY-WF-PE",
@@ -918,7 +932,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "entry": "BUY",
                     "hkin_past_depth": "PE5",
                     "hkin_ce_depth": 1,
-                    "hkin_signal_time": "2025-01-06 10:00:00",
+                    "hkin_signal_time": "2025-01-06 09:59:00",
                 },
             ]
         )
@@ -945,7 +959,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             timeout=exeexitpxy.SQUAREOFF_TIMEOUT_SECS,
         )
         mark_lock.assert_called_once_with(
-            "DEPTH_EXIT|PE|2025-01-06 10:00:00"
+            "DEPTH_EXIT|PE|2025-01-06 09:59:00"
         )
 
     def test_pastrsk_loss_filter_requires_more_than_seven_percent(self):
@@ -1630,10 +1644,12 @@ class ConfigurationWiringTests(unittest.TestCase):
             apply_ohlc_transformation(frame, mode=1), frame
         )
 
-    def test_dtaf_defaults_to_mode_zero_and_rejects_other_modes(self):
+    def test_dtaf_defaults_to_mode_three_and_rejects_other_modes(self):
         import syscnfgpxy
 
-        self.assertEqual(syscnfgpxy.SYSDTAFPXY_SELECTED_MODE, 0)
+        self.assertEqual(syscnfgpxy.SYSDTAFPXY_SELECTED_MODE, 3)
+        self.assertEqual(syscnfgpxy.SYSDTAFPXY_MODE3_MODE0_START, dt_time(9, 0))
+        self.assertEqual(syscnfgpxy.SYSDTAFPXY_MODE3_MODE0_END, dt_time(10, 0))
         self.assertEqual(syscnfgpxy.EXEAMSPXY_MAX_LGT_LOSS, 77.0)
         frame = pd.DataFrame(
             {
@@ -1644,8 +1660,63 @@ class ConfigurationWiringTests(unittest.TestCase):
             }
         )
 
-        with self.assertRaisesRegex(ValueError, "must be 0, 1, or 2"):
+        with self.assertRaisesRegex(ValueError, "must be 0, 1, 2, or 3"):
             apply_ohlc_transformation(frame, mode=8)
+
+    def test_dtaf_mode_three_uses_mode_zero_only_between_nine_and_ten_ist(self):
+        from syscnfgpxy import SYSCNFGPXY_TIMEZONE
+
+        index = pd.DatetimeIndex(
+            [
+                "2026-10-14 08:59",
+                "2026-10-14 09:00",
+                "2026-10-14 09:59",
+                "2026-10-14 10:00",
+                "2026-10-14 14:30",
+            ],
+            tz=SYSCNFGPXY_TIMEZONE,
+        )
+        frame = pd.DataFrame(
+            {
+                "Open": [100.0] * 5,
+                "High": [104.0] * 5,
+                "Low": [96.0] * 5,
+                "Close": [102.0] * 5,
+            },
+            index=index,
+        )
+
+        result = apply_ohlc_transformation(frame, mode=3)
+
+        self.assertEqual(result["Open"].tolist(), [100.0, 102.0, 102.0, 100.0, 100.0])
+        self.assertEqual(result["Close"].tolist(), [101.0, 103.0, 103.0, 101.0, 101.0])
+
+    def test_dtaf_mode_three_converts_timestamp_zones_before_selecting_window(self):
+        utc_index = pd.DatetimeIndex(
+            ["2026-10-14 03:30", "2026-10-14 04:30"], tz="UTC"
+        )
+        frame = pd.DataFrame(
+            {
+                "Open": [100.0, 100.0],
+                "High": [104.0, 104.0],
+                "Low": [96.0, 96.0],
+                "Close": [102.0, 102.0],
+            },
+            index=utc_index,
+        )
+
+        result = apply_ohlc_transformation(frame, mode=3)
+
+        self.assertEqual(result["Open"].tolist(), [102.0, 100.0])
+        self.assertEqual(result["Close"].tolist(), [103.0, 101.0])
+
+    def test_dtaf_mode_three_requires_timestamps(self):
+        frame = pd.DataFrame(
+            {"Open": [100.0], "High": [104.0], "Low": [96.0], "Close": [102.0]}
+        )
+
+        with self.assertRaisesRegex(ValueError, "requires a DatetimeIndex"):
+            apply_ohlc_transformation(frame, mode=3)
 
     def test_data_timezone_uses_shared_setting(self):
         from sysdtafpxy import TIMEZONE

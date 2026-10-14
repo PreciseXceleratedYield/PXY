@@ -11,6 +11,8 @@ from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_INTERVAL,
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     SYSDTAFPXY_FORCE_NIFTY_FUT,
+    SYSDTAFPXY_MODE3_MODE0_END,
+    SYSDTAFPXY_MODE3_MODE0_START,
     SYSDTAFPXY_SELECTED_MODE,
 )
 from sysmodepxy import dispatch_mode
@@ -25,13 +27,36 @@ FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 def apply_ohlc_transformation(
     df, mode=SYSDTAFPXY_SELECTED_MODE, futures_price=None
 ):
-    """Blend OHLC with futures, then apply mode 0, 1, or 2."""
-    if isinstance(mode, bool) or not isinstance(mode, int) or mode not in (0, 1, 2):
-        raise ValueError("DTAF mode must be 0, 1, or 2.")
+    """Blend OHLC with futures, then apply the selected DTAF mode."""
+    if (
+        isinstance(mode, bool)
+        or not isinstance(mode, int)
+        or mode not in (0, 1, 2, 3)
+    ):
+        raise ValueError("DTAF mode must be 0, 1, 2, or 3.")
     if df.empty:
         return df
 
     out = df.copy()
+    mode3_mode0_rows = None
+    if mode == 3:
+        if not isinstance(out.index, pd.DatetimeIndex):
+            raise ValueError("DTAF mode 3 requires a DatetimeIndex.")
+        local_index = (
+            out.index.tz_localize(TIMEZONE)
+            if out.index.tz is None
+            else out.index.tz_convert(TIMEZONE)
+        )
+        mode3_mode0_rows = np.fromiter(
+            (
+                SYSDTAFPXY_MODE3_MODE0_START
+                <= timestamp
+                < SYSDTAFPXY_MODE3_MODE0_END
+                for timestamp in local_index.time
+            ),
+            dtype=bool,
+            count=len(local_index),
+        )
     if futures_price is not None:
         try:
             futures_price = float(futures_price)
@@ -48,13 +73,22 @@ def apply_ohlc_transformation(
     raw_c = out["Close"].to_numpy()
 
     if mode == 0:
-        out["Open"] = raw_c
-        out["Close"] = np.where(
+        mode0_rows = np.ones(len(out), dtype=bool)
+    elif mode == 3:
+        mode0_rows = mode3_mode0_rows
+    else:
+        mode0_rows = np.zeros(len(out), dtype=bool)
+
+    if mode0_rows.any():
+        out["Open"] = np.where(mode0_rows, raw_c, raw_o)
+        mode0_close = np.where(
             raw_c >= raw_o,
             (raw_c + raw_h) / 2.0,
             (raw_c + raw_l) / 2.0,
         )
-    elif mode == 2:
+        mode2_close = (raw_o + raw_c) / 2.0
+        out["Close"] = np.where(mode0_rows, mode0_close, mode2_close)
+    elif mode in (2, 3):
         out["Close"] = (raw_o + raw_c) / 2.0
     return out
 

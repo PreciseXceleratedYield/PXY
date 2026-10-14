@@ -13,10 +13,11 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 combination; it is a documentation label, not a separate runtime selector.
 
 - **Entry router:** `ST`. MKT routes entries through 09:59:59 IST; the ST
-  router starts at 10:00 IST using Supertrend period 14, factor 1. Mode 0
-  remains the strategy/data candle transform. New books are blocked at the
+  router starts at 10:00 IST using Supertrend period 14, factor 1. Mode 3
+  selects the strategy/data candle transform by time. New books are blocked at the
   14:00 cutoff; exit signals continue to be evaluated.
-- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 0` (modified-close).
+- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 3`. Mode 3 applies
+  modified-close mode 0 from 09:00 to 10:00 IST and mode 2 at all other times.
   The separate chart display transform remains
   `SYSPLCHRTPXY_OHLC_MODE = 1` (raw OHLC).
 - **Option strikes:** `EXEOTMPXY_STRIKE_MODE = "ATM"` for option buys.
@@ -148,11 +149,16 @@ mirrored-band edge, with the lower edge mapping to BUY and upper edge to SELL.
 MKT continues to supply the SIDE-trend exit signal. Both variants respect the
 shared new-book cutoff and post-square-off cooldown.
 `SYSDTAFPXY_SELECTED_MODE` selects the DTAF strategy/data candle transform
-(default `0`, modified-close):
+(default `3`, time-filtered):
 mode `0` sets `Open` to the raw `Close` and sets `Close` to the midpoint
 between raw `Close` and `High` on an up candle or raw `Close` and `Low` on a
 down candle; mode `1` keeps raw candles, and mode `2` sets `Close` to the
-`Open`/`Close` midpoint while retaining the other OHLC fields. The separate
+`Open`/`Close` midpoint while retaining the other OHLC fields. Mode `3` applies
+mode `0` to each candle timestamp from 09:00 (inclusive) through 10:00
+(exclusive) IST and mode `2` to all other timestamps. The window uses each
+candle's localized timestamp, so historical SIM replay follows the same
+schedule as live data processing. The modified-close five-candle deep-reversal
+threshold also applies only during this Mode 0 window. The separate
 chart candle transform is controlled by
 `SYSPLCHRTPXY_OHLC_MODE`. In every DTAF mode, the live Yahoo OHLC fields are
 first averaged with the latest NIFTY futures price from
@@ -374,8 +380,9 @@ historical option P&L.
   peak rule is now explicitly configured as `RUNEXMTPXY_PEAK_MULTIPLIER`.
 - Removed the redundant data-timezone setting (now derived from the shared
   timezone), an unused transform ATR argument, and the weekday OTM map whose
-  entries all had the same distance. DTAF supports only modes 0, 1, and 2; the
-  former Renko transformation and its brick-size setting are removed.
+  entries all had the same distance. DTAF supports modes 0, 1, 2, and the
+  time-filtered mode 3; the former Renko transformation and its brick-size
+  setting are removed.
 - Averaging-order payload values, retry timing, ATR fallbacks/floors, signal
   force values, and point-replay session times are wired to the consuming
   modules. Dynamic non-aligned TGT reads its configured percentage rather than

@@ -37,6 +37,8 @@ from syscnfgpxy import (
     EXEEXITPXY_SYSDUMP_SCRIPT,
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
+    SYSDTAFPXY_MODE3_MODE0_END,
+    SYSDTAFPXY_MODE3_MODE0_START,
     SYSDTAFPXY_SELECTED_MODE,
     PASTRSK,
 )
@@ -155,10 +157,27 @@ def depth_squareoff_side(entry_signal, past_depth, threshold=EXEEXITPXY_DEPTH_EX
     return None
 
 
-def depth_exit_threshold():
-    """Use a five-candle past-depth trigger for modified-close mode only."""
+def depth_exit_threshold(signal_time=None):
+    """Use the modified-close depth threshold when that candle mode is active."""
     if SYSDTAFPXY_SELECTED_MODE == 0:
         return 4
+    if SYSDTAFPXY_SELECTED_MODE == 3 and signal_time is not None:
+        try:
+            timestamp = pd.Timestamp(signal_time)
+        except (TypeError, ValueError):
+            timestamp = pd.NaT
+        if not pd.isna(timestamp):
+            timestamp = (
+                timestamp.tz_localize(SYSCNFGPXY_TIMEZONE)
+                if timestamp.tzinfo is None
+                else timestamp.tz_convert(SYSCNFGPXY_TIMEZONE)
+            )
+            if (
+                SYSDTAFPXY_MODE3_MODE0_START
+                <= timestamp.time()
+                < SYSDTAFPXY_MODE3_MODE0_END
+            ):
+                return 4
     return EXEEXITPXY_DEPTH_EXIT_THRESHOLD
 
 
@@ -221,7 +240,7 @@ def run_depth_squareoff(client, active_df, market_data_available,
     side = depth_squareoff_side(
         snapshot.get("entry"),
         snapshot.get("hkin_past_depth"),
-        threshold=depth_exit_threshold(),
+        threshold=depth_exit_threshold(snapshot.get("hkin_signal_time")),
     )
     if side is None:
         return set()
