@@ -1,7 +1,17 @@
+#!/usr/bin/env python3
 import math
 import pandas as pd
 import re
+import sys
+from pathlib import Path
 from colorama import Fore, Style, init
+
+# ----------------- PATH FIX FOR INDEPENDENT RUNNING -----------------
+HERE = Path(__file__).resolve().parent
+for path in (HERE, HERE.parent, HERE.parent.parent):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+
 from syscnfgpxy import (
     EXEAMSPXY_MAX_LGT_LOSS,
     EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
@@ -76,10 +86,9 @@ def calculate_tgt(
     Formula when aligned: max(own_depth, 3) * own_power
     """
     if is_aligned:
-        # Safely convert to float defaults if parameters are missing or None
         depth_val = float(own_depth) if own_depth is not None else 0.0
         power_val = float(own_power) if own_power is not None else 0.0
-        return max(depth_val, 3.5) * power_val
+        return max(depth_val, 3.0) * power_val
     else:
         return NOT_ALIGNED_TARGET_PCT
 
@@ -93,22 +102,16 @@ def f(x, d=0.0):
         return d
 
 def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
-    """Calculates CE and PE exposure globally ONCE to prevent row iteration lag.
-    
-    Processes the entire DataFrame using fast, vectorized operations.
-    """
+    """Calculates CE and PE exposure globally ONCE to prevent row iteration lag."""
     if df is None or df.empty:
         return 0.0, 0.0
         
-    # Vectorized string conversion and numeric cleanup
     symbols = df['symbol'].astype(str).str.upper()
     qtys = pd.to_numeric(df['qty'], errors='coerce').fillna(0).clip(lower=0)
     prices = pd.to_numeric(df['sell_prc'], errors='coerce').fillna(0).clip(lower=0)
     
-    # Calculate row-level dollar / token exposure
     invested = qtys * prices
     
-    # Precise substring flags instead of brittle character slicing
     is_ce = symbols.str.strip().str.endswith('CE')
     is_pe = symbols.str.strip().str.endswith('PE')
     
@@ -118,23 +121,12 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     return ce_total, pe_total
 
 def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce_count: int = 0, pe_count: int = 0):
-    """Calculate the target from exit alignment and the open side counts.
-
-    Args:
-        row: dict containing entry, symbol, exit, and ATR target inputs.
-        ce_investment/pe_investment: accepted for call compatibility.
-        ce_count/pe_count: open call and put counts.
-    
-    Returns:
-        float: Target price rounded to 2 decimals
-    """
+    """Calculate the target from exit alignment and the open side counts."""
     try:
-        # 1️⃣ Entry data execution health check
         entry_prc = f(row.get('pxy_entry') or row.get('buy_prc'))
         if entry_prc <= 0:
             return 0.0
             
-        # 2️⃣ Context parameter extractors
         symbol = str(row.get('symbol', 'UNKNOWN')).upper().strip()
         exit_signal = str(row.get(EXIT_KEY_COLUMN, '')).upper().strip()
         if exit_signal not in ("BULL", "BEAR", "SIDE", "NONE"):
@@ -167,11 +159,9 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             heavy_side=heavy_side,
         )
         
-        # Calculate the positive target price.
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
         return round(calculated_target, 2)
         
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
-
