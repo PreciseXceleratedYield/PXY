@@ -484,10 +484,12 @@ class ConfigurationWiringTests(unittest.TestCase):
         cases = (
             ("BULL", {"past_depth": "PE3", "ce_depth": 1, "pe_depth": 1}, ("BUY", "BULL")),
             ("BULL", {"past_depth": "PE5", "ce_depth": 2, "pe_depth": 1}, ("NONE", "BULL")),
+            ("BULL", {"past_depth": "PE5", "ce_depth": 1, "pe_depth": 2}, ("NONE", "BULL")),
             ("BULL", {"past_depth": "PE2", "ce_depth": 1, "pe_depth": 1}, ("NONE", "BULL")),
             ("BULL", {"past_depth": "CE4", "ce_depth": 1, "pe_depth": 1}, ("NONE", "BULL")),
             ("BEAR", {"past_depth": "CE3", "ce_depth": 1, "pe_depth": 1}, ("SELL", "BEAR")),
             ("BEAR", {"past_depth": "CE5", "ce_depth": 1, "pe_depth": 2}, ("NONE", "BEAR")),
+            ("BEAR", {"past_depth": "CE5", "ce_depth": 2, "pe_depth": 1}, ("NONE", "BEAR")),
             ("BEAR", {"past_depth": "CE2", "ce_depth": 1, "pe_depth": 1}, ("NONE", "BEAR")),
             ("BEAR", {"past_depth": "PE4", "ce_depth": 1, "pe_depth": 1}, ("NONE", "BEAR")),
             ("NONE", {"past_depth": "PE4", "ce_depth": 1, "pe_depth": 1}, ("NONE", "NONE")),

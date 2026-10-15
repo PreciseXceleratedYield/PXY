@@ -33,7 +33,7 @@ def _entry_signal_for_exit(exit_signal, now=None):
 
 
 def _mkt_depth_entry_signal(market_signal, df, now):
-    """Require a three-candle opposite run and first candle of the MKT reversal."""
+    """Require an opposite run and depth one on both sides for post-10 MKT entries."""
     analysis = get_signal_depth_analysis(df=df)
     past_depth = re.fullmatch(
         r"(CE|PE)(\d+)", str(analysis.get("past_depth", "")).upper().strip()
@@ -52,6 +52,8 @@ def _mkt_depth_entry_signal(market_signal, df, now):
         and int(past_depth.group(2)) >= 3
         and math.isfinite(ce_depth)
         and ce_depth == 1
+        and math.isfinite(pe_depth)
+        and pe_depth == 1
     ):
         entry_signal = "BUY"
     elif (
@@ -59,6 +61,8 @@ def _mkt_depth_entry_signal(market_signal, df, now):
         and past_depth
         and past_depth.group(1) == "CE"
         and int(past_depth.group(2)) >= 3
+        and math.isfinite(ce_depth)
+        and ce_depth == 1
         and math.isfinite(pe_depth)
         and pe_depth == 1
     ):

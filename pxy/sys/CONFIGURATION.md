@@ -13,18 +13,18 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 combination; it is a documentation label, not a separate runtime selector.
 
 - **Entry router:** `MKT`. Through 09:59:59 IST, BULL/BEAR map directly to
-  BUY/SELL. From 10:00 IST, BUY requires past PE depth of at least 3 and
-  current CE depth 1; SELL requires past CE depth of at least 3 and current
-  PE depth 1. Other cases produce no entry. Mode 3 selects the strategy/data
-  candle transform by time. New books are blocked at the 14:00 cutoff; MKT
-  exit signals continue to be evaluated.
+  BUY/SELL. From 10:00 IST, BUY requires past PE depth of at least 3; SELL
+  requires past CE depth of at least 3. Both entries also require current CE
+  and PE depths to equal 1. Other cases produce no entry. Mode 3 selects the
+  strategy/data candle transform by time. New books are blocked at the 14:00
+  cutoff; MKT exit signals continue to be evaluated.
 - **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 3`. Mode 3 applies
   modified-close mode 0 from 09:00 to 10:00 IST and mode 2 at all other times.
   The separate chart display transform remains
   `SYSPLCHRTPXY_OHLC_MODE = 1` (raw OHLC).
 - **Option strikes:** `EXEOTMPXY_STRIKE_MODE = "ATM"` for option buys.
-- **Supertrend settings:** period 14, factor 1, used by the active ST entry
-  router from 10:00 IST onward.
+- **Supertrend settings:** period 14, factor 1, retained for charts and the
+  optional ST entry router.
 - **LGT:** `magnitude = max(1.4, round(66 × ratio, 2))`,
   `LGT = -min(magnitude, 77)`, where ratio is own-side investment divided by
   opposite-side investment and clamped to `[0.1, 10]`. Invalid or non-positive
@@ -139,11 +139,11 @@ values until deliberately restarted.
 
 `SYSENTRPXY_VARIANT` selects the `sysentrpxy` signal router. With `MKT`,
 MKT exit BULL maps to BUY and BEAR maps to SELL through 09:59:59 IST. From
-10:00 IST, BUY requires past PE depth of at least 3 and current CE depth 1;
-SELL requires past CE depth of at least 3 and current PE depth 1. All other
-depth/signal combinations suppress entry, while the exit signal remains the
-MKT signal. When `ST` is selected, it continues to use Supertrend direction
-as the exit signal when trend is BULL or BEAR.
+10:00 IST, BUY requires past PE depth of at least 3; SELL requires past CE
+depth of at least 3. Both entries require current CE and PE depths to equal 1.
+All other depth/signal combinations suppress entry, while the exit signal
+remains the MKT signal. When `ST` is selected, it continues to use Supertrend
+direction as the exit signal when trend is BULL or BEAR.
 The ST line, trend, and ATR used for entry are read from the same calculated
 series shown on the chart. In `ST`, a close within half an ATR of the ST line
 is sufficient for entry: from the line to `ST + ATR/2` in BULL, or from
