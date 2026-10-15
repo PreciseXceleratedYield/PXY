@@ -1,4 +1,3 @@
-
 import math
 import pandas as pd
 import re
@@ -13,7 +12,6 @@ from syscnfgpxy import (
 # ==================== CONFIG (this file's settings) ====================
 EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
 NOT_ALIGNED_TARGET_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
-BOTH_SIDES_ALIGNED_TARGET_PCT = 77.0
 # =======================================================================
 
 init(autoreset=True)
@@ -68,13 +66,22 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price):
 def calculate_tgt(
     is_aligned,
     atr=None,
-    side_power=None,
-    side_depth=None,
+    own_power=None,
+    own_depth=None,
     both_sides_open=False,
     heavy_side=False,
 ):
-    """Return a fixed 77% aligned target, otherwise the non-aligned target."""
-    return BOTH_SIDES_ALIGNED_TARGET_PCT if is_aligned else NOT_ALIGNED_TARGET_PCT
+    """Return dynamic target percentage when aligned, otherwise the non-aligned target.
+    
+    Formula when aligned: max(own_depth, 3) * own_power
+    """
+    if is_aligned:
+        # Safely convert to float defaults if parameters are missing or None
+        depth_val = float(own_depth) if own_depth is not None else 0.0
+        power_val = float(own_power) if own_power is not None else 0.0
+        return max(depth_val, 3.0) * power_val
+    else:
+        return NOT_ALIGNED_TARGET_PCT
 
 
 def f(x, d=0.0):
@@ -148,13 +155,14 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             if is_ce
             else pe_investment > ce_investment
         )
-        side_power = row.get("ce_power" if is_ce else "pe_power")
-        side_depth = row.get("hkin_ce_depth" if is_ce else "hkin_pe_depth")
+        own_power = row.get("ce_power" if is_ce else "pe_power")
+        own_depth = row.get("hkin_ce_depth" if is_ce else "hkin_pe_depth")
+        
         target_pct = calculate_tgt(
             is_aligned,
             atr=row.get("atr"),
-            side_power=side_power,
-            side_depth=side_depth,
+            own_power=own_power,
+            own_depth=own_depth,
             both_sides_open=both_sides_open,
             heavy_side=heavy_side,
         )
@@ -166,3 +174,4 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
+
