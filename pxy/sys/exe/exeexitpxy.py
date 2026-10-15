@@ -160,7 +160,7 @@ def depth_squareoff_side(entry_signal, past_depth, threshold=EXEEXITPXY_DEPTH_EX
 def depth_exit_threshold(signal_time=None):
     """Use the modified-close depth threshold when that candle mode is active."""
     if SYSDTAFPXY_SELECTED_MODE == 0:
-        return 4
+        return 10
     if SYSDTAFPXY_SELECTED_MODE == 3 and signal_time is not None:
         try:
             timestamp = pd.Timestamp(signal_time)
@@ -177,7 +177,7 @@ def depth_exit_threshold(signal_time=None):
                 <= timestamp.time()
                 < SYSDTAFPXY_MODE3_MODE0_END
             ):
-                return 4
+                return 10
     return EXEEXITPXY_DEPTH_EXIT_THRESHOLD
 
 
