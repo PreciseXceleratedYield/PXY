@@ -1,5 +1,17 @@
 #!/usr/bin/env python3
 # syspwerpxy.py
+import sys
+from pathlib import Path
+
+# ----------------- PATH FIX (MUST BE AT ABSOLUTE TOP) -----------------
+HERE = Path(__file__).resolve().parent          # /home/pxy/PXY/pxy/sys
+PXY_DIR = HERE.parent                            # /home/pxy/PXY/pxy
+
+# Inject search paths so script can load its neighboring sibling modules
+for path in (HERE, PXY_DIR):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+
 import math
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
@@ -17,18 +29,17 @@ def get_ce_pe_power(df=None):
     """
     Calculate power based on the 14-period average candle range (High - Low).
     
-    Tiers (Enforcing the trailing 0 rule):
-      - Ratio <= 1.0: Power is 10
-      - Ratio <= 2.0: Power is 20
-      - Ratio > 2.0 : Dynamic ratio ceiling + 1 extra point premium, scaled out to end in 0.
+    Progression:
+      - Ratio <= 1.0: Power is 1 (Less than or equal to average baseline)
+      - Ratio > 1.0 : Power scales dynamically into 2, 3, 4, 5... based on actual ratio.
     """
-    # Fetch data: fallback if insufficient rows (Need 14 closed + 1 running)
+    # Fetch data: fallbacks if insufficient rows (Need 14 closed + 1 running)
     if df is None or df.empty or len(df) < (POWER_LOOKBACK_PERIOD + 1):
         df = fetch_yf_data(period="2d", interval="1m")
     if df.empty or len(df) < (POWER_LOOKBACK_PERIOD + 1):
         df = fetch_yf_data(period="5d", interval="1m")
     if df.empty or len(df) < (POWER_LOOKBACK_PERIOD + 1):
-        return "Flat", 10, 10  # Fallback
+        return "Flat", 1, 1  # Fixed fallback to return pure integer 1 instead of 10
 
     df = df[['High', 'Low', 'Close']].astype(float).copy()
 
@@ -46,20 +57,17 @@ def get_ce_pe_power(df=None):
     # 4. Extract the historical baseline benchmark value
     current_baseline = avg_closed_range_14.iloc[-1]
 
-    # 5. Fixed Tiered Scaling Matrix (+1 Extra Premium Applied)
+    # 5. Pure Percentage-Scale Matrix
     if current_baseline > 0:
         actual_ratio = current_candle_range / current_baseline
         
         if actual_ratio <= 1.0:
-            scaled_power = 10
-        elif actual_ratio <= 2.0:
-            scaled_power = 20
+            scaled_power = 1                      # Less than or equal to average baseline
         else:
-            # Crosses double: Dynamic math.ceil + 1 extra premium, multiplied by 10 to end in 0
-            base_tier = math.ceil(actual_ratio) + 1
-            scaled_power = min(base_tier * 10, 90)  # Capped at maximum 90 matrix threshold
+            scaled_power = math.ceil(actual_ratio) # More than average -> rounds up straight into 2, 3, 4...
+            scaled_power = min(scaled_power, 9)    # Cap maximum power at 9
     else:
-        scaled_power = 10
+        scaled_power = 1
 
     # Keep track of directional sign for the return layout mapping
     last_move = float(df['Close'].iloc[-1] - df['Close'].iloc[-2])
@@ -68,15 +76,15 @@ def get_ce_pe_power(df=None):
     if last_move > 0:
         direction = "Up"
         CEPower = scaled_power
-        PEPower = 10
+        PEPower = 1
     elif last_move < 0:
         direction = "Down"
-        CEPower = 10
+        CEPower = 1
         PEPower = scaled_power
     else:
         direction = "Flat"
-        CEPower = 10
-        PEPower = 10
+        CEPower = 1
+        PEPower = 1
 
     return direction, CEPower, PEPower
 
@@ -85,8 +93,8 @@ if __name__ == "__main__":
     direction, CEPower, PEPower = get_ce_pe_power()
 
     # Color coding
-    ce_color = Fore.YELLOW if CEPower > 10 else Fore.WHITE
-    pe_color = Fore.YELLOW if PEPower > 10 else Fore.WHITE
+    ce_color = Fore.YELLOW if CEPower > 1 else Fore.WHITE
+    pe_color = Fore.YELLOW if PEPower > 1 else Fore.WHITE
 
     # Labels and values
     left_text = f"CE Power:{CEPower}"
@@ -103,3 +111,4 @@ if __name__ == "__main__":
 
     # Print single line
     print(left_text_colored + spacing + right_text_colored)
+
