@@ -84,10 +84,12 @@ def in_market_hours():
     return dispatch_mode("engine_window_open", _in_market_hours_production)
 
 def run_market_cycle():
-    """Run one production iteration of the exit, entry, and averaging pipes."""
+    """Run one production iteration with maximum exit priority."""
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeentrpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+    safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeavgpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+    safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     fancy_pause(SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
 
 
