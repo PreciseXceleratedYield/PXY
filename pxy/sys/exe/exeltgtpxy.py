@@ -1,101 +1,167 @@
 #!/usr/bin/env python3
-# syspwerpxy.py
+import sys
+from pathlib import Path
+
+# ----------------- PATH FIX (MUST BE AT ABSOLUTE TOP) -----------------
+HERE = Path(__file__).resolve().parent          # /home/pxy/PXY/pxy/sys/exe
+SYS_DIR = HERE.parent                            # /home/pxy/PXY/pxy/sys
+PXY_DIR = SYS_DIR.parent                         # /home/pxy/PXY/pxy
+
+# Prioritize SYS_DIR (parent directory) so Python finds all sys*.py files first
+for path in (SYS_DIR, PXY_DIR, HERE):
+    if str(path) not in sys.path:
+        sys.path.insert(0, str(path))
+
+# ----------------- NOW IMPORTS LOAD FLAWLESSLY -----------------
 import math
 import pandas as pd
-from sysdtafpxy import fetch_yf_data
+import re
 from colorama import Fore, Style, init
 
-# Initialize Colorama for terminal formatting
+from syscnfgpxy import (
+    EXEAMSPXY_MAX_LGT_LOSS,
+    EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
+    EXETGTPXY_EXIT_KEY_COLUMN,
+    EXETGTPXY_TGT_PCT_NOT_ALIGNED,
+)
+
+# ==================== CONFIG (this file's settings) ====================
+EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
+NOT_ALIGNED_TARGET_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
+BOTH_SIDES_ALIGNED_TARGET_PCT = 77.0
+# =======================================================================
+
 init(autoreset=True)
 
-# -------------------- Hardcoded constants --------------------
-TOTAL_WIDTH = 42
-POWER_LOOKBACK_PERIOD = 14
+_warned = set()
 
-# -------------------- CE/PE Power Calculation --------------------
-def get_ce_pe_power(df=None):
-    """
-    Calculate power based on the 14-period average candle range (High - Low).
-    
-    Progression:
-      - Ratio <= 1.0: Power is 1 (Less than or equal to average baseline)
-      - Ratio > 1.0 : Power scales dynamically into 2, 3, 4, 5... based on actual ratio.
-    """
-    # Fetch data: fallback if insufficient rows (Need 14 closed + 1 running)
-    if df is None or df.empty or len(df) < (POWER_LOOKBACK_PERIOD + 1):
-        df = fetch_yf_data(period="2d", interval="1m")
-    if df.empty or len(df) < (POWER_LOOKBACK_PERIOD + 1):
-        df = fetch_yf_data(period="5d", interval="1m")
-    if df.empty or len(df) < (POWER_LOOKBACK_PERIOD + 1):
-        return "Flat", 1, 1  # Fallback
+def _warn_once(key, msg):
+    """Prints a warning only the first time it occurs in this process."""
+    if key not in _warned:
+        _warned.add(key)
+        print(f"{Fore.YELLOW}⚠️ {msg}{Style.RESET_ALL}")
 
-    df = df[['High', 'Low', 'Close']].astype(float).copy()
 
-    # 1. Calculate the point range (High - Low) for each candle
-    df['candle_points'] = df['High'] - df['Low']
+def calculate_lgt(ce_investment, pe_investment, is_ce, index_price):
+    """Calculate the capped LGT percentage from the relative investments."""
+    try:
+        index_price = float(index_price)
+    except (TypeError, ValueError) as error:
+        raise ValueError("index_price must be a finite positive number.") from error
+    if not math.isfinite(index_price) or index_price <= 0:
+        raise ValueError("index_price must be a finite positive number.")
 
-    # 2. Average of the last 14 closed candles (Excludes current candle using shift)
-    avg_closed_range_14 = df['candle_points'].shift(1).rolling(
-        window=POWER_LOOKBACK_PERIOD
-    ).mean()
+    own_investment, opposite_investment = (
+        (ce_investment, pe_investment) if is_ce else (pe_investment, ce_investment)
+    )
+    try:
+        own_investment = float(own_investment)
+        opposite_investment = float(opposite_investment)
+    except (TypeError, ValueError, OverflowError):
+        ratio = 1.0
+    else:
+        ratio_is_valid = (
+            math.isfinite(own_investment)
+            and math.isfinite(opposite_investment)
+            and own_investment > 0
+            and opposite_investment > 0
+        )
+        if ratio_is_valid:
+            ratio = own_investment / opposite_investment
+            ratio_is_valid = math.isfinite(ratio)
+            if ratio_is_valid:
+                ratio = min(10.0, max(0.1, ratio))
+        if not ratio_is_valid:
+            ratio = 1.0
+    magnitude = max(
+        EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
+        round(66.0 * ratio, 2),
+    )
+    return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
 
-    # 3. Track the current running candle's total High - Low range points
-    current_candle_range = float(df['High'].iloc[-1] - df['Low'].iloc[-1])
-    
-    # 4. Extract the historical baseline benchmark value
-    current_baseline = avg_closed_range_14.iloc[-1]
 
-    # 5. Pure Percentage-Scale Matrix
-    if current_baseline > 0:
-        actual_ratio = current_candle_range / current_baseline
+def calculate_tgt(
+    is_aligned,
+    atr=None,
+    side_power=None,
+    side_depth=None,
+    both_sides_open=False,
+    heavy_side=False,
+):
+    """Return a fixed 77% aligned target, otherwise the non-aligned target."""
+    return BOTH_SIDES_ALIGNED_TARGET_PCT if is_aligned else NOT_ALIGNED_TARGET_PCT
+
+
+def f(x, d=0.0):
+    """Safely casts input to float, returning a default value if casting fails or value <= 0."""
+    try:
+        val = float(x)
+        return val if val > 0 else d
+    except (ValueError, TypeError):
+        return d
+
+def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
+    """Calculates CE and PE exposure globally ONCE to prevent row iteration lag."""
+    if df is None or df.empty:
+        return 0.0, 0.0
         
-        if actual_ratio <= 1.0:
-            scaled_power = 1                      # Less than or equal to average baseline
-        else:
-            scaled_power = math.ceil(actual_ratio) # More than average -> rounds up straight into 2, 3, 4, 5...
-            scaled_power = min(scaled_power, 9)    # Cap maximum power at 9
-    else:
-        scaled_power = 1
+    symbols = df['symbol'].astype(str).str.upper()
+    qtys = pd.to_numeric(df['qty'], errors='coerce').fillna(0).clip(lower=0)
+    prices = pd.to_numeric(df['sell_prc'], errors='coerce').fillna(0).clip(lower=0)
+    
+    invested = qtys * prices
+    
+    is_ce = symbols.str.strip().str.endswith('CE')
+    is_pe = symbols.str.strip().str.endswith('PE')
+    
+    ce_total = float(invested[is_ce].sum())
+    pe_total = float(invested[is_pe].sum())
+    
+    return ce_total, pe_total
 
-    # Keep track of directional sign for the return layout mapping
-    last_move = float(df['Close'].iloc[-1] - df['Close'].iloc[-2])
+def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce_count: int = 0, pe_count: int = 0):
+    """Calculate the target from exit alignment and the open side counts."""
+    try:
+        entry_prc = f(row.get('pxy_entry') or row.get('buy_prc'))
+        if entry_prc <= 0:
+            return 0.0
+            
+        symbol = str(row.get('symbol', 'UNKNOWN')).upper().strip()
+        exit_signal = str(row.get(EXIT_KEY_COLUMN, '')).upper().strip()
+        if exit_signal not in ("BULL", "BEAR", "SIDE", "NONE"):
+            _warn_once("exit", f"unrecognised exit value '{exit_signal}' (expected BULL/BEAR/SIDE/NONE).")
 
-    # Determine direction and assign powers
-    if last_move > 0:
-        direction = "Up"
-        CEPower = scaled_power
-        PEPower = 1
-    elif last_move < 0:
-        direction = "Down"
-        CEPower = 1
-        PEPower = scaled_power
-    else:
-        direction = "Flat"
-        CEPower = 1
-        PEPower = 1
+        is_ce = symbol.endswith('CE')
+        is_pe = symbol.endswith('PE')
+        if not is_ce and not is_pe:
+            return round(entry_prc, 2)
 
-    return direction, CEPower, PEPower
+        is_aligned = (
+            (exit_signal == "BULL" and is_ce)
+            or (exit_signal == "BEAR" and is_pe)
+        )
+        both_sides_open = ce_count > 0 and pe_count > 0
+        heavy_side = (
+            ce_investment > pe_investment
+            if is_ce
+            else pe_investment > ce_investment
+        )
+        side_power = row.get("ce_power" if is_ce else "pe_power")
+        side_depth = row.get("hkin_ce_depth" if is_ce else "hkin_pe_depth")
+        
+        target_pct = calculate_tgt(
+            is_aligned,
+            atr=row.get("atr"),
+            side_power=side_power,
+            side_depth=side_depth,
+            both_sides_open=both_sides_open,
+            heavy_side=heavy_side,
+        )
+        
+        calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
+        return round(calculated_target, 2)
+        
+    except Exception as e:
+        print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
+        return 0.0
 
-# -------------------- Self-runnable test --------------------
-if __name__ == "__main__":
-    direction, CEPower, PEPower = get_ce_pe_power()
-
-    # Color coding
-    ce_color = Fore.YELLOW if CEPower > 1 else Fore.WHITE
-    pe_color = Fore.YELLOW if PEPower > 1 else Fore.WHITE
-
-    # Labels and values
-    left_text = f"CE Power:{CEPower}"
-    right_text = f"PE Power:{PEPower}"
-
-    left_text_colored = "CE Power:" + ce_color + str(CEPower) + Style.RESET_ALL
-    right_text_colored = "PE Power:" + pe_color + str(PEPower) + Style.RESET_ALL
-
-    # Compute spacing for total width = 42
-    space_width = TOTAL_WIDTH - len(left_text) - len(right_text)
-    if space_width < 0:
-        space_width = 1
-    spacing = " " * space_width
-
-    # Print single line
-    print(left_text_colored + spacing + right_text_colored)
