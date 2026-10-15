@@ -7,8 +7,8 @@
 #   CE rows held + no PE row -> run pxybuype  (buys the PE leg)
 #   PE rows held + no CE row -> run pxybuyce (buys the CE leg)
 #
-# pxybuype / pxybuyce are executable shell scripts (no extension); they are run directly,
-# not through python3.
+# pxybuype / pxybuyce are shell scripts (no extension); run them through bash
+# because Git stores the wrappers without executable permission.
 #
 # Exactly one held side and an opposing exit signal are required.
 import os
@@ -93,18 +93,13 @@ def _mark_lock(key):
 
 
 def _find_script(name):
-    """Looks for the executable next to this file, then one folder up, then on PATH.
-    Returns a path or None."""
+    """Search the engine, system, and PXY directories, then PATH."""
     here = os.path.dirname(os.path.abspath(__file__))
-    for folder in (here, os.path.dirname(here)):
+    for folder in (here, os.path.dirname(here), os.path.dirname(os.path.dirname(here))):
         path = os.path.join(folder, name)
         if os.path.isfile(path):
             return path
     return shutil.which(name)
-
-
-def _is_executable(path):
-    return os.access(path, os.X_OK)
 
 
 def _today():
@@ -191,17 +186,15 @@ def check_counter_leg(remaining_df):
 
         path = _find_script(script_name)
         if not path:
-            print(f"{Fore.RED}❌ Counter script {script_name} not found (looked next to execbuypxy.py, one folder up, and on PATH).")
+            print(
+                f"{Fore.RED}❌ Counter script {script_name} not found "
+                "(searched the engine, system, PXY, and PATH locations)."
+            )
             return None
-        if not _is_executable(path):
-            print(f"{Fore.RED}❌ {path} is not executable (run: chmod +x {path}).")
-            return None
-
-        # shell script: run it directly, not through python3
         # lock + count BEFORE the launch: a duplicate buy is worse than a short wait
         _mark_lock(lock_key)
         _count_fire()
-        subprocess.Popen([path])
+        subprocess.Popen(["bash", path])
         print(f"{Fore.MAGENTA}{Style.BRIGHT}⚡ FIRED COUNTER-BUY: {script_name}")
         return script_name
     except Exception as e:

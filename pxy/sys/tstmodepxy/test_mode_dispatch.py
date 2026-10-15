@@ -288,7 +288,7 @@ class ModeDispatchTests(unittest.TestCase):
                     "exit_reason": "production_exit",
                 },
                 {"exit_signal": "BEAR"},
-                "Deep reversal: BUY with PE7 past depth",
+                "Deep reversal: BUY with PE11 past depth",
             )[0],
             "PEAKDIP",
         )

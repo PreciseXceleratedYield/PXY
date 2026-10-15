@@ -234,20 +234,11 @@ class ProductionPipeReplay:
         def get_snapshot():
             return self.snapshot
 
-        def simulated_shell(command):
-            name = Path(str(command).strip().split()[0]).name
-            if name == "pxybuyce":
-                self._place_simulated_buy("CE", "WF")
-            elif name == "pxybuype":
-                self._place_simulated_buy("PE", "WF")
-            else:
-                raise RuntimeError(
-                    f"Unexpected production shell command blocked: {command}"
-                )
-            return 0
-
         def simulated_popen(command, *args, **kwargs):
-            command_path = Path(command[0]).name if isinstance(command, (list, tuple)) else ""
+            parts = list(command) if isinstance(command, (list, tuple)) else []
+            if parts and Path(str(parts[0])).name == "bash":
+                parts = parts[1:]
+            command_path = Path(str(parts[-1])).name if parts else ""
             if command_path == "pxybuyce":
                 self._place_simulated_buy("CE", "CB")
             elif command_path == "pxybuype":
@@ -264,8 +255,16 @@ class ProductionPipeReplay:
 
         def simulated_squareoff(command, *args, **kwargs):
             command = list(command) if isinstance(command, (list, tuple)) else [command]
+            if command and Path(str(command[0])).name == "bash":
+                command = command[1:]
+            if not command:
+                raise RuntimeError("Empty command passed to simulated subprocess.")
             command_name = Path(str(command[0])).name
-            if command_name in {"pxysqrce", "pxysqrpe"}:
+            if command_name == "pxybuyce":
+                self._place_simulated_buy("CE", "WF")
+            elif command_name == "pxybuype":
+                self._place_simulated_buy("PE", "WF")
+            elif command_name in {"pxysqrce", "pxysqrpe"}:
                 all_args = ["-ce" if command_name == "pxysqrce" else "-pe"]
             elif command_name == "exesqrpxy.py" or any(
                 str(part).endswith("exesqrpxy.py") for part in command
@@ -309,7 +308,6 @@ class ProductionPipeReplay:
                 lambda _client: broker.position_summary(),
             ),
             patch.object(self.entry_pipe, "dispatch_mode", production_dispatch),
-            patch.object(self.entry_pipe.os, "system", simulated_shell),
             patch.object(self.entry_pipe, "datetime", ReplayClock),
             patch.object(self.exit_pipe, "get_combined_data", self.oms.get_combined_data),
             patch.object(self.exit_pipe, "get_session", return_value=broker),
@@ -350,6 +348,7 @@ class ProductionPipeReplay:
                 str(self.state_dir / "webavgpxy.json"),
             ),
             patch.object(self.dynamic_entry, "datetime", ReplayClock),
+            patch.object(self.target_math, "datetime", ReplayClock),
             patch.object(
                 self.dynamic_entry,
                 "DECAY_RATE_PER_MIN",
@@ -357,9 +356,8 @@ class ProductionPipeReplay:
             ),
             patch.object(self.averaging_orders, "is_cooling", lambda _side: False),
             patch.object(self.averaging_orders, "set_cooling", lambda _side: None),
-            patch.object(self.averaging_orders, "generate_pxy_tag", broker.next_tag),
+            patch.object(self.averaging_orders, "generate_pxy_tag", broker.next_tag            ),
             patch.object(self.counter_pipe, "_find_script", lambda name: name),
-            patch.object(self.counter_pipe, "_is_executable", lambda _path: True),
             patch.object(self.counter_pipe, "_load_locks", return_value={}),
             patch.object(self.counter_pipe, "_mark_lock", lambda _key: None),
             patch.object(self.counter_pipe, "_fires_today", return_value=0),

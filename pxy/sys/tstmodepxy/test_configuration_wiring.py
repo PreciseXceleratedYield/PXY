@@ -876,40 +876,38 @@ class ConfigurationWiringTests(unittest.TestCase):
                 self.assertEqual(signal, depth_signal)
                 self.assertEqual((actual_ce_depth, actual_pe_depth), (ce_depth, pe_depth))
 
-    def test_depth_squareoff_requires_opposite_side_and_depth_above_six(self):
-        self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "PE6"), None)
-        self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "PE7"), "PE")
-        self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "CE7"), None)
-        self.assertEqual(exeexitpxy.depth_squareoff_side("SELL", "CE7"), "CE")
-        self.assertEqual(exeexitpxy.depth_squareoff_side("SELL", "PE7"), None)
-        self.assertEqual(exeexitpxy.depth_squareoff_side("SELL", "CE6"), None)
-        self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "PE-7"), None)
+    def test_depth_squareoff_requires_opposite_side_and_depth_above_ten(self):
+        self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "PE10"), None)
+        self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "PE11"), "PE")
+        self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "CE11"), None)
+        self.assertEqual(exeexitpxy.depth_squareoff_side("SELL", "CE11"), "CE")
+        self.assertEqual(exeexitpxy.depth_squareoff_side("SELL", "PE11"), None)
+        self.assertEqual(exeexitpxy.depth_squareoff_side("SELL", "CE10"), None)
+        self.assertEqual(exeexitpxy.depth_squareoff_side("BUY", "PE-11"), None)
 
-    def test_mode_zero_depth_exit_threshold_is_five_and_other_modes_keep_seven(self):
-        with patch.object(exeexitpxy, "SYSDTAFPXY_SELECTED_MODE", 0):
-            self.assertEqual(exeexitpxy.depth_exit_threshold(), 4)
-        for mode in (1, 2):
-            with self.subTest(mode=mode), patch.object(
-                exeexitpxy, "SYSDTAFPXY_SELECTED_MODE", mode
+    def test_depth_exit_threshold_uses_central_config_in_every_mode(self):
+        with patch.object(exeexitpxy, "EXEEXITPXY_DEPTH_EXIT_THRESHOLD", 12):
+            for signal_time in (
+                None,
+                "2025-01-06 09:59:00",
+                "2025-01-06 10:00:00",
+                "2025-01-06 14:00:00",
             ):
-                self.assertEqual(
-                    exeexitpxy.depth_exit_threshold(),
-                    exeexitpxy.EXEEXITPXY_DEPTH_EXIT_THRESHOLD,
-                )
+                with self.subTest(signal_time=signal_time):
+                    self.assertEqual(
+                        exeexitpxy.depth_exit_threshold(signal_time), 12
+                    )
 
-    def test_mode_three_depth_exit_threshold_tracks_signal_candle_mode(self):
-        with patch.object(exeexitpxy, "SYSDTAFPXY_SELECTED_MODE", 3):
-            self.assertEqual(
-                exeexitpxy.depth_exit_threshold("2025-01-06 09:59:00"), 4
-            )
-            self.assertEqual(
-                exeexitpxy.depth_exit_threshold("2025-01-06 10:00:00"),
-                exeexitpxy.EXEEXITPXY_DEPTH_EXIT_THRESHOLD,
-            )
-            self.assertEqual(
-                exeexitpxy.depth_exit_threshold("2025-01-06 14:00:00"),
-                exeexitpxy.EXEEXITPXY_DEPTH_EXIT_THRESHOLD,
-            )
+    def test_depth_exit_threshold_does_not_change_after_ten_ist(self):
+        for signal_time in (
+            "2025-01-06 09:59:00",
+            "2025-01-06 10:00:00",
+            "2025-01-06 14:00:00",
+        ):
+            with self.subTest(signal_time=signal_time):
+                self.assertEqual(
+                    exeexitpxy.depth_exit_threshold(signal_time), 10
+                )
 
     def test_pastrsk_switch_gates_depth_squareoff(self):
         active_orders = pd.DataFrame(
@@ -918,7 +916,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "symbol": "NIFTY-WF-PE",
                     "qty": 75,
                     "entry": "BUY",
-                    "hkin_past_depth": "PE7",
+                    "hkin_past_depth": "PE11",
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 }
             ]
@@ -935,7 +933,7 @@ class ConfigurationWiringTests(unittest.TestCase):
 
         from syscnfgpxy import PASTRSK
 
-        self.assertEqual(PASTRSK, "YES")
+        self.assertEqual(PASTRSK, "NO")
         self.assertEqual(__import__("pxyconfigwebpxy").ENUMS["PASTRSK"], ("YES", "NO"))
 
     def test_depth_squareoff_uses_side_command_and_only_returns_unlocked_side_lots(self):
@@ -947,7 +945,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "tag": "CE1",
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "BUY",
-                    "hkin_past_depth": "PE5",
+                    "hkin_past_depth": "PE11",
                     "hkin_ce_depth": 1,
                     "hkin_signal_time": "2025-01-06 09:59:00",
                 },
@@ -959,7 +957,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "buy_prc": 100.0,
                     "sell_prc": 80.0,
                     "entry": "BUY",
-                    "hkin_past_depth": "PE5",
+                    "hkin_past_depth": "PE11",
                     "hkin_ce_depth": 1,
                     "hkin_signal_time": "2025-01-06 09:59:00",
                 },
@@ -983,7 +981,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             {"NIFTY-WF-PE|PE1|2025-01-06 09:59:00"},
         )
         run_command.assert_called_once_with(
-            ["pxysqrpe"],
+            ["bash", str(Path(__file__).resolve().parents[2] / "pxysqrpe")],
             check=True,
             timeout=exeexitpxy.SQUAREOFF_TIMEOUT_SECS,
         )
@@ -1002,7 +1000,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "tag": "CE1",
                     "buy_time": "2025-01-06 09:58:00",
                     "entry": "BUY",
-                    "hkin_past_depth": "PE7",
+                    "hkin_past_depth": "PE11",
                     "hkin_ce_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 },
@@ -1014,7 +1012,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "tag": "PE1",
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "BUY",
-                    "hkin_past_depth": "PE7",
+                    "hkin_past_depth": "PE11",
                     "hkin_ce_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 }
@@ -1050,7 +1048,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                 {"NIFTY-WF-PE|PE1|2025-01-06 09:59:00"},
             )
             run_command.assert_called_once_with(
-                ["pxysqrpe"],
+                ["bash", str(Path(__file__).resolve().parents[2] / "pxysqrpe")],
                 check=True,
                 timeout=exeexitpxy.SQUAREOFF_TIMEOUT_SECS,
             )
@@ -1071,7 +1069,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "sell_prc": 100.0,
                     "tag": "CE1",
                     "entry": "BUY",
-                    "hkin_past_depth": "PE7",
+                    "hkin_past_depth": "PE11",
                     "hkin_ce_depth": 2,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 },
@@ -1082,7 +1080,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "sell_prc": 80.0,
                     "tag": "PE1",
                     "entry": "BUY",
-                    "hkin_past_depth": "PE7",
+                    "hkin_past_depth": "PE11",
                     "hkin_ce_depth": 2,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 },
@@ -1115,7 +1113,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                 {"NIFTY-WF-PE|PE1|"},
             )
             run_command.assert_called_once_with(
-                ["pxysqrpe"],
+                ["bash", str(Path(__file__).resolve().parents[2] / "pxysqrpe")],
                 check=True,
                 timeout=exeexitpxy.SQUAREOFF_TIMEOUT_SECS,
             )
@@ -1131,7 +1129,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "tag": "PE1",
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "BUY",
-                    "hkin_past_depth": "PE7",
+                    "hkin_past_depth": "PE11",
                     "hkin_ce_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 }
@@ -1165,7 +1163,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                                 "tag": "CE1",
                                 "buy_time": "2025-01-06 09:58:00",
                                 "entry": "BUY",
-                                "hkin_past_depth": "PE7",
+                                "hkin_past_depth": "PE11",
                                 "hkin_ce_depth": 1,
                                 "hkin_signal_time": "2025-01-06 10:00:00",
                             }
@@ -1199,7 +1197,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "tag": "CE1",
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "SELL",
-                    "hkin_past_depth": "CE7",
+                    "hkin_past_depth": "CE11",
                     "hkin_pe_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 },
@@ -1211,7 +1209,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                     "tag": "PE1",
                     "buy_time": "2025-01-06 09:59:00",
                     "entry": "SELL",
-                    "hkin_past_depth": "CE7",
+                    "hkin_past_depth": "CE11",
                     "hkin_pe_depth": 1,
                     "hkin_signal_time": "2025-01-06 10:00:00",
                 },
@@ -1238,7 +1236,7 @@ class ConfigurationWiringTests(unittest.TestCase):
             {"NIFTY-WF-CE|CE1|2025-01-06 09:59:00"},
         )
         run_command.assert_called_once_with(
-            ["pxysqrce"],
+            ["bash", str(Path(__file__).resolve().parents[2] / "pxysqrce")],
             check=True,
             timeout=exeexitpxy.SQUAREOFF_TIMEOUT_SECS,
         )
@@ -1430,7 +1428,6 @@ class ConfigurationWiringTests(unittest.TestCase):
                 return_value="allowed",
             ),
             patch.object(execbuypxy, "_find_script", return_value="/tmp/pxybuyce"),
-            patch.object(execbuypxy, "_is_executable", return_value=True),
             patch.object(execbuypxy, "_mark_lock") as mark_lock,
             patch.object(execbuypxy, "_count_fire") as count_fire,
             patch.object(execbuypxy.subprocess, "Popen") as popen,
@@ -1445,7 +1442,7 @@ class ConfigurationWiringTests(unittest.TestCase):
                 execbuypxy.check_counter_leg(pe_hold_bull_exit),
                 "pxybuyce",
             )
-            popen.assert_called_once_with(["/tmp/pxybuyce"])
+            popen.assert_called_once_with(["bash", "/tmp/pxybuyce"])
             mark_lock.assert_called_once()
             count_fire.assert_called_once()
 
@@ -1455,21 +1452,39 @@ class ConfigurationWiringTests(unittest.TestCase):
             self.assertIsNone(execbuypxy.check_counter_leg(no_matching_exit))
             popen.assert_called_once()
 
-    def test_all_aligned_targets_are_fixed_at_77_percent(self):
-        self.assertEqual(exeltgtpxy.calculate_tgt(True, 10, 2, 3), 77.0)
-        self.assertEqual(exeltgtpxy.calculate_tgt(True, 5, 3, 4), 77.0)
-        self.assertEqual(exeltgtpxy.calculate_tgt(False), 1.4)
+    def test_aligned_targets_floor_own_side_depth_at_four_then_multiply_power(self):
+        after_start = pd.Timestamp("2026-10-16 10:00:00", tz="Asia/Kolkata")
+        calculate = lambda *args, **kwargs: exeltgtpxy.calculate_tgt(
+            *args, **kwargs, target_time=after_start
+        )
+        target = lambda *args, **kwargs: exeltgtpxy.target_price(
+            *args, **kwargs, target_time=after_start
+        )
+        self.assertEqual(calculate(True, 10, 2, 3), 8.0)
+        self.assertEqual(calculate(True, 5, 3, 4), 12.0)
+        self.assertEqual(calculate(False), 1.4)
         self.assertEqual(
-            exeltgtpxy.calculate_tgt(True, both_sides_open=True), 77.0
+            calculate(True, both_sides_open=True), 4.0
+        )
+        self.assertEqual(
+            calculate(
+                True, 10, 2, 3, both_sides_open=True, heavy_side=True
+            ),
+            8.0,
+        )
+        self.assertEqual(calculate(True, side_power=9, side_depth=20), 180.0)
+        self.assertEqual(calculate(True, side_power=0, side_depth=None), 4.0)
+        self.assertEqual(
+            calculate(False, both_sides_open=True), 1.4
         )
         self.assertEqual(
             exeltgtpxy.calculate_tgt(
-                True, 10, 2, 3, both_sides_open=True, heavy_side=True
+                True,
+                side_power=2,
+                side_depth=3,
+                target_time=pd.Timestamp("2026-10-16 09:59:59", tz="Asia/Kolkata"),
             ),
             77.0,
-        )
-        self.assertEqual(
-            exeltgtpxy.calculate_tgt(False, both_sides_open=True), 1.4
         )
         ce = {
             "pxy_entry": 1000, "symbol": "NIFTYCE", "exit": "BULL",
@@ -1481,37 +1496,37 @@ class ConfigurationWiringTests(unittest.TestCase):
             "direction": "UP", "supertrend": "SIDE", "atr": 8,
             "pe_power": 3, "hkin_pe_depth": 4,
         }
-        self.assertEqual(exeltgtpxy.target_price(ce, 1000, 5000), 1770.0)
-        self.assertEqual(exeltgtpxy.target_price(pe, 5000, 1000), 1770.0)
+        self.assertEqual(target(ce, 1000, 5000), 1080.0)
+        self.assertEqual(target(pe, 5000, 1000), 1120.0)
         self.assertEqual(
-            exeltgtpxy.target_price(ce, 1000, 5000, ce_count=1, pe_count=1),
-            1770.0,
+            target(ce, 1000, 5000, ce_count=1, pe_count=1),
+            1080.0,
         )
         self.assertEqual(
-            exeltgtpxy.target_price(pe, 5000, 1000, ce_count=1, pe_count=1),
-            1770.0,
+            target(pe, 5000, 1000, ce_count=1, pe_count=1),
+            1120.0,
         )
         self.assertEqual(
-            exeltgtpxy.target_price(ce, 5000, 1000, ce_count=1, pe_count=1),
-            1770.0,
+            target(ce, 5000, 1000, ce_count=1, pe_count=1),
+            1080.0,
         )
         self.assertEqual(
-            exeltgtpxy.target_price(pe, 1000, 5000, ce_count=1, pe_count=1),
-            1770.0,
+            target(pe, 1000, 5000, ce_count=1, pe_count=1),
+            1120.0,
         )
         self.assertEqual(
-            exeltgtpxy.target_price(ce, 1000, 1000, ce_count=1, pe_count=1),
-            1770.0,
+            target(ce, 1000, 1000, ce_count=1, pe_count=1),
+            1080.0,
         )
-        self.assertEqual(exeltgtpxy.target_price({**ce, "exit": "BEAR"}), 1014.0)
+        self.assertEqual(target({**ce, "exit": "BEAR"}), 1014.0)
         self.assertEqual(
-            exeltgtpxy.target_price(
+            target(
                 {**ce, "exit": "BEAR"}, 1000, 5000, ce_count=1, pe_count=1
             ),
             1014.0,
         )
-        self.assertEqual(exeltgtpxy.target_price({**pe, "exit": "BULL"}), 1014.0)
-        self.assertEqual(exeltgtpxy.target_price({**ce, "exit": "SIDE"}), 1014.0)
+        self.assertEqual(target({**pe, "exit": "BULL"}), 1014.0)
+        self.assertEqual(target({**ce, "exit": "SIDE"}), 1014.0)
 
     def test_averaging_alignment_uses_exit_signal_only(self):
         self.assertEqual(exeavxpxy.averaging_alignment_signals("BULL"), (True, False))
@@ -1673,12 +1688,13 @@ class ConfigurationWiringTests(unittest.TestCase):
             apply_ohlc_transformation(frame, mode=1), frame
         )
 
-    def test_dtaf_defaults_to_mode_three_and_rejects_other_modes(self):
+    def test_dtaf_defaults_to_mode_zero_all_day_and_rejects_other_modes(self):
         import syscnfgpxy
 
-        self.assertEqual(syscnfgpxy.SYSDTAFPXY_SELECTED_MODE, 3)
+        self.assertEqual(syscnfgpxy.SYSDTAFPXY_SELECTED_MODE, 0)
         self.assertEqual(syscnfgpxy.SYSDTAFPXY_MODE3_MODE0_START, dt_time(9, 0))
         self.assertEqual(syscnfgpxy.SYSDTAFPXY_MODE3_MODE0_END, dt_time(10, 0))
+        self.assertEqual(syscnfgpxy.EXEEXITPXY_DEPTH_EXIT_THRESHOLD, 10)
         self.assertEqual(syscnfgpxy.EXEAMSPXY_MAX_LGT_LOSS, 77.0)
         frame = pd.DataFrame(
             {
@@ -1692,7 +1708,14 @@ class ConfigurationWiringTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "must be 0, 1, 2, or 3"):
             apply_ohlc_transformation(frame, mode=8)
 
-    def test_dtaf_mode_three_uses_mode_zero_only_between_nine_and_ten_ist(self):
+        expected_mode_zero = frame.copy()
+        expected_mode_zero["Open"] = [101.0]
+        expected_mode_zero["Close"] = [101.5]
+        pd.testing.assert_frame_equal(
+            apply_ohlc_transformation(frame), expected_mode_zero
+        )
+
+    def test_dtaf_mode_three_remains_available_as_an_explicit_time_window(self):
         from syscnfgpxy import SYSCNFGPXY_TIMEZONE
 
         index = pd.DatetimeIndex(

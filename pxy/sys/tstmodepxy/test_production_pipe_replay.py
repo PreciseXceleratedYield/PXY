@@ -51,6 +51,9 @@ class ProductionPipeReplayTests(unittest.TestCase):
             with ProductionPipeReplay(
                 SYS_DIR, SimulatedBroker(), Path(temp) / "state"
             ) as engine:
+                engine.timestamp = pytz.timezone("Asia/Kolkata").localize(
+                    datetime(2025, 1, 6, 10, 0)
+                )
                 ce_target = engine.oms.pxy_tgt_calc(
                     {
                         "symbol": "NIFTY-WF-CE",
@@ -108,8 +111,32 @@ class ProductionPipeReplayTests(unittest.TestCase):
                     }
                 )
 
-                self.assertEqual(ce_target, 22084.7)
-                self.assertEqual(pe_target, -21915.3)
+                self.assertEqual(ce_target, 22008.8)
+                self.assertEqual(pe_target, -21991.2)
+                engine.timestamp = pytz.timezone("Asia/Kolkata").localize(
+                    datetime(2025, 1, 6, 9, 59, 59)
+                )
+                self.assertEqual(
+                    engine.oms.pxy_tgt_calc(
+                        {
+                            "symbol": "NIFTY-WF-CE",
+                            "buy_prc": 22000,
+                            "pxy_entry": 22000,
+                            "exit": "BULL",
+                            "atr": 10,
+                            "ce_power": 2,
+                            "hkin_ce_depth": 3,
+                        },
+                        0,
+                        0,
+                        1,
+                        1,
+                    ),
+                    22084.7,
+                )
+                engine.timestamp = pytz.timezone("Asia/Kolkata").localize(
+                    datetime(2025, 1, 6, 10, 0)
+                )
                 self.assertEqual(ce_baseline_target, 22001.54)
                 self.assertEqual(pe_baseline_target, -21998.46)
                 self.assertEqual(
@@ -129,17 +156,17 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 )
                 self.assertTrue(
                     engine.exit_pipe.target_exit_allowed(
-                        True, ce_target, 22084.7, 140 / 65, 140
+                        True, ce_target, 22008.8, 140 / 65, 140
                     )
                 )
                 self.assertFalse(
                     engine.exit_pipe.target_exit_allowed(
-                        True, ce_target, 22084.7, 2.14, 140
+                        True, ce_target, 22008.8, 2.14, 140
                     )
                 )
                 self.assertTrue(
                     engine.exit_pipe.target_exit_allowed(
-                        True, pe_target, 21915.3, 140 / 65, 140
+                        True, pe_target, 21991.2, 140 / 65, 140
                     )
                 )
                 self.assertFalse(
@@ -276,7 +303,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
             with ProductionPipeReplay(
                 SYS_DIR, SimulatedBroker(), Path(temp) / "state"
             ):
-                self.assertIsNot(__import__("os").system, system_call)
+                self.assertIs(__import__("os").system, system_call)
                 self.assertIsNot(__import__("subprocess").run, process_run)
         self.assertIs(__import__("os").system, system_call)
         self.assertIs(__import__("subprocess").run, process_run)
@@ -900,7 +927,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 "available": True,
                 "exit": "BULL",
                 "entry": "BUY",
-                "past_depth": "PE7",
+                "past_depth": "PE11",
                 "signal_time": "2025-01-06 09:59:00+05:30",
                 "sell_price": 80.0,
                 "target": 110.0,
@@ -916,7 +943,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 "available": True,
                 "exit": "BEAR",
                 "entry": "SELL",
-                "past_depth": "CE7",
+                "past_depth": "CE11",
                 "signal_time": "2025-01-06 10:00:00+05:30",
                 "sell_price": 80.0,
                 "target": 110.0,
@@ -932,7 +959,7 @@ class ProductionPipeReplayTests(unittest.TestCase):
                 "available": True,
                 "exit": "BULL",
                 "entry": "BUY",
-                "past_depth": "PE7",
+                "past_depth": "PE11",
                 "ce_depth": 2,
                 "signal_time": "2025-01-06 10:01:00+05:30",
                 "sell_price": 80.0,

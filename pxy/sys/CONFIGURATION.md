@@ -7,19 +7,20 @@ production launch path is `pxy/pxy` → `sysexepxy.py` → `exe/exepxy.py`; the
 shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 `RUNMODE=SIM` in their environments.
 
-## SIMPLE-DEFAULT strategy reference
+## READYFRIDAY strategy reference
 
-**SIMPLE-DEFAULT** is the name for the current production configuration
-combination; it is a documentation label, not a separate runtime selector.
+**READYFRIDAY** is the release label for the current production configuration
+combination, recorded as `SYSCNFGPXY_RELEASE_NAME`; it is not a separate
+runtime selector.
 
 - **Entry router:** `MKT`. Through 09:59:59 IST, BULL/BEAR map directly to
   BUY/SELL. From 10:00 IST, BUY requires past PE depth of at least 3 and
   current CE depth 1; SELL requires past CE depth of at least 3 and current
-  PE depth 1. Other cases produce no entry. Mode 3 selects the strategy/data
-  candle transform by time. New books are blocked at the 14:00 cutoff; MKT
+  PE depth 1. Other cases produce no entry. Mode 0 selects the strategy/data
+  candle transform for both the pre-10:00 and post-10:00 sessions. New books are blocked at the 14:00 cutoff; MKT
   exit signals continue to be evaluated.
-- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 3`. Mode 3 applies
-  modified-close mode 0 from 09:00 to 10:00 IST and mode 2 at all other times.
+- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 0`. Modified-close
+  mode 0 applies for the full trading day, before and after 10:00 IST.
   The separate chart display transform remains
   `SYSPLCHRTPXY_OHLC_MODE = 1` (raw OHLC).
 - **Option strikes:** `EXEOTMPXY_STRIKE_MODE = "ATM"` for option buys.
@@ -29,6 +30,11 @@ combination; it is a documentation label, not a separate runtime selector.
   `LGT = -min(magnitude, 77)`, where ratio is own-side investment divided by
   opposite-side investment and clamped to `[0.1, 10]`. Invalid or non-positive
   investment data uses `ratio = 1`. The maximum LGT magnitude is 77.
+- **Targets:** before 10:00 IST, aligned positions use a fixed `77%` target.
+  From 10:00 IST onward, they use
+  `max(4, own-side depth) × own-side power` percent, without an upper cap;
+  missing or invalid depth/power values use 1. Non-aligned positions retain the
+  configured 1.4% target.
 - **SIM/CHK:** exercise production decision logic with simulated or mock
   broker/order I/O; neither mode sends live orders.
 
@@ -153,16 +159,16 @@ mirrored-band edge, with the lower edge mapping to BUY and upper edge to SELL.
 MKT continues to supply the SIDE-trend exit signal. Both variants respect the
 shared new-book cutoff and post-square-off cooldown.
 `SYSDTAFPXY_SELECTED_MODE` selects the DTAF strategy/data candle transform
-(default `3`, time-filtered):
+(default `0`, applied throughout the trading day):
 mode `0` sets `Open` to the raw `Close` and sets `Close` to the midpoint
 between raw `Close` and `High` on an up candle or raw `Close` and `Low` on a
 down candle; mode `1` keeps raw candles, and mode `2` sets `Close` to the
-`Open`/`Close` midpoint while retaining the other OHLC fields. Mode `3` applies
-mode `0` to each candle timestamp from 09:00 (inclusive) through 10:00
-(exclusive) IST and mode `2` to all other timestamps. The window uses each
-candle's localized timestamp, so historical SIM replay follows the same
-schedule as live data processing. The modified-close five-candle deep-reversal
-threshold also applies only during this Mode 0 window. The separate
+`Open`/`Close` midpoint while retaining the other OHLC fields. Mode `3` remains
+available as an explicit alternative: it applies mode `0` from 09:00
+(inclusive) through 10:00 (exclusive) IST and mode `2` at other times. The
+window uses each candle's localized timestamp, so historical SIM replay
+follows the same schedule as live data processing. Mode `0` is configured for
+the full trading day, including after 10:00 IST. The separate
 chart candle transform is controlled by
 `SYSPLCHRTPXY_OHLC_MODE`. In every DTAF mode, the live Yahoo OHLC fields are
 first averaged with the latest NIFTY futures price from
@@ -186,18 +192,16 @@ controls whether the last returned candle is included (`YES`) or excluded
 candle-color depth stream all include the latest running candle and share the
 same candle window.
 `PASTRSK` enables (`YES`) or disables (`NO`) the depth-triggered reversal
-square-off; it defaults to `YES`. When enabled, outside the scheduled square-off
-window, a `BUY` entry with past depth `PE5` or greater in strategy/data mode `0`
-(modified-close), or `PE7` or greater in modes `1` and `2`, independently
-triggers a verified PE-side close only on the first candle of the new CE streak
-(`hkin_ce_depth = 1`); a `SELL` entry with `CE5` or greater in mode `0`, or
-`CE7` or greater in modes `1` and `2`, triggers a verified
-CE-side close only on the first candle of the new PE streak
-(`hkin_pe_depth = 1`). Later candles in that new streak (depth 2 or more) do
-not trigger. Both CE and PE positions must be open for either deep-reversal
-exit to run. In mode `0`, the effective past-depth threshold is `4`; otherwise
-`EXEEXITPXY_DEPTH_EXIT_THRESHOLD` defaults to `6`. The trigger is strictly
-greater than the effective threshold. This rule is independent of LGT and
+square-off; it defaults to `NO`. When enabled, outside the scheduled square-off
+window, a `BUY` entry with past depth greater than 10 (PE11 or higher), or a
+`SELL` entry with past depth greater than 10 (CE11 or higher), triggers a
+verified close of the opposite option side only on the first candle of the new
+streak (`hkin_ce_depth = 1` for PE exits, `hkin_pe_depth = 1` for CE exits).
+The threshold remains 10 before and after 10:00 IST and is configured by
+`EXEEXITPXY_DEPTH_EXIT_THRESHOLD`. Later candles in that new streak (depth 2
+or more) do not trigger. Both CE and PE positions must be open for either
+deep-reversal exit to run. The trigger is strictly greater than the configured
+threshold. This rule is independent of LGT and
 is deduplicated by signal candle. The selected side must also have a
 blended unrealized loss strictly greater than
 `EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT` (default `7%`), calculated from its
@@ -321,8 +325,10 @@ Non-interactive runs do not wait for input.
 
 The replay keeps production signals, target selection, averaging, counter-buy,
 risk confirmation, and scheduled square-off flow, evaluating time-based entry
-routing at each historical candle's timestamp. All exit-aligned positions use
-the fixed 77% target; unaligned targets remain 1.4%.
+routing at each historical candle's timestamp. Exit-aligned positions use a
+fixed 77% target before 10:00 IST and
+`max(4, own-side depth) × own-side power` from 10:00 IST onward, without an
+upper cap; unaligned targets remain 1.4%.
 SIM uses only index spot prices and a fixed quantity of 1 per lot; it divides
 production target percentages, averaging LGT thresholds, cycle-risk targets,
 and deep-reversal loss thresholds by 200 before applying them to spot returns
@@ -341,10 +347,15 @@ historical option P&L.
   belong to standalone modules with no caller in the production launch graph.
 - TGT uses only `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and the option side for
   alignment; direction, investment balance, ATR, Supertrend, and moving-average
-  values do not affect target alignment. Every aligned position uses a fixed
-  `77%` target; non-aligned positions receive
-  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). The percentage applies to
-  the option entry premium. Averaging alignment also uses only `exit`; TSMA/SMA
+  values do not affect target alignment. Aligned positions use the fixed
+  `EXETGTPXY_EARLY_ALIGNED_TARGET_PCT` (default `77%`) before
+  `SYSENTRPXY_ST_START` (10:00 IST), then
+  `max(EXETGTPXY_ALIGNED_MIN_DEPTH, own-side depth) × own-side power` (default
+  minimum depth `4`) without an upper cap. Non-aligned positions receive
+  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Missing or invalid aligned
+  depth/power values individually default to `1`. The percentage applies to the
+  option entry premium. SIM uses the replay candle's time for this switch.
+  Averaging alignment also uses only `exit`; TSMA/SMA
   has no effect on averaging eligibility or LGT. The trend chart independently
   carries both moving-average variants as `sma50` and `tsma50`.
 - The averaging window switch and start/end bounds apply only to averaging

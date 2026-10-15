@@ -29,7 +29,9 @@ class EngineRuntimeTests(unittest.TestCase):
             [
                 ("exeexitpxy.py", exepxy.EXEPXYPXY_PIPE_TIMEOUT_SECONDS),
                 ("exeentrpxy.py", exepxy.EXEPXYPXY_PIPE_TIMEOUT_SECONDS),
+                ("exeexitpxy.py", exepxy.EXEPXYPXY_PIPE_TIMEOUT_SECONDS),
                 ("exeavgpxy.py", exepxy.EXEPXYPXY_PIPE_TIMEOUT_SECONDS),
+                ("exeexitpxy.py", exepxy.EXEPXYPXY_PIPE_TIMEOUT_SECONDS),
             ],
         )
         pause.assert_called_once_with(exepxy.SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)

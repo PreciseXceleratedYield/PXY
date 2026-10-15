@@ -37,9 +37,6 @@ from syscnfgpxy import (
     EXEEXITPXY_SYSDUMP_SCRIPT,
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
-    SYSDTAFPXY_MODE3_MODE0_END,
-    SYSDTAFPXY_MODE3_MODE0_START,
-    SYSDTAFPXY_SELECTED_MODE,
     PASTRSK,
 )
 from sysmodepxy import dispatch_mode
@@ -158,26 +155,7 @@ def depth_squareoff_side(entry_signal, past_depth, threshold=EXEEXITPXY_DEPTH_EX
 
 
 def depth_exit_threshold(signal_time=None):
-    """Use the modified-close depth threshold when that candle mode is active."""
-    if SYSDTAFPXY_SELECTED_MODE == 0:
-        return 10
-    if SYSDTAFPXY_SELECTED_MODE == 3 and signal_time is not None:
-        try:
-            timestamp = pd.Timestamp(signal_time)
-        except (TypeError, ValueError):
-            timestamp = pd.NaT
-        if not pd.isna(timestamp):
-            timestamp = (
-                timestamp.tz_localize(SYSCNFGPXY_TIMEZONE)
-                if timestamp.tzinfo is None
-                else timestamp.tz_convert(SYSCNFGPXY_TIMEZONE)
-            )
-            if (
-                SYSDTAFPXY_MODE3_MODE0_START
-                <= timestamp.time()
-                < SYSDTAFPXY_MODE3_MODE0_END
-            ):
-                return 10
+    """Use the centrally configured depth threshold throughout the trading day."""
     return EXEEXITPXY_DEPTH_EXIT_THRESHOLD
 
 
@@ -301,9 +279,13 @@ def run_depth_squareoff(client, active_df, market_data_available,
         return set()
 
     command = "pxysqrpe" if side == "PE" else "pxysqrce"
+    command_path = Path(__file__).resolve().parents[2] / command
+    if not command_path.is_file():
+        print(f"{Fore.RED}❌ Square-off command not found: {command_path}")
+        return set()
     try:
         subprocess.run(
-            [command],
+            ["bash", str(command_path)],
             check=True,
             timeout=SQUAREOFF_TIMEOUT_SECS,
         )
@@ -372,7 +354,7 @@ def place_exit_order(client, row):
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             script_path = os.path.join(parent_dir, SYSDUMP_SCRIPT)
             if os.path.exists(script_path):
-                subprocess.Popen([sys.executable or "python3", script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen([sys.executable, script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
                 print(f"{Fore.RED}❌ Script not found at {script_path}")
         except Exception as script_err:
@@ -445,7 +427,7 @@ def run_snapshot():
             else:
                 _mark_lock(sq_key)          # before the run, so a hang or crash cannot cause a relaunch loop
                 try:
-                    subprocess.run([sys.executable or "python3", exe_path] + sq_args,
+                    subprocess.run([sys.executable, exe_path] + sq_args,
                                    check=True, timeout=SQUAREOFF_TIMEOUT_SECS)
                 except subprocess.TimeoutExpired:
                     print(f"{Fore.RED}❌ Square-off timed out after {SQUAREOFF_TIMEOUT_SECS}s.")

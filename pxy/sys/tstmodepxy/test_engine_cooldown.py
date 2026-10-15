@@ -60,6 +60,15 @@ class EngineCooldownTests(unittest.TestCase):
                 "get_market_signal",
                 return_value="BEAR",
             ),
+            patch.object(
+                sysentrpxy,
+                "get_signal_depth_analysis",
+                return_value={
+                    "past_depth": "CE3",
+                    "ce_depth": 2,
+                    "pe_depth": 1,
+                },
+            ),
             patch.object(sysentrpxy, "datetime") as clock,
         ):
             clock.now.return_value = datetime(2026, 10, 12, 13, 0)

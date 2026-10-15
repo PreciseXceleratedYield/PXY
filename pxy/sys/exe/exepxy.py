@@ -48,7 +48,7 @@ def run_script(script_path, timeout=None):
         return
     try:
         # ✅ Dynamic timeout value is passed here (None means run forever)
-        subprocess.run(['python3', str(script_path)], check=True, timeout=timeout)
+        subprocess.run([sys.executable, str(script_path)], check=True, timeout=timeout)
     except subprocess.TimeoutExpired:
         print(f"⏱ TIMEOUT: script stuck after {timeout}s -> {script_path} ⚠️")
     except subprocess.CalledProcessError:

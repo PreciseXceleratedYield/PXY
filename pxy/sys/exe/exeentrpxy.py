@@ -1,5 +1,5 @@
 import sys
-import os
+import subprocess
 import traceback
 from pathlib import Path
 from datetime import datetime
@@ -10,8 +10,9 @@ init(autoreset=True)
 # --- PATH SETUP ---
 HERE = Path(__file__).resolve().parent
 PARENT = HERE.parent
+PXY_DIR = PARENT.parent
 RUN_DIR = HERE / "run"
-for p in [HERE, RUN_DIR, PARENT]:
+for p in [HERE, RUN_DIR, PARENT, PXY_DIR]:
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
@@ -115,9 +116,17 @@ def main():
             f"{Fore.GREEN}{Style.BRIGHT}"
             f"🟢 FRESH ENTRY: Firing command '{command}'..."
         )
-        result = os.system(command)
-        if result != 0:
-            print(f"{Fore.RED}⚠️ {command} exited with status {result}.")
+        command_path = PXY_DIR / command
+        if not command_path.is_file():
+            print(f"{Fore.RED}❌ Entry command not found: {command_path}")
+            return
+        try:
+            result = subprocess.run(["bash", str(command_path)], check=False)
+        except OSError as error:
+            print(f"{Fore.RED}❌ Could not run {command_path}: {error}")
+            return
+        if result.returncode != 0:
+            print(f"{Fore.RED}⚠️ {command} exited with status {result.returncode}.")
 
         dprint("===== END =====", Fore.GREEN)
 

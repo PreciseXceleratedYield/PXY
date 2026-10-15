@@ -187,7 +187,7 @@ def exit_all_positions():
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             script_path = os.path.join(parent_dir, "sysddmppxy.py")
             if os.path.exists(script_path):
-                subprocess.Popen(["python3", script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen([sys.executable, script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
                 print(f"{Fore.RED}❌ Script not found at {script_path}")
         except Exception as script_err:

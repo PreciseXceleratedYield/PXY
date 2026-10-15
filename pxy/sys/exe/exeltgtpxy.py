@@ -16,19 +16,25 @@ for path in (SYS_DIR, PXY_DIR, HERE):
 import math
 import pandas as pd
 import re
+from datetime import datetime
 from colorama import Fore, Style, init
 
 from syscnfgpxy import (
     EXEAMSPXY_MAX_LGT_LOSS,
     EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
+    EXETGTPXY_EARLY_ALIGNED_TARGET_PCT,
+    EXETGTPXY_ALIGNED_MIN_DEPTH,
     EXETGTPXY_EXIT_KEY_COLUMN,
     EXETGTPXY_TGT_PCT_NOT_ALIGNED,
+    SYSCNFGPXY_TIMEZONE,
+    SYSENTRPXY_ST_START,
 )
 
 # ==================== CONFIG (this file's settings) ====================
 EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
 NOT_ALIGNED_TARGET_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
-BOTH_SIDES_ALIGNED_TARGET_PCT = 77.0
+ALIGNED_MIN_DEPTH = EXETGTPXY_ALIGNED_MIN_DEPTH
+EARLY_ALIGNED_TARGET_PCT = EXETGTPXY_EARLY_ALIGNED_TARGET_PCT
 # =======================================================================
 
 init(autoreset=True)
@@ -87,9 +93,33 @@ def calculate_tgt(
     side_depth=None,
     both_sides_open=False,
     heavy_side=False,
+    target_time=None,
 ):
-    """Return a fixed 77% aligned target, otherwise the non-aligned target."""
-    return BOTH_SIDES_ALIGNED_TARGET_PCT if is_aligned else NOT_ALIGNED_TARGET_PCT
+    """Return the time-aware aligned target, or the non-aligned baseline."""
+    if not is_aligned:
+        return NOT_ALIGNED_TARGET_PCT
+    if target_time is None:
+        target_time = datetime.now(SYSCNFGPXY_TIMEZONE)
+    else:
+        target_time = pd.Timestamp(target_time)
+        target_time = (
+            target_time.tz_localize(SYSCNFGPXY_TIMEZONE)
+            if target_time.tzinfo is None
+            else target_time.tz_convert(SYSCNFGPXY_TIMEZONE)
+        )
+    if target_time.time().replace(tzinfo=None) < SYSENTRPXY_ST_START:
+        return EARLY_ALIGNED_TARGET_PCT
+
+    def positive_factor(value):
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return 1.0
+        return parsed if math.isfinite(parsed) and parsed > 0 else 1.0
+
+    own_depth = positive_factor(side_depth)
+    own_power = positive_factor(side_power)
+    return max(ALIGNED_MIN_DEPTH, own_depth) * own_power
 
 
 def f(x, d=0.0):
@@ -119,7 +149,14 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     
     return ce_total, pe_total
 
-def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce_count: int = 0, pe_count: int = 0):
+def target_price(
+    row,
+    ce_investment: float = 0.0,
+    pe_investment: float = 0.0,
+    ce_count: int = 0,
+    pe_count: int = 0,
+    target_time=None,
+):
     """Calculate the target from exit alignment and the open side counts."""
     try:
         entry_prc = f(row.get('pxy_entry') or row.get('buy_prc'))
@@ -156,6 +193,7 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
             side_depth=side_depth,
             both_sides_open=both_sides_open,
             heavy_side=heavy_side,
+            target_time=target_time,
         )
         
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
@@ -164,4 +202,3 @@ def target_price(row, ce_investment: float = 0.0, pe_investment: float = 0.0, ce
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
-
