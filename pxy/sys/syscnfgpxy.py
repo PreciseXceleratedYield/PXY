@@ -65,7 +65,7 @@ SYSDTAFPXY_MODE3_MODE0_START = dt_time(9, 0)
 SYSDTAFPXY_MODE3_MODE0_END = dt_time(10, 0)
 if SYSDTAFPXY_MODE3_MODE0_START >= SYSDTAFPXY_MODE3_MODE0_END:
     raise ValueError("DTAF mode 3 Mode 0 window must be chronological.")
-SYSDTAFPXY_SELECTED_MODE = 3
+SYSDTAFPXY_SELECTED_MODE = 0
 if (
     isinstance(SYSDTAFPXY_SELECTED_MODE, bool)
     or not isinstance(SYSDTAFPXY_SELECTED_MODE, int)
