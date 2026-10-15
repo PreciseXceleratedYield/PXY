@@ -79,7 +79,7 @@ def calculate_tgt(
         # Safely convert to float defaults if parameters are missing or None
         depth_val = float(own_depth) if own_depth is not None else 0.0
         power_val = float(own_power) if own_power is not None else 0.0
-        return max(depth_val, 3.0) * power_val
+        return max(depth_val, 3.5) * power_val
     else:
         return NOT_ALIGNED_TARGET_PCT
 
