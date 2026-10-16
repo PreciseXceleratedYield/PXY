@@ -81,7 +81,7 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price):
             ratio = 1.0
     magnitude = max(
         EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
-        round(44.0 * ratio, 2),
+        round(66.0 * ratio, 2),
     )
     return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
 
