@@ -58,7 +58,7 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 SYSENTRPXY_VARIANT = "MKT"
 if SYSENTRPXY_VARIANT not in {"MKT", "ST"}:
     raise ValueError("SYSENTRPXY_VARIANT must be MKT or ST.")
-SYSENTRPXY_ST_START = dt_time(10, 0)
+SYSENTRPXY_ST_START = dt_time(16, 0)
 
 # Data ingestion, chart generation, and signal calculation.
 SYSDTAFPXY_FORCE_NIFTY_FUT = False
