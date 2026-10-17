@@ -82,11 +82,12 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, ce_count=0, 
                 ratio = min(10.0, max(0.1, ratio))
         if not ratio_is_valid:
             ratio = 1.0
-            
+                
     magnitude = max(
         44.0,
-        round(33.0 * ratio * ratio * ratio * ratio * ratio * ratio, 2),
+        round(33.0 * ratio ** max(1, own_count), 2),
     ) + (11.0 * own_count)
+
     
     return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
 # === SURGICAL CHANGE END ===
