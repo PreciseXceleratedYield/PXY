@@ -1639,7 +1639,7 @@ class ConfigurationWiringTests(unittest.TestCase):
     def test_value_cap_is_fixed_at_twenty_five_thousand_without_layer_mode(self):
         self.assertEqual(EXEAMSPXY_MAX_INVESTMENT, 25000.0)
 
-    def test_dtaf_modes_blend_all_ohlc_fields_with_futures_before_transforming(self):
+    def test_dtaf_mode_one_blends_all_ohlc_fields_with_futures_before_returning_raw_data(self):
         frame = pd.DataFrame(
             {
                 "Open": [100.0],
@@ -1649,12 +1649,6 @@ class ConfigurationWiringTests(unittest.TestCase):
             }
         )
         raw = apply_ohlc_transformation(frame, mode=1, futures_price=200.0)
-        modified = apply_ohlc_transformation(
-            frame, mode=0, futures_price=200.0
-        )
-        oc_half = apply_ohlc_transformation(
-            frame, mode=2, futures_price=200.0
-        )
 
         expected_raw = pd.DataFrame(
             {
@@ -1664,15 +1658,8 @@ class ConfigurationWiringTests(unittest.TestCase):
                 "Close": [150.5],
             }
         )
-        expected_modified = expected_raw.copy()
-        expected_modified["Open"] = [150.5]
-        expected_modified["Close"] = [150.75]
-        expected_oc_half = expected_raw.copy()
-        expected_oc_half["Close"] = [150.25]
 
         pd.testing.assert_frame_equal(raw, expected_raw)
-        pd.testing.assert_frame_equal(modified, expected_modified)
-        pd.testing.assert_frame_equal(oc_half, expected_oc_half)
         self.assertIsNot(raw, frame)
 
     def test_dtaf_mode_one_without_futures_keeps_raw_candles(self):
@@ -1688,12 +1675,10 @@ class ConfigurationWiringTests(unittest.TestCase):
             apply_ohlc_transformation(frame, mode=1), frame
         )
 
-    def test_dtaf_defaults_to_mode_zero_all_day_and_rejects_other_modes(self):
+    def test_dtaf_defaults_to_mode_one_and_rejects_other_modes(self):
         import syscnfgpxy
 
-        self.assertEqual(syscnfgpxy.SYSDTAFPXY_SELECTED_MODE, 0)
-        self.assertEqual(syscnfgpxy.SYSDTAFPXY_MODE3_MODE0_START, dt_time(9, 0))
-        self.assertEqual(syscnfgpxy.SYSDTAFPXY_MODE3_MODE0_END, dt_time(10, 0))
+        self.assertEqual(syscnfgpxy.SYSDTAFPXY_SELECTED_MODE, 1)
         self.assertEqual(syscnfgpxy.EXEEXITPXY_DEPTH_EXIT_THRESHOLD, 10)
         self.assertEqual(syscnfgpxy.EXEAMSPXY_MAX_LGT_LOSS, 77.0)
         frame = pd.DataFrame(
@@ -1705,70 +1690,16 @@ class ConfigurationWiringTests(unittest.TestCase):
             }
         )
 
-        with self.assertRaisesRegex(ValueError, "must be 0, 1, 2, or 3"):
+        with self.assertRaisesRegex(ValueError, "must be 1"):
+            apply_ohlc_transformation(frame, mode=0)
+        with self.assertRaisesRegex(ValueError, "must be 1"):
+            apply_ohlc_transformation(frame, mode=2)
+        with self.assertRaisesRegex(ValueError, "must be 1"):
             apply_ohlc_transformation(frame, mode=8)
 
-        expected_mode_zero = frame.copy()
-        expected_mode_zero["Open"] = [101.0]
-        expected_mode_zero["Close"] = [101.5]
         pd.testing.assert_frame_equal(
-            apply_ohlc_transformation(frame), expected_mode_zero
+            apply_ohlc_transformation(frame), frame
         )
-
-    def test_dtaf_mode_three_remains_available_as_an_explicit_time_window(self):
-        from syscnfgpxy import SYSCNFGPXY_TIMEZONE
-
-        index = pd.DatetimeIndex(
-            [
-                "2026-10-14 08:59",
-                "2026-10-14 09:00",
-                "2026-10-14 09:59",
-                "2026-10-14 10:00",
-                "2026-10-14 14:30",
-            ],
-            tz=SYSCNFGPXY_TIMEZONE,
-        )
-        frame = pd.DataFrame(
-            {
-                "Open": [100.0] * 5,
-                "High": [104.0] * 5,
-                "Low": [96.0] * 5,
-                "Close": [102.0] * 5,
-            },
-            index=index,
-        )
-
-        result = apply_ohlc_transformation(frame, mode=3)
-
-        self.assertEqual(result["Open"].tolist(), [100.0, 102.0, 102.0, 100.0, 100.0])
-        self.assertEqual(result["Close"].tolist(), [101.0, 103.0, 103.0, 101.0, 101.0])
-
-    def test_dtaf_mode_three_converts_timestamp_zones_before_selecting_window(self):
-        utc_index = pd.DatetimeIndex(
-            ["2026-10-14 03:30", "2026-10-14 04:30"], tz="UTC"
-        )
-        frame = pd.DataFrame(
-            {
-                "Open": [100.0, 100.0],
-                "High": [104.0, 104.0],
-                "Low": [96.0, 96.0],
-                "Close": [102.0, 102.0],
-            },
-            index=utc_index,
-        )
-
-        result = apply_ohlc_transformation(frame, mode=3)
-
-        self.assertEqual(result["Open"].tolist(), [102.0, 100.0])
-        self.assertEqual(result["Close"].tolist(), [103.0, 101.0])
-
-    def test_dtaf_mode_three_requires_timestamps(self):
-        frame = pd.DataFrame(
-            {"Open": [100.0], "High": [104.0], "Low": [96.0], "Close": [102.0]}
-        )
-
-        with self.assertRaisesRegex(ValueError, "requires a DatetimeIndex"):
-            apply_ohlc_transformation(frame, mode=3)
 
     def test_data_timezone_uses_shared_setting(self):
         from sysdtafpxy import TIMEZONE

@@ -16,13 +16,12 @@ runtime selector.
 - **Entry router:** `MKT`. Through 09:59:59 IST, BULL/BEAR map directly to
   BUY/SELL. From 10:00 IST, BUY requires past PE depth of at least 3 and
   current CE depth 1; SELL requires past CE depth of at least 3 and current
-  PE depth 1. Other cases produce no entry. Mode 0 selects the strategy/data
-  candle transform for both the pre-10:00 and post-10:00 sessions. New books are blocked at the 14:00 cutoff; MKT
+  PE depth 1. Other cases produce no entry. New books are blocked at the 14:00 cutoff; MKT
   exit signals continue to be evaluated.
-- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 0`. Modified-close
-  mode 0 applies for the full trading day, before and after 10:00 IST.
-  The separate chart display transform remains
-  `SYSPLCHRTPXY_OHLC_MODE = 1` (raw OHLC).
+- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 1`. DTAF uses one
+  canonical raw-OHLC mode; it keeps the same candle structure and blends the
+  latest futures price for signal input only. The separate chart display
+  transform remains `SYSPLCHRTPXY_OHLC_MODE = 1` (raw OHLC).
 - **Option strikes:** `EXEOTMPXY_STRIKE_MODE = "ATM"` for option buys.
 - **Supertrend settings:** period 14, factor 1, used by the active ST entry
   router from 10:00 IST onward.
@@ -158,23 +157,12 @@ When Supertrend is SIDE, entries are allowed within half an ATR of either outer
 mirrored-band edge, with the lower edge mapping to BUY and upper edge to SELL.
 MKT continues to supply the SIDE-trend exit signal. Both variants respect the
 shared new-book cutoff and post-square-off cooldown.
-`SYSDTAFPXY_SELECTED_MODE` selects the DTAF strategy/data candle transform
-(default `0`, applied throughout the trading day):
-mode `0` sets `Open` to the raw `Close` and sets `Close` to the midpoint
-between raw `Close` and `High` on an up candle or raw `Close` and `Low` on a
-down candle; mode `1` keeps raw candles, and mode `2` sets `Close` to the
-`Open`/`Close` midpoint while retaining the other OHLC fields. Mode `3` remains
-available as an explicit alternative: it applies mode `0` from 09:00
-(inclusive) through 10:00 (exclusive) IST and mode `2` at other times. The
-window uses each candle's localized timestamp, so historical SIM replay
-follows the same schedule as live data processing. Mode `0` is configured for
-the full trading day, including after 10:00 IST. The separate
-chart candle transform is controlled by
-`SYSPLCHRTPXY_OHLC_MODE`. In every DTAF mode, the live Yahoo OHLC fields are
-first averaged with the latest NIFTY futures price from
-`exe/run/nftfut.json`; live signals are unavailable when that quote is
-missing. Without a futures quote, the selected candle transform operates on the
-historical OHLC values directly.
+`SYSDTAFPXY_SELECTED_MODE` is fixed to `1` and represents the single
+canonical DTAF candle transform. In this mode the dataset keeps the raw OHLC
+shape and the latest NIFTY futures price is averaged into each OHLC field only
+for signal input. The separate chart candle transform remains controlled by
+`SYSPLCHRTPXY_OHLC_MODE`. If a futures quote is unavailable, DTAF falls back to
+the historical OHLC values directly without switching modes.
 MKT returns one directional signal from `sysdthapxy`: down-then-up and two
 consecutive rising moves emit `BULL`; up-then-down and two consecutive falling
 moves emit `BEAR`. Other patterns, including equal adjacent closes, emit
