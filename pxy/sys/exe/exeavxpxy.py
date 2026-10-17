@@ -130,18 +130,24 @@ def handle_side_averaging(client, df, index_price):
     ce_opposite_signal = active_exit in {"BULL", "BEAR"} and not ce_aligned
     pe_opposite_signal = active_exit in {"BULL", "BEAR"} and not pe_aligned
 
+    # === SURGICAL LINE REPLACEMENT START ===
     ce_dynamic_threshold = calculate_lgt(
         ce_investment,
         pe_investment,
         is_ce=True,
         index_price=index_price,
+        ce_count=ce_lots,
+        pe_count=pe_lots,
     )
     pe_dynamic_threshold = calculate_lgt(
         ce_investment,
         pe_investment,
         is_ce=False,
         index_price=index_price,
+        ce_count=ce_lots,
+        pe_count=pe_lots,
     )
+    # === SURGICAL LINE REPLACEMENT END ===
     if USE_OVERALL_LOSS:
         ce_lgt_val, pe_lgt_val = ce_overall_pnl_pct, pe_overall_pnl_pct
     else:
