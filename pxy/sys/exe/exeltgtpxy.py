@@ -62,6 +62,8 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, ce_count=0, 
         (ce_investment, pe_investment) if is_ce else (pe_investment, ce_investment)
     )
     own_count = float(ce_count if is_ce else pe_count)
+    # Calculate the combined total count across both sides
+    total_count = float(ce_count + pe_count)
 
     try:
         own_investment = float(own_investment)
@@ -83,14 +85,16 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, ce_count=0, 
         if not ratio_is_valid:
             ratio = 1.0
                 
+    # Swapped max(1, own_count) with max(1, total_count)
     magnitude = max(
         44.0,
-        round(33.0 * ratio ** max(1, own_count), 2),
+        round(33.0 * ratio ** max(1, total_count), 2),
     ) + (11.0 * own_count)
 
     
     return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
 # === SURGICAL CHANGE END ===
+
 
 
 
