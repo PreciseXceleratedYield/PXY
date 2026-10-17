@@ -1,7 +1,6 @@
 from datetime import datetime
 import math
 from pathlib import Path
-import re
 import sys
 
 import pandas as pd
@@ -9,12 +8,10 @@ import pandas as pd
 from sysmktpxy import get_signal as get_market_signal
 from syscnfgpxy import (
     SYSENTRPXY_VARIANT,
-    SYSENTRPXY_ST_START,
     SYSCNFGPXY_NEW_BOOK_CUTOFF,
     SYSCNFGPXY_TIMEZONE,
 )
 from sysdtstpxy import calculate_supertrend
-from sysdthapxy import get_signal_depth_analysis
 
 EXE_DIR = Path(__file__).resolve().parent / "exe"
 if str(EXE_DIR) not in sys.path:
@@ -30,40 +27,6 @@ def _entry_signal_for_exit(exit_signal, now=None):
         return "NONE", "NONE"
     entry_signal = {"BULL": "BUY", "BEAR": "SELL"}[normalized_exit]
     return _apply_new_book_cutoff(entry_signal, normalized_exit, now)
-
-
-def _mkt_depth_entry_signal(market_signal, df, now):
-    """Require a three-candle opposite run and first candle of the MKT reversal."""
-    analysis = get_signal_depth_analysis(df=df)
-    past_depth = re.fullmatch(
-        r"(CE|PE)(\d+)", str(analysis.get("past_depth", "")).upper().strip()
-    )
-    try:
-        ce_depth = float(pd.to_numeric(analysis.get("ce_depth"), errors="coerce"))
-        pe_depth = float(pd.to_numeric(analysis.get("pe_depth"), errors="coerce"))
-    except (TypeError, ValueError, OverflowError):
-        return "NONE", market_signal
-
-    entry_signal = "NONE"
-    if (
-        market_signal == "BULL"
-        and past_depth
-        and past_depth.group(1) == "PE"
-        and int(past_depth.group(2)) >= 3
-        and math.isfinite(ce_depth)
-        and ce_depth == 1
-    ):
-        entry_signal = "BUY"
-    elif (
-        market_signal == "BEAR"
-        and past_depth
-        and past_depth.group(1) == "CE"
-        and int(past_depth.group(2)) >= 3
-        and math.isfinite(pe_depth)
-        and pe_depth == 1
-    ):
-        entry_signal = "SELL"
-    return _apply_new_book_cutoff(entry_signal, market_signal, now)
 
 
 def _apply_new_book_cutoff(entry_signal, exit_signal, now=None):
@@ -86,101 +49,70 @@ def _finite_row_values(row, columns):
     return values if all(math.isfinite(value) for value in values) else None
 
 
-def _supertrend_entry_signal(df, now=None, processed_supertrend=None):
-    """Use Supertrend trend and half-ATR zones to route ST entries."""
+def _supertrend_entry_signal(
+    df, market_exit_signal, now=None, processed_supertrend=None
+):
+    """Use Supertrend for entries and preserve the independent MKT exit signal."""
     if df is None or df.empty:
-        return "NONE", "NONE"
+        return "NONE", market_exit_signal
 
     if processed_supertrend is None:
         try:
             processed = calculate_supertrend(df.copy())
         except Exception as error:
-            print(f"⚠️ Trend engine failed ({error}); signals forced to NONE.")
-            return "NONE", "NONE"
+            print(f"⚠️ Trend engine failed ({error}); STS entry forced to NONE.")
+            return "NONE", market_exit_signal
     else:
         processed = processed_supertrend
     if processed is None or processed.empty or "ST_Trend" not in processed:
-        return "NONE", "NONE"
+        return "NONE", market_exit_signal
 
     trend = str(processed["ST_Trend"].iloc[-1]).upper().strip()
-    if trend not in {"BULL", "BEAR", "SIDE"}:
-        return "NONE", "NONE"
+    if trend not in {"BULL", "BEAR"}:
+        return _apply_new_book_cutoff("NONE", market_exit_signal, now)
 
     latest = processed.iloc[-1]
     entry_signal = "NONE"
 
-    # --- TRENDING STRATEGY (0.5 * ATR Corridor Boundaries) ---
-    if trend in {"BULL", "BEAR"}:
-        if {"Close", "st_line", "st_atr"}.issubset(processed.columns):
-            values = _finite_row_values(latest, ("Close", "st_line", "st_atr"))
-            if values is not None:
-                price, st_line, atr = values
-                if atr > 0:
-                    entry_atr = atr / 2.0
-                    if (
-                        trend == "BULL"
-                        and st_line <= price <= st_line + entry_atr
-                    ):
-                        entry_signal = "BUY"
-                    elif (
-                        trend == "BEAR"
-                        and st_line - entry_atr <= price <= st_line
-                    ):
-                        entry_signal = "SELL"
-        return _apply_new_book_cutoff(entry_signal, trend, now)
-
-    # --- SIDEWAYS STRATEGY (Edge-Based ATR Envelopes) ---
-    market_signal = str(get_market_signal(df)).upper().strip()
-    if market_signal not in {"BULL", "BEAR"}:
-        market_signal = "NONE"
-    if {"Close", "st_line", "st_mirror", "st_atr"}.issubset(processed.columns):
-        values = _finite_row_values(latest, ("Close", "st_line", "st_mirror", "st_atr"))
+    # Entry requires trend direction and a close within half an ATR of the ST line.
+    if {"Close", "st_line", "st_atr"}.issubset(processed.columns):
+        values = _finite_row_values(latest, ("Close", "st_line", "st_atr"))
         if values is not None:
-            price, st_line, mirror, atr = values
+            price, st_line, atr = values
             if atr > 0:
-                upper_band, lower_band = max(st_line, mirror), min(st_line, mirror)
                 entry_atr = atr / 2.0
-                if price <= (lower_band + entry_atr):
+                if trend == "BULL" and st_line <= price <= st_line + entry_atr:
                     entry_signal = "BUY"
-                elif price >= (upper_band - entry_atr):
+                elif trend == "BEAR" and st_line - entry_atr <= price <= st_line:
                     entry_signal = "SELL"
-                    
-    exit_signal = "NONE"  
-    return _apply_new_book_cutoff(entry_signal, market_signal, now)
+    return _apply_new_book_cutoff(entry_signal, market_exit_signal, now)
 
 
 def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
-    """Route entries through MKT, with depth confirmation after 10:00 IST."""
+    """Route entries through MKT or STS while always sourcing exits from MKT."""
     if cooldown_remaining() > 0:
         print("⏳ POST-SQUARE-OFF COOLDOWN: entry and exit signals forced to NONE.")
         return "NONE", "NONE"
 
     if now is None:
         now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
-    if SYSENTRPXY_VARIANT == "ST" and now >= SYSENTRPXY_ST_START:
-        if df is None:
-            from sysdtafpxy import fetch_yf_data
-
-            df = fetch_yf_data()
-        return _supertrend_entry_signal(
-            df, now=now, processed_supertrend=processed_supertrend
-        )
-
-    if (
-        SYSENTRPXY_VARIANT == "MKT"
-        and now >= SYSENTRPXY_ST_START
-        and df is None
-    ):
+    if df is None:
         from sysdtafpxy import fetch_yf_data
 
         df = fetch_yf_data()
 
-    exit_signal = str(get_market_signal(df)).upper().strip()
-    if exit_signal not in {"BULL", "BEAR"}:
-        exit_signal = "NONE"
-    if SYSENTRPXY_VARIANT == "MKT" and now >= SYSENTRPXY_ST_START:
-        return _mkt_depth_entry_signal(exit_signal, df, now)
-    return _entry_signal_for_exit(exit_signal, now=now)
+    market_signal = str(get_market_signal(df)).upper().strip()
+    if market_signal not in {"BULL", "BEAR"}:
+        market_signal = "NONE"
+
+    if SYSENTRPXY_VARIANT == "STS":
+        return _supertrend_entry_signal(
+            df,
+            market_signal,
+            now=now,
+            processed_supertrend=processed_supertrend,
+        )
+    return _entry_signal_for_exit(market_signal, now=now)
 
 
 if __name__ == "__main__":

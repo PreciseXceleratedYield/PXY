@@ -13,11 +13,9 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 combination, recorded as `SYSCNFGPXY_RELEASE_NAME`; it is not a separate
 runtime selector.
 
-- **Entry router:** `MKT`. Through 09:59:59 IST, BULL/BEAR map directly to
-  BUY/SELL. From 10:00 IST, BUY requires past PE depth of at least 3 and
-  current CE depth 1; SELL requires past CE depth of at least 3 and current
-  PE depth 1. Other cases produce no entry. New books are blocked at the 14:00 cutoff; MKT
-  exit signals continue to be evaluated.
+- **Entry router:** `MKT`. MKT BULL/BEAR map directly to BUY/SELL throughout
+  the session. New books are blocked at the 14:00 cutoff; MKT exit signals
+  continue to be evaluated.
 - **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 1`. DTAF uses one
   canonical raw-OHLC mode; it keeps the same candle structure and blends the
   latest futures price for signal input only. The separate chart display
@@ -69,11 +67,11 @@ runtime selector.
   The standalone 15:25 square-off trigger is also intentionally separate from
   the staged exit schedule. Legacy `exe/run/X` scripts and pipe-scenario test
   fixtures retain their own values; they do not drive the production schedule.
-- The chart and ST entry router share the same Supertrend implementation and
+- The chart and STS entry router share the same Supertrend implementation and
   settings: `SYSDTSTPXY_ST1_PERIOD` (default `14`) and
-  `SYSDTSTPXY_ST1_FACTOR` (default `1`). ST entry uses the chart's already
+  `SYSDTSTPXY_ST1_FACTOR` (default `1`). STS entry uses the chart's already
   calculated Supertrend series and candle window, so its displayed trend and
-  line match the values used for ST entry routing. The Supertrend's
+  line match the values used for STS entry routing. The Supertrend's
   Wilder-style true range ATR is distinct from SKATR's session-based
   true-range ATR.
 - SKATR true-range ATR (mode 2) starts accumulating at 09:16 IST each session:
@@ -142,21 +140,14 @@ values until deliberately restarted.
 
 ## Option strike selection
 
-`SYSENTRPXY_VARIANT` selects the `sysentrpxy` signal router. With `MKT`,
-MKT exit BULL maps to BUY and BEAR maps to SELL through 09:59:59 IST. From
-10:00 IST, BUY requires past PE depth of at least 3 and current CE depth 1;
-SELL requires past CE depth of at least 3 and current PE depth 1. All other
-depth/signal combinations suppress entry, while the exit signal remains the
-MKT signal. When `ST` is selected, it continues to use Supertrend direction
-as the exit signal when trend is BULL or BEAR.
+`SYSENTRPXY_VARIANT` selects one of two entry routers: `MKT` or `STS`.
+In `MKT`, MKT BULL/BEAR maps directly to BUY/SELL. In `STS`, Supertrend
+direction and the existing half-ATR entry zone determine BUY/SELL; SIDE,
+missing data, and invalid trends produce no entry. In both modes, exits are
+always sourced from MKT and remain independent of the selected entry router.
 The ST line, trend, and ATR used for entry are read from the same calculated
-series shown on the chart. In `ST`, a close within half an ATR of the ST line
-is sufficient for entry: from the line to `ST + ATR/2` in BULL, or from
-`ST - ATR/2` to the line in BEAR; MKT confirmation does not gate these entries.
-When Supertrend is SIDE, entries are allowed within half an ATR of either outer
-mirrored-band edge, with the lower edge mapping to BUY and upper edge to SELL.
-MKT continues to supply the SIDE-trend exit signal. Both variants respect the
-shared new-book cutoff and post-square-off cooldown.
+series shown on the chart. Both variants respect the shared new-book cutoff
+and post-square-off cooldown.
 `SYSDTAFPXY_SELECTED_MODE` is fixed to `1` and represents the single
 canonical DTAF candle transform. In this mode the dataset keeps the raw OHLC
 shape and the latest NIFTY futures price is averaged into each OHLC field only
