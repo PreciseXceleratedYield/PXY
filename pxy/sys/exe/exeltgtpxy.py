@@ -48,7 +48,8 @@ def _warn_once(key, msg):
         print(f"{Fore.YELLOW}⚠️ {msg}{Style.RESET_ALL}")
 
 
-def calculate_lgt(ce_investment, pe_investment, is_ce, index_price):
+# === SURGICAL CHANGE START ===
+def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, ce_count=0, pe_count=0):
     """Calculate the capped LGT percentage from the relative investments."""
     try:
         index_price = float(index_price)
@@ -60,6 +61,8 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price):
     own_investment, opposite_investment = (
         (ce_investment, pe_investment) if is_ce else (pe_investment, ce_investment)
     )
+    own_count = float(ce_count if is_ce else pe_count)
+
     try:
         own_investment = float(own_investment)
         opposite_investment = float(opposite_investment)
@@ -79,11 +82,15 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price):
                 ratio = min(10.0, max(0.1, ratio))
         if not ratio_is_valid:
             ratio = 1.0
+            
     magnitude = max(
-        EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
+        44.0,
         round(33.0 * ratio * ratio * ratio * ratio * ratio * ratio, 2),
-    )
+    ) + (11.0 * own_count)
+    
     return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
+# === SURGICAL CHANGE END ===
+
 
 
 def calculate_tgt(
@@ -199,6 +206,8 @@ def target_price(
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
         return round(calculated_target, 2)
         
+    # === SURGICAL CHANGE START ===
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
+    # === SURGICAL CHANGE END ===
