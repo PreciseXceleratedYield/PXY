@@ -22,16 +22,23 @@ TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
 
 FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 
+import math
+
 def apply_ohlc_transformation(
-    df, mode=SYSDTAFPXY_SELECTED_MODE, futures_price=None
+    df, mode=1, futures_price=None
 ):
-    """Canonical DTAF mode 1: keep raw OHLC and optionally blend with futures price."""
+    """Canonical DTAF mode 1: keeps raw values, blends with futures price,
+
+    and updates Close to (High + Low) / 2 right before returning.
+    """
     if mode != 1:
         raise ValueError("DTAF mode must be 1.")
     if df.empty:
         return df
 
     out = df.copy()
+    
+    # 1. Optionally blend with the futures price first
     if futures_price is not None:
         try:
             futures_price = float(futures_price)
@@ -39,8 +46,17 @@ def apply_ohlc_transformation(
             raise ValueError("futures_price must be a finite positive number.") from error
         if not math.isfinite(futures_price) or futures_price <= 0:
             raise ValueError("futures_price must be a finite positive number.")
+            
         for column in ("Open", "High", "Low", "Close"):
-            out[column] = (out[column] + futures_price) / 2.0
+            if column in out.columns:
+                out[column] = (out[column] + futures_price) / 2.0
+                
+    # 2. Final adjustment: Change Close to the average of High and Low
+    if "High" in out.columns and "Low" in out.columns:
+        out["Close"] = (out["High"] + out["Low"]) / 2.0
+    else:
+        raise KeyError("DataFrame must contain 'High' and 'Low' columns to calculate Close.")
+                
     return out
 
 
