@@ -25,13 +25,15 @@ FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 def apply_ohlc_transformation(
     df, mode=SYSDTAFPXY_SELECTED_MODE, futures_price=None
 ):
-    """Canonical DTAF mode 1: keep raw OHLC and optionally blend with futures price."""
+    """Canonical DTAF mode 1: keep raw OHLC, blend with futures, and apply custom close overrides."""
     if mode != 1:
         raise ValueError("DTAF mode must be 1.")
     if df.empty:
         return df
 
     out = df.copy()
+    
+    # 1. First apply the original futures blending if present
     if futures_price is not None:
         try:
             futures_price = float(futures_price)
@@ -41,6 +43,24 @@ def apply_ohlc_transformation(
             raise ValueError("futures_price must be a finite positive number.")
         for column in ("Open", "High", "Low", "Close"):
             out[column] = (out[column] + futures_price) / 2.0
+
+    # 2. Apply the custom candle close calculations sequentially
+    if len(out) > 0:
+        # Calculate intermediate values based on current columns
+        ohlc_4 = (out["Open"] + out["High"] + out["Low"] + out["Close"]) / 4.0
+        oc_2 = (out["Open"] + out["Close"]) / 2.0
+        
+        # Shift the OHLC/4 calculation forward by 1 index to represent "previous candle" metrics
+        out["Close"] = ohlc_4.shift(1)
+        
+        # Override the very last/present row with the (Open + Close) / 2 calculation
+        out.loc[out.index[-1], "Close"] = oc_2.iloc[-1]
+        
+        # Handle edge case if df has only 1 row (previous candle shift turns NaN)
+        if len(out) > 1 and pd.isna(out.loc[out.index[0], "Close"]):
+            # Fall back to its own current oc_2 if no real previous candle exists
+            out.loc[out.index[0], "Close"] = oc_2.iloc[0]
+
     return out
 
 
@@ -146,6 +166,9 @@ def _fetch_yf_data_production(
             }
             time_indices = [current_time - pd.Timedelta(minutes=i) for i in reversed(range(target_rows))]
             fallback_df = pd.DataFrame(mock_data, index=time_indices)
+            
+            # Apply identical custom rule handling on the fallback dataframe structure
+            fallback_df = apply_ohlc_transformation(fallback_df, mode=1, futures_price=None)
             fallback_df.attrs["data_fallback"] = True
             return fallback_df
         else:
