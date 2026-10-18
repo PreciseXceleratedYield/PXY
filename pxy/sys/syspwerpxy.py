@@ -1,76 +1,61 @@
-#!/usr/bin/env python3
 # syspwerpxy.py
-import sys
-from pathlib import Path
-
-# ----------------- PATH FIX (MUST BE AT ABSOLUTE TOP) -----------------
-HERE = Path(__file__).resolve().parent          # /home/pxy/PXY/pxy/sys
-PXY_DIR = HERE.parent                            # /home/pxy/PXY/pxy
-
-# Inject search paths so script can load its neighboring sibling modules
-for path in (HERE, PXY_DIR):
-    if str(path) not in sys.path:
-        sys.path.insert(0, str(path))
-
 import math
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
+from syscnfgpxy import SYSPWERPXY_LOOKBACK_PERIOD
 from colorama import Fore, Style, init
 
-# Initialize Colorama for terminal formatting
+# Initialize Colorama
 init(autoreset=True)
 
 # -------------------- Hardcoded constants --------------------
 TOTAL_WIDTH = 42
-POWER_LOOKBACK_PERIOD = 14
 
 # -------------------- CE/PE Power Calculation --------------------
 def get_ce_pe_power(df=None):
-    """
-    Calculate power based on the 14-period average candle range (High - Low).
-    
-    Progression:
-      - Ratio <= 1.0: Power is 1 (Less than or equal to average baseline)
-      - Ratio > 1.0 : Power scales dynamically into 2, 3, 4, 5... based on actual ratio.
-    """
-    # Fetch data: fallbacks if insufficient rows (Need 14 closed + 1 running)
-    if df is None or df.empty or len(df) < (POWER_LOOKBACK_PERIOD + 1):
+    if df is None:
         df = fetch_yf_data(period="2d", interval="1m")
-    if df.empty or len(df) < (POWER_LOOKBACK_PERIOD + 1):
+        
+    """
+    Calculate CE/PE power against the average move over the configured
+    closed-candle lookback window.
+    Returns:
+        direction (str): 'Up', 'Down', 'Flat'
+        CEPower (int): 1-9
+        PEPower (int): 1-9
+    """
+    # Fetch data: fallback if insufficient rows (Need at least 5 rows for 3 closed moves + 1 running)
+    if df is None or df.empty or len(df) < 5:
+        df = fetch_yf_data(period="2d", interval="1m")
+    if df.empty or len(df) < 5:
         df = fetch_yf_data(period="5d", interval="1m")
-    if df.empty or len(df) < (POWER_LOOKBACK_PERIOD + 1):
-        return "Flat", 1, 1  # Fixed fallback to return pure integer 1 instead of 10
+    if df.empty or len(df) < 5:
+        return "Flat", 1, 1  # fallback
 
-    df = df[['High', 'Low', 'Close']].astype(float).copy()
+    df = df[['Close']].astype(float).copy()
 
-    # 1. Calculate the point range (High - Low) for each candle
-    df['candle_points'] = df['High'] - df['Low']
+    # 1. Calculate absolute candle price changes (Close to Close)
+    df['move'] = df['Close'] - df['Close'].shift(1)
+    df['abs_move'] = df['move'].abs()
 
-    # 2. Average of the last 14 closed candles (Excludes current candle using shift)
-    avg_closed_range_14 = df['candle_points'].shift(1).rolling(
-        window=POWER_LOOKBACK_PERIOD
+    # 2. Average closed-candle absolute moves, excluding the current running one.
+    avg_closed_move_3 = df['abs_move'].shift(1).rolling(
+        window=SYSPWERPXY_LOOKBACK_PERIOD, min_periods=1
     ).mean()
 
-    # 3. Track the current running candle's total High - Low range points
-    current_candle_range = float(df['High'].iloc[-1] - df['Low'].iloc[-1])
+    # 3. Track the current running candle's net move
+    last_move = float(df['move'].iloc[-1])
     
-    # 4. Extract the historical baseline benchmark value
-    current_baseline = avg_closed_range_14.iloc[-1]
+    # 4. Compute the raw ratio against the closed baseline
+    current_baseline = avg_closed_move_3.iloc[-1]
+    raw_power = abs(last_move / current_baseline) if current_baseline > 0 else 0
 
-    # 5. Pure Percentage-Scale Matrix
-    if current_baseline > 0:
-        actual_ratio = current_candle_range / current_baseline
-        
-        if actual_ratio <= 1.0:
-            scaled_power = 1                      # Less than or equal to average baseline
-        else:
-            scaled_power = math.ceil(actual_ratio) # More than average -> rounds up straight into 2, 3, 4...
-            scaled_power = min(scaled_power, 9)    # Cap maximum power at 9
-    else:
+    # 5. Step Scale logic (1.00 or less = 1 | 1.01 to 1.99 = 2 | 2.00 to 2.99 = 3 etc.)
+    if raw_power <= 1.0:
         scaled_power = 1
-
-    # Keep track of directional sign for the return layout mapping
-    last_move = float(df['Close'].iloc[-1] - df['Close'].iloc[-2])
+    else:
+        scaled_power = math.ceil(raw_power)
+        scaled_power = min(scaled_power, 9)  # Cap maximum power at 9
 
     # Determine direction and assign powers
     if last_move > 0:
@@ -111,4 +96,3 @@ if __name__ == "__main__":
 
     # Print single line
     print(left_text_colored + spacing + right_text_colored)
-
