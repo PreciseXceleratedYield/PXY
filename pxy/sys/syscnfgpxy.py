@@ -9,9 +9,12 @@ from datetime import time as dt_time
 
 import pytz
 
+
+
 # System-wide defaults and execution mode.
 SYSCNFGPXY_RELEASE_NAME = "READYFRIDAY"
-SYSCNFGPXY_TICKER = "^NSEI"
+SYSCNFGPXY_TICKER = "BTC-USD"  #  # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
+
 SYSCNFGPXY_TIMEZONE = pytz.timezone("Asia/Kolkata")
 SYSMODEPXY_RUN_MODE = os.environ.get(
     "RUNMODE", "PRD"
