@@ -46,20 +46,21 @@ def apply_ohlc_transformation(
 
     # 2. Apply the custom candle close calculations sequentially
     if len(out) > 0:
-        # Calculate intermediate values based on current columns
+        # Calculate the historical metric (OHLC / 4) based on current columns
         ohlc_4 = (out["Open"] + out["High"] + out["Low"] + out["Close"]) / 4.0
-        oc_2 = (out["Open"] + out["Close"]) / 2.0
+        
+        # Save the original close price of the latest candle before shifting
+        latest_original_close = out["Close"].iloc[-1]
         
         # Shift the OHLC/4 calculation forward by 1 index to represent "previous candle" metrics
         out["Close"] = ohlc_4.shift(1)
         
-        # Override the very last/present row with the (Open + Close) / 2 calculation
-        out.loc[out.index[-1], "Close"] = oc_2.iloc[-1]
+        # Keep the latest candle's close as its original value
+        out.loc[out.index[-1], "Close"] = latest_original_close
         
         # Handle edge case if df has only 1 row (previous candle shift turns NaN)
         if len(out) > 1 and pd.isna(out.loc[out.index[0], "Close"]):
-            # Fall back to its own current oc_2 if no real previous candle exists
-            out.loc[out.index[0], "Close"] = oc_2.iloc[0]
+            out.loc[out.index[0], "Close"] = ohlc_4.iloc[0]
 
     return out
 
@@ -109,7 +110,6 @@ def _read_nifty_futures_price():
         print(f"Warning: {fut_file_path} has no valid positive futures price.")
         return None
     return price
-
 
 
 def _fetch_yf_data_production(
