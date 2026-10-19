@@ -79,17 +79,40 @@ def _in_market_hours_production():
         and EXEPXYPXY_MARKET_OPEN <= now.time() <= EXEPXYPXY_MARKET_CLOSE
     )
 
-
 def in_market_hours():
     return dispatch_mode("engine_window_open", _in_market_hours_production)
 
+def is_exit_window():
+    """Verify if the active engine time falls inside the strict 09:15 to 10:15 window."""
+    now = datetime.now(ist).time()
+    start_window = datetime.strptime("09:15", "%H:%M").time()
+    end_window = datetime.strptime("10:15", "%H:%M").time()
+    return start_window <= now <= end_window
+
 def run_market_cycle():
-    """Run one production iteration with maximum exit priority."""
-    safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+    """Run one production iteration with conditional exit windows and maximum priority."""
+    
+    # --- PASS 1: Early Exit Evaluation (Conditional) ---
+    if is_exit_window():
+        safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+    else:
+        print(f"⏳ {datetime.now(ist).strftime('%H:%M:%S')} | SKIP: exeexitpxy.py (Outside 09:15-10:15 window)")
+        print("━" * 42)
+
+    # --- PASS 2: Primary Strategy Core Entry ---
     safe_run(HERE / "exeentrpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
-    safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+
+    # --- PASS 3: Intermediate Exit Evaluation (Conditional) ---
+    if is_exit_window():
+        safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+
+    # --- PASS 4: Average Accumulation Phase ---
     safe_run(HERE / "exeavgpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
-    safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+
+    # --- PASS 5: Late Cycle Exit Evaluation (Conditional) ---
+    if is_exit_window():
+        safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+
     fancy_pause(SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
 
 
@@ -107,14 +130,20 @@ def main():
         HERE / "exeentrpxy.py",
         HERE / "exeexitpxy.py",
     ]
+    
+    # --- STARTUP CHECKS ---
     if dispatch_mode("run_startup_checks", lambda: True):
         for script in parent_scripts:
+            # Conditional time window filter specifically tracking the startup pass for exeexitpxy
+            if script.name == "exeexitpxy.py" and not is_exit_window():
+                print(f"⏳ Startup | SKIP: exeexitpxy.py (Outside 09:15-10:15 window)")
+                print("━" * 42)
+                continue
             safe_run(script)
     else:
         print("CHK MODE: engine startup checks paused during market hours.")
 
     while True:
-        os.system("clear")
         if in_market_hours():
             live_status("🚀 LOOP: waiting trigger 📊")
             for sub_itr in range(1, EXEPXYPXY_SUB_ITERATIONS + 1):
@@ -126,6 +155,7 @@ def main():
                 run_market_cycle()
             loop_counter += 1
         else:
+            os.system("clear")
             if dispatch_mode("run_closed_market_tasks", lambda: True):
                 print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
                 safe_run(HERE.parent / "sysslefpxy.py")
@@ -136,8 +166,8 @@ def main():
             while not in_market_hours():
                 os.system("clear")
                 if dispatch_mode("run_closed_market_tasks", lambda: True):
+                    print(f" ⏳   WAIT : market opens at 09:16 IST  📡 (Checked at {datetime.now(ist).strftime('%H:%M:%S')})", end="\r")
                     safe_run(HERE.parent / "syscprtpxy.py")
-                    print(" ⏳   WAIT : market opens at 09:16 IST  📡", end="\r")
                 else:
                     print(" ⏳   CHK waits until market close  📡", end="\r")
                 time.sleep(EXEPXYPXY_IDLE_POLL_SECONDS)
@@ -147,3 +177,4 @@ def main():
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
