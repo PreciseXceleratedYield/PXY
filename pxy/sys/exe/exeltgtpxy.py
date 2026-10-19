@@ -96,8 +96,6 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, ce_count=0, 
 # === SURGICAL CHANGE END ===
 
 
-
-
 def calculate_tgt(
     is_aligned,
     atr=None,
@@ -108,8 +106,18 @@ def calculate_tgt(
     target_time=None,
 ):
     """Return the time-aware aligned target, or the non-aligned baseline."""
+    def positive_factor(value):
+        try:
+            parsed = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return 1.0
+        return parsed if math.isfinite(parsed) and parsed > 0 else 1.0
+
+    own_depth = positive_factor(side_depth)
+    own_power = positive_factor(side_power)
+
     if not is_aligned:
-        return NOT_ALIGNED_TARGET_PCT
+        return NOT_ALIGNED_TARGET_PCT - (own_depth * own_power)
     if target_time is None:
         target_time = datetime.now(SYSCNFGPXY_TIMEZONE)
     else:
@@ -122,16 +130,7 @@ def calculate_tgt(
     if target_time.time().replace(tzinfo=None) < SYSENTRPXY_ST_START:
         return EARLY_ALIGNED_TARGET_PCT
 
-    def positive_factor(value):
-        try:
-            parsed = float(value)
-        except (TypeError, ValueError, OverflowError):
-            return 1.0
-        return parsed if math.isfinite(parsed) and parsed > 0 else 1.0
-
-    own_depth = positive_factor(side_depth)
-    own_power = positive_factor(side_power)
-    return max(ALIGNED_MIN_DEPTH, own_depth) * own_power
+    return NOT_ALIGNED_TARGET_PCT - (own_depth * own_power)
 
 
 def f(x, d=0.0):
@@ -216,3 +215,4 @@ def target_price(
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
     # === SURGICAL CHANGE END ===
+
