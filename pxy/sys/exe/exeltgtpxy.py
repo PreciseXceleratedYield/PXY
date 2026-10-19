@@ -62,6 +62,7 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, ce_count=0, 
         (ce_investment, pe_investment) if is_ce else (pe_investment, ce_investment)
     )
     own_count = float(ce_count if is_ce else pe_count)
+    opp_count = float(ce_count if is_pe else pe_count)
     # Calculate the combined total count across both sides
     total_count = float(ce_count + pe_count)
 
@@ -89,7 +90,7 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, ce_count=0, 
     magnitude = max(
         1.4,
         round(33.0 * (ratio ** 33), 2),
-    ) + (11.0 * own_count)
+    ) - (11.0 * opp_count)
 
     
     return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
