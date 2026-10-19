@@ -87,7 +87,7 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, ce_count=0, 
                 
     # Swapped max(1, own_count) with max(1, total_count)
     magnitude = max(
-        44.0,
+        4.4,
         round(33.0 * ratio ** max(1, total_count), 2),
     ) + (11.0 * own_count)
 
