@@ -96,6 +96,7 @@ def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, ce_count=0, 
 # === SURGICAL CHANGE END ===
 
 
+# === SURGICAL CHANGE START ===
 def calculate_tgt(
     is_aligned,
     atr=None,
@@ -105,7 +106,7 @@ def calculate_tgt(
     heavy_side=False,
     target_time=None,
 ):
-    """Return the time-aware aligned target, or the non-aligned baseline."""
+    """Return a fixed baseline target of 33 minus trailing drag factors."""
     def positive_factor(value):
         try:
             parsed = float(value)
@@ -116,21 +117,9 @@ def calculate_tgt(
     own_depth = positive_factor(side_depth)
     own_power = positive_factor(side_power)
 
-    if not is_aligned:
-        return NOT_ALIGNED_TARGET_PCT - (own_depth * own_power)
-    if target_time is None:
-        target_time = datetime.now(SYSCNFGPXY_TIMEZONE)
-    else:
-        target_time = pd.Timestamp(target_time)
-        target_time = (
-            target_time.tz_localize(SYSCNFGPXY_TIMEZONE)
-            if target_time.tzinfo is None
-            else target_time.tz_convert(SYSCNFGPXY_TIMEZONE)
-        )
-    if target_time.time().replace(tzinfo=None) < SYSENTRPXY_ST_START:
-        return (EARLY_ALIGNED_TARGET_PCT - (own_depth * own_power))
-
-    return NOT_ALIGNED_TARGET_PCT - (own_depth * own_power)
+    # Fixed base target assigned equally to both aligned and non-aligned tracks
+    return 33.0 - (own_depth * own_power)
+# === SURGICAL CHANGE END ===
 
 
 def f(x, d=0.0):
