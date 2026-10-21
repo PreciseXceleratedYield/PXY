@@ -128,7 +128,7 @@ def calculate_tgt(
             else target_time.tz_convert(SYSCNFGPXY_TIMEZONE)
         )
     if target_time.time().replace(tzinfo=None) < SYSENTRPXY_ST_START:
-        return EARLY_ALIGNED_TARGET_PCT
+        return (EARLY_ALIGNED_TARGET_PCT - (own_depth * own_power))
 
     return NOT_ALIGNED_TARGET_PCT - (own_depth * own_power)
 
