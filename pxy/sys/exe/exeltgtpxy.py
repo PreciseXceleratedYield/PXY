@@ -118,7 +118,7 @@ def calculate_tgt(
     own_power = positive_factor(side_power)
 
     # Fixed base target assigned equally to both aligned and non-aligned tracks
-    return 33.0 - (own_depth * own_power)
+    return 22.0 - (own_depth * own_power)
 # === SURGICAL CHANGE END ===
 
 
