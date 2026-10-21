@@ -106,7 +106,7 @@ def handle_side_averaging(client, df, index_price):
     working_df['row_invested'] = (
         working_df['qty'].apply(safe_float) 
         * (
-            working_df['sell_prc'].apply(safe_float) 
+            working_df['buy_prc'].apply(safe_float) 
             + working_df['buy_prc'].apply(safe_float)
         ) / 2
     )
