@@ -20,19 +20,16 @@ from datetime import datetime
 from colorama import Fore, Style, init
 
 from syscnfgpxy import (
-    EXEAMSPXY_MAX_LGT_LOSS,
     EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
     EXETGTPXY_EARLY_ALIGNED_TARGET_PCT,
     EXETGTPXY_ALIGNED_MIN_DEPTH,
     EXETGTPXY_EXIT_KEY_COLUMN,
-    EXETGTPXY_TGT_PCT_NOT_ALIGNED,
     SYSCNFGPXY_TIMEZONE,
     SYSENTRPXY_ST_START,
 )
 
 # ==================== CONFIG (this file's settings) ====================
 EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
-NOT_ALIGNED_TARGET_PCT = EXETGTPXY_TGT_PCT_NOT_ALIGNED
 ALIGNED_MIN_DEPTH = EXETGTPXY_ALIGNED_MIN_DEPTH
 EARLY_ALIGNED_TARGET_PCT = EXETGTPXY_EARLY_ALIGNED_TARGET_PCT
 # =======================================================================
@@ -48,55 +45,25 @@ def _warn_once(key, msg):
         print(f"{Fore.YELLOW}⚠️ {msg}{Style.RESET_ALL}")
 
 
-# === SURGICAL CHANGE START ===
-def calculate_lgt(ce_investment, pe_investment, is_ce, index_price, ce_count=0, pe_count=0):
-    """Calculate the capped LGT percentage from the relative investments."""
+# === SURGICAL CHANGE START (Error Fallbacks Added) ===
+def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True):
+    """Calculate the simplified negative LGT percentage with an error fallback of -75.0."""
     try:
-        index_price = float(index_price)
-    except (TypeError, ValueError) as error:
-        raise ValueError("index_price must be a finite positive number.") from error
-    if not math.isfinite(index_price) or index_price <= 0:
-        raise ValueError("index_price must be a finite positive number.")
-
-    own_investment, opposite_investment = (
-        (ce_investment, pe_investment) if is_ce else (pe_investment, ce_investment)
-    )
-    own_count = float(ce_count if is_ce else pe_count)
-    # Calculate the combined total count across both sides
-    total_count = float(ce_count + pe_count)
-
-    try:
-        own_investment = float(own_investment)
-        opposite_investment = float(opposite_investment)
-    except (TypeError, ValueError, OverflowError):
-        ratio = 1.0
-    else:
-        ratio_is_valid = (
-            math.isfinite(own_investment)
-            and math.isfinite(opposite_investment)
-            and own_investment > 0
-            and opposite_investment > 0
-        )
-        if ratio_is_valid:
-            ratio = own_investment / opposite_investment
-            ratio_is_valid = math.isfinite(ratio)
-            if ratio_is_valid:
-                ratio = min(10.0, max(0.1, ratio))
-        if not ratio_is_valid:
-            ratio = 1.0
-                
-    # Swapped max(1, own_count) with max(1, total_count)
-    magnitude = max(
-        4.4,
-        round(33.0 * ratio ** max(1, total_count), 2),
-    ) + (11.0 * own_count)
-
-    
-    return -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)
-# === SURGICAL CHANGE END ===
+        own_count = float(ce_count if is_ce else pe_count)
+        
+        # Core baseline calculation
+        base_magnitude = 40.0 + (10.0 * own_count)
+        
+        # Scale up if it is not aligned
+        if not is_aligned:
+            base_magnitude *= 1.4
+            
+        return -base_magnitude
+    except Exception as e:
+        _warn_once("lgt_err", f"Error in calculate_lgt: {e}. Falling back to -75.0")
+        return -75.0
 
 
-# === SURGICAL CHANGE START ===
 def calculate_tgt(
     is_aligned,
     atr=None,
@@ -106,19 +73,25 @@ def calculate_tgt(
     heavy_side=False,
     target_time=None,
 ):
-    """Return a fixed baseline target of 33 minus trailing drag factors."""
-    def positive_factor(value):
-        try:
-            parsed = float(value)
-        except (TypeError, ValueError, OverflowError):
-            return 1.0
-        return parsed if math.isfinite(parsed) and parsed > 0 else 1.0
+    """Return target percentage based on alignment status with an error fallback of 25.0."""
+    try:
+        if not is_aligned:
+            return 1.4
 
-    own_depth = positive_factor(side_depth)
-    own_power = positive_factor(side_power)
+        def positive_factor(value):
+            try:
+                parsed = float(value)
+            except (TypeError, ValueError, OverflowError):
+                return 1.0
+            return parsed if math.isfinite(parsed) and parsed > 0 else 1.0
 
-    # Fixed base target assigned equally to both aligned and non-aligned tracks
-    return 22.0 - (own_depth * own_power)
+        own_depth = positive_factor(side_depth)
+        own_power = positive_factor(side_power)
+
+        return 1.4 * own_depth * own_power
+    except Exception as e:
+        _warn_once("tgt_err", f"Error in calculate_tgt: {e}. Falling back to 25.0")
+        return 25.0
 # === SURGICAL CHANGE END ===
 
 
@@ -177,31 +150,20 @@ def target_price(
             (exit_signal == "BULL" and is_ce)
             or (exit_signal == "BEAR" and is_pe)
         )
-        both_sides_open = ce_count > 0 and pe_count > 0
-        heavy_side = (
-            ce_investment > pe_investment
-            if is_ce
-            else pe_investment > ce_investment
-        )
-        side_power = row.get("ce_power" if is_ce else "pe_power")
-        side_depth = row.get("hkin_ce_depth" if is_ce else "hkin_pe_depth")
         
         target_pct = calculate_tgt(
             is_aligned,
             atr=row.get("atr"),
-            side_power=side_power,
-            side_depth=side_depth,
-            both_sides_open=both_sides_open,
-            heavy_side=heavy_side,
+            side_power=row.get("ce_power" if is_ce else "pe_power"),
+            side_depth=row.get("hkin_ce_depth" if is_ce else "hkin_pe_depth"),
+            both_sides_open=(ce_count > 0 and pe_count > 0),
+            heavy_side=(ce_investment > pe_investment if is_ce else pe_investment > ce_investment),
             target_time=target_time,
         )
         
         calculated_target = entry_prc * (1.0 + (target_pct / 100.0))
         return round(calculated_target, 2)
         
-    # === SURGICAL CHANGE START ===
     except Exception as e:
         print(f"{Fore.RED}Error in target_price engine: {e}{Style.RESET_ALL}")
         return 0.0
-    # === SURGICAL CHANGE END ===
-
