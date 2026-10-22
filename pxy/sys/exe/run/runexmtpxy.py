@@ -207,14 +207,21 @@ def cycle_risk_metrics(
         (heavy_side == "CE" and signal == "BULL")
         or (heavy_side == "PE" and signal == "BEAR")
     )
-    target = premium_paid * effective_target_pct / 100.0
+
+    target_multiplier = 2.0 if heavy_side_aligned else 1.0
+    target = (
+        premium_paid
+        * effective_target_pct
+        * target_multiplier
+        / 100.0
+    )
     target_reached = bool(
         ce_qty > 0
         and pe_qty > 0
         and premium_paid > 0
         and cycle_pnl >= target
-        and not heavy_side_aligned
     )
+
     return {
         "cycle_pnl": cycle_pnl,
         "premium_paid": premium_paid,
