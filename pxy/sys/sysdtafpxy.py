@@ -20,7 +20,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # LOCAL MODE CONFIGURATION (Switch here manually)
 # ==========================================================================
 # Set to 0 for your new logic, or 1 for your original workflow
-ACTIVE_MODE = 0 
+ACTIVE_MODE = 1 
 
 # Explicitly enforce Indian Standard Time zone mapping
 TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
