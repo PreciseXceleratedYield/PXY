@@ -88,7 +88,7 @@ def calculate_tgt(
         own_depth = positive_factor(side_depth)
         own_power = positive_factor(side_power)
 
-        return (1.4 * (own_depth + own_power)) ** own_power
+        return (14 * (own_depth + own_power)) ** own_power
     except Exception as e:
         _warn_once("tgt_err", f"Error in calculate_tgt: {e}. Falling back to 25.0")
         return 25.0
