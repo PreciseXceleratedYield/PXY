@@ -138,18 +138,15 @@ def handle_side_averaging(client, df, index_price):
 
     # === SURGICAL LINE REPLACEMENT START ===
     ce_dynamic_threshold = calculate_lgt(
-        ce_investment,
-        pe_investment,
+        is_aligned=ce_aligned,
         is_ce=True,
-        index_price=index_price,
         ce_count=ce_lots,
         pe_count=pe_lots,
     )
+    
     pe_dynamic_threshold = calculate_lgt(
-        ce_investment,
-        pe_investment,
+        is_aligned=pe_aligned,
         is_ce=False,
-        index_price=index_price,
         ce_count=ce_lots,
         pe_count=pe_lots,
     )
