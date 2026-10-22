@@ -11,11 +11,16 @@ from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_INTERVAL,
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     SYSDTAFPXY_FORCE_NIFTY_FUT,
-    SYSDTAFPXY_SELECTED_MODE,
 )
 from sysmodepxy import dispatch_mode
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
+
+# ==========================================================================
+# LOCAL MODE CONFIGURATION (Switch here manually)
+# ==========================================================================
+# Set to 0 for your new logic, or 1 for your original workflow
+ACTIVE_MODE = 0 
 
 # Explicitly enforce Indian Standard Time zone mapping
 TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
@@ -23,11 +28,15 @@ TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
 FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 
 def apply_ohlc_transformation(
-    df, mode=SYSDTAFPXY_SELECTED_MODE, futures_price=None
+    df, mode=ACTIVE_MODE, futures_price=None
 ):
-    """Canonical DTAF mode 1: keep raw OHLC, blend with futures, and apply custom close overrides."""
-    if mode != 1:
-        raise ValueError("DTAF mode must be 1.")
+    """Apply selected DTAF transformation logic.
+    
+    Mode 0: Custom dynamic override using current candle metrics.
+    Mode 1: Canonical DTAF mode (keep raw OHLC, blend futures, apply historical close overrides).
+    """
+    if mode not in (0, 1):
+        raise ValueError("DTAF mode must be 0 or 1.")
     if df.empty:
         return df
 
@@ -44,29 +53,43 @@ def apply_ohlc_transformation(
         for column in ("Open", "High", "Low", "Close"):
             out[column] = (out[column] + futures_price) / 2.0
 
-    # 2. Apply the custom candle close calculations sequentially
-    if len(out) > 0:
-        # Calculate the historical metric (OHLC / 4) based on current columns
-        ohlc_4 = (out["Open"] + out["High"] + out["Low"] + out["Close"]) / 4.0
+    # 2. Split logic execution by the selected mode
+    if mode == 0:
+        raw_o = out['Open']
+        raw_h = out['High']
+        raw_l = out['Low']
+        raw_c = out['Close']
         
-        # Save the original close price of the latest candle before shifting
-        latest_original_close = out["Close"].iloc[-1]
-        
-        # Shift the OHLC/4 calculation forward by 1 index to represent "previous candle" metrics
-        out["Close"] = ohlc_4.shift(1)
-        
-        # Keep the latest candle's close as its original value
-        out.loc[out.index[-1], "Close"] = latest_original_close
-        
-        # Handle edge case if df has only 1 row (previous candle shift turns NaN)
-        if len(out) > 1 and pd.isna(out.loc[out.index[0], "Close"]):
-            out.loc[out.index[0], "Close"] = ohlc_4.iloc[0]
+        out['Open'] = raw_c
+        out['Close'] = np.where(
+            raw_c >= raw_o, (raw_c + raw_h) / 2.0, (raw_c + raw_l) / 2.0
+        )
+        return out
+
+    elif mode == 1:
+        # Apply the custom candle close calculations sequentially
+        if len(out) > 0:
+            # Calculate the historical metric (OHLC / 4) based on current columns
+            ohlc_4 = (out["Open"] + out["High"] + out["Low"] + out["Close"]) / 4.0
+            
+            # Save the original close price of the latest candle before shifting
+            latest_original_close = out["Close"].iloc[-1]
+            
+            # Shift the OHLC/4 calculation forward by 1 index to represent "previous candle" metrics
+            out["Close"] = ohlc_4.shift(1)
+            
+            # Keep the latest candle's close as its original value
+            out.loc[out.index[-1], "Close"] = latest_original_close
+            
+            # Handle edge case if df has only 1 row (previous candle shift turns NaN)
+            if len(out) > 1 and pd.isna(out.loc[out.index[0], "Close"]):
+                out.loc[out.index[0], "Close"] = ohlc_4.iloc[0]
 
     return out
 
 
 def transform_market_data(
-    df, futures_price=None, mode=SYSDTAFPXY_SELECTED_MODE
+    df, futures_price=None, mode=ACTIVE_MODE
 ):
     """Blend futures into each OHLC field, then apply the selected DTAF mode."""
     if df is None or df.empty:
@@ -131,7 +154,7 @@ def _fetch_yf_data_production(
             except Exception as error:
                 print(f"Warning: Yahoo Finance history request failed for {period}: {error}")
 
-        # Loop with realistic 1-minute allowable lookup horizons (dropped problematic "max")
+        # Loop with realistic 1-minute allowable lookup horizons
         if df.empty or len(df) < buffer_rows:
             for search_period in ["1d", "5d", "7d"]:
                 try:
@@ -167,8 +190,8 @@ def _fetch_yf_data_production(
             time_indices = [current_time - pd.Timedelta(minutes=i) for i in reversed(range(target_rows))]
             fallback_df = pd.DataFrame(mock_data, index=time_indices)
             
-            # Apply identical custom rule handling on the fallback dataframe structure
-            fallback_df = apply_ohlc_transformation(fallback_df, mode=1, futures_price=None)
+            # Apply identical custom rule handling on the fallback dataframe structure using local mode
+            fallback_df = apply_ohlc_transformation(fallback_df, mode=ACTIVE_MODE, futures_price=None)
             fallback_df.attrs["data_fallback"] = True
             return fallback_df
         else:
@@ -196,7 +219,7 @@ def _fetch_yf_data_production(
     processed_df = transform_market_data(
         df,
         futures_price=futures_price,
-        mode=SYSDTAFPXY_SELECTED_MODE,
+        mode=ACTIVE_MODE,
     )
     processed_df = processed_df.tail(target_rows)
     processed_df.attrs["data_fallback"] = False
@@ -216,3 +239,4 @@ def fetch_yf_data(
         target_rows=target_rows,
         test_kwargs={"timezone": TIMEZONE},
     )
+
