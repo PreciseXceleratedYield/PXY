@@ -15,6 +15,7 @@
 import os
 import sys
 import time
+from datetime import time as dt_time
 from pathlib import Path
 from colorama import Fore, Style, init
 
@@ -278,12 +279,20 @@ def _tick(client, open_df, closed_df, exit_signal=None):
 
     totals = compute_totals(open_df, closed_df)
     total_raw_pnl = totals["total"]
+    current_time = now_ist().time()
+
+    risk_target_pct = (
+        99.0
+        if dt_time(15, 10) <= current_time <= dt_time(15, 30)
+        else RUNEXACPXY_CYCLE_TARGET_PCT
+    )
+
     metrics = cycle_risk_metrics(
         open_df,
         closed_df,
         cycle_tags,
         exit_signal,
-        RUNEXACPXY_CYCLE_TARGET_PCT,
+        risk_target_pct,
     )
     risk_target = (
         metrics["target"] if metrics["both_sides_open"]
