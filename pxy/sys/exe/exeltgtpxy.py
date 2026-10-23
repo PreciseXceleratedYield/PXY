@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 from pathlib import Path
+from datetime import datetime, time as dt_time
 
 # ----------------- PATH FIX (MUST BE AT ABSOLUTE TOP) -----------------
 HERE = Path(__file__).resolve().parent          # /home/pxy/PXY/pxy/sys/exe
@@ -75,6 +76,16 @@ def calculate_tgt(
 ):
     """Return target percentage based on alignment status with an error fallback of 25.0."""
     try:
+        current_time = target_time
+        if current_time is None:
+            current_time = datetime.now(SYSCNFGPXY_TIMEZONE)
+
+        if hasattr(current_time, "time"):
+            current_time = current_time.time()
+
+        if dt_time(15, 10) <= current_time <= dt_time(15, 30):
+            return 99.0
+
         if not is_aligned:
             return 1.4
 
