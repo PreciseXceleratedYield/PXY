@@ -1578,13 +1578,14 @@ function renderRiskInfo(){
     const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const row=(k,v,c)=>`<div class="ri-row"><span class="ri-k">${k}</span><span class="ri-v ${c||''}">${v}</span></div>`;
     const last=d.last_closed_snapshot;
-    const snapshot=last
-        ? `${f(last.realized_pnl)} · ${Number(last.closed_positions)||0} positions · ${esc(last.closed_at||'—')}`
+    const closedAt=last?.closed_at?new Date(last.closed_at):null;
+    const snapshot=closedAt&&!Number.isNaN(closedAt.getTime())
+        ? esc(closedAt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',hour12:true}))
         : '—';
     el.innerHTML=row('Current book',f(d.current_net_pnl),cls(d.current_net_pnl))
         +row('Booked profit',f(d.booked_profit),cls(d.booked_profit))
-        +row('Booked books',String(Number(d.closed_book_count)||0))
-        +row('Last closed snapshot',snapshot)
+        +row('Closed books',String(Number(d.closed_book_count)||0))
+        +row('Snapshot',snapshot)
         +row('Updated',`<span style="font-size:10px;font-weight:600;">${esc(d.updated_timestamp||'—')}</span>`);
 }
 (function(){
