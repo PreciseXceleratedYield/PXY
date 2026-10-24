@@ -1829,7 +1829,9 @@ async function loadOptSummary(){
     const buildRow=(lots,pnl,inv,lgt,runPct,tgt,decision)=>{
         const tgtNum=Number(tgt);
         const runColor=Number(runPct)<Number(lgt)?'var(--bear)':Number(runPct)>tgtNum?'var(--bull)':null;
-        const row=[lots??'—', toK(inv), `(${pad2(lgt)})${pad2(runPct)}(${pad2(tgtNum)})`, plainSign(pnl)];
+        
+        const row=[lots??'—', `${toK(inv)} (${toK(Number(inv||0)+Number(pnl||0)).replace('k','K')})`, `(${pad2(lgt)})${pad2(runPct)}(${pad2(tgtNum)})`, plainSign(pnl)];
+        
         return {row,runColor};
     };
     const ceRes=buildRow(d.ce_lots,d.ce_pnl,d.ce_investment,d.ce_lgt,d.ce_run_pct,d.ce_tgt,d.ce_decision);
