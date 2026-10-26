@@ -42,7 +42,7 @@ def is_monthly_expiry(expiry_date):
 
 
 def round_to_strike(price):
-    # Snaps directly to the nearest 50 interval (Ensures the last digit is always 0)
+    # Preserve the existing nearest-strike rounding.
     return int(round(float(price) / STRIKE_STEP) * STRIKE_STEP)
 
 
@@ -50,11 +50,10 @@ def round_to_strike(price):
 
 def get_symbol(price, side, otm_distance=None):
     """
-    Build an option symbol using the centrally configured strike mode.
-    `otm_distance` remains accepted for compatibility but cannot override config.
+    Build an option symbol using the configured strike policy by default.
 
-    - Math is accumulated directly first (Price + Buffer ± Weekday Distance)
-    - Enforces valid exchange tracking by rounding to the nearest 50 step at the end.
+    When otm_distance is explicitly supplied, use it as the strike offset
+    for this call. Preserve the existing expiry and symbol construction.
     """
     try:
         if not price or price == 0:
@@ -70,25 +69,38 @@ def get_symbol(price, side, otm_distance=None):
         else:
             return "NA"
 
-        # The central mode overrides caller-supplied OTM flags/distances so no
-        # buying script can bypass the configured strike policy.
-        strike_mode = get_strike_mode()
-        distance = get_dynamic_otm_distance()
-
         # ---------------- STRIKE RESOLUTION ----------------
-        # 1. Establish the raw baseline price plus your daily buffer
+        strike_mode = get_strike_mode()
+
+        if otm_distance is None:
+            # No explicit offset: preserve the configured strike policy.
+            distance = get_dynamic_otm_distance()
+            use_offset = strike_mode != "ATM"
+        else:
+            # Explicit offset: override the configured strike distance.
+            if isinstance(otm_distance, bool):
+                raise ValueError("Strike offset must be a non-negative number.")
+
+            distance = float(otm_distance)
+
+            if distance < 0 or not distance.is_integer():
+                raise ValueError("Strike offset must be a non-negative whole number.")
+
+            use_offset = True
+
+        # Establish the existing raw baseline price plus daily buffer.
         raw_base = float(price) + float(ATM_BUFFER)
 
-        # 2. Apply the centrally configured fixed/dynamic offset.
-        if strike_mode != "ATM":
+        # Apply the selected offset only to the numeric strike.
+        if use_offset:
             if opt_type == "CE":
-                raw_strike = raw_base + float(distance)
+                raw_strike = raw_base + distance
             else:
-                raw_strike = raw_base - float(distance)
+                raw_strike = raw_base - distance
         else:
             raw_strike = raw_base
 
-        # 3. Round to nearest 50 later (Guarantees last digit is 0, allowing both xx00 and xx50)
+        # Preserve existing strike rounding.
         strike = round_to_strike(raw_strike)
 
         # ---------------- EXPIRY ----------------
