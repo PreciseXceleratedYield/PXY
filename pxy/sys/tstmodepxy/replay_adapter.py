@@ -238,13 +238,23 @@ class ProductionPipeReplay:
             parts = list(command) if isinstance(command, (list, tuple)) else []
             if parts and Path(str(parts[0])).name == "bash":
                 parts = parts[1:]
-            # The buy wrappers can now include an optional strike-offset argument;
-            # identify the launched script from its path, not the final argument.
+
+            # Counter-buy wrappers may receive an explicit strike offset:
+            # [script_path, offset]. Keep script detection separate from arguments.
             command_path = Path(str(parts[0])).name if parts else ""
+            offset_override = None
+            if command_path in {"pxybuyce", "pxybuype"} and len(parts) > 1:
+                offset_text = str(parts[1]).strip()
+                if not offset_text.isdigit() or len(parts) > 2:
+                    raise RuntimeError(
+                        f"Invalid simulated counter-buy offset: {parts[1:]}"
+                    )
+                offset_override = int(offset_text)
+
             if command_path == "pxybuyce":
-                self._place_simulated_buy("CE", "CB")
+                self._place_simulated_buy("CE", "CB", offset_override)
             elif command_path == "pxybuype":
-                self._place_simulated_buy("PE", "CB")
+                self._place_simulated_buy("PE", "CB", offset_override)
             elif isinstance(command, (list, tuple)) and any(
                 Path(str(part)).name == "sysddmppxy.py" for part in command
             ):
@@ -383,9 +393,34 @@ class ProductionPipeReplay:
             self.stack.close()
             raise
 
-    def _place_simulated_buy(self, option, prefix):
+    def _place_simulated_buy(self, option, prefix, offset_override=None):
+        """Place a simulated option buy using the production strike resolver.
+
+        The old NIFTY-WF-CE/PE placeholders had no strike, so the production
+        counter-buy offset calculator could not determine whether the held leg
+        was ITM or OTM. Resolve a strike-bearing symbol without making a broker
+        or market-data request.
+        """
+        from runsymbpxy import get_symbol
+
+        option = str(option).upper().strip()
+        if option not in {"CE", "PE"}:
+            raise ValueError(f"Unsupported simulated option side: {option!r}")
+
+        signal = "OTMBUY" if option == "CE" else "OTMSELL"
+        symbol = get_symbol(
+            self.broker.current_spot,
+            signal,
+            offset_override,
+        )
+        if not symbol or str(symbol).upper() == "NA" or not str(symbol).upper().endswith(option):
+            raise RuntimeError(
+                f"Could not resolve a strike-bearing SIM symbol for {option} "
+                f"at spot {self.broker.current_spot!r} with offset {offset_override!r}."
+            )
+
         self.broker.place_order(
-            trading_symbol=f"NIFTY-WF-{option}",
+            trading_symbol=str(symbol),
             transaction_type="B",
             quantity=self.broker.quantity,
             tag=self.broker.next_tag(prefix),
