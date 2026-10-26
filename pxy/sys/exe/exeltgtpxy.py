@@ -112,13 +112,14 @@ def calculate_tgt(
         # If both CE and PE are open, preserve the existing formula.
         if not both_sides_open:
             target_pct = 1.4 * own_power
-        else:
+        elif is_aligned:
             target_pct = (
                 11.0
                 + (11.0 / own_power)
                 + (11.0 / own_depth)
             )
-
+        else:
+            target_pct = 11.0
         return min(99.0, target_pct)
 
     except Exception as e:
