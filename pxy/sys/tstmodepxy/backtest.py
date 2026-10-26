@@ -47,6 +47,8 @@ DATA_SESSION_OPEN = TSTPOINTBTPXY_TRADING_DAY_START
 OHLC_COLUMNS = {"Open", "High", "Low", "Close"}
 MAX_INTRADAY_LOOKBACK_DAYS = 28
 DEFAULT_SESSION_COUNT = 7
+
+
 def _normalize_history_columns(frame):
     """Flatten Yahoo columns using the level that actually contains OHLC names."""
     if not isinstance(frame.columns, pd.MultiIndex):
@@ -612,6 +614,31 @@ def run_backtest(
         )
         for session_date in session_dates
     }
+
+    # Add the final SIM tick at the configured full-square-off time. The
+    # historical data normally ends at 15:29, before production square-off.
+    # Reuse the last valid snapshot and spot; do not invent a market candle.
+    # Intentionally truncated diagnostic replays remain unchanged.
+    if record_limit is None:
+        squareoff_time = EXEEXITPXY_SQOFF_ALL_START
+        squareoff_delta = pd.Timedelta(
+            hours=squareoff_time.hour,
+            minutes=squareoff_time.minute,
+            seconds=squareoff_time.second,
+            microseconds=squareoff_time.microsecond,
+        )
+        for session_bars in bars_by_session.values():
+            if not session_bars:
+                continue
+            last_bar = session_bars[-1]
+            last_timestamp = pd.Timestamp(last_bar["timestamp"])
+            squareoff_timestamp = last_timestamp.normalize() + squareoff_delta
+            if last_timestamp < squareoff_timestamp:
+                squareoff_bar = dict(last_bar)
+                squareoff_bar["timestamp"] = squareoff_timestamp
+                squareoff_bar["snapshot_log"] = ""
+                session_bars.append(squareoff_bar)
+
     output_dir = output_dir or Path.home() / "pxy-sim-results"
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
