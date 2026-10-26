@@ -1,3 +1,4 @@
+
 import sys
 from pathlib import Path
 from datetime import date, timedelta
@@ -18,6 +19,7 @@ from syscnfgpxy import (
 
 STRIKE_STEP = RUNNIFTYPXY_STRIKE_STEP
 ATM_BUFFER = RUNNIFTYPXY_ATM_BUFFER
+
 
 # ---------------- HELPERS ----------------
 
@@ -41,7 +43,7 @@ def is_monthly_expiry(expiry_date):
 
 
 def round_to_strike(price):
-    # Snaps directly to the nearest 50 interval (Ensures the last digit is always 0)
+    # Snap to the nearest configured strike interval.
     return int(round(float(price) / STRIKE_STEP) * STRIKE_STEP)
 
 
@@ -49,14 +51,18 @@ def round_to_strike(price):
 
 def get_symbol(price, side, otm_distance=None):
     """
-    Build an option symbol using the centrally configured strike mode.
-    `otm_distance` remains accepted for compatibility but cannot override config.
+    Build an option symbol using the configured strike policy by default.
 
-    - Math is accumulated directly first (Price + Buffer ± Weekday Distance)
-    - Enforces valid exchange tracking by rounding to the nearest 50 step at the end.
+    If otm_distance is supplied, use that explicit non-negative whole-number
+    offset instead of the configured strike distance or ATM mode.
+
+    CE: baseline price + offset
+    PE: baseline price - offset
+
+    The final strike is rounded to the configured strike interval.
     """
     try:
-        if not price or price == 0:
+        if price is None or price == 0:
             return "NA"
 
         side = str(side).upper().strip()
@@ -69,17 +75,32 @@ def get_symbol(price, side, otm_distance=None):
         else:
             return "NA"
 
-        # The central mode overrides caller-supplied OTM flags/distances so no
-        # buying script can bypass the configured strike policy.
+        # ---------------- STRIKE MODE / DISTANCE ----------------
         strike_mode = get_strike_mode()
-        distance = get_dynamic_otm_distance()
+
+        if otm_distance is None:
+            distance = get_dynamic_otm_distance()
+            use_offset = strike_mode != "ATM"
+        else:
+            if (
+                isinstance(otm_distance, bool)
+                or not isinstance(otm_distance, int)
+                or otm_distance < 0
+            ):
+                raise ValueError(
+                    "OTM distance must be a non-negative whole number."
+                )
+
+            distance = otm_distance
+            use_offset = True
 
         # ---------------- STRIKE RESOLUTION ----------------
-        # 1. Establish the raw baseline price plus your daily buffer
+        # Establish the raw baseline price plus the configured buffer.
         raw_base = float(price) + float(ATM_BUFFER)
 
-        # 2. Apply the centrally configured fixed/dynamic offset.
-        if strike_mode != "ATM":
+        # An explicit offset takes precedence over the configured strike mode.
+        # Without an explicit offset, preserve the configured ATM/OTM behavior.
+        if use_offset:
             if opt_type == "CE":
                 raw_strike = raw_base + float(distance)
             else:
@@ -87,7 +108,7 @@ def get_symbol(price, side, otm_distance=None):
         else:
             raw_strike = raw_base
 
-        # 3. Round to nearest 50 later (Guarantees last digit is 0, allowing both xx00 and xx50)
+        # Round to the configured strike interval.
         strike = round_to_strike(raw_strike)
 
         # ---------------- EXPIRY ----------------
@@ -96,13 +117,13 @@ def get_symbol(price, side, otm_distance=None):
 
         # ---------------- FORMAT ----------------
         if is_monthly_expiry(expiry):
-            mm_str = expiry.strftime('%b').upper()
+            mm_str = expiry.strftime("%b").upper()
             return f"NIFTY{yy}{mm_str}{strike}{opt_type}"
         else:
             month_map = {10: "O", 11: "N", 12: "D"}
             mm_char = month_map.get(expiry.month, str(expiry.month))
             dd_str = f"{expiry.day:02d}"
-            return f"NIFTY{yy}{mm_char}{dd_str}{strike}{opt_type}"
+            return f"NIFTY{yy}{mm_char}{dd_str}{opt_type}"
 
     except Exception as e:
         print(f"❌ Symbol Generation Error: {e}")
