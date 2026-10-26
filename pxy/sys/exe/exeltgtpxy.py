@@ -114,9 +114,9 @@ def calculate_tgt(
             target_pct = 1.4 * own_power
         else:
             target_pct = (
-                7.0
-                + (7.0 / own_power)
-                + (7.0 / own_depth)
+                5.0
+                + (5.0 / own_power)
+                + (5.0 / own_depth)
             )
 
         return min(99.0, target_pct)
