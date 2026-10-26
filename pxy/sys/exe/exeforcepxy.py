@@ -49,7 +49,6 @@ try:
     from runclntpxy import get_session
     from runfundpxy import get_available_funds
     from runsymbpxy import get_symbol
-    from exeotmpxy import get_dynamic_otm_distance
 
     dprint("SYSTEM IMPORTS SUCCESSFUL", Fore.GREEN)
 except Exception as e:
@@ -146,14 +145,9 @@ def run_action(choice, offset_override=None):
     data = get_all_data()
     ltp = data.get("price")
 
-    # Use explicit offset when supplied; otherwise use configured dynamic distance.
-    distance = (
-        offset_override
-        if offset_override is not None
-        else get_dynamic_otm_distance()
-    )
-
-    symbol = get_symbol(ltp, sig, distance)
+    # None preserves the configured strike policy.
+    # An explicit integer overrides the configured distance.
+    symbol = get_symbol(ltp, sig, offset_override)
     res = {"stat": "SKIPPED"}
 
     if symbol and symbol != "NA":
@@ -197,9 +191,13 @@ async def main():
                 return
 
             try:
-                offset_override = int(sys.argv[2].strip())
-                if offset_override < 0:
+                offset_text = sys.argv[2].strip()
+
+                # Accept whole-number offsets only; reject decimals and negatives.
+                if not offset_text.isdigit():
                     raise ValueError
+
+                offset_override = int(offset_text)
             except ValueError:
                 print(
                     f"{Fore.RED}Invalid offset. "
