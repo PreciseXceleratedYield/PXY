@@ -1,3 +1,4 @@
+
 import sys
 from pathlib import Path
 
@@ -14,10 +15,13 @@ from syscnfgpxy import SYSCNFGPXY_TICKER
 # --- NIFTY SYMBOL BUILDER ---
 from runniftypxy import get_symbol as nifty_symbol_builder
 
+
 # ---------------- DISPATCHER ----------------
-def get_symbol(price, side, otm_distance):
+def get_symbol(price, side, otm_distance=None):
     if str(SYSCNFGPXY_TICKER).upper().strip() != "^NSEI":
         raise ValueError(
             f"Only the Nifty 50 ticker is supported: {SYSCNFGPXY_TICKER}"
         )
+
     return nifty_symbol_builder(price, side, otm_distance)
+
