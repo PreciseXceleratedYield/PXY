@@ -1,3 +1,4 @@
+
 import sys
 import asyncio
 import os
@@ -35,10 +36,12 @@ from sysdecisionpxy import exit_order_response_accepted
 t = SYSCNFGPXY_TICKER.upper().strip()
 LOT_SIZE = EXEFORCEPXY_NIFTY_LOT_SIZE if t == "^NSEI" else None
 
+
 # --- DEBUG PRINT ---
 def dprint(msg, color=Fore.CYAN):
     if EXEFORCEPXY_DEBUG_ENABLED:
         print(f"{Style.BRIGHT}{color}[FORCE DEBUG] {msg}{Style.RESET_ALL}")
+
 
 # --- SYSTEM IMPORTS ---
 try:
@@ -47,14 +50,17 @@ try:
     from runfundpxy import get_available_funds
     from runsymbpxy import get_symbol
     from exeotmpxy import get_dynamic_otm_distance
+
     dprint("SYSTEM IMPORTS SUCCESSFUL", Fore.GREEN)
 except Exception as e:
     print(f"{Fore.RED}IMPORT ERROR: {e}")
     sys.exit(1)
 
+
 def generate_pxy_tag():
-    """Generates pure timestamp tag: HHMMSS"""
-    return datetime.now(SYSCNFGPXY_TIMEZONE).strftime('%H%M%S')
+    """Generates pure timestamp tag: HHMMSS."""
+    return datetime.now(SYSCNFGPXY_TIMEZONE).strftime("%H%M%S")
+
 
 def execute_order(client, symbol, qty):
     try:
@@ -69,52 +75,68 @@ def execute_order(client, symbol, qty):
             "trading_symbol": symbol,
             "transaction_type": EXEFORCEPXY_ORDER_TRANSACTION_TYPE,
             "amo": EXEFORCEPXY_ORDER_AMO,
-            "tag": order_tag
+            "tag": order_tag,
         }
+
         res = client.place_order(**params)
         dprint(f"Broker order response: {res!r}", Fore.GREEN)
+
         if not exit_order_response_accepted(res):
             print(
                 f"{Fore.RED}❌ BROKER DID NOT CONFIRM ORDER ACCEPTANCE "
                 f"| SYMBOL: {symbol} | TAG: {order_tag} | RESPONSE: {res!r}"
             )
             return {"stat": "FAIL", "raw": res}
+
         print(
             f"{Fore.GREEN}🚀 BROKER ACCEPTED FORCED ORDER "
             f"| SYMBOL: {symbol} | TAG: {order_tag}"
         )
         return {"stat": "OK", "raw": res}
+
     except Exception as e:
         print(f"{Fore.RED}❌ EXECUTION ERROR: {e}")
         return {"stat": "FAIL", "err": str(e)}
 
-def run_action(choice):
-    """Processes a chosen action option and fires core execution logic."""
+
+def run_action(choice, offset_override=None):
+    """Processes a chosen action and optionally overrides the OTM offset."""
+
     if choice in ["4", ""]:
         print(f"{Fore.YELLOW}❌ Execution exited.")
-        return False  # Break loop
-        
+        return False
+
     elif choice == "3":
         print(f"{Fore.YELLOW}🔄 Triggering Squareoff Script...")
         target_script = HERE / "exesqrpxy.py"
+
         if target_script.exists():
             subprocess.run([sys.executable, str(target_script)])
         else:
             print(f"{Fore.RED}❌ File not found: {target_script}")
-        return True  # Keep loop going
+
+        return True
 
     elif choice == "1":
         sig = "OTMBUY"
         side_label = "CE"
+
     elif choice == "2":
         sig = "OTMSELL"
         side_label = "PE"
+
     else:
-        print(f"{Fore.RED}Invalid selection. Enter 1 for BUY, 2 for SELL, 3 for SQUAREOFF, or 4 to exit.")
+        print(
+            f"{Fore.RED}Invalid selection. "
+            "Enter 1 for BUY, 2 for SELL, 3 for SQUAREOFF, or 4 to exit."
+        )
         return True
 
-    # Core Execution Engine for Option 1 & 2
-    print(f"{Fore.MAGENTA}⚡ FORCED BYPASS TRIGGERED: Generating immediate {sig} ({side_label}) order...")
+    # --- CORE EXECUTION ENGINE FOR OPTION 1 & 2 ---
+    print(
+        f"{Fore.MAGENTA}⚡ FORCED BYPASS TRIGGERED: "
+        f"Generating immediate {sig} ({side_label}) order..."
+    )
 
     client = get_session()
     if not client:
@@ -123,8 +145,15 @@ def run_action(choice):
 
     data = get_all_data()
     ltp = data.get("price")
-    
-    symbol = get_symbol(ltp, sig, get_dynamic_otm_distance())
+
+    # Use explicit offset when supplied; otherwise use configured dynamic distance.
+    distance = (
+        offset_override
+        if offset_override is not None
+        else get_dynamic_otm_distance()
+    )
+
+    symbol = get_symbol(ltp, sig, distance)
     res = {"stat": "SKIPPED"}
 
     if symbol and symbol != "NA":
@@ -134,10 +163,11 @@ def run_action(choice):
 
     try:
         funds = get_available_funds(client)
-    except:
+    except Exception:
         funds = 0
 
-    print(f"""
+    print(
+        f"""
  =====================================
     ⚡ FORCE TRANSACTION STATUS
  =====================================
@@ -146,16 +176,44 @@ def run_action(choice):
     🎯 Action : {sig} ({side_label})
     📌 Status : {res.get('stat')}
  =====================================
- """)
+ """
+    )
+
     return True
+
 
 async def main():
     # --- CHECK FOR DIRECT COMMAND-LINE ARGUMENT ---
     if len(sys.argv) > 1:
         arg_choice = sys.argv[1].strip()
-        dprint(f"Direct bypass triggered via CLI argument: option [{arg_choice}]", Fore.YELLOW)
-        run_action(arg_choice)
-        return  # End execution immediately after processing direct instruction
+        offset_override = None
+
+        if len(sys.argv) > 2:
+            if len(sys.argv) > 3:
+                print(
+                    f"{Fore.RED}Invalid arguments. "
+                    "Usage: exeforcepxy.py <1|2|3|4> [non-negative offset]"
+                )
+                return
+
+            try:
+                offset_override = int(sys.argv[2].strip())
+                if offset_override < 0:
+                    raise ValueError
+            except ValueError:
+                print(
+                    f"{Fore.RED}Invalid offset. "
+                    "Provide a non-negative whole number, e.g. 100."
+                )
+                return
+
+        dprint(
+            f"Direct bypass triggered via CLI argument: option [{arg_choice}]",
+            Fore.YELLOW,
+        )
+
+        run_action(arg_choice, offset_override)
+        return
 
     # --- FALLBACK TO INTERACTIVE MENU IF NO ARGUMENTS ---
     while True:
@@ -164,15 +222,21 @@ async def main():
         print(f"{Fore.WHITE} [2] FORCE SELL (PE)")
         print(f"{Fore.WHITE} [3] SQUAREOFF")
         print(f"{Fore.WHITE} [4] EXIT")
-        
+
         try:
-            choice = input(f"{Fore.CYAN}Select action (1, 2, 3, or 4): {Style.RESET_ALL}").strip()
+            choice = input(
+                f"{Fore.CYAN}Select action (1, 2, 3, or 4): {Style.RESET_ALL}"
+            ).strip()
+
             should_continue = run_action(choice)
+
             if not should_continue:
                 break
+
         except (KeyboardInterrupt, SystemExit):
             print(f"\n{Fore.YELLOW}❌ Execution aborted.")
             break
+
 
 if __name__ == "__main__":
     asyncio.run(main())
