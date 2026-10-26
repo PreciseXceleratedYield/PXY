@@ -238,7 +238,9 @@ class ProductionPipeReplay:
             parts = list(command) if isinstance(command, (list, tuple)) else []
             if parts and Path(str(parts[0])).name == "bash":
                 parts = parts[1:]
-            command_path = Path(str(parts[-1])).name if parts else ""
+            # The buy wrappers can now include an optional strike-offset argument;
+            # identify the launched script from its path, not the final argument.
+            command_path = Path(str(parts[0])).name if parts else ""
             if command_path == "pxybuyce":
                 self._place_simulated_buy("CE", "CB")
             elif command_path == "pxybuype":
@@ -356,7 +358,9 @@ class ProductionPipeReplay:
             ),
             patch.object(self.averaging_orders, "is_cooling", lambda _side: False),
             patch.object(self.averaging_orders, "set_cooling", lambda _side: None),
-            patch.object(self.averaging_orders, "generate_pxy_tag", broker.next_tag            ),
+            patch.object(
+                self.averaging_orders, "generate_pxy_tag", broker.next_tag
+            ),
             patch.object(self.counter_pipe, "_find_script", lambda name: name),
             patch.object(self.counter_pipe, "_load_locks", return_value={}),
             patch.object(self.counter_pipe, "_mark_lock", lambda _key: None),
