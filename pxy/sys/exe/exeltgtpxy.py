@@ -119,7 +119,7 @@ def calculate_tgt(
                 + (7.0 / own_depth)
             )
         else:
-            target_pct = 7.0
+            target_pct = 1.4
         return min(99.0, target_pct)
 
     except Exception as e:
