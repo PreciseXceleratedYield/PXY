@@ -67,7 +67,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file='../web/webchrtp
         mirror_val = float(row['st_mirror']) if not pd.isna(row['st_mirror']) else 0.0
         sma_val = float(row['sma_50']) if not pd.isna(row.get('sma_50')) else None
         tsma_val = (
-            (float(row['tsma_50']) + float(row['sma_50'])) / 2
+            (float(row['tsma_50']) + float(row['sma_50']) + float(row['sma_50'])) / 3
             if not pd.isna(row.get('tsma_50')) and not pd.isna(row.get('sma_50'))
             else None
         )
