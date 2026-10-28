@@ -1,31 +1,49 @@
 #!/bin/bash
-set -e
+# REMOVED 'set -e' to prevent the script from killing the calling engine on errors
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+# Verify Path Helper existence
 if [ -f "$SCRIPT_DIR/pxyresolve" ]; then
     source "$SCRIPT_DIR/pxyresolve"
 elif [ -f "$HOME/.local/bin/pxyresolve" ]; then
     source "$HOME/.local/bin/pxyresolve"
 else
-    echo "[X] PXY path helper not found." >&2
-    exit 1
+    echo "[⚠️ ERROR] PXY path helper not found." >&2
+    exit 0
 fi
+
+# Locate the core application directory
 PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
-    echo "[X] Could not locate the PXY application directory." >&2
-    exit 1
+    echo "[⚠️ ERROR] Could not locate the PXY application directory." >&2
+    exit 0
 }
+
 ENGINE_DIR="$PXY_APP_DIR/sys/exe"
-if [ ! -f "$ENGINE_DIR/exeforcepxy.py" ]; then
-    echo "Engine script not found: $ENGINE_DIR/exeforcepxy.py" >&2
-    exit 1
+
+# Verify that the direct order router utility exists
+if [ ! -f "$ENGINE_DIR/exeexacpxy.py" ]; then
+    echo "[⚠️ ERROR] Direct order router utility not found: $ENGINE_DIR/exeexacpxy.py" >&2
+    exit 0
 fi
 
-cd "$ENGINE_DIR" || { echo "Could not enter engine directory: $ENGINE_DIR" >&2; exit 1; }
+cd "$ENGINE_DIR" || { echo "[⚠️ ERROR] Could not enter engine directory: $ENGINE_DIR" >&2; exit 0; }
 
-# Optional: activate virtual environment if needed
-# source ~/pxy/env/bin/activate
+# Extract the calculated numeric offset parameter ($1) passed by execbuypxy.py
+OFFSET="${1:-0}"
+shift # Shift arguments to pass the remaining flags safely to Python
 
-# Run the Python script with argument 2 to execute option 2 directly
-python3 exeforcepxy.py 2
+echo "🔄 Firing Direct PE Order Route via exeexacpxy.py (Offset: $OFFSET)..."
 
-# Optional: print completion
-echo "exeforcepxy.py option 2 execution finished."
+# Safe execution block: Route straight to the order router tool for PE side
+python3 exeexacpxy.py --side PE --offset "$OFFSET" "${@}"
+PYTHON_EXIT_CODE=$?
+
+if [ $PYTHON_EXIT_CODE -ne 0 ]; then
+    echo "❌ BASH ERROR: Direct PE entry failed with exit code $PYTHON_EXIT_CODE. Parent engine loop preserved." >&2
+else
+    echo "✅ PE entry script execution finished cleanly."
+fi
+
+# Always exit 0 to guarantee that the master calling loop stays alive
+exit 0
