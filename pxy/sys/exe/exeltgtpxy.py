@@ -111,7 +111,7 @@ def calculate_tgt(
         # Single-side position: target is 1.4 times its own power.
         # If both CE and PE are open, preserve the existing formula.
         if not both_sides_open:
-            target_pct = 1.4 * own_power
+            target_pct = 33 / own_power
         elif is_aligned:
             target_pct = (
                 33.0
