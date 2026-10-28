@@ -1,49 +1,31 @@
 #!/bin/bash
-# REMOVED 'set -e' to prevent the script from killing the calling engine on errors
-
+set -e
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-
-# Verify Path Helper existence
 if [ -f "$SCRIPT_DIR/pxyresolve" ]; then
     source "$SCRIPT_DIR/pxyresolve"
 elif [ -f "$HOME/.local/bin/pxyresolve" ]; then
     source "$HOME/.local/bin/pxyresolve"
 else
-    echo "[⚠️ ERROR] PXY path helper not found." >&2
-    exit 0
+    echo "[X] PXY path helper not found." >&2
+    exit 1
 fi
-
-# Locate the core application directory
 PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
-    echo "[⚠️ ERROR] Could not locate the PXY application directory." >&2
-    exit 0
+    echo "[X] Could not locate the PXY application directory." >&2
+    exit 1
 }
-
 ENGINE_DIR="$PXY_APP_DIR/sys/exe"
-
-# FIXED: Pointing strictly to the authentic direct order router name
-if [ ! -f "$ENGINE_DIR/exeexacpxy.py" ]; then
-    echo "[⚠️ ERROR] Direct order router utility not found: $ENGINE_DIR/exeexacpxy.py" >&2
-    exit 0
+if [ ! -f "$ENGINE_DIR/exeforcepxy.py" ]; then
+    echo "Engine script not found: $ENGINE_DIR/exeforcepxy.py" >&2
+    exit 1
 fi
 
-cd "$ENGINE_DIR" || { echo "[⚠️ ERROR] Could not enter engine directory: $ENGINE_DIR" >&2; exit 0; }
+cd "$ENGINE_DIR" || { echo "Could not enter engine directory: $ENGINE_DIR" >&2; exit 1; }
 
-# Extract the calculated numeric offset parameter ($1) passed by execbuypxy.py
-OFFSET="${1:-0}"
-shift # Shift arguments to pass remaining operational flags to Python
+# Optional: activate virtual environment if needed
+#source ~/pxy/env/bin/activate
 
-echo "🔄 Firing Direct CE Order Route via exeexacpxy.py (Offset: $OFFSET)..."
+# Run the Python script with argument 1 to execute option 1 directly
+python3 exeforcepxy.py 1
 
-# Safe execution block: Route straight to the order router tool for CE side
-python3 exeexacpxy.py --side CE --offset "$OFFSET" "${@}"
-PYTHON_EXIT_CODE=$?
-
-if [ $PYTHON_EXIT_CODE -ne 0 ]; then
-    echo "❌ BASH ERROR: Direct CE entry failed with exit code $PYTHON_EXIT_CODE. Parent engine loop preserved." >&2
-else
-    echo "✅ CE entry script execution finished cleanly."
-fi
-
-# Always exit 0 to guarantee that the master calling loop stays alive
-exit 0
+# Optional: print completion
+echo "exeforcepxy.py option 1 execution finished."
