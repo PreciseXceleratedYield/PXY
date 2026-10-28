@@ -117,7 +117,7 @@ def calculate_tgt(
             # Indented correctly under the if statement
             target_pct = 1.4 + (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
         elif is_aligned:
-            target_pct = 1.4 + (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
+            target_pct = 14 + (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
         else:
             target_pct = 1.4 + (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
         return min(99.0, target_pct)
