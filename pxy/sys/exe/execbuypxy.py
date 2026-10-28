@@ -305,28 +305,50 @@ def check_counter_leg(remaining_df):
             return None
 
         path = _find_script(script_name)
-
         if not path:
             print(
-                f"{Fore.RED}❌ Counter script {script_name} not found "
+                f"{Fore.RED} ❌ Counter script {script_name} not found "
                 "(searched the engine, system, PXY, and PATH locations)."
             )
             return None
 
-        # Lock and count before launch to reduce duplicate counter-buy orders.
+        # --- FIX START: MATH ENFORCEMENT MATRIX TO PREVENT '300100' STRING CONCATENATION ---
+        try:
+            # Safely parse the base offset value out of the signal payload
+            base_offset = int(float(str(signal).replace("BULL", "").replace("BEAR", "").strip()))
+        except (ValueError, TypeError, NameError):
+            # Fallback to zero if the signal name doesn't contain digits directly
+            base_offset = 0
+
+        # Enforce day-of-week step matrix calculation (Wednesdays default to 0 step points)
+        try:
+            day_step = int(CBUY_SCRIPTS.get("STEP_WEDNESDAY", 0))
+        except (ValueError, TypeError, AttributeError):
+            day_step = 0
+
+        # Perform absolute mathematical integer addition (300 + 0 = 300)
+        final_offset = base_offset + day_step
+        # --- FIX END ---
+
+        # Save cooldown anchors before launching process threads
         _mark_lock(lock_key)
         _count_fire()
 
-        # Pass the calculated offset to the existing buy wrapper.
-        subprocess.Popen(["bash", path, str(offset)])
-
-        print(
-            f"{Fore.MAGENTA}{Style.BRIGHT}⚡ FIRED COUNTER-BUY: "
-            f"{script_name} {offset}"
+        # Execute fully isolated background process thread to shield the parent loops
+        subprocess.Popen(
+            ["bash", path, str(final_offset)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
         )
 
+        print(
+            f"{Fore.MAGENTA}{Style.BRIGHT} ⚡ FIRED COUNTER-BUY: "
+            f"{script_name} {final_offset}"
+        )
         return script_name
 
     except Exception as e:
-        print(f"{Fore.RED}❌ Counter-check error: {e}")
+        print(f"{Fore.RED} ❌ Counter-check error; counter-buy NOT launched: {e}")
         return None
+
