@@ -4,13 +4,10 @@ import sys
 import json
 import subprocess
 from datetime import datetime
-from pathlib import Path
 from colorama import Fore, Style, init
 
-# Initialize colorama
 init(autoreset=True)
 
-# ----------------- CONFIGURATION & CONSTANTS -----------------
 CBUY_LOCK_FILE_NAME = ".cbuy_lock.json"
 CBUY_COUNT_FILE_NAME = ".cbuy_count.json"
 
@@ -38,7 +35,7 @@ def _load_locks():
 def _save_locks(data):
     try:
         with open(_LOCK_FILE, "w") as f:
-            json.dump(data, f, indent=4)
+            json.dump(data, f)
     except Exception:
         pass
 
@@ -72,84 +69,63 @@ def _mark_lock(key):
     data[key] = str(now)
     _save_locks(data)
 
-def _load_counts():
-    if not os.path.exists(_COUNT_FILE):
-        return {"count": 0}
+def _count_fire():
     try:
-        with open(_COUNT_FILE, "r") as f:
-            return json.load(f)
-    except Exception:
-        return {"count": 0}
-
-def _save_counts(data):
-    try:
+        count = 0
+        if os.path.exists(_COUNT_FILE):
+            with open(_COUNT_FILE, "r") as f:
+                count = int(f.read().strip() or 0)
+        count += 1
         with open(_COUNT_FILE, "w") as f:
-            json.dump(data, f, indent=4)
+            f.write(str(count))
     except Exception:
         pass
 
-def _count_fire():
-    counts = _load_counts()
-    counts["count"] = counts.get("count", 0) + 1
-    _save_counts(counts)
-
 def check_counter_leg(remaining_df):
-    """
-    Evaluates open positions and dynamically triggers pxybuype or pxybuyce 
-    with calculated offsets as a fully detached process context.
-    """
+    """Evaluates held positions and triggers required counter leg hedges cleanly."""
     if remaining_df is None or remaining_df.empty:
         return
 
+    # Check if we have open options positions to hedge
     for _, row in remaining_df.iterrows():
         symbol = str(row.get("symbol", "")).upper()
         if not symbol:
             continue
-
-        # Determine target counter script based on the open position type
-        if symbol.endswith("CE"):
-            script_name = "pxybuype"
-            lock_key = f"CBUY|{script_name}"
-        elif symbol.endswith("PE"):
-            script_name = "pxybuyce"
-            lock_key = f"CBUY|{script_name}"
-        else:
+            
+        # Determine the side that requires a counter-leg hedge
+        side = None
+        if symbol.endswith("PE"):
+            side = "CE"  # We hold PE, so we need to buy CE
+        elif symbol.endswith("CE"):
+            side = "PE"  # We hold CE, so we need to buy PE
+            
+        if not side:
             continue
 
-        # Check existing locks across memory and storage (limit to 10 second window)
+        lock_key = f"CBUY|{side}"
         locks = _load_locks()
-        if _recent(locks, lock_key, 10):
+        
+        # Prevent duplicate orders within 15 seconds window
+        if _recent(locks, lock_key, 15):
             continue
 
-        # Calculate contract step offsets (placeholder for internal logic)
-        offset = 0 
+        script_name = "pxybuyce" if side == "CE" else "pxybuype"
         
-        # Resolve target paths cleanly
-        here = Path(__file__).resolve().parent
-        parent_dir = here.parent
+        # FIX: Compute absolute path relative to this script directory to avoid file-not-found loop drops
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(base_dir, script_name)
         
-        # Hunt inside pxy root or sys directories
-        possible_paths = [
-            here / script_name,
-            parent_dir / script_name,
-            parent_dir / "pxy" / script_name
-        ]
-        
-        path = None
-        for p in possible_paths:
-            if p.exists():
-                path = str(p)
-                break
-                
-        if not path:
-            print(f"{Fore.RED} ❌ Script execution failed -> {script_name} not found.")
-            continue
+        # Quick check if path exists locally, otherwise look one level up in the repository layout
+        if not os.path.exists(path):
+            path = os.path.join(os.path.dirname(base_dir), script_name)
 
+        offset = 0 # Default strike offset calculation logic placeholder
+        
         # Lock and count before launch to reduce duplicate counter-buy orders.
         _mark_lock(lock_key)
         _count_fire()
 
-        # FIX: Added DEVNULL routing and start_new_session to prevent parent engine crashes
+        # FIX: Added DEVNULL routing, absolute execution, and start_new_session to prevent parent engine crashes
         try:
             subprocess.Popen(
                 ["bash", path, str(offset)],
@@ -158,8 +134,7 @@ def check_counter_leg(remaining_df):
                 start_new_session=True
             )
             print(
-                f"{Fore.MAGENTA}{Style.BRIGHT} ⚡ FIRED COUNTER-BUY: "
-                f"{script_name} {offset}"
+                f"{Fore.MAGENTA}{Style.BRIGHT} ⚡ FIRED COUNTER-BUY: {script_name} {offset}"
             )
         except Exception as e:
-            print(f"{Fore.RED} ❌ Failed to spawn background process: {e}")
+            print(f"{Fore.RED} ❌ Failed to spawn background process {script_name}: {e}")
