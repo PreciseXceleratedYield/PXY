@@ -54,7 +54,7 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True):
         own_count = float(ce_count if is_ce else pe_count)
 
         # Core baseline calculation
-        base_magnitude = 80.0 + (10.0 * own_count)
+        base_magnitude = 40.0 + (10.0 * own_count)
 
         # Scale up if it is not aligned
         if not is_aligned:
