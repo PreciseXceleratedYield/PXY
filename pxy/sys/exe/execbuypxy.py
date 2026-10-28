@@ -314,11 +314,23 @@ def check_counter_leg(remaining_df):
             return None
 
         # Lock and count before launch to reduce duplicate counter-buy orders.
+        # Lock and count before launch to reduce duplicate counter-buy orders.
         _mark_lock(lock_key)
         _count_fire()
 
-        # Pass the calculated offset to the existing buy wrapper.
-        subprocess.Popen(["bash", path, str(offset)])
+        # FIX: Added DEVNULL routing and start_new_session to prevent parent engine crashes
+        subprocess.Popen(
+            ["bash", path, str(offset)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True
+        )
+
+        print(
+            f"{ Fore. MAGENTA}{ Style. BRIGHT} ⚡ FIRED COUNTER-BUY: "
+            f"{ script_name} { offset}"
+        )
+
 
         print(
             f"{Fore.MAGENTA}{Style.BRIGHT}⚡ FIRED COUNTER-BUY: "
