@@ -111,17 +111,18 @@ def calculate_tgt(
         # Single-side position: target is 1.4 times its own power.
         # If both CE and PE are open, preserve the existing formula.
         
+        # Single-side position: target is 1.4 times its own power.
+        # If both CE and PE are open, preserve the existing formula.
         if not both_sides_open:
-
-        # Fixed error-free denominator grouping
-        target_pct = 11.0 + (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
-
+            # Indented correctly under the if statement
+            target_pct = 11.0 + (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
         elif is_aligned:
             target_pct = (
                 33.0
                 + (33.0 / own_power)
                 + (33.0 / own_depth)
             )
+
         else:
             target_pct = 33.0
         return min(99.0, target_pct)
