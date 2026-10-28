@@ -114,12 +114,12 @@ def calculate_tgt(
             target_pct = 1.4 * own_power
         elif is_aligned:
             target_pct = (
-                7.0
-                + (7.0 / own_power)
-                + (7.0 / own_depth)
+                11.0
+                + (11.0 / own_power)
+                + (11.0 / own_depth)
             )
         else:
-            target_pct = 1.4
+            target_pct = 33
         return min(99.0, target_pct)
 
     except Exception as e:
