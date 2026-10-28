@@ -25,7 +25,7 @@ cd "$ENGINE_DIR" || { echo "Could not enter engine directory: $ENGINE_DIR" >&2; 
 # source ~/pxy/env/bin/activate
 
 # Run the Python script with argument 2 to execute option 2 directly
-python3 exeforcepxy.py 2 "${@}"
+python3 exeforcepxy.py 2
 
 # Optional: print completion
 echo "exeforcepxy.py option 2 execution finished."
