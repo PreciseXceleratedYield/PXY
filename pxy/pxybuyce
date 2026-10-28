@@ -21,7 +21,7 @@ PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
 
 ENGINE_DIR="$PXY_APP_DIR/sys/exe"
 
-# Verify that the direct order router utility exists
+# FIXED: Pointing strictly to the authentic direct order router name
 if [ ! -f "$ENGINE_DIR/exeexacpxy.py" ]; then
     echo "[⚠️ ERROR] Direct order router utility not found: $ENGINE_DIR/exeexacpxy.py" >&2
     exit 0
@@ -31,7 +31,7 @@ cd "$ENGINE_DIR" || { echo "[⚠️ ERROR] Could not enter engine directory: $EN
 
 # Extract the calculated numeric offset parameter ($1) passed by execbuypxy.py
 OFFSET="${1:-0}"
-shift # Shift arguments to pass the remaining flags safely to Python
+shift # Shift arguments to pass remaining operational flags to Python
 
 echo "🔄 Firing Direct CE Order Route via exeexacpxy.py (Offset: $OFFSET)..."
 
@@ -47,4 +47,3 @@ fi
 
 # Always exit 0 to guarantee that the master calling loop stays alive
 exit 0
-
