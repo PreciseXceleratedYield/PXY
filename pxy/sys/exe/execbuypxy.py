@@ -253,8 +253,15 @@ def check_counter_leg(remaining_df):
         counter = "PE" if held == "CE" else "CE"
 
         now = datetime.now(_IST).time()
+        # =======================================================================
+        # 🛡️ PIPE GUARD: Enforce an absolute minimum 5-second safety window
+        # to prevent millisecond double-firing during back-to-back executions.
+        # =======================================================================
         lock_key = f"CBUY|{script_name}"
-        locked = _recent(_load_locks(), lock_key, CBUY_LOCK_SECS)
+        safety_cooldown = max(5.0, float(CBUY_LOCK_SECS if CBUY_LOCK_SECS is not None else 0))
+        locked = _recent(_load_locks(), lock_key, safety_cooldown)
+        # =======================================================================
+
 
         # Preserve the existing counter-buy permission behaviour.
         launches_today = 0
