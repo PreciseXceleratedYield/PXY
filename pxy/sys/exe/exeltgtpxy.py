@@ -149,7 +149,7 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     ).fillna(0).clip(lower=0)
 
     prices = pd.to_numeric(
-        df['sell_prc'], errors='coerce'
+        df['BEAR_prc'], errors='coerce'
     ).fillna(0).clip(lower=0)
 
     invested = qtys * prices
@@ -173,7 +173,7 @@ def target_price(
 ):
     """Calculate the target from exit alignment and the open side counts."""
     try:
-        entry_prc = f(row.get('pxy_entry') or row.get('buy_prc'))
+        entry_prc = f(row.get('pxy_entry') or row.get('BULL_prc'))
 
         if entry_prc <= 0:
             return 0.0
@@ -181,11 +181,11 @@ def target_price(
         symbol = str(row.get('symbol', 'UNKNOWN')).upper().strip()
         exit_signal = str(row.get(EXIT_KEY_COLUMN, '')).upper().strip()
 
-        if exit_signal not in ("BUY", "SELL", "SIDE", "NONE"):
+        if exit_signal not in ("BULL", "BEAR", "SIDE", "NONE"):
             _warn_once(
                 "exit",
                 f"unrecognised exit value '{exit_signal}' "
-                f"(expected BUY/SELL/SIDE/NONE).",
+                f"(expected BULL/BEAR/SIDE/NONE).",
             )
 
         is_ce = symbol.endswith('CE')
@@ -195,8 +195,8 @@ def target_price(
             return round(entry_prc, 2)
 
         is_aligned = (
-            (exit_signal == "BUY" and is_ce)
-            or (exit_signal == "SELL" and is_pe)
+            (exit_signal == "BULL" and is_ce)
+            or (exit_signal == "BEAR" and is_pe)
         )
 
         target_pct = calculate_tgt(
