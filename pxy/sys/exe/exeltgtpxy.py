@@ -89,7 +89,7 @@ def calculate_tgt(
             current_time = current_time.time()
 
         # From 15:10 onward, use a 99% target for all positions.
-        if current_time >= dt_time(15, 10):
+        if current_time >= dt_time(13, 15) and both_sides_open:
             return 99.0
 
         def positive_factor(value):
