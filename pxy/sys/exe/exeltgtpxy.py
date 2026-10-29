@@ -118,11 +118,11 @@ def calculate_tgt(
             if own_power > 0 and own_depth > 0:
                 target_pct = max(1.4 * own_power, 1.4 * own_depth)
             else:
-                target_pct = 33
+                target_pct = 14 + (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
                 
         elif is_aligned:
             # Aligned State Rule Engine: Forces target configuration parameter to 77
-            target_pct = 33
+            target_pct = 14 + (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
             
         else:
             # Non-Aligned State Rule Engine: Forces target configuration parameter to 1.4
