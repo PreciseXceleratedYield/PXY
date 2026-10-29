@@ -14,6 +14,8 @@
 #   Otherwise -> absolute difference rounded to nearest strike step
 #
 # Exactly one held side and an opposing exit signal are required.
+# Set to True for dynamic strike calculations, False to bypass and call default
+EXECBUYPXY_USE_DYNAMIC_STRIKE = False  
 
 import os
 import shutil
@@ -239,15 +241,24 @@ def check_counter_leg(remaining_df):
             )
             return None
 
-        # Calculate offset from the held option strike and underlying price.
-        offset = _counter_buy_offset(remaining_df)
+        # =======================================================================
+        # 🔄 STRIKE SELECTION SWITCH matrix
+        # =======================================================================
+        if EXECBUYPXY_USE_DYNAMIC_STRIKE:
+            # Mode A: Dynamic Strike Selection based on underlying price matrix
+            offset = _counter_buy_offset(remaining_df)
+            if offset is None:
+                print(
+                    f"{Fore.YELLOW} ⚠ Counter-buy skipped: "
+                    "could not safely calculate dynamic strike offset."
+                )
+                return None
+        else:
+            # Mode B: Simple Constant Call - Bypasses calculations and uses 0
+            debug_log("Simple Call Mode Active: Bypassing dynamic strike calculations.")
+            offset = 0
+        # =======================================================================
 
-        if offset is None:
-            print(
-                f"{Fore.YELLOW}⚠️ Counter-buy skipped: "
-                "could not safely calculate strike offset."
-            )
-            return None
 
         held = "PE" if signal == "BULL" else "CE"
         counter = "PE" if held == "CE" else "CE"
