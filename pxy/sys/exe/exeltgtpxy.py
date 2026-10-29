@@ -114,13 +114,22 @@ def calculate_tgt(
         # Single-side position: target is 1.4 times its own power.
         # If both CE and PE are open, preserve the existing formula.
         if not both_sides_open:
-            # Indented correctly under the if statement
-            target_pct = 1.4 + (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
+            # Resolves the higher value mathematically out of the two scaling weights
+            if own_power > 0 and own_depth > 0:
+                target_pct = max(1.4 * own_power, 1.4 * own_depth)
+            else:
+                target_pct = 33
+                
         elif is_aligned:
-            target_pct = 14 + (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
+            # Aligned State Rule Engine: Forces target configuration parameter to 77
+            target_pct = 33
+            
         else:
-            target_pct = 1.4 #+ (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
+            # Non-Aligned State Rule Engine: Forces target configuration parameter to 1.4
+            target_pct = 1.4
+            
         return min(99.0, target_pct)
+
 
     except Exception as e:
         _warn_once(
