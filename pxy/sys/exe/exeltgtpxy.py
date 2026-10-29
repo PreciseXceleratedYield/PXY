@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 import sys
 from pathlib import Path
@@ -108,28 +107,23 @@ def calculate_tgt(
         own_depth = positive_factor(side_depth)
         own_power = positive_factor(side_power)
 
-        # Single-side position: target is 1.4 times its own power.
-        # If both CE and PE are open, preserve the existing formula.
-        
-        # Single-side position: target is 1.4 times its own power.
-        # If both CE and PE are open, preserve the existing formula.
+        # Unified Condition Routing Matrix
         if not both_sides_open:
-            # Resolves the higher value mathematically out of the two scaling weights
             if own_power > 0 and own_depth > 0:
                 target_pct = max(1.4 * own_power, 1.4 * own_depth)
             else:
-                target_pct = 14 + (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
+                denom = own_power + own_depth
+                target_pct = 14.0 + (11.0 / denom if denom > 0 else 11.0)
                 
         elif is_aligned:
-            # Aligned State Rule Engine: Forces target configuration parameter to 77
-            target_pct = 14 + (11.0 / (own_power + own_depth) if (own_power > 0 and own_depth > 0) else 11.0)
+            denom = own_power + own_depth
+            target_pct = 14.0 + (11.0 / denom if denom > 0 else 11.0)
             
         else:
-            # Non-Aligned State Rule Engine: Forces target configuration parameter to 1.4
+            # Non-Aligned State Rule Engine: Forces target calculation to 1.4
             target_pct = 1.4
             
         return min(99.0, target_pct)
-
 
     except Exception as e:
         _warn_once(
