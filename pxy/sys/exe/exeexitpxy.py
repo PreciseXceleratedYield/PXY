@@ -216,7 +216,7 @@ def run_depth_squareoff(client, active_df, market_data_available,
 
     snapshot = active_df.iloc[0]
     side = depth_squareoff_side(
-        snapshot.get("entry"),
+        snapshot.get("exit"),
         snapshot.get("hkin_past_depth"),
         threshold=depth_exit_threshold(snapshot.get("hkin_signal_time")),
     )
