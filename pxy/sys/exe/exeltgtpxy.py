@@ -109,21 +109,15 @@ def calculate_tgt(
 
         # Unified Condition Routing Matrix
         if not both_sides_open:
-            if own_power > 0 and own_depth > 0:
-                target_pct = (5 + 5/own_power + 5/own_depth)
-            else:
-                denom = own_power + own_depth
-                target_pct = (5 + 5/own_power + 5/own_depth)
-                #target_pct = (5 + 5/own_power + 5/own_depth)
-                
+            target_pct = 1.4 * own_power
+        
         elif is_aligned:
-            denom = own_power + own_depth
-            #target_pct = 14.0 + (11.0 / denom if denom > 0 else 11.0)
-            target_pct = (5 + 5/own_power + 5/own_depth)
+            target_pct = 1.4 * own_power
+        
         else:
-            # Non-Aligned State Rule Engine: Forces target calculation to 1.4
+            # Non-Aligned State Rule Engine
             target_pct = 1.4
-            
+        
         return min(99.0, target_pct)
 
     except Exception as e:
