@@ -149,7 +149,7 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     ).fillna(0).clip(lower=0)
 
     prices = pd.to_numeric(
-        df['BEAR_prc'], errors='coerce'
+        df['sell_prc'], errors='coerce'
     ).fillna(0).clip(lower=0)
 
     invested = qtys * prices
@@ -173,7 +173,7 @@ def target_price(
 ):
     """Calculate the target from exit alignment and the open side counts."""
     try:
-        entry_prc = f(row.get('pxy_entry') or row.get('BULL_prc'))
+        entry_prc = f(row.get('pxy_entry') or row.get('buy_prc'))
 
         if entry_prc <= 0:
             return 0.0
@@ -185,7 +185,7 @@ def target_price(
             _warn_once(
                 "exit",
                 f"unrecognised exit value '{exit_signal}' "
-                f"(expected BULL/BEAR/SIDE/NONE).",
+                f"(expected BUY/SELL/SIDE/NONE).",
             )
 
         is_ce = symbol.endswith('CE')
