@@ -109,10 +109,10 @@ def calculate_tgt(
 
         # Unified Condition Routing Matrix
         if not both_sides_open:
-            target_pct = 1.4 * own_power
+            target_pct = 11 + (11 / own_power) + (11 / own_depth)
         
         elif is_aligned:
-            target_pct = 1.4 * own_power
+            target_pct = 11 + (11 / own_power) + (11 / own_depth)
         
         else:
             # Non-Aligned State Rule Engine
