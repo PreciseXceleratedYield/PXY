@@ -15,7 +15,7 @@ def _compute_single_st(
     period: float,
     factor: float
 ) -> tuple:
-    """Calculate the original Supertrend and a price-following mirror line."""
+    """Calculate Supertrend and its fixed-offset mirror line."""
 
     high = df['High'].to_numpy()
     low = df['Low'].to_numpy()
@@ -24,7 +24,7 @@ def _compute_single_st(
     if len(df) == 0:
         return np.array([]), np.array([])
 
-    # Calculate true range, preserving the original logic.
+    # Original true-range calculation.
     close_shifted = df['Close'].shift(1).to_numpy(copy=True)
     close_shifted[0] = close[0]
 
@@ -51,7 +51,7 @@ def _compute_single_st(
     mirror_line = np.zeros(length)
     st_trend = []
 
-    # Preserve the original first-candle ST and mirror calculations.
+    # Preserve original first-candle ST and mirror initialization.
     anchor_price = float(hl2[0])
 
     for i in range(length):
@@ -79,7 +79,7 @@ def _compute_single_st(
         else:
             final_lower[i] = prev_lower
 
-        # Original Supertrend direction and line calculation: unchanged.
+        # Original Supertrend calculation: unchanged.
         if prev_trend == 'BEAR':
             if close[i] > final_upper[i]:
                 st_trend.append('BULL')
@@ -97,10 +97,10 @@ def _compute_single_st(
                 st_trend.append('BULL')
                 supertrend[i] = final_lower[i]
 
-    # Mirror calculation:
-    # Keep the first candle's signed point offset from price constant.
-    initial_mirror_offset = mirror_line[0] - close[0]
-    mirror_line[:] = close + initial_mirror_offset
+    # Preserve the first candle's signed distance between ST and mirror.
+    # Apply that same offset to the original ST line on every candle.
+    initial_mirror_offset = mirror_line[0] - supertrend[0]
+    mirror_line[:] = supertrend + initial_mirror_offset
 
     return supertrend, mirror_line
 
