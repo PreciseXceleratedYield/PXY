@@ -1,4 +1,5 @@
 
+
 # sysstrndpxy.py
 import json
 import os
@@ -15,15 +16,18 @@ TIMEZONE = syscnfgpxy.SYSCNFGPXY_TIMEZONE
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
+# ==============================================================================
+# MASTER CONFIGURATION LAYER
+# ==============================================================================
 def get_market_trend(df: pd.DataFrame) -> str:
-    """Return the configured Supertrend classification used for entry."""
+    """Return the same configured Supertrend classification used for entry."""
     if df is None or df.empty or len(df) < 2:
         return 'SIDE'
     return get_entry_market_trend(df)
 
 
 def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
-    """Calculate Supertrend and chart indicators using shared calculations."""
+    """Calculate chart Supertrend using the shared production calculation."""
     if df is None:
         return pd.DataFrame()
 
@@ -49,13 +53,13 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         else df.tz_localize('UTC').tz_convert(tz_string)
     )
 
-    # Shared source calculation: ST and mirror remain in sync with the chart.
+    # ST and mirror both come from the same source calculation.
     df = calculate_entry_supertrend(df)
 
     df['ST'] = df['st_line']
     df['st1_mirror'] = df['st_mirror']
 
-    # Preserve the existing 30-period SMA and TSMA calculations.
+    # Preserve the original 30-period SMA and TSMA calculations.
     df['sma_50'] = calculate_moving_average(
         df['Close'], period=30, variant="SMA"
     )
@@ -70,7 +74,7 @@ def export_supertrend_json(
     df: pd.DataFrame = None,
     output_file='../web/webchrtpxy.json'
 ):
-    """Export synchronized Supertrend, mirror, SMA and original TSMA values."""
+    """Export synchronized ST, mirror, SMA and original TSMA chart values."""
     if df is None or df.empty:
         df = calculate_supertrend(pd.DataFrame())
 
@@ -86,7 +90,7 @@ def export_supertrend_json(
             else 0.0
         )
 
-        # Export the source mirror unchanged.
+        # Export the actual calculated mirror without modifying it.
         mirror_val = (
             float(row['st_mirror'])
             if not pd.isna(row['st_mirror'])
@@ -99,7 +103,7 @@ def export_supertrend_json(
             else None
         )
 
-        # Export the original TSMA; do not average with SMA.
+        # Export original TSMA directly; do not average with SMA.
         tsma_val = (
             float(row['tsma_50'])
             if not pd.isna(row.get('tsma_50'))
