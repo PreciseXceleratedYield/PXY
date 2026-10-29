@@ -91,7 +91,7 @@ SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "YES"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
     raise ValueError("SYSDTHAPXY_INCLUDE_RUNNING_CANDLE must be YES or NO.")
 
-SYSDTSTPXY_ST1_PERIOD = 1
+SYSDTSTPXY_ST1_PERIOD = 3
 SYSDTSTPXY_ST1_FACTOR = 0.5
 
 # BOS morning recognition ends at 10:10; its opening boundary uses the shared
