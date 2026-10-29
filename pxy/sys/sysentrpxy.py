@@ -106,7 +106,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
         elif st_signal == "SIDE":
             # Neutralizing exit signal inside consolidating ST market states to protect capital
             exit_sig = "NONE"
-            print("⏸️ [ST CONSOLIDATION] Exit pipeline detects SIDEWAYS trend. Forcing flat exit state.")
+            print("⏸️ Pipeline detects SIDEWAYS trend.")
         else:
             exit_sig = "NONE"
             
