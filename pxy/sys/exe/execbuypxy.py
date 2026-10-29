@@ -15,7 +15,7 @@
 #
 # Exactly one held side and an opposing exit signal are required.
 # Set to True for dynamic strike calculations, False to bypass and call default
-EXECBUYPXY_USE_DYNAMIC_STRIKE = False  
+EXECBUYPXY_USE_DYNAMIC_STRIKE = True  
 
 import os
 import shutil
