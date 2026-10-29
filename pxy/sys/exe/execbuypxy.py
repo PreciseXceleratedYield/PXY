@@ -50,7 +50,7 @@ CBUY_LOCK_FILE_NAME = ".cbuy_lock.json"
 CBUY_MAX_PER_DAY = EXECBUYPXY_MAX_PER_DAY
 CBUY_COUNT_FILE_NAME = ".cbuy_count.json"
 CBUY_LOCK_KEEP_SECS = EXECBUYPXY_LOCK_KEEP_SECS
-EXIT_KEY_COLUMN = "supertrend"
+EXIT_KEY_COLUMN = "exit"
 # =======================================================================
 
 _LOCK_FILE = os.path.join(
