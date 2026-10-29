@@ -113,12 +113,13 @@ def calculate_tgt(
                 target_pct = max(1.4 * own_power, 1.4 * own_depth)
             else:
                 denom = own_power + own_depth
-                target_pct = 14.0 + (11.0 / denom if denom > 0 else 11.0)
+                target_pct = max(1.4 * own_power, 1.4 * own_depth)
+                #target_pct = 14.0 + (11.0 / denom if denom > 0 else 11.0)
                 
         elif is_aligned:
             denom = own_power + own_depth
-            target_pct = 14.0 + (11.0 / denom if denom > 0 else 11.0)
-            
+            #target_pct = 14.0 + (11.0 / denom if denom > 0 else 11.0)
+            target_pct = max(1.4 * own_power, 1.4 * own_depth)
         else:
             # Non-Aligned State Rule Engine: Forces target calculation to 1.4
             target_pct = 1.4
