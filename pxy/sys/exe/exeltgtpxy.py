@@ -184,7 +184,7 @@ def target_price(
             _warn_once(
                 "exit",
                 f"unrecognised exit value '{exit_signal}' "
-                f"(expected BUY/SELL/SIDE/NONE).",
+                f"(expected BULL/BEAR/SIDE/NONE).",
             )
 
         is_ce = symbol.endswith('CE')
