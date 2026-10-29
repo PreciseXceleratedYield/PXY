@@ -181,7 +181,7 @@ def target_price(
         symbol = str(row.get('symbol', 'UNKNOWN')).upper().strip()
         exit_signal = str(row.get(EXIT_KEY_COLUMN, '')).upper().strip()
 
-        if exit_signal not in ("BULL", "BEAR", "SIDE", "NONE"):
+        if exit_signal not in ("BUY", "SELL", "SIDE", "NONE"):
             _warn_once(
                 "exit",
                 f"unrecognised exit value '{exit_signal}' "
@@ -195,8 +195,8 @@ def target_price(
             return round(entry_prc, 2)
 
         is_aligned = (
-            (exit_signal == "BULL" and is_ce)
-            or (exit_signal == "BEAR" and is_pe)
+            (exit_signal == "BUY" and is_ce)
+            or (exit_signal == "SELL" and is_pe)
         )
 
         target_pct = calculate_tgt(
