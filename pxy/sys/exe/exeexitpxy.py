@@ -147,9 +147,9 @@ def depth_squareoff_side(entry_signal, past_depth, threshold=EXEEXITPXY_DEPTH_EX
     depth_side, depth_value = parsed_depth.groups()
     if int(depth_value) <= threshold:
         return None
-    if signal == "BUY" and depth_side == "PE":
+    if signal == "BULL" and depth_side == "PE":
         return "PE"
-    if signal == "SELL" and depth_side == "CE":
+    if signal == "BEAR" and depth_side == "CE":
         return "CE"
     return None
 
