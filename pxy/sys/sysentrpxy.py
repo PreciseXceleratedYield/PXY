@@ -1,5 +1,4 @@
-
-from datetime import datetime
+from datetime import datetime, time as dt_time
 from pathlib import Path
 import sys
 
@@ -7,10 +6,7 @@ import pandas as pd
 
 # Upstream PXY Pipeline Architecture
 from sysmktpxy import get_signal as get_market_signal
-from syscnfgpxy import (
-    SYSCNFGPXY_NEW_BOOK_CUTOFF,
-    SYSCNFGPXY_TIMEZONE,
-)
+from syscnfgpxy import SYSCNFGPXY_TIMEZONE
 
 EXE_DIR = Path(__file__).resolve().parent / "exe"
 if str(EXE_DIR) not in sys.path:
@@ -19,12 +15,20 @@ if str(EXE_DIR) not in sys.path:
 from execoolpxy import cooldown_remaining
 
 
+# Fresh-entry window (Asia/Kolkata)
+ENTRY_START = dt_time(9, 16)
+ENTRY_END = dt_time(13, 16)
+
+
 def _apply_new_book_cutoff(entry_signal, exit_signal, now_time):
     """
-    Block new entries at or after the configured cutoff.
+    Permit fresh-entry signals only from 09:16 inclusive
+    until 13:16 exclusive.
+
+    This time restriction applies ONLY to entry signals.
     Preserve the existing exit signal.
     """
-    if now_time >= SYSCNFGPXY_NEW_BOOK_CUTOFF:
+    if not (ENTRY_START <= now_time < ENTRY_END):
         entry_signal = "NONE"
 
     return entry_signal, exit_signal
@@ -32,17 +36,21 @@ def _apply_new_book_cutoff(entry_signal, exit_signal, now_time):
 
 def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     """
-    Route both entry and exit signals exclusively through MKT.
+    Route entry and exit signals exclusively through MKT.
 
-    MKT drives entry and exit throughout the trading day.
-    The configured new-book cutoff and post-square-off cooldown
-    remain in effect.
+    Fresh-entry signals are permitted only from 09:16 to
+    13:16 Asia/Kolkata time.
+
+    Outside this window, entry is forced to NONE while
+    the MKT-derived exit signal is preserved.
+
+    Post-square-off cooldown behavior remains unchanged.
 
     processed_supertrend is retained for function signature
-    compatibility but is no longer used.
+    compatibility but is not used.
     """
 
-    # 1. Enforce post-square-off cooldown.
+    # 1. Enforce the existing post-square-off cooldown.
     if cooldown_remaining() > 0:
         print(
             "⏳ POST-SQUARE-OFF COOLDOWN: "
@@ -91,7 +99,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
         f"Exit: MKT({mkt_signal})"
     )
 
-    # 6. Apply the configured new-book cutoff.
+    # 6. Apply the entry-only time restriction.
     return _apply_new_book_cutoff(
         entry_sig,
         exit_sig,
