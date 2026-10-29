@@ -20,7 +20,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 # LOCAL MODE CONFIGURATION (Switch here manually)
 # ==========================================================================
 # Set to 0 for your new logic, or 1 for your original workflow
-ACTIVE_MODE = 1
+ACTIVE_MODE =3
 
 # Explicitly enforce Indian Standard Time zone mapping
 TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
@@ -84,6 +84,14 @@ def apply_ohlc_transformation(
             # Handle edge case if df has only 1 row (previous candle shift turns NaN)
             if len(out) > 1 and pd.isna(out.loc[out.index[0], "Close"]):
                 out.loc[out.index[0], "Close"] = ohlc_4.iloc[0]
+        elif mode == 3:
+            modified_c = (out['Close'] + out['High'] + out['Low']) / 3.0
+            raw_o = out['Open']
+            
+            out['Close'] = modified_c
+            out['High'] = np.maximum(raw_o, modified_c)
+            out['Low'] = np.minimum(raw_o, modified_c)
+
 
     return out
 
