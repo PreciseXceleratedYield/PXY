@@ -263,7 +263,7 @@ def run_depth_squareoff(client, active_df, market_data_available,
         return set()
 
     print(
-        f"{Fore.YELLOW}⚠️ Deep reversal: {snapshot.get('entry')} with "
+        f"{Fore.YELLOW}⚠️ Deep reversal: {snapshot.get('exit')} with "
         f"{snapshot.get('hkin_past_depth')} past depth and {side_loss_pct:.2f}% "
         f"running loss; squaring off {side}."
     )
