@@ -24,7 +24,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 # Mode 1: Historical OHLC/4 close override
 # Mode 2: Close = (Open + Close) / 2
 # Mode 3: Close = (Close + High + Low) / 3; recalculate High/Low
-ACTIVE_MODE = 1
+ACTIVE_MODE = 0
 
 # Explicitly enforce configured timezone mapping.
 TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
