@@ -109,14 +109,14 @@ def calculate_tgt(
 
         # Unified Condition Routing Matrix
         if not both_sides_open:
-            target_pct = 1.4 * (own_power + own_depth)
-        
-        elif is_aligned:
-            target_pct = 14 + (14/own_power) + (14/own_depth)
-        
+            if is_aligned:
+                target_pct = 1.4 * (own_power + own_depth)
+            else:
+                target_pct = 1.4
+
         else:
-            target_pct = 1.4
-        
+            target_pct = 14 + (14 / own_depth) + (14 / own_power)
+
         return min(99.0, target_pct)
 
     except Exception as e:
