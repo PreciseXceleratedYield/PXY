@@ -57,7 +57,7 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True):
 
         # Scale up if it is not aligned
         if not is_aligned:
-            base_magnitude *= 1.4
+            base_magnitude *= 1.0
 
         return -base_magnitude
 
