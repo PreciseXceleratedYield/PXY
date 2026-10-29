@@ -84,7 +84,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
         else:
             entry_sig, exit_sig = "NONE", "NONE"
             
-        print(f"⏱️ [WINDOW: 09:00-09:30] Entry: MKT({mkt_signal}) | Exit: MKT({mkt_signal})")
+        print(f"⏱️ Entry: MKT({mkt_signal}) | Exit: MKT({mkt_signal})")
     
     else:
         # ==============================================================================
@@ -110,7 +110,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
         else:
             exit_sig = "NONE"
             
-        print(f"⏱️ [WINDOW: AFTER 09:30] Entry: MKT({mkt_signal}) | Exit: ST({st_signal})")
+        print(f"⏱️ Entry: MKT({mkt_signal}) | Exit: ST({st_signal})")
 
     # 6. Apply system end-of-session cutoff rules to the calculated entry signal
     return _apply_new_book_cutoff(entry_sig, exit_sig, now_time)
