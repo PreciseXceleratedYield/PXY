@@ -64,8 +64,10 @@ if SYSENTRPXY_VARIANT not in {"MKT", "RSIG"}:
 SYSENTRPXY_ST_START = dt_time(16, 0)
 
 # Data ingestion, chart generation, and signal calculation.
-# DTAF is intentionally simplified to a single raw-OHLC mode with futures blending.
+# DTAF mode is centrally selected here; no separate mode switch exists in DTAF.
+# Mode 0 preserves original OHLC after futures blending; Mode 1 applies DTAF.
 SYSDTAFPXY_FORCE_NIFTY_FUT = False
+SYSDTAFPXY_SELECTED_MODE = 0
 if (
     isinstance(SYSDTAFPXY_SELECTED_MODE, bool)
     or not isinstance(SYSDTAFPXY_SELECTED_MODE, int)
