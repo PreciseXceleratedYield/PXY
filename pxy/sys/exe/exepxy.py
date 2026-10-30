@@ -27,18 +27,9 @@ from syscnfgpxy import (
     EXEPXYPXY_SUB_ITERATIONS,
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
-    SYSMODEPXY_RUN_MODE as RUNMODE,
 )
-from sysmodepxy import normal_start_message
 
 ist = SYSCNFGPXY_TIMEZONE
-
-if RUNMODE != "PRD":
-    _normal_start_error = normal_start_message(RUNMODE)
-else:
-    _normal_start_error = None
-
-from sysmodepxy import dispatch_mode
 
 # ---------------- HELPER FUNCTIONS ----------------
 def run_script(script_path, timeout=None):
@@ -81,7 +72,7 @@ def _in_market_hours_production():
 
 
 def in_market_hours():
-    return dispatch_mode("engine_window_open", _in_market_hours_production)
+    return _in_market_hours_production()
 
 def run_market_cycle():
     """Run one production iteration with maximum exit priority."""
@@ -94,10 +85,6 @@ def run_market_cycle():
 
 
 def main():
-    if _normal_start_error is not None:
-        print(_normal_start_error, file=sys.stderr)
-        return 2
-
     os.system("clear")
     print("\n🚀 INIT: main market loop starting now [SIMPLE MODE ONLY] 📡")
     loop_counter = 1
@@ -107,11 +94,8 @@ def main():
         HERE / "exeentrpxy.py",
         HERE / "exeexitpxy.py",
     ]
-    if dispatch_mode("run_startup_checks", lambda: True):
-        for script in parent_scripts:
-            safe_run(script)
-    else:
-        print("CHK MODE: engine startup checks paused during market hours.")
+    for script in parent_scripts:
+        safe_run(script)
 
     while True:
         os.system("clear")
@@ -126,24 +110,18 @@ def main():
                 run_market_cycle()
             loop_counter += 1
         else:
-            if dispatch_mode("run_closed_market_tasks", lambda: True):
-                print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
-                safe_run(HERE.parent / "sysslefpxy.py")
-            else:
-                print("\nCHK MODE: engine paused during market hours.")
+            print("\n🌙 MKT CLOSED: running cleanup tasks now 💤")
+            safe_run(HERE.parent / "sysslefpxy.py")
             fancy_pause(EXEPXYPXY_IDLE_PAUSE_SECONDS)
 
             while not in_market_hours():
                 os.system("clear")
-                if dispatch_mode("run_closed_market_tasks", lambda: True):
-                    safe_run(HERE.parent / "syscprtpxy.py")
-                    print(
-                        f" ⏳   WAIT : market opens at "
-                        f"{EXEPXYPXY_MARKET_OPEN.strftime('%H:%M')} IST  📡",
-                        end="\r",
-                    )
-                else:
-                    print(" ⏳   CHK waits until market close  📡", end="\r")
+                safe_run(HERE.parent / "syscprtpxy.py")
+                print(
+                    f" ⏳   WAIT : market opens at "
+                    f"{EXEPXYPXY_MARKET_OPEN.strftime('%H:%M')} IST  📡",
+                    end="\r",
+                )
                 time.sleep(EXEPXYPXY_IDLE_POLL_SECONDS)
 
             print("\n🚀 MKT OPEN: resuming main loop now 📈")

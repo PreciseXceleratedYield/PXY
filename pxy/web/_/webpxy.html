@@ -1267,14 +1267,14 @@ function selectTrade(t){
         row.classList.toggle('dimmed',!match);
         if(match)row.scrollIntoView({block:'nearest',behavior:'smooth'});
     });
-    // switch chart to day candle source (same as backtest)
+    // switch chart to day candle source
     loadDayChart();
 }
 
 async function loadDayChart(){
     try{
         const data=await fetch('/api/web-data/webdaypxy?_='+Date.now()).then(r=>r.json());
-        // parse same way as backtest parseSplit
+        // parse chart data
         let candles=[];
         if(Array.isArray(data)){
             candles=data.map(r=>({

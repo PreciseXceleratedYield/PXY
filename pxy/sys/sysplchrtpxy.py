@@ -12,7 +12,6 @@ from syscnfgpxy import (
     SYSPLCHRTPXY_TARGET_ROWS,
     SYSPLCHRTPXY_HISTORY_PERIODS,
 )
-from sysmodepxy import dispatch_mode
 
 # Silence future warning constraints completely
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -145,18 +144,10 @@ def fetch_yf_data(
     interval=SYSPLCHRTPXY_FETCH_INTERVAL,
     target_rows=SYSPLCHRTPXY_TARGET_ROWS,
 ):
-    return dispatch_mode(
-        "fetch_chart_data",
-        _fetch_yf_data_production,
+    return _fetch_yf_data_production(
         period=period,
         interval=interval,
         target_rows=target_rows,
-        test_kwargs={
-            "timezone": TIMEZONE,
-            "transform": lambda frame: apply_ohlc_transformation(
-                frame, mode=SYSPLCHRTPXY_OHLC_MODE
-            ),
-        },
     )
 
 def get_latest_data():

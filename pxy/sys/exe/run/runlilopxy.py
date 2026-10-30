@@ -13,7 +13,6 @@ from syscnfgpxy import (
     SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT,
     SYSCNFGPXY_TIMEZONE,
 )
-from sysmodepxy import dispatch_mode
 
 # 🔍 STRATEGIC FOOTPRINT: Resolved relative to run/ directory pathing
 SQUAREOFF_LOG_FILE = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/websqrpxy.json"))
@@ -455,13 +454,10 @@ def _process_lilo_orders_production(client, strict=False, risk_exit_signal=None)
 
 
 def process_lilo_orders(client, strict=False, risk_exit_signal=None):
-    return dispatch_mode(
-        "process_lilo_orders",
-        _process_lilo_orders_production,
+    return _process_lilo_orders_production(
         client=client,
         strict=strict,
         risk_exit_signal=risk_exit_signal,
-        test_kwargs={"timezone": SYSCNFGPXY_TIMEZONE},
     )
 
 

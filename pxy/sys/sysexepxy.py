@@ -8,10 +8,8 @@ from syscnfgpxy import (
     SYSEXEPXY_MARKET_CLOSE,
     SYSEXEPXY_MARKET_OPEN,
     SYSEXEPXY_SUPERVISOR_INTERVAL_SECONDS,
-    SYSMODEPXY_RUN_MODE as RUNMODE,
     SYSCNFGPXY_TIMEZONE,
 )
-from sysmodepxy import dispatch_mode, normal_start_message
 
 # ---------------- EXEC SCRIPT ----------------
 def run_execprt():
@@ -62,17 +60,12 @@ def _is_market_hours_production():
 
 
 def is_market_hours():
-    return dispatch_mode("engine_window_open", _is_market_hours_production)
+    return _is_market_hours_production()
 
 # ---------------- SUPERVISOR LOOP ----------------
 def start_loop():
     """Main loop to supervise execution"""
-    if RUNMODE != "PRD":
-        print(normal_start_message(RUNMODE), file=sys.stderr)
-        return 2
-
-    if dispatch_mode("run_startup_checks", lambda: True):
-        run_execprt()
+    run_execprt()
     was_open = False
     off_done = False
 
@@ -99,13 +92,11 @@ def start_loop():
         if os.path.exists(EXE_FILE):
             if mkt:
                 subprocess.run([sys.executable, EXE_FILE])
-            elif dispatch_mode("run_closed_market_tasks", lambda: True):
+            else:
                 if not off_done:
                     print("🌙 OFF MKT: one run executed, idle now 💤")
                     subprocess.run([sys.executable, EXE_FILE])
                     off_done = True
-            else:
-                print("CHK MODE: whole engine paused during market hours.")
         else:
             print("❌ EXE ERR: exepxy.py file not found ⚠️")
 

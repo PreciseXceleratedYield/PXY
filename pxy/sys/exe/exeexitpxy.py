@@ -39,7 +39,6 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     PASTRSK,
 )
-from sysmodepxy import dispatch_mode
 from sysdecisionpxy import (
     counter_leg_allowed,
     exit_order_response_accepted,
@@ -366,7 +365,7 @@ def place_exit_order(client, row):
         return None 
 
 def verify_and_exit(client, row): 
-    return dispatch_mode("verify_and_exit", lambda client, row: _verify_and_exit_production(client, row), client, row)
+    return _verify_and_exit_production(client, row)
 
 
 def _verify_and_exit_production(client, row):
@@ -404,16 +403,12 @@ def _verify_and_exit_production(client, row):
         print(f"{Fore.RED}❌ Safety Check Crash: {e}")
 
 def run_snapshot():
-    if not dispatch_mode("engine_window_open", lambda: True):
-        print(f"{Fore.YELLOW}CHK engine paused during market hours; exit pipe not run.")
-        return
-
     now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
     
     # Base path to the script
     exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), SQUAREOFF_SCRIPT)
     
-    if dispatch_mode("allow_squareoff", lambda: True) and os.path.exists(exe_path):
+    if os.path.exists(exe_path):
         sq_args, sq_key = None, None
         if SQOFF_START <= now < SQOFF_ALL_START:       # 15:30 to 15:31: without -all
             sq_args, sq_key = [], "SQOFF|first"
@@ -512,11 +507,7 @@ def run_snapshot():
             data.get("positions_unverified"),
             is_ledger_busy,
         ):
-            dispatch_mode(
-                "run_counter_leg",
-                lambda remaining_df: check_counter_leg(remaining_df),
-                df[held_mask],
-            )
+            check_counter_leg(df[held_mask])
     except Exception as e:
         print(f"{Fore.RED}❌ Counter-leg hook error: {e}")
 

@@ -154,8 +154,6 @@ while true; do
     echo "v) 🔭 View   - Attach Engine Tmux"
     echo "e) 🛒 Enter  - Trading Operations"
     echo "t) 🧪 Test   - Run Python Scripts"
-    echo "b) 📊 SIM    - Replay Historical Data"
-    echo "c) ✅ CHK    - Run Test Suite"
     echo "x) ❌ Exit   - Close Dashboard"
     draw_border
     read -p "Select option: " OPTION
@@ -224,36 +222,19 @@ while true; do
                 echo "[-] Web dashboard already running."
             fi
 
-            PYTHON_BIN=python3
-            if [ -x "$HOME/env/bin/python" ]; then
-                PYTHON_BIN="$HOME/env/bin/python"
-            fi
-            RUNMODE=$(cd "$PXY_APP_DIR/sys" && "$PYTHON_BIN" -c 'import syscnfgpxy; print(syscnfgpxy.SYSMODEPXY_RUN_MODE)')
-            if [ -z "$RUNMODE" ]; then
-                echo "[X] Could not read RUNMODE from syscnfgpxy.py; engine was not started."
-            elif [ "$RUNMODE" = "PRD" ]; then
-                echo "Initializing Production Trading Engine..."
-                if ! tmux has-session -t pxy-engine 2>/dev/null && ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
-                    # Restrict terminal history memory strictly to 500 lines
-                    tmux new-session -d -s pxy-engine "bash -c 'tmux set-option history-limit 500; cd \"$PXY_APP_DIR/sys\"; if [ -f \"\$HOME/env/bin/activate\" ]; then source \"\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; python3 sysexepxy.py'"
+            echo "Initializing Production Trading Engine..."
+            if ! tmux has-session -t pxy-engine 2>/dev/null && ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
+                # Restrict terminal history memory strictly to 500 lines
+                tmux new-session -d -s pxy-engine "bash -c 'tmux set-option history-limit 500; cd \"$PXY_APP_DIR/sys\"; if [ -f \"\\$HOME/env/bin/activate\" ]; then source \"\\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; python3 sysexepxy.py'"
 
-                    sleep 1
-                    if tmux has-session -t pxy-engine 2>/dev/null; then
-                        echo "[✔] Python engine running successfully inside tmux session 'pxy-engine'."
-                    else
-                        echo "[X] Production engine failed to boot! Check tmux manually."
-                    fi
+                sleep 1
+                if tmux has-session -t pxy-engine 2>/dev/null; then
+                    echo "[✔] Python engine running successfully inside tmux session 'pxy-engine'."
                 else
-                    echo "[-] Python engine is already running."
+                    echo "[X] Production engine failed to boot! Check tmux manually."
                 fi
-            elif [ "$RUNMODE" = "CHK" ]; then
-                echo "[i] RUNMODE=CHK: production engine was not started."
-                echo "    Run 'pxychk' to execute isolated checks."
-            elif [ "$RUNMODE" = "SIM" ]; then
-                echo "[i] RUNMODE=SIM: production engine was not started."
-                echo "    Run 'pxysim' to replay historical candles."
             else
-                echo "[X] Unsupported RUNMODE='$RUNMODE'; engine was not started."
+                echo "[-] Python engine is already running."
             fi
             echo ""
             read -p "Press [Enter] to return..."
@@ -307,38 +288,6 @@ while true; do
             ;;
         t)
             show_test_menu
-            ;;
-        b)
-            echo ""
-            echo "Updating code before historical SIM replay..."
-            if bash "$PXY_APP_DIR/pxyupdate"; then
-               echo ""
-               echo "Starting historical SIM replay with FULL DAY candles..."
-               if [ -x "$HOME/.local/bin/pxysim" ]; then
-                   if "$HOME/.local/bin/pxysim"; then
-                       echo "[✔] SIM replay completed."
-                   else
-                       echo "[X] SIM replay failed with exit code $?."
-                   fi
-               else
-                   echo "[X] Could not find executable $HOME/.local/bin/pxysim."
-               fi
-            else
-               echo "[X] Update failed; SIM replay was not started."
-            fi
-            echo ""
-            read -p "Press [Enter] to return..."
-            ;;
-        c)
-            echo ""
-            echo "Running CHK test suite."
-            if bash "$PXY_APP_DIR/pxychk"; then
-                echo "[✔] CHK test suite completed."
-            else
-                echo "[X] CHK test suite failed with exit code $?."
-            fi
-            echo ""
-            read -p "Press [Enter] to return..."
             ;;
         x)
             echo ""

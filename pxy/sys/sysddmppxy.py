@@ -11,7 +11,6 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSDTAFPXY_DEFAULT_INTERVAL,
 )
-from sysmodepxy import dispatch_mode
 
 # Silence future warning constraints completely
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -80,7 +79,7 @@ def _run_independent_engine_production():
 
 
 def run_independent_engine():
-    return dispatch_mode("run_independent_engine", _run_independent_engine_production)
+    return _run_independent_engine_production()
 
 
 if __name__ == "__main__":

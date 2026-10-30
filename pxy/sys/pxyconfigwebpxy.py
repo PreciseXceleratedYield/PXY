@@ -18,7 +18,6 @@ import time
 
 CONFIG_PATH = Path(__file__).with_name("syscnfgpxy.py")
 ENUMS = {
-    "SYSMODEPXY_RUN_MODE": ("PRD", "CHK", "SIM"),
     "EXEOTMPXY_STRIKE_MODE": ("ATM", "OTMFIX", "OTMDYN"),
     "SYSDTHAPXY_INCLUDE_RUNNING_CANDLE": ("YES", "NO"),
     "PASTRSK": ("YES", "NO"),

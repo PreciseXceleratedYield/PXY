@@ -4,8 +4,6 @@
 configuration is ordered from shared system/launch settings, through data and
 signals, entry/averaging, order execution, and finally portfolio risk. The
 production launch path is `pxy/pxy` → `sysexepxy.py` → `exe/exepxy.py`; the
-shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
-`RUNMODE=SIM` in their environments.
 
 ## READYFRIDAY strategy reference
 
@@ -34,8 +32,6 @@ runtime selector.
   or non-positive power/depth values default individually to 1. Targets are
   capped at 99%; from 14:45 IST, the 99% target applies only when both sides
   are open.
-- **SIM/CHK:** exercise production decision logic with simulated or mock
-  broker/order I/O; neither mode sends live orders.
 
 ## Ownership and precedence
 
@@ -53,9 +49,6 @@ runtime selector.
 - The shared NIFTY lot size and common F&O order payload defaults live under
   `SYSCNFGPXY_*`. Existing owner-prefixed order settings and the force-order
   lot-size setting are aliases to those shared values, not separate overrides.
-- `RUNMODE` is the intentional environment override for
-  `SYSMODEPXY_RUN_MODE`; the production menu reads the resolved value from
-  `syscnfgpxy.py`. Shell scripts select deployment mode, not strategy knobs.
 - `SYSCNFGPXY_ACTION_COOLDOWN_SECONDS` is the single shared cooldown for
   averaging, counter-buy, exit de-duplication, and the production engine's
   between-cycle pause. Its current value is 6 seconds. The idle engine pause,
@@ -109,12 +102,11 @@ runtime selector.
 
 | Area (owner prefixes) | Responsibility |
 | --- | --- |
-| `SYSCNFGPXY`, `SYSMODEPXY`, `SYSEXEPXY`, `EXEPXYPXY` | Shared defaults and market schedule, run-mode validation, supervisor and engine scheduling |
+| `SYSCNFGPXY`, `SYSEXEPXY`, `EXEPXYPXY` | Shared defaults and market schedule, supervisor and engine scheduling |
 | `SYSDTAFPXY`, `SYSPLCHRTPXY`, `SYSSTRNDPXY`, `SYSSMAPXY`, `SYSDTHAPXY`, `SYSDTSTPXY`, `SYSSADXPXY`, `SYSBBOSPXY`, `SYSMKTPXY`, `SYSRIGPXY`, `SYSKATRPXY`, `SYSPWERPXY`, `SYSDPTPXY` | Data acquisition and signal/indicator parameters, including breakout session recognition and directional force factors |
 | `EXEAGTPXY`, `EXEACGPXY`, `EXEAMSPXY`, `EXEAVXPXY`, `EXEAVGPXY`, `EXEENTRPXY` | Entry thresholds, averaging window/limits, average-order payload, and entry pipeline |
 | `EXEFORCEPXY`, `EXESLPXY`, `EXECBUYPXY`, `EXEEXITPXY`, `EXESQRPXY`, `EXEOMSPXY`, `EXEDYNPXY`, `EXETGTPXY`, `EXEOTMPXY` | Force/stop/counter orders, exit and square-off behavior, targets, and symbol selection |
 | `RUNNIFTYPXY`, `RUNPCHKPXY`, `RUNEXMTPXY`, `RUNEXACPXY`, `RUNEXIOPXY`, `RUNEXLQDPXY`, `RUNLILOPXY` | Symbol selection, verified NIFTY position/lot checks, risk-ledger mathematics/actions/state/liquidation, and order-ledger filtering |
-| `TSTPOINTBTPXY` | Point-replay session gates; explicitly test-only, not an engine override |
 
 The config file's comments group related settings and identify conditional
 values. Use that file as the full variable inventory; this table explains the
@@ -264,66 +256,6 @@ network boundary.
   consecutive checks, at least 10 seconds apart). The check counter is stored
   persistently so the engine can resume the confirmation after a restart. A tie
   does not count as aligned.
-- CHK exercises the target calculations and simulated square-off path.
-  `tstmodepxy/backtest.py` enables the same risk cycle during historical replay.
-  SIM never sends live orders, uses index spot as every simulated fill and
-  mark, and simulates one index unit per lot regardless of the index's actual
-  derivatives contract size. Production single-exit, averaging, cycle-risk,
-  and deep-reversal loss percentages are each divided by 200 before comparing
-  them with direction-aware spot returns or applying them to spot notional.
-  To keep the investment-cap gate meaningful with spot-priced simulated lots,
-  SIM uses a `250000` averaging cap; production retains its configured
-  `25000` cap.
-  The production minimum P&L exit gate is scaled by SIM quantity relative to
-  the prior 65-unit SIM lot, preserving the per-lot exit threshold when SIM
-  uses one index unit. CE targets require an upward move and PE targets a
-  downward move. SIM results are index-point results, not historical option
-  P&L.
-
-## Check
-
-From the `pxy` console, choose `b)` to open the SIM session-date menu and select
-one of the five most recent completed trading days or replay the latest seven
-available completed sessions, or choose `c)` to run the isolated CHK test suite.
-Seven-session SIM reports daily spot points and a running cumulative total.
-These are separate actions: CHK does not start SIM. Neither option sends live orders.
-SIM then lets you choose to review books one at a time or run the replay without
-pauses and show each book at the end. Both options print total spot points gained.
-
-Run `pxychk` directly to run only the CHK test suite. The SIM runner also accepts
-`RUNMODE=SIM python3 syssimpxy.py --session-date YYYY-MM-DD` to replay one exact
-completed session. CHK checks the shared production decision gates and invokes
-the production averaging controller against temporary mock positions; any
-resulting orders are captured by a simulated client and never sent to a broker.
-The suite also runs production-pipe replay tests using the SIM broker adapter.
-
-## Manual LGT replay
-
-Run `RUNMODE=SIM python3 syssimpxy.py` to replay the latest seven
-completed sessions from one-minute index candles (or fewer if less history is
-available), with the preceding session used for indicator warm-up. Use
-`--sessions N` to select a different number of sessions, `--records N` for a
-short diagnostic replay, or `--lgt-constant 8` to test a fixed `-8%` LGT
-threshold instead of the configured formula. SIM uses the production entry
-and exit signal path. In an interactive terminal (including a remote-host
-terminal), SIM prints a two-column Action / Why action table when each book
-closes and waits for Enter before advancing to the next book; type `q` to stop.
-Non-interactive runs do not wait for input.
-
-The replay keeps production signals, target selection, averaging, counter-buy,
-risk confirmation, and scheduled square-off flow, evaluating time-based entry
-routing at each historical candle's timestamp. Exit-aligned positions use a
-fixed 77% target before 10:00 IST and
-`max(4, own-side depth) × own-side power` from 10:00 IST onward, without an
-upper cap; unaligned targets remain 1.4%.
-SIM uses only index spot prices and a fixed quantity of 1 per lot; it divides
-production target percentages, averaging LGT thresholds, cycle-risk targets,
-and deep-reversal loss thresholds by 200 before applying them to spot returns
-or quantity-weighted entry-spot notional. CE targets require spot to rise; PE
-targets require spot to fall. P&L is signed index movement times quantity for
-each lot. Remaining positions must be closed by scheduled square-off or the
-replay reports an error. This is a spot-point strategy comparison, not
-historical option P&L.
 
 ## Other conditional settings
 
@@ -373,18 +305,16 @@ historical option P&L.
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.
 - The signal variant, ATR mode, chart transformation mode, run
-  mode, and risk action are validated at configuration import so unsupported
-  values fail visibly rather than silently selecting a fallback branch.
+  risk action is validated at configuration import so unsupported values fail
+  visibly rather than silently selecting a fallback branch.
 
 ## Audit notes
 
 - Reachability matters: `sysplchrtpxy.py`, `sysdtstpxy.py`, and `sysrigpxy.py`
   have no callers in the current production launch graph. Their settings remain
   owned by those standalone utilities and do not change the live engine.
-  `TSTPOINTBTPXY` is test-only. The older `exe/run/X` and alternate risk-runner
-  implementations are likewise outside the current production schedule.
-- The production shell menu had continued reading the removed `syscnfgpxy.RUNMODE`
-  alias after run-mode centralization. It now reads `SYSMODEPXY_RUN_MODE`.
+  The older `exe/run/X` prototype and alternate risk-runner implementations
+  are likewise outside the current production schedule.
 - Removed settings with no effective consumer: the unused second Supertrend
   parameter pair, the obsolete LGT base-loss knob, the unused order-ledger match
   mode, and the unused trailing-drop-gap setting. The risk stop's actual 2×
@@ -395,13 +325,11 @@ historical option P&L.
   time-filtered mode 3; the former Renko transformation and its brick-size
   setting are removed.
 - Averaging-order payload values, retry timing, ATR fallbacks/floors, signal
-  force values, and point-replay session times are wired to the consuming
+  force values are wired to the consuming
   modules. Dynamic non-aligned TGT reads its configured percentage rather than
   bypassing it with a literal.
 - The regular exit and square-off order paths both use the centrally configured
   sell transaction type; square-off no longer embeds a separate `"S"` literal.
-- Legacy portfolio PEAK formulas remain available for their mathematical CHK
-  coverage; production cycle liquidation uses the cycle premium target above.
 - Older/alternate engines and account-specific utilities are not implicitly
   made active by centralizing production settings. Their local constants remain
   isolated until those entry paths are deliberately adopted or retired. The

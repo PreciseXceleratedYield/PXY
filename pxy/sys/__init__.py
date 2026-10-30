@@ -1,4 +1,4 @@
-"""PXY system initialization - simulator and engine entry points."""
+"""PXY production system package."""
 import sys
 from pathlib import Path
 

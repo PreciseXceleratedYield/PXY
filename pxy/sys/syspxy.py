@@ -7,7 +7,6 @@ from pathlib import Path
 from datetime import datetime
 
 from sysdashpxy import get_full_snapshot
-from sysmodepxy import dispatch_mode
 from sysstrndpxy import export_supertrend_json
 
 
@@ -36,10 +35,7 @@ def get_all_data():
                 f"{sidecar_path}: {error}"
             )
 
-    dispatch_mode(
-        "run_futures_sidecar",
-        run_production_futures_sidecar
-    )
+    run_production_futures_sidecar()
 
     # -------- CORE --------
     core = get_full_snapshot() or {}

@@ -202,8 +202,6 @@ python3 pxy/sys/exe/exepxy.py
 ### Main Configuration File: `syscnfgpxy.py`
 
 ```python
-RUNMODE = "PRD"  # PRD: live, CHK: mock checks, SIM: historical replay
-
 PARAMS = {
     "ticker": "^NSEI",      # Trading instrument
     "ohlc_mode": 1          # OHLC calculation mode (0-5)
@@ -497,66 +495,11 @@ def get_full_snapshot() -> dict:
 }
 ```
 
-The system has three execution modes:
-
-| Execution | Start | Market data | Broker/orders |
-| --- | --- | --- | --- |
-| **PRD** | Start the usual `exepxy.py` engine with `RUNMODE = "PRD"` | Live production sources | Real broker |
-| **CHK** | Run `pxychk` | Isolated check/test suite | No live broker or live orders |
-| **SIM** | Run `pxysim --records 100` | Yahoo historical candles | CSV-backed simulated broker |
-
-`RUNMODE` accepts only `PRD`, `CHK`, or `SIM`; its checked-in default is `PRD`.
-The ordinary engine entry points start only in PRD; they refuse CHK and SIM and
-print the dedicated command to run. In the management menu, **Start** launches
-the web dashboard, then reports the configured mode without trying to boot a
-production engine in CHK or SIM.
-
-The `pxychk` and `pxysim` launchers set `RUNMODE=CHK` and `RUNMODE=SIM` only for
-the process they start; no config edit or persistent shell export is needed.
-For direct Python commands, prefix the command with `RUNMODE=CHK` or
-`RUNMODE=SIM`. SIM never falls through to live provider dispatch or submits live
-orders.
-
-Installed shell commands resolve the application directory from `PXY_APP_DIR`,
+The production engine uses live market data and the configured broker.\n\nInstalled shell commands resolve the application directory from `PXY_APP_DIR`,
 then `$HOME/PXY/pxy` or `$HOME/pxy`; `pxyupdate` installs the shared resolver
 alongside the commands in `$HOME/.local/bin`. The dashboard's script actions
 run from the directory containing `pxy.js`, so shell, Python, and web entry
 points target the same checkout.
-
-Focused unit tests cover production decision gates, mode routing, and the
-isolated replay. They can also be run from `pxy/sys` with
-`python3 -m unittest discover -s tstmodepxy -p 'test_*.py'`.
-
-### SIM one-session strategy replay
-
-Run `pxysim --records 100` from the `pxy/` directory (or
-`RUNMODE=SIM python3 syssimpxy.py --records 100` from `pxy/sys/`). The isolated
-simulator fetches recent one-minute NIFTY data for indicator warmup.
-If it cannot find a completed session in the recent history, it checks prior
-weekdays one by one and uses the first complete session found, within Yahoo's
-seven-day 1-minute data limit. It then evaluates the production dashboard and
-exit, entry, averaging, counter-leg, and square-off pipes in their normal order
-for each bar. It uses
-a CSV-backed simulated Kotak-shaped broker; live sessions, real order calls, subprocess
-launches, and production state-file writes are blocked or redirected. Console
-output is saved alongside the simulated trade ledger and bar-by-bar decision
-CSV under `~/pxy-sim-results/`.
-
-Replay-only adapters are isolated under `pxy/sys/tstmodepxy/`; production pipe
-modules do not import the backtest runner or simulated broker. The replay binds
-the production pipes' data, broker, clock, process, and state boundaries to
-these adapters for the duration of the run, then restores them. The adapter is
-activated only by the standalone backtest command; it is not part of the PRD
-scheduler or launch path.
-
-Signals from a completed candle are acted on at the next candle open. Since
-historical option premiums are not loaded, the simulator uses clearly labelled
-synthetic CE/PE premium and position proxies derived from NIFTY spot movement.
-The results are not historical option P&L and do not include transaction
-costs, slippage, or real broker/OMS behavior. The replay refuses to run during
-weekday market hours (09:15-15:30 IST) and on configured exchange holidays.
-
----
 
 ### 6. `syscnfgpxy.py` - Configuration Module
 

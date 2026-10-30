@@ -16,7 +16,6 @@ from syscnfgpxy import (
     SYSDTAFPXY_FORCE_NIFTY_FUT,
     SYSDTAFPXY_SELECTED_MODE,
 )
-from sysmodepxy import dispatch_mode
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
@@ -333,11 +332,8 @@ def fetch_yf_data(
     interval=SYSDTAFPXY_DEFAULT_INTERVAL,
     target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
 ):
-    return dispatch_mode(
-        "fetch_yf_data",
-        _fetch_yf_data_production,
+    return _fetch_yf_data_production(
         period=period,
         interval=interval,
         target_rows=target_rows,
-        test_kwargs={"timezone": TIMEZONE},
     )

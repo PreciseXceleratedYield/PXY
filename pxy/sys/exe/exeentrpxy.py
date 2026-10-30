@@ -34,7 +34,6 @@ try:
     from syspxy import get_all_data
     from runclntpxy import get_session
     from runpchkpxy import get_position_summary
-    from sysmodepxy import dispatch_mode
     from sysdecisionpxy import (
         entry_blackout,
         entry_order_command,
@@ -51,9 +50,6 @@ except Exception as e:
 
 def main():
     dprint("===== START =====", Fore.GREEN)
-    if not dispatch_mode("engine_window_open", lambda: True):
-        print(f"{Fore.YELLOW}CHK engine paused during market hours; entry pipe not run.")
-        return
     try:
         now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
         dprint(f"TIME: {now}")
@@ -66,7 +62,7 @@ def main():
             EXEENTRPXY_ENTRY_CUTOFF,
             EXEENTRPXY_SQUAREOFF_END,
         )
-        if dispatch_mode("is_entry_blackout", is_blackout, now):
+        if is_blackout(now):
             print(f"{Fore.YELLOW}⏳ Market buffer time - skip")
             return
 

@@ -5,7 +5,6 @@ Keep tunable runtime values grouped by subsystem and prefixed with their owner
 module's name. See CONFIGURATION.md for the layout and conditional settings.
 """
 import math
-import os
 from datetime import time as dt_time
 
 import pytz
@@ -38,15 +37,9 @@ if RUNLDGRPXY_LAYOUT_WIDTH < 1:
     raise ValueError("RUNLDGRPXY_LAYOUT_WIDTH must be positive.")
 if RUNNFTFUTPXY_PRICE_HISTORY_LIMIT < 1:
     raise ValueError("RUNNFTFUTPXY_PRICE_HISTORY_LIMIT must be positive.")
-SYSMODEPXY_RUN_MODE = os.environ.get(
-    "RUNMODE", "PRD"
-)  # PRD: live engine, CHK: mock engine, SIM: historical replay.
-if SYSMODEPXY_RUN_MODE not in {"PRD", "CHK", "SIM"}:
-    raise ValueError("RUNMODE must be one of 'PRD', 'CHK', or 'SIM'.")
-
 # Engine launchers and scheduling.
 # Shared trading schedule. Keep distinct close windows explicit: the supervisor,
-# execution loop, and point replay intentionally stop at different times.
+# execution loop, and scheduled shutdown intentionally stop at different times.
 SYSCNFGPXY_EXCHANGE_OPEN = dt_time(9, 15)
 SYSCNFGPXY_PREOPEN_START = dt_time(9, 14)
 SYSCNFGPXY_MARKET_OPEN = dt_time(9, 16)
@@ -368,17 +361,6 @@ RUNEXLQDPXY_FLAT_CONFIRM_POLL_SECONDS = 2.0
 RUNEXLQDPXY_SQUAREOFF_TIMEOUT_SECONDS = 120
 
 RUNLILOPXY_DEFAULT_FILTER_TIME = SYSCNFGPXY_MARKET_OPEN.strftime("%H:%M:%S")
-
-# Test replay uses the same production session schedule by default.
-TSTPOINTBTPXY_MARKET_OPEN = SYSCNFGPXY_MARKET_OPEN
-TSTPOINTBTPXY_MARKET_CLOSE = SYSCNFGPXY_TRADING_PIPE_CLOSE
-TSTPOINTBTPXY_PREOPEN_START = SYSCNFGPXY_PREOPEN_START
-TSTPOINTBTPXY_PREOPEN_END = SYSCNFGPXY_MARKET_OPEN
-TSTPOINTBTPXY_ENTRY_CUTOFF = SYSCNFGPXY_ENTRY_CUTOFF
-TSTPOINTBTPXY_SQUAREOFF_END = SYSCNFGPXY_SQUAREOFF_END
-TSTPOINTBTPXY_FORCE_EXIT_TIME = SYSCNFGPXY_SQUAREOFF_ALL_START
-TSTPOINTBTPXY_TRADING_DAY_START = SYSCNFGPXY_EXCHANGE_OPEN
-TSTPOINTBTPXY_TRADING_DAY_END = SYSCNFGPXY_TRADING_DAY_END
 
 # ---------------- SYSTEM SELF TEST ----------------
 if __name__ == "__main__":

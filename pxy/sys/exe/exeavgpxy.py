@@ -14,17 +14,12 @@ from exeomspxy import get_combined_data
 from runclntpxy import get_session
 from exeavxpxy import handle_side_averaging
 from exeexppxy import dump_idle_json
-from sysmodepxy import dispatch_mode
 from sysdecisionpxy import averaging_snapshot_status
 from syscnfgpxy import EXEAVGPXY_IDLE_EXIT_MODE as EXIT_MODE
 
 init(autoreset=True)
 
 def run_snapshot():
-    if not dispatch_mode("engine_window_open", lambda: True):
-        print(f"{Fore.YELLOW}CHK engine paused during market hours; averaging pipe not run.")
-        return
-
     data = get_combined_data()
     df = data.get("active_orders", pd.DataFrame())
     status = averaging_snapshot_status(
@@ -63,14 +58,6 @@ def run_snapshot():
             f"{Fore.RED}⚠️ Invalid index price; averaging skipped because "
             "the dynamic LGT threshold cannot be calculated."
         )
-        return
-
-    if dispatch_mode(
-        "run_check_averaging",
-        lambda **_kwargs: False,
-        df=df,
-        market_snapshot=market_snapshot,
-    ):
         return
 
     client = get_session()

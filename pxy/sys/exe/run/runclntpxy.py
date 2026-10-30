@@ -5,7 +5,6 @@ SYS_DIR = Path(__file__).resolve().parents[2]
 if str(SYS_DIR) not in sys.path:
     sys.path.insert(0, str(SYS_DIR))
 
-from sysmodepxy import dispatch_mode
 
 def _get_production_session():
     """
@@ -47,7 +46,7 @@ def _get_production_session():
 
 
 def get_session():
-    return dispatch_mode("get_session", _get_production_session)
+    return _get_production_session()
 
 if __name__ == "__main__":
     # Test the session
