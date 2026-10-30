@@ -14,6 +14,7 @@ def get_position_summary(client=None):
     Returns CE/PE position counts as "XCEYPE".
     Returns None when positions cannot be verified.
     """
+
     offset_ce_lots = 0
     offset_pe_lots = 0
 
@@ -31,6 +32,10 @@ def get_position_summary(client=None):
 
     try:
         pos_res = client.positions()
+
+        if DEBUG:
+            print("\n[Position debug] Raw broker response:")
+            pprint(pos_res, sort_dicts=False)
 
         if not isinstance(pos_res, dict):
             print("❌ Position check skipped: invalid broker response.")
@@ -56,6 +61,7 @@ def get_position_summary(client=None):
             return None
 
         status = pos_res.get("stat")
+
         if status is not None and str(status).strip().lower() not in {
             "ok", "success", "successful"
         }:
@@ -63,6 +69,7 @@ def get_position_summary(client=None):
             return None
 
         positions = pos_res.get("data")
+
         if not isinstance(positions, list):
             print("❌ Position check skipped: missing or invalid positions data.")
             return None
@@ -72,47 +79,73 @@ def get_position_summary(client=None):
 
         def parse_quantity(value):
             quantity = float(str(value).replace(",", "").strip())
+
             if not math.isfinite(quantity):
                 raise ValueError(f"Invalid quantity: {value}")
+
             return quantity
 
         for pos in positions:
+
             if not isinstance(pos, dict):
                 raise ValueError("Invalid position row.")
 
+            # Use broker net_qty when available.
             if pos.get("net_qty") is not None:
+
                 net_qty = parse_quantity(pos["net_qty"])
-            elif "flBuyQty" in pos or "flSellQty" in pos:
-                net_qty = (
-                    parse_quantity(pos.get("flBuyQty", 0))
-                    - parse_quantity(pos.get("flSellQty", 0))
-                )
+
             else:
-                raise ValueError("Position row has no recognizable quantity.")
 
-            if net_qty == 0 and ("flBuyQty" in pos or "flSellQty" in pos):
+                # Include carry-forward and today's transactions.
+                cf_buy = parse_quantity(pos.get("cfBuyQty", 0))
+                cf_sell = parse_quantity(pos.get("cfSellQty", 0))
+
+                fl_buy = parse_quantity(pos.get("flBuyQty", 0))
+                fl_sell = parse_quantity(pos.get("flSellQty", 0))
+
                 net_qty = (
-                    parse_quantity(pos.get("flBuyQty", 0))
-                    - parse_quantity(pos.get("flSellQty", 0))
+                    cf_buy
+                    + fl_buy
+                    - cf_sell
+                    - fl_sell
                 )
 
+            # Ignore fully closed positions.
             if net_qty == 0:
                 continue
 
             symbol = str(pos.get("trdSym", "")).upper().strip()
+
             if not symbol:
-                raise ValueError("Active position row has no trading symbol.")
+                raise ValueError(
+                    "Active position row has no trading symbol."
+                )
 
             if not symbol.startswith("NIFTY"):
                 continue
 
+            # NIFTY option lot size.
             lot_size = 65
-            lots = max(1, math.ceil(abs(net_qty) / lot_size))
+
+            lots = max(
+                1,
+                math.ceil(abs(net_qty) / lot_size)
+            )
 
             if symbol.endswith("CE"):
                 ce_lots += lots
+
             elif symbol.endswith("PE"):
                 pe_lots += lots
+
+            if DEBUG:
+                print(
+                    f"[Position debug] {symbol} | "
+                    f"CF Buy: {cf_buy if 'cf_buy' in locals() else 'n/a'} | "
+                    f"CF Sell: {cf_sell if 'cf_sell' in locals() else 'n/a'} | "
+                    f"Net Qty: {net_qty} | Lots: {lots}"
+                )
 
         ce_lots = max(0, ce_lots - offset_ce_lots)
         pe_lots = max(0, pe_lots - offset_pe_lots)
@@ -121,12 +154,15 @@ def get_position_summary(client=None):
 
     except Exception as e:
         print(f"❌ Position check failed: {e}")
+
         if DEBUG:
             traceback.print_exc()
+
         return None
 
 
 if __name__ == "__main__":
+
     try:
         from runclntpxy import get_session
 
@@ -139,36 +175,44 @@ if __name__ == "__main__":
         response = broker.positions()
 
         if not isinstance(response, dict):
+
             print("❌ Invalid broker response:")
             pprint(response)
 
         else:
+
             print(f"Status : {response.get('stat')}")
             print(f"Message: {response.get('errMsg')}")
 
             positions = response.get("data")
 
             if isinstance(positions, list) and positions:
+
                 print(f"\nTotal position rows: {len(positions)}")
 
                 for index, position in enumerate(positions, 1):
+
                     print(f"\n--- POSITION {index} ---")
                     pprint(position, sort_dicts=False)
 
             else:
+
                 print("\nNo position rows returned by Kotak.")
-                print("Raw response:")
                 pprint(response, sort_dicts=False)
 
         print("\n" + "=" * 70)
         print("PXY CE/PE POSITION SUMMARY")
         print("=" * 70)
 
-        print("Actual Lot Summary:", get_position_summary(broker))
+        print(
+            "Actual Lot Summary:",
+            get_position_summary(broker)
+        )
 
         print("=" * 70 + "\n")
 
     except Exception as e:
+
         print(f"❌ Test Run Error: {e}")
         traceback.print_exc()
 
