@@ -10,7 +10,7 @@ from datetime import time as dt_time
 import pytz
 
 
-# System-wide defaults and execution mode.
+# System-wide defaults.
 SYSCNFGPXY_RELEASE_NAME = "READYFRIDAY"
 SYSCNFGPXY_TICKER = "BTC-USD"  # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
 

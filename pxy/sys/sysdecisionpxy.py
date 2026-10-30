@@ -1,4 +1,4 @@
-"""Pure pipe decisions shared by production execution and CHK scenario checks."""
+"""Pure decision functions shared by the production execution pipelines."""
 
 import math
 import re
