@@ -1,3 +1,4 @@
+
 # sysstrndpxy.py
 import json
 import os
@@ -31,7 +32,8 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         from sysdtafpxy import fetch_yf_data
         try:
             raw_df = fetch_yf_data(period='3d', interval='1m')
-            if raw_df is not None and not raw_df.empty: df = raw_df.copy()
+            if raw_df is not None and not raw_df.empty:
+                df = raw_df.copy()
         except Exception:
             df = df.copy()
 
@@ -40,7 +42,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
-        
+
     tz_string = str(TIMEZONE)
     df = df.tz_convert(tz_string) if df.index.tz is not None else df.tz_localize('UTC').tz_convert(tz_string)
 
@@ -66,11 +68,14 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file='../web/webchrtp
         st_val = float(row['st_line']) if not pd.isna(row['st_line']) else 0.0
         mirror_val = float(row['st_mirror']) if not pd.isna(row['st_mirror']) else 0.0
         sma_val = float(row['sma_50']) if not pd.isna(row.get('sma_50')) else None
+
+        # Clean TSMA: raw 7-period TSMA, without SMA blending.
         tsma_val = (
-            (float(row['tsma_50']) + float(row['sma_50']) + float(row['sma_50'])) / 3
-            if not pd.isna(row.get('tsma_50')) and not pd.isna(row.get('sma_50'))
+            float(row['tsma_50'])
+            if not pd.isna(row.get('tsma_50'))
             else None
         )
+
         output.append({
             'time': int(idx.timestamp()),
             'open': float(row['Open']) if not pd.isna(row['Open']) else 0.0,
@@ -96,13 +101,13 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file='../web/webchrtp
 if __name__ == '__main__':
     from sysdtafpxy import fetch_yf_data
     print('--- STARTING LIVE PXY UNIFIED EXCLUSIVE MATRIX ENGINE ---')
-    
+
     processed_df = calculate_supertrend(pd.DataFrame())
-    
+
     if processed_df is not None and not processed_df.empty:
         target_index = processed_df.index[-1]
         current_trend = get_market_trend(processed_df)
-        
+
         print(f"Timestamp : {target_index.strftime('%Y-%m-%d %H:%M:%S %Z')}")
         print(f"Price Line (Close): {float(processed_df.at[target_index, 'Close']):.2f}")
         print(
@@ -110,7 +115,8 @@ if __name__ == '__main__':
             f"Mirror Line Tracker: {float(processed_df.at[target_index, 'st_mirror']):.2f}"
         )
         print(f"Current Market Trend State : {current_trend}")
-        
+
         export_supertrend_json(processed_df)
     else:
         print('CRITICAL: Upstream data empty.')
+
