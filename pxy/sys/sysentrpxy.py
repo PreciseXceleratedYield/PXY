@@ -9,10 +9,11 @@ from sysmktpxy import get_signal as get_market_signal
 # Existing GTIN entry pipeline, retained for MKT mode.
 from sysgtinpxy import get_entry_signal as get_gtin_entry_signal
 
-# New RSIG entry + exit pipeline.
+# TSMA-based RSIG entry + exit pipeline.
 from sysrsigpxy import get_signals as get_rsig_signals
 
-from syscnfgpxy import SYSCNFGPXY_TIMEZONE
+# Central configuration: single source of truth.
+from syscnfgpxy import SYSCNFGPXY_TIMEZONE, SYSENTRPXY_VARIANT
 
 EXE_DIR = Path(__file__).resolve().parent / "exe"
 if str(EXE_DIR) not in sys.path:
@@ -20,11 +21,6 @@ if str(EXE_DIR) not in sys.path:
 
 from execoolpxy import cooldown_remaining
 
-
-# Select the signal pipeline:
-# "MKT"  = existing GTIN entry + MKT exit behavior.
-# "RSIG" = RSIG entry + RSIG exit behavior.
-SIGNAL_MODE = "RSIG"
 
 # Fresh-entry window (Asia/Kolkata).
 ENTRY_START = dt_time(9, 16)
@@ -49,7 +45,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     """
     Return (entry_signal, exit_signal).
 
-    SIGNAL_MODE:
+    SYSENTRPXY_VARIANT:
         MKT:
             Entry = existing GTIN pipeline.
             Exit  = existing MKT pipeline.
@@ -85,8 +81,8 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
         from sysdtafpxy import fetch_yf_data
         df = fetch_yf_data()
 
-    # 4. Select the signal pipeline.
-    mode = str(SIGNAL_MODE).upper().strip()
+    # 4. Select the configured signal pipeline.
+    mode = str(SYSENTRPXY_VARIANT).upper().strip()
 
     if mode == "MKT":
         # Original behavior: GTIN entry + MKT exit.
@@ -123,8 +119,11 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
         )
 
     else:
-        # Invalid mode must not create an entry or exit signal.
-        print(f"⚠️ INVALID SIGNAL_MODE: {SIGNAL_MODE!r}. Signals forced to NONE.")
+        # Invalid configuration must fail closed.
+        print(
+            f"⚠️ INVALID SYSENTRPXY_VARIANT: "
+            f"{SYSENTRPXY_VARIANT!r}. Signals forced to NONE."
+        )
         return "NONE", "NONE"
 
     print(
@@ -144,7 +143,10 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
 if __name__ == "__main__":
     from sysdtafpxy import fetch_yf_data
 
-    print(f"--- STARTING PXY {SIGNAL_MODE} ENTRY / EXIT ROUTER ---")
+    print(
+        f"--- STARTING PXY "
+        f"{SYSENTRPXY_VARIANT} ENTRY / EXIT ROUTER ---"
+    )
 
     df = fetch_yf_data()
 
@@ -156,4 +158,5 @@ if __name__ == "__main__":
         )
     else:
         print("CRITICAL Upstream data feed empty.")
+
 
