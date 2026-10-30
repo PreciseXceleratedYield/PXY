@@ -7,7 +7,7 @@ from datetime import datetime
 
 def error_log(section, msg, data=None):
     """Reports ledger extraction and conversion failures to stderr."""
-    ts = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+    ts = datetime.now(SYSCNFGPXY_TIMEZONE).strftime('%H:%M:%S.%f')[:-3]
     print(f"[ERROR][{ts}][{section}] {msg}", file=sys.stderr)
     if data is not None:
         print(f"[ERROR_DETAILS] {repr(data)}\n", file=sys.stderr)
