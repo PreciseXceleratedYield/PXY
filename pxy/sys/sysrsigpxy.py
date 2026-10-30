@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 
 from syscnfgpxy import SYSSMAPXY_TSMA_PERIOD
+from syssmapxy import calculate_moving_average
 from sysdtafpxy import fetch_yf_data
 
 
@@ -12,7 +13,7 @@ TSMA_PERIOD = SYSSMAPXY_TSMA_PERIOD
 
 
 def calculate_tsma(close, period=TSMA_PERIOD):
-    """Return the rolling linear-regression endpoint TSMA series."""
+    """Calculate TSMA using the shared PXY moving-average implementation."""
 
     if isinstance(period, bool) or not isinstance(period, int) or period < 2:
         raise ValueError("TSMA period must be an integer of at least 2.")
@@ -22,23 +23,11 @@ def calculate_tsma(close, period=TSMA_PERIOD):
     )
     close_series = pd.to_numeric(close_series, errors="coerce")
 
-    x = np.arange(period, dtype=float)
-    x_deviations = x - x.mean()
-    variance_x = np.dot(x_deviations, x_deviations)
-
-    def regression_endpoint(values):
-        if not np.all(np.isfinite(values)):
-            return np.nan
-
-        y_mean = values.mean()
-        slope = np.dot(values - y_mean, x_deviations) / variance_x
-
-        return y_mean + slope * x_deviations[-1]
-
-    return close_series.rolling(
-        window=period,
-        min_periods=period,
-    ).apply(regression_endpoint, raw=True)
+    return calculate_moving_average(
+        close_series,
+        period=period,
+        variant="TSMA",
+    )
 
 
 def _none_result():
