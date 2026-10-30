@@ -28,6 +28,7 @@ ENUMS = {
     "EXECBUYPXY_ACTION": ("YES", "NO"),
 }
 CHOICES = {
+    "SYSDTAFPXY_SELECTED_MODE": (0, 1),
     "SYSDTAFPXY_DEFAULT_INTERVAL": ("1m", "2m", "5m", "15m", "30m", "60m", "1h", "1d"),
     "SYSPLCHRTPXY_FETCH_INTERVAL": ("1m", "2m", "5m", "15m", "30m", "60m", "1h", "1d"),
     "SYSPLCHRTPXY_OHLC_MODE": (1, 2, 3, 4, 5, 6),
@@ -36,7 +37,7 @@ CHOICES = {
 OPTIONAL_DEFAULTS = {
     "EXEOTMPXY_STRIKE_MODE": "ATM",
     "EXEOTMPXY_FIXED_DISTANCE": 100,
-    "EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES": (200, 150, 100, 50, 0),
+    "EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES": (500, 400, 300, 200, 100),
 }
 HIDDEN_PARTS = ("SECRET", "TOKEN", "PASSWORD", "API_KEY")
 SIGNED_PARTS = ("PNL", "LOSS", "FLOOR", "THRESHOLD")
@@ -142,10 +143,7 @@ def _metadata(source):
 
 
 def _encode_value(name, value, current):
-    if name == "SYSDTAFPXY_SELECTED_MODE":
-        if value != 1:
-            raise ValueError("SYSDTAFPXY_SELECTED_MODE must be 1")
-    elif name in ENUMS or name in CHOICES:
+    if name in ENUMS or name in CHOICES:
         if value not in ENUMS.get(name, CHOICES.get(name, ())):
             raise ValueError(f"{name} must be one of its listed choices")
     if isinstance(current, bool):

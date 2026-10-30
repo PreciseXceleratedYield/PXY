@@ -41,15 +41,20 @@ class ConfigEditorTests(unittest.TestCase):
         self.assertNotIn("SYSSTRNDPXY_VARIANT", config_editor.ENUMS)
         self.assertEqual(config_editor.ENUMS["SYSENTRPXY_VARIANT"], ("MKT", "RSIG"))
 
-    def test_dtaf_uses_single_mode_one_only(self):
+    def test_dtaf_supports_both_configured_modes(self):
         settings, _ = config_editor._metadata(self.original)
         mode = next(
             item for item in settings
             if item["key"] == "SYSDTAFPXY_SELECTED_MODE"
         )
         self.assertEqual(mode["value"], 1)
-        self.assertEqual(mode["options"], [])
+        self.assertEqual(mode["options"], [0, 1])
 
+        config_editor._write({"SYSDTAFPXY_SELECTED_MODE": 0})
+        self.assertIn(
+            "SYSDTAFPXY_SELECTED_MODE = 0",
+            self.config_path.read_text(encoding="utf-8"),
+        )
         config_editor._write({"SYSDTAFPXY_SELECTED_MODE": 1})
         self.assertIn(
             "SYSDTAFPXY_SELECTED_MODE = 1",
@@ -71,7 +76,7 @@ class ConfigEditorTests(unittest.TestCase):
         result = config_editor._write({
             "EXEOTMPXY_STRIKE_MODE": "ATM",
             "EXEOTMPXY_FIXED_DISTANCE": 100,
-            "EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES": [200, 150, 100, 50, 0],
+            "EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES": [500, 400, 300, 200, 100],
         })
         self.assertEqual(result["updated"], [
             "EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES",
@@ -81,7 +86,7 @@ class ConfigEditorTests(unittest.TestCase):
         source = self.config_path.read_text(encoding="utf-8")
         self.assertIn("EXEOTMPXY_STRIKE_MODE = 'ATM'", source)
         self.assertIn("EXEOTMPXY_FIXED_DISTANCE = 100", source)
-        self.assertIn("EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES = (200, 150, 100, 50, 0)", source)
+        self.assertIn("EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES = (500, 400, 300, 200, 100)", source)
 
     def test_risk_config_has_no_timed_activation(self):
         settings, _ = config_editor._metadata(self.original)
