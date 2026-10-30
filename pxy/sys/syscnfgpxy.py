@@ -59,8 +59,8 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 
 # Entry signal router.
 SYSENTRPXY_VARIANT = "MKT"
-if SYSENTRPXY_VARIANT not in {"MKT", "STS"}:
-    raise ValueError("SYSENTRPXY_VARIANT must be MKT or STS.")
+if SYSENTRPXY_VARIANT not in {"MKT", "RSIG"}:
+    raise ValueError("SYSENTRPXY_VARIANT must be MKT or RSIG.")
 SYSENTRPXY_ST_START = dt_time(16, 0)
 
 # Data ingestion, chart generation, and signal calculation.
