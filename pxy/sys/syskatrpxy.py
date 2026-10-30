@@ -6,6 +6,7 @@ import numpy as np
 from sysdtafpxy import fetch_yf_data
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
+    SYSCNFGPXY_MARKET_OPEN,
     SYSKATRPXY_ATR_MODE,
     SYSKATRPXY_ATR_STATIC_VALUE,
     SYSKATRPXY_DEPTH_ATR_MINIMUM,
@@ -69,7 +70,7 @@ def calculate_true_atr_series(df: pd.DataFrame) -> pd.Series:
 
         atr_values = np.full(len(df_clean), SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE)
         local_dates = df_clean.index.date
-        session_start = pd.Timestamp("09:16").time()
+        session_start = SYSCNFGPXY_MARKET_OPEN
         for session in pd.unique(local_dates):
             positions = np.flatnonzero(
                 (local_dates == session)

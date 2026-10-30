@@ -6,7 +6,11 @@ init(autoreset=True)
 
 # ---- Pure Production Naming Alignment Imports ----
 from sysdtafpxy import fetch_yf_data
-from syscnfgpxy import SYSDTAFPXY_DEFAULT_TARGET_ROWS, SYSSTRNDPXY_CHART_TARGET_ROWS
+from syscnfgpxy import (
+    SYSDTAFPXY_DEFAULT_TARGET_ROWS,
+    SYSSTRNDPXY_CHART_TARGET_ROWS,
+    SYSSMAPXY_MA_PERIOD,
+)
 from sysdthapxy import get_pxy_data, get_signal_depth_analysis
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
@@ -117,8 +121,8 @@ def get_full_snapshot():
     bos_bar, _ = get_bos_bar(master_df)
     result["bos_bar"] = bos_bar if bos_bar else "NONE"
     
-    # Calculate SMA 50 status (BULL/BEAR)
-    sma_data = get_sma(master_df, period=50)
+    # Calculate the configured SMA/TSMA status (BULL/BEAR).
+    sma_data = get_sma(master_df, period=SYSSMAPXY_MA_PERIOD)
     result["sma"] = sma_data.get("status", "NA") # 🔄 RENAMED: Key is now 'sma'
     
     return result
