@@ -4,8 +4,9 @@ import os
 import numpy as np
 from sysdtafpxy import fetch_yf_data
 from sysstrndpxy import calculate_supertrend
+from syscnfgpxy import SYSCHRTPXY_LOOKBACK_ROWS
 
-def export_supertrend_json(output_file="../web/webchrtpxy.json", lookback=42):
+def export_supertrend_json(output_file="../web/webchrtpxy.json", lookback=SYSCHRTPXY_LOOKBACK_ROWS):
     """
     Fetch data → compute SuperTrend & Master Price → export last N rows
     """

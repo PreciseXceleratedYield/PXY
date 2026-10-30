@@ -8,11 +8,10 @@ from threading import Lock
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from syscnfgpxy import SYSNSEHOLIDAYPXY_REQUEST_TIMEOUT_SECONDS
-
 
 NSE_TRADING_HOLIDAY_URL = "https://www.nseindia.com/api/holiday-master?type=trading"
 HOLIDAY_CACHE_PATH = Path.home() / ".pxy" / "cache" / "nse_fo_holidays.json"
+REQUEST_TIMEOUT_SECONDS = 5
 _LOGGER = logging.getLogger(__name__)
 _CACHE_LOCK = Lock()
 _MEMORY_CACHE = {}
@@ -43,7 +42,7 @@ def _fetch_holidays():
             "User-Agent": "Mozilla/5.0 (compatible; PXY/1.0)",
         },
     )
-    with urlopen(request, timeout=SYSNSEHOLIDAYPXY_REQUEST_TIMEOUT_SECONDS) as response:
+    with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
         return _parse_holidays(response.read())
 
 

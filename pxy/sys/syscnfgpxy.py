@@ -138,6 +138,13 @@ if (
     or SYSBBOSPXY_LOOKBACK_PERIOD < 2
 ):
     raise ValueError("SYSBBOSPXY_LOOKBACK_PERIOD must be an integer of at least 2.")
+SYSCHRTPXY_LOOKBACK_ROWS = 42
+if (
+    isinstance(SYSCHRTPXY_LOOKBACK_ROWS, bool)
+    or not isinstance(SYSCHRTPXY_LOOKBACK_ROWS, int)
+    or SYSCHRTPXY_LOOKBACK_ROWS < 1
+):
+    raise ValueError("SYSCHRTPXY_LOOKBACK_ROWS must be a positive integer.")
 SYSSADXPXY_USE_TSMA = True
 SYSSADXPXY_MA_PERIOD = 50
 SYSSADXPXY_SUPERTREND_PERIOD = 10
