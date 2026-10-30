@@ -137,7 +137,11 @@ def main():
                 os.system("clear")
                 if dispatch_mode("run_closed_market_tasks", lambda: True):
                     safe_run(HERE.parent / "syscprtpxy.py")
-                    print(" ⏳   WAIT : market opens at 09:16 IST  📡", end="\r")
+                    print(
+                        f" ⏳   WAIT : market opens at "
+                        f"{EXEPXYPXY_MARKET_OPEN.strftime('%H:%M')} IST  📡",
+                        end="\r",
+                    )
                 else:
                     print(" ⏳   CHK waits until market close  📡", end="\r")
                 time.sleep(EXEPXYPXY_IDLE_POLL_SECONDS)

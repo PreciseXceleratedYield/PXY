@@ -191,15 +191,14 @@ It invokes the reusable
 placement and tagging to those existing commands.
 
 `EXEOTMPXY_STRIKE_MODE` is the single strike policy used by the option-symbol
-builder for every buying script. It defaults to `ATM`, which uses a zero-point
-offset. `OTMDYN` selects a weekday offset from
+builder for every buying script. The current PRD setting is `OTMFIX`, which
+applies `EXEOTMPXY_FIXED_DISTANCE` (100 NIFTY points). `ATM` uses a zero-point
+offset. `OTMDYN` selects the weekday offset from
 `EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES`, ordered Monday to Friday (currently
-200, 150, 100, 50, 0 NIFTY points). Call strikes are set above spot by the
-selected offset and put strikes below spot; both are then rounded to the
-configured 50-point strike step. Dynamic selection fails closed on weekends
-when no weekday distance is defined. `OTMFIX` applies the fixed
-`EXEOTMPXY_FIXED_DISTANCE` (currently 100 NIFTY points). Caller OTM flags and
-distances do not override the central mode.
+500, 400, 300, 200, 100 NIFTY points). Call strikes are set above spot by the
+selected offset and put strikes below spot; both are rounded using the shared
+`RUNNIFTYPXY_STRIKE_STEP` (50 points). Counter-buy's optional dynamic-strike
+switch is `EXECBUYPXY_USE_DYNAMIC_STRIKE` and uses that same strike step.
 
 Counter-buy/re-buy uses the exit signal after `exeexitpxy` removes rows exited
 or locked this cycle. With only CE held, BEAR triggers the PE counter-leg; with
@@ -323,19 +322,19 @@ historical option P&L.
   applies to dynamic mode 3.
 - `SYSPLCHRTPXY_*` are consumed by the separate chart generator. `SYSRIGPXY_*`
   belong to standalone modules with no caller in the production launch graph.
-- TGT uses only `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and the option side for
-  alignment; direction, investment balance, ATR, Supertrend, and moving-average
-  values do not affect target alignment. Aligned positions use the fixed
-  `EXETGTPXY_EARLY_ALIGNED_TARGET_PCT` (default `77%`) before
-  `SYSENTRPXY_ST_START` (10:00 IST), then
-  `max(EXETGTPXY_ALIGNED_MIN_DEPTH, own-side depth) × own-side power` (default
-  minimum depth `4`) without an upper cap. Non-aligned positions receive
-  `EXETGTPXY_TGT_PCT_NOT_ALIGNED` (default `1.4%`). Missing or invalid aligned
-  depth/power values individually default to `1`. The percentage applies to the
-  option entry premium. SIM uses the replay candle's time for this switch.
-  Averaging alignment also uses only `exit`; TSMA/SMA
-  has no effect on averaging eligibility or LGT. The trend chart independently
-  carries both moving-average variants as `sma50` and `tsma50`.
+- The PRD target engine uses only `EXETGTPXY_EXIT_KEY_COLUMN` (`exit`) and
+  the option side for alignment; direction, investment balance, ATR,
+  Supertrend, and moving-average values do not affect target alignment.
+  Non-aligned positions use `EXETGTPXY_PRD_BASE_FACTOR` (1.4%). An aligned
+  single-side position uses 1.4 × (own-side power + own-side depth). When both
+  sides are open, it uses 14 + 14 / own-side depth + 14 / own-side power.
+  Missing, invalid, or non-positive power/depth values individually default
+  to 1. Targets are capped at `EXETGTPXY_PRD_MAX_TARGET_PCT` (99%). From
+  `EXETGTPXY_PRD_LATE_DAY_TIME` (14:45 IST), the target is set to that cap
+  only when both CE and PE sides are open. The target percentage applies to
+  the option entry premium. Averaging alignment also uses only `exit`;
+  TSMA/SMA has no effect on averaging eligibility or LGT. The trend chart
+  independently carries both moving-average variants as `sma50` and `tsma50`.
 - The averaging window switch and start/end bounds apply only to averaging
   placement, not to entry/exit pipes.
 - Averaging uses one policy with no layer-count mode: the projected side

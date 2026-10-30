@@ -73,7 +73,7 @@ EXIT_LOCK_SECS = SYSCNFGPXY_ACTION_COOLDOWN_SECONDS
 EXIT_LOCK_FILE_NAME = ".exit_lock.json"
 EXIT_LOCK_KEEP_SECS = EXEEXITPXY_EXIT_LOCK_KEEP_SECS
 
-# Square-off windows; all new buys stop at 15:10 before square-off begins.
+# Square-off windows use the central schedule; fresh-entry cutoff is enforced separately.
 SQUAREOFF_SCRIPT = EXEEXITPXY_SQUAREOFF_SCRIPT
 SQOFF_START = EXEEXITPXY_SQOFF_START
 SQOFF_ALL_START = EXEEXITPXY_SQOFF_ALL_START
@@ -415,9 +415,9 @@ def run_snapshot():
     
     if dispatch_mode("allow_squareoff", lambda: True) and os.path.exists(exe_path):
         sq_args, sq_key = None, None
-        if SQOFF_START <= now < SQOFF_ALL_START:       # 15:11 up to 15:14: without -all
+        if SQOFF_START <= now < SQOFF_ALL_START:       # 15:30 to 15:31: without -all
             sq_args, sq_key = [], "SQOFF|first"
-        elif SQOFF_ALL_START <= now < SQOFF_END:       # 15:14 up to 15:50: with -all
+        elif SQOFF_ALL_START <= now < SQOFF_END:       # 15:31 to 15:40: with -all
             sq_args, sq_key = ["-all"], "SQOFF|all"
         if sq_args is not None:
             if ledger_busy():

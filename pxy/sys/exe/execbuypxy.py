@@ -12,9 +12,6 @@
 # The calculated offset is passed directly to the shell script.
 # No weekday adjustment or additional offset is applied.
 
-EXECBUYPXY_USE_DYNAMIC_STRIKE = True
-STRIKE_STEP = 50
-
 import os
 import shutil
 import json
@@ -32,6 +29,9 @@ from syscnfgpxy import (
     EXECBUYPXY_LOCK_KEEP_SECS,
     EXECBUYPXY_MAX_PER_DAY,
     EXECBUYPXY_SCRIPTS,
+    EXECBUYPXY_USE_DYNAMIC_STRIKE,
+    EXETGTPXY_EXIT_KEY_COLUMN,
+    RUNNIFTYPXY_STRIKE_STEP,
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
 )
@@ -54,7 +54,7 @@ CBUY_MAX_PER_DAY = EXECBUYPXY_MAX_PER_DAY
 CBUY_COUNT_FILE_NAME = ".cbuy_count.json"
 CBUY_LOCK_KEEP_SECS = EXECBUYPXY_LOCK_KEEP_SECS
 
-EXIT_KEY_COLUMN = "exit"
+EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
 
 # ================================================
 
@@ -255,7 +255,7 @@ def _counter_buy_offset(remaining_df):
         flush=True,
     )
 
-    step = STRIKE_STEP
+    step = RUNNIFTYPXY_STRIKE_STEP
 
     atm_strike = int(
         ((spot / step) + 0.5) // 1 * step

@@ -212,6 +212,8 @@ EXEOMSPXY_DEBUG_ENABLED = False
 
 # Target and loss calculations.
 EXETGTPXY_EXIT_KEY_COLUMN = "exit"
+
+# Legacy replay compatibility settings; retained unchanged for now.
 EXETGTPXY_TGT_PCT_NOT_ALIGNED = 33.0
 EXETGTPXY_EARLY_ALIGNED_TARGET_PCT = 33.0
 if not math.isfinite(EXETGTPXY_EARLY_ALIGNED_TARGET_PCT) or EXETGTPXY_EARLY_ALIGNED_TARGET_PCT <= 0:
@@ -219,6 +221,23 @@ if not math.isfinite(EXETGTPXY_EARLY_ALIGNED_TARGET_PCT) or EXETGTPXY_EARLY_ALIG
 EXETGTPXY_ALIGNED_MIN_DEPTH = 10
 if not math.isfinite(EXETGTPXY_ALIGNED_MIN_DEPTH) or EXETGTPXY_ALIGNED_MIN_DEPTH <= 0:
     raise ValueError("EXETGTPXY_ALIGNED_MIN_DEPTH must be finite and positive.")
+
+# Live PRD target calculation.
+EXETGTPXY_PRD_BASE_FACTOR = 1.4
+EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT = 14.0
+EXETGTPXY_PRD_MAX_TARGET_PCT = 99.0
+EXETGTPXY_PRD_LATE_DAY_TIME = dt_time(14, 45)
+if not all(
+    math.isfinite(value) and value > 0
+    for value in (
+        EXETGTPXY_PRD_BASE_FACTOR,
+        EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT,
+        EXETGTPXY_PRD_MAX_TARGET_PCT,
+    )
+):
+    raise ValueError("PRD target settings must be finite and positive.")
+if EXETGTPXY_PRD_MAX_TARGET_PCT > 100:
+    raise ValueError("EXETGTPXY_PRD_MAX_TARGET_PCT cannot exceed 100.")
 
 EXEDYNPXY_DECAY_RATE_PER_MIN = 0.0001
 EXEDYNPXY_PNL_THRESHOLD = 0.0
@@ -229,6 +248,12 @@ EXEOTMPXY_FIXED_DISTANCE = 100
 EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES = (500, 400, 300, 200, 100)  # Monday through Friday.
 
 RUNNIFTYPXY_STRIKE_STEP = 50
+if (
+    isinstance(RUNNIFTYPXY_STRIKE_STEP, bool)
+    or not isinstance(RUNNIFTYPXY_STRIKE_STEP, int)
+    or RUNNIFTYPXY_STRIKE_STEP <= 0
+):
+    raise ValueError("RUNNIFTYPXY_STRIKE_STEP must be a positive integer.")
 RUNNIFTYPXY_ATM_BUFFER = 0
 
 # Stop-loss, counter-leg, regular exit, and square-off behavior.
@@ -236,6 +261,9 @@ EXESLPXY_FIXED_SL_BUFFER = 10.0
 EXESLPXY_MIN_PRICE = 2.0
 
 EXECBUYPXY_ACTION = "YES"
+EXECBUYPXY_USE_DYNAMIC_STRIKE = True
+if not isinstance(EXECBUYPXY_USE_DYNAMIC_STRIKE, bool):
+    raise ValueError("EXECBUYPXY_USE_DYNAMIC_STRIKE must be True or False.")
 EXECBUYPXY_DEBUG_ENABLED = False
 EXECBUYPXY_CUTOFF = SYSCNFGPXY_ENTRY_CUTOFF
 EXECBUYPXY_SCRIPTS = {

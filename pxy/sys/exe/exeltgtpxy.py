@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
 from pathlib import Path
-from datetime import datetime, time as dt_time
+from datetime import datetime
 
 # ----------------- PATH FIX (MUST BE AT ABSOLUTE TOP) -----------------
 HERE = Path(__file__).resolve().parent
@@ -20,18 +20,16 @@ import re
 from colorama import Fore, Style, init
 
 from syscnfgpxy import (
-    EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD,
-    EXETGTPXY_EARLY_ALIGNED_TARGET_PCT,
-    EXETGTPXY_ALIGNED_MIN_DEPTH,
     EXETGTPXY_EXIT_KEY_COLUMN,
+    EXETGTPXY_PRD_BASE_FACTOR,
+    EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT,
+    EXETGTPXY_PRD_LATE_DAY_TIME,
+    EXETGTPXY_PRD_MAX_TARGET_PCT,
     SYSCNFGPXY_TIMEZONE,
-    SYSENTRPXY_ST_START,
 )
 
 # ==================== CONFIG ====================
 EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
-ALIGNED_MIN_DEPTH = EXETGTPXY_ALIGNED_MIN_DEPTH
-EARLY_ALIGNED_TARGET_PCT = EXETGTPXY_EARLY_ALIGNED_TARGET_PCT
 # ================================================
 
 init(autoreset=True)
@@ -88,9 +86,12 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # From 14:45 onward, use a 99% target for all positions.
-        if current_time >= dt_time(14, 45) and both_sides_open:
-            return 99.0
+        # PRD late-day override applies only when both option sides are open.
+        if (
+            current_time >= EXETGTPXY_PRD_LATE_DAY_TIME
+            and both_sides_open
+        ):
+            return EXETGTPXY_PRD_MAX_TARGET_PCT
 
         def positive_factor(value):
             try:
@@ -108,14 +109,20 @@ def calculate_tgt(
         own_power = positive_factor(side_power)
 
         if not is_aligned:
-            target_pct = 1.4
+            target_pct = EXETGTPXY_PRD_BASE_FACTOR
         elif not both_sides_open:
-            target_pct = 1.4 * (own_power + own_depth)
+            target_pct = EXETGTPXY_PRD_BASE_FACTOR * (
+                own_power + own_depth
+            )
         else:
-            target_pct = 14 + (14 / own_depth) + (14 / own_power)
+            both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
+            target_pct = (
+                both_sides_base
+                + (both_sides_base / own_depth)
+                + (both_sides_base / own_power)
+            )
 
-
-        return min(99.0, target_pct)
+        return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
 
     except Exception as e:
         _warn_once(
