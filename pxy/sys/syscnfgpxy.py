@@ -81,7 +81,7 @@ if SYSSMAPXY_VARIANT not in {"SMA", "TSMA"}:
     raise ValueError("SYSSMAPXY_VARIANT must be SMA or TSMA.")
 
 # Single source of truth for the TSMA period across all pipelines.
-SYSSMAPXY_TSMA_PERIOD = 9
+SYSSMAPXY_TSMA_PERIOD = 7
 if (
     isinstance(SYSSMAPXY_TSMA_PERIOD, bool)
     or not isinstance(SYSSMAPXY_TSMA_PERIOD, int)
