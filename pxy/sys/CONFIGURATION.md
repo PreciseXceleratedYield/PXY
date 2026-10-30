@@ -40,6 +40,10 @@ runtime selector.
 - Name tunables `<OWNER_MODULE>_<PARAMETER>` using the consuming module's
   filename without `.py`; e.g. `RUNEXACPXY_BREACH_TICKS_REQUIRED` belongs to
   `exe/run/runexacpxy.py`.
+- `syscnfgpxy.py` is the single configuration source for all runtime modules,
+  including modules under `exe/`. Prefixes identify setting ownership; they
+  do not indicate separate configuration files. Do not create a parallel
+  execution configuration module.
 - Use `SYSCNFGPXY_` for genuinely shared values such as ticker, timezone, and
   the common exchange/engine schedule. Data ingestion derives its pandas/Yahoo
   timezone string from the shared timezone; do not add a second independent
@@ -79,9 +83,10 @@ runtime selector.
   Each following value is the expanding mean through candle 14, and subsequent
   values use a rolling 14-candle mean. The session window resets daily; earlier
   candles use the configured fallback.
-- `SYSSMAPXY_VARIANT` selects the production 50-period average used by
-  `syssmapxy.get_sma()` and defaults to `TSMA`, the rolling linear-regression
-  endpoint; `SMA` preserves the simple-moving-average behavior. The web chart
+- `SYSSMAPXY_MA_PERIOD` sets the default moving-average window (50), and
+  `SYSSMAPXY_VARIANT` selects the calculation used by `syssmapxy.get_sma()`.
+  `TSMA` is the rolling linear-regression endpoint; `SMA` preserves the
+  simple-moving-average behavior. The web chart
   displays both 50-period averages together: SMA as a solid gold line and TSMA
   as a dashed accent line. Chart history fetches `SYSSTRNDPXY_CHART_TARGET_ROWS`
   (110) candles so its 60 visible bars include the 50-bar warm-up required for

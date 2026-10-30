@@ -3,7 +3,7 @@ import numpy as np
 import warnings
 import os
 from colorama import Fore, Style, init
-from syscnfgpxy import SYSSMAPXY_VARIANT
+from syscnfgpxy import SYSSMAPXY_MA_PERIOD, SYSSMAPXY_VARIANT
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 init(autoreset=True)
@@ -11,7 +11,7 @@ init(autoreset=True)
 from sysdtafpxy import fetch_yf_data
 
 def calculate_moving_average(
-    close: pd.Series, period: int = 50, variant: str = SYSSMAPXY_VARIANT
+    close: pd.Series, period: int = SYSSMAPXY_MA_PERIOD, variant: str = SYSSMAPXY_VARIANT
 ) -> pd.Series:
     """Calculate a simple moving average or linear-regression endpoint TSMA."""
     variant = str(variant).upper()
@@ -35,7 +35,7 @@ def calculate_moving_average(
 
 
 def get_sma(
-    df: pd.DataFrame, period: int = 50, variant: str = SYSSMAPXY_VARIANT
+    df: pd.DataFrame, period: int = SYSSMAPXY_MA_PERIOD, variant: str = SYSSMAPXY_VARIANT
 ) -> dict:
     """Return the selected 50-period moving-average value and price-side status."""
     variant = str(variant).upper()
@@ -71,16 +71,16 @@ def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
     L = Lowest price point across the LAST 50 candles
     C = Current Live / Close price
     """
-    if df is None or df.empty or len(df) < 50:
+    if df is None or df.empty or len(df) < SYSSMAPXY_MA_PERIOD:
         print("Invalid data. Cannot dump single candle JSON.")
         return
-    # 1. Grab the last 50 rows to find the absolute range boundaries
-    window_50 = df.iloc[-50:]
-    # 2. Extract values (Delinking O from SMA)
-    open_price = window_50['Open'].iloc[0]  # Open price 50 candles ago
-    highest_price = window_50['High'].max()
-    lowest_price = window_50['Low'].min()
-    current_close = window_50['Close'].iloc[-1]
+    # 1. Grab the configured moving-average window for the range boundaries.
+    window = df.iloc[-SYSSMAPXY_MA_PERIOD:]
+    # 2. Extract values (opening price remains delinked from the average).
+    open_price = window['Open'].iloc[0]
+    highest_price = window['High'].max()
+    lowest_price = window['Low'].min()
+    current_close = window['Close'].iloc[-1]
     # Construct the tracking candle dictionary
     candle_data = [{
         'O': float(open_price),     # Actual open 50 periods ago
@@ -103,7 +103,7 @@ def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
 if __name__ == "__main__":
     df = fetch_yf_data()
     if df is not None and not df.empty:
-        result = get_sma(df, period=50)
+        result = get_sma(df)
         if result["status"] == "BULL":
             color = Fore.GREEN + Style.BRIGHT
             output = "🟢 PRICE MOVING BULL 🟢".center(40)

@@ -1,5 +1,5 @@
 
-from datetime import datetime, time as dt_time
+from datetime import datetime
 from pathlib import Path
 import sys
 
@@ -13,7 +13,12 @@ from sysgtinpxy import get_entry_signal as get_gtin_entry_signal
 from sysrsigpxy import get_signals as get_rsig_signals
 
 # Central configuration: single source of truth.
-from syscnfgpxy import SYSCNFGPXY_TIMEZONE, SYSENTRPXY_VARIANT
+from syscnfgpxy import (
+    SYSCNFGPXY_TIMEZONE,
+    SYSCNFGPXY_MARKET_OPEN,
+    SYSCNFGPXY_ENTRY_CUTOFF,
+    SYSENTRPXY_VARIANT,
+)
 
 EXE_DIR = Path(__file__).resolve().parent / "exe"
 if str(EXE_DIR) not in sys.path:
@@ -22,9 +27,9 @@ if str(EXE_DIR) not in sys.path:
 from execoolpxy import cooldown_remaining
 
 
-# Fresh-entry window (Asia/Kolkata).
-ENTRY_START = dt_time(9, 16)
-ENTRY_END = dt_time(13, 16)
+# Fresh-entry window uses the central system schedule (Asia/Kolkata).
+ENTRY_START = SYSCNFGPXY_MARKET_OPEN
+ENTRY_END = SYSCNFGPXY_ENTRY_CUTOFF
 
 
 def _apply_new_book_cutoff(entry_signal, exit_signal, now_time):

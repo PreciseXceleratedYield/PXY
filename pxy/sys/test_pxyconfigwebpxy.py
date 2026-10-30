@@ -39,7 +39,7 @@ class ConfigEditorTests(unittest.TestCase):
 
     def test_supertrend_variant_is_not_a_configurable_setting(self):
         self.assertNotIn("SYSSTRNDPXY_VARIANT", config_editor.ENUMS)
-        self.assertEqual(config_editor.ENUMS["SYSENTRPXY_VARIANT"], ("MKT", "STS"))
+        self.assertEqual(config_editor.ENUMS["SYSENTRPXY_VARIANT"], ("MKT", "RSIG"))
 
     def test_dtaf_uses_single_mode_one_only(self):
         settings, _ = config_editor._metadata(self.original)

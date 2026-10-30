@@ -81,6 +81,15 @@ SYSSMAPXY_VARIANT = "TSMA"
 if SYSSMAPXY_VARIANT not in {"SMA", "TSMA"}:
     raise ValueError("SYSSMAPXY_VARIANT must be SMA or TSMA.")
 
+# Default window for the 50-period SMA/TSMA display and status calculation.
+SYSSMAPXY_MA_PERIOD = 50
+if (
+    isinstance(SYSSMAPXY_MA_PERIOD, bool)
+    or not isinstance(SYSSMAPXY_MA_PERIOD, int)
+    or SYSSMAPXY_MA_PERIOD < 1
+):
+    raise ValueError("SYSSMAPXY_MA_PERIOD must be a positive integer.")
+
 # Single source of truth for the TSMA period across all pipelines.
 SYSSMAPXY_TSMA_PERIOD = 7
 if (
