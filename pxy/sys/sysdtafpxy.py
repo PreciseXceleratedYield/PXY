@@ -24,7 +24,8 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 # CENTRAL DTAF MODE CONFIGURATION
 # ==========================================================================
 # DTAF mode is controlled exclusively by syscnfgpxy.py.
-# Production currently supports only mode 1.
+# Mode 0 preserves original OHLC after futures blending.
+# Mode 1 applies the DTAF OHLC transformation after futures blending.
 ACTIVE_MODE = SYSDTAFPXY_SELECTED_MODE
 
 
@@ -38,6 +39,9 @@ def apply_ohlc_transformation(
     df, mode=ACTIVE_MODE, futures_price=None
 ):
     """Apply the configured DTAF OHLC transformation.
+
+    Mode 0:
+        Preserve the original OHLC values after optional futures blending.
 
     Mode 1:
         Replace historical closes with the previous candle's OHLC/4.
