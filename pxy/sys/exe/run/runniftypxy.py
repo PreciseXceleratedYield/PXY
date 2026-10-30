@@ -11,7 +11,7 @@ if str(EXE_DIR) not in sys.path:
     sys.path.insert(0, str(EXE_DIR))
 
 from exeotmpxy import get_dynamic_otm_distance, get_strike_mode
-from nseholidayspxy import get_nse_fo_holidays
+from syshdaypxy import get_nse_fo_holidays
 from syscnfgpxy import (
     RUNNIFTYPXY_ATM_BUFFER,
     RUNNIFTYPXY_STRIKE_STEP,
