@@ -1,7 +1,7 @@
 
 import sys
 from pathlib import Path
-from datetime import date, timedelta
+from datetime import datetime, timedelta
 
 SYS_DIR = Path(__file__).resolve().parents[2]
 EXE_DIR = SYS_DIR / "exe"
@@ -15,6 +15,7 @@ from nseholidayspxy import get_nse_fo_holidays
 from syscnfgpxy import (
     RUNNIFTYPXY_ATM_BUFFER,
     RUNNIFTYPXY_STRIKE_STEP,
+    SYSCNFGPXY_TIMEZONE,
 )
 
 STRIKE_STEP = RUNNIFTYPXY_STRIKE_STEP
@@ -23,7 +24,7 @@ ATM_BUFFER = RUNNIFTYPXY_ATM_BUFFER
 # ---------------- HELPERS ----------------
 
 def get_target_tuesday():
-    today = date.today()
+    today = datetime.now(SYSCNFGPXY_TIMEZONE).date()
     days_until_tue = (1 - today.weekday() + 7) % 7
 
     if today.weekday() <= 1:

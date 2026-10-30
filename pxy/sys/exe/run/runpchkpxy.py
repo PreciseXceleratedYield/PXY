@@ -2,12 +2,18 @@
 #!/usr/bin/env python3
 
 import math
-import os
+import sys
+from pathlib import Path
 import traceback
 
-DEBUG = os.environ.get("RUNPCHK_DEBUG") == "1"
+SYS_DIR = Path(__file__).resolve().parents[2]
+if str(SYS_DIR) not in sys.path:
+    sys.path.insert(0, str(SYS_DIR))
 
-LOT_SIZE = 65
+from syscnfgpxy import RUNPCHKPXY_DEBUG_ENABLED, RUNPCHKPXY_NIFTY_LOT_SIZE
+
+DEBUG = RUNPCHKPXY_DEBUG_ENABLED
+LOT_SIZE = RUNPCHKPXY_NIFTY_LOT_SIZE
 
 
 def _parse_quantity(value):

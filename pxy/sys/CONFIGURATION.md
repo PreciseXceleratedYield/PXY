@@ -27,11 +27,13 @@ runtime selector.
   `LGT = -min(magnitude, 77)`, where ratio is own-side investment divided by
   opposite-side investment and clamped to `[0.1, 10]`. Invalid or non-positive
   investment data uses `ratio = 1`. The maximum LGT magnitude is 77.
-- **Targets:** before 10:00 IST, aligned positions use a fixed `77%` target.
-  From 10:00 IST onward, they use
-  `max(4, own-side depth) × own-side power` percent, without an upper cap;
-  missing or invalid depth/power values use 1. Non-aligned positions retain the
-  configured 1.4% target.
+- **Targets:** alignment uses only `exit` (CE/BULL or PE/BEAR).
+  Non-aligned positions use 1.4%; aligned single-side positions use
+  `1.4 × (own-side power + own-side depth)`; when both sides are open, the
+  target is `14 + 14 / own-side depth + 14 / own-side power`. Missing, invalid,
+  or non-positive power/depth values default individually to 1. Targets are
+  capped at 99%; from 14:45 IST, the 99% target applies only when both sides
+  are open.
 - **SIM/CHK:** exercise production decision logic with simulated or mock
   broker/order I/O; neither mode sends live orders.
 
@@ -48,6 +50,9 @@ runtime selector.
   the common exchange/engine schedule. Data ingestion derives its pandas/Yahoo
   timezone string from the shared timezone; do not add a second independent
   timezone setting.
+- The shared NIFTY lot size and common F&O order payload defaults live under
+  `SYSCNFGPXY_*`. Existing owner-prefixed order settings and the force-order
+  lot-size setting are aliases to those shared values, not separate overrides.
 - `RUNMODE` is the intentional environment override for
   `SYSMODEPXY_RUN_MODE`; the production menu reads the resolved value from
   `syscnfgpxy.py`. Shell scripts select deployment mode, not strategy knobs.
@@ -108,7 +113,7 @@ runtime selector.
 | `SYSDTAFPXY`, `SYSPLCHRTPXY`, `SYSSTRNDPXY`, `SYSSMAPXY`, `SYSDTHAPXY`, `SYSDTSTPXY`, `SYSSADXPXY`, `SYSBBOSPXY`, `SYSMKTPXY`, `SYSRIGPXY`, `SYSKATRPXY`, `SYSPWERPXY`, `SYSDPTPXY` | Data acquisition and signal/indicator parameters, including breakout session recognition and directional force factors |
 | `EXEAGTPXY`, `EXEACGPXY`, `EXEAMSPXY`, `EXEAVXPXY`, `EXEAVGPXY`, `EXEENTRPXY` | Entry thresholds, averaging window/limits, average-order payload, and entry pipeline |
 | `EXEFORCEPXY`, `EXESLPXY`, `EXECBUYPXY`, `EXEEXITPXY`, `EXESQRPXY`, `EXEOMSPXY`, `EXEDYNPXY`, `EXETGTPXY`, `EXEOTMPXY` | Force/stop/counter orders, exit and square-off behavior, targets, and symbol selection |
-| `RUNNIFTYPXY`, `RUNEXMTPXY`, `RUNEXACPXY`, `RUNEXIOPXY`, `RUNEXLQDPXY`, `RUNLILOPXY` | Symbol selection, risk-ledger mathematics/actions/state/liquidation, and order-ledger filtering |
+| `RUNNIFTYPXY`, `RUNPCHKPXY`, `RUNEXMTPXY`, `RUNEXACPXY`, `RUNEXIOPXY`, `RUNEXLQDPXY`, `RUNLILOPXY` | Symbol selection, verified NIFTY position/lot checks, risk-ledger mathematics/actions/state/liquidation, and order-ledger filtering |
 | `TSTPOINTBTPXY` | Point-replay session gates; explicitly test-only, not an engine override |
 
 The config file's comments group related settings and identify conditional
@@ -246,6 +251,11 @@ network boundary.
 - The negative initial line is display-only; there is no loss-side square-off.
   `RUNEXACPXY_STOP_SQUAREOFF_ENABLED` defaults to `False`;
   `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED` defaults to `True`.
+- The existing risk-ledger late-day override remains separately configured:
+  `RUNEXACPXY_LATE_DAY_TARGET_PCT` applies from
+  `RUNEXACPXY_LATE_DAY_START` through `RUNEXACPXY_LATE_DAY_END`. This is
+  distinct from the option exit-target schedule above; centralizing it does not
+  change its existing timing or value.
 - When cycle P&L reaches its target, the risk bar waits while the higher-
   invested open option side agrees with the current `exit` signal (CE/BULL or
   PE/BEAR). If the target is met while the heavier side is misaligned, it saves
@@ -350,6 +360,8 @@ historical option P&L.
   `magnitude = max(1.4, round(66 × r, 2))`;
   `LGT = -min(magnitude, EXEAMSPXY_MAX_LGT_LOSS)`. If either side has no
   positive investment, or an input is non-finite, the fallback is `r = 1`.
+- `RUNPCHKPXY_DEBUG_ENABLED` controls position-check diagnostics; its NIFTY
+  lot size uses the shared `SYSCNFGPXY_NIFTY_LOT_SIZE`.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.

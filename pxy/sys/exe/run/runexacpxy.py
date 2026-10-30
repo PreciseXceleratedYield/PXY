@@ -15,7 +15,6 @@
 import os
 import sys
 import time
-from datetime import time as dt_time
 from pathlib import Path
 from colorama import Fore, Style, init
 
@@ -29,6 +28,9 @@ from syscnfgpxy import (
     RUNEXACPXY_CYCLE_TARGET_PCT,
     RUNEXACPXY_DEBUG_ENABLED,
     RUNEXACPXY_LEDGER_BASIS_GUARD,
+    RUNEXACPXY_LATE_DAY_END,
+    RUNEXACPXY_LATE_DAY_START,
+    RUNEXACPXY_LATE_DAY_TARGET_PCT,
     RUNEXACPXY_TARGET_SQUAREOFF_ENABLED,
     RUNEXACPXY_TICK_MIN_GAP_SECONDS,
     RUNEXACPXY_VIEW_ONLY_ENV,
@@ -282,8 +284,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     current_time = now_ist().time()
 
     risk_target_pct = (
-        99.0
-        if dt_time(15, 10) <= current_time <= dt_time(15, 30)
+        RUNEXACPXY_LATE_DAY_TARGET_PCT
+        if RUNEXACPXY_LATE_DAY_START <= current_time <= RUNEXACPXY_LATE_DAY_END
         else RUNEXACPXY_CYCLE_TARGET_PCT
     )
 
