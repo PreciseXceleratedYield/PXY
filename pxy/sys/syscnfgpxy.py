@@ -1,3 +1,4 @@
+
 """Central runtime configuration.
 
 Keep tunable runtime values grouped by subsystem and prefixed with their owner
@@ -10,10 +11,9 @@ from datetime import time as dt_time
 import pytz
 
 
-
 # System-wide defaults and execution mode.
 SYSCNFGPXY_RELEASE_NAME = "READYFRIDAY"
-SYSCNFGPXY_TICKER = "^NSEI"  #  # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
+SYSCNFGPXY_TICKER = "^NSEI"  # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
 
 SYSCNFGPXY_TIMEZONE = pytz.timezone("Asia/Kolkata")
 SYSMODEPXY_RUN_MODE = os.environ.get(
@@ -25,7 +25,6 @@ if SYSMODEPXY_RUN_MODE not in {"PRD", "CHK", "SIM"}:
 # Engine launchers and scheduling.
 # Shared trading schedule. Keep distinct close windows explicit: the supervisor,
 # execution loop, and point replay intentionally stop at different times.
-# Shared trading schedule.
 SYSCNFGPXY_EXCHANGE_OPEN = dt_time(9, 15)
 SYSCNFGPXY_PREOPEN_START = dt_time(9, 14)
 SYSCNFGPXY_MARKET_OPEN = dt_time(9, 16)
@@ -76,9 +75,22 @@ if (
     raise ValueError("SYSDTAFPXY_SELECTED_MODE must be 1.")
 SYSDTAFPXY_DEFAULT_INTERVAL = "1m"
 SYSDTAFPXY_DEFAULT_TARGET_ROWS = 60
+
 SYSSMAPXY_VARIANT = "TSMA"
 if SYSSMAPXY_VARIANT not in {"SMA", "TSMA"}:
     raise ValueError("SYSSMAPXY_VARIANT must be SMA or TSMA.")
+
+# Single source of truth for the TSMA period across all pipelines.
+SYSSMAPXY_TSMA_PERIOD = 9
+if (
+    isinstance(SYSSMAPXY_TSMA_PERIOD, bool)
+    or not isinstance(SYSSMAPXY_TSMA_PERIOD, int)
+    or SYSSMAPXY_TSMA_PERIOD < 2
+):
+    raise ValueError(
+        "SYSSMAPXY_TSMA_PERIOD must be an integer of at least 2."
+    )
+
 SYSSTRNDPXY_CHART_TARGET_ROWS = 110
 if SYSSTRNDPXY_CHART_TARGET_ROWS < 110:
     raise ValueError("SYSSTRNDPXY_CHART_TARGET_ROWS must be at least 110.")
