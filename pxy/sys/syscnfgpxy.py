@@ -66,7 +66,7 @@ SYSENTRPXY_ST_START = dt_time(16, 0)
 # Data ingestion, chart generation, and signal calculation.
 # DTAF is intentionally simplified to a single raw-OHLC mode with futures blending.
 SYSDTAFPXY_FORCE_NIFTY_FUT = False
-SYSDTAFPXY_SELECTED_MODE = 1
+SYSDTAFPXY_SELECTED_MODE = 0
 if (
     isinstance(SYSDTAFPXY_SELECTED_MODE, bool)
     or not isinstance(SYSDTAFPXY_SELECTED_MODE, int)
