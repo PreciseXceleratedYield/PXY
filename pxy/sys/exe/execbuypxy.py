@@ -2,21 +2,20 @@
 # execbuypxy.py
 # COUNTER-BUY (CBUY) TRIGGER
 #
-# Called from exeexitpxy.py after the target exits. Receives the rows that are STILL held
-# (rows just exited, or with an exit already in flight, are removed by the caller).
+# Called from exeexitpxy.py after the target exits.
 #
-#   CE rows held + no PE row -> run pxybuype <offset>  (buys the PE leg)
-#   PE rows held + no CE row -> run pxybuyce <offset>  (buys the CE leg)
+# CE rows held + no PE row -> run pxybuype <offset>
+# PE rows held + no CE row -> run pxybuyce <offset>
 #
 # Offset logic:
-#   ITM CE (strike < underlying price) -> offset 0
-#   ITM PE (strike > underlying price) -> offset 0
-#   ATM -> offset 0
-#   Otherwise -> absolute difference rounded to nearest strike step
+#   ATM / ITM -> 0
+#   OTM       -> difference rounded to nearest 50
 #
-# Exactly one held side and an opposing exit signal are required.
-# Set to True for dynamic strike calculations, False to bypass and call default
-EXECBUYPXY_USE_DYNAMIC_STRIKE = True  
+# The calculated offset is passed directly to the shell script.
+# No weekday adjustment or additional offset is applied.
+
+EXECBUYPXY_USE_DYNAMIC_STRIKE = True
+STRIKE_STEP = 50
 
 import os
 import shutil
@@ -24,6 +23,7 @@ import json
 import time
 import subprocess
 import pandas as pd
+
 from datetime import datetime
 from colorama import Fore, Style
 
@@ -34,34 +34,43 @@ from syscnfgpxy import (
     EXECBUYPXY_LOCK_KEEP_SECS,
     EXECBUYPXY_MAX_PER_DAY,
     EXECBUYPXY_SCRIPTS,
-    RUNNIFTYPXY_STRIKE_STEP,
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
 )
 
-from sysdecisionpxy import counter_leg_permission_status, counter_leg_script
+from sysdecisionpxy import (
+    counter_leg_permission_status,
+    counter_leg_script,
+)
 
 
-# ==================== CONFIG (this file's settings) ====================
+# ==================== CONFIG ====================
+
 CBUY_ACTION = EXECBUYPXY_ACTION
 CBUY_LOCK_SECS = SYSCNFGPXY_ACTION_COOLDOWN_SECONDS
 CBUY_CUTOFF = EXECBUYPXY_CUTOFF
 CBUY_SCRIPTS = EXECBUYPXY_SCRIPTS
+
 CBUY_LOCK_FILE_NAME = ".cbuy_lock.json"
 CBUY_MAX_PER_DAY = EXECBUYPXY_MAX_PER_DAY
 CBUY_COUNT_FILE_NAME = ".cbuy_count.json"
 CBUY_LOCK_KEEP_SECS = EXECBUYPXY_LOCK_KEEP_SECS
+
 EXIT_KEY_COLUMN = "exit"
-# =======================================================================
+
+# ================================================
+
 
 _LOCK_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     CBUY_LOCK_FILE_NAME,
 )
+
 _COUNT_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     CBUY_COUNT_FILE_NAME,
 )
+
 _IST = SYSCNFGPXY_TIMEZONE
 _cap_warned = False
 
@@ -72,21 +81,24 @@ def debug_log(msg, color=Fore.BLUE):
 
 
 # ---------------- small helpers ----------------
+
 def _load_locks():
-    """Reads the lock file; returns {} if missing/unreadable. Never raises."""
+    """Reads the lock file; returns {} if missing/unreadable."""
     try:
         if os.path.exists(_LOCK_FILE):
             with open(_LOCK_FILE, "r") as fh:
                 return json.load(fh)
     except Exception:
         pass
+
     return {}
 
 
 def _recent(data, key, secs):
-    """True if `key` was recorded within `secs` seconds. Never raises."""
+    """True if key was recorded within secs seconds."""
     if secs <= 0:
         return False
+
     try:
         return (time.time() - float(data.get(key, 0))) < secs
     except Exception:
@@ -94,32 +106,50 @@ def _recent(data, key, secs):
 
 
 def _mark_lock(key):
-    """Records `key` with the current time; prunes stale entries. Never raises."""
+    """Records the current time and prunes stale entries."""
     try:
         data = _load_locks()
         now = time.time()
-        keep_secs = max(CBUY_LOCK_KEEP_SECS, CBUY_LOCK_SECS * 2)
-        data = {k: v for k, v in data.items() if now - float(v) < keep_secs}
+
+        keep_secs = max(
+            CBUY_LOCK_KEEP_SECS,
+            CBUY_LOCK_SECS * 2,
+        )
+
+        data = {
+            k: v
+            for k, v in data.items()
+            if now - float(v) < keep_secs
+        }
+
         data[key] = now
+
         tmp = _LOCK_FILE + ".tmp"
+
         with open(tmp, "w") as fh:
             json.dump(data, fh)
+
         os.replace(tmp, _LOCK_FILE)
+
     except Exception:
         pass
 
 
 def _find_script(name):
-    """Search the engine, system, and PXY directories, then PATH."""
+    """Search engine, system, and PXY directories, then PATH."""
+
     here = os.path.dirname(os.path.abspath(__file__))
+
     for folder in (
         here,
         os.path.dirname(here),
         os.path.dirname(os.path.dirname(here)),
     ):
         path = os.path.join(folder, name)
+
         if os.path.isfile(path):
             return path
+
     return shutil.which(name)
 
 
@@ -128,44 +158,72 @@ def _today():
 
 
 def _fires_today():
-    """Counter-buy launches already made today (IST). Never raises."""
+    """Counter-buy launches already made today."""
+
     try:
         if os.path.exists(_COUNT_FILE):
             with open(_COUNT_FILE, "r") as fh:
-                d = json.load(fh)
-            if isinstance(d, dict) and d.get("date") == _today():
-                return int(d.get("count", 0))
+                data = json.load(fh)
+
+            if (
+                isinstance(data, dict)
+                and data.get("date") == _today()
+            ):
+                return int(data.get("count", 0))
+
     except Exception:
         pass
+
     return 0
 
 
 def _count_fire():
-    """Adds one launch to today's count. Never raises."""
+    """Adds one launch to today's count."""
+
     try:
         tmp = _COUNT_FILE + ".tmp"
+
         with open(tmp, "w") as fh:
-            json.dump({"date": _today(), "count": _fires_today() + 1}, fh)
+            json.dump(
+                {
+                    "date": _today(),
+                    "count": _fires_today() + 1,
+                },
+                fh,
+            )
+
         os.replace(tmp, _COUNT_FILE)
+
     except Exception:
         pass
 
 
+# ---------------- strike calculation ----------------
+
 def _counter_buy_offset(remaining_df):
-    """Return zero for an ITM/ATM held option; otherwise rounded offset.
-
-    CE is ITM when strike < underlying price.
-    PE is ITM when strike > underlying price.
-
-    Returns None if the strike or underlying price cannot be determined safely.
     """
+    Calculate the counter-buy strike offset.
+
+    Uses:
+        remaining_df["symbol"] -> active option strike and type
+        remaining_df["price"]  -> underlying index price
+
+    Rules:
+        ATM / ITM -> 0
+        OTM       -> absolute difference rounded to nearest 50
+
+    Returns None if the required information cannot be determined safely.
+    """
+
     if remaining_df is None or remaining_df.empty:
         return None
 
     if not {"symbol", "price"}.issubset(remaining_df.columns):
         return None
 
+    # Extract active option strike and type.
     symbols = remaining_df["symbol"].astype(str).str.upper()
+
     parsed = symbols.str.extract(r"(\d+)(CE|PE)$")
 
     if parsed.isna().any().any():
@@ -174,13 +232,14 @@ def _counter_buy_offset(remaining_df):
     strikes = parsed[0].astype(int).unique()
     option_types = parsed[1].unique()
 
-    # Do not guess if multiple strikes or option types are present.
+    # Only one active strike and one option type are allowed.
     if len(strikes) != 1 or len(option_types) != 1:
         return None
 
-    strike = strikes[0]
-    option_type = option_types[0]
+    strike = int(strikes[0])
+    option_type = str(option_types[0])
 
+    # Extract underlying index price.
     prices = pd.to_numeric(
         remaining_df["price"],
         errors="coerce",
@@ -189,45 +248,70 @@ def _counter_buy_offset(remaining_df):
     if prices.empty:
         return None
 
-    price = float(prices.iloc[0])
-    step = RUNNIFTYPXY_STRIKE_STEP
+    index_price = float(prices.iloc[0])
 
-    if not pd.notna(price) or price <= 0 or step <= 0:
+    if (
+        not pd.notna(index_price)
+        or index_price <= 0
+    ):
         return None
 
-    # ITM CE: strike below underlying price.
-    if option_type == "CE" and strike < price:
+    step = STRIKE_STEP
+
+    # Calculate the nearest ATM strike.
+    atm_strike = int(
+        ((index_price / step) + 0.5) // 1 * step
+    )
+
+    # ATM -> zero.
+    if strike == atm_strike:
         return 0
 
-    # ITM PE: strike above underlying price.
-    if option_type == "PE" and strike > price:
+    # ITM CE -> zero.
+    if option_type == "CE" and strike < index_price:
         return 0
 
-    # Exact ATM.
-    if strike == price:
+    # ITM PE -> zero.
+    if option_type == "PE" and strike > index_price:
         return 0
 
-    # Otherwise, round the absolute difference to the nearest strike step.
-    difference = abs(strike - price)
-    return int((difference + step / 2) // step * step)
+    # OTM -> difference rounded to nearest 50.
+    difference = abs(strike - index_price)
+
+    offset = int(
+        ((difference + step / 2) // step) * step
+    )
+
+    return offset
 
 
 # ---------------- main entry ----------------
-def check_counter_leg(remaining_df):
-    """remaining_df: rows still held after this cycle's target exits.
 
-    Returns the name of the script fired (or None). Never raises.
+def check_counter_leg(remaining_df):
     """
+    remaining_df: rows still held after this cycle's target exits.
+
+    Returns the name of the script fired, or None.
+    """
+
     try:
+
         if remaining_df is None or remaining_df.empty:
-            debug_log("Counter check: no rows remaining after exits.")
+            debug_log(
+                "Counter check: no rows remaining after exits."
+            )
             return None
 
         signal = str(
-            remaining_df.iloc[0].get(EXIT_KEY_COLUMN, "NONE")
+            remaining_df.iloc[0].get(
+                EXIT_KEY_COLUMN,
+                "NONE",
+            )
         ).upper().strip()
 
-        records = remaining_df[["symbol", "qty"]].to_dict("records")
+        records = remaining_df[
+            ["symbol", "qty"]
+        ].to_dict("records")
 
         script_name = counter_leg_script(
             signal,
@@ -237,45 +321,57 @@ def check_counter_leg(remaining_df):
 
         if script_name is None:
             debug_log(
-                f"Counter check: exit signal {signal} does not oppose exactly "
-                "one held option side."
+                f"Counter check: exit signal {signal} "
+                "does not oppose exactly one held option side."
             )
             return None
 
-        # =======================================================================
-        # 🔄 STRIKE SELECTION SWITCH matrix
-        # =======================================================================
+        # ---------------- strike selection ----------------
+
         if EXECBUYPXY_USE_DYNAMIC_STRIKE:
-            # Mode A: Dynamic Strike Selection based on underlying price matrix
+
             offset = _counter_buy_offset(remaining_df)
+
             if offset is None:
                 print(
                     f"{Fore.YELLOW} ⚠ Counter-buy skipped: "
                     "could not safely calculate dynamic strike offset."
                 )
                 return None
-        else:
-            # Mode B: Simple Constant Call - Bypasses calculations and uses 0
-            debug_log("Simple Call Mode Active: Bypassing dynamic strike calculations.")
-            offset = 0
-        # =======================================================================
 
+        else:
+            debug_log(
+                "Simple Call Mode Active: using offset 0."
+            )
+            offset = 0
+
+        # --------------------------------------------------
 
         held = "PE" if signal == "BULL" else "CE"
         counter = "PE" if held == "CE" else "CE"
 
         now = datetime.now(_IST).time()
-        # =======================================================================
-        # 🛡️ PIPE GUARD: Enforce an absolute minimum 5-second safety window
-        # to prevent millisecond double-firing during back-to-back executions.
-        # =======================================================================
+
+        # ---------------- cooldown protection ----------------
+
         lock_key = f"CBUY|{script_name}"
-        safety_cooldown = max(5.0, float(CBUY_LOCK_SECS if CBUY_LOCK_SECS is not None else 0))
-        locked = _recent(_load_locks(), lock_key, safety_cooldown)
-        # =======================================================================
 
+        safety_cooldown = max(
+            5.0,
+            float(
+                CBUY_LOCK_SECS
+                if CBUY_LOCK_SECS is not None
+                else 0
+            ),
+        )
 
-        # Preserve the existing counter-buy permission behaviour.
+        locked = _recent(
+            _load_locks(),
+            lock_key,
+            safety_cooldown,
+        )
+
+        # Preserve existing counter-buy permission behaviour.
         launches_today = 0
 
         permission = counter_leg_permission_status(
@@ -289,7 +385,8 @@ def check_counter_leg(remaining_df):
 
         if permission == "cutoff":
             debug_log(
-                f"Counter check: past {CBUY_CUTOFF}; not firing {script_name}."
+                f"Counter check: past {CBUY_CUTOFF}; "
+                f"not firing {script_name}."
             )
             return None
 
@@ -303,12 +400,16 @@ def check_counter_leg(remaining_df):
         global _cap_warned
 
         if permission == "daily_limit":
+
             if not _cap_warned:
                 _cap_warned = True
+
                 print(
                     f"{Fore.RED}🛑 Counter-buy daily cap reached "
-                    f"({CBUY_MAX_PER_DAY} launches); not firing {script_name}."
+                    f"({CBUY_MAX_PER_DAY} launches); "
+                    f"not firing {script_name}."
                 )
+
             return None
 
         print(
@@ -317,56 +418,68 @@ def check_counter_leg(remaining_df):
         )
 
         if permission == "passive":
+
             print(
-                f"{Fore.BLUE}{Style.BRIGHT}ℹ️ [PASSIVE ALERT] "
-                f"CBUY_ACTION=NO. Would fire {script_name} with offset {offset}."
+                f"{Fore.BLUE}{Style.BRIGHT}"
+                f"ℹ️ [PASSIVE ALERT] "
+                f"CBUY_ACTION=NO. Would fire "
+                f"{script_name} with offset {offset}."
             )
+
             return None
 
+        # ---------------- locate script ----------------
+
         path = _find_script(script_name)
+
         if not path:
             print(
-                f"{Fore.RED} ❌ Counter script {script_name} not found "
+                f"{Fore.RED} ❌ Counter script "
+                f"{script_name} not found "
                 "(searched the engine, system, PXY, and PATH locations)."
             )
             return None
 
-        # --- FIX START: MATH ENFORCEMENT MATRIX TO PREVENT '300100' STRING CONCATENATION ---
-        try:
-            # Safely parse the base offset value out of the signal payload
-            base_offset = int(float(str(signal).replace("BULL", "").replace("BEAR", "").strip()))
-        except (ValueError, TypeError, NameError):
-            # Fallback to zero if the signal name doesn't contain digits directly
-            base_offset = 0
+        # ---------------- final offset ----------------
 
-        # Enforce day-of-week step matrix calculation (Wednesdays default to 0 step points)
-        try:
-            day_step = int(CBUY_SCRIPTS.get("STEP_WEDNESDAY", 0))
-        except (ValueError, TypeError, AttributeError):
-            day_step = 0
+        # IMPORTANT:
+        # Pass the calculated offset directly.
+        # No weekday adjustment.
+        # No signal-based offset.
+        # No additional addition.
 
-        # Perform absolute mathematical integer addition (300 + 0 = 300)
-        final_offset = base_offset + day_step
-        # --- FIX END ---
+        final_offset = int(offset)
 
-        # Save cooldown anchors before launching process threads
+        # ---------------- launch ----------------
+
         _mark_lock(lock_key)
         _count_fire()
 
-        # Execute fully isolated background process thread to shield the parent loops
         subprocess.Popen(
-            ["bash", path, str(final_offset)],
+            [
+                "bash",
+                path,
+                str(final_offset),
+            ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            start_new_session=True
+            start_new_session=True,
         )
 
         print(
-            f"{Fore.MAGENTA}{Style.BRIGHT} ⚡ FIRED COUNTER-BUY: "
+            f"{Fore.MAGENTA}{Style.BRIGHT}"
+            f" ⚡ FIRED COUNTER-BUY: "
             f"{script_name} {final_offset}"
         )
+
         return script_name
 
     except Exception as e:
-        print(f"{Fore.RED} ❌ Counter-check error; counter-buy NOT launched: {e}")
+
+        print(
+            f"{Fore.RED} ❌ Counter-check error; "
+            f"counter-buy NOT launched: {e}"
+        )
+
         return None
+
