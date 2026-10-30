@@ -2,8 +2,6 @@
 # execbuypxy.py
 # COUNTER-BUY (CBUY) TRIGGER
 #
-# Called from exeexitpxy.py after the target exits.
-#
 # CE rows held + no PE row -> run pxybuype <offset>
 # PE rows held + no CE row -> run pxybuyce <offset>
 #
@@ -204,15 +202,11 @@ def _counter_buy_offset(remaining_df):
     """
     Calculate the counter-buy strike offset.
 
-    Uses:
-        remaining_df["symbol"] -> active option strike and type
-        remaining_df["price"]  -> underlying index price
+    symbol -> active option strike and type
+    price  -> price supplied in remaining_df
 
-    Rules:
-        ATM / ITM -> 0
-        OTM       -> absolute difference rounded to nearest 50
-
-    Returns None if the required information cannot be determined safely.
+    ATM / ITM -> 0
+    OTM       -> difference rounded to nearest 50
     """
 
     if remaining_df is None or remaining_df.empty:
@@ -221,7 +215,6 @@ def _counter_buy_offset(remaining_df):
     if not {"symbol", "price"}.issubset(remaining_df.columns):
         return None
 
-    # Extract active option strike and type.
     symbols = remaining_df["symbol"].astype(str).str.upper()
 
     parsed = symbols.str.extract(r"(\d+)(CE|PE)$")
@@ -232,14 +225,12 @@ def _counter_buy_offset(remaining_df):
     strikes = parsed[0].astype(int).unique()
     option_types = parsed[1].unique()
 
-    # Only one active strike and one option type are allowed.
     if len(strikes) != 1 or len(option_types) != 1:
         return None
 
     strike = int(strikes[0])
     option_type = str(option_types[0])
 
-    # Extract underlying index price.
     prices = pd.to_numeric(
         remaining_df["price"],
         errors="coerce",
@@ -248,41 +239,40 @@ def _counter_buy_offset(remaining_df):
     if prices.empty:
         return None
 
-    index_price = float(prices.iloc[0])
+    spot = float(prices.iloc[0])
 
-    if (
-        not pd.notna(index_price)
-        or index_price <= 0
-    ):
+    if not pd.notna(spot) or spot <= 0:
         return None
+
+    # Single diagnostic print.
+    print(
+        f"{Fore.CYAN}COUNTER-BUY | "
+        f"SPOT: {spot:.2f} | "
+        f"ACTIVE STRIKE: {strike} | "
+        f"TYPE: {option_type}{Style.RESET_ALL}",
+        flush=True,
+    )
 
     step = STRIKE_STEP
 
-    # Calculate the nearest ATM strike.
     atm_strike = int(
-        ((index_price / step) + 0.5) // 1 * step
+        ((spot / step) + 0.5) // 1 * step
     )
 
-    # ATM -> zero.
     if strike == atm_strike:
         return 0
 
-    # ITM CE -> zero.
-    if option_type == "CE" and strike < index_price:
+    if option_type == "CE" and strike < spot:
         return 0
 
-    # ITM PE -> zero.
-    if option_type == "PE" and strike > index_price:
+    if option_type == "PE" and strike > spot:
         return 0
 
-    # OTM -> difference rounded to nearest 50.
-    difference = abs(strike - index_price)
+    difference = abs(strike - spot)
 
-    offset = int(
+    return int(
         ((difference + step / 2) // step) * step
     )
-
-    return offset
 
 
 # ---------------- main entry ----------------
@@ -442,8 +432,7 @@ def check_counter_leg(remaining_df):
 
         # ---------------- final offset ----------------
 
-        # IMPORTANT:
-        # Pass the calculated offset directly.
+        # Pass calculated offset directly.
         # No weekday adjustment.
         # No signal-based offset.
         # No additional addition.
