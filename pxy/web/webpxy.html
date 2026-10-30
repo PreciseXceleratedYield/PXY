@@ -1767,7 +1767,7 @@ function confirmUpdate(){
     if(script==='pxyconfig'){
         if(pwd!=='1'){alert('Incorrect password');$('updPwd').value='';$('updPwd').focus();return;}
         $('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;
-        window.location.href='https://github.com/PreciseXceleratedYield/PXY/blob/main/pxy/sys/syscnfgpxy.py';
+        window.open('https://github.com/PreciseXceleratedYield/PXY/blob/main/pxy/sys/syscnfgpxy.py','_blank','noopener,noreferrer');
         return;
     }
     $('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;
