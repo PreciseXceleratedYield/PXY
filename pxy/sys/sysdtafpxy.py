@@ -27,7 +27,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 # Mode 2: Close = (Open + Close) / 2
 # Mode 3: Close = (Close + High + Low) / 3; recalculate High/Low
 # Mode 7: Historical Close = 7-period linear-regression projection of Open
-ACTIVE_MODE = 0
+ACTIVE_MODE = 7
 
 # Explicitly enforce configured timezone mapping.
 TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
