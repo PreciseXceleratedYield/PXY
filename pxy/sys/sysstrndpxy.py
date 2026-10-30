@@ -51,7 +51,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df['ST'] = df['st_line']
     df['st1_mirror'] = df['st_mirror']
     df['sma_50'] = calculate_moving_average(df['Close'], period=50, variant="SMA")
-    df['tsma_50'] = calculate_moving_average(df['Close'], period=7, variant="TSMA")
+    df['tsma_50'] = calculate_moving_average(df['Close'], period=9, variant="TSMA")
 
     return df
 
