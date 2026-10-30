@@ -26,7 +26,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 # Mode 1: Historical OHLC/4 close override
 # Mode 2: Close = (Open + Close) / 2
 # Mode 3: Close = (Close + High + Low) / 3; recalculate High/Low
-# Mode 7: Close = 7-period linear-regression projection of Open
+# Mode 7: TSMA-adjusted OHLC; final Close = adjusted OHLC/4
 ACTIVE_MODE = 7
 
 TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
@@ -86,6 +86,7 @@ def apply_ohlc_transformation(
 
     elif mode == 1:
         if len(out) > 0:
+            # Calculate OHLC/4 from the current OHLC values.
             ohlc_4 = (
                 out["Open"]
                 + out["High"]
@@ -93,14 +94,18 @@ def apply_ohlc_transformation(
                 + out["Close"]
             ) / 4.0
 
+            # Preserve the latest candle's original Close.
             latest_original_close = out["Close"].iloc[-1]
 
+            # Historical Close uses the previous candle's OHLC/4.
             out["Close"] = ohlc_4.shift(1)
 
+            # Keep the latest candle's original Close.
             out.loc[
                 out.index[-1], "Close"
             ] = latest_original_close
 
+            # Preserve the existing first-row edge-case handling.
             if len(out) > 1 and pd.isna(
                 out.loc[out.index[0], "Close"]
             ):
@@ -111,6 +116,7 @@ def apply_ohlc_transformation(
         return out
 
     elif mode == 2:
+        # Change Close only; retain Open, High and Low.
         out["Close"] = (
             out["Open"] + out["Close"]
         ) / 2.0
@@ -118,6 +124,7 @@ def apply_ohlc_transformation(
         return out
 
     elif mode == 3:
+        # Calculate the modified Close.
         modified_c = (
             out["Close"] + out["High"] + out["Low"]
         ) / 3.0
@@ -134,12 +141,10 @@ def apply_ohlc_transformation(
         # ==================================================================
         # MODE 7: 7-PERIOD LINEAR-REGRESSION TSMA
         #
-        # Open  = Original Open
-        # Close = TSMA projection of Open
-        # High  = Original High
-        # Low   = Original Low
-        #
-        # Applies to historical AND running candles.
+        # 1. Calculate TSMA from the Open-price series.
+        # 2. Average TSMA independently with each OHLC value.
+        # 3. Calculate final Close as adjusted OHLC/4.
+        # 4. Apply to historical and running candles.
         # ==================================================================
 
         period = 7
@@ -155,18 +160,21 @@ def apply_ohlc_transformation(
             n * sum_x2 - sum_x * sum_x
         )
 
-        raw_open = out["Open"].to_numpy(dtype=float)
+        # Preserve original OHLC values before transformation.
+        raw_o = out["Open"].to_numpy(dtype=float).copy()
+        raw_h = out["High"].to_numpy(dtype=float).copy()
+        raw_l = out["Low"].to_numpy(dtype=float).copy()
+        raw_c = out["Close"].to_numpy(dtype=float).copy()
 
         tsma_values = np.full(
-            len(raw_open),
+            len(raw_o),
             np.nan,
             dtype=float,
         )
 
-        # Calculate the 7-period regression projection for every
-        # candle, including the latest running candle.
-        for idx in range(period - 1, len(raw_open)):
-            window_y = raw_open[
+        # Calculate the 7-period linear-regression projection.
+        for idx in range(period - 1, len(raw_o)):
+            window_y = raw_o[
                 idx - period + 1:idx + 1
             ]
 
@@ -192,12 +200,30 @@ def apply_ohlc_transformation(
                 intercept + slope * n
             )
 
-        # Replace Close wherever a valid 7-period TSMA exists.
-        # This includes the latest running candle.
+        # Apply TSMA only where a valid 7-period value exists.
         valid = np.isfinite(tsma_values)
 
+        # Average TSMA independently with each OHLC value.
+        adjusted_o = (raw_o[valid] + tsma_values[valid]) / 2.0
+        adjusted_h = (raw_h[valid] + tsma_values[valid]) / 2.0
+        adjusted_l = (raw_l[valid] + tsma_values[valid]) / 2.0
+        adjusted_c = (raw_c[valid] + tsma_values[valid]) / 2.0
+
+        # Assign adjusted Open, High and Low.
+        out.loc[valid, "Open"] = np.round(adjusted_o, 2)
+        out.loc[valid, "High"] = np.round(adjusted_h, 2)
+        out.loc[valid, "Low"] = np.round(adjusted_l, 2)
+
+        # Final Close = average of the four adjusted OHLC values.
+        final_close = (
+            adjusted_o
+            + adjusted_h
+            + adjusted_l
+            + adjusted_c
+        ) / 4.0
+
         out.loc[valid, "Close"] = np.round(
-            tsma_values[valid], 2
+            final_close, 2
         )
 
         return out
@@ -283,6 +309,7 @@ def _fetch_yf_data_production(
     if not FORCE_NIFTY_FUT:
         ticker_obj = yf.Ticker(TICKER)
 
+        # Try the requested period first, when supplied.
         if period is not None:
             try:
                 df = ticker_obj.history(
@@ -295,6 +322,7 @@ def _fetch_yf_data_production(
                     f"for {period}: {error}"
                 )
 
+        # Try supported lookup horizons if the data is insufficient.
         if df.empty or len(df) < buffer_rows:
             for search_period in ("1d", "5d", "7d"):
                 try:
@@ -358,6 +386,7 @@ def _fetch_yf_data_production(
                 index=time_indices,
             )
 
+            # Apply the same configured transformation to fallback rows.
             fallback_df = apply_ohlc_transformation(
                 fallback_df,
                 mode=ACTIVE_MODE,
@@ -389,7 +418,7 @@ def _fetch_yf_data_production(
         )
         return pd.DataFrame()
 
-    # Normalize index to configured timezone.
+    # Normalize the index to the configured timezone.
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
 
@@ -398,7 +427,7 @@ def _fetch_yf_data_production(
     else:
         df = df.tz_convert(TIMEZONE)
 
-    # Blend futures and apply active DTAF mode.
+    # Blend futures and apply the active DTAF mode.
     processed_df = transform_market_data(
         df,
         futures_price=futures_price,
