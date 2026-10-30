@@ -3,13 +3,14 @@ from datetime import datetime, time as dt_time
 from pathlib import Path
 import sys
 
-import pandas as pd
-
-# Existing MKT pipeline remains the source of exit signals.
+# Existing MKT pipeline.
 from sysmktpxy import get_signal as get_market_signal
 
-# New independent GTIN pipeline supplies entry signals only.
+# Existing GTIN entry pipeline, retained for MKT mode.
 from sysgtinpxy import get_entry_signal as get_gtin_entry_signal
+
+# New RSIG entry + exit pipeline.
+from sysrsigpxy import get_signals as get_rsig_signals
 
 from syscnfgpxy import SYSCNFGPXY_TIMEZONE
 
@@ -20,7 +21,12 @@ if str(EXE_DIR) not in sys.path:
 from execoolpxy import cooldown_remaining
 
 
-# Fresh-entry window (Asia/Kolkata)
+# Select the signal pipeline:
+# "MKT"  = existing GTIN entry + MKT exit behavior.
+# "RSIG" = RSIG entry + RSIG exit behavior.
+SIGNAL_MODE = "RSIG"
+
+# Fresh-entry window (Asia/Kolkata).
 ENTRY_START = dt_time(9, 16)
 ENTRY_END = dt_time(13, 16)
 
@@ -31,7 +37,7 @@ def _apply_new_book_cutoff(entry_signal, exit_signal, now_time):
     until 13:16 exclusive.
 
     This restriction applies ONLY to entry signals.
-    The existing exit signal is preserved.
+    The exit signal is preserved.
     """
     if not (ENTRY_START <= now_time < ENTRY_END):
         entry_signal = "NONE"
@@ -41,18 +47,19 @@ def _apply_new_book_cutoff(entry_signal, exit_signal, now_time):
 
 def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     """
-    Route entry and exit signals through separate pipelines.
+    Return (entry_signal, exit_signal).
 
-    Entry:
-        GTIN running-candle close-to-close signal.
+    SIGNAL_MODE:
+        MKT:
+            Entry = existing GTIN pipeline.
+            Exit  = existing MKT pipeline.
 
-    Exit:
-        Existing MKT/DTHA signal, unchanged.
+        RSIG:
+            Entry = RSIG pipeline.
+            Exit  = RSIG pipeline.
 
-    Fresh entries are permitted only from 09:16 to 13:16
-    in the configured timezone.
-
-    Existing cooldown behavior and return signature are preserved.
+    Existing cooldown, time-window, function signature,
+    and tuple return behavior are preserved.
 
     processed_supertrend is retained for signature compatibility.
     """
@@ -65,7 +72,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
         )
         return "NONE", "NONE"
 
-    # 2. Resolve the current time in the configured timezone.
+    # 2. Resolve current time in the configured timezone.
     if now is None:
         now_time = datetime.now(SYSCNFGPXY_TIMEZONE).time()
     elif isinstance(now, datetime):
@@ -73,43 +80,60 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     else:
         now_time = now
 
-    # 3. Fetch market data once and pass the same frame to both pipelines.
+    # 3. Fetch market data once and share the same frame.
     if df is None:
         from sysdtafpxy import fetch_yf_data
-
         df = fetch_yf_data()
 
-    # 4. Entry signal: independent GTIN pipeline.
-    raw_entry = str(get_gtin_entry_signal(df)).upper().strip()
+    # 4. Select the signal pipeline.
+    mode = str(SIGNAL_MODE).upper().strip()
 
-    entry_sig = (
-        raw_entry
-        if raw_entry in {"BUY", "SELL"}
-        else "NONE"
-    )
+    if mode == "MKT":
+        # Original behavior: GTIN entry + MKT exit.
+        raw_entry = str(get_gtin_entry_signal(df)).upper().strip()
+        entry_sig = (
+            raw_entry
+            if raw_entry in {"BUY", "SELL"}
+            else "NONE"
+        )
 
-    # 5. Exit signal: existing MKT pipeline, unchanged.
-    raw_mkt = str(get_market_signal(df)).upper().strip()
+        raw_exit = str(get_market_signal(df)).upper().strip()
+        exit_sig = (
+            raw_exit
+            if raw_exit in {"BULL", "BEAR"}
+            else "NONE"
+        )
 
-    mkt_signal = (
-        raw_mkt
-        if raw_mkt in {"BULL", "BEAR"}
-        else "NONE"
-    )
+    elif mode == "RSIG":
+        # RSIG calculates both signals from the same data snapshot.
+        raw_entry, raw_exit = get_rsig_signals(df)
 
-    if mkt_signal == "BULL":
-        exit_sig = "BULL"
-    elif mkt_signal == "BEAR":
-        exit_sig = "BEAR"
+        raw_entry = str(raw_entry).upper().strip()
+        raw_exit = str(raw_exit).upper().strip()
+
+        entry_sig = (
+            raw_entry
+            if raw_entry in {"BUY", "SELL"}
+            else "NONE"
+        )
+        exit_sig = (
+            raw_exit
+            if raw_exit in {"BULL", "BEAR"}
+            else "NONE"
+        )
+
     else:
-        exit_sig = "NONE"
+        # Invalid mode must not create an entry or exit signal.
+        print(f"⚠️ INVALID SIGNAL_MODE: {SIGNAL_MODE!r}. Signals forced to NONE.")
+        return "NONE", "NONE"
 
     print(
-        f"⏱️ Entry: GTIN({entry_sig}) | "
-        f"Exit: MKT({mkt_signal})"
+        f"⏱️ Mode: {mode} | "
+        f"Entry: {entry_sig} | "
+        f"Exit: {exit_sig}"
     )
 
-    # 6. Preserve the existing entry-only time restriction.
+    # 5. Preserve the existing entry-only time restriction.
     return _apply_new_book_cutoff(
         entry_sig,
         exit_sig,
@@ -120,19 +144,16 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
 if __name__ == "__main__":
     from sysdtafpxy import fetch_yf_data
 
-    print(
-        "--- STARTING LIVE PXY GTIN ENTRY / "
-        "EXISTING MKT EXIT ROUTER ---"
-    )
+    print(f"--- STARTING PXY {SIGNAL_MODE} ENTRY / EXIT ROUTER ---")
 
     df = fetch_yf_data()
 
     if df is not None and not df.empty:
         entry_sig, exit_sig = get_entry_signal(df)
-
         print(
             f"RESULT >> ENTRY_SIG: {entry_sig} | "
             f"EXIT_SIG: {exit_sig}"
         )
     else:
         print("CRITICAL Upstream data feed empty.")
+
