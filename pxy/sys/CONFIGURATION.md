@@ -13,16 +13,16 @@ shell launchers `pxychk` and `pxysim` intentionally select `RUNMODE=CHK` and
 combination, recorded as `SYSCNFGPXY_RELEASE_NAME`; it is not a separate
 runtime selector.
 
-- **Entry router:** `MKT`. MKT BULL/BEAR map directly to BUY/SELL throughout
-  the session. New books are blocked at the 14:00 cutoff; MKT exit signals
-  continue to be evaluated.
-- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 1`. DTAF uses one
-  canonical raw-OHLC mode; it keeps the same candle structure and blends the
-  latest futures price for signal input only. The separate chart display
-  transform remains `SYSPLCHRTPXY_OHLC_MODE = 1` (raw OHLC).
-- **Option strikes:** `EXEOTMPXY_STRIKE_MODE = "ATM"` for option buys.
-- **Supertrend settings:** period 14, factor 1, used by the active ST entry
-  router from 10:00 IST onward.
+- **Entry router:** `RSIG` (selected by `SYSENTRPXY_VARIANT`); `MKT` remains
+  available as the alternate router. Fresh-entry signals are gated by the
+  configured 13:16 IST cutoff.
+- **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 0`. DTAF retains the
+  canonical OHLC candle structure and blends the latest futures price for
+  signal input only. The separate chart display transform remains
+  `SYSPLCHRTPXY_OHLC_MODE = 1` (raw OHLC).
+- **Option strikes:** `EXEOTMPXY_STRIKE_MODE = "OTMFIX"` with a fixed distance
+  of 100 points for option buys.
+- **Supertrend settings:** period 14, factor 1.4.
 - **LGT:** `magnitude = max(1.4, round(66 × ratio, 2))`,
   `LGT = -min(magnitude, 77)`, where ratio is own-side investment divided by
   opposite-side investment and clamped to `[0.1, 10]`. Invalid or non-positive
@@ -62,22 +62,18 @@ runtime selector.
   cache exists yet, calendar lookup fails explicitly rather than assuming dates.
 - Shared market times are declared once as `SYSCNFGPXY_*` in
   `syscnfgpxy.py`; subsystem-prefixed names remain compatibility aliases.
-  The schedule distinguishes the 09:15 exchange open, 09:16 engine start,
-  09:17 averaging start, 15:10 entry/averaging cutoff, the 15:11/15:14
-  square-off stages, and distinct engine, pipe, replay, and final-square-off
-  close times. Change those shared values rather than editing duplicate
+  The schedule distinguishes the 09:15 exchange open, 09:16 market/engine
+  start, 09:17 averaging start, 13:16 fresh-entry cutoff, 15:30 square-off
+  start, 15:31 all-position square-off start, 15:40 pipe/square-off close, and
+  15:45 engine close. Change those shared values rather than editing duplicate
   per-subsystem times. The 09:15–10:10 morning BOS classification is its own
-  strategy window.
-  The standalone 15:25 square-off trigger is also intentionally separate from
-  the staged exit schedule. Legacy `exe/run/X` scripts and pipe-scenario test
-  fixtures retain their own values; they do not drive the production schedule.
-- The chart and STS entry router share the same Supertrend implementation and
-  settings: `SYSDTSTPXY_ST1_PERIOD` (default `14`) and
-  `SYSDTSTPXY_ST1_FACTOR` (default `1`). STS entry uses the chart's already
-  calculated Supertrend series and candle window, so its displayed trend and
-  line match the values used for STS entry routing. The Supertrend's
-  Wilder-style true range ATR is distinct from SKATR's session-based
-  true-range ATR.
+  strategy window. The standalone 15:25 square-off trigger is intentionally
+  separate from the staged exit schedule. Legacy `exe/run/X` scripts and
+  pipe-scenario test fixtures retain their own values; they do not drive the
+  production schedule.
+- Supertrend calculations use `SYSDTSTPXY_ST1_PERIOD` (default `14`) and
+  `SYSDTSTPXY_ST1_FACTOR` (default `1.4`). The Supertrend's Wilder-style
+  true-range ATR is distinct from SKATR's session-based true-range ATR.
 - SKATR true-range ATR (mode 2) starts accumulating at 09:16 IST each session:
   the 09:16 candle uses high minus low only, excluding the 09:15 close gap.
   Each following value is the expanding mean through candle 14, and subsequent
@@ -145,14 +141,12 @@ values until deliberately restarted.
 
 ## Option strike selection
 
-`SYSENTRPXY_VARIANT` selects one of two entry routers: `MKT` or `STS`.
-In `MKT`, MKT BULL/BEAR maps directly to BUY/SELL. In `STS`, Supertrend
-direction and the existing half-ATR entry zone determine BUY/SELL; SIDE,
-missing data, and invalid trends produce no entry. In both modes, exits are
-always sourced from MKT and remain independent of the selected entry router.
-The ST line, trend, and ATR used for entry are read from the same calculated
-series shown on the chart. Both variants respect the shared new-book cutoff
-and post-square-off cooldown.
+`SYSENTRPXY_VARIANT` selects one of two entry routers: `MKT` or `RSIG`.
+In `MKT`, entry signals come from the GTIN pipeline and exit signals come
+from MKT. In `RSIG`, both entry and exit signals come from the RSIG pipeline.
+The router normalizes entry results to BUY/SELL and exit results to BULL/BEAR;
+invalid or unsupported results fail closed to NONE. Both variants respect the
+configured entry window and post-square-off cooldown.
 `SYSDTAFPXY_SELECTED_MODE` is fixed to `1` and represents the single
 canonical DTAF candle transform. In this mode the dataset keeps the raw OHLC
 shape and the latest NIFTY futures price is averaged into each OHLC field only

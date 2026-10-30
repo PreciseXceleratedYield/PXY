@@ -11,7 +11,9 @@ init(autoreset=True)
 from sysdtafpxy import fetch_yf_data
 
 def calculate_moving_average(
-    close: pd.Series, period: int = SYSSMAPXY_MA_PERIOD, variant: str = SYSSMAPXY_VARIANT
+    close: pd.Series,
+    period: int = SYSSMAPXY_MA_PERIOD,
+    variant: str = SYSSMAPXY_VARIANT,
 ) -> pd.Series:
     """Calculate a simple moving average or linear-regression endpoint TSMA."""
     variant = str(variant).upper()
@@ -35,9 +37,11 @@ def calculate_moving_average(
 
 
 def get_sma(
-    df: pd.DataFrame, period: int = SYSSMAPXY_MA_PERIOD, variant: str = SYSSMAPXY_VARIANT
+    df: pd.DataFrame,
+    period: int = SYSSMAPXY_MA_PERIOD,
+    variant: str = SYSSMAPXY_VARIANT,
 ) -> dict:
-    """Return the selected 50-period moving-average value and price-side status."""
+    """Return the selected moving-average value and price-side status."""
     variant = str(variant).upper()
     if variant not in {"SMA", "TSMA"}:
         raise ValueError("variant must be SMA or TSMA.")
@@ -65,10 +69,10 @@ def get_sma(
 
 def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
     """
-    Constructs a custom 50-period trend-tracking candle.
-    O = Actual Open price from 50 candles ago (SMA delinked)
-    H = Highest price point across the LAST 50 candles
-    L = Lowest price point across the LAST 50 candles
+    Constructs a trend-tracking candle over the configured moving-average window.
+    O = Actual Open price at the start of the window (SMA delinked)
+    H = Highest price point across the configured window
+    L = Lowest price point across the configured window
     C = Current Live / Close price
     """
     if df is None or df.empty or len(df) < SYSSMAPXY_MA_PERIOD:
@@ -83,7 +87,7 @@ def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
     current_close = window['Close'].iloc[-1]
     # Construct the tracking candle dictionary
     candle_data = [{
-        'O': float(open_price),     # Actual open 50 periods ago
+        'O': float(open_price),     # Actual open at the start of the window
         'H': float(highest_price),  # Highest price point in 50 candles
         'L': float(lowest_price),   # Lowest price point in 50 candles
         'C': float(current_close)   # Live price is close
