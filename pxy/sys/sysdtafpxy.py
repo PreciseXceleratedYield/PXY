@@ -1,7 +1,9 @@
+
 import json
 import math
 import os
 import warnings
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -24,6 +26,7 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 # Mode 1: Historical OHLC/4 close override
 # Mode 2: Close = (Open + Close) / 2
 # Mode 3: Close = (Close + High + Low) / 3; recalculate High/Low
+# Mode 7: Historical Close = 7-period linear-regression projection of Open
 ACTIVE_MODE = 0
 
 # Explicitly enforce configured timezone mapping.
@@ -54,10 +57,19 @@ def apply_ohlc_transformation(
         Set High = max(Open, modified Close).
         Set Low = min(Open, modified Close).
 
+    Mode 7:
+        Calculate a 7-period linear-regression projection using Open.
+        Replace historical Close values with their corresponding
+        TSMA projections.
+        Preserve the latest running candle's original Close.
+        Leave Open, High and Low unchanged.
+
     If futures_price is provided, blend it with each OHLC field first.
     """
-    if mode not in (0, 1, 2, 3):
-        raise ValueError("DTAF mode must be 0, 1, 2, or 3.")
+    if mode not in (0, 1, 2, 3, 7):
+        raise ValueError(
+            "DTAF mode must be 0, 1, 2, 3, or 7."
+        )
 
     if df is None or df.empty:
         return df
@@ -79,7 +91,9 @@ def apply_ohlc_transformation(
             )
 
         for column in ("Open", "High", "Low", "Close"):
-            out[column] = (out[column] + futures_price) / 2.0
+            out[column] = (
+                out[column] + futures_price
+            ) / 2.0
 
     # 2. Apply the selected mode.
     if mode == 0:
@@ -114,13 +128,17 @@ def apply_ohlc_transformation(
             out["Close"] = ohlc_4.shift(1)
 
             # Keep the latest candle's original Close.
-            out.loc[out.index[-1], "Close"] = latest_original_close
+            out.loc[
+                out.index[-1], "Close"
+            ] = latest_original_close
 
             # Preserve the existing first-row edge-case handling.
             if len(out) > 1 and pd.isna(
                 out.loc[out.index[0], "Close"]
             ):
-                out.loc[out.index[0], "Close"] = ohlc_4.iloc[0]
+                out.loc[
+                    out.index[0], "Close"
+                ] = ohlc_4.iloc[0]
 
         return out
 
@@ -143,6 +161,83 @@ def apply_ohlc_transformation(
         out["Close"] = modified_c
         out["High"] = np.maximum(raw_o, modified_c)
         out["Low"] = np.minimum(raw_o, modified_c)
+
+        return out
+
+    elif mode == 7:
+        # Mode 7: 7-period linear-regression TSMA.
+        # Only historical Close values are changed.
+        # The latest running candle remains unchanged.
+
+        period = 7
+        n = float(period)
+
+        # Linear-regression constants for x = 1, 2, ..., 7.
+        x = np.arange(1, period + 1, dtype=float)
+
+        sum_x = float(np.sum(x))
+        sum_x2 = float(np.sum(x * x))
+
+        denominator = (
+            n * sum_x2 - sum_x * sum_x
+        )
+
+        # Preserve original values.
+        raw_open = out["Open"].to_numpy(dtype=float)
+        raw_close = out["Close"].to_numpy(dtype=float).copy()
+
+        tsma_values = np.full(
+            len(raw_open),
+            np.nan,
+            dtype=float,
+        )
+
+        # Calculate the regression projection for each available
+        # 7-candle window, including the current candle in that window.
+        for idx in range(period - 1, len(raw_open)):
+            window_y = raw_open[
+                idx - period + 1:idx + 1
+            ]
+
+            if not np.all(np.isfinite(window_y)):
+                continue
+
+            sum_y = float(np.sum(window_y))
+
+            sum_xy = float(
+                np.dot(x, window_y)
+            )
+
+            slope = (
+                n * sum_xy - sum_x * sum_y
+            ) / denominator
+
+            intercept = (
+                sum_y - slope * sum_x
+            ) / n
+
+            # Project the regression line to the 7th point.
+            tsma_values[idx] = (
+                intercept + slope * n
+            )
+
+        # Replace historical Close values where a 7-period
+        # TSMA projection is available.
+        historical_end = max(0, len(out) - 1)
+
+        for idx in range(historical_end):
+            if np.isfinite(tsma_values[idx]):
+                out.iloc[
+                    idx,
+                    out.columns.get_loc("Close")
+                ] = round(float(tsma_values[idx]), 2)
+
+        # Preserve the latest running candle's real Close.
+        if len(out) > 0:
+            out.iloc[
+                -1,
+                out.columns.get_loc("Close")
+            ] = raw_close[-1]
 
         return out
 
@@ -251,7 +346,12 @@ def _fetch_yf_data_production(
 
                     if not temp_df.empty:
                         temp_df = temp_df.dropna(
-                            subset=["Open", "High", "Low", "Close"]
+                            subset=[
+                                "Open",
+                                "High",
+                                "Low",
+                                "Close",
+                            ]
                         )
 
                         if len(temp_df) >= buffer_rows:
