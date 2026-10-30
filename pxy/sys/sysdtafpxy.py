@@ -26,10 +26,9 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 # Mode 1: Historical OHLC/4 close override
 # Mode 2: Close = (Open + Close) / 2
 # Mode 3: Close = (Close + High + Low) / 3; recalculate High/Low
-# Mode 7: Historical Close = 7-period linear-regression projection of Open
-ACTIVE_MODE = 7
+# Mode 7: Close = 7-period linear-regression projection of Open
+ACTIVE_MODE = 0
 
-# Explicitly enforce configured timezone mapping.
 TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
 
 FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
@@ -38,34 +37,8 @@ FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 def apply_ohlc_transformation(
     df, mode=ACTIVE_MODE, futures_price=None
 ):
-    """Apply the selected DTAF OHLC transformation.
+    """Apply the selected DTAF OHLC transformation."""
 
-    Mode 0:
-        Set Open to the original Close. Calculate Close using Close and
-        High/Low depending on candle direction.
-
-    Mode 1:
-        Replace historical closes with the previous candle's OHLC/4.
-        Preserve the latest candle's original Close.
-
-    Mode 2:
-        Set Close to (Open + Close) / 2.
-        Leave Open, High and Low unchanged.
-
-    Mode 3:
-        Set Close to (Close + High + Low) / 3.
-        Set High = max(Open, modified Close).
-        Set Low = min(Open, modified Close).
-
-    Mode 7:
-        Calculate a 7-period linear-regression projection using Open.
-        Replace historical Close values with their corresponding
-        TSMA projections.
-        Preserve the latest running candle's original Close.
-        Leave Open, High and Low unchanged.
-
-    If futures_price is provided, blend it with each OHLC field first.
-    """
     if mode not in (0, 1, 2, 3, 7):
         raise ValueError(
             "DTAF mode must be 0, 1, 2, 3, or 7."
@@ -113,7 +86,6 @@ def apply_ohlc_transformation(
 
     elif mode == 1:
         if len(out) > 0:
-            # Calculate OHLC/4 from the current OHLC values.
             ohlc_4 = (
                 out["Open"]
                 + out["High"]
@@ -121,18 +93,14 @@ def apply_ohlc_transformation(
                 + out["Close"]
             ) / 4.0
 
-            # Preserve the latest candle's original Close.
             latest_original_close = out["Close"].iloc[-1]
 
-            # Historical Close uses the previous candle's OHLC/4.
             out["Close"] = ohlc_4.shift(1)
 
-            # Keep the latest candle's original Close.
             out.loc[
                 out.index[-1], "Close"
             ] = latest_original_close
 
-            # Preserve the existing first-row edge-case handling.
             if len(out) > 1 and pd.isna(
                 out.loc[out.index[0], "Close"]
             ):
@@ -143,7 +111,6 @@ def apply_ohlc_transformation(
         return out
 
     elif mode == 2:
-        # Change Close only; retain Open, High and Low.
         out["Close"] = (
             out["Open"] + out["Close"]
         ) / 2.0
@@ -151,7 +118,6 @@ def apply_ohlc_transformation(
         return out
 
     elif mode == 3:
-        # Calculate the modified Close.
         modified_c = (
             out["Close"] + out["High"] + out["Low"]
         ) / 3.0
@@ -165,14 +131,21 @@ def apply_ohlc_transformation(
         return out
 
     elif mode == 7:
-        # Mode 7: 7-period linear-regression TSMA.
-        # Only historical Close values are changed.
-        # The latest running candle remains unchanged.
+        # ==================================================================
+        # MODE 7: 7-PERIOD LINEAR-REGRESSION TSMA
+        #
+        # Open  = Original Open
+        # Close = TSMA projection of Open
+        # High  = Original High
+        # Low   = Original Low
+        #
+        # Applies to historical AND running candles.
+        # ==================================================================
 
         period = 7
         n = float(period)
 
-        # Linear-regression constants for x = 1, 2, ..., 7.
+        # Regression x-axis: 1, 2, 3, 4, 5, 6, 7.
         x = np.arange(1, period + 1, dtype=float)
 
         sum_x = float(np.sum(x))
@@ -182,9 +155,7 @@ def apply_ohlc_transformation(
             n * sum_x2 - sum_x * sum_x
         )
 
-        # Preserve original values.
         raw_open = out["Open"].to_numpy(dtype=float)
-        raw_close = out["Close"].to_numpy(dtype=float).copy()
 
         tsma_values = np.full(
             len(raw_open),
@@ -192,8 +163,8 @@ def apply_ohlc_transformation(
             dtype=float,
         )
 
-        # Calculate the regression projection for each available
-        # 7-candle window, including the current candle in that window.
+        # Calculate the 7-period regression projection for every
+        # candle, including the latest running candle.
         for idx in range(period - 1, len(raw_open)):
             window_y = raw_open[
                 idx - period + 1:idx + 1
@@ -216,28 +187,18 @@ def apply_ohlc_transformation(
                 sum_y - slope * sum_x
             ) / n
 
-            # Project the regression line to the 7th point.
+            # Project regression line to the 7th point.
             tsma_values[idx] = (
                 intercept + slope * n
             )
 
-        # Replace historical Close values where a 7-period
-        # TSMA projection is available.
-        historical_end = max(0, len(out) - 1)
+        # Replace Close wherever a valid 7-period TSMA exists.
+        # This includes the latest running candle.
+        valid = np.isfinite(tsma_values)
 
-        for idx in range(historical_end):
-            if np.isfinite(tsma_values[idx]):
-                out.iloc[
-                    idx,
-                    out.columns.get_loc("Close")
-                ] = round(float(tsma_values[idx]), 2)
-
-        # Preserve the latest running candle's real Close.
-        if len(out) > 0:
-            out.iloc[
-                -1,
-                out.columns.get_loc("Close")
-            ] = raw_close[-1]
+        out.loc[valid, "Close"] = np.round(
+            tsma_values[valid], 2
+        )
 
         return out
 
@@ -322,7 +283,6 @@ def _fetch_yf_data_production(
     if not FORCE_NIFTY_FUT:
         ticker_obj = yf.Ticker(TICKER)
 
-        # Try the requested period first, when supplied.
         if period is not None:
             try:
                 df = ticker_obj.history(
@@ -335,7 +295,6 @@ def _fetch_yf_data_production(
                     f"for {period}: {error}"
                 )
 
-        # Try supported lookup horizons if the data is insufficient.
         if df.empty or len(df) < buffer_rows:
             for search_period in ("1d", "5d", "7d"):
                 try:
@@ -364,7 +323,7 @@ def _fetch_yf_data_production(
     futures_price = _read_nifty_futures_price()
 
     # ======================================================================
-    # FALLBACK: synthesize rows from the futures price if Yahoo data
+    # FALLBACK: synthesize rows from futures price if Yahoo data
     # is unavailable or insufficient.
     # ======================================================================
     if df.empty or len(df) < buffer_rows:
@@ -399,7 +358,6 @@ def _fetch_yf_data_production(
                 index=time_indices,
             )
 
-            # Apply the same configured transformation to fallback rows.
             fallback_df = apply_ohlc_transformation(
                 fallback_df,
                 mode=ACTIVE_MODE,
@@ -423,7 +381,7 @@ def _fetch_yf_data_production(
 
             return pd.DataFrame()
 
-    # A futures price is required for the production blending logic.
+    # A futures price is required for production blending.
     if futures_price is None:
         print(
             "Critical Fault: cannot calculate DTAF signals "
@@ -431,7 +389,7 @@ def _fetch_yf_data_production(
         )
         return pd.DataFrame()
 
-    # Normalize the index to the configured timezone.
+    # Normalize index to configured timezone.
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
 
@@ -440,7 +398,7 @@ def _fetch_yf_data_production(
     else:
         df = df.tz_convert(TIMEZONE)
 
-    # Blend futures and apply the active DTAF mode.
+    # Blend futures and apply active DTAF mode.
     processed_df = transform_market_data(
         df,
         futures_price=futures_price,
