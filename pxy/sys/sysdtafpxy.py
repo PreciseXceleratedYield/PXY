@@ -1,4 +1,3 @@
-
 import json
 import math
 import os
@@ -66,16 +65,18 @@ def apply_ohlc_transformation(
     Mode 7:
         Calculate a 7-period linear-regression TSMA using Open.
 
-        For completed historical candles:
+        Completed historical candles:
             Open = TSMA
             High = TSMA
             Low = TSMA
             Close = TSMA
 
-        Preserve the latest running candle's real OHLC.
+        Latest running candle:
+            Preserve original OHLC.
 
-        The first six candles remain unchanged because
-        seven observations are required.
+        First six candles:
+            Preserve original OHLC because seven observations
+            are required.
 
     If futures_price is provided, blend it with each OHLC
     field before applying the selected mode.
@@ -211,8 +212,8 @@ def apply_ohlc_transformation(
             (x - x_mean) ** 2
         )
 
-        # Calculate the regression endpoint for each available
-        # seven-candle window.
+        # Calculate the regression endpoint for each seven-candle
+        # window, using only that candle and its preceding six candles.
         for idx in range(TSMA_PERIOD - 1, row_count):
 
             window = raw_open[
@@ -251,7 +252,7 @@ def apply_ohlc_transformation(
 
             tsma = tsma_values[idx]
 
-            # Preserve the first six candles and any invalid windows.
+            # Preserve first six candles and invalid windows.
             if not np.isfinite(tsma):
                 continue
 
@@ -264,10 +265,7 @@ def apply_ohlc_transformation(
                     idx, column_position
                 ] = tsma
 
-        # --------------------------------------------------------------
         # Latest running candle remains completely untouched.
-        # --------------------------------------------------------------
-
         return out
 
     return out
@@ -537,3 +535,4 @@ def fetch_yf_data(
         interval=interval,
         target_rows=target_rows,
         test_kwargs={"timezone": TIMEZONE},
+    )
