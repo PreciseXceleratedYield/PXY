@@ -12,6 +12,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSDTAFPXY_DEFAULT_INTERVAL,
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
+    SYSDTAFPXY_FALLBACK_PERIODS,
     SYSDTAFPXY_FORCE_NIFTY_FUT,
     SYSDTAFPXY_SELECTED_MODE,
 )
@@ -211,7 +212,7 @@ def _fetch_yf_data_production(
 
         # Try supported lookup horizons if the data is insufficient.
         if df.empty or len(df) < buffer_rows:
-            for search_period in ("1d", "5d", "7d"):
+            for search_period in SYSDTAFPXY_FALLBACK_PERIODS:
                 try:
                     temp_df = ticker_obj.history(
                         period=search_period,

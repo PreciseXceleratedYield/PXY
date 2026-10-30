@@ -10,6 +10,7 @@ from syscnfgpxy import (
     SYSPLCHRTPXY_OHLC_MODE,
     SYSPLCHRTPXY_SMA_WINDOW,
     SYSPLCHRTPXY_TARGET_ROWS,
+    SYSPLCHRTPXY_HISTORY_PERIODS,
 )
 from sysmodepxy import dispatch_mode
 
@@ -111,7 +112,7 @@ def _fetch_yf_data_production(
             
     # If no period is specified, execute your automatic 60-candle lookup cascade loop
     if df.empty:
-        for search_period in ["5d", "7d", "max"]:
+        for search_period in SYSPLCHRTPXY_HISTORY_PERIODS:
             try:
                 df = ticker_obj.history(period=search_period, interval=interval)
                 if not df.empty:
