@@ -107,15 +107,13 @@ def calculate_tgt(
         own_depth = positive_factor(side_depth)
         own_power = positive_factor(side_power)
 
-        # Unified Condition Routing Matrix
-        if not both_sides_open:
-            if is_aligned:
-                target_pct = 1.4 * (own_power + own_depth)
-            else:
-                target_pct = 1.4
-
+        if not is_aligned:
+            target_pct = 1.4
+        elif not both_sides_open:
+            target_pct = 1.4 * (own_power + own_depth)
         else:
             target_pct = 14 + (14 / own_depth) + (14 / own_power)
+
 
         return min(99.0, target_pct)
 
