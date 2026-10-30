@@ -10,6 +10,7 @@ from runclntpxy import get_session
 from runltpspxy import get_mid_price 
 from syscnfgpxy import (
     RUNLILOPXY_DEFAULT_FILTER_TIME as DEFAULT_FILTER_TIME,
+    SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT,
     SYSCNFGPXY_TIMEZONE,
 )
 from sysmodepxy import dispatch_mode
@@ -364,7 +365,7 @@ def _process_lilo_orders_production(client, strict=False, risk_exit_signal=None)
             # FIXED: Added correct [0] brackets to .iloc property to fix extraction crashes
             token_id = str(group["tok"].iloc[0]).split('.')[0].strip()
             raw_seg = str(group["exSeg"].iloc[0]).strip()
-            ex_seg = "nse_fo" if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
+            ex_seg = SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT if raw_seg.lower() in ["nse_fo", "nfo"] else raw_seg.lower()
             
             buys = group[group["trnsTp"].str.upper() == "B"].to_dict('records') 
             sells = group[group["trnsTp"].str.upper() == "S"].to_dict('records') 

@@ -1,4 +1,6 @@
-def get_mid_price(client, token: str, segment: str = "nse_fo") -> float:
+from syscnfgpxy import SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT
+
+def get_mid_price(client, token: str, segment: str = SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT) -> float:
     try:
         instr = [{"instrument_token": str(token), "exchange_segment": segment}]
         # Using 'depth' as confirmed in your raw test

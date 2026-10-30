@@ -17,6 +17,8 @@ if str(HERE.parent) not in sys.path:
 if str(HERE.parent.parent) not in sys.path:
     sys.path.append(str(HERE.parent.parent))
 
+from syscnfgpxy import SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT
+
 try:
     from runclntpxy import get_session
 except Exception as imp_err:

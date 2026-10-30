@@ -362,6 +362,13 @@ historical option P&L.
   positive investment, or an input is non-finite, the fallback is `r = 1`.
 - `RUNPCHKPXY_DEBUG_ENABLED` controls position-check diagnostics; its NIFTY
   lot size uses the shared `SYSCNFGPXY_NIFTY_LOT_SIZE`.
+- `RUNLDGRPXY_TELEGRAM_TIMEOUT_SECONDS` and `RUNLDGRPXY_LAYOUT_WIDTH`
+  control the standalone ledger report's HTTP timeout and fixed-width layout.
+  Its clock uses the shared `SYSCNFGPXY_TIMEZONE`.
+- `RUNNFTFUTPXY_PRICE_HISTORY_LIMIT` controls the retained NIFTY futures
+  price-history rows. Futures and option quote helpers use the shared F&O
+  exchange segment; futures timestamps and expiry-date selection use the
+  shared timezone.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.
@@ -397,7 +404,10 @@ historical option P&L.
   coverage; production cycle liquidation uses the cycle premium target above.
 - Older/alternate engines and account-specific utilities are not implicitly
   made active by centralizing production settings. Their local constants remain
-  isolated until those entry paths are deliberately adopted or retired.
+  isolated until those entry paths are deliberately adopted or retired. The
+  nested `exe/run/X/` prototype and the separate `runrnwnpxy.py` risk runner
+  remain outside the current production launch graph and are not rewritten by
+  this production configuration pass.
 - `exepxitpxy.py`, `sysplchrtpxy.py`, `sysdtstpxy.py`, and `sysrigpxy.py` are
   standalone/legacy paths not called by the production launcher. The standalone
   exit helper now shares the configured sell-order payload with the production

@@ -5,10 +5,16 @@ import csv
 import os
 from pathlib import Path
 
+from syscnfgpxy import (
+    RUNNFTFUTPXY_PRICE_HISTORY_LIMIT,
+    SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT,
+    SYSCNFGPXY_TIMEZONE,
+)
+
 # ============================================================
 # CONFIG
 # ============================================================
-EXCHANGE_SEGMENT = "nse_fo"
+EXCHANGE_SEGMENT = SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT
 HERE = Path(__file__).resolve().parent
 CSV_FILE = HERE / "nifty_fut.csv"
 JSON_OUTPUT_FILE = HERE / "nftfut.json"
@@ -35,7 +41,7 @@ def last_tuesday(year, month):
 
 def get_current_month_expiry():
     """Returns target expiry date. Rolls over if today is past current expiry."""
-    now = datetime.now()
+    now = datetime.now(SYSCNFGPXY_TIMEZONE)
     expiry = last_tuesday(now.year, now.month)
 
     if now.date() > expiry.date():
@@ -163,7 +169,7 @@ def cached_contract_valid(row, current_expiry):
 # ============================================================
 # GET LAST TRADED PRICE (LTP)
 # ============================================================
-def get_ltp(client, token: str, segment: str = "nse_fo") -> float:
+def get_ltp(client, token: str, segment: str = SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT) -> float:
     """Gets direct Last Traded Price (LTP) from Kotak Neo/Neo API."""
     try:
         instr = [{"instrument_token": str(token), "exchange_segment": segment}]
@@ -198,12 +204,12 @@ def save_price_to_json(price: float):
 
         # Append new record with structure matching original 'price' field mapping
         records.append({
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.now(SYSCNFGPXY_TIMEZONE).isoformat(),
             "price": price
         })
 
         # Retain only the latest 50 records
-        records = records[-50:]
+        records = records[-RUNNFTFUTPXY_PRICE_HISTORY_LIMIT:]
 
         # Save back to output
         temporary_file = JSON_OUTPUT_FILE.with_suffix(".json.tmp")

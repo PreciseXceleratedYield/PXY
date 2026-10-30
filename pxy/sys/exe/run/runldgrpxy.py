@@ -70,7 +70,7 @@ def send_telegram_payload(message_text, bot_token, chat_id):
         import urllib.parse
         data = urllib.parse.urlencode(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data)
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=RUNLDGRPXY_TELEGRAM_TIMEOUT_SECONDS) as response:
             pass
     except Exception:
         pass
@@ -81,10 +81,15 @@ def send_telegram_payload(message_text, bot_token, chat_id):
 
 #!/usr/bin/env python3
 import sys
-import pytz
 import traceback
 from datetime import datetime
-from syscnfgpxy import SYSCNFGPXY_ENGINE_CLOSE, SYSCNFGPXY_EXCHANGE_OPEN
+from syscnfgpxy import (
+    RUNLDGRPXY_LAYOUT_WIDTH,
+    RUNLDGRPXY_TELEGRAM_TIMEOUT_SECONDS,
+    SYSCNFGPXY_ENGINE_CLOSE,
+    SYSCNFGPXY_EXCHANGE_OPEN,
+    SYSCNFGPXY_TIMEZONE,
+)
 from runclntpxy import get_session
 
 # ⚙️ CONFIGURATION & ENVIRONMENTAL SETTINGS
@@ -92,8 +97,8 @@ TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_PLACEHOLDER"
 TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID_PLACEHOLDER"
 
 # Enforce explicit local reporting zones matching broker constraints
-IST = pytz.timezone("Asia/Kolkata")
-W = 30  # Strict 30-character width tracking layout
+IST = SYSCNFGPXY_TIMEZONE
+W = RUNLDGRPXY_LAYOUT_WIDTH  # Preserve the existing report layout
 
 def run_snapshot_report():
     """Generates ledger snapshot using derived formulas from Kotak Neo payload structures."""
