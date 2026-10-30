@@ -38,7 +38,7 @@ def normalize_results(response):
     return []
 
 # --- CORE OPTIONS ENGINE ---
-def get_ltp_by_symbol(client, symbol: str, segment: str = "nse_fo") -> float:
+def get_ltp_by_symbol(client, symbol: str, segment: str = SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT) -> float:
     symbol = symbol.upper().strip()
     
     # STRICT BLOCK: Reject any string that does not end with CE or PE
