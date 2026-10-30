@@ -56,61 +56,6 @@ app.get('/hostname', (req, res) => {
     res.json({ hostname: os.hostname() }); 
 }); 
 
-/* ========================= PXYCONFIG — syscnfgpxy.py ========================= */
-const PXY_CONFIG_TOOL = path.resolve(__dirname, 'sys/pxyconfigwebpxy.py');
-const ACTION_PASSWORD = '1';
-
-app.use('/api/pxy-config', (req, res, next) => {
-    res.set('Cache-Control', 'no-store');
-    return next();
-});
-
-function authorizePxyConfig(req, res, next) {
-    const supplied = Buffer.from(req.get('x-pxy-config-password') || '');
-    const expected = Buffer.from(ACTION_PASSWORD);
-    if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) {
-        return res.status(401).json({ ok: false, error: 'Invalid configuration key.' });
-    }
-    return next();
-}
-
-function runPxyConfigTool(action, input, res) {
-    const python = process.env.PXY_CONFIG_PYTHON || 'python3';
-    const child = execFile(
-        python,
-        [PXY_CONFIG_TOOL, action],
-        { cwd: __dirname, timeout: 15000, maxBuffer: 1024 * 1024 },
-        (error, stdout, stderr) => {
-            let result;
-            try {
-                result = JSON.parse(stdout);
-            } catch (parseError) {
-                console.error('[PXYCONFIG] helper returned invalid output:', stderr || parseError.message);
-                return res.status(500).json({ ok: false, error: 'Configuration helper failed.' });
-            }
-            if (error && result.ok) {
-                console.error('[PXYCONFIG] helper process failed:', stderr || error.message);
-                return res.status(500).json({ ok: false, error: 'Configuration helper failed.' });
-            }
-            return res.status(result.ok ? 200 : 400).json(result);
-        }
-    );
-    if (input !== undefined) {
-        child.stdin.end(JSON.stringify(input));
-    }
-}
-
-app.get('/api/pxy-config', authorizePxyConfig, (req, res) => {
-    runPxyConfigTool('read', undefined, res);
-});
-
-app.post('/api/pxy-config', authorizePxyConfig, (req, res) => {
-    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
-        return res.status(400).json({ ok: false, error: 'A JSON object is required.' });
-    }
-    runPxyConfigTool('write', req.body, res);
-});
-
 /* ========================= PRIVATE TEAM@HOME POSTS ========================= */
 const teamHomeAttempts = new Map();
 const TEAM_HOME_MAX_ATTEMPTS = 5;
