@@ -181,6 +181,8 @@ function shellQuote(value) {
     return `'${String(value).replace(/'/g, "'\\''")}'`;
 }
 
+const ACTION_PASSWORD = '1';
+
 function hasValidActionPassword(value) {
     const supplied = Buffer.from(value, 'utf8');
     const expected = Buffer.from(ACTION_PASSWORD, 'utf8');
