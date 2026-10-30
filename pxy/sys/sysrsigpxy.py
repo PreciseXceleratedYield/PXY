@@ -18,7 +18,7 @@ import pandas as pd
 from sysdtafpxy import fetch_yf_data
 
 
-TSMA_PERIOD = 7
+TSMA_PERIOD = 9
 
 
 def calculate_tsma(close, period=TSMA_PERIOD):
