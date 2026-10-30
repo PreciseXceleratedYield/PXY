@@ -4,6 +4,7 @@
 
 import pandas as pd
 from sysdtafpxy import fetch_yf_data
+from syscnfgpxy import SYSSMAPXY_MA_PERIOD
 from colorama import Fore, Style, init
 
 init(autoreset=True)
@@ -27,7 +28,7 @@ def get_sma50_slope(source_col="close", colored=False, return_strength=False):
         return (None, None) if return_strength else None
 
     # 2️⃣ Compute SMA(50)
-    sma50 = df[source_col].rolling(50).mean()
+    sma50 = df[source_col].rolling(SYSSMAPXY_MA_PERIOD).mean()
 
     # take last valid window only
     last6 = sma50.dropna().iloc[-6:]
