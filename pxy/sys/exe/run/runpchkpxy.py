@@ -1,9 +1,13 @@
+
 #!/usr/bin/env python3
+
 import math
 import os
 import traceback
+from pprint import pprint
 
 DEBUG = os.environ.get("RUNPCHK_DEBUG") == "1"
+
 
 def get_position_summary(client=None):
     """
@@ -27,22 +31,6 @@ def get_position_summary(client=None):
 
     try:
         pos_res = client.positions()
-        if DEBUG:
-            if isinstance(pos_res, dict):
-                positions = pos_res.get("data")
-                row_count = len(positions) if isinstance(positions, list) else "n/a"
-                print(
-                    "[Position debug] response keys="
-                    f"{sorted(pos_res.keys())}, stat={pos_res.get('stat')!r}, "
-                    f"errMsg={pos_res.get('errMsg')!r}, "
-                    f"error={pos_res.get('error')!r}, "
-                    f"data_type={type(positions).__name__}, rows={row_count}"
-                )
-            else:
-                print(
-                    "[Position debug] response type="
-                    f"{type(pos_res).__name__}"
-                )
 
         if not isinstance(pos_res, dict):
             print("❌ Position check skipped: invalid broker response.")
@@ -50,6 +38,7 @@ def get_position_summary(client=None):
 
         status = str(pos_res.get("stat", "")).strip().casefold()
         error_message = str(pos_res.get("errMsg", "")).strip().casefold()
+
         if (
             status in {"not_ok", "not ok"}
             and error_message == "no data"
@@ -60,7 +49,10 @@ def get_position_summary(client=None):
             return "0CE0PE"
 
         if pos_res.get("errMsg") or pos_res.get("error"):
-            print(f"❌ Position check failed: {pos_res.get('errMsg') or pos_res.get('error')}")
+            print(
+                f"❌ Position check failed: "
+                f"{pos_res.get('errMsg') or pos_res.get('error')}"
+            )
             return None
 
         status = pos_res.get("stat")
@@ -113,8 +105,8 @@ def get_position_summary(client=None):
 
             if not symbol.startswith("NIFTY"):
                 continue
-            lot_size = 65
 
+            lot_size = 65
             lots = max(1, math.ceil(abs(net_qty) / lot_size))
 
             if symbol.endswith("CE"):
@@ -124,6 +116,7 @@ def get_position_summary(client=None):
 
         ce_lots = max(0, ce_lots - offset_ce_lots)
         pe_lots = max(0, pe_lots - offset_pe_lots)
+
         return f"{ce_lots}CE{pe_lots}PE"
 
     except Exception as e:
@@ -138,6 +131,44 @@ if __name__ == "__main__":
         from runclntpxy import get_session
 
         broker = get_session()
+
+        print("\n" + "=" * 70)
+        print("KOTAK ACTUAL BROKER POSITIONS")
+        print("=" * 70)
+
+        response = broker.positions()
+
+        if not isinstance(response, dict):
+            print("❌ Invalid broker response:")
+            pprint(response)
+
+        else:
+            print(f"Status : {response.get('stat')}")
+            print(f"Message: {response.get('errMsg')}")
+
+            positions = response.get("data")
+
+            if isinstance(positions, list) and positions:
+                print(f"\nTotal position rows: {len(positions)}")
+
+                for index, position in enumerate(positions, 1):
+                    print(f"\n--- POSITION {index} ---")
+                    pprint(position, sort_dicts=False)
+
+            else:
+                print("\nNo position rows returned by Kotak.")
+                print("Raw response:")
+                pprint(response, sort_dicts=False)
+
+        print("\n" + "=" * 70)
+        print("PXY CE/PE POSITION SUMMARY")
+        print("=" * 70)
+
         print("Actual Lot Summary:", get_position_summary(broker))
+
+        print("=" * 70 + "\n")
+
     except Exception as e:
         print(f"❌ Test Run Error: {e}")
+        traceback.print_exc()
+
