@@ -14,6 +14,7 @@ from sysdtstpxy import get_market_trend as get_entry_market_trend
 
 TIMEZONE = syscnfgpxy.SYSCNFGPXY_TIMEZONE
 TSMA_PERIOD = syscnfgpxy.SYSSMAPXY_TSMA_PERIOD
+SMA_PERIOD = syscnfgpxy.SYSSMAPXY_MA_PERIOD
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
@@ -64,10 +65,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     df["ST"] = df["st_line"]
     df["st1_mirror"] = df["st_mirror"]
 
-    # Existing 50-period SMA remains unchanged.
+    # SMA period is shared with the central moving-average configuration.
     df["sma_50"] = calculate_moving_average(
         df["Close"],
-        period=50,
+        period=SMA_PERIOD,
         variant="SMA",
     )
 
