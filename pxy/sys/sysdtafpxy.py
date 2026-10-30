@@ -2,6 +2,7 @@ import json
 import math
 import os
 import warnings
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
@@ -12,19 +13,27 @@ from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_INTERVAL,
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     SYSDTAFPXY_FORCE_NIFTY_FUT,
+    SYSDTAFPXY_SELECTED_MODE,
 )
 from sysmodepxy import dispatch_mode
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
+
 # ==========================================================================
-# LOCAL MODE CONFIGURATION
+# CENTRAL DTAF MODE CONFIGURATION
 # ==========================================================================
-# Mode 0: Dynamic Open/Close override
-# Mode 1: Historical OHLC/4 close override
-# Mode 2: Close = (Open + Close) / 2
-# Mode 3: Close = (Close + High + Low) / 3; recalculate High/Low
-ACTIVE_MODE = 0
+# DTAF mode is controlled exclusively by syscnfgpxy.py.
+# Production currently supports only mode 1.
+ACTIVE_MODE = SYSDTAFPXY_SELECTED_MODE
+
+if (
+    isinstance(ACTIVE_MODE, bool)
+    or not isinstance(ACTIVE_MODE, int)
+    or ACTIVE_MODE != 1
+):
+    raise ValueError("DTAF mode must be 1.")
+
 
 # Explicitly enforce configured timezone mapping.
 TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
@@ -35,29 +44,21 @@ FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 def apply_ohlc_transformation(
     df, mode=ACTIVE_MODE, futures_price=None
 ):
-    """Apply the selected DTAF OHLC transformation.
-
-    Mode 0:
-        Set Open to the original Close. Calculate Close using Close and
-        High/Low depending on candle direction.
+    """Apply the configured DTAF OHLC transformation.
 
     Mode 1:
         Replace historical closes with the previous candle's OHLC/4.
         Preserve the latest candle's original Close.
 
-    Mode 2:
-        Set Close to (Open + Close) / 2.
-        Leave Open, High and Low unchanged.
-
-    Mode 3:
-        Set Close to (Close + High + Low) / 3.
-        Set High = max(Open, modified Close).
-        Set Low = min(Open, modified Close).
-
     If futures_price is provided, blend it with each OHLC field first.
     """
-    if mode not in (0, 1, 2, 3):
-        raise ValueError("DTAF mode must be 0, 1, 2, or 3.")
+
+    if (
+        isinstance(mode, bool)
+        or not isinstance(mode, int)
+        or mode != ACTIVE_MODE
+    ):
+        raise ValueError(f"DTAF mode must be {ACTIVE_MODE}.")
 
     if df is None or df.empty:
         return df
@@ -81,23 +82,8 @@ def apply_ohlc_transformation(
         for column in ("Open", "High", "Low", "Close"):
             out[column] = (out[column] + futures_price) / 2.0
 
-    # 2. Apply the selected mode.
-    if mode == 0:
-        raw_o = out["Open"]
-        raw_h = out["High"]
-        raw_l = out["Low"]
-        raw_c = out["Close"]
-
-        out["Open"] = raw_c
-        out["Close"] = np.where(
-            raw_c >= raw_o,
-            (raw_c + raw_h) / 2.0,
-            (raw_c + raw_l) / 2.0,
-        )
-
-        return out
-
-    elif mode == 1:
+    # 2. Apply configured DTAF mode.
+    if mode == 1:
         if len(out) > 0:
             # Calculate OHLC/4 from the current OHLC values.
             ohlc_4 = (
@@ -124,35 +110,14 @@ def apply_ohlc_transformation(
 
         return out
 
-    elif mode == 2:
-        # Change Close only; retain Open, High and Low.
-        out["Close"] = (
-            out["Open"] + out["Close"]
-        ) / 2.0
-
-        return out
-
-    elif mode == 3:
-        # Calculate the modified Close.
-        modified_c = (
-            out["Close"] + out["High"] + out["Low"]
-        ) / 3.0
-
-        raw_o = out["Open"]
-
-        out["Close"] = modified_c
-        out["High"] = np.maximum(raw_o, modified_c)
-        out["Low"] = np.minimum(raw_o, modified_c)
-
-        return out
-
     return out
 
 
 def transform_market_data(
     df, futures_price=None, mode=ACTIVE_MODE
 ):
-    """Blend futures into OHLC, then apply the selected DTAF mode."""
+    """Blend futures into OHLC, then apply the configured DTAF mode."""
+
     if df is None or df.empty:
         return df
 
@@ -165,6 +130,7 @@ def transform_market_data(
 
 def _read_nifty_futures_price():
     """Read the latest positive NIFTY futures price from the rolling JSON feed."""
+
     fut_file_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
         "exe",
@@ -175,6 +141,7 @@ def _read_nifty_futures_price():
     try:
         with open(fut_file_path, "r", encoding="utf-8") as f:
             fut_data = json.load(f)
+
     except (OSError, json.JSONDecodeError) as error:
         print(
             f"Warning: Could not read futures prices "
@@ -184,8 +151,10 @@ def _read_nifty_futures_price():
 
     if isinstance(fut_data, list) and fut_data:
         target_node = fut_data[-1]
+
     elif isinstance(fut_data, dict):
         target_node = fut_data
+
     else:
         target_node = {}
 
@@ -202,6 +171,7 @@ def _read_nifty_futures_price():
                 ),
             )
         )
+
     except (TypeError, ValueError):
         price = 0.0
 
@@ -221,6 +191,7 @@ def _fetch_yf_data_production(
     target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
 ):
     """Fetch OHLC data, blend futures, and apply the configured DTAF mode."""
+
     df = pd.DataFrame()
     buffer_rows = target_rows + 5
 
@@ -234,6 +205,7 @@ def _fetch_yf_data_production(
                     period=period,
                     interval=interval,
                 )
+
             except Exception as error:
                 print(
                     f"Warning: Yahoo Finance history request failed "
@@ -268,10 +240,12 @@ def _fetch_yf_data_production(
     # is unavailable or insufficient.
     # ======================================================================
     if df.empty or len(df) < buffer_rows:
+
         if FORCE_NIFTY_FUT:
             print(
                 "Forced source: using local nftfut.json fallback."
             )
+
         else:
             print(
                 "Warning: yfinance data stream unavailable. "
@@ -307,6 +281,7 @@ def _fetch_yf_data_production(
             )
 
             fallback_df.attrs["data_fallback"] = True
+
             return fallback_df
 
         else:
@@ -315,6 +290,7 @@ def _fetch_yf_data_production(
                     "Critical Fault: local nftfut.json "
                     "fallback unavailable."
                 )
+
             else:
                 print(
                     "Critical Fault: yfinance and local json "
@@ -337,10 +313,11 @@ def _fetch_yf_data_production(
 
     if df.index.tz is None:
         df = df.tz_localize("UTC").tz_convert(TIMEZONE)
+
     else:
         df = df.tz_convert(TIMEZONE)
 
-    # Blend futures and apply the active DTAF mode.
+    # Blend futures and apply the configured DTAF mode.
     processed_df = transform_market_data(
         df,
         futures_price=futures_price,
