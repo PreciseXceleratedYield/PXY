@@ -568,7 +568,7 @@ body{
 <div id="updPopup" style="display:none;position:fixed;inset:0;z-index:9999;background:var(--overlay);align-items:center;justify-content:center;">
     <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:24px 28px;min-width:260px;display:flex;flex-direction:column;gap:14px;align-items:center;box-shadow:0 2px 10px var(--shadow);">
         <div id="updTitle" style="font-family:'Syne',sans-serif;font-weight:800;font-size:14px;letter-spacing:0.06em;">▶ script</div>
-        <div style="font-size:10px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;">Enter neo password</div>
+        <div id="updPwdLabel" style="font-size:10px;color:var(--muted);letter-spacing:0.12em;text-transform:uppercase;">Enter neo password</div>
         <input type="password" id="updPwd" placeholder="password" maxlength="20"
                style="width:100%;padding:10px 14px;border-radius:8px;border:1px solid var(--border2);background:var(--bg3);color:var(--text);font-family:'DM Mono',monospace;font-size:16px;text-align:center;letter-spacing:0.14em;outline:none;"
                onkeydown="if(event.key==='Enter')confirmUpdate();if(event.key==='Escape')cancelUpdate();">
@@ -1753,20 +1753,24 @@ document.addEventListener('click',e=>{if(!amenu.contains(e.target)&&e.target!==l
 document.querySelectorAll('.amenu-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
         const script=btn.dataset.script;
-        if(script==='pxyconfig'){
-            amenu.style.display='none';
-            window.location.href='https://github.com/PreciseXceleratedYield/PXY/blob/main/pxy/sys/syscnfgpxy.py';
-            return;
-        }
         pendingScript=script;amenu.style.display='none';
-        $('updTitle').textContent='▶ '+script;$('updPwd').value='';
+        $('updTitle').textContent=script==='pxyconfig'?'⚙ PXYCONFIG':'▶ '+script;
+        $('updPwdLabel').textContent=script==='pxyconfig'?'Enter PXY password':'Enter neo password';
+        $('updPwd').value='';
         $('updPopup').style.display='flex';setTimeout(()=>$('updPwd').focus(),80);
     });
 });
 function cancelUpdate(){$('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;}
 function confirmUpdate(){
     const pwd=$('updPwd').value.trim();if(!pwd||!pendingScript)return;
-    const script=pendingScript;$('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;
+    const script=pendingScript;
+    if(script==='pxyconfig'){
+        if(pwd!=='1'){alert('Incorrect password');$('updPwd').value='';$('updPwd').focus();return;}
+        $('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;
+        window.location.href='https://github.com/PreciseXceleratedYield/PXY/blob/main/pxy/sys/syscnfgpxy.py';
+        return;
+    }
+    $('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;
     const orig=logo.innerHTML;logo.innerHTML='⏳';
     fetch(`/run/${script}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pwd})})
     .then(r=>r.json())
