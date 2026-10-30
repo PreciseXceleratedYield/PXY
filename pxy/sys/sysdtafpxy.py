@@ -27,13 +27,6 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 # Production currently supports only mode 1.
 ACTIVE_MODE = SYSDTAFPXY_SELECTED_MODE
 
-if (
-    isinstance(ACTIVE_MODE, bool)
-    or not isinstance(ACTIVE_MODE, int)
-    or ACTIVE_MODE != 1
-):
-    raise ValueError("DTAF mode must be 1.")
-
 
 # Explicitly enforce configured timezone mapping.
 TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
