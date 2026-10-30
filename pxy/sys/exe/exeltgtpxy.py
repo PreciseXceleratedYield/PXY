@@ -88,8 +88,8 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # From 13:15 onward, use a 99% target for all positions.
-        if current_time >= dt_time(13, 15) and both_sides_open:
+        # From 14:45 onward, use a 99% target for all positions.
+        if current_time >= dt_time(14, 45) and both_sides_open:
             return 99.0
 
         def positive_factor(value):
