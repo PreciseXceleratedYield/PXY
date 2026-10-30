@@ -495,7 +495,9 @@ def get_full_snapshot() -> dict:
 }
 ```
 
-The production engine uses live market data and the configured broker.\n\nInstalled shell commands resolve the application directory from `PXY_APP_DIR`,
+The production engine uses live market data and the configured broker.
+
+Installed shell commands resolve the application directory from `PXY_APP_DIR`,
 then `$HOME/PXY/pxy` or `$HOME/pxy`; `pxyupdate` installs the shared resolver
 alongside the commands in `$HOME/.local/bin`. The dashboard's script actions
 run from the directory containing `pxy.js`, so shell, Python, and web entry
