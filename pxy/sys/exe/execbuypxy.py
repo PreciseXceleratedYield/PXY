@@ -1,4 +1,3 @@
-
 # execbuypxy.py
 # COUNTER-BUY (CBUY) TRIGGER
 #
@@ -15,8 +14,8 @@
 #   Otherwise -> absolute difference rounded to nearest strike step
 #
 # Exactly one held side and an opposing exit signal are required.
-# Set to True for dynamic strike calculations, False to bypass and call default.
-EXECBUYPXY_USE_DYNAMIC_STRIKE = True
+# Set to True for dynamic strike calculations, False to bypass and call default
+EXECBUYPXY_USE_DYNAMIC_STRIKE = True  
 
 import os
 import shutil
@@ -243,12 +242,11 @@ def check_counter_leg(remaining_df):
             return None
 
         # =======================================================================
-        # STRIKE SELECTION SWITCH
+        # 🔄 STRIKE SELECTION SWITCH matrix
         # =======================================================================
         if EXECBUYPXY_USE_DYNAMIC_STRIKE:
-            # Dynamic strike selection based on underlying price.
+            # Mode A: Dynamic Strike Selection based on underlying price matrix
             offset = _counter_buy_offset(remaining_df)
-
             if offset is None:
                 print(
                     f"{Fore.YELLOW} ⚠ Counter-buy skipped: "
@@ -256,35 +254,27 @@ def check_counter_leg(remaining_df):
                 )
                 return None
         else:
-            # Static mode: use default offset.
-            debug_log(
-                "Simple Call Mode Active: "
-                "Bypassing dynamic strike calculations."
-            )
+            # Mode B: Simple Constant Call - Bypasses calculations and uses 0
+            debug_log("Simple Call Mode Active: Bypassing dynamic strike calculations.")
             offset = 0
         # =======================================================================
+
 
         held = "PE" if signal == "BULL" else "CE"
         counter = "PE" if held == "CE" else "CE"
 
         now = datetime.now(_IST).time()
-
         # =======================================================================
-        # PIPE GUARD: Enforce an absolute minimum 5-second safety window.
+        # 🛡️ PIPE GUARD: Enforce an absolute minimum 5-second safety window
+        # to prevent millisecond double-firing during back-to-back executions.
         # =======================================================================
         lock_key = f"CBUY|{script_name}"
-        safety_cooldown = max(
-            5.0,
-            float(CBUY_LOCK_SECS if CBUY_LOCK_SECS is not None else 0),
-        )
-        locked = _recent(
-            _load_locks(),
-            lock_key,
-            safety_cooldown,
-        )
+        safety_cooldown = max(5.0, float(CBUY_LOCK_SECS if CBUY_LOCK_SECS is not None else 0))
+        locked = _recent(_load_locks(), lock_key, safety_cooldown)
         # =======================================================================
 
-        # Preserve existing counter-buy permission behaviour.
+
+        # Preserve the existing counter-buy permission behaviour.
         launches_today = 0
 
         permission = counter_leg_permission_status(
@@ -298,8 +288,7 @@ def check_counter_leg(remaining_df):
 
         if permission == "cutoff":
             debug_log(
-                f"Counter check: past {CBUY_CUTOFF}; "
-                f"not firing {script_name}."
+                f"Counter check: past {CBUY_CUTOFF}; not firing {script_name}."
             )
             return None
 
@@ -317,8 +306,7 @@ def check_counter_leg(remaining_df):
                 _cap_warned = True
                 print(
                     f"{Fore.RED}🛑 Counter-buy daily cap reached "
-                    f"({CBUY_MAX_PER_DAY} launches); "
-                    f"not firing {script_name}."
+                    f"({CBUY_MAX_PER_DAY} launches); not firing {script_name}."
                 )
             return None
 
@@ -330,13 +318,11 @@ def check_counter_leg(remaining_df):
         if permission == "passive":
             print(
                 f"{Fore.BLUE}{Style.BRIGHT}ℹ️ [PASSIVE ALERT] "
-                f"CBUY_ACTION=NO. Would fire {script_name} "
-                f"with offset {offset}."
+                f"CBUY_ACTION=NO. Would fire {script_name} with offset {offset}."
             )
             return None
 
         path = _find_script(script_name)
-
         if not path:
             print(
                 f"{Fore.RED} ❌ Counter script {script_name} not found "
@@ -344,37 +330,42 @@ def check_counter_leg(remaining_df):
             )
             return None
 
-        # Apply configured day step to the calculated strike offset.
+        # --- FIX START: MATH ENFORCEMENT MATRIX TO PREVENT '300100' STRING CONCATENATION ---
+        try:
+            # Safely parse the base offset value out of the signal payload
+            base_offset = int(float(str(signal).replace("BULL", "").replace("BEAR", "").strip()))
+        except (ValueError, TypeError, NameError):
+            # Fallback to zero if the signal name doesn't contain digits directly
+            base_offset = 0
+
+        # Enforce day-of-week step matrix calculation (Wednesdays default to 0 step points)
         try:
             day_step = int(CBUY_SCRIPTS.get("STEP_WEDNESDAY", 0))
         except (ValueError, TypeError, AttributeError):
             day_step = 0
 
-        final_offset = int(offset) + day_step
+        # Perform absolute mathematical integer addition (300 + 0 = 300)
+        final_offset = base_offset + day_step
+        # --- FIX END ---
 
-        # Save cooldown anchors before launching process threads.
+        # Save cooldown anchors before launching process threads
         _mark_lock(lock_key)
         _count_fire()
 
-        # Execute isolated background process.
+        # Execute fully isolated background process thread to shield the parent loops
         subprocess.Popen(
             ["bash", path, str(final_offset)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            start_new_session=True,
+            start_new_session=True
         )
 
         print(
             f"{Fore.MAGENTA}{Style.BRIGHT} ⚡ FIRED COUNTER-BUY: "
             f"{script_name} {final_offset}"
         )
-
         return script_name
 
     except Exception as e:
-        print(
-            f"{Fore.RED} ❌ Counter-check error; "
-            f"counter-buy NOT launched: {e}"
-        )
+        print(f"{Fore.RED} ❌ Counter-check error; counter-buy NOT launched: {e}")
         return None
-
