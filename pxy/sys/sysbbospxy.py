@@ -3,7 +3,11 @@ from colorama import Fore, Style, init
 import pandas as pd
 import numpy as np
 from datetime import time
-from syscnfgpxy import SYSCNFGPXY_EXCHANGE_OPEN, SYSBBOSPXY_MORNING_SESSION_END
+from syscnfgpxy import (
+    SYSCNFGPXY_EXCHANGE_OPEN,
+    SYSBBOSPXY_MORNING_SESSION_END,
+    SYSBBOSPXY_LOOKBACK_PERIOD,
+)
 
 init(autoreset=True)
 WIDTH = 42
@@ -51,11 +55,11 @@ def build_candle_bar(o, h, l, c, width=WIDTH):
 
 def get_bos_bar(df):
     try:
-        if df is None or len(df) < 42:
+        if df is None or len(df) < SYSBBOSPXY_LOOKBACK_PERIOD:
             return Fore.LIGHTBLACK_EX + "━" * WIDTH + Style.RESET_ALL, "NONE"
             
         # 1. Isolate the previous 41 candles to lock true historic walls
-        historic_window = df.iloc[-42:-1]
+        historic_window = df.iloc[-SYSBBOSPXY_LOOKBACK_PERIOD:-1]
         h_42 = float(historic_window['High'].max())
         l_42 = float(historic_window['Low'].min())
         
@@ -130,7 +134,7 @@ def get_bos_bar(df):
         visual_bar = build_candle_bar(o_42, h_render, l_render, c_42)
         
         # 3. Calculate 42-Period Simple Moving Average on full slice Close Prices
-        full_window = df.iloc[-42:]
+        full_window = df.iloc[-SYSBBOSPXY_LOOKBACK_PERIOD:]
         sma_42 = float(full_window['Close'].mean())
         
         # 4. Pure 50/50 split midpoint engine calculation

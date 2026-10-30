@@ -120,6 +120,13 @@ SYSDTSTPXY_ST1_FACTOR = 1.4
 # BOS morning recognition ends at 10:10; its opening boundary uses the shared
 # exchange open above.
 SYSBBOSPXY_MORNING_SESSION_END = dt_time(10, 10)
+SYSBBOSPXY_LOOKBACK_PERIOD = 42
+if (
+    isinstance(SYSBBOSPXY_LOOKBACK_PERIOD, bool)
+    or not isinstance(SYSBBOSPXY_LOOKBACK_PERIOD, int)
+    or SYSBBOSPXY_LOOKBACK_PERIOD < 2
+):
+    raise ValueError("SYSBBOSPXY_LOOKBACK_PERIOD must be an integer of at least 2.")
 SYSSADXPXY_USE_TSMA = True
 SYSSADXPXY_MA_PERIOD = 50
 SYSSADXPXY_SUPERTREND_PERIOD = 10
