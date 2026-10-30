@@ -217,7 +217,9 @@ def _counter_buy_offset(remaining_df):
 
     symbols = remaining_df["symbol"].astype(str).str.upper()
 
-    parsed = symbols.str.extract(r"(\d+)(CE|PE)$")
+    # Extract only the final five strike digits before CE/PE.
+    # Example: NIFTY26N0323000CE -> 23000CE.
+    parsed = symbols.str.extract(r"(\d{5})(CE|PE)$")
 
     if parsed.isna().any().any():
         return None
