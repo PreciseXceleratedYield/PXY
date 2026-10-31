@@ -7,6 +7,16 @@ if [ -f "$SCRIPT_DIR/pxyrslve" ]; then
 elif [ -f "$HOME/.local/bin/pxyrslve" ]; then
     source "$HOME/.local/bin/pxyrslve"
 else
+    pxy_activate_env() {
+        local activate_file="$HOME/env/bin/activate"
+        if [ ! -r "$activate_file" ]; then
+            echo "[X] Python virtual environment not found: $activate_file" >&2
+            return 1
+        fi
+        source "$activate_file" || return 1
+        [ "${VIRTUAL_ENV:-}" = "$HOME/env" ] || return 1
+    }
+
     pxy_resolve_app_dir() {
         local script_dir="${1:-}"
         local candidate
@@ -33,6 +43,7 @@ REPO_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
     echo "[X] Could not locate the PXY application directory." >&2
     exit 1
 }
+pxy_activate_env || exit 1
 
 if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "[X] Repository not found at $REPO_DIR." >&2
