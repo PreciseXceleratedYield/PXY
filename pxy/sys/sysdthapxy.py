@@ -1,8 +1,85 @@
-# pxy_engine.py
-import pandas as pd
+# sysdthapxy.py
 import numpy as np
-from syscnfgpxy import SYSDTHAPXY_INCLUDE_RUNNING_CANDLE, SYSDPTPXY_LAST_N
+import pandas as pd
+
+from syscnfgpxy import (
+    SYSDTHAPXY_CANDLE_MODE,
+    SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
+    SYSDPTPXY_LAST_N,
+)
 from sysdtafpxy import fetch_yf_data
+
+
+def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
+    """Return a copy of OHLC data transformed using the selected DTHA mode.
+
+    OC2 and OHLC4 replace Close with the corresponding candle average.
+    HYPER preserves the former DTAF mode-0 transformation.
+    HA applies the standard recursive Heikin-Ashi transformation.
+    """
+    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER"}
+    if mode not in valid_modes:
+        raise ValueError(
+            "DTHA mode must be RAW, OC2, HA, OHLC4, or HYPER."
+        )
+
+    if df is None or df.empty:
+        return df
+
+    required = ("Open", "High", "Low", "Close")
+    if any(column not in df.columns for column in required):
+        return df.copy()
+
+    out = df.copy()
+    raw_open = pd.to_numeric(out["Open"], errors="coerce").to_numpy(dtype=float)
+    raw_high = pd.to_numeric(out["High"], errors="coerce").to_numpy(dtype=float)
+    raw_low = pd.to_numeric(out["Low"], errors="coerce").to_numpy(dtype=float)
+    raw_close = pd.to_numeric(out["Close"], errors="coerce").to_numpy(dtype=float)
+
+    if mode == "RAW":
+        return out
+
+    if mode == "OC2":
+        out["Close"] = (raw_open + raw_close) / 2.0
+        return out
+
+    if mode == "OHLC4":
+        out["Close"] = (
+            raw_open + raw_high + raw_low + raw_close
+        ) / 4.0
+        return out
+
+    if mode == "HYPER":
+        bullish = raw_close >= raw_open
+        hyper_close = np.where(
+            bullish,
+            (raw_close + raw_high) / 2.0,
+            (raw_close + raw_low) / 2.0,
+        )
+        out["Open"] = raw_close
+        out["Close"] = hyper_close
+        return out
+
+    # Standard Heikin-Ashi candles.
+    ha_close = (
+        raw_open + raw_high + raw_low + raw_close
+    ) / 4.0
+    ha_open = np.empty(len(out), dtype=float)
+    ha_high = np.empty(len(out), dtype=float)
+    ha_low = np.empty(len(out), dtype=float)
+
+    ha_open[0] = (raw_open[0] + raw_close[0]) / 2.0
+    for i in range(1, len(out)):
+        ha_open[i] = (ha_open[i - 1] + ha_close[i - 1]) / 2.0
+
+    ha_high[:] = np.maximum.reduce((raw_high, ha_open, ha_close))
+    ha_low[:] = np.minimum.reduce((raw_low, ha_open, ha_close))
+
+    out["Open"] = ha_open
+    out["High"] = ha_high
+    out["Low"] = ha_low
+    out["Close"] = ha_close
+    return out
 
 
 def get_close_direction_series(closes):
@@ -46,6 +123,7 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
             "current_close": None,
         }
 
+    df = transform_dtha_ohlc(df)
     close_series = pd.to_numeric(df["Close"], errors="coerce")
     evaluated_closes = close_series if include_running else close_series.iloc[:-1]
     evaluated_directions = get_close_direction_series(close_series)
@@ -116,56 +194,49 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
 
 def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
     """
-    Processes raw market OHLC candles.
-    Accepts an active live_tick dictionary to update the running candle in real-time.
-    Colors candles based on running Close vs the previous candle's static Close.
+    Processes market OHLC candles using the configured DTHA mode.
+    Accepts an active live_tick dictionary to update the running candle.
     """
     if df is None:
         df = fetch_yf_data()
-        
+
     if df is None or df.empty:
         return None, None, None, pd.DataFrame()
-        
-    # Safeguard: Separate processing safely from global reference memory
+
     df = df.copy()
-    
-    required_cols = ['Open', 'High', 'Low', 'Close']
+
+    required_cols = ["Open", "High", "Low", "Close"]
     for col in required_cols:
         if col not in df.columns:
             return None, None, None, pd.DataFrame()
 
-    # 🚨 LIVE TICK INJECTION: Mutate the running candle row with raw streaming market data
+    # Inject the live market tick into the raw running candle first.
     if live_tick is not None:
         last_idx = df.index[-1]
-        df.loc[last_idx, 'Open'] = live_tick['Open']
-        df.loc[last_idx, 'High'] = max(live_tick['High'], live_tick['Close'])
-        df.loc[last_idx, 'Low'] = min(live_tick['Low'], live_tick['Close'])
-        df.loc[last_idx, 'Close'] = live_tick['Close']  # Real-time ticking price
+        df.loc[last_idx, "Open"] = live_tick["Open"]
+        df.loc[last_idx, "High"] = max(live_tick["High"], live_tick["Close"])
+        df.loc[last_idx, "Low"] = min(live_tick["Low"], live_tick["Close"])
+        df.loc[last_idx, "Close"] = live_tick["Close"]
 
-    # ==================================================
-    # 🕯️ BUILD RAW MARKET RUNNING DATAFRAME
-    # ==================================================
-    custom_df = pd.DataFrame(index=df.index)
-    custom_df['Open'] = df['Open'].values
-    custom_df['High'] = df['High'].values
-    custom_df['Low'] = df['Low'].values
-    custom_df['Close'] = df['Close'].values
+    # Apply the selected candle mode consistently before deriving direction.
+    custom_df = transform_dtha_ohlc(df)
     custom_df["pxy_direction"] = get_close_direction_series(custom_df["Close"])
-
     custom_df["pxy_color"] = custom_df["pxy_direction"].map(
         {"UP": "green", "DOWN": "red", "FLAT": "flat"}
     ).fillna("flat")
+
     if custom_df["pxy_direction"].iloc[0] == "UNKNOWN":
         first_change = custom_df["Close"].iloc[0] - custom_df["Open"].iloc[0]
-        first_color = "green" if first_change > 0 else "red" if first_change < 0 else "flat"
+        first_color = (
+            "green" if first_change > 0
+            else "red" if first_change < 0
+            else "flat"
+        )
         custom_df.iloc[0, custom_df.columns.get_loc("pxy_color")] = first_color
 
-    # ==================================================
-    # 🛡️ PRODUCTION OUTPUT FILTER (SAME SIGNATURE PASSTHROUGH)
-    # ==================================================
     final_df = custom_df.copy()
-    pxy_close = final_df['Close'].copy()  
-    pxy_open = final_df['Open'].copy()    
-    pxy_color_series = final_df['pxy_color'].copy()
-    
+    pxy_close = final_df["Close"].copy()
+    pxy_open = final_df["Open"].copy()
+    pxy_color_series = final_df["pxy_color"].copy()
+
     return pxy_close, pxy_open, pxy_color_series, final_df
