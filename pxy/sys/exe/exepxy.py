@@ -19,7 +19,7 @@ for path in (RUN_DIR, HERE, SYS_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from runnftfutpxy import run_forever
+from runnfutpxy import run_forever
 
 from syscnfgpxy import (
     EXEPXYPXY_IDLE_PAUSE_SECONDS,

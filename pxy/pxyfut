@@ -22,6 +22,6 @@ cd "$PXY_APP_DIR/sys/exe/run" || {
 # source "$HOME/env/bin/activate"
 
 # Run the Python script
-python3 runnftfutpxy.py
+python3 runnfutpxy.py
 
 #echo "got the FUT price"
