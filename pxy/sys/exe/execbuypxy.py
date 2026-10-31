@@ -36,7 +36,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
 )
 
-from sysdecisionpxy import (
+from sysdcinpxy import (
     counter_leg_permission_status,
     counter_leg_script,
 )
