@@ -48,3 +48,13 @@ def get_signal(df=None):
 
 if __name__ == "__main__":
     print(f"IN SIGNAL: {get_signal()}")
+
+def get_entry_signal(df=None):
+    """Translate IN state into the BUY/SELL action required by execution."""
+    signal = get_signal(df)
+    return {
+        "BULL": "BUY",
+        "BEAR": "SELL",
+        "BUY": "BUY",
+        "SELL": "SELL",
+    }.get(signal, "NONE")
