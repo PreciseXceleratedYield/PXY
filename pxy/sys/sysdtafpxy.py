@@ -13,6 +13,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSDTAFPXY_DEFAULT_INTERVAL,
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
+    SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS,
     SYSDTAFPXY_FALLBACK_PERIODS,
     SYSDTAFPXY_FORCE_NIFTY_FUT,
 )
@@ -96,6 +97,36 @@ def _read_nifty_futures_price():
 
     if not isinstance(target_node, dict):
         target_node = {}
+
+    # A quote without a valid, recent receipt timestamp is unavailable.
+    # The feed refreshes every 5 seconds; the configured age allows brief
+    # scheduling/API delays without blending an old market price.
+    timestamp = target_node.get("timestamp")
+    try:
+        quote_time = pd.Timestamp(timestamp)
+        if pd.isna(quote_time) or quote_time.tzinfo is None:
+            raise ValueError("missing or timezone-naive timestamp")
+
+        quote_time = quote_time.tz_convert(TIMEZONE)
+        now = pd.Timestamp.now(tz=TIMEZONE)
+        quote_age_seconds = (now - quote_time).total_seconds()
+
+        if (
+            quote_age_seconds < 0
+            or quote_age_seconds > SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS
+        ):
+            print(
+                f"Warning: {fut_file_path} futures quote is stale "
+                f"or future-dated (age={quote_age_seconds:.1f}s; "
+                f"maximum={SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS}s)."
+            )
+            return None
+
+    except (TypeError, ValueError, OverflowError) as error:
+        print(
+            f"Warning: {fut_file_path} has no valid futures timestamp: {error}"
+        )
+        return None
 
     try:
         price = float(
@@ -229,14 +260,6 @@ def _fetch_yf_data_production(
 
             return pd.DataFrame()
 
-    # A futures price is required for the production blending logic.
-    if futures_price is None:
-        print(
-            "Critical Fault: cannot calculate DTAF signals "
-            "without a NIFTY futures price."
-        )
-        return pd.DataFrame()
-
     # Normalize the index to the configured timezone.
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
@@ -247,11 +270,19 @@ def _fetch_yf_data_production(
     else:
         df = df.tz_convert(TIMEZONE)
 
-    # Blend futures into the original OHLC fields; apply no other transform.
-    processed_df = transform_market_data(
-        df,
-        futures_price=futures_price,
-    )
+    # A stale/unavailable futures quote must never contaminate Yahoo OHLC.
+    # The documented fallback is the historical OHLC data unchanged.
+    if futures_price is None:
+        print(
+            "Warning: NIFTY futures quote unavailable or stale. "
+            "Using historical Yahoo OHLC without futures blending."
+        )
+        processed_df = transform_market_data(df)
+    else:
+        processed_df = transform_market_data(
+            df,
+            futures_price=futures_price,
+        )
 
     processed_df = processed_df.tail(target_rows)
     processed_df.attrs["data_fallback"] = False
