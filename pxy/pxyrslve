@@ -18,3 +18,26 @@ pxy_resolve_app_dir() {
 
     return 1
 }
+
+# Activate the single PXY Python environment. Fail closed if unavailable.
+pxy_activate_env() {
+    local activate_file="$HOME/env/bin/activate"
+
+    if [ ! -r "$activate_file" ]; then
+        echo "[X] Python virtual environment not found: $activate_file" >&2
+        return 1
+    fi
+
+    # shellcheck disable=SC1090
+    source "$activate_file" || {
+        echo "[X] Could not activate Python virtual environment: $activate_file" >&2
+        return 1
+    }
+
+    if [ "${VIRTUAL_ENV:-}" != "$HOME/env" ]; then
+        echo "[X] PXY Python virtual environment activation was not successful." >&2
+        return 1
+    fi
+
+    return 0
+}
