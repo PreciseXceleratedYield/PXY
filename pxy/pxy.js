@@ -90,17 +90,6 @@ const ALLOWED_SCRIPTS = [
 const SCRIPT_DIR = path.resolve(__dirname);
 const PXY_HOME = process.env.PXY_HOME || '/home/pxy';
 
-// Trading actions call their Python entry points directly; shell wrappers remain
-// available only for manual terminal use.
-const PYTHON_ACTIONS = {
-    'pxysqrall': { file: 'sys/exe/exesqrpxy.py', args: ['-all'] },
-    'pxybuyce':  { file: 'sys/exe/exeforcepxy.py', args: ['1'] },
-    'pxybuype':  { file: 'sys/exe/exeforcepxy.py', args: ['2'] },
-    'pxysqrce':  { file: 'sys/exe/exesqrpxy.py', args: ['-ce'] },
-    'pxysqrpe':  { file: 'sys/exe/exesqrpxy.py', args: ['-pe'] },
-    'pxyldgr':   { file: 'sys/exe/run/runldgrpxy.py', args: [] }
-};
-
 function shellQuote(value) {
     return `'${String(value).replace(/'/g, "'\\''")}'`;
 }
@@ -127,6 +116,9 @@ app.post('/run/:script', (req, res) => {
     } 
     
     const runAsRoot = process.env.USER === 'root';
+    const runAsUser = runAsRoot ? 'sudo -u pxy ' : '';
+    const updateEnvironment = script === 'pxyupdate' ? 'export PXY_UPDATE_FROM_WEB=1; ' : '';
+    const scriptCommand = `cd ${shellQuote(SCRIPT_DIR)} && if [ -f "$HOME/env/bin/activate" ]; then source "$HOME/env/bin/activate"; fi; export PATH=${shellQuote(SCRIPT_DIR)}:"$PATH"; ${updateEnvironment}exec ${script}`;
     const executionEnv = {
         PATH: `${PXY_HOME}/env/bin:${SCRIPT_DIR}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PXY_HOME}/.local/bin`,
         HOME: PXY_HOME,
@@ -135,10 +127,7 @@ app.post('/run/:script', (req, res) => {
         VIRTUAL_ENV: `${PXY_HOME}/env`
     };
 
-    // pxyupdate is an operating-system/repository maintenance script, not a
-    // trading wrapper, so retain its existing detached shell launch.
     if (script === 'pxyupdate') {
-        const scriptCommand = `cd ${shellQuote(SCRIPT_DIR)} && if [ -f "$HOME/env/bin/activate" ]; then source "$HOME/env/bin/activate"; fi; export PATH=${shellQuote(SCRIPT_DIR)}:"$PATH"; export PXY_UPDATE_FROM_WEB=1; exec pxyupdate`;
         const updateCommand = runAsRoot ? 'sudo' : 'bash';
         const updateArgs = runAsRoot
             ? ['-u', 'pxy', 'bash', '--login', '-c', scriptCommand]
@@ -162,21 +151,11 @@ app.post('/run/:script', (req, res) => {
         });
     }
 
-    const action = PYTHON_ACTIONS[script];
-    if (!action) {
-        return res.status(400).json({ ok: false, error: 'No Python action is configured for this command.' });
-    }
+    const cmd = `${runAsUser}bash --login -c ${shellQuote(scriptCommand)}`;
 
-    const pythonPath = path.join(PXY_HOME, 'env', 'bin', 'python3');
-    const pythonFile = path.join(SCRIPT_DIR, action.file);
-    const command = runAsRoot ? 'sudo' : pythonPath;
-    const args = runAsRoot
-        ? ['-u', 'pxy', pythonPath, pythonFile, ...action.args]
-        : [pythonFile, ...action.args];
+    if (IS_DEBUG) console.log(`[DEBUG] Executing system call command: ${cmd}`);
 
-    if (IS_DEBUG) console.log(`[DEBUG] Executing Python action: ${pythonFile} ${action.args.join(' ')}`);
-
-    execFile(command, args, {
+    exec(cmd, {
         timeout: 30000,
         cwd: SCRIPT_DIR,
         env: executionEnv
