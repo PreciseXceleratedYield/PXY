@@ -56,6 +56,17 @@ def set_cooling(side):
         print(f"{Fore.RED}⚠️ Cooldown Write Error: {e}")
 
 
+def clear_cooling(side):
+    """Removes a cooldown lock after the broker explicitly rejects an order."""
+    file_path = _cool_path(side)
+    try:
+        os.remove(file_path)
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print(f"{Fore.RED}⚠️ Cooldown Clear Error: {e}")
+
+
 def is_cooling(side):
     """Verifies filesystem locks to prevent duplicate rapid order executions."""
     file_path = _cool_path(side)
