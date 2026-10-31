@@ -51,11 +51,11 @@ show_trading_menu() {
         fi
 
         case $SUBOPT in
-            1) echo ""; pxybuyce; read -p "Done. Press [Enter]...";;
-            2) echo ""; pxybuype; read -p "Done. Press [Enter]...";;
-            3) echo ""; pxysqrce; read -p "Done. Press [Enter]...";;
-            4) echo ""; pxysqrpe; read -p "Done. Press [Enter]...";;
-            5) echo ""; pxysqrall; read -p "Done. Press [Enter]...";;
+            1) echo ""; python3 "$PXY_APP_DIR/sys/exe/exeforcepxy.py" 1; read -p "Done. Press [Enter]...";;
+            2) echo ""; python3 "$PXY_APP_DIR/sys/exe/exeforcepxy.py" 2; read -p "Done. Press [Enter]...";;
+            3) echo ""; python3 "$PXY_APP_DIR/sys/exe/exesqrpxy.py" -ce; read -p "Done. Press [Enter]...";;
+            4) echo ""; python3 "$PXY_APP_DIR/sys/exe/exesqrpxy.py" -pe; read -p "Done. Press [Enter]...";;
+            5) echo ""; python3 "$PXY_APP_DIR/sys/exe/exesqrpxy.py" -all; read -p "Done. Press [Enter]...";;
             6) break;;
             *) echo "Invalid choice."; sleep 1;;
         esac
