@@ -15,6 +15,7 @@
 import os
 import json
 import time
+from datetime import datetime
 import pandas as pd
 
 from colorama import Fore, Style
@@ -265,7 +266,7 @@ def check_counter_leg(remaining_df):
         held = "PE" if signal == "BULL" else "CE"
         counter = "PE" if held == "CE" else "CE"
 
-        now = datetime.now(_IST).time()
+        now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
 
         # ---------------- cooldown protection ----------------
 
