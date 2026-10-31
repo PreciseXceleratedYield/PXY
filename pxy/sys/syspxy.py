@@ -7,7 +7,10 @@ from pathlib import Path
 from datetime import datetime
 
 from sysexepxy import send_telegram
-from syscnfgpxy import SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS
+from syscnfgpxy import (
+    SYSCNFGPXY_TIMEZONE,
+    SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS,
+)
 from sysdashpxy import get_full_snapshot
 from sysictrpxy import export_supertrend_json
 
@@ -79,7 +82,7 @@ def get_all_data():
     # -------- COMBINE --------
     data = {
         # ===== SYSTEM TIMING =====
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(SYSCNFGPXY_TIMEZONE).isoformat(),
 
         # ===== CORE =====
         "hkin_signal": core.get("hkin_signal", "NONE"),
