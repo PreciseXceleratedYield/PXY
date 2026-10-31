@@ -16,6 +16,7 @@ from sysexitpxy import detect_raw_direction
 from sysictrpxy import calculate_indicators, get_indicator_signals
 from syspwerpxy import get_ce_pe_power
 from sysentrpxy import get_entry_signal
+from sysoutpxy import get_out_candles
 from syscseqpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
@@ -92,6 +93,8 @@ def get_full_snapshot(monitor=False):
     # ===== SUPERTREND PROFILES =====
     processed_st_df = calculate_indicators(master_df.copy())
     chart_df = calculate_indicators(chart_source_df.copy())
+    out_chart_source_df = get_out_candles(chart_source_df.copy())
+    out_chart_df = calculate_indicators(out_chart_source_df.copy())
     trend = chart_df['ST_Trend'].iloc[-1] if not chart_df.empty else "NONE"
     line_val = safe_int(chart_df['ST'].iloc[-1] if not chart_df.empty else 0)
     result["supertrend"] = trend
@@ -100,7 +103,8 @@ def get_full_snapshot(monitor=False):
     result["sma"] = indicator_signals["sma"]
     result["tsma"] = indicator_signals["tsma"]
     result["df"] = processed_st_df
-    result["chart_df"] = chart_df
+    # The web chart displays OUT-mode candles; entry routing keeps raw candles.
+    result["chart_df"] = out_chart_df
 
     # ===== DIRECTIONAL POWER MATRIX =====
     direction_power, ce, pe = get_ce_pe_power(df=master_df)
