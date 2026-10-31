@@ -3,6 +3,7 @@ const http = require('http');
 const WebSocket = require('ws'); 
 const { exec } = require('child_process'); 
 const { execFile } = require('child_process');
+const { spawn } = require('child_process');
 const crypto = require('crypto');
 const path = require('path'); 
 const os = require('os'); 
@@ -114,32 +115,58 @@ app.post('/run/:script', (req, res) => {
         return res.status(401).json({ ok: false, error: 'Invalid action password.' });
     } 
     
-    const runAsUser = process.env.USER === 'root' ? 'sudo -u pxy ' : '';
+    const runAsRoot = process.env.USER === 'root';
+    const runAsUser = runAsRoot ? 'sudo -u pxy ' : '';
     const updateEnvironment = script === 'pxyupdate' ? 'export PXY_UPDATE_FROM_WEB=1; ' : '';
     const scriptCommand = `cd ${shellQuote(SCRIPT_DIR)} && if [ -f "$HOME/env/bin/activate" ]; then source "$HOME/env/bin/activate"; fi; export PATH=${shellQuote(SCRIPT_DIR)}:"$PATH"; ${updateEnvironment}exec ${script}`;
-    const updateIsolation = script === 'pxyupdate' ? 'setsid ' : '';
-    const cmd = `${runAsUser}${updateIsolation}bash --login -c ${shellQuote(scriptCommand)}`;
-    
+    const executionEnv = {
+        PATH: `${PXY_HOME}/env/bin:${SCRIPT_DIR}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PXY_HOME}/.local/bin`,
+        HOME: PXY_HOME,
+        USER: 'pxy',
+        LOGNAME: 'pxy',
+        VIRTUAL_ENV: `${PXY_HOME}/env`
+    };
+
+    if (script === 'pxyupdate') {
+        const updateCommand = runAsRoot ? 'sudo' : 'bash';
+        const updateArgs = runAsRoot
+            ? ['-u', 'pxy', 'bash', '--login', '-c', scriptCommand]
+            : ['--login', '-c', scriptCommand];
+        const updateProcess = spawn(updateCommand, updateArgs, {
+            cwd: SCRIPT_DIR,
+            env: executionEnv,
+            detached: true,
+            stdio: 'ignore'
+        });
+
+        updateProcess.on('error', (error) => {
+            console.error('[RUN] PXY update launch failed:', error.message);
+        });
+        updateProcess.unref();
+
+        return res.status(202).json({
+            ok: true,
+            output: 'PXY update started. The dashboard and engine will restart if they were running.',
+            error: ''
+        });
+    }
+
+    const cmd = `${runAsUser}bash --login -c ${shellQuote(scriptCommand)}`;
+
     if (IS_DEBUG) console.log(`[DEBUG] Executing system call command: ${cmd}`);
 
-    exec(cmd, { 
-        timeout: script === 'pxyupdate' ? 0 : 30000, 
-        cwd: SCRIPT_DIR, 
-        env: { 
-            PATH: `${PXY_HOME}/env/bin:${SCRIPT_DIR}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PXY_HOME}/.local/bin`,
-            HOME: PXY_HOME,
-            USER: 'pxy', 
-            LOGNAME: 'pxy',
-            VIRTUAL_ENV: `${PXY_HOME}/env`
-        } 
-    }, (err, stdout, stderr) => { 
-        console.log(`[RUN] ok=${!err} out="${stdout}" err="${stderr}"`); 
-        res.json({ 
-            ok: !err, 
-            output: stdout || '', 
-            error: err ? (stderr || err.message || 'Unknown error') : '' 
-        }); 
-    }); 
+    exec(cmd, {
+        timeout: 30000,
+        cwd: SCRIPT_DIR,
+        env: executionEnv
+    }, (err, stdout, stderr) => {
+        console.log(`[RUN] ok=${!err} out="${stdout}" err="${stderr}"`);
+        res.json({
+            ok: !err,
+            output: stdout || '',
+            error: err ? (stderr || err.message || 'Unknown error') : ''
+        });
+    });
 }); 
 
 /* ========================= WEBSOCKET (500-LINE TMUX BUFFER ONLY) =========================
