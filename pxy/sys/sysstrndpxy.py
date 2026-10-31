@@ -35,10 +35,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 
     if df.empty:
-        from sysdtafpxy import fetch_yf_data
+        from sysdtafpxy import fetch_yf_data_for_monitor
 
         try:
-            raw_df = fetch_yf_data(period="3d", interval="1m")
+            raw_df = fetch_yf_data_for_monitor(period="3d", interval="1m")
 
             if raw_df is not None and not raw_df.empty:
                 df = raw_df.copy()
