@@ -18,12 +18,10 @@ PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
     echo "[X] Could not locate the PXY application directory." >&2
     exit 1
 }
+pxy_activate_env || exit 1
 cd "$PXY_APP_DIR/sys/exe/run" || { echo "❌ Ledger runner directory not found"; exit 1; }
 
 # Activate virtual environment to load your python dependencies cleanly
-if [ -f "$HOME/env/bin/activate" ]; then
-    source "$HOME/env/bin/activate"
-fi
 
 # Run the exact target Python ledger script you specified
 python3 runldgrpxy.py
