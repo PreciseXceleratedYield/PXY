@@ -13,6 +13,7 @@ PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
     echo "[X] Could not locate the PXY application directory." >&2
     exit 1
 }
+pxy_activate_env || exit 1
 ENGINE_DIR="$PXY_APP_DIR/sys/exe"
 if [ ! -f "$ENGINE_DIR/exeforcepxy.py" ]; then
     echo "Engine script not found: $ENGINE_DIR/exeforcepxy.py" >&2
@@ -21,8 +22,6 @@ fi
 
 cd "$ENGINE_DIR" || { echo "Could not enter engine directory: $ENGINE_DIR" >&2; exit 1; }
 
-# Optional: activate virtual environment if needed
-#source ~/pxy/env/bin/activate
 
 # Run the Python script with argument 1 to execute option 1 directly
 python3 exeforcepxy.py 1 "${@}"
