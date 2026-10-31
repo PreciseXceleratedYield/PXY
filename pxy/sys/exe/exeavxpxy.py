@@ -93,7 +93,7 @@ def print_telemetry_dashboard(p):
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
 
 
-def handle_side_averaging(client, df, index_price):
+def handle_side_averaging(client, df, index_price, positions_response=None):
     """Runs System A (averaging) each cycle. Exits and counter-buys live in the exit pipe."""
     if df is None or df.empty:
         return
@@ -112,7 +112,7 @@ def handle_side_averaging(client, df, index_price):
     )
     working_df['row_pnl'] = working_df['pnl'].apply(safe_float) if 'pnl' in working_df.columns else 0.0
 
-    pos_raw = str(get_position_summary(client)).upper().replace(" ", "").strip()
+    pos_raw = str(\n        get_position_summary(client, positions_response=positions_response)\n    ).upper().replace(" ", "").strip()
     ce_match = re.search(r'(\d+)CE', pos_raw)
     pe_match = re.search(r'(\d+)PE', pos_raw)
     ce_lots = int(ce_match.group(1)) if ce_match else 0
