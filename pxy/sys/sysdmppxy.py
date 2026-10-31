@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import warnings
+import tempfile
 import pandas as pd
 import yfinance as yf
 from datetime import datetime, timedelta
@@ -62,8 +63,31 @@ def _run_independent_engine_production():
             
             target_export_path = os.path.join(target_web_directory, "webdaypxy.json")
             
-            # 🟢 STEP 5: DUMP ENTIRE RAW COMPONENT DATA MATRIX
-            raw_data.to_json(target_export_path, date_format='iso', orient='split')
+            # 🟢 STEP 5: WRITE A COMPLETE JSON FILE, THEN ATOMICALLY PUBLISH IT.
+            # A unique temporary file also keeps concurrent dump processes separate.
+            temp_export_path = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w",
+                    encoding="utf-8",
+                    dir=target_web_directory,
+                    prefix=".webdaypxy.",
+                    suffix=".tmp",
+                    delete=False,
+                ) as temp_file:
+                    temp_export_path = temp_file.name
+
+                raw_data.to_json(
+                    temp_export_path,
+                    date_format="iso",
+                    orient="split",
+                )
+                os.replace(temp_export_path, target_export_path)
+                temp_export_path = None
+            finally:
+                if temp_export_path and os.path.exists(temp_export_path):
+                    os.remove(temp_export_path)
+
             print("📦 RAW JSON DUMP SUCCESS (IST)")
             
             processed_df = raw_data.copy()
