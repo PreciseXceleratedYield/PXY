@@ -293,6 +293,29 @@ def _is_no_data_order_report_response(response):
     )
 
 
+def _run_master_risk_ledger_if_broker_flat(
+    client, positions_response=None, positions_fetched=False, exit_signal=None,
+):
+    """Refresh the risk ledger on an empty order report only when broker flatness is verified."""
+    if not positions_fetched or not isinstance(positions_response, dict):
+        return
+    if (
+        str(positions_response.get("stat", "")).strip().lower() != "ok"
+        or str(positions_response.get("stCode", "")).strip() != "200"
+        or not isinstance(positions_response.get("data"), list)
+    ):
+        return
+    try:
+        if any(position_net_quantity(position) != 0 for position in positions_response["data"]):
+            return
+        import runexacpxy
+        runexacpxy.execute_master_risk_ledger(
+            client, pd.DataFrame(), pd.DataFrame(), exit_signal=exit_signal
+        )
+    except Exception as error:
+        print(f"⚠️ Master risk ledger empty-book refresh skipped: {error}")
+
+
 def _process_lilo_orders_production(
     client, strict=False, risk_exit_signal=None,
     positions_response=None, positions_fetched=False,
@@ -311,6 +334,9 @@ def _process_lilo_orders_production(
         res = client.order_report()
         if _is_no_data_order_report_response(res):
             print("ℹ️ Kotak order report has no data; LILO has nothing to process.")
+            _run_master_risk_ledger_if_broker_flat(
+                client, positions_response, positions_fetched, risk_exit_signal
+            )
             _print_summary(0, 0)
             return pd.DataFrame(), pd.DataFrame()
         if (
@@ -328,6 +354,9 @@ def _process_lilo_orders_production(
         df = pd.DataFrame(res["data"])
         if df.empty:
             print("ℹ️ No order rows returned; LILO has nothing to process.")
+            _run_master_risk_ledger_if_broker_flat(
+                client, positions_response, positions_fetched, risk_exit_signal
+            )
             _print_summary(0, 0)
             return pd.DataFrame(), pd.DataFrame()
 
