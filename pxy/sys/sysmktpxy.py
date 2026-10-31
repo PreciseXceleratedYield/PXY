@@ -2,7 +2,7 @@
 from syscnfgpxy import SYSMKTPXY_DEBUG_ENABLED
 from sysdthapxy import get_signal_depth_analysis
 from sysdtafpxy import fetch_yf_data
-from sysinpxy import get_signal as get_entry_signal
+from sysinpxy import get_entry_signal
 from sysoutpxy import get_signal as get_exit_signal
 
 
@@ -46,13 +46,13 @@ def _print_console_bar(c1, c0, execution_state):
 
 
 def get_signals(df=None):
-    """Pass IN entry signals and OUT exit signals through without extra filters."""
+    """Route IN's execution action and OUT's directional exit without extra filters."""
     if df is None:
         df = fetch_yf_data()
     try:
         entry_signal = str(get_entry_signal(df)).upper().strip()
         exit_signal = str(get_exit_signal(df)).upper().strip()
-        if entry_signal not in {"BUY", "SELL", "BULL", "BEAR"}:
+        if entry_signal not in {"BUY", "SELL"}:
             entry_signal = "NONE"
         if exit_signal not in {"BULL", "BEAR"}:
             exit_signal = "NONE"

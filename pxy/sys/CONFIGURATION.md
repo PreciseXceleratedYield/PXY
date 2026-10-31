@@ -153,7 +153,7 @@ C1. The C0 colour is C0 Close versus C1 Close; the C1 colour is C1 Close versus
 C2 Close. IN maps Green/Green to BULL, Red/Red to BEAR, Green/Red to SELL,
 and Red/Green to BUY. Flat or unavailable required candle data returns NONE.
 OUT returns BULL for a Green C0 and BEAR for a Red C0; a flat C0 or unavailable
-C1/C2 returns NONE. MKT passes IN entry and OUT exit signals through unchanged.
+C1/C2 returns NONE. MKT routes IN continuation BULL/BEAR as BUY/SELL execution actions, preserves IN flip BUY/SELL actions, and passes OUT BULL/BEAR/NONE through unchanged.
 DTHA depth remains supporting market information for the dashboard and risk
 analysis, not an additional entry/exit filter.
 The router normalizes entry results to BUY/SELL and exit results to BULL/BEAR;
@@ -165,13 +165,12 @@ shape and the latest NIFTY futures price is averaged into each OHLC field only
 for signal input. The separate chart candle transform remains controlled by
 `SYSPLCHRTPXY_OHLC_MODE`. If a futures quote is unavailable, DTAF falls back to
 the historical OHLC values directly without switching modes.
-MKT returns one directional signal from `sysdthapxy`: down-then-up and two
-consecutive rising moves emit `BULL`; up-then-down and two consecutive falling
-moves emit `BEAR`. Other patterns, including equal adjacent closes, emit
-`NONE`. `sysmktpxy.get_signal()` returns only `BULL`, `BEAR`, or `NONE` and
-retains its console monitor output. Directional depth remains available for the
-dashboard and risk analysis. DTHA also supplies the shared close-to-close
-direction series (`UP`, `DOWN`, or `FLAT`) and CE/PE streak depths. Flat closes
+DTHA, IN, and OUT each apply their configured candle mode independently.
+IN classifies the C1-to-C0 colour transition; MKT converts continuation states
+BULL/BEAR to the execution actions BUY/SELL and passes flip actions BUY/SELL
+through. OUT supplies only the current directional state (BULL/BEAR/NONE).
+DTHA supplies transformed close-to-close direction and CE/PE streak depths
+for the dashboard and risk analysis. Flat closes
 break directional streaks.
 `sysdptpxy` delegates dashboard/depth calculation to that same DTHA signal and
 depth result. Current streak depth continues past `SYSDPTPXY_LAST_N`; that
