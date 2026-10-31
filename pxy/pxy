@@ -15,11 +15,9 @@ PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
     echo "[X] Could not locate the PXY application directory." >&2
     exit 1
 }
+pxy_activate_env || exit 1
 cd "$PXY_APP_DIR/sys" || exit 1
 
-if [ -f "$HOME/env/bin/activate" ]; then
-    source "$HOME/env/bin/activate"
-fi
 
 export PATH=$PWD:$PATH
 
@@ -110,9 +108,6 @@ show_test_menu() {
             draw_border
             echo "Executing All Python Scripts Sequentially..."
             draw_border
-            if [ -f "$HOME/env/bin/activate" ]; then
-                source "$HOME/env/bin/activate"
-            fi
             for SELECTED_FILE in "${PY_FILES[@]}"; do
                 echo "-> Running: $SELECTED_FILE"
                 python3 "$SELECTED_FILE"
@@ -126,9 +121,6 @@ show_test_menu() {
             echo "Executing: $SELECTED_FILE"
             draw_border
             
-            if [ -f "$HOME/env/bin/activate" ]; then
-                source "$HOME/env/bin/activate"
-            fi
             python3 "$SELECTED_FILE"
             
             draw_border
@@ -225,7 +217,7 @@ while true; do
             echo "Initializing Production Trading Engine..."
             if ! tmux has-session -t pxy-engine 2>/dev/null && ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
                 # Restrict terminal history memory strictly to 500 lines
-                tmux new-session -d -s pxy-engine "bash -c 'tmux set-option history-limit 500; cd \"$PXY_APP_DIR/sys\"; if [ -f \"\\$HOME/env/bin/activate\" ]; then source \"\\$HOME/env/bin/activate\"; fi; export PYTHONUNBUFFERED=1; python3 sysexepxy.py'"
+                tmux new-session -d -s pxy-engine "bash -c 'tmux set-option history-limit 500; cd \"$PXY_APP_DIR/sys\"; if [ ! -r \"\\$HOME/env/bin/activate\" ]; then echo \"[X] Python virtual environment missing\"; exit 1; fi; source \"\\$HOME/env/bin/activate\" || exit 1; export PYTHONUNBUFFERED=1; exec python3 sysexepxy.py'"
 
                 sleep 1
                 if tmux has-session -t pxy-engine 2>/dev/null; then
