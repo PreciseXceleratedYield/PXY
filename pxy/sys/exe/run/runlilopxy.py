@@ -293,7 +293,10 @@ def _is_no_data_order_report_response(response):
     )
 
 
-def _process_lilo_orders_production(\n    client, strict=False, risk_exit_signal=None,\n    positions_response=None, positions_fetched=False,\n):
+def _process_lilo_orders_production(
+    client, strict=False, risk_exit_signal=None,
+    positions_response=None, positions_fetched=False,
+):
     try: 
         # MASTER RISK LEDGER hook 1: once-a-day stale web-cache override (runs before any data guard)
         try:
@@ -420,7 +423,11 @@ def _process_lilo_orders_production(\n    client, strict=False, risk_exit_signal
                         "PNL": int((live_val - b["prc"]) * b["qty"]) 
                     }) 
 
-        open_positions = _reconcile_open_with_broker(\n            client, open_positions, strict=strict,\n            positions_response=positions_response,\n            positions_fetched=positions_fetched,\n        )
+        open_positions = _reconcile_open_with_broker(
+            client, open_positions, strict=strict,
+            positions_response=positions_response,
+            positions_fetched=positions_fetched,
+        )
         open_df = pd.DataFrame(open_positions) 
         closed_df = pd.DataFrame(closed_matches) 
 
@@ -474,7 +481,9 @@ def _print_summary(total_unrealized, total_realized):
     color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
     unreal_str = f"{int(total_unrealized):+06d}" 
     real_str = f"{int(total_realized):+06d}" 
-    print(f"\n     🏃‍♂️ 🔸  {unreal_str}  🔸  🏃‍♂️   🥅  {color}{real_str}{Style.RESET_ALL}  🥅\n") 
+    print(f"
+     🏃‍♂️ 🔸  {unreal_str}  🔸  🏃‍♂️   🥅  {color}{real_str}{Style.RESET_ALL}  🥅
+") 
 
 if __name__ == "__main__": 
     os.environ["PXY_VIEW_ONLY"] = "1"   # viewing run: must not advance the ledger breach count
