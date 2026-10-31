@@ -144,7 +144,7 @@ def main():
         HERE / "exeexitpxy.py",
     ]
     for script in parent_scripts:
-        safe_run(script)
+        safe_run(script, timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
 
     while True:
         clear_screen()
