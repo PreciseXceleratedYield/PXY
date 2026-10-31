@@ -8,7 +8,6 @@ import re
 import subprocess
 import pandas as pd
 from datetime import datetime
-from pathlib import Path
 from colorama import init, Fore, Style 
 
 SYS_DIR = Path(__file__).resolve().parent.parent
@@ -276,25 +275,12 @@ def run_depth_squareoff(client, active_df, market_data_available,
     if not exited_keys:
         return set()
 
-    command = "pxysqrpe" if side == "PE" else "pxysqrce"
-    command_path = Path(__file__).resolve().parents[2] / command
-    if not command_path.is_file():
-        print(f"{Fore.RED}❌ Square-off command not found: {command_path}")
-        return set()
     try:
-        subprocess.run(
-            ["bash", str(command_path)],
-            check=True,
-            timeout=SQUAREOFF_TIMEOUT_SECS,
-        )
-    except subprocess.TimeoutExpired:
-        print(f"{Fore.RED}❌ {command} timed out after {SQUAREOFF_TIMEOUT_SECS}s.")
-        return set()
-    except subprocess.CalledProcessError as error:
-        print(f"{Fore.RED}❌ {command} failed with exit code {error.returncode}.")
-        return set()
-    except OSError as error:
-        print(f"{Fore.RED}❌ Could not run {command}: {error}")
+        from exesqrpxy import exit_all_positions
+
+        exit_all_positions("-pe" if side == "PE" else "-ce")
+    except Exception as error:
+        print(f"{Fore.RED}❌ Direct {side} square-off failed: {error}")
         return set()
 
     _mark_lock(signal_key)
