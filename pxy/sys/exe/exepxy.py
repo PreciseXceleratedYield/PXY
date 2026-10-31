@@ -20,6 +20,30 @@ for path in (RUN_DIR, HERE, SYS_DIR):
         sys.path.insert(0, str(path))
 
 from runnfutpxy import run_forever
+from sysexepxy import send_telegram
+
+# Component failures are reported periodically; they never stop the engine.
+COMPONENT_FAILURES = {}
+ENGINE_ITERATION = 0
+
+
+def _record_component_failure(name, error=None):
+    COMPONENT_FAILURES[name] = str(error or "execution failed")
+
+
+def _record_component_recovery(name):
+    COMPONENT_FAILURES.pop(name, None)
+
+
+def _notify_persistent_failures():
+    if ENGINE_ITERATION % 5 != 0:
+        return
+    for name, error in list(COMPONENT_FAILURES.items()):
+        send_telegram(
+            f"⚠️ PXY component failure (iteration {ENGINE_ITERATION})\\n"
+            f"Component: {name}\\nError: {error}\\n"
+            "Engine continues running; automatic retry remains in effect."
+        )
 
 from syscnfgpxy import (
     EXEPXYPXY_IDLE_PAUSE_SECONDS,
@@ -36,26 +60,38 @@ ist = SYSCNFGPXY_TIMEZONE
 
 # ---------------- HELPER FUNCTIONS ----------------
 def run_script(script_path, timeout=None):
+    component = Path(script_path).name
     if not Path(script_path).exists():
-        print(f"⚠️ SKIP: script not found -> {script_path}")
+        error = f"script not found: {script_path}"
+        _record_component_failure(component, error)
+        print(f"⚠️ SKIP: {error}")
         print("━" * 42)
-        return
+        return False
     try:
-        # ✅ Dynamic timeout value is passed here (None means run forever)
         subprocess.run([sys.executable, str(script_path)], check=True, timeout=timeout)
+        _record_component_recovery(component)
+        print("━" * 42)
+        return True
     except subprocess.TimeoutExpired:
-        print(f"⏱ TIMEOUT: script stuck after {timeout}s -> {script_path} ⚠️")
-    except subprocess.CalledProcessError:
-        print(f"❌ RUN ERR: script execution failed -> {script_path} ⚠️")
-    except Exception as e:
-        print(f"❌ RUN ERR: unexpected failure -> {script_path} ⚠️")
+        error = f"timed out after {timeout}s"
+        print(f"⏱ TIMEOUT: {component} {error} ⚠️")
+    except subprocess.CalledProcessError as error:
+        error = f"process exited with status {error.returncode}"
+        print(f"❌ RUN ERR: {component}: {error} ⚠️")
+    except Exception as error:
+        error = str(error)
+        print(f"❌ RUN ERR: {component}: {error} ⚠️")
+    _record_component_failure(component, error)
     print("━" * 42)
+    return False
 
 def safe_run(script_path, timeout=None):
     try:
-        run_script(script_path, timeout=timeout)
-    except Exception:
+        return run_script(script_path, timeout=timeout)
+    except Exception as error:
+        _record_component_failure(Path(script_path).name, error)
         print("⚠️ SAFE RUN: unexpected error occurred ⚠️")
+        return False
 
 def fancy_pause(seconds=EXEPXYPXY_IDLE_PAUSE_SECONDS):
     for i in range(seconds, 0, -1):
@@ -79,11 +115,14 @@ def in_market_hours():
 
 def run_market_cycle():
     """Run one production iteration with maximum exit priority."""
+    global ENGINE_ITERATION
+    ENGINE_ITERATION += 1
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeentrpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeavgpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
+    _notify_persistent_failures()
     fancy_pause(SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
 
 
@@ -98,7 +137,10 @@ def main():
     futures_ready = threading.Event()
     futures_thread = threading.Thread(
         target=run_forever,
-        args=(futures_ready,),
+        args=(futures_ready, lambda error=None: (
+            _record_component_recovery("runnfutpxy.py") if error is None
+            else _record_component_failure("runnfutpxy.py", error)
+        )),
         name="pxy-nifty-futures",
         daemon=True,
     )
