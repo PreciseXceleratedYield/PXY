@@ -122,22 +122,44 @@ def _assign_book_ids(orders_df):
     return result
 
 
-def dump_livpos_to_json(open_positions): 
-    """Writes active positions metrics to webpospxy.json."""
-    try: 
-        file_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../web/webpospxy.json"))
-        os.makedirs(os.path.dirname(file_path), exist_ok=True) 
-        
+def dump_livpos_to_json(open_positions):
+    """Atomically writes active position metrics to webpospxy.json."""
+    temp_path = None
+    try:
+        file_path = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "../../../web/webpospxy.json",
+            )
+        )
+        directory = os.path.dirname(file_path)
+        os.makedirs(directory, exist_ok=True)
+
         livpos_data = [{
-            "SYMBOL": str(p["Symbol"]), 
-            "QTY": float(p["Qty"]), 
-            "PNL": float(p["PNL"])
+            "SYMBOL": str(p["Symbol"]),
+            "QTY": float(p["Qty"]),
+            "PNL": float(p["PNL"]),
         } for p in open_positions]
-        
-        with open(file_path, "w") as f: 
-            json.dump(livpos_data, f, indent=4) 
-    except Exception as e: 
-        print(f"Error dumping livpos to JSON: {e}") 
+
+        fd, temp_path = tempfile.mkstemp(
+            dir=directory,
+            prefix=".webpospxy.",
+        )
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            json.dump(livpos_data, f, indent=4)
+
+        mode = (
+            stat.S_IMODE(os.stat(file_path).st_mode)
+            if os.path.exists(file_path)
+            else 0o644
+        )
+        os.chmod(temp_path, mode)
+        os.replace(temp_path, file_path)
+        temp_path = None
+    except Exception as e:
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+        print(f"Error dumping livpos to JSON: {e}")
 
 def _fetch_live_price(client, token_id, ex_seg):
     """5-tier fallback pricing hierarchy. Returns 0.0 when every tier fails."""
