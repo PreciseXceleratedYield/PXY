@@ -6,10 +6,10 @@ set -e
 # ------------------------------------------------------------------------------
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$SCRIPT_DIR/pxyresolve" ]; then
-    source "$SCRIPT_DIR/pxyresolve"
-elif [ -f "$HOME/.local/bin/pxyresolve" ]; then
-    source "$HOME/.local/bin/pxyresolve"
+if [ -f "$SCRIPT_DIR/pxyrslve" ]; then
+    source "$SCRIPT_DIR/pxyrslve"
+elif [ -f "$HOME/.local/bin/pxyrslve" ]; then
+    source "$HOME/.local/bin/pxyrslve"
 else
     echo "[X] PXY path helper not found." >&2
     exit 1
