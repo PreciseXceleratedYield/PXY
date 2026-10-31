@@ -8,6 +8,7 @@ import os
 import sys
 import time
 import subprocess
+import math
 from colorama import Fore, Style
 
 from runexiopxy import SQUAREOFF_SCRIPT_PATH
@@ -30,25 +31,50 @@ from execoolpxy import start_cooldown
 
 
 def broker_positions_flat(client):
-    try:
-        def _num(v):
-            return float(str(v).replace(",", "").strip() or 0)
+    """Return True only for a successful, complete broker response showing flat.
 
+    Use the same carry-forward + intraday quantity interpretation as LILO.
+    Missing, malformed, unsuccessful, or incomplete responses are never flat.
+    """
+    try:
         res = client.positions()
-        if isinstance(res, dict):
-            data = res.get("data")
-            if isinstance(data, list):
-                for pos in data:
-                    net_qty = _num(pos.get("net_qty", 0))
-                    if net_qty == 0:
-                        net_qty = _num(pos.get("flBuyQty", 0)) - _num(pos.get("flSellQty", 0))
-                    if abs(net_qty) > 0:
-                        return False
-                return True
-            if "no data" in str(res.get("errMsg", "") or res.get("message", "")).lower():
-                return True
-        return False
+
+        # A valid empty data list is an explicit flat result. Error/no-data
+        # payloads are not accepted as proof because they may hide API failure.
+        if (
+            not isinstance(res, dict)
+            or str(res.get("stat", "")).strip().lower() != "ok"
+            or str(res.get("stCode", "")).strip() != "200"
+            or not isinstance(res.get("data"), list)
+        ):
+            return False
+
+        from runlilopxy import position_net_quantity
+
+        net_by_symbol = {}
+        for pos in res["data"]:
+            if not isinstance(pos, dict):
+                return False
+
+            symbol = str(pos.get("trdSym") or "").strip()
+            if not symbol:
+                return False
+
+            try:
+                net_qty = position_net_quantity(pos)
+            except (TypeError, ValueError, OverflowError):
+                return False
+
+            if not math.isfinite(net_qty):
+                return False
+
+            net_by_symbol[symbol] = net_by_symbol.get(symbol, 0.0) + net_qty
+
+        return all(abs(quantity) <= 1e-9 for quantity in net_by_symbol.values())
+
     except Exception:
+        # An unavailable broker response must keep the book open and trigger
+        # another square-off/confirmation attempt on the next risk-ledger tick.
         return False
 
 
