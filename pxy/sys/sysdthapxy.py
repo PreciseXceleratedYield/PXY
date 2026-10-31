@@ -17,13 +17,13 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
     OC2 and OHLC4 replace Close with the corresponding candle average.
     HYPER preserves the former DTAF mode-0 transformation.
-    TOAC matches the TSMA-open/custom-close Pine candle.
+    TSMA matches the TSMA-open/custom-close Pine candle.
     HA applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TOAC"}
+    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA"}
     if mode not in valid_modes:
         raise ValueError(
-            "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, or TOAC."
+            "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, or TSMA."
         )
 
     if df is None or df.empty:
@@ -63,7 +63,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         out["Close"] = hyper_close
         return out
 
-    if mode == "TOAC":
+    if mode == "TSMA":
         # Pine: ta.linreg(open, 7, 0)
         tsma_open = calculate_moving_average(
             pd.Series(raw_open, index=out.index),
