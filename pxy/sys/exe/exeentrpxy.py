@@ -113,7 +113,7 @@ def main():
             f"🟢 FRESH ENTRY: Firing command '{command}'..."
         )
         action = "1" if command == "pxybuyce" else "2"
-        if not run_action(action):
+        if not run_action(action, show_funds=False):
             print(f"{Fore.RED}⚠️ Entry action {command} did not complete.")
 
         dprint("===== END =====", Fore.GREEN)
