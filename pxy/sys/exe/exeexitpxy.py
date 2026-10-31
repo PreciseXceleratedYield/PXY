@@ -39,7 +39,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     PASTRSK,
 )
-from sysdecisionpxy import (
+from sysdcinpxy import (
     counter_leg_allowed,
     exit_order_response_accepted,
     exit_lock_recent,
