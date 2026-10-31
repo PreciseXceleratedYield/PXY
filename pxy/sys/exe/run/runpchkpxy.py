@@ -139,11 +139,15 @@ def _get_position_summary(pos_res):
         return None
 
 
-def get_position_summary(client=None):
+def get_position_summary(client=None, positions_response=None):
     """
     Returns CE/PE position counts as 'XCEYPE'.
+    Reuses positions_response when supplied by the current engine pipe.
     Returns None when positions cannot be verified.
     """
+
+    if positions_response is not None:
+        return _get_position_summary(positions_response)
 
     if client is None:
         try:
