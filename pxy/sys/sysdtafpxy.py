@@ -340,6 +340,14 @@ def fetch_yf_data_for_monitor(
     This path is intentionally separate from fetch_yf_data(), which remains
     the NIFTY production ingestion path and retains its futures/DTAF behavior.
     """
+    if os.environ.get("PXY_MONITOR_MODE") != "1":
+        raise RuntimeError(
+            "Monitor data is restricted to the pxymon process."
+        )
+    if ticker != SYSMONPXY_TICKER:
+        raise ValueError(
+            f"Monitor ticker is fixed to {SYSMONPXY_TICKER}."
+        )
     if not isinstance(ticker, str) or not ticker.strip():
         raise ValueError("Monitor ticker must be a non-empty string.")
     if (
