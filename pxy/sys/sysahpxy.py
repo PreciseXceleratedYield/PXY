@@ -8,7 +8,7 @@ from syscnfgpxy import SYSDTHAPXY_CANDLE_MODE, SYSSMAPXY_TSMA_PERIOD
 from syssmapxy import calculate_moving_average
 
 
-VALID_MODES = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TOAC"}
+VALID_MODES = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA"}
 
 
 def transform_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
@@ -16,7 +16,7 @@ def transform_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     mode = str(mode).upper()
     if mode not in VALID_MODES:
         raise ValueError(
-            "Candle mode must be RAW, OC2, HA, OHLC4, HYPER, or TOAC."
+            "Candle mode must be RAW, OC2, HA, OHLC4, HYPER, or TSMA."
         )
 
     if df is None or df.empty:
@@ -55,16 +55,17 @@ def transform_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         )
         return out
 
-    if mode == "TOAC":
-        tsma = calculate_moving_average(
-            pd.Series(raw_close, index=out.index),
+    if mode == "TSMA":
+        tsma_open = calculate_moving_average(
+            pd.Series(raw_open, index=out.index),
             period=SYSSMAPXY_TSMA_PERIOD,
             variant="TSMA",
         ).to_numpy(dtype=float)
-        out["Open"] = tsma
-        out["Close"] = raw_close
-        out["High"] = np.maximum.reduce((raw_high, tsma, raw_close))
-        out["Low"] = np.minimum.reduce((raw_low, tsma, raw_close))
+        candle_close = (tsma_open + raw_close) / 2.0
+        out["Open"] = tsma_open
+        out["Close"] = candle_close
+        out["High"] = np.maximum(tsma_open, candle_close)
+        out["Low"] = np.minimum(tsma_open, candle_close)
         return out
 
     # Standard Heikin-Ashi.
@@ -94,7 +95,7 @@ def get_signal(df, mode=SYSDTHAPXY_CANDLE_MODE):
     mode = str(mode).upper()
     close = pd.to_numeric(transformed["Close"], errors="coerce")
 
-    if mode == "TOAC":
+    if mode == "TSMA":
         open_ = pd.to_numeric(transformed["Open"], errors="coerce")
         previous_close, current_close = close.iloc[-2], close.iloc[-1]
         previous_open, current_open = open_.iloc[-2], open_.iloc[-1]
@@ -134,7 +135,7 @@ def get_signal(df, mode=SYSDTHAPXY_CANDLE_MODE):
             else "FLAT"
         )
 
-    if mode == "TOAC":
+    if mode == "TSMA":
         if previous == "UP" and current == "UP":
             return "BULL"
         if previous == "DOWN" and current == "DOWN":
