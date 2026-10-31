@@ -79,14 +79,19 @@ runtime selector.
   Each following value is the expanding mean through candle 14, and subsequent
   values use a rolling 14-candle mean. The session window resets daily; earlier
   candles use the configured fallback.
-- `SYSSMAPXY_MA_PERIOD` sets the default moving-average window (50), and
-  `SYSSMAPXY_VARIANT` selects the calculation used by `syssmapxy.get_sma()`.
-  `TSMA` is the rolling linear-regression endpoint; `SMA` preserves the
-  simple-moving-average behavior. The web chart
-  displays both 50-period averages together: SMA as a solid gold line and TSMA
-  as a dashed accent line. Chart history fetches `SYSSTRNDPXY_CHART_TARGET_ROWS`
-  (110) candles so its 60 visible bars include the 50-bar warm-up required for
-  complete moving-average lines; signal calculations continue using
+- `SYSSMAPXY_MA_PERIOD` sets the separate chart moving-average window
+  (50), and `SYSSMAPXY_VARIANT` selects whether that line uses SMA or the
+  rolling linear-regression endpoint (TSMA). The chart carries these averages
+  as `sma50` and `tsma50`; both use the configured 50-period moving-average
+  window.
+- `SYSSMAPXY_TSMA_PERIOD` is a different setting: it controls the TSMA candle
+  transformation used by DTHA. Its current value is 7. In this mode, DTHA uses
+  the 7-period linear-regression endpoint of raw Open as synthetic Open and
+  averages that value with raw Close for synthetic Close. This 7-period candle
+  transform does not change the separate 50-period chart moving-average line.
+- Chart history fetches `SYSSTRNDPXY_CHART_TARGET_ROWS` (110) candles so its
+  60 visible bars include the 50-bar warm-up required for complete moving-
+  average lines; signal calculations continue using
   `SYSDTAFPXY_DEFAULT_TARGET_ROWS` (60).
 - `EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS` makes the signal router return
   `NONE` for both entry and exit signals for 6 seconds after a square-off
