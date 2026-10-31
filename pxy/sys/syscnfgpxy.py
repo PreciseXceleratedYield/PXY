@@ -12,7 +12,8 @@ import pytz
 
 # System-wide defaults.
 SYSCNFGPXY_RELEASE_NAME = "READYFRIDAY"
-SYSCNFGPXY_TICKER = "BTC-USD"  # Options: "^NSEI", "^NSEBANK", "BTC-USD", "GC=F", "GBPUSD=X", "^GSPC"
+SYSCNFGPXY_TICKER = "^NSEI"  # Production trading instrument.
+SYSMONPXY_TICKER = "BTC-USD"  # Monitor-only test instrument; never used by production trading.
 
 SYSCNFGPXY_TIMEZONE = pytz.timezone("Asia/Kolkata")
 SYSCNFGPXY_NIFTY_LOT_SIZE = 65
