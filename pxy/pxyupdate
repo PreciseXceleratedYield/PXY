@@ -1,42 +1,14 @@
 #!/bin/bash
-set -e
+set -Eeuo pipefail
 
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$SCRIPT_DIR/pxyrslve" ]; then
     source "$SCRIPT_DIR/pxyrslve"
 elif [ -f "$HOME/.local/bin/pxyrslve" ]; then
     source "$HOME/.local/bin/pxyrslve"
 else
-    pxy_activate_env() {
-        local activate_file="$HOME/env/bin/activate"
-        if [ ! -r "$activate_file" ]; then
-            echo "[X] Python virtual environment not found: $activate_file" >&2
-            return 1
-        fi
-        source "$activate_file" || return 1
-        [ "${VIRTUAL_ENV:-}" = "$HOME/env" ] || return 1
-    }
-
-    pxy_resolve_app_dir() {
-        local script_dir="${1:-}"
-        local candidate
-
-        for candidate in \
-            "${PXY_APP_DIR:-}" \
-            "$HOME/PXY/pxy" \
-            "$HOME/pxy" \
-            "$script_dir"
-        do
-            if [ -n "$candidate" ] \
-                && [ -f "$candidate/sys/syscnfgpxy.py" ] \
-                && [ -f "$candidate/pxy.js" ]; then
-                printf '%s\n' "$candidate"
-                return 0
-            fi
-        done
-
-        return 1
-    }
+    echo "[X] PXY path helper not found." >&2
+    exit 1
 fi
 
 REPO_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
@@ -50,14 +22,178 @@ if ! git -C "$REPO_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     exit 1
 fi
 
+ENGINE_WAS_RUNNING=0
+WEB_WAS_RUNNING=0
+RESTART_ATTEMPTED=0
+
+has_engine_process() {
+    pgrep -f '[s]ysexepxy.py' >/dev/null 2>&1
+}
+
+has_web_process() {
+    pgrep -f 'node [p]xy\.js' >/dev/null 2>&1
+}
+
+wait_for_session_exit() {
+    local session="$1"
+    local seconds="$2"
+    local i
+    for ((i=0; i<seconds; i++)); do
+        if ! tmux has-session -t "$session" 2>/dev/null; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+wait_for_process_exit() {
+    local kind="$1"
+    local seconds="$2"
+    local i
+    for ((i=0; i<seconds; i++)); do
+        if [ "$kind" = "engine" ] && ! has_engine_process; then
+            return 0
+        fi
+        if [ "$kind" = "web" ] && ! has_web_process; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+start_services() {
+    local status=0
+
+    if [ "$WEB_WAS_RUNNING" -eq 1 ]; then
+        echo "[>] Starting web dashboard..."
+        if tmux has-session -t pxy-web 2>/dev/null; then
+            echo "[X] pxy-web session already exists; refusing duplicate start." >&2
+            status=1
+        elif ! tmux new-session -d -s pxy-web -c "$REPO_DIR" "bash -c 'tmux set-option -t pxy-web history-limit 500; exec node pxy.js'"; then
+            echo "[X] Could not create pxy-web tmux session." >&2
+            status=1
+        else
+            sleep 2
+            if tmux has-session -t pxy-web 2>/dev/null && has_web_process; then
+                echo "[✔] Web dashboard is running."
+            else
+                echo "[X] Web dashboard failed to start; inspect tmux capture-pane -t pxy-web." >&2
+                status=1
+            fi
+        fi
+    else
+        echo "[-] Web dashboard was not running before update; left stopped."
+    fi
+
+    if [ "$ENGINE_WAS_RUNNING" -eq 1 ]; then
+        echo "[>] Starting trading engine..."
+        if tmux has-session -t pxy-engine 2>/dev/null; then
+            echo "[X] pxy-engine session already exists; refusing duplicate start." >&2
+            status=1
+        elif ! tmux new-session -d -s pxy-engine -c "$REPO_DIR/sys" "bash -c 'tmux set-option -t pxy-engine history-limit 500; if [ ! -r \"\$HOME/env/bin/activate\" ]; then echo \"[X] Python virtual environment missing\"; exit 1; fi; source \"\$HOME/env/bin/activate\" || exit 1; export PYTHONUNBUFFERED=1; exec python3 sysexepxy.py'"; then
+            echo "[X] Could not create pxy-engine tmux session." >&2
+            status=1
+        else
+            sleep 2
+            if tmux has-session -t pxy-engine 2>/dev/null && has_engine_process; then
+                echo "[✔] Trading engine is running."
+            else
+                echo "[X] Trading engine failed to start; inspect tmux capture-pane -t pxy-engine." >&2
+                status=1
+            fi
+        fi
+    else
+        echo "[-] Trading engine was not running before update; left stopped."
+    fi
+
+    return "$status"
+}
+
+on_exit() {
+    local exit_code=$?
+    trap - EXIT
+    if [ "$ENGINE_WAS_RUNNING" -eq 1 ] || [ "$WEB_WAS_RUNNING" -eq 1 ]; then
+        if [ "$RESTART_ATTEMPTED" -eq 0 ]; then
+            echo "[!] Update exited before restart; attempting to restore previously running services..."
+            RESTART_ATTEMPTED=1
+            start_services || echo "[X] One or more services could not be restored automatically." >&2
+        fi
+    fi
+    exit "$exit_code"
+}
+trap on_exit EXIT
+
+# Record exactly which managed services were running before the update.
+if tmux has-session -t pxy-engine 2>/dev/null; then
+    ENGINE_WAS_RUNNING=1
+elif has_engine_process; then
+    echo "[X] Engine process found outside the expected pxy-engine tmux session." >&2
+    echo "    Update aborted to avoid leaving or killing an unmanaged trading process." >&2
+    exit 1
+fi
+
+if tmux has-session -t pxy-web 2>/dev/null; then
+    WEB_WAS_RUNNING=1
+elif has_web_process; then
+    echo "[X] Web process found outside the expected pxy-web tmux session." >&2
+    echo "    Update aborted to avoid leaving or killing an unmanaged web process." >&2
+    exit 1
+fi
+
 echo " ******** get updates *******"
 echo
 git -C "$REPO_DIR" fetch origin main
 echo
 
+# Stop the engine first, then the dashboard. Ctrl-C gives each process a
+# graceful shutdown opportunity before the tmux session is forcibly closed.
+if [ "$ENGINE_WAS_RUNNING" -eq 1 ] || [ "$WEB_WAS_RUNNING" -eq 1 ]; then
+    if ! command -v tmux >/dev/null 2>&1; then
+        echo "[X] tmux is required to manage PXY services." >&2
+        exit 1
+    fi
+fi
+
+if [ "$ENGINE_WAS_RUNNING" -eq 1 ]; then
+    echo "[>] Stopping trading engine..."
+    tmux send-keys -t pxy-engine C-c 2>/dev/null || true
+    if ! wait_for_session_exit pxy-engine 15; then
+        echo "[!] Engine did not exit after Ctrl-C; closing its tmux session."
+        tmux kill-session -t pxy-engine 2>/dev/null || true
+        wait_for_session_exit pxy-engine 5 || {
+            echo "[X] Could not stop pxy-engine; update aborted." >&2
+            exit 1
+        }
+    fi
+    if ! wait_for_process_exit engine 5; then
+        echo "[X] Engine process remains after session shutdown; update aborted." >&2
+        exit 1
+    fi
+    echo "[✔] Trading engine stopped."
+fi
+
+if [ "$WEB_WAS_RUNNING" -eq 1 ]; then
+    echo "[>] Stopping web dashboard..."
+    tmux send-keys -t pxy-web C-c 2>/dev/null || true
+    if ! wait_for_session_exit pxy-web 15; then
+        echo "[!] Web server did not exit after Ctrl-C; closing its tmux session."
+        tmux kill-session -t pxy-web 2>/dev/null || true
+        wait_for_session_exit pxy-web 5 || {
+            echo "[X] Could not stop pxy-web; update aborted." >&2
+            exit 1
+        }
+    fi
+    if ! wait_for_process_exit web 5; then
+        echo "[X] Web process remains after session shutdown; update aborted." >&2
+        exit 1
+    fi
+    echo "[✔] Web dashboard stopped."
+fi
+
 echo " ****** reset software to origin/main ******"
 echo
-# syscnfgpxy.py is intentionally refreshed with the rest of the tracked code.
 git -C "$REPO_DIR" reset --hard origin/main
 echo "Updated checkout to $(git -C "$REPO_DIR" rev-parse --short HEAD)."
 echo
@@ -84,5 +220,14 @@ for file in "$REPO_DIR"/*; do
 done
 echo
 
-echo " ***** update completed *****"
+echo " ****** restart previously running services ******"
+echo
+RESTART_ATTEMPTED=1
+if ! start_services; then
+    echo "[X] Update completed, but one or more previously running services failed verification." >&2
+    exit 1
+fi
+
+echo
+echo " ***** update completed and service checks passed *****"
 echo ""
