@@ -2,14 +2,14 @@
 # execbuypxy.py
 # COUNTER-BUY (CBUY) TRIGGER
 #
-# CE rows held + no PE row -> run pxybuype <offset>
-# PE rows held + no CE row -> run pxybuyce <offset>
+# CE rows held + no PE row -> call the PE force-buy Python action with <offset>
+# PE rows held + no CE row -> call the CE force-buy Python action with <offset>
 #
 # Offset logic:
 #   ATM / ITM -> 0
 #   OTM       -> difference rounded to nearest 50
 #
-# The calculated offset is passed directly to the shell script.
+# The calculated offset is passed directly to the force-buy Python function.
 # No weekday adjustment or additional offset is applied.
 
 import os
@@ -206,7 +206,7 @@ def check_counter_leg(remaining_df):
     """
     remaining_df: rows still held after this cycle's target exits.
 
-    Returns the name of the script fired, or None.
+    Returns the configured counter action name, or None.
     """
 
     try:
