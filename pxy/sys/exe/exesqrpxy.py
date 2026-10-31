@@ -185,7 +185,7 @@ def exit_all_positions():
         start_cooldown()
         try:
             parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            script_path = os.path.join(parent_dir, "sysddmppxy.py")
+            script_path = os.path.join(parent_dir, "sysdmppxy.py")
             if os.path.exists(script_path):
                 subprocess.Popen([sys.executable, script_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
