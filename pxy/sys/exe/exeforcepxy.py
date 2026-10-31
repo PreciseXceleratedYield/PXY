@@ -30,7 +30,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TICKER,
     SYSCNFGPXY_TIMEZONE,
 )
-from sysdecisionpxy import exit_order_response_accepted
+from sysdcinpxy import exit_order_response_accepted
 
 # --- LOT SIZE LOGIC ---
 t = SYSCNFGPXY_TICKER.upper().strip()
