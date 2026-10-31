@@ -164,8 +164,8 @@ def print_dashboard(data):
     trnd, line = data["supertrend"], data["super_line"]
     if trnd == "BUY": st_c = Fore.GREEN + Style.BRIGHT
     elif trnd == "SELL": st_c = Fore.RED + Style.BRIGHT
-    elif trnd == "UP": st_c = Fore.LIGHTGREEN_EX
-    elif trnd == "DOWN": st_c = Fore.LIGHTRED_EX
+    elif trnd in {"BULL", "UP"}: st_c = Fore.LIGHTGREEN_EX
+    elif trnd in {"BEAR", "DOWN"}: st_c = Fore.LIGHTRED_EX
     else: st_c = Fore.YELLOW
     s_st = TOTAL_WIDTH - len(f"Super:{trnd}") - len(f"LINE:{line}")
     print(Fore.WHITE + "Super:" + st_c + trnd + " " * max(1, s_st) + Fore.WHITE + "LINE:" + Fore.CYAN + str(line))
