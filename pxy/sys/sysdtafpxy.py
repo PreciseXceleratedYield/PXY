@@ -9,6 +9,7 @@ import yfinance as yf
 
 from syscnfgpxy import (
     SYSCNFGPXY_TICKER as TICKER,
+    SYSMONPXY_TICKER,
     SYSCNFGPXY_TIMEZONE,
     SYSDTAFPXY_DEFAULT_INTERVAL,
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
@@ -325,6 +326,76 @@ def _fetch_yf_data_production(
     processed_df.attrs["data_fallback"] = False
 
     return processed_df
+
+
+
+def fetch_yf_data_for_monitor(
+    ticker=SYSMONPXY_TICKER,
+    period=None,
+    interval=SYSDTAFPXY_DEFAULT_INTERVAL,
+    target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
+):
+    """Fetch monitor-only Yahoo Finance data without production futures blending.
+
+    This path is intentionally separate from fetch_yf_data(), which remains
+    the NIFTY production ingestion path and retains its futures/DTAF behavior.
+    """
+    if not isinstance(ticker, str) or not ticker.strip():
+        raise ValueError("Monitor ticker must be a non-empty string.")
+    if (
+        isinstance(target_rows, bool)
+        or not isinstance(target_rows, int)
+        or target_rows < 1
+    ):
+        raise ValueError("target_rows must be a positive integer.")
+
+    ticker = ticker.strip()
+    buffer_rows = target_rows
+    ticker_obj = yf.Ticker(ticker)
+    df = pd.DataFrame()
+
+    periods = []
+    if period is not None:
+        periods.append(period)
+    periods.extend(
+        item for item in SYSDTAFPXY_FALLBACK_PERIODS
+        if item not in periods
+    )
+
+    for search_period in periods:
+        try:
+            candidate = ticker_obj.history(
+                period=search_period,
+                interval=interval,
+            )
+            if candidate is None or candidate.empty:
+                continue
+            candidate = candidate.dropna(
+                subset=["Open", "High", "Low", "Close"]
+            )
+            if len(candidate) >= buffer_rows:
+                df = candidate
+                break
+            if df.empty or len(candidate) > len(df):
+                df = candidate
+        except Exception:
+            continue
+
+    if df.empty:
+        return pd.DataFrame()
+
+    if not isinstance(df.index, pd.DatetimeIndex):
+        df.index = pd.to_datetime(df.index)
+
+    if df.index.tz is None:
+        df = df.tz_localize("UTC").tz_convert(TIMEZONE)
+    else:
+        df = df.tz_convert(TIMEZONE)
+
+    df = df.tail(target_rows).copy()
+    df.attrs["data_fallback"] = False
+    df.attrs["source_ticker"] = ticker
+    return df
 
 
 def fetch_yf_data(
