@@ -50,7 +50,6 @@ from sysdcinpxy import (
 )
 
 from exeomspxy import get_combined_data 
-from runclntpxy import get_session 
 from runexlckpxy import ledger_busy      # stand the counter-buy down while the ledger lock is held
 from runlilopxy import position_net_quantity
 
@@ -364,14 +363,16 @@ def place_exit_order(client, row):
         print(f"{Fore.RED}❌ Exit Order Error: {e}") 
         return None 
 
-def verify_and_exit(client, row): 
-    return _verify_and_exit_production(client, row)
+def verify_and_exit(client, row, positions_response=None): 
+    return _verify_and_exit_production(client, row, positions_response)
 
 
-def _verify_and_exit_production(client, row):
+def _verify_and_exit_production(client, row, positions_response=None):
     try:
-        symbol = str(row.get('symbol', '')) 
-        pos_res = client.positions() 
+        symbol = str(row.get('symbol', ''))
+        # Engine pipe passes its one positions snapshot. Keep direct-call
+        # compatibility for any standalone caller that omits it.
+        pos_res = positions_response if positions_response is not None else client.positions() 
         if not valid_exit_positions_response(pos_res):
             print(f"{Fore.RED}⚠️ Safety Block: Could not verify positions.") 
             return 
@@ -429,9 +430,10 @@ def run_snapshot():
                 except Exception as e:
                     print(f"{Fore.RED}❌ Square-off Error: {e}")
 
-    data = get_combined_data() 
-    df = data.get("active_orders", pd.DataFrame()) 
-    client = get_session() 
+    data = get_combined_data()
+    df = data.get("active_orders", pd.DataFrame())
+    client = data.get("broker_client")
+    positions_response = data.get("positions_snapshot")
     if data.get("error"):
         print(f"{Fore.RED}⚠️ Data error this cycle (see OMS DATA ERROR above). Skipping; dashboard left untouched.")
         return
@@ -482,7 +484,7 @@ def run_snapshot():
                     PNL_EXIT_MIN,
                 ):
                     print(f"{Fore.GREEN}🎯 Target Hit & PnL Met ({sym}): LTP {ltp} >= TGT {tgt} | PnL {pnl} >= {PNL_EXIT_MIN} [Execution Mode: ONE]")
-                    if verify_and_exit(client, r):
+                    if verify_and_exit(client, r, positions_response):
                         exited_keys.add(_lock_key(r))
             except Exception as e:
                 print(f"{Fore.RED}❌ Row evaluation error ({r.get('symbol', '?')}): {e}")
