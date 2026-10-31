@@ -17,7 +17,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
     OC2 and OHLC4 replace Close with the corresponding candle average.
     HYPER preserves the former DTAF mode-0 transformation.
-    TOAC creates a TSMA-open synthetic candle using actual market close.
+    TOAC matches the TSMA-open/custom-close Pine candle.
     HA applies the standard recursive Heikin-Ashi transformation.
     """
     valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TOAC"}
@@ -64,15 +64,22 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         return out
 
     if mode == "TOAC":
-        tsma = calculate_moving_average(
-            pd.Series(raw_close, index=out.index),
+        # Pine: ta.linreg(open, 7, 0)
+        tsma_open = calculate_moving_average(
+            pd.Series(raw_open, index=out.index),
             period=SYSSMAPXY_TSMA_PERIOD,
             variant="TSMA",
         ).to_numpy(dtype=float)
-        out["Open"] = tsma
-        out["Close"] = raw_close
-        out["High"] = np.maximum.reduce((raw_high, tsma, raw_close))
-        out["Low"] = np.minimum.reduce((raw_low, tsma, raw_close))
+
+        # Pine: candle_open = tsma_open
+        # Pine: candle_close = (tsma_open + raw close) / 2
+        candle_close = (tsma_open + raw_close) / 2.0
+
+        # Wickless synthetic candle: range is only between its open and close.
+        out["Open"] = tsma_open
+        out["Close"] = candle_close
+        out["High"] = np.maximum(tsma_open, candle_close)
+        out["Low"] = np.minimum(tsma_open, candle_close)
         return out
 
     # Standard Heikin-Ashi candles.
