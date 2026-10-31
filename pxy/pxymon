@@ -12,6 +12,7 @@ PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
     echo "[X] Could not locate the PXY application directory." >&2
     exit 1
 }
+pxy_activate_env || exit 1
 
 cd "$PXY_APP_DIR/sys" || { echo "Directory $PXY_APP_DIR/sys not found"; exit 1; }
 
