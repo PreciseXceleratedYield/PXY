@@ -15,19 +15,9 @@ from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     SYSDTAFPXY_FALLBACK_PERIODS,
     SYSDTAFPXY_FORCE_NIFTY_FUT,
-    SYSDTAFPXY_SELECTED_MODE,
 )
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
-
-
-# ==========================================================================
-# CENTRAL DTAF MODE CONFIGURATION
-# ==========================================================================
-# DTAF mode is controlled exclusively by syscnfgpxy.py.
-# Mode 0 preserves original OHLC after futures blending.
-# Mode 1 applies the DTAF OHLC transformation after futures blending.
-ACTIVE_MODE = SYSDTAFPXY_SELECTED_MODE
 
 
 # Explicitly enforce configured timezone mapping.
@@ -36,34 +26,16 @@ TIMEZONE = str(SYSCNFGPXY_TIMEZONE)
 FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 
 
-def apply_ohlc_transformation(
-    df, mode=ACTIVE_MODE, futures_price=None
-):
-    """Apply the configured DTAF OHLC transformation.
-
-    Mode 0:
-        Preserve the original OHLC values after optional futures blending.
-
-    Mode 1:
-        Replace historical closes with the previous candle's OHLC/4.
-        Preserve the latest candle's original Close.
-
-    If futures_price is provided, blend it with each OHLC field first.
-    """
-
-    if (
-        isinstance(mode, bool)
-        or not isinstance(mode, int)
-        or mode != ACTIVE_MODE
-    ):
-        raise ValueError(f"DTAF mode must be {ACTIVE_MODE}.")
+def apply_ohlc_transformation(df, futures_price=None):
+    """Return raw OHLC, optionally blended with the latest futures price."""
 
     if df is None or df.empty:
         return df
 
     out = df.copy()
 
-    # 1. Blend the futures price into each OHLC field, when supplied.
+    # Preserve the existing futures blending: average each OHLC field
+    # with the latest NIFTY futures price when a valid quote is supplied.
     if futures_price is not None:
         try:
             futures_price = float(futures_price)
@@ -80,48 +52,14 @@ def apply_ohlc_transformation(
         for column in ("Open", "High", "Low", "Close"):
             out[column] = (out[column] + futures_price) / 2.0
 
-    # 2. Apply configured DTAF mode.
-    if mode == 1:
-        if len(out) > 0:
-            # Calculate OHLC/4 from the current OHLC values.
-            ohlc_4 = (
-                out["Open"]
-                + out["High"]
-                + out["Low"]
-                + out["Close"]
-            ) / 4.0
-
-            # Preserve the latest candle's original Close.
-            latest_original_close = out["Close"].iloc[-1]
-
-            # Historical Close uses the previous candle's OHLC/4.
-            out["Close"] = ohlc_4.shift(1)
-
-            # Keep the latest candle's original Close.
-            out.loc[out.index[-1], "Close"] = latest_original_close
-
-            # Preserve the existing first-row edge-case handling.
-            if len(out) > 1 and pd.isna(
-                out.loc[out.index[0], "Close"]
-            ):
-                out.loc[out.index[0], "Close"] = ohlc_4.iloc[0]
-
-        return out
-
     return out
 
 
-def transform_market_data(
-    df, futures_price=None, mode=ACTIVE_MODE
-):
-    """Blend futures into OHLC, then apply the configured DTAF mode."""
-
-    if df is None or df.empty:
-        return df
+def transform_market_data(df, futures_price=None):
+    """Blend the latest futures price into raw OHLC without other transforms."""
 
     return apply_ohlc_transformation(
         df,
-        mode=mode,
         futures_price=futures_price,
     )
 
@@ -188,7 +126,7 @@ def _fetch_yf_data_production(
     interval=SYSDTAFPXY_DEFAULT_INTERVAL,
     target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
 ):
-    """Fetch OHLC data, blend futures, and apply the configured DTAF mode."""
+    """Fetch raw OHLC data and blend the latest futures price."""
 
     df = pd.DataFrame()
     buffer_rows = target_rows + 5
@@ -271,12 +209,6 @@ def _fetch_yf_data_production(
                 index=time_indices,
             )
 
-            # Apply the same configured transformation to fallback rows.
-            fallback_df = apply_ohlc_transformation(
-                fallback_df,
-                mode=ACTIVE_MODE,
-                futures_price=None,
-            )
 
             fallback_df.attrs["data_fallback"] = True
 
@@ -315,11 +247,10 @@ def _fetch_yf_data_production(
     else:
         df = df.tz_convert(TIMEZONE)
 
-    # Blend futures and apply the configured DTAF mode.
+    # Blend futures into the original OHLC fields; apply no other transform.
     processed_df = transform_market_data(
         df,
         futures_price=futures_price,
-        mode=ACTIVE_MODE,
     )
 
     processed_df = processed_df.tail(target_rows)
