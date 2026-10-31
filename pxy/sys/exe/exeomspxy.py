@@ -43,7 +43,7 @@ except Exception as e:
 
 # IMPORT LOCAL MODULES
 try:
-    from runlilopxy import process_lilo_orders, get_session, position_net_quantity
+    from runlilopxy import process_lilo_orders, get_session
     from runltpspxy import get_mid_price
 except ImportError as e:
     print(f"❌ Critical Import Error: {e}")
@@ -76,6 +76,9 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
         "market_snapshot": pd.DataFrame(),
         "active_orders": pd.DataFrame(),
         "market_snapshot_available": False,
+        "broker_client": None,
+        "positions_snapshot": None,
+        "positions_unverified": True,
     }
     if not process_lilo_orders or not get_session:
         print("❌ OMS unavailable: order-ledger or session dependency failed to load.")
@@ -122,36 +125,34 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
             if not client:
                 raise RuntimeError("Broker session unavailable; active positions are unverified.")
 
-            # A. Get unmatched orders from stateless LILO engine
+            # One fresh positions snapshot for this program call. All downstream
+            # OMS/LILO/exit/averaging logic must reuse this exact response.
+            pos_res = client.positions()
+            if (
+                not isinstance(pos_res, dict)
+                or str(pos_res.get("stat", "")).strip().lower() != "ok"
+                or str(pos_res.get("stCode", "")).strip() != "200"
+                or not isinstance(pos_res.get("data"), list)
+            ):
+                raise RuntimeError(f"Invalid Kotak positions response: {pos_res!r}")
+
+            combined["broker_client"] = client
+            combined["positions_snapshot"] = pos_res
+            combined["positions_unverified"] = False
+
+            # LILO reconciles open tags against the same program snapshot.
             active_df, _ = process_lilo_orders(
-                client, strict=True, risk_exit_signal=risk_exit_signal
+                client,
+                strict=True,
+                risk_exit_signal=risk_exit_signal,
+                positions_response=pos_res,
+                positions_fetched=True,
             )
 
             if not active_df.empty:
-                # B. Standardize casing before filtering or accessing symbol.
                 active_df.columns = [c.lower() for c in active_df.columns]
 
-                # C. Keep only symbols with verified positive broker holdings.
-                pos_res = client.positions()
-                if (
-                    isinstance(pos_res, dict)
-                    and str(pos_res.get("stat", "")).strip().lower() == "ok"
-                    and str(pos_res.get("stCode", "")).strip() == "200"
-                    and isinstance(pos_res.get("data"), list)
-                ):
-                    pos_df = pd.DataFrame(pos_res["data"])
-
-                    if pos_df.empty:
-                        active_df = active_df.iloc[0:0].copy()
-                    else:
-                        real_holdings = pos_df[
-                            pos_df.apply(position_net_quantity, axis=1) > 0
-                        ]["trdSym"].tolist()
-                        active_df = active_df[active_df["symbol"].isin(real_holdings)].copy()
-                else:
-                    raise RuntimeError(f"Invalid Kotak positions response: {pos_res!r}")
-
-            # D. Final Column Cleaning (Tag cleanup).
+            # Final Column Cleaning (Tag cleanup).
             if not active_df.empty:
                 active_df["tag"] = active_df["tag"].astype(str).str.split(".").str[0].replace("nan", "").str.strip()
                         
