@@ -81,7 +81,7 @@ if [ "$modified_successfully" = true ]; then
         echo "Exiting script."
         exit 0
     fi
-    git clone git@github.com:homekcbpcc/PXY.git
+    git clone git@github.com:PreciseXceleratedYield/PXY.git
     if [ $? -eq 0 ]; then
         echo -e "\e[32mCloned pxy repository successfully\e[0m"
         ((success_count++))
@@ -192,43 +192,17 @@ if [ "$modified_successfully" = true ]; then
         ((fail_count++))
     fi
 
-    # ---------------- LOGON SETUPS & ENVIRONMENT CONFIGURATIONS ----------------
-    echo -e "\nRunning final logon and user workspace adjustments..."
-
-    # Create a staging copy of the repository's bashrc
-    cp ~/PXY/pxy/sys/.bashrc /tmp/.pxy_bashrc
-
-    # Append configurations directly into the staged bashrc file
-    cat << 'EOF' >> /tmp/.pxy_bashrc
-
-# Force session redirection directly into user home space
-if [ "$PWD" != "$HOME" ]; then
-    cd "$HOME"
-fi
-
-# Run pxygo EXACTLY ONCE per boot session
-if [ ! -f "/dev/shm/pxygo_boot_done" ]; then
-    if command -v pxygo >/dev/null 2>&1; then
-        pxygo &
-        touch "/dev/shm/pxygo_boot_done"
-    fi
-fi
-EOF
-
-    # Install updated bash environment configurations directly over the old one
-    sudo cp /tmp/.pxy_bashrc ~/.bashrc
-    rm -f /tmp/.pxy_bashrc
-
-    if [ $? -eq 0 ]; then
-        echo -e "\e[32mConfigured pxygo execution via .bashrc: Success\e[0m"
+    # ---------------- PXY LOGIN CONFIGURATION ----------------
+    # Replace ~/.bashrc with the version maintained at the repository root.
+    if [ -f "$HOME/PXY/.bashrc" ]; then
+        install -m 0644 "$HOME/PXY/.bashrc" "$HOME/.bashrc"
+        echo -e "\\e[32mInstalled Git-managed ~/.bashrc: Success\\e[0m"
         ((success_count++))
     else
-        echo -e "\e[31mFailed to configure auto-run updates in .bashrc\e[0m"
+        echo -e "\\e[31mPXY .bashrc not found at $HOME/PXY/.bashrc\\e[0m"
         ((fail_count++))
+        exit 1
     fi
-
-    # Explicit final landing instruction to drop script execution interface into home folder
-    cd ~ || exit 1
 
     # ---------------- Summary ----------------
     echo -e "\nSummary:"
