@@ -1,5 +1,4 @@
 import sys
-import subprocess
 import traceback
 from pathlib import Path
 from datetime import datetime
@@ -34,6 +33,7 @@ try:
     from syspxy import get_all_data
     from runclntpxy import get_session
     from runpchkpxy import get_position_summary
+    from exeforcepxy import run_action
     from sysdcinpxy import (
         entry_blackout,
         entry_order_command,
@@ -112,17 +112,9 @@ def main():
             f"{Fore.GREEN}{Style.BRIGHT}"
             f"🟢 FRESH ENTRY: Firing command '{command}'..."
         )
-        command_path = PXY_DIR / command
-        if not command_path.is_file():
-            print(f"{Fore.RED}❌ Entry command not found: {command_path}")
-            return
-        try:
-            result = subprocess.run(["bash", str(command_path)], check=False)
-        except OSError as error:
-            print(f"{Fore.RED}❌ Could not run {command_path}: {error}")
-            return
-        if result.returncode != 0:
-            print(f"{Fore.RED}⚠️ {command} exited with status {result.returncode}.")
+        action = "1" if command == "pxybuyce" else "2"
+        if not run_action(action):
+            print(f"{Fore.RED}⚠️ Entry action {command} did not complete.")
 
         dprint("===== END =====", Fore.GREEN)
 
