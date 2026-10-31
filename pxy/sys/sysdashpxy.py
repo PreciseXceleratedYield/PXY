@@ -10,7 +10,9 @@ from sysdtafpxy import fetch_yf_data, fetch_yf_data_for_monitor
 from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS,
+    SYSCNFGPXY_MARKET_OPEN,
     SYSCNFGPXY_TIMEZONE,
+    SYSCNFGPXY_TRADING_DAY_END,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
 )
 from sysdthapxy import get_pxy_data, get_signal_depth_analysis
@@ -66,8 +68,16 @@ def get_full_snapshot(monitor=False):
     candle_age_seconds = (
         now_timestamp - candle_timestamp
     ).total_seconds()
+    market_time = now_timestamp.time()
+    is_exchange_session = (
+        now_timestamp.weekday() < 5
+        and SYSCNFGPXY_MARKET_OPEN
+        <= market_time
+        < SYSCNFGPXY_TRADING_DAY_END
+    )
     candle_is_stale = (
-        not is_futures_fallback
+        is_exchange_session
+        and not is_futures_fallback
         and (
             candle_age_seconds < 0
             or candle_age_seconds > SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS
