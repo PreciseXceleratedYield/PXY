@@ -19,6 +19,14 @@ SMA_PERIOD = syscnfgpxy.SYSSMAPXY_MA_PERIOD
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 
+# Resolve dashboard output from this module's location, not the launch directory.
+DEFAULT_CHART_OUTPUT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "web",
+    "webchrtpxy.json",
+)
+
+
 def get_market_trend(df: pd.DataFrame) -> str:
     """Return the same configured Supertrend classification used for entry."""
 
@@ -84,7 +92,7 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
 
 def export_supertrend_json(
     df: pd.DataFrame = None,
-    output_file="../web/webchrtpxy.json",
+    output_file=DEFAULT_CHART_OUTPUT,
 ):
     """Export structured historical data for chart visualizations."""
 
