@@ -1,6 +1,12 @@
 #!/bin/bash
 set -Eeuo pipefail
 
+# A web-triggered update restarts its own dashboard process; preserve its log
+# independently of the HTTP process that launched it.
+if [ "${PXY_UPDATE_FROM_WEB:-0}" = "1" ]; then
+    exec >> "$HOME/pxyupdate.log" 2>&1
+fi
+
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 if [ -f "$SCRIPT_DIR/pxyrslve" ]; then
     source "$SCRIPT_DIR/pxyrslve"
