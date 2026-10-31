@@ -467,11 +467,16 @@ def _process_lilo_orders_production(
         return pd.DataFrame(), pd.DataFrame() 
 
 
-def process_lilo_orders(client, strict=False, risk_exit_signal=None):
+def process_lilo_orders(
+    client, strict=False, risk_exit_signal=None,
+    positions_response=None, positions_fetched=False,
+):
     return _process_lilo_orders_production(
         client=client,
         strict=strict,
         risk_exit_signal=risk_exit_signal,
+        positions_response=positions_response,
+        positions_fetched=positions_fetched,
     )
 
 
