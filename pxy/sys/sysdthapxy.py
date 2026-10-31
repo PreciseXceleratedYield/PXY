@@ -113,84 +113,47 @@ def get_close_direction_series(closes):
 
 
 def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=None):
-    """Calculate canonical MKT signals and directional depths from DTHA data."""
+    """Calculate DTHA signal and directional depths using C0/C1 close comparisons."""
+    empty = {
+        "signal": "NONE",
+        "past_depth": "NA",
+        "ce_depth": 1,
+        "pe_depth": 1,
+        "previous_close": None,
+        "current_close": None,
+    }
+    if last_n <= 0:
+        return empty
+
     if include_running is None:
         include_running = SYSDTHAPXY_INCLUDE_RUNNING_CANDLE == "YES"
-    if last_n <= 0:
-        return {
-            "signal": "NONE",
-            "past_depth": "NA",
-            "ce_depth": 1,
-            "pe_depth": 1,
-            "previous_close": None,
-            "current_close": None,
-        }
 
     if df is None:
         df = fetch_yf_data()
     if df is None or df.empty or "Close" not in df.columns:
-        return {
-            "signal": "NONE",
-            "past_depth": "NA",
-            "ce_depth": 1,
-            "pe_depth": 1,
-            "previous_close": None,
-            "current_close": None,
-        }
+        return empty
 
-    df = transform_dtha_ohlc(df)
-    close_series = pd.to_numeric(df["Close"], errors="coerce")
-    evaluated_closes = close_series if include_running else close_series.iloc[:-1]
-    if SYSDTHAPXY_CANDLE_MODE == "TOAC":
-        candle_open = pd.to_numeric(df["Open"], errors="coerce")
-        candle_close = close_series
-        evaluated_open = candle_open if include_running else candle_open.iloc[:-1]
-        evaluated_close = candle_close if include_running else candle_close.iloc[:-1]
-        candle_colors = np.select(
-            [
-                evaluated_close.to_numpy() > evaluated_open.to_numpy(),
-                evaluated_close.to_numpy() < evaluated_open.to_numpy(),
-            ],
-            ["green", "red"],
-            default="flat",
-        )
-        directions = [
-            "UP" if color == "green"
-            else "DOWN" if color == "red"
-            else "FLAT"
-            for color in candle_colors
-        ]
-    else:
-        evaluated_directions = get_close_direction_series(close_series)
-        directions = (
-            evaluated_directions
-            if include_running
-            else evaluated_directions.iloc[:-1]
-        ).tolist()
+    transformed = transform_dtha_ohlc(df)
+    close_series = pd.to_numeric(transformed["Close"], errors="coerce")
+    evaluated_closes = (
+        close_series if include_running else close_series.iloc[:-1]
+    )
+    directions = get_close_direction_series(evaluated_closes).tolist()
 
-    closes = evaluated_closes
     signal = "NONE"
-
-    if SYSDTHAPXY_CANDLE_MODE == "TOAC" and len(directions) >= 2:
-        previous_color, current_color = directions[-2:]
-        if previous_color == "UP" and current_color == "UP":
-            signal = "BULL"
-        elif previous_color == "DOWN" and current_color == "DOWN":
-            signal = "BEAR"
-        elif previous_color == "UP" and current_color == "DOWN":
-            signal = "SELL"
-        elif previous_color == "DOWN" and current_color == "UP":
-            signal = "BUY"
-    elif len(closes) >= 3:
-        first_move, second_move = directions[-2:]
-        if first_move == "DOWN" and second_move == "UP":
-            signal = "BULL"
-        elif first_move == "UP" and second_move == "DOWN":
-            signal = "BEAR"
-        elif first_move == "UP" and second_move == "UP":
-            signal = "BULL"
-        elif first_move == "DOWN" and second_move == "DOWN":
-            signal = "BEAR"
+    # C0 is the latest evaluated candle. C1 is the candle immediately before it.
+    # Each candle's colour is its transformed Close versus the prior Close.
+    if len(directions) >= 3:
+        c1_direction, c0_direction = directions[-2:]
+        if c1_direction in {"UP", "DOWN"} and c0_direction in {"UP", "DOWN"}:
+            if c1_direction == "UP" and c0_direction == "UP":
+                signal = "BULL"
+            elif c1_direction == "DOWN" and c0_direction == "DOWN":
+                signal = "BEAR"
+            elif c1_direction == "UP" and c0_direction == "DOWN":
+                signal = "SELL"
+            elif c1_direction == "DOWN" and c0_direction == "UP":
+                signal = "BUY"
 
     current_direction = directions[-1] if directions else "UNKNOWN"
     current_depth = 0
@@ -203,7 +166,8 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
 
     current_streak_start = len(directions) - current_depth
     previous_direction = (
-        directions[current_streak_start - 1] if current_streak_start > 0 else "UNKNOWN"
+        directions[current_streak_start - 1]
+        if current_streak_start > 0 else "UNKNOWN"
     )
     past_depth = 0
     if previous_direction in {"UP", "DOWN"}:
@@ -223,9 +187,19 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
 
     ce_depth = current_depth if current_direction == "UP" else 1
     pe_depth = current_depth if current_direction == "DOWN" else 1
-    previous_close = float(closes.iloc[-2]) if len(closes) >= 2 else None
-    current_close = float(closes.iloc[-1]) if len(closes) >= 1 else None
-    signal_candle_time = str(closes.index[-1]) if len(closes) else None
+    previous_close = (
+        float(evaluated_closes.iloc[-2])
+        if len(evaluated_closes) >= 2 and pd.notna(evaluated_closes.iloc[-2])
+        else None
+    )
+    current_close = (
+        float(evaluated_closes.iloc[-1])
+        if len(evaluated_closes) >= 1 and pd.notna(evaluated_closes.iloc[-1])
+        else None
+    )
+    signal_candle_time = (
+        str(evaluated_closes.index[-1]) if len(evaluated_closes) else None
+    )
 
     return {
         "signal": signal,
@@ -264,31 +238,12 @@ def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
         df.loc[last_idx, "Low"] = min(live_tick["Low"], live_tick["Close"])
         df.loc[last_idx, "Close"] = live_tick["Close"]
 
-    # Apply the selected candle mode consistently before deriving direction.
+    # All modes use transformed C0 Close versus C1 Close.
     custom_df = transform_dtha_ohlc(df)
-    if SYSDTHAPXY_CANDLE_MODE == "TOAC":
-        custom_df["pxy_direction"] = np.select(
-            [
-                custom_df["Close"] > custom_df["Open"],
-                custom_df["Close"] < custom_df["Open"],
-            ],
-            ["UP", "DOWN"],
-            default="FLAT",
-        )
-    else:
-        custom_df["pxy_direction"] = get_close_direction_series(custom_df["Close"])
+    custom_df["pxy_direction"] = get_close_direction_series(custom_df["Close"])
     custom_df["pxy_color"] = custom_df["pxy_direction"].map(
         {"UP": "green", "DOWN": "red", "FLAT": "flat"}
     ).fillna("flat")
-
-    if custom_df["pxy_direction"].iloc[0] == "UNKNOWN":
-        first_change = custom_df["Close"].iloc[0] - custom_df["Open"].iloc[0]
-        first_color = (
-            "green" if first_change > 0
-            else "red" if first_change < 0
-            else "flat"
-        )
-        custom_df.iloc[0, custom_df.columns.get_loc("pxy_color")] = first_color
 
     final_df = custom_df.copy()
     pxy_close = final_df["Close"].copy()

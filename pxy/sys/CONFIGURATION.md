@@ -11,9 +11,11 @@ production launch path is `pxy/pxy` → `sysexepxy.py` → `exe/exepxy.py`; the
 combination, recorded as `SYSCNFGPXY_RELEASE_NAME`; it is not a separate
 runtime selector.
 
-- **Entry router:** `RSIG` (selected by `SYSENTRPXY_VARIANT`); `MKT` remains
-  available as the alternate router. Fresh-entry signals are gated by the
-  configured 13:16 IST cutoff.
+- **Signal channels:** DTHA, IN, and OUT each have an independent candle mode
+  selected by `SYSDTHAPXY_CANDLE_MODE`, `SYSINPXY_CANDLE_MODE`, and
+  `SYSOUTPXY_CANDLE_MODE`. IN generates entry signals; OUT generates
+  directional exit signals. MKT passes both through without additional filters.
+  Fresh-entry signals retain the configured 13:16 IST cutoff.
 - **Strategy/data candles:** `SYSDTAFPXY_SELECTED_MODE = 0`. DTAF retains the
   canonical OHLC candle structure and blends the latest futures price for
   signal input only. The separate chart display transform remains
@@ -138,9 +140,22 @@ values until deliberately restarted.
 
 ## Option strike selection
 
-`SYSENTRPXY_VARIANT` selects one of two entry routers: `MKT` or `RSIG`.
-In `MKT`, entry signals come from the GTIN pipeline and exit signals come
-from MKT. In `RSIG`, both entry and exit signals come from the RSIG pipeline.
+DTHA, IN, and OUT are independent signal channels. Each selects one of
+`RAW`, `OC2`, `HA`, `OHLC4`, `HYPER`, or `TOAC` through its own
+configuration setting. DTHA owns the single candle transformation engine;
+IN and OUT call that engine with their own selected modes.
+
+For every mode, candle colour is determined identically: the transformed
+Close of a candle is compared with the transformed Close of the immediately
+preceding candle. C0 is the latest evaluated candle (including the running
+candle when enabled), C1 is the preceding candle, and C2 is the candle before
+C1. The C0 colour is C0 Close versus C1 Close; the C1 colour is C1 Close versus
+C2 Close. IN maps Green/Green to BULL, Red/Red to BEAR, Green/Red to SELL,
+and Red/Green to BUY. Flat or unavailable required candle data returns NONE.
+OUT returns BULL for a Green C0 and BEAR for a Red C0; a flat C0 or unavailable
+C1/C2 returns NONE. MKT passes IN entry and OUT exit signals through unchanged.
+DTHA depth remains supporting market information for the dashboard and risk
+analysis, not an additional entry/exit filter.
 The router normalizes entry results to BUY/SELL and exit results to BULL/BEAR;
 invalid or unsupported results fail closed to NONE. Both variants respect the
 configured entry window and post-square-off cooldown.
@@ -304,8 +319,8 @@ network boundary.
 - `RUNEXIOPXY_READ_ATTEMPTS` is the total number of read attempts, while
   `RUNEXIOPXY_WRITE_RETRIES` is the number of extra attempts after the initial
   write. Read and write retry delays apply only between attempts.
-- The signal variant, ATR mode, chart transformation mode, run
-  risk action is validated at configuration import so unsupported values fail
+- The DTHA/IN/OUT candle modes, ATR mode, chart transformation mode, run
+  risk action are validated at configuration import so unsupported values fail
   visibly rather than silently selecting a fallback branch.
 
 ## Audit notes
