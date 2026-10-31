@@ -5,7 +5,7 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # ---- Pure Production Naming Alignment Imports ----
-from sysdtafpxy import fetch_yf_data
+from sysdtafpxy import fetch_yf_data_for_monitor
 from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
@@ -45,7 +45,7 @@ def run_pyc_file():
 # ================= CORE SNAPSHOT FUNCTION =================
 def get_full_snapshot():
     result = {}
-    chart_source_df = fetch_yf_data(target_rows=SYSSTRNDPXY_CHART_TARGET_ROWS)
+    chart_source_df = fetch_yf_data_for_monitor(target_rows=SYSSTRNDPXY_CHART_TARGET_ROWS)
     if chart_source_df is None or chart_source_df.empty:
         return None
 
