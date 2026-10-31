@@ -5,7 +5,7 @@ from colorama import Fore, Style, init
 init(autoreset=True)
 
 # ---- Pure Production Naming Alignment Imports ----
-from sysdtafpxy import fetch_yf_data_for_monitor
+from sysdtafpxy import fetch_yf_data, fetch_yf_data_for_monitor
 from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
@@ -43,9 +43,10 @@ def run_pyc_file():
             print(f"Error running {pyc_file}: {e}")
 
 # ================= CORE SNAPSHOT FUNCTION =================
-def get_full_snapshot():
+def get_full_snapshot(monitor=False):
     result = {}
-    chart_source_df = fetch_yf_data_for_monitor(target_rows=SYSSTRNDPXY_CHART_TARGET_ROWS)
+    data_fetch = fetch_yf_data_for_monitor if monitor else fetch_yf_data
+    chart_source_df = data_fetch(target_rows=SYSSTRNDPXY_CHART_TARGET_ROWS)
     if chart_source_df is None or chart_source_df.empty:
         return None
 
@@ -198,5 +199,7 @@ def print_dashboard(data):
 # ================= MAIN RUNNER ENGINE =================
 if __name__ == "__main__":
     run_pyc_file()
-    snapshot_data = get_full_snapshot()
+    snapshot_data = get_full_snapshot(
+        monitor=os.environ.get("PXY_MONITOR_MODE") == "1"
+    )
     print_dashboard(snapshot_data)
