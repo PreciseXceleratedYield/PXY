@@ -213,21 +213,28 @@ def position_net_quantity(position):
     )
 
 
-def _reconcile_open_with_broker(client, open_positions, strict=False):
-    """Trims the tag-matched open lots to what the broker really holds, BEFORE the risk ledger sees them.
-    A lot closed outside tag matching (manual sell, untagged square-off) would otherwise stay 'open':
-    it would be marked at live price, inflate open_rows (tighter trailing stop) and drift game P&L.
-    Symbols with net <= 0 are dropped; when the broker holds less than the open lots add up to,
-    the newest lots are kept. If broker positions are unavailable the lots are returned unchanged."""
+def _reconcile_open_with_broker(
+    client, open_positions, strict=False, positions_response=None,
+    positions_fetched=False,
+):
+    """Reconcile LILO against this program's single broker-position snapshot.
+
+    Engine pipes pass their existing snapshot. Standalone callers retain the
+    legacy behaviour of fetching positions when no snapshot was supplied.
+    """
     if not open_positions:
         return open_positions
-    try:
-        res = client.positions()
-    except Exception as e:
-        if strict:
-            raise RuntimeError(f"Broker positions call failed during reconciliation: {e}") from e
-        print(f"⚠️ Ledger reconcile skipped (positions call failed: {e}).")
-        return open_positions
+    if positions_fetched:
+        res = positions_response
+    else:
+        try:
+            res = client.positions()
+        except Exception as e:
+            if strict:
+                raise RuntimeError(f"Broker positions call failed during reconciliation: {e}") from e
+            print(f"⚠️ Ledger reconcile skipped (positions call failed: {e}).")
+            return open_positions
+
 
     if (
         not isinstance(res, dict)
@@ -286,7 +293,7 @@ def _is_no_data_order_report_response(response):
     )
 
 
-def _process_lilo_orders_production(client, strict=False, risk_exit_signal=None):
+def _process_lilo_orders_production(\n    client, strict=False, risk_exit_signal=None,\n    positions_response=None, positions_fetched=False,\n):
     try: 
         # MASTER RISK LEDGER hook 1: once-a-day stale web-cache override (runs before any data guard)
         try:
@@ -413,7 +420,7 @@ def _process_lilo_orders_production(client, strict=False, risk_exit_signal=None)
                         "PNL": int((live_val - b["prc"]) * b["qty"]) 
                     }) 
 
-        open_positions = _reconcile_open_with_broker(client, open_positions, strict=strict)
+        open_positions = _reconcile_open_with_broker(\n            client, open_positions, strict=strict,\n            positions_response=positions_response,\n            positions_fetched=positions_fetched,\n        )
         open_df = pd.DataFrame(open_positions) 
         closed_df = pd.DataFrame(closed_matches) 
 
