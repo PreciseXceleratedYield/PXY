@@ -134,12 +134,24 @@ def get_signal(df, mode=SYSDTHAPXY_CANDLE_MODE):
             else "FLAT"
         )
 
-    if previous == "UP" and current == "UP":
-        return "BULL"
-    if previous == "DOWN" and current == "DOWN":
-        return "BEAR"
-    if previous == "UP" and current == "DOWN":
-        return "SELL"
-    if previous == "DOWN" and current == "UP":
-        return "BUY"
+    if mode == "TOAC":
+        if previous == "UP" and current == "UP":
+            return "BULL"
+        if previous == "DOWN" and current == "DOWN":
+            return "BEAR"
+        if previous == "UP" and current == "DOWN":
+            return "SELL"
+        if previous == "DOWN" and current == "UP":
+            return "BUY"
+    else:
+        # Preserve the existing DTHA signal interpretation for these modes.
+        if previous == "DOWN" and current == "UP":
+            return "BULL"
+        if previous == "UP" and current == "DOWN":
+            return "BEAR"
+        if previous == "UP" and current == "UP":
+            return "BULL"
+        if previous == "DOWN" and current == "DOWN":
+            return "BEAR"
+
     return "NONE"
