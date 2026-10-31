@@ -1,6 +1,7 @@
 # run_pyc.py
 import runpy
 import os
+import pandas as pd
 from colorama import Fore, Style, init
 init(autoreset=True)
 
@@ -8,6 +9,8 @@ init(autoreset=True)
 from sysdtafpxy import fetch_yf_data, fetch_yf_data_for_monitor
 from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
+    SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS,
+    SYSCNFGPXY_TIMEZONE,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
 )
 from sysdthapxy import get_pxy_data, get_signal_depth_analysis
@@ -50,8 +53,30 @@ def get_full_snapshot(monitor=False):
         return None
 
     master_df = chart_source_df.tail(SYSDTAFPXY_DEFAULT_TARGET_ROWS).copy()
-    result["market_data_available"] = not master_df.attrs.get("data_fallback", False)
-        
+    is_futures_fallback = bool(master_df.attrs.get("data_fallback", False))
+    result["market_data_available"] = not is_futures_fallback
+
+    # Yahoo timestamps are candle-start times. Measure the age in configured
+    # IST; this is warning-only and deliberately does not gate any signal.
+    candle_timestamp = pd.Timestamp(master_df.index[-1])
+    if candle_timestamp.tzinfo is None:
+        candle_timestamp = candle_timestamp.tz_localize("UTC")
+    candle_timestamp = candle_timestamp.tz_convert(SYSCNFGPXY_TIMEZONE)
+    now_timestamp = pd.Timestamp.now(tz=SYSCNFGPXY_TIMEZONE)
+    candle_age_seconds = (
+        now_timestamp - candle_timestamp
+    ).total_seconds()
+    candle_is_stale = (
+        not is_futures_fallback
+        and (
+            candle_age_seconds < 0
+            or candle_age_seconds > SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS
+        )
+    )
+    result["market_data_timestamp"] = candle_timestamp.isoformat()
+    result["market_data_age_seconds"] = round(candle_age_seconds, 1)
+    result["market_data_stale"] = bool(candle_is_stale)
+
     # Enforce strict single source of truth across downstream layout components
     result["candle_visual"] = get_candle_visual(df=master_df)
 
