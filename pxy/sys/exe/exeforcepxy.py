@@ -2,7 +2,6 @@
 import sys
 import asyncio
 import os
-import subprocess
 from pathlib import Path
 from datetime import datetime
 from colorama import Fore, init, Style
@@ -106,13 +105,13 @@ def run_action(choice, offset_override=None, show_funds=True):
         return False
 
     elif choice == "3":
-        print(f"{Fore.YELLOW}🔄 Triggering Squareoff Script...")
-        target_script = HERE / "exesqrpxy.py"
+        print(f"{Fore.YELLOW}🔄 Triggering Squareoff...")
+        try:
+            from exesqrpxy import exit_all_positions
 
-        if target_script.exists():
-            subprocess.run([sys.executable, str(target_script)])
-        else:
-            print(f"{Fore.RED}❌ File not found: {target_script}")
+            exit_all_positions("")
+        except Exception as error:
+            print(f"{Fore.RED}❌ Square-off failed: {error}")
 
         return True
 
