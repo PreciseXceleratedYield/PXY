@@ -34,6 +34,38 @@ has_web_process() {
     pgrep -f 'node [p]xy\.js' >/dev/null 2>&1
 }
 
+web_service_ready() {
+    has_web_process || return 1
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsS --max-time 2 http://127.0.0.1/hostname >/dev/null 2>&1 \
+            || curl -fsS --max-time 2 http://127.0.0.1:8080/hostname >/dev/null 2>&1
+    else
+        return 0
+    fi
+}
+
+wait_for_web_ready() {
+    local i
+    for ((i=0; i<10; i++)); do
+        if tmux has-session -t pxy-web 2>/dev/null && web_service_ready; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
+wait_for_engine_ready() {
+    local i
+    for ((i=0; i<10; i++)); do
+        if tmux has-session -t pxy-engine 2>/dev/null && has_engine_process; then
+            return 0
+        fi
+        sleep 1
+    done
+    return 1
+}
+
 wait_for_session_exit() {
     local session="$1"
     local seconds="$2"
@@ -78,11 +110,10 @@ start_services() {
             echo "[X] Could not create pxy-web tmux session." >&2
             status=1
         else
-            sleep 2
-            if tmux has-session -t pxy-web 2>/dev/null && has_web_process; then
-                echo "[✔] Web dashboard is running."
+            if wait_for_web_ready; then
+                echo "[✔] Web dashboard is responding on HTTP."
             else
-                echo "[X] Web dashboard failed to start; inspect tmux capture-pane -t pxy-web." >&2
+                echo "[X] Web dashboard failed its HTTP/process check; inspect tmux capture-pane -t pxy-web." >&2
                 status=1
             fi
         fi
@@ -103,11 +134,10 @@ start_services() {
             echo "[X] Could not create pxy-engine tmux session." >&2
             status=1
         else
-            sleep 2
-            if tmux has-session -t pxy-engine 2>/dev/null && has_engine_process; then
-                echo "[✔] Trading engine is running."
+            if wait_for_engine_ready; then
+                echo "[✔] Trading engine process is running in tmux."
             else
-                echo "[X] Trading engine failed to start; inspect tmux capture-pane -t pxy-engine." >&2
+                echo "[X] Trading engine failed its process check; inspect tmux capture-pane -t pxy-engine." >&2
                 status=1
             fi
         fi
