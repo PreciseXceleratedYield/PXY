@@ -4,9 +4,9 @@ import warnings
 import numpy as np
 import pandas as pd
 import syscnfgpxy
-from syssmapxy import calculate_moving_average
-from systsmpxy import calculate_tsma
-from sysstrnpxy import calculate_supertrend as calculate_st
+from syssmapxy import calculate_moving_average, get_sma_signal
+from systsmpxy import calculate_tsma, get_tsma
+from sysstrnpxy import calculate_supertrend as calculate_st, get_market_trend
 
 TIMEZONE = syscnfgpxy.SYSCNFGPXY_TIMEZONE
 TSMA_PERIOD = syscnfgpxy.SYSSMAPXY_TSMA_PERIOD
@@ -57,11 +57,12 @@ def get_indicator_signals(df: pd.DataFrame) -> dict:
         df = calculate_indicators(df)
     if df is None or df.empty:
         return {"tsma": "NA", "sma": "NA", "st": "SIDE"}
-    latest = df.iloc[-1]
+    tsma_result = get_tsma(df, period=TSMA_PERIOD)
+    sma_result = get_sma_signal(df, period=SMA_PERIOD)
     return {
-        "tsma": str(latest.get("TSMA_Trend", "NA")),
-        "sma": str(latest.get("SMA_Trend", "NA")),
-        "st": str(latest.get("ST_Trend", "SIDE")),
+        "tsma": tsma_result.get("status", "NA"),
+        "sma": sma_result.get("status", "NA"),
+        "st": get_market_trend(df),
     }
 
 
