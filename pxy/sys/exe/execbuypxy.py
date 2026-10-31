@@ -19,7 +19,6 @@ import time
 import subprocess
 import pandas as pd
 
-from datetime import datetime
 from colorama import Fore, Style
 
 from syscnfgpxy import (
@@ -27,7 +26,6 @@ from syscnfgpxy import (
     EXECBUYPXY_CUTOFF,
     EXECBUYPXY_DEBUG_ENABLED,
     EXECBUYPXY_LOCK_KEEP_SECS,
-    EXECBUYPXY_MAX_PER_DAY,
     EXECBUYPXY_SCRIPTS,
     EXECBUYPXY_USE_DYNAMIC_STRIKE,
     EXETGTPXY_EXIT_KEY_COLUMN,
@@ -37,7 +35,6 @@ from syscnfgpxy import (
 )
 
 from sysdcinpxy import (
-    counter_leg_permission_status,
     counter_leg_script,
 )
 
@@ -50,8 +47,6 @@ CBUY_CUTOFF = EXECBUYPXY_CUTOFF
 CBUY_SCRIPTS = EXECBUYPXY_SCRIPTS
 
 CBUY_LOCK_FILE_NAME = ".cbuy_lock.json"
-CBUY_MAX_PER_DAY = EXECBUYPXY_MAX_PER_DAY
-CBUY_COUNT_FILE_NAME = ".cbuy_count.json"
 CBUY_LOCK_KEEP_SECS = EXECBUYPXY_LOCK_KEEP_SECS
 
 EXIT_KEY_COLUMN = EXETGTPXY_EXIT_KEY_COLUMN
@@ -64,13 +59,6 @@ _LOCK_FILE = os.path.join(
     CBUY_LOCK_FILE_NAME,
 )
 
-_COUNT_FILE = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    CBUY_COUNT_FILE_NAME,
-)
-
-_IST = SYSCNFGPXY_TIMEZONE
-_cap_warned = False
 
 
 def debug_log(msg, color=Fore.BLUE):
@@ -150,50 +138,6 @@ def _find_script(name):
 
     return shutil.which(name)
 
-
-def _today():
-    return datetime.now(_IST).strftime("%Y-%m-%d")
-
-
-def _fires_today():
-    """Counter-buy launches already made today."""
-
-    try:
-        if os.path.exists(_COUNT_FILE):
-            with open(_COUNT_FILE, "r") as fh:
-                data = json.load(fh)
-
-            if (
-                isinstance(data, dict)
-                and data.get("date") == _today()
-            ):
-                return int(data.get("count", 0))
-
-    except Exception:
-        pass
-
-    return 0
-
-
-def _count_fire():
-    """Adds one launch to today's count."""
-
-    try:
-        tmp = _COUNT_FILE + ".tmp"
-
-        with open(tmp, "w") as fh:
-            json.dump(
-                {
-                    "date": _today(),
-                    "count": _fires_today() + 1,
-                },
-                fh,
-            )
-
-        os.replace(tmp, _COUNT_FILE)
-
-    except Exception:
-        pass
 
 
 # ---------------- strike calculation ----------------
@@ -363,53 +307,27 @@ def check_counter_leg(remaining_df):
             safety_cooldown,
         )
 
-        # Preserve existing counter-buy permission behaviour.
-        launches_today = 0
-
-        permission = counter_leg_permission_status(
-            now,
-            CBUY_CUTOFF,
-            locked,
-            launches_today,
-            CBUY_MAX_PER_DAY,
-            str(CBUY_ACTION).upper().strip() == "YES",
-        )
-
-        if permission == "cutoff":
+        if now >= CBUY_CUTOFF:
             debug_log(
                 f"Counter check: past {CBUY_CUTOFF}; "
                 f"not firing {script_name}."
             )
             return None
 
-        if permission == "locked":
+        if locked:
             debug_log(
                 f"Counter check: {script_name} already fired "
                 f"within {CBUY_LOCK_SECS}s."
             )
             return None
 
-        global _cap_warned
-
-        if permission == "daily_limit":
-
-            if not _cap_warned:
-                _cap_warned = True
-
-                print(
-                    f"{Fore.RED}🛑 Counter-buy daily cap reached "
-                    f"({CBUY_MAX_PER_DAY} launches); "
-                    f"not firing {script_name}."
-                )
-
-            return None
 
         print(
             f"{Fore.YELLOW}⚠️ Exit signal ({signal}): "
             f"remaining {held} rows with NO {counter} leg."
         )
 
-        if permission == "passive":
+        if str(CBUY_ACTION).upper().strip() != "YES":
 
             print(
                 f"{Fore.BLUE}{Style.BRIGHT}"
@@ -443,9 +361,6 @@ def check_counter_leg(remaining_df):
 
         # ---------------- launch ----------------
 
-        _mark_lock(lock_key)
-        _count_fire()
-
         subprocess.Popen(
             [
                 "bash",
@@ -456,6 +371,8 @@ def check_counter_leg(remaining_df):
             stderr=subprocess.DEVNULL,
             start_new_session=True,
         )
+
+        _mark_lock(lock_key)
 
         print(
             f"{Fore.MAGENTA}{Style.BRIGHT}"
