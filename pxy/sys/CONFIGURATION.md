@@ -138,7 +138,7 @@ rapid same-size edits are not masked by stale Python bytecode. Saving does not
 restart the engine, and already-running processes continue using imported
 values until deliberately restarted.
 
-## Option strike selection
+## Signal channels
 
 DTHA, IN, and OUT are independent signal channels. Each selects one of
 `RAW`, `OC2`, `HA`, `OHLC4`, `HYPER`, or `TOAC` through its own
