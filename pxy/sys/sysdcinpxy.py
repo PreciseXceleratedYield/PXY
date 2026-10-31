@@ -117,23 +117,6 @@ def counter_leg_allowed(market_snapshot_available, positions_unverified, ledger_
     )
 
 
-def counter_leg_permission_status(
-    now,
-    cutoff,
-    lock_is_recent,
-    launches_today,
-    daily_limit,
-    action_enabled,
-):
-    if now >= cutoff:
-        return "cutoff"
-    if lock_is_recent:
-        return "locked"
-    if daily_limit > 0 and launches_today >= daily_limit:
-        return "daily_limit"
-    if not action_enabled:
-        return "passive"
-    return "allowed"
 
 
 def averaging_snapshot_status(data_error, positions_unverified, has_active_rows):
