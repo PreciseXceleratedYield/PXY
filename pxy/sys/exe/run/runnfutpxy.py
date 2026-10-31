@@ -166,7 +166,7 @@ def cached_contract_valid(row, current_expiry):
         except ValueError:
             return False
 
-    return cached_expiry.date() >= current_expiry.date()
+    return cached_expiry.date() == current_expiry.date()
 
 
 # ============================================================
