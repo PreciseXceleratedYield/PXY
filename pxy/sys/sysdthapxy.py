@@ -6,7 +6,9 @@ from syscnfgpxy import (
     SYSDTHAPXY_CANDLE_MODE,
     SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
     SYSDPTPXY_LAST_N,
+    SYSSMAPXY_TSMA_PERIOD,
 )
+from syssmapxy import calculate_moving_average
 from sysdtafpxy import fetch_yf_data
 
 
@@ -15,12 +17,13 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
     OC2 and OHLC4 replace Close with the corresponding candle average.
     HYPER preserves the former DTAF mode-0 transformation.
+    TOAC creates a TSMA-open synthetic candle using actual market close.
     HA applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER"}
+    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TOAC"}
     if mode not in valid_modes:
         raise ValueError(
-            "DTHA mode must be RAW, OC2, HA, OHLC4, or HYPER."
+            "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, or TOAC."
         )
 
     if df is None or df.empty:
@@ -58,6 +61,18 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         )
         out["Open"] = raw_close
         out["Close"] = hyper_close
+        return out
+
+    if mode == "TOAC":
+        tsma = calculate_moving_average(
+            pd.Series(raw_close, index=out.index),
+            period=SYSSMAPXY_TSMA_PERIOD,
+            variant="TSMA",
+        ).to_numpy(dtype=float)
+        out["Open"] = tsma
+        out["Close"] = raw_close
+        out["High"] = np.maximum.reduce((raw_high, tsma, raw_close))
+        out["Low"] = np.minimum.reduce((raw_low, tsma, raw_close))
         return out
 
     # Standard Heikin-Ashi candles.
@@ -126,16 +141,47 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
     df = transform_dtha_ohlc(df)
     close_series = pd.to_numeric(df["Close"], errors="coerce")
     evaluated_closes = close_series if include_running else close_series.iloc[:-1]
-    evaluated_directions = get_close_direction_series(close_series)
-    directions = (
-        evaluated_directions
-        if include_running
-        else evaluated_directions.iloc[:-1]
-    ).tolist()
+    if SYSDTHAPXY_CANDLE_MODE == "TOAC":
+        candle_open = pd.to_numeric(df["Open"], errors="coerce")
+        candle_close = close_series
+        evaluated_open = candle_open if include_running else candle_open.iloc[:-1]
+        evaluated_close = candle_close if include_running else candle_close.iloc[:-1]
+        candle_colors = np.select(
+            [
+                evaluated_close.to_numpy() > evaluated_open.to_numpy(),
+                evaluated_close.to_numpy() < evaluated_open.to_numpy(),
+            ],
+            ["green", "red"],
+            default="flat",
+        )
+        directions = [
+            "UP" if color == "green"
+            else "DOWN" if color == "red"
+            else "FLAT"
+            for color in candle_colors
+        ]
+    else:
+        evaluated_directions = get_close_direction_series(close_series)
+        directions = (
+            evaluated_directions
+            if include_running
+            else evaluated_directions.iloc[:-1]
+        ).tolist()
+
     closes = evaluated_closes
     signal = "NONE"
 
-    if len(closes) >= 3:
+    if SYSDTHAPXY_CANDLE_MODE == "TOAC" and len(directions) >= 2:
+        previous_color, current_color = directions[-2:]
+        if previous_color == "UP" and current_color == "UP":
+            signal = "BULL"
+        elif previous_color == "DOWN" and current_color == "DOWN":
+            signal = "BEAR"
+        elif previous_color == "UP" and current_color == "DOWN":
+            signal = "SELL"
+        elif previous_color == "DOWN" and current_color == "UP":
+            signal = "BUY"
+    elif len(closes) >= 3:
         first_move, second_move = directions[-2:]
         if first_move == "DOWN" and second_move == "UP":
             signal = "BULL"
@@ -220,7 +266,17 @@ def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
 
     # Apply the selected candle mode consistently before deriving direction.
     custom_df = transform_dtha_ohlc(df)
-    custom_df["pxy_direction"] = get_close_direction_series(custom_df["Close"])
+    if SYSDTHAPXY_CANDLE_MODE == "TOAC":
+        custom_df["pxy_direction"] = np.select(
+            [
+                custom_df["Close"] > custom_df["Open"],
+                custom_df["Close"] < custom_df["Open"],
+            ],
+            ["UP", "DOWN"],
+            default="FLAT",
+        )
+    else:
+        custom_df["pxy_direction"] = get_close_direction_series(custom_df["Close"])
     custom_df["pxy_color"] = custom_df["pxy_direction"].map(
         {"UP": "green", "DOWN": "red", "FLAT": "flat"}
     ).fillna("flat")
