@@ -1,8 +1,11 @@
 """PXY independent entry-signal channel (IN)."""
 
+from datetime import datetime, time as dt_time
+
 import pandas as pd
 
 from syscnfgpxy import (
+    SYSCNFGPXY_TIMEZONE,
     SYSINPXY_CANDLE_MODE,
     SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
 )
@@ -13,6 +16,10 @@ from sysdthapxy import get_close_direction_series, transform_dtha_ohlc
 def get_signal(df=None):
     """Return BULL/BEAR for continuation, BUY/SELL for a flip, else NONE."""
     try:
+        # IN must remain inactive through 09:17:00 IST.
+        if datetime.now(SYSCNFGPXY_TIMEZONE).time() <= dt_time(9, 17):
+            return "NONE"
+
         if df is None:
             df = fetch_yf_data()
         if df is None or df.empty or "Close" not in df.columns:
