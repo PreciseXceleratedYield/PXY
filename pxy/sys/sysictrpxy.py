@@ -99,10 +99,26 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file=DEFAULT_CHART_OU
             "sma_trend": str(row.get("SMA_Trend", "NA")),
             "tsma_trend": str(row.get("TSMA_Trend", "NA")),
         })
-    if os.path.dirname(output_file):
-        os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    with open(output_file, "w", encoding="utf-8") as f:
-        json.dump(output, f, indent=2)
+    output_dir = os.path.dirname(output_file) or "."
+    os.makedirs(output_dir, exist_ok=True)
+    temporary_file = None
+    try:
+        import tempfile
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=output_dir,
+            prefix=f".{os.path.basename(output_file)}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_file = handle.name
+            json.dump(output, handle, indent=2)
+        os.replace(temporary_file, output_file)
+        temporary_file = None
+    finally:
+        if temporary_file and os.path.exists(temporary_file):
+            os.unlink(temporary_file)
     return output
 
 
