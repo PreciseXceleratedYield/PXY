@@ -6,7 +6,6 @@ from colorama import init, Fore, Style
 import sys
 from pathlib import Path
 import os  # ✅ Kept for screen clearing
-import threading
 
 # ---------------- INIT ----------------
 init(autoreset=True)
@@ -19,7 +18,6 @@ for path in (RUN_DIR, HERE, SYS_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from runnfutpxy import run_forever
 from sysexepxy import send_telegram
 
 # Component failures are reported periodically; they never stop the engine.
@@ -117,6 +115,7 @@ def run_market_cycle():
     """Run one production iteration with maximum exit priority."""
     global ENGINE_ITERATION
     ENGINE_ITERATION += 1
+    safe_run(RUN_DIR / "runnfutpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeentrpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
@@ -131,22 +130,9 @@ def main():
     print("\n🚀 INIT: main market loop starting now [SIMPLE MODE ONLY] 📡")
     loop_counter = 1
 
-    # Start one persistent NIFTY futures feed before any signal calculation.
-    # The first-cycle event preserves the old startup ordering: initial entry
-    # processing begins only after the updater has attempted its first fetch.
-    futures_ready = threading.Event()
-    futures_thread = threading.Thread(
-        target=run_forever,
-        args=(futures_ready, lambda error=None: (
-            _record_component_recovery("runnfutpxy.py") if error is None
-            else _record_component_failure("runnfutpxy.py", error)
-        )),
-        name="pxy-nifty-futures",
-        daemon=True,
-    )
-    futures_thread.start()
-    if not futures_ready.wait(timeout=30):
-        print("Warning: NIFTY futures feed startup is taking longer than 30 seconds.")
+    # Obtain one synchronous FUT quote before any startup signal/trading pass.
+    # DTAF decides whether to use it or fall back to Yahoo OHLC.
+    safe_run(RUN_DIR / "runnfutpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
 
     parent_scripts = [
         HERE.parent / "sysdashpxy.py",
