@@ -87,16 +87,8 @@ if SYSENTRPXY_VARIANT not in {"MKT", "RSIG"}:
 SYSENTRPXY_ST_START = dt_time(16, 0)
 
 # Data ingestion, chart generation, and signal calculation.
-# DTAF mode is centrally selected here; no separate mode switch exists in DTAF.
-# Mode 0 preserves original OHLC after futures blending; Mode 1 applies DTAF.
+# DTAF always retains raw OHLC; the futures blend is handled in sysdtafpxy.py.
 SYSDTAFPXY_FORCE_NIFTY_FUT = False
-SYSDTAFPXY_SELECTED_MODE = 0
-if (
-    isinstance(SYSDTAFPXY_SELECTED_MODE, bool)
-    or not isinstance(SYSDTAFPXY_SELECTED_MODE, int)
-    or SYSDTAFPXY_SELECTED_MODE not in {0, 1}
-):
-    raise ValueError("SYSDTAFPXY_SELECTED_MODE must be 0 or 1.")
 SYSDTAFPXY_DEFAULT_INTERVAL = "1m"
 SYSDTAFPXY_DEFAULT_TARGET_ROWS = 60
 SYSDTAFPXY_FALLBACK_PERIODS = ("1d", "5d", "7d")
