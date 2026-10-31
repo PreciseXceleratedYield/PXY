@@ -15,6 +15,9 @@ PXY_APP_DIR="$(pxy_resolve_app_dir "$SCRIPT_DIR")" || {
 
 cd "$PXY_APP_DIR/sys" || { echo "Directory $PXY_APP_DIR/sys not found"; exit 1; }
 
+# Isolate BTC-USD testing to this monitor process only.
+export PXY_MONITOR_MODE=1
+
 # Optional: activate virtual environment if needed
 # source ~/pxy/env/bin/activate
 
