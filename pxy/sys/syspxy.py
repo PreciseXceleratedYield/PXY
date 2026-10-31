@@ -2,16 +2,69 @@
 # syspxy.py
 import json
 import os
+import time
+from pathlib import Path
 from datetime import datetime
 
+from sysexepxy import send_telegram
+from syscnfgpxy import SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS
 from sysdashpxy import get_full_snapshot
 from sysictrpxy import export_supertrend_json
+
+
+def _notify_stale_market_data(core):
+    """Send a throttled warning; this function never changes engine/trading state."""
+    state_file = (
+        Path(__file__).resolve().parent
+        / "exe"
+        / "run"
+        / ".yahoo_freshness_alert.json"
+    )
+
+    if not core.get("market_data_stale", False):
+        try:
+            state_file.unlink(missing_ok=True)
+        except OSError:
+            pass
+        return
+
+    now_epoch = time.time()
+    last_alert_epoch = 0.0
+    try:
+        with state_file.open("r", encoding="utf-8") as handle:
+            state = json.load(handle)
+        last_alert_epoch = float(state.get("last_alert_epoch", 0.0))
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        pass
+
+    if now_epoch - last_alert_epoch < SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS:
+        return
+
+    age = core.get("market_data_age_seconds")
+    candle_time = core.get("market_data_timestamp", "unknown")
+    send_telegram(
+        "⚠️ PXY MARKET DATA WARNING\n"
+        "Yahoo Finance 1-minute candle is stale or future-dated.\n"
+        f"Last candle (IST): {candle_time}\n"
+        f"Candle age: {age} seconds\n"
+        "Engine continues running; no engine stop or order action taken."
+    )
+
+    try:
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        temporary_file = state_file.with_suffix(".tmp")
+        with temporary_file.open("w", encoding="utf-8") as handle:
+            json.dump({"last_alert_epoch": now_epoch}, handle)
+        os.replace(temporary_file, state_file)
+    except OSError as error:
+        print(f"Warning: Could not persist Yahoo freshness alert state: {error}")
 
 
 def get_all_data():
 
     # -------- CORE --------
     core = get_full_snapshot() or {}
+    _notify_stale_market_data(core)
 
     # -------- RUN TREND CHART GENERATION FROM THE SAME SNAPSHOT --------
     export_supertrend_json(
