@@ -156,22 +156,16 @@ OUT returns BULL for a Green C0 and BEAR for a Red C0; a flat C0 or unavailable
 C1/C2 returns NONE. MKT routes IN continuation BULL/BEAR as BUY/SELL execution actions, preserves IN flip BUY/SELL actions, and passes OUT BULL/BEAR/NONE through unchanged.
 DTHA depth remains supporting market information for the dashboard and risk
 analysis, not an additional entry/exit filter.
-The router normalizes entry results to BUY/SELL and exit results to BULL/BEAR;
-invalid or unsupported results fail closed to NONE. Both variants respect the
-configured entry window and post-square-off cooldown.
+The MKT channel normalizes IN continuation states to BUY/SELL execution
+actions; invalid or unsupported results fail closed to NONE. The entry router
+retains the configured entry window and post-square-off cooldown.
 `SYSDTAFPXY_SELECTED_MODE` is fixed to `1` and represents the single
 canonical DTAF candle transform. In this mode the dataset keeps the raw OHLC
 shape and the latest NIFTY futures price is averaged into each OHLC field only
 for signal input. The separate chart candle transform remains controlled by
 `SYSPLCHRTPXY_OHLC_MODE`. If a futures quote is unavailable, DTAF falls back to
 the historical OHLC values directly without switching modes.
-DTHA, IN, and OUT each apply their configured candle mode independently.
-IN classifies the C1-to-C0 colour transition; MKT converts continuation states
-BULL/BEAR to the execution actions BUY/SELL and passes flip actions BUY/SELL
-through. OUT supplies only the current directional state (BULL/BEAR/NONE).
-DTHA supplies transformed close-to-close direction and CE/PE streak depths
-for the dashboard and risk analysis. Flat closes
-break directional streaks.
+
 `sysdptpxy` delegates dashboard/depth calculation to that same DTHA signal and
 depth result. Current streak depth continues past `SYSDPTPXY_LAST_N`; that
 setting only limits the previous-streak

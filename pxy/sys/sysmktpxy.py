@@ -49,6 +49,8 @@ def get_signals(df=None):
     """Route IN's execution action and OUT's directional exit without extra filters."""
     if df is None:
         df = fetch_yf_data()
+    if df is None or df.empty:
+        return "NONE", "NONE"
     try:
         entry_signal = str(get_entry_signal(df)).upper().strip()
         exit_signal = str(get_exit_signal(df)).upper().strip()
