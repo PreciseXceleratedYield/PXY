@@ -3,6 +3,7 @@
 import json
 import os
 import time
+import tempfile
 from pathlib import Path
 from datetime import datetime
 
@@ -135,9 +136,23 @@ def get_all_data():
         "webdashpxy.json"
     )
 
-    # Overwrite deployment
-    with open(target_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=4)
+    # Publish the completed dashboard snapshot atomically.
+    temporary_file = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=target_dir,
+            prefix=".webdashpxy.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_file = handle.name
+            json.dump(data, handle, indent=4)
+        os.replace(temporary_file, target_file)
+    finally:
+        if temporary_file and os.path.exists(temporary_file):
+            os.unlink(temporary_file)
 
     return data
 
