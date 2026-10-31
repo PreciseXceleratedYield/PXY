@@ -13,10 +13,8 @@
 # No weekday adjustment or additional offset is applied.
 
 import os
-import shutil
 import json
 import time
-import subprocess
 import pandas as pd
 
 from colorama import Fore, Style
@@ -119,25 +117,6 @@ def _mark_lock(key):
 
     except Exception:
         pass
-
-
-def _find_script(name):
-    """Search engine, system, and PXY directories, then PATH."""
-
-    here = os.path.dirname(os.path.abspath(__file__))
-
-    for folder in (
-        here,
-        os.path.dirname(here),
-        os.path.dirname(os.path.dirname(here)),
-    ):
-        path = os.path.join(folder, name)
-
-        if os.path.isfile(path):
-            return path
-
-    return shutil.which(name)
-
 
 
 # ---------------- strike calculation ----------------
@@ -338,16 +317,14 @@ def check_counter_leg(remaining_df):
 
             return None
 
-        # ---------------- locate script ----------------
+        # ---------------- resolve Python action ----------------
 
-        path = _find_script(script_name)
-
-        if not path:
-            print(
-                f"{Fore.RED} ❌ Counter script "
-                f"{script_name} not found "
-                "(searched the engine, system, PXY, and PATH locations)."
-            )
+        if script_name == CBUY_SCRIPTS.get("CE"):
+            action = "2"  # CE held + bearish signal -> force PE
+        elif script_name == CBUY_SCRIPTS.get("PE"):
+            action = "1"  # PE held + bullish signal -> force CE
+        else:
+            print(f"{Fore.RED} ❌ Unsupported counter-buy action: {script_name}")
             return None
 
         # ---------------- final offset ----------------
@@ -361,16 +338,13 @@ def check_counter_leg(remaining_df):
 
         # ---------------- launch ----------------
 
-        subprocess.Popen(
-            [
-                "bash",
-                path,
-                str(final_offset),
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
+        # Invoke the existing Python execution function directly.
+        # This waits only for order submission/API response, never for a fill.
+        from exeforcepxy import run_action
+
+        if not run_action(action, final_offset):
+            print(f"{Fore.RED} ❌ Counter-buy action {script_name} did not start.")
+            return None
 
         _mark_lock(lock_key)
 
