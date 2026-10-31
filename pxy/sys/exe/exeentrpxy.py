@@ -34,7 +34,7 @@ try:
     from syspxy import get_all_data
     from runclntpxy import get_session
     from runpchkpxy import get_position_summary
-    from sysdecisionpxy import (
+    from sysdcinpxy import (
         entry_blackout,
         entry_order_command,
         entry_session_available,
