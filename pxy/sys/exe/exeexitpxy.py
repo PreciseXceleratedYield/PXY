@@ -409,12 +409,11 @@ def run_snapshot():
             else:
                 _mark_lock(sq_key)          # before the run, so a hang or crash cannot cause a relaunch loop
                 try:
-                    subprocess.run([sys.executable, exe_path] + sq_args,
-                                   check=True, timeout=SQUAREOFF_TIMEOUT_SECS)
-                except subprocess.TimeoutExpired:
-                    print(f"{Fore.RED}❌ Square-off timed out after {SQUAREOFF_TIMEOUT_SECS}s.")
-                except Exception as e:
-                    print(f"{Fore.RED}❌ Square-off Error: {e}")
+                    from exesqrpxy import exit_all_positions
+
+                    exit_all_positions("-all" if sq_args else "")
+                except Exception as error:
+                    print(f"{Fore.RED}❌ Direct scheduled square-off failed: {error}")
 
     data = get_combined_data()
     df = data.get("active_orders", pd.DataFrame())
