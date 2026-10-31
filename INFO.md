@@ -516,7 +516,7 @@ Fix:
   2. Check ticker: ^NSEI (Nifty) opens after 9:15 AM
   3. Ensure internet connectivity
   4. Check Yahoo Finance API rate limits
-  5. Verify OHLC_MODE setting in syscnfgpxy.py
+  5. Verify the DTHA, IN, and OUT candle-mode settings in syscnfgpxy.py
 ```
 
 **Issue**: Web UI shows "—" (dashes) everywhere
