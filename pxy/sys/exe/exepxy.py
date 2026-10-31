@@ -40,8 +40,8 @@ def _notify_persistent_failures():
         return
     for name, error in list(COMPONENT_FAILURES.items()):
         send_telegram(
-            f"⚠️ PXY component failure (iteration {ENGINE_ITERATION})\\n"
-            f"Component: {name}\\nError: {error}\\n"
+            f"⚠️ PXY component failure (iteration {ENGINE_ITERATION})\n"
+            f"Component: {name}\nError: {error}\n"
             "Engine continues running; automatic retry remains in effect."
         )
 
