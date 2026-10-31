@@ -21,7 +21,7 @@ from syscnfgpxy import (
     EXEAMSPXY_ORDER_VALIDITY,
 )
 from exeacgpxy import (
-    safe_float, generate_pxy_tag, is_cooling, set_cooling,
+    safe_float, generate_pxy_tag, is_cooling, set_cooling, clear_cooling,
     print_pxy_trigger_dashboard
 )
 from sysdcinpxy import averaging_trigger_sides
@@ -40,6 +40,14 @@ def _newest_row(rows):
 def _order_ok(resp):
     """Same rule as exeexitpxy: a falsy reply or a broker error/failed reply is NOT a success."""
     return averaging_order_response_accepted(resp)
+
+
+def _order_rejected(resp):
+    """Return True only for an explicit broker rejection; unknown replies stay locked."""
+    if not isinstance(resp, dict):
+        return False
+    status = str(resp.get("stat", "")).strip().lower()
+    return status in {"not_ok", "failed", "error", "rejected"}
 
 
 def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_val,
@@ -115,6 +123,8 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
                 print(f"{Fore.GREEN}✅ SUCCESS: CE Averaged. Tag: {new_tag}")
             else:
                 print(f"{Fore.RED}❌ CE averaging order NOT confirmed: {resp}")
+                if _order_rejected(resp):
+                    clear_cooling("CE")
         except Exception as e:
             logger.error(f"CE Native placement tracking error: {e}", exc_info=True)
 
@@ -153,5 +163,7 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
                 print(f"{Fore.GREEN}✅ SUCCESS: PE Averaged. Tag: {new_tag}")
             else:
                 print(f"{Fore.RED}❌ PE averaging order NOT confirmed: {resp}")
+                if _order_rejected(resp):
+                    clear_cooling("PE")
         except Exception as e:
             logger.error(f"PE Native placement tracking error: {e}", exc_info=True)
