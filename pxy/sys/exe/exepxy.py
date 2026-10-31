@@ -6,6 +6,7 @@ from colorama import init, Fore, Style
 import sys
 from pathlib import Path
 import os  # ✅ Kept for screen clearing
+import threading
 
 # ---------------- INIT ----------------
 init(autoreset=True)
@@ -17,6 +18,8 @@ SYS_DIR = HERE.parent
 for path in (RUN_DIR, HERE, SYS_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
+
+from runnftfutpxy import run_forever
 
 from syscnfgpxy import (
     EXEPXYPXY_IDLE_PAUSE_SECONDS,
@@ -88,6 +91,20 @@ def main():
     os.system("clear")
     print("\n🚀 INIT: main market loop starting now [SIMPLE MODE ONLY] 📡")
     loop_counter = 1
+
+    # Start one persistent NIFTY futures feed before any signal calculation.
+    # The first-cycle event preserves the old startup ordering: initial entry
+    # processing begins only after the updater has attempted its first fetch.
+    futures_ready = threading.Event()
+    futures_thread = threading.Thread(
+        target=run_forever,
+        args=(futures_ready,),
+        name="pxy-nifty-futures",
+        daemon=True,
+    )
+    futures_thread.start()
+    if not futures_ready.wait(timeout=30):
+        print("Warning: NIFTY futures feed startup is taking longer than 30 seconds.")
 
     parent_scripts = [
         HERE.parent / "sysdashpxy.py",

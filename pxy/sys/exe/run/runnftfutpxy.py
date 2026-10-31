@@ -3,10 +3,12 @@ from datetime import datetime, timedelta
 import json
 import csv
 import os
+import time
 from pathlib import Path
 
 from syscnfgpxy import (
     RUNNFTFUTPXY_PRICE_HISTORY_LIMIT,
+    RUNNFTFUTPXY_REFRESH_SECONDS,
     SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT,
     SYSCNFGPXY_TIMEZONE,
 )
@@ -270,6 +272,66 @@ def main():
 
     # Clean single-line production output
     print(f"NIFTY {expiry_month} FUT trading at {price:.2f}")
+
+
+
+
+# ============================================================
+# PERSISTENT FUTURES FEED (ENGINE-OWNED)
+# ============================================================
+def run_forever(ready_event=None):
+    """
+    Keep one Kotak session alive and refresh the NIFTY futures LTP.
+
+    The engine starts this in one daemon thread. get_all_data() only reads
+    nftfut.json and never starts another broker login or sidecar process.
+    """
+    client = None
+    consecutive_failures = 0
+    first_cycle = True
+
+    while True:
+        try:
+            if client is None:
+                client = get_session()
+
+            if client is None:
+                # Avoid repeatedly attempting authentication on every poll.
+                if first_cycle and ready_event is not None:
+                    ready_event.set()
+                first_cycle = False
+                time.sleep(max(RUNNFTFUTPXY_REFRESH_SECONDS, 15))
+                continue
+
+            future = get_nifty_future(client)
+            if future is not None:
+                price = get_ltp(client, future["token"], EXCHANGE_SEGMENT)
+            else:
+                price = 0.0
+
+            if price > 0:
+                save_price_to_json(price)
+                consecutive_failures = 0
+            else:
+                consecutive_failures += 1
+                if consecutive_failures >= 3:
+                    # Re-authenticate after repeated quote/contract failures.
+                    client = None
+                    consecutive_failures = 0
+
+            if first_cycle and ready_event is not None:
+                ready_event.set()
+            first_cycle = False
+
+        except Exception as error:
+            print(f"Warning: Futures feed cycle failed: {error}")
+            client = None
+            consecutive_failures = 0
+            if first_cycle and ready_event is not None:
+                ready_event.set()
+            first_cycle = False
+
+        time.sleep(RUNNFTFUTPXY_REFRESH_SECONDS)
 
 
 if __name__ == "__main__":

@@ -2,8 +2,6 @@
 # syspxy.py
 import json
 import os
-import subprocess
-from pathlib import Path
 from datetime import datetime
 
 from sysdashpxy import get_full_snapshot
@@ -11,31 +9,6 @@ from sysstrndpxy import export_supertrend_json
 
 
 def get_all_data():
-
-    # -------- RUN THE SCRIPT GLOBALLY FIRST --------
-    def run_production_futures_sidecar():
-        sidecar_path = (
-            Path(__file__).resolve().parent.parent / "pxyfut"
-        )
-
-        if not sidecar_path.is_file():
-            print(
-                f"Warning: Futures sidecar {sidecar_path} not found."
-            )
-            return
-
-        try:
-            subprocess.run(
-                ["bash", str(sidecar_path)],
-                check=True
-            )
-        except (subprocess.CalledProcessError, OSError) as error:
-            print(
-                f"Warning: Could not execute futures sidecar "
-                f"{sidecar_path}: {error}"
-            )
-
-    run_production_futures_sidecar()
 
     # -------- CORE --------
     core = get_full_snapshot() or {}
