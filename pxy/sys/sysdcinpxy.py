@@ -76,12 +76,8 @@ def exit_order_response_accepted(response):
 
 
 def averaging_order_response_accepted(response):
-    if isinstance(response, dict):
-        stat = str(response.get("stat", "")).lower()
-        error = str(response.get("errMsg", "")).lower()
-        if "failed" in stat or "error" in error or "error" in stat:
-            return False
-    return bool(response)
+    """Accept an averaging order only on the same confirmed Kotak response as exits."""
+    return exit_order_response_accepted(response)
 
 
 def matching_exit_net_quantity(positions, symbol, quantity_reader):
