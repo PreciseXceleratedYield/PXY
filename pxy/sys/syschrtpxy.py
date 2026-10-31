@@ -6,7 +6,15 @@ from sysdtafpxy import fetch_yf_data
 from sysstrndpxy import calculate_supertrend
 from syscnfgpxy import SYSCHRTPXY_LOOKBACK_ROWS
 
-def export_supertrend_json(output_file="../web/webchrtpxy.json", lookback=SYSCHRTPXY_LOOKBACK_ROWS):
+
+# Resolve dashboard output from this module's location, not the launch directory.
+DEFAULT_CHART_OUTPUT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "web",
+    "webchrtpxy.json",
+)
+
+def export_supertrend_json(output_file=DEFAULT_CHART_OUTPUT, lookback=SYSCHRTPXY_LOOKBACK_ROWS):
     """
     Fetch data → compute SuperTrend & Master Price → export last N rows
     """
