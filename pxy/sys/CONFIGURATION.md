@@ -170,7 +170,7 @@ shape and the latest NIFTY futures price is averaged into each OHLC field only
 for signal input. The separate chart candle transform remains controlled by
 `SYSPLCHRTPXY_OHLC_MODE`. A futures quote is considered available only when its receipt timestamp
 is timezone-aware, not future-dated, and no older than
-`SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS` (15 seconds by default). A missing,
+`SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS` (60 seconds by default). A missing,
 invalid, stale, or future-dated quote is treated as unavailable. In that case,
 DTAF uses historical Yahoo OHLC directly without futures blending. If Yahoo
 history is also unavailable or insufficient, the local futures fallback is
