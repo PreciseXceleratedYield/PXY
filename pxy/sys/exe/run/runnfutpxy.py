@@ -4,6 +4,7 @@ import json
 import csv
 import os
 import time
+import math
 from pathlib import Path
 
 from syscnfgpxy import (
@@ -190,8 +191,12 @@ def get_ltp(client, token: str, segment: str = SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGM
 # ============================================================
 # WRITE PRICE TO JSON (MAINTAINING 50 ROLLING RECORDS)
 # ============================================================
-def save_price_to_json(price: float):
-    """Appends the latest price to a rolling list of up to 50 records."""
+def save_price_to_json(price):
+    """Append a price or an invalid marker to the rolling JSON feed.
+
+    A null marker prevents a failed current-cycle fetch from reusing a still-
+    fresh quote left by the previous cycle.
+    """
     try:
         records = []
         
@@ -218,8 +223,10 @@ def save_price_to_json(price: float):
         with temporary_file.open("w", encoding="utf-8") as f:
             json.dump(records, f, indent=4)
         os.replace(temporary_file, JSON_OUTPUT_FILE)
+        return True
     except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
         print(f"Warning: Could not update futures prices {JSON_OUTPUT_FILE}: {error}")
+        return False
 
 
 # ============================================================
@@ -249,29 +256,43 @@ def get_nifty_future(client):
 # ENTRY POINT RUNNER
 # ============================================================
 def main():
+    # Invalidate the previous cycle's quote first. If this cycle cannot
+    # obtain a usable FUT price, DTAF must fall back to Yahoo rather than
+    # accidentally blending a still-fresh quote from the prior cycle.
+    if not save_price_to_json(None):
+        try:
+            JSON_OUTPUT_FILE.unlink(missing_ok=True)
+        except OSError as error:
+            print(f"Warning: Could not invalidate previous FUT feed: {error}")
+
     client = get_session()
     if client is None:
-        return
+        return 1
 
     future = get_nifty_future(client)
     if future is None:
-        return
+        return 1
 
-    token = future["token"]
+    token = future.get("token")
+    if not token:
+        return 1
+
     price = get_ltp(client, token, EXCHANGE_SEGMENT)
+    if not math.isfinite(price) or price <= 0:
+        return 1
 
-    if price <= 0:
-        return
-
-    # Overwrite the price into the target JSON file
-    save_price_to_json(price)
+    if not save_price_to_json(price):
+        return 1
 
     # Extract month string (e.g., extracts "SEP" from "NIFTY26SEPFUT")
-    raw_symbol = future["symbol"].upper()
-    expiry_month = "".join([i for i in raw_symbol.replace("NIFTY", "").replace("FUT", "") if not i.isdigit()])
+    raw_symbol = str(future.get("symbol") or "").upper()
+    expiry_month = "".join(
+        i for i in raw_symbol.replace("NIFTY", "").replace("FUT", "")
+        if not i.isdigit()
+    )
 
-    # Clean single-line production output
     print(f"NIFTY {expiry_month} FUT trading at {price:.2f}")
+    return 0
 
 
 
@@ -343,4 +364,4 @@ def run_forever(ready_event=None, status_callback=None):
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
