@@ -114,6 +114,31 @@ if (
     raise ValueError(
         "SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS must be finite and positive."
     )
+
+# Yahoo 1-minute candle timestamps represent the candle start, so allow
+# three minutes for normal publication/API delay before warning.
+SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS = 180
+if (
+    isinstance(SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS, bool)
+    or not isinstance(SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS, (int, float))
+    or not math.isfinite(SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS)
+    or SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS <= 0
+):
+    raise ValueError(
+        "SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS must be finite and positive."
+    )
+
+# Keep repeated stale-feed Telegram warnings to one every five minutes.
+SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS = 300
+if (
+    isinstance(SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS, bool)
+    or not isinstance(SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS, int)
+    or SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS <= 0
+):
+    raise ValueError(
+        "SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS must be a positive integer."
+    )
+
 SYSDTAFPXY_FALLBACK_PERIODS = ("1d", "5d", "7d")
 
 # NSE F&O holiday-calendar HTTP request.
