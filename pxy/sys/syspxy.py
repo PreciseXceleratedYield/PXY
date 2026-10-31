@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 
 from sysdashpxy import get_full_snapshot
-from sysstrndpxy import export_supertrend_json
+from sysictrpxy import export_supertrend_json
 
 
 def get_all_data():
@@ -43,6 +43,7 @@ def get_all_data():
         "supertrend": core.get("supertrend"),
         "super_line": core.get("super_line"),
         "sma": core.get("sma", "NA"),
+        "tsma": core.get("tsma", "NA"),
 
         "ce_power": core.get("ce_power"),
         "pe_power": core.get("pe_power"),

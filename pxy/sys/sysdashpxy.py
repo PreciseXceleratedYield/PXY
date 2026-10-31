@@ -9,12 +9,12 @@ from sysdtafpxy import fetch_yf_data, fetch_yf_data_for_monitor
 from syscnfgpxy import (
     SYSDTAFPXY_DEFAULT_TARGET_ROWS,
     SYSSTRNDPXY_CHART_TARGET_ROWS,
-    SYSSMAPXY_MA_PERIOD,
 )
 from sysdthapxy import get_pxy_data, get_signal_depth_analysis
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
-from sysstrndpxy import calculate_supertrend
+from sysstrnpxy import calculate_supertrend
+from sysictrpxy import calculate_indicators, get_indicator_signals
 from syspwerpxy import get_ce_pe_power
 from sysentrpxy import get_entry_signal
 from syscseqpxy import get_candle_visual
@@ -92,12 +92,15 @@ def get_full_snapshot(monitor=False):
     result["direction"] = direction if direction else "NONE"
 
     # ===== SUPERTREND PROFILES =====
-    processed_st_df = calculate_supertrend(master_df.copy())
-    chart_df = calculate_supertrend(chart_source_df.copy())
+    processed_st_df = calculate_indicators(master_df.copy())
+    chart_df = calculate_indicators(chart_source_df.copy())
     trend = chart_df['ST_Trend'].iloc[-1] if not chart_df.empty else "NONE"
     line_val = safe_int(chart_df['ST'].iloc[-1] if not chart_df.empty else 0)
     result["supertrend"] = trend
     result["super_line"] = line_val
+    indicator_signals = get_indicator_signals(processed_st_df)
+    result["sma"] = indicator_signals["sma"]
+    result["tsma"] = indicator_signals["tsma"]
     result["df"] = processed_st_df
     result["chart_df"] = chart_df
 
@@ -122,12 +125,6 @@ def get_full_snapshot(monitor=False):
     bos_bar, _ = get_bos_bar(master_df)
     result["bos_bar"] = bos_bar if bos_bar else "NONE"
     
-    # Calculate the configured SMA/TSMA status (BULL/BEAR).
-    sma_data = get_sma(master_df, period=SYSSMAPXY_MA_PERIOD)
-    result["sma"] = sma_data.get("status", "NA") # 🔄 RENAMED: Key is now 'sma'
-    
-    return result
-
 # ================= PRINT DASHBOARD =================
 def print_dashboard(data):
     if not data:
