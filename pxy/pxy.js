@@ -179,8 +179,9 @@ const TMUX_SESSION_NAME = 'pxy-engine';
 wss.on('connection', (ws) => { 
     console.log('[WS] client connected. total clients:', wss.clients.size); 
     
-    let isProcessing = false; 
+    let isProcessing = false;
     let hasReportedEngineUnavailable = false;
+    let hasReportedPollingTimeout = false;
 
     const interval = setInterval(() => { 
         if (ws.readyState !== WebSocket.OPEN) {
@@ -197,10 +198,19 @@ wss.on('connection', (ws) => {
         
         if (IS_DEBUG) console.log('[DEBUG] WebSocket polling tmux screen buffer memory...');
 
-        exec(captureCmd, (err, stdout, stderr) => { 
-            isProcessing = false; 
+        exec(captureCmd, { timeout: 5000 }, (err, stdout, stderr) => {
+            isProcessing = false;
 
-            if (err) { 
+            if (err && err.killed) {
+                if (ws.readyState === WebSocket.OPEN && !hasReportedPollingTimeout) {
+                    ws.send('[SYSTEM STATUS] Terminal polling timed out; retrying.');
+                    hasReportedPollingTimeout = true;
+                }
+                return;
+            }
+
+            if (err) {
+                hasReportedPollingTimeout = false;
                 if (IS_DEBUG) console.log('[DEBUG] tmux has-session query rejected. Engine offline.');
                 if (ws.readyState === WebSocket.OPEN && !hasReportedEngineUnavailable) {
                     ws.send(`[SYSTEM STATUS] Engine console session "${TMUX_SESSION_NAME}" is unavailable. Start the engine from the management menu.`);
@@ -210,7 +220,8 @@ wss.on('connection', (ws) => {
             } 
 
             hasReportedEngineUnavailable = false;
-            
+            hasReportedPollingTimeout = false;
+
             if (!stdout) return; 
             
             if (ws.readyState === WebSocket.OPEN) { 
