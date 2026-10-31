@@ -16,7 +16,7 @@ from syscnfgpxy import (
     EXEAVXPXY_REBUY_ENABLED as REBUY_ENABLED,
     EXEAVXPXY_USE_OVERALL_LOSS,
 )
-from sysdecisionpxy import (
+from sysdcinpxy import (
     averaging_placement_allowed,
     averaging_window_enabled,
 )
