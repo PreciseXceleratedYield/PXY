@@ -116,7 +116,8 @@ app.post('/run/:script', (req, res) => {
     
     const runAsUser = process.env.USER === 'root' ? 'sudo -u pxy ' : '';
     const scriptCommand = `cd ${shellQuote(SCRIPT_DIR)} && if [ -f "$HOME/env/bin/activate" ]; then source "$HOME/env/bin/activate"; fi; export PATH=${shellQuote(SCRIPT_DIR)}:"$PATH"; exec ${script}`;
-    const cmd = `${runAsUser}bash --login -c ${shellQuote(scriptCommand)}`;
+    const updateIsolation = script === 'pxyupdate' ? 'setsid ' : '';
+    const cmd = `${runAsUser}${updateIsolation}bash --login -c ${shellQuote(scriptCommand)}`;
     
     if (IS_DEBUG) console.log(`[DEBUG] Executing system call command: ${cmd}`);
 
