@@ -141,7 +141,7 @@ values until deliberately restarted.
 ## Signal channels
 
 DTHA, IN, and OUT are independent signal channels. Each selects one of
-`RAW`, `OC2`, `HA`, `OHLC4`, `HYPER`, or `TOAC` through its own
+`RAW`, `OC2`, `HA`, `OHLC4`, `HYPER`, or `TSMA` through its own
 configuration setting. DTHA owns the single candle transformation engine;
 IN and OUT call that engine with their own selected modes.
 
