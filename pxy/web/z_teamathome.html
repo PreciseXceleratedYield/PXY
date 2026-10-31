@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4efe5">
+  <title>Team@Home</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #243044;
+      background: #f4efe5;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; }
+    header {
+      padding: 24px 20px;
+      color: #fff;
+      background: #26364b;
+    }
+    header, main { width: min(100%, 760px); margin: 0 auto; }
+    header { border-radius: 0 0 16px 16px; }
+    h1 { margin: 0; font-size: clamp(1.7rem, 7vw, 2.3rem); }
+    header p { margin: 6px 0 0; color: #d7e2ef; }
+    main { padding: 22px 16px 48px; }
+    .card {
+      margin: 0 0 16px;
+      padding: 20px;
+      border: 1px solid #ded8cc;
+      border-radius: 14px;
+      background: #fffdf8;
+      box-shadow: 0 4px 16px #26364b0d;
+    }
+    h2 { margin: 0 0 14px; font-size: 1.15rem; }
+    label { display: block; margin: 12px 0 6px; font-weight: 650; }
+    input, textarea, button {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid #c9c3b8;
+      border-radius: 9px;
+      padding: 10px 12px;
+      font: inherit;
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    button {
+      margin-top: 14px;
+      border-color: #26364b;
+      background: #26364b;
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .6; cursor: wait; }
+    .subtle, .time { color: #5a6676; font-size: .9rem; }
+    .notice { min-height: 1.4em; margin: 10px 0 0; color: #87352d; }
+    .post { overflow-wrap: anywhere; }
+    .post + .post { margin-top: 12px; }
+    .post-head { display: flex; justify-content: space-between; gap: 12px; }
+    .post-author { font-weight: 750; }
+    .post-body { margin: 12px 0 0; white-space: pre-wrap; line-height: 1.5; }
+    [hidden] { display: none !important; }
+    @media (max-width: 460px) {
+      .post-head { flex-direction: column; gap: 2px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Team@Home</h1>
+    <p>A private space for family updates</p>
+  </header>
+  <main>
+    <section id="signIn" class="card" aria-labelledby="signInTitle">
+      <h2 id="signInTitle">Family sign in</h2>
+      <p class="subtle">Enter the shared family password to view and add posts.</p>
+      <form id="signInForm">
+        <label for="password">Family password</label>
+        <input id="password" type="password" autocomplete="current-password" required>
+        <button id="signInButton" type="submit">Open family posts</button>
+      </form>
+      <p id="signInNotice" class="notice" role="status" aria-live="polite"></p>
+    </section>
+
+    <div id="familyContent" hidden>
+      <section class="card" aria-labelledby="composeTitle">
+        <h2 id="composeTitle">Share an update</h2>
+        <form id="postForm">
+          <label for="author">Your name</label>
+          <input id="author" maxlength="40" autocomplete="name" required>
+          <label for="postBody">Post</label>
+          <textarea id="postBody" maxlength="2000" required></textarea>
+          <button id="postButton" type="submit">Post to Team@Home</button>
+        </form>
+        <p id="postNotice" class="notice" role="status" aria-live="polite"></p>
+      </section>
+      <section class="card" aria-labelledby="postsTitle">
+        <h2 id="postsTitle">Family posts</h2>
+        <div id="posts" aria-live="polite"></div>
+        <p id="emptyNotice" class="subtle" hidden>No posts yet. Share the first update.</p>
+        <button id="signOutButton" type="button">Sign out</button>
+      </section>
+    </div>
+  </main>
+  <script>
+    (() => {
+      const signIn = document.getElementById('signIn');
+      const signInForm = document.getElementById('signInForm');
+      const passwordInput = document.getElementById('password');
+      const signInButton = document.getElementById('signInButton');
+      const signInNotice = document.getElementById('signInNotice');
+      const familyContent = document.getElementById('familyContent');
+      const postForm = document.getElementById('postForm');
+      const postButton = document.getElementById('postButton');
+      const postNotice = document.getElementById('postNotice');
+      const postList = document.getElementById('posts');
+      const emptyNotice = document.getElementById('emptyNotice');
+      let familyPassword = '';
+
+      async function request(path, options = {}) {
+        const response = await fetch(path, {
+          ...options,
+          cache: 'no-store',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Team-Home-Password': familyPassword,
+            ...options.headers,
+          },
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          if (response.status === 401 || response.status === 429 || response.status === 503) {
+            familyPassword = '';
+            familyContent.hidden = true;
+            signIn.hidden = false;
+            passwordInput.value = '';
+          }
+          throw new Error(result.error || 'The request could not be completed.');
+        }
+        return result;
+      }
+
+      function renderPosts(posts) {
+        postList.replaceChildren();
+        emptyNotice.hidden = posts.length !== 0;
+        for (const post of posts) {
+          const article = document.createElement('article');
+          article.className = 'post card';
+          const heading = document.createElement('div');
+          heading.className = 'post-head';
+          const author = document.createElement('span');
+          author.className = 'post-author';
+          author.textContent = post.author;
+          const time = document.createElement('time');
+          time.className = 'time';
+          const date = new Date(post.createdAt);
+          time.dateTime = post.createdAt;
+          time.textContent = Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
+          const body = document.createElement('p');
+          body.className = 'post-body';
+          body.textContent = post.body;
+          heading.append(author, time);
+          article.append(heading, body);
+          postList.append(article);
+        }
+      }
+
+      async function loadPosts() {
+        const result = await request('/api/team-home/posts');
+        renderPosts(result.posts);
+      }
+
+      signInForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        familyPassword = passwordInput.value;
+        signInButton.disabled = true;
+        signInNotice.textContent = '';
+        try {
+          await loadPosts();
+          signIn.hidden = true;
+          familyContent.hidden = false;
+          passwordInput.value = '';
+        } catch (error) {
+          signInNotice.textContent = error.message;
+        } finally {
+          signInButton.disabled = false;
+        }
+      });
+
+      postForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const author = document.getElementById('author').value.trim();
+        const bodyInput = document.getElementById('postBody');
+        const body = bodyInput.value.trim();
+        postButton.disabled = true;
+        postNotice.textContent = '';
+        try {
+          await request('/api/team-home/posts', {
+            method: 'POST',
+            body: JSON.stringify({ author, body }),
+          });
+          bodyInput.value = '';
+          await loadPosts();
+          postNotice.textContent = 'Your update is posted.';
+        } catch (error) {
+          postNotice.textContent = error.message;
+        } finally {
+          postButton.disabled = false;
+        }
+      });
+
+      document.getElementById('signOutButton').addEventListener('click', () => {
+        familyPassword = '';
+        renderPosts([]);
+        familyContent.hidden = true;
+        signIn.hidden = false;
+        signInNotice.textContent = 'Signed out.';
+      });
+    })();
+  </script>
+</body>
+</html>
