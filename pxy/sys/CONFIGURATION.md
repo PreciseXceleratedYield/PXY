@@ -168,8 +168,14 @@ retains the configured entry window and post-square-off cooldown.
 canonical DTAF candle transform. In this mode the dataset keeps the raw OHLC
 shape and the latest NIFTY futures price is averaged into each OHLC field only
 for signal input. The separate chart candle transform remains controlled by
-`SYSPLCHRTPXY_OHLC_MODE`. If a futures quote is unavailable, DTAF falls back to
-the historical OHLC values directly without switching modes.
+`SYSPLCHRTPXY_OHLC_MODE`. A futures quote is considered available only when its receipt timestamp
+is timezone-aware, not future-dated, and no older than
+`SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS` (15 seconds by default). A missing,
+invalid, stale, or future-dated quote is treated as unavailable. In that case,
+DTAF uses historical Yahoo OHLC directly without futures blending. If Yahoo
+history is also unavailable or insufficient, the local futures fallback is
+usable only when its quote passes the same freshness check; stale data never
+creates synthetic candles.
 
 `sysdptpxy` delegates dashboard/depth calculation to that same DTHA signal and
 depth result. Current streak depth continues past `SYSDPTPXY_LAST_N`; that
