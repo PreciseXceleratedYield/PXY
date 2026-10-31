@@ -24,8 +24,8 @@ from exeacgpxy import (
     safe_float, generate_pxy_tag, is_cooling, set_cooling,
     print_pxy_trigger_dashboard
 )
-from sysdecisionpxy import averaging_trigger_sides
-from sysdecisionpxy import averaging_order_response_accepted
+from sysdcinpxy import averaging_trigger_sides
+from sysdcinpxy import averaging_order_response_accepted
 
 def _newest_row(rows):
     """Newest lot by buy_time; falls back to the old behaviour if the column is unusable."""
