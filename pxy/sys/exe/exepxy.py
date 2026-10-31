@@ -5,7 +5,6 @@ from datetime import datetime
 from colorama import init, Fore, Style
 import sys
 from pathlib import Path
-import os  # ✅ Kept for screen clearing
 
 # ---------------- INIT ----------------
 init(autoreset=True)
@@ -91,6 +90,11 @@ def safe_run(script_path, timeout=None):
         print("⚠️ SAFE RUN: unexpected error occurred ⚠️")
         return False
 
+def clear_screen():
+    """Clear the terminal without invoking a shell command."""
+    print("\033[2J\033[H", end="", flush=True)
+
+
 def fancy_pause(seconds=EXEPXYPXY_IDLE_PAUSE_SECONDS):
     for i in range(seconds, 0, -1):
         print(f"⏳ Pause active... {Fore.YELLOW}{i}{Style.RESET_ALL}s", end="\r", flush=True)
@@ -126,7 +130,7 @@ def run_market_cycle():
 
 
 def main():
-    os.system("clear")
+    clear_screen()
     print("\n🚀 INIT: main market loop starting now [SIMPLE MODE ONLY] 📡")
     loop_counter = 1
 
@@ -143,11 +147,11 @@ def main():
         safe_run(script)
 
     while True:
-        os.system("clear")
+        clear_screen()
         if in_market_hours():
             live_status("🚀 LOOP: waiting trigger 📊")
             for sub_itr in range(1, EXEPXYPXY_SUB_ITERATIONS + 1):
-                os.system("clear")
+                clear_screen()
                 print(
                     f"📊 Loop#{loop_counter} Sub#{sub_itr} | "
                     "Execution Stack Running..."
@@ -160,7 +164,7 @@ def main():
             fancy_pause(EXEPXYPXY_IDLE_PAUSE_SECONDS)
 
             while not in_market_hours():
-                os.system("clear")
+                clear_screen()
                 safe_run(HERE.parent / "syscprtpxy.py")
                 print(
                     f" ⏳   WAIT : market opens at "
