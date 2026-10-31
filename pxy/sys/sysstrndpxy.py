@@ -35,10 +35,10 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
         return pd.DataFrame()
 
     if df.empty:
-        from sysdtafpxy import fetch_yf_data_for_monitor
+        from sysdtafpxy import fetch_yf_data
 
         try:
-            raw_df = fetch_yf_data_for_monitor(period="3d", interval="1m")
+            raw_df = fetch_yf_data(period="3d", interval="1m")
 
             if raw_df is not None and not raw_df.empty:
                 df = raw_df.copy()
@@ -150,7 +150,16 @@ def export_supertrend_json(
 if __name__ == "__main__":
     print("--- STARTING LIVE PXY UNIFIED EXCLUSIVE MATRIX ENGINE ---")
 
-    processed_df = calculate_supertrend(pd.DataFrame())
+    if os.environ.get("PXY_MONITOR_MODE") == "1":
+        from sysdtafpxy import fetch_yf_data_for_monitor
+        source_df = fetch_yf_data_for_monitor(period="3d", interval="1m")
+    else:
+        from sysdtafpxy import fetch_yf_data
+        source_df = fetch_yf_data(period="3d", interval="1m")
+
+    processed_df = calculate_supertrend(
+        source_df if source_df is not None else pd.DataFrame()
+    )
 
     if processed_df is not None and not processed_df.empty:
         target_index = processed_df.index[-1]
