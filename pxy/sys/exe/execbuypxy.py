@@ -342,7 +342,7 @@ def check_counter_leg(remaining_df):
         # This waits only for order submission/API response, never for a fill.
         from exeforcepxy import run_action
 
-        if not run_action(action, final_offset):
+        if not run_action(action, final_offset, show_funds=False):
             print(f"{Fore.RED} ❌ Counter-buy action {script_name} did not start.")
             return None
 
