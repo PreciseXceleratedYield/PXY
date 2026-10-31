@@ -98,7 +98,7 @@ def execute_order(client, symbol, qty):
         return {"stat": "FAIL", "err": str(e)}
 
 
-def run_action(choice, offset_override=None):
+def run_action(choice, offset_override=None, show_funds=True):
     """Processes a chosen action and optionally overrides the OTM offset."""
 
     if choice in ["4", ""]:
@@ -155,17 +155,21 @@ def run_action(choice, offset_override=None):
     else:
         print(f"{Fore.RED}Failed to resolve market symbol for {sig}.")
 
-    try:
-        funds = get_available_funds(client)
-    except Exception:
-        funds = 0
+    if show_funds:
+        try:
+            funds = get_available_funds(client)
+        except Exception:
+            funds = 0
+        cash_display = str(int(funds))
+    else:
+        cash_display = "not queried"
 
     print(
         f"""
  =====================================
     ⚡ FORCE TRANSACTION STATUS
  =====================================
-    💰 Cash   : {int(funds)}
+    💰 Cash   : {cash_display}
     🎫 Symbol : {symbol}
     🎯 Action : {sig} ({side_label})
     📌 Status : {res.get('stat')}
