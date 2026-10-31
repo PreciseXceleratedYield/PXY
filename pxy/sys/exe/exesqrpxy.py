@@ -95,9 +95,14 @@ def place_exit_order(client, row):
         print(f"{Fore.RED}❌ Exit Order Error for {row.get('symbol')}: {e}") 
         return None 
 
-def exit_all_positions(): 
+def exit_all_positions(target=None): 
     now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
-    dprint(f"Starting square-all; args={sys.argv[1:]!r}, local_time={now}")
+    target_param = (
+        str(target).lower().strip()
+        if target is not None
+        else (sys.argv[1].lower().strip() if len(sys.argv) > 1 else "")
+    )
+    dprint(f"Starting square-all; target={target_param!r}, local_time={now}")
     client = get_session() 
     if not client: 
         dprint("Stopped: broker session is unavailable.")
@@ -122,8 +127,7 @@ def exit_all_positions():
     # --- DYNAMIC CLI FILTER BYPASS & PANIC SWITCH ---
     force_all_bypass = False
     force_side_bypass = False
-    if len(sys.argv) > 1 and not active_df.empty:
-        target_param = sys.argv[1].lower().strip()
+    if target_param and not active_df.empty:
         if target_param == "-all":
             dprint("CLI -all selected; bypassing trend and scheduled-time filters.")
             print(f"{Fore.RED}{Style.BRIGHT}🚨 PANIC BYPASS: Nilling out ALL active positions immediately!")
