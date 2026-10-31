@@ -63,7 +63,8 @@ def print_telemetry_dashboard(p):
     if not p:
         return
     P_WIDTH = 36
-    print("\n" + Fore.CYAN + "=" * P_WIDTH)
+    print("
+" + Fore.CYAN + "=" * P_WIDTH)
     print(Fore.CYAN + " OPT  LOT   LGT   RUN  TGT      PNL")
     print(Fore.CYAN + "-" * P_WIDTH)
 
@@ -90,7 +91,8 @@ def print_telemetry_dashboard(p):
     left_n = max(0, min(track_slots, int(round(ce_ratio * track_slots))))
     right_n = max(0, track_slots - left_n)
     print("  " + Fore.GREEN + left_label + ("━" * left_n) + Fore.WHITE + "⚖️" + Fore.RED + ("━" * right_n) + Fore.RED + right_label)
-    print(Fore.CYAN + "=" * P_WIDTH + "\n")
+    print(Fore.CYAN + "=" * P_WIDTH + "
+")
 
 
 def handle_side_averaging(client, df, index_price, positions_response=None):
@@ -112,7 +114,9 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
     )
     working_df['row_pnl'] = working_df['pnl'].apply(safe_float) if 'pnl' in working_df.columns else 0.0
 
-    pos_raw = str(\n        get_position_summary(client, positions_response=positions_response)\n    ).upper().replace(" ", "").strip()
+    pos_raw = str(
+        get_position_summary(client, positions_response=positions_response)
+    ).upper().replace(" ", "").strip()
     ce_match = re.search(r'(\d+)CE', pos_raw)
     pe_match = re.search(r'(\d+)PE', pos_raw)
     ce_lots = int(ce_match.group(1)) if ce_match else 0
