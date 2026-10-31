@@ -14,7 +14,7 @@ from exeomspxy import get_combined_data
 from runclntpxy import get_session
 from exeavxpxy import handle_side_averaging
 from exeexppxy import dump_idle_json
-from sysdecisionpxy import averaging_snapshot_status
+from sysdcinpxy import averaging_snapshot_status
 from syscnfgpxy import EXEAVGPXY_IDLE_EXIT_MODE as EXIT_MODE
 
 init(autoreset=True)
