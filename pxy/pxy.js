@@ -115,14 +115,15 @@ app.post('/run/:script', (req, res) => {
     } 
     
     const runAsUser = process.env.USER === 'root' ? 'sudo -u pxy ' : '';
-    const scriptCommand = `cd ${shellQuote(SCRIPT_DIR)} && if [ -f "$HOME/env/bin/activate" ]; then source "$HOME/env/bin/activate"; fi; export PATH=${shellQuote(SCRIPT_DIR)}:"$PATH"; exec ${script}`;
+    const updateEnvironment = script === 'pxyupdate' ? 'export PXY_UPDATE_FROM_WEB=1; ' : '';
+    const scriptCommand = `cd ${shellQuote(SCRIPT_DIR)} && if [ -f "$HOME/env/bin/activate" ]; then source "$HOME/env/bin/activate"; fi; export PATH=${shellQuote(SCRIPT_DIR)}:"$PATH"; ${updateEnvironment}exec ${script}`;
     const updateIsolation = script === 'pxyupdate' ? 'setsid ' : '';
     const cmd = `${runAsUser}${updateIsolation}bash --login -c ${shellQuote(scriptCommand)}`;
     
     if (IS_DEBUG) console.log(`[DEBUG] Executing system call command: ${cmd}`);
 
     exec(cmd, { 
-        timeout: 30000, 
+        timeout: script === 'pxyupdate' ? 0 : 30000, 
         cwd: SCRIPT_DIR, 
         env: { 
             PATH: `${PXY_HOME}/env/bin:${SCRIPT_DIR}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:${PXY_HOME}/.local/bin`,
