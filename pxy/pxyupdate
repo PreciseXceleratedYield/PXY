@@ -100,7 +100,10 @@ start_services() {
 
     if [ "$WEB_WAS_RUNNING" -eq 1 ]; then
         echo "[>] Starting web dashboard..."
-        if tmux has-session -t pxy-web 2>/dev/null && has_web_process; then
+        if has_web_process && ! tmux has-session -t pxy-web 2>/dev/null; then
+            echo "[X] Web process exists outside pxy-web; refusing duplicate start." >&2
+            status=1
+        elif tmux has-session -t pxy-web 2>/dev/null && has_web_process; then
             echo "[✔] Web dashboard is already running."
         else
             if tmux has-session -t pxy-web 2>/dev/null; then
@@ -124,7 +127,10 @@ start_services() {
 
     if [ "$ENGINE_WAS_RUNNING" -eq 1 ]; then
         echo "[>] Starting trading engine..."
-        if tmux has-session -t pxy-engine 2>/dev/null && has_engine_process; then
+        if has_engine_process && ! tmux has-session -t pxy-engine 2>/dev/null; then
+            echo "[X] Engine process exists outside pxy-engine; refusing duplicate start." >&2
+            status=1
+        elif tmux has-session -t pxy-engine 2>/dev/null && has_engine_process; then
             echo "[✔] Trading engine is already running."
         else
             if tmux has-session -t pxy-engine 2>/dev/null; then
