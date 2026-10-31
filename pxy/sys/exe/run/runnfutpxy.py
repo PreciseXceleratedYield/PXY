@@ -279,7 +279,7 @@ def main():
 # ============================================================
 # PERSISTENT FUTURES FEED (ENGINE-OWNED)
 # ============================================================
-def run_forever(ready_event=None):
+def run_forever(ready_event=None, status_callback=None):
     """
     Keep one Kotak session alive and refresh the NIFTY futures LTP.
 
@@ -296,6 +296,8 @@ def run_forever(ready_event=None):
                 client = get_session()
 
             if client is None:
+                if status_callback:
+                    status_callback("Kotak Neo session unavailable")
                 # Avoid repeatedly attempting authentication on every poll.
                 if first_cycle and ready_event is not None:
                     ready_event.set()
@@ -312,7 +314,11 @@ def run_forever(ready_event=None):
             if price > 0:
                 save_price_to_json(price)
                 consecutive_failures = 0
+                if status_callback:
+                    status_callback(None)
             else:
+                if status_callback:
+                    status_callback("NIFTY futures contract or LTP unavailable")
                 consecutive_failures += 1
                 if consecutive_failures >= 3:
                     # Re-authenticate after repeated quote/contract failures.
@@ -324,6 +330,8 @@ def run_forever(ready_event=None):
             first_cycle = False
 
         except Exception as error:
+            if status_callback:
+                status_callback(str(error))
             print(f"Warning: Futures feed cycle failed: {error}")
             client = None
             consecutive_failures = 0
