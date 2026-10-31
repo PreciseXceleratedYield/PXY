@@ -185,7 +185,7 @@ def depth_exit_side_loss_pct(active_df, side):
 
 def run_depth_squareoff(client, active_df, market_data_available,
                         positions_unverified=False):
-    """Invoke the shared side-squareoff command after a confirmed deep reversal."""
+    """Call the shared side-squareoff Python function after a confirmed reversal."""
     if PASTRSK != "YES":
         return set()
     if active_df is None or active_df.empty or not market_data_available:
