@@ -11,7 +11,6 @@ import pandas as pd
 from colorama import init, Fore
 
 from exeomspxy import get_combined_data
-from runclntpxy import get_session
 from exeavxpxy import handle_side_averaging
 from exeexppxy import dump_idle_json
 from sysdcinpxy import averaging_snapshot_status
@@ -60,8 +59,14 @@ def run_snapshot():
         )
         return
 
-    client = get_session()
-    handle_side_averaging(client, df, index_price)
+    client = data.get("broker_client")
+    positions_response = data.get("positions_snapshot")
+    if not client or positions_response is None:
+        print(f"{Fore.YELLOW}⚠️ Broker snapshot unavailable; averaging skipped.")
+        return
+    handle_side_averaging(
+        client, df, index_price, positions_response=positions_response
+    )
 
 if __name__ == "__main__":
     run_snapshot()
