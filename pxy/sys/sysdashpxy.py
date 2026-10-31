@@ -13,7 +13,6 @@ from syscnfgpxy import (
 from sysdthapxy import get_pxy_data, get_signal_depth_analysis
 from syskatrpxy import calculate_atr, calculate_dynamic_k
 from sysexitpxy import detect_raw_direction
-from sysstrnpxy import calculate_supertrend
 from sysictrpxy import calculate_indicators, get_indicator_signals
 from syspwerpxy import get_ce_pe_power
 from sysentrpxy import get_entry_signal
@@ -21,7 +20,6 @@ from syscseqpxy import get_candle_visual
 from syscndlpxy import get_day_candle_bar
 from sysbbospxy import get_bos_bar
 from syssadxpxy import calculate_adx
-from syssmapxy import get_sma          # ✅ SMA Tool Imported
 
 # ✅ KEEP CONSOLE ALIGNMENT
 TOTAL_WIDTH = 42
@@ -124,6 +122,7 @@ def get_full_snapshot(monitor=False):
     # ===== BREAKOUT STRUCTURE (BOS) MATRIX =====
     bos_bar, _ = get_bos_bar(master_df)
     result["bos_bar"] = bos_bar if bos_bar else "NONE"
+    return result
     
 # ================= PRINT DASHBOARD =================
 def print_dashboard(data):
@@ -184,14 +183,17 @@ def print_dashboard(data):
     s_e = TOTAL_WIDTH - len(f"Entry:{ent}") - len(f"Signal:{ext}")
     print(Fore.WHITE + "Entry:" + e_color + ent + " " * max(1, s_e) + Fore.WHITE + "Signal:" + e_color + ext)
 
-    # 9. BOS BOUNDARY PRINT MATRIX & SURGICAL SMA ALIGNMENT LINE
+    # 9. BOS BOUNDARY PRINT MATRIX
     print(data["bos_bar"])
-    
-    # 🔄 RENAMED: Reading and printing from the 'sma' data key
+
+    # 10. INDEPENDENT INDICATOR STATUS
     sma_status = data.get("sma", "NA")
     sma_color = Fore.LIGHTGREEN_EX if sma_status == "BULL" else Fore.LIGHTRED_EX if sma_status == "BEAR" else Fore.YELLOW
-    s_sma = TOTAL_WIDTH - len("SMA:") - len(sma_status)
-    print(Fore.WHITE + "SMA:" + " " * max(1, s_sma) + sma_color + sma_status)
+    print(Fore.WHITE + "SMA:" + sma_color + sma_status)
+
+    tsma_status = data.get("tsma", "NA")
+    tsma_color = Fore.LIGHTGREEN_EX if tsma_status == "BULL" else Fore.LIGHTRED_EX if tsma_status == "BEAR" else Fore.YELLOW
+    print(Fore.WHITE + "TSMA:" + tsma_color + tsma_status)
 
 # ================= MAIN RUNNER ENGINE =================
 if __name__ == "__main__":

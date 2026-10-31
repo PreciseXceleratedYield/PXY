@@ -67,6 +67,14 @@ def get_sma(
         "df_with_sma": df # Return df to pass to json exporter
     }
 
+
+def get_sma_signal(
+    df: pd.DataFrame,
+    period: int = SYSSMAPXY_MA_PERIOD,
+) -> dict:
+    """Return the independent 50-period SMA value and price-side status."""
+    return get_sma(df, period=period, variant="SMA")
+
 def dump_ohlc_json(df: pd.DataFrame, target_folder_name: str = "web") -> None:
     """
     Constructs a trend-tracking candle over the configured moving-average window.
