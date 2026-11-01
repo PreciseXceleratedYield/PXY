@@ -397,9 +397,6 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         active_book_tags=sorted(cycle_tags),
         active_book_started_at=cycle_started_at,
     )
-    if not state_saved:
-        print(f"{Fore.RED}⚠️ Could not persist pending liquidation state; square-off not submitted.")
-        return
     print(
         f"{Fore.YELLOW}⚠️ Cycle profit target reached while heavy side is unaligned "
         f"({metrics['target_pct']:.2f}% = "
