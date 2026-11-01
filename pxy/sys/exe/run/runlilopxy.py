@@ -379,6 +379,7 @@ def _process_lilo_orders_production(
             _run_master_risk_ledger_if_broker_flat(
                 client, positions_response, positions_fetched, risk_exit_signal
             )
+            _run_pending_master_risk_liquidation(client, risk_exit_signal)
             _print_summary(0, 0)
             return pd.DataFrame(), pd.DataFrame()
         if (
@@ -399,6 +400,7 @@ def _process_lilo_orders_production(
             _run_master_risk_ledger_if_broker_flat(
                 client, positions_response, positions_fetched, risk_exit_signal
             )
+            _run_pending_master_risk_liquidation(client, risk_exit_signal)
             _print_summary(0, 0)
             return pd.DataFrame(), pd.DataFrame()
 
