@@ -73,6 +73,9 @@ def main():
 
         # 2. Central Entry Signal Verification
         data = get_all_data()
+        if liquidation_pending():
+            print(f"{Fore.YELLOW}🛑 Master risk liquidation initiated this cycle; fresh entry blocked.")
+            return
         entry_signal = data.get("entry")
 
         if not entry_signal_valid(entry_signal):
