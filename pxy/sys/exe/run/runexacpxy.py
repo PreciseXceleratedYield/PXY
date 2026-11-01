@@ -46,7 +46,10 @@ from runexstpxy import (
     load_meta, save_meta, state_is_stale, purge_stale_cache, _current_filter_time,
 )
 from runexlckpxy import _acquire_lock, _release_lock, ledger_busy  # noqa: F401
-from runexlqdpxy import liquidate_and_exit, run_squareoff, wait_until_flat  # noqa: F401
+from runexlqdpxy import (
+    broker_positions_flat, liquidate_and_exit, has_working_sell_orders,
+    run_squareoff,
+)  # noqa: F401
 
 init(autoreset=True)
 
@@ -130,7 +133,12 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         return
 
     # 2. Once-a-day override (backup for hook 1). Only a missing file or an earlier date counts as stale.
-    session_state_is_stale = state_is_stale(state_on_disk)
+    liquidation_is_pending = bool(
+        state_on_disk and state_on_disk.get("liquidation_pending", False)
+    )
+    session_state_is_stale = (
+        state_is_stale(state_on_disk) and not liquidation_is_pending
+    )
     if session_state_is_stale:
         purge_stale_cache()
         consecutive_breaches = 0
@@ -177,6 +185,27 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     if TICK_MIN_GAP_SECONDS > 0 and (now_epoch - meta["last_tick_epoch"]) < TICK_MIN_GAP_SECONDS:
         debug_log(f"Tick skipped: previous tick {now_epoch - meta['last_tick_epoch']:.1f}s ago "
                   f"(< {TICK_MIN_GAP_SECONDS}s).")
+        return
+
+    # An initiated liquidation stays authoritative across cycles and engine restarts.
+    # A fresh broker snapshot, not order acceptance, decides when the book is flat.
+    if liquidation_is_pending:
+        current_total = compute_totals(open_df, closed_df)["total"]
+        if broker_positions_flat(client):
+            liquidate_and_exit(
+                client,
+                current_total,
+                risk_control_activated=True,
+                risk_state=state_on_disk,
+                broker_flat_confirmed=True,
+            )
+        else:
+            liquidate_and_exit(
+                client,
+                current_total,
+                risk_control_activated=True,
+                risk_state=state_on_disk,
+            )
         return
 
     # 4. Keep the cycle ledger independent of LILO's display/filter basis.
@@ -352,7 +381,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
 
     consecutive_breaches += 1
     save_check_state(consecutive_breaches)
-    save_session_state(
+    state_saved = save_session_state(
         0.0,
         metrics["cycle_pnl"],
         -risk_target,
@@ -367,7 +396,11 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         active_book_id=active_book_id,
         active_book_tags=sorted(cycle_tags),
         active_book_started_at=cycle_started_at,
+        liquidation_pending=True,
     )
+    if not state_saved:
+        print(f"{Fore.RED}⚠️ Could not persist pending liquidation state; square-off not submitted.")
+        return
     print(
         f"{Fore.YELLOW}⚠️ Cycle profit target reached while heavy side is unaligned "
         f"({metrics['target_pct']:.2f}% = "
