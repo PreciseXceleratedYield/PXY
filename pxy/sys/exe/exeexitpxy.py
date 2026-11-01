@@ -419,11 +419,16 @@ def run_snapshot():
             elif _recent(_load_locks(), sq_key, SQOFF_MIN_GAP_SECS):
                 debug_log(f"Square-off {sq_key} already launched within {SQOFF_MIN_GAP_SECS}s; skipping.")
             else:
-                _mark_lock(sq_key)          # before the run, so a hang or crash cannot cause a relaunch loop
                 try:
                     from exesqrpxy import exit_all_positions
 
-                    exit_all_positions("-all" if sq_args else "")
+                    accepted_keys = exit_all_positions(
+                        "-all" if sq_args else "", return_accepted_keys=True
+                    )
+                    if accepted_keys:
+                        _mark_lock(sq_key)
+                    else:
+                        print(f"{Fore.YELLOW}⚠️ Scheduled square-off: no sell orders accepted; retry eligible next cycle.")
                 except Exception as error:
                     print(f"{Fore.RED}❌ Direct scheduled square-off failed: {error}")
 
