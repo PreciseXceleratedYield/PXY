@@ -190,6 +190,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     # An initiated liquidation stays authoritative across cycles and engine restarts.
     # A fresh broker snapshot, not order acceptance, decides when the book is flat.
     if liquidation_is_pending:
+        meta["last_tick_epoch"] = now_epoch
+        save_meta(meta)
         current_total = compute_totals(open_df, closed_df)["total"]
         if broker_positions_flat(client):
             if closed_df is None or closed_df.empty:
