@@ -10,6 +10,19 @@ from syscnfgpxy import EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS
 
 WEB_DIR = Path(__file__).resolve().parents[2] / "web"
 COOLDOWN_FILE = WEB_DIR / ".pxy_post_squareoff_cooldown.json"
+RISK_STATE_FILE = WEB_DIR / "webrinkopxy.json"
+
+
+def liquidation_pending():
+    """Fail closed while a persisted master-risk liquidation is unresolved."""
+    try:
+        with RISK_STATE_FILE.open("r", encoding="utf-8") as state_file:
+            state = json.load(state_file)
+    except FileNotFoundError:
+        return False
+    except Exception:
+        return True
+    return not isinstance(state, dict) or bool(state.get("liquidation_pending", False))
 
 
 def cooldown_remaining(now=None):
