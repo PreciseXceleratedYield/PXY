@@ -196,6 +196,34 @@ def exit_all_positions(target=None, return_accepted_keys=False, allowed_keys=Non
                 _report_verification(symbol, "invalid positions snapshot")
             return set() if return_accepted_keys else None
         from runexlqdpxy import has_working_sell_orders
+        # One consistent broker order snapshot for this square-off iteration.
+        # An unavailable or malformed response remains fail-closed.
+        try:
+            try:
+                working_orders_snapshot = client.order_report()
+            except AttributeError:
+                working_orders_snapshot = client.orders()
+        except Exception as error:
+            print(f"{Fore.YELLOW}⚠️ Cannot verify working sell orders; square-off blocked: {error}")
+            return set() if return_accepted_keys else None
+        # Invalid reports block all sells; no additional broker fetches.
+        if not (
+            isinstance(working_orders_snapshot, dict)
+            and (
+                (
+                    str(working_orders_snapshot.get("stat", "")).strip().lower() == "ok"
+                    and str(working_orders_snapshot.get("stCode", "")).strip() == "200"
+                    and isinstance(working_orders_snapshot.get("data"), list)
+                )
+                or (
+                    str(working_orders_snapshot.get("stat", "")).strip().lower() in {"not_ok", "not ok"}
+                    and str(working_orders_snapshot.get("stCode", "")).strip() == "5203"
+                    and str(working_orders_snapshot.get("errMsg", "")).strip().lower() == "no data"
+                )
+            )
+        ):
+            print(f"{Fore.YELLOW}⚠️ Invalid broker order report; square-off blocked.")
+            return set() if return_accepted_keys else None
 
     def submit(row):
         nonlocal any_order_placed
@@ -222,7 +250,7 @@ def exit_all_positions(target=None, return_accepted_keys=False, allowed_keys=Non
             if qty <= 0:
                 dprint(f"No unsubmitted quantity remains for {symbol}.")
                 return
-            if has_working_sell_orders(client, [symbol]):
+            if has_working_sell_orders(client, [symbol], order_report=working_orders_snapshot):
                 return
             row = row.copy()
             row["qty"] = qty
