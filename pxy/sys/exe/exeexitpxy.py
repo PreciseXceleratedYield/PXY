@@ -263,10 +263,6 @@ def run_depth_squareoff(client, active_df, market_data_available,
         return set()
 
     signal_key = f"DEPTH_EXIT|{side}|{signal_time}"
-    if _recent(_load_locks(), signal_key, EXIT_LOCK_KEEP_SECS):
-        debug_log(f"Depth exit {signal_key} already sent; skipping duplicate.")
-        return set()
-
     print(
         f"{Fore.YELLOW}⚠️ Deep reversal: {snapshot.get('exit')} with "
         f"{snapshot.get('hkin_past_depth')} past depth and {side_loss_pct:.2f}% "
@@ -278,21 +274,26 @@ def run_depth_squareoff(client, active_df, market_data_available,
     exited_keys = {
         _lock_key(row)
         for _, row in target_rows.iterrows()
-        if not _recently_exited(_lock_key(row))
     }
+    if all(_recently_exited(key) for key in exited_keys):
+        return set()
     if not exited_keys:
         return set()
 
     try:
         from exesqrpxy import exit_all_positions
 
-        exit_all_positions("-pe" if side == "PE" else "-ce")
+        accepted_keys = exit_all_positions(
+            "-pe" if side == "PE" else "-ce", return_accepted_keys=True
+        ) or set()
     except Exception as error:
         print(f"{Fore.RED}❌ Direct {side} square-off failed: {error}")
         return set()
 
-    _mark_lock(signal_key)
-    return exited_keys
+    accepted_keys = exited_keys.intersection(accepted_keys)
+    for key in accepted_keys:
+        _mark_exited(key)
+    return accepted_keys
 
 
 def debug_log(msg, color=Fore.BLUE): 
