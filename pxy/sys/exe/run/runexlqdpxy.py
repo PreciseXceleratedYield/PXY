@@ -182,53 +182,58 @@ def liquidate_and_exit(
         return False
 
     start_cooldown()
-        new_total, closed_df = _refresh_total(client, total_raw_pnl)
-        print(f"🧹 {Fore.GREEN}Broker flat verified! Locking offset at ₹{new_total:,.0f} and restarting engine...")
-        pnl_offset = new_total
-        state = dict(risk_state or {})
-        cycle_tags = {str(tag) for tag in state.get("cycle_tags", [])}
-        cycle_started_at = state.get("cycle_started_at")
-        cycle_id = (
-            f"{cycle_started_at}|{'|'.join(sorted(cycle_tags))}"
-            if cycle_started_at and cycle_tags else ""
+    new_total, closed_df = _refresh_total(client, total_raw_pnl)
+    print(
+        f"🧹 {Fore.GREEN}Broker flat verified! Locking offset at ₹{new_total:,.0f} "
+        "and finalizing the risk reset..."
+    )
+    cycle_tags = {str(tag) for tag in state.get("cycle_tags", [])}
+    cycle_started_at = state.get("cycle_started_at")
+    cycle_id = (
+        f"{cycle_started_at}|{'|'.join(sorted(cycle_tags))}"
+        if cycle_started_at and cycle_tags else ""
+    )
+    snapshot = cycle_closed_book_snapshot(
+        closed_df, cycle_tags, cycle_started_at
+    )
+    if snapshot is not None and cycle_id != state.get("last_closed_cycle_id"):
+        state["booked_profit"] = (
+            float(state.get("booked_profit", 0.0))
+            + snapshot["realized_pnl"]
         )
-        snapshot = cycle_closed_book_snapshot(
-            closed_df, cycle_tags, cycle_started_at
+        state["closed_book_count"] = (
+            int(state.get("closed_book_count", 0)) + 1
         )
-        if snapshot is not None and cycle_id != state.get("last_closed_cycle_id"):
-            state["booked_profit"] = (
-                float(state.get("booked_profit", 0.0))
-                + snapshot["realized_pnl"]
-            )
-            state["closed_book_count"] = (
-                int(state.get("closed_book_count", 0)) + 1
-            )
-            snapshot["book_id"] = state["closed_book_count"]
-            state["last_closed_snapshot"] = snapshot
-            state["last_closed_cycle_id"] = cycle_id
-            state["closed_books"] = [
-                *state.get("closed_books", []),
-                snapshot,
-            ]
-        target_line = INITIAL_RISK_BAR_TARGET
-        save_check_state(0)
-        save_session_state(
-            0.0,
-            0.0,
-            -target_line,
-            pnl_offset,
-            risk_control_activated=risk_control_activated,
-            target_exit_line=target_line,
-            booked_profit=state.get("booked_profit", 0.0),
-            closed_book_count=state.get("closed_book_count", 0),
-            last_closed_snapshot=state.get("last_closed_snapshot"),
-            last_closed_cycle_id=state.get("last_closed_cycle_id", ""),
-            closed_books=state.get("closed_books", []),
-            active_book_id=None,
-            active_book_tags=[],
-            active_book_started_at=None,
-        )
-        sys.exit("Master Circuit Breaker Triggered.")
+        snapshot["book_id"] = state["closed_book_count"]
+        state["last_closed_snapshot"] = snapshot
+        state["last_closed_cycle_id"] = cycle_id
+        state["closed_books"] = [
+            *state.get("closed_books", []),
+            snapshot,
+        ]
+
+    target_line = INITIAL_RISK_BAR_TARGET
+    save_check_state(0)
+    state_saved = save_session_state(
+        0.0,
+        0.0,
+        -target_line,
+        new_total,
+        risk_control_activated=risk_control_activated,
+        target_exit_line=target_line,
+        booked_profit=state.get("booked_profit", 0.0),
+        closed_book_count=state.get("closed_book_count", 0),
+        last_closed_snapshot=state.get("last_closed_snapshot"),
+        last_closed_cycle_id=state.get("last_closed_cycle_id", ""),
+        closed_books=state.get("closed_books", []),
+        active_book_id=None,
+        active_book_tags=[],
+        active_book_started_at=None,
+        liquidation_pending=False,
+    )
+    if not state_saved:
+        print(f"{Fore.RED}⚠️ Could not persist completed liquidation state; pending flag retained.")
+        return False
 
     print(f"{Fore.GREEN}✅ Master risk liquidation confirmed flat; risk state reset.")
     return True
