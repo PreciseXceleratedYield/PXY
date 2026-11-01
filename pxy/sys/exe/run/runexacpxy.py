@@ -200,6 +200,29 @@ def _tick(client, open_df, closed_df, exit_signal=None):
                     "trade rows to reconcile; risk reset remains pending."
                 )
                 return
+            active_tags = {
+                str(tag).strip()
+                for tag in state_on_disk.get("active_book_tags", [])
+                if str(tag).strip()
+            }
+            closed_columns = {
+                str(column).upper(): column for column in closed_df.columns
+            }
+            tag_column = closed_columns.get("TAG")
+            closed_tags = (
+                {
+                    str(tag).strip()
+                    for tag in closed_df[tag_column]
+                    if str(tag).strip()
+                }
+                if tag_column is not None else set()
+            )
+            if active_tags and not active_tags.issubset(closed_tags):
+                print(
+                    f"{Fore.YELLOW}⚠️ Broker is flat, but LILO has not reconciled every "
+                    "active risk-cycle tag; risk reset remains pending."
+                )
+                return
             if has_working_sell_orders(client):
                 print(
                     f"{Fore.YELLOW}⏳ Broker positions are flat, but a sell order is still working; "
