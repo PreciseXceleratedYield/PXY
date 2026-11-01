@@ -8,9 +8,11 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSINPXY_CANDLE_MODE,
     SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
+    SYSSMAPXY_MA_PERIOD,
 )
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_close_direction_series, transform_dtha_ohlc
+from syssmapxy import get_sma_signal
 from sysstrnpxy import get_market_trend
 
 
@@ -64,7 +66,31 @@ if __name__ == "__main__":
     print(f"IN SIGNAL: {get_signal()}")
 
 def get_entry_signal(df=None):
-    """Translate IN state into the BUY/SELL action required by execution."""
+    """Translate IN state into an execution action, with SMA50 confirming ST SIDE."""
+    if SYSINPXY_CANDLE_MODE == "ST":
+        if df is None:
+            df = fetch_yf_data()
+        signal = get_signal(df)
+
+        if signal == "SIDE":
+            sma_df = df
+            if (
+                sma_df is not None
+                and not sma_df.empty
+                and SYSDTHAPXY_INCLUDE_RUNNING_CANDLE != "YES"
+            ):
+                sma_df = sma_df.iloc[:-1]
+            sma = get_sma_signal(sma_df, period=SYSSMAPXY_MA_PERIOD)
+            return {
+                "BULL": "BUY",
+                "BEAR": "SELL",
+            }.get(str(sma.get("status", "NA")).upper(), "NONE")
+
+        return {
+            "BULL": "BUY",
+            "BEAR": "SELL",
+        }.get(signal, "NONE")
+
     signal = get_signal(df)
     return {
         "BULL": "BUY",

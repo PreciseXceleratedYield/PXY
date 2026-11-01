@@ -167,7 +167,10 @@ the IN channel's selected candle mode:
 Insufficient, flat, or invalid required directions return `NONE`.
 `get_entry_signal()` translates IN states to execution actions: `BULL`
 becomes `BUY`; `BEAR` becomes `SELL`; existing `BUY` and `SELL` flip actions
-remain unchanged. In ST mode, `SIDE` maps to `NONE`.
+remain unchanged. In ST mode, `BULL` maps to `BUY` and `BEAR` maps to
+`SELL`. When ST is `SIDE`, IN checks the existing SMA50 status: SMA50 `BULL`
+produces `BUY`, SMA50 `BEAR` produces `SELL`, and any other/unavailable SMA50
+status produces `NONE`.
 
 ### OUT — exit signal channel
 
