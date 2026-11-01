@@ -425,11 +425,11 @@ body{
     <div class="tab-pane active" id="paneTerminal">
         <div class="pane-hdr hdr-term">
             <span onclick="openPanelLink('terminal')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">🖥️ Terminal</span>
+            <button id="engineLogToggle" type="button" style="margin-left:auto;font:10px monospace;cursor:pointer;">LOG</button>
         </div>
         <div id="termBox"></div>
         <div id="engineLogPanel" style="display:none;flex:1;min-height:0;flex-direction:column;background:var(--bg2);color:var(--text);">
             <div style="display:flex;gap:6px;padding:5px;flex-wrap:wrap;">
-                <button id="engineLogReturn" type="button">← Return to Terminal</button>
                 <button id="engineLogCopy" type="button">Copy</button>
                 <button id="engineLogRefresh" type="button">Refresh</button>
                 <span id="engineLogStatus" style="font-size:10px;"></span>
@@ -569,7 +569,6 @@ body{
     <button class="amenu-btn pe"     data-script="pxybuype">✅ BUY PE<span class="amenu-sub">Force buy put option</span></button>
     <button class="amenu-btn pe"     data-script="pxysqrpe">⛔ SQUARE OFF PE<span class="amenu-sub">Close all put positions</span></button>
     <button class="amenu-btn config" data-script="pxyconfig">⚙️ PXYCONFIG<span class="amenu-sub">Configure runtime settings</span></button>
-    <button class="amenu-btn" id="engineLogMenu" type="button">📋 ENGINE LOG<span class="amenu-sub">View and copy live engine output</span></button>
     <button class="amenu-btn update" data-script="pxyupdate">🔄 PXYUPDATE<span class="amenu-sub">Pull latest & reset</span></button>
     <button id="amenuClose" style="margin-top:4px;padding:7px;border-radius:7px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-family:'DM Mono',monospace;font-size:11px;cursor:pointer;width:100%;">✕ Close</button>
 </div>
@@ -1771,22 +1770,24 @@ async function refreshEngineLog(){
         if(atBottom)log.scrollTop=log.scrollHeight;
     }catch(e){$('engineLogStatus').textContent='Fetch failed';}
 }
-$('engineLogMenu').addEventListener('click',()=>{
-    amenu.style.display='none';
-    switchTab('paneTerminal');
-    $('termBox').style.display='none';
-    $('engineLogPanel').style.display='flex';
-    refreshEngineLog();
-    if(engineLogTimer)clearInterval(engineLogTimer);
-    engineLogTimer=setInterval(()=>{
-        if(!window.getSelection().toString())refreshEngineLog();
-    },3000);
-});
-$('engineLogReturn').addEventListener('click',()=>{
-    if(engineLogTimer){clearInterval(engineLogTimer);engineLogTimer=null;}
-    $('engineLogPanel').style.display='none';
-    $('termBox').style.display='';
-    if(fit)setTimeout(()=>fit.fit(),50);
+$('engineLogToggle').addEventListener('click',()=>{
+    const showingLog=$('engineLogPanel').style.display==='flex';
+    if(showingLog){
+        if(engineLogTimer){clearInterval(engineLogTimer);engineLogTimer=null;}
+        $('engineLogPanel').style.display='none';
+        $('termBox').style.display='';
+        $('engineLogToggle').textContent='LOG';
+        if(fit)setTimeout(()=>fit.fit(),50);
+    }else{
+        $('termBox').style.display='none';
+        $('engineLogPanel').style.display='flex';
+        $('engineLogToggle').textContent='LIVE';
+        refreshEngineLog();
+        if(engineLogTimer)clearInterval(engineLogTimer);
+        engineLogTimer=setInterval(()=>{
+            if(!window.getSelection().toString())refreshEngineLog();
+        },3000);
+    }
 });
 $('engineLogRefresh').addEventListener('click',refreshEngineLog);
 $('engineLogCopy').addEventListener('click',async()=>{
