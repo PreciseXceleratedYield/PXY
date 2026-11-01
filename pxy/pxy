@@ -217,7 +217,7 @@ while true; do
             echo "Initializing Production Trading Engine..."
             if ! tmux has-session -t pxy-engine 2>/dev/null && ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
                 # Restrict terminal history memory strictly to 500 lines
-                tmux new-session -d -s pxy-engine "bash -c 'tmux set-option history-limit 500; cd \"$PXY_APP_DIR/sys\"; if [ ! -r \"\\$HOME/env/bin/activate\" ]; then echo \"[X] Python virtual environment missing\"; exit 1; fi; source \"\\$HOME/env/bin/activate\" || exit 1; export PYTHONUNBUFFERED=1; exec python3 sysexepxy.py'"
+                tmux new-session -d -s pxy-engine "cd \"$PXY_APP_DIR/sys\" && exec \"$HOME/env/bin/python3\" -u sysexepxy.py"
 
                 sleep 1
                 if tmux has-session -t pxy-engine 2>/dev/null; then
