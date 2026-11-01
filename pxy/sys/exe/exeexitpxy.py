@@ -50,6 +50,7 @@ from sysdcinpxy import (
 from exeomspxy import get_combined_data 
 from runexlckpxy import ledger_busy      # stand the counter-buy down while the ledger lock is held
 from runlilopxy import position_net_quantity
+from execoolpxy import liquidation_pending
 
 # IMPORT SYSTEM CO-PROCESSOR 
 from exeexppxy import analyze_targets_and_sides, process_metrics_print_and_dump, dump_idle_json
@@ -402,7 +403,7 @@ def run_snapshot():
     # Base path to the script
     exe_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), SQUAREOFF_SCRIPT)
     
-    if os.path.exists(exe_path):
+    if os.path.exists(exe_path) and not liquidation_pending():
         sq_args, sq_key = None, None
         if SQOFF_START <= now < SQOFF_ALL_START:       # 15:30 to 15:31: without -all
             sq_args, sq_key = [], "SQOFF|first"
@@ -423,6 +424,9 @@ def run_snapshot():
                     print(f"{Fore.RED}❌ Direct scheduled square-off failed: {error}")
 
     data = get_combined_data()
+    if liquidation_pending():
+        print(f"{Fore.YELLOW}🛑 Master risk liquidation pending; normal exits and counter-buy are paused.")
+        return
     df = data.get("active_orders", pd.DataFrame())
     client = data.get("broker_client")
     positions_response = data.get("positions_snapshot")
