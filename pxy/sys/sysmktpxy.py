@@ -4,6 +4,7 @@ from sysdthapxy import get_signal_depth_analysis
 from sysdtafpxy import fetch_yf_data
 from sysinpxy import get_entry_signal
 from sysoutpxy import get_signal as get_exit_signal
+from syssmapxy import get_sma_signal
 
 
 def get_pxy_data(df):
@@ -58,6 +59,17 @@ def get_signals(df=None):
             entry_signal = "NONE"
         if exit_signal not in {"BULL", "BEAR", "SIDE"}:
             exit_signal = "NONE"
+
+        # Filter IN using the existing SMA50; OUT remains unchanged.
+        if entry_signal in {"BUY", "SELL"}:
+            try:
+                sma50_status = get_sma_signal(df)["status"]
+            except Exception:
+                sma50_status = "NA"
+            if entry_signal == "BUY" and sma50_status != "BULL":
+                entry_signal = "NONE"
+            elif entry_signal == "SELL" and sma50_status != "BEAR":
+                entry_signal = "NONE"
 
         if SYSMKTPXY_DEBUG_ENABLED:
             analysis = get_signal_depth_analysis(df)
