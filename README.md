@@ -109,14 +109,9 @@ configuration reference below for their current values.
 
 ### DTHA
 
-`sysdthapxy.py` owns the shared candle transformation functions. DTHA selects
-one of the six candle transformations; IN and OUT independently select one of
-those six transformations or the direct `ST` state. Their settings are in
-central configuration:
-
-- `SYSDTHAPXY_CANDLE_MODE`
-- `SYSINPXY_CANDLE_MODE`
-- `SYSOUTPXY_CANDLE_MODE`
+`sysdthapxy.py` owns the shared candle transformation and signal-mode
+selection. The single `SYSDTHAPXY_CANDLE_MODE` setting controls DTHA,
+IN, and OUT. IN and OUT do not have separate candle-mode settings.
 
 Supported modes:
 
@@ -128,14 +123,15 @@ Supported modes:
 | `OHLC4` | Replaces Close with (Open + High + Low + Close) / 4. |
 | `HYPER` | Sets synthetic Open to raw Close; synthetic Close is the average of raw Close and raw High for bullish raw candles, or raw Close and raw Low for bearish raw candles. |
 | `TSMA` | Synthetic Open is the configured-period linear-regression endpoint of raw Open; synthetic Close is (synthetic Open + raw Close) / 2; High/Low bound those two values. |
+| `ST` | Selects the existing `sysstrnpxy.py` SuperTrend classification for both IN and OUT; OHLC remains raw. |
 
-`ST` is an additional IN/OUT selector, not a DTHA candle transformation. In
-ST mode, the channel uses the existing `sysstrnpxy.py` SuperTrend classification
-directly: `BULL`, `BEAR`, or `SIDE`. It does not create another SuperTrend
-calculation or alter OHLC candles. IN maps `BULL` to the `BUY` action, `BEAR`
-to `SELL`, and `SIDE` to `NONE`. OUT passes all three states through MKT and
-the entry router; downstream logic can therefore distinguish `SIDE` from
-missing data (`NONE`).
+When `SYSDTHAPXY_CANDLE_MODE` is `ST`, it overrides both signal channels:
+IN and OUT use the existing SuperTrend classification directly (`BULL`,
+`BEAR`, or `SIDE`), and the chart retains raw OHLC. There are no
+independent IN/OUT mode selectors. IN only generates an entry when ST is
+`SIDE` and SMA50 confirms direction: SMA50 `BULL` produces `BUY`,
+SMA50 `BEAR` produces `SELL`, and all other ST/SMA states produce
+`NONE`. OUT passes the ST state through MKT and the entry router.
 
 The configured TSMA candle period is `SYSSMAPXY_TSMA_PERIOD` (7). It is not
 the same as the separate 50-period chart moving-average window
@@ -155,7 +151,7 @@ candle participates in DTHA/IN/OUT evaluation.
 ### IN — entry signal channel
 
 `sysinpxy.py` evaluates the latest two candle directions, C1 and C0, using
-the IN channel's selected candle mode:
+the shared DTHA-selected candle mode:
 
 | C1 | C0 | IN result |
 | --- | --- | --- |
@@ -165,20 +161,19 @@ the IN channel's selected candle mode:
 | DOWN | UP | `BUY` |
 
 Insufficient, flat, or invalid required directions return `NONE`.
-`get_entry_signal()` translates IN states to execution actions: `BULL`
-becomes `BUY`; `BEAR` becomes `SELL`; existing `BUY` and `SELL` flip actions
-remain unchanged. In ST mode, `BULL` maps to `BUY` and `BEAR` maps to
-`SELL`. When ST is `SIDE`, IN checks the existing SMA50 status: SMA50 `BULL`
-produces `BUY`, SMA50 `BEAR` produces `SELL`, and any other/unavailable SMA50
-status produces `NONE`.
+`get_entry_signal()` translates the normal candle-mode results as before.
+When DTHA is in `ST` mode, IN only generates an entry when ST is
+`SIDE` and SMA50 confirms direction: SMA50 `BULL` produces `BUY`,
+SMA50 `BEAR` produces `SELL`, and all other ST/SMA states produce
+`NONE`.
 
 ### OUT — exit signal channel
 
-`sysoutpxy.py` independently evaluates its configured candle stream. For
+`sysoutpxy.py` evaluates the candle stream selected centrally by DTHA. For
 the six candle modes, it returns `BULL` when C0 is UP, `BEAR` when C0 is
 DOWN, and `NONE` when the required directions are unavailable or invalid.
-In `ST` mode, it returns the existing SuperTrend classification unchanged:
-`BULL`, `BEAR`, or `SIDE`.
+When DTHA is set to `ST`, OUT returns the existing SuperTrend classification
+unchanged: `BULL`, `BEAR`, or `SIDE`.
 
 ### MKT and entry router
 
@@ -510,7 +505,7 @@ IN has an additional internal time guard: it returns NONE through 09:17:00 IST. 
 
 ### OUT — exit state machine
 
-OUT independently applies `SYSOUTPXY_CANDLE_MODE` and the running-candle rule. It requires at least three usable Close values and valid UP/DOWN directions for C1 and C0. Its result is determined by C0:
+OUT applies the shared DTHA mode and the running-candle rule. It requires at least three usable Close values and valid UP/DOWN directions for C1 and C0. Its result is determined by C0:
 
 - C0 UP → BULL.
 - C0 DOWN → BEAR.
@@ -520,7 +515,7 @@ OUT is a directional state; it does not return BUY or SELL.
 
 ### MKT and entry-router contract
 
-The public MKT interface returns exactly the pair `(entry_signal, exit_signal)`. The first value is normalized to BUY, SELL or NONE. The second is normalized to BULL, BEAR, SIDE or NONE; SIDE is preserved when OUT uses ST mode. MKT does not add a Supertrend, SMA, TSMA, ATR or BOS confirmation filter to this pair.
+The public MKT interface returns exactly the pair `(entry_signal, exit_signal)`. The first value is normalized to BUY, SELL or NONE. The second is normalized to BULL, BEAR, SIDE or NONE; SIDE is preserved when DTHA selects ST mode. MKT does not add a Supertrend, SMA, TSMA, ATR or BOS confirmation filter to this pair.
 
 The entry router preserves this two-value tuple. While post-square-off cooldown is active, both values are forced to NONE. Otherwise it applies the entry-only time window: outside 09:16–13:16 IST, entry becomes NONE while exit is retained.
 
@@ -1041,11 +1036,10 @@ without either usable source the fetch returns an empty frame.
 
 ### Candle modes and chart/indicator settings
 
-DTHA, IN, and OUT each have an independent candle-mode setting:
-`SYSDTHAPXY_CANDLE_MODE`, `SYSINPXY_CANDLE_MODE`, and
-`SYSOUTPXY_CANDLE_MODE`. All three are currently configured as `TSMA`.
-Allowed values are `RAW`, `OC2`, `HA`, `OHLC4`, `HYPER`, and `TSMA`.
-See the candle transformation table above for the precise current formula.
+The single `SYSDTHAPXY_CANDLE_MODE` setting controls DTHA, IN, and OUT.
+It is currently `ST`. Supported values are `RAW`, `OC2`, `HA`,
+`OHLC4`, `HYPER`, `TSMA`, and `ST`. In ST mode, both signal
+channels use the existing SuperTrend classification and OHLC remains raw.
 
 - `SYSSMAPXY_MA_PERIOD`: 50-period chart moving average.
 - `SYSSMAPXY_TSMA_PERIOD`: 7-period TSMA candle transform.
@@ -1242,9 +1236,7 @@ setting only in the conditions described in the relevant subsystem section.
 
 | Setting | Current value | Meaning |
 | --- | --- | --- |
-| `SYSDTHAPXY_CANDLE_MODE` | `TSMA` | DTHA candle transform. |
-| `SYSINPXY_CANDLE_MODE` | `TSMA` | IN selector: a DTHA candle mode or `ST` for the existing BULL/BEAR/SIDE SuperTrend state. |
-| `SYSOUTPXY_CANDLE_MODE` | `TSMA` | OUT selector: a DTHA candle mode or `ST` for the existing BULL/BEAR/SIDE SuperTrend state. |
+| `SYSDTHAPXY_CANDLE_MODE` | `ST` | Single DTHA mode selector shared by DTHA, IN, and OUT; ST selects SuperTrend signals and raw OHLC. |
 | `SYSDTHAPXY_INCLUDE_RUNNING_CANDLE` | `YES` | Include latest running candle in signal calculations. |
 | `SYSSMAPXY_VARIANT` | `TSMA` | Selected chart average variant; allowed SMA/TSMA. |
 | `SYSSMAPXY_MA_PERIOD` | 50 | Chart average period. |

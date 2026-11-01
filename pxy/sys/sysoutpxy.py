@@ -3,7 +3,7 @@
 import pandas as pd
 
 from syscnfgpxy import (
-    SYSOUTPXY_CANDLE_MODE,
+    SYSDTHAPXY_CANDLE_MODE,
     SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
 )
 from sysdtafpxy import fetch_yf_data
@@ -16,10 +16,7 @@ def get_out_candles(df):
     if df is None or df.empty:
         return df.copy() if df is not None else pd.DataFrame()
 
-    if SYSOUTPXY_CANDLE_MODE == "ST":
-        transformed = df.copy()
-    else:
-        transformed = transform_dtha_ohlc(df, mode=SYSOUTPXY_CANDLE_MODE)
+    transformed = transform_dtha_ohlc(df)
     if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE != "YES":
         transformed = transformed.iloc[:-1].copy()
     return transformed
@@ -34,7 +31,7 @@ def get_signal(df=None):
             return "NONE"
 
         transformed = get_out_candles(df)
-        if SYSOUTPXY_CANDLE_MODE == "ST":
+        if SYSDTHAPXY_CANDLE_MODE == "ST":
             return get_market_trend(transformed)
 
         closes = pd.to_numeric(transformed["Close"], errors="coerce")

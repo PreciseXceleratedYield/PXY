@@ -6,7 +6,7 @@ import pandas as pd
 
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
-    SYSINPXY_CANDLE_MODE,
+    SYSDTHAPXY_CANDLE_MODE,
     SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
     SYSSMAPXY_MA_PERIOD,
 )
@@ -28,7 +28,7 @@ def get_signal(df=None):
         if df is None or df.empty or "Close" not in df.columns:
             return "NONE"
 
-        if SYSINPXY_CANDLE_MODE == "ST":
+        if SYSDTHAPXY_CANDLE_MODE == "ST":
             evaluated_df = df
             if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE != "YES":
                 evaluated_df = evaluated_df.iloc[:-1]
@@ -66,32 +66,25 @@ if __name__ == "__main__":
     print(f"IN SIGNAL: {get_signal()}")
 
 def get_entry_signal(df=None):
-    """Translate IN state into an execution action, with SMA50 confirming ST SIDE."""
-    if SYSINPXY_CANDLE_MODE == "ST":
+    """Translate IN state; in DTHA ST mode only SIDE is confirmed by SMA50."""
+    if SYSDTHAPXY_CANDLE_MODE == "ST":
         if df is None:
             df = fetch_yf_data()
         if df is None or df.empty:
             return "NONE"
-        signal = get_signal(df)
+        if get_signal(df) != "SIDE":
+            return "NONE"
 
-        if signal == "SIDE":
-            sma_df = df
-            if (
-                sma_df is not None
-                and not sma_df.empty
-                and SYSDTHAPXY_INCLUDE_RUNNING_CANDLE != "YES"
-            ):
-                sma_df = sma_df.iloc[:-1]
-            sma = get_sma_signal(sma_df, period=SYSSMAPXY_MA_PERIOD)
-            return {
-                "BULL": "BUY",
-                "BEAR": "SELL",
-            }.get(str(sma.get("status", "NA")).upper(), "NONE")
-
+        sma_df = df
+        if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE != "YES":
+            sma_df = sma_df.iloc[:-1]
+        if sma_df.empty:
+            return "NONE"
+        sma = get_sma_signal(sma_df, period=SYSSMAPXY_MA_PERIOD)
         return {
             "BULL": "BUY",
             "BEAR": "SELL",
-        }.get(signal, "NONE")
+        }.get(str(sma.get("status", "NA")).upper(), "NONE")
 
     signal = get_signal(df)
     return {
