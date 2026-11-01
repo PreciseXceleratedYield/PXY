@@ -109,8 +109,10 @@ configuration reference below for their current values.
 
 ### DTHA
 
-`sysdthapxy.py` owns the shared candle transformation functions. DTHA, IN,
-and OUT each select their own mode in central configuration:
+`sysdthapxy.py` owns the shared candle transformation functions. DTHA selects
+one of the six candle transformations; IN and OUT independently select one of
+those six transformations or the direct `ST` state. Their settings are in
+central configuration:
 
 - `SYSDTHAPXY_CANDLE_MODE`
 - `SYSINPXY_CANDLE_MODE`
@@ -163,9 +165,9 @@ the IN channel's selected candle mode:
 | DOWN | UP | `BUY` |
 
 Insufficient, flat, or invalid required directions return `NONE`.
-`get_entry_signal()` translates IN continuation states to execution actions:
-`BULL` becomes `BUY`; `BEAR` becomes `SELL`; existing `BUY` and `SELL`
-flip actions remain unchanged.
+`get_entry_signal()` translates IN states to execution actions: `BULL`
+becomes `BUY`; `BEAR` becomes `SELL`; existing `BUY` and `SELL` flip actions
+remain unchanged. In ST mode, `SIDE` maps to `NONE`.
 
 ### OUT — exit signal channel
 

@@ -46,7 +46,7 @@ def _print_console_bar(c1, c0, execution_state):
 
 
 def get_signals(df=None):
-    """Route IN's execution action and OUT's directional exit without extra filters."""
+    """Route IN's execution action and OUT's BULL/BEAR/SIDE state without extra filters."""
     if df is None:
         df = fetch_yf_data()
     if df is None or df.empty:

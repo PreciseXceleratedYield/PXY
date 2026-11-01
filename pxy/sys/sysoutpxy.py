@@ -26,7 +26,7 @@ def get_out_candles(df):
 
 
 def get_signal(df=None):
-    """Return only the latest direction: BULL, BEAR, or NONE."""
+    """Return OUT direction; ST mode preserves BULL, BEAR, and SIDE."""
     try:
         if df is None:
             df = fetch_yf_data()

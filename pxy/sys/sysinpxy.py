@@ -15,7 +15,7 @@ from sysstrnpxy import get_market_trend
 
 
 def get_signal(df=None):
-    """Return BULL/BEAR for continuation, BUY/SELL for a flip, else NONE."""
+    """Return the configured IN state, including BULL/BEAR/SIDE in ST mode."""
     try:
         # IN must remain inactive through 09:17:00 IST.
         if datetime.now(SYSCNFGPXY_TIMEZONE).time() <= dt_time(9, 17):
