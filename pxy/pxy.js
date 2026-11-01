@@ -64,6 +64,19 @@ app.get('/pxy.html', (req, res) => {
     res.redirect(302, '/web/webpxy.html');
 });
 
+/* ========================= READ-ONLY ENGINE LOG VIEWER ========================= */
+app.get('/api/engine-log', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    execFile('tmux', ['capture-pane', '-p', '-t', 'pxy-engine', '-S', '-500', '-J'], { timeout: 3000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
+        if (error) return res.status(503).json({ ok: false, error: 'Engine console unavailable.' });
+        res.json({ ok: true, log: stdout });
+    });
+});
+app.get('/engine-log', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.type('html').send(`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PXY Engine Log</title><style>body{margin:0;background:#111;color:#eee;font:14px monospace}header{position:sticky;top:0;background:#222;padding:12px;display:flex;gap:12px;align-items:center}button{padding:8px 14px;cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:14px;user-select:text}#status{margin-left:auto}</style></head><body><header><strong>PXY ENGINE LOG</strong><button id="copy">Copy text</button><button id="refresh">Refresh</button><label><input type="checkbox" id="auto" checked> Auto refresh</label><span id="status"></span></header><pre id="log">Loading...</pre><script>async function load(){try{const r=await fetch('/api/engine-log',{cache:'no-store'});const d=await r.json();document.getElementById('log').textContent=d.ok?d.log:(d.error||'Unavailable');document.getElementById('status').textContent=d.ok?'Live':'Unavailable';}catch(e){document.getElementById('status').textContent='Fetch failed';}}document.getElementById('refresh').onclick=load;document.getElementById('copy').onclick=async()=>{const t=document.getElementById('log').textContent;try{await navigator.clipboard.writeText(t);document.getElementById('status').textContent='Copied';}catch(e){const range=document.createRange();range.selectNodeContents(document.getElementById('log'));getSelection().removeAllRanges();getSelection().addRange(range);document.getElementById('status').textContent='Selected: press Ctrl+C';}};setInterval(()=>{if(document.getElementById('auto').checked&&!getSelection().toString())load();},3000);load();</script></body></html>`);
+});
+
 /* ========================= DASHBOARD DATA API ========================= */
 const WEB_DATA_FILES = new Set([
     'webactpxy', 'webavgpxy', 'webchrtpxy', 'webdashpxy', 'webdaypxy',
