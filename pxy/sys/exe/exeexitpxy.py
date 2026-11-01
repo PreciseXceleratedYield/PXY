@@ -238,7 +238,7 @@ def run_depth_squareoff(client, active_df, market_data_available,
         return set()
 
     past_depth_match = re.fullmatch(
-        r"(CE|PE)(\\d+)", str(snapshot.get("hkin_past_depth", "")).upper().strip()
+        r"(CE|PE)(\d+)", str(snapshot.get("hkin_past_depth", "")).upper().strip()
     )
     if not past_depth_match:
         return set()
