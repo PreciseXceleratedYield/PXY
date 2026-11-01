@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # runexlqdpxy.py   (lives in ~/pxy/sys/exe/run/)
 #
-# MASTER RISK LEDGER, part 4 of 6: liquidation. Squares off everything (exesqrpxy.py -all), waits until
-# the broker is flat, locks the final loss into pnl_offset, resets the engine and ends the process.
+# MASTER RISK LEDGER, part 4 of 6: liquidation. Submits square-off orders and returns immediately.
+# A later broker snapshot confirms flatness before pnl_offset and risk state are finalized.
 # Split out of runexacpxy.py (pure move). The breach decision itself stays in runexacpxy._tick.
 import os
 import sys
