@@ -1,715 +1,268 @@
-# PXY Trading Platform - Complete Documentation
+# PXY — System and Production Behaviour
 
-## Table of Contents
-1. [Project Overview](#project-overview)
-2. [Architecture](#architecture)
-3. [Installation & Setup](#installation--setup)
-4. [Configuration](#configuration)
-5. [Core Modules](#core-modules)
-6. [Trading Flow](#trading-flow)
-7. [API Reference](#api-reference)
-8. [Web UI Guide](#web-ui-guide)
-9. [Troubleshooting](#troubleshooting)
-10. [Security Considerations](#security-considerations)
+## 1. Purpose
 
----
+PXY (PreciseXceleratedYield) is an automated NIFTY options-trading platform.
+The repository contains a Node.js dashboard, Python market-data and signal
+modules, broker execution pipelines, portfolio/risk-ledger utilities, and
+supporting tools.
 
-## Project Overview
+The production configuration is
+`pxy/sys/syscnfgpxy.py`. This document describes the current implementation;
+if documentation and code disagree, the code is authoritative.
 
-**PXY** is an algorithmic options trading platform designed for the Nifty 50 index.
+## 2. Production runtime
 
-### Key Features
-- **Automated Signal Generation**: Real-time market analysis with BULL/BEAR/NONE classification
-- **Order Execution**: Automated entry/exit for options contracts
-- **Real-time Dashboard**: Desktop and mobile web interfaces
-- **Position Tracking**: Live P&L and position monitoring
-- **Technical Analysis**: Multiple OHLC modes and trend analysis
+The host management script is `pxy/pxy`. Its Start action launches:
 
-### Supported Assets
-- Nifty 50 (`^NSEI`)
-- Bitcoin (`BTC-USD`)
-- Gold Futures (`GC=F`)
-- Forex pairs (`GBPUSD=X`, etc.)
+- `pxy/pxy.js` in tmux session `pxy-web`.
+- `pxy/sys/sysexepxy.py` in tmux session `pxy-engine`.
 
-### Technology Stack
-- **Backend**: Python 3.7+, Node.js (Express.js)
-- **Frontend**: HTML5, JavaScript, Chart.js
-- **Data Source**: Yahoo Finance API
-- **Real-time Communication**: WebSockets
-- **Mobile**: PWA with Service Worker support
+The supervisor starts `pxy/sys/exe/exepxy.py`, which runs the production
+execution cycle. The manager expects the host's configured Python environment;
+this repository guide does not prescribe a generic dependency installation or
+credential setup.
 
----
+### Production execution cycle
 
-## Architecture
+The active execution loop in `sys/exe/exepxy.py` runs these child processes
+in order:
 
-### System Overview
+1. `run/runnfutpxy.py` — refresh the NIFTY futures quote.
+2. `exeexitpxy.py` — process exits.
+3. `exeentrpxy.py` — process fresh-entry logic.
+4. `exeexitpxy.py` — give exits another pass.
+5. `exeavgpxy.py` — process averaging.
+6. `exeexitpxy.py` — give exits a final pass.
 
-The production signal path is:
+Each child is launched with `EXEPXYPXY_PIPE_TIMEOUT_SECONDS`. Failures are
+recorded by component and later iterations continue; persistent failures are
+periodically reported through Telegram. The production loop uses the configured
+market schedule, sub-iteration count, and action cooldown.
 
-```text
-DTAF
-  ↓
-DTHA — shared candle transformation and directional depth
-  ├── IN  — entry signal channel
-  └── OUT — exit signal channel
-          ↓
-        MKT — routes IN and OUT without extra trend filters
-          ↓
-     SYSENTRPXY — entry window and post-square-off cooldown
-          ↓
-        EXE — order execution and position management
-```
+## 3. Market data
 
-DTHA owns candle transformation. DTHA, IN, and OUT select their modes
-independently through `syscnfgpxy.py`. IN and OUT compare transformed Close
-values with the preceding transformed Close. MKT combines their outputs; it
-does not add a Supertrend or moving-average confirmation filter.
+`sysdtafpxy.py` is the production market-data ingestion path.
 
-Supertrend, moving averages, ATR, DTHA depth, and other indicators remain
-available to dashboard, chart, and risk-analysis components. They are not an
-additional entry/exit confirmation stage in the current IN/OUT/MKT signal path.
+- The production underlying ticker is `^NSEI`.
+- The default interval is one minute and the default target is 60 rows.
+- Yahoo Finance OHLC is blended with the latest NIFTY futures quote from
+  `sys/exe/run/nftfut.json` when that quote has a valid, timezone-aware
+  timestamp and is within `SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS`.
+- The blend averages each OHLC field with the futures price.
+- If the futures quote is unavailable or stale while Yahoo history is usable,
+  Yahoo OHLC is used without futures blending.
+- If Yahoo history is insufficient, the code can synthesize fallback rows from
+  a valid recent futures quote. If neither source is usable, it returns an
+  empty frame.
+- `BTC-USD` is reserved for the separately restricted monitor-data path; it
+  is not the production trading instrument.
 
-### Directory Structure
+The code also defines Yahoo candle-age and stale-alert settings. Consult
+`syscnfgpxy.py` for their current values.
 
-```text
-pxy/
-├── pxy.js / pxy.html          # Web server and application entry
-├── sys/
-│   ├── syscnfgpxy.py          # Single runtime configuration source
-│   ├── sysdtafpxy.py          # Market-data acquisition
-│   ├── sysdthapxy.py          # Shared candle transformation and depth
-│   ├── sysinpxy.py            # Entry signal channel
-│   ├── sysoutpxy.py           # Exit signal channel
-│   ├── sysmktpxy.py           # IN/OUT signal router
-│   ├── sysentrpxy.py          # Entry window and cooldown router
-│   ├── sysdashpxy.py          # Dashboard snapshot generation
-│   ├── sysstrnpxy.py          # Supertrend indicator
-│   └── exe/                   # Production execution modules
-├── web/                       # Dashboard and web interfaces
-└── _/                         # Retained archive/backup material
-```
+## 4. Candle transformations and signal channels
 
-This is a focused map of the production signal path, not an exhaustive
-inventory of every repository file.
+### DTHA
 
-## Installation & Setup
+`sysdthapxy.py` owns the shared candle transformation functions. The DTHA,
+IN, and OUT channels each select their own mode in central configuration:
 
-### Prerequisites
-```bash
-# Python 3.7+
-python3 --version
+- `SYSDTHAPXY_CANDLE_MODE`
+- `SYSINPXY_CANDLE_MODE`
+- `SYSOUTPXY_CANDLE_MODE`
 
-# Node.js 12+
-node --version
-npm --version
+The supported modes are:
 
-# System dependencies (Ubuntu/Debian)
-sudo apt-get install python3-pip python3-dev
-```
-
-### Step 1: Clone Repository
-```bash
-git clone https://github.com/PreciseXceleratedYield/PXY.git
-cd PXY
-```
-
-### Step 2: Install Python Dependencies
-```bash
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # Linux/Mac
-# or
-venv\Scripts\activate  # Windows
-
-# Install packages
-pip install pandas numpy yfinance pytz colorama requests
-```
-
-### Step 3: Install Node Dependencies
-```bash
-cd pxy
-npm install
-```
-
-### Step 4: Configure Broker Credentials
-```bash
-# Create config file
-cp pxy/sys/syscnfgpxy.py pxy/sys/syscnfgpxy_local.py
-
-# Edit with your broker credentials
-# CONSUMER_KEY = "your_key"
-# CONSUMER_SECRET = "your_secret"
-# MOBILE_NUMBER = "your_number"
-# UCC = "your_ucc"
-# MPIN = "your_mpin"
-# TOTP_SECRET_KEY = "your_totp"
-```
-
-### Step 5: Start the System
-```bash
-# Terminal 1: Start Node.js server
-cd pxy
-npm start
-
-# Terminal 2: Start Python trading engine
-python3 pxy/sys/exe/exepxy.py
-```
-
-### Step 6: Access Interfaces
-- **Desktop**: http://localhost:3000/pxy/web/webpcpxy.html
-- **Mobile**: http://localhost:3000/pxy/web/webphpxy.html
-- **Extension**: Load `pxy/web/ext/` in Chrome
-
----
-
-## Configuration
-
-### Single source of truth
-
-All runtime settings are defined in `pxy/sys/syscnfgpxy.py`. Do not create
-parallel configuration files or edit module-local copies of settings.
-
-### Independent candle modes
-
-The following settings independently select the candle transformation used
-by each signal channel:
-
-```python
-SYSDTHAPXY_CANDLE_MODE = "TSMA"
-SYSINPXY_CANDLE_MODE = "TSMA"
-SYSOUTPXY_CANDLE_MODE = "TSMA"
-SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "YES"
-```
-
-Supported modes are:
-
-| Mode | Transformation |
+| Mode | Current implementation |
 | --- | --- |
-| `RAW` | Original OHLC candles |
-| `OC2` | Synthetic Close = (Open + Close) / 2 |
-| `HA` | Standard recursive Heikin-Ashi candles |
-| `OHLC4` | Synthetic Close = (Open + High + Low + Close) / 4 |
-| `HYPER` | Former DTAF mode-0 modified-close transformation |
-| `TSMA` | 7-period linear-regression Open and custom Close |
+| `RAW` | Retains raw OHLC values. |
+| `OC2` | Replaces Close with (Open + Close) / 2. |
+| `HA` | Standard recursive Heikin-Ashi OHLC. |
+| `OHLC4` | Replaces Close with (Open + High + Low + Close) / 4. |
+| `HYPER` | Sets synthetic Open to raw Close; synthetic Close is the average of raw Close and raw High for bullish raw candles, or raw Close and raw Low for bearish raw candles. |
+| `TSMA` | Synthetic Open is the configured-period linear-regression endpoint of raw Open; synthetic Close is (synthetic Open + raw Close) / 2; High/Low bound those two values. |
 
-For TSMA candle mode, synthetic Open is the 7-period linear-regression
-endpoint of raw Open. Synthetic Close is the average of that synthetic Open
-and raw Close. The TSMA candle period is controlled by
-`SYSSMAPXY_TSMA_PERIOD` (currently 7).
+The current configured TSMA candle period is
+`SYSSMAPXY_TSMA_PERIOD` (7). It is not the same as the separate 50-period
+chart moving-average window (`SYSSMAPXY_MA_PERIOD`).
 
-Do not confuse the TSMA candle period with the separate chart moving-average
-period. `SYSSMAPXY_MA_PERIOD` is currently 50, and
-`SYSSMAPXY_VARIANT` selects SMA or TSMA for that separate 50-period chart
-line.
+Candle direction is based on each transformed Close compared with the
+immediately preceding transformed Close:
 
-### Signal timing
+- UP / green: current Close is greater.
+- DOWN / red: current Close is lower.
+- FLAT: current Close is equal.
+- UNKNOWN: a usable comparison is unavailable.
 
-- IN remains inactive through 09:17 IST.
-- Fresh entry signals are restricted by the configured market-open and
-  entry-cutoff times.
-- A post-square-off cooldown can force both entry and exit signals to NONE.
-- The running-candle setting determines whether the latest returned candle
-  participates in signal evaluation.
+`SYSDTHAPXY_INCLUDE_RUNNING_CANDLE` determines whether the latest returned
+candle participates in DTHA/IN/OUT evaluation.
 
-See `pxy/sys/CONFIGURATION.md` for configuration ownership, conditional
-settings, and production strategy details.
+### IN — entry signal channel
 
-## Core Modules
+`sysinpxy.py` evaluates the latest two candle directions, C1 and C0, using the
+IN channel's selected candle mode. It returns:
 
-### 1. `sysdtafpxy.py` — Market data
-
-Fetches the underlying market OHLC data used by the production signal
-pipeline. DTAF provides the canonical input data; candle-mode transformations
-belong to DTHA rather than being duplicated in signal modules.
-
-### 2. `sysdthapxy.py` — Shared candle transformation and depth
-
-DTHA is the single implementation of the supported candle transformations:
-`RAW`, `OC2`, `HA`, `OHLC4`, `HYPER`, and `TSMA`.
-
-It also provides close-to-previous-close direction classification and
-directional depth analysis. The TSMA candle uses
-`SYSSMAPXY_TSMA_PERIOD` (currently 7).
-
-### 3. `sysinpxy.py` and `sysoutpxy.py` — Independent signal channels
-
-IN and OUT each select their own candle mode from central configuration and
-use DTHA's shared transformation functions.
-
-- **IN** returns `BULL` or `BEAR` for continuation, `BUY` or `SELL` for
-  a direction flip, and `NONE` when required candle directions are invalid
-  or unavailable.
-- **OUT** returns the current direction as `BULL` or `BEAR`, or `NONE`
-  when required candle directions are invalid or unavailable.
-
-Candle direction is determined by comparing each transformed Close with the
-preceding transformed Close. C0 is the latest evaluated candle, C1 the
-previous candle, and C2 the candle before C1.
-
-### 4. `sysmktpxy.py` — IN/OUT market router
-
-MKT calls the IN and OUT channels and returns the pair
-`(entry_signal, exit_signal)`. It normalizes IN continuation/flip states to
-execution actions `BUY` and `SELL`, and passes OUT's directional
-`BULL`/`BEAR` state through. It does not apply an additional Supertrend or
-moving-average filter.
-
-### 5. `sysentrpxy.py` — Entry router
-
-SYSENTRPXY calls MKT, applies the configured fresh-entry time window and
-post-square-off cooldown, and preserves the
-`(entry_signal, exit_signal)` return contract. It is the signal hand-off to
-the execution layer.
-
-### 6. `sysstrnpxy.py` — Supertrend indicator
-
-This module calculates the Supertrend indicator using the configured
-Supertrend period and factor. It is an indicator consumed by supporting
-dashboard/chart and analysis components; it is not the former
-`sysstrndpxy.py` SMA50-based entry-confirmation stage.
-
-### 7. `sysdashpxy.py` — Dashboard snapshot
-
-Aggregates current market, signal, indicator, depth, and portfolio information
-for the web dashboard. Dashboard indicator values are not extra filters in
-the IN/OUT/MKT signal route.
-
-### 8. `exe/` — Order execution
-
-The execution modules handle broker interaction, order placement, position
-management, exits, averaging, and square-off. The production launcher and
-execution loop are maintained under the current `pxy/` launch structure.
-
-## Trading Flow
-
-### Production signal sequence
-
-```text
-1. DTAF fetches the underlying OHLC data
-                  ↓
-2. DTHA applies the configured candle transformation
-                  ↓
-3. IN evaluates its independently configured candle stream
-   OUT evaluates its independently configured candle stream
-                  ↓
-4. MKT combines IN's entry action and OUT's exit direction
-                  ↓
-5. SYSENTRPXY applies entry timing and cooldown restrictions
-                  ↓
-6. EXE evaluates signals against positions and production execution rules
-                  ↓
-7. Dashboard modules publish the current snapshot
-```
-
-### Signal meanings
-
-| Channel | Result | Meaning |
+| C1 | C0 | IN result |
 | --- | --- | --- |
-| IN | `BULL` | Two consecutive green candles; continuation |
-| IN | `BEAR` | Two consecutive red candles; continuation |
-| IN | `BUY` | Red-to-green direction flip |
-| IN | `SELL` | Green-to-red direction flip |
-| OUT | `BULL` | Latest evaluated candle is green |
-| OUT | `BEAR` | Latest evaluated candle is red |
-| Either | `NONE` | Flat, invalid, or insufficient candle data |
-
-MKT normalizes IN continuation and flip results to execution actions:
-`BULL`/`BUY` become `BUY`, and `BEAR`/`SELL` become `SELL`.
-OUT remains directional: `BULL` or `BEAR`.
-
-### Candle direction
-
-For each transformed candle, direction is based on its Close relative to the
-previous transformed candle's Close:
-
-- Green: current Close is greater than previous Close.
-- Red: current Close is less than previous Close.
-- Flat: current Close equals previous Close.
-
-The latest evaluated candle is C0; C1 and C2 provide the prior closes needed
-to establish both C0 and C1 directions. A flat or unavailable required
-direction produces `NONE`.
-
-## API Reference
-
-### WebSocket Messages
-
-**Connection**:
-```javascript
-const ws = new WebSocket('ws://localhost:3000');
-ws.onopen = () => console.log('Connected');
-ws.onmessage = (event) => console.log('Data:', event.data);
-```
-
-**Message Format**:
-```json
-{
-    "type": "market_update",
-    "timestamp": "2024-01-15T10:30:45Z",
-    "data": {
-        "signal": "BULL",
-        "price": 19520.50,
-        "volume": 1500000
-    }
-}
-```
-
-### HTTP Endpoints
-
-**Get Dashboard Data**:
-```bash
-GET /pxy/web/webdashpxy.json
-Response: {
-    "timestamp": "...",
-    "bias": "BULL",
-    "entry": "ATMBUY",
-    ...
-}
-```
-
-**Get Chart Data**:
-```bash
-GET /pxy/web/webchrtpxy.json
-Response: [{
-    "time": "2024-01-15T10:30:00",
-    "open": 19450.5,
-    "high": 19520.0,
-    "low": 19420.0,
-    "close": 19510.0,
-    "sma21": 19480.5,
-    "sma50": 19470.0
-}, ...]
-```
-
-**Get Positions**:
-```bash
-GET /pxy/web/webactpxy.json
-Response: {
-    "positions": [{
-        "symbol": "NIFTY50FEB19500CE",
-        "side": "CE",
-        "quantity": 1,
-        "entry_price": 152.50,
-        "current_price": 165.25,
-        "pnl": 1275,
-        "entry_percentage": "15%",
-        "target_percentage": "25%"
-    }, ...]
-}
-```
-
----
-
-## Web UI Guide
-
-### Desktop Interface (webpcpxy.html)
-
-**Layout**: 3-column responsive design
-
-**Column 1: Terminal (21%)**
-- xterm.js integration
-- Live execution logs
-- Connection status
-- Command output
-
-**Column 2: Positions (25%)**
-- **Top Section (40%)**: Active positions list
-  - Symbol, Entry %, Target %
-  - Current P&L
-  - Sorted by P&L or symbol
-  
-- **Bottom Section (60%)**: Closed trades history
-  - Trade tag number
-  - Entry/Exit time
-  - Final P&L
-  - Win/Loss indicator
-
-**Column 3: Chart (54%)**
-- Candlestick chart (60 candles visible)
-- SMA21 (dotted line, gold)
-- SMA50 (solid line, gray)
-- Momentum bar (left sidebar)
-  - Shows volatility
-  - Current vs 8-candle high/low
-
-**Bottom Bar: Risk Metrics**
-- Stop Loss level (Daily loss limit)
-- Current Net P&L
-- Session Peak P&L
-
-**Signal Bar (Colored cells)**
-- Entry: Last entry signal
-- Exit: Last exit signal
-- Trend: Current trend direction
-- ATR: Average True Range
-- Depth/Power: Signal strength
-
----
-
-### Mobile Interface (webphpxy.html)
-
-**Tab-based Navigation**:
-1. **Terminal Tab**: Live logs and execution output
-2. **Chart Tab**: Full-screen candlestick chart
-3. **Positions Tab**: Active positions and trades (40/60 split)
-
-**Bottom Tab Bar**: For easy thumb access
-
-**Features**:
-- Touch-optimized buttons
-- PWA support (offline capable)
-- Service Worker caching
-- Responsive text scaling
-
----
-
-### Actions Menu
-
-**Accessible via**: Click PXY® logo
-
-**Actions**:
-| Action | Button | Function |
-|--------|--------|----------|
-| **SQUARE OFF ALL** | ⛔ | Close all positions |
-| **BUY CE** | ✅ | Force buy call option |
-| **SQUARE OFF CE** | ⛔ | Close all calls |
-| **BUY PE** | ✅ | Force buy put option |
-| **SQUARE OFF PE** | ⛔ | Close all puts |
-| **PXYCONFIG** | ⚙️ | Edit broker credentials |
-| **PXYUPDATE** | 🔄 | Pull latest code & reset |
-
-All actions require password confirmation (neo password).
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue**: Terminal shows "❌ Client Init Failed"
-```
-Cause: Broker credentials incorrect or session expired
-Fix:
-  1. Click ⚙️ PXYCONFIG
-  2. Verify CONSUMER_KEY, CONSUMER_SECRET
-  3. Ensure TOTP_SECRET_KEY is current
-  4. Re-enter MPIN
-  5. Save and restart
-```
-
-**Issue**: "⏱ API TIMEOUT: position fetch took too long"
-```
-Cause: Broker API slow or network latency
-Fix:
-  1. Increase timeout in exepxy.py:
-     call_with_timeout(get_position_summary, timeout=15, client)
-  2. Check broker API status
-  3. Reduce SIMPLE_MODE sub-iterations
-  4. Check network connectivity
-```
-
-**Issue**: No signals generated (shows "NONE")
-```
-Cause: Market data unavailable or close unchanged
-Fix:
-  1. Verify market hours (9:16 AM - 3:29 PM IST)
-  2. Check ticker: ^NSEI (Nifty) opens after 9:15 AM
-  3. Ensure internet connectivity
-  4. Check Yahoo Finance API rate limits
-  5. Verify the DTHA, IN, and OUT candle-mode settings in syscnfgpxy.py
-```
-
-**Issue**: Web UI shows "—" (dashes) everywhere
-```
-Cause: JSON files not updating
-Fix:
-  1. Check syspxy.py output to webdashpxy.json
-  2. Verify file permissions (chmod 666 on web/*.json)
-  3. Ensure sysdtafpxy.py can fetch data
-  4. Check browser console for fetch errors
-  5. Clear browser cache (Ctrl+Shift+Delete)
-```
-
-**Issue**: Positions not showing in UI
-```
-Cause: Position sync failed or runpchkpxy.py error
-Fix:
-  1. Check broker session (run runclntpxy.py)
-  2. Verify UCC and MPIN are correct
-  3. Check OMS (Order Management System) connection
-  4. Review positions in broker's terminal directly
-  5. Run manual position reconciliation
-```
-
-### Performance Tuning
-
-**Reduce Latency**:
-```python
-# In exepxy.py:
-PAUSE_BETWEEN_ITERATIONS = 3    # Reduce from 7 (faster but riskier)
-call_with_timeout(..., timeout=5)  # Faster API calls
-```
-
-**Increase Stability**:
-```python
-PAUSE_BETWEEN_ITERATIONS = 10   # More time between trades
-call_with_timeout(..., timeout=20) # More patient API waits
-```
-
-**Debug Mode**:
-```python
-# In various sys/*.py:
-DEBUG = True        # Enable console logging
-DEBUG_MODE = True   # Enable all debug output
-```
-
----
-
-## Security Considerations
-
-### ⚠️ Critical Issues
-
-**1. Credential Handling**
-```python
-# NEVER commit credentials
-# Instead, use environment variables:
-import os
-CONSUMER_KEY = os.getenv('PXY_CONSUMER_KEY')
-CONSUMER_SECRET = os.getenv('PXY_CONSUMER_SECRET')
-MPIN = os.getenv('PXY_MPIN')
-
-# Set via:
-# export PXY_CONSUMER_KEY="your_key"
-# or in .env file (add to .gitignore)
-```
-
-**2. Secure WebSocket**
-```python
-# Ensure TLS/SSL in production
-# Use wss:// instead of ws://
-const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-const ws = new WebSocket(`${proto}://${location.host}`);
-```
-
-**3. Remove Dangerous Scripts**
-```
-❌ DO NOT run: rm -rf * && wget --no-check-certificate ...
-✅ Instead: Use signed releases or verified hash verification
-```
-
-### Security Checklist
-
-- [ ] Store credentials in environment variables
-- [ ] Use HTTPS/WSS in production
-- [ ] Enable SSL certificate verification
-- [ ] Implement rate limiting on API endpoints
-- [ ] Add authentication to WebSocket connections
-- [ ] Validate all user inputs on backend
-- [ ] Use secrets management (AWS Secrets Manager, Vault)
-- [ ] Enable audit logging
-- [ ] Implement request signing
-- [ ] Regular security audits
-
-### Best Practices
-
-**Development**:
-```bash
-# 1. Create .env file (add to .gitignore)
-echo "PXY_CONSUMER_KEY=test_key" > .env
-
-# 2. Load before running
-set -a
-source .env
-set +a
-python3 exepxy.py
-
-# 3. Never commit .env
-echo ".env" >> .gitignore
-```
-
-**Production**:
-```bash
-# Use system-level secret management
-# AWS: aws secretsmanager get-secret-value
-# Azure: az keyvault secret show
-# GCP: gcloud secrets versions access latest
-```
-
----
-
-## Advanced Topics
-
-### Custom Candle Modes
-
-Candle transformations are centralized in `sysdthapxy.py`. Select the mode
-for DTHA, IN, or OUT in `syscnfgpxy.py`; do not add a second transformation
-implementation to the old `sysstrndpxy.py` module.
-
-The supported modes are `RAW`, `OC2`, `HA`, `OHLC4`, `HYPER`, and
-`TSMA`. Keep the mode definitions and validation in the central
-configuration and DTHA implementation aligned.
-
-### Adding New Indicators
-
-```python
-# In sysdashpxy.py:
-def calculate_rsi(df, period=14):
-    delta = df['Close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
-    rs = gain / loss
-    return 100 - (100 / (1 + rs))
-
-# Add to snapshot:
-"rsi": calculate_rsi(df).iloc[-1],
-```
-
-### Custom Entry/Exit Strategies
-
-```python
-# Create new file: sysstrategypxy.py
-def advanced_entry(df, market_signal, trend):
-    """Your custom logic here"""
-    if market_signal == "BULL" and trend == "BULL":
-        return "ATMBUY_AGGRESSIVE"
-    elif market_signal == "BULL" and trend == "BEAR":
-        return "ATMBUY_CAUTIOUS"
-    else:
-        return "NONE"
-
-# Use in sysentrpxy.py:
-from sysstrategypxy import advanced_entry
-entry_sig = advanced_entry(df, entry_dir, trend)
-```
-
----
-
-## Version History
-
-| Version | Date | Changes |
-|---------|------|---------|
-| 1.0.0 | 2024-01-15 | Initial release |
-| - | - | - |
-
----
-
-## Support & Contribution
-
-**Issues**: Create GitHub issue with:
-- Error message / screenshot
-- Steps to reproduce
-- System info (Python version, OS, broker)
-
-**Contributing**: Submit PR with:
-- Clear description of changes
-- Test cases
-- Updated documentation
-
-**Contact**: 
-- GitHub: https://github.com/PreciseXceleratedYield/PXY
-- Email: (maintainer email)
-
----
-
-*Last Updated: 2024-01-15*
-*Maintained by: PreciseXceleratedYield*
+| UP | UP | `BULL` |
+| DOWN | DOWN | `BEAR` |
+| UP | DOWN | `SELL` |
+| DOWN | UP | `BUY` |
+
+Insufficient, flat, or invalid required directions return `NONE`.
+`get_entry_signal()` translates IN continuation states to execution actions:
+`BULL` becomes `BUY`; `BEAR` becomes `SELL`; existing `BUY` and `SELL`
+flip actions remain unchanged.
+
+### OUT — exit signal channel
+
+`sysoutpxy.py` independently evaluates its configured candle stream. It
+returns `BULL` when C0 is UP, `BEAR` when C0 is DOWN, and `NONE` when the
+required directions are unavailable or invalid.
+
+### MKT and entry router
+
+`sysmktpxy.py` combines IN's `BUY`/`SELL` action with OUT's
+`BULL`/`BEAR` direction. It does not apply an additional Supertrend or
+moving-average confirmation filter. Its public pair is
+`(entry_signal, exit_signal)`.
+
+`sysentrpxy.py` preserves that tuple contract and applies the entry-time
+window and post-square-off cooldown. The configured market-open time is
+09:16 IST and the fresh-entry cutoff is 13:16 IST. Outside the entry window,
+the entry signal is forced to `NONE`; the exit signal is retained unless the
+post-square-off cooldown is active, in which case both are `NONE`.
+
+## 5. Indicators and depth
+
+DTHA provides close-direction depth information. Other indicator modules
+provide chart, dashboard, or supporting analysis data. Their presence does
+not make them extra IN/OUT entry or exit confirmation stages.
+
+The Supertrend indicator uses `SYSDTSTPXY_ST1_PERIOD` and
+`SYSDTSTPXY_ST1_FACTOR`. The chart moving-average window and TSMA candle
+period are separate settings. The ATR modes and other indicator parameters
+are documented in `pxy/sys/CONFIGURATION.md` and defined in
+`syscnfgpxy.py`.
+
+## 6. Execution and position management
+
+The execution layer under `pxy/sys/exe/` contains the production entry,
+exit, averaging, order-management, and square-off pipelines. The production
+cycle deliberately gives the exit pipeline repeated opportunities around
+entry and averaging processing.
+
+Fresh entries are issued only through the entry pipeline's valid action and
+position checks. The decision helpers in `sysdcinpxy.py` require a valid
+`BUY` or `SELL` signal and a flat CE/PE position summary before returning a
+fresh-entry command.
+
+The exit decision helpers require a usable market snapshot and enforce the
+configured target-price and minimum-P&L gates. Broker exit/averaging responses
+are treated as accepted only when the response reports `stat=ok` and
+`stCode=200`.
+
+### Averaging — actual current behaviour
+
+Averaging is orchestrated by `exeavxpxy.py` and orders are placed by
+`exeamspxy.py`. It is separate from fresh entries and exit orders.
+
+- The configured averaging window and enable switch gate averaging placement.
+- The averaging controller reads the latest active `exit` value.
+- Alignment is CE with `BULL`, and PE with `BEAR`.
+- The controller also marks the non-aligned side as an opposite-signal side
+  when the exit value is either `BULL` or `BEAR`.
+- The placement decision requires both CE and PE rows to be open and both
+  side losses to be negative. For each side independently, either its aligned
+  flag or its opposite-signal flag must be true; that side must not be cooling,
+  its projected investment must be within the configured cap, and its loss
+  must be at or beyond its calculated threshold.
+- Consequently, with both sides open and losing, a directional `BULL` or
+  `BEAR` exit value can make **both sides eligible** for averaging in the
+  same decision pass, subject to each side's own cooldown, investment cap,
+  and loss threshold. `SIDE`, `NONE`, or another non-directional value does
+  not set either opposite-signal flag and does not create this eligibility.
+- With `EXEAVXPXY_USE_OVERALL_LOSS = True`, the loss metric is the side's
+  overall P&L percentage. When false, the controller uses its per-row loss
+  calculation.
+- Projected investment includes current side investment plus the next lot at
+  its current `sell_prc`; it must not exceed
+  `EXEAMSPXY_MAX_INVESTMENT`.
+- The active `calculate_lgt()` implementation in `exeltgtpxy.py` returns
+  a negative threshold based on the side's lot count: `-(40 + 10 × own lots)`.
+  The current implementation does not adjust that threshold based on the
+  alignment flag. The separate `exeagtpxy.py` threshold-math implementation
+  is not the function used by this averaging controller's active LGT call.
+- A side cooldown is set before sending an averaging order to reduce duplicate
+  placement. An explicit broker rejection clears that side's cooldown;
+  unconfirmed/unknown responses do not count as accepted orders.
+
+This section intentionally records the implementation as it exists; it does
+not prescribe a different averaging policy.
+
+## 7. Option targets and scheduled square-off
+
+The active option target calculation is in `exeltgtpxy.py`. Alignment uses
+only the row's `exit` value and option side:
+
+- CE is aligned with `BULL`; PE is aligned with `BEAR`.
+- A non-aligned option uses the configured 1.4% base target.
+- An aligned single-side position uses 1.4 × (own-side power + own-side depth).
+- When both option sides are open, the target is 14 + 14 / own-side depth
+  + 14 / own-side power.
+- Invalid or non-positive power/depth values default individually to 1.
+- Targets are capped at 99%. From 14:45 IST, the 99% target applies when
+  both CE and PE sides are open.
+
+The target is calculated against the option entry premium. The regular exit
+pipeline also applies its market-snapshot, target-price, and minimum-P&L
+requirements before placing an exit order. Scheduled square-off and the
+portfolio risk-ledger liquidation are separate mechanisms.
+
+## 8. Portfolio risk ledger
+
+The master risk-ledger orchestrator is
+`pxy/sys/exe/run/runexacpxy.py`, called from the LILO order-processing path.
+It tracks the active risk cycle, closed-book snapshots, booked profit, and
+cycle P&L. It uses a lock and persistent state files to prevent overlapping
+ticks and preserve state across restarts.
+
+Current central settings include:
+
+- Risk-bar control: `RUNEXACPXY_CNTRLRSKBAR`.
+- Cycle target: `RUNEXACPXY_CYCLE_TARGET_PCT`.
+- Target square-off enable: `RUNEXACPXY_TARGET_SQUAREOFF_ENABLED`.
+- Stop square-off enable: `RUNEXACPXY_STOP_SQUAREOFF_ENABLED`.
+- Required consecutive breach checks and minimum interval:
+  `RUNEXACPXY_BREACH_TICKS_REQUIRED`,
+  `RUNEXACPXY_TICK_MIN_GAP_SECONDS`.
+- Late-day risk-ledger target and its time window:
+  `RUNEXACPXY_LATE_DAY_TARGET_PCT`,
+  `RUNEXACPXY_LATE_DAY_START`,
+  `RUNEXACPXY_LATE_DAY_END`.
+
+The risk-ledger target/stop controls are independent of the option-level
+premium target logic. See the configuration guide for the current target
+confirmation and heavy-side alignment conditions.
+
+## 9. Dashboard and web application
+
+`pxy/pxy.js` serves the web application and dashboard interfaces under
+`pxy/web/`. Python components publish dashboard/market/position data for the
+web UI. The chart, indicator, depth, and portfolio displays are supporting
+views; they do not alter the IN/OUT signal rules.
+
+Use the current web pages and API routes in the repository as the source of
+truth for UI details. This guide avoids documenting historical endpoint
+payloads or layout details that may no longer match the application.
+
+## 10. Configuration and maintenance
+
+All tunable runtime settings belong in `pxy/sys/syscnfgpxy.py`. See
+`pxy/sys/CONFIGURATION.md` for setting ownership, current schedule, strategy
+conditions, and the distinction between production and standalone utilities.
+
+Do not create parallel configuration files or change code merely to match
+outdated documentation. Update the relevant documentation after confirming
+the current implementation.
