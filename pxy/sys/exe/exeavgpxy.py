@@ -25,6 +25,9 @@ def run_snapshot():
         return
 
     data = get_combined_data()
+    if liquidation_pending():
+        print(f"{Fore.YELLOW}🛑 Master risk liquidation initiated this cycle; averaging is blocked.")
+        return
     df = data.get("active_orders", pd.DataFrame())
     status = averaging_snapshot_status(
         data.get("error"),
