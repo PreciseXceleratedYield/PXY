@@ -30,7 +30,8 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
 )
 from execoolpxy import start_cooldown
-from sysdcinpxy import exit_order_response_accepted
+from sysdcinpxy import exit_order_response_accepted, valid_exit_positions_response, matching_exit_net_quantity, exit_quantity_to_sell
+from runlilopxy import position_net_quantity
 
 init(autoreset=True) 
 
@@ -154,16 +155,42 @@ def exit_all_positions(target=None, return_accepted_keys=False, allowed_keys=Non
     # FIX FOR VM FREEZE: Track if any single trade actually fires an order response
     any_order_placed = False
     accepted_keys = set()
+    submitted_by_symbol = {}
+    net_by_symbol = {}
     if check_working_sells:
+        positions_response = data.get("positions_snapshot")
+        if not valid_exit_positions_response(positions_response):
+            print(f"{Fore.YELLOW}⚠️ Broker net positions unverified; scheduled square-off blocked.")
+            return set() if return_accepted_keys else None
         from runexlqdpxy import has_working_sell_orders
 
     def submit(row):
         nonlocal any_order_placed
-        if check_working_sells and has_working_sell_orders(client, [row.get("symbol", "")]):
-            return
+        symbol = str(row.get("symbol", "")).strip()
+        if check_working_sells:
+            if symbol not in net_by_symbol:
+                net_by_symbol[symbol] = matching_exit_net_quantity(
+                    positions_response["data"], symbol, position_net_quantity
+                )
+            net_qty = net_by_symbol[symbol]
+            if net_qty is None or net_qty <= 0:
+                dprint(f"No verified long position for {symbol}; skipping.")
+                return
+            remaining = net_qty - submitted_by_symbol.get(symbol, 0)
+            qty = exit_quantity_to_sell(remaining, row.get("qty", 0))
+            if qty <= 0:
+                dprint(f"No unsubmitted quantity remains for {symbol}.")
+                return
+            if has_working_sell_orders(client, [symbol]):
+                return
+            row = row.copy()
+            row["qty"] = qty
+        else:
+            qty = abs(int(row.get("qty", 0)))
         if not place_exit_order(client, row):
             return
         any_order_placed = True
+        submitted_by_symbol[symbol] = submitted_by_symbol.get(symbol, 0) + qty
         accepted_keys.add(
             f"{row.get('symbol', '')}|{row.get('tag', '')}|{row.get('buy_time', '')}"
         )
