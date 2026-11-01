@@ -44,9 +44,11 @@ The host management script is `pxy/pxy`. Its Start action launches
 `pxy/sys/sysexepxy.py` in `pxy-engine`. The supervisor starts
 `pxy/sys/exe/exepxy.py`, which runs the production execution cycle.
 
-The production host uses its established Python environment and broker
-provisioning. This README does not prescribe a generic dependency installation
-or credential setup.
+The production host uses its established Python environment at the host's
+expected `$HOME/env` location and its existing broker provisioning. The
+management script activates that environment before entering the application.
+This README does not prescribe a generic dependency installation or credential
+setup.
 
 The active execution loop in `sys/exe/exepxy.py` runs these child processes
 in order:
@@ -257,9 +259,10 @@ only the row's `exit` value and option side:
   both CE and PE sides are open.
 
 The target is calculated against the option entry premium. The regular exit
-pipeline also applies its market-snapshot, target-price, and minimum-P&L
-requirements before placing an exit order. Scheduled square-off and the
-portfolio risk-ledger liquidation are separate mechanisms.
+pipeline also requires a positive current option price at or above the target
+and row P&L of at least ₹100 (the current `EXEEXITPXY_PNL_EXIT_MIN`) before
+attempting a broker-verified sell. Scheduled square-off and the portfolio
+risk-ledger liquidation are separate mechanisms.
 
 ## Portfolio risk ledger
 
@@ -295,6 +298,668 @@ target/misalignment condition can trigger full-portfolio liquidation.
 `pxy/web/`. Python components publish dashboard/market/position data for
 the web UI. Chart, indicator, depth, and portfolio displays are supporting
 views; they do not alter the IN/OUT signal rules.
+
+
+## Detailed architecture and runtime model
+
+### Runtime layers
+
+PXY has three separate runtime layers. The layers cooperate, but their responsibilities are distinct.
+
+| Layer | Entry point | Responsibility |
+| --- | --- | --- |
+| Host control | \`pxy/pxy\` | Resolves the application directory, activates the host Python environment, and manages tmux sessions and manual actions. |
+| Web application | \`pxy/pxy.js\` | Serves dashboard pages/assets, exposes the approved action API, and streams the engine tmux buffer over WebSocket. |
+| Trading engine | \`pxy/sys/sysexepxy.py\` → \`pxy/sys/exe/exepxy.py\` | Supervises the market window and runs the production market-data, entry, exit and averaging pipelines. |
+
+The normal host uses two tmux sessions:
+
+- \`pxy-web\`: Node.js dashboard application.
+- \`pxy-engine\`: Python supervisor and its execution loop.
+
+The dashboard can be reachable while the trading engine is stopped. A working web page is not evidence that the engine is running or that broker operations are available.
+
+### Production process tree
+
+\`\`\`
+pxy/pxy
+├── tmux: pxy-web
+│   └── node pxy.js
+│       ├── dashboard pages and static assets
+│       ├── dashboard JSON API
+│       ├── approved manual-action launcher
+│       └── WebSocket: pxy-engine terminal buffer
+└── tmux: pxy-engine
+    └── python sysexepxy.py
+        ├── startup notice
+        └── exe/exepxy.py
+            ├── startup futures refresh
+            ├── startup dashboard/entry/exit passes
+            └── repeated market cycle
+                ├── run/runnfutpxy.py
+                ├── exeexitpxy.py
+                ├── exeentrpxy.py
+                ├── exeexitpxy.py
+                ├── exeavgpxy.py
+                └── exeexitpxy.py
+\`\`\`
+
+### Supervisor and execution loop
+
+\`sysexepxy.py\` is the outer supervisor. It runs the startup notice, checks weekday and the configured timezone, invokes the execution loop during its configured window, and sends Telegram notifications when the supervisor window opens or closes. It invokes the execution script synchronously.
+
+\`exepxy.py\` is the inner loop. It performs an initial futures refresh and initial dashboard/entry/exit passes. During the configured execution window it runs the six-stage market cycle. Outside the window it runs idle cleanup and polls until the next open.
+
+The supervisor and execution loop have separate market-open/close aliases. The supervisor uses \`SYSEXEPXY_MARKET_OPEN/CLOSE\`; the execution loop uses \`EXEPXYPXY_MARKET_OPEN/CLOSE\`. Their close times are intentionally distinct. Do not assume one close setting controls every subsystem.
+
+### Execution cycle and child-process recovery
+
+Each market cycle runs in this exact order:
+
+1. \`run/runnfutpxy.py\` refreshes the NIFTY futures quote.
+2. \`exeexitpxy.py\` evaluates existing positions.
+3. \`exeentrpxy.py\` evaluates fresh-entry eligibility.
+4. \`exeexitpxy.py\` gets another exit pass.
+5. \`exeavgpxy.py\` evaluates averaging.
+6. \`exeexitpxy.py\` gets a final exit pass.
+
+Each child is started with the configured pipe timeout and the current Python interpreter. A missing script, timeout, non-zero exit, or unexpected child error is recorded against that component. A later successful run clears its failure. Persistent failures are reported periodically through Telegram; the parent execution loop continues to later components and later iterations.
+
+A child-process timeout means the parent stopped waiting for the child after the configured duration. It does not establish whether a broker request made before the timeout was accepted, rejected, or filled. The order-specific locks and subsequent broker/ledger reconciliation remain important.
+
+The configured action cooldown is applied after the market-cycle sequence. The number of sub-iterations controls how many cycles the inner loop runs before it rechecks the market window.
+
+## Market-data pipeline — detailed behaviour
+
+### Production source and futures blend
+
+The production underlying is \`^NSEI\`. DTAF obtains one-minute Yahoo Finance OHLC history and optionally blends the latest NIFTY futures LTP from \`sys/exe/run/nftfut.json\`.
+
+The futures updater, \`run/runnfutpxy.py\`, obtains a Kotak Neo session, searches the NIFTY futures contract for the expiry selected by its expiry routine, validates a cached contract against that expiry, fetches the futures LTP, and writes the quote and timestamp to the local JSON feed. Its configured refresh interval is five seconds and it retains a bounded history. The related cached contract registry is \`sys/exe/run/nifty_fut.csv\`.
+
+DTAF accepts a futures quote only when its record has a parseable timezone-aware timestamp, is not future-dated, is no older than \`SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS\`, and contains a finite positive price.
+
+When the futures quote is valid, each OHLC field is blended independently:
+
+\[
+Blended\ OHLC = \frac{Yahoo\ OHLC + NIFTY\ Futures\ LTP}{2}
+\]
+
+This is an underlying-price blend. It is not an option-premium feed or an option-price calculation.
+
+### Yahoo history and fallback
+
+DTAF tries a requested Yahoo period when one is supplied. If the returned history is empty or shorter than the target row count plus its five-row sufficiency buffer, it tries the configured fallback periods in order. The standard target is 60 rows; usable Yahoo history is reduced to the latest 60 rows and its index is normalized to the configured timezone.
+
+If Yahoo history is insufficient but a valid recent futures quote exists, DTAF creates synthetic OHLC rows at that quote. The frame is marked internally as a futures fallback. If neither Yahoo history nor a valid futures quote is usable, DTAF returns an empty frame.
+
+A stale/unavailable futures quote is never blended into usable Yahoo OHLC. In that case, Yahoo OHLC is returned without futures blending.
+
+### Do not confuse the three data-validity checks
+
+| Check | Meaning | Consequence |
+| --- | --- | --- |
+| Futures quote freshness | Timestamped futures quote is valid and within the 60-second configured age. | Determines whether futures may be blended or used for fallback. |
+| Yahoo candle freshness | Latest Yahoo candle is within the 180-second age threshold during the exchange session. | Warning state and throttled Telegram alert; not an engine stop. |
+| OMS market snapshot availability | Data is not marked as synthetic fallback, exit state is recognized, and ATR is finite and positive. | Required by regular target exits and counter-buy; averaging additionally needs a valid positive index price. |
+
+Yahoo candle timestamps represent candle-start times. The stale-data check runs during the configured weekday exchange session. The stale alert is throttled by \`SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS\` and its state is stored in \`sys/exe/run/.yahoo_freshness_alert.json\`. A fresh feed clears that state. The notification explicitly states that the engine continues and no engine stop or order action is taken.
+
+### Snapshot sizes and data reuse
+
+The snapshot builder requests the chart history configured by \`SYSSTRNDPXY_CHART_TARGET_ROWS\` (110 rows) and takes the latest \`SYSDTAFPXY_DEFAULT_TARGET_ROWS\` (60 rows) as its master calculation frame.
+
+The master frame feeds the main price/direction, DTHA depth, ATR/KATR, directional-power, and IN/OUT calculations. Separate chart frames are generated for chart output; the chart display uses OUT-mode candles. The 110-row chart source and 60-row master calculation frame serve different purposes.
+
+## Candle transformations and signal mathematics
+
+### Direction calculation
+
+After a channel transforms its OHLC data, candle direction is the transformed Close compared with the immediately preceding transformed Close:
+
+\[
+\Delta_i = Close_i - Close_{i-1}
+\]
+
+| Difference | Direction |
+| --- | --- |
+| Greater than zero | UP |
+| Less than zero | DOWN |
+| Equal to zero | FLAT |
+| Missing or invalid comparison | UNKNOWN |
+
+Direction is not simply Close compared with the same candle's Open. This distinction applies to RAW, OC2, OHLC4 and TSMA as well as HA/HYPER.
+
+### Exact DTHA modes
+
+All transformations operate on a copy of the supplied frame.
+
+**RAW:** Retains source OHLC unchanged.
+
+**OC2:** Replaces Close only:
+
+\[
+Close' = \frac{Open + Close}{2}
+\]
+
+**OHLC4:** Replaces Close only:
+
+\[
+Close' = \frac{Open + High + Low + Close}{4}
+\]
+
+**HA — Heikin-Ashi:**
+
+\[
+HA\_Close_i = \frac{Open_i + High_i + Low_i + Close_i}{4}
+\]
+
+The first HA Open is \((Open_0 + Close_0)/2\). Each later HA Open is the average of the previous HA Open and previous HA Close. HA High/Low are the maximum/minimum of raw High/Low, HA Open and HA Close.
+
+**HYPER:** The synthetic Open is raw Close. A raw candle is bullish when raw Close is greater than or equal to raw Open. For a bullish raw candle, synthetic Close is the average of raw Close and raw High. For a bearish raw candle, synthetic Close is the average of raw Close and raw Low. The implementation changes synthetic Open and Close and retains source High/Low.
+
+**TSMA:** Synthetic Open is the configured-period linear-regression endpoint of raw Open; the configured period is 7:
+
+\[
+TSMA\_Open_i = linreg(Raw\_Open, 7, 0)
+\]
+
+\[
+TSMA\_Close_i = \frac{TSMA\_Open_i + Raw\_Close_i}{2}
+\]
+
+Synthetic High and Low are the maximum and minimum of synthetic Open and synthetic Close. They do not preserve the original full raw wick.
+
+### Running-candle inclusion
+
+With \`SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = YES\`, the latest returned candle is included in DTHA, IN and OUT evaluation. With \`NO\`, each channel excludes the last row before evaluation.
+
+Because the latest one-minute Yahoo row may still be forming, including it allows the current signal to change while the candle develops. Excluding it bases the signal on the last completed row in the supplied frame.
+
+### IN — entry state machine
+
+IN requires at least three usable Close values. It evaluates the two latest candle directions, C1 and C0:
+
+| C1 | C0 | IN state | Execution action |
+| --- | --- | --- | --- |
+| UP | UP | BULL | BUY |
+| DOWN | DOWN | BEAR | SELL |
+| UP | DOWN | SELL | SELL |
+| DOWN | UP | BUY | BUY |
+| FLAT/UNKNOWN or insufficient data | Any | NONE | NONE |
+
+BULL and BEAR are continuation states. BUY and SELL are direction-change actions. The execution-facing function maps BULL to BUY and BEAR to SELL; BUY and SELL remain unchanged.
+
+IN has an additional internal time guard: it returns NONE through 09:17:00 IST. This is separate from the outer entry window, which starts at 09:16. Therefore, the outer entry window can be open while IN itself is still inactive.
+
+### OUT — exit state machine
+
+OUT independently applies \`SYSOUTPXY_CANDLE_MODE\` and the running-candle rule. It requires at least three usable Close values and valid UP/DOWN directions for C1 and C0. Its result is determined by C0:
+
+- C0 UP → BULL.
+- C0 DOWN → BEAR.
+- Invalid, flat or insufficient direction → NONE.
+
+OUT is a directional state; it does not return BUY or SELL.
+
+### MKT and entry-router contract
+
+The public MKT interface returns exactly the pair \`(entry_signal, exit_signal)\`. The first value is normalized to BUY, SELL or NONE. The second is normalized to BULL, BEAR or NONE. MKT does not add a Supertrend, SMA, TSMA, ATR or BOS confirmation filter to this pair.
+
+The entry router preserves this two-value tuple. While post-square-off cooldown is active, both values are forced to NONE. Otherwise it applies the entry-only time window: outside 09:16–13:16 IST, entry becomes NONE while exit is retained.
+
+## Core snapshot and indicators
+
+### Snapshot fields
+
+\`sysdashpxy.py\` builds the common market snapshot; \`syspxy.py\` publishes it and returns the fields consumed by execution modules.
+
+| Field group | Fields | Meaning |
+| --- | --- | --- |
+| Data quality | \`market_data_available\`, \`market_data_timestamp\`, \`market_data_age_seconds\`, \`market_data_stale\` | Source fallback and candle freshness state. |
+| DTHA | \`hkin_signal\`, \`hkin_past_depth\`, \`hkin_ce_depth\`, \`hkin_pe_depth\`, \`hkin_signal_time\` | Current state, streak depths, prior streak and signal candle time. |
+| Price | \`price\`, \`direction\` | Underlying index price and raw direction. |
+| Volatility | \`atr\`, \`katr\` | ATR and dynamic KATR values. |
+| Trend | \`supertrend\`, \`super_line\`, \`sma\`, \`tsma\` | Supporting indicator classifications. |
+| Strength | \`ce_power\`, \`pe_power\`, \`ce_force\`, \`pe_force\` | Directional power and ADX-derived force. |
+| Trading states | \`entry\`, \`exit\` | Entry action and directional exit state. |
+| Visuals | \`candle_visual\`, \`day_candle\`, \`bos_bar\`, \`bos_val\` | Console/dashboard visual summaries. |
+
+A field appearing in the snapshot does not mean every execution pipeline consumes it. Only fields actually read by a production decision module influence that decision.
+
+### DTHA depth interpretation
+
+- \`hkin_signal\` is the two-candle state derived from C1 and C0.
+- \`hkin_ce_depth\` is the current UP streak length when direction is UP; otherwise it is 1.
+- \`hkin_pe_depth\` is the current DOWN streak length when direction is DOWN; otherwise it is 1.
+- \`hkin_past_depth\` labels the preceding streak CE when its direction was UP, or PE when DOWN, followed by its streak count. It is NA when the previous direction is not usable.
+- \`hkin_signal_time\` is the timestamp of the latest evaluated signal candle.
+
+The previous-streak search is bounded by \`SYSDPTPXY_LAST_N\`. The current streak is counted backwards from the latest evaluated candle until its direction changes.
+
+### Indicators are supporting data
+
+The indicator pipeline calculates Supertrend, mirror line, SMA and TSMA. Current key values are ST period 14/factor 1.4, SMA period 50 and TSMA period 7. The snapshot also includes ATR/KATR, directional power, ADX-derived force, day-candle and BOS information.
+
+These outputs support charting, analysis, target calculation or other explicitly connected consumers. Their presence does not make them additional IN/OUT entry filters.
+
+## Fresh-entry execution — complete decision path
+
+Fresh entries are handled by \`exeentrpxy.py\`. A valid market signal is only the first gate.
+
+1. **Time blackout:** The entry helper blocks 09:14 up to (but not including) 09:16, and blocks from the 13:16 entry cutoff until the configured 15:40 square-off end.
+2. **Market snapshot:** Calls \`syspxy.get_all_data()\` and reads the \`entry\` field.
+3. **Signal validation:** Only exact BUY or SELL values are accepted.
+4. **Broker session:** Obtains a Kotak Neo client through \`runclntpxy.get_session()\`.
+5. **Position verification:** Reads the broker position summary. A missing, malformed, failed or unverified result skips the entry.
+6. **Flat-position gate:** The summary must parse to zero CE lots and zero PE lots.
+7. **Command mapping:** BUY routes to \`pxybuyce\`; SELL routes to \`pxybuype\`.
+8. **Order action:** The selected action is invoked through the existing force-order path.
+
+The position parser expects a verified summary shaped like \`XCEYPE\`. It uses broker net quantity where supplied; otherwise it calculates net quantity from carry-forward and current-day buy/sell quantities. CE and PE are aggregated separately and converted to lots using the configured NIFTY lot size.
+
+A broker response explicitly representing no data is treated as flat. A request failure or invalid response is not treated as flat. If either CE or PE has non-zero lots, the fresh-entry helper returns no command.
+
+## Broker session, positions, OMS and LILO
+
+### Broker session
+
+\`runclntpxy.py\` creates the Kotak Neo client and performs the configured TOTP login and validation flow. Other modules obtain the client through \`get_session()\`; they should use this shared session helper rather than implement separate authentication logic.
+
+A valid client object does not by itself prove that a subsequent positions request succeeded.
+
+### Position verification states
+
+- **Verified flat:** The broker response is usable and CE/PE net exposure is zero.
+- **Verified open:** The broker response is usable and at least one side has non-zero exposure.
+- **Unverified:** The session, response or positions data is invalid or unavailable.
+
+Only verified flat satisfies the fresh-entry flat-position gate. An unverified state must never be silently interpreted as flat.
+
+### OMS data assembly
+
+\`exeomspxy.py\` combines the market snapshot and active order ledger for exit and averaging.
+
+For each OMS call it:
+
+1. Builds a market snapshot through \`syspxy.get_all_data()\`.
+2. Obtains a broker session.
+3. Requests one broker positions snapshot.
+4. Requires \`stat=ok\`, \`stCode=200\`, and list-valued \`data\`.
+5. Passes that same positions response to LILO reconciliation.
+6. Refreshes option valuation where the order data has no usable sell price.
+7. Maps the current market snapshot onto active order rows.
+8. Calculates PXY entry, target and stop-loss display fields when enabled.
+
+The same verified positions response is reused by downstream OMS/LILO/exit/averaging logic during that program call. If the positions request cannot be verified, the OMS reports an error/unverified state; it does not manufacture a flat portfolio.
+
+### LILO order ledger
+
+LILO reconciles local order tags and broker order/position information to produce active and closed trade rows. Active rows carry fields consumed by execution, including symbol, tag, quantity, buy price, sell price, P&L and buy time. OMS enriches those rows with current market state and calculated PXY fields.
+
+The ledger also supports web P&L/history and portfolio risk-cycle accounting. A single closed option row does not close a portfolio cycle. The portfolio risk cycle closes only when the complete portfolio is flat.
+
+## Exit execution — complete decision path
+
+### Exit priority
+
+The exit pipeline runs three times in each market cycle: before fresh-entry processing, after fresh-entry processing, and after averaging. This gives existing positions repeated evaluation opportunities around new order activity. It does not guarantee that an order fills in the same iteration.
+
+### OMS and market prerequisites
+
+The exit pipe obtains the combined OMS snapshot. An OMS data error causes the cycle to be skipped without overwriting the dashboard. An empty active-order list publishes the idle dashboard structure and returns.
+
+Regular target exits require an available market snapshot. The OMS marks the market snapshot available only when the underlying data is not synthetic futures fallback, the exit state is recognized, and ATR is finite and positive.
+
+### Regular target exit gate
+
+Each active lot is evaluated independently. A regular target exit requires all of these:
+
+- Available market snapshot.
+- Positive calculated target.
+- Positive current option sell price.
+- Current option sell price at or above the target.
+- Row P&L at or above \`EXEEXITPXY_PNL_EXIT_MIN\` (currently ₹100).
+
+A target shown as crossed in the dashboard is not proof that an order was sent. The minimum-P&L gate and broker/position verification still apply. An error on one row is caught and does not prevent the remaining rows from being evaluated.
+
+### Broker quantity verification before selling
+
+Before submitting a regular exit, the pipeline validates the positions response, matches the exact trading symbol, calculates its net quantity, limits the requested sell quantity to the verified positive net quantity and the row's requested quantity, and checks the per-lot exit lock.
+
+The lot lock key combines symbol, tag and buy time. The sell tag is derived from the original lot tag with a millisecond suffix. The order uses central F&O defaults and the sell transaction type.
+
+The broker response counts as accepted only when \`stat=ok\` and \`stCode=200\`. Broker acceptance means the request was accepted; it is not proof of a complete fill. Subsequent broker snapshots and LILO reconciliation reflect the resulting position.
+
+### Deep-reversal depth square-off
+
+The depth-based square-off path is disabled by default because \`PASTRSK = NO\`. When enabled, it requires verified positions and a valid market snapshot, no active risk-ledger lock, both CE and PE open, a previous opposite streak deeper than the configured threshold, a new reversal streak depth exactly 1, a valid signal-candle timestamp, and a selected-side running loss beyond the configured loss trigger. It also checks a duplicate lock for that side and signal candle.
+
+When all gates pass, the code invokes CE-only or PE-only square-off. This mechanism is separate from regular per-row target exits.
+
+### Stop-loss calculation is not the same as an active exit trigger
+
+OMS can calculate a \`pxy_sl\` field through \`exeslpxy.py\`. The presence of that field in OMS/dashboard data does not prove the regular exit loop submits an order when that stop price is crossed. The regular target-exit loop reads target, current sell price, P&L and market-snapshot availability. A displayed stop-loss value is a separate calculation.
+
+## Option targets — exact formula and conversion
+
+The active calculation is \`calculate_tgt()\` in \`exeltgtpxy.py\`; \`target_price()\` converts the percentage into an option premium.
+
+Alignment is based on the row's \`exit\` value:
+
+- CE is aligned only with BULL.
+- PE is aligned only with BEAR.
+- SIDE, NONE, invalid values and the opposite direction are non-aligned.
+
+For positive own-side power \(P\) and depth \(D\):
+
+**Non-aligned row**
+
+\[
+Target\% = 1.4
+\]
+
+**Aligned row when only one option side is open**
+
+\[
+Target\% = 1.4 \times (P + D)
+\]
+
+**When both CE and PE sides are open**
+
+\[
+Target\% = 14 + \frac{14}{D} + \frac{14}{P}
+\]
+
+Missing, invalid, non-finite, zero or negative power/depth values are replaced individually with 1.
+
+\[
+Target\ Premium = Entry\ Premium \times (1 + Target\%/100)
+\]
+
+The percentage is capped at 99%. From 14:45 IST onwards, when both CE and PE are open, the target percentage is the configured 99% maximum. ATR and the \`heavy_side\` argument are accepted by the target helper interface but are not used in the active target arithmetic.
+
+## Counter-buy — opposite-leg behaviour
+
+Counter-buy is a hook in the exit pipeline after regular target exits. It is not unrestricted fresh entry.
+
+The controller examines only rows that remain held after the current exit pass. Rows exited in that pass, or rows with a recent exit lock, are excluded. The decision requires an available market snapshot, verified positions, no risk-ledger lock, exactly one held side, an opposing exit direction, enabled counter-buy action, time before the configured cutoff, and no duplicate-action lock.
+
+| Remaining exposure | Exit state | Action |
+| --- | --- | --- |
+| CE only | BEAR | Buy PE |
+| PE only | BULL | Buy CE |
+| CE only | BULL | No counter-buy |
+| PE only | BEAR | No counter-buy |
+| Both sides or neither | Any | No counter-buy |
+
+The offset helper reads the active option symbol and underlying price. ATM/ITM selection uses zero offset; OTM distance is rounded to the configured strike step. The offset is passed to the force-buy Python action, which delegates symbol selection to the NIFTY symbol builder and submits the order with central F&O defaults.
+
+## Averaging — full decision and order lifecycle
+
+Averaging is a separate buy pipeline. It does not submit exits and does not replace fresh-entry logic.
+
+### Snapshot readiness and time window
+
+The averaging runner obtains the combined OMS snapshot. It skips when OMS reports an error, positions are unverified, there are no active rows, index price is missing/invalid/non-positive, or broker client/positions snapshot is unavailable.
+
+Placement requires \`EXEAVXPXY_REBUY_ENABLED = True\` and:
+
+\[
+EXEAVXPXY\_MARKET\_START \leq now < EXEAVXPXY\_MARKET\_END
+\]
+
+The current window is 09:17–13:16 IST.
+
+### Side metrics and active LGT
+
+Active rows are grouped by CE/PE suffix. The controller calculates broker lots, total P&L, side investment, side overall P&L percentage, selected loss metric, LGT threshold and next-lot projected investment.
+
+With \`EXEAVXPXY_USE_OVERALL_LOSS = True\`, the selected loss metric is side aggregate/blended P&L percentage. When false, the controller uses its per-row loss calculation and selects the maximum row loss value for that side.
+
+The active controller imports \`calculate_lgt()\` from \`exeltgtpxy.py\`. For a side with \(N\) broker lots:
+
+\[
+LGT = -(40 + 10N)
+\]
+
+| Own-side lots | Active LGT |
+| ---: | ---: |
+| 1 | -50% |
+| 2 | -60% |
+| 3 | -70% |
+| 4 | -80% |
+
+The alignment argument is accepted, but the current implementation does not change the returned threshold based on alignment. The configured \`EXEAMSPXY_MAX_LGT_LOSS = 77\` is not read by this active calculation.
+
+### Exact eligibility gates
+
+The pure decision helper requires both CE and PE rows to be present and both side loss metrics to be negative. For each side independently, all of the following must pass:
+
+1. Both CE and PE rows are open.
+2. Both side loss metrics are negative.
+3. The side is aligned or its opposite-signal flag is true.
+4. The side is not cooling.
+5. Current side investment plus next-lot projection is at or below the configured cap.
+6. The side loss metric is less than or equal to its LGT threshold.
+7. The portfolio risk-ledger lock is not held.
+8. OMS/broker snapshot is usable and averaging window is active.
+
+The controller sets the opposite-signal flag for the non-aligned side whenever exit is BULL or BEAR. Therefore, when both sides are open and losing, a directional exit can make both sides eligible in one decision pass. Each side still has its own cooldown, investment cap and loss threshold. SIDE/NONE do not set the opposite-signal flags.
+
+### Projected investment and order placement
+
+For the newest row on a side:
+
+\[
+Next\ Investment = |Quantity| \times \max(0, Sell\ Price)
+\]
+
+\[
+Projected\ Side\ Investment = Current\ Side\ Investment + Next\ Investment
+\]
+
+The projected amount must not exceed \`EXEAMSPXY_MAX_INVESTMENT\`. When triggered, the order uses the newest row's symbol and absolute quantity, generates a new PXY tag, and sends a market buy with the central F&O defaults.
+
+### Cooldown and broker acknowledgement
+
+The side cooldown is written before the broker order is sent to reduce duplicate buys. Confirmed success requires \`stat=ok\` and \`stCode=200\`. An explicit broker rejection clears that side's cooldown so a later iteration can retry. Missing, unknown or unconfirmed responses are not treated as accepted and do not automatically clear the cooldown. CE and PE cooldowns are independent.
+
+Broker acceptance is not fill confirmation. Later OMS/LILO reconciliation determines whether the new lot appears in the active ledger.
+
+## Scheduled square-off and portfolio risk ledger
+
+### Scheduled square-off windows
+
+| IST window | Action |
+| --- | --- |
+| 15:30 to before 15:31 | Square-off path without \`-all\`. |
+| 15:31 to before 15:40 | All-position square-off path with \`-all\`. |
+| Outside 15:30–15:40 | No scheduled launch from this window logic. |
+
+The launcher uses a minimum-gap lock. If the portfolio risk-ledger lock is held, scheduled square-off is skipped for that iteration. A square-off request is not proof of closure; subsequent broker positions must confirm flatness.
+
+### Risk-ledger cycle model
+
+The master risk ledger is orchestrated by \`runexacpxy.py\` and integrated into LILO order processing. It tracks a flat-to-flat portfolio cycle rather than treating each CE/PE row as a separate book.
+
+The active cycle is identified through order tags and a cycle start time. When the complete portfolio is flat, the ledger can snapshot the closed cycle's realized result, update booked profit and closed-book count, and reset active-cycle metadata. Closing one option row does not close the portfolio cycle.
+
+### State, locking and view-only behaviour
+
+The risk ledger uses separate state, metadata, confirmation and lock helpers under \`sys/exe/run/\`.
+
+- View-only mode, selected by the configured \`PXY_VIEW_ONLY\` environment variable, does not advance the breach count.
+- A tick is skipped if another tick holds the lock.
+- The minimum tick-gap setting prevents excessively frequent ledger ticks.
+- Unreadable state causes the tick to be skipped rather than replaced with zero values.
+- A daily stale-state check purges prior-session cache when state is missing or dated before the current IST date.
+- The ledger-basis guard preserves the active cycle if the LILO filter/start basis changes.
+- Active rows without valid tags or a usable buy timestamp cannot proceed through normal cycle accounting.
+
+### Target and confirmation
+
+The normal cycle target is configured as 2.8%. During the 15:10–15:30 IST late-day window, the configured late-day target is 99%.
+
+The cycle-risk calculation uses the active cycle, open and closed rows, and current exit direction. When both option sides are open, the calculated target is adjusted by active-side count. The heavier invested open side must also align with the current exit signal; a tie is not considered aligned.
+
+A qualifying target/misalignment breach must be observed for the configured number of consecutive checks, respecting the configured minimum interval. If the condition no longer qualifies, the consecutive-breach counter is reset.
+
+When the required confirmation count is reached and target square-off is enabled, the ledger invokes the portfolio liquidation helper. It requests square-off, waits for broker-flat confirmation using configured timeout/polling controls, updates/reset risk state, and exits the current ledger process through its explicit control path.
+
+The stop-square-off setting is currently disabled; target square-off is enabled. The risk-ledger target is separate from option premium targets and scheduled square-off windows.
+
+## Web application and dashboard — interfaces
+
+### Node.js routes and static content
+
+The web application is \`pxy/pxy.js\`; dependencies are declared in \`pxy/pxy.json\` (Express and WebSocket).
+
+| Route | Behaviour |
+| --- | --- |
+| \`/\` | Redirects to \`/web/webpxy.html\`. |
+| \`/pxy.html\` | Redirects to \`/web/webpxy.html\`. |
+| \`/hostname\` | Returns the host name. |
+| \`/api/web-data/:name\` | Serves only allowlisted dashboard JSON files. |
+| \`POST /run/:script\` | Invokes only an allowlisted host action. |
+| WebSocket | Streams the current \`pxy-engine\` tmux pane buffer. |
+
+Static content is served from \`pxy/web/\` with HTML and a small explicit allowlist of CSS/JavaScript assets. The default listening port is 80; if binding to port 80 fails specifically with EACCES, the server falls back to port 8080.
+
+### Dashboard JSON allowlist
+
+The current API allowlist contains:
+
+- \`webactpxy\`
+- \`webavgpxy\`
+- \`webchrtpxy\`
+- \`webdashpxy\`
+- \`webdaypxy\`
+- \`webpnlpxy\`
+- \`webpospxy\`
+- \`webrinkopxy\`
+
+Unknown names return 404. Responses are marked no-store. Python publishers write their respective runtime JSON files into \`pxy/web/\`; those generated files are outputs, not the central strategy configuration.
+
+### WebSocket terminal view
+
+The WebSocket reads the tmux pane buffer; it does not start the engine and does not read a separate historical log.
+
+- Polls every 500 milliseconds.
+- Captures up to 500 lines.
+- Preserves terminal escape sequences and joins wrapped lines.
+- Each capture command has a five-second timeout.
+- Timeout and unavailable-session notices are throttled until a successful poll resets the condition.
+
+The terminal view is a view of the tmux console buffer, not a complete historical audit log.
+
+### Manual action API
+
+The server has a fixed action allowlist for update, manual CE/PE buy, CE/PE/all square-off and the risk-ledger action. Other script names are rejected. The update action is detached and returns a process-start response; that response is not proof that the Git update or any process restart has completed.
+
+Manual dashboard actions are operator controls. They are not part of the automatic IN/OUT signal calculation.
+
+## Runtime files and data ownership
+
+Paths below are relative to the repository's \`pxy/\` directory unless otherwise stated.
+
+| Path | Owner | Purpose |
+| --- | --- | --- |
+| \`sys/syscnfgpxy.py\` | Configuration | Single source of tunable runtime values. |
+| \`sys/exe/run/nftfut.json\` | Futures updater | Latest futures quote and rolling feed. |
+| \`sys/exe/run/nifty_fut.csv\` | Futures updater | Cached futures contract/token registry. |
+| \`sys/exe/run/.yahoo_freshness_alert.json\` | Market-data notifier | Throttles stale-candle alerts. |
+| \`sys/exe/.exit_lock.json\` | Exit pipeline | Per-lot exit and scheduled-square-off locks. |
+| \`sys/exe/.cbuy_lock.json\` | Counter-buy | Counter-action duplicate locks. |
+| \`sys/exe/\` averaging state | Averaging | Side cooldown state and telemetry. |
+| \`sys/exe/run/\` risk-ledger state | Risk ledger | Cycle, closed-book, confirmation and lock state. |
+| \`web/webdashpxy.json\` | Snapshot publisher | Latest market and signal snapshot. |
+| \`web/webchrtpxy.json\` | Indicator publisher | Chart candles and indicator series. |
+| \`web/webactpxy.json\` | Exit publisher | Active position/target display. |
+| \`web/webavgpxy.json\` | Averaging controller | CE/PE averaging telemetry. |
+| \`web/webpnlpxy.json\` | LILO | Open/closed P&L and order-ledger view. |
+
+Some runtime files are created on first use and are not expected to exist in a clean Git checkout. Do not edit generated JSON as a substitute for changing the owning module or central configuration. Where a publisher writes a temporary file and atomically renames it, readers see either the previous complete document or the next complete document.
+
+## Operator runbook
+
+### Before starting
+
+Confirm the intended repository and branch, correct application-directory resolution, the established Python environment, broker provisioning, configured IST schedule, and absence of an unmanaged duplicate engine process.
+
+Starting the engine is a live-trading action. The Start option can initiate automatic execution and broker order requests.
+
+### Management menu
+
+| Key | Action | Actual behaviour |
+| --- | --- | --- |
+| \`s\` | Start | Starts \`pxy-web\` and \`pxy-engine\` only when their sessions/processes are not already detected. |
+| \`v\` | View | Displays the engine tmux pane in a read-only refresh loop. Enter returns to the menu. |
+| \`e\` | Enter | Opens the manual trading submenu. |
+| \`t\` | Test | Searches the home directory for the five most recently modified visible Python files; selected files are executed directly. |
+| \`u\` | Update | Runs the repository update workflow. |
+| \`k\` | Stop | Terminates managed web and engine sessions, with fallback process termination when tmux sessions are absent. |
+| \`x\` | Exit | Exits the management menu only; it does not itself stop running sessions. |
+
+The Test menu is not a unit-test runner. It executes Python files directly, and those files may access broker APIs or submit orders. Inspect a script before running it. The all-scripts option runs the selected five files sequentially and is not a substitute for a controlled test suite.
+
+### Manual trading submenu
+
+| Action | Behaviour |
+| --- | --- |
+| Buy-CE | Invokes the manual CE force-buy action. |
+| Buy-PE | Invokes the manual PE force-buy action. |
+| Sqr-CE | Requests CE-only square-off. |
+| Sqr-PE | Requests PE-only square-off. |
+| Sqr-All | Requests all-position square-off. |
+| Back | Returns to the main menu. |
+
+Manual actions bypass the automatic fresh-entry signal decision. Use them only when the intended broker-side effect is understood.
+
+## Troubleshooting guide
+
+| Symptom | Meaning | First checks |
+| --- | --- | --- |
+| Dashboard opens but says engine unavailable | Web server is running, but the \`pxy-engine\` tmux session cannot be captured. | Check tmux session, supervisor process and engine startup output. |
+| Engine exists but no cycles run | Supervisor/inner loop may be outside its configured window or blocked. | Check IST time, weekday, both market windows and latest console output. |
+| Entry signal appears but no buy occurs | Signal is only the first gate. | Check entry time/blackout, broker session, verified positions, flat gate and force-buy result. |
+| Target appears crossed but no sell occurs | Dashboard target crossing is not the complete order gate. | Check market snapshot, positive target/LTP, minimum P&L, broker net quantity and exit lock. |
+| Averaging telemetry updates but no order occurs | Telemetry is produced before the placement decision. | Check time window, both sides open/losing, LGT, cooldown, investment cap and ledger lock. |
+| Yahoo stale warning appears | Latest Yahoo candle exceeds its warning threshold during the exchange session. | Check Yahoo timestamp and futures feed timestamp; warning alone does not stop the engine. |
+| Market snapshot unavailable | Synthetic fallback, invalid exit state or invalid ATR. | Check Yahoo history, futures quote freshness and ATR calculation. |
+| Positions unverified | Broker session/positions request failed or response is invalid. | Check authentication and the broker positions response; do not treat as flat. |
+| Child timeout notification appears | A child exceeded the configured pipe timeout. | Identify component and determine whether a broker request may have been sent before timeout. |
+| Risk ledger does not advance | Tick may be view-only, locked, too soon, or missing valid state/tags/timestamps. | Check view-only environment, lock, tick interval, state files, order tags and buy times. |
+
+Troubleshoot the owning component first. Do not change strategy thresholds to work around infrastructure, data, broker-session or state-file failures.
+
+## Testing, validation and deployment boundaries
+
+A source commit does not prove that the production host has pulled the commit, activated the correct environment, loaded dependencies, authenticated to the broker, received live data, or placed/filled an order.
+
+- Pure decision helpers can be tested with deterministic inputs without broker access.
+- Candle/data transformation tests should use supplied frames and should not introduce hidden network calls.
+- Broker-dependent tests must be identified as broker-dependent before execution.
+- Backtests/simulations must use the production decision functions and gates; simplified replacement entry/exit rules do not represent production behaviour.
+- Syntax success is not a strategy test.
+- Broker acceptance is not fill confirmation.
+- Dashboard values are not broker position confirmation.
+
+A documentation-only commit does not require an engine restart. Production-code deployment and restart decisions must follow the host operating procedure and explicit operator authorization.
+
+## Repository maintenance and documentation rules
+
+- Root \`README.md\` is the one documentation source.
+- Do not recreate separate architecture, configuration, installation, changelog or utility documents unless explicitly requested.
+- Update README when production behaviour changes.
+- Describe current code, not old backups or abandoned experiments.
+- Files under \`_\` directories are retained/legacy material and are not automatically part of the production launch path.
+- Do not infer active callers from filenames alone; trace imports and launch paths.
+- Do not describe a chart-only indicator as a live entry filter unless the production decision path reads it.
+- Keep tunable runtime values in \`sys/syscnfgpxy.py\`; do not create a competing configuration source.
+- Preserve public signatures, tuple contracts, command names and file ownership when changing production code.
+- Generated market, order, lock and dashboard JSON files are runtime state/output, not source configuration.
+
 
 ---
 
