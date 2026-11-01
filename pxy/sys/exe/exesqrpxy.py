@@ -95,7 +95,7 @@ def place_exit_order(client, row):
         print(f"{Fore.RED}❌ Exit Order Error for {row.get('symbol')}: {e}") 
         return None 
 
-def exit_all_positions(target=None, return_accepted_keys=False, allowed_keys=None, recent_keys=None): 
+def exit_all_positions(target=None, return_accepted_keys=False, allowed_keys=None, recent_keys=None, check_working_sells=False): 
     now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
     target_param = (
         str(target).lower().strip()
@@ -154,9 +154,13 @@ def exit_all_positions(target=None, return_accepted_keys=False, allowed_keys=Non
     # FIX FOR VM FREEZE: Track if any single trade actually fires an order response
     any_order_placed = False
     accepted_keys = set()
+    if check_working_sells:
+        from runexlqdpxy import has_working_sell_orders
 
     def submit(row):
         nonlocal any_order_placed
+        if check_working_sells and has_working_sell_orders(client, [row.get("symbol", "")]):
+            return
         if not place_exit_order(client, row):
             return
         any_order_placed = True
