@@ -30,6 +30,7 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
 )
 from sysdcinpxy import exit_order_response_accepted
+from execoolpxy import liquidation_pending
 
 # --- LOT SIZE LOGIC ---
 t = SYSCNFGPXY_TICKER.upper().strip()
@@ -61,6 +62,9 @@ def generate_pxy_tag():
 
 
 def execute_order(client, symbol, qty):
+    if liquidation_pending():
+        print(f"{Fore.YELLOW}🛑 Master risk liquidation pending; forced buy blocked.")
+        return {"stat": "FAIL", "err": "master risk liquidation pending"}
     try:
         order_tag = generate_pxy_tag()
         params = {
