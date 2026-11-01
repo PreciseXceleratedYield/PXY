@@ -79,26 +79,39 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file=DEFAULT_CHART_OU
         df = calculate_indicators(df)
     if df is None or df.empty:
         return None
+    def finite_number(value):
+        try:
+            number = float(value)
+        except (TypeError, ValueError, OverflowError):
+            return None
+        return number if np.isfinite(number) else None
+
     output = []
     for idx, row in df.iterrows():
-        st_val = float(row["st_line"]) if not pd.isna(row["st_line"]) else 0.0
-        mirror_val = float(row["st_mirror"]) if not pd.isna(row["st_mirror"]) else 0.0
-        sma_val = float(row["sma_50"]) if not pd.isna(row.get("sma_50")) else None
-        tsma_val = float(row["tsma_50"]) if not pd.isna(row.get("tsma_50")) else None
+        open_val = finite_number(row.get("Open"))
+        high_val = finite_number(row.get("High"))
+        low_val = finite_number(row.get("Low"))
+        close_val = finite_number(row.get("Close"))
+        if any(value is None or value <= 0 for value in (open_val, high_val, low_val, close_val)):
+            continue
+        st_val = finite_number(row.get("st_line"))
+        mirror_val = finite_number(row.get("st_mirror"))
         output.append({
             "time": int(idx.timestamp()),
-            "open": float(row["Open"]) if not pd.isna(row["Open"]) else 0.0,
-            "high": float(row["High"]) if not pd.isna(row["High"]) else 0.0,
-            "low": float(row["Low"]) if not pd.isna(row["Low"]) else 0.0,
-            "close": float(row["Close"]),
-            "st_line": st_val,
-            "mirror_line": mirror_val,
-            "sma50": sma_val,
-            "tsma50": tsma_val,
+            "open": open_val,
+            "high": high_val,
+            "low": low_val,
+            "close": close_val,
+            "st_line": st_val if st_val is not None and st_val > 0 else None,
+            "mirror_line": mirror_val if mirror_val is not None and mirror_val > 0 else None,
+            "sma50": finite_number(row.get("sma_50")),
+            "tsma50": finite_number(row.get("tsma_50")),
             "trend": str(row.get("ST_Trend", "SIDE")),
             "sma_trend": str(row.get("SMA_Trend", "NA")),
             "tsma_trend": str(row.get("TSMA_Trend", "NA")),
         })
+    if not output:
+        return None
     output_dir = os.path.dirname(output_file) or "."
     os.makedirs(output_dir, exist_ok=True)
     temporary_file = None
@@ -113,7 +126,7 @@ def export_supertrend_json(df: pd.DataFrame = None, output_file=DEFAULT_CHART_OU
             delete=False,
         ) as handle:
             temporary_file = handle.name
-            json.dump(output, handle, indent=2)
+            json.dump(output, handle, indent=2, allow_nan=False)
         os.replace(temporary_file, output_file)
         temporary_file = None
     finally:
