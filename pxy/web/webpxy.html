@@ -427,6 +427,15 @@ body{
             <span onclick="openPanelLink('terminal')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">🖥️ Terminal</span>
         </div>
         <div id="termBox"></div>
+        <div id="engineLogPanel" style="display:none;flex:1;min-height:0;flex-direction:column;background:var(--bg2);color:var(--text);">
+            <div style="display:flex;gap:6px;padding:5px;flex-wrap:wrap;">
+                <button id="engineLogReturn" type="button">← Return to Terminal</button>
+                <button id="engineLogCopy" type="button">Copy</button>
+                <button id="engineLogRefresh" type="button">Refresh</button>
+                <span id="engineLogStatus" style="font-size:10px;"></span>
+            </div>
+            <pre id="engineLogText" style="flex:1;min-height:0;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;user-select:text;padding:8px;margin:0;font:12px monospace;">Loading...</pre>
+        </div>
     </div>
 
     <div id="resizerTerminal" class="pane-resizer"></div>
@@ -1750,7 +1759,41 @@ let pendingScript=null;
 const logo=$('logoRefresh'),amenu=$('actionsMenu');
 logo.addEventListener('click',e=>{e.stopPropagation();amenu.style.display=amenu.style.display==='flex'?'none':'flex';});
 $('amenuClose').addEventListener('click',()=>{amenu.style.display='none';});
-$('engineLogMenu').addEventListener('click',()=>{amenu.style.display='none';window.open('/engine-log','_blank','noopener,noreferrer');});
+let engineLogTimer=null;
+async function refreshEngineLog(){
+    try{
+        const response=await fetch('/api/engine-log',{cache:'no-store'});
+        const data=await response.json();
+        const log=$('engineLogText');
+        const atBottom=log.scrollTop+log.clientHeight>=log.scrollHeight-30;
+        log.textContent=data.ok?data.log:(data.error||'Engine unavailable');
+        $('engineLogStatus').textContent=data.ok?'Live':'Unavailable';
+        if(atBottom)log.scrollTop=log.scrollHeight;
+    }catch(e){$('engineLogStatus').textContent='Fetch failed';}
+}
+$('engineLogMenu').addEventListener('click',()=>{
+    amenu.style.display='none';
+    switchTab('paneTerminal');
+    $('termBox').style.display='none';
+    $('engineLogPanel').style.display='flex';
+    refreshEngineLog();
+    if(engineLogTimer)clearInterval(engineLogTimer);
+    engineLogTimer=setInterval(()=>{
+        if(!window.getSelection().toString())refreshEngineLog();
+    },3000);
+});
+$('engineLogReturn').addEventListener('click',()=>{
+    if(engineLogTimer){clearInterval(engineLogTimer);engineLogTimer=null;}
+    $('engineLogPanel').style.display='none';
+    $('termBox').style.display='';
+    if(fit)setTimeout(()=>fit.fit(),50);
+});
+$('engineLogRefresh').addEventListener('click',refreshEngineLog);
+$('engineLogCopy').addEventListener('click',async()=>{
+    const log=$('engineLogText');
+    try{await navigator.clipboard.writeText(log.textContent);$('engineLogStatus').textContent='Copied';}
+    catch(e){const range=document.createRange();range.selectNodeContents(log);window.getSelection().removeAllRanges();window.getSelection().addRange(range);$('engineLogStatus').textContent='Selected — press Ctrl+C';}
+});
 document.addEventListener('click',e=>{if(!amenu.contains(e.target)&&e.target!==logo)amenu.style.display='none';});
 document.querySelectorAll('.amenu-btn').forEach(btn=>{
     btn.addEventListener('click',()=>{
