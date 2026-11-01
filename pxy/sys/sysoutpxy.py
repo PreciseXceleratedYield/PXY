@@ -3,12 +3,10 @@
 import pandas as pd
 
 from syscnfgpxy import (
-    SYSDTHAPXY_CANDLE_MODE,
     SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
 )
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_close_direction_series, transform_dtha_ohlc
-from sysstrnpxy import get_market_trend
 
 
 def get_out_candles(df):
@@ -23,7 +21,7 @@ def get_out_candles(df):
 
 
 def get_signal(df=None):
-    """Return OUT direction; ST mode preserves BULL, BEAR, and SIDE."""
+    """Return pure DTHA OUT direction."""
     try:
         if df is None:
             df = fetch_yf_data()
@@ -31,9 +29,6 @@ def get_signal(df=None):
             return "NONE"
 
         transformed = get_out_candles(df)
-        if SYSDTHAPXY_CANDLE_MODE == "ST":
-            return get_market_trend(transformed)
-
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
 
         # Require C0, C1, and C2 so the C1/C0 candle colours are both defined.
