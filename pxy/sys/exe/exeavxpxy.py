@@ -63,8 +63,7 @@ def print_telemetry_dashboard(p):
     if not p:
         return
     P_WIDTH = 36
-    print("
-" + Fore.CYAN + "=" * P_WIDTH)
+    print("\n" + Fore.CYAN + "=" * P_WIDTH)
     print(Fore.CYAN + " OPT  LOT   LGT   RUN  TGT      PNL")
     print(Fore.CYAN + "-" * P_WIDTH)
 
@@ -91,8 +90,7 @@ def print_telemetry_dashboard(p):
     left_n = max(0, min(track_slots, int(round(ce_ratio * track_slots))))
     right_n = max(0, track_slots - left_n)
     print("  " + Fore.GREEN + left_label + ("━" * left_n) + Fore.WHITE + "⚖️" + Fore.RED + ("━" * right_n) + Fore.RED + right_label)
-    print(Fore.CYAN + "=" * P_WIDTH + "
-")
+    print(Fore.CYAN + "=" * P_WIDTH + "\n")
 
 
 def handle_side_averaging(client, df, index_price, positions_response=None):
