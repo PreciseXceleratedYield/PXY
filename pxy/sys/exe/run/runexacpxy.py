@@ -6,8 +6,8 @@
 #   1) runexacpxy.daily_purge_check()                             top of process_lilo_orders
 #   2) runexacpxy.execute_master_risk_ledger(client, open_df, closed_df)   after open_df / closed_df exist
 #
-# On a confirmed target it squares off everything, waits until the broker is flat,
-# resets risk state and ends the process with sys.exit(...).
+# On a confirmed target it submits square-off orders and persists a pending state.
+# Later broker snapshots confirm flatness before risk state is reset; the engine keeps running.
 #
 # Same maths and web JSON files as exeexacpxy.py. Do NOT keep exeexacpxy.py scheduled as well.
 #
@@ -97,8 +97,8 @@ def daily_purge_check():
 # HOOK 2: the master ledger
 # ---------------------------------------------------------------------------
 def execute_master_risk_ledger(client, open_df, closed_df, exit_signal=None):
-    """Defensive gatekeeper. Returns normally when there is nothing to do or the tick was skipped.
-    On a confirmed breach: square-off, flat check, state reset, then sys.exit(...)."""
+    """Defensive gatekeeper. Returns normally when idle, skipped, or liquidating asynchronously.
+    A persisted pending state blocks new trading until a later broker snapshot confirms flatness."""
     global _IN_LEDGER
     if _IN_LEDGER:
         return
