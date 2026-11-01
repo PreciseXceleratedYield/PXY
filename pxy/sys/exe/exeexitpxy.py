@@ -275,7 +275,8 @@ def run_depth_squareoff(client, active_df, market_data_available,
         _lock_key(row)
         for _, row in target_rows.iterrows()
     }
-    if all(_recently_exited(key) for key in exited_keys):
+    exited_keys = {key for key in exited_keys if not _recently_exited(key)}
+    if not exited_keys:
         return set()
     if not exited_keys:
         return set()
@@ -284,7 +285,9 @@ def run_depth_squareoff(client, active_df, market_data_available,
         from exesqrpxy import exit_all_positions
 
         accepted_keys = exit_all_positions(
-            "-pe" if side == "PE" else "-ce", return_accepted_keys=True
+            "-pe" if side == "PE" else "-ce",
+            return_accepted_keys=True,
+            allowed_keys=exited_keys
         ) or set()
     except Exception as error:
         print(f"{Fore.RED}❌ Direct {side} square-off failed: {error}")
