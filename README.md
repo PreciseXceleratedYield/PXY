@@ -1355,6 +1355,57 @@ that fails its validation raises an error during import; the engine should not
 be expected to continue with an invalid configuration.
 
 
+
+### Compatibility aliases and retained declarations
+
+The central configuration also contains owner-prefixed aliases and retained
+values that are not independent knobs. They are listed here so that a reader
+can distinguish a real independent setting from a value copied from the
+shared configuration.
+
+| Setting | Current value/source | Interpretation |
+| --- | --- | --- |
+| `SYSCNFGPXY_TRADING_PIPE_CLOSE` | 15:40 | Shared trading-pipe close boundary. |
+| `SYSEXEPXY_MARKET_OPEN` | `SYSCNFGPXY_MARKET_OPEN` (09:16) | Supervisor open alias. |
+| `SYSEXEPXY_MARKET_CLOSE` | `SYSCNFGPXY_ENGINE_CLOSE` (15:45) | Supervisor close alias. |
+| `EXEPXYPXY_MARKET_OPEN` | `SYSCNFGPXY_MARKET_OPEN` (09:16) | Execution-loop open alias. |
+| `EXEPXYPXY_MARKET_CLOSE` | `SYSCNFGPXY_TRADING_PIPE_CLOSE` (15:40) | Execution-loop close alias. |
+| `SYSENTRPXY_ST_START` | 16:00 | Retained declaration; no current production caller was found. |
+| `EXEENTRPXY_PREOPEN_END` | `SYSCNFGPXY_MARKET_OPEN` (09:16) | Entry blackout end alias. |
+| `EXEAMSPXY_ORDER_EXCHANGE_SEGMENT` | Shared F&O exchange segment | Averaging order alias. |
+| `EXEAMSPXY_ORDER_PRODUCT` | Shared F&O product | Averaging order alias. |
+| `EXEAMSPXY_ORDER_PRICE` | Shared F&O price | Averaging order alias. |
+| `EXEAMSPXY_ORDER_TYPE` | Shared F&O order type | Averaging order alias. |
+| `EXEAMSPXY_ORDER_VALIDITY` | Shared F&O validity | Averaging order alias. |
+| `EXEAMSPXY_ORDER_TRANSACTION_TYPE` | Shared buy transaction code | Averaging order alias. |
+| `EXEAMSPXY_ORDER_AMO` | Shared F&O AMO flag | Averaging order alias. |
+| `EXEFORCEPXY_ORDER_EXCHANGE_SEGMENT` | Shared F&O exchange segment | Manual/force order alias. |
+| `EXEFORCEPXY_ORDER_PRODUCT` | Shared F&O product | Manual/force order alias. |
+| `EXEFORCEPXY_ORDER_PRICE` | Shared F&O price | Manual/force order alias. |
+| `EXEFORCEPXY_ORDER_TYPE` | Shared F&O order type | Manual/force order alias. |
+| `EXEFORCEPXY_ORDER_VALIDITY` | Shared F&O validity | Manual/force order alias. |
+| `EXEFORCEPXY_ORDER_TRANSACTION_TYPE` | Shared buy transaction code | Manual/force order alias. |
+| `EXEFORCEPXY_ORDER_AMO` | Shared F&O AMO flag | Manual/force order alias. |
+| `EXEEXITPXY_ORDER_EXCHANGE_SEGMENT` | Shared F&O exchange segment | Exit order alias. |
+| `EXEEXITPXY_ORDER_PRODUCT` | Shared F&O product | Exit order alias. |
+| `EXEEXITPXY_ORDER_PRICE` | Shared F&O price | Exit order alias. |
+| `EXEEXITPXY_ORDER_TYPE` | Shared F&O order type | Exit order alias. |
+| `EXEEXITPXY_ORDER_VALIDITY` | Shared F&O validity | Exit order alias. |
+| `EXEEXITPXY_ORDER_TRANSACTION_TYPE` | Shared sell transaction code | Exit order alias. |
+| `EXEEXITPXY_ORDER_AMO` | Shared F&O AMO flag | Exit order alias. |
+| `EXEEXITPXY_SYSDUMP_SCRIPT` | `sysdmppxy.py` | Dump script launched after an accepted regular exit order. |
+| `EXEOMSPXY_DEBUG_ENABLED` | `False` | OMS diagnostic output switch. |
+| `EXECBUYPXY_DEBUG_ENABLED` | `False` | Counter-buy diagnostic output switch. |
+| `EXECBUYPXY_SCRIPTS` | CE → `pxybuype`; PE → `pxybuyce` | Opposite-leg action mapping. |
+| `EXETGTPXY_TGT_PCT_NOT_ALIGNED` | 33.0 | Retained legacy/replay setting; not read by the active PRD target calculation. |
+| `EXETGTPXY_EARLY_ALIGNED_TARGET_PCT` | 33.0 | Retained legacy/replay setting; not read by the active PRD target calculation. |
+| `EXETGTPXY_ALIGNED_MIN_DEPTH` | 10 | Retained legacy/replay setting; not read by the active PRD target calculation. |
+
+The three `EXETGTPXY_*` legacy/replay values above must not be substituted
+into the active `calculate_tgt()` formula. The active formula is controlled
+by the `EXETGTPXY_PRD_*` settings documented in the preceding table.
+
+
 ### Configuration ownership
 
 Use the consuming module's filename as the owner prefix, without `.py`:
