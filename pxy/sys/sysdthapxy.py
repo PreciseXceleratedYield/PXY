@@ -15,16 +15,15 @@ from sysdtafpxy import fetch_yf_data
 def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     """Return a copy of OHLC data transformed using the selected DTHA mode.
 
-    ST selects the existing SuperTrend signal source and retains raw OHLC.
     OC2 and OHLC4 replace Close with the corresponding candle average.
     HYPER preserves the former DTAF mode-0 transformation.
     TSMA matches the TSMA-open/custom-close Pine candle.
     HA applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA", "ST"}
+    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA"}
     if mode not in valid_modes:
         raise ValueError(
-            "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, TSMA, or ST."
+            "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, or TSMA."
         )
 
     if df is None or df.empty:
@@ -40,7 +39,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     raw_low = pd.to_numeric(out["Low"], errors="coerce").to_numpy(dtype=float)
     raw_close = pd.to_numeric(out["Close"], errors="coerce").to_numpy(dtype=float)
 
-    if mode in {"RAW", "ST"}:
+    if mode == "RAW":
         return out
 
     if mode == "OC2":
