@@ -220,6 +220,7 @@ def cycle_risk_metrics(
         and pe_qty > 0
         and premium_paid > 0
         and cycle_pnl >= target
+        and cycle_pnl >= 280.0  # Minimum +₹280 cycle P&L for RiskBar square-off
     )
 
     return {
