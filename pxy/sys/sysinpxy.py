@@ -70,6 +70,8 @@ def get_entry_signal(df=None):
     if SYSINPXY_CANDLE_MODE == "ST":
         if df is None:
             df = fetch_yf_data()
+        if df is None or df.empty:
+            return "NONE"
         signal = get_signal(df)
 
         if signal == "SIDE":
