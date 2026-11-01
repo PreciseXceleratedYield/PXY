@@ -34,7 +34,7 @@ def get_signal(df=None):
                 evaluated_df = evaluated_df.iloc[:-1]
             return get_market_trend(evaluated_df)
 
-        transformed = transform_dtha_ohlc(df, mode=SYSINPXY_CANDLE_MODE)
+        transformed = transform_dtha_ohlc(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
         if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE != "YES":
             closes = closes.iloc[:-1]
