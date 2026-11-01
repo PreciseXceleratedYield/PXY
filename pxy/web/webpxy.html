@@ -1795,7 +1795,7 @@ $('engineLogCopy').addEventListener('click',async()=>{
     catch(e){const range=document.createRange();range.selectNodeContents(log);window.getSelection().removeAllRanges();window.getSelection().addRange(range);$('engineLogStatus').textContent='Selected — press Ctrl+C';}
 });
 document.addEventListener('click',e=>{if(!amenu.contains(e.target)&&e.target!==logo)amenu.style.display='none';});
-document.querySelectorAll('.amenu-btn').forEach(btn=>{
+document.querySelectorAll('.amenu-btn[data-script]').forEach(btn=>{
     btn.addEventListener('click',()=>{
         const script=btn.dataset.script;
         pendingScript=script;amenu.style.display='none';
