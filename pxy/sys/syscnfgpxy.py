@@ -82,16 +82,14 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 
 # DTHA owns the candle and signal mode shared by IN and OUT.
 SYSDTHAPXY_CANDLE_MODE = "TSMA"
-if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA", "ST"}:
+if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA"}:
     raise ValueError(
-        "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, HA, OHLC4, HYPER, TSMA, or ST."
+        "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, HA, OHLC4, HYPER, or TSMA."
     )
 
 SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "YES"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
     raise ValueError("SYSDTHAPXY_INCLUDE_RUNNING_CANDLE must be YES or NO.")
-
-SYSENTRPXY_ST_START = dt_time(16, 0)
 
 # Data ingestion, chart generation, and signal calculation.
 # DTAF always retains raw OHLC; the futures blend is handled in sysdtafpxy.py.
