@@ -425,7 +425,7 @@ body{
     <div class="tab-pane active" id="paneTerminal">
         <div class="pane-hdr hdr-term">
             <span onclick="openPanelLink('terminal')" style="cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);">🖥️ Terminal</span>
-            <button id="engineLogToggle" type="button" style="margin-left:auto;font:10px monospace;cursor:pointer;">LOG</button>
+            <button id="engineLogToggle" type="button" style="margin-left:auto;font:10px monospace;cursor:pointer;" title="Show engine log" aria-label="Show engine log">📜</button>
         </div>
         <div id="termBox"></div>
         <div id="engineLogPanel" style="display:none;flex:1;min-height:0;flex-direction:column;background:var(--bg2);color:var(--text);">
@@ -1776,12 +1776,16 @@ $('engineLogToggle').addEventListener('click',()=>{
         if(engineLogTimer){clearInterval(engineLogTimer);engineLogTimer=null;}
         $('engineLogPanel').style.display='none';
         $('termBox').style.display='';
-        $('engineLogToggle').textContent='LOG';
+        $('engineLogToggle').textContent='📜';
+        $('engineLogToggle').title='Show engine log';
+        $('engineLogToggle').setAttribute('aria-label','Show engine log');
         if(fit)setTimeout(()=>fit.fit(),50);
     }else{
         $('termBox').style.display='none';
         $('engineLogPanel').style.display='flex';
-        $('engineLogToggle').textContent='LIVE';
+        $('engineLogToggle').textContent='📡';
+        $('engineLogToggle').title='Return to live terminal';
+        $('engineLogToggle').setAttribute('aria-label','Return to live terminal');
         refreshEngineLog();
         if(engineLogTimer)clearInterval(engineLogTimer);
         engineLogTimer=setInterval(()=>{
