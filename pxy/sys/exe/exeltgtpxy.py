@@ -108,18 +108,18 @@ def calculate_tgt(
         own_depth = positive_factor(side_depth)
         own_power = positive_factor(side_power)
 
-        if not is_aligned:
-            target_pct = EXETGTPXY_PRD_BASE_FACTOR
-        elif not both_sides_open:
-            target_pct = EXETGTPXY_PRD_BASE_FACTOR * (
-                own_power + own_depth
-            )
-        else:
+        if both_sides_open:
             both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
             target_pct = (
                 both_sides_base
                 + (both_sides_base / own_depth)
                 + (both_sides_base / own_power)
+            )
+        elif not is_aligned:
+            target_pct = EXETGTPXY_PRD_BASE_FACTOR
+        else:
+            target_pct = EXETGTPXY_PRD_BASE_FACTOR * (
+                own_power + own_depth
             )
 
         return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
