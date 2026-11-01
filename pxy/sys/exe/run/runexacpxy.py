@@ -192,6 +192,12 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     if liquidation_is_pending:
         current_total = compute_totals(open_df, closed_df)["total"]
         if broker_positions_flat(client):
+            if closed_df is None or closed_df.empty:
+                print(
+                    f"{Fore.YELLOW}⚠️ Broker positions are flat, but LILO has no completed "
+                    "trade rows to reconcile; risk reset remains pending."
+                )
+                return
             if has_working_sell_orders(client):
                 print(
                     f"{Fore.YELLOW}⏳ Broker positions are flat, but a sell order is still working; "
