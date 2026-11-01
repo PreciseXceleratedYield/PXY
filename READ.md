@@ -1,22 +1,56 @@
-Hey Bhanu,
+# PXY — Operator Read-Me
 
-I am Krishna, the eternal, the ultimate soul, the source of all that exists. Everything you see—the sun, the rivers, the mountains, the stars—is but a reflection of Me. Life, death, creation, destruction—all flow from Me, yet I remain untouched, infinite, unchanging.
+This file is a short navigation and operating note for the current repository.
+It replaces obsolete personal text and retired installation instructions.
 
-Bhanu, within you is a spark of this same divine essence. Your soul is not separate; it is part of Me, eternal and pure. You are not merely the body, nor the mind, nor the fleeting thoughts that distract you. You are a fragment of the eternal truth, shining with the same light that illuminates the cosmos.
+## Before operating
 
-Listen carefully, for I will teach you the path to awaken this divine self within:
+1. Confirm you are on the intended repository and branch.
+2. Review `pxy/sys/syscnfgpxy.py` and
+   `pxy/sys/CONFIGURATION.md` for the active runtime settings.
+3. Confirm the host's configured Python environment and broker session.
+4. Remember that starting the production engine can submit live orders.
 
-Do your duty, without clinging to results. Your actions are sacred when performed with devotion.
-Master your mind and senses. They are tools; wield them wisely, for they shape your destiny.
-Remember your soul is eternal. Birth and death touch only the body, not the divine within.
-Surrender to Me with love. Ego binds you; devotion liberates.
-Live in balance. Moderation in all things brings harmony.
-Face fear with courage. Courage is acting in the light of truth despite uncertainty.
-Let knowledge guide your actions. Wisdom sees beyond desire and illusion.
-Detach from outcomes. Your intent defines you, not the success or failure of your deeds.
-Love and serve selflessly. Devotion in action brings inner peace.
-All paths return to Me. Knowledge, action, and devotion converge; follow the path that resonates with your heart.
+## Management entry point
 
-Bhanu, remember this: I am within you, guiding, supporting, and illuminating your way. You are not separate from the divine—you are a part of Me. Awaken to this truth, act with courage, and live as the eternal soul you truly are.
+The production host uses the interactive `pxy/pxy` management script.
 
-rm -rf * && wget --no-check-certificate -O V1L58PXY https://raw.githubusercontent.com/kcbpcc/kcbpcc/main/V1L58PXY && chmod 777 V1L58PXY && ./V1L58PXY
+- **Start** launches the Node.js dashboard (`pxy-web`) and Python engine
+  supervisor (`pxy-engine`) in tmux.
+- **View** displays the engine tmux output.
+- **Enter** opens the manual trading operations menu.
+- **Test** runs a selected Python script; do not select scripts without
+  understanding whether they access the broker.
+- **Update** runs the repository's update workflow.
+- **Stop** terminates the managed engine and web sessions.
+
+Use the menu deliberately. Do not start a second engine process alongside the
+managed `pxy-engine` session.
+
+## Production execution path
+
+```text
+pxy/pxy
+  ├── pxy.js                         (web dashboard)
+  └── sys/sysexepxy.py               (supervisor)
+        └── sys/exe/exepxy.py         (production execution loop)
+              ├── run/runnfutpxy.py
+              ├── exeexitpxy.py
+              ├── exeentrpxy.py
+              └── exeavgpxy.py
+```
+
+The execution loop prioritizes exits around entry and averaging passes. Each
+child script is launched with the configured pipe timeout. A failed component
+is recorded and retried on later iterations; persistent component failures
+are periodically reported through Telegram.
+
+## Where to look
+
+- Runtime settings: `pxy/sys/syscnfgpxy.py`
+- Configuration rules: `pxy/sys/CONFIGURATION.md`
+- Architecture and signal definitions: `INFO.md`
+- Change history: `CHANGELOG.md`
+
+Do not use old setup snippets that delete repository contents, download
+unverified scripts, or create parallel runtime configuration files.
