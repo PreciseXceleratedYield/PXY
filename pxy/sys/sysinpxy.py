@@ -88,8 +88,6 @@ def get_entry_signal(df=None):
 
     signal = get_signal(df)
     return {
-        "BULL": "BUY",
-        "BEAR": "SELL",
         "BUY": "BUY",
         "SELL": "SELL",
     }.get(signal, "NONE")
