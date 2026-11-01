@@ -6,15 +6,12 @@
 # Split out of runexacpxy.py (pure move). The breach decision itself stays in runexacpxy._tick.
 import os
 import sys
-import time
 import subprocess
 import math
 from colorama import Fore, Style
 
 from runexiopxy import SQUAREOFF_SCRIPT_PATH
 from syscnfgpxy import (
-    RUNEXLQDPXY_FLAT_CONFIRM_POLL_SECONDS as FLAT_CONFIRM_POLL_SECONDS,
-    RUNEXLQDPXY_FLAT_CONFIRM_TIMEOUT_SECONDS as FLAT_CONFIRM_TIMEOUT_SECONDS,
     RUNEXLQDPXY_SQUAREOFF_TIMEOUT_SECONDS as SQUAREOFF_TIMEOUT_SECONDS,
 )
 from runexmtpxy import (
@@ -78,15 +75,60 @@ def broker_positions_flat(client):
         return False
 
 
-def wait_until_flat(client):
-    """Poll the broker until flat or timeout, so slow fills don't cause a false 'not flat'."""
-    deadline = time.time() + FLAT_CONFIRM_TIMEOUT_SECONDS
-    while True:
-        if broker_positions_flat(client):
+def has_working_sell_orders(client, symbols=None):
+    """Prevent duplicate liquidation sells while a broker sell order is still working."""
+    try:
+        try:
+            response = client.order_report()
+        except AttributeError:
+            response = client.orders()
+    except Exception as error:
+        print(f"{Fore.YELLOW}⚠️ Cannot verify working sell orders; duplicate square-off blocked: {error}")
+        return True
+
+    if (
+        isinstance(response, dict)
+        and str(response.get("stat", "")).strip().lower() in {"not_ok", "not ok"}
+        and str(response.get("stCode", "")).strip() == "5203"
+        and str(response.get("errMsg", "")).strip().lower() == "no data"
+    ):
+        return False
+
+    if (
+        not isinstance(response, dict)
+        or str(response.get("stat", "")).strip().lower() != "ok"
+        or str(response.get("stCode", "")).strip() != "200"
+        or not isinstance(response.get("data"), list)
+    ):
+        print(f"{Fore.YELLOW}⚠️ Invalid order report; duplicate square-off blocked.")
+        return True
+
+    symbol_filter = {
+        str(symbol).strip().upper()
+        for symbol in (symbols or [])
+        if str(symbol).strip()
+    }
+    active_statuses = {
+        "working", "open", "validation pending", "pending",
+        "trigger pending", "open pending",
+    }
+    for order in response["data"]:
+        if not isinstance(order, dict):
+            continue
+        status = str(order.get("ordSt", order.get("status", ""))).strip().lower()
+        if status not in active_statuses:
+            continue
+        side = str(order.get("trnsTp", order.get("side", ""))).strip().upper()
+        if side not in {"S", "SELL"}:
+            continue
+        symbol = str(order.get("trdSym", order.get("trading_symbol", ""))).strip().upper()
+        if not symbol_filter or symbol in symbol_filter:
+            print(
+                f"{Fore.YELLOW}⏳ Existing sell order still working for {symbol or 'unknown symbol'}; "
+                "waiting for the next broker snapshot."
+            )
             return True
-        if time.time() >= deadline:
-            return False
-        time.sleep(FLAT_CONFIRM_POLL_SECONDS)
+    return False
 
 
 def run_squareoff():
@@ -125,14 +167,21 @@ def _refresh_total(client, fallback_total):
 
 
 def liquidate_and_exit(
-    client, total_raw_pnl, risk_control_activated=False, risk_state=None
+    client, total_raw_pnl, risk_control_activated=False, risk_state=None,
+    broker_flat_confirmed=False,
 ):
-    """Confirmed breach: square off, wait for flat, lock the offset, reset the engine. Always ends the
-    process with sys.exit(...). Flat is decided by the broker, not by the script's exit code."""
-    run_squareoff()
+    """Submit liquidation and return; finalize only after a later broker snapshot is flat."""
+    state = dict(risk_state or {})
+    if not broker_flat_confirmed:
+        if has_working_sell_orders(client, state.get("open_symbols", [])):
+            return False
+        if not run_squareoff():
+            print(f"{Fore.RED}⚠️ Square-off submission did not complete; liquidation remains pending.")
+        else:
+            print(f"{Fore.YELLOW}📤 Square-off submitted. Awaiting the next broker snapshot; no fill wait.")
+        return False
 
-    if wait_until_flat(client):
-        start_cooldown()
+    start_cooldown()
         new_total, closed_df = _refresh_total(client, total_raw_pnl)
         print(f"🧹 {Fore.GREEN}Broker flat verified! Locking offset at ₹{new_total:,.0f} and restarting engine...")
         pnl_offset = new_total
@@ -181,6 +230,5 @@ def liquidate_and_exit(
         )
         sys.exit("Master Circuit Breaker Triggered.")
 
-    print(f"{Fore.RED}⚠️ Broker not flat after {FLAT_CONFIRM_TIMEOUT_SECONDS:.0f}s. "
-          f"Keeping breach count; square-off retries next tick.")
-    sys.exit("Master Circuit Breaker Triggered (broker not flat yet; square-off retries next tick).")
+    print(f"{Fore.GREEN}✅ Master risk liquidation confirmed flat; risk state reset.")
+    return True
