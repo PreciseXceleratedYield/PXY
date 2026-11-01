@@ -95,7 +95,7 @@ def place_exit_order(client, row):
         print(f"{Fore.RED}❌ Exit Order Error for {row.get('symbol')}: {e}") 
         return None 
 
-def exit_all_positions(target=None, return_accepted_keys=False): 
+def exit_all_positions(target=None, return_accepted_keys=False, allowed_keys=None): 
     now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
     target_param = (
         str(target).lower().strip()
@@ -164,7 +164,10 @@ def exit_all_positions(target=None, return_accepted_keys=False):
             f"{row.get('symbol', '')}|{row.get('tag', '')}|{row.get('buy_time', '')}"
         )
     
-    for _, row in active_df.iterrows(): 
+    for _, row in active_df.iterrows():
+        row_key = f"{row.get('symbol', '')}|{row.get('tag', '')}|{row.get('buy_time', '')}"
+        if allowed_keys is not None and row_key not in allowed_keys:
+            continue
         symbol = row.get("symbol") 
         qty = row.get("qty", 0) 
         if not symbol or qty == 0: 
