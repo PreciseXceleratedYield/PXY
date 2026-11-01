@@ -409,9 +409,9 @@ def run_snapshot():
     
     if os.path.exists(exe_path) and not liquidation_pending():
         sq_args, sq_key = None, None
-        if SQOFF_START <= now < SQOFF_ALL_START:       # 15:30 to 15:31: without -all
+        if SQOFF_START <= now < SQOFF_ALL_START:       # 15:30 to 15:32: without -all
             sq_args, sq_key = [], "SQOFF|first"
-        elif SQOFF_ALL_START <= now < SQOFF_END:       # 15:31 to 15:40: with -all
+        elif SQOFF_ALL_START <= now < SQOFF_END:       # 15:32 to 15:40: with -all
             sq_args, sq_key = ["-all"], "SQOFF|all"
         if sq_args is not None:
             if ledger_busy():
@@ -421,7 +421,7 @@ def run_snapshot():
                     from exesqrpxy import exit_all_positions
 
                     locks = _load_locks()
-                    prefix = f"{sq_key}|"
+                    prefix = "SQOFF|POSITION|"
                     recent_keys = {
                         key[len(prefix):]
                         for key in locks
@@ -432,10 +432,11 @@ def run_snapshot():
                         "-all" if sq_args else "",
                         return_accepted_keys=True,
                         recent_keys=recent_keys,
+                        check_working_sells=True,
                     )
                     if accepted_keys:
                         for key in accepted_keys:
-                            _mark_lock(f"{sq_key}|{key}")
+                            _mark_lock(f"SQOFF|POSITION|{key}")
                             _mark_exited(key)
                     else:
                         debug_log("Scheduled square-off: no new sell orders accepted.")
