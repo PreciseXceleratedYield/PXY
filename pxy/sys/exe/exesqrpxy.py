@@ -2,6 +2,7 @@
 import sys 
 import os 
 import subprocess
+import json
 from pathlib import Path
 
 # Add the system and run directories before importing local modules.
@@ -33,7 +34,37 @@ from execoolpxy import start_cooldown
 from sysdcinpxy import exit_order_response_accepted, valid_exit_positions_response, matching_exit_net_quantity, exit_quantity_to_sell
 from runlilopxy import position_net_quantity
 
-init(autoreset=True) 
+init(autoreset=True)
+
+_FAILURE_FILE = Path(__file__).with_name(".sqoff_verify_failures.json")
+
+
+def _report_verification(symbol, reason=None):
+    """Persist consecutive failed iterations; alert first and every fifth failure."""
+    try:
+        state = json.loads(_FAILURE_FILE.read_text()) if _FAILURE_FILE.exists() else {}
+        if not isinstance(state, dict):
+            state = {}
+        today = datetime.now(SYSCNFGPXY_TIMEZONE).date().isoformat()
+        if state.get("date") != today:
+            state = {"date": today, "failures": {}}
+        failures = state.setdefault("failures", {})
+        if reason is None:
+            failures.pop(symbol, None)
+        else:
+            count = int(failures.get(symbol, 0)) + 1
+            failures[symbol] = count
+            if count == 1 or count % 5 == 0:
+                message = f"⚠️ PXY scheduled square-off: broker quantity unverified for {symbol} ({reason}); failure #{count}. Engine continues."
+                print(message)
+                try:
+                    from sysexepxy import send_telegram
+                    send_telegram(message)
+                except Exception as error:
+                    print(f"⚠️ Square-off Telegram alert failed: {error}")
+        _FAILURE_FILE.write_text(json.dumps(state))
+    except Exception as error:
+        print(f"⚠️ Square-off failure tracking unavailable: {error}")
 
 def dprint(message):
     if EXEEXITPXY_DEBUG_ENABLED:
@@ -161,6 +192,8 @@ def exit_all_positions(target=None, return_accepted_keys=False, allowed_keys=Non
         positions_response = data.get("positions_snapshot")
         if data.get("positions_unverified", True) or not valid_exit_positions_response(positions_response):
             print(f"{Fore.YELLOW}⚠️ Broker net positions unverified; scheduled square-off blocked.")
+            for symbol in set(active_df["symbol"].dropna().astype(str)):
+                _report_verification(symbol, "invalid positions snapshot")
             return set() if return_accepted_keys else None
         from runexlqdpxy import has_working_sell_orders
 
@@ -177,7 +210,11 @@ def exit_all_positions(target=None, return_accepted_keys=False, allowed_keys=Non
                     print(f"{Fore.YELLOW}⚠️ Cannot verify broker quantity for {symbol}: {error}; sell skipped.")
                     net_by_symbol[symbol] = None
             net_qty = net_by_symbol[symbol]
-            if net_qty is None or net_qty <= 0:
+            if net_qty is None:
+                _report_verification(symbol, "missing or malformed net quantity")
+                return
+            _report_verification(symbol)
+            if net_qty <= 0:
                 dprint(f"No verified long position for {symbol}; skipping.")
                 return
             remaining = net_qty - submitted_by_symbol.get(symbol, 0)
