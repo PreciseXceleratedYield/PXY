@@ -381,7 +381,35 @@ def _tick(client, open_df, closed_df, exit_signal=None):
 
     consecutive_breaches += 1
     save_check_state(consecutive_breaches)
-    state_saved = save_session_state(
+    save_session_state(
+        0.0,
+        metrics["cycle_pnl"],
+        -risk_target,
+        pnl_offset,
+        risk_control_activated=True,
+        target_exit_line=risk_target,
+        booked_profit=booked_profit,
+        closed_book_count=closed_book_count,
+        last_closed_snapshot=last_closed_snapshot,
+        last_closed_cycle_id=last_closed_cycle_id,
+        closed_books=closed_books,
+        active_book_id=active_book_id,
+        active_book_tags=sorted(cycle_tags),
+        active_book_started_at=cycle_started_at,
+    )
+    if not state_saved:
+        print(f"{Fore.RED}⚠️ Could not persist pending liquidation state; square-off not submitted.")
+        return
+    print(
+        f"{Fore.YELLOW}⚠️ Cycle profit target reached while heavy side is unaligned "
+        f"({metrics['target_pct']:.2f}% = "
+        f"{RUNEXACPXY_CYCLE_TARGET_PCT:.1f}% / {metrics['active_count']}) "
+        f"(confirmation {consecutive_breaches}/{BREACH_TICKS_REQUIRED})."
+    )
+    if consecutive_breaches < BREACH_TICKS_REQUIRED:
+        return
+
+    pending_saved = save_session_state(
         0.0,
         metrics["cycle_pnl"],
         -risk_target,
@@ -398,16 +426,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         active_book_started_at=cycle_started_at,
         liquidation_pending=True,
     )
-    if not state_saved:
+    if not pending_saved:
         print(f"{Fore.RED}⚠️ Could not persist pending liquidation state; square-off not submitted.")
-        return
-    print(
-        f"{Fore.YELLOW}⚠️ Cycle profit target reached while heavy side is unaligned "
-        f"({metrics['target_pct']:.2f}% = "
-        f"{RUNEXACPXY_CYCLE_TARGET_PCT:.1f}% / {metrics['active_count']}) "
-        f"(confirmation {consecutive_breaches}/{BREACH_TICKS_REQUIRED})."
-    )
-    if consecutive_breaches < BREACH_TICKS_REQUIRED:
         return
 
     sys.stdout.write(
