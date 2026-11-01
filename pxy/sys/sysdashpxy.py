@@ -216,23 +216,23 @@ def print_dashboard(data):
     s_pw = TOTAL_WIDTH - len(f"CE Power:{ce}") - len(f"PE Power:{pe}")
     print(Fore.WHITE + "CE Power:" + ce_c + str(ce) + " " * max(1, s_pw) + Fore.WHITE + "PE Power:" + pe_c + str(pe))
 
-    # 8. LIVE ORDER SIGNALS
+    # 8. INDEPENDENT INDICATOR STATUS
+    sma_status = data.get("sma", "NA")
+    tsma_status = data.get("tsma", "NA")
+    sma_color = Fore.LIGHTGREEN_EX if sma_status == "BULL" else Fore.LIGHTRED_EX if sma_status == "BEAR" else Fore.YELLOW
+    tsma_color = Fore.LIGHTGREEN_EX if tsma_status == "BULL" else Fore.LIGHTRED_EX if tsma_status == "BEAR" else Fore.YELLOW
+    s_ind = TOTAL_WIDTH - len(f"SMA:{sma_status}") - len(f"TSMA:{tsma_status}")
+    print(Fore.WHITE + "SMA:" + sma_color + sma_status + " " * max(1, s_ind) + Fore.WHITE + "TSMA:" + tsma_color + tsma_status)
+
+    # 9. LIVE ORDER SIGNALS (FINAL STATUS ROW)
     ent, ext = data["entry"], data["exit"]
     e_color = Fore.LIGHTGREEN_EX if "BUY" in ent or "UP" in ent else Fore.LIGHTRED_EX if "SELL" in ent or "DOWN" in ent else Fore.YELLOW
-    s_e = TOTAL_WIDTH - len(f"Entry:{ent}") - len(f"Signal:{ext}")
-    print(Fore.WHITE + "Entry:" + e_color + ent + " " * max(1, s_e) + Fore.WHITE + "Signal:" + e_color + ext)
+    x_color = Fore.LIGHTGREEN_EX if ext in {"BUY", "BULL", "UP"} else Fore.LIGHTRED_EX if ext in {"SELL", "BEAR", "DOWN"} else Fore.YELLOW
+    s_e = TOTAL_WIDTH - len(f"Entry:{ent}") - len(f"Exit:{ext}")
+    print(Fore.WHITE + "Entry:" + e_color + ent + " " * max(1, s_e) + Fore.WHITE + "Exit:" + x_color + ext)
 
-    # 9. BOS BOUNDARY PRINT MATRIX
+    # 10. BOS BOUNDARY PRINT MATRIX
     print(data["bos_bar"])
-
-    # 10. INDEPENDENT INDICATOR STATUS
-    sma_status = data.get("sma", "NA")
-    sma_color = Fore.LIGHTGREEN_EX if sma_status == "BULL" else Fore.LIGHTRED_EX if sma_status == "BEAR" else Fore.YELLOW
-    print(Fore.WHITE + "SMA:" + sma_color + sma_status)
-
-    tsma_status = data.get("tsma", "NA")
-    tsma_color = Fore.LIGHTGREEN_EX if tsma_status == "BULL" else Fore.LIGHTRED_EX if tsma_status == "BEAR" else Fore.YELLOW
-    print(Fore.WHITE + "TSMA:" + tsma_color + tsma_status)
 
 # ================= MAIN RUNNER ENGINE =================
 if __name__ == "__main__":
