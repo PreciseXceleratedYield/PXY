@@ -561,9 +561,7 @@ def _print_summary(total_unrealized, total_realized):
     color = Style.BRIGHT + Fore.GREEN if total_realized >= 0 else Fore.RED 
     unreal_str = f"{int(total_unrealized):+06d}" 
     real_str = f"{int(total_realized):+06d}" 
-    print(f"
-     🏃‍♂️ 🔸  {unreal_str}  🔸  🏃‍♂️   🥅  {color}{real_str}{Style.RESET_ALL}  🥅
-") 
+    print(f"\n     🏃‍♂️ 🔸  {unreal_str}  🔸  🏃‍♂️   🥅  {color}{real_str}{Style.RESET_ALL}  🥅\n") 
 
 if __name__ == "__main__": 
     os.environ["PXY_VIEW_ONLY"] = "1"   # viewing run: must not advance the ledger breach count
