@@ -208,7 +208,7 @@ def cycle_risk_metrics(
         or (heavy_side == "PE" and signal == "BEAR")
     )
 
-    target_multiplier = 2.0 if heavy_side_aligned else 1.0
+    target_multiplier = 10.0 if heavy_side_aligned else 1.0
     target = (
         premium_paid
         * effective_target_pct
