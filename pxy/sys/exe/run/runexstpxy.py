@@ -75,6 +75,7 @@ def load_session_state():
         "active_book_id": d.get("active_book_id"),
         "active_book_tags": d.get("active_book_tags", []),
         "active_book_started_at": d.get("active_book_started_at"),
+        "liquidation_pending": bool(d.get("liquidation_pending", False)),
     }
 
 
@@ -83,6 +84,7 @@ def save_session_state(
     target_exit_line=INITIAL_RISK_BAR_TARGET, booked_profit=0.0, closed_book_count=0,
     last_closed_snapshot=None, last_closed_cycle_id="", closed_books=None,
     active_book_id=None, active_book_tags=None, active_book_started_at=None,
+    liquidation_pending=False,
 ):
     return _atomic_write_json(RENKO_STATE_FILE, {
         "session_peak_pnl": float(peak_value),
@@ -100,6 +102,7 @@ def save_session_state(
         "active_book_id": active_book_id,
         "active_book_tags": list(active_book_tags or []),
         "active_book_started_at": active_book_started_at,
+        "liquidation_pending": bool(liquidation_pending),
     })
 
 
