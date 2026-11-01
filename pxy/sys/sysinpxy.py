@@ -6,18 +6,14 @@ import pandas as pd
 
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
-    SYSDTHAPXY_CANDLE_MODE,
     SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
-    SYSSMAPXY_MA_PERIOD,
 )
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_close_direction_series, transform_dtha_ohlc
-from syssmapxy import get_sma_signal
-from sysstrnpxy import get_market_trend
 
 
 def get_signal(df=None):
-    """Return the configured IN state, including BULL/BEAR/SIDE in ST mode."""
+    """Return the pure DTHA IN state."""
     try:
         # IN must remain inactive through 09:17:00 IST.
         if datetime.now(SYSCNFGPXY_TIMEZONE).time() <= dt_time(9, 17):
@@ -27,12 +23,6 @@ def get_signal(df=None):
             df = fetch_yf_data()
         if df is None or df.empty or "Close" not in df.columns:
             return "NONE"
-
-        if SYSDTHAPXY_CANDLE_MODE == "ST":
-            evaluated_df = df
-            if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE != "YES":
-                evaluated_df = evaluated_df.iloc[:-1]
-            return get_market_trend(evaluated_df)
 
         transformed = transform_dtha_ohlc(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
@@ -66,26 +56,7 @@ if __name__ == "__main__":
     print(f"IN SIGNAL: {get_signal()}")
 
 def get_entry_signal(df=None):
-    """Translate IN state; in DTHA ST mode only SIDE is confirmed by SMA50."""
-    if SYSDTHAPXY_CANDLE_MODE == "ST":
-        if df is None:
-            df = fetch_yf_data()
-        if df is None or df.empty:
-            return "NONE"
-        if get_signal(df) != "SIDE":
-            return "NONE"
-
-        sma_df = df
-        if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE != "YES":
-            sma_df = sma_df.iloc[:-1]
-        if sma_df.empty:
-            return "NONE"
-        sma = get_sma_signal(sma_df, period=SYSSMAPXY_MA_PERIOD)
-        return {
-            "BULL": "BUY",
-            "BEAR": "SELL",
-        }.get(str(sma.get("status", "NA")).upper(), "NONE")
-
+    """Translate pure IN state into BUY, SELL, or NONE."""
     signal = get_signal(df)
     return {
         "BUY": "BUY",
