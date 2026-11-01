@@ -193,6 +193,9 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         meta["last_tick_epoch"] = now_epoch
         save_meta(meta)
         current_total = compute_totals(open_df, closed_df)["total"]
+        pending_risk_state = dict(state_on_disk)
+        pending_risk_state["cycle_tags"] = state_on_disk.get("active_book_tags", [])
+        pending_risk_state["cycle_started_at"] = state_on_disk.get("active_book_started_at")
         if broker_positions_flat(client):
             if closed_df is None or closed_df.empty:
                 print(
@@ -233,7 +236,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
                 client,
                 current_total,
                 risk_control_activated=True,
-                risk_state=state_on_disk,
+                risk_state=pending_risk_state,
                 broker_flat_confirmed=True,
             )
         else:
@@ -241,7 +244,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
                 client,
                 current_total,
                 risk_control_activated=True,
-                risk_state=state_on_disk,
+                risk_state=pending_risk_state,
             )
         return
 
