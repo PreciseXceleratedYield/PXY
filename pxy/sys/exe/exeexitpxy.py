@@ -416,19 +416,29 @@ def run_snapshot():
         if sq_args is not None:
             if ledger_busy():
                 print(f"{Fore.YELLOW}⚠️ Ledger lock held (liquidation may be running); square-off skipped this cycle.")
-            elif _recent(_load_locks(), sq_key, SQOFF_MIN_GAP_SECS):
-                debug_log(f"Square-off {sq_key} already launched within {SQOFF_MIN_GAP_SECS}s; skipping.")
             else:
                 try:
                     from exesqrpxy import exit_all_positions
 
+                    locks = _load_locks()
+                    prefix = f"{sq_key}|"
+                    recent_keys = {
+                        key[len(prefix):]
+                        for key in locks
+                        if key.startswith(prefix)
+                        and _recent(locks, key, SQOFF_MIN_GAP_SECS)
+                    }
                     accepted_keys = exit_all_positions(
-                        "-all" if sq_args else "", return_accepted_keys=True
+                        "-all" if sq_args else "",
+                        return_accepted_keys=True,
+                        recent_keys=recent_keys,
                     )
                     if accepted_keys:
-                        _mark_lock(sq_key)
+                        for key in accepted_keys:
+                            _mark_lock(f"{sq_key}|{key}")
+                            _mark_exited(key)
                     else:
-                        print(f"{Fore.YELLOW}⚠️ Scheduled square-off: no sell orders accepted; retry eligible next cycle.")
+                        debug_log("Scheduled square-off: no new sell orders accepted.")
                 except Exception as error:
                     print(f"{Fore.RED}❌ Direct scheduled square-off failed: {error}")
 
