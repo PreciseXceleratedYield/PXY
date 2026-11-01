@@ -146,7 +146,7 @@ Current settings include:
 - `EXEAVXPXY_MARKET_END`: 13:16 IST.
 - `EXEAVXPXY_USE_OVERALL_LOSS`: true.
 - `EXEAMSPXY_MAX_INVESTMENT`: ₹25,000 per side.
-- `EXEAMSPXY_MAX_LGT_LOSS`: 77 (configured cap; see implementation note).
+- `EXEAMSPXY_MAX_LGT_LOSS`: 77 is declared in configuration but is not read by the active `calculate_lgt()` implementation.
 
 The active averaging controller is `exeavxpxy.py`; placement decisions are
 made by `sysdcinpxy.averaging_trigger_sides()` and orders are placed by
