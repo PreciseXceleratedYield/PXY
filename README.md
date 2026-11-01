@@ -528,26 +528,6 @@ according to their actual callers. Before adding or changing a setting:
 
 ---
 
-## Additional repository utility: Team@Home
-
-Team@Home is a private family posts page served by the existing Node.js app at
-`/team-at-home`. Posts are stored in a JSON file outside the public `web`
-directory, so they are not available from the static-file route.
-
-The posts file defaults to
-`$PXY_HOME/.pxy/team-home-posts.json` (or the current user's home directory
-when `PXY_HOME` is unset). Set `TEAM_HOME_DATA_FILE` to choose another
-persistent file location. Posts show the author's display name and time; the
-newest 500 posts are retained.
-
-Run the storage/password checks with:
-
-```sh
-node --test pxy/test_teamhome.js
-```
-
----
-
 ## Change history
 
 ### 2026-11-01 — Documentation consolidated
