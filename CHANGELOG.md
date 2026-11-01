@@ -1,30 +1,40 @@
 # Changelog
 
-## PXY changes discussed in this chat
+## 2026-11-01 — Documentation aligned with production code
 
-The following implementation changes are merged into `main`:
+- Replaced the unrelated root README content with a PXY project overview and
+  current repository/production entry-point map.
+- Replaced obsolete `READ.md` content and retired setup commands with safe
+  operator notes for the current management script and tmux sessions.
+- Rewrote `INFO.md` around the current data, DTHA/IN/OUT/MKT, execution,
+  averaging, target, and risk-ledger implementations.
+- Rewrote `pxy/sys/CONFIGURATION.md` to reflect the active central settings
+  and current production conditions.
+- Corrected averaging documentation to describe the actual opposite-signal
+  eligibility path. No production code or strategy behaviour was changed.
 
-- **Runtime configuration:** centralized and audited production settings,
-  validated configuration values, documented ownership and conditional
-  settings, and wired previously hard-coded runtime values to their settings.
-- **Risk candle:** the initial symmetric ₹1,000 lines are display-only. The
-  2.8% premium-based profit target activates only when both CE and PE are open
-  and waits while the heavy invested side aligns with the exit signal. Loss
-  lines remain informational; losses never trigger risk square-off.
-- **PXYCONFIG editor:** added a protected web editor for supported runtime
-  configuration values, including validation, redaction of sensitive values,
-  atomic writes, and serialized edits.
+## Earlier repository changes
+
+The following implementation changes are recorded as merged into `main`:
+
+- **Runtime configuration:** centralized production settings, validated
+  configuration values, documented ownership and conditional settings, and
+  wired runtime values to their settings.
+- **Risk candle:** the initial symmetric lines are display-only; the cycle
+  profit target and its alignment/confirmation conditions are controlled by
+  the master risk ledger. The stop-square-off switch is independently
+  configured.
+- **PXYCONFIG editor:** added a web editor for supported runtime configuration
+  values, including validation, redaction of sensitive values, atomic writes,
+  and serialized edits.
 - **Game-page controls:** added PXYCONFIG navigation and the PXYIGNITE action
-  through the existing allowlisted launcher.
-- **Web access protections:** restricted static serving to HTML under the web
-  directory, routed dashboard data through an allowlisted API, and enforced
-  the configured action password on server-side script actions.
-- **Strike selection:** centralized option strike selection across active and
-  legacy NIFTY entry paths. The default is ATM, with configurable OTMFIX and
-  weekday-based OTMDYN alternatives.
-- **Cooldowns:** standardized averaging, counter-buy, exit de-duplication, and
-  active engine cycle cooldowns on the central 7-second setting.
+  through the existing launcher.
+- **Strike selection:** centralized option strike selection across the
+  supported option-buy paths, with ATM, fixed-distance OTM, and dynamic
+  weekday-distance modes.
+- **Cooldowns:** standardized the configured cooldown used by averaging,
+  counter-buy, exit de-duplication, and engine-cycle pacing.
 
-**Merged pull requests:** #1 (configuration editor), #2 (game-page actions),
-#3 (web protections), #4 (strike policy and cooldown), and #5 (risk-bar
-control).
+**Previously recorded merged pull requests:** #1 (configuration editor),
+#2 (game-page actions), #3 (web protections), #4 (strike policy and cooldown),
+and #5 (risk-bar control).
