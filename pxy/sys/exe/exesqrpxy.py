@@ -159,7 +159,7 @@ def exit_all_positions(target=None, return_accepted_keys=False, allowed_keys=Non
     net_by_symbol = {}
     if check_working_sells:
         positions_response = data.get("positions_snapshot")
-        if not valid_exit_positions_response(positions_response):
+        if data.get("positions_unverified", True) or not valid_exit_positions_response(positions_response):
             print(f"{Fore.YELLOW}⚠️ Broker net positions unverified; scheduled square-off blocked.")
             return set() if return_accepted_keys else None
         from runexlqdpxy import has_working_sell_orders
@@ -169,9 +169,13 @@ def exit_all_positions(target=None, return_accepted_keys=False, allowed_keys=Non
         symbol = str(row.get("symbol", "")).strip()
         if check_working_sells:
             if symbol not in net_by_symbol:
-                net_by_symbol[symbol] = matching_exit_net_quantity(
-                    positions_response["data"], symbol, position_net_quantity
-                )
+                try:
+                    net_by_symbol[symbol] = matching_exit_net_quantity(
+                        positions_response["data"], symbol, position_net_quantity
+                    )
+                except (TypeError, ValueError, OverflowError) as error:
+                    print(f"{Fore.YELLOW}⚠️ Cannot verify broker quantity for {symbol}: {error}; sell skipped.")
+                    net_by_symbol[symbol] = None
             net_qty = net_by_symbol[symbol]
             if net_qty is None or net_qty <= 0:
                 dprint(f"No verified long position for {symbol}; skipping.")
