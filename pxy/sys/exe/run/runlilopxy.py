@@ -315,6 +315,26 @@ def _is_no_data_order_report_response(response):
     )
 
 
+def _run_pending_master_risk_liquidation(client, exit_signal=None):
+    """Resume a persisted risk liquidation even when no completed orders are in the report."""
+    state_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../../../web/webrinkopxy.json")
+    )
+    try:
+        with open(state_path, "r", encoding="utf-8") as state_file:
+            state = json.load(state_file)
+        if not isinstance(state, dict) or not state.get("liquidation_pending", False):
+            return
+        import runexacpxy
+        runexacpxy.execute_master_risk_ledger(
+            client, pd.DataFrame(), pd.DataFrame(), exit_signal=exit_signal
+        )
+    except FileNotFoundError:
+        return
+    except Exception as error:
+        print(f"⚠️ Pending master-risk liquidation resume skipped: {error}")
+
+
 def _run_master_risk_ledger_if_broker_flat(
     client, positions_response=None, positions_fetched=False, exit_signal=None,
 ):
@@ -393,6 +413,7 @@ def _process_lilo_orders_production(
         df = df[df["ordSt"].astype(str).str.lower().isin(["complete", "traded"])].copy()
         if df.empty: 
             print("ℹ️ No completed orders returned; LILO has nothing to process.")
+            _run_pending_master_risk_liquidation(client, risk_exit_signal)
             _print_summary(0, 0) 
             return pd.DataFrame(), pd.DataFrame() 
             
@@ -402,9 +423,10 @@ def _process_lilo_orders_production(
 
         # TIME FILTER BLOCK: Ignore trades before the specified dynamic time window
         df = df[df["dt"].dt.time >= pd.to_datetime(FILTER_TIME).time()].copy()
-        if df.empty: 
-            _print_summary(0, 0) 
-            return pd.DataFrame(), pd.DataFrame() 
+        if df.empty:
+            _run_pending_master_risk_liquidation(client, risk_exit_signal)
+            _print_summary(0, 0)
+            return pd.DataFrame(), pd.DataFrame()
 
         def get_safe_tag(row): 
             t = row.get("GuiOrdId") or row.get("guiOrdId") or row.get("tag") or row.get("memo") or "" 
