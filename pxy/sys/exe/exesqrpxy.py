@@ -95,7 +95,7 @@ def place_exit_order(client, row):
         print(f"{Fore.RED}❌ Exit Order Error for {row.get('symbol')}: {e}") 
         return None 
 
-def exit_all_positions(target=None): 
+def exit_all_positions(target=None, return_accepted_keys=False): 
     now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
     target_param = (
         str(target).lower().strip()
@@ -153,6 +153,16 @@ def exit_all_positions(target=None):
     
     # FIX FOR VM FREEZE: Track if any single trade actually fires an order response
     any_order_placed = False
+    accepted_keys = set()
+
+    def submit(row):
+        nonlocal any_order_placed
+        if not place_exit_order(client, row):
+            return
+        any_order_placed = True
+        accepted_keys.add(
+            f"{row.get('symbol', '')}|{row.get('tag', '')}|{row.get('buy_time', '')}"
+        )
     
     for _, row in active_df.iterrows(): 
         symbol = row.get("symbol") 
@@ -162,22 +172,18 @@ def exit_all_positions(target=None):
             continue 
 
         if force_side_bypass:
-            if place_exit_order(client, row):
-                any_order_placed = True
+            submit(row)
             continue
             
         # If the manual panic flag is active or it is past 3:25 PM, flatten immediately
         if force_all_bypass or now >= exit_all_after: 
-            if place_exit_order(client, row):
-                any_order_placed = True
+            submit(row)
         else: 
             # Normal rule-based trend management
             if direction == "UP" and "PE" in symbol: 
-                if place_exit_order(client, row):
-                    any_order_placed = True
+                submit(row)
             elif direction == "DOWN" and "CE" in symbol: 
-                if place_exit_order(client, row):
-                    any_order_placed = True
+                submit(row)
             else: 
                 dprint(f"Trend filter held position: symbol={symbol}, direction={direction}")
                 print(f"{Fore.CYAN}Holding {symbol} | Direction: {direction}") 
@@ -198,7 +204,9 @@ def exit_all_positions(target=None):
             print(f"{Fore.RED}❌ Error launching script: {script_err}")
             
     dprint(f"Square-all loop completed; any_order_accepted={any_order_placed}")
-    print(f"{Fore.GREEN}{Style.BRIGHT}✅ Exit attempt completed.") 
+    print(f"{Fore.GREEN}{Style.BRIGHT}✅ Exit attempt completed.")
+    if return_accepted_keys:
+        return accepted_keys 
 
 if __name__ == "__main__": 
     exit_all_positions()
