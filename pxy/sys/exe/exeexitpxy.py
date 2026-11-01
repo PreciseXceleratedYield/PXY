@@ -252,7 +252,7 @@ def run_depth_squareoff(client, active_df, market_data_available,
         )
         return set()
     # Deeper past positions use a lower loss trigger, floored at 2%.
-    required_loss_pct = max(2.0, 14.0 - float(past_depth_value))
+    required_loss_pct = max(2.0, 21.0 - float(past_depth_value))
     if side_loss_pct > -required_loss_pct:
         print(
             f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: {side} running loss "
