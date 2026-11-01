@@ -13,7 +13,7 @@ EXE_DIR = Path(__file__).resolve().parent / "exe"
 if str(EXE_DIR) not in sys.path:
     sys.path.insert(0, str(EXE_DIR))
 
-from execoolpxy import cooldown_remaining
+from execoolpxy import cooldown_remaining, liquidation_pending
 
 
 ENTRY_START = SYSCNFGPXY_MARKET_OPEN
@@ -29,6 +29,10 @@ def _apply_new_book_cutoff(entry_signal, exit_signal, now_time):
 
 def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     """Return the unchanged (entry_signal, exit_signal) tuple contract."""
+    if liquidation_pending():
+        print("🛑 MASTER RISK LIQUIDATION PENDING: new entries are blocked.")
+        return "NONE", "NONE"
+
     if cooldown_remaining() > 0:
         print(
             "⏳ POST-SQUARE-OFF COOLDOWN: "
