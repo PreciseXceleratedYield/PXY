@@ -33,6 +33,18 @@ def calculate_indicators(df: pd.DataFrame) -> pd.DataFrame:
             return df.copy()
     if df.empty:
         return df
+    # Filter unusable candles before recursive SuperTrend and other indicators.
+    df = df.copy()
+    required_ohlc = ("Open", "High", "Low", "Close")
+    for column in required_ohlc:
+        df[column] = pd.to_numeric(df[column], errors="coerce")
+    valid = np.isfinite(df[list(required_ohlc)]).all(axis=1)
+    valid &= (df[list(required_ohlc)] > 0).all(axis=1)
+    valid &= df["High"] >= df[["Open", "Low", "Close"]].max(axis=1)
+    valid &= df["Low"] <= df[["Open", "High", "Close"]].min(axis=1)
+    df = df.loc[valid].copy()
+    if df.empty:
+        return df
     if not isinstance(df.index, pd.DatetimeIndex):
         df.index = pd.to_datetime(df.index)
     tz_string = str(TIMEZONE)
