@@ -19,7 +19,6 @@ from syscnfgpxy import (
     EXEEXITPXY_DEBUG_ENABLED as DEBUG_MODE,
     EXEEXITPXY_EXIT_LOCK_KEEP_SECS,
     EXEEXITPXY_DEPTH_EXIT_THRESHOLD,
-    EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT,
     EXEEXITPXY_ORDER_AMO,
     EXEEXITPXY_ORDER_EXCHANGE_SEGMENT,
     EXEEXITPXY_ORDER_PRICE,
@@ -238,6 +237,13 @@ def run_depth_squareoff(client, active_df, market_data_available,
         print(f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: signal candle time unavailable.")
         return set()
 
+    past_depth_match = re.fullmatch(
+        r"(CE|PE)(\\d+)", str(snapshot.get("hkin_past_depth", "")).upper().strip()
+    )
+    if not past_depth_match:
+        return set()
+    past_depth_value = int(past_depth_match.group(2))
+
     side_loss_pct = depth_exit_side_loss_pct(active_df, side)
     if side_loss_pct is None:
         print(
@@ -245,11 +251,12 @@ def run_depth_squareoff(client, active_df, market_data_available,
             f"{side} running P&L could not be verified."
         )
         return set()
-    if side_loss_pct >= -EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT:
+    required_loss_pct = float(past_depth_value)
+    if side_loss_pct > -required_loss_pct:
         print(
             f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: {side} running loss "
-            f"is {side_loss_pct:.2f}%; it must exceed "
-            f"{EXEEXITPXY_PASTRSK_LOSS_TRIGGER_PCT:.2f}%."
+            f"is {abs(min(side_loss_pct, 0.0)):.2f}%; it must be at least "
+            f"{required_loss_pct:.2f}% for past depth {past_depth_value}."
         )
         return set()
 
