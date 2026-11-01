@@ -11,6 +11,7 @@ import pandas as pd
 from colorama import init, Fore
 
 from exeomspxy import get_combined_data
+from execoolpxy import liquidation_pending
 from exeavxpxy import handle_side_averaging
 from exeexppxy import dump_idle_json
 from sysdcinpxy import averaging_snapshot_status
@@ -19,6 +20,10 @@ from syscnfgpxy import EXEAVGPXY_IDLE_EXIT_MODE as EXIT_MODE
 init(autoreset=True)
 
 def run_snapshot():
+    if liquidation_pending():
+        print(f"{Fore.YELLOW}🛑 Master risk liquidation pending; averaging is blocked.")
+        return
+
     data = get_combined_data()
     df = data.get("active_orders", pd.DataFrame())
     status = averaging_snapshot_status(
