@@ -75,16 +75,19 @@ def broker_positions_flat(client):
         return False
 
 
-def has_working_sell_orders(client, symbols=None):
-    """Prevent duplicate liquidation sells while a broker sell order is still working."""
-    try:
+def has_working_sell_orders(client, symbols=None, order_report=None):
+    """Prevent duplicate sells; optionally use one pre-fetched broker order snapshot."""
+    if order_report is None:
         try:
-            response = client.order_report()
-        except AttributeError:
-            response = client.orders()
-    except Exception as error:
-        print(f"{Fore.YELLOW}⚠️ Cannot verify working sell orders; duplicate square-off blocked: {error}")
-        return True
+            try:
+                response = client.order_report()
+            except AttributeError:
+                response = client.orders()
+        except Exception as error:
+            print(f"{Fore.YELLOW}⚠️ Cannot verify working sell orders; duplicate square-off blocked: {error}")
+            return True
+    else:
+        response = order_report
 
     if (
         isinstance(response, dict)
