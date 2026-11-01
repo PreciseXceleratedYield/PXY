@@ -169,22 +169,25 @@ flip actions remain unchanged.
 
 ### OUT — exit signal channel
 
-`sysoutpxy.py` independently evaluates its configured candle stream. It
-returns `BULL` when C0 is UP, `BEAR` when C0 is DOWN, and `NONE` when the
-required directions are unavailable or invalid.
+`sysoutpxy.py` independently evaluates its configured candle stream. For
+the six candle modes, it returns `BULL` when C0 is UP, `BEAR` when C0 is
+DOWN, and `NONE` when the required directions are unavailable or invalid.
+In `ST` mode, it returns the existing SuperTrend classification unchanged:
+`BULL`, `BEAR`, or `SIDE`.
 
 ### MKT and entry router
 
 `sysmktpxy.py` combines IN's `BUY`/`SELL` action with OUT's
-`BULL`/`BEAR` direction. It does not apply an additional Supertrend or
-moving-average confirmation filter. Its public pair is
+`BULL`/`BEAR`/`SIDE`/`NONE` state. It does not apply an additional
+Supertrend or moving-average confirmation filter. Its public pair is
 `(entry_signal, exit_signal)`.
 
 `sysentrpxy.py` preserves that tuple contract and applies the entry-time
 window and post-square-off cooldown. The configured market-open time is
 09:16 IST and the fresh-entry cutoff is 13:16 IST. Outside the entry window,
-the entry signal is forced to `NONE`; the exit signal is retained unless the
-post-square-off cooldown is active, in which case both are `NONE`.
+the entry signal is forced to `NONE`; the exit signal, including `SIDE`,
+is retained unless the post-square-off cooldown is active, in which case
+both are `NONE`.
 
 ## Indicators and depth
 
@@ -512,7 +515,7 @@ OUT is a directional state; it does not return BUY or SELL.
 
 ### MKT and entry-router contract
 
-The public MKT interface returns exactly the pair `(entry_signal, exit_signal)`. The first value is normalized to BUY, SELL or NONE. The second is normalized to BULL, BEAR or NONE. MKT does not add a Supertrend, SMA, TSMA, ATR or BOS confirmation filter to this pair.
+The public MKT interface returns exactly the pair `(entry_signal, exit_signal)`. The first value is normalized to BUY, SELL or NONE. The second is normalized to BULL, BEAR, SIDE or NONE; SIDE is preserved when OUT uses ST mode. MKT does not add a Supertrend, SMA, TSMA, ATR or BOS confirmation filter to this pair.
 
 The entry router preserves this two-value tuple. While post-square-off cooldown is active, both values are forced to NONE. Otherwise it applies the entry-only time window: outside 09:16–13:16 IST, entry becomes NONE while exit is retained.
 
