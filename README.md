@@ -127,6 +127,14 @@ Supported modes:
 | `HYPER` | Sets synthetic Open to raw Close; synthetic Close is the average of raw Close and raw High for bullish raw candles, or raw Close and raw Low for bearish raw candles. |
 | `TSMA` | Synthetic Open is the configured-period linear-regression endpoint of raw Open; synthetic Close is (synthetic Open + raw Close) / 2; High/Low bound those two values. |
 
+`ST` is an additional IN/OUT selector, not a DTHA candle transformation. In
+ST mode, the channel uses the existing `sysstrnpxy.py` SuperTrend classification
+directly: `BULL`, `BEAR`, or `SIDE`. It does not create another SuperTrend
+calculation or alter OHLC candles. IN maps `BULL` to the `BUY` action, `BEAR`
+to `SELL`, and `SIDE` to `NONE`. OUT passes all three states through MKT and
+the entry router; downstream logic can therefore distinguish `SIDE` from
+missing data (`NONE`).
+
 The configured TSMA candle period is `SYSSMAPXY_TSMA_PERIOD` (7). It is not
 the same as the separate 50-period chart moving-average window
 (`SYSSMAPXY_MA_PERIOD`).
@@ -1227,8 +1235,8 @@ setting only in the conditions described in the relevant subsystem section.
 | Setting | Current value | Meaning |
 | --- | --- | --- |
 | `SYSDTHAPXY_CANDLE_MODE` | `TSMA` | DTHA candle transform. |
-| `SYSINPXY_CANDLE_MODE` | `TSMA` | IN candle transform. |
-| `SYSOUTPXY_CANDLE_MODE` | `TSMA` | OUT candle transform. |
+| `SYSINPXY_CANDLE_MODE` | `TSMA` | IN selector: a DTHA candle mode or `ST` for the existing BULL/BEAR/SIDE SuperTrend state. |
+| `SYSOUTPXY_CANDLE_MODE` | `TSMA` | OUT selector: a DTHA candle mode or `ST` for the existing BULL/BEAR/SIDE SuperTrend state. |
 | `SYSDTHAPXY_INCLUDE_RUNNING_CANDLE` | `YES` | Include latest running candle in signal calculations. |
 | `SYSSMAPXY_VARIANT` | `TSMA` | Selected chart average variant; allowed SMA/TSMA. |
 | `SYSSMAPXY_MA_PERIOD` | 50 | Chart average period. |

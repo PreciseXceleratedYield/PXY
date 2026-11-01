@@ -52,7 +52,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     raw_exit = str(raw_exit).upper().strip()
 
     entry_sig = raw_entry if raw_entry in {"BUY", "SELL"} else "NONE"
-    exit_sig = raw_exit if raw_exit in {"BULL", "BEAR"} else "NONE"
+    exit_sig = raw_exit if raw_exit in {"BULL", "BEAR", "SIDE"} else "NONE"
 
     print(f"⏱️ IN: {entry_sig} | OUT: {exit_sig}")
     return _apply_new_book_cutoff(entry_sig, exit_sig, now_time)

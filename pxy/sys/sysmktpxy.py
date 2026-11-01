@@ -56,7 +56,7 @@ def get_signals(df=None):
         exit_signal = str(get_exit_signal(df)).upper().strip()
         if entry_signal not in {"BUY", "SELL"}:
             entry_signal = "NONE"
-        if exit_signal not in {"BULL", "BEAR"}:
+        if exit_signal not in {"BULL", "BEAR", "SIDE"}:
             exit_signal = "NONE"
 
         if SYSMKTPXY_DEBUG_ENABLED:

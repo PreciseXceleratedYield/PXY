@@ -11,6 +11,7 @@ from syscnfgpxy import (
 )
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_close_direction_series, transform_dtha_ohlc
+from sysstrnpxy import get_market_trend
 
 
 def get_signal(df=None):
@@ -24,6 +25,12 @@ def get_signal(df=None):
             df = fetch_yf_data()
         if df is None or df.empty or "Close" not in df.columns:
             return "NONE"
+
+        if SYSINPXY_CANDLE_MODE == "ST":
+            evaluated_df = df
+            if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE != "YES":
+                evaluated_df = evaluated_df.iloc[:-1]
+            return get_market_trend(evaluated_df)
 
         transformed = transform_dtha_ohlc(df, mode=SYSINPXY_CANDLE_MODE)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
