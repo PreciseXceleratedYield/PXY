@@ -24,6 +24,8 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
 )
 
+from execoolpxy import liquidation_pending
+
 def dprint(msg, color=Fore.CYAN):
     if EXEENTRPXY_DEBUG_ENABLED:
         print(f"{Style.BRIGHT}{color}[DBUG] {msg[:35]}{Style.RESET_ALL}")
@@ -51,6 +53,9 @@ except Exception as e:
 def main():
     dprint("===== START =====", Fore.GREEN)
     try:
+        if liquidation_pending():
+            print(f"{Fore.YELLOW}🛑 Master risk liquidation pending; fresh entry blocked.")
+            return
         now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
         dprint(f"TIME: {now}")
 
