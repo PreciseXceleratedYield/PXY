@@ -507,7 +507,7 @@ def _process_lilo_orders_production(
         closed_df = pd.DataFrame(closed_matches) 
 
         # MASTER RISK LEDGER hook 2: evaluated before the data is handed to any pipeline.
-        # SystemExit (confirmed breach) is deliberately NOT caught; every other error only prints.
+        # Pending risk liquidation is resumed here; every other ledger error only prints.
         try:
             import runexacpxy
             runexacpxy.execute_master_risk_ledger(
