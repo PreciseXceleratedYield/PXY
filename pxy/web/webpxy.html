@@ -447,19 +447,19 @@ body{
             <span id="chartMarketPrices" style="font-size:10px;font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap;">INDEX: — | FUT: —</span>
         </div>
         <div id="chartToolbar" style="flex-shrink:0;display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-end;gap:6px;min-height:26px;padding:0 10px;background:var(--bg2);border-bottom:1px solid var(--border);overflow-x:auto;">
-            <span onclick="setChartView('chart')" id="viewBtnChart" style="font-size:9px;color:var(--accent);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--accent);white-space:nowrap;">📈 Chart</span>
-            <span onclick="setChartView('game')" id="viewBtnGame" style="font-size:9px;color:var(--muted);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;">🏓 Game</span>
+            <span onclick="setChartView('chart')" id="viewBtnChart" style="font-size:9px;color:var(--accent);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--accent);white-space:nowrap;">📈</span>
+            <span onclick="setChartView('game')" id="viewBtnGame" style="font-size:9px;color:var(--muted);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;">🏓</span>
             <span id="candleLineToggle" style="display:flex;gap:4px;">
-                <span onclick="setChartMode('candle')" id="chartModeCandle" style="font-size:9px;color:var(--accent);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--accent);white-space:nowrap;">Candles</span>
-                <span onclick="setChartMode('line')" id="chartModeLine" style="font-size:9px;color:var(--muted);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;">Line</span>
+                <span onclick="setChartMode('candle')" id="chartModeCandle" style="font-size:9px;color:var(--accent);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--accent);white-space:nowrap;">🕯️</span>
+                <span onclick="setChartMode('line')" id="chartModeLine" style="font-size:9px;color:var(--muted);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;">📉</span>
                 <span id="chartLineOptions" aria-label="Chart line visibility" style="display:flex;align-items:center;gap:7px;font-size:8px;white-space:nowrap;">
                     <label style="display:flex;align-items:center;gap:3px;color:var(--cjs-sma);cursor:pointer;">
                         <input class="chart-line-toggle" type="checkbox" data-chart-line="sma50" checked aria-label="Show SMA 50" style="width:12px;height:12px;margin:0;accent-color:var(--cjs-sma);">
-                        SMA 50
+                        SMA
                     </label>
                     <label style="display:flex;align-items:center;gap:3px;color:var(--accent);cursor:pointer;">
                         <input class="chart-line-toggle" type="checkbox" data-chart-line="tsma50" checked aria-label="Show TSMA 50" style="width:12px;height:12px;margin:0;accent-color:var(--accent);">
-                        TSMA 50
+                        TSMA
                     </label>
                     <label style="display:flex;align-items:center;gap:3px;color:var(--bull);cursor:pointer;">
                         <input class="chart-line-toggle" type="checkbox" data-chart-line="stLine" checked aria-label="Show Supertrend line" style="width:12px;height:12px;margin:0;accent-color:var(--bull);">
@@ -467,7 +467,7 @@ body{
                     </label>
                     <label style="display:flex;align-items:center;gap:3px;color:var(--muted);cursor:pointer;">
                         <input class="chart-line-toggle" type="checkbox" data-chart-line="mirrorLine" checked aria-label="Show mirror line" style="width:12px;height:12px;margin:0;accent-color:var(--muted);">
-                        Mirror
+                        MIR
                     </label>
                 </span>
             </span>
