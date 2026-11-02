@@ -97,10 +97,11 @@ SYSINPXY_CONFIRM_MODE = "CLOSED"
 if SYSINPXY_CONFIRM_MODE not in {"LIVE", "CLOSED"}:
     raise ValueError("SYSINPXY_CONFIRM_MODE must be LIVE or CLOSED.")
 
-# Optional confirmed swing-structure direction filter in MKT (after SMA50).
-SYSMKTPXY_STRUCTURE_FILTER = "NO"
-if SYSMKTPXY_STRUCTURE_FILTER not in {"YES", "NO"}:
-    raise ValueError("SYSMKTPXY_STRUCTURE_FILTER must be YES or NO.")
+# MKT entry filter: NONE, SMA (SMA50), or SDIR (confirmed swing structure).
+# Selected filter applies from 10:00 IST onward; earlier entries are unfiltered.
+SYSMKTPXY_ENTRY_FILTER = "SDIR"
+if SYSMKTPXY_ENTRY_FILTER not in {"NONE", "SMA", "SDIR"}:
+    raise ValueError("SYSMKTPXY_ENTRY_FILTER must be NONE, SMA, or SDIR.")
 
 # Data ingestion, chart generation, and signal calculation.
 # DTAF always retains raw OHLC; the futures blend is handled in sysdtafpxy.py.
