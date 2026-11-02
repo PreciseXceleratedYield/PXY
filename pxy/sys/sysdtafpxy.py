@@ -35,8 +35,7 @@ def apply_ohlc_transformation(df, futures_price=None):
 
     out = df.copy()
 
-    # Preserve the existing futures blending: average each OHLC field
-    # with the latest NIFTY futures price when a valid quote is supplied.
+    # Weight index OHLC three times and the latest NIFTY futures quote once.
     if futures_price is not None:
         try:
             futures_price = float(futures_price)
@@ -51,7 +50,7 @@ def apply_ohlc_transformation(df, futures_price=None):
             )
 
         for column in ("Open", "High", "Low", "Close"):
-            out[column] = (out[column] + futures_price) / 2.0
+            out[column] = (3.0 * out[column] + futures_price) / 4.0
 
     return out
 
