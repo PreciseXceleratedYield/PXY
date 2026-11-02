@@ -26,11 +26,12 @@ def get_signal(df=None):
 
         transformed = transform_dtha_ohlc(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
-        # IN confirmation independently examines the closed flip and
-        # requires the current running candle to agree with it.
+        # CLOSED mode uses completed candles only; exclude the running candle.
+        if SYSINPXY_CONFIRM_MODE == "CLOSED":
+            closes = closes.iloc[:-1]
 
         # C0 needs C1, and C1 needs C2, to establish both candle colours.
-        if len(closes) < (4 if SYSINPXY_CONFIRM_MODE == "CLOSED" else 3):
+        if len(closes) < 3:
             return "NONE"
 
         directions = get_close_direction_series(closes)
@@ -39,17 +40,10 @@ def get_signal(df=None):
         if c1_direction not in {"UP", "DOWN"} or c0_direction not in {"UP", "DOWN"}:
             return "NONE"
 
-        if SYSINPXY_CONFIRM_MODE == "CLOSED":
-            c2_direction = directions.iloc[-3]
-            if c2_direction == "DOWN" and c1_direction == "UP" and c0_direction == "UP":
-                return "BUY"
-            if c2_direction == "UP" and c1_direction == "DOWN" and c0_direction == "DOWN":
-                return "SELL"
-        else:
-            if c1_direction == "DOWN" and c0_direction == "UP":
-                return "BUY"
-            if c1_direction == "UP" and c0_direction == "DOWN":
-                return "SELL"
+        if c1_direction == "DOWN" and c0_direction == "UP":
+            return "BUY"
+        if c1_direction == "UP" and c0_direction == "DOWN":
+            return "SELL"
         return "NONE"
     except Exception:
         return "NONE"
