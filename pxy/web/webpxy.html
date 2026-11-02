@@ -481,6 +481,7 @@ body{
                 <div id="momentumCanvasWrap"><canvas id="momentumCandle"></canvas></div>
             </div>
         </div>
+        <div id="chartMarketPrices" style="flex-shrink:0;padding:3px 10px;text-align:center;background:var(--bg2);border-top:1px solid var(--border);font-size:10px;font-variant-numeric:tabular-nums;color:var(--muted);">INDEX: — | FUT: —</div>
     </div>
 
     <!-- POSITIONS + TRADES (40/60 split) -->
@@ -982,7 +983,22 @@ function setChartView(view){
         if(lastCandles)setTimeout(()=>{drawChart(lastCandles);drawMomentumBar(lastMoCandles);},50);
     }
 }
+async function loadChartMarketPrices(){
+    const el=$('chartMarketPrices');
+    if(!el)return;
+    try{
+        const r=await fetch('/api/web-data/webprcpxy?_='+Date.now(),{cache:'no-store'});
+        if(!r.ok)throw new Error('Market prices unavailable');
+        const d=await r.json();
+        const fmt=v=>Number.isFinite(Number(v))&&v!=null&&Number(v)>0
+            ?Number(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
+        el.textContent='INDEX: '+fmt(d.index)+' | FUT: '+fmt(d.fut);
+    }catch(e){
+        el.textContent='INDEX: — | FUT: —';
+    }
+}
 async function loadChart(){
+    loadChartMarketPrices();
     try{
         const data=await fetch('/api/web-data/webchrtpxy?_='+Date.now()).then(r=>r.json());
         if(!Array.isArray(data)||!data.length)return;
