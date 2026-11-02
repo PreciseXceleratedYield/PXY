@@ -88,7 +88,13 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # PRD late-day override applies only when both option sides are open.
+        # Non-aligned positions always use the base target, including
+        # when both sides are open and during the late-day window.
+        if not is_aligned:
+            return EXETGTPXY_PRD_BASE_FACTOR
+
+        # PRD late-day override applies only to aligned positions
+        # when both option sides are open.
         if (
             current_time >= EXETGTPXY_PRD_LATE_DAY_TIME
             and both_sides_open
@@ -117,8 +123,6 @@ def calculate_tgt(
                 + (both_sides_base / own_depth)
                 + (both_sides_base / own_power)
             )
-        elif not is_aligned:
-            target_pct = EXETGTPXY_PRD_BASE_FACTOR
         else:
             strength = own_power + own_depth
             target_pct = min(
