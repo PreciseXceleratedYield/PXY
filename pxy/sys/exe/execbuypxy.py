@@ -122,7 +122,7 @@ def _mark_lock(key):
 
 # ---------------- strike calculation ----------------
 
-def _counter_buy_offset(remaining_df):
+def _counter_buy_offset(remaining_df, sma_direction="NA"):
     """
     Calculate the counter-buy strike offset.
 
@@ -196,17 +196,9 @@ def _counter_buy_offset(remaining_df):
 
     difference = abs(strike - spot)
 
-    # Apply the half-offset only when SMA50 agrees with the held option side.
-    # If SMA50 is unavailable, retain the normal full-distance offset.
-    try:
-        from syssmapxy import get_sma_signal
-        from sysdtafpxy import fetch_yf_data
-
-        sma_result = get_sma_signal(fetch_yf_data(), period=50)
-        sma_direction = str(sma_result.get("status", "NA")).upper()
-    except Exception as exc:
-        debug_log(f"SMA50 unavailable; using normal counter offset: {exc}")
-        sma_direction = "NA"
+    # Reuse the SMA50 direction from the shared syspxy market snapshot.
+    # Missing or unknown direction means normal full-distance offset.
+    sma_direction = str(sma_direction or "NA").upper().strip()
 
     if (option_type == "CE" and sma_direction == "BULL") or (
         option_type == "PE" and sma_direction == "BEAR"
@@ -220,7 +212,7 @@ def _counter_buy_offset(remaining_df):
 
 # ---------------- main entry ----------------
 
-def check_counter_leg(remaining_df):
+def check_counter_leg(remaining_df, sma_direction="NA"):
     """
     remaining_df: rows still held after this cycle's target exits.
 
@@ -263,7 +255,7 @@ def check_counter_leg(remaining_df):
 
         if EXECBUYPXY_USE_DYNAMIC_STRIKE:
 
-            offset = _counter_buy_offset(remaining_df)
+            offset = _counter_buy_offset(remaining_df, sma_direction)
 
             if offset is None:
                 print(
