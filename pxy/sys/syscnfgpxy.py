@@ -93,7 +93,7 @@ if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
 
 # IN-only entry confirmation: LIVE uses closed-to-running flip;
 # CLOSED requires closed reversal confirmation plus matching running candle.
-SYSINPXY_CONFIRM_MODE = "CLOSED"
+SYSINPXY_CONFIRM_MODE = "LIVE"
 if SYSINPXY_CONFIRM_MODE not in {"LIVE", "CLOSED"}:
     raise ValueError("SYSINPXY_CONFIRM_MODE must be LIVE or CLOSED.")
 
