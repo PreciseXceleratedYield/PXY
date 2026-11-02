@@ -83,11 +83,12 @@ def get_all_data():
     # Use the resulting core price directly.
     final_price = core.get("price")
 
-    # Show the configured MKT IN filter, not the unrelated Supertrend.
-    filter_mode = SYSMKTPXY_ENTRY_FILTER
-    filter_state = "NONE" if filter_mode == "NONE" else "NA"
+    # Display SMA50 when trading filter is NONE; otherwise show the selected filter.
+    # This display fallback does not enable an entry filter.
+    filter_mode = "SMA" if SYSMKTPXY_ENTRY_FILTER == "NONE" else SYSMKTPXY_ENTRY_FILTER
+    filter_state = "NA"
     filter_df = core.get("df")
-    if filter_mode != "NONE" and filter_df is not None and not filter_df.empty:
+    if filter_df is not None and not filter_df.empty:
         try:
             if filter_mode == "SMA":
                 filter_state = get_sma_signal(filter_df).get("status", "NA")
