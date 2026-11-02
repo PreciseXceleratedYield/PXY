@@ -284,6 +284,37 @@ def _fetch_yf_data_production(
             futures_price=futures_price,
         )
 
+    # Publish the two actual quotes already read above; never infer either
+    # from the blended DTAF candles or perform an extra market-data request.
+    try:
+        import tempfile
+        quote_path = os.path.abspath(os.path.join(
+            os.path.dirname(__file__), "..", "web", "webprcpxy.json"
+        ))
+        os.makedirs(os.path.dirname(quote_path), exist_ok=True)
+        raw_index = float(df["Close"].iloc[-1])
+        index_valid = math.isfinite(raw_index) and raw_index > 0
+        quote = {
+            "index": raw_index if index_valid else None,
+            "fut": futures_price,
+            "index_time": df.index[-1].isoformat(),
+        }
+        temp_path = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=os.path.dirname(quote_path),
+                prefix=".webprcpxy.", suffix=".tmp", delete=False
+            ) as handle:
+                temp_path = handle.name
+                json.dump(quote, handle, allow_nan=False)
+            os.replace(temp_path, quote_path)
+            temp_path = None
+        finally:
+            if temp_path and os.path.exists(temp_path):
+                os.unlink(temp_path)
+    except (OSError, ValueError, TypeError, OverflowError):
+        pass
+
     processed_df = processed_df.tail(target_rows)
     processed_df.attrs["data_fallback"] = False
 
