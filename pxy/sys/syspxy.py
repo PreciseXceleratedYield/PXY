@@ -14,6 +14,9 @@ from syscnfgpxy import (
 )
 from sysdashpxy import get_full_snapshot
 from sysictrpxy import export_supertrend_json
+from syscnfgpxy import SYSMKTPXY_ENTRY_FILTER
+from syssmapxy import get_sma_signal
+from syssdirpxy import get_structure_direction
 
 
 def _notify_stale_market_data(core):
@@ -80,6 +83,19 @@ def get_all_data():
     # Use the resulting core price directly.
     final_price = core.get("price")
 
+    # Show the configured MKT IN filter, not the unrelated Supertrend.
+    filter_mode = SYSMKTPXY_ENTRY_FILTER
+    filter_state = "NONE" if filter_mode == "NONE" else "NA"
+    filter_df = core.get("df")
+    if filter_mode != "NONE" and filter_df is not None and not filter_df.empty:
+        try:
+            if filter_mode == "SMA":
+                filter_state = get_sma_signal(filter_df).get("status", "NA")
+            elif filter_mode == "SDIR":
+                filter_state = get_structure_direction(filter_df).get("direction", "NA")
+        except Exception:
+            filter_state = "NA"
+
     # -------- COMBINE --------
     data = {
         # ===== SYSTEM TIMING =====
@@ -98,6 +114,8 @@ def get_all_data():
         "direction": core.get("direction"),
 
         "supertrend": core.get("supertrend"),
+        "entry_filter": filter_mode,
+        "entry_filter_state": filter_state,
         "super_line": core.get("super_line"),
         "sma": core.get("sma", "NA"),
         "tsma": core.get("tsma", "NA"),
