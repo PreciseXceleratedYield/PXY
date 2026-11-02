@@ -118,8 +118,10 @@ def calculate_tgt(
         elif not is_aligned:
             target_pct = EXETGTPXY_PRD_BASE_FACTOR
         else:
-            target_pct = EXETGTPXY_PRD_BASE_FACTOR * (
-                own_power + own_depth
+            strength = own_power + own_depth
+            target_pct = min(
+                EXETGTPXY_PRD_BASE_FACTOR * strength,
+                14.0 / strength,
             )
 
         return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
