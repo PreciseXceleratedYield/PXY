@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import datetime, time as dt_time
 from pathlib import Path
 import sys
 
 from sysmktpxy import get_signals as get_market_signals
+from sysexitpxy import load_cached_data, detect_raw_direction
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_MARKET_OPEN,
@@ -18,6 +19,7 @@ from execoolpxy import cooldown_remaining, liquidation_pending
 
 ENTRY_START = SYSCNFGPXY_MARKET_OPEN
 ENTRY_END = SYSCNFGPXY_ENTRY_CUTOFF
+MORNING_OVERRIDE_END = dt_time(9, 30)
 
 
 def _apply_new_book_cutoff(entry_signal, exit_signal, now_time):
@@ -46,6 +48,19 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
         now_time = now.time()
     else:
         now_time = now
+
+    if ENTRY_START <= now_time < MORNING_OVERRIDE_END:
+        try:
+            # sysexitpxy returns UP/DOWN/NONE from the shared running-candle cache.
+            _, direction = detect_raw_direction(load_cached_data())
+            direction = str(direction).upper().strip()
+            entry_sig = {"UP": "BUY", "DOWN": "SELL"}.get(direction, "NONE")
+            exit_sig = {"UP": "BULL", "DOWN": "BEAR"}.get(direction, "NONE")
+        except Exception as exc:
+            print(f"⚠️ Morning direction override unavailable: {exc}")
+            entry_sig, exit_sig = "NONE", "NONE"
+        print(f"⏱️ MORNING OVERRIDE | IN: {entry_sig} | OUT: {exit_sig}")
+        return _apply_new_book_cutoff(entry_sig, exit_sig, now_time)
 
     if df is None:
         from sysdtafpxy import fetch_yf_data
