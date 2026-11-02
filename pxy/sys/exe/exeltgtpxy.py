@@ -88,12 +88,9 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # Keep the late-day 99% override for aligned positions with both sides open.
-        if (
-            current_time >= EXETGTPXY_PRD_LATE_DAY_TIME
-            and both_sides_open
-            and is_aligned
-        ):
+        # From 15:05 IST, set 99% target for every position,
+        # regardless of alignment or whether one or both sides are open.
+        if current_time >= EXETGTPXY_PRD_LATE_DAY_TIME:
             return EXETGTPXY_PRD_MAX_TARGET_PCT
 
         # Non-aligned target: 1.4% whether one or both sides are open.
