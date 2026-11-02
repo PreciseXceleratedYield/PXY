@@ -8,9 +8,23 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
     SYSINPXY_CONFIRM_MODE,
+    SYSINPXY_STRUCTURE_FILTER,
 )
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_close_direction_series, transform_dtha_ohlc
+from syssdirpxy import get_structure_direction
+
+
+def _filter_structure(signal, df):
+    """Optional direction-only structure filter; no extra data fetch."""
+    if SYSINPXY_STRUCTURE_FILTER != "YES":
+        return signal
+    direction = get_structure_direction(df).get("direction")
+    if signal == "BUY" and direction == "BULL":
+        return signal
+    if signal == "SELL" and direction == "BEAR":
+        return signal
+    return "NONE"
 
 
 def get_signal(df=None):
@@ -43,9 +57,9 @@ def get_signal(df=None):
         if SYSINPXY_CONFIRM_MODE == "CLOSED":
             c2_direction = directions.iloc[-3]
             if c2_direction == "DOWN" and c1_direction == "UP" and c0_direction == "UP":
-                return "BUY"
+                return _filter_structure("BUY", df)
             if c2_direction == "UP" and c1_direction == "DOWN" and c0_direction == "DOWN":
-                return "SELL"
+                return _filter_structure("SELL", df)
         else:
             if c1_direction == "DOWN" and c0_direction == "UP":
                 return "BUY"
