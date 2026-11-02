@@ -1,10 +1,11 @@
 # sysmktpxy.py
-from syscnfgpxy import SYSMKTPXY_DEBUG_ENABLED
+from syscnfgpxy import SYSMKTPXY_DEBUG_ENABLED, SYSMKTPXY_STRUCTURE_FILTER
 from sysdthapxy import get_signal_depth_analysis
 from sysdtafpxy import fetch_yf_data
 from sysinpxy import get_entry_signal
 from sysoutpxy import get_signal as get_exit_signal
 from syssmapxy import get_sma_signal
+from syssdirpxy import get_structure_direction
 
 
 def get_pxy_data(df):
@@ -69,6 +70,13 @@ def get_signals(df=None):
             if entry_signal == "BUY" and sma50_status != "BULL":
                 entry_signal = "NONE"
             elif entry_signal == "SELL" and sma50_status != "BEAR":
+                entry_signal = "NONE"
+
+        if SYSMKTPXY_STRUCTURE_FILTER == "YES" and entry_signal in {"BUY", "SELL"}:
+            direction = get_structure_direction(df).get("direction")
+            if (entry_signal == "BUY" and direction != "BULL") or (
+                entry_signal == "SELL" and direction != "BEAR"
+            ):
                 entry_signal = "NONE"
 
         if SYSMKTPXY_DEBUG_ENABLED:
