@@ -88,18 +88,17 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # Non-aligned positions always use the base target, including
-        # when both sides are open and during the late-day window.
-        if not is_aligned:
-            return EXETGTPXY_PRD_BASE_FACTOR
-
-        # PRD late-day override applies only to aligned positions
-        # when both option sides are open.
+        # Keep the late-day 99% override for aligned positions with both sides open.
         if (
             current_time >= EXETGTPXY_PRD_LATE_DAY_TIME
             and both_sides_open
+            and is_aligned
         ):
             return EXETGTPXY_PRD_MAX_TARGET_PCT
+
+        # Only single-side non-aligned positions use the 1.4% base target.
+        if not both_sides_open and not is_aligned:
+            return EXETGTPXY_PRD_BASE_FACTOR
 
         def positive_factor(value):
             try:
