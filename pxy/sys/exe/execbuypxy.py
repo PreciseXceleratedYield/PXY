@@ -7,7 +7,7 @@
 #
 # Offset logic:
 #   ATM / ITM -> 0
-#   OTM       -> difference rounded to nearest 50
+#   OTM       -> half the difference, rounded to nearest 50
 #
 # The calculated offset is passed directly to the force-buy Python function.
 # No weekday adjustment or additional offset is applied.
@@ -194,7 +194,7 @@ def _counter_buy_offset(remaining_df):
     if option_type == "PE" and strike > spot:
         return 0
 
-    difference = abs(strike - spot)
+    difference = abs(strike - spot) / 2.0
 
     return int(
         ((difference + step / 2) // step) * step
