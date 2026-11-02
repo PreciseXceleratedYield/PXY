@@ -41,9 +41,9 @@ def get_signal(df=None):
         if c1_direction not in {"UP", "DOWN"} or c0_direction not in {"UP", "DOWN"}:
             return "NONE"
 
-        if c0_direction == "UP":
+        if c1_direction == "UP" and c0_direction == "UP":
             return "BULL"
-        if c0_direction == "DOWN":
+        if c1_direction == "DOWN" and c0_direction == "DOWN":
             return "BEAR"
         return "NONE"
     except Exception:
