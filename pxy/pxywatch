@@ -43,6 +43,53 @@ EOF
 }
 running_engine() { pgrep -f '[s]ysexepxy.py' >/dev/null; }
 running_web() { pgrep -f '[n]ode pxy.js' >/dev/null; }
+start_sessions() {
+  command -v tmux >/dev/null || { echo "tmux missing"; return 1; }
+  if running_engine; then
+    echo "Engine process already running; not starting another"
+  elif tmux has-session -t pxy-engine 2>/dev/null; then
+    echo "Engine tmux session exists; waiting for watchdog recovery"
+  elif pgrep -f '[/]pxy/sys/exe/exe[a-z]*pxy.py|[p]ython3 exe/exepxy.py' >/dev/null; then
+    echo "Orphan execution process found; refusing duplicate engine start"
+  else
+    tmux new-session -d -s pxy-engine -c "$APP/sys" "exec '$PYTHON' -u sysexepxy.py" || return 1
+    echo "Started pxy-engine tmux"
+  fi
+  if running_web; then
+    echo "Dashboard process already running; not starting another"
+  elif tmux has-session -t pxy-web 2>/dev/null; then
+    echo "Dashboard tmux session exists; waiting for watchdog recovery"
+  else
+    tmux new-session -d -s pxy-web -c "$APP" 'exec node pxy.js' || return 1
+    echo "Started pxy-web tmux"
+  fi
+}
+stop_sessions() {
+  # The systemd watchdog must be stopped before this function is called.
+  local failed=0
+  for session in pxy-engine pxy-web; do
+    if tmux has-session -t "$session" 2>/dev/null; then
+      tmux kill-session -t "$session" || failed=1
+      echo "Stopped $session tmux"
+    else
+      echo "$session tmux already stopped"
+    fi
+  done
+  # Refuse to claim shutdown succeeded if a detached process survived.
+  if running_engine || running_web; then
+    echo "WARNING: PXY process still detected outside tmux; manual inspection required" >&2
+    failed=1
+  fi
+  return "$failed"
+}
+start_watch() {
+  systemctl is-active --quiet "$UNIT" || sudo systemctl start "$UNIT" || return 1
+  start_sessions
+}
+stop_watch() {
+  sudo systemctl stop "$UNIT" || return 1
+  stop_sessions
+}
 watch_loop() {
   command -v tmux >/dev/null || { echo "tmux missing"; return 1; }
   exec 9>"$HOME/.pxywatch.lock"
@@ -89,9 +136,9 @@ watch_loop() {
 case "${1:-}" in
   install) install_service ;;
   uninstall) sudo systemctl disable --now "$UNIT" 2>/dev/null || true; sudo rm -f "$UNIT_PATH"; sudo systemctl daemon-reload; echo "Removed $UNIT" ;;
-  start) sudo systemctl start "$UNIT" ;;
-  stop) sudo systemctl stop "$UNIT" ;;
-  restart) sudo systemctl restart "$UNIT" ;;
+  start) start_watch ;;
+  stop) stop_watch ;;
+  restart) stop_watch && start_watch ;;
   status)
     systemctl --no-pager --full status "$UNIT" || true
     if running_engine; then echo "Engine: RUNNING"; else echo "Engine: STOPPED"; fi
