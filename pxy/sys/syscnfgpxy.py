@@ -87,13 +87,13 @@ if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA"}:
         "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, HA, OHLC4, HYPER, or TSMA."
     )
 
-SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "YES"
+SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "NO"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
     raise ValueError("SYSDTHAPXY_INCLUDE_RUNNING_CANDLE must be YES or NO.")
 
 # IN-only entry confirmation: LIVE uses closed-to-running flip;
 # CLOSED requires closed reversal confirmation plus matching running candle.
-SYSINPXY_CONFIRM_MODE = "LIVE"
+SYSINPXY_CONFIRM_MODE = "CLOSED"
 if SYSINPXY_CONFIRM_MODE not in {"LIVE", "CLOSED"}:
     raise ValueError("SYSINPXY_CONFIRM_MODE must be LIVE or CLOSED.")
 
