@@ -99,7 +99,7 @@ if SYSINPXY_CONFIRM_MODE not in {"LIVE", "CLOSED"}:
 
 # MKT entry filter: NONE, SMA (SMA50), or SDIR (confirmed swing structure).
 # Selected filter applies from 10:00 IST onward; earlier entries are unfiltered.
-SYSMKTPXY_ENTRY_FILTER = "SMA"
+SYSMKTPXY_ENTRY_FILTER = "NONE"
 if SYSMKTPXY_ENTRY_FILTER not in {"NONE", "SMA", "SDIR"}:
     raise ValueError("SYSMKTPXY_ENTRY_FILTER must be NONE, SMA, or SDIR.")
 
