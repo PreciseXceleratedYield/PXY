@@ -84,7 +84,7 @@ def get_all_data():
     # published PXY price is weighted 3:1 with the latest valid futures.
     # Read the same freshness-checked FUT feed used by DTAF; no extra API call.
     final_price = core.get("price")
-    if not core.get("data_fallback", False):
+    if core.get("market_data_available", False):
         try:
             from sysdtafpxy import _read_nifty_futures_price
             futures_price = _read_nifty_futures_price()
