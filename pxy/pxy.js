@@ -80,7 +80,7 @@ app.get('/engine-log', (req, res) => {
 /* ========================= DASHBOARD DATA API ========================= */
 const WEB_DATA_FILES = new Set([
     'webactpxy', 'webavgpxy', 'webchrtpxy', 'webdashpxy', 'webdaypxy',
-    'webpnlpxy', 'webpospxy', 'webrinkopxy'
+    'webpnlpxy', 'webpospxy', 'webprcpxy', 'webrinkopxy'
 ]);
 app.get('/api/web-data/:name', (req, res) => {
     const name = req.params.name;
