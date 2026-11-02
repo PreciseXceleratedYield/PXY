@@ -6,6 +6,7 @@ import pandas as pd
 
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
+    SYSCNFGPXY_ENTRY_CUTOFF,
     SYSCNFGPXY_CONFIRM_AFTER,
     SYSINPXY_CONFIRM_MODE,
 )
@@ -17,7 +18,8 @@ def get_signal(df=None):
     """Return the pure DTHA IN state."""
     try:
         # IN must remain inactive through 09:17:00 IST.
-        if datetime.now(SYSCNFGPXY_TIMEZONE).time() <= dt_time(9, 17):
+        now_time = datetime.now(SYSCNFGPXY_TIMEZONE).time()
+        if now_time <= dt_time(9, 17) or now_time >= SYSCNFGPXY_ENTRY_CUTOFF:
             return "NONE"
 
         if df is None:
