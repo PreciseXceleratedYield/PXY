@@ -1,9 +1,12 @@
 """PXY independent exit-signal channel (OUT)."""
 
+from datetime import datetime
+
 import pandas as pd
 
 from syscnfgpxy import (
-    SYSDTHAPXY_INCLUDE_RUNNING_CANDLE,
+    SYSCNFGPXY_TIMEZONE,
+    SYSCNFGPXY_CONFIRM_AFTER,
 )
 from sysdtafpxy import fetch_yf_data
 from sysdthapxy import get_close_direction_series, transform_dtha_ohlc
@@ -15,7 +18,8 @@ def get_out_candles(df):
         return df.copy() if df is not None else pd.DataFrame()
 
     transformed = transform_dtha_ohlc(df)
-    if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE != "YES":
+    # Live before 10:00 IST; completed candles only from 10:00 onward.
+    if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= SYSCNFGPXY_CONFIRM_AFTER:
         transformed = transformed.iloc[:-1].copy()
     return transformed
 
