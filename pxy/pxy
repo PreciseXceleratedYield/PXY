@@ -229,13 +229,13 @@ while true; do
                 echo "          PXY WATCHDOG MANAGEMENT         "
                 draw_border
                 echo "1) 📊 Status  - Watchdog / Engine / Web"
-                echo "2) ⚙️ Install - Configure Systemd"
+                echo "2) ⚙️  Install - Configure Systemd"
                 echo "3) 🚀 Start   - Watchdog + Tmux"
                 echo "4) 🛑 Stop    - Watchdog + Kill Tmux"
                 echo "5) 📜 Logs    - Watchdog Journal"
                 echo "6) ✅ Enable  - Auto Start on Boot"
                 echo "7) 🚫 Disable - No Auto Start"
-                echo "8) ↩️ Back    - Main Menu"
+                echo "8) ↩️  Back    - Main Menu"
                 draw_border
                 read -p "Select [1-8]: " WOPT
                 case "$WOPT" in
