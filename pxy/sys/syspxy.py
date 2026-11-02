@@ -1,6 +1,7 @@
 
 # syspxy.py
 import json
+import math
 import os
 import time
 import tempfile
@@ -78,10 +79,24 @@ def get_all_data():
         core.get("chart_df", core.get("df"))
     )
 
-    # -------- PRICE LOGIC (DTAF BLENDED PRICE) --------
-    # DTAF already blends NIFTY FUT into INDEX OHLC.
-    # Use the resulting core price directly.
+    # -------- PRICE LOGIC (DISPLAY/EXECUTION SNAPSHOT ONLY) --------
+    # DTAF supplies raw Yahoo candles to indicators/signals. Only the
+    # published PXY price is weighted 3:1 with the latest valid futures.
+    # Read the same freshness-checked FUT feed used by DTAF; no extra API call.
     final_price = core.get("price")
+    if not core.get("data_fallback", False):
+        try:
+            from sysdtafpxy import _read_nifty_futures_price
+            futures_price = _read_nifty_futures_price()
+            index_price = float(final_price)
+            if (
+                futures_price is not None
+                and math.isfinite(index_price)
+                and index_price > 0
+            ):
+                final_price = int((3.0 * index_price + futures_price) / 4.0)
+        except (TypeError, ValueError, OverflowError) as error:
+            print(f"Warning: Could not blend PXY price: {error}")
 
     # Display SMA50 when trading filter is NONE; otherwise show the selected filter.
     # This display fallback does not enable an entry filter.
