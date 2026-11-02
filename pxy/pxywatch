@@ -8,7 +8,7 @@ UNIT="pxywatch.service"
 UNIT_PATH="/etc/systemd/system/$UNIT"
 ENGINE="$APP/sys/sysexepxy.py"
 PYTHON="$HOME/env/bin/python3"
-INTERVAL=10
+INTERVAL=60
 GRACE=20
 
 usage() { echo "Usage: pxywatch {install|uninstall|start|stop|restart|status|logs|run}"; }
