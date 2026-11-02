@@ -7,7 +7,7 @@
 #
 # Offset logic:
 #   ATM / ITM -> 0
-#   OTM       -> half difference only when held CE/SMA50 BULL or held PE/SMA50 BEAR; otherwise full difference
+#   OTM       -> half difference only when counter PE/SMA50 BEAR or counter CE/SMA50 BULL; otherwise full difference
 #
 # The calculated offset is passed directly to the force-buy Python function.
 # No weekday adjustment or additional offset is applied.
@@ -130,7 +130,7 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     price  -> price supplied in remaining_df
 
     ATM / ITM -> 0
-    OTM       -> halve difference for CE/BULL or PE/BEAR SMA50; otherwise full
+    OTM       -> halve difference for held CE/BEAR or held PE/BULL SMA50; otherwise full
     """
 
     if remaining_df is None or remaining_df.empty:
@@ -200,8 +200,8 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     # Missing or unknown direction means normal full-distance offset.
     sma_direction = str(sma_direction or "NA").upper().strip()
 
-    if (option_type == "CE" and sma_direction == "BULL") or (
-        option_type == "PE" and sma_direction == "BEAR"
+    if (option_type == "CE" and sma_direction == "BEAR") or (
+        option_type == "PE" and sma_direction == "BULL"
     ):
         difference /= 2.0
 
