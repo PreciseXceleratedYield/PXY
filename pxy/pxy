@@ -140,14 +140,12 @@ while true; do
     draw_border
     echo "            PXY ENGINE CONSOLE            "
     draw_border
-    echo "k) 🛑 Stop   - Kill Active Engines"
-    echo "u) 🔄 Update - Foreground Live View"
-    echo "s) 🚀 Start  - Launch Tmux Engines"
-    echo "v) 🔭 View   - Attach Engine Tmux"
-    echo "e) 🛒 Enter  - Trading Operations"
-    echo "t) 🧪 Test   - Run Python Scripts"
-    echo "w) Watch    - Watchdog Management"
-    echo "x) ❌ Exit   - Close Dashboard"
+    echo "u) 🔄 Update  - Update Code Only"
+    echo "v) 🔭 View    - Live Engine Screen"
+    echo "e) 🛒 Enter   - Trading Operations"
+    echo "t) 🧪 Test    - Run Python Scripts"
+    echo "w) 🛡️ Watch   - Engine & Web Control"
+    echo "x) ❌ Exit    - Close Menu"
     draw_border
     read -p "Select option: " OPTION
     
@@ -160,43 +158,10 @@ while true; do
     fi
 
     case $OPTION in
-        k)
-            echo ""
-            read -s -p "Enter password to kill engine: " KILL_PASS
-            echo ""
-            if [ "$KILL_PASS" != "1" ]; then
-                echo "[!] Access Denied. Incorrect password."
-                sleep 1.5
-            else
-                if systemctl is-active --quiet pxywatch.service 2>/dev/null; then
-                    sudo systemctl stop pxywatch.service || { echo "[X] Stop watchdog first."; read -p "Press [Enter]..."; continue; }
-                fi
-                echo "Terminating Web Server..."
-                if tmux has-session -t pxy-web 2>/dev/null; then
-                    tmux kill-session -t pxy-web
-                    echo "[✔] Stopped web core."
-                elif pgrep -f "pxy.js" >/dev/null 2>&1; then
-                    pkill -9 -f pxy.js
-                    echo "[✔] Stopped fallback web core."
-                fi
-                
-                echo "Terminating Trading Engine..."
-                if tmux has-session -t pxy-engine 2>/dev/null; then
-                    tmux kill-session -t pxy-engine
-                    echo "[✔] Stopped trading engine tmux session."
-                elif pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
-                    pkill -f "sysexepxy.py"
-                    echo "[✔] Killed fallback trading script process."
-                else
-                    echo "[-] Trading engine was not running."
-                fi
-                read -p "Press [Enter] to return..."
-            fi
-            ;;
         u)
             echo ""
             draw_border
-            echo "       UPDATE CODE + RESTART ENGINE        "
+            echo "          UPDATE CODE ONLY                "
             draw_border
             if bash "$PXY_APP_DIR/pxyupdate"; then
                draw_border
@@ -205,34 +170,6 @@ while true; do
                draw_border
                echo "[X] Update failed; see the error above."
             fi
-            read -p "Press [Enter] to return..."
-            ;;
-        s)
-            echo ""
-            echo "Initializing Node Server..."
-            if ! tmux has-session -t pxy-web 2>/dev/null && ! pgrep -f "$PXY_APP_DIR/pxy.js" >/dev/null 2>&1; then
-                # Restrict terminal history memory strictly to 500 lines
-                tmux new-session -d -s pxy-web "bash -c 'tmux set-option history-limit 500; cd \"$PXY_APP_DIR\" && node pxy.js'"
-                echo "[✔] Web dashboard started in background (tmux)."
-            else
-                echo "[-] Web dashboard already running."
-            fi
-
-            echo "Initializing Production Trading Engine..."
-            if ! tmux has-session -t pxy-engine 2>/dev/null && ! pgrep -f "sysexepxy.py" >/dev/null 2>&1; then
-                # Restrict terminal history memory strictly to 500 lines
-                tmux new-session -d -s pxy-engine "cd \"$PXY_APP_DIR/sys\" && exec \"$HOME/env/bin/python3\" -u sysexepxy.py"
-
-                sleep 1
-                if tmux has-session -t pxy-engine 2>/dev/null; then
-                    echo "[✔] Python engine running successfully inside tmux session 'pxy-engine'."
-                else
-                    echo "[X] Production engine failed to boot! Check tmux manually."
-                fi
-            else
-                echo "[-] Python engine is already running."
-            fi
-            echo ""
             read -p "Press [Enter] to return..."
             ;;
         v)
@@ -291,14 +228,14 @@ while true; do
                 draw_border
                 echo "          PXY WATCHDOG MANAGEMENT         "
                 draw_border
-                echo "1) Status"
-                echo "2) Install service (not started)"
-                echo "3) Start watchdog"
-                echo "4) Stop watchdog (engine stays up)"
-                echo "5) Logs"
-                echo "6) Enable on boot"
-                echo "7) Disable on boot"
-                echo "8) Back"
+                echo "1) 📊 Status  - Watchdog / Engine / Web"
+                echo "2) ⚙️ Install - Configure Systemd"
+                echo "3) 🚀 Start   - Watchdog + Tmux"
+                echo "4) 🛑 Stop    - Watchdog + Kill Tmux"
+                echo "5) 📜 Logs    - Watchdog Journal"
+                echo "6) ✅ Enable  - Auto Start on Boot"
+                echo "7) 🚫 Disable - No Auto Start"
+                echo "8) ↩️ Back    - Main Menu"
                 draw_border
                 read -p "Select [1-8]: " WOPT
                 case "$WOPT" in
