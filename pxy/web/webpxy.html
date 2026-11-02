@@ -552,7 +552,7 @@ body{
 <div id="pnlBar" style="height:36px;flex-shrink:0;display:flex;align-items:stretch;background:var(--bg);border-top:1px solid var(--border);padding:0 8px;">
     <div class="sig-cell" id="cellRunning" style="flex:1;min-width:0;"><span class="sc-lbl">💰</span><span class="sc-val" id="pnlRunning">—</span></div>
     <div class="sig-cell" id="cellEntry" style="flex:1;min-width:0;"><span class="sc-lbl">🛫</span><span class="sc-val" id="hcEntry">—</span></div>
-    <div class="sig-cell" id="cellTrend" style="flex:1;min-width:0;"><span class="sc-lbl">🚀</span><span class="sc-val" id="hcTrend">—</span></div>
+    <div class="sig-cell" id="cellTrend" style="flex:1;min-width:0;"><span class="sc-lbl" id="hcTrendLabel" title="MKT IN filter">🚀</span><span class="sc-val" id="hcTrend">—</span></div>
     <div class="sig-cell" id="cellDirection" style="flex:1;min-width:0;"><span class="sc-lbl">🧭</span><span class="sc-val" id="hcDirection">—</span></div>
     <div class="sig-cell" id="cellATR" style="flex:1;min-width:0;"><span class="sc-lbl">📐</span><span class="sc-val" id="hcATR">—</span></div>
     <div class="sig-cell" id="cellDP" style="flex:4;min-width:0;"><span class="sc-lbl">⚡⚡</span><span class="sc-val" id="dpText">—</span></div>
@@ -879,7 +879,14 @@ async function loadDash(){
         };
         setV('hcEntry',emojifyEntry(d.entry??'NONE'),cls(d.entry||''));
         setV('hcExit', emojifyExit(d.exit??'NONE'), cls(d.exit||''));
-        setV('hcTrend',emojifyTrend(d.supertrend),   cls(d.supertrend||''));
+        const filterMode=String(d.entry_filter??'NONE').toUpperCase();
+        const filterState=String(d.entry_filter_state??'NA').toUpperCase();
+        const filterLabel=$('hcTrendLabel');
+        if(filterLabel){
+            filterLabel.textContent=filterMode==='SDIR'?'🧭':filterMode==='SMA'?'📏':'🚀';
+            filterLabel.title='MKT IN filter: '+filterMode;
+        }
+        setV('hcTrend',filterMode==='NONE'?'⚪':emojifyTrend(filterState),cls(filterState));
         setV('hcATR',  `${d.atr??'—'}`, 'sc-val');
         setV('hcDirection', emojifyDirection(d.direction??'NONE'), cls(d.direction||''));
 
@@ -891,7 +898,7 @@ async function loadDash(){
         ['cellEntry','cellExit','cellTrend','cellATR'].forEach(id=>{
             const el=$(id);if(!el)return;
             el.className='sig-cell';
-            const v=id==='cellEntry'?d.entry:id==='cellExit'?d.exit:id==='cellTrend'?d.supertrend:'';
+            const v=id==='cellEntry'?d.entry:id==='cellExit'?d.exit:id==='cellTrend'?d.entry_filter_state:'';
             const c=cls(v||'');
             if(c==='bull')el.classList.add('bull-cell');
             else if(c==='bear')el.classList.add('bear-cell');
