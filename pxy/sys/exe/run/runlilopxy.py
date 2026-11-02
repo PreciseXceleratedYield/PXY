@@ -247,7 +247,7 @@ def _reconcile_open_with_broker(
     if not open_positions:
         return open_positions
     if positions_fetched:
-        res = positions_response
+        res = _normalize_empty_positions_response(positions_response)
     else:
         try:
             res = client.positions()
@@ -304,6 +304,18 @@ def _reconcile_open_with_broker(
             kept.append(fixed)
             remaining -= q
     return kept
+
+
+def _normalize_empty_positions_response(response):
+    """Kotak 5203 No Data is an empty positions book, not an OMS failure."""
+    if (
+        isinstance(response, dict)
+        and str(response.get("stCode", "")).strip() == "5203"
+        and str(response.get("errMsg", "")).strip().lower() == "no data"
+        and str(response.get("stat", "")).strip().lower() in {"not_ok", "not ok"}
+    ):
+        return {"stat": "Ok", "stCode": 200, "data": []}
+    return response
 
 
 def _is_no_data_order_report_response(response):
