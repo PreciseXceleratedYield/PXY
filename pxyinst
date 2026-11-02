@@ -1,215 +1,75 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# PXY installer: safe first-time setup and repeatable maintenance.
+# Does not stop or restart active trading processes.
+set -Eeuo pipefail
+ROOT="$HOME/PXY"
+APP="$ROOT/pxy"
+VENV="$HOME/env"
+BIN="$HOME/.local/bin"
+log() { printf '[PXY] %s\n' "$*"; }
+fail() { printf '[PXY] ERROR: %s\n' "$*" >&2; exit 1; }
+trap 'fail "Installation failed at line $LINENO"' ERR
 
-# ---------------- Hushlogin & Symlink ----------------
-touch ~/.hushlogin
-sudo ln -s PXY/pxy pxy
+[[ "$EUID" -ne 0 ]] || fail "Run as your normal PXY user, not root."
+command -v sudo >/dev/null || fail "sudo is required."
+command -v apt-get >/dev/null || fail "Requires Ubuntu/Debian apt."
+touch "$HOME/.hushlogin"
+sudo -v
+sudo apt-get update
+sudo apt-get install -y git python3 python3-venv python3-pip nodejs npm tmux openssh-client
 
-# ---------------- Initialize summary variables ----------------
-success_count=0
-fail_count=0
-
-# ---------------- Confirm Removal ----------------
-read -p "Are you sure you want to remove ~/PXY/pxy? (y/n): " confirm
-if [ "$confirm" = "y" ]; then
-    if [ -d ~/PXY/pxy ]; then
-        sudo rm -rf ~/PXY/pxy
-        if [ $? -eq 0 ]; then
-            echo -e "\e[32mRemoved ~/PXY/pxy: Success\e[0m"
-            ((success_count++))
-        else
-            echo -e "\e[31mFailed to remove ~/PXY/pxy\e[0m"
-            ((fail_count++))
-            exit 1
-        fi
-    else
-        echo "Directory /pxy not found, moving on."
-    fi
-
-    sudo rm -rf /usr/local/bin/pxy*
-    if [ $? -eq 0 ]; then
-        echo -e "\e[32mRemoved files in /usr/local/bin/: Success\e[0m"
-        ((success_count++))
-    else
-        echo -e "\e[31mFailed to remove files in /usr/local/bin/\e[0m"
-        ((fail_count++))
-        exit 1
-    fi
-fi
-
-# ---------------- User Setup ----------------
-current_user=$(whoami)
-usernames=("$current_user")
-modified_successfully=false
-
-for username in "${usernames[@]}"; do
-    sudo usermod -aG sudo "$username"
-    if [ $? -eq 0 ]; then
-        echo -e "\e[32mUser modified successfully: $username\e[0m"
-        ((success_count++))
-        modified_successfully=true
-        break
-    else
-        echo -e "\e[31mFailed to modify user: $username\e[0m"
-    fi
-done
-
-if [ "$modified_successfully" = true ]; then
-
-    # ---------------- System Packages ----------------
-    sudo apt-get update
-    sudo apt-get install -y multitail git python3-venv unzip python3-pip nodejs npm tmux
-    if [ $? -eq 0 ]; then
-        echo -e "\e[32mSystem packages installed/updated: Success\e[0m"
-        ((success_count++))
-    else
-        echo -e "\e[31mFailed to install system packages\e[0m"
-        ((fail_count++))
-        exit 1
-    fi
-
-    # ---------------- SSH Key ----------------
-    if [ ! -f ~/.ssh/id_rsa.pub ]; then
-        ssh-keygen -t rsa -b 4096 -C "kcbpcc@gmail.com"
-        cat ~/.ssh/id_rsa.pub
-    else
-        echo "SSH key already exists. Skipping generation."
-    fi
-
-    # ---------------- Git Clone ----------------
-    read -p "Do you want to proceed with cloning repository? (y/n): " confirm
-    if [ "$confirm" != "y" ]; then
-        echo "Exiting script."
-        exit 0
-    fi
-    git clone git@github.com:PreciseXceleratedYield/PXY.git
-    if [ $? -eq 0 ]; then
-        echo -e "\e[32mCloned pxy repository successfully\e[0m"
-        ((success_count++))
-    else
-        echo -e "\e[31mFailed to clone pxy repository\e[0m"
-        ((fail_count++))
-        exit 1
-    fi
-
-    sudo chmod -R 777 ~/PXY/pxy
-    ((success_count++))
-
-    # ---------------- Node.js Dependencies & Port Permissions ----------------
-    echo -e "\nSetting up Node.js project environment..."
-    if [ -d ~/PXY/pxy ]; then
-        cd ~/PXY/pxy || exit 1
-        
-        # Check for pxy.json and copy it to package.json so npm works out of the box
-        if [ -f "pxy.json" ]; then
-            cp pxy.json package.json
-            npm install
-            if [ $? -eq 0 ]; then
-                echo -e "\e[32mNode.js dependencies (express, ws) installed successfully\e[0m"
-                ((success_count++))
-            else
-                echo -e "\e[31mFailed to install Node.js dependencies\e[0m"
-                ((fail_count++))
-            fi
-        else
-            echo -e "\e[33mWarning: pxy.json not found in ~/PXY/pxy. Skipping npm install.\e[0m"
-        fi
-        cd ~ || exit 1
-    fi
-
-    # Grant Node permission to use port 80 without sudo
-    sudo setcap 'cap_net_bind_service=+ep' $(which node)
-    if [ $? -eq 0 ]; then
-        echo -e "\e[32mGranted Node.js capabilities to bind to low ports (e.g. Port 80)\e[0m"
-        ((success_count++))
-    else
-        echo -e "\e[31mFailed to apply setcap capabilities to Node.js\e[0m"
-        ((fail_count++))
-    fi
-
-    # ---------------- Copy executables to /usr/local/bin ----------------
-    if [ -d ~/PXY/pxy/sys/p ]; then
-        sudo cp -r ~/PXY/pxy/sys/p/* /usr/local/bin/
-    fi
-
-    copied_any=false
-    for file in ~/PXY/pxy/*; do
-        if [ -f "$file" ] && [[ "$file" != *.* ]]; then
-            sudo cp "$file" /usr/local/bin/
-            copied_any=true
-        fi
-    done
-
-    if [ "$copied_any" = true ]; then
-        echo -e "\e[32mCopied pxy executables without extension to /usr/local/bin/: Success\e[0m"
-        ((success_count++))
-        sudo chmod +x /usr/local/bin/*
-    else
-        echo -e "\e[33mNo files without extension found to copy to /usr/local/bin/\e[0m"
-    fi
-
-    # ---------------- Python Virtual Environment ----------------
-    python3 -m venv env
-    sudo chmod -R 777 env
-    source ~/env/bin/activate
-    pip install --upgrade pip
-
-    # ---------------- Install Python Dependencies ----------------
-    REQUIREMENTS=~/PXY/pxy/pxyinstl
-    if [ -f "$REQUIREMENTS" ]; then
-        pip install -r "$REQUIREMENTS"
-        if [ $? -eq 0 ]; then
-            echo -e "\e[32mInstalled Python dependencies: Success\e[0m"
-            ((success_count++))
-        else
-            echo -e "\e[31mFailed to install Python dependencies\e[0m"
-            ((fail_count++))
-            exit 1
-        fi
-    else
-        echo -e "\e[33m$REQUIREMENTS not found! Skipping Python dependency installation.\e[0m"
-    fi
-
-    # ---------------- Executable Final Compilation ----------------
-    cd ~/PXY/pxy/sys/exe/run || exit 1
-    pxypyc
-
-    # ---------------- Force reinstall yfinance ----------------
-    echo -e "\nReinstalling yfinance..."
-    source ~/env/bin/activate
-    pip uninstall -y yfinance
-    if [ $? -eq 0 ]; then
-        echo -e "\e[32mUninstalled yfinance successfully\e[0m"
-    else
-        echo -e "\e[33mWarning: yfinance may not have been installed\e[0m"
-    fi
-
-    pip install yfinance --upgrade
-    if [ $? -eq 0 ]; then
-        echo -e "\e[32mInstalled/Updated yfinance successfully\e[0m"
-        ((success_count++))
-    else
-        echo -e "\e[31mFailed to install/update yfinance\e[0m"
-        ((fail_count++))
-    fi
-
-    # ---------------- PXY LOGIN CONFIGURATION ----------------
-    # Replace ~/.bashrc with the version maintained at the repository root.
-    if [ -f "$HOME/PXY/.bashrc" ]; then
-        install -m 0644 "$HOME/PXY/.bashrc" "$HOME/.bashrc"
-        echo -e "\\e[32mInstalled Git-managed ~/.bashrc: Success\\e[0m"
-        ((success_count++))
-    else
-        echo -e "\\e[31mPXY .bashrc not found at $HOME/PXY/.bashrc\\e[0m"
-        ((fail_count++))
-        exit 1
-    fi
-
-    # ---------------- Summary ----------------
-    echo -e "\nSummary:"
-    echo -e "\e[32mSuccesses: $success_count\e[0m"
-    echo -e "\e[31mFailures: $fail_count\e[0m"
-
+if [[ -d "$ROOT/.git" ]]; then
+    log "Existing repository preserved at $ROOT (run pxyupdate separately for code updates)."
+elif [[ -e "$ROOT" ]]; then
+    fail "$ROOT exists but is not a Git checkout; refusing to overwrite it."
 else
-    echo -e "\nWas NOT successful. Exiting script."
-    exit 1
+    log "Cloning private PXY repository; GitHub SSH access is required."
+    git clone git@github.com:PreciseXceleratedYield/PXY.git "$ROOT"
 fi
+[[ -f "$APP/pxy.js" && -f "$APP/sys/sysexepxy.py" ]] || fail "Missing current PXY application files."
+
+if [[ ! -x "$VENV/bin/python3" ]]; then
+    python3 -m venv "$VENV"
+fi
+"$VENV/bin/python3" -m pip install --upgrade pip
+[[ -f "$APP/pxyinstl" ]] || fail "Missing $APP/pxyinstl"
+"$VENV/bin/python3" -m pip install -r "$APP/pxyinstl"
+
+if [[ -f "$APP/pxy.json" ]]; then
+    cp "$APP/pxy.json" "$APP/package.json"
+elif [[ ! -f "$APP/package.json" ]]; then
+    fail "Missing Node.js package manifest."
+fi
+( cd "$APP" && npm install --no-audit --no-fund )
+
+mkdir -p "$BIN"
+for file in "$APP"/*; do
+    [[ -f "$file" && "${file##*/}" != *.* ]] || continue
+    install -m 755 "$file" "$BIN/${file##*/}"
+done
+log "Installed commands in $BIN"
+
+[[ -f "$ROOT/.bashrc" ]] || fail "Missing Git-managed $ROOT/.bashrc"
+if [[ -f "$HOME/.bashrc" ]] && ! cmp -s "$ROOT/.bashrc" "$HOME/.bashrc"; then
+    backup="$HOME/.bashrc.pxy-backup-$(date +%Y%m%d-%H%M%S)"
+    cp -p "$HOME/.bashrc" "$backup"
+    log "Backed up previous .bashrc: $backup"
+fi
+install -m 644 "$ROOT/.bashrc" "$HOME/.bashrc"
+log "Login will show the copyright notice from syscprtpxy.py (if dependencies are available)."
+
+[[ -f "$APP/pxywatch" ]] || fail "Missing pxywatch."
+if command -v systemctl >/dev/null && [[ -d /run/systemd/system ]]; then
+    bash "$APP/pxywatch" install
+    sudo systemctl enable pxywatch.service
+    if systemctl is-active --quiet pxywatch.service; then
+        log "Watchdog already running; not restarting it or the tmux sessions."
+    else
+        sudo systemctl start pxywatch.service
+        log "Watchdog started (will monitor existing engine/dashboard processes)."
+    fi
+else
+    log "systemd unavailable; watchdog not installed."
+fi
+log "Installation complete. Open a new Bash session to see the login banner."
+log "No running trading engine or dashboard was deliberately stopped or restarted."
