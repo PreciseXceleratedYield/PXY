@@ -157,10 +157,6 @@ def get_signal_depth_analysis(df=None, last_n=SYSDPTPXY_LAST_N, include_running=
                 signal = "BULL"
             elif c1_direction == "DOWN" and c0_direction == "DOWN":
                 signal = "BEAR"
-            elif c1_direction == "UP" and c0_direction == "DOWN":
-                signal = "SELL"
-            elif c1_direction == "DOWN" and c0_direction == "UP":
-                signal = "BUY"
 
     current_direction = directions[-1] if directions else "UNKNOWN"
     current_depth = 0
