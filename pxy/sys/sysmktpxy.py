@@ -1,5 +1,6 @@
 # sysmktpxy.py
-from syscnfgpxy import SYSMKTPXY_DEBUG_ENABLED, SYSMKTPXY_STRUCTURE_FILTER
+from datetime import datetime, time as dt_time
+from syscnfgpxy import SYSMKTPXY_DEBUG_ENABLED, SYSMKTPXY_ENTRY_FILTER, SYSCNFGPXY_TIMEZONE
 from sysdthapxy import get_signal_depth_analysis
 from sysdtafpxy import fetch_yf_data
 from sysinpxy import get_entry_signal
@@ -61,21 +62,21 @@ def get_signals(df=None):
         if exit_signal not in {"BULL", "BEAR", "SIDE"}:
             exit_signal = "NONE"
 
-        # Filter IN using the existing SMA50; OUT remains unchanged.
-        if entry_signal in {"BUY", "SELL"}:
-            try:
-                sma50_status = get_sma_signal(df)["status"]
-            except Exception:
-                sma50_status = "NA"
-            if entry_signal == "BUY" and sma50_status != "BULL":
-                entry_signal = "NONE"
-            elif entry_signal == "SELL" and sma50_status != "BEAR":
-                entry_signal = "NONE"
+        # Before 10:00 IST, pass IN without applying any MKT entry filter.
+        if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= dt_time(10, 0) and entry_signal in {"BUY", "SELL"}:
+            if SYSMKTPXY_ENTRY_FILTER == "SMA":
+                try:
+                    filter_direction = get_sma_signal(df)["status"]
+                except Exception:
+                    filter_direction = "NA"
+            elif SYSMKTPXY_ENTRY_FILTER == "SDIR":
+                filter_direction = get_structure_direction(df).get("direction")
+            else:
+                filter_direction = None
 
-        if SYSMKTPXY_STRUCTURE_FILTER == "YES" and entry_signal in {"BUY", "SELL"}:
-            direction = get_structure_direction(df).get("direction")
-            if (entry_signal == "BUY" and direction != "BULL") or (
-                entry_signal == "SELL" and direction != "BEAR"
+            if filter_direction is not None and (
+                (entry_signal == "BUY" and filter_direction != "BULL")
+                or (entry_signal == "SELL" and filter_direction != "BEAR")
             ):
                 entry_signal = "NONE"
 
