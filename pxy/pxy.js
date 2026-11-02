@@ -141,26 +141,22 @@ app.post('/run/:script', (req, res) => {
     };
 
     if (script === 'pxyupdate') {
-        const updateCommand = runAsRoot ? 'sudo' : 'bash';
-        const updateArgs = runAsRoot
-            ? ['-u', 'pxy', 'bash', '--login', '-c', scriptCommand]
-            : ['--login', '-c', scriptCommand];
-        const updateProcess = spawn(updateCommand, updateArgs, {
+        // Return the real update output. The update script never restarts services.
+        const cmd = `${runAsUser}bash --login -c ${shellQuote(scriptCommand.replace('export PXY_UPDATE_FROM_WEB=1; ', ''))}`;
+        return exec(cmd, {
+            timeout: 120000,
+            maxBuffer: 2 * 1024 * 1024,
             cwd: SCRIPT_DIR,
-            env: executionEnv,
-            detached: true,
-            stdio: 'ignore'
-        });
-
-        updateProcess.on('error', (error) => {
-            console.error('[RUN] PXY update launch failed:', error.message);
-        });
-        updateProcess.unref();
-
-        return res.status(202).json({
-            ok: true,
-            output: 'PXY update started. The dashboard and engine will restart if they were running.',
-            error: ''
+            env: executionEnv
+        }, (err, stdout, stderr) => {
+            console.log(`[RUN] pxyupdate ok=${!err}`);
+            if (!res.headersSent) {
+                res.json({
+                    ok: !err,
+                    output: stdout || '',
+                    error: err ? (stderr || err.message || 'Update failed') : (stderr || '')
+                });
+            }
         });
     }
 
