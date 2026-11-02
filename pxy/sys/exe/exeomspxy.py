@@ -129,6 +129,13 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
             # OMS/LILO/exit/averaging logic must reuse this exact response.
             pos_res = client.positions()
             if (
+                isinstance(pos_res, dict)
+                and str(pos_res.get("stCode", "")).strip() == "5203"
+                and str(pos_res.get("errMsg", "")).strip().lower() == "no data"
+                and str(pos_res.get("stat", "")).strip().lower() in {"not_ok", "not ok"}
+            ):
+                pos_res = {"stat": "Ok", "stCode": 200, "data": []}
+            if (
                 not isinstance(pos_res, dict)
                 or str(pos_res.get("stat", "")).strip().lower() != "ok"
                 or str(pos_res.get("stCode", "")).strip() != "200"
