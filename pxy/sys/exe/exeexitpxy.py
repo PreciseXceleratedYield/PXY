@@ -205,8 +205,7 @@ def run_depth_squareoff(client, active_df, market_data_available,
     pe_open = bool((symbols.str.endswith("PE") & quantities.gt(0)).any())
     if not (ce_open and pe_open):
         print(
-            f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: "
-            "both CE and PE positions must be open for a deep-reversal exit."
+            f"{Fore.YELLOW}⚠️ Depth -Square-off skipped: Single"
         )
         return set()
 
