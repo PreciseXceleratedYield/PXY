@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# PXY watchdog: one Git-tracked file, generates its own systemd unit.
+set -uo pipefail
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+APP="$(dirname "$SELF")"
+USER_NAME="$(id -un)"
+UNIT="pxywatch.service"
+UNIT_PATH="/etc/systemd/system/$UNIT"
+ENGINE="$APP/sys/sysexepxy.py"
+PYTHON="$HOME/env/bin/python3"
+INTERVAL=10
+GRACE=20
+
+usage() { echo "Usage: pxywatch {install|uninstall|start|stop|restart|status|logs|run}"; }
+install_service() {
+  command -v systemctl >/dev/null || { echo "systemd not found"; return 1; }
+  [[ -f "$ENGINE" && -f "$APP/pxy.js" && -x "$PYTHON" ]] || { echo "Missing PXY engine, dashboard or virtualenv"; return 1; }
+  local tmp
+  tmp="$(mktemp)"
+  cat > "$tmp" <<EOF
+[Unit]
+Description=PXY tmux engine and dashboard watchdog
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$USER_NAME
+Environment=HOME=$HOME
+WorkingDirectory=$APP
+ExecStart=/bin/bash $SELF run
+Restart=always
+RestartSec=5
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  sudo install -m 644 "$tmp" "$UNIT_PATH"
+  rm -f "$tmp"
+  sudo systemctl daemon-reload
+  echo "Installed $UNIT_PATH (not started). Run: pxywatch start"
+}
+running_engine() { pgrep -f '[s]ysexepxy.py' >/dev/null; }
+running_web() { pgrep -f '[n]ode pxy.js' >/dev/null; }
+watch_loop() {
+  command -v tmux >/dev/null || { echo "tmux missing"; return 1; }
+  exec 9>"$HOME/.pxywatch.lock"
+  flock -n 9 || { echo "Another pxywatch is running"; return 1; }
+  local emissing=0 wmissing=0 now
+  echo "$(date -Is) pxywatch monitoring started"
+  while :; do
+    now="$(date +%s)"
+    if running_engine; then
+      emissing=0
+    else
+      (( emissing == 0 )) && emissing=$now
+      if (( now - emissing >= GRACE )); then
+        if pgrep -f '[/]pxy/sys/exe/exe[a-z]*pxy.py|[p]ython3 exe/exepxy.py' >/dev/null; then
+          echo "$(date -Is) orphan execution process detected; engine recovery deferred"
+        else
+          tmux kill-session -t pxy-engine 2>/dev/null || true
+          if tmux new-session -d -s pxy-engine -c "$APP/sys" "exec '$PYTHON' -u sysexepxy.py"; then
+            echo "$(date -Is) recovered pxy-engine"
+          else
+            echo "$(date -Is) failed to recover pxy-engine"
+          fi
+        fi
+        emissing=$now
+      fi
+    fi
+    if running_web; then
+      wmissing=0
+    else
+      (( wmissing == 0 )) && wmissing=$now
+      if (( now - wmissing >= GRACE )); then
+        tmux kill-session -t pxy-web 2>/dev/null || true
+        if tmux new-session -d -s pxy-web -c "$APP" 'exec node pxy.js'; then
+          echo "$(date -Is) recovered pxy-web"
+        else
+          echo "$(date -Is) failed to recover pxy-web"
+        fi
+        wmissing=$now
+      fi
+    fi
+    sleep "$INTERVAL"
+  done
+}
+case "${1:-}" in
+  install) install_service ;;
+  uninstall) sudo systemctl disable --now "$UNIT" 2>/dev/null || true; sudo rm -f "$UNIT_PATH"; sudo systemctl daemon-reload; echo "Removed $UNIT" ;;
+  start) sudo systemctl start "$UNIT" ;;
+  stop) sudo systemctl stop "$UNIT" ;;
+  restart) sudo systemctl restart "$UNIT" ;;
+  status)
+    systemctl --no-pager --full status "$UNIT" || true
+    if running_engine; then echo "Engine: RUNNING"; else echo "Engine: STOPPED"; fi
+    if running_web; then echo "Dashboard: RUNNING"; else echo "Dashboard: STOPPED"; fi
+    ;;
+  logs) sudo journalctl -u "$UNIT" -n 80 --no-pager ;;
+  run) watch_loop ;;
+  *) usage; exit 2 ;;
+esac
