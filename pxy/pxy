@@ -146,6 +146,7 @@ while true; do
     echo "v) 🔭 View   - Attach Engine Tmux"
     echo "e) 🛒 Enter  - Trading Operations"
     echo "t) 🧪 Test   - Run Python Scripts"
+    echo "w) Watch    - Watchdog Management"
     echo "x) ❌ Exit   - Close Dashboard"
     draw_border
     read -p "Select option: " OPTION
@@ -167,6 +168,9 @@ while true; do
                 echo "[!] Access Denied. Incorrect password."
                 sleep 1.5
             else
+                if systemctl is-active --quiet pxywatch.service 2>/dev/null; then
+                    sudo systemctl stop pxywatch.service || { echo "[X] Stop watchdog first."; read -p "Press [Enter]..."; continue; }
+                fi
                 echo "Terminating Web Server..."
                 if tmux has-session -t pxy-web 2>/dev/null; then
                     tmux kill-session -t pxy-web
@@ -280,6 +284,36 @@ while true; do
             ;;
         t)
             show_test_menu
+            ;;
+        w)
+            while true; do
+                clear
+                draw_border
+                echo "          PXY WATCHDOG MANAGEMENT         "
+                draw_border
+                echo "1) Status"
+                echo "2) Install service (not started)"
+                echo "3) Start watchdog"
+                echo "4) Stop watchdog (engine stays up)"
+                echo "5) Logs"
+                echo "6) Enable on boot"
+                echo "7) Disable on boot"
+                echo "8) Back"
+                draw_border
+                read -p "Select [1-8]: " WOPT
+                case "$WOPT" in
+                    1) bash "$PXY_APP_DIR/pxywatch" status ;;
+                    2) bash "$PXY_APP_DIR/pxywatch" install ;;
+                    3) bash "$PXY_APP_DIR/pxywatch" start ;;
+                    4) bash "$PXY_APP_DIR/pxywatch" stop ;;
+                    5) bash "$PXY_APP_DIR/pxywatch" logs ;;
+                    6) sudo systemctl enable pxywatch.service ;;
+                    7) sudo systemctl disable pxywatch.service ;;
+                    8|"") break ;;
+                    *) echo "Invalid choice." ;;
+                esac
+                read -p "Press [Enter] to continue..."
+            done
             ;;
         x)
             echo ""
