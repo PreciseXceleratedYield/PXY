@@ -28,40 +28,15 @@ FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 
 
 def apply_ohlc_transformation(df, futures_price=None):
-    """Return raw OHLC, optionally blended with the latest futures price."""
-
+    """Preserve raw OHLC for all signal and indicator calculations."""
     if df is None or df.empty:
         return df
-
-    out = df.copy()
-
-    # Weight index OHLC three times and the latest NIFTY futures quote once.
-    if futures_price is not None:
-        try:
-            futures_price = float(futures_price)
-        except (TypeError, ValueError) as error:
-            raise ValueError(
-                "futures_price must be a finite positive number."
-            ) from error
-
-        if not math.isfinite(futures_price) or futures_price <= 0:
-            raise ValueError(
-                "futures_price must be a finite positive number."
-            )
-
-        for column in ("Open", "High", "Low", "Close"):
-            out[column] = (3.0 * out[column] + futures_price) / 4.0
-
-    return out
+    return df.copy()
 
 
 def transform_market_data(df, futures_price=None):
-    """Blend the latest futures price into raw OHLC without other transforms."""
-
-    return apply_ohlc_transformation(
-        df,
-        futures_price=futures_price,
-    )
+    """Return raw OHLC; price blending belongs exclusively to syspxy."""
+    return apply_ohlc_transformation(df)
 
 
 def _read_nifty_futures_price():
@@ -156,7 +131,7 @@ def _fetch_yf_data_production(
     interval=SYSDTAFPXY_DEFAULT_INTERVAL,
     target_rows=SYSDTAFPXY_DEFAULT_TARGET_ROWS,
 ):
-    """Fetch raw OHLC data and blend the latest futures price."""
+    """Fetch raw OHLC; retain futures-only fallback when Yahoo is unavailable."""
 
     df = pd.DataFrame()
     buffer_rows = target_rows + 5
@@ -269,22 +244,12 @@ def _fetch_yf_data_production(
     else:
         df = df.tz_convert(TIMEZONE)
 
-    # A stale/unavailable futures quote must never contaminate Yahoo OHLC.
-    # The documented fallback is the historical OHLC data unchanged.
-    if futures_price is None:
-        print(
-            "Warning: NIFTY futures quote unavailable or stale. "
-            "Using historical Yahoo OHLC without futures blending."
-        )
-        processed_df = transform_market_data(df)
-    else:
-        processed_df = transform_market_data(
-            df,
-            futures_price=futures_price,
-        )
+    # Futures never alter Yahoo OHLC or the signals calculated from it.
+    # The existing futures-only fallback above remains unchanged.
+    processed_df = transform_market_data(df)
 
     # Publish the two actual quotes already read above; never infer either
-    # from the blended DTAF candles or perform an extra market-data request.
+    # from transformed candles or perform an extra market-data request.
     try:
         import tempfile
         quote_path = os.path.abspath(os.path.join(
