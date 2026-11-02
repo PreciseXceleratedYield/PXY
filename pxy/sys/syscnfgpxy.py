@@ -97,10 +97,10 @@ SYSINPXY_CONFIRM_MODE = "CLOSED"
 if SYSINPXY_CONFIRM_MODE not in {"LIVE", "CLOSED"}:
     raise ValueError("SYSINPXY_CONFIRM_MODE must be LIVE or CLOSED.")
 
-# Optional confirmed swing-structure direction filter for IN only.
-SYSINPXY_STRUCTURE_FILTER = "NO"
-if SYSINPXY_STRUCTURE_FILTER not in {"YES", "NO"}:
-    raise ValueError("SYSINPXY_STRUCTURE_FILTER must be YES or NO.")
+# Optional confirmed swing-structure direction filter in MKT (after SMA50).
+SYSMKTPXY_STRUCTURE_FILTER = "NO"
+if SYSMKTPXY_STRUCTURE_FILTER not in {"YES", "NO"}:
+    raise ValueError("SYSMKTPXY_STRUCTURE_FILTER must be YES or NO.")
 
 # Data ingestion, chart generation, and signal calculation.
 # DTAF always retains raw OHLC; the futures blend is handled in sysdtafpxy.py.
