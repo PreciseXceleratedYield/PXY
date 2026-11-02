@@ -17,7 +17,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
     OC2 and OHLC4 replace Close with the corresponding candle average.
     HYPER preserves the former DTAF mode-0 transformation.
-    TSMA matches the TSMA-open/custom-close Pine candle.
+    TSMA uses TSMA open and a 3:1 weighted TSMA/real close.
     HA applies the standard recursive Heikin-Ashi transformation.
     """
     valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA"}
@@ -72,8 +72,8 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         ).to_numpy(dtype=float)
 
         # Pine: candle_open = tsma_open
-        # Pine: candle_close = (tsma_open + raw close) / 2
-        candle_close = (tsma_open + raw_close) / 2.0
+        # Weighted synthetic close: 75% TSMA open + 25% actual close
+        candle_close = (3.0 * tsma_open + raw_close) / 4.0
 
         # Wickless synthetic candle: range is only between its open and close.
         out["Open"] = tsma_open
