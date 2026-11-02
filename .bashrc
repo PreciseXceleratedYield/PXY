@@ -29,3 +29,11 @@ else
 fi
 
 unset PXY_ENV_ACTIVATE
+
+# Show the exact legal notice maintained by syscprtpxy.py on interactive login.
+PXY_COPYRIGHT_SCRIPT="$HOME/PXY/pxy/sys/syscprtpxy.py"
+if [ -f "$PXY_COPYRIGHT_SCRIPT" ] && [ -x "$HOME/env/bin/python3" ]; then
+    ( cd "$HOME/PXY/pxy/sys" && "$HOME/env/bin/python3" syscprtpxy.py ) || \
+        printf '[PXY] WARNING: Could not display copyright notice.\n' >&2
+fi
+unset PXY_COPYRIGHT_SCRIPT
