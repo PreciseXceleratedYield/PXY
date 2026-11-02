@@ -45,17 +45,19 @@ def _warn_once(key, msg):
 
 
 # === SURGICAL CHANGE START (Error Fallbacks Added) ===
-def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True):
-    """Calculate the simplified negative LGT percentage with an error fallback of -75.0."""
+def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=0.0, pe_investment=0.0):
+    """Calculate investment-weighted negative LGT with a -55% error fallback."""
     try:
         own_count = float(ce_count if is_ce else pe_count)
 
-        # Core baseline calculation
-        base_magnitude = 40.0 + (10.0 * own_count)
-
-        # Scale up if it is not aligned
-        if not is_aligned:
-            base_magnitude *= 1.0
+        own_investment = float(ce_investment if is_ce else pe_investment)
+        opposite_investment = float(pe_investment if is_ce else ce_investment)
+        investment_factor = (
+            own_investment / opposite_investment
+            if opposite_investment > 0
+            else 1.0
+        )
+        base_magnitude = 33.0 * investment_factor + 10.0 * own_count
 
         return -base_magnitude
 
