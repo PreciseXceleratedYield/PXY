@@ -144,7 +144,7 @@ while true; do
     echo "v) 🔭 View    - Live Engine Screen"
     echo "e) 🛒 Enter   - Trading Operations"
     echo "t) 🧪 Test    - Run Python Scripts"
-    echo "w) 🛡️  Watch   - Engine & Web Control"
+    echo "w) 🐕 Watch   - Engine & Web Control"
     echo "x) ❌ Exit    - Close Menu"
     draw_border
     read -p "Select option: " OPTION
