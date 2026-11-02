@@ -521,7 +521,12 @@ def run_snapshot():
             data.get("positions_unverified"),
             is_ledger_busy,
         ):
-            check_counter_leg(df[held_mask])
+            # Reuse SMA50 from the same syspxy snapshot; never refetch candles.
+            market_snapshot = data.get("market_snapshot")
+            sma_direction = "NA"
+            if isinstance(market_snapshot, pd.DataFrame) and not market_snapshot.empty:
+                sma_direction = market_snapshot.iloc[0].get("sma", "NA")
+            check_counter_leg(df[held_mask], sma_direction=sma_direction)
     except Exception as e:
         print(f"{Fore.RED}❌ Counter-leg hook error: {e}")
 
