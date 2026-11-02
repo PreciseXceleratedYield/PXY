@@ -227,10 +227,7 @@ def run_depth_squareoff(client, active_df, market_data_available,
     except (TypeError, ValueError, OverflowError):
         current_depth = math.nan
     if not math.isfinite(current_depth) or current_depth != 1:
-        print(
-            f"{Fore.YELLOW}⚠️ Depth-based square-off skipped: "
-            f"new reversal streak depth must be 1, got {snapshot.get(current_depth_column)!r}."
-        )
+        print(f"{Fore.YELLOW}⚠️ Depth-based square-off skipped")
         return set()
 
     signal_time = str(snapshot.get("hkin_signal_time", "")).strip()
