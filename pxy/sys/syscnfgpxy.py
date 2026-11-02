@@ -91,6 +91,12 @@ SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "YES"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
     raise ValueError("SYSDTHAPXY_INCLUDE_RUNNING_CANDLE must be YES or NO.")
 
+# IN-only entry confirmation: LIVE uses closed-to-running flip;
+# CLOSED requires closed reversal confirmation plus matching running candle.
+SYSINPXY_CONFIRM_MODE = "CLOSED"
+if SYSINPXY_CONFIRM_MODE not in {"LIVE", "CLOSED"}:
+    raise ValueError("SYSINPXY_CONFIRM_MODE must be LIVE or CLOSED.")
+
 # Data ingestion, chart generation, and signal calculation.
 # DTAF always retains raw OHLC; the futures blend is handled in sysdtafpxy.py.
 SYSDTAFPXY_FORCE_NIFTY_FUT = False
