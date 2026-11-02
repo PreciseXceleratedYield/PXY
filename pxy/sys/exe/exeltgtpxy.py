@@ -96,9 +96,9 @@ def calculate_tgt(
         ):
             return EXETGTPXY_PRD_MAX_TARGET_PCT
 
-        # Non-aligned positions use a 5% target with either one or both sides open.
+        # Non-aligned target: 5% with both sides open, 1.4% with one side.
         if not is_aligned:
-            return 5.0
+            return 5.0 if both_sides_open else EXETGTPXY_PRD_BASE_FACTOR
 
         def positive_factor(value):
             try:
