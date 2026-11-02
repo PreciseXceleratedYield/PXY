@@ -7,7 +7,7 @@
 #
 # Offset logic:
 #   ATM / ITM -> 0
-#   OTM       -> half the difference, rounded to nearest 50
+#   OTM       -> half difference only when held CE/SMA50 BULL or held PE/SMA50 BEAR; otherwise full difference
 #
 # The calculated offset is passed directly to the force-buy Python function.
 # No weekday adjustment or additional offset is applied.
@@ -130,7 +130,7 @@ def _counter_buy_offset(remaining_df):
     price  -> price supplied in remaining_df
 
     ATM / ITM -> 0
-    OTM       -> difference rounded to nearest 50
+    OTM       -> halve difference for CE/BULL or PE/BEAR SMA50; otherwise full
     """
 
     if remaining_df is None or remaining_df.empty:
@@ -194,7 +194,24 @@ def _counter_buy_offset(remaining_df):
     if option_type == "PE" and strike > spot:
         return 0
 
-    difference = abs(strike - spot) / 2.0
+    difference = abs(strike - spot)
+
+    # Apply the half-offset only when SMA50 agrees with the held option side.
+    # If SMA50 is unavailable, retain the normal full-distance offset.
+    try:
+        from syssmapxy import get_sma_signal
+        from sysdtafpxy import fetch_yf_data
+
+        sma_result = get_sma_signal(fetch_yf_data(), period=50)
+        sma_direction = str(sma_result.get("status", "NA")).upper()
+    except Exception as exc:
+        debug_log(f"SMA50 unavailable; using normal counter offset: {exc}")
+        sma_direction = "NA"
+
+    if (option_type == "CE" and sma_direction == "BULL") or (
+        option_type == "PE" and sma_direction == "BEAR"
+    ):
+        difference /= 2.0
 
     return int(
         ((difference + step / 2) // step) * step
