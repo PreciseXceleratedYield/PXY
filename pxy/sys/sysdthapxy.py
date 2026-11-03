@@ -256,7 +256,7 @@ def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
     return pxy_close, pxy_open, pxy_color_series, final_df
 
 def get_tsst_states(df):
-    """Classify raw closes using shared TSMA(7) and primary ST(7, 1)."""
+    """Classify DTHA-transformed closes using TSMA(7) and primary ST(7, 1)."""
     from sysstrnpxy import calculate_supertrend
 
     if df is None or df.empty or len(df) < SYSSMAPXY_TSMA_PERIOD:
@@ -264,7 +264,7 @@ def get_tsst_states(df):
     required = ("Open", "High", "Low", "Close")
     if any(name not in df.columns for name in required):
         return pd.Series(dtype="object")
-    raw = df.copy()
+    raw = transform_dtha_ohlc(df)
     for name in required:
         raw[name] = pd.to_numeric(raw[name], errors="coerce")
     if not np.isfinite(raw[list(required)].to_numpy(dtype=float)).all():
