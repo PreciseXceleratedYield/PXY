@@ -8,8 +8,6 @@ from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_MARKET_OPEN,
     SYSCNFGPXY_ENTRY_CUTOFF,
-    SYSINPXY_SIGNAL_MODE,
-    SYSOUTPXY_SIGNAL_MODE,
 )
 
 EXE_DIR = Path(__file__).resolve().parent / "exe"
@@ -51,9 +49,9 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     else:
         now_time = now
 
-    if (ENTRY_START <= now_time < MORNING_OVERRIDE_END
-            and SYSINPXY_SIGNAL_MODE != "TSST"
-            and SYSOUTPXY_SIGNAL_MODE != "TSST"):
+    # Morning direction from sysexitpxy takes priority over all IN/OUT modes
+    # and any downstream market-signal filters during this window.
+    if ENTRY_START <= now_time < MORNING_OVERRIDE_END:
         try:
             # sysexitpxy returns UP/DOWN/NONE from the shared running-candle cache.
             _, direction = detect_raw_direction(load_cached_data())
