@@ -232,7 +232,7 @@ while true; do
                 echo "2) ⚙️  Install - Configure Systemd"
                 echo "3) 🚀 Start   - Watchdog + Tmux"
                 echo "4) 🛑 Stop    - Watchdog + Kill Tmux"
-                echo "5) 📜 Diagnostics - Watchdog Journal + Last Failure"
+                echo "5) 📜 Watchdog  - Journal + Last Failure"
                 echo "6) ✅ Enable  - Auto Start on Boot"
                 echo "7) 🚫 Disable - No Auto Start"
                 echo "8) ↩️  Back    - Main Menu"
