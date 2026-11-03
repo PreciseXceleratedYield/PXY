@@ -7,9 +7,10 @@ import pandas as pd
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_CONFIRM_AFTER,
+    SYSOUTPXY_SIGNAL_MODE,
 )
 from sysdtafpxy import fetch_yf_data
-from sysdthapxy import get_close_direction_series, transform_dtha_ohlc
+from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_tsst_states
 
 
 def get_out_candles(df):
@@ -31,6 +32,10 @@ def get_signal(df=None):
             df = fetch_yf_data()
         if df is None or df.empty or "Close" not in df.columns:
             return "NONE"
+
+        if SYSOUTPXY_SIGNAL_MODE == "TSST":
+            states = get_tsst_states(df)
+            return str(states.iloc[-1]) if not states.empty else "NONE"
 
         transformed = get_out_candles(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
