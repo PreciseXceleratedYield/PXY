@@ -297,9 +297,10 @@ def check_counter_leg(remaining_df, sma_direction="NA"):
         )
 
         if now >= CBUY_CUTOFF:
-            debug_log(
-                f"Counter check: past {CBUY_CUTOFF}; "
-                f"not firing {script_name}."
+            print(
+                f"{Fore.YELLOW}⚠️ Counter-buy skipped: cutoff {CBUY_CUTOFF} IST "
+                f"reached; not firing {script_name}.",
+                flush=True,
             )
             return None
 
