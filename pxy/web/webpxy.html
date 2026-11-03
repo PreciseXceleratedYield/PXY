@@ -743,7 +743,7 @@ function emojifyExit(v){
     const s=String(v||'').toUpperCase();
     if(s.includes('BUY')||s.includes('BULL'))return'▲▲';
     if(s.includes('SELL')||s.includes('BEAR'))return'▼▼';
-    if(s.includes('SIDE'))return'●';
+    if(s.includes('SIDE'))return'🟡';
     if(s==='NONE')return'⚪';
     return v;
 }
