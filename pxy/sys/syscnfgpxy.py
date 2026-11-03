@@ -538,7 +538,7 @@ if not isinstance(EXECBUYPXY_USE_DYNAMIC_STRIKE, bool):
 # Enables verbose diagnostic logging for this subsystem.
 EXECBUYPXY_DEBUG_ENABLED = False
 # Session boundary controlling cutoff.
-EXECBUYPXY_CUTOFF = SYSCNFGPXY_ENTRY_CUTOFF
+EXECBUYPXY_CUTOFF = dt_time(15, 16)  # Independent counter-buy cutoff (IST)
 # Compatibility command mapping for scripts.
 EXECBUYPXY_SCRIPTS = {
     "CE": "pxybuype",
