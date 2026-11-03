@@ -81,7 +81,7 @@ EXEPXYPXY_IDLE_POLL_SECONDS = 60
 SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 
 # DTHA owns candle presentation; IN and OUT select signal modes independently.
-SYSDTHAPXY_CANDLE_MODE = "RAW"
+SYSDTHAPXY_CANDLE_MODE = "OC2"
 if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA"}:
     raise ValueError(
         "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, HA, OHLC4, HYPER, or TSMA."
