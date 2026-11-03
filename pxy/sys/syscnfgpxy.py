@@ -80,14 +80,16 @@ EXEPXYPXY_IDLE_PAUSE_SECONDS = 6
 EXEPXYPXY_IDLE_POLL_SECONDS = 60
 SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 
-# DTHA owns the candle and signal mode shared by IN and OUT.
-SYSDTHAPXY_CANDLE_MODE = "TSMA"
+# DTHA owns candle presentation; IN and OUT select signal modes independently.
+SYSDTHAPXY_CANDLE_MODE = "RAW"
 if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA"}:
     raise ValueError(
         "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, HA, OHLC4, HYPER, or TSMA."
     )
 
 SYSCNFGPXY_CONFIRM_AFTER = dt_time(10, 0)  # IN and OUT: LIVE before 10:00 IST, CLOSED from 10:00
+SYSINPXY_SIGNAL_MODE = "TSST"
+SYSOUTPXY_SIGNAL_MODE = "TSST"
 SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "NO"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
     raise ValueError("SYSDTHAPXY_INCLUDE_RUNNING_CANDLE must be YES or NO.")
@@ -190,8 +192,8 @@ SYSPLCHRTPXY_HISTORY_PERIODS = ("5d", "7d", "max")
 if SYSPLCHRTPXY_OHLC_MODE not in {1, 2, 3, 4, 5, 6}:
     raise ValueError("SYSPLCHRTPXY_OHLC_MODE must be between 1 and 6.")
 
-SYSDTSTPXY_ST1_PERIOD = 14
-SYSDTSTPXY_ST1_FACTOR = 1.4
+SYSDTSTPXY_ST1_PERIOD = 7
+SYSDTSTPXY_ST1_FACTOR = 1.0
 
 # BOS morning recognition ends at 10:10; its opening boundary uses the shared
 # exchange open above.
