@@ -190,8 +190,8 @@ SYSPLCHRTPXY_HISTORY_PERIODS = ("5d", "7d", "max")
 if SYSPLCHRTPXY_OHLC_MODE not in {1, 2, 3, 4, 5, 6}:
     raise ValueError("SYSPLCHRTPXY_OHLC_MODE must be between 1 and 6.")
 
-SYSDTSTPXY_ST1_PERIOD = 14
-SYSDTSTPXY_ST1_FACTOR = 1.4
+SYSDTSTPXY_ST1_PERIOD = 7
+SYSDTSTPXY_ST1_FACTOR = 3.0
 
 # BOS morning recognition ends at 10:10; its opening boundary uses the shared
 # exchange open above.
