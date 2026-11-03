@@ -68,6 +68,27 @@ start_sessions() {
     echo "Started pxy-web tmux"
   fi
 }
+# Preserve the previous tmux output before watchdog replaces a failed session.
+# Logging is best-effort and must never prevent process recovery.
+capture_recovery_logs() {
+  local session="$1" reason="$2" stamp dir file
+  dir="${PXY_WATCHDOG_LOG_DIR:-$HOME/.pxy/watchdog}"
+  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+  ( umask 077
+    mkdir -p "$dir" || exit 1
+    file="$(mktemp "$dir/${session}-${stamp}-XXXXXX.log")" || exit 1
+    {
+      printf 'Timestamp (UTC): %s\\nSession: %s\\nReason: %s\\n' "$(date -u -Is)" "$session" "$reason"
+      printf '%s\\n' '--- tmux pane history ---'
+      if tmux has-session -t "$session" 2>/dev/null; then
+        tmux capture-pane -p -J -S -2000 -t "$session" || printf '%s\\n' 'Unable to capture tmux pane.'
+      else
+        printf '%s\\n' 'No tmux session remains; pane history unavailable.'
+      fi
+    } > "$file"
+    printf '%s recovery log saved: %s\\n' "$(date -Is)" "$file"
+  ) || echo "$(date -Is) WARNING: recovery log capture failed for $session" >&2
+}
 stop_sessions() {
   # The systemd watchdog must be stopped before this function is called.
   local failed=0
@@ -110,6 +131,7 @@ watch_loop() {
         if pgrep -f '[/]pxy/sys/exe/exe[a-z]*pxy.py|[p]ython3 exe/exepxy.py' >/dev/null; then
           echo "$(date -Is) orphan execution process detected; engine recovery deferred"
         else
+          capture_recovery_logs pxy-engine "engine process missing after grace period"
           tmux kill-session -t pxy-engine 2>/dev/null || true
           if tmux new-session -d -s pxy-engine -c "$APP/sys" "exec '$PYTHON' -u sysexepxy.py"; then
             echo "$(date -Is) recovered pxy-engine"
@@ -125,6 +147,7 @@ watch_loop() {
     else
       (( wmissing == 0 )) && wmissing=$now
       if (( now - wmissing >= GRACE )); then
+        capture_recovery_logs pxy-web "dashboard process missing after grace period"
         tmux kill-session -t pxy-web 2>/dev/null || true
         if tmux new-session -d -s pxy-web -c "$APP" 'exec node pxy.js'; then
           echo "$(date -Is) recovered pxy-web"
