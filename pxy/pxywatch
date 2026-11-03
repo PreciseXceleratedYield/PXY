@@ -171,7 +171,31 @@ case "${1:-}" in
     if running_engine; then echo "Engine: RUNNING"; else echo "Engine: STOPPED"; fi
     if running_web; then echo "Dashboard: RUNNING"; else echo "Dashboard: STOPPED"; fi
     ;;
-  logs) sudo journalctl -u "$UNIT" -n 80 --no-pager ;;
+  logs)
+    echo "========== WATCHDOG JOURNAL =========="
+    sudo journalctl -u "$UNIT" -n 80 --no-pager
+    echo
+    echo "========== RECENT RECOVERY DIAGNOSTICS =========="
+    log_dir="${PXY_WATCHDOG_LOG_DIR:-$HOME/.pxy/watchdog}"
+    if [[ -d "$log_dir" ]]; then
+      shopt -s nullglob
+      recovery_logs=("$log_dir"/pxy-engine-*.log "$log_dir"/pxy-web-*.log)
+      shopt -u nullglob
+      if (( ${#recovery_logs[@]} )); then
+        latest="$(printf '%s\\n' "${recovery_logs[@]}" | sort -r | head -n 1)"
+        echo "Latest captured recovery log: $latest"
+        echo "Other saved logs:"
+        printf '%s\\n' "${recovery_logs[@]}" | sort -r | head -n 10
+        echo
+        echo "--- Latest recovery output (last 120 lines) ---"
+        tail -n 120 "$latest"
+      else
+        echo "No recovery logs recorded yet."
+      fi
+    else
+      echo "No recovery logs recorded yet."
+    fi
+    ;;
   run) watch_loop ;;
   *) usage; exit 2 ;;
 esac
