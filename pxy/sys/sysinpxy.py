@@ -30,12 +30,12 @@ def get_signal(df=None):
 
         if SYSINPXY_SIGNAL_MODE == "TSST":
             states = get_tsst_states(df)
-            if len(states) < 2:
+            if states.empty:
                 return "NONE"
-            previous, current = states.iloc[-2], states.iloc[-1]
-            if current == "BULL" and previous != "BULL":
+            current = states.iloc[-1]
+            if current == "BULL":
                 return "BUY"
-            if current == "BEAR" and previous != "BEAR":
+            if current == "BEAR":
                 return "SELL"
             return "NONE"
 
