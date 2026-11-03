@@ -13,47 +13,47 @@ import pytz
 # 00. MARKET & GLOBAL DEFAULTS
 # Production and monitoring instruments, timezone, lot sizing and shared broker order defaults.
 # ================================================================
-# Configures release name for its owning subsystem.
+# Release identifier shown in system diagnostics.
 SYSCNFGPXY_RELEASE_NAME = "READYFRIDAY"
-# Configures ticker for its owning subsystem.
+# Production market-data symbol; not the option contract symbol.
 SYSCNFGPXY_TICKER = "^NSEI"  # Production trading instrument.
-# Configures ticker for its owning subsystem.
+# Independent monitoring/test ticker; excluded from production trades.
 SYSMONPXY_TICKER = "BTC-USD"  # Monitor-only test instrument; never used by production trading.
 
-# Timezone used to interpret all session boundaries.
+# Runtime setting for timezone.
 SYSCNFGPXY_TIMEZONE = pytz.timezone("Asia/Kolkata")
-# Configures nifty lot size for its owning subsystem.
+# Quantity of contracts represented by one NIFTY option lot.
 SYSCNFGPXY_NIFTY_LOT_SIZE = 65
 
 # Shared F&O order defaults. Owner-prefixed names below are compatibility aliases.
-# Broker order field for fo order exchange segment.
+# Broker order request field: fo order exchange segment.
 SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT = "nse_fo"
-# Broker order field for fo order product.
+# Broker order request field: fo order product.
 SYSCNFGPXY_FO_ORDER_PRODUCT = "NRML"
-# Broker order field for fo order price.
+# Broker order request field: fo order price.
 SYSCNFGPXY_FO_ORDER_PRICE = "0"
-# Broker order field for fo order type.
+# Broker order request field: fo order type.
 SYSCNFGPXY_FO_ORDER_TYPE = "MKT"
-# Broker order field for fo order validity.
+# Broker order request field: fo order validity.
 SYSCNFGPXY_FO_ORDER_VALIDITY = "DAY"
-# Broker order field for fo order amo.
+# Broker order request field: fo order amo.
 SYSCNFGPXY_FO_ORDER_AMO = "NO"
-# Configures fo buy transaction type for its owning subsystem.
+# Runtime setting for fo buy transaction type.
 SYSCNFGPXY_FO_BUY_TRANSACTION_TYPE = "B"
-# Configures fo sell transaction type for its owning subsystem.
+# Runtime setting for fo sell transaction type.
 SYSCNFGPXY_FO_SELL_TRANSACTION_TYPE = "S"
 
 # ================================================================
 # 01. RUN UTILITIES
 # Standalone futures refresh, reporting layout and Telegram delivery limits.
 # ================================================================
-# Maximum wait duration for telegram timeout seconds.
+# Timeout governing telegram timeout seconds.
 RUNLDGRPXY_TELEGRAM_TIMEOUT_SECONDS = 5
-# Configures layout width for its owning subsystem.
+# Runtime setting for layout width.
 RUNLDGRPXY_LAYOUT_WIDTH = 30
-# Configures price history limit for its owning subsystem.
+# Limit or threshold governing price history limit.
 RUNNFTFUTPXY_PRICE_HISTORY_LIMIT = 50
-# Controls polling or scheduling frequency for refresh seconds.
+# Polling or execution cadence for refresh seconds.
 RUNNFTFUTPXY_REFRESH_SECONDS = 5
 if (
     isinstance(RUNNFTFUTPXY_REFRESH_SECONDS, bool)
@@ -73,29 +73,29 @@ if RUNNFTFUTPXY_PRICE_HISTORY_LIMIT < 1:
 # ================================================================
 # Shared trading schedule. Keep distinct close windows explicit: the supervisor,
 # execution loop, and scheduled shutdown intentionally stop at different times.
-# Configures exchange open for its owning subsystem.
+# Reference exchange session opening boundary.
 SYSCNFGPXY_EXCHANGE_OPEN = dt_time(9, 15)
-# Start boundary for preopen start.
+# Preopen activity boundary for entry launcher.
 SYSCNFGPXY_PREOPEN_START = dt_time(9, 14)
-# Start boundary for market open.
+# Market-processing eligibility boundary, distinct from trading authorization.
 SYSCNFGPXY_MARKET_OPEN = dt_time(9, 16)
-# End boundary for engine close.
+# Scheduled supervisor/engine session end.
 SYSCNFGPXY_ENGINE_CLOSE = dt_time(15, 45)
-# End boundary for trading pipe close.
+# End boundary for the execution pipeline.
 SYSCNFGPXY_TRADING_PIPE_CLOSE = dt_time(15, 40)
-# End boundary for trading day end.
+# Exchange trading-day end reference.
 SYSCNFGPXY_TRADING_DAY_END = dt_time(15, 30)
-# Start boundary for averaging start.
+# Earliest eligibility for position averaging.
 SYSCNFGPXY_AVERAGING_START = dt_time(9, 17)
-# Defines the cutoff beyond which this operation is restricted.
+# Latest time for opening a new book.
 SYSCNFGPXY_NEW_BOOK_CUTOFF = dt_time(13, 30)
-# Defines the cutoff beyond which this operation is restricted.
+# Latest time for fresh entry requests.
 SYSCNFGPXY_ENTRY_CUTOFF = dt_time(13, 30)
-# Controls scheduled or forced position liquidation.
+# Beginning of regular EOD liquidation handling.
 SYSCNFGPXY_SQUAREOFF_START = dt_time(15, 30)
-# Controls scheduled or forced position liquidation.
+# Beginning of forced liquidation of every remaining position.
 SYSCNFGPXY_SQUAREOFF_ALL_START = dt_time(15, 32)
-# Controls scheduled or forced position liquidation.
+# End of EOD square-off attempts.
 SYSCNFGPXY_SQUAREOFF_END = dt_time(15, 40)
 if not (
     SYSCNFGPXY_EXCHANGE_OPEN <= SYSCNFGPXY_MARKET_OPEN < SYSCNFGPXY_ENGINE_CLOSE
@@ -106,59 +106,59 @@ if not (
 ):
     raise ValueError("Shared market-hours settings are not in chronological order.")
 
-# Start boundary for market open.
+# Runtime setting for market open.
 SYSEXEPXY_MARKET_OPEN = SYSCNFGPXY_MARKET_OPEN
-# End boundary for market close.
+# Session boundary controlling market close.
 SYSEXEPXY_MARKET_CLOSE = SYSCNFGPXY_ENGINE_CLOSE
-# Controls polling or scheduling frequency for supervisor interval seconds.
+# Polling or execution cadence for supervisor interval seconds.
 SYSEXEPXY_SUPERVISOR_INTERVAL_SECONDS = 1
-# Start boundary for market open.
+# Runtime setting for market open.
 EXEPXYPXY_MARKET_OPEN = SYSCNFGPXY_MARKET_OPEN
-# End boundary for market close.
+# Session boundary controlling market close.
 EXEPXYPXY_MARKET_CLOSE = SYSCNFGPXY_TRADING_PIPE_CLOSE
-# Maximum wait duration for pipe timeout seconds.
+# Timeout governing pipe timeout seconds.
 EXEPXYPXY_PIPE_TIMEOUT_SECONDS = 60
-# Configures sub iterations for its owning subsystem.
+# Runtime setting for sub iterations.
 EXEPXYPXY_SUB_ITERATIONS = 30
-# Controls polling or scheduling frequency for idle pause seconds.
+# Polling or execution cadence for idle pause seconds.
 EXEPXYPXY_IDLE_PAUSE_SECONDS = 6
-# Controls polling or scheduling frequency for idle poll seconds.
+# Polling or execution cadence for idle poll seconds.
 EXEPXYPXY_IDLE_POLL_SECONDS = 60
-# Configures action cooldown seconds for its owning subsystem.
+# Switch or algorithm selection for action cooldown seconds.
 SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 
 # ================================================================
 # 03. CANDLES & SIGNAL ROUTING
 # DTHA transforms candles consumed by IN/OUT; TSST evaluates the selected candles independent of confirmation mode.
 # ================================================================
-# Selects DTHA candle transformation before chart and signal processing.
+# Switch or algorithm selection for candle mode.
 SYSDTHAPXY_CANDLE_MODE = "OC2"
 if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA"}:
     raise ValueError(
         "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, HA, OHLC4, HYPER, or TSMA."
     )
 
-# Controls candle confirmation or confirmation timing where applicable.
+# Boundary for legacy LIVE versus completed-candle behavior; TSST bypasses it.
 SYSCNFGPXY_CONFIRM_AFTER = dt_time(10, 0)  # IN and OUT: LIVE before 10:00 IST, CLOSED from 10:00
-# Selects the signal algorithm for this pipeline.
+# Switch or algorithm selection for signal mode.
 SYSINPXY_SIGNAL_MODE = "TSST"
-# Selects the signal algorithm for this pipeline.
+# Switch or algorithm selection for signal mode.
 SYSOUTPXY_SIGNAL_MODE = "TSST"
-# Configures include running candle for its owning subsystem.
+# Controls inclusion of the forming candle in DTHA analyses.
 SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "NO"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
     raise ValueError("SYSDTHAPXY_INCLUDE_RUNNING_CANDLE must be YES or NO.")
 
 # IN-only entry confirmation: LIVE uses closed-to-running flip;
 # CLOSED requires closed reversal confirmation plus matching running candle.
-# Controls candle confirmation or confirmation timing where applicable.
+# Legacy entry confirmation mode; TSST bypasses it.
 SYSINPXY_CONFIRM_MODE = "CLOSED"
 if SYSINPXY_CONFIRM_MODE not in {"LIVE", "CLOSED"}:
     raise ValueError("SYSINPXY_CONFIRM_MODE must be LIVE or CLOSED.")
 
 # MKT entry filter: NONE, SMA (SMA50), or SDIR (confirmed swing structure).
 # Selected filter applies from 10:00 IST onward; earlier entries are unfiltered.
-# Configures entry filter for its owning subsystem.
+# Optional post-confirmation entry filter; NONE disables filtering.
 SYSMKTPXY_ENTRY_FILTER = "NONE"
 if SYSMKTPXY_ENTRY_FILTER not in {"NONE", "SMA", "SDIR"}:
     raise ValueError("SYSMKTPXY_ENTRY_FILTER must be NONE, SMA, or SDIR.")
@@ -167,14 +167,14 @@ if SYSMKTPXY_ENTRY_FILTER not in {"NONE", "SMA", "SDIR"}:
 # 04. DATA INGESTION & FRESHNESS
 # Yahoo OHLC acquisition, futures fallback, feed freshness, alerts and holiday lookup.
 # ================================================================
-# DTAF always retains raw OHLC; the futures blend is handled in sysdtafpxy.py.
-# Configures force nifty fut for its owning subsystem.
+# DTAF retains raw Yahoo OHLC; futures fallback remains available. Price blending is downstream in syspxy.py.
+# Forces futures-based market-data fallback where supported.
 SYSDTAFPXY_FORCE_NIFTY_FUT = False
-# Controls polling or scheduling frequency for default interval.
+# Polling or execution cadence for default interval.
 SYSDTAFPXY_DEFAULT_INTERVAL = "1m"
-# Threshold or target used by default target rows.
+# Requested number of market-data candles.
 SYSDTAFPXY_DEFAULT_TARGET_ROWS = 60
-# Maximum accepted market-data age before feed is considered stale.
+# Limit or threshold governing futures max age seconds.
 SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS = 60
 if (
     isinstance(SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS, bool)
@@ -188,7 +188,7 @@ if (
 
 # Yahoo 1-minute candle timestamps represent the candle start, so allow
 # three minutes for normal publication/API delay before warning.
-# Maximum accepted market-data age before feed is considered stale.
+# Limit or threshold governing yahoo max age seconds.
 SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS = 180
 if (
     isinstance(SYSDTAFPXY_YAHOO_MAX_AGE_SECONDS, bool)
@@ -201,7 +201,7 @@ if (
     )
 
 # Keep repeated stale-feed Telegram warnings to one every five minutes.
-# Controls polling or scheduling frequency for stale alert interval seconds.
+# Polling or execution cadence for stale alert interval seconds.
 SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS = 300
 if (
     isinstance(SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS, bool)
@@ -212,11 +212,11 @@ if (
         "SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS must be a positive integer."
     )
 
-# Lookback or calculation window for fallback periods.
+# Fallback historical request ranges, attempted in order.
 SYSDTAFPXY_FALLBACK_PERIODS = ("1d", "5d", "7d")
 
 # NSE F&O holiday-calendar HTTP request.
-# Maximum wait duration for request timeout seconds.
+# Timeout governing request timeout seconds.
 SYSNSEHOLIDAYPXY_REQUEST_TIMEOUT_SECONDS = 5
 if (
     isinstance(SYSNSEHOLIDAYPXY_REQUEST_TIMEOUT_SECONDS, bool)
@@ -229,13 +229,13 @@ if (
 # 05. INDICATORS & CHART DATA
 # Moving averages, Supertrend, chart history, trend structure, ATR, power and depth.
 # ================================================================
-# Configures variant for its owning subsystem.
+# Moving-average algorithm for the general MA display.
 SYSSMAPXY_VARIANT = "TSMA"
 if SYSSMAPXY_VARIANT not in {"SMA", "TSMA"}:
     raise ValueError("SYSSMAPXY_VARIANT must be SMA or TSMA.")
 
 # Default window for the 50-period SMA/TSMA display and status calculation.
-# Lookback or calculation window for ma period.
+# Window for the general moving-average display.
 SYSSMAPXY_MA_PERIOD = 50
 if (
     isinstance(SYSSMAPXY_MA_PERIOD, bool)
@@ -245,7 +245,7 @@ if (
     raise ValueError("SYSSMAPXY_MA_PERIOD must be a positive integer.")
 
 # Single source of truth for the TSMA period across all pipelines.
-# Lookback or calculation window for tsma period.
+# Shared TSMA lookback used by DTHA and TSST.
 SYSSMAPXY_TSMA_PERIOD = 7
 if (
     isinstance(SYSSMAPXY_TSMA_PERIOD, bool)
@@ -256,33 +256,33 @@ if (
         "SYSSMAPXY_TSMA_PERIOD must be an integer of at least 2."
     )
 
-# Threshold or target used by chart target rows.
+# History length or lookback used for chart target rows.
 SYSSTRNDPXY_CHART_TARGET_ROWS = 110
 if SYSSTRNDPXY_CHART_TARGET_ROWS < 110:
     raise ValueError("SYSSTRNDPXY_CHART_TARGET_ROWS must be at least 110.")
-# Configures ohlc mode for its owning subsystem.
+# Switch or algorithm selection for ohlc mode.
 SYSPLCHRTPXY_OHLC_MODE = 1
-# Lookback or calculation window for sma window.
+# History length or lookback used for sma window.
 SYSPLCHRTPXY_SMA_WINDOW = 4
-# Controls polling or scheduling frequency for fetch interval.
+# Polling or execution cadence for fetch interval.
 SYSPLCHRTPXY_FETCH_INTERVAL = "1m"
-# Threshold or target used by target rows.
+# History length or lookback used for target rows.
 SYSPLCHRTPXY_TARGET_ROWS = 60
-# Lookback or calculation window for history periods.
+# History length or lookback used for history periods.
 SYSPLCHRTPXY_HISTORY_PERIODS = ("5d", "7d", "max")
 if SYSPLCHRTPXY_OHLC_MODE not in {1, 2, 3, 4, 5, 6}:
     raise ValueError("SYSPLCHRTPXY_OHLC_MODE must be between 1 and 6.")
 
-# Lookback or calculation window for st1 period.
+# ATR lookback for the primary Supertrend.
 SYSDTSTPXY_ST1_PERIOD = 7
-# Scaling factor for st1 factor.
+# ATR multiplier for the primary Supertrend.
 SYSDTSTPXY_ST1_FACTOR = 1.0
 
 # BOS morning recognition ends at 10:10; its opening boundary uses the shared
 # exchange open above.
-# End boundary for morning session end.
+# Session boundary controlling morning session end.
 SYSBBOSPXY_MORNING_SESSION_END = dt_time(10, 10)
-# Lookback or calculation window for lookback period.
+# History length or lookback used for lookback period.
 SYSBBOSPXY_LOOKBACK_PERIOD = 42
 if (
     isinstance(SYSBBOSPXY_LOOKBACK_PERIOD, bool)
@@ -290,7 +290,7 @@ if (
     or SYSBBOSPXY_LOOKBACK_PERIOD < 2
 ):
     raise ValueError("SYSBBOSPXY_LOOKBACK_PERIOD must be an integer of at least 2.")
-# Lookback or calculation window for lookback rows.
+# History length or lookback used for lookback rows.
 SYSCHRTPXY_LOOKBACK_ROWS = 42
 if (
     isinstance(SYSCHRTPXY_LOOKBACK_ROWS, bool)
@@ -298,158 +298,158 @@ if (
     or SYSCHRTPXY_LOOKBACK_ROWS < 1
 ):
     raise ValueError("SYSCHRTPXY_LOOKBACK_ROWS must be a positive integer.")
-# Enables or selects use tsma behavior.
+# Switch or algorithm selection for use tsma.
 SYSSADXPXY_USE_TSMA = True
-# Lookback or calculation window for ma period.
+# History length or lookback used for ma period.
 SYSSADXPXY_MA_PERIOD = 50
-# Lookback or calculation window for supertrend period.
+# Separate Supertrend period for ADX force computation.
 SYSSADXPXY_SUPERTREND_PERIOD = 10
-# Scaling factor for supertrend factor.
+# Separate Supertrend multiplier for ADX force computation.
 SYSSADXPXY_SUPERTREND_FACTOR = 3.0
-# Configures force base for its owning subsystem.
+# Scaling coefficient used in force base.
 SYSSADXPXY_FORCE_BASE = 1.0
-# Configures force boost for its owning subsystem.
+# Scaling coefficient used in force boost.
 SYSSADXPXY_FORCE_BOOST = 1.2
-# Configures force neutral for its owning subsystem.
+# Runtime setting for force neutral.
 SYSSADXPXY_FORCE_NEUTRAL = 1.1
-# Enables diagnostic output for debug enabled.
+# Enables verbose diagnostic logging for this subsystem.
 SYSMKTPXY_DEBUG_ENABLED = False
-# Enables diagnostic output for debug enabled.
+# Enables verbose diagnostic logging for this subsystem.
 SYSRIGPXY_DEBUG_ENABLED = False
 
-# Configures atr mode for its owning subsystem.
+# Switch or algorithm selection for atr mode.
 SYSKATRPXY_ATR_MODE = 2
 if SYSKATRPXY_ATR_MODE not in {1, 2, 3}:
     raise ValueError("SYSKATRPXY_ATR_MODE must be 1 (static), 2 (true ATR), or 3 (dynamic).")
-# Configures atr static value for its owning subsystem.
+# Runtime setting for atr static value.
 SYSKATRPXY_ATR_STATIC_VALUE = 7
-# Lookback or calculation window for true atr period.
+# History length or lookback used for true atr period.
 SYSKATRPXY_TRUE_ATR_PERIOD = 14
-# Configures true atr max for its owning subsystem.
+# Runtime setting for true atr max.
 SYSKATRPXY_TRUE_ATR_MAX = 10.0
-# Configures true atr min rows for its owning subsystem.
+# Limit or threshold governing true atr min rows.
 SYSKATRPXY_TRUE_ATR_MIN_ROWS = 1
-# Configures true atr fallback value for its owning subsystem.
+# Runtime setting for true atr fallback value.
 SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE = 4.0
-# Configures depth atr minimum for its owning subsystem.
+# Runtime setting for depth atr minimum.
 SYSKATRPXY_DEPTH_ATR_MINIMUM = 5
 
-# Lookback or calculation window for lookback period.
+# History length or lookback used for lookback period.
 SYSPWERPXY_LOOKBACK_PERIOD = 3
-# Configures last n for its owning subsystem.
+# Runtime setting for last n.
 SYSDPTPXY_LAST_N = 21
 
 # ================================================================
 # 06. ENTRY STRENGTH & AVERAGING
 # Signal thresholds, investment constraints and averaging order defaults.
 # ================================================================
-# Threshold or target used by system a base threshold.
+# Limit or threshold governing system a base threshold.
 EXEAGTPXY_SYSTEM_A_BASE_THRESHOLD = 8.2
-# Threshold or target used by system b base threshold.
+# Limit or threshold governing system b base threshold.
 EXEAGTPXY_SYSTEM_B_BASE_THRESHOLD = 1.4
-# Configures abs cap for its owning subsystem.
+# Limit or threshold governing abs cap.
 EXEAGTPXY_ABS_CAP = 77.0
-# Configures force default for its owning subsystem.
+# Runtime setting for force default.
 EXEAGTPXY_FORCE_DEFAULT = 1.2
 
-# Configures max investment for its owning subsystem.
+# Limit or threshold governing max investment.
 EXEAMSPXY_MAX_INVESTMENT = 25000.0
-# Threshold or target used by max lgt loss.
+# Limit or threshold governing max lgt loss.
 EXEAMSPXY_MAX_LGT_LOSS = 77.0
-# Broker order field for order exchange segment.
+# Broker order request field: order exchange segment.
 EXEAMSPXY_ORDER_EXCHANGE_SEGMENT = SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT
-# Broker order field for order product.
+# Broker order request field: order product.
 EXEAMSPXY_ORDER_PRODUCT = SYSCNFGPXY_FO_ORDER_PRODUCT
-# Broker order field for order price.
+# Broker order request field: order price.
 EXEAMSPXY_ORDER_PRICE = SYSCNFGPXY_FO_ORDER_PRICE
-# Broker order field for order type.
+# Broker order request field: order type.
 EXEAMSPXY_ORDER_TYPE = SYSCNFGPXY_FO_ORDER_TYPE
-# Broker order field for order validity.
+# Broker order request field: order validity.
 EXEAMSPXY_ORDER_VALIDITY = SYSCNFGPXY_FO_ORDER_VALIDITY
-# Broker order field for order transaction type.
+# Broker order request field: order transaction type.
 EXEAMSPXY_ORDER_TRANSACTION_TYPE = SYSCNFGPXY_FO_BUY_TRANSACTION_TYPE
-# Broker order field for order amo.
+# Broker order request field: order amo.
 EXEAMSPXY_ORDER_AMO = SYSCNFGPXY_FO_ORDER_AMO
 
 # ================================================================
 # 07. ENTRY & MANUAL ORDERS
 # Entry session aliases and manual force-order defaults.
 # ================================================================
-# Enables diagnostic output for debug enabled.
+# Enables verbose diagnostic logging for this subsystem.
 EXEENTRPXY_DEBUG_ENABLED = False
-# Start boundary for preopen start.
+# Session boundary controlling preopen start.
 EXEENTRPXY_PREOPEN_START = SYSCNFGPXY_PREOPEN_START
-# End boundary for preopen end.
+# Session boundary controlling preopen end.
 EXEENTRPXY_PREOPEN_END = SYSCNFGPXY_MARKET_OPEN
-# Defines the cutoff beyond which this operation is restricted.
+# Session boundary controlling entry cutoff.
 EXEENTRPXY_ENTRY_CUTOFF = SYSCNFGPXY_ENTRY_CUTOFF
-# Controls scheduled or forced position liquidation.
+# Session boundary controlling squareoff end.
 EXEENTRPXY_SQUAREOFF_END = SYSCNFGPXY_SQUAREOFF_END
 
 # Manual force-order command.
-# Enables diagnostic output for debug enabled.
+# Enables verbose diagnostic logging for this subsystem.
 EXEFORCEPXY_DEBUG_ENABLED = False
-# Configures nifty lot size for its owning subsystem.
+# Runtime setting for nifty lot size.
 EXEFORCEPXY_NIFTY_LOT_SIZE = SYSCNFGPXY_NIFTY_LOT_SIZE
-# Broker order field for order exchange segment.
+# Broker order request field: order exchange segment.
 EXEFORCEPXY_ORDER_EXCHANGE_SEGMENT = SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT
-# Broker order field for order product.
+# Broker order request field: order product.
 EXEFORCEPXY_ORDER_PRODUCT = SYSCNFGPXY_FO_ORDER_PRODUCT
-# Broker order field for order price.
+# Broker order request field: order price.
 EXEFORCEPXY_ORDER_PRICE = SYSCNFGPXY_FO_ORDER_PRICE
-# Broker order field for order type.
+# Broker order request field: order type.
 EXEFORCEPXY_ORDER_TYPE = SYSCNFGPXY_FO_ORDER_TYPE
-# Broker order field for order validity.
+# Broker order request field: order validity.
 EXEFORCEPXY_ORDER_VALIDITY = SYSCNFGPXY_FO_ORDER_VALIDITY
-# Broker order field for order transaction type.
+# Broker order request field: order transaction type.
 EXEFORCEPXY_ORDER_TRANSACTION_TYPE = SYSCNFGPXY_FO_BUY_TRANSACTION_TYPE
-# Broker order field for order amo.
+# Broker order request field: order amo.
 EXEFORCEPXY_ORDER_AMO = SYSCNFGPXY_FO_ORDER_AMO
 
 # ================================================================
 # 08. AVERAGING PIPELINE
 # Averaging eligibility, rebuy behavior, and order-management diagnostics.
 # ================================================================
-# Enables or selects use overall loss behavior.
+# Switch or algorithm selection for use overall loss.
 EXEAVXPXY_USE_OVERALL_LOSS = True
-# Enables or selects rebuy enabled behavior.
+# Switch or algorithm selection for rebuy enabled.
 EXEAVXPXY_REBUY_ENABLED = True
-# Start boundary for market start.
+# Session boundary controlling market start.
 EXEAVXPXY_MARKET_START = SYSCNFGPXY_AVERAGING_START
-# End boundary for market end.
+# Session boundary controlling market end.
 EXEAVXPXY_MARKET_END = SYSCNFGPXY_ENTRY_CUTOFF
-# Configures idle exit mode for its owning subsystem.
+# Switch or algorithm selection for idle exit mode.
 EXEAVGPXY_IDLE_EXIT_MODE = "one"
-# Enables diagnostic output for debug enabled.
+# Enables verbose diagnostic logging for this subsystem.
 EXEOMSPXY_DEBUG_ENABLED = False
 
 # ================================================================
 # 09. TARGETS & PNL
 # Target alignment, compatibility settings, live target parameters and PnL decay.
 # ================================================================
-# Configures exit key column for its owning subsystem.
+# Position field supplying the OUT alignment signal.
 EXETGTPXY_EXIT_KEY_COLUMN = "exit"
 
 # Legacy replay compatibility settings; retained unchanged for now.
-# Configures tgt pct not aligned for its owning subsystem.
+# Price, percentage or risk parameter for tgt pct not aligned.
 EXETGTPXY_TGT_PCT_NOT_ALIGNED = 33.0
-# Threshold or target used by early aligned target pct.
+# Price, percentage or risk parameter for early aligned target pct.
 EXETGTPXY_EARLY_ALIGNED_TARGET_PCT = 33.0
 if not math.isfinite(EXETGTPXY_EARLY_ALIGNED_TARGET_PCT) or EXETGTPXY_EARLY_ALIGNED_TARGET_PCT <= 0:
     raise ValueError("EXETGTPXY_EARLY_ALIGNED_TARGET_PCT must be finite and positive.")
-# Configures aligned min depth for its owning subsystem.
+# Limit or threshold governing aligned min depth.
 EXETGTPXY_ALIGNED_MIN_DEPTH = 10
 if not math.isfinite(EXETGTPXY_ALIGNED_MIN_DEPTH) or EXETGTPXY_ALIGNED_MIN_DEPTH <= 0:
     raise ValueError("EXETGTPXY_ALIGNED_MIN_DEPTH must be finite and positive.")
 
 # Live PRD target calculation.
-# Scaling factor for prd base factor.
+# Base target factor for non-aligned and single-side calculations.
 EXETGTPXY_PRD_BASE_FACTOR = 1.4
-# Configures prd both sides base pct for its owning subsystem.
+# Base percentage for aligned dual-side targets.
 EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT = 33.0
-# Threshold or target used by prd max target pct.
+# Upper cap for computed profit targets.
 EXETGTPXY_PRD_MAX_TARGET_PCT = 99.0
-# Configures prd late day time for its owning subsystem.
+# Time after which target calculation uses its late-day cap.
 EXETGTPXY_PRD_LATE_DAY_TIME = dt_time(15, 5)
 if not all(
     math.isfinite(value) and value > 0
@@ -463,23 +463,23 @@ if not all(
 if EXETGTPXY_PRD_MAX_TARGET_PCT > 100:
     raise ValueError("EXETGTPXY_PRD_MAX_TARGET_PCT cannot exceed 100.")
 
-# Configures decay rate per min for its owning subsystem.
+# Scaling coefficient used in decay rate per min.
 EXEDYNPXY_DECAY_RATE_PER_MIN = 0.0001
-# Threshold or target used by pnl threshold.
+# Limit or threshold governing pnl threshold.
 EXEDYNPXY_PNL_THRESHOLD = 0.0
 
 # ================================================================
 # 10. STRIKES & CONTRACTS
 # Option strike selection, distance policies and position-check settings.
 # ================================================================
-# Configures strike mode for its owning subsystem.
+# Selects ATM, fixed-offset OTM, or dynamic-offset OTM strikes.
 EXEOTMPXY_STRIKE_MODE = "OTMFIX"  # "ATM", "OTMFIX", or "OTMDYN"; applies to every option buy.
-# Configures fixed distance for its owning subsystem.
+# Strike offset when fixed-distance selection is enabled.
 EXEOTMPXY_FIXED_DISTANCE = 200
-# Configures dynamic weekday distances for its owning subsystem.
+# Weekday-dependent offsets for dynamic strike selection.
 EXEOTMPXY_DYNAMIC_WEEKDAY_DISTANCES = (500, 400, 300, 200, 100)  # Monday through Friday.
 
-# Configures strike step for its owning subsystem.
+# Runtime setting for strike step.
 RUNNIFTYPXY_STRIKE_STEP = 50
 if (
     isinstance(RUNNIFTYPXY_STRIKE_STEP, bool)
@@ -487,85 +487,85 @@ if (
     or RUNNIFTYPXY_STRIKE_STEP <= 0
 ):
     raise ValueError("RUNNIFTYPXY_STRIKE_STEP must be a positive integer.")
-# Configures atm buffer for its owning subsystem.
+# Runtime setting for atm buffer.
 RUNNIFTYPXY_ATM_BUFFER = 0
-# Enables diagnostic output for debug enabled.
+# Enables verbose diagnostic logging for this subsystem.
 RUNPCHKPXY_DEBUG_ENABLED = False
-# Configures nifty lot size for its owning subsystem.
+# Runtime setting for nifty lot size.
 RUNPCHKPXY_NIFTY_LOT_SIZE = SYSCNFGPXY_NIFTY_LOT_SIZE
 
 # ================================================================
 # 11. EXIT, COUNTER-LEG & SQUARE-OFF
 # Stop-loss controls, counter-buy, exit risk, square-off and broker sell order defaults.
 # ================================================================
-# Configures fixed sl buffer for its owning subsystem.
+# Runtime setting for fixed sl buffer.
 EXESLPXY_FIXED_SL_BUFFER = 10.0
-# Configures min price for its owning subsystem.
+# Limit or threshold governing min price.
 EXESLPXY_MIN_PRICE = 2.0
 
-# Configures action for its owning subsystem.
+# Switch or algorithm selection for action.
 EXECBUYPXY_ACTION = "YES"
-# Enables or selects use dynamic strike behavior.
+# Switch or algorithm selection for use dynamic strike.
 EXECBUYPXY_USE_DYNAMIC_STRIKE = True
 if not isinstance(EXECBUYPXY_USE_DYNAMIC_STRIKE, bool):
     raise ValueError("EXECBUYPXY_USE_DYNAMIC_STRIKE must be True or False.")
-# Enables diagnostic output for debug enabled.
+# Enables verbose diagnostic logging for this subsystem.
 EXECBUYPXY_DEBUG_ENABLED = False
-# Defines the cutoff beyond which this operation is restricted.
+# Session boundary controlling cutoff.
 EXECBUYPXY_CUTOFF = SYSCNFGPXY_ENTRY_CUTOFF
-# Configures scripts for its owning subsystem.
+# Compatibility command mapping for scripts.
 EXECBUYPXY_SCRIPTS = {
     "CE": "pxybuype",
     "PE": "pxybuyce",
 }
-# Configures lock keep secs for its owning subsystem.
+# Runtime setting for lock keep secs.
 EXECBUYPXY_LOCK_KEEP_SECS = 600
 
-# Configures pnl exit min for its owning subsystem.
+# Runtime setting for pnl exit min.
 EXEEXITPXY_PNL_EXIT_MIN = 100
-# Enables diagnostic output for debug enabled.
+# Enables verbose diagnostic logging for this subsystem.
 EXEEXITPXY_DEBUG_ENABLED = False
-# Configures exit lock keep secs for its owning subsystem.
+# Runtime setting for exit lock keep secs.
 EXEEXITPXY_EXIT_LOCK_KEEP_SECS = 600
-# Configures pastrsk for its owning subsystem.
+# Enables the past-depth reversal risk check.
 PASTRSK = "YES"
 if PASTRSK not in {"YES", "NO"}:
     raise ValueError("PASTRSK must be YES or NO.")
 # A threshold of 6 allows deep-reversal checks from past depth 7 onward.
-# Threshold or target used by depth exit threshold.
+# Minimum past-depth threshold for deep-reversal exit evaluation.
 EXEEXITPXY_DEPTH_EXIT_THRESHOLD = 6
 if EXEEXITPXY_DEPTH_EXIT_THRESHOLD < 0:
     raise ValueError("EXEEXITPXY_DEPTH_EXIT_THRESHOLD must be non-negative.")
-# Controls scheduled or forced position liquidation.
+# Compatibility command mapping for squareoff script.
 EXEEXITPXY_SQUAREOFF_SCRIPT = "exesqrpxy.py"
-# Controls scheduled or forced position liquidation.
+# Session boundary controlling sqoff start.
 EXEEXITPXY_SQOFF_START = SYSCNFGPXY_SQUAREOFF_START
-# Controls scheduled or forced position liquidation.
+# Session boundary controlling sqoff all start.
 EXEEXITPXY_SQOFF_ALL_START = SYSCNFGPXY_SQUAREOFF_ALL_START
-# Controls scheduled or forced position liquidation.
+# Session boundary controlling sqoff end.
 EXEEXITPXY_SQOFF_END = SYSCNFGPXY_SQUAREOFF_END
-# Controls scheduled or forced position liquidation.
+# Limit or threshold governing sqoff min gap secs.
 EXEEXITPXY_SQOFF_MIN_GAP_SECS = 6
-# Configures sysdump script for its owning subsystem.
+# Compatibility command mapping for sysdump script.
 EXEEXITPXY_SYSDUMP_SCRIPT = "sysdmppxy.py"
-# Broker order field for order exchange segment.
+# Broker order request field: order exchange segment.
 EXEEXITPXY_ORDER_EXCHANGE_SEGMENT = SYSCNFGPXY_FO_ORDER_EXCHANGE_SEGMENT
-# Broker order field for order product.
+# Broker order request field: order product.
 EXEEXITPXY_ORDER_PRODUCT = SYSCNFGPXY_FO_ORDER_PRODUCT
-# Broker order field for order price.
+# Broker order request field: order price.
 EXEEXITPXY_ORDER_PRICE = SYSCNFGPXY_FO_ORDER_PRICE
-# Broker order field for order type.
+# Broker order request field: order type.
 EXEEXITPXY_ORDER_TYPE = SYSCNFGPXY_FO_ORDER_TYPE
-# Broker order field for order validity.
+# Broker order request field: order validity.
 EXEEXITPXY_ORDER_VALIDITY = SYSCNFGPXY_FO_ORDER_VALIDITY
-# Broker order field for order transaction type.
+# Broker order request field: order transaction type.
 EXEEXITPXY_ORDER_TRANSACTION_TYPE = SYSCNFGPXY_FO_SELL_TRANSACTION_TYPE
-# Broker order field for order amo.
+# Broker order request field: order amo.
 EXEEXITPXY_ORDER_AMO = SYSCNFGPXY_FO_ORDER_AMO
 
-# Configures exit all after for its owning subsystem.
+# Runtime setting for exit all after.
 EXESQRPXY_EXIT_ALL_AFTER = dt_time(15, 25)
-# Configures post exit cooldown seconds for its owning subsystem.
+# Runtime setting for post exit cooldown seconds.
 EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS = 6
 
 # ================================================================
@@ -573,71 +573,71 @@ EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS = 6
 # Risk ledger thresholds, persistence, liquidation switches and late-day controls.
 # ================================================================
 # gates the activation-time setting below.
-# Configures brick size for its owning subsystem.
+# Runtime setting for brick size.
 RUNEXMTPXY_BRICK_SIZE = 50.0
-# Threshold or target used by initial loss floor.
+# Limit or threshold governing initial loss floor.
 RUNEXMTPXY_INITIAL_LOSS_FLOOR = -2000.0
-# Threshold or target used by target per active rung.
+# Price, percentage or risk parameter for target per active rung.
 RUNEXMTPXY_TARGET_PER_ACTIVE_RUNG = 1000.0
-# Scaling factor for peak multiplier.
+# Scaling coefficient used in peak multiplier.
 RUNEXMTPXY_PEAK_MULTIPLIER = 2.0  # Stop = initial floor + peak × multiplier.
 
-# Configures read attempts for its owning subsystem.
+# Retry budget for read attempts.
 RUNEXIOPXY_READ_ATTEMPTS = 2
-# Configures read retry delay for its owning subsystem.
+# Retry budget for read retry delay.
 RUNEXIOPXY_READ_RETRY_DELAY = 0.3
-# Configures write retries for its owning subsystem.
+# Retry budget for write retries.
 RUNEXIOPXY_WRITE_RETRIES = 2
-# Configures write retry delay seconds for its owning subsystem.
+# Retry budget for write retry delay seconds.
 RUNEXIOPXY_WRITE_RETRY_DELAY_SECONDS = 0.2
 
-# Configures breach ticks required for its owning subsystem.
+# Runtime setting for breach ticks required.
 RUNEXACPXY_BREACH_TICKS_REQUIRED = 2
-# Configures tick min gap seconds for its owning subsystem.
+# Limit or threshold governing tick min gap seconds.
 RUNEXACPXY_TICK_MIN_GAP_SECONDS = 10
-# Configures ledger basis guard for its owning subsystem.
+# Runtime setting for ledger basis guard.
 RUNEXACPXY_LEDGER_BASIS_GUARD = True
-# Threshold or target used by cycle target pct.
+# Price, percentage or risk parameter for cycle target pct.
 RUNEXACPXY_CYCLE_TARGET_PCT = 1.4
 if not 0 < RUNEXACPXY_CYCLE_TARGET_PCT <= 100:
     raise ValueError("RUNEXACPXY_CYCLE_TARGET_PCT must be between 0 and 100.")
 # Existing risk-ledger late-day override; kept separate from option exit targets.
-# Threshold or target used by late day target pct.
+# Price, percentage or risk parameter for late day target pct.
 RUNEXACPXY_LATE_DAY_TARGET_PCT = 99.0
-# Start boundary for late day start.
+# Start of risk-ledger late-day override, separate from option targets.
 RUNEXACPXY_LATE_DAY_START = dt_time(15, 10)
-# End boundary for late day end.
+# End of risk-ledger late-day override.
 RUNEXACPXY_LATE_DAY_END = dt_time(15, 30)
 if not 0 < RUNEXACPXY_LATE_DAY_TARGET_PCT <= 100:
     raise ValueError("RUNEXACPXY_LATE_DAY_TARGET_PCT must be between 0 and 100.")
 if RUNEXACPXY_LATE_DAY_START > RUNEXACPXY_LATE_DAY_END:
     raise ValueError("Risk-ledger late-day window must be chronological.")
-# Controls scheduled or forced position liquidation.
+# Allows portfolio stop-based square-off when enabled.
 RUNEXACPXY_STOP_SQUAREOFF_ENABLED = False
-# Controls scheduled or forced position liquidation.
+# Allows portfolio target-based square-off when enabled.
 RUNEXACPXY_TARGET_SQUAREOFF_ENABLED = True
-# Configures view only env for its owning subsystem.
+# Runtime setting for view only env.
 RUNEXACPXY_VIEW_ONLY_ENV = "PXY_VIEW_ONLY"
-# Configures cntrlrskbar for its owning subsystem.
+# Enables the portfolio risk-bar controller.
 RUNEXACPXY_CNTRLRSKBAR = "YES"
 if RUNEXACPXY_CNTRLRSKBAR not in {"YES", "NO"}:
     raise ValueError("RUNEXACPXY_CNTRLRSKBAR must be 'YES' or 'NO'.")
 
-# Enables diagnostic output for debug enabled.
+# Enables verbose diagnostic logging for this subsystem.
 RUNEXACPXY_DEBUG_ENABLED = False
 
 # ================================================================
 # 13. LIQUIDATION SUPPORT
 # Flat confirmation, liquidation timeouts and ledger filtering.
 # ================================================================
-# Controls candle confirmation or confirmation timing where applicable.
+# Timeout governing flat confirm timeout seconds.
 RUNEXLQDPXY_FLAT_CONFIRM_TIMEOUT_SECONDS = 10.0
-# Controls candle confirmation or confirmation timing where applicable.
+# Polling or execution cadence for flat confirm poll seconds.
 RUNEXLQDPXY_FLAT_CONFIRM_POLL_SECONDS = 2.0
-# Controls scheduled or forced position liquidation.
+# Timeout governing squareoff timeout seconds.
 RUNEXLQDPXY_SQUAREOFF_TIMEOUT_SECONDS = 120
 
-# Configures default filter time for its owning subsystem.
+# Runtime setting for default filter time.
 RUNLILOPXY_DEFAULT_FILTER_TIME = SYSCNFGPXY_MARKET_OPEN.strftime("%H:%M:%S")
 
 # ================================================================
