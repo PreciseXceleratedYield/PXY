@@ -78,7 +78,7 @@ def calculate_tgt(
     heavy_side=False,
     target_time=None,
 ):
-    """Return target percentage based on open sides, power and depth, capped at 99.0%."""
+    """Use the aligned formula for both open sides; preserve single-side alignment and late-day rules."""
     try:
         current_time = target_time
 
@@ -92,10 +92,6 @@ def calculate_tgt(
         # regardless of alignment or whether one or both sides are open.
         if current_time >= EXETGTPXY_PRD_LATE_DAY_TIME:
             return EXETGTPXY_PRD_MAX_TARGET_PCT
-
-        # Non-aligned target: 1.4% whether one or both sides are open.
-        if not is_aligned:
-            return EXETGTPXY_PRD_BASE_FACTOR
 
         def positive_factor(value):
             try:
@@ -120,6 +116,8 @@ def calculate_tgt(
                 + (both_sides_base / own_power)
             )
         else:
+            if not is_aligned:
+                return EXETGTPXY_PRD_BASE_FACTOR
             strength = own_power + own_depth
             target_pct = min(
                 EXETGTPXY_PRD_BASE_FACTOR * strength,
