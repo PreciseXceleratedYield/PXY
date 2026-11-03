@@ -254,3 +254,32 @@ def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
     pxy_color_series = final_df["pxy_color"].copy()
 
     return pxy_close, pxy_open, pxy_color_series, final_df
+
+def get_tsst_states(df):
+    """Classify raw closes using shared TSMA(7) and primary ST(7, 1)."""
+    from sysstrnpxy import calculate_supertrend
+
+    if df is None or df.empty or len(df) < SYSSMAPXY_TSMA_PERIOD:
+        return pd.Series(dtype="object")
+    required = ("Open", "High", "Low", "Close")
+    if any(name not in df.columns for name in required):
+        return pd.Series(dtype="object")
+    raw = df.copy()
+    for name in required:
+        raw[name] = pd.to_numeric(raw[name], errors="coerce")
+    if not np.isfinite(raw[list(required)].to_numpy(dtype=float)).all():
+        return pd.Series(dtype="object")
+    tsma = calculate_moving_average(
+        raw["Close"], period=SYSSMAPXY_TSMA_PERIOD, variant="TSMA"
+    )
+    st = calculate_supertrend(raw)["st_line"]
+    close = raw["Close"]
+    upper = np.maximum(tsma.to_numpy(dtype=float), st.to_numpy(dtype=float))
+    lower = np.minimum(tsma.to_numpy(dtype=float), st.to_numpy(dtype=float))
+    states = np.select(
+        [close.to_numpy(dtype=float) > upper, close.to_numpy(dtype=float) < lower],
+        ["BULL", "BEAR"], default="SIDE"
+    )
+    states[~np.isfinite(upper)] = "SIDE"
+    return pd.Series(states, index=raw.index, name="tsst_state")
+
