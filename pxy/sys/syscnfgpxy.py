@@ -2,6 +2,32 @@
 
 Sections follow runtime dependency order. Comments describe parameter purpose,
 not configured values. Production module logic remains authoritative.
+
+SIGNAL ROUTING REFERENCE (module responsibilities)
+--------------------------------------------------
+sysdtafpxy -> sysdthapxy -> indicators
+                                  |
+                         +--------+--------+
+                         |                 |
+                     sysinpxy          sysoutpxy
+                   BUY/SELL/NONE     BULL/BEAR/SIDE
+                         |                 |
+                         +--------+--------+
+                                  |
+                              sysmktpxy
+                       market / trend filters
+                                  |
+                              sysentrpxy <--- sysexitpxy
+                       time-based routing    morning direction
+                                  |
+                           execution pipeline
+
+Priority:
+- sysentrpxy uses sysexitpxy direction in its morning override window,
+  regardless of configured IN/OUT modes or sysmktpxy trend filters.
+- Outside that window, sysentrpxy consumes sysmktpxy filtered signals.
+- Master liquidation and post-square-off cooldown gates take precedence.
+- syscnfgpxy selects modes and parameters; it does not calculate signals.
 """
 import math
 from datetime import time as dt_time
