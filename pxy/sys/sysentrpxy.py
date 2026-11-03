@@ -53,8 +53,10 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     # and any downstream market-signal filters during this window.
     if ENTRY_START <= now_time < MORNING_OVERRIDE_END:
         try:
-            # sysexitpxy returns UP/DOWN/NONE from the shared running-candle cache.
-            _, direction = detect_raw_direction(load_cached_data())
+            # Use the caller's snapshot so Mullu and morning IN/OUT agree.
+            # Standalone invocations retain the cached-data fallback.
+            morning_df = df if df is not None else load_cached_data()
+            _, direction = detect_raw_direction(morning_df)
             direction = str(direction).upper().strip()
             entry_sig = {"UP": "BUY", "DOWN": "SELL"}.get(direction, "NONE")
             exit_sig = {"UP": "BULL", "DOWN": "BEAR"}.get(direction, "NONE")
