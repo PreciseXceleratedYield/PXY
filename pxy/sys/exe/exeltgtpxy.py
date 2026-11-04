@@ -112,7 +112,7 @@ def calculate_tgt(
         own_power = positive_factor(side_power)
 
         if not is_aligned:
-            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, EXETGTPXY_PRD_BASE_FACTOR * max(0, float(opposite_count)))
+            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, EXETGTPXY_PRD_BASE_FACTOR * max(1, float(opposite_count)))
 
         if both_sides_open:
             both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
