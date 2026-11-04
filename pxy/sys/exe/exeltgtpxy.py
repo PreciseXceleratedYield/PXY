@@ -116,7 +116,7 @@ def calculate_tgt(
             # Scale by opposing-to-own position count; protect against zero/invalid counts.
             opposite = max(1.0, float(opposite_count))
             own = positive_factor(own_count)
-            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, EXETGTPXY_PRD_BASE_FACTOR * (opposite / own))
+            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, max(EXETGTPXY_PRD_BASE_FACTOR, EXETGTPXY_PRD_BASE_FACTOR * (opposite / own)))
 
         # Aligned positions use the same target formula whether one or both sides are open.
         both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
