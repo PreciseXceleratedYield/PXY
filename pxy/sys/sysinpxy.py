@@ -47,21 +47,19 @@ def get_signal(df=None):
 
         transformed = transform_dtha_ohlc(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
-        # Evaluate the two latest candle directions, including the forming candle.
-
-        # C0 needs C1, and C1 needs C2, to establish both candle colours.
-        if len(closes) < 3:
+        # Confirm a completed-candle flip with the live running candle.
+        # C2 and C1 are completed candles; C0 is the forming candle.
+        if len(closes) < 4:
             return "NONE"
 
         directions = get_close_direction_series(closes)
-        c1_direction = directions.iloc[-2]
-        c0_direction = directions.iloc[-1]
-        if c1_direction not in {"UP", "DOWN"} or c0_direction not in {"UP", "DOWN"}:
-            return "NONE"
+        past_completed = directions.iloc[-3]
+        latest_completed = directions.iloc[-2]
+        running = directions.iloc[-1]
 
-        if c1_direction == "DOWN" and c0_direction == "UP":
+        if (past_completed, latest_completed, running) == ("DOWN", "UP", "UP"):
             return "BUY"
-        if c1_direction == "UP" and c0_direction == "DOWN":
+        if (past_completed, latest_completed, running) == ("UP", "DOWN", "DOWN"):
             return "SELL"
         return "NONE"
     except Exception:
