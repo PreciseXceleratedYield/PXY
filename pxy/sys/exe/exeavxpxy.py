@@ -200,18 +200,8 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
 
     print_telemetry_dashboard(p_packet)
 
-    try:
-        output_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), WEB_AVG_JSON_REL))
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
-        tmp_path = output_path + ".tmp"
-        with open(tmp_path, "w") as f:
-            json.dump(p_packet, f, indent=2)
-        os.replace(tmp_path, output_path)
-    except Exception as json_err:
-        logger.error(f"Failed to dump telemetry payload to json: {json_err}")
-
-    # Telemetry is informational and remains available after the averaging cutoff.
-    # Never place averaging orders outside the configured eligibility window.
+    # OMS exclusively publishes webavgpxy.json; no second telemetry writer.
+    # Keep local thresholds for the averaging order decision below.
     if not can_average:
         return
 
