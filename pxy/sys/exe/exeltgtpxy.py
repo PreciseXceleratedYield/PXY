@@ -57,7 +57,7 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
             if opposite_investment > 0
             else 1.0
         )
-        base_magnitude = 33.0 * investment_factor + 10.0 * own_count
+        base_magnitude = 10.0 * investment_factor + 10.0 * own_count
 
         return -base_magnitude
 
