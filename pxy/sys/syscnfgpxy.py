@@ -135,13 +135,13 @@ if not (
     raise ValueError("Shared market-hours settings are not in chronological order.")
 
 # Runtime setting for market open.
-SYSEXEPXY_MARKET_OPEN = SYSCNFGPXY_MARKET_OPEN
+SYSEXEPXY_MARKET_OPEN = SYSCNFGPXY_PREOPEN_START
 # Session boundary controlling market close.
 SYSEXEPXY_MARKET_CLOSE = SYSCNFGPXY_ENGINE_CLOSE
 # Polling or execution cadence for supervisor interval seconds.
 SYSEXEPXY_SUPERVISOR_INTERVAL_SECONDS = 1
 # Runtime setting for market open.
-EXEPXYPXY_MARKET_OPEN = SYSCNFGPXY_MARKET_OPEN
+EXEPXYPXY_MARKET_OPEN = SYSCNFGPXY_PREOPEN_START
 # Session boundary controlling market close.
 EXEPXYPXY_MARKET_CLOSE = SYSCNFGPXY_TRADING_PIPE_CLOSE
 # Timeout governing pipe timeout seconds.
