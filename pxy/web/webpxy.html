@@ -1887,8 +1887,32 @@ function confirmUpdate(){
 initTerm();connect();
 let optLegendOpen=false;
 async function loadOptSummary(){
-    let d=null;try{d=await fetch('/api/web-data/webavgpxy?_='+Date.now()).then(r=>r.json());}catch{}
+    let d=null, thresholds=null;
+    try{
+        const [positions, avg]=await Promise.all([
+            fetch('/api/web-data/webavgpxy?_='+Date.now()).then(r=>r.ok?r.json():null),
+            fetch('/api/web-data/webavgtgtpxy?_='+Date.now()).then(r=>r.ok?r.json():null)
+        ]);
+        d=positions;
+        thresholds=avg;
+    }catch{}
     d=d||{};
+    // OMS owns broker-verified positions; averaging owns LGT/TGT.
+    // Never substitute an unrelated or stale averaging snapshot.
+    const avgFresh=!!thresholds?.verified && !!thresholds.updated_at &&
+        Number.isFinite(Date.parse(thresholds.updated_at)) &&
+        Date.now()-Date.parse(thresholds.updated_at)<120000 &&
+        Date.now()-Date.parse(thresholds.updated_at)>=-30000;
+    for(const side of ['ce','pe']){
+        if(avgFresh && Number(d[side+'_lots'])>0 &&
+           Number(d[side+'_lots'])===Number(thresholds[side+'_lots'])){
+            d[side+'_lgt']=thresholds[side+'_lgt'];
+            d[side+'_tgt']=thresholds[side+'_tgt'];
+        }else{
+            d[side+'_lgt']=null;
+            d[side+'_tgt']=null;
+        }
+    }
     const ov=$('optOverlay');
     const colMeta=[
         {emoji:'📦🔢',label:'LOT',desc:'Lots traded'},
@@ -1902,8 +1926,8 @@ async function loadOptSummary(){
     const pad2=n=>{const r=Math.round(n||0);const a=Math.min(Math.abs(r),99);return (r<0?'-':'')+String(a).padStart(2,'0');};
     const buildRow=(lots,pnl,inv,lgt,runPct,tgt,decision)=>{
         const tgtNum=Number(tgt);
-        const runColor=Number(runPct)<Number(lgt)?'var(--bear)':Number(runPct)>tgtNum?'var(--bull)':null;
-        const row=[lots??'—', `${String(Math.round(Number(inv||0)/1000)).padStart(2,'0')}(${String(Math.round((Number(inv||0)+Number(pnl||0))/1000)).padStart(2,'0')})`, `(${pad2(lgt)})${pad2(runPct)}(${pad2(tgtNum)})`, plainSign(pnl)];        
+        const runColor=lgt!=null&&Number(runPct)<Number(lgt)?'var(--bear)':tgt!=null&&Number(runPct)>tgtNum?'var(--bull)':null;
+        const row=[lots??'—', `${String(Math.round(Number(inv||0)/1000)).padStart(2,'0')}(${String(Math.round((Number(inv||0)+Number(pnl||0))/1000)).padStart(2,'0')})`, `(${lgt==null?'—':pad2(lgt)})${pad2(runPct)}(${tgt==null?'—':pad2(tgtNum)})`, plainSign(pnl)];        
         return {row,runColor};
     };
     // Broker-verified lot count controls whether a side can display metrics.
