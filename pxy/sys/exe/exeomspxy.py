@@ -15,6 +15,8 @@ import numpy as np
 from colorama import Fore, Style
 from exepomspxy import print_market_dashboard
 from syscnfgpxy import EXEOMSPXY_DEBUG_ENABLED
+from exeltgtpxy import calculate_lgt, target_price
+from exeagtpxy import is_aligned
 
 def dprint(msg):
     if EXEOMSPXY_DEBUG_ENABLED:
@@ -106,9 +108,9 @@ def publish_position_summary(active_df, positions_verified):
         "ce_lots": 0, "pe_lots": 0,
         "ce_pnl": 0, "pe_pnl": 0,
         "ce_investment": 0, "pe_investment": 0,
-        "ce_lgt": 0, "pe_lgt": 0,
+        "ce_lgt": None, "pe_lgt": None,
         "ce_run_pct": 0, "pe_run_pct": 0,
-        "ce_tgt": 0, "pe_tgt": 0,
+        "ce_tgt": None, "pe_tgt": None,
         "ce_aligned": False, "pe_aligned": False,
         "ce_decision": "idle", "pe_decision": "idle",
     }
@@ -131,6 +133,30 @@ def publish_position_summary(active_df, positions_verified):
             pnl = packet[side + "_pnl"]
             packet[side + "_run_pct"] = 100.0 * pnl / (inv - pnl) if inv - pnl > 0 else 0.0
             packet[side + "_decision"] = "hold" if packet[side + "_lots"] else "idle"
+        # OMS is the only publisher. Use the existing trading calculation
+        # functions for informational thresholds, without placing orders.
+        ce_count, pe_count = packet["ce_lots"], packet["pe_lots"]
+        ce_inv, pe_inv = packet["ce_investment"], packet["pe_investment"]
+        for side in ("ce", "pe"):
+            rows = active_df[active_df["symbol"].astype(str).str.upper().str.endswith(side.upper())]
+            if rows.empty:
+                continue
+            try:
+                row = rows.iloc[-1]
+                signal = str(row.get("exit", "NONE")).upper().strip()
+                aligned = is_aligned(side.upper(), signal)
+                packet[side + "_lgt"] = calculate_lgt(
+                    is_aligned=aligned, is_ce=(side == "ce"),
+                    ce_count=ce_count, pe_count=pe_count,
+                    ce_investment=ce_inv, pe_investment=pe_inv,
+                )
+                entry = float(row.get("pxy_entry") or row.get("buy_prc") or 0)
+                if math.isfinite(entry) and entry > 0:
+                    target = float(target_price(row, ce_inv, pe_inv, ce_count, pe_count))
+                    if math.isfinite(target) and target > 0:
+                        packet[side + "_tgt"] = max(0.0, 100.0 * (target - entry) / entry)
+            except (ValueError, TypeError, OverflowError, KeyError) as exc:
+                print(f"⚠️ {side.upper()} display thresholds unavailable: {exc}")
     output_path = HERE.parent.parent / "web" / "webavgpxy.json"
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)
