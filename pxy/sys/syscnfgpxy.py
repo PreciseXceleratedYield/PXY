@@ -620,7 +620,7 @@ RUNEXIOPXY_WRITE_RETRY_DELAY_SECONDS = 0.2
 # Runtime setting for breach ticks required.
 RUNEXACPXY_BREACH_TICKS_REQUIRED = 2
 # Limit or threshold governing tick min gap seconds.
-RUNEXACPXY_TICK_MIN_GAP_SECONDS = 10
+RUNEXACPXY_TICK_MIN_GAP_SECONDS = 2
 # Runtime setting for ledger basis guard.
 RUNEXACPXY_LEDGER_BASIS_GUARD = True
 # Price, percentage or risk parameter for cycle target pct.
