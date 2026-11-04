@@ -19,7 +19,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     HYPER preserves the former DTAF mode-0 transformation.
     TSMA_ORIG retains the original 3:1 blend of TSMA open and real close.
     TSMA_ENH blends TSMA close with real close and uses prior synthetic close as open.
-    TSMA_MA blends SMA7 close and TSMA7 close, with prior synthetic close as open.
+    TSMA_MA blends 75% TSMA7 close and 25% SMA7 close, with prior synthetic close as open.
     HA applies the standard recursive Heikin-Ashi transformation.
     """
     valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA", "TSMA_ORIG", "TSMA_ENH", "TSMA_MA"}
@@ -108,7 +108,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         tsma_close = calculate_moving_average(
             close_series, period=SYSSMAPXY_TSMA_PERIOD, variant="TSMA"
         ).to_numpy(dtype=float)
-        candle_close = (sma_close + tsma_close) / 2.0
+        candle_close = (3.0 * tsma_close + sma_close) / 4.0
         candle_open = np.empty_like(candle_close)
         candle_open[0] = raw_open[0]
         candle_open[1:] = candle_close[:-1]
