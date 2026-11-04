@@ -478,7 +478,7 @@ EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT = 33.0
 # Upper cap for computed profit targets.
 EXETGTPXY_PRD_MAX_TARGET_PCT = 99.0
 # Time after which target calculation uses its late-day cap.
-EXETGTPXY_PRD_LATE_DAY_TIME = dt_time(15, 5)
+EXETGTPXY_PRD_LATE_DAY_TIME = SYSCNFGPXY_ENTRY_CUTOFF
 if not all(
     math.isfinite(value) and value > 0
     for value in (
@@ -631,9 +631,9 @@ if not 0 < RUNEXACPXY_CYCLE_TARGET_PCT <= 100:
     raise ValueError("RUNEXACPXY_CYCLE_TARGET_PCT must be between 0 and 100.")
 # Existing risk-ledger late-day override; kept separate from option exit targets.
 # Price, percentage or risk parameter for late day target pct.
-RUNEXACPXY_LATE_DAY_TARGET_PCT = 99.0
+RUNEXACPXY_LATE_DAY_TARGET_PCT = EXETGTPXY_PRD_MAX_TARGET_PCT
 # Start of risk-ledger late-day override, separate from option targets.
-RUNEXACPXY_LATE_DAY_START = dt_time(15, 10)
+RUNEXACPXY_LATE_DAY_START = EXETGTPXY_PRD_LATE_DAY_TIME
 # End of risk-ledger late-day override.
 RUNEXACPXY_LATE_DAY_END = dt_time(15, 30)
 if not 0 < RUNEXACPXY_LATE_DAY_TARGET_PCT <= 100:
