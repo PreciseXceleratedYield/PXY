@@ -112,9 +112,6 @@ def calculate_tgt(
         own_depth = positive_factor(side_depth)
         own_power = positive_factor(side_power)
 
-        if both_sides_open and str(exit_signal or '').upper().strip() == 'SIDE':
-            return 11.0
-
         if both_sides_open:
             both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
             target_pct = (
