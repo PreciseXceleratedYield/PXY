@@ -79,6 +79,7 @@ def calculate_tgt(
     heavy_side=False,
     target_time=None,
     exit_signal=None,
+    opposite_count=0,
 ):
     """Use the aligned formula for both open sides; preserve single-side alignment and late-day rules."""
     try:
@@ -111,7 +112,7 @@ def calculate_tgt(
         own_power = positive_factor(side_power)
 
         if not is_aligned:
-            return EXETGTPXY_PRD_BASE_FACTOR
+            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, EXETGTPXY_PRD_BASE_FACTOR * max(0, float(opposite_count)))
 
         if both_sides_open:
             both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
@@ -226,6 +227,7 @@ def target_price(
             ),
             target_time=target_time,
             exit_signal=exit_signal,
+            opposite_count=pe_count if is_ce else ce_count,
         )
 
         calculated_target = entry_prc * (
