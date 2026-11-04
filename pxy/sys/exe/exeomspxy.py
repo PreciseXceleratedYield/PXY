@@ -69,6 +69,29 @@ except Exception as e:
     print(f"⚠️ exeslpxy not loaded ({e}); stop loss will be 0.")
     pxy_sl_calc = lambda row: 0
 
+def print_capital_balance(active_df):
+    """Display CE/PE invested capital every OMS invocation (reporting only)."""
+    ce_capital = pe_capital = 0.0
+    if active_df is not None and not active_df.empty:
+        for _, row in active_df.iterrows():
+            symbol = str(row.get("symbol", "")).upper().strip()
+            try:
+                amount = float(row.get("qty", 0)) * float(row.get("buy_prc", 0))
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if not math.isfinite(amount) or amount < 0:
+                continue
+            if symbol.endswith("CE"):
+                ce_capital += amount
+            elif symbol.endswith("PE"):
+                pe_capital += amount
+    width = 29
+    total = ce_capital + pe_capital
+    left = round(width * ce_capital / total) if total > 0 else width // 2
+    right = width - left
+    print(f"  {Fore.GREEN}{ce_capital:.0f}{'━' * left}{Fore.WHITE}⚖️{Fore.RED}{'━' * right}{pe_capital:.0f}{Style.RESET_ALL}")
+
+
 # ---------------- MAIN FUNCTION ----------------
 
 def get_combined_data(map_active_with_market=True, add_calcs=True):
@@ -167,6 +190,12 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
             print(f"OMS DATA ERROR: {e}")
             active_df = pd.DataFrame()
             combined["error"] = True
+
+    # Reporting-only: print on every OMS cycle, even when averaging is skipped.
+    if combined.get("positions_unverified") or combined.get("error"):
+        print(f"{Fore.YELLOW}  CE/PE capital: UNVERIFIED{Style.RESET_ALL}")
+    else:
+        print_capital_balance(active_df)
 
     if active_df.empty:
         return combined
