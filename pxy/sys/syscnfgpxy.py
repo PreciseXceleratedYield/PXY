@@ -592,7 +592,7 @@ EXEEXITPXY_ORDER_AMO = SYSCNFGPXY_FO_ORDER_AMO
 # Runtime setting for exit all after.
 EXESQRPXY_EXIT_ALL_AFTER = dt_time(15, 25)
 # Runtime setting for post exit cooldown seconds.
-EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS = 6
+EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS = SYSCNFGPXY_ACTION_COOLDOWN_SECONDS
 
 # ================================================================
 # 12. PORTFOLIO RISK LEDGER
