@@ -7,7 +7,6 @@ import pandas as pd
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_ENTRY_CUTOFF,
-    SYSCNFGPXY_CONFIRM_AFTER,
     SYSINPXY_CONFIRM_MODE,
     SYSINPXY_SIGNAL_MODE,
 )
@@ -46,9 +45,7 @@ def get_signal(df=None):
 
         transformed = transform_dtha_ohlc(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
-        # Live before 10:00 IST; completed candles only from 10:00 onward.
-        if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= SYSCNFGPXY_CONFIRM_AFTER:
-            closes = closes.iloc[:-1]
+        # Always include the running candle for live IN signals.
 
         # C0 needs C1, and C1 needs C2, to establish both candle colours.
         if len(closes) < 3:
