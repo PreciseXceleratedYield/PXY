@@ -155,7 +155,7 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
     ).fillna(0).clip(lower=0)
 
     prices = pd.to_numeric(
-        df['sell_prc'], errors='coerce'
+        df['buy_prc'], errors='coerce'
     ).fillna(0).clip(lower=0)
 
     invested = qtys * prices
