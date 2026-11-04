@@ -30,8 +30,17 @@ while true; do
     echo "[$(date +%T)] Running sysdashpxy.py..."
     
     # Run the Python script
-    python3 sysdashpxy.py
-    python3 sysictrpxy.py
+    # Use the same dashboard snapshot and chart export pipeline as production.
+    # Only the market-data source differs (monitor ticker instead of NIFTY).
+    python3 - <<'PY'
+from sysdashpxy import get_full_snapshot, print_dashboard
+from sysictrpxy import export_supertrend_json
+
+snapshot = get_full_snapshot(monitor=True)
+print_dashboard(snapshot)
+if snapshot:
+    export_supertrend_json(snapshot.get("chart_df", snapshot.get("df")))
+PY
     
     echo "[$(date +%T)] execution finished."
     echo "Waiting 10 seconds..."
