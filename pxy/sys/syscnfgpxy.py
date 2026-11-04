@@ -113,6 +113,8 @@ SYSCNFGPXY_TRADING_PIPE_CLOSE = dt_time(15, 40)
 SYSCNFGPXY_TRADING_DAY_END = dt_time(15, 30)
 # Earliest eligibility for position averaging.
 SYSCNFGPXY_AVERAGING_START = dt_time(9, 17)
+# Independent cutoff for averaging existing positions (exclusive).
+SYSCNFGPXY_AVERAGING_CUTOFF = dt_time(15, 5)
 # Latest time for opening a new book.
 SYSCNFGPXY_NEW_BOOK_CUTOFF = dt_time(13, 30)
 # Latest time for fresh entry requests.
@@ -443,7 +445,7 @@ EXEAVXPXY_REBUY_ENABLED = True
 # Session boundary controlling market start.
 EXEAVXPXY_MARKET_START = SYSCNFGPXY_AVERAGING_START
 # Session boundary controlling market end.
-EXEAVXPXY_MARKET_END = SYSCNFGPXY_ENTRY_CUTOFF
+EXEAVXPXY_MARKET_END = SYSCNFGPXY_AVERAGING_CUTOFF
 # Switch or algorithm selection for idle exit mode.
 EXEAVGPXY_IDLE_EXIT_MODE = "one"
 # Enables verbose diagnostic logging for this subsystem.
