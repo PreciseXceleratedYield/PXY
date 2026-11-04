@@ -101,9 +101,11 @@ if RUNNFTFUTPXY_PRICE_HISTORY_LIMIT < 1:
 # execution loop, and scheduled shutdown intentionally stop at different times.
 # Reference exchange session opening boundary.
 SYSCNFGPXY_EXCHANGE_OPEN = dt_time(9, 15)
-# Preopen activity boundary for entry launcher.
+# Engine/execution startup at 09:14: initialize and run preparatory cycles;
+# this does not authorize fresh trades.
 SYSCNFGPXY_PREOPEN_START = dt_time(9, 14)
-# Market-processing eligibility boundary, distinct from trading authorization.
+# Market-data/signal processing begins at 09:16, independently of engine startup.
+# Automatic fresh-entry authorization begins separately at 09:17.
 SYSCNFGPXY_MARKET_OPEN = dt_time(9, 16)
 # Scheduled supervisor/engine session end.
 SYSCNFGPXY_ENGINE_CLOSE = dt_time(15, 45)
@@ -111,7 +113,8 @@ SYSCNFGPXY_ENGINE_CLOSE = dt_time(15, 45)
 SYSCNFGPXY_TRADING_PIPE_CLOSE = dt_time(15, 41)
 # Exchange trading-day end reference.
 SYSCNFGPXY_TRADING_DAY_END = dt_time(15, 30)
-# Automatic fresh-entry window (end exclusive); independent of counter-buy and averaging cutoffs.
+# Automatic fresh-entry signal and execution authorization: 09:17–13:00 (end exclusive).
+# Both gates share these values; counter-buy and averaging retain separate windows.
 SYSCNFGPXY_FRESH_ENTRY_START = dt_time(9, 17)
 SYSCNFGPXY_FRESH_ENTRY_END = dt_time(13, 0)
 # Earliest eligibility for position averaging.
