@@ -114,7 +114,7 @@ def calculate_tgt(
 
         if not is_aligned:
             # Scale by opposing-to-own position count; protect against zero/invalid counts.
-            opposite = max(0.0, float(opposite_count))
+            opposite = max(1.0, float(opposite_count))
             own = positive_factor(own_count)
             return min(EXETGTPXY_PRD_MAX_TARGET_PCT, EXETGTPXY_PRD_BASE_FACTOR * (opposite / own))
 
