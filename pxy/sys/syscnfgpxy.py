@@ -118,7 +118,7 @@ SYSCNFGPXY_AVERAGING_CUTOFF = dt_time(15, 5)
 # Latest time for opening a new book.
 SYSCNFGPXY_NEW_BOOK_CUTOFF = dt_time(15, 5)
 # Latest time for fresh entry requests.
-SYSCNFGPXY_ENTRY_CUTOFF = dt_time(15, 5)
+SYSCNFGPXY_ENTRY_CUTOFF = dt_time(13, 0)
 # Beginning of regular EOD liquidation handling (15:06–15:15).
 SYSCNFGPXY_SQUAREOFF_START = dt_time(15, 6)
 # Beginning of forced liquidation of every remaining position (15:15–15:41).
@@ -478,7 +478,7 @@ EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT = 33.0
 # Upper cap for computed profit targets.
 EXETGTPXY_PRD_MAX_TARGET_PCT = 99.0
 # Time after which target calculation uses its late-day cap.
-EXETGTPXY_PRD_LATE_DAY_TIME = SYSCNFGPXY_ENTRY_CUTOFF
+EXETGTPXY_PRD_LATE_DAY_TIME = SYSCNFGPXY_AVERAGING_CUTOFF
 if not all(
     math.isfinite(value) and value > 0
     for value in (
@@ -540,7 +540,7 @@ if not isinstance(EXECBUYPXY_USE_DYNAMIC_STRIKE, bool):
 # Enables verbose diagnostic logging for this subsystem.
 EXECBUYPXY_DEBUG_ENABLED = False
 # Session boundary controlling cutoff.
-EXECBUYPXY_CUTOFF = SYSCNFGPXY_ENTRY_CUTOFF  # Block counter-buys with all other entries at 15:05 IST
+EXECBUYPXY_CUTOFF = SYSCNFGPXY_AVERAGING_CUTOFF  # Counter-buys retain the 15:05 IST cutoff independently of fresh entries
 # Compatibility command mapping for scripts.
 EXECBUYPXY_SCRIPTS = {
     "CE": "pxybuype",
