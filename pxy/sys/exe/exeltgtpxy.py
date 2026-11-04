@@ -145,7 +145,7 @@ def f(x, d=0.0):
 
 
 def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
-    """Calculates CE and PE exposure globally ONCE to prevent row iteration lag."""
+    """Calculate CE and PE blended exposure using average buy and sell prices."""
     if df is None or df.empty:
         return 0.0, 0.0
 
@@ -154,11 +154,15 @@ def compute_market_exposure(df: pd.DataFrame) -> tuple[float, float]:
         df['qty'], errors='coerce'
     ).fillna(0).clip(lower=0)
 
-    prices = pd.to_numeric(
+    buy_prices = pd.to_numeric(
         df['buy_prc'], errors='coerce'
     ).fillna(0).clip(lower=0)
+    sell_prices = pd.to_numeric(
+        df['sell_prc'], errors='coerce'
+    ).fillna(0).clip(lower=0)
 
-    invested = qtys * prices
+    blended_prices = (buy_prices + sell_prices) / 2.0
+    invested = qtys * blended_prices
 
     is_ce = symbols.str.strip().str.endswith('CE')
     is_pe = symbols.str.strip().str.endswith('PE')
