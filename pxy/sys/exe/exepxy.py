@@ -108,7 +108,7 @@ def _in_market_hours_production():
     now = datetime.now(ist)
     return (
         0 <= now.weekday() <= 4
-        and EXEPXYPXY_MARKET_OPEN <= now.time() <= EXEPXYPXY_MARKET_CLOSE
+        and EXEPXYPXY_MARKET_OPEN <= now.time() < EXEPXYPXY_MARKET_CLOSE
     )
 
 
