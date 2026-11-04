@@ -255,7 +255,7 @@ def get_pxy_data(tickerSymbol=None, df=None, live_tick=None):
 
     return pxy_close, pxy_open, pxy_color_series, final_df
 
-def get_tsst_states(df):
+def get_stmt_states(df):
     """Classify DTHA-transformed closes using primary ST and its mirror."""
     from sysstrnpxy import calculate_supertrend
 
@@ -280,4 +280,4 @@ def get_tsst_states(df):
         ["BULL", "BEAR"], default="SIDE"
     )
     states[~(np.isfinite(upper) & np.isfinite(lower))] = "SIDE"
-    return pd.Series(states, index=raw.index, name="tsst_state")
+    return pd.Series(states, index=raw.index, name="stmt_state")
