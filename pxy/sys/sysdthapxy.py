@@ -18,7 +18,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     OC2 and OHLC4 replace Close with the corresponding candle average.
     HYPER preserves the former DTAF mode-0 transformation.
     TSMA_ORIG retains the original 3:1 blend of TSMA open and real close.
-    TSMA_ENH blends TSMA close with real close and uses prior synthetic close as open.
+    TSMA_ENH blends TSMA close with real close, then averages that blend with the prior final synthetic close.
     TSMA_MA blends 75% TSMA7 close and 25% SMA7 close, with prior synthetic close as open.
     HA applies the standard recursive Heikin-Ashi transformation.
     """
@@ -90,10 +90,20 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
             period=SYSSMAPXY_TSMA_PERIOD,
             variant="TSMA",
         ).to_numpy(dtype=float)
-        candle_close = (tsma_close + raw_close) / 2.0
-        candle_open = np.empty_like(candle_close)
-        candle_open[0] = raw_open[0]
-        candle_open[1:] = candle_close[:-1]
+        # First blend TSMA7 with the actual close, then average that
+        # running candle close with its synthetic open (previous final close).
+        blended_close = (tsma_close + raw_close) / 2.0
+        candle_close = np.full_like(blended_close, np.nan)
+        candle_open = np.full_like(blended_close, np.nan)
+        for i in range(len(blended_close)):
+            if not np.isfinite(blended_close[i]):
+                continue
+            candle_open[i] = (
+                candle_close[i - 1]
+                if i > 0 and np.isfinite(candle_close[i - 1])
+                else raw_open[i]
+            )
+            candle_close[i] = (candle_open[i] + blended_close[i]) / 2.0
         out["Open"] = candle_open
         out["Close"] = candle_close
         out["High"] = np.maximum(candle_open, candle_close)
