@@ -10,7 +10,7 @@ from syscnfgpxy import (
     SYSOUTPXY_SIGNAL_MODE,
 )
 from sysdtafpxy import fetch_yf_data
-from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_tsst_states
+from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_stmt_states
 
 
 def get_out_candles(df):
@@ -33,8 +33,8 @@ def get_signal(df=None):
         if df is None or df.empty or "Close" not in df.columns:
             return "NONE"
 
-        if SYSOUTPXY_SIGNAL_MODE == "TSST":
-            states = get_tsst_states(df)
+        if SYSOUTPXY_SIGNAL_MODE == "STMT":
+            states = get_stmt_states(df)
             return str(states.iloc[-1]) if not states.empty else "NONE"
 
         transformed = get_out_candles(df)
