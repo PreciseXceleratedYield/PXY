@@ -110,6 +110,9 @@ def calculate_tgt(
         own_depth = positive_factor(side_depth)
         own_power = positive_factor(side_power)
 
+        if not is_aligned:
+            return EXETGTPXY_PRD_BASE_FACTOR
+
         if both_sides_open:
             both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
             target_pct = (
@@ -118,8 +121,6 @@ def calculate_tgt(
                 + (both_sides_base / own_power)
             )
         else:
-            if not is_aligned:
-                return EXETGTPXY_PRD_BASE_FACTOR
             strength = own_power + own_depth
             target_pct = min(
                 EXETGTPXY_PRD_BASE_FACTOR * strength,
