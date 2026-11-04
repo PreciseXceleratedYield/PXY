@@ -18,7 +18,7 @@ from execoolpxy import cooldown_remaining, liquidation_pending
 
 
 ENTRY_START = SYSCNFGPXY_MARKET_OPEN
-ENTRY_END = SYSCNFGPXY_ENTRY_CUTOFF
+ENTRY_END = dt_time(13, 0)
 MORNING_OVERRIDE_END = dt_time(9, 30)
 
 
