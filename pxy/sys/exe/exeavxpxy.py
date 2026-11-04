@@ -119,8 +119,9 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
     if df is None or df.empty:
         return
     now = datetime.now(IST).time()
-    if not averaging_window_enabled(REBUY_ENABLED, now, MARKET_START, MARKET_END):
-        return
+    # Always calculate and publish dashboard thresholds for open positions.
+    # Trading eligibility is checked separately before any averaging order.
+    can_average = averaging_window_enabled(REBUY_ENABLED, now, MARKET_START, MARKET_END)
 
     working_df = df.copy()
     working_df['side'] = working_df['symbol'].astype(str).str[-2:].str.upper()
@@ -208,6 +209,11 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
         os.replace(tmp_path, output_path)
     except Exception as json_err:
         logger.error(f"Failed to dump telemetry payload to json: {json_err}")
+
+    # Telemetry is informational and remains available after the averaging cutoff.
+    # Never place averaging orders outside the configured eligibility window.
+    if not can_average:
+        return
 
     # Another process holds the ledger lock (a tick or a liquidation is running): place nothing this cycle
     is_ledger_busy = ledger_busy()
