@@ -556,7 +556,7 @@ EXEEXITPXY_DEBUG_ENABLED = False
 # Runtime setting for exit lock keep secs.
 EXEEXITPXY_EXIT_LOCK_KEEP_SECS = 600
 # Enables the past-depth reversal risk check.
-PASTRSK = "YES"
+PASTRSK = "NO"
 if PASTRSK not in {"YES", "NO"}:
     raise ValueError("PASTRSK must be YES or NO.")
 # A threshold of 6 allows deep-reversal checks from past depth 7 onward.
