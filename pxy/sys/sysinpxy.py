@@ -13,7 +13,7 @@ from syscnfgpxy import (
 )
 from sysdtafpxy import fetch_yf_data
 from sysexitpxy import detect_raw_direction
-from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_tsst_states
+from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_stmt_states
 
 
 def get_signal(df=None):
@@ -29,8 +29,8 @@ def get_signal(df=None):
         if df is None or df.empty or "Close" not in df.columns:
             return "NONE"
 
-        if SYSINPXY_SIGNAL_MODE == "TSST":
-            states = get_tsst_states(df)
+        if SYSINPXY_SIGNAL_MODE == "STMT":
+            states = get_stmt_states(df)
             if states.empty:
                 return "NONE"
             current = states.iloc[-1]
@@ -39,7 +39,7 @@ def get_signal(df=None):
             if current == "BEAR":
                 return "SELL"
             if current == "SIDE":
-                # Contrarian Mullu entry only when TSST is SIDE.
+                # Contrarian Mullu entry only when STMT is SIDE.
                 _, raw_direction = detect_raw_direction(df)
                 return {"UP": "SELL", "DOWN": "BUY"}.get(raw_direction, "NONE")
             return "NONE"
