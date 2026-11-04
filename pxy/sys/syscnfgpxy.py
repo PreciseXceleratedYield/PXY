@@ -155,7 +155,7 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 
 # ================================================================
 # 03. CANDLES & SIGNAL ROUTING
-# DTHA transforms candles consumed by IN/OUT; TSST evaluates the selected candles independent of confirmation mode.
+# DTHA transforms candles consumed by IN/OUT; STMT evaluates the selected candles independent of confirmation mode.
 # ================================================================
 # Switch or algorithm selection for candle mode.
 SYSDTHAPXY_CANDLE_MODE = "RAW"
@@ -164,12 +164,12 @@ if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA"}:
         "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, HA, OHLC4, HYPER, or TSMA."
     )
 
-# Boundary for legacy LIVE versus completed-candle behavior; TSST bypasses it.
+# Boundary for legacy LIVE versus completed-candle behavior; STMT bypasses it.
 SYSCNFGPXY_CONFIRM_AFTER = dt_time(10, 0)  # IN and OUT: LIVE before 10:00 IST, CLOSED from 10:00
 # Switch or algorithm selection for signal mode.
-SYSINPXY_SIGNAL_MODE = "TSST"
+SYSINPXY_SIGNAL_MODE = "STMT"
 # Switch or algorithm selection for signal mode.
-SYSOUTPXY_SIGNAL_MODE = "TSST"
+SYSOUTPXY_SIGNAL_MODE = "STMT"
 # Controls inclusion of the forming candle in DTHA analyses.
 SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "NO"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
@@ -177,7 +177,7 @@ if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
 
 # IN-only entry confirmation: LIVE uses closed-to-running flip;
 # CLOSED requires closed reversal confirmation plus matching running candle.
-# Legacy entry confirmation mode; TSST bypasses it.
+# Legacy entry confirmation mode; STMT bypasses it.
 SYSINPXY_CONFIRM_MODE = "CLOSED"
 if SYSINPXY_CONFIRM_MODE not in {"LIVE", "CLOSED"}:
     raise ValueError("SYSINPXY_CONFIRM_MODE must be LIVE or CLOSED.")
@@ -271,7 +271,7 @@ if (
     raise ValueError("SYSSMAPXY_MA_PERIOD must be a positive integer.")
 
 # Single source of truth for the TSMA period across all pipelines.
-# Shared TSMA lookback used by DTHA and TSST.
+# Shared TSMA lookback used by DTHA and STMT.
 SYSSMAPXY_TSMA_PERIOD = 7
 if (
     isinstance(SYSSMAPXY_TSMA_PERIOD, bool)
