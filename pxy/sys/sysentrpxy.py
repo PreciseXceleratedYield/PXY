@@ -7,7 +7,8 @@ from sysexitpxy import load_cached_data, detect_raw_direction
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_MARKET_OPEN,
-    SYSCNFGPXY_ENTRY_CUTOFF,
+    SYSCNFGPXY_FRESH_ENTRY_START,
+    SYSCNFGPXY_FRESH_ENTRY_END,
 )
 
 EXE_DIR = Path(__file__).resolve().parent / "exe"
@@ -17,8 +18,8 @@ if str(EXE_DIR) not in sys.path:
 from execoolpxy import cooldown_remaining, liquidation_pending
 
 
-ENTRY_START = dt_time(9, 17)
-ENTRY_END = dt_time(13, 0)
+ENTRY_START = SYSCNFGPXY_FRESH_ENTRY_START
+ENTRY_END = SYSCNFGPXY_FRESH_ENTRY_END
 MORNING_OVERRIDE_END = dt_time(9, 30)
 
 
