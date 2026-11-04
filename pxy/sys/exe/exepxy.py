@@ -18,6 +18,7 @@ for path in (RUN_DIR, HERE, SYS_DIR):
         sys.path.insert(0, str(path))
 
 from sysexepxy import send_telegram
+from syshdaypxy import is_nse_fo_trading_day
 
 # Component failures are reported periodically; they never stop the engine.
 COMPONENT_FAILURES = {}
@@ -106,10 +107,13 @@ def live_status(msg):
 
 def _in_market_hours_production():
     now = datetime.now(ist)
-    return (
-        0 <= now.weekday() <= 4
-        and EXEPXYPXY_MARKET_OPEN <= now.time() < EXEPXYPXY_MARKET_CLOSE
-    )
+    if not (0 <= now.weekday() <= 4 and EXEPXYPXY_MARKET_OPEN <= now.time() < EXEPXYPXY_MARKET_CLOSE):
+        return False
+    try:
+        return is_nse_fo_trading_day(now.date())
+    except Exception as error:
+        print(f"⚠️ NSE trading calendar unavailable; execution cycle skipped: {error}")
+        return False
 
 
 def in_market_hours():
