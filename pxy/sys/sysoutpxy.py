@@ -34,19 +34,15 @@ def get_signal(df=None):
         transformed = get_out_candles(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
 
-        # Require C0, C1, and C2 so the C1/C0 candle colours are both defined.
-        if len(closes) < 3:
+        # OUT follows the current live candle's direction versus the previous close.
+        # A reversal takes effect immediately; no two-candle confirmation.
+        if len(closes) < 2:
             return "NONE"
 
-        directions = get_close_direction_series(closes)
-        c1_direction = directions.iloc[-2]
-        c0_direction = directions.iloc[-1]
-        if c1_direction not in {"UP", "DOWN"} or c0_direction not in {"UP", "DOWN"}:
-            return "NONE"
-
-        if c1_direction == "UP" and c0_direction == "UP":
+        current_direction = get_close_direction_series(closes).iloc[-1]
+        if current_direction == "UP":
             return "BULL"
-        if c1_direction == "DOWN" and c0_direction == "DOWN":
+        if current_direction == "DOWN":
             return "BEAR"
         return "NONE"
     except Exception:
