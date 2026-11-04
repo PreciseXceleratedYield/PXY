@@ -15,8 +15,8 @@ def get_out_candles(df):
         return df.copy() if df is not None else pd.DataFrame()
 
     transformed = transform_dtha_ohlc(df)
-    # Always include the running candle for live OUT signals.
-    return transformed
+    # Exclude the forming candle: OUT uses completed candles only.
+    return transformed.iloc[:-1]
 
 
 def get_signal(df=None):
@@ -28,14 +28,13 @@ def get_signal(df=None):
             return "NONE"
 
         if SYSOUTPXY_SIGNAL_MODE == "STMT":
-            states = get_stmt_states(df)
+            states = get_stmt_states(df.iloc[:-1])
             return str(states.iloc[-1]) if not states.empty else "NONE"
 
         transformed = get_out_candles(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
 
-        # OUT follows the current live candle's direction versus the previous close.
-        # A reversal takes effect immediately; no two-candle confirmation.
+        # OUT follows the latest completed candle versus its predecessor.
         if len(closes) < 2:
             return "NONE"
 
