@@ -111,3 +111,13 @@ def get_nse_fo_holidays(today=None):
 
         _MEMORY_CACHE[today] = holidays
         return holidays
+
+
+def is_nse_fo_trading_day(today=None):
+    """True only for weekdays not listed in the NSE F&O holiday calendar.
+
+    Calendar failures propagate so callers can skip trading safely without
+    terminating the supervising engine.
+    """
+    today = today or date.today()
+    return today.weekday() < 5 and today not in get_nse_fo_holidays(today)
