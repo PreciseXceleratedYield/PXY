@@ -43,6 +43,10 @@ def run_snapshot():
     if status == "empty":
         print(f"{Fore.YELLOW}No active orders. System idling...")
         dump_idle_json(EXIT_MODE)
+        # Clear the separate averaging telemetry too; otherwise the web options
+        # summary keeps showing the previous CE/PE holdings after broker flatness.
+        from exeavxpxy import publish_idle_averaging_telemetry
+        publish_idle_averaging_telemetry()
         return
 
     market_snapshot = data.get("market_snapshot")

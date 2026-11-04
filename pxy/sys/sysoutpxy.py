@@ -1,12 +1,8 @@
 """PXY independent exit-signal channel (OUT)."""
 
-from datetime import datetime
-
 import pandas as pd
 
 from syscnfgpxy import (
-    SYSCNFGPXY_TIMEZONE,
-    SYSCNFGPXY_CONFIRM_AFTER,
     SYSOUTPXY_SIGNAL_MODE,
 )
 from sysdtafpxy import fetch_yf_data
@@ -19,10 +15,8 @@ def get_out_candles(df):
         return df.copy() if df is not None else pd.DataFrame()
 
     transformed = transform_dtha_ohlc(df)
-    # Live before 10:00 IST; completed candles only from 10:00 onward.
-    if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= SYSCNFGPXY_CONFIRM_AFTER:
-        transformed = transformed.iloc[:-1].copy()
-    return transformed
+    # Exclude the forming candle: OUT uses completed candles only.
+    return transformed.iloc[:-1]
 
 
 def get_signal(df=None):
@@ -34,25 +28,20 @@ def get_signal(df=None):
             return "NONE"
 
         if SYSOUTPXY_SIGNAL_MODE == "STMT":
-            states = get_stmt_states(df)
+            states = get_stmt_states(df.iloc[:-1])
             return str(states.iloc[-1]) if not states.empty else "NONE"
 
         transformed = get_out_candles(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
 
-        # Require C0, C1, and C2 so the C1/C0 candle colours are both defined.
-        if len(closes) < 3:
+        # OUT follows the latest completed candle versus its predecessor.
+        if len(closes) < 2:
             return "NONE"
 
-        directions = get_close_direction_series(closes)
-        c1_direction = directions.iloc[-2]
-        c0_direction = directions.iloc[-1]
-        if c1_direction not in {"UP", "DOWN"} or c0_direction not in {"UP", "DOWN"}:
-            return "NONE"
-
-        if c1_direction == "UP" and c0_direction == "UP":
+        current_direction = get_close_direction_series(closes).iloc[-1]
+        if current_direction == "UP":
             return "BULL"
-        if c1_direction == "DOWN" and c0_direction == "DOWN":
+        if current_direction == "DOWN":
             return "BEAR"
         return "NONE"
     except Exception:

@@ -171,7 +171,7 @@ SYSINPXY_SIGNAL_MODE = "DTHA"
 # Switch or algorithm selection for signal mode.
 SYSOUTPXY_SIGNAL_MODE = "DTHA"
 # Controls inclusion of the forming candle in DTHA analyses.
-SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "NO"
+SYSDTHAPXY_INCLUDE_RUNNING_CANDLE = "YES"
 if SYSDTHAPXY_INCLUDE_RUNNING_CANDLE not in {"YES", "NO"}:
     raise ValueError("SYSDTHAPXY_INCLUDE_RUNNING_CANDLE must be YES or NO.")
 

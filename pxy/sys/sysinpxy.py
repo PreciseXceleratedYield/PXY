@@ -7,7 +7,6 @@ import pandas as pd
 from syscnfgpxy import (
     SYSCNFGPXY_TIMEZONE,
     SYSCNFGPXY_ENTRY_CUTOFF,
-    SYSCNFGPXY_CONFIRM_AFTER,
     SYSINPXY_CONFIRM_MODE,
     SYSINPXY_SIGNAL_MODE,
 )
@@ -29,6 +28,11 @@ def get_signal(df=None):
         if df is None or df.empty or "Close" not in df.columns:
             return "NONE"
 
+        # Last row is the forming candle; signals use completed candles only.
+        df = df.iloc[:-1]
+        if df.empty:
+            return "NONE"
+
         if SYSINPXY_SIGNAL_MODE == "STMT":
             states = get_stmt_states(df)
             if states.empty:
@@ -46,9 +50,7 @@ def get_signal(df=None):
 
         transformed = transform_dtha_ohlc(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
-        # Live before 10:00 IST; completed candles only from 10:00 onward.
-        if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= SYSCNFGPXY_CONFIRM_AFTER:
-            closes = closes.iloc[:-1]
+        # Evaluate the two latest completed candle directions.
 
         # C0 needs C1, and C1 needs C2, to establish both candle colours.
         if len(closes) < 3:

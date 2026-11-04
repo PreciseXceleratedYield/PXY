@@ -2,6 +2,8 @@
 import os
 import sys
 import math
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 SYS_DIR = Path(__file__).resolve().parent.parent
@@ -69,6 +71,77 @@ except Exception as e:
     print(f"⚠️ exeslpxy not loaded ({e}); stop loss will be 0.")
     pxy_sl_calc = lambda row: 0
 
+def print_capital_balance(active_df):
+    """Display CE/PE invested capital every OMS invocation (reporting only)."""
+    ce_capital = pe_capital = 0.0
+    if active_df is not None and not active_df.empty:
+        for _, row in active_df.iterrows():
+            symbol = str(row.get("symbol", "")).upper().strip()
+            try:
+                amount = float(row.get("qty", 0)) * float(row.get("buy_prc", 0))
+            except (TypeError, ValueError, OverflowError):
+                continue
+            if not math.isfinite(amount) or amount < 0:
+                continue
+            if symbol.endswith("CE"):
+                ce_capital += amount
+            elif symbol.endswith("PE"):
+                pe_capital += amount
+    width = 29
+    total = ce_capital + pe_capital
+    left = round(width * ce_capital / total) if total > 0 else width // 2
+    right = width - left
+    print(f"  {Fore.GREEN}{ce_capital:.0f}{'━' * left}{Fore.WHITE}⚖️{Fore.RED}{'━' * right}{pe_capital:.0f}{Style.RESET_ALL}")
+
+
+def publish_position_summary(active_df, positions_verified):
+    """Refresh web summary every OMS call; never leave old positions looking live.
+
+    Averaging may subsequently enrich LGT/target fields, but is not required
+    to publish current broker-reconciled position quantities and valuation.
+    """
+    packet = {
+        "verified": bool(positions_verified),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "ce_lots": 0, "pe_lots": 0,
+        "ce_pnl": 0, "pe_pnl": 0,
+        "ce_investment": 0, "pe_investment": 0,
+        "ce_lgt": 0, "pe_lgt": 0,
+        "ce_run_pct": 0, "pe_run_pct": 0,
+        "ce_tgt": 0, "pe_tgt": 0,
+        "ce_aligned": False, "pe_aligned": False,
+        "ce_decision": "idle", "pe_decision": "idle",
+    }
+    if positions_verified and active_df is not None and not active_df.empty:
+        for _, row in active_df.iterrows():
+            side = str(row.get("symbol", "")).upper().strip()[-2:]
+            if side not in ("CE", "PE"):
+                continue
+            def numeric(key):
+                try:
+                    value = float(row.get(key, 0))
+                    return value if math.isfinite(value) else 0.0
+                except (ValueError, TypeError, OverflowError):
+                    return 0.0
+            packet[side.lower() + "_lots"] += 1
+            packet[side.lower() + "_investment"] += max(0.0, numeric("qty")) * max(0.0, numeric("sell_prc"))
+            packet[side.lower() + "_pnl"] += numeric("pnl")
+        for side in ("ce", "pe"):
+            inv = packet[side + "_investment"]
+            pnl = packet[side + "_pnl"]
+            packet[side + "_run_pct"] = 100.0 * pnl / (inv - pnl) if inv - pnl > 0 else 0.0
+            packet[side + "_decision"] = "hold" if packet[side + "_lots"] else "idle"
+    output_path = HERE.parent.parent / "web" / "webavgpxy.json"
+    try:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = output_path.with_name(output_path.name + ".oms.tmp")
+        with open(tmp_path, "w", encoding="utf-8") as handle:
+            json.dump(packet, handle, indent=2)
+        os.replace(tmp_path, output_path)
+    except OSError as exc:
+        print(f"⚠️ Options summary refresh failed: {exc}")
+
+
 # ---------------- MAIN FUNCTION ----------------
 
 def get_combined_data(map_active_with_market=True, add_calcs=True):
@@ -83,6 +156,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
     if not process_lilo_orders or not get_session:
         print("❌ OMS unavailable: order-ledger or session dependency failed to load.")
         combined["error"] = True
+        publish_position_summary(None, False)
         return combined
 
     # --- 1. MKT SNAPSHOT ---
@@ -168,7 +242,14 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
             active_df = pd.DataFrame()
             combined["error"] = True
 
+    # Reporting-only: print on every OMS cycle, even when averaging is skipped.
+    if combined.get("positions_unverified") or combined.get("error"):
+        print(f"{Fore.YELLOW}  CE/PE capital: UNVERIFIED{Style.RESET_ALL}")
+    else:
+        print_capital_balance(active_df)
+
     if active_df.empty:
+        publish_position_summary(active_df, not combined.get("positions_unverified") and not combined.get("error"))
         return combined
 
     # ==============================
@@ -226,6 +307,7 @@ def get_combined_data(map_active_with_market=True, add_calcs=True):
         active_df["pxy_sl"] = active_df.apply(pxy_sl_calc, axis=1)
 
     combined["active_orders"] = active_df
+    publish_position_summary(active_df, not combined.get("positions_unverified") and not combined.get("error"))
     return combined
 
 if __name__ == "__main__":
