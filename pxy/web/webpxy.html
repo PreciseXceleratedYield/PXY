@@ -1900,7 +1900,7 @@ async function loadOptSummary(){
     const toK=n=>Math.round((n||0)/1000)+'k';
     const rnd=n=>Math.round(n||0);
     const plainSign=n=>(Number(n||0)>=0?'+':'')+Math.round(n||0);
-    const pad2=n=>{const r=Math.round(n||0);const a=Math.min(Math.abs(r),99);return (r<0?'-':'')+String(a).padStart(2,'0');};
+    const pad2=n=>{const r=Math.round(n||0);const a=Math.min(Math.abs(r),99);return (r<0?'-':r>0?'+':'')+String(a).padStart(2,'0');};
     const buildRow=(lots,pnl,inv,lgt,runPct,tgt,decision)=>{
         const tgtNum=Number(tgt);
         const runColor=lgt!=null&&Number(runPct)<Number(lgt)?'var(--bear)':tgt!=null&&Number(runPct)>tgtNum?'var(--bull)':null;
