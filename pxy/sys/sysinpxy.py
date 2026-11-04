@@ -14,8 +14,6 @@ from sysdthapxy import get_close_direction_series, transform_dtha_ohlc, get_stmt
 def get_signal(df=None):
     """Return the pure DTHA IN state."""
     try:
-        # IN must remain inactive through 09:17:00 IST.
-
         if df is None:
             df = fetch_yf_data()
         if df is None or df.empty or "Close" not in df.columns:
