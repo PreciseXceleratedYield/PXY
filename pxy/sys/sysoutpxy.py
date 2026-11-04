@@ -34,16 +34,19 @@ def get_signal(df=None):
         transformed = get_out_candles(df)
         closes = pd.to_numeric(transformed["Close"], errors="coerce")
 
-        # OUT follows the latest candle (including forming) versus its predecessor.
-        if len(closes) < 2:
-            return "NONE"
+        # Compare the latest completed candle with the live running candle.
+        # Candle direction is determined by transformed close vs previous close.
+        if len(closes) < 3:
+            return "SIDE"
 
-        current_direction = get_close_direction_series(closes).iloc[-1]
-        if current_direction == "UP":
+        directions = get_close_direction_series(closes)
+        completed_direction = directions.iloc[-2]
+        running_direction = directions.iloc[-1]
+        if completed_direction == "UP" and running_direction == "UP":
             return "BULL"
-        if current_direction == "DOWN":
+        if completed_direction == "DOWN" and running_direction == "DOWN":
             return "BEAR"
-        return "NONE"
+        return "SIDE"
     except Exception:
         return "NONE"
 
