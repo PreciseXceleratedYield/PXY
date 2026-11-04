@@ -55,7 +55,7 @@ def _side_target_pct(rows, ce_investment=0, pe_investment=0, ce_count=0, pe_coun
 USE_OVERALL_LOSS = EXEAVXPXY_USE_OVERALL_LOSS
 
 # Telemetry JSON for the web app: anchored to this file (same web/ folder as exeexppxy), never to the working directory
-WEB_AVG_JSON_REL = "../../web/webavgpxy.json"
+WEB_AVG_JSON_REL = "../../web/webavgtgtpxy.json"
 
 
 def publish_idle_averaging_telemetry():
