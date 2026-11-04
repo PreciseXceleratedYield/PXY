@@ -199,14 +199,14 @@ def averaging_trigger_sides(
     return {
         "CE": bool(
             both_sides_open
-            and (ce_aligned or ce_opposite_signal)
+            and ce_aligned
             and not ce_cooling
             and ce_within_cap
             and ce_loss <= ce_threshold
         ),
         "PE": bool(
             both_sides_open
-            and (pe_aligned or pe_opposite_signal)
+            and pe_aligned
             and not pe_cooling
             and pe_within_cap
             and pe_loss <= pe_threshold
