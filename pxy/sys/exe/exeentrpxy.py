@@ -22,6 +22,8 @@ from syscnfgpxy import (
     EXEENTRPXY_PREOPEN_START,
     EXEENTRPXY_SQUAREOFF_END,
     SYSCNFGPXY_TIMEZONE,
+    SYSCNFGPXY_FRESH_ENTRY_START,
+    SYSCNFGPXY_FRESH_ENTRY_END,
 )
 
 from execoolpxy import liquidation_pending
@@ -58,6 +60,11 @@ def main():
             return
         now = datetime.now(SYSCNFGPXY_TIMEZONE).time()
         dprint(f"TIME: {now}")
+
+        # Automatic fresh-entry execution must match the signal window.
+        if not (SYSCNFGPXY_FRESH_ENTRY_START <= now < SYSCNFGPXY_FRESH_ENTRY_END):
+            dprint("Outside automatic fresh-entry window")
+            return
 
         # 1. Market Timing Validation
         is_blackout = lambda now: entry_blackout(
