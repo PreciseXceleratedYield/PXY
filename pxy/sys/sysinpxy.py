@@ -1,12 +1,8 @@
 """PXY independent entry-signal channel (IN)."""
 
-from datetime import datetime, time as dt_time
-
 import pandas as pd
 
 from syscnfgpxy import (
-    SYSCNFGPXY_TIMEZONE,
-    SYSCNFGPXY_ENTRY_CUTOFF,
     SYSINPXY_CONFIRM_MODE,
     SYSINPXY_SIGNAL_MODE,
 )
@@ -19,9 +15,6 @@ def get_signal(df=None):
     """Return the pure DTHA IN state."""
     try:
         # IN must remain inactive through 09:17:00 IST.
-        now_time = datetime.now(SYSCNFGPXY_TIMEZONE).time()
-        if now_time <= dt_time(9, 17) or now_time >= SYSCNFGPXY_ENTRY_CUTOFF:
-            return "NONE"
 
         if df is None:
             df = fetch_yf_data()
