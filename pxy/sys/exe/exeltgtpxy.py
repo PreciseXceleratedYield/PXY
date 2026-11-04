@@ -81,7 +81,7 @@ def calculate_tgt(
     exit_signal=None,
     opposite_count=0,
 ):
-    """Use the aligned formula for both open sides; preserve single-side alignment and late-day rules."""
+    """Use one aligned target formula regardless of how many sides are open."""
     try:
         current_time = target_time
 
@@ -114,19 +114,13 @@ def calculate_tgt(
         if not is_aligned:
             return min(EXETGTPXY_PRD_MAX_TARGET_PCT, EXETGTPXY_PRD_BASE_FACTOR * max(1, float(opposite_count)))
 
-        if both_sides_open:
-            both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
-            target_pct = (
-                both_sides_base
-                + (both_sides_base / own_depth)
-                + (both_sides_base / own_power)
-            )
-        else:
-            strength = own_power + own_depth
-            target_pct = min(
-                EXETGTPXY_PRD_BASE_FACTOR * strength,
-                14.0 / strength,
-            )
+        # Aligned positions use the same target formula whether one or both sides are open.
+        both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
+        target_pct = (
+            both_sides_base
+            + (both_sides_base / own_depth)
+            + (both_sides_base / own_power)
+        )
 
         return min(EXETGTPXY_PRD_MAX_TARGET_PCT, target_pct)
 
