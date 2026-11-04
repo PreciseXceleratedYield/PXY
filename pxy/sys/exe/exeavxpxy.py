@@ -58,6 +58,26 @@ USE_OVERALL_LOSS = EXEAVXPXY_USE_OVERALL_LOSS
 WEB_AVG_JSON_REL = "../../web/webavgpxy.json"
 
 
+def publish_idle_averaging_telemetry():
+    """Publish a verified empty broker book to the options summary."""
+    payload = {
+        "ce_lots": 0, "pe_lots": 0,
+        "ce_pnl": 0, "pe_pnl": 0,
+        "ce_investment": 0, "pe_investment": 0,
+        "ce_lgt": 0, "pe_lgt": 0,
+        "ce_run_pct": 0, "pe_run_pct": 0,
+        "ce_tgt": 0, "pe_tgt": 0,
+        "ce_aligned": False, "pe_aligned": False,
+        "ce_decision": "idle", "pe_decision": "idle",
+    }
+    output_path = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), WEB_AVG_JSON_REL))
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    tmp_path = output_path + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
+    os.replace(tmp_path, output_path)
+
+
 def print_telemetry_dashboard(p):
     """Streamlined dashboard: RUN = blended P&L% of the side, LGT = averaging trigger."""
     if not p:
