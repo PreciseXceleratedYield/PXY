@@ -17,7 +17,7 @@ if str(EXE_DIR) not in sys.path:
 from execoolpxy import cooldown_remaining, liquidation_pending
 
 
-ENTRY_START = SYSCNFGPXY_MARKET_OPEN
+ENTRY_START = dt_time(9, 17)
 ENTRY_END = dt_time(13, 0)
 MORNING_OVERRIDE_END = dt_time(9, 30)
 
