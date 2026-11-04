@@ -80,6 +80,7 @@ def calculate_tgt(
     target_time=None,
     exit_signal=None,
     opposite_count=0,
+    own_count=0,
 ):
     """Use one aligned target formula regardless of how many sides are open."""
     try:
@@ -112,7 +113,10 @@ def calculate_tgt(
         own_power = positive_factor(side_power)
 
         if not is_aligned:
-            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, EXETGTPXY_PRD_BASE_FACTOR * max(1, float(opposite_count)))
+            # Scale by opposing-to-own position count; protect against zero/invalid counts.
+            opposite = max(0.0, float(opposite_count))
+            own = positive_factor(own_count)
+            return min(EXETGTPXY_PRD_MAX_TARGET_PCT, EXETGTPXY_PRD_BASE_FACTOR * (opposite / own))
 
         # Aligned positions use the same target formula whether one or both sides are open.
         both_sides_base = EXETGTPXY_PRD_BOTH_SIDES_BASE_PCT
@@ -222,6 +226,7 @@ def target_price(
             target_time=target_time,
             exit_signal=exit_signal,
             opposite_count=pe_count if is_ce else ce_count,
+            own_count=ce_count if is_ce else pe_count,
         )
 
         calculated_target = entry_prc * (
