@@ -119,8 +119,8 @@ SYSCNFGPXY_AVERAGING_CUTOFF = dt_time(15, 5)
 SYSCNFGPXY_NEW_BOOK_CUTOFF = dt_time(15, 5)
 # Latest time for fresh entry requests.
 SYSCNFGPXY_ENTRY_CUTOFF = dt_time(15, 5)
-# Beginning of regular EOD liquidation handling (15:10–15:15).
-SYSCNFGPXY_SQUAREOFF_START = dt_time(15, 10)
+# Beginning of regular EOD liquidation handling (15:06–15:15).
+SYSCNFGPXY_SQUAREOFF_START = dt_time(15, 6)
 # Beginning of forced liquidation of every remaining position (15:15–15:41).
 SYSCNFGPXY_SQUAREOFF_ALL_START = dt_time(15, 15)
 # End of EOD square-off attempts.
