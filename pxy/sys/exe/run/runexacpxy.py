@@ -354,7 +354,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
 
     risk_target_pct = (
         RUNEXACPXY_LATE_DAY_TARGET_PCT
-        if RUNEXACPXY_LATE_DAY_START <= current_time <= RUNEXACPXY_LATE_DAY_END
+        if RUNEXACPXY_LATE_DAY_START <= current_time < RUNEXACPXY_LATE_DAY_END
         else RUNEXACPXY_CYCLE_TARGET_PCT
     )
 
