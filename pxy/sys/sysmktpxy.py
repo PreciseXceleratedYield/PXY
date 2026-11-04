@@ -1,6 +1,5 @@
 # sysmktpxy.py
-from datetime import datetime, time as dt_time
-from syscnfgpxy import SYSMKTPXY_DEBUG_ENABLED, SYSMKTPXY_ENTRY_FILTER, SYSCNFGPXY_TIMEZONE
+from syscnfgpxy import SYSMKTPXY_DEBUG_ENABLED, SYSMKTPXY_ENTRY_FILTER
 from sysdthapxy import get_signal_depth_analysis
 from sysdtafpxy import fetch_yf_data
 from sysinpxy import get_entry_signal
@@ -62,8 +61,8 @@ def get_signals(df=None):
         if exit_signal not in {"BULL", "BEAR", "SIDE"}:
             exit_signal = "NONE"
 
-        # Before 10:00 IST, pass IN without applying any MKT entry filter.
-        if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= dt_time(10, 0) and entry_signal in {"BUY", "SELL"}:
+        # Apply the configured entry filter consistently, without a 10:00 time switch.
+        if entry_signal in {"BUY", "SELL"}:
             if SYSMKTPXY_ENTRY_FILTER == "SMA":
                 try:
                     filter_direction = get_sma_signal(df)["status"]
