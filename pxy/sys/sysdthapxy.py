@@ -17,13 +17,14 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
     OC2 and OHLC4 replace Close with the corresponding candle average.
     HYPER preserves the former DTAF mode-0 transformation.
-    TSMA uses TSMA open and a 3:1 weighted TSMA/real close.
+    TSMA_ORIG retains the original 3:1 blend of TSMA open and real close.
+    TSMA_ENH blends TSMA close with real close and uses prior synthetic close as open.
     HA applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA"}
+    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA", "TSMA_ORIG", "TSMA_ENH"}
     if mode not in valid_modes:
         raise ValueError(
-            "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, or TSMA."
+            "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, TSMA_ORIG, or TSMA_ENH."
         )
 
     if df is None or df.empty:
@@ -63,7 +64,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         out["Close"] = hyper_close
         return out
 
-    if mode == "TSMA":
+    if mode in {"TSMA", "TSMA_ORIG"}:
         # Pine: ta.linreg(open, 7, 0)
         tsma_open = calculate_moving_average(
             pd.Series(raw_open, index=out.index),
@@ -80,6 +81,22 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         out["Close"] = candle_close
         out["High"] = np.maximum(tsma_open, candle_close)
         out["Low"] = np.minimum(tsma_open, candle_close)
+        return out
+
+    if mode == "TSMA_ENH":
+        tsma_close = calculate_moving_average(
+            pd.Series(raw_close, index=out.index),
+            period=SYSSMAPXY_TSMA_PERIOD,
+            variant="TSMA",
+        ).to_numpy(dtype=float)
+        candle_close = (tsma_close + raw_close) / 2.0
+        candle_open = np.empty_like(candle_close)
+        candle_open[0] = raw_open[0]
+        candle_open[1:] = candle_close[:-1]
+        out["Open"] = candle_open
+        out["Close"] = candle_close
+        out["High"] = np.maximum(candle_open, candle_close)
+        out["Low"] = np.minimum(candle_open, candle_close)
         return out
 
     # Standard Heikin-Ashi candles.
