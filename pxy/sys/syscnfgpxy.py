@@ -166,8 +166,6 @@ if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA"}:
         "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, HA, OHLC4, HYPER, or TSMA."
     )
 
-# Boundary for legacy LIVE versus completed-candle behavior; STMT bypasses it.
-SYSCNFGPXY_CONFIRM_AFTER = dt_time(10, 0)  # IN and OUT: LIVE before 10:00 IST, CLOSED from 10:00
 # Switch or algorithm selection for signal mode.
 SYSINPXY_SIGNAL_MODE = "DTHA"
 # Switch or algorithm selection for signal mode.
