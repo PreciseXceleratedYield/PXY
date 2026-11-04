@@ -90,19 +90,11 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
             period=SYSSMAPXY_TSMA_PERIOD,
             variant="TSMA",
         ).to_numpy(dtype=float)
-        # Recursive ENH: 50% previous synthetic close, 25% TSMA7, 25% actual close.
-        blended_close = (tsma_close + raw_close) / 2.0
-        candle_close = np.full_like(blended_close, np.nan)
-        candle_open = np.full_like(blended_close, np.nan)
-        for i in range(len(blended_close)):
-            if not np.isfinite(blended_close[i]):
-                continue
-            candle_open[i] = (
-                candle_close[i - 1]
-                if i > 0 and np.isfinite(candle_close[i - 1])
-                else raw_open[i]
-            )
-            candle_close[i] = (candle_open[i] + blended_close[i]) / 2.0
+        # Nonrecursive 50/50 blend of TSMA7 and actual close.
+        candle_close = (tsma_close + raw_close) / 2.0
+        candle_open = np.empty_like(candle_close)
+        candle_open[0] = raw_open[0]
+        candle_open[1:] = candle_close[:-1]
         out["Open"] = candle_open
         out["Close"] = candle_close
         out["High"] = np.maximum(candle_open, candle_close)
