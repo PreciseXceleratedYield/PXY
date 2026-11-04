@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from syscnfgpxy import SYSDTSTPXY_ST1_FACTOR, SYSDTSTPXY_ST1_PERIOD, SYSDTSTPXY_ST1_FIXED_ATR_POINTS
+from syscnfgpxy import SYSDTSTPXY_ST1_FACTOR, SYSDTSTPXY_ST1_PERIOD
 
 
 def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
@@ -9,8 +9,14 @@ def _compute_single_st(df: pd.DataFrame, period: float, factor: float) -> tuple:
     high = df["High"].to_numpy()
     low = df["Low"].to_numpy()
     close = df["Close"].to_numpy()
-    # Primary ST uses a fixed 10-point ATR instead of a rolling TR average.
-    atr = np.full(len(df), SYSDTSTPXY_ST1_FIXED_ATR_POINTS, dtype=float)
+    tr1 = high - low
+    close_shifted = df["Close"].shift(1).to_numpy(copy=True)
+    if len(close_shifted) > 0:
+        close_shifted[0] = close[0]
+    tr2 = np.abs(high - close_shifted)
+    tr3 = np.abs(low - close_shifted)
+    tr = np.maximum(tr1, np.maximum(tr2, tr3))
+    atr = pd.Series(tr, index=df.index).ewm(alpha=1 / period, adjust=False).mean().to_numpy()
     hl2 = (high + low) / 2
     basic_upper = hl2 + (factor * atr)
     basic_lower = hl2 - (factor * atr)
@@ -67,8 +73,17 @@ def calculate_supertrend(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame() if df is None else df.copy()
     result = df.copy()
+    high = pd.to_numeric(result["High"], errors="coerce")
+    low = pd.to_numeric(result["Low"], errors="coerce")
     close = pd.to_numeric(result["Close"], errors="coerce")
-    atr = pd.Series(SYSDTSTPXY_ST1_FIXED_ATR_POINTS, index=result.index)
+    close_shifted = close.shift(1)
+    if not close_shifted.empty:
+        close_shifted.iloc[0] = close.iloc[0]
+    true_range = pd.concat(
+        [high - low, (high - close_shifted).abs(), (low - close_shifted).abs()],
+        axis=1,
+    ).max(axis=1)
+    atr = true_range.ewm(alpha=1 / SYSDTSTPXY_ST1_PERIOD, adjust=False).mean()
     st_line, mirror_line = _compute_single_st(
         result, period=SYSDTSTPXY_ST1_PERIOD, factor=SYSDTSTPXY_ST1_FACTOR
     )
