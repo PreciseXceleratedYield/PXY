@@ -104,11 +104,8 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
     working_df = df.copy()
     working_df['side'] = working_df['symbol'].astype(str).str[-2:].str.upper()
     working_df['row_invested'] = (
-        working_df['qty'].apply(safe_float) 
-        * (
-            working_df['buy_prc'].apply(safe_float) 
-            + working_df['buy_prc'].apply(safe_float)
-        ) / 2
+        working_df['qty'].apply(safe_float)
+        * working_df['sell_prc'].apply(safe_float)
     )
     working_df['row_pnl'] = working_df['pnl'].apply(safe_float) if 'pnl' in working_df.columns else 0.0
 
