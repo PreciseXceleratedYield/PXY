@@ -639,7 +639,8 @@ RUNEXACPXY_LATE_DAY_TARGET_PCT = EXETGTPXY_PRD_MAX_TARGET_PCT
 # Start of risk-ledger late-day override, separate from option targets.
 RUNEXACPXY_LATE_DAY_START = EXETGTPXY_PRD_LATE_DAY_TIME
 # End of risk-ledger late-day override.
-RUNEXACPXY_LATE_DAY_END = dt_time(15, 30)
+# Exclusive end of late-day RiskBar target override.
+RUNEXACPXY_LATE_DAY_END = SYSCNFGPXY_TRADING_DAY_END
 if not 0 < RUNEXACPXY_LATE_DAY_TARGET_PCT <= 100:
     raise ValueError("RUNEXACPXY_LATE_DAY_TARGET_PCT must be between 0 and 100.")
 if RUNEXACPXY_LATE_DAY_START > RUNEXACPXY_LATE_DAY_END:
