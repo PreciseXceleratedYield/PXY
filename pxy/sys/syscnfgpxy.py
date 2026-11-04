@@ -108,7 +108,7 @@ SYSCNFGPXY_MARKET_OPEN = dt_time(9, 16)
 # Scheduled supervisor/engine session end.
 SYSCNFGPXY_ENGINE_CLOSE = dt_time(15, 45)
 # End boundary for the execution pipeline.
-SYSCNFGPXY_TRADING_PIPE_CLOSE = dt_time(15, 40)
+SYSCNFGPXY_TRADING_PIPE_CLOSE = dt_time(15, 41)
 # Exchange trading-day end reference.
 SYSCNFGPXY_TRADING_DAY_END = dt_time(15, 30)
 # Earliest eligibility for position averaging.
@@ -116,15 +116,15 @@ SYSCNFGPXY_AVERAGING_START = dt_time(9, 17)
 # Independent cutoff for averaging existing positions (exclusive).
 SYSCNFGPXY_AVERAGING_CUTOFF = dt_time(15, 5)
 # Latest time for opening a new book.
-SYSCNFGPXY_NEW_BOOK_CUTOFF = dt_time(13, 30)
+SYSCNFGPXY_NEW_BOOK_CUTOFF = dt_time(15, 5)
 # Latest time for fresh entry requests.
-SYSCNFGPXY_ENTRY_CUTOFF = dt_time(13, 30)
-# Beginning of regular EOD liquidation handling.
-SYSCNFGPXY_SQUAREOFF_START = dt_time(15, 30)
-# Beginning of forced liquidation of every remaining position.
-SYSCNFGPXY_SQUAREOFF_ALL_START = dt_time(15, 32)
+SYSCNFGPXY_ENTRY_CUTOFF = dt_time(15, 5)
+# Beginning of regular EOD liquidation handling (15:10–15:15).
+SYSCNFGPXY_SQUAREOFF_START = dt_time(15, 10)
+# Beginning of forced liquidation of every remaining position (15:15–15:41).
+SYSCNFGPXY_SQUAREOFF_ALL_START = dt_time(15, 15)
 # End of EOD square-off attempts.
-SYSCNFGPXY_SQUAREOFF_END = dt_time(15, 40)
+SYSCNFGPXY_SQUAREOFF_END = dt_time(15, 41)
 if not (
     SYSCNFGPXY_EXCHANGE_OPEN <= SYSCNFGPXY_MARKET_OPEN < SYSCNFGPXY_ENGINE_CLOSE
     and SYSCNFGPXY_PREOPEN_START <= SYSCNFGPXY_MARKET_OPEN
@@ -540,7 +540,7 @@ if not isinstance(EXECBUYPXY_USE_DYNAMIC_STRIKE, bool):
 # Enables verbose diagnostic logging for this subsystem.
 EXECBUYPXY_DEBUG_ENABLED = False
 # Session boundary controlling cutoff.
-EXECBUYPXY_CUTOFF = dt_time(15, 16)  # Independent counter-buy cutoff (IST)
+EXECBUYPXY_CUTOFF = SYSCNFGPXY_ENTRY_CUTOFF  # Block counter-buys with all other entries at 15:05 IST
 # Compatibility command mapping for scripts.
 EXECBUYPXY_SCRIPTS = {
     "CE": "pxybuype",
@@ -592,7 +592,7 @@ EXEEXITPXY_ORDER_TRANSACTION_TYPE = SYSCNFGPXY_FO_SELL_TRANSACTION_TYPE
 EXEEXITPXY_ORDER_AMO = SYSCNFGPXY_FO_ORDER_AMO
 
 # Runtime setting for exit all after.
-EXESQRPXY_EXIT_ALL_AFTER = dt_time(15, 25)
+EXESQRPXY_EXIT_ALL_AFTER = SYSCNFGPXY_SQUAREOFF_ALL_START
 # Runtime setting for post exit cooldown seconds.
 EXESQRPXY_POST_EXIT_COOLDOWN_SECONDS = SYSCNFGPXY_ACTION_COOLDOWN_SECONDS
 
