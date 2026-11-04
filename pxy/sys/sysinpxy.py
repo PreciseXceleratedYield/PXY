@@ -48,9 +48,15 @@ def get_signal(df=None):
         latest_completed = directions.iloc[-2]
         running = directions.iloc[-1]
 
-        if (past_completed, latest_completed, running) == ("DOWN", "UP", "UP"):
+        if (past_completed, latest_completed, running) in {
+            ("DOWN", "UP", "UP"),
+            ("UP", "DOWN", "UP"),  # GREEN-RED-GREEN
+        }:
             return "BUY"
-        if (past_completed, latest_completed, running) == ("UP", "DOWN", "DOWN"):
+        if (past_completed, latest_completed, running) in {
+            ("UP", "DOWN", "DOWN"),
+            ("DOWN", "UP", "DOWN"),  # RED-GREEN-RED
+        }:
             return "SELL"
         return "NONE"
     except Exception:
