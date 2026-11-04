@@ -1908,7 +1908,9 @@ async function loadOptSummary(){
     };
     // Broker-verified lot count controls whether a side can display metrics.
     // Never display old investment/P&L/thresholds for a side with zero lots.
+    const fresh=!!d.verified && !!d.updated_at && Number.isFinite(Date.parse(d.updated_at)) && (Date.now()-Date.parse(d.updated_at))<120000 && (Date.now()-Date.parse(d.updated_at))>=-30000;
     const sideRow=side=>{
+        if(!fresh)return {row:['—','—','—','—'],runColor:null};
         const lots=Number(d[side+'_lots']);
         if(!Number.isFinite(lots)||lots<=0)return {row:['0','—','—','—'],runColor:null};
         return buildRow(lots,d[side+'_pnl'],d[side+'_investment'],d[side+'_lgt'],d[side+'_run_pct'],d[side+'_tgt'],d[side+'_decision']);
