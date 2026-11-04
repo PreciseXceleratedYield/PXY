@@ -4,6 +4,7 @@ import sys
 import time
 import subprocess
 from datetime import datetime
+from syshdaypxy import is_nse_fo_trading_day
 from syscnfgpxy import (
     SYSEXEPXY_MARKET_CLOSE,
     SYSEXEPXY_MARKET_OPEN,
@@ -53,10 +54,13 @@ def _is_market_hours_production():
     now_dt = now_ist()
     t = now_dt.time()
     wd = now_dt.weekday()
-    return (
-        0 <= wd <= 4
-        and SYSEXEPXY_MARKET_OPEN <= t < SYSEXEPXY_MARKET_CLOSE
-    )
+    if not (0 <= wd <= 4 and SYSEXEPXY_MARKET_OPEN <= t < SYSEXEPXY_MARKET_CLOSE):
+        return False
+    try:
+        return is_nse_fo_trading_day(now_dt.date())
+    except Exception as error:
+        print(f"⚠️ NSE trading calendar unavailable; engine remains running but trading is paused: {error}")
+        return False
 
 
 def is_market_hours():
