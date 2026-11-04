@@ -61,6 +61,7 @@ WEB_AVG_JSON_REL = "../../web/webavgpxy.json"
 def publish_idle_averaging_telemetry():
     """Publish a verified empty broker book to the options summary."""
     payload = {
+        "verified": True, "updated_at": datetime.now(IST).isoformat(),
         "ce_lots": 0, "pe_lots": 0,
         "ce_pnl": 0, "pe_pnl": 0,
         "ce_investment": 0, "pe_investment": 0,
@@ -184,6 +185,7 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
     pe_tgt = _side_target_pct(pe_rows, ce_investment, pe_investment, ce_lots, pe_lots, is_ce=False)
 
     p_packet = {
+        "verified": True, "updated_at": datetime.now(IST).isoformat(),
         "ce_lots": ce_lots, "pe_lots": pe_lots,
         "ce_pnl": ce_pnl, "pe_pnl": pe_pnl,
         "ce_investment": ce_investment, "pe_investment": pe_investment,
