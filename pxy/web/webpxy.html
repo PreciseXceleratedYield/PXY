@@ -106,7 +106,10 @@ body{
 #hdr.exit-bull #clk,
 #hdr.exit-bear #clk,
 #hdr.exit-bull .logo sup,
-#hdr.exit-bear .logo sup{color:var(--hero-text,var(--on-bull,#fff))!important;}
+#hdr.exit-bear .logo sup{color:#101820!important;}
+/* Dark ink is readable against both muted RiskBar header colors. */
+#hdr.exit-bull #themeToggle,
+#hdr.exit-bear #themeToggle{color:#101820!important;}
 .hdr-l,.hdr-r{display:flex;align-items:center;gap:8px;}
 .logo{
     font-family:'Syne',sans-serif;font-weight:800;font-size:17px;cursor:pointer;user-select:none;
