@@ -95,12 +95,9 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
             period=SYSSMAPXY_TSMA_PERIOD,
             variant="TSMA",
         ).to_numpy(dtype=float)
-        # Equal-weight blend: TSMA(Open), TSMA(Close), actual Close, actual Open.
-        candle_close = (tsma_open + tsma_close + raw_close + raw_open) / 4.0
-        # Each candle opens at the previous final synthetic close.
-        candle_open = np.empty_like(candle_close)
-        candle_open[0] = raw_open[0]
-        candle_open[1:] = candle_close[:-1]
+        # Construct each candle independently from its actual and TSMA values.
+        candle_open = (tsma_open + raw_open) / 2.0
+        candle_close = (tsma_close + raw_close) / 2.0
         out["Open"] = candle_open
         out["Close"] = candle_close
         out["High"] = np.maximum(candle_open, candle_close)
