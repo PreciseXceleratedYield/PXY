@@ -176,15 +176,14 @@ def cycle_risk_metrics(
         cycle_pnl = float(pnl.sum())
         premium_paid = float((quantities * buy_prices).sum())
 
-    active_quantities = pd.to_numeric(
-        active_cycle_rows["QTY"]
-        if "QTY" in active_cycle_rows
-        else pd.Series(0, index=active_cycle_rows.index),
+    # Count all trade rows in this book, including realized/closed positions.
+    book_quantities = pd.to_numeric(
+        rows["QTY"] if "QTY" in rows else pd.Series(0, index=rows.index),
         errors="coerce",
-    ).fillna(0)
-    active_count = int((active_quantities > 0).sum())
+    ).fillna(0).abs()
+    book_trade_count = int((book_quantities > 0).sum())
     effective_target_pct = (
-        float(target_pct) / active_count if active_count else float(target_pct)
+        float(target_pct) / book_trade_count if book_trade_count else float(target_pct)
     )
 
     ce_qty = pe_qty = ce_investment = pe_investment = 0.0
@@ -228,7 +227,8 @@ def cycle_risk_metrics(
         "premium_paid": premium_paid,
         "target": target,
         "target_pct": effective_target_pct,
-        "active_count": active_count,
+        "active_count": book_trade_count,
+        "book_trade_count": book_trade_count,
         "ce_qty": ce_qty,
         "pe_qty": pe_qty,
         "ce_investment": ce_investment,
