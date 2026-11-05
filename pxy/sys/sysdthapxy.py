@@ -23,7 +23,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     MA7 uses SMA7 as open and averages SMA7, TSMA7 and actual close as close.
     HA applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA", "TSMA_ORIG", "TSMA_ENH", "TSMA_MA", "MA7"}
+    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA", "TSMA_ORIG", "TSMA_ENH", "TSMA_MA", "MA7", "TSMA_CLOSE"}
     if mode not in valid_modes:
         raise ValueError(
             "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, TSMA_ORIG, TSMA_ENH, or TSMA_MA, or MA7."
@@ -101,6 +101,25 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         blended_close = (tsma_close + raw_close) / 2.0
         # Final close is the average of the synthetic open and blended close.
         candle_close = (candle_open + blended_close) / 2.0
+        out["Open"] = candle_open
+        out["Close"] = candle_close
+        out["High"] = np.maximum(candle_open, candle_close)
+        out["Low"] = np.minimum(candle_open, candle_close)
+        return out
+
+    if mode == "TSMA_CLOSE":
+        tsma_open = calculate_moving_average(
+            pd.Series(raw_open, index=out.index),
+            period=SYSSMAPXY_TSMA_PERIOD,
+            variant="TSMA",
+        ).to_numpy(dtype=float)
+        tsma_close = calculate_moving_average(
+            pd.Series(raw_close, index=out.index),
+            period=SYSSMAPXY_TSMA_PERIOD,
+            variant="TSMA",
+        ).to_numpy(dtype=float)
+        candle_open = (tsma_open + raw_open) / 2.0
+        candle_close = (tsma_close + raw_close) / 2.0
         out["Open"] = candle_open
         out["Close"] = candle_close
         out["High"] = np.maximum(candle_open, candle_close)
