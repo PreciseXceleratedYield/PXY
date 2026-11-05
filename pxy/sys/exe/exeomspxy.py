@@ -107,6 +107,7 @@ def publish_position_summary(active_df, positions_verified):
         "ce_lots": 0, "pe_lots": 0,
         "ce_pnl": 0, "pe_pnl": 0,
         "ce_investment": 0, "pe_investment": 0,
+        "ce_market_worth": 0, "pe_market_worth": 0,
         "ce_lgt": None, "pe_lgt": None,
         "ce_run_pct": 0, "pe_run_pct": 0,
         "ce_tgt": None, "pe_tgt": None,
@@ -125,17 +126,18 @@ def publish_position_summary(active_df, positions_verified):
                 except (ValueError, TypeError, OverflowError):
                     return 0.0
             packet[side.lower() + "_lots"] += 1
-            packet[side.lower() + "_investment"] += max(0.0, numeric("qty")) * max(0.0, numeric("sell_prc"))
+            packet[side.lower() + "_investment"] += max(0.0, numeric("qty")) * max(0.0, numeric("buy_prc"))
+            packet[side.lower() + "_market_worth"] += max(0.0, numeric("qty")) * max(0.0, numeric("sell_prc"))
             packet[side.lower() + "_pnl"] += numeric("pnl")
         for side in ("ce", "pe"):
             inv = packet[side + "_investment"]
             pnl = packet[side + "_pnl"]
-            packet[side + "_run_pct"] = 100.0 * pnl / (inv - pnl) if inv - pnl > 0 else 0.0
+            packet[side + "_run_pct"] = 100.0 * pnl / inv if inv > 0 else 0.0
             packet[side + "_decision"] = "hold" if packet[side + "_lots"] else "idle"
         # OMS is the only publisher. Use the existing trading calculation
         # functions for informational thresholds, without placing orders.
         ce_count, pe_count = packet["ce_lots"], packet["pe_lots"]
-        ce_inv, pe_inv = packet["ce_investment"], packet["pe_investment"]
+        ce_inv, pe_inv = packet["ce_market_worth"], packet["pe_market_worth"]
         for side in ("ce", "pe"):
             rows = active_df[active_df["symbol"].astype(str).str.upper().str.endswith(side.upper())]
             if rows.empty:
