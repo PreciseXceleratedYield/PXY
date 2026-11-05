@@ -85,13 +85,18 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         return out
 
     if mode == "TSMA_ENH":
+        tsma_open = calculate_moving_average(
+            pd.Series(raw_open, index=out.index),
+            period=SYSSMAPXY_TSMA_PERIOD,
+            variant="TSMA",
+        ).to_numpy(dtype=float)
         tsma_close = calculate_moving_average(
             pd.Series(raw_close, index=out.index),
             period=SYSSMAPXY_TSMA_PERIOD,
             variant="TSMA",
         ).to_numpy(dtype=float)
-        # Final close is the 50/50 TSMA7 and actual close blend.
-        candle_close = (tsma_close + raw_close) / 2.0
+        # Equal-weight blend: TSMA(Open), TSMA(Close), actual Close, actual Open.
+        candle_close = (tsma_open + tsma_close + raw_close + raw_open) / 4.0
         # Each candle opens at the previous final synthetic close.
         candle_open = np.empty_like(candle_close)
         candle_open[0] = raw_open[0]
