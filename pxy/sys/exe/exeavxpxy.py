@@ -104,14 +104,6 @@ def print_telemetry_dashboard(p):
               + pnl_color + f"{pnl_val:>8}" + Style.RESET_ALL)
 
     print(Fore.CYAN + "-" * P_WIDTH)
-    ce_inv, pe_inv = p.get("ce_investment", 0.0), p.get("pe_investment", 0.0)
-    left_label, right_label = f"{int(round(ce_inv))}", f"{int(round(pe_inv))}"
-    track_slots = P_WIDTH - len(left_label) - len(right_label) - 6
-    total = ce_inv + pe_inv
-    ce_ratio = ce_inv / total if total > 0 else 0.5
-    left_n = max(0, min(track_slots, int(round(ce_ratio * track_slots))))
-    right_n = max(0, track_slots - left_n)
-    print("  " + Fore.GREEN + left_label + ("━" * left_n) + Fore.WHITE + "⚖️" + Fore.RED + ("━" * right_n) + Fore.RED + right_label)
     print(Fore.CYAN + "=" * P_WIDTH + "\n")
 
 
