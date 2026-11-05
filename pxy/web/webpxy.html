@@ -1896,7 +1896,7 @@ async function loadOptSummary(){
     const ov=$('optOverlay');
     const colMeta=[
         {emoji:'📦🔢',label:'LOT',desc:'Lots traded'},
-        {emoji:'💰🏦',label:'INV',desc:'Invested amount'},
+        {emoji:'💰🏦',label:'INV',desc:'Purchase investment (current market worth)'},
         {emoji:'🏃⚡',label:'RUN',desc:'(Loss threshold) Running P&L (Target)'},
         {emoji:'💹⚖️',label:'PNL',desc:'Profit &amp; Loss'}
     ];
@@ -1904,10 +1904,10 @@ async function loadOptSummary(){
     const rnd=n=>Math.round(n||0);
     const plainSign=n=>(Number(n||0)>=0?'+':'')+Math.round(n||0);
     const pad2=n=>{const r=Math.round(n||0);const a=Math.min(Math.abs(r),99);const sign=r<0?'<span style="color:var(--bear)">-</span>':r>0?'<span style="color:var(--bull)">+</span>':'';return sign+String(a).padStart(2,'0');};
-    const buildRow=(lots,pnl,inv,lgt,runPct,tgt,decision)=>{
+    const buildRow=(lots,pnl,inv,marketWorth,lgt,runPct,tgt,decision)=>{
         const tgtNum=Number(tgt);
         const runColor=lgt!=null&&Number(runPct)<Number(lgt)?'var(--bear)':tgt!=null&&Number(runPct)>tgtNum?'var(--bull)':null;
-        const row=[lots??'—', `${String(Math.round(Number(inv||0)/1000)).padStart(2,'0')}(${String(Math.round((Number(inv||0)+Number(pnl||0))/1000)).padStart(2,'0')})`, `(${lgt==null?'—':pad2(lgt)})${pad2(runPct)}(${tgt==null?'—':pad2(tgtNum)})`, plainSign(pnl)];        
+        const row=[lots??'—', `${String(Math.round(Number(inv||0)/1000)).padStart(2,'0')}(${String(Math.round(Number(marketWorth||0)/1000)).padStart(2,'0')})`, `(${lgt==null?'—':pad2(lgt)})${pad2(runPct)}(${tgt==null?'—':pad2(tgtNum)})`, plainSign(pnl)];        
         return {row,runColor};
     };
     // Broker-verified lot count controls whether a side can display metrics.
@@ -1917,7 +1917,7 @@ async function loadOptSummary(){
         if(!fresh)return {row:['—','—','—','—'],runColor:null};
         const lots=Number(d[side+'_lots']);
         if(!Number.isFinite(lots)||lots<=0)return {row:['0','—','—','—'],runColor:null};
-        return buildRow(lots,d[side+'_pnl'],d[side+'_investment'],d[side+'_lgt'],d[side+'_run_pct'],d[side+'_tgt'],d[side+'_decision']);
+        return buildRow(lots,d[side+'_pnl'],d[side+'_investment'],d[side+'_market_worth'],d[side+'_lgt'],d[side+'_run_pct'],d[side+'_tgt'],d[side+'_decision']);
     };
     const ceRes=sideRow('ce');
     const peRes=sideRow('pe');
