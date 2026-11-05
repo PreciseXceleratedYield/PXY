@@ -166,8 +166,8 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 # DTHA transforms candles consumed by IN/OUT; STMT evaluates the selected candles independent of confirmation mode.
 # ================================================================
 # Switch or algorithm selection for candle mode.
-SYSDTHAPXY_CANDLE_MODE = "TSMA_ENH"
-if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA", "TSMA_ORIG", "TSMA_ENH", "TSMA_MA", "MA7"}:
+SYSDTHAPXY_CANDLE_MODE = "TSMA_CLOSE"
+if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA", "TSMA_ORIG", "TSMA_ENH", "TSMA_MA", "MA7", "TSMA_CLOSE"}:
     raise ValueError(
         "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, HA, OHLC4, HYPER, TSMA_ORIG, TSMA_ENH, or TSMA_MA, or MA7."
     )
