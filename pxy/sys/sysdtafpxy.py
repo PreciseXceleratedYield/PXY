@@ -28,15 +28,26 @@ FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 
 
 def apply_ohlc_transformation(df, futures_price=None):
-    """Preserve raw OHLC for all signal and indicator calculations."""
+    """Blend latest NIFTY OHLC with a fresh futures price, not historical bars."""
     if df is None or df.empty:
         return df
-    return df.copy()
+    result = df.copy()
+    try:
+        fut = float(futures_price)
+    except (TypeError, ValueError, OverflowError):
+        return result
+    if not math.isfinite(fut) or fut <= 0:
+        return result
+    for column in ("Open", "High", "Low", "Close"):
+        value = pd.to_numeric(result[column].iloc[-1], errors="coerce")
+        if pd.notna(value) and math.isfinite(float(value)) and value > 0:
+            result.loc[result.index[-1], column] = (float(value) + fut) / 2.0
+    return result
 
 
 def transform_market_data(df, futures_price=None):
-    """Return raw OHLC; price blending belongs exclusively to syspxy."""
-    return apply_ohlc_transformation(df)
+    """Apply latest-candle NIFTY/futures blending when futures are fresh."""
+    return apply_ohlc_transformation(df, futures_price)
 
 
 def _read_nifty_futures_price():
@@ -244,9 +255,8 @@ def _fetch_yf_data_production(
     else:
         df = df.tz_convert(TIMEZONE)
 
-    # Futures never alter Yahoo OHLC or the signals calculated from it.
-    # The existing futures-only fallback above remains unchanged.
-    processed_df = transform_market_data(df)
+    # Only the latest candle is blended; historical bars remain untouched.
+    processed_df = transform_market_data(df, futures_price)
 
     # Publish the two actual quotes already read above; never infer either
     # from transformed candles or perform an extra market-data request.
