@@ -23,7 +23,7 @@
     --bg:#1b2029;--bg2:#1b2029;--bg3:#282f39;
     --border:rgba(255,255,255,0.055);--border2:rgba(255,255,255,0.11);
     --text:#cbd2dc;--muted:#8c97a8;--accent:#82a7d3;
-    --bull:#63ad99;--bear:#d47f7c;--gold:#d4b878;
+    --bull:#63ad99;--bear:#d47f7c;--risk-bull:#4c9883;--risk-bear:#b96562;--gold:#d4b878;
     --bull-dim:rgba(99,173,153,0.11);--bear-dim:rgba(212,127,124,0.11);
     --grid:rgba(255,255,255,0.025);--track-mid:rgba(255,255,255,0.07);
     --strong:#e7ebf0;--hdr-bg:linear-gradient(180deg,#202630,#1b2029);--sep:rgba(255,255,255,0.11);
@@ -46,7 +46,7 @@
     --bg:#f1ece2;--bg2:#ebe5d8;--bg3:#e8e2d4;
     --border:rgba(60,50,30,0.10);--border2:rgba(60,50,30,0.20);
     --text:#2e3640;--muted:#4f5b68;--accent:#2a669c;
-    --bull:#16705c;--bear:#a63e32;--gold:#7f5900;
+    --bull:#16705c;--bear:#a63e32;--risk-bull:#115b4b;--risk-bear:#8c332a;--gold:#7f5900;
     --bull-dim:rgba(22,112,92,0.12);--bear-dim:rgba(166,62,50,0.12);
     --grid:rgba(60,50,30,0.09);--track-mid:rgba(60,50,30,0.20);
     --strong:#1f2730;--hdr-bg:linear-gradient(180deg,#f6f2e9,#f1ece2);--sep:rgba(60,50,30,0.20);
@@ -95,8 +95,8 @@ body{
     transition:background 0.3s;
 }
 /* Match RiskBar candle body colors; preserve EXIT-based header switching. */
-#hdr.exit-bull{background:var(--bull);}
-#hdr.exit-bear{background:var(--hero-bear,var(--bear));}
+#hdr.exit-bull{background:var(--risk-bull);}
+#hdr.exit-bear{background:var(--risk-bear);}
 #hdr.exit-bull .logo,
 #hdr.exit-bear .logo,
 #hdr.exit-bull #brandHdr,
@@ -1644,13 +1644,13 @@ function drawRiskCandle(floor,net,peak){
     const toX=v=>Math.max(PADX,Math.min(W-PADX,((v-lo)/range)*(W-PADX*2)+PADX));
     const lowX=toX(lo),highX=toX(hi),openX=toX(open),closeX=toX(close);
     const isBull=close>=open;
-    const bodyColor=isBull?cssVar('--bull'):cssVar('--bear');
+    const bodyColor=isBull?cssVar('--risk-bull'):cssVar('--risk-bear');
     const glowColor=isBull?cssVar('--glow-bull'):cssVar('--glow-bear');
     ctx.strokeStyle=cssVar('--rk-grid');ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(lowX,midY);ctx.lineTo(highX,midY);ctx.stroke();
     ctx.lineWidth=3;ctx.lineCap='round';ctx.globalAlpha=0.8;
-    ctx.strokeStyle=cssVar('--bear');ctx.beginPath();ctx.moveTo(lowX,midY-bodyH/2);ctx.lineTo(lowX,midY+bodyH/2);ctx.stroke();
-    ctx.strokeStyle=cssVar('--bull');ctx.beginPath();ctx.moveTo(highX,midY-bodyH/2);ctx.lineTo(highX,midY+bodyH/2);ctx.stroke();
+    ctx.strokeStyle=cssVar('--risk-bear');ctx.beginPath();ctx.moveTo(lowX,midY-bodyH/2);ctx.lineTo(lowX,midY+bodyH/2);ctx.stroke();
+    ctx.strokeStyle=cssVar('--risk-bull');ctx.beginPath();ctx.moveTo(highX,midY-bodyH/2);ctx.lineTo(highX,midY+bodyH/2);ctx.stroke();
     ctx.globalAlpha=1;ctx.lineCap='butt';
     if(openX>PADX+2&&openX<W-PADX-2){
         ctx.strokeStyle=cssVar('--rk-dash');ctx.lineWidth=1;ctx.setLineDash([3,3]);
@@ -1661,8 +1661,8 @@ function drawRiskCandle(floor,net,peak){
     const sumVal=Number(riskData.booked_profit??bookedTotal)||0;
     const bookCount=Number(riskData.closed_book_count)||0;
     const overallBull=sumVal>=0;
-    const overallColor=overallBull?cssVar('--bull'):cssVar('--bear');
-    const netColor=isBull?cssVar('--bull'):cssVar('--bear');
+    const overallColor=overallBull?cssVar('--risk-bull'):cssVar('--risk-bear');
+    const netColor=isBull?cssVar('--risk-bull'):cssVar('--risk-bear');
     const netTxt='₹'+(net>=0?'+':'')+Math.round(net);
     const sumTxt=fmt(sumVal);
     const mainFont=`800 ${fz}px 'Syne',sans-serif`,chipFont=`800 ${fz-1}px 'Syne',sans-serif`;
