@@ -97,18 +97,18 @@ body{
 /* Match RiskBar candle body colors; preserve EXIT-based header switching. */
 #hdr.exit-bull{background:var(--risk-bull);}
 #hdr.exit-bear{background:var(--risk-bear);}
-/* Header text contrast follows the RiskBar state. */
-#hdr.exit-bull{--header-ink:#06241f;}
-#hdr.exit-bear{--header-ink:#150a0a;}
-[data-theme="comfort"] #hdr.exit-bull,
-[data-theme="comfort"] #hdr.exit-bear{--header-ink:#fff8e8;}
+/* Warm ivory header lettering with a subtle shadow on both RiskBar states. */
+#hdr.exit-bull,#hdr.exit-bear{--header-ink:#fff4d6;}
 #hdr.exit-bull .logo,#hdr.exit-bear .logo,
 #hdr.exit-bull #brandHdr,#hdr.exit-bear #brandHdr,
 #hdr.exit-bull #brandHdr span,#hdr.exit-bear #brandHdr span,
 #hdr.exit-bull #brandHdr sup,#hdr.exit-bear #brandHdr sup,
 #hdr.exit-bull #clk,#hdr.exit-bear #clk,
 #hdr.exit-bull .logo sup,#hdr.exit-bear .logo sup,
-#hdr.exit-bull #themeToggle,#hdr.exit-bear #themeToggle{color:var(--header-ink)!important;}
+#hdr.exit-bull #themeToggle,#hdr.exit-bear #themeToggle{
+    color:var(--header-ink)!important;
+    text-shadow:0 1px 2px rgba(0,0,0,0.55);
+}
 .hdr-l,.hdr-r{display:flex;align-items:center;gap:8px;}
 .logo{
     font-family:'Syne',sans-serif;font-weight:800;font-size:17px;cursor:pointer;user-select:none;
