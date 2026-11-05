@@ -90,7 +90,8 @@ def print_telemetry_dashboard(p):
 
     for side in ("ce", "pe"):
         lots = p[f"{side}_lots"]
-        lgt = int(round(p[f"{side}_lgt"]))
+        # Display-only floor: preserve the actual LGT used for averaging decisions.
+        lgt = max(-99, int(round(p[f"{side}_lgt"])))
 
         pnl_val = int(round(p[f"{side}_pnl"]))
         run_pct_val = int(round(p[f"{side}_run_pct"]))
