@@ -93,7 +93,6 @@ def print_capital_balance(active_df):
     total = ce_capital + pe_capital
     left = round(width * ce_capital / total) if total > 0 else width // 2
     right = width - left
-    print(f"  {Fore.GREEN}{ce_capital:.0f}{'━' * left}{Fore.WHITE}⚖️{Fore.RED}{'━' * right}{pe_capital:.0f}{Style.RESET_ALL}")
 
 
 def publish_position_summary(active_df, positions_verified):
