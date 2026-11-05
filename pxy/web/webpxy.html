@@ -94,8 +94,9 @@ body{
     background:var(--accent);opacity:0.5;
     transition:background 0.3s;
 }
-#hdr.exit-bull{background:var(--hero-bull,var(--bull));}
-#hdr.exit-bear{background:var(--hero-bear,var(--bear));}
+/* Match RiskBar candle body colors; preserve EXIT-based header switching. */
+#hdr.exit-bull{background:var(--bull);}
+#hdr.exit-bear{background:var(--bear);}
 #hdr.exit-bull .logo,
 #hdr.exit-bear .logo,
 #hdr.exit-bull #brandHdr,
