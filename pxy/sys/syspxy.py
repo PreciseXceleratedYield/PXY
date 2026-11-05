@@ -80,23 +80,8 @@ def get_all_data():
     )
 
     # -------- PRICE LOGIC (DISPLAY/EXECUTION SNAPSHOT ONLY) --------
-    # DTAF supplies raw Yahoo candles to indicators/signals. Only the
-    # published PXY price equally averages NIFTY and the latest valid futures.
-    # Read the same freshness-checked FUT feed used by DTAF; no extra API call.
+    # Use the raw NIFTY index price from the market snapshot; no futures blend.
     final_price = core.get("price")
-    if core.get("market_data_available", False):
-        try:
-            from sysdtafpxy import _read_nifty_futures_price
-            futures_price = _read_nifty_futures_price()
-            index_price = float(final_price)
-            if (
-                futures_price is not None
-                and math.isfinite(index_price)
-                and index_price > 0
-            ):
-                final_price = int((index_price + futures_price) / 2.0)
-        except (TypeError, ValueError, OverflowError) as error:
-            print(f"Warning: Could not blend PXY price: {error}")
 
     # Display SMA50 when trading filter is NONE; otherwise show the selected filter.
     # This display fallback does not enable an entry filter.
