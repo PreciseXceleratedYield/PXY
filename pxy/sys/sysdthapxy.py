@@ -97,7 +97,9 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         ).to_numpy(dtype=float)
         # Construct each candle independently from its actual and TSMA values.
         candle_open = (tsma_open + raw_open) / 2.0
-        candle_close = (tsma_close + raw_close) / 2.0
+        blended_close = (tsma_close + raw_close) / 2.0
+        # Final close is the average of the synthetic open and blended close.
+        candle_close = (candle_open + blended_close) / 2.0
         out["Open"] = candle_open
         out["Close"] = candle_close
         out["High"] = np.maximum(candle_open, candle_close)
