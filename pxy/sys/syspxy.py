@@ -81,7 +81,7 @@ def get_all_data():
 
     # -------- PRICE LOGIC (DISPLAY/EXECUTION SNAPSHOT ONLY) --------
     # DTAF supplies raw Yahoo candles to indicators/signals. Only the
-    # published PXY price is weighted 3:1 with the latest valid futures.
+    # published PXY price equally averages NIFTY and the latest valid futures.
     # Read the same freshness-checked FUT feed used by DTAF; no extra API call.
     final_price = core.get("price")
     if core.get("market_data_available", False):
@@ -94,7 +94,7 @@ def get_all_data():
                 and math.isfinite(index_price)
                 and index_price > 0
             ):
-                final_price = int((3.0 * index_price + futures_price) / 4.0)
+                final_price = int((index_price + futures_price) / 2.0)
         except (TypeError, ValueError, OverflowError) as error:
             print(f"Warning: Could not blend PXY price: {error}")
 
