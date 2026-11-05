@@ -185,75 +185,62 @@ app.post('/run/:script', (req, res) => {
    ========================= */
 const TMUX_SESSION_NAME = 'pxy-engine';
 
-wss.on('connection', (ws) => { 
-    console.log('[WS] client connected. total clients:', wss.clients.size); 
-    
-    let isProcessing = false;
-    let hasReportedEngineUnavailable = false;
-    let hasReportedPollingTimeout = false;
+// One shared tmux capture for all dashboard clients; no per-client shell pipeline.
+const CONSOLE_POLL_MS = 500;
+let consolePolling = false;
+let consoleLastOutput = null;
+let consoleLastStatus = null;
+let consoleLastStatusAt = 0;
 
-    const interval = setInterval(() => { 
-        if (ws.readyState !== WebSocket.OPEN) {
-            clearInterval(interval);
-            return;
+function broadcastConsole(message) {
+    for (const ws of wss.clients) {
+        if (ws.readyState === WebSocket.OPEN && ws.bufferedAmount < 1024 * 1024) {
+            ws.send(message, (error) => {
+                if (error && IS_DEBUG) console.error('[WS] send error:', error.message);
+            });
         }
+    }
+}
 
-        if (isProcessing) return; 
-        isProcessing = true;
-
-        // Pulls up to 500 lines directly out of active tmux terminal pane memory
-        // -e preserves color/attribute escape sequences, -J joins wrapped lines
-        const captureCmd = `pane_id=$(tmux list-panes -t ${TMUX_SESSION_NAME} -F '#{pane_id}' 2>/dev/null | head -n 1) && [ -n "$pane_id" ] && tmux capture-pane -pt "$pane_id" -S -500 -e -J`;
-        
-        if (IS_DEBUG) console.log('[DEBUG] WebSocket polling tmux screen buffer memory...');
-
-        exec(captureCmd, { timeout: 5000 }, (err, stdout, stderr) => {
-            isProcessing = false;
-
-            if (err && err.killed) {
-                if (ws.readyState === WebSocket.OPEN && !hasReportedPollingTimeout) {
-                    ws.send('[SYSTEM STATUS] Terminal polling timed out; retrying.');
-                    hasReportedPollingTimeout = true;
+function pollConsole() {
+    if (consolePolling || wss.clients.size === 0) return;
+    consolePolling = true;
+    execFile('tmux', ['capture-pane', '-p', '-t', TMUX_SESSION_NAME, '-S', '-500', '-e', '-J'],
+        { timeout: 3000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
+            consolePolling = false;
+            if (error) {
+                const status = error.killed
+                    ? '[SYSTEM STATUS] Terminal polling timed out; retrying.'
+                    : `[SYSTEM STATUS] Engine console session "${TMUX_SESSION_NAME}" is unavailable. Start the engine from the management menu.`;
+                if (status !== consoleLastStatus || Date.now() - consoleLastStatusAt >= 30000) {
+                    broadcastConsole(status);
+                    consoleLastStatusAt = Date.now();
                 }
+                consoleLastStatus = status;
+                consoleLastOutput = null;
                 return;
             }
-
-            if (err) {
-                hasReportedPollingTimeout = false;
-                if (IS_DEBUG) console.log('[DEBUG] tmux has-session query rejected. Engine offline.');
-                if (ws.readyState === WebSocket.OPEN && !hasReportedEngineUnavailable) {
-                    ws.send(`[SYSTEM STATUS] Engine console session "${TMUX_SESSION_NAME}" is unavailable. Start the engine from the management menu.`);
-                    hasReportedEngineUnavailable = true;
-                }
-                return; 
-            } 
-
-            hasReportedEngineUnavailable = false;
-            hasReportedPollingTimeout = false;
-
-            if (!stdout) return; 
-            
-            if (ws.readyState === WebSocket.OPEN) { 
-                ws.send(stdout, (sendErr) => { 
-                    if (sendErr) console.error('[WS] send error:', sendErr.message); 
-                }); 
-            } else {
-                clearInterval(interval);
+            consoleLastStatus = null;
+            if (stdout && stdout !== consoleLastOutput) {
+                consoleLastOutput = stdout;
+                broadcastConsole(stdout);
             }
-        }); 
-    }, 500); 
+        });
+}
+const consoleInterval = setInterval(pollConsole, CONSOLE_POLL_MS);
+consoleInterval.unref();
 
-    const cleanup = () => {
-        console.log('[WS] client connection cleanup'); 
-        clearInterval(interval);
-    };
-
-    ws.on('close', cleanup); 
-    ws.on('error', (e) => {
-        console.error('[WS] socket error:', e.message);
-        cleanup();
-    }); 
-}); 
+wss.on('connection', (ws) => {
+    console.log('[WS] client connected. total clients:', wss.clients.size);
+    // New clients receive the most recent snapshot immediately.
+    const initial = consoleLastStatus || consoleLastOutput;
+    if (initial && ws.readyState === WebSocket.OPEN) ws.send(initial);
+    pollConsole();
+    ws.on('close', () => {
+        console.log('[WS] client disconnected. total clients:', wss.clients.size);
+    });
+    ws.on('error', (error) => console.error('[WS] socket error:', error.message));
+});
 
 /* ========================= START ========================= */ 
 const listenServer = (port) => {
