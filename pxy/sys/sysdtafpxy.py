@@ -28,7 +28,7 @@ FORCE_NIFTY_FUT = SYSDTAFPXY_FORCE_NIFTY_FUT
 
 
 def apply_ohlc_transformation(df, futures_price=None):
-    """Blend latest NIFTY OHLC with a fresh futures price, not historical bars."""
+    """Blend latest NIFTY OHLC (25%) with fresh futures price (75%)."""
     if df is None or df.empty:
         return df
     result = df.copy()
@@ -41,12 +41,12 @@ def apply_ohlc_transformation(df, futures_price=None):
     for column in ("Open", "High", "Low", "Close"):
         value = pd.to_numeric(result[column].iloc[-1], errors="coerce")
         if pd.notna(value) and math.isfinite(float(value)) and value > 0:
-            result.loc[result.index[-1], column] = (float(value) + fut) / 2.0
+            result.loc[result.index[-1], column] = (float(value) + 3.0 * fut) / 4.0
     return result
 
 
 def transform_market_data(df, futures_price=None):
-    """Apply latest-candle NIFTY/futures blending when futures are fresh."""
+    """Apply 1:3 NIFTY/futures blending to the latest candle."""
     return apply_ohlc_transformation(df, futures_price)
 
 
