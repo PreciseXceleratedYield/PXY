@@ -5,12 +5,15 @@ Bridges raw data frame states to live automated order placement structures.
 =============================================================================
 """
 import logging
+from datetime import datetime
 from colorama import Fore, init
 
 init(autoreset=True)
 logger = logging.getLogger("exeavxpxy.strategy")
 
 from syscnfgpxy import (
+    SYSCNFGPXY_ENTRY_CUTOFF,
+    SYSCNFGPXY_TIMEZONE,
     EXEAMSPXY_MAX_INVESTMENT,
     EXEAMSPXY_ORDER_AMO,
     EXEAMSPXY_ORDER_EXCHANGE_SEGMENT,
@@ -56,6 +59,9 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
                                   ce_opposite_signal=False, pe_opposite_signal=False,
                                   max_investment=EXEAMSPXY_MAX_INVESTMENT):
     """Executes network orders for System A when pullback boundaries are breached."""
+    if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= SYSCNFGPXY_ENTRY_CUTOFF:
+        logger.warning("Averaging blocked: 15:10 IST hard buy cutoff")
+        return
     ce_last_row = _newest_row(ce_rows) if not ce_rows.empty else None
     pe_last_row = _newest_row(pe_rows) if not pe_rows.empty else None
     ce_next_investment = (
@@ -118,6 +124,9 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
                 "tag": new_tag
             }
             set_cooling("CE")      # stays BEFORE the send to prevent a duplicate buy
+            if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= SYSCNFGPXY_ENTRY_CUTOFF:
+                logger.warning("Averaging order blocked by 15:10 IST hard cutoff")
+                return
             resp = client.place_order(**params)
             if _order_ok(resp):
                 print(f"{Fore.GREEN}✅ SUCCESS: CE Averaged. Tag: {new_tag}")
@@ -158,6 +167,9 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
                 "tag": new_tag
             }
             set_cooling("PE")      # stays BEFORE the send to prevent a duplicate buy
+            if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= SYSCNFGPXY_ENTRY_CUTOFF:
+                logger.warning("Averaging order blocked by 15:10 IST hard cutoff")
+                return
             resp = client.place_order(**params)
             if _order_ok(resp):
                 print(f"{Fore.GREEN}✅ SUCCESS: PE Averaged. Tag: {new_tag}")
