@@ -18,15 +18,15 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     OC2 and OHLC4 replace Close with the corresponding candle average.
     HYPER preserves the former DTAF mode-0 transformation.
     TSMA_ORIG retains the original 3:1 blend of TSMA open and real close.
-    TSMA_ENH blends TSMA close with real close, then averages that blend with the prior final synthetic close.
+    TSAM blends TSMA close with real close, then averages that blend with the prior final synthetic close.
     TSMA_MA blends 75% TSMA7 close and 25% SMA7 close, with prior synthetic close as open.
     MA7 uses SMA7 as open and averages SMA7, TSMA7 and actual close as close.
     HA applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA", "TSMA_ORIG", "TSMA_ENH", "TSMA_MA", "MA7", "TSMA_CLOSE"}
+    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA", "TSMA_ORIG", "TSAM", "TSMA_MA", "MA7", "TSMA_CLOSE"}
     if mode not in valid_modes:
         raise ValueError(
-            "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, TSMA_ORIG, TSMA_ENH, or TSMA_MA, or MA7."
+            "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, TSMA_ORIG, TSAM, or TSMA_MA, or MA7."
         )
 
     if df is None or df.empty:
@@ -85,7 +85,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         out["Low"] = np.minimum(tsma_open, candle_close)
         return out
 
-    if mode == "TSMA_ENH":
+    if mode == "TSAM":
         tsma_open = calculate_moving_average(
             pd.Series(raw_open, index=out.index),
             period=SYSSMAPXY_TSMA_PERIOD,
