@@ -1004,8 +1004,8 @@ async function loadChartMarketPrices(){
         const futHigher=bothValid&&fut>index;
         high.textContent=futHigher?'FUT: '+fmt(d.fut):'INDEX: '+fmt(d.index);
         low.textContent=futHigher?'INDEX: '+fmt(d.index):'FUT: '+fmt(d.fut);
-        high.style.color=futHigher?'#4ade80':'#f87171';
-        low.style.color=futHigher?'#f87171':'#4ade80';
+        high.style.color=futHigher?'#83a992':'#bd8585';
+        low.style.color=futHigher?'#bd8585':'#83a992';
     }catch(e){
         high.textContent='INDEX: —';
         low.textContent='FUT: —';
