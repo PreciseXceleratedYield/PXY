@@ -58,14 +58,12 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
         cumulative_count = own_count + opposite_count
         diff_count = max(1, own_count - opposite_count)
         axefactor_count = max(1,((cumulative_count )))
-        # Preserve the power-of-power formula, but evaluate in log space.
-        # Bound the exponent to avoid floating-point overflow.
+        # Single exponent only; cap in log space to prevent overflow.
         ratio = max(0.0, own_worth) / opposite_worth
         if ratio == 0.0:
             worth_factor = 0.0
         else:
-            exponent = math.exp(min(700.0, axefactor_count * math.log(axefactor_count)))
-            log_worth = exponent * math.log(ratio)
+            log_worth = axefactor_count * math.log(ratio)
             worth_factor = math.exp(max(-745.0, min(700.0, log_worth)))
         count_factor = own_count - opposite_count
         base_lgt = -(10.0 * (cumulative_count / 2.0) * worth_factor + 10.0 * count_factor)
