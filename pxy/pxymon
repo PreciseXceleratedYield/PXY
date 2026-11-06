@@ -22,11 +22,12 @@ export PXY_MONITOR_MODE=1
 # Optional: activate virtual environment if needed
 # source ~/pxy/env/bin/activate
 
-echo "Starting loop. Press [CTRL+C] to stop."
+MAX_ITERATIONS=15
+echo "Starting monitor for ${MAX_ITERATIONS} iterations. Press [CTRL+C] to stop early."
 echo "----------------------------------------"
 
-# Infinite loop
-while true; do
+for ((iteration=1; iteration<=MAX_ITERATIONS; iteration++)); do
+    echo "Iteration ${iteration}/${MAX_ITERATIONS}"
     echo "[$(date +%T)] Running sysdashpxy.py..."
     
     # Run the Python script
@@ -43,9 +44,11 @@ if snapshot:
 PY
     
     echo "[$(date +%T)] execution finished."
-    echo "Waiting 10 seconds..."
-    echo "----------------------------------------"
-    
-    # Sleep for 10 seconds before the next iteration
-    sleep 10
+    if (( iteration < MAX_ITERATIONS )); then
+        echo "Waiting 10 seconds..."
+        echo "----------------------------------------"
+        sleep 10
+    fi
 done
+
+echo "Completed ${MAX_ITERATIONS} monitor iterations. Exiting pxymon."
