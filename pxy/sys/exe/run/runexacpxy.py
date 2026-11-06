@@ -389,13 +389,12 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         and metrics["cycle_pnl"] >= risk_target
         and metrics["cycle_pnl"] >= 280.0
     )
-    # Only SIDE with both option legs open can activate a new RiskBar exit.
+    # Any EXIT signal can activate RiskBar when both legs are open.
     # Pending liquidations resume earlier in _tick regardless of signal.
     risk_enabled = (
         RISK_CANDLE_CONTROL_ENABLED
         and RUNEXACPXY_TARGET_SQUAREOFF_ENABLED
         and metrics["both_sides_open"]
-        and str(exit_signal).upper().strip() == "SIDE"
     )
     active_book_id = closed_book_count + 1
     print(format_book_status(active_book_id, risk_target))
