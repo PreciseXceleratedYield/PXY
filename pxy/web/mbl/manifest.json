@@ -1,0 +1,19 @@
+{
+  "id": "/web/webpxy.html",
+  "name": "PXY Trading Dashboard",
+  "short_name": "PXY",
+  "description": "Private live trading dashboard",
+  "start_url": "/web/webpxy.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#e8e5dc",
+  "theme_color": "#e8e5dc",
+  "icons": [
+    {
+      "src": "/web/mbl/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
