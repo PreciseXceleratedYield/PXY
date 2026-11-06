@@ -26,7 +26,7 @@ MORNING_OVERRIDE_END = dt_time(9, 30)
 def _apply_new_book_cutoff(entry_signal, exit_signal, now_time):
     """Apply the existing entry-only market-hours restriction."""
     if not (ENTRY_START <= now_time < ENTRY_END):
-        entry_signal = "NONE"
+        entry_signal = {"BUY": "BNON", "SELL": "SNON"}.get(entry_signal, entry_signal)
     return entry_signal, exit_signal
 
 
