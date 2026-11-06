@@ -130,7 +130,7 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     price  -> price supplied in remaining_df
 
     ATM / ITM -> 0
-    OTM       -> half the strike-to-spot difference, rounded to strike step
+    OTM       -> half the strike-to-spot difference, rounded to nearest 100
     """
 
     if remaining_df is None or remaining_df.empty:
@@ -203,8 +203,10 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     # SMA adjustment disabled: use half the OTM strike distance.
     difference *= 0.5
 
+    # Counter-buy offsets round to the nearest 100 (ending in 00).
+    offset_step = 100
     return int(
-        ((difference + step / 2) // step) * step
+        ((difference + offset_step / 2) // offset_step) * offset_step
     )
 
 
