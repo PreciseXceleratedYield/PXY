@@ -32,7 +32,7 @@ market_is_open() {
 }
 
 if market_is_open; then
-    echo "pxymon blackout active (Mon-Fri, 09:00-16:00 IST)."
+    echo "I am blocked now. Come back after 4:00 PM IST."
     exit 0
 fi
 
