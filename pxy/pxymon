@@ -22,17 +22,17 @@ export PXY_MONITOR_MODE=1
 # Optional: activate virtual environment if needed
 # source ~/pxy/env/bin/activate
 
-# Never run the BTC-USD monitor during regular NSE market hours.
+# Blackout: do not run the BTC-USD monitor from 09:00 to 16:00 IST on weekdays.
 # Evaluate in India time even if the Linux server uses another timezone.
 market_is_open() {
     local weekday hhmm
     weekday=$(TZ=Asia/Kolkata date +%u)
     hhmm=$(TZ=Asia/Kolkata date +%H%M)
-    (( weekday >= 1 && weekday <= 5 && 10#$hhmm >= 915 && 10#$hhmm < 1530 ))
+    (( weekday >= 1 && weekday <= 5 && 10#$hhmm >= 900 && 10#$hhmm < 1600 ))
 }
 
 if market_is_open; then
-    echo "pxymon disabled during NSE market hours (Mon-Fri, 09:15-15:30 IST)."
+    echo "pxymon blackout active (Mon-Fri, 09:00-16:00 IST)."
     exit 0
 fi
 
@@ -42,7 +42,7 @@ echo "----------------------------------------"
 
 for ((iteration=1; iteration<=MAX_ITERATIONS; iteration++)); do
     if market_is_open; then
-        echo "NSE market hours started; stopping pxymon before the next iteration."
+        echo "pxymon blackout started; stopping before the next iteration."
         exit 0
     fi
     echo "Iteration ${iteration}/${MAX_ITERATIONS}"
