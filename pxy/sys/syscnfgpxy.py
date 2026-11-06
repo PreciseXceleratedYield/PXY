@@ -367,7 +367,7 @@ SYSKATRPXY_TRUE_ATR_FALLBACK_VALUE = 4.0
 SYSKATRPXY_DEPTH_ATR_MINIMUM = 5
 
 # History length or lookback used for lookback period.
-SYSPWERPXY_LOOKBACK_PERIOD = 3
+SYSPWERPXY_LOOKBACK_PERIOD = 1
 # Runtime setting for last n.
 SYSDPTPXY_LAST_N = 21
 
