@@ -149,6 +149,15 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
     ce_investment = float(ce_rows['row_invested'].sum()) if not ce_rows.empty else 0.0
     pe_investment = float(pe_rows['row_invested'].sum()) if not pe_rows.empty else 0.0
 
+    # LGT ratio only: midpoint of buy and sell prices, weighted by quantity.
+    working_df['row_lgt_worth'] = (
+        working_df['qty'].apply(safe_float).clip(lower=0)
+        * (working_df['buy_prc'].apply(safe_float).clip(lower=0)
+           + working_df['sell_prc'].apply(safe_float).clip(lower=0)) / 2.0
+    )
+    ce_lgt_worth = float(working_df.loc[working_df['side'] == 'CE', 'row_lgt_worth'].sum())
+    pe_lgt_worth = float(working_df.loc[working_df['side'] == 'PE', 'row_lgt_worth'].sum())
+
     ce_pnl = float(ce_rows['row_pnl'].sum()) if not ce_rows.empty else 0.0
     pe_pnl = float(pe_rows['row_pnl'].sum()) if not pe_rows.empty else 0.0
 
@@ -164,8 +173,8 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
         is_ce=True,
         ce_count=ce_lots,
         pe_count=pe_lots,
-        ce_investment=ce_investment,
-        pe_investment=pe_investment,
+        ce_investment=ce_lgt_worth,
+        pe_investment=pe_lgt_worth,
     )
     
     pe_dynamic_threshold = calculate_lgt(
@@ -173,8 +182,8 @@ def handle_side_averaging(client, df, index_price, positions_response=None):
         is_ce=False,
         ce_count=ce_lots,
         pe_count=pe_lots,
-        ce_investment=ce_investment,
-        pe_investment=pe_investment,
+        ce_investment=ce_lgt_worth,
+        pe_investment=pe_lgt_worth,
     )
     # === SURGICAL LINE REPLACEMENT END ===
     if USE_OVERALL_LOSS:
