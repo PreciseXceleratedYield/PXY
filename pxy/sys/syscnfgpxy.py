@@ -167,9 +167,9 @@ SYSCNFGPXY_ACTION_COOLDOWN_SECONDS = 6
 # ================================================================
 # Switch or algorithm selection for candle mode.
 SYSDTHAPXY_CANDLE_MODE = "TSAM"
-if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA", "TSMA_ORIG", "TSAM", "TSMA_MA", "MA7", "TSMA_CLOSE"}:
+if SYSDTHAPXY_CANDLE_MODE not in {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSAM"}:
     raise ValueError(
-        "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, HA, OHLC4, HYPER, TSMA_ORIG, TSAM, or TSMA_MA, or MA7."
+        "SYSDTHAPXY_CANDLE_MODE must be RAW, OC2, HA, OHLC4, HYPER, or TSAM."
     )
 
 # Switch or algorithm selection for signal mode.
