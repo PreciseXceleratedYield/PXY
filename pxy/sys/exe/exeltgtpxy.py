@@ -55,27 +55,19 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
         opposite_worth = float(pe_investment if is_ce else ce_investment)
         if opposite_worth <= 0:
             return -20.0
-        cumulative_count = own_count + opposite_count
-        diff_count = max(1, own_count - opposite_count)
-        axefactor_count = max(1,((cumulative_count )))
-        # Single exponent only; cap in log space to prevent overflow.
-        ratio = max(0.0, own_worth) / opposite_worth
-        if ratio == 0.0:
-            worth_factor = 0.0
-        else:
-            log_worth = axefactor_count * math.log(ratio)
-            worth_factor = math.exp(max(-745.0, min(700.0, log_worth)))
+
+        worth_factor = own_worth / opposite_worth
         count_factor = own_count - opposite_count
+        cumulative_count = own_count + opposite_count
         base_lgt = -(10.0 * (cumulative_count / 2.0) * worth_factor + 10.0 * count_factor)
-        # A position cannot lose more than 100% of its premium.
-        return max(-100.0, min(0.0, base_lgt))
+        return base_lgt
 
     except Exception as e:
         _warn_once(
             "lgt_err",
-            f"Error in calculate_lgt: {e}. Falling back to -77.0",
+            f"Error in calculate_lgt: {e}. Falling back to -55.0",
         )
-        return -77.0
+        return -55.0
 
 
 def calculate_tgt(
