@@ -105,37 +105,37 @@ SYSCNFGPXY_EXCHANGE_OPEN = dt_time(9, 15)
 # this does not authorize fresh trades.
 SYSCNFGPXY_PREOPEN_START = dt_time(9, 14)
 # Market-data/signal processing begins at 09:16, independently of engine startup.
-# Automatic fresh-entry authorization begins separately at 09:17.
+# Automatic fresh-entry authorization begins at 09:16.
 SYSCNFGPXY_MARKET_OPEN = dt_time(9, 16)
 # Scheduled supervisor/engine session end.
 SYSCNFGPXY_ENGINE_CLOSE = dt_time(15, 45)
 # End boundary for the execution pipeline.
-SYSCNFGPXY_TRADING_PIPE_CLOSE = dt_time(15, 41)
+SYSCNFGPXY_TRADING_PIPE_CLOSE = dt_time(15, 40)
 # Exchange trading-day end reference.
 SYSCNFGPXY_TRADING_DAY_END = dt_time(15, 30)
-# Automatic fresh-entry signal and execution authorization: 09:17–15:00 (end exclusive).
-# Both gates share these values; counter-buy and averaging retain separate windows.
-SYSCNFGPXY_FRESH_ENTRY_START = dt_time(9, 17)
-SYSCNFGPXY_FRESH_ENTRY_END = dt_time(15, 0)
+# Automatic fresh-entry signal and execution authorization: 09:16–15:14 (end exclusive).
+# Fresh entries, averaging and counter-buy share the 15:14 buy cutoff.
+SYSCNFGPXY_FRESH_ENTRY_START = dt_time(9, 16)
+SYSCNFGPXY_FRESH_ENTRY_END = dt_time(15, 14)
 # Earliest eligibility for position averaging.
-SYSCNFGPXY_AVERAGING_START = dt_time(9, 17)
+SYSCNFGPXY_AVERAGING_START = dt_time(9, 16)
 # Independent cutoff for averaging existing positions (exclusive).
-SYSCNFGPXY_AVERAGING_CUTOFF = dt_time(15, 10)
-# New books stop with automatic fresh entries at 15:00.
-SYSCNFGPXY_NEW_BOOK_CUTOFF = dt_time(15, 0)
-# Hard cutoff for all remaining buy paths (averaging/counter-buy) at 15:10.
-SYSCNFGPXY_ENTRY_CUTOFF = dt_time(15, 10)
-# Beginning of regular EOD liquidation handling (15:11–15:14).
-SYSCNFGPXY_SQUAREOFF_START = dt_time(15, 11)
-# Beginning of forced liquidation of every remaining position (15:14–15:41).
+SYSCNFGPXY_AVERAGING_CUTOFF = dt_time(15, 14)
+# New books stop with all other buys at 15:14.
+SYSCNFGPXY_NEW_BOOK_CUTOFF = dt_time(15, 14)
+# Hard cutoff for every buy path at 15:14.
+SYSCNFGPXY_ENTRY_CUTOFF = dt_time(15, 14)
+# Beginning of forced SQR-ALL liquidation at 15:14.
+SYSCNFGPXY_SQUAREOFF_START = dt_time(15, 14)
+# Forced SQR-ALL starts immediately at 15:14.
 SYSCNFGPXY_SQUAREOFF_ALL_START = dt_time(15, 14)
 # End of EOD square-off attempts.
-SYSCNFGPXY_SQUAREOFF_END = dt_time(15, 41)
+SYSCNFGPXY_SQUAREOFF_END = dt_time(15, 40)
 if not (
     SYSCNFGPXY_EXCHANGE_OPEN <= SYSCNFGPXY_MARKET_OPEN < SYSCNFGPXY_ENGINE_CLOSE
     and SYSCNFGPXY_PREOPEN_START <= SYSCNFGPXY_MARKET_OPEN
-    and SYSCNFGPXY_ENTRY_CUTOFF < SYSCNFGPXY_SQUAREOFF_START
-    and SYSCNFGPXY_SQUAREOFF_START < SYSCNFGPXY_SQUAREOFF_ALL_START
+    and SYSCNFGPXY_ENTRY_CUTOFF == SYSCNFGPXY_SQUAREOFF_START
+    and SYSCNFGPXY_SQUAREOFF_START == SYSCNFGPXY_SQUAREOFF_ALL_START
     and SYSCNFGPXY_SQUAREOFF_ALL_START < SYSCNFGPXY_SQUAREOFF_END
 ):
     raise ValueError("Shared market-hours settings are not in chronological order.")
@@ -544,7 +544,7 @@ if not isinstance(EXECBUYPXY_USE_DYNAMIC_STRIKE, bool):
 # Enables verbose diagnostic logging for this subsystem.
 EXECBUYPXY_DEBUG_ENABLED = False
 # Session boundary controlling cutoff.
-EXECBUYPXY_CUTOFF = SYSCNFGPXY_ENTRY_CUTOFF  # Block counter-buys with all other entries at 15:10 IST
+EXECBUYPXY_CUTOFF = SYSCNFGPXY_ENTRY_CUTOFF  # Block counter-buys with all other entries at 15:14 IST
 # Compatibility command mapping for scripts.
 EXECBUYPXY_SCRIPTS = {
     "CE": "pxybuype",
