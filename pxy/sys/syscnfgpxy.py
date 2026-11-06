@@ -623,6 +623,13 @@ RUNEXIOPXY_WRITE_RETRIES = 2
 # Retry budget for write retry delay seconds.
 RUNEXIOPXY_WRITE_RETRY_DELAY_SECONDS = 0.2
 
+# Fixed IST minute-by-minute RiskBar profit target schedule (rupees).
+# 09:00 = 7200, 16:00 = 0; outside this window = 1000.
+RUNEXACPXY_TARGET_START = dt_time(9, 0)
+RUNEXACPXY_TARGET_END = dt_time(16, 0)
+RUNEXACPXY_TARGET_OPEN_RUPEES = 7200.0
+RUNEXACPXY_TARGET_CLOSED_RUPEES = 1000.0
+
 # Runtime setting for breach ticks required.
 RUNEXACPXY_BREACH_TICKS_REQUIRED = 1
 # Limit or threshold governing tick min gap seconds.
