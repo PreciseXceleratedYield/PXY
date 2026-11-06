@@ -130,7 +130,7 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     price  -> price supplied in remaining_df
 
     ATM / ITM -> 0
-    OTM       -> full difference regardless of SMA50 (adjustment factor 1.0)
+    OTM       -> half the strike-to-spot difference, rounded to strike step
     """
 
     if remaining_df is None or remaining_df.empty:
@@ -200,8 +200,8 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     # Missing or unknown direction means normal full-distance offset.
     sma_direction = str(sma_direction or "NA").upper().strip()
 
-    # SMA adjustment disabled: use full OTM strike distance (factor 1.0).
-    difference *= 1.0
+    # SMA adjustment disabled: use half the OTM strike distance.
+    difference *= 0.5
 
     return int(
         ((difference + step / 2) // step) * step
