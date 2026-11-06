@@ -1,8 +1,8 @@
 html[data-theme="comfort"],
 html[data-theme="light"] {
     color-scheme: light !important;
-    --paper: #f1eadb !important;
-    --ink: #30271d !important;
+    --paper: #e8e5dc !important;
+    --ink: #303a3b !important;
     --bg: var(--paper) !important;
     --bg2: var(--paper) !important;
     --bg3: var(--paper) !important;
@@ -12,56 +12,56 @@ html[data-theme="light"] {
     --chip-bg: var(--paper) !important;
     --toggle-bg: var(--paper) !important;
     --text: var(--ink) !important;
-    --strong: #261e16 !important;
-    --muted: #5c5041 !important;
-    --border: rgba(48, 39, 29, 0.12) !important;
-    --border2: rgba(48, 39, 29, 0.24) !important;
-    --line: rgba(48, 39, 29, 0.24) !important;
-    --accent: #435c6b !important;
-    --blue: #435c6b !important;
-    --bull: #356348 !important;
-    --green: #356348 !important;
-    --bear: #91483d !important;
-    --red: #91483d !important;
-    --gold: #80602a !important;
-    --warn: #765722 !important;
-    --side: #765722 !important;
-    --sqr: #91483d !important;
-    --bull-dim: rgba(53, 99, 72, 0.10) !important;
-    --bear-dim: rgba(145, 72, 61, 0.10) !important;
-    --grid: rgba(48, 39, 29, 0.08) !important;
-    --chart-grid: rgba(48, 39, 29, 0.08) !important;
-    --chart-tick: #5c5041 !important;
-    --shadow: rgba(48, 39, 29, 0.14) !important;
-    --shadow-tip: 0 4px 14px rgba(48, 39, 29, 0.16) !important;
-    --track-mid: rgba(48, 39, 29, 0.16) !important;
+    --strong: #252e30 !important;
+    --muted: #515d5d !important;
+    --border: rgba(49, 58, 56, 0.12) !important;
+    --border2: rgba(49, 58, 56, 0.24) !important;
+    --line: rgba(49, 58, 56, 0.24) !important;
+    --accent: #355c66 !important;
+    --blue: #355c66 !important;
+    --bull: #2c6654 !important;
+    --green: #2c6654 !important;
+    --bear: #965147 !important;
+    --red: #965147 !important;
+    --gold: #785c32 !important;
+    --warn: #72572d !important;
+    --side: #72572d !important;
+    --sqr: #965147 !important;
+    --bull-dim: rgba(44, 102, 84, 0.10) !important;
+    --bear-dim: rgba(150, 81, 71, 0.10) !important;
+    --grid: rgba(49, 58, 56, 0.08) !important;
+    --chart-grid: rgba(49, 58, 56, 0.08) !important;
+    --chart-tick: #515d5d !important;
+    --shadow: rgba(49, 58, 56, 0.07) !important;
+    --shadow-tip: 0 3px 10px rgba(49, 58, 56, 0.10) !important;
+    --track-mid: rgba(49, 58, 56, 0.16) !important;
     --hdr-bg: var(--paper) !important;
-    --sep: rgba(48, 39, 29, 0.20) !important;
+    --sep: rgba(49, 58, 56, 0.20) !important;
     --item-bg: var(--paper) !important;
-    --item-bg-h: rgba(48, 39, 29, 0.05) !important;
-    --row-hover: rgba(48, 39, 29, 0.04) !important;
-    --overlay: rgba(48, 39, 29, 0.38) !important;
-    --hl-glow: rgba(67, 92, 107, 0.22) !important;
-    --flash-up: rgba(53, 99, 72, 0.20) !important;
-    --flash-down: rgba(145, 72, 61, 0.20) !important;
-    --glow-bull: rgba(53, 99, 72, 0.22) !important;
-    --glow-bear: rgba(145, 72, 61, 0.22) !important;
-    --glow-neutral: rgba(48, 39, 29, 0.16) !important;
+    --item-bg-h: rgba(49, 58, 56, 0.05) !important;
+    --row-hover: rgba(49, 58, 56, 0.04) !important;
+    --overlay: rgba(49, 58, 56, 0.38) !important;
+    --hl-glow: rgba(53, 92, 102, 0.08) !important;
+    --flash-up: rgba(44, 102, 84, 0.07) !important;
+    --flash-down: rgba(150, 81, 71, 0.07) !important;
+    --glow-bull: rgba(44, 102, 84, 0.09) !important;
+    --glow-bear: rgba(150, 81, 71, 0.09) !important;
+    --glow-neutral: rgba(49, 58, 56, 0.16) !important;
     --neutral-body: #777064 !important;
-    --wick: rgba(48, 39, 29, 0.58) !important;
-    --mirror: rgba(48, 39, 29, 0.58) !important;
-    --trend-neutral: rgba(48, 39, 29, 0.80) !important;
-    --line-soft: rgba(48, 39, 29, 0.52) !important;
-    --cjs-line: rgba(48, 39, 29, 0.80) !important;
-    --cjs-fill: rgba(48, 39, 29, 0.06) !important;
+    --wick: rgba(49, 58, 56, 0.58) !important;
+    --mirror: rgba(49, 58, 56, 0.58) !important;
+    --trend-neutral: rgba(49, 58, 56, 0.80) !important;
+    --line-soft: rgba(49, 58, 56, 0.52) !important;
+    --cjs-line: rgba(49, 58, 56, 0.80) !important;
+    --cjs-fill: rgba(49, 58, 56, 0.06) !important;
     --cjs-sma: rgba(128, 96, 42, 0.86) !important;
-    --rk-grid: rgba(48, 39, 29, 0.18) !important;
-    --rk-dash: rgba(48, 39, 29, 0.30) !important;
-    --on-bull: #f1eadb !important;
-    --on-bear: #f1eadb !important;
+    --rk-grid: rgba(49, 58, 56, 0.18) !important;
+    --rk-dash: rgba(49, 58, 56, 0.30) !important;
+    --on-bull: #e8e5dc !important;
+    --on-bear: #e8e5dc !important;
     --hero-bull: #1f4d3b !important;
     --hero-bear: #6b2e30 !important;
-    --hero-text: #f1eadb !important;
+    --hero-text: #e8e5dc !important;
 }
 
 html[data-theme="dark"] {
@@ -217,4 +217,11 @@ html[data-theme="light"] #gameMenuStatus {
     color: var(--text) !important;
     background: var(--bg) !important;
     border-color: var(--border2) !important;
+}
+
+/* Extended-session comfort: quiet interactions without disabling live chart updates. */
+html[data-theme="comfort"], html[data-theme="light"] { scrollbar-color: #a9b0a7 #e8e5dc; }
+html[data-theme="comfort"] :focus-visible, html[data-theme="light"] :focus-visible { outline: 2px solid #355c66; outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme="comfort"] *, html[data-theme="light"] * { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
