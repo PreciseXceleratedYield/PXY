@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, time as dt_time
 
 # ----------------- PATH FIX (MUST BE AT ABSOLUTE TOP) -----------------
 HERE = Path(__file__).resolve().parent
@@ -114,7 +114,7 @@ def calculate_tgt(
 
         # With only one active option side, use its own power alone.
         # The late-day override above remains authoritative.
-        if not both_sides_open:
+        if not both_sides_open and current_time >= dt_time(9, 30):
             return min(
                 EXETGTPXY_PRD_MAX_TARGET_PCT,
                 EXETGTPXY_PRD_BASE_FACTOR * own_power,
