@@ -380,16 +380,22 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         exit_signal,
         risk_target_pct,
     )
-    risk_target = riskbar_minute_target()
-    # Preserve all existing eligibility, minimum ₹280, and confirmation gates;
-    # only replace the monetary profit target used by RiskBar.
+    # Only count active and closed trade rows tagged to the present book.
+    # Require SIDE and 1.4% profit per book trade (open or closed).
+    # Existing both-leg, minimum ₹280, confirmation and liquidation gates remain.
+    book_count = metrics["book_trade_count"]
+    risk_target_pct = 1.4 * book_count
+    risk_target = metrics["premium_paid"] * risk_target_pct / 100.0
+    metrics["target_pct"] = risk_target_pct
+    metrics["target"] = risk_target
     metrics["target_reached"] = bool(
-        metrics["both_sides_open"]
+        str(exit_signal).upper().strip() == "SIDE"
+        and metrics["both_sides_open"]
+        and book_count > 0
         and metrics["premium_paid"] > 0
         and metrics["cycle_pnl"] >= risk_target
         and metrics["cycle_pnl"] >= 280.0
     )
-    # Any EXIT signal can activate RiskBar when both legs are open.
     # Pending liquidations resume earlier in _tick regardless of signal.
     risk_enabled = (
         RISK_CANDLE_CONTROL_ENABLED
@@ -461,9 +467,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         active_book_started_at=cycle_started_at,
     )
     print(
-        f"{Fore.YELLOW}⚠️ Cycle profit target reached while heavy side is unaligned "
-        f"({metrics['target_pct']:.2f}% = "
-        f"{RUNEXACPXY_CYCLE_TARGET_PCT:.1f}% / {metrics['active_count']}) "
+        f"{Fore.YELLOW}⚠️ SIDE book profit target reached "
+        f"({metrics['target_pct']:.2f}% = 1.4% × {book_count} book trades) "
         f"(confirmation {consecutive_breaches}/{BREACH_TICKS_REQUIRED})."
     )
     if consecutive_breaches < BREACH_TICKS_REQUIRED:
