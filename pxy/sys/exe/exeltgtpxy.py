@@ -56,7 +56,8 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
         if opposite_worth <= 0:
             return -20.0
         cumulative_count = own_count + opposite_count
-        worth_factor = (own_worth / opposite_worth) #* cumulative_count
+        axefactor_count = max(1, abs(own_count + opposite_count))
+        worth_factor = (own_worth / opposite_worth) ** axefactor_count
         count_factor = own_count - opposite_count
         base_lgt = -(10.0 * (cumulative_count / 2.0) * worth_factor + 10.0 * count_factor)
         return base_lgt
