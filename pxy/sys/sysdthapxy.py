@@ -17,16 +17,13 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
 
     OC2 and OHLC4 replace Close with the corresponding candle average.
     HYPER preserves the former DTAF mode-0 transformation.
-    TSMA_ORIG retains the original 3:1 blend of TSMA open and real close.
     TSAM blends TSMA close with real close, then averages that blend with the prior final synthetic close.
-    TSMA_MA blends 75% TSMA7 close and 25% SMA7 close, with prior synthetic close as open.
-    MA7 uses SMA7 as open and averages SMA7, TSMA7 and actual close as close.
     HA applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSMA", "TSMA_ORIG", "TSAM", "TSMA_MA", "MA7", "TSMA_CLOSE"}
+    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSAM"}
     if mode not in valid_modes:
         raise ValueError(
-            "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, TSMA_ORIG, TSAM, or TSMA_MA, or MA7."
+            "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, or TSAM."
         )
 
     if df is None or df.empty:
@@ -66,25 +63,6 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         out["Close"] = hyper_close
         return out
 
-    if mode in {"TSMA", "TSMA_ORIG"}:
-        # Pine: ta.linreg(open, 7, 0)
-        tsma_open = calculate_moving_average(
-            pd.Series(raw_open, index=out.index),
-            period=SYSSMAPXY_TSMA_PERIOD,
-            variant="TSMA",
-        ).to_numpy(dtype=float)
-
-        # Pine: candle_open = tsma_open
-        # Weighted synthetic close: 75% TSMA open + 25% actual close
-        candle_close = (3.0 * tsma_open + raw_close) / 4.0
-
-        # Wickless synthetic candle: range is only between its open and close.
-        out["Open"] = tsma_open
-        out["Close"] = candle_close
-        out["High"] = np.maximum(tsma_open, candle_close)
-        out["Low"] = np.minimum(tsma_open, candle_close)
-        return out
-
     if mode == "TSAM":
         tsma_open = calculate_moving_average(
             pd.Series(raw_open, index=out.index),
@@ -101,58 +79,6 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         blended_close = (tsma_close + raw_close) / 2.0
         # Final close is the average of the synthetic open and blended close.
         candle_close = (candle_open + blended_close) / 2.0
-        out["Open"] = candle_open
-        out["Close"] = candle_close
-        out["High"] = np.maximum(candle_open, candle_close)
-        out["Low"] = np.minimum(candle_open, candle_close)
-        return out
-
-    if mode == "TSMA_CLOSE":
-        tsma_open = calculate_moving_average(
-            pd.Series(raw_open, index=out.index),
-            period=SYSSMAPXY_TSMA_PERIOD,
-            variant="TSMA",
-        ).to_numpy(dtype=float)
-        tsma_close = calculate_moving_average(
-            pd.Series(raw_close, index=out.index),
-            period=SYSSMAPXY_TSMA_PERIOD,
-            variant="TSMA",
-        ).to_numpy(dtype=float)
-        candle_open = (tsma_open + raw_open) / 2.0
-        candle_close = (tsma_close + raw_close) / 2.0
-        out["Open"] = candle_open
-        out["Close"] = candle_close
-        out["High"] = np.maximum(candle_open, candle_close)
-        out["Low"] = np.minimum(candle_open, candle_close)
-        return out
-
-    if mode == "MA7":
-        close_series = pd.Series(raw_close, index=out.index)
-        ma7 = calculate_moving_average(
-            close_series, period=7, variant="SMA"
-        ).to_numpy(dtype=float)
-        tsma7 = calculate_moving_average(
-            close_series, period=7, variant="TSMA"
-        ).to_numpy(dtype=float)
-        candle_close = (ma7 + tsma7 + raw_close) / 3.0
-        out["Open"] = ma7
-        out["Close"] = candle_close
-        out["High"] = np.maximum(ma7, candle_close)
-        out["Low"] = np.minimum(ma7, candle_close)
-        return out
-
-    if mode == "TSMA_MA":
-        close_series = pd.Series(raw_close, index=out.index)
-        sma_close = calculate_moving_average(
-            close_series, period=SYSSMAPXY_TSMA_PERIOD, variant="SMA"
-        ).to_numpy(dtype=float)
-        tsma_close = calculate_moving_average(
-            close_series, period=SYSSMAPXY_TSMA_PERIOD, variant="TSMA"
-        ).to_numpy(dtype=float)
-        candle_close = (3.0 * tsma_close + sma_close) / 4.0
-        candle_open = np.empty_like(candle_close)
-        candle_open[0] = raw_open[0]
-        candle_open[1:] = candle_close[:-1]
         out["Open"] = candle_open
         out["Close"] = candle_close
         out["High"] = np.maximum(candle_open, candle_close)
