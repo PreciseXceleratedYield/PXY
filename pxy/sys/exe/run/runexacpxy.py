@@ -380,11 +380,11 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         exit_signal,
         risk_target_pct,
     )
-    # Only count active and closed trade rows tagged to the present book.
-    # Require SIDE and 1.4% profit per book trade (open or closed).
-    # Existing both-leg, minimum ₹280, confirmation and liquidation gates remain.
+    # Use 1.4% of total invested premium across active and closed rows
+    # tagged to the present book; never multiply the rate by row count.
+    # Existing SIDE, both-leg, minimum ₹280 and confirmation gates remain.
     book_count = metrics["book_trade_count"]
-    risk_target_pct = 1.4 * book_count
+    risk_target_pct = 1.4
     risk_target = metrics["premium_paid"] * risk_target_pct / 100.0
     metrics["target_pct"] = risk_target_pct
     metrics["target"] = risk_target
@@ -468,7 +468,8 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     )
     print(
         f"{Fore.YELLOW}⚠️ SIDE book profit target reached "
-        f"({metrics['target_pct']:.2f}% = 1.4% × {book_count} book trades) "
+        f"({metrics['target_pct']:.2f}% of ₹{metrics['premium_paid']:.2f} invested "
+        f"across {book_count} present-book rows) "
         f"(confirmation {consecutive_breaches}/{BREACH_TICKS_REQUIRED})."
     )
     if consecutive_breaches < BREACH_TICKS_REQUIRED:
