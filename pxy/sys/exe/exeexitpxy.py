@@ -405,9 +405,9 @@ def run_snapshot():
     
     if os.path.exists(exe_path) and not liquidation_pending():
         sq_args, sq_key = None, None
-        if SQOFF_START <= now < SQOFF_ALL_START:       # 15:06 to 15:15: without -all
+        if SQOFF_START <= now < SQOFF_ALL_START:       # 15:11 to 15:14: without -all
             sq_args, sq_key = [], "SQOFF|first"
-        elif SQOFF_ALL_START <= now < SQOFF_END:       # 15:15 to 15:41: with -all
+        elif SQOFF_ALL_START <= now < SQOFF_END:       # 15:14 to 15:41: with -all
             sq_args, sq_key = ["-all"], "SQOFF|all"
         if sq_args is not None:
             if ledger_busy():
