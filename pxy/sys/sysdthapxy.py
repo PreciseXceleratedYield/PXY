@@ -20,10 +20,10 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     TSMA blends TSMA close with real close, then averages that blend with the prior final synthetic close.
     HKIN applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW0", "RAW2", "HKIN", "RAW4", "HYPR", "TSMA"}
+    valid_modes = {"RAW0", "RAW2", "HKIN", "RAW4", "HYPR", "TSMA", "STRW"}
     if mode not in valid_modes:
         raise ValueError(
-            "DTHA mode must be RAW0, RAW2, HKIN, RAW4, HYPR, or TSMA."
+            "DTHA mode must be RAW0, RAW2, HKIN, RAW4, HYPR, TSMA, or STRW."
         )
 
     if df is None or df.empty:
@@ -39,7 +39,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     raw_low = pd.to_numeric(out["Low"], errors="coerce").to_numpy(dtype=float)
     raw_close = pd.to_numeric(out["Close"], errors="coerce").to_numpy(dtype=float)
 
-    if mode == "RAW0":
+    if mode in {"RAW0", "STRW"}:
         return out
 
     if mode == "RAW2":
@@ -106,6 +106,53 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     out["Close"] = ha_close
     return out
 
+
+def get_strw_signals(df, include_running=None):
+    """Return STRW IN/OUT from raw close direction and SuperTrend(1, 1).
+
+    IN is state-based (not a flip detector). ST and RAW0 use the same
+    evaluated candles. A flat close or invalid price produces NONE/SIDE.
+    """
+    from sysstrnpxy import _compute_single_st
+
+    neutral = ("NONE", "SIDE")
+    if df is None or df.empty:
+        return neutral
+    required = ("Open", "High", "Low", "Close")
+    if any(name not in df.columns for name in required):
+        return neutral
+    if include_running is None:
+        include_running = SYSDTHAPXY_INCLUDE_RUNNING_CANDLE == "YES"
+    candles = df if include_running else df.iloc[:-1]
+    if len(candles) < 2:
+        return neutral
+    raw = candles.loc[:, list(required)].copy()
+    for name in required:
+        raw[name] = pd.to_numeric(raw[name], errors="coerce")
+    if not np.isfinite(raw.to_numpy(dtype=float)).all():
+        return neutral
+
+    closes = raw["Close"].to_numpy(dtype=float)
+    change = closes[-1] - closes[-2]
+    if change == 0:
+        return neutral
+    raw_direction = "BULL" if change > 0 else "BEAR"
+
+    st_line, _ = _compute_single_st(raw, period=1, factor=1)
+    if not len(st_line) or not np.isfinite(st_line[-1]):
+        return neutral
+    # Standard SuperTrend: price above the active band is bullish,
+    # below the active band is bearish.
+    if closes[-1] > st_line[-1]:
+        st_direction = "BULL"
+    elif closes[-1] < st_line[-1]:
+        st_direction = "BEAR"
+    else:
+        return neutral
+
+    if st_direction == raw_direction:
+        return ("NONE", raw_direction)
+    return ("BUY", "SIDE") if st_direction == "BULL" else ("SELL", "SIDE")
 
 def get_close_direction_series(closes):
     """Return each close's direction relative to the preceding close."""
