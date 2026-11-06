@@ -112,6 +112,14 @@ def calculate_tgt(
         own_depth = positive_factor(side_depth)
         own_power = positive_factor(side_power)
 
+        # With only one active option side, use its own power alone.
+        # The late-day override above remains authoritative.
+        if not both_sides_open:
+            return min(
+                EXETGTPXY_PRD_MAX_TARGET_PCT,
+                EXETGTPXY_PRD_BASE_FACTOR * own_power,
+            )
+
         if not is_aligned:
             # Scale by opposing-to-own position count; protect against zero/invalid counts.
             opposite = max(1.0, float(opposite_count))
