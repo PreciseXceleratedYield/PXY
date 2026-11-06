@@ -15,6 +15,7 @@
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from colorama import Fore, Style, init
 
@@ -24,6 +25,10 @@ if str(SYS_DIR) not in sys.path:
 
 from syscnfgpxy import (
     RUNEXACPXY_CNTRLRSKBAR,
+    RUNEXACPXY_TARGET_START,
+    RUNEXACPXY_TARGET_END,
+    RUNEXACPXY_TARGET_OPEN_RUPEES,
+    RUNEXACPXY_TARGET_CLOSED_RUPEES,
     RUNEXACPXY_BREACH_TICKS_REQUIRED,
     RUNEXACPXY_CYCLE_TARGET_PCT,
     RUNEXACPXY_DEBUG_ENABLED,
@@ -66,6 +71,17 @@ VIEW_ONLY_ENV = RUNEXACPXY_VIEW_ONLY_ENV
 # Re-entrancy guard: the post-square-off ledger refresh calls process_lilo_orders again,
 # which would call this module again.
 _IN_LEDGER = False
+
+
+def riskbar_minute_target(now=None):
+    """Absolute RiskBar P&L target, stepped once per whole IST minute."""
+    current = now if now is not None else now_ist()
+    minute = current.hour * 60 + current.minute
+    start = RUNEXACPXY_TARGET_START.hour * 60 + RUNEXACPXY_TARGET_START.minute
+    end = RUNEXACPXY_TARGET_END.hour * 60 + RUNEXACPXY_TARGET_END.minute
+    if not start <= minute <= end:
+        return RUNEXACPXY_TARGET_CLOSED_RUPEES
+    return RUNEXACPXY_TARGET_OPEN_RUPEES * (end - minute) / (end - start)
 
 
 def debug_log(msg, color=Fore.BLUE):
@@ -365,9 +381,14 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         exit_signal,
         risk_target_pct,
     )
-    risk_target = (
-        metrics["target"] if metrics["both_sides_open"]
-        else INITIAL_RISK_BAR_TARGET
+    risk_target = riskbar_minute_target()
+    # Preserve all existing eligibility, minimum ₹280, and confirmation gates;
+    # only replace the monetary profit target used by RiskBar.
+    metrics["target_reached"] = bool(
+        metrics["both_sides_open"]
+        and metrics["premium_paid"] > 0
+        and metrics["cycle_pnl"] >= risk_target
+        and metrics["cycle_pnl"] >= 280.0
     )
     # Only SIDE with both option legs open can activate a new RiskBar exit.
     # Pending liquidations resume earlier in _tick regardless of signal.
