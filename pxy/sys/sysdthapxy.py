@@ -150,9 +150,23 @@ def get_strw_signals(df, include_running=None):
     else:
         return neutral
 
+    # A SuperTrend direction flip takes priority for IN on the flip candle
+    # only. OUT retains its existing RAW0/ST agreement behavior.
+    previous_st_line = st_line[-2]
+    previous_st_direction = (
+        "BULL" if closes[-2] > previous_st_line
+        else "BEAR" if closes[-2] < previous_st_line
+        else None
+    ) if np.isfinite(previous_st_line) else None
     if st_direction == raw_direction:
-        return ("NONE", raw_direction)
-    return ("BUY", "SIDE") if st_direction == "BULL" else ("SELL", "SIDE")
+        out_signal = raw_direction
+    else:
+        out_signal = "SIDE"
+    if previous_st_direction is not None and previous_st_direction != st_direction:
+        return ("BUY" if st_direction == "BULL" else "SELL", out_signal)
+    if st_direction == raw_direction:
+        return ("NONE", out_signal)
+    return ("BUY" if st_direction == "BULL" else "SELL", out_signal)
 
 def get_close_direction_series(closes):
     """Return each close's direction relative to the preceding close."""
