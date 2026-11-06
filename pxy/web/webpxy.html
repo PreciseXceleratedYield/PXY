@@ -8,6 +8,10 @@
 <meta name="apple-mobile-web-app-title" content="PXY®">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f1ece2">
+<link rel="manifest" href="/web/mbl/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/web/mbl/icon.svg">
+<link rel="apple-touch-icon" href="/web/mbl/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
 <title>PXY®</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -1956,6 +1960,15 @@ loadDash();loadChart();loadPos();loadTrades();loadRisk();loadOptSummary();
 setInterval(loadDash,1000);setInterval(loadChart,1000);
 setInterval(loadPos,1000);setInterval(loadTrades,1000);setInterval(loadRisk,1000);setInterval(loadOptSummary,1000);
 
+</script>
+<script>
+/* PWA installation support; no offline cache of live trading information. */
+if ('serviceWorker' in navigator && window.isSecureContext) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/web/mbl/sw.js', { scope: '/web/' })
+            .catch(error => console.warn('PXY app registration unavailable:', error));
+    });
+}
 </script>
 </body>
 </html>
