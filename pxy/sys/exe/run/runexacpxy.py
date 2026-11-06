@@ -367,36 +367,16 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     total_raw_pnl = totals["total"]
     current_time = now_ist().time()
 
-    risk_target_pct = (
-        RUNEXACPXY_LATE_DAY_TARGET_PCT
-        if RUNEXACPXY_LATE_DAY_START <= current_time < RUNEXACPXY_LATE_DAY_END
-        else RUNEXACPXY_CYCLE_TARGET_PCT
-    )
-
     metrics = cycle_risk_metrics(
         open_df,
         closed_df,
         cycle_tags,
         exit_signal,
-        risk_target_pct,
     )
-    # Target 1.4% of present-book invested premium, with a separate
-    # minimum P&L of ₹100 per active or closed row in that same book.
-    # Preserve SIDE, both-leg, and confirmation gates.
+    # Shared metrics own the effective SIDE/BULL/BEAR target and minimum.
+    # SIDE: 1.4% / ₹100 per row; BULL/BEAR: twice both thresholds.
     book_count = metrics["book_trade_count"]
-    risk_target_pct = 1.4
-    risk_target = metrics["premium_paid"] * risk_target_pct / 100.0
-    minimum_pnl = 100.0 * book_count
-    metrics["target_pct"] = risk_target_pct
-    metrics["target"] = risk_target
-    metrics["target_reached"] = bool(
-        str(exit_signal).upper().strip() == "SIDE"
-        and metrics["both_sides_open"]
-        and book_count > 0
-        and metrics["premium_paid"] > 0
-        and metrics["cycle_pnl"] >= risk_target
-        and metrics["cycle_pnl"] >= minimum_pnl
-    )
+    risk_target = metrics["target"]
     # Pending liquidations resume earlier in _tick regardless of signal.
     risk_enabled = (
         RISK_CANDLE_CONTROL_ENABLED
@@ -468,9 +448,9 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         active_book_started_at=cycle_started_at,
     )
     print(
-        f"{Fore.YELLOW}⚠️ SIDE book profit target reached "
+        f"{Fore.YELLOW}⚠️ {str(exit_signal).upper().strip()} book profit target reached "
         f"({metrics['target_pct']:.2f}% of ₹{metrics['premium_paid']:.2f} invested "
-        f"across {book_count} present-book rows) "
+        f"across {book_count} present-book rows; minimum ₹{metrics['minimum_pnl']:.2f}) "
         f"(confirmation {consecutive_breaches}/{BREACH_TICKS_REQUIRED})."
     )
     if consecutive_breaches < BREACH_TICKS_REQUIRED:
