@@ -225,3 +225,36 @@ html[data-theme="comfort"] :focus-visible, html[data-theme="light"] :focus-visib
 @media (prefers-reduced-motion: reduce) {
   html[data-theme="comfort"] *, html[data-theme="light"] * { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* WebPXY extended-viewing refinement: light theme only; never change live data. */
+html[data-theme="comfort"], html[data-theme="light"] {
+    --grid: rgba(49,58,56,0.045) !important;
+    --chart-grid: rgba(49,58,56,0.045) !important;
+    --rk-grid: rgba(49,58,56,0.10) !important;
+    --rk-dash: rgba(49,58,56,0.18) !important;
+    --flash-up: rgba(44,102,84,0.045) !important;
+    --flash-down: rgba(150,81,71,0.045) !important;
+    --hl-glow: transparent !important;
+    --glow-bull: transparent !important;
+    --glow-bear: transparent !important;
+    --glow-neutral: transparent !important;
+    --chart-tick: #58615e !important;
+}
+html[data-theme="comfort"] .flash-up,
+html[data-theme="comfort"] .flash-down,
+html[data-theme="light"] .flash-up,
+html[data-theme="light"] .flash-down {
+    animation-duration: 0.18s !important;
+}
+html[data-theme="comfort"] .sc-lbl,
+html[data-theme="light"] .sc-lbl { font-size: 8px; letter-spacing: 0.025em; }
+html[data-theme="comfort"] .rsk-lbl,
+html[data-theme="light"] .rsk-lbl { font-size: 9px; letter-spacing: 0.035em; }
+html[data-theme="comfort"] .sc-val,
+html[data-theme="light"] .sc-val { font-size: 11px; }
+html[data-theme="comfort"] .rsk-val,
+html[data-theme="light"] .rsk-val { font-size: 13px; }
+html[data-theme="comfort"] .t-meta,
+html[data-theme="light"] .t-meta,
+html[data-theme="comfort"] #rskInfo .ri-k,
+html[data-theme="light"] #rskInfo .ri-k { font-size: 10px; }
