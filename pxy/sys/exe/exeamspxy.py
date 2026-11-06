@@ -60,7 +60,7 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
                                   max_investment=EXEAMSPXY_MAX_INVESTMENT):
     """Executes network orders for System A when pullback boundaries are breached."""
     if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= SYSCNFGPXY_ENTRY_CUTOFF:
-        logger.warning("Averaging blocked: 15:10 IST hard buy cutoff")
+        logger.warning("Averaging blocked: 15:14 IST hard buy cutoff")
         return
     ce_last_row = _newest_row(ce_rows) if not ce_rows.empty else None
     pe_last_row = _newest_row(pe_rows) if not pe_rows.empty else None
@@ -125,7 +125,7 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
             }
             set_cooling("CE")      # stays BEFORE the send to prevent a duplicate buy
             if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= SYSCNFGPXY_ENTRY_CUTOFF:
-                logger.warning("Averaging order blocked by 15:10 IST hard cutoff")
+                logger.warning("Averaging order blocked by 15:14 IST hard cutoff")
                 return
             resp = client.place_order(**params)
             if _order_ok(resp):
@@ -168,7 +168,7 @@ def execute_side_averaging_matrix(client, ce_rows, pe_rows, ce_lgt_val, pe_lgt_v
             }
             set_cooling("PE")      # stays BEFORE the send to prevent a duplicate buy
             if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= SYSCNFGPXY_ENTRY_CUTOFF:
-                logger.warning("Averaging order blocked by 15:10 IST hard cutoff")
+                logger.warning("Averaging order blocked by 15:14 IST hard cutoff")
                 return
             resp = client.place_order(**params)
             if _order_ok(resp):
