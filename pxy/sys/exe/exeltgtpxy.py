@@ -92,7 +92,7 @@ def calculate_tgt(
         if hasattr(current_time, "time"):
             current_time = current_time.time()
 
-        # From 15:05 IST, set 99% target for every position,
+        # From the configured late-day cutoff (15:14 IST), set 99% target for every position,
         # regardless of alignment or whether one or both sides are open.
         if current_time >= EXETGTPXY_PRD_LATE_DAY_TIME:
             return EXETGTPXY_PRD_MAX_TARGET_PCT
@@ -112,9 +112,9 @@ def calculate_tgt(
         own_depth = positive_factor(side_depth)
         own_power = positive_factor(side_power)
 
-        # With only one active option side, use its own power alone.
+        # With only one active option side, use its own power alone from 09:15 until 15:14.
         # The late-day override above remains authoritative.
-        if not both_sides_open and current_time >= dt_time(9, 30):
+        if not both_sides_open and dt_time(9, 15) <= current_time < EXETGTPXY_PRD_LATE_DAY_TIME:
             return min(
                 EXETGTPXY_PRD_MAX_TARGET_PCT,
                 EXETGTPXY_PRD_BASE_FACTOR * own_power,
