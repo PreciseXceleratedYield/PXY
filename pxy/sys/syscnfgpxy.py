@@ -120,15 +120,15 @@ SYSCNFGPXY_FRESH_ENTRY_END = dt_time(15, 0)
 # Earliest eligibility for position averaging.
 SYSCNFGPXY_AVERAGING_START = dt_time(9, 17)
 # Independent cutoff for averaging existing positions (exclusive).
-SYSCNFGPXY_AVERAGING_CUTOFF = dt_time(15, 5)
-# Latest time for opening a new book.
-SYSCNFGPXY_NEW_BOOK_CUTOFF = dt_time(15, 5)
-# Latest time for fresh entry requests.
-SYSCNFGPXY_ENTRY_CUTOFF = dt_time(15, 5)
-# Beginning of regular EOD liquidation handling (15:06–15:15).
-SYSCNFGPXY_SQUAREOFF_START = dt_time(15, 6)
-# Beginning of forced liquidation of every remaining position (15:15–15:41).
-SYSCNFGPXY_SQUAREOFF_ALL_START = dt_time(15, 15)
+SYSCNFGPXY_AVERAGING_CUTOFF = dt_time(15, 10)
+# New books stop with automatic fresh entries at 15:00.
+SYSCNFGPXY_NEW_BOOK_CUTOFF = dt_time(15, 0)
+# Hard cutoff for all remaining buy paths (averaging/counter-buy) at 15:10.
+SYSCNFGPXY_ENTRY_CUTOFF = dt_time(15, 10)
+# Beginning of regular EOD liquidation handling (15:11–15:14).
+SYSCNFGPXY_SQUAREOFF_START = dt_time(15, 11)
+# Beginning of forced liquidation of every remaining position (15:14–15:41).
+SYSCNFGPXY_SQUAREOFF_ALL_START = dt_time(15, 14)
 # End of EOD square-off attempts.
 SYSCNFGPXY_SQUAREOFF_END = dt_time(15, 41)
 if not (
@@ -544,7 +544,7 @@ if not isinstance(EXECBUYPXY_USE_DYNAMIC_STRIKE, bool):
 # Enables verbose diagnostic logging for this subsystem.
 EXECBUYPXY_DEBUG_ENABLED = False
 # Session boundary controlling cutoff.
-EXECBUYPXY_CUTOFF = SYSCNFGPXY_ENTRY_CUTOFF  # Block counter-buys with all other entries at 15:05 IST
+EXECBUYPXY_CUTOFF = SYSCNFGPXY_ENTRY_CUTOFF  # Block counter-buys with all other entries at 15:10 IST
 # Compatibility command mapping for scripts.
 EXECBUYPXY_SCRIPTS = {
     "CE": "pxybuype",
