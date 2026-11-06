@@ -448,9 +448,7 @@ body{
     <div class="tab-pane" id="paneChart">
         <div id="chartHeader" style="flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:26px;padding:0 10px;background:var(--bg2);border-left:3px solid var(--gold);border-bottom:1px solid var(--border);">
             <span onclick="openPanelLink('chart')" style="margin-right:auto;cursor:pointer;font-family:'Syne',sans-serif;font-weight:800;font-size:10px;color:var(--text);white-space:nowrap;">📈 Chart</span>
-            <span id="chartMarketPrices" style="font-size:10px;font-variant-numeric:tabular-nums;color:var(--gold);white-space:nowrap;">INDEX: — | FUT: —</span>
-        </div>
-        <div id="chartToolbar" style="flex-shrink:0;display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-end;gap:6px;min-height:26px;padding:0 10px;background:var(--bg2);border-bottom:1px solid var(--border);overflow-x:auto;">
+            <div id="chartToolbar" style="display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-end;gap:6px;min-width:0;overflow-x:auto;">
             <span onclick="setChartView('chart')" id="viewBtnChart" style="font-size:9px;color:var(--accent);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--accent);white-space:nowrap;">📈</span>
             <span onclick="setChartView('game')" id="viewBtnGame" style="font-size:9px;color:var(--muted);cursor:pointer;padding:2px 8px;border-radius:3px;border:1px solid var(--border);white-space:nowrap;">🏓</span>
             <span id="candleLineToggle" style="display:flex;gap:4px;">
@@ -475,11 +473,14 @@ body{
                     </label>
                 </span>
             </span>
+            </div>
         </div>
         <div id="chartRow" style="flex:1;min-height:0;display:flex;flex-direction:row;">
             <div id="chartBox" style="flex:1;">
                 <div class="grid-over"></div>
                 <canvas id="priceChart"></canvas>
+                <span id="chartPriceHigh" style="pointer-events:none;position:absolute;z-index:4;top:6px;left:50%;transform:translateX(-50%);font:700 11px 'DM Mono',monospace;color:var(--gold);background:rgba(0,0,0,.76);padding:3px 8px;border-radius:4px;white-space:nowrap;">INDEX: —</span>
+                <span id="chartPriceLow" style="pointer-events:none;position:absolute;z-index:4;bottom:6px;left:50%;transform:translateX(-50%);font:700 11px 'DM Mono',monospace;color:var(--gold);background:rgba(0,0,0,.76);padding:3px 8px;border-radius:4px;white-space:nowrap;">FUT: —</span>
                 <!-- GAME — overlays only the chart canvas area, never the momentum bar.
                      Logic lives entirely in webgamepxy.html; iframe created lazily on first click. -->
                 <div id="gamePane" style="display:none;position:absolute;inset:0;z-index:5;background:var(--bg);"></div>
@@ -990,17 +991,22 @@ function setChartView(view){
     }
 }
 async function loadChartMarketPrices(){
-    const el=$('chartMarketPrices');
-    if(!el)return;
+    const high=$('chartPriceHigh'),low=$('chartPriceLow');
+    if(!high||!low)return;
+    const fmt=v=>Number.isFinite(Number(v))&&v!=null&&Number(v)>0
+        ?Number(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
     try{
         const r=await fetch('/api/web-data/webprcpxy?_='+Date.now(),{cache:'no-store'});
         if(!r.ok)throw new Error('Market prices unavailable');
         const d=await r.json();
-        const fmt=v=>Number.isFinite(Number(v))&&v!=null&&Number(v)>0
-            ?Number(v).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}):'—';
-        el.textContent='INDEX: '+fmt(d.index)+' | FUT: '+fmt(d.fut);
+        const index=Number(d.index),fut=Number(d.fut);
+        const bothValid=Number.isFinite(index)&&index>0&&Number.isFinite(fut)&&fut>0;
+        const futHigher=bothValid&&fut>index;
+        high.textContent=futHigher?'FUT: '+fmt(d.fut):'INDEX: '+fmt(d.index);
+        low.textContent=futHigher?'INDEX: '+fmt(d.index):'FUT: '+fmt(d.fut);
     }catch(e){
-        el.textContent='INDEX: — | FUT: —';
+        high.textContent='INDEX: —';
+        low.textContent='FUT: —';
     }
 }
 async function loadChart(){
