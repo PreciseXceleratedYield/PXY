@@ -75,9 +75,9 @@ def calculate_lgt(is_aligned, ce_count=0, pe_count=0, is_ce=True, ce_investment=
     except Exception as e:
         _warn_once(
             "lgt_err",
-            f"Error in calculate_lgt: {e}. Falling back to -55.0",
+            f"Error in calculate_lgt: {e}. Falling back to -77.0",
         )
-        return -55.0
+        return -77.0
 
 
 def calculate_tgt(
