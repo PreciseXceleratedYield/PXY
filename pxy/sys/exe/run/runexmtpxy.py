@@ -182,9 +182,6 @@ def cycle_risk_metrics(
         errors="coerce",
     ).fillna(0).abs()
     book_trade_count = int((book_quantities > 0).sum())
-    effective_target_pct = (
-        float(target_pct) / book_trade_count if book_trade_count else float(target_pct)
-    )
 
     ce_qty = pe_qty = ce_investment = pe_investment = 0.0
     if not active_cycle_rows.empty and {"SYMBOL", "QTY", "SELL_PRC"}.issubset(active_cycle_rows.columns):
@@ -207,26 +204,30 @@ def cycle_risk_metrics(
         or (heavy_side == "PE" and signal == "BEAR")
     )
 
-    target_multiplier = 10.0 if heavy_side_aligned else 1.0
-    target = (
-        premium_paid
-        * effective_target_pct
-        * target_multiplier
-        / 100.0
-    )
+    # SIDE uses the base target; directional OUT (BULL/BEAR) doubles
+    # both the investment-percentage target and the per-row minimum.
+    # All calculations use only active and closed rows of the present book.
+    target_multiplier = 1.0 if signal == "SIDE" else 2.0 if signal in {"BULL", "BEAR"} else 0.0
+    target_pct = 1.4 * target_multiplier
+    investment_target = premium_paid * target_pct / 100.0
+    minimum_pnl = 100.0 * book_trade_count * target_multiplier
+    target = max(investment_target, minimum_pnl)
     target_reached = bool(
-        ce_qty > 0
+        target_multiplier > 0
+        and ce_qty > 0
         and pe_qty > 0
+        and book_trade_count > 0
         and premium_paid > 0
         and cycle_pnl >= target
-        and cycle_pnl >= 280.0  # Minimum +₹280 cycle P&L for RiskBar square-off
     )
 
     return {
         "cycle_pnl": cycle_pnl,
         "premium_paid": premium_paid,
         "target": target,
-        "target_pct": effective_target_pct,
+        "target_pct": target_pct,
+        "minimum_pnl": minimum_pnl,
+        "investment_target": investment_target,
         "active_count": book_trade_count,
         "book_trade_count": book_trade_count,
         "ce_qty": ce_qty,
