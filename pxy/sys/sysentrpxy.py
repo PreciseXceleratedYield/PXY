@@ -75,6 +75,19 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     raw_entry = str(raw_entry).upper().strip()
     raw_exit = str(raw_exit).upper().strip()
 
+    # Additional IN trigger: opposite raw direction versus current OUT state.
+    # Preserve the existing morning override and leave OUT unchanged.
+    if raw_exit in {"BULL", "BEAR"}:
+        try:
+            _, raw_direction = detect_raw_direction(df)
+            raw_direction = str(raw_direction).upper().strip()
+            if raw_exit == "BULL" and raw_direction == "DOWN":
+                raw_entry = "BUY"
+            elif raw_exit == "BEAR" and raw_direction == "UP":
+                raw_entry = "SELL"
+        except Exception as exc:
+            print(f"⚠️ IN direction cross-check unavailable: {exc}")
+
     entry_sig = raw_entry if raw_entry in {"BUY", "SELL"} else "NONE"
     exit_sig = raw_exit if raw_exit in {"BULL", "BEAR", "SIDE"} else "NONE"
 
