@@ -21,7 +21,8 @@ const WEB_STATIC_ASSETS = new Set([
     '/pxy-theme.css',
     '/pxy-theme.js',
     '/mbl/manifest.json',
-    '/mbl/sw.js'
+    '/mbl/sw.js',
+    '/mbl/icon.svg'
 ]);
 
 /* ========================= GLOBAL ERROR HANDLING ========================= */
