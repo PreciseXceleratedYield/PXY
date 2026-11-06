@@ -113,10 +113,10 @@ SYSCNFGPXY_ENGINE_CLOSE = dt_time(15, 45)
 SYSCNFGPXY_TRADING_PIPE_CLOSE = dt_time(15, 41)
 # Exchange trading-day end reference.
 SYSCNFGPXY_TRADING_DAY_END = dt_time(15, 30)
-# Automatic fresh-entry signal and execution authorization: 09:17–13:00 (end exclusive).
+# Automatic fresh-entry signal and execution authorization: 09:17–15:00 (end exclusive).
 # Both gates share these values; counter-buy and averaging retain separate windows.
 SYSCNFGPXY_FRESH_ENTRY_START = dt_time(9, 17)
-SYSCNFGPXY_FRESH_ENTRY_END = dt_time(13, 0)
+SYSCNFGPXY_FRESH_ENTRY_END = dt_time(15, 0)
 # Earliest eligibility for position averaging.
 SYSCNFGPXY_AVERAGING_START = dt_time(9, 17)
 # Independent cutoff for averaging existing positions (exclusive).
