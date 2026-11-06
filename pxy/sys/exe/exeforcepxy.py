@@ -26,6 +26,7 @@ from syscnfgpxy import (
     EXEFORCEPXY_ORDER_TRANSACTION_TYPE,
     EXEFORCEPXY_ORDER_TYPE,
     EXEFORCEPXY_ORDER_VALIDITY,
+    SYSCNFGPXY_ENTRY_CUTOFF,
     SYSCNFGPXY_TICKER,
     SYSCNFGPXY_TIMEZONE,
 )
@@ -62,6 +63,9 @@ def generate_pxy_tag():
 
 
 def execute_order(client, symbol, qty):
+    if datetime.now(SYSCNFGPXY_TIMEZONE).time() >= SYSCNFGPXY_ENTRY_CUTOFF:
+        print(f"{Fore.YELLOW}🛑 Buy blocked: 15:10 IST hard cutoff.")
+        return {"stat": "FAIL", "err": "buy cutoff"}
     if liquidation_pending():
         print(f"{Fore.YELLOW}🛑 Master risk liquidation pending; forced buy blocked.")
         return {"stat": "FAIL", "err": "master risk liquidation pending"}
