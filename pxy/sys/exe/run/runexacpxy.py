@@ -15,7 +15,6 @@
 import os
 import sys
 import time
-from datetime import datetime
 from pathlib import Path
 from colorama import Fore, Style, init
 
