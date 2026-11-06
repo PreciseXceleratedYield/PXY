@@ -380,12 +380,13 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         exit_signal,
         risk_target_pct,
     )
-    # Use 1.4% of total invested premium across active and closed rows
-    # tagged to the present book; never multiply the rate by row count.
-    # Existing SIDE, both-leg, minimum ₹280 and confirmation gates remain.
+    # Target 1.4% of present-book invested premium, with a separate
+    # minimum P&L of ₹100 per active or closed row in that same book.
+    # Preserve SIDE, both-leg, and confirmation gates.
     book_count = metrics["book_trade_count"]
     risk_target_pct = 1.4
     risk_target = metrics["premium_paid"] * risk_target_pct / 100.0
+    minimum_pnl = 100.0 * book_count
     metrics["target_pct"] = risk_target_pct
     metrics["target"] = risk_target
     metrics["target_reached"] = bool(
@@ -394,7 +395,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         and book_count > 0
         and metrics["premium_paid"] > 0
         and metrics["cycle_pnl"] >= risk_target
-        and metrics["cycle_pnl"] >= 280.0
+        and metrics["cycle_pnl"] >= minimum_pnl
     )
     # Pending liquidations resume earlier in _tick regardless of signal.
     risk_enabled = (
