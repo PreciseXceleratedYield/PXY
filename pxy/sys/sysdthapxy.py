@@ -15,15 +15,15 @@ from sysdtafpxy import fetch_yf_data
 def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     """Return a copy of OHLC data transformed using the selected DTHA mode.
 
-    OC2 and OHLC4 replace Close with the corresponding candle average.
-    HYPER preserves the former DTAF mode-0 transformation.
-    TSAM blends TSMA close with real close, then averages that blend with the prior final synthetic close.
-    HA applies the standard recursive Heikin-Ashi transformation.
+    RAW2 and RAW4 replace Close with the corresponding candle average.
+    HYPR preserves the former DTAF mode-0 transformation.
+    TSMA blends TSMA close with real close, then averages that blend with the prior final synthetic close.
+    HKIN applies the standard recursive Heikin-Ashi transformation.
     """
-    valid_modes = {"RAW", "OC2", "HA", "OHLC4", "HYPER", "TSAM"}
+    valid_modes = {"RAW0", "RAW2", "HKIN", "RAW4", "HYPR", "TSMA"}
     if mode not in valid_modes:
         raise ValueError(
-            "DTHA mode must be RAW, OC2, HA, OHLC4, HYPER, or TSAM."
+            "DTHA mode must be RAW0, RAW2, HKIN, RAW4, HYPR, or TSMA."
         )
 
     if df is None or df.empty:
@@ -39,20 +39,20 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
     raw_low = pd.to_numeric(out["Low"], errors="coerce").to_numpy(dtype=float)
     raw_close = pd.to_numeric(out["Close"], errors="coerce").to_numpy(dtype=float)
 
-    if mode == "RAW":
+    if mode == "RAW0":
         return out
 
-    if mode == "OC2":
+    if mode == "RAW2":
         out["Close"] = (raw_open + raw_close) / 2.0
         return out
 
-    if mode == "OHLC4":
+    if mode == "RAW4":
         out["Close"] = (
             raw_open + raw_high + raw_low + raw_close
         ) / 4.0
         return out
 
-    if mode == "HYPER":
+    if mode == "HYPR":
         bullish = raw_close >= raw_open
         hyper_close = np.where(
             bullish,
@@ -63,7 +63,7 @@ def transform_dtha_ohlc(df, mode=SYSDTHAPXY_CANDLE_MODE):
         out["Close"] = hyper_close
         return out
 
-    if mode == "TSAM":
+    if mode == "TSMA":
         tsma_open = calculate_moving_average(
             pd.Series(raw_open, index=out.index),
             period=SYSSMAPXY_TSMA_PERIOD,
