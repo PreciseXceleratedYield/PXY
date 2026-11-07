@@ -17,7 +17,6 @@ for path in (RUN_DIR, HERE, SYS_DIR):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from sysexepxy import send_telegram
 from syshdaypxy import is_nse_fo_trading_day
 
 # Component failures are reported periodically; they never stop the engine.
@@ -32,16 +31,6 @@ def _record_component_failure(name, error=None):
 def _record_component_recovery(name):
     COMPONENT_FAILURES.pop(name, None)
 
-
-def _notify_persistent_failures():
-    if ENGINE_ITERATION % 5 != 0:
-        return
-    for name, error in list(COMPONENT_FAILURES.items()):
-        send_telegram(
-            f"⚠️ PXY component failure (iteration {ENGINE_ITERATION})\n"
-            f"Component: {name}\nError: {error}\n"
-            "Engine continues running; automatic retry remains in effect."
-        )
 
 from syscnfgpxy import (
     EXEPXYPXY_IDLE_PAUSE_SECONDS,
@@ -129,7 +118,6 @@ def run_market_cycle():
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeavgpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
     safe_run(HERE / "exeexitpxy.py", timeout=EXEPXYPXY_PIPE_TIMEOUT_SECONDS)
-    _notify_persistent_failures()
     fancy_pause(SYSCNFGPXY_ACTION_COOLDOWN_SECONDS)
 
 
