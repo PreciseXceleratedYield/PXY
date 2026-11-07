@@ -63,76 +63,6 @@ show_trading_menu() {
 }
 
 # ========================================
-# TEST SUBMENU (MAX 40 CHARS PER LINE)
-# ========================================
-show_test_menu() {
-    while true; do
-        clear
-        draw_border
-        echo "          PXY SCRIPT TEST MENU            "
-        draw_border
-        
-        mapfile -t PY_FILES < <(find "$HOME" -type f -name "*.py" -not -path '*/.*' 2>/dev/null -printf '%T@ %p\n' | sort -rn | head -n 5 | cut -d' ' -f2-)
-        
-        if [ ${#PY_FILES[@]} -eq 0 ]; then
-            echo "No python files found in $HOME."
-            echo "x) ❌ Back    - Return Main Menu"
-            draw_border
-            read -p "Press [Enter] to return..."
-            break
-        fi
-
-        echo "a) ✅ All     - Execute All Scripts"
-        
-        for i in "${!PY_FILES[@]}"; do
-            DISPLAY_NAME=$(basename "${PY_FILES[$i]}")
-            printf "%d) 🐍 Exec   - %-23s\n" $((i+1)) "${DISPLAY_NAME:0:23}"
-        done
-        echo "x) ❌ Back    - Return Main Menu"
-        draw_border
-        
-        read -p "Select option [a, 1-5, x]: " TESTOPT
-        
-        if [ -z "$TESTOPT" ]; then
-            break
-        fi
-        
-        if [[ "$TESTOPT" =~ [A-Za-z] ]]; then
-            TESTOPT=$(echo "$TESTOPT" | tr '[:upper:]' '[:lower:]')
-        fi
-        
-        if [ "$TESTOPT" = "x" ]; then
-            break
-        elif [ "$TESTOPT" = "a" ]; then
-            echo ""
-            draw_border
-            echo "Executing All Python Scripts Sequentially..."
-            draw_border
-            for SELECTED_FILE in "${PY_FILES[@]}"; do
-                echo "-> Running: $SELECTED_FILE"
-                python3 "$SELECTED_FILE"
-                draw_border
-            done
-            read -p "All script executions finished. Press [Enter]..."
-        elif [[ "$TESTOPT" =~ ^[1-5]$ ]] && [ "$TESTOPT" -le ${#PY_FILES[@]} ]; then
-            SELECTED_FILE="${PY_FILES[$((TESTOPT-1))]}"
-            echo ""
-            draw_border
-            echo "Executing: $SELECTED_FILE"
-            draw_border
-            
-            python3 "$SELECTED_FILE"
-            
-            draw_border
-            read -p "Execution finished. Press [Enter]..."
-        else
-            echo "[!] Invalid selection."
-            sleep 1
-        fi
-    done
-}
-
-# ========================================
 # MAIN MANAGEMENT LOOP (MAX 40 CHARS)
 # ========================================
 while true; do
@@ -140,11 +70,11 @@ while true; do
     draw_border
     echo "            PXY ENGINE CONSOLE            "
     draw_border
-    echo "u) 🔄 Update  - Update Code Only"
-    echo "v) 🔭 View    - Live Engine Screen"
-    echo "e) 🛒 Enter   - Trading Operations"
-    echo "t) 🧪 Test    - Run Python Scripts"
-    echo "w) 🐕 Watch   - Engine & Web Control"
+    echo "u) 🔄 Update  - Update Code"
+    echo "s) 🚀 Start   - Engine + Web"
+    echo "k) 🛑 Stop    - Engine + Web"
+    echo "t) 🛒 Trade   - Trading Operations"
+    echo "c) ⚙️ Control - System Management"
     echo "x) ❌ Exit    - Close Menu"
     draw_border
     read -p "Select option: " OPTION
@@ -172,7 +102,34 @@ while true; do
             fi
             read -p "Press [Enter] to return..."
             ;;
-        v)
+        s)
+            bash "$PXY_APP_DIR/pxywatch" start
+            read -p "Press [Enter] to return..."
+            ;;
+        k)
+            bash "$PXY_APP_DIR/pxywatch" stop
+            read -p "Press [Enter] to return..."
+            ;;
+        t)
+            show_trading_menu
+            ;;
+        c)
+            while true; do
+                clear
+                draw_border
+                echo "          PXY SYSTEM CONTROL              "
+                draw_border
+                echo "1) 🔭 View    - Live Engine Screen"
+                echo "2) 📊 Status  - Watchdog / Engine / Web"
+                echo "3) ⚙️ Install - Configure Systemd"
+                echo "4) 📜 Traces  - Journal + Last Failure"
+                echo "5) ✅ Enable  - Auto Start on Boot"
+                echo "6) 🚫 Disable - No Auto Start"
+                echo "7) ↩️ Back    - Main Menu"
+                draw_border
+                read -p "Select option [1-7]: " WOPT
+                case "$WOPT" in
+                    1)
             echo ""
             if tmux has-session -t pxy-engine 2>/dev/null; then
                 clear
@@ -215,38 +172,12 @@ while true; do
                 read -p "Press [Enter] to return..."
             fi
             ;;
-
-        e)
-            show_trading_menu
-            ;;
-        t)
-            show_test_menu
-            ;;
-        w)
-            while true; do
-                clear
-                draw_border
-                echo "          PXY WATCHDOG MANAGEMENT         "
-                draw_border
-                echo "1) 📊 Status  - Watchdog / Engine / Web"
-                echo "2) ⚙️  Install - Configure Systemd"
-                echo "3) 🚀 Start   - Watchdog + Tmux"
-                echo "4) 🛑 Stop    - Watchdog + Kill Tmux"
-                echo "5) 📜 Traces  - Journal + Last Failure"
-                echo "6) ✅ Enable  - Auto Start on Boot"
-                echo "7) 🚫 Disable - No Auto Start"
-                echo "8) ↩️  Back    - Main Menu"
-                draw_border
-                read -p "Select [1-8]: " WOPT
-                case "$WOPT" in
-                    1) bash "$PXY_APP_DIR/pxywatch" status ;;
-                    2) bash "$PXY_APP_DIR/pxywatch" install ;;
-                    3) bash "$PXY_APP_DIR/pxywatch" start ;;
-                    4) bash "$PXY_APP_DIR/pxywatch" stop ;;
-                    5) bash "$PXY_APP_DIR/pxywatch" logs ;;
-                    6) sudo systemctl enable pxywatch.service ;;
-                    7) sudo systemctl disable pxywatch.service ;;
-                    8|"") break ;;
+                    2) bash "$PXY_APP_DIR/pxywatch" status ;;
+                    3) bash "$PXY_APP_DIR/pxywatch" install ;;
+                    4) bash "$PXY_APP_DIR/pxywatch" logs ;;
+                    5) sudo systemctl enable pxywatch.service ;;
+                    6) sudo systemctl disable pxywatch.service ;;
+                    7|"") break ;;
                     *) echo "Invalid choice." ;;
                 esac
                 read -p "Press [Enter] to continue..."
