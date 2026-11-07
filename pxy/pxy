@@ -74,7 +74,8 @@ while true; do
     echo "s) 🚀 Start   - Engine + Web"
     echo "k) 🛑 Stop    - Engine + Web"
     echo "t) 🛒 Trade   - Trading Operations"
-    echo "c) ⚙️ Control - System Management"
+    echo "m) 📈 Mon     - Run PXY Monitor"
+    echo "c) ⚙️ Cntrl   - System Management"
     echo "x) ❌ Exit    - Close Menu"
     draw_border
     read -p "Select option: " OPTION
@@ -112,6 +113,10 @@ while true; do
             ;;
         t)
             show_trading_menu
+            ;;
+        m)
+            bash "$PXY_APP_DIR/pxymon"
+            read -p "Press [Enter] to return..."
             ;;
         c)
             while true; do
