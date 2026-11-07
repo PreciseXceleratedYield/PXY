@@ -108,7 +108,7 @@ app.get('/api/fut-history', (req, res) => {
 app.post('/api/pxyrestart', (req, res) => {
     const secret = process.env.PXY_RESTART_TOKEN;
     const supplied = typeof req.body?.pwd === 'string' ? req.body.pwd : '';
-    if (!secret || secret.length < 16) return res.status(503).json({ok:false,error:'PXYRESTART is not configured: set PXY_RESTART_TOKEN (16+ characters) for the WebPXY service.'});
+    if (!secret || secret.length < 8) return res.status(503).json({ok:false,error:'PXYRESTART is not configured: set PXY_RESTART_TOKEN (8+ characters) in the WebPXY service environment.'});
     const actual = Buffer.from(supplied, 'utf8');
     const expected = Buffer.from(secret, 'utf8');
     if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return res.status(401).json({ok:false,error:'Invalid PXYRESTART password.'});
