@@ -96,6 +96,14 @@ app.get('/api/web-data/:name', (req, res) => {
     });
 });
 
+/* Read-only rolling futures price history for the dashboard chart. */
+app.get('/api/fut-history', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.sendFile(path.join(__dirname, 'sys', 'exe', 'run', 'nftfut.json'), (error) => {
+        if (error && !res.headersSent) res.status(error.statusCode || 500).json({ ok: false, error: 'Futures history unavailable.' });
+    });
+});
+
 /* ========================= RUN SCRIPT WITH PYTHON ENV ACTIVATED ========================= */ 
 const ALLOWED_SCRIPTS = [ 
     'pxyupdate', 'pxysqrall', 'pxybuyce', 'pxybuype', 'pxysqrce', 'pxysqrpe',
