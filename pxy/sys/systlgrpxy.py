@@ -133,7 +133,7 @@ def notification_mode():
     try:
         settings = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
         mode = str(settings.get("channel", "TGR")).upper()
-        return mode if mode in {"TGR", "WSP", "BOTH"} else "TGR"
+        return mode if mode in {"TGR", "WSP"} else "TGR"
     except (OSError, ValueError, TypeError):
         return "TGR"
 
@@ -147,7 +147,7 @@ def send(state, key, category, message):
         channels[key] = {"telegram": sent[key]}
     delivered = channels.setdefault(key, {})
     mode = notification_mode()
-    targets = {"TGR": ["telegram"], "WSP": ["whatsapp"], "BOTH": ["telegram", "whatsapp"]}[mode]
+    targets = {"TGR": ["telegram"], "WSP": ["whatsapp"]}[mode]
     all_ok = True
     for channel in targets:
         if channel in delivered:
