@@ -128,11 +128,10 @@ while true; do
                 echo "2) 📊  Status  - Watchdog / Engine / Web"
                 echo "3) ⚙️   Install - Configure Systemd"
                 echo "4) 📜  Traces  - Journal + Last Failure"
-                echo "5) ✅  Enable  - Auto Start on Boot"
-                echo "6) 🚫  Disable - No Auto Start"
-                echo "7) ↩️   Back    - Main Menu"
+                echo "5) 🔁  Auto    - Auto Start Control"
+                echo "6) ↩️   Back    - Main Menu"
                 draw_border
-                read -p "Select option [1-7]: " WOPT
+                read -p "Select option [1-6]: " WOPT
                 case "$WOPT" in
                     1)
             echo ""
@@ -180,9 +179,47 @@ while true; do
                     2) bash "$PXY_APP_DIR/pxywatch" status ;;
                     3) bash "$PXY_APP_DIR/pxywatch" install ;;
                     4) bash "$PXY_APP_DIR/pxywatch" logs ;;
-                    5) sudo systemctl enable pxywatch.service ;;
-                    6) sudo systemctl disable pxywatch.service ;;
-                    7|"") break ;;
+                    5)
+                        while true; do
+                            clear
+                            draw_border
+                            echo "          PXY AUTO START CONTROL          "
+                            draw_border
+                            echo "1) ✅  Auto    - Enable Auto Start on Boot"
+                            echo "2) 🚫  Disable - Disable Auto Start"
+                            echo "3) 📊  Status  - Show Auto Start Status"
+                            echo "4) 🚪  Exit    - Return to Control Menu"
+                            draw_border
+                            read -p "Select option [1-4]: " AOPT
+                            case "$AOPT" in
+                                1)
+                                    if sudo systemctl enable pxywatch.service; then
+                                        echo "[✔] Watchdog auto-start enabled."
+                                    else
+                                        echo "[X] Failed to enable watchdog auto-start."
+                                    fi
+                                    ;;
+                                2)
+                                    if sudo systemctl disable pxywatch.service; then
+                                        echo "[✔] Watchdog auto-start disabled."
+                                    else
+                                        echo "[X] Failed to disable watchdog auto-start."
+                                    fi
+                                    ;;
+                                3)
+                                    if systemctl is-enabled --quiet pxywatch.service; then
+                                        echo "[✔] Auto Start: ENABLED"
+                                    else
+                                        echo "[i] Auto Start: $(systemctl is-enabled pxywatch.service 2>/dev/null || echo unknown)"
+                                    fi
+                                    ;;
+                                4|"") break ;;
+                                *) echo "Invalid choice." ;;
+                            esac
+                            read -p "Press [Enter] to continue..."
+                        done
+                        ;;
+                    6|"") break ;;
                     *) echo "Invalid choice." ;;
                 esac
                 read -p "Press [Enter] to continue..."
