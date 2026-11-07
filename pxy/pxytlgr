@@ -9,7 +9,7 @@ PYTHON="$HOME/env/bin/python3"
 STATE_DIR="$HOME/.pxy/tlgr"
 STATE="$STATE_DIR/state.json"
 CONFIG="$STATE_DIR/config.json"
-usage() { echo "Usage: pxytlgr {install|start|stop|restart|enable|disable|status|events-on|events-off|logs}"; }
+usage() { echo "Usage: pxytlgr {install|start|stop|restart|enable|disable|status|events-on|events-off|channel {TGR|WSP|BOTH}|logs}"; }
 case "${1:-}" in
   install)
     [[ -x "$PYTHON" && -f "$APP/sys/systlgrpxy.py" ]] || { echo "Missing Python venv or monitor"; exit 1; }
@@ -74,6 +74,7 @@ try:
  d=json.load(open(sys.argv[1]))
  try: settings=json.load(open(sys.argv[2]))
  except (OSError,ValueError): settings={}
+ print("Notification channel:", settings.get("channel","TGR"))
  print("Events after 09:35:", "ON" if settings.get("events_enabled",False) else "OFF")
  print("Books baseline established:", bool(d.get("book_initialized",False)), "(first eligible book scan completed)")
  print("Notifications recorded:", sum(1 for x in d.get("sent",{}).values() if x != "BASELINE"), "(deduplicated send records, not delivery confirmation)")
@@ -99,6 +100,36 @@ try:
 finally:
  if os.path.exists(t): os.unlink(t)
 print("Events after 09:35:", "ON" if d["events_enabled"] else "OFF", "(scheduled reports and closed-book messages unaffected)")
+PY
+    ;;
+  channel)
+    if [[ -z "${2:-}" ]]; then
+      "$PYTHON" - "$CONFIG" <<'PY'
+import json,sys
+try:
+ with open(sys.argv[1]) as f: d=json.load(f)
+except (OSError,ValueError): d={}
+print("Notification channel:", d.get("channel","TGR"))
+PY
+      exit 0
+    fi
+    mode="${2^^}"
+    [[ "$mode" == TGR || "$mode" == WSP || "$mode" == BOTH ]] || { echo "Choose TGR, WSP or BOTH"; exit 2; }
+    mkdir -p "$STATE_DIR"
+    "$PYTHON" - "$CONFIG" "$mode" <<'PY'
+import json,os,sys,tempfile
+p,mode=sys.argv[1:]
+try:
+ with open(p) as f: d=json.load(f)
+except (OSError,ValueError): d={}
+d["channel"]=mode
+fd,tmp=tempfile.mkstemp(dir=os.path.dirname(p))
+try:
+ with os.fdopen(fd,"w") as f: json.dump(d,f)
+ os.replace(tmp,p)
+finally:
+ if os.path.exists(tmp): os.unlink(tmp)
+print("Notification channel:",mode,"(effective on next notification; service restart not required)")
 PY
     ;;
   logs)
