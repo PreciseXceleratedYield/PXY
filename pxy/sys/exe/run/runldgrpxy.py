@@ -1,5 +1,5 @@
 # ==============================================================================
-# 🛠️ PART 1 OF 2: UTILITY LAYER (Layout Calculations, Math Padding & Telegram)
+# 🛠️ PART 1 OF 2: UTILITY LAYER (Layout Calculations and Math Padding)
 # ==============================================================================
 
 import sys
@@ -54,27 +54,6 @@ def force_trailing_zero(value, context_tag="MATH"):
         error_log(f"{context_tag}_ERR", f"Failed conversion on raw value: {value} ({str(e)})")
         return 0.0
 
-def send_telegram_payload(message_text, bot_token, chat_id):
-    """Dispatches the formatted layout message to your Telegram channel."""
-    if "PLACEHOLDER" in bot_token or "PLACEHOLDER" in chat_id:
-        return
-
-    url = f"https://telegram.org{bot_token}/sendMessage"
-    payload = {
-        "chat_id": chat_id,
-        "text": message_text,
-        "parse_mode": "Markdown"
-    }
-    try:
-        import urllib.request
-        import urllib.parse
-        data = urllib.parse.urlencode(payload).encode("utf-8")
-        req = urllib.request.Request(url, data=data)
-        with urllib.request.urlopen(req, timeout=RUNLDGRPXY_TELEGRAM_TIMEOUT_SECONDS) as response:
-            pass
-    except Exception:
-        pass
-
 # ==============================================================================
 # 🚀 PART 2 OF 2: CORE ENGINE LAYER (API Fetching, Data Processing & Execution)
 # ==============================================================================
@@ -85,7 +64,6 @@ import traceback
 from datetime import datetime
 from syscnfgpxy import (
     RUNLDGRPXY_LAYOUT_WIDTH,
-    RUNLDGRPXY_TELEGRAM_TIMEOUT_SECONDS,
     SYSCNFGPXY_ENGINE_CLOSE,
     SYSCNFGPXY_EXCHANGE_OPEN,
     SYSCNFGPXY_TIMEZONE,
@@ -93,8 +71,6 @@ from syscnfgpxy import (
 from runclntpxy import get_session
 
 # ⚙️ CONFIGURATION & ENVIRONMENTAL SETTINGS
-TELEGRAM_BOT_TOKEN = "YOUR_TELEGRAM_BOT_TOKEN_PLACEHOLDER"
-TELEGRAM_CHAT_ID = "YOUR_TELEGRAM_CHAT_ID_PLACEHOLDER"
 
 # Enforce explicit local reporting zones matching broker constraints
 IST = SYSCNFGPXY_TIMEZONE
@@ -268,7 +244,6 @@ def run_snapshot_report():
 
     full_message_payload = "\n".join(output_lines)
     print(full_message_payload)
-    send_telegram_payload(f"```text\n{full_message_payload}\n```", TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
 
 if __name__ == "__main__":
     run_snapshot_report()
