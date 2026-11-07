@@ -223,7 +223,9 @@ while true; do
                     6|"") break ;;
                     *) echo "Invalid choice." ;;
                 esac
-                read -p "Press [Enter] to continue..."
+                if [[ "$WOPT" != "1" ]]; then
+                    read -p "Press [Enter] to continue..."
+                fi
             done
             ;;
         x)
