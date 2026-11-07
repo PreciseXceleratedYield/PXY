@@ -354,29 +354,67 @@ def capture_lines(state):
         return []
 
 
+def event_message(kind, issue, stamp):
+    recovered = kind == "RECOVERY"
+    label = "🟢 PXY — EVENT RECOVERED" if recovered else "🚨 PXY — EVENT ALERT"
+    greeting = "Good News! ✅" if recovered else "Attention Required! ⚠️"
+    first = datetime.fromisoformat(issue["first"])
+    duration = max(0, int((stamp - first).total_seconds()))
+    severity = issue.get("severity", "ERROR")
+    component = issue.get("component", "UNKNOWN")
+    details = issue.get("detail", "NA")
+    lines = [
+        field("Date", stamp.strftime("%d-%b-%Y")),
+        field("Time", stamp.strftime("%H:%M:%S")),
+        field("Severity", severity),
+        field("Component", component),
+        field("Event", "RECOVERED" if recovered else "EXECUTION FAILURE" if severity == "ERROR" else "WARNING"),
+        field("Duration", f"{duration // 3600:02d}:{duration // 60 % 60:02d}:{duration % 60:02d}"),
+        field("Count", issue.get("count", 1)),
+        field("Engine", "RUNNING" if engine_alive() else "STOPPED"),
+        field("Trading", "NOT CONTROLLED"),
+        field("Action", "NONE" if recovered else "MONITOR ONLY"),
+        "━━━━━━━━━━━━━━━━━━━━━━━━",
+        field("Status", "RECOVERED" if recovered else "ACTIVE"),
+    ]
+    result = f"Hello {html.escape(socket.gethostname())}, {greeting}\n\n{label}\n<pre>" + "\n".join(lines) + "</pre>"
+    if not recovered:
+        result += "\n<b>Error Details</b>\n" + html.escape(details[:350])
+    return result
+
+
 def scan_events(state):
     stamp = now()
     minutes = stamp.hour * 60 + stamp.minute
+    enabled = minutes < EVENT_WINDOW[1] or state.get("events_enabled", False)
     for line in capture_lines(state):
         if not PATTERN.search(line):
             continue
-        # Never put raw terminal content (potentially credentials) in Telegram.
-        signature = re.sub(r"\\d+", "#", line)[:100]
-        key = signature
-        issue = state.setdefault("issues", {}).setdefault(key, {"first": stamp.isoformat(), "last": stamp.isoformat(), "alerted": False})
+        # Normalize varying numeric details so repeated incidents share one key.
+        signature = re.sub(r"\d+", "#", line)[:100]
+        severity = "WARNING" if re.search(r"warning|stale", line, re.I) and not re.search(r"error|failed|failure|exception|traceback|critical", line, re.I) else "ERROR"
+        component_match = re.search(r"[\w-]+\.py", line)
+        component = component_match.group(0) if component_match else "UNKNOWN"
+        issue = state.setdefault("issues", {}).get(signature)
+        if issue is None:
+            issue = {"first": stamp.isoformat(), "last": stamp.isoformat(), "alerted": False,
+                     "severity": severity, "component": component, "detail": line[:350], "count": 0}
+            state["issues"][signature] = issue
+            daily = state.setdefault("daily_incidents", {}).setdefault(stamp.date().isoformat(), {"ERROR": 0, "WARNING": 0})
+            daily[severity] = daily.get(severity, 0) + 1
         issue["last"] = stamp.isoformat()
+        issue["count"] = issue.get("count", 0) + 1
         write_jsonl(EVENT_PATH, {"time": stamp.isoformat(), "signature": signature, "status": "OBSERVED"})
-        age = (stamp - datetime.fromisoformat(issue["first"])).total_seconds()
-        if age >= 120 and (minutes < EVENT_WINDOW[1] or state.get("events_enabled", False)):
-            if not issue["alerted"]:
-                msg = f"PXY ⚠️ Persistent terminal warning\nDetected pattern: {signature[:80]}\nDuration: {age:.0f}s"
-                if send(state, f"event:{stamp.date()}:{key}:{issue['first']}", "EVENT", msg):
-                    issue["alerted"] = True
     for key, issue in list(state.setdefault("issues", {}).items()):
+        first = datetime.fromisoformat(issue["first"])
         last = datetime.fromisoformat(issue["last"])
-        if (stamp - last).total_seconds() > 120:
-            if issue["alerted"] and (minutes < EVENT_WINDOW[1] or state.get("events_enabled", False)):
-                send(state, f"recovery:{stamp.date()}:{key}:{issue['first']}", "RECOVERY", "PXY ℹ️ No further matching terminal warnings observed for 120 seconds; verify component health.")
+        age = (stamp - first).total_seconds()
+        if age >= 120 and enabled and not issue["alerted"]:
+            if send(state, f"event:{stamp.date()}:{key}:{issue['first']}", "EVENT", event_message("ALERT", issue, stamp)):
+                issue["alerted"] = True
+        # Silence is not confirmation of recovery. Keep incident open, with
+        # no fabricated RECOVERED notification until positive evidence exists.
+        if (stamp - last).total_seconds() > 3600 and not issue["alerted"]:
             del state["issues"][key]
     save(state)
 
@@ -406,6 +444,7 @@ def main():
                 state["book_initialized"] = False
                 state["tail"] = []
                 state["issues"] = {}
+                state["daily_incidents"] = {last_date: {"ERROR": 0, "WARNING": 0}}
             if trading_day(day) and 555 <= minute <= 945:
                 for target, title in REPORTS.items():
                     if target <= minute < target + 2:
