@@ -126,11 +126,11 @@ while true; do
                 draw_border
                 echo "1) 🔭  View    - Live Engine Screen"
                 echo "2) 📊  Status  - Watchdog / Engine / Web"
-                echo "3) ⚙️  Install - Configure Systemd"
+                echo "3) ⚙️   Install - Configure Systemd"
                 echo "4) 📜  Traces  - Journal + Last Failure"
                 echo "5) ✅  Enable  - Auto Start on Boot"
                 echo "6) 🚫  Disable - No Auto Start"
-                echo "7) ↩️  Back    - Main Menu"
+                echo "7) ↩️   Back    - Main Menu"
                 draw_border
                 read -p "Select option [1-7]: " WOPT
                 case "$WOPT" in
