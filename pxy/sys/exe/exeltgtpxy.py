@@ -82,7 +82,7 @@ def calculate_tgt(
     opposite_count=0,
     own_count=0,
 ):
-    """Use one aligned target formula regardless of how many sides are open."""
+    """Calculate targets using single-side max(power, depth) and existing dual-side rules."""
     try:
         current_time = target_time
 
@@ -112,12 +112,12 @@ def calculate_tgt(
         own_depth = positive_factor(side_depth)
         own_power = positive_factor(side_power)
 
-        # With only one active option side, use its own power alone from 09:15 until 15:14.
-        # The late-day override above remains authoritative.
+        # With only one active option side, use the higher of own power and own depth
+        # from 09:15 until 15:14. The late-day override remains authoritative.
         if not both_sides_open and dt_time(9, 15) <= current_time < EXETGTPXY_PRD_LATE_DAY_TIME:
             return min(
                 EXETGTPXY_PRD_MAX_TARGET_PCT,
-                EXETGTPXY_PRD_BASE_FACTOR * own_power,
+                EXETGTPXY_PRD_BASE_FACTOR * max(own_power, own_depth),
             )
 
         if not is_aligned:
