@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""PXY local SSH connection manager. Credentials never enter the repository."""
+"""SSH menu: server list in GitHub, passwords stored only on this computer."""
 import getpass
 import ipaddress
 import json
@@ -9,164 +9,113 @@ import shutil
 import subprocess
 import sys
 
-STORE = Path.home() / ".config" / "pxy" / "connections.json"
+APP_DIR = Path(__file__).resolve().parent
+CONFIG = APP_DIR / "pxyconnect.json"
+PASSWORDS = Path.home() / ".config" / "pxy" / "passwords.json"
 
-def load():
-    if not STORE.exists():
-        return {}
-    if STORE.is_symlink():
-        raise RuntimeError("Refusing symlinked credentials file")
-    if STORE.stat().st_mode & 0o077:
-        raise RuntimeError(f"Unsafe permissions on {STORE}; run chmod 600 {STORE}")
-    with STORE.open(encoding="utf-8") as handle:
-        data = json.load(handle)
+def read_config():
+    with CONFIG.open(encoding="utf-8") as file:
+        data = json.load(file)
     if not isinstance(data, dict):
-        raise RuntimeError("Invalid connections file")
+        raise ValueError("Invalid GitHub server configuration")
+    for name, server in data.items():
+        if not isinstance(name, str) or not isinstance(server, dict):
+            raise ValueError("Invalid server entry")
+        ipaddress.ip_address(server["host"])
+        user = server["user"]
+        if not isinstance(user, str) or not user or user.startswith("-") or any(c.isspace() for c in user) or "@" in user:
+            raise ValueError(f"Invalid SSH username for {name}")
     return data
 
-def save(data):
-    directory = STORE.parent
+def read_passwords():
+    if not PASSWORDS.exists():
+        return {}
+    if PASSWORDS.is_symlink() or PASSWORDS.stat().st_mode & 0o077:
+        raise PermissionError("Unsafe password file; expected regular file with mode 600")
+    with PASSWORDS.open(encoding="utf-8") as file:
+        passwords = json.load(file)
+    if not isinstance(passwords, dict):
+        raise ValueError("Invalid password file")
+    return passwords
+
+def write_passwords(passwords):
+    directory = PASSWORDS.parent
     directory.mkdir(mode=0o700, parents=True, exist_ok=True)
     if directory.is_symlink():
-        raise RuntimeError("Refusing symlinked credentials directory")
+        raise PermissionError("Unsafe credentials directory")
     directory.chmod(0o700)
-    if STORE.is_symlink():
-        raise RuntimeError("Refusing symlinked credentials file")
-    tmp = directory / f".connections.{os.getpid()}.tmp"
+    if PASSWORDS.is_symlink():
+        raise PermissionError("Unsafe credentials file")
+    tmp = directory / f".passwords.{os.getpid()}.tmp"
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            json.dump(data, handle, indent=2)
-            handle.write("\n")
-        os.replace(tmp, STORE)
-        STORE.chmod(0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as file:
+            json.dump(passwords, file, indent=2)
+            file.write("\n")
+        os.replace(tmp, PASSWORDS)
+        PASSWORDS.chmod(0o600)
     finally:
         if tmp.exists():
             tmp.unlink()
 
-def choose(data):
-    names = sorted(data)
-    for i, name in enumerate(names, 1):
-        record = data[name]
-        print(f"{i}) {name} — {record['user']}@{record['host']}")
-    if not names:
-        print("No saved connections.")
-        return None
-    raw = input("Server number (Enter to cancel): ").strip()
-    if not raw:
-        return None
-    try:
-        return names[int(raw) - 1]
-    except (ValueError, IndexError):
-        print("Invalid selection.")
-        return None
-
-def add(data):
-    name = input("Connection name: ").strip()
-    if not name or any(ch in name for ch in "\r\n"):
-        print("A valid connection name is required.")
-        return
-    if name in data:
-        print("Already exists. Use Edit.")
-        return
-    host = input("Server IP address: ").strip()
-    try:
-        ipaddress.ip_address(host)
-    except ValueError:
-        print("Enter a valid IPv4 or IPv6 address.")
-        return
-    user = input("SSH username: ").strip()
-    if not user or user.startswith("-") or any(ch.isspace() for ch in user) or "@" in user:
-        print("Invalid username.")
-        return
-    password = getpass.getpass("SSH password (not displayed): ")
-    if not password:
-        print("Password cannot be empty.")
-        return
-    data[name] = {"host": host, "user": user, "password": password}
-    save(data)
-    print("Saved locally.")
-
-def connect(data):
-    name = choose(data)
-    if not name:
-        return
+def connect(name, server):
     if not shutil.which("sshpass"):
-        print("sshpass is not installed. On Ubuntu: sudo apt-get install sshpass")
+        print("Install sshpass first: sudo apt-get install sshpass")
         return
-    record = data[name]
-    print(f"Connecting to {name} ({record['user']}@{record['host']})...")
+    passwords = read_passwords()
+    password = passwords.get(name)
+    if not password:
+        password = getpass.getpass(f"Password for {name} ({server['user']}@{server['host']}): ")
+        if not password:
+            print("Connection cancelled.")
+            return
+        passwords[name] = password
+        write_passwords(passwords)
     env = os.environ.copy()
-    env["SSHPASS"] = record["password"]
-    try:
-        subprocess.run(
-            ["sshpass", "-e", "ssh", "-o", "StrictHostKeyChecking=accept-new",
-             "--", f"{record['user']}@{record['host']}"],
-            env=env, check=False,
-        )
-    except OSError as exc:
-        print(f"SSH failed: {exc}")
-
-def edit(data):
-    name = choose(data)
-    if not name:
-        return
-    old = data[name]
-    host = input(f"IP [{old['host']}]: ").strip() or old["host"]
-    try:
-        ipaddress.ip_address(host)
-    except ValueError:
-        print("Invalid IP.")
-        return
-    user = input(f"Username [{old['user']}]: ").strip() or old["user"]
-    if user.startswith("-") or any(ch.isspace() for ch in user) or "@" in user:
-        print("Invalid username.")
-        return
-    password = getpass.getpass("New password (Enter to keep existing): ")
-    data[name] = {"host": host, "user": user, "password": password or old["password"]}
-    save(data)
-    print("Updated.")
-
-def delete(data):
-    name = choose(data)
-    if name and input(f"Delete {name}? Type YES: ").strip() == "YES":
-        del data[name]
-        save(data)
-        print("Deleted.")
+    env["SSHPASS"] = password
+    print(f"Connecting to {name} ({server['user']}@{server['host']})...")
+    subprocess.run(["sshpass", "-e", "ssh", "-o", "StrictHostKeyChecking=accept-new",
+                    f"{server['user']}@{server['host']}"], env=env, check=False)
 
 def main():
     while True:
         try:
-            data = load()
+            servers = read_config()
+            names = list(servers)
             print("\n========================================")
-            print("          PXY CONNECT MANAGER")
+            print("          PXY SSH CONNECTIONS")
             print("========================================")
-            print("1) Connect to saved server")
-            print("2) Add new server")
-            print("3) Edit saved server")
-            print("4) Delete saved server")
-            print("5) List saved servers")
-            print("0) Exit")
-            choice = input("Select option: ").strip()
-            if choice == "1":
-                connect(data)
-            elif choice == "2":
-                add(data)
-            elif choice == "3":
-                edit(data)
-            elif choice == "4":
-                delete(data)
-            elif choice == "5":
-                choose(data)
-            elif choice in ("0", ""):
+            for i, name in enumerate(names, 1):
+                server = servers[name]
+                print(f"{i}) {name} - {server['user']}@{server['host']}")
+            print("p) Change a locally saved password")
+            print("0) Back")
+            selection = input("Select server: ").strip().lower()
+            if selection in ("", "0"):
                 return
+            if selection == "p":
+                for i, name in enumerate(names, 1):
+                    print(f"{i}) {name}")
+                index = input("Server number: ").strip()
+                if index.isdigit() and 1 <= int(index) <= len(names):
+                    name = names[int(index)-1]
+                    password = getpass.getpass(f"New password for {name}: ")
+                    if password:
+                        passwords = read_passwords()
+                        passwords[name] = password
+                        write_passwords(passwords)
+                        print("Password updated locally.")
+                continue
+            if selection.isdigit() and 1 <= int(selection) <= len(names):
+                name = names[int(selection)-1]
+                connect(name, servers[name])
             else:
-                print("Invalid option.")
-        except (KeyboardInterrupt, EOFError):
+                print("Invalid selection.")
+        except (EOFError, KeyboardInterrupt):
             print("\nExiting.")
             return
-        except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
-            print(f"Error: {exc}", file=sys.stderr)
+        except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            print(f"Connection manager error: {exc}", file=sys.stderr)
 
 if __name__ == "__main__":
     main()
