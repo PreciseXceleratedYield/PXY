@@ -54,6 +54,14 @@ for file in "$REPO_DIR"/*; do
             fi
             sudo install -m 755 -- "$file" "$INSTALL_DIR/$filename"
             echo "-> installed executable command: $filename"
+            # Older releases installed commands under ~/.local/bin, which may
+            # precede /usr/local/bin in PATH and shadow the updated executable.
+            # Remove only a legacy command with this exact installed filename.
+            legacy="$HOME/.local/bin/$filename"
+            if [ -f "$legacy" ] || [ -L "$legacy" ]; then
+                rm -- "$legacy"
+                echo "-> removed obsolete user-level command: $filename"
+            fi
         fi
     fi
 done
