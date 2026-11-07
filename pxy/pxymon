@@ -16,6 +16,13 @@ pxy_activate_env || exit 1
 
 cd "$PXY_APP_DIR/sys" || { echo "Directory $PXY_APP_DIR/sys not found"; exit 1; }
 
+# Read-only Control Tower summary; no additional monitor process is started.
+if [[ -f "$PXY_APP_DIR/pxytlgr" ]]; then
+    echo "===== PXY TELEGRAM CONTROL TOWER ====="
+    bash "$PXY_APP_DIR/pxytlgr" status
+    echo "======================================"
+fi
+
 # Isolate BTC-USD testing to this monitor process only.
 export PXY_MONITOR_MODE=1
 
