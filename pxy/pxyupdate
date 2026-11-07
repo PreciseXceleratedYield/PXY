@@ -40,13 +40,15 @@ find "$REPO_DIR" -type f -name "*.pyc" -delete
 find "$REPO_DIR" -type d -name ".pytest_cache" -prune -exec rm -rf {} +
 
 echo " ****** sync binaries *******"
-mkdir -p "$HOME/.local/bin"
+# Install executable commands into the system command directory (original PXY behavior).
+# sudo is required for this installation; never restart running services.
+INSTALL_DIR="/usr/local/bin"
 for file in "$REPO_DIR"/*; do
     if [ -f "$file" ]; then
         filename=$(basename "$file")
         if [[ "$filename" != *.* ]]; then
-            cp "$file" "$HOME/.local/bin/"
-            chmod +x "$HOME/.local/bin/$filename"
+            sudo cp "$file" "$INSTALL_DIR/$filename"
+            sudo chmod +x "$INSTALL_DIR/$filename"
             echo "-> installed executable command: $filename"
         fi
     fi
