@@ -1028,9 +1028,14 @@ async function loadChartMarketPrices(){
         low.textContent=futHigher?'INDEX: '+fmt(d.index):'FUT: '+fmt(d.fut);
         high.style.color=futHigher?'#83a992':'#bd8585';
         low.style.color=futHigher?'#bd8585':'#83a992';
+        // Display-only Spot/FUT gap; do not feed these quotes into trading signals.
+        lastMomentumQuotes=bothValid?{spot:index,fut:fut}:null;
+        drawMomentumBar(lastMoCandles);
     }catch(e){
         high.textContent='INDEX: —';
         low.textContent='FUT: —';
+        lastMomentumQuotes=null;
+        drawMomentumBar(lastMoCandles);
     }
 }
 async function loadChart(){
@@ -1213,21 +1218,13 @@ function drawChart(candles){
                 ctx.moveTo(toX(i),toY(value));
                 started=true;
             }else{
-                ctx.lineTo(toX(i),toY(value));
-            }
-        }
-        ctx.stroke();
-    }
-    if(chartLineVisibility.sma50)drawMovingAverage('sma50','--cjs-sma',[]);
-    if(chartLineVisibility.tsma50)drawMovingAverage('tsma50','--accent',[4,3]);
-    ctx.setLineDash([]);
-}
+                ctx.// The momentum candle visualizes the absolute Spot/FUT premium or discount.
+// Its size uses a fixed point scale, so changes in gap have comparable lengths.
+let lastMomentumQuotes=null;
 function drawMomentumBar(candles){
-    if(!candles||!candles.length)return;
-    lastMoCandles=candles;
-    const last=candles.at(-1);
-    if(!last||last.c==null||last.st_line==null||last.mirror_line==null)return;
+    if(candles&&candles.length)lastMoCandles=candles;
     const canvas=$('momentumCandle');
+    if(!canvas)return;
     const ctx=canvas.getContext('2d');
     const dpr=window.devicePixelRatio||1;
     const rect=canvas.parentElement.getBoundingClientRect();
@@ -1238,30 +1235,21 @@ function drawMomentumBar(candles){
     ctx.clearRect(0,0,W,H);
     if(W<4||H<10)return;
     const PADY=8,midX=W/2,bodyW=Math.max(6.4,W*0.36);
-    const recent=candles.slice(-60);
-    const all=recent.flatMap(c=>[c.c,c.st_line,c.mirror_line]).filter(v=>v!=null);
-    const high=Math.max(...all),low=Math.min(...all),range=high-low||1;
-    const toY=v=>H-PADY-((v-low)/range)*(H-PADY*2);
-
-    // trend drives color: BULL/BEAR = breakout beyond both lines, SIDE = still inside the channel
-    const trend=String(last.trend||'SIDE').toUpperCase();
-    const bodyColor=trend==='BULL'?cssVar('--bull'):trend==='BEAR'?cssVar('--bear'):cssVar('--neutral-body');
-    const glowColor=trend==='BULL'?cssVar('--glow-bull'):trend==='BEAR'?cssVar('--glow-bear'):cssVar('--glow-neutral');
-    // track
-    const tg=ctx.createLinearGradient(0,0,0,H);
-    tg.addColorStop(0,'rgba(0,0,0,0)');tg.addColorStop(0.08,cssVar('--track-mid'));
-    tg.addColorStop(0.92,cssVar('--track-mid'));tg.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.strokeStyle=tg;ctx.lineWidth=1;
+    const quotes=lastMomentumQuotes;
+    if(!quotes)return; // Missing data: no misleading bullish/bearish candle.
+    const gap=quotes.fut-quotes.spot;
+    const bodyColor=gap>0?cssVar('--bull'):gap<0?cssVar('--bear'):cssVar('--neutral-body');
+    const centerY=H/2;
+    // 1 pixel per index point, capped to available height; 0 gap is a small flat body.
+    const length=Math.min(Math.abs(gap),H/2-PADY);
+    const top=gap>=0?centerY-length:centerY;
+    const height=Math.max(length,2);
+    ctx.strokeStyle=cssVar('--track-mid');ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(midX,PADY);ctx.lineTo(midX,H-PADY);ctx.stroke();
-    // wick = the st_line <-> mirror_line channel at the current bar
-    const chHigh=Math.max(last.st_line,last.mirror_line),chLow=Math.min(last.st_line,last.mirror_line);
-    const wy1=toY(chLow),wy2=toY(chHigh);
-    ctx.strokeStyle=bodyColor;ctx.lineWidth=3;ctx.globalAlpha=0.45;
-    ctx.beginPath();ctx.moveTo(midX,wy1);ctx.lineTo(midX,wy2);ctx.stroke();
-    ctx.globalAlpha=1;
-    const capW=Math.max(5,W*0.28);
-    [wy1,wy2].forEach(y=>{ctx.beginPath();ctx.moveTo(midX-capW/2,y);ctx.lineTo(midX+capW/2,y);ctx.stroke();});
-    // body = close <-> st_line (how far price has moved from the trend line, colored by trend state)
+    ctx.fillStyle=bodyColor;
+    ctx.beginPath();ctx.roundRect(midX-bodyW/2,top,bodyW,height,3);ctx.fill();
+    canvas.title='FUT − INDEX: '+(gap>=0?'+':'')+gap.toFixed(2)+' points';
+}ored by trend state)
     const open=last.st_line,close=last.c;
     const by1=toY(Math.max(open,close)),by2=toY(Math.min(open,close)),bH=Math.max(by2-by1,4);
     ctx.fillStyle=bodyColor;
