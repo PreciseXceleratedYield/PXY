@@ -54,13 +54,17 @@ for file in "$REPO_DIR"/*; do
             fi
             sudo install -m 755 -- "$file" "$INSTALL_DIR/$filename"
             echo "-> installed executable command: $filename"
-            # Older releases installed commands under ~/.local/bin, which may
-            # precede /usr/local/bin in PATH and shadow the updated executable.
-            # Remove only a legacy command with this exact installed filename.
+            # ~/.local/bin may precede /usr/local/bin in PATH, and the parent
+            # shell may have cached the legacy path. Keep a compatibility link
+            # to the freshly installed command instead of deleting the path.
+            # A child process cannot clear its parent shell's command hash.
             legacy="$HOME/.local/bin/$filename"
             if [ -f "$legacy" ] || [ -L "$legacy" ]; then
-                rm -- "$legacy"
-                echo "-> removed obsolete user-level command: $filename"
+                if [ ! -L "$legacy" ] || [ "$(readlink -- "$legacy")" != "$INSTALL_DIR/$filename" ]; then
+                    rm -- "$legacy"
+                    ln -s -- "$INSTALL_DIR/$filename" "$legacy"
+                fi
+                echo "-> legacy command points to current executable: $filename"
             fi
         fi
     fi
