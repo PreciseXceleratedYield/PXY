@@ -182,6 +182,46 @@ def counts(state):
     return daily.get("ERROR", errors), daily.get("WARNING", warnings)
 
 
+def daily_peak_investment(rows):
+    """Peak simultaneous cost basis reconstructed from open and closed lots."""
+    if not isinstance(rows, list):
+        return None
+    events = []
+    today = now().date()
+    for row in rows:
+        if not isinstance(row, dict):
+            return None
+        qty, price = safe_number(row.get("Qty")), safe_number(row.get("Buy_Prc"))
+        if qty is None or price is None or qty <= 0 or price <= 0:
+            return None
+        try:
+            bought = datetime.fromisoformat(str(row["Buy_Time"]))
+        except (KeyError, TypeError, ValueError):
+            return None
+        if bought.date() != today:
+            return None  # Carry-forward needs a separate opening-capital baseline.
+        amount = qty * price
+        events.append((bought, 1, amount))
+        status = str(row.get("Status", "")).upper()
+        if status == "CLOSED":
+            try:
+                exited = datetime.fromisoformat(str(row["Exit_Time"]))
+            except (KeyError, TypeError, ValueError):
+                return None
+            if exited < bought:
+                return None
+            events.append((exited, 0, -amount))
+        elif status != "OPEN":
+            return None
+    invested = peak = 0.0
+    for _, _, change in sorted(events):
+        invested += change
+        if invested < -0.01:
+            return None
+        peak = max(peak, invested)
+    return peak
+
+
 def snapshot_report(title, state=None):
     state = state or {}
     stamp = now()
@@ -223,6 +263,8 @@ def snapshot_report(title, state=None):
     values = [safe_number(r.get("PNL")) for r in closed]
     closed_pnl = sum(values) if isinstance(trades, list) and all(v is not None for v in values) else None
     net = closed_pnl + open_pnl if closed_pnl is not None and open_pnl is not None else None
+    peak = daily_peak_investment(trades)
+    daily_return = (100 * net / peak) if net is not None and peak is not None and peak > 0 else None
     errors, warnings = counts(state)
     health = engine and web and watch
     landed = title == "TOUCHDOWN" and ce == 0 and pe == 0 and health
@@ -256,12 +298,14 @@ def snapshot_report(title, state=None):
                   field("Closed PnL", money(closed_pnl)),
                   field("Net PnL", money(net))]
         if title in {"AIRBORNE", "TOUCHDOWN"}:
-            lines += [field("PnL %" if title == "AIRBORNE" else "Return %", "NA")]
+            lines += [field("PnL %" if title == "AIRBORNE" else "Return %", f"{daily_return:+.2f}%" if daily_return is not None else "NA")]
         if title == "TOUCHDOWN":
             wins = sum(1 for r in closed if (safe_number(r.get("PNL")) or 0) > 0)
             losses = sum(1 for r in closed if (safe_number(r.get("PNL")) or 0) < 0)
             lines += [field("Wins", wins if books is not None else "NA"),
                       field("Losses", losses if books is not None else "NA")]
+    if title == "TOUCHDOWN":
+        lines.append(field("Peak Inv", money(peak)))
     lines += [field("Books", f"{books} Closed" if books is not None else "NA"),
               field("Errors", f"{errors} Reported"),
               field("Warnings", f"{warnings} Reported"),
