@@ -88,24 +88,10 @@ def main():
             for i, name in enumerate(names, 1):
                 server = servers[name]
                 print(f"{i}) {name} - {server['user']}@{server['host']}")
-            print("p) Change a locally saved password")
             print("0) Back")
             selection = input("Select server: ").strip().lower()
             if selection in ("", "0"):
                 return
-            if selection == "p":
-                for i, name in enumerate(names, 1):
-                    print(f"{i}) {name}")
-                index = input("Server number: ").strip()
-                if index.isdigit() and 1 <= int(index) <= len(names):
-                    name = names[int(index)-1]
-                    password = getpass.getpass(f"New password for {name}: ")
-                    if password:
-                        passwords = read_passwords()
-                        passwords[name] = password
-                        write_passwords(passwords)
-                        print("Password updated locally.")
-                continue
             if selection.isdigit() and 1 <= int(selection) <= len(names):
                 name = names[int(selection)-1]
                 connect(name, servers[name])
