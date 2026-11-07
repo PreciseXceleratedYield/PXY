@@ -58,10 +58,24 @@ running_engine() {
   done < <(pgrep -f '[s]ysexepxy.py' || true)
   return 1
 }
+# Enumerate actual Python engine processes, excluding tmux and grep wrappers.
+engine_pids() {
+  local pid comm args
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    comm="$(ps -p "$pid" -o comm= 2>/dev/null)" || continue
+    [[ "$comm" == python* ]] || continue
+    args="$(ps -p "$pid" -o args= 2>/dev/null)" || continue
+    [[ "$args" == *sysexepxy.py* ]] && printf '%s\\n' "$pid"
+  done < <(pgrep -f '[s]ysexepxy.py' || true)
+}
+engine_count() { engine_pids | wc -l | tr -d ' '; }
 running_web() { pgrep -f '[n]ode pxy.js' >/dev/null; }
 start_sessions() {
   command -v tmux >/dev/null || { echo "tmux missing"; return 1; }
-  if running_engine; then
+  if (( $(engine_count) > 1 )); then
+    echo "CRITICAL: duplicate trading engines detected (PIDs: $(engine_pids | paste -sd, -)); refusing to start or kill engines automatically" >&2
+  elif running_engine; then
     echo "Engine process already running; not starting another"
   elif tmux has-session -t pxy-engine 2>/dev/null; then
     echo "Engine tmux session exists; waiting for watchdog recovery"
@@ -131,15 +145,24 @@ watch_loop() {
   command -v tmux >/dev/null || { echo "tmux missing"; return 1; }
   exec 9>"$HOME/.pxywatch.lock"
   flock -n 9 || { echo "Another pxywatch is running"; return 1; }
-  local emissing=0 wmissing=0 now sleeper=""
+  local emissing=0 wmissing=0 now sleeper="" engine_total=0 duplicate_warned=0
   # The watchdog alone owns the lock. Clean up the timer on shutdown.
   trap '[[ -n "$sleeper" ]] && kill "$sleeper" 2>/dev/null || true; wait "$sleeper" 2>/dev/null || true; exit 0' TERM INT
   echo "$(date -Is) pxywatch monitoring started"
   while :; do
     now="$(date +%s)"
-    if running_engine; then
+    engine_total="$(engine_count)"
+    if (( engine_total > 1 )); then
       emissing=0
+      if (( duplicate_warned == 0 )); then
+        echo "$(date -Is) CRITICAL: $engine_total trading engines detected (PIDs: $(engine_pids | paste -sd, -)); manual reconciliation required. No processes killed to avoid interrupting broker orders." >&2
+        duplicate_warned=1
+      fi
+    elif (( engine_total == 1 )); then
+      emissing=0
+      duplicate_warned=0
     else
+      duplicate_warned=0
       (( emissing == 0 )) && emissing=$now
       if (( now - emissing >= GRACE )); then
         if pgrep -f '[/]pxy/sys/exe/exe[a-z]*pxy.py|[p]ython3 exe/exepxy.py' >/dev/null; then
@@ -185,7 +208,7 @@ case "${1:-}" in
   restart) stop_watch && start_watch ;;
   status)
     systemctl --no-pager --full status "$UNIT" || true
-    if running_engine; then echo "Engine: RUNNING"; else echo "Engine: STOPPED"; fi
+    if (( $(engine_count) > 1 )); then echo "Engine: DUPLICATE PROCESSES — manual intervention required (PIDs: $(engine_pids | paste -sd, -))"; elif running_engine; then echo "Engine: RUNNING (one process)"; else echo "Engine: STOPPED"; fi
     if running_web; then echo "Dashboard: RUNNING"; else echo "Dashboard: STOPPED"; fi
     ;;
   logs)
