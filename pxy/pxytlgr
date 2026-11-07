@@ -39,14 +39,34 @@ EOF
     rm -f "$tmp"
     (( rc == 0 )) || exit "$rc"
     sudo systemctl daemon-reload
-    echo "Installed $UNIT; run pxytlgr enable and pxytlgr start when ready."
+    echo "Installed $UNIT. Installation does not start the service or enable boot."
+    echo "Next: $APP/pxytlgr enable && $APP/pxytlgr start"
     ;;
   start|stop|restart|enable|disable)
-    sudo systemctl "$1" "$UNIT"
+    before="$(systemctl is-active "$UNIT" 2>/dev/null || true)"
+    if sudo systemctl "$1" "$UNIT"; then
+      after="$(systemctl is-active "$UNIT" 2>/dev/null || true)"
+      boot="$(systemctl is-enabled "$UNIT" 2>/dev/null || true)"
+      case "$1" in
+        start) echo "Start completed. Control Tower: $after (previously: $before)." ;;
+        stop) echo "Stop completed. Control Tower: $after." ;;
+        restart) echo "Restart completed. Control Tower: $after. Latest installed Python code reloaded." ;;
+        enable) echo "Boot enabled: $boot. Current service: $after (enable does not start it)." ;;
+        disable) echo "Boot setting: $boot. Current service: $after (disable does not stop it)." ;;
+      esac
+      if [[ "$1" == start || "$1" == restart ]] && [[ "$after" != active ]]; then
+        echo "WARNING: Service is not active; inspect logs with: $APP/pxytlgr logs"
+        exit 1
+      fi
+    else
+      rc=$?
+      echo "FAILED: $1 $UNIT (exit $rc). Check: $APP/pxytlgr logs"
+      exit "$rc"
+    fi
     ;;
   status)
-    echo "Control Tower: $(systemctl is-active "$UNIT" 2>/dev/null || true)"
-    echo "Boot: $(systemctl is-enabled "$UNIT" 2>/dev/null || true)"
+    echo "Control Tower: $(systemctl is-active "$UNIT" 2>/dev/null || true) (systemd service state)"
+    echo "Boot: $(systemctl is-enabled "$UNIT" 2>/dev/null || true) (automatic startup after reboot)"
     if [[ -f "$STATE" ]]; then
       "$PYTHON" - "$STATE" "$CONFIG" <<'PY'
 import json,sys
@@ -55,12 +75,12 @@ try:
  try: settings=json.load(open(sys.argv[2]))
  except (OSError,ValueError): settings={}
  print("Events after 09:35:", "ON" if settings.get("events_enabled",False) else "OFF")
- print("Books baseline established:", bool(d.get("book_initialized",False)))
- print("Notifications recorded:", sum(1 for x in d.get("sent",{}).values() if x != "BASELINE"))
+ print("Books baseline established:", bool(d.get("book_initialized",False)), "(first eligible book scan completed)")
+ print("Notifications recorded:", sum(1 for x in d.get("sent",{}).values() if x != "BASELINE"), "(deduplicated send records, not delivery confirmation)")
 except (OSError,ValueError): print("Monitor state: unavailable")
 PY
     else
-      echo "Monitor state: not yet initialized"
+      echo "Monitor state: not yet initialized (service may not have completed its first cycle)"
     fi
     ;;
   events-on|events-off)
@@ -78,10 +98,11 @@ try:
  os.replace(t,p)
 finally:
  if os.path.exists(t): os.unlink(t)
-print("Events after 09:35:", "ON" if d["events_enabled"] else "OFF")
+print("Events after 09:35:", "ON" if d["events_enabled"] else "OFF", "(scheduled reports and closed-book messages unaffected)")
 PY
     ;;
   logs)
+    echo "Last 50 Control Tower journal lines:"
     journalctl -u "$UNIT" -n 50 --no-pager
     ;;
   *) usage; exit 2 ;;
