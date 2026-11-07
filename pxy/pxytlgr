@@ -8,6 +8,7 @@ UNIT_PATH="/etc/systemd/system/$UNIT"
 PYTHON="$HOME/env/bin/python3"
 STATE_DIR="$HOME/.pxy/tlgr"
 STATE="$STATE_DIR/state.json"
+CONFIG="$STATE_DIR/config.json"
 usage() { echo "Usage: pxytlgr {install|start|stop|restart|enable|disable|status|events-on|events-off|logs}"; }
 case "${1:-}" in
   install)
@@ -47,11 +48,13 @@ EOF
     echo "Control Tower: $(systemctl is-active "$UNIT" 2>/dev/null || true)"
     echo "Boot: $(systemctl is-enabled "$UNIT" 2>/dev/null || true)"
     if [[ -f "$STATE" ]]; then
-      "$PYTHON" - "$STATE" <<'PY'
+      "$PYTHON" - "$STATE" "$CONFIG" <<'PY'
 import json,sys
 try:
  d=json.load(open(sys.argv[1]))
- print("Events after 09:35:", "ON" if d.get("events_enabled",False) else "OFF")
+ try: settings=json.load(open(sys.argv[2]))
+ except (OSError,ValueError): settings={}
+ print("Events after 09:35:", "ON" if settings.get("events_enabled",False) else "OFF")
  print("Books baseline established:", bool(d.get("book_initialized",False)))
  print("Notifications recorded:", sum(1 for x in d.get("sent",{}).values() if x != "BASELINE"))
 except (OSError,ValueError): print("Monitor state: unavailable")
@@ -62,7 +65,7 @@ PY
     ;;
   events-on|events-off)
     mkdir -p "$STATE_DIR"
-    "$PYTHON" - "$STATE" "$1" <<'PY'
+    "$PYTHON" - "$CONFIG" "$1" <<'PY'
 import json,os,sys,tempfile
 p=sys.argv[1]
 try:
