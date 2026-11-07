@@ -1,5 +1,6 @@
-#!/bin/bash
-sudo apt update && sudo apt install sshpass -y
+#!/bin/sh
+# Update repositories and install sshpass via Alpine's package manager
+apk update && apk add sshpass
 
 # Target server credentials
 REMOTE_USER="pxy"
