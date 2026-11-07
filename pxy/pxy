@@ -76,6 +76,7 @@ while true; do
     echo "t) 💰 Trde    - Trading Operations"
     echo "m) 👁️  Smon    - Run PXY Monitor"
     echo "c) ⚙️  Ctrl    - System Management"
+    echo "g) 📡 Tlgr    - Telegram Control Tower"
     echo "x) 🚪 Exit    - Close Menu"
     draw_border
     read -p "Select option: " OPTION
@@ -117,6 +118,35 @@ while true; do
         m)
             bash "$PXY_APP_DIR/pxymon"
             read -p "Press [Enter] to return..."
+            ;;
+        g)
+            while true; do
+                clear
+                draw_border
+                echo "        PXY TELEGRAM CONTROL TOWER       "
+                draw_border
+                echo "1) Start         2) Stop"
+                echo "3) Restart       4) Install"
+                echo "5) Enable Boot   6) Disable Boot"
+                echo "7) Events ON     8) Events OFF"
+                echo "9) Status        0) Back"
+                draw_border
+                read -p "Select option: " GOPT
+                case "$GOPT" in
+                    1) bash "$PXY_APP_DIR/pxytlgr" start ;;
+                    2) bash "$PXY_APP_DIR/pxytlgr" stop ;;
+                    3) bash "$PXY_APP_DIR/pxytlgr" restart ;;
+                    4) bash "$PXY_APP_DIR/pxytlgr" install ;;
+                    5) bash "$PXY_APP_DIR/pxytlgr" enable ;;
+                    6) bash "$PXY_APP_DIR/pxytlgr" disable ;;
+                    7) bash "$PXY_APP_DIR/pxytlgr" events-on ;;
+                    8) bash "$PXY_APP_DIR/pxytlgr" events-off ;;
+                    9) bash "$PXY_APP_DIR/pxytlgr" status ;;
+                    0|"") break ;;
+                    *) echo "Invalid choice." ;;
+                esac
+                read -p "Press [Enter] to continue..."
+            done
             ;;
         c)
             while true; do
