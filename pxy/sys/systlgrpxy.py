@@ -360,9 +360,23 @@ def scan_books(state):
         if not state.get("book_initialized"):
             state.setdefault("sent", {})[key] = "BASELINE"
             continue
-        pnl = sum(float(r.get("PNL", 0) or 0) for r in rows)
+        values = [safe_number(r.get("PNL")) for r in rows]
+        pnl = sum(values) if all(v is not None for v in values) else None
+        peak = daily_peak_investment(rows)
+        book_return = (100 * pnl / peak) if pnl is not None and peak is not None and peak > 0 else None
         times = [str(r.get("Exit_Time", "")) for r in rows if r.get("Exit_Time")]
-        message = f"PXY 📕 Book #{book} CLOSED\nExit: {max(times) if times else 'unavailable'}\nRealized P&L: ₹{pnl:,.0f} (ledger estimate, before charges)"
+        exit_time = max(times) if times else "NA"
+        lines = [
+            f"📕 PXY — BOOK #{html.escape(book)} CLOSED",
+            "━━━━━━━━━━━━━━━━━━━━━━━━",
+            field("Exit", exit_time),
+            field("Peak Inv", money(peak)),
+            field("Closed PnL", money(pnl)),
+            field("Return %", f"{book_return:+.2f}%" if book_return is not None else "NA"),
+            field("Status", "COMPLETED"),
+            "━━━━━━━━━━━━━━━━━━━━━━━━",
+        ]
+        message = "\n".join(lines[:1]) + "\n<pre>" + "\n".join(lines[1:]) + "</pre>\n<b>BOOK NET PNL</b>\n<b>" + html.escape(money(pnl)) + "</b>"
         send(state, key, "BOOK", message)
     state["book_initialized"] = True
     save(state)
