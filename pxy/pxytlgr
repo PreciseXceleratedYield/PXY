@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+# Independent PXY Telegram Control Tower systemd management.
+set -uo pipefail
+SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+APP="$(dirname "$SELF")"
+UNIT=pxytlgr.service
+UNIT_PATH="/etc/systemd/system/$UNIT"
+PYTHON="$HOME/env/bin/python3"
+STATE_DIR="$HOME/.pxy/tlgr"
+STATE="$STATE_DIR/state.json"
+usage() { echo "Usage: pxytlgr {install|start|stop|restart|enable|disable|status|events-on|events-off|logs}"; }
+case "${1:-}" in
+  install)
+    [[ -x "$PYTHON" && -f "$APP/sys/systlgrpxy.py" ]] || { echo "Missing Python venv or monitor"; exit 1; }
+    tmp="$(mktemp)"
+    cat > "$tmp" <<EOF
+[Unit]
+Description=PXY Independent Telegram Control Tower
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$(id -un)
+Environment=HOME=$HOME
+WorkingDirectory=$APP
+ExecStart=$PYTHON -u $APP/sys/systlgrpxy.py
+Restart=always
+RestartSec=10
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    sudo install -m 644 "$tmp" "$UNIT_PATH"; rc=$?
+    rm -f "$tmp"
+    (( rc == 0 )) || exit "$rc"
+    sudo systemctl daemon-reload
+    echo "Installed $UNIT; run pxytlgr enable and pxytlgr start when ready."
+    ;;
+  start|stop|restart|enable|disable)
+    sudo systemctl "$1" "$UNIT"
+    ;;
+  status)
+    echo "Control Tower: $(systemctl is-active "$UNIT" 2>/dev/null || true)"
+    echo "Boot: $(systemctl is-enabled "$UNIT" 2>/dev/null || true)"
+    if [[ -f "$STATE" ]]; then
+      "$PYTHON" - "$STATE" <<'PY'
+import json,sys
+try:
+ d=json.load(open(sys.argv[1]))
+ print("Events after 09:35:", "ON" if d.get("events_enabled",False) else "OFF")
+ print("Books baseline established:", bool(d.get("book_initialized",False)))
+ print("Notifications recorded:", sum(1 for x in d.get("sent",{}).values() if x != "BASELINE"))
+except (OSError,ValueError): print("Monitor state: unavailable")
+PY
+    else
+      echo "Monitor state: not yet initialized"
+    fi
+    ;;
+  events-on|events-off)
+    mkdir -p "$STATE_DIR"
+    "$PYTHON" - "$STATE" "$1" <<'PY'
+import json,os,sys,tempfile
+p=sys.argv[1]
+try:
+ with open(p) as f: d=json.load(f)
+except (OSError,ValueError): d={}
+d["events_enabled"]=sys.argv[2]=="events-on"
+fd,t=tempfile.mkstemp(dir=os.path.dirname(p))
+try:
+ with os.fdopen(fd,"w") as f: json.dump(d,f)
+ os.replace(t,p)
+finally:
+ if os.path.exists(t): os.unlink(t)
+print("Events after 09:35:", "ON" if d["events_enabled"] else "OFF")
+PY
+    ;;
+  logs)
+    journalctl -u "$UNIT" -n 50 --no-pager
+    ;;
+  *) usage; exit 2 ;;
+esac
