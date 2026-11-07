@@ -1213,7 +1213,16 @@ function drawChart(candles){
                 ctx.moveTo(toX(i),toY(value));
                 started=true;
             }else{
-                ctx.function drawMomentumBar(candles){
+                ctx.lineTo(toX(i),toY(value));
+            }
+        }
+        ctx.stroke();
+    }
+    if(chartLineVisibility.sma50)drawMovingAverage('sma50','--cjs-sma',[]);
+    if(chartLineVisibility.tsma50)drawMovingAverage('tsma50','--accent',[4,3]);
+    ctx.setLineDash([]);
+}
+function drawMomentumBar(candles){
     if(!candles||!candles.length)return;
     lastMoCandles=candles;
     const last=candles.at(-1);
