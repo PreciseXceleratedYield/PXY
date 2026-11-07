@@ -45,7 +45,19 @@ EOF
     echo "Watchdog installed — service is not running. Run: pxywatch start"
   fi
 }
-running_engine() { pgrep -f '[s]ysexepxy.py' >/dev/null; }
+# Match the actual Python engine, not a tmux server whose original argv
+# still contains sysexepxy.py after the engine session has exited.
+running_engine() {
+  local pid comm args
+  while read -r pid; do
+    [[ -n "$pid" ]] || continue
+    comm="$(ps -p "$pid" -o comm= 2>/dev/null)" || continue
+    [[ "$comm" == python* ]] || continue
+    args="$(ps -p "$pid" -o args= 2>/dev/null)" || continue
+    [[ "$args" == *sysexepxy.py* ]] && return 0
+  done < <(pgrep -f '[s]ysexepxy.py' || true)
+  return 1
+}
 running_web() { pgrep -f '[n]ode pxy.js' >/dev/null; }
 start_sessions() {
   command -v tmux >/dev/null || { echo "tmux missing"; return 1; }
