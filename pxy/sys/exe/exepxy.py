@@ -73,11 +73,11 @@ def run_script(script_path, timeout=None):
     except subprocess.TimeoutExpired:
         error = f"timed out after {timeout}s"
         print(f"⏱ TIMEOUT: {component} {error} ⚠️")
-    except subprocess.CalledProcessError as error:
-        error = f"process exited with status {error.returncode}"
+    except subprocess.CalledProcessError as exc:
+        error = f"process exited with status {exc.returncode}"
         print(f"❌ RUN ERR: {component}: {error} ⚠️")
-    except Exception as error:
-        error = str(error)
+    except Exception as exc:
+        error = str(exc)
         print(f"❌ RUN ERR: {component}: {error} ⚠️")
     _record_component_failure(component, error)
     print("━" * 42)
