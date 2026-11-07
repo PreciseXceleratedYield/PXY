@@ -104,30 +104,10 @@ app.get('/api/fut-history', (req, res) => {
     });
 });
 
-/* Engine-only restart, protected by a separate server-side secret. */
-app.post('/api/pxyrestart', (req, res) => {
-    const secret = process.env.PXY_RESTART_TOKEN;
-    const supplied = typeof req.body?.pwd === 'string' ? req.body.pwd : '';
-    if (!secret || secret.length < 8) return res.status(503).json({ok:false,error:'PXYRESTART is not configured: set PXY_RESTART_TOKEN (8+ characters) in the WebPXY service environment.'});
-    const actual = Buffer.from(supplied, 'utf8');
-    const expected = Buffer.from(secret, 'utf8');
-    if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return res.status(401).json({ok:false,error:'Invalid PXYRESTART password.'});
-    execFile('systemctl', ['is-active', '--quiet', 'pxywatch.service'], {timeout:3000}, (watchErr) => {
-        if (watchErr) return res.status(409).json({ok:false,error:'Watchdog is not active; engine restart refused.'});
-        execFile('tmux', ['has-session', '-t', 'pxy-engine'], {timeout:3000}, (sessionErr) => {
-            if (sessionErr) return res.status(409).json({ok:false,error:'Engine session missing; watchdog may already be recovering it.'});
-            execFile('tmux', ['kill-session', '-t', 'pxy-engine'], {timeout:5000}, (err) => {
-                if (err) return res.status(500).json({ok:false,error:'Engine restart request failed: '+err.message});
-                res.json({ok:true,output:'Engine session stopped; active watchdog will recreate it after its recovery interval. WebPXY remains running. Verify engine status before trading.'});
-            });
-        });
-    });
-});
-
 /* ========================= RUN SCRIPT WITH PYTHON ENV ACTIVATED ========================= */ 
 const ALLOWED_SCRIPTS = [ 
     'pxyupdate', 'pxysqrall', 'pxybuyce', 'pxybuype', 'pxysqrce', 'pxysqrpe',
-    'pxyldgr'
+    'pxyldgr', 'pxyrestart'
 ]; 
 const SCRIPT_DIR = path.resolve(__dirname);
 const PXY_HOME = process.env.PXY_HOME || '/home/pxy';
@@ -136,11 +116,18 @@ function shellQuote(value) {
     return `'${String(value).replace(/'/g, "'\\''")}'`;
 }
 
-const ACTION_PASSWORD = '1';
+// Shared authentication for every WebPXY action, including PXYRESTART.
+// A local password file avoids committing the operator's password to Git.
+const fs = require('fs');
+const ACTION_PASSWORD_FILE = path.join(PXY_HOME, '.pxy', 'web-action-password');
+function getActionPassword() {
+    try { return fs.readFileSync(ACTION_PASSWORD_FILE, 'utf8').trim(); }
+    catch (err) { if (err.code !== 'ENOENT') throw err; return '1'; }
+}
 
 function hasValidActionPassword(value) {
     const supplied = Buffer.from(value, 'utf8');
-    const expected = Buffer.from(ACTION_PASSWORD, 'utf8');
+    const expected = Buffer.from(getActionPassword(), 'utf8');
     return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
 }
 
@@ -157,6 +144,19 @@ app.post('/run/:script', (req, res) => {
         return res.status(401).json({ ok: false, error: 'Invalid action password.' });
     } 
     
+    if (script === 'pxyrestart') {
+        return execFile('systemctl', ['is-active', '--quiet', 'pxywatch.service'], {timeout:3000}, (watchError) => {
+            if (watchError) return res.status(409).json({ok:false,error:'Watchdog inactive: refusing engine restart.'});
+            execFile('tmux', ['has-session', '-t', 'pxy-engine'], {timeout:3000}, (sessionError) => {
+                if (sessionError) return res.status(409).json({ok:false,error:'Engine session missing; watchdog may already be recovering it.'});
+                execFile('tmux', ['kill-session', '-t', 'pxy-engine'], {timeout:5000}, (error) => {
+                    if (error) return res.status(500).json({ok:false,error:'Engine restart failed: '+error.message});
+                    return res.json({ok:true,output:'Engine session stopped. Active watchdog will recover engine automatically. WebPXY stays online; verify engine status before trading.'});
+                });
+            });
+        });
+    }
+
     const runAsRoot = process.env.USER === 'root';
     const runAsUser = runAsRoot ? 'sudo -u pxy ' : '';
     const updateEnvironment = script === 'pxyupdate' ? 'export PXY_UPDATE_FROM_WEB=1; ' : '';
