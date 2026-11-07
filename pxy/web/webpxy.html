@@ -1883,7 +1883,7 @@ document.querySelectorAll('.amenu-btn[data-script]').forEach(btn=>{
         const script=btn.dataset.script;
         pendingScript=script;amenu.style.display='none';
         $('updTitle').textContent=script==='pxyconfig'?'⚙ PXYCONFIG':'▶ '+script;
-        $('updPwdLabel').textContent=script==='pxyrestart'?'Enter PXYRESTART password':script==='pxyconfig'?'Enter PXY password':'Enter neo password';
+        $('updPwdLabel').textContent=script==='pxyconfig'?'Enter PXY password':'Enter PXY password';
         $('updPwd').value='';
         $('updPopup').style.display='flex';setTimeout(()=>$('updPwd').focus(),80);
     });
@@ -1901,7 +1901,7 @@ function confirmUpdate(){
     if(script==='pxyrestart'&&!confirm('Restart only the PXY trading engine? Broker positions remain open. The watchdog will recover the engine.'))return;
     $('updPopup').style.display='none';$('updPwd').value='';pendingScript=null;
     const orig=logo.innerHTML;logo.innerHTML='⏳';
-    fetch(script==='pxyrestart'?'/api/pxyrestart':`/run/${script}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pwd})})
+    fetch(`/run/${script}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pwd})})
     .then(async r=>{
         const body=await r.text();
         let data;
