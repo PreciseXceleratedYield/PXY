@@ -50,7 +50,7 @@ Events are mandatory before 09:35 and controlled by a persistent switch thereaft
 - The first valid book snapshot establishes a baseline; it will not resend historical closures.
 - A Telegram API timeout after successful delivery can lead to an uncertain delivery outcome.
 - An absent or stale NSE holiday cache suppresses scheduled reports. Keep the existing engine holiday cache updated.
-- Existing Telegram calls inside the trading engine remain unchanged and can still send their original notifications. The new service does not disable them.
+- Direct Telegram dispatch has been removed from active engine supervisor, execution wrapper, market-data warning, square-off verification and ledger scripts. Existing diagnostics remain in terminal output.\n- The engine supervisor still contains the existing Telegram credential constants as a compatibility fallback for the independent monitor; the supervisor itself no longer sends Telegram.\n- Archived legacy code under `sys/_/` has not been changed.\n- Running engine processes must be restarted during a safe maintenance window to load the updated Python code.
 - Run `bash pxy/pxytlgr status` and `journalctl -u pxytlgr.service -n 50` to diagnose service health.
 
-This service has been committed to GitHub but must be tested and installed on the Linux host before production use.
+These changes are committed to GitHub but must be tested and deployed on the Linux host before production use.
