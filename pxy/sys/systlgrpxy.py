@@ -85,13 +85,35 @@ def credentials():
         return token, chat
 
 
-def send(state, key, category, message):
-    if key in state.setdefault("sent", {}):
-        return True
+def _whatsapp_credentials():
+    """WhatsApp credentials are supplied only by the service environment."""
+    return os.environ.get("PXY_WHATSAPP_PHONE", "").strip(), os.environ.get("PXY_WHATSAPP_API_KEY", "").strip()
+
+
+def _whatsapp_send(message):
+    phone, api_key = _whatsapp_credentials()
+    if not phone or not api_key or not re.fullmatch(r"[1-9][0-9]{7,14}", phone):
+        return False, "UNCONFIGURED", None
+    # Telegram uses HTML formatting; WhatsApp receives equivalent plain text.
+    plain = html.unescape(re.sub(r"</?(?:pre|b)>", "", message))
+    params = urllib.parse.urlencode({"phone": phone, "text": plain, "apikey": api_key})
+    request = urllib.request.Request("https://api.callmebot.com/whatsapp.php?" + params)
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            body = response.read(2048).decode("utf-8", "replace")
+            code = response.status
+        # HTTP 200 alone is not always proof of WhatsApp acceptance.
+        if code != 200 or re.search(r"error|invalid|not authorized|not allowed|limit exceeded", body, re.I):
+            return False, "REJECTED", None
+        return True, "ACCEPTED", None
+    except Exception as exc:
+        return False, "FAILED", type(exc).__name__
+
+
+def _telegram_send(message):
     token, chat = credentials()
     if not token or not chat:
-        write_jsonl(LOG_PATH, {"time": now().isoformat(), "key": key, "category": category, "status": "UNCONFIGURED"})
-        return False
+        return False, "UNCONFIGURED", None
     payload = urllib.parse.urlencode({"chat_id": chat, "text": message, "parse_mode": "HTML"}).encode()
     try:
         with urllib.request.urlopen(
@@ -100,14 +122,45 @@ def send(state, key, category, message):
         ) as response:
             result = json.load(response)
         if not result.get("ok"):
-            raise RuntimeError("Telegram rejected notification")
-        state["sent"][key] = now().isoformat()
-        write_jsonl(LOG_PATH, {"time": now().isoformat(), "key": key, "category": category, "status": "SENT", "telegram_message_id": result.get("result", {}).get("message_id"), "message": message})
-        save(state)
-        return True
+            return False, "REJECTED", None
+        return True, "SENT", result.get("result", {}).get("message_id")
     except Exception as exc:
-        write_jsonl(LOG_PATH, {"time": now().isoformat(), "key": key, "category": category, "status": "FAILED", "error": type(exc).__name__})
-        return False
+        return False, "FAILED", type(exc).__name__
+
+
+def send(state, key, category, message):
+    """Deliver independently; a failed channel never prevents the other."""
+    sent = state.setdefault("sent", {})
+    channels = state.setdefault("channel_sent", {})
+    # Pre-upgrade Telegram deduplication records must remain valid.
+    if key in sent and key not in channels:
+        channels[key] = {"telegram": sent[key]}
+    delivered = channels.setdefault(key, {})
+    whatsapp_enabled = os.environ.get("PXY_WHATSAPP_ENABLED", "0").lower() in {"1", "true", "yes"}
+    targets = ["telegram"] + (["whatsapp"] if whatsapp_enabled else [])
+    all_ok = True
+    for channel in targets:
+        if channel in delivered:
+            continue
+        if channel == "telegram":
+            ok, status, detail = _telegram_send(message)
+        else:
+            ok, status, detail = _whatsapp_send(message)
+        record = {"time": now().isoformat(), "key": key, "category": category,
+                  "channel": channel, "status": status}
+        if channel == "telegram" and ok:
+            record["telegram_message_id"] = detail
+        elif detail:
+            record["error"] = detail
+        write_jsonl(LOG_PATH, record)
+        if ok:
+            delivered[channel] = now().isoformat()
+            if channel == "telegram":
+                sent[key] = delivered[channel]
+            save(state)
+        else:
+            all_ok = False
+    return all_ok
 
 
 def fresh_json(name, max_age=600):
