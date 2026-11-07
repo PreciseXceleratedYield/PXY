@@ -47,8 +47,12 @@ for file in "$REPO_DIR"/*; do
     if [ -f "$file" ]; then
         filename=$(basename "$file")
         if [[ "$filename" != *.* ]]; then
-            sudo cp "$file" "$INSTALL_DIR/$filename"
-            sudo chmod +x "$INSTALL_DIR/$filename"
+            # Remove an existing symlink rather than following it into the checkout.
+            # install creates a regular executable with the correct permissions.
+            if [ -L "$INSTALL_DIR/$filename" ]; then
+                sudo rm -- "$INSTALL_DIR/$filename"
+            fi
+            sudo install -m 755 -- "$file" "$INSTALL_DIR/$filename"
             echo "-> installed executable command: $filename"
         fi
     fi
