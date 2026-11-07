@@ -135,7 +135,7 @@ while true; do
                 echo "5) Enable Boot   6) Disable Boot"
                 echo "7) Events ON     8) Events OFF"
                 echo "9) Status        0) Back"
-                echo "a) TGR           b) WSP           d) BOTH"
+                echo "a) TGR           b) WSP"
                 draw_border
                 read -p "Select option: " GOPT
                 case "$GOPT" in
@@ -150,7 +150,6 @@ while true; do
                     9) bash "$PXY_APP_DIR/pxytlgr" status ;;
                     a|A) bash "$PXY_APP_DIR/pxytlgr" channel TGR ;;
                     b|B) bash "$PXY_APP_DIR/pxytlgr" channel WSP ;;
-                    d|D) bash "$PXY_APP_DIR/pxytlgr" channel BOTH ;;
                     0|"") break ;;
                     *) echo "Invalid choice." ;;
                 esac
