@@ -7,7 +7,7 @@
 #
 # Offset logic:
 #   ATM / ITM -> 0
-#   OTM       -> full difference (SMA adjustment factor 1.0)
+#   OTM       -> max(0, full distance - 50 per held lot), rounded to 100
 #
 # The calculated offset is passed directly to the force-buy Python function.
 # No weekday adjustment or additional offset is applied.
@@ -29,6 +29,7 @@ from syscnfgpxy import (
     EXECBUYPXY_USE_DYNAMIC_STRIKE,
     EXETGTPXY_EXIT_KEY_COLUMN,
     RUNNIFTYPXY_STRIKE_STEP,
+    SYSCNFGPXY_NIFTY_LOT_SIZE,
     SYSCNFGPXY_ACTION_COOLDOWN_SECONDS,
     SYSCNFGPXY_TIMEZONE,
 )
@@ -130,13 +131,13 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     price  -> price supplied in remaining_df
 
     ATM / ITM -> 0
-    OTM       -> half the strike-to-spot difference, rounded to nearest 100
+    OTM       -> full strike-to-spot distance minus 50 per held lot, rounded to 100
     """
 
     if remaining_df is None or remaining_df.empty:
         return None
 
-    if not {"symbol", "price"}.issubset(remaining_df.columns):
+    if not {"symbol", "price", "qty"}.issubset(remaining_df.columns):
         return None
 
     symbols = remaining_df["symbol"].astype(str).str.upper()
@@ -194,14 +195,15 @@ def _counter_buy_offset(remaining_df, sma_direction="NA"):
     if option_type == "PE" and strike > spot:
         return 0
 
-    difference = abs(strike - spot)
-
-    # Reuse the SMA50 direction from the shared syspxy market snapshot.
-    # Missing or unknown direction means normal full-distance offset.
-    sma_direction = str(sma_direction or "NA").upper().strip()
-
-    # SMA adjustment disabled: use half the OTM strike distance.
-    difference *= 0.5
+    # Count actual held lots, not DataFrame rows (averaged lots can share a row).
+    quantities = pd.to_numeric(remaining_df["qty"], errors="coerce")
+    if quantities.isna().any() or (quantities <= 0).any():
+        return None
+    total_qty = float(quantities.sum())
+    if total_qty % SYSCNFGPXY_NIFTY_LOT_SIZE != 0:
+        return None
+    held_count = int(total_qty / SYSCNFGPXY_NIFTY_LOT_SIZE)
+    difference = max(0.0, abs(strike - spot) - 50.0 * held_count)
 
     # Counter-buy offsets round to the nearest 100 (ending in 00).
     offset_step = 100
