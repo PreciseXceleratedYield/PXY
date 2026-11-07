@@ -20,16 +20,33 @@ from syssdirpxy import get_structure_direction
 
 
 def _notify_stale_market_data(core):
-    """Print stale market-data diagnostics for the independent log monitor."""
+    """Throttle console-only market-data warnings; no network calls."""
+    state_file = Path(__file__).resolve().parent / "exe" / "run" / ".yahoo_freshness_alert.json"
     if not core.get("market_data_stale", False):
+        try:
+            state_file.unlink(missing_ok=True)
+        except OSError:
+            pass
         return
-    age = core.get("market_data_age_seconds")
-    candle_time = core.get("market_data_timestamp", "unknown")
+    now_epoch = time.time()
+    try:
+        last_alert = float(json.loads(state_file.read_text()).get("last_alert_epoch", 0))
+    except (OSError, ValueError, TypeError):
+        last_alert = 0
+    if now_epoch - last_alert < SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS:
+        return
     print(
         "⚠️ PXY MARKET DATA WARNING: Yahoo Finance 1-minute candle "
-        f"stale or future-dated; last candle (IST): {candle_time}; "
-        f"age: {age} seconds. Engine continues."
+        f"stale or future-dated; last candle (IST): {core.get('market_data_timestamp', 'unknown')}; "
+        f"age: {core.get('market_data_age_seconds')} seconds. Engine continues."
     )
+    try:
+        state_file.parent.mkdir(parents=True, exist_ok=True)
+        tmp = state_file.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"last_alert_epoch": now_epoch}))
+        os.replace(tmp, state_file)
+    except OSError as error:
+        print(f"Warning: Could not persist freshness diagnostic throttle: {error}")
 
 
 def get_all_data():
