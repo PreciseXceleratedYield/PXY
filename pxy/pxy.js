@@ -116,18 +116,12 @@ function shellQuote(value) {
     return `'${String(value).replace(/'/g, "'\\''")}'`;
 }
 
-// Shared authentication for every WebPXY action, including PXYRESTART.
-// A local password file avoids committing the operator's password to Git.
-const fs = require('fs');
-const ACTION_PASSWORD_FILE = path.join(PXY_HOME, '.pxy', 'web-action-password');
-function getActionPassword() {
-    try { return fs.readFileSync(ACTION_PASSWORD_FILE, 'utf8').trim(); }
-    catch (err) { if (err.code !== 'ENOENT') throw err; return '1'; }
-}
+// Shared WebPXY action password for PXYUPDATE and PXYRESTART.
+const ACTION_PASSWORD = '1';
 
 function hasValidActionPassword(value) {
     const supplied = Buffer.from(value, 'utf8');
-    const expected = Buffer.from(getActionPassword(), 'utf8');
+    const expected = Buffer.from(ACTION_PASSWORD, 'utf8');
     return supplied.length === expected.length && crypto.timingSafeEqual(supplied, expected);
 }
 
