@@ -9,7 +9,7 @@ PYTHON="$HOME/env/bin/python3"
 STATE_DIR="$HOME/.pxy/tlgr"
 STATE="$STATE_DIR/state.json"
 CONFIG="$STATE_DIR/config.json"
-usage() { echo "Usage: pxytlgr {install|start|stop|restart|enable|disable|status|events-on|events-off|channel {TGR|WSP|BOTH}|logs}"; }
+usage() { echo "Usage: pxytlgr {install|start|stop|restart|enable|disable|status|events-on|events-off|channel {TGR|WSP}|logs}"; }
 case "${1:-}" in
   install)
     [[ -x "$PYTHON" && -f "$APP/sys/systlgrpxy.py" ]] || { echo "Missing Python venv or monitor"; exit 1; }
@@ -114,7 +114,7 @@ PY
       exit 0
     fi
     mode="${2^^}"
-    [[ "$mode" == TGR || "$mode" == WSP || "$mode" == BOTH ]] || { echo "Choose TGR, WSP or BOTH"; exit 2; }
+    [[ "$mode" == TGR || "$mode" == WSP ]] || { echo "Choose TGR or WSP"; exit 2; }
     mkdir -p "$STATE_DIR"
     "$PYTHON" - "$CONFIG" "$mode" <<'PY'
 import json,os,sys,tempfile
