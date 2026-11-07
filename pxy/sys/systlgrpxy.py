@@ -312,7 +312,7 @@ def snapshot_report(title, state=None):
               "━━━━━━━━━━━━━━━━━━━━━━━━",
               field("Status", status)]
     if title == "TOUCHDOWN":
-        lines += ["━━━━━━━━━━━━━━━━━━━━━━━━", "🏆 <b>FINAL NET PNL</b>", f"<b>{html.escape(money(net))}</b>"]
+        lines += ["━━━━━━━━━━━━━━━━━━━━━━━━", f"<b>🏆 FINAL NET PNL: {html.escape(money(net))} ({f'{daily_return:+.2f}%' if daily_return is not None else 'NA'})</b>"]
     # Preformatted content keeps ten-character label alignment in Telegram.
     header = "\n".join(lines[:3])
     detail = "\n".join(lines[3:-2] if title == "TOUCHDOWN" else lines[3:])
@@ -376,7 +376,7 @@ def scan_books(state):
             field("Status", "COMPLETED"),
             "━━━━━━━━━━━━━━━━━━━━━━━━",
         ]
-        message = "\n".join(lines[:1]) + "\n<pre>" + "\n".join(lines[1:]) + "</pre>\n<b>BOOK NET PNL</b>\n<b>" + html.escape(money(pnl)) + "</b>"
+        message = "\n".join(lines[:1]) + "\n<pre>" + "\n".join(lines[1:]) + "</pre>\n<b>🏆 BOOK NET PNL: " + html.escape(money(pnl)) + " (" + (f"{book_return:+.2f}%" if book_return is not None else "NA") + ")</b>"
         send(state, key, "BOOK", message)
     state["book_initialized"] = True
     save(state)
