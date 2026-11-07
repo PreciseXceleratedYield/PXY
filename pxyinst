@@ -6,6 +6,8 @@ ROOT="$HOME/PXY"
 APP="$ROOT/pxy"
 VENV="$HOME/env"
 BIN="$HOME/.local/bin"
+SWAP_SIZE_MB="${PXY_SWAP_SIZE_MB:-2048}"
+SWAP_FILE="${PXY_SWAP_FILE:-/swapfile}"
 log() { printf '[PXY] %s\n' "$*"; }
 fail() { printf '[PXY] ERROR: %s\n' "$*" >&2; exit 1; }
 trap 'fail "Installation failed at line $LINENO"' ERR
@@ -16,7 +18,113 @@ command -v apt-get >/dev/null || fail "Requires Ubuntu/Debian apt."
 touch "$HOME/.hushlogin"
 sudo -v
 sudo apt-get update
-sudo apt-get install -y git python3 python3-venv python3-pip nodejs npm tmux openssh-client
+sudo apt-get install -y git python3 python3-venv python3-pip nodejs npm tmux openssh-client procps util-linux ca-certificates
+
+# Configure swap without touching existing swap devices/files or active services.
+# Repeated installation must not recreate, resize, or duplicate swap entries.
+configure_swap() {
+    [[ "$SWAP_SIZE_MB" =~ ^[0-9]+$ ]] && (( SWAP_SIZE_MB >= 256 )) || fail "Invalid PXY_SWAP_SIZE_MB: $SWAP_SIZE_MB"
+    [[ "$SWAP_FILE" == /* && "$SWAP_FILE" != *[[:space:]]* ]] || fail "PXY_SWAP_FILE must be an absolute path without whitespace."
+    if [[ "$SWAP_FILE" == *
+
+if [[ -d "$ROOT/.git" ]]; then
+    log "Existing repository preserved at $ROOT (run pxyupdate separately for code updates)."
+elif [[ -e "$ROOT" ]]; then
+    fail "$ROOT exists but is not a Git checkout; refusing to overwrite it."
+else
+    log "Cloning private PXY repository; GitHub SSH access is required."
+    git clone git@github.com:PreciseXceleratedYield/PXY.git "$ROOT"
+fi
+[[ -f "$APP/pxy.js" && -f "$APP/sys/sysexepxy.py" ]] || fail "Missing current PXY application files."
+
+if [[ ! -x "$VENV/bin/python3" ]]; then
+    python3 -m venv "$VENV"
+fi
+"$VENV/bin/python3" -m pip install --upgrade pip
+[[ -f "$APP/pxyinstl" ]] || fail "Missing $APP/pxyinstl"
+"$VENV/bin/python3" -m pip install -r "$APP/pxyinstl"
+
+if [[ -f "$APP/pxy.json" ]]; then
+    cp "$APP/pxy.json" "$APP/package.json"
+elif [[ ! -f "$APP/package.json" ]]; then
+    fail "Missing Node.js package manifest."
+fi
+( cd "$APP" && npm install --no-audit --no-fund )
+
+mkdir -p "$BIN"
+for file in "$APP"/*; do
+    [[ -f "$file" && "${file##*/}" != *.* ]] || continue
+    install -m 755 "$file" "$BIN/${file##*/}"
+done
+log "Installed commands in $BIN"
+
+[[ -f "$ROOT/.bashrc" ]] || fail "Missing Git-managed $ROOT/.bashrc"
+if [[ -f "$HOME/.bashrc" ]] && ! cmp -s "$ROOT/.bashrc" "$HOME/.bashrc"; then
+    backup="$HOME/.bashrc.pxy-backup-$(date +%Y%m%d-%H%M%S)"
+    cp -p "$HOME/.bashrc" "$backup"
+    log "Backed up previous .bashrc: $backup"
+fi
+install -m 644 "$ROOT/.bashrc" "$HOME/.bashrc"
+log "Login will show the copyright notice from syscprtpxy.py (if dependencies are available)."
+
+[[ -f "$APP/pxywatch" ]] || fail "Missing pxywatch."
+if command -v systemctl >/dev/null && [[ -d /run/systemd/system ]]; then
+    bash "$APP/pxywatch" install
+    sudo systemctl enable pxywatch.service
+    if systemctl is-active --quiet pxywatch.service; then
+        log "Watchdog already running; not restarting it or the tmux sessions."
+    else
+        sudo systemctl start pxywatch.service
+        log "Watchdog started (will monitor existing engine/dashboard processes)."
+    fi
+else
+    log "systemd unavailable; watchdog not installed."
+fi
+# Verify installed OS commands and application dependencies without restarting PXY.
+for cmd in git python3 node npm tmux ssh ps pgrep flock swapon; do
+    command -v "$cmd" >/dev/null || fail "Missing required OS command: $cmd"
+done
+"$VENV/bin/python3" -m pip check || fail "Python dependency consistency check failed."
+"$VENV/bin/python3" -c 'import requests, pandas, numpy, yfinance, aiohttp' || fail "Core Python import verification failed."
+( cd "$APP" && node -e 'require("express"); require("ws")' ) || fail "Node.js dependency verification failed."
+if command -v systemctl >/dev/null && [[ -d /run/systemd/system ]]; then
+    systemctl is-enabled --quiet pxywatch.service || fail "Watchdog is not enabled for boot."
+    systemctl is-active --quiet pxywatch.service || fail "Watchdog is not active."
+fi
+log "OS commands, Python dependencies, Node.js packages, swap and watchdog verified."
+log "Installation complete. Open a new Bash session to see the login banner."
+log "No running trading engine or dashboard was deliberately stopped or restarted."
+\n'* ]]; then fail "Invalid swap file path."; fi
+    if [[ -n "$(swapon --noheadings --raw --show=NAME)" ]]; then
+        log "Swap already active; preserving existing swap configuration."
+        return 0
+    fi
+    if [[ -e "$SWAP_FILE" ]]; then
+        [[ -f "$SWAP_FILE" && ! -L "$SWAP_FILE" ]] || fail "Existing $SWAP_FILE is not a regular file; refusing to modify it."
+        sudo chmod 600 "$SWAP_FILE"
+        sudo swapon "$SWAP_FILE" || fail "Existing $SWAP_FILE cannot be activated; refusing to overwrite it."
+        log "Activated existing $SWAP_FILE without recreating it."
+    else
+        local available_mb required_mb
+        available_mb="$(df -Pm "$(dirname "$SWAP_FILE")" | awk 'NR==2 {print $4}')"
+        [[ "$available_mb" =~ ^[0-9]+$ ]] || fail "Could not determine available disk space for swap."
+        required_mb=$(( SWAP_SIZE_MB + 512 ))
+        (( available_mb >= required_mb )) || fail "Insufficient free disk for swap: need at least ${required_mb} MB, available ${available_mb} MB."
+        log "Creating ${SWAP_SIZE_MB} MB swap file at $SWAP_FILE."
+        sudo touch "$SWAP_FILE"
+        sudo chmod 600 "$SWAP_FILE"
+        if ! sudo dd if=/dev/zero of="$SWAP_FILE" bs=1M count="$SWAP_SIZE_MB" status=none && sudo mkswap "$SWAP_FILE" >/dev/null && sudo swapon "$SWAP_FILE"; then
+            fail "Swap setup failed. Inspect $SWAP_FILE before retrying; existing data will not be overwritten automatically."
+        fi
+    fi
+    if ! sudo awk -v file="$SWAP_FILE" '$1 == file && $3 == "swap" {found=1} END {exit !found}' /etc/fstab; then
+        printf '%s none swap sw 0 0\n' "$SWAP_FILE" | sudo tee -a /etc/fstab >/dev/null
+        log "Persisted swap in /etc/fstab."
+    fi
+    swapon --noheadings --raw --show=NAME | grep -Fx -- "$SWAP_FILE" >/dev/null || fail "Swap verification failed."
+    log "Swap active and configured for reboot."
+}
+configure_swap
 
 if [[ -d "$ROOT/.git" ]]; then
     log "Existing repository preserved at $ROOT (run pxyupdate separately for code updates)."
