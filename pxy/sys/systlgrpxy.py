@@ -128,6 +128,16 @@ def _telegram_send(message):
         return False, "FAILED", type(exc).__name__
 
 
+def notification_mode():
+    """Read persistent channel selection on each send; default preserves Telegram."""
+    try:
+        settings = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+        mode = str(settings.get("channel", "TGR")).upper()
+        return mode if mode in {"TGR", "WSP", "BOTH"} else "TGR"
+    except (OSError, ValueError, TypeError):
+        return "TGR"
+
+
 def send(state, key, category, message):
     """Deliver independently; a failed channel never prevents the other."""
     sent = state.setdefault("sent", {})
@@ -136,8 +146,8 @@ def send(state, key, category, message):
     if key in sent and key not in channels:
         channels[key] = {"telegram": sent[key]}
     delivered = channels.setdefault(key, {})
-    whatsapp_enabled = os.environ.get("PXY_WHATSAPP_ENABLED", "0").lower() in {"1", "true", "yes"}
-    targets = ["telegram"] + (["whatsapp"] if whatsapp_enabled else [])
+    mode = notification_mode()
+    targets = {"TGR": ["telegram"], "WSP": ["whatsapp"], "BOTH": ["telegram", "whatsapp"]}[mode]
     all_ok = True
     for channel in targets:
         if channel in delivered:
