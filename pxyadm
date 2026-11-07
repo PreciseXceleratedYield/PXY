@@ -1,11 +1,40 @@
 #!/bin/sh
-# Update repositories and install sshpass via Alpine's package manager
-apk update && apk add sshpass
 
-# Target server credentials
+# 1. Self-Deployment Check
+# If executed locally as a standalone file, install it globally and clean up old instances
+TARGET_BIN="/usr/local/bin/pxyadm"
+CURRENT_SCRIPT_PATH=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")
+
+if [ "$CURRENT_SCRIPT_PATH" != "$TARGET_BIN" ]; then
+    echo "[+] Deploying pxyadm to system binaries..."
+    
+    # Remove old version if it exists
+    if [ -f "$TARGET_BIN" ]; then
+        sudo rm -f "$TARGET_BIN"
+    fi
+    
+    # Copy current script to destination and make it executable
+    sudo cp "$CURRENT_SCRIPT_PATH" "$TARGET_BIN"
+    sudo chmod +x "$TARGET_BIN"
+    
+    echo "[───] Deployment complete! You can now run it globally using: pxyadm"
+    exit 0
+fi
+
+# 2. Operating System Check (Mac vs Linux)
+OS_TYPE=$(uname)
+
+if [ "$OS_TYPE" = "Linux" ]; then
+    # Only try to handle dependencies if running on Linux/Alpine
+    if ! command -v sshpass >/dev/null 2>&1; then
+        sudo apk update && sudo apk add sshpass 2>/dev/null || apk update && apk add sshpass
+    fi
+fi
+
+# 3. Target server credentials
 REMOTE_USER="pxy"
 REMOTE_PASS="Pxy@tatlako00"
 BHANU_IP="20.219.143.148"
 
-# Direct SSH Connection
+# 4. Direct SSH Connection
 sshpass -p "$REMOTE_PASS" ssh -o StrictHostKeyChecking=no "$REMOTE_USER@$BHANU_IP"
