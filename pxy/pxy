@@ -77,6 +77,7 @@ while true; do
     echo "m) 👁️  Smon    - Run PXY Monitor"
     echo "c) ⚙️  Ctrl    - System Management"
     echo "g) 📡 Tlgr    - Telegram Control Tower"
+    echo "n) 🔗 Conn    - SSH Connections"
     echo "x) 🚪 Exit    - Close Menu"
     draw_border
     read -p "Select option: " OPTION
@@ -117,6 +118,10 @@ while true; do
             ;;
         m)
             bash "$PXY_APP_DIR/pxymon"
+            read -p "Press [Enter] to return..."
+            ;;
+        n)
+            python3 "$PXY_APP_DIR/pxyconnect"
             read -p "Press [Enter] to return..."
             ;;
         g)
