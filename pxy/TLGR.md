@@ -57,9 +57,9 @@ These changes are committed to GitHub but must be tested and deployed on the Lin
 
 ## Optional WhatsApp alongside Telegram
 
-The Control Tower supports TGR (default), WSP, and BOTH routing. WhatsApp
+The Control Tower supports TGR (default) or WSP routing (mutually exclusive). WhatsApp
 is opt-in and does not affect the trading engine, broker access, or order execution.
-Each destination has separate delivery records and retry behavior. The monitor records
+Only the selected destination is attempted; delivery records remain per channel. The monitor records
 WhatsApp HTTP acceptance, **not** proof that a message reached the phone.
 
 Set these variables for the `pxytlgr.service` process (do not commit secrets):
@@ -85,7 +85,7 @@ EnvironmentFile=/etc/pxy/notifications.env
 
 Then run `sudo systemctl daemon-reload && sudo systemctl restart pxytlgr.service`.
 A future `pxytlgr install` updates the unit file but preserves a systemd drop-in.
-Choose the channel with `pxytlgr channel TGR`, `pxytlgr channel WSP`, or `pxytlgr channel BOTH`, or select a/b/d in the existing PXY Control Tower menu. `pxytlgr channel` displays the current choice. The setting is persisted in `~/.pxy/tlgr/config.json` and takes effect on the next notification without restarting the service. The default remains TGR.
+Choose the channel with `pxytlgr channel TGR`, `pxytlgr channel WSP`, or select a/b in the existing PXY Control Tower menu. `pxytlgr channel` displays the current choice. The setting is persisted in `~/.pxy/tlgr/config.json` and takes effect on the next notification without restarting the service. The default remains TGR.
 CallMeBot is a third-party, best-effort service with no delivery guarantee. Never
 put API keys in the repository, command-line URLs, or logs. A failed WhatsApp
 attempt does not stop Telegram delivery or the trading engine.
