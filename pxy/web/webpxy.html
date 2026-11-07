@@ -947,6 +947,7 @@ async function loadDash(){
 
 /* ── CHART ── */
 let lastCandles=null,lastMoCandles=null;
+let lastFutHistory=[];
 let chartMode='candle';
 const CHART_LINE_STORAGE_KEY='pxyChartLineVisibility';
 const chartLineDefaults={sma50:true,tsma50:true,stLine:true,mirrorLine:true};
@@ -1030,7 +1031,11 @@ async function loadChartMarketPrices(){
 async function loadChart(){
     loadChartMarketPrices();
     try{
-        const data=await fetch('/api/web-data/webchrtpxy?_='+Date.now()).then(r=>r.json());
+        const [data,futHistory]=await Promise.all([
+            fetch('/api/web-data/webchrtpxy?_='+Date.now()).then(r=>r.json()),
+            fetch('/api/fut-history?_='+Date.now()).then(r=>r.json()).catch(()=>[])
+        ]);
+        lastFutHistory=Array.isArray(futHistory)?futHistory:[];
         if(!Array.isArray(data)||!data.length)return;
         const candles=data.map(d=>({
             o:d.open??d.o??null, h:d.high??d.h??null, l:d.low??d.l??null,
@@ -1071,6 +1076,13 @@ function drawChart(candles){
         if(chartLineVisibility.sma50&&c.sma50!=null){lo=Math.min(lo,c.sma50);hi=Math.max(hi,c.sma50);}
         if(chartLineVisibility.tsma50&&c.tsma50!=null){lo=Math.min(lo,c.tsma50);hi=Math.max(hi,c.tsma50);}
     });
+    // FUT history is a rolling price snapshot feed, not OHLC candles.
+    // Right-align available samples with the visible chart slots.
+    const futSeries=lastFutHistory.slice(-n).map(d=>{
+        const value=d?.price==null?NaN:Number(d.price);
+        return Number.isFinite(value)&&value>0?value:null;
+    });
+    futSeries.forEach(v=>{if(v!=null){lo=Math.min(lo,v);hi=Math.max(hi,v);}});
     if(!isFinite(lo)||!isFinite(hi))return;
     const pad=(hi-lo)*0.08||1;
     lo-=pad;hi+=pad;
@@ -1163,6 +1175,17 @@ function drawChart(candles){
         });
         ctx.stroke();
     }
+
+    // Gold FUT overlay; missing prices break the line rather than bridging gaps.
+    ctx.strokeStyle='#d4af37';ctx.lineWidth=1.8;ctx.setLineDash([]);
+    ctx.beginPath();let futStarted=false;
+    const futStart=n-futSeries.length;
+    futSeries.forEach((v,j)=>{
+        if(v==null){futStarted=false;return;}
+        const x=toX(futStart+j),y=toY(v);
+        if(!futStarted){ctx.moveTo(x,y);futStarted=true;}else ctx.lineTo(x,y);
+    });
+    ctx.stroke();
 
     // Draw both 50-period averages with distinct colors and line patterns.
     function drawMovingAverage(key,color,dash){
