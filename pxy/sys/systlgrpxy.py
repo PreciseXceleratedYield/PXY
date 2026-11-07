@@ -41,6 +41,8 @@ def now():
 def write_jsonl(path, event):
     try:
         STATE_DIR.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.stat().st_size > 5 * 1024 * 1024:
+            path.replace(path.with_suffix(".jsonl.1"))
         with path.open("a", encoding="utf-8") as file:
             file.write(json.dumps(event, ensure_ascii=False, default=str) + "\n")
     except OSError:
@@ -250,7 +252,7 @@ def scan_events(state):
         last = datetime.fromisoformat(issue["last"])
         if (stamp - last).total_seconds() > 120:
             if issue["alerted"] and (minutes < EVENT_WINDOW[1] or state.get("events_enabled", False)):
-                send(state, f"recovery:{stamp.date()}:{key}:{issue['first']}", "RECOVERY", f"PXY ✅ Warning no longer observed: {key[:80]}")
+                send(state, f"recovery:{stamp.date()}:{key}:{issue['first']}", "RECOVERY", "PXY ℹ️ No further matching terminal warnings observed for 120 seconds; verify component health.")
             del state["issues"][key]
     save(state)
 
@@ -267,7 +269,7 @@ def main():
     state = load()
     state.setdefault("events_enabled", False)
     last_book = 0.0
-    last_date = ""
+    last_date = state.get("session_date", "")
     while True:
         try:
             stamp = now()
@@ -276,6 +278,7 @@ def main():
             minute = stamp.hour * 60 + stamp.minute
             if day.isoformat() != last_date:
                 last_date = day.isoformat()
+                state["session_date"] = last_date
                 state["book_initialized"] = False
                 state["tail"] = []
                 state["issues"] = {}
