@@ -207,11 +207,12 @@ while true; do
                                     fi
                                     ;;
                                 3)
-                                    if systemctl is-enabled --quiet pxywatch.service; then
-                                        echo "[✔] Auto Start: ENABLED"
-                                    else
-                                        echo "[i] Auto Start: $(systemctl is-enabled pxywatch.service 2>/dev/null || echo unknown)"
-                                    fi
+                                    AUTO_STATUS=$(systemctl is-enabled pxywatch.service 2>/dev/null)
+                                    case "$AUTO_STATUS" in
+                                        enabled) echo "[✔] Auto Start: ENABLED" ;;
+                                        disabled) echo "[i] Auto Start: DISABLED" ;;
+                                        *) echo "[i] Auto Start: ${AUTO_STATUS:-unknown}" ;;
+                                    esac
                                     ;;
                                 4|"") break ;;
                                 *) echo "Invalid choice." ;;
