@@ -19,7 +19,6 @@ for path in (RUN_DIR, HERE, SYS_DIR):
 
 from sysexepxy import send_telegram
 from syshdaypxy import is_nse_fo_trading_day
-from sysauditpxy import record as audit_record
 
 # Component failures are reported periodically; they never stop the engine.
 COMPONENT_FAILURES = {}
@@ -28,12 +27,10 @@ ENGINE_ITERATION = 0
 
 def _record_component_failure(name, error=None):
     COMPONENT_FAILURES[name] = str(error or "execution failed")
-    audit_record(name, "FAILED", error=COMPONENT_FAILURES[name])
 
 
 def _record_component_recovery(name):
     COMPONENT_FAILURES.pop(name, None)
-    audit_record(name, "OK")
 
 
 def _notify_persistent_failures():
@@ -62,8 +59,6 @@ ist = SYSCNFGPXY_TIMEZONE
 # ---------------- HELPER FUNCTIONS ----------------
 def run_script(script_path, timeout=None):
     component = Path(script_path).name
-    started = time.monotonic()
-    audit_record(component, "START")
     if not Path(script_path).exists():
         error = f"script not found: {script_path}"
         _record_component_failure(component, error)
@@ -72,7 +67,6 @@ def run_script(script_path, timeout=None):
         return False
     try:
         subprocess.run([sys.executable, str(script_path)], check=True, timeout=timeout)
-        audit_record(component, "COMPLETE", duration_seconds=round(time.monotonic() - started, 3))
         _record_component_recovery(component)
         print("━" * 42)
         return True
@@ -85,7 +79,6 @@ def run_script(script_path, timeout=None):
     except Exception as exc:
         error = str(exc)
         print(f"❌ RUN ERR: {component}: {error} ⚠️")
-    audit_record(component, "COMPLETE", duration_seconds=round(time.monotonic() - started, 3), outcome="FAILED")
     _record_component_failure(component, error)
     print("━" * 42)
     return False
