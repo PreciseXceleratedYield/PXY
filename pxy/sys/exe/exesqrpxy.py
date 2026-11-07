@@ -40,7 +40,7 @@ _FAILURE_FILE = Path(__file__).with_name(".sqoff_verify_failures.json")
 
 
 def _report_verification(symbol, reason=None):
-    """Persist consecutive failed iterations; alert first and every fifth failure."""
+    """Persist consecutive failed iterations; log first and every fifth failure."""
     try:
         state = json.loads(_FAILURE_FILE.read_text()) if _FAILURE_FILE.exists() else {}
         if not isinstance(state, dict):
@@ -57,11 +57,6 @@ def _report_verification(symbol, reason=None):
             if count == 1 or count % 5 == 0:
                 message = f"⚠️ PXY scheduled square-off: broker quantity unverified for {symbol} ({reason}); failure #{count}. Engine continues."
                 print(message)
-                try:
-                    from sysexepxy import send_telegram
-                    send_telegram(message)
-                except Exception as error:
-                    print(f"⚠️ Square-off Telegram alert failed: {error}")
         _FAILURE_FILE.write_text(json.dumps(state))
     except Exception as error:
         print(f"⚠️ Square-off failure tracking unavailable: {error}")
