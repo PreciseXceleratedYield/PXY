@@ -28,20 +28,6 @@ def run_execprt():
 TELEGRAM_BOT_TOKEN = "7141714085:AAHlyEzszCy9N-L6wO1zSAkRwGdl0VTQCFI"
 TELEGRAM_CHAT_ID   = "-4282665161"
 
-def send_telegram(msg):
-    """Send Telegram notification"""
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": msg,
-        "parse_mode": "HTML"
-    }
-    try:
-        import requests
-        requests.post(url, data=payload)
-    except Exception as e:
-        print("📡 TG ERR: message send failed ⚠️")
-
 # ---------------- IST TIMEZONE ----------------
 IST = SYSCNFGPXY_TIMEZONE
 
@@ -82,13 +68,11 @@ def start_loop():
 
         # ---- MARKET OPEN ----
         if mkt and not was_open:
-            send_telegram("Bot started (engine window open)")
             print("🚀 ENGINE WINDOW OPEN: bot started 📡")
             off_done = False
 
         # ---- MARKET CLOSE ----
         if not mkt and was_open:
-            send_telegram("Bot paused (engine window closed)")
             print("🛑 ENGINE WINDOW CLOSED: bot paused 🔒")
             off_done = False
 
