@@ -74,7 +74,7 @@ while true; do
     echo "s) ✅ Strt    - Engine + Web"
     echo "k) 🚧 Stop    - Engine + Web"
     echo "t) 💰 Trde    - Trading Operations"
-    echo "m) 👁️ Smon    - Run PXY Monitor"
+    echo "m) 👁️  Smon    - Run PXY Monitor"
     echo "c) ⚙️  Ctrl    - System Management"
     echo "x) 🚪 Exit    - Close Menu"
     draw_border
