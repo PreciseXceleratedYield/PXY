@@ -21,6 +21,7 @@ ROOT = APP.parent
 HOME = Path.home()
 STATE_DIR = HOME / ".pxy" / "tlgr"
 STATE_PATH = STATE_DIR / "state.json"
+CONFIG_PATH = STATE_DIR / "config.json"
 LOG_PATH = STATE_DIR / "notifications.jsonl"
 EVENT_PATH = STATE_DIR / "events.jsonl"
 WEB = ROOT / "web"
@@ -254,6 +255,13 @@ def scan_events(state):
     save(state)
 
 
+def events_enabled():
+    try:
+        return bool(json.loads(CONFIG_PATH.read_text(encoding="utf-8")).get("events_enabled", False))
+    except (OSError, ValueError):
+        return False
+
+
 def main():
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     state = load()
@@ -263,6 +271,7 @@ def main():
     while True:
         try:
             stamp = now()
+            state["events_enabled"] = events_enabled()
             day = stamp.date()
             minute = stamp.hour * 60 + stamp.minute
             if day.isoformat() != last_date:
