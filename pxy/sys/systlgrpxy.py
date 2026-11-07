@@ -4,6 +4,8 @@
 No imports from trading modules, no broker calls, no orders, no engine control.
 """
 import ast
+import html
+import socket
 import json
 import os
 import re
@@ -29,9 +31,9 @@ TZ = ZoneInfo("Asia/Kolkata")
 CHECK_SECONDS = 30
 BOOK_SECONDS = 300
 EVENT_WINDOW = (9 * 60 + 15, 9 * 60 + 35)
-REPORTS = {555: "Ready for Takeoff", 575: "Airborne", 920: "Descending", 941: "Touchdown"}
-PATTERN = re.compile(r"traceback|(?:^|\\W)(?:error|failed|failure|timeout|exception|critical)(?:\\W|$)", re.I)
-ANSI = re.compile(r"\\x1b\\[[0-9;]*[A-Za-z]")
+REPORTS = {555: "TAKEOFF", 575: "AIRBORNE", 920: "DESCENDING", 941: "TOUCHDOWN"}
+PATTERN = re.compile(r"traceback|(?:^|\W)(?:error|failed|failure|timeout|exception|critical|warning|stale)(?:\W|$)", re.I)
+ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
 
 
 def now():
@@ -90,7 +92,7 @@ def send(state, key, category, message):
     if not token or not chat:
         write_jsonl(LOG_PATH, {"time": now().isoformat(), "key": key, "category": category, "status": "UNCONFIGURED"})
         return False
-    payload = urllib.parse.urlencode({"chat_id": chat, "text": message}).encode()
+    payload = urllib.parse.urlencode({"chat_id": chat, "text": message, "parse_mode": "HTML"}).encode()
     try:
         with urllib.request.urlopen(
             urllib.request.Request(f"https://api.telegram.org/bot{token}/sendMessage", data=payload),
@@ -133,24 +135,146 @@ def engine_alive():
         return False
 
 
-def snapshot_report(title):
+def field(label, value):
+    """Ten-character label, then space-colon-space; HTML-safe values."""
+    return f"{label:<10}: {html.escape(str(value))}"
+
+
+def safe_number(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def money(value):
+    if value is None:
+        return "NA"
+    return f"{'+' if value > 0 else '-' if value < 0 else ''}₹{abs(value):,.0f}"
+
+
+def service_web():
+    try:
+        return subprocess.run(["pgrep", "-f", "[n]ode pxy.js"], capture_output=True, timeout=2).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def uptime():
+    try:
+        result = subprocess.run(["ps", "-eo", "etimes,args"], capture_output=True, text=True, timeout=2)
+        for line in result.stdout.splitlines():
+            if "sysexepxy.py" in line and "grep" not in line:
+                seconds = int(line.strip().split(None, 1)[0])
+                return f"{seconds // 3600:02d}:{seconds // 60 % 60:02d}:{seconds % 60:02d}"
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        pass
+    return "NA"
+
+
+def counts(state):
+    today = now().date().isoformat()
+    issues = state.get("issues", {})
+    errors = sum(1 for x in issues.values() if x.get("first", "").startswith(today) and x.get("severity") == "ERROR")
+    warnings = sum(1 for x in issues.values() if x.get("first", "").startswith(today) and x.get("severity") == "WARNING")
+    # Persisted counters are incremented when each distinct incident is first observed.
+    daily = state.get("daily_incidents", {}).get(today, {})
+    return daily.get("ERROR", errors), daily.get("WARNING", warnings)
+
+
+def snapshot_report(title, state=None):
+    state = state or {}
+    stamp = now()
     positions = fresh_json("webpospxy")
     trades = fresh_json("webpnlpxy")
-    status = "UNAVAILABLE"
-    pnl = "unavailable"
+    engine = engine_alive()
+    web = service_web()
+    watch = running("pxywatch.service")
+    ce = pe = None
+    invested = current = open_pnl = None
     if isinstance(positions, list):
-        ce = sum(float(x.get("QTY", 0)) for x in positions if isinstance(x, dict) and "CE" in str(x.get("SYMBOL", "")).upper())
-        pe = sum(float(x.get("QTY", 0)) for x in positions if isinstance(x, dict) and "PE" in str(x.get("SYMBOL", "")).upper())
-        status = f"CE qty {ce:g}, PE qty {pe:g}"
+        ce = pe = 0
+        invested = current = open_pnl = 0.0
+        complete = True
+        for item in positions:
+            if not isinstance(item, dict):
+                complete = False
+                continue
+            qty = safe_number(item.get("QTY"))
+            symbol = str(item.get("SYMBOL", "")).upper()
+            if qty is None:
+                complete = False
+                continue
+            if "CE" in symbol:
+                ce += qty
+            elif "PE" in symbol:
+                pe += qty
+            value = safe_number(item.get("PNL"))
+            if value is None:
+                complete = False
+            else:
+                open_pnl += value
+        if not complete:
+            invested = current = open_pnl = None
+    closed = []
     if isinstance(trades, list):
-        realized = sum(float(x.get("PNL", 0)) for x in trades if isinstance(x, dict) and x.get("Status") == "CLOSED")
-        pnl = f"₹{realized:,.0f} (ledger estimate, before charges)"
-    usage = shutil.disk_usage(HOME)
-    return (f"PXY ✈ {title} | {now():%H:%M} IST\n"
-            f"Engine: {'RUNNING' if engine_alive() else 'STOPPED'} | Watchdog: {'RUNNING' if running('pxywatch.service') else 'STOPPED'}\n"
-            f"Web: {'RUNNING' if subprocess.run(['pgrep','-f','[n]ode pxy.js'], capture_output=True).returncode == 0 else 'STOPPED'}\n"
-            f"Positions: {status}\nRealized P&L: {pnl}\n"
-            f"Disk free: {usage.free // (1024**3)} GB")
+        closed = [r for r in trades if isinstance(r, dict) and str(r.get("Status", "")).upper() == "CLOSED"]
+    books = len({str(r["Book_ID"]) for r in closed if r.get("Book_ID") is not None}) if isinstance(trades, list) else None
+    values = [safe_number(r.get("PNL")) for r in closed]
+    closed_pnl = sum(values) if isinstance(trades, list) and all(v is not None for v in values) else None
+    net = closed_pnl + open_pnl if closed_pnl is not None and open_pnl is not None else None
+    errors, warnings = counts(state)
+    health = engine and web and watch
+    landed = title == "TOUCHDOWN" and ce == 0 and pe == 0 and health
+    status = ("LANDED SAFELY" if landed else "ATTENTION" if not health or (title == "TOUCHDOWN" and not landed)
+              else title if title != "TAKEOFF" else "READY")
+    greeting = "Good Evening" if title == "TOUCHDOWN" else "Good Afternoon" if title == "DESCENDING" else "Good Morning"
+    emoji = {"TAKEOFF": "🚀", "AIRBORNE": "✈️", "DESCENDING": "🛬", "TOUCHDOWN": "🛬"}[title]
+    lines = [
+        f"Hello {html.escape(socket.gethostname())}, {greeting}! ",
+        "",
+        f"{emoji} PXY — {title}",
+        "━━━━━━━━━━━━━━━━━━━━━━━━",
+        field("Date", stamp.strftime("%d-%b-%Y")),
+        field("Engine", "RUNNING" if engine else "STOPPED"),
+        field("WebPXY", "RUNNING" if web else "STOPPED"),
+        field("Watchdog", "RUNNING" if watch else "STOPPED"),
+        field("Control", "RUNNING"),
+        field("Broker", "NA"),
+        field("Market", "CLOSED" if title == "TOUCHDOWN" else "NA"),
+        field("Uptime", uptime()),
+        field("Data Age", "NA"),
+    ]
+    if title == "TAKEOFF":
+        lines += [field("Funds", "NA"), field("Positions", f"CE: {ce:g} | PE: {pe:g}" if ce is not None and pe is not None else "NA")]
+    else:
+        lines += [field("CE", f"{ce:g}" if ce is not None else "NA"),
+                  field("PE", f"{pe:g}" if pe is not None else "NA"),
+                  field("Invested", money(invested)),
+                  field("Current", money(current)),
+                  field("Open PnL", money(open_pnl)),
+                  field("Closed PnL", money(closed_pnl)),
+                  field("Net PnL", money(net))]
+        if title in {"AIRBORNE", "TOUCHDOWN"}:
+            lines += [field("PnL %" if title == "AIRBORNE" else "Return %", "NA")]
+        if title == "TOUCHDOWN":
+            wins = sum(1 for r in closed if (safe_number(r.get("PNL")) or 0) > 0)
+            losses = sum(1 for r in closed if (safe_number(r.get("PNL")) or 0) < 0)
+            lines += [field("Wins", wins if books is not None else "NA"),
+                      field("Losses", losses if books is not None else "NA")]
+    lines += [field("Books", f"{books} Closed" if books is not None else "NA"),
+              field("Errors", f"{errors} Reported"),
+              field("Warnings", f"{warnings} Reported"),
+              "━━━━━━━━━━━━━━━━━━━━━━━━",
+              field("Status", status)]
+    if title == "TOUCHDOWN":
+        lines += ["━━━━━━━━━━━━━━━━━━━━━━━━", "🏆 <b>FINAL NET PNL</b>", f"<b>{html.escape(money(net))}</b>"]
+    # Preformatted content keeps ten-character label alignment in Telegram.
+    header = "\n".join(lines[:3])
+    detail = "\n".join(lines[3:-2] if title == "TOUCHDOWN" else lines[3:])
+    if title == "TOUCHDOWN":
+        return header + "\n<pre>" + detail + "</pre>\n" + "\n".join(lines[-2:])
+    return header + "\n<pre>" + detail + "</pre>"
 
 
 def trading_day(day):
@@ -285,7 +409,7 @@ def main():
             if trading_day(day) and 555 <= minute <= 945:
                 for target, title in REPORTS.items():
                     if target <= minute < target + 2:
-                        send(state, f"report:{day}:{target}", "REPORT", snapshot_report(title))
+                        send(state, f"report:{day}:{target}", "REPORT", snapshot_report(title, state))
                 if 555 <= minute < 941:
                     scan_events(state)
                     if time.monotonic() - last_book >= BOOK_SECONDS:
