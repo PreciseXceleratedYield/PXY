@@ -104,6 +104,26 @@ app.get('/api/fut-history', (req, res) => {
     });
 });
 
+/* Engine-only restart, protected by a separate server-side secret. */
+app.post('/api/pxyrestart', (req, res) => {
+    const secret = process.env.PXY_RESTART_TOKEN;
+    const supplied = typeof req.body?.pwd === 'string' ? req.body.pwd : '';
+    if (!secret || secret.length < 16) return res.status(503).json({ok:false,error:'PXYRESTART is not configured: set PXY_RESTART_TOKEN (16+ characters) for the WebPXY service.'});
+    const actual = Buffer.from(supplied, 'utf8');
+    const expected = Buffer.from(secret, 'utf8');
+    if (actual.length !== expected.length || !crypto.timingSafeEqual(actual, expected)) return res.status(401).json({ok:false,error:'Invalid PXYRESTART password.'});
+    execFile('systemctl', ['is-active', '--quiet', 'pxywatch.service'], {timeout:3000}, (watchErr) => {
+        if (watchErr) return res.status(409).json({ok:false,error:'Watchdog is not active; engine restart refused.'});
+        execFile('tmux', ['has-session', '-t', 'pxy-engine'], {timeout:3000}, (sessionErr) => {
+            if (sessionErr) return res.status(409).json({ok:false,error:'Engine session missing; watchdog may already be recovering it.'});
+            execFile('tmux', ['kill-session', '-t', 'pxy-engine'], {timeout:5000}, (err) => {
+                if (err) return res.status(500).json({ok:false,error:'Engine restart request failed: '+err.message});
+                res.json({ok:true,output:'Engine session stopped; active watchdog will recreate it after its recovery interval. WebPXY remains running. Verify engine status before trading.'});
+            });
+        });
+    });
+});
+
 /* ========================= RUN SCRIPT WITH PYTHON ENV ACTIVATED ========================= */ 
 const ALLOWED_SCRIPTS = [ 
     'pxyupdate', 'pxysqrall', 'pxybuyce', 'pxybuype', 'pxysqrce', 'pxysqrpe',
