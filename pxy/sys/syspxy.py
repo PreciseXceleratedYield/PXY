@@ -13,6 +13,7 @@ from syscnfgpxy import (
     SYSDTAFPXY_STALE_ALERT_INTERVAL_SECONDS,
 )
 from sysdashpxy import get_full_snapshot
+from sysdtafpxy import _read_nifty_futures_price
 from sysictrpxy import export_supertrend_json
 from syscnfgpxy import SYSMKTPXY_ENTRY_FILTER
 from syssmapxy import get_sma_signal
@@ -61,8 +62,18 @@ def get_all_data():
     )
 
     # -------- PRICE LOGIC (DISPLAY/EXECUTION SNAPSHOT ONLY) --------
-    # Use the raw NIFTY index price from the market snapshot; no futures blend.
-    final_price = core.get("price")
+    # Reuse the existing timestamp-validated Kotak Futures feed; no new API call.
+    # If unavailable, use the NIFTY index price already in the Yahoo snapshot.
+    # This changes only the published price, never the OHLC or indicators.
+    futures_price = _read_nifty_futures_price()
+    index_price = core.get("price")
+    try:
+        index_price = float(index_price)
+        if not math.isfinite(index_price) or index_price <= 0:
+            index_price = None
+    except (TypeError, ValueError, OverflowError):
+        index_price = None
+    final_price = futures_price if futures_price is not None else index_price
 
     # Display SMA50 when trading filter is NONE; otherwise show the selected filter.
     # This display fallback does not enable an entry filter.
