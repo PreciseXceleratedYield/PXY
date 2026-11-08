@@ -88,13 +88,13 @@ def dump_to_json(trades_df):
         print(f"Error dumping to JSON: {e}") 
 
 
-def _assign_book_ids(orders_df):
+def _assign_cycle_ids(orders_df):
     """Label orders by flat-to-flat portfolio cycle in report chronology."""
     ordered = orders_df.sort_values("dt", kind="stable")
     positions = {}
-    active_book = None
-    next_book = 0
-    book_ids = {}
+    active_cycle = None
+    next_cycle = 0
+    cycle_ids = {}
 
     for index, order in ordered.iterrows():
         side = str(order.get("trnsTp", "")).strip().upper()
@@ -102,11 +102,11 @@ def _assign_book_ids(orders_df):
         if side not in {"B", "S"} or quantity <= 0:
             continue
 
-        if active_book is None:
-            next_book += 1
-            active_book = next_book
+        if active_cycle is None:
+            next_cycle += 1
+            active_cycle = next_cycle
 
-        book_ids[index] = active_book
+        cycle_ids[index] = active_cycle
         symbol = str(order.get("trdSym", "")).strip()
         direction = 1 if side == "B" else -1
         positions[symbol] = positions.get(symbol, 0.0) + direction * quantity
@@ -115,12 +115,11 @@ def _assign_book_ids(orders_df):
             if abs(value) > 1e-9
         }
         if not positions:
-            active_book = None
+            active_cycle = None
 
     result = orders_df.copy()
-    result["Book_ID"] = pd.Series(book_ids, dtype="Int64")
-    result["Cycle_ID"] = result["Book_ID"]  # Additive migration alias
-    return result
+    result["Cycle_ID"] = pd.Series(cycle_ids, dtype="Int64")
+        return result
 
 
 def dump_livpos_to_json(open_positions):
@@ -455,7 +454,7 @@ def _process_lilo_orders_production(
             return t_str if t_str.lower() not in ["nan", "none", "null", ""] else "" 
             
         df["tag"] = df.apply(get_safe_tag, axis=1)
-        df = _assign_book_ids(df)
+        df = _assign_cycle_ids(df)
         closed_matches = [] 
         open_positions = []
         for symbol, group in df.groupby("trdSym"): 
@@ -479,8 +478,7 @@ def _process_lilo_orders_production(
                     closed_matches.append({ 
                         "Symbol": symbol, 
                         "Qty": mqty, 
-                        "Book_ID": b.get("Book_ID"),
-                        "Cycle_ID": b.get("Cycle_ID", b.get("Book_ID")),
+                        "Cycle_ID": b.get("Cycle_ID"),
                         "Tag": b["tag"], 
                         "tok": token_id, 
                         "Buy_Time": b["dt"], 
@@ -502,8 +500,7 @@ def _process_lilo_orders_production(
                     open_positions.append({ 
                         "Symbol": symbol, 
                         "Qty": b["qty"], 
-                        "Book_ID": b.get("Book_ID"),
-                        "Cycle_ID": b.get("Cycle_ID", b.get("Book_ID")),
+                        "Cycle_ID": b.get("Cycle_ID"),
                         "tok": token_id, 
                         "tag": b["tag"], 
                         "Buy_Time": b["dt"], 
