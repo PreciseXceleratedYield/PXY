@@ -39,8 +39,10 @@ def transform_market_data(df, futures_price=None):
     return apply_ohlc_transformation(df)
 
 
-def _read_nifty_futures_price():
-    """Read the latest positive NIFTY futures price from the rolling JSON feed."""
+def _read_nifty_futures_price(max_age_seconds=None):
+    """Read the latest positive timestamped futures quote within the age limit."""
+    if max_age_seconds is None:
+        max_age_seconds = SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS
 
     fut_file_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
@@ -87,12 +89,12 @@ def _read_nifty_futures_price():
 
         if (
             quote_age_seconds < 0
-            or quote_age_seconds > SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS
+            or quote_age_seconds > max_age_seconds
         ):
             print(
                 f"Warning: {fut_file_path} futures quote is stale "
                 f"or future-dated (age={quote_age_seconds:.1f}s; "
-                f"maximum={SYSDTAFPXY_FUTURES_MAX_AGE_SECONDS}s)."
+                f"maximum={max_age_seconds}s)."
             )
             return None
 
