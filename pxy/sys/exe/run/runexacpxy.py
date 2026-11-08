@@ -295,7 +295,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
                 booked_profit += snapshot["realized_pnl"]
                 closed_book_count += 1
                 snapshot["book_id"] = closed_book_count
-            snapshot["cycle_id"] = closed_book_count
+                snapshot["cycle_id"] = closed_book_count
                 closed_books.append(snapshot)
                 last_closed_snapshot = snapshot
                 last_closed_cycle_id = cycle_id
@@ -492,11 +492,11 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             "active_target_line": risk_target,
             "booked_profit": booked_profit,
             "closed_book_count": closed_book_count,
-        "closed_cycle_count": closed_book_count,
+            "closed_cycle_count": closed_book_count,
             "last_closed_snapshot": last_closed_snapshot,
             "last_closed_cycle_id": last_closed_cycle_id,
             "closed_books": closed_books,
-        "closed_cycles": closed_books,
+            "closed_cycles": closed_books,
             "cycle_tags": sorted(cycle_tags),
             "cycle_started_at": cycle_started_at,
         },
