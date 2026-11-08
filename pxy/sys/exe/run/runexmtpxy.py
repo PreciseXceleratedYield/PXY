@@ -205,12 +205,12 @@ def cycle_risk_metrics(
     )
 
     # SIDE uses the base target; directional OUT (BULL/BEAR) doubles
-    # both the investment-percentage target and the per-row minimum.
+    # the investment-percentage target; the cumulative minimum stays ₹100.
     # All calculations use only active and closed rows of the present book.
     target_multiplier = 1.0 if signal == "SIDE" else 2.0 if signal in {"BULL", "BEAR"} else 0.0
     target_pct = 1.4 * target_multiplier
     investment_target = premium_paid * target_pct / 100.0
-    minimum_pnl = 100.0 * book_trade_count * target_multiplier
+    minimum_pnl = 100.0
     target = max(investment_target, minimum_pnl)
     target_reached = bool(
         target_multiplier > 0
