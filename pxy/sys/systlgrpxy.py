@@ -369,7 +369,7 @@ def snapshot_report(title, state=None):
                       field("Losses", losses if books is not None else "NA")]
     if title == "TOUCHDOWN":
         lines.append(field("Peak Inv", money(peak)))
-    lines += [field("Books", f"{books} Closed" if books is not None else "NA"),
+    lines += [field("Cycles", f"{books} Closed" if books is not None else "NA"),
               field("Errors", f"{errors} Reported"),
               field("Warnings", f"{warnings} Reported"),
               "━━━━━━━━━━━━━━━━━━━━━━━━",
@@ -430,7 +430,7 @@ def scan_books(state):
         times = [str(r.get("Exit_Time", "")) for r in rows if r.get("Exit_Time")]
         exit_time = max(times) if times else "NA"
         lines = [
-            f"📕 PXY — BOOK #{html.escape(book)} CLOSED",
+            f"📕 PXY — CYCLE #{html.escape(book)} CLOSED",
             "━━━━━━━━━━━━━━━━━━━━━━━━",
             field("Exit", exit_time),
             field("Peak Inv", money(peak)),
@@ -439,7 +439,7 @@ def scan_books(state):
             field("Status", "COMPLETED"),
             "━━━━━━━━━━━━━━━━━━━━━━━━",
         ]
-        message = "\n".join(lines[:1]) + "\n<pre>" + "\n".join(lines[1:]) + "</pre>\n<b>🏆 BOOK NET PNL: " + html.escape(money(pnl)) + " (" + (f"{book_return:+.2f}%" if book_return is not None else "NA") + ")</b>"
+        message = "\n".join(lines[:1]) + "\n<pre>" + "\n".join(lines[1:]) + "</pre>\n<b>🏆 CYCLE NET PNL: " + html.escape(money(pnl)) + " (" + (f"{book_return:+.2f}%" if book_return is not None else "NA") + ")</b>"
         send(state, key, "BOOK", message)
     state["book_initialized"] = True
     save(state)
