@@ -322,7 +322,7 @@ def snapshot_report(title, state=None):
     closed = []
     if isinstance(trades, list):
         closed = [r for r in trades if isinstance(r, dict) and str(r.get("Status", "")).upper() == "CLOSED"]
-    books = len({str(r.get("Cycle_ID", r.get("Cycle_ID"))) for r in closed if r.get("Cycle_ID") is not None}) if isinstance(trades, list) else None
+    cycles = len({str(r.get("Cycle_ID")) for r in closed if r.get("Cycle_ID") is not None}) if isinstance(trades, list) else None
     values = [safe_number(r.get("PNL")) for r in closed]
     closed_pnl = sum(values) if isinstance(trades, list) and all(v is not None for v in values) else None
     net = closed_pnl + open_pnl if closed_pnl is not None and open_pnl is not None else None
@@ -365,11 +365,11 @@ def snapshot_report(title, state=None):
         if title == "TOUCHDOWN":
             wins = sum(1 for r in closed if (safe_number(r.get("PNL")) or 0) > 0)
             losses = sum(1 for r in closed if (safe_number(r.get("PNL")) or 0) < 0)
-            lines += [field("Wins", wins if books is not None else "NA"),
-                      field("Losses", losses if books is not None else "NA")]
+            lines += [field("Wins", wins if cycles is not None else "NA"),
+                      field("Losses", losses if cycles is not None else "NA")]
     if title == "TOUCHDOWN":
         lines.append(field("Peak Inv", money(peak)))
-    lines += [field("Cycles", f"{books} Closed" if books is not None else "NA"),
+    lines += [field("Cycles", f"{cycles} Closed" if cycles is not None else "NA"),
               field("Errors", f"{errors} Reported"),
               field("Warnings", f"{warnings} Reported"),
               "━━━━━━━━━━━━━━━━━━━━━━━━",
@@ -404,43 +404,43 @@ def scan_cycles(state):
     trades = fresh_json("webpnlpxy")
     if not isinstance(trades, list):
         return
-    books = {}
+    cycles = {}
     for row in trades:
         if not isinstance(row, dict):
             continue
-        book = row.get("Cycle_ID", row.get("Cycle_ID"))
-        if book is None:
+        cycle = row.get("Cycle_ID")
+        if cycle is None:
             continue
-        books.setdefault(str(book), []).append(row)
+        cycles.setdefault(str(cycle), []).append(row)
     day = now().date().isoformat()
-    for book, rows in books.items():
+    for cycle, rows in cycles.items():
         if any(str(r.get("Status", "")).upper() == "OPEN" for r in rows):
             continue
         if not rows or any(str(r.get("Status", "")).upper() != "CLOSED" for r in rows):
             continue
         # The first snapshot establishes a baseline, avoiding historical alert floods.
-        key = f"book:{day}:{book}"
+        key = f"cycle:{day}:{cycle}"
         if not state.get("cycle_initialized"):
             state.setdefault("sent", {})[key] = "BASELINE"
             continue
         values = [safe_number(r.get("PNL")) for r in rows]
         pnl = sum(values) if all(v is not None for v in values) else None
         peak = daily_peak_investment(rows)
-        book_return = (100 * pnl / peak) if pnl is not None and peak is not None and peak > 0 else None
+        cycle_return = (100 * pnl / peak) if pnl is not None and peak is not None and peak > 0 else None
         times = [str(r.get("Exit_Time", "")) for r in rows if r.get("Exit_Time")]
         exit_time = max(times) if times else "NA"
         lines = [
-            f"📕 PXY — CYCLE #{html.escape(book)} CLOSED",
+            f"📕 PXY — CYCLE #{html.escape(cycle)} CLOSED",
             "━━━━━━━━━━━━━━━━━━━━━━━━",
             field("Exit", exit_time),
             field("Peak Inv", money(peak)),
             field("Closed PnL", money(pnl)),
-            field("Return %", f"{book_return:+.2f}%" if book_return is not None else "NA"),
+            field("Return %", f"{cycle_return:+.2f}%" if cycle_return is not None else "NA"),
             field("Status", "COMPLETED"),
             "━━━━━━━━━━━━━━━━━━━━━━━━",
         ]
-        message = "\n".join(lines[:1]) + "\n<pre>" + "\n".join(lines[1:]) + "</pre>\n<b>🏆 CYCLE NET PNL: " + html.escape(money(pnl)) + " (" + (f"{book_return:+.2f}%" if book_return is not None else "NA") + ")</b>"
-        send(state, key, "BOOK", message)
+        message = "\n".join(lines[:1]) + "\n<pre>" + "\n".join(lines[1:]) + "</pre>\n<b>🏆 CYCLE NET PNL: " + html.escape(money(pnl)) + " (" + (f"{cycle_return:+.2f}%" if cycle_return is not None else "NA") + ")</b>"
+        send(state, key, "CYCLE", message)
     state["cycle_initialized"] = True
     save(state)
 
