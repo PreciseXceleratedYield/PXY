@@ -266,25 +266,25 @@ body{
     border-bottom:1px solid var(--border);cursor:default;
     transition:background 0.25s,border-left-color 0.25s;
 }
-.t-book-row{
+.t-cycle-row{
     display:grid;grid-template-columns:auto 1fr auto;
     align-items:center;gap:6px;padding:9px 10px;
     border-bottom:1px solid var(--border);cursor:pointer;
     transition:background 0.25s;
 }
-.t-book-row:hover{background:var(--bg3);}
-.t-book-row.closed .t-book-toggle,
-.t-book-row.closed .t-book-name,
-.t-book-row.closed .t-book-meta,
+.t-cycle-row:hover{background:var(--bg3);}
+.t-cycle-row.closed .t-cycle-toggle,
+.t-cycle-row.closed .t-cycle-name,
+.t-cycle-row.closed .t-cycle-meta,
 .t-row.closed .t-tag,
 .t-row.closed .t-sym,
 .t-row.closed .t-meta{color:var(--muted);}
 .t-row.closed.bull-r,.t-row.closed.bear-r{border-left-color:var(--muted);}
-.t-book-details{border-bottom:1px solid var(--border);}
-.t-book-details .t-row{padding-left:20px;}
-.t-book-toggle{font-size:9px;color:var(--accent);width:12px;}
-.t-book-name{font-size:10px;font-weight:700;}
-.t-book-meta{font-size:8px;color:var(--muted);margin-top:2px;}
+.t-cycle-details{border-bottom:1px solid var(--border);}
+.t-cycle-details .t-row{padding-left:20px;}
+.t-cycle-toggle{font-size:9px;color:var(--accent);width:12px;}
+.t-cycle-name{font-size:10px;font-weight:700;}
+.t-cycle-meta{font-size:8px;color:var(--muted);margin-top:2px;}
 .p-row.bull-r{border-left:2px solid var(--bull);}
 .p-row.bear-r{border-left:2px solid var(--bear);}
 .t-row.bull-r{border-left:2px solid var(--bull);}
@@ -800,7 +800,7 @@ function lotSz(s){return 65;}
 /* ── SORT STATE ── */
 let psCol='pnl',psAsc=false;
 let trCol='time',trAsc=false;
-const expandedTradeBooks=new Set();
+const expandedTradeCycles=new Set();
 const PANEL_LINKS={terminal:'#',chart:'#',positions:'#',trades:'#'};
 function openPanelLink(key){window.location.href=PANEL_LINKS[key];}
 
@@ -1483,8 +1483,8 @@ new ResizeObserver(()=>{
 
 /* ── TRADES — wire click ── */
 async function loadTrades(){
-    let data=[],bookState={};
-    [data,bookState]=await Promise.all([
+    let data=[],cycleState={};
+    [data,cycleState]=await Promise.all([
         fetch('/api/web-data/webpnlpxy?_='+Date.now()).then(r=>r.json()).catch(()=>[]),
         fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json()).catch(()=>({}))
     ]);
@@ -1499,37 +1499,37 @@ async function loadTrades(){
     prevTradePnl=total;
     const scroll=$('tradeScroll');
     const trPrevScrollTop=scroll.scrollTop;
-    scroll.querySelectorAll('.t-row,.t-book-row,.t-book-details').forEach(r=>r.remove());
+    scroll.querySelectorAll('.t-row,.t-cycle-row,.t-cycle-details').forEach(r=>r.remove());
     if(!data.length){$('tradeEmpty').style.display='block';return;}
     $('tradeEmpty').style.display='none';
-    let riskBooks=Array.isArray(bookState.closed_books)?bookState.closed_books:[];
-    if(!riskBooks.length&&bookState.last_closed_snapshot){
-        riskBooks=[{
-            ...bookState.last_closed_snapshot,
-            book_id:bookState.closed_cycle_count??bookState.closed_book_count,
-            cycle_tags:bookState.last_closed_snapshot.cycle_tags
-                ||(bookState.last_closed_snapshot.positions||[]).map(p=>p.tag)
+    let riskCycles=Array.isArray(cycleState.closed_cycles)?cycleState.closed_cycles:[];
+    if(!riskCycles.length&&cycleState.last_closed_snapshot){
+        riskCycles=[{
+            ...cycleState.last_closed_snapshot,
+            cycle_id:cycleState.closed_cycle_count,
+            cycle_tags:cycleState.last_closed_snapshot.cycle_tags
+                ||(cycleState.last_closed_snapshot.positions||[]).map(p=>p.tag)
         }];
     }
-    riskBooks=riskBooks.map(book=>({
+    riskCycles=riskCycles.map(book=>({
         ...book,
-        id:book.cycle_id??book.book_id,
+        id:book.cycle_id,
         active:false,
         tags:new Set((book.cycle_tags||[]).map(tag=>String(tag).trim()))
     }));
-    if(bookState.active_book_id!==null&&bookState.active_book_id!==undefined){
-        riskBooks.push({
-            id:bookState.active_book_id,
+    if(cycleState.active_cycle_id!==null&&cycleState.active_cycle_id!==undefined){
+        riskCycles.push({
+            id:cycleState.active_cycle_id,
             active:true,
-            cycle_started_at:bookState.active_book_started_at,
+            cycle_started_at:cycleState.active_cycle_started_at,
             closed_at:'',
-            tags:new Set((bookState.active_book_tags||[]).map(tag=>String(tag).trim()))
+            tags:new Set((cycleState.active_cycle_tags||[]).map(tag=>String(tag).trim()))
         });
     }
-    const riskBookForTrade=t=>{
+    const riskCycleForTrade=t=>{
         const tag=String(t.Tag||'').trim();
         const entered=Date.parse(t.Buy_Time||'');
-        const tagged=riskBooks.filter(book=>book.tags.has(tag));
+        const tagged=riskCycles.filter(book=>book.tags.has(tag));
         if(!Number.isFinite(entered))return tagged.length===1?tagged[0]:undefined;
         return tagged
             .filter(book=>{
@@ -1543,14 +1543,14 @@ async function loadTrades(){
     };
     const books=new Map();
     data.forEach((t,index)=>{
-        const riskBook=riskBookForTrade(t);
-        const hasRiskBook=riskBook!==undefined;
-        const cycleId=t.Cycle_ID??t.Book_ID;
-        const hasBookId=cycleId!==null&&cycleId!==undefined&&cycleId!=='';
-        const id=hasRiskBook?String(riskBook.id):hasBookId?String(cycleId):'';
-        const key=hasRiskBook?'risk-book-'+id:hasBookId?'book-'+id:'unassigned-'+index;
+        const riskCycle=riskCycleForTrade(t);
+        const hasRiskBook=riskCycle!==undefined;
+        const cycleId=t.Cycle_ID;
+        const hasCycleId=cycleId!==null&&cycleId!==undefined&&cycleId!=='';
+        const id=hasRiskBook?String(riskCycle.id):hasCycleId?String(cycleId):'';
+        const key=hasRiskBook?'risk-book-'+id:hasCycleId?'book-'+id:'unassigned-'+index;
         if(!books.has(key))books.set(key,{
-            key,id,legacy:!hasRiskBook&&!hasBookId,risk:hasRiskBook,
+            key,id,legacy:!hasRiskBook&&!hasCycleId,risk:hasRiskBook,
             trades:[],pnl:0,open:false,sortTime:0,firstTag:String(t.Tag||'')
         });
         const book=books.get(key);
@@ -1576,33 +1576,33 @@ async function loadTrades(){
         const pnl=book.pnl,pb=pnl>=0;
         const name=book.legacy?'Unassigned trade':'Cycle '+book.id;
         const details=document.createElement('div');
-        details.className='t-book-details';
-        details.style.display=expandedTradeBooks.has(book.key)?'block':'none';
+        details.className='t-cycle-details';
+        details.style.display=expandedTradeCycles.has(book.key)?'block':'none';
         const summary=document.createElement('div');
-        summary.className=`t-book-row${book.open?'':' closed'}`;
+        summary.className=`t-cycle-row${book.open?'':' closed'}`;
         summary.setAttribute('role','button');
         summary.setAttribute('tabindex','0');
-        summary.setAttribute('aria-expanded',String(expandedTradeBooks.has(book.key)));
-        summary.innerHTML=`<span class="t-book-toggle">${expandedTradeBooks.has(book.key)?'▾':'▸'}</span>
-            <div><div class="t-book-name">${name} · ${book.open?'OPEN':'CLOSED'}</div>
-                 <div class="t-book-meta">${book.trades.length} trade${book.trades.length===1?'':'s'}${book.open?' · active position':''}</div></div>
+        summary.setAttribute('aria-expanded',String(expandedTradeCycles.has(book.key)));
+        summary.innerHTML=`<span class="t-cycle-toggle">${expandedTradeCycles.has(book.key)?'▾':'▸'}</span>
+            <div><div class="t-cycle-name">${name} · ${book.open?'OPEN':'CLOSED'}</div>
+                 <div class="t-cycle-meta">${book.trades.length} trade${book.trades.length===1?'':'s'}${book.open?' · active position':''}</div></div>
             <span class="t-pnl ${pb?'bull':'bear'}">${fmt(pnl)}</span>`;
         const toggle=()=>{
             const expanded=details.style.display==='none';
-            expandedTradeBooks.clear();
-            scroll.querySelectorAll('.t-book-details').forEach(item=>{
+            expandedTradeCycles.clear();
+            scroll.querySelectorAll('.t-cycle-details').forEach(item=>{
                 item.style.display='none';
             });
-            scroll.querySelectorAll('.t-book-row').forEach(item=>{
+            scroll.querySelectorAll('.t-cycle-row').forEach(item=>{
                 item.setAttribute('aria-expanded','false');
-                item.querySelector('.t-book-toggle').textContent='▸';
+                item.querySelector('.t-cycle-toggle').textContent='▸';
             });
             if(expanded){
-                expandedTradeBooks.add(book.key);
+                expandedTradeCycles.add(book.key);
                 details.style.display='block';
             }
             summary.setAttribute('aria-expanded',String(expanded));
-            summary.querySelector('.t-book-toggle').textContent=expanded?'▾':'▸';
+            summary.querySelector('.t-cycle-toggle').textContent=expanded?'▾':'▸';
         };
         summary.addEventListener('click',toggle);
         summary.addEventListener('keydown',event=>{
@@ -1644,13 +1644,13 @@ async function loadTrades(){
 }
 
 /* ── RISK BAR ── */
-let riskData={session_peak_pnl:0,current_net_pnl:0,active_exit_line:0,active_target_line:0,pnl_offset:0,booked_profit:0,closed_book_count:0,last_closed_snapshot:null,updated_timestamp:''};
+let riskData={session_peak_pnl:0,current_net_pnl:0,active_exit_line:0,active_target_line:0,pnl_offset:0,booked_profit:0,closed_cycle_count:0,last_closed_snapshot:null,updated_timestamp:''};
 async function loadRisk(){
     try{riskData=await fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json());}catch{}
     const peak=Math.round(riskData.session_peak_pnl??0);
     const net=Math.round(riskData.current_net_pnl??0);
     // No active cycle: show zero thresholds without altering backend risk controls.
-    const hasActiveBook=(riskData.active_cycle_id??riskData.active_book_id)!=null;
+    const hasActiveBook=(riskData.active_cycle_id??riskData.active_cycle_id)!=null;
     const floor=hasActiveBook?Math.round(riskData.active_exit_line??0):0;
     const target=hasActiveBook?Math.round(riskData.active_target_line??0):0;
     $('rskTarget').textContent='₹'+target;
@@ -1676,7 +1676,7 @@ function renderRiskInfo(){
         : '—';
     el.innerHTML=row('Current cycle',f(d.current_net_pnl),cls(d.current_net_pnl))
         +row('Booked profit',f(d.booked_profit),cls(d.booked_profit))
-        +row('Completed cycles',String(Number(d.closed_book_count)||0))
+        +row('Completed cycles',String(Number(d.closed_cycle_count)||0))
         +row('Snapshot',snapshot)
         +row('Updated',`<span style="font-size:10px;font-weight:600;">${esc(d.updated_timestamp||'—')}</span>`);
 }
@@ -1722,7 +1722,7 @@ function drawRiskCandle(floor,net,peak){
     }
     /* The chip is the current cycle; the body is cumulative realized profit. */
     const sumVal=Number(riskData.booked_profit??bookedTotal)||0;
-    const bookCount=Number(riskData.closed_book_count)||0;
+    const bookCount=Number(riskData.closed_cycle_count)||0;
     const overallBull=sumVal>=0;
     const overallColor=overallBull?cssVar('--risk-bull'):cssVar('--risk-bear');
     const netColor=isBull?cssVar('--risk-bull'):cssVar('--risk-bear');
