@@ -20,7 +20,7 @@ Service name: `pxytlgr.service`. Existing `pxywatch.service` is unchanged.
 ## Sources and cadence
 
 - Read-only tmux `pxy-engine` pane capture every 30 seconds (last 500 lines; best-effort only).
-- Read `pxy/web/webpnlpxy.json` every 5 minutes for closed books. Each new book is reported individually.
+- Read `pxy/web/webpnlpxy.json` every 5 minutes for closed cycles. Each new cycle is reported individually.
 - Read `pxy/web/webpospxy.json` and the P&L JSON for scheduled reports.
 - No broker requests, trading actions, or trading engine changes.
 - Existing Telegram credentials are read as literals from `sys/sysexepxy.py` without importing it; alternatively supply `PXY_TLGR_BOT_TOKEN` and `PXY_TLGR_CHAT_ID` in the service environment.
@@ -37,7 +37,7 @@ Events are mandatory before 09:35 and controlled by a persistent switch thereaft
 
 ## Files
 
-- `~/.pxy/tlgr/state.json` — last processed terminal lines, reported books and scheduled reports.
+- `~/.pxy/tlgr/state.json` — last processed terminal lines, reported cycles and scheduled reports.
 - `~/.pxy/tlgr/config.json` — persistent Events ON/OFF setting.
 - `~/.pxy/tlgr/notifications.jsonl` — Telegram send attempts and confirmations.
 - `~/.pxy/tlgr/events.jsonl` — matching terminal warnings and monitor errors.
@@ -47,7 +47,7 @@ Events are mandatory before 09:35 and controlled by a persistent switch thereaft
 - A tmux pane snapshot is not a guaranteed lossless log stream. More than 500 lines between polls, or a pane reset, may cause missed or duplicated event detections.
 - Errors swallowed silently by trading code cannot be detected from terminal output.
 - P&L comes from existing ledger JSON, and is an estimate before charges, not independent broker verification.
-- The first valid book snapshot establishes a baseline; it will not resend historical closures.
+- The first valid cycle snapshot establishes a baseline; it will not resend historical closures.
 - A Telegram API timeout after successful delivery can lead to an uncertain delivery outcome.
 - An absent or stale NSE holiday cache suppresses scheduled reports. Keep the existing engine holiday cache updated.
 - Direct Telegram dispatch has been removed from active engine supervisor, execution wrapper, market-data warning, square-off verification and ledger scripts. Existing diagnostics remain in terminal output.\n- The engine supervisor still contains the existing Telegram credential constants as a compatibility fallback for the independent monitor; the supervisor itself no longer sends Telegram.\n- Archived legacy code under `sys/_/` has not been changed.\n- Running engine processes must be restarted during a safe maintenance window to load the updated Python code.
