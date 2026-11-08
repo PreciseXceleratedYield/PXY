@@ -15,7 +15,7 @@ from syscnfgpxy import (
     RUNEXLQDPXY_SQUAREOFF_TIMEOUT_SECONDS as SQUAREOFF_TIMEOUT_SECONDS,
 )
 from runexmtpxy import (
-    INITIAL_RISK_BAR_TARGET, compute_totals, cycle_closed_book_snapshot,
+    INITIAL_RISK_BAR_TARGET, compute_totals, cycle_closed_snapshot,
     _both_empty,
 )
 from runexstpxy import (
@@ -196,7 +196,7 @@ def liquidate_and_exit(
         f"{cycle_started_at}|{'|'.join(sorted(cycle_tags))}"
         if cycle_started_at and cycle_tags else ""
     )
-    snapshot = cycle_closed_book_snapshot(
+    snapshot = cycle_closed_snapshot(
         closed_df, cycle_tags, cycle_started_at
     )
     if snapshot is not None and cycle_id != state.get("last_closed_cycle_id"):
