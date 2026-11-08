@@ -1573,7 +1573,7 @@ async function loadTrades(){
     });
     bookList.forEach(book=>{
         const pnl=book.pnl,pb=pnl>=0;
-        const name=book.legacy?'Unassigned trade':'Book '+book.id;
+        const name=book.legacy?'Unassigned trade':'Cycle '+book.id;
         const details=document.createElement('div');
         details.className='t-book-details';
         details.style.display=expandedTradeBooks.has(book.key)?'block':'none';
@@ -1648,7 +1648,7 @@ async function loadRisk(){
     try{riskData=await fetch('/api/web-data/webrinkopxy?_='+Date.now()).then(r=>r.json());}catch{}
     const peak=Math.round(riskData.session_peak_pnl??0);
     const net=Math.round(riskData.current_net_pnl??0);
-    // No active book: show zero thresholds without altering backend risk controls.
+    // No active cycle: show zero thresholds without altering backend risk controls.
     const hasActiveBook=riskData.active_book_id!=null;
     const floor=hasActiveBook?Math.round(riskData.active_exit_line??0):0;
     const target=hasActiveBook?Math.round(riskData.active_target_line??0):0;
@@ -1673,9 +1673,9 @@ function renderRiskInfo(){
     const snapshot=closedAt&&!Number.isNaN(closedAt.getTime())
         ? esc(closedAt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit',second:'2-digit',hour12:true}))
         : '—';
-    el.innerHTML=row('Current book',f(d.current_net_pnl),cls(d.current_net_pnl))
+    el.innerHTML=row('Current cycle',f(d.current_net_pnl),cls(d.current_net_pnl))
         +row('Booked profit',f(d.booked_profit),cls(d.booked_profit))
-        +row('Closed books',String(Number(d.closed_book_count)||0))
+        +row('Completed cycles',String(Number(d.closed_book_count)||0))
         +row('Snapshot',snapshot)
         +row('Updated',`<span style="font-size:10px;font-weight:600;">${esc(d.updated_timestamp||'—')}</span>`);
 }
@@ -1719,7 +1719,7 @@ function drawRiskCandle(floor,net,peak){
         ctx.beginPath();ctx.moveTo(openX,midY-bodyH/2);ctx.lineTo(openX,midY+bodyH/2);ctx.stroke();
         ctx.setLineDash([]);
     }
-    /* The chip is the current book; the body is cumulative closed-book profit. */
+    /* The chip is the current cycle; the body is cumulative realized profit. */
     const sumVal=Number(riskData.booked_profit??bookedTotal)||0;
     const bookCount=Number(riskData.closed_book_count)||0;
     const overallBull=sumVal>=0;
