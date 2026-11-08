@@ -42,7 +42,7 @@ from syscnfgpxy import (
 from runexiopxy import now_ist, today_ist, RENKO_STATE_FILE, WEB_DIR, SQUAREOFF_SCRIPT_PATH  # noqa: F401
 from runexmtpxy import (
     INITIAL_RISK_BAR_TARGET, compute_totals,
-    cycle_closed_book_snapshot, cycle_ledger_tags, cycle_risk_metrics,
+    cycle_closed_snapshot, cycle_ledger_tags, cycle_risk_metrics,
     cycle_start_time,
 )
 from runexstpxy import (
@@ -288,7 +288,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             if previous_start and previous_tags else ""
         )
         if cycle_id and cycle_id != last_closed_cycle_id:
-            snapshot = cycle_closed_book_snapshot(
+            snapshot = cycle_closed_snapshot(
                 closed_df, previous_tags, previous_start
             )
             if snapshot is not None:
@@ -377,7 +377,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     )
     # Shared metrics own the effective SIDE/BULL/BEAR target and minimum.
     # SIDE: 1.4% / ₹100 per row; BULL/BEAR: twice both thresholds.
-    book_count = metrics["book_trade_count"]
+    book_count = metrics["cycle_trade_count"]
     risk_target = metrics["target"]
     # Pending liquidations resume earlier in _tick regardless of signal.
     risk_enabled = (
@@ -386,7 +386,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         and metrics["both_sides_open"]
     )
     active_book_id = closed_book_count + 1
-    print(format_book_status(active_book_id, risk_target))
+    print(format_cycle_status(active_book_id, risk_target))
 
     if not risk_enabled:
         if consecutive_breaches:
@@ -503,6 +503,10 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     )
 
 
-def format_book_status(book_number, target):
+def format_cycle_status(cycle_number, target):
     """Return the single fixed-width status line for the currently open cycle."""
-    return f"CYCLE{book_number} OPEN - WAIT TARGET RS {target:.0f}"[:40].ljust(40)
+    return f"CYCLE{cycle_number} OPEN - WAIT TARGET RS {target:.0f}"[:40].ljust(40)
+
+
+# Compatibility for existing status display integrations.
+format_book_status = format_cycle_status
