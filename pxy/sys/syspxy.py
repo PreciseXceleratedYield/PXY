@@ -63,10 +63,10 @@ def get_all_data():
 
     # -------- PRICE LOGIC (DISPLAY/EXECUTION SNAPSHOT ONLY) --------
     # Reuse the existing timestamp-validated Kotak Futures feed; no new API call.
-    # If unavailable, use the NIFTY index price already in the Yahoo snapshot.
+    # If unavailable, use the NIFTY index price only when Yahoo data exists.
     # This changes only the published price, never the OHLC or indicators.
     futures_price = _read_nifty_futures_price()
-    index_price = core.get("price")
+    index_price = core.get("price") if core.get("market_data_available", False) else None
     try:
         index_price = float(index_price)
         if not math.isfinite(index_price) or index_price <= 0:
