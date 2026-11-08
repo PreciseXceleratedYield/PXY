@@ -203,7 +203,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         return
 
     # An initiated liquidation stays authoritative across cycles and engine restarts.
-    # A fresh broker snapshot, not order acceptance, decides when the book is flat.
+    # A fresh broker snapshot, not order acceptance, decides when the cycle is flat.
     if liquidation_is_pending:
         meta["last_tick_epoch"] = now_epoch
         save_meta(meta)
@@ -274,7 +274,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
             )
         meta["ledger_basis"] = current_basis
 
-    # The portfolio must be completely flat before a book is closed or reset.
+    # The portfolio must be completely flat before a cycle is closed or reset.
     open_tags = cycle_ledger_tags(open_df)
     portfolio_is_flat = open_df is None or open_df.empty
     if portfolio_is_flat:
@@ -332,7 +332,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
     ):
         print(
             f"{Fore.YELLOW}⚠️ Active positions do not all have valid order tags; "
-            "keeping the book open and skipping cycle accounting."
+            "keeping the cycle open and skipping cycle accounting."
         )
         return
 
@@ -353,7 +353,7 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         save_check_state(0)
         print(
             f"🛡️ {Fore.CYAN}Risk cycle started at {cycle_started_at}; "
-            "baseline continues until the full book is flat."
+            "baseline continues until the full cycle is flat."
         )
     else:
         cycle_tags = previous_tags | open_tags
@@ -448,9 +448,9 @@ def _tick(client, open_df, closed_df, exit_signal=None):
         active_book_started_at=cycle_started_at,
     )
     print(
-        f"{Fore.YELLOW}⚠️ {str(exit_signal).upper().strip()} book profit target reached "
+        f"{Fore.YELLOW}⚠️ {str(exit_signal).upper().strip()} cycle profit target reached "
         f"({metrics['target_pct']:.2f}% of ₹{metrics['premium_paid']:.2f} invested "
-        f"across {book_count} present-book rows; minimum ₹{metrics['minimum_pnl']:.2f}) "
+        f"across {book_count} present-cycle rows; minimum ₹{metrics['minimum_pnl']:.2f}) "
         f"(confirmation {consecutive_breaches}/{BREACH_TICKS_REQUIRED})."
     )
     if consecutive_breaches < BREACH_TICKS_REQUIRED:
@@ -500,5 +500,5 @@ def _tick(client, open_df, closed_df, exit_signal=None):
 
 
 def format_book_status(book_number, target):
-    """Return the single fixed-width status line for the currently open book."""
-    return f"BOOK{book_number} OPEN - WAIT TARGET RS {target:.0f}"[:40].ljust(40)
+    """Return the single fixed-width status line for the currently open cycle."""
+    return f"CYCLE{book_number} OPEN - WAIT TARGET RS {target:.0f}"[:40].ljust(40)
