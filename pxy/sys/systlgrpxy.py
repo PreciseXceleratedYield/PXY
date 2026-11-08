@@ -322,7 +322,7 @@ def snapshot_report(title, state=None):
     closed = []
     if isinstance(trades, list):
         closed = [r for r in trades if isinstance(r, dict) and str(r.get("Status", "")).upper() == "CLOSED"]
-    books = len({str(r["Book_ID"]) for r in closed if r.get("Book_ID") is not None}) if isinstance(trades, list) else None
+    books = len({str(r.get("Cycle_ID", r.get("Book_ID"))) for r in closed if r.get("Book_ID") is not None}) if isinstance(trades, list) else None
     values = [safe_number(r.get("PNL")) for r in closed]
     closed_pnl = sum(values) if isinstance(trades, list) and all(v is not None for v in values) else None
     net = closed_pnl + open_pnl if closed_pnl is not None and open_pnl is not None else None
@@ -408,7 +408,7 @@ def scan_books(state):
     for row in trades:
         if not isinstance(row, dict):
             continue
-        book = row.get("Book_ID")
+        book = row.get("Cycle_ID", row.get("Book_ID"))
         if book is None:
             continue
         books.setdefault(str(book), []).append(row)
