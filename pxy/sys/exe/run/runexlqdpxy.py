@@ -70,7 +70,7 @@ def broker_positions_flat(client):
         return all(abs(quantity) <= 1e-9 for quantity in net_by_symbol.values())
 
     except Exception:
-        # An unavailable broker response must keep the book open and trigger
+        # An unavailable broker response must keep the cycle open and trigger
         # another square-off/confirmation attempt on the next risk-ledger tick.
         return False
 
