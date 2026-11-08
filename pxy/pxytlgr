@@ -76,7 +76,7 @@ try:
  except (OSError,ValueError): settings={}
  print("Notification channel:", settings.get("channel","TGR"))
  print("Events after 09:35:", "ON" if settings.get("events_enabled",False) else "OFF")
- print("Books baseline established:", bool(d.get("book_initialized",False)), "(first eligible book scan completed)")
+ print("Cycles baseline established:", bool(d.get("book_initialized",False)), "(first eligible cycle scan completed)")
  print("Notifications recorded:", sum(1 for x in d.get("sent",{}).values() if x != "BASELINE"), "(deduplicated send records, not delivery confirmation)")
 except (OSError,ValueError): print("Monitor state: unavailable")
 PY
@@ -99,7 +99,7 @@ try:
  os.replace(t,p)
 finally:
  if os.path.exists(t): os.unlink(t)
-print("Events after 09:35:", "ON" if d["events_enabled"] else "OFF", "(scheduled reports and closed-book messages unaffected)")
+print("Events after 09:35:", "ON" if d["events_enabled"] else "OFF", "(scheduled reports and closed-cycle messages unaffected)")
 PY
     ;;
   channel)
