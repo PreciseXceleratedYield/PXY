@@ -176,7 +176,7 @@ def cycle_risk_metrics(
         cycle_pnl = float(pnl.sum())
         premium_paid = float((quantities * buy_prices).sum())
 
-    # Count all trade rows in this book, including realized/closed positions.
+    # Count all trade rows in this cycle, including realized/closed positions.
     book_quantities = pd.to_numeric(
         rows["QTY"] if "QTY" in rows else pd.Series(0, index=rows.index),
         errors="coerce",
@@ -206,7 +206,7 @@ def cycle_risk_metrics(
 
     # SIDE uses the base target; directional OUT (BULL/BEAR) doubles
     # the investment-percentage target; the cumulative minimum stays ₹100.
-    # All calculations use only active and closed rows of the present book.
+    # All calculations use only active and closed rows of the present cycle.
     target_multiplier = 1.0 if signal == "SIDE" else 2.0 if signal in {"BULL", "BEAR"} else 0.0
     target_pct = 1.4 * target_multiplier
     investment_target = premium_paid * target_pct / 100.0
