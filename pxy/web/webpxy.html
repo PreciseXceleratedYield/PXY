@@ -1506,14 +1506,14 @@ async function loadTrades(){
     if(!riskBooks.length&&bookState.last_closed_snapshot){
         riskBooks=[{
             ...bookState.last_closed_snapshot,
-            book_id:bookState.closed_book_count,
+            book_id:bookState.closed_cycle_count??bookState.closed_book_count,
             cycle_tags:bookState.last_closed_snapshot.cycle_tags
                 ||(bookState.last_closed_snapshot.positions||[]).map(p=>p.tag)
         }];
     }
     riskBooks=riskBooks.map(book=>({
         ...book,
-        id:book.book_id,
+        id:book.cycle_id??book.book_id,
         active:false,
         tags:new Set((book.cycle_tags||[]).map(tag=>String(tag).trim()))
     }));
@@ -1545,8 +1545,9 @@ async function loadTrades(){
     data.forEach((t,index)=>{
         const riskBook=riskBookForTrade(t);
         const hasRiskBook=riskBook!==undefined;
-        const hasBookId=t.Book_ID!==null&&t.Book_ID!==undefined&&t.Book_ID!=='';
-        const id=hasRiskBook?String(riskBook.id):hasBookId?String(t.Book_ID):'';
+        const cycleId=t.Cycle_ID??t.Book_ID;
+        const hasBookId=cycleId!==null&&cycleId!==undefined&&cycleId!=='';
+        const id=hasRiskBook?String(riskBook.id):hasBookId?String(cycleId):'';
         const key=hasRiskBook?'risk-book-'+id:hasBookId?'book-'+id:'unassigned-'+index;
         if(!books.has(key))books.set(key,{
             key,id,legacy:!hasRiskBook&&!hasBookId,risk:hasRiskBook,
@@ -1649,7 +1650,7 @@ async function loadRisk(){
     const peak=Math.round(riskData.session_peak_pnl??0);
     const net=Math.round(riskData.current_net_pnl??0);
     // No active cycle: show zero thresholds without altering backend risk controls.
-    const hasActiveBook=riskData.active_book_id!=null;
+    const hasActiveBook=(riskData.active_cycle_id??riskData.active_book_id)!=null;
     const floor=hasActiveBook?Math.round(riskData.active_exit_line??0):0;
     const target=hasActiveBook?Math.round(riskData.active_target_line??0):0;
     $('rskTarget').textContent='₹'+target;
