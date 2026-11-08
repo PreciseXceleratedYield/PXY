@@ -204,15 +204,14 @@ def liquidate_and_exit(
             float(state.get("booked_profit", 0.0))
             + snapshot["realized_pnl"]
         )
-        state["closed_book_count"] = (
-            int(state.get("closed_book_count", 0)) + 1
+        state["closed_cycle_count"] = (
+            int(state.get("closed_cycle_count", 0)) + 1
         )
-        snapshot["book_id"] = state["closed_book_count"]
-        snapshot["cycle_id"] = state["closed_book_count"]
+        snapshot["cycle_id"] = state["closed_cycle_count"]
         state["last_closed_snapshot"] = snapshot
         state["last_closed_cycle_id"] = cycle_id
-        state["closed_books"] = [
-            *state.get("closed_books", []),
+        state["closed_cycles"] = [
+            *state.get("closed_cycles", []),
             snapshot,
         ]
 
@@ -226,13 +225,13 @@ def liquidate_and_exit(
         risk_control_activated=risk_control_activated,
         target_exit_line=target_line,
         booked_profit=state.get("booked_profit", 0.0),
-        closed_book_count=state.get("closed_book_count", 0),
+        closed_cycle_count=state.get("closed_cycle_count", 0),
         last_closed_snapshot=state.get("last_closed_snapshot"),
         last_closed_cycle_id=state.get("last_closed_cycle_id", ""),
-        closed_books=state.get("closed_books", []),
-        active_book_id=None,
-        active_book_tags=[],
-        active_book_started_at=None,
+        closed_cycles=state.get("closed_cycles", []),
+        active_cycle_id=None,
+        active_cycle_tags=[],
+        active_cycle_started_at=None,
         liquidation_pending=False,
     )
     if not state_saved:
