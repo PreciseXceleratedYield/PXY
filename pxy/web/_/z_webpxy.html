@@ -1030,9 +1030,9 @@ function renderRiskInfo(){
     const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const row=(k,v,c='')=>`<div class="ri-row"><span class="ri-k">${k}</span><span class="ri-v ${c}">${v}</span></div>`;
     const snapshot=last?`${money(last.realized_pnl)} · ${Number(last.closed_positions)||0} positions · ${esc(last.closed_at||'—')}`:'—';
-    $('rskInfo').innerHTML=row('Current book',money(d.current_net_pnl),Number(d.current_net_pnl)>=0?'bull':'bear')
+    $('rskInfo').innerHTML=row('Current cycle',money(d.current_net_pnl),Number(d.current_net_pnl)>=0?'bull':'bear')
         +row('Booked profit',money(d.booked_profit),Number(d.booked_profit)>=0?'bull':'bear')
-        +row('Booked books',String(Number(d.closed_book_count)||0))
+        +row('Completed cycles',String(Number(d.closed_cycle_count)||0))
         +row('Last closed snapshot',snapshot)
         +row('Updated',esc(d.updated_timestamp||'—'));
 }
@@ -1101,9 +1101,9 @@ function drawRiskCandle(floor, net, peak){
         ctx.setLineDash([]);
     }
 
-    // body: current book / cumulative closed-book profit
+    // body: current cycle / cumulative completed-cycle profit
     const booked=Math.round(Number(riskData.booked_profit)||0);
-    const books=Number(riskData.closed_book_count)||0;
+    const books=Number(riskData.closed_cycle_count)||0;
     const netLabel=`${net>=0?'+':''}${Math.round(net).toLocaleString('en-IN')} / ₹${booked.toLocaleString('en-IN')}`;
     const fontSize = Math.round(Math.min(14, Math.max(10, H*0.28)));
     ctx.font = `800 ${fontSize}px 'Syne',sans-serif`;

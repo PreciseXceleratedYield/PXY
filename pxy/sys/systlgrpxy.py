@@ -29,7 +29,7 @@ EVENT_PATH = STATE_DIR / "events.jsonl"
 WEB = ROOT / "web"
 TZ = ZoneInfo("Asia/Kolkata")
 CHECK_SECONDS = 30
-BOOK_SECONDS = 300
+CYCLE_SECONDS = 300
 EVENT_WINDOW = (9 * 60 + 15, 9 * 60 + 35)
 REPORTS = {555: "TAKEOFF", 575: "AIRBORNE", 920: "DESCENDING", 941: "TOUCHDOWN"}
 PATTERN = re.compile(r"traceback|(?:^|\W)(?:error|failed|failure|timeout|exception|critical|warning|stale)(?:\W|$)", re.I)
@@ -322,7 +322,7 @@ def snapshot_report(title, state=None):
     closed = []
     if isinstance(trades, list):
         closed = [r for r in trades if isinstance(r, dict) and str(r.get("Status", "")).upper() == "CLOSED"]
-    books = len({str(r["Book_ID"]) for r in closed if r.get("Book_ID") is not None}) if isinstance(trades, list) else None
+    cycles = len({str(r.get("Cycle_ID")) for r in closed if r.get("Cycle_ID") is not None}) if isinstance(trades, list) else None
     values = [safe_number(r.get("PNL")) for r in closed]
     closed_pnl = sum(values) if isinstance(trades, list) and all(v is not None for v in values) else None
     net = closed_pnl + open_pnl if closed_pnl is not None and open_pnl is not None else None
@@ -365,11 +365,11 @@ def snapshot_report(title, state=None):
         if title == "TOUCHDOWN":
             wins = sum(1 for r in closed if (safe_number(r.get("PNL")) or 0) > 0)
             losses = sum(1 for r in closed if (safe_number(r.get("PNL")) or 0) < 0)
-            lines += [field("Wins", wins if books is not None else "NA"),
-                      field("Losses", losses if books is not None else "NA")]
+            lines += [field("Wins", wins if cycles is not None else "NA"),
+                      field("Losses", losses if cycles is not None else "NA")]
     if title == "TOUCHDOWN":
         lines.append(field("Peak Inv", money(peak)))
-    lines += [field("Books", f"{books} Closed" if books is not None else "NA"),
+    lines += [field("Cycles", f"{cycles} Closed" if cycles is not None else "NA"),
               field("Errors", f"{errors} Reported"),
               field("Warnings", f"{warnings} Reported"),
               "━━━━━━━━━━━━━━━━━━━━━━━━",
@@ -400,48 +400,48 @@ def trading_day(day):
         return False
 
 
-def scan_books(state):
+def scan_cycles(state):
     trades = fresh_json("webpnlpxy")
     if not isinstance(trades, list):
         return
-    books = {}
+    cycles = {}
     for row in trades:
         if not isinstance(row, dict):
             continue
-        book = row.get("Book_ID")
-        if book is None:
+        cycle = row.get("Cycle_ID")
+        if cycle is None:
             continue
-        books.setdefault(str(book), []).append(row)
+        cycles.setdefault(str(cycle), []).append(row)
     day = now().date().isoformat()
-    for book, rows in books.items():
+    for cycle, rows in cycles.items():
         if any(str(r.get("Status", "")).upper() == "OPEN" for r in rows):
             continue
         if not rows or any(str(r.get("Status", "")).upper() != "CLOSED" for r in rows):
             continue
         # The first snapshot establishes a baseline, avoiding historical alert floods.
-        key = f"book:{day}:{book}"
-        if not state.get("book_initialized"):
+        key = f"cycle:{day}:{cycle}"
+        if not state.get("cycle_initialized"):
             state.setdefault("sent", {})[key] = "BASELINE"
             continue
         values = [safe_number(r.get("PNL")) for r in rows]
         pnl = sum(values) if all(v is not None for v in values) else None
         peak = daily_peak_investment(rows)
-        book_return = (100 * pnl / peak) if pnl is not None and peak is not None and peak > 0 else None
+        cycle_return = (100 * pnl / peak) if pnl is not None and peak is not None and peak > 0 else None
         times = [str(r.get("Exit_Time", "")) for r in rows if r.get("Exit_Time")]
         exit_time = max(times) if times else "NA"
         lines = [
-            f"📕 PXY — BOOK #{html.escape(book)} CLOSED",
+            f"📕 PXY — CYCLE #{html.escape(cycle)} CLOSED",
             "━━━━━━━━━━━━━━━━━━━━━━━━",
             field("Exit", exit_time),
             field("Peak Inv", money(peak)),
             field("Closed PnL", money(pnl)),
-            field("Return %", f"{book_return:+.2f}%" if book_return is not None else "NA"),
+            field("Return %", f"{cycle_return:+.2f}%" if cycle_return is not None else "NA"),
             field("Status", "COMPLETED"),
             "━━━━━━━━━━━━━━━━━━━━━━━━",
         ]
-        message = "\n".join(lines[:1]) + "\n<pre>" + "\n".join(lines[1:]) + "</pre>\n<b>🏆 BOOK NET PNL: " + html.escape(money(pnl)) + " (" + (f"{book_return:+.2f}%" if book_return is not None else "NA") + ")</b>"
-        send(state, key, "BOOK", message)
-    state["book_initialized"] = True
+        message = "\n".join(lines[:1]) + "\n<pre>" + "\n".join(lines[1:]) + "</pre>\n<b>🏆 CYCLE NET PNL: " + html.escape(money(pnl)) + " (" + (f"{cycle_return:+.2f}%" if cycle_return is not None else "NA") + ")</b>"
+        send(state, key, "CYCLE", message)
+    state["cycle_initialized"] = True
     save(state)
 
 
@@ -551,7 +551,7 @@ def main():
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     state = load()
     state.setdefault("events_enabled", False)
-    last_book = 0.0
+    last_cycle = 0.0
     last_date = state.get("session_date", "")
     while True:
         try:
@@ -562,7 +562,7 @@ def main():
             if day.isoformat() != last_date:
                 last_date = day.isoformat()
                 state["session_date"] = last_date
-                state["book_initialized"] = False
+                state["cycle_initialized"] = False
                 state["tail"] = []
                 state["issues"] = {}
                 state["daily_incidents"] = {last_date: {"ERROR": 0, "WARNING": 0}}
@@ -572,9 +572,9 @@ def main():
                         send(state, f"report:{day}:{target}", "REPORT", snapshot_report(title, state))
                 if 555 <= minute < 941:
                     scan_events(state)
-                    if time.monotonic() - last_book >= BOOK_SECONDS:
-                        scan_books(state)
-                        last_book = time.monotonic()
+                    if time.monotonic() - last_cycle >= CYCLE_SECONDS:
+                        scan_cycles(state)
+                        last_cycle = time.monotonic()
             save(state)
         except Exception as exc:
             write_jsonl(EVENT_PATH, {"time": now().isoformat(), "status": "MONITOR_ERROR", "error": type(exc).__name__})

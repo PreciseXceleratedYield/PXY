@@ -23,7 +23,7 @@ ENTRY_END = SYSCNFGPXY_FRESH_ENTRY_END
 MORNING_OVERRIDE_END = dt_time(9, 30)
 
 
-def _apply_new_book_cutoff(entry_signal, exit_signal, now_time):
+def _apply_new_cycle_cutoff(entry_signal, exit_signal, now_time):
     """Apply the existing entry-only market-hours restriction."""
     if not (ENTRY_START <= now_time < ENTRY_END):
         entry_signal = {"BUY": "BNON", "SELL": "SNON"}.get(entry_signal, entry_signal)
@@ -65,7 +65,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
             print(f"⚠️ Morning direction override unavailable: {exc}")
             entry_sig, exit_sig = "NONE", "NONE"
         print(f"⏱️ MORNING OVERRIDE | IN: {entry_sig} | OUT: {exit_sig}")
-        return _apply_new_book_cutoff(entry_sig, exit_sig, now_time)
+        return _apply_new_cycle_cutoff(entry_sig, exit_sig, now_time)
 
     if df is None:
         from sysdtafpxy import fetch_yf_data
@@ -92,7 +92,7 @@ def get_entry_signal(df=None, *, processed_supertrend=None, now=None):
     exit_sig = raw_exit if raw_exit in {"BULL", "BEAR", "SIDE"} else "NONE"
 
     print(f"⏱️ IN: {entry_sig} | OUT: {exit_sig}")
-    return _apply_new_book_cutoff(entry_sig, exit_sig, now_time)
+    return _apply_new_cycle_cutoff(entry_sig, exit_sig, now_time)
 
 
 if __name__ == "__main__":

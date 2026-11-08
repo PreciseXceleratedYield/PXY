@@ -176,12 +176,12 @@ def cycle_risk_metrics(
         cycle_pnl = float(pnl.sum())
         premium_paid = float((quantities * buy_prices).sum())
 
-    # Count all trade rows in this book, including realized/closed positions.
-    book_quantities = pd.to_numeric(
+    # Count all trade rows in this cycle, including realized/closed positions.
+    cycle_quantities = pd.to_numeric(
         rows["QTY"] if "QTY" in rows else pd.Series(0, index=rows.index),
         errors="coerce",
     ).fillna(0).abs()
-    book_trade_count = int((book_quantities > 0).sum())
+    cycle_trade_count = int((cycle_quantities > 0).sum())
 
     ce_qty = pe_qty = ce_investment = pe_investment = 0.0
     if not active_cycle_rows.empty and {"SYMBOL", "QTY", "SELL_PRC"}.issubset(active_cycle_rows.columns):
@@ -206,7 +206,7 @@ def cycle_risk_metrics(
 
     # SIDE uses the base target; directional OUT (BULL/BEAR) doubles
     # the investment-percentage target; the cumulative minimum stays ₹100.
-    # All calculations use only active and closed rows of the present book.
+    # All calculations use only active and closed rows of the present cycle.
     target_multiplier = 1.0 if signal == "SIDE" else 2.0 if signal in {"BULL", "BEAR"} else 0.0
     target_pct = 1.4 * target_multiplier
     investment_target = premium_paid * target_pct / 100.0
@@ -216,7 +216,7 @@ def cycle_risk_metrics(
         target_multiplier > 0
         and ce_qty > 0
         and pe_qty > 0
-        and book_trade_count > 0
+        and cycle_trade_count > 0
         and premium_paid > 0
         and cycle_pnl >= target
     )
@@ -228,8 +228,8 @@ def cycle_risk_metrics(
         "target_pct": target_pct,
         "minimum_pnl": minimum_pnl,
         "investment_target": investment_target,
-        "active_count": book_trade_count,
-        "book_trade_count": book_trade_count,
+        "active_count": cycle_trade_count,
+        "cycle_trade_count": cycle_trade_count,
         "ce_qty": ce_qty,
         "pe_qty": pe_qty,
         "ce_investment": ce_investment,
@@ -241,7 +241,7 @@ def cycle_risk_metrics(
     }
 
 
-def cycle_closed_book_snapshot(closed_df, cycle_tags, cycle_started_at):
+def cycle_closed_snapshot(closed_df, cycle_tags, cycle_started_at):
     if closed_df is None or closed_df.empty:
         return None
     rows = closed_df.copy()
@@ -328,3 +328,5 @@ def compute_stop_conditions(current_game_pnl, historical_peak, active_count=2):
     stop_breached = current_game_pnl <= unified_stop
     target_breached = winners_peak_brick >= target_ceiling(active_count)
     return winners_peak_brick, unified_stop, stop_breached, target_breached
+
+

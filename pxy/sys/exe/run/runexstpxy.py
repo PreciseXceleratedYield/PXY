@@ -68,22 +68,22 @@ def load_session_state():
         "risk_control_activated": bool(d.get("risk_control_activated", False)),
         "updated_timestamp": str(d.get("updated_timestamp", "") or ""),
         "booked_profit": float(d.get("booked_profit", 0.0)),
-        "closed_book_count": max(0, int(d.get("closed_book_count", 0))),
+        "closed_cycle_count": max(0, int(d.get("closed_cycle_count", 0))),
         "last_closed_snapshot": d.get("last_closed_snapshot"),
         "last_closed_cycle_id": str(d.get("last_closed_cycle_id", "") or ""),
-        "closed_books": d.get("closed_books", []),
-        "active_book_id": d.get("active_book_id"),
-        "active_book_tags": d.get("active_book_tags", []),
-        "active_book_started_at": d.get("active_book_started_at"),
+        "closed_cycles": d.get("closed_cycles", []),
+        "active_cycle_id": d.get("active_cycle_id"),
+        "active_cycle_tags": d.get("active_cycle_tags", []),
+        "active_cycle_started_at": d.get("active_cycle_started_at"),
         "liquidation_pending": bool(d.get("liquidation_pending", False)),
     }
 
 
 def save_session_state(
     peak_value, current_net, exit_line, pnl_offset_val, risk_control_activated=False,
-    target_exit_line=INITIAL_RISK_BAR_TARGET, booked_profit=0.0, closed_book_count=0,
-    last_closed_snapshot=None, last_closed_cycle_id="", closed_books=None,
-    active_book_id=None, active_book_tags=None, active_book_started_at=None,
+    target_exit_line=INITIAL_RISK_BAR_TARGET, booked_profit=0.0, closed_cycle_count=0,
+    last_closed_snapshot=None, last_closed_cycle_id="", closed_cycles=None,
+    active_cycle_id=None, active_cycle_tags=None, active_cycle_started_at=None,
     liquidation_pending=False,
 ):
     return _atomic_write_json(RENKO_STATE_FILE, {
@@ -95,14 +95,14 @@ def save_session_state(
         "risk_control_activated": bool(risk_control_activated),
         "updated_timestamp": now_ist().strftime("%Y-%m-%d %H:%M:%S"),
         "booked_profit": float(booked_profit),
-        "closed_book_count": max(0, int(closed_book_count)),
         "last_closed_snapshot": last_closed_snapshot,
         "last_closed_cycle_id": str(last_closed_cycle_id or ""),
-        "closed_books": list(closed_books or []),
-        "active_book_id": active_book_id,
-        "active_book_tags": list(active_book_tags or []),
-        "active_book_started_at": active_book_started_at,
         "liquidation_pending": bool(liquidation_pending),
+        "closed_cycle_count": max(0, int(closed_cycle_count)),
+        "closed_cycles": list(closed_cycles or []),
+        "active_cycle_id": active_cycle_id,
+        "active_cycle_tags": list(active_cycle_tags or []),
+        "active_cycle_started_at": active_cycle_started_at,
     })
 
 
