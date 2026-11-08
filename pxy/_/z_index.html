@@ -599,7 +599,7 @@ function draw(w,h,cePx,pePx,ceY,peY,ceBat,peBat,ballX,ballY,ballColor,ballLift){
 
 
 /* ══════════════════════════════════════════════════════════════
-   RISK BAR — current book and booked-book totals come from the
+   RISK BAR — current cycle and completed-cycle totals come from the
    same state written for the main dashboard.
    ══════════════════════════════════════════════════════════════ */
 let riskData={};
@@ -623,9 +623,9 @@ function renderRiskInfo(){
     const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
     const row=(k,v,c='')=>`<div class="ri-row"><span class="ri-k">${k}</span><span class="ri-v ${c}">${v}</span></div>`;
     const snapshot=last?`${money(last.realized_pnl)} · ${Number(last.closed_positions)||0} positions · ${esc(last.closed_at||'—')}`:'—';
-    $('rskInfo').innerHTML=row('Current book',money(d.current_net_pnl),Number(d.current_net_pnl)>=0?'bull':'bear')
+    $('rskInfo').innerHTML=row('Current cycle',money(d.current_net_pnl),Number(d.current_net_pnl)>=0?'bull':'bear')
         +row('Booked profit',money(d.booked_profit),Number(d.booked_profit)>=0?'bull':'bear')
-        +row('Booked books',String(Number(d.closed_cycle_count)||0))
+        +row('Completed cycles',String(Number(d.closed_cycle_count)||0))
         +row('Last closed snapshot',snapshot)
         +row('Updated',esc(d.updated_timestamp||'—'));
 }
