@@ -68,14 +68,20 @@ def load_session_state():
         "risk_control_activated": bool(d.get("risk_control_activated", False)),
         "updated_timestamp": str(d.get("updated_timestamp", "") or ""),
         "booked_profit": float(d.get("booked_profit", 0.0)),
-        "closed_book_count": max(0, int(d.get("closed_book_count", 0))),
+        "closed_book_count": max(0, int(d.get("closed_cycle_count", d.get("closed_book_count", 0)))),
         "last_closed_snapshot": d.get("last_closed_snapshot"),
         "last_closed_cycle_id": str(d.get("last_closed_cycle_id", "") or ""),
-        "closed_books": d.get("closed_books", []),
-        "active_book_id": d.get("active_book_id"),
-        "active_book_tags": d.get("active_book_tags", []),
-        "active_book_started_at": d.get("active_book_started_at"),
+        "closed_books": d.get("closed_cycles", d.get("closed_books", [])),
+        "active_book_id": d.get("active_cycle_id", d.get("active_book_id")),
+        "active_book_tags": d.get("active_cycle_tags", d.get("active_book_tags", [])),
+        "active_book_started_at": d.get("active_cycle_started_at", d.get("active_book_started_at")),
         "liquidation_pending": bool(d.get("liquidation_pending", False)),
+        # Cycle aliases are additive; legacy callers continue receiving book fields.
+        "closed_cycle_count": max(0, int(d.get("closed_cycle_count", d.get("closed_book_count", 0)))),
+        "closed_cycles": d.get("closed_cycles", d.get("closed_books", [])),
+        "active_cycle_id": d.get("active_cycle_id", d.get("active_book_id")),
+        "active_cycle_tags": d.get("active_cycle_tags", d.get("active_book_tags", [])),
+        "active_cycle_started_at": d.get("active_cycle_started_at", d.get("active_book_started_at")),
     }
 
 
@@ -103,6 +109,12 @@ def save_session_state(
         "active_book_tags": list(active_book_tags or []),
         "active_book_started_at": active_book_started_at,
         "liquidation_pending": bool(liquidation_pending),
+        # Dual-write during migration to preserve historical readers.
+        "closed_cycle_count": max(0, int(closed_book_count)),
+        "closed_cycles": list(closed_books or []),
+        "active_cycle_id": active_book_id,
+        "active_cycle_tags": list(active_book_tags or []),
+        "active_cycle_started_at": active_book_started_at,
     })
 
 
