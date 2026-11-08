@@ -68,13 +68,13 @@ def load_session_state():
         "risk_control_activated": bool(d.get("risk_control_activated", False)),
         "updated_timestamp": str(d.get("updated_timestamp", "") or ""),
         "booked_profit": float(d.get("booked_profit", 0.0)),
-        "closed_cycle_count": max(0, int(d.get("closed_cycle_count", d.get("closed_cycle_count", 0)))),
+        "closed_cycle_count": max(0, int(d.get("closed_cycle_count", 0))),
         "last_closed_snapshot": d.get("last_closed_snapshot"),
         "last_closed_cycle_id": str(d.get("last_closed_cycle_id", "") or ""),
-        "closed_cycles": d.get("closed_cycles", d.get("closed_cycles", [])),
-        "active_cycle_id": d.get("active_cycle_id", d.get("active_cycle_id")),
-        "active_cycle_tags": d.get("active_cycle_tags", d.get("active_cycle_tags", [])),
-        "active_cycle_started_at": d.get("active_cycle_started_at", d.get("active_cycle_started_at")),
+        "closed_cycles": d.get("closed_cycles", []),
+        "active_cycle_id": d.get("active_cycle_id"),
+        "active_cycle_tags": d.get("active_cycle_tags", []),
+        "active_cycle_started_at": d.get("active_cycle_started_at"),
         "liquidation_pending": bool(d.get("liquidation_pending", False)),
     }
 
@@ -98,7 +98,11 @@ def save_session_state(
         "last_closed_snapshot": last_closed_snapshot,
         "last_closed_cycle_id": str(last_closed_cycle_id or ""),
         "liquidation_pending": bool(liquidation_pending),
-        # Dual-write during migration to preserve historical readers.
+        "closed_cycle_count": max(0, int(closed_cycle_count)),
+        "closed_cycles": list(closed_cycles or []),
+        "active_cycle_id": active_cycle_id,
+        "active_cycle_tags": list(active_cycle_tags or []),
+        "active_cycle_started_at": active_cycle_started_at,
     })
 
 
