@@ -177,11 +177,11 @@ def cycle_risk_metrics(
         premium_paid = float((quantities * buy_prices).sum())
 
     # Count all trade rows in this cycle, including realized/closed positions.
-    book_quantities = pd.to_numeric(
+    cycle_quantities = pd.to_numeric(
         rows["QTY"] if "QTY" in rows else pd.Series(0, index=rows.index),
         errors="coerce",
     ).fillna(0).abs()
-    book_trade_count = int((book_quantities > 0).sum())
+    cycle_trade_count = int((cycle_quantities > 0).sum())
 
     ce_qty = pe_qty = ce_investment = pe_investment = 0.0
     if not active_cycle_rows.empty and {"SYMBOL", "QTY", "SELL_PRC"}.issubset(active_cycle_rows.columns):
@@ -216,7 +216,7 @@ def cycle_risk_metrics(
         target_multiplier > 0
         and ce_qty > 0
         and pe_qty > 0
-        and book_trade_count > 0
+        and cycle_trade_count > 0
         and premium_paid > 0
         and cycle_pnl >= target
     )
@@ -228,9 +228,8 @@ def cycle_risk_metrics(
         "target_pct": target_pct,
         "minimum_pnl": minimum_pnl,
         "investment_target": investment_target,
-        "active_count": book_trade_count,
-        "book_trade_count": book_trade_count,
-        "cycle_trade_count": book_trade_count,
+        "active_count": cycle_trade_count,
+        "cycle_trade_count": cycle_trade_count,
         "ce_qty": ce_qty,
         "pe_qty": pe_qty,
         "ce_investment": ce_investment,
@@ -331,5 +330,3 @@ def compute_stop_conditions(current_game_pnl, historical_peak, active_count=2):
     return winners_peak_brick, unified_stop, stop_breached, target_breached
 
 
-# Compatibility for integrations importing the historical function name.
-cycle_closed_book_snapshot = cycle_closed_snapshot
