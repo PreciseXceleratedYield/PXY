@@ -208,7 +208,7 @@ def liquidate_and_exit(
             int(state.get("closed_book_count", 0)) + 1
         )
         snapshot["book_id"] = state["closed_book_count"]
-            snapshot["cycle_id"] = state["closed_book_count"]
+        snapshot["cycle_id"] = state["closed_book_count"]
         state["last_closed_snapshot"] = snapshot
         state["last_closed_cycle_id"] = cycle_id
         state["closed_books"] = [
